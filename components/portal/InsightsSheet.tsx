@@ -92,6 +92,43 @@ function RhythmHeatmap({ nodes, compact = false }: { nodes: LifeNode[]; compact?
   );
 }
 
+// 图5:「你最近反复在想」用饼图呈现(类别 × 次数),点图例进记忆
+const MIND_PIE_COLORS = ['var(--portal-blue-deep)', 'var(--status-gentle)', 'var(--status-go)', 'var(--status-calm)', 'var(--portal-cool-accent)', 'var(--status-risk)'];
+function MindPie({ items, onPick, dict }: { items: Array<[string, number]>; onPick: (tag: string) => void; dict: string }) {
+  const top = items.slice(0, 6);
+  const total = top.reduce((s, [, c]) => s + c, 0) || 1;
+  const R = 40, C = 50, CIRC = 2 * Math.PI * R;
+  let acc = 0;
+  return (
+    <div className="nesio-mindpie">
+      <svg viewBox="0 0 100 100" className="nesio-mindpie-svg" role="img" aria-label={L(dict, '反复在想的类别占比', 'What is on your mind, by share')}>
+        {top.map(([tag, c], i) => {
+          const dash = (c / total) * CIRC;
+          const el = (
+            <circle key={tag} cx={C} cy={C} r={R} fill="none"
+              stroke={MIND_PIE_COLORS[i % MIND_PIE_COLORS.length]} strokeWidth={16}
+              strokeDasharray={`${dash} ${CIRC}`} strokeDashoffset={-acc}
+              transform={`rotate(-90 ${C} ${C})`} />
+          );
+          acc += dash;
+          return el;
+        })}
+        <text x={C} y={C - 1} textAnchor="middle" className="nesio-mindpie-num">{total}</text>
+        <text x={C} y={C + 12} textAnchor="middle" className="nesio-mindpie-lbl">{L(dict, '次', 'times')}</text>
+      </svg>
+      <div className="nesio-mindpie-legend">
+        {top.map(([tag, c], i) => (
+          <button key={tag} type="button" className="nesio-mindpie-leg" onClick={() => onPick(tag)}>
+            <span className="nesio-mindpie-dot" style={{ background: MIND_PIE_COLORS[i % MIND_PIE_COLORS.length] }} aria-hidden />
+            <span className="nesio-mindpie-leg-name">{tag}</span>
+            <span className="nesio-mindpie-leg-val">{c}{L(dict, ' 次', '')}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ── Living Model(Lab 内部保留):confidence bar + 节点图 builders ───────────────
 
 function ConfidenceBar({ value }: { value: number }) {
@@ -687,15 +724,8 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
                   <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '你最近反复在想', 'On your mind lately')}</p>
                   <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '近 30 天', 'last 30 days')}</span>
                 </div>
-                <div className="nesio-theme-doors" style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '0.55rem' }}>
-                  {doors.map(([tag, count]) => (
-                    <button key={tag} type="button" className="nesio-theme-door" onClick={() => openInMemory(tag)}
-                      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.15rem', padding: '0.55rem 0.9rem', borderRadius: '0 0 var(--radius-sm, 12px) var(--radius-sm, 12px)', borderTop: '2px solid var(--portal-accent-border)', border: '1px solid var(--portal-line)', borderTopWidth: '2px', borderTopColor: 'var(--portal-accent-border)', background: 'var(--portal-bg)', cursor: 'pointer', minWidth: '4.2rem' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--portal-ink)', fontSize: '0.86rem' }}>{tag}</span>
-                      <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{count}{L(dict, ' 次', '')}</span>
-                    </button>
-                  ))}
-                </div>
+                {/* 图5:改用饼图呈现「反复在想」的类别占比,点图例进记忆 */}
+                <MindPie items={doors} onPick={openInMemory} dict={dict} />
               </div>
             )}
 

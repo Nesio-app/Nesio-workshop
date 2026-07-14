@@ -12,6 +12,7 @@ import { L, t } from '@/lib/portal/i18n';
 import { usePortalLocale } from './use-portal-locale';
 import { IconChevronRight, IconHalfMoon, IconLink, IconLock, IconMoon, IconShield, IconSun } from './icons';
 import { InfoTip } from './InfoTip';
+import { useSheetDrag } from './use-sheet-drag';
 import { captureLocationEnabled, setCaptureLocationEnabled } from '@/lib/portal/capture-location';
 import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
@@ -28,15 +29,16 @@ interface SheetProps { open: boolean; onClose: () => void; }
 
 function SheetWrap({ open, onClose, title, tip, children }: SheetProps & { title: string; tip?: string; children: React.ReactNode }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  // 图1:顶部横线拖动(上拉全屏 / 下滑关闭),取代右上角 ✕
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
   if (!open) return null;
   return (
     <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={title}>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-settings-sheet-card">
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-settings-sheet-card--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
         <div className="nesio-settings-sheet-header">
           <h2 className="nesio-settings-sheet-title">{title}{tip && <InfoTip text={tip} />}</h2>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
         <div className="nesio-settings-sheet-body">{children}</div>
       </div>
@@ -248,52 +250,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
 export const ToneSheet = GeneralSheet;
 
 // ── 档案(批次 138·设计「档案与账户分开」):昵称 + 头像,从账户拆出 ──
-export function ProfileSheet({ open, onClose, onPickAvatar }: SheetProps & { onPickAvatar: () => void }) {
-  const locale = usePortalLocale();
-  const dict = portalLocaleToDictionaryLocale(locale);
-  const [name, setName] = useState('');
-  const [savedTip, setSavedTip] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const p = loadProfileSettings();
-    setName(p.displayName && p.displayName !== '我' ? p.displayName : '');
-    setSavedTip(false);
-  }, [open]);
-
-  function saveName() {
-    saveProfileSettings({ displayName: name.trim() || '我' }); // PROFILE_UPDATED_EVENT → 全站头像/称呼即时更新
-    setSavedTip(true);
-  }
-
-  return (
-    <SheetWrap open={open} onClose={onClose} title={L(dict, '档案', 'Profile')}>
-      <p className="nesio-settings-section-label">{L(dict, '资料', 'Profile')}</p>
-      <input
-        type="text"
-        className="nesio-ob-input"
-        placeholder={L(dict, '念念这样称呼你', 'What Nessa calls you')}
-        value={name}
-        maxLength={24}
-        aria-label={L(dict, '昵称', 'Nickname')}
-        onChange={(e) => { setName(e.target.value); setSavedTip(false); }}
-        onBlur={saveName}
-      />
-      <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '0.5rem' }} onClick={saveName}>
-        {savedTip ? L(dict, '✓ 已保存', '✓ Saved') : L(dict, '保存昵称', 'Save nickname')}
-      </button>
-
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '头像', 'Avatar')}</p>
-      <button type="button" className="nesio-settings-option" onClick={onPickAvatar}>
-        <div>
-          <span className="nesio-settings-option-label">{L(dict, '更换头像', 'Change avatar')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, '上传照片 · 自动画成卡通形象', 'Upload a photo · auto-drawn as a cartoon')}</span>
-        </div>
-        <span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
-      </button>
-    </SheetWrap>
-  );
-}
+// 图3:ProfileSheet(档案页)已删除 —— 昵称与更换头像并入 AccountSheet(账户)。
 
 // ── 外观与语言(批次 138:从通用拆出;明暗 + 语言。配色仍在「数据与隐私·实验功能」预览门控下)──
 export function AppearanceSheet({ open, onClose }: SheetProps) {
@@ -1031,17 +988,19 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
  * AccountSheet — 账户管理页(QA:此前账号信息散落)。邮箱 / 套餐 / 修改密码 /
  * 恢复购买(随 App 版开放)/ 删除账号(转隐私面板)/ 退出登录。
  */
-export function AccountSheet({ open, onClose, onOpenMembership }: SheetProps & { onOpenMembership: () => void }) {
+export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: SheetProps & { onOpenMembership: () => void; onPickAvatar: () => void }) {
   const locale = usePortalLocale();
   const dict = portalLocaleToDictionaryLocale(locale);
   const [email, setEmail] = useState('');
   const [loggedIn, setLoggedIn] = useState(false);
-  const [newPw, setNewPw] = useState('');
-  const [pwMsg, setPwMsg] = useState('');
-  const [pwBusy, setPwBusy] = useState(false);
+  const [name, setName] = useState('');
+  const [savedTip, setSavedTip] = useState(false);
 
   useEffect(() => {
     if (!open) return;
+    const p = loadProfileSettings();
+    setName(p.displayName && p.displayName !== '我' ? p.displayName : '');
+    setSavedTip(false);
     fetch('/api/auth/session', { cache: 'no-store' })
       .then((r) => r.json())
       .then((d: { loggedIn?: boolean; user?: { email?: string } }) => {
@@ -1051,20 +1010,9 @@ export function AccountSheet({ open, onClose, onOpenMembership }: SheetProps & {
       .catch(() => {});
   }, [open]);
 
-  async function changePassword() {
-    if (newPw.length < 8 || pwBusy) { setPwMsg(L(dict, '密码至少 8 位。', 'At least 8 characters.')); return; }
-    setPwBusy(true); setPwMsg('');
-    try {
-      const res = await fetch('/api/auth/password', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mode: 'change', newPassword: newPw }),
-      });
-      const data = await res.json() as { ok?: boolean; error?: string };
-      if (data.ok) { setPwMsg(L(dict, '✓ 密码已更新', '✓ Password updated')); setNewPw(''); }
-      else if (data.error === 'reauth_required') setPwMsg(L(dict, '登录状态过期了,请重新登录后再改。', 'Session expired — sign in again to change it.'));
-      else setPwMsg(L(dict, '没改成,稍后再试。', 'Could not change it — try again later.'));
-    } catch { setPwMsg(L(dict, '网络错误,稍后再试。', 'Network error — try again later.')); }
-    setPwBusy(false);
+  function saveName() {
+    saveProfileSettings({ displayName: name.trim() || '我' }); // PROFILE_UPDATED_EVENT → 全站头像/称呼即时更新
+    setSavedTip(true);
   }
 
   async function signOut() {
@@ -1080,8 +1028,29 @@ export function AccountSheet({ open, onClose, onOpenMembership }: SheetProps & {
 
   return (
     <SheetWrap open={open} onClose={onClose} title={L(dict, '账户', 'Account')}>
+      {/* 图3:昵称 + 头像从「档案」并入账户(档案页已删) */}
+      <p className="nesio-settings-section-label">{L(dict, '资料', 'Profile')}</p>
+      <input
+        type="text"
+        className="nesio-ob-input"
+        placeholder={L(dict, '念念这样称呼你', 'What Nessa calls you')}
+        value={name}
+        maxLength={24}
+        aria-label={L(dict, '昵称', 'Nickname')}
+        onChange={(e) => { setName(e.target.value); setSavedTip(false); }}
+        onBlur={saveName}
+      />
+      <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '0.5rem' }} onClick={saveName}>
+        {savedTip ? L(dict, '✓ 已保存', '✓ Saved') : L(dict, '保存昵称', 'Save nickname')}
+      </button>
+      <button type="button" className="nesio-settings-option" style={{ marginTop: '0.6rem' }} onClick={onPickAvatar}>
+        <span className="nesio-settings-option-label">{L(dict, '更换头像', 'Change avatar')}</span>
+        <span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
+      </button>
+
       {!loggedIn ? (
         <>
+          <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '账户', 'Account')}</p>
           <p style={{ fontSize: '0.88rem', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
             {L(dict, '还没登录。登录后可跨设备同步、连接邮箱/日历。', 'Not signed in. Sign in to sync across devices and connect email/calendar.')}
           </p>
@@ -1091,25 +1060,12 @@ export function AccountSheet({ open, onClose, onOpenMembership }: SheetProps & {
         </>
       ) : (
         <>
+          <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '账户', 'Account')}</p>
           <div style={rowStyle}><span style={{ color: 'var(--portal-muted)' }}>{L(dict, '邮箱', 'E-mail')}</span><span>{email || '—'}</span></div>
           <button type="button" onClick={onOpenMembership} style={{ ...rowStyle, width: '100%', background: 'none', border: 'none', borderBottom: '1px solid var(--portal-line)', color: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
             <span style={{ color: 'var(--portal-muted)' }}>{L(dict, '套餐', 'Plan')}</span>
             <span>{tierLabel} ›</span>
           </button>
-
-          <p className="nesio-settings-section-label" style={{ marginTop: '1.2rem' }}>{L(dict, '修改密码', 'Change password')}</p>
-          <input
-            type="password"
-            className="nesio-ob-input"
-            placeholder={L(dict, '新密码(至少 8 位)', 'New password (8+ characters)')}
-            value={newPw}
-            onChange={(e) => setNewPw(e.target.value)}
-            autoComplete="new-password"
-          />
-          <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '0.5rem' }} onClick={changePassword} disabled={pwBusy || newPw.length < 8}>
-            {pwBusy ? L(dict, '更新中…', 'Updating…') : L(dict, '更新密码', 'Update password')}
-          </button>
-          {pwMsg && <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', marginTop: '0.4rem' }}>{pwMsg}</p>}
 
           <p className="nesio-settings-section-label" style={{ marginTop: '1.2rem' }}>{L(dict, '购买', 'Purchases')}</p>
           {/* 随 App 版 StoreKit 开放;disabled={true} 满足 no-inert-buttons 契约的显式禁用标注 */}
@@ -1118,7 +1074,7 @@ export function AccountSheet({ open, onClose, onOpenMembership }: SheetProps & {
             <span style={{ fontSize: '0.72rem' }}>{L(dict, '随 App 版开放', 'Coming with the App version')}</span>
           </button>
 
-          {/* 批次 138:删除账号入口收口到「数据与隐私」(去掉散落重复);此处只留退出。 */}
+          {/* 图1b:改密码移到登录/忘记密码流程,账户页不再放。删除账号入口在「数据与隐私」。 */}
           <p className="nesio-settings-section-label" style={{ marginTop: '1.2rem' }}>{L(dict, '会话', 'Session')}</p>
           <button type="button" onClick={signOut} style={{ ...rowStyle, width: '100%', background: 'none', border: 'none', borderBottom: 'none', color: 'var(--status-risk)', cursor: 'pointer', textAlign: 'left' }}>
             <span>{L(dict, '退出登录', 'Sign out')}</span>

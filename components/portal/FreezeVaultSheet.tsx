@@ -20,6 +20,7 @@ import { IconSnowflake } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { useSheetDrag } from './use-sheet-drag';
 
 interface FreezeVaultSheetProps {
   open: boolean;
@@ -51,6 +52,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   useEffect(() => {
     if (!open) return;
@@ -164,14 +166,14 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
 
   return (
     <div className="nesio-freeze-overlay" onClick={onClose}>
-      <div className="nesio-freeze-sheet" onClick={(e) => e.stopPropagation()}>
+      <div className={`nesio-freeze-sheet${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle} onClick={(e) => e.stopPropagation()}>
+        <div className="nesio-sheet-grip" {...handleProps} />
         <div className="nesio-freeze-header">
           <span className="nesio-freeze-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><IconSnowflake size={16} /> {L(dict, '冷冻仓', 'Freeze vault')}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button type="button" className="nesio-rewards-pts-badge" onClick={() => setTab('rewards')} title={L(dict, '积分 · 点开奖品仓库', 'Points · open rewards')}>
               ⬡ {points} {L(dict, '积分', 'pts')}
             </button>
-            <button type="button" className="nesio-freeze-close" onClick={onClose}>✕</button>
           </div>
         </div>
         <p className="nesio-freeze-hint">{L(dict, '冲动想买？先冻 24 小时，冷静一下再决定', 'Impulse buy? Freeze it 24 hours and decide with a cool head')}</p>

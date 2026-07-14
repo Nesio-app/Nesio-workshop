@@ -14,6 +14,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
+import { useSheetDrag } from '../use-sheet-drag';
 
 /**
  * 专注时长入统计(批次 6 用户问「这个数据有进入统计范围么」——此前没有):
@@ -84,6 +85,7 @@ export function FocusModeSheet({ node, onClose, onDone }: {
   }, [running]);
 
   useSheetDismiss(!!node, onClose);
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   if (!node) return null;
 
@@ -103,8 +105,8 @@ export function FocusModeSheet({ node, onClose, onDone }: {
   return (
     <div className="nesio-focus-mode-overlay" role="dialog" aria-modal aria-label={L(dict, '聚焦模式', 'Focus mode')}>
       <div className="nesio-focus-mode-backdrop" onClick={onClose} />
-      <div className="nesio-focus-mode-sheet">
-        <button type="button" className="nesio-focus-mode-close" onClick={onClose} aria-label={L(dict, '退出聚焦', 'Exit focus')}>✕</button>
+      <div className={`nesio-focus-mode-sheet${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-grip" {...handleProps} />
 
         <p className="nesio-focus-mode-label">{L(dict, '现在专注于', 'Focusing on')}</p>
         <h2 className="nesio-focus-mode-title">{node.name}</h2>

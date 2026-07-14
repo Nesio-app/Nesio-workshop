@@ -9,6 +9,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { useSheetDrag } from './use-sheet-drag';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -23,6 +24,7 @@ export default function PreviewGuidesSheet({ open, onClose }: { open: boolean; o
   const dict = portalLocaleToDictionaryLocale(locale);
   const [seeded, setSeeded] = useState(false);
   const [msg, setMsg] = useState('');
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   useEffect(() => { if (open) { try { setSeeded(hasSampleData()); } catch { setSeeded(false); } setMsg(''); } }, [open]);
 
@@ -101,10 +103,10 @@ export default function PreviewGuidesSheet({ open, onClose }: { open: boolean; o
   return (
     <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '预览引导', 'Preview guides')}>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-settings-sheet-card">
+      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-settings-sheet-card--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
         <div className="nesio-settings-sheet-header">
           <h2 className="nesio-settings-sheet-title">{L(dict, '预览引导 · 模拟运行', 'Preview guides · Dry run')}</h2>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
         <div className="nesio-settings-sheet-body">
           <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>

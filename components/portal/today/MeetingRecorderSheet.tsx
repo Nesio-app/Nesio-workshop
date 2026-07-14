@@ -13,6 +13,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
+import { useSheetDrag } from '../use-sheet-drag';
 
 type SpeechRecAPI = {
   continuous: boolean;
@@ -149,14 +150,15 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
     `${Math.floor(s / 60).toString().padStart(2, '0')}:${(s % 60).toString().padStart(2, '0')}`;
 
   useSheetDismiss(open, onClose);
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   if (!open) return null;
 
   return (
     <div className="nesio-recorder-overlay" role="dialog" aria-modal aria-label={L(dict, '会议记录', 'Meeting notes')}>
       <div className="nesio-recorder-backdrop" onClick={onClose} />
-      <div className="nesio-recorder-sheet">
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-recorder-sheet${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
 
         {saved ? (
           <div className="nesio-recorder-saved">

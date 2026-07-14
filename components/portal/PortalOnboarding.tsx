@@ -346,11 +346,11 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
   const steps: TourStep[] = [
     { Icon: IconTarget, title: t(locale, 'onboardingTipTodayTitle'), body: t(locale, 'onboardingTipTodayBody'), target: 'today', place: 'above' },
     { Icon: IconSmile, title: L(dict, '今天第一拍:心情', "Today's first beat: mood"), body: L(dict, '这里点一下心情,记下此刻的情绪和精力 —— 后面洞察会把它连成规律。', 'Tap here to log how you feel and your energy — Insights weaves it into patterns later.'), target: 'mood', place: 'auto' },
-    { Icon: IconMic, title: t(locale, 'onboardingTipCenterTitle'), body: t(locale, 'onboardingTipCenterBody'), target: 'center', place: 'above', round: true, tap: true },
+    { Icon: IconMic, title: L(dict, '存一条试试', 'Save one — try it'), body: L(dict, '点中间按钮:说一句、拍一下、或收一条链接,先存成草稿。存一条试试。', 'Tap the center button — say a line, snap a photo, or drop in a link. It saves as a draft. Try saving one.'), target: 'center', place: 'above', round: true, tap: true },
     { Icon: IconZap, title: L(dict, '任务太大?拆一下', 'Too big? Break it down'), body: L(dict, '今天要紧的事上点「拆一下」—— 把一件大事拆成 3 个立刻能动手的小步。', 'On a focus item, tap "Break down" — a big task becomes 3 steps you can start right now.'), target: 'breakdown', place: 'below' },
     { Icon: IconStar, title: t(locale, 'onboardingTipMemoryTitle'), body: L(dict, '你记过的一切都在「记忆」里。长按任意卡片:标为核心记忆,或加进某个项目。', 'Everything you noted lives in Memory. Long-press any card: mark it Core, or add it to a Project.'), target: 'memory', place: 'above' },
     { Icon: IconBulb, title: L(dict, '洞察:把点连成线', 'Insights: connect the dots'), body: L(dict, '点左上角这个晶体进洞察 —— 心情、关系、足迹、花销会被连成规律,轻轻提醒。', 'Tap this crystal top-left for Insights — mood, people, places and spending linked into gentle patterns.'), target: 'insights', place: 'below' },
-    { Icon: IconMic, title: L(dict, '长按这里有惊喜', 'Long-press here for a surprise'), body: L(dict, '长按中间按钮松手,直接问念念「护照放哪」「上次买的药」—— 记过的都能找回。', 'Long-press & release the center button to ask Nessa "Where’s my passport?" — anything noted comes back.'), target: 'center', place: 'above', round: true, tap: true, longpress: true },
+    { Icon: IconMic, title: L(dict, '长按中间按钮有惊喜', 'Long-press the center for a surprise'), body: L(dict, '长按中间按钮松手,调出「问一问」—— 直接问念念「护照放哪」「上次买的药」,记过的都能找回。试试长按。', 'Long-press & release the center button to open Ask — ask Nessa "Where’s my passport?" or "that medicine I bought"; anything noted comes back. Give it a long-press.'), target: 'center', place: 'above', round: true, tap: true, longpress: true },
   ];
   const cur = steps[step];
   const StepIcon = cur.Icon;
@@ -418,11 +418,11 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
     return { VH, bw, gap, pad, place, left, caretX };
   })();
 
-  // 可交互步:浮层放行点击(pointer-events:none),让用户真的点/长按目标;其余步照旧遮挡。
+  // 可交互步:不再放行点真实按钮(会打开拍/说/收把导览盖住、卡在原步),改为在高亮处盖一个
+  // 透明命中区,点它=完成这步直接进下一步/收尾。既有「点一下试试」的手感,又保证能往下走。
   const overlayCls = [
     'nesio-coach-overlay',
     geo ? '' : 'nesio-coach-overlay--dim',
-    cur.tap ? 'nesio-coach-overlay--pass' : '',
   ].filter(Boolean).join(' ');
 
   return (
@@ -430,6 +430,12 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
       {geo && rect && (
         <div className="nesio-coach-spot" aria-hidden
           style={{ left: rect.left - geo.pad, top: rect.top - geo.pad, width: rect.width + geo.pad * 2, height: rect.height + geo.pad * 2, borderRadius: cur.round ? '50%' : 16 }} />
+      )}
+      {cur.tap && geo && rect && (
+        <button type="button" className="nesio-coach-hit"
+          aria-label={cur.longpress ? L(dict, '长按这个按钮试试', 'Long-press this button') : L(dict, '点一下这个按钮试试', 'Tap this button')}
+          style={{ left: rect.left - geo.pad, top: rect.top - geo.pad, width: rect.width + geo.pad * 2, height: rect.height + geo.pad * 2, borderRadius: cur.round ? '50%' : 16 }}
+          onClick={() => (isLast ? onDone() : setStep(step + 1))} />
       )}
       {geo && rect ? (
         <div key={step} className={`nesio-coach-bubble nesio-coach-bubble--${geo.place}`}

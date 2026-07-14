@@ -14,6 +14,7 @@ const ReaderSheetLazy = dynamicImport(() => import('./ArticleReaderSheet'), { ss
 const PlacePickerLazy = dynamicImport(() => import('./PlacePickerSheet'), { ssr: false });
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { useSheetDrag } from './use-sheet-drag';
 const TYPE_BG_DETAIL: Record<string, string> = {
   person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
   event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
@@ -680,6 +681,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
     return () => { cancelled = true; };
   }, [node?.id, node?.assets]);
 
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
+
   if (!node || deleted) return null;
   const n = node;
 
@@ -848,8 +851,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
         </div>
       )}
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-settings-sheet-card">
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
 
         {/* Type color strip */}
         {/* 类型色条:tint 走 CSS 变量,夜间由 CSS 混暗 —— 直接 inline background 会让
@@ -870,10 +873,6 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
           ) : (
             <h2 className="nesio-settings-sheet-title" title={n.name}>{displayTitle(displayNodeName(n.name, dict))}</h2>
           )}
-          {/* 批次 125(设计详情页):右上恒为 ✕;阅读原文/回复 挪到来源行下方做显眼按钮排 */}
-          {/* 批次 150(QA #2):X 点不掉 —— 有透明元素盖在其上拦点击。抬 z-index + 关闭形自成栈,保证最上层可点。 */}
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}
-            style={{ position: 'relative', zIndex: 5, flexShrink: 0 }}>✕</button>
         </div>
 
         {/* Expanded edit form — type-specific fields */}

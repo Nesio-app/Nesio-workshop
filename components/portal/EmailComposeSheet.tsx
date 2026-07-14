@@ -12,6 +12,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { rememberAI, recallAI, sig } from '@/lib/portal/ai-cache';
 import { draftLocally } from '@/lib/portal/local-draft';
+import { useSheetDrag } from './use-sheet-drag';
 
 export interface EmailComposeContext {
   emailId?: string;
@@ -76,6 +77,8 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
     setError('');
     setDraftSource(null);
   }, [open, context.from, context.subject]);
+
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   if (!open) return null;
 
@@ -178,11 +181,10 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '写邮件', 'Compose email')} style={{ zIndex: 60 }}>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-settings-sheet-card" style={{ display: 'flex', flexDirection: 'column', maxHeight: '88vh' }}>
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={{ ...cardStyle, display: 'flex', flexDirection: 'column', maxHeight: '88vh' }}>
+        <div className="nesio-sheet-handle" {...handleProps} />
         <div className="nesio-settings-sheet-header">
           <h2 className="nesio-settings-sheet-title">{L(dict, '回复邮件', 'Reply')}</h2>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
 
         {sent ? (

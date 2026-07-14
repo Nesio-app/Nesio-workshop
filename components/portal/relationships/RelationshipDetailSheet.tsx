@@ -11,6 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getLifeGraph, addLifeNode, updateLifeNode } from '@/lib/portal/life-graph';
 import { buildPersonProfile, type PersonProfile } from '@/lib/portal/relationship-profile';
 import { markContacted, lastContactLabel, CLOSENESS_META } from '@/lib/portal/relationships';
+import { setRelationshipOverride, type OverrideCloseness } from '@/lib/portal/relationship-overrides';
 import {
   loadPersonRecords, deletePersonRecord,
   RECORD_CATEGORY_MAP, type PersonRecord,
@@ -22,6 +23,7 @@ import { IconLock } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { useSheetDrag } from '../use-sheet-drag';
 
 interface Props {
   contactKey: string | null;
@@ -66,10 +68,14 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   const fileRef = useRef<HTMLInputElement>(null);
   const [records, setRecords] = useState<PersonRecord[]>([]);
   const [hangOpen, setHangOpen] = useState(false); // 「挂一条」独立确认卡弹窗
+  const [relDraft, setRelDraft] = useState(''); // 图4:关系词编辑草稿
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   const rebuild = () => {
     if (!contactKey) { setProfile(null); setRecords([]); return; }
-    setProfile(buildPersonProfile(getLifeGraph(), contactKey));
+    const prof = buildPersonProfile(getLifeGraph(), contactKey);
+    setProfile(prof);
+    setRelDraft(prof?.contact?.relation ?? '');
     setRecords(loadPersonRecords(contactKey));
   };
 
@@ -138,8 +144,8 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={p.displayName}>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-settings-sheet-card">
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
 
         {/* 身份头 */}
         <div className="nesio-rel-detail-head">
@@ -171,7 +177,6 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
               {c?.reachOut && <span className="nesio-rel-pill nesio-rel-pill--due">{L(dict, '该联系了', 'Reach out')}</span>}
             </div>
           </div>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
 
         <div className="nesio-settings-sheet-body">
@@ -192,6 +197,33 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                   <span className="nesio-rel-stat-value">{s.value}</span>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* 图4:关系可改 —— 亲疏三档 + 关系词(推错时手动校正,只存本机) */}
+          {c && (
+            <div className="nesio-fit-panel" style={{ marginTop: '0.5rem' }}>
+              <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '关系 · 可修改', 'Relationship · editable')}</p>
+              <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem' }}>
+                {(['core', 'close', 'acquaintance'] as OverrideCloseness[]).map((cl) => (
+                  <button key={cl} type="button" aria-pressed={c.closeness === cl}
+                    onClick={() => setRelationshipOverride(p.key, { closeness: cl })}
+                    style={{ flex: 1, padding: '0.4rem 0', fontSize: '0.8rem', borderRadius: 'var(--radius-sm, 12px)', border: '1px solid var(--portal-line)', cursor: 'pointer',
+                      background: c.closeness === cl ? 'var(--portal-accent-soft-md)' : 'transparent',
+                      color: c.closeness === cl ? 'var(--portal-ink)' : 'var(--portal-muted)', fontWeight: c.closeness === cl ? 700 : 500 }}>
+                    {L(dict, CLOSENESS_META[cl].zh, CLOSENESS_META[cl].en)}
+                  </button>
+                ))}
+              </div>
+              <input type="text" className="nesio-ob-input"
+                placeholder={L(dict, '关系词,如:同事、大学同学(留空=自动)', 'Relationship, e.g. coworker (blank = auto)')}
+                value={relDraft} maxLength={16}
+                onChange={(e) => setRelDraft(e.target.value)}
+                onBlur={() => setRelationshipOverride(p.key, { relation: relDraft.trim() })}
+                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
+              <p className="nesio-settings-option-hint" style={{ margin: '0.35rem 0 0' }}>
+                {L(dict, '改了只影响这个人的亲疏与联系节奏,只存本机。', "Only affects this person's closeness & reminder cadence — stored on-device.")}
+              </p>
             </div>
           )}
 

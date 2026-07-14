@@ -28,6 +28,7 @@ import { looksLikeTask } from '@/lib/portal/task-heuristics';
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { canUsePaidCloudAi, isPro } from '@/lib/portal/entitlement';
 import { usePortalLocale } from './use-portal-locale';
+import { useSheetDrag } from './use-sheet-drag';
 
 interface VoiceInputSheetProps {
   open: boolean;
@@ -311,6 +312,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   const inputRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<{ stop: () => void } | null>(null);
   const isAskMode = intent === 'ask';
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   useEffect(() => {
     if (open) prefetchCaptureLocation(); // 批次 56:说一句打开即预热定位
@@ -557,8 +559,8 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
     <>
     <div className="nesio-voice-sheet" role="dialog" aria-modal="true" aria-label={isAskMode ? L(dict, '问念念', 'Ask Nessa') : L(dict, '说一句', 'Say it')}>
       <div className="nesio-voice-sheet-backdrop" onClick={onClose} />
-      <div className="nesio-voice-sheet-card">
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-voice-sheet-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
 
         <div className="nesio-voice-sheet-header">
           <h2 className="nesio-voice-sheet-title">{isAskMode ? L(dict, '问念念', 'Ask Nessa') : L(dict, '说一句', 'Say it')}</h2>

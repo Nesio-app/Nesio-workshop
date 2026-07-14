@@ -4,18 +4,19 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { clearProfileIdentity, loadProfileSettings, readAvatarFile, saveProfileSettings } from '@/lib/portal/profile';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { useProfileAvatar } from './use-profile-avatar';
-import { AccountSheet, ProfileSheet, AppearanceSheet, PrivacySheet, SubscriptionSheet, LabSheet } from './SettingsSheets';
+import { AccountSheet, AppearanceSheet, PrivacySheet, SubscriptionSheet, LabSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
 import RoadmapSheet from './RoadmapSheet';
 import RoutineSheet from './RoutineSheet';
 import PreviewGuidesSheet from './PreviewGuidesSheet';
+import { getTier, trialDaysLeft } from '@/lib/portal/entitlement';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
-import { IconClock, IconGear, IconGift, IconUser, IconSun, IconShield, IconHelpCircle, IconBulb } from './icons';
+import { IconClock, IconGift, IconSun, IconShield, IconHelpCircle, IconBulb } from './icons';
 
-// 批次 138 设计「设置重组」;图1:记录习惯并入隐私,Lab 独立成底部入口
-type ActiveSheet = 'profile' | 'account' | 'appearance' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | 'preview' | 'lab' | null;
+// 图3/4/5:档案页删除、账户收进头像区、菜单去分组标题与小灰字
+type ActiveSheet = 'account' | 'appearance' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | 'preview' | 'lab' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
@@ -51,9 +52,11 @@ export default function NesioProfileCard() {
   }, []);
 
   // 批次 12:缺省名「我」是 profile store 的 zh 回落值,英文界面显示 Me
-  const initials = displayName.trim() && displayName.trim() !== '我'
-    ? displayName.trim().slice(0, 1)
-    : L(dict, '我', 'Me');
+  const hasName = displayName.trim() && displayName.trim() !== '我';
+  const shownName = hasName ? displayName.trim() : L(dict, '我', 'Me');
+  const initials = hasName ? displayName.trim().slice(0, 1) : L(dict, '我', 'Me');
+  // 图5:真 Pro(非试用)王冠金色,否则灰色
+  const isPro = getTier() === 'pro' && trialDaysLeft() <= 0;
 
   async function handleLogout() {
     try {
@@ -137,16 +140,10 @@ export default function NesioProfileCard() {
     setCartoonPreview(''); setCartoonSource(''); setCartoonMsg(''); setAvatarSourceFile(null);
   }
 
-  // 批次 138:分组主菜单(档案与账户 / 偏好)+ 底部次要行
-  const menuGroups: Array<{ label: string; items: Array<{ key: ActiveSheet; icon: ReactNode; iconBg: string; label: string; sublabel: string }> }> = [
-    { label: L(dict, '档案与账户', 'Profile & account'), items: [
-      { key: 'profile', icon: <IconUser />, iconBg: 'var(--chip-frost)', label: L(dict, '档案', 'Profile'), sublabel: L(dict, '昵称 · 头像', 'Nickname · avatar') },
-      { key: 'account', icon: <IconGear />, iconBg: 'var(--chip-frost)', label: L(dict, '账户', 'Account'), sublabel: L(dict, '邮箱 · 密码 · 套餐 · 退出', 'Email · password · plan · sign out') },
-    ] },
-    { label: L(dict, '偏好', 'Preferences'), items: [
-      { key: 'appearance', icon: <IconSun />, iconBg: 'var(--chip-indigo)', label: L(dict, '外观与语言', 'Appearance & language'), sublabel: L(dict, '明暗 · 语言', 'Theme · language') },
-      { key: 'privacy', icon: <IconShield />, iconBg: 'var(--chip-blue)', label: L(dict, '数据与隐私', 'Data & privacy'), sublabel: L(dict, '数据接入 · 备份恢复 · 删除区', 'Sources · backup · delete zone') },
-    ] },
+  // 图3/4:档案与账户分组删掉(账户进头像区、档案页删),菜单只留偏好项且不带分组标题/小灰字
+  const menuItems: Array<{ key: ActiveSheet; icon: ReactNode; iconBg: string; label: string }> = [
+    { key: 'appearance', icon: <IconSun />, iconBg: 'var(--chip-indigo)', label: L(dict, '外观与语言', 'Appearance & language') },
+    { key: 'privacy', icon: <IconShield />, iconBg: 'var(--chip-blue)', label: L(dict, '数据与隐私', 'Data & privacy') },
   ];
   // 图1:Lab(实验功能 + 新手提醒/预览引导)从隐私里独立成底部入口
   const bottomItems: Array<{ key: ActiveSheet; icon: ReactNode; label: string }> = [
@@ -159,15 +156,22 @@ export default function NesioProfileCard() {
   return (
     <>
       <div className="nesio-profile-card">
-        {/* Avatar + name + stats */}
+        {/* 图5:头像区 = 头像(Pro 王冠)+ 昵称 + 箭头 → 点进账户;「返回今天」留在右侧 */}
         <div className="nesio-profile-card-top">
           <button
             type="button"
-            className="nesio-profile-avatar-lg"
-            aria-label={L(dict, '上传头像', 'Upload avatar')}
-            onClick={() => avatarInputRef.current?.click()}
+            className="nesio-profile-identity"
+            aria-label={L(dict, '账户', 'Account')}
+            onClick={() => setActiveSheet('account')}
           >
-            {avatarUrl ? <img src={avatarUrl} alt="" draggable={false} onError={refreshAvatar} /> : initials}
+            <span className="nesio-profile-avatar-lg nesio-profile-avatar-lg--nav">
+              {avatarUrl ? <img src={avatarUrl} alt="" draggable={false} onError={refreshAvatar} /> : initials}
+              <span className={`nesio-profile-pro-badge${isPro ? ' nesio-profile-pro-badge--pro' : ''}`} aria-hidden>
+                <svg viewBox="0 0 24 24" width="11" height="11" fill="currentColor"><path d="M3 7l4.5 3.2L12 4l4.5 6.2L21 7l-1.7 11.4a1 1 0 0 1-1 .85H5.7a1 1 0 0 1-1-.85L3 7z"/></svg>
+              </span>
+            </span>
+            <span className="nesio-profile-identity-name">{shownName}</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18" className="nesio-profile-identity-chev"><path d="M9 18l6-6-6-6"/></svg>
           </button>
           <input
             ref={avatarInputRef}
@@ -177,8 +181,7 @@ export default function NesioProfileCard() {
             onChange={(event) => handleAvatarFile(event.currentTarget.files?.[0])}
           />
 
-          {/* 批次 6:数字统计改「返回今天」——设置页最常见的下一步;
-              洞察(原 mirror)从主页左上角 logo 进,不再从这里开 */}
+          {/* 批次 6:数字统计改「返回今天」——设置页最常见的下一步 */}
           <a href="/" className="nesio-profile-stat" aria-label={L(dict, '返回今天', 'Back to Today')}>
             <span className="nesio-profile-stat-label" style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--portal-blue-deep)' }}>{L(dict, '返回今天', 'Back to Today')}</span>
           </a>
@@ -192,24 +195,17 @@ export default function NesioProfileCard() {
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="14" height="14"><path d="M9 18l6-6-6-6"/></svg>
           </a>
         )}
-        {/* 批次 35:顶部退出行删除 —— 邮箱与退出都在「账户」页里,重复入口去掉 */}
 
-        {/* Menu */}
+        {/* 图4:菜单去掉分组标题与每行小灰字,只留图标 + 名称 + 箭头 */}
         <nav className="nesio-profile-menu" aria-label={L(dict, '设置菜单', 'Settings menu')}>
-          {menuGroups.map((group) => (
-            <div key={group.label} className="nesio-profile-menu-group">
-              <p className="nesio-profile-menu-group-label">{group.label}</p>
-              {group.items.map((item) => (
-                <button key={String(item.key)} type="button" className="nesio-profile-menu-item" onClick={() => setActiveSheet(item.key)}>
-                  <span className="nesio-profile-menu-icon" style={{ background: item.iconBg }}>{item.icon}</span>
-                  <div className="nesio-profile-menu-text">
-                    <span className="nesio-profile-menu-label">{item.label}</span>
-                    <span className="nesio-profile-menu-sublabel">{item.sublabel}</span>
-                  </div>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" className="nesio-profile-menu-chevron"><path d="M9 18l6-6-6-6"/></svg>
-                </button>
-              ))}
-            </div>
+          {menuItems.map((item) => (
+            <button key={String(item.key)} type="button" className="nesio-profile-menu-item" onClick={() => setActiveSheet(item.key)}>
+              <span className="nesio-profile-menu-icon" style={{ background: item.iconBg }}>{item.icon}</span>
+              <div className="nesio-profile-menu-text">
+                <span className="nesio-profile-menu-label">{item.label}</span>
+              </div>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16" className="nesio-profile-menu-chevron"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
           ))}
         </nav>
 
@@ -262,8 +258,7 @@ export default function NesioProfileCard() {
       )}
 
       {/* Sub-sheets */}
-      <ProfileSheet open={activeSheet === 'profile'} onClose={() => setActiveSheet(null)} onPickAvatar={() => { setActiveSheet(null); setTimeout(() => avatarInputRef.current?.click(), 80); }} />
-      <AccountSheet open={activeSheet === 'account'} onClose={() => setActiveSheet(null)} onOpenMembership={() => setActiveSheet('subscription')} />
+      <AccountSheet open={activeSheet === 'account'} onClose={() => setActiveSheet(null)} onOpenMembership={() => setActiveSheet('subscription')} onPickAvatar={() => { setActiveSheet(null); setTimeout(() => avatarInputRef.current?.click(), 80); }} />
       <AppearanceSheet open={activeSheet === 'appearance'} onClose={() => setActiveSheet(null)} />
       <PrivacySheet open={activeSheet === 'privacy'} onClose={() => setActiveSheet(null)} onOpenConnect={() => setActiveSheet('connectors')} />
       <SubscriptionSheet open={activeSheet === 'subscription'} onClose={() => setActiveSheet(null)} />
