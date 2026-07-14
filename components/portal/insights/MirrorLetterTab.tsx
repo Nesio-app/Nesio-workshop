@@ -366,9 +366,6 @@ export default function MirrorLetterTab() {
             <p className="nesio-mirror-writing">{L(dict, `${L(dict, activeMirror.name, activeMirror.nameEn)}正在读你${monthLabel}的记录…`, `${L(dict, activeMirror.name, activeMirror.nameEn)} is reading your ${monthLabel}…`)}</p>
           ) : (
             <>
-              <p className="nesio-mirror-empty-line">
-                {L(dict, `${activeMirror.name}读完你${monthLabel}的记录,写给你一封信。`, `${activeMirror.nameEn} reads your ${monthLabel} notes and writes to you.`)}
-              </p>
               {errorText && <p className="nesio-mirror-error">{errorText}</p>}
               <button type="button" className="nesio-mirror-action nesio-mirror-action--primary" onClick={() => void generate()} disabled={nodeCount < 10 && !error}>
                 {nodeCount < 10 && !error

@@ -88,16 +88,18 @@ export default function PlacePickerSheet({ raw, lat, lon, onClose, onRenamed }: 
           />
           <button type="submit" className="nesio-fin-review-accept" disabled={!text.trim()}>{L(dict, '保存', 'Save')}</button>
         </form>
-        {/* 批次 63:手动命名也能挑分类(候选自带分类,手填的自己选) */}
-        <div className="nesio-placepick-cats">
+        {/* 分类收进下拉框(此前一整墙 chip 太占地方) */}
+        <select
+          className="nesio-fin-select nesio-placepick-select"
+          value={kindPick}
+          onChange={(e) => setKindPick(e.target.value as PlaceCategory | '')}
+          aria-label={L(dict, '选择分类', 'Category')}
+        >
+          <option value="">{L(dict, '选择分类(可选)', 'Category (optional)')}</option>
           {(Object.entries(PLACE_CATEGORY_META) as Array<[PlaceCategory, { zh: string; en: string }]>).map(([k, meta]) => (
-            <button key={k} type="button"
-              className={`nesio-placepick-cat${kindPick === k ? ' is-on' : ''}`}
-              onClick={() => setKindPick((v) => (v === k ? '' : k))}>
-              {L(dict, meta.zh, meta.en)}
-            </button>
+            <option key={k} value={k}>{L(dict, meta.zh, meta.en)}</option>
           ))}
-        </div>
+        </select>
         <p className="nesio-memmap-list-title" style={{ marginTop: '0.7rem' }}>{L(dict, '附近的地方', 'Places nearby')}{loading ? ' …' : ''}</p>
         {!loading && diagHint(diag) && (
           <p className="nesio-settings-option-hint" style={{ color: diag.startsWith('err_') || diag === 'off' ? 'var(--status-gentle)' : 'var(--portal-muted)', margin: '0 0 0.3rem' }}>

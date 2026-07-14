@@ -449,11 +449,36 @@ export default function TimelineTab() {
             <span className="nesio-tl-day">{dayLabel(dateKey)}</span>
             <button type="button" className="nesio-fin-monthnav" disabled={dayIdx <= 0} onClick={() => setDayIdx((i) => Math.max(0, i - 1))} aria-label={L(dict, '后一天', 'Next day')}>›</button>
           </div>
-          <div className="nesio-tl-stats">
-            <div className="nesio-tl-stat"><span className="nesio-tl-stat-v">{stats.visits}</span><span className="nesio-tl-stat-l">{L(dict, '个到访', 'visits')}</span></div>
-            <div className="nesio-tl-stat"><span className="nesio-tl-stat-v">{fmtDur(stats.dwellMin)}</span><span className="nesio-tl-stat-l">{L(dict, '停留', 'dwell')}</span></div>
-            {stats.moveKm > 0 && <div className="nesio-tl-stat"><span className="nesio-tl-stat-v">{fmtDist(stats.moveKm)}</span><span className="nesio-tl-stat-l">{L(dict, '移动', 'moved')}</span></div>}
-          </div>
+          {/* 设计对齐 Google Timeline:🚗 驾车 · 🚶 步行 · 📍 到访(有分模式数据就分开显示)*/}
+          {(() => {
+            const moves = journey.filter((it): it is Extract<typeof it, { kind: 'move' }> => it.kind === 'move');
+            const sum = (m: 'drive' | 'walk') => moves.filter((it) => it.mode === m).reduce((a, it) => ({ km: a.km + it.km, min: a.min + it.durationMin }), { km: 0, min: 0 });
+            const drive = sum('drive');
+            const walk = sum('walk');
+            const jstat = (icon: string, km: number, min: number, label: string) => (
+              <div className="nesio-tl-jstat">
+                <span className="nesio-tl-jstat-ic" aria-hidden>{icon}</span>
+                <div className="nesio-tl-jstat-body">
+                  <span className="nesio-tl-jstat-v">{km > 0 ? fmtDist(km) : label}</span>
+                  {min >= 1 && <span className="nesio-tl-jstat-sub">{fmtDur(min)}</span>}
+                </div>
+              </div>
+            );
+            return (
+              <div className="nesio-tl-stats nesio-tl-stats--journey">
+                {drive.km > 0 && jstat('🚗', drive.km, drive.min, '')}
+                {walk.km > 0 && jstat('🚶', walk.km, walk.min, '')}
+                {drive.km === 0 && walk.km === 0 && stats.moveKm > 0 && jstat('🚗', stats.moveKm, 0, '')}
+                <div className="nesio-tl-jstat">
+                  <span className="nesio-tl-jstat-ic" aria-hidden>📍</span>
+                  <div className="nesio-tl-jstat-body">
+                    <span className="nesio-tl-jstat-v">{stats.visits}</span>
+                    <span className="nesio-tl-jstat-sub">{L(dict, '到访', 'visits')}</span>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
           <div className="nesio-tl-journey">
             {journey.map((it, i) => it.kind === 'visit' ? (
               <div key={i} className="nesio-tl-item nesio-tl-item--visit">

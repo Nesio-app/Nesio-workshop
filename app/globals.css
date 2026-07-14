@@ -13257,6 +13257,13 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 .nesio-tl-stat { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.15rem; }
 .nesio-tl-stat-v { font-size: 1.05rem; font-weight: 700; color: var(--portal-ink); }
 .nesio-tl-stat-l { font-size: 0.66rem; color: var(--portal-muted); }
+/* Google-timeline 风格的当日出行统计(驾车/步行/到访) */
+.nesio-tl-stats--journey { align-items: stretch; }
+.nesio-tl-jstat { flex: 1; display: flex; align-items: center; gap: 0.45rem; min-width: 0; }
+.nesio-tl-jstat-ic { font-size: 1.1rem; line-height: 1; flex-shrink: 0; }
+.nesio-tl-jstat-body { display: flex; flex-direction: column; min-width: 0; }
+.nesio-tl-jstat-v { font-size: 0.98rem; font-weight: 700; color: var(--portal-ink); line-height: 1.15; }
+.nesio-tl-jstat-sub { font-size: 0.66rem; color: var(--portal-muted); }
 .nesio-tl-journey { position: relative; padding-left: 1.1rem; }
 .nesio-tl-journey::before { content: ''; position: absolute; left: 4px; top: 8px; bottom: 8px; width: 2px; background: var(--portal-line); border-radius: 1px; }
 .nesio-tl-item { position: relative; display: flex; gap: 0.7rem; align-items: center; padding: 0.4rem 0; }
@@ -16916,6 +16923,7 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
   border: 1px solid var(--portal-line); background: none; color: var(--portal-muted); cursor: pointer;
 }
 .nesio-placepick-cat.is-on { background: var(--portal-accent-soft); color: var(--portal-blue-deep); border-color: var(--portal-blue-deep); font-weight: 600; }
+.nesio-placepick-select { width: 100%; margin-top: 0.55rem; }
 .nesio-imgzoom-overlay { position: fixed; inset: 0; z-index: 440; display: grid; place-items: center; }
 .nesio-imgzoom-backdrop { position: absolute; inset: 0; background: rgba(10, 16, 30, 0.82); border: none; cursor: pointer; }
 .nesio-imgzoom-img { position: relative; max-width: 94vw; max-height: 86dvh; border-radius: 0.8rem; box-shadow: 0 12px 48px rgba(0,0,0,0.5); }
