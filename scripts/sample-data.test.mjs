@@ -43,13 +43,13 @@ assert.equal(new Set(ids).size, ids.length, 'externalId 无重复');
 const types = new Set(nodes.map((n) => n.type));
 assert.ok(types.has('person'), '有人物');
 assert.ok(types.has('commitment'), '有提醒/承诺');
-assert.ok(types.has('place'), '有位置');
+assert.ok(types.has('note'), '有笔记'); // 批次 174:place 退役,原「巷口咖啡馆」位置改为 note
 assert.ok(types.has('health_state'), '有心情');
 assert.ok(nodes.some((n) => n.source === 'email'), '有邮件来源');
 assert.ok(nodes.some((n) => n.source === 'calendar'), '有日历来源');
 
-// 位置带经纬度(足迹世界地图要用)
-const cafe = nodes.find((n) => n.type === 'place');
+// 带经纬度的地点笔记(足迹世界地图读的是 lat/lon,与节点类型无关 —— place 退役后仍留几何信息)
+const cafe = nodes.find((n) => n.attributes.externalId === 'sample-cafe');
 assert.ok(typeof cafe.attributes.lat === 'number' && typeof cafe.attributes.lon === 'number', '位置带经纬度');
 
 // 心情带情绪语义(今天页第一拍/洞察情绪)

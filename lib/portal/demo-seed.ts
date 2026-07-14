@@ -87,7 +87,7 @@ export const DEMO_SEED_NODES: LifeNode[] = [
   },
   {
     id: 'demo-cafe',
-    type: 'place',
+    type: 'note', // 批次 174:place 类型退役
     name: '巷口咖啡馆',
     source: 'manual',
     confidence: 1,

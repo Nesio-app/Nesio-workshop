@@ -70,8 +70,8 @@ export function buildSampleNodes(): IngestNodeInput[] {
       rawInput: '答应妈妈这周末回个电话',
       attributes: { externalId: 'sample-todo-callmom', dueDate: iso(2, 19), owner: '我', priority: 'medium' } },
 
-    // ── 位置（足迹 · 常去）──
-    { type: 'place', name: '巷口咖啡馆', source: 'manual', confidence: 1,
+    // ── 地方笔记（批次 174:place 类型退役 —— 无真实数据源,真实地点走「足迹」与物品 location 属性）──
+    { type: 'note', name: '巷口咖啡馆', source: 'manual', confidence: 1,
       relations: [], tags: t(['地点']),
       rawInput: '巷口那家咖啡馆下午人少,写东西效率很高',
       attributes: { externalId: 'sample-cafe', category: 'cafe', note: '靠窗的位置最好', lat: 40.0308, lon: -105.2925, city: 'Boulder', country: '美国' } },

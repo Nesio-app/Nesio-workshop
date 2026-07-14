@@ -225,7 +225,8 @@ const TYPE_LABEL_EN: Record<string, string> = {
 function typeLabel(t: string, dict: DictLocale): string {
   return (dict === 'en' ? TYPE_LABEL_EN : TYPE_LABEL_ZH)[t] ?? t;
 }
-const TYPE_ORDER = ['person', 'object', 'place', 'event', 'commitment', 'health_state', 'preference', 'note'];
+// 批次 174:'place' 从类型筛选芯片移除(退役 —— 无真实数据源)。老 place 节点仍在「全部」里渲染,清除样例即消失。
+const TYPE_ORDER = ['person', 'object', 'event', 'commitment', 'health_state', 'preference', 'note'];
 
 
 const COPY = {

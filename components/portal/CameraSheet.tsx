@@ -206,7 +206,8 @@ async function getCurrentLocation(): Promise<{ lat: number; lon: number } | null
 
 // ── Node type chips ──────────────────────────────────────────────────────────
 
-const ALL_TYPES = ['object', 'person', 'place', 'event', 'commitment', 'health_state', 'preference'] as const;
+// 批次 174:'place' 退役 —— 不再让相机把东西归类成「位置」(无真实数据源;真实地点走足迹/物品 location)
+const ALL_TYPES = ['object', 'person', 'event', 'commitment', 'health_state', 'preference'] as const;
 
 function buildPendingImageResult(dict: string = 'zh', reason: 'auth' | 'free_tier' = 'auth'): AnalysisResult {
   return {

@@ -7,7 +7,7 @@
 export type LifeNodeType =
   | 'person'
   | 'object'
-  | 'place'
+  | 'place' // 批次 174 退役:不再生产/不再进类型选择器,仅作墓碑保留(老节点仍能渲染 PlaceSection)。勿重新加进 TYPE_ORDER/ALL_TYPES。
   | 'event'
   | 'commitment'
   | 'health_state'

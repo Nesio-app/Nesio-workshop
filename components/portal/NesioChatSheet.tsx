@@ -290,7 +290,25 @@ async function buildMemoryContext(query: string, convoHint = ''): Promise<{ cont
     }
   }
 
-  // Assemble: date matches HEAD → email (if asked) → upcoming → search → recent
+  // 批次 174:手动关联喂进检索(闭环)—— 你在记忆详情里亲手 user_linked 的两条,
+  // 问到其中一条,另一条就一起进上下文。只从"话题命中"(日期命中 + 搜索命中)顺藤,
+  // 不从 upcoming/recent 噪音节点扩,避免把整张图拉进来。上限 6 条护住上下文预算。
+  const byId = new Map(graph.map((n) => [n.id, n]));
+  const hitIds = new Set([...dateNodes, ...searchNodes].map((n) => n.id));
+  const linkedNodes: LifeNode[] = [];
+  const linkedSeen = new Set<string>();
+  for (const hit of [...dateNodes, ...searchNodes]) {
+    if (linkedNodes.length >= 6) break;
+    for (const rel of hit.relations || []) {
+      if (rel.relation !== 'user_linked') continue;
+      if (hitIds.has(rel.targetId) || linkedSeen.has(rel.targetId)) continue;
+      const t = byId.get(rel.targetId);
+      if (t && !isWeatherNode(t)) { linkedSeen.add(rel.targetId); linkedNodes.push(t); }
+      if (linkedNodes.length >= 6) break;
+    }
+  }
+
+  // Assemble: date matches HEAD → email (if asked) → upcoming → search → linked → recent
   const seen = new Set<string>();
   const head: LifeNode[] = [];
   const body: LifeNode[] = [];
@@ -299,6 +317,7 @@ async function buildMemoryContext(query: string, convoHint = ''): Promise<{ cont
   for (const n of emailNodes) { if (!seen.has(n.id)) { seen.add(n.id); head.push(n); } }
   for (const n of upcomingNodes) { if (!seen.has(n.id)) { seen.add(n.id); head.push(n); } }
   for (const n of searchNodes) { if (!seen.has(n.id)) { seen.add(n.id); body.push(n); } }
+  for (const n of linkedNodes) { if (!seen.has(n.id)) { seen.add(n.id); body.push(n); } }
   // Fill remaining slots with recent nodes
   for (const n of graph.slice(0, 10)) {
     if (seen.has(n.id)) continue;
@@ -315,6 +334,7 @@ async function buildMemoryContext(query: string, convoHint = ''): Promise<{ cont
     ...dateNodes.map((n): [LifeNode, RefCandidate['layer']] => [n, 'date']),
     ...emailNodes.map((n): [LifeNode, RefCandidate['layer']] => [n, 'email']),
     ...searchNodes.map((n): [LifeNode, RefCandidate['layer']] => [n, 'search']),
+    ...linkedNodes.map((n): [LifeNode, RefCandidate['layer']] => [n, 'search']),
   ];
   for (const [n, layer] of layered) {
     if (refSeen.has(n.id)) continue;
