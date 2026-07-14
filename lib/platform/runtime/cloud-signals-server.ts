@@ -60,7 +60,10 @@ async function signalRow(identityKey: string, userId: string | null, signal: Sig
     embedding_vector: embedding.ok ? embedding.values : null,
     embedding_updated_at: embedding.ok ? new Date().toISOString() : null,
     feedback: {},
-    updated_at: new Date().toISOString(),
+    // 逻辑修改时间(编辑时刻),不是同步时刻。多端并发编辑时,谁的编辑更新谁胜,
+    // 而非「谁最后同步」—— 否则旧副本批量回传会盖掉新编辑(数据审计 #3)。
+    // DB 端 supabase-signals-conflict-guard-v1.sql 触发器据此拒绝严格更旧的写入。
+    updated_at: signal.modifiedAt || signal.capturedAt || new Date().toISOString(),
     deleted_at: null,
   };
 }

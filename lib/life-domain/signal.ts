@@ -67,7 +67,10 @@ export interface Signal {
   source: SignalSource;
   type: SignalType;
   occurredAt: string; // when the fact happened
-  capturedAt: string; // when the system recorded it
+  capturedAt: string; // when the system recorded it (creation)
+  /** 逻辑修改时间(最近一次编辑)。多端同步据此定胜负,而非同步时刻。
+   *  缺失(旧信号)回退 capturedAt。见数据审计 #3 冲突解决。 */
+  modifiedAt?: string;
   title: string;
   /** Canonical lightweight fact payload. Prefer this for new code. */
   payload?: Record<string, unknown>;
@@ -160,7 +163,7 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
     : NODE_TYPE_TO_SIGNAL[node.type] ?? 'observation';
   const payload = {
     ...Object.fromEntries(
-      Object.entries(node.attributes).filter(([key]) => !key.startsWith('signal') && key !== 'context'),
+      Object.entries(node.attributes).filter(([key]) => !key.startsWith('signal') && key !== 'context' && key !== 'updatedAt'),
     ),
     // Cutover(2026-07-04):投影保真字段——原 NODE_TYPE_TO_SIGNAL 映射有损
     // (object/person/preference 均折叠为 observation),signalToLifeNode
@@ -182,12 +185,17 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
     (typeof node.attributes['occurredAt'] === 'string' && node.attributes['occurredAt']) ||
     node.createdAt;
 
+  const modifiedAt =
+    (typeof node.attributes['updatedAt'] === 'string' && node.attributes['updatedAt']) ||
+    node.createdAt;
+
   return {
     id: signalId,
     source,
     type: signalType,
     occurredAt: String(occurredAt),
     capturedAt: node.createdAt,
+    modifiedAt: String(modifiedAt),
     title: node.name,
     payload,
     content: node.rawInput || payload,
@@ -239,6 +247,7 @@ export function signalToLifeNode(signal: Signal): LifeNode {
   attributes.signalSource = signal.source;
   attributes.signalType = signal.type;
   attributes.occurredAt = signal.occurredAt;
+  if (signal.modifiedAt) attributes.updatedAt = signal.modifiedAt;
   if (signal.context) attributes.context = JSON.stringify(signal.context);
 
   return {

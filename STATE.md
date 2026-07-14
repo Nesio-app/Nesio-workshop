@@ -118,11 +118,18 @@ sensitivity/retention 枚举化(中期)。
   当前仍是本地桩(服务端强制已能兜底,这步是把客户端展示也对齐)。
 - **数据全维度审计遗留(2026-07-14 记)**:已修 P0 越权(伪造 openid 跨用户读写云记忆 —— 所有
   据 openid 生成身份/会话的路径改走 `verifiedWechatOpenid`/`hasVerifiedSessionCookie` 验签)。
+  已修:③ 实体解析(`entity-resolution.ts` 规范化 + 别名归一,读时收敛,接进 buildRelationships)、
+  ⑤ 导出到本地文件(设置页 handleExportLocal 下载 combined backup JSON)、
+  **② 云同步 last-write-wins**(2026-07-14 做):根因是 `signalRow.updated_at` 盖同步时刻
+  `new Date()` 而非编辑时刻 —— 陈旧副本批量回传反而更新,盖掉新编辑。修法两半:
+  (a) 给编辑记逻辑修改时间——`life-graph.addLifeNode/updateLifeNode` stamp `attributes.updatedAt`,
+  经 `Signal.modifiedAt` 投影(不进 payload,避免误触重嵌入),`signalRow.updated_at` 改盖
+  `signal.modifiedAt`;(b) DB 端 `supabase-signals-conflict-guard-v1.sql` BEFORE UPDATE 触发器
+  拒绝严格更旧的写入(RETURN OLD),race-free 永不丢新编辑 —— **须在 Supabase 手动执行一次**(inert until applied)。
+  契约 `test:cloud-conflict`。
   仍开(按报告严重度):① 云备份非 E2E(应用层明文 + service-role,敏感标签不拦上云)→ 落
-  客户端 WebCrypto 或修正隐私文案;② 云同步 last-write-wins(多设备并发丢更新)→ 至少比 updated_at;
-  ③ 无实体解析(记忆是「半图」非知识图谱,同名实体不收敛)→ 实体唯一化 + 别名归一;
-  ④ 被遗忘权残留(telemetry 按 device_id 逃逸账号删除、无 TTL;云删单节点是软删 deleted_at;
-  auth.users 未删)→ 补 device 级删除 + 保留 TTL + 软删 GC;⑤ 无「导出到本地文件」按钮(现只推云)。
+  客户端 WebCrypto 或修正隐私文案;④ 被遗忘权残留(telemetry 按 device_id 逃逸账号删除、无 TTL;
+  云删单节点是软删 deleted_at;auth.users 未删)→ 补 device 级删除 + 保留 TTL + 软删 GC。
 
 **契约测试提示**:`test:contracts`(100+ 套,CI 只跑 test:security 的 18 套)
 在 2026-07-04 全量修复过一轮——历史重构造成的 15 处 marker 漂移已对齐,

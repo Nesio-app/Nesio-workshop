@@ -961,10 +961,18 @@ export function registerNodeFactSink(sink: NodeFactSink): void {
 
 export function addLifeNode(node: Omit<LifeNode, 'id' | 'createdAt'>): LifeNode {
   const nodes = loadAll();
+  const createdAt = new Date().toISOString();
   const newNode: LifeNode = {
     ...node,
     id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-    createdAt: new Date().toISOString(),
+    createdAt,
+    // 逻辑修改时间(编辑时刻)。多端同步据此定胜负 —— 而非「谁最后同步」,
+    // 否则旧副本批量回传会覆盖新编辑(数据审计 #3:云同步 last-write-wins 丢数据)。
+    // 导入/恢复若已带 updatedAt,尊重原值;新建时 = createdAt。
+    attributes: {
+      ...node.attributes,
+      updatedAt: typeof node.attributes?.updatedAt === 'string' ? node.attributes.updatedAt : createdAt,
+    },
   };
   nodes.unshift(newNode);
   saveAll(nodes);
@@ -981,7 +989,12 @@ export function updateLifeNode(id: string, patch: Partial<LifeNode>): boolean {
   const nodes = loadAll();
   const idx = nodes.findIndex((n) => n.id === id);
   if (idx < 0) return false;
-  nodes[idx] = { ...nodes[idx], ...patch };
+  const merged = { ...nodes[idx], ...patch };
+  // 每次编辑刷新逻辑修改时间 —— 多端同步据此定胜负(数据审计 #3)。
+  // patch 显式带 updatedAt(如恢复历史版本)则尊重,否则记为当前时刻。
+  const patchStamp = typeof patch.attributes?.updatedAt === 'string' ? patch.attributes.updatedAt : undefined;
+  merged.attributes = { ...merged.attributes, updatedAt: patchStamp ?? new Date().toISOString() };
+  nodes[idx] = merged;
   saveAll(nodes);
   nodeFactSink?.upsert(nodes[idx]);
   void syncLifeGraphUpsertToCloud(nodes[idx]);
