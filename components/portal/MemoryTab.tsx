@@ -17,6 +17,7 @@ import {
   isPrivateExternalNode,
   mergeCloudMemorySnapshot,
   retryLifeGraphCloudSync,
+  updateLifeNode,
   type LifeNode,
 } from '@/lib/portal/life-graph';
 import { pinNodeToTodayFocus } from '@/lib/platform/view-models/today-commands';
@@ -523,54 +524,50 @@ function LongPressSheet({
 }) {
   const dict = useDict();
   const activeProjects = projects.filter((p) => p.status === 'active');
+  const [showProj, setShowProj] = useState(false);
+  // 批次 171:收纳 = 把这条记忆变成 object 节点 + 「收纳」域标(收纳就是 object 节点投影)
+  const addToInventory = () => {
+    const live = getLifeGraph().find((x) => x.id === node.id);
+    const tags = live?.tags || [];
+    updateLifeNode(node.id, { type: 'object', tags: tags.includes('收纳') ? tags : [...tags, '收纳'] });
+    onClose();
+  };
+  // 批次 171(用户实锤·对标微信长按):竖排文字按钮 → 图标横排 + 下方小字。
+  // 4 个动作:今日/收藏夹/收纳/项目;去掉「标为核心」(核心已撤)和「分享/复制」。
   return (
     <>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
       <div className="nesio-longpress-sheet">
         <div className="nesio-longpress-node-name">{node.name}</div>
-        {activeProjects.length > 0 && (
-          <>
-            <div className="nesio-longpress-section-label">{L(dict, '加入项目', 'Add to project')}</div>
-            {activeProjects.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                className="nesio-longpress-project-btn"
-                onClick={() => { onAddToProject(p.id); onClose(); }}
-              >
-                {p.emoji} {p.name}
+        <div className="nesio-lp-actions">
+          <button type="button" className="nesio-lp-action" onClick={() => { pinNodeToTodayFocus(node.id); onClose(); }}>
+            <span className="nesio-lp-icon"><IconCalendar size={20} /></span>
+            <span className="nesio-lp-label">{L(dict, '今日', 'Today')}</span>
+          </button>
+          <button type="button" className="nesio-lp-action" onClick={() => { togglePin(node.id); onClose(); }}>
+            <span className={`nesio-lp-icon${isPinned(node.id) ? ' nesio-lp-icon--on' : ''}`}><IconBookmark size={20} /></span>
+            <span className="nesio-lp-label">{isPinned(node.id) ? L(dict, '已收藏', 'Saved') : L(dict, '收藏夹', 'Save')}</span>
+          </button>
+          <button type="button" className="nesio-lp-action" onClick={addToInventory}>
+            <span className="nesio-lp-icon"><IconBox size={20} /></span>
+            <span className="nesio-lp-label">{L(dict, '收纳', 'Storage')}</span>
+          </button>
+          <button type="button" className="nesio-lp-action" onClick={() => setShowProj((v) => !v)}>
+            <span className={`nesio-lp-icon${showProj ? ' nesio-lp-icon--on' : ''}`}><IconFolder size={20} /></span>
+            <span className="nesio-lp-label">{L(dict, '项目', 'Project')}</span>
+          </button>
+        </div>
+        {showProj && (
+          <div className="nesio-lp-projects">
+            {activeProjects.length > 0 ? activeProjects.map((p) => (
+              <button key={p.id} type="button" className="nesio-longpress-project-btn" onClick={() => { onAddToProject(p.id); onClose(); }}>
+                <IconFolder size={14} /> {p.name}
               </button>
-            ))}
-          </>
+            )) : (
+              <p className="nesio-longpress-no-projects">{L(dict, '还没有项目,先去项目球新建一个', 'No projects yet — create one from the Projects ball')}</p>
+            )}
+          </div>
         )}
-        {activeProjects.length === 0 && (
-          <p className="nesio-longpress-no-projects">{L(dict, '还没有项目，先新建一个项目', 'No projects yet — create one first')}</p>
-        )}
-        {/* 批次 50:把一条记忆亲手拉回今天的注意力 —— 进焦点 + 进训练总线 */}
-        <button
-          type="button"
-          className="nesio-longpress-share-btn"
-          onClick={() => { pinNodeToTodayFocus(node.id); onClose(); }}
-        >
-          {L(dict, '加入今日焦点', 'Add to today\'s focus')}
-        </button>
-        <button
-          type="button"
-          className="nesio-longpress-share-btn"
-          onClick={() => { toggleCore(node.id); onClose(); }}
-        >
-          {isCore(node.id) ? L(dict, '取消核心记忆', 'Remove from core') : L(dict, '标为核心记忆', 'Mark as core')}
-        </button>
-        <button
-          type="button"
-          className="nesio-longpress-share-btn"
-          onClick={() => { togglePin(node.id); onClose(); }}
-        >
-          {isPinned(node.id) ? L(dict, '取消收藏', 'Unpin') : L(dict, '收藏到首页', 'Pin to home')}
-        </button>
-        <button type="button" className="nesio-longpress-share-btn" onClick={() => { onShare(); onClose(); }}>
-          {L(dict, '分享 / 复制', 'Share / Copy')}
-        </button>
         <button type="button" className="nesio-longpress-cancel-btn" onClick={onClose}>{L(dict, '取消', 'Cancel')}</button>
       </div>
     </>

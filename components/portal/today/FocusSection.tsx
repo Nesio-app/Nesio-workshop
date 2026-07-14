@@ -336,9 +336,10 @@ export function TodayFocusSection({
                   onChange={(e) => { capture.onChange(e.target.value); growJot(); }}
                   onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); capture.onSubmit(); } }}
                   onFocus={(e) => {
-                    // 批次 167:键盘错位修复 —— 聚焦后等键盘升起,把输入框滚到可见区(否则被键盘挡住)
+                    // 批次 167→171:键盘错位 —— 聚焦后等键盘升起,把输入框滚到刚好可见(nearest,
+                    // 不再 center 留大空隙);优先用 visualViewport 精确定位到键盘上沿。
                     const el = e.currentTarget;
-                    setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch { /* ignore */ } }, 320);
+                    setTimeout(() => { try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch { /* ignore */ } }, 320);
                   }}
                   placeholder={L(dict, '点话筒说一句,或记一下…', 'Tap the mic to speak, or jot…')}
                 />

@@ -9270,11 +9270,13 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   padding: 5px 16px; border-radius: 999px;
 }
 .nesio-tl-capture-save:active { filter: brightness(0.94); }
-/* 批次 169:记下 = 小号实心 ↑ 圆钮(去掉虚线态,缩小到 24px) */
+/* 批次 169→171:记下 = 小号实心 ↑ 圆钮。必须带 .nesio-today-root button 前缀盖过全局 44px
+   触控最小值(否则被撑成 44px,比输入框还大 —— 用户实锤)。缩到 22px。 */
+.nesio-today-root button.nesio-tl-capture-send,
 .nesio-tl-capture-send {
   flex-shrink: 0;
-  width: 24px; height: 24px;
-  min-width: 24px; min-height: 24px;
+  width: 22px; height: 22px;
+  min-width: 22px; min-height: 22px;
   border-radius: 50%;
   border: none;
   background: var(--portal-accent);
@@ -13829,6 +13831,22 @@ html[data-portal-theme="night"] .nesio-longpress-sheet { background: #1a1f2e; }
   border-bottom: 1px solid var(--portal-line);
   margin-bottom: 0.25rem;
 }
+/* 批次 171:长按菜单图标横排(对标微信长按 —— 图标 + 下方小字) */
+.nesio-lp-actions { display: flex; justify-content: space-around; gap: 4px; padding: 0.7rem 0 0.4rem; }
+.nesio-lp-action {
+  flex: 1;
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  background: none; border: none; cursor: pointer; padding: 4px 2px;
+}
+.nesio-lp-icon {
+  width: 46px; height: 46px; border-radius: 14px;
+  display: grid; place-items: center;
+  background: var(--portal-accent-soft, rgba(0,0,0,0.05));
+  color: var(--portal-ink);
+}
+.nesio-lp-icon--on { background: var(--portal-accent); color: #fff; }
+.nesio-lp-label { font-size: 0.72rem; color: var(--portal-muted); }
+.nesio-lp-projects { display: flex; flex-direction: column; gap: 6px; padding: 0.3rem 0 0.2rem; }
 .nesio-longpress-section-label {
   font-size: 0.72rem;
   font-weight: 600;
