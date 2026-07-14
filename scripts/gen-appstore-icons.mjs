@@ -3,7 +3,7 @@
  *
  * 产物:
  *  - public/appstore/nesio-icon-1024.png  —— App Store 营销图标,1024×1024,**不透明**
- *    (苹果拒收带 alpha 的图标),深蓝渐变底 + 居中发光立方(草稿,可替换)。
+ *    (苹果拒收带 alpha 的图标),雾霾蓝浅渐变底(淡蓝为底)+ 居中发光立方。
  *  - public/icons/nesio-pwa-{192,512}.png  —— PWA「any」图标,不透明。
  *  - public/icons/nesio-pwa-512-maskable.png —— maskable,mark 缩到安全区(~66%)。
  *  - public/icons/nesio-apple-touch-180.png —— iOS 主屏图标,不透明。
@@ -40,16 +40,17 @@ const MARK_INNER = `
     <path d="M15.35898384862245,30.000000000000004 L50,50 L84.64101615137756,30.000000000000004 M50,50 L50,90"></path>
   </g>`;
 
-/** 组合一张不透明图标 SVG:深蓝渐变底 + 居中 mark(coverage = mark 占边长比例)。 */
+/** 组合一张不透明图标 SVG:雾霾蓝浅渐变底 + 居中 mark(coverage = mark 占边长比例)。 */
 function iconSvg(size, coverage) {
   const mark = size * coverage;
   const off = (size - mark) / 2;
   const s = mark / 100;
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
     <defs>
-      <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0" stop-color="#0b1b34"></stop>
-        <stop offset="1" stop-color="#1e3a63"></stop>
+      <linearGradient id="bg" x1="0" y1="0" x2="0.35" y2="1">
+        <stop offset="0" stop-color="#e6f0f6"></stop>
+        <stop offset="0.55" stop-color="#c9dced"></stop>
+        <stop offset="1" stop-color="#9fbcd4"></stop>
       </linearGradient>
     </defs>
     <rect width="${size}" height="${size}" fill="url(#bg)"></rect>
@@ -59,9 +60,9 @@ function iconSvg(size, coverage) {
 
 async function render(size, coverage, out) {
   const svg = iconSvg(size, coverage);
-  // flatten → 去 alpha,不透明(苹果/iOS 要求)
+  // flatten → 去 alpha,不透明(苹果/iOS 要求)。底色改雾霾蓝浅调(淡蓝为底,haze-blue 配色)
   await sharp(Buffer.from(svg))
-    .flatten({ background: '#0b1b34' })
+    .flatten({ background: '#e6f0f6' })
     .png()
     .toFile(join(ROOT, out));
   console.log('wrote', out);

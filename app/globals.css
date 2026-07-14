@@ -9415,9 +9415,10 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   min-width: 26px; min-height: 26px;
   margin: 0;                   /* 左缘 0,圆心 ≈ x13,坐轨上 */
   border-radius: 50%;
-  /* 批次 166·话筒 = 实线圈 + 灰粉背景(用户规格;164 误做成虚线,复原实线并加软填充) */
+  /* 批次 166·话筒 = 实线圈(用户规格;164 误做成虚线已复原,不回退虚线)。
+     批次190 合并:取 agent 更实的 accent 软填充,雾霾蓝等浅底也看得清,但保持实线。 */
   border: 2px solid var(--portal-accent);
-  background: var(--portal-accent-soft);
+  background: var(--portal-accent-soft-md);
   color: var(--portal-accent);
   display: grid; place-items: center;
   cursor: pointer;
