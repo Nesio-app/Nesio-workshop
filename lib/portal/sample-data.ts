@@ -9,9 +9,12 @@
  */
 import { getLifeGraph, deleteLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 import { ingestLifeNode, type IngestNodeInput } from '@/lib/life-domain/ingest-node';
+import { loadProfileSettings } from '@/lib/portal/profile';
 
 export const SAMPLE_TAG = '样例';
 const SAMPLE_EVENT = 'nesio-life-graph-updated';
+
+export type SampleLocale = 'zh' | 'en';
 
 function iso(daysFromNow: number, hour = 10, min = 0): string {
   const d = new Date();
@@ -27,8 +30,13 @@ function lastYear(hour = 9): string {
   return d.toISOString();
 }
 
-/** 样例节点模板(相对日期,每次灌入按当下时间生成)。externalId 幂等键统一 sample- 前缀。 */
-export function buildSampleNodes(): IngestNodeInput[] {
+/** 样例节点模板(相对日期,每次灌入按当下时间生成)。externalId 幂等键统一 sample- 前缀。
+ *  locale='en' 出一套英文样例(不含 Linda 这类杜撰人名,重点导览洞察页/头像进设置/提醒卡手势)。 */
+export function buildSampleNodes(locale: SampleLocale = 'zh'): IngestNodeInput[] {
+  return locale === 'en' ? buildSampleNodesEn() : buildSampleNodesZh();
+}
+
+function buildSampleNodesZh(): IngestNodeInput[] {
   const t = (extra: string[] = []) => [SAMPLE_TAG, ...extra];
   return [
     // ── 人物(关系 tab:核心/家人/朋友/同事)──
@@ -90,6 +98,92 @@ export function buildSampleNodes(): IngestNodeInput[] {
   ];
 }
 
+/** 英文样例 —— 无杜撰人名(只保留 Mom 这类角色),重点是导览:
+ *  ①洞察页的观察与分析(引导点进去)②点头像进设置 ③顶部提醒卡的左滑/右滑/双击手势。 */
+function buildSampleNodesEn(): IngestNodeInput[] {
+  const t = (extra: string[] = []) => [SAMPLE_TAG, ...extra];
+  return [
+    // ── People:只留角色关系,不杜撰名字(关系 tab 有内容但不喧宾夺主）──
+    { type: 'person', name: 'Mom', source: 'manual', confidence: 1, relations: [],
+      tags: t(['family', '联系人']),
+      attributes: { externalId: 'sample-en-mom', category: 'family', relation: 'family', note: 'Loves long walks; worries a little' } },
+
+    // ── 记忆(提到人,攒关系热度)──
+    { type: 'event', name: 'Called Mom on the way home', source: 'manual', confidence: 1,
+      relations: [{ targetId: 'Mom', relation: 'family' }],
+      tags: t(['relationship']), rawInput: 'Called Mom walking home — talked for almost an hour, she sounded happy.',
+      attributes: { externalId: 'sample-en-call-mom', date: iso(-1, 20) } },
+
+    // ── 导览①:洞察页(观察 + 分析,引导点进去)──
+    { type: 'note', name: 'See what Insights noticed this week', source: 'manual', confidence: 1,
+      relations: [], tags: t(['guide']),
+      rawInput: 'Nesio quietly watches your week and turns it into observations. Open Insights (bottom bar) to see your daily rhythm, what keeps coming to mind, and a few threads worth picking back up — tap the pie to explore.',
+      attributes: { externalId: 'sample-en-guide-insights', date: iso(0, 8) } },
+
+    // ── 导览②:点头像进设置 ──
+    { type: 'note', name: 'Tap your avatar to open Settings', source: 'manual', confidence: 1,
+      relations: [], tags: t(['guide']),
+      rawInput: 'Your avatar sits at the top-left. Tap it to reach your profile and Settings — appearance & language, data & privacy, membership, and Lab. That is also where you rename yourself and change your photo.',
+      attributes: { externalId: 'sample-en-guide-avatar', date: iso(0, 8, 30) } },
+
+    // ── 导览③:顶部提醒卡的手势(左滑/右滑/双击)──
+    { type: 'note', name: 'The reminder cards respond to gestures', source: 'manual', confidence: 1,
+      relations: [], tags: t(['guide']),
+      rawInput: 'On the reminder cards up top: swipe left if a nudge is not useful, swipe right to be reminded later, and double-tap when it is useful. No buttons to hunt for.',
+      attributes: { externalId: 'sample-en-guide-gestures', date: iso(0, 9) } },
+
+    // ── 邮件(记忆页来源=邮件)──
+    { type: 'event', name: 'Your Day Ahead', source: 'email', confidence: 1,
+      relations: [], tags: t(['邮件']),
+      rawInput: 'Good morning. One review today, and the afternoon clears up — a good window for a walk. Check Insights for what stood out this week.',
+      attributes: { externalId: 'sample-en-email-daily', from: 'Nesio Digest <digest@nesio.app>', subject: 'Your Day Ahead', date: iso(0, 7), snippet: 'One review today; the afternoon clears up.' } },
+
+    // ── 日历(今天页日程 + 洞察)──
+    { type: 'event', name: 'Product review', source: 'calendar', confidence: 1,
+      relations: [], tags: t(['会议', '日历']),
+      rawInput: 'Product review at 10am — pull together the three key points beforehand.',
+      attributes: { externalId: 'sample-en-cal-review', start: iso(1, 10), end: iso(1, 11), location: 'Room B', participants: 'Product team' } },
+
+    // ── 提醒 / 承诺（今日焦点 · 顶部提醒卡,可练手势）──
+    { type: 'commitment', name: 'Call Mom back this weekend', source: 'manual', confidence: 1,
+      relations: [{ targetId: 'Mom', relation: 'family' }], tags: t(['提醒']),
+      rawInput: 'Promised to call Mom back this weekend.',
+      attributes: { externalId: 'sample-en-todo-callmom', dueDate: iso(2, 19), owner: 'me', priority: 'medium' } },
+
+    // ── 位置（足迹 · 常去）──
+    { type: 'place', name: 'Corner Café', source: 'manual', confidence: 1,
+      relations: [], tags: t(['地点']),
+      rawInput: 'The café on the corner is quiet in the afternoon — good place to write.',
+      attributes: { externalId: 'sample-en-cafe', category: 'cafe', note: 'The window seat is best', lat: 40.0308, lon: -105.2925, city: 'Boulder', country: 'United States' } },
+
+    // ── 心情（今天页第一拍 · 洞察情绪）──
+    { type: 'health_state', name: 'Right now · Calm', source: 'manual', confidence: 1,
+      relations: [], tags: t(['moment', 'feeling', 'calm', 'energy-mid']),
+      rawInput: 'Right now: calm · steady energy',
+      attributes: { externalId: 'sample-en-mood-today', date: iso(0, 14, 20), emotion: 'calm', emotionLabel: 'Calm', emotionQuadrant: 'hv-la', energyValue: 55, energyLevel: 'mid' } },
+
+    // ── 反复在想（洞察·「你最近反复在想」的饼图,同标签≥3 攒出一瓣）──
+    { type: 'note', name: 'Morning pages before the day starts', source: 'manual', confidence: 1,
+      relations: [], tags: t(['reflection']),
+      rawInput: 'Three pages longhand before email. Head feels clearer after.',
+      attributes: { externalId: 'sample-en-reflect-morning', date: iso(-2, 7) } },
+    { type: 'note', name: 'A long walk untangled a decision', source: 'manual', confidence: 1,
+      relations: [], tags: t(['reflection']),
+      rawInput: 'Walked the loop and the stuck decision suddenly made sense.',
+      attributes: { externalId: 'sample-en-reflect-walk', date: iso(-4, 18) } },
+    { type: 'note', name: 'One deep-work block, phone away', source: 'manual', confidence: 1,
+      relations: [], tags: t(['reflection']),
+      rawInput: 'Ninety focused minutes beat the whole scattered afternoon before it.',
+      attributes: { externalId: 'sample-en-reflect-focus', date: iso(-6, 15) } },
+
+    // ── 回顾（去年今日 · 念念翻出旧记忆,顶部提醒卡）──
+    { type: 'event', name: 'My first solo trip to the coast', source: 'manual', confidence: 1,
+      relations: [], tags: t(['回顾']),
+      rawInput: 'First time at the coast on my own — the wind was fierce, and it felt less scary than I expected.',
+      attributes: { externalId: 'sample-en-lastyear-sea', date: lastYear() } },
+  ];
+}
+
 /** 是否已灌过样例。 */
 export function hasSampleData(nodes: LifeNode[] = safeGraph()): boolean {
   return nodes.some((n) => (n.tags ?? []).includes(SAMPLE_TAG));
@@ -99,10 +193,12 @@ function safeGraph(): LifeNode[] {
   try { return getLifeGraph(); } catch { return []; }
 }
 
-/** 灌入样例(幂等:externalId 命中则原地更新)。返回写入条数。调用方保证仅登录态调用。 */
+/** 灌入样例(幂等:externalId 命中则原地更新)。返回写入条数。调用方保证仅登录态调用。
+ *  按当前界面语言选中/英文样例(英文界面 → 英文数据)。 */
 export function seedSampleData(): number {
   if (typeof window === 'undefined') return 0;
-  const nodes = buildSampleNodes();
+  const locale: SampleLocale = String(loadProfileSettings().locale).startsWith('en') ? 'en' : 'zh';
+  const nodes = buildSampleNodes(locale);
   for (const input of nodes) ingestLifeNode(input);
   window.dispatchEvent(new CustomEvent(SAMPLE_EVENT));
   return nodes.length;
