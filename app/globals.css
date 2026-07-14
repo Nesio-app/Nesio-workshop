@@ -7743,7 +7743,17 @@ html[data-portal-theme="night"] .nesio-mood-saved-text { color: #e8eefa; }
   background: rgba(120,140,180,0.3);
   border-radius: 999px;
   margin: 0 auto 1rem;
+  /* 图1:横线成可拖动手柄(上拉全屏 / 下滑关闭) */
+  box-sizing: content-box;
+  padding: 0.5rem 2.5rem;
+  margin-top: -0.2rem;
+  background-clip: content-box;
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
+.nesio-mood-handle:active { cursor: grabbing; }
 
 .nesio-mood-title {
   text-align: center;

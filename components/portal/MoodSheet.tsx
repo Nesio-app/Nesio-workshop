@@ -19,6 +19,7 @@ import { IconBook, IconMoon, IconZap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { useSheetDrag } from './use-sheet-drag';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 
 // ── Journal 历史(批次 6:富文本-lite + 历史时间线 + 搜索)────────────────────
@@ -391,6 +392,14 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
     };
   }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // 横线拖动:下滑关闭沿用各阶段背景点击的语义(journal/energy/thought 保存后再关)
+  const dismiss = useCallback(() => {
+    if (phase === 'journal') { if (journalTab === 'write' && journal.trim()) handleSave({ isJournal: true }); else onClose(); return; }
+    if (phase === 'energy' || phase === 'thought') { handleSave(); return; }
+    onClose();
+  }, [phase, journalTab, journal, handleSave, onClose]);
+  const { handleProps, cardStyle, expanded } = useSheetDrag(dismiss);
+
   if (!open) return null;
 
   if (phase === 'saved') {
@@ -439,8 +448,8 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
     return (
       <div className="nesio-mood-overlay" role="dialog" aria-modal aria-label="Journal">
         <div className="nesio-mood-backdrop" onClick={() => (journalTab === 'write' && journal.trim() ? handleSave({ isJournal: true }) : onClose())} />
-        <div className="nesio-mood-card nesio-mood-card--journal">
-          <div className="nesio-mood-handle" aria-hidden />
+        <div className={`nesio-mood-card nesio-mood-card--journal${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+          <div className="nesio-mood-handle" {...handleProps} />
           <div className="nesio-mood-journal-header">
             <div style={{ display: 'flex', gap: '0.35rem' }}>
               {([['write', L(dict, '写一篇', 'Write')], ['history', L(dict, '历史', 'History')]] as const).map(([id, label]) => (
@@ -544,8 +553,8 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
     return (
       <div className="nesio-mood-overlay" role="dialog" aria-modal aria-label="记录精力">
         <div className="nesio-mood-backdrop" onClick={() => handleSave()} />
-        <div className="nesio-mood-card">
-          <div className="nesio-mood-handle" aria-hidden />
+        <div className={`nesio-mood-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+          <div className="nesio-mood-handle" {...handleProps} />
           <p className="nesio-mood-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             {selectedEm && <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: selectedEm.color, display: 'inline-block' }} />}
             {emLabel(selectedEm, dict)} · {L(dict, '身体里的劲儿呢？', "How's your energy?")}
@@ -582,8 +591,8 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
     return (
       <div className="nesio-mood-overlay" role="dialog" aria-modal aria-label={L(dict, '记录此刻想法', 'Note this thought')}>
         <div className="nesio-mood-backdrop" onClick={() => handleSave()} />
-        <div className="nesio-mood-card">
-          <div className="nesio-mood-handle" aria-hidden />
+        <div className={`nesio-mood-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+          <div className="nesio-mood-handle" {...handleProps} />
           <p className="nesio-mood-title">{L(dict, '留住这一刻', 'Keep this moment')}</p>
           {/* 批次 141·设计心情节:一句话层带情绪·能量·时段上下文(自动带上,不用手填) */}
           <p className="nesio-mood-moment-context">
@@ -609,14 +618,8 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
   return (
     <div className="nesio-mood-overlay" role="dialog" aria-modal aria-label={L(dict, '记录此刻感受', 'Log how you feel')}>
       <div className="nesio-mood-backdrop" onClick={onClose} />
-      <div className="nesio-mood-card">
-        <div className="nesio-mood-handle" aria-hidden />
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label={L(dict, '关闭', 'Close')}
-          style={{ position: 'absolute', top: 10, right: 12, width: 32, height: 32, borderRadius: 999, border: 'none', background: 'rgba(120,140,180,0.12)', color: 'var(--portal-muted)', fontSize: '0.9rem', cursor: 'pointer' }}
-        >✕</button>
+      <div className={`nesio-mood-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-mood-handle" {...handleProps} />
         <p className="nesio-mood-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
           {hoveredEm && <span aria-hidden style={{ width: 9, height: 9, borderRadius: '50%', background: hoveredEm.color, display: 'inline-block' }} />}
           {hoveredEm ? emLabel(hoveredEm, dict) : L(dict, '此刻，是什么感觉？', 'This moment — how does it feel?')}
