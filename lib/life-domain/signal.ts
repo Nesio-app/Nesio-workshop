@@ -245,7 +245,8 @@ export function signalToLifeNode(signal: Signal): LifeNode {
     id: signal.evidence.externalId || signal.id,
     type: (typeof nodeType === 'string' && NODE_TYPES.has(nodeType)
       ? nodeType
-      : SIGNAL_TYPE_TO_NODE[signal.type] ?? 'preference') as LifeNodeType,
+      // 批次 183:兜底 preference → note(见 create-signal.lifeNodeType 同批注)
+      : SIGNAL_TYPE_TO_NODE[signal.type] ?? 'note') as LifeNodeType,
     name: signal.title,
     attributes,
     source: (typeof nodeSource === 'string' && NODE_SOURCES.has(nodeSource)

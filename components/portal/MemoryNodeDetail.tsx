@@ -29,11 +29,11 @@ interface MemoryNodeDetailProps {
 
 const TYPE_LABELS_ZH: Record<string, string> = {
   person: '人物', object: '物品', place: '地点', event: '事件',
-  commitment: '承诺', health_state: '健康状态', preference: '偏好',
+  commitment: '承诺', health_state: '健康状态', preference: '偏好', note: '笔记',
 };
 const TYPE_LABELS_EN: Record<string, string> = {
   person: 'Person', object: 'Item', place: 'Place', event: 'Event',
-  commitment: 'Promise', health_state: 'Health', preference: 'Taste',
+  commitment: 'Promise', health_state: 'Health', preference: 'Taste', note: 'Note',
 };
 
 const PERSON_CATEGORIES: Record<string, string> = {

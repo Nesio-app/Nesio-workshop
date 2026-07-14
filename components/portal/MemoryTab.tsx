@@ -1345,15 +1345,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                     >
                       <IconBox size={12} /> {L(dict, '列表', 'List')}
                     </button>
-                    {(typeCounts['object'] ?? 0) > 0 && (
-                      <button
-                        type="button"
-                        className={`nesio-view-chip${showObjectMap ? ' is-active' : ''}`}
-                        onClick={() => { setShowObjectMap((prev) => !prev); setShowRelationGraph(false); }}
-                      >
-                        <IconMap size={12} /> {L(dict, '地图', 'Map')}
-                      </button>
-                    )}
+                    {/* 批次 183(用户实锤):地图视图删除 */}
                     <button
                       type="button"
                       className={`nesio-view-chip${showRelationGraph ? ' is-active' : ''}`}

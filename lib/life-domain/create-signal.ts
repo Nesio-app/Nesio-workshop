@@ -82,7 +82,9 @@ function lifeNodeType(input: CreateSignalInput): LifeNodeType {
   if (input.source === 'health' || String(input.type).startsWith('health.')) return 'health_state';
   if (String(input.type).includes('location')) return 'place';
   if (input.source === 'photo' || String(input.type).includes('object')) return 'object';
-  return 'preference';
+  // 批次 183(用户实锤「记忆类别很混乱」):兜底从 preference 改 note。
+  // preference 应留给"真偏好"(喜欢/口味),没匹配上的随手记(粘贴URL/一句话)是 note,不是偏好。
+  return 'note';
 }
 
 function primitivePayload(payload: Record<string, unknown> = {}): LifeNode['attributes'] {
