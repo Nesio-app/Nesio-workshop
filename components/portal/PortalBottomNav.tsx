@@ -55,6 +55,7 @@ export default function PortalBottomNav({
       {/* Today */}
       <button
         type="button"
+        data-tour="today"
         className={`nesio-bottom-nav-btn${activeSurface === 'today' ? ' nesio-bottom-nav-btn--active' : ''}`}
         onClick={onToday}
         aria-label="Today"
@@ -70,6 +71,7 @@ export default function PortalBottomNav({
       {/* Nesio center button — tap = 输入, long-press = 问一问 */}
       <button
         type="button"
+        data-tour="center"
         className="nesio-bottom-nav-center"
         aria-label={L(portalLocaleToDictionaryLocale(locale), '记录 / 问一问', 'Capture / Ask')}
         onPointerDown={startPress}
@@ -85,6 +87,7 @@ export default function PortalBottomNav({
       {/* Memory */}
       <button
         type="button"
+        data-tour="memory"
         className={`nesio-bottom-nav-btn${activeSurface === 'memory' ? ' nesio-bottom-nav-btn--active' : ''}`}
         onClick={onMemory}
         aria-label="Memory"

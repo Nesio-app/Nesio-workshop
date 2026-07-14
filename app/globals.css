@@ -5892,6 +5892,110 @@ html[data-portal-theme="night"] .nesio-voice-input { color: #e8eefa; }
   gap: 0.85rem;
   padding: 0.25rem 0 0.5rem;
 }
+
+/* ── 确认卡(说/拍/收共用):念念的话 + 正在成形的记忆卡 + 收进记忆/改一下 ── */
+.nesio-cfm { display: flex; flex-direction: column; gap: 0.9rem; padding: 0.25rem 0 0.4rem; }
+.nesio-cfm-lead { padding-left: 0.9rem; border-left: 2px solid var(--portal-accent-border, rgba(88,140,227,0.3)); }
+.nesio-cfm-lead-nen { display: inline-flex; align-items: center; gap: 0.3rem; font-size: 0.72rem; font-weight: 700; color: var(--portal-blue-deep); }
+.nesio-cfm-lead-text {
+  margin: 0.25rem 0 0;
+  font-family: var(--font-portal-serif), Georgia, serif;
+  font-size: 1rem;
+  line-height: 1.6;
+  color: var(--portal-ink);
+}
+.nesio-cfm-lead-hi { color: var(--portal-blue-deep); font-weight: 600; }
+
+.nesio-cfm-card {
+  background: var(--sheet-opaque, #fff);
+  border: 1px solid var(--portal-line);
+  border-radius: 18px;
+  padding: 0.9rem 1rem 1rem;
+  box-shadow: 0 8px 28px rgba(20,30,60,0.08);
+}
+.nesio-cfm-cardhead { display: flex; align-items: center; justify-content: space-between; }
+.nesio-cfm-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.7rem;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--portal-surface-2, rgba(127,127,127,0.1));
+  color: var(--portal-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+.nesio-cfm-editicon {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--portal-surface-2, rgba(127,127,127,0.08));
+  color: var(--portal-muted);
+}
+.nesio-cfm-title {
+  width: 100%;
+  margin: 0.7rem 0 0.2rem;
+  border: none;
+  background: none;
+  font-family: var(--font-portal-serif), Georgia, serif;
+  font-size: 1.7rem;
+  font-weight: 700;
+  color: var(--portal-ink);
+  padding: 0;
+}
+.nesio-cfm-title:focus { outline: none; }
+.nesio-cfm-tagslabel { margin: 0.85rem 0 0.4rem; font-size: 0.7rem; color: var(--portal-muted); }
+.nesio-cfm-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.nesio-cfm-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.32rem 0.7rem;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+.nesio-cfm-chip--domain { background: var(--portal-blue-deep); color: #fff; }
+.nesio-cfm-chip--tag { background: var(--portal-accent-soft, rgba(88,140,227,0.1)); color: var(--portal-blue-deep); }
+.nesio-cfm-chip-x { opacity: 0.7; font-size: 0.66rem; }
+.nesio-cfm-chip-add {
+  padding: 0.32rem 0.7rem;
+  border-radius: var(--radius-pill, 999px);
+  border: 1px dashed var(--portal-line);
+  color: var(--portal-muted);
+  font-size: 0.78rem;
+}
+.nesio-cfm-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  margin-top: 0.9rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: 12px;
+  background: var(--portal-surface-2, rgba(127,127,127,0.06));
+  color: var(--portal-ink);
+  text-align: left;
+}
+.nesio-cfm-opt-main { font-size: 0.85rem; font-weight: 600; }
+.nesio-cfm-opt-hint { margin-left: auto; font-size: 0.72rem; color: var(--portal-muted); }
+
+.nesio-cfm-actions { display: flex; flex-direction: column; align-items: center; gap: 0.55rem; margin-top: 0.4rem; }
+.nesio-cfm-save {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.55rem;
+  width: 100%;
+  padding: 0.95rem;
+  border-radius: 16px;
+  background: var(--portal-blue-deep, #b06f68);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+}
+.nesio-cfm-save:active { transform: scale(0.99); }
+.nesio-cfm-save-sub { font-size: 0.72rem; font-weight: 500; opacity: 0.85; }
+.nesio-cfm-edit { padding: 0.4rem 1rem; color: var(--portal-muted); font-size: 0.85rem; }
 .nesio-voice-confirm-lead {
   font-size: 0.92rem;
   font-weight: 700;
@@ -7074,6 +7178,53 @@ html[data-portal-theme="night"] .nesio-tips-body { color: #8fa3c0; }
   padding: 0.35rem 0.45rem;
   font-size: 0.72rem;
 }
+.nesio-tips-count { font-size: 0.72rem; color: var(--portal-muted); margin-right: auto; font-variant-numeric: tabular-nums; }
+
+/* ── 聚光式 coach-mark(定位到真实 UI,高亮 + 气泡指过去)── */
+.nesio-coach-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  pointer-events: auto;
+}
+.nesio-coach-overlay--dim { background: rgba(20, 22, 30, 0.55); }
+/* 高亮框:巨大 box-shadow 把四周压暗,只留目标亮着;随步平滑移动 */
+.nesio-coach-spot {
+  position: fixed;
+  box-shadow: 0 0 0 9999px rgba(20, 22, 30, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.55);
+  pointer-events: none;
+  transition: left 0.3s var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)), top 0.3s var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)), width 0.3s var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)), height 0.3s var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1)), border-radius 0.3s var(--ease-out, cubic-bezier(0.4, 0, 0.2, 1));
+}
+.nesio-coach-bubble {
+  position: fixed;
+  pointer-events: auto;
+  background: rgba(255, 255, 255, 0.97);
+  border-radius: 18px;
+  padding: 0.75rem 0.9rem 0.85rem;
+  box-shadow: 0 18px 48px rgba(20, 30, 60, 0.32);
+  animation: coachBubbleIn 0.22s var(--ease-out);
+}
+.nesio-coach-bubble--center {
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%);
+  width: min(20rem, calc(100vw - 2rem)) !important;
+}
+html[data-portal-theme="night"] .nesio-coach-bubble {
+  background: rgba(20, 30, 52, 0.97);
+  border: 1px solid rgba(120, 158, 229, 0.24);
+}
+.nesio-coach-caret {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  background: inherit;
+  border: inherit;
+  transform: translateX(-50%) rotate(45deg);
+}
+.nesio-coach-bubble--above .nesio-coach-caret { bottom: -7px; border-top: none; border-left: none; }
+.nesio-coach-bubble--below .nesio-coach-caret { top: -7px; border-bottom: none; border-right: none; }
 
 /* ─────────────────────────────────────────────
    Login page
@@ -12568,6 +12719,146 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 /* 批次 39:健康 Dashboard */
 .nesio-health-dash { display: flex; flex-direction: column; }
 .nesio-health-updated { font-size: 0.72rem; color: var(--portal-muted); margin: 0 0 0.25rem; }
+
+/* ── 健康 Pro:概览/分析 二级切换 ── */
+.nesio-health-subtabs {
+  display: flex;
+  padding: 3px;
+  gap: 3px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--portal-surface-2, rgba(127, 127, 127, 0.08));
+  margin: 0 0 0.85rem;
+}
+.nesio-health-subtab {
+  flex: 1;
+  padding: 0.5rem 0;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--portal-muted);
+}
+.nesio-health-subtab.is-active {
+  background: var(--sheet-opaque, #fff);
+  color: var(--portal-ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+/* 隐私横条 */
+.nesio-health-privacy {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.8rem;
+  border-radius: 12px;
+  background: var(--portal-surface-2, rgba(127, 127, 127, 0.07));
+  color: var(--portal-muted);
+  font-size: 0.74rem;
+  margin-bottom: 0.7rem;
+}
+
+/* 念念安抚小结 */
+.nesio-health-nen {
+  display: flex;
+  gap: 0.6rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 16px;
+  background: var(--status-go-soft, #d9ece1);
+  margin-bottom: 0.9rem;
+}
+.nesio-health-nen-avatar {
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--status-go, #5a9e7a);
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+.nesio-health-nen-text {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--portal-ink);
+}
+
+/* 今日精选 2×2 */
+.nesio-health-picks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin: 0.35rem 0 1rem;
+}
+.nesio-health-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid);
+  text-align: left;
+}
+.nesio-health-pick:active { transform: scale(0.98); }
+.nesio-health-pick-top {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--portal-muted);
+}
+.nesio-health-pick-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.nesio-health-pick-chev { margin-left: auto; color: var(--portal-muted); }
+.nesio-health-pick-val {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--portal-ink);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+.nesio-health-pick-val small { font-size: 0.8rem; font-weight: 600; margin-left: 2px; }
+.nesio-health-pick-sub { font-size: 0.72rem; color: var(--portal-muted); }
+
+/* 最要紧的一条 */
+.nesio-health-topfind {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  width: 100%;
+  padding: 0.85rem 0.9rem;
+  border-radius: 14px;
+  border: 1px solid var(--portal-line);
+  background: var(--glass-bg-solid);
+  text-align: left;
+  margin-bottom: 1rem;
+}
+.nesio-health-topfind:active { transform: scale(0.99); }
+.nesio-health-topfind-badge { flex-shrink: 0; min-width: 3.6rem; font-size: 0.68rem; font-weight: 700; padding-top: 0.1rem; }
+.nesio-health-topfind-body { font-size: 0.84rem; line-height: 1.5; color: var(--portal-ink); }
+.nesio-health-topfind-src { display: block; margin-top: 0.2rem; font-size: 0.66rem; color: var(--portal-muted); }
+
+/* 念念发现的关系 */
+.nesio-health-rel {
+  padding: 0.8rem 0.9rem;
+  border-radius: 14px;
+  background: var(--portal-surface-2, rgba(127, 127, 127, 0.06));
+  margin-bottom: 1rem;
+}
+.nesio-health-rel-tag { font-size: 0.66rem; font-weight: 700; margin-right: 0.5rem; }
+.nesio-health-rel-text { font-size: 0.84rem; color: var(--portal-ink); line-height: 1.5; }
+.nesio-health-rel-note { display: block; margin-top: 0.3rem; font-size: 0.66rem; color: var(--portal-muted); }
+
+/* 去「分析」 */
+.nesio-health-goanalysis {
+  align-self: center;
+  padding: 0.6rem 1.4rem;
+  color: var(--portal-blue-deep);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
 .nesio-health-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.6rem; margin-top: 0.5rem; }
 .nesio-health-card { display: flex; flex-direction: column; gap: 0.3rem; padding: 0.85rem 0.9rem; border: 1px solid var(--portal-line); border-radius: 14px; background: var(--glass-bg-solid); }
 .nesio-health-card-label { font-size: 0.75rem; color: var(--portal-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

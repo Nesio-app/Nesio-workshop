@@ -308,6 +308,8 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   const [webSearchUsed, setWebSearchUsed] = useState(false);
   const [draft, setDraft] = useState<PendingDraft | null>(null);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  // 确认卡默认「一眼收进记忆」;点「改一下」才展开详细字段编辑(设计:默认一眼,复杂改一下)
+  const [confirmView, setConfirmView] = useState<'card' | 'edit'>('card');
   const inputRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<{ stop: () => void } | null>(null);
   const isAskMode = intent === 'ask';
@@ -458,6 +460,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
     // trusted fact. If there's nothing to confirm, write straight through.
     if (hasContext(context)) {
       setDraft(pending);
+      setConfirmView('card');
       setSendState('confirm');
       return;
     }
@@ -564,8 +567,103 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
           {/* 批次 33:右上角 ✕ 撤除(用户指令)—— 退出走背景点击/手柄下拉 */}
         </div>
 
+        {/* 确认卡(默认一眼收进):念念的话在上 + 正在成形的记忆卡 + 收进记忆/改一下 */}
+        {sendState === 'confirm' && draft && confirmView === 'card' && (() => {
+          const domMeta = ALL_DOMAINS.find((m) => m.id === draft.domain);
+          const domLabel = domMeta ? (dict === 'en' ? domMeta.labelEn : domMeta.label) : L(dict, '生活', 'life');
+          const taskLike = draft.domain === 'growth' || Boolean(draft.dueDate);
+          const whenLabel = (() => {
+            if (!draft.dueDate) return '';
+            const todayStr = new Date().toISOString().slice(0, 10);
+            const d = new Date(draft.dueDate + 'T00:00:00');
+            const today = new Date(todayStr + 'T00:00:00');
+            const diff = Math.round((d.getTime() - today.getTime()) / 86400000);
+            const base = diff === 0 ? L(dict, '今天', 'today') : diff === 1 ? L(dict, '明天', 'tomorrow') : `${d.getMonth() + 1}/${d.getDate()}`;
+            return `${base}${draft.dueTime ? ` ${draft.dueTime}` : ''}`;
+          })();
+          const entityChips: Array<{ kind: 'people' | 'places' | 'objects'; value: string }> = [
+            ...draft.people.map((v) => ({ kind: 'people' as const, value: v })),
+            ...draft.places.map((v) => ({ kind: 'places' as const, value: v })),
+            ...draft.objects.map((v) => ({ kind: 'objects' as const, value: v })),
+          ];
+          return (
+            <div className="nesio-cfm">
+              {/* 念念的话(引文体) */}
+              <div className="nesio-cfm-lead">
+                <span className="nesio-cfm-lead-nen"><span aria-hidden>✦</span> {L(dict, '念念', 'Nessa')}</span>
+                <p className="nesio-cfm-lead-text">
+                  {L(dict, '记下了。像件', 'Noted. Feels like a little ')}
+                  <span className="nesio-cfm-lead-hi">{domLabel}</span>
+                  {draft.dueDate
+                    ? L(dict, '里的小事 —— 要不要按时提醒你一下?', ' thing — want a reminder?')
+                    : L(dict, '里的小事 —— 帮你收进第二大脑。', ' thing — I’ll keep it in your second brain.')}
+                </p>
+              </div>
+
+              {/* 正在成形的记忆卡 */}
+              <div className="nesio-cfm-card">
+                <div className="nesio-cfm-cardhead">
+                  <span className="nesio-cfm-badge">
+                    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden><path d="M12 2a3 3 0 00-3 3v6a3 3 0 006 0V5a3 3 0 00-3-3z" /><path d="M18 11a6 6 0 01-12 0M12 17v3" /></svg>
+                    {L(dict, '说一句', 'Said')} · {L(dict, '刚刚', 'just now')}
+                  </span>
+                  <button type="button" className="nesio-cfm-editicon" aria-label={L(dict, '改一下', 'Edit')} onClick={() => setConfirmView('edit')}>
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z" /></svg>
+                  </button>
+                </div>
+
+                <input className="nesio-cfm-title" value={draft.title} onChange={(e) => setDraftTitle(e.target.value)} aria-label={L(dict, '标题', 'Title')} />
+
+                <p className="nesio-cfm-tagslabel">— {L(dict, '念念贴的', 'Nessa tagged')}</p>
+                <div className="nesio-cfm-chips">
+                  {draft.domain && domMeta && (
+                    <button type="button" className="nesio-cfm-chip nesio-cfm-chip--domain" onClick={() => setDraftDomain(domMeta.id)}>
+                      {domLabel} <span className="nesio-cfm-chip-x" aria-hidden>✕</span>
+                    </button>
+                  )}
+                  {draft.inlineTags.map((tag) => (
+                    <button key={`t-${tag}`} type="button" className="nesio-cfm-chip nesio-cfm-chip--tag"
+                      onClick={() => setDraft((d) => (d ? { ...d, inlineTags: d.inlineTags.filter((x) => x !== tag), edited: true } : d))}>
+                      # {tag} <span className="nesio-cfm-chip-x" aria-hidden>✕</span>
+                    </button>
+                  ))}
+                  {entityChips.map(({ kind, value }) => (
+                    <button key={`${kind}-${value}`} type="button" className="nesio-cfm-chip nesio-cfm-chip--tag" onClick={() => dropChip(kind, value)}>
+                      # {value} <span className="nesio-cfm-chip-x" aria-hidden>✕</span>
+                    </button>
+                  ))}
+                  <button type="button" className="nesio-cfm-chip-add" onClick={() => setConfirmView('edit')}>+ {L(dict, '标签', 'tag')}</button>
+                </div>
+
+                {/* 一个可选项(提醒) */}
+                {(draft.dueDate || taskLike) && (
+                  <button type="button" className="nesio-cfm-opt" onClick={() => setShowDatePicker(true)}>
+                    <IconClock size={14} />
+                    <span className="nesio-cfm-opt-main">{draft.dueDate ? L(dict, `${whenLabel} 提醒`, `Remind ${whenLabel}`) : L(dict, '加个提醒', 'Add a reminder')}</span>
+                    <span className="nesio-cfm-opt-hint">{L(dict, '点开可改', 'tap to edit')}</span>
+                  </button>
+                )}
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={{ date: draft.dueDate ?? new Date().toISOString().slice(0, 10), time: draft.dueTime, recurring: draft.recurring, priority: draft.priority }}
+                    onChange={(v) => setDraftDTP(v)}
+                    onClose={() => setShowDatePicker(false)}
+                  />
+                )}
+              </div>
+
+              <div className="nesio-cfm-actions">
+                <button type="button" className="nesio-cfm-save" onClick={() => draft && writeSignalFromDraft(draft, true)}>
+                  {L(dict, '收进记忆', 'Keep it')}<span className="nesio-cfm-save-sub">{L(dict, '存进你的第 2 大脑', 'into your second brain')}</span>
+                </button>
+                <button type="button" className="nesio-cfm-edit" onClick={() => setConfirmView('edit')}>{L(dict, '改一下', 'Tweak')} ›</button>
+              </div>
+            </div>
+          );
+        })()}
+
         {/* Context confirm (§6.2 绝对控制优先) — AI suggested; you decide before it's trusted. */}
-        {sendState === 'confirm' && draft && (
+        {sendState === 'confirm' && draft && confirmView === 'edit' && (
           <div className="nesio-voice-confirm">
             <p className="nesio-voice-confirm-lead">{L(dict, '先确认一下，再存入 Memory', 'Confirm first, then it enters Memory')}</p>
 

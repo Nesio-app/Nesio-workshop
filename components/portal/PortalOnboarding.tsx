@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import NesioMark from './NesioMark';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { L, t } from '@/lib/portal/i18n';
@@ -329,23 +329,32 @@ function AuthStep({ onDone, locale, displayName }: {
 
 // ── Tips overlay ──────────────────────────────────────
 
+type TourStep = {
+  Icon: React.ComponentType<{ size?: number }>;
+  title: string;
+  body: string;
+  target: string | null;                 // data-tour 值;null = 居中(激活步)
+  place?: 'above' | 'below' | 'auto';
+  round?: boolean;                        // 圆形高亮(中键)
+};
+
 export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: PortalLocale }) {
   const [step, setStep] = useState(0);
   const dict = portalLocaleToDictionaryLocale(locale);
-  // 无 emoji:每步用线性图标(设计规范)。覆盖用户点名的各面:三个键 · 今天快速输入 ·
-  // 输入心情 · 长按中键问一问 · 粉碎人物 / 整理物品 · 长按记忆归核心/项目 · 洞察。
-  const tips = [
-    { Icon: IconTarget, title: t(locale, 'onboardingTipTodayTitle'), body: t(locale, 'onboardingTipTodayBody'), zone: 'today' as const },
-    { Icon: IconSmile, title: L(dict, '今天第一拍:心情', "Today's first beat: mood"), body: L(dict, '今天页顶上点一下心情球,记下此刻的情绪和精力 —— 后面洞察会把它连成规律。', 'Tap the mood orb at the top of Today to log how you feel and your energy — Insights weaves it into patterns later.'), zone: 'today' as const },
-    { Icon: IconMic, title: t(locale, 'onboardingTipCenterTitle'), body: t(locale, 'onboardingTipCenterBody'), zone: 'center' as const },
-    { Icon: IconZap, title: L(dict, '长按问一问', 'Hold to Ask'), body: L(dict, '长按中间按钮直接问:「护照放在哪」「上次买的药」,记过的都能找回。', 'Hold the center button and just ask: "Where is my passport?" — anything you noted comes back.'), zone: 'center' as const },
-    { Icon: IconUser, title: L(dict, '一句话,拆出人和物', 'One line → people & things'), body: L(dict, '把一段话丢给念念:「和老王开会,买了台显示器」—— 自动记成人物「老王」和物品「显示器」,整理归位。', 'Drop a line to Nesio: "Met Wang, bought a monitor" — it files a person "Wang" and an item "monitor" automatically.'), zone: 'center' as const },
-    { Icon: IconStar, title: t(locale, 'onboardingTipMemoryTitle'), body: L(dict, '记忆页里长按任意卡片:标为核心记忆(定义你的那些),或加进某个项目归拢起来。', 'On Memory, long-press any card: mark it Core (the ones that define you), or add it into a Project.'), zone: 'memory' as const },
-    { Icon: IconBulb, title: L(dict, '洞察:把点连成线', 'Insights: connect the dots'), body: L(dict, '记得越多,念念越懂你 —— 洞察会把心情、关系、足迹、花销连成规律,轻轻提醒。', 'The more you note, the more Nesio gets you — Insights links mood, people, places and spending into gentle patterns.'), zone: 'memory' as const },
+  // 真正的聚光式 coach-mark:每步定位到对应 UI(data-tour),高亮它 + 气泡指过去,不再原地不动。
+  const steps: TourStep[] = [
+    { Icon: IconTarget, title: t(locale, 'onboardingTipTodayTitle'), body: t(locale, 'onboardingTipTodayBody'), target: 'today', place: 'above' },
+    { Icon: IconSmile, title: L(dict, '今天第一拍:心情', "Today's first beat: mood"), body: L(dict, '这里点一下心情,记下此刻的情绪和精力 —— 后面洞察会把它连成规律。', 'Tap here to log how you feel and your energy — Insights weaves it into patterns later.'), target: 'mood', place: 'auto' },
+    { Icon: IconMic, title: t(locale, 'onboardingTipCenterTitle'), body: t(locale, 'onboardingTipCenterBody'), target: 'center', place: 'above', round: true },
+    { Icon: IconZap, title: L(dict, '长按问一问', 'Hold to Ask'), body: L(dict, '长按这个中间按钮直接问:「护照放在哪」「上次买的药」,记过的都能找回。', 'Hold this center button and just ask: "Where is my passport?" — anything you noted comes back.'), target: 'center', place: 'above', round: true },
+    { Icon: IconUser, title: L(dict, '一句话,拆出人和物', 'One line → people & things'), body: L(dict, '把一段话丢给念念:「和老王开会,买了台显示器」—— 自动记成人物「老王」和物品「显示器」,整理归位。', 'Drop a line to Nesio: "Met Wang, bought a monitor" — it files a person "Wang" and an item "monitor" automatically.'), target: 'center', place: 'above', round: true },
+    { Icon: IconStar, title: t(locale, 'onboardingTipMemoryTitle'), body: L(dict, '你记过的一切都在「记忆」里。长按任意卡片:标为核心记忆,或加进某个项目。', 'Everything you noted lives in Memory. Long-press any card: mark it Core, or add it to a Project.'), target: 'memory', place: 'above' },
+    { Icon: IconBulb, title: L(dict, '洞察:把点连成线', 'Insights: connect the dots'), body: L(dict, '点左上角这个晶体进洞察 —— 心情、关系、足迹、花销会被连成规律,轻轻提醒。', 'Tap this crystal top-left for Insights — mood, people, places and spending linked into gentle patterns.'), target: 'insights', place: 'below' },
+    { Icon: IconCheckCircle, title: '', body: '', target: null }, // 激活步:居中
   ];
-  const tip = tips[step];
-  const StepIcon = tip.Icon;
-  const isLast = step === tips.length - 1;
+  const cur = steps[step];
+  const StepIcon = cur.Icon;
+  const isLast = step === steps.length - 1;
 
   // 激活式最后一步:真的存进第一条记忆,并当场找回 —— 引导结束时
   // 用户已经亲历过一次「扔进来 → 找得到」,而不是只被告知过。
@@ -353,79 +362,120 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
   const [activatePhase, setActivatePhase] = useState<'input' | 'found'>('input');
   const [savedName, setSavedName] = useState('');
 
+  // 目标元素的位置(每步/尺寸变化重测;元素还没布好用 rAF 重试)
+  const [rect, setRect] = useState<DOMRect | null>(null);
+  useLayoutEffect(() => {
+    if (!cur.target) { setRect(null); return; }
+    let raf = 0; let tries = 0;
+    const measure = () => {
+      const el = document.querySelector(`[data-tour="${cur.target}"]`) as HTMLElement | null;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        if (r.width > 0 && r.height > 0) { setRect(r); return; }
+      }
+      if (tries++ < 30) raf = requestAnimationFrame(measure);
+      else setRect(null); // 找不到就退化成居中,不至于卡住
+    };
+    measure();
+    const onChange = () => measure();
+    window.addEventListener('resize', onChange);
+    window.addEventListener('scroll', onChange, true);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', onChange); window.removeEventListener('scroll', onChange, true); };
+  }, [step, cur.target]);
+
   function saveFirstMemory() {
     const text = firstText.trim();
     if (!text) return;
-    // 一句话笔记的句子本身就是记忆 —— 24 字符会把 "hallway drawer" 截成 "ha",
-    // 问一问只能对着残句瞎猜(QA 实锤)。放宽到 60,超长再截。
     const name = text.slice(0, 60);
     ingestLifeNode({
-      name,
-      type: 'object',
-      source: 'manual',
-      confidence: 1,
-      rawInput: text,
-      tags: [t(locale, 'onboardingActivateFirstTag')],
-      attributes: {},
-      relations: [],
+      name, type: 'object', source: 'manual', confidence: 1, rawInput: text,
+      tags: [t(locale, 'onboardingActivateFirstTag')], attributes: {}, relations: [],
     });
     setSavedName(name);
     setActivatePhase('found');
   }
 
-  return (
-    <div className="nesio-tips-overlay" role="dialog" aria-modal="false" aria-label={t(locale, 'onboardingTipsAriaLabel')}>
-      <div className={`nesio-tips-hl nesio-tips-hl--${tip.zone}`} aria-hidden />
-      {/* zone 也挂到卡片上:caret 按目标图标(左=今天/中=中键/右=记忆)定位,不再永远居中 */}
-      <div className={`nesio-tips-card nesio-tips-card--${tip.zone}`}>
-        <div className="nesio-tips-dots" aria-hidden>
-          {tips.map((_, i) => <span key={i} className={`nesio-tips-dot${i === step ? ' nesio-tips-dot--active' : ''}`} />)}
+  const dots = (
+    <div className="nesio-tips-dots" aria-hidden>
+      {steps.map((_, i) => <span key={i} className={`nesio-tips-dot${i === step ? ' nesio-tips-dot--active' : ''}`} />)}
+    </div>
+  );
+
+  const content = isLast ? (
+    activatePhase === 'input' ? (
+      <>
+        {dots}
+        <div className="nesio-tips-emoji" aria-hidden><StepIcon size={26} /></div>
+        <h3 className="nesio-tips-title">{t(locale, 'onboardingActivateTryTitle')}</h3>
+        <p className="nesio-tips-body">{t(locale, 'onboardingActivateTryBody')}</p>
+        <input className="nesio-ob-input" value={firstText}
+          onChange={(e) => setFirstText(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') saveFirstMemory(); }} style={{ marginTop: '0.5rem' }} />
+        <div className="nesio-tips-actions">
+          <button type="button" className="nesio-ob-primary-btn" onClick={saveFirstMemory} disabled={!firstText.trim()}>{t(locale, 'onboardingActivateSave')}</button>
+          <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>{t(locale, 'onboardingActivateSkip')}</button>
         </div>
-        <div className="nesio-tips-emoji" aria-hidden>{isLast && activatePhase === 'found' ? <IconCheckCircle size={26} /> : <StepIcon size={26} />}</div>
-        {isLast ? (
-          activatePhase === 'input' ? (
-            <>
-              <h3 className="nesio-tips-title">{t(locale, 'onboardingActivateTryTitle')}</h3>
-              <p className="nesio-tips-body">{t(locale, 'onboardingActivateTryBody')}</p>
-              <input
-                className="nesio-ob-input"
-                value={firstText}
-                onChange={(e) => setFirstText(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') saveFirstMemory(); }}
-                style={{ marginTop: '0.5rem' }}
-              />
-              <div className="nesio-tips-actions">
-                <button type="button" className="nesio-ob-primary-btn" onClick={saveFirstMemory} disabled={!firstText.trim()}>
-                  {t(locale, 'onboardingActivateSave')}
-                </button>
-                <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>{t(locale, 'onboardingActivateSkip')}</button>
-              </div>
-            </>
-          ) : (
-            <>
-              <h3 className="nesio-tips-title">{t(locale, 'onboardingActivateFoundTitle')}</h3>
-              <p className="nesio-tips-body">{t(locale, 'onboardingActivateFoundBody')}</p>
-              <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 12, padding: '0.7rem 0.9rem', margin: '0.5rem 0', textAlign: 'left' }}>
-                <p style={{ fontSize: '0.76rem', margin: 0, color: 'var(--portal-muted)' }}>{t(locale, 'onboardingActivateAskExample')}</p>
-                <p style={{ fontSize: '0.82rem', margin: '0.35rem 0 0', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}><IconBox size={14} /> {savedName}</p>
-              </div>
-              <p className="nesio-tips-body">{t(locale, 'onboardingActivateSummary')}</p>
-              <div className="nesio-tips-actions">
-                <button type="button" className="nesio-ob-primary-btn" onClick={onDone}>{t(locale, 'onboardingActivateStart')}</button>
-              </div>
-            </>
-          )
-        ) : (
-          <>
-            <h3 className="nesio-tips-title">{tip.title}</h3>
-            <p className="nesio-tips-body">{tip.body}</p>
-            <div className="nesio-tips-actions">
-              <button type="button" className="nesio-ob-primary-btn" onClick={() => setStep(step + 1)}>{t(locale, 'onboardingTipNext')}</button>
-              <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>{t(locale, 'onboardingSkip')}</button>
-            </div>
-          </>
-        )}
+      </>
+    ) : (
+      <>
+        {dots}
+        <div className="nesio-tips-emoji" aria-hidden><IconCheckCircle size={26} /></div>
+        <h3 className="nesio-tips-title">{t(locale, 'onboardingActivateFoundTitle')}</h3>
+        <p className="nesio-tips-body">{t(locale, 'onboardingActivateFoundBody')}</p>
+        <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 12, padding: '0.7rem 0.9rem', margin: '0.5rem 0', textAlign: 'left' }}>
+          <p style={{ fontSize: '0.76rem', margin: 0, color: 'var(--portal-muted)' }}>{t(locale, 'onboardingActivateAskExample')}</p>
+          <p style={{ fontSize: '0.82rem', margin: '0.35rem 0 0', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 5 }}><IconBox size={14} /> {savedName}</p>
+        </div>
+        <p className="nesio-tips-body">{t(locale, 'onboardingActivateSummary')}</p>
+        <div className="nesio-tips-actions">
+          <button type="button" className="nesio-ob-primary-btn" onClick={onDone}>{t(locale, 'onboardingActivateStart')}</button>
+        </div>
+      </>
+    )
+  ) : (
+    <>
+      {dots}
+      <div className="nesio-tips-emoji" aria-hidden><StepIcon size={26} /></div>
+      <h3 className="nesio-tips-title">{cur.title}</h3>
+      <p className="nesio-tips-body">{cur.body}</p>
+      <div className="nesio-tips-actions">
+        <span className="nesio-tips-count">{step + 1}/{steps.length}</span>
+        <button type="button" className="nesio-ob-skip-btn" onClick={onDone}>{t(locale, 'onboardingSkip')}</button>
+        <button type="button" className="nesio-ob-primary-btn" onClick={() => setStep(step + 1)}>{t(locale, 'onboardingTipNext')}</button>
       </div>
+    </>
+  );
+
+  // 几何:气泡贴目标上/下方,水平夹在视口内;caret 指向目标中心
+  const geo = (() => {
+    if (typeof window === 'undefined' || !rect) return null;
+    const VW = window.innerWidth, VH = window.innerHeight;
+    const bw = Math.min(300, VW - 24);
+    const gap = 14, pad = 8;
+    const cx = rect.left + rect.width / 2;
+    const place: 'above' | 'below' = cur.place === 'auto' ? (rect.top > VH / 2 ? 'above' : 'below') : (cur.place ?? 'above');
+    const left = Math.min(Math.max(cx - bw / 2, 12), VW - bw - 12);
+    const caretX = Math.min(Math.max(cx - left, 24), bw - 24);
+    return { VH, bw, gap, pad, place, left, caretX };
+  })();
+
+  return (
+    <div className={`nesio-coach-overlay${geo ? '' : ' nesio-coach-overlay--dim'}`} role="dialog" aria-modal="true" aria-label={t(locale, 'onboardingTipsAriaLabel')}>
+      {geo && rect && (
+        <div className="nesio-coach-spot" aria-hidden
+          style={{ left: rect.left - geo.pad, top: rect.top - geo.pad, width: rect.width + geo.pad * 2, height: rect.height + geo.pad * 2, borderRadius: cur.round ? '50%' : 16 }} />
+      )}
+      {geo && rect ? (
+        <div key={step} className={`nesio-coach-bubble nesio-coach-bubble--${geo.place}`}
+          style={geo.place === 'above'
+            ? { left: geo.left, width: geo.bw, bottom: geo.VH - rect.top + geo.gap }
+            : { left: geo.left, width: geo.bw, top: rect.bottom + geo.gap }}>
+          <span className="nesio-coach-caret" style={{ left: geo.caretX }} aria-hidden />
+          {content}
+        </div>
+      ) : (
+        <div className="nesio-coach-bubble nesio-coach-bubble--center">{content}</div>
+      )}
     </div>
   );
 }
