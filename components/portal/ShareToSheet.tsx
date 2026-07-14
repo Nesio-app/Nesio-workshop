@@ -14,6 +14,7 @@ import { useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { useSheetDrag } from './use-sheet-drag';
 
 // ── 单色线性图标(currentColor,无品牌色 / 无 emoji)──
 const S = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -45,6 +46,7 @@ export default function ShareToSheet({ open, onClose, getBlob, shareText, link, 
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [busy, setBusy] = useState<string>('');
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   if (!open) return null;
 
@@ -146,13 +148,10 @@ export default function ShareToSheet({ open, onClose, getBlob, shareText, link, 
   return (
     <div className="nesio-shareto-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '分享到', 'Share to')}>
       <button type="button" className="nesio-shareto-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-shareto-card">
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-shareto-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
         <div className="nesio-shareto-head">
           <h2 className="nesio-shareto-title">{L(dict, '分享到', 'Share to')}</h2>
-          <button type="button" className="nesio-shareto-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>
-            <svg viewBox="0 0 24 24" width="16" height="16" {...S}><path d="M6 6l12 12M18 6L6 18" /></svg>
-          </button>
         </div>
 
         {/* 第一行:存到相册(高亮)+ 平台,横滑 */}

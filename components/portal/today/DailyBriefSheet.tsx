@@ -15,6 +15,7 @@ import { recentBriefMemoryNotes } from '@/lib/platform/view-models/today-view-mo
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { L } from '@/lib/portal/i18n';
 import { usePortalLocale } from '../use-portal-locale';
+import { useSheetDrag } from '../use-sheet-drag';
 
 interface WeatherCache { temperatureC?: number; condition?: string; forecastNote?: string; placeLabel?: string; tempMaxC?: number; tempMinC?: number; precipProb?: number }
 
@@ -23,6 +24,7 @@ export function DailyBriefSheet({ open, onClose }: { open: boolean; onClose: () 
   const [script, setScript] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<'auth' | 'network' | null>(null);
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   const fetchBrief = useCallback(async () => {
     setLoading(true);
@@ -72,11 +74,10 @@ export function DailyBriefSheet({ open, onClose }: { open: boolean; onClose: () 
   return (
     <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '今日简报', "Today's brief")}>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-settings-sheet-card">
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
         <div className="nesio-settings-sheet-header">
           <h2 className="nesio-settings-sheet-title">{L(dict, '今日简报', "Today's brief")}</h2>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
         <div className="nesio-settings-sheet-body">
           {loading && <p className="nesio-mirror-writing">{L(dict, 'Nesio 正在整理今天…', 'Nesio is putting today together…')}</p>}

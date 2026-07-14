@@ -21,6 +21,7 @@ import { IconMic, IconCamera, IconLock } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { useSheetDrag } from '../use-sheet-drag';
 
 type Extracted = { category: PersonRecordCategory; title: string; detail?: string; date?: string; amount?: number };
 
@@ -44,6 +45,7 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
   );
   const [saved, setSaved] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   const doExtract = async (payload: { text?: string; image?: string }) => {
     setErr(null); setBusy(true); setPending(null);
@@ -100,8 +102,8 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={L(dict, `挂在 ${personName} 身上`, `Attach to ${personName}`)}>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-settings-sheet-card nesio-hang-card">
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-settings-sheet-card nesio-hang-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
 
         {/* 头:挂在 TA 身上 */}
         <div className="nesio-hang-head">
@@ -110,7 +112,6 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
             <p className="nesio-hang-head-title">{L(dict, `挂在 ${personName} 身上`, `Attach to ${personName}`)}</p>
             {subtitle && <p className="nesio-hang-head-sub">{subtitle}</p>}
           </div>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
 
         {saved ? (

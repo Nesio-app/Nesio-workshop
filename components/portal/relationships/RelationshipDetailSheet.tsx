@@ -22,6 +22,7 @@ import { IconLock } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { useSheetDrag } from '../use-sheet-drag';
 
 interface Props {
   contactKey: string | null;
@@ -66,6 +67,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   const fileRef = useRef<HTMLInputElement>(null);
   const [records, setRecords] = useState<PersonRecord[]>([]);
   const [hangOpen, setHangOpen] = useState(false); // 「挂一条」独立确认卡弹窗
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   const rebuild = () => {
     if (!contactKey) { setProfile(null); setRecords([]); return; }
@@ -138,8 +140,8 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   return (
     <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={p.displayName}>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-settings-sheet-card">
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
 
         {/* 身份头 */}
         <div className="nesio-rel-detail-head">
@@ -171,7 +173,6 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
               {c?.reachOut && <span className="nesio-rel-pill nesio-rel-pill--due">{L(dict, '该联系了', 'Reach out')}</span>}
             </div>
           </div>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
 
         <div className="nesio-settings-sheet-body">

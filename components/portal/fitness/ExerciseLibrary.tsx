@@ -17,6 +17,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import type { PlayerStep } from './WorkoutPlayer';
 import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
+import { useSheetDrag } from '../use-sheet-drag';
 
 const HOLD_IDS = new Set(['side-plank', 'deadbug', 'prone-swimmer', 'cat-cow', '9090']);
 function defaultItem(ex: Exercise): WorkoutItem {
@@ -37,6 +38,7 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
   const [flash, setFlash] = useState('');
 
   useSheetDismiss(open, onClose);
+  const { handleProps, cardStyle, expanded: sheetExpanded } = useSheetDrag(onClose);
 
   if (!open) return null;
 
@@ -71,11 +73,10 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
   return (
     <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '动作库', 'Exercise library')}>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-settings-sheet-card">
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-settings-sheet-card${sheetExpanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
         <div className="nesio-settings-sheet-header">
           <h2 className="nesio-settings-sheet-title">{L(dict, '动作库', 'Exercise library')}</h2>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
         <div className="nesio-settings-sheet-body">
           <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '三维筛选 · 点动作看要点 · 加入自由组合', 'Filter by 3 axes · tap for cues · combine freely')}</p>

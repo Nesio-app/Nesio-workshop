@@ -5755,6 +5755,34 @@ html[data-portal-theme="night"] .nesio-sheet-handle { background: rgba(255,255,2
   transition: max-height 0.24s var(--ease-out), border-radius 0.24s var(--ease-out);
 }
 
+/* 通用全屏态(任意底部弹出卡都能加,不依赖具体卡类名):上拉展开用 */
+.nesio-sheet--expanded {
+  max-height: 100dvh !important;
+  height: 100dvh !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+  padding-top: env(safe-area-inset-top) !important;
+  transition: max-height 0.24s var(--ease-out), border-radius 0.24s var(--ease-out);
+}
+/* 通用横线:没有 .nesio-sheet-handle 的卡也能用这个可拖动手柄 */
+.nesio-sheet-grip {
+  box-sizing: content-box;
+  width: 2.5rem;
+  height: 0.22rem;
+  border-radius: 999px;
+  background: rgba(0,0,0,0.15);
+  background-clip: content-box;
+  padding: 0.55rem 2.5rem;
+  margin: 0.1rem auto 0.2rem;
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  flex-shrink: 0;
+}
+.nesio-sheet-grip:active { cursor: grabbing; }
+html[data-portal-theme="night"] .nesio-sheet-grip { background: rgba(255,255,255,0.15); }
+
 .nesio-voice-sheet-header {
   display: flex;
   align-items: center;

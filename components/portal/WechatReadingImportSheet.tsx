@@ -13,11 +13,13 @@ import { track } from '@/lib/portal/telemetry';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { useSheetDrag } from './use-sheet-drag';
 
 export default function WechatReadingImportSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [text, setText] = useState('');
   const [result, setResult] = useState('');
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   if (!open) return null;
 
@@ -53,14 +55,13 @@ export default function WechatReadingImportSheet({ open, onClose }: { open: bool
   return (
     <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '微信读书导入', 'WeChat Reading import')}>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-settings-sheet-card">
-        <div className="nesio-sheet-handle" aria-hidden />
+      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
+        <div className="nesio-sheet-handle" {...handleProps} />
         <div className="nesio-settings-sheet-header">
           <h2 className="nesio-settings-sheet-title">
             {L(dict, '微信读书导入', 'WeChat Reading')}
             <InfoTip text={L(dict, '微信读书没有开放接口。在微信读书 App:某本书 → 我的笔记 → 右上角 → 导出笔记(复制/发到文件传输助手),把文字粘到下面。', 'WeChat Reading has no public API. In the app: a book → My notes → top-right → Export notes (copy), then paste the text below.')} />
           </h2>
-          <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
         <div className="nesio-settings-sheet-body">
           <textarea

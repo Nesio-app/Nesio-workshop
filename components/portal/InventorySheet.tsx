@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { useSheetDrag } from './use-sheet-drag';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { IconMapPin, IconClock, IconCamera, IconNote } from './icons';
 import LocationPicker from './LocationPicker';
@@ -58,6 +59,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const [pasteBusy, setPasteBusy] = useState(false); // 物品⑤:粘贴商品信息识别
   const [pasteMsg, setPasteMsg] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null); // 物品⑥:复制转卖文案反馈
+  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   // 加物品表单
   const [fName, setFName] = useState('');
@@ -186,7 +188,8 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
 
   return (
     <div className="nesio-freeze-overlay" onClick={onClose}>
-      <div className="nesio-freeze-sheet" onClick={(e) => e.stopPropagation()}>
+      <div className={`nesio-freeze-sheet${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle} onClick={(e) => e.stopPropagation()}>
+        <div className="nesio-sheet-grip" {...handleProps} />
         {/* 批次 133·设计:标题 + 统计收成标题旁一行小字(去掉抽象方块统计) */}
         <div className="nesio-freeze-header">
           <span className="nesio-freeze-title">{L(dict, '收纳', 'Storage')}</span>
