@@ -13713,6 +13713,15 @@ html[data-portal-theme="night"] .nesio-project-card-name { color: #d8e8ff; }
   color: var(--text-secondary, var(--portal-muted));
 }
 .nesio-inv-close { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
+/* 批次 172:项目页顶部三个统计框(进行中/已完成/已归档) */
+.nesio-proj-stats { display: flex; gap: 8px; padding: 0.1rem 1rem 0.7rem; }
+.nesio-proj-stat {
+  flex: 1; text-align: center;
+  padding: 8px 4px; border-radius: 12px;
+  background: var(--portal-accent-soft, rgba(0,0,0,0.05));
+  font-size: 0.72rem; color: var(--portal-muted);
+}
+.nesio-proj-stat b { display: block; font-size: 1.1rem; color: var(--portal-ink); font-weight: 700; }
 /* 批次 168:收藏夹维度 filter chips(全部/价值/习惯/节律/关系) */
 .nesio-fav-filter {
   display: flex;

@@ -588,6 +588,18 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   const [linkPicking, setLinkPicking] = useState(false);
   const [linkQuery, setLinkQuery] = useState('');
   const [linkError, setLinkError] = useState(''); // 批次 94:关联出错时可见,便于用户截图反馈
+  const [linkCandidates, setLinkCandidates] = useState<LifeNode[]>([]);
+  // 批次 172(关联记忆闪退根治):搜索移出渲染热路径 —— 去抖异步跑,不再每次按键同步搜全图
+  // (516 节点 + 中文 2-gram 同步搜会卡死主线程 → iOS 看门狗杀 webview = 用户实锤「一打字就闪退」)。
+  useEffect(() => {
+    if (!linkPicking || linkQuery.trim().length < 1) { setLinkCandidates([]); return; }
+    const q = linkQuery.trim();
+    const h = setTimeout(() => {
+      try { setLinkCandidates(searchLifeGraphFuzzy(q, 6).filter((x) => x.id !== node?.id)); }
+      catch { setLinkCandidates([]); }
+    }, 220);
+    return () => clearTimeout(h);
+  }, [linkQuery, linkPicking, node?.id]);
   const [rawExpanded, setRawExpanded] = useState(false); // 批次 74:原始记录折叠
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [editing, setEditing] = useState(false);
@@ -990,9 +1002,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
                 setLinkQuery('');
               }
             };
-            const candidates = linkPicking && linkQuery.trim().length >= 1
-              ? searchLifeGraphFuzzy(linkQuery.trim(), 6).filter((x) => x.id !== n.id)
-              : [];
+            // 批次 172:用去抖异步算好的候选(不在渲染里同步搜全图 —— 闪退根因)
+            const candidates = linkCandidates;
             return (
               <div className="nesio-node-links">
                 {live.map(({ r, node: t }) => (

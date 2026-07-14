@@ -749,6 +749,9 @@ function ProjectsSheet({ projects, allNodes, onClose, onOpenProject, onCreate }:
 }) {
   const dict = useDict();
   const active = projects.filter((p) => p.status === 'active');
+  // 批次 172:项目页顶部三个统计框(进行中/已完成/已归档 —— 模型状态 active/completed/archived)
+  const doneCount = projects.filter((p) => p.status === 'completed').length;
+  const archivedCount = projects.filter((p) => p.status === 'archived').length;
   return (
     <>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
@@ -757,6 +760,11 @@ function ProjectsSheet({ projects, allNodes, onClose, onOpenProject, onCreate }:
           <span className="nesio-project-detail-emoji"><IconFolder size={16} /></span>
           <span className="nesio-project-detail-name">{L(dict, '项目', 'Projects')}</span>
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="nesio-proj-stats">
+          <span className="nesio-proj-stat"><b>{active.length}</b> {L(dict, '进行中', 'Active')}</span>
+          <span className="nesio-proj-stat"><b>{doneCount}</b> {L(dict, '已完成', 'Done')}</span>
+          <span className="nesio-proj-stat"><b>{archivedCount}</b> {L(dict, '已归档', 'Archived')}</span>
         </div>
         {active.length > 0 ? (
           <div className="nesio-memory-grid nesio-fav-expanded" style={{ padding: '0 1rem 0.5rem' }}>
