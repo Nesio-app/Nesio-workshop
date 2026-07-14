@@ -72,9 +72,14 @@ export default function RelationshipsPanel() {
     );
   }
 
-  // Google 联系人分组(家人置顶),用于按组筛选
-  const allGroups = Array.from(new Set(contacts.flatMap((c) => c.groups)));
-  allGroups.sort((a, b) => (FAMILY_RE.test(b) ? 1 : 0) - (FAMILY_RE.test(a) ? 1 : 0) || a.localeCompare(b, 'zh'));
+  // 图2:分组芯片别铺一墙一次性原始标签 —— 按出现频次收敛(≥2 人),家人置顶,最多 12 枚
+  const groupCount = new Map<string, number>();
+  for (const c of contacts) for (const g of c.groups) groupCount.set(g, (groupCount.get(g) || 0) + 1);
+  const allGroups = Array.from(groupCount.entries())
+    .filter(([g, n]) => n >= 2 && g.trim().length > 0)
+    .sort((a, b) => (FAMILY_RE.test(b[0]) ? 1 : 0) - (FAMILY_RE.test(a[0]) ? 1 : 0) || b[1] - a[1] || a[0].localeCompare(b[0], 'zh'))
+    .slice(0, 12)
+    .map(([g]) => g);
   const shown = activeGroup ? contacts.filter((c) => c.groups.includes(activeGroup)) : contacts;
   const dueList = shown.filter((c) => c.reachOut);
   const familyDigest = buildFamilyDigest(contacts);

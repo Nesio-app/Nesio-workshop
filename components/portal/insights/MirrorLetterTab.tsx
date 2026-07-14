@@ -102,6 +102,10 @@ export default function MirrorLetterTab() {
 
   const [mirrorId, setMirrorId] = useState<MirrorId>('friend');
   const [month, setMonth] = useState<string>(currentMonthKey());
+  // 图3:除了按月,允许自定义任意时间段(month 存成 `custom:from:to`)
+  const [customMode, setCustomMode] = useState(false);
+  const [rangeFrom, setRangeFrom] = useState('');
+  const [rangeTo, setRangeTo] = useState('');
   const [topic, setTopic] = useState<string>('all');
   const [letter, setLetter] = useState<MirrorLetter | null>(null);
   const [loading, setLoading] = useState(false);
@@ -112,8 +116,19 @@ export default function MirrorLetterTab() {
   const [saved, setSaved] = useState(false);
   const [archive, setArchive] = useState<MirrorLetter[]>([]);
 
-  const monthLabel = monthLabelOf(month, dict);
+  const isCustomRange = month.startsWith('custom:');
+  const monthLabel = isCustomRange ? month.split(':').slice(1).join(' – ') : monthLabelOf(month, dict);
   const activeMirror = MIRRORS.find((m) => m.id === mirrorId) ?? MIRRORS[0];
+
+  function pickMonth(id: string) {
+    if (id === '__custom__') { setCustomMode(true); return; }
+    setCustomMode(false);
+    setMonth(id);
+  }
+  function setRange(from: string, to: string) {
+    setRangeFrom(from); setRangeTo(to);
+    if (from && to && from <= to) setMonth(`custom:${from}:${to}`);
+  }
   const activeTopic = MIRROR_TOPICS.find((t) => t.id === topic) ?? MIRROR_TOPICS[0];
 
   useEffect(() => {
@@ -136,8 +151,10 @@ export default function MirrorLetterTab() {
     try {
       // 批量导入剔出证据;再按所选月份把档案裁到那一个月(「任意时段都能生成」)
       const all = getLifeGraph().filter((n) => !isBulkImported(n));
-      const monthNodes = all.filter((n) => typeof n.createdAt === 'string' && n.createdAt.slice(0, 7) === month);
-      const nodes = monthNodes.length >= 10 ? monthNodes : all; // 该月太薄则回落全档,由服务端门槛兜底
+      const monthNodes = month.startsWith('custom:')
+        ? (() => { const [, f, t] = month.split(':'); const end = `${t}T23:59:59`; return all.filter((n) => typeof n.createdAt === 'string' && n.createdAt.slice(0, 10) >= f && n.createdAt <= end); })()
+        : all.filter((n) => typeof n.createdAt === 'string' && n.createdAt.slice(0, 7) === month);
+      const nodes = monthNodes.length >= 10 ? monthNodes : all; // 该段太薄则回落全档,由服务端门槛兜底
       const summary = summarizeForLivingModel({ nodes, mirrorProfile: getMirrorProfile(), previousInsights: [] });
       const res = await fetch('/api/portal/mirror-letter', {
         method: 'POST',
@@ -218,6 +235,8 @@ export default function MirrorLetterTab() {
   function openArchived(l: MirrorLetter) {
     setMirrorId(l.mirrorId);
     setMonth(l.month);
+    if (l.month.startsWith('custom:')) { const [, f, t] = l.month.split(':'); setCustomMode(true); setRangeFrom(f); setRangeTo(t); }
+    else setCustomMode(false);
     setTopic(l.topic || 'all');
     setArchiveOpen(false);
   }
@@ -248,7 +267,7 @@ export default function MirrorLetterTab() {
     [dict],
   );
   const monthOptions = useMemo(
-    () => recentMonthKeys(6).map((k) => ({ id: k, label: monthLabelOf(k, dict) })),
+    () => [...recentMonthKeys(6).map((k) => ({ id: k, label: monthLabelOf(k, dict) })), { id: '__custom__', label: L(dict, '自定义时段…', 'Custom range…') }],
     [dict],
   );
   const topicOptions = useMemo(
@@ -265,7 +284,7 @@ export default function MirrorLetterTab() {
             label={L(dict, '镜子', 'Mirror')} value={mirrorId} options={mirrorOptions} onPick={pickMirror} dict={dict}
             leading={<span className="nesio-mirror-filter-dot" aria-hidden />}
           />
-          <FilterDropdown label={L(dict, '月份', 'Month')} value={month} options={monthOptions} onPick={setMonth} dict={dict} />
+          <FilterDropdown label={L(dict, '月份', 'Month')} value={customMode || isCustomRange ? '__custom__' : month} options={monthOptions} onPick={pickMonth} dict={dict} />
           <FilterDropdown label={L(dict, '主题', 'Topic')} value={topic} options={topicOptions} onPick={setTopic} dict={dict} />
         </div>
         <button
@@ -279,6 +298,17 @@ export default function MirrorLetterTab() {
           {archive.length > 0 && <span className="nesio-mirror-archive-count">{archive.length}</span>}
         </button>
       </div>
+
+      {/* 图3:自定义任意时间段(不限每月) */}
+      {(customMode || isCustomRange) && (
+        <div className="nesio-mirror-range">
+          <input type="date" value={rangeFrom} max={rangeTo || undefined}
+            onChange={(e) => setRange(e.target.value, rangeTo)} aria-label={L(dict, '开始日期', 'From')} />
+          <span aria-hidden>—</span>
+          <input type="date" value={rangeTo} min={rangeFrom || undefined}
+            onChange={(e) => setRange(rangeFrom, e.target.value)} aria-label={L(dict, '结束日期', 'To')} />
+        </div>
+      )}
 
       {/* 信纸 */}
       {letter ? (

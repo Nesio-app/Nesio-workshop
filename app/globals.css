@@ -16081,10 +16081,27 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 .nesio-rhythm-heat-row { display: flex; align-items: center; gap: 3px; }
 .nesio-rhythm-heat-dow { width: 1rem; flex-shrink: 0; font-size: 0.6rem; color: var(--portal-muted); text-align: center; }
 .nesio-rhythm-heat-cell { flex: 1; aspect-ratio: 1; border-radius: 3px; min-width: 0; }
-/* 置顶紧凑版:缩小、无侧栏文字 */
+/* 置顶紧凑版:扁长、占满一排、无侧栏文字(图5) */
 .nesio-rhythm-heat--compact { gap: 2px; margin: 0 0 0.9rem; }
 .nesio-rhythm-heat--compact .nesio-rhythm-heat-row { gap: 2px; }
-.nesio-rhythm-heat--compact .nesio-rhythm-heat-cell { flex: 0 0 auto; width: 10px; height: 10px; border-radius: 2px; aspect-ratio: auto; }
+.nesio-rhythm-heat--compact .nesio-rhythm-heat-cell { flex: 1 1 0; width: auto; height: 8px; border-radius: 2px; aspect-ratio: auto; }
+
+/* 图5:反复在想 —— 饼图 + 图例 */
+.nesio-mindpie { display: flex; align-items: center; gap: 1rem; margin-top: 0.6rem; }
+.nesio-mindpie-svg { width: 6.2rem; height: 6.2rem; flex-shrink: 0; }
+.nesio-mindpie-num { font-size: 20px; font-weight: 800; fill: var(--portal-ink); }
+.nesio-mindpie-lbl { font-size: 8px; fill: var(--portal-muted); }
+html[data-portal-theme="night"] .nesio-mindpie-num { fill: #e8eefa; }
+.nesio-mindpie-legend { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.nesio-mindpie-leg { display: flex; align-items: center; gap: 0.5rem; width: 100%; background: none; border: none; padding: 0.1rem 0; cursor: pointer; text-align: left; }
+.nesio-mindpie-dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; flex-shrink: 0; }
+.nesio-mindpie-leg-name { flex: 1; min-width: 0; font-size: 0.82rem; font-weight: 600; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-mindpie-leg-val { font-size: 0.72rem; color: var(--portal-muted); font-weight: 600; flex-shrink: 0; }
+
+/* 图3:多面镜自定义时段的日期选择 */
+.nesio-mirror-range { display: flex; align-items: center; gap: 0.5rem; margin: 0.4rem 0 0.2rem; }
+.nesio-mirror-range input[type="date"] { flex: 1; min-width: 0; font-size: 0.82rem; padding: 0.4rem 0.6rem; border-radius: var(--radius-sm, 12px); border: 1px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); }
+.nesio-mirror-range span { color: var(--portal-muted); }
 
 /* 生命版图证据行(§2.2) */
 .nesio-insights-map-evidence {

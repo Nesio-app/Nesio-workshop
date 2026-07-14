@@ -11,6 +11,7 @@
  */
 import type { LifeNode } from './life-graph';
 import { reportStorageDropped } from './storage-health';
+import { loadRelationshipOverrides } from './relationship-overrides';
 
 export type Closeness = 'core' | 'close' | 'acquaintance';
 
@@ -258,6 +259,7 @@ export function buildRelationships(
     }
   }
 
+  const overrides = loadRelationshipOverrides(); // 图4:用户手动改过的亲疏/关系词覆盖推断
   const out: Contact[] = [];
   for (const a of acc.values()) {
     const logged = contactLog[a.key] || null;
@@ -265,14 +267,16 @@ export function buildRelationships(
     // 一次性会议与会人降噪:只当过一次 participant、无分组、无联系记录 → 不列入(路人不是关系)。
     if (a.mentions <= 1 && a.relation && PARTICIPANT_REL.test(a.relation) && groups.length === 0 && !logged) continue;
     const last = newer(a.last, logged);
-    const closeness = closenessOf(a);
+    const ov = overrides[a.key];
+    const closeness = ov?.closeness ?? closenessOf(a);
+    const relation = ov?.relation ?? a.relation;
     // 学到的真实节奏优先;学不出(联系次数<3)才用按亲疏的固定桶。
     const cadenceDays = learnedCadence(a.times, CADENCE[closeness]);
     const daysSince = last ? Math.floor((now - Date.parse(last)) / 86400000) : null;
     const overdueRatio = daysSince == null ? 1.5 : daysSince / cadenceDays; // 无记录 → 略微提示
     const reachOut = daysSince == null ? false : daysSince > cadenceDays;
     out.push({
-      key: a.key, name: a.name, relation: a.relation, closeness,
+      key: a.key, name: a.name, relation, closeness,
       mentions: a.mentions, lastContactAt: last, daysSince, cadenceDays, reachOut, overdueRatio,
       groups,
     });
