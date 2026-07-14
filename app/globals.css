@@ -6191,6 +6191,20 @@ html[data-portal-theme="night"] .nesio-voice-confirm-chip {
   background: var(--portal-card, #fff); border-color: var(--portal-line); color: var(--portal-ink);
 }
 .nesio-camera-sheet--result .nesio-camera-node-note-input { color: var(--portal-muted); border-bottom-color: var(--portal-line); }
+/* 批次 185:结果页浅底 → 表单字段(存放位置/价格/有效期/标签)改深字浅底,修「看不清」 */
+.nesio-camera-sheet--result .nesio-camera-node-expiry-label,
+.nesio-camera-sheet--result .nesio-camera-tag-field > span { color: var(--portal-muted); }
+.nesio-camera-sheet--result .nesio-camera-node-expiry-input,
+.nesio-camera-sheet--result .nesio-camera-loc-picker,
+.nesio-camera-sheet--result .nesio-camera-tag-field input {
+  background: var(--portal-card, #fff); border-color: var(--portal-line); color: var(--portal-ink);
+}
+.nesio-camera-sheet--result .nesio-camera-node-expiry-input::placeholder,
+.nesio-camera-sheet--result .nesio-camera-tag-field input::placeholder { color: var(--portal-muted); opacity: 0.7; }
+/* 批次 185:名称输入 + 删除✕ 同一行,输入框缩短 */
+.nesio-camera-node-name-row { display: flex; align-items: center; gap: 0.5rem; }
+.nesio-camera-node-name-row .nesio-camera-node-name-input { flex: 1; min-width: 0; }
+.nesio-camera-node-name-row .nesio-camera-node-delete { flex-shrink: 0; }
 .nesio-camera-sheet--result .nesio-camera-save-btn { background: var(--portal-accent); box-shadow: none; }
 /* 相似记忆(合并后)浅色:深字浅底 —— 盖掉批次180给深底加的亮字 */
 .nesio-camera-sheet--result .nesio-camera-similar-item,

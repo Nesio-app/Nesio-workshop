@@ -1224,9 +1224,14 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
           <div className="nesio-camera-result-nodes">
             {editedNodes.map((node, i) => node.deleted ? null : (
               <div key={i} className="nesio-camera-result-node nesio-camera-result-node--editable">
-                {/* 批次 16:类型选择行删除——AI 按照片内容识别(小票/物品/文档…),
-                    不再让人手挑 emoji 图标;只留删除按钮 */}
-                <div className="nesio-camera-node-type-row" style={{ justifyContent: 'flex-end' }}>
+                {/* 批次 185(用户实锤):删除 ✕ 挪到名称输入框后面同一行,输入框缩短 */}
+                <div className="nesio-camera-node-name-row">
+                  <input
+                    className="nesio-camera-node-name-input"
+                    value={node.name}
+                    onChange={(e) => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, name: e.target.value } : n))}
+                    placeholder={L(dict, '名称', 'Name')}
+                  />
                   <button
                     type="button"
                     className="nesio-camera-node-delete"
@@ -1234,14 +1239,6 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
                     onClick={() => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, deleted: true } : n))}
                   >✕</button>
                 </div>
-
-                {/* Editable name */}
-                <input
-                  className="nesio-camera-node-name-input"
-                  value={node.name}
-                  onChange={(e) => setEditedNodes((prev) => prev.map((n, j) => j === i ? { ...n, name: e.target.value } : n))}
-                  placeholder={L(dict, '名称', 'Name')}
-                />
 
                 {/* Note */}
                 <input

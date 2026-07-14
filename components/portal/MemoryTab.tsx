@@ -670,14 +670,17 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
   );
 }
 
-// 批次 180:项目卡加状态控件(用户实锤「项目这里加状态按钮/选项」)。卡片改 div(内部
-// 可点区打开 + 一排状态段控),避免按钮套按钮。
+// 批次 185(用户实锤):项目状态三选项 进行中/计划中/归档(原「已完成」→「归档」)。
 const PROJ_STATUSES: Array<[ProjectStatus, string, string]> = [
-  ['active', '进行中', 'Active'], ['planned', '计划中', 'Planned'], ['completed', '已完成', 'Done'],
+  ['active', '进行中', 'Active'], ['planned', '计划中', 'Planned'], ['archived', '归档', 'Archived'],
 ];
 function ProjectCard({ project, allNodes, onClick, onSetStatus }: { project: Project; allNodes: LifeNode[]; onClick: () => void; onSetStatus: (s: ProjectStatus) => void }) {
   const dict = useDict();
   const count = project.nodeIds.filter((id) => allNodes.some((n) => n.id === id)).length;
+  // 批次 185:已存在项目只显示当前状态一个按钮,点一下展开三选项改;选完收起。
+  const [statusOpen, setStatusOpen] = useState(false);
+  const cur = project.status || 'active';
+  const curMeta = PROJ_STATUSES.find(([k]) => k === cur) || PROJ_STATUSES[0];
   return (
     <div className="nesio-project-card">
       <button type="button" className="nesio-project-card-open" onClick={onClick}>
@@ -688,25 +691,23 @@ function ProjectCard({ project, allNodes, onClick, onSetStatus }: { project: Pro
         </span>
       </button>
       <div className="nesio-proj-card-status">
-        {PROJ_STATUSES.map(([k, zh, en]) => (
-          <button key={k} type="button" className={`nesio-proj-card-statbtn${(project.status || 'active') === k ? ' nesio-proj-card-statbtn--on' : ''}`} onClick={() => onSetStatus(k)}>
-            {L(dict, zh, en)}
+        {statusOpen ? (
+          PROJ_STATUSES.map(([k, zh, en]) => (
+            <button key={k} type="button" className={`nesio-proj-card-statbtn${cur === k ? ' nesio-proj-card-statbtn--on' : ''}`} onClick={() => { onSetStatus(k); setStatusOpen(false); }}>
+              {L(dict, zh, en)}
+            </button>
+          ))
+        ) : (
+          <button type="button" className="nesio-proj-card-statbtn nesio-proj-card-statbtn--on" onClick={() => setStatusOpen(true)}>
+            {L(dict, curMeta[1], curMeta[2])} ▾
           </button>
-        ))}
+        )}
       </div>
     </div>
   );
 }
 
-// 批次 168:收藏夹维度 —— 手动收藏的记忆按类型归到 价值/习惯/节律/关系(尽力映射)。
-type FavDim = 'all' | 'value' | 'habit' | 'rhythm' | 'relation';
-function favDimensionOf(n: LifeNode): Exclude<FavDim, 'all'> | 'other' {
-  if (n.type === 'person') return 'relation';
-  if (n.type === 'preference' || n.type === 'note') return 'value';
-  if (n.type === 'commitment' || n.type === 'health_state') return 'habit';
-  if (n.type === 'event') return 'rhythm';
-  return 'other';
-}
+// 批次 185:收藏夹改按真实 tag 筛选,原固定维度 favDimensionOf/FavDim 已删。
 
 // 批次 168:收藏夹独立页 —— 手动收藏的记忆 + 维度 filter(全部/价值/习惯/节律/关系)。
 function FavoritesSheet({ pinnedNodes, onClose, onOpenNode, onLongPressNode }: {
@@ -716,12 +717,18 @@ function FavoritesSheet({ pinnedNodes, onClose, onOpenNode, onLongPressNode }: {
   onLongPressNode?: (n: LifeNode) => void;
 }) {
   const dict = useDict();
-  const [dim, setDim] = useState<FavDim>('all');
-  const DIMS: Array<[FavDim, string, string]> = [
-    ['all', '全部', 'All'], ['value', '价值', 'Values'], ['habit', '习惯', 'Habits'],
-    ['rhythm', '节律', 'Rhythm'], ['relation', '关系', 'Relationships'],
-  ];
-  const shown = dim === 'all' ? pinnedNodes : pinnedNodes.filter((n) => favDimensionOf(n) === dim);
+  // 批次 185(用户实锤):收藏夹筛选按**真实 tag**,不用固定维度(价值/习惯/节律/关系)。
+  // 取收藏项里真实出现的标签,按频次排序;滤掉内部/系统标签(domain:/facet:/天气/心情等)。
+  const [tag, setTag] = useState<string | null>(null);
+  const HIDE_TAG = /^(domain:|facet:|weather|天气|moment|feeling|energy|calm|mid|demo|分享)/i;
+  const tagCounts = new Map<string, number>();
+  for (const n of pinnedNodes) for (const t of (n.tags || [])) {
+    const tt = t.trim();
+    if (!tt || HIDE_TAG.test(tt)) continue;
+    tagCounts.set(tt, (tagCounts.get(tt) || 0) + 1);
+  }
+  const tags = Array.from(tagCounts.entries()).sort((a, b) => b[1] - a[1]).map(([t]) => t).slice(0, 12);
+  const shown = tag ? pinnedNodes.filter((n) => (n.tags || []).some((t) => t.trim() === tag)) : pinnedNodes;
   return (
     <>
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
@@ -731,18 +738,23 @@ function FavoritesSheet({ pinnedNodes, onClose, onOpenNode, onLongPressNode }: {
           <span className="nesio-project-detail-name">{L(dict, '收藏夹', 'Saved')}</span>
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose}>✕</button>
         </div>
-        <div className="nesio-fav-filter">
-          {DIMS.map(([k, zh, en]) => (
-            <button key={k} type="button" className={`nesio-fav-chip${dim === k ? ' nesio-fav-chip--on' : ''}`} onClick={() => setDim(k)}>
-              {L(dict, zh, en)}
+        {tags.length > 0 && (
+          <div className="nesio-fav-filter">
+            <button type="button" className={`nesio-fav-chip${!tag ? ' nesio-fav-chip--on' : ''}`} onClick={() => setTag(null)}>
+              {L(dict, '全部', 'All')}
             </button>
-          ))}
-        </div>
+            {tags.map((t) => (
+              <button key={t} type="button" className={`nesio-fav-chip${tag === t ? ' nesio-fav-chip--on' : ''}`} onClick={() => setTag((prev) => (prev === t ? null : t))}>
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
         {shown.length === 0 ? (
           <p className="nesio-project-detail-empty">
-            {dim === 'all'
+            {!tag
               ? L(dict, '还没有收藏。长按记忆卡 → 收藏到首页。', 'Nothing saved yet. Long-press a card → Pin.')
-              : L(dict, '这个维度还没有收藏', 'Nothing in this dimension yet')}
+              : L(dict, '这个标签下还没有收藏', 'Nothing under this tag yet')}
           </p>
         ) : (
           <div className="nesio-memory-grid" style={{ padding: '0 1rem 1rem' }}>
@@ -769,7 +781,8 @@ function ProjectsSheet({ projects, allNodes, onClose, onOpenProject, onCreate, o
   const activeCount = projects.filter((p) => p.status === 'active' || !p.status).length;
   // 批次 178:项目页顶部三统计框改为 进行中/计划中/已完成(数字=各状态项目数)
   const plannedCount = projects.filter((p) => p.status === 'planned').length;
-  const doneCount = projects.filter((p) => p.status === 'completed').length;
+  // 批次 185:第三格「已完成」→「归档」(与卡片状态三选项一致)
+  const archivedCount = projects.filter((p) => p.status === 'archived').length;
   // 批次 180:列表显示全部项目(进行中→计划中→已完成排序),改状态后卡不消失,状态可回切
   const order: Record<string, number> = { active: 0, planned: 1, completed: 2, archived: 3 };
   const sorted = [...projects].sort((a, b) => (order[a.status || 'active'] ?? 0) - (order[b.status || 'active'] ?? 0));
@@ -785,7 +798,7 @@ function ProjectsSheet({ projects, allNodes, onClose, onOpenProject, onCreate, o
         <div className="nesio-proj-stats">
           <span className="nesio-proj-stat"><b>{activeCount}</b> {L(dict, '进行中', 'Active')}</span>
           <span className="nesio-proj-stat"><b>{plannedCount}</b> {L(dict, '计划中', 'Planned')}</span>
-          <span className="nesio-proj-stat"><b>{doneCount}</b> {L(dict, '已完成', 'Done')}</span>
+          <span className="nesio-proj-stat"><b>{archivedCount}</b> {L(dict, '归档', 'Archived')}</span>
         </div>
         {sorted.length > 0 ? (
           <div className="nesio-memory-grid nesio-fav-expanded" style={{ padding: '0 1rem 0.5rem' }}>
@@ -866,10 +879,12 @@ function CreateProjectSheet({
   onCreate,
 }: {
   onClose: () => void;
-  onCreate: (name: string, emoji: string) => void;
+  onCreate: (name: string, emoji: string, status: ProjectStatus) => void;
 }) {
   const dict = useDict();
   const [name, setName] = useState('');
+  // 批次 185(用户实锤):新建项目选状态 —— 进行中 / 计划中(默认进行中)
+  const [status, setStatus] = useState<ProjectStatus>('active');
   const emoji = '📁'; // 数据层保留字段(旧项目兼容),显示层一律线性图标
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -889,13 +904,20 @@ function CreateProjectSheet({
           placeholder={L(dict, '项目名称，比如"装修"、"妈妈生日"…', 'Project name, e.g. "Renovation", "Mom\'s birthday"…')}
           value={name}
           onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) { onCreate(name.trim(), emoji); onClose(); } }}
+          onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) { onCreate(name.trim(), emoji, status); onClose(); } }}
         />
+        <div className="nesio-proj-card-status" style={{ margin: '0.6rem 0 0.2rem' }}>
+          {([['active', '进行中', 'Active'], ['planned', '计划中', 'Planned']] as Array<[ProjectStatus, string, string]>).map(([k, zh, en]) => (
+            <button key={k} type="button" className={`nesio-proj-card-statbtn${status === k ? ' nesio-proj-card-statbtn--on' : ''}`} onClick={() => setStatus(k)}>
+              {L(dict, zh, en)}
+            </button>
+          ))}
+        </div>
         <button
           type="button"
           className="nesio-create-project-confirm"
           disabled={!name.trim()}
-          onClick={() => { if (name.trim()) { onCreate(name.trim(), emoji); onClose(); } }}
+          onClick={() => { if (name.trim()) { onCreate(name.trim(), emoji, status); onClose(); } }}
         >
           {L(dict, '创建', 'Create')}
         </button>
@@ -1519,8 +1541,9 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
       {showCreateProject && (
         <CreateProjectSheet
           onClose={() => setShowCreateProject(false)}
-          onCreate={(name, emoji) => {
-            createProject(name, emoji);
+          onCreate={(name, emoji, status) => {
+            const p = createProject(name, emoji);
+            if (status !== 'active') updateProject(p.id, { status });
             setProjects(getProjects());
           }}
         />
