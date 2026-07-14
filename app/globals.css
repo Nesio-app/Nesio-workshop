@@ -6795,6 +6795,10 @@ html[data-portal-theme="night"] .nesio-profile-menu-bottom-label { color: #e8eef
   align-items: center;
   justify-content: center;
   padding: 1.25rem;
+  /* 批次 177:键盘漂移根治 —— 同 login-root,键盘弹起让位使卡片留在可视区 */
+  padding-bottom: calc(1.25rem + var(--kb-inset, 0px));
+  transition: padding-bottom 0.22s var(--ease-out, ease);
+  overflow-y: auto;
 }
 
 .nesio-ob-bg {
@@ -7253,6 +7257,10 @@ html[data-portal-theme="night"] .nesio-coach-bubble {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
+  /* 批次 177:键盘漂移根治 —— 键盘弹起时底部让出 --kb-inset,居中框上移,卡片留在可视区 */
+  padding-bottom: calc(1.5rem + var(--kb-inset, 0px));
+  transition: padding-bottom 0.22s var(--ease-out, ease);
+  overflow-y: auto;
   position: relative;
 }
 
