@@ -25,13 +25,36 @@ import PersonExtractSheet from './PersonExtractSheet';
 import { buildFamilyDigest } from '@/lib/portal/family-digest';
 
 const GROUPS: Closeness[] = ['core', 'close', 'acquaintance'];
-const FAMILY_RE = /家人|家庭|family/i;
+
+// 图/设计:干净筛选 —— 固定桶(家人/朋友/同事/业务/重要),把杂乱的原始英文标签归并进去;
+// 归不进的塞进「更多…」。桶按 关系词 + 分组标签 一起判定。
+const BUCKETS: Array<{ id: string; zh: string; en: string; re: RegExp }> = [
+  { id: 'family', zh: '家人', en: 'Family', re: /家人|家庭|family|爸|妈|父|母|哥|姐|弟|妹|儿子|女儿|丈夫|妻子|奶奶|爷爷|姥|外婆|外公|舅|叔|姑|婶|parent|mom|dad|son|daughter|wife|husband|sister|brother|child|spouse/i },
+  { id: 'friend', zh: '朋友', en: 'Friends', re: /朋友|哥们|闺蜜|发小|friend|buddy|\bpal\b/i },
+  { id: 'colleague', zh: '同事', en: 'Colleagues', re: /同事|同僚|colleague|co-?worker|coworker|\bteam\b|\bwork\b|老板|下属|领导|manager|boss|report/i },
+  { id: 'business', zh: '业务', en: 'Business', re: /业务|客户|甲方|供应|合作|client|customer|vendor|recruit|recipient|account|contact|partner|投资|lead/i },
+  { id: 'important', zh: '重要', en: 'Important', re: /重要|关键|vip|important|\bkey\b|\bstar\b/i },
+];
+const hayOf = (c: Contact) => [c.relation || '', ...c.groups].join(' ');
+const isBucketed = (g: string) => BUCKETS.some((b) => b.re.test(g));
+
+// 莫兰迪字母块:按名字散列取一档配色(与设计稿的分层配色一致的柔和调)
+function avatarClass(name: string): string {
+  let h = 0;
+  for (const ch of name) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return `nesio-rel-av--${h % 6}`;
+}
+function initialOf(name: string): string {
+  const t = name.trim();
+  return t ? Array.from(t)[0].toUpperCase() : '·';
+}
 
 export default function RelationshipsPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [openKey, setOpenKey] = useState<string | null>(null);
-  const [activeGroup, setActiveGroup] = useState<string | null>(null);
+  const [activeGroup, setActiveGroup] = useState<string | null>(null); // null=全部;桶 id 或原始分组名
+  const [showMore, setShowMore] = useState(false);
   const [extractOpen, setExtractOpen] = useState(false);
 
   const rebuild = () => {
@@ -72,15 +95,18 @@ export default function RelationshipsPanel() {
     );
   }
 
-  // 图2:分组芯片别铺一墙一次性原始标签 —— 按出现频次收敛(≥2 人),家人置顶,最多 12 枚
-  const groupCount = new Map<string, number>();
-  for (const c of contacts) for (const g of c.groups) groupCount.set(g, (groupCount.get(g) || 0) + 1);
-  const allGroups = Array.from(groupCount.entries())
-    .filter(([g, n]) => n >= 2 && g.trim().length > 0)
-    .sort((a, b) => (FAMILY_RE.test(b[0]) ? 1 : 0) - (FAMILY_RE.test(a[0]) ? 1 : 0) || b[1] - a[1] || a[0].localeCompare(b[0], 'zh'))
-    .slice(0, 12)
-    .map(([g]) => g);
-  const shown = activeGroup ? contacts.filter((c) => c.groups.includes(activeGroup)) : contacts;
+  // 固定桶(只保留有人的),原始英文标签归并进去;归不进的进「更多…」(按频次)
+  const presentBuckets = BUCKETS.filter((b) => contacts.some((c) => b.re.test(hayOf(c))));
+  const moreCount = new Map<string, number>();
+  for (const c of contacts) for (const g of c.groups) if (g.trim() && !isBucketed(g)) moreCount.set(g, (moreCount.get(g) || 0) + 1);
+  const moreGroups = Array.from(moreCount.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], 'zh')).slice(0, 20).map(([g]) => g);
+
+  const activeBucket = BUCKETS.find((b) => b.id === activeGroup);
+  const shown = !activeGroup
+    ? contacts
+    : activeBucket
+      ? contacts.filter((c) => activeBucket.re.test(hayOf(c)))
+      : contacts.filter((c) => c.groups.includes(activeGroup));
   const dueList = shown.filter((c) => c.reachOut);
   const familyDigest = buildFamilyDigest(contacts);
 
@@ -88,19 +114,30 @@ export default function RelationshipsPanel() {
     <div className="nesio-health-dash">
       <div className="nesio-rel-head-row">
         <p className="nesio-health-updated" style={{ margin: 0 }}>
-          {L(dict, `${shown.length} 个联系人 · ${dueList.length} 个该联系`, `${shown.length} people · ${dueList.length} to reach out`)}
+          {L(dict, `${shown.length} 位联系人 · ${dueList.length} 位这周想问候`, `${shown.length} people · ${dueList.length} to reach out`)}
         </p>
         <button type="button" className="nesio-rel-log-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} onClick={() => setExtractOpen(true)}>
           <IconCamera size={14} />{L(dict, '记给某人', 'Log to…')}
         </button>
       </div>
 
-      {allGroups.length > 0 && (
+      {(presentBuckets.length > 0 || moreGroups.length > 0) && (
         <div className="nesio-rel-chips" role="tablist" aria-label={L(dict, '联系人分组', 'Contact groups')}>
           <button type="button" role="tab" aria-selected={!activeGroup} className={`nesio-rel-chip${!activeGroup ? ' nesio-rel-chip--on' : ''}`} onClick={() => setActiveGroup(null)}>
             {L(dict, '全部', 'All')}
           </button>
-          {allGroups.map((g) => (
+          {presentBuckets.map((b) => (
+            <button key={b.id} type="button" role="tab" aria-selected={activeGroup === b.id} className={`nesio-rel-chip${activeGroup === b.id ? ' nesio-rel-chip--on' : ''}`} onClick={() => setActiveGroup(b.id)}>
+              {L(dict, b.zh, b.en)}
+            </button>
+          ))}
+          {/* 更多…:展开归并不进桶的原始分组 */}
+          {moreGroups.length > 0 && !showMore && (
+            <button type="button" className="nesio-rel-chip nesio-rel-chip--more" onClick={() => setShowMore(true)}>
+              {L(dict, '更多…', 'More…')}
+            </button>
+          )}
+          {showMore && moreGroups.map((g) => (
             <button key={g} type="button" role="tab" aria-selected={activeGroup === g} className={`nesio-rel-chip${activeGroup === g ? ' nesio-rel-chip--on' : ''}`} onClick={() => setActiveGroup(g)}>
               {g}
             </button>
@@ -128,49 +165,33 @@ export default function RelationshipsPanel() {
 
       {!activeGroup && <FamilySummary digest={familyDigest} onOpen={setOpenKey} />}
 
-      {dueList.length > 0 && (
-        <div className="nesio-fit-panel" style={{ marginTop: '0.4rem' }}>
-          <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '该联系了', 'Time to reach out')}</p>
-          {dueList.slice(0, 6).map((c) => (
-            <div key={c.key} className="nesio-rel-due-row">
-              <button type="button" className="nesio-rel-due-info nesio-rel-open" onClick={() => setOpenKey(c.key)}>
-                <span className="nesio-rel-name">{c.name}</span>
-                <span className="nesio-rel-sub">
-                  {c.relation ? `${c.relation} · ` : ''}{lastContactLabel(c, dict)}
-                </span>
-              </button>
-              <button type="button" className="nesio-rel-touch-btn" onClick={() => onContacted(c.key)}>
-                {L(dict, '联系过了', 'Reached out')}
-              </button>
-            </div>
-          ))}
-          <p className="nesio-settings-option-hint" style={{ margin: '0.4rem 0 0' }}>
-            {L(dict, '节奏按亲疏推:核心 2 周 · 亲近 1 月 · 一般 3 月(点「联系过了」重置)', 'Cadence by closeness: core 2wk · close 1mo · acquaintance 3mo (tap to reset)')}
-          </p>
-        </div>
-      )}
-
+      {/* 分层列表(核心/亲近/一般)—— 字母块头像按分层配色,每行自带「该问候了/联系过了」 */}
       {GROUPS.map((g) => {
         const items = shown.filter((c) => c.closeness === g);
         if (!items.length) return null;
         return (
           <div key={g}>
-            <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>
+            <p className="nesio-rel-tier-h">
+              <span className={`nesio-rel-tier-dot nesio-rel-tier-dot--${g}`} aria-hidden />
               {L(dict, CLOSENESS_META[g].zh, CLOSENESS_META[g].en)} · {items.length}
             </p>
-            <div className="nesio-rel-grid">
+            <div className="nesio-rel-list">
               {items.map((c) => (
                 <div
                   key={c.key}
                   role="button"
                   tabIndex={0}
-                  className={`nesio-rel-card nesio-rel-open${c.reachOut ? ' nesio-rel-card--due' : ''}`}
+                  className={`nesio-rel-row nesio-rel-open${c.reachOut ? ' nesio-rel-row--due' : ''}`}
                   onClick={() => setOpenKey(c.key)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenKey(c.key); } }}
                 >
-                  <span className="nesio-rel-name">{c.name}</span>
-                  <span className="nesio-rel-sub">{c.relation || (dict === 'en' ? `mentioned ${c.mentions}×` : `提到 ${c.mentions} 次`)}</span>
-                  <span className="nesio-rel-last">{lastContactLabel(c, dict)}</span>
+                  <span className={`nesio-rel-av ${avatarClass(c.name)}`} aria-hidden>{initialOf(c.name)}</span>
+                  <span className="nesio-rel-row-body">
+                    <span className="nesio-rel-name">{c.name}</span>
+                    <span className="nesio-rel-sub">
+                      {c.relation ? `${c.relation} · ` : ''}{dict === 'en' ? `mentioned ${c.mentions}×` : `提到 ${c.mentions} 次`} · {L(dict, `上次${lastContactLabel(c, dict)}`, `last ${lastContactLabel(c, 'en')}`)}
+                    </span>
+                  </span>
                   <button
                     type="button"
                     className={`nesio-rel-touch-btn nesio-rel-touch-btn--sm${c.reachOut ? ' nesio-rel-touch-btn--due' : ''}`}

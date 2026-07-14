@@ -13038,6 +13038,36 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
   border: 1px solid var(--portal-line); cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
 .nesio-rel-chip--on { background: var(--portal-accent-soft-md); color: var(--portal-blue-deep); border-color: var(--portal-accent-border); }
+.nesio-rel-chip--more { border-style: dashed; color: var(--portal-muted); }
+
+/* 关系·列表(整理后):分层标题 + 列表行 + 莫兰迪字母块头像 */
+.nesio-rel-tier-h { display: flex; align-items: center; gap: 0.45rem; font-size: 0.72rem; font-weight: 700; color: var(--portal-muted); margin: 1.1rem 0.15rem 0.5rem; }
+.nesio-rel-tier-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; flex-shrink: 0; }
+.nesio-rel-tier-dot--core { background: var(--portal-blue-deep); }
+.nesio-rel-tier-dot--close { background: var(--status-go); }
+.nesio-rel-tier-dot--acquaintance { background: var(--portal-muted); }
+
+.nesio-rel-list { display: flex; flex-direction: column; }
+.nesio-rel-row {
+  display: flex; align-items: center; gap: 0.8rem; width: 100%; text-align: left;
+  background: none; border: none; border-bottom: 1px solid var(--portal-line);
+  padding: 0.6rem 0.15rem; cursor: pointer;
+}
+.nesio-rel-row:last-child { border-bottom: none; }
+.nesio-rel-row:active { background: rgba(88,140,227,0.05); }
+.nesio-rel-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+
+/* 字母块头像:圆角方块 + 白字,按名字散列取莫兰迪配色 */
+.nesio-rel-av {
+  flex-shrink: 0; width: 2.6rem; height: 2.6rem; border-radius: 0.8rem;
+  display: grid; place-items: center; color: #fff; font-size: 1.05rem; font-weight: 700;
+}
+.nesio-rel-av--0 { background: #b0726b; }
+.nesio-rel-av--1 { background: #6f8f8a; }
+.nesio-rel-av--2 { background: #8a7fa0; }
+.nesio-rel-av--3 { background: #9a9060; }
+.nesio-rel-av--4 { background: #7f96b3; }
+.nesio-rel-av--5 { background: #a9906a; }
 
 /* ─── 按人分类的数据(人缘㊄)─── */
 .nesio-rel-rec-head { display: flex; align-items: center; justify-content: space-between; }
