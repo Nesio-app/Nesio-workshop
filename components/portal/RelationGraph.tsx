@@ -96,11 +96,12 @@ export default function RelationGraph({
 
   const gesture = useRef<{
     mode: 'pan' | 'pinch' | null;
+    axis: 'x' | 'y' | null; // 批次187:单指轴锁 —— 纵向让外层 sheet 滚,横向才平移图
     startX: number; startY: number;
     viewX: number; viewY: number;
     startDist: number; startW: number; startH: number;
     cx: number; cy: number;
-  }>({ mode: null, startX: 0, startY: 0, viewX: 0, viewY: 0, startDist: 0, startW: 0, startH: 0, cx: 0, cy: 0 });
+  }>({ mode: null, axis: null, startX: 0, startY: 0, viewX: 0, viewY: 0, startDist: 0, startW: 0, startH: 0, cx: 0, cy: 0 });
 
   useEffect(() => { setSelected(focusId ?? null); }, [focusId]);
 
@@ -169,12 +170,13 @@ export default function RelationGraph({
         viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
         width="100%"
         height={height}
-        style={{ display: 'block', touchAction: 'none' }}
+        style={{ display: 'block', touchAction: 'pan-y' }}
         className="rg-svg"
         onWheel={(e) => { e.preventDefault(); zoomAt(e.deltaY < 0 ? 1.15 : 0.87, e.clientX, e.clientY); }}
         onDoubleClick={() => setView(fit)}
         onTouchStart={(e) => {
           const g = gesture.current;
+          g.axis = null;
           if (e.touches.length === 2) {
             const [a, b] = [e.touches[0], e.touches[1]];
             g.mode = 'pinch';
@@ -209,8 +211,17 @@ export default function RelationGraph({
             });
           } else if (g.mode === 'pan' && e.touches.length === 1) {
             const t = e.touches[0];
+            const dx = t.clientX - g.startX;
+            const dy = t.clientY - g.startY;
+            // 批次187:轴锁 —— 第一次明显位移定方向。纵向交给外层 sheet 滚(touch-action: pan-y),
+            // 只有横向才平移图,否则嵌在可滚动详情里的图会把整页滚动吃掉(用户实锤:关系 tab 卡死不能滚)。
+            if (g.axis == null) {
+              if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+              g.axis = Math.abs(dx) > Math.abs(dy) ? 'x' : 'y';
+            }
+            if (g.axis === 'y') return;
             const s = clientScale();
-            setView((v) => clampView({ ...v, x: g.viewX - (t.clientX - g.startX) * s, y: g.viewY - (t.clientY - g.startY) * s }));
+            setView((v) => clampView({ ...v, x: g.viewX - dx * s, y: g.viewY - dy * s }));
           }
         }}
         onTouchEnd={() => { gesture.current.mode = null; }}

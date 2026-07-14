@@ -119,6 +119,12 @@ export function buildEmailExtractionPrompt(emailTexts: string): string {
 只提取：预约/约会、承诺、重要日期、人名、地点。
 忽略：广告、营销、订阅推广、自动通知、验证码。
 
+分类铁律：
+- 会议 / 约会 / 日程邀请（含时间的 meeting、invite、日程、预约）→ 一个 event 节点，name=会议主题，attributes.date=ISO 时间。
+  绝不要把会议的组织者 / 发件人单独提成 person 节点 —— 那是「谁发的」，不是一条值得记的人物记忆。
+- 只有当邮件本身是在「介绍 / 认识一个新的人」（简历、引荐、新同事介绍）时，才提 person 节点。
+- 承诺 / 要做的事 → commitment；单纯的重要日期 → event。
+
 ${NODE_SCHEMA_BLOCK}
 
 每封邮件最多 2 个节点。attributes 里保留 date（ISO）、location、source（发件人）。

@@ -5484,18 +5484,19 @@ html[data-portal-theme="night"] .nesio-type-chip {
 }
 .nesio-memory-card-lead.nesio-memory-card-avatar { border-radius: 50%; }
 /* 来源徽章(设计「来源徽章·6 种·左下固定」:图标 + 名,中性 muted);不确定用注意色标「待确认」 */
+/* 批次187(用户实锤「双徽章」冗余):卡片顶部已有 type 分类徽章作主标识,
+   来源降级为左下角的一行淡色小字(图标+名),不再做成第二枚填充药丸,弱化视觉权重。 */
 .nesio-memory-card-source {
   display: inline-flex;
   align-items: center;
   gap: 0.22rem;
-  font-size: 0.64rem;
-  font-weight: 600;
+  font-size: 0.62rem;
+  font-weight: 500;
   color: var(--portal-muted);
-  padding: 0.06rem 0.4rem 0.06rem 0.32rem;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--portal-muted) 13%, transparent);
+  opacity: 0.62;
   white-space: nowrap;
 }
+.nesio-memory-card-source svg { opacity: 0.85; }
 .nesio-memory-card-pending {
   font-size: 0.64rem;
   font-weight: 700;
