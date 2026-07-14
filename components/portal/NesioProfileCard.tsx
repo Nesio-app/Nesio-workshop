@@ -9,7 +9,7 @@ import ConnectorsHub from './ConnectorsHub';
 import RoadmapSheet from './RoadmapSheet';
 import RoutineSheet from './RoutineSheet';
 import PreviewGuidesSheet from './PreviewGuidesSheet';
-import { getTier, trialDaysLeft } from '@/lib/portal/entitlement';
+import { getTier, trialDaysLeft, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -105,6 +105,8 @@ export default function NesioProfileCard() {
 
   // 批次 95:照片 → app 主题色卡通头像(生成 → 预览 → 接受设为头像)
   async function generateCartoon(dataUrl: string) {
+    // 安全审计 #2:卡通头像是付费云视觉,免费(分层启用后)→ 升级引导,不打云;原照片仍可用。
+    if (!guardPaidCloudAi('avatar_ai')) return;
     setCartoonBusy(true);
     setCartoonMsg('');
     try {

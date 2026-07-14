@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { loadProfileSettings, portalLocaleToDictionaryLocale, PROFILE_UPDATED_EVENT } from '@/lib/portal/profile';
+import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { buildDailyReport, type DailyReport } from '@/lib/portal/daily-report';
 import { autoPersistTodayReport } from '@/lib/portal/daily-report-persist';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext, type TodayReceipt } from '@/lib/platform/view-models/today-view-model';
@@ -298,7 +299,8 @@ export function useTodayData(canUsePrivateData: boolean) {
             if (raw?.sig === cacheSig) cachedCopy = raw.cards;
           } catch { /* ignore */ }
 
-          if (!cachedCopy) {
+          // 安全审计 #2:引导语润色是付费云,后台被动增强 —— 免费(分层启用后)静默跳过,用原始文案,不打云、不弹窗。
+          if (!cachedCopy && canUsePaidCloudAi()) {
             try {
               const langRes = await fetch('/api/portal/guidance-language', {
                 method: 'POST',

@@ -39,6 +39,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { InfoTip } from './InfoTip';
 import { IconRefresh, IconTrendingUp, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconDownload, IconAlertTriangle, IconBookmark } from './icons';
+import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 import TimelineTab from './insights/TimelineTab';
 import MirrorLetterTab from './insights/MirrorLetterTab';
 import FinanceTab from './finance/FinanceTab';
@@ -626,6 +627,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       setLivingModel(cached);
       return;
     }
+
+    // 安全审计 #2:生命模型是付费云 LLM,免费(分层启用后)→ 升级引导,不打云;已缓存的仍展示。
+    if (!guardPaidCloudAi('living_model')) { if (cached) setLivingModel(cached); return; }
 
     const mySeq = ++livingSeqRef.current;
     setLivingLoading(true);

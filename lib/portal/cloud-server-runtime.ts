@@ -10,6 +10,7 @@ import {
   type CloudIdentity,
 } from '@/lib/portal/cloud-identity';
 import { envValue } from '@/lib/portal/env';
+import { AUTH_SIG_COOKIE, signSessionValue } from '@/lib/portal/auth/session-sig';
 
 export { deriveCloudIdentity };
 export type { CloudIdentity };
@@ -195,6 +196,8 @@ export function setRefreshedAuthCookies(response: NextResponse, session?: Supaba
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
     });
+    const sig = signSessionValue(session.refresh_token); // 安全审计 #8:refresh 配套签名
+    if (sig) response.cookies.set(AUTH_SIG_COOKIE, sig, { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 30 });
   }
   return response;
 }

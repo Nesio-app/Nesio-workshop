@@ -25,6 +25,7 @@ import { computeRiskScores, type RiskCategory } from '@/lib/portal/health-risk';
 import { buildMonthlyHealthReport, persistHealthReportToMemory, autoPersistLastMonthHealthReport, healthMonths } from '@/lib/portal/health-report';
 import { healthReportRichHtml } from '@/lib/portal/health-report-visual';
 import { IconLock } from '../icons';
+import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 
 const TREND_HEADLINE: Record<FitnessInsight['trend'], [string, string]> = {
   up: ['体能上升中', 'Fitness rising'], flat: ['体能维持中', 'Holding steady'], down: ['体能下降中', 'Fitness dipping'], unknown: ['数据积累中', 'Gathering data'],
@@ -228,6 +229,7 @@ function AiInsightPanel({ data, dict }: { data: HealthMetrics; dict: string }) {
   const [text, setText] = useState('');
 
   async function run() {
+    if (!guardPaidCloudAi('health_insight')) return; // 安全审计 #2:健康 AI 解读付费云,免费→升级引导
     setStatus('loading');
     try {
       const rels = data.daily ? mineRelationships(data.daily) : [];

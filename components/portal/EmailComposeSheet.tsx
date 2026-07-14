@@ -12,6 +12,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { rememberAI, recallAI, sig } from '@/lib/portal/ai-cache';
 import { draftLocally } from '@/lib/portal/local-draft';
+import { canUse } from '@/lib/portal/entitlement';
 import { useSheetDrag } from './use-sheet-drag';
 
 export interface EmailComposeContext {
@@ -108,6 +109,13 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
   }
 
   async function aiDraft() {
+    // 安全审计 #3:email_reply 是 PRO_ONLY 整功能(会员页承诺),此前门从未接线 —— 免费用户
+    // 照打云 draft-reply。现接线:免费 → 升级引导 + 本地可改骨架(确定性兜底),不打付费云。
+    if (!canUse('email_reply')) {
+      window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'email_reply' } }));
+      fallbackDraft();
+      return;
+    }
     setError('');
     setDraftSource(null);
     setDrafting(true);

@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { isRateLimited } from '@/lib/portal/api-auth';
+import { AUTH_SIG_COOKIE, signSessionValue } from '@/lib/portal/auth/session-sig';
 
 interface SupabaseSession { access_token?: string; refresh_token?: string; expires_in?: number }
 
@@ -24,6 +25,8 @@ function setAuthCookies(response: NextResponse, session: SupabaseSession) {
   }
   if (session.refresh_token) {
     response.cookies.set('baohe_auth_refresh', session.refresh_token, { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 30 });
+    const sig = signSessionValue(session.refresh_token); // 安全审计 #8:refresh 配套签名
+    if (sig) response.cookies.set(AUTH_SIG_COOKIE, sig, { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 30 });
   }
 }
 

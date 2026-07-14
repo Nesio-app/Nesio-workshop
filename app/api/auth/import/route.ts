@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { bootstrapCloudAccountProfile, buildCloudAccountProfileBootstrapMeta } from '@/lib/portal/cloud-account-profile';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
+import { AUTH_SIG_COOKIE, signSessionValue } from '@/lib/portal/auth/session-sig';
 
 type SupabaseUserResponse = {
   id?: string;
@@ -70,6 +71,8 @@ function setAuthCookies(
       path: '/',
       maxAge: 60 * 60 * 24 * 30,
     });
+    const sig = signSessionValue(session.refreshToken); // 安全审计 #8:refresh 配套签名
+    if (sig) response.cookies.set(AUTH_SIG_COOKIE, sig, { httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 30 });
   }
 
   if (session.provider) {

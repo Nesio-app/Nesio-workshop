@@ -15,7 +15,7 @@ const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: fals
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { getLifeGraph, isBulkImported, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
 import { buildMemoryContext, fmtEventDate, extractCitations } from '@/lib/portal/memory-retrieval';
-import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
+import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { smartSearch } from '@/lib/portal/smart-search';
 import { parseTemporalQuery, isInSpan } from '@/lib/portal/temporal-query';
@@ -549,7 +549,7 @@ export default function NesioChatSheet({
 
     // ── 物品·问一问记物品:命中意图门 → AI 拆物品直接入库,气泡确认;
     //    提取为空/失败 → 静默落回普通聊天(不打断,不报错)。
-    if (INVENTORY_ADD_RE.test(text) && !INVENTORY_QUESTION_RE.test(text)) {
+    if (INVENTORY_ADD_RE.test(text) && !INVENTORY_QUESTION_RE.test(text) && guardPaidCloudAi('inventory_extract')) {
       try {
         const invCtrl = new AbortController();
         const invTimeout = setTimeout(() => invCtrl.abort(), 12_000);

@@ -21,7 +21,7 @@ import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
 import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab, getPalette, setPalette, PALETTES, type PaletteId } from '@/lib/portal/module-overrides';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
-import { getTier, hasProOverride, setProEntitlement, trialDaysLeft } from '@/lib/portal/entitlement';
+import { canUse, getTier, hasProOverride, setProEntitlement, trialDaysLeft } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
 import { pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
 
@@ -776,11 +776,12 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
         </span>
       </button>
 
-      {/* 批次 176:每日简报 demo —— 用「问一问」同一套检索生成,预览上线后每早推给你的那张。
-          批次 186 合并:统一走 Portal 全局挂载的 nesio-open-brief(agent 的本地 briefOpen 版本会双挂载 + 导入死路径) */}
-      <button type="button"
-        className="nesio-settings-option"
-        onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-brief')); onClose(); }}>
+      {/* 批次176/186:每日简报走 Portal 全局挂载 nesio-open-brief(agent 本地 briefOpen 会双挂载 + 死路径 import)。
+          批次192 合并(安全审计#5):简报=AI 例程(Pro),免费走升级引导不旁路 —— Pro 门 + 全局派发合一。 */}
+      <button type="button" className="nesio-settings-option" onClick={() => {
+        if (!canUse('ai_routine')) { window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'ai_routine' } })); return; }
+        window.dispatchEvent(new CustomEvent('nesio-open-brief')); onClose();
+      }}>
         <div>
           <span className="nesio-settings-option-label">{L(dict, '看每日简报 demo', 'Preview daily brief')}</span>
           <span className="nesio-settings-option-hint">

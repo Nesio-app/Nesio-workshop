@@ -22,6 +22,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { useSheetDrag } from '../use-sheet-drag';
+import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 
 type Extracted = { category: PersonRecordCategory; title: string; detail?: string; date?: string; amount?: number };
 
@@ -48,6 +49,7 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
   const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   const doExtract = async (payload: { text?: string; image?: string }) => {
+    if (!guardPaidCloudAi('person_extract')) return; // 安全审计 #2:AI 抽取付费云,免费→升级引导
     setErr(null); setBusy(true); setPending(null);
     try {
       const res = await fetch('/api/portal/person-extract', {
