@@ -45,7 +45,14 @@ export function useProfileAvatar(enabled: boolean = true): {
     // 只有本地没有永久头像(换了新设备、只剩 storagePath)时才去换签名 URL。
     if (profile.avatarStoragePath && !profile.avatarUrl?.startsWith('data:')) fetchFreshUrl(profile.avatarStoragePath);
 
-    const onUpdate = () => setAvatarUrl(loadProfileSettings().avatarUrl || '');
+    const onUpdate = () => {
+      const p = loadProfileSettings();
+      if (p.avatarUrl) { setAvatarUrl(p.avatarUrl); return; }
+      // 批次200:跨端拉到别端头像时 applyCloudProfile 会清本地 avatarUrl、只留新 avatarStoragePath。
+      // 此时不能停在空头像 —— 必须用新 storagePath 换签重渲染,否则别端的头像换不过来(显示成首字母)。
+      if (p.avatarStoragePath) { fetchFreshUrl(p.avatarStoragePath); return; }
+      setAvatarUrl('');
+    };
     window.addEventListener(PROFILE_UPDATED_EVENT, onUpdate);
     return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onUpdate);
   }, [enabled, fetchFreshUrl]);
