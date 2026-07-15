@@ -24,6 +24,7 @@ import { pinNodeToTodayFocus } from '@/lib/platform/view-models/today-commands';
 import { DOMAINS } from '@/lib/life-domain';
 import { isFeatureEnabled } from '@/lib/portal/module-overrides';
 import { smartSearch, type SearchUnderstood } from '@/lib/portal/smart-search';
+import { isNodeUncertain } from '@/lib/portal/node-provenance';
 import { semanticRerank } from '@/lib/portal/semantic-rerank';
 import { DEMO_SEED_NODES, isDemoNode } from '@/lib/portal/demo-seed';
 import { seedSampleData, clearSampleData, hasSampleData } from '@/lib/portal/sample-data';
@@ -422,10 +423,7 @@ function categoryLabelForCard(node: LifeNode, dict: DictLocale): string {
   return typeLabel(node.type, dict);
 }
 
-/** 不确定(AI 抽取的低置信项)→ 卡片标「待确认」(设计规范:不确定标 待确认)。 */
-function isNodeUncertain(node: LifeNode): boolean {
-  return typeof node.confidence === 'number' && node.confidence > 0 && node.confidence < 0.6;
-}
+/** isNodeUncertain 已抽到 lib/portal/node-provenance.ts 当单一真源(批次210),供记忆徽章 + guidance 共用。 */
 
 /** 卡片标题智能截断:整段原文取首个分句,一眼读完(批次 4)。 */
 function smartCardTitle(name: string): string {

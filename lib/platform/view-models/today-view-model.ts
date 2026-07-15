@@ -29,6 +29,8 @@ export interface FocusNode {
   createdAt: string;
   attributes: Record<string, string | number | boolean | null>;
   subtasks?: SubTask[];
+  /** 节点抽取置信度(0-1)。批次210:透传到 guidance,让 AI 推断的低置信项不冒充「用户确认」发确信提醒。 */
+  confidence?: number;
 }
 
 function parseSubtasks(attrs: Record<string, string | number | boolean | null>): SubTask[] | undefined {
@@ -297,6 +299,7 @@ export function buildTodayViewModel(input: {
   const toFocusNode = (n: LifeNode): FocusNode => ({
     id: n.id, name: n.name, type: n.type, rawInput: n.rawInput,
     createdAt: n.createdAt, attributes: n.attributes, subtasks: parseSubtasks(n.attributes),
+    confidence: n.confidence, // 批次210:透传抽取置信度到 guidance(幻觉信任)
   });
 
   const focusNodes: FocusNode[] = lifeGraphNodes

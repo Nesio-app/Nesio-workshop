@@ -13,6 +13,7 @@ import type { ProactiveContextItem, FocusNode } from '@/lib/platform/view-models
 import { inferEventType, parseEventDate } from '@/lib/platform/attention-engine';
 import { nearestNodeDate, nodeExpiryDate } from '@/lib/platform/node-dates';
 import { LEXICON } from '@/lib/platform/keyword-lexicon';
+import { isNodeUncertain, nodeConfidenceToGuidance } from '@/lib/portal/node-provenance';
 /** 批次197:objectContextEvents 只读这几个字段。收窄入参(而非要整个 LifeNode),
  *  让 Today 的 FocusNode[](无 tags)也能直接喂进来,不必强转,也接回了这段死代码。 */
 type ContextObjectNode = {
@@ -154,6 +155,11 @@ export function focusNodesToGuidanceEvents(
   const results: GuidanceEvent[] = [];
 
   for (const node of nodes) {
+    // 批次210(AI 幻觉信任):AI 抽取的低置信节点(isNodeUncertain)不该冒充「用户确认」发确信提醒。
+    // confOf 把写死的高置信降到节点真实抽取置信度 → interrupt 优先级随之降(worthInterrupting 里 confidence
+    // 占 15%),确信的错提醒降级成「不那么急、甚至不冒头」的 miss;payload.uncertain 供下游标「待确认」。
+    const uncertain = isNodeUncertain(node);
+    const confOf = (base: number): number => (uncertain ? nodeConfidenceToGuidance(node) : base);
     // 批次197:机票 event(subtype=flight)→ flight 类型,走 action-window 的 48h/26h/4h 值机窗。
     // 通用 deadline 分支只覆盖未来 2 天且口吻是「截止」,配不上「值机窗已开」,故单独接。
     if (String(node.attributes.subtype ?? '') === 'flight') {
@@ -165,9 +171,10 @@ export function focusNodesToGuidanceEvents(
         if (hoursUntil > 0 && hoursUntil <= 48) {
           results.push({
             id: `node-${node.id}`, type: 'flight', title: node.name, scheduledAt: dep,
-            source: 'memory', confidence: 88,
+            source: 'memory', confidence: confOf(88),
             payload: {
               nodeId: node.id,
+              uncertain,
               flightNo: String(node.attributes.flightNo ?? ''),
               from: String(node.attributes.from ?? ''),
               to: String(node.attributes.to ?? ''),
@@ -190,8 +197,8 @@ export function focusNodesToGuidanceEvents(
         if (days >= 0 && days <= 180) {
           results.push({
             id: `node-${node.id}`, type: 'renewal', title: node.name, scheduledAt: expDate,
-            source: 'memory', confidence: 85,
-            payload: { nodeId: node.id, subtype: renewSub, expiryDate: expRaw },
+            source: 'memory', confidence: confOf(85),
+            payload: { nodeId: node.id, uncertain, subtype: renewSub, expiryDate: expRaw },
           });
           continue;
         }
@@ -210,8 +217,8 @@ export function focusNodesToGuidanceEvents(
           title: node.name,
           scheduledAt: exp,
           source: 'memory',
-          confidence: 90,
-          payload: { nodeId: node.id, expiryDate: String(node.attributes.expiry ?? '') },
+          confidence: confOf(90),
+          payload: { nodeId: node.id, uncertain, expiryDate: String(node.attributes.expiry ?? '') },
         });
         continue; // 同一节点不再出 deadline 卡(重复出现是用户点名 bug)
       }
@@ -238,8 +245,8 @@ export function focusNodesToGuidanceEvents(
       title: node.name,
       scheduledAt: d,
       source: 'memory',
-      confidence: 90,  // user-set deadline
-      payload: { nodeId: node.id },
+      confidence: confOf(90),  // user-set deadline(uncertain 时降到真实抽取置信)
+      payload: { nodeId: node.id, uncertain },
     });
   }
 
