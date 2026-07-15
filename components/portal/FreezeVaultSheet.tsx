@@ -15,7 +15,7 @@ import type { BarcodeResult } from './BarcodeScanSheet';
 
 const BarcodeScanSheet = dynamic(() => import('./BarcodeScanSheet'), { ssr: false });
 import { earnPoints, addWishFromFreeze, getPoints, DISCIPLINE_BONUS } from '@/lib/platform/rewards-engine';
-import RewardsWarehouse from './RewardsWarehouse';
+import RewardsStore from './RewardsStore';
 import { IconSnowflake } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -193,7 +193,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
           </button>
         </div>
 
-        {tab === 'rewards' && <RewardsWarehouse />}
+        {tab === 'rewards' && <RewardsStore />}
 
         {/* Add tab */}
         {tab === 'add' && (

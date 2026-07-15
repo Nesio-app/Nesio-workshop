@@ -3,7 +3,7 @@
  *
  * 五领域(关系/事业/成长/健康/自我)按**意义密度**(不是数量)切分领土宽度,
  * 并算出「最大迁移」——近 60 天相对前 60 天占比涨得最多的那一域。
- * 纯函数、无 DOM、无 d3、无 AI —— 与 LifeCivilizationMap 的域判定同源,可单测。
+ * 纯函数、无 DOM、无 d3、无 AI —— 与 LifeMap 的域判定同源,可单测。
  * 门槛(≥21 天 / ≥6 条真实记录)由调用方(InsightsSheet)把守,这里只做数学。
  */
 
@@ -46,7 +46,7 @@ const TAG_KEYWORDS: Record<TerritoryDomainId, string[]> = {
   self:      ['自我', '反思', 'reflect', '感受', '内心', '旅行', '探索', '创作', '梦想'],
 };
 
-/** 域判定:标签/正文关键词优先,再回落节点类型。与 LifeCivilizationMap 同源。 */
+/** 域判定:标签/正文关键词优先,再回落节点类型。与 LifeMap 同源。 */
 export function detectTerritoryDomain(node: LifeNode): TerritoryDomainId {
   const searchText = [node.name, node.rawInput ?? '', ...(node.tags ?? [])]
     .join(' ')

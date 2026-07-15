@@ -15533,14 +15533,14 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   box-shadow: var(--shadow-raise);
 }
 
-/* ── Life Civilization Map ──────────────────────────────────────────────────── */
-.life-civ-wrap {
+/* ── Life Map ──────────────────────────────────────────────────── */
+.life-map-wrap {
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
   padding: var(--space-2) 0;
 }
-.life-civ-insight {
+.life-map-insight {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
@@ -15552,20 +15552,20 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   color: var(--portal-ink);
   line-height: 1.5;
 }
-.life-civ-insight-icon {
+.life-map-insight-icon {
   flex-shrink: 0;
   color: var(--portal-accent);
   font-size: 10px;
   margin-top: 3px;
 }
-.life-civ-demo-note {
+.life-map-demo-note {
   font-size: var(--text-xs);
   color: var(--portal-muted);
   text-align: center;
   padding: var(--space-1) 0;
   opacity: 0.7;
 }
-.life-civ-svg-wrap {
+.life-map-svg-wrap {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -15573,17 +15573,17 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   background: var(--portal-bg);
   padding: var(--space-2) 0 var(--space-1);
 }
-.life-civ-svg {
+.life-map-svg {
   display: block;
   min-width: 300px;
 }
-.life-civ-legend {
+.life-map-legend {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
   padding: 0 var(--space-1);
 }
-.life-civ-legend-btn {
+.life-map-legend-btn {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -15596,13 +15596,13 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
-.life-civ-legend-btn:hover,
-.life-civ-legend-btn--on {
+.life-map-legend-btn:hover,
+.life-map-legend-btn--on {
   border-color: var(--portal-accent);
   color: var(--portal-ink);
   background: var(--portal-accent-soft);
 }
-.life-civ-legend-dot {
+.life-map-legend-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
