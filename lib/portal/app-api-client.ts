@@ -287,6 +287,8 @@ export type CloudProfileSettings = {
   learningRef?: string;
   // 批次200:名字/头像身份 LWW 时间戳(ISO)。
   identityUpdatedAt?: string;
+  // 批次205:日报开关跨端一致(其余 locale/coachStyle/theme 已在上方)。
+  dailyReportEnabled?: boolean;
 };
 
 export type CloudProfileSettingsResponse = {

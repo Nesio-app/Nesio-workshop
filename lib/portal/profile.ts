@@ -56,10 +56,20 @@ const KEYS = {
 
 export const PROFILE_UPDATED_EVENT = 'treasurebox-profile-updated';
 
-/** 批次200:本地身份(名字/头像)最后修改时刻(ISO)。跨端同步比对用,无 → ''。 */
+/** 批次200:本地身份(名字/头像/语言/教练/日报)最后修改时刻(ISO)。跨端同步比对用,无 → ''。 */
 export function profileIdentityUpdatedAt(): string {
   if (typeof window === 'undefined') return '';
   try { return localStorage.getItem(KEYS.identityUpdatedAt) || ''; } catch { return ''; }
+}
+
+/** 批次205:主题在 saveProfileSettings 之外单存(AppearanceSheet 的 treasurebox-theme),
+ *  改主题时调此把 profile LWW 时间戳打新 + 广播,让自动回推与别端拉取生效。 */
+export function touchProfileIdentity(): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(KEYS.identityUpdatedAt, new Date().toISOString());
+    window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT));
+  } catch { /* ignore */ }
 }
 
 export function normalizePortalLocale(value: string | null | undefined): PortalLocale {
@@ -109,6 +119,9 @@ export function saveProfileSettings(
     // 若也算「新改」会让每次刷新都误判本地更新 → 跨端乒乓。
     const prevName = localStorage.getItem(KEYS.displayName) || '';
     const prevPath = localStorage.getItem(KEYS.avatarStoragePath) || '';
+    const prevLocale = localStorage.getItem(KEYS.locale) || '';
+    const prevCoach = localStorage.getItem(KEYS.coachStyle) || '';
+    const prevDaily = localStorage.getItem(KEYS.dailyReportEnabled) || '';
     if (patch.displayName !== undefined) {
       localStorage.setItem(KEYS.displayName, patch.displayName.trim() || '我');
     }
@@ -120,11 +133,6 @@ export function saveProfileSettings(
       if (patch.avatarStoragePath) localStorage.setItem(KEYS.avatarStoragePath, patch.avatarStoragePath);
       else localStorage.removeItem(KEYS.avatarStoragePath);
     }
-    const nameChanged = patch.displayName !== undefined && (patch.displayName.trim() || '我') !== prevName;
-    const pathChanged = patch.avatarStoragePath !== undefined && (patch.avatarStoragePath || '') !== prevPath;
-    if (nameChanged || pathChanged) {
-      localStorage.setItem(KEYS.identityUpdatedAt, opts?.identityUpdatedAt || new Date().toISOString());
-    }
     if (patch.locale !== undefined) {
       localStorage.setItem(KEYS.locale, patch.locale);
       document.documentElement.lang = portalLocaleToHtmlLang(patch.locale);
@@ -134,6 +142,16 @@ export function saveProfileSettings(
     }
     if (patch.dailyReportEnabled !== undefined) {
       localStorage.setItem(KEYS.dailyReportEnabled, patch.dailyReportEnabled ? '1' : '0');
+    }
+    // 批次200/205:profile LWW 时间戳 —— 名字/头像/语言/教练风格/日报开关**实际变化**时更新。
+    // 排除「只改 avatarUrl」(签名 URL 刷新,非用户编辑,否则跨端乒乓)。
+    const nameChanged = patch.displayName !== undefined && (patch.displayName.trim() || '我') !== prevName;
+    const pathChanged = patch.avatarStoragePath !== undefined && (patch.avatarStoragePath || '') !== prevPath;
+    const localeChanged = patch.locale !== undefined && patch.locale !== prevLocale;
+    const coachChanged = patch.coachStyle !== undefined && patch.coachStyle !== prevCoach;
+    const dailyChanged = patch.dailyReportEnabled !== undefined && (patch.dailyReportEnabled ? '1' : '0') !== prevDaily;
+    if (nameChanged || pathChanged || localeChanged || coachChanged || dailyChanged) {
+      localStorage.setItem(KEYS.identityUpdatedAt, opts?.identityUpdatedAt || new Date().toISOString());
     }
     window.dispatchEvent(new CustomEvent(PROFILE_UPDATED_EVENT));
   } catch { reportStorageDropped(); }

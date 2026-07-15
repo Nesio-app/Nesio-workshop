@@ -15,7 +15,7 @@ import { reconcileLocalOwner, claimLocalDataForUser, purgeAllLocalUserData, setL
 import { archiveCurrentSpace, restoreArchivedSpace } from '@/lib/portal/account-spaces';
 import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
 import { syncLearningWithCloud, registerLearningAutoPush } from '@/lib/portal/cloud-learning-sync';
-import { syncProfileWithCloud } from '@/lib/portal/cloud-profile-sync';
+import { syncProfileWithCloud, registerProfileAutoPush } from '@/lib/portal/cloud-profile-sync';
 
 // Heavy sheets load on first open, not at boot — together they were ~3.5k
 // lines of first-paint JS for UI the user may never touch in a session.
@@ -528,6 +528,8 @@ export default function Portal() {
     // 补上记忆/学习态之外最后一块跨端不一致(头像 婧/F/朋 各端不同的真因)。
     void syncProfileWithCloud();
     const unregisterLearningPush = registerLearningAutoPush();
+    // 批次205:改名字/头像/语言/教练/日报/主题任一 → 防抖自动推上云,别端拉取即一致。
+    const unregisterProfilePush = registerProfileAutoPush();
     const onVisible = () => {
       if (document.visibilityState === 'visible') { void syncMemoryWithCloud(); void syncLearningWithCloud(); void syncProfileWithCloud(); }
     };
@@ -535,6 +537,7 @@ export default function Portal() {
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       unregisterLearningPush();
+      unregisterProfilePush();
     };
   }, [canUsePrivateRuntime]);
 

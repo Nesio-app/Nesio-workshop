@@ -17,8 +17,24 @@
  * 免费(P3):durability 不锁付费门。best-effort:未登录/离线静默。
  */
 import { createAppApiClient } from './app-api-client';
-import { loadProfileSettings, saveProfileSettings, profileIdentityUpdatedAt } from './profile';
+import { loadProfileSettings, saveProfileSettings, profileIdentityUpdatedAt, PROFILE_UPDATED_EVENT, type PortalProfileSettings } from './profile';
 import type { CloudProfileSettings } from './app-api-client';
+
+// 批次205:主题在 profile 之外单存(AppearanceSheet 的 treasurebox-theme),同步时直接读写它。
+const THEME_KEY = 'treasurebox-theme';
+function readTheme(): string {
+  try { return localStorage.getItem(THEME_KEY) || ''; } catch { return ''; }
+}
+function applyTheme(theme: string): void {
+  if (theme !== 'day' && theme !== 'night' && theme !== 'auto') return;
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+    const resolved = theme === 'auto'
+      ? (window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'night' : 'day')
+      : theme;
+    document.documentElement.setAttribute('data-portal-theme', resolved);
+  } catch { /* ignore */ }
+}
 
 /** 批次204:dataURL → File(老头像自动迁移上云用)。 */
 function dataUrlToFile(dataUrl: string, name: string): File | null {
@@ -35,16 +51,24 @@ function dataUrlToFile(dataUrl: string, name: string): File | null {
   }
 }
 
-/** 把云端身份字段落到本地(换头像清旧 avatarUrl,强制按新 storagePath 换签)。 */
+/** 把云端 profile 字段落到本地(换头像清旧 avatarUrl;主题单存,单独 applyTheme)。 */
 function applyCloudProfile(cloud: CloudProfileSettings, cloudAt: string): boolean {
-  const patch: { displayName?: string; avatarStoragePath?: string; avatarUrl?: string } = {};
+  const patch: Record<string, unknown> = {};
   if (typeof cloud.displayName === 'string' && cloud.displayName.trim()) patch.displayName = cloud.displayName;
   if (typeof cloud.avatarStoragePath === 'string') {
     patch.avatarStoragePath = cloud.avatarStoragePath;
     patch.avatarUrl = ''; // 清旧签名 URL → useProfileAvatar 用新 storagePath 重新换签渲染
   }
-  if (patch.displayName === undefined && patch.avatarStoragePath === undefined) return false;
-  saveProfileSettings(patch, { identityUpdatedAt: cloudAt });
+  // 批次205:语言/教练风格/日报开关跨端一致(用户选定四项同步)。
+  if (typeof cloud.locale === 'string' && cloud.locale) patch.locale = cloud.locale;
+  if (typeof cloud.coachStyle === 'string' && cloud.coachStyle) patch.coachStyle = cloud.coachStyle;
+  if (typeof cloud.dailyReportEnabled === 'boolean') patch.dailyReportEnabled = cloud.dailyReportEnabled;
+  const themeChanged = typeof cloud.theme === 'string' && cloud.theme !== '' && cloud.theme !== readTheme();
+  const noProfileField = Object.keys(patch).length === 0;
+  if (noProfileField && !themeChanged) return false;
+  if (themeChanged) applyTheme(cloud.theme as string); // 主题不走 saveProfileSettings
+  if (!noProfileField) saveProfileSettings(patch as Partial<PortalProfileSettings>, { identityUpdatedAt: cloudAt });
+  else localStorage.setItem('treasurebox-profile-updated-at', cloudAt); // 只有主题变:也同步时间戳,防再拉
   return true;
 }
 
@@ -82,6 +106,11 @@ export async function pushProfileToCloud(existing?: CloudProfileSettings): Promi
       ...base,
       displayName: p.displayName,
       avatarStoragePath,
+      // 批次205:四项设置跨端一致(语言/教练风格/日报/主题)。
+      locale: p.locale,
+      coachStyle: p.coachStyle,
+      dailyReportEnabled: p.dailyReportEnabled,
+      theme: readTheme() || undefined,
       identityUpdatedAt: identityAt,
     });
     return { ok: Boolean(res?.ok && res?.writesCloud) };
@@ -109,4 +138,17 @@ export async function syncProfileWithCloud(): Promise<void> {
   } catch {
     /* best-effort */
   }
+}
+
+/** 批次205:订阅 PROFILE_UPDATED_EVENT → 防抖回推。改名字/头像/语言/教练/日报/主题任一,
+ *  几秒后自动推上云,别端登录/回前台即拉到。返回注销函数(Portal 登录 effect 挂/卸)。 */
+let profilePushTimer: ReturnType<typeof setTimeout> | null = null;
+export function registerProfileAutoPush(): () => void {
+  if (typeof window === 'undefined') return () => {};
+  const onUpdate = () => {
+    if (profilePushTimer) clearTimeout(profilePushTimer);
+    profilePushTimer = setTimeout(() => { profilePushTimer = null; void pushProfileToCloud(); }, 4000);
+  };
+  window.addEventListener(PROFILE_UPDATED_EVENT, onUpdate);
+  return () => window.removeEventListener(PROFILE_UPDATED_EVENT, onUpdate);
 }

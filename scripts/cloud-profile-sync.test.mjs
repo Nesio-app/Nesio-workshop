@@ -76,6 +76,13 @@ assert.ok(!/Entitlement/.test(sync), 'P3:不查付费门');
 assert.match(sync, /uploadCloudAsset/, '批次204:无 storagePath 的本地头像自动上传迁移');
 assert.match(sync, /startsWith\(['"]data:['"]\)/, '仅迁移本地 dataURL 头像(签名 URL 不重传)');
 assert.match(sync, /res\?\.ok\s*&&\s*res\?\.writesCloud/, 'push 检查写云真成功,不吞错');
+// 批次205:四项设置跨端同步(语言/教练风格/日报/主题)
+assert.match(sync, /locale:\s*p\.locale/, '批次205:push 带 locale');
+assert.match(sync, /coachStyle:\s*p\.coachStyle/, '批次205:push 带 coachStyle');
+assert.match(sync, /dailyReportEnabled:\s*p\.dailyReportEnabled/, '批次205:push 带 dailyReportEnabled');
+assert.match(sync, /theme:\s*readTheme\(\)/, '批次205:push 带 theme(单存 key)');
+assert.match(sync, /registerProfileAutoPush/, '批次205:profile 改动防抖自动回推');
+assert.match(sync, /applyTheme/, '批次205:采纳云主题时 applyTheme');
 
 // ── allowlist 放行 identityUpdatedAt ──
 const route = read('../app/api/cloud/profile-settings/route.ts');

@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, profileIdentityUpdatedAt, saveProfileSettings, type PortalLocale } from '@/lib/portal/profile';
+import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, profileIdentityUpdatedAt, saveProfileSettings, touchProfileIdentity, type PortalLocale } from '@/lib/portal/profile';
 import { pushProfileToCloud, syncProfileWithCloud } from '@/lib/portal/cloud-profile-sync';
 import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
@@ -113,6 +113,8 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
   function pickTheme(next: ThemeChoice) {
     setTheme(next);
     applyTheme(next);
+    touchProfileIdentity(); // 批次205:主题跨端 —— 打新 profile 时间戳 + 广播,触发自动回推
+
     // 批次 51:存储满时 setItem 静默失败 → 当前页面看着切成功,下次加载 boot
     // 脚本读不到选择又跳回「随系统」(用户实测:主页还是黑、设置回跳)。
     // 失败先自动腾空间重试;仍不行就说真话,不装保存成功。
@@ -274,6 +276,8 @@ export function AppearanceSheet({ open, onClose }: SheetProps) {
   function pickTheme(next: ThemeChoice) {
     setTheme(next);
     applyTheme(next);
+    touchProfileIdentity(); // 批次205:主题跨端 —— 打新 profile 时间戳 + 广播,触发自动回推
+
     try {
       localStorage.setItem(THEME_KEY, next);
       setThemeSaveIssue('');

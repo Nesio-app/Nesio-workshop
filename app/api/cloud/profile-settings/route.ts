@@ -12,6 +12,7 @@ type ProfileSettings = {
   theme?: string;
   calendarUrl?: string;
   observationPushEnabled?: boolean;
+  dailyReportEnabled?: boolean; // 批次205:日报开关跨端一致
   mirrorProfile?: string;
   // 批次199(P2 跨端银行):指向 cloud/assets 上「学习态 blob」(ranker 训练日志 + 偏好)的
   // 短指针,JSON 字符串 {"path","n","at"}。载荷本身在 assets(不受 2000 字上限),这里只存指针,
@@ -103,6 +104,9 @@ function sanitizeSettings(input: unknown): ProfileSettings {
   }
   if (typeof raw.observationPushEnabled === 'boolean') {
     output.observationPushEnabled = raw.observationPushEnabled;
+  }
+  if (typeof raw.dailyReportEnabled === 'boolean') {
+    output.dailyReportEnabled = raw.dailyReportEnabled; // 批次205:日报开关跨端
   }
 
   return output;
