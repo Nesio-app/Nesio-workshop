@@ -393,8 +393,8 @@ export default function FinanceTab() {
                 setReportMsg(outcome === 'created'
                   ? L(dict, `已把 ${r.ym} 月报存入记忆,「问一问」可检索`, `Report ${r.ym} saved to memory — Ask can cite it`)
                   : L(dict, `已更新记忆里的 ${r.ym} 月报`, `Updated the ${r.ym} report in memory`));
-              } catch { setReportMsg(L(dict, '存入记忆失败,请重试', 'Save to memory failed — try again')); }
-            }}>{L(dict, '存入记忆', 'Save to memory')}</button>
+              } catch { setReportMsg(L(dict, '存入记忆失败,请重试', 'Save to Memory failed — try again')); }
+            }}>{L(dict, '存入记忆', 'Save to Memory')}</button>
             <button type="button" className="nesio-fin-flowopt" onClick={() => {
               try {
                 const w = window.open('', '_blank');

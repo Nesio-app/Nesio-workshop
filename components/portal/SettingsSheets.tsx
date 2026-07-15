@@ -179,7 +179,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
         onClick={toggleDailyReport}>
         <div>
           <span className="nesio-settings-option-label">{L(dict, '每日 AI 图文日报', 'Daily AI report')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, '每天存进记忆 · 首页回顾里给你', 'Saved to memory daily · surfaced under Today')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '每天存进记忆 · 首页回顾里给你', 'Saved to Memory daily · surfaced under Today')}</span>
         </div>
         <span className={`nesio-settings-space-check${dailyReportOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
           {dailyReportOn ? '✓' : '○'}

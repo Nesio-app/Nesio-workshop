@@ -26,7 +26,7 @@ export const STRINGS = {
     expiringSoon: '即将到期', nextStep: '下一步', importantDate: '重要日期',
   },
   en: {
-    shellBrand: 'Treasure Box',
+    shellBrand: 'Nesio',
     shellTagline: 'A quiet digital courtyard',
     greetingMorning: 'Good morning', greetingDay: 'Good afternoon', greetingEvening: 'Good evening',
     settings: 'Account',

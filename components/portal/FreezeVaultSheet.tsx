@@ -169,7 +169,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
       <div className={`nesio-freeze-sheet${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle} onClick={(e) => e.stopPropagation()}>
         <div className="nesio-sheet-grip" {...handleProps} />
         <div className="nesio-freeze-header">
-          <span className="nesio-freeze-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><IconSnowflake size={16} /> {L(dict, '冷冻仓', 'Freeze vault')}</span>
+          <span className="nesio-freeze-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><IconSnowflake size={16} /> {L(dict, '冷冻仓', 'Freeze Vault')}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button type="button" className="nesio-rewards-pts-badge" onClick={() => setTab('rewards')} title={L(dict, '积分 · 点开奖品仓库', 'Points · open rewards')}>
               ⬡ {points} {L(dict, '积分', 'pts')}

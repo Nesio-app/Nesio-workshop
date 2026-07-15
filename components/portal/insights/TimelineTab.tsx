@@ -561,9 +561,9 @@ export default function TimelineTab() {
 
           {/* ── 真实地图概览(批次 59:点一下进入可缩放的「地图上的记忆」)── */}
           {mapPoints.length > 0 && (
-            <button type="button" className="nesio-tl-map-open" onClick={() => setMemMapOpen(true)} aria-label={L(dict, '打开地图上的记忆', 'Open memories in maps')}>
+            <button type="button" className="nesio-tl-map-open" onClick={() => setMemMapOpen(true)} aria-label={L(dict, '打开地图上的记忆', 'Open memories on the map')}>
               <PlaceMap points={mapPoints} height={200} />
-              <span className="nesio-tl-map-open-hint">{L(dict, '点开看地图上的记忆 · 可缩放', 'Tap for memories in maps · zoomable')}</span>
+              <span className="nesio-tl-map-open-hint">{L(dict, '点开看地图上的记忆 · 可缩放', 'Tap for memories on the map · zoomable')}</span>
             </button>
           )}
 

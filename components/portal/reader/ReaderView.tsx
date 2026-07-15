@@ -130,7 +130,7 @@ export default function ReaderView({ book, rawText, meta, onClose }: {
       name: text.slice(0, 60), type: 'preference', source: 'manual', confidence: 1, rawInput: text,
       tags: ['笔记', '摘录', book.title.slice(0, 24)], attributes: { origin: '阅读摘录', fromArticle: book.title }, relations: [],
     });
-    clearSel(); flash(L(dict, '已收进记忆', 'Saved to memory'));
+    clearSel(); flash(L(dict, '已收进记忆', 'Saved to Memory'));
   }
   function askSelection() {
     const text = selText.trim();
@@ -162,7 +162,7 @@ export default function ReaderView({ book, rawText, meta, onClose }: {
       tags: ['笔记', '阅读', book.title.slice(0, 24)],
       attributes: { origin: '阅读收藏', externalId: `read-${docId}` }, relations: [],
     });
-    flash(L(dict, '已收进记忆', 'Saved to memory'));
+    flash(L(dict, '已收进记忆', 'Saved to Memory'));
   }
   function askDoc() {
     window.dispatchEvent(new CustomEvent('nesio-ask-text', { detail: { text: book.title } }));

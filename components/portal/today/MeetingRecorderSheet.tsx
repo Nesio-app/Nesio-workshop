@@ -197,7 +197,7 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
                 )}
               </div>
             ) : (
-              <p className="nesio-recorder-saved-hint">{L(dict, '已存入记忆，和会议条目关联', 'Saved to memory, linked to the meeting entry')}</p>
+              <p className="nesio-recorder-saved-hint">{L(dict, '已存入记忆，和会议条目关联', 'Saved to Memory, linked to the meeting entry')}</p>
             )}
           </div>
         ) : (

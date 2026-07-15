@@ -498,7 +498,7 @@ function TopRelationship({ data, dict }: { data: HealthMetrics; dict: string }) 
   const r = rels[0];
   return (
     <>
-      <p className="nesio-insights-section-label">{L(dict, '念念发现的关系', 'Patterns Nen found')}</p>
+      <p className="nesio-insights-section-label">{L(dict, '念念发现的关系', 'What Nessa noticed')}</p>
       <div className="nesio-health-rel">
         <span className="nesio-health-rel-tag" style={{ color: r.strength === 'strong' ? 'var(--status-go)' : 'var(--portal-muted)' }}>
           {r.strength === 'strong' ? L(dict, '强', 'strong') : L(dict, '中', 'mod')} n={r.n}
@@ -524,7 +524,7 @@ export default function HealthDashboard() {
     if (!data?.daily?.length) return;
     try {
       const outcome = autoPersistLastMonthHealthReport(data, new Date(), dict);
-      if (outcome === 'created') setReportMsg(L(dict, '已自动生成上月健康月报并存入记忆', 'Auto-saved last month\u2019s health report to memory'));
+      if (outcome === 'created') setReportMsg(L(dict, '已自动生成上月健康月报并存入记忆', 'Auto-saved last month\u2019s health report to Memory'));
     } catch { /* 自动补失败静默,手动入口仍在 */ }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data]);
@@ -673,8 +673,8 @@ export default function HealthDashboard() {
                       setReportMsg(outcome === 'created'
                         ? L(dict, `已把 ${ym} 健康月报存入记忆,「问一问」可检索`, `Health report ${ym} saved to memory`)
                         : L(dict, `已更新记忆里的 ${ym} 健康月报`, `Updated the ${ym} health report in memory`));
-                    } catch { setReportMsg(L(dict, '存入记忆失败,请重试', 'Save to memory failed — try again')); }
-                  }}>{L(dict, '存入记忆', 'Save to memory')}</button>
+                    } catch { setReportMsg(L(dict, '存入记忆失败,请重试', 'Save to Memory failed — try again')); }
+                  }}>{L(dict, '存入记忆', 'Save to Memory')}</button>
                   <button type="button" className="nesio-fin-flowopt" onClick={() => {
                     try {
                       const w = window.open('', '_blank');

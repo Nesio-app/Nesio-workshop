@@ -351,7 +351,7 @@ export default function MirrorLetterTab() {
           <div className="nesio-mirror-actions">
             <button type="button" className="nesio-mirror-action nesio-mirror-action--primary" onClick={saveToMemory} disabled={loading}>
               {saved ? <IconCheckCircle size={16} /> : <IconBox size={16} />}
-              {saved ? L(dict, '已存入记忆', 'Saved to memory') : L(dict, '存入记忆', 'Save to memory')}
+              {saved ? L(dict, '已存入记忆', 'Saved to Memory') : L(dict, '存入记忆', 'Save to Memory')}
             </button>
             <button type="button" className="nesio-mirror-action" onClick={() => void generate()} disabled={loading}>
               <IconRefresh size={16} />
