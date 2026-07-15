@@ -54,7 +54,14 @@ export const CLASSIFICATION_RULES_BLOCK = `CRITICAL CLASSIFICATION RULES:
    attributes.expiry=证件到期日(ISO)。绝不要当 person 或 place。name 用「XX 护照/签证」这类，别含证件号。
 
 9. 保修卡 / 含保修期的收据 / 电子产品说明书 → 对应 object 节点，subtype=warranty，
-   attributes.purchaseDate=购买日(ISO)、expiry=保修截止日(购买日+保修期，能算就填 ISO)。`;
+   attributes.purchaseDate=购买日(ISO)、expiry=保修截止日(购买日+保修期，能算就填 ISO)。
+
+10. 兜底捕捉(永不丢 · 开放世界 Layer ①):以上规则都无法明确归类的输入,**绝不要跳过或丢弃**——
+    仍产出一个 note 节点:name=对原文的一句话中性概括，rawInput=原文原样保留，
+    tags=**慷慨**的检索关键词(把能想到的同义词/主题词/相关物都放进去，retrieval-only、不展示给用户)，
+    confidence ≤0.5(标明这是低置信捕捉)。
+    原则:分不出类 = 先低置信存下来(不打扰用户,但进主表、等以后翻得出/被激活),
+    而不是因「不确定」而丢——把失败从「分错类的 error」降级成「暂时没提醒的 miss」。`;
 
 // ── Canonical prompt (voice / text / image / file — the analyze route) ────────
 
