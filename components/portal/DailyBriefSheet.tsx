@@ -128,7 +128,7 @@ export function DailyBriefSheet({ open, onClose }: { open: boolean; onClose: () 
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
         <div className="nesio-settings-sheet-body">
-          {loading && <p className="nesio-mirror-writing">{L(dict, 'Nesio 正在整理今天…', 'Nesio is putting today together…')}</p>}
+          {loading && <p className="nesio-mirror-writing">{L(dict, '念念正在整理今天…', 'Nessa is putting today together…')}</p>}
           {!loading && script && (
             <>
               <p className="nesio-daily-brief-text nesio-serif-voice">{script}</p>

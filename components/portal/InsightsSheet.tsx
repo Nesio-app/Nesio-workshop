@@ -279,7 +279,7 @@ function LivingModelTab({
     return (
       <div className="nesio-lm-loading">
         <span className="nesio-focus-decompose-spinner" />
-        <span>{L(dict, 'Nesio 正在深度思考你的认知模型…', 'Nesio is thinking hard about your mind model…')}</span>
+        <span>{L(dict, '念念正在深度思考你的认知模型…', 'Nessa is thinking hard about your mind model…')}</span>
       </div>
     );
   }

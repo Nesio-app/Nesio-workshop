@@ -85,7 +85,7 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
       window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'freeze' } }));
       return;
     }
-    addToFreeze({ url: '', title: productName, price: price ? `¥${price}` : undefined, freezeHours: 24 });
+    addToFreeze({ url: '', title: productName, price: price ? `$${price}` : undefined, freezeHours: 24 });
     track('impulse_persuaded', { via: 'camera', frozen: true });
     setDecided('frozen');
   }
@@ -129,7 +129,7 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
           className="nesio-cooling-input"
           type="number"
           inputMode="decimal"
-          placeholder="¥"
+          placeholder="$"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
         />
@@ -140,7 +140,7 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
               className="nesio-cooling-input"
               type="number"
               inputMode="decimal"
-              placeholder={L(dict, '¥/小时', '$/hr')}
+              placeholder={L(dict, '$/小时', '$/hr')}
               value={wage}
               onChange={(e) => saveWage(e.target.value)}
               onBlur={() => { if (wage) setEditingWage(false); }}
@@ -154,7 +154,7 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
             style={{ marginLeft: 'auto', whiteSpace: 'nowrap' }}
             onClick={() => setEditingWage(true)}
           >
-            {L(dict, `时薪 ¥${wage} · 改`, `Pay $${wage}/hr · edit`)}
+            {L(dict, `时薪 $${wage} · 改`, `Pay $${wage}/hr · edit`)}
           </button>
         )}
       </div>
@@ -191,7 +191,7 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
           setScanImage(r.image || '');
           setScanTitle(r.title || '');
           setScanNote(r.title
-            ? L(dict, `识别到:${r.title}${r.price ? `(参考价 ¥${r.price})` : ''}`, `Found: ${r.title}${r.price ? ` (ref ¥${r.price})` : ''}`)
+            ? L(dict, `识别到:${r.title}${r.price ? `(参考价 $${r.price})` : ''}`, `Found: ${r.title}${r.price ? ` (ref $${r.price})` : ''}`)
             : L(dict, `${r.upc ? `条码 ${r.upc}:` : ''}没查到商品。可换「拍一下」拍商品让 AI 认,或手动填。`, `${r.upc ? `Barcode ${r.upc}: ` : ''}not found. Try snapping a photo (AI recognizes it) or enter it manually.`));
         }}
       />
