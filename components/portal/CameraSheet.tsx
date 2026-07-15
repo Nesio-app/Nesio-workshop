@@ -1100,7 +1100,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             <span className="nesio-camera-chooser-icon" aria-hidden><IconCamera size={30} /></span>
             <p className="nesio-camera-chooser-text">
               {phase === 'idle'
-                ? L(dict, '拍一张，Nesio 帮你识别并存入 Memory', 'Take a photo — Nesio recognizes it into Memory')
+                ? L(dict, '拍一张，Nesio 帮你识别并存入 Memory', 'Take a photo — Nesio recognizes it and saves it to Memory')
                 : L(dict, '取景框没起来 —— 用系统相机照样拍,或从相册选择。', "The viewfinder didn't start — use the system camera or pick from Photos.")}
             </p>
             <div className="nesio-camera-chooser-actions">
@@ -1157,7 +1157,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
         {phase === 'analyzing' && (
           <div className="nesio-camera-recognizing" aria-live="polite">
             <span className="nesio-camera-recognizing-dot"/>
-            {L(dict, 'Nesio 正在识别…', 'Nesio is recognizing…')}
+            {L(dict, 'Nesio 正在识别…', 'Recognizing…')}
           </div>
         )}
 
@@ -1184,7 +1184,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             <p className="nesio-camera-result-summary" style={{ margin: 0, flex: 1 }}>{result.summary}</p>
             {capturedPreview && (
               <button type="button" className="nesio-camera-select-btn" onClick={analyzeFullImage}>
-                {L(dict, 'AI 识别', 'AI')}
+                {L(dict, 'AI 识别', 'Scan')}
               </button>
             )}
             {capturedPreview && (
@@ -1368,7 +1368,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
           <div className="nesio-select-overlay-actions">
             {/* QA:AI 不再是唯一出路 —— 「直接存」零 AI 零等待;AI 识别是明示按钮 */}
             <button type="button" className="nesio-select-action-btn" onClick={saveWithoutAi}>{L(dict, '直接存', 'Save as-is')}</button>
-            <button type="button" className="nesio-select-action-btn" onClick={analyzeFullImage}>{L(dict, 'AI 识别全图', 'AI recognize')}</button>
+            <button type="button" className="nesio-select-action-btn" onClick={analyzeFullImage}>{L(dict, 'AI 识别全图', 'Scan full image')}</button>
             <button type="button" className="nesio-select-action-btn" onClick={retake}>{L(dict, '↩ 重拍', '↩ Retake')}</button>
           </div>
         </div>

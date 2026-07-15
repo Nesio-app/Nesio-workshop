@@ -19,13 +19,13 @@ const SECTIONS: LegalSection[] = [
     h: ['订阅与免费试用', 'Subscriptions and free trial'],
     body: [
       ['· Pro 订阅解锁 AI 深度识别与整理、AI 例程、邮件直接回复、冷冻仓等能力;基础记录、搜索、手动标签永久免费。',
-       '· Pro unlocks AI recognition and organizing, AI routines, direct email replies, and the Freeze Vault; capturing, search, and manual tags stay free forever.'],
+       '· Pro unlocks AI recognition and cleanup, AI routines, direct email replies, and the Freeze Vault; capture, search, and manual tags stay free forever.'],
       ['· 新用户享 21 天(3 周)全功能免费试用——刚好养成一个记录的好习惯。试用结束自动回到免费版,不自动扣费。',
        '· New users get a 21-day (3-week) full-feature free trial — just long enough to build a note-taking habit. When it ends you return to the free tier; nothing is charged automatically.'],
       ['· 付费方式与价格以 App 内购买页为准(支持按周/按月/按年);通过 App Store 订阅的,续费与退订遵循 Apple 的订阅规则,可随时在系统设置中取消。',
-       '· Billing options and prices are shown on the in-app purchase page (weekly / monthly / yearly). App Store subscriptions follow Apple’s renewal rules and can be cancelled anytime in system settings.'],
+       '· Billing options and prices are shown on the in-app purchase page (weekly / monthly / yearly). App Store subscriptions follow Apple’s renewal rules and can be canceled anytime in system settings.'],
       ['· 自动续费:订阅到期前 24 小时自动续订并扣费;取消需在当前周期结束至少 24 小时前操作。',
-       '· Auto-renewal: subscriptions renew and charge within 24 hours before the period ends; cancel at least 24 hours before the current period ends to avoid renewal.'],
+       '· Auto-renewal: your subscription renews and is charged within 24 hours before the current period ends; cancel at least 24 hours before the period ends to avoid renewal.'],
     ],
   },
   {
@@ -39,7 +39,7 @@ const SECTIONS: LegalSection[] = [
     h: ['合理使用', 'Acceptable use'],
     body: [
       ['请勿将服务用于违法用途、滥用 AI 配额或干扰服务运行。我们可能对滥用行为限流或终止服务。',
-       'Do not use the service for unlawful purposes, abuse AI quotas, or disrupt operation. We may rate-limit or terminate abusive usage.'],
+       'Do not use the service for unlawful purposes, abuse AI quotas, or disrupt how the service runs. We may rate-limit or terminate abusive usage.'],
     ],
   },
   {

@@ -96,7 +96,7 @@ const RULES: ReadonlyArray<DomainRule<PlaceInsightInput, PlaceFinding>> = [
         title: ['健身足迹有阵子没出现了', 'Workout visits have paused for a while'],
         detail: [
           `最近两周没有健身地点的足迹(此前 8 周里有 ${fitnessWeeks.size} 周去过)。不用补课,从一次轻松的开始就好。`,
-          `No workout-place visits in the last two weeks (you went in ${fitnessWeeks.size} of the prior 8). No catch-up needed — start easy.`,
+          `No workout-place visits in the last two weeks (you went in ${fitnessWeeks.size} of the prior 8 weeks). No catch-up needed — start easy.`,
         ],
       };
     },

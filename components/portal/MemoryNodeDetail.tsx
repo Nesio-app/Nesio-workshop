@@ -35,7 +35,7 @@ const TYPE_LABELS_ZH: Record<string, string> = {
 };
 const TYPE_LABELS_EN: Record<string, string> = {
   person: 'Person', object: 'Item', place: 'Place', event: 'Event',
-  commitment: 'Promise', health_state: 'Health', preference: 'Taste', note: 'Note',
+  commitment: 'Promise', health_state: 'Health', preference: 'Preference', note: 'Note',
 };
 
 const PERSON_CATEGORIES: Record<string, string> = {
@@ -217,7 +217,7 @@ function PersonSection({ node }: {
   return (
     <div className="nesio-type-section">
       {/* 批次 142·详情页统一(image 1):分类不再用彩色 pill,统一成 关键信息 里的 label→值 行 */}
-      <InfoRow label={L(dict, '关系', 'Relation')} value={category ? ((dict === 'en' ? PERSON_CATEGORIES_EN : PERSON_CATEGORIES)[category] || category) : ''} />
+      <InfoRow label={L(dict, '关系', 'Relationship')} value={category ? ((dict === 'en' ? PERSON_CATEGORIES_EN : PERSON_CATEGORIES)[category] || category) : ''} />
       <InfoRow label={L(dict, '上次见面', 'Last seen')} value={fmtDate(lastSeen, dict)} />
       <InfoRow label={L(dict, '生日', 'Birthday')} value={fmtDate(birthday, dict)} />
       <InfoRow label={L(dict, '备注', 'Note')} value={note} />

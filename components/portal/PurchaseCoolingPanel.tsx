@@ -106,7 +106,7 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
   if (decided === 'buying') {
     return (
       <div className="nesio-cooling-panel">
-        <p className="nesio-cooling-done">{L(dict, '好,买得开心。记得把价格记进来,月底能看到花在哪。', 'OK, enjoy it. Log the price so month-end shows where money went.')}</p>
+        <p className="nesio-cooling-done">{L(dict, '好,买得开心。记得把价格记进来,月底能看到花在哪。', 'OK, enjoy it. Log the price so your month-end view shows where the money went.')}</p>
       </div>
     );
   }
@@ -192,7 +192,7 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
           setScanTitle(r.title || '');
           setScanNote(r.title
             ? L(dict, `识别到:${r.title}${r.price ? `(参考价 ¥${r.price})` : ''}`, `Found: ${r.title}${r.price ? ` (ref ¥${r.price})` : ''}`)
-            : L(dict, `${r.upc ? `条码 ${r.upc}:` : ''}没查到商品。可换「拍一下」拍商品让 AI 认,或手动填。`, `${r.upc ? `Barcode ${r.upc}: ` : ''}not found. Try snapping a photo (AI recognises it) or enter it manually.`));
+            : L(dict, `${r.upc ? `条码 ${r.upc}:` : ''}没查到商品。可换「拍一下」拍商品让 AI 认,或手动填。`, `${r.upc ? `Barcode ${r.upc}: ` : ''}not found. Try snapping a photo (AI recognizes it) or enter it manually.`));
         }}
       />
     </div>

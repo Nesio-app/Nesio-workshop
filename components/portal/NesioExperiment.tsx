@@ -106,7 +106,7 @@ export function computeInsight(exp: Experiment, dict: string = 'zh'): ExpInsight
 
   if (days < 5) {
     return { r: null, meanOn: null, meanOff: null, trend: 'insufficient', days,
-      text: L(dict, `还需要 ${5 - days} 次记录，洞察就能出现。坚持每天打卡，数据会告诉你答案。`, `${5 - days} more logs and insights appear. Keep checking in daily — the data will answer.`) };
+      text: L(dict, `还需要 ${5 - days} 次记录，洞察就能出现。坚持每天打卡，数据会告诉你答案。`, `${5 - days} more logs and your insights will appear. Keep checking in daily — the data will answer.`) };
   }
 
   const ivs = pts.map((p) => p.iv);

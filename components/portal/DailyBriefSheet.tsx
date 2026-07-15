@@ -30,7 +30,7 @@ const BRIEF_MSG = {
 };
 
 function greetingFor(hour: number, dict: 'zh' | 'en', name: string): string {
-  const g = hour < 5 ? L(dict, '凌晨好', 'Good early morning')
+  const g = hour < 5 ? L(dict, '凌晨好', 'Good morning')
     : hour < 12 ? L(dict, '早上好', 'Good morning')
     : hour < 18 ? L(dict, '下午好', 'Good afternoon')
     : L(dict, '晚上好', 'Good evening');

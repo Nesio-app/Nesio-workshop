@@ -154,7 +154,7 @@ export function buildMonthlyReport(
     if (portfolio.concentrated) {
       lines.push(L(
         `${portfolio.concentrated.ticker || portfolio.concentrated.name} 占组合 ${portfolio.concentrated.pct}%,波动会更贴着这一只走,有空可以想想要不要分散一点。`,
-        `${portfolio.concentrated.ticker || portfolio.concentrated.name} is ${portfolio.concentrated.pct}% of the portfolio; volatility will track it closely — worth a think.`));
+        `${portfolio.concentrated.ticker || portfolio.concentrated.name} is ${portfolio.concentrated.pct}% of the portfolio; volatility will track it closely — worth thinking about.`));
     }
   }
 

@@ -157,7 +157,7 @@ function energyColor(v: number): string {
 
 // 批次 141·设计心情节:能量词(满电/中/蔫)、一句身体感受、时段 —— 供能量层 + 一句话上下文 + 历史用
 function energyWord(lvl: EnergyLevel, dict: DictLocale = 'zh'): string {
-  return lvl === 'high' ? L(dict, '满电', 'charged') : lvl === 'low' ? L(dict, '蔫', 'drained') : L(dict, '中', 'mid');
+  return lvl === 'high' ? L(dict, '满电', 'charged') : lvl === 'low' ? L(dict, '蔫', 'drained') : L(dict, '中', 'steady');
 }
 function energyDesc(lvl: EnergyLevel, dict: DictLocale = 'zh'): string {
   return lvl === 'high' ? L(dict, '劲儿正足,趁手做点事。', 'Full charge — ride it while it lasts.')
@@ -485,7 +485,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
                 className="nesio-journal-editor"
                 contentEditable
                 suppressContentEditableWarning
-                data-placeholder={L(dict, '写下此刻…', 'Write this moment…')}
+                data-placeholder={L(dict, '写下此刻…', 'Write down this moment…')}
                 onInput={(e) => {
                   journalHtmlRef.current = (e.target as HTMLDivElement).innerHTML;
                   setJournal((e.target as HTMLDivElement).textContent ?? '');

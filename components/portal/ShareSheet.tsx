@@ -186,8 +186,8 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
       });
 
       setParsed({
-        title: nodes[0]?.name || (type === 'image' ? '照片' : content.slice(0, 30)),
-        summary: data.summary || '提取成功',
+        title: nodes[0]?.name || (type === 'image' ? L(dict, '照片', 'Photo') : content.slice(0, 30)),
+        summary: data.summary || L(dict, '提取成功', 'Done'),
         intent: data.intent || 'MEMORY_CAPTURE',
         people: Array.from(new Set(people)),
         date,
@@ -196,7 +196,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
       });
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : '分析失败，请稍后再试。');
+      setError(e instanceof Error ? e.message : L(dict, '分析失败，请稍后再试。', 'Something went wrong — please try again.'));
       return false;
     } finally {
       setAnalyzing(false);
@@ -291,7 +291,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
         </div>
 
         <p className="nesio-share-desc">
-          {L(dict, '你分享进来的内容，Nesio 会先整理出可确认的信息，再由你决定是否存入 Memory。', 'Whatever you share in, Nesio first organizes into confirmable info — you decide what enters Memory.')}
+          {L(dict, '你分享进来的内容，Nesio 会先整理出可确认的信息，再由你决定是否存入 Memory。', 'Anything you share, Nesio sorts into details you can confirm — you choose what goes into Memory.')}
         </p>
 
         {/* Action buttons */}
@@ -345,7 +345,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
         {analyzing && (
           <div style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--portal-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
             <span className="nesio-camera-recognizing-dot" style={{ background: 'var(--portal-blue-deep)', display: 'inline-block', width: '0.5rem', height: '0.5rem', borderRadius: '50%' }} />
-            {L(dict, 'Nesio 正在整理可确认的信息…', 'Nesio is organizing confirmable info…')}
+            {L(dict, 'Nesio 正在整理可确认的信息…', 'Nesio is pulling out the key details…')}
           </div>
         )}
 
@@ -355,7 +355,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
         {/* Parsed result */}
         {parsed && (
           <div className="nesio-share-recent">
-            <p className="nesio-share-recent-label">{L(dict, '刚刚分享进来', 'Just shared in')}</p>
+            <p className="nesio-share-recent-label">{L(dict, '刚刚分享进来', 'Just shared')}</p>
             <div className="nesio-share-parsed-card">
               <span className="nesio-share-parsed-icon">
                 <NodeTypeIcon type={{ MEMORY_CAPTURE: 'object', EVENT_LOG: 'event', COMMITMENT: 'commitment', HEALTH_LOG: 'health_state', REMINDER: 'commitment' }[parsed.intent] || 'event'} size={18} />
@@ -383,7 +383,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
                     </span>
                   )}
                   <span className="nesio-share-meta-chip" style={{ background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>
-                    {parsed.nodes.length} {L(dict, '个节点', 'nodes')}
+                    {parsed.nodes.length} {L(dict, '个节点', 'items')}
                   </span>
                 </div>
               </div>

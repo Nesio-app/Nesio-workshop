@@ -220,7 +220,7 @@ const TYPE_LABEL_ZH: Record<string, string> = {
 };
 const TYPE_LABEL_EN: Record<string, string> = {
   person: 'People', object: 'Items', place: 'Places',
-  event: 'Events', commitment: 'Promises', health_state: 'Health', preference: 'Tastes', note: 'Notes',
+  event: 'Events', commitment: 'Promises', health_state: 'Health', preference: 'Preferences', note: 'Notes',
 };
 function typeLabel(t: string, dict: DictLocale): string {
   return (dict === 'en' ? TYPE_LABEL_EN : TYPE_LABEL_ZH)[t] ?? t;
@@ -460,9 +460,9 @@ function visibleMemoryNodes(nodes: LifeNode[], canUse: boolean): LifeNode[] {
   return canUse ? base : base.filter((n) => !isPrivateExternalNode(n));
 }
 
-function shareTextForNode(node: LifeNode): string {
-  const tags = node.tags?.length ? `\n标签：${node.tags.map((t) => `#${t}`).join(' ')}` : '';
-  return `${node.name}\n${cleanMemoryPreview(node)}${tags}\n来自 Nesio Memory`;
+function shareTextForNode(node: LifeNode, dict: DictLocale): string {
+  const tags = node.tags?.length ? `\n${L(dict, '标签：', 'Tags: ')}${node.tags.map((t) => `#${t}`).join(' ')}` : '';
+  return `${node.name}\n${cleanMemoryPreview(node)}${tags}\n${L(dict, '来自 Nesio Memory', 'From Nesio Memory')}`;
 }
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -567,7 +567,7 @@ function LongPressSheet({
                 <IconFolder size={14} /> {p.name}
               </button>
             )) : (
-              <p className="nesio-longpress-no-projects">{L(dict, '还没有项目,先去项目球新建一个', 'No projects yet — create one from the Projects ball')}</p>
+              <p className="nesio-longpress-no-projects">{L(dict, '还没有项目,先去项目球新建一个', 'No projects yet — create one from the Projects tab')}</p>
             )}
           </div>
         )}
@@ -591,7 +591,7 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
   async function shareNode() {
     swiped.current = true;
     clearTimer();
-    const text = shareTextForNode(node);
+    const text = shareTextForNode(node, dict);
     try {
       if (navigator.share) await navigator.share({ title: node.name, text });
       else await navigator.clipboard?.writeText(text);
@@ -753,7 +753,7 @@ function FavoritesSheet({ pinnedNodes, onClose, onOpenNode, onLongPressNode }: {
         {shown.length === 0 ? (
           <p className="nesio-project-detail-empty">
             {!tag
-              ? L(dict, '还没有收藏。长按记忆卡 → 收藏到首页。', 'Nothing saved yet. Long-press a card → Pin.')
+              ? L(dict, '还没有收藏。长按记忆卡 → 收藏到首页。', 'Nothing saved yet. Long-press a card → Save.')
               : L(dict, '这个标签下还没有收藏', 'Nothing under this tag yet')}
           </p>
         ) : (
@@ -1265,7 +1265,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   <button type="button" className="nesio-mem-jar" onClick={() => setFavPageOpen(true)}>
                     <span className="nesio-mem-jar-ball" data-halo="fav" aria-hidden><IconBookmark size={24} /></span>
                     <span className="nesio-mem-jar-name">{L(dict, '收藏夹', 'Saved')}</span>
-                    <span className="nesio-mem-jar-sub">{L(dict, `手动收 · ${pinnedNodes.length}`, `pinned · ${pinnedNodes.length}`)}</span>
+                    <span className="nesio-mem-jar-sub">{L(dict, `手动收 · ${pinnedNodes.length}`, `saved · ${pinnedNodes.length}`)}</span>
                   </button>
                   {/* 批次 168:物品收纳放中间 → 开收纳 */}
                   <button type="button" className="nesio-mem-jar" onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-inventory'))}>
@@ -1376,7 +1376,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                       <line x1="12" y1="18" x2="12" y2="21" />
                     </svg>
                   </button>
-                  <p className="nesio-memory-invite-title">{L(dict, '试试说一句', 'Try saying one thing')}</p>
+                  <p className="nesio-memory-invite-title">{L(dict, '试试说一句', 'Try saying something')}</p>
                   <p className="nesio-memory-invite-sub">
                     {L(dict, '比如「备用钥匙放在门厅抽屉」', 'e.g. "Spare keys are in the hallway drawer"')}
                     <br />
@@ -1541,7 +1541,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
             setProjects(getProjects());
           }}
           onShare={() => {
-            const text = shareTextForNode(longPressNode);
+            const text = shareTextForNode(longPressNode, dict);
             if (navigator.share) void navigator.share({ title: longPressNode.name, text });
             else void navigator.clipboard?.writeText(text);
           }}

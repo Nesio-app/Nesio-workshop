@@ -38,7 +38,7 @@ export function ThawedReminder() {
       onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-freeze'))}
     >
       <IconSnowflake size={15} />
-      <span>{L(dict, `${count} 件冷冻到期了 — 现在还想买吗？`, `${count} frozen item${count > 1 ? 's' : ''} thawed — still want it?`)}</span>
+      <span>{L(dict, `${count} 件冷冻到期了 — 现在还想买吗？`, `${count} frozen item${count > 1 ? 's' : ''} thawed — still want ${count > 1 ? 'them' : 'it'}?`)}</span>
       <span className="nesio-thawed-banner-cta">{L(dict, '去决定', 'Decide')}</span>
     </button>
   );

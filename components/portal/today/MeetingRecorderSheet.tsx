@@ -184,7 +184,7 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
                 )}
                 {extraction.inferred && extraction.inferred.length > 0 && (
                   <div className="nesio-recorder-ai-group">
-                    <p className="nesio-recorder-ai-label nesio-recorder-ai-label--muted">{L(dict, '可能还需要 · 推断', 'Might need to · inferred')}</p>
+                    <p className="nesio-recorder-ai-label nesio-recorder-ai-label--muted">{L(dict, '可能还需要 · 推断', 'Might also need · inferred')}</p>
                     <ul className="nesio-recorder-ai-list">
                       {extraction.inferred.map((s, i) => (
                         <li key={i} className="nesio-recorder-ai-item nesio-recorder-ai-item--muted">

@@ -190,7 +190,7 @@ ${donutSvg(slices, L('净支出', 'Net spend'), money(s.net))}
 <p class="lede">${L(`总市值 ${money(portfolio.totalValue)}`, `Market value ${money(portfolio.totalValue)}`)}${g !== null ? ` · <span style="color:${g >= 0 ? GO : GENTLE};font-weight:600">${g >= 0 ? '+' : '-'}${esc(money(Math.abs(g)))}${portfolio.gainPct !== null ? ` (${portfolio.gainPct >= 0 ? '+' : ''}${portfolio.gainPct}%)` : ''}</span>` : ''}</p>
 ${hbar(alloc)}<div class="legend">${allocLegend}</div>
 <table class="clean">${rows}</table>
-${portfolio.concentrated ? `<p class="muted small">${esc(L(`${portfolio.concentrated.ticker || portfolio.concentrated.name} 占组合 ${portfolio.concentrated.pct}%,波动会更贴着这一只走,有空可以想想要不要分散一点。`, `${portfolio.concentrated.ticker || portfolio.concentrated.name} is ${portfolio.concentrated.pct}% of the portfolio — worth a think.`))}</p>` : ''}</section>`);
+${portfolio.concentrated ? `<p class="muted small">${esc(L(`${portfolio.concentrated.ticker || portfolio.concentrated.name} 占组合 ${portfolio.concentrated.pct}%,波动会更贴着这一只走,有空可以想想要不要分散一点。`, `${portfolio.concentrated.ticker || portfolio.concentrated.name} is ${portfolio.concentrated.pct}% of the portfolio — worth thinking about.`))}</p>` : ''}</section>`);
   }
 
   // ── 资产小结 ──

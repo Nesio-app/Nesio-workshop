@@ -60,7 +60,7 @@ export function dailyReportExternalId(d: Date): string { return `daily-report-${
 function tt(locale: 'zh' | 'en', zh: string, en: string): string { return locale === 'en' ? en : zh; }
 
 function greetingFor(hour: number, locale: 'zh' | 'en'): string {
-  if (hour < 5) return tt(locale, '凌晨好', 'Good early morning');
+  if (hour < 5) return tt(locale, '凌晨好', 'Good morning');
   if (hour < 12) return tt(locale, '早上好', 'Good morning');
   if (hour < 18) return tt(locale, '下午好', 'Good afternoon');
   return tt(locale, '晚上好', 'Good evening');
