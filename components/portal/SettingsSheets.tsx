@@ -19,6 +19,7 @@ import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
+import { getTelemetryDeviceId } from '@/lib/portal/telemetry';
 import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab, getPalette, setPalette, PALETTES, type PaletteId } from '@/lib/portal/module-overrides';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
 import { canUse, getTier, hasProOverride, setProEntitlement, trialDaysLeft } from '@/lib/portal/entitlement';
@@ -593,9 +594,14 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       'Delete account: removes ALL cloud data (memories/profile/assets/events) + local data, and signs you out. This cannot be undone — export a backup first. Continue?'))) return;
     setDeleteMsg(L(dict, '正在删除云端账号数据…', 'Deleting cloud account data…'));
     try {
+      // 上报本设备遥测 id → 服务端设备级擦除匿名遥测(数据审计 #5/#6 被遗忘权)。
+      const telemetryDeviceId = getTelemetryDeviceId();
       const res = await fetch('/api/user-data/delete?dryRun=0', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ confirmation: 'DELETE_CLOUD_PRODUCT_DATA' }),
+        body: JSON.stringify({
+          confirmation: 'DELETE_CLOUD_PRODUCT_DATA',
+          deviceIds: telemetryDeviceId ? [telemetryDeviceId] : [],
+        }),
       });
       if (res.status === 401) { setDeleteMsg(null); clearAllLocalData(); return; } // 未登录 → 无云账号可删,退化本机删除
       const data = await res.json().catch(() => null) as { ok?: boolean } | null;

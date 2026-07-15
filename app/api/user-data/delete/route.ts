@@ -16,10 +16,13 @@ type SupabaseTokenResponse = {
   expires_in?: number;
 };
 
-const CLOUD_PRODUCT_DATA_TABLES = ['user_profiles', 'profile_settings', 'memory_nodes', 'memory_edges', 'memory_assets', 'product_events'] as const;
+// 数据审计 #5/#6 被遗忘权:signals 是主数据原子(记忆事实),之前竟不在账号删除
+// 集合里 —— 删账号后信号全留在云端。补进来做物理删。
+const CLOUD_PRODUCT_DATA_TABLES = ['user_profiles', 'profile_settings', 'signals', 'memory_nodes', 'memory_edges', 'memory_assets', 'product_events'] as const;
 const CLOUD_PRODUCT_DATA_REST_PATHS = {
   user_profiles: '/rest/v1/user_profiles',
   profile_settings: '/rest/v1/profile_settings',
+  signals: '/rest/v1/signals',
   memory_nodes: '/rest/v1/memory_nodes',
   memory_edges: '/rest/v1/memory_edges',
   memory_assets: '/rest/v1/memory_assets',
@@ -253,14 +256,60 @@ async function deleteCloudRows(config: ReturnType<typeof getCloudConfig>, table:
   if (!response.ok) throw new Error(`Supabase delete failed for ${table}: ${response.status}`);
 }
 
+// 匿名遥测按 device_id 存,无账号关联(隐私姿态如此)。因此账号删除无法反查设备。
+// 补:客户端在删除时上报自己的 device_id(它自己知道),服务端据此物理删该设备的遥测
+// —— 给用户设备级擦除(数据审计 #5/#6)。TTL 兜底见 supabase-retention-gc-v1.sql。
+function sanitizeDeviceIds(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+  return Array.from(new Set(
+    input.flatMap((raw) => (typeof raw === 'string' ? [raw.trim()] : []))
+      .filter((id) => /^[A-Za-z0-9_-]{1,80}$/.test(id)),
+  )).slice(0, 20);
+}
+
+async function deleteTelemetryForDevices(config: ReturnType<typeof getCloudConfig>, deviceIds: string[]): Promise<number> {
+  if (!deviceIds.length) return 0;
+  const url = new URL('/rest/v1/telemetry_events', config.supabaseUrl);
+  url.searchParams.set('device_id', `in.(${deviceIds.join(',')})`);
+  const response = await fetch(url.toString(), {
+    method: 'DELETE',
+    headers: { ...restHeaders(config), Prefer: 'count=exact' },
+    cache: 'no-store',
+  });
+  // 遥测表缺失/未建不阻断账号删除(它是可选的可观测面,不是用户数据主体)。
+  if (!response.ok) {
+    if (response.status === 404) return 0;
+    throw new Error(`Supabase telemetry delete failed: ${response.status}`);
+  }
+  return Number(response.headers.get('content-range')?.split('/')?.[1] || 0);
+}
+
+// 删完数据行后,删账号本体(auth.users)。FK 上的 ON DELETE CASCADE 会兜掉任何
+// 残留的 user_id 关联行。仅 supabase provider(有真实 userId)可删;wechat/external
+// 是伪身份,无 auth.users 行。best-effort:账号本体删除失败不回滚已删数据,如实上报。
+async function deleteAuthUser(config: ReturnType<typeof getCloudConfig>, userId: string): Promise<boolean> {
+  const url = new URL(`/auth/v1/admin/users/${encodeURIComponent(userId)}`, config.supabaseUrl);
+  const response = await fetch(url.toString(), {
+    method: 'DELETE',
+    headers: {
+      apikey: config.serviceRoleKey,
+      Authorization: `Bearer ${config.serviceRoleKey}`,
+    },
+    cache: 'no-store',
+  });
+  return response.ok || response.status === 404;
+}
+
 async function buildCloudUserDataDeleteResponse({
   dryRun,
   confirmation,
   auditId,
+  deviceIds,
 }: {
   dryRun: boolean;
   confirmation?: string;
   auditId: string;
+  deviceIds: string[];
 }) {
   const config = getCloudConfig();
   if (!config.configured) {
@@ -300,6 +349,9 @@ async function buildCloudUserDataDeleteResponse({
     ...(await readCloudAvatarStoragePaths(config, cloudIdentity.identityKey)),
   ]);
   const storageDeletionReady = config.storageConfigured || storageObjects.length === 0;
+
+  let telemetryDeletedCount = 0;
+  let authUserDeleted = false;
 
   const hasProductDataConfirmation = confirmation === 'DELETE_CLOUD_PRODUCT_DATA';
 
@@ -397,6 +449,11 @@ async function buildCloudUserDataDeleteResponse({
     for (const table of CLOUD_PRODUCT_DATA_TABLES) {
       await deleteCloudRows(config, table, cloudIdentity.identityKey);
     }
+    telemetryDeletedCount = await deleteTelemetryForDevices(config, deviceIds);
+    // 账号本体:仅 supabase 真实 userId 可删;wechat/external 无 auth.users 行。
+    authUserDeleted = cloudIdentity.provider === 'supabase' && cloudIdentity.userId
+      ? await deleteAuthUser(config, cloudIdentity.userId)
+      : false;
   }
   logCloudRuntimeAudit('cloud_runtime_success', {
     auditId,
@@ -431,6 +488,10 @@ async function buildCloudUserDataDeleteResponse({
     deletesRealUserData: !dryRun,
     deletesCloudData: true,
     deletesCloudStorage: !dryRun,
+    // 被遗忘权(数据审计 #5/#6):设备级遥测擦除 + 账号本体(auth.users)删除。
+    telemetryDevicesRequested: deviceIds.length,
+    telemetryDeletedCount,
+    authUserDeleted,
     readsCloud: true,
     writesCloud: !dryRun,
     storageObjects,
@@ -470,12 +531,12 @@ export async function POST(request: NextRequest) {
   } catch {
     body = {};
   }
-  const confirmation = body && typeof body === 'object' && !Array.isArray(body)
-    ? String((body as Record<string, unknown>).confirmation || '')
-    : '';
+  const bodyRecord = body && typeof body === 'object' && !Array.isArray(body) ? (body as Record<string, unknown>) : {};
+  const confirmation = String(bodyRecord.confirmation || '');
+  const deviceIds = sanitizeDeviceIds(bodyRecord.deviceIds || bodyRecord.device_ids);
 
   try {
-    const cloudResponse = await buildCloudUserDataDeleteResponse({ dryRun, confirmation, auditId });
+    const cloudResponse = await buildCloudUserDataDeleteResponse({ dryRun, confirmation, auditId, deviceIds });
     if (cloudResponse) {
       if ('authRequired' in cloudResponse) {
         // 云已配置但未登录:真删除返回 401 auth_required,绝不谎称删除成功
