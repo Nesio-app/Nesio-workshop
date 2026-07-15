@@ -20,6 +20,21 @@ import { createAppApiClient } from './app-api-client';
 import { loadProfileSettings, saveProfileSettings, profileIdentityUpdatedAt } from './profile';
 import type { CloudProfileSettings } from './app-api-client';
 
+/** 批次204:dataURL → File(老头像自动迁移上云用)。 */
+function dataUrlToFile(dataUrl: string, name: string): File | null {
+  try {
+    const [meta, b64] = dataUrl.split(',');
+    if (!b64) return null;
+    const mime = /data:(.*?);/.exec(meta)?.[1] || 'image/png';
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) arr[i] = bin.charCodeAt(i);
+    return new File([arr], name, { type: mime });
+  } catch {
+    return null;
+  }
+}
+
 /** 把云端身份字段落到本地(换头像清旧 avatarUrl,强制按新 storagePath 换签)。 */
 function applyCloudProfile(cloud: CloudProfileSettings, cloudAt: string): boolean {
   const patch: { displayName?: string; avatarStoragePath?: string; avatarUrl?: string } = {};
@@ -41,6 +56,22 @@ export async function pushProfileToCloud(existing?: CloudProfileSettings): Promi
     if (!identityAt) return { ok: false }; // 本地从没改过身份 → 无可推
     const p = loadProfileSettings();
     const client = createAppApiClient();
+    // 批次204:老头像自动迁移 —— 本地有头像(dataURL)但云里没副本(无 storagePath)时,上传成
+    // 云资产拿到 storagePath,换机/跨端头像就带得走,老用户无需手动重传;之后所有老头像自愈。
+    let avatarStoragePath = p.avatarStoragePath || '';
+    if (!avatarStoragePath && typeof p.avatarUrl === 'string' && p.avatarUrl.startsWith('data:')) {
+      try {
+        const file = dataUrlToFile(p.avatarUrl, 'avatar.png');
+        if (file) {
+          const up = await client.uploadCloudAsset({ file, purpose: 'avatar' });
+          if (up.ok && up.storagePath) {
+            avatarStoragePath = up.storagePath;
+            // 回写本地 storagePath(不改身份时间戳,避免多推一次);下次不再迁移。
+            saveProfileSettings({ avatarStoragePath }, { identityUpdatedAt: identityAt });
+          }
+        }
+      } catch { /* 迁移失败不阻塞名字推送 */ }
+    }
     let base: CloudProfileSettings = existing ?? {};
     if (!existing) {
       const cur = await client.fetchCloudProfileSettings();
@@ -50,7 +81,7 @@ export async function pushProfileToCloud(existing?: CloudProfileSettings): Promi
     const res = await client.saveCloudProfileSettings({
       ...base,
       displayName: p.displayName,
-      avatarStoragePath: p.avatarStoragePath || '',
+      avatarStoragePath,
       identityUpdatedAt: identityAt,
     });
     return { ok: Boolean(res?.ok && res?.writesCloud) };

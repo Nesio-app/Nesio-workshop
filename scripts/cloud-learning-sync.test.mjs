@@ -75,6 +75,7 @@ assert.match(sync, /learningRef/, '指针进 profile_settings.learningRef');
 assert.match(sync, /importRankerTrainLog/, '拉取走 union 合并(非覆盖)');
 assert.match(sync, /restorePreferenceState/, '偏好回灌');
 assert.ok(!/hasCloudEntitlement|Entitlement/.test(sync), 'P3:不查付费权益门');
+assert.match(sync, /saved\?\.ok/, '批次204:learning 指针写云检查结果,不吞错(203 前学习态跨端没工作的同款坑)');
 
 const pref = read('../lib/platform/personalization/preference-store.ts');
 const restoreRegion = pref.slice(pref.indexOf('export function restorePreferenceState'), pref.indexOf('export function resetPreferenceDimension'));

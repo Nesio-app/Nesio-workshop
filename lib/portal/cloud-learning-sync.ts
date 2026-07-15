@@ -87,10 +87,13 @@ export async function pushLearningToCloud(): Promise<{ ok: boolean }> {
     const client = createAppApiClient();
     const cur = await client.fetchCloudProfileSettings();
     const ref: LearningRef = { path: data.storagePath, n: trainLog.length, at: blob.at };
-    await client.saveCloudProfileSettings({
+    // 批次204:检查指针写云是否真成功(和 profile 同款:此前无脑 return ok:true,把
+    // learningRef 写失败吞了 —— 这正是学习态跨端在 203 前从没真正工作的原因)。
+    const saved = await client.saveCloudProfileSettings({
       ...(cur.ok ? cur.settings : {}),
       learningRef: JSON.stringify(ref),
     });
+    if (!saved?.ok || !saved?.writesCloud) return { ok: false };
     lastSyncedPath = data.storagePath; // 自己刚推的,别再拉回
     return { ok: true };
   } catch {

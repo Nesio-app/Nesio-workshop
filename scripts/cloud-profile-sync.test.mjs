@@ -72,6 +72,10 @@ assert.match(sync, /cloudAt > localAt/, '云更新才采纳');
 assert.match(sync, /localAt > cloudAt/, '本地更新才反推');
 assert.match(sync, /avatarUrl\s*=\s*''/, '采纳云头像时清本地旧签名 URL');
 assert.ok(!/Entitlement/.test(sync), 'P3:不查付费门');
+// 批次204:老头像自动迁移 + 写入结果检查
+assert.match(sync, /uploadCloudAsset/, '批次204:无 storagePath 的本地头像自动上传迁移');
+assert.match(sync, /startsWith\(['"]data:['"]\)/, '仅迁移本地 dataURL 头像(签名 URL 不重传)');
+assert.match(sync, /res\?\.ok\s*&&\s*res\?\.writesCloud/, 'push 检查写云真成功,不吞错');
 
 // ── allowlist 放行 identityUpdatedAt ──
 const route = read('../app/api/cloud/profile-settings/route.ts');
