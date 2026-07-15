@@ -266,7 +266,12 @@ export default function Portal() {
   // 回到前台时对比部署版本,变了就整页刷新(间隔 ≥60s,不打扰输入中的表单:
   // 仅在没有打开任何 sheet/输入焦点时刷)。
   useEffect(() => {
-    let known = '';
+    // 批次202:基线用**客户端构建 SHA**(编译期内联),而非「首次拉到的线上版本」。
+    // 旧逻辑 known='' → 首检设成线上当前版,于是只能发现「用着用着上了新版」;发现不了
+    // 「冷启动加载的本就是旧缓存代码」(PWA/浏览器缓存)——各端版本不一、修复程度不同的真因。
+    // 现在:客户端构建 ≠ 线上部署 → 这个 surface 在跑旧代码 → 强刷(SW 导航是 network-first,
+    // 刷新即取到新 HTML→新 chunk)。3 分钟防抖防 SW/CDN 抖动导致的循环。
+    let known = process.env.NEXT_PUBLIC_BUILD_SHA || '';
     let lastCheck = 0;
     const check = async () => {
       if (Date.now() - lastCheck < 60_000) return;
@@ -275,12 +280,17 @@ export default function Portal() {
         const res = await fetch('/api/version', { cache: 'no-store' });
         const data = await res.json() as { v?: string };
         if (!data.v || data.v === 'dev') return;
-        if (!known) { known = data.v; return; }
+        if (!known) { known = data.v; return; } // 本地无构建标识(dev)→ 退回旧行为
         if (data.v !== known) {
+          const last = Number(sessionStorage.getItem('nesio-version-reload') || 0);
+          if (Date.now() - last < 3 * 60_000) return; // 防抖:3 分钟内不重复整页刷
           const typing = document.activeElement instanceof HTMLInputElement
             || document.activeElement instanceof HTMLTextAreaElement;
           // busy 期间(文件选择器往返 / 正在同步)不刷新,否则会把进行中的上传冲掉、跳回主页。
-          if (!typing && !isBusy()) window.location.reload();
+          if (!typing && !isBusy()) {
+            sessionStorage.setItem('nesio-version-reload', String(Date.now()));
+            window.location.reload();
+          }
         }
       } catch { /* offline 等下次 */ }
     };

@@ -37,6 +37,10 @@ const nextConfig = {
   assetPrefix: process.env.BASE_PATH ? `${process.env.BASE_PATH}/` : '',
   env: {
     NEXT_PUBLIC_BASE_PATH: process.env.BASE_PATH || '',
+    // 批次202:把构建 commit 内联进客户端 bundle。版本自检拿它和线上 /api/version 比,
+    // 检测「这个 surface 在跑旧缓存代码」→ 强刷更新(旧逻辑只能发现「用着用着上线了新版」,
+    // 发现不了「冷启动时加载的就是旧缓存」——各端版本不一的真因)。
+    NEXT_PUBLIC_BUILD_SHA: process.env.VERCEL_GIT_COMMIT_SHA || '',
   },
   images: {
     unoptimized: true,

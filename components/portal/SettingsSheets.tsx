@@ -5,9 +5,11 @@
  * Each is a slide-up bottom sheet opened from NesioProfileCard.
  */
 
-import { useEffect, useRef, useState } from 'react';
-import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, saveProfileSettings, type PortalLocale } from '@/lib/portal/profile';
-import { pushProfileToCloud } from '@/lib/portal/cloud-profile-sync';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, profileIdentityUpdatedAt, saveProfileSettings, type PortalLocale } from '@/lib/portal/profile';
+import { pushProfileToCloud, syncProfileWithCloud } from '@/lib/portal/cloud-profile-sync';
+import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
+import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { L, t } from '@/lib/portal/i18n';
 import { usePortalLocale } from './use-portal-locale';
@@ -400,6 +402,27 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       .then((d: { loggedIn?: boolean }) => setSignedIn(Boolean(d?.loggedIn)))
       .catch(() => {});
   }, [open]);
+  // 批次202:跨端同步诊断 —— 每端一眼看出 版本/登录/身份戳,定位「为何不同步」。
+  const buildSha = (process.env.NEXT_PUBLIC_BUILD_SHA || 'dev').slice(0, 7);
+  const [diagLocalAt, setDiagLocalAt] = useState('');
+  const [diagCloudAt, setDiagCloudAt] = useState('');
+  const [diagSyncMsg, setDiagSyncMsg] = useState('');
+  const loadDiag = useCallback(() => {
+    setDiagLocalAt(profileIdentityUpdatedAt());
+    createAppApiClient().fetchCloudProfileSettings()
+      .then((r) => setDiagCloudAt(r.ok && typeof r.settings?.identityUpdatedAt === 'string' ? r.settings.identityUpdatedAt : ''))
+      .catch(() => {});
+  }, []);
+  useEffect(() => { if (open) loadDiag(); }, [open, loadDiag]);
+  async function handleForceSync() {
+    setDiagSyncMsg(L(dict, '同步中…', 'Syncing…'));
+    try {
+      await Promise.all([syncMemoryWithCloud({ force: true }), syncProfileWithCloud()]);
+      setDiagSyncMsg(L(dict, '✓ 已同步 · 下拉刷新看结果', '✓ Synced · pull to refresh'));
+      loadDiag();
+    } catch { setDiagSyncMsg(L(dict, '同步失败', 'Sync failed')); }
+  }
+  const fmtAt = (iso: string) => (iso ? iso.slice(5, 16).replace('T', ' ') : '—');
   const pickBackupDest = (d: 'drive' | 'nesio') => {
     setBackupDest(d);
     try { localStorage.setItem('nesio-backup-dest', d); } catch { /* ignore */ }
@@ -635,6 +658,13 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         {!lastBackupAt && (
           <p style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', margin: '0.4rem 0 0' }}>{L(dict, '你的数据你拥有 —— 一键导出,记忆、健康、学到的偏好全带走,换手机也不会丢。', 'Your data is yours — export once and take your memories, health and learned preferences anywhere.')}</p>
         )}
+        {/* 批次202:跨端同步诊断 —— 每端一眼看出 版本/登录/身份戳,定位为何不同步 */}
+        <div style={{ marginTop: '0.55rem', paddingTop: '0.45rem', borderTop: '1px solid var(--portal-line)', fontSize: '0.62rem', color: 'var(--portal-muted)', lineHeight: 1.7 }}>
+          <div>{L(dict, '同步诊断', 'Sync diag')} · {L(dict, '构建', 'build')} <b>{buildSha}</b> · {signedIn ? L(dict, '已登录', 'signed in') : <b style={{ color: 'var(--status-risk)' }}>{L(dict, '⚠ 未登录', '⚠ signed out')}</b>}</div>
+          <div>{L(dict, '身份戳', 'identity')} · {L(dict, '本机', 'local')} {fmtAt(diagLocalAt)} · {L(dict, '云端', 'cloud')} {fmtAt(diagCloudAt)}</div>
+          <button type="button" onClick={handleForceSync} style={{ marginTop: 5, fontSize: '0.66rem', padding: '0.25rem 0.65rem', borderRadius: 8, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-blue-deep)', cursor: 'pointer' }}>{L(dict, '立即同步(记忆+头像名字)', 'Sync now')}</button>
+          {diagSyncMsg && <span style={{ marginLeft: 8 }}>{diagSyncMsg}</span>}
+        </div>
       </div>
 
       {/* 图5:数据接入从「记录习惯」并入这里 —— 连接数据源(ConnectorsHub) */}
