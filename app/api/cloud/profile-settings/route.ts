@@ -245,7 +245,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const url = new URL('/rest/v1/profile_settings', config.supabaseUrl);
-    url.searchParams.set('on_conflict', 'user_id');
+    // 批次203(真因):profile_settings 的主键/唯一约束是 identity_key(见 schema),不是 user_id。
+    // 之前 on_conflict=user_id 与任何唯一索引都不匹配 → PostgREST 每次 upsert 都报错 → **profile
+    // 设置写云从来没成功过**(名字/头像/mirror 都没同步)。改回真实唯一键 identity_key。
+    url.searchParams.set('on_conflict', 'identity_key');
     const response = await fetch(url.toString(), {
       method: 'POST',
       headers: {

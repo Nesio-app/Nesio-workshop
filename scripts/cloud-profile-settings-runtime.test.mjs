@@ -52,6 +52,15 @@ assert.ok(
 );
 assert.ok(!/SERVICE_ROLE_KEY[\s\S]{0,120}NextResponse\.json/.test(route), 'route must never serialize the service role key');
 
+// 批次203 回归:profile_settings upsert 的 on_conflict 必须 = 表的主键(identity_key)。
+// 曾误设 on_conflict=user_id(user_id 无唯一约束)→ PostgREST upsert 永久报错 → 云写从不成功,
+// 名字/头像/mirror 全都同步不了。锁死:on_conflict 与 schema 主键一致,且绝不是 user_id。
+const schema = fs.readFileSync(path.join(repoRoot, 'database', 'schema', 'supabase-profile-settings-v1.sql'), 'utf8');
+const pkCol = (schema.match(/(\w+)\s+text\s+PRIMARY KEY/i) || [, 'identity_key'])[1];
+assert.equal(pkCol, 'identity_key', 'profile_settings 主键应为 identity_key');
+assert.match(route, new RegExp(`on_conflict['"],\\s*['"]${pkCol}['"]`), `profile_settings upsert 的 on_conflict 必须 = 主键 ${pkCol}`);
+assert.ok(!/on_conflict['"],\s*['"]user_id['"]/.test(route), 'on_conflict 不能用 user_id(非唯一键 → upsert 永久失败)');
+
 for (const marker of [
   'CloudProfileSettings',
   'observationPushEnabled?: boolean',

@@ -46,13 +46,14 @@ export async function pushProfileToCloud(existing?: CloudProfileSettings): Promi
       const cur = await client.fetchCloudProfileSettings();
       base = cur.ok && cur.settings ? cur.settings : {};
     }
-    await client.saveCloudProfileSettings({
+    // 批次203:检查写入是否真成功(此前无脑 return ok:true,把「云写失败」吞了 6 个批次都没露出)。
+    const res = await client.saveCloudProfileSettings({
       ...base,
       displayName: p.displayName,
       avatarStoragePath: p.avatarStoragePath || '',
       identityUpdatedAt: identityAt,
     });
-    return { ok: true };
+    return { ok: Boolean(res?.ok && res?.writesCloud) };
   } catch {
     return { ok: false };
   }
