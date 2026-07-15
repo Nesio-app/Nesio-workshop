@@ -105,3 +105,45 @@ export async function maybeRunSweep(
     return 'skipped';
   }
 }
+
+export interface SweepRunResult {
+  ok: boolean;
+  candidates: number; // 送去巡查的低置信候选数
+  findings: number; // LLM 抽出的确定到期/续期 finding 数
+  note?: string; // 失败原因 / 空态提示
+}
+
+/**
+ * 手动「立即巡查」(设置→同步诊断的测试按钮,批次208)。
+ * 与 maybeRunSweep 的差别:① 不受每天一次闸限制;② 忽略 sweptIds、重扫**当前所有**低置信候选
+ * (诊断「现在能翻出什么」,便于当场反复测)。结果合并进 ledger 并标 swept + 记 lastRunDate,
+ * 与自动路径对齐。返回可读诊断(送了几条 / 抽出几条)。
+ */
+export async function runSweepNow(nodes: readonly SweepNode[]): Promise<SweepRunResult> {
+  if (typeof window === 'undefined') return { ok: false, candidates: 0, findings: 0, note: 'no window' };
+  const now = new Date();
+  const ledger = readLedger();
+  const candidates = selectSweepCandidates(nodes, { sweptIds: new Set() });
+  if (candidates.length === 0) {
+    return { ok: true, candidates: 0, findings: 0, note: 'no-candidates' };
+  }
+  try {
+    const res = await fetch('/api/portal/llm-sweep', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidates }),
+    });
+    if (!res.ok) return { ok: false, candidates: candidates.length, findings: 0, note: `route ${res.status}` };
+    const data = await res.json();
+    const findings: SweepFinding[] = Array.isArray(data?.findings) ? data.findings : [];
+    const newSwept = Array.from(new Set([...ledger.sweptIds, ...candidates.map((c) => c.id)]));
+    const merged = [
+      ...ledger.findings.filter((f) => !findings.some((nf) => nf.nodeId === f.nodeId)),
+      ...findings,
+    ];
+    writeLedger({ findings: merged, sweptIds: newSwept, lastRunDate: dateKey(now) });
+    return { ok: true, candidates: candidates.length, findings: findings.length };
+  } catch {
+    return { ok: false, candidates: candidates.length, findings: 0, note: 'network' };
+  }
+}

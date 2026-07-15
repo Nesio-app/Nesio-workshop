@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, profileIdentityUpdatedAt, saveProfileSettings, touchProfileIdentity, type PortalLocale } from '@/lib/portal/profile';
 import { pushProfileToCloud, syncProfileWithCloud } from '@/lib/portal/cloud-profile-sync';
 import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
+import { runSweepNow } from '@/lib/portal/llm-sweep-auto';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { L, t } from '@/lib/portal/i18n';
@@ -411,6 +412,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const [diagLocalAt, setDiagLocalAt] = useState('');
   const [diagCloudAt, setDiagCloudAt] = useState('');
   const [diagSyncMsg, setDiagSyncMsg] = useState('');
+  const [diagSweepMsg, setDiagSweepMsg] = useState('');
   const loadDiag = useCallback(() => {
     setDiagLocalAt(profileIdentityUpdatedAt());
     createAppApiClient().fetchCloudProfileSettings()
@@ -425,6 +427,20 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       setDiagSyncMsg(L(dict, '✓ 已同步 · 下拉刷新看结果', '✓ Synced · pull to refresh'));
       loadDiag();
     } catch { setDiagSyncMsg(L(dict, '同步失败', 'Sync failed')); }
+  }
+  // 批次208:手动「立即巡查」—— 绕过每天一次闸,当场跑 Layer ③ 巡查测信噪比(web 上即可测,不必进 Apple)。
+  async function handleRunSweep() {
+    setDiagSweepMsg(L(dict, '巡查中…', 'Sweeping…'));
+    try {
+      const r = await runSweepNow(getLifeGraph());
+      if (!r.ok) {
+        setDiagSweepMsg(L(dict, `巡查未成:${r.note || '失败'}`, `Sweep failed: ${r.note || ''}`));
+      } else if (r.candidates === 0) {
+        setDiagSweepMsg(L(dict, '没有可巡查的低置信线索(先记一条藏了到期日的东西再试)', 'No low-confidence candidates yet'));
+      } else {
+        setDiagSweepMsg(L(dict, `✓ 送 ${r.candidates} 条 → 抽出 ${r.findings} 条 · 回今日下拉刷新看卡`, `✓ ${r.candidates} sent → ${r.findings} found · pull to refresh Today`));
+      }
+    } catch { setDiagSweepMsg(L(dict, '巡查失败', 'Sweep failed')); }
   }
   const fmtAt = (iso: string) => (iso ? iso.slice(5, 16).replace('T', ' ') : '—');
   const pickBackupDest = (d: 'drive' | 'nesio') => {
@@ -668,6 +684,11 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           <div>{L(dict, '身份戳', 'identity')} · {L(dict, '本机', 'local')} {fmtAt(diagLocalAt)} · {L(dict, '云端', 'cloud')} {fmtAt(diagCloudAt)}</div>
           <button type="button" onClick={handleForceSync} style={{ marginTop: 5, fontSize: '0.66rem', padding: '0.25rem 0.65rem', borderRadius: 8, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-blue-deep)', cursor: 'pointer' }}>{L(dict, '立即同步(记忆+头像名字)', 'Sync now')}</button>
           {diagSyncMsg && <span style={{ marginLeft: 8 }}>{diagSyncMsg}</span>}
+          {/* 批次208:手动跑 Layer ③ 巡查(测试低置信捕捉里的到期/续期信噪比,web 上即可,不必进 Apple) */}
+          <div style={{ marginTop: 6 }}>
+            <button type="button" onClick={handleRunSweep} style={{ fontSize: '0.66rem', padding: '0.25rem 0.65rem', borderRadius: 8, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-blue-deep)', cursor: 'pointer' }}>{L(dict, '立即巡查(找漏掉的到期/续期)', 'Run sweep now')}</button>
+            {diagSweepMsg && <span style={{ marginLeft: 8 }}>{diagSweepMsg}</span>}
+          </div>
         </div>
       </div>
 
