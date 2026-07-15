@@ -82,6 +82,9 @@ const SOURCE_RELEVANCE: Record<GuidanceSource, number> = {
   email:   70,
   habit:   60,
   weather: 50,
+  // 开放世界 Layer ③ 巡查抽取:AI 推断,比确定性源保守 —— 需更强信号才配打断,
+  // 天然给 ④ 反馈让路(用户不喜欢巡查卡时更容易压下去)。
+  llm_sweep: 55,
 };
 
 function personalRelevanceScore(source: GuidanceSource): number {

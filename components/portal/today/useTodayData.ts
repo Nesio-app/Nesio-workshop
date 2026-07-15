@@ -13,6 +13,7 @@ import { loadProfileSettings, portalLocaleToDictionaryLocale, PROFILE_UPDATED_EV
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { buildDailyReport, type DailyReport } from '@/lib/portal/daily-report';
 import { autoPersistTodayReport } from '@/lib/portal/daily-report-persist';
+import { loadSweepEvents, maybeRunSweep } from '@/lib/portal/llm-sweep-auto';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext, type TodayReceipt } from '@/lib/platform/view-models/today-view-model';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
@@ -242,6 +243,9 @@ export function useTodayData(canUsePrivateData: boolean) {
           // 批次197:接回 objectContextEvents(此前是死代码,零调用点)—— 拿临近事件(开会/出行/
           // 就诊/生日)去比对你的物品,把「带名片/带护照/7天前吹风快过期物品」这类情境提物顶出来。
           ...objectContextEvents(baseGuidanceEvents, updated.allNodes, now),
+          // 批次207:开放世界 Layer ③ —— 从缓存 ledger 读巡查抽出的到期/续期 finding(免费、本地重算窗口);
+          // 每日一次的付费巡查(maybeRunSweep,见下)只负责填 ledger,不阻塞出卡。
+          ...loadSweepEvents(updated.allNodes, now),
         ];
 
         const uiLocale = portalLocaleToDictionaryLocale(loadProfileSettings().locale);
@@ -262,6 +266,9 @@ export function useTodayData(canUsePrivateData: boolean) {
           const report = buildDailyReport(reportInput);
           if (!stale()) setTodayReport(profile.dailyReportEnabled && !report.empty ? report : null);
           autoPersistTodayReport(reportInput, { enabled: profile.dailyReportEnabled, now });
+          // 批次207:开放世界 Layer ③ —— 搭日报的车,每日一次巡查低置信捕捉(付费门在路由端)。
+          // fire-and-forget:填 ledger 供下次渲染的 loadSweepEvents 读;不阻塞本轮出卡。
+          void maybeRunSweep(updated.allNodes, { now });
         }
         // deferred:出卡但先不写「已展示」(冷却/ranker),等确认这轮结果真的上屏再 commit
         // —— 否则慢轮被 runSeqRef 丢弃时,卡被记成已展示却从未出现,下一轮全被冷却拦掉。

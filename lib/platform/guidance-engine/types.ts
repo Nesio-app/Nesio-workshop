@@ -16,7 +16,7 @@ export type GuidanceEventType =
   | 'object_context'   // 物品关联情境 — owned item relevant to an upcoming context
   | 'dec_insight';     // DEC 域引擎推荐卡(证据门控,PRD TODAY-002)
 
-export type GuidanceSource = 'calendar' | 'email' | 'memory' | 'weather' | 'habit';
+export type GuidanceSource = 'calendar' | 'email' | 'memory' | 'weather' | 'habit' | 'llm_sweep';
 
 export interface GuidanceEvent {
   id: string;
