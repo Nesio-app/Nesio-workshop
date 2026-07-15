@@ -13,6 +13,10 @@ type ProfileSettings = {
   calendarUrl?: string;
   observationPushEnabled?: boolean;
   mirrorProfile?: string;
+  // 批次199(P2 跨端银行):指向 cloud/assets 上「学习态 blob」(ranker 训练日志 + 偏好)的
+  // 短指针,JSON 字符串 {"path","n","at"}。载荷本身在 assets(不受 2000 字上限),这里只存指针,
+  // 让新设备按账号找到并回灌那份「被纠偏的 ranker + 学到的偏好」。
+  learningRef?: string;
 };
 
 const allowedSettingsKeys = [
@@ -38,6 +42,7 @@ const stringSettingsKeys = [
   'theme',
   'calendarUrl',
   'mirrorProfile',
+  'learningRef',
 ] as const;
 
 function safeJson(body: Record<string, unknown>, status = 200) {

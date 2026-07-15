@@ -14,6 +14,7 @@ import { canUse, canOpenFreeze } from '@/lib/portal/entitlement';
 import { reconcileLocalOwner, claimLocalDataForUser, purgeAllLocalUserData, setLocalOwner, getLocalOwner } from '@/lib/portal/local-owner';
 import { archiveCurrentSpace, restoreArchivedSpace } from '@/lib/portal/account-spaces';
 import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
+import { syncLearningWithCloud, registerLearningAutoPush } from '@/lib/portal/cloud-learning-sync';
 
 // Heavy sheets load on first open, not at boot — together they were ~3.5k
 // lines of first-paint JS for UI the user may never touch in a session.
@@ -509,11 +510,18 @@ export default function Portal() {
   useEffect(() => {
     if (!canUsePrivateRuntime) return;
     void syncMemoryWithCloud();
+    // 批次199 P2:同步「学习态」(被纠偏的 ranker + 学到的偏好)—— 登录即回灌 union 合并,
+    // 并订阅反馈总线做防抖回推。让这份「抄不走的私有累积」跨端一致,换机不蒸发。
+    void syncLearningWithCloud();
+    const unregisterLearningPush = registerLearningAutoPush();
     const onVisible = () => {
-      if (document.visibilityState === 'visible') void syncMemoryWithCloud();
+      if (document.visibilityState === 'visible') { void syncMemoryWithCloud(); void syncLearningWithCloud(); }
     };
     document.addEventListener('visibilitychange', onVisible);
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      unregisterLearningPush();
+    };
   }, [canUsePrivateRuntime]);
 
   useEffect(() => {

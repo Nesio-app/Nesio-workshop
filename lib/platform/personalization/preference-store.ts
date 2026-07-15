@@ -80,6 +80,26 @@ export function seedPreferenceWeights(
   saveJson(KEY, st);
 }
 
+/** 批次199(P2 跨端银行):导出全部维度权重(那份「学到的偏好」)。 */
+export function exportPreferenceState(): PrefState {
+  return loadJson<PrefState>(KEY, {});
+}
+
+/**
+ * 跨端回灌远端偏好 —— 非覆盖(overwrite=false):只补本地缺的键,不盖本地已学的权重。
+ * 新设备(本地空)→ 全量采纳;老设备 → 只补缺,本地学习不被别端旧值回退。
+ */
+export function restorePreferenceState(remote: PrefState): { seededDimensions: number } {
+  if (!remote || typeof remote !== 'object') return { seededDimensions: 0 };
+  let seededDimensions = 0;
+  for (const [dimension, weights] of Object.entries(remote)) {
+    if (!weights || typeof weights !== 'object') continue;
+    seedPreferenceWeights(dimension, weights as Record<string, number>, { overwrite: false });
+    seededDimensions += 1;
+  }
+  return { seededDimensions };
+}
+
 /** 重置某维度(mirror 的 reset / 隐私清除用)。 */
 export function resetPreferenceDimension(dimension: string): void {
   const st = loadJson<PrefState>(KEY, {});

@@ -125,6 +125,43 @@ export function retrainRankerFromLog(): { replayed: number } | null {
   save(s);
   return { replayed: s.n };
 }
+
+/** 批次199(P2 跨端银行):导出训练日志 —— 反馈的蒸馏,就是那份「被纠偏的 ranker」的事实来源。 */
+export function exportRankerTrainLog(): TrainExample[] {
+  const log = trainLog.load();
+  return Array.isArray(log) ? log : [];
+}
+
+/** 已学样本数(跨端反回归比较:更「训练过」的一侧胜)。 */
+export function rankerTrainCount(): number {
+  return exportRankerTrainLog().length;
+}
+
+/**
+ * 跨端合并远端训练日志 —— **无损 union,非覆盖**:按 (at|type|y|f) 去重,保留最新
+ * TRAIN_LOG_CAP 条,回放重建权重。两端各自的反馈都不丢。
+ * 比「权重 last-write-wins」正确:后者会让陈旧设备把别端更多的学习覆盖掉(回退)。
+ * 幂等:同一份远端重复 import 去重后集合不变 → 权重不变。
+ */
+export function importRankerTrainLog(remote: TrainExample[]): { merged: number; total: number } {
+  const local = exportRankerTrainLog();
+  if (!Array.isArray(remote) || !remote.length) return { merged: 0, total: local.length };
+  const keyOf = (e: TrainExample) => `${e.at}|${e.type}|${e.y}|${Array.isArray(e.f) ? e.f.join(',') : ''}`;
+  const byKey = new Map<string, TrainExample>();
+  for (const e of local) byKey.set(keyOf(e), e);
+  let merged = 0;
+  for (const e of remote) {
+    if (!e || !Array.isArray(e.f) || e.f.length !== FEATURE_KEYS.length || (e.y !== 0 && e.y !== 1)) continue;
+    const k = keyOf(e);
+    if (!byKey.has(k)) { byKey.set(k, e); merged += 1; }
+  }
+  if (!merged) return { merged: 0, total: local.length };
+  const all = Array.from(byKey.values()).sort((a, b) => String(a.at).localeCompare(String(b.at)));
+  const capped = all.length > TRAIN_LOG_CAP ? all.slice(all.length - TRAIN_LOG_CAP) : all;
+  trainLog.save(capped);
+  retrainRankerFromLog();
+  return { merged, total: capped.length };
+}
 function save(s: RankerState): void {
   if (typeof window === 'undefined') return;
   try { localStorage.setItem(KEY, JSON.stringify(s)); } catch { /* quota */ }

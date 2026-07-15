@@ -282,6 +282,9 @@ export type CloudProfileSettings = {
   theme?: string;
   calendarUrl?: string;
   observationPushEnabled?: boolean;
+  mirrorProfile?: string;
+  // 批次199 P2:学习态 blob 指针(ranker 训练日志 + 偏好),cross-device 回灌用。
+  learningRef?: string;
 };
 
 export type CloudProfileSettingsResponse = {
