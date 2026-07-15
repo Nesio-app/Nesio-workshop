@@ -16,6 +16,7 @@
  * 节流:mount 与 visibility 可能连触发,MIN_INTERVAL_MS 内只真正拉一次(force 跳过)。
  */
 import { createAppApiClient } from './app-api-client';
+import { logDropped } from './storage-health';
 import { mergeCloudMemorySnapshot, retryLifeGraphCloudSync, backfillLocalLifeGraphToCloud } from './life-graph';
 
 const MIN_INTERVAL_MS = 20_000;
@@ -48,7 +49,8 @@ export async function syncMemoryWithCloud(opts: { force?: boolean } = {}): Promi
     void retryLifeGraphCloudSync();
     void backfillLocalLifeGraphToCloud({ limit: 200 });
     return { ok: true, importedNodeCount: merged.importedNodeCount };
-  } catch {
+  } catch (err) {
+    logDropped('cloud.memory_sync', err); // 可观测:整条记忆同步失败别哑吞(196-205 静默丢的教训)
     return { ok: false, importedNodeCount: 0 };
   } finally {
     inFlight = false;

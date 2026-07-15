@@ -17,6 +17,7 @@ import {
   type SweepNode,
 } from '@/lib/platform/guidance-engine/llm-sweep';
 import type { GuidanceEvent } from '@/lib/platform/guidance-engine/types';
+import { logDropped } from './storage-health';
 
 const LEDGER_KEY = 'nesio-llm-sweep-ledger-v1';
 
@@ -100,7 +101,8 @@ export async function maybeRunSweep(
     ];
     writeLedger({ findings: merged, sweptIds: newSwept, lastRunDate: today });
     return 'ran';
-  } catch {
+  } catch (err) {
+    logDropped('sweep.auto', err);
     // 网络失败:不记 lastRunDate、不标 swept —— 候选保留,回前台可重试。
     return 'skipped';
   }
@@ -143,7 +145,8 @@ export async function runSweepNow(nodes: readonly SweepNode[]): Promise<SweepRun
     ];
     writeLedger({ findings: merged, sweptIds: newSwept, lastRunDate: dateKey(now) });
     return { ok: true, candidates: candidates.length, findings: findings.length };
-  } catch {
+  } catch (err) {
+    logDropped('sweep.run_now', err);
     return { ok: false, candidates: candidates.length, findings: 0, note: 'network' };
   }
 }

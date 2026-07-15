@@ -14,6 +14,7 @@
  * 免费(P3):durability = 护城河,不查任何付费权益门。best-effort:未登录/未配置/离线静默。
  */
 import { createAppApiClient } from './app-api-client';
+import { logDropped } from './storage-health';
 import {
   exportRankerTrainLog, importRankerTrainLog, rankerTrainCount, type TrainExample,
 } from '@/lib/platform/guidance-engine/guidance-ranker';
@@ -59,7 +60,8 @@ export async function pullLearningFromCloud(): Promise<{ ok: boolean; merged: nu
     const r = importRankerTrainLog(Array.isArray(blob.trainLog) ? blob.trainLog : []);
     restorePreferenceState(blob.preference || {});
     return { ok: true, merged: r.merged };
-  } catch {
+  } catch (err) {
+    logDropped('cloud.learning_pull', err);
     return { ok: false, merged: 0 };
   }
 }
@@ -96,7 +98,8 @@ export async function pushLearningToCloud(): Promise<{ ok: boolean }> {
     if (!saved?.ok || !saved?.writesCloud) return { ok: false };
     lastSyncedPath = data.storagePath; // 自己刚推的,别再拉回
     return { ok: true };
-  } catch {
+  } catch (err) {
+    logDropped('cloud.learning_push', err);
     return { ok: false };
   }
 }

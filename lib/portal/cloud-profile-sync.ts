@@ -17,6 +17,7 @@
  * 免费(P3):durability 不锁付费门。best-effort:未登录/离线静默。
  */
 import { createAppApiClient } from './app-api-client';
+import { logDropped } from './storage-health';
 import { loadProfileSettings, saveProfileSettings, profileIdentityUpdatedAt, PROFILE_UPDATED_EVENT, type PortalProfileSettings } from './profile';
 import type { CloudProfileSettings } from './app-api-client';
 
@@ -114,7 +115,8 @@ export async function pushProfileToCloud(existing?: CloudProfileSettings): Promi
       identityUpdatedAt: identityAt,
     });
     return { ok: Boolean(res?.ok && res?.writesCloud) };
-  } catch {
+  } catch (err) {
+    logDropped('cloud.profile_push', err);
     return { ok: false };
   }
 }
@@ -135,8 +137,8 @@ export async function syncProfileWithCloud(): Promise<void> {
     } else if (localAt && localAt > cloudAt) {
       void pushProfileToCloud(cloud ?? {});
     }
-  } catch {
-    /* best-effort */
+  } catch (err) {
+    logDropped('cloud.profile_sync', err);
   }
 }
 
