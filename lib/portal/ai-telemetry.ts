@@ -11,6 +11,7 @@
 import { after } from 'next/server';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
+import { recordAiCall } from '@/lib/portal/ai-budget';
 
 async function persistAiEvent(props: Record<string, string | number | boolean>, ts: number): Promise<void> {
   const url = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
@@ -33,6 +34,8 @@ export function reportAiCall(
 ): void {
   try {
     const ts = Date.now();
+    // 批次196:每次付费云 AI 调用后累计粗估花费,喂给日成本熔断(手册#3)。
+    recordAiCall(route);
     const props = { route, ok, latency_ms: ts - startedAt, ...extra };
     console.log('[telemetry]', JSON.stringify({ name: 'ai_route', props, ts }));
     try {
