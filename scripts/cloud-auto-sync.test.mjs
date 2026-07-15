@@ -38,10 +38,15 @@ const mergeRegion = lg.slice(
   lg.indexOf('export function mergeCloudMemorySnapshot'),
   lg.indexOf('export async function backfillLocalLifeGraphToCloud'),
 );
-assert.match(mergeRegion, /stampOf/, '合并用编辑时间戳比较(stampOf)');
-assert.match(mergeRegion, /updatedAt[\s\S]{0,40}createdAt/, '时间戳取 attributes.updatedAt,回退 createdAt');
-assert.match(mergeRegion, /incomingWins/, 'last-write-wins:云端更新才胜,否则保留本地');
+assert.match(mergeRegion, /mergeConflictingNodes/, '合并委托 mergeConflictingNodes(批次209:含 attributes/tags 并集)');
 assert.ok(!/\{\s*\.\.\.localNode,\s*\.\.\.incomingNode,/.test(mergeRegion), '不再「云端无条件胜」(旧 {...local,...incoming} 已移除)');
+
+// 合并粒度契约在 life-node-merge.ts(纯逻辑,行为测试见 node-conflict-merge.test.mjs)
+const merge = read('../lib/portal/life-node-merge.ts');
+assert.match(merge, /updatedAt[\s\S]{0,40}createdAt/, '时间戳取 attributes.updatedAt,回退 createdAt');
+assert.match(merge, /bWins\s*\?\s*b\s*:\s*a/, 'last-write-wins:新者(updatedAt 大)赢标量');
+assert.match(merge, /attributes:\s*\{[\s\S]{0,40}loser\.attributes[\s\S]{0,40}winner\.attributes/, 'attributes 两侧并集(较旧侧独有属性键不丢 ← 批次209 修复)');
+assert.match(merge, /tags:\s*Array\.from\(new Set/, 'tags 两侧并集去重');
 
 // ── 云快照契约诚实声明 ──
 function compileContract() {

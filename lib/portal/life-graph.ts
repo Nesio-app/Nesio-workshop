@@ -3,6 +3,7 @@
  * Nodes are stored in localStorage under a single key.
  * This is the foundation for Reasoning Engine and Today Feed.
  */
+import { mergeConflictingNodes } from './life-node-merge';
 
 export type LifeNodeType =
   | 'person'
@@ -813,20 +814,17 @@ export function mergeCloudMemorySnapshot(snapshot: { nodes?: unknown[]; assets?:
   // 此前 `{...local, ...incoming}` 让云端标量字段无条件覆盖本地 —— 一旦登录后自动拉云打开,
   // 陈旧云快照会盖掉本地更新的编辑 → 丢数据。改为按 attributes.updatedAt(数据审计#3 的
   // 编辑时刻,退化 createdAt)取新者的标量字段,较旧一侧独有字段仍保留;资产两侧永远并集。
-  const stampOf = (n?: LifeNode): string =>
-    n ? String((n.attributes?.updatedAt as string) || n.createdAt || '') : '';
   for (const incomingNode of incomingNodes) {
     const localNode = nodesById.get(incomingNode.id);
     const mergedAssets = mergeLifeNodeAssets(
       mergeLifeNodeAssets(localNode?.assets, incomingNode.assets),
       incomingAssetsByNodeId.get(incomingNode.id),
     );
-    const incomingWins = stampOf(incomingNode) >= stampOf(localNode);
-    const winner = incomingWins ? incomingNode : (localNode as LifeNode);
-    const loser = incomingWins ? localNode : incomingNode;
+    // 数据审计#3:按 updatedAt 取新者标量 + attributes/tags 两侧并集(较旧侧独有属性/标签不丢;
+    // 此前浅合并会整体替换嵌套 attributes → 并发加不同属性丢一侧)。assets 仍两侧并集。
+    const merged = localNode ? mergeConflictingNodes(localNode, incomingNode) : incomingNode;
     nodesById.set(incomingNode.id, {
-      ...loser,
-      ...winner,
+      ...merged,
       assets: mergedAssets.length ? mergedAssets : undefined,
     });
   }
