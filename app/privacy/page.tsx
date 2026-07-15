@@ -22,12 +22,16 @@ const SECTIONS: LegalSection[] = [
     ],
   },
   {
-    h: ['AI 处理', 'AI processing'],
+    h: ['AI 处理与第三方 AI 子处理方', 'AI processing and third-party AI sub-processors'],
     body: [
-      ['当你使用需要云端 AI 的功能(如拍照理解、对话问答、AI 日程)时,相关内容会发送给 AI 服务商(例如 Google Gemini)进行处理,以生成结果。这些内容仅用于为你即时生成结果,不用于训练模型。',
-       'When you use features that require cloud AI (photo understanding, conversational Q&A, AI routines), the relevant content is sent to an AI provider (for example Google Gemini) to produce the result. It is used only to generate your result, not to train models.'],
-      ['免费功能尽量在你的设备上或用确定性算法完成,不发送到付费云端 AI。',
-       'Free features run on your device or with deterministic logic wherever possible, and are not sent to paid cloud AI.'],
+      ['当你使用需要云端 AI 的功能(如拍照理解、对话问答、AI 日程/日报、主动提醒)时,相关内容(你的提问、以及相关的记忆文本或图片)会发送给我们的 AI 子处理服务商进行处理,以即时生成结果。',
+       'When you use features that require cloud AI (photo understanding, conversational Q&A, AI routines/daily brief, proactive reminders), the relevant content (your question and the related memory text or image) is sent to our AI sub-processors to generate your result in real time.'],
+      ['· 我们目前使用的 AI 子处理服务商为:Anthropic(Claude)、OpenAI(GPT)、Google(Gemini)。它们均为美国服务商,相关内容会传输至其位于美国的服务器。',
+       '· The AI sub-processors we currently use are: Anthropic (Claude), OpenAI (GPT), and Google (Gemini). They are US-based, so the relevant content is transmitted to their servers in the United States.'],
+      ['· 按各服务商的 API 条款,通过 API 传输的内容仅用于为你即时生成结果,默认不用于训练它们的模型。',
+       '· Under each provider’s API terms, content sent via their API is used only to generate your result and is not used to train their models by default.'],
+      ['免费功能尽量在你的设备上或用确定性算法完成,不发送到任何云端 AI 服务商。是否使用云端 AI 由你决定——不使用这些功能,你的内容就不会因此离开你的设备或我们的云。',
+       'Free features run on your device or with deterministic logic wherever possible and are not sent to any cloud AI provider. Using cloud AI is your choice — if you don’t use those features, your content is not sent out on that basis.'],
     ],
   },
   {
