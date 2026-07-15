@@ -17,6 +17,9 @@ type ProfileSettings = {
   // 短指针,JSON 字符串 {"path","n","at"}。载荷本身在 assets(不受 2000 字上限),这里只存指针,
   // 让新设备按账号找到并回灌那份「被纠偏的 ranker + 学到的偏好」。
   learningRef?: string;
+  // 批次200:名字/头像的身份 last-write-wins 时间戳(ISO)。用它而非 row 的 updated_at
+  // (后者会被 learningRef 等任意写刷新)做 profile 跨端 LWW 比对。
+  identityUpdatedAt?: string;
 };
 
 const allowedSettingsKeys = [
@@ -43,6 +46,7 @@ const stringSettingsKeys = [
   'calendarUrl',
   'mirrorProfile',
   'learningRef',
+  'identityUpdatedAt',
 ] as const;
 
 function safeJson(body: Record<string, unknown>, status = 200) {

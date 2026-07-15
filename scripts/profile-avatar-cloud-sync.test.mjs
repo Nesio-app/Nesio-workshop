@@ -26,7 +26,8 @@ assert.match(
 );
 assert.match(
   profileCard,
-  /uploadCloudAsset\(\{\s*file,\s*purpose:\s*['"]avatar['"]/s,
+  // 批次200:头像总是上传(卡通无源 file → dataUrlToFile 兜底成 File),故 file 变量化为 uploadFile。
+  /uploadCloudAsset\(\{\s*file:\s*uploadFile,\s*purpose:\s*['"]avatar['"]/s,
   'Avatar upload must call /api/cloud/assets with purpose=avatar for cross-device storage.',
 );
 // 批次 34/96:上传必须落一份永久本地 data: 头像 —— 批次 96 重构为 commitAvatar
@@ -36,11 +37,13 @@ assert.match(
   /saveProfileSettings\(\{\s*avatarUrl:\s*dataUrl\s*\}\)/s,
   'Avatar commit must persist a permanent local data-URL avatar so it never expires.',
 );
-// 云端 storagePath 必须持久化(供跨设备),本地也存一份 storagePath 供 hook 换签名。
+// 云端 storagePath 必须持久化(供跨设备)。批次200:改由 pushProfileToCloud() 推送 —— 它把
+// avatarStoragePath + displayName + identityUpdatedAt 合并写进 profile_settings(比裸 save 更完整,
+// 且带 LWW 时间戳供别端拉取判定),本地也存一份 storagePath 供 hook 换签名。
 assert.match(
   profileCard,
-  /saveCloudProfileSettings\(\{\s*avatarStoragePath:\s*result\.storagePath\s*\}\)/s,
-  'Cloud profile settings must persist the private storagePath for cross-device avatar.',
+  /pushProfileToCloud\(\)/s,
+  'Cloud profile settings must persist avatarStoragePath (via pushProfileToCloud) for cross-device avatar.',
 );
 assert.match(
   profileCard,

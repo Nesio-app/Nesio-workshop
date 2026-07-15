@@ -285,6 +285,8 @@ export type CloudProfileSettings = {
   mirrorProfile?: string;
   // 批次199 P2:学习态 blob 指针(ranker 训练日志 + 偏好),cross-device 回灌用。
   learningRef?: string;
+  // 批次200:名字/头像身份 LWW 时间戳(ISO)。
+  identityUpdatedAt?: string;
 };
 
 export type CloudProfileSettingsResponse = {

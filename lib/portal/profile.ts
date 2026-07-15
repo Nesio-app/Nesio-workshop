@@ -50,9 +50,17 @@ const KEYS = {
   locale: 'treasurebox-locale',
   coachStyle: 'treasurebox-coach-style',
   dailyReportEnabled: 'nesio-daily-report-enabled',
+  // 批次200:身份字段(名字/头像)最后修改时刻 —— 跨端 profile 同步的 last-write-wins 依据。
+  identityUpdatedAt: 'treasurebox-profile-updated-at',
 } as const;
 
 export const PROFILE_UPDATED_EVENT = 'treasurebox-profile-updated';
+
+/** 批次200:本地身份(名字/头像)最后修改时刻(ISO)。跨端同步比对用,无 → ''。 */
+export function profileIdentityUpdatedAt(): string {
+  if (typeof window === 'undefined') return '';
+  try { return localStorage.getItem(KEYS.identityUpdatedAt) || ''; } catch { return ''; }
+}
 
 export function normalizePortalLocale(value: string | null | undefined): PortalLocale {
   return SUPPORTED_PORTAL_LOCALES.includes(value as PortalLocale) ? value as PortalLocale : 'zh';
@@ -89,9 +97,18 @@ export function loadProfileSettings(fallbackName = '我'): PortalProfileSettings
   }
 }
 
-export function saveProfileSettings(patch: Partial<PortalProfileSettings>) {
+export function saveProfileSettings(
+  patch: Partial<PortalProfileSettings>,
+  // 批次200:cloud-apply 时传云端 updatedAt,避免刚拉回就被当成本地新改反推(乒乓)。
+  opts?: { identityUpdatedAt?: string },
+) {
   if (typeof window === 'undefined') return;
   try {
+    // 身份 last-write-wins:只在名字 / 头像 storagePath **实际变化**时更新时间戳。
+    // 刻意排除「只改 avatarUrl」—— 那是签名 URL 刷新(useProfileAvatar 定期换签),非用户编辑,
+    // 若也算「新改」会让每次刷新都误判本地更新 → 跨端乒乓。
+    const prevName = localStorage.getItem(KEYS.displayName) || '';
+    const prevPath = localStorage.getItem(KEYS.avatarStoragePath) || '';
     if (patch.displayName !== undefined) {
       localStorage.setItem(KEYS.displayName, patch.displayName.trim() || '我');
     }
@@ -102,6 +119,11 @@ export function saveProfileSettings(patch: Partial<PortalProfileSettings>) {
     if (patch.avatarStoragePath !== undefined) {
       if (patch.avatarStoragePath) localStorage.setItem(KEYS.avatarStoragePath, patch.avatarStoragePath);
       else localStorage.removeItem(KEYS.avatarStoragePath);
+    }
+    const nameChanged = patch.displayName !== undefined && (patch.displayName.trim() || '我') !== prevName;
+    const pathChanged = patch.avatarStoragePath !== undefined && (patch.avatarStoragePath || '') !== prevPath;
+    if (nameChanged || pathChanged) {
+      localStorage.setItem(KEYS.identityUpdatedAt, opts?.identityUpdatedAt || new Date().toISOString());
     }
     if (patch.locale !== undefined) {
       localStorage.setItem(KEYS.locale, patch.locale);

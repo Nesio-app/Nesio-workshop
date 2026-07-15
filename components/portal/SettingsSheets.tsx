@@ -7,6 +7,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, saveProfileSettings, type PortalLocale } from '@/lib/portal/profile';
+import { pushProfileToCloud } from '@/lib/portal/cloud-profile-sync';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { L, t } from '@/lib/portal/i18n';
 import { usePortalLocale } from './use-portal-locale';
@@ -1052,6 +1053,7 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
 
   function saveName() {
     saveProfileSettings({ displayName: name.trim() || '我' }); // PROFILE_UPDATED_EVENT → 全站头像/称呼即时更新
+    void pushProfileToCloud(); // 批次200:改名即推云,让别端登录/回前台拉到(此前 displayName 从不上云 = 名字各端不同的真因)
     setSavedTip(true);
     // 2.5s 后按钮恢复可点态,让下一次改名也有明确的「已保存」反馈(否则一直显示已保存,像卡住)
     if (savedTimer.current) clearTimeout(savedTimer.current);

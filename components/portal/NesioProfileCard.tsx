@@ -2,7 +2,23 @@
 
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { clearProfileIdentity, loadProfileSettings, readAvatarFile, saveProfileSettings } from '@/lib/portal/profile';
+import { pushProfileToCloud } from '@/lib/portal/cloud-profile-sync';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
+
+/** 批次200:dataURL → File，让卡通头像(无源文件)也能上传成云资产,跨端同步。 */
+function dataUrlToFile(dataUrl: string, name: string): File | null {
+  try {
+    const [meta, b64] = dataUrl.split(',');
+    if (!b64) return null;
+    const mime = /data:(.*?);/.exec(meta)?.[1] || 'image/png';
+    const bin = atob(b64);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) arr[i] = bin.charCodeAt(i);
+    return new File([arr], name, { type: mime });
+  } catch {
+    return null;
+  }
+}
 import { useProfileAvatar } from './use-profile-avatar';
 import { AccountSheet, AppearanceSheet, PrivacySheet, SubscriptionSheet, LabSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
@@ -72,16 +88,19 @@ export default function NesioProfileCard() {
   async function commitAvatar(dataUrl: string, file?: File) {
     let localSaved = false;
     try { saveProfileSettings({ avatarUrl: dataUrl }); localSaved = true; } catch { /* 存不下退云端 */ }
-    if (file) {
-      try {
+    // 批次200:头像**总是**上传成云资产 —— 卡通头像(acceptCartoon)没有源 file,以前就不上云、
+    // 于是没有 avatarStoragePath、跨端同步不了(婧/F/朋 各端不同的真因之一)。这里用 dataURL 兜底成 File。
+    try {
+      const uploadFile = file || dataUrlToFile(dataUrl, 'avatar.png');
+      if (uploadFile) {
         const client = createAppApiClient();
-        const result = await client.uploadCloudAsset({ file, purpose: 'avatar' });
+        const result = await client.uploadCloudAsset({ file: uploadFile, purpose: 'avatar' });
         if (result.ok && result.storagePath) {
-          await client.saveCloudProfileSettings({ avatarStoragePath: result.storagePath });
-          saveProfileSettings({ avatarStoragePath: result.storagePath });
+          saveProfileSettings({ avatarStoragePath: result.storagePath }); // bump identityUpdatedAt
+          await pushProfileToCloud(); // 一次性推 displayName + avatarStoragePath + identityUpdatedAt
         }
-      } catch { /* 云端是增强,本地已显示 */ }
-    }
+      }
+    } catch { /* 云端是增强,本地已显示 */ }
     if (!localSaved) setAvatarError(L(dict, '头像没有保存，请选择一张较小的图片。', "Avatar wasn't saved — try a smaller image."));
   }
 
