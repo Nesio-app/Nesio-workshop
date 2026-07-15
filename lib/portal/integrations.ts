@@ -120,6 +120,12 @@ const COOKIE_PREFIX: Record<IntegrationProvider, string> = {
   granola: 'nesio_granola',
 };
 
+/** provider 的 token cookie 名(access+refresh)。断连清 httpOnly cookie 时据此,别再各处硬编码。 */
+export function integrationCookieNames(provider: IntegrationProvider): string[] {
+  const prefix = COOKIE_PREFIX[provider];
+  return [`${prefix}_access`, `${prefix}_refresh`];
+}
+
 export async function readTokensFromCookies(provider: IntegrationProvider): Promise<IntegrationTokens | null> {
   const cookieStore = await cookies();
   const prefix = COOKIE_PREFIX[provider];

@@ -12,6 +12,7 @@ import {
   writeIntegrations,
   readTokensFromCookies,
   setTokenCookiesOnResponse,
+  integrationCookieNames,
   type IntegrationProvider,
   type IntegrationTokens,
 } from '@/lib/portal/integrations';
@@ -99,9 +100,9 @@ export async function DELETE(req: NextRequest) {
   if (!provider) return NextResponse.json({ ok: false, error: 'missing_provider' }, { status: 400 });
 
   const response = NextResponse.json({ ok: true, provider });
-  const prefix = provider === 'gmail' ? 'nesio_gmail' : 'nesio_google_calendar';
-  response.cookies.delete(`${prefix}_access`);
-  response.cookies.delete(`${prefix}_refresh`);
+  // 用 provider→cookie 规范映射(此前硬编码 gmail/calendar → notion/tesla/granola 断连会误删日历 cookie、
+  // 真正的 provider cookie 留活。S2:Notion 断连不撤销的真因之一)。
+  for (const name of integrationCookieNames(provider)) response.cookies.delete(name);
 
   if (supabaseToken) {
     const userId = await getSupabaseUserId(supabaseToken);

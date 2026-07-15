@@ -1141,6 +1141,19 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         })
         .catch(() => showToast(L(dict, '已断开本地连接，撤销请求失败——可在 Google 账号安全页手动移除', 'Disconnected locally; revoke request failed — remove it manually in Google account security'), false));
     }
+
+    // Notion — 断连撤销闭环(S2):清 httpOnly nesio_notion_access cookie + Supabase 集成行 + 本机选中的 DB。
+    // Notion 无公开 token 撤销端点 → 彻底移除需用户在 Notion 集成设置里删授权(文案点明,不装能做)。
+    if (id === 'notion') {
+      try { localStorage.removeItem(NOTION_DB_KEY); } catch { /* ignore */ }
+      setNotionDbSel([]);
+      void fetch('/api/portal/integrations?provider=notion', { method: 'DELETE' })
+        .then((r) => r.json() as Promise<{ ok?: boolean }>)
+        .then((d) => showToast(d.ok
+          ? L(dict, '已断开 Notion 并清除 token（彻底移除请在 Notion 集成设置里删除授权）', 'Disconnected Notion and cleared tokens (to fully remove, delete it in Notion integration settings)')
+          : L(dict, '已断开本地连接', 'Disconnected locally'), true))
+        .catch(() => showToast(L(dict, '已断开本地连接，云端清除失败——稍后重试', 'Disconnected locally; cloud clear failed — retry later'), false));
+    }
   }
 
   function copyIngestUrl() {

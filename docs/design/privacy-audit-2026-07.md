@@ -66,9 +66,11 @@ PII 进 AI / 遥测的围栏。扫描对象为 origin/main 当前部署版,不�
 
 ## 4. 剩余欠账(登记,不阻断)
 
-- **S2 · Notion 断连不撤销**(低危,我的代码):无 disconnect 端点清 `nesio_notion_access`
-  cookie 或调 Notion `oauth/token` 撤销端点;token cookie 存活 180 天。单用户 + httpOnly
-  下风险低,但「断开连接」语义上应撤销。留待后续加断连路由 + revoke 调用。
+- **S2 · Notion 断连不撤销** —— ✅ 已修(批次213)。ConnectorsHub `disconnect('notion')` 调
+  `DELETE /api/portal/integrations?provider=notion` 清 httpOnly `nesio_notion_access` cookie +
+  Supabase 集成行 + 本机选中的 DB。根因是 DELETE 路由的 cookie 名硬编码 gmail/calendar(notion/
+  tesla/granola 全误删日历 cookie、真 cookie 留活),已改用规范 `integrationCookieNames(provider)`。
+  注:Notion 无公开 token 撤销端点,彻底移除仍需用户在 Notion 集成设置删授权(UI 文案已点明)。
 - **Gmail 无限流**(可用性 > 隐私):Gmail 拉取路由缺限流,非隐私缺口,顺带记一笔。
 - **澄清**:`module-data-network-v1.sql` 是**本机 SQLite 治理注册表**(dev 工具),
   非 Supabase 云用户数据——不构成云端 RLS 暴露。此前误记为「15 表缺 RLS」,更正。
