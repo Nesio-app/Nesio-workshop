@@ -13,6 +13,7 @@ import InstallPrompt from './InstallPrompt';
 import { canUse, canOpenFreeze } from '@/lib/portal/entitlement';
 import { reconcileLocalOwner, claimLocalDataForUser, purgeAllLocalUserData, setLocalOwner, getLocalOwner } from '@/lib/portal/local-owner';
 import { archiveCurrentSpace, restoreArchivedSpace } from '@/lib/portal/account-spaces';
+import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
 
 // Heavy sheets load on first open, not at boot — together they were ~3.5k
 // lines of first-paint JS for UI the user may never touch in a session.
@@ -499,6 +500,20 @@ export default function Portal() {
       })
       .catch(() => { /* 领取失败按本机上下文继续 */ });
     return () => { cancelled = true; };
+  }, [canUsePrivateRuntime]);
+
+  // 批次198 P1:前台自动云同步 —— 登录后拉一次云端记忆合并进本地(last-write-wins),
+  // 并在标签页回到前台(visibilitychange→visible)时再拉一次。此前 pull 只在「记忆」页
+  // mount 时发生,落在「今天」页就看不到别端数据 —— 提到顶层后,打开落任何页都先拉平。
+  // best-effort:未登录/离线静默,不阻塞渲染;20s 节流由 syncMemoryWithCloud 内部保证。
+  useEffect(() => {
+    if (!canUsePrivateRuntime) return;
+    void syncMemoryWithCloud();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void syncMemoryWithCloud();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
   }, [canUsePrivateRuntime]);
 
   useEffect(() => {

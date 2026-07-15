@@ -632,7 +632,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           </div>
         </div>
         {!lastBackupAt && (
-          <p style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', margin: '0.4rem 0 0' }}>{L(dict, '数据只在这台设备上。导出一份完整备份,换手机也不会丢。', 'Data lives only on this device. Export a full backup so a new phone loses nothing.')}</p>
+          <p style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', margin: '0.4rem 0 0' }}>{L(dict, '你的数据你拥有 —— 一键导出,记忆、健康、学到的偏好全带走,换手机也不会丢。', 'Your data is yours — export once and take your memories, health and learned preferences anywhere.')}</p>
         )}
       </div>
 
@@ -690,7 +690,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       {driveMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: driveState === 'error' ? 'var(--status-risk)' : 'var(--status-go)' }}>{driveMsg}</p>}
 
       <button type="button" className="nesio-settings-action-btn" onClick={handleExportLocal} disabled={exportBusy}>
-        {exportBusy ? L(dict, '正在导出…', 'Exporting…') : L(dict, '导出到本机(下载 JSON)', 'Export to device (download JSON)')}
+        {exportBusy ? L(dict, '正在导出…', 'Exporting…') : L(dict, '导出全部(记忆 + 学到的偏好,下载 JSON)', 'Export everything (memories + learned prefs, JSON)')}
       </button>
       <button type="button" className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}>
         {L(dict, '导入备份', 'Import backup')}

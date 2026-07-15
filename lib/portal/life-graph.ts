@@ -809,15 +809,24 @@ export function mergeCloudMemorySnapshot(snapshot: { nodes?: unknown[]; assets?:
 
   const nodesById = new Map<string, LifeNode>();
   for (const localNode of loadAll()) nodesById.set(localNode.id, localNode);
+  // 批次198(P1 前台自动同步的安全前提):last-write-wins,不再「云端无条件胜」。
+  // 此前 `{...local, ...incoming}` 让云端标量字段无条件覆盖本地 —— 一旦登录后自动拉云打开,
+  // 陈旧云快照会盖掉本地更新的编辑 → 丢数据。改为按 attributes.updatedAt(数据审计#3 的
+  // 编辑时刻,退化 createdAt)取新者的标量字段,较旧一侧独有字段仍保留;资产两侧永远并集。
+  const stampOf = (n?: LifeNode): string =>
+    n ? String((n.attributes?.updatedAt as string) || n.createdAt || '') : '';
   for (const incomingNode of incomingNodes) {
     const localNode = nodesById.get(incomingNode.id);
     const mergedAssets = mergeLifeNodeAssets(
       mergeLifeNodeAssets(localNode?.assets, incomingNode.assets),
       incomingAssetsByNodeId.get(incomingNode.id),
     );
+    const incomingWins = stampOf(incomingNode) >= stampOf(localNode);
+    const winner = incomingWins ? incomingNode : (localNode as LifeNode);
+    const loser = incomingWins ? localNode : incomingNode;
     nodesById.set(incomingNode.id, {
-      ...localNode,
-      ...incomingNode,
+      ...loser,
+      ...winner,
       assets: mergedAssets.length ? mergedAssets : undefined,
     });
   }

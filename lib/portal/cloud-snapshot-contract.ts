@@ -101,9 +101,15 @@ export function buildCloudSnapshotContract() {
     semantics: {
       localData: 'device-local working copy and offline-first app state',
       cloudSnapshot: 'signed-in user controlled backup/restore copy in Supabase',
+      // automaticSyncEnabled 特指「后台/无条件同步」—— 仍无(见 boundaries.noBackgroundSync)。
       automaticSyncEnabled: false,
-      conflictResolution: 'not_started',
+      // 批次198 P1:读侧前台自动同步 —— 登录后 + 标签页回前台时,自动从云拉记忆并
+      // last-write-wins 合并进本地(lib/portal/cloud-memory-sync.ts),让各端/各浏览器打开即一致。
+      foregroundReadSyncEnabled: true,
+      // 冲突解决:按编辑时间(updated_at / attributes.updatedAt)定胜负(数据审计 #3)。
+      conflictResolution: 'last_write_wins',
       snapshotIsNotSourceOfTruth: true,
+      // 写/删等破坏性操作仍需显式用户动作;仅读同步自动化。
       requiresExplicitUserAction: true,
     },
     operations,
