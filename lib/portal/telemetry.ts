@@ -36,6 +36,15 @@ function deviceId(): string {
   } catch { return 'no-storage'; }
 }
 
+/** 只读取现有 device_id(不创建)。删除账号时上报给服务端做设备级遥测擦除
+ *  (数据审计 #5/#6 被遗忘权)。无 id / 无 storage → null。 */
+export function getTelemetryDeviceId(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(DEVICE_KEY);
+  } catch { return null; }
+}
+
 function send(events: TelemetryEvent[], useBeacon: boolean): void {
   if (events.length === 0) return;
   const payload = JSON.stringify({ events, deviceId: deviceId() });

@@ -137,8 +137,14 @@ sensitivity/retention 枚举化(中期)。
   (取回还原明文)。默认休眠现网零变化;部署侧置 `NESIO_FIELD_ENCRYPTION=1`+
   `NESIO_FIELD_ENCRYPTION_KEY` 并执行 `supabase-field-encryption-v1.sql`(放宽 jsonb 内容列
   CHECK 兼容密文)即启用。契约 `test:field-encryption`。隐私文案已如实(未虚假宣称 E2E),不改。
-  仍开(按报告严重度):④ 被遗忘权残留(telemetry 按 device_id 逃逸账号删除、无 TTL;
-  云删单节点是软删 deleted_at;auth.users 未删)→ 补 device 级删除 + 保留 TTL + 软删 GC。
+  **④ 被遗忘权**(2026-07-14 做):(a) 账号删除漏了 `signals`(主数据原子!)—— 补进物理
+  删除集合;(b) 匿名 telemetry 按 device_id 存、无账号关联 → 客户端删除时上报本机
+  telemetry device_id(`getTelemetryDeviceId` 只读不创建),服务端按 `device_id in.()` 设备级
+  擦除;(c) 删账号本体 `auth.users`(仅 supabase 真实 userId,FK cascade 兜残留),
+  wechat/external 伪身份无本体可删;(d) 软删墓碑不 GC + telemetry 无 TTL →
+  `supabase-retention-gc-v1.sql`:`nesio_gc_soft_deleted`(过 30d 宽限期物理清 signals/
+  memory_* 墓碑)+ `nesio_gc_telemetry`(180d TTL),仅 service_role 可执行,pg_cron 定时示例
+  (inert until applied)。契约 `test:forgotten-right`。**数据审计全部落地。**
 
 **契约测试提示**:`test:contracts`(100+ 套,CI 只跑 test:security 的 18 套)
 在 2026-07-04 全量修复过一轮——历史重构造成的 15 处 marker 漂移已对齐,
