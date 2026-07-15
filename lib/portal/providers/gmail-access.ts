@@ -9,17 +9,13 @@ import type { NextRequest } from 'next/server';
 import { cookies } from 'next/headers';
 import { getIntegrationToken, saveIntegrationToken } from '@/lib/portal/integrations';
 import { envValue } from '@/lib/portal/env';
+import { hasVerifiedSessionCookie } from '@/lib/portal/api-auth';
 
-/** Anonymous requests must not reach a send path. Returns true when a Nesio session exists. */
+/** Anonymous requests must not reach a send path. Returns true when a Nesio session exists.
+ *  数据审计 P0 同源:session 存在判定改走验签(伪造 refresh/openid 不再算「有会话」)。 */
 export async function hasNesioSession(): Promise<boolean> {
-  const cookieStore = await cookies();
-  const hasSession = Boolean(
-    cookieStore.get('baohe_auth_access')?.value ||
-      cookieStore.get('baohe_auth_refresh')?.value ||
-      cookieStore.get('baohe_wechat_openid')?.value,
-  );
   const noSupabase = !envValue('SUPABASE_URL') || !envValue('SUPABASE_ANON_KEY');
-  return hasSession || noSupabase;
+  return (await hasVerifiedSessionCookie()) || noSupabase;
 }
 
 async function refreshAccessToken(refreshTk: string): Promise<string | null> {

@@ -18,8 +18,8 @@ function loadRel() {
     module: mod, exports: mod.exports, console, JSON, Object, Array, String, Number, Math, Date, Map, RegExp,
     window: undefined,
     require: (p) => p.includes('storage-health') ? { reportStorageDropped: () => {} }
-      // 批次 180:buildRelationships 现在会读关系覆盖(agent 关系重构),补 mock 供其调用
-      : p.includes('relationship-overrides') ? { loadRelationshipOverrides: () => ({}), setRelationshipOverride: () => {} }
+      : p.includes('entity-resolution') ? { resolveEntityKey: (x) => String(x).trim().toLowerCase(), loadEntityAliases: () => ({}) }
+      : p.includes('relationship-overrides') ? { loadRelationshipOverrides: () => ({}) }
       : ({}),
   });
   return mod.exports;

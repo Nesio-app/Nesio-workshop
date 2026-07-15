@@ -10,7 +10,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getIntegrationToken } from '@/lib/portal/integrations';
-import { cookies } from 'next/headers';
+import { hasVerifiedSessionCookie } from '@/lib/portal/api-auth';
 import { buildEmailSignal, type EmailSignal } from '@/lib/platform/email-signals';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 import { parseJsonBlock } from '@/lib/extraction/extraction';
@@ -125,12 +125,8 @@ ${list}
 // ── Handler ───────────────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
-  const cookieStore = await cookies();
-  const hasSession = Boolean(
-    cookieStore.get('baohe_auth_access')?.value ||
-    cookieStore.get('baohe_auth_refresh')?.value ||
-    cookieStore.get('baohe_wechat_openid')?.value,
-  );
+  // 数据审计 P0 同源:session 门改走验签(伪造 refresh/openid 不算「有会话」)。
+  const hasSession = await hasVerifiedSessionCookie();
   if (!hasSession && !hasLabAccess(req)) {
     return NextResponse.json({ ok: false, error: 'auth_required', signals: [] }, { status: 401 });
   }

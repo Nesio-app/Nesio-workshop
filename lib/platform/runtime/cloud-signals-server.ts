@@ -6,6 +6,7 @@ import {
   type CloudRuntimeConfig,
 } from '@/lib/portal/cloud-server-runtime';
 import { embedSignalText } from '@/lib/life-domain/signal-embedding';
+import { encryptSignalRowColumns } from '@/lib/portal/cloud/field-encryption';
 import type { Signal } from '@/lib/life-domain/signal';
 
 export type CloudSignalWriteResult = {
@@ -39,7 +40,10 @@ async function signalRow(identityKey: string, userId: string | null, signal: Sig
   const embeddingText = buildSignalSearchText(signal);
   const embedding = await embedSignalText(embeddingText);
 
-  return {
+  // 敏感内容列静态加密(数据审计 #2)。休眠(未开 NESIO_FIELD_ENCRYPTION)时
+  // encryptSignalRowColumns 原样返回 —— 现网行为零变化。embedding_vector 不加密
+  // (不可逆数值,服务端向量检索必需)。
+  return encryptSignalRowColumns({
     identity_key: identityKey,
     user_id: userId,
     signal_id: signal.id,
@@ -60,9 +64,12 @@ async function signalRow(identityKey: string, userId: string | null, signal: Sig
     embedding_vector: embedding.ok ? embedding.values : null,
     embedding_updated_at: embedding.ok ? new Date().toISOString() : null,
     feedback: {},
-    updated_at: new Date().toISOString(),
+    // 逻辑修改时间(编辑时刻),不是同步时刻。多端并发编辑时,谁的编辑更新谁胜,
+    // 而非「谁最后同步」—— 否则旧副本批量回传会盖掉新编辑(数据审计 #3)。
+    // DB 端 supabase-signals-conflict-guard-v1.sql 触发器据此拒绝严格更旧的写入。
+    updated_at: signal.modifiedAt || signal.capturedAt || new Date().toISOString(),
     deleted_at: null,
-  };
+  });
 }
 
 export async function writeCloudSignalsForCurrentUser(signals: readonly Signal[]): Promise<CloudSignalWriteResult> {

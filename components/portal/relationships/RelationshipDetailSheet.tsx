@@ -12,6 +12,7 @@ import { getLifeGraph, addLifeNode, updateLifeNode } from '@/lib/portal/life-gra
 import { buildPersonProfile, type PersonProfile } from '@/lib/portal/relationship-profile';
 import { markContacted, lastContactLabel, CLOSENESS_META } from '@/lib/portal/relationships';
 import { setRelationshipOverride, type OverrideCloseness } from '@/lib/portal/relationship-overrides';
+import { mergeEntity } from '@/lib/portal/entity-resolution';
 import {
   loadPersonRecords, deletePersonRecord,
   RECORD_CATEGORY_MAP, type PersonRecord,
@@ -69,6 +70,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   const [records, setRecords] = useState<PersonRecord[]>([]);
   const [hangOpen, setHangOpen] = useState(false); // 「挂一条」独立确认卡弹窗
   const [relDraft, setRelDraft] = useState(''); // 图4:关系词编辑草稿
+  const [mergeDraft, setMergeDraft] = useState(''); // 数据审计 #4:合并同一个人的另一个名字
   const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   const rebuild = () => {
@@ -94,6 +96,16 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   if (!contactKey || !profile) return null;
   const p = profile;
   const avatarSrc = p.avatar || p.photo || '';
+
+  // 数据审计 #4:把「另一个名字」并到当前联系人 —— 未来这些提及都收敛到这个人。合并后关掉详情
+  // (面板会随 ENTITY_ALIASES_EVENT 重新派生),避免停留在已被并走的旧 key 上。
+  const doMerge = () => {
+    const other = mergeDraft.trim();
+    if (!other) return;
+    mergeEntity(other, p.key); // other 是 alias → 归到当前人(canonical)
+    setMergeDraft('');
+    onClose();
+  };
 
   const onContacted = () => {
     markContacted(p.key);
@@ -224,6 +236,17 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
               <p className="nesio-settings-option-hint" style={{ margin: '0.35rem 0 0' }}>
                 {L(dict, '改了只影响这个人的亲疏与联系节奏,只存本机。', "Only affects this person's closeness & reminder cadence — stored on-device.")}
               </p>
+              {/* 数据审计 #4:实体解析 —— 同一个人被记成两个名字(如「妈妈」和「母亲」)时,合并成一个 */}
+              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.6rem' }}>
+                <input type="text" className="nesio-ob-input" style={{ flex: 1 }}
+                  placeholder={L(dict, '其实是同一个人?输入 TA 的另一个名字合并', 'Same person? Type their other name to merge')}
+                  value={mergeDraft} maxLength={40}
+                  onChange={(e) => setMergeDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') doMerge(); }} />
+                <button type="button" className="nesio-fin-review-accept" disabled={!mergeDraft.trim()} onClick={doMerge}>
+                  {L(dict, '合并', 'Merge')}
+                </button>
+              </div>
             </div>
           )}
 

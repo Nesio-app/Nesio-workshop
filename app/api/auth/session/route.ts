@@ -7,7 +7,7 @@ import {
 } from '@/lib/portal/cloud-account-profile';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
-import { AUTH_SIG_COOKIE, signSessionValue } from '@/lib/portal/auth/session-sig';
+import { AUTH_SIG_COOKIE, WECHAT_SIG_COOKIE, signSessionValue, verifiedWechatOpenid } from '@/lib/portal/auth/session-sig';
 
 type SupabaseUserResponse = {
   id?: string;
@@ -135,7 +135,8 @@ export async function GET() {
   const accessCookie = cookieStore.get('baohe_auth_access')?.value || '';
   const refreshCookie = cookieStore.get('baohe_auth_refresh')?.value || '';
   const authProviderCookie = cookieStore.get('baohe_auth_provider')?.value || '';
-  const wechatOpenidCookie = cookieStore.get('baohe_wechat_openid')?.value || '';
+  // 数据审计 P0:openid 必须验签才认(伪造 openid 越权成他人身份)。无合法签名 → ''。
+  const wechatOpenidCookie = verifiedWechatOpenid(cookieStore.get('baohe_wechat_openid')?.value, cookieStore.get(WECHAT_SIG_COOKIE)?.value);
 
   if (accessCookie) {
     const user = await fetchSupabaseUser(accessCookie);

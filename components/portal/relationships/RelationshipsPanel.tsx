@@ -23,6 +23,7 @@ import RelationshipDetailSheet from './RelationshipDetailSheet';
 import FamilySummary from './FamilySummary';
 import PersonExtractSheet from './PersonExtractSheet';
 import { buildFamilyDigest } from '@/lib/portal/family-digest';
+import { ENTITY_ALIASES_EVENT } from '@/lib/portal/entity-resolution';
 
 const GROUPS: Closeness[] = ['core', 'close', 'acquaintance'];
 // 单层最多先渲染这么多行,其余「显示全部」再展开 —— 防「导入了几千个 Google 联系人 →
@@ -76,9 +77,11 @@ export default function RelationshipsPanel() {
     const onUpdate = () => rebuild();
     window.addEventListener('nesio-life-graph-updated', onUpdate);
     window.addEventListener('nesio-person-records-updated', onUpdate);
+    window.addEventListener(ENTITY_ALIASES_EVENT, onUpdate); // 数据审计 #4:合并实体后就地重算
     return () => {
       window.removeEventListener('nesio-life-graph-updated', onUpdate);
       window.removeEventListener('nesio-person-records-updated', onUpdate);
+      window.removeEventListener(ENTITY_ALIASES_EVENT, onUpdate);
     };
   }, []);
 

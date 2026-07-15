@@ -10,7 +10,7 @@ import {
   type CloudIdentity,
 } from '@/lib/portal/cloud-identity';
 import { envValue } from '@/lib/portal/env';
-import { AUTH_SIG_COOKIE, signSessionValue } from '@/lib/portal/auth/session-sig';
+import { AUTH_SIG_COOKIE, WECHAT_SIG_COOKIE, signSessionValue, verifiedWechatOpenid } from '@/lib/portal/auth/session-sig';
 
 export { deriveCloudIdentity };
 export type { CloudIdentity };
@@ -210,7 +210,8 @@ export async function getSignedInUser(config: CloudRuntimeConfig): Promise<{
   const accessToken = cookieStore.get('baohe_auth_access')?.value || '';
   const refreshToken = cookieStore.get('baohe_auth_refresh')?.value || '';
   const authProvider = cookieStore.get('baohe_auth_provider')?.value || '';
-  const wechatOpenid = cookieStore.get('baohe_wechat_openid')?.value || '';
+  // 数据审计 P0:openid 必须验签才认(伪造 openid 越权)。verifiedWechatOpenid 无合法签名返回 ''。
+  const wechatOpenid = verifiedWechatOpenid(cookieStore.get('baohe_wechat_openid')?.value, cookieStore.get(WECHAT_SIG_COOKIE)?.value);
   const user = await fetchSignedInUser(config, accessToken);
   if (user?.id) return { user, refreshedSession: null };
 
@@ -220,6 +221,7 @@ export async function getSignedInUser(config: CloudRuntimeConfig): Promise<{
     return { user: refreshedUser, refreshedSession };
   }
 
+  // wechatOpenid 已验签(伪造 openid → 上面为 ''),这里只在验真通过时才生成 identityKey。
   if (authProvider === 'wechat' && wechatOpenid) {
     return {
       user: {

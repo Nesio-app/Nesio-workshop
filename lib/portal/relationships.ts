@@ -12,6 +12,7 @@
 import type { LifeNode } from './life-graph';
 import { reportStorageDropped } from './storage-health';
 import { loadRelationshipOverrides } from './relationship-overrides';
+import { resolveEntityKey, loadEntityAliases } from './entity-resolution';
 
 export type Closeness = 'core' | 'close' | 'acquaintance';
 
@@ -186,9 +187,12 @@ export function buildRelationships(
   const acc = new Map<string, Acc>();
   const groupsByKey = new Map<string, Set<string>>();  // key → Google 分组名(排除内部标记)
   const selfIds = selfIdentityKeys(self);
+  // 数据审计 #4:实体解析 —— 别名表一趟只加载一次;身份键走 resolveEntityKey,让「妈妈/母亲」
+  // 「Linda/linda@x.com」这类同一实体的不同写法收敛成一个联系人(无别名配置时=旧的规范化行为)。
+  const aliases = loadEntityAliases();
   const bump = (rawName: string, rawKey: string, date: string | null, relation: string | null) => {
     const name = rawName.trim();
-    const key = rawKey.trim().toLowerCase();
+    const key = resolveEntityKey(rawKey, aliases);
     if (!key || key.length < 2) return;
     // 过滤明显不是人的 key(纯数字/系统标记)
     if (/^\d+$/.test(key)) return;
@@ -214,9 +218,9 @@ export function buildRelationships(
   const knownPersonKeys = new Set<string>();
   for (const n of nodes) {
     if (n.type === 'person' && n.name) {
-      knownPersonKeys.add(n.name.trim().toLowerCase());
-      const em = typeof n.attributes?.email === 'string' ? n.attributes.email.toLowerCase() : '';
-      if (em) knownPersonKeys.add(em);
+      knownPersonKeys.add(resolveEntityKey(n.name, aliases));
+      const em = typeof n.attributes?.email === 'string' ? n.attributes.email : '';
+      if (em) knownPersonKeys.add(resolveEntityKey(em, aliases));
     }
   }
 
@@ -229,7 +233,7 @@ export function buildRelationships(
     if (n.source === 'email' && typeof n.attributes?.from === 'string') {
       const c = parseContactFrom(n.attributes.from);
       if (c && !isLikelyNonHuman(c.name, c.key)) {
-        const known = knownPersonKeys.has(c.key) || knownPersonKeys.has(c.name.trim().toLowerCase());
+        const known = knownPersonKeys.has(resolveEntityKey(c.key, aliases)) || knownPersonKeys.has(resolveEntityKey(c.name, aliases));
         const personal = PERSONAL_EMAIL_DOMAIN.has(emailDomain(c.key));
         if (known || personal) bump(c.name, c.key, toIso(n.attributes.date) || nodeIso, null);
       }
@@ -242,9 +246,9 @@ export function buildRelationships(
       const gs = (n.tags || []).filter((t) => t && t !== '联系人');
       if (gs.length) {
         const addGroups = (k: string) => { const s = groupsByKey.get(k) || new Set<string>(); gs.forEach((g) => s.add(g)); groupsByKey.set(k, s); };
-        addGroups(n.name.trim().toLowerCase());
-        const em = typeof n.attributes?.email === 'string' ? n.attributes.email.toLowerCase() : '';
-        if (em) addGroups(em);
+        addGroups(resolveEntityKey(n.name, aliases));
+        const em = typeof n.attributes?.email === 'string' ? n.attributes.email : '';
+        if (em) addGroups(resolveEntityKey(em, aliases));
       }
     }
 
