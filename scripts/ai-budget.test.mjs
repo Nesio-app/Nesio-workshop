@@ -49,10 +49,38 @@ function load() {
 // 3) 未知路由走默认单价(0.005),仍计入熔断。
 {
   ENV.NESIO_DAILY_AI_BUDGET_USD = '0.01';
+  ENV.VERCEL = '';
   const m = load();
   m.recordAiCall('totally_unknown_route');  // 0.005
   m.recordAiCall('totally_unknown_route');  // 0.010
   assert.equal(m.isOverDailyBudget(), true, '未知路由默认单价累计也会熔断');
+}
+
+// 4) 批次211:未配 + 真实部署(Vercel)→ 默认武装 $25 安全网(消灭上线零上限漏钱)。
+{
+  ENV.NESIO_DAILY_AI_BUDGET_USD = '';
+  ENV.VERCEL = '1';
+  const m = load();
+  assert.equal(m.dailyBudgetUsd(), 25, '未配 + Vercel → 默认武装 $25');
+  assert.equal(m.isOverDailyBudget(), false, '刚起始未花 → 未超');
+  ENV.VERCEL = '';
+}
+
+// 5) 逃生阀:显式设 0 = 明确关闭,即便在 Vercel。
+{
+  ENV.NESIO_DAILY_AI_BUDGET_USD = '0';
+  ENV.VERCEL = '1';
+  const m = load();
+  assert.equal(m.dailyBudgetUsd(), 0, '显式 0 = 明确关闭(逃生阀),即便 Vercel');
+  ENV.VERCEL = '';
+}
+
+// 6) 本地 dev/test(无 Vercel)未配 → 仍 inert(不干扰跑测)。
+{
+  ENV.NESIO_DAILY_AI_BUDGET_USD = '';
+  ENV.VERCEL = '';
+  const m = load();
+  assert.equal(m.dailyBudgetUsd(), 0, '无 Vercel + 未配 → inert(dev/test 不受影响)');
 }
 
 console.log('ai-budget: OK');

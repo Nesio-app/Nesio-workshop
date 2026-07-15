@@ -1,5 +1,6 @@
 /**
- * 全局日成本熔断(批次196 · 手册 §11#3)。默认关(env 未设 → 不熔断,inert-safe)。
+ * 全局日成本熔断(批次196 · 手册 §11#3;批次211 默认武装)。
+ * 真实部署(Vercel)未配 env → 默认武装 $25/实例/天 安全网(消灭「上线即漏钱」);dev/test 保持 inert。
  *
  * 目的:限流(isRateLimited)只挡「同一 IP 刷太快」,挡不住「大量真实用户/多 key 一起烧」。
  * 这里再加一道**按天累计的美元级熔断**:当天粗估花费超 NESIO_DAILY_AI_BUDGET_USD 时,
@@ -25,9 +26,13 @@ const ROUTE_COST_USD: Record<string, number> = {
   living_model: 0.02,
   health_insight: 0.02,
   guidance_language: 0.004,
+  daily_brief: 0.004,
+  llm_sweep: 0.006,
   embed: 0.0002,
 };
 const DEFAULT_COST_USD = 0.005;
+/** 真实部署(Vercel)上没配 env 时的兜底日上限(每实例·美元)。安全网,非账单;可用 env 调高/调低/设 0 关闭。 */
+const DEFAULT_DAILY_BUDGET_USD = 25;
 
 let day = '';
 let spentUsd = 0;
@@ -48,8 +53,14 @@ export function recordAiCall(route: string): void {
 
 /** 当天预算上限(美元)。未设 / ≤0 → 不熔断(inert)。 */
 export function dailyBudgetUsd(): number {
-  const n = Number(envValue('NESIO_DAILY_AI_BUDGET_USD') || 0);
-  return Number.isFinite(n) && n > 0 ? n : 0;
+  const raw = envValue('NESIO_DAILY_AI_BUDGET_USD');
+  if (raw !== undefined && raw !== null && raw !== '') {
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : 0; // 显式配置优先(显式 0/负 = 明确关闭,逃生阀)
+  }
+  // 未配置:真实部署(Vercel)默认武装安全网,消灭「忘了设 env = 零上限 = 上线即漏钱」的根因;
+  // 本地 dev/test 保持 inert(不干扰跑测/联调)。运维可用 env 调高/调低,或显式设 0 关闭。
+  return envValue('VERCEL') ? DEFAULT_DAILY_BUDGET_USD : 0;
 }
 
 /** 当天粗估已花(美元,两位小数)。诊断/告警用。 */
