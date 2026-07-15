@@ -136,7 +136,7 @@ function extractPrice(html: string, url: string): string {
   ];
   for (const p of pricePatterns) {
     const m = html.match(p);
-    if (m?.[1]) return `¥${m[1]}`;
+    if (m?.[1]) return `$${m[1]}`;
   }
   return '';
 }
