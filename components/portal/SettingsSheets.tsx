@@ -880,11 +880,11 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
 
 const PLAN_NOTIFY_KEY = 'nesio-plan-notify-optin-v1';
 
-// 定价占位(周/月/年):真实价格以 App 内购页为准;家庭版已按上架决策删除。
+// 批次194 定价定稿(用户拍板):$2/周 · $5/月 · $50/年。真实收费仍随 App 内购页;家庭版已按上架决策删除。
 const PLAN_PREVIEWS = [
-  { id: 'weekly', name: 'Pro · 按周', nameEn: 'Pro · Weekly', price: '¥6', cycle: '/ 周', cycleEn: '/ wk', desc: '想先试试的轻量选择', descEn: 'A light way to try it out' },
-  { id: 'monthly', name: 'Pro · 按月', nameEn: 'Pro · Monthly', price: '¥15', cycle: '/ 月', cycleEn: '/ mo', desc: '最灵活', descEn: 'Most flexible' },
-  { id: 'yearly', name: 'Pro · 按年', nameEn: 'Pro · Yearly', price: '¥99', cycle: '/ 年', cycleEn: '/ yr', desc: '相当于 ¥8.25/月,最划算', descEn: '≈ ¥8.25/mo — best value' },
+  { id: 'weekly', name: 'Pro · 按周', nameEn: 'Pro · Weekly', price: '$2', cycle: '/ 周', cycleEn: '/ wk', desc: '想先试试的轻量选择', descEn: 'A light way to try it out' },
+  { id: 'monthly', name: 'Pro · 按月', nameEn: 'Pro · Monthly', price: '$5', cycle: '/ 月', cycleEn: '/ mo', desc: '最灵活', descEn: 'Most flexible' },
+  { id: 'yearly', name: 'Pro · 按年', nameEn: 'Pro · Yearly', price: '$50', cycle: '/ 年', cycleEn: '/ yr', desc: '相当于 $4.17/月,最划算', descEn: '≈ $4.17/mo — best value' },
 ];
 
 export function SubscriptionSheet({ open, onClose }: SheetProps) {

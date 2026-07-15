@@ -16,6 +16,7 @@ import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import { formatEnvironmentContext } from '@/lib/portal/environment';
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { L } from '@/lib/portal/i18n';
+import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { usePortalLocale } from './use-portal-locale';
 import { NodeTypeIcon } from './icons';
 
@@ -47,6 +48,9 @@ export function DailyBriefSheet({ open, onClose }: { open: boolean; onClose: () 
   const fetchBrief = useCallback(async () => {
     setLoading(true);
     setError(null);
+    // 批次194 补齐九路(§5.3):简报=付费云例程。入口已被 canUse('ai_routine') 挡(设置/例程卡);
+    // 这里再兜一层 —— 分层启用后免费直达也不打云(静默停,不重复弹升级窗)。
+    if (!canUsePaidCloudAi()) { setLoading(false); return; }
     try {
       const profile = loadProfileSettings();
       // ① 同一套检索算法(与问一问共用 buildMemoryContext)
