@@ -48,7 +48,13 @@ export const CLASSIFICATION_RULES_BLOCK = `CRITICAL CLASSIFICATION RULES:
 
 6. Pure opinions/likes/preferences → preference node
 
-7. Receipts/shopping: create object nodes for each purchased ITEM only. Do NOT create a place node for the store.`;
+7. Receipts/shopping: create object nodes for each purchased ITEM only. Do NOT create a place node for the store.
+
+8. 证件照片/扫描件(护照/签证/驾照/身份证/居留卡)→ object 节点，subtype=passport|visa|license|id，
+   attributes.expiry=证件到期日(ISO)。绝不要当 person 或 place。name 用「XX 护照/签证」这类，别含证件号。
+
+9. 保修卡 / 含保修期的收据 / 电子产品说明书 → 对应 object 节点，subtype=warranty，
+   attributes.purchaseDate=购买日(ISO)、expiry=保修截止日(购买日+保修期，能算就填 ISO)。`;
 
 // ── Canonical prompt (voice / text / image / file — the analyze route) ────────
 
@@ -124,6 +130,9 @@ export function buildEmailExtractionPrompt(emailTexts: string): string {
   绝不要把会议的组织者 / 发件人单独提成 person 节点 —— 那是「谁发的」，不是一条值得记的人物记忆。
 - 只有当邮件本身是在「介绍 / 认识一个新的人」（简历、引荐、新同事介绍）时，才提 person 节点。
 - 承诺 / 要做的事 → commitment；单纯的重要日期 → event。
+- 机票 / 行程确认（航班、值机、e-ticket、boarding、行程单）→ 一个 event 节点，subtype=flight，
+  name=「城市→城市 航班号」。attributes 必须抽：start=起飞时间（ISO，带时区偏移，别用收件时间）、
+  flightNo=航班号、from/to=始发/到达机场或城市、pnr=订座编号（有才填）。抽不到起飞时间就别标 flight。
 
 ${NODE_SCHEMA_BLOCK}
 

@@ -13,7 +13,15 @@ import type { ProactiveContextItem, FocusNode } from '@/lib/platform/view-models
 import { inferEventType, parseEventDate } from '@/lib/platform/attention-engine';
 import { nearestNodeDate, nodeExpiryDate } from '@/lib/platform/node-dates';
 import { LEXICON } from '@/lib/platform/keyword-lexicon';
-import type { LifeNode } from '@/lib/portal/life-graph';
+/** 批次197:objectContextEvents 只读这几个字段。收窄入参(而非要整个 LifeNode),
+ *  让 Today 的 FocusNode[](无 tags)也能直接喂进来,不必强转,也接回了这段死代码。 */
+type ContextObjectNode = {
+  id: string;
+  name: string;
+  type: string;
+  tags?: readonly string[];
+  attributes: Record<string, string | number | boolean | null>;
+};
 import type { ClinicalFinding } from '@/lib/portal/health-clinical';
 import type { RiskScore } from '@/lib/portal/health-risk';
 import type { FinanceFinding } from '@/lib/portal/finance-insight';
@@ -136,6 +144,9 @@ export function specialDaysToGuidanceEvents(
 
 // ── Focus nodes with due dates ────────────────────────────────────────────────
 
+// 批次197:走 renewal(证件续期/保修)长周期到期窗的 subtype 白名单。
+const RENEWAL_SUBTYPES = new Set(['passport', 'visa', 'license', 'id', 'document', 'warranty', '护照', '签证', '驾照', '身份证', '证件', '保修']);
+
 export function focusNodesToGuidanceEvents(
   nodes: readonly FocusNode[],
   now: Date = new Date(),
@@ -143,6 +154,50 @@ export function focusNodesToGuidanceEvents(
   const results: GuidanceEvent[] = [];
 
   for (const node of nodes) {
+    // 批次197:机票 event(subtype=flight)→ flight 类型,走 action-window 的 48h/26h/4h 值机窗。
+    // 通用 deadline 分支只覆盖未来 2 天且口吻是「截止」,配不上「值机窗已开」,故单独接。
+    if (String(node.attributes.subtype ?? '') === 'flight') {
+      const depRaw = typeof node.attributes.departAt === 'string' ? node.attributes.departAt
+        : typeof node.attributes.start === 'string' ? node.attributes.start : '';
+      const dep = depRaw ? new Date(depRaw) : null;
+      if (dep && !Number.isNaN(dep.getTime())) {
+        const hoursUntil = (dep.getTime() - now.getTime()) / 3_600_000;
+        if (hoursUntil > 0 && hoursUntil <= 48) {
+          results.push({
+            id: `node-${node.id}`, type: 'flight', title: node.name, scheduledAt: dep,
+            source: 'memory', confidence: 88,
+            payload: {
+              nodeId: node.id,
+              flightNo: String(node.attributes.flightNo ?? ''),
+              from: String(node.attributes.from ?? ''),
+              to: String(node.attributes.to ?? ''),
+              pnr: String(node.attributes.pnr ?? ''),
+            },
+          });
+          continue;
+        }
+      }
+    }
+
+    // 批次197:证件/保修等长周期到期(subtype∈护照/签证/驾照/身份证/保修)→ renewal 类型。
+    // expiry 类型被批次65 钉死在 0-2 天内(食物物品语义);证件要提前半年催,专属 renewal 窗。
+    const renewSub = String(node.attributes.subtype ?? '');
+    if (RENEWAL_SUBTYPES.has(renewSub)) {
+      const expRaw = typeof node.attributes.expiry === 'string' ? node.attributes.expiry : '';
+      const expDate = expRaw ? new Date(expRaw) : null;
+      if (expDate && !Number.isNaN(expDate.getTime())) {
+        const days = (expDate.getTime() - now.getTime()) / 86_400_000;
+        if (days >= 0 && days <= 180) {
+          results.push({
+            id: `node-${node.id}`, type: 'renewal', title: node.name, scheduledAt: expDate,
+            source: 'memory', confidence: 85,
+            payload: { nodeId: node.id, subtype: renewSub, expiryDate: expRaw },
+          });
+          continue;
+        }
+      }
+    }
+
     // 批次 65:有效期驱动的节点(牛奶等物品)不是任务截止 —— 专属 expiry 类型,
     // 日期按"到当天结束"判定(零点解析曾让今天到期的卡当天白天就消失)。
     const exp = nodeExpiryDate(node.attributes);
@@ -412,7 +467,7 @@ const CONTEXT_KEYWORD_MAP: Array<{
  */
 export function objectContextEvents(
   upcomingEvents: GuidanceEvent[],
-  nodes: LifeNode[],
+  nodes: readonly ContextObjectNode[],
   now: Date = new Date(),
 ): GuidanceEvent[] {
   const objectNodes = nodes.filter((n) => n.type === 'object');

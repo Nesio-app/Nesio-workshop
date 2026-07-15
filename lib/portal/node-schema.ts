@@ -31,6 +31,13 @@ export const NODE_ATTRIBUTE_SCHEMA: Record<LifeNodeType, AttributeSpec[]> = {
     { key: 'location', hint: '' },
     { key: 'url', hint: '' },
     { key: 'participants', hint: '' },
+    // 批次197:机票/行程确认 → subtype=flight。抽出起飞时间(=start)+ 航班号/始发到达/PNR,
+    // 下游按 flight 走 48h/26h/4h 值机窗(action-window.ts)。
+    { key: 'subtype', hint: 'flight(机票时用)' },
+    { key: 'flightNo', hint: '航班号,如 CA1234' },
+    { key: 'from', hint: '始发机场/城市' },
+    { key: 'to', hint: '到达机场/城市' },
+    { key: 'pnr', hint: '订座编号' },
   ],
   person: [
     { key: 'category', hint: 'family/colleague/friend' },
@@ -43,6 +50,9 @@ export const NODE_ATTRIBUTE_SCHEMA: Record<LifeNodeType, AttributeSpec[]> = {
     { key: 'purchaseDate', hint: '' },
     { key: 'price', hint: '' },
     { key: 'expiry', hint: 'ISO' },
+    // 批次197:证件(护照/签证/驾照/身份证)与保修 → subtype 标类,expiry=到期日/保修截止,
+    // 下游按 renewal 提前半年催续办/趁保送修(action-window.ts)。
+    { key: 'subtype', hint: 'passport/visa/license/id/warranty(证件或保修时)' },
     { key: 'note', hint: '' },
   ],
   place: [

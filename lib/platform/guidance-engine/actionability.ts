@@ -115,6 +115,12 @@ export function buildAction(event: GuidanceEvent, urgency: WindowUrgency, locale
       return { label: l(`确认 ${item} 是否需要用${loc ? `（${loc}）` : ''}`, `Check whether you need ${item}${loc ? ` (${loc})` : ''}`), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
     }
 
+    case 'renewal': {
+      const isWarranty = /warranty|保修/.test(String(event.payload.subtype ?? ''));
+      if (isWarranty) return { label: l('趁还在保先送修', 'Service it while under warranty'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
+      return { label: l('预约续办证件', 'Book the document renewal'), cta: l('知道了', 'Got it'), actionType: 'dismiss' };
+    }
+
     default:
       return null;
   }

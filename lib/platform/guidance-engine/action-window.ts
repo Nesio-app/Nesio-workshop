@@ -64,6 +64,14 @@ export function getActionWindow(event: GuidanceEvent, now: Date): WindowUrgency 
       if (daysUntil < 2) return 'high';          // 明天到期
       return 'closed';
 
+    case 'renewal':
+      // 证件续期/保修:提前半年就该知道(续办要预约/排队/邮寄),但别天天催。
+      if (daysUntil < 0) return 'closed';        // 已过期 → 回顾/补办,不在此打扰
+      if (daysUntil < 30) return 'high';         // 不足 1 个月:抓紧办
+      if (daysUntil < 90) return 'medium';       // 1-3 个月:该动手了
+      if (daysUntil < 180) return 'low';         // 3-6 个月:提前知会
+      return 'closed';
+
     case 'birthday':
     case 'anniversary':
       if (daysUntil < 0) return 'closed';

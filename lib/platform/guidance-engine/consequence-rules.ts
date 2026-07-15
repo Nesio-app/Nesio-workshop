@@ -5,6 +5,7 @@ const CONSEQUENCE: Record<GuidanceEventType, ConsequenceSeverity> = {
   flight:       3,  // miss the plane
   deadline:     3,  // miss deadline
   expiry:       2,  // 食物/物品浪费 —— 有实际损失但不到误机级
+  renewal:      3,  // 证件过期/过保 —— 误了要重办或自费维修,代价高
   medical:      3,  // miss appointment
   meeting:      2,  // show up unprepared or miss it
   birthday:     2,  // forget to prepare / acknowledge

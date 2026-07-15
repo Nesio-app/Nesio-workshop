@@ -35,7 +35,7 @@ import { getMirrorProfile, getDomainWeight } from '@/lib/portal/mirror-profile';
 // dec_insight(跨域推荐)与 object_context(多个物品)天生有多个不同实例,不能按裸
 // event.type 去重/冷却 —— 否则第一张之后全被当"同类"丢弃,旗舰跨域推荐只剩 1 张。
 // 这两类按 event.id(退化用 nodeId)区分,其余事件仍按 type(一类只出一张)。
-const MULTI_INSTANCE_EVENT_TYPES = new Set<GuidanceEventType>(['dec_insight', 'object_context', 'domain_insight']);
+const MULTI_INSTANCE_EVENT_TYPES = new Set<GuidanceEventType>(['dec_insight', 'object_context', 'domain_insight', 'renewal']);
 function dedupKey(event: GuidanceEvent): string {
   if (MULTI_INSTANCE_EVENT_TYPES.has(event.type)) {
     const nodeId = typeof event.payload?.nodeId === 'string' ? event.payload.nodeId : '';
@@ -85,6 +85,7 @@ const EVENT_ICON: Record<GuidanceEventType, string> = {
   medical:        '🏥',
   deadline:       '⏰',
   expiry:         '⏳',
+  renewal:        '🪪',
   birthday:       '🎂',
   anniversary:    '💝',
   holiday:        '🎈',
@@ -129,6 +130,12 @@ function buildTitle(event: GuidanceEvent, urgency: WindowUrgency, locale: string
       if (urgency === 'critical') return l(`今天过期 · ${n}`, `Expires today · ${n}`);
       if (urgency === 'high')     return l(`明天过期 · ${n}`, `Expires tomorrow · ${n}`);
       return l(`快过期了 · ${n}`, `Expiring soon · ${n}`);
+    case 'renewal': {
+      const isWarranty = /warranty|保修/.test(String(event.payload.subtype ?? ''));
+      if (isWarranty)             return l(`保修将到期 · ${n}`, `Warranty ending · ${n}`);
+      if (urgency === 'high')     return l(`证件快过期 · ${n}`, `Expiring soon · ${n}`);
+      return l(`证件到期提醒 · ${n}`, `Renewal reminder · ${n}`);
+    }
     case 'birthday':
       if (urgency === 'critical') return l(`今天是 ${n} 的生日`, `Today is ${n}'s birthday`);
       if (urgency === 'high')     return l(`明天 · ${n}`, `Tomorrow · ${n}`);
@@ -183,6 +190,13 @@ function buildBody(event: GuidanceEvent, urgency: WindowUrgency, locale: string 
     case 'expiry':
       if (urgency === 'critical') return l('有效期到今天——记得用掉或处理，别浪费。', 'Valid through today — use it up or deal with it, don\'t let it go to waste.');
       return l('明天就过期了，今天优先用它。', 'Expires tomorrow — use it first today.');
+    case 'renewal': {
+      const isWarranty = /warranty|保修/.test(String(event.payload.subtype ?? ''));
+      const exp = event.payload.expiryDate ? String(event.payload.expiryDate) : '';
+      if (isWarranty) return l(`保修${exp ? `到 ${exp}` : '快到期'}——趁还在保，有毛病先送修，过保就自费了。`, `Warranty ${exp ? `ends ${exp}` : 'is ending'} — get it serviced while it\'s still covered; after that it\'s out of pocket.`);
+      if (urgency === 'high') return l('不到一个月就过期了，尽快预约续办，别卡在出行前。', 'Less than a month left — book the renewal now, don\'t get stuck before a trip.');
+      return l(`${exp ? `${exp} 到期。` : ''}续办常要预约、排队、邮寄，早点动手更从容。`, `${exp ? `Expires ${exp}. ` : ''}Renewals often mean appointments, queues and mailing — starting early is far easier.`);
+    }
     case 'birthday':
     case 'anniversary':
       if (urgency === 'critical') return l('今天记得发条消息，哪怕一句话也能让人感到温暖。', 'Send a message today — even one line means a lot.');

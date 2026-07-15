@@ -40,6 +40,7 @@ import {
   relationshipFindingsToGuidanceEvents,
   readingFindingsToGuidanceEvents,
   crossRegionToGuidanceEvents,
+  objectContextEvents,
   type WeatherSnapshot,
   decCardsToGuidanceEvents,
 } from '@/lib/platform/guidance-engine/source-adapters';
@@ -210,7 +211,7 @@ export function useTodayData(canUsePrivateData: boolean) {
         const scored = scoreCalendarEvents(calEvents, now);
 
         registerDecCards(updated.cards); // 反馈环回写:完整卡(含 evidenceSignalIds)登记
-        const guidanceEvents = [
+        const baseGuidanceEvents = [
           // DEC 域引擎卡(证据门控)— 此前 runDEC 输出被丢弃,现与其他源同台仲裁
           ...decCardsToGuidanceEvents(updated.cards),
           ...calendarEventsToGuidanceEvents(calEvents, now),
@@ -235,6 +236,12 @@ export function useTodayData(canUsePrivateData: boolean) {
               ...crossRegionToGuidanceEvents(buildCrossRegionDeliverables(now)),
             ];
           })(),
+        ];
+        const guidanceEvents = [
+          ...baseGuidanceEvents,
+          // 批次197:接回 objectContextEvents(此前是死代码,零调用点)—— 拿临近事件(开会/出行/
+          // 就诊/生日)去比对你的物品,把「带名片/带护照/7天前吹风快过期物品」这类情境提物顶出来。
+          ...objectContextEvents(baseGuidanceEvents, updated.allNodes, now),
         ];
 
         const uiLocale = portalLocaleToDictionaryLocale(loadProfileSettings().locale);
