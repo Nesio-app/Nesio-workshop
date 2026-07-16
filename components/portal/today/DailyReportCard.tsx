@@ -65,7 +65,7 @@ export function DailyReportCard({ report }: { report: DailyReport | null }) {
                 </div>
               );})}
               <p style={{ margin: 0, fontSize: '0.68rem', color: 'var(--portal-muted)' }}>
-                {L(dict, '已存进记忆 · 在「记忆」里可回看', 'Saved to memory — revisit it under Memory')}
+                {L(dict, '已存进记忆 · 在「记忆」里可回看', 'Saved to Memory — revisit it under Memory')}
               </p>
             </div>
           )}

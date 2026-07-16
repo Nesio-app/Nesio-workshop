@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * RewardsWarehouse — 奖品仓库(批次 42)。冷冻仓 sheet 的第三个 tab。
+ * RewardsStore — 奖品仓库(批次 42)。冷冻仓 sheet 的第三个 tab。
  * 忍住没买的东西落这里当愿望;攒够积分兑换,奖励自己。手动也能加愿望。
  */
 
@@ -14,7 +14,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 
-export default function RewardsWarehouse() {
+export default function RewardsStore() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [state, setState] = useState<RewardsState>({ points: 0, ledger: [], rewards: [] });
   const [adding, setAdding] = useState(false);

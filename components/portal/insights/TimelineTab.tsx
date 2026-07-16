@@ -521,7 +521,7 @@ export default function TimelineTab() {
           {monthly && (
             <div className="nesio-tl-month">
               <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>
-                {L(dict, `${Number(monthly.current.monthKey.slice(5, 7))} 月足迹`, `${monthly.current.monthKey} footprint`)}
+                {L(dict, `${Number(monthly.current.monthKey.slice(5, 7))} 月足迹`, `${new Date(monthly.current.monthKey + '-01T00:00:00').toLocaleString('en-US', { month: 'long' })} footprint`)}
                 {monthly.prevHasData && <span className="nesio-tl-month-vs">{L(dict, ' · 对比上月', ' · vs last month')}</span>}
               </p>
               <div className="nesio-tl-month-grid">
@@ -561,16 +561,16 @@ export default function TimelineTab() {
 
           {/* ── 真实地图概览(批次 59:点一下进入可缩放的「地图上的记忆」)── */}
           {mapPoints.length > 0 && (
-            <button type="button" className="nesio-tl-map-open" onClick={() => setMemMapOpen(true)} aria-label={L(dict, '打开地图上的记忆', 'Open memories in maps')}>
+            <button type="button" className="nesio-tl-map-open" onClick={() => setMemMapOpen(true)} aria-label={L(dict, '打开地图上的记忆', 'Open memories on the map')}>
               <PlaceMap points={mapPoints} height={200} />
-              <span className="nesio-tl-map-open-hint">{L(dict, '点开看地图上的记忆 · 可缩放', 'Tap for memories in maps · zoomable')}</span>
+              <span className="nesio-tl-map-open-hint">{L(dict, '点开看地图上的记忆 · 可缩放', 'Tap for memories on the map · zoomable')}</span>
             </button>
           )}
 
           {/* ── 生活节奏:星期 × 时段外出热力 ── */}
           {rhythm.max > 1 && (
             <>
-              <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '生活节奏 · 外出时间', 'Weekly rhythm · time out')}</p>
+              <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '生活节奏 · 外出时间', 'Weekly rhythm · time outside')}</p>
               <div className="nesio-tl-rhythm">
                 <div className="nesio-tl-rhythm-col nesio-tl-rhythm-col--labels">
                   <span />
@@ -904,7 +904,7 @@ export default function TimelineTab() {
             countries={world.map((g) => ({ name: g.country, count: g.placeCount }))}
             size={Math.min(typeof window !== 'undefined' ? window.innerWidth - 16 : 360, typeof window !== 'undefined' ? window.innerHeight - 200 : 520, 600)}
           />
-          <span className="nesio-globe-stage-hint">{L(dict, '深色一侧是正处于黑夜的地区', 'The shaded side is currently in night')}</span>
+          <span className="nesio-globe-stage-hint">{L(dict, '深色一侧是正处于黑夜的地区', "The shaded side is where it's currently night")}</span>
           <button type="button" className="nesio-memmap-close nesio-globe-fsov-close" onClick={() => setGlobeFull(false)}>✕</button>
         </div>,
         document.body,

@@ -173,7 +173,7 @@ interface Props {
   nodes: LifeNode[];
 }
 
-export default function LifeCivilizationMap({ nodes }: Props) {
+export default function LifeMap({ nodes }: Props) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const svgRef = useRef<SVGSVGElement>(null);
   const [hovered, setHovered] = useState<DomainId | null>(null);
@@ -273,22 +273,22 @@ export default function LifeCivilizationMap({ nodes }: Props) {
   if (streamData.length < 2) return null;
 
   return (
-    <div className="life-civ-wrap">
+    <div className="life-map-wrap">
       {/* 顶部解读:最大迁移标注(全部来自真实数据 —— 示例地形已废除) */}
       {insight && (
-        <div className="life-civ-insight">
-          <span className="life-civ-insight-icon">◉</span>
+        <div className="life-map-insight">
+          <span className="life-map-insight-icon">◉</span>
           <span>{insight}</span>
         </div>
       )}
 
       {/* Stream SVG */}
-      <div className="life-civ-svg-wrap">
+      <div className="life-map-svg-wrap">
         <svg
           ref={svgRef}
           width={W}
           height={HEIGHT}
-          className="life-civ-svg"
+          className="life-map-svg"
           role="img"
           aria-label={L(dict, '生命版图：各领域随时间演变的意义分布', 'Life map: how meaning shifts across life domains over time')}
         >
@@ -359,17 +359,17 @@ export default function LifeCivilizationMap({ nodes }: Props) {
       </div>
 
       {/* Legend */}
-      <div className="life-civ-legend">
+      <div className="life-map-legend">
         {DOMAINS.map(d => (
           <button
             key={d.id}
-            className={`life-civ-legend-btn${hovered === d.id ? ' life-civ-legend-btn--on' : ''}`}
+            className={`life-map-legend-btn${hovered === d.id ? ' life-map-legend-btn--on' : ''}`}
             onMouseEnter={() => setHovered(d.id)}
             onMouseLeave={() => setHovered(null)}
             onClick={() => setHovered(prev => prev === d.id ? null : d.id)}
           >
             <span
-              className="life-civ-legend-dot"
+              className="life-map-legend-dot"
               style={{ background: colors[d.id] ?? 'var(--portal-accent)' }}
             />
             {L(dict, d.label, d.labelEn)}

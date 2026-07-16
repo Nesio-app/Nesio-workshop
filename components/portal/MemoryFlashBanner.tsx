@@ -96,7 +96,7 @@ export default function MemoryFlashBanner({ nodes, onDismiss }: Props) {
           type="button"
           className="mem-flash-close"
           onClick={onDismiss}
-          aria-label={L(dict, '关闭关联提示', 'Dismiss related note')}
+          aria-label={L(dict, '关闭关联提示', 'Dismiss related notes')}
         >
           ✕
         </button>

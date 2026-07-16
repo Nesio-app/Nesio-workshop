@@ -329,7 +329,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                         </span>
                         {exp && (
                           <span style={{ flexShrink: 0, fontSize: '0.7rem', color: exp === 'expired' ? 'var(--status-stop, #ef4444)' : 'var(--status-warn, #f59e0b)' }}>
-                            {exp === 'expired' ? L(dict, '已过期', 'Expired') : L(dict, '临期', 'Soon')}
+                            {exp === 'expired' ? L(dict, '已过期', 'Expired') : L(dict, '临期', 'Expiring')}
                           </span>
                         )}
                       </button>

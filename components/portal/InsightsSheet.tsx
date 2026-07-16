@@ -182,13 +182,14 @@ function MindPie({ items, onPick, dict }: { items: Array<[string, number]>; onPi
 // ── Living Model(Lab 内部保留):confidence bar + 节点图 builders ───────────────
 
 function ConfidenceBar({ value }: { value: number }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const color = value >= 85 ? 'var(--status-go)' : value >= 70 ? 'var(--portal-cool-accent)' : value >= 55 ? 'var(--status-gentle)' : 'var(--portal-muted)';
   return (
     <div className="nesio-lm-confidence">
       <div className="nesio-lm-conf-track">
         <div className="nesio-lm-conf-fill" style={{ width: `${value}%`, background: color }} />
       </div>
-      <span className="nesio-lm-conf-label" style={{ color }} title="AI 自评置信度(非精确度量)">{value}%</span>
+      <span className="nesio-lm-conf-label" style={{ color }} title={L(dict, 'AI 自评置信度(非精确度量)', 'AI self-rated confidence (not a precise metric)')}>{value}%</span>
     </div>
   );
 }
@@ -279,7 +280,7 @@ function LivingModelTab({
     return (
       <div className="nesio-lm-loading">
         <span className="nesio-focus-decompose-spinner" />
-        <span>{L(dict, 'Nesio 正在深度思考你的认知模型…', 'Nesio is thinking hard about your mind model…')}</span>
+        <span>{L(dict, '念念正在深度思考你的认知模型…', 'Nessa is thinking hard about your mind model…')}</span>
       </div>
     );
   }

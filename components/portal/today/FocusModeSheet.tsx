@@ -150,7 +150,7 @@ export function FocusModeSheet({ node, onClose, onDone }: {
         )}
 
         {finished ? (
-          <p className="nesio-focus-mode-done-msg">{L(dict, '时间到！要标记完成吗？', 'Time! Mark it done?')}</p>
+          <p className="nesio-focus-mode-done-msg">{L(dict, '时间到！要标记完成吗？', "Time's up! Mark it done?")}</p>
         ) : (
           <button
             type="button"

@@ -213,9 +213,9 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
   // 困在其内部(实测地图叠在 tab 下面而不是全屏)
   if (typeof document === 'undefined') return null;
   return createPortal(
-    <div className="nesio-memmap-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '地图上的记忆', 'Memories in maps')}>
+    <div className="nesio-memmap-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '地图上的记忆', 'Memories on the map')}>
       <div className="nesio-memmap-header">
-        <span className="nesio-memmap-title">{L(dict, '地图上的记忆', 'Memories in maps')}</span>
+        <span className="nesio-memmap-title">{L(dict, '地图上的记忆', 'Memories on the map')}</span>
         <span className="nesio-memmap-count">{L(dict, `${all.length} 条带位置`, `${all.length} located`)}</span>
         <button type="button" className="nesio-memmap-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
       </div>

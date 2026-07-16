@@ -157,7 +157,7 @@ function energyColor(v: number): string {
 
 // 批次 141·设计心情节:能量词(满电/中/蔫)、一句身体感受、时段 —— 供能量层 + 一句话上下文 + 历史用
 function energyWord(lvl: EnergyLevel, dict: DictLocale = 'zh'): string {
-  return lvl === 'high' ? L(dict, '满电', 'charged') : lvl === 'low' ? L(dict, '蔫', 'drained') : L(dict, '中', 'mid');
+  return lvl === 'high' ? L(dict, '满电', 'charged') : lvl === 'low' ? L(dict, '蔫', 'drained') : L(dict, '中', 'steady');
 }
 function energyDesc(lvl: EnergyLevel, dict: DictLocale = 'zh'): string {
   return lvl === 'high' ? L(dict, '劲儿正足,趁手做点事。', 'Full charge — ride it while it lasts.')
@@ -475,9 +475,9 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
               <p className="nesio-mood-journal-prompt">{journalPromptRef.current}</p>
               {/* 富文本-lite 工具条:加粗 / 列表 */}
               <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.4rem' }}>
-                <button type="button" onClick={wrapBold} aria-label="加粗"
+                <button type="button" onClick={wrapBold} aria-label={L(dict, '加粗', 'Bold')}
                   style={{ minWidth: 'var(--tap-min)', minHeight: '2.1rem', borderRadius: '0.5rem', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid)', fontWeight: 800, color: 'var(--portal-ink)', cursor: 'pointer' }}>B</button>
-                <button type="button" onClick={insertBullet} aria-label="列表"
+                <button type="button" onClick={insertBullet} aria-label={L(dict, '列表', 'List')}
                   style={{ minWidth: 'var(--tap-min)', minHeight: '2.1rem', borderRadius: '0.5rem', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', cursor: 'pointer' }}>•—</button>
               </div>
               <div
@@ -485,7 +485,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
                 className="nesio-journal-editor"
                 contentEditable
                 suppressContentEditableWarning
-                data-placeholder={L(dict, '写下此刻…', 'Write this moment…')}
+                data-placeholder={L(dict, '写下此刻…', 'Write down this moment…')}
                 onInput={(e) => {
                   journalHtmlRef.current = (e.target as HTMLDivElement).innerHTML;
                   setJournal((e.target as HTMLDivElement).textContent ?? '');
@@ -551,7 +551,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
 
   if (phase === 'energy') {
     return (
-      <div className="nesio-mood-overlay" role="dialog" aria-modal aria-label="记录精力">
+      <div className="nesio-mood-overlay" role="dialog" aria-modal aria-label={L(dict, '记录精力', 'Log energy')}>
         <div className="nesio-mood-backdrop" onClick={() => handleSave()} />
         <div className={`nesio-mood-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
           <div className="nesio-mood-handle" {...handleProps} />
@@ -626,7 +626,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
         </p>
         <div className="nesio-mood-wheel-wrap">
           <svg ref={svgRef} viewBox="0 0 300 300" className="nesio-mood-wheel-svg"
-            role="group" aria-label="情绪转盘"
+            role="group" aria-label={L(dict, '情绪转盘', 'Mood wheel')}
             onMouseDown={onSvgStart} onMouseMove={onSvgMove} onMouseUp={onSvgEnd} onMouseLeave={onSvgLeave}
             onTouchStart={(e) => { onSvgStart(e); }}
             onTouchMove={(e) => { e.preventDefault(); onSvgMove(e); }}

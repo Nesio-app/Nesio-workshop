@@ -331,7 +331,7 @@ export default function FinanceTab() {
                   </div>
                 )}
               </div>
-              <p className="nesio-fin-alert-note">{L(dict, '预警按规则算(非 LLM):与 Today / 问一问 同一套判定', 'Rule-based (not LLM) — the same findings Today and Ask read')}</p>
+              <p className="nesio-fin-alert-note">{L(dict, '预警按规则算(非 LLM):与 Today / 问一问 同一套判定', 'Rule-based (not LLM) — the same findings Today and Ask use')}</p>
             </>
           )}
 
@@ -383,7 +383,7 @@ export default function FinanceTab() {
                 a.download = `finance-report-${ym}.html`;
                 document.body.appendChild(a); a.click(); a.remove();
                 setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-                setReportMsg(L(dict, `已下载 ${ym} 彩色月报(.html,双击打开)`, `Colorful report for ${ym} downloaded (.html)`));
+                setReportMsg(L(dict, `已下载 ${ym} 彩色月报(.html,双击打开)`, `Visual report for ${ym} downloaded (.html)`));
               } catch { setReportMsg(L(dict, '月报生成失败,请重试', 'Report failed — try again')); }
             }}>{L(dict, '下载彩色月报', 'Download report')}</button>
             <button type="button" className="nesio-fin-flowopt" onClick={() => {
@@ -393,8 +393,8 @@ export default function FinanceTab() {
                 setReportMsg(outcome === 'created'
                   ? L(dict, `已把 ${r.ym} 月报存入记忆,「问一问」可检索`, `Report ${r.ym} saved to memory — Ask can cite it`)
                   : L(dict, `已更新记忆里的 ${r.ym} 月报`, `Updated the ${r.ym} report in memory`));
-              } catch { setReportMsg(L(dict, '存入记忆失败,请重试', 'Save to memory failed — try again')); }
-            }}>{L(dict, '存入记忆', 'Save to memory')}</button>
+              } catch { setReportMsg(L(dict, '存入记忆失败,请重试', 'Save to Memory failed — try again')); }
+            }}>{L(dict, '存入记忆', 'Save to Memory')}</button>
             <button type="button" className="nesio-fin-flowopt" onClick={() => {
               try {
                 const w = window.open('', '_blank');
@@ -605,7 +605,7 @@ export default function FinanceTab() {
           )}
           <p className="nesio-settings-section-label" style={{ marginTop: upcoming.items.length ? '1rem' : 0 }}>{L(dict, '识别到的定期账单', 'Detected recurring bills')}</p>
           {recurring.length === 0 ? (
-            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没识别到定期账单 —— 同一商户 2 笔规律扣款(或知名订阅品牌 1 笔)就会以「待确认」出现,3 笔转正。新连接的银行,完整历史会在几天内陆续回填,期间隔天点一次「同步」即可。', 'No recurring bills yet — 2 regular charges per merchant (or 1 from a known subscription brand) show as "unconfirmed", confirming at 3. Newly linked banks backfill history over a few days; sync again occasionally.')}</p>
+            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没识别到定期账单 —— 同一商户 2 笔规律扣款(或知名订阅品牌 1 笔)就会以「待确认」出现,3 笔转正。新连接的银行,完整历史会在几天内陆续回填,期间隔天点一次「同步」即可。', 'No recurring bills yet — 2 regular charges per merchant (or 1 from a known subscription brand) show up as "unconfirmed" and are confirmed after 3 charges. Newly linked banks backfill history over a few days; sync again occasionally.')}</p>
           ) : (
             <div className="nesio-fin-recurlist">
               {recurring.map((r) => (
@@ -678,7 +678,7 @@ export default function FinanceTab() {
                   <span className="nesio-fin-budget-hero-sub">{L(dict, `${monthBills.items.length} 笔已识别定期`, `${monthBills.items.length} recurring`)}</span>
                 </div>
                 <div className="nesio-fin-kpi">
-                  <span className="nesio-fin-kpi-l">{L(dict, '收入', 'Earnings')}</span>
+                  <span className="nesio-fin-kpi-l">{L(dict, '收入', 'Income')}</span>
                   <span className="nesio-fin-kpi-v">{formatMoney(summary.income, summary.currency)}</span>
                   {incomeDet && <span className="nesio-fin-budget-hero-sub">{L(dict, `预期约 ${formatMoney(incomeDet.monthlyIncome)}/月`, `expect ~${formatMoney(incomeDet.monthlyIncome)}/mo`)}</span>}
                 </div>
@@ -789,7 +789,7 @@ export default function FinanceTab() {
                 {portfolio.concentrated && (
                   <p className="nesio-fin-score-hint" style={{ marginTop: '0.6rem' }}>{L(dict,
                     `${portfolio.concentrated.ticker || portfolio.concentrated.name} 占了组合的 ${portfolio.concentrated.pct}% —— 集中不是错,只是波动会更贴着这一只走;有空可以想想要不要分散一点。`,
-                    `${portfolio.concentrated.ticker || portfolio.concentrated.name} is ${portfolio.concentrated.pct}% of the portfolio — concentration isn't wrong, but volatility will track this one closely; worth a think when you have a moment.`)}</p>
+                    `${portfolio.concentrated.ticker || portfolio.concentrated.name} is ${portfolio.concentrated.pct}% of the portfolio — concentration isn't wrong, but volatility will track this one closely; worth thinking about when you have a moment.`)}</p>
                 )}
                 <p className="nesio-settings-section-label" style={{ marginTop: '0.8rem' }}>{L(dict, '组合结构', 'Allocation')}</p>
                 <div className="nesio-fin-cats">

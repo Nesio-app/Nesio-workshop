@@ -600,7 +600,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
             type="button"
             className={`nesio-voice-mic-btn${listening ? ' nesio-voice-mic-btn--active' : ''}`}
             onClick={listening ? stopListening : startListening}
-            aria-label={listening ? '停止录音' : '开始录音'}
+            aria-label={listening ? L(dict, '停止录音', 'Stop recording') : L(dict, '开始录音', 'Start recording')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
               <path d="M12 1a3 3 0 00-3 3v8a3 3 0 006 0V4a3 3 0 00-3-3z"/>

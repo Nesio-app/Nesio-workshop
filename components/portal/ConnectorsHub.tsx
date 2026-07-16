@@ -48,7 +48,7 @@ interface ConnectorDef {
 const CONNECTORS: ConnectorDef[] = [
   // 日历和 Gmail 是同一次 Google 授权,合并为一个入口(批次 5 用户反馈)
   { id: 'google', name: 'Google 日历 · Gmail', nameEn: 'Google Calendar · Gmail', icon: <IconCalendar />, iconBg: 'var(--chip-blue)', method: 'oauth', description: '一次授权同时接入:日程生成提醒和简报,邮件提取人物、日期、承诺', descriptionEn: 'One consent covers both: calendar drives reminders and briefs; email yields people, dates, promises' },
-  { id: 'weather', name: '地理位置 · 天气', nameEn: 'Location · Weather', icon: <IconCloudSun />, iconBg: 'var(--chip-amber)', method: 'geo', description: '基于实时天气生成外出和健康建议', descriptionEn: 'Live weather feeds outing and health suggestions' },
+  { id: 'weather', name: '地理位置 · 天气', nameEn: 'Location · Weather', icon: <IconCloudSun />, iconBg: 'var(--chip-amber)', method: 'geo', description: '基于实时天气生成外出和健康建议', descriptionEn: 'Live weather powers outing and health tips' },
   // 批次 21:银行流水(Plaid)—— Link 授权后增量同步交易,明细只存本机
   { id: 'plaid', name: '银行流水 · Plaid', nameEn: 'Bank feed · Plaid', icon: <IconCard />, iconBg: 'var(--chip-fog)', method: 'oauth', description: '连接美国银行账户,交易流水增量同步(明细只存本机)', descriptionEn: 'Link a US bank account; transactions sync incrementally (details stay on-device)' },
   // 批次 21:Google 地图时间轴导入 —— 手机端导出的 JSON 并入地点足迹
@@ -167,7 +167,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (params.get('connector') === 'notion' && params.get('status') === 'connected') {
       saveConnectorState('notion', true);
       setConnected((p) => ({ ...p, notion: true }));
-      showToast(L(dict, 'Notion 已授权,点「同步」拉取你选择的页面', 'Notion authorized — tap Sync to pull the pages you granted'), true);
+      showToast(L(dict, 'Notion 已授权,点「同步」拉取你选择的页面', 'Notion authorized — tap Sync to pull the pages you shared'), true);
     }
     // 批次 158:Granola OAuth 回参
     const granolaParam = params.get('granola');
@@ -211,7 +211,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         <div className="nesio-connector-body">
           <p className="nesio-connector-name">
             {dict === 'en' ? (c.nameEn ?? c.name) : c.name}
-            <span className="nesio-connector-soon">{c.comingSoon ? L(dict, '即将上线', 'Coming soon') : L(dict, '开发中', 'In dev')}</span>
+            <span className="nesio-connector-soon">{c.comingSoon ? L(dict, '即将上线', 'Coming soon') : L(dict, '开发中', 'In development')}</span>
           </p>
           <p className="nesio-connector-desc">{dict === 'en' ? (c.descriptionEn ?? c.description) : c.description}</p>
         </div>
@@ -569,7 +569,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           : L(dict, '这些库都是日历/维度表,已跳过(没有可折叠的书/项目等主表)。想导松散页面可在 Notion 里把页面共享给集成。', 'Those databases are all calendar/dimension tables — skipped. To import loose pages, share them with the integration in Notion.'), true);
       } else {
         const suffix = c.id === 'notion' && data.aiUsed === false ? L(dict, '(未接 AI,已按页面标题/正文存入,可直接阅读)', '(no AI — saved by page title/text, readable directly)') : '';
-        showToast(L(dict, `已提取 ${n.length} 个节点${suffix}`, `Extracted ${n.length} nodes ${suffix}`), true);
+        showToast(L(dict, `已提取 ${n.length} 个节点${suffix}`, `Extracted ${n.length} items${suffix}`), true);
       }
     } catch { showToast(L(dict, '网络错误', 'Network error'), false); }
     setSyncing(null);
@@ -834,7 +834,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
             window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
           }
           setCounts((p) => ({ ...p, gmail: nodeCount }));
-          const detail = L(dict, `读取 ${emailCount} 封邮件 · 提取 ${nodeCount} 个节点`, `Read ${emailCount} emails · extracted ${nodeCount} nodes`);
+          const detail = L(dict, `读取 ${emailCount} 封邮件 · 提取 ${nodeCount} 个节点`, `Read ${emailCount} emails · extracted ${nodeCount} items`);
           setOauthSyncResult((p) => ({ ...p, gmail: { ok: true, msg: L(dict, '同步成功', 'Synced'), detail } }));
           showToast(detail, true);
         }

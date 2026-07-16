@@ -279,7 +279,7 @@ function BubbleMenu({ msg, onClose, onSave, onCopy, onContinue }: {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   return (
     <>
-      <button type="button" className="nesio-bubble-menu-backdrop" onClick={onClose} aria-label="关闭" />
+      <button type="button" className="nesio-bubble-menu-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
       <div className="nesio-bubble-menu">
         {/* 批次 135·设计长按菜单:存入记忆 / 复制 / 以此为题继续问 */}
         {!msg.savedToMemory && (
@@ -311,6 +311,7 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [cameraError, setCameraError] = useState('');
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
 
   // Stop tracks on unmount
   useEffect(() => () => { stream?.getTracks().forEach((t) => t.stop()); }, [stream]);
@@ -342,7 +343,7 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
       setStream(s);
     } catch (err) {
       console.warn('[camera] getUserMedia failed:', err);
-      setCameraError('无法访问摄像头，请检查权限或改用相册');
+      setCameraError(L(dict, '无法访问摄像头，请检查权限或改用相册', 'Camera unavailable — check permissions or use the album'));
     }
   }
 
@@ -380,11 +381,11 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
         for (const node of data.nodes) {
           for (const n of searchLifeGraphFuzzy(node.name, 2)) found.set(n.id, n);
         }
-        onResult(names || data.summary || '（未识别到）', Array.from(found.values()).slice(0, 6));
+        onResult(names || data.summary || L(dict, '（未识别到）', 'Nothing recognized'), Array.from(found.values()).slice(0, 6));
       } else {
-        onResult(data.summary || '（未识别到）', []);
+        onResult(data.summary || L(dict, '（未识别到）', 'Nothing recognized'), []);
       }
-    } catch { onResult('识别失败', []); }
+    } catch { onResult(L(dict, '识别失败', 'Recognition failed'), []); }
     setAnalyzing(false);
   }
 
@@ -399,28 +400,28 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
         >←</button>
         {/* muted + playsInline required on iOS for autoplay in PWA */}
         <video ref={videoRef} autoPlay muted playsInline className="nesio-camera-video" />
-        <button type="button" className="nesio-chat-camera-shutter" onClick={capture} aria-label="拍照">
+        <button type="button" className="nesio-chat-camera-shutter" onClick={capture} aria-label={L(dict, '拍照', 'Take photo')}>
           <span className="nesio-camera-shutter-ring" />
         </button>
-        {analyzing && <p className="nesio-camera-status">识别中…</p>}
+        {analyzing && <p className="nesio-camera-status">{L(dict, '识别中…', 'Recognizing…')}</p>}
       </div>
     );
   }
 
   return (
     <div className="nesio-camera-entry">
-      <button type="button" className="nesio-wechat-back-btn" onClick={onClose}>← 返回</button>
+      <button type="button" className="nesio-wechat-back-btn" onClick={onClose}>← {L(dict, '返回', 'Back')}</button>
       {analyzing ? (
-        <p className="nesio-camera-status">识别中…</p>
+        <p className="nesio-camera-status">{L(dict, '识别中…', 'Recognizing…')}</p>
       ) : (
         <>
           {cameraError && <p className="nesio-camera-status" style={{ color: 'var(--status-risk)' }}>{cameraError}</p>}
           <div className="nesio-camera-entry-btns">
             <button type="button" className="nesio-wechat-plus-item" onClick={openCamera}>
-              <span className="nesio-wechat-plus-icon"><IconCamera /></span><span>打开摄像头</span>
+              <span className="nesio-wechat-plus-icon"><IconCamera /></span><span>{L(dict, '打开摄像头', 'Open camera')}</span>
             </button>
             <button type="button" className="nesio-wechat-plus-item" onClick={() => fileRef.current?.click()}>
-              <span className="nesio-wechat-plus-icon"><IconImage /></span><span>从相册选图</span>
+              <span className="nesio-wechat-plus-icon"><IconImage /></span><span>{L(dict, '从相册选图', 'Choose from album')}</span>
             </button>
           </div>
         </>
@@ -676,8 +677,8 @@ Edit location/value anytime in Storage.`),
       // 兜底：从本地记忆模糊搜索
       const localHits = searchLifeGraphFuzzy(text.trim(), 5);
       const fallbackText = localHits.length
-        ? `AI 暂时不可用，但我在记忆库里找到了这些相关线索：\n${localHits.map((n) => `• ${n.name}`).join('\n')}`
-        : isTimeout ? '响应超时，请重试。' : 'AI 暂时不可用，记忆库里也没找到相关线索。';
+        ? L(dict, `AI 暂时不可用，但我在记忆库里找到了这些相关线索：\n${localHits.map((n) => `• ${n.name}`).join('\n')}`, `AI is briefly unavailable, but I found these related clues in your memory:\n${localHits.map((n) => `• ${n.name}`).join('\n')}`)
+        : isTimeout ? L(dict, '响应超时，请重试。', 'The response timed out — please try again.') : L(dict, 'AI 暂时不可用，记忆库里也没找到相关线索。', 'AI is briefly unavailable, and nothing related turned up in your memory.');
       const errMsg: UiMessage = { id: nextMsgId('e'), role: 'model', text: fallbackText, refs: localHits.map((n) => ({ id: n.id, name: n.name, source: n.source })) };
       setMessages((prev) => [...prev, errMsg]);
     }
@@ -821,7 +822,7 @@ Edit location/value anytime in Storage.`),
     if (!isText) {
       const notice: UiMessage = {
         id: `m-${Date.now()}`, role: 'model',
-        text: `暂时只支持文本（CSV/TXT/JSON 等）和图片文件。"${file.name}" 是 .${ext || '未知'} 格式，暂不支持。`,
+        text: L(dict, `暂时只支持文本（CSV/TXT/JSON 等）和图片文件。"${file.name}" 是 .${ext || '未知'} 格式，暂不支持。`, `For now, only text files (CSV/TXT/JSON, etc.) and images are supported. "${file.name}" is .${ext || 'unknown'} — not supported yet.`),
       };
       setMessages((prev) => [...prev, notice]);
       return;
@@ -842,18 +843,18 @@ Edit location/value anytime in Storage.`),
       fileContextRef.current = { name: file.name, content };
 
       const rowCount = isCsvLike(file.name)
-        ? `${raw.trim().split(/\r?\n/).length - 1} 行数据`
+        ? L(dict, `${raw.trim().split(/\r?\n/).length - 1} 行数据`, `${raw.trim().split(/\r?\n/).length - 1} rows`)
         : `${(raw.length / 1024).toFixed(1)} KB`;
 
       const notice: UiMessage = {
         id: `f-${Date.now()}`, role: 'model',
-        text: `已加载 **${file.name}**（${rowCount}）\n\n可以问我这个文件里的任何问题，比如：\n• 这里有多少条记录？\n• 帮我总结一下\n• 谁的金额最高？`,
+        text: L(dict, `已加载 **${file.name}**（${rowCount}）\n\n可以问我这个文件里的任何问题，比如：\n• 这里有多少条记录？\n• 帮我总结一下\n• 谁的金额最高？`, `Loaded **${file.name}** (${rowCount})\n\nAsk me anything about this file, for example:\n• How many records are here?\n• Give me a summary\n• Who has the highest amount?`),
       };
       setMessages((prev) => [...prev, notice]);
     } catch {
       const errMsg: UiMessage = {
         id: `e-${Date.now()}`, role: 'model',
-        text: `读取文件失败，请确认文件没有损坏。`,
+        text: L(dict, `读取文件失败，请确认文件没有损坏。`, `Couldn't read the file — please make sure it isn't corrupted.`),
       };
       setMessages((prev) => [...prev, errMsg]);
     }
@@ -874,7 +875,7 @@ Edit location/value anytime in Storage.`),
     const r = getSR();
     if (!r) {
       // SpeechRecognition not available — surface a clear message
-      const errMsg: UiMessage = { id: `e-${Date.now()}`, role: 'model', text: '当前浏览器不支持语音输入，请切换到键盘文字输入。' };
+      const errMsg: UiMessage = { id: `e-${Date.now()}`, role: 'model', text: L(dict, '当前浏览器不支持语音输入，请切换到键盘文字输入。', 'Your browser does not support voice input — switch to keyboard text input.') };
       setMessages((prev) => [...prev, errMsg]);
       setVoiceMode(false);
       return;
@@ -909,10 +910,10 @@ Edit location/value anytime in Storage.`),
 
   function handleCameraResult(label: string, nodes: LifeNode[]) {
     setShowCamera(false);
-    const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: '[图片] 识别图片' };
+    const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: L(dict, '[图片] 识别图片', '[Image] Recognize image') };
     const aiText = nodes.length > 0
-      ? `识别到：${label}\n\n记忆库里找到 ${nodes.length} 条相关记录：\n${nodes.map((n) => `• ${n.name}（${n.type}）`).join('\n')}`
-      : `识别到：${label}\n\n记忆库里暂时没有找到相关记录。`;
+      ? L(dict, `识别到：${label}\n\n记忆库里找到 ${nodes.length} 条相关记录：\n${nodes.map((n) => `• ${n.name}（${n.type}）`).join('\n')}`, `Recognized: ${label}\n\nFound ${nodes.length} related record(s) in your memory:\n${nodes.map((n) => `• ${n.name} (${n.type})`).join('\n')}`)
+      : L(dict, `识别到：${label}\n\n记忆库里暂时没有找到相关记录。`, `Recognized: ${label}\n\nNo related records in your memory yet.`);
     const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text: aiText };
     const next = [...messages, userMsg, aiMsg];
     setMessages(next); saveHistory(next);
@@ -922,7 +923,7 @@ Edit location/value anytime in Storage.`),
 
   if (showCamera) {
     return (
-      <div className="nesio-wechat-fullscreen" role="dialog" aria-label="拍照识别">
+      <div className="nesio-wechat-fullscreen" role="dialog" aria-label={L(dict, '拍照识别', 'Camera capture')}>
         <CameraView
           onResult={handleCameraResult}
           onClose={() => { setShowCamera(false); setCameraAutoOpen(false); }}
@@ -945,7 +946,7 @@ Edit location/value anytime in Storage.`),
   }
 
   return (
-    <div className="nesio-wechat-fullscreen" role="dialog" aria-modal="true" aria-label="问一问">
+    <div className="nesio-wechat-fullscreen" role="dialog" aria-modal="true" aria-label={L(dict, '问一问', 'Ask')}>
       {/* 关联记忆闪现 */}
       <MemoryFlashBanner nodes={flashNodes} onDismiss={dismissFlash} />
 
@@ -966,7 +967,7 @@ Edit location/value anytime in Storage.`),
 
       {/* Header */}
       <div className="nesio-wechat-header">
-        <button type="button" className="nesio-wechat-back-btn" onClick={onClose} aria-label="关闭">←</button>
+        <button type="button" className="nesio-wechat-back-btn" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>←</button>
         {/* 批次 140·设计念念节:头部品牌行 —— 念念 + 当前模式副标(按 entitlement 诚实:分层未启用即深问·云端) */}
         <div className="nesio-wechat-brand">
           <span className="nesio-wechat-title">{L(dict, '念念', 'Nessa')}</span>
@@ -981,8 +982,8 @@ Edit location/value anytime in Storage.`),
             type="button"
             className="nesio-wechat-more-btn"
             onClick={() => { setSessions(loadSessions()); setShowHistory(true); }}
-            aria-label="历史记录"
-            title="历史记录"
+            aria-label={L(dict, '历史记录', 'History')}
+            title={L(dict, '历史记录', 'History')}
           >
             <IconHistory size={18} />
           </button>
@@ -995,7 +996,7 @@ Edit location/value anytime in Storage.`),
       {/* 历史记录面板 */}
       {showHistory && (
         <div className="nesio-chat-history-panel">
-          <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setShowHistory(false)} aria-label="关闭" />
+          <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setShowHistory(false)} aria-label={L(dict, '关闭', 'Close')} />
           <div className="nesio-chat-history-card">
             <p className="nesio-chat-history-title">{L(dict, '历史对话', 'Past chats')}</p>
             {sessions.length === 0 && (
@@ -1228,7 +1229,7 @@ Edit location/value anytime in Storage.`),
       {/* Plus panel */}
       {showPlus && (
         <div className="nesio-wechat-plus-panel">
-          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const userMsg:UiMessage={id:nextMsgId('u'),role:'user',text:'[图片] 识别图片'}; setMessages(prev=>[...prev,userMsg]); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join('、'); const found=new Map<string,LifeNode>(); for(const node of data.nodes){for(const n of searchLifeGraphFuzzy(node.name,2))found.set(n.id,n);} const nodes=Array.from(found.values()).slice(0,6); const aiText=nodes.length>0?`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`:`识别到：${names}\n\n记忆库里暂时没有相关记录。`; const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:aiText}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}else{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:data.summary||'图片识别暂时不可用。'}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}}).catch(()=>{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:'图片识别失败，请重试。'}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const userMsg:UiMessage={id:nextMsgId('u'),role:'user',text:L(dict,'[图片] 识别图片','[Image] Recognize image')}; setMessages(prev=>[...prev,userMsg]); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join('、'); const found=new Map<string,LifeNode>(); for(const node of data.nodes){for(const n of searchLifeGraphFuzzy(node.name,2))found.set(n.id,n);} const nodes=Array.from(found.values()).slice(0,6); const aiText=nodes.length>0?L(dict,`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`,`Recognized: ${names}\n\nFound ${nodes.length} related record(s):\n${nodes.map(n=>`• ${n.name}`).join('\n')}`):L(dict,`识别到：${names}\n\n记忆库里暂时没有相关记录。`,`Recognized: ${names}\n\nNo related records in your memory yet.`); const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:aiText}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}else{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:data.summary||L(dict,'图片识别暂时不可用。','Image recognition is briefly unavailable.')}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}}).catch(()=>{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:L(dict,'图片识别失败，请重试。','Image recognition failed — please try again.')}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
             <span className="nesio-wechat-plus-icon"><IconImage /></span>
             <span>{L(dict, '相册', 'Photos')}</span>
           </button>
@@ -1293,7 +1294,7 @@ Edit location/value anytime in Storage.`),
               type="button"
               className="nesio-wechat-mode-btn"
               onClick={() => setVoiceMode(false)}
-              aria-label="切换到键盘"
+              aria-label={L(dict, '切换到键盘', 'Switch to keyboard')}
             >
               <IconKeyboard />
             </button>
@@ -1304,7 +1305,7 @@ Edit location/value anytime in Storage.`),
               onPointerUp={stopRecording}
               onPointerLeave={() => { if (recording) stopRecording(); }}
               onPointerCancel={() => { if (recording) stopRecording(); }}
-              aria-label="按住说话"
+              aria-label={L(dict, '按住说话', 'Hold to talk')}
             >
               {recording ? L(dict, '松开发送', 'Release to send') : L(dict, '按住 说话', 'Hold to talk')}
             </button>
@@ -1312,7 +1313,7 @@ Edit location/value anytime in Storage.`),
               type="button"
               className={`nesio-wechat-emoji-btn${showEmoji ? ' nesio-wechat-emoji-btn--active' : ''}`}
               onClick={() => { setShowEmoji((v) => !v); setShowPlus(false); }}
-              aria-label="表情"
+              aria-label={L(dict, '表情', 'Emoji')}
             >
               <IconSmile />
             </button>
@@ -1320,7 +1321,7 @@ Edit location/value anytime in Storage.`),
               type="button"
               className={`nesio-wechat-plus-btn${showPlus ? ' nesio-wechat-plus-btn--active' : ''}`}
               onClick={() => setShowPlus((v) => !v)}
-              aria-label="更多"
+              aria-label={L(dict, '更多', 'More')}
             >
               ＋
             </button>
@@ -1332,7 +1333,7 @@ Edit location/value anytime in Storage.`),
               type="button"
               className="nesio-wechat-mode-btn"
               onClick={() => setVoiceMode(true)}
-              aria-label="切换到语音"
+              aria-label={L(dict, '切换到语音', 'Switch to voice')}
             >
               <IconMic />
             </button>
@@ -1350,7 +1351,7 @@ Edit location/value anytime in Storage.`),
               type="button"
               className={`nesio-wechat-emoji-btn${showEmoji ? ' nesio-wechat-emoji-btn--active' : ''}`}
               onClick={() => { setShowEmoji((v) => !v); setShowPlus(false); }}
-              aria-label="表情"
+              aria-label={L(dict, '表情', 'Emoji')}
             >
               <IconSmile />
             </button>
@@ -1360,7 +1361,7 @@ Edit location/value anytime in Storage.`),
                 className="nesio-wechat-send-btn"
                 onClick={() => void sendMessage(input)}
                 disabled={sending}
-                aria-label="发送"
+                aria-label={L(dict, '发送', 'Send')}
               >
                 {L(dict, '发送', 'Send')}
               </button>
@@ -1369,7 +1370,7 @@ Edit location/value anytime in Storage.`),
                 type="button"
                 className={`nesio-wechat-plus-btn${showPlus ? ' nesio-wechat-plus-btn--active' : ''}`}
                 onClick={() => setShowPlus((v) => !v)}
-                aria-label="更多"
+                aria-label={L(dict, '更多', 'More')}
               >
                 ＋
               </button>

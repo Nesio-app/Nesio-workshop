@@ -15,7 +15,7 @@ import type { BarcodeResult } from './BarcodeScanSheet';
 
 const BarcodeScanSheet = dynamic(() => import('./BarcodeScanSheet'), { ssr: false });
 import { earnPoints, addWishFromFreeze, getPoints, DISCIPLINE_BONUS } from '@/lib/platform/rewards-engine';
-import RewardsWarehouse from './RewardsWarehouse';
+import RewardsStore from './RewardsStore';
 import { IconSnowflake } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -103,9 +103,9 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
     setScanOpen(false);
     if (r.url) setUrlInput(r.url);
     const title = r.title || (r.upc ? L(dict, `条码 ${r.upc}`, `Barcode ${r.upc}`) : '');
-    const priceLabel = r.priceLabel || (typeof r.price === 'number' && r.price > 0 ? `¥${r.price}` : undefined);
+    const priceLabel = r.priceLabel || (typeof r.price === 'number' && r.price > 0 ? `$${r.price}` : undefined);
     setParsed({ title, price: priceLabel, image: r.image, store: r.store });
-    setParseError(title ? '' : L(dict, '扫到码了,但商品库没这件。手动填名称,或用「拍一下」拍商品让 AI 认。', 'Scanned, but not in the product db. Type the name, or use the camera to let AI recognise it.'));
+    setParseError(title ? '' : L(dict, '扫到码了,但商品库没这件。手动填名称,或用「拍一下」拍商品让 AI 认。', 'Scanned, but not in the product db. Type the name, or use the camera to let AI recognize it.'));
     setTab('add');
   }
 
@@ -169,7 +169,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
       <div className={`nesio-freeze-sheet${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle} onClick={(e) => e.stopPropagation()}>
         <div className="nesio-sheet-grip" {...handleProps} />
         <div className="nesio-freeze-header">
-          <span className="nesio-freeze-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><IconSnowflake size={16} /> {L(dict, '冷冻仓', 'Freeze vault')}</span>
+          <span className="nesio-freeze-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><IconSnowflake size={16} /> {L(dict, '冷冻仓', 'Freeze Vault')}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button type="button" className="nesio-rewards-pts-badge" onClick={() => setTab('rewards')} title={L(dict, '积分 · 点开奖品仓库', 'Points · open rewards')}>
               ⬡ {points} {L(dict, '积分', 'pts')}
@@ -193,7 +193,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
           </button>
         </div>
 
-        {tab === 'rewards' && <RewardsWarehouse />}
+        {tab === 'rewards' && <RewardsStore />}
 
         {/* Add tab */}
         {tab === 'add' && (

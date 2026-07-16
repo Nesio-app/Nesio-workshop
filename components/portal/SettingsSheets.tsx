@@ -179,7 +179,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
         onClick={toggleDailyReport}>
         <div>
           <span className="nesio-settings-option-label">{L(dict, '每日 AI 图文日报', 'Daily AI report')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, '每天存进记忆 · 首页回顾里给你', 'Saved to memory daily · surfaced under Today')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '每天存进记忆 · 首页回顾里给你', 'Saved to Memory daily · shown in Today')}</span>
         </div>
         <span className={`nesio-settings-space-check${dailyReportOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
           {dailyReportOn ? '✓' : '○'}
@@ -190,7 +190,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
         onClick={toggleHaptics}>
         <div>
           <span className="nesio-settings-option-label">{L(dict, '触感反馈', 'Haptics')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, '记录成功/找到/长按录音时轻震', 'Gentle buzz on save, find, hold-to-record')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '记录成功/找到/长按录音时轻震', 'Gentle buzz when you save, find something, or hold to record')}</span>
         </div>
         <span className={`nesio-settings-space-check${hapticsOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
           {hapticsOn ? '✓' : '○'}
@@ -206,7 +206,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
         }}>
         <div>
           <span className="nesio-settings-option-label">{L(dict, '记忆自动定位', 'Auto-locate memories')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, '亲手记的带上位置 · 只存本机', 'Your captures get located · stored on-device only')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '亲手记的带上位置 · 只存本机', 'Your own notes get a location · kept on this device only')}</span>
         </div>
         <span className={`nesio-settings-space-check${captureLocOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
           {captureLocOn ? '✓' : '○'}
@@ -459,7 +459,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       await handleCloudBackup();
     } else {
       setDriveState('error');
-      setDriveMsg(L(dict, '备份到 Drive 没成功 —— 稍后再试或用「导出完整备份」', "Drive backup didn't go through — try later or use Export full backup"));
+      setDriveMsg(L(dict, '备份到 Drive 没成功 —— 稍后再试或用「导出完整备份」', "Drive backup didn't go through — try again later or use Export full backup"));
     }
   }
   // 备份/恢复走用户选的目的地(Drive 失败自动兜底 Nesio 已在 handleDriveBackup 内)
@@ -477,7 +477,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         ? L(dict, '你的 Drive 里还没有备份 —— 先点上面「免费备份到 Google Drive」', 'No backup in your Drive yet — tap "Back up free to Google Drive" above first')
         : r.error === 'not_connected'
           ? L(dict, '先连接 Google 再恢复', 'Connect Google first')
-          : L(dict, '从 Drive 恢复没成功 —— 稍后再试', "Restore from Drive didn't go through — try later"));
+          : L(dict, '从 Drive 恢复没成功 —— 稍后再试', "Restore from Drive didn't go through — try again later"));
     }
   }
 
@@ -485,7 +485,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     switch (err) {
       case 'entitlement_required': return L(dict, '云备份即将开放 —— 到下方「订阅」留个位,开放时第一时间通知你。', "Cloud backup is coming soon — join the waitlist under Subscription and we'll ping you first.");
       case 'not_signed_in': return L(dict, '先登录(上方入口),才能同步到你的云账户。', 'Sign in first (link above) to sync to your cloud account.');
-      case 'cloud_not_configured': return L(dict, '云同步暂未开启,稍后再试。', "Cloud sync isn't enabled yet — try later.");
+      case 'cloud_not_configured': return L(dict, '云同步暂未开启,稍后再试。', "Cloud sync isn't enabled yet — try again later.");
       case 'too_large': return L(dict, '数据超过 8MB 单次上限,先导出到本地留一份。', 'Data is over the 8MB limit — export a local copy for now.');
       default: return L(dict, '这次没传上去。检查网络后可以再试一次。', "Didn't go through. Check your connection and try again.");
     }
@@ -755,7 +755,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       {restoreMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
 
       <button type="button" className="nesio-settings-danger-btn" onClick={clearAllMemory}>
-        {deleted ? L(dict, '✓ 已清除', '✓ Cleared') : L(dict, '清除所有 Memory', 'Clear all Memory')}
+        {deleted ? L(dict, '✓ 已清除', '✓ Cleared') : L(dict, '清除所有 Memory', 'Clear all memories')}
       </button>
       <button type="button" className="nesio-settings-danger-btn" style={{ marginTop: '0.4rem', opacity: 0.85 }} onClick={clearAllLocalData}>
         {L(dict, '彻底删除本机全部数据', 'Delete all local data')}
@@ -1146,7 +1146,7 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
       </button>
       {savedTip && (
         <p className="nesio-settings-option-hint" aria-live="polite" style={{ margin: '0.35rem 0 0', color: 'var(--status-go)' }}>
-          {L(dict, `念念以后叫你「${name.trim() || '我'}」`, `Nessa will call you "${name.trim() || 'me'}" from now on`)}
+          {L(dict, `念念以后叫你「${name.trim() || '我'}」`, `Nessa will call you "${name.trim() || 'you'}" from now on`)}
         </p>
       )}
       <button type="button" className="nesio-settings-option" style={{ marginTop: '0.6rem' }} onClick={onPickAvatar}>
@@ -1177,7 +1177,7 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
           {/* 随 App 版 StoreKit 开放;disabled={true} 满足 no-inert-buttons 契约的显式禁用标注 */}
           <button type="button" disabled={true} style={{ ...rowStyle, width: '100%', background: 'none', border: 'none', color: 'var(--portal-muted)', cursor: 'default', textAlign: 'left' }}>
             <span>{L(dict, '恢复购买', 'Restore purchase')}</span>
-            <span style={{ fontSize: '0.72rem' }}>{L(dict, '随 App 版开放', 'Coming with the App version')}</span>
+            <span style={{ fontSize: '0.72rem' }}>{L(dict, '随 App 版开放', 'Coming with the App Store version')}</span>
           </button>
 
           {/* 图1b:改密码移到登录/忘记密码流程,账户页不再放。删除账号入口在「数据与隐私」。 */}
