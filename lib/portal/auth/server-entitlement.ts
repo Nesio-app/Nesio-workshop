@@ -24,42 +24,110 @@ import { getSupabaseUserId } from '@/lib/portal/integrations';
 
 export type ServerTier = 'free' | 'pro' | 'unknown';
 
+/** 服务端账号级权益详情(供 /api/entitlements 回传客户端展示)。 */
+export interface ServerEntitlementDetail {
+  tier: ServerTier;
+  /** 'pro' | 'premium' | 'trial' | 'free' | null(unknown 时) */
+  plan: string | null;
+  /** 试用剩余天数(0 = 无试用/已过);仅 tier 由试用判定时 > 0。 */
+  trialDaysLeft: number;
+}
+
+/** 免费试用期(与客户端 entitlement.TRIAL_DAYS 对齐)。 */
+const SERVER_TRIAL_DAYS = 21;
+
 /** 服务端权益强制总闸。默认关(骨架 inert);真源接上后置 '1' 开启。 */
 export function serverEntitlementEnforced(): boolean {
   return envValue('NESIO_SERVER_ENTITLEMENT') === '1';
 }
 
-/** 权益真源表名(列:user_id / plan)。未配 → 未接源。 */
+/** 权益真源表名(列:user_id / plan / trial_started_at ...)。未配 → 未接源。 */
 function entitlementTable(): string {
   return envValue('NESIO_ENTITLEMENT_TABLE') || '';
 }
 
-/**
- * 读用户的服务端权益档。返回 'unknown' 表示「不强制」(总闸未开 / 真源未接 / 查询失败),
- * 调用方必须据此 fail-open。只有真源明确返回非 pro 才是 'free'。
- */
-export async function readServerTier(accessToken: string | null): Promise<ServerTier> {
-  if (!serverEntitlementEnforced()) return 'unknown';       // ① 总闸未开
-  if (!accessToken) return 'unknown';
+/** 解析强制上下文:总闸开 + supabase 配齐 + 真实 uid。任一缺失 → null(fail-open)。 */
+async function resolveEntitlementContext(accessToken: string | null): Promise<
+  { url: string; serviceKey: string; table: string; uid: string } | null
+> {
+  if (!serverEntitlementEnforced()) return null;            // ① 总闸未开
+  if (!accessToken) return null;
   const url = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
   const serviceKey = envValue('SUPABASE_SERVICE_ROLE_KEY');
   const table = entitlementTable();
-  if (!url || !serviceKey || !table) return 'unknown';      // ② 真源未接
+  if (!url || !serviceKey || !table) return null;           // ② 真源未接
+  const uid = await getSupabaseUserId(accessToken);
+  if (!uid) return null;
+  return { url, serviceKey, table, uid };
+}
+
+function trialDaysLeftFrom(startedAt: string | null | undefined): number {
+  if (!startedAt) return 0;
+  const start = Date.parse(startedAt);
+  if (!Number.isFinite(start)) return 0;
+  const used = (Date.now() - start) / 86_400_000;
+  return Math.max(0, Math.ceil(SERVER_TRIAL_DAYS - used));
+}
+
+/**
+ * 首登兜底:确保用户在真源表有一行、并落试用起点(账号级,防清缓存/重装重置 —— 报告 #6)。
+ * on_conflict=user_id + ignore-duplicates:已有行原样保留(不覆盖 plan / 已有 trial 起点)。
+ * best-effort:总闸未开/未接源/失败都静默(不阻塞登录)。
+ */
+export async function ensureServerEntitlementRow(accessToken: string | null): Promise<void> {
+  const ctx = await resolveEntitlementContext(accessToken);
+  if (!ctx) return;
   try {
-    const uid = await getSupabaseUserId(accessToken);
-    if (!uid) return 'unknown';
-    const res = await fetch(
-      `${url}/rest/v1/${encodeURIComponent(table)}?user_id=eq.${encodeURIComponent(uid)}&select=plan`,
-      { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` }, cache: 'no-store' },
-    );
-    if (!res.ok) return 'unknown';                           // ③ 查询失败 → 不锁真用户
-    const rows = (await res.json()) as Array<{ plan?: string }>;
-    const plan = Array.isArray(rows) ? rows[0]?.plan : undefined;
-    if (plan === 'pro' || plan === 'premium') return 'pro';
-    return 'free';                                           // 有源、明确非 pro → 唯一强制分支
+    const nowIso = new Date().toISOString();
+    await fetch(`${ctx.url}/rest/v1/${encodeURIComponent(ctx.table)}?on_conflict=user_id`, {
+      method: 'POST',
+      headers: {
+        apikey: ctx.serviceKey,
+        Authorization: `Bearer ${ctx.serviceKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=ignore-duplicates,return=minimal',
+      },
+      body: JSON.stringify([{ user_id: ctx.uid, plan: 'free', trial_started_at: nowIso }]),
+      cache: 'no-store',
+    });
   } catch {
-    return 'unknown';
+    /* best-effort */
   }
+}
+
+/**
+ * 读账号级权益详情。tier==='unknown' 表示「不强制」(总闸未开/未接源/查询失败),调用方 fail-open。
+ * 判定顺序:① 付费 Pro(plan pro/premium 且订阅未过期)→ pro;② 试用未过 → pro(trial);③ 其余 free。
+ */
+export async function readServerEntitlementDetail(accessToken: string | null): Promise<ServerEntitlementDetail> {
+  const ctx = await resolveEntitlementContext(accessToken);
+  if (!ctx) return { tier: 'unknown', plan: null, trialDaysLeft: 0 };
+  try {
+    const res = await fetch(
+      `${ctx.url}/rest/v1/${encodeURIComponent(ctx.table)}?user_id=eq.${encodeURIComponent(ctx.uid)}&select=plan,trial_started_at,current_period_end`,
+      { headers: { apikey: ctx.serviceKey, Authorization: `Bearer ${ctx.serviceKey}` }, cache: 'no-store' },
+    );
+    if (!res.ok) return { tier: 'unknown', plan: null, trialDaysLeft: 0 }; // ③ 查询失败 → 不锁真用户
+    const rows = (await res.json()) as Array<{ plan?: string; trial_started_at?: string; current_period_end?: string }>;
+    const row = Array.isArray(rows) ? rows[0] : undefined;
+    const plan = row?.plan;
+    const periodOk = !row?.current_period_end || Date.parse(row.current_period_end) > Date.now();
+    if ((plan === 'pro' || plan === 'premium') && periodOk) {
+      return { tier: 'pro', plan, trialDaysLeft: 0 };
+    }
+    const trialLeft = trialDaysLeftFrom(row?.trial_started_at);
+    if (trialLeft > 0) return { tier: 'pro', plan: 'trial', trialDaysLeft: trialLeft };
+    return { tier: 'free', plan: plan || 'free', trialDaysLeft: 0 };      // 有源、明确非 pro → 强制
+  } catch {
+    return { tier: 'unknown', plan: null, trialDaysLeft: 0 };
+  }
+}
+
+/**
+ * 读用户的服务端权益 tier。返回 'unknown' 表示「不强制」,调用方必须据此 fail-open。
+ */
+export async function readServerTier(accessToken: string | null): Promise<ServerTier> {
+  return (await readServerEntitlementDetail(accessToken)).tier;
 }
 
 /**
