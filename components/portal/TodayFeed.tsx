@@ -189,8 +189,8 @@ export default function TodayFeed({
     const nameRaw = displayName.trim();
     const name = nameRaw.length > 0 && nameRaw.length <= 12 && !GENERIC_NAMES.has(nameRaw.toLowerCase()) && !GENERIC_NAMES.has(nameRaw) ? nameRaw : '';
     const hello = hourNow < 11
-      ? L(uiLocale, '早', 'Morning')
-      : isEvening ? L(uiLocale, '晚上好', 'Evening') : L(uiLocale, '下午好', 'Afternoon');
+      ? L(uiLocale, '早', 'Good morning')
+      : isEvening ? L(uiLocale, '晚上好', 'Good evening') : L(uiLocale, '下午好', 'Good afternoon');
     const prefix = name ? `${name},${hello}。` : `${hello}。`;
 
     if (receipt.realTotal === 0) {

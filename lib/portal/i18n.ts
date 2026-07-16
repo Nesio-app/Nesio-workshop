@@ -626,7 +626,7 @@ const STRINGS = {
     nightLaterLabel: '你反馈后逐步调整',
     /* ── Onboarding 补全(REG-006)── */
     onboardingWelcomeDesc: '把重要的事放进来，需要时找得到。你分享进来的内容，都会先变成可确认的线索。',
-    onboardingStart: '开始使用 →',
+    onboardingStart: '先记一件事',
     onboardingSkip: '跳过',
     onboardingDefaultFriendName: '朋友',
     onboardingAuthHelloTemplate: '你好，{name}',
@@ -1351,7 +1351,7 @@ const STRINGS = {
     nightLaterLabel: 'Adjusts gradually with your feedback',
     /* ── Onboarding completion (REG-006) ── */
     onboardingWelcomeDesc: 'Put important things in, and find them later. What you share first becomes clues you can confirm.',
-    onboardingStart: 'Get started →',
+    onboardingStart: 'Add one thing',
     onboardingSkip: 'Skip',
     onboardingDefaultFriendName: 'Friend',
     onboardingAuthHelloTemplate: 'Hello, {name}',
