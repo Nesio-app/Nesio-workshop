@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { envValue } from '@/lib/portal/env';
 import { getSupabaseUserId } from '@/lib/portal/integrations';
+import { logDropped } from '@/lib/portal/storage-health';
 
 export const runtime = 'nodejs';
 
@@ -47,9 +48,24 @@ export async function POST(req: NextRequest) {
       body: form.toString(),
       cache: 'no-store',
     });
-    const data = (await res.json().catch(() => ({}))) as { url?: string };
+    const data = (await res.json().catch(() => ({}))) as {
+      url?: string;
+      error?: { message?: string; code?: string; param?: string; type?: string };
+    };
     if (!res.ok || !data.url) {
-      return NextResponse.json({ ok: false, error: 'stripe_checkout_failed' }, { status: 502 });
+      // 把 Stripe 真错因透出 —— 否则客户端静默降级 waitlist,付费为何不通谁也看不见。
+      // Stripe 错误信息不含密钥(只引用 price id / 模式),可安全回传 + 记 Vercel 日志。
+      logDropped('billing.checkout', data.error?.message || `stripe http ${res.status}`);
+      return NextResponse.json(
+        {
+          ok: false,
+          error: 'stripe_checkout_failed',
+          detail: data.error?.message || null,
+          code: data.error?.code || null,
+          param: data.error?.param || null,
+        },
+        { status: 502 },
+      );
     }
     return NextResponse.json({ ok: true, url: data.url });
   } catch {

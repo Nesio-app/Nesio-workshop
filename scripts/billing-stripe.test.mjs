@@ -43,6 +43,11 @@ assert.match(se, /resolution=merge-duplicates/, 'merge-duplicates:只覆盖传�
 const settings = read('../components/portal/SettingsSheets.tsx');
 assert.match(settings, /\/api\/billing\/checkout/, '会员页调 checkout');
 assert.match(settings, /window\.location\.href = data\.url/, '成功 → 跳转 Stripe');
-assert.match(settings, /optIn\(\);[\s\S]*503\/失败/, '503/失败 → 降级 waitlist');
+assert.match(settings, /optIn\(\);[\s\S]*503 真·未配/, '503 真·未配 → 降级 waitlist');
+assert.match(settings, /stripe_checkout_failed[\s\S]{0,80}setBillingError/, '502 拒结账 → 显真错因(不静默当 waitlist)');
+
+// checkout 路由把 Stripe 真错因透出(诊断:否则付费为何不通谁也看不见)
+assert.match(checkout, /logDropped\('billing\.checkout'/, 'Stripe 拒结账记 Vercel 日志');
+assert.match(checkout, /detail: data\.error\?\.message/, '回传 Stripe 错误 message(不含密钥,安全)');
 
 console.log('billing-stripe: OK');

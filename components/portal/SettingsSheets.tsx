@@ -984,25 +984,29 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
   const [notified, setNotified] = useState(false);
   const [upgradeBusy, setUpgradeBusy] = useState(false);
   const [billingHint, setBillingHint] = useState<'signin' | null>(null);
+  const [billingError, setBillingError] = useState('');
 
   useEffect(() => {
     if (!open) return;
     try { setNotified(localStorage.getItem(PLAN_NOTIFY_KEY) === '1'); } catch { /* ignore */ }
   }, [open]);
 
-  // Web Stripe 订阅结账。配了 STRIPE_* → 跳 Stripe 付款;未配(503)→ 优雅降级为 waitlist 登记
-  // (等价原「通知我」),现网无支付时不误导。
+  // Web Stripe 订阅结账。配了 STRIPE_* + Stripe 接受 → 跳 Stripe 付款;真·未配(503)→ 优雅降级为
+  // waitlist 登记;Stripe 拒结账(502,价格/模式/配置问题)→ 把真错因显出来,别静默当成 waitlist。
   async function handleUpgrade() {
     setBillingHint(null);
+    setBillingError('');
     setUpgradeBusy(true);
     try {
       const res = await fetch('/api/billing/checkout', { method: 'POST' });
       if (res.status === 401) { setBillingHint('signin'); return; }
-      if (res.ok) {
-        const data = await res.json().catch(() => ({})) as { url?: string };
-        if (data.url) { window.location.href = data.url; return; } // 跳转 Stripe Checkout
+      const data = await res.json().catch(() => ({})) as { url?: string; error?: string; detail?: string; code?: string };
+      if (res.ok && data.url) { window.location.href = data.url; return; } // 跳转 Stripe Checkout
+      if (data.error === 'stripe_checkout_failed') {
+        setBillingError(data.detail || data.code || 'Stripe checkout failed'); // 真错因显给用户(诊断)
+        return;
       }
-      optIn(); // 503/失败 → 登记 waitlist,开放时通知
+      optIn(); // 503 真·未配 → 登记 waitlist,开放时通知
     } catch {
       optIn();
     } finally {
@@ -1091,6 +1095,11 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
       {billingHint === 'signin' && (
         <p style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '0.5rem' }}>
           {L(dict, '登录后即可升级。', 'Sign in first to upgrade.')}
+        </p>
+      )}
+      {billingError && (
+        <p style={{ fontSize: '0.72rem', color: 'var(--status-risk, #d9534f)', textAlign: 'center', marginTop: '0.5rem', wordBreak: 'break-word' }}>
+          {L(dict, '支付未能发起:', 'Checkout failed: ')}{billingError}
         </p>
       )}
       <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '0.8rem' }}>
