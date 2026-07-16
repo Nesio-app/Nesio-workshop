@@ -47,6 +47,69 @@ const PRO_KEY = 'nesio-pro-entitlement-v1';
 const TRIAL_START_KEY = 'nesio-trial-start-v1';
 export const TIER_UPDATED_EVENT = 'nesio-tier-updated';
 
+/**
+ * 服务端权益快照缓存(账号级真源的本地镜像)。/api/entitlements 返回后写这里,getTier() 优先读它 ——
+ * 使「清缓存/换设备/换浏览器就白嫖 Pro」失效(报告 #6:此前 Pro 门 100% 客户端 localStorage 置 1)。
+ * 缓存仅是展示/快路径,真正的付费门在服务端 guardServerEntitlement;这里 enforced 为真且判到 free
+ * 时前端也据实收权,不再被本地 PRO_KEY 蒙蔽。
+ */
+const SERVER_CACHE_KEY = 'nesio-server-entitlement-v1';
+
+/** 服务端权益快照(镜像 /api/entitlements 的 server* 字段)。 */
+interface ServerEntitlementCache {
+  /** 'free' | 'pro' | 'unknown'(unknown=服务端未强制,回退本地判定) */
+  tier: 'free' | 'pro' | 'unknown';
+  /** 服务端是否已开启强制(总闸)。false → 完全回退本地。 */
+  enforced: boolean;
+  /** 服务端账号级试用剩余天数。 */
+  trialDaysLeft: number;
+}
+
+function readServerEntitlementCache(): ServerEntitlementCache | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(SERVER_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<ServerEntitlementCache>;
+    const tier = parsed.tier === 'free' || parsed.tier === 'pro' ? parsed.tier : 'unknown';
+    return {
+      tier,
+      enforced: parsed.enforced === true,
+      trialDaysLeft: Number.isFinite(parsed.trialDaysLeft) ? Number(parsed.trialDaysLeft) : 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 拉取服务端账号级权益并落缓存(登录后调用)。best-effort:任何失败都静默(保留旧缓存/回退本地),
+ * 绝不因权益接口抖动锁死真用户。返回是否成功刷新。
+ */
+export async function refreshServerEntitlement(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  try {
+    const res = await fetch('/api/entitlements', { credentials: 'include', cache: 'no-store' });
+    if (!res.ok) return false;
+    const data = (await res.json()) as {
+      serverTier?: string;
+      serverEntitlementEnforced?: boolean;
+      serverTrialDaysLeft?: number;
+    };
+    const tier = data.serverTier === 'free' || data.serverTier === 'pro' ? data.serverTier : 'unknown';
+    const cache: ServerEntitlementCache = {
+      tier,
+      enforced: data.serverEntitlementEnforced === true,
+      trialDaysLeft: Number.isFinite(data.serverTrialDaysLeft) ? Number(data.serverTrialDaysLeft) : 0,
+    };
+    localStorage.setItem(SERVER_CACHE_KEY, JSON.stringify(cache));
+    window.dispatchEvent(new CustomEvent(TIER_UPDATED_EVENT));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** 免费试用期:21 天(3 周)—— 产品文案:刚好养成一个记录的好习惯。 */
 export const TRIAL_DAYS = 21;
 
@@ -73,6 +136,10 @@ export function trialDaysLeft(): number {
 export function getTier(): Tier {
   if (typeof window === 'undefined') return 'free';
   try {
+    // 服务端账号级真源优先:总闸开且明确判到 pro/free 时,以它为准 —— 清缓存/换设备不再白嫖 Pro,
+    // 到期也不再被本地 PRO_KEY 蒙蔽(报告 #6)。unknown / 未强制 → 回退本地判定(下方)。
+    const server = readServerEntitlementCache();
+    if (server?.enforced && (server.tier === 'pro' || server.tier === 'free')) return server.tier;
     if (localStorage.getItem(PRO_KEY) === '1') return 'pro';
     // 试用期内按 Pro 对待(分层启用后生效;PWA 分层未启用本就全放行,无感)
     if (trialDaysLeft() > 0) return 'pro';

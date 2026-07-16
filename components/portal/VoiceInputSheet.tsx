@@ -12,7 +12,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { getRecentNodes, getLifeGraph, updateLifeNode, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { signalToLifeNode } from '@/lib/life-domain';
-import { searchSignalsSemantically } from '@/lib/life-domain/signal-search';
+import { searchSignalsSemantically, searchSignalsWithCloudFallback } from '@/lib/life-domain/signal-search';
+import { markRetrievalFeedback } from '@/lib/life-domain/retrieval-feedback';
 import {
   createSignalWithNode,
   extractContext,
@@ -435,8 +436,14 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       stopListening();
       setSendState('analyzing');
       const allCandidates = getRecentNodes(80).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
-      // Signal 事实面语义搜索优先(cutover 后读事实缓存),模糊/近期节点补位
-      const semanticFirst = searchSignalsSemantically(t, 20)
+      // Signal 事实面语义搜索优先(cutover 后读事实缓存),模糊/近期节点补位。
+      // 已登录用户:先经云端 RAG 回溯(pgvector/文本)再本地并轨 —— 本地事实缓存
+      // 只是全量图谱的近端切片,深问需要回捞更早/别端只落云的事实(OPEN-WORLD ②)。
+      // best-effort:云端不可达时 searchSignalsWithCloudFallback 内部回退纯本地。
+      const semanticSignals = canUsePrivateData
+        ? await searchSignalsWithCloudFallback(t, 30)
+        : searchSignalsSemantically(t, 20);
+      const semanticFirst = semanticSignals
         .map(signalToLifeNode)
         .filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
       const fuzzyFirst = searchLifeGraphFuzzy(t, 20);
@@ -753,6 +760,20 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
                   <div key={node.id} className="nesio-ask-citation-card">
                     <span className="nesio-ask-citation-name">{node.name}</span>
                     {node.reason && <span className="nesio-ask-citation-reason">{node.reason}</span>}
+                    {/* 开放世界 ④:检索反馈闭环 —— 「不是这个」落成一等公民 Signal(跨端/可撤),
+                        下次检索到同一目标即自动剔除。就地从当前来源里移除。 */}
+                    <button
+                      type="button"
+                      className="nesio-ask-citation-dismiss"
+                      aria-label={L(dict, '不是这个', 'Not this')}
+                      title={L(dict, '不是这个', 'Not this')}
+                      onClick={() => {
+                        markRetrievalFeedback(node.id, 'not_this');
+                        setAskResults((prev) => prev.filter((n) => n.id !== node.id));
+                      }}
+                    >
+                      ×
+                    </button>
                   </div>
                 ))}
               </div>

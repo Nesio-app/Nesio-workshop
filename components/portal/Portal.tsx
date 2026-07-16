@@ -10,7 +10,7 @@ import TellNesioSheet, { type CaptureMode } from './TellNesioSheet';
 import PortalBottomNav from './PortalBottomNav';
 import PortalOnboarding from './PortalOnboarding';
 import InstallPrompt from './InstallPrompt';
-import { canUse, canOpenFreeze } from '@/lib/portal/entitlement';
+import { canUse, canOpenFreeze, refreshServerEntitlement } from '@/lib/portal/entitlement';
 import { reconcileLocalOwner, claimLocalDataForUser, purgeAllLocalUserData, setLocalOwner, getLocalOwner } from '@/lib/portal/local-owner';
 import { archiveCurrentSpace, restoreArchivedSpace } from '@/lib/portal/account-spaces';
 import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
@@ -520,6 +520,9 @@ export default function Portal() {
   // best-effort:未登录/离线静默,不阻塞渲染;20s 节流由 syncMemoryWithCloud 内部保证。
   useEffect(() => {
     if (!canUsePrivateRuntime) return;
+    // 账号级权益真源:登录即拉一次 /api/entitlements 落缓存 —— getTier() 优先读它,
+    // 清缓存/换设备/换浏览器不再白嫖 Pro,到期也据实收权(报告 #6)。best-effort。
+    void refreshServerEntitlement();
     void syncMemoryWithCloud();
     // 批次199 P2:同步「学习态」(被纠偏的 ranker + 学到的偏好)—— 登录即回灌 union 合并,
     // 并订阅反馈总线做防抖回推。让这份「抄不走的私有累积」跨端一致,换机不蒸发。

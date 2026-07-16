@@ -11863,9 +11863,10 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   margin: 0 0 0.2rem;
 }
 .nesio-ask-citation-card {
-  padding: 0.5rem 0.75rem;
+  position: relative;
+  padding: 0.5rem 1.9rem 0.5rem 0.75rem;
   background: var(--portal-card-bg, #fff);
-  border: 1px solid rgba(88,140,227,0.15);
+  border: 1px solid var(--portal-accent-border);
   border-radius: 0.6rem;
   display: flex;
   flex-direction: column;
@@ -11880,6 +11881,30 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   font-size: 0.75rem;
   color: var(--portal-muted);
   line-height: 1.4;
+}
+/* 开放世界 ④:「不是这个」剔除按钮。措辞克制(warm-coach),仅 hover 时浮出风险色 —— 不制造焦虑。 */
+.nesio-ask-citation-dismiss {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  width: 1.2rem;
+  height: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-size: 0.95rem;
+  line-height: 1;
+  color: var(--portal-muted);
+  background: transparent;
+  border: none;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.nesio-ask-citation-dismiss:hover {
+  background: var(--status-risk-soft);
+  color: var(--status-risk);
 }
 .nesio-ask-again-btn {
   display: flex;

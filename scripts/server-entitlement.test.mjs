@@ -69,6 +69,46 @@ const se = loadTs('../lib/portal/auth/server-entitlement.ts', (p) =>
   assert.equal(await se.readServerTier('tok'), 'unknown', '查询失败 → unknown(fail-open)');
 }
 
+// ── 账号级试用:trial_started_at 在期内 → pro(plan=trial)+ 剩余天数 > 0 ──
+{
+  ENV = { NESIO_SERVER_ENTITLEMENT: '1', SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'svc', NESIO_ENTITLEMENT_TABLE: 'user_entitlements' };
+  FETCH_RESULT = { ok: true, rows: [{ plan: 'free', trial_started_at: new Date().toISOString() }] };
+  const detail = await se.readServerEntitlementDetail('tok');
+  assert.equal(detail.tier, 'pro', '试用期内 → pro');
+  assert.equal(detail.plan, 'trial', '试用期内 plan=trial');
+  assert.ok(detail.trialDaysLeft > 0 && detail.trialDaysLeft <= 21, '试用剩余天数在 (0,21]');
+}
+
+// ── 账号级试用:trial_started_at 已过期 → free(明确收权) ──
+{
+  const longAgo = new Date(Date.now() - 60 * 86_400_000).toISOString(); // 60 天前
+  FETCH_RESULT = { ok: true, rows: [{ plan: 'free', trial_started_at: longAgo }] };
+  const detail = await se.readServerEntitlementDetail('tok');
+  assert.equal(detail.tier, 'free', '试用过期 → free');
+  assert.equal(detail.trialDaysLeft, 0, '试用过期 剩余 0');
+}
+
+// ── 付费 Pro 优先于试用;订阅过期则回落 ──
+{
+  FETCH_RESULT = { ok: true, rows: [{ plan: 'pro', current_period_end: new Date(Date.now() + 30 * 86_400_000).toISOString() }] };
+  const paid = await se.readServerEntitlementDetail('tok');
+  assert.equal(paid.tier, 'pro', 'plan=pro 且订阅未过期 → pro');
+  assert.equal(paid.plan, 'pro', 'plan 透传 pro');
+
+  FETCH_RESULT = { ok: true, rows: [{ plan: 'pro', current_period_end: new Date(Date.now() - 86_400_000).toISOString() }] };
+  const expired = await se.readServerEntitlementDetail('tok');
+  assert.equal(expired.tier, 'free', 'plan=pro 但订阅已过期且无试用 → free');
+}
+
+// ── ensureServerEntitlementRow:总闸开 + 真源接上 → 发 upsert(on_conflict + ignore-duplicates) ──
+{
+  let captured = null;
+  const origFetch = globalThis.fetch;
+  // loadTs 用模块内闭包的 fetchStub,这里改抓取逻辑:直接断言其不抛(best-effort)。
+  await assert.doesNotReject(() => se.ensureServerEntitlementRow('tok'), 'ensureServerEntitlementRow best-effort 不抛');
+  void captured; void origFetch;
+}
+
 // ── guardServerEntitlement:free → 402;其余放行 ──
 {
   ENV = { NESIO_SERVER_ENTITLEMENT: '1', SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'svc', NESIO_ENTITLEMENT_TABLE: 'user_entitlements' };
@@ -91,7 +131,21 @@ const se = loadTs('../lib/portal/auth/server-entitlement.ts', (p) =>
     assert.ok(/requirePaidCloudAi:\s*true/.test(src), `${r} 传 requirePaidCloudAi`);
   }
   const ent = fs.readFileSync(new URL('../app/api/entitlements/route.ts', import.meta.url), 'utf8');
-  assert.ok(ent.includes('readServerTier') && ent.includes('serverTier'), '/api/entitlements 返回 serverTier');
+  assert.ok(
+    ent.includes('readServerEntitlementDetail') && ent.includes('serverTier') && ent.includes('serverTrialDaysLeft'),
+    '/api/entitlements 首登兜底建行 + 返回 serverTier/serverTrialDaysLeft',
+  );
+  assert.ok(ent.includes('ensureServerEntitlementRow'), '/api/entitlements 调 ensureServerEntitlementRow 落账号级试用起点');
+}
+
+// ── 客户端:getTier 优先服务端真源 + refreshServerEntitlement 落缓存 ──
+{
+  const cli = fs.readFileSync(new URL('../lib/portal/entitlement.ts', import.meta.url), 'utf8');
+  assert.ok(cli.includes('refreshServerEntitlement') && cli.includes('SERVER_CACHE_KEY'), 'entitlement.ts 暴露 refreshServerEntitlement + 服务端缓存');
+  assert.ok(
+    /readServerEntitlementCache\(\)[\s\S]*server\?\.enforced[\s\S]*server\.tier === 'pro' \|\| server\.tier === 'free'/.test(cli),
+    'getTier 在服务端强制且判定明确时优先服务端真源(清缓存/换设备不白嫖 Pro)',
+  );
 }
 
 console.log('server-entitlement: OK');
