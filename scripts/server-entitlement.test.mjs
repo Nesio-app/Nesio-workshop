@@ -42,10 +42,18 @@ const se = loadTs('../lib/portal/auth/server-entitlement.ts', (p) =>
   assert.equal(await se.serverEntitlementEnforced(), false, 'enforced 默认 false');
 }
 
-// ── 总闸开但真源未接(无表名)→ unknown ──
+// ── 修「付费不生效」footgun:总闸开 + 无表名 → 读侧默认 user_entitlements(与写侧对称,不再 inert)──
+// 此前:读侧未配 NESIO_ENTITLEMENT_TABLE 就退空→unknown,而写侧默认写 user_entitlements,
+// 结果 Stripe 付了钱写进表、app 读不出 Pro。现在读侧同样默认 user_entitlements。
 {
-  ENV = { NESIO_SERVER_ENTITLEMENT: '1', SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'svc' };
-  assert.equal(await se.readServerTier('tok'), 'unknown', '真源未接 → unknown');
+  ENV = { NESIO_SERVER_ENTITLEMENT: '1', SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'svc' }; // 故意不配表名
+  FETCH_RESULT = { ok: true, rows: [{ plan: 'pro' }] };
+  assert.equal(await se.readServerTier('tok'), 'pro', '无表名也默认 user_entitlements → 读到 pro(修付费不生效)');
+}
+// 总闸未开时,配不配表名都 inert
+{
+  ENV = { SUPABASE_URL: 'https://x.supabase.co', SUPABASE_SERVICE_ROLE_KEY: 'svc' };
+  assert.equal(await se.readServerTier('tok'), 'unknown', '总闸未开 → 恒 unknown(表名默认不影响总闸)');
 }
 
 // ── 真源接上 + 查到 pro → pro ──

@@ -41,9 +41,16 @@ export function serverEntitlementEnforced(): boolean {
   return envValue('NESIO_SERVER_ENTITLEMENT') === '1';
 }
 
-/** 权益真源表名(列:user_id / plan / trial_started_at ...)。未配 → 未接源。 */
+/**
+ * 权益真源表名(列:user_id / plan / trial_started_at ...)。
+ * 默认 'user_entitlements'(= supabase-user-entitlements-v1.sql 建的那张表),与写侧
+ * writeEntitlementByUid 一致 —— 修「读写不对称」footgun:此前读侧未配 NESIO_ENTITLEMENT_TABLE
+ * 就退空→resolveEntitlementContext 返回 null→tier 'unknown',而写侧默认写 user_entitlements,
+ * 结果 Stripe 付了钱写进了表、app 却读不出 Pro(付费不生效)。总闸 NESIO_SERVER_ENTITLEMENT
+ * 仍是唯一开关(未开一律 inert),置 '1' 即够,不必再单独配表名。
+ */
 function entitlementTable(): string {
-  return envValue('NESIO_ENTITLEMENT_TABLE') || '';
+  return envValue('NESIO_ENTITLEMENT_TABLE') || 'user_entitlements';
 }
 
 /** 解析强制上下文:总闸开 + supabase 配齐 + 真实 uid。任一缺失 → null(fail-open)。 */
