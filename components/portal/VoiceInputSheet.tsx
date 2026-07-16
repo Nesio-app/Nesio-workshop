@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { getRecentNodes, getLifeGraph, updateLifeNode, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { signalToLifeNode } from '@/lib/life-domain';
-import { searchSignalsSemantically } from '@/lib/life-domain/signal-search';
+import { searchSignalsSemantically, searchSignalsWithCloudFallback } from '@/lib/life-domain/signal-search';
 import {
   createSignalWithNode,
   extractContext,
@@ -422,8 +422,14 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       stopListening();
       setSendState('analyzing');
       const allCandidates = getRecentNodes(80).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
-      // Signal 事实面语义搜索优先(cutover 后读事实缓存),模糊/近期节点补位
-      const semanticFirst = searchSignalsSemantically(t, 20)
+      // Signal 事实面语义搜索优先(cutover 后读事实缓存),模糊/近期节点补位。
+      // 已登录用户:先经云端 RAG 回溯(pgvector/文本)再本地并轨 —— 本地事实缓存
+      // 只是全量图谱的近端切片,深问需要回捞更早/别端只落云的事实(OPEN-WORLD ②)。
+      // best-effort:云端不可达时 searchSignalsWithCloudFallback 内部回退纯本地。
+      const semanticSignals = canUsePrivateData
+        ? await searchSignalsWithCloudFallback(t, 30)
+        : searchSignalsSemantically(t, 20);
+      const semanticFirst = semanticSignals
         .map(signalToLifeNode)
         .filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
       const fuzzyFirst = searchLifeGraphFuzzy(t, 20);
