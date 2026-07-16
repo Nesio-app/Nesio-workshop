@@ -22,8 +22,21 @@ CREATE TABLE IF NOT EXISTS public.user_entitlements (
   trial_started_at timestamptz,                     -- 账号级试用起点(迁自设备级 localStorage)
   expires_at timestamptz,                           -- 订阅到期(续订回调刷新);null=不过期/非订阅
   source text,                                       -- 'storekit' | 'stripe' | 'grant' 等,溯源用
+  -- Stripe Web 收费(billing/webhook 写、readServerEntitlementDetail 读 current_period_end 判过期):
+  stripe_customer_id text,
+  stripe_subscription_id text,
+  stripe_status text,                               -- Stripe 订阅状态:active/trialing/canceled/...
+  current_period_end timestamptz,                   -- 本计费周期结束;readServerEntitlementDetail 据此判 pro 是否过期
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+
+-- ⚠️ 存量表补列:CREATE TABLE IF NOT EXISTS **不会**给已存在的表加列。若表是早前(仅 StoreKit 版)
+-- 建的,缺 stripe_*/current_period_end 列 —— webhook 的 upsert 因「列不存在」整条失败,plan='pro'
+-- 永远写不进 → Stripe 付完不认 Pro。下面 ADD COLUMN IF NOT EXISTS 幂等补齐(部署侧必须对线上库跑一次)。
+ALTER TABLE public.user_entitlements ADD COLUMN IF NOT EXISTS stripe_customer_id text;
+ALTER TABLE public.user_entitlements ADD COLUMN IF NOT EXISTS stripe_subscription_id text;
+ALTER TABLE public.user_entitlements ADD COLUMN IF NOT EXISTS stripe_status text;
+ALTER TABLE public.user_entitlements ADD COLUMN IF NOT EXISTS current_period_end timestamptz;
 
 ALTER TABLE public.user_entitlements ENABLE ROW LEVEL SECURITY;
 
