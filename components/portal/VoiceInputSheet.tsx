@@ -24,6 +24,7 @@ import { IconBox, IconCalendar, IconCamera, IconClock, IconMapPin, IconUser } fr
 import { L } from '@/lib/portal/i18n';
 import { prefetchCaptureLocation } from '@/lib/portal/capture-location';
 import { looksLikeTask } from '@/lib/portal/task-heuristics';
+import { permissionRationale, shouldExplainPermission, markPermissionExplained } from '@/lib/portal/permission-rationale';
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { useSheetDrag } from './use-sheet-drag';
@@ -327,6 +328,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
+  const [micPrimer, setMicPrimer] = useState(false); // 批次216:首次点麦克风先讲「为什么」再弹系统框
   const [sendState, setSendState] = useState<SendState>('idle');
   const [intentLabel, setIntentLabel] = useState('');
   const [micError, setMicError] = useState('');
@@ -413,6 +415,17 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   }
 
   function stopListening() { recRef.current?.stop(); setListening(false); }
+  // 批次216:第一次点麦克风,先弹前置说明(讲清用途 + 端上/不上传),再触发系统框;
+  // 说明过一次(localStorage)后直接开始。拒绝的优雅降级(退打字)已在 startListening 的 onerror 里。
+  function handleMicTap() {
+    if (shouldExplainPermission('microphone')) { setMicPrimer(true); return; }
+    startListening();
+  }
+  function allowMicAndStart() {
+    markPermissionExplained('microphone');
+    setMicPrimer(false);
+    startListening();
+  }
 
   async function handleSend() {
     const t = text.trim();
@@ -584,6 +597,19 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
 
         {/* 批次189:确认卡 + 编辑卡整块删除 —— 告诉念念直接存,日期/重复移到输入区折叠「详情」。 */}
 
+        {/* 批次216:麦克风权限前置说明 —— 先讲为什么再弹系统框,把「端上/不上传」卖点说出来 */}
+        {micPrimer && (
+          <div style={{ margin: '0 0 0.6rem', padding: '0.9rem 1rem', borderRadius: 14, background: 'var(--portal-card, #fff)', border: '1px solid var(--portal-line, #d7deea)', textAlign: 'center' }}>
+            <div style={{ fontSize: '1.7rem', lineHeight: 1 }} aria-hidden>{permissionRationale('microphone').icon}</div>
+            <p style={{ fontWeight: 600, margin: '0.5rem 0 0.25rem' }}>{permissionRationale('microphone').title[dict === 'en' ? 1 : 0]}</p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--portal-muted, #8a94a6)', lineHeight: 1.6, margin: 0 }}>{permissionRationale('microphone').body[dict === 'en' ? 1 : 0]}</p>
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.8rem' }}>
+              <button type="button" onClick={() => setMicPrimer(false)} style={{ flex: 1, padding: '0.55rem', borderRadius: 10, border: '1px solid var(--portal-line, #d7deea)', background: 'transparent', color: 'var(--portal-muted, #8a94a6)', cursor: 'pointer' }}>{L(dict, '以后再说', 'Not now')}</button>
+              <button type="button" className="nesio-ob-primary-btn" onClick={allowMicAndStart} style={{ flex: 1, marginTop: 0 }}>{L(dict, '允许并开始', 'Allow & start')}</button>
+            </div>
+          </div>
+        )}
+
         {/* Text input fallback */}
         {sendState !== 'confirm' && (
         <div className="nesio-voice-input-row">
@@ -599,7 +625,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
           <button
             type="button"
             className={`nesio-voice-mic-btn${listening ? ' nesio-voice-mic-btn--active' : ''}`}
-            onClick={listening ? stopListening : startListening}
+            onClick={listening ? stopListening : handleMicTap}
             aria-label={listening ? L(dict, '停止录音', 'Stop recording') : L(dict, '开始录音', 'Start recording')}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="16" height="16">
