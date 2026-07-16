@@ -1,4 +1,10 @@
 import { getSignals, type Signal } from './signal';
+import { retrievalScoreAdjust, isDownranked } from './retrieval-feedback';
+
+/** 检索反馈的目标稳定键:与云端行 evidence.externalId 对齐,回退 signal.id。 */
+function retrievalKey(signal: Signal): string {
+  return signal.evidence?.externalId || signal.id;
+}
 
 export type CloudSignalRow = {
   signal_id?: string;
@@ -68,16 +74,21 @@ export function scoreSignalForQuery(signal: Signal, query: string): number {
   const rel = relevanceScore(signal, query);
   const ageHours = (Date.now() - new Date(signal.capturedAt).getTime()) / 3_600_000;
   const recencyBoost = Number.isFinite(ageHours) ? Math.max(0, 1.2 - ageHours / 168) : 0;
-  return rel + recencyBoost + signal.confidence * 0.8;
+  // 开放世界 ④:用户检索反馈微调排序(「有用」轻升、「不是这个」强降至剔除)。
+  return rel + recencyBoost + signal.confidence * 0.8 + retrievalScoreAdjust(retrievalKey(signal));
 }
 
 export function searchSignalsSemantically(query: string, limit = 8): Signal[] {
   const trimmed = query.trim();
   if (!trimmed) return [];
   return getSignals()
+    // 检索反馈本身是一等公民 Signal(feedback.retrieval),但不该成为检索结果被答出去 —— 剔除。
+    .filter((signal) => !String(signal.type).startsWith('feedback'))
     .map((signal) => ({ signal, rel: relevanceScore(signal, trimmed), score: scoreSignalForQuery(signal, trimmed) }))
     // 门只认查询相关性:必须真的命中查询词/实体才够格,近因/置信只用来排序。
     .filter((entry) => entry.rel > 0)
+    // 开放世界 ④:用户标了「不是这个」的目标直接剔除(不只是降权)。
+    .filter((entry) => !isDownranked(retrievalKey(entry.signal)))
     .sort((a, b) => b.score - a.score)
     .slice(0, limit)
     .map((entry) => entry.signal);
@@ -152,7 +163,10 @@ export async function searchSignalsWithCloudFallback(query: string, limit = 8): 
     });
     if (!response.ok) return localMatches;
     const data = await response.json() as CloudSignalSearchResponse;
-    const cloudSignals = cloudSignalRowsToSignals(data.signals || []);
+    // 开放世界 ④:云端回捞的候选也过一遍「不是这个」剔除(反馈按 targetId 对齐,跨端一致)。
+    const cloudSignals = cloudSignalRowsToSignals(data.signals || []).filter(
+      (signal) => !isDownranked(retrievalKey(signal)),
+    );
     const cloudMatches = data.search?.mode === 'signal_vector_pgvector'
       ? cloudSignals.slice(0, limit)
       : rankSignals(cloudSignals, trimmed, limit);

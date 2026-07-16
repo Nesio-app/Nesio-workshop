@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getRecentNodes, getLifeGraph, updateLifeNode, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { signalToLifeNode } from '@/lib/life-domain';
 import { searchSignalsSemantically, searchSignalsWithCloudFallback } from '@/lib/life-domain/signal-search';
+import { markRetrievalFeedback } from '@/lib/life-domain/retrieval-feedback';
 import {
   createSignalWithNode,
   extractContext,
@@ -733,6 +734,20 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
                   <div key={node.id} className="nesio-ask-citation-card">
                     <span className="nesio-ask-citation-name">{node.name}</span>
                     {node.reason && <span className="nesio-ask-citation-reason">{node.reason}</span>}
+                    {/* 开放世界 ④:检索反馈闭环 —— 「不是这个」落成一等公民 Signal(跨端/可撤),
+                        下次检索到同一目标即自动剔除。就地从当前来源里移除。 */}
+                    <button
+                      type="button"
+                      className="nesio-ask-citation-dismiss"
+                      aria-label={L(dict, '不是这个', 'Not this')}
+                      title={L(dict, '不是这个', 'Not this')}
+                      onClick={() => {
+                        markRetrievalFeedback(node.id, 'not_this');
+                        setAskResults((prev) => prev.filter((n) => n.id !== node.id));
+                      }}
+                    >
+                      ×
+                    </button>
                   </div>
                 ))}
               </div>
