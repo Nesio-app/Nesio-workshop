@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { loadProfileSettings, portalLocaleToDictionaryLocale, PROFILE_UPDATED_EVENT } from '@/lib/portal/profile';
+import { L } from '@/lib/portal/i18n';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { buildDailyReport, type DailyReport } from '@/lib/portal/daily-report';
 import { autoPersistTodayReport } from '@/lib/portal/daily-report-persist';
@@ -50,26 +51,28 @@ import { buildCrossRegionDeliverables } from '@/lib/platform/cross-region/delive
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { isProactiveCardDismissed, type ProactiveCardData, registerDecCards } from './proactive-types';
 
-const EMPTY_SIGNAL_CARDS: RecommendationCard[] = [
-  {
-    id: 'needs-input-public',
-    domain: 'home',
-    domainLabel: '从一件小事开始',
-    confidence: 0.6,
-    urgency: 1,
-    icon: '✦',
-    iconBg: 'var(--chip-periwinkle)',
-    title: '先放进来一件事就好',
-    body: '说一句、拍一下，Nesio 会帮你留到以后找得到。',
-    tags: ['本地优先 · 可确认'],
-    evidence: [],
-    primaryAction: '先记一件事',
-    secondaryAction: '稍后',
-    type: 'standard',
-    expiresAt: new Date(Date.now() + 24 * 3600000).toISOString(),
-    sourceStatus: 'needs_input',
-  },
-];
+function buildEmptySignalCards(loc: string): RecommendationCard[] {
+  return [
+    {
+      id: 'needs-input-public',
+      domain: 'home',
+      domainLabel: L(loc, '从一件小事开始', 'Start with something small'),
+      confidence: 0.6,
+      urgency: 1,
+      icon: '✦',
+      iconBg: 'var(--chip-periwinkle)',
+      title: L(loc, '先放进来一件事就好', 'Just put one thing in'),
+      body: L(loc, '说一句、拍一下，Nesio 会帮你留到以后找得到。', 'Say it or snap it — Nesio keeps it so you can find it later.'),
+      tags: [L(loc, '本地优先 · 可确认', 'Local-first · confirmable')],
+      evidence: [],
+      primaryAction: L(loc, '先记一件事', 'Add one thing'),
+      secondaryAction: L(loc, '稍后', 'Later'),
+      type: 'standard',
+      expiresAt: new Date(Date.now() + 24 * 3600000).toISOString(),
+      sourceStatus: 'needs_input',
+    },
+  ];
+}
 
 async function loadCloudSignals(canUsePrivateData: boolean) {
   if (!canUsePrivateData) return [];
@@ -183,7 +186,8 @@ export function useTodayData(canUsePrivateData: boolean) {
       const myRun = ++runSeqRef.current; // 本次运行序号;被更新的运行取代后不再写 state
       const stale = () => cancelled || myRun !== runSeqRef.current;
       const cloudSignals = await loadCloudSignals(canUsePrivateData);
-      const updated = buildTodayViewModel({ canUsePrivateData, fallbackCards: EMPTY_SIGNAL_CARDS, cloudSignals });
+      const loc = portalLocaleToDictionaryLocale(loadProfileSettings().locale);
+      const updated = buildTodayViewModel({ canUsePrivateData, fallbackCards: buildEmptySignalCards(loc), cloudSignals });
       if (stale()) return;
       setMemoryCount(updated.memoryCount);
       setMemoryNotes(updated.memoryNotes);

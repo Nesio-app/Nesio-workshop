@@ -1301,7 +1301,7 @@ export default function Portal() {
       {memoryReceipt && (
         <div className="nesio-memory-receipt" role="status" aria-live="polite">
           <span className="nesio-memory-receipt-crystal" aria-hidden />
-          <span>{L(dict, '收好了，以后可以找回来。', 'Tucked away — you can find it again later.')}</span>
+          <span>{L(dict, '收好了，以后可以找回来。', 'Kept. You can find it whenever you need it.')}</span>
         </div>
       )}
       <PortalOnboarding />
