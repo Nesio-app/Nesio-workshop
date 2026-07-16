@@ -76,3 +76,32 @@ export async function guardServerEntitlement(accessToken: string | null, feature
   }
   return null;
 }
+
+/**
+ * 按 uid 直接 upsert 权益(Stripe webhook 用:收据校验后写 plan)。不经 accessToken —— uid
+ * 来自已验签的 Stripe 事件(client_reference_id / subscription.metadata.user_id)。
+ * merge-duplicates:只覆盖传入列(plan/stripe_* 等),不动 trial_started_at。
+ * gate 在 supabase 配置(不 gate 总闸:收到钱就该记账,总闸只控「是否强制」)。best-effort。
+ */
+export async function writeEntitlementByUid(userId: string, patch: Record<string, unknown>): Promise<boolean> {
+  const url = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
+  const serviceKey = envValue('SUPABASE_SERVICE_ROLE_KEY');
+  const table = entitlementTable() || 'user_entitlements';
+  if (!url || !serviceKey || !userId) return false;
+  try {
+    const res = await fetch(`${url}/rest/v1/${encodeURIComponent(table)}?on_conflict=user_id`, {
+      method: 'POST',
+      headers: {
+        apikey: serviceKey,
+        Authorization: `Bearer ${serviceKey}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify([{ user_id: userId, ...patch, updated_at: new Date().toISOString() }]),
+      cache: 'no-store',
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}

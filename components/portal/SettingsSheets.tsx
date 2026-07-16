@@ -982,11 +982,33 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
   const locale = usePortalLocale();
   const dict = portalLocaleToDictionaryLocale(locale);
   const [notified, setNotified] = useState(false);
+  const [upgradeBusy, setUpgradeBusy] = useState(false);
+  const [billingHint, setBillingHint] = useState<'signin' | null>(null);
 
   useEffect(() => {
     if (!open) return;
     try { setNotified(localStorage.getItem(PLAN_NOTIFY_KEY) === '1'); } catch { /* ignore */ }
   }, [open]);
+
+  // Web Stripe 订阅结账。配了 STRIPE_* → 跳 Stripe 付款;未配(503)→ 优雅降级为 waitlist 登记
+  // (等价原「通知我」),现网无支付时不误导。
+  async function handleUpgrade() {
+    setBillingHint(null);
+    setUpgradeBusy(true);
+    try {
+      const res = await fetch('/api/billing/checkout', { method: 'POST' });
+      if (res.status === 401) { setBillingHint('signin'); return; }
+      if (res.ok) {
+        const data = await res.json().catch(() => ({})) as { url?: string };
+        if (data.url) { window.location.href = data.url; return; } // 跳转 Stripe Checkout
+      }
+      optIn(); // 503/失败 → 登记 waitlist,开放时通知
+    } catch {
+      optIn();
+    } finally {
+      setUpgradeBusy(false);
+    }
+  }
 
   function optIn() {
     try { localStorage.setItem(PLAN_NOTIFY_KEY, '1'); } catch { /* ignore */ }
@@ -1063,9 +1085,14 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
         </div>
       ))}
 
-      <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1.2rem' }} onClick={optIn} disabled={notified}>
-        {notified ? `✓ ${t(locale, 'subNotifyDone')}` : t(locale, 'subNotify')}
+      <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1.2rem' }} onClick={handleUpgrade} disabled={upgradeBusy || notified}>
+        {notified ? `✓ ${t(locale, 'subNotifyDone')}` : upgradeBusy ? L(dict, '正在跳转…', 'Redirecting…') : L(dict, '升级 Pro', 'Upgrade to Pro')}
       </button>
+      {billingHint === 'signin' && (
+        <p style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '0.5rem' }}>
+          {L(dict, '登录后即可升级。', 'Sign in first to upgrade.')}
+        </p>
+      )}
       <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '0.8rem' }}>
         {L(dict, '付费随 App 版内购开放,价格以内购页为准。', 'Purchases open with the App Store version; in-app prices apply.')}
         <br />
