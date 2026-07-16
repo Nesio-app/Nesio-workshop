@@ -10,6 +10,9 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from '../use-portal-locale';
 
 export interface MapPoint {
   lat: number;
@@ -31,6 +34,7 @@ function yWorld(lat: number, z: number): number {
 }
 
 export default function PlaceMap({ points, path, height = 200 }: { points: MapPoint[]; path?: Array<{ lat: number; lon: number }>; height?: number }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(340);
 
@@ -75,7 +79,7 @@ export default function PlaceMap({ points, path, height = 200 }: { points: MapPo
   const maxW = Math.max(1, ...pts.map((p) => p.weightMin));
 
   return (
-    <div ref={wrapRef} className="nesio-tl-realmap" style={{ height }} role="img" aria-label="足迹地图">
+    <div ref={wrapRef} className="nesio-tl-realmap" style={{ height }} role="img" aria-label={L(dict, '足迹地图', 'Footprint map')}>
       {tiles.map((t) => (
         // OSM 栅格瓦片,惰性加载;地图不可交互(纯概览),点位才是主角
         // eslint-disable-next-line @next/next/no-img-element

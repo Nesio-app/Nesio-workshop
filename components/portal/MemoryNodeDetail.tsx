@@ -560,7 +560,7 @@ interface EditFields {
 
 // 批次 76(用户实锤「点关联记忆进入页面错误」):详情崩溃只崩这张卡,
 // 不再把整页打成错误页 —— 卡片级边界,给出关闭出口。
-class DetailErrorBoundary extends Component<{ onClose: () => void; children: ReactNode }, { err: boolean; msg: string }> {
+class DetailErrorBoundary extends Component<{ onClose: () => void; dict: string; children: ReactNode }, { err: boolean; msg: string }> {
   state = { err: false, msg: '' };
   static getDerivedStateFromError(e: unknown) {
     return { err: true, msg: e instanceof Error ? `${e.name}: ${e.message}` : String(e) };
@@ -572,8 +572,8 @@ class DetailErrorBoundary extends Component<{ onClose: () => void; children: Rea
       return (
         <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" onClick={this.props.onClose}>
           <div className="nesio-node-detail-sheet" style={{ padding: '1.4rem 1.2rem', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-            <p style={{ margin: '0 0 0.4rem', fontSize: '1rem', fontWeight: 600 }}>这条记忆的详情没打开成功</p>
-            <p style={{ margin: '0 0 0.9rem', fontSize: '0.8rem', color: 'var(--portal-muted)' }}>数据没有丢。关闭后再试一次。若反复出现,把下面这行错误复制发回来就能定位。</p>
+            <p style={{ margin: '0 0 0.4rem', fontSize: '1rem', fontWeight: 600 }}>{L(this.props.dict, '这条记忆的详情没打开成功', "This memory's details didn't open")}</p>
+            <p style={{ margin: '0 0 0.9rem', fontSize: '0.8rem', color: 'var(--portal-muted)' }}>{L(this.props.dict, '数据没有丢。关闭后再试一次。若反复出现,把下面这行错误复制发回来就能定位。', 'Your data is safe. Close and try again. If it keeps happening, copy the error line below and send it to us so we can pinpoint it.')}</p>
             {this.state.msg && (
               <p style={{
                 fontSize: '0.72rem', color: 'var(--status-risk, #c0392b)', margin: '0 auto 0.8rem', maxWidth: 300,
@@ -583,9 +583,9 @@ class DetailErrorBoundary extends Component<{ onClose: () => void; children: Rea
             )}
             <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
               {this.state.msg && (
-                <button type="button" className="nesio-connector-disconnect" onClick={() => { try { navigator.clipboard?.writeText(this.state.msg); } catch { /* 手抄 */ } }}>复制错误</button>
+                <button type="button" className="nesio-connector-disconnect" onClick={() => { try { navigator.clipboard?.writeText(this.state.msg); } catch { /* 手抄 */ } }}>{L(this.props.dict, '复制错误', 'Copy error')}</button>
               )}
-              <button type="button" className="nesio-fin-review-accept" onClick={this.props.onClose}>关闭</button>
+              <button type="button" className="nesio-fin-review-accept" onClick={this.props.onClose}>{L(this.props.dict, '关闭', 'Close')}</button>
             </div>
           </div>
         </div>
@@ -596,8 +596,9 @@ class DetailErrorBoundary extends Component<{ onClose: () => void; children: Rea
 }
 
 export default function MemoryNodeDetail(props: MemoryNodeDetailProps) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   return (
-    <DetailErrorBoundary key={props.node?.id ?? 'none'} onClose={props.onClose}>
+    <DetailErrorBoundary key={props.node?.id ?? 'none'} onClose={props.onClose} dict={dict}>
       <MemoryNodeDetailInner {...props} />
     </DetailErrorBoundary>
   );

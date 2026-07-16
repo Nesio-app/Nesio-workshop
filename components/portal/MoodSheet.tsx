@@ -475,9 +475,9 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
               <p className="nesio-mood-journal-prompt">{journalPromptRef.current}</p>
               {/* 富文本-lite 工具条:加粗 / 列表 */}
               <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.4rem' }}>
-                <button type="button" onClick={wrapBold} aria-label="加粗"
+                <button type="button" onClick={wrapBold} aria-label={L(dict, '加粗', 'Bold')}
                   style={{ minWidth: 'var(--tap-min)', minHeight: '2.1rem', borderRadius: '0.5rem', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid)', fontWeight: 800, color: 'var(--portal-ink)', cursor: 'pointer' }}>B</button>
-                <button type="button" onClick={insertBullet} aria-label="列表"
+                <button type="button" onClick={insertBullet} aria-label={L(dict, '列表', 'List')}
                   style={{ minWidth: 'var(--tap-min)', minHeight: '2.1rem', borderRadius: '0.5rem', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', cursor: 'pointer' }}>•—</button>
               </div>
               <div
@@ -551,7 +551,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
 
   if (phase === 'energy') {
     return (
-      <div className="nesio-mood-overlay" role="dialog" aria-modal aria-label="记录精力">
+      <div className="nesio-mood-overlay" role="dialog" aria-modal aria-label={L(dict, '记录精力', 'Log energy')}>
         <div className="nesio-mood-backdrop" onClick={() => handleSave()} />
         <div className={`nesio-mood-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
           <div className="nesio-mood-handle" {...handleProps} />
@@ -626,7 +626,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
         </p>
         <div className="nesio-mood-wheel-wrap">
           <svg ref={svgRef} viewBox="0 0 300 300" className="nesio-mood-wheel-svg"
-            role="group" aria-label="情绪转盘"
+            role="group" aria-label={L(dict, '情绪转盘', 'Mood wheel')}
             onMouseDown={onSvgStart} onMouseMove={onSvgMove} onMouseUp={onSvgEnd} onMouseLeave={onSvgLeave}
             onTouchStart={(e) => { onSvgStart(e); }}
             onTouchMove={(e) => { e.preventDefault(); onSvgMove(e); }}

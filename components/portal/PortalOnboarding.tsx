@@ -614,9 +614,10 @@ export default function PortalOnboarding() {
 
   const STEPS: Step[] = ['welcome', 'name', 'auth'];
   const stepIdx = STEPS.indexOf(step);
+  const dict = portalLocaleToDictionaryLocale(locale);
 
   return (
-    <div className="nesio-ob-overlay" role="dialog" aria-modal="true" aria-label="欢迎使用 Nesio">
+    <div className="nesio-ob-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '欢迎使用 Nesio', 'Welcome to Nesio')}>
       <div className="nesio-ob-bg" aria-hidden />
       <div className="nesio-ob-card">
         {/* Progress */}

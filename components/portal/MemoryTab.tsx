@@ -839,7 +839,7 @@ function ProjectDetailSheet({
 
   return (
     <>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label="关闭" />
+      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
       <div className="nesio-project-detail-sheet">
         <div className="nesio-project-detail-header">
           <span className="nesio-project-detail-emoji"><IconFolder size={16} /></span>
@@ -892,7 +892,7 @@ function CreateProjectSheet({
 
   return (
     <>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label="关闭" />
+      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
       <div className="nesio-create-project-sheet">
         <div className="nesio-create-project-header">
           <span>{L(dict, '新建项目', 'New project')}</span>
@@ -1324,7 +1324,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
 
                   {/* 批次 88:类型筛选栏 —— 只放「是什么」的分类(真类型 + 属性派生的
                       计划/清单虚拟分类);地图/关联图是「怎么看」,已移到下方视图切换。 */}
-                  <div className="nesio-memory-type-filter" role="group" aria-label="按类型筛选">
+                  <div className="nesio-memory-type-filter" role="group" aria-label={L(dict, '按类型筛选', 'Filter by type')}>
                     <button
                       type="button"
                       className={`nesio-type-chip${!typeFilter ? ' is-active' : ''}`}
