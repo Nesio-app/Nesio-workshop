@@ -26,7 +26,7 @@ import { purgeLocalImages } from '@/lib/portal/local-image-store';
 import { getTelemetryDeviceId } from '@/lib/portal/telemetry';
 import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab, getPalette, setPalette, PALETTES, type PaletteId } from '@/lib/portal/module-overrides';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
-import { canUse, getTier, hasProOverride, setProEntitlement, trialDaysLeft } from '@/lib/portal/entitlement';
+import { canUse, getTier, hasProOverride, hasPaidPro, refreshServerEntitlement, setProEntitlement, trialDaysLeft, TIER_UPDATED_EVENT } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
 import { pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, buildCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
 
@@ -985,10 +985,18 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
   const [upgradeBusy, setUpgradeBusy] = useState(false);
   const [billingHint, setBillingHint] = useState<'signin' | null>(null);
   const [billingError, setBillingError] = useState('');
+  const [isPaidPro, setIsPaidPro] = useState(false); // 账号级付费 Pro(服务端真源)→ 显「已是会员」而非升级
 
   useEffect(() => {
     if (!open) return;
     try { setNotified(localStorage.getItem(PLAN_NOTIFY_KEY) === '1'); } catch { /* ignore */ }
+    // 开订阅页即拉一次最新服务端权益 + 监听更新 —— 付完回来这页能立刻反映「已是 Pro」,
+    // 不再因「无 TIER_UPDATED_EVENT 监听」而永远显「升级 Pro」(付费不生效的表象)。
+    const sync = () => setIsPaidPro(hasPaidPro());
+    sync();
+    void refreshServerEntitlement().then(sync);
+    window.addEventListener(TIER_UPDATED_EVENT, sync);
+    return () => window.removeEventListener(TIER_UPDATED_EVENT, sync);
   }, [open]);
 
   // Web Stripe 订阅结账。配了 STRIPE_* + Stripe 接受 → 跳 Stripe 付款;真·未配(503)→ 优雅降级为
@@ -1089,9 +1097,16 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
         </div>
       ))}
 
+      {isPaidPro ? (
+        <div style={{ marginTop: '1.2rem', padding: '0.9rem 1rem', borderRadius: 12, textAlign: 'center', background: 'var(--portal-card, #fff)', border: '1px solid var(--status-gentle, #6cbf84)' }}>
+          <p style={{ fontWeight: 600, margin: 0, color: 'var(--status-gentle, #4a9d63)' }}>{L(dict, '✓ 你已是 Pro 会员', "✓ You're a Pro member")}</p>
+          <p style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', margin: '0.35rem 0 0' }}>{L(dict, '订阅生效中,感谢支持。可在支付渠道管理或取消。', 'Subscription active — thank you. Manage or cancel via your payment provider.')}</p>
+        </div>
+      ) : (
       <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1.2rem' }} onClick={handleUpgrade} disabled={upgradeBusy || notified}>
         {notified ? `✓ ${t(locale, 'subNotifyDone')}` : upgradeBusy ? L(dict, '正在跳转…', 'Redirecting…') : L(dict, '升级 Pro', 'Upgrade to Pro')}
       </button>
+      )}
       {billingHint === 'signin' && (
         <p style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '0.5rem' }}>
           {L(dict, '登录后即可升级。', 'Sign in first to upgrade.')}

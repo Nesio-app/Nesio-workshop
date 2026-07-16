@@ -82,6 +82,17 @@ function readServerEntitlementCache(): ServerEntitlementCache | null {
   }
 }
 
+/** 服务端权益快照(供 UI 反映「付费 Pro / 试用 / 免费」态);null=无缓存。 */
+export function serverEntitlementSnapshot(): ServerEntitlementCache | null {
+  return readServerEntitlementCache();
+}
+
+/** 是否账号级**付费** Pro(服务端已强制 + tier=pro + 非试用)—— 用于订阅页显「已是会员」。 */
+export function hasPaidPro(): boolean {
+  const s = readServerEntitlementCache();
+  return Boolean(s?.enforced && s.tier === 'pro' && s.trialDaysLeft <= 0);
+}
+
 /**
  * 拉取服务端账号级权益并落缓存(登录后调用)。best-effort:任何失败都静默(保留旧缓存/回退本地),
  * 绝不因权益接口抖动锁死真用户。返回是否成功刷新。
