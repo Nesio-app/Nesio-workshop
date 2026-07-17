@@ -5,6 +5,7 @@ import { useSheetDrag } from './use-sheet-drag';
 import { IconActivity, IconBook, IconBookOpen, IconCalendar, IconCar, IconCheckSquare, IconCloudSun, IconHeartPulse, IconMail, IconNote, IconTimer , IconImage, IconMapPin, IconCard } from './icons';
 import dynamic from 'next/dynamic';
 const WechatReadingImportSheet = dynamic(() => import('./WechatReadingImportSheet'), { ssr: false });
+const TeslaSheet = dynamic(() => import('./TeslaSheet'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { ingestGranolaMeeting } from '@/lib/platform/view-models/today-view-model';
 import { runPlaidSync, runFlomoSync, saveCalendarEventsToMemory } from '@/lib/portal/connector-sync';
@@ -112,6 +113,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const photosRef = useRef<HTMLInputElement>(null);
   const timelineRef = useRef<HTMLInputElement>(null);
   const [wechatReadingOpen, setWechatReadingOpen] = useState(false);
+  const [teslaSheetOpen, setTeslaSheetOpen] = useState(false);
   const [connected, setConnected] = useState<Record<string, boolean>>({});
   const [syncing, setSyncing] = useState<string | null>(null);
   // P0 隐私:连接私有数据源(邮箱/日历/银行/Notion/Flomo)必须先登录 —— 匿名授权=无主
@@ -1271,6 +1273,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                       {c.id === 'plaid' && (
                         <button type="button" className="nesio-connector-connect" style={{ background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)' }} onClick={() => connectPlaid()} disabled={isSync}>{L(dict, '+ 银行', '+ Bank')}</button>
                       )}
+                      {/* Tesla 独立数据视图(用户定):电量/里程/充电历史直接看,不用翻财务/足迹 */}
+                      {c.id === 'tesla' && (
+                        <button type="button" className="nesio-connector-connect" style={{ background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)' }} onClick={() => setTeslaSheetOpen(true)}>{L(dict, '数据', 'Data')}</button>
+                      )}
                       <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)}>{L(dict, '断开', 'Disconnect')}</button>
                     </div>
                   ) : isConn ? (
@@ -1423,6 +1429,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         </div>
       )}
       <WechatReadingImportSheet open={wechatReadingOpen} onClose={() => setWechatReadingOpen(false)} />
+      <TeslaSheet open={teslaSheetOpen} onClose={() => setTeslaSheetOpen(false)} />
     </div>
   );
 }
