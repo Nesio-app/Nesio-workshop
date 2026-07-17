@@ -205,6 +205,18 @@ export const GROWTH_FRAMEWORKS: GrowthFramework[] = [
     prompt: '对下面这件事连问五个为什么,帮我找到根因,而不是停在表面解释:\n\n【粘贴内容】',
   },
   {
+    id: 'dyp-three',
+    name: '段永平三问', nameEn: "Duan Yongping's three questions",
+    desc: '看一门生意/一家公司:十年后还在吗?我真看得懂吗?管理层可信吗', descEn: 'For a business: will it exist in 10 years? Do I truly understand it? Is management trustworthy?',
+    prompt: '用段永平的三个问题帮我审视下面这家公司/这门生意,每问都要给出「凭什么这么判断」的依据,不确定就明说不确定:\n1. 这门生意十年后还在吗?靠什么活着?\n2. 我真的看得懂它怎么赚钱吗?哪里是我理解的边界?\n3. 管理层过往的言行可信吗?\n\n【粘贴公司/生意】',
+  },
+  {
+    id: 'circle-check',
+    name: '能力圈检查', nameEn: 'Circle of competence check',
+    desc: '判断一件事是否真在自己能力圈内,而不是「感觉懂」', descEn: 'Test whether something is truly inside your circle, not just familiar',
+    prompt: '帮我做能力圈检查:对下面这个领域/标的,列出 5 个「真正懂的人一定答得上」的问题逐一问我的描述里有没有答案;最后诚实结论——它在我能力圈内、边缘、还是圈外?圈外的话,补什么才能进圈?\n\n【粘贴领域/标的与我的理解】',
+  },
+  {
     id: 'premortem',
     name: '事前验尸', nameEn: 'Premortem',
     desc: '假设这个决定一年后失败了,倒推原因', descEn: 'Assume the decision failed in a year — work backwards',
