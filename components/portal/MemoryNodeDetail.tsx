@@ -349,6 +349,10 @@ function EventSection({ node }: {
         </div>
       )}
       {participants && <InfoRow label={L(dict, '参与者', 'People')} value={participants} />}
+      {/* CARD SPEC 关键信息:电商/物流类邮件事件的语义键值行(商家/类型/预计到货) */}
+      <InfoRow label={L(dict, '商家', 'Merchant')} value={attr(node, 'store', 'merchant')} />
+      <InfoRow label={L(dict, '类型', 'Kind')} value={attr(node, 'subtype')} />
+      <InfoRow label={L(dict, '预计到货', 'ETA')} value={attr(node, 'eta', 'expectedDelivery', 'deliveryDate')} />
       {note && (
         <div className="nesio-node-attr-row">
           <span className="nesio-node-attr-key">{L(dict, '会议记录', 'Meeting notes')}</span>
