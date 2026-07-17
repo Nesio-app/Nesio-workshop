@@ -448,9 +448,13 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         setSyncing(null);
         return;
       }
+      // OAuth 银行会整窗跳去银行授权,回来落在 /plaid-oauth 续接页 —— 它需要
+      // 用同一个 link_token 重建 Link,发起前先存本机(成功/退出时清)。
+      try { localStorage.setItem('nesio-plaid-link-token', data.linkToken); } catch { /* ignore */ }
       const link = Plaid.create({
         token: data.linkToken,
         onSuccess: async (publicToken: string) => {
+          try { localStorage.removeItem('nesio-plaid-link-token'); } catch { /* ignore */ }
           // 财务⑥:带上 linkToken —— 多机构一次授权时服务端据此捞出 session 里
           // 全部 item 的 public_token 逐个交换,不再只连上第一家。
           const ex = await fetch('/api/portal/plaid/exchange', {
@@ -469,7 +473,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
             showToast(L(dict, `绑定失败:${exData.error || '未知'}`, `Link failed: ${exData.error || 'unknown'}`), false);
           }
         },
-        onExit: () => { /* 用户取消 */ },
+        onExit: () => {
+          // 用户取消:清掉续接用的 link_token,避免 /plaid-oauth 误用过期 token。
+          try { localStorage.removeItem('nesio-plaid-link-token'); } catch { /* ignore */ }
+        },
       });
       link.open();
     } catch {

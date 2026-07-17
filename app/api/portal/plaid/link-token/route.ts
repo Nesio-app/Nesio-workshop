@@ -31,30 +31,44 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const res = await fetch(`${plaidBase()}/link/token/create`, {
+    const baseBody = {
+      client_id: clientId,
+      secret,
+      client_name: 'Nesio',
+      user: { client_user_id: 'nesio-user' },
+      products: ['transactions'],
+      // 财务⑯:机构支持时顺带启用 investments(投资账户流水);不支持不影响连接
+      optional_products: ['investments'],
+      // 免费最大化·Plaid A:历史窗口从默认 90 天抬到 730 天(2 年,免费)——
+      // 支撑真·同比、更准的订阅识别(Plaid 官方建议 Recurring 至少 180 天)。
+      // 仅对新建/重连的 Item 生效;已连账户需重连一次才拿到 2 年历史。
+      transactions: { days_requested: 730 },
+      country_codes: ['US'],
+      language: 'en',
+    };
+    // iOS PWA/webview 修:OAuth 银行(Chase 等)授权后必须把浏览器带回本站
+    // 就地续接 Link,否则依赖旧页面活着 —— PWA 被 iOS 杀掉重载即黑屏断链。
+    // redirect_uri 必须先在 dashboard.plaid.com → API → Allowed redirect URIs
+    // 登记;没登记时 Plaid 会拒绝 create,这里自动去掉重试,行为与旧版一致。
+    const redirectUri = envValue('PLAID_REDIRECT_URI') || `${new URL(req.url).origin}/plaid-oauth`;
+    const create = (body: object) => fetch(`${plaidBase()}/link/token/create`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        client_id: clientId,
-        secret,
-        client_name: 'Nesio',
-        user: { client_user_id: 'nesio-user' },
-        products: ['transactions'],
-        // 财务⑯:机构支持时顺带启用 investments(投资账户流水);不支持不影响连接
-        optional_products: ['investments'],
-        // 免费最大化·Plaid A:历史窗口从默认 90 天抬到 730 天(2 年,免费)——
-        // 支撑真·同比、更准的订阅识别(Plaid 官方建议 Recurring 至少 180 天)。
-        // 仅对新建/重连的 Item 生效;已连账户需重连一次才拿到 2 年历史。
-        transactions: { days_requested: 730 },
-        country_codes: ['US'],
-        language: 'en',
-      }),
+      body: JSON.stringify(body),
     });
-    const data = await res.json() as { link_token?: string; error_message?: string };
+    let usedRedirect = true;
+    let res = await create({ ...baseBody, redirect_uri: redirectUri });
+    let data = await res.json() as { link_token?: string; error_message?: string; error_code?: string };
+    if (!data.link_token && /redirect/i.test(data.error_message || '')) {
+      console.warn('plaid_redirect_uri_not_allowlisted', redirectUri);
+      usedRedirect = false;
+      res = await create(baseBody);
+      data = await res.json() as { link_token?: string; error_message?: string; error_code?: string };
+    }
     if (!data.link_token) {
       return NextResponse.json({ ok: false, error: data.error_message || 'link_token_failed' }, { status: 502 });
     }
-    return NextResponse.json({ ok: true, linkToken: data.link_token, env: plaidEnv() });
+    return NextResponse.json({ ok: true, linkToken: data.link_token, env: plaidEnv(), oauthRedirect: usedRedirect });
   } catch {
     return NextResponse.json({ ok: false, error: 'plaid_unreachable' }, { status: 502 });
   }
