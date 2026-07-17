@@ -39,6 +39,12 @@ export interface NesioSheetProps {
   onCommit?: () => void;
   /** 附加到 panel 的类名(迁移期用来保留个别 sheet 的既有布局类)。 */
   className?: string;
+  /**
+   * 是否由原语渲染标准卡片壳(面/圆角/内边距/阴影)。默认 true。
+   * 迁移期若 sheet 自带定制卡片(尺寸/圆角/背景独特),传 false ——
+   * 原语只接管定位/遮罩/焦点机器,卡片视觉保持原样(零视觉回归)。
+   */
+  card?: boolean;
   children: ReactNode;
 }
 
@@ -152,8 +158,9 @@ function VaulContent({ panelClass, ariaLabel, open, children }: {
 
 /** center / fullscreen:Radix portal/Esc/scroll-lock + 自持焦点陷阱。
  *  关掉 Radix 自己的 auto-focus,避免与自持 trap 互抢。 */
-function RadixContent({ panelClass, ariaLabel, open, dismissible, children }: {
-  panelClass: string; ariaLabel: string; open: boolean; dismissible: boolean; children: ReactNode;
+function RadixContent({ panelClass, ariaLabel, open, dismissible, bareCenter, onOpenChange, children }: {
+  panelClass: string; ariaLabel: string; open: boolean; dismissible: boolean;
+  bareCenter: boolean; onOpenChange: (open: boolean) => void; children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useFocusTrap(ref, open);
@@ -163,6 +170,9 @@ function RadixContent({ panelClass, ariaLabel, open, dismissible, children }: {
       className={panelClass}
       aria-label={ariaLabel}
       tabIndex={-1}
+      // bare-center 时 Content 满视口 flex 居中,Radix 检测不到「点击外部」——
+      // 补空白区点击关闭(点到容器自身、非卡片子节点时关),复刻旧 backdrop 行为。
+      onClick={bareCenter && dismissible ? (e) => { if (e.target === e.currentTarget) onOpenChange(false); } : undefined}
       onOpenAutoFocus={(e) => e.preventDefault()}
       onCloseAutoFocus={(e) => e.preventDefault()}
       onEscapeKeyDown={dismissible ? undefined : (e) => e.preventDefault()}
@@ -182,9 +192,10 @@ export default function NesioSheet({
   dismissible = true,
   ariaLabel,
   className,
+  card = true,
   children,
 }: NesioSheetProps) {
-  const panelClass = `nesio-sheet nesio-sheet--${variant}${className ? ` ${className}` : ''}`;
+  const panelClass = `nesio-sheet nesio-sheet--${variant}${card ? '' : ' nesio-sheet--bare'}${className ? ` ${className}` : ''}`;
 
   if (variant === 'bottom') {
     return (
@@ -203,7 +214,14 @@ export default function NesioSheet({
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="nesio-sheet-overlay" />
-        <RadixContent panelClass={panelClass} ariaLabel={ariaLabel} open={open} dismissible={dismissible}>
+        <RadixContent
+          panelClass={panelClass}
+          ariaLabel={ariaLabel}
+          open={open}
+          dismissible={dismissible}
+          bareCenter={!card && variant === 'center'}
+          onOpenChange={onOpenChange}
+        >
           {children}
         </RadixContent>
       </Dialog.Portal>
