@@ -264,7 +264,12 @@ export function normalizeSignedStorageUrl(config: CloudRuntimeConfig, signedUrl:
     return signedUrl;
   }
   if (signedUrl.startsWith('/')) {
-    return `${config.supabaseUrl}${signedUrl}`;
+    // Supabase 返回的 signedURL 形如 /object/sign/<bucket>/<path>?token=... —— 相对 storage
+    // API 根,需补 /storage/v1 段。此前直接拼 supabaseUrl 丢了这段 → 生产 GET 404 → 物品图
+    // 破图「?」。已含 /storage/v1 的则原样返回,避免重复。
+    const path = signedUrl.replace(/^\/+/, '');
+    const withPrefix = path.startsWith('storage/v1/') ? path : `storage/v1/${path}`;
+    return `${config.supabaseUrl}/${withPrefix}`;
   }
   return `${config.supabaseUrl}/storage/v1/${signedUrl.replace(/^\/+/, '')}`;
 }

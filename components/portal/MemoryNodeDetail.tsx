@@ -1180,7 +1180,15 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
             const heroKey = heroShown
               ? (() => { const f = allAssets.find((a) => a.kind === 'image' || a.mimeType?.startsWith('image/')); return f ? (f.id || f.storagePath || f.label || 'asset') : ''; })()
               : '';
-            const galleryAssets = allAssets.filter((a) => (a.id || a.storagePath || a.label || 'asset') !== heroKey);
+            // 顶部已用**本地图**作 hero 时,跳过它的云端孪生副本(同一张照片的云备份,id/storagePath
+            // 不同故 key 去重漏掉它)——那条云图正是详情页那张破图「?」的来源。只留额外的本地图/文件线索。
+            const heroIsLocalImage = heroShown && allAssets.some((a) => (a.kind === 'image' || a.mimeType?.startsWith('image/')) && a.local);
+            const galleryAssets = allAssets.filter((a) => {
+              if ((a.id || a.storagePath || a.label || 'asset') === heroKey) return false;
+              const isImg = a.kind === 'image' || a.mimeType?.startsWith('image/');
+              if (heroIsLocalImage && isImg && !a.local && a.storagePath) return false;
+              return true;
+            });
             if (galleryAssets.length === 0) return null;
             return (
             <>
@@ -1194,7 +1202,10 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
                     <div key={key} className="nesio-type-asset-card">
                       {isImage && previewUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={previewUrl} alt={asset.label || n.name} draggable={false} className="nesio-type-asset-img" onClick={() => setViewImage({ url: previewUrl, name: asset.label || n.name })} style={{ cursor: 'zoom-in' }} />
+                        <img src={previewUrl} alt={asset.label || n.name} draggable={false} className="nesio-type-asset-img" onClick={() => setViewImage({ url: previewUrl, name: asset.label || n.name })} style={{ cursor: 'zoom-in' }}
+                          // 云图签名 URL 加载失败(过期/取不到)时,别把浏览器默认破图「?」留在页面 ——
+                          // 从 assetUrls 摘掉这条,自动回落到下面的软文案分支(有可见失败态,不是破图)。
+                          onError={() => setAssetUrls((cur) => { if (!(key in cur)) return cur; const next = { ...cur }; delete next[key]; return next; })} />
                       ) : (
                         <p style={{ fontSize: '0.82rem', color: 'var(--portal-muted)', marginBottom: '0.35rem' }}>
                           {asset.local ? L(dict, '图片加载中…', 'Loading image…') : asset.storagePath ? L(dict, '图片线索已保存，登录后可查看。', 'Image clue saved — sign in to view.') : L(dict, '附件线索已保存。', 'Attachment clue saved.')}

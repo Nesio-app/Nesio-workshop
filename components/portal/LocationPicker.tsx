@@ -85,8 +85,10 @@ export default function LocationPicker({ value, onChange, className }: LocationP
     const name = freeText.trim();
     if (!name) return;
     const np: NamedPlace = {
+      // 存放位置显示一律线性无 emoji;新地点不再默认存 📍(它会经 buildDisplayValue 拼进
+      // 存储串,成为详情/收纳里要反复 stripEmoji 清洗的源头)。
       id: `place-${Date.now().toString(36)}`,
-      name, emoji: '📍', lat: 0, lon: 0, radiusMeters: 150, rooms: [], subRooms: {},
+      name, emoji: '', lat: 0, lon: 0, radiusMeters: 150, rooms: [], subRooms: {},
     };
     upsertNamedPlace(np);
     setPlaces(getNamedPlaces());
@@ -168,12 +170,12 @@ export default function LocationPicker({ value, onChange, className }: LocationP
         {/* 批次192:自由文本 → 存为可复用命名地点(下次直接选,改名自动传导到所有物品) */}
         {freeText.trim() && (
           <button type="button" className="nesio-loc-switch-btn" onClick={saveAsPlace}>
-            ➕ {L(dict, '存为新地点', 'Save as place')}
+            {L(dict, '存为新地点', 'Save as place')}
           </button>
         )}
         {places.length > 0 && (
           <button type="button" className="nesio-loc-switch-btn" onClick={() => setMode('named')}>
-            📍 {L(dict, '选命名地点', 'Pick a place')}
+            {L(dict, '选命名地点', 'Pick a place')}
           </button>
         )}
       </div>

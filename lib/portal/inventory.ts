@@ -27,11 +27,19 @@ import { displayStoredLocation } from './named-places';
 
 export const LOC_SEP = ' · '; // 物品②:CSV 导入拼 location 复用同一分隔词
 
+// 分组键去 emoji:存放位置显示已去掉 🏠 等 emoji(带 placeId 的物品解析出「家」),但历史
+// 自由文本物品的 location 原文可能仍存着「🏠 家」。若不归一,老物品会按「🏠 家」、新物品按
+// 「家」分成两组(收纳页分组割裂)。这里把首段(space=分组键)的 emoji 清掉,新老归为一组。
+const SPACE_EMOJI_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE00}-\u{FE0F}\u{1F1E6}-\u{1F1FF}\u{200D}]/gu;
+function normalizeSpace(s: string): string {
+  return s.replace(SPACE_EMOJI_RE, '').replace(/\s{2,}/g, ' ').trim();
+}
+
 /** 解析 location 为 {space(首段,浏览分组用), container(其余)}。自由文本整段落到 space。 */
 export function splitLocation(location: string): { space: string; container: string } {
   const idx = location.indexOf(LOC_SEP);
-  if (idx === -1) return { space: location.trim(), container: '' };
-  return { space: location.slice(0, idx).trim(), container: location.slice(idx + LOC_SEP.length).trim() };
+  if (idx === -1) return { space: normalizeSpace(location.trim()), container: '' };
+  return { space: normalizeSpace(location.slice(0, idx).trim()), container: location.slice(idx + LOC_SEP.length).trim() };
 }
 
 /* ---------- 物品视图(life-graph object 节点的投影) ---------- */
