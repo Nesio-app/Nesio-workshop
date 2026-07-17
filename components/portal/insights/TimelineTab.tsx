@@ -223,6 +223,11 @@ export default function TimelineTab() {
     const read = () => setTrail(loadPlaceTrail());
     read();
     window.addEventListener(PLACE_TRAIL_UPDATED_EVENT, read);
+    // 自愈:历史导入里「未知地点/纯坐标」的到访,打开足迹时反查补名(限量+缓存,
+    // 改动经 save 广播 PLACE_TRAIL_UPDATED_EVENT,上面的 read 会自动刷新)。
+    void import('@/lib/portal/place-trail')
+      .then((m) => m.backfillGenericPlaceLabels(20))
+      .catch(() => {});
     return () => window.removeEventListener(PLACE_TRAIL_UPDATED_EVENT, read);
   }, []);
 

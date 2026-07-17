@@ -554,7 +554,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (!file) return;
     setSyncing('timeline');
     try {
-      const { parseGoogleTimeline, mergeImportedVisits } = await import('@/lib/portal/place-trail');
+      const { parseGoogleTimeline, mergeImportedVisits, backfillGenericPlaceLabels } = await import('@/lib/portal/place-trail');
       const json = JSON.parse(await file.text()) as unknown;
       const visits = parseGoogleTimeline(json);
       if (!visits.length) {
@@ -564,7 +564,13 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         saveConnectorState('timeline', true);
         setConnected((p) => ({ ...p, timeline: true }));
         setCounts((p) => ({ ...p, timeline: added }));
-        showToast(L(dict, `时间轴导入完成:解析 ${visits.length} 段,新增 ${added} 条足迹(洞察 → 分析 → 地点足迹)`, `Timeline imported: ${visits.length} segments parsed, ${added} new visits (Insights → Analytics → Place trail)`), true);
+        // Google 新版导出大多只有坐标没地名(满屏「未知地点」的根因)—— 导入完
+        // 就地反查回填,常去的先有名字;查不完的下次打开地图/再导入时继续。
+        showToast(L(dict, `时间轴导入完成:解析 ${visits.length} 段,新增 ${added} 条足迹。正在为地点补名字…`, `Timeline imported: ${visits.length} segments, ${added} new visits. Naming places…`), true);
+        const named = await backfillGenericPlaceLabels(60);
+        showToast(named > 0
+          ? L(dict, `已为 ${named} 条足迹补上真实地名(洞察 → 分析 → 地点足迹)`, `Named ${named} visits (Insights → Analytics → Place trail)`)
+          : L(dict, '导入完成(洞察 → 分析 → 地点足迹)', 'Import done (Insights → Analytics → Place trail)'), true);
       }
     } catch {
       showToast(L(dict, '文件不是有效的 JSON', 'Not a valid JSON file'), false);

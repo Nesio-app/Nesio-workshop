@@ -662,3 +662,72 @@ function humanizeSemanticType(label: string): string {
   };
   return map[label] ?? label;
 }
+
+// ── 反查回填:给「无名占位/纯坐标 + 有坐标」的到访补真实地名 ──────────────
+// Google 新版时间轴导出大多数段只有坐标 + semanticType(UNKNOWN → 「未知地点」),
+// 地名要自己反查(用户实测:导入后满屏未知地点)。按 ~110m 坐标格去重 —— 同一
+// 地点的反复到访只查一次;结果缓存本机,跨次导入/打开不重查;每轮限量,防一次
+// 导入几百个格子把免费反查服务打爆(查不完的下轮继续,常去的先有名字)。
+const REVGEO_CACHE_KEY = 'nesio-revgeo-cache-v1';
+const COORD_LABEL_RE = /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/;
+
+function needsRealName(v: PlaceVisit): boolean {
+  return v.lat != null && v.lon != null &&
+    (isGenericPlace(v.label) || COORD_LABEL_RE.test((v.label || '').trim()));
+}
+
+export async function backfillGenericPlaceLabels(maxLookups = 40): Promise<number> {
+  if (typeof window === 'undefined') return 0;
+  const trail = loadPlaceTrail();
+  const needs = trail.filter(needsRealName);
+  if (!needs.length) return 0;
+
+  let cache: Record<string, { label: string; city?: string; country?: string }> = {};
+  try { cache = JSON.parse(localStorage.getItem(REVGEO_CACHE_KEY) || '{}') as typeof cache; } catch { cache = {}; }
+
+  const cellOf = (v: PlaceVisit) => `${(v.lat as number).toFixed(3)},${(v.lon as number).toFixed(3)}`;
+  const byCell = new Map<string, number>();
+  for (const v of needs) byCell.set(cellOf(v), (byCell.get(cellOf(v)) || 0) + 1);
+  // 到访多的格子先查 —— 常去的地方先有名字
+  const cells = [...byCell.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
+
+  const { reverseGeocodeRobust } = await import('./capture-location');
+  let lookups = 0;
+  const resolved = new Map<string, { label: string; city?: string; country?: string }>();
+  for (const key of cells) {
+    let hit = cache[key];
+    if (!hit) {
+      if (lookups >= maxLookups) continue;
+      lookups++;
+      const [lat, lon] = key.split(',').map(Number);
+      try {
+        const g = await reverseGeocodeRobust(lat, lon);
+        if (!g.label) continue; // 本轮查不到:跳过,下轮再试(不缓存失败)
+        hit = { label: g.label, city: g.city, country: g.country };
+        cache[key] = hit;
+      } catch { continue; }
+    }
+    resolved.set(key, hit);
+  }
+  try { localStorage.setItem(REVGEO_CACHE_KEY, JSON.stringify(cache)); } catch { reportStorageDropped(); }
+  if (!resolved.size) return 0;
+
+  let touched = 0;
+  const next = trail.map((v) => {
+    if (!needsRealName(v)) return v;
+    const hit = resolved.get(cellOf(v));
+    if (!hit) return v;
+    touched++;
+    const name = canonicalPlaceLabel(hit.label) || hit.label;
+    return { ...v, label: name };
+  });
+  if (!touched) return 0;
+  save(next); // store 自带 PLACE_TRAIL_UPDATED_EVENT 广播,地图/时间线就地刷新
+  // World tab / 分类链路:城市、国家元数据跟着新名字走
+  const geoAll = loadPlaceGeo();
+  for (const { label, city, country } of resolved.values()) {
+    const name = canonicalPlaceLabel(label) || label;
+    try { setPlaceGeo(name, { ...(geoAll[name] || {}), name, city, country, resolved: true }); } catch { /* 元数据可缺 */ }
+  }
+  return touched;
+}
