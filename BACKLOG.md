@@ -62,3 +62,13 @@
 ---
 
 _最后更新：2026-07-02_
+
+## 连接器 · iOS PWA OAuth(2026-07-17 记)
+
+- **Granola 的 PWA 跨环境授权还没修**:gmail/tesla 已用「签名 state 带 uid,回调直写
+  Supabase」闭环(公众仓 d8d5da1 / 本仓同批),但 Granola 的回调依赖 PKCE stash
+  cookie(state+codeVerifier+DCR client 全在 `nesio_granola_oauth` cookie 里),
+  iOS 应用内浏览器的回调拿不到 → 必挂。修法方向:发起侧把 uid 签进 state,
+  stash 存 Supabase 用户行(临时键),回调凭 state 里的 uid 取回 stash 换 token,
+  用后即清。在此之前的绕法:在桌面浏览器(或 iPhone Safari 直开,非主屏图标)
+  连一次,server 真源合并会让手机端显示已连接。

@@ -3,10 +3,25 @@
  * Receives OAuth code, exchanges for tokens, stores per-user via lib/portal/integrations.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { saveIntegrationToken, setTokenCookiesOnResponse } from '@/lib/portal/integrations';
+import { saveIntegrationToken, saveIntegrationTokenByUserId, setTokenCookiesOnResponse } from '@/lib/portal/integrations';
 import { envValue } from '@/lib/portal/env';
+import { verifySessionValue } from '@/lib/portal/auth/session-sig';
 
 const STATE_COOKIE = 'nesio_gmail_oauth_state';
+// 签名 state 的有效窗口:发起→回调正常几十秒,15 分钟足够宽,过期即忽略 uid
+// (退回 cookie 归属),防旧 state 被重放做账号绑定。
+const SIGNED_STATE_TTL_MS = 15 * 60 * 1000;
+
+/** 解析签名 state(nesio_gmail:<ts>:<uid>:<sig>),验签+验时效,失败返回 null。 */
+function verifiedStateUid(state: string | null): string | null {
+  if (!state) return null;
+  const parts = state.split(':');
+  if (parts.length !== 4 || parts[0] !== 'nesio_gmail') return null;
+  const [prefix, ts, uid, sig] = parts;
+  const age = Date.now() - Number(ts);
+  if (!Number.isFinite(age) || age < 0 || age > SIGNED_STATE_TTL_MS) return null;
+  return verifySessionValue(`${prefix}:${ts}:${uid}`, sig) ? uid : null;
+}
 
 function callbackUrl(req: NextRequest): string {
   const configured = envValue('GMAIL_REDIRECT_URI');
@@ -63,16 +78,21 @@ export async function GET(req: NextRequest) {
   }
 
   // Save token per user (Supabase + cookies)
-  const savedTokens = await saveIntegrationToken(
-    'gmail',
-    {
-      accessToken: token.access_token,
-      refreshToken: token.refresh_token,
-      expiresAt: token.expires_in ? Date.now() + token.expires_in * 1000 : undefined,
-      scope: token.scope,
-    },
-    req,
-  );
+  const tokenPayload = {
+    accessToken: token.access_token,
+    refreshToken: token.refresh_token,
+    expiresAt: token.expires_in ? Date.now() + token.expires_in * 1000 : undefined,
+    scope: token.scope,
+  };
+  const savedTokens = await saveIntegrationToken('gmail', tokenPayload, req);
+  // iOS PWA:回调跑在独立存储的应用内浏览器里,请求不带主环境登录 cookie,
+  // 上面的 cookie 归属会静默跳过 Supabase —— 用发起侧签进 state 的 uid 兜底,
+  // service role 直写该用户(验签+15min 时效,伪造/重放不认)。
+  const stateUid = verifiedStateUid(state);
+  if (stateUid) {
+    const wrote = await saveIntegrationTokenByUserId(stateUid, 'gmail', tokenPayload);
+    if (!wrote) console.error('gmail_oauth_state_uid_save_failed', stateUid.slice(0, 8));
+  }
 
   // 批次 15:请求了 gmail scope 但 Google 没授出(同意屏幕未配置该 scope /
   // 应用未过审时会被静默丢弃)——这是「重新授权后仍 403」死循环的根源,
@@ -95,12 +115,8 @@ export async function GET(req: NextRequest) {
   ));
   setTokenCookiesOnResponse(redirect, 'gmail', savedTokens);
   if (grantsCalendar) {
-    await saveIntegrationToken('calendar', {
-      accessToken: token.access_token,
-      refreshToken: token.refresh_token,
-      expiresAt: token.expires_in ? Date.now() + token.expires_in * 1000 : undefined,
-      scope: token.scope,
-    }, req);
+    await saveIntegrationToken('calendar', tokenPayload, req);
+    if (stateUid) await saveIntegrationTokenByUserId(stateUid, 'calendar', tokenPayload);
     setTokenCookiesOnResponse(redirect, 'calendar', savedTokens);
   }
   redirect.cookies.delete(STATE_COOKIE);

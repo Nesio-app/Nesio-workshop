@@ -5,6 +5,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { TESLA_AUTH_URL, TESLA_SCOPES, TESLA_AUDIENCE, teslaConfigured } from '@/lib/portal/tesla';
+import { getRefreshedUserId } from '@/lib/portal/integrations';
+import { signSessionValue } from '@/lib/portal/auth/session-sig';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,7 +45,12 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const state = `nesio_tesla:${auditId()}`;
+  // iOS PWA 修(同 gmail):发起侧(登录态)把 uid 签进 state,回调凭签归属 token,
+  // 不依赖回调环境的 cookie。未登录/无密钥退回旧 state(cookie CSRF 路径不变)。
+  const ts = Date.now();
+  const uid = await getRefreshedUserId();
+  const sig = uid ? signSessionValue(`nesio_tesla:${ts}:${uid}`) : '';
+  const state = uid && sig ? `nesio_tesla:${ts}:${uid}:${sig}` : `nesio_tesla:${auditId()}`;
   const authorizeUrl = new URL(TESLA_AUTH_URL);
   authorizeUrl.searchParams.set('client_id', envValue('TESLA_CLIENT_ID'));
   authorizeUrl.searchParams.set('redirect_uri', callbackUrl(req));

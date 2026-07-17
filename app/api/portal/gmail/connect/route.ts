@@ -6,6 +6,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { envValue } from '@/lib/portal/env';
 import { isPortalRequestAuthorized } from '@/lib/portal/auth/api-auth';
+import { getRefreshedUserId } from '@/lib/portal/integrations';
+import { signSessionValue } from '@/lib/portal/auth/session-sig';
 
 // Request calendar scope alongside gmail so one consent covers both connectors
 // and the resulting refresh token can serve either API.
@@ -42,7 +44,15 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const state = `nesio_gmail:${Date.now()}`;
+  // iOS PWA 修:OAuth 跳转会被系统踢进独立存储的应用内浏览器,回调请求不带
+  // 主环境的登录 cookie → token 落不进 Supabase(真源)。这里在**发起侧**(此刻
+  // 一定是登录态,上面刚过鉴权门)把 userId 签名后随 state 带过去,回调凭签名
+  // 归属 token,不再依赖回调环境的 cookie。签名用服务端密钥(session-sig),
+  // 伪造不了;拿不到 uid 或没配密钥则退回旧 state,行为不变。
+  const ts = Date.now();
+  const uid = await getRefreshedUserId();
+  const sig = uid ? signSessionValue(`nesio_gmail:${ts}:${uid}`) : '';
+  const state = uid && sig ? `nesio_gmail:${ts}:${uid}:${sig}` : `nesio_gmail:${ts}`;
   const authorizeUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
   authorizeUrl.searchParams.set('client_id', clientId);
   authorizeUrl.searchParams.set('redirect_uri', callbackUrl(req));

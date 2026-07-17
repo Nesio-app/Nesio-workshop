@@ -5,11 +5,24 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { exchangeTeslaCode } from '@/lib/portal/tesla';
-import { saveIntegrationToken, setTokenCookiesOnResponse } from '@/lib/portal/integrations';
+import { saveIntegrationToken, saveIntegrationTokenByUserId, setTokenCookiesOnResponse } from '@/lib/portal/integrations';
+import { verifySessionValue } from '@/lib/portal/auth/session-sig';
 
 export const dynamic = 'force-dynamic';
 
 const TESLA_OAUTH_STATE_COOKIE = 'nesio_tesla_oauth_state';
+// 签名 state 有效窗(同 gmail 修法):防旧 state 重放做账号绑定。
+const SIGNED_STATE_TTL_MS = 15 * 60 * 1000;
+
+/** 解析签名 state(nesio_tesla:<ts>:<uid>:<sig>),验签+验时效,失败返回 null。 */
+function verifiedStateUid(state: string): string | null {
+  const parts = state.split(':');
+  if (parts.length !== 4 || parts[0] !== 'nesio_tesla') return null;
+  const [prefix, ts, uid, sig] = parts;
+  const age = Date.now() - Number(ts);
+  if (!Number.isFinite(age) || age < 0 || age > SIGNED_STATE_TTL_MS) return null;
+  return verifySessionValue(`${prefix}:${ts}:${uid}`, sig) ? uid : null;
+}
 
 function envValue(key: string): string {
   const v = process.env[key];
@@ -36,8 +49,12 @@ export async function GET(req: NextRequest) {
   const returnedState = source.searchParams.get('state') || '';
   const storedState = req.cookies.get(TESLA_OAUTH_STATE_COOKIE)?.value || '';
 
-  // CSRF: returned state must match the cookie we set at /connect.
-  if (!returnedState || !storedState || returnedState !== storedState) {
+  // CSRF:同环境走 cookie 比对;iOS PWA 的回调落在独立存储的应用内浏览器
+  // (cookie 必缺,此前在这里必挂)→ 改认发起侧签名的 state(只有服务端能签,
+  // 带 15min 时效),两条路都不通才拒。
+  const signedUid = returnedState ? verifiedStateUid(returnedState) : null;
+  const cookieStateOk = Boolean(returnedState && storedState && returnedState === storedState);
+  if (!cookieStateOk && !signedUid) {
     console.warn('tesla_oauth_failure', { reason: 'tesla_oauth_state_mismatch' });
     const response = NextResponse.redirect(safeRedirectUrl(req, { tesla: 'oauth_failed', status: 'tesla_oauth_state_mismatch' }));
     response.cookies.delete(TESLA_OAUTH_STATE_COOKIE);
@@ -70,6 +87,11 @@ export async function GET(req: NextRequest) {
       scope: tokens.scope,
     };
     await saveIntegrationToken('tesla', stored, req);
+    // 跨环境归属:回调环境没有登录 cookie 时,凭发起侧签进 state 的 uid 直写云端。
+    if (signedUid) {
+      const wrote = await saveIntegrationTokenByUserId(signedUid, 'tesla', stored);
+      if (!wrote) console.error('tesla_oauth_state_uid_save_failed', signedUid.slice(0, 8));
+    }
     setTokenCookiesOnResponse(response, 'tesla', { ...stored, connectedAt: new Date().toISOString() });
   }
   return response;
