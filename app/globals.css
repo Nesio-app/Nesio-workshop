@@ -4581,9 +4581,10 @@ body:has(.nesio-mood-overlay) .nesio-bottom-nav::before {
 }
 
 /* 悬浮导航下方的渐隐垫:滚动内容不再「裸露」在按钮后面(批次 2)。
-   补实底渐变(iOS PWA 修):此前只有 backdrop-filter,iOS 滚动后 fixed 层的
-   backdrop-filter 常不重绘,「发霉」成一条实色带(下滑强制重绘才消失)——
-   垫上页面底色渐变后,即便滤镜失效,露出的也是与设计一致的底色。 */
+   ⚠️ 曾加过 `background: linear-gradient(to top, var(--portal-bg) 30%, transparent)`
+   补实底,结果这条硬色带把半透明导航 pill 的下半截「切」成实白,视觉上像
+   底部按钮被切掉 —— 已回退。色带的真正根治是 html 兜底色 + 滚动器
+   overscroll-behavior 隔离,不靠这层实底。保留 blur+mask 的毛玻璃渐隐。 */
 .nesio-bottom-nav::before {
   content: '';
   position: fixed;
@@ -4591,7 +4592,6 @@ body:has(.nesio-mood-overlay) .nesio-bottom-nav::before {
   right: 0;
   bottom: 0;
   height: calc(4.6rem + env(safe-area-inset-bottom, 0px));
-  background: linear-gradient(to top, var(--portal-bg) 30%, transparent);
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);
   -webkit-mask-image: linear-gradient(to top, black 38%, transparent);

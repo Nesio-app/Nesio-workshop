@@ -360,6 +360,13 @@ function cleanMemoryPreview(node: LifeNode, dict: DictLocale = 'zh'): string {
   const raw = node.rawInput || attrPreview;
   const cleaned = raw
     .replace(node.name, '')
+    // CARD SPEC(老数据兜底):老邮件 rawInput 形如「来自 X <a@b.com>: 正文」,
+    // 从未被剥头 —— 卡片正文直接糊「来自 Namecheap <billing@...>」这类乱码。
+    // 去「来自 X:」前缀、去尖括号邮箱、去裸邮箱。新数据走 aiSummary 分支不受影响。
+    .replace(/^来自\s[^:：]*[:：]\s*/, '')
+    .replace(/^来自\s[^:：]*$/, '')
+    .replace(/<[^>]*>?/g, ' ')
+    .replace(/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g, '')
     // 批次 24:剥掉链接与裸 URL 片段(flomo/导入节点常把 memo_id、模板路径
     // 之类当预览显示,如 m/mine/?memo_id=、s/x_xxx、ft.cn/template/xxx、d=xxx)
     .replace(/https?:\/\/\S+/g, '')
