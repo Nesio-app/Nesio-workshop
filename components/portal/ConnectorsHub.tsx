@@ -1186,7 +1186,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         <div className="nesio-settings-sheet-body">
           {/* 分层入口(用户定):免费只留 Google(日历+邮件)和 地理位置·天气;
               Pro 加 Flomo(Google people/tasks 的 scope 已随 google 一次授权带上,无独立行);
-              Lab(内测)全量可见。 */}
+              Lab 全量可见 —— 本仓个人版 Lab 默认开(isLabModeOn 默认 true),
+              显式关掉 Lab 才会看到这里的分层公开形态。 */}
           {CONNECTORS.filter((c) => !c.dev)
             .filter((c) => {
               if (isLabModeOn()) return true;

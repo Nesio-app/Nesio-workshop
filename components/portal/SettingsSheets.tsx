@@ -24,7 +24,7 @@ import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
 import { getTelemetryDeviceId } from '@/lib/portal/telemetry';
-import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab, getPalette, setPalette, PALETTES, type PaletteId } from '@/lib/portal/module-overrides';
+import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab, isLabModeOn, getPalette, setPalette, PALETTES, type PaletteId } from '@/lib/portal/module-overrides';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
 import { canUse, getTier, hasProOverride, hasPaidPro, refreshServerEntitlement, setProEntitlement, trialDaysLeft, TIER_UPDATED_EVENT } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
@@ -785,7 +785,7 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
   useEffect(() => {
     if (!open) return;
     try {
-      setLabOn(localStorage.getItem('baohe_personal_lab') === '1' || localStorage.getItem('baohe_lab_mode') === '1');
+      setLabOn(isLabModeOn()); // 个人版默认开;只有显式 '0' 才算关
       setPaletteState(getPalette());
       setProOn(hasProOverride()); // 批次 32:显示覆盖位本身;试用期 getTier 恒 pro 会让开关关不掉
     } catch { /* ignore */ }
@@ -804,7 +804,8 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
     const turningOn = !labOn;
     try {
       if (labOn) {
-        localStorage.removeItem('baohe_personal_lab');
+        // 个人版默认开:关闭必须显式写 '0'(删 key 会退回默认开)
+        localStorage.setItem('baohe_personal_lab', '0');
         localStorage.removeItem('baohe_lab_mode');
         sessionStorage.removeItem('baohe_personal_lab');
         sessionStorage.removeItem('baohe_lab_mode');
@@ -844,8 +845,8 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
             {labMsg
               ? labMsg
               : labOn
-                ? L(dict, '实验工具和预览功能已解锁。关闭后回到公开版。', 'Experimental tools and previews unlocked. Turn off to return to the public build.')
-                : L(dict, '解锁实验工具和预览功能。之前需要 ?baohePersonal=1 参数,现在点这里就行。', 'Unlock experimental tools and previews. Used to need ?baohePersonal=1 — now just tap here.')}
+                ? L(dict, '个人版默认全开:实验工具与全部连接器可见。关闭可预览公开版形态。', 'Personal build defaults to all-on: experimental tools and every connector visible. Turn off to preview the public build.')
+                : L(dict, '你手动关过 Lab(公开版形态预览中)。点击恢复全开(个人版默认)。', 'You turned Lab off (previewing the public build). Tap to restore all-on — the personal-build default.')}
           </span>
         </div>
         <span className={`nesio-settings-space-check${labOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>

@@ -204,7 +204,11 @@ Signal M1-M4(读切换 + 删除传导)、REG-004/006 i18n 闭环
 
 ## 模式速查
 
-- Lab 模式:URL `?baohePersonal=1` 进入,`?baohePublic=1` 退出;viewerRole
+- Lab 模式(**2026-07-16 起默认开**,用户定:本仓=个人全功能版,双前端分家后
+  公众版已在 Nesio-app/Nesio 仓):非提审构建默认 personal_lab / isLabModeOn()=true;
+  显式退出才收起 —— `?baohePublic=1` 或 设置→Lab 关(写 localStorage
+  `baohe_personal_lab='0'`,删 key = 回默认开);`?baohePersonal=1` 从退出态一键回全开。
+  提审构建(NEXT_PUBLIC_APPSTORE_BUILD=1)恒 public 不变。viewerRole
   四级 public/tester/personal_lab/local(lib/portal/launch-surface.mjs)
 - Demo/personal/market 三模式矩阵:components/portal/tool-state.ts(ShellMode)
 - Stage5 代理动作:CEO 双 env 门禁 + invocation secret

@@ -7,7 +7,7 @@
  * (你可以开 Lab 再单独关掉某个不想要的工具)。
  */
 
-import { APPSTORE_HIDDEN_IDS, isAppStoreBlocked } from './app-build.mjs';
+import { APPSTORE_HIDDEN_IDS, isAppStoreBlocked, isAppStoreBuild } from './app-build.mjs';
 
 const KEY = 'nesio-module-overrides-v1';
 export const MODULE_OVERRIDES_EVENT = 'nesio-module-overrides-updated';
@@ -94,11 +94,14 @@ export function isLowSatThemeOn(): boolean { return getPalette() !== ''; }
 export function setLowSatTheme(on: boolean): void { setPalette(on ? 'haze-blue' : ''); }
 export const applyLowSatTheme = applyPalette;
 
-/** Lab 模式(内测全解锁)是否开着。SSR 一律 false(= 公开面)。 */
+/** Lab 模式(内测全解锁)是否开着。本仓 = 个人全功能版:**默认开**;
+ *  只有显式写 '0'(设置→Lab 关闭 / ?baohePublic=1)才收起,用于预览公开形态。
+ *  提审构建恒关(合规);SSR 一律 false(= 公开面,水合后客户端接管)。 */
 export function isLabModeOn(): boolean {
   if (typeof window === 'undefined') return false;
+  if (isAppStoreBuild()) return false;
   try {
-    return localStorage.getItem('baohe_personal_lab') === '1' || localStorage.getItem('baohe_lab_mode') === '1';
+    return localStorage.getItem('baohe_personal_lab') !== '0';
   } catch { return false; }
 }
 
