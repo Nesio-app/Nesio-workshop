@@ -12701,8 +12701,11 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-rd-h { font-size: calc(1.15rem * var(--nesio-rd-scale, 1)); font-weight: 700; color: var(--portal-ink); margin: 1.4rem 0 0.7rem; scroll-margin-top: 1rem; }
 
 /* ══ 阅读器 · 多功能版 / 聚焦版(设计稿对齐:暖纸宋体 + 划词浮层 + 底部动作栏)══ */
-.nesio-rd-overlay--full { background: color-mix(in srgb, var(--status-gentle) 5%, var(--glass-bg-solid)); }
-.nesio-rd-overlay--focus { background: color-mix(in srgb, var(--status-gentle) 9%, var(--glass-bg-solid)); }
+/* 底色必须真不透明:--glass-bg-solid 在夜间是 rgba(255,255,255,0.07)(93% 透明),
+   用它做全屏浮层底色 → 底下的记忆详情透出来 = 重影(用户实测,Granola/会议内容常读所以常见)。
+   改用 --sheet-opaque(不透明面)调暖色。 */
+.nesio-rd-overlay--full { background: color-mix(in srgb, var(--status-gentle) 5%, var(--sheet-opaque, #fdfeff)); }
+.nesio-rd-overlay--focus { background: color-mix(in srgb, var(--status-gentle) 9%, var(--sheet-opaque, #fdfeff)); }
 .nesio-rd-overlay--focus .nesio-rd-topbar { border-bottom: none; background: transparent; }
 .nesio-rd-head-mid { flex: 1; min-width: 0; text-align: center; }
 .nesio-rd-head-kicker { margin: 0; font-size: 0.82rem; font-weight: 800; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
