@@ -141,13 +141,16 @@ export function ProactiveGuidanceCard({
   return (
     <div
       className="nesio-proactive-card"
-      onPointerDown={(e) => beginSwipe(e.clientX, e.clientY)}
+      onPointerDown={(e) => {
+        // iOS 在惯性滚动容器里对未捕获指针发 pointercancel(清掉共享 startRef,Touch 兜底
+        // 读到空起点 → 手势全落空)。setPointerCapture 后 iOS 不再抢指针,Pointer 单流即可,
+        // 删 Touch 双绑(它只会再次污染 startRef)。同产品仓修法。
+        try { (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId); } catch { /* Safari 偶发,忽略 */ }
+        beginSwipe(e.clientX, e.clientY);
+      }}
       onPointerMove={(e) => moveSwipe(e.clientX, e.clientY)}
       onPointerUp={(e) => endSwipe(e.clientX)}
       onPointerCancel={() => { startRef.current = null; setDx(0); }}
-      onTouchStart={(e) => { const t = e.touches[0]; if (t) beginSwipe(t.clientX, t.clientY); }}
-      onTouchMove={(e) => { const t = e.touches[0]; if (t) moveSwipe(t.clientX, t.clientY); }}
-      onTouchEnd={(e) => endSwipe(e.changedTouches[0]?.clientX ?? startRef.current?.x ?? 0)}
       style={{ transform: dx ? `translateX(${dx}px)` : undefined, transition: dx ? 'none' : 'transform 0.2s ease', touchAction: 'pan-y' }}
     >
       {/* 批次 165:滑动提示 —— 拖动时露出这一滑会做什么(左滑=没用 / 右滑=稍后),过阈值高亮=松手即执行 */}
