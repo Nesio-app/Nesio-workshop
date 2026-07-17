@@ -905,6 +905,7 @@ export default function TimelineTab() {
           open
           onOpenChange={(next) => { if (!next) setGlobeFull(false); }}
           card={false}
+          modal={false}
           className="nesio-globe-fsov"
           ariaLabel={L(dict, '世界', 'World')}
         >

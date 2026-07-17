@@ -42,6 +42,13 @@ export interface NesioSheetProps {
   /** 附加到 panel 的内联样式(迁移期用来保留个别 sheet 挂在根节点的 CSS 变量等)。 */
   style?: CSSProperties;
   /**
+   * center/fullscreen:是否走 Radix modal(react-remove-scroll 锁背景滚动 + 渲染遮罩)。
+   * 默认 true。**canvas/手势型全屏面板(地图 pinch、地球旋转)必须传 false** ——
+   * react-remove-scroll 会用非被动 touchmove/wheel + preventDefault 拦截手势,把双指
+   * 缩放/旋转废掉。这类面板自带不透明底,不需要遮罩底衬。焦点仍靠自持 trap,Esc 仍生效。
+   */
+  modal?: boolean;
+  /**
    * 是否由原语渲染标准卡片壳(面/圆角/内边距/阴影)。默认 true。
    * 迁移期若 sheet 自带定制卡片(尺寸/圆角/背景独特),传 false ——
    * 原语只接管定位/遮罩/焦点机器,卡片视觉保持原样(零视觉回归)。
@@ -197,6 +204,7 @@ export default function NesioSheet({
   className,
   style,
   card = true,
+  modal = true,
   children,
 }: NesioSheetProps) {
   const panelClass = `nesio-sheet nesio-sheet--${variant}${card ? '' : ' nesio-sheet--bare'}${className ? ` ${className}` : ''}`;
@@ -218,7 +226,7 @@ export default function NesioSheet({
   // 需要背后有不透明层,否则在夜间(--glass-bg-solid 近全透)会透出下层。
   const overlayClass = `nesio-sheet-overlay${variant === 'fullscreen' ? ' nesio-sheet-overlay--opaque' : ''}`;
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root open={open} onOpenChange={onOpenChange} modal={modal}>
       <Dialog.Portal>
         <Dialog.Overlay className={overlayClass} />
         <RadixContent
