@@ -12,6 +12,7 @@ import {
   todayGrowthCards, recordGrowthAnswer, growthHistory, growthStreakDays,
   GROWTH_FRAMEWORKS, runFrameworkInline, composeArgumentTeardown, type GrowthCard, type GrowthAnswer,
 } from '@/lib/portal/growth-guide';
+import { collectSeeds, generateObservation, DIMENSION_LABEL, type Observation } from '@/lib/portal/growth-engine';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -42,6 +43,11 @@ export default function GrowthTab() {
   const [fwInput, setFwInput] = useState<Record<string, string>>({});
   const [fwOut, setFwOut] = useState<Record<string, { state: 'running' | 'done' | 'error'; text: string }>>({});
 
+  // 智能观察(引擎:真实记忆 → 镜头 → 三态)。obsState: loading→有几条 / done→渲染 / empty→回落规则卡
+  const [obs, setObs] = useState<Observation[]>([]);
+  const [obsLoading, setObsLoading] = useState(true);
+  const [quizPick, setQuizPick] = useState<Record<string, number>>({});
+
   const refresh = () => {
     try {
       setCards(todayGrowthCards());
@@ -50,6 +56,28 @@ export default function GrowthTab() {
     } catch { /* 本地数据读取失败:空态兜底 */ }
   };
   useEffect(() => { refresh(); }, []);
+
+  // 引擎:选种子 → 逐个 AI 生成(失败/无 key → obs 为空,回落规则卡)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const answered = new Set(growthHistory().map((a) => `${a.kind}:${a.refId}`));
+        const seeds = collectSeeds(Date.now(), answered, 2);
+        if (!seeds.length) { if (!cancelled) setObsLoading(false); return; }
+        const results = await Promise.all(seeds.map((s) => generateObservation(s, en ? 'en' : 'zh')));
+        if (!cancelled) { setObs(results.filter((o): o is Observation => o !== null)); setObsLoading(false); }
+      } catch { if (!cancelled) setObsLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [en]);
+
+  function answerObservation(o: Observation, text: string) {
+    recordGrowthAnswer({ id: o.id, kind: 'dusty_memory', refId: o.sourceId, question: o.title, questionEn: o.title, context: o.sourceText },
+      text);
+    setObs((prev) => prev.filter((x) => x.id !== o.id));
+    refresh();
+  }
 
   function submit(card: GrowthCard) {
     const text = (draft[card.id] || '').trim();
@@ -94,12 +122,75 @@ export default function GrowthTab() {
       )}
 
       <p className="nesio-insights-section-label">{L(dict, '今日引导', "Today's prompts")}</p>
-      {cards.length === 0 ? (
+
+      {/* 智能观察(引擎三态):真实记忆 → 镜头 → 主动疏导 / 小测 / 趋势 */}
+      {obsLoading && (
+        <p className="nesio-settings-option-hint" style={{ marginBottom: 'var(--space-3)' }}>
+          {L(dict, '念念在看你最近的记录…', 'Nessa is looking over your recent notes…')}
+        </p>
+      )}
+      {obs.map((o) => (
+        <div key={o.id} style={{ border: '1px solid var(--portal-accent-border)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)', marginBottom: 'var(--space-3)', background: 'var(--portal-accent-soft)' }}>
+          <p style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', margin: '0 0 var(--space-2)' }}>
+            <span style={{ fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{o.title}</span>
+            <span style={{ fontSize: '0.66rem', color: 'var(--portal-blue-deep)', background: 'var(--panel, rgba(255,255,255,0.5))', padding: '1px 7px', borderRadius: 'var(--radius-pill)' }}>{L(dict, DIMENSION_LABEL[o.dimension].zh, DIMENSION_LABEL[o.dimension].en)}</span>
+          </p>
+
+          {/* nudge / trend:一段话 + 答一句(存进回看流) */}
+          {o.mode !== 'quiz' && (
+            <>
+              <p style={{ color: 'var(--portal-ink)', lineHeight: 1.7, margin: '0 0 var(--space-2)', whiteSpace: 'pre-wrap' }}>{o.body}</p>
+              <textarea className="nesio-routine-input" style={{ minHeight: '3rem', resize: 'vertical', width: '100%' }}
+                placeholder={o.mode === 'nudge' ? L(dict, '想说点什么就说一句 —— 会存进回看流', "Say a line if you'd like — saved to your review trail") : L(dict, '记一句你的想法', 'Jot a line')}
+                value={draft[o.id] || ''} onChange={(e) => setDraft((p) => ({ ...p, [o.id]: e.target.value }))} />
+              <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-2)' }}
+                disabled={!(draft[o.id] || '').trim()} onClick={() => answerObservation(o, draft[o.id])}>
+                {L(dict, '记下这条回看', 'Save this reflection')}
+              </button>
+            </>
+          )}
+
+          {/* quiz:选项 → 揭晓正误 + 解释(思维利器形式,题是你的真实想法) */}
+          {o.mode === 'quiz' && o.quiz && (
+            <>
+              <p style={{ color: 'var(--portal-ink)', lineHeight: 1.6, margin: '0 0 var(--space-1)' }}>{o.quiz.question}</p>
+              <p className="nesio-settings-option-hint" style={{ margin: '0 0 var(--space-2)' }}>{o.sourceText}</p>
+              {o.quiz.options.map((opt, i) => {
+                const picked = quizPick[o.id];
+                const revealed = picked != null;
+                const isCorrect = i === o.quiz!.correctIndex;
+                const bg = !revealed ? 'var(--panel, #fff)'
+                  : isCorrect ? 'var(--status-go-soft)'
+                  : i === picked ? 'var(--status-risk-soft)' : 'var(--panel, #fff)';
+                return (
+                  <button key={i} type="button" disabled={revealed}
+                    onClick={() => setQuizPick((p) => ({ ...p, [o.id]: i }))}
+                    style={{ display: 'block', width: '100%', textAlign: 'left', padding: 'var(--space-3)', marginBottom: 'var(--space-2)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', background: bg, color: 'var(--portal-ink)', cursor: revealed ? 'default' : 'pointer' }}>
+                    <span style={{ fontWeight: 'var(--weight-medium)' }}>{String.fromCharCode(65 + i)}. </span>{opt}
+                  </button>
+                );
+              })}
+              {quizPick[o.id] != null && (
+                <div style={{ marginTop: 'var(--space-2)' }}>
+                  <p style={{ color: quizPick[o.id] === o.quiz.correctIndex ? 'var(--status-go)' : 'var(--status-gentle)', fontWeight: 'var(--weight-semibold)', margin: '0 0 var(--space-1)' }}>
+                    {quizPick[o.id] === o.quiz.correctIndex ? L(dict, '✓ 看得很准', '✓ Nicely spotted') : L(dict, '再体会一下 ——', 'Have another look —')}
+                  </p>
+                  <p style={{ color: 'var(--portal-ink)', lineHeight: 1.7, margin: '0 0 var(--space-2)', whiteSpace: 'pre-wrap' }}>{o.quiz.explanation}</p>
+                  <button type="button" className="nesio-connector-connect" onClick={() => answerObservation(o, `[${DIMENSION_LABEL[o.dimension].zh}] ${o.quiz!.options[o.quiz!.correctIndex]}`)}>{L(dict, '记下这次觉察', 'Log this insight')}</button>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      ))}
+
+      {/* 规则卡:引擎没产出时的兜底(commitment/spend/dusty,零 AI) */}
+      {!obsLoading && obs.length === 0 && cards.length === 0 ? (
         <p className="nesio-settings-option-hint">
           {L(dict, '今天没有要回看的 —— 记录多了,这里会从你的数据里挑值得回头看一眼的事。',
             'Nothing to look back on today — as your records grow, prompts will surface from your own data.')}
         </p>
-      ) : cards.map((c) => (
+      ) : (!obsLoading && obs.length === 0) ? cards.map((c) => (
         <div key={c.id} style={{ border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', padding: 'var(--space-4)', marginBottom: 'var(--space-3)' }}>
           <p style={{ color: 'var(--portal-ink)', lineHeight: 1.6, margin: 0 }}>{en ? c.questionEn : c.question}</p>
           <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-2) 0' }}>{c.context}</p>
@@ -115,7 +206,7 @@ export default function GrowthTab() {
             {L(dict, '记下这条回看', 'Save this reflection')}
           </button>
         </div>
-      ))}
+      )) : null}
 
       <p className="nesio-insights-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '回看流', 'Review trail')}</p>
       {history.length === 0 ? (
