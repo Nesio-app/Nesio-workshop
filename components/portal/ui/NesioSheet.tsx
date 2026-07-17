@@ -23,7 +23,7 @@
 
 import { Drawer } from 'vaul';
 import * as Dialog from '@radix-ui/react-dialog';
-import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { useEffect, useRef, type CSSProperties, type ReactNode, type RefObject } from 'react';
 
 export type NesioSheetVariant = 'bottom' | 'center' | 'fullscreen';
 
@@ -39,6 +39,8 @@ export interface NesioSheetProps {
   onCommit?: () => void;
   /** 附加到 panel 的类名(迁移期用来保留个别 sheet 的既有布局类)。 */
   className?: string;
+  /** 附加到 panel 的内联样式(迁移期用来保留个别 sheet 挂在根节点的 CSS 变量等)。 */
+  style?: CSSProperties;
   /**
    * 是否由原语渲染标准卡片壳(面/圆角/内边距/阴影)。默认 true。
    * 迁移期若 sheet 自带定制卡片(尺寸/圆角/背景独特),传 false ——
@@ -142,13 +144,13 @@ function useFocusTrap(ref: RefObject<HTMLElement | null>, active: boolean) {
 }
 
 /** bottom:Vaul 手势/弹簧 + 自持焦点陷阱。 */
-function VaulContent({ panelClass, ariaLabel, open, children }: {
-  panelClass: string; ariaLabel: string; open: boolean; children: ReactNode;
+function VaulContent({ panelClass, panelStyle, ariaLabel, open, children }: {
+  panelClass: string; panelStyle?: CSSProperties; ariaLabel: string; open: boolean; children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   useFocusTrap(ref, open);
   return (
-    <Drawer.Content ref={ref} className={panelClass} aria-label={ariaLabel} tabIndex={-1}>
+    <Drawer.Content ref={ref} className={panelClass} style={panelStyle} aria-label={ariaLabel} tabIndex={-1}>
       <Drawer.Title className="sr-only">{ariaLabel}</Drawer.Title>
       <div className="nesio-sheet-grabber" aria-hidden="true" />
       {children}
@@ -158,8 +160,8 @@ function VaulContent({ panelClass, ariaLabel, open, children }: {
 
 /** center / fullscreen:Radix portal/Esc/scroll-lock + 自持焦点陷阱。
  *  关掉 Radix 自己的 auto-focus,避免与自持 trap 互抢。 */
-function RadixContent({ panelClass, ariaLabel, open, dismissible, bareCenter, onOpenChange, children }: {
-  panelClass: string; ariaLabel: string; open: boolean; dismissible: boolean;
+function RadixContent({ panelClass, panelStyle, ariaLabel, open, dismissible, bareCenter, onOpenChange, children }: {
+  panelClass: string; panelStyle?: CSSProperties; ariaLabel: string; open: boolean; dismissible: boolean;
   bareCenter: boolean; onOpenChange: (open: boolean) => void; children: ReactNode;
 }) {
   const ref = useRef<HTMLDivElement>(null);
@@ -168,6 +170,7 @@ function RadixContent({ panelClass, ariaLabel, open, dismissible, bareCenter, on
     <Dialog.Content
       ref={ref}
       className={panelClass}
+      style={panelStyle}
       aria-label={ariaLabel}
       tabIndex={-1}
       // bare-center 时 Content 满视口 flex 居中,Radix 检测不到「点击外部」——
@@ -192,6 +195,7 @@ export default function NesioSheet({
   dismissible = true,
   ariaLabel,
   className,
+  style,
   card = true,
   children,
 }: NesioSheetProps) {
@@ -202,7 +206,7 @@ export default function NesioSheet({
       <Drawer.Root open={open} onOpenChange={onOpenChange} dismissible={dismissible} modal repositionInputs={false}>
         <Drawer.Portal>
           <Drawer.Overlay className="nesio-sheet-overlay" />
-          <VaulContent panelClass={panelClass} ariaLabel={ariaLabel} open={open}>
+          <VaulContent panelClass={panelClass} panelStyle={style} ariaLabel={ariaLabel} open={open}>
             {children}
           </VaulContent>
         </Drawer.Portal>
@@ -210,12 +214,16 @@ export default function NesioSheet({
     );
   }
 
+  // fullscreen 的遮罩用不透明页面底当底衬 —— 全屏面板常是磨砂玻璃底(半透明),
+  // 需要背后有不透明层,否则在夜间(--glass-bg-solid 近全透)会透出下层。
+  const overlayClass = `nesio-sheet-overlay${variant === 'fullscreen' ? ' nesio-sheet-overlay--opaque' : ''}`;
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="nesio-sheet-overlay" />
+        <Dialog.Overlay className={overlayClass} />
         <RadixContent
           panelClass={panelClass}
+          panelStyle={style}
           ariaLabel={ariaLabel}
           open={open}
           dismissible={dismissible}
