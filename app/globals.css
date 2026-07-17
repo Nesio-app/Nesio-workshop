@@ -17826,6 +17826,8 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   z-index: 900;
   background: var(--modal-backdrop-bg, rgba(16, 28, 54, 0.25));
 }
+/* fullscreen 底衬:不透明页面底,给半透明(磨砂玻璃)全屏面板兜底,防夜间透出下层 */
+.nesio-sheet-overlay--opaque { background: var(--portal-bg, #f4f8fd); }
 .nesio-sheet-overlay[data-state='open'] { animation: nesioSheetFade var(--dur, 0.3s) var(--ease-out); }
 .nesio-sheet-overlay[data-state='closed'] { animation: nesioSheetFadeOut var(--dur-fast, 0.2s) var(--ease-out); }
 
@@ -17833,11 +17835,15 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .nesio-sheet {
   position: fixed;
   z-index: 901;
-  background: var(--sheet-opaque, #fdfeff);
   color: var(--portal-ink);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   outline: none;
+}
+/* 不透明面只作用于非 bare —— bare 的背景由迁移元素自带的 className 提供
+   (fullscreen 阅读器等),或保持透明(center 的满视口 flex 容器)。 */
+.nesio-sheet:not(.nesio-sheet--bare) {
+  background: var(--sheet-opaque, #fdfeff);
 }
 
 /* bottom:底部抽屉。Vaul 负责 y 轴 transform,这里只给静止态样式 */
@@ -17877,7 +17883,6 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 /* bare:原语只做定位/遮罩/焦点,不渲染卡片壳 —— 迁移期保留 sheet 自带的定制
    卡片(尺寸/圆角/背景独特)时用,零视觉回归。child 自己带 card 视觉。 */
 .nesio-sheet--bare {
-  background: none;
   border: none;
   box-shadow: none;
   padding: 0;
