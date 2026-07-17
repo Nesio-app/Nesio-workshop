@@ -682,7 +682,7 @@ export async function backfillGenericPlaceLabels(maxLookups = 40): Promise<numbe
   const needs = trail.filter(needsRealName);
   if (!needs.length) return 0;
 
-  let cache: Record<string, { label: string; city?: string; country?: string }> = {};
+  let cache: Record<string, { label: string; city?: string; country?: string; kind?: string }> = {};
   try { cache = JSON.parse(localStorage.getItem(REVGEO_CACHE_KEY) || '{}') as typeof cache; } catch { cache = {}; }
 
   const cellOf = (v: PlaceVisit) => `${(v.lat as number).toFixed(3)},${(v.lon as number).toFixed(3)}`;
@@ -692,20 +692,45 @@ export async function backfillGenericPlaceLabels(maxLookups = 40): Promise<numbe
   const cells = [...byCell.entries()].sort((a, b) => b[1] - a[1]).map(([k]) => k);
 
   const { reverseGeocodeRobust } = await import('./capture-location');
+  // 有 Foursquare key 时服务端 geocode 出「店名 + 类别」(POI 级,认店最准),
+  // 优先走它;被限流(429)后本轮不再打服务端,余下格子回落免费链(街道级)。
+  let serverBlocked = false;
+  const lookupOnce = async (lat: number, lon: number): Promise<{ label: string; city?: string; country?: string; kind?: string } | null> => {
+    if (!serverBlocked) {
+      try {
+        const res = await fetch('/api/portal/geocode', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lat, lon }),
+        });
+        if (res.status === 429) { serverBlocked = true; } else {
+          const d = await res.json() as { ok?: boolean; name?: string; city?: string; country?: string; kind?: string };
+          if (d.ok && d.name) {
+            const label = [d.name, d.city && d.city !== d.name ? d.city : '', d.country].filter(Boolean).join(', ');
+            return { label, city: d.city, country: d.country, kind: d.kind };
+          }
+        }
+      } catch { /* 服务端不可达 → 回落免费链 */ }
+    }
+    try {
+      const g = await reverseGeocodeRobust(lat, lon);
+      if (g.label) return { label: g.label, city: g.city, country: g.country };
+    } catch { /* 免费链也没查到 */ }
+    return null;
+  };
+
   let lookups = 0;
-  const resolved = new Map<string, { label: string; city?: string; country?: string }>();
+  const resolved = new Map<string, { label: string; city?: string; country?: string; kind?: string }>();
   for (const key of cells) {
     let hit = cache[key];
     if (!hit) {
       if (lookups >= maxLookups) continue;
       lookups++;
       const [lat, lon] = key.split(',').map(Number);
-      try {
-        const g = await reverseGeocodeRobust(lat, lon);
-        if (!g.label) continue; // 本轮查不到:跳过,下轮再试(不缓存失败)
-        hit = { label: g.label, city: g.city, country: g.country };
-        cache[key] = hit;
-      } catch { continue; }
+      const g = await lookupOnce(lat, lon);
+      if (!g) continue; // 本轮查不到:跳过,下轮再试(不缓存失败)
+      hit = g;
+      cache[key] = hit;
     }
     resolved.set(key, hit);
   }
@@ -723,11 +748,16 @@ export async function backfillGenericPlaceLabels(maxLookups = 40): Promise<numbe
   });
   if (!touched) return 0;
   save(next); // store 自带 PLACE_TRAIL_UPDATED_EVENT 广播,地图/时间线就地刷新
-  // World tab / 分类链路:城市、国家元数据跟着新名字走
+  // World tab / 分类链路:城市、国家、类别元数据跟着新名字走。
+  // Foursquare 给的 kind(超市/咖啡/公园…)写进分类 —— 但用户手动改过的不覆盖。
   const geoAll = loadPlaceGeo();
-  for (const { label, city, country } of resolved.values()) {
+  const catOverrides = loadPlaceCategories();
+  for (const { label, city, country, kind } of resolved.values()) {
     const name = canonicalPlaceLabel(label) || label;
-    try { setPlaceGeo(name, { ...(geoAll[name] || {}), name, city, country, resolved: true }); } catch { /* 元数据可缺 */ }
+    try {
+      setPlaceGeo(name, { ...(geoAll[name] || {}), name, city, country, resolved: true, ...(kind ? { kind: kind as PlaceCategory } : {}) });
+      if (kind && !catOverrides[name]) setPlaceCategory(name, kind as PlaceCategory);
+    } catch { /* 元数据可缺 */ }
   }
   return touched;
 }
