@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "npm run bundle:toolbox && next dev",
+    "dev": "npm run bundle:toolbox && npm run bundle:ort && next dev",
     "build": "npm run build:server",
-    "build:server": "npm run check:leak && npm run bundle:toolbox && next build",
+    "build:server": "npm run bundle:ort && npm run check:leak && npm run bundle:toolbox && next build",
     "check:leak": "node scripts/check-platform-leak.mjs",
     "bundle:toolbox": "node scripts/bundle-toolbox.mjs",
     "report:modules": "node scripts/report-module-registry.mjs",
@@ -287,7 +287,8 @@
     "test:cross-region-leadlag": "node scripts/cross-region-leadlag.test.mjs",
     "test:cross-region-deliver": "node scripts/cross-region-deliver.test.mjs",
     "test:cross-region-bandit": "node scripts/cross-region-bandit.test.mjs",
-    "test:meeting-calendar-link": "node scripts/meeting-calendar-link.test.mjs"
+    "test:meeting-calendar-link": "node scripts/meeting-calendar-link.test.mjs",
+    "bundle:ort": "node scripts/copy-ort-wasm.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.4.1",
@@ -298,6 +299,7 @@
     "d3-geo": "^3.1.1",
     "fflate": "^0.8.3",
     "next": "^16.2.10",
+    "onnxruntime-web": "^1.27.0",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "recharts": "^3.9.2",
