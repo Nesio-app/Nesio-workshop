@@ -117,7 +117,7 @@ assert.ok(sheet.includes("view === 'sell'") && sheet.includes('sellPile(items)')
 assert.ok(sheet.includes('forSale: !item.forSale'), '详情页标记/取消出售');
 // 物品④⑤⑥ 接线
 assert.ok(sheet.includes('isContainer: !item.isContainer'), '物品④:详情页变成/解除容器');
-assert.ok(sheet.includes('🗃'), '物品④:容器图标区分');
+assert.ok(sheet.includes('容器'), '物品④:容器切换可见(设计去 emoji 后按文案而非图标区分)');
 assert.ok(sheet.includes('containedCount'), '物品④:装了几件可见');
 assert.ok(sheet.includes('/api/portal/inventory-extract') && sheet.includes('clipboard.readText'), '物品⑤:粘贴商品信息走提取路由');
 assert.ok(sheet.includes('pasteMsg'), '物品⑤:识别失败可见(不静默)');

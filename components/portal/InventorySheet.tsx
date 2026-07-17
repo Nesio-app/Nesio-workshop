@@ -363,7 +363,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                 style={{ flex: 1, borderRadius: 12, border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.82rem' }}
                 onClick={() => fileRef.current?.click()}
               >
-                📄 {L(dict, '导入 CSV', 'Import CSV')}
+                {L(dict, '导入 CSV', 'Import CSV')}
               </button>
               <input
                 ref={fileRef}
@@ -399,7 +399,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               style={{ width: '100%', padding: '0.55rem', borderRadius: 10, border: '1px dashed var(--border-subtle, rgba(255,255,255,0.2))', background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.82rem', opacity: pasteBusy ? 0.6 : 1 }}
               onClick={pasteRecognize}
             >
-              📋 {pasteBusy ? L(dict, '识别中…', 'Recognizing…') : L(dict, '粘贴商品信息识别(商品标题/描述都行)', 'Paste product info to auto-fill')}
+              {pasteBusy ? L(dict, '识别中…', 'Recognizing…') : L(dict, '粘贴商品信息识别(商品标题/描述都行)', 'Paste product info to auto-fill')}
             </button>
             {pasteMsg && <p style={{ margin: '0.4rem 0 0', fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'center' }}>{pasteMsg}</p>}
             <label style={label}>{L(dict, '物品名', 'Item name')}</label>
@@ -514,7 +514,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                 if (!sp.items.length) return null;
                 return (
                   <p style={{ margin: '1rem 0 0', fontSize: '0.82rem' }}>
-                    💰 {L(dict, `卖闲置堆:${sp.items.length} 件,约值 $${sp.totalValue.toLocaleString('en-US')}`, `Sell pile: ${sp.items.length} items ≈ $${sp.totalValue.toLocaleString('en-US')}`)}
+                    {L(dict, `卖闲置堆:${sp.items.length} 件,约值 $${sp.totalValue.toLocaleString('en-US')}`, `Sell pile: ${sp.items.length} items ≈ $${sp.totalValue.toLocaleString('en-US')}`)}
                   </p>
                 );
               })()}
@@ -548,7 +548,6 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                     <div key={i.id} style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
                       <button type="button" onClick={() => { setDetailId(i.id); setView('detail'); }}
                         style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: '0.6rem 0.7rem', borderRadius: 12, border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)' }}>
-                        <span style={{ fontSize: '1.05rem' }}>💰</span>
                         <span style={{ flex: 1, minWidth: 0 }}>
                           <span style={{ display: 'block', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.name}{i.quantity != null ? ` ×${i.quantity}` : ''}</span>
                           <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{i.location || L(dict, '未归位', 'Unplaced')}</span>
@@ -652,7 +651,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
         style={{ width: '100%', marginTop: '1rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: item.forSale ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem' }}
         onClick={() => { updateInventoryItem(item.id, { forSale: !item.forSale }); onChanged(); }}
       >
-        💰 {item.forSale ? L(dict, '已在卖闲置堆 · 点击取消', 'In sell pile · tap to remove') : L(dict, '标记出售(进卖闲置堆)', 'Mark for sale')}
+        {item.forSale ? L(dict, '已在卖闲置堆 · 点击取消', 'In sell pile · tap to remove') : L(dict, '标记出售(进卖闲置堆)', 'Mark for sale')}
       </button>
       {/* 物品④:物品本身变容器(收纳箱等);解除只摘 flag,不动已放进去的物品 */}
       <button
@@ -660,7 +659,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
         style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: item.isContainer ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem' }}
         onClick={() => { updateInventoryItem(item.id, { isContainer: !item.isContainer }); onChanged(); }}
       >
-        🗃 {item.isContainer
+        {item.isContainer
           ? L(dict, `已是容器,装了 ${item.containedCount} 件 · 点击解除(不影响里面的物品)`, `It's a bin holding ${item.containedCount} · tap to unmark (contents stay)`)
           : L(dict, '变成容器(其他物品的位置就能写它)', 'Make it a bin (other items can live in it)')}
       </button>

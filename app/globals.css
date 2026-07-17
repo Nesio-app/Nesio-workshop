@@ -126,6 +126,8 @@
   --dur-slow: 0.6s;
   /* ── Ink & surface (day) ── */
   --portal-bg:    #f4f8fd;
+  --portal-card:  #ffffff;
+  --portal-fg:    #1e2a3a;
   --portal-ink:   #1e2a3a;
   --portal-muted: #5a6d82;
   --portal-line:  rgba(88, 140, 227, 0.14);
@@ -248,6 +250,8 @@ html[data-portal-theme="night"] .portal-root {
   --portal-blue-light: #2c4a78;
   /* Night ink/surface */
   --portal-bg:    #0e1626;
+  --portal-card:  #16233a;
+  --portal-fg:    #e7eefb;
   --portal-ink:   #e7eefb;
   --portal-muted: rgba(200, 217, 245, 0.6);
   --portal-line:  rgba(127, 176, 245, 0.16);
@@ -325,6 +329,8 @@ body {
   --portal-blue-mid: #96c7f3;
   --portal-blue-light: #cddefc;
   --portal-bg: #f4f8fd;
+  --portal-card: #ffffff;
+  --portal-fg: #1e2a3a;
   --portal-ink: #1e2a3a;
   --portal-muted: #5a6d82;
   --portal-line: rgba(88, 140, 227, 0.14);
@@ -2784,6 +2790,8 @@ html[data-portal-theme="night"] .portal-root{
   --portal-blue-mid:#5f8fd6;
   --portal-blue-light:#2c4a78;
   --portal-bg:#0e1626;
+  --portal-card:#16233a;
+  --portal-fg:#e7eefb;
   --portal-ink:#e7eefb;
   --portal-muted:rgba(200,217,245,.6);
   --portal-line:rgba(127,176,245,.16);
@@ -11518,33 +11526,37 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   align-items: center;
   flex: 1;
 }
+/* 存放位置下拉/输入:此前用深色主题近白硬编码色(#e2e8f0),但只在浅底(收纳/识别结果)
+   出现 → 近白字压近白底几乎不可见(用户报「选项字看不清」)。改走设计系统浅色 token。 */
 .nesio-loc-select {
-  background: rgba(255,255,255,0.07);
-  border: 1.5px solid rgba(255,255,255,0.12);
+  background: var(--portal-accent-soft);
+  border: 1.5px solid var(--portal-accent-border);
   border-radius: 8px;
-  color: #e2e8f0;
+  color: var(--portal-ink);
   font-size: 0.82rem;
   padding: 0.3rem 0.5rem;
   outline: none;
   cursor: pointer;
   max-width: 130px;
 }
-.nesio-loc-select:focus { border-color: rgba(99,179,237,0.5); }
+/* 原生下拉弹层项也要显式给色,否则继承系统默认近白 */
+.nesio-loc-select option { color: var(--portal-ink); background: var(--portal-bg); }
+.nesio-loc-select:focus { border-color: var(--portal-blue-deep); }
 .nesio-loc-free-input {
   flex: 1;
-  background: rgba(255,255,255,0.07);
-  border: 1.5px solid rgba(255,255,255,0.12);
+  background: var(--portal-accent-soft);
+  border: 1.5px solid var(--portal-accent-border);
   border-radius: 8px;
-  color: #e2e8f0;
+  color: var(--portal-ink);
   font-size: 0.82rem;
   padding: 0.3rem 0.6rem;
   outline: none;
   min-width: 0;
 }
-.nesio-loc-free-input:focus { border-color: rgba(99,179,237,0.5); }
+.nesio-loc-free-input:focus { border-color: var(--portal-blue-deep); }
 .nesio-loc-switch-btn {
   font-size: 0.75rem;
-  color: #7bafd4;
+  color: var(--portal-accent);
   background: none;
   border: none;
   padding: 0.2rem 0.4rem;
