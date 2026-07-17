@@ -222,36 +222,77 @@ async function testOauthCookieReadsGoogleCalendarApiWithoutIcsEnv() {
   mockBaoheAuthCookie = 'baohe-session';
   mockCalendarAccessCookie = 'google-access-token';
   const fetchedUrls = [];
+  // 多日历契约:先 calendarList 列举勾选日历(含订阅日历),再逐日历拉 events ——
+  // 订阅日历(如 Fidelity)必须进来,此前只拉 primary 导致 Other calendars 全漏。
   global.fetch = async (url, init = {}) => {
-    fetchedUrls.push({ url: String(url), authorization: init.headers?.Authorization || init.headers?.authorization || '' });
-    return {
-      ok: true,
-      async json() {
-        return {
-          items: [
-            {
-              id: 'google-event-1',
-              summary: 'Google OAuth Event',
-              start: { dateTime: '2099-02-01T10:00:00-05:00' },
-              end: { dateTime: '2099-02-01T10:30:00-05:00' },
-              htmlLink: 'https://calendar.google.com/event?eid=1',
-            },
-          ],
-        };
-      },
-    };
+    const urlText = String(url);
+    fetchedUrls.push({ url: urlText, authorization: init.headers?.Authorization || init.headers?.authorization || '' });
+    if (urlText.includes('/users/me/calendarList')) {
+      return {
+        ok: true,
+        async json() {
+          return {
+            items: [
+              { id: 'primary', summary: 'Janice', primary: true, selected: true },
+              { id: 'fidelity@group.calendar.google.com', summary: 'Fidelity', selected: true },
+              { id: 'unchecked@group.calendar.google.com', summary: 'Unchecked', selected: false },
+            ],
+          };
+        },
+      };
+    }
+    if (urlText.includes('/calendars/primary/events')) {
+      return {
+        ok: true,
+        async json() {
+          return {
+            items: [
+              {
+                id: 'google-event-1',
+                summary: 'Google OAuth Event',
+                start: { dateTime: '2099-02-01T10:00:00-05:00' },
+                end: { dateTime: '2099-02-01T10:30:00-05:00' },
+                htmlLink: 'https://calendar.google.com/event?eid=1',
+              },
+            ],
+          };
+        },
+      };
+    }
+    if (urlText.includes('fidelity%40group.calendar.google.com')) {
+      return {
+        ok: true,
+        async json() {
+          return {
+            items: [
+              {
+                id: 'fidelity-event-1',
+                summary: 'Fidelity Webinar',
+                start: { dateTime: '2099-02-02T10:00:00-05:00' },
+                end: { dateTime: '2099-02-02T11:00:00-05:00' },
+              },
+            ],
+          };
+        },
+      };
+    }
+    throw new Error(`Unexpected fetch: ${urlText}`);
   };
 
   const { GET } = loadRoute();
   const response = await GET(mockRequest());
 
-  assert.equal(fetchedUrls.length, 1);
-  assert.match(fetchedUrls[0].url, /https:\/\/www\.googleapis\.com\/calendar\/v3\/calendars\/primary\/events/);
+  assert.equal(fetchedUrls.length, 3, 'calendarList + 两个勾选日历(selected:false 的不拉)');
+  assert.match(fetchedUrls[0].url, /\/users\/me\/calendarList/);
   assert.equal(fetchedUrls[0].authorization, 'Bearer google-access-token');
   assert.equal(response.body.ok, true);
   assert.equal(response.body.provider, 'google_calendar_oauth');
-  assert.equal(response.body.events[0].title, 'Google OAuth Event');
-  assert.equal(response.body.events[0].source, 'Google Calendar');
+  const titles = response.body.events.map((e) => e.title);
+  assert.ok(titles.includes('Google OAuth Event'), '主日历事件在');
+  assert.ok(titles.includes('Fidelity Webinar'), '订阅日历(Fidelity)事件必须进来');
+  const fidelityEv = response.body.events.find((e) => e.title === 'Fidelity Webinar');
+  assert.equal(fidelityEv.calendarName, 'Fidelity', '事件携带真实日历名(不再硬编码 Google Calendar)');
+  assert.equal(fidelityEv.source, 'Google Calendar');
 }
 
 // 修「Token 存储精神分裂」:换设备只有 Supabase token、本机无 cookie 时,
@@ -264,7 +305,16 @@ async function testSupabaseTokenReadsCalendarCrossDeviceWithoutCookie() {
   mockSupabaseCalendarToken = { accessToken: 'supabase-access-token', refreshToken: 'supabase-refresh-token' };
   const fetchedUrls = [];
   global.fetch = async (url, init = {}) => {
-    fetchedUrls.push({ url: String(url), authorization: init.headers?.Authorization || init.headers?.authorization || '' });
+    const urlText = String(url);
+    fetchedUrls.push({ url: urlText, authorization: init.headers?.Authorization || init.headers?.authorization || '' });
+    if (urlText.includes('/users/me/calendarList')) {
+      return {
+        ok: true,
+        async json() {
+          return { items: [{ id: 'primary', summary: 'Google Calendar', primary: true, selected: true }] };
+        },
+      };
+    }
     return {
       ok: true,
       async json() {
@@ -286,8 +336,8 @@ async function testSupabaseTokenReadsCalendarCrossDeviceWithoutCookie() {
     const { GET } = loadRoute();
     const response = await GET(mockRequest());
 
-    assert.equal(fetchedUrls.length, 1, '应直接用 Supabase token 打 Google,而不是掉进 iCal 兜底。');
-    assert.equal(fetchedUrls[0].authorization, 'Bearer supabase-access-token', '用的是 Supabase 里的 token,不是 cookie。');
+    assert.equal(fetchedUrls.length, 2, '应直接用 Supabase token 打 Google(calendarList + events),而不是掉进 iCal 兜底。');
+    assert.ok(fetchedUrls.every((f) => f.authorization === 'Bearer supabase-access-token'), '用的是 Supabase 里的 token,不是 cookie。');
     assert.equal(response.body.ok, true);
     assert.equal(response.body.provider, 'google_calendar_oauth');
     assert.equal(response.body.events[0].title, 'Cross-device Google Event');
@@ -310,8 +360,10 @@ async function testOauthRefreshCookieRecoversExpiredCalendarAccess() {
     const urlText = String(url);
     fetchedUrls.push(urlText);
     authorizations.push(init.headers?.Authorization || init.headers?.authorization || '');
+    const auth = authorizations.at(-1);
 
-    if (urlText.includes('/calendar/v3/calendars/primary/events') && authorizations.at(-1) === 'Bearer expired-google-access-token') {
+    // 过期 token:calendarList 与 events 都 401(→ 路由走刷新链)
+    if ((urlText.includes('/users/me/calendarList') || urlText.includes('/calendar/v3/calendars/primary/events')) && auth === 'Bearer expired-google-access-token') {
       return {
         ok: false,
         status: 401,
@@ -337,7 +389,16 @@ async function testOauthRefreshCookieRecoversExpiredCalendarAccess() {
       };
     }
 
-    if (urlText.includes('/calendar/v3/calendars/primary/events') && authorizations.at(-1) === 'Bearer fresh-google-access-token') {
+    if (urlText.includes('/users/me/calendarList') && auth === 'Bearer fresh-google-access-token') {
+      return {
+        ok: true,
+        async json() {
+          return { items: [{ id: 'primary', summary: 'Google Calendar', primary: true, selected: true }] };
+        },
+      };
+    }
+
+    if (urlText.includes('/calendar/v3/calendars/primary/events') && auth === 'Bearer fresh-google-access-token') {
       return {
         ok: true,
         async json() {
@@ -368,8 +429,12 @@ async function testOauthRefreshCookieRecoversExpiredCalendarAccess() {
   assert.deepEqual(
     fetchedUrls.map((url) => (url === 'https://oauth2.googleapis.com/token' ? url : new URL(url).origin + new URL(url).pathname)),
     [
+      // 过期尝试:calendarList 401(容错回退 primary)→ primary events 401 → 走刷新
+      'https://www.googleapis.com/calendar/v3/users/me/calendarList',
       'https://www.googleapis.com/calendar/v3/calendars/primary/events',
       'https://oauth2.googleapis.com/token',
+      // 刷新后重试:calendarList → primary events
+      'https://www.googleapis.com/calendar/v3/users/me/calendarList',
       'https://www.googleapis.com/calendar/v3/calendars/primary/events',
     ],
   );

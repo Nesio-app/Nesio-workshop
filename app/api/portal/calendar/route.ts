@@ -4,6 +4,7 @@ import { cookies } from 'next/headers';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 import { mergeCalendarEvents } from '@/lib/portal/calendar-filters';
+import type { CalendarEvent } from '@/lib/portal/types';
 import { parseIcsEvents, parseCalendarName } from '@/lib/portal/ics';
 import { resolveGmailAccessToken } from '@/lib/portal/providers/gmail-access';
 import { getIntegrationToken, saveIntegrationToken } from '@/lib/portal/integrations';
@@ -157,7 +158,7 @@ function conferenceUrl(item: GoogleCalendarItem): string {
   return any?.uri || '';
 }
 
-function mapGoogleCalendarItem(item: GoogleCalendarItem) {
+function mapGoogleCalendarItem(item: GoogleCalendarItem, calName = 'Google Calendar') {
   const start = item.start?.dateTime || item.start?.date || '';
   const end = item.end?.dateTime || item.end?.date || start;
   const desc = item.description || '';
@@ -177,7 +178,7 @@ function mapGoogleCalendarItem(item: GoogleCalendarItem) {
     // 批次 48:全天事件(start.date 无 dateTime)必须带标记 —— 拍平后下游把
     // "2026-07-11" 按 UTC 午夜解析,长出「20:00 · 2h后」的假钟点和假倒计时
     allDay: !item.start?.dateTime,
-    calendarName: 'Google Calendar',
+    calendarName: calName,
     source: 'Google Calendar',
     // Meeting/Zoom link takes priority over generic htmlLink (Google Calendar page)
     url: meetingUrl || item.htmlLink || '',
@@ -209,14 +210,31 @@ async function refreshGoogleCalendarSession(refreshToken: string): Promise<Googl
   return response.json() as Promise<GoogleTokenResponse>;
 }
 
-async function fetchGoogleOAuthEvents(accessToken: string) {
+type GoogleCalendarListEntry = { id: string; summary: string; primary?: boolean };
+
+// 列出用户在 Google 日历里勾选显示的所有日历(含订阅/Other calendars)。
+// calendar.readonly 已覆盖 calendarList.list,无需加 scope / 重连。
+async function fetchGoogleCalendarList(accessToken: string): Promise<GoogleCalendarListEntry[]> {
+  const res = await fetch(
+    'https://www.googleapis.com/calendar/v3/users/me/calendarList?minAccessRole=reader&showHidden=false',
+    { headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' }, cache: 'no-store' },
+  );
+  if (!res.ok) throw new Error(`calendarlist_http_${res.status}`);
+  const data = await res.json().catch(() => ({})) as { items?: Array<{ id?: string; summary?: string; summaryOverride?: string; primary?: boolean; selected?: boolean }> };
+  return (data.items || [])
+    .filter((c) => c.id && c.selected !== false) // selected=false = 用户在 Google 日历左栏取消勾选
+    .map((c) => ({ id: c.id as string, summary: c.summaryOverride || c.summary || (c.primary ? 'Google Calendar' : c.id as string), primary: c.primary }));
+}
+
+async function fetchEventsForCalendar(accessToken: string, cal: GoogleCalendarListEntry) {
   const now = new Date();
   const timeMin = now.toISOString();
   const timeMax = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString();
-  const url = new URL('https://www.googleapis.com/calendar/v3/calendars/primary/events');
+  const url = new URL(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal.id)}/events`);
   url.searchParams.set('singleEvents', 'true');
   url.searchParams.set('orderBy', 'startTime');
-  url.searchParams.set('maxResults', '80');
+  // 主日历保持原 80;订阅日历各 50(农历/节假日一天一条,靠 mergeCalendarEvents 的农历过滤 + 总量 80 挡噪音)
+  url.searchParams.set('maxResults', cal.primary ? '80' : '50');
   url.searchParams.set('timeMin', timeMin);
   url.searchParams.set('timeMax', timeMax);
 
@@ -235,7 +253,37 @@ async function fetchGoogleOAuthEvents(accessToken: string) {
   }
   const data = await res.json().catch(() => ({}));
   const rows = Array.isArray(data?.items) ? data.items : [];
-  return rows.map((item: GoogleCalendarItem) => mapGoogleCalendarItem(item));
+  return rows.map((item: GoogleCalendarItem) => mapGoogleCalendarItem(item, cal.summary));
+}
+
+// 多日历拉取:此前只拉 calendars/primary/events,用户在 Google 日历勾选的订阅日历
+// (Fidelity/课程/节假日等 Other calendars)全部漏掉。现在先 calendarList 列举再逐个
+// 并发拉,单日历失败不阻断其它;全军覆没才抛错(让上层的刷新/借用重试链接管)。
+async function fetchGoogleOAuthEvents(accessToken: string): Promise<{ events: CalendarEvent[]; feeds: FeedResult[] }> {
+  let calendars: GoogleCalendarListEntry[] = [];
+  try {
+    calendars = await fetchGoogleCalendarList(accessToken);
+  } catch { /* calendarList 不可用(旧 token/权限异常)→ 退回只拉 primary,不差于从前 */ }
+  if (!calendars.length) calendars = [{ id: 'primary', summary: 'Google Calendar', primary: true }];
+
+  const settled = await Promise.allSettled(calendars.map((c) => fetchEventsForCalendar(accessToken, c)));
+  const lists: ReturnType<typeof mapGoogleCalendarItem>[][] = [];
+  const feeds: FeedResult[] = [];
+  settled.forEach((r, i) => {
+    if (r.status === 'fulfilled') {
+      lists.push(r.value);
+      feeds.push({ label: calendars[i].summary, ok: true, count: r.value.length });
+    } else {
+      feeds.push({ label: calendars[i].summary, ok: false, count: 0, error: r.reason instanceof Error ? r.reason.message : 'fetch failed' });
+    }
+  });
+  if (lists.length === 0) {
+    const first = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
+    throw first ? (first.reason instanceof Error ? first.reason : new Error(String(first.reason))) : new Error('calendar_all_failed');
+  }
+  // mergeCalendarEvents:跨日历去重(同一会议同时出现在主日历+团队日历)+ 农历标记过滤 + 时间排序,总量 80
+  const events = mergeCalendarEvents(lists, 80);
+  return { events, feeds };
 }
 
 export async function GET(req: NextRequest) {
@@ -255,7 +303,7 @@ export async function GET(req: NextRequest) {
   // access 可能过期但 refresh 仍在 → 只要有任一,就走 OAuth 路径(而非直接掉进 iCal)。
   if (shouldUseOAuth({ accessToken, refreshToken })) {
     try {
-      const events = await fetchGoogleOAuthEvents(accessToken);
+      const { events, feeds: calFeeds } = await fetchGoogleOAuthEvents(accessToken);
       return NextResponse.json(
         {
           ok: true,
@@ -263,8 +311,8 @@ export async function GET(req: NextRequest) {
           enabled: true,
           provider: 'google_calendar_oauth',
           events,
-          feeds: [{ label: 'Google Calendar', ok: true, count: events.length }],
-          sources: ['Google Calendar'],
+          feeds: calFeeds,
+          sources: calFeeds.map((f) => f.label),
           fetchedAt: new Date().toISOString(),
         },
         { headers: { 'Cache-Control': 'no-store, max-age=0' } },
@@ -274,7 +322,7 @@ export async function GET(req: NextRequest) {
       const refreshedSession = await refreshGoogleCalendarSession(refreshToken);
       if (refreshedSession?.access_token) {
         try {
-          const events = await fetchGoogleOAuthEvents(refreshedSession.access_token);
+          const { events, feeds: calFeeds } = await fetchGoogleOAuthEvents(refreshedSession.access_token);
           // 刷新成功后同时写回 Supabase(不只 cookie),否则换设备下次又拿到旧 token。
           await saveIntegrationToken('calendar', {
             accessToken: refreshedSession.access_token,
@@ -289,8 +337,8 @@ export async function GET(req: NextRequest) {
               provider: 'google_calendar_oauth',
               status: 'calendar_session_refreshed',
               events,
-              feeds: [{ label: 'Google Calendar', ok: true, count: events.length }],
-              sources: ['Google Calendar'],
+              feeds: calFeeds,
+              sources: calFeeds.map((f) => f.label),
               fetchedAt: new Date().toISOString(),
             },
             { headers: { 'Cache-Control': 'no-store, max-age=0' } },
@@ -306,7 +354,7 @@ export async function GET(req: NextRequest) {
       const borrowed = await resolveGmailAccessToken(req).catch(() => '');
       if (borrowed && borrowed !== accessToken) {
         try {
-          const events = await fetchGoogleOAuthEvents(borrowed);
+          const { events, feeds: calFeeds } = await fetchGoogleOAuthEvents(borrowed);
           return NextResponse.json(
             {
               ok: true,
@@ -315,8 +363,8 @@ export async function GET(req: NextRequest) {
               provider: 'google_calendar_oauth',
               status: 'calendar_borrowed_token',
               events,
-              feeds: [{ label: 'Google Calendar', ok: true, count: events.length }],
-              sources: ['Google Calendar'],
+              feeds: calFeeds,
+              sources: calFeeds.map((f) => f.label),
               fetchedAt: new Date().toISOString(),
             },
             { headers: { 'Cache-Control': 'no-store, max-age=0' } },
