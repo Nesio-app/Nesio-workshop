@@ -8,11 +8,11 @@ export const metadata: Metadata = {
   manifest: '/manifest.json',
   icons: {
     icon: [
-      { url: '/icons/nesio-favicon-32.png', sizes: '32x32', type: 'image/png' },
-      { url: '/icons/nesio-pwa-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/treasurebox-favicon-32.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icons/treasurebox-pwa-192.png', sizes: '192x192', type: 'image/png' },
     ],
     apple: [
-      { url: '/icons/nesio-apple-touch-180.png', sizes: '180x180', type: 'image/png' },
+      { url: '/icons/treasurebox-pwa-180.png', sizes: '180x180', type: 'image/png' },
     ],
   },
   appleWebApp: {
@@ -29,7 +29,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   viewportFit: 'cover',
-  themeColor: '#588ce3',
+  themeColor: '#c07f79',
 };
 
 // 批次 99:防闪。主题(日/夜)+ 莫兰迪皮肤都在 paint 前落 data 属性 —— 皮肤逻辑
