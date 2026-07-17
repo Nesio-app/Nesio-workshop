@@ -111,15 +111,6 @@ async function analyzeImage(base64: string, prompt?: string, dict: string = 'zh'
   return { nodes: data.nodes, summary: data.summary || L(dict, '识别完成', 'Recognition done') };
 }
 
-const TYPE_ICON: Record<string, string> = {
-  person: '👤', object: '📦', place: '📍', event: '📅',
-  commitment: '🤝', health_state: '🩷', preference: '⭐',
-};
-const TYPE_LABEL: Record<string, string> = {
-  person: '人物', object: '物品', place: '地点', event: '事件',
-  commitment: '承诺', health_state: '健康', preference: '偏好',
-};
-
 function confidenceLabel(confidence: number): string {
   if (confidence >= 0.82) return '比较确定';
   if (confidence >= 0.58) return '可能相关';
@@ -848,7 +839,12 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             updatedAt: new Date().toISOString(),
           };
           cloudAssets = [{ ...assetRecord, nodeId: savedNodes[0].id }];
-          updateLifeNode(savedNodes[0].id, { assets: [assetRecord] });
+          // 合并而非覆盖:updateLifeNode 对 assets 是浅替换。此前直接 { assets:[assetRecord] }
+          // 会把上面写入的本地图 asset(local:true)整个抹掉,详情页只剩依赖云端签名 URL 的
+          // asset —— 生产上该 URL 加载失败就成破图「?」。读实时节点(含已写入的本地 asset)再
+          // 追加云端 asset,本地图排在前面,ObjectSection.firstImage 优先命中它、直接从 IDB 出图。
+          const liveForAssets = getLifeGraph().find((x) => x.id === savedNodes[0].id);
+          updateLifeNode(savedNodes[0].id, { assets: [...(liveForAssets?.assets || []), assetRecord] });
         }
       } catch {
         // Cloud asset sync is best-effort; local Memory remains the source of continuity offline.
@@ -938,8 +934,12 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
     ctx.stroke();
-    ctx.fillStyle = 'rgba(59,130,246,0.12)';
+    // eslint-disable-next-line no-restricted-syntax -- canvas fillStyle 无法解析 var(),读 --portal-blue-deep 兜底(此前硬编码废弃蓝 #3b82f6)
+    const fillBlue = getComputedStyle(document.documentElement).getPropertyValue('--portal-blue-deep').trim() || '#588ce3';
+    ctx.fillStyle = fillBlue;
+    ctx.globalAlpha = 0.12;
     ctx.fill();
+    ctx.globalAlpha = 1;
   }
 
   async function handleSelTouchEnd(e: React.TouchEvent<HTMLCanvasElement>) {
@@ -1378,7 +1378,7 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
         <div className="nesio-camera-result-panel" style={{ textAlign: 'center', padding: '1.5rem 1.25rem' }}>
           <p style={{ color: 'var(--status-go)', fontSize: '2rem', margin: 0, lineHeight: 1 }}>✓</p>
           <p style={{ color: 'var(--status-go)', fontSize: '1.1rem', fontWeight: 700, marginTop: '0.5rem' }}>{L(dict, '已存入 Memory', 'Saved to Memory')}</p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>{L(dict, '在「记忆」里查看', 'View it in Memory')}</p>
+          <p style={{ color: 'var(--portal-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>{L(dict, '在「记忆」里查看', 'View it in Memory')}</p>
         </div>
       )}
 
