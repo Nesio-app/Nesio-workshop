@@ -17874,6 +17874,29 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .nesio-sheet--center[data-state='open'] { animation: nesioSheetPop var(--dur, 0.3s) var(--ease-out); }
 .nesio-sheet--center[data-state='closed'] { animation: nesioSheetPopOut var(--dur-fast, 0.2s) var(--ease-out); }
 
+/* bare:原语只做定位/遮罩/焦点,不渲染卡片壳 —— 迁移期保留 sheet 自带的定制
+   卡片(尺寸/圆角/背景独特)时用,零视觉回归。child 自己带 card 视觉。 */
+.nesio-sheet--bare {
+  background: none;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+/* center-bare:复刻旧 overlay 的「满视口 flex 居中」—— child 的 %/vw 宽度
+   才对视口解析(否则 transform 居中 + width:auto 会 shrink-to-fit,child 的
+   100% 塌成内容宽度 = 宽度回归)。空白区点击关闭在 RadixContent 里补。 */
+.nesio-sheet--center.nesio-sheet--bare {
+  inset: 0;
+  width: auto;
+  max-height: none;
+  transform: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.nesio-sheet--bottom.nesio-sheet--bare { padding: 0; }
+
 /* fullscreen:全屏面板 */
 .nesio-sheet--fullscreen {
   inset: 0;

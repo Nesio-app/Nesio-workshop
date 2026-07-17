@@ -29,6 +29,7 @@ import { getTier, trialDaysLeft, guardPaidCloudAi } from '@/lib/portal/entitleme
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import NesioSheet from './ui/NesioSheet';
 import { IconClock, IconGift, IconSun, IconShield, IconHelpCircle, IconBulb } from './icons';
 
 // 图3/4/5:档案页删除、账户收进头像区、菜单去分组标题与小灰字
@@ -235,7 +236,14 @@ export default function NesioProfileCard() {
 
       {/* 批次 95:卡通头像 —— 生成中 / 预览接受 / 报错 */}
       {(cartoonBusy || cartoonPreview || cartoonMsg) && (
-        <div className="nesio-cartoon-overlay" role="dialog" aria-modal="true">
+        <NesioSheet
+          variant="center"
+          open
+          onOpenChange={() => { /* 状态驱动:出口是卡片内的按钮(生成中不可关) */ }}
+          dismissible={false}
+          card={false}
+          ariaLabel={L(dict, '卡通头像', 'Cartoon avatar')}
+        >
           <div className="nesio-cartoon-card">
             {cartoonBusy ? (
               <>
@@ -267,7 +275,7 @@ export default function NesioProfileCard() {
               </>
             )}
           </div>
-        </div>
+        </NesioSheet>
       )}
 
       {/* Sub-sheets */}
