@@ -217,6 +217,7 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
       card={false}
+      modal={false}
       className="nesio-memmap-overlay"
       ariaLabel={L(dict, '地图上的记忆', 'Memories on the map')}
     >
