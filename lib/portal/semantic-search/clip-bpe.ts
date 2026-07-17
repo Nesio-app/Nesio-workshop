@@ -44,8 +44,14 @@ export class ClipBpe {
     this.vocab = data.vocab;
     this.contextLength = data.context_length;
     data.merges.forEach((m, i) => this.ranks.set(m, i));
-    this.sot = data.vocab['<|startoftext|>'];
-    this.eot = data.vocab['<|endoftext|>'];
+    // 特殊 token 命名随 open_clip 版本变:MobileCLIP2 用 <start_of_text>,
+    // 老 CLIP 用 <|startoftext|>——都试一遍,取到为止
+    const pick = (...keys: string[]) => {
+      for (const k of keys) if (data.vocab[k] !== undefined) return data.vocab[k];
+      throw new Error(`词表里找不到起止 token(试过 ${keys.join(', ')})`);
+    };
+    this.sot = pick('<start_of_text>', '<|startoftext|>');
+    this.eot = pick('<end_of_text>', '<|endoftext|>');
   }
 
   private bpe(token: string): string {
