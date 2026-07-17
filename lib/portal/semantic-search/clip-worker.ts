@@ -14,20 +14,28 @@ import { ClipBpe, type TokenizerData } from './clip-bpe';
 // wasm 运行时自托管在 /ort/(scripts/copy-ort-wasm.mjs 拷入):
 // 本仓 CSP connect-src 'self',走 CDN 会被静默拦(Plaid 当年同款坑)
 ort.env.wasm.wasmPaths = '/ort/';
+// 无跨源隔离(dev/普通部署没设 COOP/COEP)→ 没有 SharedArrayBuffer →
+// 多线程 wasm 会在推理时卡死。强制单线程走非线程代理路径,稳过。
+ort.env.wasm.numThreads = 1;
 
 let imgSession: ort.InferenceSession | null = null;
 let txtSession: ort.InferenceSession | null = null;
 let bpe: ClipBpe | null = null;
 let inputSize = 256;
 
+// backend 选择:URL 带 ?webgpu 时才试 WebGPU(某些浏览器会创建成功却在推理时挂,
+// 真机验证过再默认开);否则 WASM——最稳、到处能跑
+const WANT_WEBGPU = typeof location !== 'undefined' && location.search.includes('webgpu');
+
 async function createSession(buf: ArrayBuffer): Promise<[ort.InferenceSession, string]> {
-  try {
-    const s = await ort.InferenceSession.create(buf, { executionProviders: ['webgpu', 'wasm'] });
-    return [s, 'webgpu|wasm'];
-  } catch {
-    const s = await ort.InferenceSession.create(buf, { executionProviders: ['wasm'] });
-    return [s, 'wasm'];
+  if (WANT_WEBGPU) {
+    try {
+      const s = await ort.InferenceSession.create(buf, { executionProviders: ['webgpu'] });
+      return [s, 'webgpu'];
+    } catch { /* 落回 wasm */ }
   }
+  const s = await ort.InferenceSession.create(buf, { executionProviders: ['wasm'] });
+  return [s, 'wasm'];
 }
 
 function normalize(v: Float32Array): Float32Array {
