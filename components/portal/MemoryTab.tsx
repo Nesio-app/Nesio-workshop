@@ -44,7 +44,7 @@ import dynamic from 'next/dynamic';
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
-import { DomainIcon, IconBox, IconBookmark, IconCalendar, IconCamera, IconCheckSquare, IconFolder, IconMail, IconMapPin, IconMic, IconNote, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
+import { DomainIcon, IconActivity, IconBox, IconBookmark, IconCalendar, IconCamera, IconCheckSquare, IconFolder, IconMail, IconMapPin, IconMic, IconNote, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
@@ -346,6 +346,10 @@ function cleanMemoryPreview(node: LifeNode, dict: DictLocale = 'zh'): string {
     const d = new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' });
     return L(dict, `一段 ${d} 的心情记录 · 点开查看`, `A mood entry from ${d} · tap to view`);
   }
+  // CARD SPEC:入库时若已产出归一化摘要(attributes.summary),第二行优先用它 ——
+  // 老数据无此字段走下面的正则兜底,渐进生效。
+  const aiSummary = typeof node.attributes.summary === 'string' ? node.attributes.summary.trim() : '';
+  if (aiSummary) return aiSummary.slice(0, 44);
   // 批次 59:属性兜底改走可见名单 —— 位置戳/信号基建/内部字段绝不上卡片面
   // (此前 Object.values 全量拼接,capturedLat/Lon 裸坐标直接糊在卡片上)。
   const PREVIEW_HIDDEN = /^(capturedLat|capturedLon|capturedPlace|lat|lon|signalId|signalSource|signalType|signalVersion|occurredAt|capturedAt|externalId|calendarId|calendarName|subtasksJson|done|doneAt|focusPinnedOn|retentionPolicy|sensitivity|schemaVersion|sourceNodeId|emailId|messageId|htmlLink|context|userTags|status)$/;
@@ -403,6 +407,9 @@ function sourceMeta(node: LifeNode, dict: DictLocale): { label: string; icon: Re
   const sz = 11;
   if (tags.includes('notion')) return { label: 'Notion', icon: <IconNote size={sz} /> };
   if (tags.includes('keep')) return { label: 'Keep', icon: <IconNote size={sz} /> };
+  // CARD SPEC:外部 API 来源(Flomo/微信)单独立徽章,不再落到 default「手记」。
+  if (tags.includes('flomo')) return { label: 'Flomo', icon: <IconNote size={sz} /> };
+  if (tags.includes('微信读书') || tags.includes('wechat') || tags.includes('微信')) return { label: L(dict, '微信', 'WeChat'), icon: <IconNote size={sz} /> };
   if (node.type === 'place') return { label: L(dict, '位置', 'Place'), icon: <IconMapPin size={sz} /> };
   switch (node.source) {
     case 'email': return { label: L(dict, '邮件', 'Email'), icon: <IconMail size={sz} /> };
@@ -601,6 +608,7 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
   const { initials, bg: avatarBg } = isPerson ? getPersonInitials(node.name) : { initials: '', bg: '' };
   const srcMeta = sourceMeta(node, dict);
   const catLabel = categoryLabelForCard(node, dict);
+  const isMood = node.type === 'health_state' && (node.tags || []).some((t) => t === 'feeling' || t === 'moment');
   const uncertain = isNodeUncertain(node);
 
   return (
@@ -639,7 +647,8 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
           <span className="nesio-memory-card-lead nesio-memory-card-avatar" style={{ background: avatarBg }}>{initials}</span>
         ) : (
           <span className="nesio-memory-card-lead nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || 'var(--portal-accent-soft)' }}>
-            <NodeTypeIcon type={node.type} size={14} />
+            {/* CARD SPEC:情绪有独立图标(波形),不再借健康的心跳图标 */}
+            {isMood ? <IconActivity size={14} /> : <NodeTypeIcon type={node.type} size={14} />}
           </span>
         )}
         <span className="nesio-memory-card-cat-label">{catLabel}</span>

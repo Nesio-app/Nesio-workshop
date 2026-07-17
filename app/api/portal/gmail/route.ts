@@ -397,6 +397,9 @@ export async function GET(req: NextRequest) {
           from: header(m, 'from'),
           emailId: m.id,
           mailCategory: cat,
+          // CARD SPEC:列表卡第二行优先读 summary(干净摘要)—— 兜底路径用 Gmail 自带
+          // snippet(正文首句预览,无邮件头),不再靠渲染层从「来自 X: …」rawInput 里现剥。
+          ...(m.snippet ? { summary: m.snippet.slice(0, 120) } : {}),
           ...(body ? { article: body } : {}),
         },
         relations: [] as Array<{ targetId: string; relation: string }>,
