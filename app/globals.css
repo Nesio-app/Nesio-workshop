@@ -17808,3 +17808,114 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   animation: nesioSpin 0.8s linear infinite;
 }
 @keyframes nesioSpin { to { transform: rotate(360deg); } }
+
+/* ══════════════════════════════════════════════════════════════════════
+   NesioSheet 原语(施工单 W0)—— 全仓 sheet/modal 唯一容器的视觉层。
+   底座:bottom=Vaul(JS 内联 transform 驱动拖拽/弹簧),center/fullscreen=
+   Radix Dialog(data-state 驱动 CSS 进出)。视觉对齐旧 .nesio-visitmem-sheet,
+   保证迁移零视觉回归。动效只引 --ease-out/--dur token,不写裸值。
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* 遮罩:Vaul 与 Radix 都挂 data-state,统一淡入淡出 */
+.nesio-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  /* 900/901:压过所有遗留 sheet 遮罩(≤730)—— 迁移期原语常在旧式 role=dialog
+     里嵌套打开(如 node-detail=450),必须浮其上;仍低于日期选择器/录音/收据
+     等特殊模态(1010–1200),让它们能再叠在原语之上。 */
+  z-index: 900;
+  background: var(--modal-backdrop-bg, rgba(16, 28, 54, 0.25));
+}
+.nesio-sheet-overlay[data-state='open'] { animation: nesioSheetFade var(--dur, 0.3s) var(--ease-out); }
+.nesio-sheet-overlay[data-state='closed'] { animation: nesioSheetFadeOut var(--dur-fast, 0.2s) var(--ease-out); }
+
+/* panel 公共:面/字色/滚动 */
+.nesio-sheet {
+  position: fixed;
+  z-index: 901;
+  background: var(--sheet-opaque, #fdfeff);
+  color: var(--portal-ink);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  outline: none;
+}
+
+/* bottom:底部抽屉。Vaul 负责 y 轴 transform,这里只给静止态样式 */
+.nesio-sheet--bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: 1.1rem 1.1rem 0 0;
+  border-top: 1px solid var(--portal-line);
+  max-height: 88lvh;
+  padding: 0.5rem 1rem calc(env(safe-area-inset-bottom, 0px) + var(--kb-inset, 0px) + 0.9rem);
+}
+.nesio-sheet-grabber {
+  width: 2.2rem;
+  height: 0.28rem;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--portal-line);
+  margin: 0.1rem auto 0.7rem;
+  flex: none;
+}
+
+/* center:居中模态,不锚定触发器。Radix data-state 驱动缩放淡入 */
+.nesio-sheet--center {
+  top: 50%;
+  left: 50%;
+  width: min(92vw, 30rem);
+  max-height: 84lvh;
+  transform: translate(-50%, -50%);
+  border-radius: var(--radius-md, 16px);
+  border: 1px solid var(--portal-line);
+  padding: 1.1rem 1.15rem calc(env(safe-area-inset-bottom, 0px) + 1.1rem);
+  box-shadow: 0 24px 60px rgba(16, 28, 54, 0.22);
+}
+.nesio-sheet--center[data-state='open'] { animation: nesioSheetPop var(--dur, 0.3s) var(--ease-out); }
+.nesio-sheet--center[data-state='closed'] { animation: nesioSheetPopOut var(--dur-fast, 0.2s) var(--ease-out); }
+
+/* fullscreen:全屏面板 */
+.nesio-sheet--fullscreen {
+  inset: 0;
+  max-height: 100lvh;
+  padding: calc(env(safe-area-inset-top, 0px)) 0 calc(env(safe-area-inset-bottom, 0px));
+}
+.nesio-sheet--fullscreen[data-state='open'] { animation: nesioSheetRise var(--dur, 0.3s) var(--ease-out); }
+.nesio-sheet--fullscreen[data-state='closed'] { animation: nesioSheetFadeOut var(--dur-fast, 0.2s) var(--ease-out); }
+
+@keyframes nesioSheetFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes nesioSheetFadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes nesioSheetPop {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes nesioSheetPopOut {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+}
+@keyframes nesioSheetRise { from { opacity: 0; transform: translateY(1.5%); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── 三档降级 ─────────────────────────────────────────────────────────── */
+/* ① reduced-motion(= 安静模式 B 跟随系统):交叉淡入,无位移/无缩放 */
+@media (prefers-reduced-motion: reduce) {
+  .nesio-sheet-overlay[data-state='open'],
+  .nesio-sheet-overlay[data-state='closed'],
+  .nesio-sheet--center[data-state='open'],
+  .nesio-sheet--center[data-state='closed'],
+  .nesio-sheet--fullscreen[data-state='open'],
+  .nesio-sheet--fullscreen[data-state='closed'] {
+    animation: nesioSheetFade 0.2s linear;
+  }
+  .nesio-sheet--center[data-state='closed'],
+  .nesio-sheet--fullscreen[data-state='closed'],
+  .nesio-sheet-overlay[data-state='closed'] { animation: nesioSheetFadeOut 0.16s linear; }
+  /* center 静止 transform 必须保留(否则丢居中),关键帧里不再动 transform */
+}
+/* ② reduced-transparency:遮罩实底,不透穿背景 */
+@media (prefers-reduced-transparency: reduce) {
+  .nesio-sheet-overlay { background: rgba(16, 28, 54, 0.55); }
+}
+/* ③ contrast:实边框 */
+@media (prefers-contrast: more) {
+  .nesio-sheet { border: 2px solid var(--portal-ink); }
+}

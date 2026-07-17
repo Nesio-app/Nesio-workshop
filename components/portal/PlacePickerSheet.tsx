@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { createPortal } from 'react-dom';
+import NesioSheet from './ui/NesioSheet';
 import { displayLabel, renamePlaceLabel, setPlaceCategory, setPlaceGeo, PLACE_CATEGORY_META, type PlaceCategory } from '@/lib/portal/place-trail';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -35,6 +35,13 @@ export default function PlacePickerSheet({ raw, lat, lon, onClose, onRenamed }: 
   // 批次 101:Foursquare 调用状态可见 —— 「配了 key 看不出变化」时,一眼看出是
   // key 没生效(off)、被拒(err_401 旧版 key / err_429 超额)、还是正常但附近无 POI。
   const [diag, setDiag] = useState<string>('');
+  // 桥接:两处调用点是「条件挂载、关闭即卸载」。内部持 open 态,关闭时先播
+  // 退出动画(Vaul),再延迟通知父卸载 —— 保留调用点契约不变(铁律:只换壳)。
+  const [open, setOpen] = useState(true);
+  function requestClose() {
+    setOpen(false);
+    window.setTimeout(onClose, 220); // 覆盖退出动画(标准 ~200ms / reduced-motion ~160ms)
+  }
 
   useEffect(() => {
     if (typeof lat !== 'number' || typeof lon !== 'number') return;
@@ -70,14 +77,16 @@ export default function PlacePickerSheet({ raw, lat, lon, onClose, onRenamed }: 
     if (k) setPlaceCategory(trimmed, k as PlaceCategory);
     setPlaceGeo(trimmed, { name: trimmed, resolved: true, ...(k ? { kind: k as PlaceCategory } : {}), ...(city ? { city } : {}), ...(country ? { country } : {}) });
     onRenamed?.(trimmed);
-    onClose();
+    requestClose();
   }
 
-  if (typeof document === 'undefined') return null;
-  return createPortal(
-    <div className="nesio-visitmem-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '这是哪里?', 'Where was this?')}>
-      <button type="button" className="nesio-visitmem-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-visitmem-sheet">
+  return (
+    <NesioSheet
+      variant="bottom"
+      open={open}
+      onOpenChange={(next) => { if (!next) requestClose(); }}
+      ariaLabel={L(dict, '这是哪里?', 'Where was this?')}
+    >
         <p className="nesio-memmap-list-title">{L(dict, '这是哪里?', 'Where was this?')} · {displayLabel(raw)}</p>
         <form className="nesio-placepick-row" onSubmit={(e) => { e.preventDefault(); commit(text); }}>
           <input
@@ -120,8 +129,6 @@ export default function PlacePickerSheet({ raw, lat, lon, onClose, onRenamed }: 
             </button>
           ))}
         </div>
-      </div>
-    </div>,
-    document.body,
+    </NesioSheet>
   );
 }
