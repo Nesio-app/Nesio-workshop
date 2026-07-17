@@ -80,6 +80,24 @@ function writeMeetingExtraction(
   const extraTags = prov?.extraTags ?? [];
   const recordedAt = prov?.recordedAt || new Date().toISOString();
 
+  // ⓪ 闭环(用户定):会议记录挂到对应的日历日程记忆上 —— Granola 的会议本来就
+  // 来自日历,按「会议时间落在日程窗口内(前 30min 후 60min 宽容)+ 标题吻合;
+  // 窗口内唯一候选则放宽标题」找日历节点,下面创建记录时带上双向可见的关联。
+  const meetingT = new Date(recordedAt).getTime();
+  const norm = (s: string) => (s || '').toLowerCase().replace(/[\s·:：\-—_,,。.]/g, '');
+  const mName = norm(meetingName);
+  const calCandidates = Number.isFinite(meetingT) ? getLifeGraph().filter((n) => {
+    if (n.source !== 'calendar') return false;
+    const s = n.attributes?.start ? new Date(String(n.attributes.start)).getTime() : NaN;
+    if (!Number.isFinite(s)) return false;
+    const e = n.attributes?.end ? new Date(String(n.attributes.end)).getTime() : s + 60 * 60_000;
+    return meetingT >= s - 30 * 60_000 && meetingT <= e + 60 * 60_000;
+  }) : [];
+  const calNode = calCandidates.find((n) => {
+    const cName = norm(n.name);
+    return cName && mName && (cName.includes(mName) || mName.includes(cName));
+  }) || (calCandidates.length === 1 ? calCandidates[0] : undefined);
+
   // ① 会议记录节点:留转写原文,并把总结/推断项/人名收进 attributes(详情页可读)。
   const record = ingestLifeNode({
     name: `${en ? 'Meeting notes' : '会议记录'} · ${meetingName}`,
@@ -93,12 +111,24 @@ function writeMeetingExtraction(
       ...(extraction?.summary ? { summary: extraction.summary } : {}),
       ...(inferred.length ? { inferredJson: JSON.stringify(inferred) } : {}),
       ...(people.length ? { people: people.join(en ? ', ' : '、') } : {}),
+      ...(calNode ? { calendarNodeId: calNode.id, calendarName: calNode.name } : {}),
     },
     rawInput: notes,
     confidence: 1,
     source: 'voice',
-    relations: [],
+    relations: calNode ? [{ targetId: calNode.id, relation: en ? 'calendar event' : '对应日程' }] : [],
   });
+
+  // 反向可见:日历日程节点也记住会议记录(详情页从日程一侧就能跳到记录/待办)。
+  if (calNode && record?.id) {
+    updateLifeNode(calNode.id, {
+      attributes: {
+        ...calNode.attributes,
+        meetingRecordId: record.id,
+        ...(prov?.granolaMeetingId ? { granolaMeetingId: prov.granolaMeetingId } : {}),
+      },
+    });
+  }
 
   // ② To do(显式指派)→ 各成一条 commitment 节点,钉进今天页;承诺了截止日的带 date(走倒计时)。
   const today = localDayKey();
