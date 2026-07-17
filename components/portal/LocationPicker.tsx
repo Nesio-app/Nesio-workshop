@@ -190,7 +190,7 @@ export default function LocationPicker({ value, onChange, className }: LocationP
       >
         <option value="">{L(dict, '选择地点…', 'Pick a place…')}</option>
         {places.map((p) => (
-          <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>
+          <option key={p.id} value={p.id}>{p.name}</option>
         ))}
         <option value="__free__">{L(dict, '自定义输入', 'Custom entry')}</option>
       </select>

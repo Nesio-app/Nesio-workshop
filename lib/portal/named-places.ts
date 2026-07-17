@@ -85,7 +85,9 @@ export function formatLocation(placeId: string, room: string, subRoom: string): 
   const places = getNamedPlaces();
   const place = places.find((p) => p.id === placeId);
   if (!place) return [placeId, room, subRoom].filter(Boolean).join(' · ');
-  const parts = [`${place.emoji} ${place.name}`];
+  // 设计:存放位置显示一律线性无 emoji(🏠 等图形字符不进 UI 文本)。只保留地点名,
+  // 图标交给渲染层。存储是结构化 placeId/room/subRoom,这里纯展示,去 emoji 不影响匹配。
+  const parts = [place.name];
   if (room) parts.push(room);
   if (subRoom) parts.push(subRoom);
   return parts.join(' · ');
