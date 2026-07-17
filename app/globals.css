@@ -17851,6 +17851,10 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   left: 0;
   right: 0;
   bottom: 0;
+}
+/* chrome(圆角/边/内边距/高)只作用非 bare —— bare 的这些由迁移元素自带的
+   className(如 .nesio-settings-sheet-card)提供,像素级保真。 */
+.nesio-sheet--bottom:not(.nesio-sheet--bare) {
   border-radius: 1.1rem 1.1rem 0 0;
   border-top: 1px solid var(--portal-line);
   max-height: 88lvh;
