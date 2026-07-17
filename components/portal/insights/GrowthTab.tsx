@@ -10,11 +10,17 @@
 import { useEffect, useState } from 'react';
 import {
   todayGrowthCards, recordGrowthAnswer, growthHistory, growthStreakDays,
-  GROWTH_FRAMEWORKS, type GrowthCard, type GrowthAnswer,
+  GROWTH_FRAMEWORKS, runFrameworkInline, composeArgumentTeardown, type GrowthCard, type GrowthAnswer,
 } from '@/lib/portal/growth-guide';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+
+const ARG_EXAMPLES = [
+  '你作为负责人，要起模范带头作用，学会鼓舞团队士气。',
+  '你都不给项目投资，说明你对自己的产品没信心吧？',
+  '别那么自私，格局大一点，不就是搭把手的事。',
+];
 
 export default function GrowthTab() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -23,7 +29,18 @@ export default function GrowthTab() {
   const [history, setHistory] = useState<GrowthAnswer[]>([]);
   const [streak, setStreak] = useState(0);
   const [draft, setDraft] = useState<Record<string, string>>({});
-  const [copied, setCopied] = useState('');
+
+  // 帮你吵(bangnichao)内联表单
+  const [said, setSaid] = useState('');
+  const [ctx, setCtx] = useState('');
+  const [argState, setArgState] = useState<'idle' | 'running' | 'done' | 'error'>('idle');
+  const [argOut, setArgOut] = useState('');
+  const [argErr, setArgErr] = useState('');
+
+  // 框架书架:展开的框架 id + 各自的输入/输出/状态
+  const [openFw, setOpenFw] = useState('');
+  const [fwInput, setFwInput] = useState<Record<string, string>>({});
+  const [fwOut, setFwOut] = useState<Record<string, { state: 'running' | 'done' | 'error'; text: string }>>({});
 
   const refresh = () => {
     try {
@@ -42,15 +59,26 @@ export default function GrowthTab() {
     refresh();
   }
 
-  async function copyFramework(id: string, prompt: string) {
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setCopied(id);
-      setTimeout(() => setCopied(''), 2200);
-    } catch {
-      setCopied('!' + id); // 设计红线:异步动作必有可见失败态
-      setTimeout(() => setCopied(''), 2200);
-    }
+  const errText = (e?: string) => e === 'auth'
+    ? L(dict, '要先登录 Nesio 才能用 AI 拆解。', 'Sign in to Nesio to use AI here.')
+    : e === 'rate' ? L(dict, '太快了，喘口气再试一次。', 'Too fast — take a breath and retry.')
+    : L(dict, '这会儿没接上，稍后再试一次。', "Couldn't reach the AI — try again shortly.");
+
+  async function runArgument() {
+    const s = said.trim();
+    if (!s || argState === 'running') return;
+    setArgState('running'); setArgOut(''); setArgErr('');
+    const r = await runFrameworkInline(composeArgumentTeardown(s, ctx), '', en ? 'en' : 'zh');
+    if (r.ok && r.text) { setArgOut(r.text); setArgState('done'); }
+    else { setArgErr(errText(r.error)); setArgState('error'); }
+  }
+
+  async function runFramework(id: string, promptTemplate: string) {
+    const content = (fwInput[id] || '').trim();
+    if (!content) return;
+    setFwOut((p) => ({ ...p, [id]: { state: 'running', text: '' } }));
+    const r = await runFrameworkInline(promptTemplate, content, en ? 'en' : 'zh');
+    setFwOut((p) => ({ ...p, [id]: r.ok && r.text ? { state: 'done', text: r.text } : { state: 'error', text: errText(r.error) } }));
   }
 
   const fmtDay = (iso: string) => en
@@ -103,21 +131,73 @@ export default function GrowthTab() {
         </div>
       ))}
 
-      <p className="nesio-insights-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '框架书架', 'Framework shelf')}</p>
+      {/* ── 帮你吵:粘对方的话 → 直接内联拆解 + 回法(不跳转、不复制)── */}
+      <p className="nesio-insights-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '帮你吵', 'Win the argument')}</p>
       <p className="nesio-settings-option-hint" style={{ marginBottom: 'var(--space-2)' }}>
-        {L(dict, '复制一个框架,贴进「问一问」,套在你自己的内容上。', 'Copy a framework, paste it into Ask, apply it to your own content.')}
+        {L(dict, '吵赢，不是把人说哑，是把架吵清楚。把对方那句话原样贴进来。', "Winning isn't silencing them — it's making the argument clear. Paste what they said.")}
       </p>
-      {GROWTH_FRAMEWORKS.map((f) => (
-        <div key={f.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--portal-line)' }}>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ color: 'var(--portal-ink)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>{en ? f.nameEn : f.name}</p>
-            <p className="nesio-settings-option-hint" style={{ margin: 0 }}>{en ? f.descEn : f.desc}</p>
-          </div>
-          <button type="button" className="nesio-connector-connect" style={{ flexShrink: 0 }} onClick={() => void copyFramework(f.id, f.prompt)}>
-            {copied === f.id ? L(dict, '已复制', 'Copied') : copied === '!' + f.id ? L(dict, '复制失败,长按选中', 'Copy failed — select manually') : L(dict, '复制', 'Copy')}
-          </button>
+      <textarea className="nesio-routine-input" style={{ minHeight: '3.6rem', resize: 'vertical', width: '100%' }}
+        placeholder={L(dict, '别人对你说了啥？（原样打进来）', 'What did they say to you? (paste it)')}
+        value={said} onChange={(e) => setSaid(e.target.value)} />
+      <input className="nesio-routine-input" style={{ width: '100%', marginTop: 'var(--space-2)' }}
+        placeholder={L(dict, '当时是什么场合？（可不填）', 'What was the setting? (optional)')}
+        value={ctx} onChange={(e) => setCtx(e.target.value)} />
+      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', margin: 'var(--space-2) 0' }}>
+        {ARG_EXAMPLES.map((ex, i) => (
+          <button key={i} type="button" className="nesio-connector-connect"
+            style={{ fontSize: '0.72rem', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)' }}
+            onClick={() => setSaid(ex)}>{ex.slice(0, 12)}…</button>
+        ))}
+      </div>
+      <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%' }}
+        disabled={!said.trim() || argState === 'running'} onClick={() => void runArgument()}>
+        {argState === 'running' ? L(dict, '正在拆这一架…', 'Working through it…') : L(dict, '帮我拆这一架 ⚔️', 'Break down the argument ⚔️')}
+      </button>
+      {argState === 'done' && argOut && (
+        <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-4)', background: 'var(--portal-accent-soft)', borderRadius: 'var(--radius-md)', color: 'var(--portal-ink)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{argOut}</div>
+      )}
+      {argState === 'error' && (
+        <div style={{ marginTop: 'var(--space-2)' }}>
+          <p className="nesio-settings-option-hint">{argErr}</p>
+          <button type="button" className="nesio-connector-connect" onClick={() => void runArgument()}>{L(dict, '再试一次', 'Try again')}</button>
         </div>
-      ))}
+      )}
+
+      {/* ── 框架书架:点开 → 内联输入 → 直接出结果(去掉复制粘贴)── */}
+      <p className="nesio-insights-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '思维框架', 'Thinking frameworks')}</p>
+      <p className="nesio-settings-option-hint" style={{ marginBottom: 'var(--space-2)' }}>
+        {L(dict, '点开一个框架，把你的内容贴进去，直接帮你套着拆 —— 不用复制粘贴。', 'Open one, paste your content, and it applies the framework right here — no copy-paste.')}
+      </p>
+      {GROWTH_FRAMEWORKS.map((f) => {
+        const open = openFw === f.id;
+        const out = fwOut[f.id];
+        return (
+          <div key={f.id} style={{ borderBottom: '1px solid var(--portal-line)', padding: 'var(--space-3) 0' }}>
+            <button type="button" onClick={() => setOpenFw(open ? '' : f.id)}
+              style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', width: '100%', border: 'none', background: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <p style={{ color: 'var(--portal-ink)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>{en ? f.nameEn : f.name}</p>
+                <p className="nesio-settings-option-hint" style={{ margin: 0 }}>{en ? f.descEn : f.desc}</p>
+              </div>
+              <span aria-hidden style={{ color: 'var(--portal-muted)', flexShrink: 0 }}>{open ? '−' : '+'}</span>
+            </button>
+            {open && (
+              <div style={{ marginTop: 'var(--space-3)' }}>
+                <textarea className="nesio-routine-input" style={{ minHeight: '3.4rem', resize: 'vertical', width: '100%' }}
+                  placeholder={L(dict, '把要套用的内容贴到这里…', 'Paste the content to apply it to…')}
+                  value={fwInput[f.id] || ''} onChange={(e) => setFwInput((p) => ({ ...p, [f.id]: e.target.value }))} />
+                <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-2)' }}
+                  disabled={!(fwInput[f.id] || '').trim() || out?.state === 'running'} onClick={() => void runFramework(f.id, f.prompt)}>
+                  {out?.state === 'running' ? L(dict, '拆解中…', 'Working…') : L(dict, '开始拆解', 'Apply framework')}
+                </button>
+                {out && out.state !== 'running' && (
+                  <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-4)', background: 'var(--portal-accent-soft)', borderRadius: 'var(--radius-md)', color: out.state === 'error' ? 'var(--portal-muted)' : 'var(--portal-ink)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>{out.text}</div>
+                )}
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

@@ -217,9 +217,44 @@ export const GROWTH_FRAMEWORKS: GrowthFramework[] = [
     prompt: '帮我做能力圈检查:对下面这个领域/标的,列出 5 个「真正懂的人一定答得上」的问题逐一问我的描述里有没有答案;最后诚实结论——它在我能力圈内、边缘、还是圈外?圈外的话,补什么才能进圈?\n\n【粘贴领域/标的与我的理解】',
   },
   {
+    id: 'fallacy',
+    name: '谬误辨识', nameEn: 'Spot the fallacy',
+    desc: '这段话哪里逻辑不对?(偷换概念/滑坡/稻草人…)', descEn: "Where's the logic off? (equivocation, slippery slope, straw man…)",
+    prompt: '帮我辨识下面这段话里的逻辑谬误:逐条指出用了哪种谬误(如偷换概念、稻草人、滑坡、诉诸情绪、以偏概全、循环论证等),为什么算这种,并给一句「怎么点破它」的回法。没有明显谬误就照实说。\n\n【粘贴内容】',
+  },
+  {
     id: 'premortem',
     name: '事前验尸', nameEn: 'Premortem',
     desc: '假设这个决定一年后失败了,倒推原因', descEn: 'Assume the decision failed in a year — work backwards',
     prompt: '假设我下面这个决定一年后被证明是错的,最可能的三个原因是什么?现在有什么低成本动作能提前排掉它们?\n\n【粘贴决定】',
   },
 ];
+
+
+// ── 内联 AI(用户定:去掉复制粘贴,点一下直接出结果)────────────────────────────
+// 走既有 /api/portal/chat(登录 + guardAiRoute + 限流)。把框架 prompt 里的
+// 占位符替换成用户粘的内容,直接返回文本,组件内联渲染,不跳「问一问」。
+
+export async function runFrameworkInline(promptTemplate: string, content: string, locale: string): Promise<{ ok: boolean; text?: string; error?: string }> {
+  const filled = promptTemplate.replace(/【[^】]*】/g, `\n\n"""${content.trim()}"""`);
+  try {
+    const res = await fetch('/api/portal/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: filled, uiLocale: locale.toLowerCase().startsWith('en') ? 'en' : 'zh' }),
+    });
+    if (res.status === 401) return { ok: false, error: 'auth' };
+    if (res.status === 429) return { ok: false, error: 'rate' };
+    const data = await res.json() as { ok?: boolean; response?: string; error?: string };
+    if (data.ok && data.response) return { ok: true, text: data.response };
+    return { ok: false, error: data.error || 'unknown' };
+  } catch {
+    return { ok: false, error: 'network' };
+  }
+}
+
+/** 「帮你吵」:把对方的话 + 场合,组成一条按「前提·事实·逻辑·情绪」拆解并给回法的 message。 */
+export function composeArgumentTeardown(said: string, context: string): string {
+  const ctx = context.trim() ? `\n场合:${context.trim()}` : '';
+  return `别人对我说了这句话,帮我把这一架吵清楚(不是把人说哑,是把理讲明):${ctx}\n\n对方说:"""${said.trim()}"""\n\n请按四步来:\n1. 前提——这句话默认了什么我没同意的前提?\n2. 事实——哪些是事实、哪些是他的主观判断?站得住吗?\n3. 逻辑——推理有没有跳步、偷换、以偏概全?\n4. 情绪——它想让我产生什么情绪、好让我不反驳?\n最后给我两三句「可以怎么平静而有力地回」——就事论事,不攻击人。`;
+}
