@@ -53,6 +53,8 @@ export default function TeslaSheet({ open, onClose }: { open: boolean; onClose: 
       if (!data.ok) {
         setErrMsg(data.error === 'not_connected' || data.error === 'token_expired'
           ? L(dict, 'Tesla 授权已失效 —— 回到「数据接入」重新连接一次即可。', 'Tesla auth expired — reconnect it from Data sources.')
+          : data.error === 'partner_not_registered'
+          ? L(dict, '域名还没在 Tesla 完成注册,刚已自动补交 —— 稍等半分钟再试一次。', 'Domain registration with Tesla was just submitted automatically — wait half a minute and try again.')
           : L(dict, `没取到数据(${data.error || '未知'}),稍后再试一次。`, `Couldn't fetch data (${data.error || 'unknown'}) — try again shortly.`));
         setState('error');
         return;

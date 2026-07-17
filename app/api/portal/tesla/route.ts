@@ -7,7 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isPortalRequestAuthorized, isRateLimited } from '@/lib/portal/api-auth';
 import { getIntegrationToken, saveIntegrationToken, setTokenCookiesOnResponse } from '@/lib/portal/integrations';
-import { collectTeslaData, refreshTeslaToken, teslaConfigured } from '@/lib/portal/tesla';
+import { collectTeslaData, refreshTeslaToken, registerPartnerAccount, teslaConfigured } from '@/lib/portal/tesla';
+import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,6 +53,26 @@ export async function GET(req: NextRequest) {
   if (snapshot.status === 401) {
     return NextResponse.json({ ok: false, error: 'token_expired' });
   }
+
+  // 412 = 合作方域名未注册(域名切换后的典型状态)。就地注册一次再重试 ——
+  // 不再要求用户重新授权才触发(回调里的自动注册只覆盖新授权)。
+  if (snapshot.vehiclesStatus === 412) {
+    const configured = envValue('TESLA_REDIRECT_URI');
+    const domain = configured ? new URL(configured).hostname : (req.headers.get('host') || '').split(':')[0];
+    const registered = domain ? await registerPartnerAccount(domain) : false;
+    console.info('tesla_partner_register_on_sync', { domain, registered });
+    if (registered) snapshot = await collectTeslaData(accessToken);
+  }
+  // 车辆列表仍拿不到 → 把真实状态透出去,别让 UI 只能显示「没有车」。
+  if (snapshot.vehiclesStatus && snapshot.vehiclesStatus !== 200) {
+    console.warn('tesla_vehicles_failed', { status: snapshot.vehiclesStatus });
+    return NextResponse.json({
+      ok: false,
+      error: snapshot.vehiclesStatus === 412 ? 'partner_not_registered' : 'tesla_fetch_failed',
+      status: snapshot.vehiclesStatus,
+    });
+  }
+
   if (snapshot.status !== 200) {
     console.warn('tesla_fetch_failed', { status: snapshot.status });
     return NextResponse.json({ ok: false, error: 'tesla_fetch_failed', status: snapshot.status });

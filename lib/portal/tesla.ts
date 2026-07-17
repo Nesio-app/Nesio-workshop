@@ -218,9 +218,14 @@ type VehicleRow = { id?: string | number; id_s?: string; display_name?: string; 
  * charging history (with billed cost). Returns status 401 so the caller can
  * refresh the token and retry.
  */
-export async function collectTeslaData(accessToken: string): Promise<{ status: number; drives: TeslaDrive[]; charges: TeslaCharge[] }> {
+export async function collectTeslaData(accessToken: string): Promise<{ status: number; drives: TeslaDrive[]; charges: TeslaCharge[]; vehiclesStatus?: number }> {
   const vehiclesRes = await teslaGet('/api/1/vehicles', accessToken);
   if (vehiclesRes.status === 401) return { status: 401, drives: [], charges: [] };
+  // 412 = 合作方域名未注册(Fleet API 前置条件)。以前被静默当成「没有车」,
+  // UI 只能显示空态 —— 把状态带出去,路由侧可就地补注册并重试。
+  if (vehiclesRes.status !== 200) {
+    return { status: 200, drives: [], charges: [], vehiclesStatus: vehiclesRes.status };
+  }
   const vehicles = ((vehiclesRes.data as { response?: VehicleRow[] })?.response) || [];
 
   const drives: TeslaDrive[] = [];
