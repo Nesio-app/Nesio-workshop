@@ -162,6 +162,11 @@ export async function GET(req: NextRequest) {
   const removedIds: string[] = [];
   const acctById = new Map<string, PlaidAccount>();
   let anyRelink = false;
+  // 需要走 Link update mode 修复的 token 下标(ITEM_LOGIN_REQUIRED:授权过期/改密码)。
+  const relinkTokenIndexes: number[] = [];
+  // 彻底死掉的 token 下标(INVALID_ACCESS_TOKEN:换 Plaid 账号/凭证后旧 token 永不再活),
+  // 留着只会让每次同步白跑 —— 本次直接从 cookie 摘除。
+  const deadTokenIndexes = new Set<number>();
   // 财务⑦:刚连上的机构,accounts/get 立即可用,但流水初始拉取要在 Plaid 侧准备几分钟——
   // /transactions/sync 此时返回 NOT_READY/空。不识别它就是静默空同步(账户出现了、数字全不动)。
   let pendingItems = 0;
@@ -197,7 +202,11 @@ export async function GET(req: NextRequest) {
           pendingItems += 1; // 游标不动,下次同步从头再拉这家
           break;
         }
-        if (data.error_code) { if (data.error_code === 'ITEM_LOGIN_REQUIRED') anyRelink = true; break; }
+        if (data.error_code) {
+          if (data.error_code === 'ITEM_LOGIN_REQUIRED') { anyRelink = true; relinkTokenIndexes.push(i); }
+          if (data.error_code === 'INVALID_ACCESS_TOKEN') deadTokenIndexes.add(i);
+          break;
+        }
         // added + modified 都送客户端按 id upsert;removed 让客户端删掉。
         added.push(...(data.added ?? []), ...(data.modified ?? []));
         for (const r of data.removed ?? []) removedIds.push(r.transaction_id);
@@ -300,15 +309,30 @@ export async function GET(req: NextRequest) {
         try { await plaidPost('/item/remove', { access_token: tokens[i] }); } catch { /* best-effort */ }
       }
     }
+    // 死 token(换 Plaid 账号后的旧凭证)一并摘除 —— 不调 /item/remove(它属于
+    // 另一个 client,调了也是拒),只从 cookie 清掉,别再拖累每次同步。
+    if (deadTokenIndexes.size) {
+      console.warn('plaid_dead_tokens_pruned', { count: deadTokenIndexes.size });
+      for (const i of deadTokenIndexes) stale.add(i);
+    }
     const keptTokens = tokens.filter((_, i) => !stale.has(i));
     const keptCursors = nextCursors.filter((_, i) => !stale.has(i));
     const keptAccountsOk = accountsOk.filter((_, i) => !stale.has(i));
+    // relink 下标换算成"摘除后的 cookie 数组"位置 —— 客户端下次带 updateIndex 来
+    // 建 update-mode Link 时按新数组取 token。
+    const keptIndexMap = new Map<number, number>();
+    tokens.forEach((_, i) => { if (!stale.has(i)) keptIndexMap.set(i, keptIndexMap.size); });
+    const relinkIndexes = relinkTokenIndexes
+      .filter((i) => keptIndexMap.has(i))
+      .map((i) => keptIndexMap.get(i) as number);
     const accounts = [...acctById.values()];
     // 权威快照:每个存活 token 的 accounts/get 都成功 → 客户端可整体替换账户表
     const authoritative = keptAccountsOk.length > 0 && keptAccountsOk.every(Boolean);
 
     const response = NextResponse.json({
       relink: anyRelink || undefined,
+      relinkIndexes: relinkIndexes.length ? relinkIndexes : undefined,
+      prunedDead: deadTokenIndexes.size || undefined,
       pendingItems: pendingItems || undefined,
       authoritative,
       ok: true,

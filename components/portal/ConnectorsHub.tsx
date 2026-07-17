@@ -114,6 +114,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const timelineRef = useRef<HTMLInputElement>(null);
   const [wechatReadingOpen, setWechatReadingOpen] = useState(false);
   const [teslaSheetOpen, setTeslaSheetOpen] = useState(false);
+  // 需要 update-mode 修复的银行连接下标(来自上次同步)—— 有值时 Plaid 行给「修复」入口
+  const [plaidRelink, setPlaidRelink] = useState<number[]>([]);
   const [connected, setConnected] = useState<Record<string, boolean>>({});
   const [syncing, setSyncing] = useState<string | null>(null);
   // P0 隐私:连接私有数据源(邮箱/日历/银行/Notion/Flomo)必须先登录 —— 匿名授权=无主
@@ -414,11 +416,16 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   }
 
   // ── 批次 21:Plaid 银行流水 ──
-  async function connectPlaid() {
+  async function connectPlaid(updateIndex?: number) {
+    const isUpdate = typeof updateIndex === 'number';
     setSyncing('plaid');
     try {
-      const res = await fetch('/api/portal/plaid/link-token', { method: 'POST' });
-      const data = await res.json() as { ok?: boolean; linkToken?: string; error?: string; env?: string };
+      const res = await fetch('/api/portal/plaid/link-token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(isUpdate ? { updateIndex } : {}),
+      });
+      const data = await res.json() as { ok?: boolean; linkToken?: string; error?: string; env?: string; mode?: string };
       if (!data.ok || !data.linkToken) {
         const msg = data.error === 'plaid_not_configured'
           ? L(dict, 'Plaid 还没配置:dashboard.plaid.com → Keys 拿 client_id 和 Sandbox secret,配到 Vercel(PLAID_CLIENT_ID / PLAID_SECRET / PLAID_ENV)', 'Plaid not configured: dashboard.plaid.com → Keys → set PLAID_CLIENT_ID / PLAID_SECRET / PLAID_ENV on Vercel')
@@ -452,11 +459,20 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       }
       // OAuth 银行会整窗跳去银行授权,回来落在 /plaid-oauth 续接页 —— 它需要
       // 用同一个 link_token 重建 Link,发起前先存本机(成功/退出时清)。
-      try { localStorage.setItem('nesio-plaid-link-token', data.linkToken); } catch { /* ignore */ }
+      // JSON 带 mode:update 模式的 onSuccess 不做 exchange(修复既有 item,
+      // public_token 不可换),续接页据此分流。
+      try { localStorage.setItem('nesio-plaid-link-token', JSON.stringify({ token: data.linkToken, update: isUpdate })); } catch { /* ignore */ }
       const link = Plaid.create({
         token: data.linkToken,
         onSuccess: async (publicToken: string) => {
           try { localStorage.removeItem('nesio-plaid-link-token'); } catch { /* ignore */ }
+          if (isUpdate) {
+            // 修复模式:item 已就地修好,不换 token、不烧名额 —— 直接重同步。
+            setPlaidRelink((prev) => prev.filter((x) => x !== updateIndex));
+            showToast(L(dict, '银行连接已修复,正在重新同步…', 'Bank connection repaired — resyncing…'), true);
+            void syncPlaid();
+            return;
+          }
           // 财务⑥:带上 linkToken —— 多机构一次授权时服务端据此捞出 session 里
           // 全部 item 的 public_token 逐个交换,不再只连上第一家。
           const ex = await fetch('/api/portal/plaid/exchange', {
@@ -506,6 +522,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setCounts((p) => ({ ...p, plaid: r.total }));
     saveConnectorState('plaid', true);
     setConnected((p) => ({ ...p, plaid: true }));
+    // 有连接需要修复(授权过期/改密码)→ 记下标,行内出「修复」按钮(update mode 不烧名额)
+    setPlaidRelink(r.relinkIndexes || []);
+    if (r.relinkIndexes?.length) {
+      showToast(L(dict, `${r.relinkIndexes.length} 家银行的授权需要修复 —— 点 Plaid 行的「修复」,走的是修复模式,不占新名额`, `${r.relinkIndexes.length} bank connection(s) need repair — tap Repair on the Plaid row (update mode, doesn't use a new connection)`), false);
+    }
     // 财务⑦:新连接的机构流水在 Plaid 侧要准备几分钟——明示状态并自动再试,不静默空同步
     if (r.pending > 0 && retry < 3) {
       showToast(L(dict, `已同步 ${r.fresh} 笔;还有 ${r.pending} 家机构的流水在准备中(新连接约需几分钟),1 分钟后自动再试`, `Synced ${r.fresh}; ${r.pending} institution(s) still preparing transactions (takes a few minutes) — retrying in 1 min`), true);
@@ -1272,6 +1293,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                       {/* 批次 27:Plaid 连了一家还想连别家 —— 已连接也给「+银行」再开一次 Link */}
                       {c.id === 'plaid' && (
                         <button type="button" className="nesio-connector-connect" style={{ background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)' }} onClick={() => connectPlaid()} disabled={isSync}>{L(dict, '+ 银行', '+ Bank')}</button>
+                      )}
+                      {/* update mode:授权过期的连接就地修复,不新建 connection、不烧名额 */}
+                      {c.id === 'plaid' && plaidRelink.length > 0 && (
+                        <button type="button" className="nesio-connector-connect" style={{ background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }} onClick={() => connectPlaid(plaidRelink[0])} disabled={isSync}>{L(dict, `修复 (${plaidRelink.length})`, `Repair (${plaidRelink.length})`)}</button>
                       )}
                       {/* Tesla 独立数据视图(用户定):电量/里程/充电历史直接看,不用翻财务/足迹 */}
                       {c.id === 'tesla' && (

@@ -30,6 +30,21 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'plaid_not_configured' }, { status: 503 });
   }
 
+  // update mode(修复模式):重连"已连过的银行"不新建 connection、不烧名额。
+  // 客户端传 updateIndex(cookie token 数组下标,来自 transactions 的 relinkIndexes),
+  // 服务端取出该 access_token 建 update-mode Link;token 不出服务端。
+  const { updateIndex } = await req.json().catch(() => ({})) as { updateIndex?: number };
+  let updateAccessToken = '';
+  if (typeof updateIndex === 'number') {
+    try {
+      const arr = JSON.parse(req.cookies.get('nesio_plaid_tokens')?.value || '[]') as string[];
+      updateAccessToken = (Array.isArray(arr) && arr[updateIndex]) || '';
+    } catch { /* fall through */ }
+    if (!updateAccessToken) {
+      return NextResponse.json({ ok: false, error: 'unknown_item' }, { status: 400 });
+    }
+  }
+
   try {
     const baseBody = {
       client_id: clientId,
@@ -56,19 +71,23 @@ export async function POST(req: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
+    // update mode:带 access_token,且不传产品参数(Plaid 修复模式的要求);
+    // 修复既有 item 不新建 connection,不烧试用名额。
+    const { products: _p, optional_products: _op, transactions: _t, ...updateBase } = baseBody;
+    const requestBody = updateAccessToken ? { ...updateBase, access_token: updateAccessToken } : baseBody;
     let usedRedirect = true;
-    let res = await create({ ...baseBody, redirect_uri: redirectUri });
+    let res = await create({ ...requestBody, redirect_uri: redirectUri });
     let data = await res.json() as { link_token?: string; error_message?: string; error_code?: string };
     if (!data.link_token && /redirect/i.test(data.error_message || '')) {
       console.warn('plaid_redirect_uri_not_allowlisted', redirectUri);
       usedRedirect = false;
-      res = await create(baseBody);
+      res = await create(requestBody);
       data = await res.json() as { link_token?: string; error_message?: string; error_code?: string };
     }
     if (!data.link_token) {
       return NextResponse.json({ ok: false, error: data.error_message || 'link_token_failed' }, { status: 502 });
     }
-    return NextResponse.json({ ok: true, linkToken: data.link_token, env: plaidEnv(), oauthRedirect: usedRedirect });
+    return NextResponse.json({ ok: true, linkToken: data.link_token, env: plaidEnv(), oauthRedirect: usedRedirect, mode: updateAccessToken ? 'update' : 'link' });
   } catch {
     return NextResponse.json({ ok: false, error: 'plaid_unreachable' }, { status: 502 });
   }

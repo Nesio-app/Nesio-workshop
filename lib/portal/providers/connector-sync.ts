@@ -11,6 +11,9 @@ export interface PlaidSyncResult {
   ok: boolean;
   error?: string;                 // 'not_connected' | 'relink_required' | 其他
   fresh: number; total: number; accounts: number; pending: number; withLogo: number;
+  // 需要 update-mode 修复的 token 下标(服务端 cookie 数组位置)—— UI 据此给「修复」入口,
+  // 修复既有连接不烧 Plaid 名额。
+  relinkIndexes?: number[];
   // 投资拉取诊断(有投资账户但没数据时的可见失败态用)。
   investments?: { accounts: number; holdings: number; transactions: number; error?: string };
 }
@@ -26,6 +29,7 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
       ok?: boolean; error?: string; pendingItems?: number; authoritative?: boolean;
       transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>;
       removedIds?: string[]; accounts?: unknown[]; holdings?: unknown[];
+      relinkIndexes?: number[];
       investments?: { accounts?: number; holdings?: number; transactions?: number; error?: string };
     };
     if (data.accounts?.length) {
@@ -57,6 +61,7 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
     const inv = data.investments;
     return {
       ok: true, fresh, total: merged.length, accounts: data.accounts?.length || 0, pending: data.pendingItems || 0, withLogo,
+      ...(data.relinkIndexes?.length ? { relinkIndexes: data.relinkIndexes } : {}),
       ...(inv ? { investments: { accounts: inv.accounts || 0, holdings: inv.holdings || 0, transactions: inv.transactions || 0, error: inv.error } } : {}),
     };
   } catch { return fail('network'); }

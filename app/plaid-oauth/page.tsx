@@ -23,7 +23,15 @@ export default function PlaidOAuthResumePage() {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const linkToken = localStorage.getItem(LINK_TOKEN_KEY) || '';
+    // stash 兼容两代格式:旧=裸 link_token 字符串;新=JSON {token, update}
+    // (update 模式的 onSuccess 不做 exchange —— 修复既有 item,public_token 不可换)。
+    const raw = localStorage.getItem(LINK_TOKEN_KEY) || '';
+    let linkToken = raw;
+    let isUpdate = false;
+    try {
+      const parsed = JSON.parse(raw) as { token?: string; update?: boolean };
+      if (parsed && typeof parsed.token === 'string') { linkToken = parsed.token; isUpdate = Boolean(parsed.update); }
+    } catch { /* 旧格式:裸字符串 */ }
     if (!params.get('oauth_state_id') || !linkToken) {
       // 直接访问/上下文对不上(如换了浏览器环境):无从续接,回主页重连一次即可。
       window.location.replace('/');
@@ -49,6 +57,12 @@ export default function PlaidOAuthResumePage() {
           token: linkToken,
           receivedRedirectUri: window.location.href,
           onSuccess: async (publicToken: string) => {
+            localStorage.removeItem(LINK_TOKEN_KEY);
+            if (isUpdate) {
+              // 修复模式:item 已就地修好,无需 exchange,直接回家标记已连。
+              window.location.replace('/?connector=plaid&status=connected');
+              return;
+            }
             setMsg('银行已授权,正在写入…');
             try {
               const ex = await fetch('/api/portal/plaid/exchange', {
