@@ -4580,7 +4580,10 @@ body:has(.nesio-mood-overlay) .nesio-bottom-nav::before {
   display: none;
 }
 
-/* 悬浮导航下方的渐隐垫:滚动内容不再「裸露」在按钮后面(批次 2) */
+/* 悬浮导航下方的渐隐垫:滚动内容不再「裸露」在按钮后面(批次 2)。
+   补实底渐变(iOS PWA 修):此前只有 backdrop-filter,iOS 滚动后 fixed 层的
+   backdrop-filter 常不重绘,「发霉」成一条实色带(下滑强制重绘才消失)——
+   垫上页面底色渐变后,即便滤镜失效,露出的也是与设计一致的底色。 */
 .nesio-bottom-nav::before {
   content: '';
   position: fixed;
@@ -4588,6 +4591,7 @@ body:has(.nesio-mood-overlay) .nesio-bottom-nav::before {
   right: 0;
   bottom: 0;
   height: calc(4.6rem + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to top, var(--portal-bg) 30%, transparent);
   backdrop-filter: blur(9px);
   -webkit-backdrop-filter: blur(9px);
   -webkit-mask-image: linear-gradient(to top, black 38%, transparent);
@@ -4787,6 +4791,7 @@ html[data-portal-theme="night"] .nesio-logo-night { display: inline-block !impor
   overflow-y: auto;
   padding: 0.5rem 1.1rem calc(5.5rem + env(safe-area-inset-bottom));
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain; /* iOS PWA:触底橡皮筋会拖动 fixed 层露出 html 兜底色(底部色带) */
 }
 
 .nesio-today-greeting {
@@ -5104,6 +5109,7 @@ html[data-portal-theme="night"] .nesio-today-btn--ghost {
   overflow-x: hidden; /* 竖向滚动容器绝不横滚:堵住「页面漂移/超出屏幕」 */
   padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 1.1rem calc(5.5rem + env(safe-area-inset-bottom));
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain; /* 同 today-scroll:掐断触底橡皮筋,不露 html 兜底色 */
 }
 
 .nesio-memory-search-wrap {
@@ -12663,7 +12669,7 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-reader-tools { display: flex; gap: 0.4rem; }
 .nesio-reader-btn { min-width: 38px; min-height: 34px; border-radius: 8px; border: 1px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.82rem; cursor: pointer; padding: 0 0.5rem; }
 .nesio-reader-btn.is-active { border-color: var(--portal-blue-deep); color: var(--portal-blue-deep); }
-.nesio-reader-scroll { flex: 1; overflow-y: auto; padding: 1.2rem 1.15rem calc(2.5rem + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
+.nesio-reader-scroll { flex: 1; overflow-y: auto; padding: 1.2rem 1.15rem calc(2.5rem + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
 .nesio-reader-title { font-weight: 700; color: var(--portal-ink); line-height: 1.35; margin: 0 0 1.2rem; max-width: 40rem; }
 .nesio-reader-body { max-width: 40rem; margin: 0 auto; }
 .nesio-reader-para { line-height: 1.95; letter-spacing: 0.01em; color: var(--portal-ink); margin: 0 0 1.35rem; transition: opacity 0.2s; }
@@ -17030,6 +17036,16 @@ html[data-portal-theme="night"][data-palette="sage"] .portal-root {
 html[data-portal-theme="night"][data-palette="bluegray-rose"] { background-color:#180f12; }
 html[data-portal-theme="night"][data-palette="milktea"]       { background-color:#150f09; }
 html[data-portal-theme="night"][data-palette="sage"]          { background-color:#0e130f; }
+
+/* 批次 106 的白天版(iOS PWA 底部色带拔根):白天四套皮肤此前从没配 html 兜底色,
+   一直沿用默认的 background-color: var(--portal-blue-deep) —— 皮肤把 blue-deep 覆盖成
+   饱和 accent(milktea=金棕 #a98f66)后,底部安全区/橡皮筋露出的就是那条「金棕色带」。
+   兜底取各皮肤渐变的底部终止色,任何 fixed 层没盖到的地方漏出的都与设计底一致。
+   同夜间块:只在 html 上,不带 .portal-root(否则盖住 body::before 的渐变层)。 */
+html[data-palette="bluegray-rose"]:not([data-portal-theme="night"]) { background-color:#ccd1d7; }
+html[data-palette="milktea"]:not([data-portal-theme="night"])       { background-color:#d9ccb5; }
+html[data-palette="haze-blue"]:not([data-portal-theme="night"])     { background-color:#9fbcd4; }
+html[data-palette="sage"]:not([data-portal-theme="night"])          { background-color:#c0d3c8; }
 
 /* 4 色卡选择器(设置 › 实验功能) */
 .nesio-palette-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}

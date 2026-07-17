@@ -161,6 +161,9 @@ function safeExternalUrl(url: string): string {
 const HIDDEN_ATTRIBUTE_KEYS = new Set([
   // Internal / calendar
   'calendarId', 'calendarName', 'description', 'emailId', 'messageId', 'htmlLink',
+  // CARD SPEC:原始邮件头不污染卡片 —— from(「"U.S. Bank Alerts" <usbank@…>」)、
+  // 邮件分类、snippet 属技术字段,藏进「原始记录·邮件原文」折叠区,不当属性平铺。
+  'from', 'mailCategory', 'snippet',
   // 批次 150(QA #9):日历/外部集成内部 ID 与技术字段,绝不该露给终端用户
   'externalId', 'iCalUID', 'recurringEventId', 'sequence', 'etag', 'organizer', 'creator',
   'notionPageId', 'sourceApp', 'source', 'dayOfWeek', 'aiConfidence',
@@ -802,7 +805,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   const shownAttrs = Object.entries(n.attributes).filter(
     ([k, v]) => v !== null && v !== '' && !HIDDEN_ATTRIBUTE_KEYS.has(k),
   );
-  const showRawInput = Boolean(n.rawInput && n.source !== 'calendar' && n.source !== 'email');
+  // CARD SPEC:邮件也进「原始记录·邮件原文」折叠区(原始 from 头藏这里,不污染卡片)。
+  const showRawInput = Boolean(n.rawInput && n.source !== 'calendar');
   const typeBg = TYPE_BG_DETAIL[n.type] || 'var(--chip-fog)';
 
   // 批次 27:阅读入口不再只认 article —— 老邮件节点没存 article,退到 summary/snippet/正文,
