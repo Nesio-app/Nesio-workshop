@@ -31,6 +31,7 @@ const PlacesShareSheet = dynamic(() => import('../PlacesShareSheet'), { ssr: fal
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import NesioSheet from '../ui/NesioSheet';
 import { computePlacesShareStats, type PlacesShareStats } from '@/lib/portal/places-share';
 import { matchPlacePhotoAsset, placePhotoOverrideId, setPlacePhotoOverride, PLACE_PHOTOS_EVENT, type GeoImageNode } from '@/lib/portal/place-photos';
 
@@ -897,9 +898,16 @@ export default function TimelineTab() {
         document.body,
       )}
 
-      {/* 批次 63:3D 地球全屏;批次 69:真全屏(不透明深空,背后不透出) */}
-      {globeFull && typeof document !== 'undefined' && createPortal(
-        <div className="nesio-globe-fsov" role="dialog" aria-modal="true" aria-label={L(dict, '世界', 'World')}>
+      {/* 批次 63:3D 地球全屏;批次 69:真全屏(不透明深空,背后不透出)。W2:NesioSheet 接管壳。 */}
+      {globeFull && (
+        <NesioSheet
+          variant="fullscreen"
+          open
+          onOpenChange={(next) => { if (!next) setGlobeFull(false); }}
+          card={false}
+          className="nesio-globe-fsov"
+          ariaLabel={L(dict, '世界', 'World')}
+        >
           <p className="nesio-globe-stats">
             {L(dict,
               `${world.length} 国 · ${world.reduce((n, g) => n + g.cities.length, 0)} 城 · ${trail.length} 足迹`,
@@ -911,8 +919,7 @@ export default function TimelineTab() {
           />
           <span className="nesio-globe-stage-hint">{L(dict, '深色一侧是正处于黑夜的地区', "The shaded side is where it's currently night")}</span>
           <button type="button" className="nesio-memmap-close nesio-globe-fsov-close" onClick={() => setGlobeFull(false)}>✕</button>
-        </div>,
-        document.body,
+        </NesioSheet>
       )}
 
       {/* 批次 63:缩略图放大查看 */}
