@@ -42,6 +42,7 @@ import { IconRefresh, IconTrendingUp, IconMail, IconCalendar, IconCamera, IconMi
 import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 import TimelineTab from './insights/TimelineTab';
 import GrowthTab from './insights/GrowthTab';
+import MontageTab from './insights/MontageTab';
 import MirrorLetterTab from './insights/MirrorLetterTab';
 import FinanceTab from './finance/FinanceTab';
 import HealthDashboard from './health/HealthDashboard';
@@ -52,7 +53,7 @@ import { readFactJournal, ensureFactJournal } from '@/lib/platform/fact-journal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type MainTab = 'reflection' | 'growth' | 'health' | 'timeline' | 'finance' | 'relationships' | 'living';
+type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'timeline' | 'finance' | 'relationships' | 'living';
 
 const DAY_MS = 86_400_000;
 
@@ -745,14 +746,14 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
 
       {/* Main tabs */}
       <div className="nesio-insights-main-tabs">
-        {(['reflection', 'growth', 'health', 'timeline', 'finance', 'relationships', 'living'] as MainTab[]).filter(tabEnabled).map((t) => (
+        {(['reflection', 'growth', 'montage', 'health', 'timeline', 'finance', 'relationships', 'living'] as MainTab[]).filter(tabEnabled).map((t) => (
           <button
             key={t}
             type="button"
             className={`nesio-insights-main-tab${mainTab === t ? ' nesio-insights-main-tab--active' : ''}`}
             onClick={() => setMainTab(t)}
           >
-            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'growth' ? L(dict, '成长', 'Growth') : t === 'health' ? L(dict, '健康', 'Health') : t === 'timeline' ? L(dict, '足迹', 'Places') : t === 'finance' ? L(dict, '财务', 'Finance') : t === 'relationships' ? L(dict, '关系', 'People') : L(dict, '多面镜', 'Mirror')}
+            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'growth' ? L(dict, '成长', 'Growth') : t === 'montage' ? L(dict, '小剧场', 'Films') : t === 'health' ? L(dict, '健康', 'Health') : t === 'timeline' ? L(dict, '足迹', 'Places') : t === 'finance' ? L(dict, '财务', 'Finance') : t === 'relationships' ? L(dict, '关系', 'People') : L(dict, '多面镜', 'Mirror')}
             {t === 'living' && <sup style={{ marginLeft: '0.2rem', fontSize: '0.6em', fontWeight: 600, color: 'var(--portal-accent)' }}>Pro</sup>}
           </button>
         ))}
@@ -919,6 +920,13 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {mainTab === 'growth' && (
           <div className="nesio-analytics-tab">
             <GrowthTab />
+          </div>
+        )}
+
+        {/* ── Tab: 小剧场(记忆 → 厚涂动漫短片,呈现层;生成在 Lab 端)── */}
+        {mainTab === 'montage' && (
+          <div className="nesio-analytics-tab">
+            <MontageTab />
           </div>
         )}
 
