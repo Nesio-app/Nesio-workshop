@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { isPortalRequestAuthorized, isRateLimited } from '@/lib/portal/api-auth';
+import { getSupabaseUserId, readIntegrations, writeIntegrations } from '@/lib/portal/integrations';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,9 +53,36 @@ export async function POST(req: NextRequest) {
     cookieStore.get('nesio_google_calendar_access')?.value,
   ].filter((v): v is string => Boolean(v));
 
+  // Supabase 才是登录用户 token 的真源(跨设备;iOS PWA 环境下 cookie 常为空)。
+  // 只撤 cookie 不动 Supabase = 「断开」后服务端照样能拉邮件,且 UI 按服务端
+  // 真源合并后会立刻又显示已连接。这里把 Supabase 里的 token 一并纳入撤销
+  // 候选,撤销后删行。
+  const supabaseToken = cookieStore.get('baohe_auth_access')?.value;
+  let userId: string | null = null;
+  let integrationMap: Awaited<ReturnType<typeof readIntegrations>> = null;
+  if (supabaseToken) {
+    userId = await getSupabaseUserId(supabaseToken);
+    if (userId) {
+      integrationMap = await readIntegrations(userId, supabaseToken);
+      for (const provider of ['gmail', 'calendar'] as const) {
+        const t = integrationMap?.[provider];
+        if (t?.refreshToken) candidates.push(t.refreshToken);
+        if (t?.accessToken) candidates.push(t.accessToken);
+      }
+    }
+  }
+
   let revoked = false;
   for (const token of candidates) {
     if (await revokeAtGoogle(token)) { revoked = true; break; }
+  }
+
+  // 云端断连:删掉 gmail/calendar 两行(其余 provider 不动)。读失败时不以
+  // 「空」覆写 —— 见 /api/portal/integrations DELETE 的同款保护。
+  if (userId && supabaseToken && integrationMap && (integrationMap.gmail || integrationMap.calendar)) {
+    delete integrationMap.gmail;
+    delete integrationMap.calendar;
+    await writeIntegrations(userId, supabaseToken, integrationMap);
   }
 
   const response = NextResponse.json({

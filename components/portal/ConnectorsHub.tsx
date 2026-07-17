@@ -148,6 +148,24 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     // 永远停在「接入」,用户以为没连上。
     if (loadToken('notion')) savedConn.notion = true;
     setConnected(savedConn);
+    // 服务端真源合并(同公众仓修法):iOS PWA 的 OAuth 在独立存储的应用内浏览器里
+    // 完成,本机 nesio-connectors-v1 标记写不回主环境 —— 授权成功 UI 却一直显示
+    // 「接入」。登录用户 token 在 Supabase(跨设备),服务端说已连就是已连,回写本机。
+    fetch('/api/portal/integrations', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d: { integrations?: Record<string, { connected?: boolean }> } | null) => {
+        const s = d?.integrations;
+        if (!s) return;
+        const updates: Record<string, boolean> = {};
+        if (s.gmail?.connected || s.calendar?.connected) updates.google = true;
+        for (const p of ['tesla', 'granola', 'notion'] as const) {
+          if (s[p]?.connected) updates[p] = true;
+        }
+        if (!Object.keys(updates).length) return;
+        for (const id of Object.keys(updates)) saveConnectorState(id, true);
+        setConnected((prev) => ({ ...prev, ...updates }));
+      })
+      .catch(() => {});
     setIngestUrl(`${window.location.origin}/api/portal/ingest`);
     // 批次 39:OAuth 连过(cookie token,没有本地 token)也要翻成已连接。
     // Notion 修:授权可能在另一个浏览器完成(token 落 Supabase),回到本 App
