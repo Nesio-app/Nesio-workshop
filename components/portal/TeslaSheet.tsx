@@ -62,6 +62,11 @@ export default function TeslaSheet({ open, onClose }: { open: boolean; onClose: 
       setDrives(data.drives || []);
       setCharges(data.charges || []);
       setState('ready');
+      // 顺手沉淀:面板刚拉到的新鲜快照复用给足迹/信号管线(externalId 去重,
+      // 不会重复计),停车点/充电站即时进地图足迹 —— 看一眼车,足迹就更新。
+      void import('@/lib/portal/connectors')
+        .then((m) => m.refreshTesla({ drives: (data.drives || []) as never[], charges: (data.charges || []) as never[] }))
+        .catch(() => {});
     } catch {
       setErrMsg(L(dict, '网络没接上,稍后再试一次。', 'Network hiccup — try again shortly.'));
       setState('error');
