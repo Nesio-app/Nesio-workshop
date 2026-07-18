@@ -111,9 +111,10 @@ sensitivity/retention 枚举化(中期)。
   test:security 链尾**:原语外每一处手写模态标记登记进 ALLOWLIST,新面板不走原语即 CI 红;
   迁完降数/摘除。workshop(lab)比 nesio 多若干实验面板(Tesla/Wechat/fitness/Montage/NotePanel/
   PreviewGuides/ConnectorsHub),ALLOWLIST 更长属预期漂移。**待迁(高风险,留整块真机验证时间)**:
-  **叠放组批①已迁(2026-07-18)**:LongPressSheet/ProjectsSheet/CreateProjectSheet(workshop 里
-  仍在单体 MemoryTab.tsx 内联)。① 叠放组剩余——FavoritesSheet/ProjectDetailSheet/MemoryNodeDetail/
-  DailyBrief/TodayFeed(点开拉起兄弟 modal,双层 Vaul 须真机验);② 多子 sheet——Settings/
+  **叠放组批①②已迁(2026-07-18,nesio 侧 prod 隔离验双层 Vaul 通过)**:批① LongPress/Projects/
+  CreateProject;批② Favorites/ProjectDetail(workshop 里都在单体 MemoryTab.tsx 内联)。① 叠放组
+  剩余——MemoryNodeDetail(需 fragment 抽 3 个嵌套 modal + 丢 expand-to-full 决策)、DailyBrief/
+  TodayFeed(嵌套 MemoryNodeDetail);② 多子 sheet——Settings/
   Mood;③ 嵌套子 sheet——EmailCompose/RelationshipDetail;④ 特殊结构——Voice(双 backdrop);
   ⑤ 豁免——Camera/Barcode(实时相机)。清单即 ALLOWLIST,以测试为准。两仓(nesio + workshop)同步。
 
