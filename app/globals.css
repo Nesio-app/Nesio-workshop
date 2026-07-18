@@ -17827,8 +17827,11 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   z-index: 900;
   background: var(--modal-backdrop-bg, rgba(16, 28, 54, 0.25));
 }
-/* fullscreen 底衬:不透明页面底,给半透明(磨砂玻璃)全屏面板兜底,防夜间透出下层 */
-.nesio-sheet-overlay--opaque { background: var(--portal-bg, #f4f8fd); }
+/* fullscreen 底衬:不透明页面底,给半透明(磨砂玻璃)全屏面板兜底,防夜间透出下层。
+   z=929/930:全屏面板常从 bottom 卡(900/901)里打开(如记忆详情→阅读原文),
+   必须整个盖住触发它的 bottom 卡,否则卡片会从半透明面板里透出来(实测「阅读器透明」)。
+   仍低于 image-viewer(950)/镜信抽屉(948)/日期选择器等特殊模态(1010–1200)。 */
+.nesio-sheet-overlay--opaque { background: var(--portal-bg, #f4f8fd); z-index: 929; }
 .nesio-sheet-overlay[data-state='open'] { animation: nesioSheetFade var(--dur, 0.3s) var(--ease-out); }
 .nesio-sheet-overlay[data-state='closed'] { animation: nesioSheetFadeOut var(--dur-fast, 0.2s) var(--ease-out); }
 
@@ -17906,10 +17909,17 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   padding: 1rem;
 }
 .nesio-sheet--bottom.nesio-sheet--bare { padding: 0; }
+/* 迁移期铁律副作用修:某些自带卡(.nesio-settings-sheet-card)带 sheetSlideUp
+   入场动画 = translateY(100%)→0。作 Vaul bare 面板时,该动画的 transform 会
+   覆盖 Vaul 拖拽用的内联 transform(CSS 动画优先级高于内联样式)→ 卡片拖不动/
+   下拉关不掉。入场交给 Vaul,这里清掉自带动画。 */
+.nesio-sheet--bottom.nesio-sheet--bare { animation: none; }
 
-/* fullscreen:全屏面板 */
+/* fullscreen:全屏面板。z=930 压过 bottom/center 面板(901)—— 从 bottom 卡里
+   打开的全屏面板(阅读器等)要完整盖住触发卡,配合 --opaque 底衬(929)。 */
 .nesio-sheet--fullscreen {
   inset: 0;
+  z-index: 930;
   max-height: 100lvh;
   padding: calc(env(safe-area-inset-top, 0px)) 0 calc(env(safe-area-inset-bottom, 0px));
 }
