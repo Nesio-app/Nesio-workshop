@@ -18147,3 +18147,93 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .ng-mem-text{font-size:.95rem;line-height:1.6;color:var(--portal-ink);margin:0 0 9px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
 .ng-mem-tags{display:flex;gap:6px;flex-wrap:wrap}
 .ng-mem-tag{font-size:.7rem;color:var(--portal-muted);background:var(--portal-bg);border:1px solid var(--portal-line);border-radius:6px;padding:2px 8px}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   小剧场 · 想试 · 想分享(artifact 0119784e)—— 走 portal 主题 token
+   ══════════════════════════════════════════════════════════════════════════ */
+.nesio-montage{
+  --nm-ease:cubic-bezier(0.23,1,0.32,1);
+  --nm-faint:color-mix(in srgb, var(--portal-muted) 66%, transparent);
+  --nm-gold:linear-gradient(120deg,#f0d68a,#d8ad5a);
+  font-family:var(--font-source-sans);color:var(--portal-ink);line-height:1.6;
+}
+.nesio-montage *{box-sizing:border-box}
+.nm-hd{display:flex;align-items:center;gap:10px;margin:0 0 4px}
+.nm-hd svg{width:22px;height:22px;stroke:var(--portal-accent);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.nm-hd h1{font-size:1.35rem;letter-spacing:-.01em;margin:0;font-weight:var(--weight-semibold);color:var(--portal-ink)}
+.nm-sub{color:var(--nm-faint);font-size:.82rem;margin:0 0 22px 32px}
+.nm-sec{display:flex;align-items:baseline;justify-content:space-between;margin:0 0 12px}
+.nm-sec .l{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--portal-accent);font-weight:var(--weight-semibold)}
+.nm-sec .r{font-size:.74rem;color:var(--nm-faint)}
+.nm-gap{height:30px}
+
+.nm-gift{background:linear-gradient(135deg,var(--portal-accent-soft),var(--portal-card));border:1px solid var(--portal-accent-border);border-radius:18px;padding:15px 15px 6px;margin-bottom:8px}
+.nm-gift .gh{display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--portal-accent);font-weight:var(--weight-semibold);margin:0 0 11px;line-height:1.4}
+.nm-gift .gh svg{width:16px;height:16px;stroke:var(--portal-accent);stroke-width:1.8;fill:none;flex:none}
+
+.nm-poster{position:relative;border-radius:15px;overflow:hidden;cursor:pointer;aspect-ratio:16/11;display:flex;flex-direction:column;justify-content:flex-end;color:#fff;border:1px solid rgba(0,0,0,.12);width:100%;padding:0;background:var(--portal-accent-soft);background-size:cover;background-position:center}
+.nm-poster .sh{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.66),rgba(0,0,0,.05) 55%,transparent)}
+.nm-poster .txt{position:relative;padding:13px 14px;text-align:left}
+.nm-poster .t{font-size:1.05rem;font-weight:var(--weight-semibold);margin:0;text-shadow:0 1px 6px rgba(0,0,0,.45)}
+.nm-poster .s{font-size:.8rem;opacity:.94;margin:3px 0 0;line-height:1.4;text-shadow:0 1px 5px rgba(0,0,0,.45)}
+.nm-poster .play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.24);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;border:1.5px solid rgba(255,255,255,.65)}
+.nm-poster .play svg{width:20px;height:20px;fill:#fff;margin-left:2px}
+.nm-poster .kind{position:absolute;top:10px;left:11px;font-size:.66rem;font-weight:var(--weight-semibold);letter-spacing:.03em;background:rgba(0,0,0,.42);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border-radius:6px;padding:3px 8px;color:#fff}
+.nm-poster .kind.pro{color:#1a1a1a;background:var(--nm-gold)}
+.nm-poster .dur{position:absolute;top:10px;right:11px;font-size:.66rem;font-weight:var(--weight-medium);background:rgba(0,0,0,.42);border-radius:6px;padding:3px 7px;color:#fff;font-variant-numeric:tabular-nums}
+
+.nm-how{font-size:.78rem;color:var(--portal-muted);text-align:center;padding:11px 4px 8px;line-height:1.55}
+.nm-how b{color:var(--portal-accent)}
+.nm-quota{display:flex;gap:10px;align-items:flex-start;background:var(--portal-card);border:1px solid var(--portal-line);border-radius:13px;padding:12px 14px;margin:14px 0 0;font-size:.82rem;line-height:1.55}
+.nm-quota svg{width:17px;height:17px;stroke:var(--portal-accent);stroke-width:1.7;fill:none;flex:none;margin-top:2px}
+.nm-quota b{color:var(--portal-accent)}
+.nm-make{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;font-family:inherit;font-size:.92rem;font-weight:var(--weight-semibold);color:var(--portal-accent);background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:14px;padding:14px 0;cursor:pointer;margin-top:12px;transition:transform .12s var(--nm-ease)}
+.nm-make:active{transform:scale(.98)}
+.nm-make svg{width:18px;height:18px;stroke:var(--portal-accent);stroke-width:1.8;fill:none;stroke-linecap:round}
+
+.nm-grid2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.nm-grid2 .nm-poster{aspect-ratio:3/4}
+.nm-grid2 .nm-poster .t{font-size:.9rem}
+.nm-grid2 .nm-poster .s{font-size:.72rem}
+.nm-privacy{display:flex;gap:9px;align-items:flex-start;margin-top:18px;font-size:.8rem;color:var(--portal-muted);line-height:1.55}
+.nm-privacy svg{width:16px;height:16px;stroke:var(--portal-accent);stroke-width:1.7;fill:none;flex:none;margin-top:2px}
+.nm-privacy b{color:var(--portal-accent)}
+.nm-foot{margin-top:26px;padding-top:15px;border-top:1px solid var(--portal-line);font-size:.75rem;color:var(--nm-faint);line-height:1.65}
+.nm-foot b{color:var(--portal-muted)}
+.nm-empty{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:16px;padding:16px;font-size:.9rem;color:var(--portal-accent);text-align:center;line-height:1.55}
+
+/* 落差揭晓播放器(portal 到 body,不透明深底) */
+.nm-scrim{position:fixed;inset:0;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;padding:22px;z-index:2147483000;animation:nm-fade .28s var(--nm-ease)}
+.nm-player{max-width:420px;width:100%}
+.nm-screen{aspect-ratio:16/11;border-radius:14px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;text-align:center;padding:22px;background:#000 center/cover no-repeat}
+.nm-screen .note{color:rgba(255,255,255,.94);font-size:.95rem;line-height:1.7;font-style:italic;transition:opacity .7s,filter .7s;position:relative;z-index:2;text-shadow:0 2px 12px rgba(0,0,0,.8)}
+.nm-screen::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.42)}
+.nm-video{width:100%;max-height:70vh;border-radius:14px;background:#000;display:block}
+.nm-feel{position:absolute;left:0;right:0;bottom:0;padding:16px 18px;color:#fff;font-size:.98rem;font-weight:var(--weight-semibold);line-height:1.6;background:linear-gradient(to top,rgba(0,0,0,.72),transparent);text-shadow:0 2px 10px rgba(0,0,0,.6);opacity:0;transition:opacity 1s;z-index:3;text-align:left}
+.nm-feel.on{opacity:1}
+.nm-stage{font-size:.7rem;color:rgba(255,255,255,.6);text-align:center;margin:12px 0 8px;min-height:1em}
+.nm-prow{display:flex;gap:10px;margin-top:6px}
+.nm-prow button{flex:1;font-family:inherit;font-size:.85rem;font-weight:var(--weight-semibold);border-radius:11px;padding:12px 0;cursor:pointer;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.13);color:#fff}
+.nm-prow button.pri{background:#fff;color:#1a1a1a;border-color:#fff}
+
+/* 分享卡(病毒单元) */
+.nm-sharewrap{position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px;z-index:2147483001;overflow:auto;animation:nm-fade .28s var(--nm-ease)}
+.nm-sharecard{width:250px;border-radius:20px;overflow:hidden;background:#1a1a1a;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.nm-sharecard .top{aspect-ratio:3/4;position:relative;display:flex;flex-direction:column;justify-content:flex-end;color:#fff;background:#333 center/cover no-repeat}
+.nm-sharecard .top .fl{position:relative;padding:16px 15px;font-size:.98rem;font-weight:var(--weight-semibold);line-height:1.55;text-shadow:0 2px 10px rgba(0,0,0,.55);z-index:2}
+.nm-sharecard .top .sh{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.72),transparent 60%)}
+.nm-sharecard .bot{padding:13px 15px;background:#1a1a1a;color:#fff}
+.nm-sharecard .brand{display:flex;align-items:center;gap:7px;font-size:.74rem;color:rgba(255,255,255,.75)}
+.nm-sharecard .brand .dot{width:7px;height:7px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#eaf3fb,#6db3a6 70%)}
+.nm-sharecard .invite{font-size:.82rem;color:#fff;margin:9px 0 0;line-height:1.5}
+.nm-sharecard .invite b{color:#8fd3c6}
+.nm-sharebtns{display:flex;gap:9px;margin-top:16px;width:250px}
+.nm-sharebtns button{flex:1;font-family:inherit;font-size:.84rem;font-weight:var(--weight-semibold);border-radius:11px;padding:11px 0;cursor:pointer;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.13);color:#fff}
+.nm-sharebtns button.pri{background:#fff;color:#1a1a1a;border:none}
+.nm-shareprivacy{font-size:.72rem;color:rgba(255,255,255,.6);margin-top:14px;text-align:center;max-width:250px;line-height:1.5}
+
+.nm-toast{position:fixed;left:50%;bottom:calc(26px + var(--portal-bottom-nav-clearance, 0px));transform:translateX(-50%);background:var(--portal-ink);color:var(--portal-bg);font-size:.82rem;padding:11px 16px;border-radius:12px;z-index:2147483002;max-width:330px;text-align:center;animation:nm-toast-in .3s var(--nm-ease)}
+@keyframes nm-fade{from{opacity:0}to{opacity:1}}
+@keyframes nm-toast-in{from{opacity:0;transform:translateX(-50%) translateY(16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.nesio-montage :focus-visible,.nm-scrim :focus-visible,.nm-sharewrap :focus-visible{outline:2px solid var(--portal-accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.nesio-montage *,.nm-scrim,.nm-sharewrap,.nm-toast{animation:none!important;transition:opacity .2s!important}}
