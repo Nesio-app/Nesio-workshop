@@ -18015,6 +18015,7 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .ng-chip.blind{color:var(--portal-accent);background:var(--portal-accent-soft);border-color:var(--portal-accent-border)}
 .ng-chip.trend{color:var(--status-go);background:var(--status-go-soft);border-color:var(--status-go)}
 .ng-ask{font-size:1.06rem;line-height:1.55;font-weight:var(--weight-semibold);margin:0 0 8px;text-wrap:pretty;color:var(--portal-ink)}
+.ng-ask .ng-mem{color:var(--portal-accent)}
 .ng-basis{font-size:.75rem;color:var(--ng-faint);margin:0 0 14px;padding-left:12px;border-left:2px solid var(--portal-accent-border);line-height:1.5}
 .ng-ta{width:100%;font-family:inherit;font-size:.92rem;color:var(--portal-ink);background:var(--portal-bg);
   border:1px solid var(--portal-line);border-radius:11px;padding:11px 12px;resize:vertical;line-height:1.55}

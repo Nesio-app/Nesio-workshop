@@ -204,10 +204,16 @@ function TodayObsCard({ o, dict, en, basis, draft, setDraft, pick, onPick, onSav
 }) {
   const chip = CHIP_CLASS[o.mode];
   const chipLabel = L(dict, DIMENSION_LABEL[o.dimension].zh, DIMENSION_LABEL[o.dimension].en);
+  // 记忆原话由代码保证引出来(不靠 AI):sourceText 就是你的真实记忆/数据,永远显示
+  const lead = o.mode === 'nudge' ? L(dict, '你记下 —— ', 'You noted — ') : o.mode === 'quiz' ? L(dict, '你写 ', 'You wrote ') : '';
+  const memQuote = o.mode === 'trend' ? `${o.sourceText}。` : `${lead}「${o.sourceText}」。`;
+  const tail = o.mode === 'quiz'
+    ? L(dict, '这句话里藏着一个常见的思维陷阱 —— 你抓得出是哪个吗?', 'A common thinking trap hides in this line — can you spot it?')
+    : (o.body || L(dict, '要不要陪你看看?', 'Want to look at it together?'));
   return (
     <div className="ng-today">
       <span className={`ng-chip ${chip}`}>{o.mode === 'nudge' ? L(dict, '情绪 · 主动疏导', 'Feeling · gentle') : o.mode === 'quiz' ? L(dict, '盲点 · 每日观察', 'Blind spot · daily') : L(dict, '趋势 · 主动发现', 'Trend · noticed')} · {chipLabel}</span>
-      <p className="ng-ask">{o.mode === 'quiz' && o.quiz ? o.quiz.question : o.body}</p>
+      <p className="ng-ask"><span className="ng-mem">{memQuote}</span>{tail}</p>
       <p className="ng-basis">{basis}</p>
 
       {o.mode !== 'quiz' ? (

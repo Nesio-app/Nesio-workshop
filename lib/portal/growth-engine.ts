@@ -76,7 +76,7 @@ export const LENSES: Lens[] = [
       const src = `${n.name}${n.attributes?.notes ? ' —— ' + n.attributes.notes : ''}`;
       return { id: `soothe:${n.id}`, lensId: 'soothe', mode: 'nudge', sourceId: n.id, sourceText: src };
     },
-    buildPrompt: (s) => `你是念念,一个温柔、不评判、像认识很久的朋友。对方今天记下了这样一段:"""${s.sourceText}"""。\n请**先把 ta 这段里最重的那半句用「」原样引出来**(像:今天你写下和老板的那段 ——「原话」),说这话听着有点重;再轻轻问要不要陪 ta 一起看看,它是不是真有那么重(强调:是把话看清,不是分析 ta)。两三句,口语,别用"您",别列点。只输出这几句话本身。`,
+    buildPrompt: (s) => `你是念念,一个温柔、不评判、像认识很久的朋友。对方今天记下了这样一段心情:"""${s.sourceText}"""。\n用一两句轻轻关心一下,再问 ta 要不要陪着一起看看,它是不是真有那么重(是把话看清,不是分析 ta)。别重复 ta 的原话(卡片上会单独引出来)。中文,口语,别用"您",别列点。只输出这几句话。`,
     parse: (_s, t) => ({ title: '念念想和你聊聊', body: t.trim() }),
   },
   // ② 认知重评(quiz)—— 检测到自责/灾难化的想法 → 考考你这想法哪里可能不对
@@ -112,7 +112,7 @@ export const LENSES: Lens[] = [
       const src = `${n.name}${n.attributes?.notes ? ' —— ' + n.attributes.notes : ''}`;
       return { id: `stoic:${n.id}`, lensId: 'stoic', mode: 'nudge', sourceId: n.id, sourceText: src };
     },
-    buildPrompt: (s) => `对方记下了一件让 ta 挂心的事:"""${s.sourceText}"""。\n请**先用「」把 ta 的原话轻轻引出来**,再像温和的斯多葛式向导,把这件事分成两半:哪些是自己能决定、能行动的,哪些是控制不了、只能先接受的;末尾把落点收到「自己此刻能做的一件小事」上。两三句,口语,别用"您",别列点。只输出这几句话。`,
+    buildPrompt: (s) => `对方记下了一件让 ta 挂心的事:"""${s.sourceText}"""。\n像温和的斯多葛式向导,把这件事分成两半:哪些是自己能决定、能行动的,哪些是控制不了、只能先接受的;末尾把落点收到「自己此刻能做的一件小事」上。别重复 ta 的原话(卡片上会单独引出来)。两三句,口语,别用"您",别列点。只输出这几句话。`,
     parse: (_s, t) => ({ title: '哪些在你手里', body: t.trim() }),
   },
   // ④ 苏格拉底追问(nudge)—— 笃定的绝对判断 → 用一个问题邀 ta 自己检视
@@ -128,7 +128,7 @@ export const LENSES: Lens[] = [
       const src = `${n.name}${n.attributes?.notes ? ' —— ' + n.attributes.notes : ''}`;
       return { id: `socratic:${n.id}`, lensId: 'socratic', mode: 'nudge', sourceId: n.id, sourceText: src };
     },
-    buildPrompt: (s) => `对方在记录里写下了一个挺笃定的判断:"""${s.sourceText}"""。\n请**先用「」把这句判断原样引出来**,再像苏格拉底那样用一个温和、不带评判的追问,邀 ta 自己检视它的依据或例外(如「真的每一次都这样吗?」「有没有哪怕一次不是?」「这是事实,还是此刻的感受?」)。只引原话 + 问一个问题,不给答案、不说教。中文,口语。只输出这两句。`,
+    buildPrompt: (s) => `对方在记录里写下了一个挺笃定的判断:"""${s.sourceText}"""。\n像苏格拉底那样用一个温和、不带评判的追问,邀 ta 自己检视它的依据或例外(如「真的每一次都这样吗?」「有没有哪怕一次不是?」「这是事实,还是此刻的感受?」)。只问一个问题,不给答案。别重复原话(卡片上会单独引出来)。中文,口语。只输出这一句问题。`,
     parse: (_s, t) => ({ title: '念念想追问一句', body: t.trim() }),
   },
   // ⑤ 趋势洞察(trend)—— 财务:近一周快递/购物笔数偏多 → 温和点出花销趋势
@@ -144,7 +144,7 @@ export const LENSES: Lens[] = [
       if (parcels.length < 4 || spend < 80) return null;
       return { id: `trend-spend:${new Date(now).toISOString().slice(0, 10)}`, lensId: 'trend-spend', mode: 'trend', sourceId: 'finance-week', sourceText: `近 7 天购物/快递 ${parcels.length} 笔,共 $${spend.toFixed(0)}`, meta: { count: parcels.length, spend: Math.round(spend) } };
     },
-    buildPrompt: (s) => `观察到一个真实的花销趋势(只用这个事实,别编别的):${s.sourceText}。\n请**先把这个具体数字点出来**(像:这两周到了 N 个快递,「购物」比上月同期多了约 …),再接一句「不是说该省 —— 是你自己想看看这个趋势吗?」。温和、不说教、不制造焦虑。中文。只输出这一两句。`,
+    buildPrompt: (s) => `观察到一个真实的花销趋势(数字见此,别重复念):${s.sourceText}。\n用一句温和、不说教、不制造焦虑的话,问对方要不要自己看看这个趋势(像:不是说该省 —— 是你自己想看看吗?)。中文。只输出这一句。`,
     parse: (s, t) => ({ title: '一个小趋势', body: t.trim() }),
   },
 ];
