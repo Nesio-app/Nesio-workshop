@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { todayGrowthCards, recordGrowthAnswer, growthHistory, growthStreakDays, type GrowthCard, type GrowthAnswer } from '@/lib/portal/growth-guide';
-import { collectSeeds, generateObservation, DIMENSION_LABEL, summarizeDimensions, ringEmptyPct, type Observation } from '@/lib/portal/growth-engine';
+import { collectSeeds, generateObservation, DIMENSION_LABEL, summarizeDimensions, ringEmptyPct, deepenNudge, recentSpendItems, type Observation } from '@/lib/portal/growth-engine';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -151,9 +151,8 @@ export default function GrowthTab() {
           ) : !current ? (
             <div className="ng-done">{L(dict, '今天的回看做完了。都从你自己的记忆里长出来 —— 明天是新的几条。', 'Done for today. All grown from your own memories — tomorrow brings new ones.')}</div>
           ) : current.t === 'obs' ? (
-            <TodayObsCard o={current.o} dict={dict} en={en}
+            <TodayObsCard key={current.o.id} o={current.o} dict={dict} en={en}
               basis={basisLine(current.o)}
-              draft={draft} setDraft={setDraft}
               pick={quizPick[current.o.id]} onPick={(i) => setQuizPick((p) => ({ ...p, [current.o.id]: i }))}
               onSave={(text) => answerObservation(current.o, text)} onSkip={skip} />
           ) : (
@@ -197,9 +196,8 @@ export default function GrowthTab() {
 }
 
 // 今天卡 · 引擎观察(nudge/trend 文本;quiz 选项+揭晓)
-function TodayObsCard({ o, dict, en, basis, draft, setDraft, pick, onPick, onSave, onSkip }: {
+function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip }: {
   o: Observation; dict: 'zh' | 'en'; en: boolean; basis: string;
-  draft: Record<string, string>; setDraft: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   pick: number | undefined; onPick: (i: number) => void; onSave: (text: string) => void; onSkip: () => void;
 }) {
   const chip = CHIP_CLASS[o.mode];
@@ -210,6 +208,20 @@ function TodayObsCard({ o, dict, en, basis, draft, setDraft, pick, onPick, onSav
   const tail = o.mode === 'quiz'
     ? L(dict, '这句话里藏着一个常见的思维陷阱 —— 你抓得出是哪个吗?', 'A common thinking trap hides in this line — can you spot it?')
     : (o.body || L(dict, '要不要陪你看看?', 'Want to look at it together?'));
+
+  // 引导态:念念的话(情绪)/ 明细(趋势)—— 主按钮做事,不是让你记
+  const [reply, setReply] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [detail, setDetail] = useState(false);
+  const opened = reply !== null || detail;
+  async function talk() {
+    setLoading(true);
+    const r = await deepenNudge(o.sourceText, en ? 'en' : 'zh');
+    setLoading(false);
+    setReply(r || L(dict, '这会儿没接上 —— 不过你已经愿意停下来看它,本身就是在照顾自己了。', "Couldn't reach me — but pausing to notice this is already care."));
+  }
+  const spend = detail ? recentSpendItems() : [];
+
   return (
     <div className="ng-today">
       <span className={`ng-chip ${chip}`}>{o.mode === 'nudge' ? L(dict, '情绪 · 主动疏导', 'Feeling · gentle') : o.mode === 'quiz' ? L(dict, '盲点 · 每日观察', 'Blind spot · daily') : L(dict, '趋势 · 主动发现', 'Trend · noticed')} · {chipLabel}</span>
@@ -218,12 +230,27 @@ function TodayObsCard({ o, dict, en, basis, draft, setDraft, pick, onPick, onSav
 
       {o.mode !== 'quiz' ? (
         <>
-          <textarea className="ng-ta" rows={2}
-            placeholder={o.mode === 'nudge' ? L(dict, '想说点什么就说一句 —— 会存进回看流', "Say a line if you'd like — saved to your trail") : L(dict, '记一句你的想法', 'Jot a line')}
-            value={draft[o.id] || ''} onChange={(e) => setDraft((p) => ({ ...p, [o.id]: e.target.value }))} />
+          {/* 念念的引导(情绪) */}
+          {reply !== null && <div className="ng-reveal" style={{ whiteSpace: 'pre-wrap' }}>{reply}</div>}
+          {/* 消费明细(趋势) */}
+          {detail && (
+            <div className="ng-reveal">
+              {spend.length > 0 ? spend.map((t, i) => (
+                <div key={i} className="ng-spend-row"><span>{new Date(t.date).getMonth() + 1}/{new Date(t.date).getDate()} · {t.name}</span><b>${t.amount.toFixed(0)}</b></div>
+              )) : <span>{L(dict, '这几笔在「财务」tab 里能看到完整明细。', 'Full details are in the Finance tab.')}</span>}
+            </div>
+          )}
           <div className="ng-acts">
-            <button type="button" className="ng-btn" disabled={!(draft[o.id] || '').trim()} onClick={() => onSave((draft[o.id] || '').trim())}>{L(dict, '记下这条回看', 'Save')}</button>
-            <button type="button" className="ng-btn ghost" onClick={onSkip}>{L(dict, '先跳过', 'Skip')}</button>
+            {o.mode === 'nudge' && reply === null && (
+              <button type="button" className="ng-btn" disabled={loading} onClick={() => void talk()}>{loading ? L(dict, '念念在想…', 'Nessa is thinking…') : L(dict, '和念念聊聊', 'Talk with Nessa')}</button>
+            )}
+            {o.mode === 'trend' && !detail && (
+              <button type="button" className="ng-btn" onClick={() => setDetail(true)}>{L(dict, '看看明细', 'See the details')}</button>
+            )}
+            {opened && (
+              <button type="button" className="ng-btn" onClick={() => onSave(`[${chipLabel}] ${o.mode === 'nudge' ? L(dict, '和念念聊过', 'talked it through') : L(dict, '看了明细', 'saw the details')}`)}>{L(dict, '记下这次觉察', 'Log this insight')}</button>
+            )}
+            <button type="button" className="ng-btn ghost" onClick={onSkip}>{o.mode === 'nudge' ? L(dict, '先不了', 'Not now') : L(dict, '知道了', 'Got it')}</button>
           </div>
           <p className="ng-todaynote">{L(dict, '今天先看这一件。', 'Just this one for today.')}</p>
         </>

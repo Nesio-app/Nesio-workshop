@@ -18039,6 +18039,10 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .ng-reveal{margin-top:6px;padding:13px 14px;background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);
   border-radius:12px;font-size:.88rem;line-height:1.65;color:var(--portal-ink);animation:ng-reveal-in .4s var(--ng-ease)}
 .ng-reveal b{color:var(--portal-accent)}
+.ng-spend-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:.86rem;border-bottom:1px solid var(--portal-line)}
+.ng-spend-row:last-child{border-bottom:none}
+.ng-spend-row span{color:var(--portal-muted)}
+.ng-spend-row b{color:var(--portal-ink);font-variant-numeric:tabular-nums}
 
 /* 回看流:时间线 */
 .ng-trail{position:relative;margin-left:6px;padding-left:20px}

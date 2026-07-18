@@ -185,6 +185,35 @@ export async function generateObservation(seed: Seed, locale: string): Promise<O
   } catch { return null; }
 }
 
+async function chatText(message: string, locale: string): Promise<string | null> {
+  try {
+    const res = await fetch('/api/portal/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, uiLocale: locale.toLowerCase().startsWith('en') ? 'en' : 'zh' }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { ok?: boolean; response?: string };
+    return data.ok && data.response ? data.response.trim() : null;
+  } catch { return null; }
+}
+
+/** 情绪卡「和念念聊聊」:念念对这段情绪给一段真正陪你看清的话(引导,不是让你记)。 */
+export async function deepenNudge(sourceText: string, locale: string): Promise<string | null> {
+  return chatText(`你是念念,温柔、不评判、像认识很久的朋友。对方记下了这样的心情:"""${sourceText}"""。\n陪 ta 把这份情绪看清楚一点(不是分析 ta):三四句话 —— 先接住并正常化这份感受;再轻轻提一个换个角度看的可能(它也许没那么重,或它在提醒你什么);最后给一件此刻就能做的很小的事。中文,口语,别用"您",别说教,别列点。只输出这几句话。`, locale);
+}
+
+/** 趋势卡「看看明细」:近 7 天购物/快递明细(金额降序)。 */
+export function recentSpendItems(now = Date.now(), limit = 6): Array<{ date: string; name: string; amount: number }> {
+  try {
+    const txs = loadBankTx() as Array<{ date: string; name: string; amount: number; category?: string }>;
+    const weekAgo = now - 7 * DAY;
+    return txs
+      .filter((t) => new Date(t.date).getTime() >= weekAgo && t.amount > 0 && /amazon|快递|shop|购物|delivery/i.test(`${t.name} ${t.category || ''}`))
+      .sort((a, b) => b.amount - a.amount).slice(0, limit)
+      .map((t) => ({ date: t.date, name: t.name, amount: t.amount }));
+  } catch { return []; }
+}
+
 export const DIMENSION_LABEL: Record<MindDimension, { zh: string; en: string }> = {
   emotion: { zh: '情绪理解', en: 'Emotional insight' },
   reframe: { zh: '认知重构', en: 'Reframing' },
