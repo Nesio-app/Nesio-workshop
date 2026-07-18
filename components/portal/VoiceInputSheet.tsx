@@ -10,6 +10,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getRecentNodes, getLifeGraph, updateLifeNode, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { signalToLifeNode } from '@/lib/life-domain';
 import { searchSignalsSemantically, searchSignalsWithCloudFallback } from '@/lib/life-domain/signal-search';
@@ -28,7 +29,7 @@ import { looksLikeTask } from '@/lib/portal/task-heuristics';
 import { permissionRationale, shouldExplainPermission, markPermissionExplained } from '@/lib/portal/permission-rationale';
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
-import { useSheetDrag } from './use-sheet-drag';
+import NesioSheet from './ui/NesioSheet';
 
 interface VoiceInputSheetProps {
   open: boolean;
@@ -348,7 +349,6 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   const imgInputRef = useRef<HTMLInputElement>(null);
   const recRef = useRef<{ stop: () => void } | null>(null);
   const isAskMode = intent === 'ask';
-  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   useEffect(() => {
     if (open) prefetchCaptureLocation(); // 批次 56:说一句打开即预热定位
@@ -591,11 +591,14 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   if (!open) return null;
 
   return (
-    <>
-    <div className="nesio-voice-sheet" role="dialog" aria-modal="true" aria-label={isAskMode ? L(dict, '问念念', 'Ask Nessa') : L(dict, '说一句', 'Say it')}>
-      <div className="nesio-voice-sheet-backdrop" onClick={onClose} />
-      <div className={`nesio-voice-sheet-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
-        <div className="nesio-sheet-handle" {...handleProps} />
+    <NesioSheet
+      variant="bottom"
+      open={open}
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-voice-sheet-card"
+      ariaLabel={isAskMode ? L(dict, '问念念', 'Ask Nessa') : L(dict, '说一句', 'Say it')}
+    >
 
         <div className="nesio-voice-sheet-header">
           <h2 className="nesio-voice-sheet-title">{isAskMode ? L(dict, '问念念', 'Ask Nessa') : L(dict, '说一句', 'Say it')}</h2>
@@ -666,12 +669,15 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
             </button>
           </div>
         )}
-        {!isAskMode && detailOpen && sendState !== 'saved' && (
+        {!isAskMode && detailOpen && sendState !== 'saved' && typeof document !== 'undefined' && createPortal(
+          // 日期选择器是 position:fixed 全屏面板;语音 sheet 已是 Vaul(transform),内联会被困住。
+          // portal 到 body 逃出 transform(.nesio-dtp-overlay 自带 z-1200 + pointer-events:auto 绕 Vaul body 锁)。
           <DateTimePicker
             value={{ date: detail.date ?? new Date().toISOString().slice(0, 10), time: detail.time, recurring: detail.recurring, priority: detail.priority }}
             onChange={setDetailDTP}
             onClose={() => setDetailOpen(false)}
-          />
+          />,
+          document.body,
         )}
 
         {/* Intent label — 批次 184:聊天意图变成可点链接,跳「问一问」并带上这句话(不再是死标签) */}
@@ -814,8 +820,6 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
             {isAskMode ? L(dict, '问念念', 'Ask') : L(dict, '告诉念念', 'Tell Nessa')}
           </button>
         ) : null}
-      </div>
-    </div>
-    </>
+    </NesioSheet>
   );
 }

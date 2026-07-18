@@ -11586,6 +11586,7 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   position: fixed;
   inset: 0;
   z-index: 1200;
+  pointer-events: auto; /* portal 到 body 后绕开 Vaul 的 body pointer-events:none */
   display: flex;
   align-items: flex-end;
 }

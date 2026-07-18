@@ -41,7 +41,6 @@ const ALLOWLIST = new Map([
   ['components/portal/BarcodeScanSheet.tsx', 2],
   ['components/portal/CameraSheet.tsx', 2],
   ['components/portal/ConnectorsHub.tsx', 2],
-  ['components/portal/EmailComposeSheet.tsx', 2],
   ['components/portal/InstallPrompt.tsx', 1],
   ['components/portal/MemoryNodeDetail.tsx', 4],
   ['components/portal/MoodSheet.tsx', 10],
@@ -54,14 +53,13 @@ const ALLOWLIST = new Map([
   ['components/portal/TellNesioSheet.tsx', 2],
   ['components/portal/TeslaSheet.tsx', 2],
   ['components/portal/ToolsTreasureSheet.tsx', 1],
-  ['components/portal/VoiceInputSheet.tsx', 4],
+  ['components/portal/VoiceInputSheet.tsx', 2],
   ['components/portal/WechatReadingImportSheet.tsx', 2],
   ['components/portal/fitness/ExerciseLibrary.tsx', 2],
   ['components/portal/fitness/WorkoutPlayer.tsx', 2],
   ['components/portal/insights/MirrorLetterTab.tsx', 1],
   ['components/portal/insights/MontageTab.tsx', 2],
   ['components/portal/insights/TimelineTab.tsx', 4],
-  ['components/portal/relationships/RelationshipDetailSheet.tsx', 2],
 ]);
 
 const SCAN_DIRS = ['app', 'components', 'lib'];
