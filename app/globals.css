@@ -18045,3 +18045,71 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 @keyframes ng-fresh-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
 .nesio-growth :focus-visible{outline:2px solid var(--portal-accent);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.nesio-growth *{animation:none!important;transition:none!important}}
+
+/* ── 练习场(artifact 59587b8d)+ 镜头看记忆(d7bd8990),同 .nesio-growth 作用域 ── */
+.ng-nav{display:flex;align-items:center;gap:8px;color:var(--portal-muted);font-size:.86rem;margin-bottom:16px;background:none;border:none;font-family:inherit;cursor:pointer;padding:0}
+.ng-nav svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.ng-sub{color:var(--ng-faint);font-size:.82rem;margin:0 0 6px 32px}
+.ng-mastery{color:var(--portal-accent);font-size:.82rem;margin:0 0 22px 32px}
+
+/* 练习场:每日一练 */
+.ng-src{font-size:.75rem;color:var(--ng-faint);margin:0 0 10px;padding-left:11px;border-left:2px solid var(--portal-accent-border);line-height:1.5}
+.ng-scene{font-size:1rem;line-height:1.65;color:var(--portal-ink);margin:0 0 6px;background:var(--portal-bg);border:1px solid var(--portal-line);border-radius:12px;padding:12px 13px}
+.ng-ques{font-size:.92rem;color:var(--portal-muted);margin:11px 0 12px}
+.ng-lrow{padding:11px 0;border-top:1px solid var(--portal-line);display:flex;gap:10px}
+.ng-lrow:first-of-type{border-top:none}
+.ng-lrow .k{flex:none;width:78px;font-size:.76rem;font-weight:var(--weight-semibold);color:var(--portal-accent)}
+.ng-lrow .v{font-size:.88rem;line-height:1.6;color:var(--portal-ink)}
+.ng-lrow .v b{color:var(--status-gentle)}
+.ng-life{margin-top:12px;padding:12px 13px;background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:12px;font-size:.86rem;line-height:1.6;color:var(--portal-ink)}
+.ng-life .t{font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.03em;color:var(--portal-accent);display:block;margin-bottom:4px}
+.ng-quiet{font-size:.75rem;color:var(--ng-faint);text-align:center;margin:12px 2px 0}
+
+/* 利器图鉴 */
+.ng-filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:13px}
+.ng-filters button{font-family:inherit;font-size:.74rem;color:var(--portal-muted);background:var(--portal-card);border:1px solid var(--portal-line);border-radius:8px;padding:5px 11px;cursor:pointer;transition:all .12s var(--ng-ease)}
+.ng-filters button.on{color:var(--portal-accent);background:var(--portal-accent-soft);border-color:var(--portal-accent-border);font-weight:var(--weight-medium)}
+.ng-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.ng-cell{border:1px solid var(--portal-line);border-radius:13px;padding:12px 8px 10px;text-align:center;background:var(--portal-card)}
+.ng-cell.met{cursor:pointer;border-color:var(--portal-accent-border)}
+.ng-cell.met:hover{background:var(--portal-accent-soft)}
+.ng-cell .cnum{font-size:.62rem;color:var(--ng-faint);text-align:left;margin:-4px 0 2px}
+.ng-cell .cic{width:26px;height:26px;margin:0 auto 7px;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;display:block}
+.ng-cell.met .cic{stroke:var(--portal-accent)}
+.ng-cell.locked .cic{stroke:var(--ng-faint);opacity:.5}
+.ng-cell .cn{font-size:.76rem;font-weight:var(--weight-medium);color:var(--portal-ink)}
+.ng-cell.locked .cn{color:var(--ng-faint);font-weight:var(--weight-regular)}
+.ng-cell .cs{font-size:.64rem;color:var(--ng-faint);margin-top:2px}
+.ng-cell.met .cs{color:var(--portal-accent)}
+.ng-pop{margin-top:12px;background:var(--portal-card);border:1px solid var(--portal-accent-border);border-radius:14px;padding:14px;font-size:.87rem;line-height:1.6;color:var(--portal-ink);animation:ng-reveal-in .3s var(--ng-ease)}
+.ng-pop .pt{font-weight:var(--weight-semibold);color:var(--portal-accent);margin:0 0 6px}
+.ng-pop .pe{background:var(--portal-bg);border:1px solid var(--portal-line);border-radius:10px;padding:10px 12px;margin:8px 0 0;color:var(--portal-muted);font-size:.83rem}
+
+/* 成长页 → 练习场 入口卡 */
+.ng-entry{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font-family:inherit;background:var(--portal-card);
+  border:1px solid var(--portal-line);border-radius:14px;padding:14px 15px;cursor:pointer;transition:border-color .12s var(--ng-ease),transform .12s var(--ng-ease)}
+.ng-entry:hover{border-color:var(--portal-accent-border)}
+.ng-entry:active{transform:scale(.99)}
+.ng-entry svg{width:20px;height:20px;stroke:var(--portal-accent);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ng-entry .et{flex:1;min-width:0}
+.ng-entry .en{font-size:.95rem;font-weight:var(--weight-semibold);margin:0;color:var(--portal-ink)}
+.ng-entry .ed{font-size:.78rem;color:var(--portal-muted);margin:1px 0 0}
+.ng-entry .ec{color:var(--ng-faint);flex:none}
+
+/* 镜头看记忆:记忆上的镜头库(NesioSheet 内) */
+.ng-lens{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;font-family:inherit;background:var(--portal-bg);
+  border:1px solid var(--portal-line);border-radius:13px;padding:12px 13px;margin-bottom:9px;cursor:pointer;transition:border-color .12s var(--ng-ease)}
+.ng-lens:hover{border-color:var(--portal-accent-border)}
+.ng-lens.rec{border-color:var(--portal-accent-border);background:var(--portal-accent-soft)}
+.ng-lens .li{width:19px;height:19px;stroke:var(--portal-accent);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none;margin-top:2px}
+.ng-lens .lt{flex:1;min-width:0}
+.ng-lens .ln{font-size:.92rem;font-weight:var(--weight-semibold);margin:0;display:flex;align-items:center;gap:7px;color:var(--portal-ink)}
+.ng-lens .rc{font-size:.64rem;font-weight:var(--weight-semibold);color:var(--portal-accent);background:var(--portal-card);border:1px solid var(--portal-accent-border);border-radius:5px;padding:1px 6px}
+.ng-lens .ld{font-size:.78rem;color:var(--portal-muted);margin:2px 0 0;line-height:1.45}
+.ng-lens.locked{opacity:.5;cursor:default}
+.ng-lens.locked .li{stroke:var(--ng-faint)}
+.ng-lbl{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--portal-accent);font-weight:var(--weight-semibold);margin:16px 0 9px}
+.ng-hint{display:flex;gap:11px;align-items:flex-start;background:var(--ng-warm-soft);border:1px solid var(--ng-warm);border-radius:14px;padding:12px 14px;margin:13px 0}
+.ng-hint svg{width:18px;height:18px;stroke:var(--ng-warm);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none;margin-top:1px}
+.ng-hint p{margin:0;font-size:.86rem;line-height:1.5;color:var(--portal-ink);flex:1}
+.ng-hint .x{font-size:.74rem;color:var(--portal-muted);background:none;border:none;cursor:pointer;flex:none;padding:2px 4px}

@@ -16,6 +16,7 @@ import { collectSeeds, generateObservation, DIMENSION_LABEL, summarizeDimensions
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import PracticeGround from './PracticeGround';
 
 const ARG_EXAMPLES = [
   '你作为负责人，要起模范带头作用，学会鼓舞团队士气。',
@@ -41,6 +42,7 @@ export default function GrowthTab() {
   const [obsLoading, setObsLoading] = useState(true);
   const [idx, setIdx] = useState(0);          // 今天一次一件的游标
   const [freshAt, setFreshAt] = useState<string | null>(null); // 刚答完的回看流条目(滑入动效)
+  const [view, setView] = useState<'main' | 'practice'>('main'); // 练习场子视图
 
   // 帮你吵(收进「更多」)
   const [said, setSaid] = useState('');
@@ -133,6 +135,8 @@ export default function GrowthTab() {
       ? L(dict, '依据:你自己写下的想法 · 敌人是思维陷阱,不是你', 'From your own words · the enemy is the trap, not you')
       : L(dict, '依据:你的真实数据 · 只是让你自己看见', 'From your real data · just so you can see it');
 
+  if (view === 'practice') return <PracticeGround onBack={() => setView('main')} />;
+
   return (
     <div className="nesio-growth">
       <div className="ng-hd">
@@ -223,6 +227,17 @@ export default function GrowthTab() {
           ))}
         </div>
       )}
+
+      {/* ── 练习场入口(不推给你,想磨的时候来找它)── */}
+      <div className="ng-gap" />
+      <button type="button" className="ng-entry" onClick={() => setView('practice')}>
+        <svg viewBox="0 0 24 24" aria-hidden><path d="M12 3l7 4v5c0 4-3 7-7 9-4-2-7-5-7-9V7z" /><path d="M9 12l2 2 4-4" /></svg>
+        <span className="et">
+          <span className="en">{L(dict, '练习场', 'Practice ground')}</span>
+          <span className="ed">{L(dict, '想磨的时候来 —— 用你自己的生活练思维', 'Come to sharpen — practice with your own life')}</span>
+        </span>
+        <span className="ec" aria-hidden>›</span>
+      </button>
 
       {/* ── 更多 · 镜头工具(临时,等「镜头看记忆」归位)── */}
       <details className="ng-more">
