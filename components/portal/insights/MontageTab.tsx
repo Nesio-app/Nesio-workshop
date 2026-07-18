@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { loadMontages, deleteMontage, KIND_LABEL, DEMO_MONTAGES, MONTHLY_PRO_QUOTA, type VideoMontage } from '@/lib/portal/video-montage';
+import NesioSheet from '../ui/NesioSheet';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -146,10 +147,11 @@ export default function MontageTab() {
         <div>{L(dict, '都在本机生成 · 只有你能看到 · ', 'Rendered on your device · only you can see them · ')}<b>{L(dict, '分享了才出门', 'shared only if you share')}</b>{L(dict, '(每条链接只这一片,可随时收回)', ' (each link is just this one film, revocable anytime)')}</div>
       </div>
 
-      {/* ── 落差揭晓播放器 ── */}
-      {playing && typeof document !== 'undefined' && createPortal(
-        <div className="nm-scrim" role="dialog" aria-modal="true" aria-label={playing.title} onClick={() => setPlaying(null)}>
-          <div className="nm-player" onClick={(e) => e.stopPropagation()}>
+      {/* ── 落差揭晓播放器(NesioSheet·Radix 居中,稳稳叠在洞察抽屉之上,不再手写 portal 漏手势)── */}
+      <NesioSheet variant="center" card={false} dismissible open={playing !== null}
+        onOpenChange={(o) => { if (!o) setPlaying(null); }} ariaLabel={playing?.title ?? L(dict, '播放', 'Play')}>
+        {playing && (
+          <div className="nesio-montage nm-player">
             {phase === 'intro' ? (
               <div className="nm-screen" style={playing.poster ? { backgroundImage: `url(${playing.poster})` } : undefined}>
                 <p className="note">「{playing.sourceNote || playing.storyLine}」</p>
@@ -168,14 +170,14 @@ export default function MontageTab() {
               <button type="button" onClick={() => setPlaying(null)}>{L(dict, '收起', 'Close')}</button>
             </div>
           </div>
-        </div>,
-        document.body,
-      )}
+        )}
+      </NesioSheet>
 
       {/* ── 分享卡(病毒单元)── */}
-      {sharing && typeof document !== 'undefined' && createPortal(
-        <div className="nm-sharewrap" role="dialog" aria-modal="true" aria-label={L(dict, '分享卡', 'Share card')} onClick={() => setSharing(null)}>
-          <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <NesioSheet variant="center" card={false} dismissible open={sharing !== null}
+        onOpenChange={(o) => { if (!o) setSharing(null); }} ariaLabel={L(dict, '分享卡', 'Share card')}>
+        {sharing && (
+          <div className="nesio-montage" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div className="nm-sharecard">
               <div className="top" style={sharing.poster ? { backgroundImage: `url(${sharing.poster})` } : undefined}>
                 <div className="sh" />
@@ -192,9 +194,8 @@ export default function MontageTab() {
             </div>
             <p className="nm-shareprivacy">{L(dict, '这一条链接只这一片,别人看不到你其它记忆,你随时能收回。', 'This link is just this one film — no other memories, revocable anytime.')}</p>
           </div>
-        </div>,
-        document.body,
-      )}
+        )}
+      </NesioSheet>
 
       {toast && typeof document !== 'undefined' && createPortal(<div className="nm-toast">{toast}</div>, document.body)}
     </div>

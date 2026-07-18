@@ -18176,9 +18176,9 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .nm-poster .txt{position:relative;padding:13px 14px;text-align:left}
 .nm-poster .t{font-size:1.05rem;font-weight:var(--weight-semibold);margin:0;text-shadow:0 1px 6px rgba(0,0,0,.45)}
 .nm-poster .s{font-size:.8rem;opacity:.94;margin:3px 0 0;line-height:1.4;text-shadow:0 1px 5px rgba(0,0,0,.45)}
-.nm-poster .play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.24);backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);display:flex;align-items:center;justify-content:center;border:1.5px solid rgba(255,255,255,.65)}
+.nm-poster .play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:48px;height:48px;border-radius:50%;background:rgba(20,18,20,.42);display:flex;align-items:center;justify-content:center;border:1.5px solid rgba(255,255,255,.7)}
 .nm-poster .play svg{width:20px;height:20px;fill:#fff;margin-left:2px}
-.nm-poster .kind{position:absolute;top:10px;left:11px;font-size:.66rem;font-weight:var(--weight-semibold);letter-spacing:.03em;background:rgba(0,0,0,.42);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);border-radius:6px;padding:3px 8px;color:#fff}
+.nm-poster .kind{position:absolute;top:10px;left:11px;font-size:.66rem;font-weight:var(--weight-semibold);letter-spacing:.03em;background:rgba(0,0,0,.5);border-radius:6px;padding:3px 8px;color:#fff}
 .nm-poster .kind.pro{color:#1a1a1a;background:var(--nm-gold)}
 .nm-poster .dur{position:absolute;top:10px;right:11px;font-size:.66rem;font-weight:var(--weight-medium);background:rgba(0,0,0,.42);border-radius:6px;padding:3px 7px;color:#fff;font-variant-numeric:tabular-nums}
 
@@ -18202,9 +18202,8 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .nm-foot b{color:var(--portal-muted)}
 .nm-empty{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:16px;padding:16px;font-size:.9rem;color:var(--portal-accent);text-align:center;line-height:1.55}
 
-/* 落差揭晓播放器(portal 到 body,不透明深底) */
-.nm-scrim{position:fixed;inset:0;background:rgba(0,0,0,.9);display:flex;align-items:center;justify-content:center;padding:22px;z-index:2147483000;animation:nm-fade .28s var(--nm-ease)}
-.nm-player{max-width:420px;width:100%}
+/* 落差揭晓播放器(内容在 NesioSheet·Radix 居中面里;不再手写 portal 遮罩) */
+.nm-player{width:min(420px,88vw)}
 .nm-screen{aspect-ratio:16/11;border-radius:14px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;text-align:center;padding:22px;background:#000 center/cover no-repeat}
 .nm-screen .note{color:rgba(255,255,255,.94);font-size:.95rem;line-height:1.7;font-style:italic;transition:opacity .7s,filter .7s;position:relative;z-index:2;text-shadow:0 2px 12px rgba(0,0,0,.8)}
 .nm-screen::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.42)}
@@ -18216,8 +18215,7 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .nm-prow button{flex:1;font-family:inherit;font-size:.85rem;font-weight:var(--weight-semibold);border-radius:11px;padding:12px 0;cursor:pointer;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.13);color:#fff}
 .nm-prow button.pri{background:#fff;color:#1a1a1a;border-color:#fff}
 
-/* 分享卡(病毒单元) */
-.nm-sharewrap{position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:22px;z-index:2147483001;overflow:auto;animation:nm-fade .28s var(--nm-ease)}
+/* 分享卡(病毒单元;内容在 NesioSheet 居中面里) */
 .nm-sharecard{width:250px;border-radius:20px;overflow:hidden;background:#1a1a1a;box-shadow:0 20px 60px rgba(0,0,0,.5)}
 .nm-sharecard .top{aspect-ratio:3/4;position:relative;display:flex;flex-direction:column;justify-content:flex-end;color:#fff;background:#333 center/cover no-repeat}
 .nm-sharecard .top .fl{position:relative;padding:16px 15px;font-size:.98rem;font-weight:var(--weight-semibold);line-height:1.55;text-shadow:0 2px 10px rgba(0,0,0,.55);z-index:2}
@@ -18233,7 +18231,6 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .nm-shareprivacy{font-size:.72rem;color:rgba(255,255,255,.6);margin-top:14px;text-align:center;max-width:250px;line-height:1.5}
 
 .nm-toast{position:fixed;left:50%;bottom:calc(26px + var(--portal-bottom-nav-clearance, 0px));transform:translateX(-50%);background:var(--portal-ink);color:var(--portal-bg);font-size:.82rem;padding:11px 16px;border-radius:12px;z-index:2147483002;max-width:330px;text-align:center;animation:nm-toast-in .3s var(--nm-ease)}
-@keyframes nm-fade{from{opacity:0}to{opacity:1}}
 @keyframes nm-toast-in{from{opacity:0;transform:translateX(-50%) translateY(16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
-.nesio-montage :focus-visible,.nm-scrim :focus-visible,.nm-sharewrap :focus-visible{outline:2px solid var(--portal-accent);outline-offset:2px}
-@media (prefers-reduced-motion:reduce){.nesio-montage *,.nm-scrim,.nm-sharewrap,.nm-toast{animation:none!important;transition:opacity .2s!important}}
+.nesio-montage :focus-visible{outline:2px solid var(--portal-accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.nesio-montage *,.nm-toast{animation:none!important;transition:opacity .2s!important}}
