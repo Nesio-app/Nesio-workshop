@@ -97,8 +97,8 @@ export default function MemoryLensSheet({ open, onOpenChange, node }: { open: bo
             <button type="button" className="ng-nav" onClick={reset}>
               <svg viewBox="0 0 24 24" aria-hidden><path d="M15 5l-7 7 7 7" /></svg>{L(dict, '换个镜头', 'Another lens')}
             </button>
-            <p style={{ display: 'flex', alignItems: 'center', gap: 8, fontWeight: 'var(--weight-semibold)', fontSize: '0.98rem', margin: '0 0 12px', color: 'var(--portal-accent)' }}>
-              <Ico path={applied.icon} cls="li" />{L(dict, applied.name, applied.nameEn)}
+            <p style={{ fontWeight: 'var(--weight-semibold)', fontSize: '0.98rem', margin: '0 0 12px', color: 'var(--portal-accent)' }}>
+              {L(dict, applied.name, applied.nameEn)}
             </p>
 
             {busy ? (
