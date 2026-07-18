@@ -76,10 +76,6 @@ export default function PracticeGround() {
 
   return (
     <>
-      <div className="ng-hd">
-        <svg viewBox="0 0 24 24" aria-hidden><path d="M12 3l7 4v5c0 4-3 7-7 9-4-2-7-5-7-9V7z" /><path d="M9 12l2 2 4-4" /></svg>
-        <h1>{L(dict, '练习场', 'Practice')}</h1>
-      </div>
       <p className="ng-sub">{L(dict, '想磨的时候来 —— 不推给你,你来找它', 'Come when you want to sharpen — you find it, it won’t push')}</p>
       <p className="ng-mastery">{L(dict, mastery.zh, mastery.en)}</p>
 

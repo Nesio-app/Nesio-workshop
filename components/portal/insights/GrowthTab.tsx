@@ -106,10 +106,6 @@ export default function GrowthTab() {
 
       {tab === 'lens' ? <LensTab /> : tab === 'practice' ? <PracticeGround /> : (
         <>
-          <div className="ng-hd">
-            <svg viewBox="0 0 24 24" aria-hidden><path d="M12 20c0-6 0-9 4-12M12 20c0-4-2-6-6-7M12 20c0-3 1.5-4.5 4-5.5" /><path d="M12 20v1.5" /></svg>
-            <h1>{L(dict, '成长', 'Growth')}</h1>
-          </div>
           <p className="ng-streak">
             {streak > 1 ? L(dict, `已连续回看 ${streak} 天 · 慢慢来`, `${streak} days in a row · no rush`) : L(dict, '慢慢来 —— 一次看清一件就好', 'No rush — one clear look at a time')}
           </p>

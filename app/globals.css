@@ -17985,10 +17985,7 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 }
 .nesio-growth *{box-sizing:border-box}
 
-.ng-hd{display:flex;align-items:center;gap:10px;margin:0 0 4px}
-.ng-hd svg{width:22px;height:22px;stroke:var(--portal-accent);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}
-.ng-hd h1{font-size:1.35rem;letter-spacing:-.01em;margin:0;font-weight:var(--weight-semibold);color:var(--portal-ink)}
-.ng-streak{color:var(--ng-faint);font-size:.8rem;margin:0 0 22px 32px}
+.ng-streak{color:var(--ng-faint);font-size:.8rem;margin:0 0 22px}
 
 .ng-sec{display:flex;align-items:baseline;justify-content:space-between;margin:0 0 12px}
 .ng-sec .l{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--portal-accent);font-weight:var(--weight-semibold)}
@@ -18069,8 +18066,8 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 /* ── 练习场(artifact 59587b8d)+ 镜头看记忆(d7bd8990),同 .nesio-growth 作用域 ── */
 .ng-nav{display:flex;align-items:center;gap:8px;color:var(--portal-muted);font-size:.86rem;margin-bottom:16px;background:none;border:none;font-family:inherit;cursor:pointer;padding:0}
 .ng-nav svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
-.ng-sub{color:var(--ng-faint);font-size:.82rem;margin:0 0 6px 32px}
-.ng-mastery{color:var(--portal-accent);font-size:.82rem;margin:0 0 22px 32px}
+.ng-sub{color:var(--ng-faint);font-size:.82rem;margin:0 0 6px}
+.ng-mastery{color:var(--portal-accent);font-size:.82rem;margin:0 0 22px}
 
 /* 练习场:每日一练 */
 .ng-src{font-size:.75rem;color:var(--ng-faint);margin:0 0 10px;padding-left:11px;border-left:2px solid var(--portal-accent-border);line-height:1.5}

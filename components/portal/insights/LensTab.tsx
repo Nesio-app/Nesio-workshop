@@ -40,10 +40,6 @@ export default function LensTab() {
 
   return (
     <>
-      <div className="ng-hd">
-        <svg viewBox="0 0 24 24" aria-hidden><path d="M2 12l4-7h12l4 7-10 8z" /><path d="M6 5l6 7 6-7M12 12v8" /></svg>
-        <h1>{L(dict, '镜头', 'Lenses')}</h1>
-      </div>
       <p className="ng-sub">{L(dict, '挑一段记忆,套个镜头看看 —— 同一套心智模型,套在你真实的事上', 'Pick a memory, look through a lens — one model, on your own real moment')}</p>
 
       {memories.length === 0 ? (
