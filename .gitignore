@@ -70,3 +70,6 @@ next-env.d.ts
 ios/
 public/ort/
 public/_demo/
+
+# Lab CLIP fp16 模型:太大(~150MB)不入库,scripts/fetch_web_models.sh 从 nesio-ml Release 拉
+public/lab/models/

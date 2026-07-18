@@ -3,8 +3,9 @@
 /**
  * Lab · 语义相册搜索(自测用)— MobileCLIP2-S0 ONNX 全端上跑。
  *
- * - 模型不托管:首次把 nesio-ml 导出的 ImageEncoder.fp16.onnx / TextEncoder.fp16.onnx
- *   拖进来,存 IndexedDB,之后离线可用。
+ * - 模型两条路:① 跑 scripts/fetch_web_models.sh 把 fp16 双塔从 nesio-ml Release 拉到
+ *   public/lab/models/,开机自动载入 IndexedDB;② 或手动把 ImageEncoder.fp16.onnx /
+ *   TextEncoder.fp16.onnx 拖进来。两者都只入本机 IDB,首次之后离线可用。
  * - 照片与向量全留本机(红线);tokenizer 移植正确性由黄金用例开机自检。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -16,6 +17,47 @@ import {
 } from '@/lib/portal/semantic-search/ml-store';
 
 type Hit = IndexEntry & { score: number };
+
+/**
+ * 开机若 IDB 无模型,试从同源 public/lab/models/ 自动载入(fetch_web_models.sh 已拉则命中)。
+ * 私库 Release 浏览器不能直连,故走同源静态文件这一步。没放模型时静默返回 false(回退拖入);
+ * 放了但载入出错则显式报错(设计红线:异步动作必须有可见失败态),让用户改用拖入。
+ */
+async function tryLoadBundledModels(say: (s: string) => void): Promise<boolean> {
+  const urls: Record<'image' | 'text', string> = {
+    image: '/lab/models/ImageEncoder.fp16.onnx',
+    text: '/lab/models/TextEncoder.fp16.onnx',
+  };
+  // HEAD 探测:没放模型(404)就静默回退,别把 404 页面当模型
+  try {
+    const head = await Promise.all([
+      fetch(urls.image, { method: 'HEAD' }),
+      fetch(urls.text, { method: 'HEAD' }),
+    ]);
+    if (!head[0].ok || !head[1].ok) return false;
+  } catch {
+    return false;
+  }
+  try {
+    say('· 发现本机模型包,正在载入 IndexedDB(约 150MB,首次稍候)…');
+    for (const key of ['image', 'text'] as const) {
+      const res = await fetch(urls[key]);
+      if (!res.ok) throw new Error(`${urls[key]} HTTP ${res.status}`);
+      const blob = await res.blob();
+      // 防呆:onnx 权重应为二进制且够大,别把 HTML 兜底页/半截文件存进去
+      if (blob.type.includes('html') || blob.size < 1_000_000) {
+        throw new Error(`${urls[key]} 不像模型(${blob.type || '未知类型'}, ${blob.size}B)`);
+      }
+      await putModel(key, blob);
+    }
+    const [img, txt] = await Promise.all([getModel('image'), getModel('text')]);
+    if (img && txt) { say('✓ 模型已载入本机(IndexedDB),之后离线可用'); return true; }
+    throw new Error('写入 IndexedDB 后读回为空');
+  } catch (e) {
+    say(`✗ 自动载入模型失败:${e instanceof Error ? e.message : String(e)} —— 可改用下面的拖入`);
+    return false;
+  }
+}
 
 export default function SemanticSearchLab() {
   const [log, setLog] = useState<string[]>([]);
@@ -50,7 +92,8 @@ export default function SemanticSearchLab() {
       }
       const [img, txt] = await Promise.all([getModel('image'), getModel('text')]);
       if (img && txt) { setModelsReady(true); say('✓ 模型已在本机(IndexedDB)'); }
-      else say('· 还没有模型:把 ImageEncoder*.onnx 和 TextEncoder*.onnx 一起拖进下面的选择框');
+      else if (await tryLoadBundledModels(say)) { setModelsReady(true); }
+      else say('· 还没有模型:跑 scripts/fetch_web_models.sh 拉取,或把 ImageEncoder*.onnx / TextEncoder*.onnx 拖进下面的选择框');
       setIndexCount((await getAllIndex()).length);
     })();
   }, [say]);
@@ -168,7 +211,8 @@ export default function SemanticSearchLab() {
         <section style={{ border: '2px dashed var(--portal-line)', borderRadius: 12, padding: 16, margin: '12px 0' }}>
           <b>第一步:导入模型(一次即可)</b>
           <p style={{ fontSize: 13, color: 'var(--portal-muted)' }}>
-            选择 nesio-ml 导出的 <code>ImageEncoder.fp16.onnx</code> 和 <code>TextEncoder.fp16.onnx</code>(共约 143MB,存入本机后离线可用)
+            推荐:跑 <code>scripts/fetch_web_models.sh</code> 从 nesio-ml Release 拉到 <code>public/lab/models/</code>,刷新即自动载入。
+            或手动选择 <code>ImageEncoder.fp16.onnx</code> 和 <code>TextEncoder.fp16.onnx</code>(共约 150MB,存入本机后离线可用)。
           </p>
           <input type="file" accept=".onnx" multiple onChange={(e) => onModelFiles(e.target.files)} />
         </section>
