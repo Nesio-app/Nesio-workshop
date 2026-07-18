@@ -8,19 +8,19 @@
 
 import { useEffect, useState } from 'react';
 import { todayGrowthCards, recordGrowthAnswer, growthHistory, growthStreakDays, type GrowthCard, type GrowthAnswer } from '@/lib/portal/growth-guide';
-import { collectSeeds, generateObservation, DIMENSION_LABEL, summarizeDimensions, ringEmptyPct, deepenNudge, recentSpendItems, applyIFS, type Observation, type NudgeGuide, type IFSResult } from '@/lib/portal/growth-engine';
-import { earnPoints, POINTS_PER_HEALING } from '@/lib/platform/rewards-engine';
+import { collectSeeds, generateObservation, DIMENSION_LABEL, summarizeDimensions, ringEmptyPct, deepenNudge, recentSpendItems, type Observation, type NudgeGuide } from '@/lib/portal/growth-engine';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import PracticeGround from './PracticeGround';
 import LensTab from './LensTab';
+import HealingTab from './HealingTab';
 
 const CHIP_CLASS: Record<Observation['mode'], string> = { nudge: 'emo', quiz: 'blind', trend: 'trend' };
 
 // 今天流:引擎观察优先;没有(无 key/无种子)时回落规则卡。统一成一件件过。
 type TodayItem = { key: string; t: 'obs'; o: Observation } | { key: string; t: 'rule'; c: GrowthCard };
-type SubTab = 'home' | 'lens' | 'practice';
+type SubTab = 'home' | 'lens' | 'practice' | 'healing';
 
 export default function GrowthTab() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -104,9 +104,10 @@ export default function GrowthTab() {
         <button type="button" role="tab" aria-selected={tab === 'home'} className={tab === 'home' ? 'on' : ''} onClick={() => setTab('home')}>{L(dict, '成长', 'Growth')}</button>
         <button type="button" role="tab" aria-selected={tab === 'lens'} className={tab === 'lens' ? 'on' : ''} onClick={() => setTab('lens')}>{L(dict, '镜头', 'Lenses')}</button>
         <button type="button" role="tab" aria-selected={tab === 'practice'} className={tab === 'practice' ? 'on' : ''} onClick={() => setTab('practice')}>{L(dict, '练习场', 'Practice')}</button>
+        <button type="button" role="tab" aria-selected={tab === 'healing'} className={tab === 'healing' ? 'on' : ''} onClick={() => setTab('healing')}>{L(dict, '疗愈', 'Healing')}</button>
       </div>
 
-      {tab === 'lens' ? <LensTab /> : tab === 'practice' ? <PracticeGround /> : (
+      {tab === 'lens' ? <LensTab /> : tab === 'practice' ? <PracticeGround /> : tab === 'healing' ? <HealingTab /> : (
         <>
           <p className="ng-streak">
             {streak > 1 ? L(dict, `已连续回看 ${streak} 天 · 慢慢来`, `${streak} days in a row · no rush`) : L(dict, '慢慢来 —— 一次看清一件就好', 'No rush — one clear look at a time')}
@@ -156,7 +157,8 @@ export default function GrowthTab() {
             <TodayObsCard key={current.o.id} o={current.o} dict={dict} en={en}
               basis={basisLine(current.o)}
               pick={quizPick[current.o.id]} onPick={(i) => setQuizPick((p) => ({ ...p, [current.o.id]: i }))}
-              onSave={(text) => answerObservation(current.o, text)} onSkip={skip} />
+              onSave={(text) => answerObservation(current.o, text)} onSkip={skip}
+              onGoHealing={() => setTab('healing')} />
           ) : (
             <div className="ng-today">
               <span className="ng-chip blind">{L(dict, '今日引导', "Today's prompt")}</span>
@@ -205,9 +207,10 @@ export default function GrowthTab() {
 }
 
 // 今天卡 · 引擎观察(nudge/trend 文本;quiz 选项+揭晓)
-function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip }: {
+function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip, onGoHealing }: {
   o: Observation; dict: 'zh' | 'en'; en: boolean; basis: string;
   pick: number | undefined; onPick: (i: number) => void; onSave: (text: string) => void; onSkip: () => void;
+  onGoHealing: () => void;
 }) {
   const chip = CHIP_CLASS[o.mode];
   const chipLabel = L(dict, DIMENSION_LABEL[o.dimension].zh, DIMENSION_LABEL[o.dimension].en);
@@ -223,9 +226,7 @@ function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip }: {
   const [gpick, setGpick] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState(false);
-  const [ifs, setIfs] = useState<IFSResult | null>(null);        // 阴影整合(IFS)下探结果
-  const [ifsLoading, setIfsLoading] = useState(false);
-  const opened = guide !== null || detail || ifs !== null;
+  const opened = guide !== null || detail;
   const gq = guide?.quiz;
   async function talk() {
     setLoading(true);
@@ -233,29 +234,12 @@ function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip }: {
     setLoading(false);
     setGuide(g ?? { reflection: L(dict, '这会儿没接上 —— 不过你已经愿意停下来看它,本身就是在照顾自己了。', "Couldn't reach me — but pausing to notice this is already care.") });
   }
-  async function talkProtector() {
-    setIfsLoading(true);
-    const r = await applyIFS(o.sourceText, en ? 'en' : 'zh');
-    setIfsLoading(false);
-    setIfs(r ?? {
-      protector: L(dict, '你心里有个部分,一直用最严的方式守着你 —— 它怕你不安全,才这么逼你。谢谢它一直在。', 'A part of you has guarded you the hardest way it knows — because it feared you weren’t safe.'),
-      self: L(dict, '但现在你已经安全了,有力量建立边界 —— 可以让它先歇一歇。', 'But you’re safe now, and strong enough to set boundaries — it can rest.'),
-      insight: '', action: L(dict, '把手放在心口,深呼吸三次,对自己说「我已经足够了」。', 'Hand on your heart, three slow breaths — “I am already enough.”'),
-    });
-  }
   const spend = detail ? recentSpendItems() : [];
   function saveNudge() {
     const label = o.mode === 'trend'
       ? `[${chipLabel}] ${L(dict, '看了明细', 'saw the details')}`
       : (gq && gpick != null ? `[${chipLabel}] ${gq.tool || gq.options[gq.correctIndex]}` : `[${chipLabel}] ${L(dict, '和念念聊过', 'talked it through')}`);
     onSave(label);
-  }
-  function saveIFS() {
-    try {
-      earnPoints(POINTS_PER_HEALING, 'healing', `${L(dict, '阴影整合', 'Shadow work')}:${o.sourceText.slice(0, 18)}`);
-      window.dispatchEvent(new CustomEvent('nesio-rewards-updated'));
-    } catch { /* SSR / 无存储 */ }
-    onSave(`[${chipLabel}] ${L(dict, '和保护者对话', 'talked with the protector')}`);
   }
 
   return (
@@ -288,15 +272,6 @@ function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip }: {
               )}
             </>
           )}
-          {/* 阴影整合(IFS):保护者 → 清醒自我 → 洞察 → 躯体微动作 */}
-          {ifs && (
-            <div className="ng-ifs">
-              <div className="ng-ifs-part protector"><span className="lbl">🛡 {L(dict, '保护者 · PROTECTOR', 'Protector')}</span>{ifs.protector}</div>
-              <div className="ng-ifs-part self"><span className="lbl">🧘 {L(dict, '清醒自我 · SELF', 'Self energy')}</span>{ifs.self}</div>
-              {ifs.insight && <div className="ng-ifs-part insight"><span className="lbl">✦ {L(dict, '念念洞察', 'Nessa’s read')}</span>{ifs.insight}</div>}
-              {ifs.action && <div className="ng-ifs-action">📍 {ifs.action}</div>}
-            </div>
-          )}
           {/* 消费明细(趋势) */}
           {detail && (
             <div className="ng-reveal">
@@ -306,20 +281,23 @@ function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip }: {
             </div>
           )}
           <div className="ng-acts">
-            {o.mode === 'nudge' && !guide && !ifs && (
+            {o.mode === 'nudge' && !guide && (
               <button type="button" className="ng-btn" disabled={loading} onClick={() => void talk()}>{loading ? L(dict, '念念在想…', 'Nessa is thinking…') : L(dict, '和念念聊聊', 'Talk with Nessa')}</button>
-            )}
-            {o.mode === 'nudge' && !ifs && (
-              <button type="button" className="ng-btn ifs" disabled={ifsLoading} onClick={() => void talkProtector()}>{ifsLoading ? L(dict, '念念在陪你看…', 'Nessa is with you…') : L(dict, '🛡 和保护者对话', '🛡 Meet the protector')}</button>
             )}
             {o.mode === 'trend' && !detail && (
               <button type="button" className="ng-btn" onClick={() => setDetail(true)}>{L(dict, '看看明细', 'See the details')}</button>
             )}
             {opened && (
-              <button type="button" className="ng-btn" onClick={ifs ? saveIFS : saveNudge}>{ifs ? L(dict, `记下 · +${POINTS_PER_HEALING}`, `Log · +${POINTS_PER_HEALING}`) : L(dict, '记下这次觉察', 'Log this insight')}</button>
+              <button type="button" className="ng-btn" onClick={saveNudge}>{L(dict, '记下这次觉察', 'Log this insight')}</button>
             )}
             <button type="button" className="ng-btn ghost" onClick={onSkip}>{o.mode === 'nudge' ? L(dict, '先不了', 'Not now') : L(dict, '知道了', 'Got it')}</button>
           </div>
+          {o.mode === 'nudge' && (
+            <button type="button" className="ng-healing-link" onClick={onGoHealing}>
+              {L(dict, '这条有点重 —— 去疗愈馆和它待一会儿', 'This one sits heavy — sit with it in the Healing room')}
+              <span aria-hidden> ›</span>
+            </button>
+          )}
           <p className="ng-todaynote">{L(dict, '今天先看这一件。', 'Just this one for today.')}</p>
         </>
       ) : o.quiz ? (

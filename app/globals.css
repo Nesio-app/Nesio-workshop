@@ -10131,16 +10131,19 @@ html[data-portal-theme="night"] .nesio-connector-token-box {
 .nesio-today-points {
   display: inline-flex;
   align-items: center;
-  gap: 0.28rem;
+  justify-content: center;
+  min-width: 1.9rem;
+  height: 1.9rem;
   font-family: inherit;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
+  line-height: 1;
   font-weight: var(--weight-semibold, 600);
   font-variant-numeric: tabular-nums;
   color: var(--portal-accent);
   background: var(--portal-accent-soft);
   border: 1px solid var(--portal-accent-border);
   border-radius: 999px;
-  padding: 0.28rem 0.62rem;
+  padding: 0 0.5rem;
   cursor: pointer;
   transition: transform 0.12s var(--ease-out, ease);
 }
@@ -18139,6 +18142,16 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .ng-ifs-part.insight{background:var(--status-calm-soft);border-color:var(--status-calm)}
 .ng-ifs-part.insight .lbl{color:var(--status-calm)}
 .ng-ifs-action{margin-top:2px;background:var(--portal-card);border:1px solid var(--portal-line);border-radius:10px;padding:9px 12px;font-size:.86rem;color:var(--portal-ink);line-height:1.5}
+
+/* 疗愈子 tab:软入口 + 身体层落地卡 + 躯体接地步骤 */
+.ng-healing-link{display:block;width:100%;text-align:left;margin-top:10px;font-family:inherit;font-size:.82rem;line-height:1.4;color:var(--portal-accent);background:none;border:none;padding:4px 0;cursor:pointer}
+.ng-healing-link:hover{text-decoration:underline}
+.ng-heal .ng-streak{margin-bottom:16px}
+.ng-ground{background:var(--status-calm-soft);border:1px solid var(--status-calm);border-radius:14px;padding:13px 15px;animation:ng-reveal-in .4s var(--ng-ease)}
+.ng-ground-lead{margin:0 0 8px;font-size:.86rem;font-weight:var(--weight-semibold);color:var(--status-calm)}
+.ng-ground-list{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:.9rem;line-height:1.5;color:var(--portal-ink)}
+.ng-ground-step{margin-top:2px;background:var(--status-gentle-soft);border:1px solid var(--status-gentle);border-radius:10px;padding:10px 13px;font-size:.9rem;color:var(--portal-ink);line-height:1.55}
+.ng-ground-step .lbl{display:block;font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.06em;color:var(--status-gentle);margin-bottom:5px}
 .ng-todaynote{font-size:.75rem;color:var(--ng-faint);margin:13px 2px 0;text-align:center}
 .ng-done{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:16px;padding:16px;font-size:.9rem;color:var(--portal-accent);text-align:center;line-height:1.55}
 
