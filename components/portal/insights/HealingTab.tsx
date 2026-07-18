@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { collectSeeds, applyIFS, scanAnts, type Seed, type IFSResult } from '@/lib/portal/growth-engine';
 import { recordGrowthAnswer } from '@/lib/portal/growth-guide';
 import { earnPoints, POINTS_PER_HEALING } from '@/lib/platform/rewards-engine';
+import { EMOTIONS, recordMoment, emotionOf } from '@/lib/portal/mood';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -54,14 +55,11 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
   const [ifs, setIfs] = useState<IFSResult | null>(null);
   const [ifsLoading, setIfsLoading] = useState(false);
   const [reply, setReply] = useState<string | null>(null);
-  const [feel, setFeel] = useState<string | null>(null);
+  const [feelEm, setFeelEm] = useState<string | null>(null); // 此刻心情:接现有心情系统的 12 情绪
   const [feelNote, setFeelNote] = useState('');
   const [earned, setEarned] = useState(false);
   const rank = phaseRank(phase);
-
-  const feels = en
-    ? ['A little lighter', 'Relieved', 'Clearer now', 'Still needs time', 'About the same']
-    : ['轻了一点', '松了口气', '更清楚了', '还需要点时间', '没太大变化'];
+  const feelEmObj = feelEm ? emotionOf(feelEm) : null;
 
   const fears = en
     ? ['Being left', 'Losing control', 'Not enough', 'Getting hurt again', "Can't say"]
@@ -84,10 +82,13 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
     });
   }
 
-  // 闭环:做完躯体动作 + 记下此刻感受 → 存进回看(带前后对照)+ 发分(每天一次)
+  // 闭环:做完躯体动作 + 记下此刻心情 → 写进心情系统 + 存进回看(带前后对照)+ 发分(每天一次)
   function closeLoop() {
+    if (!feelEmObj) return;
+    // 此刻心情进「留住这一刻」同一套情绪记录(自然汇入情绪趋势),带 healing 来源标
+    recordMoment(feelEmObj.id, { en, thought: feelNote.trim(), tags: ['healing'] });
     const said = reply ? reply.replace(/[「」“”]/g, '') : '';
-    const now = feel || L(dict, '记下了此刻', 'noted this moment');
+    const now = en ? feelEmObj.labelEn : feelEmObj.label;
     const note = feelNote.trim();
     const answer = [said, `${L(dict, '此刻', 'Now')}:${now}`, note].filter(Boolean).join(' · ');
     recordGrowthAnswer(
@@ -102,7 +103,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
   }
 
   function restart() {
-    setPhase('voice'); setVoice(''); setFear(null); setIfs(null); setReply(null); setFeel(null); setFeelNote(''); setEarned(false);
+    setPhase('voice'); setVoice(''); setFear(null); setIfs(null); setReply(null); setFeelEm(null); setFeelNote(''); setEarned(false);
   }
 
   // 时间线单步:done 收起摘要 / active 放大高亮 / todo 灰
@@ -112,7 +113,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
     { key: 'protector', n: 3, title: L(dict, '看见保护者', 'Meet the protector'), sum: L(dict, '已看见它在守着你', 'Seen — it was guarding you') },
     { key: 'self', n: 4, title: L(dict, '清醒自我接管', 'Your calm self leads'), sum: reply ? reply.replace(/[「」“”]/g, '').slice(0, 18) : L(dict, '让保护者歇一歇', 'Let the protector rest') },
     { key: 'body', n: 5, title: L(dict, '落到身体,真做一遍', 'Ground it in the body'), sum: L(dict, '已做一遍', 'Done') },
-    { key: 'feel', n: 6, title: L(dict, '此刻,心里怎么样', 'How you feel now'), sum: feel ? `${feel}${earned ? ' · +' + POINTS_PER_HEALING : ''}` : '' },
+    { key: 'feel', n: 6, title: L(dict, '此刻,心里怎么样', 'How you feel now'), sum: feelEmObj ? `${feelEmObj.emoji} ${en ? feelEmObj.labelEn : feelEmObj.label}${earned ? ' · +' + POINTS_PER_HEALING : ''}` : '' },
   ];
   const stateOf = (k: typeof PHASES[number]) => {
     const mine = PHASES.indexOf(k);
@@ -226,14 +227,19 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
 
                 {st === 'active' && s.key === 'feel' && (
                   <div className="ng-tl-in">
-                    <p className="ng-tl-q">{L(dict, '刚才那句话,现在还有那么重吗?', 'That thought — does it still weigh the same?')}</p>
-                    <div className="ng-heal-chips">
-                      {feels.map((f) => <button key={f} type="button" className={`ng-heal-chip${feel === f ? ' on' : ''}`} onClick={() => setFeel(f)}>{f}</button>)}
+                    <p className="ng-tl-q">{L(dict, '走完这一遍,此刻心里是什么感受?', 'After all that — how do you feel right now?')}</p>
+                    <div className="ng-mood-grid">
+                      {EMOTIONS.map((m) => (
+                        <button key={m.id} type="button" className={`ng-mood-chip${feelEm === m.id ? ' on' : ''}`} onClick={() => setFeelEm(m.id)}>
+                          <span className="em" aria-hidden>{m.emoji}</span>{en ? m.labelEn : m.label}
+                        </button>
+                      ))}
                     </div>
+                    <p className="ng-heal-from">{L(dict, '会记进你的心情记录,汇入情绪趋势。', 'Saved to your mood log — it flows into your emotion trends.')}</p>
                     <textarea className="ng-ta" rows={2} value={feelNote} onChange={(e) => setFeelNote(e.target.value)}
                       placeholder={L(dict, '想补一句就写(可跳过)', 'Add a line if you want (optional)')} />
                     <div className="ng-acts">
-                      <button type="button" className="ng-btn" disabled={!feel} onClick={closeLoop}>
+                      <button type="button" className="ng-btn" disabled={!feelEm} onClick={closeLoop}>
                         {earnedToday() ? L(dict, '记下此刻 · 存进回看', 'Log this moment · save') : L(dict, `记下此刻 · +${POINTS_PER_HEALING}`, `Log this moment · +${POINTS_PER_HEALING}`)}
                       </button>
                     </div>
@@ -250,7 +256,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
           <div className="ng-loop">
             <div className="ng-loop-row"><span className="k">{L(dict, '开始时', 'At the start')}</span><span className="v">「{voice.slice(0, 20)}{voice.length > 20 ? '…' : ''}」</span></div>
             <div className="ng-loop-arrow" aria-hidden>↓</div>
-            <div className="ng-loop-row now"><span className="k">{L(dict, '此刻', 'Now')}</span><span className="v">{feel}{feelNote.trim() ? ` · ${feelNote.trim()}` : ''}</span></div>
+            <div className="ng-loop-row now"><span className="k">{L(dict, '此刻', 'Now')}</span><span className="v">{feelEmObj ? `${feelEmObj.emoji} ${en ? feelEmObj.labelEn : feelEmObj.label}` : ''}{feelNote.trim() ? ` · ${feelNote.trim()}` : ''}</span></div>
           </div>
           <p className="ng-done" style={{ marginTop: 12 }}>
             {earned
