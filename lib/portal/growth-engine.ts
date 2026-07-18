@@ -56,6 +56,10 @@ interface MatchContext {
 const DAY = 86_400_000;
 const DISTRESS_RE = /累|沮丧|难过|焦虑|烦|压力|失望|委屈|不开心|心情不好|崩溃|想哭|扛不住|emo/i;
 const SELF_BLAME_RE = /我(真|太|就是|怎么这么)?(没用|不行|不够|差劲|失败|搞砸|做不好|笨)|都怪我|是我的错|我应该|要是我/i;
+// 对「控制不了/未来/别人怎么看」的挂心 → 斯多葛控制二分
+const CONTROL_WORRY_RE = /担心|万一|会不会|如果.{0,8}(怎么办|咋办|办)|别人(怎么|会)?(看|想|说|评价)|控制不了|左右不了|掌控不了|不受.{0,4}控制|失控|结果会/;
+// 笃定的以偏概全/绝对判断 → 苏格拉底追问
+const ABSOLUTE_RE = /总是|老是|永远|从来(没|不)|所有人都|没有人|大家都|每次都|一定是|肯定是|绝对|根本(不|没)|只会|不可能|注定/;
 
 // ── 镜头库(加镜头 = 往这加一个对象)────────────────────────────────────────────
 export const LENSES: Lens[] = [
@@ -95,7 +99,39 @@ export const LENSES: Lens[] = [
       return { title: '来考考这个想法', quiz: { question: j.question, options: j.options.slice(0, 4), correctIndex: Math.max(0, Math.min(3, j.correctIndex)), explanation: j.explanation || '' } };
     },
   },
-  // ③ 趋势洞察(trend)—— 财务:近一周快递/购物笔数偏多 → 温和点出花销趋势
+  // ③ 斯多葛·控制二分(nudge)—— 对控制不了的事挂心 → 帮 ta 分清能做什么、放下什么
+  {
+    id: 'stoic', name: '控制二分', nameEn: 'Dichotomy of control', mode: 'nudge', dimension: 'control',
+    match: ({ nodes, now }) => {
+      const n = nodes.find((x) => {
+        if (now - new Date(x.createdAt).getTime() > 4 * DAY) return false;
+        const text = `${x.name} ${(x.attributes?.notes as string) || x.rawInput || ''}`;
+        return CONTROL_WORRY_RE.test(text);
+      });
+      if (!n) return null;
+      const src = `${n.name}${n.attributes?.notes ? ' —— ' + n.attributes.notes : ''}`;
+      return { id: `stoic:${n.id}`, lensId: 'stoic', mode: 'nudge', sourceId: n.id, sourceText: src };
+    },
+    buildPrompt: (s) => `对方记下了一件让 ta 挂心的事:"""${s.sourceText}"""。\n请像一位温和的斯多葛式向导,帮 ta 把这件事轻轻分成两半:哪些部分是自己能决定、能行动的,哪些是自己控制不了、只能先接受的。用两三句话,不说教,末尾把落点收到「自己此刻能做的一件小事」上。中文,口语,别用"您",别列点。只输出这几句话。`,
+    parse: (_s, t) => ({ title: '哪些在你手里', body: t.trim() }),
+  },
+  // ④ 苏格拉底追问(nudge)—— 笃定的绝对判断 → 用一个问题邀 ta 自己检视
+  {
+    id: 'socratic', name: '苏格拉底追问', nameEn: 'A Socratic question', mode: 'nudge', dimension: 'logic',
+    match: ({ nodes, now }) => {
+      const n = nodes.find((x) => {
+        if (now - new Date(x.createdAt).getTime() > 4 * DAY) return false;
+        const text = `${x.name} ${(x.attributes?.notes as string) || x.rawInput || ''}`;
+        return ABSOLUTE_RE.test(text);
+      });
+      if (!n) return null;
+      const src = `${n.name}${n.attributes?.notes ? ' —— ' + n.attributes.notes : ''}`;
+      return { id: `socratic:${n.id}`, lensId: 'socratic', mode: 'nudge', sourceId: n.id, sourceText: src };
+    },
+    buildPrompt: (s) => `对方在记录里写下了一个挺笃定的判断:"""${s.sourceText}"""。\n请像苏格拉底那样,用一个温和、不带评判的追问,邀请 ta 自己去检视这个判断的依据或例外(比如「真的每一次都这样吗?」「有没有哪怕一次不是?」「这是事实,还是此刻的感受?」)。只问一个问题,不给答案、不说教。中文,口语。只输出这一句问题。`,
+    parse: (_s, t) => ({ title: '念念想追问一句', body: t.trim() }),
+  },
+  // ⑤ 趋势洞察(trend)—— 财务:近一周快递/购物笔数偏多 → 温和点出花销趋势
   {
     id: 'trend-spend', name: '趋势洞察', nameEn: 'Trend nudge', mode: 'trend', dimension: 'blindspot',
     match: ({ now }) => {
@@ -122,7 +158,8 @@ export function collectSeeds(now = Date.now(), answered: Set<string> = new Set()
     if (out.length >= limit) break;
     try {
       const seed = lens.match(ctx);
-      if (seed && !answered.has(seed.id) && !out.some((s) => s.id === seed.id)) out.push(seed);
+      // 同一段记忆只出一张卡(镜头顺序 = 优先级);已回应的不再出
+      if (seed && !answered.has(seed.id) && !out.some((s) => s.id === seed.id || s.sourceId === seed.sourceId)) out.push(seed);
     } catch { /* 单镜头失败不拦其余 */ }
   }
   return out;
@@ -149,16 +186,16 @@ export async function generateObservation(seed: Seed, locale: string): Promise<O
 }
 
 export const DIMENSION_LABEL: Record<MindDimension, { zh: string; en: string }> = {
-  emotion: { zh: '情绪觉察', en: 'Emotional awareness' },
-  reframe: { zh: '认知灵活', en: 'Cognitive flexibility' },
-  logic: { zh: '逻辑清晰', en: 'Clear reasoning' },
-  blindspot: { zh: '盲点发掘', en: 'Blind-spot finding' },
-  control: { zh: '自我掌控', en: 'Self-control' },
-  selfaware: { zh: '自我觉知', en: 'Self-awareness' },
+  emotion: { zh: '情绪理解', en: 'Emotional insight' },
+  reframe: { zh: '认知重构', en: 'Reframing' },
+  logic: { zh: '逻辑推理', en: 'Reasoning' },
+  blindspot: { zh: '盲点发掘', en: 'Blind spots' },
+  control: { zh: '掌控感', en: 'Sense of control' },
+  selfaware: { zh: '自我觉察', en: 'Self-awareness' },
 };
 
-/** 图鉴里六维的固定排序(展示顺序稳定)。 */
-export const DIMENSION_ORDER: MindDimension[] = ['emotion', 'reframe', 'blindspot', 'logic', 'control', 'selfaware'];
+/** 图鉴里六维的固定排序(展示顺序稳定;对齐成长页 v2 心智成长环)。 */
+export const DIMENSION_ORDER: MindDimension[] = ['emotion', 'reframe', 'blindspot', 'control', 'logic', 'selfaware'];
 
 /** 老规则卡没有 dimension 字段时的兜底映射(让历史回答也能点亮图鉴)。 */
 const KIND_DIMENSION_FALLBACK: Record<string, MindDimension> = {
@@ -181,6 +218,15 @@ export const LEVEL_LABEL: Record<DimensionLevel, { zh: string; en: string }> = {
   2: { zh: '成形', en: 'Forming' },
   3: { zh: '纯熟', en: 'Fluent' },
 };
+
+/** 心智成长环:底部被 clip 掉的百分比(越小=填得越满);0 次=100(不画弧)。 */
+export function ringEmptyPct(count: number): number {
+  if (count <= 0) return 100;
+  if (count < 3) return 64;
+  if (count < 6) return 42;
+  if (count < 10) return 20;
+  return 8;
+}
 
 export interface DimensionStat { dimension: MindDimension; count: number; level: DimensionLevel }
 
