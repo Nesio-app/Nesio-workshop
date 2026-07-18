@@ -113,8 +113,9 @@ sensitivity/retention 枚举化(中期)。
   PreviewGuides/ConnectorsHub),ALLOWLIST 更长属预期漂移。**待迁(高风险,留整块真机验证时间)**:
   **叠放组批①②已迁(2026-07-18,nesio 侧 prod 隔离验双层 Vaul 通过)**:批① LongPress/Projects/
   CreateProject;批② Favorites/ProjectDetail(workshop 里都在单体 MemoryTab.tsx 内联)。① 叠放组
-  剩余——MemoryNodeDetail(需 fragment 抽 3 个嵌套 modal + 丢 expand-to-full 决策)、DailyBrief/
-  TodayFeed(嵌套 MemoryNodeDetail);② 多子 sheet——Settings/
+  **批③已迁**:MemoryNodeDetail(决策=统一丢 expand-to-full;image-viewer/EmailCompose createPortal
+  到 body + z-950 + pointer-events:auto 绕 Vaul body 锁)。剩余——DailyBrief/TodayFeed(嵌套
+  MemoryNodeDetail,现已可迁);② 多子 sheet——Settings/
   Mood;③ 嵌套子 sheet——EmailCompose/RelationshipDetail;④ 特殊结构——Voice(双 backdrop);
   ⑤ 豁免——Camera/Barcode(实时相机)。清单即 ALLOWLIST,以测试为准。两仓(nesio + workshop)同步。
 
