@@ -1062,7 +1062,9 @@ export default function TimelineTab() {
           <div className="nesio-visitmem-sheet">
             <p className="nesio-memmap-list-title">{visitMems.title} · {L(dict, `${visitMems.nodes.length} 条记忆`, `${visitMems.nodes.length} memories`)}</p>
             <div className="nesio-memmap-list-scroll">
-              {visitMems.nodes.map((n) => (
+              {visitMems.nodes.length === 0 ? (
+                <p className="nesio-tl-catplace-more" style={{ padding: '1rem 0' }}>{L(dict, '这里还没有关联到的记忆', 'No memories linked here yet')}</p>
+              ) : visitMems.nodes.map((n) => (
                 <button key={n.id} type="button" className="nesio-memmap-item nesio-memmap-item--btn" onClick={() => setVisitSel(n)}>
                   <span className="nesio-memmap-item-name">{n.name}</span>
                   <span className="nesio-memmap-item-time">{new Date(n.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
