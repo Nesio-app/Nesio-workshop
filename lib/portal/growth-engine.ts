@@ -76,7 +76,7 @@ export const LENSES: Lens[] = [
       const src = `${n.name}${n.attributes?.notes ? ' —— ' + n.attributes.notes : ''}`;
       return { id: `soothe:${n.id}`, lensId: 'soothe', mode: 'nudge', sourceId: n.id, sourceText: src };
     },
-    buildPrompt: (s) => `你是念念,${'一个温柔、不评判、像认识对方很久的朋友'}。对方最近记下了这样的心情:"""${s.sourceText}"""。\n用两三句话主动、轻轻地关心一下——先接住情绪(不急着给建议、不说教),再留一个愿意听的开口。中文,口语,别用"您",别列点。只输出这几句话本身。`,
+    buildPrompt: (s) => `你是念念,一个温柔、不评判、像认识很久的朋友。对方今天记下了这样一段心情:"""${s.sourceText}"""。\n用一两句轻轻关心一下,再问 ta 要不要陪着一起看看,它是不是真有那么重(是把话看清,不是分析 ta)。别重复 ta 的原话(卡片上会单独引出来)。中文,口语,别用"您",别列点。只输出这几句话。`,
     parse: (_s, t) => ({ title: '念念想和你聊聊', body: t.trim() }),
   },
   // ② 认知重评(quiz)—— 检测到自责/灾难化的想法 → 考考你这想法哪里可能不对
@@ -92,7 +92,7 @@ export const LENSES: Lens[] = [
       const src = `${n.name}${n.attributes?.notes ? ' —— ' + n.attributes.notes : ''}`;
       return { id: `reframe:${n.id}`, lensId: 'reframe', mode: 'quiz', sourceId: n.id, sourceText: src };
     },
-    buildPrompt: (s) => `对方在记录里写下了一个带着情绪的想法:"""${s.sourceText}"""。\n请像一位温和的认知行为治疗(CBT)向导,把它做成一道"看看这个想法里可能藏着哪种认知偏差"的小测:\n- 选出这个想法里最可能存在的一种认知扭曲(如:灾难化、以偏概全、非黑即白、读心术、应该式、贴标签自责、情绪化推理);\n- 给 4 个选项(1 个最贴切 + 3 个似是而非但不对),打乱顺序;\n- 解释为什么是它、以及一句更平衡的自我对话(温柔,不否定情绪)。\n只输出严格 JSON:{"question":"这个想法里,最可能藏着哪一种思维偏差?","options":["…","…","…","…"],"correctIndex":0,"explanation":"为什么 + 一句更平衡的说法"}`,
+    buildPrompt: (s) => `对方在记录里写下了一个带着情绪的想法:"""${s.sourceText}"""。\n做成一道温和的认知偏差小测:\n- **question 必须先用「」把 ta 这句原话引出来**(像:你写「原话」),再接一句「这句话里藏着一个常见的思维陷阱 —— 你抓得出是哪个吗?」;\n- 选出最可能的一种认知扭曲(灾难化/以偏概全/非黑即白/读心术/应该式/贴标签自责/情绪化推理),给 4 个选项(1 个最贴切 + 3 个似是而非但不对),打乱顺序;\n- explanation 先点破陷阱名,再把「具体那件事」和「我这个人不行」分开(前者能修,后者是错觉),温柔、不否定情绪。\n只输出严格 JSON:{"question":"你写「…」。这句话里藏着一个常见的思维陷阱 —— 你抓得出是哪个吗?","options":["…","…","…","…"],"correctIndex":0,"explanation":"…"}`,
     parse: (_s, t) => {
       const j = safeJson(t);
       if (!j?.question || !Array.isArray(j.options) || typeof j.correctIndex !== 'number') return null;
@@ -112,7 +112,7 @@ export const LENSES: Lens[] = [
       const src = `${n.name}${n.attributes?.notes ? ' —— ' + n.attributes.notes : ''}`;
       return { id: `stoic:${n.id}`, lensId: 'stoic', mode: 'nudge', sourceId: n.id, sourceText: src };
     },
-    buildPrompt: (s) => `对方记下了一件让 ta 挂心的事:"""${s.sourceText}"""。\n请像一位温和的斯多葛式向导,帮 ta 把这件事轻轻分成两半:哪些部分是自己能决定、能行动的,哪些是自己控制不了、只能先接受的。用两三句话,不说教,末尾把落点收到「自己此刻能做的一件小事」上。中文,口语,别用"您",别列点。只输出这几句话。`,
+    buildPrompt: (s) => `对方记下了一件让 ta 挂心的事:"""${s.sourceText}"""。\n像温和的斯多葛式向导,把这件事分成两半:哪些是自己能决定、能行动的,哪些是控制不了、只能先接受的;末尾把落点收到「自己此刻能做的一件小事」上。别重复 ta 的原话(卡片上会单独引出来)。两三句,口语,别用"您",别列点。只输出这几句话。`,
     parse: (_s, t) => ({ title: '哪些在你手里', body: t.trim() }),
   },
   // ④ 苏格拉底追问(nudge)—— 笃定的绝对判断 → 用一个问题邀 ta 自己检视
@@ -128,7 +128,7 @@ export const LENSES: Lens[] = [
       const src = `${n.name}${n.attributes?.notes ? ' —— ' + n.attributes.notes : ''}`;
       return { id: `socratic:${n.id}`, lensId: 'socratic', mode: 'nudge', sourceId: n.id, sourceText: src };
     },
-    buildPrompt: (s) => `对方在记录里写下了一个挺笃定的判断:"""${s.sourceText}"""。\n请像苏格拉底那样,用一个温和、不带评判的追问,邀请 ta 自己去检视这个判断的依据或例外(比如「真的每一次都这样吗?」「有没有哪怕一次不是?」「这是事实,还是此刻的感受?」)。只问一个问题,不给答案、不说教。中文,口语。只输出这一句问题。`,
+    buildPrompt: (s) => `对方在记录里写下了一个挺笃定的判断:"""${s.sourceText}"""。\n像苏格拉底那样用一个温和、不带评判的追问,邀 ta 自己检视它的依据或例外(如「真的每一次都这样吗?」「有没有哪怕一次不是?」「这是事实,还是此刻的感受?」)。只问一个问题,不给答案。别重复原话(卡片上会单独引出来)。中文,口语。只输出这一句问题。`,
     parse: (_s, t) => ({ title: '念念想追问一句', body: t.trim() }),
   },
   // ⑤ 趋势洞察(trend)—— 财务:近一周快递/购物笔数偏多 → 温和点出花销趋势
@@ -144,7 +144,7 @@ export const LENSES: Lens[] = [
       if (parcels.length < 4 || spend < 80) return null;
       return { id: `trend-spend:${new Date(now).toISOString().slice(0, 10)}`, lensId: 'trend-spend', mode: 'trend', sourceId: 'finance-week', sourceText: `近 7 天购物/快递 ${parcels.length} 笔,共 $${spend.toFixed(0)}`, meta: { count: parcels.length, spend: Math.round(spend) } };
     },
-    buildPrompt: (s) => `观察到一个真实的花销趋势(只用这个事实,别编别的):${s.sourceText}。\n用一两句温和、不说教、不制造焦虑的话把它轻轻点出来 —— 像朋友顺口提一句,让对方自己意识到,而不是评判。中文。只输出这句话。`,
+    buildPrompt: (s) => `观察到一个真实的花销趋势(数字见此,别重复念):${s.sourceText}。\n用一句温和、不说教、不制造焦虑的话,问对方要不要自己看看这个趋势(像:不是说该省 —— 是你自己想看看吗?)。中文。只输出这一句。`,
     parse: (s, t) => ({ title: '一个小趋势', body: t.trim() }),
   },
 ];
@@ -183,6 +183,57 @@ export async function generateObservation(seed: Seed, locale: string): Promise<O
     if (!content) return null;
     return { ...seed, dimension: lens.dimension, title: content.title, body: content.body, quiz: content.quiz };
   } catch { return null; }
+}
+
+async function chatText(message: string, locale: string): Promise<string | null> {
+  try {
+    const res = await fetch('/api/portal/chat', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message, uiLocale: locale.toLowerCase().startsWith('en') ? 'en' : 'zh' }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as { ok?: boolean; response?: string };
+    return data.ok && data.response ? data.response.trim() : null;
+  } catch { return null; }
+}
+
+/**
+ * 情绪卡「和念念聊聊」升级为引导链:念念先陪你看清(reflection),再带一道
+ * 「这份感受背后是哪种想法习惯」的小测(quiz,选项=图鉴里的思维利器,tool=命中的利器名)。
+ * 选错由 explanation 继续引导;答完记入维度 + 点亮图鉴。JSON 解析失败则只给 reflection。
+ */
+export interface NudgeGuide {
+  reflection: string;
+  quiz?: { question: string; options: string[]; correctIndex: number; explanation: string; tool: string };
+}
+export async function deepenNudge(sourceText: string, locale: string): Promise<NudgeGuide | null> {
+  const t = await chatText(
+    `你是念念,温柔、不评判、像认识很久的朋友。对方记下了这样的心情:"""${sourceText}"""。\n` +
+    `分两部分:\n① reflection:三四句话陪 ta 把这份情绪看清楚(先接住并正常化;再轻轻提一个换角度看的可能;最后一件此刻能做的很小的事)。口语,别用"您",别说教。\n` +
+    `② quiz:一道温和的小测 —— 这份感受背后,最可能是哪种「想法习惯」在放大它。从这些思维利器里选最贴切的一种(以偏概全/应该式思维/灾难化/贴标签/非黑即白/读心术/情绪化推理),给 4 个选项(1 个最贴切 + 3 个似是而非),打乱;correctIndex 是正确项下标;explanation 温柔点破(把「这一件具体的事」和「我这个人」分开,前者能修,后者是错觉);tool 填命中的那把利器名(如「以偏概全」)。\n` +
+    `只输出严格 JSON:{"reflection":"","quiz":{"question":"这份感受背后,最可能是哪种想法习惯在放大它?","options":["","","",""],"correctIndex":0,"explanation":"","tool":"以偏概全"}}`,
+    locale,
+  );
+  if (!t) return null;
+  const j = safeJson(t) as unknown as (NudgeGuide & { quiz?: Record<string, unknown> }) | null;
+  if (!j?.reflection) return { reflection: t };  // 非 JSON → 整段当疏导话
+  const q = j.quiz as { question?: string; options?: string[]; correctIndex?: number; explanation?: string; tool?: string } | undefined;
+  const quiz = (q?.question && Array.isArray(q.options) && q.options.length >= 2 && typeof q.correctIndex === 'number')
+    ? { question: String(q.question), options: q.options.slice(0, 4).map(String), correctIndex: Math.max(0, Math.min(3, q.correctIndex)), explanation: String(q.explanation || ''), tool: String(q.tool || '') }
+    : undefined;
+  return { reflection: String(j.reflection), quiz };
+}
+
+/** 趋势卡「看看明细」:近 7 天购物/快递明细(金额降序)。 */
+export function recentSpendItems(now = Date.now(), limit = 6): Array<{ date: string; name: string; amount: number }> {
+  try {
+    const txs = loadBankTx() as Array<{ date: string; name: string; amount: number; category?: string }>;
+    const weekAgo = now - 7 * DAY;
+    return txs
+      .filter((t) => new Date(t.date).getTime() >= weekAgo && t.amount > 0 && /amazon|快递|shop|购物|delivery/i.test(`${t.name} ${t.category || ''}`))
+      .sort((a, b) => b.amount - a.amount).slice(0, limit)
+      .map((t) => ({ date: t.date, name: t.name, amount: t.amount }));
+  } catch { return []; }
 }
 
 export const DIMENSION_LABEL: Record<MindDimension, { zh: string; en: string }> = {
