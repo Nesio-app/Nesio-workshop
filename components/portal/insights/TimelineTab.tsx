@@ -33,7 +33,8 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import NesioSheet from '../ui/NesioSheet';
 import { computePlacesShareStats, type PlacesShareStats } from '@/lib/portal/places-share';
-import { matchPlacePhotoAsset, placePhotoOverrideId, setPlacePhotoOverride, PLACE_PHOTOS_EVENT, type GeoImageNode } from '@/lib/portal/place-photos';
+import { matchPlacePhotoAsset, placePhotoOverrideId, setPlacePhotoOverride, PLACE_PHOTOS_EVENT, type GeoImageNode, type PlaceDescriptor } from '@/lib/portal/place-photos';
+import { countryDisplayName, canonicalCountryKey } from '@/lib/portal/country-normalize';
 
 type Sub = 'timeline' | 'analytics' | 'travel' | 'world';
 
@@ -157,18 +158,19 @@ function PlaceDonut({ segments, selected, onSelect, centerCount, centerLabel, di
 }
 
 // 地点封面照:自动就近匹配一张带图记忆;点图从本地换。无图 → 渐变占位。
-function PlacePhoto({ placeKey, coords, imageNodes, gradClass, className, dict, children }: {
+function PlacePhoto({ placeKey, coords, imageNodes, place, gradClass, className, dict, children }: {
   placeKey: string; coords: Array<{ lat: number; lon: number }>; imageNodes: GeoImageNode[];
-  gradClass: string; className: string; dict: string; children?: ReactNode;
+  place?: PlaceDescriptor; gradClass: string; className: string; dict: string; children?: ReactNode;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const coordsKey = coords.map((c) => `${c.lat.toFixed(3)},${c.lon.toFixed(3)}`).join('|');
   const imgKey = imageNodes.map((n) => n.assetId).join('|');
+  const placeSig = `${place?.city || ''}|${place?.country || ''}`;
   useEffect(() => {
     let alive = true;
     const resolve = () => {
-      const id = placePhotoOverrideId(placeKey) || matchPlacePhotoAsset(coords, imageNodes);
+      const id = placePhotoOverrideId(placeKey) || matchPlacePhotoAsset(coords, imageNodes, place);
       if (!id) { if (alive) setUrl(null); return; }
       getLocalImage(id).then((u) => { if (alive) setUrl(u); }).catch(() => { if (alive) setUrl(null); });
     };
@@ -176,7 +178,7 @@ function PlacePhoto({ placeKey, coords, imageNodes, gradClass, className, dict, 
     window.addEventListener(PLACE_PHOTOS_EVENT, resolve);
     return () => { alive = false; window.removeEventListener(PLACE_PHOTOS_EVENT, resolve); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [placeKey, coordsKey, imgKey]);
+  }, [placeKey, coordsKey, imgKey, placeSig]);
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.currentTarget.files?.[0];
     e.currentTarget.value = '';
@@ -294,11 +296,27 @@ export default function TimelineTab() {
   const placeRanking = useMemo(() => clusterPlaces(placePeriodTrail, 6).slice().sort((a, b) => b.visits - a.visits).slice(0, 5), [placePeriodTrail]);
   // 图2:点饼图某类别 → 下面「最常去」只出这个类别的地点明细(全量按次数排,不止前 5)
   const placeRankingAll = useMemo(() => clusterPlaces(placePeriodTrail, 99999).slice().sort((a, b) => b.visits - a.visits), [placePeriodTrail]);
-  // 地点封面照:带图 + 有定位的记忆节点,按国家/城市聚到就近坐标。
-  const imageNodes = useMemo<GeoImageNode[]>(() => getLifeGraph()
-    .map((n) => ({ n, asset: (n.assets || []).find((a) => a.kind === 'image') }))
-    .filter((x) => x.asset && typeof x.n.attributes?.capturedLat === 'number' && typeof x.n.attributes?.capturedLon === 'number')
-    .map((x) => ({ assetId: x.asset!.id, lat: Number(x.n.attributes.capturedLat), lon: Number(x.n.attributes.capturedLon), ts: new Date(x.n.createdAt).getTime() })), []);
+  // 地点封面照:所有带图记忆节点。有坐标的按就近配,没坐标的按 capturedPlace 经 geo 表
+  // 映射到 city/country 后按地名配 —— 用户实锤「有对应记忆照片就自动展示一张,别让照片位空着」。
+  const imageNodes = useMemo<GeoImageNode[]>(() => {
+    const geo = loadPlaceGeo();
+    return getLifeGraph()
+      .map((n) => ({ n, asset: (n.assets || []).find((a) => a.kind === 'image') }))
+      .filter((x) => Boolean(x.asset))
+      .map((x) => {
+        const a = x.n.attributes || {};
+        const label = typeof a.capturedPlace === 'string' ? a.capturedPlace : '';
+        const g = label ? geo[label] : undefined;
+        return {
+          assetId: x.asset!.id,
+          lat: typeof a.capturedLat === 'number' ? a.capturedLat : undefined,
+          lon: typeof a.capturedLon === 'number' ? a.capturedLon : undefined,
+          ts: new Date(x.n.createdAt).getTime(),
+          city: g?.city || (typeof a.city === 'string' ? a.city : undefined),
+          country: g?.country || (typeof a.country === 'string' ? a.country : undefined),
+        };
+      });
+  }, []);
   const placeCoords = useMemo(() => {
     const geo = loadPlaceGeo();
     const byCountry = new Map<string, Array<{ lat: number; lon: number }>>();
@@ -365,12 +383,14 @@ export default function TimelineTab() {
     for (const v of trail) {
       const g = geo[v.label];
       if (!g?.country) continue;
+      const key = canonicalCountryKey(g.country); // 按归一化国家键聚,变体不分家
+      if (!key) continue;
       const t = new Date(v.ts).getTime();
-      const a = byC.get(g.country) || { visits: 0, earliest: Infinity, maxLat: -Infinity, minLat: Infinity };
+      const a = byC.get(key) || { visits: 0, earliest: Infinity, maxLat: -Infinity, minLat: Infinity };
       a.visits += 1;
       if (Number.isFinite(t)) a.earliest = Math.min(a.earliest, t);
       if (typeof v.lat === 'number') { a.maxLat = Math.max(a.maxLat, v.lat); a.minLat = Math.min(a.minLat, v.lat); }
-      byC.set(g.country, a);
+      byC.set(key, a);
     }
     const entries = [...byC.entries()];
     if (!entries.length) return new Map<string, { text: string }>();
@@ -507,7 +527,7 @@ export default function TimelineTab() {
                       );
                     })()}
                   </span>
-                  <VisitThumbs nodes={memNodesAtVisit(it.seg)} onZoom={(url, name) => setZoomImg({ url, name })} />
+                  <VisitThumbs nodes={memNodesAtVisit(it.seg)} onOpen={(n) => setVisitSel(n)} />
                 </div>
               </div>
             ) : (
@@ -830,13 +850,14 @@ export default function TimelineTab() {
           })()}
           <div className="nesio-tl-ccards">
             {world.map((g) => {
-              const tag = worldCountryTags.get(g.country);
+              const tag = worldCountryTags.get(g.countryKey);
+              const name = countryDisplayName(g.countryKey, dict, g.country);
               return (
-                <div key={g.country} className="nesio-tl-ccard">
-                  <PlacePhoto placeKey={`country:${g.country}`} coords={placeCoords.byCountry.get(g.country) || []} imageNodes={imageNodes} gradClass={`nesio-tl-cc-g${gradIdx(g.country)}`} className="nesio-tl-ccard-img" dict={dict} />
-                  <button type="button" className="nesio-tl-ccard-nav" onClick={() => setWorldCountry(g.country)}>
+                <div key={g.countryKey} className="nesio-tl-ccard">
+                  <PlacePhoto placeKey={`country:${g.countryKey}`} coords={placeCoords.byCountry.get(g.country) || []} imageNodes={imageNodes} place={{ country: g.countryKey }} gradClass={`nesio-tl-cc-g${gradIdx(g.countryKey)}`} className="nesio-tl-ccard-img" dict={dict} />
+                  <button type="button" className="nesio-tl-ccard-nav" onClick={() => setWorldCountry(g.countryKey)}>
                     <span className="nesio-tl-ccard-body">
-                      <span className="nesio-tl-ccard-name">{g.country}<small>{L(dict, `${g.cities.length} 城`, `${g.cities.length} cities`)}</small></span>
+                      <span className="nesio-tl-ccard-name">{name}<small>{L(dict, `${g.cities.length} 城`, `${g.cities.length} cities`)}</small></span>
                       {tag && <span className="nesio-tl-ccard-tag">{tag.text}</span>}
                     </span>
                     <span className="nesio-tl-ccard-chev" aria-hidden>›</span>
@@ -848,14 +869,14 @@ export default function TimelineTab() {
         </>
       )}
       {sub === 'world' && worldCountry && (() => {
-        const g = world.find((x) => x.country === worldCountry);
+        const g = world.find((x) => x.countryKey === worldCountry);
         const cities = (g?.cities ?? []).slice().sort((a, b) => b.count - a.count);
         return (
           <>
             <div className="nesio-tl-city-head">
               <button type="button" className="nesio-tl-city-back" onClick={() => setWorldCountry(null)} aria-label={L(dict, '返回', 'Back')}>‹</button>
               <div>
-                <div className="nesio-tl-city-title">{worldCountry}</div>
+                <div className="nesio-tl-city-title">{countryDisplayName(worldCountry, dict, g?.country)}</div>
                 <div className="nesio-tl-city-sub">{L(dict, `${cities.length} 城 · ${g?.placeCount ?? 0} 地`, `${cities.length} cities · ${g?.placeCount ?? 0} places`)}</div>
               </div>
             </div>
@@ -865,7 +886,7 @@ export default function TimelineTab() {
               <div className="nesio-tl-citycards">
                 {cities.map((c) => (
                   <div key={c.city} className="nesio-tl-citycard">
-                    <PlacePhoto placeKey={`city:${c.city}`} coords={placeCoords.byCity.get(c.city) || []} imageNodes={imageNodes} gradClass={`nesio-tl-cc-g${gradIdx(c.city)}`} className="nesio-tl-citycard-img" dict={dict}>
+                    <PlacePhoto placeKey={`city:${c.city}`} coords={placeCoords.byCity.get(c.city) || []} imageNodes={imageNodes} place={{ city: c.city }} gradClass={`nesio-tl-cc-g${gradIdx(c.city)}`} className="nesio-tl-citycard-img" dict={dict}>
                       <span className="nesio-tl-citycard-tag">{L(dict, `${c.count} 个地点`, `${c.count} places`)}</span>
                     </PlacePhoto>
                     <span className="nesio-tl-citycard-name">{c.city}</span>
@@ -948,16 +969,17 @@ export default function TimelineTab() {
               ))}
             </div>
           </div>
-          {visitSel && <MemoryNodeDetail node={visitSel} onClose={() => setVisitSel(null)} />}
         </div>,
         document.body,
       )}
+      {/* 记忆详情提到顶层:时间线缩略图 / 到访记忆列表两条路径都能点开(自带 Vaul portal) */}
+      {visitSel && <MemoryNodeDetail node={visitSel} onClose={() => setVisitSel(null)} />}
     </div>
   );
 }
 
 /** 批次 62:到访时段照片小预览 —— 记忆里带图的,先给两张缩略图(点开进详情)。 */
-function VisitThumbs({ nodes, onZoom }: { nodes: LifeNode[]; onZoom: (url: string, name: string) => void }) {
+function VisitThumbs({ nodes, onOpen }: { nodes: LifeNode[]; onOpen: (n: LifeNode) => void }) {
   const withImg = nodes
     .map((n) => ({ n, asset: (n.assets || []).find((a) => a.kind === 'image') }))
     .filter((x): x is { n: LifeNode; asset: NonNullable<LifeNode['assets']>[number] } => Boolean(x.asset))
@@ -978,7 +1000,7 @@ function VisitThumbs({ nodes, onZoom }: { nodes: LifeNode[]; onZoom: (url: strin
     <div className="nesio-tl-thumbs">
       {withImg.map(({ n, asset }) => (
         urls[asset.id]
-          ? <button key={asset.id} type="button" className="nesio-tl-thumb" onClick={() => onZoom(urls[asset.id], n.name)} aria-label={n.name}>
+          ? <button key={asset.id} type="button" className="nesio-tl-thumb" onClick={() => onOpen(n)} aria-label={n.name}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={urls[asset.id]} alt="" loading="lazy" />
             </button>
