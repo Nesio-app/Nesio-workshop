@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { getLifeGraph, isBulkImported } from '@/lib/portal/life-graph';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { summarizeForLivingModel } from '@/lib/platform/living-model';
@@ -380,9 +381,11 @@ export default function MirrorLetterTab() {
       {/* 页脚诚实声明 */}
       <p className="nesio-mirror-note">{L(dict, '只回看,不预测 · 任意时段都能生成', 'Looks back, never predicts · generate for any period')}</p>
 
-      {/* 往期存档抽屉 */}
-      {archiveOpen && (
-        <>
+      {/* 往期存档抽屉。portal 到 body:此 Tab 可能渲染在 Vaul(transform)卡片内,
+          position:fixed 会被 transform 祖先困住;portal 出去 + 容器 z-948(压过洞察卡 901)
+          + pointer-events:auto(绕 Vaul 的 body pointer-events:none)才正确浮在最上。 */}
+      {archiveOpen && typeof document !== 'undefined' && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 948, pointerEvents: 'auto' }}>
           <button type="button" className="nesio-mirror-drawer-scrim" aria-label={L(dict, '关闭', 'Close')} onClick={() => setArchiveOpen(false)} />
           <div className="nesio-mirror-drawer" role="dialog" aria-label={L(dict, '往期的信', 'Past letters')}>
             <div className="nesio-mirror-drawer-head">
@@ -417,7 +420,8 @@ export default function MirrorLetterTab() {
               </div>
             )}
           </div>
-        </>
+        </div>,
+        document.body,
       )}
     </div>
   );
