@@ -33,8 +33,9 @@ const PRIMITIVE = 'components/portal/ui/NesioSheet.tsx';
  * file(相对根) → 允许的手写模态标记出现次数(regex 匹配数,非行数)。
  * 每一项都是一个「尚未迁 NesioSheet」或「明确豁免」的旧壳。迁完即降数/摘除。
  *
- * 豁免(短期不迁):Camera/Barcode(实时相机取景,react-remove-scroll 干扰手势先例)。
- * 其余为叠放组 / 多子 sheet / 带嵌套子 sheet 的复杂件,待整组一起迁(见 STATE.md 欠账)。
+ * 豁免(手势面,不迁):Camera/Barcode(实时相机取景)+ MoodSheet(情绪轮是 touch-drag canvas,
+ * Vaul 路径硬编码 modal 会挡 touchmove、且 Vaul 拖拽关闭与轮盘选择抢手势)。
+ * 其余为多子 sheet / 带嵌套子 sheet 的复杂件,待迁(见 STATE.md 欠账)。
  */
 const ALLOWLIST = new Map([
   ['components/portal/BarcodeScanSheet.tsx', 2],
