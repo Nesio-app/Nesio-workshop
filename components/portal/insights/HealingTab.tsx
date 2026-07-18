@@ -13,7 +13,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { collectSeeds, applyIFS, scanAnts, type Seed, type IFSResult } from '@/lib/portal/growth-engine';
 import { recordGrowthAnswer } from '@/lib/portal/growth-guide';
 import { earnPoints, POINTS_PER_HEALING } from '@/lib/platform/rewards-engine';
-import { EMOTIONS, recordMoment, emotionOf } from '@/lib/portal/mood';
+import { recordMoment, emotionOf } from '@/lib/portal/mood';
+import MoodWheel from '../MoodWheel';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -227,15 +228,9 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
 
                 {st === 'active' && s.key === 'feel' && (
                   <div className="ng-tl-in">
-                    <p className="ng-tl-q">{L(dict, '走完这一遍,此刻心里是什么感受?', 'After all that — how do you feel right now?')}</p>
-                    <div className="ng-mood-grid">
-                      {EMOTIONS.map((m) => (
-                        <button key={m.id} type="button" className={`ng-mood-chip${feelEm === m.id ? ' on' : ''}`} onClick={() => setFeelEm(m.id)}>
-                          <span className="dot" style={{ background: m.color }} aria-hidden />{en ? m.labelEn : m.label}
-                        </button>
-                      ))}
-                    </div>
-                    <p className="ng-heal-from">{L(dict, '会记进你的心情记录,汇入情绪趋势。', 'Saved to your mood log — it flows into your emotion trends.')}</p>
+                    <p className="ng-tl-q">{L(dict, '走完这一遍,此刻,是什么感觉?', 'After all that — how does this moment feel?')}</p>
+                    <MoodWheel value={feelEm} onPick={setFeelEm} en={en} />
+                    <p className="ng-heal-from">{L(dict, '就是你熟悉的那个心情转盘 —— 会记进心情记录,汇入情绪趋势。', 'The same mood wheel you know — saved to your mood log and emotion trends.')}</p>
                     <textarea className="ng-ta" rows={2} value={feelNote} onChange={(e) => setFeelNote(e.target.value)}
                       placeholder={L(dict, '想补一句就写(可跳过)', 'Add a line if you want (optional)')} />
                     <div className="ng-acts">
