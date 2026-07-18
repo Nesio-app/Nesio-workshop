@@ -60,6 +60,7 @@ export async function purgeAllLocalUserData(): Promise<void> {
     purgeLocalData(localStorage);                         // 本机 localStorage key 收口清除(保留 auth)
     await purgeIdbBlobs();                                // IDB blob(健康/临床/地点)
     await purgeLocalImages();                             // 记忆照片独立 IDB(nesio-images)
+    await (await import('./local-email-body')).purgeEmailBodies(); // 邮件全文独立 IDB(nesio-email-bodies)
   } catch (err) { logDropped('local_owner.purge', err); }
 }
 

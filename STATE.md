@@ -100,6 +100,17 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **邮件全链路 里程碑 A(抓全存全 + 本地深抽取,2026-07-18)**:邮件内容抓取/分析落地第一步,
+  **全免费、零云成本、隐私优先**。**Phase 1(抓全存全)**:gmail 路由 `extractText` 加 `maxLen`
+  参数,新增 `extractFullBody`(≤20k)+ `buildEmailBodies`,响应带 `emailBodies`(emailId→全文)
+  **仅回本设备**;客户端 connector-sync 收到后存**本机专属 IndexedDB**(`lib/portal/local-email-body.ts`,
+  DB=`nesio-email-bodies`)——**隐私红线:全文不进云同步的 LifeNode.attributes**,记忆节点只留
+  ≤1500 `article` 预览 + `emailId` 指针;详情「阅读原文」按 emailId 取全文。清空本地数据
+  (SettingsSheets/local-owner)一并 `purgeEmailBodies()`。**Phase 2(本地深抽取)**:新增
+  `lib/portal/email-extract-local.ts` 纯正则抽取(金额/预计到货/订单号/快递单号/商家/待办信号),
+  gmail 免费兜底分支把命中项挂 attributes + 待办标「待回复」tag;MemoryNodeDetail 加
+  amount/orderNo/trackingNo 属性标签,eta/store/merchant/subtype 由 EventSection 渲染故隐藏去重。
+  **待办**:里程碑 B(检索接全平台)、里程碑 C(付费云深检索/embedding rerank)。
 - **NesioSheet 原语迁移(进行中,2026-07-18)**:模态语义(aria-modal/role="dialog")统一到
   单源原语 `components/portal/ui/NesioSheet.tsx`(Vaul bottom + Radix center/fullscreen,
   自持 useFocusTrap——库的焦点管理在 React19+Next16+Turbopack 本栈不可靠)。**决策**:

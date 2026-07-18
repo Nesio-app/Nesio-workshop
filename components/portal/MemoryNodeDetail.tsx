@@ -73,10 +73,13 @@ const PRIORITY_LABELS: Record<string, { label: string; labelEn: string; color: s
 const ATTR_KEY_LABELS: Record<string, string> = {
   temperatureC: '温度', condition: '天气', forecastNote: '预报',
   placeName: '地点', humidity: '湿度', windKph: '风速',
+  // 邮件本地深抽取(Phase 2)的结构化线索
+  amount: '金额', orderNo: '订单号', trackingNo: '快递单号',
 };
 const ATTR_KEY_LABELS_EN: Record<string, string> = {
   temperatureC: 'Temperature', condition: 'Weather', forecastNote: 'Forecast',
   placeName: 'Place', humidity: 'Humidity', windKph: 'Wind',
+  amount: 'Amount', orderNo: 'Order #', trackingNo: 'Tracking #',
 };
 
 /** 长文本(如日历事件的会议记录)默认只显示摘要,点「详情」展开 */
@@ -183,7 +186,9 @@ const HIDDEN_ATTRIBUTE_KEYS = new Set([
   'occuredAt', 'occurredAt', 'capturedAt', 'retentionPolicy', 'sensitivity',
   'sourceNodeId', 'schemaVersion',
   // Type-specific (handled in sections)
-  'note', 'price', 'purchaseDate', 'expiry', 'store', 'paymentMethod',
+  'note', 'price', 'purchaseDate', 'expiry', 'store', 'merchant', 'subtype', 'paymentMethod',
+  // 电商/物流事件:预计到货由 EventSection 单独渲染,不在通用属性区重复
+  'eta', 'expectedDelivery', 'deliveryDate',
   'visitCount', 'category', 'lastSeen', 'birthday',
   'start', 'end', 'date', 'dueDate', 'deadline',
   'priority', 'owner', 'recurring', 'participants',
@@ -653,6 +658,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   const [readerOpen, setReaderOpen] = useState(false);
   // 批次 36:在 Nesio 内回复邮件
   const [composeOpen, setComposeOpen] = useState(false);
+  // 邮件全链路 Phase 1:邮件全文存本机 IndexedDB(不上云),阅读原文按 emailId 取。
+  const [emailFullBody, setEmailFullBody] = useState('');
   // 用户需求:在记忆详情里补传本地照片进这条记忆
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [addingPhoto, setAddingPhoto] = useState(false);
@@ -685,6 +692,17 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
     window.addEventListener('nesio-view-image', onView);
     return () => window.removeEventListener('nesio-view-image', onView);
   }, []);
+  // 邮件全链路 Phase 1:邮件节点按 emailId 从本机 IndexedDB 取全文,供「阅读原文」。
+  useEffect(() => {
+    setEmailFullBody('');
+    const eid = node?.source === 'email' && typeof node.attributes?.emailId === 'string' ? node.attributes.emailId : '';
+    if (!eid) return;
+    let cancelled = false;
+    void import('@/lib/portal/local-email-body').then(({ getEmailBody }) =>
+      getEmailBody(eid).then((body) => { if (!cancelled && body) setEmailFullBody(body); }),
+    ).catch(() => {});
+    return () => { cancelled = true; };
+  }, [node]);
 
   function field(k: keyof EditFields) {
     return fields[k];
@@ -854,8 +872,10 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   // 批次 27:阅读入口不再只认 article —— 老邮件节点没存 article,退到 summary/snippet/正文,
   // 只要有一段够长的正文(>40 字)就给「阅读」按钮,进瀑布流阅读器。
   const readableAttrs = n.attributes as Record<string, unknown>;
-  const readableText = [readableAttrs.article, readableAttrs.summary, readableAttrs.snippet, readableAttrs.body, n.rawInput]
-    .find((v): v is string => typeof v === 'string' && v.trim().length > 40);
+  // 邮件全文优先(本机 IndexedDB,Phase 1);没有再退到节点里存的短预览/摘要。
+  const readableText = (emailFullBody && emailFullBody.trim().length > 40 ? emailFullBody : undefined)
+    ?? [readableAttrs.article, readableAttrs.summary, readableAttrs.snippet, readableAttrs.body, n.rawInput]
+      .find((v): v is string => typeof v === 'string' && v.trim().length > 40);
 
   // 批次 36:邮件节点 → 可在 Nesio 内直接回复。识别:source=email 且带发件人。
   const emailFrom = typeof readableAttrs.from === 'string' ? readableAttrs.from : '';
