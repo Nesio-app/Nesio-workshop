@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import NesioMark from './NesioMark';
 
@@ -18,6 +19,8 @@ import { buildMemoryContext, fmtEventDate, extractCitations } from '@/lib/portal
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { smartSearch } from '@/lib/portal/smart-search';
+import { searchPhotos, warmClip } from '@/lib/portal/semantic-search/clip-search';
+import { getLocalImage } from '@/lib/portal/local-image-store';
 import { parseTemporalQuery, isInSpan } from '@/lib/portal/temporal-query';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import { refreshLocation } from '@/lib/portal/location-store';
@@ -104,6 +107,8 @@ interface UiMessage {
   /** 🔴#2:这条回答时语义检索降级了(缺 AI 配置,只用了关键词匹配)。 */
   semanticDegraded?: boolean;
   semanticReason?: string; // 未生效的具体原因(no_key/rate_limited/provider/network/auth)
+  /** 端上 CLIP 照片语义搜索命中(非阻塞:文本答案先出,模型就绪后补进来)。 */
+  photos?: Array<{ id: string; thumb: string; score: number }>;
 }
 
 
@@ -466,6 +471,29 @@ export default function NesioChatSheet({
   // 批次 77:问卷选择(消息 id → 题号 → 选中项)
   const [quizPicks, setQuizPicks] = useState<Record<string, Record<number, string>>>({});
   const [detailNode, setDetailNode] = useState<LifeNode | null>(null);
+  const [lightbox, setLightbox] = useState<string | null>(null); // 照片放大(端上 CLIP 命中)
+
+  // 点缩略图 → 取本机大图放大(取不到就用缩略图兜底)
+  const openPhoto = useCallback(async (assetId: string, fallbackThumb: string) => {
+    const full = await getLocalImage(assetId);
+    setLightbox(full || fallbackThumb);
+  }, []);
+
+  // 非阻塞地给一条「找东西」答复补上端上 CLIP 照片命中:文本答案已先出,这里模型就绪后回填。
+  // 全程端上、失败静默(照片是加成,不该影响文本答案)。低于阈值的弱匹配不展示,免得答非所问。
+  const augmentWithPhotos = useCallback(async (msgId: string, query: string) => {
+    try {
+      warmClip(); // 触发模型加载 + 后台增量索引宝盒相册(幂等)
+      const hits = (await searchPhotos(query, 4)).filter((h) => h.score >= 0.2);
+      if (!hits.length) return;
+      const photos = hits.map((h) => ({ id: h.id, thumb: h.thumb, score: h.score }));
+      setMessages((prev) => {
+        const next = prev.map((m) => (m.id === msgId ? { ...m, photos } : m));
+        saveHistory(next);
+        return next;
+      });
+    } catch { /* 照片是加成,失败静默 */ }
+  }, []);
   const [replyNode, setReplyNode] = useState<LifeNode | null>(null); // 批次 38:引用卡直接回复邮件
   const [showHistory, setShowHistory] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
@@ -610,6 +638,9 @@ Edit location/value anytime in Storage.`),
       setMessages((prev) => { const next = [...prev, aiMsg]; saveHistory(next); return next; });
       setSending(false);
       sendingRef.current = false;
+      // 「找东西」类问句 → 非阻塞补端上照片命中(文本答案已出,照片模型就绪后回填)。
+      // 只在 find 意图触发,避免闲聊也加载 150MB 模型。
+      if (INVENTORY_QUESTION_RE.test(text)) void augmentWithPhotos(aiMsg.id, text.trim());
       return;
     }
 
@@ -671,6 +702,8 @@ Edit location/value anytime in Storage.`),
       };
       // 函数式追加 + 用最终列表存档,别用可能已过期的 nextMsgs 快照覆盖并发消息。
       setMessages((prev) => { const next = [...prev, aiMsg]; saveHistory(next); return next; });
+      // 找东西类问句 → 非阻塞补端上照片命中(云端/端上两路都补,照片检索与文本答复无关)。
+      if (INVENTORY_QUESTION_RE.test(text)) void augmentWithPhotos(aiMsg.id, text.trim());
     } catch (err) {
       clearTimeout(timeout);
       const isTimeout = err instanceof Error && err.name === 'AbortError';
@@ -950,6 +983,16 @@ Edit location/value anytime in Storage.`),
       {/* 关联记忆闪现 */}
       <MemoryFlashBanner nodes={flashNodes} onDismiss={dismissFlash} />
 
+      {/* 照片放大(端上 CLIP 命中);复用 imgzoom 样式,不加 role=dialog 以守 NesioSheet 原语契约 */}
+      {lightbox && createPortal(
+        <div className="nesio-imgzoom-overlay">
+          <button type="button" className="nesio-imgzoom-backdrop" onClick={() => setLightbox(null)} aria-label={L(dict, '关闭', 'Close')} />
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img className="nesio-imgzoom-img" src={lightbox} alt="" onClick={() => setLightbox(null)} />
+        </div>,
+        document.body,
+      )}
+
       {/* 批次 38:从引用卡直接回复邮件(AI 帮我写 + 发送都在里面) */}
       {replyNode && (
         <EmailComposeSheet
@@ -1071,6 +1114,22 @@ Edit location/value anytime in Storage.`),
                   onContextMenu={(e) => { e.preventDefault(); if (!isUser) setMenuMsg(msg); }}
                 >
                   <p className="nesio-wechat-bubble-text">{msg.text}</p>
+                  {msg.photos && msg.photos.length > 0 && (
+                    <div className="nesio-chat-photo-hits" role="group" aria-label={L(dict, '相关照片', 'Related photos')}>
+                      {msg.photos.map((p) => (
+                        <button
+                          key={p.id}
+                          type="button"
+                          className="nesio-chat-photo-thumb"
+                          onClick={() => openPhoto(p.id, p.thumb)}
+                          aria-label={L(dict, '放大照片', 'Enlarge photo')}
+                        >
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={p.thumb} alt="" draggable={false} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
                   {msg.savedToMemory && <p className="nesio-wechat-saved-badge">✓ {L(dict, '已存入记忆', 'Saved to Memory')}</p>}
                 </div>
                 {/* 批次 140·设计念念节:气泡模式徽章 —— 按这条答复的真实来路诚实标(不追溯旧消息) */}

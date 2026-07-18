@@ -14,7 +14,7 @@
  *   clipStatus()               当前状态(供 UI 提示)
  */
 import { type TokenizerData } from './clip-bpe';
-import { getModel, putModel, getAllIndex, putIndexEntry, type IndexEntry } from './ml-store';
+import { getModel, putModel, getAllIndex, putIndexEntry, listBaoheImages, type IndexEntry } from './ml-store';
 
 export interface PhotoHit extends IndexEntry {
   score: number;
@@ -165,4 +165,51 @@ export async function indexPhoto(entry: {
 /** 该照片是否已索引(增量索引跳过用)。 */
 export async function isPhotoIndexed(id: string): Promise<boolean> {
   return (await getAllIndex()).some((e) => e.id === id);
+}
+
+/** 缩略图:把 bitmap 缩到最长边 maxDim 的 JPEG dataURL(索引里存这个,省 IDB)。 */
+function thumbFromBitmap(bitmap: ImageBitmap, maxDim = 200): string {
+  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
+  const c = document.createElement('canvas');
+  c.width = Math.max(1, Math.round(bitmap.width * scale));
+  c.height = Math.max(1, Math.round(bitmap.height * scale));
+  const ctx = c.getContext('2d');
+  if (!ctx) return '';
+  ctx.drawImage(bitmap, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', 0.7);
+}
+
+let indexing = false;
+/**
+ * 增量索引宝盒相册:只算还没索引的照片,可反复调(自带并发锁,已在跑就直接返回)。
+ * 返回本轮新索引的张数。全程端上,图与向量不出设备。
+ */
+export async function indexBaohePhotos(onProgress?: (done: number, total: number) => void): Promise<number> {
+  if (indexing) return 0;
+  if (!(await ensureClipReady())) return 0;
+  indexing = true;
+  try {
+    const imgs = await listBaoheImages();
+    const existing = new Set((await getAllIndex()).map((e) => e.id));
+    const todo = imgs.filter((x) => !existing.has(x.id));
+    let done = 0;
+    for (const x of todo) {
+      try {
+        const blob = await fetch(x.dataUrl).then((r) => r.blob());
+        const bitmap = await createImageBitmap(blob);
+        const thumb = thumbFromBitmap(bitmap); // 先出缩略图(下一步 bitmap 会被转移进 worker)
+        const ok = await indexPhoto({ id: x.id, label: x.id, thumb, bitmap, source: 'baohe' });
+        if (ok) done += 1;
+      } catch { /* 单张失败跳过,不打断整轮 */ }
+      onProgress?.(done, todo.length);
+    }
+    return done;
+  } finally {
+    indexing = false;
+  }
+}
+
+/** 后台预热:加载模型 + 增量索引宝盒相册(fire-and-forget,失败静默)。问念念打开时调。 */
+export function warmClip(): void {
+  void ensureClipReady().then((ok) => { if (ok) void indexBaohePhotos(); });
 }

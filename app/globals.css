@@ -10567,6 +10567,31 @@ html[data-portal-theme="night"] .nesio-wechat-bubble--ai {
 }
 .nesio-wechat-bubble--user .nesio-wechat-bubble-text { color: #fff; }
 
+/* 端上 CLIP 照片命中:答复气泡里的缩略图行(点开放大) */
+.nesio-chat-photo-hits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.nesio-chat-photo-thumb {
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--portal-accent-soft);
+  cursor: zoom-in;
+  flex: 0 0 auto;
+}
+.nesio-chat-photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
 /* Thinking dots */
 .nesio-wechat-bubble--thinking {
   display: flex;
