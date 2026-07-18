@@ -241,11 +241,34 @@ export function recentSpendItems(now = Date.now(), limit = 6): Array<{ date: str
  * 把一句自我批判 / 全有全无的念头,拆成:保护者的积极意图 → 清醒自我温柔接管 → 整合洞察
  * → 一件此刻能做的躯体微动作。复用 inner-space 那套 C-PTSD prompt。只在重情绪下探时用。
  */
+// ── ANT(自动负性思维)实时扫描:本地词表 → 认知扭曲名,不靠 AI,即时给反馈 ──
+const ANT_WORDS: { w: string; kind: string }[] = [
+  { w: '必须', kind: '应该式' }, { w: '应该', kind: '应该式' }, { w: '一定要', kind: '应该式' }, { w: '本该', kind: '应该式' },
+  { w: '全搞砸', kind: '非黑即白' }, { w: '什么都', kind: '非黑即白' }, { w: '全毁', kind: '非黑即白' }, { w: '绝对', kind: '非黑即白' }, { w: '不可能', kind: '非黑即白' },
+  { w: '永远', kind: '以偏概全' }, { w: '从来', kind: '以偏概全' }, { w: '总是', kind: '以偏概全' }, { w: '每次', kind: '以偏概全' }, { w: '怎么又', kind: '以偏概全' },
+  { w: '太失败', kind: '贴标签自责' }, { w: '废物', kind: '贴标签自责' }, { w: '没用', kind: '贴标签自责' }, { w: '不行', kind: '贴标签自责' }, { w: '失败者', kind: '贴标签自责' }, { w: '都是我', kind: '贴标签自责' }, { w: '都怪我', kind: '贴标签自责' },
+  { w: '完了', kind: '灾难化' }, { w: '糟透', kind: '灾难化' }, { w: '毁了', kind: '灾难化' },
+];
+/** 扫出对方原话里的负性思维词 + 归一到一个认知扭曲名(命中最多的那类)。空则返回 null。 */
+export function scanAnts(text: string): { words: string[]; label: string } | null {
+  const hits = ANT_WORDS.filter((a) => text.includes(a.w));
+  if (!hits.length) return null;
+  const words = [...new Set(hits.map((h) => h.w))];
+  const counts: Record<string, number> = {};
+  for (const h of hits) counts[h.kind] = (counts[h.kind] || 0) + 1;
+  const label = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+  return { words, label };
+}
+
 export interface IFSResult { protector: string; self: string; insight: string; action: string }
-export async function applyIFS(sourceText: string, locale: string): Promise<IFSResult | null> {
+/** focus:对方自己感觉「这个声音在怕什么」(如 被抛弃 / 失控),用来让回应贴着 ta 的恐惧,而非通用模板。 */
+export async function applyIFS(sourceText: string, locale: string, focus?: string): Promise<IFSResult | null> {
+  const focusLine = focus && focus.trim()
+    ? `对方自己感觉,这个声音最怕的是「${focus.trim()}」—— 请让 protector / self / insight 都紧贴这份恐惧来说,别泛泛而谈。\n`
+    : '';
   const t = await chatText(
     `你是 C-PTSD 疗愈助手。规则:不评判、不说教、禁鸡汤;用 IFS(内在家庭系统)框架,先接住再温和整合。` +
-    `对方的内在独白是:"""${sourceText}"""。\n分四部分,温柔、口语、别用"您":\n` +
+    `对方的内在独白是:"""${sourceText}"""。\n${focusLine}分四部分,温柔、口语、别用"您":\n` +
     `- protector:以「保护者」的口吻,说清它用完美主义 / 苛责 / 焦虑在保护对方什么(它极其渴望什么、害怕什么),并谢谢它过去一直在拼命保护;\n` +
     `- self:以「清醒自我」的口吻温柔接管 —— 现在已经安全了,有足够的理智和力量去建立边界,让这个保护者可以歇一歇;\n` +
     `- insight:一句更整合的看见(这句话背后是一个怕你不安全的部分;你的价值,不靠它挣来);\n` +

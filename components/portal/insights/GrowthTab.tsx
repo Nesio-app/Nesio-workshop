@@ -293,7 +293,7 @@ function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip, onGoHe
             <button type="button" className="ng-btn ghost" onClick={onSkip}>{o.mode === 'nudge' ? L(dict, '先不了', 'Not now') : L(dict, '知道了', 'Got it')}</button>
           </div>
           {o.mode === 'nudge' && (
-            <button type="button" className="ng-healing-link" onClick={onGoHealing}>
+            <button type="button" className="ng-healing-btn" onClick={onGoHealing}>
               {L(dict, '这条有点重 —— 去疗愈馆和它待一会儿', 'This one sits heavy — sit with it in the Healing room')}
               <span aria-hidden> ›</span>
             </button>
