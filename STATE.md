@@ -116,9 +116,11 @@ sensitivity/retention 枚举化(中期)。
   **批③已迁**:MemoryNodeDetail(决策=统一丢 expand-to-full;image-viewer/EmailCompose createPortal
   到 body + z-950 + pointer-events:auto 绕 Vaul body 锁)。**批④已迁(收尾)**:DailyBrief/TodayFeed
   洞察 sheet + MirrorLetterTab 往期抽屉 portal 修复。**叠放组清空。批⑤**:Settings 已迁(共享 SheetWrap
-  一迁全迁);Mood **改判豁免**(情绪轮 touch-drag canvas 与 Vaul 手势冲突,同 Camera)。**剩余**——② 带嵌套——EmailCompose/
-  Mood;③ 嵌套子 sheet——EmailCompose/RelationshipDetail;④ 特殊结构——Voice(双 backdrop);
-  ⑤ 豁免——Camera/Barcode(实时相机)。清单即 ALLOWLIST,以测试为准。两仓(nesio + workshop)同步。
+  一迁全迁);Mood **改判豁免**(情绪轮 touch-drag canvas 与 Vaul 手势冲突,同 Camera)。**批⑥(收尾)已迁**:
+  RelationshipDetail/EmailCompose/VoiceInput/Freeze/Inventory——嵌套 modal(HangNote/DateTimePicker/
+  BarcodeScan)createPortal 到 body + pointer-events:auto;撤 MND 给 EmailCompose 加的 z-950 wrapper。
+  **sheet 迁移主体完成。豁免**:Camera/Barcode/Mood(手势面)。剩余仅小件(VoiceInput 内 DateTimePicker,
+  已 portal 兜住)/非 sheet(引导/装机/聊天/lab 实验面板)。清单即 ALLOWLIST。两仓(nesio + workshop)同步。
 
 - ~~restore-from-cloud~~ **已做**(2026-07-07):见上「进行中的迁移 ③」——推 + 拉都通了,云备份**往返闭环**
   (注:是「往返打通」,**非端到端加密 E2E**;云端为应用层明文 + service-role,别用「端到端」措辞误导。数据审计 §4)。
