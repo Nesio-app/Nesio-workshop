@@ -41,7 +41,8 @@ function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): nu
 }
 
 // lat/lon 可缺省 —— 没坐标的带图记忆也纳入,按 city/country 地名回退匹配。
-export interface GeoImageNode { assetId: string; lat?: number; lon?: number; ts: number; city?: string; country?: string }
+// storagePath:云端图兜底用(本机 IDB 取不到时,用它换签名 URL,否则云端图永远显示不出)。
+export interface GeoImageNode { assetId: string; lat?: number; lon?: number; ts: number; city?: string; country?: string; storagePath?: string }
 
 /** 卡片的地点描述(城市卡传 city,国家卡传 country)—— 坐标匹配不到时按名回退。 */
 export interface PlaceDescriptor { city?: string; country?: string }

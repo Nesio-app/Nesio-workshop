@@ -22,6 +22,7 @@ import { IconHome, IconUtensils, IconCard, IconActivity, IconBriefcase, IconPlan
 import dynamic from 'next/dynamic';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import { getLocalImage } from '@/lib/portal/local-image-store';
+import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { createPortal } from 'react-dom';
 const MemoryMapSheet = dynamic(() => import('./MemoryMapSheet'), { ssr: false });
 const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
@@ -172,7 +173,16 @@ function PlacePhoto({ placeKey, coords, imageNodes, place, gradClass, className,
     const resolve = () => {
       const id = placePhotoOverrideId(placeKey) || matchPlacePhotoAsset(coords, imageNodes, place);
       if (!id) { if (alive) setUrl(null); return; }
-      getLocalImage(id).then((u) => { if (alive) setUrl(u); }).catch(() => { if (alive) setUrl(null); });
+      getLocalImage(id).then((u) => {
+        if (!alive) return;
+        if (u) { setUrl(u); return; }
+        // 本机 IDB 没有(云端图 / 本地已清)→ 用 storagePath 换签名 URL 兜底,否则永远空
+        const cloud = imageNodes.find((n) => n.assetId === id)?.storagePath;
+        if (!cloud) { setUrl(null); return; }
+        createAppApiClient().fetchCloudAssetReadUrl({ storagePath: cloud })
+          .then((r) => { if (alive) setUrl(r.ok && r.signedUrl ? r.signedUrl : null); })
+          .catch(() => { if (alive) setUrl(null); });
+      }).catch(() => { if (alive) setUrl(null); });
     };
     resolve();
     window.addEventListener(PLACE_PHOTOS_EVENT, resolve);
@@ -301,7 +311,7 @@ export default function TimelineTab() {
   const imageNodes = useMemo<GeoImageNode[]>(() => {
     const geo = loadPlaceGeo();
     return getLifeGraph()
-      .map((n) => ({ n, asset: (n.assets || []).find((a) => a.kind === 'image') }))
+      .map((n) => ({ n, asset: (n.assets || []).find((a) => a.kind === 'image' || a.mimeType?.startsWith('image/')) }))
       .filter((x) => Boolean(x.asset))
       .map((x) => {
         const a = x.n.attributes || {};
@@ -314,6 +324,7 @@ export default function TimelineTab() {
           ts: new Date(x.n.createdAt).getTime(),
           city: g?.city || (typeof a.city === 'string' ? a.city : undefined),
           country: g?.country || (typeof a.country === 'string' ? a.country : undefined),
+          storagePath: x.asset!.storagePath,
         };
       });
   }, []);
@@ -324,7 +335,9 @@ export default function TimelineTab() {
     for (const v of trail) {
       if (typeof v.lat !== 'number' || typeof v.lon !== 'number') continue;
       const g = geo[v.label];
-      if (g?.country) { const a = byCountry.get(g.country) || []; a.push({ lat: v.lat, lon: v.lon }); byCountry.set(g.country, a); }
+      // 国家坐标按归一化键聚 —— 世界卡已按 countryKey 合并「美国/US」,坐标也要合并,
+      // 否则合并后的卡只拿到一个变体的到访点,另一变体附近的照片配不上(封面照空)。
+      if (g?.country) { const k = canonicalCountryKey(g.country); const a = byCountry.get(k) || []; a.push({ lat: v.lat, lon: v.lon }); byCountry.set(k, a); }
       if (g?.city) { const a = byCity.get(g.city) || []; a.push({ lat: v.lat, lon: v.lon }); byCity.set(g.city, a); }
     }
     return { byCountry, byCity };
@@ -875,7 +888,7 @@ export default function TimelineTab() {
               const name = countryDisplayName(g.countryKey, dict, g.country);
               return (
                 <div key={g.countryKey} className="nesio-tl-ccard">
-                  <PlacePhoto placeKey={`country:${g.countryKey}`} coords={placeCoords.byCountry.get(g.country) || []} imageNodes={imageNodes} place={{ country: g.countryKey }} gradClass={`nesio-tl-cc-g${gradIdx(g.countryKey)}`} className="nesio-tl-ccard-img" dict={dict} />
+                  <PlacePhoto placeKey={`country:${g.countryKey}`} coords={placeCoords.byCountry.get(g.countryKey) || []} imageNodes={imageNodes} place={{ country: g.countryKey }} gradClass={`nesio-tl-cc-g${gradIdx(g.countryKey)}`} className="nesio-tl-ccard-img" dict={dict} />
                   <button type="button" className="nesio-tl-ccard-nav" onClick={() => setWorldCountry(g.countryKey)}>
                     <span className="nesio-tl-ccard-body">
                       <span className="nesio-tl-ccard-name">{name}<small>{L(dict, `${g.cities.length} 城`, `${g.cities.length} cities`)}</small></span>
