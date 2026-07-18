@@ -13,6 +13,7 @@
 import { getLifeGraph, type LifeNode } from './life-graph';
 import { extractContext, nodeDomain, readNodeContext, type FrontDomain } from '@/lib/life-domain';
 import { parseTemporalQuery, isInSpan } from './temporal-query';
+import { emailFulltextScore } from './email-fulltext-index';
 
 export interface SearchUnderstood {
   people: string[];
@@ -177,6 +178,14 @@ export function smartSearch(query: string, domainFilter: FrontDomain | null = nu
       for (const token of tokens) {
         if (node.name.toLowerCase().includes(token)) score += 3;
         if (text.includes(token)) score += 1;
+      }
+
+      // ── 里程碑 B:邮件全文命中(本机索引,零云)────────────────────────
+      // 节点 attributes 只有 ≤1500 的 article 预览;预览之外的正文靠这里的本机全文索引
+      // 补分,让「内容在正文里但预览没命中」的邮件也能被搜到。索引未就绪则后台惰性水合。
+      if (node.source === 'email') {
+        const eid = typeof node.attributes.emailId === 'string' ? node.attributes.emailId : '';
+        if (eid) score += emailFulltextScore(eid, tokens, ql);
       }
 
       return { node, score };
