@@ -13,7 +13,7 @@ import { usePortalLocale } from './use-portal-locale';
 import { rememberAI, recallAI, sig } from '@/lib/portal/ai-cache';
 import { draftLocally } from '@/lib/portal/local-draft';
 import { canUse } from '@/lib/portal/entitlement';
-import { useSheetDrag } from './use-sheet-drag';
+import NesioSheet from './ui/NesioSheet';
 
 export interface EmailComposeContext {
   emailId?: string;
@@ -78,8 +78,6 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
     setError('');
     setDraftSource(null);
   }, [open, context.from, context.subject]);
-
-  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   if (!open) return null;
 
@@ -187,10 +185,15 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
   const label = { fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' } as const;
 
   return (
-    <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '写邮件', 'Compose email')} style={{ zIndex: 60 }}>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={{ ...cardStyle, display: 'flex', flexDirection: 'column', maxHeight: '88vh' }}>
-        <div className="nesio-sheet-handle" {...handleProps} />
+    <NesioSheet
+      variant="bottom"
+      open={open}
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-settings-sheet-card"
+      style={{ display: 'flex', flexDirection: 'column', maxHeight: '88vh' }}
+      ariaLabel={L(dict, '写邮件', 'Compose email')}
+    >
         <div className="nesio-settings-sheet-header">
           <h2 className="nesio-settings-sheet-title">{L(dict, '回复邮件', 'Reply')}</h2>
         </div>
@@ -299,7 +302,6 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
             </p>
           </div>
         )}
-      </div>
-    </div>
+    </NesioSheet>
   );
 }

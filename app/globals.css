@@ -11586,6 +11586,7 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   position: fixed;
   inset: 0;
   z-index: 1200;
+  pointer-events: auto; /* portal 到 body 后绕开 Vaul 的 body pointer-events:none */
   display: flex;
   align-items: flex-end;
 }
@@ -13689,7 +13690,7 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 .nesio-tl-geo-msg { font-size: 0.72rem; color: var(--portal-accent); }
 
 /* 批次 23:全屏看图 */
-.nesio-image-viewer { position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem; }
+.nesio-image-viewer { position: fixed; inset: 0; z-index: 950; pointer-events: auto; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem; }
 .nesio-image-viewer-img { max-width: 100%; max-height: 78vh; object-fit: contain; border-radius: 8px; }
 .nesio-image-viewer-actions { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
 .nesio-image-viewer-close { background: none; border: none; color: rgba(255,255,255,0.7); font-size: 0.8rem; cursor: pointer; text-decoration: underline; }
@@ -17952,6 +17953,25 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   .nesio-sheet { border: 2px solid var(--portal-ink); }
 }
 
+/* 记忆详情底部动作按钮:统一几何(高度/圆角/字号/触控目标),各自保留颜色身份
+   (阅读=主强调实心 / 编辑·取消=中性描边 / 删除=风险)。真机反馈「按钮大小形状不统一」。
+   放文件末尾,确保 source-order 覆盖各按钮基类的 padding/radius/font/height。 */
+.nesio-nd-action-btn {
+  flex: 1;
+  width: auto;
+  height: 46px;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 0 1rem;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 0.88rem;
+  font-weight: var(--weight-semibold, 600);
+  margin-top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
 /* ══════════════════════════════════════════════════════════════════════════
    成长引擎 v2(artifact 1170dd28 / 59587b8d / d7bd8990)—— 走 portal 主题 token
    字体/动效统一:--ng-ease 贯穿三页;颜色全部映射到 --portal-* / --status-*。

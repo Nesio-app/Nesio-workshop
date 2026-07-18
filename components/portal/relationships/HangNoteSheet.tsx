@@ -21,7 +21,7 @@ import { IconMic, IconCamera, IconLock } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { useSheetDrag } from '../use-sheet-drag';
+import NesioSheet from '../ui/NesioSheet';
 import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 
 type Extracted = { category: PersonRecordCategory; title: string; detail?: string; date?: string; amount?: number };
@@ -46,7 +46,6 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
   );
   const [saved, setSaved] = useState(false);
   const photoRef = useRef<HTMLInputElement>(null);
-  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   const doExtract = async (payload: { text?: string; image?: string }) => {
     if (!guardPaidCloudAi('person_extract')) return; // 安全审计 #2:AI 抽取付费云,免费→升级引导
@@ -102,10 +101,14 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
   const anySensitive = pending?.some((r) => RECORD_CATEGORY_MAP[r.category].sensitive) || (manual && RECORD_CATEGORY_MAP[form.category].sensitive);
 
   return (
-    <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={L(dict, `挂在 ${personName} 身上`, `Attach to ${personName}`)}>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className={`nesio-settings-sheet-card nesio-hang-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
-        <div className="nesio-sheet-handle" {...handleProps} />
+    <NesioSheet
+      variant="bottom"
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-settings-sheet-card nesio-hang-card"
+      ariaLabel={L(dict, `挂在 ${personName} 身上`, `Attach to ${personName}`)}
+    >
 
         {/* 头:挂在 TA 身上 */}
         <div className="nesio-hang-head">
@@ -210,7 +213,6 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
             <button type="button" className="nesio-hang-redo" onClick={() => setManual(true)}>{L(dict, '想自己填? 手动填 ›', 'Prefer to type it? Fill in manually ›')}</button>
           </div>
         )}
-      </div>
-    </div>
+    </NesioSheet>
   );
 }

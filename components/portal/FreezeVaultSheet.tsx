@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import {
   addToFreeze,
@@ -20,7 +21,7 @@ import { IconSnowflake } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
-import { useSheetDrag } from './use-sheet-drag';
+import NesioSheet from './ui/NesioSheet';
 
 interface FreezeVaultSheetProps {
   open: boolean;
@@ -52,7 +53,6 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [scanOpen, setScanOpen] = useState(false);
-  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   useEffect(() => {
     if (!open) return;
@@ -165,9 +165,15 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
   const resolved = items.filter((i) => i.decision !== 'pending');
 
   return (
-    <div className="nesio-freeze-overlay" onClick={onClose}>
-      <div className={`nesio-freeze-sheet${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle} onClick={(e) => e.stopPropagation()}>
-        <div className="nesio-sheet-grip" {...handleProps} />
+    <>
+      <NesioSheet
+        variant="bottom"
+        open={open}
+        onOpenChange={(next) => { if (!next) onClose(); }}
+        card={false}
+        className="nesio-freeze-sheet"
+        ariaLabel={L(dict, '冷冻仓', 'Freeze Vault')}
+      >
         <div className="nesio-freeze-header">
           <span className="nesio-freeze-title" style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}><IconSnowflake size={16} /> {L(dict, '冷冻仓', 'Freeze Vault')}</span>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -308,9 +314,16 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
             )}
           </div>
         )}
-      </div>
-      {scanOpen && <BarcodeScanSheet open={scanOpen} onClose={() => setScanOpen(false)} onResult={handleScanResult} />}
-    </div>
+      </NesioSheet>
+      {/* 扫码是相机全屏面板(position:fixed)。冷冻仓已是 Vaul(transform),内联会被困住;
+          portal 到 body + z-1150(压过 Vaul 卡 901)+ pointer-events:auto(绕 Vaul body 锁)。 */}
+      {scanOpen && typeof document !== 'undefined' && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 1150, pointerEvents: 'auto' }}>
+          <BarcodeScanSheet open={scanOpen} onClose={() => setScanOpen(false)} onResult={handleScanResult} />
+        </div>,
+        document.body,
+      )}
+    </>
   );
 }
 

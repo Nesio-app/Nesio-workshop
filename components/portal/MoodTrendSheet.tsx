@@ -16,6 +16,7 @@ import { getLifeGraph } from '@/lib/portal/life-graph';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import NesioSheet from './ui/NesioSheet';
 
 const EMO: Record<string, string> = {
   joy: '开心', excited: '兴奋', moved: '感动', calm: '平静', content: '满足', grateful: '感激',
@@ -90,9 +91,14 @@ export default function MoodTrendSheet({ open, onClose }: { open: boolean; onClo
   const warmWord = warmer > 4 ? L(dict, '回暖了', 'warmed up') : warmer < -4 ? L(dict, '低了些', 'dipped a bit') : L(dict, '大体平稳', 'stayed steady');
 
   return (
-    <div className="nesio-mood-overlay" role="dialog" aria-modal aria-label={L(dict, '情绪趋势', 'Mood trend')}>
-      <div className="nesio-mood-backdrop" onClick={onClose} />
-      <div className="nesio-mood-card nesio-trend-card">
+    <NesioSheet
+      variant="bottom"
+      open={open}
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-mood-card nesio-trend-card"
+      ariaLabel={L(dict, '情绪趋势', 'Mood trend')}
+    >
         <div className="nesio-trend-header">
           <button type="button" className="nesio-wechat-back-btn" onClick={onClose} aria-label={L(dict, '返回', 'Back')}>‹</button>
           <span className="nesio-trend-title">{L(dict, '情绪趋势', 'Mood trend')}</span>
@@ -161,7 +167,6 @@ export default function MoodTrendSheet({ open, onClose }: { open: boolean; onClo
             )}
           </>
         )}
-      </div>
-    </div>
+    </NesioSheet>
   );
 }

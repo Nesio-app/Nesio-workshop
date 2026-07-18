@@ -1,6 +1,7 @@
 'use client';
 
 import { Component, useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { deleteLifeNode, getLifeGraph, searchLifeGraphFuzzy, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 import { displayStoredLocation } from '@/lib/portal/named-places';
 import type { LocationMeta } from './LocationPicker';
@@ -16,7 +17,7 @@ const ReaderSheetLazy = dynamicImport(() => import('./ArticleReaderSheet'), { ss
 const PlacePickerLazy = dynamicImport(() => import('./PlacePickerSheet'), { ssr: false });
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
-import { useSheetDrag } from './use-sheet-drag';
+import NesioSheet from './ui/NesioSheet';
 import MemoryLensSheet from './MemoryLensSheet';
 import { shouldNudge } from '@/lib/portal/lens';
 const TYPE_BG_DETAIL: Record<string, string> = {
@@ -716,8 +717,6 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
     return () => { cancelled = true; };
   }, [node?.id, node?.assets]);
 
-  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
-
   if (!node || deleted) return null;
   const n = node;
 
@@ -860,18 +859,19 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   };
 
   return (
-    <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={n.name}>
+    <>
       {readerOpen && readableText && (
         <ReaderSheetLazy title={n.name} article={readableText} meta={readerMeta} onClose={() => setReaderOpen(false)} />
       )}
-      {isEmailNode && (
+      {/* Reader 与 EmailCompose 都是 NesioSheet,自带 portal + 自管 pointer-events,直接渲染即可。 */}
+      {isEmailNode && composeOpen && (
         <EmailComposeSheet
           open={composeOpen}
           onClose={() => setComposeOpen(false)}
           context={{ emailId, from: emailFrom, subject: n.name, snippet: typeof readableAttrs.snippet === 'string' ? readableAttrs.snippet : undefined, article: readableText }}
         />
       )}
-      {viewImage && (
+      {viewImage && typeof document !== 'undefined' && createPortal(
         <div className="nesio-image-viewer" role="dialog" aria-modal="true" onClick={() => setViewImage(null)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={viewImage.url} alt={viewImage.name} className="nesio-image-viewer-img" />
@@ -890,11 +890,17 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
             </button>
             <button type="button" className="nesio-image-viewer-close" onClick={() => setViewImage(null)}>{L(dict, '关闭', 'Close')}</button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
-        <div className="nesio-sheet-handle" {...handleProps} />
+      <NesioSheet
+        variant="bottom"
+        open
+        onOpenChange={(next) => { if (!next) onClose(); }}
+        card={false}
+        className="nesio-settings-sheet-card"
+        ariaLabel={n.name}
+      >
 
         {/* Type color strip */}
         {/* 类型色条:tint 走 CSS 变量,夜间由 CSS 混暗 —— 直接 inline background 会让
@@ -1321,23 +1327,23 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
           <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.25rem' }}>
             {editing ? (
               <>
-                <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={saveEdit}>{L(dict, '保存', 'Save')}</button>
-                <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</button>
+                <button type="button" className="nesio-ob-primary-btn nesio-nd-action-btn" onClick={saveEdit}>{L(dict, '保存', 'Save')}</button>
+                <button type="button" className="nesio-today-btn nesio-today-btn--ghost nesio-nd-action-btn" onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</button>
               </>
             ) : (
               <>
                 {/* 批次 33:阅读入口顶部有(替换✕),底部也放回来一份 —— 用户反馈顶部那颗找不到 */}
                 {readableText && (
-                  <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
+                  <button type="button" className="nesio-ob-primary-btn nesio-nd-action-btn" onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
                 )}
                 {/* 批次 37:回复按钮移到顶部「阅读」旁,底部不再重复 */}
-                <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={startEdit}>{L(dict, '编辑', 'Edit')}</button>
-                <button type="button" className="nesio-settings-danger-btn" style={{ flex: 1, marginTop: 0 }} onClick={handleDelete}>{L(dict, '删除', 'Delete')}</button>
+                <button type="button" className="nesio-today-btn nesio-today-btn--ghost nesio-nd-action-btn" onClick={startEdit}>{L(dict, '编辑', 'Edit')}</button>
+                <button type="button" className="nesio-settings-danger-btn nesio-nd-action-btn" onClick={handleDelete}>{L(dict, '删除', 'Delete')}</button>
               </>
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </NesioSheet>
+    </>
   );
 }

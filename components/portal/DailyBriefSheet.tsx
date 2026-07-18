@@ -19,6 +19,7 @@ import { L } from '@/lib/portal/i18n';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { usePortalLocale } from './use-portal-locale';
 import { NodeTypeIcon } from './icons';
+import NesioSheet from './ui/NesioSheet';
 
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 
@@ -116,10 +117,15 @@ export function DailyBriefSheet({ open, onClose }: { open: boolean; onClose: () 
   const liveRefs = refs.map((r) => getLifeGraph().find((n) => n.id === r.id) || r);
 
   return (
-    <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '今日简报', "Today's brief")}>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-settings-sheet-card nesio-brief-card">
-        <div className="nesio-sheet-handle" aria-hidden />
+    <>
+      <NesioSheet
+        variant="bottom"
+        open
+        onOpenChange={(next) => { if (!next) onClose(); }}
+        card={false}
+        className="nesio-settings-sheet-card nesio-brief-card"
+        ariaLabel={L(dict, '今日简报', "Today's brief")}
+      >
         <div className="nesio-brief-head">
           <div>
             <p className="nesio-brief-greeting">{greetingFor(now.getHours(), dict, profile.displayName || '')}</p>
@@ -163,10 +169,10 @@ export function DailyBriefSheet({ open, onClose }: { open: boolean; onClose: () 
             </>
           )}
         </div>
-      </div>
+      </NesioSheet>
       {detailNode && (
         <MemoryNodeDetail node={detailNode} onClose={() => setDetailNode(null)} onOpenNode={(n) => setDetailNode(n)} />
       )}
-    </div>
+    </>
   );
 }

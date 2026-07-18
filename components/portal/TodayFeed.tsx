@@ -43,6 +43,8 @@ import { useTodayData } from './today/useTodayData';
 import { FocusModeSheet } from './today/FocusModeSheet';
 import { MeetingRecorderSheet } from './today/MeetingRecorderSheet';
 
+import NesioSheet from './ui/NesioSheet';
+
 // 1143-line analytics sheet — load on open, not at boot
 const InsightsSheet = dynamic(() => import('./InsightsSheet'), { ssr: false });
 const MoodTrendSheet = dynamic(() => import('./MoodTrendSheet'), { ssr: false });
@@ -355,13 +357,16 @@ export default function TodayFeed({
 
       {/* Insights mirror */}
       {mirrorOpen && (
-        <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(uiLocale, 'Nesio 的洞察', "Nesio's insights")}>
-          <button type="button" className="nesio-settings-sheet-backdrop" onClick={() => setMirrorOpen(false)} aria-label={L(uiLocale, '关闭', 'Close')} />
-          <div className="nesio-settings-sheet-card nesio-insights-sheet-card">
-            <div className="nesio-sheet-handle" aria-hidden />
-            <InsightsSheet onClose={() => setMirrorOpen(false)} canUsePrivateData={canUsePrivateData} initialTab={insightsTab} />
-          </div>
-        </div>
+        <NesioSheet
+          variant="bottom"
+          open
+          onOpenChange={(next) => { if (!next) setMirrorOpen(false); }}
+          card={false}
+          className="nesio-settings-sheet-card nesio-insights-sheet-card"
+          ariaLabel={L(uiLocale, 'Nesio 的洞察', "Nesio's insights")}
+        >
+          <InsightsSheet onClose={() => setMirrorOpen(false)} canUsePrivateData={canUsePrivateData} initialTab={insightsTab} />
+        </NesioSheet>
       )}
 
       {/* 批次 136:情绪趋势(心情第一拍「看趋势」进来) */}

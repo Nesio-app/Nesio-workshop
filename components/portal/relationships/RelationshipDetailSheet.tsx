@@ -24,7 +24,7 @@ import { IconLock } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { useSheetDrag } from '../use-sheet-drag';
+import NesioSheet from '../ui/NesioSheet';
 
 interface Props {
   contactKey: string | null;
@@ -71,7 +71,6 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   const [hangOpen, setHangOpen] = useState(false); // 「挂一条」独立确认卡弹窗
   const [relDraft, setRelDraft] = useState(''); // 图4:关系词编辑草稿
   const [mergeDraft, setMergeDraft] = useState(''); // 数据审计 #4:合并同一个人的另一个名字
-  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   const rebuild = () => {
     if (!contactKey) { setProfile(null); setRecords([]); return; }
@@ -154,10 +153,15 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   if (knownDays != null) stats.push({ label: L(dict, '认识', 'Known'), value: L(dict, `${knownDays} 天`, `${knownDays}d`) });
 
   return (
-    <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={p.displayName}>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
-        <div className="nesio-sheet-handle" {...handleProps} />
+    <>
+      <NesioSheet
+        variant="bottom"
+        open
+        onOpenChange={(next) => { if (!next) onClose(); }}
+        card={false}
+        className="nesio-settings-sheet-card"
+        ariaLabel={p.displayName}
+      >
 
         {/* 身份头 */}
         <div className="nesio-rel-detail-head">
@@ -325,7 +329,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
             {L(dict, '只存本机 · 从你的记忆、邮件、通讯录推出', 'On-device only · from your notes, email and contacts')}
           </p>
         </div>
-      </div>
+      </NesioSheet>
 
       {hangOpen && (
         <HangNoteSheet
@@ -336,6 +340,6 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
           onClose={() => setHangOpen(false)}
         />
       )}
-    </div>
+    </>
   );
 }
