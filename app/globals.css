@@ -8162,6 +8162,41 @@ html[data-portal-theme="night"] .nesio-node-source-name { color: #e8eefa; }
 }
 .nesio-node-action-primary:active,
 .nesio-node-action-secondary:active { transform: scale(0.98); }
+/* 补传本地照片进记忆 */
+.nesio-nd-photo-add { margin-bottom: 1rem; }
+.nesio-nd-photo-btn { width: 100%; min-height: 42px; }
+.nesio-nd-photo-btn:disabled { opacity: 0.6; cursor: default; }
+.nesio-nd-photo-err {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: var(--status-risk);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.nesio-nd-photo-retry {
+  border: 1px solid var(--status-risk);
+  color: var(--status-risk);
+  background: transparent;
+  border-radius: var(--radius-pill, 999px);
+  padding: 0.1rem 0.6rem;
+  font-size: 0.76rem;
+  font-weight: var(--weight-semibold, 600);
+  cursor: pointer;
+}
+.nesio-nd-added-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+.nesio-nd-added-thumb {
+  width: 3.2rem;
+  height: 3.2rem;
+  object-fit: cover;
+  border-radius: var(--radius-sm, 12px);
+  border: 1px solid var(--portal-line);
+}
 .nesio-node-action-primary {
   border: none;
   background: var(--portal-accent);
@@ -13640,6 +13675,9 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
   background: color-mix(in srgb, #fff 78%, transparent); border-radius: 0.4rem; padding: 0.12rem 0.5rem;
 }
 .nesio-tl-citycard-name { display: block; padding: 0.6rem 0.8rem 0.7rem; font-size: 0.9rem; font-weight: 800; color: var(--portal-ink); }
+/* 城市名做成可点按钮:点进去看该城市记忆列表 */
+.nesio-tl-citycard-name--btn { width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-family: inherit; }
+.nesio-tl-citycard-name--btn:active { opacity: 0.7; }
 .nesio-tl-catbar--home { background: #588ce3; }
 .nesio-tl-catbar--work { background: #7b5ea7; }
 .nesio-tl-catbar--shopping { background: #e8888f; }

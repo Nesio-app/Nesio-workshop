@@ -1,8 +1,8 @@
 'use client';
 
-import { Component, useEffect, useState, type ReactNode } from 'react';
+import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { deleteLifeNode, getLifeGraph, searchLifeGraphFuzzy, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
+import { deleteLifeNode, getLifeGraph, searchLifeGraphFuzzy, updateLifeNode, type LifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
 import { displayStoredLocation } from '@/lib/portal/named-places';
 import type { LocationMeta } from './LocationPicker';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
@@ -653,6 +653,11 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   const [readerOpen, setReaderOpen] = useState(false);
   // 批次 36:在 Nesio 内回复邮件
   const [composeOpen, setComposeOpen] = useState(false);
+  // 用户需求:在记忆详情里补传本地照片进这条记忆
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [addingPhoto, setAddingPhoto] = useState(false);
+  const [photoErr, setPhotoErr] = useState('');
+  const [addedThumbs, setAddedThumbs] = useState<string[]>([]);
   // 批次 57:有坐标没地名(反查当时没跑完/存量节点)→ 打开详情时自愈回填
   const [healedPlace, setHealedPlace] = useState('');
   const [placePickOpen, setPlacePickOpen] = useState(false); // 批次 63:记忆页也能改地址(与足迹同库)
@@ -796,6 +801,36 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
     });
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
     onClose();
+  }
+  // 补传本地照片进这条记忆:压缩存 IndexedDB → 追加 node.assets(本机,不上传)。
+  // 失败必须可见(设计红线:每个 async 动作要有显式失败态)。
+  async function addPhotos(files: FileList | null) {
+    const list = Array.from(files || []).filter((f) => f.type.startsWith('image/')).slice(0, 30);
+    if (!list.length) return;
+    setAddingPhoto(true);
+    setPhotoErr('');
+    try {
+      const { compressToDataUrl, putLocalImage } = await import('@/lib/portal/local-image-store');
+      const added: LifeNodeAsset[] = [];
+      const thumbs: string[] = [];
+      for (let i = 0; i < list.length; i++) {
+        const dataUrl = await compressToDataUrl(list[i], 1400, 0.82);
+        const id = `local-${n.id}-${Date.now()}-${i}`;
+        await putLocalImage(id, dataUrl);
+        added.push({ id, kind: 'image', local: true, mimeType: 'image/jpeg', createdAt: new Date().toISOString() });
+        thumbs.push(dataUrl);
+      }
+      const live = getLifeGraph().find((x) => x.id === n.id);
+      const nextAssets = [...(live?.assets || n.assets || []), ...added];
+      const ok = updateLifeNode(n.id, { assets: nextAssets });
+      if (!ok) throw new Error('updateLifeNode returned false');
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+      setAddedThumbs((p) => [...p, ...thumbs]);
+    } catch {
+      setPhotoErr(L(dict, '照片没加成功,请再试一次', 'Could not add the photos — try again'));
+    } finally {
+      setAddingPhoto(false);
+    }
   }
 
   // 标签三层 §3.3:「记录于 2026年7月9日」→ 相对时间(今天 12:34 / 昨天 / N 天前)
@@ -995,6 +1030,44 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
                 <button type="button" className="nesio-node-action-secondary" onClick={() => setComposeOpen(true)}>
                   {L(dict, '回复', 'Reply')}
                 </button>
+              )}
+            </div>
+          )}
+
+          {/* 用户需求:在记忆详情里补传本地照片进这条记忆(本机存,不上传) */}
+          {!editing && (
+            <div className="nesio-nd-photo-add">
+              <button
+                type="button"
+                className="nesio-node-action-secondary nesio-nd-photo-btn"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={addingPhoto}
+              >
+                {addingPhoto ? L(dict, '添加中…', 'Adding…') : L(dict, '＋ 添加照片', '＋ Add photos')}
+              </button>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => { const f = e.currentTarget.files; e.currentTarget.value = ''; void addPhotos(f); }}
+              />
+              {photoErr && (
+                <p className="nesio-nd-photo-err" role="alert">
+                  {photoErr}
+                  <button type="button" className="nesio-nd-photo-retry" onClick={() => photoInputRef.current?.click()}>
+                    {L(dict, '重试', 'Retry')}
+                  </button>
+                </p>
+              )}
+              {addedThumbs.length > 0 && (
+                <div className="nesio-nd-added-thumbs">
+                  {addedThumbs.map((u, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={i} src={u} alt="" className="nesio-nd-added-thumb" draggable={false} />
+                  ))}
+                </div>
               )}
             </div>
           )}

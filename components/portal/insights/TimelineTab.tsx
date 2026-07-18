@@ -329,6 +329,27 @@ export default function TimelineTab() {
     }
     return { byCountry, byCity };
   }, [trail]);
+  // 城市卡点进去看该城市的记忆:capturedPlace 经 geo 归属该城市,或坐标在该城市到访点 25km 内
+  const memsAtCity = (city: string): LifeNode[] => {
+    const geo = loadPlaceGeo();
+    const cityCoords = placeCoords.byCity.get(city) || [];
+    const seen = new Set<string>();
+    const out: LifeNode[] = [];
+    for (const nn of getLifeGraph()) {
+      const a = nn.attributes || {};
+      const label = typeof a.capturedPlace === 'string' ? a.capturedPlace : '';
+      let hit = Boolean(label && geo[label]?.city === city);
+      if (!hit && typeof a.capturedLat === 'number' && typeof a.capturedLon === 'number') {
+        for (const c of cityCoords) {
+          const dLat = (a.capturedLat - c.lat) * 111_320;
+          const dLon = (a.capturedLon - c.lon) * 111_320 * Math.cos((c.lat * Math.PI) / 180);
+          if (Math.hypot(dLat, dLon) < 25_000) { hit = true; break; }
+        }
+      }
+      if (hit && !seen.has(nn.id)) { seen.add(nn.id); out.push(nn); }
+    }
+    return out;
+  };
   const placeDistinct = useMemo(() => clusterPlaces(placePeriodTrail, 99999).length, [placePeriodTrail]);
   // 批次 67:世界 tab 亮点卡(参考「一生足迹」:最北/最南/最常去/最早,带度分坐标)
   const worldHighlights = useMemo(() => {
@@ -889,7 +910,7 @@ export default function TimelineTab() {
                     <PlacePhoto placeKey={`city:${c.city}`} coords={placeCoords.byCity.get(c.city) || []} imageNodes={imageNodes} place={{ city: c.city }} gradClass={`nesio-tl-cc-g${gradIdx(c.city)}`} className="nesio-tl-citycard-img" dict={dict}>
                       <span className="nesio-tl-citycard-tag">{L(dict, `${c.count} 个地点`, `${c.count} places`)}</span>
                     </PlacePhoto>
-                    <span className="nesio-tl-citycard-name">{c.city}</span>
+                    <button type="button" className="nesio-tl-citycard-name nesio-tl-citycard-name--btn" onClick={() => setVisitMems({ title: c.city, nodes: memsAtCity(c.city) })}>{c.city}</button>
                   </div>
                 ))}
               </div>
