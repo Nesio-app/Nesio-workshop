@@ -197,9 +197,31 @@ async function chatText(message: string, locale: string): Promise<string | null>
   } catch { return null; }
 }
 
-/** 情绪卡「和念念聊聊」:念念对这段情绪给一段真正陪你看清的话(引导,不是让你记)。 */
-export async function deepenNudge(sourceText: string, locale: string): Promise<string | null> {
-  return chatText(`你是念念,温柔、不评判、像认识很久的朋友。对方记下了这样的心情:"""${sourceText}"""。\n陪 ta 把这份情绪看清楚一点(不是分析 ta):三四句话 —— 先接住并正常化这份感受;再轻轻提一个换个角度看的可能(它也许没那么重,或它在提醒你什么);最后给一件此刻就能做的很小的事。中文,口语,别用"您",别说教,别列点。只输出这几句话。`, locale);
+/**
+ * 情绪卡「和念念聊聊」升级为引导链:念念先陪你看清(reflection),再带一道
+ * 「这份感受背后是哪种想法习惯」的小测(quiz,选项=图鉴里的思维利器,tool=命中的利器名)。
+ * 选错由 explanation 继续引导;答完记入维度 + 点亮图鉴。JSON 解析失败则只给 reflection。
+ */
+export interface NudgeGuide {
+  reflection: string;
+  quiz?: { question: string; options: string[]; correctIndex: number; explanation: string; tool: string };
+}
+export async function deepenNudge(sourceText: string, locale: string): Promise<NudgeGuide | null> {
+  const t = await chatText(
+    `你是念念,温柔、不评判、像认识很久的朋友。对方记下了这样的心情:"""${sourceText}"""。\n` +
+    `分两部分:\n① reflection:三四句话陪 ta 把这份情绪看清楚(先接住并正常化;再轻轻提一个换角度看的可能;最后一件此刻能做的很小的事)。口语,别用"您",别说教。\n` +
+    `② quiz:一道温和的小测 —— 这份感受背后,最可能是哪种「想法习惯」在放大它。从这些思维利器里选最贴切的一种(以偏概全/应该式思维/灾难化/贴标签/非黑即白/读心术/情绪化推理),给 4 个选项(1 个最贴切 + 3 个似是而非),打乱;correctIndex 是正确项下标;explanation 温柔点破(把「这一件具体的事」和「我这个人」分开,前者能修,后者是错觉);tool 填命中的那把利器名(如「以偏概全」)。\n` +
+    `只输出严格 JSON:{"reflection":"","quiz":{"question":"这份感受背后,最可能是哪种想法习惯在放大它?","options":["","","",""],"correctIndex":0,"explanation":"","tool":"以偏概全"}}`,
+    locale,
+  );
+  if (!t) return null;
+  const j = safeJson(t) as unknown as (NudgeGuide & { quiz?: Record<string, unknown> }) | null;
+  if (!j?.reflection) return { reflection: t };  // 非 JSON → 整段当疏导话
+  const q = j.quiz as { question?: string; options?: string[]; correctIndex?: number; explanation?: string; tool?: string } | undefined;
+  const quiz = (q?.question && Array.isArray(q.options) && q.options.length >= 2 && typeof q.correctIndex === 'number')
+    ? { question: String(q.question), options: q.options.slice(0, 4).map(String), correctIndex: Math.max(0, Math.min(3, q.correctIndex)), explanation: String(q.explanation || ''), tool: String(q.tool || '') }
+    : undefined;
+  return { reflection: String(j.reflection), quiz };
 }
 
 /** 趋势卡「看看明细」:近 7 天购物/快递明细(金额降序)。 */

@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { todayGrowthCards, recordGrowthAnswer, growthHistory, growthStreakDays, type GrowthCard, type GrowthAnswer } from '@/lib/portal/growth-guide';
-import { collectSeeds, generateObservation, DIMENSION_LABEL, summarizeDimensions, ringEmptyPct, deepenNudge, recentSpendItems, type Observation } from '@/lib/portal/growth-engine';
+import { collectSeeds, generateObservation, DIMENSION_LABEL, summarizeDimensions, ringEmptyPct, deepenNudge, recentSpendItems, type Observation, type NudgeGuide } from '@/lib/portal/growth-engine';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -36,6 +36,7 @@ export default function GrowthTab() {
   const [obsLoading, setObsLoading] = useState(true);
   const [idx, setIdx] = useState(0);          // 今天一次一件的游标
   const [freshAt, setFreshAt] = useState<string | null>(null); // 刚答完的回看流条目(滑入动效)
+  const [openTrail, setOpenTrail] = useState<string | null>(null); // 点开回看的条目 key
 
   const refresh = () => {
     try {
@@ -180,13 +181,20 @@ export default function GrowthTab() {
             <p className="ng-empty">{L(dict, '答过的引导会留在这里:当时的问题、数据和你的回答 —— 复利在回看。', 'Answered prompts live here: the question, the data, your answer.')}</p>
           ) : (
             <div className="ng-trail">
-              {history.slice(0, 30).map((a, i) => (
-                <div key={`${a.at}-${i}`} className={`ng-tr${a.at === freshAt ? ' fresh' : ''}`}>
-                  <p className="ng-tr-meta">{fmtDay(a.at)}{a.context ? ` · ${a.context}` : ''}</p>
-                  <p className="ng-tr-q">{a.question}</p>
-                  <p className="ng-tr-a">{a.answer}</p>
-                </div>
-              ))}
+              {history.slice(0, 30).map((a, i) => {
+                const k = `${a.at}-${i}`;
+                const open = openTrail === k;
+                const dim = a.dimension && a.dimension in DIMENSION_LABEL ? DIMENSION_LABEL[a.dimension as keyof typeof DIMENSION_LABEL] : null;
+                return (
+                  <button key={k} type="button" className={`ng-tr${a.at === freshAt ? ' fresh' : ''}${open ? ' open' : ''}`}
+                    aria-expanded={open} onClick={() => setOpenTrail(open ? null : k)}>
+                    <p className="ng-tr-meta">{fmtDay(a.at)}{dim ? ` · ${L(dict, dim.zh, dim.en)}` : ''}</p>
+                    <p className="ng-tr-q">{a.question}</p>
+                    <p className={`ng-tr-a${open ? '' : ' clamp'}`}>{a.answer}</p>
+                    {open && a.context && <p className="ng-tr-ctx">{L(dict, '当时的数据 · ', 'The data then · ')}{a.context}</p>}
+                  </button>
+                );
+              })}
             </div>
           )}
         </>
@@ -209,18 +217,26 @@ function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip }: {
     ? L(dict, '这句话里藏着一个常见的思维陷阱 —— 你抓得出是哪个吗?', 'A common thinking trap hides in this line — can you spot it?')
     : (o.body || L(dict, '要不要陪你看看?', 'Want to look at it together?'));
 
-  // 引导态:念念的话(情绪)/ 明细(趋势)—— 主按钮做事,不是让你记
-  const [reply, setReply] = useState<string | null>(null);
+  // 引导态:念念的引导链(情绪:疏导 + 图鉴小测)/ 明细(趋势)—— 主按钮做事,不是让你记
+  const [guide, setGuide] = useState<NudgeGuide | null>(null);
+  const [gpick, setGpick] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [detail, setDetail] = useState(false);
-  const opened = reply !== null || detail;
+  const opened = guide !== null || detail;
+  const gq = guide?.quiz;
   async function talk() {
     setLoading(true);
-    const r = await deepenNudge(o.sourceText, en ? 'en' : 'zh');
+    const g = await deepenNudge(o.sourceText, en ? 'en' : 'zh');
     setLoading(false);
-    setReply(r || L(dict, '这会儿没接上 —— 不过你已经愿意停下来看它,本身就是在照顾自己了。', "Couldn't reach me — but pausing to notice this is already care."));
+    setGuide(g ?? { reflection: L(dict, '这会儿没接上 —— 不过你已经愿意停下来看它,本身就是在照顾自己了。', "Couldn't reach me — but pausing to notice this is already care.") });
   }
   const spend = detail ? recentSpendItems() : [];
+  function saveNudge() {
+    const label = o.mode === 'trend'
+      ? `[${chipLabel}] ${L(dict, '看了明细', 'saw the details')}`
+      : (gq && gpick != null ? `[${chipLabel}] ${gq.tool || gq.options[gq.correctIndex]}` : `[${chipLabel}] ${L(dict, '和念念聊过', 'talked it through')}`);
+    onSave(label);
+  }
 
   return (
     <div className="ng-today">
@@ -230,8 +246,28 @@ function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip }: {
 
       {o.mode !== 'quiz' ? (
         <>
-          {/* 念念的引导(情绪) */}
-          {reply !== null && <div className="ng-reveal" style={{ whiteSpace: 'pre-wrap' }}>{reply}</div>}
+          {/* 念念的引导链(情绪):先陪你看 → 再一道图鉴小测,选错继续讲 */}
+          {guide && (
+            <>
+              <div className="ng-reveal" style={{ whiteSpace: 'pre-wrap' }}>{guide.reflection}</div>
+              {gq && (
+                <div style={{ marginTop: 'var(--space-3)' }}>
+                  <p className="ng-ask" style={{ fontSize: '0.96rem' }}>{gq.question}</p>
+                  {gq.options.map((opt, i) => {
+                    const revealed = gpick != null;
+                    const cls = !revealed ? 'ng-opt' : i === gq.correctIndex ? 'ng-opt right' : i === gpick ? 'ng-opt wrong' : 'ng-opt';
+                    return <button key={i} type="button" className={cls} disabled={revealed} onClick={() => setGpick(i)}>{String.fromCharCode(65 + i)}. {opt}</button>;
+                  })}
+                  {gpick != null && (
+                    <div className="ng-reveal">
+                      {gpick !== gq.correctIndex && <b>{L(dict, '再看看 —— ', 'Look again — ')}</b>}
+                      {gq.tool && <b>「{gq.tool}」</b>} {gq.explanation}
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          )}
           {/* 消费明细(趋势) */}
           {detail && (
             <div className="ng-reveal">
@@ -241,14 +277,14 @@ function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip }: {
             </div>
           )}
           <div className="ng-acts">
-            {o.mode === 'nudge' && reply === null && (
+            {o.mode === 'nudge' && !guide && (
               <button type="button" className="ng-btn" disabled={loading} onClick={() => void talk()}>{loading ? L(dict, '念念在想…', 'Nessa is thinking…') : L(dict, '和念念聊聊', 'Talk with Nessa')}</button>
             )}
             {o.mode === 'trend' && !detail && (
               <button type="button" className="ng-btn" onClick={() => setDetail(true)}>{L(dict, '看看明细', 'See the details')}</button>
             )}
             {opened && (
-              <button type="button" className="ng-btn" onClick={() => onSave(`[${chipLabel}] ${o.mode === 'nudge' ? L(dict, '和念念聊过', 'talked it through') : L(dict, '看了明细', 'saw the details')}`)}>{L(dict, '记下这次觉察', 'Log this insight')}</button>
+              <button type="button" className="ng-btn" onClick={saveNudge}>{L(dict, '记下这次觉察', 'Log this insight')}</button>
             )}
             <button type="button" className="ng-btn ghost" onClick={onSkip}>{o.mode === 'nudge' ? L(dict, '先不了', 'Not now') : L(dict, '知道了', 'Got it')}</button>
           </div>
