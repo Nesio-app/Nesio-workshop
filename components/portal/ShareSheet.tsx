@@ -18,7 +18,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { canUsePaidCloudAi, isPro } from '@/lib/portal/entitlement';
 import { usePortalLocale } from './use-portal-locale';
 import { NodeTypeIcon } from './icons';
-import { useSheetDrag } from './use-sheet-drag';
+import NesioSheet from './ui/NesioSheet';
 
 interface ShareSheetProps { open: boolean; onClose: () => void; }
 
@@ -42,7 +42,6 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
   const [textInput, setTextInput] = useState('');
   const [error, setError] = useState('');
   const [sourceFile, setSourceFile] = useState<File | null>(null);
-  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   useEffect(() => {
     if (!open) { setParsed(null); setSaved(false); setAnalyzing(false); setTextMode(false); setTextInput(''); setError(''); setSourceFile(null); }
@@ -281,10 +280,14 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
   if (!open) return null;
 
   return (
-    <div className="nesio-share-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '分享', 'Share')}>
-      <div className="nesio-share-backdrop" onClick={onClose} />
-      <div className={`nesio-share-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
-        <div className="nesio-sheet-handle" {...handleProps} />
+    <NesioSheet
+      variant="bottom"
+      open={open}
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-share-card"
+      ariaLabel={L(dict, '分享', 'Share')}
+    >
 
         <div className="nesio-share-header">
           <h2 className="nesio-share-title">{L(dict, '分享', 'Share')}</h2>
@@ -418,7 +421,6 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
             </div>
           </div>
         )}
-      </div>
-    </div>
+    </NesioSheet>
   );
 }
