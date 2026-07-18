@@ -17951,3 +17951,97 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 @media (prefers-contrast: more) {
   .nesio-sheet { border: 2px solid var(--portal-ink); }
 }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   成长引擎 v2(artifact 1170dd28 / 59587b8d / d7bd8990)—— 走 portal 主题 token
+   字体/动效统一:--ng-ease 贯穿三页;颜色全部映射到 --portal-* / --status-*。
+   ══════════════════════════════════════════════════════════════════════════ */
+.nesio-growth{
+  --ng-ease:cubic-bezier(0.23,1,0.32,1);
+  --ng-ease-sheet:cubic-bezier(0.32,0.72,0,1);
+  --ng-faint:color-mix(in srgb, var(--portal-muted) 66%, transparent);
+  --ng-warm:var(--status-gentle); --ng-warm-soft:var(--status-gentle-soft);
+  font-family:var(--font-source-sans);color:var(--portal-ink);line-height:1.6;
+}
+.nesio-growth *{box-sizing:border-box}
+
+.ng-hd{display:flex;align-items:center;gap:10px;margin:0 0 4px}
+.ng-hd svg{width:22px;height:22px;stroke:var(--portal-accent);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ng-hd h1{font-size:1.35rem;letter-spacing:-.01em;margin:0;font-weight:var(--weight-semibold);color:var(--portal-ink)}
+.ng-streak{color:var(--ng-faint);font-size:.8rem;margin:0 0 22px 32px}
+
+.ng-sec{display:flex;align-items:baseline;justify-content:space-between;margin:0 0 12px}
+.ng-sec .l{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--portal-accent);font-weight:var(--weight-semibold)}
+.ng-sec .r{font-size:.74rem;color:var(--ng-faint)}
+.ng-gap{height:32px}
+
+/* 心智成长环 */
+.ng-mind{background:var(--portal-card);border:1px solid var(--portal-line);border-radius:16px;padding:15px 16px 13px;margin-bottom:6px}
+.ng-mind-top{font-size:.82rem;color:var(--portal-muted);margin:0 0 13px;line-height:1.55}
+.ng-mind-top b{color:var(--portal-ink);font-weight:var(--weight-semibold)}
+.ng-dims{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 8px}
+.ng-dim{text-align:center}
+.ng-ring{width:34px;height:34px;margin:0 auto 5px;border-radius:50%;border:2px solid var(--portal-line);position:relative}
+.ng-ring i{position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--portal-accent);clip-path:inset(0 0 var(--empty,60%) 0);transition:clip-path .5s var(--ng-ease)}
+.ng-dim.locked .ng-ring i{display:none}
+.ng-dim-nm{font-size:.72rem;color:var(--portal-muted)}
+.ng-dim.locked .ng-dim-nm{color:var(--ng-faint)}
+.ng-dim-ct{font-size:.66rem;color:var(--ng-faint)}
+.ng-dim:not(.locked) .ng-dim-ct{color:var(--portal-accent)}
+
+/* 今天:智能卡一次一件 */
+.ng-today{background:var(--portal-card);border:1px solid var(--portal-accent-border);border-radius:18px;padding:18px 17px 15px;
+  box-shadow:0 1px 2px rgba(20,20,20,.04),0 10px 26px rgba(20,20,20,.05);animation:ng-card-in .38s var(--ng-ease)}
+.ng-chip{display:inline-flex;align-items:center;gap:6px;font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.03em;
+  border-radius:7px;padding:3px 9px;margin-bottom:12px;border:1px solid}
+.ng-chip.emo{color:var(--ng-warm);background:var(--ng-warm-soft);border-color:var(--ng-warm)}
+.ng-chip.blind{color:var(--portal-accent);background:var(--portal-accent-soft);border-color:var(--portal-accent-border)}
+.ng-chip.trend{color:var(--status-go);background:var(--status-go-soft);border-color:var(--status-go)}
+.ng-ask{font-size:1.06rem;line-height:1.55;font-weight:var(--weight-semibold);margin:0 0 8px;text-wrap:pretty;color:var(--portal-ink)}
+.ng-basis{font-size:.75rem;color:var(--ng-faint);margin:0 0 14px;padding-left:12px;border-left:2px solid var(--portal-accent-border);line-height:1.5}
+.ng-ta{width:100%;font-family:inherit;font-size:.92rem;color:var(--portal-ink);background:var(--portal-bg);
+  border:1px solid var(--portal-line);border-radius:11px;padding:11px 12px;resize:vertical;line-height:1.55}
+.ng-ta:focus{outline:none;border-color:var(--portal-accent)}
+.ng-acts{display:flex;gap:9px;margin-top:11px;align-items:center;flex-wrap:wrap}
+.ng-btn{appearance:none;font-family:inherit;font-size:.9rem;font-weight:var(--weight-semibold);border-radius:11px;padding:11px 16px;cursor:pointer;
+  border:1px solid var(--portal-accent);background:var(--portal-accent);color:#fff;transition:transform .12s var(--ng-ease)}
+.ng-btn:active{transform:scale(.975)}
+.ng-btn[disabled]{opacity:.45;cursor:default}
+.ng-btn.ghost{background:none;color:var(--portal-muted);border-color:var(--portal-line);font-weight:var(--weight-medium)}
+.ng-todaynote{font-size:.75rem;color:var(--ng-faint);margin:13px 2px 0;text-align:center}
+.ng-done{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:16px;padding:16px;font-size:.9rem;color:var(--portal-accent);text-align:center;line-height:1.55}
+
+/* quiz 选项 + 揭晓 */
+.ng-opt{display:block;width:100%;text-align:left;font-family:inherit;font-size:.88rem;color:var(--portal-ink);
+  background:var(--portal-bg);border:1px solid var(--portal-line);border-radius:11px;padding:11px 13px;margin-bottom:8px;cursor:pointer;transition:border-color .12s var(--ng-ease)}
+.ng-opt:hover{border-color:var(--portal-accent-border)}
+.ng-opt.right{background:var(--status-go-soft);border-color:var(--status-go);color:var(--status-go)}
+.ng-opt.wrong{background:var(--ng-warm-soft);border-color:var(--ng-warm)}
+.ng-opt[disabled]{cursor:default}
+.ng-reveal{margin-top:6px;padding:13px 14px;background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);
+  border-radius:12px;font-size:.88rem;line-height:1.65;color:var(--portal-ink);animation:ng-reveal-in .4s var(--ng-ease)}
+.ng-reveal b{color:var(--portal-accent)}
+
+/* 回看流:时间线 */
+.ng-trail{position:relative;margin-left:6px;padding-left:20px}
+.ng-trail::before{content:"";position:absolute;left:3px;top:6px;bottom:8px;width:2px;background:linear-gradient(var(--portal-accent-border),var(--portal-accent-border) 70%,transparent)}
+.ng-tr{position:relative;padding:0 0 20px}
+.ng-tr::before{content:"";position:absolute;left:-20px;top:5px;width:8px;height:8px;border-radius:50%;background:var(--portal-card);border:2px solid var(--portal-accent-border)}
+.ng-tr.fresh::before{border-color:var(--portal-accent);background:var(--portal-accent)}
+.ng-tr.fresh{animation:ng-fresh-in .45s var(--ng-ease)}
+.ng-tr-meta{font-size:.74rem;color:var(--ng-faint);margin:0 0 3px}
+.ng-tr-q{font-size:.82rem;color:var(--portal-muted);margin:0 0 3px;line-height:1.45}
+.ng-tr-a{font-size:.95rem;color:var(--portal-ink);margin:0;line-height:1.55}
+.ng-empty{font-size:.82rem;color:var(--ng-faint);line-height:1.6}
+
+/* 收起的旧工具(帮你吵/框架)—— 等镜头看记忆归位前的临时入口 */
+.ng-more{margin-top:30px;border-top:1px solid var(--portal-line);padding-top:14px}
+.ng-more>summary{cursor:pointer;font-size:.8rem;color:var(--portal-muted);list-style:none}
+.ng-more>summary::-webkit-details-marker{display:none}
+.ng-more[open]>summary{margin-bottom:12px;color:var(--portal-accent)}
+
+@keyframes ng-card-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes ng-reveal-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes ng-fresh-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.nesio-growth :focus-visible{outline:2px solid var(--portal-accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.nesio-growth *{animation:none!important;transition:none!important}}

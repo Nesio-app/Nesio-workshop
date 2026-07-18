@@ -186,16 +186,16 @@ export async function generateObservation(seed: Seed, locale: string): Promise<O
 }
 
 export const DIMENSION_LABEL: Record<MindDimension, { zh: string; en: string }> = {
-  emotion: { zh: '情绪觉察', en: 'Emotional awareness' },
-  reframe: { zh: '认知灵活', en: 'Cognitive flexibility' },
-  logic: { zh: '逻辑清晰', en: 'Clear reasoning' },
-  blindspot: { zh: '盲点发掘', en: 'Blind-spot finding' },
-  control: { zh: '自我掌控', en: 'Self-control' },
-  selfaware: { zh: '自我觉知', en: 'Self-awareness' },
+  emotion: { zh: '情绪理解', en: 'Emotional insight' },
+  reframe: { zh: '认知重构', en: 'Reframing' },
+  logic: { zh: '逻辑推理', en: 'Reasoning' },
+  blindspot: { zh: '盲点发掘', en: 'Blind spots' },
+  control: { zh: '掌控感', en: 'Sense of control' },
+  selfaware: { zh: '自我觉察', en: 'Self-awareness' },
 };
 
-/** 图鉴里六维的固定排序(展示顺序稳定)。 */
-export const DIMENSION_ORDER: MindDimension[] = ['emotion', 'reframe', 'blindspot', 'logic', 'control', 'selfaware'];
+/** 图鉴里六维的固定排序(展示顺序稳定;对齐成长页 v2 心智成长环)。 */
+export const DIMENSION_ORDER: MindDimension[] = ['emotion', 'reframe', 'blindspot', 'control', 'logic', 'selfaware'];
 
 /** 老规则卡没有 dimension 字段时的兜底映射(让历史回答也能点亮图鉴)。 */
 const KIND_DIMENSION_FALLBACK: Record<string, MindDimension> = {
@@ -218,6 +218,15 @@ export const LEVEL_LABEL: Record<DimensionLevel, { zh: string; en: string }> = {
   2: { zh: '成形', en: 'Forming' },
   3: { zh: '纯熟', en: 'Fluent' },
 };
+
+/** 心智成长环:底部被 clip 掉的百分比(越小=填得越满);0 次=100(不画弧)。 */
+export function ringEmptyPct(count: number): number {
+  if (count <= 0) return 100;
+  if (count < 3) return 64;
+  if (count < 6) return 42;
+  if (count < 10) return 20;
+  return 8;
+}
 
 export interface DimensionStat { dimension: MindDimension; count: number; level: DimensionLevel }
 
