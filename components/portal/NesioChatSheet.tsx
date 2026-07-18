@@ -470,9 +470,16 @@ export default function NesioChatSheet({
   const [showHistory, setShowHistory] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const filePickerRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<{ stop(): void } | null>(null);
+  // 输入框随字数自增高:重置到 auto 再取 scrollHeight,封顶 ~5 行(120px)后内部滚动。
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, [input]);
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const voiceTextRef = useRef('');
   // Loaded file context — persists across messages in this session
@@ -1245,6 +1252,10 @@ Edit location/value anytime in Storage.`),
             <span className="nesio-wechat-plus-icon"><IconFile /></span>
             <span>{L(dict, '文件', 'File')}</span>
           </button>
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); setShowEmoji(true); }}>
+            <span className="nesio-wechat-plus-icon"><IconSmile /></span>
+            <span>{L(dict, '表情', 'Emoji')}</span>
+          </button>
         </div>
       )}
 
@@ -1311,16 +1322,8 @@ Edit location/value anytime in Storage.`),
             </button>
             <button
               type="button"
-              className={`nesio-wechat-emoji-btn${showEmoji ? ' nesio-wechat-emoji-btn--active' : ''}`}
-              onClick={() => { setShowEmoji((v) => !v); setShowPlus(false); }}
-              aria-label={L(dict, '表情', 'Emoji')}
-            >
-              <IconSmile />
-            </button>
-            <button
-              type="button"
               className={`nesio-wechat-plus-btn${showPlus ? ' nesio-wechat-plus-btn--active' : ''}`}
-              onClick={() => setShowPlus((v) => !v)}
+              onClick={() => { setShowPlus((v) => !v); setShowEmoji(false); }}
               aria-label={L(dict, '更多', 'More')}
             >
               ＋
@@ -1337,25 +1340,26 @@ Edit location/value anytime in Storage.`),
             >
               <IconMic />
             </button>
-            <input
+            <textarea
               ref={inputRef}
               className="nesio-wechat-input"
-              type="text"
+              rows={1}
               placeholder={L(dict, '问一问…', 'Ask…')}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void sendMessage(input); } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendMessage(input); } }}
               disabled={sending}
             />
+            {/* 「＋」常驻:打字后也能加图片/拍摄/文件/表情,不再被发送键顶掉 */}
             <button
               type="button"
-              className={`nesio-wechat-emoji-btn${showEmoji ? ' nesio-wechat-emoji-btn--active' : ''}`}
-              onClick={() => { setShowEmoji((v) => !v); setShowPlus(false); }}
-              aria-label={L(dict, '表情', 'Emoji')}
+              className={`nesio-wechat-plus-btn${showPlus ? ' nesio-wechat-plus-btn--active' : ''}`}
+              onClick={() => { setShowPlus((v) => !v); setShowEmoji(false); }}
+              aria-label={L(dict, '更多', 'More')}
             >
-              <IconSmile />
+              ＋
             </button>
-            {input.trim() ? (
+            {input.trim() && (
               <button
                 type="button"
                 className="nesio-wechat-send-btn"
@@ -1364,15 +1368,6 @@ Edit location/value anytime in Storage.`),
                 aria-label={L(dict, '发送', 'Send')}
               >
                 {L(dict, '发送', 'Send')}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className={`nesio-wechat-plus-btn${showPlus ? ' nesio-wechat-plus-btn--active' : ''}`}
-                onClick={() => setShowPlus((v) => !v)}
-                aria-label={L(dict, '更多', 'More')}
-              >
-                ＋
               </button>
             )}
           </>
