@@ -207,7 +207,10 @@ export async function runGmailSync(opts?: { force?: boolean }): Promise<GmailSyn
     if (!data.ok) return { ok: false, read: 0, extracted: 0, error: data.error || 'unknown' };
     // 邮件全文存本机 IndexedDB(隐私红线:不进云同步的节点 attributes)。失败不拦同步。
     if (data.emailBodies && Object.keys(data.emailBodies).length) {
-      void import('../local-email-body').then(({ putEmailBodies }) => putEmailBodies(data!.emailBodies!)).catch(() => {});
+      const bodies = data.emailBodies;
+      void import('../local-email-body').then(({ putEmailBodies }) => putEmailBodies(bodies)).catch(() => {});
+      // 里程碑 B:并入本机全文检索索引,刚同步的邮件立即可被搜索/RAG 命中。
+      void import('../email-fulltext-index').then(({ indexEmailBodies }) => indexEmailBodies(bodies)).catch(() => {});
     }
     const nodes = data.nodes || [];
     if (nodes.length) {

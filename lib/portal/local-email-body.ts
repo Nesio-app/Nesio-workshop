@@ -66,6 +66,25 @@ export async function getEmailBody(emailId: string): Promise<string | null> {
   });
 }
 
+/** 读出全部本机邮件全文(emailId → 正文)。用于建本机全文检索索引(里程碑 B)。 */
+export async function getAllEmailBodies(): Promise<Record<string, string>> {
+  const db = await openDB();
+  if (!db) return {};
+  return new Promise((resolve) => {
+    const out: Record<string, string> = {};
+    const tx = db.transaction(STORE, 'readonly');
+    const req = tx.objectStore(STORE).openCursor();
+    req.onsuccess = () => {
+      const cur = req.result;
+      if (cur) {
+        if (typeof cur.key === 'string' && typeof cur.value === 'string') out[cur.key] = cur.value;
+        cur.continue();
+      } else resolve(out);
+    };
+    req.onerror = () => resolve(out);
+  });
+}
+
 /** 清空所有本机邮件全文(隐私收口:「清空本地数据」调用)。返回清掉的条数。 */
 export async function purgeEmailBodies(): Promise<number> {
   const db = await openDB();

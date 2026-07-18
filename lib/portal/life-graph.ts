@@ -4,6 +4,7 @@
  * This is the foundation for Reasoning Engine and Today Feed.
  */
 import { mergeConflictingNodes } from './life-node-merge';
+import { emailFulltextScore } from './email-fulltext-index';
 
 export type LifeNodeType =
   | 'person'
@@ -1083,6 +1084,11 @@ export function searchLifeGraphFuzzy(query: string, limit = 6): LifeNode[] {
         if (node.name.toLowerCase().includes(token)) score += 4;
         if (node.tags?.some((tag) => tag.toLowerCase().includes(token))) score += 3;
         if (text.includes(token)) score += 1;
+      }
+      // 里程碑 B:邮件正文(≤1500 预览之外)命中 —— 本机全文索引补分,零云。
+      if (node.source === 'email') {
+        const eid = typeof node.attributes.emailId === 'string' ? node.attributes.emailId : '';
+        if (eid) score += emailFulltextScore(eid, tokens, q);
       }
       return { node, score };
     })

@@ -12,6 +12,25 @@ import { domainInsightsContextBlock } from '@/lib/portal/domain-insights';
 import { parseTemporalQuery, isInSpan } from '@/lib/portal/temporal-query';
 import { semanticRerankMeta } from '@/lib/portal/semantic-rerank';
 import { detectCrossLingualGap } from '@/lib/portal/cross-lingual-gap.mjs';
+import { getEmailBody } from '@/lib/portal/local-email-body';
+import { ensureEmailFulltextIndex } from '@/lib/portal/email-fulltext-index';
+
+// 里程碑 B:邮件进 RAG 时喂全文(本机 IndexedDB),不再只给 ≤140 字预览 —— 否则模型对着
+// 半句预览「总结邮件」只能编。query-aware 取窗:围绕查询词命中处取一段,命不中取开头。
+const EMAIL_CTX_BUDGET = 500;
+function emailContextBody(fullBody: string | undefined, preview: string, query: string): string {
+  const source = fullBody && fullBody.trim().length > preview.trim().length ? fullBody : preview;
+  const text = source.replace(/\s+/g, ' ').trim();
+  if (!text || text.length <= EMAIL_CTX_BUDGET) return text;
+  const toks = query.toLowerCase().match(/[\p{L}\p{N}]{2,}/gu) || [];
+  const lower = text.toLowerCase();
+  let idx = -1;
+  for (const t of toks) { const i = lower.indexOf(t); if (i >= 0 && (idx < 0 || i < idx)) idx = i; }
+  if (idx < 0) return `${text.slice(0, EMAIL_CTX_BUDGET)}…`;
+  const start = Math.max(0, idx - 140);
+  const end = Math.min(text.length, start + EMAIL_CTX_BUDGET);
+  return `${start > 0 ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`;
+}
 
 export function fmtEventDate(iso: string): string {
   return new Date(iso).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', weekday: 'short' });
@@ -45,18 +64,19 @@ const SOURCE_LABEL: Record<string, string> = {
   system: '系统',
 };
 
-function fmtNode(n: LifeNode): string {
+function fmtNode(n: LifeNode, fullBody?: string, query = ''): string {
   // 批次 37:邮件节点给 AI 真实内容(发件人 + 真实收件日期 + 摘要),否则只有主题一行
   // AI 会凭空编造邮件内容(用户遇到的「今天的邮件」被虚构成面试/物业通知)。
+  // 里程碑 B:优先喂本机全文(fullBody),query-aware 取窗;无全文退到预览。
   if (n.source === 'email') {
     const from = typeof n.attributes.from === 'string' ? n.attributes.from : '';
     const dateStr = typeof n.attributes.date === 'string' ? n.attributes.date : n.createdAt;
     const d = new Date(dateStr);
     const dateLabel = Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' });
-    const body = [n.attributes.snippet, n.attributes.article, n.rawInput]
+    const preview = [n.attributes.snippet, n.attributes.article, n.rawInput]
       .find((v): v is string => typeof v === 'string' && v.trim().length > 0) || '';
-    const snippet = body.replace(/\s+/g, ' ').slice(0, 140);
-    return `• [邮件] 主题「${n.name}」${from ? ` · 来自 ${from}` : ''}${dateLabel ? ` · ${dateLabel}` : ''}${snippet ? ` · 摘要:${snippet}` : ''}`;
+    const snippet = emailContextBody(fullBody, preview, query);
+    return `• [邮件] 主题「${n.name}」${from ? ` · 来自 ${from}` : ''}${dateLabel ? ` · ${dateLabel}` : ''}${snippet ? ` · 内容:${snippet}` : ''}`;
   }
   const startStr = n.attributes.start as string | undefined;
   const dateLabel = startStr
@@ -95,6 +115,8 @@ export function isWeatherNode(n: LifeNode): boolean {
 export async function buildMemoryContext(query: string, convoHint = ''): Promise<{ context: string; refCandidates: RefCandidate[]; semanticDegraded: boolean; semanticReason: string }> {
   const graph = getLifeGraph().filter((n) => !isWeatherNode(n));
   const temporal = parseTemporalQuery(query);
+  // 里程碑 B:惰性水合邮件全文检索索引(不阻塞本次;让后续 smartSearch 能按正文命中排序)。
+  void ensureEmailFulltextIndex();
 
   // Layer 1: date-matched nodes (attributes.start matches the parsed date)
   const dateNodes: LifeNode[] = temporal.hasDate
@@ -176,6 +198,15 @@ export async function buildMemoryContext(query: string, convoHint = ''): Promise
     }
   }
 
+  // 里程碑 B:给入选邮件节点预取本机全文(隐私红线:全文只在本机 IndexedDB),
+  // 拼进 RAG 上下文,让「总结邮件/这封讲了啥」拿到真正的正文而不是 140 字预览。
+  const emailBodyById = new Map<string, string>();
+  await Promise.all(emailNodes.map(async (n) => {
+    const eid = typeof n.attributes.emailId === 'string' ? n.attributes.emailId : '';
+    if (!eid) return;
+    try { const b = await getEmailBody(eid); if (b) emailBodyById.set(n.id, b); } catch { /* 取不到退预览 */ }
+  }));
+
   // 批次 174:手动关联喂进检索(闭环)—— 你在记忆详情里亲手 user_linked 的两条,
   // 问到其中一条,另一条就一起进上下文。只从"话题命中"(日期命中 + 搜索命中)顺藤,
   // 不从 upcoming/recent 噪音节点扩,避免把整张图拉进来。上限 6 条护住上下文预算。
@@ -235,7 +266,7 @@ export async function buildMemoryContext(query: string, convoHint = ''): Promise
     if (refCandidates.length >= 8) break;
   }
   const idOf = new Map(refCandidates.map((r) => [r.node.id, r.shortId]));
-  const fmtCite = (n: LifeNode): string => (idOf.has(n.id) ? `[#${idOf.get(n.id)}] ` : '') + fmtNode(n);
+  const fmtCite = (n: LifeNode): string => (idOf.has(n.id) ? `[#${idOf.get(n.id)}] ` : '') + fmtNode(n, emailBodyById.get(n.id), query);
 
   const parts: string[] = [`【用户记忆库】共 ${graph.length} 条`];
 
@@ -251,7 +282,7 @@ export async function buildMemoryContext(query: string, convoHint = ''): Promise
 
   if (upcomingNodes.length > 0 && !temporal.hasDate) {
     parts.push('\n【今天起7天内的安排】');
-    parts.push(...upcomingNodes.map(fmtNode));
+    parts.push(...upcomingNodes.map((n) => fmtNode(n)));
   }
 
   if (emailNodes.length > 0) {

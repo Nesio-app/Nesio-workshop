@@ -100,6 +100,16 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **邮件全链路 里程碑 B(检索接全平台,2026-07-18)**:让**本机邮件全文**(里程碑 A 存进
+  `nesio-email-bodies` IndexedDB 的 ≤20k 正文)可被全平台检索/RAG 命中——**全免费、零云**。
+  难点:搜索路径(`smartSearch`/`searchLifeGraphFuzzy`)是**同步线性扫内存图谱**,拿不到需
+  await 的 IndexedDB;此前邮件只有 ≤1500 的 `article` 预览能被搜到。方案两块:
+  ① **本机全文索引** `lib/portal/email-fulltext-index.ts`——内存 `Map<emailId,全文>`(受控容量
+  1500 封 × ≤6k 字),`emailFulltextScore` 同步补分(整句 +6、每 token +2 封顶 6 个,≤+18);
+  惰性水合 + gmail 同步增量并入(刚同步立即可搜);接入 `smart-search.ts` 与 `life-graph.ts`。
+  ② **RAG 喂全文** `memory-retrieval.ts`——`buildMemoryContext` 对入选邮件节点 `await getEmailBody`
+  预取全文,`fmtNode` query-aware 取窗 500 字替代原 140 字预览。tsx 单测 7/7;两仓 tsc + build 全绿。
+  **待办**:里程碑 C(付费云深检索:embedding rerank 纳入邮件正文,付费路径)。
 - **邮件全链路 里程碑 A(抓全存全 + 本地深抽取,2026-07-18)**:邮件内容抓取/分析落地第一步,
   **全免费、零云成本、隐私优先**。**Phase 1(抓全存全)**:gmail 路由 `extractText` 加 `maxLen`
   参数,新增 `extractFullBody`(≤20k)+ `buildEmailBodies`,响应带 `emailBodies`(emailId→全文)
