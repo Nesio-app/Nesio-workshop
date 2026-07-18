@@ -50,13 +50,15 @@ export interface PlaceDescriptor { city?: string; country?: string }
 /**
  * 给地点卡挑一张封面照(用户:有对应记忆照片就自动展示最好的一张,别空着):
  *  1) 坐标就近:到访点 coords 与带坐标的照片比,取 25km 内最近的一张(并列取最近记的);
- *  2) 地名回退:没坐标命中时,按该照片记忆归属的 city/country 与卡片一致来配,取最近记的一张。
+ *  2) 时间归属:照片拍摄时间落在该地某次到访的时段内 → 算这地的照片(现拍/无坐标照片全靠它);
+ *  3) 地名回退:按该照片记忆归属的 city/country 与卡片一致来配,取最近记的一张。
  * 「最好」这里取最近记录的(时间新),稳定且可解释。
  */
 export function matchPlacePhotoAsset(
   coords: Array<{ lat: number; lon: number }>,
   imageNodes: GeoImageNode[],
   place?: PlaceDescriptor,
+  timeRanges?: Array<[number, number]>,
 ): string | null {
   if (!imageNodes.length) return null;
 
@@ -74,7 +76,16 @@ export function matchPlacePhotoAsset(
     if (best && bestD <= 25) return best.assetId;
   }
 
-  // 2) 地名回退:城市卡按城市、国家卡按国家匹配归属照片,取最新
+  // 2) 时间归属:照片拍摄时间落在该地到访时段内(现拍照片常无坐标,靠这条兜住)
+  if (timeRanges && timeRanges.length) {
+    let best: GeoImageNode | null = null;
+    for (const n of imageNodes) {
+      if (timeRanges.some(([s, e]) => n.ts >= s && n.ts <= e) && (!best || n.ts > best.ts)) best = n;
+    }
+    if (best) return best.assetId;
+  }
+
+  // 3) 地名回退:城市卡按城市、国家卡按国家匹配归属照片,取最新
   if (place) {
     const wantCity = place.city?.trim().toLowerCase();
     const wantCountry = place.country ? canonicalCountryKey(place.country) : '';
