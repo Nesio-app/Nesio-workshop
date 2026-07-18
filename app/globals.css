@@ -18143,15 +18143,64 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .ng-ifs-part.insight .lbl{color:var(--status-calm)}
 .ng-ifs-action{margin-top:2px;background:var(--portal-card);border:1px solid var(--portal-line);border-radius:10px;padding:9px 12px;font-size:.86rem;color:var(--portal-ink);line-height:1.5}
 
-/* 疗愈子 tab:软入口 + 身体层落地卡 + 躯体接地步骤 */
-.ng-healing-link{display:block;width:100%;text-align:left;margin-top:10px;font-family:inherit;font-size:.82rem;line-height:1.4;color:var(--portal-accent);background:none;border:none;padding:4px 0;cursor:pointer}
-.ng-healing-link:hover{text-decoration:underline}
+/* 疗愈子 tab:入口按钮 + 身体层可点落地 + 阴影整合时间线 */
+.ng-healing-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin-top:12px;font-family:inherit;font-size:.85rem;font-weight:var(--weight-medium);line-height:1.35;text-align:left;color:var(--portal-accent);background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:12px;padding:11px 14px;cursor:pointer;transition:transform .12s var(--ng-ease),background .15s var(--ng-ease)}
+.ng-healing-btn:hover{background:var(--portal-card)}
+.ng-healing-btn:active{transform:scale(.99)}
 .ng-heal .ng-streak{margin-bottom:16px}
+
+/* 身体层:此刻先落地(可点掉) */
 .ng-ground{background:var(--status-calm-soft);border:1px solid var(--status-calm);border-radius:14px;padding:13px 15px;animation:ng-reveal-in .4s var(--ng-ease)}
-.ng-ground-lead{margin:0 0 8px;font-size:.86rem;font-weight:var(--weight-semibold);color:var(--status-calm)}
-.ng-ground-list{margin:0;padding-left:18px;display:flex;flex-direction:column;gap:5px;font-size:.9rem;line-height:1.5;color:var(--portal-ink)}
+.ng-ground-lead{margin:0 0 9px;font-size:.82rem;font-weight:var(--weight-semibold);color:var(--status-calm)}
+.ng-ground-list{display:flex;flex-direction:column;gap:6px}
+.ng-ground-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;font-family:inherit;font-size:.9rem;line-height:1.4;color:var(--portal-ink);background:var(--portal-card);border:1px solid var(--portal-line);border-radius:10px;padding:9px 12px;cursor:pointer;transition:border-color .15s var(--ng-ease),color .15s var(--ng-ease)}
+.ng-ground-item .tick{flex:none;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ng-faint);display:flex;align-items:center;justify-content:center;font-size:.7rem;color:#fff}
+.ng-ground-item.on{color:var(--status-calm);border-color:var(--status-calm)}
+.ng-ground-item.on .tick{background:var(--status-calm);border-color:var(--status-calm)}
 .ng-ground-step{margin-top:2px;background:var(--status-gentle-soft);border:1px solid var(--status-gentle);border-radius:10px;padding:10px 13px;font-size:.9rem;color:var(--portal-ink);line-height:1.55}
 .ng-ground-step .lbl{display:block;font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.06em;color:var(--status-gentle);margin-bottom:5px}
+
+/* 阴影整合时间线:当前步放大高亮 / 已完成收起 / 未来步灰 */
+.ng-tl{display:flex;flex-direction:column}
+.ng-tl-step{display:flex;gap:12px}
+.ng-tl-rail{flex:none;width:22px;display:flex;justify-content:center;position:relative}
+.ng-tl-rail::after{content:'';position:absolute;top:5px;bottom:-4px;left:50%;width:1.5px;transform:translateX(-50%);background:var(--portal-line)}
+.ng-tl-step:last-child .ng-tl-rail::after{display:none}
+.ng-tl-node{flex:none;width:15px;height:15px;margin-top:3px;border-radius:50%;border:2px solid var(--ng-faint);background:var(--portal-bg);display:flex;align-items:center;justify-content:center;font-size:.6rem;color:#fff;z-index:1;transition:box-shadow .3s var(--ng-ease),background .3s var(--ng-ease),border-color .3s var(--ng-ease)}
+.ng-tl-step.done .ng-tl-node{background:var(--portal-accent);border-color:var(--portal-accent)}
+.ng-tl-step.done .ng-tl-rail::after{background:var(--portal-accent-border)}
+.ng-tl-step.active .ng-tl-node{border-color:var(--portal-accent);background:var(--portal-accent);box-shadow:0 0 0 4px var(--portal-accent-soft)}
+.ng-tl-body{flex:1;min-width:0;padding-bottom:16px;transition:opacity .3s var(--ng-ease)}
+.ng-tl-step.todo .ng-tl-body{opacity:.4}
+.ng-tl-step.done .ng-tl-body{opacity:.6}
+.ng-tl-head{display:flex;align-items:center;gap:8px}
+.ng-tl-n{flex:none;font-size:.7rem;font-weight:var(--weight-semibold);color:var(--portal-muted);font-variant-numeric:tabular-nums}
+.ng-tl-t{font-size:.95rem;font-weight:var(--weight-semibold);color:var(--portal-ink)}
+.ng-tl-step.active .ng-tl-t{color:var(--portal-accent)}
+.ng-tl-sum{margin:4px 0 0 20px;font-size:.82rem;color:var(--portal-muted);line-height:1.45}
+.ng-tl-in{margin-top:10px;background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:14px;padding:13px;display:flex;flex-direction:column;gap:10px;animation:ng-reveal-in .35s var(--ng-ease)}
+.ng-tl-q{margin:0;font-size:.9rem;font-weight:var(--weight-medium);color:var(--portal-ink);line-height:1.5}
+
+/* 参与式选项 chips + ANT 实时识别 */
+.ng-heal-chips{display:flex;flex-wrap:wrap;gap:7px}
+.ng-heal-chips.col{flex-direction:column}
+.ng-heal-chip{font-family:inherit;font-size:.85rem;color:var(--portal-ink);background:var(--portal-card);border:1px solid var(--portal-line);border-radius:999px;padding:6px 13px;cursor:pointer;text-align:left;transition:border-color .12s var(--ng-ease),transform .12s var(--ng-ease)}
+.ng-heal-chip:hover{border-color:var(--portal-accent-border)}
+.ng-heal-chip:active{transform:scale(.97)}
+.ng-heal-chip.line{border-radius:12px;line-height:1.45}
+.ng-heal-chip.on{color:var(--portal-accent);border-color:var(--portal-accent);background:var(--portal-card)}
+.ng-ant{background:var(--status-gentle-soft);border:1px solid var(--status-gentle);border-radius:10px;padding:10px 12px}
+.ng-ant-h{margin:0 0 3px;font-size:.8rem;font-weight:var(--weight-semibold);color:var(--status-gentle)}
+.ng-ant-b{margin:0 0 8px;font-size:.8rem;color:var(--portal-ink);line-height:1.5}
+.ng-ant-ch{display:flex;flex-wrap:wrap;gap:6px}
+.ng-ant-w{font-size:.78rem;font-weight:var(--weight-semibold);color:var(--status-gentle);background:var(--portal-card);border-radius:6px;padding:2px 8px}
+.ng-heal-close{animation:ng-reveal-in .4s var(--ng-ease)}
+.ng-loop{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+.ng-loop-row{display:flex;flex-direction:column;gap:2px}
+.ng-loop-row .k{font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.06em;color:var(--portal-muted)}
+.ng-loop-row .v{font-size:.9rem;color:var(--portal-ink);line-height:1.5}
+.ng-loop-row.now .v{color:var(--portal-accent);font-weight:var(--weight-semibold)}
+.ng-loop-arrow{text-align:center;color:var(--ng-faint);font-size:.85rem;margin:2px 0}
 .ng-todaynote{font-size:.75rem;color:var(--ng-faint);margin:13px 2px 0;text-align:center}
 .ng-done{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:16px;padding:16px;font-size:.9rem;color:var(--portal-accent);text-align:center;line-height:1.55}
 
