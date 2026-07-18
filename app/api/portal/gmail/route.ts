@@ -12,6 +12,7 @@ import { writeCloudSignalsForCurrentUser } from '@/lib/platform/runtime/cloud-si
 import { normalizeGmailToSignal } from '@/lib/life-domain/normalizers';
 import { getIntegrationToken, saveIntegrationToken } from '@/lib/portal/integrations';
 import { buildEmailExtractionPrompt, parseJsonBlock } from '@/lib/extraction/extraction';
+import { extractEmailLocal } from '@/lib/portal/email-extract-local';
 import { cookies } from 'next/headers';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 import { envValue } from '@/lib/portal/env';
@@ -95,15 +96,32 @@ function stripHtml(html: string): string {
 }
 
 // 修 HTML-only bug:优先递归取 text/plain;没有(大量通知/账单邮件只有 HTML)则取
-// text/html 剥标签;都没有再退顶层 body / snippet。
-function extractText(msg: GmailMessage): string {
+// text/html 剥标签;都没有再退顶层 body / snippet。maxLen 控截断:卡片预览用短的,
+// 全文(存本机、供阅读原文/检索)用大的。
+function extractText(msg: GmailMessage, maxLen = 1500): string {
   const root = msg.payload;
   const plain = findPartData(root, 'text/plain');
-  if (plain) return plain.slice(0, 1500);
+  if (plain) return plain.slice(0, maxLen);
   const html = findPartData(root, 'text/html');
-  if (html) return stripHtml(html).slice(0, 1500);
-  if (root?.body?.data) return decodeBase64Url(root.body.data).slice(0, 1500);
-  return msg.snippet?.slice(0, 400) || '';
+  if (html) return stripHtml(html).slice(0, maxLen);
+  if (root?.body?.data) return decodeBase64Url(root.body.data).slice(0, maxLen);
+  return msg.snippet?.slice(0, Math.min(maxLen, 400)) || '';
+}
+
+// 邮件全文(≤20k 防极端;附件不含)。用于本机专属存储 —— 不进云同步的 LifeNode.attributes。
+const EMAIL_FULLTEXT_MAX = 20_000;
+function extractFullBody(msg: GmailMessage): string {
+  return extractText(msg, EMAIL_FULLTEXT_MAX);
+}
+/** 非广告邮件的 emailId → 全文映射。客户端收到后存本机 IndexedDB(local-email-body),不上云。 */
+function buildEmailBodies(messages: GmailMessage[]): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const m of messages) {
+    if (isPromotion(m) || !m.id) continue;
+    const body = extractFullBody(m);
+    if (body) out[m.id] = body;
+  }
+  return out;
 }
 
 // Gmail 系统分类标签 → 语义。CATEGORY_PROMOTIONS=广告(不进 AI 省钱)、
@@ -381,26 +399,36 @@ export async function GET(req: NextRequest) {
   // 免费最大化·Gmail:兜底也跳过广告(和 AI 分支一致,不把促销塞进记忆)。
   if (includeBody && nodes.length === 0 && messages.length > 0) {
     nodes = messages.filter((m) => !isPromotion(m)).map((m) => {
-      const body = extractText(m); // 批次 25:邮件正文,供友好阅读器
+      const body = extractText(m); // 批次 25:邮件正文预览(≤1500,供友好阅读器/搜索;全文另存本机)
       const cat = mailCategory(m);
       const important = (m.labelIds || []).includes('IMPORTANT');
+      // 邮件全链路 Phase 2:本地深抽取(金额/预计到货/订单号/快递单号/商家/待办),零云成本。
+      const subject = header(m, 'subject');
+      const from = header(m, 'from');
+      const local = extractEmailLocal(subject, from, extractFullBody(m));
       return {
         type: 'event' as const,
-        name: header(m, 'subject') || 'Gmail 邮件',
+        name: subject || 'Gmail 邮件',
         source: 'email' as const,
         confidence: important ? 0.8 : 0.7,
-        rawInput: `来自 ${header(m, 'from') || '未知'}: ${m.snippet?.slice(0, 120) || ''}`,
-        // 通知类(账单/收据/快递)标 tag,供 Today 卡按类挑；重要标记透传
-        tags: ['邮件', 'Gmail', ...(cat === 'updates' ? ['通知'] : []), ...(important ? ['重要'] : [])],
+        rawInput: `来自 ${from || '未知'}: ${m.snippet?.slice(0, 120) || ''}`,
+        // 通知类(账单/收据/快递)标 tag,供 Today 卡按类挑；重要标记透传；本地抽到待办信号标「待回复」
+        tags: ['邮件', 'Gmail', ...(cat === 'updates' ? ['通知'] : []), ...(important ? ['重要'] : []), ...(local.todoHint ? ['待回复'] : [])],
         attributes: {
           date: header(m, 'date'),
-          from: header(m, 'from'),
+          from,
           emailId: m.id,
           mailCategory: cat,
           // CARD SPEC:列表卡第二行优先读 summary(干净摘要)—— 兜底路径用 Gmail 自带
           // snippet(正文首句预览,无邮件头),不再靠渲染层从「来自 X: …」rawInput 里现剥。
           ...(m.snippet ? { summary: m.snippet.slice(0, 120) } : {}),
           ...(body ? { article: body } : {}),
+          // 本地抽取的结构化线索(命中才给)
+          ...(local.store ? { store: local.store } : {}),
+          ...(local.eta ? { eta: local.eta } : {}),
+          ...(local.amount ? { amount: local.amount } : {}),
+          ...(local.orderNo ? { orderNo: local.orderNo } : {}),
+          ...(local.trackingNo ? { trackingNo: local.trackingNo } : {}),
         },
         relations: [] as Array<{ targetId: string; relation: string }>,
       };
@@ -436,6 +464,9 @@ export async function GET(req: NextRequest) {
     cloudSignalWrite,
     count: nodes.length,
     emailCount: messages.length,
+    // 邮件全文(emailId → 正文,≤20k)。仅回给本设备,客户端存本机 IndexedDB;
+    // 隐私红线:不进云同步的记忆节点 attributes。免费/付费都本机可读。
+    emailBodies: includeBody ? buildEmailBodies(messages) : undefined,
   });
 
   // Persist refreshed access token as cookie so the next request doesn't need to re-refresh

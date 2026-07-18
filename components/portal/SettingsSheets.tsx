@@ -623,6 +623,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       purgeLocalData(localStorage);                         // localStorage 全部本机 key 收口清除(保留 auth)
       void purgeIdbBlobs();                                 // IDB blob(健康/临床/地点)一并清 —— 别漏
       void purgeLocalImages();                              // 隐私审计:记忆照片在独立 IDB(nesio-images),必须一并清,否则「删除」留图在本机
+      void import('@/lib/portal/local-email-body').then(({ purgeEmailBodies }) => purgeEmailBodies()); // 邮件全文独立 IDB(nesio-email-bodies)一并清
     } catch { /* ignore */ }
     setNodeCount(0);
     setDeleted(true);
