@@ -18,7 +18,14 @@ import {
 import { wallHHMM, dateKeyToLocalDate } from '@/lib/portal/place-time.mjs';
 import { monthlyPlaceComparison, weekRhythm, footprintHighlights } from '@/lib/portal/place-stats';
 import PlaceMap from './PlaceMap';
-import { IconHome, IconUtensils, IconCard, IconActivity, IconBriefcase, IconPlane, IconBed, IconHeartPulse, IconBook, IconSun, IconStar, IconMapPin } from '../icons';
+import { IconHome, IconUtensils, IconCard, IconActivity, IconBriefcase, IconPlane, IconBed, IconHeartPulse, IconBook, IconSun, IconStar, IconMapPin, NodeTypeIcon } from '../icons';
+import { displayNodeName } from '@/lib/portal/node-display';
+
+// 到访记忆列表:类型 → 图标底色(与记忆详情类型条同一套 chip 语义色)
+const VM_TYPE_BG: Record<string, string> = {
+  person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
+  event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
+};
 import dynamic from 'next/dynamic';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import { getLocalImage } from '@/lib/portal/local-image-store';
@@ -1060,16 +1067,34 @@ export default function TimelineTab() {
         <div className="nesio-visitmem-overlay" role="dialog" aria-modal="true">
           <button type="button" className="nesio-visitmem-backdrop" onClick={() => setVisitMems(null)} aria-label={L(dict, '关闭', 'Close')} />
           <div className="nesio-visitmem-sheet">
-            <p className="nesio-memmap-list-title">{visitMems.title} · {L(dict, `${visitMems.nodes.length} 条记忆`, `${visitMems.nodes.length} memories`)}</p>
+            <div className="nesio-vm-grabber" aria-hidden />
+            <div className="nesio-vm-head">
+              <span className="nesio-vm-title">{visitMems.title}</span>
+              <span className="nesio-vm-count">{L(dict, `${visitMems.nodes.length} 条记忆`, `${visitMems.nodes.length} ${visitMems.nodes.length === 1 ? 'memory' : 'memories'}`)}</span>
+            </div>
             <div className="nesio-memmap-list-scroll">
               {visitMems.nodes.length === 0 ? (
-                <p className="nesio-tl-catplace-more" style={{ padding: '1rem 0' }}>{L(dict, '这里还没有关联到的记忆', 'No memories linked here yet')}</p>
-              ) : visitMems.nodes.map((n) => (
-                <button key={n.id} type="button" className="nesio-memmap-item nesio-memmap-item--btn" onClick={() => setVisitSel(n)}>
-                  <span className="nesio-memmap-item-name">{n.name}</span>
-                  <span className="nesio-memmap-item-time">{new Date(n.createdAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}</span>
-                </button>
-              ))}
+                <p className="nesio-vm-empty">{L(dict, '这里还没有关联到的记忆', 'No memories linked here yet')}</p>
+              ) : visitMems.nodes.map((n) => {
+                const src = n.source === 'email' ? L(dict, '邮件', 'Email') : n.source === 'calendar' ? L(dict, '日历', 'Calendar') : n.source === 'photo' ? L(dict, '照片', 'Photo') : n.source === 'voice' ? L(dict, '语音', 'Voice') : n.source === 'system' ? L(dict, '系统', 'System') : L(dict, '手记', 'Note');
+                const d = new Date(n.createdAt);
+                const midnight = new Date(); midnight.setHours(0, 0, 0, 0);
+                const when = d >= midnight
+                  ? d.toLocaleTimeString(dict === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })
+                  : d.toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' });
+                return (
+                  <button key={n.id} type="button" className="nesio-vm-item" onClick={() => setVisitSel(n)}>
+                    <span className="nesio-vm-ic" style={{ ['--vm-ic-bg' as string]: VM_TYPE_BG[n.type] || 'var(--chip-fog)' }}>
+                      <NodeTypeIcon type={n.type} size={15} />
+                    </span>
+                    <span className="nesio-vm-body">
+                      <span className="nesio-vm-name">{displayNodeName(n.name, dict)}</span>
+                      <span className="nesio-vm-meta">{src} · {when}</span>
+                    </span>
+                    <span className="nesio-vm-chev" aria-hidden>›</span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>,
