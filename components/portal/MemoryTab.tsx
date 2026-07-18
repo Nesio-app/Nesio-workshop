@@ -51,6 +51,7 @@ import { displayNodeName } from '@/lib/portal/node-display';
 import { isPinned, loadPins, PINS_UPDATED_EVENT, togglePin, isCore, toggleCore, loadCore, CORE_UPDATED_EVENT } from '@/lib/portal/pins';
 import { listInventoryItems, inventoryStats } from '@/lib/portal/inventory';
 import { usePortalLocale } from './use-portal-locale';
+import NesioSheet from './ui/NesioSheet';
 
 /** 组件内取字典语言(批次 9 全量双语的局部 hook)。 */
 function useDict(): DictLocale {
@@ -550,9 +551,14 @@ function LongPressSheet({
   // 批次 171(用户实锤·对标微信长按):竖排文字按钮 → 图标横排 + 下方小字。
   // 4 个动作:今日/收藏夹/收纳/项目;去掉「标为核心」(核心已撤)和「分享/复制」。
   return (
-    <>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-longpress-sheet">
+    <NesioSheet
+      variant="bottom"
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-longpress-sheet"
+      ariaLabel={node.name}
+    >
         <div className="nesio-longpress-node-name">{node.name}</div>
         <div className="nesio-lp-actions">
           <button type="button" className="nesio-lp-action" onClick={() => { pinNodeToTodayFocus(node.id); onClose(); }}>
@@ -584,8 +590,7 @@ function LongPressSheet({
           </div>
         )}
         <button type="button" className="nesio-longpress-cancel-btn" onClick={onClose}>{L(dict, '取消', 'Cancel')}</button>
-      </div>
-    </>
+    </NesioSheet>
   );
 }
 
@@ -801,9 +806,14 @@ function ProjectsSheet({ projects, allNodes, onClose, onOpenProject, onCreate, o
   const order: Record<string, number> = { active: 0, planned: 1, completed: 2, archived: 3 };
   const sorted = [...projects].sort((a, b) => (order[a.status || 'active'] ?? 0) - (order[b.status || 'active'] ?? 0));
   return (
-    <>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-project-detail-sheet">
+    <NesioSheet
+      variant="bottom"
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-project-detail-sheet"
+      ariaLabel={L(dict, '项目', 'Projects')}
+    >
         <div className="nesio-project-detail-header">
           <span className="nesio-project-detail-emoji"><IconFolder size={16} /></span>
           <span className="nesio-project-detail-name">{L(dict, '项目', 'Projects')}</span>
@@ -826,8 +836,7 @@ function ProjectsSheet({ projects, allNodes, onClose, onOpenProject, onCreate, o
         <button type="button" className="nesio-mem-jar-create" style={{ margin: '0 1rem 1rem' }} onClick={onCreate}>
           {L(dict, '新建项目', 'New project')}
         </button>
-      </div>
-    </>
+    </NesioSheet>
   );
 }
 
@@ -905,9 +914,14 @@ function CreateProjectSheet({
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
 
   return (
-    <>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-create-project-sheet">
+    <NesioSheet
+      variant="bottom"
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-create-project-sheet"
+      ariaLabel={L(dict, '新建项目', 'New project')}
+    >
         <div className="nesio-create-project-header">
           <span>{L(dict, '新建项目', 'New project')}</span>
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose}>✕</button>
@@ -935,8 +949,7 @@ function CreateProjectSheet({
         >
           {L(dict, '创建', 'Create')}
         </button>
-      </div>
-    </>
+    </NesioSheet>
   );
 }
 
