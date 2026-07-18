@@ -1314,18 +1314,18 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
           <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.25rem' }}>
             {editing ? (
               <>
-                <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={saveEdit}>{L(dict, '保存', 'Save')}</button>
-                <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</button>
+                <button type="button" className="nesio-ob-primary-btn nesio-nd-action-btn" onClick={saveEdit}>{L(dict, '保存', 'Save')}</button>
+                <button type="button" className="nesio-today-btn nesio-today-btn--ghost nesio-nd-action-btn" onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</button>
               </>
             ) : (
               <>
                 {/* 批次 33:阅读入口顶部有(替换✕),底部也放回来一份 —— 用户反馈顶部那颗找不到 */}
                 {readableText && (
-                  <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
+                  <button type="button" className="nesio-ob-primary-btn nesio-nd-action-btn" onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
                 )}
                 {/* 批次 37:回复按钮移到顶部「阅读」旁,底部不再重复 */}
-                <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={startEdit}>{L(dict, '编辑', 'Edit')}</button>
-                <button type="button" className="nesio-settings-danger-btn" style={{ flex: 1, marginTop: 0 }} onClick={handleDelete}>{L(dict, '删除', 'Delete')}</button>
+                <button type="button" className="nesio-today-btn nesio-today-btn--ghost nesio-nd-action-btn" onClick={startEdit}>{L(dict, '编辑', 'Edit')}</button>
+                <button type="button" className="nesio-settings-danger-btn nesio-nd-action-btn" onClick={handleDelete}>{L(dict, '删除', 'Delete')}</button>
               </>
             )}
           </div>

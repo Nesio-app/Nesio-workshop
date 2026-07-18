@@ -17951,3 +17951,23 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 @media (prefers-contrast: more) {
   .nesio-sheet { border: 2px solid var(--portal-ink); }
 }
+
+/* 记忆详情底部动作按钮:统一几何(高度/圆角/字号/触控目标),各自保留颜色身份
+   (阅读=主强调实心 / 编辑·取消=中性描边 / 删除=风险)。真机反馈「按钮大小形状不统一」。
+   放文件末尾,确保 source-order 覆盖各按钮基类的 padding/radius/font/height。 */
+.nesio-nd-action-btn {
+  flex: 1;
+  width: auto;
+  height: 46px;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 0 1rem;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 0.88rem;
+  font-weight: var(--weight-semibold, 600);
+  margin-top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
