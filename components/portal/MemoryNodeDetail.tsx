@@ -1,6 +1,7 @@
 'use client';
 
 import { Component, useEffect, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { deleteLifeNode, getLifeGraph, searchLifeGraphFuzzy, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 import { displayStoredLocation } from '@/lib/portal/named-places';
 import type { LocationMeta } from './LocationPicker';
@@ -16,7 +17,7 @@ const ReaderSheetLazy = dynamicImport(() => import('./ArticleReaderSheet'), { ss
 const PlacePickerLazy = dynamicImport(() => import('./PlacePickerSheet'), { ssr: false });
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
-import { useSheetDrag } from './use-sheet-drag';
+import NesioSheet from './ui/NesioSheet';
 const TYPE_BG_DETAIL: Record<string, string> = {
   person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
   event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
@@ -712,8 +713,6 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
     return () => { cancelled = true; };
   }, [node?.id, node?.assets]);
 
-  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
-
   if (!node || deleted) return null;
   const n = node;
 
@@ -856,18 +855,27 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   };
 
   return (
-    <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={n.name}>
+    <>
       {readerOpen && readableText && (
         <ReaderSheetLazy title={n.name} article={readableText} meta={readerMeta} onClose={() => setReaderOpen(false)} />
       )}
-      {isEmailNode && (
-        <EmailComposeSheet
-          open={composeOpen}
-          onClose={() => setComposeOpen(false)}
-          context={{ emailId, from: emailFrom, subject: n.name, snippet: typeof readableAttrs.snippet === 'string' ? readableAttrs.snippet : undefined, article: readableText }}
-        />
+      {/* 迁 NesioSheet(Vaul)后,详情卡在 body 末尾 portal(z~901)。这两个嵌套 modal
+          若就地渲染,会被祖先的 stacking context 困住、渲染在卡片之下(高 z 也没用)——
+          必须 portal 到 body 同层,z-950 才真正压过卡片。又因 Vaul 开启时把 body 设为
+          pointer-events:none(强制模态),body 上新挂的这两层会继承成不可点——故各自显式
+          pointer-events:auto 重新收事件(image-viewer 在 CSS 里、compose 在 inline)。
+          Reader 是 NesioSheet 自带 portal + 自管 pointer-events,无需处理。 */}
+      {isEmailNode && composeOpen && typeof document !== 'undefined' && createPortal(
+        <div style={{ position: 'fixed', inset: 0, zIndex: 950, pointerEvents: 'auto' }}>
+          <EmailComposeSheet
+            open={composeOpen}
+            onClose={() => setComposeOpen(false)}
+            context={{ emailId, from: emailFrom, subject: n.name, snippet: typeof readableAttrs.snippet === 'string' ? readableAttrs.snippet : undefined, article: readableText }}
+          />
+        </div>,
+        document.body,
       )}
-      {viewImage && (
+      {viewImage && typeof document !== 'undefined' && createPortal(
         <div className="nesio-image-viewer" role="dialog" aria-modal="true" onClick={() => setViewImage(null)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={viewImage.url} alt={viewImage.name} className="nesio-image-viewer-img" />
@@ -886,11 +894,17 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
             </button>
             <button type="button" className="nesio-image-viewer-close" onClick={() => setViewImage(null)}>{L(dict, '关闭', 'Close')}</button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
-        <div className="nesio-sheet-handle" {...handleProps} />
+      <NesioSheet
+        variant="bottom"
+        open
+        onOpenChange={(next) => { if (!next) onClose(); }}
+        card={false}
+        className="nesio-settings-sheet-card"
+        ariaLabel={n.name}
+      >
 
         {/* Type color strip */}
         {/* 类型色条:tint 走 CSS 变量,夜间由 CSS 混暗 —— 直接 inline background 会让
@@ -1316,7 +1330,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </NesioSheet>
+    </>
   );
 }

@@ -43,7 +43,7 @@ const ALLOWLIST = new Map([
   ['components/portal/DailyBriefSheet.tsx', 2],
   ['components/portal/EmailComposeSheet.tsx', 2],
   ['components/portal/InstallPrompt.tsx', 1],
-  ['components/portal/MemoryNodeDetail.tsx', 6],
+  ['components/portal/MemoryNodeDetail.tsx', 4],
   ['components/portal/MoodSheet.tsx', 10],
   ['components/portal/NesioChatSheet.tsx', 3],
   ['components/portal/NotePanelEnhanced.tsx', 1],
