@@ -60,15 +60,34 @@ function makeEngine({ nodes = [], txs = [] } = {}) {
   assert.ok(!eng2.collectSeeds(NOW, new Set(), 3).some((s) => s.lensId === 'trend-spend'), '不足 4 笔不出趋势');
 }
 
-// 4) answered 去重 + 限量 + 插件数组
+// 3b) 斯多葛控制二分 nudge(对控制不了的事挂心)
+{
+  const eng = makeEngine({ nodes: [{ id: 'w1', name: '下周面试', tags: [], createdAt: day(1), attributes: { notes: '好担心，万一搞砸了怎么办' } }] });
+  const st = eng.collectSeeds(NOW, new Set(), 3).find((s) => s.lensId === 'stoic');
+  assert.ok(st && st.mode === 'nudge', '挂心控制不了的事 → 斯多葛 nudge');
+}
+
+// 3c) 苏格拉底追问 nudge(绝对判断)
+{
+  const eng = makeEngine({ nodes: [{ id: 'a1', name: '复盘', tags: [], createdAt: day(1), attributes: { notes: '他总是不回消息，根本不在乎这个项目' } }] });
+  const so = eng.collectSeeds(NOW, new Set(), 3).find((s) => s.lensId === 'socratic');
+  assert.ok(so && so.mode === 'nudge' && so.sourceText.includes('复盘'), '绝对判断 → 苏格拉底 nudge');
+}
+
+// 4) answered 去重 + 限量 + 插件数组 + 同源只出一张 + 优先级
 {
   const eng = makeEngine({ nodes: [{ id: 'm1', name: '累', tags: ['情绪'], createdAt: day(1), attributes: { notes: '压力好大' } }] });
   assert.ok(eng.collectSeeds(NOW, new Set(['soothe:m1']), 3).every((s) => s.id !== 'soothe:m1'), '已回应不再出');
-  assert.ok(Array.isArray(eng.LENSES) && eng.LENSES.length >= 3, '镜头库是数组(插件式)');
+  assert.ok(Array.isArray(eng.LENSES) && eng.LENSES.length >= 5, '镜头库是数组(插件式,≥5 镜头)');
   assert.equal(eng.collectSeeds(NOW, new Set(), 0).length, 0, 'limit=0 不出');
   // 去重键 = seed.id(`${lensId}:${sourceId}`):回看流存的 refId 就是 seed.id,故按 seed.id 去重能命中
   const seed = eng.collectSeeds(NOW, new Set(), 3).find((s) => s.lensId === 'soothe');
   assert.equal(seed.id, `soothe:${seed.sourceId}`, 'seed.id = lensId:sourceId(答完存这个当 refId)');
+  // 一段记忆同时命中多镜头(自责+绝对+控制忧虑)→ 只出一张,按 LENSES 顺序取最靠前(reframe)
+  const multi = makeEngine({ nodes: [{ id: 'x1', name: '崩了', tags: [], createdAt: day(1), attributes: { notes: '都怪我，我永远做不好，好担心万一被开怎么办' } }] });
+  const forX1 = multi.collectSeeds(NOW, new Set(), 3).filter((s) => s.sourceId === 'x1');
+  assert.equal(forX1.length, 1, '同一段记忆只出一张卡');
+  assert.equal(forX1[0].lensId, 'reframe', '多镜头命中时取优先级最高的(reframe 在 stoic/socratic 之前)');
 }
 
 // 5) 心智成长图鉴聚合:六维全量 + 老卡 kind 兜底 + 等级门槛
