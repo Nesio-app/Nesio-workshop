@@ -30,6 +30,7 @@ const NesioChatSheet = dynamic(() => import('./NesioChatSheet'), { ssr: false })
 const NotePanelEnhanced = dynamic(() => import('./NotePanelEnhanced'), { ssr: false });
 const ToolsTreasurePopup = dynamic(() => import('./ToolsTreasureSheet'), { ssr: false });
 const InventorySheet = dynamic(() => import('./InventorySheet'), { ssr: false });
+const RewardsStoreSheet = dynamic(() => import('./RewardsStoreSheet'), { ssr: false });
 const DailyBriefSheet = dynamic(() => import('./DailyBriefSheet').then((m) => m.DailyBriefSheet), { ssr: false });
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
 import { openToolHref } from '@/lib/portal/open-tool';
@@ -434,6 +435,7 @@ export default function Portal() {
   >(null);
   const [ownerBusy, setOwnerBusy] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [rewardsOpen, setRewardsOpen] = useState(false);
   const [workoutSession, setWorkoutSession] = useState<import('./fitness/WorkoutPlayer').PlayerSession | null>(null);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
@@ -750,6 +752,7 @@ export default function Portal() {
       track('freeze_open'); setFreezeOpen(true);
     };
     const inventoryHandler = () => { track('inventory_open'); setInventoryOpen(true); };
+    const rewardsHandler = () => { track('rewards_open'); setRewardsOpen(true); };
     const briefHandler = () => { track('brief_open', {}); setBriefOpen(true); };
     const workoutHandler = (e: Event) => { track('workout_start', {}); setWorkoutSession((e as CustomEvent).detail); };
     const proGateHandler = (e: Event) => {
@@ -777,6 +780,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-mood', moodHandler);
     window.addEventListener('nesio-open-freeze', freezeHandler);
     window.addEventListener('nesio-open-inventory', inventoryHandler);
+    window.addEventListener('nesio-open-rewards', rewardsHandler);
     window.addEventListener('nesio-open-brief', briefHandler);
     window.addEventListener('nesio-start-workout', workoutHandler);
     return () => {
@@ -787,6 +791,7 @@ export default function Portal() {
       window.removeEventListener('nesio-open-mood', moodHandler);
       window.removeEventListener('nesio-open-freeze', freezeHandler);
       window.removeEventListener('nesio-open-inventory', inventoryHandler);
+      window.removeEventListener('nesio-open-rewards', rewardsHandler);
       window.removeEventListener('nesio-open-brief', briefHandler);
       window.removeEventListener('nesio-start-workout', workoutHandler);
     };
@@ -1207,6 +1212,7 @@ export default function Portal() {
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
       <MoodSheet open={moodOpen} onClose={() => setMoodOpen(false)} />
       <FreezeVaultSheet open={freezeOpen} onClose={() => setFreezeOpen(false)} initialTab="add" />
+      <RewardsStoreSheet open={rewardsOpen} onClose={() => setRewardsOpen(false)} />
       {ownerConflict && (
         <NesioSheet
           variant="center"
