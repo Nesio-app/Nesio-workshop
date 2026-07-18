@@ -25,6 +25,7 @@ export interface GrowthCard {
   questionEn: string;
   context: string;       // 数据快照(回看流里与回答一起存)
   refId: string;
+  dimension?: string;    // 心智维度(MindDimension);答完点亮成长图鉴
 }
 
 export interface GrowthAnswer {
@@ -34,6 +35,7 @@ export interface GrowthAnswer {
   question: string;
   context: string;
   answer: string;
+  dimension?: string;    // 心智维度(回看流据此聚合成图鉴)
 }
 
 const DAY_MS = 86_400_000;
@@ -65,6 +67,7 @@ function commitmentReviewCard(now: number): GrowthCard | null {
     question: `${days} 天前你记下「${n.name}」—— 还想做吗?当时为什么它重要?`,
     questionEn: `${days} days ago you noted "${n.name}" — still on? Why did it matter then?`,
     context: `记于 ${n.createdAt.slice(0, 10)} · 未完成`,
+    dimension: 'control',
   };
 }
 
@@ -102,6 +105,7 @@ function spendShiftCard(now: number): GrowthCard | null {
     question: `这个月「${best.cat}」花了 $${best.to.toFixed(0)},比上月多 $${(best.to - best.from).toFixed(0)} —— 是有原因的,还是顺手就花了?`,
     questionEn: `"${best.cat}" is $${best.to.toFixed(0)} this month, up $${(best.to - best.from).toFixed(0)} — intentional, or just drift?`,
     context: `${prev}: $${best.from.toFixed(0)} → ${cur}: $${best.to.toFixed(0)}`,
+    dimension: 'blindspot',
   };
 }
 
@@ -124,6 +128,7 @@ function dustyMemoryCard(now: number, dayKey: string): GrowthCard | null {
     question: `「${n.name}」在记忆里躺了 ${Math.round((now - new Date(n.createdAt).getTime()) / DAY_MS)} 天 —— 它还重要吗?`,
     questionEn: `"${n.name}" has sat in Memory for ${Math.round((now - new Date(n.createdAt).getTime()) / DAY_MS)} days — does it still matter?`,
     context: `记于 ${n.createdAt.slice(0, 10)}`,
+    dimension: 'selfaware',
   };
 }
 
@@ -150,7 +155,7 @@ export function recordGrowthAnswer(card: GrowthCard, answer: string): void {
     source: 'ai_observation',
     type: GROWTH_REFLECTION_TYPE,
     title: `成长回看:${card.question.slice(0, 40)}`,
-    payload: { kind: card.kind, refId: card.refId, question: card.question, context: card.context, answer: text },
+    payload: { kind: card.kind, refId: card.refId, question: card.question, context: card.context, answer: text, dimension: card.dimension },
     confidence: 1,
     retentionPolicy: 'LongLiving',
     tags: ['成长引导'],
@@ -169,6 +174,7 @@ export function growthHistory(): GrowthAnswer[] {
         question: p.question || '',
         context: p.context || '',
         answer: p.answer || '',
+        dimension: p.dimension,
       };
     })
     .filter((a) => a.question)

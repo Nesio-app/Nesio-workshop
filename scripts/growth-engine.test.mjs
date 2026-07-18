@@ -66,6 +66,29 @@ function makeEngine({ nodes = [], txs = [] } = {}) {
   assert.ok(eng.collectSeeds(NOW, new Set(['soothe:m1']), 3).every((s) => s.id !== 'soothe:m1'), '已回应不再出');
   assert.ok(Array.isArray(eng.LENSES) && eng.LENSES.length >= 3, '镜头库是数组(插件式)');
   assert.equal(eng.collectSeeds(NOW, new Set(), 0).length, 0, 'limit=0 不出');
+  // 去重键 = seed.id(`${lensId}:${sourceId}`):回看流存的 refId 就是 seed.id,故按 seed.id 去重能命中
+  const seed = eng.collectSeeds(NOW, new Set(), 3).find((s) => s.lensId === 'soothe');
+  assert.equal(seed.id, `soothe:${seed.sourceId}`, 'seed.id = lensId:sourceId(答完存这个当 refId)');
+}
+
+// 5) 心智成长图鉴聚合:六维全量 + 老卡 kind 兜底 + 等级门槛
+{
+  const eng = makeEngine();
+  const stats = eng.summarizeDimensions([
+    { dimension: 'emotion' }, { dimension: 'emotion' }, { dimension: 'emotion' }, // 3 → 成形(level2)
+    { kind: 'spend_shift' },                                                        // 无 dimension → 兜底 blindspot
+    { dimension: 'zzz-unknown' },                                                   // 非法维度忽略
+  ]);
+  assert.equal(stats.length, 6, '图鉴永远返回六维');
+  const by = Object.fromEntries(stats.map((s) => [s.dimension, s]));
+  assert.equal(by.emotion.count, 3, '情绪 3 次');
+  assert.equal(by.emotion.level, 2, '3 次 = 成形(level2)');
+  assert.equal(by.blindspot.count, 1, '老卡 spend_shift 兜底到 blindspot');
+  assert.equal(by.logic.count, 0, '没答过的维度 count=0');
+  assert.equal(eng.levelOf(0), 0, '0 次未点亮');
+  assert.equal(eng.levelOf(2), 1, '<3 萌芽');
+  assert.equal(eng.levelOf(6), 3, '≥6 纯熟');
+  assert.deepEqual(stats.map((s) => s.dimension), eng.DIMENSION_ORDER, '顺序 = DIMENSION_ORDER');
 }
 
 console.log('growth-engine contract tests passed');

@@ -157,6 +157,52 @@ export const DIMENSION_LABEL: Record<MindDimension, { zh: string; en: string }> 
   selfaware: { zh: '自我觉知', en: 'Self-awareness' },
 };
 
+/** 图鉴里六维的固定排序(展示顺序稳定)。 */
+export const DIMENSION_ORDER: MindDimension[] = ['emotion', 'reframe', 'blindspot', 'logic', 'control', 'selfaware'];
+
+/** 老规则卡没有 dimension 字段时的兜底映射(让历史回答也能点亮图鉴)。 */
+const KIND_DIMENSION_FALLBACK: Record<string, MindDimension> = {
+  commitment_review: 'control',
+  spend_shift: 'blindspot',
+  dusty_memory: 'selfaware',
+};
+
+/** 一维的成长等级:答的次数越多越熟。0=未点亮。 */
+export type DimensionLevel = 0 | 1 | 2 | 3;
+export function levelOf(count: number): DimensionLevel {
+  if (count <= 0) return 0;       // 未点亮
+  if (count < 3) return 1;        // 萌芽
+  if (count < 6) return 2;        // 成形
+  return 3;                       // 纯熟
+}
+export const LEVEL_LABEL: Record<DimensionLevel, { zh: string; en: string }> = {
+  0: { zh: '未点亮', en: 'Locked' },
+  1: { zh: '萌芽', en: 'Sprouting' },
+  2: { zh: '成形', en: 'Forming' },
+  3: { zh: '纯熟', en: 'Fluent' },
+};
+
+export interface DimensionStat { dimension: MindDimension; count: number; level: DimensionLevel }
+
+/**
+ * 心智成长图鉴聚合:把回看流(答过的观察/卡)按维度归并计数。
+ * 每条优先用它自己的 dimension;老卡缺字段时用 kind 兜底映射。
+ * 返回六维全量(未点亮的 count=0),顺序 = DIMENSION_ORDER。
+ */
+export function summarizeDimensions(entries: Array<{ dimension?: string; kind?: string }>): DimensionStat[] {
+  const counts = new Map<MindDimension, number>(DIMENSION_ORDER.map((d) => [d, 0]));
+  for (const e of entries) {
+    const dim = (e.dimension && DIMENSION_ORDER.includes(e.dimension as MindDimension))
+      ? (e.dimension as MindDimension)
+      : (e.kind ? KIND_DIMENSION_FALLBACK[e.kind] : undefined);
+    if (dim) counts.set(dim, (counts.get(dim) || 0) + 1);
+  }
+  return DIMENSION_ORDER.map((dimension) => {
+    const count = counts.get(dimension) || 0;
+    return { dimension, count, level: levelOf(count) };
+  });
+}
+
 function safeJson(text: string): { question?: string; options?: string[]; correctIndex?: number; explanation?: string } | null {
   const t = text.trim().replace(/^```json?/i, '').replace(/```$/, '').trim();
   try { return JSON.parse(t); } catch {

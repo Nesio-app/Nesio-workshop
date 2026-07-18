@@ -12,7 +12,7 @@ import {
   todayGrowthCards, recordGrowthAnswer, growthHistory, growthStreakDays,
   GROWTH_FRAMEWORKS, runFrameworkInline, composeArgumentTeardown, type GrowthCard, type GrowthAnswer,
 } from '@/lib/portal/growth-guide';
-import { collectSeeds, generateObservation, DIMENSION_LABEL, type Observation } from '@/lib/portal/growth-engine';
+import { collectSeeds, generateObservation, DIMENSION_LABEL, summarizeDimensions, LEVEL_LABEL, type Observation } from '@/lib/portal/growth-engine';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -62,7 +62,8 @@ export default function GrowthTab() {
     let cancelled = false;
     (async () => {
       try {
-        const answered = new Set(growthHistory().map((a) => `${a.kind}:${a.refId}`));
+        // 观察答完存的 refId = seed.id(`${lensId}:${sourceId}`),collectSeeds 按 seed.id 去重
+        const answered = new Set(growthHistory().map((a) => a.refId));
         const seeds = collectSeeds(Date.now(), answered, 2);
         if (!seeds.length) { if (!cancelled) setObsLoading(false); return; }
         const results = await Promise.all(seeds.map((s) => generateObservation(s, en ? 'en' : 'zh')));
@@ -73,7 +74,8 @@ export default function GrowthTab() {
   }, [en]);
 
   function answerObservation(o: Observation, text: string) {
-    recordGrowthAnswer({ id: o.id, kind: 'dusty_memory', refId: o.sourceId, question: o.title, questionEn: o.title, context: o.sourceText },
+    // refId 存 seed.id(= o.id = `${lensId}:${sourceId}`),这样下次 collectSeeds 能按 seed.id 去重;dimension 点亮图鉴
+    recordGrowthAnswer({ id: o.id, kind: 'dusty_memory', refId: o.id, question: o.title, questionEn: o.title, context: o.sourceText, dimension: o.dimension },
       text);
     setObs((prev) => prev.filter((x) => x.id !== o.id));
     refresh();
@@ -112,6 +114,11 @@ export default function GrowthTab() {
   const fmtDay = (iso: string) => en
     ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     : `${new Date(iso).getMonth() + 1}月${new Date(iso).getDate()}日`;
+
+  // 心智成长图鉴:把回看流按六维聚合(答过的观察/卡点亮对应维度)
+  const codex = summarizeDimensions(history);
+  const codexLit = codex.filter((d) => d.count > 0).length;
+  const codexTotal = codex.reduce((s, d) => s + d.count, 0);
 
   return (
     <div>
@@ -221,6 +228,47 @@ export default function GrowthTab() {
           <p style={{ color: 'var(--portal-ink)', margin: 0, lineHeight: 1.55 }}>{a.answer}</p>
         </div>
       ))}
+
+      {/* ── 心智成长图鉴:回看流按六维聚合,答一次点亮一维,越答越熟 ── */}
+      <p className="nesio-insights-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '心智成长图鉴', 'Mind atlas')}</p>
+      <p className="nesio-settings-option-hint" style={{ marginBottom: 'var(--space-3)' }}>
+        {codexTotal === 0
+          ? L(dict, '每答一条引导,就点亮一维心智 —— 慢慢集齐六维,看自己在哪长得最快。',
+              'Every prompt you answer lights up one facet of mind — collect all six, and see where you grow fastest.')
+          : L(dict, `已点亮 ${codexLit}/6 维 · 共 ${codexTotal} 次觉察`,
+              `${codexLit}/6 facets lit · ${codexTotal} insights logged`)}
+      </p>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+        {codex.map((d) => {
+          const lit = d.count > 0;
+          return (
+            <div key={d.dimension} style={{
+              padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)',
+              background: lit ? 'var(--portal-accent-soft)' : 'transparent',
+              border: `1px solid ${lit ? 'transparent' : 'var(--portal-line)'}`,
+              opacity: lit ? 1 : 0.6,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 }}>
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', color: lit ? 'var(--portal-ink)' : 'var(--portal-muted)' }}>
+                  {L(dict, DIMENSION_LABEL[d.dimension].zh, DIMENSION_LABEL[d.dimension].en)}
+                </span>
+                {lit && <span style={{ fontSize: '0.62rem', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>×{d.count}</span>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 5 }}>
+                {[1, 2, 3].map((lvl) => (
+                  <span key={lvl} style={{
+                    width: 6, height: 6, borderRadius: '50%',
+                    background: d.level >= lvl ? 'var(--portal-blue-deep)' : 'var(--portal-line)',
+                  }} />
+                ))}
+                <span style={{ fontSize: '0.62rem', color: lit ? 'var(--portal-blue-deep)' : 'var(--portal-muted)', marginLeft: 2 }}>
+                  {L(dict, LEVEL_LABEL[d.level].zh, LEVEL_LABEL[d.level].en)}
+                </span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
 
       {/* ── 帮你吵:粘对方的话 → 直接内联拆解 + 回法(不跳转、不复制)── */}
       <p className="nesio-insights-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '帮你吵', 'Win the argument')}</p>
