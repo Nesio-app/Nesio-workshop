@@ -13648,9 +13648,10 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 /* 换封面小徽章(右下角相机) */
 .nesio-tl-photo-edit {
   position: absolute; right: 4px; bottom: 4px;
-  width: 18px; height: 18px; border-radius: 50%;
+  width: 26px; height: 26px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
   background: rgba(20, 22, 30, 0.5); color: #fff;
+  cursor: pointer;
 }
 .nesio-tl-citycard-img { position: relative; border: none; padding: 0; cursor: pointer; width: 100%; background-color: var(--portal-surface-2, rgba(127,127,127,0.08)); }
 .nesio-tl-ccard-body { flex: 1; min-width: 0; padding: 0 0.9rem; display: flex; flex-direction: column; gap: 0.3rem; }
