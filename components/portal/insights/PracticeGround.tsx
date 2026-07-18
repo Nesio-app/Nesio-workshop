@@ -21,7 +21,7 @@ function Icon({ path, cls }: { path: string; cls: string }) {
   return <svg className={cls} viewBox="0 0 24 24" aria-hidden dangerouslySetInnerHTML={{ __html: path }} />;
 }
 
-export default function PracticeGround({ onBack }: { onBack: () => void }) {
+export default function PracticeGround() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const en = dict === 'en';
 
@@ -75,11 +75,7 @@ export default function PracticeGround({ onBack }: { onBack: () => void }) {
     : `${new Date(iso).getMonth() + 1}月${new Date(iso).getDate()}日`;
 
   return (
-    <div className="nesio-growth">
-      <button type="button" className="ng-nav" onClick={onBack}>
-        <svg viewBox="0 0 24 24" aria-hidden><path d="M15 5l-7 7 7 7" /></svg>{L(dict, '回成长', 'Back to Growth')}
-      </button>
-
+    <>
       <div className="ng-hd">
         <svg viewBox="0 0 24 24" aria-hidden><path d="M12 3l7 4v5c0 4-3 7-7 9-4-2-7-5-7-9V7z" /><path d="M9 12l2 2 4-4" /></svg>
         <h1>{L(dict, '练习场', 'Practice')}</h1>
@@ -163,6 +159,6 @@ export default function PracticeGround({ onBack }: { onBack: () => void }) {
         {L(dict, '题从你的真实记忆改写(换了细节,留了那个念头);图鉴是你在生活里遇见过的陷阱,不是抽象解锁。进步只跟自己比,不搞段位。',
           'Questions are rewritten from your real memories; the atlas is traps you’ve met in life, not abstract unlocks. Progress is only vs. your past self.')}
       </p>
-    </div>
+    </>
   );
 }

@@ -18133,3 +18133,20 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .ng-hint svg{width:18px;height:18px;stroke:var(--ng-warm);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none;margin-top:1px}
 .ng-hint p{margin:0;font-size:.86rem;line-height:1.5;color:var(--portal-ink);flex:1}
 .ng-hint .x{font-size:.74rem;color:var(--portal-muted);background:none;border:none;cursor:pointer;flex:none;padding:2px 4px}
+
+/* ── 成长下的三子 tab(成长/练习场/镜头)+ 镜头 tab 的记忆挑选卡 ── */
+.ng-subtabs{display:flex;gap:4px;background:var(--portal-accent-soft);border-radius:12px;padding:4px;margin-bottom:20px}
+.ng-subtabs button{flex:1;font-family:inherit;font-size:.82rem;font-weight:var(--weight-medium);color:var(--portal-muted);background:none;border:none;border-radius:9px;padding:8px 0;cursor:pointer;transition:color .15s var(--ng-ease),background .15s var(--ng-ease)}
+.ng-subtabs button.on{color:var(--portal-accent);background:var(--portal-card);font-weight:var(--weight-semibold);box-shadow:0 1px 2px rgba(20,20,20,.05)}
+
+.ng-mem{display:block;width:100%;text-align:left;font-family:inherit;background:var(--portal-card);border:1px solid var(--portal-line);border-radius:16px;padding:14px 15px;margin-bottom:10px;cursor:pointer;transition:border-color .12s var(--ng-ease),transform .12s var(--ng-ease)}
+.ng-mem:hover{border-color:var(--portal-accent-border)}
+.ng-mem:active{transform:scale(.99)}
+.ng-mem.heavy{border-color:var(--ng-warm)}
+.ng-mem-meta{display:flex;align-items:center;gap:8px;font-size:.73rem;color:var(--ng-faint);margin-bottom:8px;flex-wrap:wrap}
+.ng-mem-meta .dot{width:5px;height:5px;border-radius:50%;background:var(--portal-accent);flex:none}
+.ng-mem.heavy .ng-mem-meta .dot{background:var(--ng-warm)}
+.ng-mem-meta .go{margin-left:auto;color:var(--portal-accent);font-weight:var(--weight-semibold)}
+.ng-mem-text{font-size:.95rem;line-height:1.6;color:var(--portal-ink);margin:0 0 9px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.ng-mem-tags{display:flex;gap:6px;flex-wrap:wrap}
+.ng-mem-tag{font-size:.7rem;color:var(--portal-muted);background:var(--portal-bg);border:1px solid var(--portal-line);border-radius:6px;padding:2px 8px}
