@@ -18180,6 +18180,7 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .ng-tl-sum{margin:4px 0 0 20px;font-size:.82rem;color:var(--portal-muted);line-height:1.45}
 .ng-tl-in{margin-top:10px;background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:14px;padding:13px;display:flex;flex-direction:column;gap:10px;animation:ng-reveal-in .35s var(--ng-ease)}
 .ng-tl-q{margin:0;font-size:.9rem;font-weight:var(--weight-medium);color:var(--portal-ink);line-height:1.5}
+.ng-heal-from{margin:-2px 0 0;font-size:.74rem;color:var(--portal-accent);line-height:1.4}
 
 /* 参与式选项 chips + ANT 实时识别 */
 .ng-heal-chips{display:flex;flex-wrap:wrap;gap:7px}

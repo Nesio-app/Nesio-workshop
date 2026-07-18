@@ -27,6 +27,7 @@ export default function GrowthTab() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const en = dict === 'en';
   const [tab, setTab] = useState<SubTab>('home');
+  const [healingSeed, setHealingSeed] = useState<string | null>(null); // 从情绪卡「去疗愈馆」带过来的那条记忆
 
   const [cards, setCards] = useState<GrowthCard[]>([]);
   const [history, setHistory] = useState<GrowthAnswer[]>([]);
@@ -105,10 +106,10 @@ export default function GrowthTab() {
         <button type="button" role="tab" aria-selected={tab === 'home'} className={tab === 'home' ? 'on' : ''} onClick={() => setTab('home')}>{L(dict, '成长', 'Growth')}</button>
         <button type="button" role="tab" aria-selected={tab === 'lens'} className={tab === 'lens' ? 'on' : ''} onClick={() => setTab('lens')}>{L(dict, '镜头', 'Lenses')}</button>
         <button type="button" role="tab" aria-selected={tab === 'practice'} className={tab === 'practice' ? 'on' : ''} onClick={() => setTab('practice')}>{L(dict, '练习场', 'Practice')}</button>
-        <button type="button" role="tab" aria-selected={tab === 'healing'} className={tab === 'healing' ? 'on' : ''} onClick={() => setTab('healing')}>{L(dict, '疗愈', 'Healing')}</button>
+        <button type="button" role="tab" aria-selected={tab === 'healing'} className={tab === 'healing' ? 'on' : ''} onClick={() => { setHealingSeed(null); setTab('healing'); }}>{L(dict, '疗愈', 'Healing')}</button>
       </div>
 
-      {tab === 'lens' ? <LensTab /> : tab === 'practice' ? <PracticeGround /> : tab === 'healing' ? <HealingTab /> : (
+      {tab === 'lens' ? <LensTab /> : tab === 'practice' ? <PracticeGround /> : tab === 'healing' ? <HealingTab seed={healingSeed} /> : (
         <>
           <GrowthFootprint onGoTab={(t) => setTab(t)} />
           <p className="ng-streak">
@@ -160,7 +161,7 @@ export default function GrowthTab() {
               basis={basisLine(current.o)}
               pick={quizPick[current.o.id]} onPick={(i) => setQuizPick((p) => ({ ...p, [current.o.id]: i }))}
               onSave={(text) => answerObservation(current.o, text)} onSkip={skip}
-              onGoHealing={() => setTab('healing')} />
+              onGoHealing={() => { setHealingSeed(current.o.sourceText); setTab('healing'); }} />
           ) : (
             <div className="ng-today">
               <span className="ng-chip blind">{L(dict, '今日引导', "Today's prompt")}</span>

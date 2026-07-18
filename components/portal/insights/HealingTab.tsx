@@ -26,7 +26,7 @@ const PHASES = ['voice', 'fear', 'protector', 'self', 'body', 'feel'] as const;
 type Phase = typeof PHASES[number] | 'done';
 const phaseRank = (p: Phase) => (p === 'done' ? PHASES.length : PHASES.indexOf(p));
 
-export default function HealingTab() {
+export default function HealingTab({ seed }: { seed?: string | null }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const en = dict === 'en';
 
@@ -48,7 +48,7 @@ export default function HealingTab() {
   useEffect(() => { try { setSeeds(collectSeeds(Date.now(), new Set(), 6).filter((s) => s.mode === 'nudge')); } catch { /* 空 */ } }, []);
 
   const [phase, setPhase] = useState<Phase>('voice');
-  const [voice, setVoice] = useState('');
+  const [voice, setVoice] = useState(() => seed || ''); // 从成长页那条记忆带过来,直接引用不用重填
   const ants = useMemo(() => scanAnts(voice), [voice]);
   const [fear, setFear] = useState<string | null>(null);
   const [ifs, setIfs] = useState<IFSResult | null>(null);
@@ -156,6 +156,9 @@ export default function HealingTab() {
                   <div className="ng-tl-in">
                     <textarea className="ng-ta" rows={2} value={voice} onChange={(e) => setVoice(e.target.value)}
                       placeholder={L(dict, '我必须…… / 我应该早就…… / 全搞砸了……', 'I must… / I should have… / I ruined it all…')} />
+                    {seed && (
+                      <p className="ng-heal-from">{L(dict, '从你成长页那条带过来的 · 想改可以改', 'Carried over from your Growth note — edit if you like')}</p>
+                    )}
                     {seeds.length > 0 && !voice && (
                       <div className="ng-heal-chips">
                         {seeds.slice(0, 3).map((sd) => (
