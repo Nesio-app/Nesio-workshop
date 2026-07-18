@@ -236,6 +236,29 @@ export function recentSpendItems(now = Date.now(), limit = 6): Array<{ date: str
   } catch { return []; }
 }
 
+/**
+ * 阴影整合(IFS · 内在家庭系统)—— 从 inner-space「阴影整合舱」搬来的更深一层。
+ * 把一句自我批判 / 全有全无的念头,拆成:保护者的积极意图 → 清醒自我温柔接管 → 整合洞察
+ * → 一件此刻能做的躯体微动作。复用 inner-space 那套 C-PTSD prompt。只在重情绪下探时用。
+ */
+export interface IFSResult { protector: string; self: string; insight: string; action: string }
+export async function applyIFS(sourceText: string, locale: string): Promise<IFSResult | null> {
+  const t = await chatText(
+    `你是 C-PTSD 疗愈助手。规则:不评判、不说教、禁鸡汤;用 IFS(内在家庭系统)框架,先接住再温和整合。` +
+    `对方的内在独白是:"""${sourceText}"""。\n分四部分,温柔、口语、别用"您":\n` +
+    `- protector:以「保护者」的口吻,说清它用完美主义 / 苛责 / 焦虑在保护对方什么(它极其渴望什么、害怕什么),并谢谢它过去一直在拼命保护;\n` +
+    `- self:以「清醒自我」的口吻温柔接管 —— 现在已经安全了,有足够的理智和力量去建立边界,让这个保护者可以歇一歇;\n` +
+    `- insight:一句更整合的看见(这句话背后是一个怕你不安全的部分;你的价值,不靠它挣来);\n` +
+    `- action:一件 2 分钟内可执行的躯体微动作(如把手放在心口、深呼吸三次)。\n` +
+    `只输出严格 JSON:{"protector":"","self":"","insight":"","action":""}`,
+    locale,
+  );
+  if (!t) return null;
+  const j = safeJson(t) as unknown as Partial<IFSResult> | null;
+  if (!j?.protector && !j?.self) return null;
+  return { protector: String(j.protector || ''), self: String(j.self || ''), insight: String(j.insight || ''), action: String(j.action || '') };
+}
+
 export const DIMENSION_LABEL: Record<MindDimension, { zh: string; en: string }> = {
   emotion: { zh: '情绪理解', en: 'Emotional insight' },
   reframe: { zh: '认知重构', en: 'Reframing' },

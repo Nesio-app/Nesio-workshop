@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { useProfileAvatar } from './use-profile-avatar';
+import { getPoints } from '@/lib/platform/rewards-engine';
 import NesioMark from './NesioMark';
 import RetrospectCard from './RetrospectCard';
 import { usePortalLocale } from './use-portal-locale';
@@ -72,6 +73,13 @@ export default function TodayFeed({
   } = useTodayData(canUsePrivateData);
   const [mirrorOpen, setMirrorOpen] = useState(false);
   const [moodTrendOpen, setMoodTrendOpen] = useState(false);
+  const [points, setPoints] = useState(0); // App 级积分(奖品商城),顶栏徽章
+  useEffect(() => {
+    const sync = () => { try { setPoints(getPoints()); } catch { /* SSR / 无存储 */ } };
+    sync();
+    window.addEventListener('nesio-rewards-updated', sync);
+    return () => window.removeEventListener('nesio-rewards-updated', sync);
+  }, []);
   const [guideDetailNode, setGuideDetailNode] = useState<LiveMemoryNode | null>(null); // 批次 83:引导卡点开详情
   // 批次 31:焦点下方快捷输入(用户新指令)
   const [quickAdd, setQuickAdd] = useState('');
@@ -241,6 +249,11 @@ export default function TodayFeed({
           <NesioMark className="nesio-today-brand-icon" />
         </button>
         <div className="nesio-today-header-tools">
+          {/* App 级积分徽章 → 奖品商城(积分来自忍住没买 / 跟练 / 深度疗愈);点开经 Portal 的 nesio-open-rewards 门 */}
+          <button type="button" className="nesio-today-points" onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-rewards'))}
+            aria-label={L(uiLocale, `${points} 积分 · 打开奖品商城`, `${points} points · open rewards`)}>
+            <span aria-hidden>⬡</span> {points}
+          </button>
           {/* 批次 39:听简报暂时收进「设置 → 路线图」(还在打磨);记录心情移到中央「+」扇形菜单 */}
           <a href="/settings" className="nesio-today-avatar" aria-label={L(uiLocale, '我的设置', 'My settings')}>
             {avatarUrl ? (

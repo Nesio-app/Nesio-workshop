@@ -10127,6 +10127,26 @@ html[data-portal-theme="night"] .nesio-connector-token-box {
   gap: 0.45rem;
 }
 
+/* App 级积分徽章(顶栏,头像旁)→ 奖品商城 */
+.nesio-today-points {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: var(--weight-semibold, 600);
+  font-variant-numeric: tabular-nums;
+  color: var(--portal-accent);
+  background: var(--portal-accent-soft);
+  border: 1px solid var(--portal-accent-border);
+  border-radius: 999px;
+  padding: 0.28rem 0.62rem;
+  cursor: pointer;
+  transition: transform 0.12s var(--ease-out, ease);
+}
+.nesio-today-points:active { transform: scale(0.96); }
+.nesio-today-points:focus-visible { outline: 2px solid var(--portal-accent); outline-offset: 2px; }
+
 
 html[data-portal-theme="night"] .nesio-today-avatar {
   background: var(--portal-blue-light, #2c4a78);
@@ -18078,6 +18098,19 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .ng-btn:active{transform:scale(.975)}
 .ng-btn[disabled]{opacity:.45;cursor:default}
 .ng-btn.ghost{background:none;color:var(--portal-muted);border-color:var(--portal-line);font-weight:var(--weight-medium)}
+.ng-btn.ifs{background:var(--status-calm-soft);color:var(--status-calm);border-color:var(--status-calm)}
+
+/* 阴影整合(IFS):三个内在部分各一色(守护/清醒/洞察),走主题 token */
+.ng-ifs{margin-top:var(--space-3);display:flex;flex-direction:column;gap:9px;animation:ng-reveal-in .4s var(--ng-ease)}
+.ng-ifs-part{border-radius:12px;padding:12px 14px;font-size:.92rem;line-height:1.65;border:1px solid}
+.ng-ifs-part .lbl{display:block;font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.06em;margin-bottom:5px}
+.ng-ifs-part.protector{background:var(--status-gentle-soft);border-color:var(--status-gentle)}
+.ng-ifs-part.protector .lbl{color:var(--status-gentle)}
+.ng-ifs-part.self{background:var(--portal-accent-soft);border-color:var(--portal-accent-border)}
+.ng-ifs-part.self .lbl{color:var(--portal-accent)}
+.ng-ifs-part.insight{background:var(--status-calm-soft);border-color:var(--status-calm)}
+.ng-ifs-part.insight .lbl{color:var(--status-calm)}
+.ng-ifs-action{margin-top:2px;background:var(--portal-card);border:1px solid var(--portal-line);border-radius:10px;padding:9px 12px;font-size:.86rem;color:var(--portal-ink);line-height:1.5}
 .ng-todaynote{font-size:.75rem;color:var(--ng-faint);margin:13px 2px 0;text-align:center}
 .ng-done{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:16px;padding:16px;font-size:.9rem;color:var(--portal-accent);text-align:center;line-height:1.55}
 
