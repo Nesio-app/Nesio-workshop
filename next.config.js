@@ -32,6 +32,14 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  // 允许局域网设备(如手机真机自测 Lab)访问 dev server 的客户端资源。
+  // Next 16 默认只放行同源访问 /_next/*:跨 host(手机开 http://<Mac 局域网IP>:port)
+  // 会拿到 403 → 页面出了 SSR 但客户端 JS 加载失败、不 hydrate(表现:能看见界面但
+  // 点按无反应、日志空白)。仅 dev 生效,不影响生产/导出构建。
+  // 用法:真机自测时 `NESIO_DEV_LAN_ORIGIN=192.168.1.201 npm run dev`(填 Mac 局域网 IP)。
+  ...(process.env.NESIO_DEV_LAN_ORIGIN
+    ? { allowedDevOrigins: process.env.NESIO_DEV_LAN_ORIGIN.split(',').map((s) => s.trim()) }
+    : {}),
   ...(shouldExport ? { output: 'export' } : {}),
   basePath: process.env.BASE_PATH || '',
   assetPrefix: process.env.BASE_PATH ? `${process.env.BASE_PATH}/` : '',
