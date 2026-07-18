@@ -749,9 +749,14 @@ function FavoritesSheet({ pinnedNodes, onClose, onOpenNode, onLongPressNode }: {
   const tags = Array.from(tagCounts.entries()).sort((a, b) => b[1] - a[1]).map(([t]) => t).slice(0, 12);
   const shown = tag ? pinnedNodes.filter((n) => (n.tags || []).some((t) => t.trim() === tag)) : pinnedNodes;
   return (
-    <>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-project-detail-sheet nesio-fav-sheet">
+    <NesioSheet
+      variant="bottom"
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-project-detail-sheet nesio-fav-sheet"
+      ariaLabel={L(dict, '收藏夹', 'Saved')}
+    >
         <div className="nesio-project-detail-header">
           <span className="nesio-project-detail-emoji"><IconBookmark size={16} /></span>
           <span className="nesio-project-detail-name">{L(dict, '收藏夹', 'Saved')}</span>
@@ -782,8 +787,7 @@ function FavoritesSheet({ pinnedNodes, onClose, onOpenNode, onLongPressNode }: {
             ))}
           </div>
         )}
-      </div>
-    </>
+    </NesioSheet>
   );
 }
 
@@ -861,9 +865,14 @@ function ProjectDetailSheet({
   // 状态改在项目聚合页(进行中/计划中/已完成)语义上体现。
 
   return (
-    <>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-project-detail-sheet">
+    <NesioSheet
+      variant="bottom"
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-project-detail-sheet"
+      ariaLabel={project.name}
+    >
         <div className="nesio-project-detail-header">
           <span className="nesio-project-detail-emoji"><IconFolder size={16} /></span>
           <span className="nesio-project-detail-name">{project.name}</span>
@@ -892,8 +901,7 @@ function ProjectDetailSheet({
             {L(dict, '删除项目', 'Delete project')}
           </button>
         </div>
-      </div>
-    </>
+    </NesioSheet>
   );
 }
 
