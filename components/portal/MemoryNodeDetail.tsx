@@ -17,6 +17,8 @@ const PlacePickerLazy = dynamicImport(() => import('./PlacePickerSheet'), { ssr:
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { useSheetDrag } from './use-sheet-drag';
+import MemoryLensSheet from './MemoryLensSheet';
+import { shouldNudge } from '@/lib/portal/lens';
 const TYPE_BG_DETAIL: Record<string, string> = {
   person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
   event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
@@ -619,6 +621,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   const [linkQuery, setLinkQuery] = useState('');
   const [linkError, setLinkError] = useState(''); // 批次 94:关联出错时可见,便于用户截图反馈
   const [linkCandidates, setLinkCandidates] = useState<LifeNode[]>([]);
+  const [lensOpen, setLensOpen] = useState(false);        // 镜头看记忆(底部弹层)
+  const [nudgeDismissed, setNudgeDismissed] = useState(false); // 情绪重记忆的主动提示已划走
   // 批次 172(关联记忆闪退根治):搜索移出渲染热路径 —— 去抖异步跑,不再每次按键同步搜全图
   // (516 节点 + 中文 2-gram 同步搜会卡死主线程 → iOS 看门狗杀 webview = 用户实锤「一打字就闪退」)。
   useEffect(() => {
@@ -1295,6 +1299,23 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
           onRenamed={(name) => setHealedPlace(name)}
         />
       )}
+
+      {/* 镜头看记忆:情绪重的主动提示 + 用镜头看看(长在记忆上的动作) */}
+          {!editing && (
+            <div className="nesio-growth">
+              {shouldNudge(`${n.name} ${(n.attributes?.notes as string) || n.rawInput || ''}`) && !nudgeDismissed && (
+                <div className="ng-hint" style={{ marginTop: '1.25rem' }}>
+                  <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+                  <p>{L(dict, '念念看到这条情绪有点重 —— 要不要陪你把它看清楚一点?(不是分析你,是把话看清)', 'This one feels heavy — want to look at it more clearly? (not analyzing you — just seeing the words)')}</p>
+                  <button type="button" className="x" onClick={() => setNudgeDismissed(true)}>{L(dict, '轻轻划走', 'Dismiss')}</button>
+                </div>
+              )}
+              <button type="button" className="ng-btn" style={{ width: '100%', marginTop: '0.75rem' }} onClick={() => setLensOpen(true)}>
+                {L(dict, '用镜头看看 ✦', 'Look with a lens ✦')}
+              </button>
+            </div>
+          )}
+          <MemoryLensSheet open={lensOpen} onOpenChange={setLensOpen} node={n} />
 
       {/* Actions */}
           <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.25rem' }}>
