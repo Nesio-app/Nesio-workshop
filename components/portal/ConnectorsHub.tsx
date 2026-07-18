@@ -55,7 +55,7 @@ const CONNECTORS: ConnectorDef[] = [
   // 批次 21:Google 地图时间轴导入 —— 手机端导出的 JSON 并入地点足迹
   { id: 'timeline', name: 'Google 时间轴导入', nameEn: 'Google Timeline import', icon: <IconMapPin />, iconBg: 'var(--chip-leaf)', method: 'file', description: '手机 Google 地图 → 设置 → 时间轴 → 导出数据,把 JSON 传进来并入地点足迹', descriptionEn: 'Google Maps app → Settings → Timeline → export, upload the JSON to merge into your place trail' },
   // 批次 19:相册批量导入 —— 一次选多张,AI 逐张识别入库(解决「一张张传太麻烦」)
-  { id: 'photos', name: '相册批量导入', nameEn: 'Batch photo import', icon: <IconImage />, iconBg: 'var(--chip-frost)', method: 'batch-photos', description: '一次选多张照片,自动识别成记忆(每批最多 10 张)', descriptionEn: 'Pick multiple photos; each is recognized into memories (up to 10 per batch)' },
+  { id: 'photos', name: '相册批量导入', nameEn: 'Batch photo import', icon: <IconImage />, iconBg: 'var(--chip-frost)', method: 'batch-photos', description: '一次选多张照片,自动识别成记忆(每批最多 30 张)', descriptionEn: 'Pick multiple photos; each is recognized into memories (up to 30 per batch)' },
   { id: 'flomo', name: 'Flomo', icon: <IconNote />, iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=5000', description: '同步 flomo 笔记，提取想法与记录', descriptionEn: 'Sync flomo notes; extract ideas and records' },
   // 批次 18:Notion 转正 —— OAuth 一键授权(像 flomo 那样选页面),内部 token 流保留为回退
   { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成(Internal)→ 复制 Internal Integration Secret(ntn_… 或 secret_…)→ 在要同步的 Notion 页面右上角「…」→ 连接 → 选中这个集成', tokenHintEn: 'notion.so/my-integrations → New internal integration → copy the secret (ntn_… / secret_…) → on each page: ••• → Connections → add this integration', description: '粘贴内部集成 token,同步共享给它的页面(提取项目与想法)', descriptionEn: 'Paste an internal integration token to sync the pages you shared with it' },
@@ -264,7 +264,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   }
 
   async function handleBatchPhotos(files: FileList | null) {
-    const list = Array.from(files || []).slice(0, 10);
+    // 每批上限 30(此前 10 太少,用户要「多一些」)。逐张走云识别 + 进度提示,顺序不阻塞 UI。
+    const list = Array.from(files || []).slice(0, 30);
     if (!list.length) return;
     setSyncing('photos');
     let saved = 0; let failed = 0;

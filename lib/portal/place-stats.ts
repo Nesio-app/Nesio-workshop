@@ -6,6 +6,7 @@
 
 import { buildPlaceTimeline, haversineKm, placeKey, loadPlaceGeo, type PlaceVisit } from './place-trail';
 import { dateKeyToLocalDate, wallHour } from './place-time.mjs';
+import { distinctCountryCount } from './country-normalize';
 
 export interface MonthPlaceStats {
   /** 'YYYY-MM' */
@@ -189,7 +190,8 @@ export function footprintHighlights(visits: PlaceVisit[]): FootprintHighlights |
   }
 
   const geo = loadPlaceGeo();
-  const countries = new Set(Object.values(geo).map((g) => g.country).filter(Boolean)).size;
+  // 按归一化国家键去重 —— 「美国/United States/US」是同一国,不再各算一个(用户实锤)。
+  const countries = distinctCountryCount(Object.values(geo).map((g) => g.country));
   const cities = new Set(Object.values(geo).map((g) => g.city).filter(Boolean)).size;
 
   const monthly = [...monthPlaces.entries()]

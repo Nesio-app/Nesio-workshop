@@ -5,6 +5,7 @@
  * 覆盖映射存 localStorage。全本机,不上传。
  */
 import { compressToDataUrl, putLocalImage } from './local-image-store';
+import { canonicalCountryKey } from './country-normalize';
 
 const KEY = 'nesio-place-photos-v1';
 export const PLACE_PHOTOS_EVENT = 'nesio-place-photos-updated';
@@ -39,18 +40,52 @@ function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): nu
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-export interface GeoImageNode { assetId: string; lat: number; lon: number; ts: number }
+// lat/lon 可缺省 —— 没坐标的带图记忆也纳入,按 city/country 地名回退匹配。
+export interface GeoImageNode { assetId: string; lat?: number; lon?: number; ts: number; city?: string; country?: string }
 
-/** 就近匹配:该地的到访点 coords 与带图节点比,取 25km 内最近的一张(并列取最近记的)。 */
-export function matchPlacePhotoAsset(coords: Array<{ lat: number; lon: number }>, imageNodes: GeoImageNode[]): string | null {
-  if (!coords.length || !imageNodes.length) return null;
-  let best: GeoImageNode | null = null;
-  let bestD = Infinity;
-  for (const n of imageNodes) {
-    for (const c of coords) {
-      const d = haversineKm(c.lat, c.lon, n.lat, n.lon);
-      if (d < bestD || (d === bestD && best && n.ts > best.ts)) { bestD = d; best = n; }
+/** 卡片的地点描述(城市卡传 city,国家卡传 country)—— 坐标匹配不到时按名回退。 */
+export interface PlaceDescriptor { city?: string; country?: string }
+
+/**
+ * 给地点卡挑一张封面照(用户:有对应记忆照片就自动展示最好的一张,别空着):
+ *  1) 坐标就近:到访点 coords 与带坐标的照片比,取 25km 内最近的一张(并列取最近记的);
+ *  2) 地名回退:没坐标命中时,按该照片记忆归属的 city/country 与卡片一致来配,取最近记的一张。
+ * 「最好」这里取最近记录的(时间新),稳定且可解释。
+ */
+export function matchPlacePhotoAsset(
+  coords: Array<{ lat: number; lon: number }>,
+  imageNodes: GeoImageNode[],
+  place?: PlaceDescriptor,
+): string | null {
+  if (!imageNodes.length) return null;
+
+  // 1) 坐标就近
+  if (coords.length) {
+    let best: GeoImageNode | null = null;
+    let bestD = Infinity;
+    for (const n of imageNodes) {
+      if (typeof n.lat !== 'number' || typeof n.lon !== 'number') continue;
+      for (const c of coords) {
+        const d = haversineKm(c.lat, c.lon, n.lat, n.lon);
+        if (d < bestD || (d === bestD && best && n.ts > best.ts)) { bestD = d; best = n; }
+      }
     }
+    if (best && bestD <= 25) return best.assetId;
   }
-  return best && bestD <= 25 ? best.assetId : null;
+
+  // 2) 地名回退:城市卡按城市、国家卡按国家匹配归属照片,取最新
+  if (place) {
+    const wantCity = place.city?.trim().toLowerCase();
+    const wantCountry = place.country ? canonicalCountryKey(place.country) : '';
+    let best: GeoImageNode | null = null;
+    for (const n of imageNodes) {
+      const hit = wantCity
+        ? Boolean(n.city && n.city.trim().toLowerCase() === wantCity)
+        : Boolean(wantCountry && n.country && canonicalCountryKey(n.country) === wantCountry);
+      if (hit && (!best || n.ts > best.ts)) best = n;
+    }
+    if (best) return best.assetId;
+  }
+
+  return null;
 }
