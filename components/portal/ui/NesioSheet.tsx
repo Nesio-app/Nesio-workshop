@@ -114,11 +114,14 @@ function useFocusTrap(ref: RefObject<HTMLElement | null>, active: boolean) {
         first.focus({ preventScroll: true });
       }
     };
-    // 焦点逃到 sheet 外(含 Tab 溜出)→ 拉回。放行 Radix focus-guard 哨兵。
+    // 焦点逃到 sheet 外(含 Tab 溜出)→ 拉回。放行两类:Radix focus-guard 哨兵;
+    // 以及焦点进入「另一个后开的模态」(嵌套 sheet / node-detail 等)—— 嵌套感知,
+    // 别把它拽回来,否则嵌套模态里无法输入/交互。只有逃到普通背景才拉回。
     const onFocusIn = (e: FocusEvent) => {
       const t = e.target as HTMLElement | null;
       if (!t || el.contains(t)) return;
       if (t.hasAttribute?.('data-radix-focus-guard')) return;
+      if (t.closest?.('[role="dialog"], [aria-modal="true"], [data-vaul-drawer], [data-radix-portal]')) return;
       focusFirst();
     };
     // 焦点掉到 body(异步 setState 卸载了当前控件)→ 下一帧拉回
