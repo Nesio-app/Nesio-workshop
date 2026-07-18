@@ -50,7 +50,6 @@ const ALLOWLIST = new Map([
   ['components/portal/Portal.tsx', 2],
   ['components/portal/PortalOnboarding.tsx', 4],
   ['components/portal/PreviewGuidesSheet.tsx', 2],
-  ['components/portal/SettingsSheets.tsx', 2],
   ['components/portal/TellNesioSheet.tsx', 2],
   ['components/portal/TeslaSheet.tsx', 2],
   ['components/portal/ToolsTreasureSheet.tsx', 1],
