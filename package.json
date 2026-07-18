@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "npm run bundle:toolbox && npm run bundle:ort && next dev",
     "build": "npm run build:server",
-    "build:server": "npm run bundle:ort && npm run check:leak && npm run bundle:toolbox && next build",
+    "build:server": "npm run bundle:ort && npm run bundle:models && npm run check:leak && npm run bundle:toolbox && next build",
     "check:leak": "node scripts/check-platform-leak.mjs",
     "bundle:toolbox": "node scripts/bundle-toolbox.mjs",
     "report:modules": "node scripts/report-module-registry.mjs",
@@ -288,7 +288,8 @@
     "test:cross-region-deliver": "node scripts/cross-region-deliver.test.mjs",
     "test:cross-region-bandit": "node scripts/cross-region-bandit.test.mjs",
     "test:meeting-calendar-link": "node scripts/meeting-calendar-link.test.mjs",
-    "bundle:ort": "node scripts/copy-ort-wasm.mjs"
+    "bundle:ort": "node scripts/copy-ort-wasm.mjs",
+    "bundle:models": "node scripts/fetch-web-models-ci.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.4.1",
