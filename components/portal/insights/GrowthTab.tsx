@@ -208,7 +208,7 @@ function TodayObsCard({ o, dict, en, basis, draft, setDraft, pick, onPick, onSav
     <div className="ng-today">
       <span className={`ng-chip ${chip}`}>{o.mode === 'nudge' ? L(dict, '情绪 · 主动疏导', 'Feeling · gentle') : o.mode === 'quiz' ? L(dict, '盲点 · 每日观察', 'Blind spot · daily') : L(dict, '趋势 · 主动发现', 'Trend · noticed')} · {chipLabel}</span>
       <p className="ng-ask">{o.mode === 'quiz' && o.quiz ? o.quiz.question : o.body}</p>
-      <p className="ng-basis">{o.mode === 'quiz' ? o.sourceText : basis}</p>
+      <p className="ng-basis">{basis}</p>
 
       {o.mode !== 'quiz' ? (
         <>
