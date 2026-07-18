@@ -10733,7 +10733,7 @@ html[data-portal-theme="night"] .nesio-wechat-bubble--ai {
 /* Input bar */
 .nesio-wechat-input-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-end; /* 输入框自增高时,麦克风/＋/发送 仍贴底对齐 */
   gap: 0.4rem;
   padding: 0.55rem 0.75rem;
   padding-bottom: calc(0.55rem + env(safe-area-inset-bottom, 0px));
@@ -10749,23 +10749,29 @@ html[data-portal-theme="night"] .nesio-wechat-input-bar {
 .nesio-wechat-input {
   flex: 1;
   min-width: 0;
-  height: 2.2rem;
-  padding: 0 0.75rem;
-  border-radius: 1.1rem;
+  /* 单行起步、随字数自增高(JS 控 scrollHeight,封顶 120px 后内部滚动) */
+  min-height: 2.5rem;
+  max-height: 120px;
+  padding: 0.5rem 0.85rem;
+  border-radius: 1.25rem;
   border: 1px solid rgba(0,0,0,0.1);
   background: #fff;
-  font-size: 0.9rem;
+  font-family: var(--font-sans);
+  font-size: 1.02rem; /* 字体调大,长文更好读 */
+  line-height: 1.4;
   color: var(--portal-ink);
   outline: none;
+  resize: none;
+  overflow-y: auto;
 }
 html[data-portal-theme="night"] .nesio-wechat-input { background: #2a2d3e; border-color: rgba(255,255,255,0.1); color: #d0d8f0; }
 .nesio-wechat-input::placeholder { color: var(--portal-muted); opacity: 0.6; }
 .nesio-wechat-input:focus { border-color: var(--portal-blue-deep); }
 
 .nesio-wechat-send-btn {
-  padding: 0 0.9rem;
-  height: 2.2rem;
-  border-radius: 1.1rem;
+  padding: 0 0.95rem;
+  height: 2.5rem;
+  border-radius: 1.25rem;
   /* 批次 180:发送键改主题色(原微信绿 #07c160 与莫兰迪主题冲突) */
   background: var(--portal-accent);
   color: #fff;
@@ -10779,8 +10785,8 @@ html[data-portal-theme="night"] .nesio-wechat-input { background: #2a2d3e; borde
 .nesio-wechat-send-btn:disabled { opacity: 0.45; }
 
 .nesio-wechat-plus-btn {
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 50%;
   border: 1px solid rgba(0,0,0,0.1);
   background: #fff;
@@ -10963,8 +10969,8 @@ html[data-portal-theme="night"] .nesio-memory-detail-val { color: #d0d8f0; }
 /* ── Voice/text mode toggle button ── */
 .nesio-wechat-mode-btn {
   color: var(--portal-muted);
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 50%;
   border: 1px solid rgba(0,0,0,0.1);
   background: #fff;
