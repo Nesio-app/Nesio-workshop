@@ -14,6 +14,7 @@
  */
 
 import type { LifeNode } from './life-graph';
+import { embedTexts, TEXT_EMBED_MODEL } from './semantic-search/text-embed';
 
 const LEGACY_LS_KEY = 'nesio-node-embeddings-v1';
 const DB_NAME = 'nesio-vectors';
@@ -84,7 +85,10 @@ export type SemanticReason = 'ok' | 'not_needed' | 'no_key' | 'rate_limited' | '
 
 type FetchVectorsResult = { vectors: Array<number[] | null>; model: string } | { failure: Exclude<SemanticReason, 'ok' | 'not_needed'> };
 
-async function fetchVectors(texts: string[]): Promise<FetchVectorsResult> {
+async function fetchVectors(texts: string[], queryCount = 0): Promise<FetchVectorsResult> {
+  // 端上优先:免费/离线/私密/跨语言。就绪则用它;没就绪(后台加载中)返回 null → 本次回退云端。
+  const local = await embedTexts(texts, queryCount);
+  if (local) return { vectors: local.map((v) => Array.from(v)), model: TEXT_EMBED_MODEL };
   try {
     const res = await fetch('/api/portal/embed', {
       method: 'POST',
@@ -142,7 +146,7 @@ export async function semanticRerankMeta(query: string, nodes: LifeNode[], topK 
   });
 
   const texts = [q, ...missing.map((m) => m.text)];
-  const fetched = await fetchVectors(texts);
+  const fetched = await fetchVectors(texts, 1); // texts[0]=查询,贴 "query: ";其余是文档 "passage: "
   if ('failure' in fetched) return { nodes, semantic: false, reason: fetched.failure };
   if (!fetched.vectors[0]) return { nodes, semantic: false, reason: 'provider' }; // 查询向量都没回来 = 提供方故障/配额
 
