@@ -342,13 +342,25 @@ export default function TimelineTab() {
     const geo = loadPlaceGeo();
     const byCountry = new Map<string, Array<{ lat: number; lon: number }>>();
     const byCity = new Map<string, Array<{ lat: number; lon: number }>>();
+    // 按 ~1km 网格去重并封顶 —— trail 可达上万点,不去重会让下游匹配 O(节点×坐标)
+    // 在主线程扫爆(用户实锤点城市卡卡死)。25km 匹配阈值下,1km 网格精度绰绰有余。
+    const seenC = new Map<string, Set<string>>();
+    const seenCity = new Map<string, Set<string>>();
+    const add = (map: Map<string, Array<{ lat: number; lon: number }>>, seenMap: Map<string, Set<string>>, key: string, lat: number, lon: number) => {
+      let seen = seenMap.get(key);
+      if (!seen) { seen = new Set(); seenMap.set(key, seen); }
+      const rk = `${lat.toFixed(2)},${lon.toFixed(2)}`;
+      if (seen.has(rk)) return;
+      seen.add(rk);
+      const a = map.get(key) || [];
+      if (a.length < 80) { a.push({ lat, lon }); map.set(key, a); }
+    };
     for (const v of trail) {
       if (typeof v.lat !== 'number' || typeof v.lon !== 'number') continue;
       const g = geo[v.label];
-      // 国家坐标按归一化键聚 —— 世界卡已按 countryKey 合并「美国/US」,坐标也要合并,
-      // 否则合并后的卡只拿到一个变体的到访点,另一变体附近的照片配不上(封面照空)。
-      if (g?.country) { const k = canonicalCountryKey(g.country); const a = byCountry.get(k) || []; a.push({ lat: v.lat, lon: v.lon }); byCountry.set(k, a); }
-      if (g?.city) { const a = byCity.get(g.city) || []; a.push({ lat: v.lat, lon: v.lon }); byCity.set(g.city, a); }
+      // 国家坐标按归一化键聚 —— 世界卡已按 countryKey 合并「美国/US」,坐标也要合并。
+      if (g?.country) add(byCountry, seenC, canonicalCountryKey(g.country), v.lat, v.lon);
+      if (g?.city) add(byCity, seenCity, g.city, v.lat, v.lon);
     }
     return { byCountry, byCity };
   }, [trail]);
@@ -357,8 +369,8 @@ export default function TimelineTab() {
   const placeTimes = useMemo(() => {
     const geo = loadPlaceGeo();
     const BUF = 90 * 60_000;
-    const byCountry = new Map<string, Array<[number, number]>>();
-    const byCity = new Map<string, Array<[number, number]>>();
+    const rawCountry = new Map<string, Array<[number, number]>>();
+    const rawCity = new Map<string, Array<[number, number]>>();
     for (const v of trail) {
       const g = geo[v.label];
       if (!g?.country && !g?.city) continue;
@@ -366,9 +378,24 @@ export default function TimelineTab() {
       if (!Number.isFinite(s)) continue;
       const e = v.end ? new Date(v.end).getTime() : s;
       const range: [number, number] = [s - BUF, (Number.isFinite(e) ? e : s) + BUF];
-      if (g?.country) { const k = canonicalCountryKey(g.country); const a = byCountry.get(k) || []; a.push(range); byCountry.set(k, a); }
-      if (g?.city) { const a = byCity.get(g.city) || []; a.push(range); byCity.set(g.city, a); }
+      if (g?.country) { const k = canonicalCountryKey(g.country); const a = rawCountry.get(k) || []; a.push(range); rawCountry.set(k, a); }
+      if (g?.city) { const a = rawCity.get(g.city) || []; a.push(range); rawCity.set(g.city, a); }
     }
+    // 合并重叠区间:成千上万个 ±90min 窗合并成几段「停留」,匹配时不再逐条扫爆主线程。
+    const merge = (ranges: Array<[number, number]>): Array<[number, number]> => {
+      ranges.sort((a, b) => a[0] - b[0]);
+      const out: Array<[number, number]> = [];
+      for (const r of ranges) {
+        const last = out[out.length - 1];
+        if (last && r[0] <= last[1]) last[1] = Math.max(last[1], r[1]);
+        else out.push([r[0], r[1]]);
+      }
+      return out;
+    };
+    const byCountry = new Map<string, Array<[number, number]>>();
+    const byCity = new Map<string, Array<[number, number]>>();
+    for (const [k, a] of rawCountry) byCountry.set(k, merge(a));
+    for (const [k, a] of rawCity) byCity.set(k, merge(a));
     return { byCountry, byCity };
   }, [trail]);
   // 城市卡点进去看该城市的记忆:capturedPlace 经 geo 归属该城市,或坐标在该城市到访点 25km 内
@@ -399,7 +426,7 @@ export default function TimelineTab() {
         const t = new Date(nn.createdAt).getTime();
         if (Number.isFinite(t) && cityTimes.some(([s, e]) => t >= s && t <= e)) hit = true;
       }
-      if (hit && !seen.has(nn.id)) { seen.add(nn.id); out.push(nn); }
+      if (hit && !seen.has(nn.id)) { seen.add(nn.id); out.push(nn); if (out.length >= 80) break; }
     }
     return out;
   };
