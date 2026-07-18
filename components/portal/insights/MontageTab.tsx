@@ -6,7 +6,8 @@
  * 短片在 Lab 端生成后落本机,这里读出来看/播/删。
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { loadMontages, deleteMontage, KIND_LABEL, DEMO_MONTAGES, type VideoMontage } from '@/lib/portal/video-montage';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -18,6 +19,18 @@ export default function MontageTab() {
   const [items, setItems] = useState<VideoMontage[]>([]);
   const [isDemo, setIsDemo] = useState(false);
   const [playing, setPlaying] = useState<VideoMontage | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+
+  // 全屏:iOS 独立 PWA 下内联 video 原生全屏键常失灵 → 显式请求(iOS 走 webkitEnterFullscreen)
+  function goFullscreen() {
+    const v = videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void; webkitRequestFullscreen?: () => void }) | null;
+    if (!v) return;
+    try {
+      if (typeof v.requestFullscreen === 'function') void v.requestFullscreen();
+      else if (typeof v.webkitEnterFullscreen === 'function') v.webkitEnterFullscreen();
+      else if (typeof v.webkitRequestFullscreen === 'function') v.webkitRequestFullscreen();
+    } catch { /* 用户手势外/不支持:静默 */ }
+  }
 
   const refresh = () => {
     const real = loadMontages();
@@ -123,17 +136,21 @@ export default function MontageTab() {
           'Rendered on your device · from your own memories and photos · only you can see them')}
       </p>
 
-      {playing && (
-        <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={playing.title}
-          onClick={() => setPlaying(null)}>
-          <div style={{ maxWidth: 460, width: '92%', margin: 'auto' }} onClick={(e) => e.stopPropagation()}>
-            <video src={playing.videoUrl} controls autoPlay playsInline style={{ width: '100%', borderRadius: 'var(--radius-md)', background: '#000' }} />
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-2)' }}>
+      {/* 播放器:portal 到 body,逃离洞察 sheet 的 transform 层叠上下文(治重影);不透明深底盖满全屏 */}
+      {playing && typeof document !== 'undefined' && createPortal(
+        <div role="dialog" aria-modal="true" aria-label={playing.title} onClick={() => setPlaying(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(12,10,12,0.88)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '4vh 16px' }}>
+          <div style={{ maxWidth: 460, width: '100%', margin: 'auto' }} onClick={(e) => e.stopPropagation()}>
+            <video ref={videoRef} src={playing.videoUrl} controls autoPlay playsInline
+              style={{ width: '100%', maxHeight: '78vh', borderRadius: 'var(--radius-md)', background: '#000', display: 'block' }} />
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
               <button type="button" className="nesio-connector-connect" onClick={() => setPlaying(null)}>{L(dict, '关闭', 'Close')}</button>
+              <button type="button" className="nesio-connector-connect" onClick={goFullscreen}>{L(dict, '全屏', 'Fullscreen')}</button>
               <button type="button" className="nesio-connector-disconnect" onClick={() => { deleteMontage(playing.id); setPlaying(null); refresh(); }}>{L(dict, '删除', 'Delete')}</button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
