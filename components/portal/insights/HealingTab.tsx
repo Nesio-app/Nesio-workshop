@@ -113,7 +113,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
     { key: 'protector', n: 3, title: L(dict, '看见保护者', 'Meet the protector'), sum: L(dict, '已看见它在守着你', 'Seen — it was guarding you') },
     { key: 'self', n: 4, title: L(dict, '清醒自我接管', 'Your calm self leads'), sum: reply ? reply.replace(/[「」“”]/g, '').slice(0, 18) : L(dict, '让保护者歇一歇', 'Let the protector rest') },
     { key: 'body', n: 5, title: L(dict, '落到身体,真做一遍', 'Ground it in the body'), sum: L(dict, '已做一遍', 'Done') },
-    { key: 'feel', n: 6, title: L(dict, '此刻,心里怎么样', 'How you feel now'), sum: feelEmObj ? `${feelEmObj.emoji} ${en ? feelEmObj.labelEn : feelEmObj.label}${earned ? ' · +' + POINTS_PER_HEALING : ''}` : '' },
+    { key: 'feel', n: 6, title: L(dict, '此刻,心里怎么样', 'How you feel now'), sum: feelEmObj ? `${en ? feelEmObj.labelEn : feelEmObj.label}${earned ? ' · +' + POINTS_PER_HEALING : ''}` : '' },
   ];
   const stateOf = (k: typeof PHASES[number]) => {
     const mine = PHASES.indexOf(k);
@@ -231,7 +231,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
                     <div className="ng-mood-grid">
                       {EMOTIONS.map((m) => (
                         <button key={m.id} type="button" className={`ng-mood-chip${feelEm === m.id ? ' on' : ''}`} onClick={() => setFeelEm(m.id)}>
-                          <span className="em" aria-hidden>{m.emoji}</span>{en ? m.labelEn : m.label}
+                          <span className="dot" style={{ background: m.color }} aria-hidden />{en ? m.labelEn : m.label}
                         </button>
                       ))}
                     </div>
@@ -256,7 +256,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
           <div className="ng-loop">
             <div className="ng-loop-row"><span className="k">{L(dict, '开始时', 'At the start')}</span><span className="v">「{voice.slice(0, 20)}{voice.length > 20 ? '…' : ''}」</span></div>
             <div className="ng-loop-arrow" aria-hidden>↓</div>
-            <div className="ng-loop-row now"><span className="k">{L(dict, '此刻', 'Now')}</span><span className="v">{feelEmObj ? `${feelEmObj.emoji} ${en ? feelEmObj.labelEn : feelEmObj.label}` : ''}{feelNote.trim() ? ` · ${feelNote.trim()}` : ''}</span></div>
+            <div className="ng-loop-row now"><span className="k">{L(dict, '此刻', 'Now')}</span><span className="v">{feelEmObj && <span className="ng-mdot" style={{ background: feelEmObj.color }} aria-hidden />}{feelEmObj ? (en ? feelEmObj.labelEn : feelEmObj.label) : ''}{feelNote.trim() ? ` · ${feelNote.trim()}` : ''}</span></div>
           </div>
           <p className="ng-done" style={{ marginTop: 12 }}>
             {earned
