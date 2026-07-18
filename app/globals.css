@@ -18203,7 +18203,8 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .nm-foot b{color:var(--portal-muted)}
 .nm-empty{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:16px;padding:16px;font-size:.9rem;color:var(--portal-accent);text-align:center;line-height:1.55}
 
-/* 落差揭晓播放器(内容在 NesioSheet·Radix 居中面里;不再手写 portal 遮罩) */
+/* 落差揭晓播放器(内容在 NesioSheet·Radix 居中面里,可交互;自带不透明深底=干净影院感,不透底) */
+.nm-cinema{position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:22px;overflow:auto}
 .nm-player{width:min(420px,88vw)}
 .nm-screen{aspect-ratio:16/11;border-radius:14px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;text-align:center;padding:22px;background:#000 center/cover no-repeat}
 .nm-screen .note{color:rgba(255,255,255,.94);font-size:.95rem;line-height:1.7;font-style:italic;transition:opacity .7s,filter .7s;position:relative;z-index:2;text-shadow:0 2px 12px rgba(0,0,0,.8)}

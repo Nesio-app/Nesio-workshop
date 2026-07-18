@@ -151,7 +151,8 @@ export default function MontageTab() {
       <NesioSheet variant="center" card={false} dismissible open={playing !== null}
         onOpenChange={(o) => { if (!o) setPlaying(null); }} ariaLabel={playing?.title ?? L(dict, '播放', 'Play')}>
         {playing && (
-          <div className="nesio-montage nm-player">
+          <div className="nesio-montage nm-cinema" onClick={() => setPlaying(null)}>
+          <div className="nm-player" onClick={(e) => e.stopPropagation()}>
             {phase === 'intro' ? (
               <div className="nm-screen" style={playing.poster ? { backgroundImage: `url(${playing.poster})` } : undefined}>
                 <p className="note">「{playing.sourceNote || playing.storyLine}」</p>
@@ -170,6 +171,7 @@ export default function MontageTab() {
               <button type="button" onClick={() => setPlaying(null)}>{L(dict, '收起', 'Close')}</button>
             </div>
           </div>
+          </div>
         )}
       </NesioSheet>
 
@@ -177,7 +179,8 @@ export default function MontageTab() {
       <NesioSheet variant="center" card={false} dismissible open={sharing !== null}
         onOpenChange={(o) => { if (!o) setSharing(null); }} ariaLabel={L(dict, '分享卡', 'Share card')}>
         {sharing && (
-          <div className="nesio-montage" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <div className="nesio-montage nm-cinema" onClick={() => setSharing(null)}>
+          <div onClick={(e) => e.stopPropagation()} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <div className="nm-sharecard">
               <div className="top" style={sharing.poster ? { backgroundImage: `url(${sharing.poster})` } : undefined}>
                 <div className="sh" />
@@ -193,6 +196,7 @@ export default function MontageTab() {
               <button type="button" onClick={() => setSharing(null)}>{L(dict, '再想想', 'Maybe later')}</button>
             </div>
             <p className="nm-shareprivacy">{L(dict, '这一条链接只这一片,别人看不到你其它记忆,你随时能收回。', 'This link is just this one film — no other memories, revocable anytime.')}</p>
+          </div>
           </div>
         )}
       </NesioSheet>
