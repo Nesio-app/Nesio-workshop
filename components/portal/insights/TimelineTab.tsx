@@ -406,6 +406,8 @@ export default function TimelineTab() {
     return { byCountry, byCity };
   }, [trail]);
   // 城市卡点进去看该城市的记忆:capturedPlace 经 geo 归属该城市,或坐标在该城市到访点 25km 内
+  // 只收「真正发生在这里」的 —— 照片/语音/手记;邮件/日历/系统这类是同步进来的,不算地点记忆。
+  const ONSITE_SOURCES = new Set(['photo', 'voice', 'manual']);
   const memsAtCity = (city: string): LifeNode[] => {
     const geo = loadPlaceGeo();
     const cityCoords = placeCoords.byCity.get(city) || [];
@@ -413,6 +415,7 @@ export default function TimelineTab() {
     const seen = new Set<string>();
     const out: LifeNode[] = [];
     for (const nn of getLifeGraph()) {
+      if (!ONSITE_SOURCES.has(nn.source)) continue;
       const a = nn.attributes || {};
       const label = typeof a.capturedPlace === 'string' ? a.capturedPlace : '';
       let hit = Boolean(label && geo[label]?.city === city);
@@ -433,9 +436,11 @@ export default function TimelineTab() {
         const t = new Date(nn.createdAt).getTime();
         if (Number.isFinite(t) && cityTimes.some(([s, e]) => t >= s && t <= e)) hit = true;
       }
-      if (hit && !seen.has(nn.id)) { seen.add(nn.id); out.push(nn); if (out.length >= 80) break; }
+      if (hit && !seen.has(nn.id)) { seen.add(nn.id); out.push(nn); if (out.length >= 300) break; }
     }
-    return out;
+    // 从新到旧,取最近 80 条
+    out.sort((x, y) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime());
+    return out.slice(0, 80);
   };
   const placeDistinct = useMemo(() => clusterPlaces(placePeriodTrail, 99999).length, [placePeriodTrail]);
   // 批次 67:世界 tab 亮点卡(参考「一生足迹」:最北/最南/最常去/最早,带度分坐标)
