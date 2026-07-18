@@ -100,6 +100,15 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **邮件全链路 里程碑 C(付费云深检索,2026-07-18)**:邮件全链路唯一**花钱**的一块——把邮件
+  正文纳入**付费**语义 embedding rerank。此前 `semantic-rerank.ts` 的 `nodeEmbeddingText` 只嵌
+  `name+rawInput+tags`,付费语义检索也搜不到正文语义。改:邮件节点嵌入**真实内容**(本机全文
+  优先,退到 article/summary 预览),更大预算 1600 字;`semanticRerankMeta` 对池内(≤20)邮件
+  节点 `await getEmailBody` 预取全文再嵌入。**红线四要件齐全**(复用现成 embed 路由):
+  requirePaidCloudAi + 熔断 + reportAiCall + docs 登记;客户端 `canUsePaidCloudAi()` 前置拦下——
+  **免费永不把邮件正文送云**(免费走里程碑 B 本机全文索引词法检索)。**注**:workshop 的
+  semantic-rerank 此前漂移缺 Phase 2 免费门,本次一并补上(与 nesio 对齐)。两仓 tsc + build 全绿。
+  **邮件全链路 A/B/C 三里程碑全部落地。**
 - **邮件全链路 里程碑 B(检索接全平台,2026-07-18)**:让**本机邮件全文**(里程碑 A 存进
   `nesio-email-bodies` IndexedDB 的 ≤20k 正文)可被全平台检索/RAG 命中——**全免费、零云**。
   难点:搜索路径(`smartSearch`/`searchLifeGraphFuzzy`)是**同步线性扫内存图谱**,拿不到需

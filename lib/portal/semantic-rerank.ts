@@ -14,6 +14,8 @@
  */
 
 import type { LifeNode } from './life-graph';
+import { canUsePaidCloudAi } from './entitlement';
+import { getEmailBody } from './local-email-body';
 
 const LEGACY_LS_KEY = 'nesio-node-embeddings-v1';
 const DB_NAME = 'nesio-vectors';
@@ -27,7 +29,19 @@ function djb2(text: string): number {
   return h;
 }
 
-function nodeEmbeddingText(n: LifeNode): string {
+// 里程碑 C(付费云深检索):邮件节点嵌入**真实内容**(本机全文优先,退到 article/summary
+// 预览),让付费语义检索能按正文语义匹配,而不是只嵌「主题 + 邮件/Gmail tag」。邮件正文比
+// 其他节点信息量大,给更大预算(嵌入模型可吃 ~2k token)。非邮件保持 name+rawInput+tags。
+// 隐私:仅付费层(canUsePaidCloudAi)走到这里,正文才随嵌入请求过云(与付费深问一致)。
+const EMAIL_EMBED_BUDGET = 1600;
+function nodeEmbeddingText(n: LifeNode, emailBody?: string): string {
+  if (n.source === 'email') {
+    const from = typeof n.attributes.from === 'string' ? n.attributes.from : '';
+    const article = typeof n.attributes.article === 'string' ? n.attributes.article : '';
+    const summary = typeof n.attributes.summary === 'string' ? n.attributes.summary : '';
+    const content = (emailBody && emailBody.trim()) || article || summary || n.rawInput || '';
+    return [n.name, from, content].join(' ').replace(/\s+/g, ' ').slice(0, EMAIL_EMBED_BUDGET);
+  }
   return [n.name, n.rawInput || '', ...(n.tags || [])].join(' ').slice(0, 400);
 }
 
@@ -126,14 +140,30 @@ export async function semanticRerankMeta(query: string, nodes: LifeNode[], topK 
   const q = query.trim();
   if (!q || nodes.length < 3) return { nodes, semantic: false, reason: 'not_needed' }; // 候选太少不是故障,别吓用户
 
+  // 前置分流:免费层不打云 embed —— 直接回词法序,省一次云往返 + 私密不出端。
+  // 服务端 /api/portal/embed 已是付费门(免费 402),这里前置拦下不发起。
+  // 分层未启用 → canUsePaidCloudAi() 恒 true,行为不变。里程碑 C 的邮件正文出网也据此仅付费。
+  if (!canUsePaidCloudAi()) return { nodes, semantic: false, reason: 'not_needed' };
+
   const pool = nodes.slice(0, Math.min(nodes.length, 20));
+
+  // 里程碑 C:给池内邮件节点预取本机全文(≤20 封,await 便宜),嵌入真实正文而非仅主题。
+  const emailBodyById = new Map<string, string>();
+  await Promise.all(pool.map(async (n) => {
+    if (n.source !== 'email') return;
+    const eid = typeof n.attributes.emailId === 'string' ? n.attributes.emailId : '';
+    if (!eid) return;
+    try { const b = await getEmailBody(eid); if (b) emailBodyById.set(n.id, b); } catch { /* 取不到退预览 */ }
+  }));
+  const embedText = (n: LifeNode): string => nodeEmbeddingText(n, emailBodyById.get(n.id));
+
   const db = await openDb();
   const cached = db ? await idbGetMany(db, pool.map((n) => n.id)) : new Map<string, CacheEntry>();
 
   // Figure out which texts need embedding (query always does)
   const missing: Array<{ idx: number; text: string }> = [];
   const nodeVecs: Array<ArrayLike<number> | null> = pool.map((n, i) => {
-    const text = nodeEmbeddingText(n);
+    const text = embedText(n);
     const hash = djb2(text);
     const hit = cached.get(n.id);
     if (hit && hit.hash === hash) return hit.vec;
@@ -167,14 +197,14 @@ export async function semanticRerankMeta(query: string, nodes: LifeNode[], topK 
     if (fetched.model && entryModel !== fetched.model) staleIdx.push(i);
   });
   if (staleIdx.length) {
-    const refetch = await fetchVectors(staleIdx.map((i) => nodeEmbeddingText(pool[i])));
+    const refetch = await fetchVectors(staleIdx.map((i) => embedText(pool[i])));
     const refetchOk = !('failure' in refetch) ? refetch : null;
     staleIdx.forEach((i, j) => {
       const vec = refetchOk?.vectors[j];
       if (vec) {
         const typed = Float32Array.from(vec);
         nodeVecs[i] = typed;
-        toStore.push([pool[i].id, { hash: djb2(nodeEmbeddingText(pool[i])), vec: typed, model: refetchOk?.model || fetched.model }]);
+        toStore.push([pool[i].id, { hash: djb2(embedText(pool[i])), vec: typed, model: refetchOk?.model || fetched.model }]);
       } else {
         nodeVecs[i] = null; // 刷新失败:宁可不参与语义分,也不用错源向量
       }
