@@ -15,6 +15,7 @@ import { usePortalLocale } from '../use-portal-locale';
 import PracticeGround from './PracticeGround';
 import LensTab from './LensTab';
 import HealingTab from './HealingTab';
+import GrowthFootprint from './GrowthFootprint';
 
 const CHIP_CLASS: Record<Observation['mode'], string> = { nudge: 'emo', quiz: 'blind', trend: 'trend' };
 
@@ -109,6 +110,7 @@ export default function GrowthTab() {
 
       {tab === 'lens' ? <LensTab /> : tab === 'practice' ? <PracticeGround /> : tab === 'healing' ? <HealingTab /> : (
         <>
+          <GrowthFootprint onGoTab={(t) => setTab(t)} />
           <p className="ng-streak">
             {streak > 1 ? L(dict, `已连续回看 ${streak} 天 · 慢慢来`, `${streak} days in a row · no rush`) : L(dict, '慢慢来 —— 一次看清一件就好', 'No rush — one clear look at a time')}
           </p>

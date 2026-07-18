@@ -18201,6 +18201,39 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .ng-loop-row .v{font-size:.9rem;color:var(--portal-ink);line-height:1.5}
 .ng-loop-row.now .v{color:var(--portal-accent);font-weight:var(--weight-semibold)}
 .ng-loop-arrow{text-align:center;color:var(--ng-faint);font-size:.85rem;margin:2px 0}
+
+/* 成长足迹总览面板(成长首页顶部) */
+.ng-fp{background:var(--portal-card);border:1px solid var(--portal-line);border-radius:16px;padding:16px;margin-bottom:20px}
+.ng-fp-hd{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.ng-fp-hd .l{font-size:.95rem;font-weight:var(--weight-semibold);color:var(--portal-ink)}
+.ng-fp-hd .r{font-size:.75rem;color:var(--ng-faint)}
+.ng-fp-empty{margin:0;font-size:.85rem;color:var(--portal-muted);line-height:1.6}
+.ng-fp-lead{margin:0 0 14px;font-size:.86rem;color:var(--portal-muted);line-height:1.6}
+.ng-fp-lead b{color:var(--portal-ink);font-weight:var(--weight-semibold)}
+.ng-fp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.ng-fp-tile{text-align:left;background:var(--portal-accent-soft);border:none;border-radius:11px;padding:11px 13px;font-family:inherit}
+.ng-fp-tile.act{cursor:pointer;transition:transform .12s var(--ng-ease)}
+.ng-fp-tile.act:active{transform:scale(.98)}
+.ng-fp-tile .n{margin:0;font-size:1.35rem;font-weight:var(--weight-semibold);color:var(--portal-ink);line-height:1.1;font-variant-numeric:tabular-nums}
+.ng-fp-tile .n span{font-size:.8rem;font-weight:400;color:var(--portal-muted)}
+.ng-fp-tile .k{margin:3px 0 0;font-size:.76rem;color:var(--portal-muted)}
+.ng-fp-tile.act .k{color:var(--portal-accent)}
+.ng-fp-week,.ng-fp-trend{border-top:1px solid var(--portal-line);padding-top:12px;margin-top:2px}
+.ng-fp-week .hd,.ng-fp-trend .hd{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px}
+.ng-fp-week .hd span:first-child,.ng-fp-trend .hd span:first-child{font-size:.8rem;color:var(--portal-ink);font-weight:var(--weight-medium)}
+.ng-fp-week .hd .q,.ng-fp-trend .hd .q{font-size:.72rem;color:var(--ng-faint)}
+.ng-fp-week .cols{display:flex;justify-content:space-between;gap:6px}
+.ng-fp-week .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.ng-fp-week .bar{width:100%;height:24px;border-radius:7px;background:var(--portal-accent-soft)}
+.ng-fp-week .bar.on{background:var(--portal-accent)}
+.ng-fp-week .bar.today:not(.on){background:none;border:1px dashed var(--portal-accent-border)}
+.ng-fp-week .lb{font-size:.68rem;color:var(--portal-muted)}
+.ng-fp-week .col:last-child .lb{color:var(--portal-accent)}
+.ng-fp-trend{margin-top:12px}
+.ng-fp-trend .spark{display:block;width:100%;height:38px}
+.ng-fp-trend .spark .ar{fill:var(--portal-accent-soft)}
+.ng-fp-trend .spark .ln{fill:none;stroke:var(--portal-accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ng-fp-trend .spark .dot{fill:var(--portal-accent);stroke:var(--portal-card);stroke-width:1.5}
 .ng-todaynote{font-size:.75rem;color:var(--ng-faint);margin:13px 2px 0;text-align:center}
 .ng-done{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:16px;padding:16px;font-size:.9rem;color:var(--portal-accent);text-align:center;line-height:1.55}
 
