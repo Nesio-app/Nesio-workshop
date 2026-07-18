@@ -159,9 +159,10 @@ function PlaceDonut({ segments, selected, onSelect, centerCount, centerLabel, di
 }
 
 // 地点封面照:自动就近匹配一张带图记忆;点图从本地换。无图 → 渐变占位。
-function PlacePhoto({ placeKey, coords, imageNodes, place, timeRanges, gradClass, className, dict, children }: {
+function PlacePhoto({ placeKey, coords, imageNodes, place, timeRanges, onActivate, gradClass, className, dict, children }: {
   placeKey: string; coords: Array<{ lat: number; lon: number }>; imageNodes: GeoImageNode[];
-  place?: PlaceDescriptor; timeRanges?: Array<[number, number]>; gradClass: string; className: string; dict: string; children?: ReactNode;
+  place?: PlaceDescriptor; timeRanges?: Array<[number, number]>; onActivate?: () => void;
+  gradClass: string; className: string; dict: string; children?: ReactNode;
 }) {
   const [url, setUrl] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -199,11 +200,16 @@ function PlacePhoto({ placeKey, coords, imageNodes, place, timeRanges, gradClass
       type="button"
       className={`${className}${url ? ' has-photo' : ` ${gradClass}`}`}
       style={url ? { backgroundImage: `url("${url}")`, backgroundSize: 'cover', backgroundPosition: 'center' } : undefined}
-      onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
-      aria-label={L(dict, '点图换封面照', 'Tap to change cover photo')}
+      onClick={(e) => { e.stopPropagation(); if (onActivate) onActivate(); else inputRef.current?.click(); }}
+      aria-label={onActivate ? L(dict, '查看这里的记忆', 'See memories here') : L(dict, '点图换封面照', 'Tap to change cover photo')}
     >
       {children}
-      <span className="nesio-tl-photo-edit" aria-hidden>
+      {/* 换封面照移到角标相机图标(主区点击留给「看记忆」);span 内联点击,不嵌套 button */}
+      <span
+        className="nesio-tl-photo-edit"
+        title={L(dict, '换封面照', 'Change cover')}
+        onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
+      >
         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.9"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" /><circle cx="12" cy="13" r="4" /></svg>
       </span>
       <input ref={inputRef} type="file" accept="image/*" hidden onChange={onFile} onClick={(e) => e.stopPropagation()} />
@@ -369,18 +375,29 @@ export default function TimelineTab() {
   const memsAtCity = (city: string): LifeNode[] => {
     const geo = loadPlaceGeo();
     const cityCoords = placeCoords.byCity.get(city) || [];
+    const cityTimes = placeTimes.byCity.get(city) || [];
     const seen = new Set<string>();
     const out: LifeNode[] = [];
     for (const nn of getLifeGraph()) {
       const a = nn.attributes || {};
       const label = typeof a.capturedPlace === 'string' ? a.capturedPlace : '';
       let hit = Boolean(label && geo[label]?.city === city);
-      if (!hit && typeof a.capturedLat === 'number' && typeof a.capturedLon === 'number') {
-        for (const c of cityCoords) {
-          const dLat = (a.capturedLat - c.lat) * 111_320;
-          const dLon = (a.capturedLon - c.lon) * 111_320 * Math.cos((c.lat * Math.PI) / 180);
-          if (Math.hypot(dLat, dLon) < 25_000) { hit = true; break; }
+      // 坐标:capturedLat/Lon(EXIF)优先,否则退 lat/lon(现拍当前定位)—— 与封面照同源修复
+      if (!hit) {
+        const lat = typeof a.capturedLat === 'number' ? a.capturedLat : (typeof a.lat === 'number' ? a.lat : undefined);
+        const lon = typeof a.capturedLon === 'number' ? a.capturedLon : (typeof a.lon === 'number' ? a.lon : undefined);
+        if (typeof lat === 'number' && typeof lon === 'number') {
+          for (const c of cityCoords) {
+            const dLat = (lat - c.lat) * 111_320;
+            const dLon = (lon - c.lon) * 111_320 * Math.cos((c.lat * Math.PI) / 180);
+            if (Math.hypot(dLat, dLon) < 25_000) { hit = true; break; }
+          }
         }
+      }
+      // 时间归属:记忆记录时间落在该城市到访时段内(无坐标的现拍/笔记也能归位)
+      if (!hit && cityTimes.length) {
+        const t = new Date(nn.createdAt).getTime();
+        if (Number.isFinite(t) && cityTimes.some(([s, e]) => t >= s && t <= e)) hit = true;
       }
       if (hit && !seen.has(nn.id)) { seen.add(nn.id); out.push(nn); }
     }
@@ -911,7 +928,7 @@ export default function TimelineTab() {
               const name = countryDisplayName(g.countryKey, dict, g.country);
               return (
                 <div key={g.countryKey} className="nesio-tl-ccard">
-                  <PlacePhoto placeKey={`country:${g.countryKey}`} coords={placeCoords.byCountry.get(g.countryKey) || []} imageNodes={imageNodes} place={{ country: g.countryKey }} timeRanges={placeTimes.byCountry.get(g.countryKey)} gradClass={`nesio-tl-cc-g${gradIdx(g.countryKey)}`} className="nesio-tl-ccard-img" dict={dict} />
+                  <PlacePhoto placeKey={`country:${g.countryKey}`} coords={placeCoords.byCountry.get(g.countryKey) || []} imageNodes={imageNodes} place={{ country: g.countryKey }} timeRanges={placeTimes.byCountry.get(g.countryKey)} onActivate={() => setWorldCountry(g.countryKey)} gradClass={`nesio-tl-cc-g${gradIdx(g.countryKey)}`} className="nesio-tl-ccard-img" dict={dict} />
                   <button type="button" className="nesio-tl-ccard-nav" onClick={() => setWorldCountry(g.countryKey)}>
                     <span className="nesio-tl-ccard-body">
                       <span className="nesio-tl-ccard-name">{name}<small>{L(dict, `${g.cities.length} 城`, `${g.cities.length} cities`)}</small></span>
@@ -943,7 +960,7 @@ export default function TimelineTab() {
               <div className="nesio-tl-citycards">
                 {cities.map((c) => (
                   <div key={c.city} className="nesio-tl-citycard">
-                    <PlacePhoto placeKey={`city:${c.city}`} coords={placeCoords.byCity.get(c.city) || []} imageNodes={imageNodes} place={{ city: c.city }} timeRanges={placeTimes.byCity.get(c.city)} gradClass={`nesio-tl-cc-g${gradIdx(c.city)}`} className="nesio-tl-citycard-img" dict={dict}>
+                    <PlacePhoto placeKey={`city:${c.city}`} coords={placeCoords.byCity.get(c.city) || []} imageNodes={imageNodes} place={{ city: c.city }} timeRanges={placeTimes.byCity.get(c.city)} onActivate={() => setVisitMems({ title: c.city, nodes: memsAtCity(c.city) })} gradClass={`nesio-tl-cc-g${gradIdx(c.city)}`} className="nesio-tl-citycard-img" dict={dict}>
                       <span className="nesio-tl-citycard-tag">{L(dict, `${c.count} 个地点`, `${c.count} places`)}</span>
                     </PlacePhoto>
                     <button type="button" className="nesio-tl-citycard-name nesio-tl-citycard-name--btn" onClick={() => setVisitMems({ title: c.city, nodes: memsAtCity(c.city) })}>{c.city}</button>
