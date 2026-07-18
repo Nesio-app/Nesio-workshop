@@ -22,7 +22,7 @@ const todayKey = () => new Date().toISOString().slice(0, 10);
 const earnedToday = () => { try { return localStorage.getItem(HEAL_EARNED_KEY) === todayKey(); } catch { return false; } };
 const markEarnedToday = () => { try { localStorage.setItem(HEAL_EARNED_KEY, todayKey()); } catch { /* 无存储 */ } };
 
-const PHASES = ['voice', 'fear', 'protector', 'self', 'body'] as const;
+const PHASES = ['voice', 'fear', 'protector', 'self', 'body', 'feel'] as const;
 type Phase = typeof PHASES[number] | 'done';
 const phaseRank = (p: Phase) => (p === 'done' ? PHASES.length : PHASES.indexOf(p));
 
@@ -54,8 +54,14 @@ export default function HealingTab() {
   const [ifs, setIfs] = useState<IFSResult | null>(null);
   const [ifsLoading, setIfsLoading] = useState(false);
   const [reply, setReply] = useState<string | null>(null);
+  const [feel, setFeel] = useState<string | null>(null);
+  const [feelNote, setFeelNote] = useState('');
   const [earned, setEarned] = useState(false);
   const rank = phaseRank(phase);
+
+  const feels = en
+    ? ['A little lighter', 'Relieved', 'Clearer now', 'Still needs time', 'About the same']
+    : ['轻了一点', '松了口气', '更清楚了', '还需要点时间', '没太大变化'];
 
   const fears = en
     ? ['Being left', 'Losing control', 'Not enough', 'Getting hurt again', "Can't say"]
@@ -78,10 +84,15 @@ export default function HealingTab() {
     });
   }
 
-  function completeGrounding() {
+  // 闭环:做完躯体动作 + 记下此刻感受 → 存进回看(带前后对照)+ 发分(每天一次)
+  function closeLoop() {
+    const said = reply ? reply.replace(/[「」“”]/g, '') : '';
+    const now = feel || L(dict, '记下了此刻', 'noted this moment');
+    const note = feelNote.trim();
+    const answer = [said, `${L(dict, '此刻', 'Now')}:${now}`, note].filter(Boolean).join(' · ');
     recordGrowthAnswer(
       { id: `heal:${Date.now()}`, kind: 'dusty_memory', refId: `heal:${voice.slice(0, 12)}`, question: `和内在的部分待了一会儿:「${voice.slice(0, 24)}」`, questionEn: `Sat with a part: “${voice.slice(0, 24)}”`, context: voice, dimension: 'emotion' },
-      reply ? reply.replace(/[「」“”]/g, '') : L(dict, '做完了躯体接地', 'Did the grounding'),
+      answer,
     );
     if (!earnedToday()) {
       try { earnPoints(POINTS_PER_HEALING, 'healing', `${L(dict, '深度疗愈', 'Deep healing')}:${voice.slice(0, 18)}`); window.dispatchEvent(new CustomEvent('nesio-rewards-updated')); } catch { /* 无存储 */ }
@@ -91,7 +102,7 @@ export default function HealingTab() {
   }
 
   function restart() {
-    setPhase('voice'); setVoice(''); setFear(null); setIfs(null); setReply(null); setEarned(false);
+    setPhase('voice'); setVoice(''); setFear(null); setIfs(null); setReply(null); setFeel(null); setFeelNote(''); setEarned(false);
   }
 
   // 时间线单步:done 收起摘要 / active 放大高亮 / todo 灰
@@ -100,7 +111,8 @@ export default function HealingTab() {
     { key: 'fear', n: 2, title: L(dict, '它在怕什么', 'What it fears'), sum: fear || '' },
     { key: 'protector', n: 3, title: L(dict, '看见保护者', 'Meet the protector'), sum: L(dict, '已看见它在守着你', 'Seen — it was guarding you') },
     { key: 'self', n: 4, title: L(dict, '清醒自我接管', 'Your calm self leads'), sum: reply ? reply.replace(/[「」“”]/g, '').slice(0, 18) : L(dict, '让保护者歇一歇', 'Let the protector rest') },
-    { key: 'body', n: 5, title: L(dict, '落到身体,真做一遍', 'Ground it in the body'), sum: L(dict, `已做一遍${earned ? ' · +' + POINTS_PER_HEALING : ''}`, `Done${earned ? ' · +' + POINTS_PER_HEALING : ''}`) },
+    { key: 'body', n: 5, title: L(dict, '落到身体,真做一遍', 'Ground it in the body'), sum: L(dict, '已做一遍', 'Done') },
+    { key: 'feel', n: 6, title: L(dict, '此刻,心里怎么样', 'How you feel now'), sum: feel ? `${feel}${earned ? ' · +' + POINTS_PER_HEALING : ''}` : '' },
   ];
   const stateOf = (k: typeof PHASES[number]) => {
     const mine = PHASES.indexOf(k);
@@ -204,8 +216,22 @@ export default function HealingTab() {
                   <div className="ng-tl-in">
                     <div className="ng-ground-step"><span className="lbl">{L(dict, '现在,给身体一个动作', 'Now, one thing for the body')}</span>{ifs.action}</div>
                     <div className="ng-acts">
-                      <button type="button" className="ng-btn" onClick={completeGrounding}>
-                        {earnedToday() ? L(dict, '我按着做了一遍 · 存进回看', 'I did it · save') : L(dict, `我按着做了一遍 · +${POINTS_PER_HEALING}`, `I did it · +${POINTS_PER_HEALING}`)}
+                      <button type="button" className="ng-btn" onClick={() => setPhase('feel')}>{L(dict, '我按着做了一遍', 'I did it')}</button>
+                    </div>
+                  </div>
+                )}
+
+                {st === 'active' && s.key === 'feel' && (
+                  <div className="ng-tl-in">
+                    <p className="ng-tl-q">{L(dict, '刚才那句话,现在还有那么重吗?', 'That thought — does it still weigh the same?')}</p>
+                    <div className="ng-heal-chips">
+                      {feels.map((f) => <button key={f} type="button" className={`ng-heal-chip${feel === f ? ' on' : ''}`} onClick={() => setFeel(f)}>{f}</button>)}
+                    </div>
+                    <textarea className="ng-ta" rows={2} value={feelNote} onChange={(e) => setFeelNote(e.target.value)}
+                      placeholder={L(dict, '想补一句就写(可跳过)', 'Add a line if you want (optional)')} />
+                    <div className="ng-acts">
+                      <button type="button" className="ng-btn" disabled={!feel} onClick={closeLoop}>
+                        {earnedToday() ? L(dict, '记下此刻 · 存进回看', 'Log this moment · save') : L(dict, `记下此刻 · +${POINTS_PER_HEALING}`, `Log this moment · +${POINTS_PER_HEALING}`)}
                       </button>
                     </div>
                   </div>
@@ -218,9 +244,14 @@ export default function HealingTab() {
 
       {phase === 'done' && (
         <div className="ng-heal-close">
-          <p className="ng-done" style={{ marginTop: 0 }}>
+          <div className="ng-loop">
+            <div className="ng-loop-row"><span className="k">{L(dict, '开始时', 'At the start')}</span><span className="v">「{voice.slice(0, 20)}{voice.length > 20 ? '…' : ''}」</span></div>
+            <div className="ng-loop-arrow" aria-hidden>↓</div>
+            <div className="ng-loop-row now"><span className="k">{L(dict, '此刻', 'Now')}</span><span className="v">{feel}{feelNote.trim() ? ` · ${feelNote.trim()}` : ''}</span></div>
+          </div>
+          <p className="ng-done" style={{ marginTop: 12 }}>
             {earned
-              ? L(dict, `已存进回看 · +${POINTS_PER_HEALING} 进奖品商城 —— 你不是记了一下,是真的照顾了自己一次。`, `Saved · +${POINTS_PER_HEALING} to your rewards — you didn’t just log it, you cared for yourself.`)
+              ? L(dict, `+${POINTS_PER_HEALING} 进奖品商城 —— 你不是记了一下,是真的陪自己走完了一次。`, `+${POINTS_PER_HEALING} to your rewards — you didn’t just log it, you walked yourself through it.`)
               : L(dict, '已存进回看 —— 今天的疗愈积分记过了,但这一次的照顾一样算数。', 'Saved — today’s healing points were already counted, but this care still matters.')}
           </p>
           <div className="ng-acts">

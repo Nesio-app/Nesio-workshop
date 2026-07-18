@@ -18195,6 +18195,12 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .ng-ant-ch{display:flex;flex-wrap:wrap;gap:6px}
 .ng-ant-w{font-size:.78rem;font-weight:var(--weight-semibold);color:var(--status-gentle);background:var(--portal-card);border-radius:6px;padding:2px 8px}
 .ng-heal-close{animation:ng-reveal-in .4s var(--ng-ease)}
+.ng-loop{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+.ng-loop-row{display:flex;flex-direction:column;gap:2px}
+.ng-loop-row .k{font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.06em;color:var(--portal-muted)}
+.ng-loop-row .v{font-size:.9rem;color:var(--portal-ink);line-height:1.5}
+.ng-loop-row.now .v{color:var(--portal-accent);font-weight:var(--weight-semibold)}
+.ng-loop-arrow{text-align:center;color:var(--ng-faint);font-size:.85rem;margin:2px 0}
 .ng-todaynote{font-size:.75rem;color:var(--ng-faint);margin:13px 2px 0;text-align:center}
 .ng-done{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:16px;padding:16px;font-size:.9rem;color:var(--portal-accent);text-align:center;line-height:1.55}
 
