@@ -245,14 +245,40 @@ async function extractNodes(messages: GmailMessage[]): Promise<object[]> {
   // 免费最大化·Gmail:把 Gmail 系统分类叠加到 AI 提取的节点(此前只在兜底路径打,AI 正常出结果时丢了)。
   // 按发件人邮箱归并 —— schema 要求节点 attributes 保留 source(发件人),据此可靠回填通知/重要/mailCategory。
   const byEmail = mailClassBySender(worth);
+  // 邮件全链路 join key(P0 修复):AI 抽取的节点必须带 emailId,否则全文索引/语义检索/RAG/
+  // 「阅读原文」全部拿不到 key、静默失效。按「发件人唯一 → 主题精确」回关源邮件注入 m.id。
+  const bySender = new Map<string, GmailMessage[]>();
+  for (const m of worth) {
+    const addr = emailAddrOf(header(m, 'from'));
+    if (!addr) continue;
+    const arr = bySender.get(addr) || [];
+    arr.push(m);
+    bySender.set(addr, arr);
+  }
+  const findSourceId = (attrs: Record<string, unknown>, name: unknown): string | undefined => {
+    const addr = emailAddrOf(String(attrs.source ?? attrs.from ?? ''));
+    const cands = addr ? bySender.get(addr) : undefined;
+    if (!cands || !cands.length) return undefined;
+    if (cands.length === 1) return cands[0].id || undefined;
+    const subj = String(attrs.subject ?? name ?? '').trim();
+    if (subj) {
+      const hit = cands.find((m) => header(m, 'subject').trim() === subj);
+      if (hit) return hit.id || undefined;
+    }
+    return undefined;
+  };
   return parsed.map((n) => {
     const attrs = (n.attributes && typeof n.attributes === 'object') ? { ...(n.attributes as Record<string, unknown>) } : {};
+    const emailId = findSourceId(attrs, n.name);
     const cls = byEmail.get(emailAddrOf(String(attrs.source ?? attrs.from ?? '')));
-    if (!cls) return n;
     const tags = Array.isArray(n.tags) ? [...n.tags] : [];
-    if (cls.category === 'updates' && !tags.includes('通知')) tags.push('通知');
-    if (cls.important && !tags.includes('重要')) tags.push('重要');
-    return { ...n, tags, attributes: { ...attrs, mailCategory: cls.category } };
+    if (cls?.category === 'updates' && !tags.includes('通知')) tags.push('通知');
+    if (cls?.important && !tags.includes('重要')) tags.push('重要');
+    return {
+      ...n,
+      tags,
+      attributes: { ...attrs, ...(emailId ? { emailId } : {}), ...(cls ? { mailCategory: cls.category } : {}) },
+    };
   });
 }
 

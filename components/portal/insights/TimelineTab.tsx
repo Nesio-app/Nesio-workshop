@@ -414,7 +414,10 @@ export default function TimelineTab() {
     const cityTimes = placeTimes.byCity.get(city) || [];
     const seen = new Set<string>();
     const out: LifeNode[] = [];
-    for (const nn of getLifeGraph()) {
+    // 先按记录时间从新到旧排,再收集 —— 否则 300 封顶(perf 护栏)可能把最新的记忆挡在门外,
+    // 违反「取最近 80」承诺(getLifeGraph() 非日期序)。一次排序,封顶后 slice 80 即最新 80。
+    const sortedGraph = getLifeGraph().slice().sort((x, y) => new Date(y.createdAt).getTime() - new Date(x.createdAt).getTime());
+    for (const nn of sortedGraph) {
       if (!ONSITE_SOURCES.has(nn.source)) continue;
       const a = nn.attributes || {};
       const label = typeof a.capturedPlace === 'string' ? a.capturedPlace : '';
