@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   };
 
   try {
-    const { text } = await completeText({ prompt: buildMomentumPrompt(p), maxTokens: 600 });
+    const { text } = await completeText({ prompt: buildMomentumPrompt(p), maxTokens: 600, route: 'decompose-task' });
     const steps = extractStepsFromText(text);
     if (steps && steps.length > 0) return NextResponse.json({ ok: true, steps });
   } catch (err) {

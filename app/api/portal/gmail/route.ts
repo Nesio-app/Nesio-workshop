@@ -239,7 +239,7 @@ async function extractNodes(messages: GmailMessage[]): Promise<object[]> {
 
   const prompt = buildEmailExtractionPrompt(emailTexts);
 
-  const raw = (await completeText({ prompt, maxTokens: 2048 })).text || '[]';
+  const raw = (await completeText({ prompt, maxTokens: 2048, route: 'gmail' })).text || '[]';
   const parsed = parseJsonBlock<Array<Record<string, unknown>>>(raw) ?? [];
 
   // 免费最大化·Gmail:把 Gmail 系统分类叠加到 AI 提取的节点(此前只在兜底路径打,AI 正常出结果时丢了)。
