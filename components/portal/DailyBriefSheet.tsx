@@ -38,7 +38,7 @@ function greetingFor(hour: number, dict: 'zh' | 'en', name: string): string {
   return name ? (dict === 'en' ? `${g}, ${name}` : `${g},${name}`) : g;
 }
 
-export function DailyBriefSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function DailyBriefSheet({ open, onClose, canUsePrivateData = false }: { open: boolean; onClose: () => void; canUsePrivateData?: boolean }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [script, setScript] = useState('');
   const [refs, setRefs] = useState<LifeNode[]>([]);
@@ -59,7 +59,8 @@ export function DailyBriefSheet({ open, onClose }: { open: boolean; onClose: () 
     try {
       const profile = loadProfileSettings();
       // ① 同一套检索算法(与问一问共用 buildMemoryContext)
-      const { context: memoryContext, refCandidates } = await buildMemoryContext(dict === 'en' ? BRIEF_QUERY.en : BRIEF_QUERY.zh);
+      // 隐私红线:未登录/未知态不把邮件正文/日历经 RAG 上下文送 /chat(见 buildMemoryContext includePrivate)。
+      const { context: memoryContext, refCandidates } = await buildMemoryContext(dict === 'en' ? BRIEF_QUERY.en : BRIEF_QUERY.zh, '', canUsePrivateData);
       // 批次190:把**真·跨域相关**(真实皮尔逊 r)喂进简报上下文 —— 让简报引真数字,
       // 不再让模型在聚合块上瞎编「外卖多 40%」。统计相关非因果,原样引用不改动。
       let briefContext = memoryContext;

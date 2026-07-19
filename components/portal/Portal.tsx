@@ -1316,7 +1316,7 @@ export default function Portal() {
       )}
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
       {workoutSession && <WorkoutPlayer session={workoutSession} onClose={() => setWorkoutSession(null)} />}
-      {briefOpen && <DailyBriefSheet open={briefOpen} onClose={() => setBriefOpen(false)} />}
+      {briefOpen && <DailyBriefSheet open={briefOpen} onClose={() => setBriefOpen(false)} canUsePrivateData={canUsePrivateRuntime} />}
       <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />
 
       <NesioChatSheet open={chatOpen} onClose={() => setChatOpen(false)} canUsePrivateData={canUsePrivateRuntime} />

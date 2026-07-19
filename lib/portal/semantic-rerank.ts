@@ -13,7 +13,7 @@
  * content hash, so each node is embedded once until its text changes.
  */
 
-import type { LifeNode } from './life-graph';
+import { isPrivateExternalNode, type LifeNode } from './life-graph';
 import { canUsePaidCloudAi } from './entitlement';
 import { getEmailBody } from './local-email-body';
 
@@ -130,14 +130,17 @@ export interface RerankResult {
  * with embedding similarity: final = 0.5·rankScore + 0.5·cosine.
  * Returns the input unchanged when embeddings are unavailable.
  */
-export async function semanticRerank(query: string, nodes: LifeNode[], topK = 12): Promise<LifeNode[]> {
-  return (await semanticRerankMeta(query, nodes, topK)).nodes;
+export async function semanticRerank(query: string, nodes: LifeNode[], topK = 12, includePrivate = false): Promise<LifeNode[]> {
+  return (await semanticRerankMeta(query, nodes, topK, includePrivate)).nodes;
 }
 
 /** Same as semanticRerank but also reports whether embeddings were actually used,
- *  so callers can distinguish "semantic search off (AI not configured)" from "no data". */
-export async function semanticRerankMeta(query: string, nodes: LifeNode[], topK = 12): Promise<RerankResult> {
+ *  so callers can distinguish "semantic search off (AI not configured)" from "no data".
+ *  includePrivate:仅登录态传 true 才允许私密外部节点(邮件正文/日历)进云 embed;默认排除。 */
+export async function semanticRerankMeta(query: string, nodes: LifeNode[], topK = 12, includePrivate = false): Promise<RerankResult> {
   const q = query.trim();
+  // 隐私红线:未登录/未知态(includePrivate=false)不把邮件正文/日历送云 embed。默认 false(安全默认)。
+  if (!includePrivate) nodes = nodes.filter((n) => !isPrivateExternalNode(n));
   if (!q || nodes.length < 3) return { nodes, semantic: false, reason: 'not_needed' }; // 候选太少不是故障,别吓用户
 
   // 前置分流:免费层不打云 embed —— 直接回词法序,省一次云往返 + 私密不出端。
