@@ -1347,7 +1347,7 @@ Edit location/value anytime in Storage.`),
               placeholder={L(dict, '问一问…', 'Ask…')}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void sendMessage(input); } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void sendMessage(input); } }}
               disabled={sending}
             />
             {/* 「＋」常驻:打字后也能加图片/拍摄/文件/表情,不再被发送键顶掉 */}
