@@ -9,7 +9,7 @@
  * 属 AI 例程(ai_routine),Pro 整功能(试用期内可用)。
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { buildMemoryContext, extractCitations } from '@/lib/portal/memory-retrieval';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
@@ -45,8 +45,12 @@ export function DailyBriefSheet({ open, onClose }: { open: boolean; onClose: () 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<'auth' | 'network' | null>(null);
   const [detailNode, setDetailNode] = useState<LifeNode | null>(null);
+  // 生成代:连点「换个说法/重试」会并发多个 /api/portal/chat,慢的旧响应后到会盖掉新简报。
+  // 每次生成 bump 此代,收尾按代校验,只认最后一次(last-response-wins)。
+  const briefSeqRef = useRef(0);
 
   const fetchBrief = useCallback(async () => {
+    const myGen = ++briefSeqRef.current;
     setLoading(true);
     setError(null);
     // 批次194 补齐九路(§5.3):简报=付费云例程。入口已被 canUse('ai_routine') 挡(设置/例程卡);
@@ -84,8 +88,11 @@ export function DailyBriefSheet({ open, onClose }: { open: boolean; onClose: () 
           environmentContext: formatEnvironmentContext(),
         }),
       });
+      // 连点期间又发起了新一次生成 → 这次已过期,丢弃(不 setScript/setError 到新结果上)。
+      if (briefSeqRef.current !== myGen) return;
       if (res.status === 401) { setError('auth'); return; }
       const data = await res.json() as { ok?: boolean; response?: string };
+      if (briefSeqRef.current !== myGen) return;
       if (data.ok && data.response) {
         // ③ 同一套引用解析:把模型自报的【依据】剥掉,cited 节点挂成「相关记忆」链接
         const { text, ids } = extractCitations(data.response.trim());
@@ -98,9 +105,10 @@ export function DailyBriefSheet({ open, onClose }: { open: boolean; onClose: () 
         setError('network');
       }
     } catch {
-      setError('network');
+      if (briefSeqRef.current === myGen) setError('network');
     } finally {
-      setLoading(false);
+      // 只有仍是最新一次才收 loading,避免过期请求的 finally 提前停掉新一次的转圈。
+      if (briefSeqRef.current === myGen) setLoading(false);
     }
   }, [dict]);
 
