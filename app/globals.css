@@ -17996,6 +17996,19 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   margin: 0.1rem auto 0.7rem;
   flex: none;
 }
+/* Vaul bottom 滚动修复:Drawer.Content 自身当滚动容器时,Vaul 的拖拽手势独占它的
+   touch 事件 —— 内容超长触屏下拉不动(桌面滚轮能滚、手机滚不动,「弹出页看不全」根因)。
+   Content 变不滚动的 flex 列框架,滚动交给内层 .nesio-sheet-scroll,Vaul getScrollParent
+   认得这个嵌套滚动区。max-height/遮罩/焦点/拖拽关闭全不变。 */
+.nesio-sheet--bottom { display: flex; flex-direction: column; }
+.nesio-sheet.nesio-sheet--bottom { overflow: hidden; }
+.nesio-sheet--bottom > .nesio-sheet-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
 
 /* center:居中模态,不锚定触发器。Radix data-state 驱动缩放淡入 */
 .nesio-sheet--center {

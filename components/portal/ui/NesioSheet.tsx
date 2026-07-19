@@ -163,7 +163,11 @@ function VaulContent({ panelClass, panelStyle, ariaLabel, open, children }: {
     <Drawer.Content ref={ref} className={panelClass} style={panelStyle} aria-label={ariaLabel} tabIndex={-1}>
       <Drawer.Title className="sr-only">{ariaLabel}</Drawer.Title>
       <div className="nesio-sheet-grabber" aria-hidden="true" />
-      {children}
+      {/* 滚动壳:Vaul 把 Drawer.Content 自身的 touch 事件当「拖拽关闭」独占,内容超长时
+          触屏无法下拉(桌面滚轮能滚、手机滚不动)。把滚动交给内层容器 —— Vaul 的
+          getScrollParent 认得这个嵌套滚动区,只在到顶/到底才让位给拖拽。Content 只当
+          flex 框架(见 globals.css .nesio-sheet--bottom)。modal/遮罩/焦点全保留。 */}
+      <div className="nesio-sheet-scroll">{children}</div>
     </Drawer.Content>
   );
 }
