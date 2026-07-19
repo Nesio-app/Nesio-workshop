@@ -118,6 +118,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const [plaidRelink, setPlaidRelink] = useState<number[]>([]);
   const [connected, setConnected] = useState<Record<string, boolean>>({});
   const [syncing, setSyncing] = useState<string | null>(null);
+  // 同步代:syncGoogle 串行拉多段(10–20s)全程无守卫,收尾无条件把 google 写回「已连接」。
+  // 若期间用户点了「断开」(已撤销服务端 token),收尾会把连接器弹回「已连接」—— 本地标记与
+  // 实际不一致的隐私隐患。disconnect 递增此代作废在途同步,收尾按代校验后跳过回写。
+  const syncGenRef = useRef(0);
   // P0 隐私:连接私有数据源(邮箱/日历/银行/Notion/Flomo)必须先登录 —— 匿名授权=无主
   // token,换人用这台设备就能看到你的邮件。null=未知(网络失败不误伤),false 才拦。
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
@@ -677,6 +681,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
 
   // ── OAuth sync(google = 日历 + 邮件一起同步,结果分行展示)──
   async function syncGoogle(c: ConnectorDef) {
+    const myGen = ++syncGenRef.current;
     setSyncing(c.id);
     setOauthSyncResult((p) => ({ ...p, google: { ok: true, msg: L(dict, '同步中…', 'Syncing…') } }));
     const parts: string[] = [];
@@ -755,6 +760,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       }
     } catch { allOk = false; parts.push(L(dict, '通讯录:网络错误', 'Contacts: network error')); }
 
+    // 若同步期间用户点了「断开」(bump 了 syncGenRef),不许收尾把连接器弹回「已连接」——
+    // 那会和已撤销的服务端 token 不一致。仅清同步态,保留 disconnect 写下的断开状态。
+    if (syncGenRef.current !== myGen) { setSyncing(null); return; }
     saveConnectorState('google', true);
     setConnected((p) => ({ ...p, google: true }));
     setOauthSyncResult((p) => ({ ...p, google: { ok: allOk, msg: allOk ? L(dict, '同步成功', 'Synced') : L(dict, '部分同步失败', 'Partly failed'), detail: parts.join('\n'), needsReauth: reauth } }));
@@ -1166,6 +1174,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   }
 
   function disconnect(id: string) {
+    // 作废任何在途 syncGoogle 的收尾回写(否则它会把刚断开的连接器弹回「已连接」)。
+    syncGenRef.current++;
     saveConnectorState(id, false);
     saveToken(id, '');
     setConnected((p) => ({ ...p, [id]: false }));

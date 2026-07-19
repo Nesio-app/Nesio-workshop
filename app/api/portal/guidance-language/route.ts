@@ -53,6 +53,7 @@ async function enhanceWithAi(
 
   // 共享客户端:Claude(haiku)优先,自动回落 Gemini;全别名解析 key(修窄读 —— 部署配 Gemini 时也能用)。
   const { text: raw } = await completeText({
+    route: 'guidance-language',
     prompt: `请改写以下引导卡片的标题和正文：\n\n${cardDescriptions}\n\n输出 JSON 数组（${cards.length} 条）：`,
     system: `你是 Nesio，${userName || '用户'}的贴身 AI 助手。
 你的任务是把系统生成的引导卡片语言改写成更自然、温和、具体的中文。

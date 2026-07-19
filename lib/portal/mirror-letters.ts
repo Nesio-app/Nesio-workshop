@@ -7,6 +7,8 @@
  * 老友视角免费可试读,其余四面镜挂 Pro 门(feature: 'mirror_letter')。
  */
 
+import { logDropped } from './storage-health';
+
 export type MirrorId = 'friend' | 'socratic' | 'jung' | 'blindspot' | 'stoic';
 
 export interface MirrorDef {
@@ -125,7 +127,7 @@ export function saveMirrorFeedback(paragraphKey: string, verdict: MirrorVerdict)
     const all = loadMirrorFeedback();
     all[paragraphKey] = verdict;
     localStorage.setItem(FEEDBACK_KEY, JSON.stringify(all));
-  } catch { /* ignore */ }
+  } catch (err) { logDropped('mirror_feedback.save', err); }
 }
 
 /** 最近的反馈样本(带原文),给下一封信的 prompt 用。 */

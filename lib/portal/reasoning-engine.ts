@@ -7,6 +7,8 @@
  * so they live in a dependency-free leaf to avoid cycles.
  */
 
+import { logDropped } from './storage-health';
+
 export type CardDomain = 'weather' | 'work' | 'family' | 'home' | 'health' | 'vehicle' | 'learning' | 'finance';
 
 export interface EvidenceRef {
@@ -67,7 +69,7 @@ export function recordCardFeedback(cardId: string, feedback: RecommendationCard[
     existing[cardId] = { feedback, at: new Date().toISOString() };
     localStorage.setItem(FEEDBACK_KEY, JSON.stringify(existing));
     window.dispatchEvent(new CustomEvent('nesio-feedback-recorded', { detail: { cardId, feedback } }));
-  } catch {
-    /* ignore */
+  } catch (err) {
+    logDropped('card_feedback.record', err);
   }
 }

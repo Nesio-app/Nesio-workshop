@@ -1173,11 +1173,13 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     setSmartNodes(textRankedNodes);
     if (!query.trim() || textRankedNodes.length < 3) return;
     let cancelled = false;
-    void semanticRerank(query, textRankedNodes).then((reranked) => {
+    // 隐私红线:未登录/未知态不把私密外部节点(邮件正文)送云 embed —— rerank 早于展示过滤,
+    // 故必须在这层就把 canUsePrivateData 传进去,别等渲染层 visibleMemoryNodes 才拦(正文已过云)。
+    void semanticRerank(query, textRankedNodes, undefined, canUsePrivateData).then((reranked) => {
       if (!cancelled) setSmartNodes(reranked);
     });
     return () => { cancelled = true; };
-  }, [query, textRankedNodes]);
+  }, [query, textRankedNodes, canUsePrivateData]);
 
   const hasUnderstoodEntities = understood.people.length + understood.places.length + understood.objects.length > 0;
 

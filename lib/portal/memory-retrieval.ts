@@ -6,7 +6,7 @@
  * 纯客户端(读 life-graph),会在缺邮件时按需触发一次 Gmail 增量同步。
  */
 
-import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { getLifeGraph, isPrivateExternalNode, type LifeNode } from '@/lib/portal/life-graph';
 import { smartSearch } from '@/lib/portal/smart-search';
 import { domainInsightsContextBlock } from '@/lib/portal/domain-insights';
 import { parseTemporalQuery, isInSpan } from '@/lib/portal/temporal-query';
@@ -112,8 +112,11 @@ export function isWeatherNode(n: LifeNode): boolean {
     || /天气信号|天气$/.test(n.name);
 }
 
-export async function buildMemoryContext(query: string, convoHint = ''): Promise<{ context: string; refCandidates: RefCandidate[]; semanticDegraded: boolean; semanticReason: string }> {
-  const graph = getLifeGraph().filter((n) => !isWeatherNode(n));
+export async function buildMemoryContext(query: string, convoHint = '', includePrivate = false): Promise<{ context: string; refCandidates: RefCandidate[]; semanticDegraded: boolean; semanticReason: string }> {
+  // 隐私红线:私密外部数据(邮件正文/日历)只在**已登录**(includePrivate=true)时才进 RAG 上下文。
+  // 登录未知态(网络抖动:节点没被剪、canUsePaidCloudAi 又恒 true)默认排除 —— 邮件正文绝不
+  // 因这层默认放行而随 /chat 请求体离端。默认 false(安全默认:调用方忘传也不泄漏)。
+  const graph = getLifeGraph().filter((n) => !isWeatherNode(n) && (includePrivate || !isPrivateExternalNode(n)));
   const temporal = parseTemporalQuery(query);
   // 里程碑 B:惰性水合邮件全文检索索引(不阻塞本次;让后续 smartSearch 能按正文命中排序)。
   void ensureEmailFulltextIndex();
@@ -130,8 +133,8 @@ export async function buildMemoryContext(query: string, convoHint = ''): Promise
   // falls back to pure text order when the embed endpoint is unavailable)
   // 批次 43:smartSearch 内部读的是未过滤全量图谱 —— 天气信号曾从这条路
   // 漏进「相关记忆」引用卡(图谱级过滤只罩住了 dateNodes/upcoming)。
-  const textRanked = smartSearch(query, null).nodes.filter((n) => !isWeatherNode(n)).slice(0, 20);
-  const reranked = await semanticRerankMeta(query, textRanked);
+  const textRanked = smartSearch(query, null).nodes.filter((n) => !isWeatherNode(n) && (includePrivate || !isPrivateExternalNode(n))).slice(0, 20);
+  const reranked = await semanticRerankMeta(query, textRanked, undefined, includePrivate);
   const searchNodes = reranked.nodes.slice(0, 12);
   // 🔴#2:语义检索没用上 embedding(缺 AI key / 端点挂了)= 静默降级,跨语言记录会被漏。
   // 但只在库里真的有"另一种语言"的记录时提示才有意义 —— 纯中文用户查纯中文库不该被
@@ -181,7 +184,9 @@ export async function buildMemoryContext(query: string, convoHint = ''): Promise
     ).sort((a, b) => emailReceived(b) - emailReceived(a)).slice(0, 12);
   };
   let emailNodes: LifeNode[] = [];
-  if (wantsEmail) {
+  // 邮件召回天然是私密外部数据(含本机正文预取)。仅登录态(includePrivate)才做,否则整块跳过
+  // —— 不读全量图谱重捞、不触发同步、不预取正文,杜绝未登录/未知态邮件正文进上下文。
+  if (wantsEmail && includePrivate) {
     emailNodes = pickEmailNodes(graph);
     // 问一问修复批:问到邮件但目标时段没有邮件节点(常见:「今天的邮件」但后台
     // 还没轮到同步)→ 当场触发一次增量同步再重读,而不是回答「还没同步过来」。

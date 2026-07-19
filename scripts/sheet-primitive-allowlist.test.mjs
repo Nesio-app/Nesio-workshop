@@ -58,7 +58,6 @@ const ALLOWLIST = new Map([
   ['components/portal/fitness/ExerciseLibrary.tsx', 2],
   ['components/portal/fitness/WorkoutPlayer.tsx', 2],
   ['components/portal/insights/MirrorLetterTab.tsx', 1],
-  ['components/portal/insights/MontageTab.tsx', 2],
   ['components/portal/insights/TimelineTab.tsx', 4],
 ]);
 

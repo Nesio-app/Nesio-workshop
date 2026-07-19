@@ -13,7 +13,7 @@ import NesioMark from './NesioMark';
 // 批次 139:统一「打开详情」—— 聊天引用卡与记忆页/今天页共用同一个完整详情组件
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { getLifeGraph, isBulkImported, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
+import { getLifeGraph, isBulkImported, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
 import { buildMemoryContext, fmtEventDate, extractCitations } from '@/lib/portal/memory-retrieval';
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { loadProfileSettings } from '@/lib/portal/profile';
@@ -604,7 +604,8 @@ Edit location/value anytime in Storage.`),
     // 行为完全不变、当前用户无回归。
     // 批次 148:端上模式(用户手动选)或免费层 → 本机记忆搜索,不打云。深问 + 有权益才走云。
     if (!deepMode || !canUsePaidCloudAi()) {
-      const hits = searchLifeGraphFuzzy(text.trim(), 6);
+      // 隐私红线:未登录/未知态不把邮件主题、日程标题(私密外部节点 name)显示到聊天气泡里。
+      const hits = searchLifeGraphFuzzy(text.trim(), 6).filter((n) => canUsePrivateData || !isPrivateExternalNode(n));
       const body = hits.length
         ? L(dict, `在你的记忆里找到 ${hits.length} 条:\n${hits.map((n) => `• ${n.name}`).join('\n')}`,
             `Found ${hits.length} in your memory:\n${hits.map((n) => `• ${n.name}`).join('\n')}`)
@@ -625,7 +626,7 @@ Edit location/value anytime in Storage.`),
     try {
       // 🔴#3:把最近几条用户提问作为召回线索,让"第二封讲啥"这类追问仍能重新召回邮件。
       const convoHint = messages.filter((m) => m.role === 'user').slice(-2).map((m) => m.text).join(' ');
-      const { context: memoryContext, refCandidates, semanticDegraded, semanticReason } = await buildMemoryContext(text.trim(), convoHint);
+      const { context: memoryContext, refCandidates, semanticDegraded, semanticReason } = await buildMemoryContext(text.trim(), convoHint, canUsePrivateData);
       const res = await fetch('/api/portal/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -638,7 +639,7 @@ Edit location/value anytime in Storage.`),
             ? { name: fileContextRef.current.name, content: fileContextRef.current.content }
             : undefined,
           memoryContext,
-          calendarContext: buildCalendarContext(text.trim()),
+          calendarContext: canUsePrivateData ? buildCalendarContext(text.trim()) : undefined,
           environmentContext: formatEnvironmentContext(),
         }),
         signal: controller.signal,
@@ -681,8 +682,8 @@ Edit location/value anytime in Storage.`),
     } catch (err) {
       clearTimeout(timeout);
       const isTimeout = err instanceof Error && err.name === 'AbortError';
-      // 兜底：从本地记忆模糊搜索
-      const localHits = searchLifeGraphFuzzy(text.trim(), 5);
+      // 兜底：从本地记忆模糊搜索(隐私红线:未登录/未知态不带出邮件主题、日程标题)
+      const localHits = searchLifeGraphFuzzy(text.trim(), 5).filter((n) => canUsePrivateData || !isPrivateExternalNode(n));
       const fallbackText = localHits.length
         ? L(dict, `AI 暂时不可用，但我在记忆库里找到了这些相关线索：\n${localHits.map((n) => `• ${n.name}`).join('\n')}`, `AI is briefly unavailable, but I found these related clues in your memory:\n${localHits.map((n) => `• ${n.name}`).join('\n')}`)
         : isTimeout ? L(dict, '响应超时，请重试。', 'The response timed out — please try again.') : L(dict, 'AI 暂时不可用，记忆库里也没找到相关线索。', 'AI is briefly unavailable, and nothing related turned up in your memory.');

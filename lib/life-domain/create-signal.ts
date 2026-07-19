@@ -181,7 +181,10 @@ export function createSignalWithNode(input: CreateSignalInput): { signal: Signal
   const signal = lifeNodeToSignal(node);
   // M2:IDB 事实库双写(读路径未切,见 signal-store-idb.ts)。B3:此前 fire-and-forget
   // 无 catch → 写失败静默丢事实;加日志,别再哑吞(离线记的事实进不了库要看得见)。
-  void appendSignalIdb(signal).catch((err) => logDropped('signal.idb_write', err));
+  // 注意:appendSignalIdb 失败是 resolve(false) 而非 reject,故 .catch 是死代码 —— 必须判返回值。
+  void appendSignalIdb(signal)
+    .then((ok) => { if (!ok) logDropped('signal.idb_write', 'put returned false'); })
+    .catch((err) => logDropped('signal.idb_write', err));
   if (signalWriteMode() === 'cloud_mirror_pending') {
     void writeCloudSignal(signal);
   }

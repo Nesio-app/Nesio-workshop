@@ -9,7 +9,7 @@
  * 老友免费试读,其余四面镜 Pro(dispatch nesio-pro-gate)。
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { getLifeGraph, isBulkImported } from '@/lib/portal/life-graph';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
@@ -138,14 +138,20 @@ export default function MirrorLetterTab() {
     setArchive(listMirrorLetters());
   }, []);
 
+  // 生成代:generate 闭包捕获旧三元组(mirrorId/month/topic),生成 5–15s 内切换镜子/月/主题,
+  // 在途请求 resolve 会用旧信覆盖新选择(抬头与正文对不上)。切换与新生成都 bump 此代,收尾按代校验。
+  const genSeqRef = useRef(0);
+
   // 切镜子/月/主题:先取该三元组的本地缓存,没有就等用户点「写这封信」(不自动打云)
   useEffect(() => {
+    genSeqRef.current++; // 作废任何在途 generate 的收尾,避免旧信盖到新选择
     setLetter(loadMirrorLetter(month, mirrorId, topic));
     setError(null);
     setSaved(false);
   }, [month, mirrorId, topic]);
 
   const generate = useCallback(async () => {
+    const myGen = ++genSeqRef.current;
     setLoading(true);
     setError(null);
     setSaved(false);
@@ -176,8 +182,11 @@ export default function MirrorLetterTab() {
           feedbackSamples: recentFeedbackSamples(),
         }),
       });
+      // 生成期间用户切了镜子/月/主题 → 这次结果已过期,丢弃(不 setLetter/ setError 到新选择上)。
+      if (genSeqRef.current !== myGen) return;
       if (res.status === 401) { setError('auth'); return; }
       const data = await res.json() as { ok?: boolean; paragraphs?: Array<{ text: string; evidence: string[]; confidence: number }>; reason?: string };
+      if (genSeqRef.current !== myGen) return;
       if (data.reason === 'no_api_key') { setError('no-key'); return; }
       if (data.reason === 'quota') { setError('quota'); return; }
       if (data.reason === 'insufficient_data') { setError('thin'); return; }
@@ -194,9 +203,10 @@ export default function MirrorLetterTab() {
       setArchive(listMirrorLetters());
       track('mirror_letter_generated', { mirror: mirrorId });
     } catch {
-      setError('network');
+      if (genSeqRef.current === myGen) setError('network');
     } finally {
-      setLoading(false);
+      // 只有仍是最新一次生成才收 loading,避免过期请求的 finally 提前停掉新一次的转圈。
+      if (genSeqRef.current === myGen) setLoading(false);
     }
   }, [mirrorId, dict, month, monthLabel, topic, activeTopic]);
 
