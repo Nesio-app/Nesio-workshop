@@ -6,6 +6,8 @@
  * 「功能以现有为准」:这是阅读器唯一新增的小能力,收进记忆/问念念/复制都走现成的。
  */
 
+import { reportStorageDropped } from '@/lib/portal/storage-health';
+
 const KEY = 'nesio-reader-highlights-v1';
 export const READER_HIGHLIGHTS_EVENT = 'nesio-reader-highlights-updated';
 
@@ -21,7 +23,10 @@ function saveAll(all: Store): void {
   try {
     localStorage.setItem(KEY, JSON.stringify(all));
     window.dispatchEvent(new CustomEvent(READER_HIGHLIGHTS_EVENT));
-  } catch { /* 配额满就不存,不阻塞阅读 */ }
+  } catch {
+    // 高亮是用户亲手划的内容,配额满丢了必须可见(红线),别假装存进去了。
+    reportStorageDropped();
+  }
 }
 
 /** 读某文档的全部高亮片段。 */

@@ -18,6 +18,7 @@ import { getReaderProgress, setReaderProgress } from '@/lib/portal/reader-store-
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { loadHighlights, toggleHighlight, addHighlight, segmentParagraph, READER_HIGHLIGHTS_EVENT } from '@/lib/portal/reader-highlights';
 import { IconBox, IconTarget, IconHelpCircle } from '../icons';
+import NesioSheet from '../ui/NesioSheet';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -211,10 +212,14 @@ export default function ReaderView({ book, rawText, meta, onClose }: {
   const isFull = mode === 'full';
 
   return (
-    <div
+    <NesioSheet
+      variant="fullscreen"
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
       className={`nesio-rd-overlay nesio-rd-overlay--${mode}`}
-      role="dialog" aria-modal="true" aria-label={book.title}
       style={{ ['--nesio-rd-scale' as string]: String(FONT_SCALES[fontStep]) }}
+      ariaLabel={book.title}
     >
       {/* ── 头部 ── */}
       <div className="nesio-rd-topbar">
@@ -373,6 +378,6 @@ export default function ReaderView({ book, rawText, meta, onClose }: {
       )}
 
       {toast && <div className="nesio-rd-toast">{toast}</div>}
-    </div>
+    </NesioSheet>
   );
 }

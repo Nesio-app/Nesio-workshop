@@ -55,7 +55,7 @@ const CONNECTORS: ConnectorDef[] = [
   // 批次 21:Google 地图时间轴导入 —— 手机端导出的 JSON 并入地点足迹
   { id: 'timeline', name: 'Google 时间轴导入', nameEn: 'Google Timeline import', icon: <IconMapPin />, iconBg: 'var(--chip-leaf)', method: 'file', description: '手机 Google 地图 → 设置 → 时间轴 → 导出数据,把 JSON 传进来并入地点足迹', descriptionEn: 'Google Maps app → Settings → Timeline → export, upload the JSON to merge into your place trail' },
   // 批次 19:相册批量导入 —— 一次选多张,AI 逐张识别入库(解决「一张张传太麻烦」)
-  { id: 'photos', name: '相册批量导入', nameEn: 'Batch photo import', icon: <IconImage />, iconBg: 'var(--chip-frost)', method: 'batch-photos', description: '一次选多张照片,自动识别成记忆(每批最多 10 张)', descriptionEn: 'Pick multiple photos; each is recognized into memories (up to 10 per batch)' },
+  { id: 'photos', name: '相册批量导入', nameEn: 'Batch photo import', icon: <IconImage />, iconBg: 'var(--chip-frost)', method: 'batch-photos', description: '一次选多张照片,自动识别成记忆(每批最多 30 张)', descriptionEn: 'Pick multiple photos; each is recognized into memories (up to 30 per batch)' },
   { id: 'flomo', name: 'Flomo', icon: <IconNote />, iconBg: 'var(--chip-indigo)', method: 'server', syncEndpoint: '/api/portal/flomo?limit=5000', description: '同步 flomo 笔记，提取想法与记录', descriptionEn: 'Sync flomo notes; extract ideas and records' },
   // 批次 18:Notion 转正 —— OAuth 一键授权(像 flomo 那样选页面),内部 token 流保留为回退
   { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成(Internal)→ 复制 Internal Integration Secret(ntn_… 或 secret_…)→ 在要同步的 Notion 页面右上角「…」→ 连接 → 选中这个集成', tokenHintEn: 'notion.so/my-integrations → New internal integration → copy the secret (ntn_… / secret_…) → on each page: ••• → Connections → add this integration', description: '粘贴内部集成 token,同步共享给它的页面(提取项目与想法)', descriptionEn: 'Paste an internal integration token to sync the pages you shared with it' },
@@ -118,6 +118,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const [plaidRelink, setPlaidRelink] = useState<number[]>([]);
   const [connected, setConnected] = useState<Record<string, boolean>>({});
   const [syncing, setSyncing] = useState<string | null>(null);
+  // 同步代:syncGoogle 串行拉多段(10–20s)全程无守卫,收尾无条件把 google 写回「已连接」。
+  // 若期间用户点了「断开」(已撤销服务端 token),收尾会把连接器弹回「已连接」—— 本地标记与
+  // 实际不一致的隐私隐患。disconnect 递增此代作废在途同步,收尾按代校验后跳过回写。
+  const syncGenRef = useRef(0);
   // P0 隐私:连接私有数据源(邮箱/日历/银行/Notion/Flomo)必须先登录 —— 匿名授权=无主
   // token,换人用这台设备就能看到你的邮件。null=未知(网络失败不误伤),false 才拦。
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
@@ -264,7 +268,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   }
 
   async function handleBatchPhotos(files: FileList | null) {
-    const list = Array.from(files || []).slice(0, 10);
+    // 每批上限 30(此前 10 太少,用户要「多一些」)。逐张走云识别 + 进度提示,顺序不阻塞 UI。
+    const list = Array.from(files || []).slice(0, 30);
     if (!list.length) return;
     setSyncing('photos');
     let saved = 0; let failed = 0;
@@ -676,6 +681,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
 
   // ── OAuth sync(google = 日历 + 邮件一起同步,结果分行展示)──
   async function syncGoogle(c: ConnectorDef) {
+    const myGen = ++syncGenRef.current;
     setSyncing(c.id);
     setOauthSyncResult((p) => ({ ...p, google: { ok: true, msg: L(dict, '同步中…', 'Syncing…') } }));
     const parts: string[] = [];
@@ -754,6 +760,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       }
     } catch { allOk = false; parts.push(L(dict, '通讯录:网络错误', 'Contacts: network error')); }
 
+    // 若同步期间用户点了「断开」(bump 了 syncGenRef),不许收尾把连接器弹回「已连接」——
+    // 那会和已撤销的服务端 token 不一致。仅清同步态,保留 disconnect 写下的断开状态。
+    if (syncGenRef.current !== myGen) { setSyncing(null); return; }
     saveConnectorState('google', true);
     setConnected((p) => ({ ...p, google: true }));
     setOauthSyncResult((p) => ({ ...p, google: { ok: allOk, msg: allOk ? L(dict, '同步成功', 'Synced') : L(dict, '部分同步失败', 'Partly failed'), detail: parts.join('\n'), needsReauth: reauth } }));
@@ -1165,6 +1174,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   }
 
   function disconnect(id: string) {
+    // 作废任何在途 syncGoogle 的收尾回写(否则它会把刚断开的连接器弹回「已连接」)。
+    syncGenRef.current++;
     saveConnectorState(id, false);
     saveToken(id, '');
     setConnected((p) => ({ ...p, [id]: false }));

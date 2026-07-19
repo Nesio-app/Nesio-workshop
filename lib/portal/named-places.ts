@@ -1,3 +1,5 @@
+import { reportStorageDropped } from '@/lib/portal/storage-health';
+
 export interface NamedPlace {
   id: string;
   name: string;
@@ -42,7 +44,10 @@ export function getNamedPlaces(): NamedPlace[] {
 
 export function saveNamedPlaces(places: NamedPlace[]): void {
   if (typeof window === 'undefined') return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(places));
+  // 用户命名的地点(家/常去)是原创数据;此前裸 setItem 配额满会抛,上层某处一 catch 就变静默丢。
+  // 包住并派发可见事件(红线),不让「保存地点」悄无声息失败。
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(places)); }
+  catch { reportStorageDropped(); }
 }
 
 export function upsertNamedPlace(place: NamedPlace): void {

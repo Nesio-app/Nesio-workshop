@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import NesioSheet from '../ui/NesioSheet';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -209,11 +209,18 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
     }
   };
 
-  // 批次 60:createPortal 到 body —— 洞察 sheet 有 transform,position:fixed 会被
+  // 批次 60→W2:原语内部走 Radix Portal 到 body,天然逃出洞察 sheet 的 transform
   // 困在其内部(实测地图叠在 tab 下面而不是全屏)
-  if (typeof document === 'undefined') return null;
-  return createPortal(
-    <div className="nesio-memmap-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '地图上的记忆', 'Memories on the map')}>
+  return (
+    <NesioSheet
+      variant="fullscreen"
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      modal={false}
+      className="nesio-memmap-overlay"
+      ariaLabel={L(dict, '地图上的记忆', 'Memories on the map')}
+    >
       <div className="nesio-memmap-header">
         <span className="nesio-memmap-title">{L(dict, '地图上的记忆', 'Memories on the map')}</span>
         <span className="nesio-memmap-count">{L(dict, `${all.length} 条带位置`, `${all.length} located`)}</span>
@@ -305,7 +312,6 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
           </div>
         </div>
       )}
-    </div>,
-    document.body,
+    </NesioSheet>
   );
 }

@@ -4580,7 +4580,11 @@ body:has(.nesio-mood-overlay) .nesio-bottom-nav::before {
   display: none;
 }
 
-/* 悬浮导航下方的渐隐垫:滚动内容不再「裸露」在按钮后面(批次 2) */
+/* 悬浮导航下方的渐隐垫:滚动内容不再「裸露」在按钮后面(批次 2)。
+   ⚠️ 曾加过 `background: linear-gradient(to top, var(--portal-bg) 30%, transparent)`
+   补实底,结果这条硬色带把半透明导航 pill 的下半截「切」成实白,视觉上像
+   底部按钮被切掉 —— 已回退。色带的真正根治是 html 兜底色 + 滚动器
+   overscroll-behavior 隔离,不靠这层实底。保留 blur+mask 的毛玻璃渐隐。 */
 .nesio-bottom-nav::before {
   content: '';
   position: fixed;
@@ -4787,6 +4791,7 @@ html[data-portal-theme="night"] .nesio-logo-night { display: inline-block !impor
   overflow-y: auto;
   padding: 0.5rem 1.1rem calc(5.5rem + env(safe-area-inset-bottom));
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain; /* iOS PWA:触底橡皮筋会拖动 fixed 层露出 html 兜底色(底部色带) */
 }
 
 .nesio-today-greeting {
@@ -5104,6 +5109,7 @@ html[data-portal-theme="night"] .nesio-today-btn--ghost {
   overflow-x: hidden; /* 竖向滚动容器绝不横滚:堵住「页面漂移/超出屏幕」 */
   padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 1.1rem calc(5.5rem + env(safe-area-inset-bottom));
   -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain; /* 同 today-scroll:掐断触底橡皮筋,不露 html 兜底色 */
 }
 
 .nesio-memory-search-wrap {
@@ -8156,6 +8162,41 @@ html[data-portal-theme="night"] .nesio-node-source-name { color: #e8eefa; }
 }
 .nesio-node-action-primary:active,
 .nesio-node-action-secondary:active { transform: scale(0.98); }
+/* 补传本地照片进记忆 */
+.nesio-nd-photo-add { margin-bottom: 1rem; }
+.nesio-nd-photo-btn { width: 100%; min-height: 42px; }
+.nesio-nd-photo-btn:disabled { opacity: 0.6; cursor: default; }
+.nesio-nd-photo-err {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: var(--status-risk);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.nesio-nd-photo-retry {
+  border: 1px solid var(--status-risk);
+  color: var(--status-risk);
+  background: transparent;
+  border-radius: var(--radius-pill, 999px);
+  padding: 0.1rem 0.6rem;
+  font-size: 0.76rem;
+  font-weight: var(--weight-semibold, 600);
+  cursor: pointer;
+}
+.nesio-nd-added-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.6rem;
+}
+.nesio-nd-added-thumb {
+  width: 3.2rem;
+  height: 3.2rem;
+  object-fit: cover;
+  border-radius: var(--radius-sm, 12px);
+  border: 1px solid var(--portal-line);
+}
 .nesio-node-action-primary {
   border: none;
   background: var(--portal-accent);
@@ -10086,6 +10127,29 @@ html[data-portal-theme="night"] .nesio-connector-token-box {
   gap: 0.45rem;
 }
 
+/* App 级积分徽章(顶栏,头像旁)→ 奖品商城 */
+.nesio-today-points {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  font-family: inherit;
+  font-size: 0.78rem;
+  line-height: 1;
+  font-weight: var(--weight-semibold, 600);
+  font-variant-numeric: tabular-nums;
+  color: var(--portal-accent);
+  background: var(--portal-accent-soft);
+  border: 1px solid var(--portal-accent-border);
+  border-radius: 999px;
+  padding: 0 0.5rem;
+  cursor: pointer;
+  transition: transform 0.12s var(--ease-out, ease);
+}
+.nesio-today-points:active { transform: scale(0.96); }
+.nesio-today-points:focus-visible { outline: 2px solid var(--portal-accent); outline-offset: 2px; }
+
 
 html[data-portal-theme="night"] .nesio-today-avatar {
   background: var(--portal-blue-light, #2c4a78);
@@ -10694,7 +10758,7 @@ html[data-portal-theme="night"] .nesio-wechat-bubble--ai {
 /* Input bar */
 .nesio-wechat-input-bar {
   display: flex;
-  align-items: center;
+  align-items: flex-end; /* 输入框自增高时,麦克风/＋/发送 仍贴底对齐 */
   gap: 0.4rem;
   padding: 0.55rem 0.75rem;
   padding-bottom: calc(0.55rem + env(safe-area-inset-bottom, 0px));
@@ -10710,23 +10774,29 @@ html[data-portal-theme="night"] .nesio-wechat-input-bar {
 .nesio-wechat-input {
   flex: 1;
   min-width: 0;
-  height: 2.2rem;
-  padding: 0 0.75rem;
-  border-radius: 1.1rem;
+  /* 单行起步、随字数自增高(JS 控 scrollHeight,封顶 120px 后内部滚动) */
+  min-height: 2.5rem;
+  max-height: 120px;
+  padding: 0.5rem 0.85rem;
+  border-radius: 1.25rem;
   border: 1px solid rgba(0,0,0,0.1);
   background: #fff;
-  font-size: 0.9rem;
+  font-family: var(--font-sans);
+  font-size: 1.02rem; /* 字体调大,长文更好读 */
+  line-height: 1.4;
   color: var(--portal-ink);
   outline: none;
+  resize: none;
+  overflow-y: auto;
 }
 html[data-portal-theme="night"] .nesio-wechat-input { background: #2a2d3e; border-color: rgba(255,255,255,0.1); color: #d0d8f0; }
 .nesio-wechat-input::placeholder { color: var(--portal-muted); opacity: 0.6; }
 .nesio-wechat-input:focus { border-color: var(--portal-blue-deep); }
 
 .nesio-wechat-send-btn {
-  padding: 0 0.9rem;
-  height: 2.2rem;
-  border-radius: 1.1rem;
+  padding: 0 0.95rem;
+  height: 2.5rem;
+  border-radius: 1.25rem;
   /* 批次 180:发送键改主题色(原微信绿 #07c160 与莫兰迪主题冲突) */
   background: var(--portal-accent);
   color: #fff;
@@ -10740,8 +10810,8 @@ html[data-portal-theme="night"] .nesio-wechat-input { background: #2a2d3e; borde
 .nesio-wechat-send-btn:disabled { opacity: 0.45; }
 
 .nesio-wechat-plus-btn {
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 50%;
   border: 1px solid rgba(0,0,0,0.1);
   background: #fff;
@@ -10924,8 +10994,8 @@ html[data-portal-theme="night"] .nesio-memory-detail-val { color: #d0d8f0; }
 /* ── Voice/text mode toggle button ── */
 .nesio-wechat-mode-btn {
   color: var(--portal-muted);
-  width: 2.2rem;
-  height: 2.2rem;
+  width: 2.5rem;
+  height: 2.5rem;
   border-radius: 50%;
   border: 1px solid rgba(0,0,0,0.1);
   background: #fff;
@@ -11605,6 +11675,7 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
   position: fixed;
   inset: 0;
   z-index: 1200;
+  pointer-events: auto; /* portal 到 body 后绕开 Vaul 的 body pointer-events:none */
   display: flex;
   align-items: flex-end;
 }
@@ -12688,7 +12759,7 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-reader-tools { display: flex; gap: 0.4rem; }
 .nesio-reader-btn { min-width: 38px; min-height: 34px; border-radius: 8px; border: 1px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.82rem; cursor: pointer; padding: 0 0.5rem; }
 .nesio-reader-btn.is-active { border-color: var(--portal-blue-deep); color: var(--portal-blue-deep); }
-.nesio-reader-scroll { flex: 1; overflow-y: auto; padding: 1.2rem 1.15rem calc(2.5rem + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; }
+.nesio-reader-scroll { flex: 1; overflow-y: auto; padding: 1.2rem 1.15rem calc(2.5rem + env(safe-area-inset-bottom)); -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
 .nesio-reader-title { font-weight: 700; color: var(--portal-ink); line-height: 1.35; margin: 0 0 1.2rem; max-width: 40rem; }
 .nesio-reader-body { max-width: 40rem; margin: 0 auto; }
 .nesio-reader-para { line-height: 1.95; letter-spacing: 0.01em; color: var(--portal-ink); margin: 0 0 1.35rem; transition: opacity 0.2s; }
@@ -13631,9 +13702,10 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 /* 换封面小徽章(右下角相机) */
 .nesio-tl-photo-edit {
   position: absolute; right: 4px; bottom: 4px;
-  width: 18px; height: 18px; border-radius: 50%;
+  width: 26px; height: 26px; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
   background: rgba(20, 22, 30, 0.5); color: #fff;
+  cursor: pointer;
 }
 .nesio-tl-citycard-img { position: relative; border: none; padding: 0; cursor: pointer; width: 100%; background-color: var(--portal-surface-2, rgba(127,127,127,0.08)); }
 .nesio-tl-ccard-body { flex: 1; min-width: 0; padding: 0 0.9rem; display: flex; flex-direction: column; gap: 0.3rem; }
@@ -13658,6 +13730,9 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
   background: color-mix(in srgb, #fff 78%, transparent); border-radius: 0.4rem; padding: 0.12rem 0.5rem;
 }
 .nesio-tl-citycard-name { display: block; padding: 0.6rem 0.8rem 0.7rem; font-size: 0.9rem; font-weight: 800; color: var(--portal-ink); }
+/* 城市名做成可点按钮:点进去看该城市记忆列表 */
+.nesio-tl-citycard-name--btn { width: 100%; text-align: left; background: none; border: none; cursor: pointer; font-family: inherit; }
+.nesio-tl-citycard-name--btn:active { opacity: 0.7; }
 .nesio-tl-catbar--home { background: #588ce3; }
 .nesio-tl-catbar--work { background: #7b5ea7; }
 .nesio-tl-catbar--shopping { background: #e8888f; }
@@ -13708,7 +13783,7 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 .nesio-tl-geo-msg { font-size: 0.72rem; color: var(--portal-accent); }
 
 /* 批次 23:全屏看图 */
-.nesio-image-viewer { position: fixed; inset: 0; z-index: 600; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem; }
+.nesio-image-viewer { position: fixed; inset: 0; z-index: 950; pointer-events: auto; background: rgba(0,0,0,0.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1rem; padding: 1.5rem; }
 .nesio-image-viewer-img { max-width: 100%; max-height: 78vh; object-fit: contain; border-radius: 8px; }
 .nesio-image-viewer-actions { display: flex; flex-direction: column; align-items: center; gap: 0.6rem; }
 .nesio-image-viewer-close { background: none; border: none; color: rgba(255,255,255,0.7); font-size: 0.8rem; cursor: pointer; text-decoration: underline; }
@@ -17056,6 +17131,16 @@ html[data-portal-theme="night"][data-palette="bluegray-rose"] { background-color
 html[data-portal-theme="night"][data-palette="milktea"]       { background-color:#150f09; }
 html[data-portal-theme="night"][data-palette="sage"]          { background-color:#0e130f; }
 
+/* 批次 106 的白天版(iOS PWA 底部色带拔根):白天四套皮肤此前从没配 html 兜底色,
+   一直沿用默认的 background-color: var(--portal-blue-deep) —— 皮肤把 blue-deep 覆盖成
+   饱和 accent(milktea=金棕 #a98f66)后,底部安全区/橡皮筋露出的就是那条「金棕色带」。
+   兜底取各皮肤渐变的底部终止色,任何 fixed 层没盖到的地方漏出的都与设计底一致。
+   同夜间块:只在 html 上,不带 .portal-root(否则盖住 body::before 的渐变层)。 */
+html[data-palette="bluegray-rose"]:not([data-portal-theme="night"]) { background-color:#ccd1d7; }
+html[data-palette="milktea"]:not([data-portal-theme="night"])       { background-color:#d9ccb5; }
+html[data-palette="haze-blue"]:not([data-portal-theme="night"])     { background-color:#9fbcd4; }
+html[data-palette="sage"]:not([data-portal-theme="night"])          { background-color:#c0d3c8; }
+
 /* 4 色卡选择器(设置 › 实验功能) */
 .nesio-palette-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
 .nesio-palette-card{display:flex;flex-direction:column;align-items:flex-start;gap:4px;
@@ -17265,7 +17350,10 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
 
 /* ── 批次 61:到访记忆列表 ─────────────────────────────────────────────── */
 .nesio-tl-item-mem--btn { background: none; border: none; padding: 0; cursor: pointer; font-size: inherit; }
-.nesio-visitmem-overlay { position: fixed; inset: 0; z-index: 420; display: flex; flex-direction: column; justify-content: flex-end; }
+/* z=901:与 sheet 原语同带 —— 洞察面板迁 NesioSheet(bottom,901)后,这层若仍在 420
+   会被洞察面板整个盖住(点城市卡「没反应」的真相)。同带靠 DOM 顺序压在洞察之上,
+   而从列表点开的 MemoryNodeDetail(也 901,后挂载)又自然压在本列表之上。 */
+.nesio-visitmem-overlay { position: fixed; inset: 0; z-index: 901; pointer-events: auto; display: flex; flex-direction: column; justify-content: flex-end; }
 .nesio-visitmem-backdrop { position: absolute; inset: 0; background: var(--modal-backdrop-bg, rgba(16,28,54,0.25)); border: none; cursor: pointer; }
 .nesio-visitmem-sheet {
   position: relative;
@@ -17277,6 +17365,34 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
   padding: 0.9rem 1rem calc(env(safe-area-inset-bottom, 0px) + var(--kb-inset, 0px) + 0.9rem);
 }
 .nesio-memmap-item--btn { width: 100%; background: none; border: none; cursor: pointer; text-align: left; font-size: inherit; color: inherit; }
+
+/* ── 到访记忆列表(点城市 / 时间线「记了 N 条」)—— 卡片化,不再纯文字行 ── */
+.nesio-vm-grabber {
+  width: 2.2rem; height: 0.28rem; border-radius: var(--radius-pill, 999px);
+  background: var(--portal-line); margin: 0 auto 0.7rem; flex: none;
+}
+.nesio-vm-head { display: flex; align-items: baseline; gap: 0.5rem; margin: 0 0.15rem 0.7rem; }
+.nesio-vm-title { font-family: var(--font-serif, inherit); font-size: 1.02rem; font-weight: var(--weight-bold, 700); color: var(--portal-ink); }
+.nesio-vm-count { font-size: 0.76rem; color: var(--portal-muted); }
+.nesio-vm-empty { padding: 1.6rem 0.4rem; text-align: center; font-size: 0.85rem; color: var(--portal-muted); }
+.nesio-vm-item {
+  display: flex; align-items: center; gap: 0.7rem; width: 100%;
+  padding: 0.55rem 0.5rem; border: none; background: none; cursor: pointer; text-align: left;
+  border-radius: var(--radius-sm, 12px); transition: background 0.14s;
+}
+.nesio-vm-item:active { background: var(--portal-accent-soft, rgba(88,140,227,.10)); }
+.nesio-vm-ic {
+  flex: none; width: 2.1rem; height: 2.1rem; border-radius: var(--radius-sm, 12px);
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--vm-ic-bg, var(--chip-fog)); color: var(--portal-ink);
+}
+.nesio-vm-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.12rem; }
+.nesio-vm-name {
+  font-size: 0.9rem; font-weight: var(--weight-semibold, 600); color: var(--portal-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nesio-vm-meta { font-size: 0.72rem; color: var(--portal-muted); }
+.nesio-vm-chev { flex: none; font-size: 1.2rem; line-height: 1; color: var(--portal-muted); opacity: 0.6; }
 
 /* ── 批次 62:地点选择器 + 时间线缩略图 + 地图控件 safe-area ─────────────── */
 .nesio-tl-item-name--btn { background: none; border: none; padding: 0; font: inherit; color: inherit; text-align: left; cursor: pointer; text-decoration: underline dotted var(--portal-muted); text-underline-offset: 3px; }
@@ -17817,3 +17933,566 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
   animation: nesioSpin 0.8s linear infinite;
 }
 @keyframes nesioSpin { to { transform: rotate(360deg); } }
+
+/* ══════════════════════════════════════════════════════════════════════
+   NesioSheet 原语(施工单 W0)—— 全仓 sheet/modal 唯一容器的视觉层。
+   底座:bottom=Vaul(JS 内联 transform 驱动拖拽/弹簧),center/fullscreen=
+   Radix Dialog(data-state 驱动 CSS 进出)。视觉对齐旧 .nesio-visitmem-sheet,
+   保证迁移零视觉回归。动效只引 --ease-out/--dur token,不写裸值。
+   ══════════════════════════════════════════════════════════════════════ */
+
+/* 遮罩:Vaul 与 Radix 都挂 data-state,统一淡入淡出 */
+.nesio-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  /* 900/901:压过所有遗留 sheet 遮罩(≤730)—— 迁移期原语常在旧式 role=dialog
+     里嵌套打开(如 node-detail=450),必须浮其上;仍低于日期选择器/录音/收据
+     等特殊模态(1010–1200),让它们能再叠在原语之上。 */
+  z-index: 900;
+  background: var(--modal-backdrop-bg, rgba(16, 28, 54, 0.25));
+}
+/* fullscreen 底衬:不透明页面底,给半透明(磨砂玻璃)全屏面板兜底,防夜间透出下层。
+   z=929/930:全屏面板常从 bottom 卡(900/901)里打开(如记忆详情→阅读原文),
+   必须整个盖住触发它的 bottom 卡,否则卡片会从半透明面板里透出来(实测「阅读器透明」)。
+   仍低于 image-viewer(950)/镜信抽屉(948)/日期选择器等特殊模态(1010–1200)。 */
+.nesio-sheet-overlay--opaque { background: var(--portal-bg, #f4f8fd); z-index: 929; }
+.nesio-sheet-overlay[data-state='open'] { animation: nesioSheetFade var(--dur, 0.3s) var(--ease-out); }
+.nesio-sheet-overlay[data-state='closed'] { animation: nesioSheetFadeOut var(--dur-fast, 0.2s) var(--ease-out); }
+
+/* panel 公共:面/字色/滚动 */
+.nesio-sheet {
+  position: fixed;
+  z-index: 901;
+  color: var(--portal-ink);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  outline: none;
+}
+/* 不透明面只作用于非 bare —— bare 的背景由迁移元素自带的 className 提供
+   (fullscreen 阅读器等),或保持透明(center 的满视口 flex 容器)。 */
+.nesio-sheet:not(.nesio-sheet--bare) {
+  background: var(--sheet-opaque, #fdfeff);
+}
+
+/* bottom:底部抽屉。Vaul 负责 y 轴 transform,这里只给静止态样式 */
+.nesio-sheet--bottom {
+  left: 0;
+  right: 0;
+  bottom: 0;
+}
+/* chrome(圆角/边/内边距/高)只作用非 bare —— bare 的这些由迁移元素自带的
+   className(如 .nesio-settings-sheet-card)提供,像素级保真。 */
+.nesio-sheet--bottom:not(.nesio-sheet--bare) {
+  border-radius: 1.1rem 1.1rem 0 0;
+  border-top: 1px solid var(--portal-line);
+  max-height: 88lvh;
+  padding: 0.5rem 1rem calc(env(safe-area-inset-bottom, 0px) + var(--kb-inset, 0px) + 0.9rem);
+}
+.nesio-sheet-grabber {
+  width: 2.2rem;
+  height: 0.28rem;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--portal-line);
+  margin: 0.1rem auto 0.7rem;
+  flex: none;
+}
+
+/* center:居中模态,不锚定触发器。Radix data-state 驱动缩放淡入 */
+.nesio-sheet--center {
+  top: 50%;
+  left: 50%;
+  width: min(92vw, 30rem);
+  max-height: 84lvh;
+  transform: translate(-50%, -50%);
+  border-radius: var(--radius-md, 16px);
+  border: 1px solid var(--portal-line);
+  padding: 1.1rem 1.15rem calc(env(safe-area-inset-bottom, 0px) + 1.1rem);
+  box-shadow: 0 24px 60px rgba(16, 28, 54, 0.22);
+}
+.nesio-sheet--center[data-state='open'] { animation: nesioSheetPop var(--dur, 0.3s) var(--ease-out); }
+.nesio-sheet--center[data-state='closed'] { animation: nesioSheetPopOut var(--dur-fast, 0.2s) var(--ease-out); }
+
+/* bare:原语只做定位/遮罩/焦点,不渲染卡片壳 —— 迁移期保留 sheet 自带的定制
+   卡片(尺寸/圆角/背景独特)时用,零视觉回归。child 自己带 card 视觉。 */
+.nesio-sheet--bare {
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+/* center-bare:复刻旧 overlay 的「满视口 flex 居中」—— child 的 %/vw 宽度
+   才对视口解析(否则 transform 居中 + width:auto 会 shrink-to-fit,child 的
+   100% 塌成内容宽度 = 宽度回归)。空白区点击关闭在 RadixContent 里补。 */
+.nesio-sheet--center.nesio-sheet--bare {
+  inset: 0;
+  width: auto;
+  max-height: none;
+  transform: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.nesio-sheet--bottom.nesio-sheet--bare { padding: 0; }
+/* 迁移期铁律副作用修:某些自带卡(.nesio-settings-sheet-card)带 sheetSlideUp
+   入场动画 = translateY(100%)→0。作 Vaul bare 面板时,该动画的 transform 会
+   覆盖 Vaul 拖拽用的内联 transform(CSS 动画优先级高于内联样式)→ 卡片拖不动/
+   下拉关不掉。入场交给 Vaul,这里清掉自带动画。 */
+.nesio-sheet--bottom.nesio-sheet--bare { animation: none; }
+
+/* fullscreen:全屏面板。z=930 压过 bottom/center 面板(901)—— 从 bottom 卡里
+   打开的全屏面板(阅读器等)要完整盖住触发卡,配合 --opaque 底衬(929)。 */
+.nesio-sheet--fullscreen {
+  inset: 0;
+  z-index: 930;
+  max-height: 100lvh;
+  padding: calc(env(safe-area-inset-top, 0px)) 0 calc(env(safe-area-inset-bottom, 0px));
+}
+.nesio-sheet--fullscreen[data-state='open'] { animation: nesioSheetRise var(--dur, 0.3s) var(--ease-out); }
+.nesio-sheet--fullscreen[data-state='closed'] { animation: nesioSheetFadeOut var(--dur-fast, 0.2s) var(--ease-out); }
+
+@keyframes nesioSheetFade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes nesioSheetFadeOut { from { opacity: 1; } to { opacity: 0; } }
+@keyframes nesioSheetPop {
+  from { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+@keyframes nesioSheetPopOut {
+  from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  to { opacity: 0; transform: translate(-50%, -50%) scale(0.96); }
+}
+@keyframes nesioSheetRise { from { opacity: 0; transform: translateY(1.5%); } to { opacity: 1; transform: translateY(0); } }
+
+/* ── 三档降级 ─────────────────────────────────────────────────────────── */
+/* ① reduced-motion(= 安静模式 B 跟随系统):交叉淡入,无位移/无缩放 */
+@media (prefers-reduced-motion: reduce) {
+  .nesio-sheet-overlay[data-state='open'],
+  .nesio-sheet-overlay[data-state='closed'],
+  .nesio-sheet--center[data-state='open'],
+  .nesio-sheet--center[data-state='closed'],
+  .nesio-sheet--fullscreen[data-state='open'],
+  .nesio-sheet--fullscreen[data-state='closed'] {
+    animation: nesioSheetFade 0.2s linear;
+  }
+  .nesio-sheet--center[data-state='closed'],
+  .nesio-sheet--fullscreen[data-state='closed'],
+  .nesio-sheet-overlay[data-state='closed'] { animation: nesioSheetFadeOut 0.16s linear; }
+  /* center 静止 transform 必须保留(否则丢居中),关键帧里不再动 transform */
+}
+/* ② reduced-transparency:遮罩实底,不透穿背景 */
+@media (prefers-reduced-transparency: reduce) {
+  .nesio-sheet-overlay { background: rgba(16, 28, 54, 0.55); }
+}
+/* ③ contrast:实边框 */
+@media (prefers-contrast: more) {
+  .nesio-sheet { border: 2px solid var(--portal-ink); }
+}
+
+/* 记忆详情底部动作按钮:统一几何(高度/圆角/字号/触控目标),各自保留颜色身份
+   (阅读=主强调实心 / 编辑·取消=中性描边 / 删除=风险)。真机反馈「按钮大小形状不统一」。
+   放文件末尾,确保 source-order 覆盖各按钮基类的 padding/radius/font/height。 */
+.nesio-nd-action-btn {
+  flex: 1;
+  width: auto;
+  height: 46px;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 0 1rem;
+  border-radius: var(--radius-pill, 999px);
+  font-size: 0.88rem;
+  font-weight: var(--weight-semibold, 600);
+  margin-top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   成长引擎 v2(artifact 1170dd28 / 59587b8d / d7bd8990)—— 走 portal 主题 token
+   字体/动效统一:--ng-ease 贯穿三页;颜色全部映射到 --portal-* / --status-*。
+   ══════════════════════════════════════════════════════════════════════════ */
+.nesio-growth{
+  --ng-ease:cubic-bezier(0.23,1,0.32,1);
+  --ng-ease-sheet:cubic-bezier(0.32,0.72,0,1);
+  --ng-faint:color-mix(in srgb, var(--portal-muted) 66%, transparent);
+  --ng-warm:var(--status-gentle); --ng-warm-soft:var(--status-gentle-soft);
+  font-family:var(--font-source-sans);color:var(--portal-ink);line-height:1.6;
+}
+.nesio-growth *{box-sizing:border-box}
+
+.ng-streak{color:var(--ng-faint);font-size:.8rem;margin:0 0 22px}
+
+.ng-sec{display:flex;align-items:baseline;justify-content:space-between;margin:0 0 12px}
+.ng-sec .l{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--portal-accent);font-weight:var(--weight-semibold)}
+.ng-sec .r{font-size:.74rem;color:var(--ng-faint)}
+.ng-gap{height:32px}
+
+/* 心智成长环 */
+.ng-mind{background:var(--portal-card);border:1px solid var(--portal-line);border-radius:16px;padding:15px 16px 13px;margin-bottom:6px}
+.ng-mind-top{font-size:.82rem;color:var(--portal-muted);margin:0 0 13px;line-height:1.55}
+.ng-mind-top b{color:var(--portal-ink);font-weight:var(--weight-semibold)}
+.ng-dims{display:grid;grid-template-columns:repeat(3,1fr);gap:12px 8px}
+.ng-dim{text-align:center}
+.ng-ring{width:34px;height:34px;margin:0 auto 5px;border-radius:50%;border:2px solid var(--portal-line);position:relative}
+.ng-ring i{position:absolute;inset:-2px;border-radius:50%;border:2px solid var(--portal-accent);clip-path:inset(0 0 var(--empty,60%) 0);transition:clip-path .5s var(--ng-ease)}
+.ng-dim.locked .ng-ring i{display:none}
+.ng-dim-nm{font-size:.72rem;color:var(--portal-muted)}
+.ng-dim.locked .ng-dim-nm{color:var(--ng-faint)}
+.ng-dim-ct{font-size:.66rem;color:var(--ng-faint)}
+.ng-dim:not(.locked) .ng-dim-ct{color:var(--portal-accent)}
+
+/* 今天:智能卡一次一件 */
+.ng-today{background:var(--portal-card);border:1px solid var(--portal-accent-border);border-radius:18px;padding:18px 17px 15px;
+  box-shadow:0 1px 2px rgba(20,20,20,.04),0 10px 26px rgba(20,20,20,.05);animation:ng-card-in .38s var(--ng-ease)}
+.ng-chip{display:inline-flex;align-items:center;gap:6px;font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.03em;
+  border-radius:7px;padding:3px 9px;margin-bottom:12px;border:1px solid}
+.ng-chip.emo{color:var(--ng-warm);background:var(--ng-warm-soft);border-color:var(--ng-warm)}
+.ng-chip.blind{color:var(--portal-accent);background:var(--portal-accent-soft);border-color:var(--portal-accent-border)}
+.ng-chip.trend{color:var(--status-go);background:var(--status-go-soft);border-color:var(--status-go)}
+.ng-ask{font-size:1.06rem;line-height:1.55;font-weight:var(--weight-semibold);margin:0 0 8px;text-wrap:pretty;color:var(--portal-ink)}
+.ng-ask .ng-mem{color:var(--portal-accent)}
+.ng-basis{font-size:.75rem;color:var(--ng-faint);margin:0 0 14px;padding-left:12px;border-left:2px solid var(--portal-accent-border);line-height:1.5}
+.ng-ta{width:100%;font-family:inherit;font-size:.92rem;color:var(--portal-ink);background:var(--portal-bg);
+  border:1px solid var(--portal-line);border-radius:11px;padding:11px 12px;resize:vertical;line-height:1.55}
+.ng-ta:focus{outline:none;border-color:var(--portal-accent)}
+.ng-acts{display:flex;gap:9px;margin-top:11px;align-items:center;flex-wrap:wrap}
+.ng-btn{appearance:none;font-family:inherit;font-size:.9rem;font-weight:var(--weight-semibold);border-radius:11px;padding:11px 16px;cursor:pointer;
+  border:1px solid var(--portal-accent);background:var(--portal-accent);color:#fff;transition:transform .12s var(--ng-ease)}
+.ng-btn:active{transform:scale(.975)}
+.ng-btn[disabled]{opacity:.45;cursor:default}
+.ng-btn.ghost{background:none;color:var(--portal-muted);border-color:var(--portal-line);font-weight:var(--weight-medium)}
+.ng-btn.ifs{background:var(--status-calm-soft);color:var(--status-calm);border-color:var(--status-calm)}
+
+/* 阴影整合(IFS):三个内在部分各一色(守护/清醒/洞察),走主题 token */
+.ng-ifs{margin-top:var(--space-3);display:flex;flex-direction:column;gap:9px;animation:ng-reveal-in .4s var(--ng-ease)}
+.ng-ifs-part{border-radius:12px;padding:12px 14px;font-size:.92rem;line-height:1.65;border:1px solid}
+.ng-ifs-part .lbl{display:block;font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.06em;margin-bottom:5px}
+.ng-ifs-part.protector{background:var(--status-gentle-soft);border-color:var(--status-gentle)}
+.ng-ifs-part.protector .lbl{color:var(--status-gentle)}
+.ng-ifs-part.self{background:var(--portal-accent-soft);border-color:var(--portal-accent-border)}
+.ng-ifs-part.self .lbl{color:var(--portal-accent)}
+.ng-ifs-part.insight{background:var(--status-calm-soft);border-color:var(--status-calm)}
+.ng-ifs-part.insight .lbl{color:var(--status-calm)}
+.ng-ifs-action{margin-top:2px;background:var(--portal-card);border:1px solid var(--portal-line);border-radius:10px;padding:9px 12px;font-size:.86rem;color:var(--portal-ink);line-height:1.5}
+
+/* 疗愈子 tab:入口按钮 + 身体层可点落地 + 阴影整合时间线 */
+.ng-healing-btn{display:flex;align-items:center;justify-content:space-between;gap:8px;width:100%;margin-top:12px;font-family:inherit;font-size:.85rem;font-weight:var(--weight-medium);line-height:1.35;text-align:left;color:var(--portal-accent);background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:12px;padding:11px 14px;cursor:pointer;transition:transform .12s var(--ng-ease),background .15s var(--ng-ease)}
+.ng-healing-btn:hover{background:var(--portal-card)}
+.ng-healing-btn:active{transform:scale(.99)}
+.ng-heal .ng-streak{margin-bottom:16px}
+
+/* 身体层:此刻先落地(可点掉) */
+.ng-ground{background:var(--status-calm-soft);border:1px solid var(--status-calm);border-radius:14px;padding:13px 15px;animation:ng-reveal-in .4s var(--ng-ease)}
+.ng-ground-lead{margin:0 0 9px;font-size:.82rem;font-weight:var(--weight-semibold);color:var(--status-calm)}
+.ng-ground-list{display:flex;flex-direction:column;gap:6px}
+.ng-ground-item{display:flex;align-items:center;gap:9px;width:100%;text-align:left;font-family:inherit;font-size:.9rem;line-height:1.4;color:var(--portal-ink);background:var(--portal-card);border:1px solid var(--portal-line);border-radius:10px;padding:9px 12px;cursor:pointer;transition:border-color .15s var(--ng-ease),color .15s var(--ng-ease)}
+.ng-ground-item .tick{flex:none;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ng-faint);display:flex;align-items:center;justify-content:center;font-size:.7rem;color:#fff}
+.ng-ground-item.on{color:var(--status-calm);border-color:var(--status-calm)}
+.ng-ground-item.on .tick{background:var(--status-calm);border-color:var(--status-calm)}
+.ng-ground-step{margin-top:2px;background:var(--status-gentle-soft);border:1px solid var(--status-gentle);border-radius:10px;padding:10px 13px;font-size:.9rem;color:var(--portal-ink);line-height:1.55}
+.ng-ground-step .lbl{display:block;font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.06em;color:var(--status-gentle);margin-bottom:5px}
+
+/* 阴影整合时间线:当前步放大高亮 / 已完成收起 / 未来步灰 */
+.ng-tl{display:flex;flex-direction:column}
+.ng-tl-step{display:flex;gap:12px}
+.ng-tl-rail{flex:none;width:22px;display:flex;justify-content:center;position:relative}
+.ng-tl-rail::after{content:'';position:absolute;top:5px;bottom:-4px;left:50%;width:1.5px;transform:translateX(-50%);background:var(--portal-line)}
+.ng-tl-step:last-child .ng-tl-rail::after{display:none}
+.ng-tl-node{flex:none;width:15px;height:15px;margin-top:3px;border-radius:50%;border:2px solid var(--ng-faint);background:var(--portal-bg);display:flex;align-items:center;justify-content:center;font-size:.6rem;color:#fff;z-index:1;transition:box-shadow .3s var(--ng-ease),background .3s var(--ng-ease),border-color .3s var(--ng-ease)}
+.ng-tl-step.done .ng-tl-node{background:var(--portal-accent);border-color:var(--portal-accent)}
+.ng-tl-step.done .ng-tl-rail::after{background:var(--portal-accent-border)}
+.ng-tl-step.active .ng-tl-node{border-color:var(--portal-accent);background:var(--portal-accent);box-shadow:0 0 0 4px var(--portal-accent-soft)}
+.ng-tl-body{flex:1;min-width:0;padding-bottom:16px;transition:opacity .3s var(--ng-ease)}
+.ng-tl-step.todo .ng-tl-body{opacity:.4}
+.ng-tl-step.done .ng-tl-body{opacity:.6}
+.ng-tl-head{display:flex;align-items:center;gap:8px}
+.ng-tl-n{flex:none;font-size:.7rem;font-weight:var(--weight-semibold);color:var(--portal-muted);font-variant-numeric:tabular-nums}
+.ng-tl-t{font-size:.95rem;font-weight:var(--weight-semibold);color:var(--portal-ink)}
+.ng-tl-step.active .ng-tl-t{color:var(--portal-accent)}
+.ng-tl-sum{margin:4px 0 0 20px;font-size:.82rem;color:var(--portal-muted);line-height:1.45}
+.ng-tl-in{margin-top:10px;background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:14px;padding:13px;display:flex;flex-direction:column;gap:10px;animation:ng-reveal-in .35s var(--ng-ease)}
+.ng-tl-q{margin:0;font-size:.9rem;font-weight:var(--weight-medium);color:var(--portal-ink);line-height:1.5}
+.ng-heal-from{margin:-2px 0 0;font-size:.74rem;color:var(--portal-accent);line-height:1.4}
+/* 情绪转盘(纯 HTML 绝对定位,iOS 安全):12 圆点环 + 中心大圈 */
+.ng-wheel{position:relative;width:min(280px,82vw);aspect-ratio:1/1;margin:8px auto 6px}
+.ng-wheel-dot{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;padding:0;cursor:pointer;font-family:inherit}
+.ng-wheel-dot .d{width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.55);transition:transform .12s var(--ng-ease)}
+.ng-wheel-dot.on .d{transform:scale(1.16);border:2.5px solid #fff;box-shadow:0 0 0 4px rgba(20,20,20,.05)}
+.ng-wheel-dot:active .d{transform:scale(1.1)}
+.ng-wheel-dot .l{font-size:.72rem;line-height:1;color:var(--portal-muted);white-space:nowrap}
+.ng-wheel-dot.on .l{color:var(--portal-ink);font-weight:var(--weight-semibold)}
+.ng-wheel-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:43%;aspect-ratio:1/1;border-radius:50%;background:var(--portal-card);border:1.5px solid var(--portal-line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:background .25s var(--ng-ease),border-color .25s var(--ng-ease)}
+.ng-wheel-center .nm{font-family:var(--font-portal-serif,Georgia,serif);font-size:1.15rem;font-weight:800;color:var(--portal-muted)}
+.ng-wheel-center .nm.on{color:#fff}
+.ng-wheel-center .hint{font-size:.7rem;color:var(--portal-muted)}
+.ng-mdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}
+
+/* 参与式选项 chips + ANT 实时识别 */
+.ng-heal-chips{display:flex;flex-wrap:wrap;gap:7px}
+.ng-heal-chips.col{flex-direction:column}
+.ng-heal-chip{font-family:inherit;font-size:.85rem;color:var(--portal-ink);background:var(--portal-card);border:1px solid var(--portal-line);border-radius:999px;padding:6px 13px;cursor:pointer;text-align:left;transition:border-color .12s var(--ng-ease),transform .12s var(--ng-ease)}
+.ng-heal-chip:hover{border-color:var(--portal-accent-border)}
+.ng-heal-chip:active{transform:scale(.97)}
+.ng-heal-chip.line{border-radius:12px;line-height:1.45}
+.ng-heal-chip.on{color:var(--portal-accent);border-color:var(--portal-accent);background:var(--portal-card)}
+.ng-ant{background:var(--status-gentle-soft);border:1px solid var(--status-gentle);border-radius:10px;padding:10px 12px}
+.ng-ant-h{margin:0 0 3px;font-size:.8rem;font-weight:var(--weight-semibold);color:var(--status-gentle)}
+.ng-ant-b{margin:0 0 8px;font-size:.8rem;color:var(--portal-ink);line-height:1.5}
+.ng-ant-ch{display:flex;flex-wrap:wrap;gap:6px}
+.ng-ant-w{font-size:.78rem;font-weight:var(--weight-semibold);color:var(--status-gentle);background:var(--portal-card);border-radius:6px;padding:2px 8px}
+.ng-heal-close{animation:ng-reveal-in .4s var(--ng-ease)}
+.ng-loop{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:3px}
+.ng-loop-row{display:flex;flex-direction:column;gap:2px}
+.ng-loop-row .k{font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.06em;color:var(--portal-muted)}
+.ng-loop-row .v{font-size:.9rem;color:var(--portal-ink);line-height:1.5}
+.ng-loop-row.now .v{color:var(--portal-accent);font-weight:var(--weight-semibold)}
+.ng-loop-arrow{text-align:center;color:var(--ng-faint);font-size:.85rem;margin:2px 0}
+
+/* 成长足迹总览面板(成长首页顶部) */
+.ng-fp{background:var(--portal-card);border:1px solid var(--portal-line);border-radius:16px;padding:16px;margin-bottom:20px}
+.ng-fp-hd{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.ng-fp-hd .l{font-size:.95rem;font-weight:var(--weight-semibold);color:var(--portal-ink)}
+.ng-fp-hd .r{font-size:.75rem;color:var(--ng-faint)}
+.ng-fp-empty{margin:0;font-size:.85rem;color:var(--portal-muted);line-height:1.6}
+.ng-fp-lead{margin:0 0 14px;font-size:.86rem;color:var(--portal-muted);line-height:1.6}
+.ng-fp-lead b{color:var(--portal-ink);font-weight:var(--weight-semibold)}
+.ng-fp-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.ng-fp-tile{text-align:left;background:var(--portal-accent-soft);border:none;border-radius:11px;padding:11px 13px;font-family:inherit}
+.ng-fp-tile.act{cursor:pointer;transition:transform .12s var(--ng-ease)}
+.ng-fp-tile.act:active{transform:scale(.98)}
+.ng-fp-tile .n{margin:0;font-size:1.35rem;font-weight:var(--weight-semibold);color:var(--portal-ink);line-height:1.1;font-variant-numeric:tabular-nums}
+.ng-fp-tile .n span{font-size:.8rem;font-weight:400;color:var(--portal-muted)}
+.ng-fp-tile .k{margin:3px 0 0;font-size:.76rem;color:var(--portal-muted)}
+.ng-fp-tile.act .k{color:var(--portal-accent)}
+.ng-fp-week,.ng-fp-trend{border-top:1px solid var(--portal-line);padding-top:12px;margin-top:2px}
+.ng-fp-week .hd,.ng-fp-trend .hd{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px}
+.ng-fp-week .hd span:first-child,.ng-fp-trend .hd span:first-child{font-size:.8rem;color:var(--portal-ink);font-weight:var(--weight-medium)}
+.ng-fp-week .hd .q,.ng-fp-trend .hd .q{font-size:.72rem;color:var(--ng-faint)}
+.ng-fp-week .cols{display:flex;justify-content:space-between;gap:6px}
+.ng-fp-week .col{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px}
+.ng-fp-week .bar{width:100%;height:24px;border-radius:7px;background:var(--portal-accent-soft)}
+.ng-fp-week .bar.on{background:var(--portal-accent)}
+.ng-fp-week .bar.today:not(.on){background:none;border:1px dashed var(--portal-accent-border)}
+.ng-fp-week .lb{font-size:.68rem;color:var(--portal-muted)}
+.ng-fp-week .col:last-child .lb{color:var(--portal-accent)}
+.ng-fp-trend{margin-top:12px}
+.ng-fp-trend .spark{display:block;width:100%;height:38px}
+.ng-fp-trend .spark .ar{fill:var(--portal-accent-soft)}
+.ng-fp-trend .spark .ln{fill:none;stroke:var(--portal-accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+.ng-fp-trend .spark .dot{fill:var(--portal-accent);stroke:var(--portal-card);stroke-width:1.5}
+.ng-todaynote{font-size:.75rem;color:var(--ng-faint);margin:13px 2px 0;text-align:center}
+.ng-done{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:16px;padding:16px;font-size:.9rem;color:var(--portal-accent);text-align:center;line-height:1.55}
+
+/* quiz 选项 + 揭晓 */
+.ng-opt{display:block;width:100%;text-align:left;font-family:inherit;font-size:.88rem;color:var(--portal-ink);
+  background:var(--portal-bg);border:1px solid var(--portal-line);border-radius:11px;padding:11px 13px;margin-bottom:8px;cursor:pointer;transition:border-color .12s var(--ng-ease)}
+.ng-opt:hover{border-color:var(--portal-accent-border)}
+.ng-opt.right{background:var(--status-go-soft);border-color:var(--status-go);color:var(--status-go)}
+.ng-opt.wrong{background:var(--ng-warm-soft);border-color:var(--ng-warm)}
+.ng-opt[disabled]{cursor:default}
+.ng-reveal{margin-top:6px;padding:13px 14px;background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);
+  border-radius:12px;font-size:.88rem;line-height:1.65;color:var(--portal-ink);animation:ng-reveal-in .4s var(--ng-ease)}
+.ng-reveal b{color:var(--portal-accent)}
+.ng-spend-row{display:flex;justify-content:space-between;gap:10px;padding:6px 0;font-size:.86rem;border-bottom:1px solid var(--portal-line)}
+.ng-spend-row:last-child{border-bottom:none}
+.ng-spend-row span{color:var(--portal-muted)}
+.ng-spend-row b{color:var(--portal-ink);font-variant-numeric:tabular-nums}
+
+/* 回看流:时间线 */
+.ng-trail{position:relative;margin-left:6px;padding-left:20px}
+.ng-trail::before{content:"";position:absolute;left:3px;top:6px;bottom:8px;width:2px;background:linear-gradient(var(--portal-accent-border),var(--portal-accent-border) 70%,transparent)}
+.ng-tr{position:relative;display:block;width:100%;text-align:left;font-family:inherit;background:none;border:none;padding:2px 0 18px;cursor:pointer;transition:opacity .12s var(--ng-ease)}
+.ng-tr:active{opacity:.7}
+.ng-tr::before{content:"";position:absolute;left:-20px;top:7px;width:8px;height:8px;border-radius:50%;background:var(--portal-card);border:2px solid var(--portal-accent-border)}
+.ng-tr.open::before,.ng-tr.fresh::before{border-color:var(--portal-accent);background:var(--portal-accent)}
+.ng-tr.fresh{animation:ng-fresh-in .45s var(--ng-ease)}
+.ng-tr-meta{font-size:.74rem;color:var(--ng-faint);margin:0 0 3px}
+.ng-tr-q{font-size:.82rem;color:var(--portal-muted);margin:0 0 3px;line-height:1.45}
+.ng-tr-a{font-size:.95rem;color:var(--portal-ink);margin:0;line-height:1.55}
+.ng-tr-a.clamp{overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.ng-tr-ctx{font-size:.76rem;color:var(--ng-faint);margin:8px 0 0;padding:8px 10px;background:var(--portal-accent-soft);border-radius:8px;line-height:1.5}
+.ng-empty{font-size:.82rem;color:var(--ng-faint);line-height:1.6}
+
+/* 收起的旧工具(帮你吵/框架)—— 等镜头看记忆归位前的临时入口 */
+.ng-more{margin-top:30px;border-top:1px solid var(--portal-line);padding-top:14px}
+.ng-more>summary{cursor:pointer;font-size:.8rem;color:var(--portal-muted);list-style:none}
+.ng-more>summary::-webkit-details-marker{display:none}
+.ng-more[open]>summary{margin-bottom:12px;color:var(--portal-accent)}
+
+@keyframes ng-card-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes ng-reveal-in{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes ng-fresh-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.nesio-growth :focus-visible{outline:2px solid var(--portal-accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.nesio-growth *{animation:none!important;transition:none!important}}
+
+/* ── 练习场(artifact 59587b8d)+ 镜头看记忆(d7bd8990),同 .nesio-growth 作用域 ── */
+.ng-nav{display:flex;align-items:center;gap:8px;color:var(--portal-muted);font-size:.86rem;margin-bottom:16px;background:none;border:none;font-family:inherit;cursor:pointer;padding:0}
+.ng-nav svg{width:18px;height:18px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+.ng-sub{color:var(--ng-faint);font-size:.82rem;margin:0 0 6px}
+.ng-mastery{color:var(--portal-accent);font-size:.82rem;margin:0 0 22px}
+
+/* 练习场:每日一练 */
+.ng-src{font-size:.75rem;color:var(--ng-faint);margin:0 0 10px;padding-left:11px;border-left:2px solid var(--portal-accent-border);line-height:1.5}
+.ng-scene{font-size:1rem;line-height:1.65;color:var(--portal-ink);margin:0 0 6px;background:var(--portal-bg);border:1px solid var(--portal-line);border-radius:12px;padding:12px 13px}
+.ng-ques{font-size:.92rem;color:var(--portal-muted);margin:11px 0 12px}
+.ng-lrow{padding:11px 0;border-top:1px solid var(--portal-line);display:flex;gap:10px}
+.ng-lrow:first-of-type{border-top:none}
+.ng-lrow .k{flex:none;width:78px;font-size:.76rem;font-weight:var(--weight-semibold);color:var(--portal-accent)}
+.ng-lrow .v{font-size:.88rem;line-height:1.6;color:var(--portal-ink)}
+.ng-lrow .v b{color:var(--status-gentle)}
+.ng-life{margin-top:12px;padding:12px 13px;background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:12px;font-size:.86rem;line-height:1.6;color:var(--portal-ink)}
+.ng-life .t{font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.03em;color:var(--portal-accent);display:block;margin-bottom:4px}
+.ng-quiet{font-size:.75rem;color:var(--ng-faint);text-align:center;margin:12px 2px 0}
+
+/* 利器图鉴 */
+.ng-filters{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:13px}
+.ng-filters button{font-family:inherit;font-size:.74rem;color:var(--portal-muted);background:var(--portal-card);border:1px solid var(--portal-line);border-radius:8px;padding:5px 11px;cursor:pointer;transition:all .12s var(--ng-ease)}
+.ng-filters button.on{color:var(--portal-accent);background:var(--portal-accent-soft);border-color:var(--portal-accent-border);font-weight:var(--weight-medium)}
+.ng-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.ng-cell{border:1px solid var(--portal-line);border-radius:13px;padding:12px 8px 10px;text-align:center;background:var(--portal-card)}
+.ng-cell.met{cursor:pointer;border-color:var(--portal-accent-border)}
+.ng-cell.met:hover{background:var(--portal-accent-soft)}
+.ng-cell .cnum{font-size:.62rem;color:var(--ng-faint);text-align:left;margin:-4px 0 2px}
+.ng-cell .cic{width:26px;height:26px;margin:0 auto 7px;stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;display:block}
+.ng-cell.met .cic{stroke:var(--portal-accent)}
+.ng-cell.locked .cic{stroke:var(--ng-faint);opacity:.5}
+.ng-cell .cn{font-size:.76rem;font-weight:var(--weight-medium);color:var(--portal-ink)}
+.ng-cell.locked .cn{color:var(--ng-faint);font-weight:var(--weight-regular)}
+.ng-cell .cs{font-size:.64rem;color:var(--ng-faint);margin-top:2px}
+.ng-cell.met .cs{color:var(--portal-accent)}
+.ng-pop{margin-top:12px;background:var(--portal-card);border:1px solid var(--portal-accent-border);border-radius:14px;padding:14px;font-size:.87rem;line-height:1.6;color:var(--portal-ink);animation:ng-reveal-in .3s var(--ng-ease)}
+.ng-pop .pt{font-weight:var(--weight-semibold);color:var(--portal-accent);margin:0 0 6px}
+.ng-pop .pe{background:var(--portal-bg);border:1px solid var(--portal-line);border-radius:10px;padding:10px 12px;margin:8px 0 0;color:var(--portal-muted);font-size:.83rem}
+
+/* 成长页 → 练习场 入口卡 */
+.ng-entry{display:flex;align-items:center;gap:12px;width:100%;text-align:left;font-family:inherit;background:var(--portal-card);
+  border:1px solid var(--portal-line);border-radius:14px;padding:14px 15px;cursor:pointer;transition:border-color .12s var(--ng-ease),transform .12s var(--ng-ease)}
+.ng-entry:hover{border-color:var(--portal-accent-border)}
+.ng-entry:active{transform:scale(.99)}
+.ng-entry svg{width:20px;height:20px;stroke:var(--portal-accent);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.ng-entry .et{flex:1;min-width:0}
+.ng-entry .en{font-size:.95rem;font-weight:var(--weight-semibold);margin:0;color:var(--portal-ink)}
+.ng-entry .ed{font-size:.78rem;color:var(--portal-muted);margin:1px 0 0}
+.ng-entry .ec{color:var(--ng-faint);flex:none}
+
+/* 镜头看记忆:记忆上的镜头库(NesioSheet 内) */
+.ng-lens{display:flex;gap:12px;align-items:flex-start;width:100%;text-align:left;font-family:inherit;background:var(--portal-bg);
+  border:1px solid var(--portal-line);border-radius:13px;padding:12px 13px;margin-bottom:9px;cursor:pointer;transition:border-color .12s var(--ng-ease)}
+.ng-lens:hover{border-color:var(--portal-accent-border)}
+.ng-lens.rec{border-color:var(--portal-accent-border);background:var(--portal-accent-soft)}
+.ng-lens .li{width:19px;height:19px;stroke:var(--portal-accent);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none;margin-top:2px}
+.ng-lens .lt{flex:1;min-width:0}
+.ng-lens .ln{font-size:.92rem;font-weight:var(--weight-semibold);margin:0;display:flex;align-items:center;gap:7px;color:var(--portal-ink)}
+.ng-lens .rc{font-size:.64rem;font-weight:var(--weight-semibold);color:var(--portal-accent);background:var(--portal-card);border:1px solid var(--portal-accent-border);border-radius:5px;padding:1px 6px}
+.ng-lens .ld{font-size:.78rem;color:var(--portal-muted);margin:2px 0 0;line-height:1.45}
+.ng-lens.locked{opacity:.5;cursor:default}
+.ng-lens.locked .li{stroke:var(--ng-faint)}
+.ng-lbl{font-size:.7rem;letter-spacing:.12em;text-transform:uppercase;color:var(--portal-accent);font-weight:var(--weight-semibold);margin:16px 0 9px}
+.ng-hint{display:flex;gap:11px;align-items:flex-start;background:var(--ng-warm-soft);border:1px solid var(--ng-warm);border-radius:14px;padding:12px 14px;margin:13px 0}
+.ng-hint svg{width:18px;height:18px;stroke:var(--ng-warm);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none;margin-top:1px}
+.ng-hint p{margin:0;font-size:.86rem;line-height:1.5;color:var(--portal-ink);flex:1}
+.ng-hint .x{font-size:.74rem;color:var(--portal-muted);background:none;border:none;cursor:pointer;flex:none;padding:2px 4px}
+
+/* ── 成长下的三子 tab(成长/练习场/镜头)+ 镜头 tab 的记忆挑选卡 ── */
+.ng-subtabs{display:flex;gap:4px;background:var(--portal-accent-soft);border-radius:12px;padding:4px;margin-bottom:20px}
+.ng-subtabs button{flex:1;font-family:inherit;font-size:.82rem;font-weight:var(--weight-medium);color:var(--portal-muted);background:none;border:none;border-radius:9px;padding:8px 0;cursor:pointer;transition:color .15s var(--ng-ease),background .15s var(--ng-ease)}
+.ng-subtabs button.on{color:var(--portal-accent);background:var(--portal-card);font-weight:var(--weight-semibold);box-shadow:0 1px 2px rgba(20,20,20,.05)}
+
+.ng-mem{display:block;width:100%;text-align:left;font-family:inherit;background:var(--portal-card);border:1px solid var(--portal-line);border-radius:16px;padding:14px 15px;margin-bottom:10px;cursor:pointer;transition:border-color .12s var(--ng-ease),transform .12s var(--ng-ease)}
+.ng-mem:hover{border-color:var(--portal-accent-border)}
+.ng-mem:active{transform:scale(.99)}
+.ng-mem.heavy{border-color:var(--ng-warm)}
+.ng-mem-meta{display:flex;align-items:center;gap:8px;font-size:.73rem;color:var(--ng-faint);margin-bottom:8px;flex-wrap:wrap}
+.ng-mem-meta .dot{width:5px;height:5px;border-radius:50%;background:var(--portal-accent);flex:none}
+.ng-mem.heavy .ng-mem-meta .dot{background:var(--ng-warm)}
+.ng-mem-meta .go{margin-left:auto;color:var(--portal-accent);font-weight:var(--weight-semibold)}
+.ng-mem-text{font-size:.95rem;line-height:1.6;color:var(--portal-ink);margin:0 0 9px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.ng-mem-tags{display:flex;gap:6px;flex-wrap:wrap}
+.ng-mem-tag{font-size:.7rem;color:var(--portal-muted);background:var(--portal-bg);border:1px solid var(--portal-line);border-radius:6px;padding:2px 8px}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   小剧场 · 想试 · 想分享(artifact 0119784e)—— 走 portal 主题 token
+   ══════════════════════════════════════════════════════════════════════════ */
+.nesio-montage{
+  --nm-ease:cubic-bezier(0.23,1,0.32,1);
+  --nm-faint:color-mix(in srgb, var(--portal-muted) 66%, transparent);
+  --nm-gold:linear-gradient(120deg,#f0d68a,#d8ad5a);
+  font-family:var(--font-source-sans);color:var(--portal-ink);line-height:1.6;
+}
+.nesio-montage *{box-sizing:border-box}
+.nm-hd{display:flex;align-items:center;gap:10px;margin:0 0 4px}
+.nm-hd svg{width:22px;height:22px;stroke:var(--portal-accent);stroke-width:1.7;fill:none;stroke-linecap:round;stroke-linejoin:round;flex:none}
+.nm-hd h1{font-size:1.35rem;letter-spacing:-.01em;margin:0;font-weight:var(--weight-semibold);color:var(--portal-ink)}
+.nm-sub{color:var(--nm-faint);font-size:.82rem;margin:0 0 22px 32px}
+.nm-sec{display:flex;align-items:baseline;justify-content:space-between;margin:0 0 12px}
+.nm-sec .l{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--portal-accent);font-weight:var(--weight-semibold)}
+.nm-sec .r{font-size:.74rem;color:var(--nm-faint)}
+.nm-gap{height:30px}
+
+.nm-gift{background:linear-gradient(135deg,var(--portal-accent-soft),var(--portal-card));border:1px solid var(--portal-accent-border);border-radius:18px;padding:15px 15px 6px;margin-bottom:8px}
+.nm-gift .gh{display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--portal-accent);font-weight:var(--weight-semibold);margin:0 0 11px;line-height:1.4}
+.nm-gift .gh svg{width:16px;height:16px;stroke:var(--portal-accent);stroke-width:1.8;fill:none;flex:none}
+
+.nm-poster{position:relative;border-radius:15px;overflow:hidden;cursor:pointer;aspect-ratio:16/11;display:flex;flex-direction:column;justify-content:flex-end;color:#fff;border:1px solid rgba(0,0,0,.12);width:100%;padding:0;background:var(--portal-accent-soft);background-size:cover;background-position:center}
+.nm-poster .sh{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.66),rgba(0,0,0,.05) 55%,transparent)}
+.nm-poster .txt{position:relative;padding:13px 14px;text-align:left}
+.nm-poster .t{font-size:1.05rem;font-weight:var(--weight-semibold);margin:0;text-shadow:0 1px 6px rgba(0,0,0,.45)}
+.nm-poster .s{font-size:.8rem;opacity:.94;margin:3px 0 0;line-height:1.4;text-shadow:0 1px 5px rgba(0,0,0,.45)}
+.nm-poster .play{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:48px;height:48px;border-radius:50%;background:rgba(20,18,20,.42);display:flex;align-items:center;justify-content:center;border:1.5px solid rgba(255,255,255,.7)}
+.nm-poster .play svg{width:20px;height:20px;fill:#fff;margin-left:2px}
+.nm-poster .kind{position:absolute;top:10px;left:11px;font-size:.66rem;font-weight:var(--weight-semibold);letter-spacing:.03em;background:rgba(0,0,0,.5);border-radius:6px;padding:3px 8px;color:#fff}
+.nm-poster .kind.pro{color:#1a1a1a;background:var(--nm-gold)}
+.nm-poster .dur{position:absolute;top:10px;right:11px;font-size:.66rem;font-weight:var(--weight-medium);background:rgba(0,0,0,.42);border-radius:6px;padding:3px 7px;color:#fff;font-variant-numeric:tabular-nums}
+
+.nm-how{font-size:.78rem;color:var(--portal-muted);text-align:center;padding:11px 4px 8px;line-height:1.55}
+.nm-how b{color:var(--portal-accent)}
+.nm-quota{display:flex;gap:10px;align-items:flex-start;background:var(--portal-card);border:1px solid var(--portal-line);border-radius:13px;padding:12px 14px;margin:14px 0 0;font-size:.82rem;line-height:1.55}
+.nm-quota svg{width:17px;height:17px;stroke:var(--portal-accent);stroke-width:1.7;fill:none;flex:none;margin-top:2px}
+.nm-quota b{color:var(--portal-accent)}
+.nm-make{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;font-family:inherit;font-size:.92rem;font-weight:var(--weight-semibold);color:var(--portal-accent);background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:14px;padding:14px 0;cursor:pointer;margin-top:12px;transition:transform .12s var(--nm-ease)}
+.nm-make:active{transform:scale(.98)}
+.nm-make svg{width:18px;height:18px;stroke:var(--portal-accent);stroke-width:1.8;fill:none;stroke-linecap:round}
+
+.nm-grid2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
+.nm-grid2 .nm-poster{aspect-ratio:3/4}
+.nm-grid2 .nm-poster .t{font-size:.9rem}
+.nm-grid2 .nm-poster .s{font-size:.72rem}
+.nm-privacy{display:flex;gap:9px;align-items:flex-start;margin-top:18px;font-size:.8rem;color:var(--portal-muted);line-height:1.55}
+.nm-privacy svg{width:16px;height:16px;stroke:var(--portal-accent);stroke-width:1.7;fill:none;flex:none;margin-top:2px}
+.nm-privacy b{color:var(--portal-accent)}
+.nm-foot{margin-top:26px;padding-top:15px;border-top:1px solid var(--portal-line);font-size:.75rem;color:var(--nm-faint);line-height:1.65}
+.nm-foot b{color:var(--portal-muted)}
+.nm-empty{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:16px;padding:16px;font-size:.9rem;color:var(--portal-accent);text-align:center;line-height:1.55}
+
+/* 落差揭晓播放器(内容在 NesioSheet·Radix 居中面里,可交互;自带不透明深底=干净影院感,不透底) */
+.nm-cinema{position:fixed;inset:0;background:rgba(0,0,0,.92);display:flex;align-items:center;justify-content:center;padding:22px;overflow:auto}
+.nm-player{width:min(420px,88vw)}
+.nm-screen{aspect-ratio:16/11;border-radius:14px;position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center;text-align:center;padding:22px;background:#000 center/cover no-repeat}
+.nm-screen .note{color:rgba(255,255,255,.94);font-size:.95rem;line-height:1.7;font-style:italic;transition:opacity .7s,filter .7s;position:relative;z-index:2;text-shadow:0 2px 12px rgba(0,0,0,.8)}
+.nm-screen::before{content:"";position:absolute;inset:0;background:rgba(0,0,0,.42)}
+.nm-video{width:100%;max-height:70vh;border-radius:14px;background:#000;display:block}
+.nm-feel{position:absolute;left:0;right:0;bottom:0;padding:16px 18px;color:#fff;font-size:.98rem;font-weight:var(--weight-semibold);line-height:1.6;background:linear-gradient(to top,rgba(0,0,0,.72),transparent);text-shadow:0 2px 10px rgba(0,0,0,.6);opacity:0;transition:opacity 1s;z-index:3;text-align:left}
+.nm-feel.on{opacity:1}
+.nm-stage{font-size:.7rem;color:rgba(255,255,255,.6);text-align:center;margin:12px 0 8px;min-height:1em}
+.nm-prow{display:flex;gap:10px;margin-top:6px}
+.nm-prow button{flex:1;font-family:inherit;font-size:.85rem;font-weight:var(--weight-semibold);border-radius:11px;padding:12px 0;cursor:pointer;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.13);color:#fff}
+.nm-prow button.pri{background:#fff;color:#1a1a1a;border-color:#fff}
+
+/* 分享卡(病毒单元;内容在 NesioSheet 居中面里) */
+.nm-sharecard{width:250px;border-radius:20px;overflow:hidden;background:#1a1a1a;box-shadow:0 20px 60px rgba(0,0,0,.5)}
+.nm-sharecard .top{aspect-ratio:3/4;position:relative;display:flex;flex-direction:column;justify-content:flex-end;color:#fff;background:#333 center/cover no-repeat}
+.nm-sharecard .top .fl{position:relative;padding:16px 15px;font-size:.98rem;font-weight:var(--weight-semibold);line-height:1.55;text-shadow:0 2px 10px rgba(0,0,0,.55);z-index:2}
+.nm-sharecard .top .sh{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.72),transparent 60%)}
+.nm-sharecard .bot{padding:13px 15px;background:#1a1a1a;color:#fff}
+.nm-sharecard .brand{display:flex;align-items:center;gap:7px;font-size:.74rem;color:rgba(255,255,255,.75)}
+.nm-sharecard .brand .dot{width:7px;height:7px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#eaf3fb,#6db3a6 70%)}
+.nm-sharecard .invite{font-size:.82rem;color:#fff;margin:9px 0 0;line-height:1.5}
+.nm-sharecard .invite b{color:#8fd3c6}
+.nm-sharebtns{display:flex;gap:9px;margin-top:16px;width:250px}
+.nm-sharebtns button{flex:1;font-family:inherit;font-size:.84rem;font-weight:var(--weight-semibold);border-radius:11px;padding:11px 0;cursor:pointer;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.13);color:#fff}
+.nm-sharebtns button.pri{background:#fff;color:#1a1a1a;border:none}
+.nm-shareprivacy{font-size:.72rem;color:rgba(255,255,255,.6);margin-top:14px;text-align:center;max-width:250px;line-height:1.5}
+
+.nm-toast{position:fixed;left:50%;bottom:calc(26px + var(--portal-bottom-nav-clearance, 0px));transform:translateX(-50%);background:var(--portal-ink);color:var(--portal-bg);font-size:.82rem;padding:11px 16px;border-radius:12px;z-index:2147483002;max-width:330px;text-align:center;animation:nm-toast-in .3s var(--nm-ease)}
+@keyframes nm-toast-in{from{opacity:0;transform:translateX(-50%) translateY(16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.nesio-montage :focus-visible{outline:2px solid var(--portal-accent);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.nesio-montage *,.nm-toast{animation:none!important;transition:opacity .2s!important}}

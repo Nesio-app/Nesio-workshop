@@ -17,7 +17,7 @@ import { matchPerson } from '@/lib/portal/person-match';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { useSheetDrag } from '../use-sheet-drag';
+import NesioSheet from '../ui/NesioSheet';
 import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 
 type Extracted = { category: PersonRecordCategory; title: string; detail?: string; date?: string; amount?: number };
@@ -31,7 +31,6 @@ export default function PersonExtractSheet({ open, onClose }: { open: boolean; o
   const [pending, setPending] = useState<Extracted[] | null>(null);
   const [personKey, setPersonKey] = useState('');
   const photoRef = useRef<HTMLInputElement>(null);
-  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   if (!open) return null;
 
@@ -71,10 +70,14 @@ export default function PersonExtractSheet({ open, onClose }: { open: boolean; o
   };
 
   return (
-    <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '记给某人', 'Log to a person')}>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
-        <div className="nesio-sheet-handle" {...handleProps} />
+    <NesioSheet
+      variant="bottom"
+      open={open}
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-settings-sheet-card"
+      ariaLabel={L(dict, '记给某人', 'Log to a person')}
+    >
         <div className="nesio-settings-sheet-header">
           <h2 className="nesio-settings-sheet-title">{L(dict, '拍一张 / 说一句,记给某人', 'Snap or say it — log to a person')}</h2>
         </div>
@@ -137,7 +140,6 @@ export default function PersonExtractSheet({ open, onClose }: { open: boolean; o
             {L(dict, '只存本机 · 敏感项(医疗/药物/健康)不上传', 'On-device only · sensitive items never leave your device')}
           </p>
         </div>
-      </div>
-    </div>
+    </NesioSheet>
   );
 }

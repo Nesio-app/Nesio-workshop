@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react';
 import { addRoutine, deleteRoutine, loadRoutines, ROUTINES_UPDATED_EVENT, updateRoutine, type Routine, type RoutineCategory } from '@/lib/portal/routines';
 import { PROTOCOL_LIBRARY, startProtocol } from '@/lib/platform/training-protocol-engine';
 import { InfoTip } from './InfoTip';
-import { useSheetDrag } from './use-sheet-drag';
+import NesioSheet from './ui/NesioSheet';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -37,7 +37,6 @@ export default function RoutineSheet({ open, onClose }: { open: boolean; onClose
   const [days, setDays] = useState<number[]>(ALL_DAYS);
   const [category, setCategory] = useState<RoutineCategory>('general');
   const [protocolId, setProtocolId] = useState<string | undefined>(undefined);
-  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   useEffect(() => {
     if (!open) return;
@@ -68,10 +67,14 @@ export default function RoutineSheet({ open, onClose }: { open: boolean; onClose
   }
 
   return (
-    <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '例行提醒', 'Routines')}>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-settings-sheet-card--expanded' : ''}`} style={cardStyle}>
-        <div className="nesio-sheet-handle" {...handleProps} />
+    <NesioSheet
+      variant="bottom"
+      open={open}
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-settings-sheet-card"
+      ariaLabel={L(dict, '例行提醒', 'Routines')}
+    >
         <div className="nesio-settings-sheet-header">
           <h2 className="nesio-settings-sheet-title">
             {L(dict, '例行提醒', 'Routines')}
@@ -196,7 +199,6 @@ export default function RoutineSheet({ open, onClose }: { open: boolean; onClose
             </div>
           ))}
         </div>
-      </div>
-    </div>
+    </NesioSheet>
   );
 }

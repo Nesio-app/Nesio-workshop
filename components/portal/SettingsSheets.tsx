@@ -16,7 +16,7 @@ import { L, t } from '@/lib/portal/i18n';
 import { usePortalLocale } from './use-portal-locale';
 import { IconChevronRight, IconHalfMoon, IconLink, IconLock, IconMoon, IconShield, IconSun } from './icons';
 import { InfoTip } from './InfoTip';
-import { useSheetDrag } from './use-sheet-drag';
+import NesioSheet from './ui/NesioSheet';
 import { captureLocationEnabled, setCaptureLocationEnabled } from '@/lib/portal/capture-location';
 import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
@@ -33,21 +33,21 @@ import { pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, buildCom
 interface SheetProps { open: boolean; onClose: () => void; }
 
 function SheetWrap({ open, onClose, title, tip, children }: SheetProps & { title: string; tip?: string; children: React.ReactNode }) {
-  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  // 图1:顶部横线拖动(上拉全屏 / 下滑关闭),取代右上角 ✕
-  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
   if (!open) return null;
   return (
-    <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={title}>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-settings-sheet-card--expanded' : ''}`} style={cardStyle}>
-        <div className="nesio-sheet-handle" {...handleProps} />
-        <div className="nesio-settings-sheet-header">
-          <h2 className="nesio-settings-sheet-title">{title}{tip && <InfoTip text={tip} />}</h2>
-        </div>
-        <div className="nesio-settings-sheet-body">{children}</div>
+    <NesioSheet
+      variant="bottom"
+      open={open}
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-settings-sheet-card"
+      ariaLabel={title}
+    >
+      <div className="nesio-settings-sheet-header">
+        <h2 className="nesio-settings-sheet-title">{title}{tip && <InfoTip text={tip} />}</h2>
       </div>
-    </div>
+      <div className="nesio-settings-sheet-body">{children}</div>
+    </NesioSheet>
   );
 }
 
@@ -623,6 +623,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       purgeLocalData(localStorage);                         // localStorage 全部本机 key 收口清除(保留 auth)
       void purgeIdbBlobs();                                 // IDB blob(健康/临床/地点)一并清 —— 别漏
       void purgeLocalImages();                              // 隐私审计:记忆照片在独立 IDB(nesio-images),必须一并清,否则「删除」留图在本机
+      void import('@/lib/portal/local-email-body').then(({ purgeEmailBodies }) => purgeEmailBodies()); // 邮件全文独立 IDB(nesio-email-bodies)一并清
     } catch { /* ignore */ }
     setNodeCount(0);
     setDeleted(true);

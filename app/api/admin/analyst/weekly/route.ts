@@ -28,7 +28,7 @@ async function runWeekly(req: NextRequest) {
   let narrative = '';
   if (aiProviderAvailable()) {
     try {
-      const { text } = await completeText({ prompt: buildWeeklyPrompt(report), maxTokens: 400 });
+      const { text } = await completeText({ prompt: buildWeeklyPrompt(report), maxTokens: 400, route: 'analyst-weekly' });
       narrative = (text || '').trim();
     } catch { /* 兜底 */ }
   }

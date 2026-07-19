@@ -67,8 +67,8 @@ assert.equal(mailCategory({ labelIds: ['INBOX'] }), 'personal');
 assert.ok(src.includes('mailClassBySender'), 'AI 提取路径用 mailClassBySender 回填分类');
 assert.ok(/const byEmail = mailClassBySender\(worth\)/.test(src), 'extractNodes 按 worth 邮件建发件人分类表');
 assert.ok(/emailAddrOf\(String\(attrs\.source \?\? attrs\.from/.test(src), 'AI 节点按发件人邮箱归并分类');
-assert.ok(/cls\.category === 'updates'[\s\S]{0,60}'通知'/.test(src), 'AI 节点:updates → 通知 tag');
-assert.ok(/cls\.important[\s\S]{0,60}'重要'/.test(src), 'AI 节点:important → 重要 tag');
+assert.ok(/cls\??\.category === 'updates'[\s\S]{0,60}'通知'/.test(src), 'AI 节点:updates → 通知 tag');
+assert.ok(/cls\??\.important[\s\S]{0,60}'重要'/.test(src), 'AI 节点:important → 重要 tag');
 assert.ok(/mailCategory: cls\.category/.test(src), 'AI 节点写 mailCategory 属性');
 
 // 纯函数:emailAddrOf + mailClassBySender

@@ -14,7 +14,7 @@ import NesioMark from './NesioMark';
 // 批次 139:统一「打开详情」—— 聊天引用卡与记忆页/今天页共用同一个完整详情组件
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { getLifeGraph, isBulkImported, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
+import { getLifeGraph, isBulkImported, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
 import { buildMemoryContext, fmtEventDate, extractCitations } from '@/lib/portal/memory-retrieval';
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { loadProfileSettings } from '@/lib/portal/profile';
@@ -498,9 +498,16 @@ export default function NesioChatSheet({
   const [showHistory, setShowHistory] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const listRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const filePickerRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<{ stop(): void } | null>(null);
+  // 输入框随字数自增高:重置到 auto 再取 scrollHeight,封顶 ~5 行(120px)后内部滚动。
+  useEffect(() => {
+    const el = inputRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 120)}px`;
+  }, [input]);
   const longPressRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const voiceTextRef = useRef('');
   // Loaded file context — persists across messages in this session
@@ -625,7 +632,8 @@ Edit location/value anytime in Storage.`),
     // 行为完全不变、当前用户无回归。
     // 批次 148:端上模式(用户手动选)或免费层 → 本机记忆搜索,不打云。深问 + 有权益才走云。
     if (!deepMode || !canUsePaidCloudAi()) {
-      const hits = searchLifeGraphFuzzy(text.trim(), 6);
+      // 隐私红线:未登录/未知态不把邮件主题、日程标题(私密外部节点 name)显示到聊天气泡里。
+      const hits = searchLifeGraphFuzzy(text.trim(), 6).filter((n) => canUsePrivateData || !isPrivateExternalNode(n));
       const body = hits.length
         ? L(dict, `在你的记忆里找到 ${hits.length} 条:\n${hits.map((n) => `• ${n.name}`).join('\n')}`,
             `Found ${hits.length} in your memory:\n${hits.map((n) => `• ${n.name}`).join('\n')}`)
@@ -649,7 +657,7 @@ Edit location/value anytime in Storage.`),
     try {
       // 🔴#3:把最近几条用户提问作为召回线索,让"第二封讲啥"这类追问仍能重新召回邮件。
       const convoHint = messages.filter((m) => m.role === 'user').slice(-2).map((m) => m.text).join(' ');
-      const { context: memoryContext, refCandidates, semanticDegraded, semanticReason } = await buildMemoryContext(text.trim(), convoHint);
+      const { context: memoryContext, refCandidates, semanticDegraded, semanticReason } = await buildMemoryContext(text.trim(), convoHint, canUsePrivateData);
       const res = await fetch('/api/portal/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -662,7 +670,7 @@ Edit location/value anytime in Storage.`),
             ? { name: fileContextRef.current.name, content: fileContextRef.current.content }
             : undefined,
           memoryContext,
-          calendarContext: buildCalendarContext(text.trim()),
+          calendarContext: canUsePrivateData ? buildCalendarContext(text.trim()) : undefined,
           environmentContext: formatEnvironmentContext(),
         }),
         signal: controller.signal,
@@ -707,8 +715,8 @@ Edit location/value anytime in Storage.`),
     } catch (err) {
       clearTimeout(timeout);
       const isTimeout = err instanceof Error && err.name === 'AbortError';
-      // 兜底：从本地记忆模糊搜索
-      const localHits = searchLifeGraphFuzzy(text.trim(), 5);
+      // 兜底：从本地记忆模糊搜索(隐私红线:未登录/未知态不带出邮件主题、日程标题)
+      const localHits = searchLifeGraphFuzzy(text.trim(), 5).filter((n) => canUsePrivateData || !isPrivateExternalNode(n));
       const fallbackText = localHits.length
         ? L(dict, `AI 暂时不可用，但我在记忆库里找到了这些相关线索：\n${localHits.map((n) => `• ${n.name}`).join('\n')}`, `AI is briefly unavailable, but I found these related clues in your memory:\n${localHits.map((n) => `• ${n.name}`).join('\n')}`)
         : isTimeout ? L(dict, '响应超时，请重试。', 'The response timed out — please try again.') : L(dict, 'AI 暂时不可用，记忆库里也没找到相关线索。', 'AI is briefly unavailable, and nothing related turned up in your memory.');
@@ -1304,6 +1312,10 @@ Edit location/value anytime in Storage.`),
             <span className="nesio-wechat-plus-icon"><IconFile /></span>
             <span>{L(dict, '文件', 'File')}</span>
           </button>
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); setShowEmoji(true); }}>
+            <span className="nesio-wechat-plus-icon"><IconSmile /></span>
+            <span>{L(dict, '表情', 'Emoji')}</span>
+          </button>
         </div>
       )}
 
@@ -1370,16 +1382,8 @@ Edit location/value anytime in Storage.`),
             </button>
             <button
               type="button"
-              className={`nesio-wechat-emoji-btn${showEmoji ? ' nesio-wechat-emoji-btn--active' : ''}`}
-              onClick={() => { setShowEmoji((v) => !v); setShowPlus(false); }}
-              aria-label={L(dict, '表情', 'Emoji')}
-            >
-              <IconSmile />
-            </button>
-            <button
-              type="button"
               className={`nesio-wechat-plus-btn${showPlus ? ' nesio-wechat-plus-btn--active' : ''}`}
-              onClick={() => setShowPlus((v) => !v)}
+              onClick={() => { setShowPlus((v) => !v); setShowEmoji(false); }}
               aria-label={L(dict, '更多', 'More')}
             >
               ＋
@@ -1396,25 +1400,26 @@ Edit location/value anytime in Storage.`),
             >
               <IconMic />
             </button>
-            <input
+            <textarea
               ref={inputRef}
               className="nesio-wechat-input"
-              type="text"
+              rows={1}
               placeholder={L(dict, '问一问…', 'Ask…')}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); void sendMessage(input); } }}
+              onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void sendMessage(input); } }}
               disabled={sending}
             />
+            {/* 「＋」常驻:打字后也能加图片/拍摄/文件/表情,不再被发送键顶掉 */}
             <button
               type="button"
-              className={`nesio-wechat-emoji-btn${showEmoji ? ' nesio-wechat-emoji-btn--active' : ''}`}
-              onClick={() => { setShowEmoji((v) => !v); setShowPlus(false); }}
-              aria-label={L(dict, '表情', 'Emoji')}
+              className={`nesio-wechat-plus-btn${showPlus ? ' nesio-wechat-plus-btn--active' : ''}`}
+              onClick={() => { setShowPlus((v) => !v); setShowEmoji(false); }}
+              aria-label={L(dict, '更多', 'More')}
             >
-              <IconSmile />
+              ＋
             </button>
-            {input.trim() ? (
+            {input.trim() && (
               <button
                 type="button"
                 className="nesio-wechat-send-btn"
@@ -1423,15 +1428,6 @@ Edit location/value anytime in Storage.`),
                 aria-label={L(dict, '发送', 'Send')}
               >
                 {L(dict, '发送', 'Send')}
-              </button>
-            ) : (
-              <button
-                type="button"
-                className={`nesio-wechat-plus-btn${showPlus ? ' nesio-wechat-plus-btn--active' : ''}`}
-                onClick={() => setShowPlus((v) => !v)}
-                aria-label={L(dict, '更多', 'More')}
-              >
-                ＋
               </button>
             )}
           </>

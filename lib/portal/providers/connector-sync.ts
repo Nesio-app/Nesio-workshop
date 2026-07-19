@@ -200,11 +200,18 @@ export async function runGmailSync(opts?: { force?: boolean }): Promise<GmailSyn
     const res = await fetch(`/api/portal/gmail?includeBody=true&analyze=true${afterTs ? `&afterTs=${afterTs}` : ''}`);
     // 平台超时(504)回非 JSON —— 直接 res.json() 会炸进 catch 被误报成 network,
     // 状态码如实带出才能在同步详情里看到真病因。
-    type GmailPayload = { ok?: boolean; nodes?: Array<Record<string, unknown>>; error?: string; emailCount?: number };
+    type GmailPayload = { ok?: boolean; nodes?: Array<Record<string, unknown>>; error?: string; emailCount?: number; emailBodies?: Record<string, string> };
     let data: GmailPayload | null = null;
     try { data = JSON.parse(await res.text()) as GmailPayload; } catch { /* 网关/超时页 */ }
     if (!data) return { ok: false, read: 0, extracted: 0, error: `http_${res.status}` };
     if (!data.ok) return { ok: false, read: 0, extracted: 0, error: data.error || 'unknown' };
+    // 邮件全文存本机 IndexedDB(隐私红线:不进云同步的节点 attributes)。失败不拦同步。
+    if (data.emailBodies && Object.keys(data.emailBodies).length) {
+      const bodies = data.emailBodies;
+      void import('../local-email-body').then(({ putEmailBodies }) => putEmailBodies(bodies)).catch(() => {});
+      // 里程碑 B:并入本机全文检索索引,刚同步的邮件立即可被搜索/RAG 命中。
+      void import('../email-fulltext-index').then(({ indexEmailBodies }) => indexEmailBodies(bodies)).catch(() => {});
+    }
     const nodes = data.nodes || [];
     if (nodes.length) {
       nodes.forEach((n) => ingestLifeNode({ ...n, source: 'email' } as Parameters<typeof ingestLifeNode>[0]));

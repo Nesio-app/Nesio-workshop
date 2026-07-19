@@ -7,6 +7,7 @@
  *(canvas/序列化 SVG 不认 var(),必须先 getComputedStyle 取值)。
  */
 import type { PlaceVisit } from './place-trail';
+import { canonicalCountryKey } from './country-normalize';
 
 export type Continent = 'NA' | 'SA' | 'EU' | 'AF' | 'AS' | 'OC';
 
@@ -55,7 +56,14 @@ const COUNTRY_CONTINENT: Record<string, Continent> = {
 };
 
 export function countryContinent(country: string): Continent | null {
-  return COUNTRY_CONTINENT[country.trim()] ?? null;
+  const raw = country.trim();
+  if (COUNTRY_CONTINENT[raw]) return COUNTRY_CONTINENT[raw];
+  // 归一化后再查一次:ISO 码/别名(US/UK/USA…)也能落到洲
+  const key = canonicalCountryKey(raw);
+  for (const [name, cont] of Object.entries(COUNTRY_CONTINENT)) {
+    if (canonicalCountryKey(name) === key) return cont;
+  }
+  return null;
 }
 
 // ── 点阵世界地图:32×15 陆地掩码,每格标洲。用矩形跨度构造,避免手写字符串错位。──
@@ -146,7 +154,8 @@ export function computePlacesShareStats(
   countryNames: string[],
   now: Date = new Date(),
 ): PlacesShareStats {
-  const countries = new Set(countryNames.map((c) => c.trim()).filter(Boolean));
+  // 按归一化国家键去重(去过 N 国不再因「美国/United States」重复虚高)
+  const countries = new Set(countryNames.map((c) => canonicalCountryKey(c)).filter(Boolean));
   const conts = new Set<Continent>();
   for (const c of countries) { const k = countryContinent(c); if (k) conts.add(k); }
 

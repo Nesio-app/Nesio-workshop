@@ -1,6 +1,7 @@
 import type { RecommendationCard } from '../portal/reasoning-engine';
 import { createSignal } from './create-signal';
 import type { Signal } from './signal';
+import { logDropped } from '../portal/storage-health';
 
 const SIGNAL_FEEDBACK_KEY = 'nesio-signal-feedback-v1';
 
@@ -43,8 +44,9 @@ function writeRecords(records: SignalFeedbackRecord[]): void {
   try {
     localStorage.setItem(SIGNAL_FEEDBACK_KEY, JSON.stringify(records.slice(-500)));
     window.dispatchEvent(new CustomEvent('nesio-signal-feedback-recorded'));
-  } catch {
-    /* feedback is best-effort; the visible action must not fail. */
+  } catch (err) {
+    // feedback is best-effort;可见动作不该因此失败,但也别全静默 —— 留可 grep 日志。
+    logDropped('signal_feedback.write', err);
   }
 }
 

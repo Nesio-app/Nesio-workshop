@@ -15,7 +15,7 @@
 
 import { reportStorageDropped } from '@/lib/portal/storage-health';
 
-export type PointsSource = 'freeze_decline' | 'fitness' | 'project' | 'breath' | 'manual' | 'redeem';
+export type PointsSource = 'freeze_decline' | 'fitness' | 'project' | 'breath' | 'healing' | 'manual' | 'redeem';
 
 export interface PointsEntry {
   id: string;
@@ -53,6 +53,8 @@ export const POINTS_PER_FITNESS_SESSION = 20;
 export const POINTS_PER_PROJECT = 50;
 /** 一次呼吸/冷静练习。 */
 export const POINTS_PER_BREATH = 15;
+
+export const POINTS_PER_HEALING = 15;   // 深度疗愈(阴影整合 / 接地)完成一次
 /** 忍住购买时,愿望在仓库里的兑换成本 = 原价 × 此系数(默认 1:1,1 积分≈1 元)。 */
 const WISH_COST_RATIO = 1;
 /** 解析不出价格时,愿望的兜底成本。 */

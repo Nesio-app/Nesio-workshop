@@ -64,7 +64,7 @@ async function extractNodes(source: string, content: string): Promise<{ nodes: o
   const prompt = buildSourceExtractionPrompt(source, content);
 
   try {
-    const { text } = await completeText({ prompt, maxTokens: 2048 });
+    const { text } = await completeText({ prompt, maxTokens: 2048, route: 'ingest' });
     const parsed = parseJsonBlock<{ nodes?: object[]; summary?: string }>(text);
     if (!parsed) throw new Error('unparseable');
     return { nodes: parsed.nodes || [], summary: parsed.summary || '已记录' };

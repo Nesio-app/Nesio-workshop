@@ -44,13 +44,14 @@ import dynamic from 'next/dynamic';
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
-import { DomainIcon, IconBox, IconBookmark, IconCalendar, IconCamera, IconCheckSquare, IconFolder, IconMail, IconMapPin, IconMic, IconNote, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
+import { DomainIcon, IconActivity, IconBox, IconBookmark, IconCalendar, IconCamera, IconCheckSquare, IconFolder, IconMail, IconMapPin, IconMic, IconNote, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
 import { isPinned, loadPins, PINS_UPDATED_EVENT, togglePin, isCore, toggleCore, loadCore, CORE_UPDATED_EVENT } from '@/lib/portal/pins';
 import { listInventoryItems, inventoryStats } from '@/lib/portal/inventory';
 import { usePortalLocale } from './use-portal-locale';
+import NesioSheet from './ui/NesioSheet';
 
 /** 组件内取字典语言(批次 9 全量双语的局部 hook)。 */
 function useDict(): DictLocale {
@@ -346,6 +347,10 @@ function cleanMemoryPreview(node: LifeNode, dict: DictLocale = 'zh'): string {
     const d = new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' });
     return L(dict, `一段 ${d} 的心情记录 · 点开查看`, `A mood entry from ${d} · tap to view`);
   }
+  // CARD SPEC:入库时若已产出归一化摘要(attributes.summary),第二行优先用它 ——
+  // 老数据无此字段走下面的正则兜底,渐进生效。
+  const aiSummary = typeof node.attributes.summary === 'string' ? node.attributes.summary.trim() : '';
+  if (aiSummary) return aiSummary.slice(0, 44);
   // 批次 59:属性兜底改走可见名单 —— 位置戳/信号基建/内部字段绝不上卡片面
   // (此前 Object.values 全量拼接,capturedLat/Lon 裸坐标直接糊在卡片上)。
   const PREVIEW_HIDDEN = /^(capturedLat|capturedLon|capturedPlace|lat|lon|signalId|signalSource|signalType|signalVersion|occurredAt|capturedAt|externalId|calendarId|calendarName|subtasksJson|done|doneAt|focusPinnedOn|retentionPolicy|sensitivity|schemaVersion|sourceNodeId|emailId|messageId|htmlLink|context|userTags|status)$/;
@@ -356,6 +361,13 @@ function cleanMemoryPreview(node: LifeNode, dict: DictLocale = 'zh'): string {
   const raw = node.rawInput || attrPreview;
   const cleaned = raw
     .replace(node.name, '')
+    // CARD SPEC(老数据兜底):老邮件 rawInput 形如「来自 X <a@b.com>: 正文」,
+    // 从未被剥头 —— 卡片正文直接糊「来自 Namecheap <billing@...>」这类乱码。
+    // 去「来自 X:」前缀、去尖括号邮箱、去裸邮箱。新数据走 aiSummary 分支不受影响。
+    .replace(/^来自\s[^:：]*[:：]\s*/, '')
+    .replace(/^来自\s[^:：]*$/, '')
+    .replace(/<[^>]*>?/g, ' ')
+    .replace(/\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g, '')
     // 批次 24:剥掉链接与裸 URL 片段(flomo/导入节点常把 memo_id、模板路径
     // 之类当预览显示,如 m/mine/?memo_id=、s/x_xxx、ft.cn/template/xxx、d=xxx)
     .replace(/https?:\/\/\S+/g, '')
@@ -403,6 +415,9 @@ function sourceMeta(node: LifeNode, dict: DictLocale): { label: string; icon: Re
   const sz = 11;
   if (tags.includes('notion')) return { label: 'Notion', icon: <IconNote size={sz} /> };
   if (tags.includes('keep')) return { label: 'Keep', icon: <IconNote size={sz} /> };
+  // CARD SPEC:外部 API 来源(Flomo/微信)单独立徽章,不再落到 default「手记」。
+  if (tags.includes('flomo')) return { label: 'Flomo', icon: <IconNote size={sz} /> };
+  if (tags.includes('微信读书') || tags.includes('wechat') || tags.includes('微信')) return { label: L(dict, '微信', 'WeChat'), icon: <IconNote size={sz} /> };
   if (node.type === 'place') return { label: L(dict, '位置', 'Place'), icon: <IconMapPin size={sz} /> };
   switch (node.source) {
     case 'email': return { label: L(dict, '邮件', 'Email'), icon: <IconMail size={sz} /> };
@@ -536,9 +551,14 @@ function LongPressSheet({
   // 批次 171(用户实锤·对标微信长按):竖排文字按钮 → 图标横排 + 下方小字。
   // 4 个动作:今日/收藏夹/收纳/项目;去掉「标为核心」(核心已撤)和「分享/复制」。
   return (
-    <>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-longpress-sheet">
+    <NesioSheet
+      variant="bottom"
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-longpress-sheet"
+      ariaLabel={node.name}
+    >
         <div className="nesio-longpress-node-name">{node.name}</div>
         <div className="nesio-lp-actions">
           <button type="button" className="nesio-lp-action" onClick={() => { pinNodeToTodayFocus(node.id); onClose(); }}>
@@ -570,8 +590,7 @@ function LongPressSheet({
           </div>
         )}
         <button type="button" className="nesio-longpress-cancel-btn" onClick={onClose}>{L(dict, '取消', 'Cancel')}</button>
-      </div>
-    </>
+    </NesioSheet>
   );
 }
 
@@ -601,6 +620,7 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
   const { initials, bg: avatarBg } = isPerson ? getPersonInitials(node.name) : { initials: '', bg: '' };
   const srcMeta = sourceMeta(node, dict);
   const catLabel = categoryLabelForCard(node, dict);
+  const isMood = node.type === 'health_state' && (node.tags || []).some((t) => t === 'feeling' || t === 'moment');
   const uncertain = isNodeUncertain(node);
 
   return (
@@ -639,7 +659,8 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
           <span className="nesio-memory-card-lead nesio-memory-card-avatar" style={{ background: avatarBg }}>{initials}</span>
         ) : (
           <span className="nesio-memory-card-lead nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || 'var(--portal-accent-soft)' }}>
-            <NodeTypeIcon type={node.type} size={14} />
+            {/* CARD SPEC:情绪有独立图标(波形),不再借健康的心跳图标 */}
+            {isMood ? <IconActivity size={14} /> : <NodeTypeIcon type={node.type} size={14} />}
           </span>
         )}
         <span className="nesio-memory-card-cat-label">{catLabel}</span>
@@ -728,9 +749,14 @@ function FavoritesSheet({ pinnedNodes, onClose, onOpenNode, onLongPressNode }: {
   const tags = Array.from(tagCounts.entries()).sort((a, b) => b[1] - a[1]).map(([t]) => t).slice(0, 12);
   const shown = tag ? pinnedNodes.filter((n) => (n.tags || []).some((t) => t.trim() === tag)) : pinnedNodes;
   return (
-    <>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-project-detail-sheet nesio-fav-sheet">
+    <NesioSheet
+      variant="bottom"
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-project-detail-sheet nesio-fav-sheet"
+      ariaLabel={L(dict, '收藏夹', 'Saved')}
+    >
         <div className="nesio-project-detail-header">
           <span className="nesio-project-detail-emoji"><IconBookmark size={16} /></span>
           <span className="nesio-project-detail-name">{L(dict, '收藏夹', 'Saved')}</span>
@@ -761,8 +787,7 @@ function FavoritesSheet({ pinnedNodes, onClose, onOpenNode, onLongPressNode }: {
             ))}
           </div>
         )}
-      </div>
-    </>
+    </NesioSheet>
   );
 }
 
@@ -785,9 +810,14 @@ function ProjectsSheet({ projects, allNodes, onClose, onOpenProject, onCreate, o
   const order: Record<string, number> = { active: 0, planned: 1, completed: 2, archived: 3 };
   const sorted = [...projects].sort((a, b) => (order[a.status || 'active'] ?? 0) - (order[b.status || 'active'] ?? 0));
   return (
-    <>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-project-detail-sheet">
+    <NesioSheet
+      variant="bottom"
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-project-detail-sheet"
+      ariaLabel={L(dict, '项目', 'Projects')}
+    >
         <div className="nesio-project-detail-header">
           <span className="nesio-project-detail-emoji"><IconFolder size={16} /></span>
           <span className="nesio-project-detail-name">{L(dict, '项目', 'Projects')}</span>
@@ -810,8 +840,7 @@ function ProjectsSheet({ projects, allNodes, onClose, onOpenProject, onCreate, o
         <button type="button" className="nesio-mem-jar-create" style={{ margin: '0 1rem 1rem' }} onClick={onCreate}>
           {L(dict, '新建项目', 'New project')}
         </button>
-      </div>
-    </>
+    </NesioSheet>
   );
 }
 
@@ -836,9 +865,14 @@ function ProjectDetailSheet({
   // 状态改在项目聚合页(进行中/计划中/已完成)语义上体现。
 
   return (
-    <>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-project-detail-sheet">
+    <NesioSheet
+      variant="bottom"
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-project-detail-sheet"
+      ariaLabel={project.name}
+    >
         <div className="nesio-project-detail-header">
           <span className="nesio-project-detail-emoji"><IconFolder size={16} /></span>
           <span className="nesio-project-detail-name">{project.name}</span>
@@ -867,8 +901,7 @@ function ProjectDetailSheet({
             {L(dict, '删除项目', 'Delete project')}
           </button>
         </div>
-      </div>
-    </>
+    </NesioSheet>
   );
 }
 
@@ -889,9 +922,14 @@ function CreateProjectSheet({
   useEffect(() => { setTimeout(() => inputRef.current?.focus(), 100); }, []);
 
   return (
-    <>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className="nesio-create-project-sheet">
+    <NesioSheet
+      variant="bottom"
+      open
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-create-project-sheet"
+      ariaLabel={L(dict, '新建项目', 'New project')}
+    >
         <div className="nesio-create-project-header">
           <span>{L(dict, '新建项目', 'New project')}</span>
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose}>✕</button>
@@ -919,8 +957,7 @@ function CreateProjectSheet({
         >
           {L(dict, '创建', 'Create')}
         </button>
-      </div>
-    </>
+    </NesioSheet>
   );
 }
 
@@ -1136,11 +1173,13 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     setSmartNodes(textRankedNodes);
     if (!query.trim() || textRankedNodes.length < 3) return;
     let cancelled = false;
-    void semanticRerank(query, textRankedNodes).then((reranked) => {
+    // 隐私红线:未登录/未知态不把私密外部节点(邮件正文)送云 embed —— rerank 早于展示过滤,
+    // 故必须在这层就把 canUsePrivateData 传进去,别等渲染层 visibleMemoryNodes 才拦(正文已过云)。
+    void semanticRerank(query, textRankedNodes, undefined, canUsePrivateData).then((reranked) => {
       if (!cancelled) setSmartNodes(reranked);
     });
     return () => { cancelled = true; };
-  }, [query, textRankedNodes]);
+  }, [query, textRankedNodes, canUsePrivateData]);
 
   const hasUnderstoodEntities = understood.people.length + understood.places.length + understood.objects.length > 0;
 

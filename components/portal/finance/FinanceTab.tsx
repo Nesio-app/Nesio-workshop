@@ -786,6 +786,23 @@ export default function FinanceTab() {
                   )}
                   <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '持仓', 'Positions')}</span>{portfolio.positions.length}</span>
                 </div>
+                {(() => {
+                  // 现金观察(用户定持仓透视三件套之三;纯统计,只观察不建议):
+                  // 现金 = 存款账户正余额 + 组合内现金类;资产 = 现金 + 非现金持仓市值。
+                  const depositCash = depositAccts.reduce((sum, a) => sum + (typeof a.balance === 'number' && a.balance > 0 ? a.balance : 0), 0);
+                  const portfolioCash = portfolio.byType.filter((x) => x.label === '现金').reduce((sum, x) => sum + x.value, 0);
+                  const cash = depositCash + portfolioCash;
+                  const assets = cash + (portfolio.totalValue - portfolioCash);
+                  if (!(assets > 0) || cash <= 0) return null;
+                  const pct = Math.round((cash / assets) * 100);
+                  return (
+                    <p className="nesio-fin-score-hint" style={{ marginTop: '0.6rem' }}>
+                      {L(dict,
+                        `现金 ${formatMoney(cash)},占可见资产的 ${pct}%。${pct >= 35 ? '如果这是刻意留的安全垫,很好;如果只是没顾上,它正在被通胀慢慢磨。' : ''}`,
+                        `Cash ${formatMoney(cash)} — ${pct}% of visible assets.${pct >= 35 ? " If it's a deliberate cushion, great; if it just piled up, inflation is quietly grinding it." : ''}`)}
+                    </p>
+                  );
+                })()}
                 {portfolio.concentrated && (
                   <p className="nesio-fin-score-hint" style={{ marginTop: '0.6rem' }}>{L(dict,
                     `${portfolio.concentrated.ticker || portfolio.concentrated.name} 占了组合的 ${portfolio.concentrated.pct}% —— 集中不是错,只是波动会更贴着这一只走;有空可以想想要不要分散一点。`,

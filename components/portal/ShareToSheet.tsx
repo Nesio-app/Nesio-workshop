@@ -14,7 +14,7 @@ import { useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
-import { useSheetDrag } from './use-sheet-drag';
+import NesioSheet from './ui/NesioSheet';
 
 // ── 单色线性图标(currentColor,无品牌色 / 无 emoji)──
 const S = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const };
@@ -46,7 +46,6 @@ export default function ShareToSheet({ open, onClose, getBlob, shareText, link, 
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [busy, setBusy] = useState<string>('');
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
-  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   if (!open) return null;
 
@@ -146,10 +145,14 @@ export default function ShareToSheet({ open, onClose, getBlob, shareText, link, 
   ];
 
   return (
-    <div className="nesio-shareto-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '分享到', 'Share to')}>
-      <button type="button" className="nesio-shareto-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className={`nesio-shareto-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
-        <div className="nesio-sheet-handle" {...handleProps} />
+    <NesioSheet
+      variant="bottom"
+      open={open}
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-shareto-card"
+      ariaLabel={L(dict, '分享到', 'Share to')}
+    >
         <div className="nesio-shareto-head">
           <h2 className="nesio-shareto-title">{L(dict, '分享到', 'Share to')}</h2>
         </div>
@@ -186,7 +189,6 @@ export default function ShareToSheet({ open, onClose, getBlob, shareText, link, 
         <p className="nesio-shareto-privacy">
           {L(dict, '分享的是你做好的成就卡(过去 · 聚合),不含实时定位。', 'You share a finished achievement card (past · aggregated) — no live location.')}
         </p>
-      </div>
-    </div>
+    </NesioSheet>
   );
 }

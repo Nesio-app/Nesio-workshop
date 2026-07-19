@@ -1,7 +1,8 @@
 'use client';
 
-import { Component, useEffect, useState, type ReactNode } from 'react';
-import { deleteLifeNode, getLifeGraph, searchLifeGraphFuzzy, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
+import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
+import { deleteLifeNode, getLifeGraph, searchLifeGraphFuzzy, updateLifeNode, type LifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
 import { displayStoredLocation } from '@/lib/portal/named-places';
 import type { LocationMeta } from './LocationPicker';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
@@ -16,7 +17,9 @@ const ReaderSheetLazy = dynamicImport(() => import('./ArticleReaderSheet'), { ss
 const PlacePickerLazy = dynamicImport(() => import('./PlacePickerSheet'), { ssr: false });
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
-import { useSheetDrag } from './use-sheet-drag';
+import NesioSheet from './ui/NesioSheet';
+import MemoryLensSheet from './MemoryLensSheet';
+import { shouldNudge } from '@/lib/portal/lens';
 const TYPE_BG_DETAIL: Record<string, string> = {
   person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
   event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
@@ -70,10 +73,13 @@ const PRIORITY_LABELS: Record<string, { label: string; labelEn: string; color: s
 const ATTR_KEY_LABELS: Record<string, string> = {
   temperatureC: '温度', condition: '天气', forecastNote: '预报',
   placeName: '地点', humidity: '湿度', windKph: '风速',
+  // 邮件本地深抽取(Phase 2)的结构化线索
+  amount: '金额', orderNo: '订单号', trackingNo: '快递单号',
 };
 const ATTR_KEY_LABELS_EN: Record<string, string> = {
   temperatureC: 'Temperature', condition: 'Weather', forecastNote: 'Forecast',
   placeName: 'Place', humidity: 'Humidity', windKph: 'Wind',
+  amount: 'Amount', orderNo: 'Order #', trackingNo: 'Tracking #',
 };
 
 /** 长文本(如日历事件的会议记录)默认只显示摘要,点「详情」展开 */
@@ -161,6 +167,9 @@ function safeExternalUrl(url: string): string {
 const HIDDEN_ATTRIBUTE_KEYS = new Set([
   // Internal / calendar
   'calendarId', 'calendarName', 'description', 'emailId', 'messageId', 'htmlLink',
+  // CARD SPEC:原始邮件头不污染卡片 —— from(「"U.S. Bank Alerts" <usbank@…>」)、
+  // 邮件分类、snippet 属技术字段,藏进「原始记录·邮件原文」折叠区,不当属性平铺。
+  'from', 'mailCategory', 'snippet',
   // 批次 150(QA #9):日历/外部集成内部 ID 与技术字段,绝不该露给终端用户
   'externalId', 'iCalUID', 'recurringEventId', 'sequence', 'etag', 'organizer', 'creator',
   'notionPageId', 'sourceApp', 'source', 'dayOfWeek', 'aiConfidence',
@@ -177,7 +186,9 @@ const HIDDEN_ATTRIBUTE_KEYS = new Set([
   'occuredAt', 'occurredAt', 'capturedAt', 'retentionPolicy', 'sensitivity',
   'sourceNodeId', 'schemaVersion',
   // Type-specific (handled in sections)
-  'note', 'price', 'purchaseDate', 'expiry', 'store', 'paymentMethod',
+  'note', 'price', 'purchaseDate', 'expiry', 'store', 'merchant', 'subtype', 'paymentMethod',
+  // 电商/物流事件:预计到货由 EventSection 单独渲染,不在通用属性区重复
+  'eta', 'expectedDelivery', 'deliveryDate',
   'visitCount', 'category', 'lastSeen', 'birthday',
   'start', 'end', 'date', 'dueDate', 'deadline',
   'priority', 'owner', 'recurring', 'participants',
@@ -346,6 +357,10 @@ function EventSection({ node }: {
         </div>
       )}
       {participants && <InfoRow label={L(dict, '参与者', 'People')} value={participants} />}
+      {/* CARD SPEC 关键信息:电商/物流类邮件事件的语义键值行(商家/类型/预计到货) */}
+      <InfoRow label={L(dict, '商家', 'Merchant')} value={attr(node, 'store', 'merchant')} />
+      <InfoRow label={L(dict, '类型', 'Kind')} value={attr(node, 'subtype')} />
+      <InfoRow label={L(dict, '预计到货', 'ETA')} value={attr(node, 'eta', 'expectedDelivery', 'deliveryDate')} />
       {note && (
         <div className="nesio-node-attr-row">
           <span className="nesio-node-attr-key">{L(dict, '会议记录', 'Meeting notes')}</span>
@@ -612,6 +627,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   const [linkQuery, setLinkQuery] = useState('');
   const [linkError, setLinkError] = useState(''); // 批次 94:关联出错时可见,便于用户截图反馈
   const [linkCandidates, setLinkCandidates] = useState<LifeNode[]>([]);
+  const [lensOpen, setLensOpen] = useState(false);        // 镜头看记忆(底部弹层)
+  const [nudgeDismissed, setNudgeDismissed] = useState(false); // 情绪重记忆的主动提示已划走
   // 批次 172(关联记忆闪退根治):搜索移出渲染热路径 —— 去抖异步跑,不再每次按键同步搜全图
   // (516 节点 + 中文 2-gram 同步搜会卡死主线程 → iOS 看门狗杀 webview = 用户实锤「一打字就闪退」)。
   useEffect(() => {
@@ -641,6 +658,13 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   const [readerOpen, setReaderOpen] = useState(false);
   // 批次 36:在 Nesio 内回复邮件
   const [composeOpen, setComposeOpen] = useState(false);
+  // 邮件全链路 Phase 1:邮件全文存本机 IndexedDB(不上云),阅读原文按 emailId 取。
+  const [emailFullBody, setEmailFullBody] = useState('');
+  // 用户需求:在记忆详情里补传本地照片进这条记忆
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const [addingPhoto, setAddingPhoto] = useState(false);
+  const [photoErr, setPhotoErr] = useState('');
+  const [addedThumbs, setAddedThumbs] = useState<string[]>([]);
   // 批次 57:有坐标没地名(反查当时没跑完/存量节点)→ 打开详情时自愈回填
   const [healedPlace, setHealedPlace] = useState('');
   const [placePickOpen, setPlacePickOpen] = useState(false); // 批次 63:记忆页也能改地址(与足迹同库)
@@ -668,6 +692,17 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
     window.addEventListener('nesio-view-image', onView);
     return () => window.removeEventListener('nesio-view-image', onView);
   }, []);
+  // 邮件全链路 Phase 1:邮件节点按 emailId 从本机 IndexedDB 取全文,供「阅读原文」。
+  useEffect(() => {
+    setEmailFullBody('');
+    const eid = node?.source === 'email' && typeof node.attributes?.emailId === 'string' ? node.attributes.emailId : '';
+    if (!eid) return;
+    let cancelled = false;
+    void import('@/lib/portal/local-email-body').then(({ getEmailBody }) =>
+      getEmailBody(eid).then((body) => { if (!cancelled && body) setEmailFullBody(body); }),
+    ).catch(() => {});
+    return () => { cancelled = true; };
+  }, [node]);
 
   function field(k: keyof EditFields) {
     return fields[k];
@@ -704,8 +739,6 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
     }
     return () => { cancelled = true; };
   }, [node?.id, node?.assets]);
-
-  const { handleProps, cardStyle, expanded } = useSheetDrag(onClose);
 
   if (!node || deleted) return null;
   const n = node;
@@ -787,6 +820,36 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
     onClose();
   }
+  // 补传本地照片进这条记忆:压缩存 IndexedDB → 追加 node.assets(本机,不上传)。
+  // 失败必须可见(设计红线:每个 async 动作要有显式失败态)。
+  async function addPhotos(files: FileList | null) {
+    const list = Array.from(files || []).filter((f) => f.type.startsWith('image/')).slice(0, 30);
+    if (!list.length) return;
+    setAddingPhoto(true);
+    setPhotoErr('');
+    try {
+      const { compressToDataUrl, putLocalImage } = await import('@/lib/portal/local-image-store');
+      const added: LifeNodeAsset[] = [];
+      const thumbs: string[] = [];
+      for (let i = 0; i < list.length; i++) {
+        const dataUrl = await compressToDataUrl(list[i], 1400, 0.82);
+        const id = `local-${n.id}-${Date.now()}-${i}`;
+        await putLocalImage(id, dataUrl);
+        added.push({ id, kind: 'image', local: true, mimeType: 'image/jpeg', createdAt: new Date().toISOString() });
+        thumbs.push(dataUrl);
+      }
+      const live = getLifeGraph().find((x) => x.id === n.id);
+      const nextAssets = [...(live?.assets || n.assets || []), ...added];
+      const ok = updateLifeNode(n.id, { assets: nextAssets });
+      if (!ok) throw new Error('updateLifeNode returned false');
+      if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+      setAddedThumbs((p) => [...p, ...thumbs]);
+    } catch {
+      setPhotoErr(L(dict, '照片没加成功,请再试一次', 'Could not add the photos — try again'));
+    } finally {
+      setAddingPhoto(false);
+    }
+  }
 
   // 标签三层 §3.3:「记录于 2026年7月9日」→ 相对时间(今天 12:34 / 昨天 / N 天前)
   const createdDate = (() => {
@@ -802,14 +865,17 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   const shownAttrs = Object.entries(n.attributes).filter(
     ([k, v]) => v !== null && v !== '' && !HIDDEN_ATTRIBUTE_KEYS.has(k),
   );
-  const showRawInput = Boolean(n.rawInput && n.source !== 'calendar' && n.source !== 'email');
+  // CARD SPEC:邮件也进「原始记录·邮件原文」折叠区(原始 from 头藏这里,不污染卡片)。
+  const showRawInput = Boolean(n.rawInput && n.source !== 'calendar');
   const typeBg = TYPE_BG_DETAIL[n.type] || 'var(--chip-fog)';
 
   // 批次 27:阅读入口不再只认 article —— 老邮件节点没存 article,退到 summary/snippet/正文,
   // 只要有一段够长的正文(>40 字)就给「阅读」按钮,进瀑布流阅读器。
   const readableAttrs = n.attributes as Record<string, unknown>;
-  const readableText = [readableAttrs.article, readableAttrs.summary, readableAttrs.snippet, readableAttrs.body, n.rawInput]
-    .find((v): v is string => typeof v === 'string' && v.trim().length > 40);
+  // 邮件全文优先(本机 IndexedDB,Phase 1);没有再退到节点里存的短预览/摘要。
+  const readableText = (emailFullBody && emailFullBody.trim().length > 40 ? emailFullBody : undefined)
+    ?? [readableAttrs.article, readableAttrs.summary, readableAttrs.snippet, readableAttrs.body, n.rawInput]
+      .find((v): v is string => typeof v === 'string' && v.trim().length > 40);
 
   // 批次 36:邮件节点 → 可在 Nesio 内直接回复。识别:source=email 且带发件人。
   const emailFrom = typeof readableAttrs.from === 'string' ? readableAttrs.from : '';
@@ -848,18 +914,19 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
   };
 
   return (
-    <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" aria-label={n.name}>
+    <>
       {readerOpen && readableText && (
         <ReaderSheetLazy title={n.name} article={readableText} meta={readerMeta} onClose={() => setReaderOpen(false)} />
       )}
-      {isEmailNode && (
+      {/* Reader 与 EmailCompose 都是 NesioSheet,自带 portal + 自管 pointer-events,直接渲染即可。 */}
+      {isEmailNode && composeOpen && (
         <EmailComposeSheet
           open={composeOpen}
           onClose={() => setComposeOpen(false)}
           context={{ emailId, from: emailFrom, subject: n.name, snippet: typeof readableAttrs.snippet === 'string' ? readableAttrs.snippet : undefined, article: readableText }}
         />
       )}
-      {viewImage && (
+      {viewImage && typeof document !== 'undefined' && createPortal(
         <div className="nesio-image-viewer" role="dialog" aria-modal="true" onClick={() => setViewImage(null)}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={viewImage.url} alt={viewImage.name} className="nesio-image-viewer-img" />
@@ -878,11 +945,17 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
             </button>
             <button type="button" className="nesio-image-viewer-close" onClick={() => setViewImage(null)}>{L(dict, '关闭', 'Close')}</button>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className={`nesio-settings-sheet-card${expanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
-        <div className="nesio-sheet-handle" {...handleProps} />
+      <NesioSheet
+        variant="bottom"
+        open
+        onOpenChange={(next) => { if (!next) onClose(); }}
+        card={false}
+        className="nesio-settings-sheet-card"
+        ariaLabel={n.name}
+      >
 
         {/* Type color strip */}
         {/* 类型色条:tint 走 CSS 变量,夜间由 CSS 混暗 —— 直接 inline background 会让
@@ -977,6 +1050,44 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
                 <button type="button" className="nesio-node-action-secondary" onClick={() => setComposeOpen(true)}>
                   {L(dict, '回复', 'Reply')}
                 </button>
+              )}
+            </div>
+          )}
+
+          {/* 用户需求:在记忆详情里补传本地照片进这条记忆(本机存,不上传) */}
+          {!editing && (
+            <div className="nesio-nd-photo-add">
+              <button
+                type="button"
+                className="nesio-node-action-secondary nesio-nd-photo-btn"
+                onClick={() => photoInputRef.current?.click()}
+                disabled={addingPhoto}
+              >
+                {addingPhoto ? L(dict, '添加中…', 'Adding…') : L(dict, '＋ 添加照片', '＋ Add photos')}
+              </button>
+              <input
+                ref={photoInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                hidden
+                onChange={(e) => { const f = e.currentTarget.files; e.currentTarget.value = ''; void addPhotos(f); }}
+              />
+              {photoErr && (
+                <p className="nesio-nd-photo-err" role="alert">
+                  {photoErr}
+                  <button type="button" className="nesio-nd-photo-retry" onClick={() => photoInputRef.current?.click()}>
+                    {L(dict, '重试', 'Retry')}
+                  </button>
+                </p>
+              )}
+              {addedThumbs.length > 0 && (
+                <div className="nesio-nd-added-thumbs">
+                  {addedThumbs.map((u, i) => (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img key={i} src={u} alt="" className="nesio-nd-added-thumb" draggable={false} />
+                  ))}
+                </div>
               )}
             </div>
           )}
@@ -1288,27 +1399,44 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
         />
       )}
 
+      {/* 镜头看记忆:情绪重的主动提示 + 用镜头看看(长在记忆上的动作) */}
+          {!editing && (
+            <div className="nesio-growth">
+              {shouldNudge(`${n.name} ${(n.attributes?.notes as string) || n.rawInput || ''}`) && !nudgeDismissed && (
+                <div className="ng-hint" style={{ marginTop: '1.25rem' }}>
+                  <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+                  <p>{L(dict, '念念看到这条情绪有点重 —— 要不要陪你把它看清楚一点?(不是分析你,是把话看清)', 'This one feels heavy — want to look at it more clearly? (not analyzing you — just seeing the words)')}</p>
+                  <button type="button" className="x" onClick={() => setNudgeDismissed(true)}>{L(dict, '轻轻划走', 'Dismiss')}</button>
+                </div>
+              )}
+              <button type="button" className="ng-btn" style={{ width: '100%', marginTop: '0.75rem' }} onClick={() => setLensOpen(true)}>
+                {L(dict, '用镜头看看 ✦', 'Look with a lens ✦')}
+              </button>
+            </div>
+          )}
+          <MemoryLensSheet open={lensOpen} onOpenChange={setLensOpen} node={n} />
+
       {/* Actions */}
           <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.25rem' }}>
             {editing ? (
               <>
-                <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={saveEdit}>{L(dict, '保存', 'Save')}</button>
-                <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</button>
+                <button type="button" className="nesio-ob-primary-btn nesio-nd-action-btn" onClick={saveEdit}>{L(dict, '保存', 'Save')}</button>
+                <button type="button" className="nesio-today-btn nesio-today-btn--ghost nesio-nd-action-btn" onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</button>
               </>
             ) : (
               <>
                 {/* 批次 33:阅读入口顶部有(替换✕),底部也放回来一份 —— 用户反馈顶部那颗找不到 */}
                 {readableText && (
-                  <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
+                  <button type="button" className="nesio-ob-primary-btn nesio-nd-action-btn" onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
                 )}
                 {/* 批次 37:回复按钮移到顶部「阅读」旁,底部不再重复 */}
-                <button type="button" className="nesio-today-btn nesio-today-btn--ghost" style={{ flex: 1 }} onClick={startEdit}>{L(dict, '编辑', 'Edit')}</button>
-                <button type="button" className="nesio-settings-danger-btn" style={{ flex: 1, marginTop: 0 }} onClick={handleDelete}>{L(dict, '删除', 'Delete')}</button>
+                <button type="button" className="nesio-today-btn nesio-today-btn--ghost nesio-nd-action-btn" onClick={startEdit}>{L(dict, '编辑', 'Edit')}</button>
+                <button type="button" className="nesio-settings-danger-btn nesio-nd-action-btn" onClick={handleDelete}>{L(dict, '删除', 'Delete')}</button>
               </>
             )}
           </div>
         </div>
-      </div>
-    </div>
+      </NesioSheet>
+    </>
   );
 }

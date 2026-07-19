@@ -100,6 +100,58 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **邮件全链路 里程碑 C(付费云深检索,2026-07-18)**:邮件全链路唯一**花钱**的一块——把邮件
+  正文纳入**付费**语义 embedding rerank。此前 `semantic-rerank.ts` 的 `nodeEmbeddingText` 只嵌
+  `name+rawInput+tags`,付费语义检索也搜不到正文语义。改:邮件节点嵌入**真实内容**(本机全文
+  优先,退到 article/summary 预览),更大预算 1600 字;`semanticRerankMeta` 对池内(≤20)邮件
+  节点 `await getEmailBody` 预取全文再嵌入。**红线四要件齐全**(复用现成 embed 路由):
+  requirePaidCloudAi + 熔断 + reportAiCall + docs 登记;客户端 `canUsePaidCloudAi()` 前置拦下——
+  **免费永不把邮件正文送云**(免费走里程碑 B 本机全文索引词法检索)。**注**:workshop 的
+  semantic-rerank 此前漂移缺 Phase 2 免费门,本次一并补上(与 nesio 对齐)。两仓 tsc + build 全绿。
+  **邮件全链路 A/B/C 三里程碑全部落地。**
+- **邮件全链路 里程碑 B(检索接全平台,2026-07-18)**:让**本机邮件全文**(里程碑 A 存进
+  `nesio-email-bodies` IndexedDB 的 ≤20k 正文)可被全平台检索/RAG 命中——**全免费、零云**。
+  难点:搜索路径(`smartSearch`/`searchLifeGraphFuzzy`)是**同步线性扫内存图谱**,拿不到需
+  await 的 IndexedDB;此前邮件只有 ≤1500 的 `article` 预览能被搜到。方案两块:
+  ① **本机全文索引** `lib/portal/email-fulltext-index.ts`——内存 `Map<emailId,全文>`(受控容量
+  1500 封 × ≤6k 字),`emailFulltextScore` 同步补分(整句 +6、每 token +2 封顶 6 个,≤+18);
+  惰性水合 + gmail 同步增量并入(刚同步立即可搜);接入 `smart-search.ts` 与 `life-graph.ts`。
+  ② **RAG 喂全文** `memory-retrieval.ts`——`buildMemoryContext` 对入选邮件节点 `await getEmailBody`
+  预取全文,`fmtNode` query-aware 取窗 500 字替代原 140 字预览。tsx 单测 7/7;两仓 tsc + build 全绿。
+  **待办**:里程碑 C(付费云深检索:embedding rerank 纳入邮件正文,付费路径)。
+- **邮件全链路 里程碑 A(抓全存全 + 本地深抽取,2026-07-18)**:邮件内容抓取/分析落地第一步,
+  **全免费、零云成本、隐私优先**。**Phase 1(抓全存全)**:gmail 路由 `extractText` 加 `maxLen`
+  参数,新增 `extractFullBody`(≤20k)+ `buildEmailBodies`,响应带 `emailBodies`(emailId→全文)
+  **仅回本设备**;客户端 connector-sync 收到后存**本机专属 IndexedDB**(`lib/portal/local-email-body.ts`,
+  DB=`nesio-email-bodies`)——**隐私红线:全文不进云同步的 LifeNode.attributes**,记忆节点只留
+  ≤1500 `article` 预览 + `emailId` 指针;详情「阅读原文」按 emailId 取全文。清空本地数据
+  (SettingsSheets/local-owner)一并 `purgeEmailBodies()`。**Phase 2(本地深抽取)**:新增
+  `lib/portal/email-extract-local.ts` 纯正则抽取(金额/预计到货/订单号/快递单号/商家/待办信号),
+  gmail 免费兜底分支把命中项挂 attributes + 待办标「待回复」tag;MemoryNodeDetail 加
+  amount/orderNo/trackingNo 属性标签,eta/store/merchant/subtype 由 EventSection 渲染故隐藏去重。
+  **待办**:里程碑 B(检索接全平台)、里程碑 C(付费云深检索/embedding rerank)。
+- **NesioSheet 原语迁移(进行中,2026-07-18)**:模态语义(aria-modal/role="dialog")统一到
+  单源原语 `components/portal/ui/NesioSheet.tsx`(Vaul bottom + Radix center/fullscreen,
+  自持 useFocusTrap——库的焦点管理在 React19+Next16+Turbopack 本栈不可靠)。**决策**:
+  安静模式=B(跟随系统 reduced-motion)、CameraSheet=B(豁免)、路线 A。**已迁**:PlacePicker、
+  W1 全部 center-modal、W2 全部 fullscreen(含地图/地球 `modal={false}` 绕开 react-remove-scroll
+  阻断手势)、W3 底部 8 件(Roadmap/Routine/Connectors/Share/ShareTo/MeetingRecorder/FocusMode/
+  HangNote/PersonExtract)+ MoodTrend。底部统一 Vaul 拖拽(去自写 useSheetDrag,失去
+  expand-to-full,待真机验手感)。**契约锁 `scripts/sheet-primitive-allowlist.test.mjs` 已挂
+  test:security 链尾**:原语外每一处手写模态标记登记进 ALLOWLIST,新面板不走原语即 CI 红;
+  迁完降数/摘除。workshop(lab)比 nesio 多若干实验面板(Tesla/Wechat/fitness/Montage/NotePanel/
+  PreviewGuides/ConnectorsHub),ALLOWLIST 更长属预期漂移。**待迁(高风险,留整块真机验证时间)**:
+  **叠放组批①②已迁(2026-07-18,nesio 侧 prod 隔离验双层 Vaul 通过)**:批① LongPress/Projects/
+  CreateProject;批② Favorites/ProjectDetail(workshop 里都在单体 MemoryTab.tsx 内联)。① 叠放组
+  **批③已迁**:MemoryNodeDetail(决策=统一丢 expand-to-full;image-viewer/EmailCompose createPortal
+  到 body + z-950 + pointer-events:auto 绕 Vaul body 锁)。**批④已迁(收尾)**:DailyBrief/TodayFeed
+  洞察 sheet + MirrorLetterTab 往期抽屉 portal 修复。**叠放组清空。批⑤**:Settings 已迁(共享 SheetWrap
+  一迁全迁);Mood **改判豁免**(情绪轮 touch-drag canvas 与 Vaul 手势冲突,同 Camera)。**批⑥(收尾)已迁**:
+  RelationshipDetail/EmailCompose/VoiceInput/Freeze/Inventory——嵌套 modal(HangNote/DateTimePicker/
+  BarcodeScan)createPortal 到 body + pointer-events:auto;撤 MND 给 EmailCompose 加的 z-950 wrapper。
+  **sheet 迁移主体完成。豁免**:Camera/Barcode/Mood(手势面)。剩余仅小件(VoiceInput 内 DateTimePicker,
+  已 portal 兜住)/非 sheet(引导/装机/聊天/lab 实验面板)。清单即 ALLOWLIST。两仓(nesio + workshop)同步。
+
 - ~~restore-from-cloud~~ **已做**(2026-07-07):见上「进行中的迁移 ③」——推 + 拉都通了,云备份**往返闭环**
   (注:是「往返打通」,**非端到端加密 E2E**;云端为应用层明文 + service-role,别用「端到端」措辞误导。数据审计 §4)。
 - **云备份付费桩转真**:hasCloudEntitlement 现读本地 flag;支付/StoreKit/账户 plan 字段

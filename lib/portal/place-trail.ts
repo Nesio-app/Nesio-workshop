@@ -9,6 +9,7 @@
 import { reportStorageDropped } from './storage-health';
 import { createBlobStore } from './idb-blob-store';
 import { wallDateKey, wallHour, clampEndToWallDay } from './place-time.mjs';
+import { canonicalCountryKey } from './country-normalize';
 
 export interface PlaceVisit {
   /** ISO 时间(到访开始) */
@@ -303,23 +304,29 @@ export function placesByCategory(visits: PlaceVisit[]): CategoryGroup[] {
 }
 
 // 批次 40:World tab —— 按国家聚合(需先跑 geocode 拿到 country/city)。国家 → 城市子分类。
-export interface CountryGroup { country: string; cities: Array<{ city: string; count: number }>; placeCount: number; visits: number }
+// countryKey = 归一化 canonical key(ISO2/降级串),按它分组去重 —— 反查回来的
+// 「美国/United States/US」是同一个国家,不再各占一行(用户实锤:国别识别错误)。
+// country = 首见原串,仅作显示回退;渲染优先用 countryDisplayName(countryKey, locale)。
+export interface CountryGroup { country: string; countryKey: string; cities: Array<{ city: string; count: number }>; placeCount: number; visits: number }
 export function worldByCountry(visits: PlaceVisit[]): CountryGroup[] {
   const clusters = clusterPlaces(visits, 99999);
   const geo = loadPlaceGeo();
-  const byCountry = new Map<string, { cities: Map<string, number>; placeCount: number; visits: number }>();
+  const byCountry = new Map<string, { country: string; cities: Map<string, number>; placeCount: number; visits: number }>();
   for (const c of clusters) {
     const g = geo[c.label];
     if (!g?.country) continue;
-    const b = byCountry.get(g.country) || { cities: new Map<string, number>(), placeCount: 0, visits: 0 };
+    const key = canonicalCountryKey(g.country);
+    if (!key) continue;
+    const b = byCountry.get(key) || { country: g.country, cities: new Map<string, number>(), placeCount: 0, visits: 0 };
     b.placeCount += 1;
     b.visits += c.visits;
     if (g.city) b.cities.set(g.city, (b.cities.get(g.city) || 0) + 1);
-    byCountry.set(g.country, b);
+    byCountry.set(key, b);
   }
   return [...byCountry.entries()]
-    .map(([country, b]) => ({
-      country,
+    .map(([countryKey, b]) => ({
+      country: b.country,
+      countryKey,
       placeCount: b.placeCount,
       visits: b.visits,
       cities: [...b.cities.entries()].map(([city, count]) => ({ city, count })).sort((x, y) => y.count - x.count),

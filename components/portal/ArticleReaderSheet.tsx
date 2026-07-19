@@ -13,6 +13,7 @@ import { textToAdhdBook, type ReaderBook } from '@/lib/portal/adhd-reader';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import NesioSheet from './ui/NesioSheet';
 import ReaderView, { type ReaderMeta } from './reader/ReaderView';
 
 /** 由标题派生稳定 id,让同一篇文章重开时能恢复阅读进度。 */
@@ -42,7 +43,14 @@ export default function ArticleReaderSheet({ title, article, meta, onClose }: {
 
   if (!book) {
     return (
-      <div className="nesio-rd-overlay" role="dialog" aria-modal="true" aria-label={title}>
+      <NesioSheet
+        variant="fullscreen"
+        open
+        onOpenChange={(next) => { if (!next) onClose(); }}
+        card={false}
+        className="nesio-rd-overlay"
+        ariaLabel={title}
+      >
         <div className="nesio-rd-topbar">
           <button type="button" className="nesio-rd-btn" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
           <div className="nesio-rd-head-mid"><p className="nesio-rd-head-title">{title}</p></div>
@@ -51,7 +59,7 @@ export default function ArticleReaderSheet({ title, article, meta, onClose }: {
         <div className="nesio-rd-scroll">
           <p className="nesio-rd-end">{L(dict, '这条没有可阅读的正文。', 'No readable text here.')}</p>
         </div>
-      </div>
+      </NesioSheet>
     );
   }
 

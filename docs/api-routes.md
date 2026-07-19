@@ -42,7 +42,7 @@ Auth legend:
 | GET/POST /api/secretary/health, /api/secretary/chat | session / lab(route 内建) | — |
 | POST /api/portal/analyze | session (route-local) | — |
 | POST /api/portal/ingest | secret / session | — |
-| POST /api/portal/embed | session / no-Supabase | — |
+| POST /api/portal/embed | session / no-Supabase + requirePaidCloudAi(付费门)+ 熔断 + reportAiCall | — | 里程碑 C:付费语义检索会把记忆文本(含邮件正文,本机全文优先)嵌入化过云;仅付费层(canUsePaidCloudAi)到达,免费前置拦下不出网 |
 | POST /api/secretary/chat | session / lab | — |
 
 ## Private-data routes

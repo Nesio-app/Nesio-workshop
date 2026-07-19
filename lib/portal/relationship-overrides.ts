@@ -7,6 +7,8 @@
 export type OverrideCloseness = 'core' | 'close' | 'acquaintance';
 export interface RelationOverride { closeness?: OverrideCloseness; relation?: string }
 
+import { reportStorageDropped } from '@/lib/portal/storage-health';
+
 const KEY = 'nesio-relationship-overrides-v1';
 export const RELATIONSHIP_OVERRIDES_EVENT = 'nesio-relationship-overrides-updated';
 
@@ -23,7 +25,8 @@ export function setRelationshipOverride(key: string, patch: RelationOverride): v
   if (next.relation === '') delete next.relation;
   if (next.closeness === undefined && !next.relation) delete map[key];
   else map[key] = next;
-  try { localStorage.setItem(KEY, JSON.stringify(map)); } catch { /* 满了忽略 */ }
+  // 用户亲手校正的关系,配额满丢了必须可见(红线);别在失败后还照发 updated 事件骗 UI。
+  try { localStorage.setItem(KEY, JSON.stringify(map)); } catch { reportStorageDropped(); }
   window.dispatchEvent(new CustomEvent(RELATIONSHIP_OVERRIDES_EVENT));
   // 关系派生自 life-graph;用同一事件让面板/详情就地重算
   window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));

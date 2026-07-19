@@ -10,6 +10,7 @@ import TellNesioSheet, { type CaptureMode } from './TellNesioSheet';
 import PortalBottomNav from './PortalBottomNav';
 import PortalOnboarding from './PortalOnboarding';
 import InstallPrompt from './InstallPrompt';
+import NesioSheet from './ui/NesioSheet';
 import { canUse, canOpenFreeze, refreshServerEntitlement } from '@/lib/portal/entitlement';
 import { reconcileLocalOwner, claimLocalDataForUser, purgeAllLocalUserData, setLocalOwner, getLocalOwner } from '@/lib/portal/local-owner';
 import { archiveCurrentSpace, restoreArchivedSpace } from '@/lib/portal/account-spaces';
@@ -29,6 +30,7 @@ const NesioChatSheet = dynamic(() => import('./NesioChatSheet'), { ssr: false })
 const NotePanelEnhanced = dynamic(() => import('./NotePanelEnhanced'), { ssr: false });
 const ToolsTreasurePopup = dynamic(() => import('./ToolsTreasureSheet'), { ssr: false });
 const InventorySheet = dynamic(() => import('./InventorySheet'), { ssr: false });
+const RewardsStoreSheet = dynamic(() => import('./RewardsStoreSheet'), { ssr: false });
 const DailyBriefSheet = dynamic(() => import('./DailyBriefSheet').then((m) => m.DailyBriefSheet), { ssr: false });
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
 import { openToolHref } from '@/lib/portal/open-tool';
@@ -106,10 +108,14 @@ function AskGuideSheet({
   onStart: () => void;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  if (!open) return null;
   return (
-    <div className="nesio-ask-guide" role="dialog" aria-modal="true" aria-label={L(dict, '问念念', 'Ask Nessa')}>
-      <button type="button" className="nesio-ask-guide-backdrop" onClick={onClose} aria-label={L(dict, '关闭问念念引导', 'Close Ask Nessa guide')} />
+    <NesioSheet
+      variant="center"
+      open={open}
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      ariaLabel={L(dict, '问念念', 'Ask Nessa')}
+    >
       <div className="nesio-ask-guide-card">
         <div className="nesio-sheet-handle" aria-hidden />
         <p className="nesio-ask-guide-kicker">{L(dict, '长按中间按钮', 'Long-press the center button')}</p>
@@ -125,7 +131,7 @@ function AskGuideSheet({
           <button type="button" className="nesio-ask-guide-later" onClick={onClose}>{L(dict, '稍后', 'Later')}</button>
         </div>
       </div>
-    </div>
+    </NesioSheet>
   );
 }
 
@@ -429,6 +435,7 @@ export default function Portal() {
   >(null);
   const [ownerBusy, setOwnerBusy] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [rewardsOpen, setRewardsOpen] = useState(false);
   const [workoutSession, setWorkoutSession] = useState<import('./fitness/WorkoutPlayer').PlayerSession | null>(null);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
@@ -745,6 +752,7 @@ export default function Portal() {
       track('freeze_open'); setFreezeOpen(true);
     };
     const inventoryHandler = () => { track('inventory_open'); setInventoryOpen(true); };
+    const rewardsHandler = () => { track('rewards_open'); setRewardsOpen(true); };
     const briefHandler = () => { track('brief_open', {}); setBriefOpen(true); };
     const workoutHandler = (e: Event) => { track('workout_start', {}); setWorkoutSession((e as CustomEvent).detail); };
     const proGateHandler = (e: Event) => {
@@ -772,6 +780,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-mood', moodHandler);
     window.addEventListener('nesio-open-freeze', freezeHandler);
     window.addEventListener('nesio-open-inventory', inventoryHandler);
+    window.addEventListener('nesio-open-rewards', rewardsHandler);
     window.addEventListener('nesio-open-brief', briefHandler);
     window.addEventListener('nesio-start-workout', workoutHandler);
     return () => {
@@ -782,6 +791,7 @@ export default function Portal() {
       window.removeEventListener('nesio-open-mood', moodHandler);
       window.removeEventListener('nesio-open-freeze', freezeHandler);
       window.removeEventListener('nesio-open-inventory', inventoryHandler);
+      window.removeEventListener('nesio-open-rewards', rewardsHandler);
       window.removeEventListener('nesio-open-brief', briefHandler);
       window.removeEventListener('nesio-start-workout', workoutHandler);
     };
@@ -1202,8 +1212,18 @@ export default function Portal() {
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
       <MoodSheet open={moodOpen} onClose={() => setMoodOpen(false)} />
       <FreezeVaultSheet open={freezeOpen} onClose={() => setFreezeOpen(false)} initialTab="add" />
+      <RewardsStoreSheet open={rewardsOpen} onClose={() => setRewardsOpen(false)} />
       {ownerConflict && (
-        <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, zIndex: 95, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(4, 10, 22, 0.72)', padding: '1rem' }}>
+        <NesioSheet
+          variant="center"
+          open
+          onOpenChange={() => { /* 强制选择:不可点外/Esc 关,出口是卡片内的按钮 */ }}
+          dismissible={false}
+          card={false}
+          ariaLabel={ownerConflict.kind === 'other_account'
+            ? L(dict, '这台设备上有另一个账号的数据', 'This device holds another account’s data')
+            : L(dict, '把本机已有的记录归入这个账号?', 'Keep the records already on this device?')}
+        >
           <div style={{ width: 'min(96vw, 440px)', background: 'var(--sheet-opaque, #fff)', color: 'var(--portal-ink, #2c2c2c)', borderRadius: 20, padding: '1.4rem 1.25rem', boxShadow: '0 12px 48px rgba(4,10,22,0.4)' }}>
             <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', fontWeight: 700 }}>
               {ownerConflict.kind === 'other_account'
@@ -1260,7 +1280,7 @@ export default function Portal() {
               )}
             </div>
           </div>
-        </div>
+        </NesioSheet>
       )}
       {proGate && (
         <div
@@ -1296,7 +1316,7 @@ export default function Portal() {
       )}
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
       {workoutSession && <WorkoutPlayer session={workoutSession} onClose={() => setWorkoutSession(null)} />}
-      {briefOpen && <DailyBriefSheet open={briefOpen} onClose={() => setBriefOpen(false)} />}
+      {briefOpen && <DailyBriefSheet open={briefOpen} onClose={() => setBriefOpen(false)} canUsePrivateData={canUsePrivateRuntime} />}
       <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />
 
       <NesioChatSheet open={chatOpen} onClose={() => setChatOpen(false)} canUsePrivateData={canUsePrivateRuntime} />

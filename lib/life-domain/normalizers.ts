@@ -1,10 +1,18 @@
 import { type CreateSignalInput } from './create-signal';
 
+// CARD SPEC:语音标题 = 首分句(干净标题),全文仍在 payload.text/raw(详情「原始记录」可读)。
+// 此前 slice(0,40) 生生把长转写截成半句乱码当标题。
+function firstClause(text: string, max = 24): string {
+  const t = text.trim();
+  const head = (t.split(/[。！？!?\n;；,，]/).find((s) => s.trim()) || t).trim();
+  return head.length > max ? `${head.slice(0, max)}…` : head;
+}
+
 export function normalizeVoiceToSignal(input: { text: string; occurredAt?: string | Date; tags?: string[] }): CreateSignalInput {
   return {
     source: 'voice',
     type: 'observation',
-    title: input.text.slice(0, 40) || '语音记录',
+    title: firstClause(input.text) || '语音记录',
     payload: { text: input.text },
     occurredAt: input.occurredAt,
     confidence: 0.75,
