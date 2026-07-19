@@ -32,6 +32,13 @@ const securityHeaders = [
 ];
 
 const nextConfig = {
+  // 端上模型/wasm 是纯客户端静态资源(从 public/ 直接下发),绝不该被打进 serverless
+  // 函数包。next.config.js→dec-data-api.mjs 里的动态 fs 操作会让 NFT 过度追踪、把整个
+  // public/(含 ~395MB 模型)扫进某个 API 函数 → 超 250MB 部署上限而失败。这里显式把
+  // 大静态资源排除出所有函数的文件追踪(纯静态服务不受影响)。
+  outputFileTracingExcludes: {
+    '*': ['public/lab/models/**', 'public/ort/**'],
+  },
   // 允许局域网设备(如手机真机自测 Lab)访问 dev server 的客户端资源。
   // Next 16 默认只放行同源访问 /_next/*:跨 host(手机开 http://<Mac 局域网IP>:port)
   // 会拿到 403 → 页面出了 SSR 但客户端 JS 加载失败、不 hydrate(表现:能看见界面但
