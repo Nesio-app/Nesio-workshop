@@ -6,6 +6,8 @@
  * 问一问也能拿到 base64 做图片问答。key = assetId,与节点的 asset 记录对应。
  */
 
+import { logDropped, reportStorageDropped } from '@/lib/portal/storage-health';
+
 const DB_NAME = 'nesio-images';
 const STORE = 'images';
 
@@ -36,14 +38,24 @@ export async function compressToDataUrl(file: File | Blob, maxDim = 1400, qualit
   return canvas.toDataURL('image/jpeg', quality);
 }
 
-export async function putLocalImage(assetId: string, dataUrl: string): Promise<void> {
+/**
+ * 存一张本机照片。返回是否成功——离线/未登录时这是**唯一副本**,失败必须可见:
+ * 红线「绝不吞掉存储写入失败」。姊妹文件 local-email-body.ts 同法(此前本文件遗漏)。
+ * 返回 boolean(非破坏:现有 `await` 丢弃返回值的调用方不受影响,新调用方可据此提示重试)。
+ */
+export async function putLocalImage(assetId: string, dataUrl: string): Promise<boolean> {
   const db = await openDB();
-  if (!db) return;
-  await new Promise<void>((resolve) => {
+  if (!db) { logDropped('image_store.put:no_idb', assetId); return false; }
+  return new Promise<boolean>((resolve) => {
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).put(dataUrl, assetId);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => resolve();
+    tx.oncomplete = () => resolve(true);
+    tx.onerror = () => {
+      // 照片体积大,失败多为配额满 —— 既派发可见事件(壳层提示),又落 grep 日志。
+      logDropped('image_store.put', tx.error);
+      reportStorageDropped();
+      resolve(false);
+    };
   });
 }
 
@@ -118,6 +130,11 @@ export async function restoreLocalImages(map: Record<string, string>): Promise<n
       if (typeof dataUrl === 'string') { os.put(dataUrl, id); n++; }
     }
     tx.oncomplete = () => resolve(n);
-    tx.onerror = () => resolve(0);
+    tx.onerror = () => {
+      // 恢复导入失败(配额满)= 备份里的照片没写回,必须可见,别假装恢复成功。
+      logDropped('image_store.restore', tx.error);
+      reportStorageDropped();
+      resolve(0);
+    };
   });
 }

@@ -7,6 +7,7 @@
  */
 
 import type { LifeNode } from './life-graph';
+import { reportStorageDropped } from './storage-health';
 
 // 批次 178:加 'planned'(计划中)—— 项目聚合统计按 进行中/计划中/已完成 分。'archived' 保留兼容旧数据。
 export type ProjectStatus = 'active' | 'planned' | 'completed' | 'archived';
@@ -43,7 +44,13 @@ export function getProjects(): Project[] {
 }
 
 function persist(projects: Project[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  // Project 是唯一用户亲手定义的记忆单元;配额满丢了必须可见(红线),失败就别再发 updated 骗 UI。
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(projects));
+  } catch {
+    reportStorageDropped();
+    return;
+  }
   window.dispatchEvent(new Event('nesio-projects-updated'));
 }
 

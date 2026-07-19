@@ -153,7 +153,9 @@ async function fetchAskResponse(query: string, candidates: LifeNode[]): Promise<
       }),
     }),
   });
-  if (!res.ok) return empty;
+  // 500/402/429/超时 是**故障**,不是「空结果」—— 抛错让调用方走显式失败态,别把基础设施
+  // 故障伪装成「没找到线索」(红线)。genuine 空答由下面 200 响应的 !data.ok && !answer 处理。
+  if (!res.ok) throw new Error(`ask_failed_${res.status}`);
   const data = await res.json() as {
     ok?: boolean;
     matches?: Array<{ id?: string; name?: string; reason?: string }>;
@@ -339,6 +341,8 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   const [askAnswer, setAskAnswer] = useState('');
   const [askAggregations, setAskAggregations] = useState<AskAggregation[]>([]);
   const [webSearchUsed, setWebSearchUsed] = useState(false);
+  // 付费云答失败(500/402/超时)不再伪装成「没找到线索」:置此标志渲染显式失败态 + 重试(红线)。
+  const [askError, setAskError] = useState(false);
   // 批次189:说一句直接存 —— 删确认卡。日期/重复收进折叠「详情」;可贴一张图;存完带时间的给「加入日历」。
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -435,6 +439,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
     if (isAskMode) {
       stopListening();
       setSendState('analyzing');
+      setAskError(false);
       const allCandidates = getRecentNodes(80).filter((node) => canUsePrivateData || !isPrivateExternalNode(node));
       // Signal 事实面语义搜索优先(cutover 后读事实缓存),模糊/近期节点补位。
       // 已登录用户:先经云端 RAG 回溯(pgvector/文本)再本地并轨 —— 本地事实缓存
@@ -453,6 +458,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
         if (!seenIds.has(n.id)) { seenIds.add(n.id); merged.push(n); }
       }
       const candidates = merged.slice(0, 60);
+      let askFailed = false;
       try {
         const result = await fetchAskResponse(t, candidates);
         setAskAnswer(result.answer);
@@ -468,12 +474,17 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
           setAskResults([]);
         }
       } catch {
+        // 云答故障:保留本地模糊结果作降级兜底,但置 askError 让屏上显式提示 + 可重试,
+        // 不再把故障伪装成「没找到线索」的成功态(红线:每个异步动作必须有可见失败态)。
+        askFailed = true;
         const fuzzyFallback = searchLifeGraphFuzzy(t, 4);
         setAskResults(fuzzyFallback.map((n) => ({ id: n.id, name: n.name, source: n.source || '' })));
         setAskAnswer('');
       }
+      setAskError(askFailed);
       setSendState('saved');
-      setText('');
+      // 失败时保留输入,重试按钮直接再调 handleSend(读同一 text);成功才清空。
+      if (!askFailed) setText('');
       setIntentLabel('');
       return;
     }
@@ -733,6 +744,34 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
         {/* Ask 结果展示 */}
         {isAskMode && sendState === 'saved' ? (
           <div className="nesio-ask-result">
+            {/* 云答故障的显式失败态:warm-coach 语气 + 重试;下方仍展示本地兜底线索。 */}
+            {askError && (
+              <div
+                className="nesio-ask-answer-block"
+                style={{
+                  border: '1px solid var(--status-gentle-soft)',
+                  background: 'var(--status-gentle-soft)',
+                  borderRadius: 'var(--radius-md)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)',
+                }}
+              >
+                <p className="nesio-ask-answer-text" style={{ color: 'var(--portal-ink)', margin: 0 }}>
+                  {L(dict, '这次没接上,先给你本地记忆里的线索。', "Couldn't reach the assistant — showing clues from your local memory.")}
+                </p>
+                <button
+                  type="button"
+                  className="nesio-ask-retry-btn"
+                  onClick={() => { void handleSend(); }}
+                  style={{
+                    flexShrink: 0, padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-pill)',
+                    border: '1px solid var(--portal-accent-border)', background: 'var(--portal-bg)',
+                    color: 'var(--portal-accent)', fontSize: 'var(--text-sm)', cursor: 'pointer',
+                  }}
+                >
+                  {L(dict, '重试', 'Retry')}
+                </button>
+              </div>
+            )}
             {/* AI 综合回答 */}
             {askAnswer ? (
               <div className="nesio-ask-answer-block">
