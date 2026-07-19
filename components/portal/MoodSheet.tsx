@@ -21,6 +21,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { useSheetDrag } from './use-sheet-drag';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { EMOTIONS, autoContext, type EmotionId } from '@/lib/portal/mood';
 
 // ── Journal 历史(批次 6:富文本-lite + 历史时间线 + 搜索)────────────────────
 
@@ -83,28 +84,11 @@ function loadJournalEntries(): JournalEntry[] {
     .sort((a, b) => b.date.getTime() - a.date.getTime());
 }
 
-// ── 12-Emotion taxonomy (Russell Circumplex 4 quadrants × 3) ─────────────────
-const EMOTIONS = [
-  { id: 'joy',        label: '开心', labelEn: 'Joyful',    emoji: '😄', color: 'var(--emotion-joy)', quadrant: 'hv-ha' },
-  { id: 'excited',    label: '兴奋', labelEn: 'Excited',   emoji: '🤩', color: 'var(--emotion-excited)', quadrant: 'hv-ha' },
-  { id: 'moved',      label: '感动', labelEn: 'Moved',     emoji: '🥰', color: 'var(--emotion-moved)', quadrant: 'hv-ha' },
-  { id: 'calm',       label: '平静', labelEn: 'Calm',      emoji: '😌', color: 'var(--emotion-calm)', quadrant: 'hv-la' },
-  { id: 'content',    label: '满足', labelEn: 'Content',   emoji: '😊', color: 'var(--emotion-content)', quadrant: 'hv-la' },
-  { id: 'grateful',   label: '感激', labelEn: 'Grateful',  emoji: '🤗', color: 'var(--emotion-grateful)', quadrant: 'hv-la' },
-  { id: 'tired',      label: '疲惫', labelEn: 'Tired',     emoji: '😪', color: 'var(--emotion-tired)', quadrant: 'lv-la' },
-  { id: 'empty',      label: '空洞', labelEn: 'Empty',     emoji: '😶', color: 'var(--emotion-empty)', quadrant: 'lv-la' },
-  { id: 'sad',        label: '难过', labelEn: 'Sad',       emoji: '😢', color: 'var(--emotion-sad)', quadrant: 'lv-la' },
-  { id: 'anxious',    label: '焦虑', labelEn: 'Anxious',   emoji: '😰', color: 'var(--emotion-anxious)', quadrant: 'lv-ha' },
-  { id: 'frustrated', label: '烦躁', labelEn: 'Restless',  emoji: '😤', color: 'var(--emotion-frustrated)', quadrant: 'lv-ha' },
-  { id: 'angry',      label: '生气', labelEn: 'Angry',     emoji: '😠', color: 'var(--emotion-angry)', quadrant: 'lv-ha' },
-] as const;
-
 function emLabel(em: { label: string; labelEn: string } | null | undefined, dict: DictLocale): string {
   if (!em) return '';
   return dict === 'en' ? em.labelEn : em.label;
 }
 
-type EmotionId = typeof EMOTIONS[number]['id'];
 type EnergyLevel = 'high' | 'mid' | 'low';
 
 // ── SVG geometry（设计稿 mood-wheel2:圆点环 + 中心大圈,不再是扇形饼)──────────
@@ -192,18 +176,6 @@ function todayPrompt(list: Array<[string, string]>, dict: DictLocale): string {
 }
 
 // ── Context auto-fill ─────────────────────────────────────────────────────────
-function autoContext(): Record<string, string | boolean | number> {
-  const now = new Date();
-  const hour = now.getHours();
-  return {
-    recordedAt: now.toISOString(),
-    hourOfDay: hour,
-    isWorkHours: hour >= 9 && hour < 18 && now.getDay() >= 1 && now.getDay() <= 5,
-    isEvening: hour >= 21,
-    isMorning: hour >= 6 && hour < 10,
-    dayOfWeek: now.getDay(),
-  };
-}
 
 // ── Component ─────────────────────────────────────────────────────────────────
 

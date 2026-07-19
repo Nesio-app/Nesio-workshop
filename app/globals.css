@@ -18186,6 +18186,20 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .ng-tl-sum{margin:4px 0 0 20px;font-size:.82rem;color:var(--portal-muted);line-height:1.45}
 .ng-tl-in{margin-top:10px;background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:14px;padding:13px;display:flex;flex-direction:column;gap:10px;animation:ng-reveal-in .35s var(--ng-ease)}
 .ng-tl-q{margin:0;font-size:.9rem;font-weight:var(--weight-medium);color:var(--portal-ink);line-height:1.5}
+.ng-heal-from{margin:-2px 0 0;font-size:.74rem;color:var(--portal-accent);line-height:1.4}
+/* 情绪转盘(纯 HTML 绝对定位,iOS 安全):12 圆点环 + 中心大圈 */
+.ng-wheel{position:relative;width:min(280px,82vw);aspect-ratio:1/1;margin:8px auto 6px}
+.ng-wheel-dot{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;padding:0;cursor:pointer;font-family:inherit}
+.ng-wheel-dot .d{width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.55);transition:transform .12s var(--ng-ease)}
+.ng-wheel-dot.on .d{transform:scale(1.16);border:2.5px solid #fff;box-shadow:0 0 0 4px rgba(20,20,20,.05)}
+.ng-wheel-dot:active .d{transform:scale(1.1)}
+.ng-wheel-dot .l{font-size:.72rem;line-height:1;color:var(--portal-muted);white-space:nowrap}
+.ng-wheel-dot.on .l{color:var(--portal-ink);font-weight:var(--weight-semibold)}
+.ng-wheel-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:43%;aspect-ratio:1/1;border-radius:50%;background:var(--portal-card);border:1.5px solid var(--portal-line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:background .25s var(--ng-ease),border-color .25s var(--ng-ease)}
+.ng-wheel-center .nm{font-family:var(--font-portal-serif,Georgia,serif);font-size:1.15rem;font-weight:800;color:var(--portal-muted)}
+.ng-wheel-center .nm.on{color:#fff}
+.ng-wheel-center .hint{font-size:.7rem;color:var(--portal-muted)}
+.ng-mdot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:1px}
 
 /* 参与式选项 chips + ANT 实时识别 */
 .ng-heal-chips{display:flex;flex-wrap:wrap;gap:7px}
