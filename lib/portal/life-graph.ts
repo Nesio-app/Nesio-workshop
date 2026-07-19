@@ -5,6 +5,7 @@
  */
 import { mergeConflictingNodes } from './life-node-merge';
 import { emailFulltextScore } from './email-fulltext-index';
+import { tokenizeCJK } from './cjk-tokenize';
 
 export type LifeNodeType =
   | 'person'
@@ -1058,15 +1059,11 @@ function nodeSearchText(node: LifeNode): string {
   ].join(' ').toLowerCase();
 }
 
+// 端上简答的分词器与 smart-search(深问)共用 cjk-tokenize —— 中文没空格,
+// 整句「充电宝在哪」曾被当一个 token,永远匹配不到记忆名「充电宝」(用户实测)。
+// smart-search 早修过同样的坑,这个函数当时漏了,导致端上中文检索全灭。
 function queryTokens(query: string): string[] {
-  return Array.from(new Set(
-    query
-      .toLowerCase()
-      .replace(/[，。！？、,.!?;；:："'“”‘’()[\]{}]/g, ' ')
-      .split(/\s+/)
-      .map((token) => token.trim())
-      .filter(Boolean),
-  ));
+  return tokenizeCJK(query);
 }
 
 export function searchLifeGraphFuzzy(query: string, limit = 6): LifeNode[] {
@@ -1077,7 +1074,11 @@ export function searchLifeGraphFuzzy(query: string, limit = 6): LifeNode[] {
     .map((node) => {
       const text = nodeSearchText(node);
       let score = 0;
-      if (node.name.toLowerCase().includes(q)) score += 8;
+      const nameLower = node.name.toLowerCase();
+      if (nameLower.includes(q)) score += 8;
+      // 反向包含:提问里含记忆名(「充电宝在哪」含「充电宝」)—— 中文长名的强命中,
+      // 比逐 bigram 更稳。≥2 字防单字名过度命中。
+      else if (node.name.trim().length >= 2 && q.includes(nameLower)) score += 8;
       if (node.rawInput?.toLowerCase().includes(q)) score += 6;
       if (text.includes(q)) score += 5;
       for (const token of tokens) {
