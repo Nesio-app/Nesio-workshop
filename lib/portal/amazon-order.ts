@@ -137,7 +137,7 @@ export function consolidateAmazonOrder(nodes: RawNode[], summary = ''): Consolid
   }
 
   return {
-    name: pickProductName(nodes) || (orderNo ? `订单 ${orderNo}` : '亚马逊订单'),
+    name: pickProductName(nodes) || (attrs.orderNo ? `订单 ${attrs.orderNo}` : '亚马逊订单'),
     type: 'object',
     tags: ['亚马逊'],
     attributes: attrs,
