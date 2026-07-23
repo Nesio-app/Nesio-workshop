@@ -42,10 +42,13 @@ export function loadExerciseCatalog(): Promise<ExerciseCatalog> {
   if (cache) return cache;
   cache = fetch(CATALOG_URL)
     .then((r) => {
-      if (!r.ok) throw new Error(`加载动作库失败: ${r.status}`);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
       return r.json() as Promise<ExerciseCatalog>;
     })
     .then((doc) => {
+      if (!doc || !Array.isArray(doc.exercises) || doc.exercises.length === 0) {
+        throw new Error('数据格式异常(缺 exercises)');
+      }
       byId = new Map(doc.exercises.map((e) => [e.id, e]));
       return doc;
     })

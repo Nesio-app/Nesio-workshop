@@ -45,19 +45,23 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
   const [mode, setMode] = useState<'core' | 'all'>('core');
   const [catalog, setCatalog] = useState<CatalogExercise[] | null>(null);
   const [catStatus, setCatStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [catErr, setCatErr] = useState('');
   const [q, setQ] = useState('');
 
   // 切到「全部」时懒加载扩展库(1324)。
   // ⚠️ 只从 idle 触发一次:失败后停在 error(不是 idle)→ effect 不再自触发,
   //    避免「拉取失败→重触发→再失败」无限循环卡死主线程。重试由按钮显式把 catStatus 拨回 idle。
+  const loadCat = () => {
+    setCatStatus('loading');
+    setCatErr('');
+    loadExerciseCatalog()
+      .then((doc) => { setCatalog(doc.exercises); setCatStatus('ready'); })
+      .catch((e) => { setCatErr(String((e && e.message) || e)); setCatStatus('error'); });
+  };
   useEffect(() => {
     if (mode !== 'all' || catalog || catStatus !== 'idle') return;
-    let alive = true;
-    setCatStatus('loading');
-    loadExerciseCatalog()
-      .then((doc) => { if (alive) { setCatalog(doc.exercises); setCatStatus('ready'); } })
-      .catch(() => { if (alive) setCatStatus('error'); });
-    return () => { alive = false; };
+    loadCat();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, catalog, catStatus]);
 
   const [catPart, setCatPart] = useState<string>('all');
@@ -191,11 +195,16 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
                 placeholder={L(dict, '搜动作 / 部位 / 器械 / 要点', 'Search name / part / gear / cue')}
                 aria-label={L(dict, '搜索动作', 'Search exercises')}
               />
+              {catStatus === 'idle' && !catalog && (
+                <button type="button" className="nesio-exfig-retry" style={{ margin: '0.6rem 0' }} onClick={loadCat}>
+                  {L(dict, '载入 1324 个动作', 'Load 1324 exercises')}
+                </button>
+              )}
               {catStatus === 'loading' && <p className="nesio-freeze-empty">{L(dict, '正在载入 1324 个动作…', 'Loading 1324 exercises…')}</p>}
               {catStatus === 'error' && (
                 <div className="nesio-exfig--error" style={{ aspectRatio: 'auto', padding: '1rem' }}>
-                  <span className="nesio-exfig-msg">{L(dict, '动作库先歇会儿', 'Library hiccuped')}</span>
-                  <button type="button" className="nesio-exfig-retry" onClick={() => { setCatalog(null); setCatStatus('idle'); }}>{L(dict, '重试', 'Retry')}</button>
+                  <span className="nesio-exfig-msg">{L(dict, '动作库没载进来', 'Library did not load')}{catErr ? `（${catErr}）` : ''}</span>
+                  <button type="button" className="nesio-exfig-retry" onClick={loadCat}>{L(dict, '重试', 'Retry')}</button>
                 </div>
               )}
               {catalog && (
