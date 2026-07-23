@@ -115,7 +115,12 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
       list = list.filter((i) =>
         i.name.toLowerCase().includes(q) ||
         i.location.toLowerCase().includes(q) ||
-        i.note.toLowerCase().includes(q));
+        i.note.toLowerCase().includes(q) ||
+        // 标签也进搜索 —— 否则点「亚马逊」标签 chip 筛不出(标签名不在 name/location/note 里)。
+        i.tags.some((t) => t.toLowerCase().includes(q)) ||
+        i.category.toLowerCase().includes(q) ||
+        i.seller.toLowerCase().includes(q) ||
+        i.orderNo.toLowerCase().includes(q));
     }
     return list;
   }, [items, groupFilter, query]);
@@ -597,7 +602,39 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
   const [category, setCategory] = useState(item.category); // 物品①
   const [tags, setTags] = useState(item.tags.join(', '));
   const [price, setPrice] = useState(item.price != null ? String(item.price) : '');
+  // ── 亚马逊转卖(flip)字段 ──
+  const [amzOpen, setAmzOpen] = useState(item.isAmazon);
+  const [orderNo, setOrderNo] = useState(item.orderNo);
+  const [seller, setSeller] = useState(item.seller);
+  const [keywords, setKeywords] = useState(item.keywords);
+  const [buyPrice, setBuyPrice] = useState(item.buyPrice != null ? String(item.buyPrice) : '');
+  const [tax, setTax] = useState(item.tax != null ? String(item.tax) : '');
+  const [arrivedAt, setArrivedAt] = useState(item.arrivedAt ?? '');
+  const [rebate, setRebate] = useState(item.rebate != null ? String(item.rebate) : '');
+  const [resalePrice, setResalePrice] = useState(item.resalePrice != null ? String(item.resalePrice) : '');
+  const [rebateReceived, setRebateReceived] = useState(item.rebateReceived);
+  const [reviewDone, setReviewDone] = useState(item.reviewDone);
+  const [reviewExempt, setReviewExempt] = useState(item.reviewExempt);
+  const [sold, setSold] = useState(item.sold);
   const exp = expiryStatus(item);
+
+  const nOrNull = (s: string) => (s ? parseFloat(s) : (null as unknown as number | undefined));
+  // 自付额 = 买入价 + 税 − 返现;盈利 = 转卖价 − 自付额(实时,与 inventory.ts 派生一致)。
+  const bpNum = parseFloat(buyPrice);
+  const oop = Number.isFinite(bpNum)
+    ? Math.round((bpNum + (parseFloat(tax) || 0) - (parseFloat(rebate) || 0)) * 100) / 100
+    : null;
+  const rspNum = parseFloat(resalePrice);
+  const profit = Number.isFinite(rspNum) && oop != null ? Math.round((rspNum - oop) * 100) / 100 : null;
+  const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const chip = (on: boolean, toggle: () => void, text: string) => (
+    <button type="button" onClick={toggle} style={{
+      padding: '0.3rem 0.7rem', borderRadius: 'var(--radius-pill, 999px)', fontSize: '0.78rem',
+      border: '1px solid var(--portal-accent-border)', cursor: 'pointer',
+      background: on ? 'var(--status-go-soft)' : 'transparent',
+      color: on ? 'var(--status-go)' : 'var(--portal-muted)', fontWeight: on ? 600 : 400,
+    }}>{on ? '✓ ' : ''}{text}</button>
+  );
 
   const save = () => {
     updateInventoryItem(item.id, {
@@ -608,6 +645,11 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
       category,
       tags: tags.split(/[,,、]/).map((t) => t.trim()).filter(Boolean),
       price: price ? parseFloat(price) : null as unknown as number | undefined,
+      isAmazon: amzOpen,
+      orderNo, seller, keywords,
+      buyPrice: nOrNull(buyPrice), tax: nOrNull(tax), arrivedAt,
+      rebate: nOrNull(rebate), resalePrice: nOrNull(resalePrice),
+      rebateReceived, reviewDone, reviewExempt, sold,
     });
     onChanged();
   };
@@ -648,6 +690,71 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
       <input className="nesio-ob-input" value={tags} onChange={(e) => setTags(e.target.value)} />
       <label style={label}>{L(dict, '备注', 'Note')}</label>
       <input className="nesio-ob-input" value={note} onChange={(e) => setNote(e.target.value)} />
+
+      {/* ── 亚马逊转卖(flip)追踪:订单/返现/留评/转卖/利润 —— 对应用户 Notion 表 ── */}
+      <button
+        type="button"
+        onClick={() => setAmzOpen((v) => !v)}
+        style={{ width: '100%', marginTop: '1rem', padding: '0.5rem 0.7rem', borderRadius: 10, textAlign: 'left', fontWeight: 600,
+          border: '1px solid var(--portal-accent-border)', background: amzOpen ? 'var(--portal-accent-soft)' : 'transparent',
+          color: 'var(--portal-accent)', fontSize: '0.85rem' }}
+      >
+        {amzOpen ? '▾' : '▸'} {L(dict, '亚马逊转卖 · 订单/返现/利润', 'Amazon flip · order / rebate / profit')}
+      </button>
+      {amzOpen && (
+        <div style={{ marginTop: 8 }}>
+          <label style={label}>{L(dict, '订单号', 'Order #')}</label>
+          <input className="nesio-ob-input" value={orderNo} onChange={(e) => setOrderNo(e.target.value)} placeholder="112-…" />
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={label}>{L(dict, '商家', 'Seller')}</label>
+              <input className="nesio-ob-input" value={seller} onChange={(e) => setSeller(e.target.value)} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={label}>{L(dict, '到货日', 'Arrived')}</label>
+              <input className="nesio-ob-input" type="date" value={arrivedAt} onChange={(e) => setArrivedAt(e.target.value)} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={label}>{L(dict, '买入价 $', 'Buy $')}</label>
+              <input className="nesio-ob-input" inputMode="decimal" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value.replace(/[^0-9.]/g, ''))} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={label}>{L(dict, '税 $', 'Tax $')}</label>
+              <input className="nesio-ob-input" inputMode="decimal" value={tax} onChange={(e) => setTax(e.target.value.replace(/[^0-9.]/g, ''))} />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <label style={label}>{L(dict, '返现 $', 'Rebate $')}</label>
+              <input className="nesio-ob-input" inputMode="decimal" value={rebate} onChange={(e) => setRebate(e.target.value.replace(/[^0-9.]/g, ''))} />
+            </div>
+            <div style={{ flex: 1 }}>
+              <label style={label}>{L(dict, '转卖价 $', 'Resale $')}</label>
+              <input className="nesio-ob-input" inputMode="decimal" value={resalePrice} onChange={(e) => setResalePrice(e.target.value.replace(/[^0-9.]/g, ''))} />
+            </div>
+          </div>
+          <label style={label}>{L(dict, '关键词', 'Keywords')}</label>
+          <input className="nesio-ob-input" value={keywords} onChange={(e) => setKeywords(e.target.value)} placeholder="aluminum carry on luggage" />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+            {chip(reviewDone, () => setReviewDone((v) => !v), L(dict, '已留评', 'Reviewed'))}
+            {chip(reviewExempt, () => setReviewExempt((v) => !v), L(dict, '免评', 'No review'))}
+            {chip(rebateReceived, () => setRebateReceived((v) => !v), L(dict, '返现到账', 'Rebate in'))}
+            {chip(sold, () => setSold((v) => !v), L(dict, '已售出', 'Sold'))}
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 10, fontSize: '0.9rem' }}>
+            <span style={{ color: 'var(--portal-muted)' }}>{L(dict, '自付额', 'Out of pocket')}: {oop != null ? money(oop) : '—'}</span>
+            <span style={{ fontWeight: 700, color: profit == null ? 'var(--portal-muted)' : profit >= 0 ? 'var(--status-go)' : 'var(--status-risk)' }}>
+              {L(dict, '盈利', 'Profit')}: {profit != null ? money(profit) : '—'}
+            </span>
+          </div>
+          <p style={{ margin: '6px 2px 0', fontSize: '0.68rem', color: 'var(--portal-muted)' }}>
+            {L(dict, '自付额 = 买入价 + 税 − 返现;盈利 = 转卖价 − 自付额。保存后打「亚马逊」标签。', 'Out of pocket = buy + tax − rebate; profit = resale − out of pocket. Saving tags it 亚马逊.')}
+          </p>
+        </div>
+      )}
+
       <button
         type="button"
         style={{ width: '100%', marginTop: '1rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: item.forSale ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem' }}

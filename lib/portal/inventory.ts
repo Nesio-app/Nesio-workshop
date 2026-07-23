@@ -61,6 +61,22 @@ export interface InventoryItem {
   forSale: boolean;      // 物品③:标记出售(进卖闲置堆)
   isContainer: boolean;  // 物品④:这件物品本身是容器(收纳箱等),其他物品位置可写它
   containedCount: number;// 物品④:装了几件(其他物品 location 的容器段命中该物品名;列表时计算)
+  // ── 亚马逊转卖(flip)追踪 —— 买→留评→返现→转卖→算利润。对应用户 Notion 表 ──
+  isAmazon: boolean;         // node.tags 含「亚马逊」
+  orderNo: string;           // 订单号
+  seller: string;            // 商家(Sold by …)
+  keywords: string;          // 搜索关键词
+  buyPrice: number | null;   // 买入价(美金价格)
+  tax: number | null;        // 税
+  arrivedAt: string | null;  // 到货日 'YYYY-MM-DD'
+  rebate: number | null;     // 卖方返现金额
+  rebateReceived: boolean;   // 返现是否到账(Notion PayStatus)
+  reviewDone: boolean;       // 是否已留评(Notion Review Status)
+  reviewExempt: boolean;     // 免评
+  resalePrice: number | null;// 转卖价
+  sold: boolean;             // 已售出(否=在库)
+  outOfPocket: number | null;// 自付额 = 买入价 + 税 − 返现(派生,不落库)
+  profit: number | null;     // 盈利 = 转卖价 − 自付额(派生,不落库)
 }
 
 function str(v: unknown): string {
@@ -95,6 +111,34 @@ export function toInventoryItem(node: LifeNode): InventoryItem {
     forSale: a.forSale === true,
     isContainer: a.isContainer === true,
     containedCount: 0, // listInventoryItems 里跨物品计算
+    ...amazonFields(node, a),
+  };
+}
+
+/** 亚马逊转卖字段的读取 + 派生(自付额/盈利)。全部标量,派生值不落库。 */
+function amazonFields(node: LifeNode, a: LifeNode['attributes']): {
+  isAmazon: boolean; orderNo: string; seller: string; keywords: string;
+  buyPrice: number | null; tax: number | null; arrivedAt: string | null; rebate: number | null;
+  rebateReceived: boolean; reviewDone: boolean; reviewExempt: boolean;
+  resalePrice: number | null; sold: boolean; outOfPocket: number | null; profit: number | null;
+} {
+  const buyPrice = num(a.buyPrice);
+  const tax = num(a.tax);
+  const rebate = num(a.rebate);
+  const resalePrice = num(a.resalePrice);
+  // 自付额 = 买入价 + 税 − 返现(税算进成本;想改不含税删掉 + (tax||0) 即可)。
+  const outOfPocket = buyPrice != null ? Math.round((buyPrice + (tax || 0) - (rebate || 0)) * 100) / 100 : null;
+  const profit = resalePrice != null && outOfPocket != null ? Math.round((resalePrice - outOfPocket) * 100) / 100 : null;
+  return {
+    isAmazon: (node.tags || []).includes('亚马逊'),
+    orderNo: str(a.orderNo),
+    seller: str(a.seller),
+    keywords: str(a.keywords),
+    buyPrice, tax, arrivedAt: str(a.arrivedAt).slice(0, 10) || null, rebate,
+    rebateReceived: a.rebateReceived === true,
+    reviewDone: a.reviewDone === true,
+    reviewExempt: a.reviewExempt === true,
+    resalePrice, sold: a.sold === true, outOfPocket, profit,
   };
 }
 
@@ -130,6 +174,20 @@ export interface NewInventoryItem {
   price?: number;    // 物品①:估值(单件)
   forSale?: boolean; // 物品③:标记出售
   isContainer?: boolean; // 物品④:变成容器
+  // 亚马逊转卖字段
+  isAmazon?: boolean;      // 控制「亚马逊」标签的增删
+  orderNo?: string;
+  seller?: string;
+  keywords?: string;
+  buyPrice?: number;
+  tax?: number;
+  arrivedAt?: string;      // 'YYYY-MM-DD'
+  rebate?: number;
+  rebateReceived?: boolean;
+  reviewDone?: boolean;
+  reviewExempt?: boolean;
+  resalePrice?: number;
+  sold?: boolean;
 }
 
 export function addInventoryItem(input: NewInventoryItem): LifeNode {
@@ -141,7 +199,21 @@ export function addInventoryItem(input: NewInventoryItem): LifeNode {
   if (input.category?.trim()) attributes.category = input.category.trim();
   if (input.price != null && Number.isFinite(input.price)) attributes.price = input.price;
   if (input.forSale) attributes.forSale = true; // 物品③
+  // 亚马逊转卖字段(创建时可由截图/文字抽取预填)
+  if (input.orderNo?.trim()) attributes.orderNo = input.orderNo.trim();
+  if (input.seller?.trim()) attributes.seller = input.seller.trim();
+  if (input.keywords?.trim()) attributes.keywords = input.keywords.trim();
+  if (input.buyPrice != null && Number.isFinite(input.buyPrice)) attributes.buyPrice = input.buyPrice;
+  if (input.tax != null && Number.isFinite(input.tax)) attributes.tax = input.tax;
+  if (input.arrivedAt?.trim()) attributes.arrivedAt = input.arrivedAt.trim();
+  if (input.rebate != null && Number.isFinite(input.rebate)) attributes.rebate = input.rebate;
+  if (input.rebateReceived) attributes.rebateReceived = true;
+  if (input.reviewDone) attributes.reviewDone = true;
+  if (input.reviewExempt) attributes.reviewExempt = true;
+  if (input.resalePrice != null && Number.isFinite(input.resalePrice)) attributes.resalePrice = input.resalePrice;
+  if (input.sold) attributes.sold = true;
   const itemTags = (input.tags || []).map((t) => t.trim()).filter(Boolean);
+  const withAmazon = input.isAmazon ? ['亚马逊', ...itemTags.filter((t) => t !== '亚马逊')] : itemTags;
   return addLifeNode({
     type: 'object',
     name: input.name.trim(),
@@ -149,18 +221,31 @@ export function addInventoryItem(input: NewInventoryItem): LifeNode {
     source: 'manual',
     confidence: 1,
     relations: [],
-    tags: ['收纳', ...itemTags.filter((t) => t !== '收纳')],
+    tags: ['收纳', ...withAmazon.filter((t) => t !== '收纳')],
   });
 }
 
 /** 更新物品属性(位置/数量/效期/备注)。 */
 export function updateInventoryItem(
   id: string,
-  patch: Partial<Pick<NewInventoryItem, 'location' | 'quantity' | 'expiry' | 'note' | 'category' | 'tags' | 'price' | 'forSale' | 'isContainer'>> & { name?: string },
+  patch: Partial<Omit<NewInventoryItem, 'name'>> & { name?: string },
 ): boolean {
   const node = getLifeGraph().find((n) => n.id === id);
   if (!node) return false;
   const attributes = { ...node.attributes };
+  // 亚马逊字段用的 set-or-delete 小工具(空/无效值即清键,不留脏数据)。
+  const setStr = (k: string, v: string | undefined) => {
+    if (v === undefined) return;
+    if (v.trim()) attributes[k] = v.trim(); else delete attributes[k];
+  };
+  const setNum = (k: string, v: number | undefined) => {
+    if (v === undefined) return;
+    if (v != null && Number.isFinite(v)) attributes[k] = v; else delete attributes[k];
+  };
+  const setBool = (k: string, v: boolean | undefined) => {
+    if (v === undefined) return;
+    if (v) attributes[k] = true; else delete attributes[k];
+  };
   if (patch.location !== undefined) {
     if (patch.location.trim()) attributes.location = patch.location.trim();
     else delete attributes.location;
@@ -196,10 +281,30 @@ export function updateInventoryItem(
     if (patch.isContainer) attributes.isContainer = true;
     else delete attributes.isContainer;
   }
+  // 亚马逊转卖字段
+  setStr('orderNo', patch.orderNo);
+  setStr('seller', patch.seller);
+  setStr('keywords', patch.keywords);
+  setNum('buyPrice', patch.buyPrice);
+  setNum('tax', patch.tax);
+  setStr('arrivedAt', patch.arrivedAt);
+  setNum('rebate', patch.rebate);
+  setBool('rebateReceived', patch.rebateReceived);
+  setBool('reviewDone', patch.reviewDone);
+  setBool('reviewExempt', patch.reviewExempt);
+  setNum('resalePrice', patch.resalePrice);
+  setBool('sold', patch.sold);
   const nodePatch: Partial<LifeNode> = { attributes, lastConfirmedAt: new Date().toISOString() };
-  if (patch.tags !== undefined) {
-    const itemTags = (patch.tags || []).map((t) => t.trim()).filter((t) => t && t !== '收纳');
-    nodePatch.tags = ['收纳', ...itemTags];
+  // tags + 「亚马逊」域标:patch.tags 重设用户标签;patch.isAmazon 单独增删亚马逊标签。
+  if (patch.tags !== undefined || patch.isAmazon !== undefined) {
+    let userTags = patch.tags !== undefined
+      ? (patch.tags || []).map((t) => t.trim()).filter((t) => t && t !== '收纳')
+      : (node.tags || []).filter((t) => t && t !== '收纳');
+    if (patch.isAmazon !== undefined) {
+      userTags = userTags.filter((t) => t !== '亚马逊');
+      if (patch.isAmazon) userTags.unshift('亚马逊');
+    }
+    nodePatch.tags = ['收纳', ...userTags];
   }
   if (patch.name?.trim()) nodePatch.name = patch.name.trim();
   return updateLifeNode(id, nodePatch);
