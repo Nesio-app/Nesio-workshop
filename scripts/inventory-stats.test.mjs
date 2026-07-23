@@ -46,7 +46,7 @@ assert.equal(item.price, null, '清空估值');
 
 // ── 亚马逊转卖(flip):字段回路 + 自付额/盈利派生 + 亚马逊标签 ──
 nodes.length = 0; seq = 0;
-const amz = inv.addInventoryItem({ name: 'ALPHA CAMP 20 Inch', isAmazon: true, orderNo: '112-4313914-7678611', seller: 'Makun', buyPrice: 118.99, tax: 8.63, keywords: 'aluminum carry on luggage' });
+const amz = inv.addInventoryItem({ name: 'ALPHA CAMP 20 Inch', isAmazon: true, orderNo: '112-4313914-7678611', seller: 'Makun', buyPrice: 118.99, tax: 8.63, orderedAt: '2026-07-23', arrivedAt: '2026-08-02', keywords: 'aluminum carry on luggage' });
 let ai = inv.listInventoryItems().find((i) => i.id === amz.id);
 assert.equal(ai.isAmazon, true, '亚马逊标签投影');
 assert.ok(amz.tags.includes('亚马逊'), 'node.tags 带「亚马逊」');
@@ -54,23 +54,60 @@ assert.equal(ai.orderNo, '112-4313914-7678611');
 assert.equal(ai.seller, 'Makun');
 assert.equal(ai.buyPrice, 118.99);
 assert.equal(ai.tax, 8.63);
+assert.equal(ai.orderedAt, '2026-07-23');
+assert.equal(ai.arrivedAt, '2026-08-02');
 assert.equal(ai.keywords, 'aluminum carry on luggage');
-assert.equal(ai.outOfPocket, 127.62, '自付额 = 买入价 118.99 + 税 8.63 − 返现 0');
+assert.equal(ai.outOfPocket, 118.99, '自付额 = 买入价 118.99 − 返现 0(税不进成本)');
 assert.equal(ai.profit, null, '未填转卖价 → 盈利 null');
 inv.updateInventoryItem(amz.id, { rebate: 118.99, resalePrice: 90, reviewDone: true, rebateReceived: true, sold: true });
 ai = inv.listInventoryItems().find((i) => i.id === amz.id);
 assert.equal(ai.rebate, 118.99);
-assert.equal(ai.outOfPocket, 8.63, '返现后自付额 = 118.99 + 8.63 − 118.99');
-assert.equal(ai.profit, 81.37, '盈利 = 转卖价 90 − 自付额 8.63');
+assert.equal(ai.outOfPocket, 0, '返现后自付额 = 118.99 − 118.99(税不算)');
+assert.equal(ai.profit, 90, '盈利 = 转卖价 90 − 自付额 0');
 assert.equal(ai.reviewDone, true);
 assert.equal(ai.rebateReceived, true);
 assert.equal(ai.sold, true);
-inv.updateInventoryItem(amz.id, { isAmazon: false });
-assert.equal(inv.listInventoryItems().find((i) => i.id === amz.id).isAmazon, false, '取消亚马逊标签');
-inv.updateInventoryItem(amz.id, { buyPrice: null, tax: null, rebate: null, resalePrice: null });
-ai = inv.listInventoryItems().find((i) => i.id === amz.id);
-assert.equal(ai.outOfPocket, null, '无买入价 → 自付额 null');
-assert.equal(ai.profit, null, '无自付额 → 盈利 null');
+
+// ── 留评到期 reviewDueInfo(到货 + 10 天)──
+const DAY = 86_400_000;
+const base = { reviewExempt: false, reviewDone: false, arrivedAt: '2026-07-10' };
+const at = (d) => new Date(`${d}T00:00:00`).getTime();
+assert.equal(inv.reviewDueInfo(base, 10, at('2026-07-15')).status, 'waiting', '到货 5 天 → 等待');
+assert.equal(inv.reviewDueInfo(base, 10, at('2026-07-15')).daysLeft, 5, '还差 5 天到期');
+assert.equal(inv.reviewDueInfo(base, 10, at('2026-07-21')).status, 'due', '到货 11 天 → 该评论');
+assert.equal(inv.reviewDueInfo({ ...base, reviewExempt: true }, 10, at('2026-07-21')).status, 'exempt', '免评永不催');
+assert.equal(inv.reviewDueInfo({ ...base, reviewDone: true }, 10, at('2026-07-21')).status, 'done', '已评不催');
+assert.equal(inv.reviewDueInfo({ ...base, arrivedAt: null }, 10, at('2026-07-21')).status, 'not_arrived', '无到货日不催');
+
+// ── 排序:免评置顶,再按到货日期升序 ──
+nodes.length = 0; seq = 0;
+inv.addInventoryItem({ name: '晚到', isAmazon: true, arrivedAt: '2026-07-20' });
+inv.addInventoryItem({ name: '免评件', isAmazon: true, arrivedAt: '2026-07-25', reviewExempt: true });
+inv.addInventoryItem({ name: '早到', isAmazon: true, arrivedAt: '2026-07-10' });
+inv.addInventoryItem({ name: '非亚马逊', price: 5 });
+const flip = inv.sortAmazonFlip(inv.listInventoryItems());
+assert.deepEqual(flip.map((i) => i.name), ['免评件', '早到', '晚到'], '免评置顶,其余按到货升序,非亚马逊排除');
+
+// ── 汇总 amazonSummary ──
+nodes.length = 0; seq = 0;
+inv.addInventoryItem({ name: 'S1', isAmazon: true, buyPrice: 100, rebate: 100, resalePrice: 60, sold: true });
+inv.addInventoryItem({ name: 'S2', isAmazon: true, buyPrice: 40, rebate: 0 });
+const sum = inv.amazonSummary(inv.listInventoryItems());
+assert.equal(sum.count, 2, '2 件亚马逊');
+assert.equal(sum.sold, 1); assert.equal(sum.inStock, 1);
+assert.equal(sum.outOfPocketTotal, 40, '总自付 = 0(S1 返满) + 40(S2)');
+assert.equal(sum.rebateTotal, 100);
+assert.equal(sum.realizedProfit, 60, '已售利润 = 转卖 60 − 自付 0');
+
+// 清空数字字段回路
+nodes.length = 0; seq = 0;
+const amz2 = inv.addInventoryItem({ name: 'X', isAmazon: true, buyPrice: 50 });
+inv.updateInventoryItem(amz2.id, { isAmazon: false });
+assert.equal(inv.listInventoryItems().find((i) => i.id === amz2.id).isAmazon, false, '取消亚马逊标签');
+inv.updateInventoryItem(amz2.id, { buyPrice: null, tax: null, rebate: null, resalePrice: null });
+const aiX = inv.listInventoryItems().find((i) => i.id === amz2.id);
+assert.equal(aiX.outOfPocket, null, '无买入价 → 自付额 null');
+assert.equal(aiX.profit, null, '无自付额 → 盈利 null');
 
 // ── 统计口径 ──
 nodes.length = 0; seq = 0;
