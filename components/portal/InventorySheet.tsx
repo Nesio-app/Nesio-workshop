@@ -602,14 +602,23 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
           return (
             <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
               {/* 汇总:总自付 / 返现 / 已售利润 / 在库·已售 / 待评 */}
-              <div style={{ borderRadius: 14, padding: '0.9rem', background: 'var(--glass-bg, rgba(255,255,255,0.05))', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.1rem' }}>
-                <span><b>{sum.count}</b> <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>{L(dict, '件', 'items')}</span></span>
-                <span><b>{fmt(sum.outOfPocketTotal)}</b> <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>{L(dict, '自付', 'out of pocket')}</span></span>
-                <span><b>{fmt(sum.rebateTotal)}</b> <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>{L(dict, '返现', 'rebate')}</span></span>
-                <span style={{ color: sum.realizedProfit >= 0 ? 'var(--status-go)' : 'var(--status-risk)' }}><b>{fmt(sum.realizedProfit)}</b> <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>{L(dict, '已售利润', 'realized')}</span></span>
-                <span><b>{sum.inStock}</b>/<b>{sum.sold}</b> <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>{L(dict, '在库/已售', 'in stock/sold')}</span></span>
-                {sum.reviewDue > 0 && <span style={{ color: 'var(--status-gentle)' }}><b>{sum.reviewDue}</b> <span style={{ fontSize: '0.72rem' }}>{L(dict, '该评论', 'to review')}</span></span>}
-              </div>
+              {(() => {
+                const lbl = (v: string, k: string, color?: string) => (
+                  <span style={{ display: 'flex', flexDirection: 'column', minWidth: 64 }}>
+                    <b style={{ fontSize: '1.05rem', color }}>{v}</b>
+                    <span style={{ color: 'var(--text-tertiary)', fontSize: '0.68rem' }}>{k}</span>
+                  </span>
+                );
+                return (
+                  <div style={{ borderRadius: 14, padding: '0.9rem 1rem', background: 'var(--glass-bg, rgba(255,255,255,0.05))', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', display: 'flex', flexWrap: 'wrap', gap: '0.7rem 1.2rem' }}>
+                    {lbl(fmt(sum.grossSpent), L(dict, '花销(含税)', 'Spent'))}
+                    {lbl(fmt(sum.rebateTotal), L(dict, '返钱', 'Rebate'))}
+                    {lbl(fmt(sum.realizedProfit), L(dict, '收益(已售)', 'Profit'), sum.realizedProfit >= 0 ? 'var(--status-go)' : 'var(--status-risk)')}
+                    {lbl(`${sum.inStock}/${sum.sold}`, L(dict, '在库/已售', 'stock/sold'))}
+                    {sum.reviewDue > 0 && lbl(String(sum.reviewDue), L(dict, '该评论', 'to review'), 'var(--status-gentle)')}
+                  </div>
+                );
+              })()}
               <p style={{ margin: '0.6rem 2px 0.4rem', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
                 {L(dict, '免评置顶 · 其余按到货日排 · 到货约 10 天提醒留评', 'No-review on top · rest by arrival · review reminder ~10d after arrival')}
               </p>
@@ -642,19 +651,22 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
             label={label}
             onChanged={refresh}
             onDeleted={() => { refresh(); setView('list'); setDetailId(null); }}
+            onSaved={() => { refresh(); setView('list'); setDetailId(null); }}
           />
         )}
     </NesioSheet>
   );
 }
 
-function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
+function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
   item: InventoryItem;
   dict: ReturnType<typeof portalLocaleToDictionaryLocale>;
   label: React.CSSProperties;
   onChanged: () => void;
   onDeleted: () => void;
+  onSaved: () => void;
 }) {
+  const [saveMsg, setSaveMsg] = useState<'idle' | 'ok' | 'err'>('idle');
   const [location, setLocation] = useState(item.location);
   const [qty, setQty] = useState(item.quantity != null ? String(item.quantity) : '');
   const [expiry, setExpiry] = useState(item.expiry ?? '');
@@ -699,21 +711,34 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
   );
 
   const save = () => {
-    updateInventoryItem(item.id, {
-      location,
-      quantity: qty ? parseInt(qty, 10) : null as unknown as number | undefined,
-      expiry,
-      note,
-      category,
-      tags: tags.split(/[,,、]/).map((t) => t.trim()).filter(Boolean),
-      price: price ? parseFloat(price) : null as unknown as number | undefined,
-      isAmazon: amzOpen,
-      orderNo, seller, keywords,
-      buyPrice: nOrNull(buyPrice), tax: nOrNull(tax), orderedAt, arrivedAt,
-      rebate: nOrNull(rebate), resalePrice: nOrNull(resalePrice),
-      rebateReceived, reviewDone, reviewExempt, sold,
-    });
-    onChanged();
+    // 设计红线:保存必须有可见成败态(此前点保存无任何反应 = 用户实测「保存不管用」)。
+    let ok = false;
+    try {
+      ok = updateInventoryItem(item.id, {
+        location,
+        quantity: qty ? parseInt(qty, 10) : null as unknown as number | undefined,
+        expiry,
+        note,
+        category,
+        tags: tags.split(/[,,、]/).map((t) => t.trim()).filter(Boolean),
+        price: price ? parseFloat(price) : null as unknown as number | undefined,
+        isAmazon: amzOpen,
+        orderNo, seller, keywords,
+        buyPrice: nOrNull(buyPrice), tax: nOrNull(tax), orderedAt, arrivedAt,
+        rebate: nOrNull(rebate), resalePrice: nOrNull(resalePrice),
+        rebateReceived, reviewDone, reviewExempt, sold,
+      });
+    } catch {
+      ok = false;
+    }
+    if (ok) {
+      onChanged();
+      setSaveMsg('ok');
+      // 让「✓ 已保存」闪一下,再回列表(能看到更新后的物品,是最直接的成功反馈)。
+      setTimeout(() => onSaved(), 550);
+    } else {
+      setSaveMsg('err');
+    }
   };
 
   return (
@@ -836,9 +861,16 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
           ? L(dict, `已是容器,装了 ${item.containedCount} 件 · 点击解除(不影响里面的物品)`, `It's a bin holding ${item.containedCount} · tap to unmark (contents stay)`)
           : L(dict, '变成容器(其他物品的位置就能写它)', 'Make it a bin (other items can live in it)')}
       </button>
-      <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', marginTop: '0.6rem' }} onClick={save}>
-        {L(dict, '保存', 'Save')}
+      <button type="button" className="nesio-freeze-primary-btn"
+        style={{ width: '100%', marginTop: '0.6rem', background: saveMsg === 'ok' ? 'var(--status-go)' : undefined }}
+        onClick={save}>
+        {saveMsg === 'ok' ? L(dict, '✓ 已保存', '✓ Saved') : L(dict, '保存', 'Save')}
       </button>
+      {saveMsg === 'err' && (
+        <p role="alert" style={{ margin: '0.4rem 2px 0', fontSize: '0.78rem', color: 'var(--status-risk)', textAlign: 'center' }}>
+          {L(dict, '没存进去 —— 本机空间可能满了。先在设置里导出备份,或删几条旧记忆再试。', "Couldn't save — local storage may be full. Export a backup in Settings or free some space, then retry.")}
+        </p>
+      )}
       <button
         type="button"
         style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: 'transparent', color: 'var(--status-stop, #ef4444)', fontSize: '0.85rem' }}
