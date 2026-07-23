@@ -22,12 +22,15 @@ import { importInventoryCsv } from '@/lib/portal/inventory-import';
 import { useRef } from 'react';
 import {
   addInventoryItem,
+  amazonSummary,
   buildListingText,
   expiryStatus,
   inventoryStats,
   listInventoryItems,
   removeInventoryItem,
+  reviewDueInfo,
   sellPile,
+  sortAmazonFlip,
   updateInventoryItem,
   type InventoryItem,
 } from '@/lib/portal/inventory';
@@ -67,7 +70,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   const [groupFilter, setGroupFilter] = useState<string>(ALL);
   const [query, setQuery] = useState('');
-  const [view, setView] = useState<'list' | 'add' | 'detail' | 'stats' | 'sell'>('list');
+  const [view, setView] = useState<'list' | 'add' | 'detail' | 'stats' | 'sell' | 'flip'>('list');
   const [detailId, setDetailId] = useState<string | null>(null);
   const [importMsg, setImportMsg] = useState(''); // 物品②:导入结果可见展示(不静默)
   const fileRef = useRef<HTMLInputElement>(null);
@@ -277,6 +280,11 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               <button type="button" style={chip(false)} onClick={() => setView('sell')}>
                 {L(dict, '卖闲置', 'Sell pile')}
               </button>
+              {items.some((i) => i.isAmazon) && (
+                <button type="button" style={chip(false)} onClick={() => setView('flip')}>
+                  {L(dict, '亚马逊转卖', 'Amazon flip')}
+                </button>
+              )}
             </div>
 
             {visible.length === 0 ? (
@@ -575,6 +583,58 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
           );
         })()}
 
+        {view === 'flip' && (() => {
+          const flip = sortAmazonFlip(items);
+          const sum = amazonSummary(items);
+          const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+          const badge = (i: InventoryItem) => {
+            const d = reviewDueInfo(i);
+            const map: Record<string, [string, string, string]> = {
+              exempt: [L(dict, '免评', 'No review'), 'var(--status-calm)', 'var(--status-calm-soft)'],
+              done: [L(dict, '已评', 'Reviewed'), 'var(--status-go)', 'var(--status-go-soft)'],
+              due: [L(dict, '该评论了', 'Review now'), 'var(--status-gentle)', 'var(--status-gentle-soft)'],
+              waiting: [L(dict, `${d.daysLeft} 天后可评`, `Review in ${d.daysLeft}d`), 'var(--portal-muted)', 'transparent'],
+              not_arrived: [L(dict, '未到货', 'Not arrived'), 'var(--portal-muted)', 'transparent'],
+            };
+            const [text, color, bg] = map[d.status];
+            return <span style={{ fontSize: '0.7rem', fontWeight: 600, color, background: bg, padding: '0.15rem 0.5rem', borderRadius: 'var(--radius-pill, 999px)', whiteSpace: 'nowrap' }}>{text}</span>;
+          };
+          return (
+            <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
+              {/* 汇总:总自付 / 返现 / 已售利润 / 在库·已售 / 待评 */}
+              <div style={{ borderRadius: 14, padding: '0.9rem', background: 'var(--glass-bg, rgba(255,255,255,0.05))', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1.1rem' }}>
+                <span><b>{sum.count}</b> <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>{L(dict, '件', 'items')}</span></span>
+                <span><b>{fmt(sum.outOfPocketTotal)}</b> <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>{L(dict, '自付', 'out of pocket')}</span></span>
+                <span><b>{fmt(sum.rebateTotal)}</b> <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>{L(dict, '返现', 'rebate')}</span></span>
+                <span style={{ color: sum.realizedProfit >= 0 ? 'var(--status-go)' : 'var(--status-risk)' }}><b>{fmt(sum.realizedProfit)}</b> <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>{L(dict, '已售利润', 'realized')}</span></span>
+                <span><b>{sum.inStock}</b>/<b>{sum.sold}</b> <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>{L(dict, '在库/已售', 'in stock/sold')}</span></span>
+                {sum.reviewDue > 0 && <span style={{ color: 'var(--status-gentle)' }}><b>{sum.reviewDue}</b> <span style={{ fontSize: '0.72rem' }}>{L(dict, '该评论', 'to review')}</span></span>}
+              </div>
+              <p style={{ margin: '0.6rem 2px 0.4rem', fontSize: '0.7rem', color: 'var(--text-tertiary)' }}>
+                {L(dict, '免评置顶 · 其余按到货日排 · 到货约 10 天提醒留评', 'No-review on top · rest by arrival · review reminder ~10d after arrival')}
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 4 }}>
+                {flip.map((i) => (
+                  <button key={i.id} type="button" onClick={() => { setDetailId(i.id); setView('detail'); }}
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: '0.6rem 0.7rem', borderRadius: 12, border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)' }}>
+                    <span style={{ flex: 1, minWidth: 0 }}>
+                      <span style={{ display: 'block', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.name}</span>
+                      <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                        {i.arrivedAt ? L(dict, `到货 ${i.arrivedAt}`, `Arrived ${i.arrivedAt}`) : i.orderedAt ? L(dict, `下单 ${i.orderedAt}`, `Ordered ${i.orderedAt}`) : L(dict, '无日期', 'no date')}
+                        {i.sold && i.profit != null ? ` · ${L(dict, '盈利', 'profit')} ${fmt(i.profit)}` : ''}
+                      </span>
+                    </span>
+                    <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{i.outOfPocket != null ? fmt(i.outOfPocket) : (i.buyPrice != null ? fmt(i.buyPrice) : '—')}</span>
+                      {badge(i)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })()}
+
         {view === 'detail' && detail && (
           <ItemDetail
             item={detail}
@@ -609,6 +669,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
   const [keywords, setKeywords] = useState(item.keywords);
   const [buyPrice, setBuyPrice] = useState(item.buyPrice != null ? String(item.buyPrice) : '');
   const [tax, setTax] = useState(item.tax != null ? String(item.tax) : '');
+  const [orderedAt, setOrderedAt] = useState(item.orderedAt ?? '');
   const [arrivedAt, setArrivedAt] = useState(item.arrivedAt ?? '');
   const [rebate, setRebate] = useState(item.rebate != null ? String(item.rebate) : '');
   const [resalePrice, setResalePrice] = useState(item.resalePrice != null ? String(item.resalePrice) : '');
@@ -621,8 +682,9 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
   const nOrNull = (s: string) => (s ? parseFloat(s) : (null as unknown as number | undefined));
   // 自付额 = 买入价 + 税 − 返现;盈利 = 转卖价 − 自付额(实时,与 inventory.ts 派生一致)。
   const bpNum = parseFloat(buyPrice);
+  // 自付额 = 买入价 − 返现(税不进成本,与 inventory.ts 一致)。
   const oop = Number.isFinite(bpNum)
-    ? Math.round((bpNum + (parseFloat(tax) || 0) - (parseFloat(rebate) || 0)) * 100) / 100
+    ? Math.round((bpNum - (parseFloat(rebate) || 0)) * 100) / 100
     : null;
   const rspNum = parseFloat(resalePrice);
   const profit = Number.isFinite(rspNum) && oop != null ? Math.round((rspNum - oop) * 100) / 100 : null;
@@ -647,7 +709,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
       price: price ? parseFloat(price) : null as unknown as number | undefined,
       isAmazon: amzOpen,
       orderNo, seller, keywords,
-      buyPrice: nOrNull(buyPrice), tax: nOrNull(tax), arrivedAt,
+      buyPrice: nOrNull(buyPrice), tax: nOrNull(tax), orderedAt, arrivedAt,
       rebate: nOrNull(rebate), resalePrice: nOrNull(resalePrice),
       rebateReceived, reviewDone, reviewExempt, sold,
     });
@@ -705,10 +767,12 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
         <div style={{ marginTop: 8 }}>
           <label style={label}>{L(dict, '订单号', 'Order #')}</label>
           <input className="nesio-ob-input" value={orderNo} onChange={(e) => setOrderNo(e.target.value)} placeholder="112-…" />
+          <label style={label}>{L(dict, '商家', 'Seller')}</label>
+          <input className="nesio-ob-input" value={seller} onChange={(e) => setSeller(e.target.value)} placeholder="Makun" />
           <div style={{ display: 'flex', gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <label style={label}>{L(dict, '商家', 'Seller')}</label>
-              <input className="nesio-ob-input" value={seller} onChange={(e) => setSeller(e.target.value)} />
+              <label style={label}>{L(dict, '下单日', 'Ordered')}</label>
+              <input className="nesio-ob-input" type="date" value={orderedAt} onChange={(e) => setOrderedAt(e.target.value)} />
             </div>
             <div style={{ flex: 1 }}>
               <label style={label}>{L(dict, '到货日', 'Arrived')}</label>
@@ -750,7 +814,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted }: {
             </span>
           </div>
           <p style={{ margin: '6px 2px 0', fontSize: '0.68rem', color: 'var(--portal-muted)' }}>
-            {L(dict, '自付额 = 买入价 + 税 − 返现;盈利 = 转卖价 − 自付额。保存后打「亚马逊」标签。', 'Out of pocket = buy + tax − rebate; profit = resale − out of pocket. Saving tags it 亚马逊.')}
+            {L(dict, '自付额 = 买入价 − 返现(税不进成本);盈利 = 转卖价 − 自付额。保存后打「亚马逊」标签。', 'Out of pocket = buy − rebate (tax excluded); profit = resale − out of pocket. Saving tags it 亚马逊.')}
           </p>
         </div>
       )}

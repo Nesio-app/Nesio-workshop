@@ -67,7 +67,8 @@ export interface InventoryItem {
   seller: string;            // 商家(Sold by …)
   keywords: string;          // 搜索关键词
   buyPrice: number | null;   // 买入价(美金价格)
-  tax: number | null;        // 税
+  tax: number | null;        // 税(只记录,不进成本)
+  orderedAt: string | null;  // 下单日 'YYYY-MM-DD'
   arrivedAt: string | null;  // 到货日 'YYYY-MM-DD'
   rebate: number | null;     // 卖方返现金额
   rebateReceived: boolean;   // 返现是否到账(Notion PayStatus)
@@ -75,7 +76,7 @@ export interface InventoryItem {
   reviewExempt: boolean;     // 免评
   resalePrice: number | null;// 转卖价
   sold: boolean;             // 已售出(否=在库)
-  outOfPocket: number | null;// 自付额 = 买入价 + 税 − 返现(派生,不落库)
+  outOfPocket: number | null;// 自付额 = 买入价 − 返现(税不进成本,派生,不落库)
   profit: number | null;     // 盈利 = 转卖价 − 自付额(派生,不落库)
 }
 
@@ -118,28 +119,77 @@ export function toInventoryItem(node: LifeNode): InventoryItem {
 /** 亚马逊转卖字段的读取 + 派生(自付额/盈利)。全部标量,派生值不落库。 */
 function amazonFields(node: LifeNode, a: LifeNode['attributes']): {
   isAmazon: boolean; orderNo: string; seller: string; keywords: string;
-  buyPrice: number | null; tax: number | null; arrivedAt: string | null; rebate: number | null;
+  buyPrice: number | null; tax: number | null; orderedAt: string | null; arrivedAt: string | null; rebate: number | null;
   rebateReceived: boolean; reviewDone: boolean; reviewExempt: boolean;
   resalePrice: number | null; sold: boolean; outOfPocket: number | null; profit: number | null;
 } {
   const buyPrice = num(a.buyPrice);
-  const tax = num(a.tax);
   const rebate = num(a.rebate);
   const resalePrice = num(a.resalePrice);
-  // 自付额 = 买入价 + 税 − 返现(税算进成本;想改不含税删掉 + (tax||0) 即可)。
-  const outOfPocket = buyPrice != null ? Math.round((buyPrice + (tax || 0) - (rebate || 0)) * 100) / 100 : null;
+  // 自付额 = 买入价 − 返现(税只记录不进成本;要含税改成 + (num(a.tax)||0))。
+  const outOfPocket = buyPrice != null ? Math.round((buyPrice - (rebate || 0)) * 100) / 100 : null;
   const profit = resalePrice != null && outOfPocket != null ? Math.round((resalePrice - outOfPocket) * 100) / 100 : null;
   return {
     isAmazon: (node.tags || []).includes('亚马逊'),
     orderNo: str(a.orderNo),
     seller: str(a.seller),
     keywords: str(a.keywords),
-    buyPrice, tax, arrivedAt: str(a.arrivedAt).slice(0, 10) || null, rebate,
+    buyPrice, tax: num(a.tax),
+    orderedAt: str(a.orderedAt).slice(0, 10) || null,
+    arrivedAt: str(a.arrivedAt).slice(0, 10) || null, rebate,
     rebateReceived: a.rebateReceived === true,
     reviewDone: a.reviewDone === true,
     reviewExempt: a.reviewExempt === true,
     resalePrice, sold: a.sold === true, outOfPocket, profit,
   };
+}
+
+/** 留评到期状态:到货约 N 天(默认 10)后该留评。免评/已评/未到货各有终态。 */
+export type ReviewDueStatus = 'exempt' | 'done' | 'not_arrived' | 'waiting' | 'due';
+export function reviewDueInfo(
+  item: Pick<InventoryItem, 'reviewExempt' | 'reviewDone' | 'arrivedAt'>,
+  windowDays = 10,
+  nowMs: number = Date.now(),
+): { status: ReviewDueStatus; daysLeft: number | null; dueDate: string | null } {
+  if (item.reviewExempt) return { status: 'exempt', daysLeft: null, dueDate: null };
+  if (item.reviewDone) return { status: 'done', daysLeft: null, dueDate: null };
+  if (!item.arrivedAt) return { status: 'not_arrived', daysLeft: null, dueDate: null };
+  const arrived = new Date(`${item.arrivedAt}T00:00:00`).getTime();
+  if (!Number.isFinite(arrived)) return { status: 'not_arrived', daysLeft: null, dueDate: null };
+  const dueMs = arrived + windowDays * 86_400_000;
+  const daysLeft = Math.ceil((dueMs - nowMs) / 86_400_000);
+  const dueDate = new Date(dueMs).toISOString().slice(0, 10);
+  return { status: daysLeft <= 0 ? 'due' : 'waiting', daysLeft, dueDate };
+}
+
+/** 亚马逊转卖汇总:件数、总自付、总返现、已实现利润(已售)、在库/已售计数。 */
+export function amazonSummary(items: InventoryItem[]): {
+  count: number; outOfPocketTotal: number; rebateTotal: number;
+  realizedProfit: number; inStock: number; sold: number; reviewDue: number;
+} {
+  const amz = items.filter((i) => i.isAmazon);
+  let outOfPocketTotal = 0, rebateTotal = 0, realizedProfit = 0, inStock = 0, sold = 0, reviewDue = 0;
+  for (const i of amz) {
+    outOfPocketTotal += i.outOfPocket || 0;
+    rebateTotal += i.rebate || 0;
+    if (i.sold) { sold += 1; realizedProfit += i.profit || 0; } else inStock += 1;
+    if (reviewDueInfo(i).status === 'due') reviewDue += 1;
+  }
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  return { count: amz.length, outOfPocketTotal: r2(outOfPocketTotal), rebateTotal: r2(rebateTotal), realizedProfit: r2(realizedProfit), inStock, sold, reviewDue };
+}
+
+/** 亚马逊转卖列表排序:免评置顶(用户要求),再按到货日期升序(空到货垫底),同日按新→旧。 */
+export function sortAmazonFlip(items: InventoryItem[]): InventoryItem[] {
+  return items
+    .filter((i) => i.isAmazon)
+    .sort((a, b) => {
+      if (a.reviewExempt !== b.reviewExempt) return a.reviewExempt ? -1 : 1;
+      const ax = a.arrivedAt || '9999-12-31';
+      const bx = b.arrivedAt || '9999-12-31';
+      if (ax !== bx) return ax < bx ? -1 : 1;
+      return new Date(b.node.createdAt).getTime() - new Date(a.node.createdAt).getTime();
+    });
 }
 
 /** 全部物品(object 节点),新→旧。容器物品的 containedCount 在此跨物品计算。 */
@@ -181,7 +231,8 @@ export interface NewInventoryItem {
   keywords?: string;
   buyPrice?: number;
   tax?: number;
-  arrivedAt?: string;      // 'YYYY-MM-DD'
+  orderedAt?: string;      // 'YYYY-MM-DD' 下单日
+  arrivedAt?: string;      // 'YYYY-MM-DD' 到货日
   rebate?: number;
   rebateReceived?: boolean;
   reviewDone?: boolean;
@@ -205,6 +256,7 @@ export function addInventoryItem(input: NewInventoryItem): LifeNode {
   if (input.keywords?.trim()) attributes.keywords = input.keywords.trim();
   if (input.buyPrice != null && Number.isFinite(input.buyPrice)) attributes.buyPrice = input.buyPrice;
   if (input.tax != null && Number.isFinite(input.tax)) attributes.tax = input.tax;
+  if (input.orderedAt?.trim()) attributes.orderedAt = input.orderedAt.trim();
   if (input.arrivedAt?.trim()) attributes.arrivedAt = input.arrivedAt.trim();
   if (input.rebate != null && Number.isFinite(input.rebate)) attributes.rebate = input.rebate;
   if (input.rebateReceived) attributes.rebateReceived = true;
@@ -287,6 +339,7 @@ export function updateInventoryItem(
   setStr('keywords', patch.keywords);
   setNum('buyPrice', patch.buyPrice);
   setNum('tax', patch.tax);
+  setStr('orderedAt', patch.orderedAt);
   setStr('arrivedAt', patch.arrivedAt);
   setNum('rebate', patch.rebate);
   setBool('rebateReceived', patch.rebateReceived);
