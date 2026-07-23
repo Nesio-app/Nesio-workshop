@@ -1,0 +1,5 @@
+# 动作定格帧目录。第三方版权媒体(licensed,如 Gym visual)默认忽略——
+# 往 GitHub 推 = 再分发,可能侵权。自有/公共领域动图用 `!<id>/` 显式放行。
+*/
+!.gitignore
+!lying-leg-raise/
