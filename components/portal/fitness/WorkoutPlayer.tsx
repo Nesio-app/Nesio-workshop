@@ -9,6 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { exerciseById, exerciseAnimFrames, MUSCLE_LABEL } from '@/lib/portal/exercise-library';
+import { catalogExerciseByIdSync } from '@/lib/portal/exercise-catalog';
 import ExerciseFigure from './ExerciseFigure';
 import { skillById } from '@/lib/life-domain/assets/skill-inventory';
 import { logSession } from '@/lib/platform/training-protocol-engine';
@@ -38,6 +39,8 @@ function resolve(id: string, dict: string): { name: string; muscles?: Array<{ n:
     const animFrames = exerciseAnimFrames(ex);
     return { name: ex.name, muscles: ex.muscles, cues: ex.cues, neural: ex.neural, animFrames, animFps: ex.anim?.fps, animPingpong: ex.anim?.pingpong };
   }
+  const cat = catalogExerciseByIdSync(id);
+  if (cat) return { name: cat.name, muscles: cat.target ? [{ n: cat.target, t: 'p' }] : undefined, cues: cat.cues };
   const sk = skillById(id);
   if (sk) return { name: dict === 'en' ? sk.name.en : sk.name.zh };
   return { name: id };

@@ -13336,6 +13336,13 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
   border: 1px solid var(--portal-accent-border); background: transparent; color: var(--portal-accent); cursor: pointer; }
 .nesio-wp-figure { margin-top: 0.25rem; }
 @media (prefers-reduced-motion: reduce) { .nesio-exfig-loading { animation: none; } }
+
+/* 扩展动作库搜索框 */
+.nesio-xlib-search { width: 100%; padding: 0.55rem 0.9rem; margin: 0.2rem 0 0.4rem;
+  border-radius: var(--radius-sm, 12px); border: 1px solid var(--portal-line);
+  background: var(--portal-bg); color: var(--portal-ink); font-size: 0.9rem; }
+.nesio-xlib-search::placeholder { color: var(--portal-muted); }
+.nesio-xlib-search:focus { outline: none; border-color: var(--portal-accent-border); }
 .nesio-wp-muscles { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .nesio-wp-muscle { font-size: 0.72rem; padding: 0.12rem 0.5rem; border-radius: 0.4rem; background: var(--portal-line); color: var(--portal-muted); }
 .nesio-wp-muscle.is-p { background: var(--portal-accent-soft); color: var(--portal-blue-deep); font-weight: 600; }
