@@ -23,12 +23,6 @@ export interface Exercise {
   neural: string[];
   warnings: string[];
   mods: string[];
-  /**
-   * 定格动图(可选)。帧文件约定放在 `public/exercise-anim/<id>/f00.webp…`,
-   * 由 `scripts/video-to-anim.mjs` 从动作视频抽帧生成。缺省则不显示动图,
-   * UI 优雅降级为纯文字卡。
-   */
-  anim?: { frames: number; fps?: number; pingpong?: boolean };
 }
 
 export const MUSCLE_LABEL: Record<MuscleTag, [string, string]> = {
@@ -132,29 +126,10 @@ export const EXERCISES: readonly Exercise[] = [
     neural: ['这个动作在用全身幅度跟神经系统打招呼'],
     warnings: ['腰部圆背：膝盖弯曲更多', '头晕：减慢过渡速度'],
     mods: ['只做触脚趾', '只做深蹲'] },
-  { id: 'lying-leg-raise', name: 'Lying Leg Raise', muscles: [{ n: '下腹', t: 'p' }, { n: '髂腰肌', t: 's' }], tags: ['core'], move: ['core_s'], equip: ['bodyweight'], diff: 'easy',
-    cues: ['仰卧，双手放身侧或臀下托稳腰', '双腿并拢伸直，缓慢抬到与地面垂直', '控制离心：慢慢放回，脚跟不落地', '全程腰部贴地，别用惯性甩腿'],
-    neural: ['想象用下腹把腿"卷"起来——不是用大腿把腿举起来'],
-    warnings: ['腰部拱起离地：屈膝减小幅度，或缩小下放范围', '甩腿借力说明太重了——放慢速度'],
-    mods: ['屈膝版：膝盖弯曲降低难度', '下放只到 45°：缩小活动范围'],
-    anim: { frames: 12, fps: 8, pingpong: true } },
 ];
 
 export function exerciseById(id: string): Exercise | undefined {
   return EXERCISES.find((e) => e.id === id);
-}
-
-/** 动图帧目录约定:public/exercise-anim/<id>/ 。 */
-export function exerciseAnimDir(id: string): string {
-  return `/exercise-anim/${id}`;
-}
-
-/** 返回某动作的定格帧 src 数组(按 f00…fNN 顺序);无动图返回空数组。 */
-export function exerciseAnimFrames(ex: Pick<Exercise, 'id' | 'anim'>): string[] {
-  const n = ex.anim?.frames ?? 0;
-  if (n <= 0) return [];
-  const dir = exerciseAnimDir(ex.id);
-  return Array.from({ length: n }, (_, i) => `${dir}/f${String(i).padStart(2, '0')}.webp`);
 }
 
 export function filterExercises(f: { muscle?: MuscleTag | 'all'; equip?: Equip | 'all'; move?: MoveTag | 'all' }): Exercise[] {
