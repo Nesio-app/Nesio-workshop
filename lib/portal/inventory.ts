@@ -164,19 +164,20 @@ export function reviewDueInfo(
 
 /** 亚马逊转卖汇总:件数、总自付、总返现、已实现利润(已售)、在库/已售计数。 */
 export function amazonSummary(items: InventoryItem[]): {
-  count: number; outOfPocketTotal: number; rebateTotal: number;
+  count: number; grossSpent: number; outOfPocketTotal: number; rebateTotal: number;
   realizedProfit: number; inStock: number; sold: number; reviewDue: number;
 } {
   const amz = items.filter((i) => i.isAmazon);
-  let outOfPocketTotal = 0, rebateTotal = 0, realizedProfit = 0, inStock = 0, sold = 0, reviewDue = 0;
+  let grossSpent = 0, outOfPocketTotal = 0, rebateTotal = 0, realizedProfit = 0, inStock = 0, sold = 0, reviewDue = 0;
   for (const i of amz) {
-    outOfPocketTotal += i.outOfPocket || 0;
+    grossSpent += (i.buyPrice || 0) + (i.tax || 0); // 实际刷卡花销(含税)
+    outOfPocketTotal += i.outOfPocket || 0;          // 净自付(买入价 − 返现)
     rebateTotal += i.rebate || 0;
     if (i.sold) { sold += 1; realizedProfit += i.profit || 0; } else inStock += 1;
     if (reviewDueInfo(i).status === 'due') reviewDue += 1;
   }
   const r2 = (n: number) => Math.round(n * 100) / 100;
-  return { count: amz.length, outOfPocketTotal: r2(outOfPocketTotal), rebateTotal: r2(rebateTotal), realizedProfit: r2(realizedProfit), inStock, sold, reviewDue };
+  return { count: amz.length, grossSpent: r2(grossSpent), outOfPocketTotal: r2(outOfPocketTotal), rebateTotal: r2(rebateTotal), realizedProfit: r2(realizedProfit), inStock, sold, reviewDue };
 }
 
 /** 亚马逊转卖列表排序:免评置顶(用户要求),再按到货日期升序(空到货垫底),同日按新→旧。 */

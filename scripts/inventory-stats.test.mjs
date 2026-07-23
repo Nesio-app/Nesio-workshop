@@ -95,6 +95,7 @@ inv.addInventoryItem({ name: 'S2', isAmazon: true, buyPrice: 40, rebate: 0 });
 const sum = inv.amazonSummary(inv.listInventoryItems());
 assert.equal(sum.count, 2, '2 件亚马逊');
 assert.equal(sum.sold, 1); assert.equal(sum.inStock, 1);
+assert.equal(sum.grossSpent, 140, '总花销(含税) = 100(S1) + 40(S2)');
 assert.equal(sum.outOfPocketTotal, 40, '总自付 = 0(S1 返满) + 40(S2)');
 assert.equal(sum.rebateTotal, 100);
 assert.equal(sum.realizedProfit, 60, '已售利润 = 转卖 60 − 自付 0');
