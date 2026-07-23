@@ -11,6 +11,7 @@ import { matchNearestPlace, formatLocation, getNamedPlaces } from '@/lib/portal/
 import LocationPicker from './LocationPicker';
 import { IconCamera, IconImage, NodeTypeIcon } from './icons';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
+import { consolidateAmazonOrder } from '@/lib/portal/amazon-order';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -90,6 +91,11 @@ function cropPrompt(en: boolean): string {
     : '用户已圈选了图片中的特定区域（圈外已遮黑）。请只识别圈内最主要的1-2个物品，生成对应 Memory 节点。不要识别背景、黑色遮罩区域或其他无关物体。';
 }
 
+function orderPrompt(en: boolean): string {
+  return en
+    ? 'This is an online shopping ORDER / receipt screenshot (e.g. Amazon). Produce EXACTLY ONE object node for the purchased product (use the product title as the node name). Put ONLY into that node\'s attributes: orderNo (the order number string), buyPrice (item subtotal / pre-tax total as a number), tax (tax amount as a number), seller (the "Sold by" merchant), orderedAt (order placed date YYYY-MM-DD), arrivedAt (delivery/arrival date YYYY-MM-DD if shown). Do NOT create separate nodes for totals, tax, order number or store; do NOT create place or person nodes.'
+    : '这是一张网购订单/收据截图(如亚马逊)。请只生成 1 个 object 节点代表所购商品(节点名用商品标题)。只把这些放进该节点的 attributes:orderNo(订单号字符串)、buyPrice(税前小计/商品总价,数字)、tax(税费,数字)、seller(Sold by 商家)、orderedAt(下单日期 YYYY-MM-DD)、arrivedAt(到货/送达日期 YYYY-MM-DD,若有)。不要为总计、税费、订单号、店铺单独生成节点;不要生成地点或人物节点。';
+}
 async function analyzeImage(base64: string, prompt?: string, dict: string = 'zh'): Promise<AnalysisResult> {
   // 成本护栏:免费层不打云视觉 —— 照片照样保存(待确认线索,可手动加名/标签),
   // AI 深识别归 Pro。分层未启用(当前 PWA)恒放行,不变。
@@ -626,6 +632,48 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
         return;
       }
       setError(L(dict, '识别失败。你可以先保存为待确认图片线索。', 'Recognition failed. You can save it as an unconfirmed image clue for now.'));
+      setResult(buildPendingImageResult(dict));
+      setPhase('result');
+    }
+  }
+
+  // 「订单」模式:亚马逊订单截图 → 合并成一条物品(订单号/买入价/税/商家/日期入 attributes,
+  // 打「亚马逊」标签)。合并逻辑在 lib/portal/amazon-order.ts(有单测),这里只做相机侧编排。
+  async function analyzeOrder() {
+    if (!capturedBase64) return;
+    if (!canUsePaidCloudAi()) {
+      window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'photo_ai' } }));
+      return;
+    }
+    setSelecting(false);
+    setPhase('analyzing');
+    setError('');
+    try {
+      const en = dict.toLowerCase().startsWith('en');
+      const res = await analyzeImage(capturedBase64, orderPrompt(en), dict);
+      const c = consolidateAmazonOrder(res.nodes, res.summary);
+      const node: EditedNode = {
+        name: c.name, type: 'object', attributes: c.attributes, tags: c.tags,
+        source: 'photo', confidence: 0.9, relations: [], note: '', expiry: '', price: '', deleted: false,
+      };
+      const parts: string[] = [c.name];
+      if (c.attributes.orderNo) parts.push(`#${c.attributes.orderNo}`);
+      if (c.attributes.buyPrice != null) parts.push(`$${c.attributes.buyPrice}`);
+      if (c.attributes.tax != null) parts.push(L(dict, `税 $${c.attributes.tax}`, `tax $${c.attributes.tax}`));
+      if (c.attributes.seller) parts.push(String(c.attributes.seller));
+      setResult({ ...res, summary: L(dict, `订单识别成一条:${parts.join(' · ')}。保存后到「物品管理」补返现/转卖价`, `Order → one item: ${parts.join(' · ')}. Add rebate/resale in Storage after saving.`) });
+      setEditedNodes([node]);
+      setIsReceipt(false);
+      setPhase('result');
+    } catch (err: unknown) {
+      if (err instanceof AnalyzeImageError && (err.code === 'ai_auth_required' || err.code === 'free_tier_local')) {
+        const pending = buildPendingImageResult(dict, err.code === 'free_tier_local' ? 'free_tier' : 'auth');
+        setResult(pending);
+        setEditedNodes(toEditedNodes(pending.nodes, pending.summary));
+        setPhase('result');
+        return;
+      }
+      setError(L(dict, '订单识别失败。可先存为图片线索,或换「AI 识别」。', 'Order recognition failed. Save as an image clue, or try "Scan".'));
       setResult(buildPendingImageResult(dict));
       setPhase('result');
     }
@@ -1190,6 +1238,11 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
             {capturedPreview && (
               <button type="button" className="nesio-camera-select-btn" onClick={openSelection}>
                 {L(dict, '圈选', 'Circle')}
+              </button>
+            )}
+            {capturedPreview && (
+              <button type="button" className="nesio-camera-select-btn" onClick={analyzeOrder}>
+                {L(dict, '订单', 'Order')}
               </button>
             )}
             {/* 批次 84(对标 Lens「点搜索」):识别结果直接搜本地记忆库 ——
