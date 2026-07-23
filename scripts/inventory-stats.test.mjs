@@ -44,6 +44,34 @@ assert.equal(item.category, '', '清空分类');
 assert.deepEqual([...item.tags], ['gift'], '标签整体替换');
 assert.equal(item.price, null, '清空估值');
 
+// ── 亚马逊转卖(flip):字段回路 + 自付额/盈利派生 + 亚马逊标签 ──
+nodes.length = 0; seq = 0;
+const amz = inv.addInventoryItem({ name: 'ALPHA CAMP 20 Inch', isAmazon: true, orderNo: '112-4313914-7678611', seller: 'Makun', buyPrice: 118.99, tax: 8.63, keywords: 'aluminum carry on luggage' });
+let ai = inv.listInventoryItems().find((i) => i.id === amz.id);
+assert.equal(ai.isAmazon, true, '亚马逊标签投影');
+assert.ok(amz.tags.includes('亚马逊'), 'node.tags 带「亚马逊」');
+assert.equal(ai.orderNo, '112-4313914-7678611');
+assert.equal(ai.seller, 'Makun');
+assert.equal(ai.buyPrice, 118.99);
+assert.equal(ai.tax, 8.63);
+assert.equal(ai.keywords, 'aluminum carry on luggage');
+assert.equal(ai.outOfPocket, 127.62, '自付额 = 买入价 118.99 + 税 8.63 − 返现 0');
+assert.equal(ai.profit, null, '未填转卖价 → 盈利 null');
+inv.updateInventoryItem(amz.id, { rebate: 118.99, resalePrice: 90, reviewDone: true, rebateReceived: true, sold: true });
+ai = inv.listInventoryItems().find((i) => i.id === amz.id);
+assert.equal(ai.rebate, 118.99);
+assert.equal(ai.outOfPocket, 8.63, '返现后自付额 = 118.99 + 8.63 − 118.99');
+assert.equal(ai.profit, 81.37, '盈利 = 转卖价 90 − 自付额 8.63');
+assert.equal(ai.reviewDone, true);
+assert.equal(ai.rebateReceived, true);
+assert.equal(ai.sold, true);
+inv.updateInventoryItem(amz.id, { isAmazon: false });
+assert.equal(inv.listInventoryItems().find((i) => i.id === amz.id).isAmazon, false, '取消亚马逊标签');
+inv.updateInventoryItem(amz.id, { buyPrice: null, tax: null, rebate: null, resalePrice: null });
+ai = inv.listInventoryItems().find((i) => i.id === amz.id);
+assert.equal(ai.outOfPocket, null, '无买入价 → 自付额 null');
+assert.equal(ai.profit, null, '无自付额 → 盈利 null');
+
 // ── 统计口径 ──
 nodes.length = 0; seq = 0;
 inv.addInventoryItem({ name: 'A', location: '家 · 卧室 · 衣柜', category: '衣物', price: 20, quantity: 3, tags: ['冬装'] });
