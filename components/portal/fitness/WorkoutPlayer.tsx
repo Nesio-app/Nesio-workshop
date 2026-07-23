@@ -8,7 +8,9 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { exerciseById, MUSCLE_LABEL } from '@/lib/portal/exercise-library';
+import { exerciseById, exerciseAnimFrames, MUSCLE_LABEL } from '@/lib/portal/exercise-library';
+import { catalogExerciseByIdSync } from '@/lib/portal/exercise-catalog';
+import ExerciseFigure from './ExerciseFigure';
 import { skillById } from '@/lib/life-domain/assets/skill-inventory';
 import { logSession } from '@/lib/platform/training-protocol-engine';
 import { earnPoints, POINTS_PER_FITNESS_SESSION } from '@/lib/platform/rewards-engine';
@@ -31,9 +33,14 @@ export interface PlayerSession {
   sessionId?: string;
 }
 
-function resolve(id: string, dict: string): { name: string; muscles?: Array<{ n: string; t: 'p' | 's' }>; cues?: string[]; neural?: string[] } {
+function resolve(id: string, dict: string): { name: string; muscles?: Array<{ n: string; t: 'p' | 's' }>; cues?: string[]; neural?: string[]; animFrames?: string[]; animFps?: number; animPingpong?: boolean } {
   const ex = exerciseById(id);
-  if (ex) return { name: ex.name, muscles: ex.muscles, cues: ex.cues, neural: ex.neural };
+  if (ex) {
+    const animFrames = exerciseAnimFrames(ex);
+    return { name: ex.name, muscles: ex.muscles, cues: ex.cues, neural: ex.neural, animFrames, animFps: ex.anim?.fps, animPingpong: ex.anim?.pingpong };
+  }
+  const cat = catalogExerciseByIdSync(id);
+  if (cat) return { name: cat.name, muscles: cat.target ? [{ n: cat.target, t: 'p' }] : undefined, cues: cat.cues };
   const sk = skillById(id);
   if (sk) return { name: dict === 'en' ? sk.name.en : sk.name.zh };
   return { name: id };
@@ -122,6 +129,15 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
       </div>
 
       <div className="nesio-wp-body">
+        {phase !== 'rest' && ex.animFrames && ex.animFrames.length > 0 && (
+          <ExerciseFigure
+            frames={ex.animFrames}
+            fps={ex.animFps}
+            pingpong={ex.animPingpong}
+            alt={ex.name}
+            className="nesio-wp-figure"
+          />
+        )}
         <h2 className="nesio-wp-name">{ex.name}</h2>
         {ex.muscles && (
           <div className="nesio-wp-muscles">
