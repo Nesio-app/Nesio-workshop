@@ -64,6 +64,17 @@ export default function PlaidOAuthResumePage() {
               return;
             }
             setMsg('银行已授权,正在写入…');
+            // 错付防线:OAuth 回来 exchange 失败时,Plaid 侧已建的 Item 必须释放,否则每次
+            // 失败占 1 个试用名额(20/10 的根因)。navigating 前 await 清理,别让 replace 掐断。
+            const release = async () => {
+              try {
+                await fetch('/api/portal/plaid/remove', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ publicToken, linkToken }),
+                });
+              } catch { /* best-effort */ }
+            };
             try {
               const ex = await fetch('/api/portal/plaid/exchange', {
                 method: 'POST',
@@ -76,9 +87,11 @@ export default function PlaidOAuthResumePage() {
                 // 与 Portal 的 OAuth 回参处理约定一致:connector+status 会写连接标记。
                 window.location.replace('/?connector=plaid&status=connected');
               } else {
+                await release();
                 window.location.replace(`/?connector=plaid&error=${encodeURIComponent(exData.error || 'exchange_failed')}`);
               }
             } catch {
+              await release();
               window.location.replace('/?connector=plaid&error=exchange_network');
             }
           },

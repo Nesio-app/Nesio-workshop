@@ -309,4 +309,68 @@ assert.ok(/slice\(0, 5000\)/.test(syncCore2), '本机保留上限 5000');
 assert.ok(/saveHoldings/.test(syncCore2), '财务㉗:同步回包的持仓落本机 store');
 assert.ok(/runPlaidSync/.test(hub), 'Hub 收编到 connector-sync 核心,不留双实现');
 
+// ══ 错付防线:失败链接释放 Item(/api/portal/plaid/remove)——「失败也烧名额」的根治 ══
+// 一个 connection = 一个活 Item;Item 在 onSuccess 那刻已建。exchange 失败 → 没拿到 token →
+// 常规去重看不见 → 名额永久被占(20/10 的根因)。remove 路由用 publicToken 换 token 再 /item/remove。
+{
+  const removeLog = { exchanges: [], removes: [], cookieSets: 0 };
+  async function removeFetch(url, opts) {
+    const body = JSON.parse(opts?.body || '{}');
+    if (url.includes('/link/token/get')) {
+      return { json: async () => ({ link_sessions: [{ results: { item_add_results: [
+        { public_token: 'pub-a' }, { public_token: 'pub-b' }, { public_token: 'pub-c' },
+      ] } }] }) };
+    }
+    if (url.includes('/item/public_token/exchange')) {
+      removeLog.exchanges.push(body.public_token);
+      return { json: async () => ({ access_token: `at-${body.public_token}` }) };
+    }
+    if (url.includes('/item/remove')) {
+      removeLog.removes.push(body.access_token);
+      return { json: async () => ({}) };
+    }
+    throw new Error(`unexpected fetch ${url}`);
+  }
+  const removeNextResponse = {
+    json: (b, init) => ({ __json: b, __status: init?.status ?? 200, cookies: { set: () => { removeLog.cookieSets++; } } }),
+  };
+  const src = fs.readFileSync(new URL('../app/api/portal/plaid/remove/route.ts', import.meta.url), 'utf8');
+  const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const mod = { exports: {} };
+  vm.runInNewContext(js, {
+    module: mod, exports: mod.exports, console, JSON, Array, Object, fetch: removeFetch, process: { env: {} },
+    require: (p) => p === 'next/server' ? { NextRequest: class {}, NextResponse: removeNextResponse }
+      : p === '@/lib/portal/api-auth' ? { guardAiRoute: async () => null }
+      : p === '../link-token/route' ? { plaidBase: () => 'https://sandbox.plaid.com' }
+      : p === '../exchange/route' ? { sessionPublicTokens: route.sessionPublicTokens }
+      : p === '@/lib/portal/env' ? { envValue: () => 'k' } : ({}),
+  });
+  const removeRoute = mod.exports;
+  const rReq = (bodyObj) => ({ json: async () => bodyObj });
+
+  // 多机构一次授权失败 → session 里 3 个 Item 全部释放
+  const r1 = await removeRoute.POST(rReq({ publicToken: 'pub-a', linkToken: 'lt-1' }));
+  assert.equal(r1.__json.ok, true);
+  assert.equal(r1.__json.removed, 3, '失败链接:session 3 个 Item 全部 /item/remove 释放名额');
+  assert.deepEqual([...removeLog.removes].sort(), ['at-pub-a', 'at-pub-b', 'at-pub-c'], '每个都先换 token 再 remove');
+  assert.equal(removeLog.cookieSets, 0, '清理路由绝不写 cookie(纯释放,不落连接态)');
+
+  // 无 linkToken:只释放 onSuccess 那一个
+  removeLog.removes.length = 0;
+  const r2 = await removeRoute.POST(rReq({ publicToken: 'pub-solo' }));
+  assert.equal(r2.__json.removed, 1, '无 linkToken 只释放一个');
+
+  // 缺 publicToken → 400(没有可释放目标)
+  const r3 = await removeRoute.POST(rReq({}));
+  assert.equal(r3.__status, 400, '缺 publicToken → 400');
+}
+
+// ── 客户端契约:失败链接必调 remove 释放名额 + 发起阶段防连点 ──
+assert.ok(/\/api\/portal\/plaid\/remove/.test(hub), 'ConnectorsHub 失败时调 /plaid/remove 释放 Item');
+assert.ok(/releaseFailedPlaidItem\(publicToken, data\.linkToken\)/.test(hub), 'exchange 失败与网络异常两条路径都释放刚建的 Item');
+assert.ok(/plaidBusyRef\.current/.test(hub), '发起阶段互斥,防连点各建一个 Item 多烧名额');
+// OAuth 续接页同样在 exchange 失败/网络异常时释放 Item
+const oauthPage = fs.readFileSync(new URL('../app/plaid-oauth/page.tsx', import.meta.url), 'utf8');
+assert.ok(/\/api\/portal\/plaid\/remove/.test(oauthPage), 'OAuth 续接页失败时也释放 Item(不烧名额)');
+
 console.log('plaid-multi-item: OK');
