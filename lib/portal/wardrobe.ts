@@ -203,8 +203,25 @@ export function warmthForTemp(repTempC: number | null): { target: Warmth; needOu
 
 const FORMALITY_RANK: Record<Formality, number> = { casual: 0, smart: 1, formal: 2 };
 
-/** 单件对当日的契合分(越高越合适);含「久没穿」微加权,鼓励穿遍全衣橱。 */
-function scoreGarment(g: Garment, target: Warmth, need: Formality, todayMs: number): number {
+/* ── B｜反馈学习:用户偏好(纯数据,由 lib/portal/wardrobe-prefs 从本地反馈算好后传入) ── */
+export interface OutfitPrefs {
+  colorLikes: Record<string, number>; // 颜色词 → 净好感(👍+1 / 👎-1,穿了+)
+  dislikedItemIds: string[];          // 明确不想再推的单品 id
+  dislikedPairs: string[];            // 用户拒绝过的上下装组合,key = pairKey(idA,idB)
+}
+export const EMPTY_PREFS: OutfitPrefs = { colorLikes: {}, dislikedItemIds: [], dislikedPairs: [] };
+export function pairKey(a: string, b: string): string { return [a, b].sort().join('|'); }
+
+/** 偏好对单件的加权(夹在 ±6,别压过协调/保暖)。 */
+function prefBias(g: Garment, prefs: OutfitPrefs): number {
+  let d = 0;
+  for (const c of g.colors) d += (prefs.colorLikes[c] || 0);
+  if (prefs.dislikedItemIds.includes(g.id)) d -= 5;
+  return Math.max(-6, Math.min(6, d));
+}
+
+/** 单件对当日的契合分(越高越合适);含「久没穿」微加权 + 用户偏好。 */
+function scoreGarment(g: Garment, target: Warmth, need: Formality, todayMs: number, prefs: OutfitPrefs = EMPTY_PREFS): number {
   const warmthFit = -Math.abs(g.warmth - target) * 3;
   const formalFit = -Math.abs(FORMALITY_RANK[g.formality] - FORMALITY_RANK[need]) * 3;
   // 新鲜度:从没穿过给满(2),否则按闲置天数封顶 2 分
@@ -213,13 +230,13 @@ function scoreGarment(g: Garment, target: Warmth, need: Formality, todayMs: numb
     const days = Math.max(0, (todayMs - Date.parse(g.lastWornAt)) / 86_400_000);
     freshness = Math.min(2, days / 7); // 一周没穿 ≈ 满分
   }
-  return warmthFit + formalFit + freshness;
+  return warmthFit + formalFit + freshness + prefBias(g, prefs);
 }
 
-function pickBest(pool: Garment[], target: Warmth, need: Formality, todayMs: number): Garment | null {
+function pickBest(pool: Garment[], target: Warmth, need: Formality, todayMs: number, prefs: OutfitPrefs = EMPTY_PREFS): Garment | null {
   if (pool.length === 0) return null;
   return pool
-    .map((g) => ({ g, s: scoreGarment(g, target, need, todayMs) }))
+    .map((g) => ({ g, s: scoreGarment(g, target, need, todayMs, prefs) }))
     .sort((a, b) => b.s - a.s)[0].g;
 }
 
@@ -258,13 +275,14 @@ function incoherenceNote(top: Garment, bottom: Garment): [string, string] {
   ];
 }
 
-/** 上下装一对的联合分:各自契合 + 保暖协调 + 季节一致 + 正式度一致 + 色彩和谐。 */
-function pairScore(top: Garment, bottom: Garment, target: Warmth, need: Formality, todayMs: number): number {
-  let s = scoreGarment(top, target, need, todayMs) + scoreGarment(bottom, target, need, todayMs);
+/** 上下装一对的联合分:各自契合 + 保暖协调 + 季节一致 + 正式度一致 + 色彩和谐 + 用户偏好。 */
+function pairScore(top: Garment, bottom: Garment, target: Warmth, need: Formality, todayMs: number, prefs: OutfitPrefs = EMPTY_PREFS): number {
+  let s = scoreGarment(top, target, need, todayMs, prefs) + scoreGarment(bottom, target, need, todayMs, prefs);
   if (Math.abs(top.warmth - bottom.warmth) >= 2) s -= 6;         // 保暖档差太多(厚配薄)
   if (seasonConflict(top, bottom)) s -= 8;                       // 季节冲突(毛衣配短裤)
   if (Math.abs(FORMALITY_RANK[top.formality] - FORMALITY_RANK[bottom.formality]) >= 2) s -= 4; // 正式度撕裂
   s += colorHarmony(top, bottom) * 2;                           // 色彩和谐
+  if (prefs.dislikedPairs.includes(pairKey(top.id, bottom.id))) s -= 10; // 用户拒绝过这对
   return s;
 }
 
@@ -276,6 +294,7 @@ export function suggestOutfit(
   wardrobe: readonly Garment[],
   ctx: OutfitContext,
   todayIso: string,
+  prefs: OutfitPrefs = EMPTY_PREFS,
 ): OutfitSuggestion {
   const { target, needOuter } = warmthForTemp(ctx.repTempC);
   const need = ctx.formalNeed;
@@ -287,15 +306,15 @@ export function suggestOutfit(
   const want = (present: boolean, type: GarmentType) => { if (!present) gaps.push(type); };
   let mismatch: [string, string] | null = null;
 
-  // 主体:上装×下装挑**最协调的一对**(联合评分:保暖/季节/正式度/色彩),避免「毛衣配短裤」;
+  // 主体:上装×下装挑**最协调的一对**(联合评分:保暖/季节/正式度/色彩 + 用户偏好),避免「毛衣配短裤」;
   // 两者不全但有连衣裙 → 连衣裙(本身自洽)。手头只有乱搭的一对时仍给出,但诚实标注 mismatch。
   const tops = byType('top');
   const bottoms = byType('bottom');
-  const dress = pickBest(byType('dress'), target, need, todayMs);
+  const dress = pickBest(byType('dress'), target, need, todayMs, prefs);
   if (tops.length && bottoms.length) {
     let best: { top: Garment; bottom: Garment; s: number } | null = null;
     for (const tp of tops) for (const bt of bottoms) {
-      const s = pairScore(tp, bt, target, need, todayMs);
+      const s = pairScore(tp, bt, target, need, todayMs, prefs);
       if (!best || s > best.s) best = { top: tp, bottom: bt, s };
     }
     if (best) {
@@ -305,15 +324,15 @@ export function suggestOutfit(
   } else if (dress) {
     pieces.push(dress);
   } else {
-    const top = pickBest(tops, target, need, todayMs);
-    const bottom = pickBest(bottoms, target, need, todayMs);
+    const top = pickBest(tops, target, need, todayMs, prefs);
+    const bottom = pickBest(bottoms, target, need, todayMs, prefs);
     if (top) pieces.push(top); else want(false, 'top');
     if (bottom) pieces.push(bottom); else want(false, 'bottom');
   }
 
   // 外套(冷时)
   if (needOuter) {
-    const outer = pickBest(byType('outer'), target, need, todayMs);
+    const outer = pickBest(byType('outer'), target, need, todayMs, prefs);
     if (outer) pieces.push(outer); else want(false, 'outer');
   }
   // 鞋
