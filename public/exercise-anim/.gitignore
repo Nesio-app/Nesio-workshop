@@ -3,3 +3,6 @@
 */
 !.gitignore
 !lying-leg-raise/
+# catalog/ = exercises-dataset 演示 GIF(Gym visual)。私有仓库 + 私有部署,自用放行。
+# 若仓库转公开或部署公开,须移除本行并清空 catalog/(否则构成再分发)。
+!catalog/

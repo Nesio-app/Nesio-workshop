@@ -66,6 +66,11 @@ export function catalogAnimDir(media: string): string {
   return `/exercise-anim/catalog/${media}`;
 }
 
+/** 演示 GIF 路径(base-path 感知)。私有仓库自用素材:public/exercise-anim/catalog/<media>.gif 。 */
+export function catalogGifSrc(media: string): string {
+  return media ? `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/exercise-anim/catalog/${media}.gif` : '';
+}
+
 /** 若本地已放该动作的帧,返回 f00…fNN 路径;否则调用方自行判断存在性。 */
 export function catalogAnimFrames(media: string, frames: number): string[] {
   if (!media || frames <= 0) return [];

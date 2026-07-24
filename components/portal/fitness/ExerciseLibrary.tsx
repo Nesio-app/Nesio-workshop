@@ -12,9 +12,10 @@ import {
   type Exercise, type MuscleTag, type Equip, type MoveTag,
 } from '@/lib/portal/exercise-library';
 import {
-  loadExerciseCatalog, filterCatalog, catalogFacets, CATALOG_EQUIP_LABEL, CATALOG_PART_LABEL,
+  loadExerciseCatalog, filterCatalog, catalogFacets, catalogGifSrc, CATALOG_EQUIP_LABEL, CATALOG_PART_LABEL,
   type CatalogExercise,
 } from '@/lib/portal/exercise-catalog';
+import ExerciseGif from './ExerciseGif';
 
 const CATALOG_RENDER_CAP = 40; // 一次最多渲染 40 张,避免上千卡片卡死主线程
 import { saveWorkout, type WorkoutItem } from '@/lib/portal/workout-store';
@@ -239,10 +240,13 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
                             </div>
                           </button>
                           {ex.cues[0] && <p className="nesio-xlib-cue">{ex.cues[0]}</p>}
-                          {expanded && ex.cues.length > 0 && (
+                          {expanded && (
                             <div className="nesio-xlib-detail">
-                              <p className="nesio-xlib-detail-label">{L(dict, '技术要点', 'Cues')}</p>
-                              <ul>{ex.cues.map((c, i) => <li key={i}>{c}</li>)}</ul>
+                              <ExerciseGif src={catalogGifSrc(ex.media)} alt={ex.nameZh || ex.name} />
+                              {ex.cues.length > 0 && <>
+                                <p className="nesio-xlib-detail-label">{L(dict, '技术要点', 'Cues')}</p>
+                                <ul>{ex.cues.map((c, i) => <li key={i}>{c}</li>)}</ul>
+                              </>}
                             </div>
                           )}
                           <button type="button" className={`nesio-xlib-add${picked ? ' is-picked' : ''}`} onClick={() => toggleDraftId(ex.id)}>
