@@ -87,6 +87,12 @@ export default function WardrobePanel() {
   const [aiError, setAiError] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null); // 拍照(capture=environment)
   const uploadRef = useRef<HTMLInputElement>(null); // 上传本地图片(相册,无 capture)
+  // A｜Pro 云造型师:AI 从现有单品挑一套 + 理由 + 贴士。免费/失败回落规则版 outfit。
+  const [stylist, setStylist] = useState<{ pieceIds: string[]; reason: string; tips: string[] } | null>(null);
+  const [stylistBusy, setStylistBusy] = useState(false);
+  const [stylistError, setStylistError] = useState(false);
+  const [restyleNonce, setRestyleNonce] = useState(0);
+  const isPro = canUsePaidCloudAi();
 
   const load = () => { try { setItems(listWardrobe()); } catch { setItems([]); } };
   useEffect(() => {
@@ -110,19 +116,60 @@ export default function WardrobePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
-  const outfit = useMemo(() => {
+  // 今日天气/场合 context —— 规则版和云造型师共用
+  const weatherCtx = useMemo(() => {
     const now = new Date();
     const w = readPortalCache<{ temperatureC?: number; tempMinC?: number; tempMaxC?: number; precipProb?: number }>(PORTAL_CACHE_KEYS.weather);
     const cal = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar)?.events ?? [];
     const todayCal = cal.filter((e) => isToday(e.start, now));
-    return suggestOutfit(items, {
+    return {
       repTempC: w?.tempMinC ?? w?.temperatureC ?? null,
       tempMinC: w?.tempMinC ?? null,
       tempMaxC: w?.tempMaxC ?? null,
       precipProb: w?.precipProb ?? null,
       formalNeed: inferFormalNeed(todayCal),
-    }, now.toISOString());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
+
+  // 规则版(免费/兜底)——始终算,离线可用
+  const outfit = useMemo(() => suggestOutfit(items, weatherCtx, new Date().toISOString()), [items, weatherCtx]);
+
+  // Pro 云造型师:随衣橱/场合变化 or「重新造型」重算。失败置 stylistError,展示时回落规则版。
+  useEffect(() => {
+    if (!isPro || items.length < 2) { setStylist(null); setStylistError(false); return; }
+    let cancelled = false;
+    setStylistBusy(true); setStylistError(false);
+    (async () => {
+      try {
+        const res = await fetch('/api/portal/wardrobe-stylist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
+          body: JSON.stringify({
+            items: items.map((it) => ({ id: it.id, name: it.name, type: it.garmentType, warmth: it.warmth, formality: it.formality, colors: it.colors })),
+            tempMinC: weatherCtx.tempMinC, tempMaxC: weatherCtx.tempMaxC, precipProb: weatherCtx.precipProb,
+            occasion: weatherCtx.formalNeed, locale: dict,
+          }),
+        });
+        const data = await res.json() as { ok?: boolean; pieceIds?: string[]; reason?: string; tips?: string[] };
+        if (cancelled) return;
+        if (data?.ok && Array.isArray(data.pieceIds) && data.pieceIds.length) {
+          setStylist({ pieceIds: data.pieceIds, reason: data.reason || '', tips: Array.isArray(data.tips) ? data.tips : [] });
+        } else { setStylist(null); setStylistError(true); }
+      } catch { if (!cancelled) { setStylist(null); setStylistError(true); } }
+      finally { if (!cancelled) setStylistBusy(false); }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, weatherCtx, isPro, restyleNonce, dict]);
+
+  // 云造型师给的 pieceIds → 实际单品(丢失的忽略)
+  const aiPieces = useMemo(() => {
+    if (!stylist) return null;
+    const byId = new Map(items.map((it) => [it.id, it]));
+    const list = stylist.pieceIds.map((id) => byId.get(id)).filter(Boolean) as Garment[];
+    return list.length ? list : null;
+  }, [stylist, items]);
 
   const grouped = useMemo(() => {
     const map = new Map<GarmentType, Garment[]>();
@@ -210,16 +257,23 @@ export default function WardrobePanel() {
 
   return (
     <div className="nesio-analytics-tab">
-      {/* ① 今天穿这套 */}
-      {items.length >= 2 && outfit.pieces.length > 0 ? (
+      {/* ① 今天穿这套(有 AI 造型用 AI 的,否则规则版) */}
+      {(() => {
+        const pieces = aiPieces ?? outfit.pieces;
+        if (items.length < 2 || pieces.length === 0) return null;
+        const reasonText = aiPieces ? stylist!.reason : (dict === 'en' ? outfit.reason[1] : outfit.reason[0]);
+        return (
         <div style={{ ...card, background: 'var(--portal-accent-soft-md)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-2)' }}>
-            <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>👔 {L(dict, '今天穿这套', 'Today’s outfit')}</span>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, `${outfit.pieces.length} 件`, `${outfit.pieces.length} pieces`)}</span>
+            <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>
+              👔 {L(dict, '今天穿这套', 'Today’s outfit')}
+              {aiPieces && <span style={{ marginLeft: '0.4rem', fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--portal-blue-deep)' }}>✨ {L(dict, 'AI 造型', 'AI styled')}</span>}
+            </span>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, `${pieces.length} 件`, `${pieces.length} pieces`)}</span>
           </div>
-          <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>{dict === 'en' ? outfit.reason[1] : outfit.reason[0]}</p>
+          {reasonText && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>{reasonText}</p>}
           <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
-            {outfit.pieces.map((p) => (
+            {pieces.map((p) => (
               <span key={p.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-sm)', background: 'var(--glass-bg-solid, var(--portal-bg))', border: '1px solid var(--portal-line)', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)' }}>
                 {thumbs[p.id] && (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -229,14 +283,34 @@ export default function WardrobePanel() {
               </span>
             ))}
           </div>
+          {/* AI 造型贴士 */}
+          {aiPieces && stylist!.tips.length > 0 && (
+            <ul style={{ margin: 'var(--space-2) 0 0', paddingLeft: '1.1rem', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.7 }}>
+              {stylist!.tips.map((t, i) => <li key={i}>{t}</li>)}
+            </ul>
+          )}
           {outfit.needUmbrella && (
             <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-calm)' }}>☔ {L(dict, '今天可能下雨,记得带伞', 'Rain likely — take an umbrella')}</p>
           )}
-          {outfit.mismatch && (
+          {/* 规则版的季节冲突提示(AI 造型时不显示,AI 自己会避开) */}
+          {!aiPieces && outfit.mismatch && (
             <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>⚠ {dict === 'en' ? outfit.mismatch[1] : outfit.mismatch[0]}</p>
           )}
+          {/* Pro:云造型状态 + 重新造型 */}
+          {isPro && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                {stylistBusy ? L(dict, '造型中…', 'Styling…') : stylistError ? L(dict, 'AI 造型暂不可用,先按规则搭配', 'AI styling unavailable — showing rule-based') : ''}
+              </span>
+              <button type="button" onClick={() => setRestyleNonce((n) => n + 1)} disabled={stylistBusy}
+                style={{ flexShrink: 0, padding: '0.3rem 0.7rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-xs)', cursor: stylistBusy ? 'default' : 'pointer', opacity: stylistBusy ? 0.6 : 1 }}>
+                {L(dict, '✨ 换一套', '✨ Restyle')}
+              </button>
+            </div>
+          )}
         </div>
-      ) : (
+        );
+      })() || (
         <p className="nesio-insights-empty" style={{ marginTop: 0 }}>
           {items.length === 0
             ? L(dict, '衣橱还空着。把衣服拍进来,我就能每天按天气和日程帮你搭一套。', 'Your wardrobe is empty. Add clothes and I’ll suggest a daily outfit by weather and schedule.')
