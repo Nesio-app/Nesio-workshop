@@ -23,6 +23,7 @@ import { financeFindings } from '@/lib/portal/finance-insight';
 import { computeFinanceScores } from '@/lib/portal/finance-risk';
 import { incomeBreakdown, detectIncome, portfolioSummary, recurringPriceHikes } from '@/lib/portal/finance-features';
 import { removeBankAccount } from '@/lib/portal/bank-tx';
+import { loadTeslaChargeTx, teslaFinAccount } from '@/lib/portal/tesla-finance';
 import { loadBudget, saveBudget, hasBudget, suggestBudget, budgetProgress, type BudgetConfig } from '@/lib/portal/finance-budget';
 import { buildMonthlyReport, persistReportToMemory, autoPersistLastMonthReport } from '@/lib/portal/finance-report';
 import { reportRichHtml } from '@/lib/portal/finance-report-visual';
@@ -103,9 +104,14 @@ export default function FinanceTab() {
 
   useEffect(() => {
     const reload = () => {
-      const loaded = loadBankTx();
+      // Tesla 充电花费:兑现「充电花费自动进财务」。在显示层并进流水(不写 bank-tx
+      // 存储 —— 避开 Plaid 权威 replace 冲掉 + 孤儿过滤误杀),数据以 signal 为单一真源。
+      const bank = loadBankTx();
+      const tesla = loadTeslaChargeTx();
+      const loaded = tesla.length ? [...bank, ...tesla] : bank;
       setTxs(loaded);
-      setAccounts(loadBankAccounts());
+      const accts = loadBankAccounts();
+      setAccounts(tesla.length ? [...accts, teslaFinAccount()] : accts);
       setHoldings(loadHoldings());
       const av = availableMonths(loaded);
       if (av.length) setYm((cur) => (av.includes(cur) ? cur : av[0])); // 不覆盖用户已选月份
@@ -113,7 +119,12 @@ export default function FinanceTab() {
     reload();
     // 数据搬 IDB 后:水合完成/同步后派发 nesio-bank-updated → 重读(冷启动空窗自愈)。
     window.addEventListener('nesio-bank-updated', reload);
-    return () => window.removeEventListener('nesio-bank-updated', reload);
+    // Tesla 同步后派发 nesio-connectors-refreshed → 新充电花费即时进财务。
+    window.addEventListener('nesio-connectors-refreshed', reload);
+    return () => {
+      window.removeEventListener('nesio-bank-updated', reload);
+      window.removeEventListener('nesio-connectors-refreshed', reload);
+    };
   }, []);
 
   const months = useMemo(() => availableMonths(txs), [txs]);

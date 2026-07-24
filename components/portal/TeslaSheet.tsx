@@ -214,6 +214,19 @@ export default function TeslaSheet({ open, onClose }: { open: boolean; onClose: 
                   </div>
                 </div>
               ))}
+
+              {/* 数据去向:直接回答「连了但数据在哪」——沉淀分散在足迹/财务,这里指路。 */}
+              <div style={{
+                marginTop: 'var(--space-5)', paddingTop: 'var(--space-4)',
+                borderTop: '1px solid var(--portal-line)',
+              }}>
+                <p className="nesio-settings-section-label">{L(dict, '这些数据去哪了', 'Where this data lives')}</p>
+                <ul style={{ margin: 0, paddingLeft: '1.1rem', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)', lineHeight: 1.7 }}>
+                  <li>{L(dict, '充电花费 → 洞察 · 财务(和银行流水并在一起看)', 'Charging spend → Insights · Finance (alongside bank transactions)')}</li>
+                  <li>{L(dict, '停车 / 充电位置 → 洞察 · 分析 · 地点足迹', 'Parking / charging locations → Insights · Analytics · Place trail')}</li>
+                  <li>{L(dict, '行驶 / 充电记录 → 问一问、时间线可搜到', 'Drives / charges → searchable in Ask & Timeline')}</li>
+                </ul>
+              </div>
             </>
           )}
         </div>
