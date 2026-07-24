@@ -41,6 +41,8 @@ export type AppSessionState = {
   lastOpenAt: number;
   sessionCount: number;
   activeDays: string[];
+  /** 24 桶「几点打开 App」直方图 —— 自动调工作流:让主动卡在你真正活跃的时段出。 */
+  openHours?: number[];
 };
 
 export type ReengageNudge = {
@@ -67,7 +69,7 @@ function write(key: string, value: unknown): void {
 
 function emptyUsage(): FeatureUsageState { return { used: {}, snoozedUntil: {}, never: [] }; }
 function emptySession(now: number): AppSessionState {
-  return { firstOpenAt: now, lastOpenAt: now, sessionCount: 0, activeDays: [] };
+  return { firstOpenAt: now, lastOpenAt: now, sessionCount: 0, activeDays: [], openHours: new Array(24).fill(0) };
 }
 
 export function loadFeatureUsage(): FeatureUsageState { return read(USAGE_KEY, emptyUsage()); }
@@ -83,14 +85,36 @@ export function recordAppOpen(now = Date.now()): AppSessionState {
   const s = read<AppSessionState>(SESSION_KEY, emptySession(now));
   const isNewSession = s.sessionCount === 0 || now - s.lastOpenAt > NEW_SESSION_GAP;
   const today = dayKey(now);
+  // 24 桶活跃时段:只在「新会话」时 +1(避免同一次停留刷屏灌爆某小时)。
+  const openHours = (Array.isArray(s.openHours) && s.openHours.length === 24) ? [...s.openHours] : new Array(24).fill(0);
+  if (isNewSession) openHours[new Date(now).getHours()] += 1;
   const next: AppSessionState = {
     firstOpenAt: s.firstOpenAt || now,
     lastOpenAt: now,
     sessionCount: s.sessionCount + (isNewSession ? 1 : 0),
     activeDays: s.activeDays.includes(today) ? s.activeDays : [...s.activeDays, today].slice(-60),
+    openHours,
   };
   write(SESSION_KEY, next);
   return next;
+}
+
+/** 24 桶活跃时段直方图(几点开 App)。 */
+export function getActiveHours(session: AppSessionState = loadAppSessions()): number[] {
+  return (Array.isArray(session.openHours) && session.openHours.length === 24) ? session.openHours : new Array(24).fill(0);
+}
+
+/**
+ * 你真正活跃的时段(按开 App 次数取 top-n,次数>0)。纯函数,喂给 goodHours 让主动卡挑时段。
+ * 没有活跃数据时返回 [] —— 调用方回落到既有 goodHours,不改变行为。
+ */
+export function topActiveHours(n = 4, openHours: number[] = getActiveHours()): number[] {
+  return openHours
+    .map((v, h) => ({ h, v }))
+    .filter((x) => x.v > 0)
+    .sort((a, b) => b.v - a.v || a.h - b.h)
+    .slice(0, Math.max(0, n))
+    .map((x) => x.h);
 }
 
 /** 显式标记某功能已使用(view 类功能埋点用,如洞察/阅读器)。 */
@@ -155,6 +179,8 @@ type FeatureDef = {
   infer?: (nodes: readonly UsageNode[]) => boolean;
   /** 数据够不够格触发(如洞察需要攒够节点才有的看)。 */
   readyWhen?: (nodes: readonly UsageNode[]) => boolean;
+  /** 相关度/就绪深度:越高越优先推(按你的数据算,替静态目录序)。缺省 0。 */
+  readiness?: (nodes: readonly UsageNode[]) => number;
 };
 
 const FEELING_TAGS = new Set(['feeling', 'moment']);
@@ -169,6 +195,8 @@ export function featureCatalog(zh: boolean): FeatureDef[] {
       body: L('心情、关系、足迹、花销,念念已经悄悄连成了几条规律 —— 想看看吗?', 'Mood, people, places, spending — Nesio has quietly found a few patterns. Want a look?'),
       ctaLabel: L('打开洞察', 'Open Insights'),
       readyWhen: (nodes) => nodes.length >= 8,
+      // 攒的记忆越多,洞察越有的看 → 越该推
+      readiness: (nodes) => nodes.length,
     },
     {
       key: 'mood',
@@ -185,6 +213,8 @@ export function featureCatalog(zh: boolean): FeatureDef[] {
       ctaLabel: L('整理物品', 'Organize items'),
       openEvent: 'nesio-open-inventory',
       infer: (nodes) => nodes.some((n) => n.type === 'object'),
+      // 物品节点越多,越可能受益于收纳
+      readiness: (nodes) => nodes.filter((n) => n.type === 'object').length * 3,
     },
     {
       key: 'capture',
@@ -223,14 +253,19 @@ export function pickReengagementNudge(opts: {
   if (!force && !isReturningUser(session)) return null;
   if (!force && usage.lastNudgeAt && now - usage.lastNudgeAt < GLOBAL_NUDGE_COOLDOWN) return null;
 
-  for (const def of featureCatalog(zh)) {
-    if (usage.never.includes(def.key)) continue;
-    if (usage.snoozedUntil[def.key] && now < usage.snoozedUntil[def.key]) continue;
-    if (!force) {
-      if (isUsed(def, usage, nodes)) continue;
-      if (def.readyWhen && !def.readyWhen(nodes)) continue;
-    }
-    return { key: def.key, title: def.title, body: def.body, ctaLabel: def.ctaLabel, openEvent: def.openEvent };
-  }
-  return null;
+  // 先收齐所有合格候选,再按「就绪度/相关度」排序 —— 推你数据最该受益的那个,而非固定目录序。
+  const eligible = featureCatalog(zh)
+    .map((def, idx) => ({ def, idx }))
+    .filter(({ def }) => {
+      if (usage.never.includes(def.key)) return false;
+      if (usage.snoozedUntil[def.key] && now < usage.snoozedUntil[def.key]) return false;
+      if (force) return true;
+      if (isUsed(def, usage, nodes)) return false;
+      if (def.readyWhen && !def.readyWhen(nodes)) return false;
+      return true;
+    })
+    .sort((a, b) => (b.def.readiness?.(nodes) ?? 0) - (a.def.readiness?.(nodes) ?? 0) || a.idx - b.idx);
+
+  const top = eligible[0]?.def;
+  return top ? { key: top.key, title: top.title, body: top.body, ctaLabel: top.ctaLabel, openEvent: top.openEvent } : null;
 }
