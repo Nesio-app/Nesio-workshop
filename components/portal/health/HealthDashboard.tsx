@@ -13,7 +13,6 @@ import type { HealthMetric, HealthMetrics, GlucoseAnalysis, SleepStages, Activit
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import TrainingPlan from './TrainingPlan';
 import { computeFitnessInsight, type FitnessInsight } from '@/lib/platform/fitness-integrator';
 import { loadTrainingState, sessionsThisWeek, protocolById } from '@/lib/platform/training-protocol-engine';
 import { healthNarrative, analyzeSeries } from '@/lib/portal/health-narrative';
@@ -554,7 +553,6 @@ export default function HealthDashboard() {
             'No health data yet. Go to Settings → Data sources → Apple Health and drop the exported zip (or export.xml) to parse steps, heart rate, sleep, SpO₂, weight and more.')}
         </p>
         <FamilyDataCard kind="health" />
-        <TrainingPlan />
       </div>
     );
   }
@@ -646,8 +644,6 @@ export default function HealthDashboard() {
               </div>
             );
           })}
-
-          <TrainingPlan />
 
           {/* ── 健康月报(对齐财务页形态:下载彩色 HTML / 存记忆 / 打印存 PDF) ── */}
           {(() => {
