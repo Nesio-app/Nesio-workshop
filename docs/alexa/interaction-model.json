@@ -1,0 +1,66 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "nesio",
+      "intents": [
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "CaptureMemoryIntent",
+          "slots": [
+            {
+              "name": "content",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "remember {content}",
+            "remember that {content}",
+            "note {content}",
+            "note that {content}",
+            "save {content}",
+            "keep {content}",
+            "jot down {content}",
+            "make a note that {content}",
+            "log that {content}"
+          ]
+        },
+        {
+          "name": "AskMemoryIntent",
+          "slots": [
+            {
+              "name": "query",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "ask {query}",
+            "ask where {query}",
+            "where is {query}",
+            "where are {query}",
+            "what did I say about {query}",
+            "do I have {query}",
+            "look up {query}",
+            "find {query}",
+            "recall {query}"
+          ]
+        }
+      ],
+      "types": []
+    }
+  }
+}
