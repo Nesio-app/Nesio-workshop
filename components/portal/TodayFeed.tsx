@@ -135,11 +135,11 @@ export default function TodayFeed({
       window.dispatchEvent(new CustomEvent('nesio-open-voice'));
     }
   }
-  const [insightsTab, setInsightsTab] = useState<'reflection' | 'health'>('reflection');
+  const [insightsTab, setInsightsTab] = useState<'fitness' | undefined>(undefined);
 
   // 健身 routine 卡「开始练」→ 打开洞察的健康 tab(训练计划在那)
   useEffect(() => {
-    const openTraining = () => { setInsightsTab('health'); setMirrorOpen(true); };
+    const openTraining = () => { setInsightsTab('fitness'); setMirrorOpen(true); };
     const openMoodTrend = () => setMoodTrendOpen(true); // 批次 136:心情第一拍「看趋势」→ 情绪趋势 sheet
     window.addEventListener('nesio-open-training', openTraining);
     window.addEventListener('nesio-open-mood-trend', openMoodTrend);
@@ -244,7 +244,7 @@ export default function TodayFeed({
           data-tour="insights"
           className="nesio-today-brand"
           aria-label={L(uiLocale, '打开 Nesio 洞察', "Open Nesio insights")}
-          onClick={() => { setInsightsTab('reflection'); setMirrorOpen(true); }}
+          onClick={() => { setInsightsTab(undefined); setMirrorOpen(true); }}
         >
           <NesioMark className="nesio-today-brand-icon" />
         </button>
@@ -282,7 +282,7 @@ export default function TodayFeed({
         {canUsePrivateData && (
           <ReengageNudgeCard
             nodes={allNodes}
-            onOpenInsights={() => { setInsightsTab('reflection'); setMirrorOpen(true); }}
+            onOpenInsights={() => { setInsightsTab(undefined); setMirrorOpen(true); }}
           />
         )}
 

@@ -8465,9 +8465,44 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
 
 /* ─── Insights Sheet ─── */
 .nesio-insights-sheet-card {
-  /* 批次 32:定高 —— 空 tab(足迹/健康无数据)时弹框忽大忽小,固定住 */
-  height: 88dvh !important;
-  max-height: 88dvh !important;
+  /* 洞察升级为全屏页:满高 + 顶部不留圆角/间隙,像一个完整页面而非半屏弹框 */
+  height: 100dvh !important;
+  max-height: 100dvh !important;
+  border-top-left-radius: 0 !important;
+  border-top-right-radius: 0 !important;
+}
+
+/* 洞察首页:入口宫格(3 列纯文字按钮) */
+.nesio-insights-hub {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.6rem;
+  padding: 0.4rem 0 1rem;
+}
+.nesio-insights-hub-tile {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 0.5rem;
+  border-radius: var(--radius-md, 16px);
+  border: 1px solid var(--portal-line);
+  background: var(--portal-accent-soft);
+  color: var(--portal-ink);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.nesio-insights-hub-tile:active { transform: scale(0.96); }
+.nesio-insights-hub-tile:hover { box-shadow: 0 6px 18px rgba(88, 140, 227, 0.12); }
+.nesio-insights-hub-pro { font-size: 0.55em; font-weight: 700; color: var(--portal-accent); margin-left: 0.15rem; vertical-align: super; }
+.nesio-insights-back {
+  width: 2rem; height: 2rem; flex: 0 0 auto; margin-right: 0.1rem;
+  display: grid; place-items: center; border: none; cursor: pointer;
+  border-radius: 50%; background: var(--portal-accent-soft); color: var(--portal-accent);
+  font-size: 1.3rem; line-height: 1;
 }
 .nesio-insights-sheet {
   display: flex;
