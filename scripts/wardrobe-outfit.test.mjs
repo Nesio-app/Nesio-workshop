@@ -143,4 +143,45 @@ const ctx = (over) => ({ repTempC: 20, tempMinC: null, tempMaxC: null, precipPro
   assert.equal(out[0].id, 'outfit-2026-07-24', 'id 带当天日期,每天新实例');
 }
 
+// ── 协调:毛衣配短裤 = 季节冲突,唯一选项时诚实标注 mismatch(截图里的真实 bug) ──
+{
+  const wardrobe = [
+    g({ id: 'sw', garmentType: 'top', warmth: 3, name: '浅灰高领字母毛衣' }),
+    g({ id: 'sh', garmentType: 'bottom', warmth: 1, name: '蓝色牛仔短裤' }),
+    g({ id: 'shoes', garmentType: 'shoes', warmth: 2, name: '小白鞋' }),
+  ];
+  const s = W.suggestOutfit(wardrobe, ctx({ repTempC: 22 }), TODAY);
+  assert.ok(s.mismatch, '毛衣配短裤 → 标注 mismatch(不装好看)');
+  assert.ok(/季节不太搭/.test(s.mismatch[0]), 'mismatch 文案点明季节不搭');
+  const finds = W.outfitFindings(wardrobe, ctx({ repTempC: 22 }), TODAY);
+  assert.ok(/⚠/.test(finds[0].body[0]), '今天页卡正文带 ⚠ 提示');
+}
+
+// ── 协调:有更配的下装时,优先协调款、避开季节冲突 ──
+{
+  const wardrobe = [
+    g({ id: 'sw', garmentType: 'top', warmth: 3, name: '高领毛衣' }),
+    g({ id: 'shorts', garmentType: 'bottom', warmth: 1, name: '牛仔短裤' }),
+    g({ id: 'pants', garmentType: 'bottom', warmth: 3, name: '羊毛长裤' }),
+    g({ id: 'boots', garmentType: 'shoes', warmth: 2, name: '靴子' }),
+  ];
+  const s = W.suggestOutfit(wardrobe, ctx({ repTempC: 8 }), TODAY);
+  const ids = s.pieces.map((p) => p.id);
+  assert.ok(ids.includes('pants'), '有协调选项 → 优先长裤');
+  assert.ok(!ids.includes('shorts'), '避开季节冲突的短裤');
+  assert.equal(s.mismatch, null, '协调搭配无 mismatch');
+}
+
+// ── 审美:撞色时优先中性色 ──
+{
+  const wardrobe = [
+    g({ id: 'red', garmentType: 'top', warmth: 2, name: '红色上衣', colors: ['红'] }),
+    g({ id: 'green', garmentType: 'bottom', warmth: 2, name: '绿色裤子', colors: ['绿'] }),
+    g({ id: 'black', garmentType: 'bottom', warmth: 2, name: '黑色裤子', colors: ['黑'] }),
+    g({ id: 'shoes', garmentType: 'shoes', warmth: 2, name: '鞋' }),
+  ];
+  const s = W.suggestOutfit(wardrobe, ctx({ repTempC: 20 }), TODAY);
+  assert.ok(s.pieces.map((p) => p.id).includes('black'), '撞色时优先中性(黑裤)而非绿裤');
+}
+
 console.log('✓ wardrobe-outfit 契约全部通过');
