@@ -727,7 +727,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
           <div className="nesio-insights-title-row">
             <h2 className="nesio-insights-title">{L(dict, '洞察', 'Insights')}</h2>
           </div>
-          <button type="button" className="nesio-insights-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
+          <button type="button" className="nesio-insights-close" onClick={onClose} aria-label={L(dict, '回到今天', 'Back to Today')}>{L(dict, '今天', 'Today')}</button>
         </div>
         <div className="nesio-insights-body">
           <p className="nesio-insights-empty" style={{ marginTop: '2.5rem' }}>
@@ -750,7 +750,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         <div className="nesio-insights-title-row">
           <h2 className="nesio-insights-title">{showHub ? L(dict, '洞察', 'Insights') : tabLabel(mainTab)}</h2>
         </div>
-        <button type="button" className="nesio-insights-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
+        <button type="button" className="nesio-insights-close" onClick={onClose} aria-label={L(dict, '回到今天', 'Back to Today')}>{L(dict, '今天', 'Today')}</button>
       </div>
 
       <div className="nesio-insights-body">

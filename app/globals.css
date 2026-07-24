@@ -8514,7 +8514,8 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.1rem 0 0.9rem;
+  /* 全屏后顶到状态栏:留状态栏安全区,和记忆页一致 */
+  padding: calc(0.6rem + env(safe-area-inset-top, 0px)) 0 0.9rem;
   flex-shrink: 0;
   border-bottom: 1px solid var(--portal-line);
   margin-bottom: 0.1rem;
@@ -8558,12 +8559,14 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
   box-shadow: 0 1px 3px rgba(0,0,0,0.08);
 }
 .nesio-insights-close {
-  font-size: 0.9rem;
-  color: var(--portal-muted);
-  background: none;
-  border: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--portal-accent);
+  background: var(--portal-accent-soft);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill, 999px);
   cursor: pointer;
-  padding: 0.2rem;
+  padding: 0.35rem 0.85rem;
   flex-shrink: 0;
 }
 .nesio-insights-body {
