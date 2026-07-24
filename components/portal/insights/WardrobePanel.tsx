@@ -12,8 +12,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   listWardrobe, addGarment, removeGarment, markWorn, suggestOutfit, inferFormalNeed,
-  GARMENT_TYPES, type Garment, type GarmentType, type Warmth, type Formality,
+  GARMENT_TYPES, type Garment, type GarmentType, type Warmth, type Formality, type OutfitPrefs,
 } from '@/lib/portal/wardrobe';
+import { loadWardrobePrefs, recordOutfitFeedback, buildStylistDislikes } from '@/lib/portal/wardrobe-prefs';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { L } from '@/lib/portal/i18n';
@@ -92,14 +93,28 @@ export default function WardrobePanel() {
   const [stylistBusy, setStylistBusy] = useState(false);
   const [stylistError, setStylistError] = useState(false);
   const [restyleNonce, setRestyleNonce] = useState(0);
+  // B｜反馈学习:本地偏好(喜欢的颜色 / 拒绝的组合),回喂规则版 + 云造型师
+  const [prefs, setPrefs] = useState<OutfitPrefs>({ colorLikes: {}, dislikedItemIds: [], dislikedPairs: [] });
+  const [fbFlash, setFbFlash] = useState<string | null>(null);
   const isPro = canUsePaidCloudAi();
 
   const load = () => { try { setItems(listWardrobe()); } catch { setItems([]); } };
   useEffect(() => {
     load();
+    try { setPrefs(loadWardrobePrefs()); } catch { /* 无存储 */ }
     window.addEventListener('nesio-life-graph-updated', load);
     return () => window.removeEventListener('nesio-life-graph-updated', load);
   }, []);
+
+  // 记一条反馈(👍/👎/穿了)→ 更新本地偏好 + 触发重排(dislike 会避开这套)
+  const giveFeedback = (kind: 'like' | 'dislike' | 'worn', pieces: Garment[]) => {
+    if (pieces.length === 0) return;
+    const next = recordOutfitFeedback(kind, pieces.map((p) => ({ id: p.id, colors: p.colors, garmentType: p.garmentType })));
+    setPrefs(next);
+    setFbFlash(kind === 'dislike' ? L(dict, '记下了,以后避开这套', 'Noted — I’ll avoid this') : L(dict, '记下了,以后多推这类', 'Noted — more like this'));
+    setTimeout(() => setFbFlash(null), 2200);
+    if (kind === 'dislike') setRestyleNonce((n) => n + 1); // 换一套,避开刚拒绝的
+  };
 
   // 缩略图:按需从本机图库读(和收纳页同法)
   useEffect(() => {
@@ -132,8 +147,8 @@ export default function WardrobePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
-  // 规则版(免费/兜底)——始终算,离线可用
-  const outfit = useMemo(() => suggestOutfit(items, weatherCtx, new Date().toISOString()), [items, weatherCtx]);
+  // 规则版(免费/兜底)——始终算,离线可用;带上用户偏好
+  const outfit = useMemo(() => suggestOutfit(items, weatherCtx, new Date().toISOString(), prefs), [items, weatherCtx, prefs]);
 
   // Pro 云造型师:随衣橱/场合变化 or「重新造型」重算。失败置 stylistError,展示时回落规则版。
   useEffect(() => {
@@ -149,6 +164,7 @@ export default function WardrobePanel() {
             items: items.map((it) => ({ id: it.id, name: it.name, type: it.garmentType, warmth: it.warmth, formality: it.formality, colors: it.colors })),
             tempMinC: weatherCtx.tempMinC, tempMaxC: weatherCtx.tempMaxC, precipProb: weatherCtx.precipProb,
             occasion: weatherCtx.formalNeed, locale: dict,
+            dislikes: buildStylistDislikes(prefs, new Map(items.map((it) => [it.id, { name: it.name }]))),
           }),
         });
         const data = await res.json() as { ok?: boolean; pieceIds?: string[]; reason?: string; tips?: string[] };
@@ -296,6 +312,20 @@ export default function WardrobePanel() {
           {!aiPieces && outfit.mismatch && (
             <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>⚠ {dict === 'en' ? outfit.mismatch[1] : outfit.mismatch[0]}</p>
           )}
+          {/* B｜反馈:喜欢/不喜欢 → 越用越懂你(免费+Pro 都有) */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
+            {fbFlash ? (
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-go)' }}>✓ {fbFlash}</span>
+            ) : (
+              <>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '这套怎么样?', 'Like this?')}</span>
+                <button type="button" aria-label={L(dict, '喜欢', 'Like')} onClick={() => giveFeedback('like', pieces)}
+                  style={{ padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', cursor: 'pointer', fontSize: 'var(--text-sm)' }}>👍</button>
+                <button type="button" aria-label={L(dict, '不喜欢', 'Dislike')} onClick={() => giveFeedback('dislike', pieces)}
+                  style={{ padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', cursor: 'pointer', fontSize: 'var(--text-sm)' }}>👎</button>
+              </>
+            )}
+          </div>
           {/* Pro:云造型状态 + 重新造型 */}
           {isPro && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
@@ -413,7 +443,7 @@ export default function WardrobePanel() {
                     {L(dict, WARMTH_LABEL[it.warmth][0], WARMTH_LABEL[it.warmth][1])} · {L(dict, FORMAL_LABEL[it.formality][0], FORMAL_LABEL[it.formality][1])}
                   </p>
                   <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.3rem' }}>
-                    <button type="button" onClick={() => { markWorn(it.id, new Date().toISOString()); load(); }}
+                    <button type="button" onClick={() => { markWorn(it.id, new Date().toISOString()); giveFeedback('worn', [it]); load(); }}
                       style={{ flex: 1, padding: '0.2rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-blue-deep)', fontSize: '0.62rem', cursor: 'pointer' }}
                       title={L(dict, '记一次今天穿了', 'Mark worn today')}>{L(dict, '穿了', 'Worn')}</button>
                     <button type="button" onClick={() => { if (confirm(L(dict, `从衣橱移除「${it.name}」?`, `Remove “${it.name}” from wardrobe?`))) { removeGarment(it.id); load(); } }}
