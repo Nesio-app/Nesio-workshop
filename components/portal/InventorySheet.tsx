@@ -483,59 +483,107 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
           </div>
         )}
 
-        {/* ── 物品①:库存统计(对标 Inventory Stats:KPI / 分类分布 / 标签云) ── */}
+        {/* ── 物品①:库存统计 Dashboard(设计 token 全量;KPI / 归位进度 / 分类 / 标签 / 处理中)── */}
         {view === 'stats' && (() => {
+          if (items.length === 0) {
+            return <p style={{ padding: 'var(--space-8) 0', textAlign: 'center', color: 'var(--portal-muted)' }}>{L(dict, '还没有物品,统计会随记录自动出现。', 'No items yet — stats appear as you add.')}</p>;
+          }
           const st = inventoryStats(items);
-          const kpi: React.CSSProperties = { flex: 1, minWidth: 120, borderRadius: 12, padding: '0.7rem 0.8rem', background: 'var(--glass-bg, rgba(255,255,255,0.05))', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))' };
-          const kv: React.CSSProperties = { display: 'block', fontSize: '1.3rem', fontWeight: 700 };
-          const kl: React.CSSProperties = { display: 'block', fontSize: '0.72rem', color: 'var(--text-tertiary)' };
+          const sp = sellPile(items);
+          const amz = amazonSummary(items);
+          const totalItems = items.length;
+          const unplaced = items.filter((i) => !i.space).length;
+          const placed = totalItems - unplaced;
+          const placedPct = totalItems ? Math.round((placed / totalItems) * 100) : 0;
           const maxCat = Math.max(1, ...st.byCategory.map((c) => c.count));
+
+          const card: React.CSSProperties = { borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', padding: 'var(--space-4)' };
+          const kv: React.CSSProperties = { display: 'block', fontSize: 'var(--text-h2)', fontWeight: 'var(--weight-bold)', color: 'var(--portal-ink)', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' };
+          const kl: React.CSSProperties = { display: 'block', marginTop: '0.25rem', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' };
+          const sectionLbl: React.CSSProperties = { margin: 'var(--space-5) 0 var(--space-2)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' };
+
           return (
-            <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <div style={kpi}><span style={kv}>{st.spaces}</span><span style={kl}>{L(dict, '空间', 'Spaces')}</span></div>
-                <div style={kpi}><span style={kv}>{st.containers}</span><span style={kl}>{L(dict, '容器', 'Bins')}</span></div>
-                <div style={kpi}><span style={kv}>{st.count}</span><span style={kl}>{L(dict, '物品', 'Items')}</span></div>
-                <div style={kpi}><span style={kv}>${st.totalValue.toLocaleString('en-US')}</span><span style={kl}>{L(dict, '估值', 'Est. value')}</span></div>
+            <div style={{ maxHeight: '64vh', overflowY: 'auto', paddingBottom: 'var(--space-4)' }}>
+              {/* 概览:物品 / 估值 / 未归位(未归位>0 时用琥珀提示,不用红色制造焦虑) */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
+                <div style={card}><span style={kv}>{totalItems}</span><span style={kl}>{L(dict, '物品', 'Items')}</span></div>
+                <div style={card}><span style={kv}>≈${Math.round(st.totalValue).toLocaleString('en-US')}</span><span style={kl}>{L(dict, '估值', 'Est. value')}</span></div>
+                <div style={{ ...card, ...(unplaced > 0 ? { background: 'var(--status-gentle-soft)', borderColor: 'transparent' } : {}) }}>
+                  <span style={{ ...kv, ...(unplaced > 0 ? { color: 'var(--status-gentle)' } : {}) }}>{unplaced}</span>
+                  <span style={kl}>{L(dict, '未归位', 'Unplaced')}</span>
+                </div>
               </div>
+
+              {/* 归位进度条 */}
+              <p style={{ ...sectionLbl, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <span>{L(dict, '归位进度', 'Placement')}</span>
+                <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--status-go)', fontVariantNumeric: 'tabular-nums' }}>{placedPct}%</span>
+              </p>
+              <div style={{ height: 10, borderRadius: 'var(--radius-pill)', background: 'var(--status-gentle-soft)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${placedPct}%`, background: 'var(--status-go)', borderRadius: 'var(--radius-pill)' }} />
+              </div>
+              <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                {L(dict, `已归位 ${placed} · 未归位 ${unplaced} · ${st.spaces} 个空间 · ${st.containers} 个容器`, `${placed} placed · ${unplaced} unplaced · ${st.spaces} spaces · ${st.containers} bins`)}
+              </p>
+
+              {/* 按分类(横向条,主强调色) */}
               {st.byCategory.length > 0 && (
                 <>
-                  <p style={{ margin: '1rem 0 0.4rem', fontSize: '0.82rem', fontWeight: 600 }}>{L(dict, '按分类', 'Items by category')}</p>
-                  {st.byCategory.map((c) => (
-                    <div key={c.category} style={{ margin: '0.35rem 0' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem' }}>
-                        <span>{c.category}</span><span style={{ color: 'var(--text-tertiary)' }}>{c.count}</span>
+                  <p style={sectionLbl}>{L(dict, '按分类', 'By category')}</p>
+                  {st.byCategory.slice(0, 8).map((c) => (
+                    <div key={c.category} style={{ margin: '0 0 var(--space-2)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', marginBottom: '0.2rem' }}>
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.category}</span>
+                        <span style={{ color: 'var(--portal-muted)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{c.count}</span>
                       </div>
-                      <div style={{ height: 6, borderRadius: 3, background: 'var(--glass-bg, rgba(255,255,255,0.06))' }}>
-                        <div style={{ height: '100%', borderRadius: 3, width: `${Math.round((c.count / maxCat) * 100)}%`, background: 'var(--accent-primary, #5b8cff)' }} />
+                      <div style={{ height: 6, borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)' }}>
+                        <div style={{ height: '100%', borderRadius: 'var(--radius-pill)', width: `${Math.round((c.count / maxCat) * 100)}%`, background: 'var(--portal-accent)' }} />
                       </div>
                     </div>
                   ))}
                 </>
               )}
+
+              {/* 常用标签 */}
               {st.topTags.length > 0 && (
                 <>
-                  <p style={{ margin: '1rem 0 0.4rem', fontSize: '0.82rem', fontWeight: 600 }}>{L(dict, '常用标签', 'Top tags')}</p>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  <p style={sectionLbl}>{L(dict, '常用标签', 'Top tags')}</p>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                     {st.topTags.map((t) => (
-                      <span key={t.tag} style={{ padding: '0.25rem 0.6rem', borderRadius: 999, fontSize: '0.76rem', background: 'var(--glass-bg, rgba(255,255,255,0.06))', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))' }}>
-                        {t.tag} <span style={{ color: 'var(--text-tertiary)' }}>{t.count}</span>
+                      <span key={t.tag} style={{ padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-xs)', background: 'var(--portal-accent-soft)', border: '1px solid var(--portal-line)', color: 'var(--portal-ink)' }}>
+                        {t.tag} <span style={{ color: 'var(--portal-muted)' }}>{t.count}</span>
                       </span>
                     ))}
                   </div>
                 </>
               )}
-              {(() => {
-                const sp = sellPile(items);
-                if (!sp.items.length) return null;
-                return (
-                  <p style={{ margin: '1rem 0 0', fontSize: '0.82rem' }}>
-                    {L(dict, `卖闲置堆:${sp.items.length} 件,约值 $${sp.totalValue.toLocaleString('en-US')}`, `Sell pile: ${sp.items.length} items ≈ $${sp.totalValue.toLocaleString('en-US')}`)}
-                  </p>
-                );
-              })()}
-              {items.length === 0 && (
-                <p style={{ padding: '1.4rem 0', textAlign: 'center', color: 'var(--text-tertiary)' }}>{L(dict, '还没有物品,统计会随记录自动出现。', 'No items yet — stats appear as you add.')}</p>
+
+              {/* 处理中:卖闲置 + 亚马逊转卖(点卡进对应子视图) */}
+              {(sp.items.length > 0 || amz.count > 0) && (
+                <>
+                  <p style={sectionLbl}>{L(dict, '在处理', 'In progress')}</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: amz.count > 0 ? '1fr 1fr' : '1fr', gap: 'var(--space-2)' }}>
+                    <button type="button" onClick={() => setView('sell')} style={{ ...card, textAlign: 'left', cursor: 'pointer' }}>
+                      <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{L(dict, '卖闲置堆', 'Sell pile')}</span>
+                      <span style={{ display: 'block', marginTop: '0.3rem', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                        {L(dict, `${sp.items.length} 件 · 约 $${Math.round(sp.totalValue).toLocaleString('en-US')}`, `${sp.items.length} items · ≈$${Math.round(sp.totalValue).toLocaleString('en-US')}`)}
+                      </span>
+                    </button>
+                    {amz.count > 0 && (
+                      <button type="button" onClick={() => setView('flip')} style={{ ...card, textAlign: 'left', cursor: 'pointer' }}>
+                        <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{L(dict, '亚马逊转卖', 'Amazon flip')}</span>
+                        <span style={{ display: 'block', marginTop: '0.3rem', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                          {L(dict, `${amz.count} 件 · 已赚 $${Math.round(amz.realizedProfit).toLocaleString('en-US')}`, `${amz.count} items · $${Math.round(amz.realizedProfit).toLocaleString('en-US')} earned`)}
+                        </span>
+                        {amz.reviewDue > 0 && (
+                          <span style={{ display: 'inline-block', marginTop: '0.4rem', padding: '0.1rem 0.5rem', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-xs)', background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>
+                            {L(dict, `${amz.reviewDue} 件待留评`, `${amz.reviewDue} to review`)}
+                          </span>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           );
