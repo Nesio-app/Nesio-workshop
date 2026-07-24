@@ -38,6 +38,31 @@ async function supabaseSelect<T>(path: string): Promise<{ rows: T[]; error?: str
   }
 }
 
+/** PostgREST Content-Range → 精确总数(如 "0-0/12345" → 12345);拿不到返回 null。 */
+export function parseCountHeader(contentRange: string | null): number | null {
+  if (!contentRange) return null;
+  const total = contentRange.split('/')[1];
+  if (!total || total === '*') return null;
+  const n = parseInt(total, 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** 精确计数(HEAD + count=exact,不回行 —— 绕开 1000 行采样上限,给真实 total)。 */
+async function supabaseCount(path: string): Promise<number | null> {
+  const url = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
+  const key = envValue('SUPABASE_SERVICE_ROLE_KEY') || envValue('SUPABASE_ANON_KEY');
+  if (!url || !key) return null;
+  try {
+    const res = await fetch(`${url}/rest/v1/${path}`, {
+      method: 'HEAD',
+      headers: { apikey: key, Authorization: `Bearer ${key}`, Prefer: 'count=exact', Range: '0-0' },
+      cache: 'no-store',
+    });
+    if (!res.ok && res.status !== 206) return null;
+    return parseCountHeader(res.headers.get('content-range'));
+  } catch { return null; }
+}
+
 function dayKey(iso: string): string {
   return iso.slice(0, 10);
 }
@@ -79,6 +104,14 @@ export async function GET(req: NextRequest) {
     ),
   ]);
 
+  // ── 精确事件计数(绕开 1000 行采样上限,拿真实 total) ──
+  const sinceDaysIso = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
+  const [cntToday, cntWeek, cntMonth] = telemetry.error ? [null, null, null] : await Promise.all([
+    supabaseCount(`telemetry_events?select=name&at=gte.${sinceDaysIso(1)}`),
+    supabaseCount(`telemetry_events?select=name&at=gte.${sinceDaysIso(7)}`),
+    supabaseCount(`telemetry_events?select=name&at=gte.${sinceDaysIso(30)}`),
+  ]);
+
   // ── 聚合:总量/独立设备(今日、7 天、30 天) ──
   const now = Date.now();
   const cut = (days: number) => now - days * 86_400_000;
@@ -86,6 +119,13 @@ export async function GET(req: NextRequest) {
     const rows = telemetry.rows.filter((r) => new Date(r.at).getTime() >= cut(days));
     return { events: rows.length, devices: new Set(rows.map((r) => r.device_id)).size };
   };
+  // 事件数优先用精确计数(拿不到再回落采样);设备数用采样(自持小实例足够准)。
+  const windowOut = (days: number, exact: number | null) => {
+    const s = windowStats(days);
+    return { events: exact ?? s.events, devices: s.devices };
+  };
+  // 采样是否被截断(精确总数 > 拿回的行数)→ 面板提示「分项为近似」
+  const sampleCapped = (cntMonth ?? 0) > telemetry.rows.length;
 
   // ── 按事件名计数(7 天) ──
   const byName7 = new Map<string, number>();
@@ -293,9 +333,40 @@ export async function GET(req: NextRequest) {
     insights.push({ severity: 'go', title: '一切平稳', detail: '数据在进,没有触发任何告警规则。', advice: '不用管面板,去做创意。' });
   }
 
+  // ── 设备明细 + 行为画像(自持小实例 = 你自己的画像;从采样行算) ──
+  const IGNORE_EVENTS = new Set(['ai_route', 'client_error', 'exp_exposure']);
+  const devMap = new Map<string, { events: number; firstAt: string; lastAt: string }>();
+  const featCount = new Map<string, number>();
+  const hours: number[] = new Array(24).fill(0);
+  const activeDaySet = new Set<string>();
+  for (const r of telemetry.rows) {
+    const d = devMap.get(r.device_id) || { events: 0, firstAt: r.at, lastAt: r.at };
+    d.events += 1;
+    if (r.at < d.firstAt) d.firstAt = r.at;
+    if (r.at > d.lastAt) d.lastAt = r.at;
+    devMap.set(r.device_id, d);
+    if (new Date(r.at).getTime() >= cut(30) && !IGNORE_EVENTS.has(r.name)) {
+      featCount.set(r.name, (featCount.get(r.name) || 0) + 1);
+      hours[new Date(r.at).getHours()] += 1; // 服务端(UTC)小时
+      activeDaySet.add(dayKey(r.at));
+    }
+  }
+  const deviceList = [...devMap.entries()]
+    .sort((a, b) => b[1].events - a[1].events)
+    .slice(0, 20)
+    .map(([id, d]) => ({ id: id.slice(0, 8), events: d.events, firstAt: d.firstAt, lastAt: d.lastAt }));
+  const behavior = {
+    activeDays30: activeDaySet.size,
+    activeHours: hours,
+    topFeatures: [...featCount.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([name, count]) => ({ name, count })),
+  };
+
   return NextResponse.json({
     ok: true,
     generatedAt: new Date().toISOString(),
+    sampleCapped,
+    deviceList,
+    behavior,
     insights,
     deltas,
     ai: { totals: aiTotals, routes: aiRoutes.slice(0, 8) },
@@ -307,7 +378,7 @@ export async function GET(req: NextRequest) {
       telemetryEvents: telemetry.error ? { ok: false, error: telemetry.error } : { ok: true, rows: telemetry.rows.length },
       productEvents: product.error ? { ok: false, error: product.error } : { ok: true, rows: product.rows.length },
     },
-    windows: { today: windowStats(1), week: windowStats(7), month: windowStats(30) },
+    windows: { today: windowOut(1, cntToday), week: windowOut(7, cntWeek), month: windowOut(30, cntMonth) },
     topEvents7d: [...byName7.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12).map(([name, count]) => ({ name, count })),
     daily60d: [...daily.entries()].map(([date, d]) => ({ date, events: d.events, devices: d.devices.size })),
     funnel30d: funnel,
