@@ -122,6 +122,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   // 若期间用户点了「断开」(已撤销服务端 token),收尾会把连接器弹回「已连接」—— 本地标记与
   // 实际不一致的隐私隐患。disconnect 递增此代作废在途同步,收尾按代校验后跳过回写。
   const syncGenRef = useRef(0);
+  // 「错付」防线:一次只发起一个 Plaid Link —— 连点会各建一个 Item,每个占 1 个试用名额。
+  const plaidBusyRef = useRef(false);
   // P0 隐私:连接私有数据源(邮箱/日历/银行/Notion/Flomo)必须先登录 —— 匿名授权=无主
   // token,换人用这台设备就能看到你的邮件。null=未知(网络失败不误伤),false 才拦。
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
@@ -421,8 +423,21 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   }
 
   // ── 批次 21:Plaid 银行流水 ──
+  // 清理「失败链接」在 Plaid 侧已建但没换成 token 的 Item —— 否则每次失败都占 1 个试用名额
+  //(错付根因)。best-effort,不阻断 UI。
+  function releaseFailedPlaidItem(publicToken: string, linkToken?: string) {
+    void fetch('/api/portal/plaid/remove', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ publicToken, linkToken }),
+    }).catch(() => { /* 清理失败最差回到占一个名额,不再抛 */ });
+  }
+
   async function connectPlaid(updateIndex?: number) {
     const isUpdate = typeof updateIndex === 'number';
+    // 防连点:发起阶段互斥。每发起一次 Link 都可能建一个 Item,连点 = 多烧名额。
+    if (plaidBusyRef.current) return;
+    plaidBusyRef.current = true;
     setSyncing('plaid');
     try {
       const res = await fetch('/api/portal/plaid/link-token', {
@@ -438,6 +453,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           ? L(dict, '连接银行需要先登录 Nesio(数据接入的私有数据都要求登录)', 'Linking a bank requires signing in to Nesio first')
           : L(dict, `Plaid 连接失败:${data.error || '未知'}`, `Plaid connect failed: ${data.error || 'unknown'}`);
         showToast(msg, false);
+        plaidBusyRef.current = false;
         setSyncing(null);
         return;
       }
@@ -459,6 +475,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       const Plaid = (window as unknown as { Plaid?: { create: (cfg: object) => { open: () => void } } }).Plaid;
       if (!Plaid) {
         showToast(L(dict, 'Plaid Link 脚本没加载(可能被网络或拦截器挡了),请稍后重试', "Plaid Link script didn't load (network or a blocker may have stopped it) — try again"), false);
+        plaidBusyRef.current = false;
         setSyncing(null);
         return;
       }
@@ -471,6 +488,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         token: data.linkToken,
         onSuccess: async (publicToken: string) => {
           try { localStorage.removeItem('nesio-plaid-link-token'); } catch { /* ignore */ }
+          plaidBusyRef.current = false; // 模态已完成,放行下次发起
           if (isUpdate) {
             // 修复模式:item 已就地修好,不换 token、不烧名额 —— 直接重同步。
             setPlaidRelink((prev) => prev.filter((x) => x !== updateIndex));
@@ -480,30 +498,41 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           }
           // 财务⑥:带上 linkToken —— 多机构一次授权时服务端据此捞出 session 里
           // 全部 item 的 public_token 逐个交换,不再只连上第一家。
-          const ex = await fetch('/api/portal/plaid/exchange', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ publicToken, linkToken: data.linkToken }),
-          });
-          const exData = await ex.json() as { ok?: boolean; error?: string; items?: number };
-          if (exData.ok) {
-            saveConnectorState('plaid', true);
-            setConnected((p) => ({ ...p, plaid: true }));
-            const n = exData.items || 1;
-            showToast(n > 1 ? L(dict, `已连接 ${n} 家机构,正在同步流水…`, `${n} institutions linked — syncing…`) : L(dict, '银行已连接,正在同步流水…', 'Bank linked — syncing…'), true);
-            void syncPlaid(); // 连上就同步,账户/流水立即可见,不再等用户手点
-          } else {
-            showToast(L(dict, `绑定失败:${exData.error || '未知'}`, `Link failed: ${exData.error || 'unknown'}`), false);
+          try {
+            const ex = await fetch('/api/portal/plaid/exchange', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ publicToken, linkToken: data.linkToken }),
+            });
+            const exData = await ex.json() as { ok?: boolean; error?: string; items?: number };
+            if (exData.ok) {
+              saveConnectorState('plaid', true);
+              setConnected((p) => ({ ...p, plaid: true }));
+              const n = exData.items || 1;
+              showToast(n > 1 ? L(dict, `已连接 ${n} 家机构,正在同步流水…`, `${n} institutions linked — syncing…`) : L(dict, '银行已连接,正在同步流水…', 'Bank linked — syncing…'), true);
+              void syncPlaid(); // 连上就同步,账户/流水立即可见,不再等用户手点
+            } else {
+              // 错付防线:Plaid 已在 onSuccess 建好 Item(占 1 个名额),exchange 失败必须
+              // 把它释放掉,否则「失败也烧名额」重演(20/10 的根因)。
+              releaseFailedPlaidItem(publicToken, data.linkToken);
+              showToast(L(dict, `绑定失败:${exData.error || '未知'}(已释放这次连接,不占名额)`, `Link failed: ${exData.error || 'unknown'} — connection released, no quota used`), false);
+            }
+          } catch {
+            // 网络中断同样可能留下已建 Item → 一并释放
+            releaseFailedPlaidItem(publicToken, data.linkToken);
+            showToast(L(dict, '绑定时网络中断(已释放这次连接,不占名额),请重试', 'Network dropped while linking — connection released, no quota used. Try again'), false);
           }
         },
         onExit: () => {
           // 用户取消:清掉续接用的 link_token,避免 /plaid-oauth 误用过期 token。
           try { localStorage.removeItem('nesio-plaid-link-token'); } catch { /* ignore */ }
+          plaidBusyRef.current = false; // 放行下次发起
         },
       });
       link.open();
     } catch {
       showToast(L(dict, 'Plaid Link 加载失败,请检查网络', 'Failed to load Plaid Link — check your network'), false);
+      plaidBusyRef.current = false;
     }
     setSyncing(null);
   }
