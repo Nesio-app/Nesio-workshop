@@ -66,6 +66,7 @@ interface MeetingProvenance {
 }
 
 // 共享写入:会议记录节点 + To do 各成 commitment 节点。麦克风保存与 Granola 同步都走这里。
+// 返回挂上的日历日程节点 id(没匹配到对应日程 → null),供上游统计「挂到日程几场」。
 function writeMeetingExtraction(
   meetingNodeId: string,
   meetingName: string,
@@ -73,7 +74,7 @@ function writeMeetingExtraction(
   locale: string,
   extraction?: MeetingExtraction,
   prov?: MeetingProvenance,
-): void {
+): string | null {
   const en = locale.toLowerCase().startsWith('en');
   const inferred = (extraction?.inferred ?? []).filter((s) => s.trim());
   const people = (extraction?.people ?? []).filter((s) => s.trim());
@@ -154,6 +155,7 @@ function writeMeetingExtraction(
     });
   }
   broadcast();
+  return calNode?.id ?? null;
 }
 
 export function addMeetingNotes(
@@ -178,13 +180,13 @@ export interface GranolaMeetingInput {
 export async function ingestGranolaMeeting(
   meeting: GranolaMeetingInput,
   locale: string = 'zh',
-): Promise<'created' | 'skipped' | 'stored_raw'> {
+): Promise<{ status: 'created' | 'skipped' | 'stored_raw'; linked: boolean }> {
   const id = (meeting.id || '').trim();
   const transcript = (meeting.transcript || '').trim();
-  if (!id || !transcript) return 'skipped';
+  if (!id || !transcript) return { status: 'skipped', linked: false };
 
   // 去重:同一场会议已入库就跳过(重复同步不再造重节点)。
-  if (getLifeGraph().some((n) => n.attributes?.granolaMeetingId === id)) return 'skipped';
+  if (getLifeGraph().some((n) => n.attributes?.granolaMeetingId === id)) return { status: 'skipped', linked: false };
 
   // 批次154 抽取:把转写喂 meeting-notes 路由拿 To do/Inferred。会议真实日期作截止日锚点。
   let extraction: MeetingExtraction | undefined;
@@ -200,12 +202,12 @@ export async function ingestGranolaMeeting(
     }
   } catch { /* 抽取失败 → 降级只存原文,不丢会议 */ }
 
-  writeMeetingExtraction('', meeting.title, transcript, locale, extraction, {
+  const linkedCalId = writeMeetingExtraction('', meeting.title, transcript, locale, extraction, {
     granolaMeetingId: id,
     recordedAt: meeting.startedAt,
     extraTags: ['Granola'],
   });
-  return extraction ? 'created' : 'stored_raw';
+  return { status: extraction ? 'created' : 'stored_raw', linked: Boolean(linkedCalId) };
 }
 
 /** 批次 50:记忆页长按「加入今日焦点」—— 钉进今天(明天自然过期)。

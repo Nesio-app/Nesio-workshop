@@ -876,14 +876,16 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       }
       const meetings = data.meetings || [];
       let created = 0;
+      let linked = 0; // 挂到对应日历日程的场次(端到端可见:没挂上 = 标题/时间差超容差或日历没同步)
       for (const m of meetings) {
         const r = await ingestGranolaMeeting({ id: m.id, title: m.title, transcript: m.transcript, startedAt: m.date }, dict);
-        if (r !== 'skipped') created += 1;
+        if (r.status !== 'skipped') created += 1;
+        if (r.linked) linked += 1;
       }
       setCounts((p) => ({ ...p, granola: created }));
       window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
       window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-      const detail = L(dict, `提炼 ${meetings.length} 场 · 新增 ${created}`, `Distilled ${meetings.length} · ${created} new`);
+      const detail = L(dict, `提炼 ${meetings.length} 场 · 新增 ${created} · 挂到日程 ${linked}`, `Distilled ${meetings.length} · ${created} new · ${linked} linked`);
       setOauthSyncResult((p) => ({ ...p, granola: { ok: true, msg: L(dict, '同步成功', 'Synced'), detail } }));
       showToast(created > 0 ? detail : L(dict, '没有新的行动项', 'No new action items'), true);
     } catch (err) {

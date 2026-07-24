@@ -67,7 +67,8 @@ const CAL = {
   // writeMeetingExtraction 未导出:经 ingestGranolaMeeting 会走网络抽取,测试里
   // fetch 缺失 → 降级 stored_raw,仍会带 recordedAt 写入(锁的正是这条链)。
   const r = await w2.cmds.ingestGranolaMeeting({ id: 'g-uuid-1', title: 'Kompass Migration Delivery Impacts', transcript: 'hello', startedAt: '2026-07-17T14:05:00.000Z' }, 'zh');
-  assert.equal(r, 'stored_raw', '无抽取服务时降级存原文');
+  assert.equal(r.status, 'stored_raw', '无抽取服务时降级存原文');
+  assert.equal(r.linked, true, '挂到对应日程 → linked=true(端到端可见)');
   const rec2 = w2.created.find((n) => n.tags?.includes('meeting-notes'));
   assert.ok(rec2, 'Granola 会议记录节点存在');
   assert.equal(rec2.attributes.calendarNodeId, 'cal1', '记录 → 日历:attributes.calendarNodeId');
@@ -87,10 +88,11 @@ const CAL = {
 // 3) 时间窗外 → 不挂
 {
   const w = makeWorld([CAL]);
-  await w.cmds.ingestGranolaMeeting({ id: 'g3', title: 'Kompass Migration Delivery Impacts', transcript: 'x', startedAt: '2026-07-17T20:00:00.000Z' }, 'zh');
+  const r3 = await w.cmds.ingestGranolaMeeting({ id: 'g3', title: 'Kompass Migration Delivery Impacts', transcript: 'x', startedAt: '2026-07-17T20:00:00.000Z' }, 'zh');
   const rec = w.created.find((n) => n.tags?.includes('meeting-notes'));
   assert.equal(rec.attributes.calendarNodeId, undefined, '窗口外不硬凑');
   assert.equal(rec.relations.length, 0);
+  assert.equal(r3.linked, false, '没挂上 → linked=false');
 }
 
 // 4) 窗口内多候选且标题全不合 → 不挂错
