@@ -25,6 +25,7 @@ import { emitFeedback, type Reaction } from '@/lib/platform/personalization';
 import { getEnergyState } from '@/lib/platform/energy-state';
 import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
 import { getBestInterruptionHours } from '@/lib/portal/mirror-profile';
+import { topActiveHours } from '@/lib/portal/feature-usage';
 import { rememberAI, recallAI, sig } from '@/lib/portal/ai-cache';
 import {
   calendarEventsToGuidanceEvents,
@@ -300,7 +301,8 @@ export function useTodayData(canUsePrivateData: boolean) {
           scoredCalendar: scored,
           now,
           energy: getEnergyState(now),
-          goodHours: getBestInterruptionHours(),
+          // 自动调工作流:好时段 = 学到的偏好时段 ∪ 你实际活跃的时段(在你真在用 App 时才出卡)
+          goodHours: [...new Set([...getBestInterruptionHours(), ...topActiveHours(4)])],
         });
         const rawProactiveCards: ProactiveCardData[] = guidanceCards
           .map((card) => ({
