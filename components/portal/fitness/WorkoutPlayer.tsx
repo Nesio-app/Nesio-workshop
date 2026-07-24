@@ -82,6 +82,8 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   const [countdown, setCountdown] = useState<number | null>(null);
   const [repCount, setRepCount] = useState(0); // 跟拍进行中的当前次数(0 = 未跟拍)
   const [muted, setMuted] = useState(false);
+  const [showCues, setShowCues] = useState(false); // 指导文字默认收起,点「动作要点」才展开
+  const [countTotal, setCountTotal] = useState(0); // 本次倒计时的总量,给进度条算百分比
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mutedRef = useRef(false);
   mutedRef.current = muted; // 供 setInterval 闭包读到最新静音态
@@ -109,6 +111,7 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   // 倒计时通用:末段读秒声(最后 3 秒短音 + 结束长音),到 0 时调用 onEnd
   function runCountdown(sec: number, onEnd: () => void) {
     clearTimer();
+    setCountTotal(sec);
     setCountdown(sec);
     timerRef.current = setInterval(() => {
       setCountdown((c) => {
@@ -192,7 +195,7 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
       </div>
 
       <div className="nesio-wp-body">
-        {/* 预览:动图/GIF 全程显示(work 看着做、rest 时也能盯着动作预习下一组)。 */}
+        {/* 展示图:跟练时的大屏主角,全程显示(work 看着做、rest 时预习下一组)。 */}
         {ex.animFrames && ex.animFrames.length > 0 ? (
           <ExerciseFigure
             frames={ex.animFrames}
@@ -217,27 +220,47 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
         </div>
 
         {phase === 'rest' ? (
-          <div className="nesio-wp-rest">
+          <div className="nesio-wp-timer">
             <p className="nesio-wp-rest-label">{L(dict, '组间休息', 'Rest')}</p>
             <p className="nesio-wp-count">{countdown ?? 0}s</p>
+            <div className="nesio-wp-bar" aria-hidden><div className="nesio-wp-bar-fill" style={{ width: `${countTotal ? Math.max(0, ((countdown ?? 0) / countTotal) * 100) : 0}%` }} /></div>
             <button type="button" className="nesio-wp-ghost" onClick={skipRest}>{L(dict, '跳过休息', 'Skip rest')}</button>
           </div>
         ) : (
           <>
-            {ex.neural && ex.neural[0] && (
-              <div className="nesio-wp-neural">{ex.neural[0]}</div>
+            {/* 秒数动作:大数字 + 倒计时条 */}
+            {step.unit === 'sec' && countdown != null && (
+              <div className="nesio-wp-timer">
+                <p className="nesio-wp-count nesio-wp-count--work">{countdown}s</p>
+                <div className="nesio-wp-bar" aria-hidden><div className="nesio-wp-bar-fill" style={{ width: `${countTotal ? Math.max(0, (countdown / countTotal) * 100) : 0}%` }} /></div>
+              </div>
             )}
-            {ex.cues && ex.cues.length > 0 && (
-              <ul className="nesio-wp-cues">
-                {ex.cues.map((c, i) => <li key={i}>{c}</li>)}
-              </ul>
+            {/* reps 跟拍:大号次数 + 进度条 */}
+            {step.unit === 'reps' && repCount > 0 && (
+              <div className="nesio-wp-timer">
+                <p className="nesio-wp-count nesio-wp-count--work">{repCount}<span className="nesio-wp-count-total">/{step.reps}</span></p>
+                <div className="nesio-wp-bar" aria-hidden><div className="nesio-wp-bar-fill" style={{ width: `${Math.min(100, (repCount / step.reps) * 100)}%` }} /></div>
+              </div>
             )}
-            {step.unit === 'sec' && countdown != null ? (
-              <div className="nesio-wp-count nesio-wp-count--work">{countdown}s</div>
-            ) : null}
-            {step.unit === 'reps' && repCount > 0 ? (
-              <div className="nesio-wp-count nesio-wp-count--work">{repCount}<span className="nesio-wp-count-total">/{step.reps}</span></div>
-            ) : null}
+
+            {/* 指导文字收进按钮:需要时点开(默认收起,不挡大图) */}
+            {((ex.cues && ex.cues.length > 0) || (ex.neural && ex.neural[0])) && (
+              <>
+                <button type="button" className="nesio-wp-cuebtn" onClick={() => setShowCues((s) => !s)} aria-expanded={showCues}>
+                  {showCues ? L(dict, '收起要点 ▴', 'Hide cues ▴') : L(dict, '动作要点 ▾', 'How to ▾')}
+                </button>
+                {showCues && (
+                  <div className="nesio-wp-cuebox">
+                    {ex.neural && ex.neural[0] && <div className="nesio-wp-neural">{ex.neural[0]}</div>}
+                    {ex.cues && ex.cues.length > 0 && (
+                      <ul className="nesio-wp-cues">
+                        {ex.cues.map((c, i) => <li key={i}>{c}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </>
         )}
       </div>

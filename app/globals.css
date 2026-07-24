@@ -13373,8 +13373,17 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-exfig-msg { font-size: 0.85rem; }
 .nesio-exfig-retry { font-size: 0.8rem; padding: 0.3rem 0.9rem; border-radius: var(--radius-pill, 999px);
   border: 1px solid var(--portal-accent-border); background: transparent; color: var(--portal-accent); cursor: pointer; }
-.nesio-wp-figure { margin-top: 0.25rem; width: 100%; max-width: 420px; align-self: center; }
+.nesio-wp-figure { margin-top: 0.25rem; width: 100%; max-width: 520px; align-self: center; }
 .nesio-wp-count-total { font-size: 1.6rem; font-weight: 700; color: var(--portal-muted); margin-left: 0.15rem; }
+
+/* 计时块:大数字 + 进度条,居中 */
+.nesio-wp-timer { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; margin: 0.8rem 0 0; }
+.nesio-wp-bar { width: 100%; max-width: 520px; height: 10px; border-radius: var(--radius-pill, 999px); background: var(--portal-accent-soft); overflow: hidden; }
+.nesio-wp-bar-fill { height: 100%; border-radius: var(--radius-pill, 999px); background: var(--portal-accent); transition: width 0.95s linear; }
+
+/* 指导要点:收进按钮,点开才看 */
+.nesio-wp-cuebtn { align-self: center; margin: 0.9rem 0 0; padding: 0.4rem 1rem; font-size: 0.82rem; font-weight: var(--weight-semibold, 600); color: var(--portal-accent); background: var(--portal-accent-soft); border: 1px solid var(--portal-accent-border); border-radius: var(--radius-pill, 999px); cursor: pointer; }
+.nesio-wp-cuebox { margin-top: 0.7rem; }
 @media (prefers-reduced-motion: reduce) { .nesio-exfig-loading { animation: none; } }
 
 /* 扩展动作库搜索框 */
