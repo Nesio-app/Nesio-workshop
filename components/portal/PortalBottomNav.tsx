@@ -12,7 +12,8 @@ interface PortalBottomNavProps {
   onToday: () => void;
   onTell: () => void;
   onAsk?: () => void;
-  onMemory: () => void;
+  onInsights: () => void;
+  insightsActive?: boolean;
   onChatOpen: () => void;
 }
 
@@ -23,7 +24,8 @@ export default function PortalBottomNav({
   locale = 'zh',
   onToday,
   onTell,
-  onMemory,
+  onInsights,
+  insightsActive = false,
   onChatOpen,
 }: PortalBottomNavProps) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,19 +86,21 @@ export default function PortalBottomNav({
         <NesioMark className="nesio-bottom-nav-center-icon" />
       </button>
 
-      {/* Memory */}
+      {/* Insights — 全屏浮层(洞察),非 surface;点开由 Portal 渲染 */}
       <button
         type="button"
-        data-tour="memory"
-        className={`nesio-bottom-nav-btn${activeSurface === 'memory' ? ' nesio-bottom-nav-btn--active' : ''}`}
-        onClick={onMemory}
-        aria-label="Memory"
-        aria-current={activeSurface === 'memory' ? 'page' : undefined}
+        data-tour="insights"
+        className={`nesio-bottom-nav-btn${insightsActive ? ' nesio-bottom-nav-btn--active' : ''}`}
+        onClick={onInsights}
+        aria-label={L(portalLocaleToDictionaryLocale(locale), '洞察', 'Insights')}
+        aria-current={insightsActive ? 'page' : undefined}
       >
+        {/* 宝盒晶体:多切面钻石,呼应品牌,区别于今天(钟)/记忆(立方) */}
         <svg className="nesio-bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M4 8.2 12 4l8 4.2M4 8.2v9L12 21l8-3.8v-9M4 8.2 12 12.4l8-4.2M12 12.4V21" />
+          <path d="M6 3h12l3 5-9 13L3 8z" />
+          <path d="M3 8h18M9 3 7.5 8 12 21M15 3l1.5 5L12 21" />
         </svg>
-        <span className="nesio-bottom-nav-label">{t(locale, 'navMemory')}</span>
+        <span className="nesio-bottom-nav-label">{t(locale, 'navInsights')}</span>
       </button>
     </nav>
   );

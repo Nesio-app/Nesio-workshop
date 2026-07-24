@@ -32,6 +32,8 @@ const ToolsTreasurePopup = dynamic(() => import('./ToolsTreasureSheet'), { ssr: 
 const InventorySheet = dynamic(() => import('./InventorySheet'), { ssr: false });
 const RewardsStoreSheet = dynamic(() => import('./RewardsStoreSheet'), { ssr: false });
 const DailyBriefSheet = dynamic(() => import('./DailyBriefSheet').then((m) => m.DailyBriefSheet), { ssr: false });
+// 洞察 = 全屏浮层(非 surface):提到 Portal 层,底部导航从任意页都能开。1143 行,开时才加载。
+const InsightsSheet = dynamic(() => import('./InsightsSheet'), { ssr: false });
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
 import { openToolHref } from '@/lib/portal/open-tool';
 import {
@@ -426,6 +428,8 @@ export default function Portal() {
   const [moodOpen, setMoodOpen] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false); // 批次 176:每日简报全局挂载(例行卡 + Lab demo 都派 nesio-open-brief 打开)
   const [freezeOpen, setFreezeOpen] = useState(false);
+  const [insightsOpen, setInsightsOpen] = useState(false); // 洞察全屏浮层(底部导航第 3 个 tab / nesio-open-insights 事件打开)
+  const [insightsTab, setInsightsTab] = useState<'fitness' | undefined>(undefined);
   const [proGate, setProGate] = useState<string | null>(null); // 非 null = 显示 Pro 升级引导(值=功能名)
   // 跨账号本地数据冲突(P0 隐私):登录后本机数据归属与当前用户不符 → 阻断处理
   const [ownerConflict, setOwnerConflict] = useState<
@@ -754,6 +758,14 @@ export default function Portal() {
     const inventoryHandler = () => { track('inventory_open'); setInventoryOpen(true); };
     const rewardsHandler = () => { track('rewards_open'); setRewardsOpen(true); };
     const briefHandler = () => { track('brief_open', {}); setBriefOpen(true); };
+    // 洞察浮层:底部导航 / 卡片 / 「开始练」都派事件打开;detail.tab 指定进哪个 tab(如 fitness)
+    const insightsHandler = (e: Event) => {
+      const tab = (e as CustomEvent).detail?.tab;
+      track('insights_open', {});
+      setInsightsTab(tab === 'fitness' ? 'fitness' : undefined);
+      setInsightsOpen(true);
+    };
+    const trainingHandler = () => { setInsightsTab('fitness'); setInsightsOpen(true); };
     const workoutHandler = (e: Event) => { track('workout_start', {}); setWorkoutSession((e as CustomEvent).detail); };
     const proGateHandler = (e: Event) => {
       const feature = (e as CustomEvent).detail?.feature || 'pro';
@@ -782,6 +794,8 @@ export default function Portal() {
     window.addEventListener('nesio-open-inventory', inventoryHandler);
     window.addEventListener('nesio-open-rewards', rewardsHandler);
     window.addEventListener('nesio-open-brief', briefHandler);
+    window.addEventListener('nesio-open-insights', insightsHandler);
+    window.addEventListener('nesio-open-training', trainingHandler);
     window.addEventListener('nesio-start-workout', workoutHandler);
     return () => {
       window.removeEventListener('nesio-memory-search', memorySearchHandler);
@@ -793,6 +807,8 @@ export default function Portal() {
       window.removeEventListener('nesio-open-inventory', inventoryHandler);
       window.removeEventListener('nesio-open-rewards', rewardsHandler);
       window.removeEventListener('nesio-open-brief', briefHandler);
+      window.removeEventListener('nesio-open-insights', insightsHandler);
+      window.removeEventListener('nesio-open-training', trainingHandler);
       window.removeEventListener('nesio-start-workout', workoutHandler);
     };
   }, []);
@@ -1195,7 +1211,8 @@ export default function Portal() {
             onToday={() => setActiveSurface('today')}
             onTell={() => setActiveSurface(activeSurface === 'tell' ? 'today' : 'tell')}
             onAsk={handleAskFromCenterButton}
-            onMemory={() => setActiveSurface('memory')}
+            onInsights={() => { setInsightsTab(undefined); setInsightsOpen(true); }}
+            insightsActive={insightsOpen}
             onChatOpen={() => setChatOpen(true)}
           />
         )}
@@ -1313,6 +1330,19 @@ export default function Portal() {
             </button>
           </div>
         </div>
+      )}
+      {/* 洞察 = 全屏浮层(底部导航第 3 个 tab / nesio-open-insights 打开);从任意 surface 都能开 */}
+      {insightsOpen && (
+        <NesioSheet
+          variant="bottom"
+          open
+          onOpenChange={(next) => { if (!next) setInsightsOpen(false); }}
+          card={false}
+          className="nesio-settings-sheet-card nesio-insights-sheet-card"
+          ariaLabel={L(dict, 'Nesio 的洞察', "Nesio's insights")}
+        >
+          <InsightsSheet onClose={() => setInsightsOpen(false)} canUsePrivateData={canUsePrivateRuntime} initialTab={insightsTab} />
+        </NesioSheet>
       )}
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
       {workoutSession && <WorkoutPlayer session={workoutSession} onClose={() => setWorkoutSession(null)} />}

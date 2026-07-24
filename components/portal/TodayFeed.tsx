@@ -44,10 +44,6 @@ import { useTodayData } from './today/useTodayData';
 import { FocusModeSheet } from './today/FocusModeSheet';
 import { MeetingRecorderSheet } from './today/MeetingRecorderSheet';
 
-import NesioSheet from './ui/NesioSheet';
-
-// 1143-line analytics sheet — load on open, not at boot
-const InsightsSheet = dynamic(() => import('./InsightsSheet'), { ssr: false });
 const MoodTrendSheet = dynamic(() => import('./MoodTrendSheet'), { ssr: false });
 const MemoryNodeDetailLazy = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 import MemoryFlashBanner, { useMemoryFlash } from './MemoryFlashBanner';
@@ -71,7 +67,6 @@ export default function TodayFeed({
     proactiveCards, setProactiveCards,
     dismissedCardIds, setDismissedCardIds,
   } = useTodayData(canUsePrivateData);
-  const [mirrorOpen, setMirrorOpen] = useState(false);
   const [moodTrendOpen, setMoodTrendOpen] = useState(false);
   const [points, setPoints] = useState(0); // App 级积分(奖品商城),顶栏徽章
   useEffect(() => {
@@ -135,16 +130,11 @@ export default function TodayFeed({
       window.dispatchEvent(new CustomEvent('nesio-open-voice'));
     }
   }
-  const [insightsTab, setInsightsTab] = useState<'fitness' | undefined>(undefined);
-
-  // 健身 routine 卡「开始练」→ 打开洞察的健康 tab(训练计划在那)
+  // 心情第一拍「看趋势」→ 情绪趋势 sheet(洞察浮层现由 Portal 层挂载,见 nesio-open-insights)
   useEffect(() => {
-    const openTraining = () => { setInsightsTab('fitness'); setMirrorOpen(true); };
-    const openMoodTrend = () => setMoodTrendOpen(true); // 批次 136:心情第一拍「看趋势」→ 情绪趋势 sheet
-    window.addEventListener('nesio-open-training', openTraining);
+    const openMoodTrend = () => setMoodTrendOpen(true);
     window.addEventListener('nesio-open-mood-trend', openMoodTrend);
     return () => {
-      window.removeEventListener('nesio-open-training', openTraining);
       window.removeEventListener('nesio-open-mood-trend', openMoodTrend);
     };
   }, []);
@@ -241,10 +231,10 @@ export default function TodayFeed({
       <header className="nesio-today-header">
         <button
           type="button"
-          data-tour="insights"
+          data-tour="memory"
           className="nesio-today-brand"
-          aria-label={L(uiLocale, '打开 Nesio 洞察', "Open Nesio insights")}
-          onClick={() => { setInsightsTab(undefined); setMirrorOpen(true); }}
+          aria-label={L(uiLocale, '打开记忆', 'Open memory')}
+          onClick={() => onOpenMemory?.()}
         >
           <NesioMark className="nesio-today-brand-icon" />
         </button>
@@ -282,7 +272,7 @@ export default function TodayFeed({
         {canUsePrivateData && (
           <ReengageNudgeCard
             nodes={allNodes}
-            onOpenInsights={() => { setInsightsTab(undefined); setMirrorOpen(true); }}
+            onOpenInsights={() => window.dispatchEvent(new CustomEvent('nesio-open-insights'))}
           />
         )}
 
@@ -366,20 +356,6 @@ export default function TodayFeed({
       {guideDetailNode && typeof document !== 'undefined' && createPortal(
         <MemoryNodeDetailLazy node={guideDetailNode} onClose={() => setGuideDetailNode(null)} />,
         document.body,
-      )}
-
-      {/* Insights mirror */}
-      {mirrorOpen && (
-        <NesioSheet
-          variant="bottom"
-          open
-          onOpenChange={(next) => { if (!next) setMirrorOpen(false); }}
-          card={false}
-          className="nesio-settings-sheet-card nesio-insights-sheet-card"
-          ariaLabel={L(uiLocale, 'Nesio 的洞察', "Nesio's insights")}
-        >
-          <InsightsSheet onClose={() => setMirrorOpen(false)} canUsePrivateData={canUsePrivateData} initialTab={insightsTab} />
-        </NesioSheet>
       )}
 
       {/* 批次 136:情绪趋势(心情第一拍「看趋势」进来) */}

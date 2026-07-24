@@ -736,6 +736,7 @@ const STRINGS = {
     langSoonHint: '界面翻译完成一种就开放一种,不给不生效的选项。',
     navToday: '今天',
     navMemory: '记忆',
+    navInsights: '洞察',
   },
   en: {
     settingsTitle: 'Account',
@@ -1461,6 +1462,7 @@ const STRINGS = {
     langSoonHint: 'Each language opens as its translation completes — no options that do nothing.',
     navToday: 'Today',
     navMemory: 'Memory',
+    navInsights: 'Insights',
   },
 } as const;
 
