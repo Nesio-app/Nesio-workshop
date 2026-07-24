@@ -78,6 +78,14 @@ interface Draft {
 }
 const EMPTY_DRAFT: Draft = { name: '', garmentType: 'top', warmth: 2, formality: 'casual', colors: '', dataUrl: null, mimeType: 'image/jpeg' };
 
+// C｜试穿:全身照存本机(固定 id,一张),localStorage 记有没有
+const BODY_ASSET_ID = 'nesio-wardrobe-body';
+const BODY_FLAG = 'nesio-wardrobe-body-v1';
+function dataUrlToPart(dataUrl: string): { base64: string; mime: string } | null {
+  const m = /^data:(image\/[a-z+]+);base64,(.*)$/i.exec(dataUrl);
+  return m ? { mime: m[1], base64: m[2] } : null;
+}
+
 export default function WardrobePanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [items, setItems] = useState<Garment[]>([]);
@@ -96,6 +104,13 @@ export default function WardrobePanel() {
   // B｜反馈学习:本地偏好(喜欢的颜色 / 拒绝的组合),回喂规则版 + 云造型师
   const [prefs, setPrefs] = useState<OutfitPrefs>({ colorLikes: {}, dislikedItemIds: [], dislikedPairs: [] });
   const [fbFlash, setFbFlash] = useState<string | null>(null);
+  // C｜上身试穿
+  const [tryonOpen, setTryonOpen] = useState(false);
+  const [tryonBusy, setTryonBusy] = useState(false);
+  const [tryonError, setTryonError] = useState<string | null>(null);
+  const [tryonResult, setTryonResult] = useState<string | null>(null);
+  const [bodyThumb, setBodyThumb] = useState<string | null>(null);
+  const bodyFileRef = useRef<HTMLInputElement>(null);
   const isPro = canUsePaidCloudAi();
 
   const load = () => { try { setItems(listWardrobe()); } catch { setItems([]); } };
@@ -105,6 +120,65 @@ export default function WardrobePanel() {
     window.addEventListener('nesio-life-graph-updated', load);
     return () => window.removeEventListener('nesio-life-graph-updated', load);
   }, []);
+
+  // 全身照(试穿用):有就读缩略图
+  useEffect(() => {
+    (async () => {
+      try {
+        if (localStorage.getItem(BODY_FLAG) !== '1') return;
+        const { getLocalImage } = await import('@/lib/portal/local-image-store');
+        const url = await getLocalImage(BODY_ASSET_ID);
+        if (url) setBodyThumb(url);
+      } catch { /* ignore */ }
+    })();
+  }, []);
+
+  const onPickBody = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    setTryonError(null);
+    try {
+      const { dataUrl } = await compressImage(file);
+      const { putLocalImage } = await import('@/lib/portal/local-image-store');
+      const ok = await putLocalImage(BODY_ASSET_ID, dataUrl);
+      if (!ok) { setTryonError(L(dict, '全身照存不下了(存储空间满),清点空间再试。', 'Could not save the photo (storage full).')); return; }
+      try { localStorage.setItem(BODY_FLAG, '1'); } catch { /* ignore */ }
+      setBodyThumb(dataUrl);
+    } catch { setTryonError(L(dict, '这张图读不了,换一张试试。', 'Could not read that image — try another.')); }
+  };
+
+  // 试穿:全身照 + 这套单品照 → 云端合成上身效果
+  const runTryon = async (pieces: Garment[]) => {
+    if (!isPro) { guardPaidCloudAi('wardrobe-tryon'); return; }
+    if (!bodyThumb) { setTryonError(L(dict, '先上传一张全身照。', 'Add a full-body photo first.')); return; }
+    const person = dataUrlToPart(bodyThumb);
+    if (!person) { setTryonError(L(dict, '全身照读不了,重新上传一张。', 'Body photo unreadable — re-upload.')); return; }
+    setTryonBusy(true); setTryonError(null); setTryonResult(null);
+    try {
+      const { getLocalImage } = await import('@/lib/portal/local-image-store');
+      const garments: Array<{ base64: string; mime: string }> = [];
+      for (const p of pieces) {
+        if (!p.assetId) continue;
+        const url = await getLocalImage(p.assetId);
+        const part = url ? dataUrlToPart(url) : null;
+        if (part) garments.push(part);
+      }
+      if (garments.length === 0) { setTryonError(L(dict, '这套里的单品还没有照片 —— 先给它们拍照/上传,才能试穿。', 'Outfit pieces have no photos yet — add photos to try on.')); setTryonBusy(false); return; }
+      const res = await fetch('/api/portal/wardrobe-tryon', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
+        body: JSON.stringify({ person, garments }),
+      });
+      const data = await res.json() as { ok?: boolean; dataUrl?: string; message?: string };
+      if (data?.ok && data.dataUrl) setTryonResult(data.dataUrl);
+      else setTryonError(data?.message || L(dict, '试穿没成功,过会儿再试。', 'Try-on failed — try again later.'));
+    } catch {
+      setTryonError(L(dict, '试穿没成功,过会儿再试。', 'Try-on failed — try again later.'));
+    } finally {
+      setTryonBusy(false);
+    }
+  };
 
   // 记一条反馈(👍/👎/穿了)→ 更新本地偏好 + 触发重排(dislike 会避开这套)
   const giveFeedback = (kind: 'like' | 'dislike' | 'worn', pieces: Garment[]) => {
@@ -186,6 +260,9 @@ export default function WardrobePanel() {
     const list = stylist.pieceIds.map((id) => byId.get(id)).filter(Boolean) as Garment[];
     return list.length ? list : null;
   }, [stylist, items]);
+
+  // 当前这套(AI 优先,否则规则版)—— 试穿/反馈都用它
+  const currentPieces = aiPieces ?? outfit.pieces;
 
   const grouped = useMemo(() => {
     const map = new Map<GarmentType, Garment[]>();
@@ -323,6 +400,10 @@ export default function WardrobePanel() {
                   style={{ padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', cursor: 'pointer', fontSize: 'var(--text-sm)' }}>👍</button>
                 <button type="button" aria-label={L(dict, '不喜欢', 'Dislike')} onClick={() => giveFeedback('dislike', pieces)}
                   style={{ padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', cursor: 'pointer', fontSize: 'var(--text-sm)' }}>👎</button>
+                <button type="button" onClick={() => { setTryonOpen(true); setTryonResult(null); setTryonError(null); }}
+                  style={{ marginLeft: 'auto', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
+                  {L(dict, '🪞 试穿这套', '🪞 Try on')}
+                </button>
               </>
             )}
           </div>
@@ -346,6 +427,66 @@ export default function WardrobePanel() {
             ? L(dict, '衣橱还空着。把衣服拍进来,我就能每天按天气和日程帮你搭一套。', 'Your wardrobe is empty. Add clothes and I’ll suggest a daily outfit by weather and schedule.')
             : L(dict, '再多加几件,就能自动搭出完整一套。', 'Add a few more pieces to get a full outfit.')}
         </p>
+      )}
+
+      {/* C｜上身试穿(展开在搭配卡下方) */}
+      {tryonOpen && (
+        <div style={{ ...card, marginTop: 'var(--space-3)', background: 'var(--glass-bg-solid, var(--portal-bg))' }}>
+          <input ref={bodyFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onPickBody} />
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>🪞 {L(dict, '上身试穿', 'Virtual try-on')}</span>
+            <button type="button" onClick={() => setTryonOpen(false)} aria-label={L(dict, '收起', 'Close')}
+              style={{ background: 'none', border: 'none', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+          </div>
+
+          {tryonResult ? (
+            <div style={{ marginTop: 'var(--space-3)' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={tryonResult} alt={L(dict, '试穿效果', 'Try-on result')} style={{ width: '100%', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)' }} />
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+                <a href={tryonResult} download="nesio-tryon.png" style={{ flex: 1, textAlign: 'center', padding: '0.5rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', textDecoration: 'none' }}>{L(dict, '保存图片', 'Save image')}</a>
+                <button type="button" onClick={() => runTryon(currentPieces)} disabled={tryonBusy}
+                  style={{ flex: 1, padding: '0.5rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', cursor: tryonBusy ? 'default' : 'pointer', opacity: tryonBusy ? 0.6 : 1 }}>{L(dict, '再试一次', 'Try again')}</button>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* 全身照 */}
+              <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'center', marginTop: 'var(--space-3)' }}>
+                <button type="button" onClick={() => bodyFileRef.current?.click()}
+                  style={{ flexShrink: 0, width: 64, height: 84, borderRadius: 'var(--radius-md)', border: '1px dashed var(--portal-accent-border)', background: 'var(--portal-accent-soft)', cursor: 'pointer', overflow: 'hidden', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', padding: 0 }}>
+                  {bodyThumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={bodyThumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                  ) : L(dict, '📷 全身照', '📷 Full body')}
+                </button>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
+                    {bodyThumb
+                      ? L(dict, '用这张全身照把这套穿上看看。可随时换一张。', 'Use this full-body photo to see the outfit on you. Swap anytime.')
+                      : L(dict, '上传一张全身照(正面、光线好),就能看这套穿在你身上的样子。', 'Add a full-body photo (front, good light) to see the outfit on you.')}
+                  </p>
+                  {bodyThumb && (
+                    <button type="button" onClick={() => bodyFileRef.current?.click()}
+                      style={{ marginTop: '0.4rem', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>{L(dict, '换全身照', 'Change photo')}</button>
+                  )}
+                </div>
+              </div>
+
+              {tryonError && (
+                <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>{tryonError}</p>
+              )}
+
+              <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-3)', opacity: tryonBusy ? 0.6 : 1 }}
+                disabled={tryonBusy} onClick={() => runTryon(currentPieces)}>
+                {tryonBusy ? L(dict, '生成中…(约十几秒)', 'Generating… (~15s)') : !isPro ? L(dict, '试穿这套(Pro)', 'Try on (Pro)') : L(dict, '试穿这套', 'Try on')}
+              </button>
+              <p style={{ margin: 'var(--space-2) 0 0', fontSize: '0.62rem', color: 'var(--portal-muted)', lineHeight: 1.5 }}>
+                {L(dict, '全身照只存在你手机本地,仅在点「试穿」时用于生成,服务端不留存。', 'Your photo stays on your device — sent only when you tap Try on, never stored on the server.')}
+              </p>
+            </>
+          )}
+        </div>
       )}
 
       {/* ② 加衣服 */}
