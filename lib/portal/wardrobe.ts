@@ -175,6 +175,7 @@ export interface OutfitSuggestion {
   needUmbrella: boolean;
   reason: [string, string];
   gaps: GarmentType[];       // 该有却没挑到的类型(衣橱缺口)
+  mismatch: [string, string] | null; // 被迫选了不协调的一套(如毛衣配短裤)→ 诚实提示,不装好看
 }
 
 /** 今日日历 → 正式度需求。纯正则,不依赖 attention-engine(可测)。 */
@@ -222,6 +223,51 @@ function pickBest(pool: Garment[], target: Warmth, need: Formality, todayMs: num
     .sort((a, b) => b.s - a.s)[0].g;
 }
 
+/* ── 审美/协调:季节 · 色彩 · 上下装联合评分(避免「毛衣配短裤」这类乱搭) ── */
+
+type Season = 'warm' | 'mid' | 'cool';
+// 名字里的季节信号优先(比保暖档数字更可靠 —— 毛衣就是凉季、短裤就是热季)
+const COOL_RE = /毛衣|针织|卫衣|大衣|风衣|羽绒|棉服|夹克|长袖|高领|turtleneck|sweater|knit|coat|hoodie|fleece|down|cardigan|wool/i;
+const WARM_RE = /短裤|背心|吊带|短袖|t恤|tee|shorts|tank|sleeveless|凉鞋|sandal|linen|亚麻/i;
+function garmentSeason(g: Garment): Season {
+  if (WARM_RE.test(g.name)) return 'warm';
+  if (COOL_RE.test(g.name)) return 'cool';
+  return g.warmth === 1 ? 'warm' : g.warmth === 3 ? 'cool' : 'mid';
+}
+function seasonConflict(a: Garment, b: Garment): boolean {
+  const x = garmentSeason(a), y = garmentSeason(b);
+  return (x === 'warm' && y === 'cool') || (x === 'cool' && y === 'warm');
+}
+// 中性色百搭(含牛仔);两件都是彩色且不同 → 可能撞色
+const NEUTRAL_RE = /黑|白|灰|米|卡其|藏青|驼|裸|棕|米白|牛仔|black|white|gray|grey|beige|navy|khaki|cream|tan|denim|brown/i;
+function isNeutral(g: Garment): boolean { return g.colors.length === 0 || g.colors.every((c) => NEUTRAL_RE.test(c)); }
+function colorHarmony(a: Garment, b: Garment): number {
+  if (isNeutral(a) || isNeutral(b)) return 1;                     // 至少一件中性 → 百搭
+  if (a.colors.some((c) => b.colors.includes(c))) return 0.5;    // 同色系呼应
+  return -1;                                                      // 两件彩色且不同 → 扣分
+}
+
+/** 上装×下装是否明显不协调(季节冲突 or 保暖档差 ≥2)。 */
+function incoherent(top: Garment, bottom: Garment): boolean {
+  return seasonConflict(top, bottom) || Math.abs(top.warmth - bottom.warmth) >= 2;
+}
+function incoherenceNote(top: Garment, bottom: Garment): [string, string] {
+  return [
+    `手头「${top.name}」配「${bottom.name}」季节不太搭 —— 补一件更配的,整套会更协调。`,
+    `“${top.name}” with “${bottom.name}” mixes seasons — add a better match for a more coherent look.`,
+  ];
+}
+
+/** 上下装一对的联合分:各自契合 + 保暖协调 + 季节一致 + 正式度一致 + 色彩和谐。 */
+function pairScore(top: Garment, bottom: Garment, target: Warmth, need: Formality, todayMs: number): number {
+  let s = scoreGarment(top, target, need, todayMs) + scoreGarment(bottom, target, need, todayMs);
+  if (Math.abs(top.warmth - bottom.warmth) >= 2) s -= 6;         // 保暖档差太多(厚配薄)
+  if (seasonConflict(top, bottom)) s -= 8;                       // 季节冲突(毛衣配短裤)
+  if (Math.abs(FORMALITY_RANK[top.formality] - FORMALITY_RANK[bottom.formality]) >= 2) s -= 4; // 正式度撕裂
+  s += colorHarmony(top, bottom) * 2;                           // 色彩和谐
+  return s;
+}
+
 /**
  * 每日穿搭(纯规则)。按天气定保暖档+是否外套、按日历定正式度,从衣橱各类挑最合适一件组一套。
  * 衣橱为空/太少 → pieces 为空(由 outfitFindings 决定是否出引导卡)。
@@ -239,16 +285,28 @@ export function suggestOutfit(
   const pieces: Garment[] = [];
   const gaps: GarmentType[] = [];
   const want = (present: boolean, type: GarmentType) => { if (!present) gaps.push(type); };
+  let mismatch: [string, string] | null = null;
 
-  // 主体:优先上装+下装;两者不全但有连衣裙 → 连衣裙
-  const top = pickBest(byType('top'), target, need, todayMs);
-  const bottom = pickBest(byType('bottom'), target, need, todayMs);
+  // 主体:上装×下装挑**最协调的一对**(联合评分:保暖/季节/正式度/色彩),避免「毛衣配短裤」;
+  // 两者不全但有连衣裙 → 连衣裙(本身自洽)。手头只有乱搭的一对时仍给出,但诚实标注 mismatch。
+  const tops = byType('top');
+  const bottoms = byType('bottom');
   const dress = pickBest(byType('dress'), target, need, todayMs);
-  if (top && bottom) {
-    pieces.push(top, bottom);
+  if (tops.length && bottoms.length) {
+    let best: { top: Garment; bottom: Garment; s: number } | null = null;
+    for (const tp of tops) for (const bt of bottoms) {
+      const s = pairScore(tp, bt, target, need, todayMs);
+      if (!best || s > best.s) best = { top: tp, bottom: bt, s };
+    }
+    if (best) {
+      pieces.push(best.top, best.bottom);
+      if (incoherent(best.top, best.bottom)) mismatch = incoherenceNote(best.top, best.bottom);
+    }
   } else if (dress) {
     pieces.push(dress);
   } else {
+    const top = pickBest(tops, target, need, todayMs);
+    const bottom = pickBest(bottoms, target, need, todayMs);
     if (top) pieces.push(top); else want(false, 'top');
     if (bottom) pieces.push(bottom); else want(false, 'bottom');
   }
@@ -275,6 +333,7 @@ export function suggestOutfit(
     needUmbrella,
     reason: buildReason(ctx, target, needOuter, need, needUmbrella),
     gaps,
+    mismatch,
   };
 }
 
@@ -343,11 +402,13 @@ export function outfitFindings(
     }];
   }
   const names = s.pieces.map((p) => p.name).slice(0, 4).join(' · ');
+  const zhTail = s.mismatch ? `\n⚠ ${s.mismatch[0]}` : '';
+  const enTail = s.mismatch ? `\n⚠ ${s.mismatch[1]}` : '';
   return [{
     id: `outfit-${day}`,
     severity: 'attention',
     title: [`今天穿这套 · ${s.pieces.length} 件`, `Today’s outfit · ${s.pieces.length} pieces`],
-    body: [`${s.reason[0]}\n${names}`, `${s.reason[1]}\n${names}`],
+    body: [`${s.reason[0]}\n${names}${zhTail}`, `${s.reason[1]}\n${names}${enTail}`],
     cta: ['打开衣橱看搭配', 'See the outfit'],
   }];
 }

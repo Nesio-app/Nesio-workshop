@@ -232,6 +232,9 @@ export default function WardrobePanel() {
           {outfit.needUmbrella && (
             <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-calm)' }}>☔ {L(dict, '今天可能下雨,记得带伞', 'Rain likely — take an umbrella')}</p>
           )}
+          {outfit.mismatch && (
+            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>⚠ {dict === 'en' ? outfit.mismatch[1] : outfit.mismatch[0]}</p>
+          )}
         </div>
       ) : (
         <p className="nesio-insights-empty" style={{ marginTop: 0 }}>
