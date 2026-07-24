@@ -399,6 +399,14 @@ export function inventoryFindingsToGuidanceEvents(
   return insightsToGuidanceEvents('inventory', '📦', '收纳', items);
 }
 
+// 穿搭:衣橱(object garment 节点)+ 天气 + 日历 → 每日一套。findings 由 lib/portal/wardrobe 的
+// outfitFindings 算好(纯规则,免费/端上),这里只做归一映射。点卡打开洞察「衣橱」tab。
+export function outfitFindingsToGuidanceEvents(
+  items: readonly DomainInsightItem[],
+): GuidanceEvent[] {
+  return insightsToGuidanceEvents('outfit', '👔', '穿搭', items);
+}
+
 // 地图:placeFindings(活动范围/习惯断档,只出 attention 轻观察)→ 域洞察。
 const PLACE_CTA: [string, string] = ['来自你的足迹数据,想看细节可以打开时间线。', 'From your own places data — open Timeline for details.'];
 
