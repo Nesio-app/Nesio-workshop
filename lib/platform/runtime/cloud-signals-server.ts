@@ -6,7 +6,9 @@ import {
   type CloudRuntimeConfig,
 } from '@/lib/portal/cloud-server-runtime';
 import { embedSignalText } from '@/lib/life-domain/signal-embedding';
-import { encryptSignalRowColumns } from '@/lib/portal/cloud/field-encryption';
+import { encryptSignalRowColumns, decryptSignalRowColumns } from '@/lib/portal/cloud/field-encryption';
+import { envValue } from '@/lib/portal/env';
+import type { CloudIdentity } from '@/lib/portal/cloud-identity';
 import type { Signal } from '@/lib/life-domain/signal';
 
 export type CloudSignalWriteResult = {
@@ -72,6 +74,38 @@ async function signalRow(identityKey: string, userId: string | null, signal: Sig
   });
 }
 
+/**
+ * 单用户自用入口(Alexa/Shortcuts secret 路径)的归属身份:
+ * NESIO_OWNER_ID = owner 的 Supabase user id(UUID)→ deriveCloudIdentity 得到
+ * `supabase:<uuid>`,与 owner 登录后 App 写云用的 identity_key 完全一致 ——
+ * 于是语音随口记 / 随口问 都落在、读自「和 App 同一片记忆」。
+ */
+export function resolveOwnerIdentity(): CloudIdentity | null {
+  const ownerId = envValue('NESIO_OWNER_ID').trim();
+  if (!ownerId) return null;
+  return deriveCloudIdentity({ id: ownerId });
+}
+
+async function writeSignalsForIdentity(
+  config: CloudRuntimeConfig,
+  identity: CloudIdentity,
+  signals: readonly Signal[],
+): Promise<CloudSignalWriteResult> {
+  const url = new URL('/rest/v1/signals', config.supabaseUrl);
+  url.searchParams.set('on_conflict', 'identity_key,signal_id');
+  const rows = await Promise.all(signals.map((signal) => signalRow(identity.identityKey, identity.userId, signal)));
+  const response = await fetch(url.toString(), {
+    method: 'POST',
+    headers: restHeaders(config),
+    body: JSON.stringify(rows),
+    cache: 'no-store',
+  });
+  if (!response.ok) {
+    return { ok: false, writesCloud: false, savedCount: 0, error: 'cloud_write_failed', status: response.status };
+  }
+  return { ok: true, writesCloud: true, savedCount: signals.length };
+}
+
 export async function writeCloudSignalsForCurrentUser(signals: readonly Signal[]): Promise<CloudSignalWriteResult> {
   if (!signals.length) return { ok: true, writesCloud: false, savedCount: 0 };
 
@@ -83,21 +117,33 @@ export async function writeCloudSignalsForCurrentUser(signals: readonly Signal[]
   const userSession = await getSignedInUser(config);
   const cloudIdentity = deriveCloudIdentity(userSession.user);
   if (!cloudIdentity) {
-    return { ok: false, writesCloud: false, savedCount: 0, error: 'not_signed_in', status: 401 };
+    // 有 cookie 会话时按会话归属;无会话(如 Alexa secret 路径)回落 owner 身份,
+    // 否则单用户语音捕获会静默丢失(top-level ok 却 not_signed_in)。
+    const owner = resolveOwnerIdentity();
+    if (!owner) return { ok: false, writesCloud: false, savedCount: 0, error: 'not_signed_in', status: 401 };
+    return writeSignalsForIdentity(config, owner, signals);
   }
 
+  return writeSignalsForIdentity(config, cloudIdentity, signals);
+}
+
+/**
+ * 读回某身份的云 signals(服务端 service-role),解密后原始行返回。
+ * 供 /api/alexa 语音召回排序用。deleted_at is null,按 captured_at 倒序取近 N 条。
+ */
+export async function readCloudSignalRowsForIdentity(
+  config: CloudRuntimeConfig,
+  identityKey: string,
+  limit = 200,
+): Promise<{ ok: boolean; rows: Array<Record<string, unknown>>; error?: string }> {
   const url = new URL('/rest/v1/signals', config.supabaseUrl);
-  url.searchParams.set('on_conflict', 'identity_key,signal_id');
-  const rows = await Promise.all(signals.map((signal) => signalRow(cloudIdentity.identityKey, cloudIdentity.userId, signal)));
-  const response = await fetch(url.toString(), {
-    method: 'POST',
-    headers: restHeaders(config),
-    body: JSON.stringify(rows),
-    cache: 'no-store',
-  });
-
-  if (!response.ok) {
-    return { ok: false, writesCloud: false, savedCount: 0, error: 'cloud_write_failed', status: response.status };
-  }
-  return { ok: true, writesCloud: true, savedCount: signals.length };
+  url.searchParams.set('identity_key', `eq.${identityKey}`);
+  url.searchParams.set('deleted_at', 'is.null');
+  url.searchParams.set('select', 'signal_id,source,type,occurred_at,captured_at,title,payload,entities,evidence,confidence,sensitivity,retention_policy,feedback,embedding_text');
+  url.searchParams.set('order', 'captured_at.desc');
+  url.searchParams.set('limit', String(Math.max(1, Math.min(limit, 500))));
+  const response = await fetch(url.toString(), { headers: restHeaders(config), cache: 'no-store' });
+  if (!response.ok) return { ok: false, rows: [], error: `cloud_read_${response.status}` };
+  const raw = await response.json() as Array<Record<string, unknown>>;
+  return { ok: true, rows: raw.map((row) => decryptSignalRowColumns(row)) };
 }

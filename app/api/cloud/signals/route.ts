@@ -3,6 +3,7 @@ import { deriveCloudIdentity } from '@/lib/portal/cloud-identity';
 import * as cloudRuntime from '@/lib/portal/cloud-server-runtime';
 import { embedSignalText, signalEmbeddingModel, signalVectorSearchEnabled } from '@/lib/life-domain/signal-embedding';
 import { encryptSignalRowColumns, decryptSignalRowColumns } from '@/lib/portal/cloud/field-encryption';
+import { sortRowsForQuery } from '@/lib/portal/cloud/signal-search';
 import type { Signal, SignalSensitivity, SignalSource, RetentionPolicy } from '@/lib/life-domain/signal';
 
 const SIGNAL_SCHEMA_VERSION = 'Signal@v1';
@@ -103,64 +104,6 @@ function buildSignalSearchText(signal: Pick<Signal, 'title' | 'source' | 'type' 
     JSON.stringify(signal.payload || {}),
     signal.evidence?.raw || '',
   ].join(' ').slice(0, 8000);
-}
-
-function tokenizeSearchQuery(value: string): string[] {
-  const normalized = value
-    .toLowerCase()
-    .replace(/[，。！？；：、,.!?;:()[\]{}"'`~@#$%^&*_+=|\\/<>-]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  const words = normalized.split(' ').filter(Boolean);
-  const cjk = Array.from(normalized.matchAll(/[\u4e00-\u9fff]{1,4}/g)).map((match) => match[0]);
-  return Array.from(new Set([...words, ...cjk])).filter(Boolean);
-}
-
-function stringifySearchValue(value: unknown): string {
-  if (value == null) return '';
-  if (typeof value === 'string') return value;
-  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return '';
-  }
-}
-
-function scoreCloudSignalRow(row: Record<string, unknown>, query: string): number {
-  const tokens = tokenizeSearchQuery(query);
-  if (!tokens.length) return 0;
-  const haystack = [
-    row.title,
-    row.source,
-    row.type,
-    row.embedding_text,
-    stringifySearchValue(row.payload),
-    stringifySearchValue(row.entities),
-    stringifySearchValue(row.evidence),
-    stringifySearchValue(row.feedback),
-  ].join(' ').toLowerCase();
-  let score = 0;
-  for (const token of tokens) {
-    if (haystack.includes(token)) score += token.length >= 2 ? 2 : 1;
-  }
-  const title = typeof row.title === 'string' ? row.title.toLowerCase() : '';
-  if (title && query.toLowerCase().includes(title)) score += 4;
-  const confidence = typeof row.confidence === 'number' ? row.confidence : 0.6;
-  const capturedAt = typeof row.captured_at === 'string' ? Date.parse(row.captured_at) : NaN;
-  const ageHours = Number.isFinite(capturedAt) ? (Date.now() - capturedAt) / 3_600_000 : NaN;
-  const recencyBoost = Number.isFinite(ageHours) ? Math.max(0, 1.2 - ageHours / 168) : 0;
-  return score + confidence * 0.8 + recencyBoost;
-}
-
-function sortRowsForQuery(rows: Array<Record<string, unknown>>, query: string, limit: number): Array<Record<string, unknown>> {
-  if (!query) return rows.slice(0, limit);
-  return rows
-    .map((row) => ({ row, score: scoreCloudSignalRow(row, query) }))
-    .filter((entry) => entry.score > 0.3)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit)
-    .map((entry) => entry.row);
 }
 
 function sanitizeSignal(input: unknown): Signal | null {

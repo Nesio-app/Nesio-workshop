@@ -31,10 +31,17 @@ Echo 设备 → Alexa 云(ASR+NLU) → POST https://<你的域名>/api/alexa
 | 变量 | 作用 | 必填 |
 |------|------|------|
 | `ALEXA_SKILL_ID` | 你的技能 ID（`amzn1.ask.skill.xxxx`）；端点用它校验 `applicationId`，挡别人的技能乱打 | ✅ |
-| `INGEST_SHARED_SECRET` | 个人单用户回落：捕获直接落到 owner 的记忆（无账号关联时用） | 个人版必填 |
+| `INGEST_SHARED_SECRET` | 个人单用户「随口记」凭证：捕获直接落到 owner 的记忆（无账号关联时用） | 个人版必填 |
+| `NESIO_OWNER_ID` | owner 的 **Supabase user id（UUID）**；让「随口记 / 随口问」都落在、读自「和 App 同一片记忆」 | 个人版必填（问一问需要） |
 
 > 多用户 / 上架版应改用**账号关联（Account Linking）**：Alexa 带 `accessToken` 过来，
-> 端点用它归属用户，不再依赖共享密钥。个人自用配 `INGEST_SHARED_SECRET` 即可。
+> 端点用它归属用户，不再依赖共享密钥 / owner id。个人自用配 `INGEST_SHARED_SECRET` + `NESIO_OWNER_ID` 即可。
+
+### 怎么找到我的 `NESIO_OWNER_ID`
+
+在**登录了 Nesio App 的浏览器**里,直接打开 `https://<你的域名>/api/alexa`(GET)。
+返回 JSON 里的 `signedInOwner.userId` 就是你的 Supabase user id —— 复制它填到
+`NESIO_OWNER_ID`。没登录会显示 `signedInOwner: null` 并提示先登录。
 
 ---
 
@@ -72,13 +79,20 @@ Echo 设备 → Alexa 云(ASR+NLU) → POST https://<你的域名>/api/alexa
 | "Alexa, tell nessa to remember the passport is in the top drawer" | 入档一条记忆 |
 | "Alexa, ask nessa to note the wifi password is sunflower42" | 入档一条记忆 |
 | "Alexa, open nessa" | 欢迎语 + 引导 |
-| "Alexa, ask nessa where my passport is" | v2 占位：先引导回 App（语音召回下一步做） |
+| "Alexa, ask nessa where my passport is" | 读你的记忆 → 一句话念回答案（查不到会诚实说没找到） |
 
 ---
 
 ## 路线（诚实标注）
 
-- ✅ **v1（本次）：** 随口说入档（capture → ingest）。这是最有价值、最稳的一环。
-- 🔜 **v2：** 语音召回（ask → 云端/本地语义搜索念回答）。现在是诚实占位，不假装能查。
-- 🔜 **v2：** 账号关联多用户；证书链完整校验（上架必需）。
+- ✅ **v1：** 随口说入档（capture → ingest，诚实态:仅真落库才回 saved）。
+- ✅ **v2（本次）：** 语音召回（ask → 服务端读 owner 云记忆 → 评分排序 → 云 LLM 一句话念回；
+  LLM 挂了确定性兜底把命中记忆原样念回，不静默变哑）。
+- 🔜 账号关联多用户；证书链完整校验（上架必需）。
 - ❌ **不做：** 中文语音（Alexa 无中文 NLU，架构性限制，不是没写）。
+
+## 隐私 / 成本说明（owner 自用）
+
+问一问会把命中的记忆片段发给云 LLM 组织答案 —— 这是 owner 自用、已明示不计成本/隐私的
+取舍。它**不**改变产品对普通付费/免费用户的边界(那条线仍由 `guardAiRoute` +
+`requirePaidCloudAi` 把守);Alexa 端点走的是 owner 身份的私有通道。
