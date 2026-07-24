@@ -34,6 +34,33 @@ export interface PlayerSession {
   sessionId?: string;
 }
 
+// 简单声音卡点:WebAudio 生一个短音,不用任何音频资源。首次由用户手势(点按钮)触发,
+// iOS 才允许出声。失败(无 AudioContext / 被策略挡)静默,不影响练。
+let _audioCtx: AudioContext | null = null;
+function tone(freq: number, ms: number) {
+  try {
+    if (typeof window === 'undefined') return;
+    const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AC) return;
+    _audioCtx = _audioCtx || new AC();
+    if (_audioCtx.state === 'suspended') void _audioCtx.resume();
+    const o = _audioCtx.createOscillator();
+    const g = _audioCtx.createGain();
+    o.type = 'sine';
+    o.frequency.value = freq;
+    o.connect(g);
+    g.connect(_audioCtx.destination);
+    const t = _audioCtx.currentTime;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.3, t + 0.008);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
+    o.start(t);
+    o.stop(t + ms / 1000 + 0.02);
+  } catch { /* 无音频不影响练 */ }
+}
+
+const REP_TEMPO_SEC = 3; // 跟拍:每次约 3 秒(1 秒发力 + 2 秒还原)
+
 function resolve(id: string, dict: string): { name: string; muscles?: Array<{ n: string; t: 'p' | 's' }>; cues?: string[]; neural?: string[]; animFrames?: string[]; animFps?: number; animPingpong?: boolean; gif?: string } {
   const ex = exerciseById(id);
   if (ex) {
@@ -53,7 +80,12 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   const [setNum, setSetNum] = useState(1);
   const [phase, setPhase] = useState<'work' | 'rest' | 'done'>('work');
   const [countdown, setCountdown] = useState<number | null>(null);
+  const [repCount, setRepCount] = useState(0); // 跟拍进行中的当前次数(0 = 未跟拍)
+  const [muted, setMuted] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mutedRef = useRef(false);
+  mutedRef.current = muted; // 供 setInterval 闭包读到最新静音态
+  const ping = (freq: number, ms = 80) => { if (!mutedRef.current) tone(freq, ms); };
 
   useSheetDismiss(true, onClose); // 挂载即打开;Escape 关闭 + 焦点回收
 
@@ -74,18 +106,36 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   const clearTimer = () => { if (timerRef.current) { clearInterval(timerRef.current); timerRef.current = null; } };
   useEffect(() => () => clearTimer(), []);
 
-  // 倒计时通用:到 0 时调用 onEnd
+  // 倒计时通用:末段读秒声(最后 3 秒短音 + 结束长音),到 0 时调用 onEnd
   function runCountdown(sec: number, onEnd: () => void) {
     clearTimer();
     setCountdown(sec);
     timerRef.current = setInterval(() => {
       setCountdown((c) => {
         if (c == null) return c;
-        if (c <= 1) { clearTimer(); onEnd(); return null; }
+        if (c <= 1) { clearTimer(); ping(1320, 220); onEnd(); return null; }
+        if (c <= 4) ping(880, 70); // 剩 3、2、1 秒各一声,提示准备
         return c - 1;
       });
     }, 1000);
   }
+
+  // 跟拍做(reps):每 REP_TEMPO_SEC 秒一声、次数 +1,到目标次数发完成长音后停(等用户点完成这组)。
+  function startRepTempo() {
+    if (!step) return;
+    clearTimer();
+    setRepCount(1);
+    ping(880, 80); // 第 1 次(需用户手势触发,iOS 才出声 —— 这个点击就是手势)
+    timerRef.current = setInterval(() => {
+      setRepCount((r) => {
+        const next = r + 1;
+        if (next > step.reps) { clearTimer(); ping(1320, 240); return 0; }
+        ping(880, 80);
+        return next;
+      });
+    }, REP_TEMPO_SEC * 1000);
+  }
+  function stopRepTempo() { clearTimer(); setRepCount(0); }
 
   function nextAfterSet() {
     if (!step) return;
@@ -106,6 +156,7 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   function completeSet() {
     clearTimer();
     setCountdown(null);
+    setRepCount(0);
     nextAfterSet();
   }
 
@@ -136,11 +187,13 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
       <div className="nesio-wp-top">
         <span className="nesio-wp-progress">{L(dict, `动作 ${idx + 1}/${steps.length}`, `${idx + 1}/${steps.length}`)}</span>
         <span className="nesio-wp-session">{session.name}</span>
+        <button type="button" className="nesio-wp-close" onClick={() => setMuted((m) => !m)} aria-label={muted ? L(dict, '开声音', 'Unmute') : L(dict, '静音', 'Mute')} aria-pressed={muted}>{muted ? '🔇' : '🔊'}</button>
         <button type="button" className="nesio-wp-close" onClick={onClose} aria-label={L(dict, '退出', 'Exit')}>✕</button>
       </div>
 
       <div className="nesio-wp-body">
-        {phase !== 'rest' && ex.animFrames && ex.animFrames.length > 0 && (
+        {/* 预览:动图/GIF 全程显示(work 看着做、rest 时也能盯着动作预习下一组)。 */}
+        {ex.animFrames && ex.animFrames.length > 0 ? (
           <ExerciseFigure
             frames={ex.animFrames}
             fps={ex.animFps}
@@ -148,10 +201,9 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
             alt={ex.name}
             className="nesio-wp-figure"
           />
-        )}
-        {phase !== 'rest' && !ex.animFrames?.length && ex.gif && (
+        ) : ex.gif ? (
           <ExerciseGif src={ex.gif} alt={ex.name} className="nesio-wp-figure" />
-        )}
+        ) : null}
         <h2 className="nesio-wp-name">{ex.name}</h2>
         {ex.muscles && (
           <div className="nesio-wp-muscles">
@@ -183,6 +235,9 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
             {step.unit === 'sec' && countdown != null ? (
               <div className="nesio-wp-count nesio-wp-count--work">{countdown}s</div>
             ) : null}
+            {step.unit === 'reps' && repCount > 0 ? (
+              <div className="nesio-wp-count nesio-wp-count--work">{repCount}<span className="nesio-wp-count-total">/{step.reps}</span></div>
+            ) : null}
           </>
         )}
       </div>
@@ -190,9 +245,18 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
       {phase === 'work' && (
         <div className="nesio-wp-actions">
           {step.unit === 'sec' && countdown == null && (
-            <button type="button" className="nesio-wp-ghost" onClick={() => runCountdown(step.reps, () => { /* 计时到,等用户点完成 */ })}>
+            <button type="button" className="nesio-wp-ghost" onClick={() => runCountdown(step.reps, () => { ping(1320, 240); })}>
               {L(dict, `计时 ${step.reps}s`, `Time ${step.reps}s`)}
             </button>
+          )}
+          {step.unit === 'reps' && (
+            repCount === 0 ? (
+              <button type="button" className="nesio-wp-ghost" onClick={startRepTempo}>
+                {L(dict, `跟拍做 ×${step.reps}`, `Tempo ×${step.reps}`)}
+              </button>
+            ) : (
+              <button type="button" className="nesio-wp-ghost" onClick={stopRepTempo}>{L(dict, '停节拍', 'Stop')}</button>
+            )
           )}
           <button type="button" className="nesio-wp-primary" onClick={completeSet}>
             {setNum < step.sets ? L(dict, '完成这组', 'Set done') : idx < steps.length - 1 ? L(dict, '完成,下一个', 'Done, next') : L(dict, '完成最后一组', 'Finish')}
