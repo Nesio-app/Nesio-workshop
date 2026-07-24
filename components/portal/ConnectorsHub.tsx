@@ -124,6 +124,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const syncGenRef = useRef(0);
   // 「错付」防线:一次只发起一个 Plaid Link —— 连点会各建一个 Item,每个占 1 个试用名额。
   const plaidBusyRef = useRef(false);
+  // 连好一家银行后就地问「再连一家」,免得跳回设置页重新找入口(多银行连续连接)。
+  const [plaidChain, setPlaidChain] = useState<{ count: number } | null>(null);
   // P0 隐私:连接私有数据源(邮箱/日历/银行/Notion/Flomo)必须先登录 —— 匿名授权=无主
   // token,换人用这台设备就能看到你的邮件。null=未知(网络失败不误伤),false 才拦。
   const [signedIn, setSignedIn] = useState<boolean | null>(null);
@@ -510,6 +512,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
               setConnected((p) => ({ ...p, plaid: true }));
               const n = exData.items || 1;
               showToast(n > 1 ? L(dict, `已连接 ${n} 家机构,正在同步流水…`, `${n} institutions linked — syncing…`) : L(dict, '银行已连接,正在同步流水…', 'Bank linked — syncing…'), true);
+              // 就地问「再连一家」——连续连多家银行不用跳回设置页重新点入口。
+              setPlaidChain((prev) => ({ count: (prev?.count || 0) + n }));
               void syncPlaid(); // 连上就同步,账户/流水立即可见,不再等用户手点
             } else {
               // 错付防线:Plaid 已在 onSuccess 建好 Item(占 1 个名额),exchange 失败必须
@@ -1276,6 +1280,26 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         {toast && (
           <div style={{ background: toast.ok ? 'var(--status-go-soft)' : 'var(--status-risk-soft)', border: `1px solid ${toast.ok ? 'var(--status-go)' : 'var(--status-risk)'}`, borderRadius: '0.75rem', padding: '0.65rem 0.85rem', marginBottom: '0.75rem', fontSize: '0.8rem', color: toast.ok ? 'var(--status-go)' : 'var(--status-risk)' }}>
             {toast.ok ? '✓ ' : ''}{toast.msg}
+          </div>
+        )}
+
+        {/* 多银行连续连接:连好一家后就地问要不要再连一家(不用跳回设置页重新找入口)。 */}
+        {plaidChain && (
+          <div style={{ background: 'var(--portal-accent-soft)', border: '1px solid var(--portal-accent-border)', borderRadius: 'var(--radius-md)', padding: '0.7rem 0.85rem', marginBottom: '0.75rem' }}>
+            <p style={{ margin: '0 0 0.5rem', fontSize: '0.82rem', color: 'var(--portal-ink)' }}>
+              {L(dict, `已连接 ${plaidChain.count} 家银行。还有别的银行要连吗?`, `${plaidChain.count} bank(s) linked. Add another?`)}
+            </p>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }}
+                onClick={() => { setPlaidChain(null); void connectPlaid(); }}>
+                {L(dict, '＋ 再连一家', '＋ Add another')}
+              </button>
+              <button type="button"
+                style={{ flex: 1, borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: '0.82rem' }}
+                onClick={() => setPlaidChain(null)}>
+                {L(dict, '连好了', 'All done')}
+              </button>
+            </div>
           </div>
         )}
 
