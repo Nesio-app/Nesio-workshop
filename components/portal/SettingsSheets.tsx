@@ -18,6 +18,7 @@ import { IconChevronRight, IconHalfMoon, IconLink, IconLock, IconMoon, IconShiel
 import { InfoTip } from './InfoTip';
 import NesioSheet from './ui/NesioSheet';
 import { captureLocationEnabled, setCaptureLocationEnabled } from '@/lib/portal/capture-location';
+import { getFontScale, applyFontScale, type FontScale } from '@/lib/portal/font-scale';
 import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
@@ -85,6 +86,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
   const [dailyReportOn, setDailyReportOn] = useState(false);
   const [theme, setTheme] = useState<ThemeChoice>('auto');
   const [themeSaveIssue, setThemeSaveIssue] = useState('');
+  const [fontScale, setFontScale] = useState<FontScale>('md');
   const [captureLocOn, setCaptureLocOn] = useState(false);
 
   useEffect(() => {
@@ -98,6 +100,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
       setHapticsOn(localStorage.getItem(HAPTIC_FEEDBACK_KEY) !== '0');
       const th = localStorage.getItem(THEME_KEY);
       setTheme(th === 'day' || th === 'night' ? th : 'auto');
+      setFontScale(getFontScale());
       setCaptureLocOn(captureLocationEnabled());
     } catch { /* ignore */ }
   }, [open]);
@@ -229,6 +232,18 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
         <p style={{ marginTop: '0.4rem', fontSize: '0.76rem', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
       )}
 
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '字体大小', 'Text size')}<InfoTip text={L(dict, '整体放大界面文字与间距;标准 = 跟随系统设置。', 'Scales the whole UI text & spacing; Standard = follow system.')} /></p>
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
+        {([['sm', L(dict, '小', 'S'), '0.8rem'], ['md', L(dict, '标准', 'M'), '0.95rem'], ['lg', L(dict, '大', 'L'), '1.1rem'], ['xl', L(dict, '特大', 'XL'), '1.28rem']] as Array<[FontScale, string, string]>).map(([id, label, demo]) => (
+          <button key={id} type="button"
+            className={`nesio-settings-option${fontScale === id ? ' nesio-settings-option--active' : ''}`}
+            style={{ flex: 1, justifyContent: 'center' }}
+            onClick={() => { setFontScale(id); applyFontScale(id); }}>
+            <span className="nesio-settings-option-label" style={{ fontSize: demo, lineHeight: 1 }}>{label}</span>
+          </button>
+        ))}
+      </div>
+
       <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionLanguage')}<InfoTip text={t(locale, 'langSoonHint')} /></p>
       {/* 批次 5:下拉选择,只开放字典已完成的语言(真实有效红线:不给不生效的选项) */}
       <select
@@ -265,12 +280,14 @@ export function AppearanceSheet({ open, onClose }: SheetProps) {
   const dict = portalLocaleToDictionaryLocale(locale);
   const [theme, setTheme] = useState<ThemeChoice>('auto');
   const [themeSaveIssue, setThemeSaveIssue] = useState('');
+  const [fontScale, setFontScale] = useState<FontScale>('md');
 
   useEffect(() => {
     if (!open) return;
     try {
       const th = localStorage.getItem(THEME_KEY);
       setTheme(th === 'day' || th === 'night' ? th : 'auto');
+      setFontScale(getFontScale());
     } catch { /* ignore */ }
   }, [open]);
 
@@ -321,6 +338,18 @@ export function AppearanceSheet({ open, onClose }: SheetProps) {
       {themeSaveIssue && (
         <p style={{ marginTop: '0.4rem', fontSize: '0.76rem', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
       )}
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '字体大小', 'Text size')}<InfoTip text={L(dict, '整体放大界面文字与间距;标准 = 跟随系统设置。', 'Scales the whole UI text & spacing; Standard = follow system.')} /></p>
+      <div style={{ display: 'flex', gap: '0.5rem' }}>
+        {([['sm', L(dict, '小', 'S'), '0.8rem'], ['md', L(dict, '标准', 'M'), '0.95rem'], ['lg', L(dict, '大', 'L'), '1.1rem'], ['xl', L(dict, '特大', 'XL'), '1.28rem']] as Array<[FontScale, string, string]>).map(([id, label, demo]) => (
+          <button key={id} type="button"
+            className={`nesio-settings-option${fontScale === id ? ' nesio-settings-option--active' : ''}`}
+            style={{ flex: 1, justifyContent: 'center' }}
+            onClick={() => { setFontScale(id); applyFontScale(id); }}>
+            <span className="nesio-settings-option-label" style={{ fontSize: demo, lineHeight: 1 }}>{label}</span>
+          </button>
+        ))}
+      </div>
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionLanguage')}<InfoTip text={t(locale, 'langSoonHint')} /></p>
       <select

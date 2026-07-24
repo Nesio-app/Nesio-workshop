@@ -43,6 +43,9 @@ const THEME_BOOT = `(function(){try{var c=localStorage.getItem('treasurebox-them
 // padding-bottom:var(--kb-inset) 让位,卡片留在可视区,iOS 不再滚动漂移。
 const VIEWPORT_BOOT = `(function(){try{var vv=window.visualViewport;var de=document.documentElement;function u(){var h=vv?vv.height:window.innerHeight;var kb=vv?Math.max(0,Math.round(window.innerHeight-vv.height-vv.offsetTop)):0;de.style.setProperty('--app-vh',h+'px');de.style.setProperty('--kb-inset',kb+'px');}u();if(vv){vv.addEventListener('resize',u);vv.addEventListener('scroll',u);}window.addEventListener('resize',u);window.addEventListener('orientationchange',function(){setTimeout(u,120);});}catch(e){}})();`;
 
+// 全局字体大小:开机即把保存的档位应用到根字号(防闪)。100% = 跟随系统。
+const FONT_BOOT = `(function(){try{var s=localStorage.getItem('nesio-font-scale-v1');var m={sm:'93.75%',md:'100%',lg:'112.5%',xl:'125%'};if(s&&m[s]&&s!=='md'){document.documentElement.style.fontSize=m[s];}}catch(e){}})();`;
+
 export default function RootLayout({
   children,
 }: {
@@ -56,6 +59,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: THEME_BOOT }} />
         <script dangerouslySetInnerHTML={{ __html: VIEWPORT_BOOT }} />
+        <script dangerouslySetInnerHTML={{ __html: FONT_BOOT }} />
       </head>
       <body className="font-sans">
         <AuthHashImportBridge />
