@@ -37,7 +37,7 @@ const nextConfig = {
   // public/(含 ~395MB 模型)扫进某个 API 函数 → 超 250MB 部署上限而失败。这里显式把
   // 大静态资源排除出所有函数的文件追踪(纯静态服务不受影响)。
   outputFileTracingExcludes: {
-    '*': ['public/lab/models/**', 'public/ort/**'],
+    '*': ['public/lab/models/**', 'public/ort/**', 'public/exercise-anim/**'],
   },
   // 允许局域网设备(如手机真机自测 Lab)访问 dev server 的客户端资源。
   // Next 16 默认只放行同源访问 /_next/*:跨 host(手机开 http://<Mac 局域网IP>:port)
