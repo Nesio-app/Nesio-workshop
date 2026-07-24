@@ -470,6 +470,10 @@ function LivingModelTab({
 export default function InsightsSheet({ onClose, canUsePrivateData = false, initialTab }: { onClose: () => void; canUsePrivateData?: boolean; initialTab?: MainTab }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [mainTab, setMainTab] = useState<MainTab>(initialTab ?? 'reflection');
+  // 洞察改版:首页是入口宫格(showHub),点卡进板块;有 initialTab(深链)时直达板块。
+  const [showHub, setShowHub] = useState(!initialTab);
+  const tabLabel = (t: MainTab): string =>
+    t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'growth' ? L(dict, '成长', 'Growth') : t === 'montage' ? L(dict, '小剧场', 'Films') : t === 'health' ? L(dict, '健康', 'Health') : t === 'fitness' ? L(dict, '健身', 'Fitness') : t === 'timeline' ? L(dict, '足迹', 'Places') : t === 'finance' ? L(dict, '财务', 'Finance') : t === 'relationships' ? L(dict, '关系', 'People') : L(dict, '多面镜', 'Mirror');
   const showPlaces = useFeatureEnabled('places');
   const showExperiment = useFeatureEnabled('experiment');
   const showHealth = useFeatureEnabled('health');
@@ -738,30 +742,34 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
 
   return (
     <div className="nesio-insights-sheet">
-      {/* Header */}
+      {/* Header:首页显「洞察」,板块内显返回 + 板块名 */}
       <div className="nesio-insights-header">
+        {!showHub && (
+          <button type="button" className="nesio-insights-back" onClick={() => setShowHub(true)} aria-label={L(dict, '返回', 'Back')}>‹</button>
+        )}
         <div className="nesio-insights-title-row">
-          <h2 className="nesio-insights-title">{L(dict, '洞察', 'Insights')}</h2>
+          <h2 className="nesio-insights-title">{showHub ? L(dict, '洞察', 'Insights') : tabLabel(mainTab)}</h2>
         </div>
         <button type="button" className="nesio-insights-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
       </div>
 
-      {/* Main tabs */}
-      <div className="nesio-insights-main-tabs">
-        {(['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'finance', 'relationships', 'living'] as MainTab[]).filter(tabEnabled).map((t) => (
-          <button
-            key={t}
-            type="button"
-            className={`nesio-insights-main-tab${mainTab === t ? ' nesio-insights-main-tab--active' : ''}`}
-            onClick={() => setMainTab(t)}
-          >
-            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'growth' ? L(dict, '成长', 'Growth') : t === 'montage' ? L(dict, '小剧场', 'Films') : t === 'health' ? L(dict, '健康', 'Health') : t === 'fitness' ? L(dict, '健身', 'Fitness') : t === 'timeline' ? L(dict, '足迹', 'Places') : t === 'finance' ? L(dict, '财务', 'Finance') : t === 'relationships' ? L(dict, '关系', 'People') : L(dict, '多面镜', 'Mirror')}
-            {t === 'living' && <sup style={{ marginLeft: '0.2rem', fontSize: '0.6em', fontWeight: 600, color: 'var(--portal-accent)' }}>Pro</sup>}
-          </button>
-        ))}
-      </div>
-
       <div className="nesio-insights-body">
+        {showHub ? (
+          <div className="nesio-insights-hub">
+            {(['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'finance', 'relationships', 'living'] as MainTab[]).filter(tabEnabled).map((t) => (
+              <button
+                key={t}
+                type="button"
+                className="nesio-insights-hub-tile"
+                onClick={() => { setMainTab(t); setShowHub(false); }}
+              >
+                {tabLabel(t)}
+                {t === 'living' && <span className="nesio-insights-hub-pro">Pro</span>}
+              </button>
+            ))}
+          </div>
+        ) : (
+        <>
 
         {/* ── Tab 1: 免费四件套(v1 规格 §2.1)── */}
         {mainTab === 'reflection' && (
@@ -960,6 +968,8 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
               </div>
             )}
           </>
+        )}
+        </>
         )}
 
       </div>
