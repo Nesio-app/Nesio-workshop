@@ -12,7 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   listWardrobe, addGarment, removeGarment, markWorn, suggestOutfit, inferFormalNeed,
-  GARMENT_TYPES, type Garment, type GarmentType, type Warmth, type Formality, type OutfitPrefs,
+  GARMENT_TYPES, updateGarment, type Garment, type GarmentType, type Warmth, type Formality, type OutfitPrefs,
 } from '@/lib/portal/wardrobe';
 import { loadWardrobePrefs, recordOutfitFeedback, buildStylistDislikes } from '@/lib/portal/wardrobe-prefs';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
@@ -59,6 +59,20 @@ function compressImage(file: File): Promise<{ dataUrl: string; mimeType: string 
 
 function newAssetId(): string {
   try { return `wardrobe-${crypto.randomUUID()}`; } catch { return `wardrobe-${Date.now()}-${Math.round(Math.random() * 1e9)}`; }
+}
+
+// analyze(clothing) 返回节点 → 衣物属性 patch(供单件识别 + 批量共用);无有效字段返回 null。
+function attrsFromAnalyze(n: { name?: unknown; attributes?: Record<string, unknown> } | undefined): Partial<{ name: string; garmentType: GarmentType; warmth: Warmth; formality: Formality; colors: string[] }> | null {
+  if (!n) return null;
+  const a = n.attributes || {};
+  const patch: Partial<{ name: string; garmentType: GarmentType; warmth: Warmth; formality: Formality; colors: string[] }> = {};
+  if (typeof n.name === 'string' && n.name.trim()) patch.name = n.name.trim();
+  if ((GARMENT_TYPES as string[]).includes(String(a.garmentType))) patch.garmentType = a.garmentType as GarmentType;
+  const w = Number(a.warmth);
+  if (w === 1 || w === 2 || w === 3) patch.warmth = w as Warmth;
+  if (['casual', 'smart', 'formal'].includes(String(a.formality))) patch.formality = a.formality as Formality;
+  if (typeof a.colors === 'string' && a.colors.trim()) patch.colors = a.colors.split(/[,，、]/).map((s) => s.trim()).filter(Boolean);
+  return Object.keys(patch).length ? patch : null;
 }
 
 const isToday = (iso?: string, now = new Date()): boolean => {
@@ -111,6 +125,11 @@ export default function WardrobePanel() {
   const [tryonResult, setTryonResult] = useState<string | null>(null);
   const [bodyThumb, setBodyThumb] = useState<string | null>(null);
   const bodyFileRef = useRef<HTMLInputElement>(null);
+  // 批量上传 + 点按编辑
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkMsg, setBulkMsg] = useState<string | null>(null);
+  const bulkRef = useRef<HTMLInputElement>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const isPro = canUsePaidCloudAi();
 
   const load = () => { try { setItems(listWardrobe()); } catch { setItems([]); } };
@@ -317,6 +336,14 @@ export default function WardrobePanel() {
 
   const save = async () => {
     const name = draft.name.trim() || L(dict, TYPE_LABEL[draft.garmentType][0], TYPE_LABEL[draft.garmentType][1]);
+    const colors = draft.colors ? draft.colors.split(/[,，、]/).map((s) => s.trim()).filter(Boolean) : [];
+    // 编辑模式:只改属性(照片不动)
+    if (editingId) {
+      updateGarment(editingId, { name, garmentType: draft.garmentType, warmth: draft.warmth, formality: draft.formality, colors });
+      setEditingId(null); setDraft(EMPTY_DRAFT); setAdding(false); setAiError(null);
+      load();
+      return;
+    }
     let assetId: string | null = null;
     if (draft.dataUrl) {
       try {
@@ -325,17 +352,57 @@ export default function WardrobePanel() {
         await putLocalImage(assetId, draft.dataUrl);
       } catch { assetId = null; /* 存图失败也让衣服进衣橱,只是没缩略图 */ }
     }
-    addGarment({
-      name,
-      garmentType: draft.garmentType,
-      warmth: draft.warmth,
-      formality: draft.formality,
-      colors: draft.colors ? draft.colors.split(/[,，、]/).map((s) => s.trim()).filter(Boolean) : [],
-      assetId,
-      mimeType: draft.mimeType,
-    });
+    addGarment({ name, garmentType: draft.garmentType, warmth: draft.warmth, formality: draft.formality, colors, assetId, mimeType: draft.mimeType });
     setDraft(EMPTY_DRAFT); setAdding(false); setAiError(null);
     load();
+  };
+
+  // 批量上传多张:每张存本机 + 建一件(Pro 顺手 AI 识别填属性,失败/免费保留默认可后补)
+  const onPickBulk = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = '';
+    if (files.length === 0) return;
+    setBulkBusy(true);
+    setBulkMsg(L(dict, `处理中 0/${files.length}`, `Processing 0/${files.length}`));
+    const { putLocalImage } = await import('@/lib/portal/local-image-store');
+    const pro = canUsePaidCloudAi();
+    let aiStopped = false; // 撞到限流就停 AI、继续存图
+    let added = 0;
+    for (let i = 0; i < files.length; i++) {
+      try {
+        const { dataUrl, mimeType } = await compressImage(files[i]);
+        const assetId = newAssetId();
+        await putLocalImage(assetId, dataUrl);
+        const node = addGarment({ name: '', garmentType: 'top', warmth: 2, formality: 'casual', assetId, mimeType });
+        if (pro && !aiStopped) {
+          try {
+            const base64 = dataUrl.split(',')[1] || '';
+            const res = await fetch('/api/portal/analyze', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
+              body: JSON.stringify({ type: 'image', mode: 'clothing', content: L(dict, '识别这件衣服', 'Identify this clothing item'), imageBase64: base64, mimeType, uiLocale: dict }),
+            });
+            const data = await res.json() as { ok?: boolean; nodes?: Array<{ name?: string; attributes?: Record<string, unknown> }>; error?: string };
+            if (res.status === 429 || data.error === 'rate_limited') aiStopped = true; // 剩下的先存,不再识别
+            else { const patch = attrsFromAnalyze(data.nodes?.[0]); if (patch) updateGarment(node.id, patch); }
+          } catch { /* 保留默认,不阻塞批量 */ }
+        }
+        added += 1;
+      } catch { /* 跳过读不了的图 */ }
+      setBulkMsg(L(dict, `处理中 ${i + 1}/${files.length}`, `Processing ${i + 1}/${files.length}`));
+    }
+    load();
+    setBulkBusy(false);
+    const tail = pro ? (aiStopped ? L(dict, '（部分已 AI 识别,其余可点每件补）', ' (some AI-tagged; tap to finish)') : L(dict, '（已 AI 识别）', ' (AI-tagged)')) : L(dict, '（点每件可补属性）', ' — tap each to edit');
+    setBulkMsg(L(dict, `加了 ${added} 件${tail}`, `Added ${added}${tail}`));
+    setTimeout(() => setBulkMsg(null), 4500);
+  };
+
+  // 点某件 → 用编辑表单预填(改属性)
+  const startEdit = (g: Garment) => {
+    setEditingId(g.id);
+    setDraft({ name: g.name, garmentType: g.garmentType, warmth: g.warmth, formality: g.formality, colors: g.colors.join(','), dataUrl: null, mimeType: 'image/jpeg' });
+    setAdding(true); setAiError(null);
   };
 
   /* ── 样式(全 token) ── */
@@ -489,24 +556,40 @@ export default function WardrobePanel() {
         </div>
       )}
 
-      {/* ② 加衣服 */}
+      {/* ② 加衣服 / 批量上传 */}
+      <input ref={bulkRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={onPickBulk} />
       {!adding ? (
-        <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-4)' }} onClick={() => { setDraft(EMPTY_DRAFT); setAdding(true); setAiError(null); }}>
-          {L(dict, '+ 加衣服', '+ Add clothing')}
-        </button>
+        <>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
+            <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1, opacity: bulkBusy ? 0.6 : 1 }} disabled={bulkBusy} onClick={() => { setEditingId(null); setDraft(EMPTY_DRAFT); setAdding(true); setAiError(null); }}>
+              {L(dict, '+ 加一件', '+ Add one')}
+            </button>
+            <button type="button" onClick={() => bulkRef.current?.click()} disabled={bulkBusy}
+              style={{ flex: 1, padding: '0.7rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: bulkBusy ? 'default' : 'pointer', opacity: bulkBusy ? 0.6 : 1 }}>
+              {bulkBusy ? L(dict, '处理中…', 'Working…') : L(dict, '📸 批量上传', '📸 Bulk upload')}
+            </button>
+          </div>
+          {bulkMsg && (
+            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: bulkBusy ? 'var(--portal-muted)' : 'var(--status-go)', textAlign: 'center' }}>{bulkBusy ? '' : '✓ '}{bulkMsg}</p>
+          )}
+        </>
       ) : (
         <div style={{ ...card, marginTop: 'var(--space-4)', background: 'var(--glass-bg-solid, var(--portal-bg))' }}>
+          {editingId && <p style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{L(dict, '编辑衣物 · 改属性(照片不动)', 'Edit · attributes only')}</p>}
           {/* 拍照走相机;上传走相册(无 capture) —— 两个入口共用 onPickFile */}
           <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onPickFile} />
           <input ref={uploadRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onPickFile} />
-          {/* 两个大号取图入口:一眼可见,并排等宽 */}
+          {/* 两个大号取图入口:一眼可见,并排等宽(编辑时隐藏 —— 只改属性) */}
+          {!editingId && (
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
             <button type="button" onClick={() => cameraRef.current?.click()}
               style={{ flex: 1, padding: '0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: 'pointer' }}>{L(dict, '📷 拍照', '📷 Camera')}</button>
             <button type="button" onClick={() => uploadRef.current?.click()}
               style={{ flex: 1, padding: '0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: 'pointer' }}>{L(dict, '🖼 上传照片', '🖼 Upload photo')}</button>
           </div>
+          )}
           <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
+            {!editingId && (
             <button type="button" onClick={() => uploadRef.current?.click()}
               aria-label={L(dict, '选择衣服照片', 'Choose clothing photo')}
               style={{ flexShrink: 0, width: 76, height: 76, borderRadius: 'var(--radius-md)', border: '1px dashed var(--portal-accent-border)', background: 'var(--portal-accent-soft)', cursor: 'pointer', overflow: 'hidden', color: 'var(--portal-muted)', fontSize: '1.4rem', padding: 0 }}>
@@ -515,6 +598,7 @@ export default function WardrobePanel() {
                 <img src={draft.dataUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               ) : '👕'}
             </button>
+            )}
             <div style={{ flex: 1, minWidth: 0 }}>
               <input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
                 placeholder={L(dict, '名字(可留空)', 'Name (optional)')}
@@ -558,8 +642,8 @@ export default function WardrobePanel() {
             style={{ width: '100%', marginTop: 'var(--space-4)', padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }} />
 
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
-            <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={save}>{L(dict, '存进衣橱', 'Save')}</button>
-            <button type="button" onClick={() => { setAdding(false); setAiError(null); }}
+            <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={save}>{editingId ? L(dict, '保存修改', 'Save changes') : L(dict, '存进衣橱', 'Save')}</button>
+            <button type="button" onClick={() => { setAdding(false); setEditingId(null); setAiError(null); }}
               style={{ padding: '0 var(--space-4)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>{L(dict, '取消', 'Cancel')}</button>
           </div>
         </div>
@@ -587,6 +671,8 @@ export default function WardrobePanel() {
                     <button type="button" onClick={() => { markWorn(it.id, new Date().toISOString()); giveFeedback('worn', [it]); load(); }}
                       style={{ flex: 1, padding: '0.2rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-blue-deep)', fontSize: '0.62rem', cursor: 'pointer' }}
                       title={L(dict, '记一次今天穿了', 'Mark worn today')}>{L(dict, '穿了', 'Worn')}</button>
+                    <button type="button" onClick={() => startEdit(it)} aria-label={L(dict, '编辑', 'Edit')}
+                      style={{ padding: '0.2rem 0.4rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: '0.62rem', cursor: 'pointer' }}>✎</button>
                     <button type="button" onClick={() => { if (confirm(L(dict, `从衣橱移除「${it.name}」?`, `Remove “${it.name}” from wardrobe?`))) { removeGarment(it.id); load(); } }}
                       aria-label={L(dict, '移除', 'Remove')}
                       style={{ padding: '0.2rem 0.4rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: '0.62rem', cursor: 'pointer' }}>✕</button>
