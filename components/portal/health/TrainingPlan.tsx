@@ -65,7 +65,7 @@ export default function TrainingPlan() {
   const fitnessTop = (
     <>
       <button type="button" className="nesio-routine-brief-preset" style={{ marginTop: '1rem' }} onClick={() => setLibOpen(true)}>
-        {L(dict, '+ 动作库 · 自由组合训练(17 个动作,三维筛选)', '+ Exercise library · build your own (17 moves, 3 filters)')}
+        {L(dict, '+ 动作库 · 自由组合训练(精选 18 + 全部 1324,带演示图)', '+ Exercise library · build your own (18 curated + 1324 all, with demos)')}
       </button>
       {workouts.length > 0 && (
         <>

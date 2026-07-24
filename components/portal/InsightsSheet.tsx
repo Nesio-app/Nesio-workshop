@@ -46,6 +46,7 @@ import MontageTab from './insights/MontageTab';
 import MirrorLetterTab from './insights/MirrorLetterTab';
 import FinanceTab from './finance/FinanceTab';
 import HealthDashboard from './health/HealthDashboard';
+import TrainingPlan from './health/TrainingPlan';
 import RelationshipsPanel from './relationships/RelationshipsPanel';
 import LearningStatusPanel from './LearningStatusPanel';
 import { mineCrossDomain } from '@/lib/portal/cross-domain-correlations';
@@ -53,7 +54,7 @@ import { readFactJournal, ensureFactJournal } from '@/lib/platform/fact-journal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'timeline' | 'finance' | 'relationships' | 'living';
+type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'fitness' | 'timeline' | 'finance' | 'relationships' | 'living';
 
 const DAY_MS = 86_400_000;
 
@@ -477,6 +478,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   const tabEnabled = (t: MainTab): boolean =>
     t === 'timeline' ? showPlaces
       : t === 'health' ? showHealth
+      : t === 'fitness' ? showHealth
       : t === 'finance' ? showFinance
       : t === 'relationships' ? showPeople
       : true;
@@ -746,14 +748,14 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
 
       {/* Main tabs */}
       <div className="nesio-insights-main-tabs">
-        {(['reflection', 'growth', 'montage', 'health', 'timeline', 'finance', 'relationships', 'living'] as MainTab[]).filter(tabEnabled).map((t) => (
+        {(['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'finance', 'relationships', 'living'] as MainTab[]).filter(tabEnabled).map((t) => (
           <button
             key={t}
             type="button"
             className={`nesio-insights-main-tab${mainTab === t ? ' nesio-insights-main-tab--active' : ''}`}
             onClick={() => setMainTab(t)}
           >
-            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'growth' ? L(dict, '成长', 'Growth') : t === 'montage' ? L(dict, '小剧场', 'Films') : t === 'health' ? L(dict, '健康', 'Health') : t === 'timeline' ? L(dict, '足迹', 'Places') : t === 'finance' ? L(dict, '财务', 'Finance') : t === 'relationships' ? L(dict, '关系', 'People') : L(dict, '多面镜', 'Mirror')}
+            {t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'growth' ? L(dict, '成长', 'Growth') : t === 'montage' ? L(dict, '小剧场', 'Films') : t === 'health' ? L(dict, '健康', 'Health') : t === 'fitness' ? L(dict, '健身', 'Fitness') : t === 'timeline' ? L(dict, '足迹', 'Places') : t === 'finance' ? L(dict, '财务', 'Finance') : t === 'relationships' ? L(dict, '关系', 'People') : L(dict, '多面镜', 'Mirror')}
             {t === 'living' && <sup style={{ marginLeft: '0.2rem', fontSize: '0.6em', fontWeight: 600, color: 'var(--portal-accent)' }}>Pro</sup>}
           </button>
         ))}
@@ -935,6 +937,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
 
         {/* ── Tab: 健康 Dashboard ── */}
         {mainTab === 'health' && showHealth && <HealthDashboard />}
+        {mainTab === 'fitness' && showHealth && <div className="nesio-analytics-tab"><TrainingPlan /></div>}
 
         {/* ── Tab: 关系管理 ── */}
         {mainTab === 'relationships' && showPeople && <RelationshipsPanel />}
