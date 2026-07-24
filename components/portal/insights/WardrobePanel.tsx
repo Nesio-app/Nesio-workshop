@@ -251,23 +251,22 @@ export default function WardrobePanel() {
           {/* 拍照走相机;上传走相册(无 capture) —— 两个入口共用 onPickFile */}
           <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onPickFile} />
           <input ref={uploadRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onPickFile} />
+          {/* 两个大号取图入口:一眼可见,并排等宽 */}
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+            <button type="button" onClick={() => cameraRef.current?.click()}
+              style={{ flex: 1, padding: '0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: 'pointer' }}>{L(dict, '📷 拍照', '📷 Camera')}</button>
+            <button type="button" onClick={() => uploadRef.current?.click()}
+              style={{ flex: 1, padding: '0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: 'pointer' }}>{L(dict, '🖼 上传照片', '🖼 Upload photo')}</button>
+          </div>
           <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
-            <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-              <button type="button" onClick={() => uploadRef.current?.click()}
-                aria-label={L(dict, '选择衣服照片', 'Choose clothing photo')}
-                style={{ width: 76, height: 76, borderRadius: 'var(--radius-md)', border: '1px dashed var(--portal-accent-border)', background: 'var(--portal-accent-soft)', cursor: 'pointer', overflow: 'hidden', color: 'var(--portal-muted)', fontSize: '1.4rem', padding: 0 }}>
-                {draft.dataUrl ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={draft.dataUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : '👕'}
-              </button>
-              <div style={{ display: 'flex', gap: '0.3rem' }}>
-                <button type="button" onClick={() => cameraRef.current?.click()}
-                  style={{ flex: 1, padding: '0.25rem 0', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: '0.66rem', cursor: 'pointer' }}>{L(dict, '📷 拍照', '📷 Camera')}</button>
-                <button type="button" onClick={() => uploadRef.current?.click()}
-                  style={{ flex: 1, padding: '0.25rem 0', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: '0.66rem', cursor: 'pointer' }}>{L(dict, '🖼 上传', '🖼 Upload')}</button>
-              </div>
-            </div>
+            <button type="button" onClick={() => uploadRef.current?.click()}
+              aria-label={L(dict, '选择衣服照片', 'Choose clothing photo')}
+              style={{ flexShrink: 0, width: 76, height: 76, borderRadius: 'var(--radius-md)', border: '1px dashed var(--portal-accent-border)', background: 'var(--portal-accent-soft)', cursor: 'pointer', overflow: 'hidden', color: 'var(--portal-muted)', fontSize: '1.4rem', padding: 0 }}>
+              {draft.dataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={draft.dataUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : '👕'}
+            </button>
             <div style={{ flex: 1, minWidth: 0 }}>
               <input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
                 placeholder={L(dict, '名字(可留空)', 'Name (optional)')}
