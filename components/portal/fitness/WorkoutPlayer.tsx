@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { exerciseById, exerciseAnimFrames, MUSCLE_LABEL } from '@/lib/portal/exercise-library';
-import { catalogExerciseByIdSync } from '@/lib/portal/exercise-catalog';
+import { catalogExerciseByIdSync, loadExerciseCatalog } from '@/lib/portal/exercise-catalog';
 import ExerciseFigure from './ExerciseFigure';
 import { skillById } from '@/lib/life-domain/assets/skill-inventory';
 import { logSession } from '@/lib/platform/training-protocol-engine';
@@ -55,6 +55,16 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useSheetDismiss(true, onClose); // 挂载即打开;Escape 关闭 + 焦点回收
+
+  // 训练里若含扩展库动作(不在精选 18 里),按需把 catalog 载进内存,让名字/要点解析出来。
+  // 否则从「保存的训练」直接开练、本会话没开过「全部 1324」时,只会显示原始编号(如 0001)。
+  const [, setCatTick] = useState(0);
+  useEffect(() => {
+    if (!session.steps.some((s) => !exerciseById(s.exerciseId) && !catalogExerciseByIdSync(s.exerciseId))) return;
+    let alive = true;
+    loadExerciseCatalog().then(() => { if (alive) setCatTick((n) => n + 1); }).catch(() => {});
+    return () => { alive = false; };
+  }, [session]);
 
   const steps = session.steps;
   const step = steps[idx];
