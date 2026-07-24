@@ -20,21 +20,41 @@ interface Metrics {
   error?: string;
   hint?: string;
   generatedAt?: string;
+  sampleCapped?: boolean;
   sources?: { telemetryEvents: { ok: boolean; error?: string }; productEvents: { ok: boolean; error?: string } };
   windows?: { today: { events: number; devices: number }; week: { events: number; devices: number }; month: { events: number; devices: number } };
   insights?: Array<{ severity: 'go' | 'gentle' | 'risk'; title: string; detail: string; advice: string }>;
   ai?: { totals: { calls: number; estCostUsd: number; okRate: number | null; avgLatencyMs: number | null }; routes: Array<{ route: string; calls: number; okRate: number; avgLatencyMs: number; estCostUsd: number }> };
-  smartness?: { score: number };
+  smartness?: { score: number; dims?: Array<{ dim: string; score: number; thin: boolean }> };
   clientErrors?: Array<{ kind: string; message: string; count: number; devices: number; lastAt: string }>;
+  deviceList?: Array<{ id: string; events: number; firstAt: string; lastAt: string }>;
+  behavior?: { activeDays30: number; activeHours: number[]; topFeatures: Array<{ name: string; count: number }> };
 }
 
 const SEV_COLOR: Record<string, string> = { go: 'var(--status-go)', gentle: 'var(--status-gentle)', risk: 'var(--status-risk)' };
+
+// 埋点事件名 → 人话(画像用);没映射的显示原名
+const FEATURE_LABEL: Record<string, [string, string]> = {
+  app_open: ['打开 App', 'Open app'], mood_open: ['记心情', 'Mood'], capture_voice_open: ['说一句', 'Voice note'],
+  chat_send: ['问一问/聊天', 'Chat'], memory_saved: ['存记忆', 'Save memory'], first_memory: ['首条记忆', 'First memory'],
+  workout_start: ['开始跟练', 'Workout'], insights_open: ['开洞察', 'Open insights'], inventory_open: ['物品', 'Items'],
+  rewards_open: ['奖品商城', 'Rewards'], brief_play: ['听简报', 'Brief'], brief_open: ['简报', 'Brief'],
+  freeze_open: ['冷冻仓', 'Vault'], pro_gate_shown: ['碰到 Pro 门', 'Pro gate'], mood_open2: ['心情', 'Mood'],
+  capture_camera_open: ['拍一下', 'Camera'], feature_used: ['用功能', 'Feature'],
+};
+const featLabel = (name: string, en: boolean): string => {
+  const m = FEATURE_LABEL[name];
+  return m ? (en ? m[1] : m[0]) : name;
+};
 
 export default function AdminOpsPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [secret, setSecret] = useState('');
   const [data, setData] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showDims, setShowDims] = useState(false);   // 点聪明度 → 展开五维
+  const [showDevices, setShowDevices] = useState(false);
+  const en = dict === 'en';
 
   const load = useCallback(async (withSecret: string) => {
     setLoading(true);
@@ -122,12 +142,93 @@ export default function AdminOpsPanel() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
         <div style={card}><span style={big}>{data.windows?.today.events ?? 0}</span><span style={{ ...label, display: 'block', marginTop: '0.2rem' }}>{L(dict, `今日事件 · ${data.windows?.today.devices ?? 0} 台`, `Events today · ${data.windows?.today.devices ?? 0} devices`)}</span></div>
         <div style={card}><span style={big}>{data.windows?.week.events ?? 0}</span><span style={{ ...label, display: 'block', marginTop: '0.2rem' }}>{L(dict, '7 天事件', 'Events / 7d')}</span></div>
-        <div style={card}><span style={big}>{data.windows?.month.devices ?? 0}</span><span style={{ ...label, display: 'block', marginTop: '0.2rem' }}>{L(dict, '30 天设备', 'Devices / 30d')}</span></div>
-        <div style={card}>
+        <button type="button" onClick={() => setShowDevices((v) => !v)} style={{ ...card, textAlign: 'left', cursor: 'pointer' }}>
+          <span style={big}>{data.windows?.month.devices ?? 0}</span>
+          <span style={{ ...label, display: 'block', marginTop: '0.2rem' }}>{L(dict, '30 天设备 · 点看明细', 'Devices / 30d · tap')}</span>
+        </button>
+        <button type="button" onClick={() => setShowDims((v) => !v)} style={{ ...card, textAlign: 'left', cursor: 'pointer' }}>
           <span style={{ ...big, color: (data.smartness?.score ?? 0) >= 70 ? 'var(--status-go)' : (data.smartness?.score ?? 0) >= 50 ? 'var(--status-gentle)' : 'var(--status-risk)' }}>{data.smartness?.score ?? '—'}</span>
-          <span style={{ ...label, display: 'block', marginTop: '0.2rem' }}>{L(dict, '聪明度(30 天)', 'Smartness / 30d')}</span>
-        </div>
+          <span style={{ ...label, display: 'block', marginTop: '0.2rem' }}>{L(dict, '聪明度 · 点看五维', 'Smartness · tap')}</span>
+        </button>
       </div>
+
+      {data.sampleCapped && (
+        <p style={{ margin: 'var(--space-2) 0 0', fontSize: '0.62rem', color: 'var(--portal-muted)' }}>
+          {L(dict, '事件数为精确值;下方分项(Top/画像/AI)基于最近采样,近似。', 'Event counts are exact; breakdowns below use a recent sample (approximate).')}
+        </p>
+      )}
+
+      {/* 聪明度五维(点开) */}
+      {showDims && (data.smartness?.dims?.length ?? 0) > 0 && (
+        <div style={{ ...card, marginTop: 'var(--space-2)' }}>
+          <p style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
+            {L(dict, '聪明度 = 五维平均(0–100)。样本不足的维度按 50 中性、标·。', 'Smartness = avg of 5 dims (0–100). Thin-sample dims default to 50 (·).')}
+          </p>
+          {data.smartness!.dims!.map((d) => (
+            <div key={d.dim} style={{ margin: '0 0 var(--space-2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', marginBottom: '0.2rem' }}>
+                <span>{d.dim}{d.thin ? ' ·' : ''}</span>
+                <span style={{ color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>{d.score}</span>
+              </div>
+              <div style={{ height: 6, borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)' }}>
+                <div style={{ height: '100%', borderRadius: 'var(--radius-pill)', width: `${d.score}%`, background: d.score >= 70 ? 'var(--status-go)' : d.score >= 50 ? 'var(--status-gentle)' : 'var(--status-risk)' }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 设备明细(点 30 天设备卡展开) */}
+      {showDevices && (
+        <div style={{ ...card, marginTop: 'var(--space-2)' }}>
+          {(data.deviceList?.length ?? 0) === 0 ? (
+            <p style={label}>{L(dict, '暂无设备记录。', 'No devices yet.')}</p>
+          ) : data.deviceList!.map((d) => (
+            <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', padding: '0.25rem 0', borderTop: '1px solid var(--portal-line)', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)' }}>
+              <span style={{ fontFamily: 'monospace' }}>{d.id}…</span>
+              <span style={{ color: 'var(--portal-muted)' }}>{L(dict, `${d.events} 事件 · ${d.lastAt.slice(5, 10)} 最近`, `${d.events} events · last ${d.lastAt.slice(5, 10)}`)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* 行为画像 */}
+      {data.behavior && (data.behavior.topFeatures.length > 0) && (() => {
+        const b = data.behavior!;
+        const maxFeat = Math.max(1, ...b.topFeatures.map((f) => f.count));
+        const maxHour = Math.max(1, ...b.activeHours);
+        const peakHour = b.activeHours.indexOf(maxHour);
+        return (
+          <>
+            <p style={sectionLbl}>{L(dict, '行为画像(30 天,你自己)', 'Behavior profile / 30d')}</p>
+            <div style={card}>
+              <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--portal-ink)', lineHeight: 1.6 }}>
+                {L(dict, `活跃 ${b.activeDays30} 天 · 最常用「${featLabel(b.topFeatures[0].name, false)}」· 高峰 ${peakHour}:00(UTC)附近`, `${b.activeDays30} active days · top “${featLabel(b.topFeatures[0].name, true)}” · peak ~${peakHour}:00 UTC`)}
+              </p>
+              {/* Top 功能 */}
+              <p style={{ ...label, margin: 'var(--space-3) 0 var(--space-2)' }}>{L(dict, '最常用', 'Most used')}</p>
+              {b.topFeatures.slice(0, 6).map((f) => (
+                <div key={f.name} style={{ margin: '0 0 var(--space-2)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', marginBottom: '0.2rem' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{featLabel(f.name, en)}</span>
+                    <span style={{ color: 'var(--portal-muted)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{f.count}</span>
+                  </div>
+                  <div style={{ height: 6, borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)' }}>
+                    <div style={{ height: '100%', borderRadius: 'var(--radius-pill)', width: `${Math.round((f.count / maxFeat) * 100)}%`, background: 'var(--portal-accent)' }} />
+                  </div>
+                </div>
+              ))}
+              {/* 活跃时段 24h 小柱 */}
+              <p style={{ ...label, margin: 'var(--space-3) 0 var(--space-2)' }}>{L(dict, '活跃时段(0–23 时 · UTC)', 'Active hours (0–23 · UTC)')}</p>
+              <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1, height: 40 }}>
+                {b.activeHours.map((h, i) => (
+                  <div key={i} title={`${i}:00 · ${h}`} style={{ flex: 1, height: `${Math.max(3, Math.round((h / maxHour) * 100))}%`, background: h > 0 ? 'var(--portal-accent)' : 'var(--portal-line)', borderRadius: '1px 1px 0 0' }} />
+                ))}
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       {/* 规则洞察 */}
       {(data.insights?.length ?? 0) > 0 && (
