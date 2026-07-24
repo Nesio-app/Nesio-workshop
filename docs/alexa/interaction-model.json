@@ -1,7 +1,7 @@
 {
   "interactionModel": {
     "languageModel": {
-      "invocationName": "nesio",
+      "invocationName": "nessa",
       "intents": [
         {
           "name": "AMAZON.HelpIntent",

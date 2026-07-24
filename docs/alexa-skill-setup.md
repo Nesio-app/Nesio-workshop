@@ -42,14 +42,14 @@ Echo 设备 → Alexa 云(ASR+NLU) → POST https://<你的域名>/api/alexa
 
 1. 登 [developer.amazon.com](https://developer.amazon.com) → **Alexa** → **Alexa Skills Kit** → *Create Skill*。
 2. 名称随意；**Model = Custom**；**Host = Provision your own**（我们用自己的 HTTPS 端点，不用 Lambda）。
-3. **Invocation Name** 填 `nesio`（唤醒后说 "Alexa, open nesio" 或直接 "Alexa, tell nesio to remember …"）。
+3. **Invocation Name** 填 `nessa`（唤醒后说 "Alexa, open nessa" 或直接 "Alexa, tell nessa to remember …"）。
 4. **JSON Editor** → 粘贴 `docs/alexa/interaction-model.json` 的内容 → *Save* → *Build Model*。
 5. **Endpoint** → 选 **HTTPS** → Default region 填 `https://<你的生产域名>/api/alexa`
    → 证书类型选「My development endpoint is a sub-domain of a domain that has a wildcard certificate…」
    （Vercel 域名有有效 TLS，选带受信证书那项即可）。
 6. 复制页面顶部的 **Skill ID**（`amzn1.ask.skill.…`）→ 填到 Vercel 环境变量 `ALEXA_SKILL_ID`。
 7. 生产环境再配 `INGEST_SHARED_SECRET`（和 App 里外部捕获用的同一个）。
-8. **Test** 页开 *Development*，输入 "ask nesio to remember the spare key is under the mat" 验证。
+8. **Test** 页开 *Development*，输入 "ask nessa to remember the spare key is under the mat" 验证。
 
 ---
 
@@ -69,10 +69,10 @@ Echo 设备 → Alexa 云(ASR+NLU) → POST https://<你的域名>/api/alexa
 
 | 说 | 结果 |
 |----|------|
-| "Alexa, tell nesio to remember the passport is in the top drawer" | 入档一条记忆 |
-| "Alexa, ask nesio to note the wifi password is sunflower42" | 入档一条记忆 |
-| "Alexa, open nesio" | 欢迎语 + 引导 |
-| "Alexa, ask nesio where my passport is" | v2 占位：先引导回 App（语音召回下一步做） |
+| "Alexa, tell nessa to remember the passport is in the top drawer" | 入档一条记忆 |
+| "Alexa, ask nessa to note the wifi password is sunflower42" | 入档一条记忆 |
+| "Alexa, open nessa" | 欢迎语 + 引导 |
+| "Alexa, ask nessa where my passport is" | v2 占位：先引导回 App（语音召回下一步做） |
 
 ---
 
