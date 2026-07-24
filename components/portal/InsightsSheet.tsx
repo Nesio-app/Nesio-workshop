@@ -48,7 +48,7 @@ import FinanceTab from './finance/FinanceTab';
 import HealthDashboard from './health/HealthDashboard';
 import TrainingPlan from './health/TrainingPlan';
 import RelationshipsPanel from './relationships/RelationshipsPanel';
-import MeetingsPanel from './insights/MeetingsPanel';
+import SchedulePanel from './insights/SchedulePanel';
 import InventoryStatsPanel from './insights/InventoryStatsPanel';
 import TeslaPanel from './TeslaPanel';
 import TabErrorBoundary from './TabErrorBoundary';
@@ -58,7 +58,7 @@ import { readFactJournal, ensureFactJournal } from '@/lib/platform/fact-journal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'fitness' | 'timeline' | 'meetings' | 'finance' | 'inventory' | 'relationships' | 'tesla' | 'living';
+type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'fitness' | 'timeline' | 'schedule' | 'finance' | 'inventory' | 'relationships' | 'tesla' | 'living';
 
 const DAY_MS = 86_400_000;
 
@@ -477,7 +477,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   // 洞察改版:首页是入口宫格(showHub),点卡进板块;有 initialTab(深链)时直达板块。
   const [showHub, setShowHub] = useState(!initialTab);
   const tabLabel = (t: MainTab): string =>
-    t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'growth' ? L(dict, '成长', 'Growth') : t === 'montage' ? L(dict, '小剧场', 'Films') : t === 'health' ? L(dict, '健康', 'Health') : t === 'fitness' ? L(dict, '健身', 'Fitness') : t === 'timeline' ? L(dict, '足迹', 'Places') : t === 'finance' ? L(dict, '财务', 'Finance') : t === 'relationships' ? L(dict, '关系', 'People') : t === 'meetings' ? L(dict, '会议', 'Meetings') : t === 'inventory' ? L(dict, '物品', 'Items') : t === 'tesla' ? L(dict, '车 · Tesla', 'Car · Tesla') : L(dict, '多面镜', 'Mirror');
+    t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'growth' ? L(dict, '成长', 'Growth') : t === 'montage' ? L(dict, '小剧场', 'Films') : t === 'health' ? L(dict, '健康', 'Health') : t === 'fitness' ? L(dict, '健身', 'Fitness') : t === 'timeline' ? L(dict, '足迹', 'Places') : t === 'finance' ? L(dict, '财务', 'Finance') : t === 'relationships' ? L(dict, '关系', 'People') : t === 'schedule' ? L(dict, '日程', 'Schedule') : t === 'inventory' ? L(dict, '物品', 'Items') : t === 'tesla' ? L(dict, '车 · Tesla', 'Car · Tesla') : L(dict, '多面镜', 'Mirror');
   const showPlaces = useFeatureEnabled('places');
   const showExperiment = useFeatureEnabled('experiment');
   const showHealth = useFeatureEnabled('health');
@@ -760,7 +760,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       <div className="nesio-insights-body">
         {showHub ? (
           <div className="nesio-insights-hub">
-            {(['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'meetings', 'finance', 'inventory', 'relationships', 'tesla', 'living'] as MainTab[]).filter(tabEnabled).map((t) => (
+            {(['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule', 'finance', 'inventory', 'relationships', 'tesla', 'living'] as MainTab[]).filter(tabEnabled).map((t) => (
               <button
                 key={t}
                 type="button"
@@ -957,7 +957,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {mainTab === 'relationships' && showPeople && <RelationshipsPanel />}
 
         {/* ── Tab: 会议(只看会议记录 + 挂没挂到日程,解决「混在一堆里找不着」)── */}
-        {mainTab === 'meetings' && <MeetingsPanel onOpenMemory={openInMemory} />}
+        {mainTab === 'schedule' && <TabErrorBoundary label="schedule"><SchedulePanel onOpenMemory={openInMemory} /></TabErrorBoundary>}
 
         {/* ── Tab: 物品(只读统计 dashboard;管理去物品页)── */}
         {mainTab === 'inventory' && <TabErrorBoundary label="inventory"><InventoryStatsPanel /></TabErrorBoundary>}
