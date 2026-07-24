@@ -88,6 +88,10 @@ export default function TeslaPanel() {
     .filter((c) => c.batteryLevel == null)
     .sort((a, b) => (a.at < b.at ? 1 : -1));
 
+  // 有车但一个坐标都没回 = 多半没授权 vehicle_location(独立权限)→ 位置进不了足迹。
+  const hasVehicle = liveByVehicle.size > 0;
+  const hasAnyLocation = drives.some((d) => d.latitude != null && d.longitude != null);
+
   const monthAgo = Date.now() - 30 * 86_400_000;
   const recent = history.filter((c) => new Date(c.at).getTime() >= monthAgo);
   const recentCost = recent.reduce((s, c) => s + (c.costUsd || 0), 0);
@@ -171,6 +175,19 @@ export default function TeslaPanel() {
           </div>
         );
       })}
+
+      {/* 有车却没坐标:提示重连以授权位置(vehicle_location 是独立权限)——否则足迹永远空 */}
+      {hasVehicle && !hasAnyLocation && (
+        <div style={{
+          marginTop: 'var(--space-3)', padding: 'var(--space-3)',
+          borderRadius: 'var(--radius-md)', background: 'var(--status-calm-soft)',
+          fontSize: 'var(--text-sm)', color: 'var(--portal-ink)', lineHeight: 1.6,
+        }}>
+          {L(dict,
+            '想把停车 / 充电位置记进足迹?到「设置 → 数据接入 → Tesla」重新连接一次 —— 这次会请求位置权限(Tesla 把 GPS 单列为一项权限,之前没带上)。',
+            'Want parking / charging spots in your Place trail? Reconnect Tesla in Settings → Data sources — this time it asks for location (Tesla gates GPS behind a separate permission that was missing before).')}
+        </div>
+      )}
 
       <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-4)' }}>
         {L(dict, '充电', 'Charging')}

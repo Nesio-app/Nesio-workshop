@@ -32,9 +32,11 @@ export const TESLA_FLEET_BASE = envValue('TESLA_FLEET_API_BASE') || 'https://fle
 // Audience for partner/client tokens = the fleet API base.
 export const TESLA_AUDIENCE = envValue('TESLA_AUDIENCE') || TESLA_FLEET_BASE;
 
-// Read-only scopes chosen with the user: Vehicle Information + Charging Management.
+// Read-only scopes chosen with the user: Vehicle Information + Location + Charging.
 // openid + offline_access are required to receive a refresh token.
-export const TESLA_SCOPES = 'openid offline_access vehicle_device_data vehicle_charging_cmds';
+// vehicle_location 是**独立**权限:没有它,drive_state 的经纬度一律返回 null ——
+// 停车/充电位置进不了足迹(用户实锤「地址页没有」的根因)。加上后需重新授权一次生效。
+export const TESLA_SCOPES = 'openid offline_access vehicle_device_data vehicle_location vehicle_charging_cmds';
 
 export function teslaConfigured(): boolean {
   return Boolean(envValue('TESLA_CLIENT_ID') && envValue('TESLA_CLIENT_SECRET'));
