@@ -44,6 +44,7 @@ Auth legend:
 | POST /api/portal/wardrobe-stylist | guardAiRoute + requirePaidCloudAi | 20/min | 衣橱·Pro 云造型师:从现有单品挑一套协调搭配 + 理由 + 贴士;免费/失败回落规则版 suggestOutfit |
 | POST /api/portal/wardrobe-tryon | guardAiRoute + requirePaidCloudAi | 10/min | 衣橱·Pro 上身试穿:全身照 + 单品照 → Gemini 图像模型合成上身效果;隐私:照片不落库、仅请求时发送;reportAiCall 上账 |
 | POST /api/portal/ingest | secret / session | — |
+| POST /api/alexa | applicationId(ALEXA_SKILL_ID)+ 时间戳新鲜度 | — | 智能家居·Alexa 语音入口:capture→转发 /api/portal/ingest 入档;ask=v2 占位;英文 only(Alexa 无中文);GET 自检。个人版回落 INGEST_SHARED_SECRET,多用户走账号关联 accessToken。详见 docs/alexa-skill-setup.md |
 | POST /api/portal/embed | session / no-Supabase + requirePaidCloudAi(付费门)+ 熔断 + reportAiCall | — | 里程碑 C:付费语义检索会把记忆文本(含邮件正文,本机全文优先)嵌入化过云;仅付费层(canUsePaidCloudAi)到达,免费前置拦下不出网 |
 | POST /api/secretary/chat | session / lab | — |
 
