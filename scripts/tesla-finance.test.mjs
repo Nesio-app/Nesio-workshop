@@ -72,4 +72,8 @@ assert.ok(/loadTeslaChargeTx\(\)/.test(fin), 'FinanceTab 合并 Tesla 充电花�
 assert.ok(/teslaFinAccount\(\)/.test(fin), 'Tesla 花费带合成账户进账户表');
 assert.ok(/nesio-connectors-refreshed/.test(fin), 'Tesla 同步后事件触发财务重读');
 
+// ── 契约:Tesla OAuth scope 必含 vehicle_location(否则 GPS 全 null,足迹永空)──
+const teslaSrc = fs.readFileSync(new URL('../lib/portal/tesla.ts', import.meta.url), 'utf8');
+assert.ok(/vehicle_location/.test(teslaSrc), 'TESLA_SCOPES 必含 vehicle_location(位置是独立权限,缺了足迹拿不到坐标)');
+
 console.log('tesla-finance: OK');
