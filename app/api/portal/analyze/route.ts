@@ -56,6 +56,28 @@ function isAnalyzeAiAllowed(req: NextRequest): boolean {
 // Canonical extraction prompt — shared with ingest/gmail via lib/extraction
 const SYSTEM_PROMPT = EXTRACTION_SYSTEM_PROMPT;
 
+// 衣橱:拍一件衣服 → 结构化属性(付费/云;客户端已用 canUsePaidCloudAi 门控)。
+// 输出仍是通用 {nodes:[{name, attributes}], summary},客户端读 nodes[0].attributes 预填,
+// 缺字段用户手改 —— 永不盲信。
+function buildClothingPrompt(uiLocale?: string): string {
+  const isEn = (uiLocale || 'zh').toLowerCase().startsWith('en');
+  return `You are a wardrobe assistant. The image is ONE clothing item. Identify it and return ONLY valid JSON, no markdown fences:
+{
+  "summary": "${isEn ? 'one short sentence naming the item' : '一句话描述这件衣服'}",
+  "nodes": [{
+    "name": "${isEn ? 'short item name, e.g. \"navy oxford shirt\"' : '简短名字,如「藏青牛津衬衫」'}",
+    "attributes": {
+      "garmentType": "one of: top | bottom | outer | dress | shoes | accessory",
+      "warmth": 1,                     // 1 thin, 2 medium, 3 warm
+      "formality": "one of: casual | smart | formal",
+      "colors": "${isEn ? 'comma-separated colors' : '逗号分隔的颜色词'}",
+      "material": "${isEn ? 'main fabric if visible, else empty' : '可见的主要材质,看不出留空'}"
+    }
+  }]
+}
+RULES: garmentType/warmth/formality MUST use the exact allowed values. Guess reasonably from the photo. Output ${isEn ? 'English' : 'Chinese'} for name/colors/material.`;
+}
+
 const ASK_SYSTEM_PROMPT = `You are Nesio, a personal life assistant embedded in a user's memory app.
 The user message is JSON: {"query": "...", "candidates": [...memory nodes...], "totalNodeCount": N}
 
@@ -363,6 +385,7 @@ export async function POST(req: NextRequest) {
       imageBase64?: string;
       mimeType?: string;
       uiLocale?: string;
+      mode?: 'clothing';
     };
 
     let raw = '';
@@ -370,7 +393,10 @@ export async function POST(req: NextRequest) {
     const aiAllowed = isAnalyzeAiAllowed(req);
     // 输出语言跟随 UI(英文用户不该拿到中文 name/summary/tags)。
     const isEn = (body.uiLocale || 'zh').toLowerCase().startsWith('en');
-    const extractionPrompt = buildExtractionSystemPrompt(body.uiLocale);
+    // 衣橱识别用专属 prompt(结构化属性);其余走通用抽取。默认路径不变。
+    const extractionPrompt = (isImage && body.mode === 'clothing')
+      ? buildClothingPrompt(body.uiLocale)
+      : buildExtractionSystemPrompt(body.uiLocale);
 
     // 有鉴权但之前无限流:单个会话可无节流刷最贵的视觉/grounding 调用(每请求最多 4 次外部 AI)。
     if (aiAllowed && isRateLimited(req, 'analyze', { limit: 20 })) {

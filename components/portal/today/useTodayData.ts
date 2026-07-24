@@ -42,9 +42,11 @@ import {
   readingFindingsToGuidanceEvents,
   crossRegionToGuidanceEvents,
   objectContextEvents,
+  outfitFindingsToGuidanceEvents,
   type WeatherSnapshot,
   decCardsToGuidanceEvents,
 } from '@/lib/platform/guidance-engine/source-adapters';
+import { listWardrobe, outfitFindings, inferFormalNeed } from '@/lib/portal/wardrobe';
 import { computeDomainFindings } from '@/lib/portal/domain-insights';
 import { buildCrossRegionDeliverables } from '@/lib/platform/cross-region/deliver';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
@@ -236,6 +238,26 @@ export function useTodayData(canUsePrivateData: boolean) {
               // 跨区 P2:已过同意/新鲜度/可打断性/预算门的跨区关联,进七层管线主动投递
               ...crossRegionToGuidanceEvents(buildCrossRegionDeliverables(now)),
             ];
+          })(),
+          // 穿搭:今日天气(冷热/降水)+ 今天的日程(正式度)→ 每日一套。规则版免费/端上;
+          // 衣橱空则不打扰、太少给轻引导。点卡打开洞察「衣橱」tab。
+          ...(() => {
+            const w = weather as (WeatherSnapshot & { tempMinC?: number; tempMaxC?: number; precipProb?: number }) | null;
+            const isToday = (iso?: string) => {
+              if (!iso) return false;
+              const d = new Date(iso);
+              return !Number.isNaN(d.getTime())
+                && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+            };
+            const todayCal = calEvents.filter((e) => isToday(e.start));
+            const outfitCtx = {
+              repTempC: w?.tempMinC ?? w?.temperatureC ?? null,
+              tempMinC: w?.tempMinC ?? null,
+              tempMaxC: w?.tempMaxC ?? null,
+              precipProb: w?.precipProb ?? null,
+              formalNeed: inferFormalNeed(todayCal),
+            };
+            return outfitFindingsToGuidanceEvents(outfitFindings(listWardrobe(), outfitCtx, now.toISOString()));
           })(),
         ];
         const guidanceEvents = [
