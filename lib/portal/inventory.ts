@@ -457,6 +457,106 @@ export function buildListingText(item: InventoryItem, dict: string = 'zh'): stri
   return lines.join('\n');
 }
 
+/* ---------- 物品⑦:亚马逊转卖 CSV 导入(对接用户 Notion「Amazon Free Tracker」导出)---------- */
+
+/** 一行 CSV → 字段数组(尊重双引号内的逗号,如 "November 28, 2025" / "CN¥2,115.50")。 */
+export function splitCsvLine(line: string): string[] {
+  const out: string[] = [];
+  let cur = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (line[i + 1] === '"') { cur += '"'; i++; } // 转义双引号
+        else inQuotes = false;
+      } else cur += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === ',') { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+/** 金额串 → 数字。剥 $/¥/CN/逗号/空白,保留负号与小数;负号可在货币符前(-$0.67)。空 → null。 */
+export function parseMoneyLoose(raw: string): number | null {
+  if (!raw) return null;
+  const cleaned = raw.replace(/[^0-9.\-]/g, '');
+  if (!cleaned || cleaned === '-' || cleaned === '.') return null;
+  const n = parseFloat(cleaned);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** 「November 28, 2025」/「2025-11-28」→「YYYY-MM-DD」;解析不动返回 ''。 */
+export function parseFlexibleDate(raw: string): string {
+  const s = (raw || '').trim();
+  if (!s) return '';
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10);
+  const t = Date.parse(s);
+  if (!Number.isFinite(t)) return '';
+  const d = new Date(t);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+/**
+ * 解析 Notion「Amazon Free Tracker」导出 CSV → 可直接喂 addInventoryItem 的条目。
+ * 列:Name, In Stock, Order #, PayStatus, Review Status, 免评, 到货时间, 盈利, 美金价格, 自付额, 转卖价, 返现金额
+ *
+ * 关键:返现金额是人民币(CN¥),其它金额是美元。为让 app 派生的自付额/盈利与表里**一致**,
+ * 用美元字段反推返现:rebate$ = 美金价格 − 自付额(自付额 = 买入价 − 返现)。缺美金价格时
+ * 返现留空。表头按**名称**匹配(容忍 BOM 与列顺序变化),缺名的行跳过。
+ */
+export function parseAmazonFlipCsv(text: string): NewInventoryItem[] {
+  const raw = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+  const lines = raw.split('\n').filter((l) => l.trim().length > 0);
+  if (lines.length < 2) return [];
+  const header = splitCsvLine(lines[0]).map((h) => h.replace(/^﻿/, '').trim());
+  const idx = (name: string) => header.findIndex((h) => h === name);
+  const col = {
+    name: idx('Name'),
+    inStock: idx('In Stock'),
+    orderNo: idx('Order #'),
+    payStatus: idx('PayStatus'),
+    reviewStatus: idx('Review Status'),
+    exempt: idx('免评'),
+    arrived: idx('到货时间'),
+    buyPrice: idx('美金价格'),
+    outOfPocket: idx('自付额'),
+    resale: idx('转卖价'),
+  };
+  if (col.name === -1) return []; // 没有 Name 列 = 不是这张表
+  const at = (cells: string[], i: number) => (i >= 0 && i < cells.length ? cells[i].trim() : '');
+  const truthy = (v: string) => /^(done|yes|是|已|true|完成)/i.test(v.trim());
+
+  const out: NewInventoryItem[] = [];
+  for (let r = 1; r < lines.length; r++) {
+    const cells = splitCsvLine(lines[r]);
+    const name = at(cells, col.name);
+    if (!name) continue;
+    const buyPrice = parseMoneyLoose(at(cells, col.buyPrice));
+    const oop = parseMoneyLoose(at(cells, col.outOfPocket));
+    const resale = parseMoneyLoose(at(cells, col.resale));
+    // rebate$ = 买入价 − 自付额(反推,保证 app 派生的自付额/盈利与表一致)
+    const rebate = buyPrice != null && oop != null ? Math.round((buyPrice - oop) * 100) / 100 : null;
+    const item: NewInventoryItem = { name, isAmazon: true };
+    if (buyPrice != null) item.buyPrice = buyPrice;
+    if (rebate != null) item.rebate = rebate;
+    if (resale != null) item.resalePrice = resale;
+    const arrived = parseFlexibleDate(at(cells, col.arrived));
+    if (arrived) item.arrivedAt = arrived;
+    const orderNo = at(cells, col.orderNo);
+    if (orderNo) item.orderNo = orderNo;
+    if (/sold|已售/i.test(at(cells, col.inStock))) item.sold = true;
+    if (truthy(at(cells, col.payStatus))) item.rebateReceived = true;
+    if (truthy(at(cells, col.reviewStatus))) item.reviewDone = true;
+    if (truthy(at(cells, col.exempt))) item.reviewExempt = true;
+    out.push(item);
+  }
+  return out;
+}
+
 /* ---------- 域判定(接 Cross-Insight Reader / guidance)---------- */
 
 /** 收纳域「值得提示」判定 —— 与健康/财务 finding 同形,经 domain-insights 汇聚。 */

@@ -27,6 +27,7 @@ import {
   expiryStatus,
   inventoryStats,
   listInventoryItems,
+  parseAmazonFlipCsv,
   removeInventoryItem,
   reviewDueInfo,
   sellPile,
@@ -391,7 +392,30 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                   e.target.value = '';
                   if (!f) return;
                   try {
-                    const r = importInventoryCsv(await f.text());
+                    const text = await f.text();
+                    const firstLine = text.split('\n')[0] || '';
+                    // 自动识别亚马逊转卖表(Notion「Amazon Free Tracker」导出):列名一命中就走转卖解析,
+                    // 否则走通用物品导入。用户不必选类型,直接传文件即可。
+                    const isAmazon = /美金价格|自付额|Review Status|PayStatus/.test(firstLine);
+                    if (isAmazon) {
+                      const parsed = parseAmazonFlipCsv(text);
+                      // 去重:同名 + 同到货日已在库就跳过(同文件导两次不叠加)。
+                      const seen = new Set(items.filter((i) => i.isAmazon).map((i) => `${i.name}|${i.arrivedAt || ''}`));
+                      let imported = 0; let dup = 0;
+                      for (const it of parsed) {
+                        const key = `${it.name}|${it.arrivedAt || ''}`;
+                        if (seen.has(key)) { dup++; continue; }
+                        seen.add(key);
+                        addInventoryItem(it);
+                        imported++;
+                      }
+                      refresh();
+                      setImportMsg(imported > 0
+                        ? L(dict, `导入 ${imported} 件亚马逊转卖${dup ? ` · 跳过 ${dup} 件重复` : ''}`, `Imported ${imported} Amazon flips${dup ? ` · ${dup} duplicates skipped` : ''}`)
+                        : L(dict, `没有新增(${dup} 件已在库)`, `Nothing new (${dup} already tracked)`));
+                      return;
+                    }
+                    const r = importInventoryCsv(text);
                     refresh();
                     const parts = [L(dict, `导入 ${r.imported} 件`, `Imported ${r.imported}`)];
                     if (r.skipped) parts.push(L(dict, `跳过 ${r.skipped} 行(缺名称)`, `${r.skipped} skipped (no name)`));
