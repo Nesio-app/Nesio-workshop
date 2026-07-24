@@ -86,7 +86,8 @@ export default function TrainingPlan() {
           </div>
         </>
       )}
-      <ExerciseLibrary open={libOpen} onClose={() => setLibOpen(false)} />
+      {/* 只在打开时挂载:避免动作库的挂载副作用(hook/懒加载)拖累健身 tab 首屏。 */}
+      {libOpen && <ExerciseLibrary open onClose={() => setLibOpen(false)} />}
     </>
   );
 

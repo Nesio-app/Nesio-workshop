@@ -50,6 +50,7 @@ import TrainingPlan from './health/TrainingPlan';
 import RelationshipsPanel from './relationships/RelationshipsPanel';
 import MeetingsPanel from './insights/MeetingsPanel';
 import TeslaPanel from './TeslaPanel';
+import TabErrorBoundary from './TabErrorBoundary';
 import LearningStatusPanel from './LearningStatusPanel';
 import { mineCrossDomain } from '@/lib/portal/cross-domain-correlations';
 import { readFactJournal, ensureFactJournal } from '@/lib/platform/fact-journal';
@@ -947,7 +948,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
 
         {/* ── Tab: 健康 Dashboard ── */}
         {mainTab === 'health' && showHealth && <HealthDashboard />}
-        {mainTab === 'fitness' && showHealth && <div className="nesio-analytics-tab"><TrainingPlan /></div>}
+        {mainTab === 'fitness' && showHealth && (
+          <TabErrorBoundary label="fitness"><div className="nesio-analytics-tab"><TrainingPlan /></div></TabErrorBoundary>
+        )}
 
         {/* ── Tab: 关系管理 ── */}
         {mainTab === 'relationships' && showPeople && <RelationshipsPanel />}
