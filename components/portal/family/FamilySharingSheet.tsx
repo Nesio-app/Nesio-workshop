@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
+import { IconTarget, IconStar, IconCamera } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale, loadProfileSettings } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -230,8 +231,8 @@ function GoalSection({ familyId, me, owed, onSaved, t }: {
 
   if (!goal) {
     return (
-      <button type="button" onClick={() => setOpen(true)} style={{ ...ghostBtn, alignSelf: 'flex-start' }}>
-        🎯 {t('设一个攒钱目标', 'Set a savings goal')}
+      <button type="button" onClick={() => setOpen(true)} style={{ ...ghostBtn, alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+        <IconTarget size={14} /> {t('设一个攒钱目标', 'Set a savings goal')}
       </button>
     );
   }
@@ -241,8 +242,8 @@ function GoalSection({ familyId, me, owed, onSaved, t }: {
   return (
     <div style={{ ...cardStyle, padding: 'var(--space-4)', background: reached ? 'var(--status-go-soft)' : 'var(--portal-accent-soft)', borderColor: 'transparent' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
-        <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)' as unknown as number, color: 'var(--portal-ink)' }}>
-          {reached ? '🎉 ' : '🎯 '}{me.goalLabel || t('攒钱目标', 'Savings goal')}
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)' as unknown as number, color: reached ? 'var(--status-go)' : 'var(--portal-ink)' }}>
+          {reached ? <IconStar size={15} /> : <IconTarget size={15} />}{me.goalLabel || t('攒钱目标', 'Savings goal')}
         </span>
         <button type="button" onClick={() => setOpen(true)} style={{ border: 'none', background: 'transparent', color: 'var(--portal-accent)', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>{t('改', 'Edit')}</button>
       </div>
@@ -251,7 +252,7 @@ function GoalSection({ familyId, me, owed, onSaved, t }: {
       </div>
       <p className="nesio-reward-progress-label" style={{ color: reached ? 'var(--status-go)' : 'var(--portal-muted)' }}>
         {reached
-          ? t(`攒够了!可以买 ${me.goalLabel || '它'} 了 🎉`, `Goal reached — you can get ${me.goalLabel || 'it'}! 🎉`)
+          ? t(`攒够了!可以买 ${me.goalLabel || '它'} 了`, `Goal reached — you can get ${me.goalLabel || 'it'}!`)
           : t(`${money(owed)} / ${money(goal)} · 还差 ${money(Math.max(0, goal - owed))}`, `${money(owed)} / ${money(goal)} · ${money(Math.max(0, goal - owed))} to go`)}
       </p>
     </div>
@@ -336,7 +337,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
             {board.toReview.map((c, i) => (
               <div key={c.id} style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch', gap: 'var(--space-2)', borderBottom: i === board.toReview.length - 1 ? 'none' : rowStyle.borderBottom }}>
                 <div style={{ fontSize: 'var(--text-body)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}><MemberAvatar name={displayName(c.assigneeId)} avatar={avatarOf(c.assigneeId)} size={22} /><span>{displayName(c.assigneeId)} · {choreTitle(c, t)} <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>{money(c.value)}</span></span></div>
-                {c.proofPhotoRef && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>📷 {t('附了张存证照 —— 只存在你们家庭里。', 'A photo was added — stays in your family vault.')}</div>}
+                {c.proofPhotoRef && <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}><IconCamera size={12} />{t('附了张存证照 —— 只存在你们家庭里。', 'A photo was added — stays in your family vault.')}</div>}
                 <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                   <button type="button" onClick={() => act(c.id, 'approve')} disabled={busyId === c.id + 'approve'} style={{ ...goBtn, flex: 1 }}>{t('看着不错', 'Looks good')}</button>
                   <button type="button" onClick={() => act(c.id, 'send_back')} disabled={busyId === c.id + 'send_back'} style={{ ...ghostBtn, flex: 1 }}>{t('再来一次', 'Try again')}</button>
