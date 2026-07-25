@@ -35,9 +35,17 @@ export const DEDICATED_SYNC_KEYS = new Set<string>([
   'nesio-preference-v1',
 ]);
 
-/** 由专属引擎负责的 key 前缀(通用 module-sync 让路)。 */
+/** 邮件全文行前缀(cloud-email-sync)。 */
+/** 导入书籍逐本行前缀(cloud-reader-sync)—— 独立 IDB nesio-reader,量级大,per-record 上云。 */
+export const READER_BOOK_MODULE_PREFIX = 'reader-book:';
+
+/**
+ * 由专属引擎负责的 key 前缀(通用 module-sync 让路)。加新的 per-record 专属引擎 = 在此加它的前缀,
+ * 通用同步会据此**服务端**排除(不下载)+ 客户端跳过,自动合规。
+ */
 export const DEDICATED_SYNC_PREFIXES: readonly string[] = [
-  EMAIL_BODY_MODULE_PREFIX, // 邮件全文逐封行(cloud-email-sync)。
+  EMAIL_BODY_MODULE_PREFIX,   // 邮件全文逐封行(cloud-email-sync)
+  READER_BOOK_MODULE_PREFIX,  // 导入书籍逐本行(cloud-reader-sync)
 ];
 
 /** 该 key 是否由某个专属引擎负责同步 → 通用 module-sync 应跳过它。 */

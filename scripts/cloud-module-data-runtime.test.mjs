@@ -61,11 +61,12 @@ for (const marker of ['pushModulesToCloud', 'pullModulesFromCloud', 'autoSyncMod
   assert.ok(client.includes(marker), `module-sync client missing: ${marker}`);
 }
 // 归属排除走单一登记(sync-ownership),不再各写一份 —— 通用同步对专属引擎的 key 一律让路。
-assert.match(client, /import \{ isDedicatedSyncKey \} from '\.\/sync-ownership'/, 'module-sync 从 sync-ownership 引入归属判断');
+assert.match(client, /import \{[^}]*isDedicatedSyncKey[^}]*\} from '\.\/sync-ownership'/, 'module-sync 从 sync-ownership 引入归属判断');
 assert.match(client, /restoreCombinedBackup\(backup, 'replace'\)/, '落地复用 restoreCombinedBackup(replace 覆盖选中 key)');
-// 模块同步 GET 必须用 excludePrefix 把邮件全文行挡在门外(否则 20s 轮询下载数十 MB)
-assert.match(client, /excludePrefix=/, 'module-sync GET 用 excludePrefix 排除邮件行');
-assert.ok(client.includes('EMAIL_BODY_MODULE_PREFIX'), 'module-sync 引用邮件行前缀常量,双保险跳过');
+// 模块同步 GET 必须用 excludePrefix 把所有 per-record 专属引擎的行(邮件/书籍…)挡在门外
+// (否则 20s 轮询下载数十 MB)。前缀集来自 sync-ownership 单一真源,新增引擎自动被排除。
+assert.match(client, /excludePrefix=/, 'module-sync GET 用 excludePrefix 排除 per-record 行');
+assert.ok(client.includes('DEDICATED_SYNC_PREFIXES'), 'module-sync 用 sync-ownership 的前缀集(单一真源,新增引擎自动排除)');
 
 // 邮件全文逐封记录级同步引擎:前缀行、gz 压缩、并集补缺、喂全文索引
 const emailClient = fs.readFileSync(emailClientPath, 'utf8');
