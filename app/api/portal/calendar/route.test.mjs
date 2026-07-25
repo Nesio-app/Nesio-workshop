@@ -150,6 +150,10 @@ function loadRoute() {
         // 纯常量/纯函数,忠实复制(用户时区固定纽约)。
         return { USER_TIME_ZONE: 'America/New_York', nowUserTzISO: () => '2026-01-01T00:00:00-05:00' };
       }
+      if (specifier === '@/lib/portal/api-auth') {
+        // 验真会话门:忠实映射到 mock cookie —— 有会话 → true(通过),无 → false(fail-closed)。
+        return { hasVerifiedSessionCookie: async () => Boolean(mockBaoheAuthCookie) };
+      }
       throw new Error(`Unexpected import in calendar route test: ${specifier}`);
     },
   };

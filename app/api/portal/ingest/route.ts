@@ -21,27 +21,29 @@ import {
   normalizeVoiceToSignal,
 } from '@/lib/life-domain/normalizers';
 import { buildSourceExtractionPrompt, parseJsonBlock, SOURCE_HINTS } from '@/lib/extraction/extraction';
-import { isRateLimited } from '@/lib/portal/api-auth';
+import { isRateLimited, isPortalRequestAuthorized, safeEqual } from '@/lib/portal/api-auth';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
-function isIngestAllowed(req: NextRequest, bodySecret?: string): boolean {
+async function isIngestAllowed(req: NextRequest, bodySecret?: string): Promise<boolean> {
   const sharedSecret = envValue('INGEST_SHARED_SECRET');
-  if (sharedSecret && bodySecret === sharedSecret) return true;
+  if (sharedSecret && bodySecret && safeEqual(bodySecret, sharedSecret)) return true; // 常量时间比较,防计时侧信道
 
   const stage5Secret = envValue('NESIO_STAGE5_INVOCATION_SECRET');
   const providedStage5Secret = req.headers.get('x-nesio-stage5-secret')?.trim() || '';
   if (stage5Secret && providedStage5Secret === stage5Secret) return true;
 
-  const hasSignedInCookie = Boolean(req.cookies.get('baohe_auth_access')?.value);
-  if (hasSignedInCookie) return true;
-
+  // 本地/实验 env-flag 旁路。
   const accessMode = req.headers.get('x-baohe-access-mode')?.trim() || '';
   const labEnabled = envValue('BAOHE_PERSONAL_LAB_AI_ENABLED').toLowerCase() === 'true';
-  return labEnabled && accessMode === 'personal_lab';
+  if (labEnabled && accessMode === 'personal_lab') return true;
+
+  // 安全(denial-of-wallet 收口):**验真会话**(Supabase 验 access / HMAC 验签 refresh|openid /
+  // Stage5 / 无 Supabase 放行),不再只看 baohe_auth_access 存在。伪造 cookie → 拒。
+  return isPortalRequestAuthorized(req);
 }
 
 async function extractNodes(source: string, content: string): Promise<{ nodes: object[]; summary: string }> {
@@ -98,7 +100,7 @@ export async function POST(req: NextRequest) {
     body = { source: 'shortcuts', content: text };
   }
 
-  if (!isIngestAllowed(req, body.secret)) {
+  if (!(await isIngestAllowed(req, body.secret))) {
     return NextResponse.json({ ok: false, error: 'ingest_auth_required' }, { status: 401 });
   }
   // 有鉴权但之前无限流:登录/持 secret 后可无节流打 Gemini 抽取。
