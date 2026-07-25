@@ -38,6 +38,7 @@ const ToolsTreasurePopup = dynamic(() => import('./ToolsTreasureSheet'), { ssr: 
 const InventorySheet = dynamic(() => import('./InventorySheet'), { ssr: false });
 const CalendarCreateSheet = dynamic(() => import('./CalendarCreateSheet'), { ssr: false });
 const FamilySharingSheet = dynamic(() => import('./family/FamilySharingSheet'), { ssr: false });
+const CookingSheet = dynamic(() => import('./cooking/CookingSheet'), { ssr: false });
 const RewardsStoreSheet = dynamic(() => import('./RewardsStoreSheet'), { ssr: false });
 const DailyBriefSheet = dynamic(() => import('./DailyBriefSheet').then((m) => m.DailyBriefSheet), { ssr: false });
 // 洞察 = 全屏浮层(非 surface):提到 Portal 层,底部导航从任意页都能开。1143 行,开时才加载。
@@ -449,6 +450,7 @@ export default function Portal() {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [calendarCreateOpen, setCalendarCreateOpen] = useState(false);
   const [familyOpen, setFamilyOpen] = useState(false);
+  const [cookingOpen, setCookingOpen] = useState(false);
   const [rewardsOpen, setRewardsOpen] = useState(false);
   const [workoutSession, setWorkoutSession] = useState<import('./fitness/WorkoutPlayer').PlayerSession | null>(null);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
@@ -789,6 +791,7 @@ export default function Portal() {
     const inventoryHandler = () => { track('inventory_open'); setInventoryOpen(true); };
     const calendarCreateHandler = () => { track('calendar_create_open'); setCalendarCreateOpen(true); };
     const familyHandler = () => { track('family_sharing_open'); setFamilyOpen(true); };
+    const cookingHandler = () => { track('cooking_open'); setCookingOpen(true); };
     const rewardsHandler = () => { track('rewards_open'); setRewardsOpen(true); };
     const briefHandler = () => { track('brief_open', {}); setBriefOpen(true); };
     // 洞察浮层:底部导航 / 卡片 / 「开始练」都派事件打开;detail.tab 指定进哪个 tab(如 fitness)
@@ -827,6 +830,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-inventory', inventoryHandler);
     window.addEventListener('nesio-open-calendar-create', calendarCreateHandler);
     window.addEventListener('nesio-open-family', familyHandler);
+    window.addEventListener('nesio-open-cooking', cookingHandler);
     window.addEventListener('nesio-open-rewards', rewardsHandler);
     window.addEventListener('nesio-open-brief', briefHandler);
     window.addEventListener('nesio-open-insights', insightsHandler);
@@ -842,6 +846,7 @@ export default function Portal() {
       window.removeEventListener('nesio-open-inventory', inventoryHandler);
       window.removeEventListener('nesio-open-calendar-create', calendarCreateHandler);
       window.removeEventListener('nesio-open-family', familyHandler);
+      window.removeEventListener('nesio-open-cooking', cookingHandler);
       window.removeEventListener('nesio-open-rewards', rewardsHandler);
       window.removeEventListener('nesio-open-brief', briefHandler);
       window.removeEventListener('nesio-open-insights', insightsHandler);
@@ -1386,6 +1391,7 @@ export default function Portal() {
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
       {calendarCreateOpen && <CalendarCreateSheet open={calendarCreateOpen} onClose={() => setCalendarCreateOpen(false)} />}
       {familyOpen && <FamilySharingSheet open={familyOpen} onClose={() => setFamilyOpen(false)} />}
+      {cookingOpen && <CookingSheet open={cookingOpen} onClose={() => setCookingOpen(false)} />}
       {workoutSession && (
         // 错误边界(修「打开跟练 app 卡死」):跟练播放器一旦被畸形数据(如别端同步回的坏 workout)
         // 击中 throw,绝不能冒泡卸载整棵 Portal(=白屏/卡死);就地兜住、显示可截图的报错。

@@ -810,6 +810,24 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
               <span style={{ color: 'var(--portal-muted)' }}>›</span>
             </button>
           </div>
+          {/* 做饭 · 库存(workshop 域实验)—— 本地私密的第二张脸:用光你已有的、快过期的。 */}
+          <div className="nesio-insights-section" style={{ marginTop: 'var(--space-3)' }}>
+            <p className="nesio-insights-section-label">{L(dict, '做饭 · 库存', 'Cooking · Pantry')}</p>
+            <button
+              type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-cooking'))}
+              style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', background: 'var(--portal-bg)', cursor: 'pointer', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }}
+            >
+              <span aria-hidden style={{ width: 40, height: 40, borderRadius: 'var(--radius-sm)', display: 'grid', placeItems: 'center', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', flex: 'none' }}>
+                <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V2M5 11v11M19 2c-1.7 0-3 2-3 5s0 5 1.5 5H19v9" /></svg>
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{L(dict, '库存 & 做饭', 'Pantry & cooking')}</span>
+                <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '家里有什么、什么快过期 —— 先用光它', 'What’s on hand & expiring — use it first')}</span>
+              </span>
+              <span style={{ color: 'var(--portal-muted)' }}>›</span>
+            </button>
+          </div>
           </>
         ) : (
         <>
