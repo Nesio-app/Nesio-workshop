@@ -10,7 +10,7 @@ import { GEMINI_MODEL_FALLBACKS } from '@/lib/portal/ai-provider-chain.mjs';
 import { createSignal } from '@/lib/life-domain/create-signal';
 import { normalizePhotoToSignal, normalizeVoiceToSignal } from '@/lib/life-domain/normalizers';
 import { EXTRACTION_SYSTEM_PROMPT, buildExtractionSystemPrompt, languageDirective, parseJsonBlock } from '@/lib/extraction/extraction';
-import { isRateLimited } from '@/lib/portal/api-auth';
+import { isRateLimited, isPortalRequestAuthorized } from '@/lib/portal/api-auth';
 import { resolveAiKey } from '@/lib/portal/ai-keys';
 import { envValue } from '@/lib/portal/env';
 
@@ -33,24 +33,21 @@ function getOpenAIKey(): string | undefined {
   return (process.env.OpenAI_KEY || process.env.OPENAI_API_KEY)?.trim();
 }
 
-function isAnalyzeAiAllowed(req: NextRequest): boolean {
+async function isAnalyzeAiAllowed(req: NextRequest): Promise<boolean> {
   const stage5Secret = envValue('NESIO_STAGE5_INVOCATION_SECRET');
   const providedStage5Secret = req.headers.get('x-nesio-stage5-secret')?.trim() || '';
   if (stage5Secret && providedStage5Secret === stage5Secret) return true;
 
-  // 与 isPortalRequestAuthorized(chat 用的门)对齐 —— 认全套会话 cookie。
-  // 之前只认 baohe_auth_access:该 access cookie 短时效,过期后 refresh 还在、
-  // 文字聊天照常,但图片识别却报「登录后可用」。这就是「明明登录了图片识别失败」。
-  const hasSignedInCookie = Boolean(
-    req.cookies.get('baohe_auth_access')?.value ||
-      req.cookies.get('baohe_auth_refresh')?.value ||
-      req.cookies.get('baohe_wechat_openid')?.value,
-  );
-  if (hasSignedInCookie) return true;
-
+  // 本地/实验 env-flag 旁路(不需要 secret;仅本地实验开)。
   const accessMode = req.headers.get('x-baohe-access-mode')?.trim() || '';
   const labEnabled = envValue('BAOHE_PERSONAL_LAB_AI_ENABLED').toLowerCase() === 'true';
-  return labEnabled && accessMode === 'personal_lab';
+  if (labEnabled && accessMode === 'personal_lab') return true;
+
+  // 安全(denial-of-wallet 收口):**验真会话**,不再只看 cookie 存在。isPortalRequestAuthorized 会向
+  // Supabase 验 access token / HMAC 验签 refresh|openid / 认 Stage5 secret / 无 Supabase 的本地部署放行。
+  // 伪造 cookie 拿不到有效 token → 拒。access 过期时 cookie 同步失效 → 落 refresh 签名分支,合法用户不误伤
+  // (与全仓 30+ guardAiRoute 路由同款成熟路径)。
+  return isPortalRequestAuthorized(req);
 }
 
 // Canonical extraction prompt — shared with ingest/gmail via lib/extraction
@@ -390,7 +387,7 @@ export async function POST(req: NextRequest) {
 
     let raw = '';
     const isImage = body.type === 'image' && Boolean(body.imageBase64);
-    const aiAllowed = isAnalyzeAiAllowed(req);
+    const aiAllowed = await isAnalyzeAiAllowed(req);
     // 输出语言跟随 UI(英文用户不该拿到中文 name/summary/tags)。
     const isEn = (body.uiLocale || 'zh').toLowerCase().startsWith('en');
     // 衣橱识别用专属 prompt(结构化属性);其余走通用抽取。默认路径不变。

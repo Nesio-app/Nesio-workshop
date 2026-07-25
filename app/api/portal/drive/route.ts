@@ -11,6 +11,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveGmailAccessToken } from '@/lib/portal/providers/gmail-access';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -32,6 +33,9 @@ async function findBackupId(accessToken: string): Promise<string | null> {
 }
 
 export async function POST(req: NextRequest) {
+  // 红线:读写私密数据(Drive 备份)必须过 guardAiRoute(验真会话 + 限流)。
+  const guard = await guardAiRoute(req, 'drive', { limit: 20 });
+  if (guard) return guard;
   const accessToken = await resolveGmailAccessToken(req);
   if (!accessToken) return notConnected();
 
@@ -67,6 +71,9 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
+  // 红线:读私密数据(Drive 备份)必须过 guardAiRoute(验真会话 + 限流)。
+  const guard = await guardAiRoute(req, 'drive', { limit: 20 });
+  if (guard) return guard;
   const accessToken = await resolveGmailAccessToken(req);
   if (!accessToken) return notConnected();
   try {

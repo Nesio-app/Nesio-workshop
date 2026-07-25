@@ -40,12 +40,13 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
   const [faqOpen, setFaqOpen] = useState(false);
   const [voteOpen, setVoteOpen] = useState(false);
 
-  // 自由许愿(批次 4):文本进遥测(props 上限 80 字)+ 云产品事件(payload 全文),
-  // /admin Top 事件与 product_events 都能看到,和候选榜同池评审。
+  // 自由许愿(批次 4):**许愿全文只进云产品事件**(按本人身份、RLS 隔离,产品评审用)——
+  // 隐私修复:不再把 free-text 塞进共享匿名 telemetry_events(仅带 device_id、绕 RLS),那会把
+  // 用户原话泄进匿名共享表。遥测只留「有人许愿 + 长度」的无内容信号,不带任何原文。
   function submitWish() {
     const text = wish.trim();
     if (!text || wishSent) return;
-    track('feature_wish', { text: text.slice(0, 80) });
+    track('feature_wish', { length: text.length });
     void createAppApiClient().recordCloudProductEvent({
       eventType: 'feature.wish',
       source: 'roadmap',

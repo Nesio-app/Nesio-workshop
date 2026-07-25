@@ -11,6 +11,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveGmailAccessToken } from '@/lib/portal/providers/gmail-access';
+import { guardAiRoute } from '@/lib/portal/api-auth';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
@@ -43,6 +44,9 @@ function fmtBirthday(p: RawPerson): string | undefined {
 }
 
 export async function GET(req: NextRequest) {
+  // 红线:读私密数据(Google 通讯录)必须过 guardAiRoute(验真会话 + 限流)。
+  const guard = await guardAiRoute(req, 'people', { limit: 20 });
+  if (guard) return guard;
   const accessToken = await resolveGmailAccessToken(req);
   if (!accessToken) {
     return NextResponse.json({ ok: false, error: 'not_connected', connectUrl: '/api/portal/gmail/connect' }, { status: 401 });

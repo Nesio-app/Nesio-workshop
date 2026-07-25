@@ -19,6 +19,7 @@ import {
   type DraftEvent,
 } from '@/lib/portal/calendar-create';
 import { USER_TIME_ZONE, nowUserTzISO } from '@/lib/portal/user-timezone';
+import { hasVerifiedSessionCookie } from '@/lib/portal/api-auth';
 
 type Feed = { url: string; label: string };
 type FeedResult = { label: string; ok: boolean; count: number; error?: string };
@@ -49,12 +50,9 @@ function hasStage5LabAccess(req: NextRequest): boolean {
 }
 
 async function requireAuthenticatedCalendarAccess(req: NextRequest): Promise<NextResponse | null> {
-  const cookieStore = await cookies();
-  const hasNesioSession = Boolean(
-    cookieStore.get('baohe_auth_access')?.value ||
-      cookieStore.get('baohe_auth_refresh')?.value ||
-      cookieStore.get('baohe_wechat_openid')?.value,
-  );
+  // 安全:验真会话(HMAC 验签 refresh|openid,不再裸信 cookie 存在;与 gmail 同款)。access 的真伪由
+  // 下游取 Google 数据时兜底(伪 access 拿不到日历数据、无泄露)。收口伪造 refresh/openid presence 洞。
+  const hasNesioSession = await hasVerifiedSessionCookie();
   const noSupabase = !envValue('SUPABASE_URL') || !envValue('SUPABASE_ANON_KEY');
   if (hasNesioSession || hasStage5LabAccess(req) || noSupabase) return null;
 

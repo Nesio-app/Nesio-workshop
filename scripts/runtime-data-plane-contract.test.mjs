@@ -110,10 +110,14 @@ for (const marker of [
 const ingest = read('app/api/portal/ingest/route.ts');
 assert.match(ingest, /normalize\w+ToSignal/, 'Ingest route must normalize real input into Signal.');
 assert.match(ingest, /createSignal/, 'Ingest route must write through createSignal.');
+// 安全(denial-of-wallet):花钱 AI 路由必须**验真会话**,不能只看 cookie 存在(伪造即白嫖)。
+assert.match(ingest, /isPortalRequestAuthorized/, 'Ingest 花钱 AI 门必须验真会话(isPortalRequestAuthorized),不再只看 cookie 存在。');
 
 const analyze = read('app/api/portal/analyze/route.ts');
 assert.match(analyze, /normalizePhotoToSignal|normalizeVoiceToSignal/, 'Analyze route must normalize capture results into Signal input.');
 assert.match(analyze, /createSignal/, 'Analyze route must expose the Signal write path for captures.');
+assert.match(analyze, /isPortalRequestAuthorized/, 'Analyze 花钱 AI 门必须验真会话(isPortalRequestAuthorized),不再只看 cookie 存在。');
+assert.doesNotMatch(analyze, /hasSignedInCookie/, 'Analyze 不再用可伪造的 cookie-presence 门(hasSignedInCookie 已移除)。');
 
 const gmail = read('app/api/portal/gmail/route.ts');
 assert.match(gmail, /metadataOnly/, 'Gmail route must preserve metadata-only default.');
