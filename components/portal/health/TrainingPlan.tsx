@@ -18,6 +18,8 @@ import {
 } from '@/lib/platform/training-protocol-engine';
 import { earnPoints, POINTS_PER_FITNESS_SESSION } from '@/lib/platform/rewards-engine';
 import { loadWorkouts, deleteWorkout, WORKOUTS_UPDATED, type Workout } from '@/lib/portal/workout-store';
+import { workoutDisplayName, resolveExerciseName } from '@/lib/portal/workout-name';
+import { loadExerciseCatalog } from '@/lib/portal/exercise-catalog';
 
 const ExerciseLibrary = dynamic(() => import('../fitness/ExerciseLibrary'), { ssr: false });
 
@@ -50,6 +52,7 @@ export default function TrainingPlan() {
   const [earned, setEarned] = useState<number | null>(null);
   const [libOpen, setLibOpen] = useState(false);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
+  const [, setCatTick] = useState(0); // 扩展库动作名要等 catalog 载入内存才解析得出 → 载好后 bump 重渲染
   useEffect(() => {
     setSt(loadTrainingState());
     setWorkouts(loadWorkouts());
@@ -57,7 +60,16 @@ export default function TrainingPlan() {
     window.addEventListener(WORKOUTS_UPDATED, on);
     return () => window.removeEventListener(WORKOUTS_UPDATED, on);
   }, []);
+  // 「我的训练」若含扩展库动作(名字解析不出)→ 按需把 catalog 载进内存,让卡片/开练都显真名(含旧训练)。
+  useEffect(() => {
+    if (!workouts.some((w) => w.items.some((it) => !resolveExerciseName(it.exerciseId)))) return;
+    let alive = true;
+    loadExerciseCatalog().then(() => { if (alive) setCatTick((n) => n + 1); }).catch(() => {});
+    return () => { alive = false; };
+  }, [workouts]);
   if (!st) return null;
+  const dictLocale: 'zh' | 'en' = dict === 'en' ? 'en' : 'zh';
+  const nameOf = (w: Workout) => workoutDisplayName(w.items, w.name, dictLocale);
 
   const active = st.activeProtocolId ? protocolById(st.activeProtocolId) : undefined;
 
@@ -74,11 +86,11 @@ export default function TrainingPlan() {
             {workouts.map((w) => (
               <div key={w.id} className="nesio-fin-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
                 <div style={{ minWidth: 0 }}>
-                  <span className="nesio-fin-card-name">{w.name}</span>
+                  <span className="nesio-fin-card-name">{nameOf(w)}</span>
                   <p className="nesio-fin-card-meta" style={{ marginTop: '0.15rem' }}>{L(dict, `${w.items.length} 个动作`, `${w.items.length} moves`)}</p>
                 </div>
                 <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
-                  <button type="button" className="nesio-fin-review-accept" onClick={() => startWorkout(w.name, w.items.map((it) => ({ ...it, restSec: 45 })))}>{L(dict, '开始跟练', 'Start')}</button>
+                  <button type="button" className="nesio-fin-review-accept" onClick={() => startWorkout(nameOf(w), w.items.map((it) => ({ ...it, restSec: 45 })))}>{L(dict, '开始跟练', 'Start')}</button>
                   <button type="button" className="nesio-routine-delete" aria-label={L(dict, '删除', 'Delete')} onClick={() => { deleteWorkout(w.id); setWorkouts(loadWorkouts()); }}>✕</button>
                 </div>
               </div>

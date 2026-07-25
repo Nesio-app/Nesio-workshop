@@ -8,13 +8,14 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  EXERCISES, filterExercises, exerciseById, MUSCLE_LABEL, EQUIP_LABEL, MOVE_LABEL, DIFF_LABEL,
+  EXERCISES, filterExercises, MUSCLE_LABEL, EQUIP_LABEL, MOVE_LABEL, DIFF_LABEL,
   type Exercise, type MuscleTag, type Equip, type MoveTag,
 } from '@/lib/portal/exercise-library';
 import {
-  loadExerciseCatalog, filterCatalog, catalogFacets, catalogGifSrc, catalogExerciseByIdSync, CATALOG_EQUIP_LABEL, CATALOG_PART_LABEL,
+  loadExerciseCatalog, filterCatalog, catalogFacets, catalogGifSrc, CATALOG_EQUIP_LABEL, CATALOG_PART_LABEL,
   type CatalogExercise,
 } from '@/lib/portal/exercise-catalog';
+import { workoutDisplayName } from '@/lib/portal/workout-name';
 import ExerciseGif from './ExerciseGif';
 
 const CATALOG_RENDER_CAP = 40; // 一次最多渲染 40 张,避免上千卡片卡死主线程
@@ -29,24 +30,6 @@ import { useSheetDrag } from '../use-sheet-drag';
 const HOLD_IDS = new Set(['side-plank', 'deadbug', 'prone-swimmer', 'cat-cow', '9090']);
 function defaultItem(ex: Exercise): WorkoutItem {
   return HOLD_IDS.has(ex.id) ? { exerciseId: ex.id, sets: 3, reps: 30, unit: 'sec' } : { exerciseId: ex.id, sets: 3, reps: 10, unit: 'reps' };
-}
-
-// 用真实动作名给训练命名(修「选好动作卡片/跟练页名字对不上,只显示『自定义·N动作』」)。
-// 精选 18 从核心库拿名,扩展库从已载入内存的 catalog 拿 nameZh。1 个动作 → 用它的名字;
-// 多个动作 → 整合成「名1 · 名2 (等 N 个)」,让「我的训练」卡片和跟练页头都显示真名。
-function resolveExerciseName(id: string): string {
-  const core = exerciseById(id);
-  if (core) return core.name;
-  const cat = catalogExerciseByIdSync(id);
-  if (cat) return cat.nameZh || cat.name;
-  return id;
-}
-function workoutNameFromItems(items: WorkoutItem[], dict: string): string {
-  const names = items.map((it) => resolveExerciseName(it.exerciseId)).filter(Boolean);
-  if (names.length === 0) return L(dict, '自定义训练', 'Custom workout');
-  if (names.length === 1) return names[0];
-  if (names.length === 2) return `${names[0]} · ${names[1]}`;
-  return L(dict, `${names[0]} · ${names[1]} 等 ${names.length} 个`, `${names[0]} · ${names[1]} +${names.length - 2}`);
 }
 
 const MUSCLES: MuscleTag[] = ['glute', 'hip', 'core', 'back', 'chest', 'shoulder'];
@@ -112,7 +95,7 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
   const startPlay = () => {
     if (!draft.length) return;
     const steps: PlayerStep[] = draft.map((d) => ({ ...d, restSec: 45 }));
-    window.dispatchEvent(new CustomEvent('nesio-start-workout', { detail: { name: workoutNameFromItems(draft, dict), steps } }));
+    window.dispatchEvent(new CustomEvent('nesio-start-workout', { detail: { name: workoutDisplayName(draft, L(dict, '自定义训练', 'Custom workout'), dict === 'en' ? 'en' : 'zh'), steps } }));
     // 开练后收起动作库、清草稿(和 save 一致),否则 WorkoutPlayer 关掉后动作库还开着、草稿还在。
     setDraft([]);
     onClose();
@@ -120,7 +103,7 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
 
   const save = () => {
     if (!draft.length) return;
-    saveWorkout({ name: workoutNameFromItems(draft, dict), items: draft });
+    saveWorkout({ name: workoutDisplayName(draft, L(dict, '自定义训练', 'Custom workout'), dict === 'en' ? 'en' : 'zh'), items: draft });
     setFlash(L(dict, '已存到健康页', 'Saved to Health'));
     setDraft([]);
     setTimeout(() => setFlash(''), 1800);

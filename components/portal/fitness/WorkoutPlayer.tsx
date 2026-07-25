@@ -7,7 +7,7 @@
  * 全局挂在 Portal,任意入口 dispatch `nesio-start-workout`(detail=session)启动。
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { exerciseById, exerciseAnimFrames, MUSCLE_LABEL } from '@/lib/portal/exercise-library';
 import { catalogExerciseByIdSync, loadExerciseCatalog, catalogGifSrc } from '@/lib/portal/exercise-catalog';
 import ExerciseFigure from './ExerciseFigure';
@@ -34,36 +34,17 @@ export interface PlayerSession {
   sessionId?: string;
 }
 
-// 【节拍音:改用 HTMLAudioElement,不再碰 WebAudio —— 真机永不卡死】
-// 历史:移动端 WebView 里首次任何 **WebAudio** 操作(建音频上下文 / 恢复播放 / 启动振荡器 /
-// 激活音频硬件)都可能在主线程上同步阻塞且不返回(是阻塞不是抛错,错误边界接不住)→ 屏幕永久冻死。
-// 修法:彻底不用 WebAudio,改用普通 <audio> 元素(HTMLAudioElement)。它的 play() 返回 Promise、
-// 异步走媒体管线,不做那种同步激活硬件的阻塞;声源用预生成的极短 WAV(data URI,预加载),
-// 点击手势内首次 play() 完成解锁,之后 setInterval 里播放亦可。全部包 try/catch + .play().catch(),
-// 声音永远是尽力而为,任何异常都不影响跟拍/计时。
-//
-// 预生成一段极短蜂鸣的 WAV data URI(8kHz 单声道,带淡入淡出包络防爆音)。仅在客户端构建、体积几 KB。
-function makeBeepDataUri(freq: number, ms: number, vol = 0.28): string {
-  if (typeof window === 'undefined' || typeof btoa !== 'function') return '';
-  const rate = 8000;
-  const n = Math.max(1, Math.floor((rate * ms) / 1000));
-  const buf = new ArrayBuffer(44 + n * 2);
-  const dv = new DataView(buf);
-  const wr = (o: number, s: string) => { for (let i = 0; i < s.length; i++) dv.setUint8(o + i, s.charCodeAt(i)); };
-  wr(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); wr(8, 'WAVE'); wr(12, 'fmt ');
-  dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, 1, true);
-  dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true); dv.setUint16(32, 2, true); dv.setUint16(34, 16, true);
-  wr(36, 'data'); dv.setUint32(40, n * 2, true);
-  for (let i = 0; i < n; i++) {
-    const t = i / rate;
-    const env = Math.min(1, i / (rate * 0.005)) * Math.min(1, (n - i) / (rate * 0.03)); // 淡入 5ms / 淡出 30ms
-    const s = Math.sin(2 * Math.PI * freq * t) * vol * env;
-    dv.setInt16(44 + i * 2, Math.max(-1, Math.min(1, s)) * 0x7fff, true);
-  }
-  const bytes = new Uint8Array(buf);
-  let bin = '';
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return 'data:audio/wav;base64,' + btoa(bin);
+// 【节拍:无声 —— 本机任何声音播放都会永久卡死主线程,已两次真机验证】
+// 事实:去掉全部声音 → 跟拍做正常;只要一放声音(无论哪种播放方式)→ 一点跟拍做就永久冻死。
+// 结论:这台设备/壳内 WebView 首次激活音频硬件会同步阻塞主线程且不返回(是阻塞不是抛错,
+// try/catch 与错误边界都接不住)。所以跟练**绝不播放任何声音**。
+// 节拍改为不碰音频硬件的两条反馈:① 轻震动(navigator.vibrate,支持的设备才有,不支持即静默跳过);
+// ② 视觉脉冲(大号次数每拍放大一下)。两者都在主线程上瞬时返回,永不阻塞。
+function buzz(strong: boolean): void {
+  try {
+    const nav = typeof navigator !== 'undefined' ? (navigator as Navigator & { vibrate?: (p: number | number[]) => boolean }) : null;
+    if (nav && typeof nav.vibrate === 'function') nav.vibrate(strong ? [55, 40, 55] : 22);
+  } catch { /* 震动尽力而为,不支持/被拦都无所谓,绝不影响跟练 */ }
 }
 
 const REP_TEMPO_SEC = 3; // 跟拍:每次约 3 秒(1 秒发力 + 2 秒还原)
@@ -93,23 +74,12 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   const [countTotal, setCountTotal] = useState(0); // 本次倒计时的总量,给进度条算百分比
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mutedRef = useRef(false);
-  mutedRef.current = muted; // 供 setInterval 闭包读到最新静音态
+  mutedRef.current = muted; // 供 setInterval 闭包读到最新节拍开关
 
-  // 节拍音源:两段预生成 WAV(tick=每拍/读秒,ding=完成)。仅客户端构建一次,几 KB。
-  const tickSrc = useMemo(() => makeBeepDataUri(880, 90), []);
-  const dingSrc = useMemo(() => makeBeepDataUri(1180, 220), []);
-  const tickRef = useRef<HTMLAudioElement | null>(null);
-  const dingRef = useRef<HTMLAudioElement | null>(null);
-  // 播放一段节拍:HTMLAudioElement.play() 异步、不阻塞主线程;全程 try/catch 兜底,声音失败绝不影响跟练。
+  // 节拍反馈:只震动,绝不碰声音(本机放声音会永久卡死)。freq>=1200 视为「完成」用强震。
   const ping = (freq: number, _ms = 80) => {
     if (mutedRef.current) return;
-    const el = freq >= 1200 ? dingRef.current : tickRef.current;
-    if (!el) return;
-    try {
-      el.currentTime = 0;
-      const p = el.play();
-      if (p && typeof p.catch === 'function') p.catch(() => {});
-    } catch { /* 声音是尽力而为,永不影响跟拍/计时 */ }
+    buzz(freq >= 1200);
   };
 
   useSheetDismiss(true, onClose); // 挂载即打开;Escape 关闭 + 焦点回收
@@ -217,9 +187,6 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
 
   return (
     <div className="nesio-wp-overlay" role="dialog" aria-modal aria-label={session.name || L(dict, '跟练', 'Workout')}>
-      {/* 节拍音源:预加载的极短 WAV,点击手势内首次 play() 解锁。用 HTMLAudioElement,永不碰 WebAudio。 */}
-      {tickSrc && <audio ref={tickRef} src={tickSrc} preload="auto" aria-hidden="true" />}
-      {dingSrc && <audio ref={dingRef} src={dingSrc} preload="auto" aria-hidden="true" />}
       <div className="nesio-wp-top">
         <span className="nesio-wp-progress">{L(dict, `动作 ${idx + 1}/${steps.length}`, `${idx + 1}/${steps.length}`)}</span>
         <span className="nesio-wp-session">{session.name}</span>
@@ -268,10 +235,10 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
                 <div className="nesio-wp-bar" aria-hidden><div className="nesio-wp-bar-fill" style={{ width: `${countTotal ? Math.max(0, (countdown / countTotal) * 100) : 0}%` }} /></div>
               </div>
             )}
-            {/* reps 跟拍:大号次数 + 进度条 */}
+            {/* reps 跟拍:大号次数 + 进度条。每拍 key 变化 → 数字重挂载重放脉冲动画 = 无声的「视觉节拍」。 */}
             {step.unit === 'reps' && repCount > 0 && (
               <div className="nesio-wp-timer">
-                <p className="nesio-wp-count nesio-wp-count--work">{repCount}<span className="nesio-wp-count-total">/{step.reps}</span></p>
+                <p key={repCount} className="nesio-wp-count nesio-wp-count--work nesio-wp-beat">{repCount}<span className="nesio-wp-count-total">/{step.reps}</span></p>
                 <div className="nesio-wp-bar" aria-hidden><div className="nesio-wp-bar-fill" style={{ width: `${Math.min(100, (repCount / step.reps) * 100)}%` }} /></div>
               </div>
             )}
