@@ -53,6 +53,8 @@ const SYSTEM_BASE = `你是 Nesio，用户的贴身 AI 助手，叫"念念"（�
 - 需要澄清时:优先用 questions 问卷 —— 一次给 2-4 个问题,每题带 2-4 个短选项(≤12字),用户点选后一次性提交,效率最高:
   "questions":[{"q":"计划玩几天?","options":["3天内","4-5天","6天以上"]},{"q":"预算档位?","options":["经济","舒适","不设限"]}]
   只有单个问题时才用 options。反例(禁止):正文里列出「1. 2. 3. 4. 5.」多个编号问题 —— 问题必须放进 questions/options 动作块,正文保持一句话。
+- 用户想把某件事「加到日历/建个日程/预约/安排在X点/提醒我X点做Y」时:输出 calendarEvents 数组,每项 {summary(标题,具体如「约牙医」), startISO, allDay(可选), location(可选)}。用【实时环境】的当前日期把「明天/这周五下午3点/下周一上午十点」解析成用户本地钟点,写成不带时区的 "YYYY-MM-DDTHH:MM:00"(如 "2026-08-01T15:00:00");只有日期没具体时间就写 "YYYY-MM-DD" 并 allDay:true。正文只说一句「要加到日历吗?点下面确认」,绝不声称已加。
+  "calendarEvents":[{"summary":"约牙医","startISO":"2026-08-01T15:00:00","location":"口腔诊所"}]
 - 普通问答不输出动作块。JSON 必须单行、合法、双引号。`;
 
 const TONE_STYLE: Record<string, string> = {
@@ -227,7 +229,18 @@ async function callGemini(
 
 export interface PlanItem { name: string; date?: string; time?: string; place?: string; kind?: string; note?: string }
 export interface ChatQuestion { q: string; options: string[] }
-export interface ChatActions { options?: string[]; planItems?: PlanItem[]; planTitle?: string; questions?: ChatQuestion[] }
+export interface CalendarEventDraft { summary: string; startISO: string; endISO?: string; allDay?: boolean; location?: string }
+export interface ChatActions { options?: string[]; planItems?: PlanItem[]; planTitle?: string; questions?: ChatQuestion[]; calendarEvents?: CalendarEventDraft[] }
+
+/** startISO 年份朝前滚(同 planItems 防模型把年份写成去年 → 一建就「已过去」)。best-effort。 */
+function rollForwardStartISO(startISO: string): string {
+  const dm = startISO.match(/^(\d{4})(-\d{2}-\d{2}[\s\S]*)$/);
+  if (!dm) return startISO;
+  let y = Number(dm[1]);
+  const rest = dm[2];
+  for (let g = 0; g < 3 && new Date(`${y}${rest}`).getTime() < Date.now() - 36 * 3_600_000; g++) y += 1;
+  return `${y}${rest}`;
+}
 
 /** 从回复末尾剥出 <<NESIO_ACTIONS>>{...} 并校验;剥不出或不合法就当没有(纯文本照常)。 */
 export function parseChatActions(raw: string): { text: string; actions: ChatActions | null } {
@@ -273,6 +286,23 @@ export function parseChatActions(raw: string): { text: string; actions: ChatActi
     if (typeof parsed.planTitle === 'string' && parsed.planTitle.trim()) {
       actions.planTitle = parsed.planTitle.trim().slice(0, 30);
     }
+    if (Array.isArray((parsed as { calendarEvents?: unknown }).calendarEvents)) {
+      const evs = ((parsed as { calendarEvents: unknown[] }).calendarEvents)
+        .filter((it): it is Record<string, unknown> => typeof it === 'object' && it !== null)
+        .map((it) => {
+          const summary = typeof it.summary === 'string' ? it.summary.trim().slice(0, 80) : '';
+          const startISO = typeof it.startISO === 'string' ? it.startISO.trim() : '';
+          if (!summary || !startISO) return null;
+          const out: CalendarEventDraft = { summary, startISO: rollForwardStartISO(startISO) };
+          if (typeof it.endISO === 'string' && it.endISO.trim()) out.endISO = rollForwardStartISO(it.endISO.trim());
+          if (it.allDay === true) out.allDay = true;
+          if (typeof it.location === 'string' && it.location.trim()) out.location = it.location.trim().slice(0, 80);
+          return out;
+        })
+        .filter((x): x is CalendarEventDraft => x !== null)
+        .slice(0, 10);
+      if (evs.length > 0) actions.calendarEvents = evs;
+    }
     if (Array.isArray(parsed.questions)) {
       const qs = parsed.questions
         .filter((x): x is Record<string, unknown> => typeof x === 'object' && x !== null)
@@ -287,7 +317,7 @@ export function parseChatActions(raw: string): { text: string; actions: ChatActi
         .slice(0, 4);
       if (qs.length > 0) actions.questions = qs;
     }
-    return { text, actions: (actions.options || actions.planItems || actions.questions) ? actions : null };
+    return { text, actions: (actions.options || actions.planItems || actions.questions || actions.calendarEvents) ? actions : null };
   } catch {
     return { text, actions: null };
   }

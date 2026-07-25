@@ -16,6 +16,7 @@ const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: fals
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { getLifeGraph, isBulkImported, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
 import { buildMemoryContext, fmtEventDate, extractCitations } from '@/lib/portal/memory-retrieval';
+import { createCalendarEvent } from '@/lib/portal/calendar-client';
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { loadProfileSettings } from '@/lib/portal/profile';
 import { smartSearch } from '@/lib/portal/smart-search';
@@ -104,6 +105,10 @@ interface UiMessage {
   /** 批次 77:问卷式澄清(多题带选项,一次提交) */
   questions?: Array<{ q: string; options: string[] }>;
   questionsDone?: boolean;
+  /** 日历事件草稿(念念提议加日历)—— 点确认才写入 Google 主日历。 */
+  calendarEvents?: Array<{ summary: string; startISO: string; endISO?: string; allDay?: boolean; location?: string }>;
+  calendarState?: 'idle' | 'saving' | 'ok' | 'error';
+  calendarError?: string;
   /** 🔴#2:这条回答时语义检索降级了(缺 AI 配置,只用了关键词匹配)。 */
   semanticDegraded?: boolean;
   semanticReason?: string; // 未生效的具体原因(no_key/rate_limited/provider/network/auth)
@@ -676,7 +681,7 @@ Edit location/value anytime in Storage.`),
         signal: controller.signal,
       });
       clearTimeout(timeout);
-      const data = await res.json() as { ok?: boolean; response?: string; sources?: Array<{ title: string; url: string }>; actions?: { options?: string[]; planItems?: ChatPlanItem[]; planTitle?: string; questions?: Array<{ q: string; options: string[] }> } };
+      const data = await res.json() as { ok?: boolean; response?: string; sources?: Array<{ title: string; url: string }>; actions?: { options?: string[]; planItems?: ChatPlanItem[]; planTitle?: string; questions?: Array<{ q: string; options: string[] }>; calendarEvents?: Array<{ summary: string; startISO: string; endISO?: string; allDay?: boolean; location?: string }> } };
       const rawResp = data.response?.trim() || L(dict, '（暂时没有找到相关信息）', '(Nothing relevant found)');
       // 🔴#1:只保留模型真正引用的记忆节点。ids===null(没自报)→ 回退到前 3 候选作"相关记忆";
       // ids=[](明确"无")→ 不出引用卡(修"模型说没记录、下面还渲染 6 张伪造依据卡")。
@@ -707,6 +712,7 @@ Edit location/value anytime in Storage.`),
         ...(data.actions?.planItems ? { planItems: data.actions.planItems } : {}),
         ...(data.actions?.planTitle ? { planTitle: data.actions.planTitle } : {}),
         ...(data.actions?.questions ? { questions: data.actions.questions } : {}),
+        ...(data.actions?.calendarEvents ? { calendarEvents: data.actions.calendarEvents, calendarState: 'idle' as const } : {}),
       };
       // 函数式追加 + 用最终列表存档,别用可能已过期的 nextMsgs 快照覆盖并发消息。
       setMessages((prev) => { const next = [...prev, aiMsg]; saveHistory(next); return next; });
@@ -772,6 +778,22 @@ Edit location/value anytime in Storage.`),
     }
     setMessages((prev) => { const next = prev.map((m) => m.id === msg.id ? { ...m, planSaved: true } : m); saveHistory(next); return next; });
     window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+  }
+
+  // 日历确认卡 → 逐个写进 Google 主日历。异步动作显式失败态(红线):失败保留可重试。
+  async function confirmCalendarEvents(msg: UiMessage) {
+    if (!msg.calendarEvents?.length || msg.calendarState === 'saving' || msg.calendarState === 'ok') return;
+    setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, calendarState: 'saving' as const, calendarError: undefined } : m));
+    let firstErr = '';
+    for (const ev of msg.calendarEvents) {
+      const res = await createCalendarEvent({ summary: ev.summary, startISO: ev.startISO, endISO: ev.endISO, allDay: ev.allDay, location: ev.location });
+      if (!res.ok && !firstErr) firstErr = res.message || L(dict, '写入日历失败', 'Failed to add to calendar');
+    }
+    setMessages((prev) => {
+      const next = prev.map((m) => m.id === msg.id ? { ...m, calendarState: (firstErr ? 'error' : 'ok') as 'error' | 'ok', calendarError: firstErr || undefined } : m);
+      saveHistory(next);
+      return next;
+    });
   }
 
   // 批次 72:回答里的列表行(*/-/1. 开头)解析成可勾选清单项
@@ -1213,6 +1235,42 @@ Edit location/value anytime in Storage.`),
                       {msg.planSaved
                         ? L(dict, '已存入 ✓ 带日期的会按时出现在今日聚焦', 'Saved ✓ dated items will surface in Today focus')
                         : L(dict, `存入记忆 · ${msg.planItems.length} 条`, `Save ${msg.planItems.length} to Memory`)}
+                    </button>
+                  </div>
+                )}
+                {/* 日历确认卡 —— 念念只提议,点确认才写进 Google 主日历 */}
+                {!isUser && msg.calendarEvents && msg.calendarEvents.length > 0 && (
+                  <div style={{ marginTop: 'var(--space-2)', padding: 'var(--space-3)', border: '1px solid var(--portal-accent-border)', borderRadius: 'var(--radius-md)', background: 'var(--portal-accent-soft)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                    {msg.calendarEvents.map((ev, i) => (
+                      <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{ev.summary}</span>
+                        <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>
+                          {[ev.allDay ? ev.startISO.slice(0, 10) : ev.startISO.replace('T', ' ').slice(0, 16), ev.location || ''].filter(Boolean).join(' · ')}
+                        </span>
+                      </div>
+                    ))}
+                    {msg.calendarState === 'error' && msg.calendarError && (
+                      <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-xs)' }}>{msg.calendarError}</span>
+                    )}
+                    <button
+                      type="button"
+                      disabled={msg.calendarState === 'saving' || msg.calendarState === 'ok'}
+                      onClick={() => confirmCalendarEvents(msg)}
+                      style={{
+                        marginTop: '2px', padding: 'var(--space-2) var(--space-3)', border: 'none', borderRadius: 'var(--radius-sm)',
+                        background: msg.calendarState === 'ok' ? 'var(--status-go-soft)' : 'var(--portal-accent)',
+                        color: msg.calendarState === 'ok' ? 'var(--portal-ink)' : '#fff',
+                        fontSize: 'var(--text-sm)', fontFamily: 'var(--font-sans)', fontWeight: 'var(--weight-medium)' as unknown as number,
+                        cursor: msg.calendarState === 'saving' || msg.calendarState === 'ok' ? 'default' : 'pointer',
+                      }}
+                    >
+                      {msg.calendarState === 'ok'
+                        ? L(dict, '已加到日历 ✓', 'Added to calendar ✓')
+                        : msg.calendarState === 'saving'
+                          ? L(dict, '正在加入…', 'Adding…')
+                          : msg.calendarState === 'error'
+                            ? L(dict, '重试加入日历', 'Retry')
+                            : L(dict, `加入日历 · ${msg.calendarEvents.length} 项`, `Add ${msg.calendarEvents.length} to calendar`)}
                     </button>
                   </div>
                 )}
