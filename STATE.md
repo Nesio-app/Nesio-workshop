@@ -254,6 +254,43 @@ Signal M1-M4(读切换 + 删除传导)、REG-004/006 i18n 闭环
   跑 schema bundle(2026-07-04 起含 telemetry_events/feature_votes 表 +
   Access control 列)。
 
+## Alexa 语音入口(2026-07-25 上线,真机验证通过)
+
+把满屋 Echo 变成 Nesio 的语音前端:随口记(CaptureMemoryIntent)、随口问
+(AskMemoryIntent)。路由 `app/api/alexa/route.ts`(纯函数 `routeAlexa` 可单测)、
+召回纯函数层 `lib/portal/alexa-answer.ts`、共用评分排序 `lib/portal/cloud/signal-search.ts`。
+
+**数据归属(重要):** Alexa 记的东西 → `/api/portal/ingest` → `createSignal(source='alexa')`
+→ `writeCloudSignalsForCurrentUser` → 云 `signals` 表,`identity_key = supabase:<NESIO_OWNER_ID>`。
+**与 owner 登录 App 写云用的是同一 identity_key,即 Alexa 与 App 共用同一片云记忆池**,
+不是隔离两套。召回读同一池(`readCloudSignalRowsForIdentity`);App 今天页
+(`useTodayData` → `GET /api/cloud/signals`)登录后也拉得到。无 cookie 会话时
+(Alexa secret 路径)`writeCloudSignalsForCurrentUser` 回落 owner 身份
+(`resolveOwnerIdentity` 读 `NESIO_OWNER_ID`),否则捕获静默丢失。
+
+**生产配置清单(treasurebox 项目 / 部署自本仓 workshop):**
+- Alexa 后台 Endpoint = HTTPS `https://treasurebox-nu.vercel.app/api/alexa`
+- **SSL 证书类型必须选「wildcard 子域」那项**(第 2 项)—— vercel.app 是
+  `*.vercel.app` 通配符证书;选第 1 项「trusted CA」会被 Alexa 在发请求前拒掉
+  (报 `Certificate ... contains wildcard '*.vercel.app'`,请求根本到不了函数)。
+- Vercel 环境变量(改后**必须 redeploy** 才生效):`ALEXA_SKILL_ID`(applicationId 校验)、
+  `INGEST_SHARED_SECRET`(capture→ingest 鉴权)、`NESIO_OWNER_ID`(= owner Supabase user id,
+  归属捕获/召回;GET /api/alexa 会回显登录 owner 的 userId 便于配)。
+- 交互模型 invocationName = **my box**(初版 nesio/nessa 与显示名 Nassa 易混,已换)。
+  改唤醒名必须重 build 模型。
+
+**踩坑史(定位链,供后人少走弯路):** 唤醒名混淆(nessa/nassa/显示名 Nassa)→
+endpoint 未保存/未 build → **SSL 证书类型选错(通配符,真凶之一)** →
+`NESIO_OWNER_ID` 未配致云写 not_signed_in → env 改后未 redeploy。逐层排除靠
+Vercel 运行日志(POST 是否到达函数 + `cloudSignalWrite.ok`)+ Alexa Manual JSON
+(直连 endpoint 看原始 SSL 错误)。
+
+**限制 & 欠账:** ① Alexa 无中文 NLU,交互语言 en-US(中文内容能存、识别率低);
+② 个人/开发版校验仅 applicationId + 时间戳新鲜度,上架需补完整 SignatureCertChainUrl
+证书链;③ 服务端 ingest 每次刷一行 `[nesio:dropped] signal.idb_write — put returned false`
+(服务端无 IndexedDB,本地写必然失败在如实报告,云写成功不受影响)——噪音,待清;
+④ 可选:capture/ask 双意图未来可合成单一 TalkIntent + `classifyUtterance` 由服务端判记/问。
+
 ## 模式速查
 
 - Lab 模式(**2026-07-16 起默认开**,用户定:本仓=个人全功能版,双前端分家后
