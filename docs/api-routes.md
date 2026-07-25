@@ -87,6 +87,26 @@ Auth legend:
 `/api/entitlements` and similar read-only/config routes are intentionally
 open. If one of these starts touching AI or private data, move it up a table.
 
+## Family sharing (workshop 域实验, 2026-07)
+
+家务 + 零花钱账本(信任模型 A:服务端授权)。每条都 `resolveActor`(= `getSignedInUser`,
+未登录 401)+ `requireMember`(非该家庭成员 403)+ 受控写再过 `lib/family/chores-core`
+的能力门(无 `can_approve` 审核 / 无 `can_record_payout` 记付款 → 403)。**永不碰钱**:
+payout 仅记账。数据经 service-role 落 family 表,RLS(`is_family_member`)纵深防御。
+
+| Route | Auth | Rate limit |
+|---|---|---|
+| `GET/POST /api/portal/family` | session + membership | —(workshop) |
+| `POST /api/portal/family/join` | session | —(workshop) |
+| `GET /api/portal/family/board` | session + membership | — |
+| `GET /api/portal/family/ledger` | session + membership | — |
+| `POST /api/portal/family/chore` | session + membership + `can_approve` | — |
+| `POST /api/portal/family/chore/action` | session + membership + 能力(核心判) | — |
+| `POST /api/portal/family/payout` | session + membership + `can_record_payout` | — |
+
+注:非 AI 花费路由,未挂 `guardAiRoute`(无云成本);走等价的 session+成员+能力三重判。
+workshop 实验暂未加 per-IP 限流,转正前应补(join 尤其)。
+
 ## OAuth (2026-07 审查)
 
 - **2026-07 免费最大化扩展**: 联合授权新增 `drive.appdata`(非敏感,免费云备份到用户
