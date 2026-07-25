@@ -13373,7 +13373,10 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-exfig-msg { font-size: 0.85rem; }
 .nesio-exfig-retry { font-size: 0.8rem; padding: 0.3rem 0.9rem; border-radius: var(--radius-pill, 999px);
   border: 1px solid var(--portal-accent-border); background: transparent; color: var(--portal-accent); cursor: pointer; }
-.nesio-wp-figure { margin-top: 0.25rem; width: 100%; max-width: 520px; align-self: center; }
+/* 跟练主图:铺满宽度、按原始比例自适应高度,不套 16:9 外框 → 两边不留色边/白边(修真机「图片两边有白条」)。 */
+.nesio-wp-figure { margin-top: 0.25rem; width: 100%; max-width: 560px; align-self: center;
+  aspect-ratio: auto; height: auto; max-height: 52vh; background: transparent; border-radius: var(--radius-md, 16px); overflow: hidden; }
+.nesio-wp-figure .nesio-exfig-img { width: 100%; height: auto; max-height: 52vh; object-fit: contain; }
 .nesio-wp-count-total { font-size: 1.6rem; font-weight: 700; color: var(--portal-muted); margin-left: 0.15rem; }
 
 /* 计时块:大数字 + 进度条,居中 */
