@@ -923,6 +923,26 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
               </div>
             )}
 
+            {/* 与家人共享:家庭分享(workshop 域实验入口)—— 家务 + 零花钱账本。
+                同一道门以后也放别的共享(一趟旅行、一个项目),故命名「与家人共享」不叫「家务」。 */}
+            <div className="nesio-insights-section">
+              <p className="nesio-insights-section-label">{L(dict, '与家人共享', 'Shared with people')}</p>
+              <button
+                type="button"
+                onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-family'))}
+                style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', background: 'var(--portal-bg)', cursor: 'pointer', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }}
+              >
+                <span aria-hidden style={{ width: 40, height: 40, borderRadius: 'var(--radius-sm)', display: 'grid', placeItems: 'center', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', flex: 'none' }}>
+                  <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 11a2.5 2.5 0 1 0 0-5M4 20v-1a5 5 0 0 1 10 0v1M15.5 15.5A5 5 0 0 1 20 20v1" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </span>
+                <span style={{ flex: 1, minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{L(dict, '家庭分享', 'Family sharing')}</span>
+                  <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '家务 & 零花钱账本 —— Nesio 只记账,永不碰钱', 'Chores & allowance — Nesio just keeps the count')}</span>
+                </span>
+                <span style={{ color: 'var(--portal-muted)' }}>›</span>
+              </button>
+            </div>
+
             {/* 我的实验(Lab 功能开关,与提审隐藏同闸) */}
             {showExperiment && (
               <div className="nesio-insights-section">
