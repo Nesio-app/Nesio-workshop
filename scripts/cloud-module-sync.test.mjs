@@ -145,4 +145,30 @@ function cloudRow(moduleKey, json, updatedAt = '2026-07-25T00:00:00.000Z') {
   assert.equal(ctx._restoreApplied().entries['nesio-health-v1'], '{"metrics":["CLOUD_NEWER"]}', '落地云端新值');
 }
 
+// 5. 反遮盖闸:云端明显更小/更空的值,绝不覆盖本机非空值(防丢积分/跟练类进度)。
+{
+  // 本机是「满」的进度;云端是「空」的(远小于一半)。即便 LWW 判云端胜,也不许覆盖。
+  const localFull = JSON.stringify({ points: 320, ledger: new Array(40).fill({ k: 'earn', v: 8 }) });
+  const cloudEmpty = JSON.stringify({ points: 0, ledger: [] });
+  const rows = [cloudRow('nesio-inventory-v1', cloudEmpty)];
+  const fetchImpl = async (url) => (url === '/api/cloud/module-data'
+    ? { ok: true, status: 200, json: async () => ({ ok: true, modules: rows }) }
+    : { ok: false, status: 404, json: async () => ({}) });
+  // state.hash 恰为本机满值哈希 → 语义上「本机自上次同步未改」(LWW 本会判云端胜),靠反遮盖闸兜住。
+  const { mod, ctx } = makeCtx({
+    lsInit: {},
+    localEntries: { 'nesio-inventory-v1': localFull },
+    fetchImpl,
+  });
+  // 先 push 建立 state(hash=满值)——用同一 fetchImpl 的 POST 分支
+  const okPost = async (url, init) => (url === '/api/cloud/module-data' && init?.method === 'POST'
+    ? { ok: true, status: 200, json: async () => ({ ok: true }) }
+    : fetchImpl(url));
+  const c2 = makeCtx({ localEntries: { 'nesio-inventory-v1': localFull }, fetchImpl: async (u, i) => (i?.method === 'POST' ? okPost(u, i) : fetchImpl(u)) });
+  await c2.mod.pushModulesToCloud();
+  const r = await c2.mod.pullModulesFromCloud();
+  assert.equal(r.applied, 0, '云端空值(<本机一半)→ 反遮盖闸拦下,不覆盖本机满值');
+  assert.equal(c2.ctx._restoreApplied(), null, '未落地任何 key(积分/跟练不被空状态盖掉)');
+}
+
 console.log('cloud-module-sync: OK');

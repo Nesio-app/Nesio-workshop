@@ -12,7 +12,7 @@ const src = fs.readFileSync(new URL('../lib/portal/storage-manifest.ts', import.
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const mod = { exports: {} };
 vm.runInNewContext(js, { module: mod, exports: mod.exports, require: () => ({}), console });
-const { isAppKey, keyKind, keysForBackup, isBackupKey, purgeLocalData } = mod.exports;
+const { isAppKey, keyKind, keysForBackup, isBackupKey, purgeLocalData, isLocalOnly } = mod.exports;
 
 function fakeStorage(initial) {
   const map = new Map(Object.entries(initial));
@@ -56,6 +56,12 @@ assert.equal(keyKind('nesio-mirror-profile-v1'), 'durable', 'mirror-profile 不�
 for (const k of ['nesio-preference-v1', 'nesio-baseline-v1', 'nesio-recency-v1', 'nesio-guidance-ranker-v1']) {
   assert.equal(keyKind(k), 'durable', `${k} 学习态必须 durable(导出/删除收口)`);
   assert.equal(isBackupKey(k), true, `${k} 必须进备份`);
+}
+
+// 「纯本地/不上传」的每设备进度必须是 local-only + 不进备份/同步(否则被空状态跨端盖掉,真机丢过积分/跟练)
+for (const k of ['nesio-rewards-v1', 'nesio-place-photos-v1', 'nesio-reader-highlights-v1']) {
+  assert.equal(isLocalOnly(k), true, `${k} 必须 local-only(纯本地进度,绝不跨端同步)`);
+  assert.equal(isBackupKey(k), false, `${k} 不进备份(不出本机,防被空状态盖掉)`);
 }
 
 // 备份:durable 进、auth/cache 不进;覆盖 baohe_/analyst_(修此前漏)
