@@ -18,6 +18,7 @@ import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
 import { syncLearningWithCloud, registerLearningAutoPush } from '@/lib/portal/cloud-learning-sync';
 import { syncProfileWithCloud, registerProfileAutoPush } from '@/lib/portal/cloud-profile-sync';
 import { autoSyncModulesWithCloud } from '@/lib/portal/cloud-module-sync';
+import { isCloudSyncSuspended, whenIdle, SYNC_RESUME_EVENT } from '@/lib/portal/sync-suspend';
 import { autoSyncEmailBodiesWithCloud } from '@/lib/portal/cloud-email-sync';
 import { autoSyncReaderBooksWithCloud } from '@/lib/portal/cloud-reader-sync';
 import { autoSyncPlaceImagesWithCloud } from '@/lib/portal/cloud-place-image-sync';
@@ -550,39 +551,36 @@ export default function Portal() {
     // 账号级权益真源:登录即拉一次 /api/entitlements 落缓存 —— getTier() 优先读它,
     // 清缓存/换设备/换浏览器不再白嫖 Pro,到期也据实收权(报告 #6)。best-effort。
     void refreshServerEntitlement();
-    void syncMemoryWithCloud();
-    // 批次199 P2:同步「学习态」(被纠偏的 ranker + 学到的偏好)—— 登录即回灌 union 合并,
-    // 并订阅反馈总线做防抖回推。让这份「抄不走的私有累积」跨端一致,换机不蒸发。
-    void syncLearningWithCloud();
-    // 批次200:同步 profile(名字/头像)—— 登录/回前台按 identityUpdatedAt 做 last-write-wins,
-    // 补上记忆/学习态之外最后一块跨端不一致(头像 婧/F/朋 各端不同的真因)。
-    void syncProfileWithCloud();
-    // 记录级模块同步(**唯一的通用云同步**):健康/足迹/财务/物品/关系/物品… 每个 durable key 一行同步,
-    // 换端逐模块自动拉回(新设备首拉后 reload 水合)。专属引擎(记忆图/头像/学习态/邮件)由 sync-ownership
-    // 登记、通用同步让路,避免多引擎抢同一份数据。整包备份(cloud-backup)只保留手动导出/恢复,不再自动跑
-    // (此前它与本引擎并发对同一 key 一个 merge 一个 replace,是换端数据横跳的一大来源)。
-    void autoSyncModulesWithCloud();
-    // 邮件全文逐封记录级同步(独立 IDB nesio-email-bodies,量级大不进模块同步):换端补齐邮件正文并
-    // 即刻喂全文检索索引。仅本人账号内、不进 AI。best-effort,30s 节流。
-    void autoSyncEmailBodiesWithCloud();
-    // 导入书籍逐本记录级同步(独立 IDB nesio-reader,量级大不进模块同步):换端补齐导入的书,
-    // 让阅读进度不再指向空书。仅本人账号内、不进 AI。best-effort,30s 节流。
-    void autoSyncReaderBooksWithCloud();
-    // 地点封面照逐张同步(nesio-images 的 placephoto-*,走通用 record-sync 工厂):换端补齐封面图,
-    // 不再退回渐变占位。仅本人账号内、不进 AI。best-effort。
-    void autoSyncPlaceImagesWithCloud();
-    // 开机/登录:所有已接入的外部连接器(日历/邮件/flomo/银行/通讯录)自动同步一次拉新内容。
-    // 30 分钟节流(内部保证),未连接的源静默早退;best-effort 不阻塞渲染。
-    void autoSyncConnectorsOnBoot();
+    // ⚠️ 重云同步一律走 whenIdle + 暂停闸门(修真机「跟练卡死」根因):所有 gzip/JSON/hash 都在主线程,
+    // 大数据下单个调用就能卡住主线程数秒。① 跟练等交互全屏开着(isCloudSyncSuspended)时整批跳过;
+    // ② 永不在「挂载/回前台」那一帧同步跑,统一推到浏览器空闲时。退出跟练会经 SYNC_RESUME_EVENT 补跑一次。
+    const runHeavySyncBatch = () => {
+      if (isCloudSyncSuspended()) { return; } // 跟练中:先不同步,退出时(resume)再补
+      // 记忆图/学习态/profile 逐一 union/LWW 合并回灌(跨端一致)。
+      void syncMemoryWithCloud();
+      void syncLearningWithCloud();
+      void syncProfileWithCloud();
+      // 记录级模块同步(**唯一的通用云同步**):健康/足迹/财务/物品/关系… 每个 durable key 一行同步。
+      void autoSyncModulesWithCloud();
+      // 邮件全文/导入书籍/地点封面照:各自独立 IDB 的记录级同步,量级大不进模块同步。best-effort。
+      void autoSyncEmailBodiesWithCloud();
+      void autoSyncReaderBooksWithCloud();
+      void autoSyncPlaceImagesWithCloud();
+      // 外部连接器(日历/邮件/flomo/银行/通讯录)拉新,30 分钟节流,内部保证。
+      void autoSyncConnectorsOnBoot();
+    };
+    const scheduleHeavySyncBatch = () => whenIdle(runHeavySyncBatch);
+    scheduleHeavySyncBatch(); // 挂载/登录:也推到空闲,不阻塞首屏交互
     const unregisterLearningPush = registerLearningAutoPush();
     // 批次205:改名字/头像/语言/教练/日报/主题任一 → 防抖自动推上云,别端拉取即一致。
     const unregisterProfilePush = registerProfileAutoPush();
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') { void syncMemoryWithCloud(); void syncLearningWithCloud(); void syncProfileWithCloud(); void autoSyncModulesWithCloud(); void autoSyncEmailBodiesWithCloud(); void autoSyncReaderBooksWithCloud(); void autoSyncPlaceImagesWithCloud(); void autoSyncConnectorsOnBoot(); }
-    };
+    const onVisible = () => { if (document.visibilityState === 'visible') { scheduleHeavySyncBatch(); } };
+    const onSyncResume = () => { scheduleHeavySyncBatch(); }; // 退出跟练等 → 补跑一次(此时已离开交互场景)
     document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener(SYNC_RESUME_EVENT, onSyncResume);
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener(SYNC_RESUME_EVENT, onSyncResume);
       unregisterLearningPush();
       unregisterProfilePush();
     };

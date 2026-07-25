@@ -270,6 +270,7 @@
     "test:amazon-order": "node scripts/amazon-order.test.mjs",
     "test:exercise-anim": "node scripts/exercise-anim.test.mjs",
     "test:workout-audio-nonblocking": "node scripts/workout-audio-nonblocking.test.mjs",
+    "test:workout-sync-suspend": "node scripts/workout-sync-suspend.test.mjs",
     "test:exercise-catalog": "node scripts/exercise-catalog.test.mjs",
     "test:inventory-import": "node scripts/inventory-import.test.mjs",
     "test:chat-inventory-add": "node scripts/chat-inventory-add.test.mjs",

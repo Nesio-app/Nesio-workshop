@@ -19,6 +19,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
+import { suspendCloudSync } from '@/lib/portal/sync-suspend';
 
 export interface PlayerStep {
   exerciseId: string;
@@ -75,6 +76,11 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   const ping = (_freq: number, _ms = 80) => { /* no-op:不碰任何硬件,永不阻塞主线程 */ };
 
   useSheetDismiss(true, onClose); // 挂载即打开;Escape 关闭 + 焦点回收
+
+  // 跟练全程暂停重云同步(修真机「跟练卡死」根因):云同步的 gzip/JSON/hash 全在主线程,大数据下会卡住
+  // 主线程数秒。跟练是盖在 Portal 上的浮层,若不暂停,一回前台(锁屏/切换/通知后返回)整批同步就在那一帧
+  // 跑,界面冻死。退出跟练时 release 会派发 resume 事件,让 Portal 补跑一次。
+  useEffect(() => suspendCloudSync(), []);
 
   // 防御(修「打开跟练卡死」):session/steps 可能来自别端同步回的畸形数据(缺 steps、非数组、
   // 元素缺 exerciseId)。绝不裸解引用 —— 归一成合法 steps 数组,非法则本组件优雅关闭,不 throw。
