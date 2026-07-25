@@ -204,12 +204,23 @@ export async function autoSyncModulesWithCloud(opts: { force?: boolean } = {}): 
     const { newlyAdded } = await pullModulesFromCloud();
     // 水合刷新每个页面加载最多一次(sessionStorage 闸)—— 防「某 key 永远判缺失」时 reload 无限刷屏
     // (真机踩过:历史遗留云端行被误判缺失导致一闪一闪)。正常冷启动首拉只会触发一次,足够水合。
-    let reloadedThisLoad = false;
-    try { reloadedThisLoad = sessionStorage.getItem('nesio-module-hydrate-reloaded') === '1'; } catch { /* ignore */ }
-    if (newlyAdded > 0 && !reloadedThisLoad && typeof window.location?.reload === 'function') {
-      try { sessionStorage.setItem('nesio-module-hydrate-reloaded', '1'); } catch { /* ignore */ }
-      window.location.reload(); // 新设备首次拉到数据 → 刷新水合(每次加载至多一次)
-      return;
+    if (newlyAdded > 0 && typeof window.location?.reload === 'function') {
+      const FLAG = 'nesio-module-hydrate-reloaded';
+      let alreadyReloaded = false;
+      let flagPersisted = false;
+      try {
+        alreadyReloaded = sessionStorage.getItem(FLAG) === '1';
+        if (!alreadyReloaded) {
+          sessionStorage.setItem(FLAG, '1');
+          // 关键:回读校验标志真的持久化了才 reload。隐私模式/分区存储写不进 → 不 reload
+          // (否则每次 reload 都以为「首次」→ 无限刷屏,与 cloud-backup 的硬化同款)。
+          flagPersisted = sessionStorage.getItem(FLAG) === '1';
+        }
+      } catch { /* sessionStorage 不可用:不 reload,避免死循环 */ }
+      if (!alreadyReloaded && flagPersisted) {
+        window.location.reload(); // 新设备首次拉到数据 → 刷新水合(每次加载至多一次)
+        return;
+      }
     }
     await pushModulesToCloud();
   } catch (err) {

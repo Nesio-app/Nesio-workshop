@@ -31,6 +31,7 @@ const ShareSheet = dynamic(() => import('./ShareSheet'), { ssr: false });
 const MoodSheet = dynamic(() => import('./MoodSheet'), { ssr: false });
 const FreezeVaultSheet = dynamic(() => import('./FreezeVaultSheet'), { ssr: false });
 const WorkoutPlayer = dynamic(() => import('./fitness/WorkoutPlayer'), { ssr: false });
+import TabErrorBoundary from './TabErrorBoundary';
 const NesioChatSheet = dynamic(() => import('./NesioChatSheet'), { ssr: false });
 const NotePanelEnhanced = dynamic(() => import('./NotePanelEnhanced'), { ssr: false });
 const ToolsTreasurePopup = dynamic(() => import('./ToolsTreasureSheet'), { ssr: false });
@@ -1385,7 +1386,13 @@ export default function Portal() {
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
       {calendarCreateOpen && <CalendarCreateSheet open={calendarCreateOpen} onClose={() => setCalendarCreateOpen(false)} />}
       {familyOpen && <FamilySharingSheet open={familyOpen} onClose={() => setFamilyOpen(false)} />}
-      {workoutSession && <WorkoutPlayer session={workoutSession} onClose={() => setWorkoutSession(null)} />}
+      {workoutSession && (
+        // 错误边界(修「打开跟练 app 卡死」):跟练播放器一旦被畸形数据(如别端同步回的坏 workout)
+        // 击中 throw,绝不能冒泡卸载整棵 Portal(=白屏/卡死);就地兜住、显示可截图的报错。
+        <TabErrorBoundary label="workout">
+          <WorkoutPlayer session={workoutSession} onClose={() => setWorkoutSession(null)} />
+        </TabErrorBoundary>
+      )}
       {briefOpen && <DailyBriefSheet open={briefOpen} onClose={() => setBriefOpen(false)} canUsePrivateData={canUsePrivateRuntime} />}
       <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />
 
