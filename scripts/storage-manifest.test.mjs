@@ -58,14 +58,13 @@ for (const k of ['nesio-preference-v1', 'nesio-baseline-v1', 'nesio-recency-v1',
   assert.equal(isBackupKey(k), true, `${k} 必须进备份`);
 }
 
-// workshop:积分/地点照片/阅读高亮 改为**云端同步**(durable + 进备份/同步);靠 cloud-module-sync
-// 的反遮盖闸防「被空状态盖掉」,不再靠 local-only 隔离。
-for (const k of ['nesio-rewards-v1', 'nesio-place-photos-v1', 'nesio-reader-highlights-v1']) {
+// workshop:一切数据跨端一致 —— 积分/地点照片/阅读高亮 + 按人数据(含医疗/药物/健康)全部改为
+// **云端同步**(durable + 进备份/同步,仅本人账号内、不进 AI);靠 cloud-module-sync 的反遮盖闸防
+// 「被空状态盖掉」,不再靠 local-only 隔离。故 LOCAL_ONLY_KEYS 现为空集。
+for (const k of ['nesio-rewards-v1', 'nesio-place-photos-v1', 'nesio-reader-highlights-v1', 'nesio-person-records-v1']) {
   assert.equal(isLocalOnly(k), false, `${k} 不再 local-only(改云端同步)`);
   assert.equal(isBackupKey(k), true, `${k} 进备份/同步(跨端一致)`);
 }
-// 但医疗/药物/健康按人数据仍是隐私红线,默认 local-only(除非用户显式改)
-assert.equal(isLocalOnly('nesio-person-records-v1'), true, 'person-records(医疗/药物/健康)默认仍 local-only(隐私红线)');
 
 // 备份:durable 进、auth/cache 不进;覆盖 baohe_/analyst_(修此前漏)
 assert.equal(isBackupKey('nesio-bank-tx-v1'), true);

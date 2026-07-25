@@ -127,8 +127,8 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
             <p className="nesio-hang-nessa">
               <span className="nesio-hang-nessa-kicker">{L(dict, '念念', 'Nessa')}</span>
               {L(dict,
-                `记到 ${personName} 身上了。${anySensitive ? '健康项我自动只存本机。' : '我已经归好类了。'}`,
-                `Saving to ${personName}.${anySensitive ? ' Health items stay on your device.' : ' Sorted and dated.'}`)}
+                `记到 ${personName} 身上了。${anySensitive ? '健康项只你可见、不进 AI。' : '我已经归好类了。'}`,
+                `Saving to ${personName}.${anySensitive ? ' Health items stay private to you, never sent to AI.' : ' Sorted and dated.'}`)}
             </p>
             {pending.map((r, i) => {
               const meta = RECORD_CATEGORY_MAP[r.category];
@@ -148,7 +148,7 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
                   <div className="nesio-hang-lock">
                     <IconLock size={12} />
                     {meta.sensitive
-                      ? L(dict, `${meta.zh} · 只存本机,不上传云端`, `${meta.en} · on-device only, never uploaded`)
+                      ? L(dict, `${meta.zh} · 仅你可见,不进 AI`, `${meta.en} · only you, never sent to AI`)
                       : L(dict, `${meta.zh} · 存进 TA 的档案`, `${meta.en} · to their profile`)}
                   </div>
                 </div>
@@ -180,7 +180,7 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
               )}
             </div>
             {RECORD_CATEGORY_MAP[form.category].sensitive && (
-              <div className="nesio-hang-lock"><IconLock size={12} />{L(dict, '敏感信息:只存本机,不进 AI、不上传', 'Sensitive — on-device only, never sent to AI')}</div>
+              <div className="nesio-hang-lock"><IconLock size={12} />{L(dict, '敏感信息:仅你可见 · 跨端同步 · 不进 AI', 'Sensitive — only you, synced across your devices, never sent to AI')}</div>
             )}
             <button type="button" className="nesio-ob-primary-btn nesio-hang-primary" onClick={saveManual}>{L(dict, `挂到 ${personName} 身上`, `Attach to ${personName}`)}</button>
             <button type="button" className="nesio-hang-redo" onClick={() => setManual(false)}>{L(dict, '‹ 用说的', '‹ Speak instead')}</button>
@@ -209,7 +209,7 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
                 onChange={(e) => { void onPickPhoto(e.target.files?.[0]); e.currentTarget.value = ''; }} />
             </div>
             {err && <p className="nesio-rel-detail-err" role="alert">{err}</p>}
-            <div className="nesio-hang-lock nesio-hang-lock--foot"><IconLock size={12} />{L(dict, '敏感项(医疗 / 药物 / 健康)只存本机', 'Sensitive (medical / medication / health) stays on-device')}</div>
+            <div className="nesio-hang-lock nesio-hang-lock--foot"><IconLock size={12} />{L(dict, '敏感项(医疗 / 药物 / 健康)仅你可见 · 不进 AI', 'Sensitive (medical / medication / health) — only you, never sent to AI')}</div>
             <button type="button" className="nesio-hang-redo" onClick={() => setManual(true)}>{L(dict, '想自己填? 手动填 ›', 'Prefer to type it? Fill in manually ›')}</button>
           </div>
         )}

@@ -1,7 +1,8 @@
 /**
  * 行为契约:按人分类的数据(人缘㊄)。
- * 锁死:person-records 本机 store 的增删读 + 分类元(敏感三类标记/消费带金额);敏感数据
- * local-only —— 进删除、不进备份(兑现「只存本机、不上传」);详情页可挂一条/展示/删除、敏感提示。
+ * 锁死:person-records 本机 store 的增删读 + 分类元(敏感三类标记/消费带金额);workshop 全数据
+ * 跨端一致 —— 按人数据改为**云端同步**(durable + 进备份/同步,仅本人账号内、不进 AI),仍进删除收口;
+ * 详情页可挂一条/展示/删除、敏感项「仅你可见 · 不进 AI」提示。
  */
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -50,11 +51,11 @@ assert.equal(pr.loadPersonRecords('mia').length, 1, '删除生效');
 // 其他人不受影响
 assert.equal(pr.loadPersonRecords('other')[0].amount, 200, '金额落库');
 
-// ── storage-manifest:person-records local-only(进删除、不进备份) ──
+// ── storage-manifest:person-records 改云端同步(durable + 进备份/同步,仍进删除收口) ──
 const sm = run(compile('../lib/portal/storage-manifest.ts'), { require: () => ({}) });
-assert.equal(sm.isLocalOnly('nesio-person-records-v1'), true, '按人数据 = local-only');
+assert.equal(sm.isLocalOnly('nesio-person-records-v1'), false, '按人数据不再 local-only(workshop:跨端同步)');
 assert.equal(sm.keyKind('nesio-person-records-v1'), 'durable', '仍是 durable(删除会清)');
-assert.equal(sm.isBackupKey('nesio-person-records-v1'), false, 'local-only 不进备份(不上传)');
+assert.equal(sm.isBackupKey('nesio-person-records-v1'), true, '进备份/同步(仅本人账号、不进 AI)');
 assert.equal(sm.isBackupKey('nesio-life-graph-v1'), true, '普通 durable 仍进备份(对照)');
 // 删除数据会清掉它
 const st = { data: { 'nesio-person-records-v1': '[]', 'nesio-life-graph-v1': '[]' } };
@@ -74,11 +75,11 @@ assert.ok(purged.keys.includes('nesio-person-records-v1'), '删除数据清掉�
 const sheet = fs.readFileSync(new URL('../components/portal/relationships/RelationshipDetailSheet.tsx', import.meta.url), 'utf8');
 assert.ok(sheet.includes('deletePersonRecord') && sheet.includes('loadPersonRecords'), '详情页删/读记录');
 assert.ok(sheet.includes('挂一条') && sheet.includes('HangNoteSheet'), '详情页开「挂一条」弹窗');
-assert.ok(sheet.includes('sensitive') && sheet.includes('只存本机'), '敏感项本机提示');
+assert.ok(sheet.includes('sensitive') && sheet.includes('不进 AI'), '敏感项「仅你可见 · 不进 AI」提示');
 
 const hang = fs.readFileSync(new URL('../components/portal/relationships/HangNoteSheet.tsx', import.meta.url), 'utf8');
 assert.ok(hang.includes('addPersonRecord') && hang.includes('RECORD_CATEGORIES'), '挂一条:新增记录 + 分类选择');
-assert.ok(hang.includes('sensitive') && hang.includes('只存本机'), '挂一条:敏感项只存本机');
+assert.ok(hang.includes('sensitive') && hang.includes('不进 AI'), '挂一条:敏感项「仅你可见 · 不进 AI」');
 assert.ok(hang.includes('person-extract'), '挂一条:AI 提取走 person-extract');
 
 console.log('person-records: OK');

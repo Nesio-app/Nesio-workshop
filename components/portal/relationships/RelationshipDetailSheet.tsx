@@ -238,7 +238,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                 onBlur={() => setRelationshipOverride(p.key, { relation: relDraft.trim() })}
                 onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
               <p className="nesio-settings-option-hint" style={{ margin: '0.35rem 0 0' }}>
-                {L(dict, '改了只影响这个人的亲疏与联系节奏,只存本机。', "Only affects this person's closeness & reminder cadence — stored on-device.")}
+                {L(dict, '改了只影响这个人的亲疏与联系节奏,仅你可见。', "Only affects this person's closeness & reminder cadence — visible only to you.")}
               </p>
               {/* 数据审计 #4:实体解析 —— 同一个人被记成两个名字(如「妈妈」和「母亲」)时,合并成一个 */}
               <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.6rem' }}>
@@ -290,11 +290,11 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                           {L(dict, meta.zh, meta.en)}
                           {r.date ? ` · ${new Date(r.date).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' })}` : ''}
                           {r.detail ? ` · ${r.detail}` : ''}
-                          {meta.sensitive ? L(dict, ' · 只存本机', ' · on-device') : ''}
+                          {meta.sensitive ? L(dict, ' · 仅你可见', ' · only you') : ''}
                         </span>
                       </div>
                       {meta.sensitive && (
-                        <span className="nesio-rel-rec-local" title={L(dict, '只存本机', 'On-device only')}><IconLock size={11} />{L(dict, '本机', 'Local')}</span>
+                        <span className="nesio-rel-rec-local" title={L(dict, '仅你可见 · 不进 AI', 'Only you · never sent to AI')}><IconLock size={11} />{L(dict, '私密', 'Private')}</span>
                       )}
                       <button type="button" className="nesio-rel-rec-del" onClick={() => removeRecord(r.id)} aria-label={L(dict, '删除', 'Delete')}>✕</button>
                     </div>
@@ -303,7 +303,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
               </div>
             ) : (
               <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>
-                {L(dict, '把成绩、消费、位置,或医疗/药物/健康按人记在这里(敏感项只存本机)。', 'Attach achievements, spending, places — or medical/medication/health, per person (sensitive stays on-device).')}
+                {L(dict, '把成绩、消费、位置,或医疗/药物/健康按人记在这里(敏感项仅你可见 · 不进 AI)。', 'Attach achievements, spending, places — or medical/medication/health, per person (sensitive — only you, never sent to AI).')}
               </p>
             )}
           </div>
@@ -326,7 +326,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
           )}
 
           <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>
-            {L(dict, '只存本机 · 从你的记忆、邮件、通讯录推出', 'On-device only · from your notes, email and contacts')}
+            {L(dict, '仅你可见 · 从你的记忆、邮件、通讯录推出', 'Only you · from your notes, email and contacts')}
           </p>
         </div>
       </NesioSheet>
