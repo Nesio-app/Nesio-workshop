@@ -35,6 +35,7 @@ import {
   updateInventoryItem,
   type InventoryItem,
 } from '@/lib/portal/inventory';
+import { isFoodItem } from '@/lib/cooking/pantry';
 
 interface InventorySheetProps {
   open: boolean;
@@ -90,7 +91,8 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const [fTags, setFTags] = useState('');         // 逗号分隔
   const [fPrice, setFPrice] = useState('');
 
-  const refresh = () => setItems(listInventoryItems());
+  // 食材(subtype=食材)归「做饭·库存」那张脸,物品/收纳页排除,免得护照清单里混进菠菜。
+  const refresh = () => setItems(listInventoryItems().filter((i) => !isFoodItem(i)));
 
   useEffect(() => {
     if (!open) return;
