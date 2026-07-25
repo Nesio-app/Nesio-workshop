@@ -154,13 +154,17 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
     if (localVal === json) { state[key] = { hash: contentHash(json), syncedAt: stamp }; continue; } // 已一致
     const localMissing = localVal === undefined;
     const localUnchangedSinceSync = !localMissing && state[key]?.hash === contentHash(localVal);
-    if (localMissing || localUnchangedSinceSync) {
+    // 反遮盖闸(通用防丢):**绝不用明显更小/更空的云端值覆盖本机非空值**。真机踩过——积分/
+    // 跟练等「每设备进度」被一台空浏览器的空状态盖掉。云端这份不到本机一半大 → 疑似空/被清,
+    // 不覆盖;保留本机、让它下次 push 覆盖云端(与「durability=取更全」同一原则)。
+    const cloudWouldShrink = !localMissing && localVal.length > 0 && json.length * 2 < localVal.length;
+    if ((localMissing || localUnchangedSinceSync) && !cloudWouldShrink) {
       // 本机没有 → 填充(换端关键路径);或本机自上次同步未改 → 云端更新胜。
       applyEntries[key] = json;
       if (localMissing) newlyAdded++;
       state[key] = { hash: contentHash(json), syncedAt: stamp };
     }
-    // 否则:本机自上次同步后改过 → 本机胜,保留(等 push 覆盖云端)。
+    // 否则(本机改过、或云端疑似空):本机胜,保留(等 push 覆盖云端),**不动 state** 以便下次重推。
   }
 
   const appliedKeys = Object.keys(applyEntries);
