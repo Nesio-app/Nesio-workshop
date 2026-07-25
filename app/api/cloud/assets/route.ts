@@ -90,6 +90,24 @@ function storageHeaders(config: ReturnType<typeof getCloudStorageConfig>, conten
   return cloudRuntime.serviceRoleStorageHeaders(config, contentType, { 'x-upsert': 'false' });
 }
 
+function pickLatestBackupObject(
+  objects: cloudRuntime.StorageObjectEntry[],
+): cloudRuntime.StorageObjectEntry | null {
+  const valid = objects.filter(
+    (o) => o && typeof o.name === 'string' && o.name && o.name !== '.emptyFolderPlaceholder' && o.id !== null,
+  );
+  if (valid.length === 0) return null;
+  // created_at 倒序挑最新;并列(或缺 created_at)时按 name 倒序兜底 —— 上传路径嵌
+  // `${Date.now()}-${uuid}`,13 位毫秒戳在同世纪内字典序即时间序,足够定位最新那份。
+  valid.sort((a, b) => {
+    const ta = a.created_at || '';
+    const tb = b.created_at || '';
+    if (ta !== tb) return ta < tb ? 1 : -1;
+    return a.name < b.name ? 1 : -1;
+  });
+  return valid[0];
+}
+
 function isStoragePathOwnedByIdentity(storagePath: string, identityKey: string): boolean {
   const identitySegment = safePathSegment(identityKey);
   if (!storagePath || storagePath.length > 600) return false;
@@ -126,6 +144,45 @@ export async function GET(request: NextRequest) {
   if (!cloudIdentity) {
     logCloudRuntimeAudit('cloud_runtime_failure', { auditId, method: 'GET', reason: 'not_signed_in' });
     return safeJson({ ok: false, cloudAssetRead: true, error: 'not_signed_in', auditId, readsCloud: false, writesCloud: false }, 401);
+  }
+
+  // 「按账号找最新备份」模式(交接清单 ①,跨浏览器同步命门):新浏览器不知道备份那串带
+  // 时间戳的路径,这里列出登录用户 {identity}/backup/ 下全部对象、挑最新那份、直接回签名读 URL。
+  // 前缀由服务端按已鉴权身份拼(不接受用户传路径),天然隔离。云端确实没备份 → found:false(非错误)。
+  const listMode = sanitizeString(request.nextUrl.searchParams.get('list'), 40);
+  if (listMode === 'backup') {
+    const identitySegment = safePathSegment(cloudIdentity.identityKey);
+    const backupPrefix = `${identitySegment}/backup/`;
+    const listExpiresIn = 60 * 10;
+    try {
+      const objects = await cloudRuntime.listStorageObjects(config, backupPrefix, { limit: 100 });
+      const latest = pickLatestBackupObject(objects);
+      if (!latest) {
+        logCloudRuntimeAudit('cloud_runtime_success', { auditId, method: 'GET', readsCloud: true, writesCloud: false });
+        return setRefreshedAuthCookies(safeJson({
+          ok: true, cloudBackupList: true, found: false, auditId, readsCloud: true, writesCloud: false,
+        }), userSession.refreshedSession);
+      }
+      const latestPath = `${backupPrefix}${latest.name}`;
+      const signedUrl = await createSignedAssetUrl(config, latestPath, listExpiresIn);
+      if (!signedUrl) throw new Error('Supabase Storage signed URL failed');
+      logCloudRuntimeAudit('cloud_runtime_success', { auditId, method: 'GET', readsCloud: true, writesCloud: false });
+      return setRefreshedAuthCookies(safeJson({
+        ok: true,
+        cloudBackupList: true,
+        found: true,
+        auditId,
+        readsCloud: true,
+        writesCloud: false,
+        storagePath: latestPath,
+        signedUrl,
+        expiresIn: listExpiresIn,
+        createdAt: latest.created_at ?? null,
+      }), userSession.refreshedSession);
+    } catch {
+      logCloudRuntimeAudit('cloud_runtime_failure', { auditId, method: 'GET', reason: 'cloud_asset_read_failed' });
+      return setRefreshedAuthCookies(safeJson({ ok: false, cloudBackupList: true, error: 'cloud_asset_read_failed', auditId, readsCloud: false, writesCloud: false }, 502), userSession.refreshedSession);
+    }
   }
 
   const storagePath = sanitizeString(request.nextUrl.searchParams.get('storagePath'), 600);

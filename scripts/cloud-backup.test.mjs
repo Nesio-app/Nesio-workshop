@@ -30,9 +30,14 @@ function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKey
     delete: async (k) => { idbStore.delete(k); },
     keys: async () => [...idbStore.keys()],
   };
+  let scheduledPush = null;
   const ctx = {
     module: { exports: {} }, exports: {}, console, Date,
     window: {},
+    // 防抖 push 用 setTimeout —— 假计时器只捕获回调,测试手动触发(vm 上下文默认无计时器)
+    setTimeout: (fn) => { scheduledPush = fn; return 1; },
+    clearTimeout: () => { scheduledPush = null; },
+    _scheduledPush: () => scheduledPush,
     localStorage,
     Blob: class { constructor(parts) { this.size = parts.join('').length; } },
     File: class { constructor(parts, name, opts) { this._content = parts.join(''); this.name = name; this.type = opts && opts.type; } },
@@ -75,26 +80,26 @@ function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKey
 
 const ok200 = () => ({ ok: true, status: 200, json: async () => ({ ok: true, storagePath: 'id/backup/1-abc.nesio-backup.json.txt' }) });
 
-// 1. 付费桩门:未解锁 → entitlement_required,不发网络
+// 1. durability 免费 + 空数据保险丝:登录即可用(常开);0 条目绝不上云(不发网络)——
+//    「空浏览器绝不用空数据盖云端」红线,避免空的「最新」遮住云端真备份。
 {
-  const { mod, ctx } = makeCtx({ fetchImpl: ok200 });
-  assert.equal(mod.hasCloudEntitlement(), false, '默认未解锁');
+  const { mod, ctx } = makeCtx({ fetchImpl: ok200 }); // 无 fbEntries/idbBlobs → 备份 0 条
+  assert.equal(mod.hasCloudEntitlement(), true, 'durability 免费:浏览器环境常开,登录即可用');
   const r = await mod.pushBackupToCloud();
-  assert.equal(r.ok, false);
-  assert.equal(r.error, 'entitlement_required', '未解锁返回 entitlement_required');
-  assert.equal(ctx._lastFetch(), null, '未解锁不发网络请求');
+  assert.equal(r.ok, true, '空数据视作无事可做,静默成功(不算失败)');
+  assert.equal(r.entryCount, 0, '0 条目');
+  assert.equal(ctx._lastFetch(), null, '空数据不发网络请求(不遮盖云端真备份)');
 }
 
 // 2. happy path:合并 localStorage durable + IDB blob → 上传 → 记 last-backup
 {
   const { mod, ctx, lsMap } = makeCtx({
-    lsInit: { 'nesio-cloud-entitlement-v1': 'on' },
     fbEntries: { 'nesio-life-graph-v1': '[{"id":"n1"}]' },
     // 批次 52 行为锁:cache 类 IDB blob(ai-cache)不进备份,durable 的照常进
     idbBlobs: { 'nesio-health-v1': '{"metrics":[1]}', 'nesio-bank-tx-v1': '[]', 'nesio-ai-cache-v1': '{"chat":{}}' },
     fetchImpl: ok200,
   });
-  assert.equal(mod.hasCloudEntitlement(), true, 'flag=on 解锁');
+  assert.equal(mod.hasCloudEntitlement(), true, 'durability 免费:登录即可用');
   const r = await mod.pushBackupToCloud();
   assert.equal(r.ok, true, '解锁后推送成功');
   assert.equal(r.storagePath, 'id/backup/1-abc.nesio-backup.json.txt');
@@ -113,10 +118,10 @@ const ok200 = () => ({ ok: true, status: 200, json: async () => ({ ok: true, sto
   assert.equal(mod.lastCloudBackup().entryCount, 3, 'lastCloudBackup() 读回');
 }
 
-// 3. 401 → not_signed_in
+// 3. 401 → not_signed_in(有数据才会真发网络;empty-fuse 只拦 0 条目)
 {
   const { mod } = makeCtx({
-    lsInit: { 'nesio-cloud-entitlement-v1': 'on' },
+    fbEntries: { 'nesio-life-graph-v1': '[{"id":"n1"}]' },
     fetchImpl: () => ({ ok: false, status: 401, json: async () => ({ ok: false, error: 'not_signed_in' }) }),
   });
   const r = await mod.pushBackupToCloud();
@@ -127,7 +132,7 @@ const ok200 = () => ({ ok: true, status: 200, json: async () => ({ ok: true, sto
 // 4. 503 → cloud_not_configured
 {
   const { mod } = makeCtx({
-    lsInit: { 'nesio-cloud-entitlement-v1': 'on' },
+    fbEntries: { 'nesio-life-graph-v1': '[{"id":"n1"}]' },
     fetchImpl: () => ({ ok: false, status: 503, json: async () => ({ ok: false, error: 'cloud_storage_not_configured' }) }),
   });
   const r = await mod.pushBackupToCloud();
@@ -174,45 +179,76 @@ const backupDoc = (entries) => ({ format: 'nesio-full-backup', version: 1, expor
   assert.equal(c2._idbStore().get('nesio-health-v1'), 'NEW', 'replace 覆盖 IDB(修 #43 迁移留下的 replace 静默失效)');
 }
 
-// 8. pullBackupFromCloud:付费门 + 无备份
-{
-  const off = makeCtx({});
-  assert.equal((await off.mod.pullBackupFromCloud()).error, 'entitlement_required', '未解锁不恢复');
-
-  const noBk = makeCtx({ lsInit: { 'nesio-cloud-entitlement-v1': 'on' } });
-  assert.equal((await noBk.mod.pullBackupFromCloud()).error, 'no_backup', '无上次备份记录 → no_backup');
-}
-
-// 9. pullBackupFromCloud happy path:签名 URL → 拉 blob → 校验 → 分流恢复
+// 8. pullBackupFromCloud:命门修复 —— 问服务端「按账号找最新」,不依赖本地记录。
+//    新浏览器 localStorage 空也能判定:云端确实无备份(found:false)→ no_backup。
 {
   const fetchImpl = (url) => {
-    if (String(url).startsWith('/api/cloud/assets?')) return { ok: true, status: 200, json: async () => ({ ok: true, signedUrl: 'https://signed/x' }) };
+    if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: true, status: 200, json: async () => ({ ok: true, cloudBackupList: true, found: false }) };
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const noBk = makeCtx({ fetchImpl }); // 无任何本地 last-backup 记录(模拟全新浏览器)
+  assert.equal((await noBk.mod.pullBackupFromCloud()).error, 'no_backup', '云端无备份 → no_backup(新浏览器也能判定)');
+  // 关键:确实问了服务端的 list 模式,而不是靠本地记录
+  assert.ok(String(noBk.ctx._lastFetch().url).includes('list=backup'), 'pull 走服务端 ?list=backup');
+}
+
+// 9. pullBackupFromCloud happy path:list=backup 拿最新签名 URL → 拉 blob → 校验 → 分流恢复。
+//    模拟全新浏览器(无本地 last-backup 记录)也能拉回,并记下最新路径供 UI 显示。
+{
+  const fetchImpl = (url) => {
+    if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: true, status: 200, json: async () => ({ ok: true, found: true, signedUrl: 'https://signed/x', storagePath: 'id/backup/2-latest.nesio-backup.json.txt' }) };
     if (url === 'https://signed/x') return { ok: true, status: 200, text: async () => JSON.stringify(backupDoc({ 'nesio-life-graph-v1': '[]', 'nesio-health-v1': '{"metrics":[]}' })) };
     return { ok: false, status: 404, json: async () => ({}) };
   };
-  const { mod, ctx } = makeCtx({
-    lsInit: { 'nesio-cloud-entitlement-v1': 'on', 'nesio-cloud-backup-last-v1': JSON.stringify({ at: 'x', storagePath: 'id/backup/x.txt', bytes: 1, entryCount: 2 }) },
-    idbKeys: ['nesio-health-v1'], fetchImpl,
-  });
+  const { mod, ctx, lsMap } = makeCtx({ idbKeys: ['nesio-health-v1'], fetchImpl });
   const res = await mod.pullBackupFromCloud('merge');
   assert.equal(res.ok, true, '恢复成功');
   assert.equal(res.idbRestored, 2, 'health + life-graph 两条落 IDB(图谱已迁 IDB)');
   assert.equal(ctx._idbStore().get('nesio-health-v1'), '{"metrics":[]}', 'health 落 IDB');
   assert.equal(ctx._idbStore().get('nesio-life-graph-v1'), '[]', 'life-graph merge-union 落 IDB');
   assert.equal(JSON.stringify(ctx._lastRestore().entries), JSON.stringify({}), '图谱已迁 IDB,localStorage 侧不含它');
+  assert.equal(JSON.parse(lsMap.get('nesio-cloud-backup-last-v1')).storagePath, 'id/backup/2-latest.nesio-backup.json.txt', 'pull 记下最新备份路径(供 UI 显示上次同步)');
 }
 
 // 10. 云端 blob 不是有效备份 → invalid_backup,不动本机
 {
   const fetchImpl = (url) => {
-    if (String(url).startsWith('/api/cloud/assets?')) return { ok: true, status: 200, json: async () => ({ ok: true, signedUrl: 'https://signed/x' }) };
+    if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: true, status: 200, json: async () => ({ ok: true, found: true, signedUrl: 'https://signed/x', storagePath: 'p' }) };
     return { ok: true, status: 200, text: async () => 'not json at all' };
   };
-  const { mod } = makeCtx({
-    lsInit: { 'nesio-cloud-entitlement-v1': 'on', 'nesio-cloud-backup-last-v1': JSON.stringify({ at: 'x', storagePath: 'p', bytes: 1, entryCount: 1 }) },
-    fetchImpl,
-  });
+  const { mod } = makeCtx({ fetchImpl });
   assert.equal((await mod.pullBackupFromCloud()).error, 'invalid_backup', '坏 blob → invalid_backup');
+}
+
+// 13. autoSyncBackupWithCloud 数据安全不变式:先拉后推;pull 失败不推(防遮盖云端真备份)。
+{
+  // (a) pull 成功 → 安排了防抖 push
+  const okFetch = (url) => {
+    if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: true, status: 200, json: async () => ({ ok: true, found: true, signedUrl: 'https://signed/x', storagePath: 'id/backup/1.txt' }) };
+    if (url === 'https://signed/x') return { ok: true, status: 200, text: async () => JSON.stringify(backupDoc({ 'nesio-health-v1': '{"m":[]}' })) };
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const okCtx = makeCtx({ idbKeys: ['nesio-health-v1'], fetchImpl: okFetch });
+  await okCtx.mod.autoSyncBackupWithCloud({ force: true });
+  assert.ok(okCtx.ctx._scheduledPush(), 'pull 成功后安排了防抖 push(先拉后推)');
+
+  // (b) 云端确实空(no_backup)→ 也推(把本机数据首次带上云;empty-fuse 兜住真空账号)
+  const emptyFetch = (url) => {
+    if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: true, status: 200, json: async () => ({ ok: true, found: false }) };
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const emptyCtx = makeCtx({ fetchImpl: emptyFetch });
+  await emptyCtx.mod.autoSyncBackupWithCloud({ force: true });
+  assert.ok(emptyCtx.ctx._scheduledPush(), '云端无备份也推(首次上云;空账号由 empty-fuse 拦)');
+
+  // (c) pull 网络失败 → 不推(避免把本地空/旧数据推成新「最新」,遮住云端真备份)
+  const failFetch = (url) => {
+    if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: false, status: 500, json: async () => ({ ok: false }) };
+    return { ok: false, status: 500, json: async () => ({}) };
+  };
+  const failCtx = makeCtx({ fetchImpl: failFetch });
+  await failCtx.mod.autoSyncBackupWithCloud({ force: true });
+  assert.equal(failCtx.ctx._scheduledPush(), null, 'pull 失败绝不推(防遮盖云端真备份)');
 }
 
 // 11. 记忆照片导出:includeImages 才带图(默认导出不含图,避免云备份塞满);

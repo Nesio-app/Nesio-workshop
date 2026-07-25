@@ -61,4 +61,36 @@ assert.equal(contract.semantics.conflictResolution, 'last_write_wins', '冲突�
 assert.equal(contract.semantics.foregroundReadSyncEnabled, true, '声明前台读同步已启用');
 assert.equal(contract.boundaries.noBackgroundSync, true, '仍无后台同步(边界不变)');
 
+// ── 全量数据跨浏览器同步(健康/足迹/银行流水… 先拉后推,交接清单)──
+// 换浏览器登录后自动从云拉回全量本地大数据,一个都不能丢;数据安全第一。
+const backup = read('../lib/portal/cloud-backup.ts');
+assert.match(backup, /export async function autoSyncBackupWithCloud/, '导出 autoSyncBackupWithCloud(先拉后推编排)');
+// 命门①②:pull 走服务端「按账号找最新」,不再依赖本地 last-backup 记录(新浏览器为空 → 拉不回)
+assert.match(backup, /\/api\/cloud\/assets\?list=backup/, 'pull 问服务端要账号下最新备份签名 URL(跨浏览器命门)');
+assert.ok(!/const last = lastCloudBackup\(\);\s*\n\s*if \(!last\?\.storagePath\) return \{ ok: false, error: 'no_backup' \}/.test(backup), 'pull 不再靠本地 last-backup 记录判 no_backup(否则新浏览器永远拉不回)');
+// 先拉后推 + pull 失败不推(仅 pull 成功 / 云端确实空 no_backup 才推 —— 防空/旧数据遮盖云端真备份)
+assert.match(backup, /pullBackupFromCloud\('merge'\)[\s\S]{0,320}pull\.ok\s*\|\|\s*pull\.error === 'no_backup'[\s\S]{0,60}scheduleAutoPush/, '先拉后推:pull 成功/云端空才推,其余失败不推');
+// 空数据保险丝:0 条目绝不上云(空浏览器绝不用空数据盖云端)
+assert.match(backup, /entryCount === 0[\s\S]{0,80}ok: true/, '空数据保险丝:0 条目静默成功、不上云');
+// ③ durability 免费:hasCloudEntitlement 常开(登录即用),付费桩已拆
+assert.match(backup, /export function hasCloudEntitlement\(\)[\s\S]{0,140}typeof window !== 'undefined'/, 'durability 免费:hasCloudEntitlement 常开,登录即用');
+assert.ok(!/nesio-cloud-entitlement-v1/.test(backup), '④ 付费本地 flag 已拆(不再默认关/手动开)');
+// ④ 合并逻辑复用(merge:节点 id union、已有不覆盖)—— restoreCombinedBackup merge 模式
+assert.match(backup, /pullBackupFromCloud\(mode: RestoreMode = 'merge'\)/, 'pull 默认 merge(不覆盖本地新编辑)');
+
+// 服务端「列出最新备份」helper + 路由 GET 模式
+const runtime = read('../lib/portal/cloud-server-runtime.ts');
+assert.match(runtime, /export async function listStorageObjects/, 'runtime 导出 listStorageObjects(列前缀对象)');
+assert.match(runtime, /\/storage\/v1\/object\/list\//, '走 Supabase storage list API');
+const assetsRoute = read('../app/api/cloud/assets/route.ts');
+assert.match(assetsRoute, /list.*===.*'backup'|'backup'/, 'GET 支持 list=backup 模式');
+assert.match(assetsRoute, /pickLatestBackupObject/, '挑最新那份');
+assert.match(assetsRoute, /\$\{identitySegment\}\/backup\//, '前缀按已鉴权身份拼(身份隔离,拿不到别人的)');
+assert.match(assetsRoute, /found: false/, '云端确实无备份 → found:false(非错误)');
+
+// Portal 顶层触发全量备份自动同步(mount 登录后 + visibility 回前台)
+assert.match(portal, /import \{ autoSyncBackupWithCloud \} from '@\/lib\/portal\/cloud-backup'/, 'Portal 引入全量备份自动同步');
+assert.match(portal, /canUsePrivateRuntime\)\s*return;[\s\S]*?autoSyncBackupWithCloud\(\)/, 'Portal 登录后触发全量备份同步');
+assert.match(portal, /visibilityState === 'visible'[\s\S]{0,260}autoSyncBackupWithCloud\(\)/, 'Portal 回前台也触发全量备份同步');
+
 console.log('cloud-auto-sync: OK');
