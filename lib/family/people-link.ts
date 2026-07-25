@@ -55,6 +55,29 @@ export function autoLinkByEmail(familyId: string, members: Array<{ id: string; e
   return out;
 }
 
+/**
+ * 批量取「家庭成员 → 已配 People 的真名 + 头像」(图谱只读一遍)。供家庭板/今天条用配到的
+ * person 的真实姓名/头像顶替入伙昵称(Me/Mom)。没配到的成员不在返回里 → 调用方回退昵称。
+ */
+export function linkedIdentities(memberIds: string[]): Map<string, { name: string; avatar: string }> {
+  const map = loadMap();
+  const wanted = new Map<string, string>(); // memberId → personId
+  for (const id of memberIds) { const e = map[id]; if (e) wanted.set(id, e.personId); }
+  const out = new Map<string, { name: string; avatar: string }>();
+  if (!wanted.size) return out;
+  const personIds = new Set(wanted.values());
+  const byId = new Map<string, LifeNode>();
+  try { for (const n of getLifeGraph()) { if (n.type === 'person' && personIds.has(n.id)) byId.set(n.id, n); } } catch { /* 读不了就回退昵称 */ }
+  for (const [memberId, pid] of wanted) {
+    const n = byId.get(pid);
+    if (!n) continue;
+    const avatar = (typeof n.attributes?.avatar === 'string' && n.attributes.avatar)
+      || (typeof n.attributes?.photo === 'string' && n.attributes.photo) || '';
+    out.set(memberId, { name: n.name, avatar });
+  }
+  return out;
+}
+
 /** 反查:某 person 节点配到了哪个家庭成员(没配返回 null)。供 person 详情显示家务/攒钱。 */
 export function memberForPerson(personNodeId: string): { memberId: string; familyId: string } | null {
   const map = loadMap();
