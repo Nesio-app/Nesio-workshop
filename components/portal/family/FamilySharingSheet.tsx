@@ -6,7 +6,8 @@
  * ③ 某成员账本(欠多少 + 历史 + 发薪冲账)。**一个 app 所有人一样**,区块由权限显隐,
  * 但真正的门在服务端(核心 fail-closed)。Nesio 永不碰钱。每个异步动作都有显式失败态(红线)。
  */
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { linkedIdentities } from '@/lib/family/people-link';
 import NesioSheet from '../ui/NesioSheet';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -209,6 +210,17 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
 
   useEffect(() => { void load(); }, [load]);
 
+  // 本机把成员配到的 People 真名/头像顶替入伙昵称(Me/Mom)。图谱只读一遍;board 变才重算。
+  const identities = useMemo(() => {
+    if (!board) return new Map<string, { name: string; avatar: string }>();
+    const ids = [
+      ...board.everyone.map((e) => e.member.id),
+      ...board.assigned.map((c) => c.assigneeId),
+      ...board.toReview.map((c) => c.assigneeId),
+    ];
+    return linkedIdentities(ids);
+  }, [board]);
+
   async function act(instanceId: string, action: 'done' | 'approve' | 'send_back') {
     setBusyId(instanceId + action); setErr('');
     const r = await choreAction(familyId, instanceId, action);
@@ -219,6 +231,10 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
 
   if (err && !board) return <ErrorRow msg={t('没连上,稍后再试。', 'Could not load — try again.')} onRetry={load} t={t} />;
   if (!board) return <Muted>{t('加载中…', 'Loading…')}</Muted>;
+
+  // 优先显示配到的 People 真名/头像,配不上回退入伙昵称。
+  const displayName = (id: string): string => identities.get(id)?.name || nameFor(board, id) || t('家人', 'family');
+  const avatarOf = (id: string): string => identities.get(id)?.avatar || '';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
@@ -257,7 +273,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
           <div style={cardStyle}>
             {board.toReview.map((c, i) => (
               <div key={c.id} style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch', gap: 'var(--space-2)', borderBottom: i === board.toReview.length - 1 ? 'none' : rowStyle.borderBottom }}>
-                <div style={{ fontSize: 'var(--text-body)' }}>{nameFor(board, c.assigneeId)} · {choreTitle(c, t)} <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>{money(c.value)}</span></div>
+                <div style={{ fontSize: 'var(--text-body)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}><MemberAvatar name={displayName(c.assigneeId)} avatar={avatarOf(c.assigneeId)} size={22} /><span>{displayName(c.assigneeId)} · {choreTitle(c, t)} <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>{money(c.value)}</span></span></div>
                 {c.proofPhotoRef && <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>📷 {t('附了张存证照 —— 只存在你们家庭里。', 'A photo was added — stays in your family vault.')}</div>}
                 <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                   <button type="button" onClick={() => act(c.id, 'approve')} disabled={busyId === c.id + 'approve'} style={{ ...goBtn, flex: 1 }}>{t('看着不错', 'Looks good')}</button>
@@ -296,7 +312,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
                         {g.title}{g.count > 1 ? ` · ×${g.count}` : ''}
                       </div>
                       <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-                        {t('交给', 'for')} {nameFor(board, g.assigneeId) || t('家人', 'family')}
+                        {t('交给', 'for')} {displayName(g.assigneeId)}
                         {g.count > 1 ? ` · ${t('完成', 'done')} ${g.done}/${g.count} · ${t('自', 'from')} ${g.earliest}` : ` · ${g.earliest}`}
                       </div>
                     </div>
@@ -312,10 +328,11 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
         <p style={sectLabel}>{t('大家', 'Everyone')}</p>
         <div style={cardStyle}>
           {board.everyone.map((e, i) => (
-            <button key={e.member.id} type="button" onClick={() => onOpenLedger(e.member.id, e.member.name)}
+            <button key={e.member.id} type="button" onClick={() => onOpenLedger(e.member.id, displayName(e.member.id))}
               style={{ ...rowStyle, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: i === board.everyone.length - 1 ? 'none' : '1px solid var(--portal-line)', cursor: 'pointer' }}>
+              <MemberAvatar name={displayName(e.member.id)} avatar={avatarOf(e.member.id)} size={32} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{e.member.name}</div>
+                <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{displayName(e.member.id)}</div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('攒了', 'saved up')}</div>
               </div>
               <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)' as unknown as number, fontVariantNumeric: 'tabular-nums' }}>{money(e.owed)}</span>
@@ -330,6 +347,19 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
 
 function nameFor(board: BoardView, personId: string): string {
   return board.everyone.find((e) => e.member.id === personId)?.member.name ?? '';
+}
+// 成员头像:配到 People 有头像用头像,否则首字母兜底(圆形,主题色)。
+function MemberAvatar({ name, avatar, size = 28 }: { name: string; avatar: string; size?: number }) {
+  const initial = (name || '?').trim().charAt(0).toUpperCase();
+  if (avatar) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={avatar} alt="" width={size} height={size} style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} draggable={false} />;
+  }
+  return (
+    <div style={{ width: size, height: size, borderRadius: '50%', background: 'var(--portal-accent-soft-md)', color: 'var(--portal-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: `${Math.round(size * 0.42)}px`, fontWeight: 'var(--weight-semibold)' as unknown as number, flexShrink: 0 }}>
+      {initial}
+    </div>
+  );
 }
 function assignedStateLabel(state: ChoreInstanceView['state'], t: (a: string, b: string) => string): string {
   switch (state) {
