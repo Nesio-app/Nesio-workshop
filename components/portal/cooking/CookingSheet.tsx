@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
-import { IconUtensils, IconClock, IconBox, IconMapPin, IconCamera } from '../icons';
+import { IconUtensils, IconClock, IconBox, IconMapPin, IconCamera, IconCheckSquare } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -20,6 +20,7 @@ import {
 import { normalizeIngredient } from '@/lib/cooking/food-catalog';
 import { loadRecipes, recipeImageUrl, type Recipe } from '@/lib/cooking/food-data';
 import { matchRecipes, type RecipeMatch } from '@/lib/cooking/recipe-match';
+import { getShoppingList, addToShopping, toggleShoppingItem, removeShoppingItem, checkoutBought, type ShoppingItem } from '@/lib/cooking/shopping';
 
 type View = { kind: 'pantry' } | { kind: 'recipe'; match: RecipeMatch<Recipe> };
 
@@ -34,8 +35,14 @@ export default function CookingSheet({ open, onClose }: { open: boolean; onClose
   const [view, setView] = useState<View>({ kind: 'pantry' });
   const [recipes, setRecipes] = useState<Recipe[] | null>(null);
   const [recipesErr, setRecipesErr] = useState(false);
+  const [shopping, setShopping] = useState<ShoppingItem[]>([]);
+  const [shopMsg, setShopMsg] = useState('');
 
-  const reload = useCallback(() => { try { setItems(listPantry()); } catch { setErr(t('读不出库存,刷新看看。', 'Could not read the pantry — refresh.')); } }, [t]);
+  const reloadShopping = useCallback(() => { try { setShopping(getShoppingList()?.items ?? []); } catch { /* 购物清单读不出不致命,静默 */ } }, []);
+  const reload = useCallback(() => {
+    try { setItems(listPantry()); } catch { setErr(t('读不出库存,刷新看看。', 'Could not read the pantry — refresh.')); }
+    reloadShopping();
+  }, [t, reloadShopping]);
   useEffect(() => { if (open) reload(); }, [open, reload]);
 
   const loadRec = useCallback(() => {
@@ -67,7 +74,22 @@ export default function CookingSheet({ open, onClose }: { open: boolean; onClose
     setBusyId(''); reload();
   }
 
+  function addMissing(names: string[]) {
+    try { addToShopping(names); reloadShopping(); setShopMsg(t('加进购物清单了', 'Added to shopping list')); setTimeout(() => setShopMsg(''), 1500); }
+    catch { setErr(t('没加上购物清单,再试一次。', 'Could not add to list — try again.')); }
+  }
+  function toggleShop(name: string, checked: boolean) { try { toggleShoppingItem(name, checked); reloadShopping(); } catch { setErr(t('没记上,再试一次。', 'Could not update — try again.')); } }
+  function removeShop(name: string) { try { removeShoppingItem(name); reloadShopping(); } catch { setErr(t('没删成,再试一次。', 'Could not remove — try again.')); } }
+  function checkout() {
+    try {
+      const n = checkoutBought(); reload();
+      setShopMsg(n > 0 ? t(`回流 ${n} 样进库存`, `${n} back in pantry`) : t('先勾上买到的', 'Check what you bought first'));
+      setTimeout(() => setShopMsg(''), 1800);
+    } catch { setErr(t('没回流成,再试一次。', 'Could not update pantry — try again.')); }
+  }
+
   const inRecipe = view.kind === 'recipe';
+  const shopChecked = shopping.filter((s) => s.checked).length;
 
   return (
     <NesioSheet variant="fullscreen" open={open} onOpenChange={(o) => { if (!o) onClose(); }} ariaLabel={t('做饭 · 库存', 'Cooking · Pantry')}>
@@ -84,7 +106,7 @@ export default function CookingSheet({ open, onClose }: { open: boolean; onClose
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
           {inRecipe ? (
-            <RecipeDetail match={view.match} t={t} />
+            <RecipeDetail match={view.match} onAddToShopping={addMissing} shopMsg={shopMsg} t={t} />
           ) : (
             <>
               {err && <ErrorRow msg={err} onRetry={() => { setErr(''); reload(); }} t={t} />}
@@ -173,6 +195,29 @@ export default function CookingSheet({ open, onClose }: { open: boolean; onClose
                 </div>
               </section>
 
+              {/* 购物清单(反向闭环:缺料 → 清单 → 到店勾选 → 回流库存)。它是一条「记忆」,可搜、随云走。 */}
+              {shopping.length > 0 && (
+                <section>
+                  <p style={{ ...sectLabel, display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}><IconCheckSquare size={12} />{t('购物清单', 'Shopping list')} · {shopping.length}</p>
+                  <div style={cardStyle}>
+                    {shopping.map((s, i) => (
+                      <div key={s.name} style={{ ...rowStyle, borderBottom: i === shopping.length - 1 ? 'none' : rowStyle.borderBottom }}>
+                        <button type="button" onClick={() => toggleShop(s.name, !s.checked)} aria-label={s.checked ? t('取消勾选', 'Uncheck') : t('勾上', 'Check')}
+                          style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, display: 'inline-flex', color: s.checked ? 'var(--status-go)' : 'var(--portal-muted)' }}>
+                          {s.checked ? <IconCheckSquare size={20} /> : <span style={{ width: 18, height: 18, borderRadius: 4, border: '1.6px solid var(--portal-line)', display: 'inline-block' }} />}
+                        </button>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', textDecoration: s.checked ? 'line-through' : 'none', color: s.checked ? 'var(--portal-muted)' : 'var(--portal-ink)' }}>{s.name}</span>
+                        <button type="button" onClick={() => removeShop(s.name)} aria-label={t('删除', 'Remove')} style={{ border: 'none', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: 'var(--text-sm)', padding: 'var(--space-1)' }}>✕</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+                    <button type="button" onClick={checkout} disabled={shopChecked === 0} style={{ ...primaryBtn, opacity: shopChecked === 0 ? 0.6 : 1 }}>{t('买到的 → 回流库存', 'Bought → into pantry')}</button>
+                    {shopMsg && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-go)' }}>{shopMsg}</span>}
+                  </div>
+                </section>
+              )}
+
               <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6, margin: 0 }}>
                 {t('库存只在你自己的图谱里,随你的云备份走,不共享给别人。快到期会在今天页轻轻提醒你先用掉。',
                   'Your pantry lives in your own graph and syncs to your cloud only. Nesio nudges you to use things before they expire.')}
@@ -186,7 +231,9 @@ export default function CookingSheet({ open, onClose }: { open: boolean; onClose
 }
 
 // ── 菜谱详情 ──────────────────────────────────────────────────────────────────
-function RecipeDetail({ match, t }: { match: RecipeMatch<Recipe>; t: (a: string, b: string) => string }) {
+function RecipeDetail({ match, onAddToShopping, shopMsg, t }: {
+  match: RecipeMatch<Recipe>; onAddToShopping: (names: string[]) => void; shopMsg: string; t: (a: string, b: string) => string;
+}) {
   const r = match.recipe;
   const img = recipeImageUrl(r.image);
   return (
@@ -208,7 +255,10 @@ function RecipeDetail({ match, t }: { match: RecipeMatch<Recipe>; t: (a: string,
         <div>
           <p style={sectLabel}>{t('还缺', 'Still need')}</p>
           <div style={chipWrap}>{match.missing.map((n) => <span key={n} style={{ ...chip, ...chipMiss }}>{n}</span>)}</div>
-          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: 'var(--space-1) 0 0' }}>{t('（加进购物清单 · 即将支持）', '(Add to shopping list — coming soon)')}</p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+            <button type="button" onClick={() => onAddToShopping(match.missing)} style={{ ...ghostBtn, display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}><IconCheckSquare size={14} />{t('把缺的加进购物清单', 'Add missing to shopping list')}</button>
+            {shopMsg && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-go)' }}>{shopMsg}</span>}
+          </div>
         </div>
       )}
       {match.staples.length > 0 && (
