@@ -16,7 +16,12 @@ export interface FamilySummary { familyId: string; name: string; inviteCode: str
 export interface BoardView {
   familyId: string; me: FamilyMemberView;
   myChoresToday: ChoreInstanceView[]; toReview: ChoreInstanceView[];
+  assigned: ChoreInstanceView[];
   everyone: Array<{ member: FamilyMemberView; owed: number }>;
+}
+export interface EventAssignmentView {
+  assigned: boolean; assigneeId?: string; assigneeName?: string;
+  state?: ChoreStateView; familyId?: string; dueDate?: string; count?: number;
 }
 export interface PayoutView { id: string; personId: string; amount: number; date: string; note?: string; }
 export interface LedgerView {
@@ -72,6 +77,9 @@ export function choreAction(
 }
 export function listFamilyMembers(familyId: string): Promise<ApiResult<{ familyId: string; me: FamilyMemberView; members: FamilyMemberView[] }>> {
   return api(`/api/portal/family/members?familyId=${encodeURIComponent(familyId)}`);
+}
+export function getEventAssignment(sourceEventId: string): Promise<ApiResult<EventAssignmentView>> {
+  return api(`/api/portal/family/assignment?sourceEventId=${encodeURIComponent(sourceEventId)}`);
 }
 export function assignChoreFromEvent(
   input: { familyId: string; sourceEventId: string; title: string; dueDate: string; assigneeId: string; value?: number; needsApproval?: boolean; cadence?: Cadence },
