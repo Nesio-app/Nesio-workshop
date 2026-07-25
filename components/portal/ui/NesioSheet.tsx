@@ -54,6 +54,12 @@ export interface NesioSheetProps {
    * 原语只接管定位/遮罩/焦点机器,卡片视觉保持原样(零视觉回归)。
    */
   card?: boolean;
+  /**
+   * center/fullscreen:遮罩是否不透明(挡住背后内容)。默认 fullscreen 才不透明。
+   * 隐私强制型弹窗(如「换账号」归属确认)必须传 true —— 否则半透明遮罩下背后仍渲染上一账号的
+   * 界面,同机换人时会被肉眼看到(数据泄露)。
+   */
+  opaqueOverlay?: boolean;
   children: ReactNode;
 }
 
@@ -212,6 +218,7 @@ export default function NesioSheet({
   style,
   card = true,
   modal = true,
+  opaqueOverlay = false,
   children,
 }: NesioSheetProps) {
   const panelClass = `nesio-sheet nesio-sheet--${variant}${card ? '' : ' nesio-sheet--bare'}${className ? ` ${className}` : ''}`;
@@ -231,7 +238,7 @@ export default function NesioSheet({
 
   // fullscreen 的遮罩用不透明页面底当底衬 —— 全屏面板常是磨砂玻璃底(半透明),
   // 需要背后有不透明层,否则在夜间(--glass-bg-solid 近全透)会透出下层。
-  const overlayClass = `nesio-sheet-overlay${variant === 'fullscreen' ? ' nesio-sheet-overlay--opaque' : ''}`;
+  const overlayClass = `nesio-sheet-overlay${variant === 'fullscreen' || opaqueOverlay ? ' nesio-sheet-overlay--opaque' : ''}`;
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange} modal={modal}>
       <Dialog.Portal>

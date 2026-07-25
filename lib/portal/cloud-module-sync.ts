@@ -19,9 +19,10 @@ import { buildCombinedBackup, restoreCombinedBackup } from './cloud-backup';
 import type { FullBackup } from './full-backup';
 import { logDropped } from './storage-health';
 import { EMAIL_BODY_MODULE_PREFIX } from './cloud-email-sync';
+import { isDedicatedSyncKey } from './sync-ownership';
 
-/** 记忆图另有 signals 记录级同步,模块同步排除它。 */
-const LIFE_GRAPH_KEY = 'nesio-life-graph-v1';
+// 归属:记忆图/头像身份/学习态/邮件全文 各有专属引擎(见 sync-ownership.ts),通用模块同步一律让路,
+// 避免两套合并语义抢同一份数据(换端横跳的根因)。判断统一走 isDedicatedSyncKey,不再各写一份。
 /** 每 key 上次同步的内容哈希 + 时间(判本机是否改过、云端是否更新)。 */
 const SYNC_STATE_KEY = 'nesio-module-sync-state-v1';
 /** 单模块压缩块上限(与路由 MAX_DATA_BYTES 对齐,< Vercel 4.5MB 请求体上限)。 */
@@ -77,7 +78,7 @@ async function localModuleEntries(): Promise<Record<string, string>> {
   const backup = await buildCombinedBackup();
   const out: Record<string, string> = {};
   for (const [k, v] of Object.entries(backup.entries)) {
-    if (k === LIFE_GRAPH_KEY) continue;
+    if (isDedicatedSyncKey(k)) continue; // 专属引擎负责的 key(记忆图/头像/学习态/邮件)让路
     out[k] = v;
   }
   return out;
@@ -147,8 +148,8 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
 
   for (const row of rows) {
     const key = row.moduleKey;
-    if (!key || typeof key !== 'string' || key === LIFE_GRAPH_KEY) continue;
-    if (key.startsWith(EMAIL_BODY_MODULE_PREFIX)) continue; // 邮件全文行由 cloud-email-sync 处理,防御性再跳一次
+    if (!key || typeof key !== 'string') continue;
+    if (isDedicatedSyncKey(key)) continue; // 专属引擎负责的 key(记忆图/头像/学习态/邮件)不由通用同步落地
     const gz = (row.data as { gz?: string } | null)?.gz;
     if (typeof gz !== 'string') continue;
     const json = unpackValue(gz);

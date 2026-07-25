@@ -42,6 +42,13 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-gmail-last-sync',
   'nesio-node-embeddings-v1', // legacy 向量缓存(已迁 IndexedDB)
   'nesio-ai-cache-v1',
+  // 各同步引擎「自己的簿记/水位」—— 单设备本地状态,绝不该被当数据同步(否则每轮 churn 上云、
+  // 且新设备被别端水位污染 → 冷启动该刷新却不刷新)。归 cache:不进备份/模块同步。
+  'nesio-module-sync-state-v1',           // cloud-module-sync 每 key 上次同步哈希
+  'nesio-email-sync-state-v1',            // cloud-email-sync 每封上次同步哈希
+  'nesio-backup-synced-entrycount-v1',    // cloud-backup 高水位
+  'nesio-cloud-backup-last-v1',           // cloud-backup 上次推送标记
+  'nesio-backup-first-sync-done-v1',      // legacy 首次同步标志
 ]);
 // 注意:**不要**在这里放裸 `geo` —— 它会误伤足迹主数据键 `nesio-place-geo-v1`
 // (`-geo-` 被判成缓存 → 从云备份里被剔除 → 换浏览器足迹永远同步不过去,已踩过)。

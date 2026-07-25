@@ -66,6 +66,12 @@ for (const k of ['nesio-rewards-v1', 'nesio-place-photos-v1', 'nesio-reader-high
   assert.equal(isBackupKey(k), true, `${k} 进备份/同步(跨端一致)`);
 }
 
+// 各同步引擎「自己的簿记/水位」= cache:绝不进备份/模块同步(否则每轮 churn 上云 + 新设备被别端水位污染)。
+for (const k of ['nesio-module-sync-state-v1', 'nesio-email-sync-state-v1', 'nesio-backup-synced-entrycount-v1', 'nesio-cloud-backup-last-v1']) {
+  assert.equal(keyKind(k), 'cache', `${k} = cache(同步簿记不该被当数据同步)`);
+  assert.equal(isBackupKey(k), false, `${k} 不进备份/同步`);
+}
+
 // 备份:durable 进、auth/cache 不进;覆盖 baohe_/analyst_(修此前漏)
 assert.equal(isBackupKey('nesio-bank-tx-v1'), true);
 assert.equal(isBackupKey('baohe_auth_access'), false, '票据绝不进备份文件(安全)');
