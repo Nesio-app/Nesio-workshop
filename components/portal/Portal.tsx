@@ -30,6 +30,7 @@ const NesioChatSheet = dynamic(() => import('./NesioChatSheet'), { ssr: false })
 const NotePanelEnhanced = dynamic(() => import('./NotePanelEnhanced'), { ssr: false });
 const ToolsTreasurePopup = dynamic(() => import('./ToolsTreasureSheet'), { ssr: false });
 const InventorySheet = dynamic(() => import('./InventorySheet'), { ssr: false });
+const CalendarCreateSheet = dynamic(() => import('./CalendarCreateSheet'), { ssr: false });
 const RewardsStoreSheet = dynamic(() => import('./RewardsStoreSheet'), { ssr: false });
 const DailyBriefSheet = dynamic(() => import('./DailyBriefSheet').then((m) => m.DailyBriefSheet), { ssr: false });
 // 洞察 = 全屏浮层(非 surface):提到 Portal 层,底部导航从任意页都能开。1143 行,开时才加载。
@@ -439,6 +440,7 @@ export default function Portal() {
   >(null);
   const [ownerBusy, setOwnerBusy] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
+  const [calendarCreateOpen, setCalendarCreateOpen] = useState(false);
   const [rewardsOpen, setRewardsOpen] = useState(false);
   const [workoutSession, setWorkoutSession] = useState<import('./fitness/WorkoutPlayer').PlayerSession | null>(null);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
@@ -756,6 +758,7 @@ export default function Portal() {
       track('freeze_open'); setFreezeOpen(true);
     };
     const inventoryHandler = () => { track('inventory_open'); setInventoryOpen(true); };
+    const calendarCreateHandler = () => { track('calendar_create_open'); setCalendarCreateOpen(true); };
     const rewardsHandler = () => { track('rewards_open'); setRewardsOpen(true); };
     const briefHandler = () => { track('brief_open', {}); setBriefOpen(true); };
     // 洞察浮层:底部导航 / 卡片 / 「开始练」都派事件打开;detail.tab 指定进哪个 tab(如 fitness)
@@ -792,6 +795,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-mood', moodHandler);
     window.addEventListener('nesio-open-freeze', freezeHandler);
     window.addEventListener('nesio-open-inventory', inventoryHandler);
+    window.addEventListener('nesio-open-calendar-create', calendarCreateHandler);
     window.addEventListener('nesio-open-rewards', rewardsHandler);
     window.addEventListener('nesio-open-brief', briefHandler);
     window.addEventListener('nesio-open-insights', insightsHandler);
@@ -805,6 +809,7 @@ export default function Portal() {
       window.removeEventListener('nesio-open-mood', moodHandler);
       window.removeEventListener('nesio-open-freeze', freezeHandler);
       window.removeEventListener('nesio-open-inventory', inventoryHandler);
+      window.removeEventListener('nesio-open-calendar-create', calendarCreateHandler);
       window.removeEventListener('nesio-open-rewards', rewardsHandler);
       window.removeEventListener('nesio-open-brief', briefHandler);
       window.removeEventListener('nesio-open-insights', insightsHandler);
@@ -1345,6 +1350,7 @@ export default function Portal() {
         </NesioSheet>
       )}
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
+      {calendarCreateOpen && <CalendarCreateSheet open={calendarCreateOpen} onClose={() => setCalendarCreateOpen(false)} />}
       {workoutSession && <WorkoutPlayer session={workoutSession} onClose={() => setWorkoutSession(null)} />}
       {briefOpen && <DailyBriefSheet open={briefOpen} onClose={() => setBriefOpen(false)} canUsePrivateData={canUsePrivateRuntime} />}
       <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />

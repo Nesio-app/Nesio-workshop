@@ -297,6 +297,26 @@ export default function TodayFeed({
         {/* 冷冻到期提醒(批次 7:冷冻仓入口迁到拍一下,决定回路留在首屏) */}
         <ThawedReminder />
 
+        {/* 新建日程入口:写进 Google 主日历(一句话 / 填表单)。派事件由 Portal 开面板。 */}
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-calendar-create'))}
+          style={{
+            alignSelf: 'flex-start',
+            display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)',
+            padding: 'var(--space-2) var(--space-3)',
+            border: '1px solid var(--portal-accent-border)',
+            borderRadius: 'var(--radius-pill)',
+            background: 'var(--portal-accent-soft)',
+            color: 'var(--portal-accent)',
+            fontSize: 'var(--text-sm)', fontFamily: 'var(--font-sans)',
+            fontWeight: 'var(--weight-medium)' as unknown as number,
+            cursor: 'pointer',
+          }}
+        >
+          + {L(uiLocale, '新建日程', 'New event')}
+        </button>
+
         {/* 今日焦点 — 重要安排 / 重要日子 / 重要提醒 */}
         <TodayFocusSection
           guidanceNodeIds={guidanceNodeIds}
