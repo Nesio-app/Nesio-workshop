@@ -32,6 +32,7 @@ for (const k of [
 // per-record 专属引擎的行前缀:邮件全文 + 导入书籍
 assert.equal(isDedicatedSyncKey('email-body:18c1aa'), true, '邮件全文行由 cloud-email-sync 负责');
 assert.equal(isDedicatedSyncKey('reader-book:bk_123'), true, '导入书籍行由 cloud-reader-sync 负责');
+assert.equal(isDedicatedSyncKey('place-image:placephoto-tokyo'), true, '地点封面照行由 cloud-place-image-sync 负责');
 
 // 普通 durable 数据 → 非 dedicated:默认走通用 module-sync(加功能零同步代码的那条默认路)
 for (const k of ['nesio-health-v1', 'nesio-place-geo-v1', 'nesio-bank-tx-v1', 'nesio-inventory-v1', 'nesio-person-records-v1', 'nesio-rewards-v1']) {
