@@ -88,6 +88,8 @@ export interface CloudBackupResult {
   at?: string;
   bytes?: number;
   entryCount?: number;
+  /** 本机备份比云端最新那份还少 → 跳过上传,不遮盖云端更全的真备份(防遮盖闸)。 */
+  skippedRegression?: boolean;
 }
 
 /**
@@ -146,7 +148,7 @@ function mapHttpError(status: number): CloudBackupError {
  * 一键推送:组装 → 上传到用户云账户。成功后记 last-backup(供 UI 显示"上次同步")。
  * 每个失败分支都返回明确 error code —— UI 必须据此渲染可见失败态(设计红线)。
  */
-export async function pushBackupToCloud(): Promise<CloudBackupResult> {
+export async function pushBackupToCloud(opts: { skipIfFewerThan?: number } = {}): Promise<CloudBackupResult> {
   if (!hasCloudEntitlement()) return { ok: false, error: 'entitlement_required' };
   if (typeof window === 'undefined') return { ok: false, error: 'network' };
 
@@ -166,6 +168,13 @@ export async function pushBackupToCloud(): Promise<CloudBackupResult> {
   // 「最新」会遮住云端真备份,换机 pull 只会拿回这份空的(数据丢失陷阱)。没东西可备份就
   // 静默成功、不发网络(纵深防御:自动同步侧已「pull 失败不推」,这里再兜一层任何调用点)。
   if (entryCount === 0) return { ok: true, entryCount: 0, bytes };
+
+  // 防遮盖:若本机这份比云端「最新」那份**还少**条目,说明拉取没把云端数据全并进本机
+  // (place-geo 曾被误剔、IDB 写失败、reload 打断等),此时上云会用更少的数据遮住云端更全
+  // 的真备份。宁可不推,等本机补齐再说。仅自动同步传此参数;手动「备份」不传,尊重用户意图。
+  if (opts.skipIfFewerThan != null && entryCount < opts.skipIfFewerThan) {
+    return { ok: true, entryCount, bytes, skippedRegression: true };
+  }
 
   // 本地预检:超 8MB 直接给明确态,不白跑一趟网络(路由也会 413 兜底)。
   if (bytes > CLOUD_UPLOAD_LIMIT_BYTES) return { ok: false, error: 'too_large', bytes, entryCount };
@@ -273,6 +282,8 @@ export interface CloudRestoreResult {
   error?: CloudRestoreError;
   restoredKeys?: number;
   idbRestored?: number;
+  /** 云端最新那份备份的条目数(供自动同步做防遮盖判断:本机别推得比它还少)。 */
+  cloudEntryCount?: number;
 }
 
 /**
@@ -301,6 +312,7 @@ export async function pullBackupFromCloud(mode: RestoreMode = 'merge'): Promise<
     let parsed: unknown;
     try { parsed = JSON.parse(await blobRes.text()); } catch { return { ok: false, error: 'invalid_backup' }; }
     if (!isValidBackup(parsed)) return { ok: false, error: 'invalid_backup' };
+    const cloudEntryCount = Object.keys(parsed.entries).length;
 
     // 3. 恢复(IDB/localStorage 分流,merge = 只补缺/新者胜)
     const res = await restoreCombinedBackup(parsed, mode);
@@ -316,7 +328,7 @@ export async function pullBackupFromCloud(mode: RestoreMode = 'merge'): Promise<
         localStorage.setItem(LAST_CLOUD_BACKUP_KEY, JSON.stringify(record));
       } catch { /* quota */ }
     }
-    return { ok: true, restoredKeys: res.restoredKeys, idbRestored: res.idbRestored };
+    return { ok: true, restoredKeys: res.restoredKeys, idbRestored: res.idbRestored, cloudEntryCount };
   } catch {
     return { ok: false, error: 'network' };
   }
@@ -345,12 +357,13 @@ let autoSyncLastAt = 0;
 let autoSyncInFlight = false;
 let autoPushTimer: ReturnType<typeof setTimeout> | null = null;
 
-function scheduleAutoPush(): void {
+function scheduleAutoPush(skipIfFewerThan = 0): void {
   if (typeof window === 'undefined') return;
   if (autoPushTimer) clearTimeout(autoPushTimer);
   autoPushTimer = setTimeout(() => {
     autoPushTimer = null;
-    void pushBackupToCloud();
+    // 防遮盖:自动推绝不上传比云端最新那份还少条目的备份(见 pushBackupToCloud)。
+    void pushBackupToCloud({ skipIfFewerThan });
   }, AUTO_PUSH_DEBOUNCE_MS);
 }
 
@@ -384,11 +397,12 @@ export async function autoSyncBackupWithCloud(opts: { force?: boolean } = {}): P
         window.location.reload();
         return;
       }
-      scheduleAutoPush();
+      // 推时带上「云端最新那份的条目数」做防遮盖闸:本机若比它还少就不推(见 pushBackupToCloud)。
+      scheduleAutoPush(pull.cloudEntryCount ?? 0);
     } else if (pull.error === 'no_backup') {
       // 云端确实无备份:也推(把本机数据首次带上云;空账号由 push 的 entryCount===0 保险丝拦)。
       // 不置 first-sync 标志 —— 等原浏览器把数据推上云后,本浏览器下次拉到真数据仍会首刷一次。
-      scheduleAutoPush();
+      scheduleAutoPush(0);
     }
     // 其余失败态(网络/未登录/坏备份)一律不推(防本地空/旧数据遮盖云端真备份)。
   } catch {

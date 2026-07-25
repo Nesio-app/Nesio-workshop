@@ -41,6 +41,14 @@ assert.equal(keyKind('nesio-email-signals-cache'), 'cache');
 assert.equal(keyKind('nesio-ai-cache-v1'), 'cache');
 assert.equal(keyKind('nesio-health-v1'), 'durable', '健康数据 = durable');
 assert.equal(keyKind('nesio-bank-tx-v1'), 'durable');
+// 足迹主数据键:裸 `geo` 的缓存正则曾误伤 `nesio-place-geo-v1`(`-geo-` 命中)→ 从备份剔除 →
+// 换浏览器足迹永远同步不过去。必须是 durable + 进备份。回归钉死。
+assert.equal(keyKind('nesio-place-geo-v1'), 'durable', '足迹主数据 = durable(不可被 geo 缓存正则误伤)');
+assert.equal(isBackupKey('nesio-place-geo-v1'), true, '足迹必须进备份(否则换机丢足迹)');
+assert.equal(keyKind('nesio-place-cat-v1'), 'durable', '足迹分类 = durable');
+// 但真正的地理缓存仍要判成 cache(不进备份)
+assert.equal(keyKind('nesio-revgeo-cache-v1'), 'cache', '反向地理编码缓存 = cache');
+assert.equal(keyKind('nesio-place-geocode-enabled'), 'cache', 'geocode 开关/缓存 = cache');
 assert.equal(keyKind('analyst_feedback'), 'durable', '学习态 = durable(进备份)');
 assert.equal(keyKind('nesio-mirror-profile-v1'), 'durable', 'mirror-profile 不该被误判成 auth');
 // A 计划学习态(localStorage 侧)全部 durable —— 进备份、「彻底删除」要清。

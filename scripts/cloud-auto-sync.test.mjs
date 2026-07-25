@@ -70,13 +70,20 @@ assert.match(backup, /\/api\/cloud\/assets\?list=backup/, 'pull 问服务端要�
 assert.ok(!/const last = lastCloudBackup\(\);\s*\n\s*if \(!last\?\.storagePath\) return \{ ok: false, error: 'no_backup' \}/.test(backup), 'pull 不再靠本地 last-backup 记录判 no_backup(否则新浏览器永远拉不回)');
 // 先拉后推:pull 成功分支处理(首刷 reload + 推),云端空(no_backup)也推,其余失败态不推
 assert.match(backup, /const pull = await pullBackupFromCloud\('merge'\)/, '先拉(merge)');
-assert.match(backup, /if \(pull\.ok\)\s*\{[\s\S]{0,1400}scheduleAutoPush\(\)/, 'pull 成功分支里安排防抖 push(先拉后推)');
-assert.match(backup, /pull\.error === 'no_backup'[\s\S]{0,320}scheduleAutoPush\(\)/, '云端确实空也推(首次上云)');
+assert.match(backup, /if \(pull\.ok\)\s*\{[\s\S]{0,1400}scheduleAutoPush\(/, 'pull 成功分支里安排防抖 push(先拉后推)');
+assert.match(backup, /pull\.error === 'no_backup'[\s\S]{0,320}scheduleAutoPush\(/, '云端确实空也推(首次上云)');
 // 冷浏览器首次拉回有数据 → reload 让各 store 重新水合(修「换个网页记录不显示」),且首刷标志防 reload 循环
 assert.match(backup, /firstSync &&[\s\S]{0,60}restoredSomething[\s\S]{0,90}location[\s\S]{0,20}reload/, '冷浏览器首次拉回有数据 → reload 重新水合');
 assert.match(backup, /FIRST_SYNC_DONE_FLAG/, 'reload 由「首刷完成」标志守卫(每浏览器仅一次,防循环)');
 // 空数据保险丝:0 条目绝不上云(空浏览器绝不用空数据盖云端)
 assert.match(backup, /entryCount === 0[\s\S]{0,80}ok: true/, '空数据保险丝:0 条目静默成功、不上云');
+// 防遮盖闸:本机比云端最新那份还少条目就不推(pull 回报 cloudEntryCount,自动推带 skipIfFewerThan)
+assert.match(backup, /cloudEntryCount = Object\.keys\(parsed\.entries\)\.length/, 'pull 回报云端最新那份的条目数');
+assert.match(backup, /skipIfFewerThan[\s\S]{0,120}entryCount < opts\.skipIfFewerThan[\s\S]{0,60}skippedRegression/, 'push:比云端少 → 跳过上传(防遮盖)');
+assert.match(backup, /scheduleAutoPush\(pull\.cloudEntryCount/, '自动推带上云端条目数做防遮盖闸');
+// 足迹主数据键不被 geo 缓存正则误伤(否则备份里没足迹,换机永远同步不过去)
+const manifest = read('../lib/portal/storage-manifest.ts');
+assert.ok(!/\|geo\)/.test(manifest.match(/const CACHE_RE =.*/)?.[0] || ''), 'CACHE_RE 不含裸 geo(否则误剔 nesio-place-geo-v1)');
 // ③ durability 免费:hasCloudEntitlement 常开(登录即用),付费桩已拆
 assert.match(backup, /export function hasCloudEntitlement\(\)[\s\S]{0,140}typeof window !== 'undefined'/, 'durability 免费:hasCloudEntitlement 常开,登录即用');
 assert.ok(!/nesio-cloud-entitlement-v1/.test(backup), '④ 付费本地 flag 已拆(不再默认关/手动开)');
