@@ -159,6 +159,27 @@ const ok200 = () => ({ ok: true, status: 200, json: async () => ({ ok: true, sto
 
 const backupDoc = (entries) => ({ format: 'nesio-full-backup', version: 1, exportedAt: 'x', entries });
 
+// 5b. 防遮盖闸:本机备份比云端最新那份还少条目 → 跳过上传(不发网络),skippedRegression。
+{
+  const { mod, ctx } = makeCtx({
+    fbEntries: { 'nesio-life-graph-v1': '[{"id":"n1"}]' }, // 本机仅 1 条
+    fetchImpl: ok200,
+  });
+  const r = await mod.pushBackupToCloud({ skipIfFewerThan: 5 }); // 云端最新有 5 条
+  assert.equal(r.ok, true, '不算失败(等本机补齐再推)');
+  assert.equal(r.skippedRegression, true, '比云端少 → 标记跳过');
+  assert.equal(ctx._lastFetch(), null, '防遮盖:比云端少绝不上传(不发网络)');
+  // 而条目数 >= 门槛时照常推
+  const { mod: m2, ctx: c2 } = makeCtx({
+    fbEntries: { 'a': '1', 'b': '2', 'c': '3', 'd': '4', 'e': '5' },
+    fetchImpl: ok200,
+  });
+  const r2 = await m2.pushBackupToCloud({ skipIfFewerThan: 5 });
+  assert.equal(r2.ok, true);
+  assert.ok(!r2.skippedRegression, '>= 门槛照常推');
+  assert.ok(c2._lastFetch(), '>= 门槛真上传');
+}
+
 // 6. restoreCombinedBackup 路由:IDB key 落 idbBackend、其余走 restoreFullBackup(localStorage)
 {
   const { mod, ctx } = makeCtx({ idbKeys: ['nesio-health-v1'] });
@@ -206,6 +227,7 @@ const backupDoc = (entries) => ({ format: 'nesio-full-backup', version: 1, expor
   const { mod, ctx, lsMap } = makeCtx({ idbKeys: ['nesio-health-v1'], fetchImpl });
   const res = await mod.pullBackupFromCloud('merge');
   assert.equal(res.ok, true, '恢复成功');
+  assert.equal(res.cloudEntryCount, 2, 'pull 回报云端最新那份的条目数(供防遮盖闸)');
   assert.equal(res.idbRestored, 2, 'health + life-graph 两条落 IDB(图谱已迁 IDB)');
   assert.equal(ctx._idbStore().get('nesio-health-v1'), '{"metrics":[]}', 'health 落 IDB');
   assert.equal(ctx._idbStore().get('nesio-life-graph-v1'), '[]', 'life-graph merge-union 落 IDB');

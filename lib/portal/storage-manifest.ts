@@ -43,7 +43,11 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-node-embeddings-v1', // legacy 向量缓存(已迁 IndexedDB)
   'nesio-ai-cache-v1',
 ]);
-const CACHE_RE = /(^|[-_])(cache|last-sync|last-location|warned-at|shown|geocode|geo)([-_]|$)/i;
+// 注意:**不要**在这里放裸 `geo` —— 它会误伤足迹主数据键 `nesio-place-geo-v1`
+// (`-geo-` 被判成缓存 → 从云备份里被剔除 → 换浏览器足迹永远同步不过去,已踩过)。
+// 反向地理编码缓存靠 `cache`(nesio-revgeo-cache-v1)、地理编码开关靠 `geocode` 各自命中,
+// 都不需要裸 `geo`。
+const CACHE_RE = /(^|[-_])(cache|last-sync|last-location|warned-at|shown|geocode)([-_]|$)/i;
 
 export type StorageKind = 'auth' | 'cache' | 'durable';
 
