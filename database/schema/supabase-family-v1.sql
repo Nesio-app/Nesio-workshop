@@ -72,6 +72,9 @@ CREATE TABLE IF NOT EXISTS public.family_members (
 ALTER TABLE public.family_members ADD COLUMN IF NOT EXISTS email text;
 -- 成员身份自成一套:名字/头像来自 TA 自己的账号资料(自报+自愈),不再匹配 People 联系人。
 ALTER TABLE public.family_members ADD COLUMN IF NOT EXISTS avatar_url text;
+-- 攒钱目标(孩子端动机):攒够 goal_amount 买 goal_label。进度 = 现攒 / 目标。
+ALTER TABLE public.family_members ADD COLUMN IF NOT EXISTS goal_amount numeric;
+ALTER TABLE public.family_members ADD COLUMN IF NOT EXISTS goal_label text;
 
 CREATE INDEX IF NOT EXISTS idx_family_members_user
   ON public.family_members (user_id);

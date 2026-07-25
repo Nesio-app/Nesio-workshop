@@ -6,7 +6,7 @@
 import type { Cadence } from '@/lib/family/chores-core';
 
 export type ChoreStateView = 'todo' | 'done' | 'approved' | 'paid';
-export interface FamilyMemberView { id: string; name: string; canApprove: boolean; needsApproval: boolean; canRecordPayout: boolean; email?: string; avatarUrl?: string; }
+export interface FamilyMemberView { id: string; name: string; canApprove: boolean; needsApproval: boolean; canRecordPayout: boolean; email?: string; avatarUrl?: string; goalAmount?: number; goalLabel?: string; }
 export interface ChoreInstanceView {
   id: string; templateId: string; assigneeId: string; dueDate: string; value: number;
   state: ChoreStateView; needsApproval: boolean; doneAt?: string; approvedAt?: string; proofPhotoRef?: string;
@@ -61,6 +61,10 @@ export function joinFamily(inviteCode: string, displayName: string, avatarUrl?: 
 /** 把我的账号资料(名字/头像)同步到我在各家庭的成员行(打开家庭分享时刷新)。 */
 export function syncMyFamilyProfile(displayName: string, avatarUrl: string): Promise<ApiResult<{ updated: number }>> {
   return api('/api/portal/family/profile', postJson({ displayName, avatarUrl }));
+}
+/** 设我在某家庭的攒钱目标(攒够 amount 买 label;amount<=0 清除)。 */
+export function setMyGoal(familyId: string, amount: number, label: string): Promise<ApiResult<Record<string, never>>> {
+  return api('/api/portal/family/goal', postJson({ familyId, amount, label }));
 }
 export function getBoard(familyId: string): Promise<ApiResult<{ board: BoardView }>> {
   return api(`/api/portal/family/board?familyId=${encodeURIComponent(familyId)}`);

@@ -34,6 +34,8 @@ export interface FamilyMember {
   needsApproval: boolean;     // 自己干完的活要进"待审"而非直接记账
   canRecordPayout: boolean;   // 能记一笔线下付款冲账
   avatarUrl?: string;         // 显示用:来自成员自己的账号资料(纯展示,不参与能力判定)
+  goalAmount?: number;        // 攒钱目标金额(0/缺省=未设);纯展示
+  goalLabel?: string;         // 攒钱目标名字(如「乐高」)
 }
 
 /** 家务模板(按周期生成实例)。value = 积分或金额(核心不区分,纯数)。 */
