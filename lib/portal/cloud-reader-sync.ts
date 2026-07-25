@@ -15,6 +15,7 @@ import { loadReaderBooks, saveReaderBook } from './reader-store-idb';
 import { READER_BOOK_MODULE_PREFIX } from './sync-ownership';
 import type { ReaderBook } from './adhd-reader';
 import { logDropped } from './storage-health';
+import { yieldToMain } from './yield-main';
 
 const SYNC_STATE_KEY = 'nesio-reader-sync-state-v1';
 const MAX_BOOK_PACKED_BYTES = 4 * 1024 * 1024; // 单本压缩块上限(< Vercel 4.5MB);超限的书跳过(留日志)
@@ -67,6 +68,7 @@ export async function pushReaderBooksToCloud(): Promise<{ pushed: number }> {
   const now = new Date().toISOString();
   const rows: Array<{ moduleKey: string; data: { gz: string }; updatedAt: string }> = [];
   const staged: ReaderSyncState = {};
+  let packed = 0;
   for (const book of books) {
     const id = book?.id;
     if (!id || typeof id !== 'string' || !SAFE_ID_RE.test(id)) continue;
@@ -74,6 +76,7 @@ export async function pushReaderBooksToCloud(): Promise<{ pushed: number }> {
     try { json = JSON.stringify(book); } catch { continue; }
     const h = contentHash(json);
     if (state[id] === h) continue; // 已推
+    if (packed++ > 0) await yieldToMain(); // 书体积大,每压一本让出主线程
     const gz = packValue(json);
     if (!gz) continue;
     if (gz.length > MAX_BOOK_PACKED_BYTES) { logDropped('cloud.reader_book_too_large', new Error(id)); continue; }
@@ -123,6 +126,7 @@ export async function pullReaderBooksFromCloud(): Promise<{ applied: number }> {
     if (!id || localIds.has(id)) { if (id) state[id] = state[id] || 'have'; continue; } // 本机已有 → 不覆盖
     const gz = (row.data as { gz?: string } | null)?.gz;
     if (typeof gz !== 'string') continue;
+    await yieldToMain(); // 每本解压前让出主线程
     const json = unpackValue(gz);
     if (json == null) continue;
     let book: ReaderBook;

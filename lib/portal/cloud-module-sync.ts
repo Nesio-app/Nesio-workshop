@@ -20,6 +20,7 @@ import type { FullBackup } from './full-backup';
 import { logDropped } from './storage-health';
 import { isDedicatedSyncKey, DEDICATED_SYNC_PREFIXES } from './sync-ownership';
 import { isBackupKey } from './storage-manifest';
+import { yieldToMain } from './yield-main';
 
 // 归属:记忆图/头像身份/学习态/邮件全文 各有专属引擎(见 sync-ownership.ts),通用模块同步一律让路,
 // 避免两套合并语义抢同一份数据(换端横跳的根因)。判断统一走 isDedicatedSyncKey,不再各写一份。
@@ -95,9 +96,12 @@ export async function pushModulesToCloud(): Promise<{ pushed: number }> {
   const now = new Date().toISOString();
   const modules: Array<{ moduleKey: string; data: { gz: string }; updatedAt: string }> = [];
   const staged: ModuleSyncState = {};
+  let packed = 0;
   for (const [key, value] of Object.entries(entries)) {
     const h = contentHash(value);
     if (state[key]?.hash === h) continue; // 未变
+    // 大 blob(健康/财务/足迹)同步 gzip 在主线程 —— 每压一条让出一拍,避免整段循环冻住 UI。
+    if (packed++ > 0) await yieldToMain();
     const gz = packValue(value);
     if (!gz || gz.length > MAX_MODULE_PACKED_BYTES) continue; // 压缩失败/极端超限:跳过
     modules.push({ moduleKey: key, data: { gz }, updatedAt: now });
@@ -158,6 +162,7 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
     if (!isBackupKey(key)) continue;
     const gz = (row.data as { gz?: string } | null)?.gz;
     if (typeof gz !== 'string') continue;
+    await yieldToMain(); // 每条解压前让出主线程,避免大数据集一次解压把 UI 冻住
     const json = unpackValue(gz);
     if (json == null) continue;
     const stamp = row.updatedAt || new Date().toISOString();

@@ -41,6 +41,7 @@ function makeCtx({ lsInit = {}, localBodies = {}, fetchImpl } = {}) {
       };
       if (p === './email-fulltext-index') return { indexEmailBodies: (map) => { indexedCaptured = { ...(indexedCaptured || {}), ...map }; } };
       if (p === './storage-health') return { logDropped: () => {} };
+      if (p === './yield-main') return { yieldToMain: async () => {} };
       return {};
     },
     _lastPost: () => lastPost,

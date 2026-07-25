@@ -50,6 +50,7 @@ function makeCtx({ lsInit = {}, localEntries = {}, fetchImpl, withReload = false
         restoreCombinedBackup: async (backup, mode) => { restoreApplied = { entries: backup.entries, mode }; return { restoredKeys: 0, idbRestored: Object.keys(backup.entries).length, skippedKeys: [], corruptKeys: [] }; },
       };
       if (p === './storage-health') return { logDropped: () => {} };
+      if (p === './yield-main') return { yieldToMain: async () => {} };
       // isBackupKey:测试用的都是 durable 应用 key(nesio-*-v1),按真值等价返回 true;
       // 专属/前缀行在此之前已被 isDedicatedSyncKey 跳过。
       if (p === './storage-manifest') return { isBackupKey: (k) => k.startsWith('nesio-') && !k.startsWith('email-body:') && !k.startsWith('reader-book:') && !k.startsWith('place-image:') && k !== 'nesio-module-sync-state-v1' };

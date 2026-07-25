@@ -19,6 +19,7 @@ import { gzipSync, gunzipSync, strToU8, strFromU8 } from 'fflate';
 import { getAllEmailBodies, putEmailBodies } from './local-email-body';
 import { indexEmailBodies } from './email-fulltext-index';
 import { logDropped } from './storage-health';
+import { yieldToMain } from './yield-main';
 
 /** 邮件全文行的 module_key 前缀。cloud-module-sync 靠它把邮件行排除在普通模块同步之外。 */
 export const EMAIL_BODY_MODULE_PREFIX = 'email-body:';
@@ -80,10 +81,13 @@ export async function pushEmailBodiesToCloud(): Promise<{ pushed: number }> {
   const now = new Date().toISOString();
   const rows: Array<{ moduleKey: string; data: { gz: string }; updatedAt: string }> = [];
   const staged: EmailSyncState = {};
+  let packed = 0;
   for (const [emailId, body] of Object.entries(bodies)) {
     if (!emailId || !SAFE_ID_RE.test(emailId) || !body) continue;
     const h = contentHash(body);
     if (state[emailId] === h) continue; // 已推
+    // 上千封邮件全文同步 gzip 在主线程 —— 每压一条让出一拍,避免开机首次同步冻住 UI。
+    if (packed++ > 0) await yieldToMain();
     const gz = packValue(body);
     if (!gz || gz.length > MAX_BODY_PACKED_BYTES) continue;
     rows.push({ moduleKey: EMAIL_BODY_MODULE_PREFIX + emailId, data: { gz }, updatedAt: now });
@@ -132,12 +136,13 @@ export async function pullEmailBodiesFromCloud(): Promise<{ applied: number }> {
     if (!key || typeof key !== 'string' || !key.startsWith(EMAIL_BODY_MODULE_PREFIX)) continue;
     const emailId = key.slice(EMAIL_BODY_MODULE_PREFIX.length);
     if (!emailId) continue;
+    // 已在本机(内容不可变)→ 只登记 state,不解压、不重复落地。
+    if (local[emailId]) { state[emailId] = contentHash(local[emailId]); continue; }
     const gz = (row.data as { gz?: string } | null)?.gz;
     if (typeof gz !== 'string') continue;
+    await yieldToMain(); // 每条解压前让出主线程(上千封别一次解压冻住 UI)
     const body = unpackValue(gz);
     if (body == null || !body) continue;
-    // 已在本机(内容不可变)→ 只登记 state,不重复落地。
-    if (local[emailId]) { state[emailId] = contentHash(local[emailId]); continue; }
     toPut[emailId] = body;
     state[emailId] = contentHash(body);
   }
