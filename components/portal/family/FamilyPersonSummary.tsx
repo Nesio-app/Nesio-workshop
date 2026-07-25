@@ -69,22 +69,65 @@ export default function FamilyPersonSummary({ personNodeId, personEmail }: { per
         </div>
       )}
       {!err && !ledger && <span style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>{t('加载中…', 'Loading…')}</span>}
-      {!err && ledger && (
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-4)' }}>
-          <div>
-            <div style={{ fontSize: 'var(--text-h3)', fontWeight: 'var(--weight-bold)' as unknown as number, color: 'var(--portal-ink)', fontVariantNumeric: 'tabular-nums' }}>{money(ledger.balance.owed)}</div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('攒了', 'saved up')}</div>
+      {!err && ledger && (() => {
+        const s = periodStats(ledger.approved);
+        const owed = ledger.balance.owed;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            {/* 周 / 月 / 累计 三个小统计 */}
+            <div style={{ display: 'flex', gap: 'var(--space-5)', flexWrap: 'wrap' }}>
+              <Stat label={t('本周', 'This week')} main={`${s.wC} ${t('件', '')}`.trim()} sub={s.wS > 0 ? `+${money(s.wS)}` : ''} />
+              <Stat label={t('本月', 'This month')} main={`${s.mC} ${t('件', '')}`.trim()} sub={s.mS > 0 ? `+${money(s.mS)}` : ''} />
+              <Stat label={owed >= 0 ? t('攒了', 'Saved') : t('多给了', 'Overpaid')} main={money(Math.abs(owed))} sub="" />
+              <button type="button" onClick={() => { try { window.dispatchEvent(new CustomEvent('nesio-open-family')); } catch { /* noop */ } }}
+                style={{ marginLeft: 'auto', alignSelf: 'center', border: 'none', background: 'transparent', color: 'var(--portal-accent)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)' as unknown as number }}>
+                {t('看账本 ›', 'Ledger ›')}
+              </button>
+            </div>
+            {/* 最近做的活 */}
+            {s.recent.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                {s.recent.map((r, i) => (
+                  <div key={i} style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)', fontSize: 'var(--text-xs)' }}>
+                    <span style={{ color: 'var(--portal-ink)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title || t('家务', 'Chore')}</span>
+                    <span style={{ color: 'var(--portal-muted)' }}>{r.date}</span>
+                    {r.value > 0 && <span style={{ color: 'var(--status-go)', fontVariantNumeric: 'tabular-nums' }}>+{money(r.value)}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-          <div>
-            <div style={{ fontSize: 'var(--text-h3)', fontWeight: 'var(--weight-bold)' as unknown as number, color: 'var(--portal-ink)', fontVariantNumeric: 'tabular-nums' }}>{ledger.approved.length}</div>
-            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('件已完成', 'chores done')}</div>
-          </div>
-          <button type="button" onClick={() => { try { window.dispatchEvent(new CustomEvent('nesio-open-family')); } catch { /* noop */ } }}
-            style={{ marginLeft: 'auto', alignSelf: 'center', border: 'none', background: 'transparent', color: 'var(--portal-accent)', cursor: 'pointer', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)' as unknown as number }}>
-            {t('看账本 ›', 'Ledger ›')}
-          </button>
-        </div>
-      )}
+        );
+      })()}
+    </div>
+  );
+}
+
+/** 从已完成家务算 本周/本月 件数+金额,并取最近几条。 */
+function periodStats(approved: LedgerView['approved']): { wC: number; wS: number; mC: number; mS: number; recent: Array<{ title: string; date: string; value: number }> } {
+  const now = new Date();
+  const monthPrefix = now.toLocaleDateString('en-CA').slice(0, 7);   // YYYY-MM
+  const monday = new Date(now); monday.setHours(0, 0, 0, 0);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7));           // 本周一(周一=0)
+  const weekStart = monday.toLocaleDateString('en-CA');
+  const rows = approved
+    .map((c) => ({ title: (c.title || '').trim(), date: (c.approvedAt || '').slice(0, 10) || c.dueDate, value: Number(c.value) || 0 }))
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+  let wC = 0, wS = 0, mC = 0, mS = 0;
+  for (const r of rows) {
+    if (r.date.slice(0, 7) === monthPrefix) { mC += 1; mS += r.value; }
+    if (r.date >= weekStart) { wC += 1; wS += r.value; }
+  }
+  return { wC, wS, mC, mS, recent: rows.slice(0, 4) };
+}
+
+function Stat({ label, main, sub }: { label: string; main: string; sub: string }) {
+  return (
+    <div>
+      <div style={{ fontSize: 'var(--text-h3)', fontWeight: 'var(--weight-bold)' as unknown as number, color: 'var(--portal-ink)', fontVariantNumeric: 'tabular-nums', lineHeight: 1.1 }}>
+        {main}{sub ? <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-go)', fontWeight: 'var(--weight-medium)' as unknown as number, marginLeft: 4 }}>{sub}</span> : null}
+      </div>
+      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{label}</div>
     </div>
   );
 }

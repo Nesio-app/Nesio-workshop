@@ -410,14 +410,18 @@ function LedgerScreen({ familyId, personId, canRecordPayout, t }: {
 
   const history = [
     ...ledger.approved.map((c) => ({ id: c.id, title: choreTitle(c, t), date: c.approvedAt?.slice(0, 10) ?? c.dueDate, delta: c.value })),
-    ...ledger.payouts.map((p) => ({ id: p.id, title: t('发薪 —— 已付现金', 'Payday — paid in cash'), date: p.date, delta: -p.amount })),
+    ...ledger.payouts.map((p) => ({ id: p.id, title: t('你给了现金 · 从攒的里扣', 'You gave cash · deducted'), date: p.date, delta: -p.amount })),
   ].sort((a, b) => (a.date < b.date ? 1 : -1));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
       <div style={{ ...cardStyle, padding: 'var(--space-4)' }}>
-        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>{t('现在欠 TA', 'Owed right now')}</div>
-        <div style={{ fontSize: 'var(--text-display)', fontWeight: 'var(--weight-bold)' as unknown as number, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{money(ledger.balance.owed)}</div>
+        {/* owed<0 = 你给的现金比 TA 挣的还多(多给了),别显示成「欠 -$20」那种迷惑负数。 */}
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>{ledger.balance.owed >= 0 ? t('还欠 TA', 'You still owe') : t('已多给 TA', 'You’ve overpaid')}</div>
+        <div style={{ fontSize: 'var(--text-display)', fontWeight: 'var(--weight-bold)' as unknown as number, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{money(Math.abs(ledger.balance.owed))}</div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginTop: 'var(--space-1)' }}>
+          {t('审核过的家务往上加 · 你给的现金往下扣', 'Approved chores add up · cash you give deducts')}
+        </div>
       </div>
 
       <section>
@@ -454,8 +458,8 @@ function LedgerScreen({ familyId, personId, canRecordPayout, t }: {
       )}
 
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6, margin: 0 }}>
-        {t('Nesio 永不碰钱。现金你来给,我们只把账记清 —— 审核过的家务往上加,发薪把它清零。没有银行、没有卡、没有要打电话取消的订阅。',
-          'Nesio never moves money. You give the cash; we just keep the count straight — approved chores add up, a payout zeroes it out.')}
+        {t('Nesio 永不碰钱。现金你来给,我们只把账记清 —— 审核过的家务往上加,你给的现金往下扣。没有银行、没有卡、没有要打电话取消的订阅。',
+          'Nesio never moves money. You give the cash; we just keep the count straight — approved chores add up, cash you give deducts.')}
       </p>
     </div>
   );
