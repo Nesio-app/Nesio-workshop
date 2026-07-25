@@ -747,9 +747,16 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       }
     } catch { allOk = false; parts.push(L(dict, '日历:网络错误', 'Calendar: network error')); }
 
-    // 邮件
+    // 邮件(重:读全文 + AI 抽取。加 75s 超时,便于把「耗时太久」和真「网络断」区分开)
     try {
-      const res = await fetch('/api/portal/gmail?includeBody=true&analyze=true');
+      const ctrl = new AbortController();
+      const to = setTimeout(() => ctrl.abort(), 75_000);
+      let res: Response;
+      try {
+        res = await fetch('/api/portal/gmail?includeBody=true&analyze=true', { signal: ctrl.signal });
+      } finally {
+        clearTimeout(to);
+      }
       const data = await readJson<{ ok?: boolean; nodes?: NodeInput[]; error?: string; emailCount?: number; messages?: unknown[] }>(res);
       if (!data) {
         allOk = false;
@@ -776,7 +783,13 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
             ? L(dict, '邮件:授权已失效,需重新授权', 'Mail: authorization expired, reconnect needed')
             : L(dict, `邮件:同步失败(${data.error || '未知'})`, `Mail: sync failed (${data.error || 'unknown'})`));
       }
-    } catch { allOk = false; parts.push(L(dict, '邮件:网络错误', 'Mail: network error')); }
+    } catch (e) {
+      allOk = false;
+      const aborted = e instanceof DOMException && e.name === 'AbortError';
+      parts.push(aborted
+        ? L(dict, '邮件:这批较多没跑完(已在后台处理),过一会儿再点一次同步就好,不影响日历/记忆', 'Mail: this batch was large and timed out — tap Sync again in a bit; calendar/memory are unaffected')
+        : L(dict, '邮件:网络不稳,请重试', 'Mail: network unstable — please retry'));
+    }
 
     // 通讯录(People)→ 关系 tab 的 person 节点(人缘管理)
     try {

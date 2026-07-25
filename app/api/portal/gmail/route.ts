@@ -301,8 +301,10 @@ export async function GET(req: NextRequest) {
   const shouldAnalyze = url.searchParams.get('analyze') === 'true';
   // 连接器批②:增量游标(unix 秒)。带 afterTs 只拉该时刻之后的新邮件;不带 = 全量窗口(30 天)。
   const afterTs = Number(url.searchParams.get('afterTs') || 0) || undefined;
-  // 全量窗口放宽到 100 封(增量轮询通常只有零星几封,同一上限不碍事)
-  const fetchMax = afterTs ? 50 : 100;
+  // 方案 A(单次同步稳过 60s 函数上限):全量窗口一次拉 100 封全文再喂 AI,
+  // 巨型 prompt 会拖到超时被掐断 → 前端误报「网络错误」。收到 35 封/次,
+  // 单次可控;积压靠多点几次同步 + afterTs 增量 + emailId 去重逐步消化。
+  const fetchMax = afterTs ? 40 : 35;
   const metadataOnly = !includeBody;
   // Get token for current user (Supabase → cookies fallback)
   let tokens = await getIntegrationToken('gmail');
