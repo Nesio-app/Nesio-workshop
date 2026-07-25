@@ -184,6 +184,7 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   }
 
   if (!step || !ex) return null;
+  const hasCues = Boolean((ex.cues && ex.cues.length > 0) || (ex.neural && ex.neural[0]));
 
   return (
     <div className="nesio-wp-overlay" role="dialog" aria-modal aria-label={session.name || L(dict, '跟练', 'Workout')}>
@@ -207,10 +208,28 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
         ) : ex.gif ? (
           <ExerciseGif src={ex.gif} alt={ex.name} className="nesio-wp-figure" />
         ) : null}
-        <h2 className="nesio-wp-name">{ex.name}</h2>
+        {/* 动作名 + 「动作要点」收起按钮同一行(要点紧跟名字后面)。 */}
+        <div className="nesio-wp-namerow">
+          <h2 className="nesio-wp-name">{ex.name}</h2>
+          {hasCues && (
+            <button type="button" className="nesio-wp-cuebtn" onClick={() => setShowCues((s) => !s)} aria-expanded={showCues}>
+              {showCues ? L(dict, '要点 ▴', 'Cues ▴') : L(dict, '动作要点 ▾', 'How to ▾')}
+            </button>
+          )}
+        </div>
         {ex.muscles && (
           <div className="nesio-wp-muscles">
             {ex.muscles.map((m, i) => <span key={i} className={`nesio-wp-muscle${m.t === 'p' ? ' is-p' : ''}`}>{m.n}</span>)}
+          </div>
+        )}
+        {hasCues && showCues && (
+          <div className="nesio-wp-cuebox">
+            {ex.neural && ex.neural[0] && <div className="nesio-wp-neural">{ex.neural[0]}</div>}
+            {ex.cues && ex.cues.length > 0 && (
+              <ul className="nesio-wp-cues">
+                {ex.cues.map((c, i) => <li key={i}>{c}</li>)}
+              </ul>
+            )}
           </div>
         )}
 
@@ -241,25 +260,6 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
                 <p key={repCount} className="nesio-wp-count nesio-wp-count--work nesio-wp-beat">{repCount}<span className="nesio-wp-count-total">/{step.reps}</span></p>
                 <div className="nesio-wp-bar" aria-hidden><div className="nesio-wp-bar-fill" style={{ width: `${Math.min(100, (repCount / step.reps) * 100)}%` }} /></div>
               </div>
-            )}
-
-            {/* 指导文字收进按钮:需要时点开(默认收起,不挡大图) */}
-            {((ex.cues && ex.cues.length > 0) || (ex.neural && ex.neural[0])) && (
-              <>
-                <button type="button" className="nesio-wp-cuebtn" onClick={() => setShowCues((s) => !s)} aria-expanded={showCues}>
-                  {showCues ? L(dict, '收起要点 ▴', 'Hide cues ▴') : L(dict, '动作要点 ▾', 'How to ▾')}
-                </button>
-                {showCues && (
-                  <div className="nesio-wp-cuebox">
-                    {ex.neural && ex.neural[0] && <div className="nesio-wp-neural">{ex.neural[0]}</div>}
-                    {ex.cues && ex.cues.length > 0 && (
-                      <ul className="nesio-wp-cues">
-                        {ex.cues.map((c, i) => <li key={i}>{c}</li>)}
-                      </ul>
-                    )}
-                  </div>
-                )}
-              </>
             )}
           </>
         )}
