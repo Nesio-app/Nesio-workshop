@@ -20,35 +20,35 @@ function loadMap(): LinkMap {
 function saveMap(m: LinkMap): void {
   try { localStorage.setItem(LINK_KEY, JSON.stringify(m)); } catch { /* 配额/隐私模式:配不上顶多每次重配 */ }
 }
-function personById(id: string): LifeNode | null {
-  try { return getLifeGraph().find((n) => n.id === id && n.type === 'person') ?? null; } catch { return null; }
-}
-function personEmailIndex(): Map<string, LifeNode> {
-  const idx = new Map<string, LifeNode>();
+/** 一次遍历图谱,建 person 的 邮箱索引 + id 索引(避免在大图谱上反复 getLifeGraph().find 扫爆主线程)。 */
+function buildPersonIndex(): { byEmail: Map<string, LifeNode>; byId: Map<string, LifeNode> } {
+  const byEmail = new Map<string, LifeNode>();
+  const byId = new Map<string, LifeNode>();
   try {
     for (const n of getLifeGraph()) {
       if (n.type !== 'person') continue;
+      byId.set(n.id, n);
       const e = typeof n.attributes?.email === 'string' ? n.attributes.email.toLowerCase().trim() : '';
-      if (e && !idx.has(e)) idx.set(e, n);
+      if (e && !byEmail.has(e)) byEmail.set(e, n);
     }
   } catch { /* 图谱读不了就当没配 */ }
-  return idx;
+  return { byEmail, byId };
 }
 
 /**
  * 把某家庭的成员按邮箱配到本机 person 节点,写入本地映射;返回 {memberUserId → person 节点}。
- * 已配过且 person 仍在 → 沿用;新配上的落盘。
+ * 已配过且 person 仍在 → 沿用;新配上的落盘。图谱只读一遍(大图谱防卡)。
  */
 export function autoLinkByEmail(familyId: string, members: Array<{ id: string; email?: string }>): Map<string, LifeNode> {
-  const idx = personEmailIndex();
+  const { byEmail, byId } = buildPersonIndex();
   const map = loadMap();
   const out = new Map<string, LifeNode>();
   let changed = false;
   for (const m of members) {
-    const prev = map[m.id]?.personId ? personById(map[m.id].personId) : null;
+    const prev = map[m.id]?.personId ? byId.get(map[m.id].personId) ?? null : null;
     if (prev) { out.set(m.id, prev); continue; }
     const e = (m.email || '').toLowerCase().trim();
-    const hit = e ? idx.get(e) : undefined;
+    const hit = e ? byEmail.get(e) : undefined;
     if (hit) { map[m.id] = { personId: hit.id, familyId }; out.set(m.id, hit); changed = true; }
   }
   if (changed) saveMap(map);
