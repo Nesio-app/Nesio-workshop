@@ -89,6 +89,10 @@ export function listFamilyMembers(familyId: string): Promise<ApiResult<{ familyI
 export function getEventAssignment(sourceEventId: string): Promise<ApiResult<EventAssignmentView>> {
   return api(`/api/portal/family/assignment?sourceEventId=${encodeURIComponent(sourceEventId)}`);
 }
+/** 停掉/删除一条(含周期全部)来自日历事件的家务(需 can_approve)。 */
+export function cancelEventChore(familyId: string, sourceEventId: string): Promise<ApiResult<{ cancelled: number }>> {
+  return api('/api/portal/family/cancel', postJson({ familyId, sourceEventId }));
+}
 export function assignChoreFromEvent(
   input: { familyId: string; sourceEventId: string; title: string; dueDate: string; assigneeId: string; value?: number; needsApproval?: boolean; cadence?: Cadence },
 ): Promise<ApiResult<{ instance: ChoreInstanceView }>> {

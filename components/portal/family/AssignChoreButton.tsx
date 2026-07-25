@@ -12,7 +12,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import {
-  listFamilies, listFamilyMembers, assignChoreFromEvent, getEventAssignment,
+  listFamilies, listFamilyMembers, assignChoreFromEvent, getEventAssignment, cancelEventChore,
   type FamilySummary, type FamilyMemberView, type ChoreStateView,
 } from '@/lib/family/family-client';
 import type { Cadence } from '@/lib/family/chores-core';
@@ -34,7 +34,7 @@ type Phase =
   | { s: 'pick'; families: FamilySummary[]; familyId: string; members: FamilyMemberView[] }
   | { s: 'saving'; name: string }
   | { s: 'done'; name: string }
-  | { s: 'assigned'; name: string; state: ChoreStateView; count: number }
+  | { s: 'assigned'; name: string; state: ChoreStateView; count: number; familyId: string }
   | { s: 'nofamily' }
   | { s: 'error'; msg: string };
 
@@ -55,6 +55,20 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
   const [reward, setReward] = useState('');            // 这件家务值多少钱(接回零花钱账本;留空=0,只当待办)
   const [needsApproval, setNeedsApproval] = useState(true); // 要不要家长看一眼再计入
   const [repeat, setRepeat] = useState<'once' | 'daily' | 'weekly'>('once'); // 周期:一次/每天/每周(接 chores-core cadence)
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [cancelErr, setCancelErr] = useState('');
+
+  const cancelChore = useCallback(async (familyId: string) => {
+    setCancelBusy(true); setCancelErr('');
+    const r = await cancelEventChore(familyId, node.id);
+    setCancelBusy(false);
+    if (!r.ok) {
+      setCancelErr(r.error === 'forbidden' ? t('只有家长能停掉家务。', 'Only a parent can stop chores.') : t('没停成,再试一次。', 'Could not stop — try again.'));
+      return;
+    }
+    setPhase({ s: 'idle' });
+    try { window.dispatchEvent(new CustomEvent('nesio-family-updated')); } catch { /* noop */ }
+  }, [node.id, t]);
 
   const loadMembers = useCallback(async (families: FamilySummary[], familyId: string) => {
     const m = await listFamilyMembers(familyId);
@@ -105,7 +119,7 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
       const r = await getEventAssignment(node.id);
       if (!alive) return;
       if (r.ok && r.data.assigned && r.data.state) {
-        setPhase({ s: 'assigned', name: r.data.assigneeName || t('家人', 'Family'), state: r.data.state, count: r.data.count || 1 });
+        setPhase({ s: 'assigned', name: r.data.assigneeName || t('家人', 'Family'), state: r.data.state, count: r.data.count || 1, familyId: r.data.familyId || '' });
       } else {
         setPhase({ s: 'idle' });
       }
@@ -125,9 +139,16 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
           <b>{t('已交给', 'Assigned to')} {phase.name}</b> · <span style={{ color: 'var(--portal-muted)' }}>{stateLabel(phase.state, t)}</span>
           {phase.count > 1 ? ` · ${t(`共 ${phase.count} 次`, `${phase.count}×`)}` : ''}
         </p>
-        <button type="button" className="nesio-node-action-secondary nesio-nd-photo-btn" onClick={() => void begin()} style={{ marginTop: '0.5rem' }}>
-          {t('改派给别人', 'Reassign')}
-        </button>
+        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+          <button type="button" className="nesio-node-action-secondary nesio-nd-photo-btn" onClick={() => void begin()}>
+            {t('改派给别人', 'Reassign')}
+          </button>
+          <button type="button" onClick={() => void cancelChore(phase.familyId)} disabled={cancelBusy}
+            style={{ border: 'none', background: 'transparent', color: 'var(--status-risk)', fontSize: '0.82rem', cursor: 'pointer', padding: '0.2rem 0.4rem' }}>
+            {cancelBusy ? t('停下中…', 'Stopping…') : phase.count > 1 ? t('停掉这条循环家务', 'Stop this recurring chore') : t('取消这件家务', 'Cancel this chore')}
+          </button>
+        </div>
+        {cancelErr && <p className="nesio-nd-photo-err" role="alert" style={{ marginTop: '0.4rem' }}>{cancelErr}</p>}
       </div>
     );
   }
