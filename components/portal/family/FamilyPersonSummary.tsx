@@ -9,7 +9,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { memberForPerson, autoLinkByEmail } from '@/lib/family/people-link';
+import { memberForPerson } from '@/lib/family/people-link';
 import { getLedger, listFamilies, listFamilyMembers, type LedgerView } from '@/lib/family/family-client';
 
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -23,10 +23,11 @@ export default function FamilyPersonSummary({ personNodeId, personEmail }: { per
   const [ledger, setLedger] = useState<LedgerView | null>(null);
   const [err, setErr] = useState(false);
 
-  // 解析配对:没现成映射且这个人有邮箱 → 拉家庭成员按邮箱自动配一次(不依赖先开过分派选人)。
+  // 解析配对:直接把「这个人的邮箱」和「家庭成员的账号邮箱」比对 —— 不经 person 索引的
+  // 首次命中(防重复 Linda 联系人错配到别的节点,导致明明邮箱对得上却不显示)。
   useEffect(() => {
-    if (link) return;                          // 已有映射,不用再拉
-    const email = (personEmail || '').trim();
+    if (link) return;                          // 已有现成映射,直接用
+    const email = (personEmail || '').trim().toLowerCase();
     if (!email) { setResolved(true); return; } // 没邮箱不可能配上,省一次网络
     let alive = true;
     void (async () => {
@@ -34,12 +35,13 @@ export default function FamilyPersonSummary({ personNodeId, personEmail }: { per
       if (alive && fr.ok) {
         for (const fam of fr.data.families) {
           const mr = await listFamilyMembers(fam.familyId);
-          if (mr.ok) autoLinkByEmail(fam.familyId, mr.data.members);
+          if (!alive) return;
+          const hit = mr.ok ? mr.data.members.find((m) => (m.email || '').trim().toLowerCase() === email) : undefined;
+          if (hit) { setLink({ memberId: hit.id, familyId: fam.familyId }); setResolved(true); return; }
         }
       }
       if (!alive) return;
-      setLink(memberForPerson(personNodeId));
-      setResolved(true);
+      setResolved(true);   // 没配到
     })();
     return () => { alive = false; };
   }, [personNodeId, personEmail, link]);
