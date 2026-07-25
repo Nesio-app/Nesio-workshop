@@ -122,7 +122,7 @@ export default function PersonExtractSheet({ open, onClose }: { open: boolean; o
                         <span className="nesio-rel-rec-sub">
                           {L(dict, meta.zh, meta.en)}
                           {r.date ? ` · ${r.date}` : ''}{r.detail ? ` · ${r.detail}` : ''}
-                          {meta.sensitive ? L(dict, ' · 只存本机', ' · on-device') : ''}
+                          {meta.sensitive ? L(dict, ' · 仅你可见', ' · only you') : ''}
                         </span>
                       </div>
                     </div>
@@ -137,7 +137,7 @@ export default function PersonExtractSheet({ open, onClose }: { open: boolean; o
           )}
 
           <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>
-            {L(dict, '只存本机 · 敏感项(医疗/药物/健康)不上传', 'On-device only · sensitive items never leave your device')}
+            {L(dict, '仅你可见 · 敏感项(医疗/药物/健康)不进 AI', 'Only you · sensitive items (medical/medication/health) never sent to AI')}
           </p>
         </div>
     </NesioSheet>

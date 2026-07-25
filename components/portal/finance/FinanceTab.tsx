@@ -319,7 +319,7 @@ export default function FinanceTab() {
                   </div>
                 ))}
               </div>
-              <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, '来自你在「关系 → 挂一条」记的消费,只存本机。', 'From spending you logged under People → attach; on-device only.')}</p>
+              <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, '来自你在「关系 → 挂一条」记的消费,仅你可见。', 'From spending you logged under People → attach; visible only to you.')}</p>
             </>
           )}
 

@@ -78,7 +78,7 @@ export default function FamilyDataCard({ kind }: { kind: 'health' | 'spend' }) {
         </div>
       )}
       <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>
-        {L(dict, '点进去看 / 加(拍一张也行)· 只存本机', 'Tap to view or add (photo works too) · on-device')}
+        {L(dict, '点进去看 / 加(拍一张也行)· 仅你可见', 'Tap to view or add (photo works too) · only you')}
       </p>
       {openKey && <RelationshipDetailSheet contactKey={openKey} onClose={() => setOpenKey(null)} />}
     </div>

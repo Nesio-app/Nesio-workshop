@@ -223,7 +223,7 @@ export default function RelationshipsPanel() {
       })}
 
       <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>
-        {L(dict, '只存本机 · 从你的记忆和邮件推出,非 AI', 'On-device only · derived from your notes and email, not AI')}
+        {L(dict, '仅你可见 · 从你的记忆和邮件推出,不进 AI', 'Only you · derived from your notes and email, not AI')}
       </p>
 
       {openKey && <RelationshipDetailSheet contactKey={openKey} onClose={() => setOpenKey(null)} />}
