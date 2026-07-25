@@ -38,6 +38,7 @@ function makeCtx({ lsInit = {}, localBooks = [], fetchImpl } = {}) {
       };
       if (p === './sync-ownership') return { READER_BOOK_MODULE_PREFIX: 'reader-book:' };
       if (p === './storage-health') return { logDropped: () => {} };
+      if (p === './yield-main') return { yieldToMain: async () => {} };
       return {};
     },
     _lastPost: () => lastPost,

@@ -11,6 +11,7 @@
  */
 import { gzipSync, gunzipSync, strToU8, strFromU8 } from 'fflate';
 import { logDropped } from './storage-health';
+import { yieldToMain } from './yield-main';
 
 export interface RecordSyncConfig {
   /** module_key 前缀(须已在 sync-ownership 的 DEDICATED_SYNC_PREFIXES 登记)。 */
@@ -86,10 +87,13 @@ export function createRecordSync(cfg: RecordSyncConfig): RecordSync {
     const now = new Date().toISOString();
     const rows: Array<{ moduleKey: string; data: { gz: string }; updatedAt: string }> = [];
     const staged: Record<string, string> = {};
+    let packed = 0;
     for (const [id, value] of Object.entries(local)) {
       if (!id || !SAFE_ID_RE.test(id) || !value) continue;
       const h = contentHash(value);
       if (state[id] === h) continue;
+      // 大量记录(邮件/书籍/照片)同步 gzip 在主线程 —— 每压一条让出一拍,避免整段循环冻住 UI。
+      if (packed++ > 0) await yieldToMain();
       const gz = packValue(value);
       if (!gz) continue;
       if (gz.length > maxPacked) { logDropped(`cloud.${label}_too_large`, new Error(id)); continue; }
@@ -135,6 +139,7 @@ export function createRecordSync(cfg: RecordSyncConfig): RecordSync {
       if (local[id] !== undefined) { state[id] = state[id] || 'have'; continue; } // 本机已有 → 并集不覆盖
       const gz = (row.data as { gz?: string } | null)?.gz;
       if (typeof gz !== 'string') continue;
+      await yieldToMain(); // 每条解压前让出主线程
       const val = unpackValue(gz);
       if (val == null || !val) continue;
       toApply[id] = val;

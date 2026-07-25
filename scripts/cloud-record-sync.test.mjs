@@ -29,6 +29,7 @@ function makeCtx({ lsInit = {}, fetchImpl } = {}) {
     require: (p) => {
       if (p === 'fflate') return fflate;
       if (p === './storage-health') return { logDropped: () => {} };
+      if (p === './yield-main') return { yieldToMain: async () => {} };
       return {};
     },
     _lastPost: () => lastPost, _lastGetUrl: () => lastGetUrl,
