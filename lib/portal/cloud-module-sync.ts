@@ -14,7 +14,7 @@
  * 同步以来未改(内容哈希 == 上次同步哈希)→ 云端更新则云端胜;本机改过 → 本机胜(等 push 覆盖云端)。
  * 对这些「多为导入/单端编辑」的模块足够安全,远好过整包全有或全无。
  */
-import { gzipSync, gunzipSync, strToU8, strFromU8 } from 'fflate';
+import { gzip, gunzip, strToU8, strFromU8 } from 'fflate';
 import { buildCombinedBackup, restoreCombinedBackup } from './cloud-backup';
 import type { FullBackup } from './full-backup';
 import { logDropped } from './storage-health';
@@ -49,11 +49,20 @@ function b64ToBytes(b64: string): Uint8Array {
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
-function packValue(json: string): string | null {
-  try { return bytesToB64(gzipSync(strToU8(json))); } catch { return null; }
+// gzip/gunzip 走 fflate **异步(Web Worker)** 版本 —— 压缩这台设备最大的隐患:健康/财务/GPS 足迹是
+// 多 MB blob,同步 gzipSync 单次调用就把主线程卡住数秒(真机「跟练卡死」的真凶,yield 切不开单个大调用)。
+// 异步版在 worker 线程压缩,主线程永不阻塞。btoa/atob 作用在**压缩后**的小字节上,毫秒级,留主线程无妨。
+function gzipAsync(u8: Uint8Array): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => gzip(u8, (err, out) => (err ? reject(err) : resolve(out))));
 }
-function unpackValue(b64gz: string): string | null {
-  try { return strFromU8(gunzipSync(b64ToBytes(b64gz))); } catch { return null; }
+function gunzipAsync(u8: Uint8Array): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => gunzip(u8, (err, out) => (err ? reject(err) : resolve(out))));
+}
+async function packValue(json: string): Promise<string | null> {
+  try { return bytesToB64(await gzipAsync(strToU8(json))); } catch { return null; }
+}
+async function unpackValue(b64gz: string): Promise<string | null> {
+  try { return strFromU8(await gunzipAsync(b64ToBytes(b64gz))); } catch { return null; }
 }
 
 /** 非加密内容哈希(FNV-1a)—— 仅用于判「本机是否改过 / 与云端是否一致」,不作安全用途。 */
@@ -102,7 +111,7 @@ export async function pushModulesToCloud(): Promise<{ pushed: number }> {
     if (state[key]?.hash === h) continue; // 未变
     // 大 blob(健康/财务/足迹)同步 gzip 在主线程 —— 每压一条让出一拍,避免整段循环冻住 UI。
     if (packed++ > 0) await yieldToMain();
-    const gz = packValue(value);
+    const gz = await packValue(value);
     if (!gz || gz.length > MAX_MODULE_PACKED_BYTES) continue; // 压缩失败/极端超限:跳过
     modules.push({ moduleKey: key, data: { gz }, updatedAt: now });
     staged[key] = { hash: h, syncedAt: now };
@@ -163,7 +172,7 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
     const gz = (row.data as { gz?: string } | null)?.gz;
     if (typeof gz !== 'string') continue;
     await yieldToMain(); // 每条解压前让出主线程,避免大数据集一次解压把 UI 冻住
-    const json = unpackValue(gz);
+    const json = await unpackValue(gz);
     if (json == null) continue;
     const stamp = row.updatedAt || new Date().toISOString();
     const localVal = localEntries[key];

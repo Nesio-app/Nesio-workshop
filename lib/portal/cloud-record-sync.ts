@@ -9,7 +9,7 @@
  * 合并语义:记录按 id 基本不可变 → **并集补缺**(只补本机没有的,不覆盖、不删除),无 LWW 复杂度。
  * 仅本人账号内(RLS 只本人可读)、不进 AI。best-effort。
  */
-import { gzipSync, gunzipSync, strToU8, strFromU8 } from 'fflate';
+import { gzip, gunzip, strToU8, strFromU8 } from 'fflate';
 import { logDropped } from './storage-health';
 import { yieldToMain } from './yield-main';
 
@@ -44,11 +44,19 @@ function b64ToBytes(b64: string): Uint8Array {
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
-function packValue(s: string): string | null {
-  try { return bytesToB64(gzipSync(strToU8(s))); } catch { return null; }
+// gzip/gunzip 走 fflate 异步(Web Worker)版本:记录(如地点封面照 base64)可能较大,同步 gzipSync 会卡
+// 主线程。异步版在 worker 压缩,主线程永不阻塞;btoa/atob 作用在压缩后的小字节上,毫秒级,留主线程无妨。
+function gzipAsync(u8: Uint8Array): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => gzip(u8, (err, out) => (err ? reject(err) : resolve(out))));
 }
-function unpackValue(b64gz: string): string | null {
-  try { return strFromU8(gunzipSync(b64ToBytes(b64gz))); } catch { return null; }
+function gunzipAsync(u8: Uint8Array): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => gunzip(u8, (err, out) => (err ? reject(err) : resolve(out))));
+}
+async function packValue(s: string): Promise<string | null> {
+  try { return bytesToB64(await gzipAsync(strToU8(s))); } catch { return null; }
+}
+async function unpackValue(b64gz: string): Promise<string | null> {
+  try { return strFromU8(await gunzipAsync(b64ToBytes(b64gz))); } catch { return null; }
 }
 function contentHash(s: string): string {
   let h = 0x811c9dc5;
@@ -94,7 +102,7 @@ export function createRecordSync(cfg: RecordSyncConfig): RecordSync {
       if (state[id] === h) continue;
       // 大量记录(邮件/书籍/照片)同步 gzip 在主线程 —— 每压一条让出一拍,避免整段循环冻住 UI。
       if (packed++ > 0) await yieldToMain();
-      const gz = packValue(value);
+      const gz = await packValue(value);
       if (!gz) continue;
       if (gz.length > maxPacked) { logDropped(`cloud.${label}_too_large`, new Error(id)); continue; }
       rows.push({ moduleKey: prefix + id, data: { gz }, updatedAt: now });
@@ -140,7 +148,7 @@ export function createRecordSync(cfg: RecordSyncConfig): RecordSync {
       const gz = (row.data as { gz?: string } | null)?.gz;
       if (typeof gz !== 'string') continue;
       await yieldToMain(); // 每条解压前让出主线程
-      const val = unpackValue(gz);
+      const val = await unpackValue(gz);
       if (val == null || !val) continue;
       toApply[id] = val;
       state[id] = contentHash(val);

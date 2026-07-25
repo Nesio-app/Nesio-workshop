@@ -15,7 +15,7 @@
  *
  * 隐私:与其它 durable 数据同权 —— 仅本人账号内(RLS 只本人可读)、不进 AI、不训练。
  */
-import { gzipSync, gunzipSync, strToU8, strFromU8 } from 'fflate';
+import { gzip, gunzip, strToU8, strFromU8 } from 'fflate';
 import { getAllEmailBodies, putEmailBodies } from './local-email-body';
 import { indexEmailBodies } from './email-fulltext-index';
 import { logDropped } from './storage-health';
@@ -48,11 +48,19 @@ function b64ToBytes(b64: string): Uint8Array {
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
-function packValue(json: string): string | null {
-  try { return bytesToB64(gzipSync(strToU8(json))); } catch { return null; }
+// gzip/gunzip 走 fflate 异步(Web Worker)版本:邮件成千上万封,批量同步压缩不占主线程 → 永不卡 UI。
+// btoa/atob 作用在压缩后的小字节上,毫秒级,留主线程无妨。
+function gzipAsync(u8: Uint8Array): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => gzip(u8, (err, out) => (err ? reject(err) : resolve(out))));
 }
-function unpackValue(b64gz: string): string | null {
-  try { return strFromU8(gunzipSync(b64ToBytes(b64gz))); } catch { return null; }
+function gunzipAsync(u8: Uint8Array): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => gunzip(u8, (err, out) => (err ? reject(err) : resolve(out))));
+}
+async function packValue(json: string): Promise<string | null> {
+  try { return bytesToB64(await gzipAsync(strToU8(json))); } catch { return null; }
+}
+async function unpackValue(b64gz: string): Promise<string | null> {
+  try { return strFromU8(await gunzipAsync(b64ToBytes(b64gz))); } catch { return null; }
 }
 
 /** 非加密内容哈希(FNV-1a）—— 仅判「本机是否已推该封」。 */
@@ -88,7 +96,7 @@ export async function pushEmailBodiesToCloud(): Promise<{ pushed: number }> {
     if (state[emailId] === h) continue; // 已推
     // 上千封邮件全文同步 gzip 在主线程 —— 每压一条让出一拍,避免开机首次同步冻住 UI。
     if (packed++ > 0) await yieldToMain();
-    const gz = packValue(body);
+    const gz = await packValue(body);
     if (!gz || gz.length > MAX_BODY_PACKED_BYTES) continue;
     rows.push({ moduleKey: EMAIL_BODY_MODULE_PREFIX + emailId, data: { gz }, updatedAt: now });
     staged[emailId] = h;
@@ -141,7 +149,7 @@ export async function pullEmailBodiesFromCloud(): Promise<{ applied: number }> {
     const gz = (row.data as { gz?: string } | null)?.gz;
     if (typeof gz !== 'string') continue;
     await yieldToMain(); // 每条解压前让出主线程(上千封别一次解压冻住 UI)
-    const body = unpackValue(gz);
+    const body = await unpackValue(gz);
     if (body == null || !body) continue;
     toPut[emailId] = body;
     state[emailId] = contentHash(body);

@@ -10,7 +10,7 @@
  * 合并极简:书按 id 基本不可变 → **并集补缺**,只补本机没有的书,不覆盖/不删除,无 LWW 复杂度。
  * 仅本人账号内(RLS 只本人可读)、不进 AI。
  */
-import { gzipSync, gunzipSync, strToU8, strFromU8 } from 'fflate';
+import { gzip, gunzip, strToU8, strFromU8 } from 'fflate';
 import { loadReaderBooks, saveReaderBook } from './reader-store-idb';
 import { READER_BOOK_MODULE_PREFIX } from './sync-ownership';
 import type { ReaderBook } from './adhd-reader';
@@ -39,11 +39,19 @@ function b64ToBytes(b64: string): Uint8Array {
   for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
   return out;
 }
-function packValue(json: string): string | null {
-  try { return bytesToB64(gzipSync(strToU8(json))); } catch { return null; }
+// gzip/gunzip 走 fflate 异步(Web Worker)版本:书籍全文可达数 MB,同步 gzipSync 单次调用会卡住主线程。
+// 异步版在 worker 压缩,主线程永不阻塞;btoa/atob 作用在压缩后的小字节上,毫秒级,留主线程无妨。
+function gzipAsync(u8: Uint8Array): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => gzip(u8, (err, out) => (err ? reject(err) : resolve(out))));
 }
-function unpackValue(b64gz: string): string | null {
-  try { return strFromU8(gunzipSync(b64ToBytes(b64gz))); } catch { return null; }
+function gunzipAsync(u8: Uint8Array): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => gunzip(u8, (err, out) => (err ? reject(err) : resolve(out))));
+}
+async function packValue(json: string): Promise<string | null> {
+  try { return bytesToB64(await gzipAsync(strToU8(json))); } catch { return null; }
+}
+async function unpackValue(b64gz: string): Promise<string | null> {
+  try { return strFromU8(await gunzipAsync(b64ToBytes(b64gz))); } catch { return null; }
 }
 function contentHash(s: string): string {
   let h = 0x811c9dc5;
@@ -77,7 +85,7 @@ export async function pushReaderBooksToCloud(): Promise<{ pushed: number }> {
     const h = contentHash(json);
     if (state[id] === h) continue; // 已推
     if (packed++ > 0) await yieldToMain(); // 书体积大,每压一本让出主线程
-    const gz = packValue(json);
+    const gz = await packValue(json);
     if (!gz) continue;
     if (gz.length > MAX_BOOK_PACKED_BYTES) { logDropped('cloud.reader_book_too_large', new Error(id)); continue; }
     rows.push({ moduleKey: READER_BOOK_MODULE_PREFIX + id, data: { gz }, updatedAt: now });
@@ -127,7 +135,7 @@ export async function pullReaderBooksFromCloud(): Promise<{ applied: number }> {
     const gz = (row.data as { gz?: string } | null)?.gz;
     if (typeof gz !== 'string') continue;
     await yieldToMain(); // 每本解压前让出主线程
-    const json = unpackValue(gz);
+    const json = await unpackValue(gz);
     if (json == null) continue;
     let book: ReaderBook;
     try { book = JSON.parse(json) as ReaderBook; } catch { continue; }
