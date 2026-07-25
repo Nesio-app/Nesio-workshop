@@ -14,6 +14,7 @@
  * 支付基建接上后,把这个桩换成真权益读取即可,推送机制本身不用动。
  */
 
+import { gzipSync, gunzipSync, strToU8, strFromU8 } from 'fflate';
 import { buildFullBackup, restoreFullBackup, isValidBackup, type FullBackup } from './full-backup';
 import { collectIdbBlobs, isIdbBlobKey, idbBackend, registerIdbBlobKey } from './idb-blob-store';
 import { keyKind, isLocalOnly } from './storage-manifest';
@@ -63,8 +64,13 @@ function mergeGraphJson(currentRaw: string | null, incomingRaw: string): string 
 
 /** 上次云备份记录(小,留 localStorage)。 */
 const LAST_CLOUD_BACKUP_KEY = 'nesio-cloud-backup-last-v1';
-/** assets 路由的硬上限(与 app/api/cloud/assets/route.ts MAX_UPLOAD_BYTES 对齐)。 */
-const CLOUD_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
+/**
+ * 上传体积上限(压缩后)。**4MB** —— Vercel 无服务器函数请求体硬上限是 4.5MB,备份是穿过
+ * `/api/cloud/assets` 函数上传的,超 4.5MB 会被平台在到达函数前挡掉、fetch 直接抛错(表现为
+ * 「网络」错误,而非清晰的「太大」)。取 4MB 留 multipart 余量,超了给明确 too_large 提示。
+ * (路由 MAX_UPLOAD_BYTES 仍 8MB,但 Vercel 边缘先卡 4.5MB,故客户端预检以此为准。)
+ */
+const CLOUD_UPLOAD_LIMIT_BYTES = 4 * 1024 * 1024;
 
 export interface LastCloudBackup {
   at: string;
@@ -144,22 +150,17 @@ function mapHttpError(status: number): CloudBackupError {
   return 'upload_failed';
 }
 
-/** gzip 压缩(浏览器原生 CompressionStream)。不可用/失败返回 null → 调用方回退明文。 */
-async function gzipString(text: string): Promise<Uint8Array | null> {
-  if (typeof CompressionStream === 'undefined') return null;
-  try {
-    const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
-    return new Uint8Array(await new Response(stream).arrayBuffer());
-  } catch { return null; }
+// gzip 压缩/解压统一走 **fflate**(纯 JS,所有浏览器都支持)。此前用浏览器原生
+// CompressionStream/DecompressionStream —— 需 iOS Safari 16.4+,旧环境不支持时压不上/解不开,
+// 表现为「上传网络错误 + 从云恢复失败」双向都挂。fflate 无平台依赖,彻底消掉这个兼容性变量。
+/** gzip 压缩。失败返回 null → 调用方回退明文。 */
+function gzipString(text: string): Uint8Array | null {
+  try { return gzipSync(strToU8(text)); } catch { return null; }
 }
 
-/** gzip 解压(DecompressionStream)。不可用/失败返回 null。 */
-async function gunzipToString(bytes: Uint8Array): Promise<string | null> {
-  if (typeof DecompressionStream === 'undefined') return null;
-  try {
-    const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream('gzip'));
-    return await new Response(stream).text();
-  } catch { return null; }
+/** gzip 解压。失败返回 null。 */
+function gunzipToString(bytes: Uint8Array): string | null {
+  try { return strFromU8(gunzipSync(bytes)); } catch { return null; }
 }
 
 /**
@@ -198,7 +199,7 @@ export async function pushBackupToCloud(opts: { skipIfFewerThan?: number } = {})
   // 上限」挡回来 —— 这是「原浏览器一次都没推成功、换机永远空」的真凶。上传 gzip 字节、文件名
   // 带 .gz(声明 text/plain 过路由 MIME 白名单;内容是二进制,pull 按 gzip magic 字节自动识别)。
   // 浏览器不支持 CompressionStream(旧 Safari)则回退明文,行为同旧版。
-  const gz = await gzipString(payload);
+  const gz = gzipString(payload);
   const uploadBody: Uint8Array | string = gz ?? payload;
   bytes = gz ? gz.byteLength : new Blob([payload]).size;
 
@@ -340,7 +341,7 @@ export async function pullBackupFromCloud(mode: RestoreMode = 'merge'): Promise<
     try {
       const buf = new Uint8Array(await blobRes.arrayBuffer());
       if (buf.length >= 2 && buf[0] === 0x1f && buf[1] === 0x8b) {
-        const un = await gunzipToString(buf);
+        const un = gunzipToString(buf);
         if (un == null) return { ok: false, error: 'invalid_backup' };
         text = un;
       } else {

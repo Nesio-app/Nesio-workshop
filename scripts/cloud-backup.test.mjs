@@ -9,11 +9,12 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import assert from 'node:assert/strict';
+import * as fflate from 'fflate';
 
 const src = fs.readFileSync(new URL('../lib/portal/cloud-backup.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 
-function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKeys = [], idbInit = {}, localImages = {}, withReload = false, realWebApis = false } = {}) {
+function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKeys = [], idbInit = {}, localImages = {}, withReload = false, realWebApis = false, realCompression = false } = {}) {
   const lsMap = new Map(Object.entries(lsInit));
   const localStorage = {
     getItem: (k) => (lsMap.has(k) ? lsMap.get(k) : null),
@@ -54,6 +55,8 @@ function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKey
         }),
     fetch: async (url, init) => { lastFetch = { url, init }; return fetchImpl(url, init); },
     require: (p) => {
+      // fflate:默认桩空(→ gzipString 返回 null 走明文,现有断言按明文验);realCompression 时给真库。
+      if (p === 'fflate') return realCompression ? fflate : {};
       if (p === './full-backup') return {
         buildFullBackup: () => ({ format: 'nesio-full-backup', version: 1, exportedAt: '2026-01-01T00:00:00.000Z', entries: { ...fbEntries } }),
         // 捕获 localStorage 侧收到的 entries(验证路由);返回条数
@@ -149,16 +152,17 @@ const ok200 = () => ({ ok: true, status: 200, json: async () => ({ ok: true, sto
   assert.equal(r.error, 'cloud_not_configured', '503 → cloud_not_configured');
 }
 
-// 5. 本地超 8MB 预检:不白跑网络
+// 5. 本地超 4MB(压缩后)预检:不白跑网络(Vercel 函数体 4.5MB 上限,取 4MB 留余量)。
+//    此处不给 realCompression → 明文路径,5MB 明文即超 4MB 门。
 {
   const { mod, ctx } = makeCtx({
     lsInit: { 'nesio-cloud-entitlement-v1': 'on' },
-    idbBlobs: { big: 'x'.repeat(8 * 1024 * 1024 + 1) },
+    idbBlobs: { big: 'x'.repeat(5 * 1024 * 1024) },
     fetchImpl: ok200,
   });
   const r = await mod.pushBackupToCloud();
   assert.equal(r.ok, false);
-  assert.equal(r.error, 'too_large', '超 8MB → too_large');
+  assert.equal(r.error, 'too_large', '超 4MB → too_large');
   assert.equal(ctx._lastFetch(), null, '超限不发网络');
 }
 
@@ -337,8 +341,8 @@ const okFetch = (url) => {
   assert.equal(ctx._idbStore().get('nesio-health-v1'), 'H', '同批非图数据照常恢复');
 }
 
-// 14. gzip 往返(用 Node 原生 Web API 真跑):push 压缩上传(高冗余大数据也能压过 8MB),
-//     pull 按 magic 字节自动解压 → 完整还原。这是「原浏览器超 8MB 一次都没推成功」的修复。
+// 14. gzip 往返(fflate 真跑,任何浏览器都支持):push 压缩上传(高冗余大数据显著变小),
+//     pull 按 magic 字节自动解压 → 完整还原。修「原生 CompressionStream 不支持 → 双向都失败」。
 {
   let storedBytes = null;
   const fetchImpl = async (url, init) => {
@@ -353,13 +357,13 @@ const okFetch = (url) => {
   };
   // 高冗余的「足迹」大数据:明文很大,gzip 后骤减(模拟真实 GPS 点串)
   const big = JSON.stringify(Array.from({ length: 40000 }, (_, i) => ({ lat: 37.1, lng: -122.2, t: i })));
-  const push = makeCtx({ fbEntries: { 'nesio-place-geo-v1': big }, fetchImpl, realWebApis: true });
+  const push = makeCtx({ fbEntries: { 'nesio-place-geo-v1': big }, fetchImpl, realWebApis: true, realCompression: true });
   const pr = await push.mod.pushBackupToCloud();
   assert.equal(pr.ok, true, 'gzip 后上传成功');
   assert.ok(storedBytes && storedBytes[0] === 0x1f && storedBytes[1] === 0x8b, '上传的是 gzip 字节(magic 1f 8b)');
   assert.ok(storedBytes.length < big.length / 2, `gzip 显著压缩(${big.length}→${storedBytes.length})`);
 
-  const pull = makeCtx({ idbKeys: ['nesio-place-geo-v1'], fetchImpl, realWebApis: true });
+  const pull = makeCtx({ idbKeys: ['nesio-place-geo-v1'], fetchImpl, realWebApis: true, realCompression: true });
   const rr = await pull.mod.pullBackupFromCloud('merge');
   assert.equal(rr.ok, true, 'pull 自动解压并恢复成功');
   assert.equal(pull.ctx._idbStore().get('nesio-place-geo-v1'), big, '足迹经 gzip 往返完整还原(逐字节一致)');
