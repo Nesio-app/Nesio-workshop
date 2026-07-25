@@ -42,6 +42,9 @@ function makeCtx({ lsInit = {}, localEntries = {}, fetchImpl, withReload = false
         restoreCombinedBackup: async (backup, mode) => { restoreApplied = { entries: backup.entries, mode }; return { restoredKeys: 0, idbRestored: Object.keys(backup.entries).length, skippedKeys: [], corruptKeys: [] }; },
       };
       if (p === './storage-health') return { logDropped: () => {} };
+      // isBackupKey:测试用的都是 durable 应用 key(nesio-*-v1),按真值等价返回 true;
+      // 专属/前缀行在此之前已被 isDedicatedSyncKey 跳过。
+      if (p === './storage-manifest') return { isBackupKey: (k) => k.startsWith('nesio-') && !k.startsWith('email-body:') && !k.startsWith('reader-book:') && !k.startsWith('place-image:') && k !== 'nesio-module-sync-state-v1' };
       if (p === './cloud-email-sync') return { EMAIL_BODY_MODULE_PREFIX: 'email-body:' };
       // 专属引擎归属:记忆图 + 邮件/书籍行让路(与 sync-ownership 真值等价,覆盖测试用到的 key)。
       if (p === './sync-ownership') return {
@@ -175,6 +178,25 @@ function cloudRow(moduleKey, json, updatedAt = '2026-07-25T00:00:00.000Z') {
   const r = await c2.mod.pullModulesFromCloud();
   assert.equal(r.applied, 0, '云端空值(<本机一半)→ 反遮盖闸拦下,不覆盖本机满值');
   assert.equal(c2.ctx._restoreApplied(), null, '未落地任何 key(积分/跟练不被空状态盖掉)');
+}
+
+// 6. 回归(修刷屏死循环):历史遗留的云端行、其 key 现已不属本引擎同步范围(非 isBackupKey,如
+//    曾 durable、现归 cache 的 nesio-module-sync-state-v1)→ 绝不当「本机缺失」落地,否则每次 pull
+//    newlyAdded>0 → reload → 一闪一闪。必须跳过、不计新增。
+{
+  const rows = [
+    cloudRow('nesio-health-v1', '{"metrics":[7]}'),
+    cloudRow('nesio-module-sync-state-v1', '{"nesio-health-v1":{"hash":"x"}}'), // 历史遗留簿记行
+  ];
+  const fetchImpl = async (url) => (String(url).startsWith('/api/cloud/module-data')
+    ? { ok: true, status: 200, json: async () => ({ ok: true, modules: rows }) }
+    : { ok: false, status: 404, json: async () => ({}) });
+  const { mod, ctx } = makeCtx({ localEntries: {}, fetchImpl, withReload: true });
+  const r = await mod.pullModulesFromCloud();
+  assert.equal(r.newlyAdded, 1, '只新增健康(遗留簿记行不算「缺失」,不触发反复 reload)');
+  const applied = ctx._restoreApplied();
+  assert.equal(applied.entries['nesio-health-v1'], '{"metrics":[7]}', '健康正常落地');
+  assert.equal(applied.entries['nesio-module-sync-state-v1'], undefined, '遗留簿记行绝不落地(防刷屏死循环)');
 }
 
 console.log('cloud-module-sync: OK');

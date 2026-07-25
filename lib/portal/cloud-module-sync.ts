@@ -19,6 +19,7 @@ import { buildCombinedBackup, restoreCombinedBackup } from './cloud-backup';
 import type { FullBackup } from './full-backup';
 import { logDropped } from './storage-health';
 import { isDedicatedSyncKey, DEDICATED_SYNC_PREFIXES } from './sync-ownership';
+import { isBackupKey } from './storage-manifest';
 
 // 归属:记忆图/头像身份/学习态/邮件全文 各有专属引擎(见 sync-ownership.ts),通用模块同步一律让路,
 // 避免两套合并语义抢同一份数据(换端横跳的根因)。判断统一走 isDedicatedSyncKey,不再各写一份。
@@ -150,6 +151,11 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
     const key = row.moduleKey;
     if (!key || typeof key !== 'string') continue;
     if (isDedicatedSyncKey(key)) continue; // 专属引擎负责的 key(记忆图/头像/学习态/邮件)不由通用同步落地
+    // 关键(修刷屏死循环):只落地「本引擎自己也会同步」的 key(durable、非 cache/auth/local-only)。
+    // 否则**历史遗留的云端行**(如曾是 durable、现已归 cache 的 nesio-module-sync-state-v1)会被当成
+    // 「本机缺失」→ 每次 pull 都 newlyAdded>0 → reload → 无限刷屏。localModuleEntries 已排除这些 key,
+    // 落地侧必须对齐同一判据,否则永远「缺失」。
+    if (!isBackupKey(key)) continue;
     const gz = (row.data as { gz?: string } | null)?.gz;
     if (typeof gz !== 'string') continue;
     const json = unpackValue(gz);
@@ -196,8 +202,13 @@ export async function autoSyncModulesWithCloud(opts: { force?: boolean } = {}): 
   lastSyncAt = now;
   try {
     const { newlyAdded } = await pullModulesFromCloud();
-    if (newlyAdded > 0 && typeof window.location?.reload === 'function') {
-      window.location.reload(); // 新设备首次拉到数据 → 刷新水合;newlyAdded 只在「本机原本没有」时>0,不进循环
+    // 水合刷新每个页面加载最多一次(sessionStorage 闸)—— 防「某 key 永远判缺失」时 reload 无限刷屏
+    // (真机踩过:历史遗留云端行被误判缺失导致一闪一闪)。正常冷启动首拉只会触发一次,足够水合。
+    let reloadedThisLoad = false;
+    try { reloadedThisLoad = sessionStorage.getItem('nesio-module-hydrate-reloaded') === '1'; } catch { /* ignore */ }
+    if (newlyAdded > 0 && !reloadedThisLoad && typeof window.location?.reload === 'function') {
+      try { sessionStorage.setItem('nesio-module-hydrate-reloaded', '1'); } catch { /* ignore */ }
+      window.location.reload(); // 新设备首次拉到数据 → 刷新水合(每次加载至多一次)
       return;
     }
     await pushModulesToCloud();
