@@ -72,9 +72,11 @@ assert.ok(!/const last = lastCloudBackup\(\);\s*\n\s*if \(!last\?\.storagePath\)
 assert.match(backup, /const pull = await pullBackupFromCloud\('merge'\)/, '先拉(merge)');
 assert.match(backup, /if \(pull\.ok\)\s*\{[\s\S]{0,1400}scheduleAutoPush\(/, 'pull 成功分支里安排防抖 push(先拉后推)');
 assert.match(backup, /pull\.error === 'no_backup'[\s\S]{0,320}scheduleAutoPush\(/, '云端确实空也推(首次上云)');
-// 冷浏览器首次拉回有数据 → reload 让各 store 重新水合(修「换个网页记录不显示」),且首刷标志防 reload 循环
-assert.match(backup, /firstSync &&[\s\S]{0,60}restoredSomething[\s\S]{0,90}location[\s\S]{0,20}reload/, '冷浏览器首次拉回有数据 → reload 重新水合');
-assert.match(backup, /FIRST_SYNC_DONE_FLAG/, 'reload 由「首刷完成」标志守卫(每浏览器仅一次,防循环)');
+// 高水位:云端「最完整」那份比本浏览器已反映的更全(cloudN>prevN)且有恢复 → reload 重新水合。
+// 用高水位而非一次性首刷标志,才能覆盖「空备份阶段刷过、真数据随后到达」(否则真数据永不显示)。
+assert.match(backup, /cloudN > prevN && restoredSomething[\s\S]{0,60}location[\s\S]{0,20}reload/, '云端长大且有恢复 → reload 重新水合');
+assert.match(backup, /SYNCED_HIGHWATER_KEY/, 'reload 由「已反映条目数」高水位守卫(只增、增长时才刷,防循环)');
+assert.ok(!/FIRST_SYNC_DONE_FLAG/.test(backup), '一次性首刷标志已废弃(会漏掉后到的真数据)');
 // 空数据保险丝:0 条目绝不上云(空浏览器绝不用空数据盖云端)
 assert.match(backup, /entryCount === 0[\s\S]{0,80}ok: true/, '空数据保险丝:0 条目静默成功、不上云');
 // 压缩:超 8MB 的高冗余数据(健康/足迹)gzip 后上传;pull 按 gzip magic 字节自动解压(新旧兼容)
@@ -84,7 +86,8 @@ assert.match(backup, /gunzipToString/, 'pull 有解压路径');
 // 防遮盖闸:本机比云端最新那份还少条目就不推(pull 回报 cloudEntryCount,自动推带 skipIfFewerThan)
 assert.match(backup, /cloudEntryCount = Object\.keys\(parsed\.entries\)\.length/, 'pull 回报云端最新那份的条目数');
 assert.match(backup, /skipIfFewerThan[\s\S]{0,120}entryCount < opts\.skipIfFewerThan[\s\S]{0,60}skippedRegression/, 'push:比云端少 → 跳过上传(防遮盖)');
-assert.match(backup, /scheduleAutoPush\(pull\.cloudEntryCount/, '自动推带上云端条目数做防遮盖闸');
+assert.match(backup, /const cloudN = pull\.cloudEntryCount/, '取云端最完整那份的条目数');
+assert.match(backup, /scheduleAutoPush\(cloudN\)/, '自动推带上云端条目数做防遮盖闸');
 // 足迹主数据键不被 geo 缓存正则误伤(否则备份里没足迹,换机永远同步不过去)
 const manifest = read('../lib/portal/storage-manifest.ts');
 assert.ok(!/\|geo\)/.test(manifest.match(/const CACHE_RE =.*/)?.[0] || ''), 'CACHE_RE 不含裸 geo(否则误剔 nesio-place-geo-v1)');
