@@ -34,23 +34,36 @@ export interface PlayerSession {
   sessionId?: string;
 }
 
-// 简单声音卡点:WebAudio 生一个短音,不用任何音频资源。首次由用户手势(点按钮)触发,
-// iOS 才允许出声。失败(无 AudioContext / 被策略挡)静默,不影响练。
+// 简单声音卡点:WebAudio 生一个短音,不用任何音频资源。
+// 【真机卡死修复】**绝不在点击的同步关键路径里 new/resume AudioContext**:移动端 WKWebView/Android
+// WebView 里,进程第一个 `new AudioContext()` 会在主线程上同步激活共享音频会话/硬件,一旦在争用状态
+// 卡住,这一行就**阻塞主线程且不返回**(是阻塞不是抛错,try/catch 接不住,屏幕永久冻死)。真机:一点
+// 「跟拍做」(全 app 第一次出声)就永久卡死。改为:挂载时在**宏任务**里预创建(不落点击线程),tone()
+// 只在已就绪时发声、绝不 new。音频哪怕永远起不来也只是没声,绝不冻界面(音频本就是尽力而为)。
 let _audioCtx: AudioContext | null = null;
+let _audioInitStarted = false;
+function initAudioDeferred(): void {
+  if (_audioInitStarted || typeof window === 'undefined') return;
+  _audioInitStarted = true;
+  const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AC) return;
+  // setTimeout(0):把 new AudioContext 挪出任何点击/手势的同步路径,慢或卡都不落到 UI 交互那一帧。
+  setTimeout(() => {
+    try { _audioCtx = new AC(); } catch { _audioCtx = null; }
+  }, 0);
+}
 function tone(freq: number, ms: number) {
+  const ctx = _audioCtx;
+  if (!ctx) return; // 未就绪 → 跳过这一声(绝不在此 new/resume,不阻塞主线程)
   try {
-    if (typeof window === 'undefined') return;
-    const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-    if (!AC) return;
-    _audioCtx = _audioCtx || new AC();
-    if (_audioCtx.state === 'suspended') void _audioCtx.resume();
-    const o = _audioCtx.createOscillator();
-    const g = _audioCtx.createGain();
+    if (ctx.state === 'suspended') void ctx.resume(); // resume 是异步、不阻塞;在点击手势里调可解锁 iOS
+    const o = ctx.createOscillator();
+    const g = ctx.createGain();
     o.type = 'sine';
     o.frequency.value = freq;
     o.connect(g);
-    g.connect(_audioCtx.destination);
-    const t = _audioCtx.currentTime;
+    g.connect(ctx.destination);
+    const t = ctx.currentTime;
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(0.3, t + 0.008);
     g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
@@ -90,6 +103,9 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   const ping = (freq: number, ms = 80) => { if (!mutedRef.current) tone(freq, ms); };
 
   useSheetDismiss(true, onClose); // 挂载即打开;Escape 关闭 + 焦点回收
+
+  // 挂载即在宏任务里预热音频(不在点击同步路径,防移动端首个 AudioContext 阻塞主线程 = 跟拍做卡死)。
+  useEffect(() => { initAudioDeferred(); }, []);
 
   // 防御(修「打开跟练卡死」):session/steps 可能来自别端同步回的畸形数据(缺 steps、非数组、
   // 元素缺 exerciseId)。绝不裸解引用 —— 归一成合法 steps 数组,非法则本组件优雅关闭,不 throw。
