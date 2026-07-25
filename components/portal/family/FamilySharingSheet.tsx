@@ -6,14 +6,13 @@
  * ③ 某成员账本(欠多少 + 历史 + 发薪冲账)。**一个 app 所有人一样**,区块由权限显隐,
  * 但真正的门在服务端(核心 fail-closed)。Nesio 永不碰钱。每个异步动作都有显式失败态(红线)。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { linkedIdentities } from '@/lib/family/people-link';
+import { useCallback, useEffect, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
 import { L } from '@/lib/portal/i18n';
-import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { portalLocaleToDictionaryLocale, loadProfileSettings } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import {
-  listFamilies, createFamily, joinFamily, getBoard, getLedger, choreAction, recordPayout,
+  listFamilies, createFamily, joinFamily, getBoard, getLedger, choreAction, recordPayout, syncMyFamilyProfile,
   type FamilySummary, type BoardView, type LedgerView, type ChoreInstanceView,
 } from '@/lib/family/family-client';
 
@@ -33,6 +32,8 @@ export default function FamilySharingSheet({ open, onClose }: { open: boolean; o
 
   const refreshFamilies = useCallback(async () => {
     setLoading(true); setLoadErr('');
+    // 打开时把「我」的账号名字/头像同步到成员行(身份自成一套,不匹配 People)。best-effort。
+    try { const p = loadProfileSettings(); await syncMyFamilyProfile(p.displayName, p.avatarUrl || ''); } catch { /* 首次未入伙时无行可更,忽略 */ }
     const r = await listFamilies();
     if (!r.ok) { setLoadErr(r.error); setLoading(false); return; }
     setFamilies(r.data.families);
@@ -121,7 +122,8 @@ const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box'
 function SetupView({ t, onDone }: { t: (a: string, b: string) => string; onDone: () => void }) {
   const [tab, setTab] = useState<'create' | 'join'>('create');
   const [name, setName] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  // 称呼默认取账号资料里的名字(身份自成一套);头像也一起带上,家人看到的是你本人。
+  const [displayName, setDisplayName] = useState(() => { try { return loadProfileSettings().displayName || ''; } catch { return ''; } });
   const [code, setCode] = useState('');
   const [status, setStatus] = useState<'idle' | 'busy' | 'error'>('idle');
   const [err, setErr] = useState('');
@@ -129,9 +131,10 @@ function SetupView({ t, onDone }: { t: (a: string, b: string) => string; onDone:
 
   async function submit() {
     setStatus('busy'); setErr('');
+    const avatar = (() => { try { return loadProfileSettings().avatarUrl || ''; } catch { return ''; } })();
     const r = tab === 'create'
-      ? await createFamily(name.trim(), displayName.trim())
-      : await joinFamily(code.trim(), displayName.trim());
+      ? await createFamily(name.trim(), displayName.trim(), avatar)
+      : await joinFamily(code.trim(), displayName.trim(), avatar);
     if (!r.ok) { setErr(r.error); setStatus('error'); return; }
     const code2 = (r.data as { inviteCode?: string }).inviteCode;
     if (tab === 'create' && code2) { setInvite(code2); setStatus('idle'); }
@@ -210,17 +213,6 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
 
   useEffect(() => { void load(); }, [load]);
 
-  // 本机把成员配到的 People 真名/头像顶替入伙昵称(Me/Mom)。图谱只读一遍;board 变才重算。
-  const identities = useMemo(() => {
-    if (!board) return new Map<string, { name: string; avatar: string }>();
-    const ids = [
-      ...board.everyone.map((e) => e.member.id),
-      ...board.assigned.map((c) => c.assigneeId),
-      ...board.toReview.map((c) => c.assigneeId),
-    ];
-    return linkedIdentities(ids);
-  }, [board]);
-
   async function act(instanceId: string, action: 'done' | 'approve' | 'send_back') {
     setBusyId(instanceId + action); setErr('');
     const r = await choreAction(familyId, instanceId, action);
@@ -232,9 +224,10 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
   if (err && !board) return <ErrorRow msg={t('没连上,稍后再试。', 'Could not load — try again.')} onRetry={load} t={t} />;
   if (!board) return <Muted>{t('加载中…', 'Loading…')}</Muted>;
 
-  // 优先显示配到的 People 真名/头像,配不上回退入伙昵称。
-  const displayName = (id: string): string => identities.get(id)?.name || nameFor(board, id) || t('家人', 'family');
-  const avatarOf = (id: string): string => identities.get(id)?.avatar || '';
+  // 名字/头像来自成员自己的账号资料(family_members 行),不匹配 People。
+  const memberOf = (id: string) => board.everyone.find((e) => e.member.id === id)?.member;
+  const displayName = (id: string): string => memberOf(id)?.name || t('家人', 'family');
+  const avatarOf = (id: string): string => memberOf(id)?.avatarUrl || '';
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
@@ -343,10 +336,6 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
       </section>
     </div>
   );
-}
-
-function nameFor(board: BoardView, personId: string): string {
-  return board.everyone.find((e) => e.member.id === personId)?.member.name ?? '';
 }
 // 成员头像:配到 People 有头像用头像,否则首字母兜底(圆形,主题色)。
 function MemberAvatar({ name, avatar, size = 28 }: { name: string; avatar: string; size?: number }) {

@@ -16,7 +16,6 @@ import dynamicImport from 'next/dynamic';
 const ReaderSheetLazy = dynamicImport(() => import('./ArticleReaderSheet'), { ssr: false });
 const PlacePickerLazy = dynamicImport(() => import('./PlacePickerSheet'), { ssr: false });
 const AssignChoreLazy = dynamicImport(() => import('./family/AssignChoreButton'), { ssr: false });
-const FamilyPersonSummaryLazy = dynamicImport(() => import('./family/FamilyPersonSummary'), { ssr: false });
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
@@ -1203,11 +1202,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
 
           {/* Type-specific section */}
           {n.type === 'person' && (
-            <>
-              <PersonSection node={n} relatedNodes={relatedNodes} onOpenNode={onOpenNode} />
-              {/* item 6:若这个人已按邮箱配到某家庭成员,显示 TA 的家务/攒钱回落。 */}
-              <FamilyPersonSummaryLazy personNodeId={n.id} personEmail={typeof n.attributes?.email === 'string' ? n.attributes.email : ''} />
-            </>
+            <PersonSection node={n} relatedNodes={relatedNodes} onOpenNode={onOpenNode} />
           )}
           {n.type === 'object' && (
             <ObjectSection node={n} assetUrls={assetUrls} />
