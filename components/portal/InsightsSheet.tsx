@@ -485,6 +485,14 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   const showHealth = useFeatureEnabled('health');
   const showFinance = useFeatureEnabled('finance');
   const showPeople = useFeatureEnabled('people');
+  // 此前这几张 tile 恒 true(无开关),用户「功能开关中心全关了还看得到」的真因 —— 现逐个接开关。
+  const showInventory = useFeatureEnabled('inventory');
+  const showSchedule = useFeatureEnabled('plan');
+  const showGrowth = useFeatureEnabled('growth');
+  const showMontage = useFeatureEnabled('montage');
+  const showWardrobe = useFeatureEnabled('wardrobe');
+  const showTesla = useFeatureEnabled('tesla');
+  const showLiving = useFeatureEnabled('living');
   const tabEnabled = (t: MainTab): boolean =>
     t === 'timeline' ? showPlaces
       : t === 'health' ? showHealth
@@ -492,8 +500,15 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       : t === 'finance' ? showFinance
       : t === 'relationships' ? showPeople
       : t === 'admin' ? showExperiment // 运营后台:仅 Lab(owner)可见,数据再由管理密钥二次门控
-      : true;
-  useEffect(() => { if (!tabEnabled(mainTab)) setMainTab('reflection'); }, [showPlaces, showHealth, showFinance, showPeople, mainTab]); // eslint-disable-line react-hooks/exhaustive-deps
+      : t === 'inventory' ? showInventory
+      : t === 'schedule' ? showSchedule
+      : t === 'growth' ? showGrowth
+      : t === 'montage' ? showMontage
+      : t === 'wardrobe' ? showWardrobe
+      : t === 'tesla' ? showTesla
+      : t === 'living' ? showLiving
+      : true; // 'reflection'(洞察)= 核心,永远在
+  useEffect(() => { if (!tabEnabled(mainTab)) setMainTab('reflection'); }, [showPlaces, showHealth, showFinance, showPeople, showInventory, showSchedule, showGrowth, showMontage, showWardrobe, showTesla, showLiving, mainTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [allNodes, setAllNodes] = useState<LifeNode[]>([]);
   const [labOn, setLabOn] = useState(false);
