@@ -109,7 +109,7 @@ payout 仅记账。数据经 service-role 落 family 表,RLS(`is_family_member`)
 | `POST /api/portal/family/goal` | session + membership(设我自己的攒钱目标) | — |
 | `POST /api/portal/family/cancel` | session + membership + `can_approve`(停掉/删家务) | — |
 | `POST /api/portal/family/member` | session + membership(改角色/踢人需 `can_approve`;退出自己可) | — |
-| `POST /api/portal/family/payout` | session + membership + `can_record_payout` | — |
+| `POST /api/portal/family/payout` | session + membership + `can_record_payout` | —(默认记一笔;`action:'reverse'`+`payoutId` 软删冲正,账本自动回加) |
 
 注:非 AI 花费路由,未挂 `guardAiRoute`(无云成本);走等价的 session+成员+能力三重判。
 workshop 实验暂未加 per-IP 限流,转正前应补(join 尤其)。
