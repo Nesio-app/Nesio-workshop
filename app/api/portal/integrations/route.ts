@@ -40,16 +40,16 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({
-    ok: true,
-    isLoggedIn: Boolean(userId),
-    integrations: Object.fromEntries(
-      Object.entries(integrationMap).map(([k, v]) => [
-        k,
-        { connected: Boolean((v as IntegrationTokens)?.accessToken), connectedAt: (v as IntegrationTokens)?.connectedAt },
-      ]),
-    ),
-  });
+  const integrations: Record<string, { connected: boolean; connectedAt?: string }> = {};
+  for (const [k, v] of Object.entries(integrationMap)) {
+    if (k === 'plaid') continue; // plaid 是加密令牌数组条目,单独判(下方)
+    integrations[k] = { connected: Boolean((v as IntegrationTokens)?.accessToken), connectedAt: (v as IntegrationTokens)?.connectedAt };
+  }
+  // Plaid:云端有加密令牌条目即算已连(跨浏览器复原连接状态,不再"换浏览器显示未连")。
+  const plaidEntry = integrationMap.plaid;
+  if (plaidEntry?.tokensEnc) integrations.plaid = { connected: true, connectedAt: plaidEntry.connectedAt };
+
+  return NextResponse.json({ ok: true, isLoggedIn: Boolean(userId), integrations });
 }
 
 export async function POST(req: NextRequest) {

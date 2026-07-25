@@ -8,6 +8,7 @@ import { cookies } from 'next/headers';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
 import { getCloudConfig, getSignedInUser } from '@/lib/portal/cloud-server-runtime';
+import { encryptField, decryptField } from '@/lib/portal/cloud/field-encryption';
 
 export type IntegrationProvider = 'gmail' | 'calendar' | 'notion' | 'tesla' | 'granola';
 
@@ -19,7 +20,15 @@ export interface IntegrationTokens {
   connectedAt: string;
 }
 
-export type IntegrationMap = Partial<Record<IntegrationProvider, IntegrationTokens>>;
+/**
+ * Plaid 不是单令牌 OAuth,而是多家银行的 access_token 数组,故不塞进 IntegrationTokens,
+ * 而在同一 jsonb 列 integrations 下挂一个专属条目(令牌数组 JSON 整体加密)。
+ */
+export interface PlaidCloudEntry {
+  tokensEnc: string;      // encryptField(JSON.stringify(string[]))
+  connectedAt: string;
+}
+export type IntegrationMap = Partial<Record<IntegrationProvider, IntegrationTokens>> & { plaid?: PlaidCloudEntry };
 
 // ── Env ──────────────────────────────────────────────────────────────────────
 
@@ -247,6 +256,68 @@ export async function saveIntegrationTokenByUserId(
   existing[provider] = full;
   await writeIntegrations(userId, serviceKey, existing);
   return true;
+}
+
+// ── Plaid 令牌云持久化(跨浏览器/设备复用连接)────────────────────────────────
+// 附加式:cookie 路径不动,这里只多一份云端令牌(加密),供换浏览器登录后取回。
+
+/** 当前登录用户的 Plaid 令牌数组(云端,已解密)。未登录/无记录/读失败 → null。 */
+export async function readPlaidTokensForCurrentUser(): Promise<string[] | null> {
+  const userId = await getRefreshedUserId();
+  const serviceKey = envValue('SUPABASE_SERVICE_ROLE_KEY');
+  if (!userId || !serviceKey) return null;
+  const map = await readIntegrations(userId, serviceKey);
+  const enc = map?.plaid?.tokensEnc;
+  if (!enc) return null;
+  try {
+    const json = decryptField<string>(enc);
+    const arr = JSON.parse(json) as unknown;
+    return Array.isArray(arr) ? arr.filter((t): t is string => typeof t === 'string' && t.length > 0) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 把 Plaid 令牌数组写进云端(加密整体)。读-改-写,读失败绝不空覆写(防清掉别的 provider)。
+ * 返回是否成功(失败时调用方仍有 cookie 兜底)。
+ */
+export async function writePlaidTokensForCurrentUser(tokens: string[]): Promise<boolean> {
+  const userId = await getRefreshedUserId();
+  const serviceKey = envValue('SUPABASE_SERVICE_ROLE_KEY');
+  if (!userId || !serviceKey) return false;
+  const unique = Array.from(new Set(tokens.filter((t) => typeof t === 'string' && t.length > 0)));
+  if (!unique.length) return false;
+  const existing = await readIntegrations(userId, serviceKey);
+  if (existing === null) { console.error('plaid_cloud_save_aborted_read_failed'); return false; }
+  const entry: PlaidCloudEntry = {
+    tokensEnc: String(encryptField(JSON.stringify(unique))),
+    connectedAt: existing.plaid?.connectedAt || new Date().toISOString(),
+  };
+  existing.plaid = entry;
+  await writeIntegrations(userId, serviceKey, existing);
+  return true;
+}
+
+/** 状态:当前用户云端是否有 Plaid 连接(供 /integrations 状态 + 断连清理)。 */
+export async function plaidConnectedForCurrentUser(): Promise<{ connected: boolean; connectedAt?: string }> {
+  const userId = await getRefreshedUserId();
+  const serviceKey = envValue('SUPABASE_SERVICE_ROLE_KEY');
+  if (!userId || !serviceKey) return { connected: false };
+  const map = await readIntegrations(userId, serviceKey);
+  const entry = map?.plaid;
+  return { connected: Boolean(entry?.tokensEnc), connectedAt: entry?.connectedAt };
+}
+
+/** 断开 Plaid:清云端令牌条目(cookie 侧由路由清)。 */
+export async function clearPlaidTokensForCurrentUser(): Promise<void> {
+  const userId = await getRefreshedUserId();
+  const serviceKey = envValue('SUPABASE_SERVICE_ROLE_KEY');
+  if (!userId || !serviceKey) return;
+  const existing = await readIntegrations(userId, serviceKey);
+  if (!existing || existing === null || !existing.plaid) return;
+  delete existing.plaid;
+  await writeIntegrations(userId, serviceKey, existing);
 }
 
 /**

@@ -10,6 +10,7 @@
  * 同时给每个账户附机构名/logo/主色(/item/get + /institutions/get_by_id),供 UI 展示。
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { readPlaidTokensForCurrentUser } from '@/lib/portal/integrations';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { plaidBase } from '../link-token/route';
 import { envValue } from '@/lib/portal/env';
@@ -136,6 +137,13 @@ export async function GET(req: NextRequest) {
     const single = req.cookies.get('nesio_plaid_access')?.value || '';
     tokens = single ? [single] : [];
   }
+  // 跨浏览器:本浏览器 cookie 没有令牌(换了个浏览器/清了缓存)→ 从云端取回登录账号的令牌。
+  // 云端拿到后游标从空开始(全量刷新一次,不丢数据,只是首次略重),不依赖本机 cookie 游标。
+  let tokensFromCloud = false;
+  if (!tokens.length) {
+    const cloud = await readPlaidTokensForCurrentUser();
+    if (cloud && cloud.length) { tokens = cloud; tokensFromCloud = true; }
+  }
   if (!tokens.length) {
     return NextResponse.json({ ok: false, error: 'not_connected' }, { status: 401 });
   }
@@ -149,6 +157,8 @@ export async function GET(req: NextRequest) {
   // 在新交易上;?full=1 忽略游标从头重拉,客户端按 id 覆盖补齐(每设备一次)。
   const fullResync = req.nextUrl?.searchParams?.get('full') === '1';
   if (fullResync) cursors = [];
+  // 令牌来自云端(本机 cookie 无令牌)→ cookie 游标与之不对齐,一律从空开始(全量刷新一次)。
+  if (tokensFromCloud) cursors = [];
 
   const added: PlaidTx[] = [];
   const invAdded: PlaidInvTx[] = []; // 财务⑯:投资账户流水(独立产品拉取)

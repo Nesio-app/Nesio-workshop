@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { plaidBase } from '../link-token/route';
 import { envValue } from '@/lib/portal/env';
+import { writePlaidTokensForCurrentUser } from '@/lib/portal/integrations';
 
 export const dynamic = 'force-dynamic';
 
@@ -95,5 +96,7 @@ export async function POST(req: NextRequest) {
   response.cookies.set('nesio_plaid_access', accessTokens[accessTokens.length - 1], {
     httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 180,
   });
+  // 跨浏览器:把全量令牌数组(加密)写一份到云端;失败不阻塞(cookie 已够本浏览器用)。
+  await writePlaidTokensForCurrentUser(tokens).catch(() => { /* cookie 兜底 */ });
   return response;
 }

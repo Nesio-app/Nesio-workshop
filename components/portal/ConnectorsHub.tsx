@@ -170,7 +170,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         if (!s) return;
         const updates: Record<string, boolean> = {};
         if (s.gmail?.connected || s.calendar?.connected) updates.google = true;
-        for (const p of ['tesla', 'granola', 'notion'] as const) {
+        // plaid 加进服务端真源合并 —— 令牌上云后,换浏览器登录即显示已连(不再要求重连)。
+        for (const p of ['tesla', 'granola', 'notion', 'plaid'] as const) {
           if (s[p]?.connected) updates[p] = true;
         }
         if (!Object.keys(updates).length) return;
