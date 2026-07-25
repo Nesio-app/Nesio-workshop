@@ -34,18 +34,12 @@ export interface PlayerSession {
   sessionId?: string;
 }
 
-// 【节拍:无声 —— 本机任何声音播放都会永久卡死主线程,已两次真机验证】
-// 事实:去掉全部声音 → 跟拍做正常;只要一放声音(无论哪种播放方式)→ 一点跟拍做就永久冻死。
-// 结论:这台设备/壳内 WebView 首次激活音频硬件会同步阻塞主线程且不返回(是阻塞不是抛错,
-// try/catch 与错误边界都接不住)。所以跟练**绝不播放任何声音**。
-// 节拍改为不碰音频硬件的两条反馈:① 轻震动(navigator.vibrate,支持的设备才有,不支持即静默跳过);
-// ② 视觉脉冲(大号次数每拍放大一下)。两者都在主线程上瞬时返回,永不阻塞。
-function buzz(strong: boolean): void {
-  try {
-    const nav = typeof navigator !== 'undefined' ? (navigator as Navigator & { vibrate?: (p: number | number[]) => boolean }) : null;
-    if (nav && typeof nav.vibrate === 'function') nav.vibrate(strong ? [55, 40, 55] : 22);
-  } catch { /* 震动尽力而为,不支持/被拦都无所谓,绝不影响跟练 */ }
-}
+// 【节拍:纯视觉,绝不碰任何设备硬件 —— 本机碰硬件就永久卡死,已多次真机验证】
+// 事实链:放声音 → 一点跟拍就永久冻死;去掉声音只留「轻震动」→ 仍会卡死。
+// 结论:这台设备/壳内 WebView **任何硬件激活**(音频、震动马达…)都可能同步阻塞主线程且不返回
+// (是阻塞不是抛错,try/catch 与错误边界都接不住)。所以跟练**只用纯界面反馈,不碰任何硬件**。
+// 节拍 = 大号次数每拍放大回弹一下(见 .nesio-wp-beat,由 repCount 变化驱动,纯 React+CSS,永不阻塞)。
+// ping 保留成空函数,只为不动各调用点;它绝不做任何会碰硬件的事。
 
 const REP_TEMPO_SEC = 3; // 跟拍:每次约 3 秒(1 秒发力 + 2 秒还原)
 
@@ -76,11 +70,9 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   const mutedRef = useRef(false);
   mutedRef.current = muted; // 供 setInterval 闭包读到最新节拍开关
 
-  // 节拍反馈:只震动,绝不碰声音(本机放声音会永久卡死)。freq>=1200 视为「完成」用强震。
-  const ping = (freq: number, _ms = 80) => {
-    if (mutedRef.current) return;
-    buzz(freq >= 1200);
-  };
+  // 节拍反馈:空函数 —— 绝不碰任何硬件(声音/震动本机都会永久卡死)。真正的节拍是纯视觉的
+  // 大号次数脉冲(.nesio-wp-beat,由 repCount 变化驱动)。保留 ping 只为不改各调用点。
+  const ping = (_freq: number, _ms = 80) => { /* no-op:不碰任何硬件,永不阻塞主线程 */ };
 
   useSheetDismiss(true, onClose); // 挂载即打开;Escape 关闭 + 焦点回收
 
@@ -185,6 +177,8 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
 
   if (!step || !ex) return null;
   const hasCues = Boolean((ex.cues && ex.cues.length > 0) || (ex.neural && ex.neural[0]));
+  // 主图默认放到最大;跟拍/计时进行时(下面出现大号数字)自动缩小,给数字+按钮腾地方 → 两不耽误。
+  const figureClass = `nesio-wp-figure${repCount > 0 || countdown != null ? ' is-compact' : ''}`;
 
   return (
     <div className="nesio-wp-overlay" role="dialog" aria-modal aria-label={session.name || L(dict, '跟练', 'Workout')}>
@@ -203,10 +197,10 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
             fps={ex.animFps}
             pingpong={ex.animPingpong}
             alt={ex.name}
-            className="nesio-wp-figure"
+            className={figureClass}
           />
         ) : ex.gif ? (
-          <ExerciseGif src={ex.gif} alt={ex.name} className="nesio-wp-figure" />
+          <ExerciseGif src={ex.gif} alt={ex.name} className={figureClass} />
         ) : null}
         {/* 动作名 + 「动作要点」收起按钮同一行(要点紧跟名字后面)。 */}
         <div className="nesio-wp-namerow">
