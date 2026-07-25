@@ -55,6 +55,7 @@ Auth legend:
 | GET /api/portal/gmail | session / no-Supabase + OAuth token |
 | GET /api/portal/gmail-quick | session / no-Supabase + OAuth token |
 | GET /api/portal/calendar | session / no-Supabase (cloud mode fails closed) |
+| POST /api/portal/calendar | session / no-Supabase + OAuth token (calendar.events) — 建日程(结构化 or 自然语言 LLM 解析,写 primary) |
 | POST /api/portal/drive | Google OAuth token (drive.appdata) — 免费云备份到用户 Drive |
 | GET /api/portal/drive | Google OAuth token (drive.appdata) — 拉回云备份 |
 | GET /api/portal/tasks | Google OAuth token (tasks) — 读 Google Tasks 待办 |
@@ -91,8 +92,9 @@ open. If one of these starts touching AI or private data, move it up a table.
 - **2026-07 免费最大化扩展**: 联合授权新增 `drive.appdata`(非敏感,免费云备份到用户
   自己 Drive 的隐藏 App 文件夹)+ `tasks` + `contacts.readonly`(敏感 scope,生产需
   Google OAuth 验证审核;验证前有未验证警告与 100 用户上限)。加 scope 后老用户重授权一次。
-- **Scopes 最小化 ✓**: 仅 `gmail.readonly` + `calendar.readonly`(联合授权,
-  一次 consent 覆盖两个连接器)。无写权限、无 profile/contacts。
+- **Scopes ✓**: `gmail.readonly` + `calendar.readonly` + `calendar.events`(建日程写权限,
+  2026-07 加;联合授权一次 consent 覆盖)+ `gmail.send`/`tasks`/`drive.appdata`。
+  加 `calendar.events` 后老用户需重授权一次(断开重连 Google)。无 profile 写权限。
 - **撤销路径 ✓**: `POST /api/portal/oauth/disconnect` 调 Google revoke
   端点作废整个 grant 并清除全部 4 个 token cookie。由于共用授权,断开
   任一连接器会同时断开另一个(UI 已同步提示)。

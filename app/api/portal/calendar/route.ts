@@ -10,6 +10,14 @@ import { resolveGmailAccessToken } from '@/lib/portal/providers/gmail-access';
 import { getIntegrationToken, saveIntegrationToken } from '@/lib/portal/integrations';
 import { pickCalendarTokens, shouldUseOAuth } from '@/lib/portal/calendar-token.mjs';
 import { envValue } from '@/lib/portal/env';
+import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
+import {
+  buildEventParsePrompt,
+  parseDraftFromLlm,
+  validateDraft,
+  draftToGoogleEvent,
+  type DraftEvent,
+} from '@/lib/portal/calendar-create';
 
 type Feed = { url: string; label: string };
 type FeedResult = { label: string; ok: boolean; count: number; error?: string };
@@ -445,4 +453,142 @@ export async function GET(req: NextRequest) {
     },
     { headers: { 'Cache-Control': 'no-store, max-age=0' } },
   );
+}
+
+// ── 创建日程(POST)──────────────────────────────────────────────────────────
+// 需 calendar.events scope(见 connect 路由);写主日历 primary。入参二选一:
+//   ① 结构化 { summary, startISO, endISO?, allDay?, location?, description?, timeZone? }
+//   ② 自然语言 { text, timeZone? } —— LLM 解析成草稿(相对时间锚 now)。
+// 复用 GET 的鉴权 / 取 token / 刷新 / 写 cookie。失败态显式(红线:异步动作必有可见失败)。
+
+async function acquireCalendarToken(req: NextRequest): Promise<{ accessToken: string; refreshToken: string }> {
+  const { accessToken, refreshToken } = await resolveCalendarTokens();
+  if (!accessToken && !refreshToken) {
+    const borrowed = await resolveGmailAccessToken(req).catch(() => '');
+    if (borrowed) return { accessToken: borrowed, refreshToken: '' };
+  }
+  return { accessToken, refreshToken };
+}
+
+function insertGoogleEvent(accessToken: string, eventBody: Record<string, unknown>): Promise<Response> {
+  return fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(eventBody),
+    cache: 'no-store',
+  });
+}
+
+function normalizeCreated(g: Record<string, unknown>, draft: DraftEvent) {
+  return {
+    id: typeof g.id === 'string' ? g.id : '',
+    htmlLink: typeof g.htmlLink === 'string' ? g.htmlLink : '',
+    summary: typeof g.summary === 'string' ? g.summary : draft.summary,
+    start: (g.start as unknown) ?? null,
+    end: (g.end as unknown) ?? null,
+  };
+}
+
+export async function POST(req: NextRequest) {
+  const authFailure = await requireAuthenticatedCalendarAccess(req);
+  if (authFailure) return authFailure;
+
+  let body: {
+    text?: string; timeZone?: string; summary?: string; startISO?: string;
+    endISO?: string; allDay?: boolean; location?: string; description?: string;
+  };
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ ok: false, error: 'bad_json' }, { status: 400 });
+  }
+
+  const timeZone = (body.timeZone || 'Asia/Shanghai').trim();
+
+  // 组装草稿:显式字段优先;否则自然语言 → LLM 解析。
+  let draft: DraftEvent | null = null;
+  if (body.summary && body.startISO) {
+    draft = {
+      summary: body.summary, startISO: body.startISO, endISO: body.endISO,
+      allDay: body.allDay, location: body.location, description: body.description, timeZone,
+    };
+  } else if (body.text && body.text.trim()) {
+    if (!aiProviderAvailable()) {
+      return NextResponse.json(
+        { ok: false, error: 'nl_parse_unavailable', message: 'AI 暂不可用,可直接传 summary + startISO 建日程。' },
+        { status: 503 },
+      );
+    }
+    try {
+      const { text } = await completeText({
+        prompt: buildEventParsePrompt(body.text, new Date().toISOString(), timeZone),
+        maxTokens: 300, temperature: 0.1, route: 'calendar-create',
+      });
+      draft = parseDraftFromLlm(text);
+      if (draft && !draft.timeZone) draft.timeZone = timeZone;
+    } catch {
+      return NextResponse.json(
+        { ok: false, error: 'nl_parse_failed', message: '没太听懂时间,换种说法、或直接选个时间。' },
+        { status: 422 },
+      );
+    }
+  }
+
+  const invalid = validateDraft(draft);
+  if (invalid || !draft) {
+    return NextResponse.json(
+      { ok: false, error: invalid || 'no_draft', message: '缺少标题或时间,补齐后再试。' },
+      { status: 400 },
+    );
+  }
+
+  const eventBody = draftToGoogleEvent(draft);
+
+  const { accessToken, refreshToken } = await acquireCalendarToken(req);
+  if (!accessToken && !refreshToken) {
+    return NextResponse.json(
+      { ok: false, error: 'calendar_not_connected', message: '还没连接 Google 日历,先去设置里连接。' },
+      { status: 409 },
+    );
+  }
+
+  // 有 access 先试;401/403/网络失败且有 refresh → 刷新后重试一次。
+  let res: Response | null = null;
+  if (accessToken) res = await insertGoogleEvent(accessToken, eventBody).catch(() => null);
+  if ((!res || res.status === 401 || res.status === 403) && refreshToken) {
+    const refreshed = await refreshGoogleCalendarSession(refreshToken);
+    if (refreshed?.access_token) {
+      const retry = await insertGoogleEvent(refreshed.access_token, eventBody).catch(() => null);
+      if (retry && retry.ok) {
+        await saveIntegrationToken('calendar', {
+          accessToken: refreshed.access_token,
+          refreshToken: refreshed.refresh_token || refreshToken || undefined,
+          expiresAt: refreshed.expires_in ? Date.now() + refreshed.expires_in * 1000 : undefined,
+        }, req).catch(() => { /* Supabase heal best-effort */ });
+        const okJson = await retry.json().catch(() => ({})) as Record<string, unknown>;
+        const created = NextResponse.json({ ok: true, status: 'calendar_session_refreshed', event: normalizeCreated(okJson, draft) });
+        return setCalendarCookies(created, refreshed);
+      }
+      res = retry;
+    }
+  }
+
+  if (!res) {
+    return NextResponse.json({ ok: false, error: 'network', message: '网络不太稳,稍后再试一次。' }, { status: 502 });
+  }
+  if (!res.ok) {
+    const errText = await res.text().catch(() => '');
+    const hint = res.status === 403
+      ? '可能还没重新授权「管理日程」(断开重连 Google),或 Google Cloud 未启用 Calendar API。'
+      : '写入日历没成功,稍后再试。';
+    return NextResponse.json(
+      { ok: false, error: `google_${res.status}`, message: hint, detail: errText.slice(0, 300) },
+      { status: 502 },
+    );
+  }
+
+  const okJson = await res.json().catch(() => ({})) as Record<string, unknown>;
+  return NextResponse.json({ ok: true, event: normalizeCreated(okJson, draft) });
 }
