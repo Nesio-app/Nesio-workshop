@@ -103,7 +103,7 @@ payout 仅记账。数据经 service-role 落 family 表,RLS(`is_family_member`)
 | `POST /api/portal/family/chore` | session + membership + `can_approve` | — |
 | `POST /api/portal/family/chore/action` | session + membership + 能力(核心判) | — |
 | `GET /api/portal/family/members` | session + membership | — |
-| `POST /api/portal/family/assign` | session + membership + `can_approve` | — |
+| `POST /api/portal/family/assign` | session + membership(互相分派,任一成员可派) | — |
 | `POST /api/portal/family/payout` | session + membership + `can_record_payout` | — |
 
 注:非 AI 花费路由,未挂 `guardAiRoute`(无云成本);走等价的 session+成员+能力三重判。

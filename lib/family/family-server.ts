@@ -295,7 +295,9 @@ export async function listFamilyMembersOp(actor: FamilyActor, familyId: string):
 }
 
 /**
- * 闭环起点:把一条日历事件(记忆节点)分派给某个家庭成员。需 can_approve(分派 = 家长动作)。
+ * 闭环起点:把一条日历事件(记忆节点)分派给某个家庭成员。
+ * 分派是**互相的** —— 任何家庭成员都能把活派给任何成员(孩子也能给爸妈派)。只要是本家庭成员即可。
+ * (真正的「谁能审核/记账」仍是家长动作,在 applyChoreAction/recordPayout 里按 can_approve 强制。)
  * 一事件一实例:按 (family_id, source_event_id) upsert —— 再点即改派,不重复生成。
  * 改派给新的人 → 状态复位 todo(旧的完成/审核不带过去)。
  */
@@ -304,8 +306,7 @@ export async function assignChoreFromEventOp(
   input: { familyId: string; sourceEventId: string; title: string; dueDate: string; assigneeId: string; value?: number; needsApproval?: boolean },
 ): Promise<FamilyResult<ChoreInstance>> {
   const gate = await requireMember(actor, input.familyId);
-  if (!gate.ok) return gate;
-  if (!memberCan(memberFromRow(gate.value), 'assign')) return fail('forbidden', 403);
+  if (!gate.ok) return gate;   // 成员即可分派;不要求 can_approve(互相分派)
 
   const sourceEventId = (input.sourceEventId || '').trim();
   const title = (input.title || '').trim();

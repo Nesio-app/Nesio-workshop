@@ -64,10 +64,7 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
       assigneeId: member.id,
     });
     if (!r.ok) {
-      const msg = r.error === 'forbidden'
-        ? t('只有能审核的家长可以分派家务。', 'Only a parent who can review can assign chores.')
-        : t('没分派成,再试一次。', 'Could not assign — try again.');
-      setPhase({ s: 'error', msg });
+      setPhase({ s: 'error', msg: t('没分派成,再试一次。', 'Could not assign — try again.') });
       return;
     }
     setPhase({ s: 'done', name: member.name });

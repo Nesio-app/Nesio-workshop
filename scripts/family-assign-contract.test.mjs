@@ -1,10 +1,10 @@
 /**
  * 契约:闭环「日历家务 → 分派给家人 → 做完回响到今天页」。
  * 钉死三条红线:
- *  ① 分派是家长动作 —— 服务端 assignChoreFromEventOp 必须过 memberCan(..,'assign')(can_approve),
- *     绝不信任客户端(fail-closed)。
+ *  ① 分派是互相的 —— 任何家庭成员都能派活(requireMember),但外人一律拒(fail-closed)。
+ *     被分派人也必须是本家庭成员。
  *  ② 一事件一实例 —— 按 (family_id, source_event_id) upsert,再点即改派,不重复生成。
- *  ③ 路由存在且各挂鉴权(assign 需 can_approve;members 需 membership)。
+ *  ③ 路由存在且各挂鉴权(assign/members 均需 session + membership)。
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -17,8 +17,13 @@ const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 const server = read('lib/family/family-server.ts');
 assert.match(server, /export async function assignChoreFromEventOp/, 'assignChoreFromEventOp must be exported.');
 assert.match(server, /export async function listFamilyMembersOp/, 'listFamilyMembersOp must be exported.');
-// 分派能力门:必须服务端强制 can_approve(经 memberCan(..,'assign'))
-assert.match(server, /memberCan\(memberFromRow\(gate\.value\),\s*'assign'\)/, 'assign must be gated by memberCan(..,"assign") server-side.');
+// 分派互相:成员即可(requireMember),但不得对分派额外要求 can_approve(否则就不是互相了)
+assert.match(server, /assignChoreFromEventOp[\s\S]*?requireMember\(actor, input\.familyId\)/, 'assign must require family membership.');
+assert.doesNotMatch(
+  server.slice(server.indexOf('assignChoreFromEventOp'), server.indexOf('recordPayoutOp')),
+  /memberCan\([^)]*'assign'\)/,
+  'assign must NOT be gated by can_approve — any member can assign (mutual).',
+);
 // 一事件一实例:按来源去重(upsert / patch existing by source_event_id)
 assert.match(server, /source_event_id=eq\.\$\{sourceEventId\}/, 'assign must look up existing instance by source_event_id (one-per-event).');
 // 被分派人必须是本家庭成员(不给外人塞活)
