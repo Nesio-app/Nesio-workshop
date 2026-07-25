@@ -121,10 +121,25 @@ export function localDayKey(d: Date = new Date()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** 从外部同步 API 倒进来的参考笔记(flomo/notion 等)—— 是资料库,不是今天的待办。
+ *  它们正文常叙述「今天…/昨日…」,会被下方文本启发式误当成今日事项拉进焦点,
+ *  再因原始日期是几周前被标「已过期」(用户实锤:今天页被 flomo 旧笔记刷屏)。
+ *  这类节点只属于记忆页;要放上今天,由用户在记忆页主动「加入今日焦点」(pin 优先于此判定)。 */
+function isSyncedReferenceNode(node: LifeNode): boolean {
+  const a = node.attributes || {};
+  const src = a.source;
+  if (src === 'Flomo' || src === 'Notion') return true;
+  if (typeof a.flomoSlug === 'string' && a.flomoSlug) return true;
+  if (typeof a.notionPageId === 'string' && a.notionPageId) return true;
+  return false;
+}
+
 function isFocusNode(node: LifeNode): boolean {
   if (node.attributes.done) return false;
   // 批次 50:记忆页长按「加入今日焦点」钉进来的,今天无条件在场(明天自然过期)
   if (node.attributes.focusPinnedOn === localDayKey()) return true;
+  // 同步进来的参考笔记(flomo/notion)不进今日焦点 —— 除非上面用户主动钉了。
+  if (isSyncedReferenceNode(node)) return false;
   // 批次 37:手动/语音亲手添加的待办,当天就进焦点 —— 用户主动放进来的事,
   // 今天就是它的日子(此前无日期待办被拒之门外,「刚记的去哪了」)。
   if (node.type === 'commitment' && (node.source === 'manual' || node.source === 'voice')) {

@@ -132,6 +132,24 @@ function loadRoute() {
         // 共享 env 助手(取代各路由本地 envValue);纯函数,忠实复制。
         return { envValue: (key) => (process.env[key] ?? '').trim() };
       }
+      if (specifier === '@/lib/portal/ai-complete') {
+        // 日历 POST 的「一句话建日程」NL 解析用云 LLM;fail-closed 用例不走该分支。
+        // 桩成「无 AI 供应商」——既不发真实云调用,又保持 GET fail-closed 断言不受影响。
+        return { completeText: async () => ({ text: '', tier: 'none' }), aiProviderAvailable: () => false };
+      }
+      if (specifier === '@/lib/portal/calendar-create') {
+        // POST 建日程的纯解析/校验助手;GET fail-closed 用例不触达,桩成安全 no-op。
+        return {
+          buildEventParsePrompt: () => '',
+          parseDraftFromLlm: () => null,
+          validateDraft: () => ({ ok: false, error: 'stubbed' }),
+          draftToGoogleEvent: () => ({}),
+        };
+      }
+      if (specifier === '@/lib/portal/user-timezone') {
+        // 纯常量/纯函数,忠实复制(用户时区固定纽约)。
+        return { USER_TIME_ZONE: 'America/New_York', nowUserTzISO: () => '2026-01-01T00:00:00-05:00' };
+      }
       throw new Error(`Unexpected import in calendar route test: ${specifier}`);
     },
   };

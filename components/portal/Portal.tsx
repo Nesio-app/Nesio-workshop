@@ -18,6 +18,7 @@ import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
 import { syncLearningWithCloud, registerLearningAutoPush } from '@/lib/portal/cloud-learning-sync';
 import { syncProfileWithCloud, registerProfileAutoPush } from '@/lib/portal/cloud-profile-sync';
 import { autoSyncBackupWithCloud } from '@/lib/portal/cloud-backup';
+import { autoSyncConnectorsOnBoot } from '@/lib/portal/connector-sync';
 
 // Heavy sheets load on first open, not at boot — together they were ~3.5k
 // lines of first-paint JS for UI the user may never touch in a session.
@@ -548,11 +549,14 @@ export default function Portal() {
     // 登录后自动从云 merge 回本机(补缺、不覆盖),拉完防抖上云。空浏览器只会被填充,绝不用
     // 空盖云;pull 失败不推,防遮盖云端真备份。durability 免费,不查付费门。
     void autoSyncBackupWithCloud();
+    // 开机/登录:所有已接入的外部连接器(日历/邮件/flomo/银行/通讯录)自动同步一次拉新内容。
+    // 30 分钟节流(内部保证),未连接的源静默早退;best-effort 不阻塞渲染。
+    void autoSyncConnectorsOnBoot();
     const unregisterLearningPush = registerLearningAutoPush();
     // 批次205:改名字/头像/语言/教练/日报/主题任一 → 防抖自动推上云,别端拉取即一致。
     const unregisterProfilePush = registerProfileAutoPush();
     const onVisible = () => {
-      if (document.visibilityState === 'visible') { void syncMemoryWithCloud(); void syncLearningWithCloud(); void syncProfileWithCloud(); void autoSyncBackupWithCloud(); }
+      if (document.visibilityState === 'visible') { void syncMemoryWithCloud(); void syncLearningWithCloud(); void syncProfileWithCloud(); void autoSyncBackupWithCloud(); void autoSyncConnectorsOnBoot(); }
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {

@@ -8,7 +8,7 @@ const WechatReadingImportSheet = dynamic(() => import('./WechatReadingImportShee
 const TeslaSheet = dynamic(() => import('./TeslaSheet'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { ingestGranolaMeeting } from '@/lib/platform/view-models/today-view-model';
-import { runPlaidSync, runFlomoSync, saveCalendarEventsToMemory } from '@/lib/portal/connector-sync';
+import { runPlaidSync, runFlomoSync, saveCalendarEventsToMemory, enrichGmailInBackground } from '@/lib/portal/connector-sync';
 import { type LifeNode, pruneNotionNodes } from '@/lib/portal/life-graph';
 import type { HealthMetrics, HealthNode } from '@/lib/portal/apple-health';
 import { readLaunchSurfaceContextFromBrowser } from '@/lib/portal/launch-surface.mjs';
@@ -722,7 +722,24 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     saveConnectorState(c.id, true);
     setConnected((p) => ({ ...p, [c.id]: true }));
     setCounts((p) => ({ ...p, [c.id]: r.fresh }));
-    showToast(L(dict, r.fresh ? `已同步 ${r.fresh} 条 flomo 笔记(按 slug 去重,老笔记不重复入库)` : '没有新笔记 —— 已全部同步过', r.fresh ? `Synced ${r.fresh} flomo notes (deduped by slug)` : 'No new notes — everything already synced'), true);
+    // 单次封顶(防闪退):若还有剩余,提示再点一次继续导入。
+    const more = r.remaining && r.remaining > 0 ? r.remaining : 0;
+    showToast(
+      L(
+        dict,
+        r.fresh
+          ? more
+            ? `已同步 ${r.fresh} 条 flomo 笔记,还剩 ${more} 条 —— 再点一次「同步」继续导入`
+            : `已同步 ${r.fresh} 条 flomo 笔记(按 slug 去重,老笔记不重复入库)`
+          : '没有新笔记 —— 已全部同步过',
+        r.fresh
+          ? more
+            ? `Synced ${r.fresh} flomo notes; ${more} left — tap Sync again to continue`
+            : `Synced ${r.fresh} flomo notes (deduped by slug)`
+          : 'No new notes — everything already synced',
+      ),
+      true,
+    );
     setSyncing(null);
   }
 
@@ -761,15 +778,16 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       }
     } catch { allOk = false; parts.push(L(dict, '日历:网络错误', 'Calendar: network error')); }
 
-    // 邮件(重:读全文 + AI 抽取。加 75s 超时,便于把「耗时太久」和真「网络断」区分开)
+    // 邮件:阻塞段用 analyze=false → 服务端本地正则抽取,快且稳(不再卡在云 AI 上超 60s → 504 →
+    // 「网络错误」)。云 AI 抽取转后台富化(下方 enrichGmailInBackground),拿到更好的语义节点原位升级。
     try {
       const ctrl = new AbortController();
-      const to = setTimeout(() => ctrl.abort(), 75_000);
+      const to = setTimeout(() => ctrl.abort(), 55_000); // 55s < 服务端 60s:拿干净 abort,不等平台 504
       let res: Response;
       try {
         // returnBodies=false:同步按钮只要 nodes,不拉几百 KB 全文回来(弱网会传断);
         // 全文由 connector-sync 专路另存本机。
-        res = await fetch('/api/portal/gmail?includeBody=true&analyze=true&returnBodies=false', { signal: ctrl.signal });
+        res = await fetch('/api/portal/gmail?includeBody=true&analyze=false&returnBodies=false', { signal: ctrl.signal });
       } finally {
         clearTimeout(to);
       }
@@ -783,6 +801,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           data.nodes!.forEach((n) => ingestLifeNode({ ...n, source: 'email' } as NodeInput));
           localStorage.setItem('nesio-gmail-last-sync', String(Date.now()));
         }
+        // 云 AI 抽取后台富化(不阻塞本次同步;失败无声)—— 保留 AI 语义节点,同时同步不再超时。
+        void enrichGmailInBackground(0);
         parts.push(L(dict, `邮件:读取 ${data.emailCount ?? data.messages?.length ?? 0} 封,提取 ${nodeCount} 条`, `Mail: read ${data.emailCount ?? data.messages?.length ?? 0}, extracted ${nodeCount}`));
       } else {
         allOk = false;
