@@ -330,6 +330,24 @@ export async function setMyGoalOp(actor: FamilyActor, input: { familyId: string;
   return { ok: true, value: { ok: true } };
 }
 
+/** 停掉/删除一条(含周期全部)来自日历事件的家务 —— 软删,不再出现在板/今天页。管理动作,需 can_approve。 */
+export async function cancelEventChoreOp(actor: FamilyActor, input: { familyId: string; sourceEventId: string }): Promise<FamilyResult<{ cancelled: number }>> {
+  const gate = await requireMember(actor, input.familyId);
+  if (!gate.ok) return gate;
+  if (!memberCan(memberFromRow(gate.value), 'approve')) return fail('forbidden', 403);
+  const base = (input.sourceEventId || '').trim();
+  if (!base) return fail('bad_request', 400);
+  const inst = await restGet<InstanceRow>(actor.config, 'family_chore_instances',
+    `family_id=eq.${input.familyId}&deleted_at=is.null&select=id,source_event_id`);
+  if (inst === null) return fail('upstream', 502);
+  const ids = inst.filter((r) => r.source_event_id === base || (r.source_event_id ?? '').startsWith(`${base}#`)).map((r) => r.id);
+  if (!ids.length) return { ok: true, value: { cancelled: 0 } };
+  const saved = await restPatch<InstanceRow>(actor.config, 'family_chore_instances',
+    `id=in.(${ids.join(',')})&family_id=eq.${input.familyId}`, { deleted_at: new Date().toISOString() });
+  if (saved === null) return fail('upstream', 502);
+  return { ok: true, value: { cancelled: ids.length } };
+}
+
 /** 家庭全体成员(供「分派给家人」选人)。名字/头像来自各成员自己的账号资料。任何成员可读。 */
 export async function listFamilyMembersOp(actor: FamilyActor, familyId: string): Promise<FamilyResult<{ familyId: string; me: FamilyMemberWithEmail; members: FamilyMemberWithEmail[] }>> {
   const gate = await requireMember(actor, familyId);
