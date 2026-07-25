@@ -64,12 +64,17 @@ async function restPatch<T>(config: CloudRuntimeConfig, table: string, query: st
 }
 
 // ── 行类型(DB 快照)────────────────────────────────────────────────────────────
-interface MemberRow { family_id: string; user_id: string; display_name: string; can_approve: boolean; needs_approval: boolean; can_record_payout: boolean; }
+interface MemberRow { family_id: string; user_id: string; display_name: string; can_approve: boolean; needs_approval: boolean; can_record_payout: boolean; email: string | null; }
 interface InstanceRow { id: string; family_id: string; template_id: string | null; assignee_user_id: string | null; due_date: string; value: number; state: ChoreState; needs_approval: boolean; done_at: string | null; approved_at: string | null; proof_asset_ref: string | null; title: string | null; source_event_id: string | null; }
 interface PayoutRow { id: string; family_id: string; person_user_id: string | null; amount: number; date: string; note: string | null; }
 
 function memberFromRow(r: MemberRow): FamilyMember {
   return { id: r.user_id, name: r.display_name, canApprove: r.can_approve, needsApproval: r.needs_approval, canRecordPayout: r.can_record_payout };
+}
+/** 成员 + 账号邮箱(供拥有者本地按邮箱配到 People 的 person 节点)。 */
+export interface FamilyMemberWithEmail extends FamilyMember { email: string; }
+function memberWithEmailFromRow(r: MemberRow): FamilyMemberWithEmail {
+  return { ...memberFromRow(r), email: (r.email ?? '').toLowerCase() };
 }
 function instanceFromRow(r: InstanceRow): ChoreInstance {
   return {
@@ -84,7 +89,7 @@ function payoutFromRow(r: PayoutRow): Payout {
 }
 
 // ── 登录 + 成员解析 ───────────────────────────────────────────────────────────
-export interface FamilyActor { config: CloudRuntimeConfig; userId: string; }
+export interface FamilyActor { config: CloudRuntimeConfig; userId: string; email: string; }
 
 /** 解析登录用户(未配置/未登录 fail-closed)。 */
 export async function resolveActor(_req: NextRequest): Promise<FamilyResult<FamilyActor>> {
@@ -92,7 +97,7 @@ export async function resolveActor(_req: NextRequest): Promise<FamilyResult<Fami
   if (!config.configured) return fail('not_configured', 503);
   const { user } = await getSignedInUser(config);
   if (!user?.id) return fail('not_signed_in', 401);
-  return { ok: true, value: { config, userId: user.id } };
+  return { ok: true, value: { config, userId: user.id, email: (user.email ?? '').toLowerCase() } };
 }
 
 /** 取 actor 在某家庭的成员行(非成员 → not_member,fail-closed)。 */
@@ -124,7 +129,7 @@ export async function createFamily(actor: FamilyActor, input: { name: string; di
   if (!famRows?.length) return fail('upstream', 502);
   const familyId = famRows[0].id;
   const memberRows = await restInsert<MemberRow>(actor.config, 'family_members', {
-    family_id: familyId, user_id: actor.userId, display_name: displayName,
+    family_id: familyId, user_id: actor.userId, display_name: displayName, email: actor.email || null,
     can_approve: true, needs_approval: false, can_record_payout: true,
   });
   if (!memberRows?.length) return fail('upstream', 502);
@@ -144,7 +149,7 @@ export async function joinFamily(actor: FamilyActor, input: { inviteCode: string
   const existing = await restGet<MemberRow>(actor.config, 'family_members', `family_id=eq.${familyId}&user_id=eq.${actor.userId}&select=user_id`);
   if (existing?.length) return { ok: true, value: { familyId } };
   const rows = await restInsert<MemberRow>(actor.config, 'family_members', {
-    family_id: familyId, user_id: actor.userId, display_name: displayName,
+    family_id: familyId, user_id: actor.userId, display_name: displayName, email: actor.email || null,
     can_approve: false, needs_approval: true, can_record_payout: false,
   });
   if (!rows?.length) return fail('upstream', 502);
@@ -286,13 +291,19 @@ export async function createChoreTemplateOp(
   return { ok: true, value: { templateId, generated: rows.length } };
 }
 
-/** 家庭全体成员(供「分派给家人」选人)。任何成员可读。 */
-export async function listFamilyMembersOp(actor: FamilyActor, familyId: string): Promise<FamilyResult<{ familyId: string; me: FamilyMember; members: FamilyMember[] }>> {
+/** 家庭全体成员 + 账号邮箱(供「分派给家人」选人 + 拥有者本地按邮箱配 People)。任何成员可读。 */
+export async function listFamilyMembersOp(actor: FamilyActor, familyId: string): Promise<FamilyResult<{ familyId: string; me: FamilyMemberWithEmail; members: FamilyMemberWithEmail[] }>> {
   const gate = await requireMember(actor, familyId);
   if (!gate.ok) return gate;
+  // 自愈:老成员行没存邮箱(建列之前入伙的)→ 用当前登录邮箱补上自己那行,配对才有料。
+  if (!gate.value.email && actor.email) {
+    await restPatch<MemberRow>(actor.config, 'family_members',
+      `family_id=eq.${familyId}&user_id=eq.${actor.userId}`, { email: actor.email });
+    gate.value.email = actor.email;
+  }
   const rows = await restGet<MemberRow>(actor.config, 'family_members', `family_id=eq.${familyId}&select=*`);
   if (rows === null) return fail('upstream', 502);
-  return { ok: true, value: { familyId, me: memberFromRow(gate.value), members: rows.map(memberFromRow) } };
+  return { ok: true, value: { familyId, me: memberWithEmailFromRow(gate.value), members: rows.map(memberWithEmailFromRow) } };
 }
 
 /**

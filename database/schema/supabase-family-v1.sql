@@ -63,9 +63,13 @@ CREATE TABLE IF NOT EXISTS public.family_members (
   can_approve boolean NOT NULL DEFAULT false,
   needs_approval boolean NOT NULL DEFAULT true,
   can_record_payout boolean NOT NULL DEFAULT false,
+  email text,                 -- 成员自报的账号邮箱(入伙时本人写自己的);供拥有者本地把成员配到 People 的 person 节点
   joined_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (family_id, user_id)
 );
+
+-- 反复应用安全:老表补列(People ↔ 家庭成员 按邮箱自动配对用)。
+ALTER TABLE public.family_members ADD COLUMN IF NOT EXISTS email text;
 
 CREATE INDEX IF NOT EXISTS idx_family_members_user
   ON public.family_members (user_id);

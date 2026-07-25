@@ -6,7 +6,7 @@
 import type { Cadence } from '@/lib/family/chores-core';
 
 export type ChoreStateView = 'todo' | 'done' | 'approved' | 'paid';
-export interface FamilyMemberView { id: string; name: string; canApprove: boolean; needsApproval: boolean; canRecordPayout: boolean; }
+export interface FamilyMemberView { id: string; name: string; canApprove: boolean; needsApproval: boolean; canRecordPayout: boolean; email?: string; }
 export interface ChoreInstanceView {
   id: string; templateId: string; assigneeId: string; dueDate: string; value: number;
   state: ChoreStateView; needsApproval: boolean; doneAt?: string; approvedAt?: string; proofPhotoRef?: string;

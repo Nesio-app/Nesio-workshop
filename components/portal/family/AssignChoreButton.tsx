@@ -16,6 +16,8 @@ import {
   type FamilySummary, type FamilyMemberView,
 } from '@/lib/family/family-client';
 import type { Cadence } from '@/lib/family/chores-core';
+import { autoLinkByEmail } from '@/lib/family/people-link';
+import { displayNodeName } from '@/lib/portal/node-display';
 
 /** 事件/承诺记忆的到期日 → YYYY-MM-DD(纯日期不做时区换算);缺失回退本地今天。 */
 function dayKeyFromNode(node: LifeNode): string {
@@ -30,7 +32,7 @@ function dayKeyFromNode(node: LifeNode): string {
 type Phase =
   | { s: 'idle' }
   | { s: 'loading' }
-  | { s: 'pick'; families: FamilySummary[]; familyId: string; members: FamilyMemberView[] }
+  | { s: 'pick'; families: FamilySummary[]; familyId: string; members: FamilyMemberView[]; linked: Record<string, string> }
   | { s: 'saving'; name: string }
   | { s: 'done'; name: string }
   | { s: 'nofamily' }
@@ -47,8 +49,13 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
   const loadMembers = useCallback(async (families: FamilySummary[], familyId: string) => {
     const m = await listFamilyMembers(familyId);
     if (!m.ok) { setPhase({ s: 'error', msg: m.error }); return; }
-    setPhase({ s: 'pick', families, familyId, members: m.data.members });
-  }, []);
+    // 按邮箱把成员配到本机 People 的 person 节点 → 选人时显示你在 People 里认得的名字。
+    const linked: Record<string, string> = {};
+    try {
+      autoLinkByEmail(familyId, m.data.members).forEach((node, memberId) => { linked[memberId] = displayNodeName(node.name, dict); });
+    } catch { /* 配不上就用家庭显示名 */ }
+    setPhase({ s: 'pick', families, familyId, members: m.data.members, linked });
+  }, [dict]);
 
   const begin = useCallback(async () => {
     setPhase({ s: 'loading' });
@@ -193,7 +200,7 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
         {phase.members.map((m) => (
           <button key={m.id} type="button" className="nesio-node-action-secondary" style={{ padding: '0.35rem 0.8rem', fontSize: '0.85rem' }}
             onClick={() => fam && void assign(fam.familyId, m)}>
-            {m.name}
+            {phase.linked[m.id] || m.name}
           </button>
         ))}
         {phase.members.length === 0 && (
