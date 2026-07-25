@@ -57,9 +57,11 @@ for (const marker of ['CREATE TABLE', 'user_module_data', 'PRIMARY KEY (identity
 
 // 客户端引擎:逐模块行、gz 压缩、排除记忆图、LWW、新设备 reload
 const client = fs.readFileSync(clientPath, 'utf8');
-for (const marker of ['pushModulesToCloud', 'pullModulesFromCloud', 'autoSyncModulesWithCloud', 'gzipSync', 'LIFE_GRAPH_KEY', 'newlyAdded', 'reload']) {
+for (const marker of ['pushModulesToCloud', 'pullModulesFromCloud', 'autoSyncModulesWithCloud', 'gzipSync', 'isDedicatedSyncKey', 'newlyAdded', 'reload']) {
   assert.ok(client.includes(marker), `module-sync client missing: ${marker}`);
 }
+// 归属排除走单一登记(sync-ownership),不再各写一份 —— 通用同步对专属引擎的 key 一律让路。
+assert.match(client, /import \{ isDedicatedSyncKey \} from '\.\/sync-ownership'/, 'module-sync 从 sync-ownership 引入归属判断');
 assert.match(client, /restoreCombinedBackup\(backup, 'replace'\)/, '落地复用 restoreCombinedBackup(replace 覆盖选中 key)');
 // 模块同步 GET 必须用 excludePrefix 把邮件全文行挡在门外(否则 20s 轮询下载数十 MB)
 assert.match(client, /excludePrefix=/, 'module-sync GET 用 excludePrefix 排除邮件行');
@@ -76,11 +78,14 @@ assert.ok(emailClient.includes("EMAIL_BODY_MODULE_PREFIX = 'email-body:'"), 'ema
 // Portal 顶层触发(mount + visibility)
 const portal = fs.readFileSync(portalPath, 'utf8');
 assert.match(portal, /import \{ autoSyncModulesWithCloud \} from '@\/lib\/portal\/cloud-module-sync'/, 'Portal 引入模块同步');
-assert.match(portal, /canUsePrivateRuntime\)\s*return;[\s\S]*?autoSyncModulesWithCloud\(\)/, 'Portal 登录后触发模块同步');
+// 数据泄露收口(P0):同步门必须在「本机数据归属」核对通过后才开 —— ownerConflict 非空时一律不同步,
+// 否则换人登录时上一账号数据会按当前登录人身份上传。
+assert.match(portal, /canSyncPrivateData\s*=\s*canUsePrivateRuntime\s*&&\s*ownerConflict === null/, 'Portal 同步门 = 登录 && 归属已核对(防跨账号泄露)');
+assert.match(portal, /canSyncPrivateData\)\s*return;[\s\S]*?autoSyncModulesWithCloud\(\)/, 'Portal 归属核对通过后才触发模块同步');
 assert.match(portal, /visibilityState === 'visible'[\s\S]{0,360}autoSyncModulesWithCloud\(\)/, 'Portal 回前台也触发模块同步');
 // 邮件全文同步也要在 Portal mount + 回前台触发
 assert.match(portal, /import \{ autoSyncEmailBodiesWithCloud \} from '@\/lib\/portal\/cloud-email-sync'/, 'Portal 引入邮件全文同步');
-assert.match(portal, /canUsePrivateRuntime\)\s*return;[\s\S]*?autoSyncEmailBodiesWithCloud\(\)/, 'Portal 登录后触发邮件全文同步');
+assert.match(portal, /canSyncPrivateData\)\s*return;[\s\S]*?autoSyncEmailBodiesWithCloud\(\)/, 'Portal 归属核对通过后才触发邮件全文同步');
 assert.match(portal, /visibilityState === 'visible'[\s\S]{0,420}autoSyncEmailBodiesWithCloud\(\)/, 'Portal 回前台也触发邮件全文同步');
 
 // package.json 注册

@@ -17,7 +17,6 @@ import { archiveCurrentSpace, restoreArchivedSpace } from '@/lib/portal/account-
 import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
 import { syncLearningWithCloud, registerLearningAutoPush } from '@/lib/portal/cloud-learning-sync';
 import { syncProfileWithCloud, registerProfileAutoPush } from '@/lib/portal/cloud-profile-sync';
-import { autoSyncBackupWithCloud } from '@/lib/portal/cloud-backup';
 import { autoSyncModulesWithCloud } from '@/lib/portal/cloud-module-sync';
 import { autoSyncEmailBodiesWithCloud } from '@/lib/portal/cloud-email-sync';
 import { autoSyncConnectorsOnBoot } from '@/lib/portal/connector-sync';
@@ -499,6 +498,10 @@ export default function Portal() {
     [shellManifest.tools, launchSurfaceContext],
   );
   const canUsePrivateRuntime = authReady && authSessionLoggedIn;
+  // 数据泄露收口(P0):在「本机数据归属」核对通过前,**任何**私有云同步都不许跑 —— 否则 A 没登出、
+  // B 同机登录时,弹窗还没弹,A 的记忆/健康/财务已按 B 的身份上传落库(进了 B 的账号)。ownerConflict
+  // 非空(other_account / anonymous_data)= 归属未定 → 一律不同步,直到用户在弹窗里选定归属。
+  const canSyncPrivateData = canUsePrivateRuntime && ownerConflict === null;
 
   useEffect(() => {
     setLaunchSurfaceContext((prev) => ({
@@ -538,7 +541,7 @@ export default function Portal() {
   // mount 时发生,落在「今天」页就看不到别端数据 —— 提到顶层后,打开落任何页都先拉平。
   // best-effort:未登录/离线静默,不阻塞渲染;20s 节流由 syncMemoryWithCloud 内部保证。
   useEffect(() => {
-    if (!canUsePrivateRuntime) return;
+    if (!canSyncPrivateData) return; // 归属未定(换人/匿名残留)绝不同步,防跨账号泄露
     // 账号级权益真源:登录即拉一次 /api/entitlements 落缓存 —— getTier() 优先读它,
     // 清缓存/换设备/换浏览器不再白嫖 Pro,到期也据实收权(报告 #6)。best-effort。
     void refreshServerEntitlement();
@@ -549,12 +552,10 @@ export default function Portal() {
     // 批次200:同步 profile(名字/头像)—— 登录/回前台按 identityUpdatedAt 做 last-write-wins,
     // 补上记忆/学习态之外最后一块跨端不一致(头像 婧/F/朋 各端不同的真因)。
     void syncProfileWithCloud();
-    // 全量数据跨浏览器同步(健康/足迹/银行流水等本地大数据):登录即先拉后推 —— 换浏览器
-    // 登录后自动从云 merge 回本机(补缺、不覆盖),拉完防抖上云。空浏览器只会被填充,绝不用
-    // 空盖云;pull 失败不推,防遮盖云端真备份。durability 免费,不查付费门。
-    void autoSyncBackupWithCloud();
-    // 记录级模块同步(根治·对齐 Google Contacts 式):健康/足迹/财务/物品 每个模块一行同步,
-    // 换端逐模块自动拉回(新设备首拉后 reload 水合),不再依赖整包备份大文件。需 user_module_data 表。
+    // 记录级模块同步(**唯一的通用云同步**):健康/足迹/财务/物品/关系/物品… 每个 durable key 一行同步,
+    // 换端逐模块自动拉回(新设备首拉后 reload 水合)。专属引擎(记忆图/头像/学习态/邮件)由 sync-ownership
+    // 登记、通用同步让路,避免多引擎抢同一份数据。整包备份(cloud-backup)只保留手动导出/恢复,不再自动跑
+    // (此前它与本引擎并发对同一 key 一个 merge 一个 replace,是换端数据横跳的一大来源)。
     void autoSyncModulesWithCloud();
     // 邮件全文逐封记录级同步(独立 IDB nesio-email-bodies,量级大不进模块同步):换端补齐邮件正文并
     // 即刻喂全文检索索引。仅本人账号内、不进 AI。best-effort,30s 节流。
@@ -566,7 +567,7 @@ export default function Portal() {
     // 批次205:改名字/头像/语言/教练/日报/主题任一 → 防抖自动推上云,别端拉取即一致。
     const unregisterProfilePush = registerProfileAutoPush();
     const onVisible = () => {
-      if (document.visibilityState === 'visible') { void syncMemoryWithCloud(); void syncLearningWithCloud(); void syncProfileWithCloud(); void autoSyncBackupWithCloud(); void autoSyncModulesWithCloud(); void autoSyncEmailBodiesWithCloud(); void autoSyncConnectorsOnBoot(); }
+      if (document.visibilityState === 'visible') { void syncMemoryWithCloud(); void syncLearningWithCloud(); void syncProfileWithCloud(); void autoSyncModulesWithCloud(); void autoSyncEmailBodiesWithCloud(); void autoSyncConnectorsOnBoot(); }
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {
@@ -574,7 +575,7 @@ export default function Portal() {
       unregisterLearningPush();
       unregisterProfilePush();
     };
-  }, [canUsePrivateRuntime]);
+  }, [canSyncPrivateData]);
 
   useEffect(() => {
     const onOnboardingVisibility = (event: Event) => {
@@ -1264,6 +1265,8 @@ export default function Portal() {
           onOpenChange={() => { /* 强制选择:不可点外/Esc 关,出口是卡片内的按钮 */ }}
           dismissible={false}
           card={false}
+          opaqueOverlay // 隐私:不透明遮罩,换人时背后不透出上一账号界面
+
           ariaLabel={ownerConflict.kind === 'other_account'
             ? L(dict, '这台设备上有另一个账号的数据', 'This device holds another account’s data')
             : L(dict, '把本机已有的记录归入这个账号?', 'Keep the records already on this device?')}

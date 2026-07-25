@@ -28,7 +28,7 @@ assert.ok(!/hasCloudEntitlement/.test(sync), 'P3:自动同步不锁付费墙(不
 // ── Portal 顶层触发 ──
 const portal = read('../components/portal/Portal.tsx');
 assert.match(portal, /import \{ syncMemoryWithCloud \} from '@\/lib\/portal\/cloud-memory-sync'/, 'Portal 引入共享同步');
-const portalHasTrigger = /canUsePrivateRuntime\)\s*return;[\s\S]*?syncMemoryWithCloud\(\)/.test(portal)
+const portalHasTrigger = /canSyncPrivateData\)\s*return;[\s\S]*?syncMemoryWithCloud\(\)/.test(portal)
   && /visibilitychange/.test(portal);
 assert.ok(portalHasTrigger, 'Portal 登录后触发同步且监听 visibilitychange 回前台再拉');
 
@@ -112,9 +112,10 @@ assert.match(assetsRoute, /sb - sa/, 'size 大者优先 —— 空备份哪怕�
 assert.match(assetsRoute, /\$\{identitySegment\}\/backup\//, '前缀按已鉴权身份拼(身份隔离,拿不到别人的)');
 assert.match(assetsRoute, /found: false/, '云端确实无备份 → found:false(非错误)');
 
-// Portal 顶层触发全量备份自动同步(mount 登录后 + visibility 回前台)
-assert.match(portal, /import \{ autoSyncBackupWithCloud \} from '@\/lib\/portal\/cloud-backup'/, 'Portal 引入全量备份自动同步');
-assert.match(portal, /canUsePrivateRuntime\)\s*return;[\s\S]*?autoSyncBackupWithCloud\(\)/, 'Portal 登录后触发全量备份同步');
-assert.match(portal, /visibilityState === 'visible'[\s\S]{0,260}autoSyncBackupWithCloud\(\)/, 'Portal 回前台也触发全量备份同步');
+// 全量备份自动同步已**下线**(降为手动导出/恢复):Portal 不再自动触发 autoSyncBackupWithCloud
+// —— 它此前与记录级模块同步并发对同一 key(一个 merge 一个 replace),是换端数据横跳的一大来源。
+// 通用自动同步现在**唯一**走 cloud-module-sync;备份引擎仍导出供设置页手动导出/恢复(见 :67)。
+assert.doesNotMatch(portal, /autoSyncBackupWithCloud\(\)/, '全量备份自动同步已下线,Portal 不再自动触发(改手动导出/恢复)');
+assert.match(portal, /import \{ autoSyncModulesWithCloud \} from '@\/lib\/portal\/cloud-module-sync'/, '通用自动同步改由记录级模块同步承担');
 
 console.log('cloud-auto-sync: OK');

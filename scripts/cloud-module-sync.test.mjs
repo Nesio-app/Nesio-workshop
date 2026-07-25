@@ -43,6 +43,8 @@ function makeCtx({ lsInit = {}, localEntries = {}, fetchImpl, withReload = false
       };
       if (p === './storage-health') return { logDropped: () => {} };
       if (p === './cloud-email-sync') return { EMAIL_BODY_MODULE_PREFIX: 'email-body:' };
+      // 专属引擎归属:记忆图 + 邮件行让路(与 sync-ownership 真值等价,覆盖测试用到的 key)。
+      if (p === './sync-ownership') return { isDedicatedSyncKey: (k) => k === 'nesio-life-graph-v1' || k.startsWith('email-body:') };
       return {};
     },
     _lastPost: () => lastPost,
