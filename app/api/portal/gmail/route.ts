@@ -299,6 +299,10 @@ export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const includeBody = url.searchParams.get('includeBody') === 'true';
   const shouldAnalyze = url.searchParams.get('analyze') === 'true';
+  // returnBodies=false:服务端照常抓正文做 AI 抽取,但**不把几百 KB 全文塞回响应**。
+  // 连接器「同步」按钮只用 nodes,带上全文会让响应体过大、手机弱网传一半就断,
+  // 前端误判「网络不稳」。全文另有 connector-sync 专路存本机,不受影响。
+  const returnBodies = url.searchParams.get('returnBodies') !== 'false';
   // 连接器批②:增量游标(unix 秒)。带 afterTs 只拉该时刻之后的新邮件;不带 = 全量窗口(30 天)。
   const afterTs = Number(url.searchParams.get('afterTs') || 0) || undefined;
   // 方案 A(单次同步稳过 60s 函数上限):全量窗口一次拉 100 封全文再喂 AI,
@@ -494,7 +498,7 @@ export async function GET(req: NextRequest) {
     emailCount: messages.length,
     // 邮件全文(emailId → 正文,≤20k)。仅回给本设备,客户端存本机 IndexedDB;
     // 隐私红线:不进云同步的记忆节点 attributes。免费/付费都本机可读。
-    emailBodies: includeBody ? buildEmailBodies(messages) : undefined,
+    emailBodies: includeBody && returnBodies ? buildEmailBodies(messages) : undefined,
   });
 
   // Persist refreshed access token as cookie so the next request doesn't need to re-refresh

@@ -753,7 +753,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       const to = setTimeout(() => ctrl.abort(), 75_000);
       let res: Response;
       try {
-        res = await fetch('/api/portal/gmail?includeBody=true&analyze=true', { signal: ctrl.signal });
+        // returnBodies=false:同步按钮只要 nodes,不拉几百 KB 全文回来(弱网会传断);
+        // 全文由 connector-sync 专路另存本机。
+        res = await fetch('/api/portal/gmail?includeBody=true&analyze=true&returnBodies=false', { signal: ctrl.signal });
       } finally {
         clearTimeout(to);
       }
