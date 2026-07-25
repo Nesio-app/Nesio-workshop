@@ -63,6 +63,7 @@ for (const marker of [
   // 「按账号找最新备份」GET 模式(跨浏览器同步命门):列出 {identity}/backup/、回最新那份签名 URL
   'cloudBackupList',
   'pickLatestBackupObject',
+  'backupObjectSize',
   'listStorageObjects',
   '/storage/v1/object/list/',
 ]) {

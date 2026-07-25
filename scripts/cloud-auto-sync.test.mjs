@@ -100,7 +100,9 @@ assert.match(runtime, /export async function listStorageObjects/, 'runtime 导�
 assert.match(runtime, /\/storage\/v1\/object\/list\//, '走 Supabase storage list API');
 const assetsRoute = read('../app/api/cloud/assets/route.ts');
 assert.match(assetsRoute, /list.*===.*'backup'|'backup'/, 'GET 支持 list=backup 模式');
-assert.match(assetsRoute, /pickLatestBackupObject/, '挑最新那份');
+assert.match(assetsRoute, /pickLatestBackupObject/, '挑最完整那份');
+assert.match(assetsRoute, /backupObjectSize/, '按体积挑「最完整」备份(而非最新)');
+assert.match(assetsRoute, /sb - sa/, 'size 大者优先 —— 空备份哪怕更新也盖不住真备份');
 assert.match(assetsRoute, /\$\{identitySegment\}\/backup\//, '前缀按已鉴权身份拼(身份隔离,拿不到别人的)');
 assert.match(assetsRoute, /found: false/, '云端确实无备份 → found:false(非错误)');
 

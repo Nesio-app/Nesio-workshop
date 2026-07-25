@@ -90,6 +90,11 @@ function storageHeaders(config: ReturnType<typeof getCloudStorageConfig>, conten
   return cloudRuntime.serviceRoleStorageHeaders(config, contentType, { 'x-upsert': 'false' });
 }
 
+function backupObjectSize(o: cloudRuntime.StorageObjectEntry): number {
+  const s = o.metadata?.size;
+  return typeof s === 'number' && Number.isFinite(s) ? s : 0;
+}
+
 function pickLatestBackupObject(
   objects: cloudRuntime.StorageObjectEntry[],
 ): cloudRuntime.StorageObjectEntry | null {
@@ -97,12 +102,17 @@ function pickLatestBackupObject(
     (o) => o && typeof o.name === 'string' && o.name && o.name !== '.emptyFolderPlaceholder' && o.id !== null,
   );
   if (valid.length === 0) return null;
-  // created_at 倒序挑最新;并列(或缺 created_at)时按 name 倒序兜底 —— 上传路径嵌
-  // `${Date.now()}-${uuid}`,13 位毫秒戳在同世纪内字典序即时间序,足够定位最新那份。
+  // 挑「最完整」那份 = **体积最大**,而非「最新」。换机场景下,一个近空浏览器 push 出的极小
+  // 备份哪怕 created_at 更新,也绝不能盖过原浏览器的真备份 —— 云备份是**加法/durability**语义
+  // (pull 用 merge 只补不删),取最大 = 数据最全 = 永不被空备份遮住(真机踩过:1.6MB 真备份
+  // 被随后一条 204B 空备份按「最新」规则盖掉,换机拉回空的)。体积并列/缺失再按 created_at 兜底。
   valid.sort((a, b) => {
+    const sa = backupObjectSize(a);
+    const sb = backupObjectSize(b);
+    if (sa !== sb) return sb - sa; // size 大者优先
     const ta = a.created_at || '';
     const tb = b.created_at || '';
-    if (ta !== tb) return ta < tb ? 1 : -1;
+    if (ta !== tb) return ta < tb ? 1 : -1; // 再新者优先
     return a.name < b.name ? 1 : -1;
   });
   return valid[0];

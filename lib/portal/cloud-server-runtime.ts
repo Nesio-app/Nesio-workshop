@@ -298,6 +298,7 @@ export interface StorageObjectEntry {
   id?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
+  metadata?: { size?: number | null } | null;
 }
 
 /**
