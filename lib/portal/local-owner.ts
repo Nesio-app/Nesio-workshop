@@ -53,6 +53,8 @@ export function hasMeaningfulLocalData(): boolean {
 /**
  * 清除本机全部用户数据(记忆/健康/财务/地点/照片/学习偏好…),保留登录态。
  * 与设置页「彻底删除本机全部数据」同一套动作 —— 单一实现,两处共用。
+ * 注意:走 deleteLifeNode **会把删除传导到云**(事实库/signals),是「彻底删号/抹数据」语义。
+ * 登出**不能**用它(否则连云端也抹了、重登拉不回)—— 登出走下面的 purgeLocalUserDataForLogout。
  */
 export async function purgeAllLocalUserData(): Promise<void> {
   try {
@@ -62,6 +64,24 @@ export async function purgeAllLocalUserData(): Promise<void> {
     await purgeLocalImages();                             // 记忆照片独立 IDB(nesio-images)
     await (await import('./local-email-body')).purgeEmailBodies(); // 邮件全文独立 IDB(nesio-email-bodies)
   } catch (err) { logDropped('local_owner.purge', err); }
+}
+
+/**
+ * 退出登录时的**本机清除**(数据泄露收口):把本机全部用户数据从这台设备抹掉,让下一个人/guest
+ * 看到的是空白,而**不**触碰云端(数据已跨端同步,重新登录会从云拉回)。与 purgeAllLocalUserData 的
+ * 关键区别:**绝不走 deleteLifeNode**(那会把删除传导上云),只做纯本地清除 ——
+ *   - purgeLocalData 直接 removeItem 掉 nesio-life-graph-v1 等 durable key(纯本地删,不发云删除)
+ *   - IDB(blob/照片/邮件全文)本地 clear
+ *   - 清主人记录:这台设备回到「干净设备」,重登静默认领、从云回灌。
+ */
+export async function purgeLocalUserDataForLogout(): Promise<void> {
+  try {
+    purgeLocalData(localStorage);                         // 本机 localStorage 用户数据(含记忆图 key)——纯本地删,不传导云
+    await purgeIdbBlobs();                                // 健康/临床/地点 IDB(本地 clear)
+    await purgeLocalImages();                             // 记忆照片 IDB(本地 clear)
+    await (await import('./local-email-body')).purgeEmailBodies(); // 邮件全文 IDB(本地 clear)
+    try { localStorage.removeItem(OWNER_KEY); } catch { /* ignore */ } // 清主人记录:回到干净设备
+  } catch (err) { logDropped('local_owner.logout_purge', err); }
 }
 
 export type OwnerVerdict =

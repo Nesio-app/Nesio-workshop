@@ -1198,8 +1198,18 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
   }
 
   async function signOut() {
+    // 服务端清票据(cookie)。
     await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
-    window.location.href = '/';
+    // 数据泄露收口:退出登录 = 把本机全部用户数据从这台设备抹掉(头像/昵称/记忆/今天/健康/财务/
+    // 地点/邮件全文…),否则下一个人或 guest 会看到上一个账号的数据。**只清本机、不碰云**
+    // (数据已跨端同步,重新登录自动从云拉回)—— 走 purgeLocalUserDataForLogout,绝不走会传导云删除的
+    // deleteLifeNode。best-effort:即便清理抛错也照常登出、进登录页。
+    try {
+      const { purgeLocalUserDataForLogout } = await import('@/lib/portal/local-owner');
+      await purgeLocalUserDataForLogout();
+    } catch { /* 仍要登出跳转 */ }
+    // 退出后进登录页(不是首页),兑现「退出登录 → 登录页 + 全空白」。
+    window.location.href = '/login';
   }
 
   const days = trialDaysLeft();
