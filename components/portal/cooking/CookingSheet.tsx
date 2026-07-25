@@ -7,7 +7,7 @@
  * 数据 = 本地 object 节点(食材)+ 打包菜谱;随生活图谱上你自己的云,不共享。每个异步动作有显式失败态。
  * 文案暖教练、不用红色制造焦虑;全用设计 token、无 emoji、线性图标。
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
 import { IconUtensils, IconClock, IconBox, IconMapPin, IconCamera, IconCheckSquare } from '../icons';
 import { L } from '@/lib/portal/i18n';
@@ -37,6 +37,7 @@ export default function CookingSheet({ open, onClose }: { open: boolean; onClose
   const [recipesErr, setRecipesErr] = useState(false);
   const [shopping, setShopping] = useState<ShoppingItem[]>([]);
   const [shopMsg, setShopMsg] = useState('');
+  const camInputRef = useRef<HTMLInputElement>(null);
 
   const reloadShopping = useCallback(() => { try { setShopping(getShoppingList()?.items ?? []); } catch { /* 购物清单读不出不致命,静默 */ } }, []);
   const reload = useCallback(() => {
@@ -163,7 +164,10 @@ export default function CookingSheet({ open, onClose }: { open: boolean; onClose
                 ? <AddForm onAdded={() => { setShowAdd(false); reload(); }} onCancel={() => setShowAdd(false)} onError={setErr} t={t} />
                 : (
                   <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-                    <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-cooking-camera'))} style={{ ...primaryBtn, display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}><IconCamera size={14} />{t('拍一拍进货', 'Snap to stock up')}</button>
+                    {/* 拍一拍:先原生拍照拿到文件,再把文件交给现有相机识别(与主相机同一条已验证路径,不走无文件取景) */}
+                    <input ref={camInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }}
+                      onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) window.dispatchEvent(new CustomEvent('nesio-open-cooking-camera', { detail: { file: f } })); }} />
+                    <button type="button" onClick={() => camInputRef.current?.click()} style={{ ...primaryBtn, display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}><IconCamera size={14} />{t('拍一拍进货', 'Snap to stock up')}</button>
                     <button type="button" onClick={() => { setShowAdd(true); setErr(''); }} style={{ ...ghostBtn, display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}><IconBox size={14} />{t('手动加一样', 'Add by hand')}</button>
                   </div>
                 )}

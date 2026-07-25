@@ -794,8 +794,13 @@ export default function Portal() {
     const calendarCreateHandler = () => { track('calendar_create_open'); setCalendarCreateOpen(true); };
     const familyHandler = () => { track('family_sharing_open'); setFamilyOpen(true); };
     const cookingHandler = () => { track('cooking_open'); setCookingOpen(true); };
-    // 做饭页「拍一拍进货」:关做饭 → 复用相机(进货模式,拍到的打食材)。相机 z=400 在全屏 sheet 之下,故先关做饭。
-    const cookingCameraHandler = () => { track('cooking_camera_open'); setCookingOpen(false); setPantryIntake(true); setCameraFile(null); setCaptureMode('camera'); };
+    // 做饭页「拍一拍进货」:做饭页先原生拍照拿到 File(detail.file)→ 关做饭 → 用文件走已验证的相机识别路径
+    // (进货模式,拍到的打食材)。相机 z=400 在全屏 sheet 之下,故先关做饭;相机关后自动重开做饭。
+    const cookingCameraHandler = (e: Event) => {
+      const file = (e as CustomEvent).detail?.file as File | undefined;
+      track('cooking_camera_open');
+      setCookingOpen(false); setPantryIntake(true); setCameraFile(file ?? null); setCaptureMode('camera');
+    };
     const rewardsHandler = () => { track('rewards_open'); setRewardsOpen(true); };
     const briefHandler = () => { track('brief_open', {}); setBriefOpen(true); };
     // 洞察浮层:底部导航 / 卡片 / 「开始练」都派事件打开;detail.tab 指定进哪个 tab(如 fitness)
