@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
-import { IconUtensils, IconClock, IconBox, IconMapPin } from '../icons';
+import { IconUtensils, IconClock, IconBox, IconMapPin, IconCamera } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -136,10 +136,15 @@ export default function CookingSheet({ open, onClose }: { open: boolean; onClose
                 </section>
               )}
 
-              {/* 进货 */}
+              {/* 进货:拍一拍(复用现有相机)或手动加一样 */}
               {showAdd
                 ? <AddForm onAdded={() => { setShowAdd(false); reload(); }} onCancel={() => setShowAdd(false)} onError={setErr} t={t} />
-                : <button type="button" onClick={() => { setShowAdd(true); setErr(''); }} style={{ ...primaryBtn, alignSelf: 'flex-start', display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}><IconBox size={14} />{t('进货 · 加一样', 'Stock up · add')}</button>}
+                : (
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                    <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-cooking-camera'))} style={{ ...primaryBtn, display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}><IconCamera size={14} />{t('拍一拍进货', 'Snap to stock up')}</button>
+                    <button type="button" onClick={() => { setShowAdd(true); setErr(''); }} style={{ ...ghostBtn, display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}><IconBox size={14} />{t('手动加一样', 'Add by hand')}</button>
+                  </div>
+                )}
 
               {/* 库存清单 */}
               <section>

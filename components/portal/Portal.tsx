@@ -452,6 +452,7 @@ export default function Portal() {
   const [calendarCreateOpen, setCalendarCreateOpen] = useState(false);
   const [familyOpen, setFamilyOpen] = useState(false);
   const [cookingOpen, setCookingOpen] = useState(false);
+  const [pantryIntake, setPantryIntake] = useState(false);   // 做饭页「拍一拍进货」:复用相机、拍的当食材落库
   const [rewardsOpen, setRewardsOpen] = useState(false);
   const [workoutSession, setWorkoutSession] = useState<import('./fitness/WorkoutPlayer').PlayerSession | null>(null);
   // 每次「开始跟练」自增,用作 WorkoutPlayer 的 key → 换一个训练(如跑步→力量)必定全新挂载,
@@ -793,6 +794,8 @@ export default function Portal() {
     const calendarCreateHandler = () => { track('calendar_create_open'); setCalendarCreateOpen(true); };
     const familyHandler = () => { track('family_sharing_open'); setFamilyOpen(true); };
     const cookingHandler = () => { track('cooking_open'); setCookingOpen(true); };
+    // 做饭页「拍一拍进货」:关做饭 → 复用相机(进货模式,拍到的打食材)。相机 z=400 在全屏 sheet 之下,故先关做饭。
+    const cookingCameraHandler = () => { track('cooking_camera_open'); setCookingOpen(false); setPantryIntake(true); setCameraFile(null); setCaptureMode('camera'); };
     const rewardsHandler = () => { track('rewards_open'); setRewardsOpen(true); };
     const briefHandler = () => { track('brief_open', {}); setBriefOpen(true); };
     // 洞察浮层:底部导航 / 卡片 / 「开始练」都派事件打开;detail.tab 指定进哪个 tab(如 fitness)
@@ -832,6 +835,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-calendar-create', calendarCreateHandler);
     window.addEventListener('nesio-open-family', familyHandler);
     window.addEventListener('nesio-open-cooking', cookingHandler);
+    window.addEventListener('nesio-open-cooking-camera', cookingCameraHandler);
     window.addEventListener('nesio-open-rewards', rewardsHandler);
     window.addEventListener('nesio-open-brief', briefHandler);
     window.addEventListener('nesio-open-insights', insightsHandler);
@@ -848,6 +852,7 @@ export default function Portal() {
       window.removeEventListener('nesio-open-calendar-create', calendarCreateHandler);
       window.removeEventListener('nesio-open-family', familyHandler);
       window.removeEventListener('nesio-open-cooking', cookingHandler);
+      window.removeEventListener('nesio-open-cooking-camera', cookingCameraHandler);
       window.removeEventListener('nesio-open-rewards', rewardsHandler);
       window.removeEventListener('nesio-open-brief', briefHandler);
       window.removeEventListener('nesio-open-insights', insightsHandler);
@@ -1262,7 +1267,7 @@ export default function Portal() {
       </div>
 
       {/* Capture sheets — rendered at root level, independent of TellNesioSheet state */}
-      <CameraSheet open={captureMode === 'camera'} initialFile={cameraFile} onClose={() => { setCaptureMode(null); setCameraFile(null); }} />
+      <CameraSheet open={captureMode === 'camera'} initialFile={cameraFile} intakeSubtype={pantryIntake ? '食材' : undefined} onClose={() => { const wasPantry = pantryIntake; setCaptureMode(null); setCameraFile(null); setPantryIntake(false); if (wasPantry) setTimeout(() => setCookingOpen(true), 80); }} />
       <VoiceInputSheet
         open={captureMode === 'voice'}
         intent={voiceIntent}

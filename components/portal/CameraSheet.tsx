@@ -53,6 +53,8 @@ interface CameraSheetProps {
   onClose: () => void;
   /** 扇形按钮同手势拍到的照片 — 有它就跳过选择页直接进识别流。 */
   initialFile?: File | null;
+  /** 进货模式:非空时,拍到的 object 节点打上该后台子类(如「食材」→ 进「做饭·库存」)。复用整条相机管线。 */
+  intakeSubtype?: string;
 }
 
 interface AnalyzedNode extends Omit<LifeNode, 'id' | 'createdAt'> {}
@@ -251,7 +253,7 @@ function dataUrlToFile(dataUrl: string, fileName: string): File | null {
   return new File([bytes], fileName, { type: mimeType || 'image/jpeg' });
 }
 
-export default function CameraSheet({ open, onClose, initialFile }: CameraSheetProps) {
+export default function CameraSheet({ open, onClose, initialFile, intakeSubtype }: CameraSheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -812,6 +814,8 @@ export default function CameraSheet({ open, onClose, initialFile }: CameraSheetP
           ...(n.note?.trim() ? { note: n.note.trim() as string } : {}),
           ...(n.expiry?.trim() ? { expiry: n.expiry.trim() as string } : {}),
           ...(n.price?.trim() ? { price: n.price.trim() as string } : {}),
+          // 进货模式:object 节点打后台子类(食材)→ 进「做饭·库存」而非物品页。属性,不渲染成标签。
+          ...(intakeSubtype && n.type === 'object' ? { subtype: intakeSubtype } : {}),
           ...(userTags.length ? { userTags: userTags.join(', ') as string } : {}),
         },
       });
