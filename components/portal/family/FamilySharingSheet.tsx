@@ -14,6 +14,7 @@ import { portalLocaleToDictionaryLocale, loadProfileSettings } from '@/lib/porta
 import { usePortalLocale } from '../use-portal-locale';
 import {
   listFamilies, createFamily, joinFamily, getBoard, getLedger, choreAction, recordPayout, syncMyFamilyProfile, setMyGoal,
+  listFamilyMembers, setMemberRole, removeMember,
   type FamilySummary, type FamilyMemberView, type BoardView, type LedgerView, type ChoreInstanceView,
 } from '@/lib/family/family-client';
 
@@ -72,6 +73,7 @@ export default function FamilySharingSheet({ open, onClose }: { open: boolean; o
               families={families}
               onSwitchFamily={setFamilyId}
               onOpenLedger={(personId, personName) => setView({ kind: 'ledger', personId, personName })}
+              onLeftFamily={() => { setFamilyId(''); void refreshFamilies(); }}
               t={t}
             />
           )}
@@ -260,10 +262,11 @@ function GoalSection({ familyId, me, owed, onSaved, t }: {
 }
 
 // ── 家庭板 ────────────────────────────────────────────────────────────────────
-function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
+function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, onLeftFamily, t }: {
   familyId: string; families: FamilySummary[];
   onSwitchFamily: (id: string) => void;
   onOpenLedger: (personId: string, personName: string) => void;
+  onLeftFamily: () => void;
   t: (a: string, b: string) => string;
 }) {
   const [board, setBoard] = useState<BoardView | null>(null);
@@ -404,9 +407,91 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
           ))}
         </div>
       </section>
+
+      <MembersManager familyId={familyId} meId={board.me.id} canManage={board.me.canApprove} onChanged={load} onLeft={onLeftFamily} t={t} />
     </div>
   );
 }
+
+// ── 成员管理(改角色 / 移出 / 退出)· 折叠 ──────────────────────────────────────
+function MembersManager({ familyId, meId, canManage, onChanged, onLeft, t }: {
+  familyId: string; meId: string; canManage: boolean; onChanged: () => void; onLeft: () => void; t: (a: string, b: string) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [members, setMembers] = useState<FamilyMemberView[] | null>(null);
+  const [busyId, setBusyId] = useState('');
+  const [err, setErr] = useState('');
+
+  const load = useCallback(async () => {
+    const r = await listFamilyMembers(familyId);
+    if (r.ok) setMembers(r.data.members);
+  }, [familyId]);
+  useEffect(() => { if (open && members === null) void load(); }, [open, members, load]);
+
+  async function setRole(m: FamilyMemberView, parent: boolean) {
+    setBusyId(m.id + 'role'); setErr('');
+    const role = parent
+      ? { canApprove: true, needsApproval: false, canRecordPayout: true }
+      : { canApprove: false, needsApproval: true, canRecordPayout: false };
+    const r = await setMemberRole(familyId, m.id, role);
+    setBusyId('');
+    if (!r.ok) { setErr(r.error === 'conflict' ? t('至少要留一位家长。', 'Keep at least one parent.') : t('没改成,再试一次。', 'Could not change — try again.')); return; }
+    void load(); onChanged();
+  }
+  async function remove(m: FamilyMemberView) {
+    setBusyId(m.id + 'remove'); setErr('');
+    const r = await removeMember(familyId, m.id);
+    setBusyId('');
+    if (!r.ok) { setErr(r.error === 'conflict' ? t('先把家长身份交给别人,再退出。', 'Hand parent role to someone first.') : t('没成,再试一次。', 'Could not do that — try again.')); return; }
+    if (m.id === meId) { onLeft(); return; }  // 退出自己 → 刷新家庭列表(已不是成员,board 会 403)
+    void load(); onChanged();
+  }
+
+  return (
+    <section>
+      <button type="button" onClick={() => setOpen((v) => !v)}
+        style={{ ...sectLabel, display: 'flex', alignItems: 'center', gap: 'var(--space-1)', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}>
+        {t('成员', 'Members')} {open ? '▾' : '▸'}
+      </button>
+      {open && (
+        <div style={cardStyle}>
+          {members === null && <p style={{ ...rowStyle, borderBottom: 'none', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)' }}>{t('加载中…', 'Loading…')}</p>}
+          {err && <p style={{ ...rowStyle, borderBottom: 'none', color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}>{err}</p>}
+          {(members ?? []).map((m, i) => {
+            const isParent = m.canApprove;
+            const isMe = m.id === meId;
+            return (
+              <div key={m.id} style={{ ...rowStyle, flexWrap: 'wrap', borderBottom: i === (members?.length ?? 0) - 1 ? 'none' : rowStyle.borderBottom }}>
+                <MemberAvatar name={m.name} avatar={m.avatarUrl || ''} size={28} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{m.name}{isMe ? t(' (我)', ' (me)') : ''}</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{isParent ? t('家长 · 能审核·记付款', 'Parent · reviews & pays') : t('孩子 · 做完要家长看一眼', 'Kid · needs review')}</div>
+                </div>
+                {canManage && (
+                  <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+                    <button type="button" onClick={() => void setRole(m, true)} disabled={busyId === m.id + 'role' || isParent}
+                      style={{ ...roleChip, ...(isParent ? roleChipOn : {}) }}>{t('家长', 'Parent')}</button>
+                    <button type="button" onClick={() => void setRole(m, false)} disabled={busyId === m.id + 'role' || !isParent}
+                      style={{ ...roleChip, ...(!isParent ? roleChipOn : {}) }}>{t('孩子', 'Kid')}</button>
+                  </div>
+                )}
+                {(canManage || isMe) && (
+                  <button type="button" onClick={() => void remove(m)} disabled={busyId === m.id + 'remove'}
+                    style={{ border: 'none', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: 'var(--space-1)' }}>
+                    {isMe ? t('退出', 'Leave') : t('移出', 'Remove')}
+                  </button>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </section>
+  );
+}
+const roleChip: React.CSSProperties = { border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', padding: 'var(--space-1) var(--space-2)', cursor: 'pointer', fontFamily: 'var(--font-sans)' };
+const roleChipOn: React.CSSProperties = { background: 'var(--portal-accent-soft-md)', color: 'var(--portal-accent)', borderColor: 'transparent', fontWeight: 'var(--weight-semibold)' as unknown as number };
+
 // 成员头像:配到 People 有头像用头像,否则首字母兜底(圆形,主题色)。
 function MemberAvatar({ name, avatar, size = 28 }: { name: string; avatar: string; size?: number }) {
   const initial = (name || '?').trim().charAt(0).toUpperCase();

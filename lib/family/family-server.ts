@@ -63,6 +63,13 @@ async function restPatch<T>(config: CloudRuntimeConfig, table: string, query: st
   } catch { return null; }
 }
 
+async function restDelete(config: CloudRuntimeConfig, table: string, query: string): Promise<boolean> {
+  try {
+    const res = await fetch(restUrl(config, table, query), { method: 'DELETE', headers: serviceRoleRestHeaders(config) });
+    return res.ok;
+  } catch { return false; }
+}
+
 // ── 行类型(DB 快照)────────────────────────────────────────────────────────────
 interface MemberRow { family_id: string; user_id: string; display_name: string; can_approve: boolean; needs_approval: boolean; can_record_payout: boolean; email: string | null; avatar_url: string | null; goal_amount: number | null; goal_label: string | null; }
 interface InstanceRow { id: string; family_id: string; template_id: string | null; assignee_user_id: string | null; due_date: string; value: number; state: ChoreState; needs_approval: boolean; done_at: string | null; approved_at: string | null; proof_asset_ref: string | null; title: string | null; source_event_id: string | null; }
@@ -346,6 +353,41 @@ export async function cancelEventChoreOp(actor: FamilyActor, input: { familyId: 
     `id=in.(${ids.join(',')})&family_id=eq.${input.familyId}`, { deleted_at: new Date().toISOString() });
   if (saved === null) return fail('upstream', 502);
   return { ok: true, value: { cancelled: ids.length } };
+}
+
+/** 改某成员的权限(家长动作,需 can_approve)。防锁死:不把最后一个能审核的人降级。 */
+export async function setMemberRoleOp(actor: FamilyActor, input: { familyId: string; memberUserId: string; canApprove: boolean; needsApproval: boolean; canRecordPayout: boolean }): Promise<FamilyResult<{ ok: true }>> {
+  const gate = await requireMember(actor, input.familyId);
+  if (!gate.ok) return gate;
+  if (!memberCan(memberFromRow(gate.value), 'approve')) return fail('forbidden', 403);
+  const rows = await restGet<MemberRow>(actor.config, 'family_members', `family_id=eq.${input.familyId}&select=user_id,can_approve`);
+  if (rows === null) return fail('upstream', 502);
+  const target = rows.find((r) => r.user_id === input.memberUserId);
+  if (!target) return fail('not_found', 404);
+  const approvers = rows.filter((r) => r.can_approve).length;
+  if (target.can_approve && !input.canApprove && approvers <= 1) return fail('conflict', 409); // 别把唯一家长降级
+  const saved = await restPatch<MemberRow>(actor.config, 'family_members',
+    `family_id=eq.${input.familyId}&user_id=eq.${input.memberUserId}`,
+    { can_approve: !!input.canApprove, needs_approval: !!input.needsApproval, can_record_payout: !!input.canRecordPayout });
+  if (saved === null) return fail('upstream', 502);
+  return { ok: true, value: { ok: true } };
+}
+
+/** 移出成员(踢别人需 can_approve;踢自己=退出,任何成员可)。防锁死:不踢掉唯一家长(除非只剩自己)。 */
+export async function removeMemberOp(actor: FamilyActor, input: { familyId: string; memberUserId: string }): Promise<FamilyResult<{ ok: true }>> {
+  const gate = await requireMember(actor, input.familyId);
+  if (!gate.ok) return gate;
+  const isSelf = input.memberUserId === actor.userId;
+  if (!isSelf && !memberCan(memberFromRow(gate.value), 'approve')) return fail('forbidden', 403);
+  const rows = await restGet<MemberRow>(actor.config, 'family_members', `family_id=eq.${input.familyId}&select=user_id,can_approve`);
+  if (rows === null) return fail('upstream', 502);
+  const target = rows.find((r) => r.user_id === input.memberUserId);
+  if (!target) return { ok: true, value: { ok: true } };  // 已不在,幂等
+  const approvers = rows.filter((r) => r.can_approve).length;
+  if (target.can_approve && approvers <= 1 && rows.length > 1) return fail('conflict', 409); // 别留一堆孩子没家长
+  const del = await restDelete(actor.config, 'family_members', `family_id=eq.${input.familyId}&user_id=eq.${input.memberUserId}`);
+  if (!del) return fail('upstream', 502);
+  return { ok: true, value: { ok: true } };
 }
 
 /** 家庭全体成员(供「分派给家人」选人)。名字/头像来自各成员自己的账号资料。任何成员可读。 */
