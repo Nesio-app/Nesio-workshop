@@ -86,6 +86,14 @@ export function choreAction(
 export function listFamilyMembers(familyId: string): Promise<ApiResult<{ familyId: string; me: FamilyMemberView; members: FamilyMemberView[] }>> {
   return api(`/api/portal/family/members?familyId=${encodeURIComponent(familyId)}`);
 }
+/** 改某成员权限(需 can_approve)。 */
+export function setMemberRole(familyId: string, memberUserId: string, role: { canApprove: boolean; needsApproval: boolean; canRecordPayout: boolean }): Promise<ApiResult<Record<string, never>>> {
+  return api('/api/portal/family/member', postJson({ action: 'role', familyId, memberUserId, ...role }));
+}
+/** 移出成员(踢别人需 can_approve;memberUserId=自己=退出家庭)。 */
+export function removeMember(familyId: string, memberUserId: string): Promise<ApiResult<Record<string, never>>> {
+  return api('/api/portal/family/member', postJson({ action: 'remove', familyId, memberUserId }));
+}
 export function getEventAssignment(sourceEventId: string): Promise<ApiResult<EventAssignmentView>> {
   return api(`/api/portal/family/assignment?sourceEventId=${encodeURIComponent(sourceEventId)}`);
 }
