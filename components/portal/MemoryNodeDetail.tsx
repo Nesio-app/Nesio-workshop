@@ -1206,7 +1206,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
             <>
               <PersonSection node={n} relatedNodes={relatedNodes} onOpenNode={onOpenNode} />
               {/* item 6:若这个人已按邮箱配到某家庭成员,显示 TA 的家务/攒钱回落。 */}
-              <FamilyPersonSummaryLazy personNodeId={n.id} />
+              <FamilyPersonSummaryLazy personNodeId={n.id} personEmail={typeof n.attributes?.email === 'string' ? n.attributes.email : ''} />
             </>
           )}
           {n.type === 'object' && (
