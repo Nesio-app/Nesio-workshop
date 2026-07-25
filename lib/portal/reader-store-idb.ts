@@ -7,6 +7,7 @@
  */
 
 import type { ReaderBook } from './adhd-reader';
+import { logDropped, reportStorageDropped } from './storage-health';
 
 const DB_NAME = 'nesio-reader';
 const STORE = 'books';
@@ -26,12 +27,13 @@ function openDB(): Promise<IDBDatabase | null> {
 
 export async function saveReaderBook(book: ReaderBook): Promise<void> {
   const db = await openDB();
-  if (!db) return;
+  // 红线:storage 写失败必须可见(否则导入的书配额满/隐私模式下静默丢失,连日志都没)。
+  if (!db) { logDropped('reader_book.save', new Error('indexeddb_unavailable')); reportStorageDropped(); return; }
   await new Promise<void>((resolve) => {
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).put(book);
     tx.oncomplete = () => resolve();
-    tx.onerror = () => resolve();
+    tx.onerror = () => { logDropped('reader_book.save', tx.error); reportStorageDropped(); resolve(); };
   });
 }
 

@@ -63,15 +63,21 @@ export async function GET(request: NextRequest) {
   }
 
   const keyPrefix = sanitizePrefix(request.nextUrl.searchParams.get('keyPrefix'));
-  const excludePrefix = sanitizePrefix(request.nextUrl.searchParams.get('excludePrefix'));
+  // excludePrefix 支持逗号分隔多个前缀(邮件/书籍等 per-record 专属引擎的行都排除),各自 sanitize。
+  const excludePrefixes = (request.nextUrl.searchParams.get('excludePrefix') || '')
+    .split(',').map((s) => sanitizePrefix(s)).filter((s): s is string => Boolean(s));
 
   try {
     const url = new URL('/rest/v1/user_module_data', config.supabaseUrl);
     url.searchParams.set('identity_key', `eq.${cloudIdentity.identityKey}`);
-    // 前缀分流(PostgREST like/not.like,`*` 为通配符):只拉/只排某前缀的行,避免把邮件全文
-    // 海量行卷进普通模块同步(反之亦然)。二者互斥,keyPrefix 优先。
-    if (keyPrefix) url.searchParams.set('module_key', `like.${keyPrefix}*`);
-    else if (excludePrefix) url.searchParams.set('module_key', `not.like.${excludePrefix}*`);
+    // 前缀分流(PostgREST like/not.like,`*` 为通配符):只拉/只排某些前缀的行,避免把邮件全文/书籍
+    // 等海量 per-record 行卷进普通模块同步(反之亦然)。keyPrefix 优先(只取);否则排除给定前缀。
+    if (keyPrefix) {
+      url.searchParams.set('module_key', `like.${keyPrefix}*`);
+    } else if (excludePrefixes.length) {
+      // 多个前缀:PostgREST and=(module_key.not.like.p1*,module_key.not.like.p2*)
+      url.searchParams.set('and', `(${excludePrefixes.map((p) => `module_key.not.like.${p}*`).join(',')})`);
+    }
     url.searchParams.set('select', 'module_key,data,updated_at');
     const res = await fetch(url.toString(), {
       headers: cloudRuntime.serviceRoleRestHeaders(config),

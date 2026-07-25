@@ -9,7 +9,7 @@
  * 与 local-image-store 同构;「清空本地数据」时一并清。
  */
 
-import { logDropped } from '@/lib/portal/storage-health';
+import { logDropped, reportStorageDropped } from '@/lib/portal/storage-health';
 
 const DB_NAME = 'nesio-email-bodies';
 const STORE = 'bodies';
@@ -31,12 +31,12 @@ function openDB(): Promise<IDBDatabase | null> {
 export async function putEmailBody(emailId: string, body: string): Promise<void> {
   if (!emailId || !body) return;
   const db = await openDB();
-  if (!db) { logDropped('email_body.put', new Error('indexeddb_unavailable')); return; }
+  if (!db) { logDropped('email_body.put', new Error('indexeddb_unavailable')); reportStorageDropped(); return; }
   await new Promise<void>((resolve) => {
     const tx = db.transaction(STORE, 'readwrite');
     tx.objectStore(STORE).put(body, emailId);
     tx.oncomplete = () => resolve();
-    tx.onerror = () => { logDropped('email_body.put', tx.error); resolve(); };
+    tx.onerror = () => { logDropped('email_body.put', tx.error); reportStorageDropped(); resolve(); };
   });
 }
 
@@ -44,7 +44,7 @@ export async function putEmailBody(emailId: string, body: string): Promise<void>
 export async function putEmailBodies(map: Record<string, string>): Promise<void> {
   const db = await openDB();
   if (!map) return;
-  if (!db) { logDropped('email_body.putMany', new Error('indexeddb_unavailable')); return; }
+  if (!db) { logDropped('email_body.putMany', new Error('indexeddb_unavailable')); reportStorageDropped(); return; }
   await new Promise<void>((resolve) => {
     const tx = db.transaction(STORE, 'readwrite');
     const os = tx.objectStore(STORE);
@@ -52,7 +52,7 @@ export async function putEmailBodies(map: Record<string, string>): Promise<void>
       if (id && typeof body === 'string' && body) os.put(body, id);
     }
     tx.oncomplete = () => resolve();
-    tx.onerror = () => { logDropped('email_body.putMany', tx.error); resolve(); };
+    tx.onerror = () => { logDropped('email_body.putMany', tx.error); reportStorageDropped(); resolve(); };
   });
 }
 

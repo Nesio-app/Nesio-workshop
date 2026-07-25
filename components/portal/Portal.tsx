@@ -19,6 +19,7 @@ import { syncLearningWithCloud, registerLearningAutoPush } from '@/lib/portal/cl
 import { syncProfileWithCloud, registerProfileAutoPush } from '@/lib/portal/cloud-profile-sync';
 import { autoSyncModulesWithCloud } from '@/lib/portal/cloud-module-sync';
 import { autoSyncEmailBodiesWithCloud } from '@/lib/portal/cloud-email-sync';
+import { autoSyncReaderBooksWithCloud } from '@/lib/portal/cloud-reader-sync';
 import { autoSyncConnectorsOnBoot } from '@/lib/portal/connector-sync';
 
 // Heavy sheets load on first open, not at boot — together they were ~3.5k
@@ -560,6 +561,9 @@ export default function Portal() {
     // 邮件全文逐封记录级同步(独立 IDB nesio-email-bodies,量级大不进模块同步):换端补齐邮件正文并
     // 即刻喂全文检索索引。仅本人账号内、不进 AI。best-effort,30s 节流。
     void autoSyncEmailBodiesWithCloud();
+    // 导入书籍逐本记录级同步(独立 IDB nesio-reader,量级大不进模块同步):换端补齐导入的书,
+    // 让阅读进度不再指向空书。仅本人账号内、不进 AI。best-effort,30s 节流。
+    void autoSyncReaderBooksWithCloud();
     // 开机/登录:所有已接入的外部连接器(日历/邮件/flomo/银行/通讯录)自动同步一次拉新内容。
     // 30 分钟节流(内部保证),未连接的源静默早退;best-effort 不阻塞渲染。
     void autoSyncConnectorsOnBoot();
@@ -567,7 +571,7 @@ export default function Portal() {
     // 批次205:改名字/头像/语言/教练/日报/主题任一 → 防抖自动推上云,别端拉取即一致。
     const unregisterProfilePush = registerProfileAutoPush();
     const onVisible = () => {
-      if (document.visibilityState === 'visible') { void syncMemoryWithCloud(); void syncLearningWithCloud(); void syncProfileWithCloud(); void autoSyncModulesWithCloud(); void autoSyncEmailBodiesWithCloud(); void autoSyncConnectorsOnBoot(); }
+      if (document.visibilityState === 'visible') { void syncMemoryWithCloud(); void syncLearningWithCloud(); void syncProfileWithCloud(); void autoSyncModulesWithCloud(); void autoSyncEmailBodiesWithCloud(); void autoSyncReaderBooksWithCloud(); void autoSyncConnectorsOnBoot(); }
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {

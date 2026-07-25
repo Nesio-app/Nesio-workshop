@@ -18,8 +18,7 @@ import { gzipSync, gunzipSync, strToU8, strFromU8 } from 'fflate';
 import { buildCombinedBackup, restoreCombinedBackup } from './cloud-backup';
 import type { FullBackup } from './full-backup';
 import { logDropped } from './storage-health';
-import { EMAIL_BODY_MODULE_PREFIX } from './cloud-email-sync';
-import { isDedicatedSyncKey } from './sync-ownership';
+import { isDedicatedSyncKey, DEDICATED_SYNC_PREFIXES } from './sync-ownership';
 
 // 归属:记忆图/头像身份/学习态/邮件全文 各有专属引擎(见 sync-ownership.ts),通用模块同步一律让路,
 // 避免两套合并语义抢同一份数据(换端横跳的根因)。判断统一走 isDedicatedSyncKey,不再各写一份。
@@ -132,9 +131,10 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
   if (typeof window === 'undefined') return { applied: 0, newlyAdded: 0 };
   let rows: Array<{ moduleKey?: string; data?: unknown; updatedAt?: string | null }>;
   try {
-    // 排除邮件全文行(email-body:*):它们量级大、由 cloud-email-sync 另行逐封同步,绝不卷进这里
-    // (否则 20s 轮询每次下载数十 MB)。服务端过滤,不只客户端跳过。
-    const res = await fetch(`/api/cloud/module-data?excludePrefix=${encodeURIComponent(EMAIL_BODY_MODULE_PREFIX)}`, { cache: 'no-store' });
+    // 排除所有 per-record 专属引擎的行(邮件全文 email-body:* / 书籍 reader-book:* …):它们量级大、
+    // 各由自己的引擎同步,绝不卷进这里(否则 20s 轮询每次下载数十 MB)。服务端过滤,不只客户端跳过。
+    // 前缀集来自 sync-ownership 单一真源 —— 以后新增 per-record 引擎自动被排除,无需改这里。
+    const res = await fetch(`/api/cloud/module-data?excludePrefix=${encodeURIComponent(DEDICATED_SYNC_PREFIXES.join(','))}`, { cache: 'no-store' });
     const data = (await res.json().catch(() => ({}))) as { ok?: boolean; modules?: unknown };
     if (!res.ok || !data.ok || !Array.isArray(data.modules)) return { applied: 0, newlyAdded: 0 };
     rows = data.modules as typeof rows;
