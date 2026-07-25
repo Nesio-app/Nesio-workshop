@@ -79,8 +79,11 @@ assert.match(backup, /SYNCED_HIGHWATER_KEY/, 'reload 由「已反映条目数」
 assert.ok(!/FIRST_SYNC_DONE_FLAG/.test(backup), '一次性首刷标志已废弃(会漏掉后到的真数据)');
 // 空数据保险丝:0 条目绝不上云(空浏览器绝不用空数据盖云端)
 assert.match(backup, /entryCount === 0[\s\S]{0,80}ok: true/, '空数据保险丝:0 条目静默成功、不上云');
-// 压缩:超 8MB 的高冗余数据(健康/足迹)gzip 后上传;pull 按 gzip magic 字节自动解压(新旧兼容)
-assert.match(backup, /CompressionStream[\s\S]{0,200}gzip/, 'push 前 gzip 压缩(把超 8MB 挡回来)');
+// 压缩:高冗余数据(健康/足迹)gzip 后上传;pull 按 gzip magic 字节自动解压(新旧兼容)。
+// 用 fflate(纯 JS,所有浏览器都支持),不依赖原生 CompressionStream(旧 Safari 不支持会双向都挂)。
+assert.match(backup, /from 'fflate'/, '用 fflate 压缩(纯 JS,全浏览器兼容)');
+assert.match(backup, /gzipSync\(strToU8/, 'push 前 gzip 压缩');
+assert.ok(!/new (Compression|Decompression)Stream/.test(backup), '不再实例化原生 CompressionStream(旧环境不支持)');
 assert.match(backup, /0x1f && buf\[1\] === 0x8b/, 'pull 按 gzip magic 字节(1f 8b)识别并解压');
 assert.match(backup, /gunzipToString/, 'pull 有解压路径');
 // 防遮盖闸:本机比云端最新那份还少条目就不推(pull 回报 cloudEntryCount,自动推带 skipIfFewerThan)
