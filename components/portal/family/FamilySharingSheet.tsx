@@ -169,6 +169,25 @@ function SetupView({ t, onDone }: { t: (a: string, b: string) => string; onDone:
   );
 }
 
+// ── 邀请码(常驻家庭板,随时可取 —— 修「创建后邀请码找不到了」)────────────────────
+function InviteSection({ inviteCode, t }: { inviteCode: string; t: (a: string, b: string) => string }) {
+  const [copied, setCopied] = useState(false);
+  if (!inviteCode) return null;
+  async function copy() {
+    try { await navigator.clipboard.writeText(inviteCode); setCopied(true); setTimeout(() => setCopied(false), 1500); }
+    catch { /* 复制不了也没关系,码是明文摆着的,可手抄 */ }
+  }
+  return (
+    <div style={{ ...cardStyle, padding: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('邀请家人 · 让 TA 各自登录后输入这个码', 'Invite family — they enter this after signing in')}</div>
+        <div style={{ fontSize: 'var(--text-h3)', fontWeight: 'var(--weight-bold)' as unknown as number, letterSpacing: '0.14em', color: 'var(--portal-accent)' }}>{inviteCode}</div>
+      </div>
+      <button type="button" onClick={copy} style={ghostBtn}>{copied ? t('已复制', 'Copied') : t('复制', 'Copy')}</button>
+    </div>
+  );
+}
+
 // ── 家庭板 ────────────────────────────────────────────────────────────────────
 function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
   familyId: string; families: FamilySummary[];
@@ -209,6 +228,8 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
       )}
 
       {err && <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}>{t('那一下没成,再试一次。', 'That didn’t go through — try again.')}</span>}
+
+      <InviteSection inviteCode={families.find((f) => f.familyId === familyId)?.inviteCode ?? ''} t={t} />
 
       <section>
         <p style={sectLabel}>{t('你今天的活', 'Your chores today')}</p>

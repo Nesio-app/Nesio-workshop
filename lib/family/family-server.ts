@@ -150,16 +150,17 @@ export async function joinFamily(actor: FamilyActor, input: { inviteCode: string
 }
 
 /** 我所属的全部家庭 + 我在每个家庭的权限。 */
-export async function listMyFamilies(actor: FamilyActor): Promise<FamilyResult<Array<{ familyId: string; name: string; me: FamilyMember }>>> {
+export async function listMyFamilies(actor: FamilyActor): Promise<FamilyResult<Array<{ familyId: string; name: string; inviteCode: string; me: FamilyMember }>>> {
   const mine = await restGet<MemberRow>(actor.config, 'family_members', `user_id=eq.${actor.userId}&select=*`);
   if (mine === null) return fail('upstream', 502);
   if (!mine.length) return { ok: true, value: [] };
   const ids = mine.map((m) => m.family_id);
-  const fams = await restGet<{ id: string; name: string }>(actor.config, 'families', `id=in.(${ids.join(',')})&select=id,name`);
-  const nameById = new Map((fams ?? []).map((f) => [f.id, f.name]));
+  const fams = await restGet<{ id: string; name: string; invite_code: string }>(actor.config, 'families', `id=in.(${ids.join(',')})&select=id,name,invite_code`);
+  const byId = new Map((fams ?? []).map((f) => [f.id, f]));
   return {
     ok: true,
-    value: mine.map((m) => ({ familyId: m.family_id, name: nameById.get(m.family_id) ?? 'Family', me: memberFromRow(m) })),
+    // 邀请码随家庭一起回,家庭板可随时展示 —— 修「创建后邀请码就找不到了」。
+    value: mine.map((m) => ({ familyId: m.family_id, name: byId.get(m.family_id)?.name ?? 'Family', inviteCode: byId.get(m.family_id)?.invite_code ?? '', me: memberFromRow(m) })),
   };
 }
 

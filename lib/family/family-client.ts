@@ -11,7 +11,7 @@ export interface ChoreInstanceView {
   id: string; templateId: string; assigneeId: string; dueDate: string; value: number;
   state: ChoreStateView; needsApproval: boolean; doneAt?: string; approvedAt?: string; proofPhotoRef?: string;
 }
-export interface FamilySummary { familyId: string; name: string; me: FamilyMemberView; }
+export interface FamilySummary { familyId: string; name: string; inviteCode: string; me: FamilyMemberView; }
 export interface BoardView {
   familyId: string; me: FamilyMemberView;
   myChoresToday: ChoreInstanceView[]; toReview: ChoreInstanceView[];
