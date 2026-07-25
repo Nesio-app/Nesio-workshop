@@ -60,12 +60,10 @@ export function keyKind(key: string): StorageKind {
 // durable 但「绝不出本机」—— 即便备份也不带走(隐私最敏感的按人数据:含医疗/药物/健康)。
 // 仍算用户数据:「删除数据」会清它;只是不进任何云备份文件,兑现「敏感只存本机、不上传」。
 export const LOCAL_ONLY_KEYS = new Set<string>([
-  'nesio-person-records-v1', // 人缘㊄:按人分类数据(成绩/消费/位置/医疗/药物/健康)
-  // 「纯本地/不上传」的**每设备进度**:各自代码注释已声明不上传,但此前被误判成 durable → 卷进
-  // 跨端同步 → 被一台没有它们的浏览器空状态盖掉(真机丢了积分/跟练)。回归其本意:绝不出本机。
-  'nesio-rewards-v1',          // 积分/奖励(rewards-engine:「纯本地,不上传」)
-  'nesio-place-photos-v1',     // 地点照片覆盖映射(「全本机,不上传」)
-  'nesio-reader-highlights-v1', // 阅读高亮(「纯本地」)
+  'nesio-person-records-v1', // 人缘㊄:按人分类数据(成绩/消费/位置/医疗/药物/健康)—— 隐私红线,默认不出本机
+  // 注:积分/地点照片/阅读高亮 曾因「被空状态跨端盖掉」临时列此(#216 止血)。现全部改为**云端同步**
+  // (workshop:一切数据跨端一致):它们是 durable → 记录级模块同步覆盖,且靠 cloud-module-sync 的
+  // 「反遮盖闸」(云端明显更空的值绝不覆盖本机非空值)兜住,不会再被清空的浏览器盖掉。
 ]);
 
 export function isLocalOnly(key: string): boolean {
