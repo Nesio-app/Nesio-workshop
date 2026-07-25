@@ -333,6 +333,14 @@ export async function pullBackupFromCloud(mode: RestoreMode = 'merge'): Promise<
 
 const AUTO_SYNC_MIN_INTERVAL_MS = 20_000;
 const AUTO_PUSH_DEBOUNCE_MS = 8_000;
+/**
+ * 「本浏览器已完成首次云同步」标志(localStorage)。用途:冷浏览器(换个网页/新设备)首次把
+ * 云端数据 merge 回本机后**需要 reload**,否则各 store 的内存缓存仍是空的(health/place-trail/
+ * inventory 等只在加载时读一次 IDB,restore 直写 IDB 不触发它们的 *-updated 事件)—— 数据在库里
+ * 但界面空,正是「换个网页记录不显示」的根因。用此标志把 reload 限制为「每个浏览器仅首次一次」,
+ * 避免每次回前台都刷新造成 reload 循环。
+ */
+const FIRST_SYNC_DONE_FLAG = 'nesio-backup-first-sync-done-v1';
 let autoSyncLastAt = 0;
 let autoSyncInFlight = false;
 let autoPushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -359,8 +367,30 @@ export async function autoSyncBackupWithCloud(opts: { force?: boolean } = {}): P
   autoSyncLastAt = now;
   try {
     const pull = await pullBackupFromCloud('merge');
-    // 只在拉成功、或云端确实空(no_backup)时才推;其余失败态一律不推(防遮盖云端真备份)。
-    if (pull.ok || pull.error === 'no_backup') scheduleAutoPush();
+    if (pull.ok) {
+      const restoredSomething = (pull.restoredKeys ?? 0) + (pull.idbRestored ?? 0) > 0;
+      let firstSync = false;
+      let flagPersisted = false;
+      try {
+        firstSync = !localStorage.getItem(FIRST_SYNC_DONE_FLAG);
+        localStorage.setItem(FIRST_SYNC_DONE_FLAG, '1');
+        // 只有真写进去了才算数 —— 隐私模式 setItem 可能静默失败,若此时仍 reload 会因标志
+        // 每次都缺而**死循环刷新**。写不进 → 不 reload(数据已落 IDB,退化为需手动刷新一次)。
+        flagPersisted = localStorage.getItem(FIRST_SYNC_DONE_FLAG) === '1';
+      } catch { firstSync = false; flagPersisted = false; }
+      // 冷浏览器首次拉回且确有数据:reload 让各 store 从 IDB/localStorage 重新水合
+      // (健康/足迹/物品等缓存态不会自更新)。仅首次一次(标志已持久化),不进 reload 循环。
+      if (firstSync && flagPersisted && restoredSomething && typeof window.location?.reload === 'function') {
+        window.location.reload();
+        return;
+      }
+      scheduleAutoPush();
+    } else if (pull.error === 'no_backup') {
+      // 云端确实无备份:也推(把本机数据首次带上云;空账号由 push 的 entryCount===0 保险丝拦)。
+      // 不置 first-sync 标志 —— 等原浏览器把数据推上云后,本浏览器下次拉到真数据仍会首刷一次。
+      scheduleAutoPush();
+    }
+    // 其余失败态(网络/未登录/坏备份)一律不推(防本地空/旧数据遮盖云端真备份)。
   } catch {
     /* best-effort:静默(pull 内部已 fail-safe) */
   } finally {

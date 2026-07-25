@@ -68,8 +68,13 @@ assert.match(backup, /export async function autoSyncBackupWithCloud/, '导出 au
 // 命门①②:pull 走服务端「按账号找最新」,不再依赖本地 last-backup 记录(新浏览器为空 → 拉不回)
 assert.match(backup, /\/api\/cloud\/assets\?list=backup/, 'pull 问服务端要账号下最新备份签名 URL(跨浏览器命门)');
 assert.ok(!/const last = lastCloudBackup\(\);\s*\n\s*if \(!last\?\.storagePath\) return \{ ok: false, error: 'no_backup' \}/.test(backup), 'pull 不再靠本地 last-backup 记录判 no_backup(否则新浏览器永远拉不回)');
-// 先拉后推 + pull 失败不推(仅 pull 成功 / 云端确实空 no_backup 才推 —— 防空/旧数据遮盖云端真备份)
-assert.match(backup, /pullBackupFromCloud\('merge'\)[\s\S]{0,320}pull\.ok\s*\|\|\s*pull\.error === 'no_backup'[\s\S]{0,60}scheduleAutoPush/, '先拉后推:pull 成功/云端空才推,其余失败不推');
+// 先拉后推:pull 成功分支处理(首刷 reload + 推),云端空(no_backup)也推,其余失败态不推
+assert.match(backup, /const pull = await pullBackupFromCloud\('merge'\)/, '先拉(merge)');
+assert.match(backup, /if \(pull\.ok\)\s*\{[\s\S]{0,1400}scheduleAutoPush\(\)/, 'pull 成功分支里安排防抖 push(先拉后推)');
+assert.match(backup, /pull\.error === 'no_backup'[\s\S]{0,320}scheduleAutoPush\(\)/, '云端确实空也推(首次上云)');
+// 冷浏览器首次拉回有数据 → reload 让各 store 重新水合(修「换个网页记录不显示」),且首刷标志防 reload 循环
+assert.match(backup, /firstSync &&[\s\S]{0,60}restoredSomething[\s\S]{0,90}location[\s\S]{0,20}reload/, '冷浏览器首次拉回有数据 → reload 重新水合');
+assert.match(backup, /FIRST_SYNC_DONE_FLAG/, 'reload 由「首刷完成」标志守卫(每浏览器仅一次,防循环)');
 // 空数据保险丝:0 条目绝不上云(空浏览器绝不用空数据盖云端)
 assert.match(backup, /entryCount === 0[\s\S]{0,80}ok: true/, '空数据保险丝:0 条目静默成功、不上云');
 // ③ durability 免费:hasCloudEntitlement 常开(登录即用),付费桩已拆

@@ -61,6 +61,14 @@
    (与 cloud-memory-sync/学习态/profile 同口径)。合并逻辑复用 restoreCombinedBackup merge(节点
    id union、已有不覆盖)。契约 `test:cloud-backup`(空保险丝/list=backup pull/先拉后推不变式)+
    `test:cloud-assets-runtime`(list 模式 marker)+ `test:cloud-auto-sync`(全量同步契约)。tsc + next build 绿。
+   **⑤ 冷浏览器首刷重新水合(2026-07-25 追加,修「换个网页记录还是不显示」)**:根因是 pull 把数据
+   写进 IDB 后**没 reload** —— health/place-trail/inventory 等 store 只在加载时读一次 IDB、缓存在内存,
+   restore 直写 IDB 不触发它们的 `*-updated` 事件,于是数据在库里但界面仍是空缓存(记忆图除外——它经
+   cloud-memory-sync 事件实时更新)。修:`autoSyncBackupWithCloud` 在**冷浏览器首次**成功拉回且确有数据时
+   `location.reload()` 让各 store 重新水合;用 `nesio-backup-first-sync-done-v1` 标志限制为每浏览器仅一次
+   (且标志须真持久化才 reload,防隐私模式死循环刷新)。**连接器澄清**(非本次改,已如此):gmail/日历/notion
+   令牌存 Supabase 按身份跨端(登录即通);flomo 用服务端 env(`FLOMO_WEBHOOK_URL`,与浏览器无关);
+   邮件正文按隐私红线**只存本机 IDB 不上云**,仅 ≤1500 预览节点随记忆图跨端。
 
 4a. **A 计划施工线 ✅ 完整闭环(2026-07-07,#50-#59)**:见 `docs/design/algorithm-layer-plan.md`。
    Layer2 2a(总线+事实日志+三原语,mirror/energy 收编,card-feedback/cooling/dormant 有据保留)→

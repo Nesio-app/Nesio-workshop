@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 const src = fs.readFileSync(new URL('../lib/portal/cloud-backup.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 
-function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKeys = [], idbInit = {}, localImages = {} } = {}) {
+function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKeys = [], idbInit = {}, localImages = {}, withReload = false } = {}) {
   const lsMap = new Map(Object.entries(lsInit));
   const localStorage = {
     getItem: (k) => (lsMap.has(k) ? lsMap.get(k) : null),
@@ -31,13 +31,16 @@ function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKey
     keys: async () => [...idbStore.keys()],
   };
   let scheduledPush = null;
+  let reloaded = false;
   const ctx = {
     module: { exports: {} }, exports: {}, console, Date,
-    window: {},
+    // withReload 时装 location.reload 探针,验证冷浏览器首次拉回后确实 reload 让 store 重新水合
+    window: withReload ? { location: { reload: () => { reloaded = true; } } } : {},
     // 防抖 push 用 setTimeout —— 假计时器只捕获回调,测试手动触发(vm 上下文默认无计时器)
     setTimeout: (fn) => { scheduledPush = fn; return 1; },
     clearTimeout: () => { scheduledPush = null; },
     _scheduledPush: () => scheduledPush,
+    _reloaded: () => reloaded,
     localStorage,
     Blob: class { constructor(parts) { this.size = parts.join('').length; } },
     File: class { constructor(parts, name, opts) { this._content = parts.join(''); this.name = name; this.type = opts && opts.type; } },
@@ -220,35 +223,47 @@ const backupDoc = (entries) => ({ format: 'nesio-full-backup', version: 1, expor
   assert.equal((await mod.pullBackupFromCloud()).error, 'invalid_backup', '坏 blob → invalid_backup');
 }
 
-// 13. autoSyncBackupWithCloud 数据安全不变式:先拉后推;pull 失败不推(防遮盖云端真备份)。
+// 13. autoSyncBackupWithCloud 数据安全不变式 + 冷浏览器首刷重新水合。
+const okFetch = (url) => {
+  if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: true, status: 200, json: async () => ({ ok: true, found: true, signedUrl: 'https://signed/x', storagePath: 'id/backup/1.txt' }) };
+  if (url === 'https://signed/x') return { ok: true, status: 200, text: async () => JSON.stringify(backupDoc({ 'nesio-health-v1': '{"m":[]}' })) };
+  return { ok: false, status: 404, json: async () => ({}) };
+};
 {
-  // (a) pull 成功 → 安排了防抖 push
-  const okFetch = (url) => {
-    if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: true, status: 200, json: async () => ({ ok: true, found: true, signedUrl: 'https://signed/x', storagePath: 'id/backup/1.txt' }) };
-    if (url === 'https://signed/x') return { ok: true, status: 200, text: async () => JSON.stringify(backupDoc({ 'nesio-health-v1': '{"m":[]}' })) };
-    return { ok: false, status: 404, json: async () => ({}) };
-  };
-  const okCtx = makeCtx({ idbKeys: ['nesio-health-v1'], fetchImpl: okFetch });
-  await okCtx.mod.autoSyncBackupWithCloud({ force: true });
-  assert.ok(okCtx.ctx._scheduledPush(), 'pull 成功后安排了防抖 push(先拉后推)');
+  // (a) 冷浏览器(无 first-sync 标志)首次拉回且有数据 → reload 让各 store 重新水合,不再走 push。
+  //     这是「换个网页记录不显示」的根因修复:数据落 IDB 后必须刷新,否则界面仍是空缓存。
+  const coldCtx = makeCtx({ idbKeys: ['nesio-health-v1'], fetchImpl: okFetch, withReload: true });
+  await coldCtx.mod.autoSyncBackupWithCloud({ force: true });
+  assert.equal(coldCtx.ctx._reloaded(), true, '冷浏览器首次拉回有数据 → reload 重新水合');
+  assert.equal(coldCtx.ctx._scheduledPush(), null, '首刷这一趟不推(reload 后新页面再推)');
+  assert.equal(coldCtx.lsMap.get('nesio-backup-first-sync-done-v1'), '1', '置首刷完成标志(防 reload 循环)');
 
-  // (b) 云端确实空(no_backup)→ 也推(把本机数据首次带上云;empty-fuse 兜住真空账号)
+  // (a2) 已同步过的浏览器(标志已置)→ 不再 reload,正常防抖 push(稳态)。
+  const warmCtx = makeCtx({ idbKeys: ['nesio-health-v1'], fetchImpl: okFetch, withReload: true, lsInit: { 'nesio-backup-first-sync-done-v1': '1' } });
+  await warmCtx.mod.autoSyncBackupWithCloud({ force: true });
+  assert.equal(warmCtx.ctx._reloaded(), false, '已同步过不再 reload(不进循环)');
+  assert.ok(warmCtx.ctx._scheduledPush(), '稳态:pull 成功后安排防抖 push');
+
+  // (b) 云端确实空(no_backup)→ 也推(把本机数据首次带上云;empty-fuse 兜住真空账号),不 reload。
   const emptyFetch = (url) => {
     if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: true, status: 200, json: async () => ({ ok: true, found: false }) };
     return { ok: false, status: 404, json: async () => ({}) };
   };
-  const emptyCtx = makeCtx({ fetchImpl: emptyFetch });
+  const emptyCtx = makeCtx({ fetchImpl: emptyFetch, withReload: true });
   await emptyCtx.mod.autoSyncBackupWithCloud({ force: true });
   assert.ok(emptyCtx.ctx._scheduledPush(), '云端无备份也推(首次上云;空账号由 empty-fuse 拦)');
+  assert.equal(emptyCtx.ctx._reloaded(), false, '云端无备份不 reload');
+  assert.equal(emptyCtx.lsMap.get('nesio-backup-first-sync-done-v1'), undefined, 'no_backup 不置首刷标志(等原浏览器推上云后仍会首刷一次)');
 
-  // (c) pull 网络失败 → 不推(避免把本地空/旧数据推成新「最新」,遮住云端真备份)
+  // (c) pull 网络失败 → 不推、不 reload(避免把本地空/旧数据推成新「最新」,遮住云端真备份)
   const failFetch = (url) => {
     if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: false, status: 500, json: async () => ({ ok: false }) };
     return { ok: false, status: 500, json: async () => ({}) };
   };
-  const failCtx = makeCtx({ fetchImpl: failFetch });
+  const failCtx = makeCtx({ fetchImpl: failFetch, withReload: true });
   await failCtx.mod.autoSyncBackupWithCloud({ force: true });
   assert.equal(failCtx.ctx._scheduledPush(), null, 'pull 失败绝不推(防遮盖云端真备份)');
+  assert.equal(failCtx.ctx._reloaded(), false, 'pull 失败不 reload');
 }
 
 // 11. 记忆照片导出:includeImages 才带图(默认导出不含图,避免云备份塞满);
