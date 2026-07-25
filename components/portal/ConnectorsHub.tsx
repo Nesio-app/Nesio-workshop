@@ -702,7 +702,20 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setSyncing(c.id);
     const r = await runFlomoSync(); // 数据核心在 connector-sync,与记忆页下拉共用
     if (!r.ok) {
-      showToast(L(dict, 'Flomo 未配置或同步失败', 'Flomo not configured or sync failed'), false);
+      // 路由已返回可操作提示(缺 FLOMO_API_KEY / 令牌过期 / 格式不对)——直接透出,
+      // 别再用「未配置或同步失败」把用户真正该做的一步(配读取令牌)藏起来。
+      const raw = r.error || '';
+      const actionable = raw && raw !== 'network' && raw !== 'not_configured';
+      showToast(
+        actionable
+          ? L(dict, raw, raw)
+          : L(
+              dict,
+              raw === 'network' ? 'Flomo 同步网络不稳,稍后再试一次' : 'Flomo 还差一步:需配置读取令牌 FLOMO_API_KEY',
+              raw === 'network' ? 'Flomo sync hit a network hiccup — try again shortly' : 'Flomo needs one more step: set the read key FLOMO_API_KEY',
+            ),
+        false,
+      );
       setSyncing(null);
       return;
     }
