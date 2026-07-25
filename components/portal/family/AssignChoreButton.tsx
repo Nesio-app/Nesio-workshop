@@ -6,14 +6,14 @@
  * 分派成功后:被分派人会在 TA 的今天页看到这件家务;做完后你会在今天页收到回响。
  * 每个异步动作都有显式失败态(设计红线)。
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { LifeNode } from '@/lib/portal/life-graph';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import {
-  listFamilies, listFamilyMembers, assignChoreFromEvent,
-  type FamilySummary, type FamilyMemberView,
+  listFamilies, listFamilyMembers, assignChoreFromEvent, getEventAssignment,
+  type FamilySummary, type FamilyMemberView, type ChoreStateView,
 } from '@/lib/family/family-client';
 import type { Cadence } from '@/lib/family/chores-core';
 import { autoLinkByEmail } from '@/lib/family/people-link';
@@ -30,18 +30,30 @@ function dayKeyFromNode(node: LifeNode): string {
 }
 
 type Phase =
+  | { s: 'checking' }
   | { s: 'idle' }
   | { s: 'loading' }
   | { s: 'pick'; families: FamilySummary[]; familyId: string; members: FamilyMemberView[]; linked: Record<string, string> }
   | { s: 'saving'; name: string }
   | { s: 'done'; name: string }
+  | { s: 'assigned'; name: string; state: ChoreStateView; count: number }
   | { s: 'nofamily' }
   | { s: 'error'; msg: string };
+
+function stateLabel(state: ChoreStateView, t: (a: string, b: string) => string): string {
+  switch (state) {
+    case 'todo': return t('待完成', 'To do');
+    case 'done': return t('已提交,待你审核', 'Submitted — awaiting review');
+    case 'approved': return t('已完成', 'Done');
+    case 'paid': return t('已结清', 'Paid');
+    default: return '';
+  }
+}
 
 export default function AssignChoreButton({ node }: { node: LifeNode }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const t = (zh: string, en: string) => L(dict, zh, en);
-  const [phase, setPhase] = useState<Phase>({ s: 'idle' });
+  const [phase, setPhase] = useState<Phase>({ s: 'checking' });
   const [reward, setReward] = useState('');            // 这件家务值多少钱(接回零花钱账本;留空=0,只当待办)
   const [needsApproval, setNeedsApproval] = useState(true); // 要不要家长看一眼再计入
   const [repeat, setRepeat] = useState<'once' | 'daily' | 'weekly'>('once'); // 周期:一次/每天/每周(接 chores-core cadence)
@@ -93,7 +105,40 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
     try { window.dispatchEvent(new CustomEvent('nesio-family-updated')); } catch { /* noop */ }
   }, [node, t, reward, needsApproval, repeat]);
 
+  // 打开详情时:查这条事件是否已分派 → 显示「已交给谁 · 状态」而非又回到「派活」。
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const r = await getEventAssignment(node.id);
+      if (!alive) return;
+      if (r.ok && r.data.assigned && r.data.state) {
+        setPhase({ s: 'assigned', name: r.data.assigneeName || t('家人', 'Family'), state: r.data.state, count: r.data.count || 1 });
+      } else {
+        setPhase({ s: 'idle' });
+      }
+    })();
+    return () => { alive = false; };
+    // t 每次渲染新建但仅影响兜底名字文案,不需要重跑;只认 node.id。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [node.id]);
+
   // ── 视图 ──
+  if (phase.s === 'checking') return null;   // 查询中不闪「派活」(用户实锤:重开又回到派活)
+
+  if (phase.s === 'assigned') {
+    return (
+      <div className="nesio-nd-photo-add">
+        <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--portal-ink)', lineHeight: 1.6 }}>
+          <b>{t('已交给', 'Assigned to')} {phase.name}</b> · <span style={{ color: 'var(--portal-muted)' }}>{stateLabel(phase.state, t)}</span>
+          {phase.count > 1 ? ` · ${t(`共 ${phase.count} 次`, `${phase.count}×`)}` : ''}
+        </p>
+        <button type="button" className="nesio-node-action-secondary nesio-nd-photo-btn" onClick={() => void begin()} style={{ marginTop: '0.5rem' }}>
+          {t('改派给别人', 'Reassign')}
+        </button>
+      </div>
+    );
+  }
+
   if (phase.s === 'idle') {
     return (
       <div className="nesio-nd-photo-add">

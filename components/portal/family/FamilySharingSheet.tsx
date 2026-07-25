@@ -268,6 +268,24 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
         </section>
       )}
 
+      {board.assigned.length > 0 && (
+        <section>
+          <p style={sectLabel}>{t('已安排', 'Assigned')}</p>
+          <div style={cardStyle}>
+            {board.assigned.map((c, i) => (
+              <div key={c.id} style={{ ...rowStyle, borderBottom: i === board.assigned.length - 1 ? 'none' : rowStyle.borderBottom }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{choreTitle(c, t)}</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                    {t('交给', 'for')} {nameFor(board, c.assigneeId) || t('家人', 'family')} · {assignedStateLabel(c.state, t)} · {c.dueDate}{c.value > 0 ? ` · ${money(c.value)}` : ''}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       <section>
         <p style={sectLabel}>{t('大家', 'Everyone')}</p>
         <div style={cardStyle}>
@@ -290,6 +308,15 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
 
 function nameFor(board: BoardView, personId: string): string {
   return board.everyone.find((e) => e.member.id === personId)?.member.name ?? '';
+}
+function assignedStateLabel(state: ChoreInstanceView['state'], t: (a: string, b: string) => string): string {
+  switch (state) {
+    case 'todo': return t('待完成', 'To do');
+    case 'done': return t('待审', 'In review');
+    case 'approved': return t('已完成', 'Done');
+    case 'paid': return t('已结清', 'Paid');
+    default: return '';
+  }
 }
 function choreTitle(c: ChoreInstanceView, t: (a: string, b: string) => string): string {
   if (c.title && c.title.trim()) return c.title.trim();          // 日历事件分派而来:显示原标题

@@ -176,6 +176,7 @@ export interface BoardView {
   me: FamilyMember;
   myChoresToday: ChoreInstance[];
   toReview: ChoreInstance[];        // 仅 can_approve 才非空
+  assigned: ChoreInstance[];        // 所有已安排(todo/done)的活,含未来到期 —— 让「谁被派了什么、什么状态」可见
   everyone: Array<{ member: FamilyMember; owed: number }>;
 }
 
@@ -199,12 +200,17 @@ export async function getBoard(actor: FamilyActor, familyId: string, todayKey: s
   // 待审:只对 can_approve 暴露(服务端判定,不靠 UI 藏)
   const toReview = memberCan(me, 'approve') ? instances.filter((c) => c.state === 'done') : [];
 
+  // 已安排(含未来到期):按到期日升序,让「派了什么给谁、什么状态」在板上一眼可见。
+  const assigned = instances
+    .filter((c) => c.state === 'todo' || c.state === 'done')
+    .sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0));
+
   const everyone = memberRows.map((m) => ({
     member: memberFromRow(m),
     owed: computeBalance(m.user_id, instances, payouts).owed,
   }));
 
-  return { ok: true, value: { familyId, me, myChoresToday, toReview, everyone } };
+  return { ok: true, value: { familyId, me, myChoresToday, toReview, assigned, everyone } };
 }
 
 /** 某成员的账本明细(历史 + 余额)。任何成员可看(自己/家人的攒钱数是共享的)。 */
@@ -313,6 +319,33 @@ export async function listFamilyMembersOp(actor: FamilyActor, familyId: string):
  * 一事件一实例:按 (family_id, source_event_id) upsert —— 再点即改派,不重复生成。
  * 改派给新的人 → 状态复位 todo(旧的完成/审核不带过去)。
  */
+/** 查某条日历事件(记忆)当前的分派状态 —— 供详情按钮重开时显示「已交给谁 · 状态」而非又回到「派活」。 */
+export async function getEventAssignmentOp(
+  actor: FamilyActor, sourceEventId: string,
+): Promise<FamilyResult<{ assigned: boolean; assigneeId?: string; assigneeName?: string; state?: ChoreState; familyId?: string; dueDate?: string; count?: number }>> {
+  const base = (sourceEventId || '').trim();
+  if (!base) return { ok: true, value: { assigned: false } };
+  const mine = await restGet<MemberRow>(actor.config, 'family_members', `user_id=eq.${actor.userId}&select=family_id`);
+  if (mine === null) return fail('upstream', 502);
+  if (!mine.length) return { ok: true, value: { assigned: false } };
+  const ids = mine.map((m) => m.family_id);
+  const inst = await restGet<InstanceRow>(actor.config, 'family_chore_instances',
+    `family_id=in.(${ids.join(',')})&deleted_at=is.null&select=*`);
+  if (inst === null) return fail('upstream', 502);
+  // 一次性:source_event_id === base;周期:base#YYYY-MM-DD。取最早到期的那条代表当前状态。
+  const matches = inst.filter((r) => r.source_event_id === base || (r.source_event_id ?? '').startsWith(`${base}#`));
+  if (!matches.length) return { ok: true, value: { assigned: false } };
+  matches.sort((a, b) => (a.due_date < b.due_date ? -1 : a.due_date > b.due_date ? 1 : 0));
+  const first = matches[0];
+  let assigneeName = '';
+  if (first.assignee_user_id) {
+    const m = await restGet<MemberRow>(actor.config, 'family_members',
+      `family_id=eq.${first.family_id}&user_id=eq.${first.assignee_user_id}&select=display_name`);
+    assigneeName = m?.[0]?.display_name ?? '';
+  }
+  return { ok: true, value: { assigned: true, assigneeId: first.assignee_user_id ?? '', assigneeName, state: first.state, familyId: first.family_id, dueDate: first.due_date, count: matches.length } };
+}
+
 const ASSIGN_HORIZON_DAYS = 14;   // 周期分派向前铺的窗口
 
 /** 按 source_event_id 幂等 upsert 一条事件家务实例(改派给新的人则复位 todo)。 */
