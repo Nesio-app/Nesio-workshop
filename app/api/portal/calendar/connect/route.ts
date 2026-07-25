@@ -40,10 +40,17 @@ function logCalendarOAuthAudit(
 }
 
 function callbackUrl(req: NextRequest): string {
-  const configured = envValue('GOOGLE_CALENDAR_REDIRECT_URI');
-  if (configured) return configured;
+  // 回调跟随发起域名:只在 env host 与当前 host 一致时用 env,否则用当前 origin,
+  // 避免 env 被钉到 sibling 部署(nesio)导致 workshop 连接被甩走、令牌落错库。
   const url = new URL(req.url);
-  return `${url.origin}/api/portal/calendar/oauth/callback`;
+  const fallback = `${url.origin}/api/portal/calendar/oauth/callback`;
+  const configured = envValue('GOOGLE_CALENDAR_REDIRECT_URI');
+  if (configured) {
+    try {
+      if (new URL(configured).host === url.host) return configured;
+    } catch { /* 非法 URL → 用当前 origin */ }
+  }
+  return fallback;
 }
 
 function getGoogleCalendarSetupTask(req: NextRequest): ProductionRuntimeSetupTask | undefined {

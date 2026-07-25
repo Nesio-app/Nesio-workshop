@@ -24,10 +24,17 @@ function verifiedStateUid(state: string | null): string | null {
 }
 
 function callbackUrl(req: NextRequest): string {
-  const configured = envValue('GMAIL_REDIRECT_URI');
-  if (configured) return configured;
+  // 必须与 connect 侧同逻辑(token 交换的 redirect_uri 要和授权时完全一致):
+  // 只在 env host 与当前 host 一致时用 env,否则用当前 origin。见 connect 路由注释。
   const url = new URL(req.url);
-  return `${url.origin}/api/portal/gmail/callback`;
+  const fallback = `${url.origin}/api/portal/gmail/callback`;
+  const configured = envValue('GMAIL_REDIRECT_URI');
+  if (configured) {
+    try {
+      if (new URL(configured).host === url.host) return configured;
+    } catch { /* 配置非法 URL → 用当前 origin 兜底 */ }
+  }
+  return fallback;
 }
 
 type TokenResponse = {

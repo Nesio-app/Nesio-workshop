@@ -20,10 +20,20 @@ const GMAIL_SCOPE = 'https://www.googleapis.com/auth/gmail.readonly https://www.
 const STATE_COOKIE = 'nesio_gmail_oauth_state';
 
 function callbackUrl(req: NextRequest): string {
-  const configured = envValue('GMAIL_REDIRECT_URI');
-  if (configured) return configured;
+  // 回调必须跟随「发起连接的域名」:workshop(treasurebox)和 nesio.app 是两套独立
+  // 部署 + 两套 Supabase,若把 GMAIL_REDIRECT_URI 钉到 sibling(nesio),从 workshop
+  // 点连接会被甩到 nesio、令牌落进 nesio 那套库,workshop 永远显示未连接。
+  // 故:只在 env 的 host 与当前请求 host 一致时才用 env(允许显式 canonical),
+  // 否则一律用当前 origin —— 保证「在哪连,就回哪」。
   const url = new URL(req.url);
-  return `${url.origin}/api/portal/gmail/callback`;
+  const fallback = `${url.origin}/api/portal/gmail/callback`;
+  const configured = envValue('GMAIL_REDIRECT_URI');
+  if (configured) {
+    try {
+      if (new URL(configured).host === url.host) return configured;
+    } catch { /* 配置非法 URL → 用当前 origin 兜底 */ }
+  }
+  return fallback;
 }
 
 export async function GET(req: NextRequest) {

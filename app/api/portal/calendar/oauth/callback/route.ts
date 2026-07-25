@@ -46,10 +46,16 @@ function logCalendarOAuthAudit(
 }
 
 function callbackUrl(req: NextRequest): string {
-  const configured = envValue('GOOGLE_CALENDAR_REDIRECT_URI');
-  if (configured) return configured;
+  // 与 connect 同逻辑:只在 env host 与当前 host 一致时用 env,否则用当前 origin。
   const url = new URL(req.url);
-  return `${url.origin}${url.pathname}`;
+  const fallback = `${url.origin}${url.pathname}`;
+  const configured = envValue('GOOGLE_CALENDAR_REDIRECT_URI');
+  if (configured) {
+    try {
+      if (new URL(configured).host === url.host) return configured;
+    } catch { /* 非法 URL → 用当前 origin */ }
+  }
+  return fallback;
 }
 
 function setCalendarCookies(response: NextResponse, session: GoogleTokenResponse) {
