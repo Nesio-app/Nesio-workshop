@@ -69,31 +69,46 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
 
 /* ---------- Flomo 笔记(全量翻页,按 slug 去重只进增量) ---------- */
 
-export interface FlomoSyncResult { ok: boolean; fresh: number; error?: string }
+export interface FlomoSyncResult { ok: boolean; fresh: number; error?: string; remaining?: number }
+
+// 闪退根因:ingestLifeNode 每条都 loadAll+saveAll 整图 + 发云请求;旧代码在一个同步 for
+// 里灌**上千条** flomo 笔记 → O(n²) 写盘 + 主线程长时间阻塞 → iOS 直接杀标签(用户「点同步闪退」)。
+// 双保险:① 单次最多灌 FLOMO_INGEST_CAP 条(其余下次同步继续,按 slug 去重天然增量);
+//        ② 分块 + 每块之间让出事件循环,主线程不再被长时间独占。
+const FLOMO_INGEST_CAP = 250;
+const FLOMO_INGEST_CHUNK = 20;
 
 export async function runFlomoSync(): Promise<FlomoSyncResult> {
   try {
-    const res = await fetch('/api/portal/flomo?limit=5000');
+    // limit 从 5000 收到 800:5000 = 服务端翻 25 页,拉取本身就慢/易超时;800 足够覆盖增量,
+    // 首灌超量的部分靠多点几次同步逐步消化(去重保证不重复)。
+    const res = await fetch('/api/portal/flomo?limit=800');
     const data = await res.json() as { ok?: boolean; memos?: Array<{ content: string; created_at: string; tags: string[]; slug?: string }>; error?: string };
     if (!data.ok) return { ok: false, fresh: 0, error: data.error || 'not_configured' };
     const { getLifeGraph } = await import('@/lib/portal/life-graph');
     const existingSlugs = new Set(getLifeGraph().map((n) => n.attributes?.flomoSlug as string).filter(Boolean));
     const fresh = (data.memos || []).filter((m) => !existingSlugs.has(m.slug || ''));
-    // 全量导入:首次整库入,之后只进增量;写失败由 storage-health 弹可见提示
-    for (const m of fresh) {
-      ingestLifeNode({
-        type: 'preference',
-        name: m.content.replace(/<[^>]+>/g, '').slice(0, 40),
-        attributes: { source: 'Flomo', created: m.created_at, flomoSlug: m.slug || '' },
-        relations: [],
-        tags: ['Flomo', ...(m.tags || [])],
-        confidence: 0.9,
-        rawInput: m.content.replace(/<[^>]+>/g, '').slice(0, 200),
-        source: 'manual',
-      });
+    const batch = fresh.slice(0, FLOMO_INGEST_CAP); // memos 已按新→旧;先灌最新一批
+    let imported = 0;
+    for (let i = 0; i < batch.length; i += FLOMO_INGEST_CHUNK) {
+      for (const m of batch.slice(i, i + FLOMO_INGEST_CHUNK)) {
+        ingestLifeNode({
+          type: 'preference',
+          name: m.content.replace(/<[^>]+>/g, '').slice(0, 40),
+          attributes: { source: 'Flomo', created: m.created_at, flomoSlug: m.slug || '' },
+          relations: [],
+          tags: ['Flomo', ...(m.tags || [])],
+          confidence: 0.9,
+          rawInput: m.content.replace(/<[^>]+>/g, '').slice(0, 200),
+          source: 'manual',
+        });
+        imported++;
+      }
+      // 让出事件循环:主线程喘口气,避免长时间独占被系统判「无响应」杀掉。
+      if (i + FLOMO_INGEST_CHUNK < batch.length) await new Promise((r) => setTimeout(r, 0));
     }
-    if (fresh.length) window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
-    return { ok: true, fresh: fresh.length };
+    if (imported) window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+    return { ok: true, fresh: imported, remaining: Math.max(0, fresh.length - imported) };
   } catch { return { ok: false, fresh: 0, error: 'network' }; }
 }
 
@@ -190,6 +205,32 @@ export interface GmailSyncResult { ok: boolean; read: number; extracted: number;
 
 const GMAIL_SYNC_KEY = 'nesio-gmail-last-sync';
 
+// 邮件「网络错误」回归根因:同步阻塞在服务端 analyze=true 的云 LLM 抽取上,
+// 35 封全文喂一个大 prompt,延迟一波动就冲破 60s 函数上限 → 平台 504 → 前端报「网络错误」。
+// 修法(两段式):① 阻塞段用 analyze=false —— 服务端走**本地正则抽取**(金额/到货/单号/待办),
+// 快且稳,几秒内必返回,同步不再超时;② 云 AI 抽取转**后台非阻塞富化**,拿到就原位 upsert
+// 升级节点(emailId 幂等),超时/失败无声,不影响这次同步已成功。增量小批时富化基本都能成。
+let gmailEnrichInFlight = false;
+export async function enrichGmailInBackground(afterTs: number): Promise<void> {
+  if (gmailEnrichInFlight) return;
+  gmailEnrichInFlight = true;
+  try {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), 58_000); // 58s < 服务端 60s:拿干净 abort,不等平台 504
+    let res: Response;
+    try {
+      res = await fetch(`/api/portal/gmail?includeBody=true&analyze=true&returnBodies=false${afterTs ? `&afterTs=${afterTs}` : ''}`, { signal: ctrl.signal });
+    } finally { clearTimeout(to); }
+    let data: { ok?: boolean; nodes?: Array<Record<string, unknown>> } | null = null;
+    try { data = JSON.parse(await res.text()); } catch { /* 网关/超时页 */ }
+    if (data?.ok && data.nodes?.length) {
+      data.nodes.forEach((n) => ingestLifeNode({ ...n, source: 'email' } as Parameters<typeof ingestLifeNode>[0]));
+      window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+    }
+  } catch { /* 富化 best-effort:失败无声,同步已成功 */ }
+  finally { gmailEnrichInFlight = false; }
+}
+
 export async function runGmailSync(opts?: { force?: boolean }): Promise<GmailSyncResult> {
   try {
     const lastSync = parseInt(localStorage.getItem(GMAIL_SYNC_KEY) || '0', 10);
@@ -197,7 +238,8 @@ export async function runGmailSync(opts?: { force?: boolean }): Promise<GmailSyn
     localStorage.setItem(GMAIL_SYNC_KEY, String(Date.now()));
     // 增量游标回退 5 分钟防边界漏件;重复由 emailId upsert 幂等吸收
     const afterTs = lastSync > 0 ? Math.floor(lastSync / 1000) - 300 : 0;
-    const res = await fetch(`/api/portal/gmail?includeBody=true&analyze=true${afterTs ? `&afterTs=${afterTs}` : ''}`);
+    // 阻塞段:analyze=false → 本地抽取,快且稳(不再卡在云 AI 上超时)
+    const res = await fetch(`/api/portal/gmail?includeBody=true&analyze=false${afterTs ? `&afterTs=${afterTs}` : ''}`);
     // 平台超时(504)回非 JSON —— 直接 res.json() 会炸进 catch 被误报成 network,
     // 状态码如实带出才能在同步详情里看到真病因。
     type GmailPayload = { ok?: boolean; nodes?: Array<Record<string, unknown>>; error?: string; emailCount?: number; emailBodies?: Record<string, string> };
@@ -217,6 +259,8 @@ export async function runGmailSync(opts?: { force?: boolean }): Promise<GmailSyn
       nodes.forEach((n) => ingestLifeNode({ ...n, source: 'email' } as Parameters<typeof ingestLifeNode>[0]));
       window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
     }
+    // 云 AI 抽取转后台富化:同步已成功返回,富化拿到更好的语义节点就原位升级(失败无声)。
+    void enrichGmailInBackground(afterTs);
     return { ok: true, read: data.emailCount ?? 0, extracted: nodes.length };
   } catch { return { ok: false, read: 0, extracted: 0, error: 'network' }; }
 }
@@ -319,4 +363,22 @@ export async function syncAllConnectors(): Promise<SyncAllOutcome[]> {
   out.push({ id: 'plaid', ok: plaid.ok, detail: plaid.ok ? [`银行新增 ${plaid.fresh} 笔(共 ${plaid.total})`, `Bank +${plaid.fresh} (${plaid.total} total)`] : ['银行未连接', 'Bank not linked'] });
   out.push({ id: 'people', ok: people.ok, detail: people.ok ? [`联系人导入 ${people.imported}、更新 ${people.updated}${(people.deduped ?? 0) > 0 ? `、清理重复 ${people.deduped}` : ''}(库中 ${people.total ?? '?'} 人)`, `Contacts +${people.imported}, updated ${people.updated}${(people.deduped ?? 0) > 0 ? `, deduped ${people.deduped}` : ''} (${people.total ?? '?'} total)`] : ['通讯录未同步(未连接 Google)', 'Contacts not synced'] });
   return out;
+}
+
+// 开机/登录自动拉新:此前顶层只自动同步「云端你自己的数据」(记忆/学习态/备份),
+// 但**外部连接器的新内容**(日历/邮件/flomo/银行/通讯录)要手动点同步才拉 —— 用户希望
+// 开机就自动拉一次。这里做节流包装:每 30 分钟至多自动跑一次(手动同步不受限);未连接的
+// 源各自静默早退,不产生无谓请求。best-effort:失败无声,不阻塞渲染。
+const CONNECTOR_AUTOSYNC_KEY = 'nesio-connectors-autosync-at-v1';
+const CONNECTOR_AUTOSYNC_MIN_INTERVAL_MS = 30 * 60_000;
+
+export async function autoSyncConnectorsOnBoot(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const last = parseInt(localStorage.getItem(CONNECTOR_AUTOSYNC_KEY) || '0', 10);
+    if (Date.now() - last < CONNECTOR_AUTOSYNC_MIN_INTERVAL_MS) return;
+    localStorage.setItem(CONNECTOR_AUTOSYNC_KEY, String(Date.now()));
+    await syncAllConnectors(); // 各源内部对未连接/未配置静默早退
+    window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+  } catch { /* best-effort:失败无声 */ }
 }
