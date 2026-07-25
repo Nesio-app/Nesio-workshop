@@ -68,8 +68,10 @@ CREATE TABLE IF NOT EXISTS public.family_members (
   PRIMARY KEY (family_id, user_id)
 );
 
--- 反复应用安全:老表补列(People ↔ 家庭成员 按邮箱自动配对用)。
+-- 反复应用安全:老表补列(email 早期用于 People 配对,现已解耦;保留不碍事)。
 ALTER TABLE public.family_members ADD COLUMN IF NOT EXISTS email text;
+-- 成员身份自成一套:名字/头像来自 TA 自己的账号资料(自报+自愈),不再匹配 People 联系人。
+ALTER TABLE public.family_members ADD COLUMN IF NOT EXISTS avatar_url text;
 
 CREATE INDEX IF NOT EXISTS idx_family_members_user
   ON public.family_members (user_id);

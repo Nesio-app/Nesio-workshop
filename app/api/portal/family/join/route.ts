@@ -10,8 +10,8 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   const actor = await resolveActor(req);
   if (!actor.ok) return NextResponse.json({ ok: false, error: actor.error }, { status: actor.status });
-  const body = await req.json().catch(() => ({})) as { inviteCode?: string; displayName?: string };
-  const r = await joinFamily(actor.value, { inviteCode: body.inviteCode ?? '', displayName: body.displayName ?? '' });
+  const body = await req.json().catch(() => ({})) as { inviteCode?: string; displayName?: string; avatarUrl?: string };
+  const r = await joinFamily(actor.value, { inviteCode: body.inviteCode ?? '', displayName: body.displayName ?? '', avatarUrl: body.avatarUrl });
   if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: r.status });
   return NextResponse.json({ ok: true, ...r.value });
 }

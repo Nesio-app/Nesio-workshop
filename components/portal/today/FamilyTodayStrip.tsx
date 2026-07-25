@@ -9,13 +9,12 @@
  * 数据来自 Supabase 家庭表(跨账号),经 /api/portal/family/board 服务端授权拉取。
  * 说明:回响是「下次打开今天页时出现」(拉取式),不是实时推送 —— app 暂无 realtime 通道。
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { listFamilies, getBoard, choreAction, type BoardView, type ChoreInstanceView } from '@/lib/family/family-client';
 import { readPortalCache, writePortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
-import { linkedIdentities } from '@/lib/family/people-link';
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 const dayKey = () => new Date().toLocaleDateString('en-CA');
@@ -98,9 +97,7 @@ export default function FamilyTodayStrip() {
     setSnoozed((prev) => { const next = new Set(prev).add(id); persistSnoozed(next); return next; });
   }, []);
 
-  // 配到 People 的真名顶替入伙昵称(本机图谱只读一遍;boards 变才重算,不在每次渲染扫图)。
-  const identities = useMemo(() => linkedIdentities(boards.flatMap((b) => b.everyone.map((e) => e.member.id))), [boards]);
-  const nameFor = (b: Board, personId: string) => identities.get(personId)?.name || (b.everyone.find((e) => e.member.id === personId)?.member.name ?? '');
+  const nameFor = (b: Board, personId: string) => b.everyone.find((e) => e.member.id === personId)?.member.name ?? '';
 
   const myChores = boards.flatMap((b) => b.myChoresToday.map((c) => ({ b, c }))).filter(({ c }) => !snoozed.has(c.id));
   const toReview = boards.flatMap((b) => b.toReview.map((c) => ({ b, c }))).filter(({ c }) => !snoozed.has('rv:' + c.id));

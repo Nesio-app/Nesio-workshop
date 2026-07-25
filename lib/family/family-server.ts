@@ -64,12 +64,12 @@ async function restPatch<T>(config: CloudRuntimeConfig, table: string, query: st
 }
 
 // ── 行类型(DB 快照)────────────────────────────────────────────────────────────
-interface MemberRow { family_id: string; user_id: string; display_name: string; can_approve: boolean; needs_approval: boolean; can_record_payout: boolean; email: string | null; }
+interface MemberRow { family_id: string; user_id: string; display_name: string; can_approve: boolean; needs_approval: boolean; can_record_payout: boolean; email: string | null; avatar_url: string | null; }
 interface InstanceRow { id: string; family_id: string; template_id: string | null; assignee_user_id: string | null; due_date: string; value: number; state: ChoreState; needs_approval: boolean; done_at: string | null; approved_at: string | null; proof_asset_ref: string | null; title: string | null; source_event_id: string | null; }
 interface PayoutRow { id: string; family_id: string; person_user_id: string | null; amount: number; date: string; note: string | null; }
 
 function memberFromRow(r: MemberRow): FamilyMember {
-  return { id: r.user_id, name: r.display_name, canApprove: r.can_approve, needsApproval: r.needs_approval, canRecordPayout: r.can_record_payout };
+  return { id: r.user_id, name: r.display_name, canApprove: r.can_approve, needsApproval: r.needs_approval, canRecordPayout: r.can_record_payout, avatarUrl: r.avatar_url ?? undefined };
 }
 /** 成员 + 账号邮箱(供拥有者本地按邮箱配到 People 的 person 节点)。 */
 export interface FamilyMemberWithEmail extends FamilyMember { email: string; }
@@ -119,7 +119,7 @@ function shortInviteCode(): string {
 // ── 操作 ──────────────────────────────────────────────────────────────────────
 
 /** 建家:创建者自动成为家长成员(can_approve + can_record_payout,needs_approval=off)。 */
-export async function createFamily(actor: FamilyActor, input: { name: string; displayName: string }): Promise<FamilyResult<{ familyId: string; inviteCode: string }>> {
+export async function createFamily(actor: FamilyActor, input: { name: string; displayName: string; avatarUrl?: string }): Promise<FamilyResult<{ familyId: string; inviteCode: string }>> {
   const name = (input.name || '').trim();
   const displayName = (input.displayName || '').trim() || 'Me';
   if (!name) return fail('bad_request', 400);
@@ -129,7 +129,7 @@ export async function createFamily(actor: FamilyActor, input: { name: string; di
   if (!famRows?.length) return fail('upstream', 502);
   const familyId = famRows[0].id;
   const memberRows = await restInsert<MemberRow>(actor.config, 'family_members', {
-    family_id: familyId, user_id: actor.userId, display_name: displayName, email: actor.email || null,
+    family_id: familyId, user_id: actor.userId, display_name: displayName, email: actor.email || null, avatar_url: input.avatarUrl || null,
     can_approve: true, needs_approval: false, can_record_payout: true,
   });
   if (!memberRows?.length) return fail('upstream', 502);
@@ -137,7 +137,7 @@ export async function createFamily(actor: FamilyActor, input: { name: string; di
 }
 
 /** 入伙:凭邀请码加入,默认孩子权限(needs_approval=on / can_approve=off)。家长可在成员管理里改。 */
-export async function joinFamily(actor: FamilyActor, input: { inviteCode: string; displayName: string }): Promise<FamilyResult<{ familyId: string }>> {
+export async function joinFamily(actor: FamilyActor, input: { inviteCode: string; displayName: string; avatarUrl?: string }): Promise<FamilyResult<{ familyId: string }>> {
   const code = (input.inviteCode || '').trim().toUpperCase();
   const displayName = (input.displayName || '').trim() || 'Me';
   if (!code) return fail('bad_request', 400);
@@ -149,7 +149,7 @@ export async function joinFamily(actor: FamilyActor, input: { inviteCode: string
   const existing = await restGet<MemberRow>(actor.config, 'family_members', `family_id=eq.${familyId}&user_id=eq.${actor.userId}&select=user_id`);
   if (existing?.length) return { ok: true, value: { familyId } };
   const rows = await restInsert<MemberRow>(actor.config, 'family_members', {
-    family_id: familyId, user_id: actor.userId, display_name: displayName, email: actor.email || null,
+    family_id: familyId, user_id: actor.userId, display_name: displayName, email: actor.email || null, avatar_url: input.avatarUrl || null,
     can_approve: false, needs_approval: true, can_record_payout: false,
   });
   if (!rows?.length) return fail('upstream', 502);
@@ -297,7 +297,20 @@ export async function createChoreTemplateOp(
   return { ok: true, value: { templateId, generated: rows.length } };
 }
 
-/** 家庭全体成员 + 账号邮箱(供「分派给家人」选人 + 拥有者本地按邮箱配 People)。任何成员可读。 */
+/** 同步「我」自己的账号资料(名字/头像)到我在各家庭的成员行 —— 家庭成员身份自成一套,
+ *  名字头像来自 TA 本人的账号,不再匹配 People。TA 每次打开家庭分享时刷新一次。 */
+export async function syncMyProfileOp(actor: FamilyActor, input: { displayName?: string; avatarUrl?: string }): Promise<FamilyResult<{ updated: number }>> {
+  const patch: Record<string, unknown> = {};
+  const dn = (input.displayName || '').trim();
+  if (dn) patch.display_name = dn;
+  if (typeof input.avatarUrl === 'string') patch.avatar_url = input.avatarUrl || null;
+  if (!Object.keys(patch).length) return { ok: true, value: { updated: 0 } };
+  const rows = await restPatch<MemberRow>(actor.config, 'family_members', `user_id=eq.${actor.userId}`, patch);
+  if (rows === null) return fail('upstream', 502);
+  return { ok: true, value: { updated: rows.length } };
+}
+
+/** 家庭全体成员(供「分派给家人」选人)。名字/头像来自各成员自己的账号资料。任何成员可读。 */
 export async function listFamilyMembersOp(actor: FamilyActor, familyId: string): Promise<FamilyResult<{ familyId: string; me: FamilyMemberWithEmail; members: FamilyMemberWithEmail[] }>> {
   const gate = await requireMember(actor, familyId);
   if (!gate.ok) return gate;

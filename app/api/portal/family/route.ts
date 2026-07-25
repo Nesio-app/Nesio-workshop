@@ -24,8 +24,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const actor = await resolveActor(req);
   if (!actor.ok) return err(actor);
-  const body = await req.json().catch(() => ({})) as { name?: string; displayName?: string };
-  const r = await createFamily(actor.value, { name: body.name ?? '', displayName: body.displayName ?? '' });
+  const body = await req.json().catch(() => ({})) as { name?: string; displayName?: string; avatarUrl?: string };
+  const r = await createFamily(actor.value, { name: body.name ?? '', displayName: body.displayName ?? '', avatarUrl: body.avatarUrl });
   if (!r.ok) return err(r);
   return NextResponse.json({ ok: true, ...r.value });
 }

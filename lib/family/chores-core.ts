@@ -33,6 +33,7 @@ export interface FamilyMember {
   canApprove: boolean;        // 能审核他人家务 / 记付款 / 看全家总额
   needsApproval: boolean;     // 自己干完的活要进"待审"而非直接记账
   canRecordPayout: boolean;   // 能记一笔线下付款冲账
+  avatarUrl?: string;         // 显示用:来自成员自己的账号资料(纯展示,不参与能力判定)
 }
 
 /** 家务模板(按周期生成实例)。value = 积分或金额(核心不区分,纯数)。 */

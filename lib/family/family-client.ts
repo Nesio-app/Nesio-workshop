@@ -6,7 +6,7 @@
 import type { Cadence } from '@/lib/family/chores-core';
 
 export type ChoreStateView = 'todo' | 'done' | 'approved' | 'paid';
-export interface FamilyMemberView { id: string; name: string; canApprove: boolean; needsApproval: boolean; canRecordPayout: boolean; email?: string; }
+export interface FamilyMemberView { id: string; name: string; canApprove: boolean; needsApproval: boolean; canRecordPayout: boolean; email?: string; avatarUrl?: string; }
 export interface ChoreInstanceView {
   id: string; templateId: string; assigneeId: string; dueDate: string; value: number;
   state: ChoreStateView; needsApproval: boolean; doneAt?: string; approvedAt?: string; proofPhotoRef?: string;
@@ -52,11 +52,15 @@ const postJson = (body: unknown): RequestInit => ({
 export function listFamilies(): Promise<ApiResult<{ families: FamilySummary[] }>> {
   return api('/api/portal/family');
 }
-export function createFamily(name: string, displayName: string): Promise<ApiResult<{ familyId: string; inviteCode: string }>> {
-  return api('/api/portal/family', postJson({ name, displayName }));
+export function createFamily(name: string, displayName: string, avatarUrl?: string): Promise<ApiResult<{ familyId: string; inviteCode: string }>> {
+  return api('/api/portal/family', postJson({ name, displayName, avatarUrl }));
 }
-export function joinFamily(inviteCode: string, displayName: string): Promise<ApiResult<{ familyId: string }>> {
-  return api('/api/portal/family/join', postJson({ inviteCode, displayName }));
+export function joinFamily(inviteCode: string, displayName: string, avatarUrl?: string): Promise<ApiResult<{ familyId: string }>> {
+  return api('/api/portal/family/join', postJson({ inviteCode, displayName, avatarUrl }));
+}
+/** 把我的账号资料(名字/头像)同步到我在各家庭的成员行(打开家庭分享时刷新)。 */
+export function syncMyFamilyProfile(displayName: string, avatarUrl: string): Promise<ApiResult<{ updated: number }>> {
+  return api('/api/portal/family/profile', postJson({ displayName, avatarUrl }));
 }
 export function getBoard(familyId: string): Promise<ApiResult<{ board: BoardView }>> {
   return api(`/api/portal/family/board?familyId=${encodeURIComponent(familyId)}`);
