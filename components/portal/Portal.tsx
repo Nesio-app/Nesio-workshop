@@ -454,6 +454,9 @@ export default function Portal() {
   const [cookingOpen, setCookingOpen] = useState(false);
   const [rewardsOpen, setRewardsOpen] = useState(false);
   const [workoutSession, setWorkoutSession] = useState<import('./fitness/WorkoutPlayer').PlayerSession | null>(null);
+  // 每次「开始跟练」自增,用作 WorkoutPlayer 的 key → 换一个训练(如跑步→力量)必定全新挂载,
+  // 绝不复用上一个训练的内部态(idx/phase/repCount)。修「打开力量没反应 / 退出力量却冒出跑步」的换练串台。
+  const [workoutKey, setWorkoutKey] = useState(0);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
@@ -800,7 +803,7 @@ export default function Portal() {
       setInsightsOpen(true);
     };
     const trainingHandler = () => { setInsightsTab('fitness'); setInsightsOpen(true); };
-    const workoutHandler = (e: Event) => { track('workout_start', {}); setWorkoutSession((e as CustomEvent).detail); };
+    const workoutHandler = (e: Event) => { track('workout_start', {}); setWorkoutKey((k) => k + 1); setWorkoutSession((e as CustomEvent).detail); };
     const proGateHandler = (e: Event) => {
       const feature = (e as CustomEvent).detail?.feature || 'pro';
       track('pro_gate_shown', { feature });
@@ -1393,7 +1396,7 @@ export default function Portal() {
       {workoutSession && (
         // 错误边界(修「打开跟练 app 卡死」):跟练播放器一旦被畸形数据(如别端同步回的坏 workout)
         // 击中 throw,绝不能冒泡卸载整棵 Portal(=白屏/卡死);就地兜住、显示可截图的报错。
-        <TabErrorBoundary label="workout">
+        <TabErrorBoundary key={workoutKey} label="workout">
           <WorkoutPlayer session={workoutSession} onClose={() => setWorkoutSession(null)} />
         </TabErrorBoundary>
       )}
