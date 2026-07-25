@@ -450,6 +450,88 @@ function choreTitle(c: ChoreInstanceView, t: (a: string, b: string) => string): 
   return c.templateId ? t('家务', 'Chore') + ` · ${c.dueDate}` : c.dueDate;
 }
 
+// ── 统计(本周/本月 + 近 8 周柱状图 + 常做的活)· 全部由 approved 客户端算,无新接口 ────────
+const ymd = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const parseYmd = (s: string) => { const [y, m, d] = s.split('-').map(Number); return new Date(y || 1970, (m || 1) - 1, d || 1); };
+const weekStartKey = (s: string) => { const d = parseYmd(s); const wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); return ymd(d); }; // 周一为一周起点
+
+function StatsSection({ approved, dict, t }: { approved: ChoreInstanceView[]; dict: Dict; t: (a: string, b: string) => string }) {
+  if (approved.length === 0) return null;
+  const dateOf = (c: ChoreInstanceView) => c.approvedAt?.slice(0, 10) || c.dueDate;
+  const now = new Date();
+  const todayKey = ymd(now);
+  const thisWeekStart = weekStartKey(todayKey);
+  const thisMonthPrefix = todayKey.slice(0, 7);
+
+  let weekCount = 0, weekEarned = 0, monthCount = 0, monthEarned = 0;
+  const byTitle = new Map<string, { count: number; sum: number }>();
+  const byWeek = new Map<string, number>();
+  for (const c of approved) {
+    const dk = dateOf(c);
+    if (weekStartKey(dk) === thisWeekStart) { weekCount += 1; weekEarned += c.value; }
+    if (dk.slice(0, 7) === thisMonthPrefix) { monthCount += 1; monthEarned += c.value; }
+    const tt = choreTitle(c, t);
+    const g = byTitle.get(tt) ?? { count: 0, sum: 0 }; g.count += 1; g.sum += c.value; byTitle.set(tt, g);
+    const wk = weekStartKey(dk); byWeek.set(wk, (byWeek.get(wk) ?? 0) + c.value);
+  }
+
+  // 近 8 周(含本周)每周攒的
+  const weeks: string[] = [];
+  const base = parseYmd(thisWeekStart);
+  for (let i = 7; i >= 0; i -= 1) { const w = new Date(base); w.setDate(base.getDate() - i * 7); weeks.push(ymd(w)); }
+  const bars = weeks.map((w) => ({ week: w, earned: byWeek.get(w) ?? 0 }));
+  const maxBar = Math.max(1, ...bars.map((b) => b.earned));
+
+  const top = [...byTitle.entries()].map(([title, g]) => ({ title, ...g })).sort((a, b) => b.count - a.count).slice(0, 5);
+
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      <p style={sectLabel}>{t('统计', 'Stats')}</p>
+
+      {/* 本周 / 本月 */}
+      <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
+        {[{ label: t('本周', 'This week'), n: weekCount, e: weekEarned }, { label: t('本月', 'This month'), n: monthCount, e: monthEarned }].map((s) => (
+          <div key={s.label} style={{ ...cardStyle, flex: 1, padding: 'var(--space-3)' }}>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{s.label}</div>
+            <div style={{ fontSize: 'var(--text-h2)', fontWeight: 'var(--weight-bold)' as unknown as number, lineHeight: 1.1, color: 'var(--portal-ink)', fontVariantNumeric: 'tabular-nums' }}>{money(s.e, dict)}</div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t(`完成 ${s.n} 件`, `${s.n} done`)}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* 近 8 周柱状图 */}
+      <div style={{ ...cardStyle, padding: 'var(--space-3)' }}>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginBottom: 'var(--space-2)' }}>{t('近 8 周攒的 · 每根一周', 'Last 8 weeks · one bar per week')}</div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 'var(--space-1)', height: 64 }}>
+          {bars.map((b, i) => {
+            const isNow = i === bars.length - 1;
+            const h = Math.round((b.earned / maxBar) * 100);
+            return (
+              <div key={b.week} title={`${b.week} · ${money(b.earned, dict)}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%' }}>
+                <div style={{ height: `${Math.max(b.earned > 0 ? 6 : 2, h)}%`, background: isNow ? 'var(--portal-blue-deep)' : 'var(--portal-accent-soft-md)', borderRadius: 'var(--radius-sm)', transition: 'height .2s' }} />
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* 常做的活 —— 回答「做了哪些活」*/}
+      <div style={cardStyle}>
+        <div style={{ ...rowStyle, borderBottom: '1px solid var(--portal-line)', paddingBottom: 'var(--space-2)' }}>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('都做了哪些活', 'What got done')}</span>
+        </div>
+        {top.map((row, i) => (
+          <div key={row.title} style={{ ...rowStyle, borderBottom: i === top.length - 1 ? 'none' : rowStyle.borderBottom }}>
+            <div style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.title}</div>
+            <span style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', whiteSpace: 'nowrap' }}>×{row.count}</span>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' as unknown as number, color: 'var(--status-go)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{money(row.sum, dict)}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 // ── 账本(点某人进来:账本 + 就地管理 TA 的角色/去留)──────────────────────────────
 function LedgerScreen({ familyId, person, me, onChanged, onLeft, dict, t }: {
   familyId: string; person: FamilyMemberView; me: FamilyMemberView;
@@ -512,6 +594,8 @@ function LedgerScreen({ familyId, person, me, onChanged, onLeft, dict, t }: {
           {t('审核过的家务往上加 · 你给的现金往下扣', 'Approved chores add up · cash you give deducts')}
         </div>
       </div>
+
+      <StatsSection approved={ledger.approved} dict={dict} t={t} />
 
       <section>
         <p style={sectLabel}>{t('历史', 'History')}</p>
