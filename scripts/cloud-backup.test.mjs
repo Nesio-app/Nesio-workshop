@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 const src = fs.readFileSync(new URL('../lib/portal/cloud-backup.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 
-function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKeys = [], idbInit = {}, localImages = {}, withReload = false } = {}) {
+function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKeys = [], idbInit = {}, localImages = {}, withReload = false, realWebApis = false } = {}) {
   const lsMap = new Map(Object.entries(lsInit));
   const localStorage = {
     getItem: (k) => (lsMap.has(k) ? lsMap.get(k) : null),
@@ -42,9 +42,16 @@ function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKey
     _scheduledPush: () => scheduledPush,
     _reloaded: () => reloaded,
     localStorage,
-    Blob: class { constructor(parts) { this.size = parts.join('').length; } },
-    File: class { constructor(parts, name, opts) { this._content = parts.join(''); this.name = name; this.type = opts && opts.type; } },
-    FormData: class { constructor() { this._d = new Map(); } append(k, v) { this._d.set(k, v); } get(k) { return this._d.get(k); } },
+    // pull 读 arrayBuffer 需要这些编解码全局。默认 vm 里无 CompressionStream/DecompressionStream
+    // → gzip 助手回退明文走原路;realWebApis=true 时注入 Node 原生 Web API,真跑 gzip 往返。
+    TextEncoder, TextDecoder, Uint8Array,
+    ...(realWebApis
+      ? { Blob, File, FormData, Response, CompressionStream, DecompressionStream }
+      : {
+          Blob: class { constructor(parts) { this.size = parts.join('').length; } },
+          File: class { constructor(parts, name, opts) { this._content = parts.join(''); this.name = name; this.type = opts && opts.type; } },
+          FormData: class { constructor() { this._d = new Map(); } append(k, v) { this._d.set(k, v); } get(k) { return this._d.get(k); } },
+        }),
     fetch: async (url, init) => { lastFetch = { url, init }; return fetchImpl(url, init); },
     require: (p) => {
       if (p === './full-backup') return {
@@ -158,6 +165,8 @@ const ok200 = () => ({ ok: true, status: 200, json: async () => ({ ok: true, sto
 // ── 恢复(pull / restoreCombinedBackup)──
 
 const backupDoc = (entries) => ({ format: 'nesio-full-backup', version: 1, exportedAt: 'x', entries });
+// pull 现按字节读 blob(gzip magic 识别),明文备份以 '{' 开头照旧解码 —— mock 回 arrayBuffer。
+const blobResp = (str) => ({ ok: true, status: 200, arrayBuffer: async () => new TextEncoder().encode(str).buffer });
 
 // 5b. 防遮盖闸:本机备份比云端最新那份还少条目 → 跳过上传(不发网络),skippedRegression。
 {
@@ -221,7 +230,7 @@ const backupDoc = (entries) => ({ format: 'nesio-full-backup', version: 1, expor
 {
   const fetchImpl = (url) => {
     if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: true, status: 200, json: async () => ({ ok: true, found: true, signedUrl: 'https://signed/x', storagePath: 'id/backup/2-latest.nesio-backup.json.txt' }) };
-    if (url === 'https://signed/x') return { ok: true, status: 200, text: async () => JSON.stringify(backupDoc({ 'nesio-life-graph-v1': '[]', 'nesio-health-v1': '{"metrics":[]}' })) };
+    if (url === 'https://signed/x') return blobResp(JSON.stringify(backupDoc({ 'nesio-life-graph-v1': '[]', 'nesio-health-v1': '{"metrics":[]}' })));
     return { ok: false, status: 404, json: async () => ({}) };
   };
   const { mod, ctx, lsMap } = makeCtx({ idbKeys: ['nesio-health-v1'], fetchImpl });
@@ -239,7 +248,7 @@ const backupDoc = (entries) => ({ format: 'nesio-full-backup', version: 1, expor
 {
   const fetchImpl = (url) => {
     if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: true, status: 200, json: async () => ({ ok: true, found: true, signedUrl: 'https://signed/x', storagePath: 'p' }) };
-    return { ok: true, status: 200, text: async () => 'not json at all' };
+    return blobResp('not json at all');
   };
   const { mod } = makeCtx({ fetchImpl });
   assert.equal((await mod.pullBackupFromCloud()).error, 'invalid_backup', '坏 blob → invalid_backup');
@@ -248,7 +257,7 @@ const backupDoc = (entries) => ({ format: 'nesio-full-backup', version: 1, expor
 // 13. autoSyncBackupWithCloud 数据安全不变式 + 冷浏览器首刷重新水合。
 const okFetch = (url) => {
   if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: true, status: 200, json: async () => ({ ok: true, found: true, signedUrl: 'https://signed/x', storagePath: 'id/backup/1.txt' }) };
-  if (url === 'https://signed/x') return { ok: true, status: 200, text: async () => JSON.stringify(backupDoc({ 'nesio-health-v1': '{"m":[]}' })) };
+  if (url === 'https://signed/x') return blobResp(JSON.stringify(backupDoc({ 'nesio-health-v1': '{"m":[]}' })));
   return { ok: false, status: 404, json: async () => ({}) };
 };
 {
@@ -314,6 +323,34 @@ const okFetch = (url) => {
   assert.equal(ctx._idbStore().has('local-image:a1'), false, '照片不落 blob IDB');
   assert.equal(JSON.stringify(ctx._lastRestore().entries), JSON.stringify({}), '照片不落 localStorage');
   assert.equal(ctx._idbStore().get('nesio-health-v1'), 'H', '同批非图数据照常恢复');
+}
+
+// 14. gzip 往返(用 Node 原生 Web API 真跑):push 压缩上传(高冗余大数据也能压过 8MB),
+//     pull 按 magic 字节自动解压 → 完整还原。这是「原浏览器超 8MB 一次都没推成功」的修复。
+{
+  let storedBytes = null;
+  const fetchImpl = async (url, init) => {
+    if (url === '/api/cloud/assets' && init && init.method === 'POST') {
+      const file = init.body.get('file');                 // 真 File
+      storedBytes = new Uint8Array(await file.arrayBuffer());
+      return { ok: true, status: 200, json: async () => ({ ok: true, storagePath: 'id/backup/gz.txt' }) };
+    }
+    if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: true, status: 200, json: async () => ({ ok: true, found: true, signedUrl: 'https://signed/gz', storagePath: 'id/backup/gz.txt' }) };
+    if (url === 'https://signed/gz') return { ok: true, status: 200, arrayBuffer: async () => storedBytes.buffer };
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  // 高冗余的「足迹」大数据:明文很大,gzip 后骤减(模拟真实 GPS 点串)
+  const big = JSON.stringify(Array.from({ length: 40000 }, (_, i) => ({ lat: 37.1, lng: -122.2, t: i })));
+  const push = makeCtx({ fbEntries: { 'nesio-place-geo-v1': big }, fetchImpl, realWebApis: true });
+  const pr = await push.mod.pushBackupToCloud();
+  assert.equal(pr.ok, true, 'gzip 后上传成功');
+  assert.ok(storedBytes && storedBytes[0] === 0x1f && storedBytes[1] === 0x8b, '上传的是 gzip 字节(magic 1f 8b)');
+  assert.ok(storedBytes.length < big.length / 2, `gzip 显著压缩(${big.length}→${storedBytes.length})`);
+
+  const pull = makeCtx({ idbKeys: ['nesio-place-geo-v1'], fetchImpl, realWebApis: true });
+  const rr = await pull.mod.pullBackupFromCloud('merge');
+  assert.equal(rr.ok, true, 'pull 自动解压并恢复成功');
+  assert.equal(pull.ctx._idbStore().get('nesio-place-geo-v1'), big, '足迹经 gzip 往返完整还原(逐字节一致)');
 }
 
 console.log('cloud-backup: OK');

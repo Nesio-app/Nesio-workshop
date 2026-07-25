@@ -77,6 +77,10 @@ assert.match(backup, /firstSync &&[\s\S]{0,60}restoredSomething[\s\S]{0,90}locat
 assert.match(backup, /FIRST_SYNC_DONE_FLAG/, 'reload 由「首刷完成」标志守卫(每浏览器仅一次,防循环)');
 // 空数据保险丝:0 条目绝不上云(空浏览器绝不用空数据盖云端)
 assert.match(backup, /entryCount === 0[\s\S]{0,80}ok: true/, '空数据保险丝:0 条目静默成功、不上云');
+// 压缩:超 8MB 的高冗余数据(健康/足迹)gzip 后上传;pull 按 gzip magic 字节自动解压(新旧兼容)
+assert.match(backup, /CompressionStream[\s\S]{0,200}gzip/, 'push 前 gzip 压缩(把超 8MB 挡回来)');
+assert.match(backup, /0x1f && buf\[1\] === 0x8b/, 'pull 按 gzip magic 字节(1f 8b)识别并解压');
+assert.match(backup, /gunzipToString/, 'pull 有解压路径');
 // 防遮盖闸:本机比云端最新那份还少条目就不推(pull 回报 cloudEntryCount,自动推带 skipIfFewerThan)
 assert.match(backup, /cloudEntryCount = Object\.keys\(parsed\.entries\)\.length/, 'pull 回报云端最新那份的条目数');
 assert.match(backup, /skipIfFewerThan[\s\S]{0,120}entryCount < opts\.skipIfFewerThan[\s\S]{0,60}skippedRegression/, 'push:比云端少 → 跳过上传(防遮盖)');
