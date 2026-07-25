@@ -292,3 +292,40 @@ export async function createSignedAssetUrl(
   const signedUrl = payload.signedURL || payload.signedUrl;
   return signedUrl ? normalizeSignedStorageUrl(config, signedUrl) : null;
 }
+
+export interface StorageObjectEntry {
+  name: string;
+  id?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+/**
+ * 列出某前缀下的存储对象(service-role)。用于「按账号找最新备份」——
+ * 换浏览器登录后并不知道备份那串带时间戳的路径,靠这个列出 {identity}/backup/ 下全部对象、
+ * 由调用方挑最新那份。前缀始终由服务端按**已鉴权身份**拼接(绝不接受用户传入路径),
+ * 天然身份隔离,拿不到别人的备份。失败(未配置/网络/响应非数组)一律返回空数组,
+ * 调用方据此走 found:false —— 与「无备份」同态,不谎称错误。
+ */
+export async function listStorageObjects(
+  config: CloudRuntimeConfig,
+  prefix: string,
+  opts: { limit?: number } = {},
+): Promise<StorageObjectEntry[]> {
+  const listUrl = new URL(`/storage/v1/object/list/${config.storageBucket}`, config.supabaseUrl);
+  const response = await fetch(listUrl.toString(), {
+    method: 'POST',
+    headers: serviceRoleRestHeaders(config),
+    body: JSON.stringify({
+      prefix,
+      limit: opts.limit ?? 100,
+      offset: 0,
+      sortBy: { column: 'created_at', order: 'desc' },
+    }),
+    cache: 'no-store',
+  });
+  if (!response.ok) return [];
+  const payload = await response.json().catch(() => null);
+  if (!Array.isArray(payload)) return [];
+  return payload as StorageObjectEntry[];
+}

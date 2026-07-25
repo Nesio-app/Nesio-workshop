@@ -17,6 +17,7 @@ import { archiveCurrentSpace, restoreArchivedSpace } from '@/lib/portal/account-
 import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
 import { syncLearningWithCloud, registerLearningAutoPush } from '@/lib/portal/cloud-learning-sync';
 import { syncProfileWithCloud, registerProfileAutoPush } from '@/lib/portal/cloud-profile-sync';
+import { autoSyncBackupWithCloud } from '@/lib/portal/cloud-backup';
 
 // Heavy sheets load on first open, not at boot — together they were ~3.5k
 // lines of first-paint JS for UI the user may never touch in a session.
@@ -543,11 +544,15 @@ export default function Portal() {
     // 批次200:同步 profile(名字/头像)—— 登录/回前台按 identityUpdatedAt 做 last-write-wins,
     // 补上记忆/学习态之外最后一块跨端不一致(头像 婧/F/朋 各端不同的真因)。
     void syncProfileWithCloud();
+    // 全量数据跨浏览器同步(健康/足迹/银行流水等本地大数据):登录即先拉后推 —— 换浏览器
+    // 登录后自动从云 merge 回本机(补缺、不覆盖),拉完防抖上云。空浏览器只会被填充,绝不用
+    // 空盖云;pull 失败不推,防遮盖云端真备份。durability 免费,不查付费门。
+    void autoSyncBackupWithCloud();
     const unregisterLearningPush = registerLearningAutoPush();
     // 批次205:改名字/头像/语言/教练/日报/主题任一 → 防抖自动推上云,别端拉取即一致。
     const unregisterProfilePush = registerProfileAutoPush();
     const onVisible = () => {
-      if (document.visibilityState === 'visible') { void syncMemoryWithCloud(); void syncLearningWithCloud(); void syncProfileWithCloud(); }
+      if (document.visibilityState === 'visible') { void syncMemoryWithCloud(); void syncLearningWithCloud(); void syncProfileWithCloud(); void autoSyncBackupWithCloud(); }
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => {

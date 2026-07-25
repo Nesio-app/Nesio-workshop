@@ -748,7 +748,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', margin: '0 0 0.4rem' }}>
         {backupDest === 'drive'
           ? L(dict, '存到你自己的 Google Drive(免费,私有文件夹);没连 Google 会自动改用 Nesio 云兜底。', 'Saved to your own Google Drive (free, private folder); falls back to Nesio cloud if Google isn\'t connected.')
-          : L(dict, '存到 Nesio 云(Pro 权益,试用期内可用)。', 'Saved to Nesio cloud (a Pro benefit; available during trial).')}
+          : L(dict, '存到 Nesio 云(登录即用,免费跨端同步 —— 换浏览器也拉得回)。', 'Saved to Nesio cloud (free once you sign in; syncs across devices, so a new browser can pull it back).')}
       </p>
 
       <button type="button" className="nesio-settings-action-btn" onClick={handleBackupChosen} disabled={cloudState === 'pushing' || driveState === 'busy'}>

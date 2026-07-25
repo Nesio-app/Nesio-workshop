@@ -63,8 +63,6 @@ function mergeGraphJson(currentRaw: string | null, incomingRaw: string): string 
 
 /** 上次云备份记录(小,留 localStorage)。 */
 const LAST_CLOUD_BACKUP_KEY = 'nesio-cloud-backup-last-v1';
-/** 付费权益桩开关(真权益层落地前的临时门)。 */
-const CLOUD_ENTITLEMENT_FLAG = 'nesio-cloud-entitlement-v1';
 /** assets 路由的硬上限(与 app/api/cloud/assets/route.ts MAX_UPLOAD_BYTES 对齐)。 */
 const CLOUD_UPLOAD_LIMIT_BYTES = 8 * 1024 * 1024;
 
@@ -93,17 +91,14 @@ export interface CloudBackupResult {
 }
 
 /**
- * 付费权益桩:云备份是否已解锁。
- * 真权益强制层落地前,读本地 flag(默认关);解锁只影响能否**发起**推送,
- * 云端仍独立校验登录/配置(纵深防御)。
+ * 云备份/同步是否可发起。**durability = 免费护城河**(交接清单 ③):跨端不丢是基本盘,
+ * 不锁付费墙 —— 登录即自动、免费(与 cloud-memory-sync「登录即同步」同口径)。
+ * 真正的门是「已登录」,由路由层校验(未登录→401,前端呈现可见失败态);这里只做
+ * 「浏览器环境可用」判断,常开。历史上是付费桩(读本地 flag,默认关),现改常开;
+ * 保留函数名与 entitlement_required 错误枚举仅为兼容既有调用点/类型,推送机制不变。
  */
 export function hasCloudEntitlement(): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    return localStorage.getItem(CLOUD_ENTITLEMENT_FLAG) === 'on';
-  } catch {
-    return false;
-  }
+  return typeof window !== 'undefined';
 }
 
 /**
@@ -166,6 +161,11 @@ export async function pushBackupToCloud(): Promise<CloudBackupResult> {
   } catch {
     return { ok: false, error: 'network' };
   }
+
+  // 交接清单红线「空浏览器绝不用空数据盖云端」的保险丝:0 条目备份绝不上云 —— 一份空的
+  // 「最新」会遮住云端真备份,换机 pull 只会拿回这份空的(数据丢失陷阱)。没东西可备份就
+  // 静默成功、不发网络(纵深防御:自动同步侧已「pull 失败不推」,这里再兜一层任何调用点)。
+  if (entryCount === 0) return { ok: true, entryCount: 0, bytes };
 
   // 本地预检:超 8MB 直接给明确态,不白跑一趟网络(路由也会 413 兜底)。
   if (bytes > CLOUD_UPLOAD_LIMIT_BYTES) return { ok: false, error: 'too_large', bytes, entryCount };
@@ -276,32 +276,94 @@ export interface CloudRestoreResult {
 }
 
 /**
- * 从云拉回最近一次备份并恢复。GET assets 签名 URL → fetch blob → 校验 → restoreCombinedBackup。
- * 门禁/失败态与 push 对齐。成功后调用方应 reload。
+ * 从云拉回**最新**一份备份并恢复。命门修复(交接清单 ①②):不再依赖本地 last-backup 记录
+ * (换浏览器后 localStorage 为空 → 永远 no_backup、拉不回,这正是跨浏览器同步的死穴)。
+ * 改问服务端「我账号 backup/ 前缀里最新那份」(GET ?list=backup),直接拿签名读 URL →
+ * fetch blob → 校验 → restoreCombinedBackup。默认 merge:节点 id union、已有不覆盖,
+ * 空浏览器只会被填充、绝不反向覆盖。门禁/失败态与 push 对齐。成功后调用方应 reload。
  */
 export async function pullBackupFromCloud(mode: RestoreMode = 'merge'): Promise<CloudRestoreResult> {
   if (!hasCloudEntitlement()) return { ok: false, error: 'entitlement_required' };
   if (typeof window === 'undefined') return { ok: false, error: 'network' };
-  const last = lastCloudBackup();
-  if (!last?.storagePath) return { ok: false, error: 'no_backup' };
 
   try {
-    // 1. 取签名读 URL(assets GET 校验身份 + 归属)
-    const metaRes = await fetch(`/api/cloud/assets?storagePath=${encodeURIComponent(last.storagePath)}`, { cache: 'no-store' });
-    const meta = (await metaRes.json().catch(() => ({}))) as { ok?: boolean; signedUrl?: string };
-    if (!metaRes.ok || !meta.ok || !meta.signedUrl) return { ok: false, error: mapHttpError(metaRes.status) };
+    // 1. 问服务端要「账号下最新那份备份」的签名读 URL(身份由路由校验,前缀服务端拼)
+    const listRes = await fetch('/api/cloud/assets?list=backup', { cache: 'no-store' });
+    const list = (await listRes.json().catch(() => ({}))) as {
+      ok?: boolean; found?: boolean; signedUrl?: string; storagePath?: string;
+    };
+    if (!listRes.ok || !list.ok) return { ok: false, error: mapHttpError(listRes.status) };
+    if (!list.found || !list.signedUrl) return { ok: false, error: 'no_backup' };
 
-    // 2. 拉 blob
-    const blobRes = await fetch(meta.signedUrl, { cache: 'no-store' });
+    // 2. 拉 blob(坏数据绝不动本机:校验不过就原样返回)
+    const blobRes = await fetch(list.signedUrl, { cache: 'no-store' });
     if (!blobRes.ok) return { ok: false, error: 'network' };
     let parsed: unknown;
     try { parsed = JSON.parse(await blobRes.text()); } catch { return { ok: false, error: 'invalid_backup' }; }
     if (!isValidBackup(parsed)) return { ok: false, error: 'invalid_backup' };
 
-    // 3. 恢复(IDB/localStorage 分流)
+    // 3. 恢复(IDB/localStorage 分流,merge = 只补缺/新者胜)
     const res = await restoreCombinedBackup(parsed, mode);
+    // 记下这份路径,供 UI 显示「上次同步」(best-effort,失败不影响恢复结果)
+    if (list.storagePath) {
+      try {
+        const record: LastCloudBackup = {
+          at: new Date().toISOString(),
+          storagePath: list.storagePath,
+          bytes: 0,
+          entryCount: res.restoredKeys + res.idbRestored,
+        };
+        localStorage.setItem(LAST_CLOUD_BACKUP_KEY, JSON.stringify(record));
+      } catch { /* quota */ }
+    }
     return { ok: true, restoredKeys: res.restoredKeys, idbRestored: res.idbRestored };
   } catch {
     return { ok: false, error: 'network' };
+  }
+}
+
+// ── 自动同步(先拉后推 · 登录/回前台触发,交接清单 ②)────────────────────────────
+//
+// 仿 cloud-memory-sync:登录或标签页回前台时先 pull(merge)再防抖 push。数据安全不变式:
+//  · 先拉后推 —— push 永远发生在 pull 之后;空浏览器先被云端填充再上云,不会用空盖云。
+//  · pull 失败(网络/未登录/坏备份)则**跳过 push** —— 避免把本地空/旧数据推成新「最新」,
+//    遮住云端真备份(换机数据丢失陷阱)。仅 pull 成功、或云端确实无备份(no_backup)时才推。
+//  · push 侧 entryCount===0 保险丝再兜一层:任何情况下空数据都不上云(纵深防御)。
+// best-effort:未登录/离线/未配置全静默,不阻塞渲染;20s 节流避免 mount+visibility 连触发。
+
+const AUTO_SYNC_MIN_INTERVAL_MS = 20_000;
+const AUTO_PUSH_DEBOUNCE_MS = 8_000;
+let autoSyncLastAt = 0;
+let autoSyncInFlight = false;
+let autoPushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleAutoPush(): void {
+  if (typeof window === 'undefined') return;
+  if (autoPushTimer) clearTimeout(autoPushTimer);
+  autoPushTimer = setTimeout(() => {
+    autoPushTimer = null;
+    void pushBackupToCloud();
+  }, AUTO_PUSH_DEBOUNCE_MS);
+}
+
+/**
+ * 登录后 / 回前台调一次:先把云端最新备份 merge 回本机(补缺、不覆盖),拉完再防抖上云。
+ * @param opts.force 跳过 20s 节流(手动「立即同步」用)。
+ */
+export async function autoSyncBackupWithCloud(opts: { force?: boolean } = {}): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (!hasCloudEntitlement()) return;
+  const now = Date.now();
+  if (!opts.force && (autoSyncInFlight || now - autoSyncLastAt < AUTO_SYNC_MIN_INTERVAL_MS)) return;
+  autoSyncInFlight = true;
+  autoSyncLastAt = now;
+  try {
+    const pull = await pullBackupFromCloud('merge');
+    // 只在拉成功、或云端确实空(no_backup)时才推;其余失败态一律不推(防遮盖云端真备份)。
+    if (pull.ok || pull.error === 'no_backup') scheduleAutoPush();
+  } catch {
+    /* best-effort:静默(pull 内部已 fail-safe) */
+  } finally {
+    autoSyncInFlight = false;
   }
 }

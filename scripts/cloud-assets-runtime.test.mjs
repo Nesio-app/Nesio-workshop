@@ -60,6 +60,11 @@ for (const marker of [
   'requiresSignedUrl',
   'expiresIn',
   'setRefreshedAuthCookies',
+  // 「按账号找最新备份」GET 模式(跨浏览器同步命门):列出 {identity}/backup/、回最新那份签名 URL
+  'cloudBackupList',
+  'pickLatestBackupObject',
+  'listStorageObjects',
+  '/storage/v1/object/list/',
 ]) {
   assert.ok(route.includes(marker), `cloud assets route missing marker: ${marker}`);
 }

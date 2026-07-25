@@ -2,8 +2,8 @@
 
 > Loop-engineering 原则:状态必须活在对话之外。任何 AI 会话或新协作者
 > **先读这个文件**,再动手。改动仓库重大状态时,同步更新这里。
-> 最后更新:2026-07-10(v1 产品规格批次 27-29:洞察四件套+多面镜 / Today 收据 /
-> 标签相对时间;规格 = docs/design/v1-product-spec-2026-07.md)
+> 最后更新:2026-07-25(全量数据跨浏览器同步闭环:服务端按账号找最新备份 +
+> 登录/回前台先拉后推 + durability 转免费;见「进行中的迁移 ③」末段)
 
 ## 当前纪元:两代产品交接中
 
@@ -49,6 +49,18 @@
    (replace 覆盖 / merge 缺才补)、其余走 restoreFullBackup 落 localStorage;`pullBackupFromCloud`
    走 assets 签名 URL 回读。**顺带修了 #43 迁 IDB 的坑**:旧 restore 全写 localStorage,而 blob store
    仅在「IDB 空」才迁移,故 replace 模式对已有 IDB 数据静默失效——本地「导入备份」也受此影响,已一并改走 restoreCombinedBackup。
+   **全量数据跨浏览器同步闭环(2026-07-25):** 修「换浏览器登录后全量本地大数据(健康/足迹/
+   银行流水…)拉不回」的命门。① 服务端 `/api/cloud/assets` GET 加 `?list=backup` 模式:列出登录
+   用户 `{identity}/backup/` 下全部对象、回**最新那份**签名 URL(此前 POST 存带时间戳的新路径、
+   GET 必须已知路径,新浏览器 localStorage 空 → 永远拉不回)。helper `listStorageObjects`
+   (cloud-server-runtime,前缀按已鉴权身份拼,身份隔离)。② `pullBackupFromCloud` 改问服务端
+   要最新份,不再依赖本地 last-backup 记录。③ 新增 `autoSyncBackupWithCloud`:Portal 顶层登录/
+   回前台**先拉(merge)后防抖推**——空浏览器只被填充绝不用空盖云;**pull 失败不推**(防空/旧数据
+   遮盖云端真备份)+ push 侧 `entryCount===0` 保险丝(空数据绝不上云)。④ **付费桩转免费**:
+   `hasCloudEntitlement` 由「读本地 flag 默认关」改常开(登录即用),遵循 durability=免费护城河
+   (与 cloud-memory-sync/学习态/profile 同口径)。合并逻辑复用 restoreCombinedBackup merge(节点
+   id union、已有不覆盖)。契约 `test:cloud-backup`(空保险丝/list=backup pull/先拉后推不变式)+
+   `test:cloud-assets-runtime`(list 模式 marker)+ `test:cloud-auto-sync`(全量同步契约)。tsc + next build 绿。
 
 4a. **A 计划施工线 ✅ 完整闭环(2026-07-07,#50-#59)**:见 `docs/design/algorithm-layer-plan.md`。
    Layer2 2a(总线+事实日志+三原语,mirror/energy 收编,card-feedback/cooling/dormant 有据保留)→
@@ -154,8 +166,11 @@ sensitivity/retention 枚举化(中期)。
 
 - ~~restore-from-cloud~~ **已做**(2026-07-07):见上「进行中的迁移 ③」——推 + 拉都通了,云备份**往返闭环**
   (注:是「往返打通」,**非端到端加密 E2E**;云端为应用层明文 + service-role,别用「端到端」措辞误导。数据审计 §4)。
-- **云备份付费桩转真**:hasCloudEntitlement 现读本地 flag;支付/StoreKit/账户 plan 字段
-  接上后换成真权益读取(推送机制本身不用动)。(2026-07-07 记)
+  **跨浏览器全量同步已闭环(2026-07-25)**:命门(新浏览器 localStorage 空、GET 需已知路径 → 拉不回)
+  已修 —— 服务端 `?list=backup` 按账号找最新份 + 登录/回前台自动先拉后推,见「进行中的迁移 ③」末段。
+- ~~**云备份付费桩转真**~~ **改判:durability 转免费(2026-07-25)**:hasCloudEntitlement 由「读本地 flag
+  默认关」改常开(登录即用,不锁付费墙)—— 跨端不丢是护城河基本盘,与记忆/学习态/profile 同口径。
+  重资产付费(整包手动备份/图片深检索)另论;云备份/恢复本身对登录用户免费。
 - **服务端权益强制:骨架已落、待接真源**(2026-07-14 记,安全审计 #1):
   `lib/portal/auth/server-entitlement.ts` 提供 `readServerTier` / `guardServerEntitlement`,
   已接进 `guardAiRoute({ requirePaidCloudAi:true })`,七路付费云 AI 路由(meeting-notes /
