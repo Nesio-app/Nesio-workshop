@@ -111,3 +111,7 @@ export function recordPayout(
 ): Promise<ApiResult<{ payout: PayoutView }>> {
   return api('/api/portal/family/payout', postJson({ familyId, personId, amount, date, note }));
 }
+/** 冲正一笔发薪(记错了撤掉;需 can_record_payout)。软删,账本自动回加。 */
+export function reversePayout(familyId: string, payoutId: string): Promise<ApiResult<{ reversed: number }>> {
+  return api('/api/portal/family/payout', postJson({ action: 'reverse', familyId, payoutId }));
+}

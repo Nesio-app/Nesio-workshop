@@ -13,14 +13,16 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale, loadProfileSettings } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import {
-  listFamilies, createFamily, joinFamily, getBoard, getLedger, choreAction, recordPayout, syncMyFamilyProfile, setMyGoal,
-  listFamilyMembers, setMemberRole, removeMember,
+  listFamilies, createFamily, joinFamily, getBoard, getLedger, choreAction, recordPayout, reversePayout, syncMyFamilyProfile, setMyGoal,
+  setMemberRole, removeMember,
   type FamilySummary, type FamilyMemberView, type BoardView, type LedgerView, type ChoreInstanceView,
 } from '@/lib/family/family-client';
 
-type View = { kind: 'board' } | { kind: 'ledger'; personId: string; personName: string };
+type View = { kind: 'board' } | { kind: 'ledger'; person: FamilyMemberView };
+type Dict = 'zh' | 'en';
 
-const money = (n: number) => `$${n.toFixed(2)}`;
+// 货币符号跟随语言:中文 ¥、英文 $。金额纯展示(Nesio 永不碰钱),不做汇率换算。
+const money = (n: number, dict: Dict) => `${dict === 'en' ? '$' : '¥'}${n.toFixed(2)}`;
 
 export default function FamilySharingSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -53,7 +55,7 @@ export default function FamilySharingSheet({ open, onClose }: { open: boolean; o
     <NesioSheet variant="fullscreen" open={open} onOpenChange={(o) => { if (!o) onClose(); }} ariaLabel={t('家庭分享', 'Family sharing')}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }}>
         <Header
-          title={view.kind === 'ledger' ? `${view.personName}${t(' 的账本', "’s ledger")}` : t('家庭分享', 'Family')}
+          title={view.kind === 'ledger' ? `${view.person.name}${t(' 的账本', "’s ledger")}` : t('家庭分享', 'Family')}
           onBack={view.kind === 'ledger' ? () => setView({ kind: 'board' }) : undefined}
           onClose={onClose}
           t={t}
@@ -72,14 +74,22 @@ export default function FamilySharingSheet({ open, onClose }: { open: boolean; o
               familyId={familyId}
               families={families}
               onSwitchFamily={setFamilyId}
-              onOpenLedger={(personId, personName) => setView({ kind: 'ledger', personId, personName })}
-              onLeftFamily={() => { setFamilyId(''); void refreshFamilies(); }}
+              onOpenLedger={(member) => setView({ kind: 'ledger', person: member })}
+              dict={dict}
               t={t}
             />
           )}
 
           {!loading && !loadErr && view.kind === 'ledger' && me && (
-            <LedgerScreen familyId={familyId} personId={view.personId} canRecordPayout={me.canRecordPayout} t={t} />
+            <LedgerScreen
+              familyId={familyId}
+              person={view.person}
+              me={me}
+              onChanged={refreshFamilies}
+              onLeft={() => { setView({ kind: 'board' }); setFamilyId(''); void refreshFamilies(); }}
+              dict={dict}
+              t={t}
+            />
           )}
         </div>
       </div>
@@ -196,8 +206,8 @@ function InviteSection({ inviteCode, t }: { inviteCode: string; t: (a: string, b
 }
 
 // ── 我的攒钱目标(孩子端动机 · 复用 .nesio-reward-progress)────────────────────────
-function GoalSection({ familyId, me, owed, onSaved, t }: {
-  familyId: string; me: FamilyMemberView; owed: number; onSaved: () => void; t: (a: string, b: string) => string;
+function GoalSection({ familyId, me, owed, onSaved, dict, t }: {
+  familyId: string; me: FamilyMemberView; owed: number; onSaved: () => void; dict: Dict; t: (a: string, b: string) => string;
 }) {
   const goal = me.goalAmount ?? 0;
   const [open, setOpen] = useState(false);
@@ -255,18 +265,18 @@ function GoalSection({ familyId, me, owed, onSaved, t }: {
       <p className="nesio-reward-progress-label" style={{ color: reached ? 'var(--status-go)' : 'var(--portal-muted)' }}>
         {reached
           ? t(`攒够了!可以买 ${me.goalLabel || '它'} 了`, `Goal reached — you can get ${me.goalLabel || 'it'}!`)
-          : t(`${money(owed)} / ${money(goal)} · 还差 ${money(Math.max(0, goal - owed))}`, `${money(owed)} / ${money(goal)} · ${money(Math.max(0, goal - owed))} to go`)}
+          : t(`${money(owed, dict)} / ${money(goal, dict)} · 还差 ${money(Math.max(0, goal - owed), dict)}`, `${money(owed, dict)} / ${money(goal, dict)} · ${money(Math.max(0, goal - owed), dict)} to go`)}
       </p>
     </div>
   );
 }
 
 // ── 家庭板 ────────────────────────────────────────────────────────────────────
-function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, onLeftFamily, t }: {
+function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, dict, t }: {
   familyId: string; families: FamilySummary[];
   onSwitchFamily: (id: string) => void;
-  onOpenLedger: (personId: string, personName: string) => void;
-  onLeftFamily: () => void;
+  onOpenLedger: (member: FamilyMemberView) => void;
+  dict: Dict;
   t: (a: string, b: string) => string;
 }) {
   const [board, setBoard] = useState<BoardView | null>(null);
@@ -310,7 +320,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, onLeftF
       {err && <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}>{t('那一下没成,再试一次。', 'That didn’t go through — try again.')}</span>}
 
       {/* 我的攒钱目标(孩子端动机):攒够就买 XX。进度 = 现攒 / 目标。 */}
-      <GoalSection familyId={familyId} me={board.me} owed={board.everyone.find((e) => e.member.id === board.me.id)?.owed ?? 0} onSaved={load} t={t} />
+      <GoalSection familyId={familyId} me={board.me} owed={board.everyone.find((e) => e.member.id === board.me.id)?.owed ?? 0} onSaved={load} dict={dict} t={t} />
 
       <InviteSection inviteCode={families.find((f) => f.familyId === familyId)?.inviteCode ?? ''} t={t} />
 
@@ -322,7 +332,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, onLeftF
             <div key={c.id} style={{ ...rowStyle, borderBottom: i === board.myChoresToday.length - 1 ? 'none' : rowStyle.borderBottom }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{choreTitle(c, t)}</div>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{c.state === 'done' ? t('已提交,等审核', 'Submitted — waiting for review') : t('干完点「完成」', 'Tap Done when finished')} · {money(c.value)}</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{c.state === 'done' ? t('已提交,等审核', 'Submitted — waiting for review') : t('干完点「完成」', 'Tap Done when finished')} · {money(c.value, dict)}</div>
               </div>
               {c.state === 'todo' && (
                 <button type="button" onClick={() => act(c.id, 'done')} disabled={busyId === c.id + 'done'} style={primaryBtn}>{t('完成', 'Done')}</button>
@@ -339,7 +349,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, onLeftF
           <div style={cardStyle}>
             {board.toReview.map((c, i) => (
               <div key={c.id} style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch', gap: 'var(--space-2)', borderBottom: i === board.toReview.length - 1 ? 'none' : rowStyle.borderBottom }}>
-                <div style={{ fontSize: 'var(--text-body)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}><MemberAvatar name={displayName(c.assigneeId)} avatar={avatarOf(c.assigneeId)} size={22} /><span>{displayName(c.assigneeId)} · {choreTitle(c, t)} <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>{money(c.value)}</span></span></div>
+                <div style={{ fontSize: 'var(--text-body)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}><MemberAvatar name={displayName(c.assigneeId)} avatar={avatarOf(c.assigneeId)} size={22} /><span>{displayName(c.assigneeId)} · {choreTitle(c, t)} <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>{money(c.value, dict)}</span></span></div>
                 {c.proofPhotoRef && <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}><IconCamera size={12} />{t('附了张存证照 —— 只存在你们家庭里。', 'A photo was added — stays in your family vault.')}</div>}
                 <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                   <button type="button" onClick={() => act(c.id, 'approve')} disabled={busyId === c.id + 'approve'} style={{ ...goBtn, flex: 1 }}>{t('看着不错', 'Looks good')}</button>
@@ -394,99 +404,20 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, onLeftF
         <p style={sectLabel}>{t('大家', 'Everyone')}</p>
         <div style={cardStyle}>
           {board.everyone.map((e, i) => (
-            <button key={e.member.id} type="button" onClick={() => onOpenLedger(e.member.id, displayName(e.member.id))}
+            <button key={e.member.id} type="button" onClick={() => onOpenLedger(e.member)}
               style={{ ...rowStyle, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: i === board.everyone.length - 1 ? 'none' : '1px solid var(--portal-line)', cursor: 'pointer' }}>
               <MemberAvatar name={displayName(e.member.id)} avatar={avatarOf(e.member.id)} size={32} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{displayName(e.member.id)}</div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('攒了', 'saved up')}</div>
               </div>
-              <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)' as unknown as number, fontVariantNumeric: 'tabular-nums' }}>{money(e.owed)}</span>
+              <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)' as unknown as number, fontVariantNumeric: 'tabular-nums' }}>{money(e.owed, dict)}</span>
               <span style={{ color: 'var(--portal-muted)' }}>›</span>
             </button>
           ))}
         </div>
       </section>
-
-      <MembersManager familyId={familyId} meId={board.me.id} canManage={board.me.canApprove} onChanged={load} onLeft={onLeftFamily} t={t} />
     </div>
-  );
-}
-
-// ── 成员管理(改角色 / 移出 / 退出)· 折叠 ──────────────────────────────────────
-function MembersManager({ familyId, meId, canManage, onChanged, onLeft, t }: {
-  familyId: string; meId: string; canManage: boolean; onChanged: () => void; onLeft: () => void; t: (a: string, b: string) => string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [members, setMembers] = useState<FamilyMemberView[] | null>(null);
-  const [busyId, setBusyId] = useState('');
-  const [err, setErr] = useState('');
-
-  const load = useCallback(async () => {
-    const r = await listFamilyMembers(familyId);
-    if (r.ok) setMembers(r.data.members);
-  }, [familyId]);
-  useEffect(() => { if (open && members === null) void load(); }, [open, members, load]);
-
-  async function setRole(m: FamilyMemberView, parent: boolean) {
-    setBusyId(m.id + 'role'); setErr('');
-    const role = parent
-      ? { canApprove: true, needsApproval: false, canRecordPayout: true }
-      : { canApprove: false, needsApproval: true, canRecordPayout: false };
-    const r = await setMemberRole(familyId, m.id, role);
-    setBusyId('');
-    if (!r.ok) { setErr(r.error === 'conflict' ? t('至少要留一位家长。', 'Keep at least one parent.') : t('没改成,再试一次。', 'Could not change — try again.')); return; }
-    void load(); onChanged();
-  }
-  async function remove(m: FamilyMemberView) {
-    setBusyId(m.id + 'remove'); setErr('');
-    const r = await removeMember(familyId, m.id);
-    setBusyId('');
-    if (!r.ok) { setErr(r.error === 'conflict' ? t('先把家长身份交给别人,再退出。', 'Hand parent role to someone first.') : t('没成,再试一次。', 'Could not do that — try again.')); return; }
-    if (m.id === meId) { onLeft(); return; }  // 退出自己 → 刷新家庭列表(已不是成员,board 会 403)
-    void load(); onChanged();
-  }
-
-  return (
-    <section>
-      <button type="button" onClick={() => setOpen((v) => !v)}
-        style={{ ...sectLabel, display: 'flex', alignItems: 'center', gap: 'var(--space-1)', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}>
-        {t('成员', 'Members')} {open ? '▾' : '▸'}
-      </button>
-      {open && (
-        <div style={cardStyle}>
-          {members === null && <p style={{ ...rowStyle, borderBottom: 'none', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)' }}>{t('加载中…', 'Loading…')}</p>}
-          {err && <p style={{ ...rowStyle, borderBottom: 'none', color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}>{err}</p>}
-          {(members ?? []).map((m, i) => {
-            const isParent = m.canApprove;
-            const isMe = m.id === meId;
-            return (
-              <div key={m.id} style={{ ...rowStyle, flexWrap: 'wrap', borderBottom: i === (members?.length ?? 0) - 1 ? 'none' : rowStyle.borderBottom }}>
-                <MemberAvatar name={m.name} avatar={m.avatarUrl || ''} size={28} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{m.name}{isMe ? t(' (我)', ' (me)') : ''}</div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{isParent ? t('家长 · 能审核·记付款', 'Parent · reviews & pays') : t('孩子 · 做完要家长看一眼', 'Kid · needs review')}</div>
-                </div>
-                {canManage && (
-                  <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-                    <button type="button" onClick={() => void setRole(m, true)} disabled={busyId === m.id + 'role' || isParent}
-                      style={{ ...roleChip, ...(isParent ? roleChipOn : {}) }}>{t('家长', 'Parent')}</button>
-                    <button type="button" onClick={() => void setRole(m, false)} disabled={busyId === m.id + 'role' || !isParent}
-                      style={{ ...roleChip, ...(!isParent ? roleChipOn : {}) }}>{t('孩子', 'Kid')}</button>
-                  </div>
-                )}
-                {(canManage || isMe) && (
-                  <button type="button" onClick={() => void remove(m)} disabled={busyId === m.id + 'remove'}
-                    style={{ border: 'none', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: 'var(--space-1)' }}>
-                    {isMe ? t('退出', 'Leave') : t('移出', 'Remove')}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
   );
 }
 const roleChip: React.CSSProperties = { border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', padding: 'var(--space-1) var(--space-2)', cursor: 'pointer', fontFamily: 'var(--font-sans)' };
@@ -519,16 +450,22 @@ function choreTitle(c: ChoreInstanceView, t: (a: string, b: string) => string): 
   return c.templateId ? t('家务', 'Chore') + ` · ${c.dueDate}` : c.dueDate;
 }
 
-// ── 账本 ──────────────────────────────────────────────────────────────────────
-function LedgerScreen({ familyId, personId, canRecordPayout, t }: {
-  familyId: string; personId: string; canRecordPayout: boolean; t: (a: string, b: string) => string;
+// ── 账本(点某人进来:账本 + 就地管理 TA 的角色/去留)──────────────────────────────
+function LedgerScreen({ familyId, person, me, onChanged, onLeft, dict, t }: {
+  familyId: string; person: FamilyMemberView; me: FamilyMemberView;
+  onChanged: () => void; onLeft: () => void; dict: Dict; t: (a: string, b: string) => string;
 }) {
+  const personId = person.id;
+  const canRecordPayout = me.canRecordPayout;
   const [ledger, setLedger] = useState<LedgerView | null>(null);
   const [err, setErr] = useState('');
   const [payAmt, setPayAmt] = useState('');
   const [payBusy, setPayBusy] = useState(false);
   const [payErr, setPayErr] = useState('');
   const [showPay, setShowPay] = useState(false);
+  const [confirmReverse, setConfirmReverse] = useState('');   // 待确认冲正的 payoutId
+  const [revBusy, setRevBusy] = useState('');
+  const [revErr, setRevErr] = useState('');
 
   const load = useCallback(async () => {
     setErr('');
@@ -549,12 +486,20 @@ function LedgerScreen({ familyId, personId, canRecordPayout, t }: {
     setPayAmt(''); setShowPay(false); void load();
   }
 
+  async function reverse(payoutId: string) {
+    setRevBusy(payoutId); setRevErr('');
+    const r = await reversePayout(familyId, payoutId);
+    setRevBusy('');
+    if (!r.ok) { setRevErr(t('没撤成,再试一次。', 'Could not undo — try again.')); return; }
+    setConfirmReverse(''); void load();
+  }
+
   if (err && !ledger) return <ErrorRow msg={t('没连上,稍后再试。', 'Could not load — try again.')} onRetry={load} t={t} />;
   if (!ledger) return <Muted>{t('加载中…', 'Loading…')}</Muted>;
 
-  const history = [
+  const history: Array<{ id: string; title: string; date: string; delta: number; payoutId?: string }> = [
     ...ledger.approved.map((c) => ({ id: c.id, title: choreTitle(c, t), date: c.approvedAt?.slice(0, 10) ?? c.dueDate, delta: c.value })),
-    ...ledger.payouts.map((p) => ({ id: p.id, title: t('你给了现金 · 从攒的里扣', 'You gave cash · deducted'), date: p.date, delta: -p.amount })),
+    ...ledger.payouts.map((p) => ({ id: `p_${p.id}`, title: t('你给了现金 · 从攒的里扣', 'You gave cash · deducted'), date: p.date, delta: -p.amount, payoutId: p.id })),
   ].sort((a, b) => (a.date < b.date ? 1 : -1));
 
   return (
@@ -562,7 +507,7 @@ function LedgerScreen({ familyId, personId, canRecordPayout, t }: {
       <div style={{ ...cardStyle, padding: 'var(--space-4)' }}>
         {/* owed<0 = 你给的现金比 TA 挣的还多(多给了),别显示成「欠 -$20」那种迷惑负数。 */}
         <div style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>{ledger.balance.owed >= 0 ? t('还欠 TA', 'You still owe') : t('已多给 TA', 'You’ve overpaid')}</div>
-        <div style={{ fontSize: 'var(--text-display)', fontWeight: 'var(--weight-bold)' as unknown as number, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{money(Math.abs(ledger.balance.owed))}</div>
+        <div style={{ fontSize: 'var(--text-display)', fontWeight: 'var(--weight-bold)' as unknown as number, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{money(Math.abs(ledger.balance.owed), dict)}</div>
         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginTop: 'var(--space-1)' }}>
           {t('审核过的家务往上加 · 你给的现金往下扣', 'Approved chores add up · cash you give deducts')}
         </div>
@@ -572,17 +517,38 @@ function LedgerScreen({ familyId, personId, canRecordPayout, t }: {
         <p style={sectLabel}>{t('历史', 'History')}</p>
         <div style={cardStyle}>
           {history.length === 0 && <p style={{ ...rowStyle, borderBottom: 'none', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)' }}>{t('还没有记录。', 'Nothing yet.')}</p>}
-          {history.map((h, i) => (
-            <div key={h.id} style={{ ...rowStyle, borderBottom: i === history.length - 1 ? 'none' : rowStyle.borderBottom }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontSize: 'var(--text-body)' }}>{h.title}</div>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{h.date}</div>
+          {history.map((h, i) => {
+            const canUndo = canRecordPayout && !!h.payoutId;   // 只有发薪行、且能记付款的人可撤
+            const confirming = confirmReverse === h.payoutId;
+            return (
+              <div key={h.id} style={{ ...rowStyle, flexWrap: 'wrap', borderBottom: i === history.length - 1 ? 'none' : rowStyle.borderBottom }}>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 'var(--text-body)' }}>{h.title}</div>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{h.date}</div>
+                </div>
+                <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)' as unknown as number, color: h.delta >= 0 ? 'var(--status-go)' : 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                  {h.delta >= 0 ? '+' : '−'}{money(Math.abs(h.delta), dict)}
+                </span>
+                {canUndo && !confirming && (
+                  <button type="button" onClick={() => { setConfirmReverse(h.payoutId!); setRevErr(''); }}
+                    style={{ border: 'none', background: 'transparent', color: 'var(--portal-accent)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: 'var(--space-1)', whiteSpace: 'nowrap' }}>
+                    {t('记错了?撤这笔', 'Undo')}
+                  </button>
+                )}
+                {canUndo && confirming && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', width: '100%', marginTop: 'var(--space-2)' }}>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('撤掉这笔发薪?TA 攒的会加回去。', 'Undo this payout? It goes back to their savings.')}</span>
+                    {revErr && <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-xs)' }}>{revErr}</span>}
+                    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                      <button type="button" onClick={() => void reverse(h.payoutId!)} disabled={revBusy === h.payoutId}
+                        style={{ ...ghostBtn, color: 'var(--status-risk)' }}>{revBusy === h.payoutId ? t('撤销中…', 'Undoing…') : t('撤掉', 'Undo it')}</button>
+                      <button type="button" onClick={() => { setConfirmReverse(''); setRevErr(''); }} style={ghostBtn}>{t('先不', 'Not now')}</button>
+                    </div>
+                  </div>
+                )}
               </div>
-              <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)' as unknown as number, color: h.delta >= 0 ? 'var(--status-go)' : 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                {h.delta >= 0 ? '+' : '−'}{money(Math.abs(h.delta))}
-              </span>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -601,10 +567,99 @@ function LedgerScreen({ familyId, personId, canRecordPayout, t }: {
         )
       )}
 
+      <MemberAdmin familyId={familyId} person={person} me={me} onChanged={onChanged} onLeft={onLeft} t={t} />
+
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6, margin: 0 }}>
         {t('Nesio 永不碰钱。现金你来给,我们只把账记清 —— 审核过的家务往上加,你给的现金往下扣。没有银行、没有卡、没有要打电话取消的订阅。',
           'Nesio never moves money. You give the cash; we just keep the count straight — approved chores add up, cash you give deducts.')}
       </p>
     </div>
+  );
+}
+
+// ── 成员管理(点某人进账本页里的一块:改 TA 角色 / 移出 / 退出)────────────────────
+// 从独立「成员」区挪来:家庭成员就是 People 之外自成一套的登录账号,管理跟着人走。
+function MemberAdmin({ familyId, person, me, onChanged, onLeft, t }: {
+  familyId: string; person: FamilyMemberView; me: FamilyMemberView;
+  onChanged: () => void; onLeft: () => void; t: (a: string, b: string) => string;
+}) {
+  const isMe = person.id === me.id;
+  const canManage = me.canApprove;
+  const [isParent, setIsParent] = useState(person.canApprove);
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  // 既不能管别人、又不是自己(无「退出」)→ 这块对 TA 没有任何动作,不渲染。
+  if (!canManage && !isMe) return null;
+
+  async function setRole(parent: boolean) {
+    if (parent === isParent) return;
+    setBusy('role'); setErr('');
+    const role = parent
+      ? { canApprove: true, needsApproval: false, canRecordPayout: true }
+      : { canApprove: false, needsApproval: true, canRecordPayout: false };
+    const r = await setMemberRole(familyId, person.id, role);
+    setBusy('');
+    if (!r.ok) { setErr(r.error === 'conflict' ? t('至少要留一位家长。', 'Keep at least one parent.') : t('没改成,再试一次。', 'Could not change — try again.')); return; }
+    setIsParent(parent); onChanged();
+  }
+  async function remove() {
+    setBusy('remove'); setErr('');
+    const r = await removeMember(familyId, person.id);
+    setBusy('');
+    if (!r.ok) { setErr(r.error === 'conflict' ? t('先把家长身份交给别人,再退出。', 'Hand the parent role to someone first.') : t('没成,再试一次。', 'Could not do that — try again.')); return; }
+    if (isMe) { onLeft(); return; }       // 退出自己 → 回到板并刷新(已不是成员)
+    onChanged(); onLeft();                 // 移出别人 → 该账本页无意义了,退回板
+  }
+
+  return (
+    <section>
+      <p style={sectLabel}>{t('这个人', 'This person')}</p>
+      <div style={{ ...cardStyle, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <MemberAvatar name={person.name} avatar={person.avatarUrl || ''} size={32} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{person.name}{isMe ? t(' (我)', ' (me)') : ''}</div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{isParent ? t('家长 · 能审核·记付款', 'Parent · reviews & pays') : t('孩子 · 做完要家长看一眼', 'Kid · needs review')}</div>
+          </div>
+        </div>
+
+        {canManage && (
+          <div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginBottom: 'var(--space-1)' }}>{t('身份', 'Role')}</div>
+            <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+              <button type="button" onClick={() => void setRole(true)} disabled={busy === 'role' || isParent}
+                style={{ ...roleChip, ...(isParent ? roleChipOn : {}) }}>{t('家长', 'Parent')}</button>
+              <button type="button" onClick={() => void setRole(false)} disabled={busy === 'role' || !isParent}
+                style={{ ...roleChip, ...(!isParent ? roleChipOn : {}) }}>{t('孩子', 'Kid')}</button>
+            </div>
+          </div>
+        )}
+
+        {err && <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}>{err}</span>}
+
+        {(canManage || isMe) && (
+          confirmRemove ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>
+                {isMe ? t('确定退出这个家庭?你的账本记录会留给家人。', 'Leave this family? Your ledger stays with the family.')
+                      : t('把 TA 从家庭移出?TA 的账本记录会保留。', 'Remove them from the family? Their ledger is kept.')}
+              </span>
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <button type="button" onClick={() => void remove()} disabled={busy === 'remove'}
+                  style={{ ...primaryBtn, background: 'var(--status-risk)' }}>{busy === 'remove' ? t('处理中…', 'Working…') : isMe ? t('退出家庭', 'Leave') : t('确认移出', 'Remove')}</button>
+                <button type="button" onClick={() => setConfirmRemove(false)} style={ghostBtn}>{t('先不', 'Not now')}</button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => { setConfirmRemove(true); setErr(''); }}
+              style={{ alignSelf: 'flex-start', border: 'none', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-sm)', cursor: 'pointer', padding: 'var(--space-1) 0' }}>
+              {isMe ? t('退出这个家庭', 'Leave this family') : t('把 TA 移出家庭', 'Remove from family')}
+            </button>
+          )
+        )}
+      </div>
+    </section>
   );
 }

@@ -531,3 +531,21 @@ export async function recordPayoutOp(
   if (!rows?.length) return fail('upstream', 502);
   return { ok: true, value: payoutFromRow(rows[0]) };
 }
+
+/** 冲正一笔发薪(记错了撤掉)。软删 deleted_at,账本读已滤 deleted_at 会自动回加。
+ *  能力 can_record_payout 同发薪(能记就能撤)。幂等:已撤/不存在返回 reversed:0。 */
+export async function reversePayoutOp(
+  actor: FamilyActor,
+  input: { familyId: string; payoutId: string },
+): Promise<FamilyResult<{ reversed: number }>> {
+  const gate = await requireMember(actor, input.familyId);
+  if (!gate.ok) return gate;
+  if (!memberCan(memberFromRow(gate.value), 'record_payout')) return fail('forbidden', 403);
+  const id = (input.payoutId || '').trim();
+  if (!id) return fail('bad_request', 400);
+  const saved = await restPatch<PayoutRow>(actor.config, 'family_payouts',
+    `id=eq.${id}&family_id=eq.${input.familyId}&deleted_at=is.null`,
+    { deleted_at: new Date().toISOString() });
+  if (saved === null) return fail('upstream', 502);
+  return { ok: true, value: { reversed: saved.length } };
+}

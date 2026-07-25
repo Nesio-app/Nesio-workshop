@@ -16,7 +16,8 @@ import { usePortalLocale } from '../use-portal-locale';
 import { listFamilies, getBoard, choreAction, type BoardView, type ChoreInstanceView } from '@/lib/family/family-client';
 import { readPortalCache, writePortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 
-const money = (n: number) => `$${n.toFixed(2)}`;
+// 货币符号跟随语言:中文 ¥、英文 $(金额纯展示,Nesio 永不碰钱)。
+const money = (n: number, dict: 'zh' | 'en') => `${dict === 'en' ? '$' : '¥'}${n.toFixed(2)}`;
 const dayKey = () => new Date().toLocaleDateString('en-CA');
 const THROTTLE_MS = 60_000;
 const FETCH_AT_KEY = 'nesio-family-strip-fetch-at-v1';
@@ -115,7 +116,7 @@ export default function FamilyTodayStrip() {
             <div key={c.id} style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch', gap: 'var(--space-2)' }}>
               <div style={{ fontSize: 'var(--text-body)' }}>
                 <b>{nameFor(b, c.assigneeId) || t('家人', 'Family')}</b> {t('做完了', 'finished')} 「{choreLabel(c, t('家务', 'Chore'))}」
-                <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}> · {money(c.value)}</span>
+                <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}> · {money(c.value, dict)}</span>
               </div>
               <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                 <button type="button" onClick={() => void act(b.familyId, c.id, 'approve')} disabled={busyId === c.id + 'approve'} style={{ ...pillBtn, background: 'var(--status-go)', color: '#fff', flex: 1 }}>{t('看着不错', 'Looks good')}</button>
@@ -136,7 +137,7 @@ export default function FamilyTodayStrip() {
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{choreLabel(c, t('家务', 'Chore'))}</div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-                  {c.state === 'done' ? t('已提交,等审核', 'Submitted — waiting') : t('干完点「完成」', 'Tap Done when finished')}{c.value > 0 ? ` · ${money(c.value)}` : ''}
+                  {c.state === 'done' ? t('已提交,等审核', 'Submitted — waiting') : t('干完点「完成」', 'Tap Done when finished')}{c.value > 0 ? ` · ${money(c.value, dict)}` : ''}
                 </div>
               </div>
               {c.state === 'todo' && (
