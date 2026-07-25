@@ -11,6 +11,7 @@ const root = process.cwd();
 const routePath = path.join(root, 'app', 'api', 'cloud', 'module-data', 'route.ts');
 const schemaPath = path.join(root, 'database', 'schema', 'supabase-user-module-data-v1.sql');
 const clientPath = path.join(root, 'lib', 'portal', 'cloud-module-sync.ts');
+const emailClientPath = path.join(root, 'lib', 'portal', 'cloud-email-sync.ts');
 const portalPath = path.join(root, 'components', 'portal', 'Portal.tsx');
 const packagePath = path.join(root, 'package.json');
 
@@ -36,6 +37,10 @@ for (const marker of [
   'MAX_DATA_BYTES',
   'setRefreshedAuthCookies',
   'safePublicStatus',
+  // 前缀分流:邮件全文行(email-body:*)与普通模块行分开拉,避免海量邮件卷进模块同步
+  'keyPrefix',
+  'excludePrefix',
+  'not.like.',
 ]) {
   assert.ok(route.includes(marker), `module-data route missing marker: ${marker}`);
 }
@@ -56,17 +61,34 @@ for (const marker of ['pushModulesToCloud', 'pullModulesFromCloud', 'autoSyncMod
   assert.ok(client.includes(marker), `module-sync client missing: ${marker}`);
 }
 assert.match(client, /restoreCombinedBackup\(backup, 'replace'\)/, '落地复用 restoreCombinedBackup(replace 覆盖选中 key)');
+// 模块同步 GET 必须用 excludePrefix 把邮件全文行挡在门外(否则 20s 轮询下载数十 MB)
+assert.match(client, /excludePrefix=/, 'module-sync GET 用 excludePrefix 排除邮件行');
+assert.ok(client.includes('EMAIL_BODY_MODULE_PREFIX'), 'module-sync 引用邮件行前缀常量,双保险跳过');
+
+// 邮件全文逐封记录级同步引擎:前缀行、gz 压缩、并集补缺、喂全文索引
+const emailClient = fs.readFileSync(emailClientPath, 'utf8');
+for (const marker of ['pushEmailBodiesToCloud', 'pullEmailBodiesFromCloud', 'autoSyncEmailBodiesWithCloud', 'EMAIL_BODY_MODULE_PREFIX', 'getAllEmailBodies', 'putEmailBodies', 'indexEmailBodies', 'gzipSync']) {
+  assert.ok(emailClient.includes(marker), `email-sync client missing: ${marker}`);
+}
+assert.match(emailClient, /keyPrefix=/, 'email-sync GET 用 keyPrefix 只取邮件行');
+assert.ok(emailClient.includes("EMAIL_BODY_MODULE_PREFIX = 'email-body:'"), 'email 行前缀 = email-body:');
 
 // Portal 顶层触发(mount + visibility)
 const portal = fs.readFileSync(portalPath, 'utf8');
 assert.match(portal, /import \{ autoSyncModulesWithCloud \} from '@\/lib\/portal\/cloud-module-sync'/, 'Portal 引入模块同步');
 assert.match(portal, /canUsePrivateRuntime\)\s*return;[\s\S]*?autoSyncModulesWithCloud\(\)/, 'Portal 登录后触发模块同步');
-assert.match(portal, /visibilityState === 'visible'[\s\S]{0,320}autoSyncModulesWithCloud\(\)/, 'Portal 回前台也触发模块同步');
+assert.match(portal, /visibilityState === 'visible'[\s\S]{0,360}autoSyncModulesWithCloud\(\)/, 'Portal 回前台也触发模块同步');
+// 邮件全文同步也要在 Portal mount + 回前台触发
+assert.match(portal, /import \{ autoSyncEmailBodiesWithCloud \} from '@\/lib\/portal\/cloud-email-sync'/, 'Portal 引入邮件全文同步');
+assert.match(portal, /canUsePrivateRuntime\)\s*return;[\s\S]*?autoSyncEmailBodiesWithCloud\(\)/, 'Portal 登录后触发邮件全文同步');
+assert.match(portal, /visibilityState === 'visible'[\s\S]{0,420}autoSyncEmailBodiesWithCloud\(\)/, 'Portal 回前台也触发邮件全文同步');
 
 // package.json 注册
 const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));
 assert.equal(pkg.scripts['test:cloud-module-data-runtime'], 'node scripts/cloud-module-data-runtime.test.mjs', 'package.json 暴露 test:cloud-module-data-runtime');
 assert.match(pkg.scripts['test:contracts'], /test:cloud-module-data-runtime/, 'test:contracts 含 module-data 路由测试');
 assert.match(pkg.scripts['test:contracts'], /test:cloud-module-sync/, 'test:contracts 含 module-sync 引擎测试');
+assert.equal(pkg.scripts['test:cloud-email-sync'], 'node scripts/cloud-email-sync.test.mjs', 'package.json 暴露 test:cloud-email-sync');
+assert.match(pkg.scripts['test:contracts'], /test:cloud-email-sync/, 'test:contracts 含 email-sync 引擎测试');
 
 console.log('cloud-module-data runtime contract passed');

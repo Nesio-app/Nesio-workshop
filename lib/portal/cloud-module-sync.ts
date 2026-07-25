@@ -18,6 +18,7 @@ import { gzipSync, gunzipSync, strToU8, strFromU8 } from 'fflate';
 import { buildCombinedBackup, restoreCombinedBackup } from './cloud-backup';
 import type { FullBackup } from './full-backup';
 import { logDropped } from './storage-health';
+import { EMAIL_BODY_MODULE_PREFIX } from './cloud-email-sync';
 
 /** 记忆图另有 signals 记录级同步,模块同步排除它。 */
 const LIFE_GRAPH_KEY = 'nesio-life-graph-v1';
@@ -130,7 +131,9 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
   if (typeof window === 'undefined') return { applied: 0, newlyAdded: 0 };
   let rows: Array<{ moduleKey?: string; data?: unknown; updatedAt?: string | null }>;
   try {
-    const res = await fetch('/api/cloud/module-data', { cache: 'no-store' });
+    // 排除邮件全文行(email-body:*):它们量级大、由 cloud-email-sync 另行逐封同步,绝不卷进这里
+    // (否则 20s 轮询每次下载数十 MB)。服务端过滤,不只客户端跳过。
+    const res = await fetch(`/api/cloud/module-data?excludePrefix=${encodeURIComponent(EMAIL_BODY_MODULE_PREFIX)}`, { cache: 'no-store' });
     const data = (await res.json().catch(() => ({}))) as { ok?: boolean; modules?: unknown };
     if (!res.ok || !data.ok || !Array.isArray(data.modules)) return { applied: 0, newlyAdded: 0 };
     rows = data.modules as typeof rows;
@@ -145,6 +148,7 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
   for (const row of rows) {
     const key = row.moduleKey;
     if (!key || typeof key !== 'string' || key === LIFE_GRAPH_KEY) continue;
+    if (key.startsWith(EMAIL_BODY_MODULE_PREFIX)) continue; // 邮件全文行由 cloud-email-sync 处理,防御性再跳一次
     const gz = (row.data as { gz?: string } | null)?.gz;
     if (typeof gz !== 'string') continue;
     const json = unpackValue(gz);

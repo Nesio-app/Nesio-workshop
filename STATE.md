@@ -67,8 +67,10 @@
    cloud-memory-sync 事件实时更新)。修:`autoSyncBackupWithCloud` 在**冷浏览器首次**成功拉回且确有数据时
    `location.reload()` 让各 store 重新水合;用 `nesio-backup-first-sync-done-v1` 标志限制为每浏览器仅一次
    (且标志须真持久化才 reload,防隐私模式死循环刷新)。**连接器澄清**(非本次改,已如此):gmail/日历/notion
-   令牌存 Supabase 按身份跨端(登录即通);flomo 用服务端 env(`FLOMO_WEBHOOK_URL`,与浏览器无关);
-   邮件正文按隐私红线**只存本机 IDB 不上云**,仅 ≤1500 预览节点随记忆图跨端。
+   令牌存 Supabase 按身份跨端(登录即通);flomo 用服务端 env(`FLOMO_WEBHOOK_URL`,与浏览器无关)。
+   ~~邮件正文只存本机 IDB 不上云~~ **已改(2026-07-25,workshop 全数据云端化)**:邮件正文改为
+   **逐封记录级同步**(`lib/portal/cloud-email-sync.ts`,`email-body:<id>` 行进 `user_module_data`),
+   换端补齐正文并即刻喂全文索引;**仅本人账号内、RLS 只本人可读、不进 AI**。见下「⑦」。
 
    **⑥ 记录级模块同步(2026-07-25,根治 · 对齐「Google Contacts 式」)** —— ①~⑤ 都是「整包 blob
    备份」这个**错误模型**的症状(8MB/4.5MB 上限、压缩兼容、遮盖、刷新)。根因:健康/足迹/财务/物品
@@ -86,6 +88,22 @@
      「双向都失败」);blob 上传预检降到 4MB(对齐 Vercel 4.5MB 函数体上限)。
    - 契约 `test:cloud-module-sync`(引擎:逐行/排除记忆图/增量/双向 LWW/新设备 reload)+
      `test:cloud-module-data-runtime`(路由+表+Portal 接线)。**部署侧欠账:apply 上面那张表的 SQL 后才生效。**
+
+   **⑦ workshop 全数据云端化(2026-07-25,#217/#218/#219)** —— 目标:workshop 版**一切数据跨端一致**,
+   不再有「换端就没了」的纯本地数据。逐类收编此前的 local-only:
+   - **积分/地点照片/阅读高亮**(#217):曾因「被空浏览器状态跨端盖掉」临时 local-only(#216 止血),现
+     移出 `LOCAL_ONLY_KEYS` → 走记录级模块同步,安全靠 `cloud-module-sync` 的**反遮盖闸**(云端明显更空
+     的值绝不覆盖本机非空值)。
+   - **按人数据 `nesio-person-records-v1`**(#218,含**医疗/药物/健康**,原隐私红线):用户显式拍板上云 →
+     移出 `LOCAL_ONLY_KEYS`(该集合现为空)→ durable 进备份+模块同步(**仅本人账号内、RLS 只本人可读、
+     不进 AI**)。关系/人缘 UI 文案「只存本机」统一改「仅你可见 · 不进 AI」,兑现真实行为不说假话。
+   - **邮件全文 `nesio-email-bodies`**(#219):独立 IDB、量级数十 MB 远超 4MB 单模块上限 →**逐封记录级同步**
+     `lib/portal/cloud-email-sync.ts`(`email-body:<id>` 行进 `user_module_data`,gz-b64 压缩,并集合并只补缺、
+     不覆盖不删除,落地即喂全文索引 `indexEmailBodies` 无需 reload)。路由 `/api/cloud/module-data` 加
+     `keyPrefix`/`excludePrefix` 分流:模块同步 20s 轮询用 `excludePrefix=email-body:` **绝不下载海量邮件行**,
+     邮件同步用 `keyPrefix=email-body:` 只取邮件行。Portal mount+visibility 触发 `autoSyncEmailBodiesWithCloud`。
+   - 契约 `test:cloud-email-sync`(引擎:逐封前缀行/增量/并集补缺/喂索引)+ `test:cloud-module-data-runtime`
+     扩(路由前缀过滤 + 模块同步 excludePrefix)。**复用现成 user_module_data 表,无需新 SQL apply。**
 
 4a. **A 计划施工线 ✅ 完整闭环(2026-07-07,#50-#59)**:见 `docs/design/algorithm-layer-plan.md`。
    Layer2 2a(总线+事实日志+三原语,mirror/energy 收编,card-feedback/cooling/dormant 有据保留)→
