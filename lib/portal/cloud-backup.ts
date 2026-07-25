@@ -144,6 +144,24 @@ function mapHttpError(status: number): CloudBackupError {
   return 'upload_failed';
 }
 
+/** gzip 压缩(浏览器原生 CompressionStream)。不可用/失败返回 null → 调用方回退明文。 */
+async function gzipString(text: string): Promise<Uint8Array | null> {
+  if (typeof CompressionStream === 'undefined') return null;
+  try {
+    const stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
+    return new Uint8Array(await new Response(stream).arrayBuffer());
+  } catch { return null; }
+}
+
+/** gzip 解压(DecompressionStream)。不可用/失败返回 null。 */
+async function gunzipToString(bytes: Uint8Array): Promise<string | null> {
+  if (typeof DecompressionStream === 'undefined') return null;
+  try {
+    const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream('gzip'));
+    return await new Response(stream).text();
+  } catch { return null; }
+}
+
 /**
  * 一键推送:组装 → 上传到用户云账户。成功后记 last-backup(供 UI 显示"上次同步")。
  * 每个失败分支都返回明确 error code —— UI 必须据此渲染可见失败态(设计红线)。
@@ -176,11 +194,19 @@ export async function pushBackupToCloud(opts: { skipIfFewerThan?: number } = {})
     return { ok: true, entryCount, bytes, skippedRegression: true };
   }
 
-  // 本地预检:超 8MB 直接给明确态,不白跑一趟网络(路由也会 413 兜底)。
+  // 压缩:健康/足迹(GPS 点)这类 JSON 冗余度极高,gzip 常压到 1/5~1/10,把「超 8MB 单次
+  // 上限」挡回来 —— 这是「原浏览器一次都没推成功、换机永远空」的真凶。上传 gzip 字节、文件名
+  // 带 .gz(声明 text/plain 过路由 MIME 白名单;内容是二进制,pull 按 gzip magic 字节自动识别)。
+  // 浏览器不支持 CompressionStream(旧 Safari)则回退明文,行为同旧版。
+  const gz = await gzipString(payload);
+  const uploadBody: Uint8Array | string = gz ?? payload;
+  bytes = gz ? gz.byteLength : new Blob([payload]).size;
+
+  // 本地预检:压缩后仍超 8MB 才给明确态,不白跑一趟网络(路由也会 413 兜底)。
   if (bytes > CLOUD_UPLOAD_LIMIT_BYTES) return { ok: false, error: 'too_large', bytes, entryCount };
 
   try {
-    const file = new File([payload], 'nesio-backup.json', { type: 'text/plain' });
+    const file = new File([uploadBody as BlobPart], gz ? 'nesio-backup.json.gz' : 'nesio-backup.json', { type: 'text/plain' });
     const form = new FormData();
     form.append('file', file);
     form.append('purpose', 'backup');
@@ -306,11 +332,23 @@ export async function pullBackupFromCloud(mode: RestoreMode = 'merge'): Promise<
     if (!listRes.ok || !list.ok) return { ok: false, error: mapHttpError(listRes.status) };
     if (!list.found || !list.signedUrl) return { ok: false, error: 'no_backup' };
 
-    // 2. 拉 blob(坏数据绝不动本机:校验不过就原样返回)
+    // 2. 拉 blob(坏数据绝不动本机:校验不过就原样返回)。按 gzip magic 字节(1f 8b)自动识别
+    //    压缩备份并解压;明文旧备份(以 '{' 0x7b 开头)照旧解码 —— 新旧格式兼容。
     const blobRes = await fetch(list.signedUrl, { cache: 'no-store' });
     if (!blobRes.ok) return { ok: false, error: 'network' };
+    let text: string;
+    try {
+      const buf = new Uint8Array(await blobRes.arrayBuffer());
+      if (buf.length >= 2 && buf[0] === 0x1f && buf[1] === 0x8b) {
+        const un = await gunzipToString(buf);
+        if (un == null) return { ok: false, error: 'invalid_backup' };
+        text = un;
+      } else {
+        text = new TextDecoder().decode(buf);
+      }
+    } catch { return { ok: false, error: 'network' }; }
     let parsed: unknown;
-    try { parsed = JSON.parse(await blobRes.text()); } catch { return { ok: false, error: 'invalid_backup' }; }
+    try { parsed = JSON.parse(text); } catch { return { ok: false, error: 'invalid_backup' }; }
     if (!isValidBackup(parsed)) return { ok: false, error: 'invalid_backup' };
     const cloudEntryCount = Object.keys(parsed.entries).length;
 
