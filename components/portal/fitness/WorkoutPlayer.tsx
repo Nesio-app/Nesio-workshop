@@ -91,17 +91,24 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
 
   useSheetDismiss(true, onClose); // 挂载即打开;Escape 关闭 + 焦点回收
 
+  // 防御(修「打开跟练卡死」):session/steps 可能来自别端同步回的畸形数据(缺 steps、非数组、
+  // 元素缺 exerciseId)。绝不裸解引用 —— 归一成合法 steps 数组,非法则本组件优雅关闭,不 throw。
+  const steps: PlayerStep[] = Array.isArray(session?.steps)
+    ? session.steps.filter((s): s is PlayerStep => Boolean(s) && typeof s.exerciseId === 'string' && s.exerciseId.length > 0)
+    : [];
+
   // 训练里若含扩展库动作(不在精选 18 里),按需把 catalog 载进内存,让名字/要点解析出来。
   // 否则从「保存的训练」直接开练、本会话没开过「全部 1324」时,只会显示原始编号(如 0001)。
   const [, setCatTick] = useState(0);
   useEffect(() => {
-    if (!session.steps.some((s) => !exerciseById(s.exerciseId) && !catalogExerciseByIdSync(s.exerciseId))) return;
+    if (!steps.some((s) => !exerciseById(s.exerciseId) && !catalogExerciseByIdSync(s.exerciseId))) return;
     let alive = true;
     loadExerciseCatalog().then(() => { if (alive) setCatTick((n) => n + 1); }).catch(() => {});
     return () => { alive = false; };
-  }, [session]);
+  }, [session]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const steps = session.steps;
+  // 没有任何合法动作 → 关闭播放器(别卡在空壳)。effect 里调,避免渲染中 setState。
+  useEffect(() => { if (steps.length === 0) onClose(); }, [steps.length]); // eslint-disable-line react-hooks/exhaustive-deps
   const step = steps[idx];
   const ex = step ? resolve(step.exerciseId, dict) : null;
 

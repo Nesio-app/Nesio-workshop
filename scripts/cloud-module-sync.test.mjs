@@ -17,12 +17,19 @@ import * as fflate from 'fflate';
 const src = fs.readFileSync(new URL('../lib/portal/cloud-module-sync.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 
-function makeCtx({ lsInit = {}, localEntries = {}, fetchImpl, withReload = false } = {}) {
+function makeCtx({ lsInit = {}, localEntries = {}, fetchImpl, withReload = false, ssBroken = false } = {}) {
   const lsMap = new Map(Object.entries(lsInit));
   const localStorage = {
     getItem: (k) => (lsMap.has(k) ? lsMap.get(k) : null),
     setItem: (k, v) => lsMap.set(k, String(v)),
     removeItem: (k) => lsMap.delete(k),
+  };
+  // sessionStorage(水合 reload 闸用):回读校验持久化才 reload。默认真持久化;传 ssBroken 模拟隐私模式。
+  const ssMap = new Map();
+  const sessionStorage = {
+    getItem: (k) => (ssMap.has(k) ? ssMap.get(k) : null),
+    setItem: (k, v) => { if (!ssBroken) ssMap.set(k, String(v)); }, // ssBroken:写不进(回读=null → 不 reload)
+    removeItem: (k) => ssMap.delete(k),
   };
   let lastPost = null;
   let restoreApplied = null;
@@ -32,6 +39,7 @@ function makeCtx({ lsInit = {}, localEntries = {}, fetchImpl, withReload = false
     Date, Math, JSON, btoa, atob, String, Uint8Array, Array, Object, Number,
     window: withReload ? { location: { reload: () => { reloaded = true; } } } : {},
     localStorage,
+    sessionStorage,
     fetch: async (url, init) => fetchImpl(url, init, (b) => { lastPost = b; }),
     require: (p) => {
       if (p === 'fflate') return fflate;
@@ -197,6 +205,18 @@ function cloudRow(moduleKey, json, updatedAt = '2026-07-25T00:00:00.000Z') {
   const applied = ctx._restoreApplied();
   assert.equal(applied.entries['nesio-health-v1'], '{"metrics":[7]}', '健康正常落地');
   assert.equal(applied.entries['nesio-module-sync-state-v1'], undefined, '遗留簿记行绝不落地(防刷屏死循环)');
+}
+
+// 7. reload 闸(防隐私模式死循环):sessionStorage 写不进(回读!=1)→ **绝不 reload**
+//    (否则每次都以为「首次」→ 无限刷屏,与 cloud-backup 硬化同款)。
+{
+  const rows = [cloudRow('nesio-health-v1', '{"metrics":[3]}')];
+  const fetchImpl = async (url) => (String(url).startsWith('/api/cloud/module-data')
+    ? { ok: true, status: 200, json: async () => ({ ok: true, modules: rows }) }
+    : { ok: false, status: 404, json: async () => ({}) });
+  const broken = makeCtx({ localEntries: {}, fetchImpl, withReload: true, ssBroken: true });
+  await broken.mod.autoSyncModulesWithCloud({ force: true });
+  assert.equal(broken.ctx._reloaded(), false, 'sessionStorage 写不进 → 不 reload(防隐私模式无限刷屏)');
 }
 
 console.log('cloud-module-sync: OK');
