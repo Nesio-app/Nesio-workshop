@@ -8,17 +8,22 @@
 -- 防御:同一家庭的成员可读写家庭数据,非成员一行都拿不到。
 
 -- ── 成员判定(SECURITY DEFINER,避免 family_members 自引用导致 RLS 递归)──────────────
+-- 用 plpgsql 而非 sql:sql 函数体在**创建时**就校验引用的表是否存在,而 family_members
+-- 在本函数之后才建 → 会报 relation does not exist。plpgsql 的表名在**调用时**才解析,
+-- 所以函数可以先声明、表后建,顺序不再要紧。
 CREATE OR REPLACE FUNCTION public.is_family_member(fid uuid, uid uuid)
 RETURNS boolean
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT EXISTS (
+BEGIN
+  RETURN EXISTS (
     SELECT 1 FROM public.family_members m
     WHERE m.family_id = fid AND m.user_id = uid
   );
+END;
 $$;
 
 -- ── families ──────────────────────────────────────────────────────────────────
