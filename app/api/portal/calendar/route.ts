@@ -18,6 +18,7 @@ import {
   draftToGoogleEvent,
   type DraftEvent,
 } from '@/lib/portal/calendar-create';
+import { USER_TIME_ZONE, nowUserTzISO } from '@/lib/portal/user-timezone';
 
 type Feed = { url: string; label: string };
 type FeedResult = { label: string; ok: boolean; count: number; error?: string };
@@ -505,7 +506,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'bad_json' }, { status: 400 });
   }
 
-  const timeZone = (body.timeZone || 'Asia/Shanghai').trim();
+  // 个人版固定纽约时区:忽略设备上报的时区(可能是 Asia/Shanghai),
+  // 保证「周六上午9点」按纽约本地解析、写进 Google 也标 America/New_York。
+  const timeZone = USER_TIME_ZONE;
 
   // 组装草稿:显式字段优先;否则自然语言 → LLM 解析。
   let draft: DraftEvent | null = null;
@@ -523,7 +526,7 @@ export async function POST(req: NextRequest) {
     }
     try {
       const { text } = await completeText({
-        prompt: buildEventParsePrompt(body.text, new Date().toISOString(), timeZone),
+        prompt: buildEventParsePrompt(body.text, nowUserTzISO(), timeZone),
         maxTokens: 300, temperature: 0.1, route: 'calendar-create',
       });
       draft = parseDraftFromLlm(text);

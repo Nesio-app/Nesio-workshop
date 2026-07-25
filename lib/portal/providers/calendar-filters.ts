@@ -1,4 +1,5 @@
 import type { CalendarEvent } from '../types';
+import { USER_TIME_ZONE } from '../user-timezone';
 
 const LUNAR_CALENDAR_RE =
   /农历|阴历|lunar|chinese\s*lunar|节气和节日|传统节日|chinese\s*holiday|huang\s*li|黄历/i;
@@ -71,7 +72,8 @@ export function isLunarEvent(
   return isLunarEventTitle(title);
 }
 
-const DEFAULT_CALENDAR_TZ = 'Asia/Shanghai';
+// 个人版固定纽约:日历事件按纽约的「天」归组,避免 +12h 时区把事件分到错误日期。
+const DEFAULT_CALENDAR_TZ = USER_TIME_ZONE;
 
 /** YYYY-MM-DD in the given IANA timezone. */
 export function calendarDayKey(date: Date, timeZone = DEFAULT_CALENDAR_TZ): string {

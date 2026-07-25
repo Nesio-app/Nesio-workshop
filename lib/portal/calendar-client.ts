@@ -1,7 +1,8 @@
 /**
  * 客户端建日程:POST /api/portal/calendar。结构化或自然语言二选一。
- * 自动带浏览器时区(相对时间锚点用)。返回统一形状,失败态显式(红线)。
+ * 时区固定纽约(见 user-timezone)。返回统一形状,失败态显式(红线)。
  */
+import { USER_TIME_ZONE } from './user-timezone';
 
 export interface CreateEventInput {
   summary?: string;
@@ -29,16 +30,9 @@ export interface CreateEventResult {
   message?: string;
 }
 
-function browserTimeZone(): string {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Shanghai';
-  } catch {
-    return 'Asia/Shanghai';
-  }
-}
-
 export async function createCalendarEvent(input: CreateEventInput): Promise<CreateEventResult> {
-  const timeZone = input.timeZone || browserTimeZone();
+  // 个人版固定纽约时区(不信设备,设备可能是 Asia/Shanghai)。服务端也会再兜一层。
+  const timeZone = input.timeZone || USER_TIME_ZONE;
   try {
     const res = await fetch('/api/portal/calendar', {
       method: 'POST',

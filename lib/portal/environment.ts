@@ -11,6 +11,7 @@ import { readPortalCache, PORTAL_CACHE_KEYS } from './prefetch-cache';
 import { loadCalendarFromLocal } from './calendar-local-store';
 import { loadLastLocation, formatLocationAge, type StoredLocation } from './location-store';
 import { isInSpan, type TemporalSpan } from './temporal-query';
+import { userTzParts } from './user-timezone';
 import type { CalendarEvent } from './types';
 
 export interface WeatherView {
@@ -30,7 +31,7 @@ export interface Environment {
 }
 
 export function timeOfDay(now: Date = new Date()): TimeOfDay {
-  const h = now.getHours();
+  const h = userTzParts(now).hour; // 纽约本地小时
   if (h < 5) return 'night';
   if (h < 9) return 'early_morning';
   if (h < 12) return 'morning';
@@ -45,7 +46,7 @@ export function getEnvironment(now: Date = new Date()): Environment {
     weather: readPortalCache<WeatherView>(PORTAL_CACHE_KEYS.weather) ?? null,
     location: loadLastLocation(),
     timeOfDay: timeOfDay(now),
-    hour: now.getHours(),
+    hour: userTzParts(now).hour,
   };
 }
 
@@ -57,12 +58,13 @@ export function formatEnvironmentContext(env: Environment = getEnvironment()): s
   const parts: string[] = [];
   // 当前本地日期时间永远在环境头部 — 没有它,模型会把白天当深夜、把日期说错
   // (2026-07-04 用户实测:凌晨问答正常,白天被当成半夜;「今天」说成 7月3日)
-  const now = new Date();
-  const wd = ['日', '一', '二', '三', '四', '五', '六'][now.getDay()];
-  const h = now.getHours();
+  // 纽约本地时间(个人版固定时区)—— 不用设备时区,避免设备在别的时区时把「今天/周几」说错。
+  const p = userTzParts(new Date());
+  const wd = ['日', '一', '二', '三', '四', '五', '六'][p.weekdayIndex];
+  const h = p.hour;
   const period = h < 6 ? '凌晨' : h < 12 ? '上午' : h < 14 ? '中午' : h < 18 ? '下午' : h < 23 ? '晚上' : '深夜';
-  const mm = String(now.getMinutes()).padStart(2, '0');
-  parts.push(`当前时间：${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 周${wd} ${period} ${h}:${mm}（用户本地时间，涉及今天/明天/白天/深夜的判断必须以此为准）`);
+  const mm = String(p.minute).padStart(2, '0');
+  parts.push(`当前时间：${p.year}年${p.month}月${p.day}日 周${wd} ${period} ${h}:${mm}（美国东部/纽约时间，涉及今天/明天/白天/深夜/周几的判断必须以此为准）`);
   if (env.location) {
     parts.push(`当前位置：${env.location.label}（${formatLocationAge(env.location.ts)}）`);
   }
