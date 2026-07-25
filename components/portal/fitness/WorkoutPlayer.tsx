@@ -67,6 +67,9 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   const [muted, setMuted] = useState(false);
   const [showCues, setShowCues] = useState(false); // 指导文字默认收起,点「动作要点」才展开
   const [countTotal, setCountTotal] = useState(0); // 本次倒计时的总量,给进度条算百分比
+  // 【临时诊断】独立时钟(卡死则停 → 证明主线程是否还活)+ 「跟拍做」点击计数(证明 tap 是否登记)。
+  const [diagClock, setDiagClock] = useState(0);
+  const [diagTaps, setDiagTaps] = useState(0);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mutedRef = useRef(false);
   mutedRef.current = muted; // 供 setInterval 闭包读到最新节拍开关
@@ -81,6 +84,13 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   // 主线程数秒。跟练是盖在 Portal 上的浮层,若不暂停,一回前台(锁屏/切换/通知后返回)整批同步就在那一帧
   // 跑,界面冻死。退出跟练时 release 会派发 resume 事件,让 Portal 补跑一次。
   useEffect(() => suspendCloudSync(), []);
+
+  // 【临时诊断】每 250ms 心跳一次。若跟练卡死,这个数字会停住 = 主线程被阻塞;若继续走 = 主线程活着,
+  // 那「没反应」就是 tap 没登记或状态没更新的问题。用独立 interval,不依赖任何其它逻辑。
+  useEffect(() => {
+    const t = setInterval(() => setDiagClock((c) => c + 1), 250);
+    return () => clearInterval(t);
+  }, []);
 
   // 防御(修「打开跟练卡死」):session/steps 可能来自别端同步回的畸形数据(缺 steps、非数组、
   // 元素缺 exerciseId)。绝不裸解引用 —— 归一成合法 steps 数组,非法则本组件优雅关闭,不 throw。
@@ -194,6 +204,10 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
         <button type="button" className="nesio-wp-close" onClick={() => setMuted((m) => !m)} aria-label={muted ? L(dict, '开声音', 'Unmute') : L(dict, '静音', 'Mute')} aria-pressed={muted}>{muted ? '🔇' : '🔊'}</button>
         <button type="button" className="nesio-wp-close" onClick={onClose} aria-label={L(dict, '退出', 'Exit')}>✕</button>
       </div>
+      {/* 【临时诊断条】t=心跳(停=卡死) rep=当前跟拍数 tap=跟拍做点击次数 phase=阶段。测完会撤掉。 */}
+      <div style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'var(--portal-blue-deep)', background: 'var(--portal-accent-soft)', borderRadius: 8, padding: '0.25rem 0.5rem', margin: '0 0 0.3rem', textAlign: 'center' }}>
+        诊断 t={diagClock} · rep={repCount} · tap={diagTaps} · {phase}
+      </div>
 
       <div className="nesio-wp-body">
         {/* 展示图:跟练时的大屏主角,全程显示(work 看着做、rest 时预习下一组)。 */}
@@ -274,7 +288,7 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
           )}
           {step.unit === 'reps' && (
             repCount === 0 ? (
-              <button type="button" className="nesio-wp-ghost" onClick={startRepTempo}>
+              <button type="button" className="nesio-wp-ghost" onClick={() => { setDiagTaps((n) => n + 1); startRepTempo(); }}>
                 {L(dict, `跟拍做 ×${step.reps}`, `Tempo ×${step.reps}`)}
               </button>
             ) : (
