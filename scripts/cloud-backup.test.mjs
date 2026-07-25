@@ -261,19 +261,31 @@ const okFetch = (url) => {
   return { ok: false, status: 404, json: async () => ({}) };
 };
 {
-  // (a) 冷浏览器(无 first-sync 标志)首次拉回且有数据 → reload 让各 store 重新水合,不再走 push。
+  // (a) 冷浏览器(高水位=0)拉回更全的云端数据(cloudN>0)且有恢复 → reload 让各 store 重新水合。
   //     这是「换个网页记录不显示」的根因修复:数据落 IDB 后必须刷新,否则界面仍是空缓存。
   const coldCtx = makeCtx({ idbKeys: ['nesio-health-v1'], fetchImpl: okFetch, withReload: true });
   await coldCtx.mod.autoSyncBackupWithCloud({ force: true });
-  assert.equal(coldCtx.ctx._reloaded(), true, '冷浏览器首次拉回有数据 → reload 重新水合');
-  assert.equal(coldCtx.ctx._scheduledPush(), null, '首刷这一趟不推(reload 后新页面再推)');
-  assert.equal(coldCtx.lsMap.get('nesio-backup-first-sync-done-v1'), '1', '置首刷完成标志(防 reload 循环)');
+  assert.equal(coldCtx.ctx._reloaded(), true, '冷浏览器拉到更全数据 → reload 重新水合');
+  assert.equal(coldCtx.ctx._scheduledPush(), null, '这一趟不推(reload 后新页面再推)');
+  assert.equal(coldCtx.lsMap.get('nesio-backup-synced-entrycount-v1'), '1', '高水位记为云端条目数(1)');
 
-  // (a2) 已同步过的浏览器(标志已置)→ 不再 reload,正常防抖 push(稳态)。
-  const warmCtx = makeCtx({ idbKeys: ['nesio-health-v1'], fetchImpl: okFetch, withReload: true, lsInit: { 'nesio-backup-first-sync-done-v1': '1' } });
+  // (a2) 高水位已 >= 云端条目数(已反映过)→ 不再 reload,正常防抖 push(稳态,不进循环)。
+  const warmCtx = makeCtx({ idbKeys: ['nesio-health-v1'], fetchImpl: okFetch, withReload: true, lsInit: { 'nesio-backup-synced-entrycount-v1': '1' } });
   await warmCtx.mod.autoSyncBackupWithCloud({ force: true });
-  assert.equal(warmCtx.ctx._reloaded(), false, '已同步过不再 reload(不进循环)');
+  assert.equal(warmCtx.ctx._reloaded(), false, '高水位已达 → 不再 reload(不进循环)');
   assert.ok(warmCtx.ctx._scheduledPush(), '稳态:pull 成功后安排防抖 push');
+
+  // (a3) 关键:空备份阶段已刷过(高水位=1),真数据(cloudN=5)随后到达 → 再 reload 一次。
+  //      旧的一次性 first-sync 标志会漏掉这一刷,导致真数据进 IDB 却永不显示。
+  const growFetch = (url) => {
+    if (String(url).startsWith('/api/cloud/assets?list=backup')) return { ok: true, status: 200, json: async () => ({ ok: true, found: true, signedUrl: 'https://signed/big', storagePath: 'id/backup/big.txt' }) };
+    if (url === 'https://signed/big') return blobResp(JSON.stringify(backupDoc({ 'nesio-health-v1': 'H', 'nesio-place-geo-v1': 'G', 'nesio-bank-tx-v1': 'B', 'a': '1', 'b': '2' })));
+    return { ok: false, status: 404, json: async () => ({}) };
+  };
+  const growCtx = makeCtx({ idbKeys: ['nesio-health-v1', 'nesio-place-geo-v1', 'nesio-bank-tx-v1'], fetchImpl: growFetch, withReload: true, lsInit: { 'nesio-backup-synced-entrycount-v1': '1' } });
+  await growCtx.mod.autoSyncBackupWithCloud({ force: true });
+  assert.equal(growCtx.ctx._reloaded(), true, '云端长大(1→5)→ 再 reload 一次(修真数据永不显示)');
+  assert.equal(growCtx.lsMap.get('nesio-backup-synced-entrycount-v1'), '5', '高水位抬到 5');
 
   // (b) 云端确实空(no_backup)→ 也推(把本机数据首次带上云;empty-fuse 兜住真空账号),不 reload。
   const emptyFetch = (url) => {
@@ -284,7 +296,7 @@ const okFetch = (url) => {
   await emptyCtx.mod.autoSyncBackupWithCloud({ force: true });
   assert.ok(emptyCtx.ctx._scheduledPush(), '云端无备份也推(首次上云;空账号由 empty-fuse 拦)');
   assert.equal(emptyCtx.ctx._reloaded(), false, '云端无备份不 reload');
-  assert.equal(emptyCtx.lsMap.get('nesio-backup-first-sync-done-v1'), undefined, 'no_backup 不置首刷标志(等原浏览器推上云后仍会首刷一次)');
+  assert.equal(emptyCtx.lsMap.get('nesio-backup-synced-entrycount-v1'), undefined, 'no_backup 不动高水位');
 
   // (c) pull 网络失败 → 不推、不 reload(避免把本地空/旧数据推成新「最新」,遮住云端真备份)
   const failFetch = (url) => {
