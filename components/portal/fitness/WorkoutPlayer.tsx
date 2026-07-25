@@ -34,43 +34,13 @@ export interface PlayerSession {
   sessionId?: string;
 }
 
-// 简单声音卡点:WebAudio 生一个短音,不用任何音频资源。
-// 【真机卡死修复】**绝不在点击的同步关键路径里 new/resume AudioContext**:移动端 WKWebView/Android
-// WebView 里,进程第一个 `new AudioContext()` 会在主线程上同步激活共享音频会话/硬件,一旦在争用状态
-// 卡住,这一行就**阻塞主线程且不返回**(是阻塞不是抛错,try/catch 接不住,屏幕永久冻死)。真机:一点
-// 「跟拍做」(全 app 第一次出声)就永久卡死。改为:挂载时在**宏任务**里预创建(不落点击线程),tone()
-// 只在已就绪时发声、绝不 new。音频哪怕永远起不来也只是没声,绝不冻界面(音频本就是尽力而为)。
-let _audioCtx: AudioContext | null = null;
-let _audioInitStarted = false;
-function initAudioDeferred(): void {
-  if (_audioInitStarted || typeof window === 'undefined') return;
-  _audioInitStarted = true;
-  const AC = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-  if (!AC) return;
-  // setTimeout(0):把 new AudioContext 挪出任何点击/手势的同步路径,慢或卡都不落到 UI 交互那一帧。
-  setTimeout(() => {
-    try { _audioCtx = new AC(); } catch { _audioCtx = null; }
-  }, 0);
-}
-function tone(freq: number, ms: number) {
-  const ctx = _audioCtx;
-  if (!ctx) return; // 未就绪 → 跳过这一声(绝不在此 new/resume,不阻塞主线程)
-  try {
-    if (ctx.state === 'suspended') void ctx.resume(); // resume 是异步、不阻塞;在点击手势里调可解锁 iOS
-    const o = ctx.createOscillator();
-    const g = ctx.createGain();
-    o.type = 'sine';
-    o.frequency.value = freq;
-    o.connect(g);
-    g.connect(ctx.destination);
-    const t = ctx.currentTime;
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.3, t + 0.008);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + ms / 1000);
-    o.start(t);
-    o.stop(t + ms / 1000 + 0.02);
-  } catch { /* 无音频不影响练 */ }
-}
+// 【节拍音已彻底移除 —— 真机永久卡死收口】
+// 移动端 WebView 里,**首次任何 Web 音频操作**(建上下文 / 恢复 / 激活音频硬件 / 启动振荡器)都可能在
+// 主线程上同步阻塞且不返回 —— 是阻塞不是抛错(try/catch 与错误边界都接不住),屏幕永久冻死。真机实测:
+// 一点「跟拍做」(全 app 第一次出声)就永久卡死,先前只把「建上下文」挪走仍卡(恢复/启动还在点击路径)。
+// 音频本就是尽力而为的次要功能 —— 直接**完全去掉音频**,保证跟拍/计时永不卡。节拍靠界面大号数字 +
+// 进度条即可。(将来若要恢复声音,须走完全离主线程的方案,并真机验证。)
+function tone(_freq: number, _ms: number): void { /* no-op:不触碰任何音频,永不阻塞主线程 */ }
 
 const REP_TEMPO_SEC = 3; // 跟拍:每次约 3 秒(1 秒发力 + 2 秒还原)
 
@@ -103,9 +73,6 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   const ping = (freq: number, ms = 80) => { if (!mutedRef.current) tone(freq, ms); };
 
   useSheetDismiss(true, onClose); // 挂载即打开;Escape 关闭 + 焦点回收
-
-  // 挂载即在宏任务里预热音频(不在点击同步路径,防移动端首个 AudioContext 阻塞主线程 = 跟拍做卡死)。
-  useEffect(() => { initAudioDeferred(); }, []);
 
   // 防御(修「打开跟练卡死」):session/steps 可能来自别端同步回的畸形数据(缺 steps、非数组、
   // 元素缺 exerciseId)。绝不裸解引用 —— 归一成合法 steps 数组,非法则本组件优雅关闭,不 throw。
