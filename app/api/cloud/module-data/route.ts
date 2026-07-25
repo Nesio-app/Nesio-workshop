@@ -33,12 +33,21 @@ function getConfig() {
 function sanitizeModuleKey(value: unknown): string | null {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
-  // 模块 key 形如 nesio-health-v1 / local-image:xxx —— 收紧字符集,防注入/越界。
+  // 模块 key 形如 nesio-health-v1 / local-image:xxx / email-body:xxx —— 收紧字符集,防注入/越界。
   if (!trimmed || trimmed.length > 200 || !/^[a-zA-Z0-9._:-]+$/.test(trimmed)) return null;
   return trimmed;
 }
 
-export async function GET() {
+// key 前缀过滤(收紧字符集 + 长度,防注入)。用于把邮件全文行(email-body:*)与普通模块行分流:
+// 模块同步 GET 传 excludePrefix=email-body: 绝不下载海量邮件;邮件同步 GET 传 keyPrefix=email-body:。
+function sanitizePrefix(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 64 || !/^[a-zA-Z0-9._:-]+$/.test(trimmed)) return null;
+  return trimmed;
+}
+
+export async function GET(request: NextRequest) {
   const id = auditId();
   logAudit('cloud_runtime_request', { auditId: id, method: 'GET', readsCloud: true, writesCloud: false });
   const config = getConfig();
@@ -53,9 +62,16 @@ export async function GET() {
     return safeJson({ ok: false, error: 'not_signed_in', auditId: id, modules: [] }, 401);
   }
 
+  const keyPrefix = sanitizePrefix(request.nextUrl.searchParams.get('keyPrefix'));
+  const excludePrefix = sanitizePrefix(request.nextUrl.searchParams.get('excludePrefix'));
+
   try {
     const url = new URL('/rest/v1/user_module_data', config.supabaseUrl);
     url.searchParams.set('identity_key', `eq.${cloudIdentity.identityKey}`);
+    // 前缀分流(PostgREST like/not.like,`*` 为通配符):只拉/只排某前缀的行,避免把邮件全文
+    // 海量行卷进普通模块同步(反之亦然)。二者互斥,keyPrefix 优先。
+    if (keyPrefix) url.searchParams.set('module_key', `like.${keyPrefix}*`);
+    else if (excludePrefix) url.searchParams.set('module_key', `not.like.${excludePrefix}*`);
     url.searchParams.set('select', 'module_key,data,updated_at');
     const res = await fetch(url.toString(), {
       headers: cloudRuntime.serviceRoleRestHeaders(config),

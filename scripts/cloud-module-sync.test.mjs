@@ -42,6 +42,7 @@ function makeCtx({ lsInit = {}, localEntries = {}, fetchImpl, withReload = false
         restoreCombinedBackup: async (backup, mode) => { restoreApplied = { entries: backup.entries, mode }; return { restoredKeys: 0, idbRestored: Object.keys(backup.entries).length, skippedKeys: [], corruptKeys: [] }; },
       };
       if (p === './storage-health') return { logDropped: () => {} };
+      if (p === './cloud-email-sync') return { EMAIL_BODY_MODULE_PREFIX: 'email-body:' };
       return {};
     },
     _lastPost: () => lastPost,
@@ -65,7 +66,7 @@ function cloudRow(moduleKey, json, updatedAt = '2026-07-25T00:00:00.000Z') {
 // 1. push:逐模块行(压缩块)、排除记忆图、只推已变
 {
   const okPost = async (url, init, cap) => {
-    if (url === '/api/cloud/module-data' && init?.method === 'POST') { cap(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => ({ ok: true, savedCount: 1 }) }; }
+    if (String(url).startsWith('/api/cloud/module-data') && init?.method === 'POST') { cap(JSON.parse(init.body)); return { ok: true, status: 200, json: async () => ({ ok: true, savedCount: 1 }) }; }
     return { ok: false, status: 404, json: async () => ({}) };
   };
   const { mod, ctx } = makeCtx({
@@ -88,7 +89,7 @@ function cloudRow(moduleKey, json, updatedAt = '2026-07-25T00:00:00.000Z') {
 {
   const rows = [cloudRow('nesio-health-v1', '{"metrics":[9]}'), cloudRow('nesio-life-graph-v1', '[{"id":"x"}]')];
   const fetchImpl = async (url) => {
-    if (url === '/api/cloud/module-data') return { ok: true, status: 200, json: async () => ({ ok: true, modules: rows }) };
+    if (String(url).startsWith('/api/cloud/module-data')) return { ok: true, status: 200, json: async () => ({ ok: true, modules: rows }) };
     return { ok: false, status: 404, json: async () => ({}) };
   };
   const { mod, ctx } = makeCtx({ localEntries: {}, fetchImpl, withReload: true });
@@ -110,7 +111,7 @@ function cloudRow(moduleKey, json, updatedAt = '2026-07-25T00:00:00.000Z') {
 {
   const rows = [cloudRow('nesio-health-v1', '{"metrics":["CLOUD"]}')];
   const fetchImpl = async (url) => {
-    if (url === '/api/cloud/module-data') return { ok: true, status: 200, json: async () => ({ ok: true, modules: rows }) };
+    if (String(url).startsWith('/api/cloud/module-data')) return { ok: true, status: 200, json: async () => ({ ok: true, modules: rows }) };
     return { ok: false, status: 404, json: async () => ({}) };
   };
   // state 记录的是**旧**哈希(本机现值已改成 LOCAL,与 state 不符 → 本机改过)
@@ -129,12 +130,12 @@ function cloudRow(moduleKey, json, updatedAt = '2026-07-25T00:00:00.000Z') {
 {
   const localJson = '{"metrics":["SAME_AS_SYNCED"]}';
   const rows = [cloudRow('nesio-health-v1', '{"metrics":["CLOUD_NEWER"]}')];
-  const fetchImpl = async (url) => (url === '/api/cloud/module-data'
+  const fetchImpl = async (url) => (String(url).startsWith('/api/cloud/module-data')
     ? { ok: true, status: 200, json: async () => ({ ok: true, modules: rows }) }
     : { ok: false, status: 404, json: async () => ({}) });
   // 先跑一次真实 hash:用引擎自己的哈希不方便,这里用「本机现值 == 上次同步值」的语义等价:
   // 让 state 的 hash 恰为本机现值的哈希 —— 通过先 push 建立 state,再 pull。
-  const okPost = async (url, init) => (url === '/api/cloud/module-data' && init?.method === 'POST'
+  const okPost = async (url, init) => (String(url).startsWith('/api/cloud/module-data') && init?.method === 'POST'
     ? { ok: true, status: 200, json: async () => ({ ok: true }) }
     : fetchImpl(url));
   const combined = async (url, init) => (init?.method === 'POST' ? okPost(url, init) : fetchImpl(url, init));
@@ -151,7 +152,7 @@ function cloudRow(moduleKey, json, updatedAt = '2026-07-25T00:00:00.000Z') {
   const localFull = JSON.stringify({ points: 320, ledger: new Array(40).fill({ k: 'earn', v: 8 }) });
   const cloudEmpty = JSON.stringify({ points: 0, ledger: [] });
   const rows = [cloudRow('nesio-inventory-v1', cloudEmpty)];
-  const fetchImpl = async (url) => (url === '/api/cloud/module-data'
+  const fetchImpl = async (url) => (String(url).startsWith('/api/cloud/module-data')
     ? { ok: true, status: 200, json: async () => ({ ok: true, modules: rows }) }
     : { ok: false, status: 404, json: async () => ({}) });
   // state.hash 恰为本机满值哈希 → 语义上「本机自上次同步未改」(LWW 本会判云端胜),靠反遮盖闸兜住。
@@ -161,7 +162,7 @@ function cloudRow(moduleKey, json, updatedAt = '2026-07-25T00:00:00.000Z') {
     fetchImpl,
   });
   // 先 push 建立 state(hash=满值)——用同一 fetchImpl 的 POST 分支
-  const okPost = async (url, init) => (url === '/api/cloud/module-data' && init?.method === 'POST'
+  const okPost = async (url, init) => (String(url).startsWith('/api/cloud/module-data') && init?.method === 'POST'
     ? { ok: true, status: 200, json: async () => ({ ok: true }) }
     : fetchImpl(url));
   const c2 = makeCtx({ localEntries: { 'nesio-inventory-v1': localFull }, fetchImpl: async (u, i) => (i?.method === 'POST' ? okPost(u, i) : fetchImpl(u)) });
