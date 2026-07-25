@@ -58,6 +58,8 @@ export interface ChoreInstance {
   approvedAt?: string;
   paidAt?: string;
   proofPhotoRef?: string;     // 可选存证照 —— 只指向家庭 vault,永不出门(核心不含上传路径)
+  title?: string;            // 由日历事件分派而来的家务:显示原事件标题(模板家务留空,按 templateId 显示)
+  sourceEventId?: string;    // 关联的来源(日历事件对应的记忆节点 id);一事件一实例的去重键
 }
 
 /** 付款记录:爸妈线下给了现金,在这记一笔冲账。永远不是一笔转账。 */

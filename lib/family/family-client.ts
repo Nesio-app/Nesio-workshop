@@ -10,6 +10,7 @@ export interface FamilyMemberView { id: string; name: string; canApprove: boolea
 export interface ChoreInstanceView {
   id: string; templateId: string; assigneeId: string; dueDate: string; value: number;
   state: ChoreStateView; needsApproval: boolean; doneAt?: string; approvedAt?: string; proofPhotoRef?: string;
+  title?: string; sourceEventId?: string;
 }
 export interface FamilySummary { familyId: string; name: string; inviteCode: string; me: FamilyMemberView; }
 export interface BoardView {
@@ -68,6 +69,14 @@ export function choreAction(
   familyId: string, instanceId: string, action: 'done' | 'approve' | 'send_back', proofRef?: string,
 ): Promise<ApiResult<{ instance: ChoreInstanceView }>> {
   return api('/api/portal/family/chore/action', postJson({ familyId, instanceId, action, proofRef }));
+}
+export function listFamilyMembers(familyId: string): Promise<ApiResult<{ familyId: string; me: FamilyMemberView; members: FamilyMemberView[] }>> {
+  return api(`/api/portal/family/members?familyId=${encodeURIComponent(familyId)}`);
+}
+export function assignChoreFromEvent(
+  input: { familyId: string; sourceEventId: string; title: string; dueDate: string; assigneeId: string; value?: number; needsApproval?: boolean },
+): Promise<ApiResult<{ instance: ChoreInstanceView }>> {
+  return api('/api/portal/family/assign', postJson(input));
 }
 export function recordPayout(
   familyId: string, personId: string, amount: number, date?: string, note?: string,

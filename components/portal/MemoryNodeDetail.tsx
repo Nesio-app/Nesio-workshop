@@ -15,6 +15,7 @@ import { displayNodeName } from '@/lib/portal/node-display';
 import dynamicImport from 'next/dynamic';
 const ReaderSheetLazy = dynamicImport(() => import('./ArticleReaderSheet'), { ssr: false });
 const PlacePickerLazy = dynamicImport(() => import('./PlacePickerSheet'), { ssr: false });
+const AssignChoreLazy = dynamicImport(() => import('./family/AssignChoreButton'), { ssr: false });
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
@@ -1090,6 +1091,11 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
                 </div>
               )}
             </div>
+          )}
+
+          {/* 闭环起点:日历/承诺类记忆可「分派给家人」(→ 对方今天页看到 → 做完你今天页收到回响)。 */}
+          {!editing && (n.type === 'event' || n.type === 'commitment') && (
+            <AssignChoreLazy node={n} />
           )}
 
           {/* 批次 70:关联链 —— 行程↔邮件自动挂钩、计划容器↔条目,点开跳转;

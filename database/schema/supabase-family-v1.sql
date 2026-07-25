@@ -126,11 +126,22 @@ CREATE TABLE IF NOT EXISTS public.family_chore_instances (
   approved_at timestamptz,
   paid_at timestamptz,
   proof_asset_ref text,
+  title text,                 -- 由日历事件分派而来的家务:留原事件标题(模板家务为空,按 template 显示)
+  source_event_id text,       -- 关联的来源记忆节点 id(日历事件)。一事件一实例的去重键。
   updated_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now(),
   deleted_at timestamptz,
   UNIQUE (family_id, template_id, due_date)
 );
+
+-- 反复应用安全:老表补列(闭环「日历家务 → 分派给家人」用)。
+ALTER TABLE public.family_chore_instances ADD COLUMN IF NOT EXISTS title text;
+ALTER TABLE public.family_chore_instances ADD COLUMN IF NOT EXISTS source_event_id text;
+
+-- 一个家庭里,一条来源日历事件只对应一条家务实例 → 再点「分派」= 改派(upsert),不重复生成。
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_family_chore_source_event
+  ON public.family_chore_instances (family_id, source_event_id)
+  WHERE source_event_id IS NOT NULL AND deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_family_chore_instances_family
   ON public.family_chore_instances (family_id, due_date DESC)

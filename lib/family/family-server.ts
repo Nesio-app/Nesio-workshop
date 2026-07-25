@@ -64,7 +64,7 @@ async function restPatch<T>(config: CloudRuntimeConfig, table: string, query: st
 
 // ── 行类型(DB 快照)────────────────────────────────────────────────────────────
 interface MemberRow { family_id: string; user_id: string; display_name: string; can_approve: boolean; needs_approval: boolean; can_record_payout: boolean; }
-interface InstanceRow { id: string; family_id: string; template_id: string | null; assignee_user_id: string | null; due_date: string; value: number; state: ChoreState; needs_approval: boolean; done_at: string | null; approved_at: string | null; proof_asset_ref: string | null; }
+interface InstanceRow { id: string; family_id: string; template_id: string | null; assignee_user_id: string | null; due_date: string; value: number; state: ChoreState; needs_approval: boolean; done_at: string | null; approved_at: string | null; proof_asset_ref: string | null; title: string | null; source_event_id: string | null; }
 interface PayoutRow { id: string; family_id: string; person_user_id: string | null; amount: number; date: string; note: string | null; }
 
 function memberFromRow(r: MemberRow): FamilyMember {
@@ -75,6 +75,7 @@ function instanceFromRow(r: InstanceRow): ChoreInstance {
     id: r.id, templateId: r.template_id ?? '', assigneeId: r.assignee_user_id ?? '', dueDate: r.due_date,
     value: Number(r.value), state: r.state, needsApproval: r.needs_approval,
     doneAt: r.done_at ?? undefined, approvedAt: r.approved_at ?? undefined, proofPhotoRef: r.proof_asset_ref ?? undefined,
+    title: r.title ?? undefined, sourceEventId: r.source_event_id ?? undefined,
   };
 }
 function payoutFromRow(r: PayoutRow): Payout {
@@ -282,6 +283,68 @@ export async function createChoreTemplateOp(
     if (inserted === null) return fail('upstream', 502);
   }
   return { ok: true, value: { templateId, generated: rows.length } };
+}
+
+/** 家庭全体成员(供「分派给家人」选人)。任何成员可读。 */
+export async function listFamilyMembersOp(actor: FamilyActor, familyId: string): Promise<FamilyResult<{ familyId: string; me: FamilyMember; members: FamilyMember[] }>> {
+  const gate = await requireMember(actor, familyId);
+  if (!gate.ok) return gate;
+  const rows = await restGet<MemberRow>(actor.config, 'family_members', `family_id=eq.${familyId}&select=*`);
+  if (rows === null) return fail('upstream', 502);
+  return { ok: true, value: { familyId, me: memberFromRow(gate.value), members: rows.map(memberFromRow) } };
+}
+
+/**
+ * 闭环起点:把一条日历事件(记忆节点)分派给某个家庭成员。需 can_approve(分派 = 家长动作)。
+ * 一事件一实例:按 (family_id, source_event_id) upsert —— 再点即改派,不重复生成。
+ * 改派给新的人 → 状态复位 todo(旧的完成/审核不带过去)。
+ */
+export async function assignChoreFromEventOp(
+  actor: FamilyActor,
+  input: { familyId: string; sourceEventId: string; title: string; dueDate: string; assigneeId: string; value?: number; needsApproval?: boolean },
+): Promise<FamilyResult<ChoreInstance>> {
+  const gate = await requireMember(actor, input.familyId);
+  if (!gate.ok) return gate;
+  if (!memberCan(memberFromRow(gate.value), 'assign')) return fail('forbidden', 403);
+
+  const sourceEventId = (input.sourceEventId || '').trim();
+  const title = (input.title || '').trim();
+  const dueDate = (input.dueDate || '').trim();
+  const assigneeId = (input.assigneeId || '').trim();
+  const value = Number.isFinite(input.value) && (input.value as number) >= 0 ? (input.value as number) : 0;
+  const needsApproval = input.needsApproval !== false;
+  if (!sourceEventId || !title || !assigneeId || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return fail('bad_request', 400);
+
+  // 被分派人必须是本家庭成员(fail-closed:不给外人塞活)。
+  const target = await restGet<MemberRow>(actor.config, 'family_members', `family_id=eq.${input.familyId}&user_id=eq.${assigneeId}&select=user_id`);
+  if (target === null) return fail('upstream', 502);
+  if (!target.length) return fail('bad_request', 400);
+
+  const existing = await restGet<InstanceRow>(actor.config, 'family_chore_instances',
+    `family_id=eq.${input.familyId}&source_event_id=eq.${sourceEventId}&deleted_at=is.null&select=*`);
+  if (existing === null) return fail('upstream', 502);
+
+  if (existing.length) {
+    const reassigned = existing[0].assignee_user_id !== assigneeId;
+    const patch: Record<string, unknown> = {
+      assignee_user_id: assigneeId, title, due_date: dueDate, value, needs_approval: needsApproval,
+      updated_at: new Date().toISOString(),
+      // 改派给新的人:旧完成/审核不带过去,复位 todo。派回原人:保持现状。
+      ...(reassigned ? { state: 'todo', done_at: null, approved_at: null, proof_asset_ref: null } : {}),
+    };
+    const saved = await restPatch<InstanceRow>(actor.config, 'family_chore_instances',
+      `id=eq.${existing[0].id}&family_id=eq.${input.familyId}`, patch);
+    if (!saved?.length) return fail('upstream', 502);
+    return { ok: true, value: instanceFromRow(saved[0]) };
+  }
+
+  const inserted = await restInsert<InstanceRow>(actor.config, 'family_chore_instances', {
+    family_id: input.familyId, template_id: null, assignee_user_id: assigneeId,
+    due_date: dueDate, value, state: 'todo', needs_approval: needsApproval,
+    title, source_event_id: sourceEventId,
+  });
+  if (!inserted?.length) return fail('upstream', 502);
+  return { ok: true, value: instanceFromRow(inserted[0]) };
 }
 
 /** 记一笔线下现金冲账。能力 can_record_payout 服务端强制;金额恒正。永不是转账。 */

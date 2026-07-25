@@ -46,6 +46,7 @@ import { MeetingRecorderSheet } from './today/MeetingRecorderSheet';
 
 const MoodTrendSheet = dynamic(() => import('./MoodTrendSheet'), { ssr: false });
 const MemoryNodeDetailLazy = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
+const FamilyTodayStrip = dynamic(() => import('./today/FamilyTodayStrip'), { ssr: false });
 import MemoryFlashBanner, { useMemoryFlash } from './MemoryFlashBanner';
 import WrappedCard, { useWrappedTrigger } from './WrappedCard';
 
@@ -257,6 +258,9 @@ export default function TodayFeed({
       <div className="nesio-today-scroll">
         {/* §1 ①安心态收据(宋体 = Nesio 的声音):先兑现承诺,再看今天 */}
         <p className="nesio-today-receipt nesio-serif-voice">{receiptLine}</p>
+
+        {/* 家庭家务闭环的今天页一端:分给我的家务可当场完成;有人做完了在这收到回响。空则不渲染。 */}
+        <FamilyTodayStrip />
 
         {/* 批次 105:回顾卡(去年今日)—— 念念翻出一条旧记忆,放问候下面(设计规范今天页第 2 段)。
             周年/月纪念优先;没有符合的不渲染。点开复用 MemoryNodeDetail。 */}
