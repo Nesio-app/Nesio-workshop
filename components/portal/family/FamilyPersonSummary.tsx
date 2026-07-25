@@ -9,18 +9,40 @@ import { useCallback, useEffect, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { memberForPerson } from '@/lib/family/people-link';
-import { getLedger, type LedgerView } from '@/lib/family/family-client';
+import { memberForPerson, autoLinkByEmail } from '@/lib/family/people-link';
+import { getLedger, listFamilies, listFamilyMembers, type LedgerView } from '@/lib/family/family-client';
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 
-export default function FamilyPersonSummary({ personNodeId }: { personNodeId: string }) {
+export default function FamilyPersonSummary({ personNodeId, personEmail }: { personNodeId: string; personEmail?: string }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const t = (zh: string, en: string) => L(dict, zh, en);
 
-  const [link] = useState(() => memberForPerson(personNodeId));
+  const [link, setLink] = useState<{ memberId: string; familyId: string } | null>(() => memberForPerson(personNodeId));
+  const [resolved, setResolved] = useState(() => !!memberForPerson(personNodeId));
   const [ledger, setLedger] = useState<LedgerView | null>(null);
   const [err, setErr] = useState(false);
+
+  // 解析配对:没现成映射且这个人有邮箱 → 拉家庭成员按邮箱自动配一次(不依赖先开过分派选人)。
+  useEffect(() => {
+    if (link) return;                          // 已有映射,不用再拉
+    const email = (personEmail || '').trim();
+    if (!email) { setResolved(true); return; } // 没邮箱不可能配上,省一次网络
+    let alive = true;
+    void (async () => {
+      const fr = await listFamilies();
+      if (alive && fr.ok) {
+        for (const fam of fr.data.families) {
+          const mr = await listFamilyMembers(fam.familyId);
+          if (mr.ok) autoLinkByEmail(fam.familyId, mr.data.members);
+        }
+      }
+      if (!alive) return;
+      setLink(memberForPerson(personNodeId));
+      setResolved(true);
+    })();
+    return () => { alive = false; };
+  }, [personNodeId, personEmail, link]);
 
   const load = useCallback(async () => {
     if (!link) return;
@@ -32,7 +54,8 @@ export default function FamilyPersonSummary({ personNodeId }: { personNodeId: st
 
   useEffect(() => { void load(); }, [load]);
 
-  if (!link) return null;  // 没配到家庭成员 → 不占地方
+  if (!resolved) return null;   // 配对解析中,先不占地方
+  if (!link) return null;       // 确认没配到家庭成员 → 不显示
 
   return (
     <div style={{ marginTop: 'var(--space-3)', padding: 'var(--space-3)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', background: 'var(--portal-accent-soft)' }}>

@@ -198,6 +198,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
   const [board, setBoard] = useState<BoardView | null>(null);
   const [err, setErr] = useState('');
   const [busyId, setBusyId] = useState('');
+  const [showAssigned, setShowAssigned] = useState(false);   // 已安排默认折叠(周期家务会铺很多条)
 
   const load = useCallback(async () => {
     setErr('');
@@ -268,23 +269,44 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
         </section>
       )}
 
-      {board.assigned.length > 0 && (
-        <section>
-          <p style={sectLabel}>{t('已安排', 'Assigned')}</p>
-          <div style={cardStyle}>
-            {board.assigned.map((c, i) => (
-              <div key={c.id} style={{ ...rowStyle, borderBottom: i === board.assigned.length - 1 ? 'none' : rowStyle.borderBottom }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{choreTitle(c, t)}</div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-                    {t('交给', 'for')} {nameFor(board, c.assigneeId) || t('家人', 'family')} · {assignedStateLabel(c.state, t)} · {c.dueDate}{c.value > 0 ? ` · ${money(c.value)}` : ''}
+      {board.assigned.length > 0 && (() => {
+        // 按 标题+被分派人 归并 —— 周期家务(每天铺一条)收成一行,不刷屏。
+        const groups = new Map<string, { title: string; assigneeId: string; count: number; earliest: string; done: number }>();
+        for (const c of board.assigned) {
+          const key = `${choreTitle(c, t)}|${c.assigneeId}`;
+          const g = groups.get(key) ?? { title: choreTitle(c, t), assigneeId: c.assigneeId, count: 0, earliest: c.dueDate, done: 0 };
+          g.count += 1;
+          if (c.state === 'approved' || c.state === 'paid') g.done += 1;
+          if (c.dueDate < g.earliest) g.earliest = c.dueDate;
+          groups.set(key, g);
+        }
+        const rows = [...groups.values()].sort((a, b) => (a.earliest < b.earliest ? -1 : a.earliest > b.earliest ? 1 : 0));
+        return (
+          <section>
+            <button type="button" onClick={() => setShowAssigned((v) => !v)}
+              style={{ ...sectLabel, display: 'flex', alignItems: 'center', gap: 'var(--space-1)', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}>
+              {t('已安排', 'Assigned')} · {rows.length} {showAssigned ? '▾' : '▸'}
+            </button>
+            {showAssigned && (
+              <div style={cardStyle}>
+                {rows.map((g, i) => (
+                  <div key={`${g.title}-${g.assigneeId}`} style={{ ...rowStyle, borderBottom: i === rows.length - 1 ? 'none' : rowStyle.borderBottom }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>
+                        {g.title}{g.count > 1 ? ` · ×${g.count}` : ''}
+                      </div>
+                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                        {t('交给', 'for')} {nameFor(board, g.assigneeId) || t('家人', 'family')}
+                        {g.count > 1 ? ` · ${t('完成', 'done')} ${g.done}/${g.count} · ${t('自', 'from')} ${g.earliest}` : ` · ${g.earliest}`}
+                      </div>
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </section>
-      )}
+            )}
+          </section>
+        );
+      })()}
 
       <section>
         <p style={sectLabel}>{t('大家', 'Everyone')}</p>
