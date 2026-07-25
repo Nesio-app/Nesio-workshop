@@ -14,11 +14,11 @@ import { portalLocaleToDictionaryLocale, loadProfileSettings } from '@/lib/porta
 import { usePortalLocale } from '../use-portal-locale';
 import {
   listFamilies, createFamily, joinFamily, getBoard, getLedger, choreAction, recordPayout, syncMyFamilyProfile, setMyGoal,
-  listFamilyMembers, setMemberRole, removeMember,
+  setMemberRole, removeMember,
   type FamilySummary, type FamilyMemberView, type BoardView, type LedgerView, type ChoreInstanceView,
 } from '@/lib/family/family-client';
 
-type View = { kind: 'board' } | { kind: 'ledger'; personId: string; personName: string };
+type View = { kind: 'board' } | { kind: 'ledger'; person: FamilyMemberView };
 
 const money = (n: number) => `$${n.toFixed(2)}`;
 
@@ -53,7 +53,7 @@ export default function FamilySharingSheet({ open, onClose }: { open: boolean; o
     <NesioSheet variant="fullscreen" open={open} onOpenChange={(o) => { if (!o) onClose(); }} ariaLabel={t('家庭分享', 'Family sharing')}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }}>
         <Header
-          title={view.kind === 'ledger' ? `${view.personName}${t(' 的账本', "’s ledger")}` : t('家庭分享', 'Family')}
+          title={view.kind === 'ledger' ? `${view.person.name}${t(' 的账本', "’s ledger")}` : t('家庭分享', 'Family')}
           onBack={view.kind === 'ledger' ? () => setView({ kind: 'board' }) : undefined}
           onClose={onClose}
           t={t}
@@ -72,14 +72,20 @@ export default function FamilySharingSheet({ open, onClose }: { open: boolean; o
               familyId={familyId}
               families={families}
               onSwitchFamily={setFamilyId}
-              onOpenLedger={(personId, personName) => setView({ kind: 'ledger', personId, personName })}
-              onLeftFamily={() => { setFamilyId(''); void refreshFamilies(); }}
+              onOpenLedger={(member) => setView({ kind: 'ledger', person: member })}
               t={t}
             />
           )}
 
           {!loading && !loadErr && view.kind === 'ledger' && me && (
-            <LedgerScreen familyId={familyId} personId={view.personId} canRecordPayout={me.canRecordPayout} t={t} />
+            <LedgerScreen
+              familyId={familyId}
+              person={view.person}
+              me={me}
+              onChanged={refreshFamilies}
+              onLeft={() => { setView({ kind: 'board' }); setFamilyId(''); void refreshFamilies(); }}
+              t={t}
+            />
           )}
         </div>
       </div>
@@ -262,11 +268,10 @@ function GoalSection({ familyId, me, owed, onSaved, t }: {
 }
 
 // ── 家庭板 ────────────────────────────────────────────────────────────────────
-function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, onLeftFamily, t }: {
+function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
   familyId: string; families: FamilySummary[];
   onSwitchFamily: (id: string) => void;
-  onOpenLedger: (personId: string, personName: string) => void;
-  onLeftFamily: () => void;
+  onOpenLedger: (member: FamilyMemberView) => void;
   t: (a: string, b: string) => string;
 }) {
   const [board, setBoard] = useState<BoardView | null>(null);
@@ -394,7 +399,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, onLeftF
         <p style={sectLabel}>{t('大家', 'Everyone')}</p>
         <div style={cardStyle}>
           {board.everyone.map((e, i) => (
-            <button key={e.member.id} type="button" onClick={() => onOpenLedger(e.member.id, displayName(e.member.id))}
+            <button key={e.member.id} type="button" onClick={() => onOpenLedger(e.member)}
               style={{ ...rowStyle, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: i === board.everyone.length - 1 ? 'none' : '1px solid var(--portal-line)', cursor: 'pointer' }}>
               <MemberAvatar name={displayName(e.member.id)} avatar={avatarOf(e.member.id)} size={32} />
               <div style={{ flex: 1 }}>
@@ -407,86 +412,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, onLeftF
           ))}
         </div>
       </section>
-
-      <MembersManager familyId={familyId} meId={board.me.id} canManage={board.me.canApprove} onChanged={load} onLeft={onLeftFamily} t={t} />
     </div>
-  );
-}
-
-// ── 成员管理(改角色 / 移出 / 退出)· 折叠 ──────────────────────────────────────
-function MembersManager({ familyId, meId, canManage, onChanged, onLeft, t }: {
-  familyId: string; meId: string; canManage: boolean; onChanged: () => void; onLeft: () => void; t: (a: string, b: string) => string;
-}) {
-  const [open, setOpen] = useState(false);
-  const [members, setMembers] = useState<FamilyMemberView[] | null>(null);
-  const [busyId, setBusyId] = useState('');
-  const [err, setErr] = useState('');
-
-  const load = useCallback(async () => {
-    const r = await listFamilyMembers(familyId);
-    if (r.ok) setMembers(r.data.members);
-  }, [familyId]);
-  useEffect(() => { if (open && members === null) void load(); }, [open, members, load]);
-
-  async function setRole(m: FamilyMemberView, parent: boolean) {
-    setBusyId(m.id + 'role'); setErr('');
-    const role = parent
-      ? { canApprove: true, needsApproval: false, canRecordPayout: true }
-      : { canApprove: false, needsApproval: true, canRecordPayout: false };
-    const r = await setMemberRole(familyId, m.id, role);
-    setBusyId('');
-    if (!r.ok) { setErr(r.error === 'conflict' ? t('至少要留一位家长。', 'Keep at least one parent.') : t('没改成,再试一次。', 'Could not change — try again.')); return; }
-    void load(); onChanged();
-  }
-  async function remove(m: FamilyMemberView) {
-    setBusyId(m.id + 'remove'); setErr('');
-    const r = await removeMember(familyId, m.id);
-    setBusyId('');
-    if (!r.ok) { setErr(r.error === 'conflict' ? t('先把家长身份交给别人,再退出。', 'Hand parent role to someone first.') : t('没成,再试一次。', 'Could not do that — try again.')); return; }
-    if (m.id === meId) { onLeft(); return; }  // 退出自己 → 刷新家庭列表(已不是成员,board 会 403)
-    void load(); onChanged();
-  }
-
-  return (
-    <section>
-      <button type="button" onClick={() => setOpen((v) => !v)}
-        style={{ ...sectLabel, display: 'flex', alignItems: 'center', gap: 'var(--space-1)', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}>
-        {t('成员', 'Members')} {open ? '▾' : '▸'}
-      </button>
-      {open && (
-        <div style={cardStyle}>
-          {members === null && <p style={{ ...rowStyle, borderBottom: 'none', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)' }}>{t('加载中…', 'Loading…')}</p>}
-          {err && <p style={{ ...rowStyle, borderBottom: 'none', color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}>{err}</p>}
-          {(members ?? []).map((m, i) => {
-            const isParent = m.canApprove;
-            const isMe = m.id === meId;
-            return (
-              <div key={m.id} style={{ ...rowStyle, flexWrap: 'wrap', borderBottom: i === (members?.length ?? 0) - 1 ? 'none' : rowStyle.borderBottom }}>
-                <MemberAvatar name={m.name} avatar={m.avatarUrl || ''} size={28} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{m.name}{isMe ? t(' (我)', ' (me)') : ''}</div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{isParent ? t('家长 · 能审核·记付款', 'Parent · reviews & pays') : t('孩子 · 做完要家长看一眼', 'Kid · needs review')}</div>
-                </div>
-                {canManage && (
-                  <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
-                    <button type="button" onClick={() => void setRole(m, true)} disabled={busyId === m.id + 'role' || isParent}
-                      style={{ ...roleChip, ...(isParent ? roleChipOn : {}) }}>{t('家长', 'Parent')}</button>
-                    <button type="button" onClick={() => void setRole(m, false)} disabled={busyId === m.id + 'role' || !isParent}
-                      style={{ ...roleChip, ...(!isParent ? roleChipOn : {}) }}>{t('孩子', 'Kid')}</button>
-                  </div>
-                )}
-                {(canManage || isMe) && (
-                  <button type="button" onClick={() => void remove(m)} disabled={busyId === m.id + 'remove'}
-                    style={{ border: 'none', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: 'var(--space-1)' }}>
-                    {isMe ? t('退出', 'Leave') : t('移出', 'Remove')}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
   );
 }
 const roleChip: React.CSSProperties = { border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', padding: 'var(--space-1) var(--space-2)', cursor: 'pointer', fontFamily: 'var(--font-sans)' };
@@ -519,10 +445,13 @@ function choreTitle(c: ChoreInstanceView, t: (a: string, b: string) => string): 
   return c.templateId ? t('家务', 'Chore') + ` · ${c.dueDate}` : c.dueDate;
 }
 
-// ── 账本 ──────────────────────────────────────────────────────────────────────
-function LedgerScreen({ familyId, personId, canRecordPayout, t }: {
-  familyId: string; personId: string; canRecordPayout: boolean; t: (a: string, b: string) => string;
+// ── 账本(点某人进来:账本 + 就地管理 TA 的角色/去留)──────────────────────────────
+function LedgerScreen({ familyId, person, me, onChanged, onLeft, t }: {
+  familyId: string; person: FamilyMemberView; me: FamilyMemberView;
+  onChanged: () => void; onLeft: () => void; t: (a: string, b: string) => string;
 }) {
+  const personId = person.id;
+  const canRecordPayout = me.canRecordPayout;
   const [ledger, setLedger] = useState<LedgerView | null>(null);
   const [err, setErr] = useState('');
   const [payAmt, setPayAmt] = useState('');
@@ -601,10 +530,99 @@ function LedgerScreen({ familyId, personId, canRecordPayout, t }: {
         )
       )}
 
+      <MemberAdmin familyId={familyId} person={person} me={me} onChanged={onChanged} onLeft={onLeft} t={t} />
+
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6, margin: 0 }}>
         {t('Nesio 永不碰钱。现金你来给,我们只把账记清 —— 审核过的家务往上加,你给的现金往下扣。没有银行、没有卡、没有要打电话取消的订阅。',
           'Nesio never moves money. You give the cash; we just keep the count straight — approved chores add up, cash you give deducts.')}
       </p>
     </div>
+  );
+}
+
+// ── 成员管理(点某人进账本页里的一块:改 TA 角色 / 移出 / 退出)────────────────────
+// 从独立「成员」区挪来:家庭成员就是 People 之外自成一套的登录账号,管理跟着人走。
+function MemberAdmin({ familyId, person, me, onChanged, onLeft, t }: {
+  familyId: string; person: FamilyMemberView; me: FamilyMemberView;
+  onChanged: () => void; onLeft: () => void; t: (a: string, b: string) => string;
+}) {
+  const isMe = person.id === me.id;
+  const canManage = me.canApprove;
+  const [isParent, setIsParent] = useState(person.canApprove);
+  const [busy, setBusy] = useState('');
+  const [err, setErr] = useState('');
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  // 既不能管别人、又不是自己(无「退出」)→ 这块对 TA 没有任何动作,不渲染。
+  if (!canManage && !isMe) return null;
+
+  async function setRole(parent: boolean) {
+    if (parent === isParent) return;
+    setBusy('role'); setErr('');
+    const role = parent
+      ? { canApprove: true, needsApproval: false, canRecordPayout: true }
+      : { canApprove: false, needsApproval: true, canRecordPayout: false };
+    const r = await setMemberRole(familyId, person.id, role);
+    setBusy('');
+    if (!r.ok) { setErr(r.error === 'conflict' ? t('至少要留一位家长。', 'Keep at least one parent.') : t('没改成,再试一次。', 'Could not change — try again.')); return; }
+    setIsParent(parent); onChanged();
+  }
+  async function remove() {
+    setBusy('remove'); setErr('');
+    const r = await removeMember(familyId, person.id);
+    setBusy('');
+    if (!r.ok) { setErr(r.error === 'conflict' ? t('先把家长身份交给别人,再退出。', 'Hand the parent role to someone first.') : t('没成,再试一次。', 'Could not do that — try again.')); return; }
+    if (isMe) { onLeft(); return; }       // 退出自己 → 回到板并刷新(已不是成员)
+    onChanged(); onLeft();                 // 移出别人 → 该账本页无意义了,退回板
+  }
+
+  return (
+    <section>
+      <p style={sectLabel}>{t('这个人', 'This person')}</p>
+      <div style={{ ...cardStyle, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+          <MemberAvatar name={person.name} avatar={person.avatarUrl || ''} size={32} />
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{person.name}{isMe ? t(' (我)', ' (me)') : ''}</div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{isParent ? t('家长 · 能审核·记付款', 'Parent · reviews & pays') : t('孩子 · 做完要家长看一眼', 'Kid · needs review')}</div>
+          </div>
+        </div>
+
+        {canManage && (
+          <div>
+            <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginBottom: 'var(--space-1)' }}>{t('身份', 'Role')}</div>
+            <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
+              <button type="button" onClick={() => void setRole(true)} disabled={busy === 'role' || isParent}
+                style={{ ...roleChip, ...(isParent ? roleChipOn : {}) }}>{t('家长', 'Parent')}</button>
+              <button type="button" onClick={() => void setRole(false)} disabled={busy === 'role' || !isParent}
+                style={{ ...roleChip, ...(!isParent ? roleChipOn : {}) }}>{t('孩子', 'Kid')}</button>
+            </div>
+          </div>
+        )}
+
+        {err && <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}>{err}</span>}
+
+        {(canManage || isMe) && (
+          confirmRemove ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              <span style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>
+                {isMe ? t('确定退出这个家庭?你的账本记录会留给家人。', 'Leave this family? Your ledger stays with the family.')
+                      : t('把 TA 从家庭移出?TA 的账本记录会保留。', 'Remove them from the family? Their ledger is kept.')}
+              </span>
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                <button type="button" onClick={() => void remove()} disabled={busy === 'remove'}
+                  style={{ ...primaryBtn, background: 'var(--status-risk)' }}>{busy === 'remove' ? t('处理中…', 'Working…') : isMe ? t('退出家庭', 'Leave') : t('确认移出', 'Remove')}</button>
+                <button type="button" onClick={() => setConfirmRemove(false)} style={ghostBtn}>{t('先不', 'Not now')}</button>
+              </div>
+            </div>
+          ) : (
+            <button type="button" onClick={() => { setConfirmRemove(true); setErr(''); }}
+              style={{ alignSelf: 'flex-start', border: 'none', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-sm)', cursor: 'pointer', padding: 'var(--space-1) 0' }}>
+              {isMe ? t('退出这个家庭', 'Leave this family') : t('把 TA 移出家庭', 'Remove from family')}
+            </button>
+          )
+        )}
+      </div>
+    </section>
   );
 }
