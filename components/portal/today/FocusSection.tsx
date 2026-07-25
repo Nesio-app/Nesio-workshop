@@ -23,6 +23,7 @@ import { MeetingRecorderSheet } from './MeetingRecorderSheet';
 import MemoryFlashBanner, { useMemoryFlash } from '../MemoryFlashBanner';
 import MoodBeat from '../MoodBeat';
 import { t, L } from '@/lib/portal/i18n';
+import { recordCardFeedback } from '@/lib/portal/reasoning-engine';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { IconCalendar, IconGift, IconNote, IconMic } from '../icons';
@@ -33,6 +34,7 @@ function CollapsedTaskItem({
   onDone,
   onDismiss,
   onDeleteNode,
+  onNotUseful,
   onOpenRecorder,
   onFocusMode,
 }: {
@@ -41,14 +43,16 @@ function CollapsedTaskItem({
   onDone: (node: FocusNode) => void;
   onDismiss: (id: string) => void;
   onDeleteNode?: (id: string) => void;
+  onNotUseful?: (id: string) => void;
   onOpenRecorder?: () => void;
   onFocusMode?: () => void;
 }) {
   const locale = usePortalLocale();
+  const dict = portalLocaleToDictionaryLocale(locale);
   const [expanded, setExpanded] = useState(false);
   const isDone = doneIds.has(node.id);
   const isMeeting = isMeetingNode(node);
-  const hint = focusTimeHint(node, portalLocaleToDictionaryLocale(locale));
+  const hint = focusTimeHint(node, dict);
 
   return (
     <li className={`nesio-collapsed-item${isDone ? ' nesio-collapsed-item--done' : ''}`}>
@@ -64,7 +68,24 @@ function CollapsedTaskItem({
           {hint && <span className="nesio-collapsed-kicker">{hint}</span>}
           <span className="nesio-collapsed-title">{node.name}</span>
         </button>
-        {/* 批次 39:✕ 撤除(用户指令)—— 完成圈/左滑已够 */}
+        {/* 反馈:这条对今天没用 —— 记一条反馈(系统据此学习少推这类)+ 今天不再出现。
+            轻量文字钮,不用红色不制造焦虑(warm-coach);颜色走 token。 */}
+        {onNotUseful && !isDone && (
+          <button
+            type="button"
+            className="nesio-tl-feedback-btn"
+            onClick={(e) => { e.stopPropagation(); onNotUseful(node.id); }}
+            aria-label={L(dict, '反馈:这条今天用不上', 'Feedback: not useful today')}
+            title={L(dict, '这条今天用不上', 'Not useful today')}
+            style={{
+              flexShrink: 0, border: 'none', background: 'transparent',
+              color: 'var(--portal-muted)', fontSize: 'var(--text-xs)',
+              padding: 'var(--space-1) var(--space-2)', cursor: 'pointer', opacity: 0.75,
+            }}
+          >
+            {L(dict, '没用', 'Skip')}
+          </button>
+        )}
       </div>
       {expanded && (
         <div className="nesio-collapsed-detail">
@@ -200,6 +221,13 @@ export function TodayFocusSection({
     setTimeout(() => markFocusNodeDone(node.id), 600);
   }
 
+  // 「没用」反馈:记一条负反馈(reasoning-engine 反馈库 + 事件,供排序/DEC 学习少推这类),
+  // 并当天从今天移除(持久化,次日不复活缠人)。不删节点 —— 记忆页仍在,只是不占今天。
+  function handleNotUseful(id: string) {
+    recordCardFeedback(id, 'wrong');
+    setDismissed((prev) => { const next = new Set(prev); next.add(id); persistDismissed(next); return next; });
+  }
+
   // 批次 32:今日聚焦「至多显示一个」—— 有置顶卡时它就是那一个,折叠区全收进「还有 N 项」;
   // 没置顶卡时露出最靠前的一条(至少一个、至多一个),其余折叠。
   const collapsedNodes: React.ReactNode[] = [
@@ -227,6 +255,7 @@ export function TodayFocusSection({
         onDone={handleDone}
         onDismiss={(id) => setDismissed((prev) => { const next = new Set(prev); next.add(id); persistDismissed(next); return next; })}
         onDeleteNode={onDeleteNode}
+        onNotUseful={handleNotUseful}
         onOpenRecorder={onOpenRecorder ? () => onOpenRecorder(node) : undefined}
         onFocusMode={onFocusMode ? () => onFocusMode(node) : undefined}
       />

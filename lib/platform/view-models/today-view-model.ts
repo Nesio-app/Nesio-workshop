@@ -165,9 +165,15 @@ function isFocusNode(node: LifeNode): boolean {
     // 「不该早早出现」管的是倒计时文字 —— 超 12h 不显示倒计时(CalendarCards)。
     if (diff >= 0 && diff < 48 * 3_600_000) return true;
   }
-  // Explicit "今天/今日" in name or rawInput even without a date attribute
+  // 正文含「今天/今日」——**仅对今天新建的节点**生效。老笔记(几周前记的日记/flomo 导入)
+  // 正文里的「今天」说的是它写下的那天,不是现在;旧代码无条件放进焦点 → 一堆旧笔记涌上今天
+  // 又被标「已过期」(用户实锤两屏)。加「createdAt 是今天」这道闸,保留「刚手写的今天待办
+  // 即时在场」的原意,同时把陈年笔记挡在外面。
   const text = [node.name, node.rawInput || ''].join(' ');
-  if (text.includes('今天') || text.includes('今日')) return true;
+  if (text.includes('今天') || text.includes('今日')) {
+    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
+    if (new Date(node.createdAt).getTime() >= dayStart.getTime()) return true;
+  }
   return false;
 }
 
