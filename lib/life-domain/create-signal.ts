@@ -182,9 +182,13 @@ export function createSignalWithNode(input: CreateSignalInput): { signal: Signal
   // M2:IDB 事实库双写(读路径未切,见 signal-store-idb.ts)。B3:此前 fire-and-forget
   // 无 catch → 写失败静默丢事实;加日志,别再哑吞(离线记的事实进不了库要看得见)。
   // 注意:appendSignalIdb 失败是 resolve(false) 而非 reject,故 .catch 是死代码 —— 必须判返回值。
-  void appendSignalIdb(signal)
-    .then((ok) => { if (!ok) logDropped('signal.idb_write', 'put returned false'); })
-    .catch((err) => logDropped('signal.idb_write', err));
+  // IndexedDB 只在浏览器端存在;服务端(Alexa/Shortcuts ingest 等)本就无本地事实库,
+  // 云写才是真持久化 —— 服务端跳过,别把「预期性缺失」误报成 dropped 刷屏。
+  if (typeof indexedDB !== 'undefined') {
+    void appendSignalIdb(signal)
+      .then((ok) => { if (!ok) logDropped('signal.idb_write', 'put returned false'); })
+      .catch((err) => logDropped('signal.idb_write', err));
+  }
   if (signalWriteMode() === 'cloud_mirror_pending') {
     void writeCloudSignal(signal);
   }

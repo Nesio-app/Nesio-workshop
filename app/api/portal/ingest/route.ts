@@ -45,7 +45,9 @@ function isIngestAllowed(req: NextRequest, bodySecret?: string): boolean {
 }
 
 async function extractNodes(source: string, content: string): Promise<{ nodes: object[]; summary: string }> {
-  if (!aiProviderAvailable()) {
+  // Alexa 语音捕获只关心「存没存进云 signals」,不消费抽取出的 nodes/summary —— 那次
+  // Gemini 调用纯浪费(~$0.0001 + ~850ms 延迟拖慢语音回应)。走规则兜底,省钱又更快。
+  if (!aiProviderAvailable() || source === 'alexa') {
     // Rule-based fallback
     return {
       nodes: [{
