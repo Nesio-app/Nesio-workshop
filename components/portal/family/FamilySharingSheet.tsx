@@ -12,8 +12,8 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale, loadProfileSettings } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import {
-  listFamilies, createFamily, joinFamily, getBoard, getLedger, choreAction, recordPayout, syncMyFamilyProfile,
-  type FamilySummary, type BoardView, type LedgerView, type ChoreInstanceView,
+  listFamilies, createFamily, joinFamily, getBoard, getLedger, choreAction, recordPayout, syncMyFamilyProfile, setMyGoal,
+  type FamilySummary, type FamilyMemberView, type BoardView, type LedgerView, type ChoreInstanceView,
 } from '@/lib/family/family-client';
 
 type View = { kind: 'board' } | { kind: 'ledger'; personId: string; personName: string };
@@ -192,6 +192,72 @@ function InviteSection({ inviteCode, t }: { inviteCode: string; t: (a: string, b
   );
 }
 
+// ── 我的攒钱目标(孩子端动机 · 复用 .nesio-reward-progress)────────────────────────
+function GoalSection({ familyId, me, owed, onSaved, t }: {
+  familyId: string; me: FamilyMemberView; owed: number; onSaved: () => void; t: (a: string, b: string) => string;
+}) {
+  const goal = me.goalAmount ?? 0;
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState(goal ? String(goal) : '');
+  const [label, setLabel] = useState(me.goalLabel ?? '');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+
+  async function save() {
+    const amt = Number(amount);
+    setBusy(true); setErr('');
+    const r = await setMyGoal(familyId, amt > 0 ? amt : 0, label.trim());
+    setBusy(false);
+    if (!r.ok) { setErr(t('没存上,再试一次。', 'Could not save — try again.')); return; }
+    setOpen(false); onSaved();
+  }
+
+  if (open) {
+    return (
+      <div style={{ ...cardStyle, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>{t('攒够钱想买什么?', 'Saving up for what?')}</p>
+        <input style={inputStyle} placeholder={t('想要的东西(如「乐高」)', 'What you want (e.g. Lego)')} value={label} onChange={(e) => setLabel(e.target.value)} />
+        <input style={inputStyle} inputMode="decimal" placeholder={t('目标金额 $', 'Goal amount $')} value={amount} onChange={(e) => setAmount(e.target.value)} />
+        {err && <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}>{err}</span>}
+        <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+          <button type="button" onClick={save} disabled={busy} style={primaryBtn}>{busy ? t('保存中…', 'Saving…') : t('定下目标', 'Set goal')}</button>
+          {goal > 0 && <button type="button" onClick={() => { setAmount(''); void setMyGoal(familyId, 0, '').then(onSaved); setOpen(false); }} style={ghostBtn}>{t('取消目标', 'Clear')}</button>}
+          <button type="button" onClick={() => { setOpen(false); setErr(''); }} style={ghostBtn}>{t('返回', 'Back')}</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (!goal) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} style={{ ...ghostBtn, alignSelf: 'flex-start' }}>
+        🎯 {t('设一个攒钱目标', 'Set a savings goal')}
+      </button>
+    );
+  }
+
+  const reached = owed >= goal;
+  const pct = Math.max(0, Math.min(100, Math.round((owed / goal) * 100)));
+  return (
+    <div style={{ ...cardStyle, padding: 'var(--space-4)', background: reached ? 'var(--status-go-soft)' : 'var(--portal-accent-soft)', borderColor: 'transparent' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+        <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)' as unknown as number, color: 'var(--portal-ink)' }}>
+          {reached ? '🎉 ' : '🎯 '}{me.goalLabel || t('攒钱目标', 'Savings goal')}
+        </span>
+        <button type="button" onClick={() => setOpen(true)} style={{ border: 'none', background: 'transparent', color: 'var(--portal-accent)', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>{t('改', 'Edit')}</button>
+      </div>
+      <div className="nesio-reward-progress" style={{ marginTop: 'var(--space-2)' }}>
+        <div className="nesio-reward-progress-fill" style={{ width: `${pct}%`, background: reached ? 'var(--status-go)' : 'var(--portal-blue-deep)' }} />
+      </div>
+      <p className="nesio-reward-progress-label" style={{ color: reached ? 'var(--status-go)' : 'var(--portal-muted)' }}>
+        {reached
+          ? t(`攒够了!可以买 ${me.goalLabel || '它'} 了 🎉`, `Goal reached — you can get ${me.goalLabel || 'it'}! 🎉`)
+          : t(`${money(owed)} / ${money(goal)} · 还差 ${money(Math.max(0, goal - owed))}`, `${money(owed)} / ${money(goal)} · ${money(Math.max(0, goal - owed))} to go`)}
+      </p>
+    </div>
+  );
+}
+
 // ── 家庭板 ────────────────────────────────────────────────────────────────────
 function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
   familyId: string; families: FamilySummary[];
@@ -238,6 +304,9 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, t }: {
       )}
 
       {err && <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}>{t('那一下没成,再试一次。', 'That didn’t go through — try again.')}</span>}
+
+      {/* 我的攒钱目标(孩子端动机):攒够就买 XX。进度 = 现攒 / 目标。 */}
+      <GoalSection familyId={familyId} me={board.me} owed={board.everyone.find((e) => e.member.id === board.me.id)?.owed ?? 0} onSaved={load} t={t} />
 
       <InviteSection inviteCode={families.find((f) => f.familyId === familyId)?.inviteCode ?? ''} t={t} />
 

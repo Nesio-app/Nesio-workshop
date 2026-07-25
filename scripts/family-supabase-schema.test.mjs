@@ -45,6 +45,9 @@ for (const marker of [
   // 成员身份自成一套:邮箱(早期 People 配对,已解耦保留)+ 头像(来自成员自己的账号资料)
   'ADD COLUMN IF NOT EXISTS email text',
   'ADD COLUMN IF NOT EXISTS avatar_url text',
+  // 攒钱目标(孩子端动机)
+  'ADD COLUMN IF NOT EXISTS goal_amount numeric',
+  'ADD COLUMN IF NOT EXISTS goal_label text',
 ]) {
   assert.match(schema, new RegExp(esc(marker)), `family schema missing marker: ${marker}`);
 }

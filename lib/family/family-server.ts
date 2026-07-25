@@ -64,12 +64,17 @@ async function restPatch<T>(config: CloudRuntimeConfig, table: string, query: st
 }
 
 // ── 行类型(DB 快照)────────────────────────────────────────────────────────────
-interface MemberRow { family_id: string; user_id: string; display_name: string; can_approve: boolean; needs_approval: boolean; can_record_payout: boolean; email: string | null; avatar_url: string | null; }
+interface MemberRow { family_id: string; user_id: string; display_name: string; can_approve: boolean; needs_approval: boolean; can_record_payout: boolean; email: string | null; avatar_url: string | null; goal_amount: number | null; goal_label: string | null; }
 interface InstanceRow { id: string; family_id: string; template_id: string | null; assignee_user_id: string | null; due_date: string; value: number; state: ChoreState; needs_approval: boolean; done_at: string | null; approved_at: string | null; proof_asset_ref: string | null; title: string | null; source_event_id: string | null; }
 interface PayoutRow { id: string; family_id: string; person_user_id: string | null; amount: number; date: string; note: string | null; }
 
 function memberFromRow(r: MemberRow): FamilyMember {
-  return { id: r.user_id, name: r.display_name, canApprove: r.can_approve, needsApproval: r.needs_approval, canRecordPayout: r.can_record_payout, avatarUrl: r.avatar_url ?? undefined };
+  return {
+    id: r.user_id, name: r.display_name, canApprove: r.can_approve, needsApproval: r.needs_approval, canRecordPayout: r.can_record_payout,
+    avatarUrl: r.avatar_url ?? undefined,
+    goalAmount: r.goal_amount != null ? Number(r.goal_amount) : undefined,
+    goalLabel: r.goal_label ?? undefined,
+  };
 }
 /** 成员 + 账号邮箱(供拥有者本地按邮箱配到 People 的 person 节点)。 */
 export interface FamilyMemberWithEmail extends FamilyMember { email: string; }
@@ -308,6 +313,21 @@ export async function syncMyProfileOp(actor: FamilyActor, input: { displayName?:
   const rows = await restPatch<MemberRow>(actor.config, 'family_members', `user_id=eq.${actor.userId}`, patch);
   if (rows === null) return fail('upstream', 502);
   return { ok: true, value: { updated: rows.length } };
+}
+
+/** 设「我」自己在某家庭的攒钱目标(攒够 amount 买 label)。只能设自己的。amount<=0 = 清除目标。 */
+export async function setMyGoalOp(actor: FamilyActor, input: { familyId: string; amount: number; label: string }): Promise<FamilyResult<{ ok: true }>> {
+  const gate = await requireMember(actor, input.familyId);
+  if (!gate.ok) return gate;
+  const amount = Number(input.amount);
+  const label = (input.label || '').trim().slice(0, 40);
+  const patch = amount > 0 && Number.isFinite(amount)
+    ? { goal_amount: amount, goal_label: label || null }
+    : { goal_amount: null, goal_label: null };
+  const saved = await restPatch<MemberRow>(actor.config, 'family_members',
+    `family_id=eq.${input.familyId}&user_id=eq.${actor.userId}`, patch);
+  if (saved === null) return fail('upstream', 502);
+  return { ok: true, value: { ok: true } };
 }
 
 /** 家庭全体成员(供「分派给家人」选人)。名字/头像来自各成员自己的账号资料。任何成员可读。 */
