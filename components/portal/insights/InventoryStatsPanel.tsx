@@ -8,6 +8,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { listInventoryItems, inventoryStats, sellPile, amazonSummary, type InventoryItem } from '@/lib/portal/inventory';
+import { isFoodItem } from '@/lib/cooking/pantry';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -17,7 +18,8 @@ export default function InventoryStatsPanel() {
   const [items, setItems] = useState<InventoryItem[]>([]);
 
   useEffect(() => {
-    const load = () => { try { setItems(listInventoryItems()); } catch { setItems([]); } };
+    // 食材归「做饭·库存」脸,物品统计排除,免得库存数/估值把菠菜也算进去。
+    const load = () => { try { setItems(listInventoryItems().filter((i) => !isFoodItem(i))); } catch { setItems([]); } };
     load();
     window.addEventListener('nesio-life-graph-updated', load);
     window.addEventListener('nesio-connectors-refreshed', load);

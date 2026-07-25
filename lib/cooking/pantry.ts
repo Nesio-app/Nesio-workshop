@@ -25,8 +25,17 @@ import {
 export { daysLeftOf, expiringPantry, PANTRY_CATEGORIES } from './pantry-core';
 export type { PantryItem, PantryCategory } from './pantry-core';
 
-/** 域标:标记一件 object 节点是「食材」(在收纳的「收纳」标之外再加一枚)。 */
-export const PANTRY_TAG = '食材';
+/**
+ * 「食材」是**后台子类**(attributes.subtype),不是可见标签 —— 属性从不渲染成 chip,
+ * 所以库存食材不会在物品页/记忆卡上冒出「食材」小标签。listPantry 收它、物品页排除它,
+ * 同一张图两张脸靠这一个判定分开(isFoodItem),不重复不孤岛。
+ */
+export const PANTRY_SUBTYPE = '食材';
+
+/** 一件物品是不是食材(做饭页收、物品页排除的唯一判定)。兼容早期用 tag 标的历史项。 */
+export function isFoodItem(i: InventoryItem): boolean {
+  return i.subtype === PANTRY_SUBTYPE || i.tags.includes(PANTRY_SUBTYPE);
+}
 
 function toPantryItem(i: InventoryItem, now: Date): PantryItem {
   return {
@@ -35,10 +44,10 @@ function toPantryItem(i: InventoryItem, now: Date): PantryItem {
   };
 }
 
-/** 全部食材(打了「食材」标的 object 节点),快过期在前、其余按名。 */
+/** 全部食材(subtype=食材 的 object 节点),快过期在前、其余按名。 */
 export function listPantry(now = new Date()): PantryItem[] {
   const items = listInventoryItems()
-    .filter((i) => i.tags.includes(PANTRY_TAG))
+    .filter(isFoodItem)
     .map((i) => toPantryItem(i, now));
   return sortPantry(items);
 }
@@ -47,7 +56,7 @@ export interface NewPantryItem {
   name: string; quantity?: number; expiry?: string; location?: string; category?: string;
 }
 
-/** 进货:加一件食材(带「食材」标 → 自动进过期提醒 + 云同步)。返回新节点 id。 */
+/** 进货:加一件食材(subtype=食材,后台标 → 自动进过期提醒 + 云同步)。返回新节点 id。 */
 export function addPantry(input: NewPantryItem): string {
   const node = addInventoryItem({
     name: input.name,
@@ -55,7 +64,7 @@ export function addPantry(input: NewPantryItem): string {
     expiry: input.expiry,
     location: input.location,
     category: input.category,
-    tags: [PANTRY_TAG],
+    subtype: PANTRY_SUBTYPE,
   });
   return node.id;
 }

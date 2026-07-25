@@ -57,6 +57,7 @@ export interface InventoryItem {
   price: number | null;
   hasPhoto: boolean;
   category: string;      // 物品①:分类('' = 未分类)
+  subtype: string;       // 后台子类(flight/passport… / 食材);不渲染成标签,只做分面判定
   tags: string[];        // 物品①:物品标签(node.tags 去掉域标「收纳」)
   forSale: boolean;      // 物品③:标记出售(进卖闲置堆)
   isContainer: boolean;  // 物品④:这件物品本身是容器(收纳箱等),其他物品位置可写它
@@ -108,6 +109,7 @@ export function toInventoryItem(node: LifeNode): InventoryItem {
     price: num(a.price),
     hasPhoto: Boolean(node.assets?.some((as) => as.kind === 'image')),
     category: str(a.category).trim(),
+    subtype: str(a.subtype).trim(),
     tags: (node.tags || []).filter((t) => t && t !== '收纳'),
     forSale: a.forSale === true,
     isContainer: a.isContainer === true,
@@ -221,6 +223,7 @@ export interface NewInventoryItem {
   expiry?: string; // 'YYYY-MM-DD'
   note?: string;
   category?: string; // 物品①:分类
+  subtype?: string;  // 后台子类(如 食材);不显示成标签
   tags?: string[];   // 物品①:标签
   price?: number;    // 物品①:估值(单件)
   forSale?: boolean; // 物品③:标记出售
@@ -249,6 +252,7 @@ export function addInventoryItem(input: NewInventoryItem): LifeNode {
   if (input.expiry?.trim()) attributes.expiry = input.expiry.trim();
   if (input.note?.trim()) attributes.note = input.note.trim();
   if (input.category?.trim()) attributes.category = input.category.trim();
+  if (input.subtype?.trim()) attributes.subtype = input.subtype.trim();
   if (input.price != null && Number.isFinite(input.price)) attributes.price = input.price;
   if (input.forSale) attributes.forSale = true; // 物品③
   // 亚马逊转卖字段(创建时可由截图/文字抽取预填)
