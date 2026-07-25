@@ -166,7 +166,7 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
   if (phase.s === 'loading' || phase.s === 'saving') {
     return (
       <div className="nesio-nd-photo-add">
-        <button type="button" className="nesio-node-action-secondary nesio-nd-photo-btn" disabled>
+        <button type="button" className="nesio-node-action-secondary nesio-nd-photo-btn" disabled={true}>
           {phase.s === 'saving' ? t('分派中…', 'Assigning…') : t('加载中…', 'Loading…')}
         </button>
       </div>
