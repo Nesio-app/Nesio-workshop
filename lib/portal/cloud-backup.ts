@@ -163,6 +163,12 @@ function gunzipToString(bytes: Uint8Array): string | null {
   try { return strFromU8(gunzipSync(bytes)); } catch { return null; }
 }
 
+/** 网络抖动重试次数(手机弱网/通话中传输易中断,自动重试省得用户反复手点)。 */
+const NETWORK_RETRIES = 2;
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => { setTimeout(resolve, ms); });
+}
+
 /**
  * 一键推送:组装 → 上传到用户云账户。成功后记 last-backup(供 UI 显示"上次同步")。
  * 每个失败分支都返回明确 error code —— UI 必须据此渲染可见失败态(设计红线)。
@@ -206,23 +212,32 @@ export async function pushBackupToCloud(opts: { skipIfFewerThan?: number } = {})
   // 本地预检:压缩后仍超 8MB 才给明确态,不白跑一趟网络(路由也会 413 兜底)。
   if (bytes > CLOUD_UPLOAD_LIMIT_BYTES) return { ok: false, error: 'too_large', bytes, entryCount };
 
-  try {
-    const file = new File([uploadBody as BlobPart], gz ? 'nesio-backup.json.gz' : 'nesio-backup.json', { type: 'text/plain' });
-    const form = new FormData();
-    form.append('file', file);
-    form.append('purpose', 'backup');
-    const res = await fetch('/api/cloud/assets', { method: 'POST', body: form, cache: 'no-store' });
-    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; storagePath?: string; error?: string };
-    if (!res.ok || !data.ok || !data.storagePath) {
-      return { ok: false, error: mapHttpError(res.status), bytes, entryCount };
+  // 弱网重试:上传中断/超时(手机弱网、通话中)自动重试,不必用户反复手点。
+  // 只重试网络抛错与 5xx(upload_failed);401/413/503 是终态,不重试。
+  let lastError: CloudBackupError = 'network';
+  for (let attempt = 0; attempt <= NETWORK_RETRIES; attempt++) {
+    if (attempt > 0) await sleep(400 * attempt);
+    try {
+      const file = new File([uploadBody as BlobPart], gz ? 'nesio-backup.json.gz' : 'nesio-backup.json', { type: 'text/plain' });
+      const form = new FormData();
+      form.append('file', file);
+      form.append('purpose', 'backup');
+      const res = await fetch('/api/cloud/assets', { method: 'POST', body: form, cache: 'no-store' });
+      const data = (await res.json().catch(() => ({}))) as { ok?: boolean; storagePath?: string; error?: string };
+      if (!res.ok || !data.ok || !data.storagePath) {
+        lastError = mapHttpError(res.status);
+        if (res.status === 401 || res.status === 413 || res.status === 503) break; // 终态不重试
+        continue; // 5xx:重试
+      }
+      const at = new Date().toISOString();
+      const record: LastCloudBackup = { at, storagePath: data.storagePath, bytes, entryCount };
+      try { localStorage.setItem(LAST_CLOUD_BACKUP_KEY, JSON.stringify(record)); } catch { /* quota */ }
+      return { ok: true, storagePath: data.storagePath, at, bytes, entryCount };
+    } catch {
+      lastError = 'network'; // fetch 抛错:重试
     }
-    const at = new Date().toISOString();
-    const record: LastCloudBackup = { at, storagePath: data.storagePath, bytes, entryCount };
-    try { localStorage.setItem(LAST_CLOUD_BACKUP_KEY, JSON.stringify(record)); } catch { /* quota */ }
-    return { ok: true, storagePath: data.storagePath, at, bytes, entryCount };
-  } catch {
-    return { ok: false, error: 'network', bytes, entryCount };
   }
+  return { ok: false, error: lastError, bytes, entryCount };
 }
 
 // ── 恢复(pull)────────────────────────────────────────────────────────────────
