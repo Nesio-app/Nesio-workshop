@@ -11,6 +11,7 @@ import type { NextRequest } from 'next/server';
 import { getCloudConfig, getSignedInUser, serviceRoleRestHeaders, type CloudRuntimeConfig } from '@/lib/portal/cloud-server-runtime';
 import {
   markChoreDone, approveChore, sendBackChore, memberCan, computeBalance, generateDueInstances,
+  cadenceDue, addDays,
   type FamilyMember, type ChoreInstance, type Payout, type ChoreState, type Cadence,
 } from '@/lib/family/chores-core';
 
@@ -63,18 +64,24 @@ async function restPatch<T>(config: CloudRuntimeConfig, table: string, query: st
 }
 
 // ── 行类型(DB 快照)────────────────────────────────────────────────────────────
-interface MemberRow { family_id: string; user_id: string; display_name: string; can_approve: boolean; needs_approval: boolean; can_record_payout: boolean; }
-interface InstanceRow { id: string; family_id: string; template_id: string | null; assignee_user_id: string | null; due_date: string; value: number; state: ChoreState; needs_approval: boolean; done_at: string | null; approved_at: string | null; proof_asset_ref: string | null; }
+interface MemberRow { family_id: string; user_id: string; display_name: string; can_approve: boolean; needs_approval: boolean; can_record_payout: boolean; email: string | null; }
+interface InstanceRow { id: string; family_id: string; template_id: string | null; assignee_user_id: string | null; due_date: string; value: number; state: ChoreState; needs_approval: boolean; done_at: string | null; approved_at: string | null; proof_asset_ref: string | null; title: string | null; source_event_id: string | null; }
 interface PayoutRow { id: string; family_id: string; person_user_id: string | null; amount: number; date: string; note: string | null; }
 
 function memberFromRow(r: MemberRow): FamilyMember {
   return { id: r.user_id, name: r.display_name, canApprove: r.can_approve, needsApproval: r.needs_approval, canRecordPayout: r.can_record_payout };
+}
+/** 成员 + 账号邮箱(供拥有者本地按邮箱配到 People 的 person 节点)。 */
+export interface FamilyMemberWithEmail extends FamilyMember { email: string; }
+function memberWithEmailFromRow(r: MemberRow): FamilyMemberWithEmail {
+  return { ...memberFromRow(r), email: (r.email ?? '').toLowerCase() };
 }
 function instanceFromRow(r: InstanceRow): ChoreInstance {
   return {
     id: r.id, templateId: r.template_id ?? '', assigneeId: r.assignee_user_id ?? '', dueDate: r.due_date,
     value: Number(r.value), state: r.state, needsApproval: r.needs_approval,
     doneAt: r.done_at ?? undefined, approvedAt: r.approved_at ?? undefined, proofPhotoRef: r.proof_asset_ref ?? undefined,
+    title: r.title ?? undefined, sourceEventId: r.source_event_id ?? undefined,
   };
 }
 function payoutFromRow(r: PayoutRow): Payout {
@@ -82,7 +89,7 @@ function payoutFromRow(r: PayoutRow): Payout {
 }
 
 // ── 登录 + 成员解析 ───────────────────────────────────────────────────────────
-export interface FamilyActor { config: CloudRuntimeConfig; userId: string; }
+export interface FamilyActor { config: CloudRuntimeConfig; userId: string; email: string; }
 
 /** 解析登录用户(未配置/未登录 fail-closed)。 */
 export async function resolveActor(_req: NextRequest): Promise<FamilyResult<FamilyActor>> {
@@ -90,7 +97,7 @@ export async function resolveActor(_req: NextRequest): Promise<FamilyResult<Fami
   if (!config.configured) return fail('not_configured', 503);
   const { user } = await getSignedInUser(config);
   if (!user?.id) return fail('not_signed_in', 401);
-  return { ok: true, value: { config, userId: user.id } };
+  return { ok: true, value: { config, userId: user.id, email: (user.email ?? '').toLowerCase() } };
 }
 
 /** 取 actor 在某家庭的成员行(非成员 → not_member,fail-closed)。 */
@@ -122,7 +129,7 @@ export async function createFamily(actor: FamilyActor, input: { name: string; di
   if (!famRows?.length) return fail('upstream', 502);
   const familyId = famRows[0].id;
   const memberRows = await restInsert<MemberRow>(actor.config, 'family_members', {
-    family_id: familyId, user_id: actor.userId, display_name: displayName,
+    family_id: familyId, user_id: actor.userId, display_name: displayName, email: actor.email || null,
     can_approve: true, needs_approval: false, can_record_payout: true,
   });
   if (!memberRows?.length) return fail('upstream', 502);
@@ -142,7 +149,7 @@ export async function joinFamily(actor: FamilyActor, input: { inviteCode: string
   const existing = await restGet<MemberRow>(actor.config, 'family_members', `family_id=eq.${familyId}&user_id=eq.${actor.userId}&select=user_id`);
   if (existing?.length) return { ok: true, value: { familyId } };
   const rows = await restInsert<MemberRow>(actor.config, 'family_members', {
-    family_id: familyId, user_id: actor.userId, display_name: displayName,
+    family_id: familyId, user_id: actor.userId, display_name: displayName, email: actor.email || null,
     can_approve: false, needs_approval: true, can_record_payout: false,
   });
   if (!rows?.length) return fail('upstream', 502);
@@ -282,6 +289,102 @@ export async function createChoreTemplateOp(
     if (inserted === null) return fail('upstream', 502);
   }
   return { ok: true, value: { templateId, generated: rows.length } };
+}
+
+/** 家庭全体成员 + 账号邮箱(供「分派给家人」选人 + 拥有者本地按邮箱配 People)。任何成员可读。 */
+export async function listFamilyMembersOp(actor: FamilyActor, familyId: string): Promise<FamilyResult<{ familyId: string; me: FamilyMemberWithEmail; members: FamilyMemberWithEmail[] }>> {
+  const gate = await requireMember(actor, familyId);
+  if (!gate.ok) return gate;
+  // 自愈:老成员行没存邮箱(建列之前入伙的)→ 用当前登录邮箱补上自己那行,配对才有料。
+  if (!gate.value.email && actor.email) {
+    await restPatch<MemberRow>(actor.config, 'family_members',
+      `family_id=eq.${familyId}&user_id=eq.${actor.userId}`, { email: actor.email });
+    gate.value.email = actor.email;
+  }
+  const rows = await restGet<MemberRow>(actor.config, 'family_members', `family_id=eq.${familyId}&select=*`);
+  if (rows === null) return fail('upstream', 502);
+  return { ok: true, value: { familyId, me: memberWithEmailFromRow(gate.value), members: rows.map(memberWithEmailFromRow) } };
+}
+
+/**
+ * 闭环起点:把一条日历事件(记忆节点)分派给某个家庭成员。
+ * 分派是**互相的** —— 任何家庭成员都能把活派给任何成员(孩子也能给爸妈派)。只要是本家庭成员即可。
+ * (真正的「谁能审核/记账」仍是家长动作,在 applyChoreAction/recordPayout 里按 can_approve 强制。)
+ * 一事件一实例:按 (family_id, source_event_id) upsert —— 再点即改派,不重复生成。
+ * 改派给新的人 → 状态复位 todo(旧的完成/审核不带过去)。
+ */
+const ASSIGN_HORIZON_DAYS = 14;   // 周期分派向前铺的窗口
+
+/** 按 source_event_id 幂等 upsert 一条事件家务实例(改派给新的人则复位 todo)。 */
+async function upsertEventInstance(
+  config: CloudRuntimeConfig, familyId: string,
+  d: { sourceEventId: string; title: string; dueDate: string; assigneeId: string; value: number; needsApproval: boolean },
+): Promise<FamilyResult<ChoreInstance>> {
+  const existing = await restGet<InstanceRow>(config, 'family_chore_instances',
+    `family_id=eq.${familyId}&source_event_id=eq.${encodeURIComponent(d.sourceEventId)}&deleted_at=is.null&select=*`);
+  if (existing === null) return fail('upstream', 502);
+  if (existing.length) {
+    const reassigned = existing[0].assignee_user_id !== d.assigneeId;
+    const patch: Record<string, unknown> = {
+      assignee_user_id: d.assigneeId, title: d.title, due_date: d.dueDate, value: d.value, needs_approval: d.needsApproval,
+      updated_at: new Date().toISOString(),
+      // 改派给新的人:旧完成/审核不带过去,复位 todo。派回原人:保持现状。
+      ...(reassigned ? { state: 'todo', done_at: null, approved_at: null, proof_asset_ref: null } : {}),
+    };
+    const saved = await restPatch<InstanceRow>(config, 'family_chore_instances',
+      `id=eq.${existing[0].id}&family_id=eq.${familyId}`, patch);
+    if (!saved?.length) return fail('upstream', 502);
+    return { ok: true, value: instanceFromRow(saved[0]) };
+  }
+  const inserted = await restInsert<InstanceRow>(config, 'family_chore_instances', {
+    family_id: familyId, template_id: null, assignee_user_id: d.assigneeId,
+    due_date: d.dueDate, value: d.value, state: 'todo', needs_approval: d.needsApproval,
+    title: d.title, source_event_id: d.sourceEventId,
+  });
+  if (!inserted?.length) return fail('upstream', 502);
+  return { ok: true, value: instanceFromRow(inserted[0]) };
+}
+
+export async function assignChoreFromEventOp(
+  actor: FamilyActor,
+  input: { familyId: string; sourceEventId: string; title: string; dueDate: string; assigneeId: string; value?: number; needsApproval?: boolean; cadence?: Cadence },
+): Promise<FamilyResult<ChoreInstance>> {
+  const gate = await requireMember(actor, input.familyId);
+  if (!gate.ok) return gate;   // 成员即可分派;不要求 can_approve(互相分派)
+
+  const baseEventId = (input.sourceEventId || '').trim();
+  const title = (input.title || '').trim();
+  const dueDate = (input.dueDate || '').trim();
+  const assigneeId = (input.assigneeId || '').trim();
+  const value = Number.isFinite(input.value) && (input.value as number) >= 0 ? (input.value as number) : 0;
+  const needsApproval = input.needsApproval !== false;
+  const cadence: Cadence = input.cadence ?? { kind: 'once' };
+  if (!baseEventId || !title || !assigneeId || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return fail('bad_request', 400);
+
+  // 被分派人必须是本家庭成员(fail-closed:不给外人塞活)。
+  const target = await restGet<MemberRow>(actor.config, 'family_members', `family_id=eq.${input.familyId}&user_id=eq.${assigneeId}&select=user_id`);
+  if (target === null) return fail('upstream', 502);
+  if (!target.length) return fail('bad_request', 400);
+
+  const common = { title, assigneeId, value, needsApproval };
+
+  // 一次性:一事件一实例(source_event_id = 记忆节点 id)。
+  if (cadence.kind === 'once') {
+    return upsertEventInstance(actor.config, input.familyId, { ...common, sourceEventId: baseEventId, dueDate });
+  }
+
+  // 周期:向前铺一个窗口,每个到期日各一条(source key = `${节点id}#${日期}`,天然去重 + 可改派)。
+  // 复用 cadenceDue —— 吃到 chores-core 的周期机制,不再「明天得再派一次」。
+  const toKey = addDays(dueDate, ASSIGN_HORIZON_DAYS - 1);
+  let primary: ChoreInstance | null = null;
+  for (let cursor = dueDate, guard = 0; guard < 400 && cursor <= toKey; guard++, cursor = addDays(cursor, 1)) {
+    if (!cadenceDue(cadence, cursor, dueDate)) continue;
+    const r = await upsertEventInstance(actor.config, input.familyId, { ...common, sourceEventId: `${baseEventId}#${cursor}`, dueDate: cursor });
+    if (!r.ok) return r;
+    if (!primary) primary = r.value;
+  }
+  if (!primary) return fail('bad_request', 400);   // 窗口内没有任何到期日(理论上不会发生)
+  return { ok: true, value: primary };
 }
 
 /** 记一笔线下现金冲账。能力 can_record_payout 服务端强制;金额恒正。永不是转账。 */

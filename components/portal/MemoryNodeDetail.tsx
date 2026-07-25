@@ -15,6 +15,8 @@ import { displayNodeName } from '@/lib/portal/node-display';
 import dynamicImport from 'next/dynamic';
 const ReaderSheetLazy = dynamicImport(() => import('./ArticleReaderSheet'), { ssr: false });
 const PlacePickerLazy = dynamicImport(() => import('./PlacePickerSheet'), { ssr: false });
+const AssignChoreLazy = dynamicImport(() => import('./family/AssignChoreButton'), { ssr: false });
+const FamilyPersonSummaryLazy = dynamicImport(() => import('./family/FamilyPersonSummary'), { ssr: false });
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
@@ -1092,6 +1094,11 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
             </div>
           )}
 
+          {/* 闭环起点:日历/承诺类记忆可「分派给家人」(→ 对方今天页看到 → 做完你今天页收到回响)。 */}
+          {!editing && (n.type === 'event' || n.type === 'commitment') && (
+            <AssignChoreLazy node={n} />
+          )}
+
           {/* 批次 70:关联链 —— 行程↔邮件自动挂钩、计划容器↔条目,点开跳转;
               批次 73:手动增删关联(删除自动连线 = 反馈信号,本地留痕) */}
           {(() => {
@@ -1196,7 +1203,11 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
 
           {/* Type-specific section */}
           {n.type === 'person' && (
-            <PersonSection node={n} relatedNodes={relatedNodes} onOpenNode={onOpenNode} />
+            <>
+              <PersonSection node={n} relatedNodes={relatedNodes} onOpenNode={onOpenNode} />
+              {/* item 6:若这个人已按邮箱配到某家庭成员,显示 TA 的家务/攒钱回落。 */}
+              <FamilyPersonSummaryLazy personNodeId={n.id} />
+            </>
           )}
           {n.type === 'object' && (
             <ObjectSection node={n} assetUrls={assetUrls} />

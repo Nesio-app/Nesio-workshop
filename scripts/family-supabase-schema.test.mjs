@@ -39,6 +39,11 @@ for (const marker of [
   'public.is_family_member(family_id, auth.uid())',
   // 幂等 upsert 键
   'UNIQUE (family_id, template_id, due_date)',
+  // 闭环「日历家务 → 分派给家人」:补列 + 一事件一实例去重键(可改派)
+  'ADD COLUMN IF NOT EXISTS source_event_id text',
+  'uniq_family_chore_source_event',
+  // item 6:成员邮箱(供拥有者本地按邮箱配到 People 的 person 节点)
+  'ADD COLUMN IF NOT EXISTS email text',
 ]) {
   assert.match(schema, new RegExp(esc(marker)), `family schema missing marker: ${marker}`);
 }

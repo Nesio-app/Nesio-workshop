@@ -292,6 +292,7 @@ function nameFor(board: BoardView, personId: string): string {
   return board.everyone.find((e) => e.member.id === personId)?.member.name ?? '';
 }
 function choreTitle(c: ChoreInstanceView, t: (a: string, b: string) => string): string {
+  if (c.title && c.title.trim()) return c.title.trim();          // 日历事件分派而来:显示原标题
   return c.templateId ? t('家务', 'Chore') + ` · ${c.dueDate}` : c.dueDate;
 }
 

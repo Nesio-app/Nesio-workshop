@@ -63,9 +63,13 @@ CREATE TABLE IF NOT EXISTS public.family_members (
   can_approve boolean NOT NULL DEFAULT false,
   needs_approval boolean NOT NULL DEFAULT true,
   can_record_payout boolean NOT NULL DEFAULT false,
+  email text,                 -- 成员自报的账号邮箱(入伙时本人写自己的);供拥有者本地把成员配到 People 的 person 节点
   joined_at timestamptz NOT NULL DEFAULT now(),
   PRIMARY KEY (family_id, user_id)
 );
+
+-- 反复应用安全:老表补列(People ↔ 家庭成员 按邮箱自动配对用)。
+ALTER TABLE public.family_members ADD COLUMN IF NOT EXISTS email text;
 
 CREATE INDEX IF NOT EXISTS idx_family_members_user
   ON public.family_members (user_id);
@@ -126,11 +130,22 @@ CREATE TABLE IF NOT EXISTS public.family_chore_instances (
   approved_at timestamptz,
   paid_at timestamptz,
   proof_asset_ref text,
+  title text,                 -- 由日历事件分派而来的家务:留原事件标题(模板家务为空,按 template 显示)
+  source_event_id text,       -- 关联的来源记忆节点 id(日历事件)。一事件一实例的去重键。
   updated_at timestamptz NOT NULL DEFAULT now(),
   created_at timestamptz NOT NULL DEFAULT now(),
   deleted_at timestamptz,
   UNIQUE (family_id, template_id, due_date)
 );
+
+-- 反复应用安全:老表补列(闭环「日历家务 → 分派给家人」用)。
+ALTER TABLE public.family_chore_instances ADD COLUMN IF NOT EXISTS title text;
+ALTER TABLE public.family_chore_instances ADD COLUMN IF NOT EXISTS source_event_id text;
+
+-- 一个家庭里,一条来源日历事件只对应一条家务实例 → 再点「分派」= 改派(upsert),不重复生成。
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_family_chore_source_event
+  ON public.family_chore_instances (family_id, source_event_id)
+  WHERE source_event_id IS NOT NULL AND deleted_at IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_family_chore_instances_family
   ON public.family_chore_instances (family_id, due_date DESC)
