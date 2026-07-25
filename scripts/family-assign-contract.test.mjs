@@ -25,9 +25,11 @@ assert.doesNotMatch(
   'assign must NOT be gated by can_approve — any member can assign (mutual).',
 );
 // 一事件一实例:按来源去重(upsert / patch existing by source_event_id)
-assert.match(server, /source_event_id=eq\.\$\{sourceEventId\}/, 'assign must look up existing instance by source_event_id (one-per-event).');
+assert.match(server, /source_event_id=eq\./, 'assign must look up existing instance by source_event_id (one-per-event).');
 // 被分派人必须是本家庭成员(不给外人塞活)
 assert.match(server, /family_members[^\n]*user_id=eq\.\$\{assigneeId\}/, 'assign must verify assignee is a family member.');
+// 吃到 chores-core 的周期机制(每天/每周向前铺,不用天天重派)
+assert.match(server, /cadenceDue\(/, 'assign must reuse cadenceDue for recurring assignment.');
 
 // ── 路由 ──
 const assignRoute = read('app/api/portal/family/assign/route.ts');

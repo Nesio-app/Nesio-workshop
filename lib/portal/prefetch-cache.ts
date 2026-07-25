@@ -32,6 +32,7 @@ export const PORTAL_CACHE_KEYS = {
   calendar: 'treasurebox-cache-calendar',
   weather: 'treasurebox-cache-weather',
   decModules: 'treasurebox-cache-dec-modules',
+  family: 'treasurebox-cache-family',
 } as const;
 
 export const TREASURE_TOOLBOX_KEY = 'treasurebox-toolbox-open';

@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { resolveActor, assignChoreFromEventOp } from '@/lib/family/family-server';
+import type { Cadence } from '@/lib/family/chores-core';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,7 +13,7 @@ export async function POST(req: NextRequest) {
   const actor = await resolveActor(req);
   if (!actor.ok) return NextResponse.json({ ok: false, error: actor.error }, { status: actor.status });
   const body = await req.json().catch(() => ({})) as {
-    familyId?: string; sourceEventId?: string; title?: string; dueDate?: string; assigneeId?: string; value?: number; needsApproval?: boolean;
+    familyId?: string; sourceEventId?: string; title?: string; dueDate?: string; assigneeId?: string; value?: number; needsApproval?: boolean; cadence?: Cadence;
   };
   if (!body.familyId) return NextResponse.json({ ok: false, error: 'bad_request' }, { status: 400 });
 
@@ -24,6 +25,7 @@ export async function POST(req: NextRequest) {
     assigneeId: body.assigneeId ?? '',
     value: Number(body.value ?? 0),
     needsApproval: body.needsApproval !== false,
+    cadence: body.cadence,
   });
   if (!r.ok) return NextResponse.json({ ok: false, error: r.error }, { status: r.status });
   return NextResponse.json({ ok: true, instance: r.value });

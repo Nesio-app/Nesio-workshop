@@ -74,7 +74,7 @@ export function listFamilyMembers(familyId: string): Promise<ApiResult<{ familyI
   return api(`/api/portal/family/members?familyId=${encodeURIComponent(familyId)}`);
 }
 export function assignChoreFromEvent(
-  input: { familyId: string; sourceEventId: string; title: string; dueDate: string; assigneeId: string; value?: number; needsApproval?: boolean },
+  input: { familyId: string; sourceEventId: string; title: string; dueDate: string; assigneeId: string; value?: number; needsApproval?: boolean; cadence?: Cadence },
 ): Promise<ApiResult<{ instance: ChoreInstanceView }>> {
   return api('/api/portal/family/assign', postJson(input));
 }

@@ -15,6 +15,7 @@ import {
   listFamilies, listFamilyMembers, assignChoreFromEvent,
   type FamilySummary, type FamilyMemberView,
 } from '@/lib/family/family-client';
+import type { Cadence } from '@/lib/family/chores-core';
 
 /** 事件/承诺记忆的到期日 → YYYY-MM-DD(纯日期不做时区换算);缺失回退本地今天。 */
 function dayKeyFromNode(node: LifeNode): string {
@@ -39,6 +40,9 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const t = (zh: string, en: string) => L(dict, zh, en);
   const [phase, setPhase] = useState<Phase>({ s: 'idle' });
+  const [reward, setReward] = useState('');            // 这件家务值多少钱(接回零花钱账本;留空=0,只当待办)
+  const [needsApproval, setNeedsApproval] = useState(true); // 要不要家长看一眼再计入
+  const [repeat, setRepeat] = useState<'once' | 'daily' | 'weekly'>('once'); // 周期:一次/每天/每周(接 chores-core cadence)
 
   const loadMembers = useCallback(async (families: FamilySummary[], familyId: string) => {
     const m = await listFamilyMembers(familyId);
@@ -56,12 +60,22 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
 
   const assign = useCallback(async (familyId: string, member: FamilyMemberView) => {
     setPhase({ s: 'saving', name: member.name });
+    const v = Number(reward);
+    const due = dayKeyFromNode(node);
+    const cadence: Cadence = repeat === 'daily'
+      ? { kind: 'daily' }
+      : repeat === 'weekly'
+        ? { kind: 'weekly', weekdays: [new Date(`${due}T00:00:00Z`).getUTCDay()] }  // 每周 = 事件当天那个星期几
+        : { kind: 'once' };
     const r = await assignChoreFromEvent({
       familyId,
       sourceEventId: node.id,
       title: node.name || t('家务', 'Chore'),
-      dueDate: dayKeyFromNode(node),
+      dueDate: due,
       assigneeId: member.id,
+      value: Number.isFinite(v) && v > 0 ? v : 0,   // 接回账本:>0 才计入攒钱,留空=纯待办
+      needsApproval,
+      cadence,
     });
     if (!r.ok) {
       setPhase({ s: 'error', msg: t('没分派成,再试一次。', 'Could not assign — try again.') });
@@ -70,7 +84,7 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
     setPhase({ s: 'done', name: member.name });
     // 通知已挂载的今天页家庭条刷新(被分派人/自己的今天页即时反映)。
     try { window.dispatchEvent(new CustomEvent('nesio-family-updated')); } catch { /* noop */ }
-  }, [node, t]);
+  }, [node, t, reward, needsApproval, repeat]);
 
   // ── 视图 ──
   if (phase.s === 'idle') {
@@ -146,6 +160,35 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
           {phase.families.map((f) => <option key={f.familyId} value={f.familyId}>{f.name}</option>)}
         </select>
       )}
+      {/* 周期:接 chores-core cadence —— 每天/每周会向前铺 14 天,不用天天重派。 */}
+      <div style={{ display: 'flex', gap: '0.3rem' }}>
+        {([['once', t('一次', 'Once')], ['daily', t('每天', 'Daily')], ['weekly', t('每周', 'Weekly')]] as const).map(([k, label]) => (
+          <button key={k} type="button" onClick={() => setRepeat(k)}
+            style={{
+              flex: 1, padding: '0.3rem 0.4rem', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', cursor: 'pointer',
+              border: '1px solid var(--portal-line)', fontFamily: 'var(--font-sans)',
+              background: repeat === k ? 'var(--portal-accent-soft-md)' : 'transparent',
+              color: repeat === k ? 'var(--portal-accent)' : 'var(--portal-muted)',
+              fontWeight: (repeat === k ? 'var(--weight-semibold)' : 'var(--weight-regular)') as unknown as number,
+            }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* 金额:接回零花钱账本。留空 = 纯待办(不计钱)。 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <span style={{ fontSize: '0.85rem', color: 'var(--portal-muted)' }}>$</span>
+        <input
+          inputMode="decimal" value={reward} onChange={(e) => setReward(e.target.value)}
+          placeholder={t('给多少(可留空)', 'Reward (optional)')}
+          style={{ flex: 1, minWidth: 0, padding: '0.35rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontSize: '0.85rem' }}
+        />
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', color: 'var(--portal-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+          <input type="checkbox" checked={needsApproval} onChange={(e) => setNeedsApproval(e.target.checked)} />
+          {t('做完我看一眼', 'I review it')}
+        </label>
+      </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
         {phase.members.map((m) => (
           <button key={m.id} type="button" className="nesio-node-action-secondary" style={{ padding: '0.35rem 0.8rem', fontSize: '0.85rem' }}

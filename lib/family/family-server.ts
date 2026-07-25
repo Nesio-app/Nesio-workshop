@@ -11,6 +11,7 @@ import type { NextRequest } from 'next/server';
 import { getCloudConfig, getSignedInUser, serviceRoleRestHeaders, type CloudRuntimeConfig } from '@/lib/portal/cloud-server-runtime';
 import {
   markChoreDone, approveChore, sendBackChore, memberCan, computeBalance, generateDueInstances,
+  cadenceDue, addDays,
   type FamilyMember, type ChoreInstance, type Payout, type ChoreState, type Cadence,
 } from '@/lib/family/chores-core';
 
@@ -301,51 +302,78 @@ export async function listFamilyMembersOp(actor: FamilyActor, familyId: string):
  * 一事件一实例:按 (family_id, source_event_id) upsert —— 再点即改派,不重复生成。
  * 改派给新的人 → 状态复位 todo(旧的完成/审核不带过去)。
  */
+const ASSIGN_HORIZON_DAYS = 14;   // 周期分派向前铺的窗口
+
+/** 按 source_event_id 幂等 upsert 一条事件家务实例(改派给新的人则复位 todo)。 */
+async function upsertEventInstance(
+  config: CloudRuntimeConfig, familyId: string,
+  d: { sourceEventId: string; title: string; dueDate: string; assigneeId: string; value: number; needsApproval: boolean },
+): Promise<FamilyResult<ChoreInstance>> {
+  const existing = await restGet<InstanceRow>(config, 'family_chore_instances',
+    `family_id=eq.${familyId}&source_event_id=eq.${encodeURIComponent(d.sourceEventId)}&deleted_at=is.null&select=*`);
+  if (existing === null) return fail('upstream', 502);
+  if (existing.length) {
+    const reassigned = existing[0].assignee_user_id !== d.assigneeId;
+    const patch: Record<string, unknown> = {
+      assignee_user_id: d.assigneeId, title: d.title, due_date: d.dueDate, value: d.value, needs_approval: d.needsApproval,
+      updated_at: new Date().toISOString(),
+      // 改派给新的人:旧完成/审核不带过去,复位 todo。派回原人:保持现状。
+      ...(reassigned ? { state: 'todo', done_at: null, approved_at: null, proof_asset_ref: null } : {}),
+    };
+    const saved = await restPatch<InstanceRow>(config, 'family_chore_instances',
+      `id=eq.${existing[0].id}&family_id=eq.${familyId}`, patch);
+    if (!saved?.length) return fail('upstream', 502);
+    return { ok: true, value: instanceFromRow(saved[0]) };
+  }
+  const inserted = await restInsert<InstanceRow>(config, 'family_chore_instances', {
+    family_id: familyId, template_id: null, assignee_user_id: d.assigneeId,
+    due_date: d.dueDate, value: d.value, state: 'todo', needs_approval: d.needsApproval,
+    title: d.title, source_event_id: d.sourceEventId,
+  });
+  if (!inserted?.length) return fail('upstream', 502);
+  return { ok: true, value: instanceFromRow(inserted[0]) };
+}
+
 export async function assignChoreFromEventOp(
   actor: FamilyActor,
-  input: { familyId: string; sourceEventId: string; title: string; dueDate: string; assigneeId: string; value?: number; needsApproval?: boolean },
+  input: { familyId: string; sourceEventId: string; title: string; dueDate: string; assigneeId: string; value?: number; needsApproval?: boolean; cadence?: Cadence },
 ): Promise<FamilyResult<ChoreInstance>> {
   const gate = await requireMember(actor, input.familyId);
   if (!gate.ok) return gate;   // 成员即可分派;不要求 can_approve(互相分派)
 
-  const sourceEventId = (input.sourceEventId || '').trim();
+  const baseEventId = (input.sourceEventId || '').trim();
   const title = (input.title || '').trim();
   const dueDate = (input.dueDate || '').trim();
   const assigneeId = (input.assigneeId || '').trim();
   const value = Number.isFinite(input.value) && (input.value as number) >= 0 ? (input.value as number) : 0;
   const needsApproval = input.needsApproval !== false;
-  if (!sourceEventId || !title || !assigneeId || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return fail('bad_request', 400);
+  const cadence: Cadence = input.cadence ?? { kind: 'once' };
+  if (!baseEventId || !title || !assigneeId || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) return fail('bad_request', 400);
 
   // 被分派人必须是本家庭成员(fail-closed:不给外人塞活)。
   const target = await restGet<MemberRow>(actor.config, 'family_members', `family_id=eq.${input.familyId}&user_id=eq.${assigneeId}&select=user_id`);
   if (target === null) return fail('upstream', 502);
   if (!target.length) return fail('bad_request', 400);
 
-  const existing = await restGet<InstanceRow>(actor.config, 'family_chore_instances',
-    `family_id=eq.${input.familyId}&source_event_id=eq.${sourceEventId}&deleted_at=is.null&select=*`);
-  if (existing === null) return fail('upstream', 502);
+  const common = { title, assigneeId, value, needsApproval };
 
-  if (existing.length) {
-    const reassigned = existing[0].assignee_user_id !== assigneeId;
-    const patch: Record<string, unknown> = {
-      assignee_user_id: assigneeId, title, due_date: dueDate, value, needs_approval: needsApproval,
-      updated_at: new Date().toISOString(),
-      // 改派给新的人:旧完成/审核不带过去,复位 todo。派回原人:保持现状。
-      ...(reassigned ? { state: 'todo', done_at: null, approved_at: null, proof_asset_ref: null } : {}),
-    };
-    const saved = await restPatch<InstanceRow>(actor.config, 'family_chore_instances',
-      `id=eq.${existing[0].id}&family_id=eq.${input.familyId}`, patch);
-    if (!saved?.length) return fail('upstream', 502);
-    return { ok: true, value: instanceFromRow(saved[0]) };
+  // 一次性:一事件一实例(source_event_id = 记忆节点 id)。
+  if (cadence.kind === 'once') {
+    return upsertEventInstance(actor.config, input.familyId, { ...common, sourceEventId: baseEventId, dueDate });
   }
 
-  const inserted = await restInsert<InstanceRow>(actor.config, 'family_chore_instances', {
-    family_id: input.familyId, template_id: null, assignee_user_id: assigneeId,
-    due_date: dueDate, value, state: 'todo', needs_approval: needsApproval,
-    title, source_event_id: sourceEventId,
-  });
-  if (!inserted?.length) return fail('upstream', 502);
-  return { ok: true, value: instanceFromRow(inserted[0]) };
+  // 周期:向前铺一个窗口,每个到期日各一条(source key = `${节点id}#${日期}`,天然去重 + 可改派)。
+  // 复用 cadenceDue —— 吃到 chores-core 的周期机制,不再「明天得再派一次」。
+  const toKey = addDays(dueDate, ASSIGN_HORIZON_DAYS - 1);
+  let primary: ChoreInstance | null = null;
+  for (let cursor = dueDate, guard = 0; guard < 400 && cursor <= toKey; guard++, cursor = addDays(cursor, 1)) {
+    if (!cadenceDue(cadence, cursor, dueDate)) continue;
+    const r = await upsertEventInstance(actor.config, input.familyId, { ...common, sourceEventId: `${baseEventId}#${cursor}`, dueDate: cursor });
+    if (!r.ok) return r;
+    if (!primary) primary = r.value;
+  }
+  if (!primary) return fail('bad_request', 400);   // 窗口内没有任何到期日(理论上不会发生)
+  return { ok: true, value: primary };
 }
 
 /** 记一笔线下现金冲账。能力 can_record_payout 服务端强制;金额恒正。永不是转账。 */
