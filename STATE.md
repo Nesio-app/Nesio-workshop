@@ -70,6 +70,23 @@
    令牌存 Supabase 按身份跨端(登录即通);flomo 用服务端 env(`FLOMO_WEBHOOK_URL`,与浏览器无关);
    邮件正文按隐私红线**只存本机 IDB 不上云**,仅 ≤1500 预览节点随记忆图跨端。
 
+   **⑥ 记录级模块同步(2026-07-25,根治 · 对齐「Google Contacts 式」)** —— ①~⑤ 都是「整包 blob
+   备份」这个**错误模型**的症状(8MB/4.5MB 上限、压缩兼容、遮盖、刷新)。根因:健康/足迹/财务/物品
+   等本机模块**只能靠整包备份大文件**跨端(全有或全无);而记忆/头像名字/学习态早已走**记录级同步**
+   (signals/profile_settings 表,逐条 upsert、`updated_at` 定胜负、增量、自动)—— 那套一直很稳,就是
+   Google Contacts 的做法。新增把这些模块也搬上记录级同步:
+   - 表 `user_module_data`(identity_key+module_key 主键,`database/schema/supabase-user-module-data-v1.sql`,
+     **需在 Supabase 手动 apply**);路由 `/api/cloud/module-data`(GET 拉全部行 / POST upsert)。
+   - 引擎 `lib/portal/cloud-module-sync.ts`:**复用**备份的枚举(buildCombinedBackup)+落地(restoreCombinedBackup
+     replace),但**按 key 逐行**传输(gz-b64 压缩块,单模块 <4MB 不触 Vercel 上限);记忆图排除(它另有
+     signals 同步)。模块级 LWW:本机缺→填充、本机自上次同步未改→云端更新胜、本机改过→本机胜。新设备首拉
+     到本机没有的模块 → `newlyAdded>0` → reload 水合。Portal 顶层 mount+visibility 触发 `autoSyncModulesWithCloud`。
+   - 整包备份(cloud-backup)降级为**手动导出/恢复**用途(设置页按钮),不再是自动跨端主路。
+   - **压缩统一 fflate**(纯 JS,全浏览器兼容;此前 `CompressionStream` 需 iOS16.4+,旧环境压不上/解不开→
+     「双向都失败」);blob 上传预检降到 4MB(对齐 Vercel 4.5MB 函数体上限)。
+   - 契约 `test:cloud-module-sync`(引擎:逐行/排除记忆图/增量/双向 LWW/新设备 reload)+
+     `test:cloud-module-data-runtime`(路由+表+Portal 接线)。**部署侧欠账:apply 上面那张表的 SQL 后才生效。**
+
 4a. **A 计划施工线 ✅ 完整闭环(2026-07-07,#50-#59)**:见 `docs/design/algorithm-layer-plan.md`。
    Layer2 2a(总线+事实日志+三原语,mirror/energy 收编,card-feedback/cooling/dormant 有据保留)→
    Layer1(通用规则引擎 domain-rules + 判定域铺开:健康/财务/地图/心情,+并行会话的收纳=五域;
