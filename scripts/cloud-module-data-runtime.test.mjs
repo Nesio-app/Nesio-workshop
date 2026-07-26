@@ -57,9 +57,13 @@ for (const marker of ['CREATE TABLE', 'user_module_data', 'PRIMARY KEY (identity
 
 // 客户端引擎:逐模块行、gz 压缩、排除记忆图、LWW、新设备 reload
 const client = fs.readFileSync(clientPath, 'utf8');
-for (const marker of ['pushModulesToCloud', 'pullModulesFromCloud', 'autoSyncModulesWithCloud', 'gzipSync', 'isDedicatedSyncKey', 'newlyAdded', 'reload']) {
+for (const marker of ['pushModulesToCloud', 'pullModulesFromCloud', 'autoSyncModulesWithCloud', 'gzipAsync', 'isDedicatedSyncKey', 'newlyAdded', 'reload']) {
   assert.ok(client.includes(marker), `module-sync client missing: ${marker}`);
 }
+// gzip 必须走 Web Worker 异步版(修「大数据同步压缩卡死主线程」)—— 绝不再用同步 gzipSync。
+assert.ok(!/gzipSync\(|gunzipSync\(/.test(client), 'module-sync 不得再调用同步 gzipSync/gunzipSync(须走离主线程的 gzipAsync)');
+// 增量拉取:GET 带 since 水位,只拉变过的行(修「上云后登录特别慢」)。
+assert.match(client, /since=/, 'module-sync GET 用 since 增量拉取(只拉变过的行)');
 // 归属排除走单一登记(sync-ownership),不再各写一份 —— 通用同步对专属引擎的 key 一律让路。
 assert.match(client, /import \{[^}]*isDedicatedSyncKey[^}]*\} from '\.\/sync-ownership'/, 'module-sync 从 sync-ownership 引入归属判断');
 assert.match(client, /restoreCombinedBackup\(backup, 'replace'\)/, '落地复用 restoreCombinedBackup(replace 覆盖选中 key)');
@@ -70,9 +74,10 @@ assert.ok(client.includes('DEDICATED_SYNC_PREFIXES'), 'module-sync 用 sync-owne
 
 // 邮件全文逐封记录级同步引擎:前缀行、gz 压缩、并集补缺、喂全文索引
 const emailClient = fs.readFileSync(emailClientPath, 'utf8');
-for (const marker of ['pushEmailBodiesToCloud', 'pullEmailBodiesFromCloud', 'autoSyncEmailBodiesWithCloud', 'EMAIL_BODY_MODULE_PREFIX', 'getAllEmailBodies', 'putEmailBodies', 'indexEmailBodies', 'gzipSync']) {
+for (const marker of ['pushEmailBodiesToCloud', 'pullEmailBodiesFromCloud', 'autoSyncEmailBodiesWithCloud', 'EMAIL_BODY_MODULE_PREFIX', 'getAllEmailBodies', 'putEmailBodies', 'indexEmailBodies', 'gzipAsync']) {
   assert.ok(emailClient.includes(marker), `email-sync client missing: ${marker}`);
 }
+assert.ok(!/gzipSync\(|gunzipSync\(/.test(emailClient), 'email-sync 不得再调用同步 gzipSync/gunzipSync(须走离主线程的 gzipAsync)');
 assert.match(emailClient, /keyPrefix=/, 'email-sync GET 用 keyPrefix 只取邮件行');
 assert.ok(emailClient.includes("EMAIL_BODY_MODULE_PREFIX = 'email-body:'"), 'email 行前缀 = email-body:');
 
@@ -83,11 +88,14 @@ assert.match(portal, /import \{ autoSyncModulesWithCloud \} from '@\/lib\/portal
 // 否则换人登录时上一账号数据会按当前登录人身份上传。
 assert.match(portal, /canSyncPrivateData\s*=\s*canUsePrivateRuntime\s*&&\s*ownerConflict === null/, 'Portal 同步门 = 登录 && 归属已核对(防跨账号泄露)');
 assert.match(portal, /canSyncPrivateData\)\s*return;[\s\S]*?autoSyncModulesWithCloud\(\)/, 'Portal 归属核对通过后才触发模块同步');
-assert.match(portal, /visibilityState === 'visible'[\s\S]{0,360}autoSyncModulesWithCloud\(\)/, 'Portal 回前台也触发模块同步');
-// 邮件全文同步也要在 Portal mount + 回前台触发
+// 重同步批次改经 whenIdle 调度 + isCloudSyncSuspended 闸门(修「同步抢主线程 = 跟练卡死」),
+// mount 与回前台都路由到 scheduleHeavySyncBatch,不再在交互帧同步直呼各引擎。
+assert.match(portal, /if\s*\(\s*isCloudSyncSuspended\(\)\s*\)\s*\{?\s*return/, 'Portal 重同步批次受暂停闸门早退');
+assert.match(portal, /whenIdle\(/, 'Portal 重同步经 whenIdle 空闲调度(不抢交互帧)');
+assert.match(portal, /visibilityState === 'visible'[\s\S]{0,160}scheduleHeavySyncBatch\(\)/, 'Portal 回前台经空闲批次触发同步');
+// 邮件全文同步也在同步批次内(mount + 回前台经批次触发)
 assert.match(portal, /import \{ autoSyncEmailBodiesWithCloud \} from '@\/lib\/portal\/cloud-email-sync'/, 'Portal 引入邮件全文同步');
-assert.match(portal, /canSyncPrivateData\)\s*return;[\s\S]*?autoSyncEmailBodiesWithCloud\(\)/, 'Portal 归属核对通过后才触发邮件全文同步');
-assert.match(portal, /visibilityState === 'visible'[\s\S]{0,420}autoSyncEmailBodiesWithCloud\(\)/, 'Portal 回前台也触发邮件全文同步');
+assert.match(portal, /autoSyncEmailBodiesWithCloud\(\)/, 'Portal 同步批次含邮件全文同步');
 
 // package.json 注册
 const pkg = JSON.parse(fs.readFileSync(packagePath, 'utf8'));

@@ -83,6 +83,16 @@ function writeState(state: ModuleSyncState): void {
   try { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(state)); } catch { /* quota */ }
 }
 
+// 增量拉取水位(仅本机 bookkeeping,不上云):记「上次拉到的最大 updated_at」。下次 GET 传 since=它,
+// 服务端只回变过的行 → 登录不再每次重下全量(修「上云后登录特别慢」)。空/清缓存 → 全量(新设备该拿全)。
+const SINCE_KEY = 'nesio-module-sync-since-v1';
+function readSince(): string | null {
+  try { return localStorage.getItem(SINCE_KEY) || null; } catch { return null; }
+}
+function writeSince(iso: string): void {
+  try { localStorage.setItem(SINCE_KEY, iso); } catch { /* quota */ }
+}
+
 /** 本机应同步的模块条目(= 备份枚举去掉记忆图)。 */
 async function localModuleEntries(): Promise<Record<string, string>> {
   const backup = await buildCombinedBackup();
@@ -148,7 +158,10 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
     // 排除所有 per-record 专属引擎的行(邮件全文 email-body:* / 书籍 reader-book:* …):它们量级大、
     // 各由自己的引擎同步,绝不卷进这里(否则 20s 轮询每次下载数十 MB)。服务端过滤,不只客户端跳过。
     // 前缀集来自 sync-ownership 单一真源 —— 以后新增 per-record 引擎自动被排除,无需改这里。
-    const res = await fetch(`/api/cloud/module-data?excludePrefix=${encodeURIComponent(DEDICATED_SYNC_PREFIXES.join(','))}`, { cache: 'no-store' });
+    const since = readSince();
+    let qs = `excludePrefix=${encodeURIComponent(DEDICATED_SYNC_PREFIXES.join(','))}`;
+    if (since) qs += `&since=${encodeURIComponent(since)}`; // 增量:只拉自上次以来变过的模块行
+    const res = await fetch(`/api/cloud/module-data?${qs}`, { cache: 'no-store' });
     const data = (await res.json().catch(() => ({}))) as { ok?: boolean; modules?: unknown };
     if (!res.ok || !data.ok || !Array.isArray(data.modules)) return { applied: 0, newlyAdded: 0 };
     rows = data.modules as typeof rows;
@@ -201,6 +214,13 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
     try { await restoreCombinedBackup(backup, 'replace'); } catch (err) { logDropped('cloud.module_sync_apply', err); }
   }
   writeState(state);
+  // 推进增量水位到本次拉到的最大 updated_at(含被跳过的行——它们也已「见过」)。下次只拉更新的。
+  let maxSeen: string | null = null;
+  for (const row of rows) {
+    const u = row.updatedAt;
+    if (typeof u === 'string' && u && (maxSeen === null || Date.parse(u) > Date.parse(maxSeen))) maxSeen = u;
+  }
+  if (maxSeen) writeSince(maxSeen);
   return { applied: appliedKeys.length, newlyAdded };
 }
 

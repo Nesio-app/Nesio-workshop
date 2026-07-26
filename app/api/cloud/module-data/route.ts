@@ -47,6 +47,17 @@ function sanitizePrefix(value: string | null): string | null {
   return trimmed;
 }
 
+// 增量拉取水位:客户端传上次拉到的最大 updated_at,服务端只回 updated_at >= since 的行(仅拉「变过的」,
+// 登录不再每次重下全量)。用 Date 往返校验合法性 + 归一到 ISO,非法则忽略(退回全量,安全)。
+function sanitizeSince(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed.length > 40) return null;
+  const ms = Date.parse(trimmed);
+  if (Number.isNaN(ms)) return null;
+  return new Date(ms).toISOString();
+}
+
 export async function GET(request: NextRequest) {
   const id = auditId();
   logAudit('cloud_runtime_request', { auditId: id, method: 'GET', readsCloud: true, writesCloud: false });
@@ -66,6 +77,7 @@ export async function GET(request: NextRequest) {
   // excludePrefix 支持逗号分隔多个前缀(邮件/书籍等 per-record 专属引擎的行都排除),各自 sanitize。
   const excludePrefixes = (request.nextUrl.searchParams.get('excludePrefix') || '')
     .split(',').map((s) => sanitizePrefix(s)).filter((s): s is string => Boolean(s));
+  const since = sanitizeSince(request.nextUrl.searchParams.get('since'));
 
   try {
     const url = new URL('/rest/v1/user_module_data', config.supabaseUrl);
@@ -78,6 +90,8 @@ export async function GET(request: NextRequest) {
       // 多个前缀:PostgREST and=(module_key.not.like.p1*,module_key.not.like.p2*)
       url.searchParams.set('and', `(${excludePrefixes.map((p) => `module_key.not.like.${p}*`).join(',')})`);
     }
+    // 增量:只回自上次以来变过的行(updated_at >= since)。gte 含边界,客户端按内容哈希去重,零误漏。
+    if (since) url.searchParams.set('updated_at', `gte.${since}`);
     url.searchParams.set('select', 'module_key,data,updated_at');
     const res = await fetch(url.toString(), {
       headers: cloudRuntime.serviceRoleRestHeaders(config),
