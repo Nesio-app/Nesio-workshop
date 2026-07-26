@@ -21,6 +21,7 @@ import { normalizeIngredient } from '@/lib/cooking/food-catalog';
 import { loadRecipes, recipeImageUrl, type Recipe } from '@/lib/cooking/food-data';
 import { matchRecipes, type RecipeMatch } from '@/lib/cooking/recipe-match';
 import { getShoppingList, addToShopping, toggleShoppingItem, removeShoppingItem, checkoutBought, type ShoppingItem } from '@/lib/cooking/shopping';
+import { recipeMainNutrition, type FoodNutrition } from '@/lib/cooking/nutrition';
 
 type View = { kind: 'pantry' } | { kind: 'recipe'; match: RecipeMatch<Recipe> };
 
@@ -240,6 +241,12 @@ function RecipeDetail({ match, onAddToShopping, shopMsg, t }: {
 }) {
   const r = match.recipe;
   const img = recipeImageUrl(r.image);
+  const [nutri, setNutri] = useState<FoodNutrition[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    recipeMainNutrition(r.ingredients).then((n) => { if (live) setNutri(n); }).catch(() => { if (live) setNutri([]); });
+    return () => { live = false; };
+  }, [r.ingredients]);
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
       {img
@@ -270,6 +277,26 @@ function RecipeDetail({ match, onAddToShopping, shopMsg, t }: {
           <p style={sectLabel}>{t('常备调料', 'Staples')}</p>
           <div style={chipWrap}>{match.staples.map((n) => <span key={n} style={{ ...chip, color: 'var(--portal-muted)' }}>{n}</span>)}</div>
         </div>
+      )}
+
+      {/* 主料营养(每100g · 查《中国食物成分表》· 部分食材名对不齐时只显对上的,标估算) */}
+      {nutri !== null && nutri.length > 0 && (
+        <section>
+          <p style={sectLabel}>{t('主料营养 · 每100g · 估算', 'Main ingredients · per 100g · est.')}</p>
+          <div style={cardStyle}>
+            {nutri.map((f, i) => (
+              <div key={f.foodName} style={{ ...rowStyle, borderBottom: i === nutri.length - 1 ? 'none' : rowStyle.borderBottom }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.foodName}</span>
+                <span style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums' }}>
+                  {Math.round(f.energyKCal)} kcal · {t('蛋白', 'P')} {f.protein}g
+                </span>
+              </div>
+            ))}
+          </div>
+          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: 'var(--space-1) 0 0' }}>
+            {t('查《中国食物成分表》· 每100g 可食部,仅供参考。', 'From China Food Composition Table · per 100g edible · reference only.')}
+          </p>
+        </section>
       )}
 
       <section>
