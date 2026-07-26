@@ -98,6 +98,12 @@ function orderPrompt(en: boolean): string {
     ? 'This is an online shopping ORDER / receipt screenshot (e.g. Amazon). Produce EXACTLY ONE object node for the purchased product (use the product title as the node name). Put ONLY into that node\'s attributes: orderNo (the order number string), buyPrice (item subtotal / pre-tax total as a number), tax (tax amount as a number), seller (the "Sold by" merchant), orderedAt (order placed date YYYY-MM-DD), arrivedAt (delivery/arrival date YYYY-MM-DD if shown). Do NOT create separate nodes for totals, tax, order number or store; do NOT create place or person nodes.'
     : '这是一张网购订单/收据截图(如亚马逊)。请只生成 1 个 object 节点代表所购商品(节点名用商品标题)。只把这些放进该节点的 attributes:orderNo(订单号字符串)、buyPrice(税前小计/商品总价,数字)、tax(税费,数字)、seller(Sold by 商家)、orderedAt(下单日期 YYYY-MM-DD)、arrivedAt(到货/送达日期 YYYY-MM-DD,若有)。不要为总计、税费、订单号、店铺单独生成节点;不要生成地点或人物节点。';
 }
+// 进货模式:食材专用识别 —— 逐个认出食材、用通用名、数量/保质期入 attributes。
+function foodPrompt(en: boolean): string {
+  return en
+    ? 'This is a photo of groceries / food (fridge, dishes, shopping bag, etc.). For EACH visible ingredient/food item, create ONE object node whose name is the food\'s common name (e.g. "tomato", "egg", "milk", "spinach" — NOT quantified names like "a box of eggs"). If the count is visible, put it in attributes.quantity (a number). If a printed expiry / best-before date is legible, put it in attributes.expiry (YYYY-MM-DD). Do NOT create place or person nodes, and do NOT create a summary node.'
+    : '这是一张食材/食品照片(冰箱、菜、购物袋等)。请为每一种可见的食材/食品单独生成一个 object 节点,节点名用食材的通用名(如「西红柿」「鸡蛋」「牛奶」「菠菜」,不要写「一盒鸡蛋」这类带量词的长名)。数量能数清就放进 attributes.quantity(数字);包装上印的保质期/到期日能看清就放进 attributes.expiry(YYYY-MM-DD)。不要生成地点或人物节点,不要生成汇总节点。';
+}
 async function analyzeImage(base64: string, prompt?: string, dict: string = 'zh'): Promise<AnalysisResult> {
   // 成本护栏:免费层不打云视觉 —— 照片照样保存(待确认线索,可手动加名/标签),
   // AI 深识别归 Pro。分层未启用(当前 PWA)恒放行,不变。
@@ -211,18 +217,21 @@ async function getCurrentLocation(): Promise<{ lat: number; lon: number } | null
 // 批次 174:'place' 退役 —— 不再让相机把东西归类成「位置」(无真实数据源;真实地点走足迹/物品 location)
 const ALL_TYPES = ['object', 'person', 'event', 'commitment', 'health_state', 'preference'] as const;
 
-function buildPendingImageResult(dict: string = 'zh', reason: 'auth' | 'free_tier' = 'auth'): AnalysisResult {
+function buildPendingImageResult(dict: string = 'zh', reason: 'auth' | 'free_tier' = 'auth', pantry = false): AnalysisResult {
+  // 进货模式:名字留空(让用户直接打食材名,而不是「照片 · 时间」),文案也换成起名引导。
   return {
-    summary: reason === 'free_tier'
-      ? L(dict, '照片已记下,可以自己加名字和标签。升级 Pro 可用 AI 自动识别图中物品和场景。', 'Photo saved — add a name and tags yourself. Upgrade to Pro for AI recognition of objects and scenes.')
-      : L(dict, '照片已存好 —— 改个名字、加点标签更好找。', 'Photo saved — rename or tag it to find it later.'),
+    summary: pantry
+      ? L(dict, '拍好了 —— 给它起个名字,比如「西红柿」「鸡蛋」;数量、保质期可选。', 'Snapped — name it (e.g. tomato, eggs); quantity & expiry optional.')
+      : reason === 'free_tier'
+        ? L(dict, '照片已记下,可以自己加名字和标签。升级 Pro 可用 AI 自动识别图中物品和场景。', 'Photo saved — add a name and tags yourself. Upgrade to Pro for AI recognition of objects and scenes.')
+        : L(dict, '照片已存好 —— 改个名字、加点标签更好找。', 'Photo saved — rename or tag it to find it later.'),
     nodes: [
       {
         type: 'object',
-        name: L(dict, `照片 · ${new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, `Photo · ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`),
+        name: pantry ? '' : L(dict, `照片 · ${new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, `Photo · ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`),
         attributes: {},
         relations: [],
-        tags: [L(dict, '图片', 'image')],
+        tags: pantry ? [] : [L(dict, '图片', 'image')],
         source: 'photo',
         confidence: 0.9,
       },
@@ -607,11 +616,12 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
     setPhase('analyzing');
     setError('');
     try {
-      const res = await analyzeImage(capturedBase64, undefined, dict);
+      const en = dict.toLowerCase().startsWith('en');
+      const res = await analyzeImage(capturedBase64, intakeSubtype ? foodPrompt(en) : undefined, dict);
       const nodes = toEditedNodes(res.nodes, res.summary);
       setResult(res);
       setEditedNodes(nodes);
-      setIsReceipt(detectReceipt(res));
+      setIsReceipt(intakeSubtype ? false : detectReceipt(res));
       setPhase('result');
       tryMatchGpsAndPrefill(nodes);
       // Check for similar existing objects
@@ -625,8 +635,8 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
       if (Object.keys(similars).length > 0) setSimilarItems(similars);
     } catch (err: unknown) {
       if (err instanceof AnalyzeImageError && (err.code === 'ai_auth_required' || err.code === 'free_tier_local')) {
-        // 未登录 / 免费层:照片照样保存(待确认线索),不打云;文案分流(登录引导 vs Pro 升级)
-        const pending = buildPendingImageResult(dict, err.code === 'free_tier_local' ? 'free_tier' : 'auth');
+        // 未登录 / 免费层:照片照样保存(待确认线索),不打云;进货模式名字留空让用户直接打食材名
+        const pending = buildPendingImageResult(dict, err.code === 'free_tier_local' ? 'free_tier' : 'auth', !!intakeSubtype);
         setResult(pending);
         setEditedNodes(toEditedNodes(pending.nodes, pending.summary));
         setIsReceipt(false);
@@ -634,7 +644,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
         return;
       }
       setError(L(dict, '识别失败。你可以先保存为待确认图片线索。', 'Recognition failed. You can save it as an unconfirmed image clue for now.'));
-      setResult(buildPendingImageResult(dict));
+      setResult(buildPendingImageResult(dict, 'auth', !!intakeSubtype));
       setPhase('result');
     }
   }
