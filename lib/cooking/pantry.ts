@@ -41,6 +41,7 @@ function toPantryItem(i: InventoryItem, now: Date): PantryItem {
   return {
     id: i.id, name: i.name, quantity: i.quantity, expiry: i.expiry,
     location: i.location, category: i.category, daysLeft: daysLeftOf(i.expiry, now),
+    addedAt: (i.node.createdAt || '').slice(0, 10),
   };
 }
 
