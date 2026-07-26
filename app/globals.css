@@ -18595,3 +18595,20 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 @keyframes nm-toast-in{from{opacity:0;transform:translateX(-50%) translateY(16px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 .nesio-montage :focus-visible{outline:2px solid var(--portal-accent);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.nesio-montage *,.nm-toast{animation:none!important;transition:opacity .2s!important}}
+
+/* ── 做饭 · 库存(CookingSheet)固定成 workshop 视觉稿配色 ──────────────────────
+   用户明确要求这套 UI 和视觉稿一模一样(浅色底 + 石板蓝 + 白卡),不跟随设备主题/配色。
+   故在 sheet 根上重声明 token 值,内部所有 var(--portal-*) 自动解析到稿子配色。 */
+.cooking-skin{
+  --portal-bg:#eef3f7; --portal-card:#ffffff;
+  --portal-ink:#2c3b4d; --portal-muted:#8493a3; --portal-line:#eaeef2;
+  --portal-accent:#5c7389;
+  --portal-accent-soft:#e9eef3; --portal-accent-soft-md:#dbe3ec; --portal-accent-border:rgba(92,115,137,.25);
+  --status-go:#6f9483; --status-go-soft:#e5ece8;
+  --status-gentle:#b5875e; --status-gentle-soft:#f4e9db;
+  --status-calm:#6b8fc9; --status-calm-soft:#e2eaf3;
+  --status-risk:#cf6b6b; --status-risk-soft:#f5d9d9;
+  --shadow-card:0 6px 20px rgba(60,80,110,.07);
+  background:linear-gradient(180deg,#eff3f7 0%,#e4ebf2 100%);
+  color:var(--portal-ink);
+}
