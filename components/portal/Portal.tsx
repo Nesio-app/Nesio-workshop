@@ -1402,7 +1402,19 @@ export default function Portal() {
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
       {calendarCreateOpen && <CalendarCreateSheet open={calendarCreateOpen} onClose={() => setCalendarCreateOpen(false)} />}
       {familyOpen && <FamilySharingSheet open={familyOpen} onClose={() => setFamilyOpen(false)} />}
-      {cookingOpen && <CookingSheet open={cookingOpen} onClose={() => setCookingOpen(false)} />}
+      {cookingOpen && (
+        <CookingSheet
+          open={cookingOpen}
+          onClose={() => setCookingOpen(false)}
+          onExitTo={(target) => {
+            setCookingOpen(false);
+            if (target === 'today') setActiveSurface('today');
+            else if (target === 'capture') setActiveSurface('tell');
+            else if (target === 'insights') { setInsightsTab(undefined); setInsightsOpen(true); }
+            else if (target === 'chat') setChatOpen(true);
+          }}
+        />
+      )}
       {workoutSession && (
         // 错误边界(修「打开跟练 app 卡死」):跟练播放器一旦被畸形数据(如别端同步回的坏 workout)
         // 击中 throw,绝不能冒泡卸载整棵 Portal(=白屏/卡死);就地兜住、显示可截图的报错。

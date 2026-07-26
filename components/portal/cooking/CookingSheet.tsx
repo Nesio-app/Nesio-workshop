@@ -10,7 +10,8 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
-import { IconBox, IconMapPin, IconCamera, IconCheckSquare, IconZap, IconStar, IconChevronRight, IconSnowflake } from '../icons';
+import NesioMark from '../NesioMark';
+import { IconMapPin, IconCamera, IconCheckSquare, IconZap, IconChevronRight, IconSnowflake } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -32,7 +33,11 @@ type View =
   | { kind: 'recipe'; match: RecipeMatch<Recipe> }
   | { kind: 'needs'; match: RecipeMatch<Recipe>; from: 'home' | 'wishlist' | 'recipe' };
 
-export default function CookingSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function CookingSheet({ open, onClose, initialView, onExitTo }: {
+  open: boolean; onClose: () => void;
+  initialView?: 'home' | 'pantry' | 'wishlist';
+  onExitTo?: (target: 'today' | 'capture' | 'insights' | 'chat') => void;
+}) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const t = useCallback((zh: string, en: string) => L(dict, zh, en), [dict]);
 
@@ -50,7 +55,7 @@ export default function CookingSheet({ open, onClose }: { open: boolean; onClose
     try { setShopping(getShoppingList()?.items ?? []); } catch { /* 购物清单读不出不致命 */ }
     try { setWishes(getWishlist()); } catch { /* 想做清单读不出不致命 */ }
   }, [t]);
-  useEffect(() => { if (open) { reload(); setView({ kind: 'home' }); } }, [open, reload]);
+  useEffect(() => { if (open) { reload(); setView({ kind: initialView ?? 'home' }); } }, [open, reload, initialView]);
 
   const loadRec = useCallback(() => {
     setRecipesErr(false);
@@ -66,6 +71,7 @@ export default function CookingSheet({ open, onClose }: { open: boolean; onClose
     [recipes, pantryNames],
   );
 
+  const setTopView = useCallback((k: 'home' | 'pantry' | 'wishlist') => { setErr(''); setView({ kind: k }); }, []);
   const openCamera = useCallback(() => camInputRef.current?.click(), []);
   const onCamFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; e.target.value = '';
@@ -97,61 +103,64 @@ export default function CookingSheet({ open, onClose }: { open: boolean; onClose
   if (!open) return null;
 
   return (
-    <NesioSheet variant="fullscreen" open={open} onOpenChange={(o) => { if (!o) onClose(); }} ariaLabel={t('做饭 · 库存', 'Cooking · Pantry')}>
+    <NesioSheet variant="fullscreen" open={open} onOpenChange={(o) => { if (!o) onClose(); }} ariaLabel={t('做饭 · 库存', 'Cooking · Pantry')} className="cooking-skin">
       <input ref={camInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onCamFile} />
-      <div style={{ minHeight: '100%', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }}>
-        <div style={{ padding: 'var(--space-5) var(--space-4) var(--space-8)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
-          {err && <ErrorRow msg={err} onRetry={() => { setErr(''); reload(); }} t={t} />}
+      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }}>
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <div style={{ padding: 'var(--space-5) var(--space-4) var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+            {err && <ErrorRow msg={err} onRetry={() => { setErr(''); reload(); }} t={t} />}
 
-          {view.kind === 'home' && (
-            <>
-              <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} title={t('做饭', 'Cooking')} subtitle={t('冰箱里还有这些', 'Here’s what’s in the fridge')} />
-              <HomeBody
-                soon={soon} matches={matches} recipes={recipes} recipesErr={recipesErr} soonNames={soonNames}
-                pantryCount={items.length} wishCount={wishes.length} shopCount={shopping.length}
-                onLoadRec={loadRec} onOpenRecipe={(m) => setView({ kind: 'recipe', match: m })}
-                onGoPantry={() => setView({ kind: 'pantry' })} onGoWishlist={() => setView({ kind: 'wishlist' })} t={t}
-              />
-            </>
-          )}
-          {view.kind === 'pantry' && (
-            <>
-              <ScreenHead backLabel={t('做饭', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={t('库存', 'Pantry')} />
-              <PantryBody items={items} shopping={shopping} onCamera={openCamera} onConsume={consume} onRemove={remove} onError={setErr} onChanged={reload} t={t} />
-            </>
-          )}
-          {view.kind === 'wishlist' && (
-            <>
-              <ScreenHead backLabel={t('做饭', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={t('想做清单', 'Want to cook')} subtitle={t('想做的菜 · 先存这儿', 'Save what you want to make')} subtitleRight={wishes.length > 0 ? t(`${wishes.length} 道`, `${wishes.length}`) : undefined} />
-              <WishlistBody wishes={wishes} onCompute={(n) => computeNeeds(n, 'wishlist')} onError={setErr} onChanged={reload} onCamera={openCamera} t={t} />
-            </>
-          )}
-          {view.kind === 'recipe' && (
-            <>
-              <ScreenHead backLabel={t('做饭', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={view.match.recipe.name} />
-              <RecipeBody match={view.match} soonNames={soonNames} onNeeds={() => setView({ kind: 'needs', match: view.match, from: 'recipe' })} t={t} />
-            </>
-          )}
-          {view.kind === 'needs' && (
-            <>
-              <ScreenHead
-                backLabel={view.from === 'wishlist' ? t('想做清单', 'Want to cook') : view.from === 'recipe' ? view.match.recipe.name : t('做饭', 'Cooking')}
-                onBack={() => setView(view.from === 'wishlist' ? { kind: 'wishlist' } : view.from === 'recipe' ? { kind: 'recipe', match: view.match } : { kind: 'home' })}
-                title={view.match.recipe.name} />
-              <NeedsBody match={view.match} onError={setErr} onDone={() => setView({ kind: 'home' })} t={t} />
-            </>
-          )}
+            {view.kind === 'home' && (
+              <>
+                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} title={t('做饭', 'Cooking')} subtitle={t('冰箱里还有这些', 'Here’s what’s in the fridge')} />
+                <SubTabs active="home" onSelect={setTopView} t={t} />
+                <HomeBody
+                  soon={soon} matches={matches} recipes={recipes} recipesErr={recipesErr} soonNames={soonNames}
+                  pantryCount={items.length} onLoadRec={loadRec} onOpenRecipe={(m) => setView({ kind: 'recipe', match: m })} t={t}
+                />
+              </>
+            )}
+            {view.kind === 'pantry' && (
+              <>
+                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} title={t('库存', 'Pantry')} />
+                <SubTabs active="pantry" onSelect={setTopView} t={t} />
+                <PantryBody items={items} shopping={shopping} onCamera={openCamera} onConsume={consume} onRemove={remove} onError={setErr} onChanged={reload} t={t} />
+              </>
+            )}
+            {view.kind === 'wishlist' && (
+              <>
+                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} title={t('想做清单', 'Want to cook')} subtitle={t('想做的菜 · 先存这儿', 'Save what you want to make')} subtitleRight={wishes.length > 0 ? t(`${wishes.length} 道`, `${wishes.length}`) : undefined} />
+                <SubTabs active="wishlist" onSelect={setTopView} t={t} />
+                <WishlistBody wishes={wishes} onCompute={(n) => computeNeeds(n, 'wishlist')} onError={setErr} onChanged={reload} onCamera={openCamera} t={t} />
+              </>
+            )}
+            {view.kind === 'recipe' && (
+              <>
+                <ScreenHead backLabel={t('做饭', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={view.match.recipe.name} />
+                <RecipeBody match={view.match} soonNames={soonNames} onNeeds={() => setView({ kind: 'needs', match: view.match, from: 'recipe' })} t={t} />
+              </>
+            )}
+            {view.kind === 'needs' && (
+              <>
+                <ScreenHead
+                  backLabel={view.from === 'wishlist' ? t('想做清单', 'Want to cook') : view.from === 'recipe' ? view.match.recipe.name : t('做饭', 'Cooking')}
+                  onBack={() => setView(view.from === 'wishlist' ? { kind: 'wishlist' } : view.from === 'recipe' ? { kind: 'recipe', match: view.match } : { kind: 'home' })}
+                  title={view.match.recipe.name} />
+                <NeedsBody match={view.match} onError={setErr} onDone={() => setView({ kind: 'home' })} t={t} />
+              </>
+            )}
+          </div>
         </div>
+        <CookingBottomNav locale={dict} onToday={() => (onExitTo ? onExitTo('today') : onClose())} onCapture={() => (onExitTo ? onExitTo('capture') : onClose())} onInsights={() => (onExitTo ? onExitTo('insights') : onClose())} onChat={() => onExitTo?.('chat')} t={t} />
       </div>
     </NesioSheet>
   );
 }
 
 // ── 屏1 做饭首页 ──────────────────────────────────────────────────────────────
-function HomeBody({ soon, matches, recipes, recipesErr, soonNames, pantryCount, wishCount, shopCount, onLoadRec, onOpenRecipe, onGoPantry, onGoWishlist, t }: {
+function HomeBody({ soon, matches, recipes, recipesErr, soonNames, pantryCount, onLoadRec, onOpenRecipe, t }: {
   soon: PantryItem[]; matches: RecipeMatch<Recipe>[]; recipes: Recipe[] | null; recipesErr: boolean; soonNames: Set<string>;
-  pantryCount: number; wishCount: number; shopCount: number;
-  onLoadRec: () => void; onOpenRecipe: (m: RecipeMatch<Recipe>) => void; onGoPantry: () => void; onGoWishlist: () => void; t: TT;
+  pantryCount: number; onLoadRec: () => void; onOpenRecipe: (m: RecipeMatch<Recipe>) => void; t: TT;
 }) {
   const anyReady = matches.some((m) => m.canCook);
   return (
@@ -208,16 +217,6 @@ function HomeBody({ soon, matches, recipes, recipesErr, soonNames, pantryCount, 
         <IconZap size={16} />{t('生成新菜谱', 'Generate a recipe')}
         <span style={{ ...pill, background: 'rgba(255,255,255,.22)', color: '#fff', marginLeft: 'var(--space-1)' }}>Pro</span>
       </button>
-
-      {/* 去 库存 / 想做清单 */}
-      <div style={card}>
-        <NavRow icon={<IconBox size={18} />} label={t('库存', 'Pantry')}
-          sub={pantryCount > 0 ? t(`${pantryCount} 样${shopCount > 0 ? ` · 购物清单 ${shopCount}` : ''}`, `${pantryCount} items${shopCount > 0 ? ` · ${shopCount} to buy` : ''}`) : t('还没记 · 拍小票入库', 'Empty · snap a receipt')}
-          onClick={onGoPantry} last={false} />
-        <NavRow icon={<IconStar size={18} />} label={t('想做清单', 'Want to cook')}
-          sub={wishCount > 0 ? t(`${wishCount} 道想做的菜`, `${wishCount} saved`) : t('攒着想做的菜,选一道算缺料', 'Save dishes, plan the shopping')}
-          onClick={onGoWishlist} last />
-      </div>
     </>
   );
 }
@@ -566,18 +565,56 @@ function SectionHead({ label, right, rightGo }: { label: string; right?: string;
     </div>
   );
 }
-function NavRow({ icon, label, sub, onClick, last }: { icon: React.ReactNode; label: string; sub: string; onClick: () => void; last: boolean }) {
+/** 做饭内部子 tab:做饭 / 库存 / 想做清单(在洞察下,做饭的子导航)。 */
+function SubTabs({ active, onSelect, t }: { active: 'home' | 'pantry' | 'wishlist'; onSelect: (k: 'home' | 'pantry' | 'wishlist') => void; t: TT }) {
+  const tabs: Array<{ k: 'home' | 'pantry' | 'wishlist'; label: string }> = [
+    { k: 'home', label: t('做饭', 'Cook') },
+    { k: 'pantry', label: t('库存', 'Pantry') },
+    { k: 'wishlist', label: t('想做清单', 'Wishlist') },
+  ];
   return (
-    <button type="button" onClick={onClick} style={{ ...row, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: last ? 'none' : divider, cursor: 'pointer' }}>
-      <span style={{ width: 34, height: 34, borderRadius: 'var(--radius-sm)', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', display: 'grid', placeItems: 'center', flex: 'none' }}>{icon}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 'var(--text-body)', fontWeight: 600 }}>{label}</div>
-        <div style={subText}>{sub}</div>
-      </div>
-      <IconChevronRight size={16} />
-    </button>
+    <div style={{ display: 'flex', gap: 'var(--space-1)', background: 'var(--portal-accent-soft)', borderRadius: 'var(--radius-pill)', padding: 3 }}>
+      {tabs.map((tb) => {
+        const on = tb.k === active;
+        return (
+          <button key={tb.k} type="button" onClick={() => onSelect(tb.k)}
+            style={{ flex: 1, border: 'none', borderRadius: 'var(--radius-pill)', padding: 'var(--space-2) 0', fontSize: 'var(--text-sm)', fontWeight: on ? 700 : 600, fontFamily: 'var(--font-sans)', cursor: 'pointer', background: on ? 'var(--portal-card)' : 'transparent', color: on ? 'var(--portal-accent)' : 'var(--portal-muted)', boxShadow: on ? 'var(--shadow-card)' : 'none' }}>
+            {tb.label}
+          </button>
+        );
+      })}
+    </div>
   );
 }
+
+/** 底部导航 —— 复用 app 真导航(今天 / 记录 / 洞察),点了退出做饭跳对应页。洞察态高亮。 */
+function CookingBottomNav({ onToday, onCapture, onInsights, onChat, t }: { locale: string; onToday: () => void; onCapture: () => void; onInsights: () => void; onChat: () => void; t: TT }) {
+  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const fired = useRef(false);
+  const start = () => { fired.current = false; pressTimer.current = setTimeout(() => { fired.current = true; onChat(); }, 450); };
+  const end = () => { if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; } if (!fired.current) onCapture(); };
+  const cancel = () => { if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; } };
+  return (
+    <nav style={{ flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-around', background: 'var(--portal-card)', borderTop: divider, padding: 'var(--space-2) var(--space-4)', paddingBottom: 'calc(var(--space-2) + env(safe-area-inset-bottom, 0px))' }}>
+      <button type="button" onClick={onToday} aria-label={t('今天', 'Today')} style={navBtn(false)}>
+        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8.25" /><path d="M12 7.5V12l3 2.2" /></svg>
+        <span style={navLabel}>{t('今天', 'Today')}</span>
+      </button>
+      <button type="button" onPointerDown={start} onPointerUp={end} onPointerLeave={cancel} onPointerCancel={cancel} onContextMenu={(e) => e.preventDefault()}
+        aria-label={t('记录 / 问一问', 'Capture / Ask')} style={{ border: 'none', background: 'var(--portal-accent)', width: 52, height: 52, borderRadius: '50%', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: 'var(--shadow-card)', marginTop: -18 }}>
+        <NesioMark style={{ width: 26, height: 26 }} />
+      </button>
+      <button type="button" onClick={onInsights} aria-label={t('洞察', 'Insights')} style={navBtn(true)}>
+        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h12l3 5-9 13L3 8z" /><path d="M3 8h18M9 3 7.5 8 12 21M15 3l1.5 5L12 21" /></svg>
+        <span style={navLabel}>{t('洞察', 'Insights')}</span>
+      </button>
+    </nav>
+  );
+}
+function navBtn(active: boolean): React.CSSProperties {
+  return { border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: 'var(--space-1) var(--space-3)', color: active ? 'var(--portal-accent)' : 'var(--portal-muted)', fontFamily: 'var(--font-sans)' };
+}
+const navLabel: React.CSSProperties = { fontSize: 'var(--text-xs)', fontWeight: 600 };
 function NutriCol({ v, label, last }: { v: string; label: string; last?: boolean }) {
   return (
     <div style={{ flex: 1, textAlign: 'center', padding: '0 var(--space-2)', borderRight: last ? 'none' : divider }}>
