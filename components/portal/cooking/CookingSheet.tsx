@@ -23,7 +23,7 @@ import { loadRecipes, type Recipe } from '@/lib/cooking/food-data';
 import { matchRecipe, matchRecipes, type RecipeMatch } from '@/lib/cooking/recipe-match';
 import { getShoppingList, addToShopping, toggleShoppingItem, removeShoppingItem, checkoutBought, type ShoppingItem } from '@/lib/cooking/shopping';
 import { recipeNutritionPerServing, recipeMainNutrition, lookupNutrition, type PerServing, type FoodNutrition } from '@/lib/cooking/nutrition';
-import { getWishlist, addWish, removeWish, type WishDish } from '@/lib/cooking/wishlist';
+import { getWishlist, addWish, type WishDish } from '@/lib/cooking/wishlist';
 import { addMeal, type MealSource, type MealItem } from '@/lib/cooking/meals';
 import { planWeek, type WeekPlan } from '@/lib/cooking/meal-plan-core';
 
@@ -154,7 +154,7 @@ export default function CookingSheet({ open, onClose, initialView }: {
             {view.kind === 'recipe' && (
               <>
                 <ScreenHead backLabel={t('做饭', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={view.match.recipe.name} />
-                <RecipeBody match={view.match} soonNames={soonNames} onNeeds={() => setView({ kind: 'needs', match: view.match, from: 'recipe' })} t={t} />
+                <RecipeBody match={view.match} t={t} />
               </>
             )}
             {view.kind === 'needs' && (
@@ -169,7 +169,7 @@ export default function CookingSheet({ open, onClose, initialView }: {
             {view.kind === 'logmeal' && (
               <>
                 <ScreenHead backLabel={t('做饭', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={t('记一餐', 'Log a meal')} />
-                <MealLogBody onCamera={openCamera} onError={setErr} onDone={() => setView({ kind: 'home' })} t={t} />
+                <MealLogBody onError={setErr} onDone={() => setView({ kind: 'home' })} t={t} />
               </>
             )}
             {view.kind === 'plan' && (
@@ -380,7 +380,6 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
     try { addWish(v); setName(''); setAdding(false); onChanged(); }
     catch { onError(t('没加上,再试一次。', 'Could not add — try again.')); }
   }
-  function drop(nm: string) { try { removeWish(nm); onChanged(); } catch { onError(t('没删成,再试一次。', 'Could not remove — try again.')); } }
 
   return (
     <>
@@ -400,8 +399,8 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
                   <div style={{ fontSize: 'var(--text-body)', fontWeight: 600, color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
                   {w.note && <div style={subText}>{w.note}</div>}
                 </button>
-                <button type="button" onClick={() => onCompute(w.name)} style={i === 0 ? primaryBtn : ghostBtn}>{t('算缺料', 'Missing')}</button>
-                <button type="button" onClick={() => drop(w.name)} aria-label={t('删除', 'Remove')} style={xBtn}>✕</button>
+                <button type="button" onClick={() => onCompute(w.name)} aria-label={t('算缺料', 'What’s missing')}
+                  style={{ flex: 'none', width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', fontSize: 'var(--text-sm)', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>{t('缺', '?')}</button>
               </div>
             ))}
           </div>
@@ -431,13 +430,12 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
             <button type="button" onClick={() => setAdding(true)} style={{ ...ghostBtn, flex: 1, padding: 'var(--space-3)', fontSize: 'var(--text-body)' }}>+ {t('搜个菜', 'Search a dish')}</button>
             <button type="button" onClick={onCamera} aria-label={t('拍一张加进来', 'Snap to add')} style={{ ...ghostBtn, padding: 'var(--space-3)' }}><IconCamera size={16} /></button>
           </div>}
-      <p style={caption}>{t('浏览、朋友推荐、拍一张都能加进来 —— 直接复用「记忆」,随云走。点一道看步骤。', 'Add from browsing, a friend, or a photo. Tap one for steps.')}</p>
     </>
   );
 }
 
 // ── 屏3 菜谱详情 ──────────────────────────────────────────────────────────────
-function RecipeBody({ match, soonNames, onNeeds, t }: { match: RecipeMatch<Recipe>; soonNames: Set<string>; onNeeds: () => void; t: TT }) {
+function RecipeBody({ match, t }: { match: RecipeMatch<Recipe>; t: TT }) {
   const r = match.recipe;
   const [per, setPer] = useState<PerServing | null>(null);
   const [main, setMain] = useState<FoodNutrition[] | null>(null);
@@ -450,13 +448,6 @@ function RecipeBody({ match, soonNames, onNeeds, t }: { match: RecipeMatch<Recip
 
   return (
     <>
-      {/* 绿色横幅:材料齐 → 就能做;缺料 → 去缺料屏 */}
-      {match.canCook
-        ? <div style={{ ...banner, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{recipeReason(match, soonNames, t)}</div>
-        : <button type="button" onClick={onNeeds} style={{ ...banner, background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)', border: 'none', cursor: 'pointer', width: '100%', justifyContent: 'space-between', textAlign: 'left' }}>
-            <span>{t(`还缺 ${match.missing.length} 样 · 看看要买什么`, `${match.missing.length} to buy · plan the shopping`)}</span><IconChevronRight size={16} />
-          </button>}
-
       <section>
         <SectionHead label={t('步骤', 'Steps')} />
         <div style={{ ...card, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -496,17 +487,6 @@ function RecipeBody({ match, soonNames, onNeeds, t }: { match: RecipeMatch<Recip
               </>
             : <p style={hintLine}>{main === null ? t('查营养中…', 'Looking up nutrition…') : t('这道菜的食材名暂时对不齐成分表,先不显示假数。', 'Ingredient names don’t line up with the table yet — no fake numbers.')}</p>}
       </section>
-
-      {/* 配饮(Pro) */}
-      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'cooking_pairing_ai' } }))}
-        style={{ ...card, padding: 'var(--space-3) var(--space-4)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', textAlign: 'left', cursor: 'pointer' }}>
-        <Dot />
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 'var(--text-body)', fontWeight: 600 }}>{t('配个饮 · 搭配建议', 'Pair a drink · suggestions')}</span>
-          <span style={{ display: 'block', ...subText }}>{t('云生成 · 按口味给搭配', 'Cloud · tailored to the dish')}</span>
-        </span>
-        <span style={{ ...pill, background: 'var(--portal-accent)', color: '#fff' }}>Pro</span>
-      </button>
     </>
   );
 }
@@ -561,13 +541,19 @@ function NeedsBody({ match, onError, onDone, t }: { match: RecipeMatch<Recipe>; 
 
 // ── 记一餐(进食事件)──────────────────────────────────────────────────────────
 const MEAL_SOURCES: MealSource[] = ['自己做', '餐厅', '外卖', '其他'];
-function MealLogBody({ onCamera, onError, onDone, t }: { onCamera: () => void; onError: (m: string) => void; onDone: () => void; t: TT }) {
+function MealLogBody({ onError, onDone, t }: { onError: (m: string) => void; onDone: () => void; t: TT }) {
   const [items, setItems] = useState<MealItem[]>([]);
   const [source, setSource] = useState<MealSource>('自己做');
   const [name, setName] = useState('');
   const [grams, setGrams] = useState('');
   const [nutri, setNutri] = useState<{ ek: number; p: number; f: number; c: number; matched: number } | null>(null);
   const [saved, setSaved] = useState(false);
+  const [photoUrl, setPhotoUrl] = useState('');
+  const photoRef = useRef<HTMLInputElement>(null);
+  function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0]; e.target.value = '';
+    if (f) { try { setPhotoUrl(URL.createObjectURL(f)); } catch { /* 预览失败不致命 */ } }
+  }
 
   // 营养 = Σ(每100g × 克/100),查本地成分表;没克数的项按 100g 估。全标估算。
   useEffect(() => {
@@ -605,13 +591,15 @@ function MealLogBody({ onCamera, onError, onDone, t }: { onCamera: () => void; o
 
   return (
     <>
-      {/* 拍一张·云端认菜(Pro) */}
-      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'meal_photo_ai' } }))}
-        style={{ ...card, padding: 'var(--space-6) var(--space-4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', cursor: 'pointer', color: 'var(--portal-muted)', fontWeight: 600, fontSize: 'var(--text-body)', fontFamily: 'var(--font-sans)' }}>
-        <IconCamera size={18} />{t('拍一张 · 云端认菜', 'Snap · cloud recognizes')}
-        <span style={{ ...pill, background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)' }}>Pro</span>
+      {/* 拍一张 —— 显示这餐的照片 */}
+      <input ref={photoRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onPhoto} />
+      <button type="button" onClick={() => photoRef.current?.click()} aria-label={t('拍一张', 'Take a photo')}
+        style={{ ...card, padding: 0, overflow: 'hidden', cursor: 'pointer', display: 'block', width: '100%' }}>
+        {photoUrl
+          // eslint-disable-next-line @next/next/no-img-element
+          ? <img src={photoUrl} alt="" style={{ width: '100%', maxHeight: '30vh', objectFit: 'cover', display: 'block' }} draggable={false} />
+          : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', padding: 'var(--space-8) var(--space-4)', color: 'var(--portal-muted)', fontWeight: 600, fontSize: 'var(--text-body)' }}><IconCamera size={20} />{t('拍一张', 'Take a photo')}</span>}
       </button>
-      <p style={caption}>{t('免费:手动加吃了什么;拍照云端认菜是 Pro。', 'Free: add items by hand. Cloud photo recognition is Pro.')}</p>
 
       {/* 吃了什么 */}
       <section>
