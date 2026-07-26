@@ -10,7 +10,6 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
-import NesioMark from '../NesioMark';
 import { IconMapPin, IconCamera, IconCheckSquare, IconZap, IconChevronRight, IconSnowflake } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -33,10 +32,9 @@ type View =
   | { kind: 'recipe'; match: RecipeMatch<Recipe> }
   | { kind: 'needs'; match: RecipeMatch<Recipe>; from: 'home' | 'wishlist' | 'recipe' };
 
-export default function CookingSheet({ open, onClose, initialView, onExitTo }: {
+export default function CookingSheet({ open, onClose, initialView }: {
   open: boolean; onClose: () => void;
   initialView?: 'home' | 'pantry' | 'wishlist';
-  onExitTo?: (target: 'today' | 'capture' | 'insights' | 'chat') => void;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const t = useCallback((zh: string, en: string) => L(dict, zh, en), [dict]);
@@ -87,6 +85,15 @@ export default function CookingSheet({ open, onClose, initialView, onExitTo }: {
     setView({ kind: 'needs', match: matchRecipe(r, pantryNames, normalizeIngredient), from });
   }, [recipes, pantryNames, t]);
 
+  // 想做清单点一道菜 → 目录里找到就打开菜谱详情看步骤;找不到(自定义菜)轻提示。
+  const openRecipeByName = useCallback((name: string) => {
+    if (!recipes) return;
+    const r = recipes.find((x) => x.name === name) ?? recipes.find((x) => x.name.includes(name) || name.includes(x.name));
+    if (!r) { setErr(t(`「${name}」还没有步骤(自定义菜)—— 之后可以自己补。`, `No steps for "${name}" yet (custom dish).`)); return; }
+    setErr('');
+    setView({ kind: 'recipe', match: matchRecipe(r, pantryNames, normalizeIngredient) });
+  }, [recipes, pantryNames, t]);
+
   const consume = useCallback(async (id: string) => {
     setErr('');
     try { if (!consumePantry(id)) setErr(t('没扣上,再试一次。', 'Could not update — try again.')); }
@@ -105,9 +112,9 @@ export default function CookingSheet({ open, onClose, initialView, onExitTo }: {
   return (
     <NesioSheet variant="fullscreen" open={open} onOpenChange={(o) => { if (!o) onClose(); }} ariaLabel={t('做饭 · 库存', 'Cooking · Pantry')} className="cooking-skin">
       <input ref={camInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onCamFile} />
-      <div style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }}>
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <div style={{ padding: 'var(--space-5) var(--space-4) var(--space-6)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
+      <div style={{ minHeight: '100%', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }}>
+        <div>
+          <div style={{ padding: 'var(--space-5) var(--space-4) var(--space-8)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
             {err && <ErrorRow msg={err} onRetry={() => { setErr(''); reload(); }} t={t} />}
 
             {view.kind === 'home' && (
@@ -131,7 +138,7 @@ export default function CookingSheet({ open, onClose, initialView, onExitTo }: {
               <>
                 <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} title={t('想做清单', 'Want to cook')} subtitle={t('想做的菜 · 先存这儿', 'Save what you want to make')} subtitleRight={wishes.length > 0 ? t(`${wishes.length} 道`, `${wishes.length}`) : undefined} />
                 <SubTabs active="wishlist" onSelect={setTopView} t={t} />
-                <WishlistBody wishes={wishes} onCompute={(n) => computeNeeds(n, 'wishlist')} onError={setErr} onChanged={reload} onCamera={openCamera} t={t} />
+                <WishlistBody wishes={wishes} recipes={recipes} onCompute={(n) => computeNeeds(n, 'wishlist')} onOpenDish={openRecipeByName} onError={setErr} onChanged={reload} onCamera={openCamera} t={t} />
               </>
             )}
             {view.kind === 'recipe' && (
@@ -151,7 +158,6 @@ export default function CookingSheet({ open, onClose, initialView, onExitTo }: {
             )}
           </div>
         </div>
-        <CookingBottomNav locale={dict} onToday={() => (onExitTo ? onExitTo('today') : onClose())} onCapture={() => (onExitTo ? onExitTo('capture') : onClose())} onInsights={() => (onExitTo ? onExitTo('insights') : onClose())} onChat={() => onExitTo?.('chat')} t={t} />
       </div>
     </NesioSheet>
   );
@@ -307,37 +313,44 @@ function PantryBody({ items, shopping, onCamera, onConsume, onRemove, onError, o
 
 function PantryRow({ it, last, soon, onConsume, onRemove, t }: { it: PantryItem; last: boolean; soon: boolean; onConsume: (id: string) => void; onRemove: (id: string) => void; t: TT }) {
   const frozen = it.category === '冷冻';
+  const meta = [it.addedAt ? buyLabel(it.addedAt, t) : it.category || '', it.location].filter(Boolean).join(' · ');
   return (
     <div style={{ ...row, borderBottom: last ? 'none' : divider }}>
       <Dot />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 'var(--text-body)', fontWeight: 600 }}>{qtyName(it)}</div>
-        <div style={{ ...subText, display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)', flexWrap: 'wrap' }}>
-          {it.addedAt ? <span>{buyLabel(it.addedAt, t)}</span> : it.category ? <span>{it.category}</span> : null}
-          {it.location && <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}><IconMapPin size={10} />{it.location}</span>}
-        </div>
+        <div style={{ fontSize: 'var(--text-body)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{qtyName(it)}</div>
+        {meta && <div style={{ ...subText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta}</div>}
       </div>
       {soon
         ? <span style={{ ...pill, background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>{daysPill(it.daysLeft, t)}</span>
         : frozen
           ? <span style={{ ...pill, background: 'var(--status-calm-soft)', color: 'var(--status-calm)', display: 'inline-flex', alignItems: 'center', gap: 2 }}><IconSnowflake size={11} />{t('冷冻', 'Frozen')}</span>
           : <span style={{ ...pill, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{t('充足', 'Stocked')}</span>}
-      <button type="button" onClick={() => void onConsume(it.id)} style={ghostBtn}>{t('用掉', 'Use')}</button>
+      <button type="button" onClick={() => void onConsume(it.id)} aria-label={t('用掉一份', 'Use one')} style={{ ...xBtn, color: 'var(--portal-accent)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>{t('用掉', 'Use')}</button>
       <button type="button" onClick={() => void onRemove(it.id)} aria-label={t('删除', 'Remove')} style={xBtn}>✕</button>
     </div>
   );
 }
 
 // ── 屏4 想做清单 ──────────────────────────────────────────────────────────────
-function WishlistBody({ wishes, onCompute, onError, onChanged, onCamera, t }: {
-  wishes: WishDish[]; onCompute: (name: string) => void; onError: (m: string) => void; onChanged: () => void; onCamera: () => void; t: TT;
+function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onError, onChanged, onCamera, t }: {
+  wishes: WishDish[]; recipes: Recipe[] | null; onCompute: (name: string) => void; onOpenDish: (name: string) => void;
+  onError: (m: string) => void; onChanged: () => void; onCamera: () => void; t: TT;
 }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
-  function add() {
-    const nm = name.trim();
-    if (!nm) { setAdding(false); return; }
-    try { addWish(nm); setName(''); setAdding(false); onChanged(); }
+  // 搜的时候模糊匹配已登记在库的菜谱,dropdown 给 ≤5 条。
+  const suggestions = useMemo(() => {
+    const q = name.trim();
+    if (!q || !recipes) return [];
+    const have = new Set(wishes.map((w) => w.name));
+    return recipes.filter((r) => r.name.includes(q) && !have.has(r.name)).slice(0, 5);
+  }, [name, recipes, wishes]);
+
+  function add(nm?: string) {
+    const v = (nm ?? name).trim();
+    if (!v) { setAdding(false); return; }
+    try { addWish(v); setName(''); setAdding(false); onChanged(); }
     catch { onError(t('没加上,再试一次。', 'Could not add — try again.')); }
   }
   function drop(nm: string) { try { removeWish(nm); onChanged(); } catch { onError(t('没删成,再试一次。', 'Could not remove — try again.')); } }
@@ -345,17 +358,17 @@ function WishlistBody({ wishes, onCompute, onError, onChanged, onCamera, t }: {
   return (
     <>
       {wishes.length === 0 && !adding
-        ? <p style={{ ...hintLine, lineHeight: 1.6 }}>{t('想做的菜先攒着 —— 朋友推荐的、刷到的、想给家人做的。选一道就能算「还缺什么」。', 'Save dishes you want to make — then pick one to see what’s missing.')}</p>
+        ? <p style={{ ...hintLine, lineHeight: 1.6 }}>{t('想做的菜先攒着 —— 朋友推荐的、刷到的、想给家人做的。点一道看步骤,或算「还缺什么」。', 'Save dishes you want to make — tap one for steps, or see what’s missing.')}</p>
         : (
           <div style={card}>
             {wishes.map((w, i) => (
               <div key={w.name} style={{ ...row, borderBottom: i === wishes.length - 1 ? 'none' : divider }}>
                 <Dot />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 'var(--text-body)', fontWeight: 600 }}>{w.name}</div>
+                <button type="button" onClick={() => onOpenDish(w.name)} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-sans)' }}>
+                  <div style={{ fontSize: 'var(--text-body)', fontWeight: 600, color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
                   {w.note && <div style={subText}>{w.note}</div>}
-                </div>
-                <button type="button" onClick={() => onCompute(w.name)} style={i === 0 ? primaryBtn : ghostBtn}>{t('算缺料', 'What’s missing')}</button>
+                </button>
+                <button type="button" onClick={() => onCompute(w.name)} style={i === 0 ? primaryBtn : ghostBtn}>{t('算缺料', 'Missing')}</button>
                 <button type="button" onClick={() => drop(w.name)} aria-label={t('删除', 'Remove')} style={xBtn}>✕</button>
               </div>
             ))}
@@ -363,16 +376,30 @@ function WishlistBody({ wishes, onCompute, onError, onChanged, onCamera, t }: {
         )}
 
       {adding
-        ? <div style={{ ...card, padding: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-            <input style={{ ...inputStyle, flex: 1 }} placeholder={t('菜名(如「番茄炒蛋」)', 'Dish (e.g. tomato & egg)')} value={name} autoFocus
-              onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
-            <button type="button" onClick={add} style={primaryBtn}>{t('加进来', 'Add')}</button>
+        ? <div>
+            <div style={{ ...card, padding: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+              <input style={{ ...inputStyle, flex: 1 }} placeholder={t('搜个菜名(如「番茄炒蛋」)', 'Search a dish (e.g. tomato & egg)')} value={name} autoFocus
+                onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
+              <button type="button" onClick={() => add()} style={primaryBtn}>{t('加进来', 'Add')}</button>
+            </div>
+            {suggestions.length > 0 && (
+              <div style={{ ...card, marginTop: 'var(--space-2)' }}>
+                {suggestions.map((r, i) => (
+                  <button key={r.name} type="button" onClick={() => add(r.name)}
+                    style={{ ...row, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: i === suggestions.length - 1 ? 'none' : divider, cursor: 'pointer' }}>
+                    <Dot />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{r.category}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         : <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <button type="button" onClick={() => setAdding(true)} style={{ ...ghostBtn, flex: 1, padding: 'var(--space-3)', fontSize: 'var(--text-body)' }}>+ {t('搜个菜', 'Search a dish')}</button>
             <button type="button" onClick={onCamera} aria-label={t('拍一张加进来', 'Snap to add')} style={{ ...ghostBtn, padding: 'var(--space-3)' }}><IconCamera size={16} /></button>
           </div>}
-      <p style={caption}>{t('浏览、朋友推荐、拍一张都能加进来 —— 直接复用「记忆」,随云走。', 'Add from browsing, a friend, or a photo — stored as a memory, synced to your cloud.')}</p>
+      <p style={caption}>{t('浏览、朋友推荐、拍一张都能加进来 —— 直接复用「记忆」,随云走。点一道看步骤。', 'Add from browsing, a friend, or a photo. Tap one for steps.')}</p>
     </>
   );
 }
@@ -587,34 +614,6 @@ function SubTabs({ active, onSelect, t }: { active: 'home' | 'pantry' | 'wishlis
   );
 }
 
-/** 底部导航 —— 复用 app 真导航(今天 / 记录 / 洞察),点了退出做饭跳对应页。洞察态高亮。 */
-function CookingBottomNav({ onToday, onCapture, onInsights, onChat, t }: { locale: string; onToday: () => void; onCapture: () => void; onInsights: () => void; onChat: () => void; t: TT }) {
-  const pressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const fired = useRef(false);
-  const start = () => { fired.current = false; pressTimer.current = setTimeout(() => { fired.current = true; onChat(); }, 450); };
-  const end = () => { if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; } if (!fired.current) onCapture(); };
-  const cancel = () => { if (pressTimer.current) { clearTimeout(pressTimer.current); pressTimer.current = null; } };
-  return (
-    <nav style={{ flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-around', background: 'var(--portal-card)', borderTop: divider, padding: 'var(--space-2) var(--space-4)', paddingBottom: 'calc(var(--space-2) + env(safe-area-inset-bottom, 0px))' }}>
-      <button type="button" onClick={onToday} aria-label={t('今天', 'Today')} style={navBtn(false)}>
-        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="8.25" /><path d="M12 7.5V12l3 2.2" /></svg>
-        <span style={navLabel}>{t('今天', 'Today')}</span>
-      </button>
-      <button type="button" onPointerDown={start} onPointerUp={end} onPointerLeave={cancel} onPointerCancel={cancel} onContextMenu={(e) => e.preventDefault()}
-        aria-label={t('记录 / 问一问', 'Capture / Ask')} style={{ border: 'none', background: 'var(--portal-accent)', width: 52, height: 52, borderRadius: '50%', display: 'grid', placeItems: 'center', cursor: 'pointer', boxShadow: 'var(--shadow-card)', marginTop: -18 }}>
-        <NesioMark style={{ width: 26, height: 26 }} />
-      </button>
-      <button type="button" onClick={onInsights} aria-label={t('洞察', 'Insights')} style={navBtn(true)}>
-        <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round"><path d="M6 3h12l3 5-9 13L3 8z" /><path d="M3 8h18M9 3 7.5 8 12 21M15 3l1.5 5L12 21" /></svg>
-        <span style={navLabel}>{t('洞察', 'Insights')}</span>
-      </button>
-    </nav>
-  );
-}
-function navBtn(active: boolean): React.CSSProperties {
-  return { border: 'none', background: 'transparent', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, padding: 'var(--space-1) var(--space-3)', color: active ? 'var(--portal-accent)' : 'var(--portal-muted)', fontFamily: 'var(--font-sans)' };
-}
-const navLabel: React.CSSProperties = { fontSize: 'var(--text-xs)', fontWeight: 600 };
 function NutriCol({ v, label, last }: { v: string; label: string; last?: boolean }) {
   return (
     <div style={{ flex: 1, textAlign: 'center', padding: '0 var(--space-2)', borderRight: last ? 'none' : divider }}>

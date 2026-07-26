@@ -21,7 +21,7 @@ import type { LifeNode } from '@/lib/portal/life-graph';
 import { markFeatureUsed } from '@/lib/portal/feature-usage';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { loadProfileSettings } from '@/lib/portal/profile';
-import { isLabModeOn, LAB_MODE_EVENT } from '@/lib/portal/module-overrides';
+import { isLabModeOn, LAB_MODE_EVENT, isFeatureEnabled } from '@/lib/portal/module-overrides';
 import {
   loadLivingModel,
   saveLivingModel,
@@ -810,7 +810,8 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
               <span style={{ color: 'var(--portal-muted)' }}>›</span>
             </button>
           </div>
-          {/* 做饭 · 库存(workshop 域实验)—— 本地私密的第二张脸:用光你已有的、快过期的。 */}
+          {/* 做饭 · 库存(workshop 域实验)—— 本地私密的第二张脸:用光你已有的、快过期的。lab 可关。 */}
+          {isFeatureEnabled('cooking') && (
           <div className="nesio-insights-section" style={{ marginTop: 'var(--space-3)' }}>
             <p className="nesio-insights-section-label">{L(dict, '做饭 · 库存', 'Cooking · Pantry')}</p>
             <button
@@ -828,6 +829,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
               <span style={{ color: 'var(--portal-muted)' }}>›</span>
             </button>
           </div>
+          )}
           </>
         ) : (
         <>

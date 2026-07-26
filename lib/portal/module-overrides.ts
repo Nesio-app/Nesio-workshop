@@ -43,6 +43,7 @@ export const FEATURE_CATALOG: readonly FeatureEntry[] = Object.freeze([
   { id: 'wardrobe', zh: '衣橱', en: 'Wardrobe', kind: 'feature', defaultOn: true },
   { id: 'tesla', zh: '车 · Tesla', en: 'Car · Tesla', kind: 'feature', defaultOn: true },
   { id: 'living', zh: '多面镜', en: 'Mirror', kind: 'feature', defaultOn: true },
+  { id: 'cooking', zh: '做饭 · 库存', en: 'Cooking · Pantry', kind: 'feature', defaultOn: true },
 ]);
 
 export const LAB_MODE_EVENT = 'nesio-lab-mode-updated';
