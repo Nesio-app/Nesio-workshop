@@ -53,6 +53,42 @@ export async function lookupNutrition(name: string): Promise<FoodNutrition | nul
   return foods ? toNutri(pick(foods)) : null;
 }
 
+export interface PerServing { energyKCal: number; protein: number; fat: number; cho: number; servings: number; matched: number }
+
+/**
+ * 一道菜每份营养(屏3 四列):用 quantities(餐厅出餐量)× 每100g 加总,再按可食部克数估份数缩到家庭份。
+ * 坑:quantities 的 item 名多有噪声、覆盖低 —— 匹配 < 2 项就返回 null(不硬凑假数)。全标估算。
+ */
+export async function recipeNutritionPerServing(
+  quantities: ReadonlyArray<{ amount: number; unit: string; item: string }>,
+): Promise<PerServing | null> {
+  if (!quantities?.length) return null;
+  const m = await buildIndex();
+  let ek = 0, p = 0, f = 0, c = 0, matched = 0, edibleG = 0;
+  for (const q of quantities) {
+    const g = q.unit === 'kg' ? q.amount * 1000 : q.amount;   // g/ml 视作克
+    if (!(g > 0)) continue;
+    const nm = normalizeIngredient(q.item);
+    if (!nm.name) continue;
+    const foods = m.get(stripFoodName(nm.name));
+    if (!foods) continue;
+    const nu = toNutri(pick(foods));
+    matched += 1;
+    const fac = g / 100;
+    ek += nu.energyKCal * fac; p += nu.protein * fac; f += nu.fat * fac; c += nu.cho * fac;
+    if (nm.name !== '水' && nm.name !== '高汤') edibleG += g;   // 水/高汤不算份数
+  }
+  if (matched < 2) return null;
+  const servings = Math.max(1, Math.round(edibleG / 450));      // ≈450g 可食部/份,估
+  return {
+    energyKCal: Math.round(ek / servings),
+    protein: Math.round((p / servings) * 10) / 10,
+    fat: Math.round((f / servings) * 10) / 10,
+    cho: Math.round((c / servings) * 10) / 10,
+    servings, matched,
+  };
+}
+
 /** 一道菜的主料(非常备、去重)每100g营养 —— 匹配到的返回,标「估算」。 */
 export async function recipeMainNutrition(ingredients: readonly string[]): Promise<FoodNutrition[]> {
   const m = await buildIndex();

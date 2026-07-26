@@ -16,6 +16,7 @@ export interface PantryItem {
   location: string;          // 原始 location('' = 未归位)
   category: string;          // '' = 未分类
   daysLeft: number | null;   // 距到期天数(负 = 已过期);无效期 = null
+  addedAt: string;           // 买入/记录日 'YYYY-MM-DD'(节点 createdAt;'' = 未知)
 }
 
 const DAY_MS = 86_400_000;
