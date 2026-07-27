@@ -247,6 +247,8 @@ export default function TimelineTab() {
   // 批次 62:地点纠正选择器(附近候选 + 手动命名,参考 Foursquare Where? 形态)
   const [placePick, setPlacePick] = useState<{ raw: string; lat?: number; lon?: number } | null>(null);
   const [shareStats, setShareStats] = useState<PlacesShareStats | null>(null); // 足迹成就卡分享
+  const [locateBusy, setLocateBusy] = useState(false);
+  const [locateMsg, setLocateMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [doneTrips, setDoneTrips] = useState<Trip[]>([]);
   const [openDoneTripId, setOpenDoneTripId] = useState<string | null>(null);
 
@@ -571,6 +573,47 @@ export default function TimelineTab() {
     setEditRaw(null); setEditVal('');
   }
 
+  /** 当场打点证明定位:取 GPS → 反查地名 → 写入足迹 → 跳到今天。地图本来只画库里的点,没有蓝点。 */
+  async function markHereNow() {
+    if (locateBusy) return;
+    setLocateBusy(true);
+    setLocateMsg(null);
+    try {
+      const { getDevicePosition, recordVisitFromCoords, ensurePlaceTrailWatch } = await import('@/lib/portal/native-geolocation');
+      const pos = await getDevicePosition({ timeoutMs: 15_000, maximumAgeMs: 30_000, enableHighAccuracy: true });
+      if (!pos) {
+        setLocateMsg({
+          ok: false,
+          text: L(dict, '拿不到坐标 — 确认系统已允许定位,到窗边/室外再试', 'No coordinates — allow Location, try near a window/outdoors'),
+        });
+        return;
+      }
+      await recordVisitFromCoords(pos.lat, pos.lon);
+      void ensurePlaceTrailWatch();
+      setTrail(loadPlaceTrail());
+      setDayIdx(0);
+      setSub('timeline');
+      let label = `${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}`;
+      try {
+        const { reverseGeocode } = await import('@/lib/portal/providers/weather');
+        const g = await reverseGeocode(pos.lat, pos.lon);
+        label = g.label || g.city || label;
+      } catch { /* 坐标也够证明 */ }
+      setLocateMsg({
+        ok: true,
+        text: L(
+          dict,
+          `已标记当前位置: ${label}（${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}）· 地图只显示足迹点,不是实时蓝点`,
+          `Marked here: ${label} (${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}) · map shows trail points, not a live blue dot`,
+        ),
+      });
+    } catch {
+      setLocateMsg({ ok: false, text: L(dict, '定位失败,稍后再试', 'Locate failed — try again') });
+    } finally {
+      setLocateBusy(false);
+    }
+  }
+
   // 显示名:改过名→用改的;没改的无名占位→「未命名地点」;其余→原名
   function pretty(c: PlaceCluster): string {
     const d = displayLabel(c.label);
@@ -610,6 +653,42 @@ export default function TimelineTab() {
             <span className="nesio-tl-day">{dayLabel(dateKey)}</span>
             <button type="button" className="nesio-fin-monthnav" disabled={dayIdx <= 0} onClick={() => setDayIdx((i) => Math.max(0, i - 1))} aria-label={L(dict, '后一天', 'Next day')}>›</button>
           </div>
+          <div style={{ display: 'flex', gap: '0.5rem', margin: '0 0 0.75rem', alignItems: 'stretch' }}>
+            <button
+              type="button"
+              className="nesio-ob-primary-btn"
+              style={{ flex: 1, fontSize: '0.82rem', padding: '0.55rem 0.75rem' }}
+              disabled={locateBusy}
+              onClick={() => { void markHereNow(); }}
+            >
+              {locateBusy
+                ? L(dict, '正在定位…', 'Locating…')
+                : L(dict, '📍 标记当前位置(验证定位)', '📍 Mark here (prove GPS)')}
+            </button>
+          </div>
+          {locateMsg && (
+            <p
+              style={{
+                margin: '0 0 0.75rem',
+                padding: '0.55rem 0.75rem',
+                borderRadius: '0.75rem',
+                fontSize: '0.78rem',
+                lineHeight: 1.45,
+                background: locateMsg.ok ? 'var(--status-go-soft)' : 'var(--status-risk-soft)',
+                color: locateMsg.ok ? 'var(--status-go)' : 'var(--status-risk)',
+                border: `1px solid ${locateMsg.ok ? 'var(--status-go)' : 'var(--status-risk)'}`,
+              }}
+            >
+              {locateMsg.text}
+            </p>
+          )}
+          <p style={{ margin: '0 0 0.85rem', fontSize: '0.72rem', color: 'var(--portal-muted)', lineHeight: 1.4 }}>
+            {L(
+              dict,
+              '地图只画「足迹库」里的到访(含 Google 时间轴导入),不是实时导航蓝点。上面 2450+ 打点多半是历史导入;要证明现在定位,请点「标记当前位置」。',
+              'The map only plots visits in your trail (including Google Timeline imports), not a live GPS blue dot. Use “Mark here” to prove current location.',
+            )}
+          </p>
           {/* 设计对齐 Google Timeline:🚗 驾车 · 🚶 步行 · 📍 到访(有分模式数据就分开显示)*/}
           {(() => {
             const moves = journey.filter((it): it is Extract<typeof it, { kind: 'move' }> => it.kind === 'move');
