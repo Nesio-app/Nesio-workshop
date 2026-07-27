@@ -155,6 +155,7 @@ function storageKeyLabel(key: string, dict: Parameters<typeof L>[0]): string {
     'nesio-bank-tx-v1': ['银行流水', 'Bank transactions'],
     'nesio-bank-accounts-v1': ['银行账户', 'Bank accounts'],
     'nesio-place-trail-v1': ['足迹轨迹', 'Place trail'],
+    'nesio-travel-trips-v1': ['行程计划', 'Travel trips'],
     'nesio-img-hash-v1': ['图片指纹索引', 'Image index'],
     'nesio-health-v1': ['健康数据', 'Health data'],
     'nesio-experiments-v2': ['实验数据', 'Experiments'],
@@ -403,10 +404,10 @@ export default function Portal() {
   // 批次 14 数据完整性:会话接口网络失败/非 200 时不能当「未登录」——
   // 此前任何一次瞬时失败都会触发 prunePrivateExternalNodes 硬删日历/邮件
   // 节点(项目里引用的也跟着消失),下次重新同步 createdAt 全新 → 列表大洗牌。
-  // 三态:true=确定登录 / false=服务器明确说未登录 / null=未知(网络问题),
-  // 未知态既不跑连接器也不删数据。
+  // 三态:true=确定登录 / false=服务器明确说未登录 / null=未知(启动中/网络问题/session_unverified)。
+  // 未知态既不跑连接器也不删数据;UI 读本机私据时也不要塞演示数据/空登录页。
   const [authDefinitelyAnonymous, setAuthDefinitelyAnonymous] = useState(false);
-  const [authSessionLoggedIn, setAuthSessionLoggedIn] = useState(false);
+  const [authSessionLoggedIn, setAuthSessionLoggedIn] = useState<boolean | null>(null);
   const [onboardingActive, setOnboardingActive] = useState(false);
   const [memoryReceipt, setMemoryReceipt] = useState(false);
   const [askGuideOpen, setAskGuideOpen] = useState(false);
@@ -507,7 +508,11 @@ export default function Portal() {
     () => resolveShellRuntimeTools(shellManifest.tools, launchSurfaceContext),
     [shellManifest.tools, launchSurfaceContext],
   );
-  const canUsePrivateRuntime = authReady && authSessionLoggedIn;
+  // 云同步/连接器:必须「确定已登录」(null/false 都不跑,防未鉴权上传)。
+  const canUsePrivateRuntime = authSessionLoggedIn === true;
+  // UI 读本机私据:未知(null)时保持上次可见性——不当匿名,避免演示种子/空态来回跳。
+  // 只有服务器明确 signed_out 才收成匿名门。
+  const canViewPrivateData = authSessionLoggedIn !== false;
   // 数据泄露收口(P0):在「本机数据归属」核对通过前,**任何**私有云同步都不许跑 —— 否则 A 没登出、
   // B 同机登录时,弹窗还没弹,A 的记忆/健康/财务已按 B 的身份上传落库(进了 B 的账号)。ownerConflict
   // 非空(other_account / anonymous_data)= 归属未定 → 一律不同步,直到用户在弹窗里选定归属。
@@ -625,53 +630,61 @@ export default function Portal() {
 
   useEffect(() => {
     let cancelled = false;
-    const refreshAuthSession = () => {
-      fetchAuthSessionPayload()
-        .then((data) => {
-          if (cancelled) return;
-          const loggedIn = Boolean(data?.loggedIn);
-          const sessionReady = loggedIn && data?.authReady !== false && data?.profileBootstrapBlocking !== true;
-          setAuthSessionLoggedIn(loggedIn);
-          // P0 隐私:核对本机数据归属。换账号登录时,上一个人的记忆绝不能默默留给下一个人。
-          if (loggedIn && data?.user?.id) {
-            const verdict = reconcileLocalOwner(data.user.id, data.user.email || '');
-            if (verdict.kind !== 'ok') {
-              setOwnerConflict((cur) => cur ?? {
-                ...(verdict.kind === 'other_account'
-                  ? { kind: 'other_account' as const, prevEmail: verdict.prevEmail }
-                  : { kind: 'anonymous_data' as const }),
-                userId: data.user!.id!,
-                email: data.user!.email || '',
-              });
-            }
+    // 必须 return Promise:外层不能在 fetch 尚未完成时就把 authReady 置 true
+    // (否则会短暂「已就绪+未登录」→ 演示数据/空洞察闪一下再跳回已登录)。
+    const refreshAuthSession = () => fetchAuthSessionPayload()
+      .then((data) => {
+        if (cancelled) return;
+        // 非 200 / 解析失败 = 未知:保持上一拍登录态,绝不打成匿名。
+        if (data == null) {
+          setAuthDefinitelyAnonymous(false);
+          return;
+        }
+        // access 校验失败但还在刷新中的瞬时态 —— 也当未知,别把已登录用户踢成游客。
+        if (data.status === 'session_unverified') {
+          setAuthDefinitelyAnonymous(false);
+          return;
+        }
+        const loggedIn = Boolean(data.loggedIn);
+        const sessionReady = loggedIn && data.authReady !== false && data.profileBootstrapBlocking !== true;
+        setAuthSessionLoggedIn(loggedIn);
+        // P0 隐私:核对本机数据归属。换账号登录时,上一个人的记忆绝不能默默留给下一个人。
+        if (loggedIn && data.user?.id) {
+          const verdict = reconcileLocalOwner(data.user.id, data.user.email || '');
+          if (verdict.kind !== 'ok') {
+            setOwnerConflict((cur) => cur ?? {
+              ...(verdict.kind === 'other_account'
+                ? { kind: 'other_account' as const, prevEmail: verdict.prevEmail }
+                : { kind: 'anonymous_data' as const }),
+              userId: data.user!.id!,
+              email: data.user!.email || '',
+            });
           }
-          // data 为 null(接口非 200)= 未知,不算「确定未登录」
-          setAuthDefinitelyAnonymous(data != null && !loggedIn);
-          if (sessionReady) {
-            try {
-              markNesioOnboardingDoneForAuth();
-              window.dispatchEvent(new CustomEvent(NESIO_ONBOARDING_COMPLETE_EVENT, { detail: data }));
-            } catch {
-              // Auth state is still valid; local onboarding persistence is best-effort.
-            }
+        }
+        setAuthDefinitelyAnonymous(!loggedIn);
+        if (sessionReady) {
+          try {
+            markNesioOnboardingDoneForAuth();
+            window.dispatchEvent(new CustomEvent(NESIO_ONBOARDING_COMPLETE_EVENT, { detail: data }));
+          } catch {
+            // Auth state is still valid; local onboarding persistence is best-effort.
           }
-        })
-        .catch(() => {
-          // 网络失败 = 未知,不触发数据清理
-          if (!cancelled) { setAuthSessionLoggedIn(false); setAuthDefinitelyAnonymous(false); }
-        })
-        .finally(() => {
-          if (!cancelled) setAuthReady(true);
-        });
-    };
+        }
+      })
+      .catch(() => {
+        // 网络失败 = 未知:不改 loggedIn,不触发数据清理
+        if (!cancelled) setAuthDefinitelyAnonymous(false);
+      })
+      .finally(() => {
+        if (!cancelled) setAuthReady(true);
+      });
+
     importSupabaseHashSession()
       .catch(() => ({ imported: false, ok: false }))
       .then(() => refreshAuthSession())
       .catch(() => {
-        if (!cancelled) setAuthSessionLoggedIn(false);
-      })
-      .finally(() => {
-        if (!cancelled) setAuthReady(true);
+        // hash 导入失败不代表已登出;等 refreshAuthSession 自己定性
+        if (!cancelled) setAuthDefinitelyAnonymous(false);
       });
 
     window.addEventListener('nesio-auth-session-ready', refreshAuthSession);
@@ -801,6 +814,12 @@ export default function Portal() {
       track('cooking_camera_open');
       setCookingOpen(false); setPantryIntake(true); setCameraFile(file ?? null); setCaptureMode('camera');
     };
+    // 行程购物/预算「拍小票」—— 打开通用相机识别(不强制食材进货模式)
+    const openCameraHandler = (e: Event) => {
+      const file = (e as CustomEvent).detail?.file as File | undefined;
+      track('travel_camera_open');
+      setPantryIntake(false); setCameraFile(file ?? null); setCaptureMode('camera');
+    };
     const rewardsHandler = () => { track('rewards_open'); setRewardsOpen(true); };
     const briefHandler = () => { track('brief_open', {}); setBriefOpen(true); };
     // 洞察浮层:底部导航 / 卡片 / 「开始练」都派事件打开;detail.tab 指定进哪个 tab(如 fitness)
@@ -841,6 +860,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-family', familyHandler);
     window.addEventListener('nesio-open-cooking', cookingHandler);
     window.addEventListener('nesio-open-cooking-camera', cookingCameraHandler);
+    window.addEventListener('nesio-open-camera', openCameraHandler);
     window.addEventListener('nesio-open-rewards', rewardsHandler);
     window.addEventListener('nesio-open-brief', briefHandler);
     window.addEventListener('nesio-open-insights', insightsHandler);
@@ -858,6 +878,7 @@ export default function Portal() {
       window.removeEventListener('nesio-open-family', familyHandler);
       window.removeEventListener('nesio-open-cooking', cookingHandler);
       window.removeEventListener('nesio-open-cooking-camera', cookingCameraHandler);
+      window.removeEventListener('nesio-open-camera', openCameraHandler);
       window.removeEventListener('nesio-open-rewards', rewardsHandler);
       window.removeEventListener('nesio-open-brief', briefHandler);
       window.removeEventListener('nesio-open-insights', insightsHandler);
@@ -1239,11 +1260,11 @@ export default function Portal() {
         )}
         <div className="nesio-shell">
           {!onboardingActive && activeSurface === 'today' && (
-            <TodayFeed canUsePrivateData={canUsePrivateRuntime} onOpenMemory={() => setActiveSurface('memory')} />
+            <TodayFeed canUsePrivateData={canViewPrivateData} onOpenMemory={() => setActiveSurface('memory')} />
           )}
-          {!onboardingActive && activeSurface === 'memory' && <MemoryTab canUsePrivateData={canUsePrivateRuntime} />}
+          {!onboardingActive && activeSurface === 'memory' && <MemoryTab canUsePrivateData={canViewPrivateData} />}
           {!onboardingActive && activeSurface === 'tell' && (
-            <TodayFeed canUsePrivateData={canUsePrivateRuntime} onOpenMemory={() => setActiveSurface('memory')} />
+            <TodayFeed canUsePrivateData={canViewPrivateData} onOpenMemory={() => setActiveSurface('memory')} />
           )}
         </div>
 
@@ -1276,7 +1297,7 @@ export default function Portal() {
       <VoiceInputSheet
         open={captureMode === 'voice'}
         intent={voiceIntent}
-        canUsePrivateData={canUsePrivateRuntime}
+        canUsePrivateData={canViewPrivateData}
         onClose={() => { setCaptureMode(null); setVoiceIntent('note'); }}
       />
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
@@ -1396,7 +1417,7 @@ export default function Portal() {
           className="nesio-settings-sheet-card nesio-insights-sheet-card"
           ariaLabel={L(dict, 'Nesio 的洞察', "Nesio's insights")}
         >
-          <InsightsSheet onClose={() => setInsightsOpen(false)} canUsePrivateData={canUsePrivateRuntime} initialTab={insightsTab} />
+          <InsightsSheet onClose={() => setInsightsOpen(false)} canUsePrivateData={canViewPrivateData} initialTab={insightsTab} />
         </NesioSheet>
       )}
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
@@ -1410,10 +1431,10 @@ export default function Portal() {
           <WorkoutPlayer session={workoutSession} onClose={() => setWorkoutSession(null)} />
         </TabErrorBoundary>
       )}
-      {briefOpen && <DailyBriefSheet open={briefOpen} onClose={() => setBriefOpen(false)} canUsePrivateData={canUsePrivateRuntime} />}
+      {briefOpen && <DailyBriefSheet open={briefOpen} onClose={() => setBriefOpen(false)} canUsePrivateData={canViewPrivateData} />}
       <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />
 
-      <NesioChatSheet open={chatOpen} onClose={() => setChatOpen(false)} canUsePrivateData={canUsePrivateRuntime} />
+      <NesioChatSheet open={chatOpen} onClose={() => setChatOpen(false)} canUsePrivateData={canViewPrivateData} />
       <NotePanelEnhanced open={noteOpen} onOpenChange={setNoteOpen} />
       {memoryReceipt && (
         <div className="nesio-memory-receipt" role="status" aria-live="polite">

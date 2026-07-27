@@ -67,8 +67,13 @@ assert.match(
 );
 assert.match(
   portal,
-  /canUsePrivateRuntime/,
-  'Portal must derive one runtime gate for private data connectors and surfaces.',
+  /canUsePrivateRuntime\s*=\s*authSessionLoggedIn\s*===\s*true/,
+  'Portal connectors/sync must require a definitive signed-in session.',
+);
+assert.match(
+  portal,
+  /canViewPrivateData\s*=\s*authSessionLoggedIn\s*!==\s*false/,
+  'Portal UI private view must stay sticky while auth is unknown (avoid demo/empty flicker).',
 );
 assert.doesNotMatch(
   portal,
@@ -77,8 +82,8 @@ assert.doesNotMatch(
 );
 assert.match(
   portal,
-  /<TodayFeed[\s\S]*canUsePrivateData=\{canUsePrivateRuntime\}/,
-  'TodayFeed must receive the same private-data gate used by connectors.',
+  /<TodayFeed[\s\S]*canUsePrivateData=\{canViewPrivateData\}/,
+  'TodayFeed must use the sticky UI private-data gate (not flip to demo while session is unknown).',
 );
 assert.match(
   portal,
@@ -87,8 +92,13 @@ assert.match(
 );
 assert.match(
   portal,
-  /<MemoryTab[\s\S]*canUsePrivateData=\{canUsePrivateRuntime\}/,
-  'MemoryTab must receive the same private-data gate used by connectors.',
+  /<MemoryTab[\s\S]*canUsePrivateData=\{canViewPrivateData\}/,
+  'MemoryTab must use the sticky UI private-data gate (not flip to demo while session is unknown).',
+);
+assert.match(
+  portal,
+  /if\s*\(\s*!canUsePrivateRuntime\s*\)\s*\{[\s\S]*?return;\s*\}\s*runConnectors/s,
+  'Connectors must still be gated by definitive canUsePrivateRuntime (not the sticky UI gate).',
 );
 
 for (const [name, source] of [

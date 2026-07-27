@@ -21,7 +21,7 @@ import type { LifeNode } from '@/lib/portal/life-graph';
 import { markFeatureUsed } from '@/lib/portal/feature-usage';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { loadProfileSettings } from '@/lib/portal/profile';
-import { isLabModeOn, LAB_MODE_EVENT, isFeatureEnabled } from '@/lib/portal/module-overrides';
+import { isLabModeOn, LAB_MODE_EVENT } from '@/lib/portal/module-overrides';
 import {
   loadLivingModel,
   saveLivingModel,
@@ -38,7 +38,11 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { InfoTip } from './InfoTip';
-import { IconRefresh, IconTrendingUp, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconDownload, IconAlertTriangle, IconBookmark } from './icons';
+import {
+  IconRefresh, IconTrendingUp, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconDownload, IconAlertTriangle, IconBookmark,
+  IconBulb, IconTarget, IconPlay, IconHeartPulse, IconActivity, IconMapPin, IconCard, IconBox, IconUser, IconCar, IconMirror,
+  IconGear, IconPeople, IconUtensils,
+} from './icons';
 import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 import TimelineTab from './insights/TimelineTab';
 import GrowthTab from './insights/GrowthTab';
@@ -479,7 +483,39 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   // 洞察改版:首页是入口宫格(showHub),点卡进板块;有 initialTab(深链)时直达板块。
   const [showHub, setShowHub] = useState(!initialTab);
   const tabLabel = (t: MainTab): string =>
-    t === 'reflection' ? L(dict, '洞察', 'Insights') : t === 'growth' ? L(dict, '成长', 'Growth') : t === 'montage' ? L(dict, '小剧场', 'Films') : t === 'health' ? L(dict, '健康', 'Health') : t === 'fitness' ? L(dict, '健身', 'Fitness') : t === 'timeline' ? L(dict, '足迹', 'Places') : t === 'finance' ? L(dict, '财务', 'Finance') : t === 'relationships' ? L(dict, '关系', 'People') : t === 'schedule' ? L(dict, '日程', 'Schedule') : t === 'inventory' ? L(dict, '物品', 'Items') : t === 'wardrobe' ? L(dict, '衣橱', 'Wardrobe') : t === 'tesla' ? L(dict, '车 · Tesla', 'Car · Tesla') : t === 'admin' ? L(dict, '运营', 'Ops') : L(dict, '多面镜', 'Mirror');
+    t === 'reflection' ? L(dict, '洞察', 'Insights')
+      : t === 'growth' ? L(dict, '成长', 'Growth')
+      : t === 'montage' ? L(dict, '剧场', 'Films')
+      : t === 'health' ? L(dict, '健康', 'Health')
+      : t === 'fitness' ? L(dict, '健身', 'Fitness')
+      : t === 'timeline' ? L(dict, '足迹', 'Places')
+      : t === 'finance' ? L(dict, '财务', 'Finance')
+      : t === 'relationships' ? L(dict, '关系', 'People')
+      : t === 'schedule' ? L(dict, '日程', 'Schedule')
+      : t === 'inventory' ? L(dict, '物品', 'Items')
+      : t === 'wardrobe' ? L(dict, '衣橱', 'Wardrobe')
+      : t === 'tesla' ? L(dict, '车', 'Car')
+      : t === 'admin' ? L(dict, '运营', 'Ops')
+      : L(dict, '镜子', 'Mirror');
+  const tabIcon = (t: MainTab): ReactNode => {
+    switch (t) {
+      case 'reflection': return <IconBulb />;
+      case 'growth': return <IconTarget />;
+      case 'montage': return <IconPlay />;
+      case 'health': return <IconHeartPulse />;
+      case 'fitness': return <IconActivity />;
+      case 'timeline': return <IconMapPin />;
+      case 'schedule': return <IconCalendar />;
+      case 'finance': return <IconCard />;
+      case 'inventory': return <IconBox />;
+      case 'wardrobe': return <IconBookmark />;
+      case 'relationships': return <IconUser />;
+      case 'tesla': return <IconCar />;
+      case 'living': return <IconMirror />;
+      case 'admin': return <IconGear />;
+      default: return <IconNote />;
+    }
+  };
   const showPlaces = useFeatureEnabled('places');
   const showExperiment = useFeatureEnabled('experiment');
   const showHealth = useFeatureEnabled('health');
@@ -493,6 +529,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   const showWardrobe = useFeatureEnabled('wardrobe');
   const showTesla = useFeatureEnabled('tesla');
   const showLiving = useFeatureEnabled('living');
+  const showCooking = useFeatureEnabled('cooking');
   const tabEnabled = (t: MainTab): boolean =>
     t === 'timeline' ? showPlaces
       : t === 'health' ? showHealth
@@ -779,57 +816,39 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {showHub ? (
           <>
           <div className="nesio-insights-hub">
-            {(['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule', 'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'admin'] as MainTab[]).filter(tabEnabled).map((t) => (
+            {(['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule', 'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'admin'] as MainTab[])
+              .filter(tabEnabled)
+              .map((t) => (
+                <button
+                  key={t}
+                  type="button"
+                  className="nesio-insights-hub-tile"
+                  onClick={() => { setMainTab(t); setShowHub(false); }}
+                >
+                  <span className="nesio-insights-hub-icon" aria-hidden>{tabIcon(t)}</span>
+                  <span className="nesio-insights-hub-label">{tabLabel(t)}</span>
+                </button>
+              ))}
+            {/* 家务 / 美味:与宫格同款(图标上、文字下),不再用下方长条卡 */}
+            <button
+              type="button"
+              className="nesio-insights-hub-tile"
+              onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-family'))}
+            >
+              <span className="nesio-insights-hub-icon" aria-hidden><IconPeople /></span>
+              <span className="nesio-insights-hub-label">{L(dict, '家务', 'Chores')}</span>
+            </button>
+            {showCooking && (
               <button
-                key={t}
                 type="button"
                 className="nesio-insights-hub-tile"
-                onClick={() => { setMainTab(t); setShowHub(false); }}
+                onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-cooking'))}
               >
-                {tabLabel(t)}
-                {t === 'living' && <span className="nesio-insights-hub-pro">Pro</span>}
+                <span className="nesio-insights-hub-icon" aria-hidden><IconUtensils /></span>
+                <span className="nesio-insights-hub-label">{L(dict, '美味', 'Cooking')}</span>
               </button>
-            ))}
+            )}
           </div>
-          {/* 与家人共享:家庭分享入口(workshop 域实验)—— 放在洞察首屏九宫格下方,进门就看得到。
-              同一道门以后也放别的共享(一趟旅行、一个项目),故命名「与家人共享」不叫「家务」。 */}
-          <div className="nesio-insights-section" style={{ marginTop: 'var(--space-3)' }}>
-            <p className="nesio-insights-section-label">{L(dict, '与家人共享', 'Shared with people')}</p>
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-family'))}
-              style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', background: 'var(--portal-bg)', cursor: 'pointer', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }}
-            >
-              <span aria-hidden style={{ width: 40, height: 40, borderRadius: 'var(--radius-sm)', display: 'grid', placeItems: 'center', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', flex: 'none' }}>
-                <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 11a2.5 2.5 0 1 0 0-5M4 20v-1a5 5 0 0 1 10 0v1M15.5 15.5A5 5 0 0 1 20 20v1" strokeLinecap="round" strokeLinejoin="round" /></svg>
-              </span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{L(dict, '家庭分享', 'Family sharing')}</span>
-                <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '家务 & 零花钱账本 —— Nesio 只记账,永不碰钱', 'Chores & allowance — Nesio just keeps the count')}</span>
-              </span>
-              <span style={{ color: 'var(--portal-muted)' }}>›</span>
-            </button>
-          </div>
-          {/* 做饭 · 库存(workshop 域实验)—— 本地私密的第二张脸:用光你已有的、快过期的。lab 可关。 */}
-          {isFeatureEnabled('cooking') && (
-          <div className="nesio-insights-section" style={{ marginTop: 'var(--space-3)' }}>
-            <p className="nesio-insights-section-label">{L(dict, '做饭 · 库存', 'Cooking · Pantry')}</p>
-            <button
-              type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-cooking'))}
-              style={{ width: '100%', textAlign: 'left', display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', background: 'var(--portal-bg)', cursor: 'pointer', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }}
-            >
-              <span aria-hidden style={{ width: 40, height: 40, borderRadius: 'var(--radius-sm)', display: 'grid', placeItems: 'center', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', flex: 'none' }}>
-                <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 2v7a2 2 0 0 0 2 2h0a2 2 0 0 0 2-2V2M5 11v11M19 2c-1.7 0-3 2-3 5s0 5 1.5 5H19v9" /></svg>
-              </span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{L(dict, '库存 & 做饭', 'Pantry & cooking')}</span>
-                <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '家里有什么、什么快过期 —— 先用光它', 'What’s on hand & expiring — use it first')}</span>
-              </span>
-              <span style={{ color: 'var(--portal-muted)' }}>›</span>
-            </button>
-          </div>
-          )}
           </>
         ) : (
         <>

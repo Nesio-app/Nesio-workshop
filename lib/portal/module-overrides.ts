@@ -39,11 +39,11 @@ export const FEATURE_CATALOG: readonly FeatureEntry[] = Object.freeze([
   // 洞察 tab 可见性(此前这几张 tile 无开关、永远在,用户「全关了还看得到」的真因)。
   // 加进开关中心,逐个可控;默认开(维持现状),想关就关。
   { id: 'growth', zh: '成长', en: 'Growth', kind: 'feature', defaultOn: true },
-  { id: 'montage', zh: '小剧场', en: 'Films', kind: 'feature', defaultOn: true },
+  { id: 'montage', zh: '剧场', en: 'Films', kind: 'feature', defaultOn: true },
   { id: 'wardrobe', zh: '衣橱', en: 'Wardrobe', kind: 'feature', defaultOn: true },
-  { id: 'tesla', zh: '车 · Tesla', en: 'Car · Tesla', kind: 'feature', defaultOn: true },
-  { id: 'living', zh: '多面镜', en: 'Mirror', kind: 'feature', defaultOn: true },
-  { id: 'cooking', zh: '做饭 · 库存', en: 'Cooking · Pantry', kind: 'feature', defaultOn: true },
+  { id: 'tesla', zh: '车', en: 'Car', kind: 'feature', defaultOn: true },
+  { id: 'living', zh: '镜子', en: 'Mirror', kind: 'feature', defaultOn: true },
+  { id: 'cooking', zh: '美味', en: 'Cooking', kind: 'feature', defaultOn: true },
 ]);
 
 export const LAB_MODE_EVENT = 'nesio-lab-mode-updated';

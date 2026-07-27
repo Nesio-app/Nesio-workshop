@@ -4,18 +4,17 @@
  * CookingSheet — 做饭 / 库存(workshop 第二张脸)。「一张图,多张脸」:食材=生活图谱 object 节点,
  * 想做/购物清单=记忆节点,相机=拍一拍,营养=本地成分表查表,全复用,不重复造车轮。
  *
- * 视觉严格对齐 workshop 视觉稿(屏1-5):左对齐大标题 + 副标题 + 「‹返回」;白色抬起卡片(--portal-card
- * + shadow-card);快过期横向卡;用手上的能做=圆点 + 理由 + 状态 pill;营养每份四列;缺料闭环。
+ * 入口对齐记一物品(手动 + 小相机);做饭/想做清单去大标题;菜谱自选输入;记一餐相机先行。
  * 主线全免费·确定性;云生成是 Pro 点缀。每个异步动作有显式失败态;全用设计 token、无 emoji、线性图标。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
-import { IconMapPin, IconCamera, IconCheckSquare, IconZap, IconChevronRight, IconSnowflake, IconUtensils } from '../icons';
+import { IconCamera, IconCheckSquare, IconZap, IconUtensils } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import {
-  listPantry, addPantry, consumePantry, removePantry, expiringPantry,
+  listPantry, addPantry, removePantry, expiringPantry,
   PANTRY_CATEGORIES, type PantryItem,
 } from '@/lib/cooking/pantry';
 import { normalizeIngredient } from '@/lib/cooking/food-catalog';
@@ -51,6 +50,8 @@ export default function CookingSheet({ open, onClose, initialView }: {
   const [shopping, setShopping] = useState<ShoppingItem[]>([]);
   const [wishes, setWishes] = useState<WishDish[]>([]);
   const camInputRef = useRef<HTMLInputElement>(null);
+  const mealCamRef = useRef<HTMLInputElement>(null);
+  const [mealPhoto, setMealPhoto] = useState('');
 
   const reload = useCallback(() => {
     try { setItems(listPantry()); } catch { setErr(t('读不出库存,刷新看看。', 'Could not read the pantry — refresh.')); }
@@ -65,13 +66,10 @@ export default function CookingSheet({ open, onClose, initialView }: {
   }, []);
   useEffect(() => { if (open && recipes === null && !recipesErr) loadRec(); }, [open, recipes, recipesErr, loadRec]);
 
-  const soon = useMemo(() => expiringPantry(items, 4), [items]);
+  // 7 天窗:「快过期」要覆盖「这周内先用」的日常节奏(牛奶/叶菜常是 3–7 天),4 天太窄会漏。
+  const soon = useMemo(() => expiringPantry(items, 7), [items]);
   const soonNames = useMemo(() => new Set(soon.map((i) => normalizeIngredient(i.name).name).filter(Boolean)), [soon]);
   const pantryNames = useMemo(() => new Set(items.map((i) => normalizeIngredient(i.name).name).filter(Boolean)), [items]);
-  const matches = useMemo(
-    () => (recipes && pantryNames.size ? matchRecipes(recipes, pantryNames, normalizeIngredient, { onlyWithPantry: true }).slice(0, 12) : []),
-    [recipes, pantryNames],
-  );
   // 排周计划用更宽的候选集(含少量需采购),给一周排满。
   const planMatches = useMemo(
     () => (recipes && pantryNames.size ? matchRecipes(recipes, pantryNames, normalizeIngredient, { onlyWithPantry: true }).slice(0, 30) : []),
@@ -83,6 +81,25 @@ export default function CookingSheet({ open, onClose, initialView }: {
   const onCamFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; e.target.value = '';
     if (f) window.dispatchEvent(new CustomEvent('nesio-open-cooking-camera', { detail: { file: f } }));
+  }, []);
+  /** 记一餐:点一下先开相机,拍好带图进记一餐页(页内不再放相机)。 */
+  const startLogMeal = useCallback(() => { mealCamRef.current?.click(); }, []);
+  const onMealCamFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; e.target.value = '';
+    if (!f) return;
+    setMealPhoto((prev) => {
+      if (prev) try { URL.revokeObjectURL(prev); } catch { /* ignore */ }
+      try { return URL.createObjectURL(f); } catch { return ''; }
+    });
+    setErr('');
+    setView({ kind: 'logmeal' });
+  }, []);
+  const finishLogMeal = useCallback(() => {
+    setMealPhoto((prev) => {
+      if (prev) try { URL.revokeObjectURL(prev); } catch { /* ignore */ }
+      return '';
+    });
+    setView({ kind: 'home' });
   }, []);
 
   const computeNeeds = useCallback((dishName: string, from: 'wishlist' | 'home' | 'recipe') => {
@@ -103,12 +120,6 @@ export default function CookingSheet({ open, onClose, initialView }: {
     setView({ kind: 'recipe', match: matchRecipe(r, pantryNames, normalizeIngredient) });
   }, [recipes, pantryNames, t]);
 
-  const consume = useCallback(async (id: string) => {
-    setErr('');
-    try { if (!consumePantry(id)) setErr(t('没扣上,再试一次。', 'Could not update — try again.')); }
-    catch { setErr(t('没扣上,再试一次。', 'Could not update — try again.')); }
-    reload();
-  }, [t, reload]);
   const remove = useCallback((id: string) => {
     setErr('');
     try { if (!removePantry(id)) setErr(t('没删成,再试一次。', 'Could not remove — try again.')); }
@@ -121,6 +132,7 @@ export default function CookingSheet({ open, onClose, initialView }: {
   return (
     <NesioSheet variant="fullscreen" open={open} onOpenChange={(o) => { if (!o) onClose(); }} ariaLabel={t('做饭 · 库存', 'Cooking · Pantry')} className="cooking-skin">
       <input ref={camInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onCamFile} />
+      <input ref={mealCamRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onMealCamFile} />
       <div style={{ minHeight: '100%', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }}>
         <div>
           <div style={{ padding: 'var(--space-5) var(--space-4) var(--space-8)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>
@@ -128,12 +140,12 @@ export default function CookingSheet({ open, onClose, initialView }: {
 
             {view.kind === 'home' && (
               <>
-                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} title={t('做饭', 'Cooking')} subtitle={t('冰箱里还有这些', 'Here’s what’s in the fridge')} />
+                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} />
                 <SubTabs active="home" onSelect={setTopView} t={t} />
                 <HomeBody
-                  soon={soon} matches={matches} recipes={recipes} recipesErr={recipesErr} soonNames={soonNames}
-                  pantryCount={items.length} onLoadRec={loadRec} onOpenRecipe={(m) => setView({ kind: 'recipe', match: m })}
-                  onLogMeal={() => setView({ kind: 'logmeal' })} t={t}
+                  soon={soon} recipes={recipes} recipesErr={recipesErr} soonNames={soonNames} pantryNames={pantryNames}
+                  onLoadRec={loadRec} onOpenRecipe={(m) => setView({ kind: 'recipe', match: m })}
+                  onLogMeal={startLogMeal} onCamera={openCamera} t={t}
                 />
               </>
             )}
@@ -141,12 +153,12 @@ export default function CookingSheet({ open, onClose, initialView }: {
               <>
                 <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} title={t('库存', 'Pantry')} />
                 <SubTabs active="pantry" onSelect={setTopView} t={t} />
-                <PantryBody items={items} shopping={shopping} onCamera={openCamera} onConsume={consume} onRemove={remove} onError={setErr} onChanged={reload} t={t} />
+                <PantryBody items={items} shopping={shopping} onCamera={openCamera} onRemove={remove} onError={setErr} onChanged={reload} t={t} />
               </>
             )}
             {view.kind === 'wishlist' && (
               <>
-                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} title={t('想做清单', 'Want to cook')} subtitle={t('想做的菜 · 先存这儿', 'Save what you want to make')} subtitleRight={wishes.length > 0 ? t(`${wishes.length} 道`, `${wishes.length}`) : undefined} />
+                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} />
                 <SubTabs active="wishlist" onSelect={setTopView} t={t} />
                 <WishlistBody wishes={wishes} recipes={recipes} onCompute={(n) => computeNeeds(n, 'wishlist')} onOpenDish={openRecipeByName} onPlan={() => setView({ kind: 'plan' })} onError={setErr} onChanged={reload} onCamera={openCamera} t={t} />
               </>
@@ -168,14 +180,14 @@ export default function CookingSheet({ open, onClose, initialView }: {
             )}
             {view.kind === 'logmeal' && (
               <>
-                <ScreenHead backLabel={t('做饭', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={t('记一餐', 'Log a meal')} />
-                <MealLogBody onError={setErr} onDone={() => setView({ kind: 'home' })} t={t} />
+                <ScreenHead backLabel={t('做饭', 'Cooking')} onBack={finishLogMeal} title={t('记一餐', 'Log a meal')} />
+                <MealLogBody photoUrl={mealPhoto} onError={setErr} onDone={finishLogMeal} t={t} />
               </>
             )}
             {view.kind === 'plan' && (
               <>
-                <ScreenHead backLabel={t('想做清单', 'Want to cook')} onBack={() => setView({ kind: 'wishlist' })} title={t('做饭计划', 'Meal plan')} subtitle={t('本周 · 按库存 + 目标 + 防过期排', 'This week · by pantry + goal + expiry')} />
-                <PlanBody matches={planMatches} soonNames={soonNames} onError={setErr} t={t} />
+                <ScreenHead backLabel={t('想做清单', 'Want to cook')} onBack={() => setView({ kind: 'wishlist' })} title={t('做饭计划', 'Meal plan')} />
+                <PlanBody matches={planMatches} recipes={recipes} soonNames={soonNames} pantryNames={pantryNames} onError={setErr} t={t} />
               </>
             )}
           </div>
@@ -186,82 +198,138 @@ export default function CookingSheet({ open, onClose, initialView }: {
 }
 
 // ── 屏1 做饭首页 ──────────────────────────────────────────────────────────────
-function HomeBody({ soon, matches, recipes, recipesErr, soonNames, pantryCount, onLoadRec, onOpenRecipe, onLogMeal, t }: {
-  soon: PantryItem[]; matches: RecipeMatch<Recipe>[]; recipes: Recipe[] | null; recipesErr: boolean; soonNames: Set<string>;
-  pantryCount: number; onLoadRec: () => void; onOpenRecipe: (m: RecipeMatch<Recipe>) => void; onLogMeal: () => void; t: TT;
+function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec, onOpenRecipe, onLogMeal, onCamera, t }: {
+  soon: PantryItem[]; recipes: Recipe[] | null; recipesErr: boolean; soonNames: Set<string>; pantryNames: Set<string>;
+  onLoadRec: () => void; onOpenRecipe: (m: RecipeMatch<Recipe>) => void; onLogMeal: () => void; onCamera: () => void; t: TT;
 }) {
-  const anyReady = matches.some((m) => m.canCook);
+  // 菜谱由用户自选/输入,不再用库存自动塞固定列表。
+  const [picked, setPicked] = useState<string[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [q, setQ] = useState('');
+
+  const suggestions = useMemo(() => {
+    const query = q.trim();
+    if (!query || !recipes) return [];
+    const have = new Set(picked);
+    return recipes.filter((r) => r.name.includes(query) && !have.has(r.name)).slice(0, 6);
+  }, [q, recipes, picked]);
+
+  const rows = useMemo(() => {
+    if (!recipes) return picked.map((name) => ({ name, match: null as RecipeMatch<Recipe> | null }));
+    return picked.map((name) => {
+      const r = recipes.find((x) => x.name === name)
+        ?? recipes.find((x) => x.name.includes(name) || name.includes(x.name));
+      return { name, match: r ? matchRecipe(r, pantryNames, normalizeIngredient) : null };
+    });
+  }, [picked, recipes, pantryNames]);
+
+  function addDish(nm?: string) {
+    const v = (nm ?? q).trim();
+    if (!v) { setAdding(false); return; }
+    setPicked((prev) => (prev.includes(v) ? prev : [...prev, v]));
+    setQ(''); setAdding(false);
+  }
+  function removeDish(name: string) { setPicked((prev) => prev.filter((n) => n !== name)); }
+
   return (
     <>
-      {/* 快过期 · 先用掉 —— 横向白卡 + 琥珀 pill,别浪费 */}
+      {/* 入口对齐记一物品:手动选菜 + 小相机 */}
+      {adding
+        ? (
+          <div>
+            <div style={{ ...card, padding: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+              <input style={{ ...inputStyle, flex: 1 }} placeholder={t('搜或输入菜名', 'Search or type a dish')} value={q} autoFocus
+                onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addDish(); }} />
+              <button type="button" onClick={() => addDish()} style={primaryBtn}>{t('加进来', 'Add')}</button>
+              <button type="button" onClick={() => { setAdding(false); setQ(''); }} style={ghostBtn}>{t('取消', 'Cancel')}</button>
+            </div>
+            {suggestions.length > 0 && (
+              <div style={{ ...card, marginTop: 'var(--space-2)' }}>
+                {suggestions.map((r, i) => (
+                  <button key={r.name} type="button" onClick={() => addDish(r.name)}
+                    style={{ ...row, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: i === suggestions.length - 1 ? 'none' : divider, cursor: 'pointer' }}>
+                    <Dot />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{r.category}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+        : <CaptureRow manualLabel={`+ ${t('选个菜', 'Pick a dish')}`} onManual={() => setAdding(true)} onCamera={onCamera} t={t} />}
+
+      {/* 快过期 · 先用掉 —— 横向白卡 + 软色 pill +「别浪费」 */}
       {soon.length > 0 && (
         <section>
           <SectionHead label={t('快过期 · 先用掉', 'Use these first')} right={t('别浪费', 'Don’t waste it')} />
           <div style={{ display: 'flex', gap: 'var(--space-3)', overflowX: 'auto', paddingBottom: 'var(--space-1)', margin: '0 calc(-1 * var(--space-4))', padding: '0 var(--space-4) var(--space-1)', scrollSnapType: 'x proximity' }}>
-            {soon.slice(0, 6).map((it) => (
-              <div key={it.id} style={{ flex: 'none', width: 118, scrollSnapAlign: 'start', ...card, padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                <div style={{ fontSize: 'var(--text-body)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</div>
-                <span style={{ ...pill, background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)', alignSelf: 'flex-start' }}>{daysPill(it.daysLeft, t)}</span>
-              </div>
-            ))}
+            {soon.slice(0, 6).map((it) => {
+              const tone = soonPillTone(it.daysLeft);
+              return (
+                <div key={it.id} style={{ flex: 'none', width: 118, scrollSnapAlign: 'start', ...card, padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                  <div style={{ fontSize: 'var(--text-body)', fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</div>
+                  <span style={{ ...pill, background: tone.bg, color: tone.fg, alignSelf: 'flex-start' }}>{daysPill(it.daysLeft, t)}</span>
+                </div>
+              );
+            })}
           </div>
         </section>
       )}
 
-      {/* 用手上的能做 —— 圆点 + 理由 + 状态 pill */}
+      {/* 自选菜谱列表(无「用手上的能做」标题) */}
       <section>
-        <SectionHead label={t('用手上的能做', 'Cook with what you have')} right={anyReady ? t('免费 · 材料齐了', 'Free · ready') : undefined} rightGo />
         {recipesErr && <ErrorRow msg={t('菜谱没载出来。', 'Recipes didn’t load.')} onRetry={onLoadRec} t={t} />}
         {!recipesErr && recipes === null && <p style={hintLine}>{t('翻翻菜谱…', 'Looking through recipes…')}</p>}
-        {!recipesErr && recipes !== null && matches.length === 0 && (
-          <div style={{ ...card, padding: 'var(--space-4)' }}>
-            <p style={{ ...hintLine, padding: 0, lineHeight: 1.6 }}>{pantryCount === 0
-              ? t('先去「库存」加两样,这里就冒出「手上能做的菜」。', 'Add a couple of things to the pantry and cookable dishes appear here.')
-              : t('现有的还凑不齐一道菜,再补两样试试。', 'Not quite enough for a dish yet — add a couple more.')}</p>
-          </div>
+        {rows.length === 0 && !adding && (
+          <p style={{ ...hintLine, lineHeight: 1.6 }}>{t('自己选几道想做的 —— 搜库里的,或直接打菜名。', 'Pick dishes yourself — search the library or type a name.')}</p>
         )}
-        {matches.length > 0 && (
+        {rows.length > 0 && (
           <div style={card}>
-            {matches.map((m, i) => (
-              <button key={m.recipe.name} type="button" onClick={() => onOpenRecipe(m)}
-                style={{ ...row, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: i === matches.length - 1 ? 'none' : divider, cursor: 'pointer' }}>
+            {rows.map((rowItem, i) => (
+              <div key={rowItem.name} style={{ ...row, borderBottom: i === rows.length - 1 ? 'none' : divider }}>
                 <Dot />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 'var(--text-body)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.recipe.name}</div>
-                  <div style={subText}>{recipeReason(m, soonNames, t)}</div>
-                </div>
-                {m.canCook
-                  ? <span style={{ ...pill, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{t('材料齐', 'Ready')}</span>
-                  : <span style={{ ...pill, background: 'var(--portal-accent-soft)', color: 'var(--portal-muted)' }}>{t(`缺 ${m.missing.length} 样`, `${m.missing.length} to buy`)}</span>}
-              </button>
+                <button type="button"
+                  onClick={() => { if (rowItem.match) onOpenRecipe(rowItem.match); }}
+                  disabled={!rowItem.match}
+                  style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'transparent', border: 'none', cursor: rowItem.match ? 'pointer' : 'default', padding: 0, fontFamily: 'var(--font-sans)' }}>
+                  <div style={{ fontSize: 'var(--text-body)', fontWeight: 600, color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{rowItem.name}</div>
+                  <div style={subText}>{rowItem.match ? recipeReason(rowItem.match, soonNames, t) : t('自定义菜 · 可先记下', 'Custom · saved for now')}</div>
+                </button>
+                {rowItem.match
+                  ? (rowItem.match.canCook
+                    ? <span style={{ ...pill, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{t('材料齐', 'Ready')}</span>
+                    : <span style={{ ...pill, background: 'var(--portal-accent-soft)', color: 'var(--portal-muted)' }}>{t(`缺 ${rowItem.match.missing.length} 样`, `${rowItem.match.missing.length} to buy`)}</span>)
+                  : <span style={{ ...pill, background: 'var(--portal-accent-soft)', color: 'var(--portal-muted)' }}>{t('自定义', 'Custom')}</span>}
+                <button type="button" onClick={() => removeDish(rowItem.name)} aria-label={t('删除', 'Remove')} style={xBtn}>✕</button>
+              </div>
             ))}
           </div>
         )}
       </section>
 
-      {/* 生成新菜谱(Pro) */}
       <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'cooking_recipe_ai' } }))}
         style={{ ...primaryBtn, width: '100%', padding: 'var(--space-4)', fontSize: 'var(--text-body)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
         <IconZap size={16} />{t('生成新菜谱', 'Generate a recipe')}
         <span style={{ ...pill, background: 'rgba(255,255,255,.22)', color: '#fff', marginLeft: 'var(--space-1)' }}>Pro</span>
       </button>
 
-      {/* 记一餐 —— 吃了什么落进身体账本(进食事件原语) */}
+      {/* 记一餐:点一下开相机 → 拍完进记一餐页 */}
       <button type="button" onClick={onLogMeal} style={{ ...ghostBtn, width: '100%', padding: 'var(--space-3)', fontSize: 'var(--text-body)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
-        <IconCheckSquare size={16} />{t('记一餐', 'Log a meal')}
+        <IconCamera size={16} />{t('记一餐', 'Log a meal')}
       </button>
     </>
   );
 }
 
 // ── 屏2 库存 ──────────────────────────────────────────────────────────────────
-function PantryBody({ items, shopping, onCamera, onConsume, onRemove, onError, onChanged, t }: {
-  items: PantryItem[]; shopping: ShoppingItem[]; onCamera: () => void; onConsume: (id: string) => void; onRemove: (id: string) => void;
+function PantryBody({ items, shopping, onCamera, onRemove, onError, onChanged, t }: {
+  items: PantryItem[]; shopping: ShoppingItem[]; onCamera: () => void; onRemove: (id: string) => void;
   onError: (m: string) => void; onChanged: () => void; t: TT;
 }) {
   const [showAdd, setShowAdd] = useState(false);
   const [shopMsg, setShopMsg] = useState('');
-  const soon = useMemo(() => items.filter((i) => i.daysLeft != null && i.daysLeft <= 4), [items]);
+  const soon = useMemo(() => items.filter((i) => i.daysLeft != null && i.daysLeft <= 7), [items]);
   const soonIds = useMemo(() => new Set(soon.map((i) => i.id)), [soon]);
   const rest = useMemo(() => items.filter((i) => !soonIds.has(i.id)), [items, soonIds]);
   const shopChecked = shopping.filter((s) => s.checked).length;
@@ -278,17 +346,15 @@ function PantryBody({ items, shopping, onCamera, onConsume, onRemove, onError, o
 
   return (
     <>
+      {/* 对齐记一物品:手动记 + 小相机 */}
       {showAdd
         ? <AddForm onAdded={() => { setShowAdd(false); onChanged(); }} onCancel={() => setShowAdd(false)} onError={onError} t={t} />
-        : <button type="button" onClick={onCamera} style={{ ...card, padding: 'var(--space-4)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', cursor: 'pointer', color: 'var(--portal-ink)', fontWeight: 600, fontSize: 'var(--text-body)', fontFamily: 'var(--font-sans)' }}>
-            <IconCamera size={16} />{t('拍小票入库 · 或手动添加', 'Snap a receipt · or add by hand')}
-          </button>}
-      {!showAdd && <button type="button" onClick={() => setShowAdd(true)} style={{ ...ghostBtn, alignSelf: 'flex-start', marginTop: 'calc(-1 * var(--space-3))' }}>{t('手动添加', 'Add by hand')}</button>}
+        : <CaptureRow manualLabel={`+ ${t('手动记', 'Add by hand')}`} onManual={() => setShowAdd(true)} onCamera={onCamera} t={t} />}
 
       {items.length === 0 && !showAdd && (
         <p style={{ ...hintLine, lineHeight: 1.6 }}>
-          {t('还没记库存。拍张小票或手动加一样 —— 之后「快过期先用」「手上能做什么」就都有了。',
-            'Pantry is empty. Snap a receipt or add by hand — then expiry nudges and cookable dishes appear.')}
+          {t('还没记库存。手动加一样,或拍张小票 —— 之后「快过期先用」就有了。',
+            'Pantry is empty. Add by hand or snap a receipt — then expiry nudges appear.')}
         </p>
       )}
 
@@ -296,7 +362,7 @@ function PantryBody({ items, shopping, onCamera, onConsume, onRemove, onError, o
         <section>
           <SectionHead label={t('快过期', 'Expiring soon')} right={t(`${soon.length} 项`, `${soon.length}`)} />
           <div style={card}>
-            {soon.map((it, i) => <PantryRow key={it.id} it={it} last={i === soon.length - 1} soon onConsume={onConsume} onRemove={onRemove} t={t} />)}
+            {soon.map((it, i) => <PantryRow key={it.id} it={it} last={i === soon.length - 1} soon onRemove={onRemove} t={t} />)}
           </div>
         </section>
       )}
@@ -305,7 +371,7 @@ function PantryBody({ items, shopping, onCamera, onConsume, onRemove, onError, o
         <section>
           <SectionHead label={t('充足', 'Well stocked')} />
           <div style={card}>
-            {rest.map((it, i) => <PantryRow key={it.id} it={it} last={i === rest.length - 1} soon={false} onConsume={onConsume} onRemove={onRemove} t={t} />)}
+            {rest.map((it, i) => <PantryRow key={it.id} it={it} last={i === rest.length - 1} soon={false} onRemove={onRemove} t={t} />)}
           </div>
         </section>
       )}
@@ -338,8 +404,7 @@ function PantryBody({ items, shopping, onCamera, onConsume, onRemove, onError, o
   );
 }
 
-function PantryRow({ it, last, soon, onConsume, onRemove, t }: { it: PantryItem; last: boolean; soon: boolean; onConsume: (id: string) => void; onRemove: (id: string) => void; t: TT }) {
-  const frozen = it.category === '冷冻';
+function PantryRow({ it, last, soon, onRemove, t }: { it: PantryItem; last: boolean; soon: boolean; onRemove: (id: string) => void; t: TT }) {
   const meta = [it.addedAt ? buyLabel(it.addedAt, t) : it.category || '', it.location].filter(Boolean).join(' · ');
   return (
     <div style={{ ...row, borderBottom: last ? 'none' : divider }}>
@@ -348,12 +413,7 @@ function PantryRow({ it, last, soon, onConsume, onRemove, t }: { it: PantryItem;
         <div style={{ fontSize: 'var(--text-body)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{qtyName(it)}</div>
         {meta && <div style={{ ...subText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta}</div>}
       </div>
-      {soon
-        ? <span style={{ ...pill, background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>{daysPill(it.daysLeft, t)}</span>
-        : frozen
-          ? <span style={{ ...pill, background: 'var(--status-calm-soft)', color: 'var(--status-calm)', display: 'inline-flex', alignItems: 'center', gap: 2 }}><IconSnowflake size={11} />{t('冷冻', 'Frozen')}</span>
-          : <span style={{ ...pill, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{t('充足', 'Stocked')}</span>}
-      <button type="button" onClick={() => void onConsume(it.id)} aria-label={t('用掉一份', 'Use one')} style={{ ...xBtn, color: 'var(--portal-accent)', fontSize: 'var(--text-xs)', fontWeight: 600 }}>{t('用掉', 'Use')}</button>
+      {soon && <span style={{ ...pill, background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>{daysPill(it.daysLeft, t)}</span>}
       <button type="button" onClick={() => void onRemove(it.id)} aria-label={t('删除', 'Remove')} style={xBtn}>✕</button>
     </div>
   );
@@ -383,13 +443,38 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
 
   return (
     <>
-      {/* 一周食谱 —— 按库存+目标+防过期排一周,缺料一次性汇总成购物清单存进记忆 */}
+      {/* 入口置顶:手动搜 + 小相机(对齐记一物品) */}
+      {adding
+        ? (
+          <div>
+            <div style={{ ...card, padding: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+              <input style={{ ...inputStyle, flex: 1 }} placeholder={t('搜或输入菜名', 'Search or type a dish')} value={name} autoFocus
+                onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
+              <button type="button" onClick={() => add()} style={primaryBtn}>{t('加进来', 'Add')}</button>
+              <button type="button" onClick={() => { setAdding(false); setName(''); }} style={ghostBtn}>{t('取消', 'Cancel')}</button>
+            </div>
+            {suggestions.length > 0 && (
+              <div style={{ ...card, marginTop: 'var(--space-2)' }}>
+                {suggestions.map((r, i) => (
+                  <button key={r.name} type="button" onClick={() => add(r.name)}
+                    style={{ ...row, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: i === suggestions.length - 1 ? 'none' : divider, cursor: 'pointer' }}>
+                    <Dot />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{r.category}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )
+        : <CaptureRow manualLabel={`+ ${t('搜个菜', 'Search a dish')}`} onManual={() => setAdding(true)} onCamera={onCamera} t={t} />}
+
       <button type="button" onClick={onPlan} style={{ ...primaryBtn, width: '100%', padding: 'var(--space-3)', fontSize: 'var(--text-body)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
         <IconUtensils size={16} />{t('排一周食谱', 'Plan the week')}
       </button>
 
       {wishes.length === 0 && !adding
-        ? <p style={{ ...hintLine, lineHeight: 1.6 }}>{t('想做的菜先攒着 —— 朋友推荐的、刷到的、想给家人做的。点一道看步骤,或算「还缺什么」。', 'Save dishes you want to make — tap one for steps, or see what’s missing.')}</p>
+        ? <p style={{ ...hintLine, lineHeight: 1.6 }}>{t('想做的菜先攒着 —— 搜库里的,或直接打菜名。点一道看步骤,或算「还缺什么」。', 'Save dishes you want — search or type. Tap for steps, or see what’s missing.')}</p>
         : (
           <div style={card}>
             {wishes.map((w, i) => (
@@ -405,31 +490,6 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
             ))}
           </div>
         )}
-
-      {adding
-        ? <div>
-            <div style={{ ...card, padding: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-              <input style={{ ...inputStyle, flex: 1 }} placeholder={t('搜个菜名(如「番茄炒蛋」)', 'Search a dish (e.g. tomato & egg)')} value={name} autoFocus
-                onChange={(e) => setName(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') add(); }} />
-              <button type="button" onClick={() => add()} style={primaryBtn}>{t('加进来', 'Add')}</button>
-            </div>
-            {suggestions.length > 0 && (
-              <div style={{ ...card, marginTop: 'var(--space-2)' }}>
-                {suggestions.map((r, i) => (
-                  <button key={r.name} type="button" onClick={() => add(r.name)}
-                    style={{ ...row, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: i === suggestions.length - 1 ? 'none' : divider, cursor: 'pointer' }}>
-                    <Dot />
-                    <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{r.category}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        : <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-            <button type="button" onClick={() => setAdding(true)} style={{ ...ghostBtn, flex: 1, padding: 'var(--space-3)', fontSize: 'var(--text-body)' }}>+ {t('搜个菜', 'Search a dish')}</button>
-            <button type="button" onClick={onCamera} aria-label={t('拍一张加进来', 'Snap to add')} style={{ ...ghostBtn, padding: 'var(--space-3)' }}><IconCamera size={16} /></button>
-          </div>}
     </>
   );
 }
@@ -541,19 +601,13 @@ function NeedsBody({ match, onError, onDone, t }: { match: RecipeMatch<Recipe>; 
 
 // ── 记一餐(进食事件)──────────────────────────────────────────────────────────
 const MEAL_SOURCES: MealSource[] = ['自己做', '餐厅', '外卖', '其他'];
-function MealLogBody({ onError, onDone, t }: { onError: (m: string) => void; onDone: () => void; t: TT }) {
+function MealLogBody({ photoUrl, onError, onDone, t }: { photoUrl?: string; onError: (m: string) => void; onDone: () => void; t: TT }) {
   const [items, setItems] = useState<MealItem[]>([]);
   const [source, setSource] = useState<MealSource>('自己做');
   const [name, setName] = useState('');
   const [grams, setGrams] = useState('');
   const [nutri, setNutri] = useState<{ ek: number; p: number; f: number; c: number; matched: number } | null>(null);
   const [saved, setSaved] = useState(false);
-  const [photoUrl, setPhotoUrl] = useState('');
-  const photoRef = useRef<HTMLInputElement>(null);
-  function onPhoto(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0]; e.target.value = '';
-    if (f) { try { setPhotoUrl(URL.createObjectURL(f)); } catch { /* 预览失败不致命 */ } }
-  }
 
   // 营养 = Σ(每100g × 克/100),查本地成分表;没克数的项按 100g 估。全标估算。
   useEffect(() => {
@@ -591,15 +645,13 @@ function MealLogBody({ onError, onDone, t }: { onError: (m: string) => void; onD
 
   return (
     <>
-      {/* 拍一张 —— 显示这餐的照片 */}
-      <input ref={photoRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onPhoto} />
-      <button type="button" onClick={() => photoRef.current?.click()} aria-label={t('拍一张', 'Take a photo')}
-        style={{ ...card, padding: 0, overflow: 'hidden', cursor: 'pointer', display: 'block', width: '100%' }}>
-        {photoUrl
-          // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={photoUrl} alt="" style={{ width: '100%', maxHeight: '30vh', objectFit: 'cover', display: 'block' }} draggable={false} />
-          : <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)', padding: 'var(--space-8) var(--space-4)', color: 'var(--portal-muted)', fontWeight: 600, fontSize: 'var(--text-body)' }}><IconCamera size={20} />{t('拍一张', 'Take a photo')}</span>}
-      </button>
+      {/* 照片由入口相机带入,页内不再放相机按钮 */}
+      {photoUrl && (
+        <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={photoUrl} alt="" style={{ width: '100%', maxHeight: '30vh', objectFit: 'cover', display: 'block' }} draggable={false} />
+        </div>
+      )}
 
       {/* 吃了什么 */}
       <section>
@@ -661,47 +713,91 @@ function MealLogBody({ onError, onDone, t }: { onError: (m: string) => void; onD
 // ── 做饭计划(周)──────────────────────────────────────────────────────────────
 const WEEK_DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const WEEK_DAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-function PlanBody({ matches, soonNames, onError, t }: { matches: RecipeMatch<Recipe>[]; soonNames: Set<string>; onError: (m: string) => void; t: TT }) {
+function PlanBody({ matches, recipes, soonNames, pantryNames, onError, t }: {
+  matches: RecipeMatch<Recipe>[]; recipes: Recipe[] | null; soonNames: Set<string>; pantryNames: Set<string>; onError: (m: string) => void; t: TT;
+}) {
   const [msg, setMsg] = useState('');
   const [saved, setSaved] = useState(false);
   const dict = t('zh', 'en');
-  const plan: WeekPlan = useMemo(() => planWeek(matches, dict === 'zh' ? WEEK_DAYS : WEEK_DAYS_EN, soonNames), [matches, soonNames, dict]);
+  const days = dict === 'zh' ? WEEK_DAYS : WEEK_DAYS_EN;
+  const plan: WeekPlan = useMemo(() => planWeek(matches, days, soonNames), [matches, soonNames, days]);
+  // 每天可自选/输入菜名;空 = 用自动排的,用户改了以输入为准。
+  const [edits, setEdits] = useState<Record<string, string>>({});
+  useEffect(() => {
+    setEdits((prev) => {
+      const next: Record<string, string> = { ...prev };
+      for (const d of plan.days) {
+        if (next[d.day] === undefined) next[d.day] = d.dishName ?? '';
+      }
+      return next;
+    });
+  }, [plan.days]);
+
+  const dayStatus = useCallback((dishName: string) => {
+    const nm = dishName.trim();
+    if (!nm) return { status: '餐厅' as const, missing: 0 };
+    if (!recipes) return { status: '需采购' as const, missing: 0 };
+    const r = recipes.find((x) => x.name === nm) ?? recipes.find((x) => x.name.includes(nm) || nm.includes(x.name));
+    if (!r) return { status: '需采购' as const, missing: 0 };
+    const m = matchRecipe(r, pantryNames, normalizeIngredient);
+    return { status: m.canCook ? '库存够' as const : '需采购' as const, missing: m.missing.length };
+  }, [recipes, pantryNames]);
+
+  const missingAll = useMemo(() => {
+    if (!recipes) return plan.missingAll;
+    const miss = new Set<string>();
+    for (const d of days) {
+      const nm = (edits[d] ?? '').trim();
+      if (!nm) continue;
+      const r = recipes.find((x) => x.name === nm) ?? recipes.find((x) => x.name.includes(nm) || nm.includes(x.name));
+      if (!r) continue;
+      for (const x of matchRecipe(r, pantryNames, normalizeIngredient).missing) miss.add(x);
+    }
+    return [...miss];
+  }, [edits, days, recipes, pantryNames, plan.missingAll]);
 
   function save() {
-    if (!plan.missingAll.length) { setMsg(t('本周库存都够,不用买。', 'Fully stocked this week.')); setTimeout(() => setMsg(''), 1800); return; }
-    try { addToShopping(plan.missingAll); setSaved(true); setMsg(t(`存了 ${plan.missingAll.length} 样进「记忆」`, `${plan.missingAll.length} saved to memory`)); setTimeout(() => setMsg(''), 2200); }
+    if (!missingAll.length) { setMsg(t('本周库存都够,不用买。', 'Fully stocked this week.')); setTimeout(() => setMsg(''), 1800); return; }
+    try { addToShopping(missingAll); setSaved(true); setMsg(t(`存了 ${missingAll.length} 样进「记忆」`, `${missingAll.length} saved to memory`)); setTimeout(() => setMsg(''), 2200); }
     catch { onError(t('没存上,再试一次。', 'Could not save — try again.')); }
   }
 
-  if (!matches.length) {
-    return <p style={{ ...hintLine, lineHeight: 1.6 }}>{t('先去库存加两样、或攒几道想做的菜,这里就能按库存 + 防过期排一周。', 'Add a few pantry items or saved dishes, then a week gets planned by pantry + expiry.')}</p>;
-  }
+  const recipeNames = useMemo(() => (recipes ?? []).map((r) => r.name), [recipes]);
 
   return (
     <>
-      <p style={{ ...caption, margin: 0, textAlign: 'right' }}>{t('可拖动改(即将支持)', 'Drag to reorder (soon)')}</p>
       <div style={card}>
-        {plan.days.map((d, i) => (
-          <div key={d.day} style={{ ...row, borderBottom: i === plan.days.length - 1 ? 'none' : divider }}>
-            <span style={{ flex: 'none', width: 34, fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', fontWeight: 600 }}>{d.day}</span>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 'var(--text-body)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.dishName ?? t('外食', 'Eating out')}</div>
-              {d.reason && <div style={subText}>{t(d.reason, d.reason === '防过期先用' ? 'use before expiry' : d.reason)}</div>}
+        {days.map((day, i) => {
+          const dish = edits[day] ?? '';
+          const st = dayStatus(dish);
+          return (
+            <div key={day} style={{ ...row, borderBottom: i === days.length - 1 ? 'none' : divider, alignItems: 'center' }}>
+              <span style={{ flex: 'none', width: 34, fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', fontWeight: 600 }}>{day}</span>
+              <input
+                list="cooking-plan-dishes"
+                style={{ ...inputStyle, flex: 1, minWidth: 0, padding: 'var(--space-2) var(--space-3)', border: 'none', background: 'transparent' }}
+                placeholder={t('选或输入菜名', 'Pick or type a dish')}
+                value={dish}
+                onChange={(e) => setEdits((prev) => ({ ...prev, [day]: e.target.value }))}
+              />
+              {st.status === '库存够'
+                ? <span style={{ ...pill, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{t('库存够', 'Stocked')}</span>
+                : st.status === '需采购'
+                  ? <span style={{ ...pill, background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>{t('需采购', 'To buy')}</span>
+                  : <span style={{ ...pill, background: 'var(--portal-accent-soft)', color: 'var(--portal-muted)' }}>{t('餐厅', 'Out')}</span>}
             </div>
-            {d.status === '库存够'
-              ? <span style={{ ...pill, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{t('库存够', 'Stocked')}</span>
-              : d.status === '需采购'
-                ? <span style={{ ...pill, background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>{t('需采购', 'To buy')}</span>
-                : <span style={{ ...pill, background: 'var(--portal-accent-soft)', color: 'var(--portal-muted)' }}>{t('餐厅', 'Out')}</span>}
-          </div>
-        ))}
+          );
+        })}
+      </div>
+      <datalist id="cooking-plan-dishes">
+        {recipeNames.map((n) => <option key={n} value={n} />)}
+      </datalist>
+
+      <div style={{ ...banner, background: missingAll.length ? 'var(--status-gentle-soft)' : 'var(--status-go-soft)', color: missingAll.length ? 'var(--status-gentle)' : 'var(--status-go)' }}>
+        {missingAll.length ? t(`本周缺 ${missingAll.length} 样 —— 一次性汇总成购物清单`, `${missingAll.length} short this week — one shopping list`) : t('本周库存都够 —— 不用买', 'Fully stocked — nothing to buy')}
       </div>
 
-      <div style={{ ...banner, background: plan.missingAll.length ? 'var(--status-gentle-soft)' : 'var(--status-go-soft)', color: plan.missingAll.length ? 'var(--status-gentle)' : 'var(--status-go)' }}>
-        {plan.missingAll.length ? t(`本周缺 ${plan.missingAll.length} 样 —— 一次性汇总成购物清单`, `${plan.missingAll.length} short this week — one shopping list`) : t('本周库存都够 —— 不用买', 'Fully stocked — nothing to buy')}
-      </div>
-
-      {plan.missingAll.length > 0 && (
+      {missingAll.length > 0 && (
         <>
           <button type="button" onClick={save} disabled={saved} style={{ ...primaryBtn, width: '100%', padding: 'var(--space-4)', fontSize: 'var(--text-body)', opacity: saved ? 0.55 : 1 }}>
             {t('存进「记忆」· 一周购物清单', 'Save to memory · week’s shopping list')}
@@ -709,7 +805,8 @@ function PlanBody({ matches, soonNames, onError, t }: { matches: RecipeMatch<Rec
           {msg && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-go)', textAlign: 'center' }}>{msg}</span>}
         </>
       )}
-      <p style={caption}>{t('缺料一次性存进「记忆」当购物清单;到店勾选、买回自动进库存 —— 闭环。', 'The week’s gaps become one shopping list in memory; buy them back into the pantry — full loop.')}</p>
+      {msg && !missingAll.length && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-go)', textAlign: 'center' }}>{msg}</span>}
+      <p style={caption}>{t('每天可改菜名;缺料一次性存进「记忆」当购物清单。', 'Edit each day; gaps become one shopping list in memory.')}</p>
     </>
   );
 }
@@ -757,17 +854,29 @@ function AddForm({ onAdded, onCancel, onError, t }: { onAdded: () => void; onCan
 // ── 结构件 & 小工具 ───────────────────────────────────────────────────────────
 type TT = (zh: string, en: string) => string;
 
-function ScreenHead({ backLabel, onBack, title, subtitle, subtitleRight }: { backLabel: string; onBack: () => void; title: string; subtitle?: string; subtitleRight?: string }) {
+function ScreenHead({ backLabel, onBack, title, subtitle, subtitleRight }: { backLabel: string; onBack: () => void; title?: string; subtitle?: string; subtitleRight?: string }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       <button type="button" onClick={onBack} style={backLink}>‹ {backLabel}</button>
-      <h1 style={{ margin: 0, fontSize: 'var(--text-h1)', fontWeight: 700, lineHeight: 1.15, color: 'var(--portal-ink)' }}>{title}</h1>
+      {title && <h1 style={{ margin: 0, fontSize: 'var(--text-h1)', fontWeight: 700, lineHeight: 1.15, color: 'var(--portal-ink)' }}>{title}</h1>}
       {subtitle && (
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
           <span style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>{subtitle}</span>
           {subtitleRight && <span style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>{subtitleRight}</span>}
         </div>
       )}
+    </div>
+  );
+}
+/** 记一物品式入口:主按钮手动记 + 右侧小相机。 */
+function CaptureRow({ manualLabel, onManual, onCamera, t }: { manualLabel: string; onManual: () => void; onCamera: () => void; t: TT }) {
+  return (
+    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+      <button type="button" onClick={onManual} style={{ ...ghostBtn, flex: 1, padding: 'var(--space-3)', fontSize: 'var(--text-body)' }}>{manualLabel}</button>
+      <button type="button" onClick={onCamera} aria-label={t('拍照', 'Camera')}
+        style={{ ...ghostBtn, flex: 'none', width: 48, padding: 'var(--space-3)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+        <IconCamera size={18} />
+      </button>
     </div>
   );
 }
@@ -822,11 +931,21 @@ function recipeReason(m: RecipeMatch<Recipe>, soonNames: Set<string>, t: TT): st
   if (m.canCook) return t(`${m.have.slice(0, 2).join(' · ')} · 手上都有`, `${m.have.slice(0, 2).join(' · ')} · all on hand`);
   return t(`还缺 ${m.missing.length} 样`, `${m.missing.length} to buy`);
 }
+/** 视觉稿:近 2 天写「还剩 N 天」,更远写「N 天」。 */
 function daysPill(daysLeft: number | null, t: TT): string {
   if (daysLeft == null) return '';
   if (daysLeft < 0) return t('过期', 'Past');
   if (daysLeft === 0) return t('今天', 'Today');
+  if (daysLeft <= 2) return t(`还剩 ${daysLeft} 天`, `${daysLeft}d left`);
   return t(`${daysLeft} 天`, `${daysLeft}d`);
+}
+/** pill 色阶对齐视觉稿: ≤2 琥珀 · 3–4 浅红 · ≥5 浅绿。 */
+function soonPillTone(daysLeft: number | null): { fg: string; bg: string } {
+  if (daysLeft == null) return { fg: 'var(--status-gentle)', bg: 'var(--status-gentle-soft)' };
+  if (daysLeft <= 0) return { fg: 'var(--status-risk)', bg: 'var(--status-risk-soft)' };
+  if (daysLeft <= 2) return { fg: 'var(--status-gentle)', bg: 'var(--status-gentle-soft)' };
+  if (daysLeft <= 4) return { fg: 'var(--status-risk)', bg: 'var(--status-risk-soft)' };
+  return { fg: 'var(--status-go)', bg: 'var(--status-go-soft)' };
 }
 function buyLabel(addedAt: string, t: TT): string {
   const m = addedAt.match(/^(\d{4})-(\d{2})-(\d{2})$/);

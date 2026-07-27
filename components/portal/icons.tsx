@@ -84,6 +84,10 @@ export const IconUtensils = make(<><path d="M3 2v7a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2
 export const IconBriefcase = make(<><rect x="2" y="7" width="20" height="14" rx="2" /><path d="M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M2 13h20" /></>);
 export const IconBulb = make(<><path d="M9 18h6M10 22h4" /><path d="M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3A7 7 0 0 0 12 2z" /></>);
 export const IconRain = make(<><path d="M17.5 15a4.5 4.5 0 0 0 .4-9A7 7 0 0 0 4.3 8.4 4 4 0 0 0 6 16" /><path d="M8 19v2M12 18v3M16 19v2" /></>);
+/** 镜子 / 多面镜入口 */
+export const IconMirror = make(<><rect x="6" y="3" width="12" height="18" rx="2" /><path d="M9 8h6M9 12h4M9 16h5" /></>);
+/** 家人 / 家务入口 */
+export const IconPeople = make(<><path d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 11a2.5 2.5 0 1 0 0-5" /><path d="M4 20v-1a5 5 0 0 1 10 0v1M15.5 15.5A5 5 0 0 1 20 20v1" /></>);
 
 /** 记忆节点类型 → 描边图标(替代 👤📦📍📅🤝🩷⭐ emoji 映射) */
 export function NodeTypeIcon({ type, size = 16 }: { type: string; size?: number }) {

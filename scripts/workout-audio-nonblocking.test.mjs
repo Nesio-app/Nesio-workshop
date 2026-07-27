@@ -1,24 +1,65 @@
 /**
- * 行为契约:跟练播放器**绝不碰任何设备硬件**(修真机「一点跟拍做永久卡死」)。
- * 真机事实链:放声音 → 一点跟拍就永久冻死;去掉声音、只留「轻震动」→ 仍会卡死。
- * 结论:这台壳内 WebView 任何硬件激活(音频、震动马达…)都可能同步阻塞主线程且不返回
- * (是阻塞非抛错,错误边界接不住)。所以跟练只用**纯界面反馈**:大号次数的视觉脉冲(.nesio-wp-beat)。
- * 锁死:WorkoutPlayer 源码里不得出现任何音频播放 API,也不得出现震动(navigator.vibrate)。
+ * 行为契约:跟练节拍音**安全恢复** —— 有声但不卡死。
+ *
+ * 历史:壳内 WebView 首次激活音频硬件(WebAudio / HTMLAudio / vibrate)可能同步阻塞主线程
+ * 且不返回。修法:
+ *  1) WorkoutPlayer 本身绝不直接碰音频/震动 API;视觉节拍(.nesio-wp-beat)必须保留。
+ *  2) 声音走独立模块 workout-tempo-sound:仅 HTMLAudioElement + 宏任务 play + 不安全环境静音。
+ *  3) 该模块不得出现 WebAudio / vibrate。
  */
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
 const root = process.cwd();
-const src = fs.readFileSync(path.join(root, 'components', 'portal', 'fitness', 'WorkoutPlayer.tsx'), 'utf8');
+const wp = fs.readFileSync(path.join(root, 'components', 'portal', 'fitness', 'WorkoutPlayer.tsx'), 'utf8');
+const sound = fs.readFileSync(path.join(root, 'lib', 'portal', 'workout-tempo-sound.ts'), 'utf8');
 
-// 不得碰任何硬件:音频(WebAudio + HTMLMediaElement)与震动马达都不行。
-// 注释里也不得出现这些字面量,避免误锁松动。
-for (const forbidden of ['AudioContext', 'webkitAudioContext', 'createOscillator', 'createGain', '.resume(', 'new Audio', '<audio', '.play(', 'vibrate']) {
-  assert.ok(!src.includes(forbidden), `WorkoutPlayer 绝不碰设备硬件(本机任何硬件激活都会同步卡死主线程):发现 ${forbidden}`);
+// 1) 播放器本体:不得直接碰硬件音频/震动(实现全在独立模块,便于闸门+契约)。
+for (const forbidden of [
+  'AudioContext',
+  'webkitAudioContext',
+  'createOscillator',
+  'createGain',
+  'new Audio',
+  '<audio',
+  'vibrate',
+]) {
+  assert.ok(!wp.includes(forbidden), `WorkoutPlayer 不得直接碰音频/震动 API(发现 ${forbidden});须走 workout-tempo-sound`);
 }
 
-// 必须有不碰硬件的纯视觉节拍:大号次数每拍放大回弹(.nesio-wp-beat)。
-assert.match(src, /nesio-wp-beat/, '节拍必须是纯视觉脉冲(.nesio-wp-beat,每拍数字放大回弹,纯 React+CSS)');
+// 2) 必须保留纯视觉节拍 + 接线到安全播音模块。
+assert.match(wp, /nesio-wp-beat/, '节拍必须保留纯视觉脉冲(.nesio-wp-beat)');
+assert.match(wp, /playWorkoutTempo/, 'WorkoutPlayer 须调用 playWorkoutTempo(异步短 WAV)');
+assert.match(wp, /unlockWorkoutTempoSound/, '跟拍/计时点击须 unlockWorkoutTempoSound(手势解锁)');
+assert.match(wp, /warmupWorkoutTempoSound/, '挂载须 warmupWorkoutTempoSound(宏任务预热)');
 
-console.log('workout-audio-nonblocking: OK(纯视觉节拍,绝不碰任何硬件)');
+// 3) 播音模块:HTMLAudio + 宏任务 + 不安全环境闸门;禁 WebAudio/震动。
+assert.match(sound, /new Audio\(/, '节拍音须用 HTMLAudioElement(new Audio),不走 WebAudio');
+assert.match(sound, /setTimeout\(/, 'play/warmup 须丢进宏任务,不挡点击路径上的 setState');
+assert.match(sound, /isNativePlatform/, '原生壳须默认静音(历史卡死主场)');
+assert.match(sound, /; wv\\\)/, 'Android WebView(; wv)须默认静音');
+assert.match(sound, /\.catch\(/, 'play() Promise 须 .catch 兜底');
+for (const forbidden of [
+  'new AudioContext',
+  'new webkitAudioContext',
+  'webkitAudioContext',
+  '.createOscillator(',
+  '.createGain(',
+  'navigator.vibrate',
+  '.vibrate(',
+]) {
+  assert.ok(!sound.includes(forbidden), `workout-tempo-sound 不得碰 ${forbidden}`);
+}
+
+// 4) 短 WAV 资源必须在仓库里(离线可播)。
+assert.ok(
+  fs.existsSync(path.join(root, 'public', 'assets', 'sounds', 'workout-tick.wav')),
+  '缺少 public/assets/sounds/workout-tick.wav',
+);
+assert.ok(
+  fs.existsSync(path.join(root, 'public', 'assets', 'sounds', 'workout-ding.wav')),
+  '缺少 public/assets/sounds/workout-ding.wav',
+);
+
+console.log('workout-audio-nonblocking: OK(视觉节拍 + 安全 HTMLAudio,壳内默认静音)');
