@@ -130,11 +130,15 @@ function useFocusTrap(ref: RefObject<HTMLElement | null>, active: boolean) {
       if (t.closest?.('[role="dialog"], [aria-modal="true"], [data-vaul-drawer], [data-radix-portal]')) return;
       focusFirst();
     };
-    // 焦点掉到 body(异步 setState 卸载了当前控件)→ 下一帧拉回
+    // 焦点掉到 body(异步 setState 卸载了当前控件)→ 下一帧拉回。
+    // iOS 收键盘常 blur 到 body 且 relatedTarget=null —— 绝不能再 focusFirst,
+    // 否则键盘弹不回去 / 输入框像卡死。
     const onFocusOut = (e: FocusEvent) => {
       if (e.relatedTarget) return; // 有去处,交给 focusin 判断
       requestAnimationFrame(() => {
-        if (ref.current && !ref.current.contains(document.activeElement)) focusFirst();
+        const ae = document.activeElement;
+        if (!ae || ae === document.body || ae === document.documentElement) return;
+        if (ref.current && !ref.current.contains(ae)) focusFirst();
       });
     };
     document.addEventListener('keydown', onKeyDown, true);

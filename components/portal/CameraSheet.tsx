@@ -204,14 +204,10 @@ function detectReceipt(result: AnalysisResult): boolean {
 // ── Location helper ──────────────────────────────────────────────────────────
 
 async function getCurrentLocation(): Promise<{ lat: number; lon: number } | null> {
-  return new Promise((resolve) => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) { resolve(null); return; }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ lat: pos.coords.latitude, lon: pos.coords.longitude }),
-      () => resolve(null),
-      { timeout: 3000, maximumAge: 60_000 },
-    );
-  });
+  // 壳:原生 Geolocation;PWA:web geo + 硬超时。定位失败不挡保存。
+  const { getDevicePosition } = await import('@/lib/portal/native-geolocation');
+  const pos = await getDevicePosition({ timeoutMs: 5_000, maximumAgeMs: 60_000, enableHighAccuracy: false });
+  return pos ? { lat: pos.lat, lon: pos.lon } : null;
 }
 
 // ── Node type chips ──────────────────────────────────────────────────────────
@@ -838,9 +834,21 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
   async function doSave(nodesToSave: EditedNode[]) {
     const userTags = parseInlineTags(extraTags);
 
-    // Best-effort location — attach if permission already granted
+    // Best-effort location — attach if permission already granted(硬超时,不挡保存)
     const loc = await getCurrentLocation();
-    const locAttrs = loc ? { lat: loc.lat, lon: loc.lon } : {};
+    // 地图「带位置的记忆」读 capturedLat/Lon;live GPS 也写入同一对字段。
+    const captureCoords: Record<string, number> = {};
+    if (exifCap?.lat != null && exifCap.lon != null) {
+      captureCoords.capturedLat = exifCap.lat as number;
+      captureCoords.capturedLon = exifCap.lon as number;
+      captureCoords.lat = exifCap.lat as number;
+      captureCoords.lon = exifCap.lon as number;
+    } else if (loc) {
+      captureCoords.capturedLat = loc.lat;
+      captureCoords.capturedLon = loc.lon;
+      captureCoords.lat = loc.lat;
+      captureCoords.lon = loc.lon;
+    }
 
     const savedNodes = nodesToSave.map((n, i) => {
       const origIdx = editedNodes.indexOf(n);
@@ -856,9 +864,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
         rawInput: n.rawInput,
         attributes: {
           ...n.attributes,
-          ...(loc ? { lat: loc.lat as number, lon: loc.lon as number } : {}),
-          // 批次 63:EXIF 拍摄地/拍摄时间 —— 批量导旧照也拿"当时在哪",不是上传地
-          ...(exifCap?.lat != null && exifCap.lon != null ? { capturedLat: exifCap.lat, capturedLon: exifCap.lon } : {}),
+          ...captureCoords,
           ...(exifCap?.takenAt ? { takenAt: exifCap.takenAt } : {}),
           ...(locationVal ? { location: locationVal as string } : {}),
           // 批次192:存稳定 placeId/room/subRoom —— 命名地点改名后,物品位置自动跟着变。
@@ -927,43 +933,38 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
         .catch(() => {});
     }
 
-    let cloudAssets: Array<LifeNodeAsset & { nodeId?: string }> = [];
+    // 云上传/快照 best-effort,不阻塞「保存中…」收尾(弱网曾导致永远转圈)。
     if (sourceFile && savedNodes.length > 0) {
-      try {
-        const client = createAppApiClient();
-        const upload = await client.uploadCloudAsset({ file: sourceFile, purpose: 'memory' });
-        if (upload.ok && upload.storagePath) {
-          const assetRecord: LifeNodeAsset = {
-            id: `asset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-            kind: sourceFile.type.startsWith('image/') ? 'image' : 'file',
-            storagePath: upload.storagePath,
-            mimeType: upload.mimeType,
-            label: result?.summary || savedNodes[0].name,
-            analysisSummary: result?.summary,
-            tags: Array.from(new Set([...(savedNodes[0].tags || []), ...userTags])),
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-          };
-          cloudAssets = [{ ...assetRecord, nodeId: savedNodes[0].id }];
-          // 合并而非覆盖:updateLifeNode 对 assets 是浅替换。此前直接 { assets:[assetRecord] }
-          // 会把上面写入的本地图 asset(local:true)整个抹掉,详情页只剩依赖云端签名 URL 的
-          // asset —— 生产上该 URL 加载失败就成破图「?」。读实时节点(含已写入的本地 asset)再
-          // 追加云端 asset,本地图排在前面,ObjectSection.firstImage 优先命中它、直接从 IDB 出图。
-          const liveForAssets = getLifeGraph().find((x) => x.id === savedNodes[0].id);
-          updateLifeNode(savedNodes[0].id, { assets: [...(liveForAssets?.assets || []), assetRecord] });
+      const nodesSnapshot = savedNodes;
+      const tagsSnapshot = userTags;
+      const summary = result?.summary;
+      const file = sourceFile;
+      void (async () => {
+        let cloudAssets: Array<LifeNodeAsset & { nodeId?: string }> = [];
+        try {
+          const client = createAppApiClient();
+          const upload = await client.uploadCloudAsset({ file, purpose: 'memory' });
+          if (upload.ok && upload.storagePath) {
+            const assetRecord: LifeNodeAsset = {
+              id: `asset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+              kind: file.type.startsWith('image/') ? 'image' : 'file',
+              storagePath: upload.storagePath,
+              mimeType: upload.mimeType,
+              label: summary || nodesSnapshot[0].name,
+              analysisSummary: summary,
+              tags: Array.from(new Set([...(nodesSnapshot[0].tags || []), ...tagsSnapshot])),
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            };
+            cloudAssets = [{ ...assetRecord, nodeId: nodesSnapshot[0].id }];
+            const liveForAssets = getLifeGraph().find((x) => x.id === nodesSnapshot[0].id);
+            updateLifeNode(nodesSnapshot[0].id, { assets: [...(liveForAssets?.assets || []), assetRecord] });
+          }
+          await client.saveCloudMemorySnapshot({ nodes: nodesSnapshot, assets: cloudAssets });
+        } catch {
+          // Cloud sync is best-effort; local Memory remains available.
         }
-      } catch {
-        // Cloud asset sync is best-effort; local Memory remains the source of continuity offline.
-      }
-    }
-    try {
-      const client = createAppApiClient();
-      await client.saveCloudMemorySnapshot({
-        nodes: savedNodes,
-        assets: cloudAssets,
-      });
-    } catch {
-      // Cloud Memory sync is best-effort; local Memory remains available.
+      })();
     }
   }
 

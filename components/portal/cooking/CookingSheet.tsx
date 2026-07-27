@@ -552,6 +552,8 @@ function GenerateBody({ pantryItems, soonNames, locale, onDone, t }: {
       return;
     }
     setBusy(true);
+    const ac = new AbortController();
+    const kill = window.setTimeout(() => ac.abort(), 90_000);
     try {
       const res = await fetch('/api/portal/cooking-recipe', {
         method: 'POST',
@@ -562,6 +564,7 @@ function GenerateBody({ pantryItems, soonNames, locale, onDone, t }: {
           customPrompt: extra.trim() || undefined,
           locale,
         }),
+        signal: ac.signal,
       });
       const data = await res.json().catch(() => null) as { ok?: boolean; recipe?: Recipe; error?: string } | null;
       if (!res.ok || !data?.ok || !data.recipe) {
@@ -576,6 +579,7 @@ function GenerateBody({ pantryItems, soonNames, locale, onDone, t }: {
     } catch {
       setFail(t('网络不稳,生成没发出去。', 'Network hiccup — generate didn’t go through.'));
     } finally {
+      window.clearTimeout(kill);
       setBusy(false);
     }
   }
@@ -636,14 +640,23 @@ function GenerateBody({ pantryItems, soonNames, locale, onDone, t }: {
 
       {fail && <ErrorRow msg={fail} onRetry={() => { setFail(''); void run(); }} t={t} />}
 
-      <button
-        type="button"
-        onClick={() => void run()}
-        disabled={busy}
-        style={{ ...primaryBtn, width: '100%', padding: 'var(--space-4)', fontSize: 'var(--text-body)', opacity: busy ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}
-      >
-        <IconZap size={16} />{busy ? t('正在生成…', 'Generating…') : t('开始生成', 'Generate')}
-      </button>
+      <div style={{
+        position: 'sticky',
+        bottom: 0,
+        zIndex: 2,
+        paddingTop: 'var(--space-3)',
+        paddingBottom: 'calc(var(--space-3) + env(safe-area-inset-bottom, 0px))',
+        background: 'linear-gradient(180deg, transparent, var(--portal-bg) 28%)',
+      }}>
+        <button
+          type="button"
+          onClick={() => void run()}
+          disabled={busy}
+          style={{ ...primaryBtn, width: '100%', padding: 'var(--space-4)', fontSize: 'var(--text-body)', opacity: busy ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}
+        >
+          <IconZap size={16} />{busy ? t('正在生成…', 'Generating…') : t('开始生成', 'Generate')}
+        </button>
+      </div>
       <p style={caption}>{t('步骤会存进本机,并加进想做清单。营养仍用本地成分表估算。', 'Steps stay on-device and go to your wishlist. Nutrition still uses the local table.')}</p>
     </>
   );
@@ -790,10 +803,19 @@ function MealLogBody({ photoUrl, onError, onDone, t }: { photoUrl?: string; onEr
   }
   function removeItem(i: number) { setItems((v) => v.filter((_, idx) => idx !== i)); }
   function save() {
-    if (!items.length) { onError(t('先加一样吃的。', 'Add at least one item.')); return; }
+    // 输入框有字但忘点「加」→ 自动并入,避免「先加一样吃的」+ 无效 Retry。
+    let next = items;
+    const pending = name.trim();
+    if (pending) {
+      const g = Number(grams);
+      next = [...items, { name: pending, ...(grams.trim() && Number.isFinite(g) ? { grams: g } : {}) }];
+      setItems(next);
+      setName(''); setGrams('');
+    }
+    if (!next.length) { onError(t('先加一样吃的(输入名字后点「加」,或填完直接「记入」)。', 'Add a food name first — tap Add, or fill the name and Log.')); return; }
     try {
       const today = new Date().toISOString().slice(0, 10);
-      addMeal({ source, items, energyKCal: nutri?.ek ?? 0, protein: nutri?.p ?? 0, fat: nutri?.f ?? 0, cho: nutri?.c ?? 0, occurredAt: today });
+      addMeal({ source, items: next, energyKCal: nutri?.ek ?? 0, protein: nutri?.p ?? 0, fat: nutri?.f ?? 0, cho: nutri?.c ?? 0, occurredAt: today });
       setSaved(true); setTimeout(onDone, 800);
     } catch { onError(t('没记上,再试一次。', 'Could not save — try again.')); }
   }

@@ -9073,7 +9073,7 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior: contain;
-  padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px));
+  padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px) + var(--kb-inset, 0px));
 }
 
 .nesio-camera-result-summary {

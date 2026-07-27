@@ -12,6 +12,7 @@
  */
 
 import { reverseGeocode } from './weather';
+import { getDevicePosition } from './native-geolocation';
 
 const FLAG_KEY = 'nesio-capture-loc-v1';           // durable:用户选择,进备份
 const FIX_CACHE_KEY = 'nesio-capture-fix-cache-v1'; // cache:可再生,不进备份
@@ -66,20 +67,20 @@ let labelInFlight = false;
 /** 捕获面打开时调用:节流取一次手机定位,写缓存;地名异步反查补进缓存。 */
 export function prefetchCaptureLocation(force = false): void {
   if (typeof window === 'undefined' || !captureLocationEnabled()) return;
-  if (!('geolocation' in navigator)) return;
   const now = Date.now();
   if (!force && now - lastPrefetchAt < PREFETCH_THROTTLE) return;
   lastPrefetchAt = now;
-  navigator.geolocation.getCurrentPosition(
-    (pos) => {
+  void getDevicePosition({ timeoutMs: 8_000, maximumAgeMs: 120_000, enableHighAccuracy: false })
+    .then((pos) => {
+      if (!pos) return;
       const prev = readFixCache();
       const fix: CaptureFix = {
-        lat: pos.coords.latitude,
-        lon: pos.coords.longitude,
-        accuracy: pos.coords.accuracy ?? 0,
+        lat: pos.lat,
+        lon: pos.lon,
+        accuracy: pos.accuracy,
         ts: Date.now(),
         // 没挪窝(<300m)沿用旧地名,省一次反查
-        label: prev && distMeters(prev, pos.coords) < 300 ? prev.label : undefined,
+        label: prev && distMeters(prev, { latitude: pos.lat, longitude: pos.lon }) < 300 ? prev.label : undefined,
       };
       writeFixCache(fix);
       if (!fix.label && !labelInFlight) {
@@ -108,10 +109,8 @@ export function prefetchCaptureLocation(force = false): void {
       } else if (fix.label) {
         feedFootprints(fix.label, fix.lat, fix.lon);
       }
-    },
-    () => { /* 拒绝/超时:保持旧缓存,盖章自然跳过 */ },
-    { enableHighAccuracy: false, timeout: 8000, maximumAge: 120_000 },
-  );
+    })
+    .catch(() => { /* 拒绝/超时:保持旧缓存,盖章自然跳过 */ });
 }
 
 function coordLabel(lat: number, lon: number): string {

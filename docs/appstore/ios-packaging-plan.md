@@ -2,6 +2,8 @@
 
 > 目标:不碰那台跑不动新 Xcode 的老 Mac,用**云端 CI**把 Nesio 出成 iOS 包 → **TestFlight**
 > 装到 iPhone 17。这条路同时解锁**上架**和**端上模型测试**(端上模型是原生 App 起来之后的事)。
+>
+> **只要自己 iPhone / AltStore 自签**：见 [`altstore-ipa.md`](./altstore-ipa.md)（更短，不需 ASC / Codemagic）。
 
 ## 架构决定:hosted webview
 

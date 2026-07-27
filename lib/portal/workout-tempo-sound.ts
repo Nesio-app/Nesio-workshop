@@ -19,6 +19,8 @@ let tickEl: HTMLAudioElement | null = null;
 let dingEl: HTMLAudioElement | null = null;
 let primed = false;
 let disabled = false;
+/** 用户点「跟拍做」后本会话允许壳内试声(仍走 HTMLAudio + 宏任务,失败静默)。 */
+let sessionUnlocked = false;
 
 function forceEnabled(): boolean {
   try {
@@ -32,12 +34,18 @@ function forceEnabled(): boolean {
 export function isWorkoutTempoSoundAllowed(): boolean {
   if (typeof window === 'undefined') return false;
   if (disabled) return false;
-  if (forceEnabled()) return true;
+  if (forceEnabled() || sessionUnlocked) return true;
   if (isNativePlatform()) return false;
   const ua = navigator.userAgent || '';
   // Android System WebView —— 历史卡死主场
   if (/Android/i.test(ua) && /; wv\)/i.test(ua)) return false;
   return true;
+}
+
+/** 壳内默认是否静音(UI 用):未解锁前为 true。 */
+export function isWorkoutTempoSoundMutedByPolicy(): boolean {
+  if (forceEnabled() || sessionUnlocked) return false;
+  return isNativePlatform();
 }
 
 function ensureEls(): void {
@@ -99,7 +107,8 @@ export function playWorkoutTempo(freq: number): void {
 
 /** 用户手势内解锁(跟拍/计时按钮点击时调一次)。 */
 export function unlockWorkoutTempoSound(): void {
-  if (!isWorkoutTempoSoundAllowed()) return;
+  // 点「跟拍做」即允许本会话尝试播声(含 Capacitor 壳);仍用宏任务 HTMLAudio。
+  sessionUnlocked = true;
   try {
     ensureEls();
     if (!tickEl || primed) return;

@@ -271,6 +271,22 @@ export default function Portal() {
     try { recordAppOpen(); } catch { /* 本机偏好,失败不影响使用 */ }
   }, []);
 
+  // 原生壳:已连位置或已有 Always → 恢复足迹后台监听(significant / visits)。
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const { isNativePlatform } = await import('@/lib/portal/platform-capabilities');
+        if (!isNativePlatform() || cancelled) return;
+        const { checkLocationPermission, ensurePlaceTrailWatch } = await import('@/lib/portal/native-geolocation');
+        const perm = await checkLocationPermission();
+        if (!perm.whenInUse || cancelled) return;
+        await ensurePlaceTrailWatch();
+      } catch { /* 无插件时安静跳过 */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const [config, setConfig] = useState<PortalConfig>(DEFAULT_PORTAL_CONFIG);
   const [decModules, setDecModules] = useState<Map<string, PortalDecMetadata>>(new Map());
   const [decShellRoutes, setDecShellRoutes] = useState<
@@ -372,7 +388,11 @@ export default function Portal() {
   // 偶发卡短(WebKit 老 bug),主页面 100dvh 布局随之缩水。焦点离开输入框
   // 后滚回顶部,促使视口回弹;浮层已用 lvh 免疫,这里管的是主页面。
   useEffect(() => {
-    const heal = () => setTimeout(() => window.scrollTo(0, 0), 60);
+    const heal = () => setTimeout(() => {
+      const t = document.activeElement as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      window.scrollTo(0, 0);
+    }, 60);
     window.addEventListener('focusout', heal);
     return () => window.removeEventListener('focusout', heal);
   }, []);

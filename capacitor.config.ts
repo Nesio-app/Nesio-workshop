@@ -1,33 +1,47 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 /**
- * Capacitor 原生壳配置(iOS 打包)。见 docs/appstore/ios-packaging-plan.md。
+ * Capacitor 原生壳(iPhone / AltStore 自签)。
+ * 详见 docs/appstore/ios-packaging-plan.md。
  *
- * 架构:**hosted webview** —— 壳里的 webview 直接加载一个开了合规旗
- * (NEXT_PUBLIC_APPSTORE_BUILD=1)的部署。Nesio 是带后端 API 的 Next.js,不能静态
- * 导出(会废掉 /api 路由),所以走远端加载而不是本地打包 web 资源。原生能力
- * (端上模型 / 语音 / 视觉 / StoreKit / Apple 登录)由后续的 Capacitor 插件补,
- * 也正是它们让这个 App 过 Apple 4.2「别只是套网页」。
+ * 架构:**hosted webview** —— 壳加载远端 Next.js 部署(保留 /api)。
+ * 自用 AltStore 连现网；将来提审再换 NEXT_PUBLIC_APPSTORE_BUILD=1 的合规域名。
  */
 const config: CapacitorConfig = {
-  // ⬜ 你的 App 唯一标识(reverse-DNS),要和 App Store Connect / 签名证书一致。
   appId: 'app.nesio.ios',
   appName: 'Nesio',
 
-  // hosted 模式下 webDir 只作离线兜底(server.url 不可达时显示 ios-shell/index.html)。
+  // hosted 模式下 webDir 只作离线兜底(server.url 不可达时显示)。
   webDir: 'ios-shell',
 
   server: {
-    // ⬜ 换成你的**合规部署**域名(用 NEXT_PUBLIC_APPSTORE_BUILD=1 构建的那个,
-    //    藏掉 财务/健康/地图/people/Lab)。可以是 Vercel 上一个单独 project/域名,
-    //    例如 https://app.nesio.app。webview 加载它,Capacitor 会把原生桥注入这个 origin。
-    url: 'https://app.nesio.app',
+    // 自用现网。提审时改成 APPSTORE_BUILD=1 的合规部署域名。
+    url: 'https://treasurebox-nu.vercel.app',
     cleartext: false,
+    // OAuth / 外链回跳(Google、Apple、Plaid 等)允许离开主域再回来。
+    allowNavigation: [
+      'treasurebox-nu.vercel.app',
+      '*.vercel.app',
+      'accounts.google.com',
+      'appleid.apple.com',
+      '*.supabase.co',
+    ],
   },
 
+  // 官方 @capacitor/geolocation + local-notifications 在 Xcode 15 + Cap 8 SPM 编不过
+  // (Swift API 被 $NonescapableTypes 门控,需 Xcode 26)。改走 App 内自研桥:
+  // NesioGeolocation / NesioLocalNotify。packageClassList 由 cap sync 维护 + 下方手工追加。
+  packageClassList: [
+    'NesioGeolocationPlugin',
+    'NesioLocalNotifyPlugin',
+    'NesioHealthKitPlugin',
+  ],
+
   ios: {
-    contentInset: 'always',
-    backgroundColor: '#071326', // 深蓝,和 App 夜间底一致,首屏加载不闪白
+    // never: WebView 铺满物理屏,安全区交给 CSS env(safe-area-inset-*)。
+    // always 会把内容缩进安全区,底下露出原生底色 → 键盘/底部白边/深蓝条。
+    contentInset: 'never',
+    backgroundColor: '#f4f8fd', // 与昼间 --portal-bg 一致,缝隙不露系统白
   },
 };
 

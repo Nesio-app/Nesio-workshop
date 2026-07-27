@@ -240,16 +240,27 @@ export async function fetchWeatherAt(
   };
 }
 
-export function readGeo(timeoutMs = 4_000): Promise<GeolocationPosition> {
-  return new Promise((resolve, reject) => {
-    if (!navigator.geolocation) {
-      reject(new Error('no geo'));
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(resolve, reject, {
-      enableHighAccuracy: true,
-      timeout: timeoutMs,
-      maximumAge: 60_000,
-    });
+export async function readGeo(timeoutMs = 4_000): Promise<GeolocationPosition> {
+  const { getDevicePosition } = await import('../native-geolocation');
+  const pos = await getDevicePosition({
+    timeoutMs,
+    maximumAgeMs: 60_000,
+    enableHighAccuracy: true,
   });
+  if (!pos) throw new Error('no geo');
+  // 兼容旧调用方:拼一个近似 GeolocationPosition
+  return {
+    coords: {
+      latitude: pos.lat,
+      longitude: pos.lon,
+      accuracy: pos.accuracy,
+      altitude: null,
+      altitudeAccuracy: null,
+      heading: null,
+      speed: null,
+      toJSON() { return this; },
+    },
+    timestamp: pos.timestamp,
+    toJSON() { return this; },
+  } as GeolocationPosition;
 }

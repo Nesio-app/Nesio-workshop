@@ -38,19 +38,47 @@ export default function MontageTab() {
   };
   useEffect(() => { refresh(); }, []);
 
-  // 落差揭晓:先亮原话(intro ~1.9s)→ 放真视频(playing);feel 结尾句延迟浮现再淡出
+  // 落差揭晓:原话叠在视频上(~0.8s),视频在同一用户手势内 muted 起播,
+  // 避免 1.9s 后 autoPlay 手势过期 → 壳里点了没声/没画。
   useEffect(() => {
     if (!playing) { setPhase('intro'); setFeelOn(false); return; }
     setPhase('intro'); setFeelOn(false);
-    const t = setTimeout(() => setPhase('playing'), 1900);
+    const t = setTimeout(() => setPhase('playing'), 800);
     return () => clearTimeout(t);
   }, [playing]);
   useEffect(() => {
     if (phase !== 'playing') return;
+    const v = videoRef.current;
+    if (v) {
+      try {
+        v.muted = false;
+        const p = v.play();
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => showToast(L(dict, '没播起来 — 点一下画面上的播放键,或用「全屏」', 'Didn’t start — tap play on the video, or Fullscreen')));
+        }
+      } catch {
+        showToast(L(dict, '没播起来 — 点一下画面上的播放键', 'Didn’t start — tap play on the video'));
+      }
+    }
     const a = setTimeout(() => setFeelOn(true), 700);
     const b = setTimeout(() => setFeelOn(false), 5200);
     return () => { clearTimeout(a); clearTimeout(b); };
-  }, [phase]);
+  }, [phase, dict]);
+
+  function openFilm(m: VideoMontage) {
+    if (!m.videoUrl) return;
+    setPlaying(m);
+    // 同一次点击里尽量进系统全屏播放器(iOS WKWebView 上更接近「系统播放器」)。
+    requestAnimationFrame(() => {
+      const v = videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
+      if (!v) return;
+      try {
+        v.muted = true;
+        void v.play()?.catch(() => {});
+        if (typeof v.webkitEnterFullscreen === 'function') v.webkitEnterFullscreen();
+      } catch { /* 不支持全屏:留内嵌播放 */ }
+    });
+  }
 
   function showToast(t: string) {
     setToast(t);
@@ -80,8 +108,8 @@ export default function MontageTab() {
 
   const Poster = ({ m }: { m: VideoMontage }) => (
     <div className="nm-poster" role="button" tabIndex={0} style={m.poster ? { backgroundImage: `url(${m.poster})` } : undefined}
-      onClick={() => m.videoUrl && setPlaying(m)}
-      onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && m.videoUrl) { e.preventDefault(); setPlaying(m); } }}
+      onClick={() => openFilm(m)}
+      onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && m.videoUrl) { e.preventDefault(); openFilm(m); } }}
       aria-label={L(dict, `播放 ${m.title}`, `Play ${m.title}`)}>
       <span className={`kind${m.tier === 'pro' ? ' pro' : ''}`}>{badgeText(m)}</span>
       <span className="dur">{fmtDur(m.durationSec)}</span>
@@ -153,16 +181,24 @@ export default function MontageTab() {
         {playing && (
           <div className="nesio-montage nm-cinema" onClick={() => setPlaying(null)}>
           <div className="nm-player" onClick={(e) => e.stopPropagation()}>
-            {phase === 'intro' ? (
-              <div className="nm-screen" style={playing.poster ? { backgroundImage: `url(${playing.poster})` } : undefined}>
-                <p className="note">「{playing.sourceNote || playing.storyLine}」</p>
-              </div>
-            ) : (
-              <div style={{ position: 'relative' }}>
-                <video ref={videoRef} src={playing.videoUrl} controls autoPlay playsInline className="nm-video" />
-                {playing.feel && <div className={`nm-feel${feelOn ? ' on' : ''}`}>{playing.feel}</div>}
-              </div>
-            )}
+            <div style={{ position: 'relative' }}>
+              <video
+                ref={videoRef}
+                src={playing.videoUrl}
+                controls={phase === 'playing'}
+                playsInline
+                muted={phase === 'intro'}
+                autoPlay
+                className="nm-video"
+                style={phase === 'intro' ? { position: 'absolute', inset: 0, opacity: 0 } : undefined}
+              />
+              {phase === 'intro' && (
+                <div className="nm-screen" style={playing.poster ? { backgroundImage: `url(${playing.poster})` } : undefined}>
+                  <p className="note">「{playing.sourceNote || playing.storyLine}」</p>
+                </div>
+              )}
+              {phase === 'playing' && playing.feel && <div className={`nm-feel${feelOn ? ' on' : ''}`}>{playing.feel}</div>}
+            </div>
             <p className="nm-stage">{phase === 'intro' ? L(dict, '先给你看你写下的那句…', 'First, the line you wrote…') : L(dict, '…再看它变成的样子', '…now watch it become this')}</p>
             <div className="nm-prow">
               <button type="button" className="pri" onClick={() => { setSharing(playing); setPlaying(null); }}>{L(dict, '分享这一片', 'Share this')}</button>

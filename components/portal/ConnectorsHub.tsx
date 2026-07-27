@@ -49,7 +49,7 @@ interface ConnectorDef {
 const CONNECTORS: ConnectorDef[] = [
   // 日历和 Gmail 是同一次 Google 授权,合并为一个入口(批次 5 用户反馈)
   { id: 'google', name: 'Google 日历 · Gmail', nameEn: 'Google Calendar · Gmail', icon: <IconCalendar />, iconBg: 'var(--chip-blue)', method: 'oauth', description: '一次授权同时接入:日程生成提醒和简报,邮件提取人物、日期、承诺', descriptionEn: 'One consent covers both: calendar drives reminders and briefs; email yields people, dates, promises' },
-  { id: 'weather', name: '地理位置 · 天气', nameEn: 'Location · Weather', icon: <IconCloudSun />, iconBg: 'var(--chip-amber)', method: 'geo', description: '基于实时天气生成外出和健康建议', descriptionEn: 'Live weather powers outing and health tips' },
+  { id: 'weather', name: '地理位置 · 天气', nameEn: 'Location · Weather', icon: <IconCloudSun />, iconBg: 'var(--chip-amber)', method: 'geo', description: '使用期间定位 + 可选始终(后台足迹);驱动天气与外出建议', descriptionEn: 'When-in-use location + optional Always for background place trail; powers weather tips' },
   // 批次 21:银行流水(Plaid)—— Link 授权后增量同步交易,明细只存本机
   { id: 'plaid', name: '银行流水 · Plaid', nameEn: 'Bank feed · Plaid', icon: <IconCard />, iconBg: 'var(--chip-fog)', method: 'oauth', description: '连接美国银行账户,交易流水增量同步(明细只存本机)', descriptionEn: 'Link a US bank account; transactions sync incrementally (details stay on-device)' },
   // 批次 21:Google 地图时间轴导入 —— 手机端导出的 JSON 并入地点足迹
@@ -62,7 +62,7 @@ const CONNECTORS: ConnectorDef[] = [
   // 批次 158:Granola 会议 —— Nesio 作为其远程 MCP 客户端(OAuth 2.0 DCR)。转写自动提炼成 To do/推断项。
   { id: 'granola', name: 'Granola 会议', nameEn: 'Granola meetings', icon: <IconBookOpen />, iconBg: 'var(--chip-leaf)', method: 'oauth', description: '连接 Granola,会议转写自动提炼成 To do(带截止日)和推断项,直接进今天页', descriptionEn: 'Connect Granola — meeting transcripts distill into dated to-dos and inferred items, straight to Today' },
   { id: 'toggl', name: 'Toggl Track', icon: <IconTimer />, iconBg: 'var(--chip-red)', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', tokenHintEn: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布', descriptionEn: 'Sync time entries to see where your focus goes', dev: true },
-  { id: 'health', name: 'Apple Health 导出', nameEn: 'Apple Health export', icon: <IconHeartPulse />, iconBg: 'var(--chip-pink)', method: 'file', description: '直接传导出的 zip 或 export.xml,提取步数、睡眠、心率、锻炼', descriptionEn: 'Drop the exported zip or export.xml — extracts steps, sleep, heart rate, workouts' },
+  { id: 'health', name: 'Apple 健康', nameEn: 'Apple Health', icon: <IconHeartPulse />, iconBg: 'var(--chip-pink)', method: 'file', description: 'App 壳:直连 HealthKit 读步数/睡眠/心率;也可导入导出 zip/xml', descriptionEn: 'Native shell: HealthKit for steps/sleep/HR; or import export zip/xml' },
   { id: 'reminder', name: 'Apple 提醒事项', nameEn: 'Apple Reminders', icon: <IconCheckSquare />, iconBg: 'var(--chip-amber)', method: 'shortcuts', ingestSource: 'reminder', description: '通过快捷指令推送提醒，自动转为承诺', descriptionEn: 'Push reminders via Shortcuts; they become commitments', dev: true },
   { id: 'keep', name: 'Keep 健康', nameEn: 'Keep fitness', icon: <IconActivity />, iconBg: 'var(--chip-green)', method: 'shortcuts', ingestSource: 'keep', description: '通过快捷指令推送运动数据（点设置看步骤）', descriptionEn: 'Push workout data via Shortcuts (tap Set up for steps)' },
   // 批次 22:微信读书无开放 API —— App 内导出笔记,粘贴文本解析入库
@@ -1081,15 +1081,137 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (c.id === 'tesla') { window.location.href = '/api/portal/tesla/connect'; return; }
     if (c.method === 'geo') {
       setSyncing(c.id);
-      navigator.geolocation.getCurrentPosition(
-        () => { saveConnectorState('weather', true); setConnected((p) => ({ ...p, weather: true })); setSyncing(null); window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed')); showToast(L(dict, '位置已授权', 'Location granted'), true); },
-        () => { setSyncing(null); showToast(L(dict, '位置权限被拒绝', 'Location permission denied'), false); },
-        { timeout: 8000 },
-      );
+      void (async () => {
+        const {
+          getDevicePosition,
+          requestLocationPermission,
+          requestAlwaysLocationPermission,
+        } = await import('@/lib/portal/native-geolocation');
+        const { isNativePlatform } = await import('@/lib/portal/platform-capabilities');
+        const allowed = await requestLocationPermission();
+        if (!allowed) {
+          setSyncing(null);
+          showToast(L(dict, '位置权限被拒绝 — 可在系统设置里打开定位后再试', 'Location denied — enable Location in Settings and retry'), false);
+          return;
+        }
+        const pos = await getDevicePosition({ timeoutMs: 8_000, maximumAgeMs: 30_000, enableHighAccuracy: false });
+        if (!pos) {
+          setSyncing(null);
+          showToast(L(dict, '暂时拿不到坐标 — 到室外或稍后再试', 'Couldn’t get coordinates — try outdoors or again later'), false);
+          return;
+        }
+        // 写入天气/记忆定位缓存,让「已连接」真有实时坐标可用。
+        try {
+          const { prefetchCaptureLocation } = await import('@/lib/portal/capture-location');
+          const cacheKey = 'nesio-weather-last-geo-v1';
+          localStorage.setItem(cacheKey, JSON.stringify({ lat: pos.lat, lon: pos.lon, ts: Date.now() }));
+          void prefetchCaptureLocation(true);
+        } catch { /* ignore */ }
+
+        let alwaysOk = false;
+        if (isNativePlatform()) {
+          const always = await requestAlwaysLocationPermission();
+          alwaysOk = always.always;
+        }
+        // 立刻记一条足迹 + 开后台监听(此前只要权限、不记点 → Always 了足迹仍空)。
+        try {
+          const { recordVisitFromCoords, ensurePlaceTrailWatch } = await import('@/lib/portal/native-geolocation');
+          await recordVisitFromCoords(pos.lat, pos.lon);
+          if (isNativePlatform()) void ensurePlaceTrailWatch();
+        } catch { /* ignore */ }
+        setSyncing(null);
+        saveConnectorState('weather', true);
+        setConnected((p) => ({ ...p, weather: true }));
+        window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+        window.dispatchEvent(new CustomEvent('nesio-place-trail-updated'));
+        const alwaysHint = alwaysOk
+          ? L(dict, ' · 始终已开 · 已写入足迹', ' · Always on · trail updated')
+          : (isNativePlatform()
+            ? L(dict, ' · 足迹已记(始终可在系统设置打开)', ' · Trail saved (enable Always in Settings)')
+            : L(dict, ' · 足迹已记', ' · Trail saved'));
+        showToast(
+          L(dict, `位置已授权 · ${pos.lat.toFixed(3)}, ${pos.lon.toFixed(3)}${alwaysHint}`, `Location granted · ${pos.lat.toFixed(3)}, ${pos.lon.toFixed(3)}${alwaysHint}`),
+          true,
+        );
+        // 顺手要本地通知权限 + 3 秒后一条自检提醒(失败不影响定位)。
+        void import('@/lib/portal/native-local-notifications')
+          .then(async (m) => {
+            const ok = await m.ensureLocalNotificationPermission();
+            if (!ok) return;
+            await m.scheduleLocalAlert({
+              title: L(dict, 'Nesio 提醒已就绪', 'Nesio alerts ready'),
+              body: L(dict, '本地通知可用。之后的到点提醒会走这条通道。', 'Local notifications work. Timed reminders will use this channel.'),
+              afterSec: 3,
+            });
+          })
+          .catch(() => {});
+      })();
       return;
     }
-    // 打开文件选择器前标记 busy —— 选完文件回到前台时,别被"新部署自动整页刷新"冲掉上传。
-    if (c.id === 'health') { markBusy(); fileRef.current?.click(); return; }
+    // 原生壳优先 HealthKit;失败或 Web 再走导出文件。
+    if (c.id === 'health') {
+      void (async () => {
+        const { isNativePlatform, healthKit } = await import('@/lib/portal/platform-capabilities');
+        if (!isNativePlatform()) {
+          markBusy();
+          fileRef.current?.click();
+          return;
+        }
+        if (healthKit() !== 'native') {
+          showToast(
+            L(dict, '这版壳还没带 HealthKit — 请装最新 Nesio-shell-fix.ipa 后再点', 'This shell build has no HealthKit — install latest Nesio-shell-fix.ipa'),
+            false,
+          );
+          return;
+        }
+        setSyncing('health');
+        showToast(
+          L(dict, '即将弹出「健康」权限 — 请打开需要的类别(步数/睡眠/心率…)', 'Health permission sheet next — turn on steps/sleep/HR…'),
+          true,
+        );
+        try {
+          const { syncHealthKitToStore } = await import('@/lib/portal/native-healthkit');
+          const res = await syncHealthKitToStore(30);
+          setSyncing(null);
+          if (!res.ok || !res.metrics) {
+            showToast(
+              L(
+                dict,
+                `HealthKit 未读到数据(${res.reason || 'denied'})。可到「健康 App → 共享 → App → Nesio」打开开关；或点确定后改用导出文件。`,
+                `HealthKit empty (${res.reason || 'denied'}). Open Health → Sharing → Apps → Nesio; or use export file next.`,
+              ),
+              false,
+            );
+            markBusy();
+            fileRef.current?.click();
+            return;
+          }
+          saveConnectorState('health', true);
+          setConnected((p) => ({ ...p, health: true }));
+          setCounts((p) => ({ ...p, health: res.metrics!.metrics.length || res.metrics!.workouts }));
+          // 洞察「健康」tab 默认跟 Lab;同步成功后强制打开,免得数据进了却看不到。
+          try {
+            const { setModuleOverride } = await import('@/lib/portal/module-overrides');
+            setModuleOverride('health', 'on');
+          } catch { /* ignore */ }
+          window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
+          showToast(
+            L(
+              dict,
+              `已接入 HealthKit:${res.metrics.metrics.length} 项 · 洞察→健康。改权限:「健康」App→共享→App→Nesio`,
+              `HealthKit: ${res.metrics.metrics.length} metrics · Insights→Health. Permissions: Health app→Sharing→Apps→Nesio`,
+            ),
+            true,
+          );
+        } catch {
+          setSyncing(null);
+          showToast(L(dict, 'HealthKit 同步失败 — 可改用导出文件', 'HealthKit sync failed — try export file'), false);
+          markBusy();
+          fileRef.current?.click();
+        }
+      })();
+      return;
+    }
     if (c.method === 'batch-photos') { markBusy(); photosRef.current?.click(); return; }
     if (c.id === 'timeline') { markBusy(); timelineRef.current?.click(); return; }
     if (c.id === 'wechat_reading') { setWechatReadingOpen(true); return; }
@@ -1360,8 +1482,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           {CONNECTORS.filter((c) => !c.dev)
             .filter((c) => {
               if (isLabModeOn()) return true;
-              const FREE = ['google', 'weather'];
-              const PRO = ['google', 'weather', 'flomo'];
+              // 位置/健康是壳能力自测与日常刚需,Lab 关也保留入口。
+              const FREE = ['google', 'weather', 'health'];
+              const PRO = ['google', 'weather', 'health', 'flomo'];
               return (isPro() ? PRO : FREE).includes(c.id);
             })
             .map((c) => {

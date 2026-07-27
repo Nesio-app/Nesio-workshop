@@ -429,7 +429,22 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
   function allowMicAndStart() {
     markPermissionExplained('microphone');
     setMicPrimer(false);
-    startListening();
+    // 先要原生麦权限(Capacitor Info.plist / Safari),再启 Web Speech。
+    // 壳里只调 SpeechRecognition 常既无系统框、也启不了听写。
+    const kick = () => startListening();
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+      void navigator.mediaDevices.getUserMedia({ audio: true })
+        .then((stream) => {
+          stream.getTracks().forEach((t) => t.stop());
+          kick();
+        })
+        .catch(() => {
+          setMicError(L(dict, '麦克风权限被拒，请在系统设置里允许后重试；也可直接打字。', 'Mic permission denied — allow it in Settings, or just type.'));
+          setTimeout(() => inputRef.current?.focus(), 100);
+        });
+      return;
+    }
+    kick();
   }
 
   async function handleSend() {

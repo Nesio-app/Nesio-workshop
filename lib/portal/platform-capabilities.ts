@@ -66,6 +66,25 @@ export function push(): CapabilityImpl {
   return 'none';
 }
 
+/** 本地通知(到点提醒)。native: NesioLocalNotify(自研);web: 不可靠 → none。 */
+export function localNotifications(): CapabilityImpl {
+  if (hasNativePlugin('NesioLocalNotify') || hasNativePlugin('LocalNotifications')) return 'native';
+  return 'none';
+}
+
+/** 定位。native: NesioGeolocation(使用期间/Always);web: navigator.geolocation。 */
+export function geolocation(): CapabilityImpl {
+  if (hasNativePlugin('NesioGeolocation') || hasNativePlugin('Geolocation')) return 'native';
+  if (typeof navigator !== 'undefined' && !!navigator.geolocation) return 'web';
+  return 'none';
+}
+
+/** HealthKit 读。仅原生壳;web 走导出文件。 */
+export function healthKit(): CapabilityImpl {
+  if (hasNativePlugin('NesioHealthKit')) return 'native';
+  return 'none';
+}
+
 /** 相机/录音(getUserMedia)。web 基本全平台可用;native 插件可选。 */
 export function camera(): CapabilityImpl {
   if (hasNativePlugin('Camera')) return 'native';
@@ -96,6 +115,8 @@ export function capabilitiesSnapshot(): Record<string, CapabilityImpl | boolean>
     vision: vision(),
     onDeviceLLM: onDeviceLLM(),
     push: push(),
+    localNotifications: localNotifications(),
+    geolocation: geolocation(),
     camera: camera(),
     composeEmail: composeEmail(),
   };

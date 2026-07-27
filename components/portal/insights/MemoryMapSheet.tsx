@@ -43,8 +43,12 @@ interface Cluster { lat: number; lon: number; items: GeoNode[] }
 function geoNodes(): GeoNode[] {
   return getLifeGraph()
     .map((node) => {
-      const lat = node.attributes?.capturedLat;
-      const lon = node.attributes?.capturedLon;
+      const a = node.attributes || {};
+      // 拍一拍 live GPS 写 lat/lon;EXIF/自动定位写 capturedLat/Lon —— 两边都算「带位置」。
+      const lat = typeof a.capturedLat === 'number' ? a.capturedLat
+        : typeof a.lat === 'number' ? a.lat : null;
+      const lon = typeof a.capturedLon === 'number' ? a.capturedLon
+        : typeof a.lon === 'number' ? a.lon : null;
       return typeof lat === 'number' && typeof lon === 'number' ? { node, lat, lon } : null;
     })
     .filter((g): g is GeoNode => g !== null);
