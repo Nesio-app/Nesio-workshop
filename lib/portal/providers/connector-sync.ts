@@ -319,7 +319,7 @@ export async function runPeopleSync(): Promise<PeopleSyncResult> {
         updateLifeNode(existing.id, { attributes: { ...existing.attributes, ...attrs }, tags: mergedTags });
         updated++;
       } else {
-        addLifeNode({ type: 'person', name: name || email, source: 'system', confidence: 0.9, attributes: attrs, relations: [], tags });
+        ingestLifeNode({ type: 'person', name: name || email, source: 'system', confidence: 0.9, attributes: { ...attrs, epistemic: 'observation', generator: 'connector:google-people' }, relations: [], tags });
         imported++;
       }
     }

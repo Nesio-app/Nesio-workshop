@@ -14,6 +14,11 @@ import { lifeNodeToSignal, type RetentionPolicy, type Signal, type SignalSensiti
 import type { SignalContext } from './context';
 import { appendSignalIdb } from './signal-store-idb';
 import { logDropped } from '../portal/storage-health';
+import {
+  serializeDerivedFrom,
+  stampEpistemic,
+  type SignalEpistemic,
+} from './signal-epistemic';
 
 export const SIGNAL_SCHEMA_VERSION = 'Signal@v1';
 export type SignalWriteMode = 'local_first' | 'cloud_mirror_attempted' | 'cloud_mirror_pending';
@@ -33,6 +38,12 @@ export interface CreateSignalInput {
   externalId?: string;
   /** Structured semantics (domain / people / places / objects / intent). */
   context?: SignalContext;
+  /** 认识论层级;缺省由 stampEpistemic 按 type/source 推断。 */
+  epistemic?: SignalEpistemic;
+  /** 写出者:user / connector:gmail / ai:mirror / rule:growth … */
+  generator?: string;
+  /** 派生所依据的事实 id。 */
+  derivedFrom?: string[];
 }
 
 function iso(value: string | Date | undefined): string {
@@ -157,6 +168,8 @@ export function createSignalWithNode(input: CreateSignalInput): { signal: Signal
   const occurredAt = iso(input.occurredAt);
   const capturedAt = iso(input.capturedAt);
   const signalId = buildSignalId({ ...input, occurredAt });
+  const stamp = stampEpistemic(input);
+  const derivedAttr = serializeDerivedFrom(stamp.derivedFrom);
   const node = addLifeNode({
     type: lifeNodeType(input),
     name: input.title,
@@ -170,12 +183,15 @@ export function createSignalWithNode(input: CreateSignalInput): { signal: Signal
       externalId: input.externalId || null,
       retentionPolicy: inferRetention(input),
       sensitivity: inferSensitivity(input),
+      epistemic: stamp.epistemic,
+      generator: stamp.generator || null,
+      ...(derivedAttr ? { derivedFrom: derivedAttr } : {}),
       ...(input.context ? { context: JSON.stringify(input.context) } : {}),
     },
     source: lifeNodeSource(input.source),
     confidence: clampConfidence(input.confidence),
     relations: [],
-    tags: Array.from(new Set([...(input.tags || []), input.source, String(input.type)])),
+    tags: Array.from(new Set([...(input.tags || []), input.source, String(input.type), `epistemic:${stamp.epistemic}`])),
     rawInput: input.raw,
   });
   const signal = lifeNodeToSignal(node);

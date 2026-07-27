@@ -24,11 +24,11 @@ import { getActionWindow } from './action-window';
 import { buildAction } from './actionability';
 import { L } from '@/lib/portal/i18n';
 import { getConsequenceSeverity } from './consequence-rules';
-import { interruptPriority, worthInterrupting, featureDims } from './interrupt-evaluator';
+import { interruptPriority, worthInterrupting } from './interrupt-evaluator';
 import { computeAttentionBudget, passesBudgetGate } from './attention-budget';
 import { loadCoolingStore, isOnCooldown, recordShown, saveCoolingStore } from './cooling-store';
-import { rankerScore, recordShownFeatures, type GuidanceFeatures } from './guidance-ranker';
-import { getMirrorProfile, getDomainWeight } from '@/lib/portal/mirror-profile';
+import { getDomainWeight } from '@/lib/portal/mirror-profile';
+import { getWeight } from '@/lib/platform/personalization';
 
 // Compute when a card's action window closes and the card becomes irrelevant.
 // Google Now principle: a boarding-pass card disappears when the plane departs.
@@ -263,11 +263,8 @@ export function runGuidancePipelineDeferred(
     input.goodHours && input.goodHours.length > 0 && !input.goodHours.includes(now.getHours()),
   );
 
-  // 批次 52:在线学习排序器要用的两个自适应特征,一次算好(该时段互动度 / 该类卡采纳度)。
-  const mirror = getMirrorProfile();
-  const hourFit = mirror.hourEngagement[now.getHours()] ?? 0.5;
-
-  const candidates: Array<{ card: GuidanceCard; priority: number; rScore: number; feats: GuidanceFeatures; urgency: WindowUrgency; coolKey: string }> = [];
+  // 排序:规则分 + Preference/mirror 口味(已退役 guidance-ranker)。
+  const candidates: Array<{ card: GuidanceCard; priority: number; ruleScore: number; urgency: WindowUrgency; coolKey: string }> = [];
   const seenTypes = new Set<string>();
 
   // Pre-filter: drop events whose action window has already closed (card would be stale).
@@ -303,19 +300,16 @@ export function runGuidancePipelineDeferred(
     if (seenTypes.has(dk)) continue;
     seenTypes.add(dk);
 
-    // 0-10 band 仍用于时段门与卡片展示;排序改用在线学习器的分。
+    // 0-10 规则分 + Preference/mirror 口味轻加权(已退役 guidance-ranker 在线学习)。
     const priority = interruptPriority(severity, urgency, event.type, event.source, confidence);
 
     // Hour-fit gate: outside receptive hours, only severity-3 or high-priority cards show
     if (offHours && severity < 3 && priority < 6) continue;
 
-    // 批次 52:特征 = 5 维(归一)+ hourFit + domainFit;排序分由学习器给(冷启动=旧公式)。
-    const feats: GuidanceFeatures = {
-      ...featureDims(severity, urgency, event.type, event.source, confidence),
-      hourFit,
-      domainFit: getDomainWeight(event.type),
-    };
-    const rScore = rankerScore(feats);
+    // Preference 域权重(总线投影)+ mirror domainFit 作轻加权,不另起伪智能排序器。
+    const prefW = getWeight('domain', event.type);
+    const mirrorW = getDomainWeight(event.type);
+    const ruleScore = priority + (Number.isFinite(prefW) ? (prefW - 0.5) * 2 : 0) + (mirrorW - 0.5);
     // email_signal 与 domain_insight 自带图标(邮件 provider 图标 / 域图标),其余用类型固定图标。
     const icon = (event.type === 'email_signal' || event.type === 'domain_insight') && typeof event.payload.icon === 'string'
       ? event.payload.icon
@@ -323,8 +317,7 @@ export function runGuidancePipelineDeferred(
 
     candidates.push({
       priority,
-      rScore,
-      feats,
+      ruleScore,
       urgency,
       coolKey: dk,
       card: {
@@ -344,12 +337,12 @@ export function runGuidancePipelineDeferred(
     });
   }
 
-  // 批次 52:按在线学习器的分排序(冷启动=旧公式,之后从反馈里偏移);
-  // 并列再按 urgency → 最近到期。TODAY_CARD_BUDGET 仍是唯一"出几张"的裁决者(PRD TODAY-003)。
+  // 规则分排序 + Preference/cooling;并列再按 urgency → 最近到期。
+  // TODAY_CARD_BUDGET 仍是唯一"出几张"的裁决者(PRD TODAY-003)。
   const URGENCY_RANK: Record<WindowUrgency, number> = { critical: 4, high: 3, medium: 2, low: 1, closed: 0 };
   const ranked = candidates
     .sort((a, b) => {
-      if (b.rScore !== a.rScore) return b.rScore - a.rScore;
+      if (b.ruleScore !== a.ruleScore) return b.ruleScore - a.ruleScore;
       if (URGENCY_RANK[b.urgency] !== URGENCY_RANK[a.urgency]) return URGENCY_RANK[b.urgency] - URGENCY_RANK[a.urgency];
       const ax = a.card.expiresAt ? new Date(a.card.expiresAt).getTime() : Infinity;
       const bx = b.card.expiresAt ? new Date(b.card.expiresAt).getTime() : Infinity;
@@ -358,14 +351,11 @@ export function runGuidancePipelineDeferred(
     .slice(0, TODAY_CARD_BUDGET);
   const result = ranked.map((c) => c.card);
 
-  // 「已展示」副作用(冷却 + ranker 特征暂存)拆成显式提交:调用方确认这轮结果
+  // 「已展示」副作用(冷却)拆成显式提交:调用方确认这轮结果
   // **真的会上屏**后才调用。此前副作用在返回前就写,而 useTodayData 的并发守卫
   // (runSeqRef)可能丢弃慢轮的 UI 输出 —— 卡被记成已展示却从未出现,下一轮全被
   // 冷却拦掉,Today 只剩兜底金句(收纳临期卡首发时踩中)。
   const commitShown = () => {
-    // 批次 52:出卡时暂存特征 —— 用户反馈到达时(recordCardFeedback)据此做一次在线更新。
-    for (const c of ranked) recordShownFeatures(c.card.id, c.feats, c.card.type);
-
     // Record shown → update cooling state
     if (result.length > 0) {
       let updated = coolingStore;

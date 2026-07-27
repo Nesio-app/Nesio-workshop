@@ -9,7 +9,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import FamilyDataCard from '../relationships/FamilyDataCard';
 import {
-  loadBankTx, loadBankAccounts, availableMonths, summarizeMonth, categoryBreakdown, topMerchants,
+  loadBankTx, loadBankAccounts, availableMonths, categoryBreakdown, topMerchants,
   monthlyTrend, needsReview, suggestCategory, setMerchantRule, effectiveCategory,
   accountMonth, formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
@@ -24,6 +24,8 @@ import { computeFinanceScores } from '@/lib/portal/finance-risk';
 import { incomeBreakdown, detectIncome, portfolioSummary, recurringPriceHikes } from '@/lib/portal/finance-features';
 import { removeBankAccount } from '@/lib/portal/bank-tx';
 import { loadTeslaChargeTx, teslaFinAccount } from '@/lib/portal/tesla-finance';
+import { domainExpenseTotal, listExpenses, EXPENSES_EVENT, type Expense } from '@/lib/portal/finance-sources';
+import { financeMonthAggregate } from '@/lib/portal/finance-aggregate';
 import { loadBudget, saveBudget, hasBudget, suggestBudget, budgetProgress, type BudgetConfig } from '@/lib/portal/finance-budget';
 import { buildMonthlyReport, persistReportToMemory, autoPersistLastMonthReport } from '@/lib/portal/finance-report';
 import { reportRichHtml } from '@/lib/portal/finance-report-visual';
@@ -121,15 +123,17 @@ export default function FinanceTab() {
     window.addEventListener('nesio-bank-updated', reload);
     // Tesla 同步后派发 nesio-connectors-refreshed → 新充电花费即时进财务。
     window.addEventListener('nesio-connectors-refreshed', reload);
+    window.addEventListener(EXPENSES_EVENT, reload);
     return () => {
       window.removeEventListener('nesio-bank-updated', reload);
       window.removeEventListener('nesio-connectors-refreshed', reload);
+      window.removeEventListener(EXPENSES_EVENT, reload);
     };
   }, []);
 
   const months = useMemo(() => availableMonths(txs), [txs]);
-  const summary = useMemo(() => summarizeMonth(txs, ym), [txs, ym]);
-  const prevSummary = useMemo(() => summarizeMonth(txs, prevYm(ym)), [txs, ym]);
+  const summary = useMemo(() => financeMonthAggregate(ym), [txs, ym, rev]);
+  const prevSummary = useMemo(() => financeMonthAggregate(prevYm(ym)), [txs, ym, rev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const cats = useMemo(() => categoryBreakdown(txs, ym), [txs, ym, rev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -159,6 +163,14 @@ export default function FinanceTab() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const budget = useMemo(() => loadBudget(), [rev]);
   const bp = useMemo(() => budgetProgress(txs, ym, budget), [txs, ym, budget]);
+  // 跨域小票/旅行支出(不写 bank-tx,旁条展示)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const domainSpend = useMemo(() => domainExpenseTotal(ym), [ym, rev, txs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const domainRows = useMemo(
+    () => listExpenses(ym, { includeBank: false, includeDomain: true, financeOnly: true }) as Expense[],
+    [ym, rev, txs],
+  );
   // 财务㉗:投资组合(持仓聚合;⚠️ 同样必须在空态早退之前)
   const portfolio = useMemo(() => portfolioSummary(holdings), [holdings]);
   const [budgetNote, setBudgetNote] = useState('');
@@ -177,6 +189,20 @@ export default function FinanceTab() {
     return (
       <div className="nesio-analytics-tab">
         <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Go to Settings → Data sources → Bank feed · Plaid, connect and Sync.')}</p>
+        {domainSpend.count > 0 && (
+          <div style={{ marginTop: '0.75rem' }}>
+            <p className="nesio-settings-section-label">{L(dict, '本月小票 / 旅行', 'Receipts / travel this month')}</p>
+            <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>
+              {L(dict, `${domainSpend.count} 笔 · 合计约 ${domainSpend.total.toFixed(0)}(未并入银行 KPI)`, `${domainSpend.count} · ~${domainSpend.total.toFixed(0)} (not in bank KPIs)`)}
+            </p>
+            {domainRows.slice(0, 6).map((e) => (
+              <div key={e.id} className="nesio-fin-person-row" style={{ marginTop: '0.35rem' }}>
+                <span className="nesio-fin-person-name">{e.merchant || e.note || e.source}</span>
+                <span className="nesio-fin-person-amt">{e.currency}{e.amount}</span>
+              </div>
+            ))}
+          </div>
+        )}
         <FamilyDataCard kind="spend" />
       </div>
     );
@@ -188,8 +214,8 @@ export default function FinanceTab() {
   const idx = months.indexOf(ym);
 
   // 设计:总览顶部补 —— 本月支出(毛)+ 环比、念念一句话小结、消费×人(真数据)
-  const grossSpend = cats.reduce((s, c) => s + c.total, 0);
-  const prevGross = categoryBreakdown(txs, prevYm(ym)).reduce((s, c) => s + c.total, 0);
+  const grossSpend = cats.reduce((s, c) => s + c.total, 0) + (summary.domainNet || 0);
+  const prevGross = categoryBreakdown(txs, prevYm(ym)).reduce((s, c) => s + c.total, 0) + (prevSummary.domainNet || 0);
   const spendDelta = prevGross >= 50 ? Math.round(((grossSpend - prevGross) / prevGross) * 100) : null;
   // 念念一句话:省/多花 + 本周待付账单(都来自真数据,不编)
   const nessaSummary = (() => {
@@ -297,6 +323,26 @@ export default function FinanceTab() {
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '净支出', 'Net spend')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.net, summary.currency)}</span>{netDelta !== null && <span className={`nesio-fin-delta${netDelta > 0 ? ' up' : ' down'}`}>{netDelta > 0 ? '+' : ''}{netDelta}%</span>}</div>
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '收入', 'Income')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.income, summary.currency)}</span></div>
           </div>
+          {domainSpend.count > 0 && (
+            <>
+              <p className="nesio-settings-section-label">{L(dict, '小票 / 旅行', 'Receipts / travel')}</p>
+              <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: '-0.35rem' }}>
+                {L(
+                  dict,
+                  `本月 ${domainSpend.count} 笔 · 约 ${domainSpend.total.toFixed(0)}${summary.domainCount ? ` · 其中 ${summary.domainCount} 笔同币种已并入上方支出` : ''}${summary.otherCurrencyCount ? ` · ${summary.otherCurrencyCount} 笔异币种另计` : ''}`,
+                  `${domainSpend.count} this month · ~${domainSpend.total.toFixed(0)}${summary.domainCount ? ` · ${summary.domainCount} same-currency folded into KPIs` : ''}${summary.otherCurrencyCount ? ` · ${summary.otherCurrencyCount} other-currency aside` : ''}`,
+                )}
+              </p>
+              <div className="nesio-fin-personspend" style={{ marginBottom: '0.8rem' }}>
+                {domainRows.slice(0, 5).map((e) => (
+                  <div key={e.id} className="nesio-fin-person-row">
+                    <span className="nesio-fin-person-name">{e.merchant || e.note || (e.source === 'travel' ? L(dict, '旅行', 'Travel') : L(dict, '小票', 'Receipt'))}</span>
+                    <span className="nesio-fin-person-amt">{e.currency}{e.amount}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
           {/* 财务⑯:收入构成(工资/利息/分红/退税…按 Plaid 细分类分桶) */}
           {summary.income > 0 && (() => {
             const ib = incomeBreakdown(txs, ym);
@@ -348,19 +394,48 @@ export default function FinanceTab() {
 
           {trend.length > 1 && (
             <>
-              <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '月度趋势 · 净支出', 'Monthly trend · net spend')}</p>
-              <div className="nesio-fin-trend">
-                {trend.map((t) => {
-                  const max = Math.max(...trend.map((x) => x.net), 1);
-                  return (
-                    <div key={t.ym} className="nesio-fin-trend-col">
-                      <span className="nesio-fin-trend-val">{formatMoney(t.net, summary.currency)}</span>
-                      <div className="nesio-fin-trend-bar-wrap"><div className={`nesio-fin-trend-bar${t.ym === ym ? ' is-cur' : ''}`} style={{ height: `${Math.max(4, Math.round((t.net / max) * 100))}%` }} /></div>
-                      <span className="nesio-fin-trend-lbl">{t.ym.slice(5)}</span>
+              <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-6)' }}>{L(dict, '月度趋势 · 净支出与启发', 'Monthly trend · net spend + insight')}</p>
+              {(() => {
+                const max = Math.max(...trend.map((x) => x.net), 1);
+                const last = trend[trend.length - 1];
+                const prev = trend[trend.length - 2];
+                const delta = prev && prev.net > 0 ? Math.round(((last.net - prev.net) / prev.net) * 100) : null;
+                const narrative = delta == null
+                  ? L(dict, '多记几个月,这里会出现「比上月怎样」的一句话。', 'A few more months unlock a one-line vs-last-month story.')
+                  : delta > 8
+                    ? L(dict, `本月净支出比上月高约 ${delta}% —— 值得扫一眼分类里哪块在涨。`, `Net spend is ~${delta}% above last month — glance which category rose.`)
+                    : delta < -8
+                      ? L(dict, `本月净支出比上月低约 ${Math.abs(delta)}% —— 节奏在往下走。`, `Net spend is ~${Math.abs(delta)}% below last month — the pace is easing.`)
+                      : L(dict, '本月净支出与上月接近 —— 先稳住再说。', 'Net spend is close to last month — hold steady.');
+                // DataEase 启发:面积折线 + 柱对照,同一数据两面读(深度 vs 形状)
+                const W = 100; const H = 36;
+                const pts = trend.map((t, i) => {
+                  const x = trend.length > 1 ? (i / (trend.length - 1)) * W : W / 2;
+                  const y = H - (Math.max(0, t.net) / max) * (H - 2);
+                  return `${x.toFixed(1)},${y.toFixed(1)}`;
+                });
+                const area = `0,${H} ${pts.join(' ')} ${W},${H}`;
+                return (
+                  <>
+                    <p className="nesio-fin-insight-line">{narrative}</p>
+                    <div className="nesio-fin-trend-area" aria-hidden>
+                      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="72" preserveAspectRatio="none">
+                        <polygon points={area} fill="var(--portal-accent-soft)" />
+                        <polyline points={pts.join(' ')} fill="none" stroke="var(--portal-blue-deep)" strokeWidth="1.6" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                      </svg>
                     </div>
-                  );
-                })}
-              </div>
+                    <div className="nesio-fin-trend">
+                      {trend.map((t) => (
+                        <div key={t.ym} className="nesio-fin-trend-col">
+                          <span className="nesio-fin-trend-val">{formatMoney(t.net, summary.currency)}</span>
+                          <div className="nesio-fin-trend-bar-wrap"><div className={`nesio-fin-trend-bar${t.ym === ym ? ' is-cur' : ''}`} style={{ height: `${Math.max(4, Math.round((t.net / max) * 100))}%` }} /></div>
+                          <span className="nesio-fin-trend-lbl">{t.ym.slice(5)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                );
+              })()}
             </>
           )}
 

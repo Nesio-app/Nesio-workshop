@@ -10,7 +10,7 @@ export { emitFeedback, onFeedback, type FeedbackEvent, type Reaction } from './f
 export { readFeedbackLog, replayFeedback } from './feedback-log';
 export { recordPreference, getWeight, getWeights, seedPreferenceWeights, resetPreferenceDimension } from './preference-store';
 export { foldSample, baseline, zScore, ewmaState, seedEwma, type Estimator } from './baseline-store';
-export { markSeen, sinceSeen, cooldownRemaining, type CooldownPolicy } from './recency-store';
+// Recency 原语已退役(生产零接线);冷却继续用 cooling-store / dormant-engine 原子记录。
 
 // 副作用引入:确保 feedback-log / preference-store 的 onFeedback 订阅在首次 emit 前已注册。
 import './feedback-log';

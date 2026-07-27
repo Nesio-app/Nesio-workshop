@@ -1,42 +1,76 @@
 /**
- * 反馈事实日志 —— A 计划 #0 前置(event-sourcing)。
+ * 反馈事实日志 —— Signal 投影(不再独立 IDB 双写)。
  *
- * 订阅反馈总线,把每条反馈**追加**成可回放事实(不再"折进权重即弃")。三原语/ranker 的状态是它的
- * 可回放**投影**:collect first, derive second。有了它,2b 的「回放重训」「审计」「跨设备迁移」才可能。
- *
- * 物理:先放独立 IDB append 日志(有界,保留最近 N 条,够小模型回放 + 审计),结构对齐 Signal fact,
- * 日后可并入 Signal 事实表(见 system-layers.md #0 与本提案的张力,已按"先独立日志"落地)。
+ * 旧方案曾用独立 blob 日志 + 总线订阅,与 `feedback.*` Signal 平行。
+ * 2026-07-27(可清数据精简):事实只认 Signal;`readFeedbackLog` / `replayFeedback` 从
+ * `feedback.*` 投影。总线仍扇出到 preference / ranker(投影学习器),不在此落第二份事实。
  */
+import { getSignals } from '@/lib/life-domain/signal';
+import { emitFeedback, onFeedback, type FeedbackEvent, type Reaction } from './feedback-bus';
+import { createSignal } from '@/lib/life-domain/create-signal';
 
-import { createBlobStore } from '@/lib/portal/idb-blob-store';
-import { reportStorageDropped } from '@/lib/portal/storage-health';
-import { onFeedback, type FeedbackEvent } from './feedback-bus';
+const REACTIONS: ReadonlySet<string> = new Set(['useful', 'dismiss', 'wrong', 'done', 'snooze', 'too_much']);
 
-const LOG_KEY = 'nesio-feedback-log-v1';
-const LOG_CAP = 2000; // 追加式有界:保留最近 2000 条(足够小模型回放/重训 + 审计,又不撑爆配额)
-
-const store = createBlobStore<FeedbackEvent[]>({
-  key: LOG_KEY,
-  updateEvent: 'nesio-feedback-log-updated',
-  validate: (v) => Array.isArray(v),
-  onWriteError: reportStorageDropped,
-});
-
-function append(e: FeedbackEvent): void {
-  const cur = store.load();
-  const arr = Array.isArray(cur) ? cur.slice() : [];
-  arr.push(e);
-  if (arr.length > LOG_CAP) arr.splice(0, arr.length - LOG_CAP);
-  store.save(arr);
+function asReaction(value: unknown): Reaction | null {
+  return typeof value === 'string' && REACTIONS.has(value) ? (value as Reaction) : null;
 }
 
-// 作为总线订阅者:每条反馈先落日志(collect first)。模块被 index 引入即注册。
-onFeedback(append);
+function signalToEvent(signal: { type: string; capturedAt: string; payload?: Record<string, unknown> }): FeedbackEvent | null {
+  const p = signal.payload || {};
+  // 规范总线形:payload 已带 surface/dimension/key/reaction
+  if (typeof p.surface === 'string' && typeof p.dimension === 'string' && typeof p.key === 'string') {
+    const reaction = asReaction(p.reaction)
+      || (p.feedback === 'not_now' ? 'snooze' : asReaction(p.feedback));
+    if (reaction) {
+      return {
+        surface: p.surface,
+        dimension: p.dimension,
+        key: p.key,
+        reaction,
+        at: typeof p.at === 'string' ? p.at : signal.capturedAt,
+      };
+    }
+  }
+  // feedback.today_card
+  if (signal.type === 'feedback.today_card' && typeof p.cardId === 'string') {
+    const reaction = p.feedback === 'not_now' ? 'snooze' : asReaction(p.feedback);
+    if (!reaction) return null;
+    return { surface: 'today', dimension: 'card', key: p.cardId, reaction, at: signal.capturedAt };
+  }
+  // feedback.retrieval
+  if (signal.type === 'feedback.retrieval' && typeof p.targetId === 'string') {
+    const reaction = p.verdict === 'not_this' ? 'wrong' : p.verdict === 'useful' ? 'useful' : null;
+    if (!reaction) return null;
+    return { surface: 'ask', dimension: 'retrieval', key: p.targetId, reaction, at: signal.capturedAt };
+  }
+  // feedback.reaction(总线落事实)
+  if (signal.type === 'feedback.reaction') {
+    const reaction = asReaction(p.reaction);
+    if (!reaction || typeof p.surface !== 'string' || typeof p.dimension !== 'string' || typeof p.key !== 'string') return null;
+    return {
+      surface: p.surface,
+      dimension: p.dimension,
+      key: p.key,
+      reaction,
+      at: typeof p.at === 'string' ? p.at : signal.capturedAt,
+    };
+  }
+  return null;
+}
 
-/** 读全量日志(投影/回放用)。 */
+/** 读全量反馈事实(Signal 投影;时间升序便于回放重建投影)。 */
 export function readFeedbackLog(): FeedbackEvent[] {
-  const cur = store.load();
-  return Array.isArray(cur) ? cur : [];
+  const seen = new Set<string>();
+  const out: FeedbackEvent[] = [];
+  for (const s of getSignals().filter((x) => String(x.type).startsWith('feedback.'))) {
+    const e = signalToEvent(s);
+    if (!e) continue;
+    const k = `${e.surface}|${e.dimension}|${e.key}|${e.reaction}|${e.at.slice(0, 19)}`;
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(e);
+  }
+  return out.reverse(); // getSignals 新→旧 → 回放要旧→新
 }
 
 /** 回放:可按 surface/dimension 过滤,供某原语从头重建投影。 */
@@ -44,3 +78,38 @@ export function replayFeedback(filter?: (e: FeedbackEvent) => boolean): Feedback
   const log = readFeedbackLog();
   return filter ? log.filter(filter) : log;
 }
+
+/**
+ * 总线 → Signal:一次 emitFeedback 落一条 `feedback.reaction`(事实唯一入口)。
+ * preference/ranker 仍直接订总线;本模块只负责把总线事件变成可回放事实。
+ * Today 富反馈另有 `feedback.today_card`(含 evidence ids);总线不再为 today/card 落瘦 `feedback.reaction`。
+ */
+let wired = false;
+export function ensureFeedbackSignalBridge(): void {
+  if (wired) return;
+  wired = true;
+  onFeedback((event) => {
+    // Today 富反馈已由 recordSignalFeedback 落 feedback.today_card;跳过瘦 reaction 避免双事实。
+    if (event.surface === 'today' && event.dimension === 'card') return;
+    try {
+      createSignal({
+        source: 'manual',
+        type: 'feedback.reaction',
+        title: `反馈:${event.surface}/${event.dimension}/${event.key}`,
+        payload: { ...event },
+        confidence: 1,
+        retentionPolicy: 'LongLiving',
+        tags: ['feedback', event.surface],
+        epistemic: 'feedback',
+        generator: 'user',
+        derivedFrom: [event.key],
+      });
+    } catch { /* 落事实失败不拖垮扇出 */ }
+  });
+}
+
+// 模块加载即接线(与旧 onFeedback(append) 同位置)。
+ensureFeedbackSignalBridge();
+
+// 再导出总线,方便测试「emit → Signal → readFeedbackLog」闭环。
+export { emitFeedback };

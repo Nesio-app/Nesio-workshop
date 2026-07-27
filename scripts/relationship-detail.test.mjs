@@ -74,7 +74,7 @@ assert.ok(panel.includes('setOpenKey(c.key)') && panel.includes('<RelationshipDe
 
 const sheet = fs.readFileSync(new URL('../components/portal/relationships/RelationshipDetailSheet.tsx', import.meta.url), 'utf8');
 assert.ok(sheet.includes('buildPersonProfile'), '详情 sheet 读后台档案(非现算)');
-assert.ok(sheet.includes('updateLifeNode') && sheet.includes('addLifeNode') && sheet.includes('avatar'), '可上传头像(有节点则富化、无则建)');
+assert.ok(sheet.includes('updateLifeNode') && sheet.includes('ingestLifeNode') && sheet.includes('avatar'), '可上传头像(有节点则富化、无则 ingest)');
 assert.ok(sheet.includes('RelationGraph'), '复用关系图组件');
 assert.ok(sheet.includes('markContacted'), '详情里可「联系过了」');
 

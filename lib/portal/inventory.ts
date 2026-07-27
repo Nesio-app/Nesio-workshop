@@ -12,12 +12,12 @@
  */
 
 import {
-  addLifeNode,
   deleteLifeNode,
   getLifeGraph,
   updateLifeNode,
   type LifeNode,
 } from './life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { displayStoredLocation } from './named-places';
 
 /* ---------- location 规范 ---------- */
@@ -271,10 +271,10 @@ export function addInventoryItem(input: NewInventoryItem): LifeNode {
   if (input.sold) attributes.sold = true;
   const itemTags = (input.tags || []).map((t) => t.trim()).filter(Boolean);
   const withAmazon = input.isAmazon ? ['亚马逊', ...itemTags.filter((t) => t !== '亚马逊')] : itemTags;
-  return addLifeNode({
+  return ingestLifeNode({
     type: 'object',
     name: input.name.trim(),
-    attributes,
+    attributes: { ...attributes, epistemic: 'observation', generator: 'user' },
     source: 'manual',
     confidence: 1,
     relations: [],

@@ -242,10 +242,29 @@ function reactionToGuidanceFeedback(r: Reaction): GuidanceFeedback {
   return 'not_now'; // snooze | dismiss
 }
 
-// 订阅统一反馈总线:card 维度的反馈 → ranker 更新(替代 useTodayData 手工直调)。更新律不变。
-onFeedback((e: FeedbackEvent) => {
-  if (e.dimension === 'card' && e.key) applyGuidanceFeedback(e.key, reactionToGuidanceFeedback(e.reaction));
-});
+// 2026-07-27 激进审计:退役在线学习接线。Today 排序改回规则分 + Preference/cooling。
+// 保留本文件 API 供契约/云学习同步只读探测;不再订反馈总线、不再写 trainlog。
+const RANKER_LEARNING_ENABLED = false;
+
+const RETIRED_PURGE_KEY = 'nesio-ranker-learning-retired-purge-v1';
+/** 学习退役后一次性清掉旧权重/训练日志,避免僵尸 ranker 状态误导调试面板。 */
+function purgeRetiredRankerStateIfNeeded(): void {
+  if (RANKER_LEARNING_ENABLED || typeof window === 'undefined') return;
+  try {
+    if (localStorage.getItem(RETIRED_PURGE_KEY)) return;
+    localStorage.removeItem(KEY);
+    trainLog.save([]);
+    save(fresh());
+    localStorage.setItem(RETIRED_PURGE_KEY, '1');
+  } catch { /* best-effort */ }
+}
+purgeRetiredRankerStateIfNeeded();
+
+if (RANKER_LEARNING_ENABLED && typeof window !== 'undefined') {
+  onFeedback((e: FeedbackEvent) => {
+    if (e.dimension === 'card' && e.key) applyGuidanceFeedback(e.key, reactionToGuidanceFeedback(e.reaction));
+  });
+}
 
 // ── 2b③:情境分化测量仪(mirror 情境化的前置证据门)────────────────────────────
 // 评估结论:反馈是全 app 最稀缺的数据,现在按 (domain×时段) 分桶会把稀缺样本劈碎、让所有

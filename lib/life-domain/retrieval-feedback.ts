@@ -55,7 +55,7 @@ function adjustments(): Map<string, RetrievalVerdict> {
 export function markRetrievalFeedback(targetId: string, verdict: RetrievalVerdict): void {
   if (!targetId) return;
   createSignal({
-    source: 'ai_observation',
+    source: 'manual',
     type: RETRIEVAL_FEEDBACK_TYPE,
     title: `检索反馈:${verdict === 'not_this' ? '不是这个' : '有用'}`,
     payload: { targetId, verdict },
@@ -63,6 +63,9 @@ export function markRetrievalFeedback(targetId: string, verdict: RetrievalVerdic
     retentionPolicy: 'LongLiving',
     tags: ['feedback', 'retrieval'],
     raw: `${targetId} ${verdict}`,
+    epistemic: 'feedback',
+    generator: 'user',
+    derivedFrom: [targetId],
   });
   adjustmentCache = null; // 立即生效(不等事件回环),本次会话即降权
 }

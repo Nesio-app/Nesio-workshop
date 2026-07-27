@@ -17,7 +17,7 @@ import {
   listPantry, addPantry, removePantry, expiringPantry,
   PANTRY_CATEGORIES, type PantryItem,
 } from '@/lib/cooking/pantry';
-import { normalizeIngredient } from '@/lib/cooking/food-catalog';
+import { normalizeIngredient, CUISINES } from '@/lib/cooking/food-catalog';
 import { loadRecipes, type Recipe } from '@/lib/cooking/food-data';
 import { matchRecipe, matchRecipes, type RecipeMatch } from '@/lib/cooking/recipe-match';
 import { getShoppingList, addToShopping, toggleShoppingItem, removeShoppingItem, checkoutBought, type ShoppingItem } from '@/lib/cooking/shopping';
@@ -25,6 +25,8 @@ import { recipeNutritionPerServing, recipeMainNutrition, lookupNutrition, type P
 import { getWishlist, addWish, type WishDish } from '@/lib/cooking/wishlist';
 import { addMeal, type MealSource, type MealItem } from '@/lib/cooking/meals';
 import { planWeek, type WeekPlan } from '@/lib/cooking/meal-plan-core';
+import { saveGeneratedRecipe, findGeneratedRecipe } from '@/lib/cooking/generated-recipes';
+import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
 
 type View =
   | { kind: 'home' }
@@ -33,7 +35,8 @@ type View =
   | { kind: 'recipe'; match: RecipeMatch<Recipe> }
   | { kind: 'needs'; match: RecipeMatch<Recipe>; from: 'home' | 'wishlist' | 'recipe' }
   | { kind: 'logmeal' }
-  | { kind: 'plan' };
+  | { kind: 'plan' }
+  | { kind: 'generate' };
 
 export default function CookingSheet({ open, onClose, initialView }: {
   open: boolean; onClose: () => void;
@@ -103,18 +106,19 @@ export default function CookingSheet({ open, onClose, initialView }: {
   }, []);
 
   const computeNeeds = useCallback((dishName: string, from: 'wishlist' | 'home' | 'recipe') => {
-    if (!recipes) return;
-    const r = recipes.find((x) => x.name === dishName)
-      ?? recipes.find((x) => x.name.includes(dishName) || dishName.includes(x.name));
+    const r = (recipes || []).find((x) => x.name === dishName)
+      ?? (recipes || []).find((x) => x.name.includes(dishName) || dishName.includes(x.name))
+      ?? findGeneratedRecipe(dishName);
     if (!r) { setErr(t(`菜谱库里还没有「${dishName}」,先加进库存或换一道。`, `No recipe for "${dishName}" yet — add pantry items or pick another.`)); return; }
     setErr('');
     setView({ kind: 'needs', match: matchRecipe(r, pantryNames, normalizeIngredient), from });
   }, [recipes, pantryNames, t]);
 
-  // 想做清单点一道菜 → 目录里找到就打开菜谱详情看步骤;找不到(自定义菜)轻提示。
+  // 想做清单点一道菜 → 目录/AI 生成库找到就打开菜谱详情。
   const openRecipeByName = useCallback((name: string) => {
-    if (!recipes) return;
-    const r = recipes.find((x) => x.name === name) ?? recipes.find((x) => x.name.includes(name) || name.includes(x.name));
+    const r = (recipes || []).find((x) => x.name === name)
+      ?? (recipes || []).find((x) => x.name.includes(name) || name.includes(x.name))
+      ?? findGeneratedRecipe(name);
     if (!r) { setErr(t(`「${name}」还没有步骤(自定义菜)—— 之后可以自己补。`, `No steps for "${name}" yet (custom dish).`)); return; }
     setErr('');
     setView({ kind: 'recipe', match: matchRecipe(r, pantryNames, normalizeIngredient) });
@@ -145,7 +149,13 @@ export default function CookingSheet({ open, onClose, initialView }: {
                 <HomeBody
                   soon={soon} recipes={recipes} recipesErr={recipesErr} soonNames={soonNames} pantryNames={pantryNames}
                   onLoadRec={loadRec} onOpenRecipe={(m) => setView({ kind: 'recipe', match: m })}
-                  onLogMeal={startLogMeal} onCamera={openCamera} t={t}
+                  onLogMeal={startLogMeal} onCamera={openCamera}
+                  onGenerate={() => {
+                    if (!guardPaidCloudAi('cooking_recipe_ai')) return;
+                    setErr('');
+                    setView({ kind: 'generate' });
+                  }}
+                  t={t}
                 />
               </>
             )}
@@ -184,6 +194,22 @@ export default function CookingSheet({ open, onClose, initialView }: {
                 <MealLogBody photoUrl={mealPhoto} onError={setErr} onDone={finishLogMeal} t={t} />
               </>
             )}
+            {view.kind === 'generate' && (
+              <>
+                <ScreenHead backLabel={t('做饭', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={t('生成新菜谱', 'Generate a recipe')} />
+                <GenerateBody
+                  pantryItems={items}
+                  soonNames={soonNames}
+                  locale={dict}
+                  onDone={(recipe) => {
+                    try { addWish(recipe.name, t('AI 生成', 'AI generated')); } catch { /* wishlist 失败不挡打开 */ }
+                    reload();
+                    setView({ kind: 'recipe', match: matchRecipe(recipe, pantryNames, normalizeIngredient) });
+                  }}
+                  t={t}
+                />
+              </>
+            )}
             {view.kind === 'plan' && (
               <>
                 <ScreenHead backLabel={t('想做清单', 'Want to cook')} onBack={() => setView({ kind: 'wishlist' })} title={t('做饭计划', 'Meal plan')} />
@@ -198,9 +224,10 @@ export default function CookingSheet({ open, onClose, initialView }: {
 }
 
 // ── 屏1 做饭首页 ──────────────────────────────────────────────────────────────
-function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec, onOpenRecipe, onLogMeal, onCamera, t }: {
+function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec, onOpenRecipe, onLogMeal, onCamera, onGenerate, t }: {
   soon: PantryItem[]; recipes: Recipe[] | null; recipesErr: boolean; soonNames: Set<string>; pantryNames: Set<string>;
-  onLoadRec: () => void; onOpenRecipe: (m: RecipeMatch<Recipe>) => void; onLogMeal: () => void; onCamera: () => void; t: TT;
+  onLoadRec: () => void; onOpenRecipe: (m: RecipeMatch<Recipe>) => void; onLogMeal: () => void; onCamera: () => void;
+  onGenerate: () => void; t: TT;
 }) {
   // 菜谱由用户自选/输入,不再用库存自动塞固定列表。
   const [picked, setPicked] = useState<string[]>([]);
@@ -308,10 +335,10 @@ function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec
         )}
       </section>
 
-      <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'cooking_recipe_ai' } }))}
+      <button type="button" onClick={onGenerate}
         style={{ ...primaryBtn, width: '100%', padding: 'var(--space-4)', fontSize: 'var(--text-body)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
         <IconZap size={16} />{t('生成新菜谱', 'Generate a recipe')}
-        <span style={{ ...pill, background: 'rgba(255,255,255,.22)', color: '#fff', marginLeft: 'var(--space-1)' }}>Pro</span>
+        {!canUsePaidCloudAi() && <span style={{ ...pill, background: 'rgba(255,255,255,.22)', color: '#fff', marginLeft: 'var(--space-1)' }}>Pro</span>}
       </button>
 
       {/* 记一餐:点一下开相机 → 拍完进记一餐页 */}
@@ -490,6 +517,134 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
             ))}
           </div>
         )}
+    </>
+  );
+}
+
+// ── 生成新菜谱(Pro) ──────────────────────────────────────────────────────────
+function GenerateBody({ pantryItems, soonNames, locale, onDone, t }: {
+  pantryItems: PantryItem[]; soonNames: Set<string>; locale: string;
+  onDone: (r: Recipe) => void; t: TT;
+}) {
+  const pantryNames = useMemo(
+    () => pantryItems.map((i) => normalizeIngredient(i.name).name).filter(Boolean),
+    [pantryItems],
+  );
+  const seedIngredients = useMemo(() => {
+    const soon = pantryNames.filter((n) => soonNames.has(n));
+    const rest = pantryNames.filter((n) => !soonNames.has(n));
+    return [...soon, ...rest].slice(0, 12);
+  }, [pantryNames, soonNames]);
+
+  const [cuisineId, setCuisineId] = useState(CUISINES[2]?.id || CUISINES[0]?.id || 'chuan');
+  const [extra, setExtra] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [fail, setFail] = useState('');
+
+  async function run() {
+    setFail('');
+    if (!guardPaidCloudAi('cooking_recipe_ai')) return;
+    const ingredients = seedIngredients.length
+      ? seedIngredients
+      : extra.split(/[,，、\s]+/).map((s) => s.trim()).filter(Boolean).slice(0, 12);
+    if (!ingredients.length) {
+      setFail(t('先在库存记几样,或在下面打几个食材名。', 'Add pantry items first, or type a few ingredients below.'));
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await fetch('/api/portal/cooking-recipe', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ingredients,
+          cuisineId,
+          customPrompt: extra.trim() || undefined,
+          locale,
+        }),
+      });
+      const data = await res.json().catch(() => null) as { ok?: boolean; recipe?: Recipe; error?: string } | null;
+      if (!res.ok || !data?.ok || !data.recipe) {
+        const msg = data?.error === 'parse_failed'
+          ? t('这次没写清楚步骤,再试一次。', 'That draft was unclear — try again.')
+          : t('生成没成功,稍后再试。', 'Couldn’t generate — try again in a bit.');
+        setFail(msg);
+        return;
+      }
+      const saved = saveGeneratedRecipe(data.recipe);
+      onDone(saved);
+    } catch {
+      setFail(t('网络不稳,生成没发出去。', 'Network hiccup — generate didn’t go through.'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <p style={{ ...hintLine, lineHeight: 1.6 }}>
+        {t('用手上的食材 + 选个菜系,云端帮你写一道带步骤的新菜(Pro)。',
+          'Use pantry ingredients + a cuisine — cloud writes a new recipe with steps (Pro).')}
+      </p>
+
+      <section>
+        <SectionHead label={t('会用到的食材', 'Ingredients')} right={seedIngredients.length ? t(`${seedIngredients.length} 样`, `${seedIngredients.length}`) : undefined} />
+        {seedIngredients.length > 0
+          ? (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+              {seedIngredients.map((n) => (
+                <span key={n} style={{ ...pill, background: soonNames.has(n) ? 'var(--status-gentle-soft)' : 'var(--portal-accent-soft)', color: soonNames.has(n) ? 'var(--status-gentle)' : 'var(--portal-ink)' }}>{n}</span>
+              ))}
+            </div>
+          )
+          : <p style={hintLine}>{t('库存还空 —— 在下面打几个食材,或先去「库存」记几样。', 'Pantry empty — type ingredients below, or add some in Pantry first.')}</p>}
+      </section>
+
+      <section>
+        <SectionHead label={t('菜系', 'Cuisine')} />
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+          {CUISINES.map((c) => (
+            <button
+              key={c.id}
+              type="button"
+              onClick={() => setCuisineId(c.id)}
+              style={{
+                ...pill,
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+                background: cuisineId === c.id ? 'var(--portal-accent)' : 'var(--portal-accent-soft)',
+                color: cuisineId === c.id ? '#fff' : 'var(--portal-ink)',
+                padding: 'var(--space-2) var(--space-3)',
+              }}
+            >
+              {c.name.replace(/大师$/, '')}
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section>
+        <SectionHead label={t('额外要求(可选)', 'Extra notes (optional)')} />
+        <input
+          style={{ ...inputStyle, width: '100%' }}
+          value={extra}
+          onChange={(e) => setExtra(e.target.value)}
+          placeholder={t('少油 / 给孩子吃 / 只要 20 分钟…', 'Less oil / for kids / 20 min only…')}
+        />
+      </section>
+
+      {fail && <ErrorRow msg={fail} onRetry={() => { setFail(''); void run(); }} t={t} />}
+
+      <button
+        type="button"
+        onClick={() => void run()}
+        disabled={busy}
+        style={{ ...primaryBtn, width: '100%', padding: 'var(--space-4)', fontSize: 'var(--text-body)', opacity: busy ? 0.6 : 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}
+      >
+        <IconZap size={16} />{busy ? t('正在生成…', 'Generating…') : t('开始生成', 'Generate')}
+      </button>
+      <p style={caption}>{t('步骤会存进本机,并加进想做清单。营养仍用本地成分表估算。', 'Steps stay on-device and go to your wishlist. Nutrition still uses the local table.')}</p>
     </>
   );
 }

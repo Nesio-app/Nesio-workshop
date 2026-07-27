@@ -156,25 +156,38 @@ async function fetchSignedInUser(
   return response.json() as Promise<SupabaseUserResponse>;
 }
 
+const cloudRefreshInflight = new Map<string, Promise<SupabaseTokenResponse | null>>();
+
 async function refreshSupabaseSession(
   config: CloudRuntimeConfig,
   refreshToken: string,
 ): Promise<SupabaseTokenResponse | null> {
   if (!refreshToken) return null;
 
-  const response = await fetch(`${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
-    method: 'POST',
-    headers: {
-      apikey: config.anonKey,
-      Authorization: `Bearer ${config.anonKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-    cache: 'no-store',
+  // 同进程单飞:access 过期后多条云 API 并行 refresh 会把旋转后的 refresh token 互踢失效。
+  const existing = cloudRefreshInflight.get(refreshToken);
+  if (existing) return existing;
+
+  const inflight = (async (): Promise<SupabaseTokenResponse | null> => {
+    const response = await fetch(`${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${config.anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+      cache: 'no-store',
+    });
+
+    if (!response.ok) return null;
+    return response.json() as Promise<SupabaseTokenResponse>;
+  })().finally(() => {
+    cloudRefreshInflight.delete(refreshToken);
   });
 
-  if (!response.ok) return null;
-  return response.json() as Promise<SupabaseTokenResponse>;
+  cloudRefreshInflight.set(refreshToken, inflight);
+  return inflight;
 }
 
 export function setRefreshedAuthCookies(response: NextResponse, session?: SupabaseTokenResponse | null) {

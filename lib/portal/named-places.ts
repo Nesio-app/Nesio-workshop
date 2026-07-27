@@ -1,4 +1,5 @@
 import { reportStorageDropped } from '@/lib/portal/storage-health';
+import { haversineMeters } from '@/lib/portal/geo';
 
 export interface NamedPlace {
   id: string;
@@ -62,22 +63,12 @@ export function deleteNamedPlace(id: string): void {
   saveNamedPlaces(getNamedPlaces().filter((p) => p.id !== id));
 }
 
-function haversine(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 6371000;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
-
 export function matchNearestPlace(lat: number, lon: number): NamedPlace | null {
   const places = getNamedPlaces().filter((p) => p.lat !== 0 || p.lon !== 0);
   let best: NamedPlace | null = null;
   let bestDist = Infinity;
   for (const p of places) {
-    const d = haversine(lat, lon, p.lat, p.lon);
+    const d = haversineMeters(lat, lon, p.lat, p.lon);
     if (d < p.radiusMeters && d < bestDist) {
       bestDist = d;
       best = p;

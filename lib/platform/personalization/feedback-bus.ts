@@ -1,6 +1,7 @@
 /**
  * 反馈总线 —— A 计划 Layer 2 的统一入口(取代散落各 surface 的手工 fan-out)。
- * 一次用户反馈 → emitFeedback 一处 → 扇出到所有订阅者(事实日志 + 三原语 + guidance-ranker)。
+ * 一次用户反馈 → emitFeedback 一处 → 扇出到订阅者(事实日志 + Preference 等)。
+ * guidance-ranker / bandit 学习接线已退役(2026-07-27)。
  *
  * schema 依 `docs/personalization-capacity-proposal.md §2`:`{ surface, dimension, key, reaction }`。
  * 纯内存分发,不落库(落库由 feedback-log 作为订阅者完成 —— collect first, derive second)。

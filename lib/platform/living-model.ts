@@ -1,19 +1,17 @@
 /**
- * Living Model — AI's world model of the user, structured as 7 cognitive layers.
+ * Living Model — 2026-07-27 退役(认知双轨 Kill)。
+ * 保留 summarizeForLivingModel 供 MirrorLetterTab 作证据摘要辅助;
+ * LS / nesio-lm-feedback:* / Lab UI / API 生成路径已停用。
+ * 主认知面 = 多面镜月度信(MirrorLetterTab)。
  *
- * Design principles (from AI Identity Framework 2025 + Oura Advisor research):
- * - Behavioral observation > self-declaration: model derives from what user DOES
- * - Evidence traceability: each insight links to concrete behavioral patterns
- * - Confidence degrades when new evidence contradicts existing insights
- * - User correction feeds back into next regeneration
- * - Blind Spots require confidence >= 90 before showing (high bar prevents noise)
- * - Model is cached locally; refreshed on significant data change, not every open
+ * (历史) AI's world model of the user, structured as 7 cognitive layers.
  */
 
 import type { LifeNode } from '@/lib/portal/life-graph';
 import type { MirrorProfile } from '@/lib/portal/mirror-profile';
 import { countByDomain } from '@/lib/portal/domain-stats';
 import { reportStorageDropped } from '@/lib/portal/storage-health';
+import { buildEvidenceLenses, type EvidenceLens } from '@/lib/portal/mirror-evidence';
 
 export type LivingModelLayerId =
   | 'identity'     // 身份认同 — 价值观、方向感、决策风格（慢变，6-12个月）
@@ -103,43 +101,14 @@ export function shouldRefreshLivingModel(model: LivingModel | null, currentNodeC
   return false;
 }
 
-/** Save user feedback on a single insight (affects next regeneration prompt). */
+/** 退役:不再写 nesio-lm-feedback:*(避免只进 prompt 的第二真相)。 */
 export function saveLivingModelFeedback(insightId: string, verified: boolean): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(`${FEEDBACK_KEY_PREFIX}${insightId}`, String(verified));
-    // Also update the in-memory model
-    const model = loadLivingModel();
-    if (!model) return;
-    for (const layer of model.layers) {
-      for (const insight of layer.insights) {
-        if (insight.id === insightId) {
-          insight.userVerified = verified;
-        }
-      }
-    }
-    saveLivingModel(model);
-  } catch {
-    reportStorageDropped();
-  }
+  void insightId; void verified;
 }
 
-/** Load all saved feedbacks as a record for injecting into the next API call. */
+/** 退役:恒返回空,段落反馈改走总线或砍掉。 */
 export function loadLivingModelFeedbacks(): Record<string, boolean> {
-  if (typeof window === 'undefined') return {};
-  const result: Record<string, boolean> = {};
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const key = localStorage.key(i);
-      if (key?.startsWith(FEEDBACK_KEY_PREFIX)) {
-        const id = key.slice(FEEDBACK_KEY_PREFIX.length);
-        result[id] = localStorage.getItem(key) === 'true';
-      }
-    }
-  } catch {
-    /* ignore */
-  }
-  return result;
+  return {};
 }
 
 // ── Data summarization for API ────────────────────────────────────────────────
@@ -161,6 +130,10 @@ export function summarizeForLivingModel(input: LivingModelApiInput): {
   feedbackCount: number;
   dominantDomains: string[];
   previousInsights: Array<{ layerId: string; content: string; verified: boolean | null }>;
+  /** 三重验证过关的线索(写信优先采用) */
+  verifiedLenses: EvidenceLens[];
+  /** 弱线索(可写但勿当铁证) */
+  weakClues: EvidenceLens[];
 } {
   const { nodes, mirrorProfile, previousInsights = [] } = input;
 
@@ -199,6 +172,8 @@ export function summarizeForLivingModel(input: LivingModelApiInput): {
     .slice(0, 4)
     .map(([d]) => d);
 
+  const lenses = buildEvidenceLenses({ recentSample, topDomains, typeBreakdown });
+
   return {
     nodeCount: nodes.length,
     typeBreakdown,
@@ -213,5 +188,7 @@ export function summarizeForLivingModel(input: LivingModelApiInput): {
       content: p.content,
       verified: p.userVerified,
     })),
+    verifiedLenses: lenses.verifiedLenses,
+    weakClues: lenses.weakClues,
   };
 }

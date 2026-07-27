@@ -8,7 +8,8 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { getLifeGraph, addLifeNode, updateLifeNode } from '@/lib/portal/life-graph';
+import { getLifeGraph, updateLifeNode } from '@/lib/portal/life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { buildPersonProfile, type PersonProfile } from '@/lib/portal/relationship-profile';
 import { markContacted, lastContactLabel, CLOSENESS_META } from '@/lib/portal/relationships';
 import { setRelationshipOverride, type OverrideCloseness } from '@/lib/portal/relationship-overrides';
@@ -123,9 +124,9 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
         const node = getLifeGraph().find((n) => n.id === p.nodeId);
         updateLifeNode(p.nodeId, { attributes: { ...(node?.attributes || {}), avatar: dataUrl } });
       } else {
-        addLifeNode({
+        ingestLifeNode({
           type: 'person', name: p.displayName, source: 'manual', confidence: 0.9,
-          attributes: { avatar: dataUrl, ...(p.email ? { email: p.email } : {}) },
+          attributes: { avatar: dataUrl, epistemic: 'observation', generator: 'user', ...(p.email ? { email: p.email } : {}) },
           relations: [], tags: ['联系人'],
         });
       }

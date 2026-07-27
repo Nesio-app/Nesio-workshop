@@ -12,13 +12,22 @@ function compile(rel) {
   const src = fs.readFileSync(new URL(rel, import.meta.url), 'utf8');
   return ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 }
-const mod = { exports: {} };
-vm.runInNewContext(compile('../lib/portal/places-share.ts'), {
-  module: mod, exports: mod.exports, console, JSON, Object, Array, String, Number, Math, Date, Set, Map, Intl,
-  window: undefined, document: undefined,
-  require: () => ({}),
+function loadModule(rel, requireImpl = () => ({})) {
+  const mod = { exports: {} };
+  vm.runInNewContext(compile(rel), {
+    module: mod, exports: mod.exports, console, JSON, Object, Array, String, Number, Math, Date, Set, Map, Intl,
+    window: undefined, document: undefined,
+    require: requireImpl,
+  });
+  return mod.exports;
+}
+const countryNorm = loadModule('../lib/portal/country-normalize.ts');
+const geo = loadModule('../lib/portal/geo.ts');
+const ps = loadModule('../lib/portal/places-share.ts', (p) => {
+  if (p.includes('country-normalize')) return countryNorm;
+  if (p.includes('/geo')) return geo;
+  return {};
 });
-const ps = mod.exports;
 
 // ── 国家 → 洲 ──
 assert.equal(ps.countryContinent('冰岛'), 'EU', '冰岛=欧洲');

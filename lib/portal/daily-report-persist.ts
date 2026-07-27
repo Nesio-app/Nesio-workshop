@@ -31,6 +31,8 @@ export function persistDailyReportToMemory(report: DailyReport): 'saved' | 'skip
       externalId: dailyReportExternalId(new Date(`${report.date}T12:00:00`)),
       date: report.date,
       headline: report.headline,
+      epistemic: 'system_summary',
+      generator: 'rule:daily-report',
     },
   });
   return 'saved';

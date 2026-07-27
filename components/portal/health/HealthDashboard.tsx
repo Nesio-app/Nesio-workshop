@@ -25,6 +25,10 @@ import { buildMonthlyHealthReport, persistHealthReportToMemory, autoPersistLastM
 import { healthReportRichHtml } from '@/lib/portal/health-report-visual';
 import { IconLock } from '../icons';
 import { guardPaidCloudAi } from '@/lib/portal/entitlement';
+import BodyLedgerPanel, { BodyLedgerQuickLinks } from './BodyLedgerPanel';
+import BeautyCarePanel from './BeautyCarePanel';
+import type { BodyLedgerSection } from '@/lib/portal/body-ledger';
+import { buildDayLedger, ledgerPrompt, todayYmd } from '@/lib/portal/body-ledger';
 
 const TREND_HEADLINE: Record<FitnessInsight['trend'], [string, string]> = {
   up: ['体能上升中', 'Fitness rising'], flat: ['体能维持中', 'Holding steady'], down: ['体能下降中', 'Fitness dipping'], unknown: ['数据积累中', 'Gathering data'],
@@ -388,14 +392,22 @@ function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
   );
 }
 
-// ── 概览/分析 二级切换 ──
-function HealthSubTabs({ view, onChange, dict }: { view: 'overview' | 'analysis'; onChange: (v: 'overview' | 'analysis') => void; dict: string }) {
+// ── 概览 / 分析 / 身体账本 / 护理 ──
+type HealthView = 'overview' | 'analysis' | 'ledger' | 'care';
+
+function HealthSubTabs({ view, onChange, dict }: { view: HealthView; onChange: (v: HealthView) => void; dict: string }) {
+  const tabs: Array<[HealthView, string, string]> = [
+    ['overview', '概览', 'Overview'],
+    ['analysis', '分析', 'Analysis'],
+    ['ledger', '身体账本', 'Body ledger'],
+    ['care', '护理', 'Care'],
+  ];
   return (
     <div className="nesio-health-subtabs" role="tablist" aria-label={L(dict, '健康视图', 'Health view')}>
-      {(['overview', 'analysis'] as const).map((v) => (
+      {tabs.map(([v, zh, en]) => (
         <button key={v} type="button" role="tab" aria-selected={view === v}
           className={`nesio-health-subtab${view === v ? ' is-active' : ''}`} onClick={() => onChange(v)}>
-          {v === 'overview' ? L(dict, '概览', 'Overview') : L(dict, '分析', 'Analysis')}
+          {L(dict, zh, en)}
         </button>
       ))}
     </div>
@@ -514,7 +526,8 @@ export default function HealthDashboard() {
   const [data, setData] = useState<HealthMetrics | null>(null);
   const [clinical, setClinical] = useState<StoredClinical | null>(null);
   const [labMode, setLabMode] = useState(false);
-  const [view, setView] = useState<'overview' | 'analysis'>('overview'); // 概览先安抚 / 分析看全部
+  const [view, setView] = useState<HealthView>('overview');
+  const [ledgerSection, setLedgerSection] = useState<BodyLedgerSection>('today');
 
   const [reportMsg, setReportMsg] = useState(''); // 健康月报动作反馈(可见状态,不静默)
   // 月初自动补生成上月健康月报并存记忆(每设备每月一次,幂等)。
@@ -547,12 +560,28 @@ export default function HealthDashboard() {
   if (!data || data.metrics.length === 0) {
     return (
       <div className="nesio-health-dash">
-        <p className="nesio-insights-empty" style={{ marginBottom: 0 }}>
-          {L(dict,
-            '还没有健康数据。到「设置 → 数据接入 → Apple Health」直接上传导出的 zip(或 export.xml),就会解析出步数、心率、睡眠、血氧、体重等指标。',
-            'No health data yet. Go to Settings → Data sources → Apple Health and drop the exported zip (or export.xml) to parse steps, heart rate, sleep, SpO₂, weight and more.')}
-        </p>
-        <FamilyDataCard kind="health" />
+        <HealthSubTabs view={view} onChange={setView} dict={dict} />
+        {view === 'ledger' && (
+          <BodyLedgerPanel key={ledgerSection} health={data} initialSection={ledgerSection} />
+        )}
+        {view === 'care' && <BeautyCarePanel />}
+        {(view === 'overview' || view === 'analysis') && (
+          <>
+            <p className="nesio-insights-empty" style={{ marginBottom: 0 }}>
+              {L(dict,
+                '还没有 Apple Health 指标。身体账本仍可用「美味 · 记一餐」;护理看护肤物品。完整曲线请到「设置 → 数据接入 → Apple Health」上传导出。',
+                'No Apple Health metrics yet. Body ledger still works from Cooking meals; Care lists skincare items. For full curves, upload an export in Settings → Data sources → Apple Health.')}
+            </p>
+            <BodyLedgerQuickLinks
+              dict={dict}
+              onOpen={(sec) => {
+                if (sec === 'care') setView('care');
+                else { setLedgerSection(sec); setView('ledger'); }
+              }}
+            />
+            <FamilyDataCard kind="health" />
+          </>
+        )}
       </div>
     );
   }
@@ -563,24 +592,55 @@ export default function HealthDashboard() {
   const insight = computeFitnessInsight(data.metrics, sessionsThisWeek(ts), activeProto?.sessionsPerWeek ?? null);
 
   const rels = data.daily ? mineRelationships(data.daily) : [];
+  const dayLedger = buildDayLedger(todayYmd(), { rings: data.activityRings });
+  const blPrompt = ledgerPrompt(dayLedger, dict !== 'en');
+
+  function openLedger(sec: BodyLedgerSection) {
+    if (sec === 'care') { setView('care'); return; }
+    setLedgerSection(sec);
+    setView('ledger');
+  }
 
   return (
     <div className="nesio-health-dash">
       <HealthSubTabs view={view} onChange={setView} dict={dict} />
 
+      {view === 'ledger' && (
+        <BodyLedgerPanel
+          key={ledgerSection}
+          health={data}
+          initialSection={ledgerSection}
+        />
+      )}
+      {view === 'care' && <BeautyCarePanel />}
+
       {view === 'overview' ? (
         /* ── 概览:一眼看懂 + 先安抚(焦虑细节收进「分析」)── */
         <>
           <PrivacyBanner dict={dict} />
+          {blPrompt && (
+            <div className="nesio-bl-active-card">
+              <p>{blPrompt}</p>
+              <div className="nesio-bl-active-actions">
+                <button type="button" className="nesio-trip-action" onClick={() => openLedger('today')}>
+                  {L(dict, '看账本', 'Open ledger')}
+                </button>
+                <button type="button" className="nesio-trip-action" onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-cooking'))}>
+                  {L(dict, '去美味', 'Cooking')}
+                </button>
+              </div>
+            </div>
+          )}
           <NenSummaryCard data={data} dict={dict} />
           <TodayPicks data={data} dict={dict} onOpen={() => setView('analysis')} />
+          <BodyLedgerQuickLinks dict={dict} onOpen={openLedger} />
           <TopFinding data={data} dict={dict} onOpen={() => setView('analysis')} />
           <TopRelationship data={data} dict={dict} />
           <button type="button" className="nesio-health-goanalysis" onClick={() => setView('analysis')}>
             {L(dict, '去「分析」看全部数据', 'See all data in Analysis')} ›
           </button>
         </>
-      ) : (
+      ) : view === 'analysis' ? (
         /* ── 分析:深看全部(专项 + 判定 + 指标组 + 月报 + 临床)── */
         <>
           <p className="nesio-health-updated">{L(dict, `${data.metrics.length} 项指标 · 锻炼 ${data.workouts} 次 · 导入于 ${importedLabel}`, `${data.metrics.length} metrics · ${data.workouts} workouts · imported ${importedLabel}`)}</p>
@@ -696,7 +756,7 @@ export default function HealthDashboard() {
             {L(dict, '数据只存本机 · 随时可断开;取最近导入的最新读数', 'On-device only · disconnect anytime; latest readings from your import')}
           </p>
         </>
-      )}
+      ) : null}
     </div>
   );
 }

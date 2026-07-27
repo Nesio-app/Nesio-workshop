@@ -1,14 +1,15 @@
 'use client';
 
 /**
- * 足迹「计划(要去)」— 即将出发列表 + 新建行程 / 转发订票确认。
+ * 足迹「计划」tab — 即将出发列表 + 新建行程 / 粘贴订票确认导入。
  */
 
 import { useEffect, useState } from 'react';
 import {
-  listPlannedTrips, createBlankTrip, ensureDemoTokyoTrip, deleteTrip,
+  listPlannedTrips, createBlankTrip, deleteTrip, importBookingIntoTrip,
   TRAVEL_TRIPS_UPDATED_EVENT, type Trip,
 } from '@/lib/portal/travel-trips';
+import { ensureTravelPoiLoaded } from '@/lib/portal/travel-poi';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -30,18 +31,21 @@ export default function TravelPlanPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [trips, setTrips] = useState<Trip[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [mode, setMode] = useState<'idle' | 'create' | 'import'>('idle');
   const [dest, setDest] = useState('');
   const [start, setStart] = useState(todayYmd());
   const [days, setDays] = useState(5);
+  const [importText, setImportText] = useState('');
+  const [importMsg, setImportMsg] = useState<string | null>(null);
+  const [importErr, setImportErr] = useState<string | null>(null);
 
   function reload() {
-    ensureDemoTokyoTrip();
     setTrips(listPlannedTrips());
   }
 
   useEffect(() => {
     reload();
+    void ensureTravelPoiLoaded();
     const onUp = () => setTrips(listPlannedTrips());
     window.addEventListener(TRAVEL_TRIPS_UPDATED_EVENT, onUp);
     return () => window.removeEventListener(TRAVEL_TRIPS_UPDATED_EVENT, onUp);
@@ -57,8 +61,42 @@ export default function TravelPlanPanel() {
       endDate: end,
       days,
     });
-    setCreating(false);
+    setMode('idle');
     setDest('');
+    setOpenId(trip.id);
+    reload();
+  }
+
+  function doImport() {
+    setImportErr(null);
+    setImportMsg(null);
+    const text = importText.trim();
+    if (!text) {
+      setImportErr(L(dict, '先粘贴订票确认全文(航班号/酒店名)。', 'Paste the booking confirmation first.'));
+      return;
+    }
+    const destination = dest.trim()
+      || text.match(/(?:到达|目的地|destination)\s*[:：]?\s*([^\n,，]{2,20})/i)?.[1]?.trim()
+      || L(dict, '新行程', 'New trip');
+    const end = addDaysYmd(start, Math.max(1, days) - 1);
+    const trip = createBlankTrip({
+      title: `${destination} · ${days} ${L(dict, '天', 'days')}`,
+      destination,
+      startDate: start,
+      endDate: end,
+      days,
+    });
+    const n = importBookingIntoTrip(trip.id, text);
+    if (n <= 0) {
+      setImportErr(L(dict, '没识别出航班/酒店 —— 可先建空行程,再在时间线里手动加。', 'No flight/hotel found — create a blank trip and add nodes on the timeline.'));
+      setOpenId(trip.id);
+      setMode('idle');
+      reload();
+      return;
+    }
+    setImportMsg(L(dict, `已拆出 ${n} 个节点`, `Unpacked ${n} nodes`));
+    setImportText('');
+    setMode('idle');
     setOpenId(trip.id);
     reload();
   }
@@ -70,10 +108,10 @@ export default function TravelPlanPanel() {
         <span className="nesio-travel-plan-count">{L(dict, `${trips.length} 段`, `${trips.length} trip${trips.length === 1 ? '' : 's'}`)}</span>
       </div>
 
-      {trips.length === 0 && (
+      {trips.length === 0 && mode === 'idle' && (
         <div className="nesio-travel-plan-empty">
           <IconPlane size={28} />
-          <p>{L(dict, '还没有行程 —— 新建一趟,或转发订票确认让我帮你排时间线。', 'No trips yet — start one, or forward a booking confirmation.')}</p>
+          <p>{L(dict, '还没有行程 —— 新建一趟,或粘贴订票确认自动拆时间线。', 'No trips yet — create one, or paste a booking confirmation to unpack the timeline.')}</p>
         </div>
       )}
 
@@ -84,7 +122,7 @@ export default function TravelPlanPanel() {
               <span className="nesio-travel-plan-card-ico"><IconPlane size={18} /></span>
               <span className="nesio-travel-plan-card-main">
                 <b>{t.title}</b>
-                <small>{t.startDate} → {t.endDate}{t.weatherHint ? ` · ${t.weatherHint}` : ''}</small>
+                <small>{t.startDate} → {t.endDate}{t.weatherHint ? ` · ${t.weatherHint}` : ''} · {t.nodes.length} {L(dict, '节点', 'nodes')}</small>
               </span>
               <IconChevronRight size={16} />
             </button>
@@ -100,11 +138,18 @@ export default function TravelPlanPanel() {
         ))}
       </ul>
 
-      {!creating ? (
-        <button type="button" className="nesio-travel-plan-cta" onClick={() => setCreating(true)}>
-          {L(dict, '+ 新建行程 · 或转发订票确认', '+ New itinerary · or forward booking confirmation')}
-        </button>
-      ) : (
+      {mode === 'idle' && (
+        <div className="nesio-travel-plan-cta-row">
+          <button type="button" className="nesio-travel-plan-cta" onClick={() => setMode('create')}>
+            {L(dict, '+ 新建行程', '+ New itinerary')}
+          </button>
+          <button type="button" className="nesio-travel-plan-cta nesio-travel-plan-cta--ghost" onClick={() => setMode('import')}>
+            {L(dict, '粘贴订票确认', 'Paste booking')}
+          </button>
+        </div>
+      )}
+
+      {mode === 'create' && (
         <div className="nesio-travel-plan-form">
           <label>
             <span>{L(dict, '目的地', 'Destination')}</span>
@@ -119,12 +164,42 @@ export default function TravelPlanPanel() {
             <input type="number" min={1} max={60} value={days} onChange={(e) => setDays(Number(e.target.value) || 1)} />
           </label>
           <div className="nesio-travel-plan-form-actions">
-            <button type="button" className="nesio-trip-action" onClick={() => setCreating(false)}>{L(dict, '取消', 'Cancel')}</button>
+            <button type="button" className="nesio-trip-action" onClick={() => setMode('idle')}>{L(dict, '取消', 'Cancel')}</button>
             <button type="button" className="nesio-trip-primary" onClick={create}>{L(dict, '创建', 'Create')}</button>
           </div>
-          <p className="nesio-trip-footnote">
-            {L(dict, '转发订票确认到邮箱或拍照上传后,云端会帮你拆成时间线节点(航班/酒店)。', 'Forward a booking email or snap it — the cloud can unpack flight/hotel nodes onto the timeline.')}
-          </p>
+        </div>
+      )}
+
+      {mode === 'import' && (
+        <div className="nesio-travel-plan-form">
+          <label>
+            <span>{L(dict, '目的地(可空,会试着从正文猜)', 'Destination (optional)')}</span>
+            <input value={dest} onChange={(e) => setDest(e.target.value)} placeholder={L(dict, '东京', 'Tokyo')} />
+          </label>
+          <label>
+            <span>{L(dict, '出发日', 'Start')}</span>
+            <input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
+          </label>
+          <label>
+            <span>{L(dict, '订票确认全文', 'Booking text')}</span>
+            <textarea
+              rows={6}
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder={L(dict, '粘贴航空公司/酒店确认邮件… 含航班号如 NH976、PVG→HND、酒店名', 'Paste airline/hotel confirmation… flight no. like NH976, PVG→HND, hotel name')}
+            />
+          </label>
+          {importErr && (
+            <p className="nesio-trip-msg" role="alert" style={{ color: 'var(--status-risk)' }}>
+              {importErr}
+              <button type="button" className="nesio-trip-link" onClick={doImport}>{L(dict, '重试', 'Retry')}</button>
+            </p>
+          )}
+          {importMsg && <p className="nesio-trip-msg" role="status">{importMsg}</p>}
+          <div className="nesio-travel-plan-form-actions">
+            <button type="button" className="nesio-trip-action" onClick={() => { setMode('idle'); setImportErr(null); }}>{L(dict, '取消', 'Cancel')}</button>
+            <button type="button" className="nesio-trip-primary" onClick={doImport}>{L(dict, '识别并创建', 'Parse & create')}</button>
+          </div>
         </div>
       )}
 

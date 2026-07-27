@@ -81,25 +81,38 @@ async function fetchSupabaseUser(accessToken: string): Promise<SupabaseUserRespo
   return response.json() as Promise<SupabaseUserResponse>;
 }
 
+const sessionRefreshInflight = new Map<string, Promise<SupabaseTokenResponse | null>>();
+
 async function refreshSupabaseSession(refreshToken: string): Promise<SupabaseTokenResponse | null> {
   const supabaseUrl = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
   const supabaseAnonKey = envValue('SUPABASE_ANON_KEY');
   if (!supabaseUrl || !supabaseAnonKey || !refreshToken) return null;
 
-  const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
-    method: 'POST',
-    headers: {
-      apikey: supabaseAnonKey,
-      Authorization: `Bearer ${supabaseAnonKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      refresh_token: refreshToken,
-    }),
+  // 同进程单飞:Supabase refresh token 旋转时并行 refresh 会互踢。
+  const existing = sessionRefreshInflight.get(refreshToken);
+  if (existing) return existing;
+
+  const inflight = (async (): Promise<SupabaseTokenResponse | null> => {
+    const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: {
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        refresh_token: refreshToken,
+      }),
+    });
+
+    if (!response.ok) return null;
+    return response.json() as Promise<SupabaseTokenResponse>;
+  })().finally(() => {
+    sessionRefreshInflight.delete(refreshToken);
   });
 
-  if (!response.ok) return null;
-  return response.json() as Promise<SupabaseTokenResponse>;
+  sessionRefreshInflight.set(refreshToken, inflight);
+  return inflight;
 }
 
 function signedInResponse(
@@ -155,6 +168,7 @@ export async function GET() {
         return signedInResponse(refreshedUser, true, refreshedSession, profileBootstrap);
       }
     }
+    // refresh 失败先不立刻返回 —— 下面 local / 微信仍可兜底;仅生产有 Supabase 时才 sticky unverified。
   }
 
   // No Supabase configured → local-only mode: treat user as authenticated.
@@ -194,11 +208,22 @@ export async function GET() {
     });
   }
 
+  // refresh cookie 还在但本次刷新失败(并发旋转/瞬时网络)——绝不能标 signed_out,
+  // 否则前端会 prune 私有节点,看起来像「隔几分钟被踢」。
+  if (refreshCookie) {
+    return safeJson({
+      ok: true,
+      loggedIn: false,
+      hasRefreshToken: true,
+      status: 'session_unverified',
+    });
+  }
+
   if (!accessCookie) {
     return safeJson({
       ok: true,
       loggedIn: false,
-      hasRefreshToken: Boolean(refreshCookie),
+      hasRefreshToken: false,
       status: 'signed_out',
     });
   }
@@ -206,7 +231,7 @@ export async function GET() {
   return safeJson({
     ok: true,
     loggedIn: false,
-    hasRefreshToken: Boolean(refreshCookie),
+    hasRefreshToken: false,
     status: 'session_unverified',
   });
 }

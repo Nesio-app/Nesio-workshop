@@ -23,7 +23,18 @@
 1. **⏳ Daily snapshot journal**:天气/当前位置/日历等是 live/易逝的,取完即弃。想学「下雨天打车支出↑」
    这类跨域相关,**必须当天把上下文采样落盘**——没记就永远学不出。雏形:`analyst_daily`、`place-trail`;
    缺的是统一的「每日上下文横切」journal。
-2. **❌ 学习反馈没进事实库**:见 Layer 2。事实库现在只装**内容 Signal**,不装**学习反馈**。
+2. **🟡 学习反馈进事实库(已并轨)**:`feedback.*` Signal 为唯一事实;
+   `readFeedbackLog` 为其投影。检索默认只答地面事实。偏好/ranker 仍为可重建投影。
+   见 `docs/design/signal-epistemic.md`。
+
+**可信度分层(2026-07-27 ✅ 首版)**:学 claude-obsidian 哲学(`.raw` vs wiki),不引其库。
+`observation|user_asserted|extraction` = 地面事实;`derived|system_summary|feedback` = 蒸馏/元评价。
+写入门盖章 + 检索 `isGroundFact` 滤层。契约 `test:signal-epistemic`。
+
+**共享承重件(2026-07-26 ✅ 首版)**:跨域开销汇口 Expense(`finance-sources` + `financeMonthAggregate`)、
+PeriodLedger / Geo / PlaceRef、ExternalAdapter、CaptureAdapter、Locality 登记表。
+索引 `docs/design/SYSTEM-LOGIC.md` + `shared-primitives.md` / `finance-aggregator-spec.md` /
+`data-locality-policy.md` / `entity-schema-2026-07.md`。家务零花钱**永不**进财务汇口。
 
 **隐私(硬约束)**:全部 local-first(place-trail 已是)。统一层的**导出/删除必须覆盖 journal + 学习态**——
 现在散落 10+ 个 key 时最容易漏,收进来反而是把隐私边界收成一处的机会。
@@ -101,8 +112,8 @@ guidance-ranker `learnInto` 折进权重后 `delete pending`;cooling 只留计�
    └──────────────►  反馈作为 fact 写回数据层事实库(event-sourcing)——闭环
 ```
 
-**当前断点**:最后那根箭头没接——反馈没回写事实库,而是折进 localStorage 权重丢弃。补上它是整个闭环能否
-持久/可迁移的前提。
+**当前断点**:反馈事实已并入 Signal;`card-feedback` DEC 压制与 ranker 权重仍是业务/投影态,
+不是第二真相源。capture 确认升格与旁路清零后的持续守卫契约可再加硬。
 
 ---
 

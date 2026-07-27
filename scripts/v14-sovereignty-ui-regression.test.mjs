@@ -90,8 +90,8 @@ assert.match(
 );
 assert.match(
   analyzeRoute,
-  /baohe_auth_access|cookies\.get/,
-  'Analyze API should allow real AI for authenticated sessions while anonymous calls remain gated.',
+  /isPortalRequestAuthorized/,
+  'Analyze API should verify real session via isPortalRequestAuthorized while anonymous calls remain gated.',
 );
 
 assert.match(
@@ -195,8 +195,10 @@ assert.doesNotMatch(voiceSheet, /识别完成 · 点「告诉 Nesio」保存/, '
 // the store the DEC filters on next run.
 assert.match(todayFeed, /recordCardFeedback/, 'Today cards must write feedback back so 稍后/不再提醒 has a visible result.');
 assert.doesNotMatch(todayFeed, /为什么\{why \? ' ↑' : ' ↓'\}/, 'Today card 为什么 action should not append arrow glyphs.');
-// Organized-clues sheet evolved: mirror profile card → InsightsSheet.
-assert.match(todayFeed, /onClick=\{[^}]*setMirrorOpen\(true\)[\s\S]*<InsightsSheet/, 'Today logo should open the organized-clues / insights sheet.');
+// Organized-clues sheet:Insights 由 Portal 层 nesio-open-insights 挂载;Today 左上角 logo 开记忆。
+assert.match(portal, /nesio-open-insights[\s\S]*<InsightsSheet/, 'Portal should open InsightsSheet on nesio-open-insights.');
+assert.match(todayFeed, /onOpenMemory/, 'Today logo should open memory via onOpenMemory.');
+assert.doesNotMatch(todayFeed, /setMirrorOpen\(true\)/, 'TodayFeed should not inline-mount insights mirror sheet.');
 assert.match(globals, /@keyframes tellFanIn[\s\S]*from \{ opacity: 0; \}[\s\S]*to\s+\{ opacity: 1; \}/, 'Center N fan animation must not override button transforms.');
 assert.match(globals, /nesio-tell-fan-btn--left[\s\S]*translate\(-1\.45rem,\s*0\.45rem\)[\s\S]*nesio-tell-fan-btn--right[\s\S]*translate\(1\.45rem,\s*0\.45rem\)/, 'Center N actions should be positioned as a visible fan.');
 assert.doesNotMatch(globals, /nesio-tell-fan-btn--left[^{]*\{[^}]*rotate|nesio-tell-fan-btn--right[^{]*\{[^}]*rotate/, 'Center N fan icons/text should stay upright, not rotated.');

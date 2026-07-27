@@ -29,7 +29,7 @@ const store = [];
 let seq = 0;
 const rf = loadTs('../lib/life-domain/retrieval-feedback.ts', (p) =>
   p.includes('create-signal')
-    ? { createSignal: (input) => { const sig = { id: `fb${seq++}`, source: input.source, type: input.type, payload: input.payload, evidence: {} }; store.unshift(sig); return sig; } }
+    ? { createSignal: (input) => { const sig = { id: `fb${seq++}`, source: input.source, type: input.type, payload: input.payload, evidence: {}, epistemic: input.epistemic }; store.unshift(sig); return sig; } }
   : p.endsWith('/signal') || p.includes('./signal')
     ? { getSignals: (opts) => store.filter((s) => !opts?.types?.length || opts.types.includes(s.type)) }
   : ({}));
@@ -44,7 +44,8 @@ assert.equal(store.length, 1, 'markRetrievalFeedback 写入一条 Signal');
 assert.equal(store[0].type, 'feedback.retrieval', 'type=feedback.retrieval(一等公民事实)');
 assert.equal(store[0].payload.targetId, 't1', 'payload.targetId 记录目标');
 assert.equal(store[0].payload.verdict, 'not_this', 'payload.verdict 记录裁决');
-assert.equal(store[0].source, 'ai_observation', 'source=ai_observation');
+assert.equal(store[0].source, 'manual', 'source=manual(用户反馈,非 ai_observation)');
+assert.equal(store[0].epistemic, 'feedback', 'epistemic=feedback');
 assert.equal(rf.isDownranked('t1'), true, 'not_this → 降权(剔除)');
 assert.equal(rf.retrievalScoreAdjust('t1'), -100, 'not_this → 强负(盖过相关性,等同剔除)');
 
@@ -67,7 +68,7 @@ assert.equal(store.length, before, '空 targetId → 不写入');
 const search = fs.readFileSync(new URL('../lib/life-domain/signal-search.ts', import.meta.url), 'utf8');
 assert.match(search, /retrievalScoreAdjust\(retrievalKey\(signal\)\)/, 'scoreSignalForQuery 计入检索反馈调整');
 assert.match(search, /!isDownranked\(retrievalKey\(entry\.signal\)\)/, '本地检索剔除 not_this 目标');
-assert.match(search, /!String\(signal\.type\)\.startsWith\('feedback'\)/, 'feedback.* 不作为检索结果被答出去');
+assert.match(search, /isGroundFact\(signal\)/, '本地检索只答地面事实(observation/user_asserted/extraction)');
 assert.match(search, /cloudSignalRowsToSignals\([\s\S]*?\)\.filter\(\s*\([^)]*\)\s*=>\s*!isDownranked\(retrievalKey/, '云端回捞候选同样剔除 not_this');
 
 const sheet = fs.readFileSync(new URL('../components/portal/VoiceInputSheet.tsx', import.meta.url), 'utf8');

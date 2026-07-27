@@ -18,9 +18,9 @@ function extractConstArray(source, constName) {
   return match[1];
 }
 
-// v14 dashboard retired — mood colors now live in MoodSheet's EMOTIONS wheel.
-const moodSheet = readFileSync(join(root, 'components', 'portal', 'MoodSheet.tsx'), 'utf8');
-const moodOptions = extractConstArray(moodSheet, 'EMOTIONS');
+// v14 dashboard retired — mood colors live in lib/portal/mood EMOTIONS wheel.
+const moodSource = readFileSync(join(root, 'lib', 'portal', 'mood.ts'), 'utf8');
+const moodOptions = extractConstArray(moodSource, 'EMOTIONS');
 const rawHexColor = /color:\s*['"]#[0-9a-fA-F]{3,8}['"]/;
 
 assert(

@@ -10,7 +10,11 @@ import assert from 'node:assert/strict';
 const src = fs.readFileSync(new URL('../lib/portal/reader-highlights.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const mod = { exports: {} };
-vm.runInNewContext(js, { module: mod, exports: mod.exports }); // 无 import,免 require
+vm.runInNewContext(js, {
+  module: mod,
+  exports: mod.exports,
+  require: (p) => (p.includes('storage-health') ? { logDropped() {} } : {}),
+});
 const { segmentParagraph } = mod.exports;
 
 const joined = (segs) => segs.map((s) => s.text).join('');

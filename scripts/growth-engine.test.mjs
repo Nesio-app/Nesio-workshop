@@ -4,7 +4,8 @@
  *  1) 情绪疏导镜头匹配到近 3 天带低落情绪的记忆(nudge);
  *  2) 认知重评镜头匹配到自责/灾难化的想法(quiz);
  *  3) 趋势洞察镜头匹配到近 7 天 ≥4 笔且 ≥$80 的购物/快递(trend);
- *  4) collectSeeds 去掉已回应(answered)的种子、限量;各镜头是插件(LENSES 数组)。
+ *  4) collectSeeds 去掉已回应(answered)的种子、限量;各镜头是插件(LENSES 数组);
+ *  5) 行动卡点 / 伴读碰撞 / 心智经营方程镜头可匹配;假成功 AI 文案被拒收。
  */
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -22,10 +23,13 @@ function loadTs(path, requireImpl) {
 const NOW = new Date('2026-07-17T12:00:00.000Z').getTime();
 const day = (n) => new Date(NOW - n * 86_400_000).toISOString();
 
+const protocols = loadTs('../lib/portal/growth-protocols.ts', () => ({}));
+
 function makeEngine({ nodes = [], txs = [] } = {}) {
   return loadTs('../lib/portal/growth-engine.ts', (p) => {
     if (p.includes('life-graph')) return { getLifeGraph: () => nodes };
     if (p.includes('bank-tx')) return { loadBankTx: () => txs };
+    if (p.includes('growth-protocols')) return protocols;
     return {};
   });
 }
@@ -74,11 +78,41 @@ function makeEngine({ nodes = [], txs = [] } = {}) {
   assert.ok(so && so.mode === 'nudge' && so.sourceText.includes('复盘'), '绝对判断 → 苏格拉底 nudge');
 }
 
+// 3d) 行动卡点(未完成承诺 5–30 天)
+{
+  const eng = makeEngine({ nodes: [{ id: 'c1', type: 'commitment', name: '把方案写完', createdAt: day(10), attributes: { notes: '想清楚再动手' }, tags: [] }] });
+  const seed = eng.collectSeeds(NOW, new Set(), 3).find((s) => s.lensId === 'action-stall');
+  assert.ok(seed && seed.mode === 'nudge', '未完成承诺 → 行动卡点');
+  assert.equal(seed.meta?.stall, 'overthink');
+}
+
+// 3e) 伴读碰撞(久放高置信)
+{
+  const eng = makeEngine({ nodes: [{ id: 'd1', type: 'preference', name: '某本书的观点还记得', confidence: 0.9, createdAt: day(25), attributes: { notes: '真正重要的是把判断写下来再碰一次，而不是急着收藏更多摘要。' } }] });
+  const seed = eng.collectSeeds(NOW, new Set(), 3).find((s) => s.lensId === 'collision-read');
+  assert.ok(seed && seed.mode === 'nudge', '久放高置信 → 伴读碰撞');
+}
+
+// 3f) 心智经营方程(事业语料)
+{
+  const eng = makeEngine({ nodes: [{ id: 'b1', name: '获客复盘', createdAt: day(1), attributes: { notes: '内容发了但客户没转化，定价也不敢动' } }] });
+  const seed = eng.collectSeeds(NOW, new Set(), 3).find((s) => s.lensId === 'biz-equation');
+  assert.ok(seed && seed.mode === 'quiz', '事业语料 → 心智经营 quiz');
+}
+
+// 3g) 协议:拒收假成功 + 回看分级
+{
+  assert.ok(protocols.isGrowthAiSlop('云端脑子有点挤，过几分钟再问一次。'), '假成功文案拒收');
+  assert.equal(protocols.gradeReflection('嗯'), 0);
+  assert.equal(protocols.gradeReflection('因为证据不够，所以定价其实还站不住 —— 怎么办?', '定价还站不住'), 3);
+  assert.ok(protocols.ZHANG_LI_EQUATION.formulaZh.includes('触达力'));
+}
+
 // 4) answered 去重 + 限量 + 插件数组 + 同源只出一张 + 优先级
 {
   const eng = makeEngine({ nodes: [{ id: 'm1', name: '累', tags: ['情绪'], createdAt: day(1), attributes: { notes: '压力好大' } }] });
   assert.ok(eng.collectSeeds(NOW, new Set(['soothe:m1']), 3).every((s) => s.id !== 'soothe:m1'), '已回应不再出');
-  assert.ok(Array.isArray(eng.LENSES) && eng.LENSES.length >= 5, '镜头库是数组(插件式,≥5 镜头)');
+  assert.ok(Array.isArray(eng.LENSES) && eng.LENSES.length >= 8, '镜头库是数组(插件式,≥8 镜头)');
   assert.equal(eng.collectSeeds(NOW, new Set(), 0).length, 0, 'limit=0 不出');
   // 去重键 = seed.id(`${lensId}:${sourceId}`):回看流存的 refId 就是 seed.id,故按 seed.id 去重能命中
   const seed = eng.collectSeeds(NOW, new Set(), 3).find((s) => s.lensId === 'soothe');

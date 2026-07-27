@@ -81,6 +81,8 @@ assert.match(portal, /window\.dispatchEvent\(new CustomEvent\(NESIO_ONBOARDING_C
 assert.match(portal, /canUsePrivateRuntime\s*=\s*authSessionLoggedIn\s*===\s*true/s, 'Portal private runtime/sync must require a definitive signed-in session (not unknown).');
 assert.match(portal, /canViewPrivateData\s*=\s*authSessionLoggedIn\s*!==\s*false/s, 'Portal UI private view must stay sticky while session is unknown (avoid demo/empty flicker).');
 assert.match(portal, /status\s*===\s*['"]session_unverified['"]/s, 'Portal must treat session_unverified as unknown, not signed-out.');
+assert.match(portal, /hasRefreshToken/s, 'Portal must sticky-keep session when refresh cookie remains after a failed refresh.');
+assert.match(portal, /fetchAuthSessionPayload\(\)/s, 'Portal sync batch must warm session before parallel cloud calls.');
 assert.match(portal, /useState<\s*boolean\s*\|\s*null\s*>\s*\(\s*null\s*\)/s, 'Portal auth login bit must be tri-state (true/false/null).');
 assert.doesNotMatch(portal, /\.finally\(\s*\(\)\s*=>\s*\{\s*if\s*\(\s*!cancelled\s*\)\s*setAuthReady\(true\);\s*\}\s*\)\s*;\s*\n\s*window\.addEventListener/s, 'Portal must not set authReady in an outer finally that races ahead of the session fetch.');
 assert.doesNotMatch(portal, /profileBootstrapped|profileBootstrapStatus/s, 'Portal UI gate must not bounce signed-in users because product profile bootstrap is unavailable.');

@@ -5,7 +5,6 @@
  * 每个命令负责自己的 UI 失效广播(nesio-life-graph-updated)。
  */
 
-import { emitFeedback } from '../personalization/feedback-bus';
 import { ingestLifeNode } from '../../life-domain/ingest-node';
 import { getLifeGraph, updateLifeNode, deleteLifeNode } from '../../portal/life-graph';
 import { localDayKey, type SubTask, type FocusNode } from './today-view-model';
@@ -211,22 +210,18 @@ export async function ingestGranolaMeeting(
 }
 
 /** 批次 50:记忆页长按「加入今日焦点」—— 钉进今天(明天自然过期)。
- *  与 manual_add 同级的强正信号:用户亲手把一条记忆拉回今天的注意力,
- *  ranker/偏好据此学「这类记忆值得主动浮现」。 */
+ *  操作类动作不冒充 `useful` 反馈(2026-07-27 信任缺口)。 */
 export function pinNodeToTodayFocus(nodeId: string): boolean {
   const node = getLifeGraph().find((n) => n.id === nodeId);
   if (!node) return false;
   updateLifeNode(nodeId, { attributes: { ...node.attributes, focusPinnedOn: localDayKey(), done: false } });
-  try { emitFeedback({ surface: 'memory', dimension: 'pin_to_focus', key: node.type, reaction: 'useful', at: new Date().toISOString() }); } catch { /* 反馈失败不拦动作 */ }
   broadcast();
   return true;
 }
 
 export function addCommitmentNode(name: string): FocusNode {
   const node = ingestLifeNode({ name, type: 'commitment', source: 'manual', confidence: 1, tags: [], attributes: {}, relations: [] });
-  // 批次 37:用户亲手把事放进焦点 = 最强的正信号 —— 进统一反馈总线,
-  // ranker/偏好据此学「这类事对我重要」。
-  try { emitFeedback({ surface: 'today', dimension: 'manual_add', key: 'commitment', reaction: 'useful', at: new Date().toISOString() }); } catch { /* 反馈失败不拦记录 */ }
+  // 操作类动作不冒充 useful(2026-07-27);真正的卡反馈仍走 emitFeedback。
   broadcast();
   return { id: node.id, name: node.name, type: node.type, rawInput: node.rawInput, createdAt: node.createdAt, attributes: node.attributes };
 }

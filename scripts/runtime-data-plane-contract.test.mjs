@@ -157,6 +157,13 @@ for (const marker of [
 ]) {
   assert.ok(feedback.includes(marker), `feedback loop missing marker: ${marker}`);
 }
+assert.doesNotMatch(feedback, /getItem|setItem/, 'Today feedback must not keep a parallel browser storage log');
+assert.match(feedback, /getSignals/, 'readSignalFeedback must project from Signal facts');
+
+const feedbackLog = read('lib/platform/personalization/feedback-log.ts');
+assert.doesNotMatch(feedbackLog, /createBlobStore/, 'Unified feedback log must not dual-write an IDB blob');
+assert.match(feedbackLog, /getSignals/, 'Unified feedback log must project from Signal');
+assert.match(feedbackLog, /feedback\.reaction/, 'Bus events must land as feedback.reaction Signals');
 
 // Today 表面已按工程 PRD 拆分(容器 + today/);反馈环活在 today/ 里
 const todayFeed = [

@@ -10,6 +10,9 @@ import { reportStorageDropped } from './storage-health';
 import { createBlobStore } from './idb-blob-store';
 import { wallDateKey, wallHour, clampEndToWallDay } from './place-time.mjs';
 import { canonicalCountryKey } from './country-normalize';
+import { haversineKm, isGenericPlaceLabel, placeKey as geoPlaceKey } from './geo';
+
+export { haversineKm } from './geo';
 
 export interface PlaceVisit {
   /** ISO 时间(到访开始) */
@@ -523,16 +526,6 @@ export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): Timeline
 
 // ── 批次 28:Google 时间线 tab 用的 —— 行程/统计/聚类 ─────────────────────────
 
-export function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
-  const R = 6371;
-  const dLat = ((bLat - aLat) * Math.PI) / 180;
-  const dLon = ((bLon - aLon) * Math.PI) / 180;
-  const s =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos((aLat * Math.PI) / 180) * Math.cos((bLat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1 - s));
-}
-
 export type TransitMode = 'walk' | 'drive' | 'move';
 
 export type JourneyItem =
@@ -584,17 +577,16 @@ export function timelineDays(visits: PlaceVisit[]): string[] {
 
 export interface PlaceCluster { label: string; category: PlaceCategory; totalMin: number; visits: number; lastTs: string; lat?: number; lon?: number; generic?: boolean }
 
-// 批次 33:Google 时间轴给的无名占位标签(一个「Unknown」里其实是很多不同地点)。
-const GENERIC_RE = /^(unknown|未知|未知地点|aliased location|searched address|地址)$/i;
-export function isGenericPlace(label: string): boolean { return GENERIC_RE.test((label || '').trim()); }
+export function isGenericPlace(label: string): boolean {
+  return isGenericPlaceLabel(label);
+}
 
-/** 无名占位 + 有坐标 → 按 ~1km 粗坐标分桶,让不同地点分开(可各自改名/找真名)。 */
+/** 无名占位 + 有坐标 → 按 ~1km 粗坐标分桶(实现见 geo.ts)。 */
 export function placeKey(label: string, lat?: number, lon?: number): string {
-  return bucketKey(label, lat, lon);
+  return geoPlaceKey(label, lat, lon);
 }
 function bucketKey(label: string, lat?: number, lon?: number): string {
-  if (isGenericPlace(label) && lat != null && lon != null) return `${label} ·${lat.toFixed(2)},${lon.toFixed(2)}`;
-  return label;
+  return geoPlaceKey(label, lat, lon);
 }
 
 /** 常去地点聚类:跨全部数据按地点名聚合;无名占位按粗坐标拆开。 */

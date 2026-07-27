@@ -13,6 +13,12 @@ import { getLifeGraph } from './life-graph';
 import { loadBankTx } from './bank-tx';
 import { createSignal } from '../life-domain/create-signal';
 import { getSignals } from '../life-domain/signal';
+import {
+  ACTION_STALL_HINT,
+  detectActionStall,
+  isGrowthAiSlop,
+  ZHANG_LI_EQUATION,
+} from './growth-protocols';
 
 export const GROWTH_REFLECTION_TYPE = 'growth.reflection';
 
@@ -60,12 +66,15 @@ function commitmentReviewCard(now: number): GrowthCard | null {
   const n = nodes[0];
   if (!n) return null;
   const days = Math.round((now - new Date(n.createdAt).getTime()) / DAY_MS);
+  const notes = String(n.attributes?.notes || n.rawInput || '');
+  const stall = detectActionStall(`${n.name} ${notes}`);
+  const stallTip = stall === 'generic' ? '' : `（或许是${ACTION_STALL_HINT[stall].zh}）`;
   return {
     id: `commitment_review:${n.id}`,
     kind: 'commitment_review',
     refId: n.id,
-    question: `${days} 天前你记下「${n.name}」—— 还想做吗?当时为什么它重要?`,
-    questionEn: `${days} days ago you noted "${n.name}" — still on? Why did it matter then?`,
+    question: `${days} 天前你记下「${n.name}」—— 还想做吗?当时为什么它重要?${stallTip}`,
+    questionEn: `${days} days ago you noted "${n.name}" — still on? Why did it matter then?${stall === 'generic' ? '' : ` (${ACTION_STALL_HINT[stall].en})`}`,
     context: `记于 ${n.createdAt.slice(0, 10)} · 未完成`,
     dimension: 'control',
   };
@@ -152,13 +161,16 @@ export function recordGrowthAnswer(card: GrowthCard, answer: string): void {
   const text = (answer || '').trim();
   if (!text) return;
   createSignal({
-    source: 'ai_observation',
+    source: 'manual',
     type: GROWTH_REFLECTION_TYPE,
     title: `成长回看:${card.question.slice(0, 40)}`,
     payload: { kind: card.kind, refId: card.refId, question: card.question, context: card.context, answer: text, dimension: card.dimension },
     confidence: 1,
     retentionPolicy: 'LongLiving',
     tags: ['成长引导'],
+    epistemic: 'user_asserted',
+    generator: 'user',
+    derivedFrom: card.refId ? [card.refId] : undefined,
   });
 }
 
@@ -234,6 +246,30 @@ export const GROWTH_FRAMEWORKS: GrowthFramework[] = [
     desc: '假设这个决定一年后失败了,倒推原因', descEn: 'Assume the decision failed in a year — work backwards',
     prompt: '假设我下面这个决定一年后被证明是错的,最可能的三个原因是什么?现在有什么低成本动作能提前排掉它们?\n\n【粘贴决定】',
   },
+  {
+    id: 'zhangli-mind',
+    name: '张丽心智方程', nameEn: "Zhang Li's mind-share equation",
+    desc: ZHANG_LI_EQUATION.formulaZh, descEn: ZHANG_LI_EQUATION.formulaEn,
+    prompt: `用张丽心智经营方程帮我诊断下面这件事:\n${ZHANG_LI_EQUATION.formulaZh}\n\n请分别评估:\n1. 触达力——出现在谁眼前、多常出现\n2. 内容力——信息增量够不够\n3. 触动力——注意力有没有变成信任/行动\n4. 人机协同——哪步该人判断、哪步可交给 AI\n最后指出「此刻最短的一力」+ 本周可验证的一个微动作。不确定就明说不确定。\n\n【粘贴事业/内容/产品现状】`,
+  },
+  {
+    id: 'one-sentence-read',
+    name: '读后一句话', nameEn: 'One sentence after reading',
+    desc: '用自己的话落下一句,再看是复述还是生出新问题', descEn: 'Land one sentence in your words — restating or a new question?',
+    prompt: '读完下面这段后,请只帮我做两件事(不要长摘要):\n1) 逼我用自己的话写「读后一句话」(你先示范一句我可以改的)\n2) 判断这句话更像 L1 复述、L2 有判断、还是 L3 生出新问题,并给一句追问让我往 L3 走。\n\n【粘贴段落】',
+  },
+  {
+    id: 'action-diag',
+    name: '执行力诊断', nameEn: 'Action diagnosis',
+    desc: '区分准备/想太多/换方向/先学 —— 然后最小一步', descEn: 'Spot preparing / overthinking / pivoting / learning-as-delay — then one tiny step',
+    prompt: '我对下面这件事「知道该做却没动」。请诊断最像哪一种卡点(准备在替代执行 / 思考在回避行动 / 换方向在逃避深入 / 学习在推迟动手 / 就是还没开始),用一句温柔点破,再给我「今天 10 分钟内能做完的最小一步」。\n\n【粘贴卡住的事】',
+  },
+  {
+    id: 'slow-is-fast',
+    name: '慢就是快', nameEn: 'Slow is fast',
+    desc: '先问值不值得加速,再谈怎么做', descEn: 'Ask if speeding up is worth it before how',
+    prompt: '用「慢就是快」审视下面这个想加速的决定:先问值不值得快、快了会牺牲什么复利、哪一步其实必须慢;再给一个「故意变慢但更稳」的版本。\n\n【粘贴想加速的事】',
+  },
 ];
 
 
@@ -252,7 +288,8 @@ export async function runFrameworkInline(promptTemplate: string, content: string
     if (res.status === 401) return { ok: false, error: 'auth' };
     if (res.status === 429) return { ok: false, error: 'rate' };
     const data = await res.json() as { ok?: boolean; response?: string; error?: string };
-    if (data.ok && data.response) return { ok: true, text: data.response };
+    if (data.ok && data.response && !isGrowthAiSlop(data.response)) return { ok: true, text: data.response };
+    if (data.ok && data.response && isGrowthAiSlop(data.response)) return { ok: false, error: 'busy' };
     return { ok: false, error: data.error || 'unknown' };
   } catch {
     return { ok: false, error: 'network' };

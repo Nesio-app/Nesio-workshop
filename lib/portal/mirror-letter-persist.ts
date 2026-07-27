@@ -36,6 +36,8 @@ export function persistMirrorLetterToMemory(
       month: letter.month,
       mirrorId: letter.mirrorId,
       topic: letter.topic || 'all',
+      epistemic: 'derived',
+      generator: 'ai:mirror',
     },
   });
   return 'saved';

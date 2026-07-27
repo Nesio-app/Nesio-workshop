@@ -2,7 +2,8 @@
  * wishlist — 想做清单(屏4)。**就是一条「记忆」节点**(note,tag 想做清单),dish 列表 JSON 存
  * attributes.dishes。想做的菜先攒着,选一道 → 算缺料(屏5)。复用 addLifeNode,不另起存储。
  */
-import { addLifeNode, updateLifeNode, deleteLifeNode, getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { updateLifeNode, deleteLifeNode, getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 
 const TAG = '想做清单';
 export interface WishDish { name: string; note?: string }   // note = 朋友推荐/拍一张/想给孩子做…
@@ -35,7 +36,11 @@ export function addWish(name: string, note?: string): WishDish[] {
     return cur;
   }
   const dishes: WishDish[] = [{ name: nm, ...(note ? { note } : {}) }];
-  addLifeNode({ type: 'note', name: '想做清单', attributes: { dishes: JSON.stringify(dishes) }, source: 'manual', confidence: 1, relations: [], tags: [TAG] });
+  ingestLifeNode({
+    type: 'note', name: '想做清单',
+    attributes: { dishes: JSON.stringify(dishes), epistemic: 'observation', generator: 'user' },
+    source: 'manual', confidence: 1, relations: [], tags: [TAG],
+  });
   return dishes;
 }
 

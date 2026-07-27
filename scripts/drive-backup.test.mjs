@@ -25,7 +25,9 @@ function loadRoute(token, fetchImpl) {
   vm.runInNewContext(js, {
     module: mod, exports: mod.exports, console, JSON, Object, Array, String, Date, encodeURIComponent, fetch: fetchImpl,
     require: (p) => p === 'next/server' ? { NextRequest: class {}, NextResponse: { json: (b, init) => ({ __json: b, __status: init?.status ?? 200 }) } }
-      : p.includes('gmail-access') ? { resolveGmailAccessToken: async () => token } : ({}),
+      : p.includes('gmail-access') ? { resolveGmailAccessToken: async () => token }
+      : p.includes('api-auth') ? { guardAiRoute: async () => null }
+      : ({}),
   });
   return mod.exports;
 }

@@ -27,7 +27,6 @@ const GATED = [
   ['components/portal/relationships/HangNoteSheet.tsx', 'person_extract'],
   ['components/portal/InventorySheet.tsx', 'inventory_extract'],
   ['components/portal/NesioChatSheet.tsx', 'inventory_extract'],
-  ['components/portal/InsightsSheet.tsx', 'living_model'],
   ['components/portal/health/HealthDashboard.tsx', 'health_insight'],
 ];
 for (const [file, feature] of GATED) {
@@ -36,7 +35,14 @@ for (const [file, feature] of GATED) {
   assert.ok(src.includes(`guardPaidCloudAi('${feature}')`), `${file} 用 feature=${feature} 接门`);
 }
 
-// ── 后台被动增强:静默跳过(canUsePaidCloudAi,不派发弹窗) ──
+// ── living_model 已退役(410);API 仍保留 guard,客户端入口已删 ──
+{
+  const route = read('app/api/portal/living-model/route.ts');
+  assert.ok(route.includes('guardAiRoute'), 'living-model API 仍 guardAiRoute(410 不花 token)');
+  const sheet = read('components/portal/InsightsSheet.tsx');
+  assert.doesNotMatch(sheet, /guardPaidCloudAi\('living_model'\)/, 'InsightsSheet 不再调 living_model 云 AI');
+}
+
 {
   const today = read('components/portal/today/useTodayData.ts');
   assert.ok(/!cachedCopy && canUsePaidCloudAi\(\)/.test(today), '引导语润色分层启用后静默跳过');

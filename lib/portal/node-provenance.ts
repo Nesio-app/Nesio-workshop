@@ -7,8 +7,18 @@
  * 抽到这里当**横切一等公民**:记忆徽章与 guidance 置信度共用同一条「什么算不确定」的定义。
  *
  * 结构化入参(只看 confidence)—— LifeNode / FocusNode 都能传。
+ * 2026-07-27:叠加 epistemic —— extraction 未确认也算不确定(即使 confidence 偏高)。
  */
-export function isNodeUncertain(node: { confidence?: number }): boolean {
+import { isSignalEpistemic, type SignalEpistemic } from '@/lib/life-domain/signal-epistemic';
+
+export function isNodeUncertain(node: {
+  confidence?: number;
+  attributes?: Record<string, unknown>;
+  epistemic?: SignalEpistemic;
+}): boolean {
+  const epi = node.epistemic
+    || (isSignalEpistemic(node.attributes?.epistemic) ? node.attributes!.epistemic as SignalEpistemic : undefined);
+  if (epi === 'extraction') return true;
   return typeof node.confidence === 'number' && node.confidence > 0 && node.confidence < 0.6;
 }
 

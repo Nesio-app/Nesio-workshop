@@ -1,5 +1,6 @@
 import { getSignals, type Signal } from './signal';
 import { retrievalScoreAdjust, isDownranked } from './retrieval-feedback';
+import { isGroundFact, isSignalEpistemic, parseDerivedFromAttr } from './signal-epistemic';
 
 /** 检索反馈的目标稳定键:与云端行 evidence.externalId 对齐,回退 signal.id。 */
 function retrievalKey(signal: Signal): string {
@@ -82,8 +83,8 @@ export function searchSignalsSemantically(query: string, limit = 8): Signal[] {
   const trimmed = query.trim();
   if (!trimmed) return [];
   return getSignals()
-    // 检索反馈本身是一等公民 Signal(feedback.retrieval),但不该成为检索结果被答出去 —— 剔除。
-    .filter((signal) => !String(signal.type).startsWith('feedback'))
+    // 地面事实池:feedback / derived / system_summary 默认不答问(学 wiki vs .raw)。
+    .filter((signal) => isGroundFact(signal))
     .map((signal) => ({ signal, rel: relevanceScore(signal, trimmed), score: scoreSignalForQuery(signal, trimmed) }))
     // 门只认查询相关性:必须真的命中查询词/实体才够格,近因/置信只用来排序。
     .filter((entry) => entry.rel > 0)
@@ -98,11 +99,14 @@ export function cloudSignalRowToSignal(row: CloudSignalRow): Signal | null {
   if (!row.signal_id || !row.source || !row.type) return null;
   const now = new Date().toISOString();
   const embeddingText = typeof row.embedding_text === 'string' ? row.embedding_text : '';
-  const payload = {
+  const payload: Record<string, unknown> = {
     ...(row.payload || {}),
     ...(embeddingText ? { embedding_text: embeddingText } : {}),
   };
   const evidence = row.evidence || { source: row.source, raw: embeddingText };
+  const epistemic = isSignalEpistemic(payload.epistemic) ? payload.epistemic : undefined;
+  const generator = typeof payload.generator === 'string' ? payload.generator : undefined;
+  const derivedFrom = parseDerivedFromAttr(payload.derivedFrom);
   return {
     id: row.signal_id,
     source: row.source,
@@ -118,6 +122,9 @@ export function cloudSignalRowToSignal(row: CloudSignalRow): Signal | null {
     retentionPolicy: row.retention_policy || 'Normal',
     evidence,
     tags: [],
+    epistemic,
+    generator,
+    derivedFrom,
   };
 }
 

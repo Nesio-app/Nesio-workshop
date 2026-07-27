@@ -15,6 +15,21 @@
 import { getLifeGraph, deleteLifeNode, type LifeNode, type LifeNodeType, type LifeNodeSource } from '../portal/life-graph';
 import { getCachedSignals } from './signal-read-cache';
 import type { SignalContext } from './context';
+import {
+  inferEpistemic,
+  isSignalEpistemic,
+  parseDerivedFromAttr,
+  type SignalEpistemic,
+} from './signal-epistemic';
+
+export type { SignalEpistemic } from './signal-epistemic';
+export {
+  GROUND_EPISTEMICS,
+  inferEpistemic,
+  isGroundFact,
+  resolveEpistemic,
+  stampEpistemic,
+} from './signal-epistemic';
 
 export type SignalSource =
   | 'voice'
@@ -85,6 +100,16 @@ export interface Signal {
   /** Structured semantics on the signal (domain / people / places / objects /
    *  intent). Suggestion until the user confirms (Domain-Capability PRD §7). */
   context?: SignalContext;
+  /**
+   * 认识论层级(可信度分层)。缺省时由 resolveEpistemic() 按 type/source 推断。
+   * observation/user_asserted/extraction = 地面事实;derived/system_summary = 蒸馏;
+   * feedback = 元评价(永不作答问证据)。
+   */
+  epistemic?: SignalEpistemic;
+  /** 谁写出这条:user / connector:gmail / ai:mirror / rule:growth … */
+  generator?: string;
+  /** 派生主张所依据的 Signal/Node id 链(claude-obsidian 式引用)。 */
+  derivedFrom?: string[];
 }
 
 // ── LifeNode → Signal adapter ────────────────────────────────────────────────
@@ -161,13 +186,16 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
   const signalType = typeof node.attributes['signalType'] === 'string'
     ? node.attributes['signalType']
     : NODE_TYPE_TO_SIGNAL[node.type] ?? 'observation';
-  const payload = {
+  const payload: Record<string, unknown> = {
     ...Object.fromEntries(
-      Object.entries(node.attributes).filter(([key]) => !key.startsWith('signal') && key !== 'context' && key !== 'updatedAt'),
+      Object.entries(node.attributes).filter(([key]) =>
+        !key.startsWith('signal')
+        && key !== 'context'
+        && key !== 'updatedAt'
+        && key !== 'epistemic'
+        && key !== 'generator'
+        && key !== 'derivedFrom'),
     ),
-    // Cutover(2026-07-04):投影保真字段——原 NODE_TYPE_TO_SIGNAL 映射有损
-    // (object/person/preference 均折叠为 observation),signalToLifeNode
-    // 重建投影时需要原始 type/source。
     nodeType: node.type,
     nodeSource: node.source,
   };
@@ -189,6 +217,19 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
     (typeof node.attributes['updatedAt'] === 'string' && node.attributes['updatedAt']) ||
     node.createdAt;
 
+  const epistemicAttr = node.attributes['epistemic'];
+  const kind = typeof node.attributes['kind'] === 'string' ? node.attributes['kind'] : undefined;
+  const epistemic = isSignalEpistemic(epistemicAttr)
+    ? epistemicAttr
+    : inferEpistemic({ type: signalType, source, confidence: node.confidence, kind });
+  const generator = typeof node.attributes['generator'] === 'string'
+    ? node.attributes['generator']
+    : undefined;
+  const derivedFrom = parseDerivedFromAttr(node.attributes['derivedFrom']);
+  payload.epistemic = epistemic;
+  if (generator) payload.generator = generator;
+  if (derivedFrom?.length) payload.derivedFrom = derivedFrom;
+
   return {
     id: signalId,
     source,
@@ -206,6 +247,9 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
     evidence: { source, externalId: node.id, raw: node.rawInput },
     tags: node.tags,
     context,
+    epistemic,
+    generator,
+    derivedFrom,
   };
 }
 
@@ -249,6 +293,12 @@ export function signalToLifeNode(signal: Signal): LifeNode {
   attributes.occurredAt = signal.occurredAt;
   if (signal.modifiedAt) attributes.updatedAt = signal.modifiedAt;
   if (signal.context) attributes.context = JSON.stringify(signal.context);
+  if (signal.epistemic) attributes.epistemic = signal.epistemic;
+  else if (isSignalEpistemic(payload.epistemic)) attributes.epistemic = payload.epistemic;
+  if (signal.generator) attributes.generator = signal.generator;
+  else if (typeof payload.generator === 'string') attributes.generator = payload.generator;
+  const derived = signal.derivedFrom || parseDerivedFromAttr(payload.derivedFrom);
+  if (derived?.length) attributes.derivedFrom = JSON.stringify(derived);
 
   return {
     id: signal.evidence.externalId || signal.id,

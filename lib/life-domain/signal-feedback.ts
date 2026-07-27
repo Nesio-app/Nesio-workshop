@@ -1,9 +1,11 @@
+/**
+ * Today 卡反馈 → Signal 事实(唯一落点)。
+ * 2026-07-27:删平行反馈数组(无读方、与 Signal 完全重复)。
+ * 读回看 getSignals(type=feedback.today_card)。
+ */
 import type { RecommendationCard } from '../portal/reasoning-engine';
 import { createSignal } from './create-signal';
-import type { Signal } from './signal';
-import { logDropped } from '../portal/storage-health';
-
-const SIGNAL_FEEDBACK_KEY = 'nesio-signal-feedback-v1';
+import { getSignals, type Signal } from './signal';
 
 export interface SignalFeedbackRecord {
   cardId: string;
@@ -13,6 +15,8 @@ export interface SignalFeedbackRecord {
   preferencePatch: Record<string, unknown>;
   createdAt: string;
 }
+
+export const TODAY_CARD_FEEDBACK_TYPE = 'feedback.today_card';
 
 function feedbackSignalIds(card: RecommendationCard): string[] {
   return Array.from(new Set([
@@ -28,28 +32,6 @@ function preferencePatch(card: RecommendationCard, feedback: RecommendationCard[
   return { deferDomain: card.domain, reason: 'not_now' };
 }
 
-function readRecords(): SignalFeedbackRecord[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(SIGNAL_FEEDBACK_KEY);
-    const parsed = raw ? JSON.parse(raw) : [];
-    return Array.isArray(parsed) ? parsed as SignalFeedbackRecord[] : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeRecords(records: SignalFeedbackRecord[]): void {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(SIGNAL_FEEDBACK_KEY, JSON.stringify(records.slice(-500)));
-    window.dispatchEvent(new CustomEvent('nesio-signal-feedback-recorded'));
-  } catch (err) {
-    // feedback is best-effort;可见动作不该因此失败,但也别全静默 —— 留可 grep 日志。
-    logDropped('signal_feedback.write', err);
-  }
-}
-
 function writeCloudSignalFeedback(record: SignalFeedbackRecord, feedbackSignal?: Signal): void {
   if (typeof window === 'undefined' || typeof fetch === 'undefined') return;
 
@@ -59,9 +41,7 @@ function writeCloudSignalFeedback(record: SignalFeedbackRecord, feedbackSignal?:
       credentials: 'same-origin',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ signal: { ...feedbackSignal, schemaVersion: 'Signal@v1' } }),
-    }).catch(() => {
-      /* Explicit feedback Signal is best-effort during Signal dual-write. */
-    });
+    }).catch(() => { /* best-effort */ });
   }
 
   if (!record.feedbackSignalIds.length) return;
@@ -81,9 +61,7 @@ function writeCloudSignalFeedback(record: SignalFeedbackRecord, feedbackSignal?:
         createdAt: record.createdAt,
       },
     }),
-  }).catch(() => {
-    /* Cloud feedback is best-effort during Signal dual-write. */
-  });
+  }).catch(() => { /* best-effort */ });
 }
 
 export function recordSignalFeedback(card: RecommendationCard, feedback: RecommendationCard['feedback']): SignalFeedbackRecord {
@@ -95,10 +73,9 @@ export function recordSignalFeedback(card: RecommendationCard, feedback: Recomme
     preferencePatch: preferencePatch(card, feedback),
     createdAt: new Date().toISOString(),
   };
-  writeRecords([...readRecords(), record]);
   const feedbackSignal = createSignal({
-    source: 'ai_observation',
-    type: 'feedback.today_card',
+    source: 'manual',
+    type: TODAY_CARD_FEEDBACK_TYPE,
     title: `反馈：${card.title}`,
     payload: {
       cardId: record.cardId,
@@ -106,16 +83,40 @@ export function recordSignalFeedback(card: RecommendationCard, feedback: Recomme
       feedbackSignalIds: record.feedbackSignalIds,
       decEngineId: record.decEngineId,
       preferencePatch: record.preferencePatch,
+      surface: 'today',
+      dimension: 'card',
+      key: record.cardId,
+      reaction: record.feedback === 'not_now' ? 'snooze' : record.feedback,
+      at: record.createdAt,
     },
     confidence: 1,
     retentionPolicy: 'LongLiving',
     tags: ['feedback', card.domain],
     raw: `${card.title} ${feedback}`,
+    epistemic: 'feedback',
+    generator: 'user',
+    derivedFrom: record.feedbackSignalIds,
   });
   writeCloudSignalFeedback(record, feedbackSignal);
   return record;
 }
 
+/** 从 Signal 事实表读回(替代已删的平行反馈数组)。 */
 export function readSignalFeedback(): SignalFeedbackRecord[] {
-  return readRecords();
+  const out: SignalFeedbackRecord[] = [];
+  for (const s of getSignals({ types: [TODAY_CARD_FEEDBACK_TYPE] })) {
+    const p = (s.payload || {}) as Partial<SignalFeedbackRecord> & { feedback?: RecommendationCard['feedback'] };
+    if (!p.cardId || !p.feedback) continue;
+    out.push({
+      cardId: String(p.cardId),
+      feedback: p.feedback,
+      feedbackSignalIds: Array.isArray(p.feedbackSignalIds) ? p.feedbackSignalIds.map(String) : [],
+      decEngineId: String(p.decEngineId || ''),
+      preferencePatch: (p.preferencePatch && typeof p.preferencePatch === 'object')
+        ? p.preferencePatch as Record<string, unknown>
+        : {},
+      createdAt: s.capturedAt,
+    });
+  }
+  return out;
 }

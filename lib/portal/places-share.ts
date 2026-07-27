@@ -8,6 +8,7 @@
  */
 import type { PlaceVisit } from './place-trail';
 import { canonicalCountryKey } from './country-normalize';
+import { haversineKm } from './geo';
 
 export type Continent = 'NA' | 'SA' | 'EU' | 'AF' | 'AS' | 'OC';
 
@@ -91,16 +92,6 @@ export function worldDotCells(): DotCell[] {
   return cells;
 }
 export const WORLD_GRID = { w: GRID_W, h: GRID_H };
-
-function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
-  const R = 6371;
-  const dLat = ((bLat - aLat) * Math.PI) / 180;
-  const dLon = ((bLon - aLon) * Math.PI) / 180;
-  const la1 = (aLat * Math.PI) / 180;
-  const la2 = (bLat * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
-}
 
 function localDayKey(ts: string): string {
   const d = new Date(ts);

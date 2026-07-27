@@ -18,6 +18,7 @@ const lifeGraphStub = {
   updateLifeNode: (id, patch) => { const i = nodes.findIndex((x) => x.id === id); if (i < 0) return false; nodes[i] = { ...nodes[i], ...patch }; return true; },
   deleteLifeNode: (id) => { const i = nodes.findIndex((x) => x.id === id); if (i < 0) return false; nodes.splice(i, 1); return true; },
 };
+const ingestStub = { ingestLifeNode: (n) => lifeGraphStub.addLifeNode(n) };
 function loadTs(path, requireImpl) {
   const src = fs.readFileSync(new URL(path, import.meta.url), 'utf8');
   const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -25,11 +26,12 @@ function loadTs(path, requireImpl) {
   vm.runInNewContext(js, { module: mod, exports: mod.exports, require: requireImpl, process: { env: {} }, console, Date, Math, Set, Map, JSON, Number, Array, Object, String });
   return mod.exports;
 }
-const inv = loadTs('../lib/portal/inventory.ts', (p) => (
+const invRequire = (p) => (
   p.includes('life-graph') ? lifeGraphStub
-  // 批次192:inventory 现在从 named-places 引 displayStoredLocation(placeId 解析);测试用字符串样例,回退 location。
+  : p.includes('ingest-node') ? ingestStub
   : p.includes('named-places') ? { displayStoredLocation: (a) => (a && typeof a.location === 'string' ? a.location : '') }
-  : ({})));
+  : ({}));
+const inv = loadTs('../lib/portal/inventory.ts', invRequire);
 
 // ── 字段回路:add → 投影 → update → 清空 ──
 const n1 = inv.addInventoryItem({ name: 'Lancome Toner', location: '🏠 家 · 卫生间', category: '护肤', tags: ['skincare', 'pink', '收纳'], price: 55, quantity: 1 });

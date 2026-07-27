@@ -25,9 +25,20 @@ function compile(path, requireImpl, extraGlobals = {}) {
   return mod.exports;
 }
 
+const epistemicStub = {
+  inferEpistemic: () => 'observation',
+  isSignalEpistemic: () => false,
+  parseDerivedFromAttr: () => [],
+  isGroundFact: () => true,
+  resolveEpistemic: (x) => x?.epistemic || 'observation',
+  stampEpistemic: (s) => s,
+  GROUND_EPISTEMICS: new Set(['observation']),
+};
+
 const sig = compile('../lib/life-domain/signal.ts', (p) =>
   p.includes('signal-read-cache') ? { getCachedSignals: () => null }
   : p.includes('life-graph') ? { getLifeGraph: () => [], deleteLifeNode: () => {} }
+  : p.includes('signal-epistemic') ? epistemicStub
   : ({}));
 
 const base = {

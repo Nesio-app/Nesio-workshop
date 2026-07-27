@@ -13,7 +13,8 @@ import { financeFindings } from './finance-insight';
 import { computeFinanceScores } from './finance-risk';
 import { loadBudget, hasBudget, budgetProgress } from './finance-budget';
 import { categoryLabel, categoryDetailLabel } from './tx-category';
-import { addLifeNode, updateLifeNode, getLifeGraph } from './life-graph';
+import { updateLifeNode, getLifeGraph } from './life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 
 export interface MonthlyReport {
   ym: string;
@@ -193,12 +194,14 @@ export function persistReportToMemory(r: MonthlyReport): 'created' | 'updated' {
     net: r.summary.net,
     saved: r.summary.saved,
     txCount: r.summary.txCount,
+    epistemic: 'system_summary',
+    generator: 'rule:finance-report',
   };
   if (existing) {
     updateLifeNode(existing.id, { name: r.title, attributes, rawInput: r.markdown });
     return 'updated';
   }
-  addLifeNode({
+  ingestLifeNode({
     type: 'event',
     name: r.title,
     attributes,

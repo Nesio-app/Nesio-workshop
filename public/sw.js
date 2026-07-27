@@ -4,14 +4,15 @@
  * Strategy:
  * - navigations: network-first, cached shell as offline fallback
  *   (never serves a stale deploy when online)
- * - /_next/static, /icons, /assets: cache-first (content-hashed, immutable)
+ * - /_next/static, /icons, /assets, /data: cache-first (immutable / bundled offline packs)
  * - /api/*: never touched — data flows stay live
  *
  * All user data lives in localStorage/IndexedDB, so a cached shell is all
- * that's needed to read memories in airplane mode.
+ * that's needed to read memories in airplane mode. /data/* (cooking, travel POI)
+ * is cache-first after first fetch so offline packs keep working.
  */
 
-const VERSION = 'nesio-sw-v4';
+const VERSION = 'nesio-sw-v5';
 const SHELL_CACHE = `${VERSION}-shell`;
 const STATIC_CACHE = `${VERSION}-static`;
 
@@ -36,11 +37,12 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return;
 
-  // Immutable build assets: cache-first
+  // Immutable build assets + 随包数据(菜谱/景点等): cache-first
   if (
     url.pathname.startsWith('/_next/static/') ||
     url.pathname.startsWith('/icons/') ||
-    url.pathname.startsWith('/assets/')
+    url.pathname.startsWith('/assets/') ||
+    url.pathname.startsWith('/data/')
   ) {
     event.respondWith(
       caches.open(STATIC_CACHE).then(async (cache) => {

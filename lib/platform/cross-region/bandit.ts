@@ -99,8 +99,24 @@ export function applyCrossRegionBanditFeedback(cardId: string, reaction: string)
   return true;
 }
 
-// 反馈闭环武装:订阅反馈总线(与 guidance-ranker 同款),cross_region 卡的反馈进 bandit。
-if (typeof window !== 'undefined') {
+// 2026-07-27 激进审计:停用 bandit 反馈更新路径(detection/冷启动排序可留)。
+// 不再订反馈总线 —— 避免「学了 N 次」伪智能;投递仍可用冷启动 θ₀≈按强度排。
+const BANDIT_LEARNING_ENABLED = false;
+
+const BANDIT_RETIRED_PURGE_KEY = 'nesio-cross-region-bandit-retired-purge-v1';
+/** 学习退役后重置 LinUCB 状态,旧 θ 不再影响跨区排序。 */
+function purgeRetiredBanditStateIfNeeded(): void {
+  if (BANDIT_LEARNING_ENABLED || typeof window === 'undefined') return;
+  try {
+    if (localStorage.getItem(BANDIT_RETIRED_PURGE_KEY)) return;
+    stateBlob.save(createBanditState(priorTheta(), { lambda: BANDIT_DEFAULTS.lambda }) as BanditState);
+    shownBlob.save({});
+    localStorage.setItem(BANDIT_RETIRED_PURGE_KEY, '1');
+  } catch { /* best-effort */ }
+}
+purgeRetiredBanditStateIfNeeded();
+
+if (BANDIT_LEARNING_ENABLED && typeof window !== 'undefined') {
   onFeedback((e) => {
     if (e.dimension === 'card' && e.key) applyCrossRegionBanditFeedback(e.key, e.reaction);
   });

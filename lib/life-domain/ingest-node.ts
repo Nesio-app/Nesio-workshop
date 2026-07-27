@@ -21,6 +21,7 @@ import { loadLastLocation, refreshLocation } from '@/lib/portal/location-store';
 import { captureLocationEnabled, getFreshCaptureFix, prefetchCaptureLocation } from '@/lib/portal/capture-location';
 import { lifeNodeToSignal } from './signal';
 import { signalWriteMode, writeCloudSignal } from './create-signal';
+import { isSignalEpistemic, stampEpistemic } from './signal-epistemic';
 
 export type IngestNodeInput = Omit<LifeNode, 'id' | 'createdAt'>;
 
@@ -96,6 +97,19 @@ function externalKey(attrs: IngestNodeInput['attributes'] | undefined): string |
 
 export function ingestLifeNode(input: IngestNodeInput): LifeNode {
   input = stampCaptureLocation(input);
+  // 可信度盖章:旁路迁入后门也必须带 epistemic(可清数据后不再靠读时猜测)。
+  const attrs = { ...(input.attributes || {}) };
+  if (!isSignalEpistemic(attrs.epistemic)) {
+    const stamp = stampEpistemic({
+      source: input.source,
+      type: typeof attrs.signalType === 'string' ? attrs.signalType : input.type,
+      confidence: input.confidence,
+      payload: attrs as Record<string, unknown>,
+    });
+    attrs.epistemic = stamp.epistemic;
+    if (stamp.generator) attrs.generator = stamp.generator;
+  }
+  input = { ...input, attributes: attrs };
   // ⑦ 去重下沉到唯一写入口:带外部 id 的输入(Gmail/Notion 重复同步)幂等 —— 命中就原地更新,
   //   不再生成重复节点。一处修掉此前 Gmail/Notion 各自没做去重的问题。
   const key = externalKey(input.attributes);

@@ -4,12 +4,14 @@
  * 每月一封:选一面镜子,它读你的本地档案,用第二人称写给你。
  * 规则:只回看不预测;每段带证据、可反驳(✓/✗);低置信不写;
  * 批量导入(通讯录等)剔出证据 —— 见 life-graph.isBulkImported。
- * 老友视角免费可试读,其余四面镜挂 Pro 门(feature: 'mirror_letter')。
+ * 老友 / 暖教练 免费可试读,其余镜挂 Pro 门(feature: 'mirror_letter')。
  */
 
 import { logDropped } from './storage-health';
 
-export type MirrorId = 'friend' | 'socratic' | 'jung' | 'blindspot' | 'stoic';
+export type MirrorId =
+  | 'friend' | 'socratic' | 'jung' | 'blindspot' | 'stoic'
+  | 'coach' | 'editor' | 'body' | 'time' | 'inverse';
 
 export interface MirrorDef {
   id: MirrorId;
@@ -21,13 +23,18 @@ export interface MirrorDef {
   freePreview?: boolean;
 }
 
-/** 镜子的人格 prompt 在服务端(app/api/portal/mirror-letter),客户端只传 id。 */
+/** 镜子的人格 Skill 在 lib/portal/mirror-skills;客户端只传 id。 */
 export const MIRRORS: MirrorDef[] = [
   { id: 'friend',    name: '老友',     nameEn: 'Old friend',     desc: '温暖直白,像认识你十年的人', descEn: 'Warm and direct, like someone who has known you for ten years', freePreview: true },
+  { id: 'coach',     name: '暖教练',   nameEn: 'Warm coach',     desc: '承认难处,给一个可轻轻做的下一步', descEn: 'Names the hard part, offers one gentle next step', freePreview: true },
   { id: 'socratic',  name: '苏格拉底', nameEn: 'Socrates',       desc: '不下结论,只把你的矛盾变成问题', descEn: 'No conclusions — turns your contradictions into questions' },
   { id: 'jung',      name: '荣格',     nameEn: 'Jung',           desc: '反复出现的意象、你回避的主题', descEn: 'Recurring imagery and the themes you avoid' },
   { id: 'blindspot', name: '盲区侦探', nameEn: 'Blind-spot detective', desc: '你从不记什么,和这说明什么', descEn: 'What you never write down, and what that means' },
   { id: 'stoic',     name: '斯多葛',   nameEn: 'Stoic',          desc: '你惦记的事里哪些真的可控', descEn: 'Of the things on your mind, which are truly in your control' },
+  { id: 'editor',    name: '苛刻编辑', nameEn: 'Tough editor',   desc: '删空话,追问你真正想说的那一句', descEn: 'Cuts fluff and asks what you really meant' },
+  { id: 'body',      name: '身体',     nameEn: 'Body',           desc: '吃练睡与不适——身体账本那一面', descEn: 'Food, training, sleep, discomfort — the body ledger side' },
+  { id: 'time',      name: '时间',     nameEn: 'Time',           desc: '注意力落在哪些时段与主题', descEn: 'Where your attention density actually lands' },
+  { id: 'inverse',   name: '逆向',     nameEn: 'Inversion',      desc: '先想怎样搞砸,再对照你实际在靠近什么', descEn: 'First how to fail it — then what your notes are drifting toward' },
 ];
 
 /** 主题镜(把信聚焦到某一面生活;'all' = 不设限)。收成 filter,与镜子/月份并列。 */
@@ -39,6 +46,9 @@ export const MIRROR_TOPICS: MirrorTopic[] = [
   { id: 'work',      name: '事业', nameEn: 'Work' },
   { id: 'growth',    name: '成长', nameEn: 'Growth' },
   { id: 'health',    name: '健康', nameEn: 'Health' },
+  { id: 'money',     name: '钱',   nameEn: 'Money' },
+  { id: 'home',      name: '家',   nameEn: 'Home' },
+  { id: 'learning',  name: '学习', nameEn: 'Learning' },
 ];
 
 export interface MirrorParagraph {

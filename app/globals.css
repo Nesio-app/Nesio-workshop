@@ -8467,14 +8467,24 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
 
 /* ─── Insights Sheet ─── */
 .nesio-insights-sheet-card {
-  /* 洞察升级为全屏页:满高 + 顶部不留圆角/间隙,像一个完整页面而非半屏弹框。
-     用 lvh(最大视口)而非 dvh —— iOS 动态视口常短一截,底边露出 WebView/系统白边。 */
-  height: 100vh !important;
-  height: 100lvh !important;
-  max-height: 100vh !important;
-  max-height: 100lvh !important;
-  border-top-left-radius: 0 !important;
-  border-top-right-radius: 0 !important;
+  /* 真全屏页:用 inset:0 贴满 WebView,不靠视口单位撑高、也不靠抽屉底填充。
+     历史踩坑:variant=bottom + 视口高度 → 抽屉 transform 把内容上推叠状态栏,
+     底下露出系统/遮罩缝;下滑才重算对齐。子页换色也治不好。 */
+  inset: 0 !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  max-height: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  background: var(--portal-bg) !important;
+  background-color: var(--portal-bg) !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
 }
 
 /* 洞察首页:入口宫格(3 列纯文字按钮) */
@@ -8532,7 +8542,9 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-height: 100%;
   overflow: hidden;
+  background: var(--portal-bg);
 }
 .nesio-insights-header {
   display: flex;
@@ -8601,7 +8613,8 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
   padding-top: 0.75rem;
-  padding-bottom: 1.5rem;
+  /* 底安全区由内容自己吃 —— 全屏 sheet padding=0,不再靠 Vaul ::after 填色 */
+  padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
 }
 .nesio-insights-body::-webkit-scrollbar { display: none; }
 
@@ -13132,6 +13145,8 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-fin-trend-bar { width: 100%; min-height: 4px; background: var(--portal-accent-soft-lg, var(--portal-accent-soft)); border-radius: 4px 4px 0 0; }
 .nesio-fin-trend-bar.is-cur { background: var(--portal-accent); }
 .nesio-fin-trend-lbl { font-size: 0.62rem; color: var(--portal-muted); }
+.nesio-fin-trend-area { margin: 0 0 var(--space-2); border-radius: var(--radius-md); overflow: hidden; background: var(--portal-bg); border: 1px solid var(--portal-line); }
+.nesio-fin-insight-line { margin: 0 0 var(--space-2); font-size: var(--text-sm); color: var(--portal-ink); line-height: 1.45; }
 .nesio-fin-review { border: 1px solid var(--portal-accent-border); border-radius: 14px; padding: 0.8rem; background: var(--portal-accent-soft); }
 .nesio-fin-review-title { margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--portal-ink); }
 .nesio-fin-review-sug { margin: 0.3rem 0 0.6rem; font-size: 0.76rem; color: var(--portal-muted); }
@@ -13204,6 +13219,155 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
   color: var(--portal-ink);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
 }
+
+/* 身体账本 / 护理(健康 × 美味) */
+.nesio-body-ledger, .nesio-beauty-care { display: flex; flex-direction: column; gap: var(--space-3); }
+.nesio-bl-tabs {
+  display: flex; gap: 4px; padding: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--portal-surface-2, rgba(127, 127, 127, 0.08));
+}
+.nesio-bl-tab {
+  flex: 1; border: 0; background: transparent; cursor: pointer;
+  padding: 0.45rem 0.2rem; border-radius: var(--radius-pill);
+  font-family: var(--font-sans); font-size: var(--text-xs); font-weight: var(--weight-semibold);
+  color: var(--portal-muted);
+}
+.nesio-bl-tab.is-active {
+  background: var(--sheet-opaque, #fff); color: var(--portal-ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+.nesio-bl-section { display: flex; flex-direction: column; gap: var(--space-3); }
+.nesio-bl-lede {
+  margin: 0; font-family: var(--font-serif);
+  font-size: var(--text-h3); font-weight: var(--weight-semibold); color: var(--portal-ink);
+}
+.nesio-bl-goalrow {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  font-size: var(--text-sm); color: var(--portal-muted);
+}
+.nesio-bl-goalchips { display: flex; flex-wrap: wrap; gap: 6px; }
+.nesio-bl-chip {
+  border: 1px solid var(--portal-line); background: var(--portal-card, #fff);
+  color: var(--portal-ink); border-radius: var(--radius-pill);
+  padding: 0.3rem 0.65rem; font-family: var(--font-sans); font-size: var(--text-xs); cursor: pointer;
+}
+.nesio-bl-chip.is-on {
+  border-color: var(--portal-accent-border);
+  background: var(--portal-accent-soft); color: var(--portal-blue-deep);
+}
+.nesio-bl-summary {
+  border: 1px solid var(--portal-line); border-radius: var(--radius-md);
+  background: var(--portal-card, #fff); padding: var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
+.nesio-bl-summary-line { margin: 0; font-size: var(--text-sm); color: var(--portal-muted); }
+.nesio-bl-prog-top {
+  display: flex; justify-content: space-between; gap: var(--space-2);
+  font-size: var(--text-sm); color: var(--portal-ink);
+}
+.nesio-bl-prog-bar {
+  height: 8px; border-radius: 999px; background: var(--portal-accent-soft); overflow: hidden; margin-top: 4px;
+}
+.nesio-bl-prog-fill {
+  height: 100%; border-radius: inherit; background: var(--portal-blue-deep);
+}
+.nesio-bl-prompt, .nesio-bl-active-card {
+  border-radius: var(--radius-md); padding: var(--space-3);
+  background: var(--status-gentle-soft); color: var(--portal-ink);
+  font-size: var(--text-sm); line-height: 1.55;
+}
+.nesio-bl-prompt--calm { background: var(--status-calm-soft); }
+.nesio-bl-active-card p { margin: 0 0 var(--space-2); }
+.nesio-bl-active-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.nesio-bl-dinner-list, .nesio-bl-meal-list, .nesio-bl-quick, .nesio-bl-rank, .nesio-bl-care-list {
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px;
+}
+.nesio-bl-dinner-card, .nesio-bl-quick-row, .nesio-bl-care-row, .nesio-bl-emptycta {
+  display: flex; align-items: center; gap: var(--space-2);
+  width: 100%; text-align: left;
+  border: 1px solid var(--portal-line); border-radius: var(--radius-md);
+  background: var(--portal-card, #fff); color: var(--portal-ink);
+  padding: 0.7rem 0.85rem; cursor: pointer; font-family: var(--font-sans);
+}
+.nesio-bl-dinner-main, .nesio-bl-quick-main, .nesio-bl-care-main, .nesio-bl-meal-main {
+  flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px;
+}
+.nesio-bl-dinner-main b, .nesio-bl-quick-main b, .nesio-bl-care-main b, .nesio-bl-meal-main b {
+  font-size: var(--text-sm); font-weight: var(--weight-semibold);
+}
+.nesio-bl-quick-main small, .nesio-bl-care-main small, .nesio-bl-meal-main small {
+  font-size: var(--text-xs); color: var(--portal-muted);
+}
+.nesio-bl-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.nesio-bl-tag {
+  font-size: 0.68rem; font-weight: var(--weight-semibold);
+  padding: 0.15rem 0.45rem; border-radius: var(--radius-pill);
+  background: var(--portal-accent-soft); color: var(--portal-blue-deep);
+}
+.nesio-bl-go {
+  border: 0; border-radius: var(--radius-sm);
+  background: var(--portal-blue-deep); color: #fff;
+  padding: 0.45rem 0.75rem; font-family: var(--font-sans);
+  font-size: var(--text-xs); font-weight: var(--weight-semibold); cursor: pointer; flex-shrink: 0;
+}
+.nesio-bl-quick-ico, .nesio-bl-care-ico, .nesio-bl-meal-ico {
+  width: 32px; height: 32px; border-radius: 10px;
+  display: grid; place-items: center; flex-shrink: 0;
+  background: var(--portal-accent-soft); color: var(--portal-blue-deep);
+}
+.nesio-bl-emptycta { justify-content: flex-start; gap: var(--space-2); }
+.nesio-bl-chart {
+  border: 1px solid var(--portal-line); border-radius: var(--radius-md);
+  background: var(--portal-card, #fff); padding: var(--space-3) var(--space-3) var(--space-2);
+}
+.nesio-bl-chart-axis {
+  display: flex; justify-content: space-between;
+  font-size: 0.65rem; color: var(--portal-muted); margin-top: 2px;
+}
+.nesio-bl-legend {
+  display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center;
+  font-size: var(--text-xs); color: var(--portal-muted); margin-top: 0.45rem;
+}
+.nesio-bl-legend i {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: middle;
+}
+.nesio-bl-unit { margin-left: auto; }
+.nesio-bl-stats {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2);
+}
+.nesio-bl-stats > div {
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: var(--portal-card, #fff); padding: 0.55rem 0.65rem;
+  display: flex; flex-direction: column; gap: 2px;
+}
+.nesio-bl-stats small { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-bl-stats b { font-size: var(--text-h3); color: var(--portal-ink); }
+.nesio-bl-stats span { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-bl-rank-row {
+  display: flex; justify-content: space-between; gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+.nesio-bl-rank-val.is-spike { color: var(--status-gentle); font-weight: var(--weight-semibold); }
+.nesio-bl-rank-val.is-stable { color: var(--status-go); font-weight: var(--weight-semibold); }
+.nesio-bl-rank-bar {
+  height: 8px; border-radius: 999px; background: var(--portal-accent-soft); overflow: hidden; margin: 4px 0 2px;
+}
+.nesio-bl-rank-bar > div { height: 100%; border-radius: inherit; }
+.nesio-bl-rank-bar.is-spike > div { background: var(--status-gentle); }
+.nesio-bl-rank-bar.is-stable > div { background: var(--status-go); }
+.nesio-bl-rank-n { font-size: 0.65rem; color: var(--portal-muted); }
+.nesio-bl-empty-block {
+  border: 1px dashed var(--portal-line); border-radius: var(--radius-md);
+  padding: var(--space-4); text-align: center;
+  color: var(--portal-muted); font-size: var(--text-sm); line-height: 1.55;
+}
+.nesio-bl-empty-actions {
+  display: flex; justify-content: center; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3);
+}
+
+/* 四 tab 时字号略收 */
+.nesio-health-subtabs .nesio-health-subtab { font-size: 0.78rem; padding: 0.45rem 0; }
 
 /* 隐私横条 */
 .nesio-health-privacy {
@@ -18182,12 +18346,23 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .nesio-sheet--bottom.nesio-sheet--bare { animation: none; }
 
 /* fullscreen:全屏面板。z=930 压过 bottom/center 面板(901)—— 从 bottom 卡里
-   打开的全屏面板(阅读器等)要完整盖住触发卡,配合 --opaque 底衬(929)。 */
+   打开的全屏面板(阅读器等)要完整盖住触发卡,配合 --opaque 底衬(929)。
+   用 inset:0 贴满可视 WebView,不要再用 height/max-height:100lvh —— iOS 动态视口下
+   视口单位与 fixed inset 不一致时,底下会露缝或整页上推。默认壳吃安全区;
+   洞察等自管顶栏的页面在业务 class 里把 padding 清零。 */
 .nesio-sheet--fullscreen {
   inset: 0;
   z-index: 930;
-  max-height: 100lvh;
-  padding: calc(env(safe-area-inset-top, 0px)) 0 calc(env(safe-area-inset-bottom, 0px));
+  width: auto;
+  height: auto;
+  max-height: none;
+  padding: env(safe-area-inset-top, 0px) 0 env(safe-area-inset-bottom, 0px);
+  overflow: hidden;
+  background: var(--portal-bg, #f4f8fd);
+  box-sizing: border-box;
+}
+.nesio-sheet--fullscreen.nesio-sheet--bare {
+  background: var(--portal-bg, #f4f8fd);
 }
 .nesio-sheet--fullscreen[data-state='open'] { animation: nesioSheetRise var(--dur, 0.3s) var(--ease-out); }
 .nesio-sheet--fullscreen[data-state='closed'] { animation: nesioSheetFadeOut var(--dur-fast, 0.2s) var(--ease-out); }
@@ -18262,6 +18437,7 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .nesio-growth *{box-sizing:border-box}
 
 .ng-streak{color:var(--ng-faint);font-size:.8rem;margin:0 0 22px}
+.ng-coach-lead{margin:0 0 var(--space-2);font-family:var(--font-serif);font-size:var(--text-h3);color:var(--portal-ink);line-height:1.35;font-weight:var(--weight-medium)}
 
 .ng-sec{display:flex;align-items:baseline;justify-content:space-between;margin:0 0 12px}
 .ng-sec .l{font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--portal-accent);font-weight:var(--weight-semibold)}
@@ -18639,21 +18815,21 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .nesio-montage :focus-visible{outline:2px solid var(--portal-accent);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.nesio-montage *,.nm-toast{animation:none!important;transition:opacity .2s!important}}
 
-/* ── 做饭 · 库存(CookingSheet)固定成 workshop 视觉稿配色 ──────────────────────
-   用户明确要求这套 UI 和视觉稿一模一样(浅色底 + 石板蓝 + 白卡),不跟随设备主题/配色。
-   故在 sheet 根上重声明 token 值,内部所有 var(--portal-*) 自动解析到稿子配色。 */
+/* ── 做饭 · 库存(CookingSheet):跟全局主题色,铺满物理屏 ───────────────────────
+   强调色 / 底 / 卡片全用 :root 的 portal token。inset:0 的 fullscreen 父级已贴满,
+   这里只上色 + 让内容区吃底安全区,不另设 100lvh。 */
 .cooking-skin{
-  --portal-bg:#eef3f7; --portal-card:#ffffff;
-  --portal-ink:#2c3b4d; --portal-muted:#8493a3; --portal-line:#eaeef2;
-  --portal-accent:#5c7389;
-  --portal-accent-soft:#e9eef3; --portal-accent-soft-md:#dbe3ec; --portal-accent-border:rgba(92,115,137,.25);
-  --status-go:#6f9483; --status-go-soft:#e5ece8;
-  --status-gentle:#b5875e; --status-gentle-soft:#f4e9db;
-  --status-calm:#6b8fc9; --status-calm-soft:#e2eaf3;
-  --status-risk:#cf6b6b; --status-risk-soft:#f5d9d9;
-  --shadow-card:0 6px 20px rgba(60,80,110,.07);
-  background:linear-gradient(180deg,#eff3f7 0%,#e4ebf2 100%);
-  color:var(--portal-ink);
+  height: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+  background: var(--portal-bg);
+  color: var(--portal-ink);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.nesio-sheet--fullscreen.cooking-skin {
+  background: var(--portal-bg);
 }
 
 /* ── 足迹 · 行程计划(去过 / 要去) ─────────────────────────────────────────── */
@@ -18729,6 +18905,9 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
   font-size: 1.2rem; padding: 0 var(--space-2); cursor: pointer; border-radius: var(--radius-sm);
 }
 .nesio-travel-plan-del:active { color: var(--status-risk); background: var(--status-risk-soft); }
+.nesio-travel-plan-cta-row {
+  display: flex; flex-direction: column; gap: var(--space-2);
+}
 .nesio-travel-plan-cta {
   border: 1px dashed var(--portal-accent-border);
   background: var(--portal-accent-soft);
@@ -18739,6 +18918,28 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   cursor: pointer;
+}
+.nesio-travel-plan-cta--ghost {
+  background: transparent;
+  border-style: solid;
+  color: var(--portal-ink);
+}
+.nesio-travel-plan-form textarea {
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  padding: 0.55rem 0.7rem; font-family: var(--font-sans); font-size: var(--text-body);
+  color: var(--portal-ink); background: var(--portal-bg); resize: vertical; min-height: 6rem;
+}
+.nesio-trip-addbar {
+  display: flex; flex-wrap: wrap; gap: var(--space-2);
+}
+.nesio-trip-map {
+  width: 100%; height: 140px; border: 0; border-radius: var(--radius-md);
+  border: 1px solid var(--portal-line); background: var(--portal-accent-soft);
+}
+a.nesio-trip-mapfake {
+  text-decoration: none;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 6px; font-size: var(--text-sm); font-weight: var(--weight-semibold);
 }
 .nesio-travel-plan-form {
   display: flex; flex-direction: column; gap: var(--space-3);
@@ -18927,6 +19128,47 @@ a.nesio-trip-action { color: var(--portal-ink); }
 }
 .nesio-trip-cat-note { font-size: var(--text-xs); color: var(--status-go); }
 .nesio-trip-cat-note.is-over { color: var(--status-risk); }
+
+.nesio-trip-poi-picker { max-height: min(58lvh, 520px); overflow: auto; }
+.nesio-trip-poi-head {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+}
+.nesio-trip-poi-head b { font-size: var(--text-body); font-weight: var(--weight-semibold); }
+.nesio-trip-poi-types { display: flex; flex-wrap: wrap; gap: 6px; }
+.nesio-trip-poi-types .nesio-trip-action.is-on,
+.nesio-trip-action.is-on {
+  border-color: var(--portal-accent-border);
+  background: var(--portal-accent-soft);
+  color: var(--portal-blue-deep);
+}
+.nesio-trip-poi-list {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: min(36lvh, 320px); overflow: auto;
+}
+.nesio-trip-poi-row {
+  display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: var(--space-2);
+  width: 100%; text-align: left;
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: var(--portal-bg); color: var(--portal-ink);
+  padding: 0.55rem 0.7rem; cursor: pointer;
+  font-family: var(--font-sans);
+}
+.nesio-trip-poi-row.is-on {
+  border-color: var(--portal-accent-border);
+  background: var(--portal-accent-soft);
+}
+.nesio-trip-poi-ico {
+  width: 28px; height: 28px; border-radius: 8px;
+  display: grid; place-items: center;
+  background: var(--portal-accent-soft-md); color: var(--portal-blue-deep);
+}
+.nesio-trip-poi-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nesio-trip-poi-main b {
+  font-size: var(--text-sm); font-weight: var(--weight-medium);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nesio-trip-poi-main small { font-size: var(--text-xs); color: var(--portal-muted); }
 
 html[data-portal-theme="night"] .nesio-foot-mode.is-active {
   background: color-mix(in srgb, var(--portal-card) 92%, var(--portal-accent-soft));

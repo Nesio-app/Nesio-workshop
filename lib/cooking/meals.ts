@@ -3,7 +3,8 @@
  * **就是一条「记忆」节点**(note,tag 一餐),items/来源/营养/时间 JSON 存 attributes。复用 addLifeNode,
  * 随生活图谱上你自己的云、可搜、和别的记忆一视同仁。不建独立竖井、不建 Supabase 表。
  */
-import { addLifeNode, getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 
 const TAG = '一餐';
 export type MealSource = '自己做' | '餐厅' | '外卖' | '其他';
@@ -32,12 +33,14 @@ function parse(n: LifeNode): Meal | null {
 /** 记一餐:落一条「一餐」记忆节点(喂身体账本)。返回节点 id。 */
 export function addMeal(m: Omit<Meal, 'id'>): string {
   const title = m.items.map((i) => i.name).filter(Boolean).slice(0, 3).join(' · ') || '一餐';
-  const node = addLifeNode({
+  const node = ingestLifeNode({
     type: 'note', name: title, source: 'manual', confidence: 1, relations: [], tags: [TAG],
     attributes: {
       items: JSON.stringify(m.items), source: m.source,
       energyKCal: String(m.energyKCal), protein: String(m.protein), fat: String(m.fat), cho: String(m.cho),
       occurredAt: m.occurredAt,
+      epistemic: 'observation',
+      generator: 'user',
     },
   });
   return node.id;

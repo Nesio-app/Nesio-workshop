@@ -95,7 +95,7 @@ export default function PortalBottomNav({
         aria-label={L(portalLocaleToDictionaryLocale(locale), '洞察', 'Insights')}
         aria-current={insightsActive ? 'page' : undefined}
       >
-        {/* 宝盒晶体:多切面钻石,呼应品牌,区别于今天(钟)/记忆(立方) */}
+        {/* 品牌晶体:多切面钻石,呼应 Nesio,区别于今天(钟)/记忆(立方) */}
         <svg className="nesio-bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
           <path d="M6 3h12l3 5-9 13L3 8z" />
           <path d="M3 8h18M9 3 7.5 8 12 21M15 3l1.5 5L12 21" />

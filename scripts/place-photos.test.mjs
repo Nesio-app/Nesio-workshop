@@ -11,13 +11,23 @@ function compile(rel) {
   const src = fs.readFileSync(new URL(rel, import.meta.url), 'utf8');
   return ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 }
-const mod = { exports: {} };
-vm.runInNewContext(compile('../lib/portal/place-photos.ts'), {
-  module: mod, exports: mod.exports, console, JSON, Object, Array, Math, Date, Number, String,
-  window: undefined, localStorage: undefined,
-  require: () => ({ compressToDataUrl: async () => '', putLocalImage: async () => {} }),
+function loadModule(rel, requireImpl = () => ({})) {
+  const mod = { exports: {} };
+  vm.runInNewContext(compile(rel), {
+    module: mod, exports: mod.exports, console, JSON, Object, Array, Math, Date, Number, String,
+    window: undefined, localStorage: undefined,
+    require: requireImpl,
+  });
+  return mod.exports;
+}
+const geo = loadModule('../lib/portal/geo.ts');
+const countryNorm = loadModule('../lib/portal/country-normalize.ts');
+const pp = loadModule('../lib/portal/place-photos.ts', (p) => {
+  if (p.includes('/geo')) return geo;
+  if (p.includes('country-normalize')) return countryNorm;
+  if (p.includes('image-compress')) return { compressToDataUrl: async () => '', putLocalImage: async () => {} };
+  return {};
 });
-const pp = mod.exports;
 
 const raleigh = { lat: 35.78, lon: -78.64 };
 const nodes = [

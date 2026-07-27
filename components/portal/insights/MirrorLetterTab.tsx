@@ -6,7 +6,7 @@
  * 整屏只留一封信:念念选一面镜子读你的本地档案(批量导入已剔除),用第二人称写给你。
  * 镜子 / 月份 / 主题收成三枚 filter;往期信折叠成右上「往期」按钮 → 存档抽屉。
  * 信下方两颗动作:存入记忆(幂等落库) / 重写(重生成)。只回看不预测,任意时段都能生成。
- * 老友免费试读,其余四面镜 Pro(dispatch nesio-pro-gate)。
+ * 老友 + 暖教练免费试读,其余镜 Pro(dispatch nesio-pro-gate)。
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -178,6 +178,8 @@ export default function MirrorLetterTab() {
           completionRate: summary.completionRate,
           topHour: summary.topHour,
           dominantDomains: summary.dominantDomains,
+          verifiedLenses: summary.verifiedLenses,
+          weakClues: summary.weakClues,
           userName: loadProfileSettings().displayName,
           feedbackSamples: recentFeedbackSamples(),
         }),

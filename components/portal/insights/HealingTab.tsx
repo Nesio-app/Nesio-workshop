@@ -114,7 +114,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
     { key: 'protector', n: 3, title: L(dict, '看见保护者', 'Meet the protector'), sum: L(dict, '已看见它在守着你', 'Seen — it was guarding you') },
     { key: 'self', n: 4, title: L(dict, '清醒自我接管', 'Your calm self leads'), sum: reply ? reply.replace(/[「」“”]/g, '').slice(0, 18) : L(dict, '让保护者歇一歇', 'Let the protector rest') },
     { key: 'body', n: 5, title: L(dict, '落到身体,真做一遍', 'Ground it in the body'), sum: L(dict, '已做一遍', 'Done') },
-    { key: 'feel', n: 6, title: L(dict, '此刻,心里怎么样', 'How you feel now'), sum: feelEmObj ? `${en ? feelEmObj.labelEn : feelEmObj.label}${earned ? ' · +' + POINTS_PER_HEALING : ''}` : '' },
+    { key: 'feel', n: 6, title: L(dict, '此刻,心里怎么样', 'How you feel now'), sum: feelEmObj ? `${en ? feelEmObj.labelEn : feelEmObj.label}` : '' },
   ];
   const stateOf = (k: typeof PHASES[number]) => {
     const mine = PHASES.indexOf(k);
@@ -235,7 +235,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
                       placeholder={L(dict, '想补一句就写(可跳过)', 'Add a line if you want (optional)')} />
                     <div className="ng-acts">
                       <button type="button" className="ng-btn" disabled={!feelEm} onClick={closeLoop}>
-                        {earnedToday() ? L(dict, '记下此刻 · 存进回看', 'Log this moment · save') : L(dict, `记下此刻 · +${POINTS_PER_HEALING}`, `Log this moment · +${POINTS_PER_HEALING}`)}
+                        {L(dict, '记下此刻 · 存进回看', 'Log this moment · save')}
                       </button>
                     </div>
                   </div>
@@ -254,9 +254,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
             <div className="ng-loop-row now"><span className="k">{L(dict, '此刻', 'Now')}</span><span className="v">{feelEmObj && <span className="ng-mdot" style={{ background: feelEmObj.color }} aria-hidden />}{feelEmObj ? (en ? feelEmObj.labelEn : feelEmObj.label) : ''}{feelNote.trim() ? ` · ${feelNote.trim()}` : ''}</span></div>
           </div>
           <p className="ng-done" style={{ marginTop: 12 }}>
-            {earned
-              ? L(dict, `+${POINTS_PER_HEALING} 进奖品商城 —— 你不是记了一下,是真的陪自己走完了一次。`, `+${POINTS_PER_HEALING} to your rewards — you didn’t just log it, you walked yourself through it.`)
-              : L(dict, '已存进回看 —— 今天的疗愈积分记过了,但这一次的照顾一样算数。', 'Saved — today’s healing points were already counted, but this care still matters.')}
+            {L(dict, '已存进回看 —— 你真的陪自己走完了一次。', 'Saved — you walked yourself through it.')}
           </p>
           <div className="ng-acts">
             <button type="button" className="ng-btn ghost" onClick={restart}>{L(dict, '再走一遍', 'Again')}</button>
@@ -264,7 +262,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
         </div>
       )}
 
-      <p className="ng-todaynote">{L(dict, '积分只奖励真的把动作做了一遍 —— 每天一次就够。回看留在「成长」的回看流里。', 'Points reward actually doing the grounding — once a day. Look-backs live in the Growth trail.')}</p>
+      <p className="ng-todaynote">{L(dict, '回看留在「成长」的回看流里 —— 这里不追积分。', 'Look-backs live in the Growth trail — no points chase here.')}</p>
     </div>
   );
 }

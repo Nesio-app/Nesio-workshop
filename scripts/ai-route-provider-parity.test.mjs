@@ -15,9 +15,8 @@ import assert from 'node:assert/strict';
 const root = new URL('../', import.meta.url).pathname;
 const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 
-// ── ① 三个已修路由:走共享客户端 ──
+// ── ① 活跃 AI 路由:走共享客户端(living-model 已 410 退役,单独断言)──
 for (const rel of [
-  'app/api/portal/living-model/route.ts',
   'app/api/portal/proactive/route.ts',
   'app/api/portal/guidance-language/route.ts',
 ]) {
@@ -27,6 +26,12 @@ for (const rel of [
   assert.ok(/completeText\(/.test(src), `${rel} 生成走 completeText(Claude→Gemini 回落)`);
   assert.ok(!/api\.anthropic\.com/.test(src), `${rel} 不再直连 anthropic`);
   assert.ok(!/const anthropicKey = envValue\('ANTHROPIC_API_KEY'\)/.test(src), `${rel} 不再 anthropic-only 门`);
+}
+
+{
+  const lm = read('app/api/portal/living-model/route.ts');
+  assert.match(lm, /status:\s*410/, 'living-model 退役 410,不再 completeText');
+  assert.match(lm, /guardAiRoute/, 'living-model 仍 guardAiRoute');
 }
 
 // ── ② 全局护栏:遍历所有 portal route,anthropic 读 key 必须配 gemini 路径 ──

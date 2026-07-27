@@ -38,7 +38,9 @@ function loadRoute() {
     require: (p) => p === 'next/server' ? { NextRequest: class {}, NextResponse: fakeNextResponse }
       : p === '@/lib/portal/api-auth' ? { guardAiRoute: async () => null }
       : p === '../link-token/route' ? { plaidBase: () => 'https://sandbox.plaid.com' }
-      : p === '@/lib/portal/env' ? { envValue: () => 'k' } : ({}),
+      : p === '@/lib/portal/env' ? { envValue: () => 'k' }
+      : p === '@/lib/portal/integrations' ? { writePlaidTokensForCurrentUser: async () => true }
+      : ({}),
   });
   return mod.exports;
 }

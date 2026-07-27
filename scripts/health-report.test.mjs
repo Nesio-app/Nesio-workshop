@@ -11,6 +11,7 @@ import assert from 'node:assert/strict';
 
 const lsData = new Map();
 const fakeLocalStorage = { getItem: (k) => lsData.get(k) ?? null, setItem: (k, v) => lsData.set(k, String(v)), removeItem: (k) => lsData.delete(k) };
+const ingestStub = { ingestLifeNode: (n) => lifeGraphStub.addLifeNode(n) };
 const nodes = [];
 const lifeGraphStub = {
   getLifeGraph: () => nodes,
@@ -37,7 +38,8 @@ const report = loadTs('../lib/portal/health-report.ts', (p) =>
   p === './health-clinical' ? clinical
   : p === './health-risk' ? risk
   : p === './health-correlations' ? corr
-  : p === './life-graph' ? lifeGraphStub : ({}));
+  : p === './life-graph' ? lifeGraphStub
+  : p.includes('ingest-node') ? ingestStub : ({}));
 const visual = loadTs('../lib/portal/health-report-visual.ts', (p) =>
   p === './health-clinical' ? clinical
   : p === './health-risk' ? risk

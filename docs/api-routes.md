@@ -43,6 +43,7 @@ Auth legend:
 | POST /api/portal/analyze | verified session (Supabase) / env-lab | — | isAnalyzeAiAllowed→isPortalRequestAuthorized(验真 access token,不再只看 cookie 存在);衣橱:mode='clothing' 用专属 prompt 抽结构化衣物属性(付费云;客户端 canUsePaidCloudAi 前置门,免费手填兜底) |
 | POST /api/portal/wardrobe-stylist | guardAiRoute + requirePaidCloudAi | 20/min | 衣橱·Pro 云造型师:从现有单品挑一套协调搭配 + 理由 + 贴士;免费/失败回落规则版 suggestOutfit |
 | POST /api/portal/wardrobe-tryon | guardAiRoute + requirePaidCloudAi | 10/min | 衣橱·Pro 上身试穿:全身照 + 单品照 → Gemini 图像模型合成上身效果;隐私:照片不落库、仅请求时发送;reportAiCall 上账 |
+| POST /api/portal/cooking-recipe | guardAiRoute + requirePaidCloudAi | 12/min | 美食·Pro 云生成菜谱:食材+菜系(+可选要求)→ 步骤/贴士 JSON,钳成 Recipe;客户端存本机 generated-recipes + 想做清单 |
 | POST /api/portal/ingest | shared-secret / verified session (Supabase) / env-lab | — | isIngestAllowed→isPortalRequestAuthorized(验真会话;body secret 走 safeEqual 常量时间比较) |
 | POST /api/alexa | applicationId(ALEXA_SKILL_ID)+ 时间戳新鲜度 | — | 智能家居·Alexa 语音入口:capture→转发 /api/portal/ingest 入档(诚实态:仅真落库才回 saved);ask→服务端读 owner 云记忆→文本评分排序→云 LLM 一句话念回(LLM 挂了确定性兜底念回命中记忆)。英文 only(Alexa 无中文)。归属:账号关联 accessToken 或 NESIO_OWNER_ID(owner Supabase user id)。GET 自检并回显登录 owner 的 identityKey/userId 方便配 NESIO_OWNER_ID。详见 docs/alexa-skill-setup.md |
 | POST /api/portal/embed | session / no-Supabase + requirePaidCloudAi(付费门)+ 熔断 + reportAiCall | — | 里程碑 C:付费语义检索会把记忆文本(含邮件正文,本机全文优先)嵌入化过云;仅付费层(canUsePaidCloudAi)到达,免费前置拦下不出网 |

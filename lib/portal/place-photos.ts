@@ -6,6 +6,7 @@
  */
 import { compressToDataUrl, putLocalImage } from './local-image-store';
 import { canonicalCountryKey } from './country-normalize';
+import { haversineKm } from './geo';
 
 const KEY = 'nesio-place-photos-v1';
 export const PLACE_PHOTOS_EVENT = 'nesio-place-photos-updated';
@@ -29,15 +30,6 @@ export async function setPlacePhotoOverride(placeKey: string, file: File): Promi
 
 export function placePhotoOverrideId(placeKey: string): string | null {
   return loadPlacePhotoOverrides()[placeKey] ?? null;
-}
-
-function haversineKm(aLat: number, aLon: number, bLat: number, bLon: number): number {
-  const R = 6371;
-  const dLat = ((bLat - aLat) * Math.PI) / 180;
-  const dLon = ((bLon - aLon) * Math.PI) / 180;
-  const la1 = (aLat * Math.PI) / 180, la2 = (bLat * Math.PI) / 180;
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(la1) * Math.cos(la2) * Math.sin(dLon / 2) ** 2;
-  return 2 * R * Math.asin(Math.sqrt(h));
 }
 
 // lat/lon 可缺省 —— 没坐标的带图记忆也纳入,按 city/country 地名回退匹配。

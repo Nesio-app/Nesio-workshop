@@ -152,31 +152,19 @@ ${prevStr}
 }
 
 export async function POST(req: NextRequest) {
+  // 2026-07-27 激进审计:退役 living-model 认知双轨(主形态 = 多面镜月度信)。
+  // 仍过 guardAiRoute 以免未鉴权探测;不再花 token 生成 7 层模型。
   const guard = await guardAiRoute(req, 'living_model', { limit: 10, requirePaidCloudAi: true });
   if (guard) return guard;
 
-  const body = await req.json() as LivingModelRequest;
-
-  const fallback = buildFallbackModel();
-
-  // 至少 10 条记录才生成认知模型 —— 与客户端空态"已记录 N/10 条,记满后开始推断"一致;
-  // 此前 <3 就生成 7 层带置信度画像,3-4 条杂项的新用户会拿到一份看似笃定却是编造的模型。
-  if (body.nodeCount < 10) {
-    return NextResponse.json({ ok: true, layers: fallback, reason: 'insufficient_data' });
-  }
-
-  // 全 provider 认 key(Anthropic 或 Gemini 任一即可);共享客户端负责实际选路 + 回落。
-  if (!aiProviderAvailable()) {
-    return NextResponse.json({ ok: true, layers: fallback, reason: 'no_api_key' });
-  }
-
-  try {
-    const layers = await generateModel(body);
-    return NextResponse.json({ ok: true, layers });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    console.error('[living-model] error:', msg);
-    const quota = msg.includes('quota') || msg.includes('429') || msg.includes('RESOURCE_EXHAUSTED');
-    return NextResponse.json({ ok: true, layers: fallback, reason: quota ? 'quota' : 'api_error' });
-  }
+  return NextResponse.json(
+    {
+      ok: false,
+      retired: true,
+      layers: [],
+      reason: 'retired',
+      message: 'Living cognitive model Lab is retired. Use Mirror Letter (多面镜) instead.',
+    },
+    { status: 410 },
+  );
 }

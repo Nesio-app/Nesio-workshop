@@ -16,6 +16,7 @@ const fakeCreateBlobStore = () => {
 };
 const lsData = new Map();
 const fakeLocalStorage = { getItem: (k) => lsData.get(k) ?? null, setItem: (k, v) => lsData.set(k, String(v)), removeItem: (k) => lsData.delete(k) };
+const ingestStub = { ingestLifeNode: (n) => lifeGraphStub.addLifeNode(n) };
 // life-graph 桩:内存节点表
 const nodes = [];
 const lifeGraphStub = {
@@ -52,7 +53,8 @@ const report = loadTs('../lib/portal/finance-report.ts', (p) =>
   : p === './finance-risk' ? risk
   : p === './finance-budget' ? budget
   : p === './tx-category' ? txCategory
-  : p === './life-graph' ? lifeGraphStub : ({}));
+  : p === './life-graph' ? lifeGraphStub
+  : p.includes('ingest-node') ? ingestStub : ({}));
 const visualKit = loadTs('../lib/portal/report-visual-kit.ts', () => ({}));
 const visual = loadTs('../lib/portal/finance-report-visual.ts', (p) =>
   p === './bank-tx' ? bank

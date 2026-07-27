@@ -19,7 +19,7 @@ function loadTs(path, requireImpl) {
   const mod = { exports: {} };
   vm.runInNewContext(js, {
     module: mod, exports: mod.exports, require: requireImpl, console,
-    Array, Object, JSON, Map, Set, String, Number, Boolean, Date, Math,
+    Array, Object, JSON, Map, Set, String, Number, Boolean, Date, RegExp, Math,
   });
   return mod.exports;
 }
@@ -29,14 +29,16 @@ const day = (n) => new Date(NOW - n * 86_400_000).toISOString();
 
 function makeWorld({ nodes = [], txs = [] } = {}) {
   const signals = [];
+  const protocols = loadTs('../lib/portal/growth-protocols.ts', () => ({}));
   const gg = loadTs('../lib/portal/growth-guide.ts', (p) => {
     if (p.includes('life-graph')) return { getLifeGraph: () => nodes };
     if (p.includes('bank-tx')) return { loadBankTx: () => txs };
     if (p.includes('create-signal')) return { createSignal: (input) => { const s = { ...input, capturedAt: new Date(NOW).toISOString() }; signals.unshift(s); return s; } };
     if (p.includes('signal')) return { getSignals: (o) => signals.filter((s) => !o?.types?.length || o.types.includes(s.type)) };
+    if (p.includes('growth-protocols')) return protocols;
     return {};
   });
-  return { gg, signals };
+  return { gg, signals, protocols };
 }
 
 const COMMIT_OLD = { id: 'c1', type: 'commitment', name: '给妈妈打电话聊搬家', createdAt: day(8), confidence: 1, attributes: {}, tags: [] };
@@ -102,6 +104,15 @@ const COMMIT_OLD = { id: 'c1', type: 'commitment', name: '给妈妈打电话聊�
   assert.equal(gg.growthStreakDays(NOW), 1);
   gg.recordGrowthAnswer({ ...card, refId: 'x2', id: 'commitment_review:x2' }, '  ');
   assert.equal(signals.length, 1, '空回答不落 Signal');
+}
+
+// 6) 框架书架含张丽方程 + 读后一句话 / 执行力 / 慢就是快
+{
+  const { gg } = makeWorld();
+  const ids = gg.GROWTH_FRAMEWORKS.map((f) => f.id);
+  for (const id of ['zhangli-mind', 'one-sentence-read', 'action-diag', 'slow-is-fast']) {
+    assert.ok(ids.includes(id), `framework ${id}`);
+  }
 }
 
 console.log('growth-guide contract tests passed');

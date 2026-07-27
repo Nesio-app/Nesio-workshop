@@ -12,6 +12,8 @@ import LocationPicker from './LocationPicker';
 import { IconCamera, IconImage, NodeTypeIcon } from './icons';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { consolidateAmazonOrder } from '@/lib/portal/amazon-order';
+import { appendShoppingReceipt, consumeTravelReceiptTripId } from '@/lib/portal/travel-trips';
+import { addReceiptExpense } from '@/lib/portal/finance-sources';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -783,6 +785,48 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
     setSaving(true); // 立刻反馈:按钮变「保存中…」+ 禁用,避免用户以为没点上
     try {
       await doSave(nodesToSave);
+      // 行程预算/购物「拍小票」:把识别条目并入当前行程购物节点
+      const travelTripId = consumeTravelReceiptTripId();
+      if (travelTripId) {
+        const lines = nodesToSave
+          .filter((n) => n.type === 'object')
+          .map((n) => ({
+            name: n.name.trim() || L(dict, '未命名', 'Untitled'),
+            price: n.price?.trim() ? Number(String(n.price).replace(/[^\d.]/g, '')) || undefined : undefined,
+            note: n.attributes?.store ? String(n.attributes.store) : undefined,
+            intoInventory: true,
+          }));
+        if (lines.length) {
+          appendShoppingReceipt(travelTripId, lines, {
+            title: L(dict, '购物 · 小票', 'Shopping · receipt'),
+            date: new Date().toISOString().slice(0, 10),
+            currency: '¥',
+          });
+        }
+      } else {
+        // 非行程:多数条目带价 → 当作小票记入财务聚合口
+        const lines = nodesToSave
+          .filter((n) => n.type === 'object')
+          .map((n) => ({
+            name: n.name.trim() || L(dict, '未命名', 'Untitled'),
+            price: n.price?.trim() ? Number(String(n.price).replace(/[^\d.]/g, '')) || undefined : undefined,
+            note: n.attributes?.store ? String(n.attributes.store) : undefined,
+          }));
+        const priced = lines.filter((l) => (l.price || 0) > 0).length;
+        if (priced >= 1 && priced >= Math.max(1, lines.length - 1)) {
+          const merchant = lines.find((l) => l.note)?.note;
+          const fingerprint = lines.map((l) => `${l.name}:${l.price || 0}`).join('|').slice(0, 80);
+          addReceiptExpense({
+            lines,
+            date: new Date().toISOString().slice(0, 10),
+            currency: '¥',
+            source: 'receipt',
+            merchant,
+            includeInFinance: true,
+            sourceRef: `camera:${new Date().toISOString().slice(0, 10)}:${fingerprint}`,
+          });
+        }
+      }
       setPhase('saved');
       setTimeout(() => { onClose(); setPhase('idle'); setResult(null); setExtraTags(''); setSourceFile(null); setNodeLocations({}); setNodePlaceMeta({}); setDetectedPlaceId(''); setSaving(false); }, 1200);
     } catch {

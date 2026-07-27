@@ -3,7 +3,8 @@
  * attributes.items —— 因此可搜、随生活图谱上你自己的云、和别的记忆一视同仁,不是孤岛工具。
  * 缺料并入 → 到店勾选 → 买到的经 addPantry 回流库存。全程复用现成件,不另起竖井。
  */
-import { addLifeNode, updateLifeNode, deleteLifeNode, getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { updateLifeNode, deleteLifeNode, getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { normalizeIngredient } from './food-catalog';
 import { addPantry } from './pantry';
 import { mergeShoppingItems, partitionCheckout, type ShoppingItem } from './shopping-core';
@@ -50,8 +51,9 @@ export function addToShopping(rawNames: string[]): ShoppingListView | null {
   }
   if (!names.length) return null;
   const items = mergeShoppingItems([], names);
-  const node = addLifeNode({
-    type: 'note', name: '购物清单', attributes: { items: JSON.stringify(items) },
+  const node = ingestLifeNode({
+    type: 'note', name: '购物清单',
+    attributes: { items: JSON.stringify(items), epistemic: 'observation', generator: 'user' },
     source: 'manual', confidence: 1, relations: [], tags: [TAG],
   });
   return { id: node.id, items };

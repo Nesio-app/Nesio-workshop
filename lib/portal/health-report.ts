@@ -8,7 +8,8 @@ import type { HealthMetrics, DailyFact } from './apple-health';
 import { evaluateHealthFindings } from './health-clinical';
 import { computeRiskScores } from './health-risk';
 import { mineRelationships } from './health-correlations';
-import { addLifeNode, updateLifeNode, getLifeGraph } from './life-graph';
+import { updateLifeNode, getLifeGraph } from './life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 
 export interface HealthMonthlyReport {
   ym: string;
@@ -140,14 +141,17 @@ export function persistHealthReportToMemory(r: HealthMonthlyReport): 'created' |
   const existing = getLifeGraph().find(
     (n) => n.source === 'system' && n.attributes?.kind === 'health-monthly-report' && n.attributes?.ym === r.ym,
   );
-  const attributes: Record<string, string | number> = { kind: 'health-monthly-report', ym: r.ym, days: r.summary.days };
+  const attributes: Record<string, string | number> = {
+    kind: 'health-monthly-report', ym: r.ym, days: r.summary.days,
+    epistemic: 'system_summary', generator: 'rule:health-report',
+  };
   if (r.summary.sleepAvg !== null) attributes.sleepAvg = r.summary.sleepAvg;
   if (r.summary.stepsAvg !== null) attributes.stepsAvg = r.summary.stepsAvg;
   if (existing) {
     updateLifeNode(existing.id, { name: r.title, attributes, rawInput: r.markdown });
     return 'updated';
   }
-  addLifeNode({ type: 'event', name: r.title, attributes, source: 'system', confidence: 1, relations: [], tags: ['健康', '月报'], rawInput: r.markdown });
+  ingestLifeNode({ type: 'event', name: r.title, attributes, source: 'system', confidence: 1, relations: [], tags: ['健康', '月报'], rawInput: r.markdown });
   return 'created';
 }
 

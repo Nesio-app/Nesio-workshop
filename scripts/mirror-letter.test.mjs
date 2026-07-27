@@ -11,7 +11,11 @@ import assert from 'node:assert/strict';
 const src = fs.readFileSync(new URL('../lib/portal/mirror-letters.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 const mod = { exports: {} };
-vm.runInNewContext(js, { module: mod, exports: mod.exports });
+vm.runInNewContext(js, {
+  module: mod,
+  exports: mod.exports,
+  require: (p) => (p.includes('storage-health') ? { logDropped() {} } : {}),
+});
 const { recentMonthKeys, mirrorLetterKey, MIRROR_TOPICS, currentMonthKey } = mod.exports;
 
 // 三元键

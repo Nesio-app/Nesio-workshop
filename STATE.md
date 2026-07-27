@@ -2,8 +2,8 @@
 
 > Loop-engineering 原则:状态必须活在对话之外。任何 AI 会话或新协作者
 > **先读这个文件**,再动手。改动仓库重大状态时,同步更新这里。
-> 最后更新:2026-07-25(全量数据跨浏览器同步闭环:服务端按账号找最新备份 +
-> 登录/回前台先拉后推 + durability 转免费;见「进行中的迁移 ③」末段)
+> 最后更新:2026-07-27(激进审计落地:Kill 伪智能/反馈双轨/认知双轨 + 成长教练收口 +
+> Finance/Health 可视化与品味旁注;见「已知欠账」首条与 signal-epistemic.md)
 
 ## 当前纪元:两代产品交接中
 
@@ -115,7 +115,7 @@
    认知(living-model)域 LLM-bound 不设确定性判定层。
 4. **Personalization 底座地基(2026-07-07,A 计划 Layer 2 起步)**:
    `lib/platform/personalization/` — 统一反馈总线(schema `{surface,dimension,key,reaction}`)+ **事实日志
-   (event-sourcing #0,`nesio-feedback-log-v1`,追加式可回放,修"折权重即弃")**+ 三原语
+   (event-sourcing #0,反馈事实并入 `feedback.*` Signal,`readFeedbackLog` 投影回放)**+ 三原语
    Preference/Baseline/Recency。guidance-ranker 接线改走统一总线(权重仍自存);#48 放错位的
    `lib/portal/learning/learner.ts` 已删、schema/落位对齐蓝图。**下一步(2a 续)**:mirror→规范 Preference、
    评估并掉 card-feedback、energy→Baseline、cooling/dormant→Recency。见 `docs/design/algorithm-layer-plan.md`。
@@ -155,6 +155,26 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **激进审计落地(2026-07-27)**:Kill `nesio-card-feedback-v1`(DEC 改读 Signal 投影);
+  停用 `guidance-ranker` / cross-region bandit **学习接线**(Today 回规则分+Preference+cooling);
+  退役 living-model API(410)+Lab UI+`nesio-lm-feedback`;demo personalization stage 停写;
+  Recency 已退役。成长大面保留并教练化(主路径「今天这一件」、弱化 POINTS)。
+  信任缺口:`hasWeakEvidenceChain` + pin/add 不再冒充 useful。写入门契约 `test:write-gate`。
+  可视化:Finance 面积+柱+启发句;BodyLedger 面积填充。品味旁注 `docs/design/taste-notes.md`。
+  文档 `docs/design/signal-epistemic.md`。契约绿:`signal-epistemic` / `personalization` /
+  `guidance-ranker` / `living-model-robust` / `growth-*` / `retrieval-feedback` / `write-gate`。
+  **仍欠**:capture 确认升格;真删 ranker/bandit 文件(现为开关退役+一次性清 LS,便于回滚)。
+  InsightsSheet living-model 死代码已物理删(2026-07-27);feedback today/card 不再双写瘦 reaction。
+- **成长引擎升级(2026-07-27)**:融合 ljg-read 伴读三岔 / dbskill 行动卡点 / 张丽心智方程
+  (`心智经营=(触达+内容+触动)×人机协同`)。新镜头 `action-stall` · `collision-read` · `biz-equation`;
+  协议 `lib/portal/growth-protocols.ts`(L0–L3 回看分级、假成功 AI 拒收);框架书架扩容;
+  GrowthTab 显式失败+重试 · 教练主路径收口。契约 `test:growth-engine` / `test:growth-guide`。dbskill 仅借流程不抄文。
+- **共享承重件焊点(2026-07-26)**:`SYSTEM-LOGIC.md` + finance-aggregator / shared-primitives /
+  entity-schema / data-locality / capture-adapters。代码:`geo` · `period-ledger` · `finance-sources` ·
+  `finance-aggregate`(KPI 同币种并入) · `entity-schema.resolvePlace` · `locality` · external/capture 注册表。
+  旅行/相机小票已写汇口;家务零花钱隔离。契约 `test:architecture-welds`。
+  **待办**:capture 真适配器迁入 CameraSheet;ExternalAdapter 与 connector 调度合并;实体 L1 确认卡。
+- **~~Signal 可信度分层~~ → 已并入上方「激进审计落地」**。
 - **邮件全链路 里程碑 C(付费云深检索,2026-07-18)**:邮件全链路唯一**花钱**的一块——把邮件
   正文纳入**付费**语义 embedding rerank。此前 `semantic-rerank.ts` 的 `nodeEmbeddingText` 只嵌
   `name+rawInput+tags`,付费语义检索也搜不到正文语义。改:邮件节点嵌入**真实内容**(本机全文

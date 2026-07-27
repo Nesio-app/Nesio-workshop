@@ -12,7 +12,8 @@
  * suggestOutfit 是纯函数(不碰 storage/DOM),既是免费兜底,也是云版的确定性底座。
  */
 
-import { addLifeNode, deleteLifeNode, getLifeGraph, updateLifeNode, type LifeNode } from './life-graph';
+import { deleteLifeNode, getLifeGraph, updateLifeNode, type LifeNode } from './life-graph';
+import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import type { CalendarEvent } from './types';
 
 export const WARDROBE_CATEGORY = '服饰';
@@ -116,10 +117,10 @@ export function addGarment(input: NewGarment): LifeNode {
   const assets = input.assetId
     ? [{ id: input.assetId, kind: 'image' as const, local: true, mimeType: input.mimeType || 'image/jpeg' }]
     : undefined;
-  return addLifeNode({
+  return ingestLifeNode({
     type: 'object',
     name: input.name.trim() || '未命名衣物',
-    attributes,
+    attributes: { ...attributes, epistemic: 'observation', generator: input.assetId ? 'user:photo' : 'user' },
     source: input.assetId ? 'photo' : 'manual',
     confidence: 1,
     relations: [],

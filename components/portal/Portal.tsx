@@ -100,6 +100,7 @@ type AuthSessionPayload = {
   ok?: boolean;
   user?: { id?: string; email?: string };
   loggedIn?: boolean;
+  hasRefreshToken?: boolean;
   status?: string;
   authReady?: boolean;
   profileBootstrapBlocking?: boolean;
@@ -565,18 +566,23 @@ export default function Portal() {
     // ② 永不在「挂载/回前台」那一帧同步跑,统一推到浏览器空闲时。退出跟练会经 SYNC_RESUME_EVENT 补跑一次。
     const runHeavySyncBatch = () => {
       if (isCloudSyncSuspended()) { return; } // 跟练中:先不同步,退出时(resume)再补
-      // 记忆图/学习态/profile 逐一 union/LWW 合并回灌(跨端一致)。
-      void syncMemoryWithCloud();
-      void syncLearningWithCloud();
-      void syncProfileWithCloud();
-      // 记录级模块同步(**唯一的通用云同步**):健康/足迹/财务/物品/关系… 每个 durable key 一行同步。
-      void autoSyncModulesWithCloud();
-      // 邮件全文/导入书籍/地点封面照:各自独立 IDB 的记录级同步,量级大不进模块同步。best-effort。
-      void autoSyncEmailBodiesWithCloud();
-      void autoSyncReaderBooksWithCloud();
-      void autoSyncPlaceImagesWithCloud();
-      // 外部连接器(日历/邮件/flomo/银行/通讯录)拉新,30 分钟节流,内部保证。
-      void autoSyncConnectorsOnBoot();
+      // 先单路刷新会话写回 cookie,再开并行云同步 —— 避免 access 过期窗口多路 grant_type=refresh_token 互踢。
+      void (async () => {
+        await fetchAuthSessionPayload();
+        if (isCloudSyncSuspended()) return;
+        // 记忆图/学习态/profile 逐一 union/LWW 合并回灌(跨端一致)。
+        void syncMemoryWithCloud();
+        void syncLearningWithCloud();
+        void syncProfileWithCloud();
+        // 记录级模块同步(**唯一的通用云同步**):健康/足迹/财务/物品/关系… 每个 durable key 一行同步。
+        void autoSyncModulesWithCloud();
+        // 邮件全文/导入书籍/地点封面照:各自独立 IDB 的记录级同步,量级大不进模块同步。best-effort。
+        void autoSyncEmailBodiesWithCloud();
+        void autoSyncReaderBooksWithCloud();
+        void autoSyncPlaceImagesWithCloud();
+        // 外部连接器(日历/邮件/flomo/银行/通讯录)拉新,30 分钟节流,内部保证。
+        void autoSyncConnectorsOnBoot();
+      })();
     };
     const scheduleHeavySyncBatch = () => whenIdle(runHeavySyncBatch);
     scheduleHeavySyncBatch(); // 挂载/登录:也推到空闲,不阻塞首屏交互
@@ -641,7 +647,8 @@ export default function Portal() {
           return;
         }
         // access 校验失败但还在刷新中的瞬时态 —— 也当未知,别把已登录用户踢成游客。
-        if (data.status === 'session_unverified') {
+        // 有 refresh cookie 却 refresh 失败(并发旋转/瞬时网络)同理:绝不当 signed_out。
+        if (data.status === 'session_unverified' || (!data.loggedIn && data.hasRefreshToken)) {
           setAuthDefinitelyAnonymous(false);
           return;
         }
@@ -1407,14 +1414,15 @@ export default function Portal() {
           </div>
         </div>
       )}
-      {/* 洞察 = 全屏浮层(底部导航第 3 个 tab / nesio-open-insights 打开);从任意 surface 都能开 */}
+      {/* 洞察 = 真全屏页(Radix fullscreen),不是「底部 Vaul 抽屉硬撑 100lvh」。
+          假全屏会让 Vaul transform 把整页上推叠状态栏、底下留缝;下滑只是重算位置。 */}
       {insightsOpen && (
         <NesioSheet
-          variant="bottom"
+          variant="fullscreen"
           open
           onOpenChange={(next) => { if (!next) setInsightsOpen(false); }}
           card={false}
-          className="nesio-settings-sheet-card nesio-insights-sheet-card"
+          className="nesio-insights-sheet-card"
           ariaLabel={L(dict, 'Nesio 的洞察', "Nesio's insights")}
         >
           <InsightsSheet onClose={() => setInsightsOpen(false)} canUsePrivateData={canViewPrivateData} initialTab={insightsTab} />

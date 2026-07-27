@@ -12,6 +12,14 @@
  */
 import { getLifeGraph, type LifeNode } from './life-graph';
 import { loadBankTx } from './bank-tx';
+import {
+  ACTION_STALL_HINT,
+  detectActionStall,
+  isGrowthAiSlop,
+  ZHANG_LI_EQUATION,
+  gradeReflection,
+  type ReflectionGrade,
+} from './growth-protocols';
 
 export type ObservationMode = 'nudge' | 'quiz' | 'trend';
 /** 心智维度(成长图鉴的轴;比 righthere 的纯逻辑更宽)。 */
@@ -32,7 +40,11 @@ export interface Observation extends Seed {
   title: string;
   body?: string;                          // nudge/trend 的文本
   quiz?: { question: string; options: string[]; correctIndex: number; explanation: string };
+  /** 可选微下一步(行动卡点 / 心智方程镜头)。 */
+  nextStep?: string;
 }
+
+export { gradeReflection, type ReflectionGrade };
 
 export interface Lens {
   id: string;
@@ -44,7 +56,7 @@ export interface Lens {
   /** 生成用的 message(喂 /api/portal/chat)。quiz 要求返回严格 JSON。 */
   buildPrompt: (seed: Seed) => string;
   /** 把 AI 文本解析成 Observation 内容。 */
-  parse: (seed: Seed, aiText: string) => Pick<Observation, 'title' | 'body' | 'quiz'> | null;
+  parse: (seed: Seed, aiText: string) => Pick<Observation, 'title' | 'body' | 'quiz' | 'nextStep'> | null;
 }
 
 interface MatchContext {
@@ -60,6 +72,18 @@ const SELF_BLAME_RE = /我(真|太|就是|怎么这么)?(没用|不行|不够|�
 const CONTROL_WORRY_RE = /担心|万一|会不会|如果.{0,8}(怎么办|咋办|办)|别人(怎么|会)?(看|想|说|评价)|控制不了|左右不了|掌控不了|不受.{0,4}控制|失控|结果会/;
 // 笃定的以偏概全/绝对判断 → 苏格拉底追问
 const ABSOLUTE_RE = /总是|老是|永远|从来(没|不)|所有人都|没有人|大家都|每次都|一定是|肯定是|绝对|根本(不|没)|只会|不可能|注定/;
+// 事业/内容经营语料 → 张丽心智方程
+const BIZ_MIND_RE = /生意|客户|定价|产品|内容|增长|品牌|获客|转化|触达|投放|私域|公域|成交|复购|人设|心智|流量|漏斗|客单价/;
+
+function nodeSrc(n: LifeNode): string {
+  return `${n.name}${n.attributes?.notes ? ' —— ' + n.attributes.notes : ''}`;
+}
+
+function parseNudgeBody(title: string, t: string, nextStep?: string): Pick<Observation, 'title' | 'body' | 'nextStep'> | null {
+  const body = (t || '').trim();
+  if (!body || isGrowthAiSlop(body) || body.length < 8) return null;
+  return nextStep ? { title, body, nextStep } : { title, body };
+}
 
 // ── 镜头库(加镜头 = 往这加一个对象)────────────────────────────────────────────
 export const LENSES: Lens[] = [
@@ -77,7 +101,7 @@ export const LENSES: Lens[] = [
       return { id: `soothe:${n.id}`, lensId: 'soothe', mode: 'nudge', sourceId: n.id, sourceText: src };
     },
     buildPrompt: (s) => `你是念念,一个温柔、不评判、像认识很久的朋友。对方今天记下了这样一段心情:"""${s.sourceText}"""。\n用一两句轻轻关心一下,再问 ta 要不要陪着一起看看,它是不是真有那么重(是把话看清,不是分析 ta)。别重复 ta 的原话(卡片上会单独引出来)。中文,口语,别用"您",别列点。只输出这几句话。`,
-    parse: (_s, t) => ({ title: '念念想和你聊聊', body: t.trim() }),
+    parse: (_s, t) => parseNudgeBody('念念想和你聊聊', t),
   },
   // ② 认知重评(quiz)—— 检测到自责/灾难化的想法 → 考考你这想法哪里可能不对
   {
@@ -96,7 +120,39 @@ export const LENSES: Lens[] = [
     parse: (_s, t) => {
       const j = safeJson(t);
       if (!j?.question || !Array.isArray(j.options) || typeof j.correctIndex !== 'number') return null;
+      if (isGrowthAiSlop(String(j.question))) return null;
       return { title: '来考考这个想法', quiz: { question: j.question, options: j.options.slice(0, 4), correctIndex: Math.max(0, Math.min(3, j.correctIndex)), explanation: j.explanation || '' } };
+    },
+  },
+  // ②b 行动卡点(nudge)—— 记了却没动的承诺;dbskill 式「准备/换方向/先学」信号
+  {
+    id: 'action-stall', name: '行动卡点', nameEn: 'Action stall', mode: 'nudge', dimension: 'control',
+    match: ({ nodes, now }) => {
+      const n = nodes.find((x) => {
+        if (x.type !== 'commitment' || x.attributes?.done) return false;
+        if (x.tags?.includes('meeting-notes')) return false;
+        const age = now - new Date(x.createdAt).getTime();
+        if (age < 5 * DAY || age > 30 * DAY) return false;
+        return true;
+      });
+      if (!n) return null;
+      const src = nodeSrc(n);
+      const stall = detectActionStall(src);
+      return {
+        id: `action-stall:${n.id}`, lensId: 'action-stall', mode: 'nudge', sourceId: n.id, sourceText: src,
+        meta: { stall, days: Math.round((now - new Date(n.createdAt).getTime()) / DAY) },
+      };
+    },
+    buildPrompt: (s) => {
+      const stall = String(s.meta?.stall || 'generic') as keyof typeof ACTION_STALL_HINT;
+      const hint = ACTION_STALL_HINT[stall]?.zh || ACTION_STALL_HINT.generic.zh;
+      return `对方有一条还没动的承诺:"""${s.sourceText}"""。卡点信号倾向「${hint}」。\n像温和的行动教练:一两句点破「知道却没开始」的可能机制(别指责),再给「今天 10 分钟内能做完的最小一步」(具体、可勾选)。别重复原话。中文,口语。只输出两段:第一段看见,第二段以「最小一步:」开头。`;
+    },
+    parse: (_s, t) => {
+      const body = (t || '').trim();
+      if (!body || isGrowthAiSlop(body)) return null;
+      const m = body.match(/最小一步[:：]\s*(.+)$/m);
+      return { title: '这一步还没落地', body, nextStep: m?.[1]?.trim() };
     },
   },
   // ③ 斯多葛·控制二分(nudge)—— 对控制不了的事挂心 → 帮 ta 分清能做什么、放下什么
@@ -109,11 +165,11 @@ export const LENSES: Lens[] = [
         return CONTROL_WORRY_RE.test(text);
       });
       if (!n) return null;
-      const src = `${n.name}${n.attributes?.notes ? ' —— ' + n.attributes.notes : ''}`;
+      const src = nodeSrc(n);
       return { id: `stoic:${n.id}`, lensId: 'stoic', mode: 'nudge', sourceId: n.id, sourceText: src };
     },
     buildPrompt: (s) => `对方记下了一件让 ta 挂心的事:"""${s.sourceText}"""。\n像温和的斯多葛式向导,把这件事分成两半:哪些是自己能决定、能行动的,哪些是控制不了、只能先接受的;末尾把落点收到「自己此刻能做的一件小事」上。别重复 ta 的原话(卡片上会单独引出来)。两三句,口语,别用"您",别列点。只输出这几句话。`,
-    parse: (_s, t) => ({ title: '哪些在你手里', body: t.trim() }),
+    parse: (_s, t) => parseNudgeBody('哪些在你手里', t),
   },
   // ④ 苏格拉底追问(nudge)—— 笃定的绝对判断 → 用一个问题邀 ta 自己检视
   {
@@ -125,11 +181,54 @@ export const LENSES: Lens[] = [
         return ABSOLUTE_RE.test(text);
       });
       if (!n) return null;
-      const src = `${n.name}${n.attributes?.notes ? ' —— ' + n.attributes.notes : ''}`;
+      const src = nodeSrc(n);
       return { id: `socratic:${n.id}`, lensId: 'socratic', mode: 'nudge', sourceId: n.id, sourceText: src };
     },
     buildPrompt: (s) => `对方在记录里写下了一个挺笃定的判断:"""${s.sourceText}"""。\n像苏格拉底那样用一个温和、不带评判的追问,邀 ta 自己检视它的依据或例外(如「真的每一次都这样吗?」「有没有哪怕一次不是?」「这是事实,还是此刻的感受?」)。只问一个问题,不给答案。别重复原话(卡片上会单独引出来)。中文,口语。只输出这一句问题。`,
-    parse: (_s, t) => ({ title: '念念想追问一句', body: t.trim() }),
+    parse: (_s, t) => parseNudgeBody('念念想追问一句', t),
+  },
+  // ④b 伴读碰撞(nudge)—— 久放高置信记忆;ljg-read 三岔:赞同 / 质疑 / 延伸
+  {
+    id: 'collision-read', name: '伴读碰撞', nameEn: 'Reading collision', mode: 'nudge', dimension: 'selfaware',
+    match: ({ nodes, now }) => {
+      const n = nodes.find((x) => {
+        if ((x.confidence ?? 0) < 0.8) return false;
+        if (x.type === 'commitment' || x.type === 'event') return false;
+        const age = now - new Date(x.createdAt).getTime();
+        if (age < 14 * DAY) return false;
+        const notes = String(x.attributes?.notes || x.rawInput || '');
+        return notes.length >= 24 || (x.name?.length || 0) >= 12;
+      });
+      if (!n) return null;
+      const src = nodeSrc(n);
+      return { id: `collision-read:${n.id}`, lensId: 'collision-read', mode: 'nudge', sourceId: n.id, sourceText: src };
+    },
+    buildPrompt: (s) => `对方有一条很久没再碰、但当初挺确信的记录:"""${s.sourceText}"""。\n用「伴读三岔」陪 ta 再碰一次(不要总结全书,只对这段):给出三条短线——① 赞同:哪一句现在仍站得住;② 质疑:哪里可能过时或证据不足;③ 延伸:从这段能长出哪个新问题。每条一行,口语,别用"您"。只输出这三行。`,
+    parse: (_s, t) => parseNudgeBody('再碰一次这段', t),
+  },
+  // ④c 心智经营方程(quiz)—— 事业/内容语料套张丽方程三力×人机协同
+  {
+    id: 'biz-equation', name: '心智经营', nameEn: 'Mind-share equation', mode: 'quiz', dimension: 'blindspot',
+    match: ({ nodes, now }) => {
+      const n = nodes.find((x) => {
+        if (now - new Date(x.createdAt).getTime() > 10 * DAY) return false;
+        const text = `${x.name} ${(x.attributes?.notes as string) || x.rawInput || ''}`;
+        return BIZ_MIND_RE.test(text);
+      });
+      if (!n) return null;
+      const src = nodeSrc(n);
+      return { id: `biz-equation:${n.id}`, lensId: 'biz-equation', mode: 'quiz', sourceId: n.id, sourceText: src };
+    },
+    buildPrompt: (s) => {
+      const forces = ZHANG_LI_EQUATION.forces.map((f) => `${f.zh}(${f.tipZh})`).join('、');
+      return `用张丽「心智经营方程」${ZHANG_LI_EQUATION.formulaZh} 审视对方这段事业/内容记录:"""${s.sourceText}"""。\n做成一道温和小测:\n- question 先用「」引出原话要点,再问「此刻最可能短的是哪一力?」;\n- 四个选项必须对应:触达力 / 内容力 / 触动力 / 人机协同(释义可短写),打乱顺序;\n- explanation 点破命中的那一力,并给「本周可验证的一个微动作」;别鸡汤。\n力含义:${forces}\n只输出严格 JSON:{"question":"…","options":["触达力 · …","内容力 · …","触动力 · …","人机协同 · …"],"correctIndex":0,"explanation":"…"}`;
+    },
+    parse: (_s, t) => {
+      const j = safeJson(t);
+      if (!j?.question || !Array.isArray(j.options) || typeof j.correctIndex !== 'number') return null;
+      if (isGrowthAiSlop(String(j.question))) return null;
+      return { title: '哪一力最短', quiz: { question: j.question, options: j.options.slice(0, 4), correctIndex: Math.max(0, Math.min(3, j.correctIndex)), explanation: j.explanation || '' } };
+    },
   },
   // ⑤ 趋势洞察(trend)—— 财务:近一周快递/购物笔数偏多 → 温和点出花销趋势
   {
@@ -145,7 +244,7 @@ export const LENSES: Lens[] = [
       return { id: `trend-spend:${new Date(now).toISOString().slice(0, 10)}`, lensId: 'trend-spend', mode: 'trend', sourceId: 'finance-week', sourceText: `近 7 天购物/快递 ${parcels.length} 笔,共 $${spend.toFixed(0)}`, meta: { count: parcels.length, spend: Math.round(spend) } };
     },
     buildPrompt: (s) => `观察到一个真实的花销趋势(数字见此,别重复念):${s.sourceText}。\n用一句温和、不说教、不制造焦虑的话,问对方要不要自己看看这个趋势(像:不是说该省 —— 是你自己想看看吗?)。中文。只输出这一句。`,
-    parse: (s, t) => ({ title: '一个小趋势', body: t.trim() }),
+    parse: (_s, t) => parseNudgeBody('一个小趋势', t),
   },
 ];
 
@@ -178,10 +277,10 @@ export async function generateObservation(seed: Seed, locale: string): Promise<O
     });
     if (!res.ok) return null;
     const data = await res.json() as { ok?: boolean; response?: string };
-    if (!data.ok || !data.response) return null;
+    if (!data.ok || !data.response || isGrowthAiSlop(data.response)) return null;
     const content = lens.parse(seed, data.response);
     if (!content) return null;
-    return { ...seed, dimension: lens.dimension, title: content.title, body: content.body, quiz: content.quiz };
+    return { ...seed, dimension: lens.dimension, title: content.title, body: content.body, quiz: content.quiz, nextStep: content.nextStep };
   } catch { return null; }
 }
 
@@ -193,7 +292,8 @@ async function chatText(message: string, locale: string): Promise<string | null>
     });
     if (!res.ok) return null;
     const data = await res.json() as { ok?: boolean; response?: string };
-    return data.ok && data.response ? data.response.trim() : null;
+    if (!data.ok || !data.response || isGrowthAiSlop(data.response)) return null;
+    return data.response.trim();
   } catch { return null; }
 }
 

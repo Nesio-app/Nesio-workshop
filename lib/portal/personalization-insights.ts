@@ -66,9 +66,19 @@ export interface BaohePersonalizationProfile {
   };
 }
 
-export const PERSONALIZATION_STAGE_KEY = 'treasurebox-personalization-demo-stage';
+export const PERSONALIZATION_STAGE_KEY = 'treasurebox-personalization-demo-stage'; // 死壳:stage 切换已退役,勿再写
 const INSIGHT_SHOWN_DAY_KEY = 'treasurebox-personalization-insight-shown-day';
 const INSIGHT_SUPPRESSED_PREFIX = 'treasurebox-personalization-insight-suppressed-until:';
+
+/** 退役:demo stage 不再驱动 UI;恒按真实图深度算。 */
+export function readBaohePersonalizationStage(): BaohePersonalizationStage {
+  return 'day_34';
+}
+
+export function saveBaohePersonalizationStage(_stage: BaohePersonalizationStage) {
+  void _stage;
+  // 退役:不再写 demo stage key
+}
 
 const FIRST_USE_PROFILE: BaohePersonalizationProfile = {
   stage: 'first_use',
@@ -145,22 +155,11 @@ export function getBaohePersonalizationProfile(
     memoryProgressLabel: memoryCount === 0
       ? 'Nesio 正在了解你 · 记一点东西就会有发现'
       : `已记住 ${memoryCount} 件事 · 越用越懂你`,
-    insightVisible: false,                   // 不再造假洞察:真洞察走 认知模型 / 学习面板
+    insightVisible: false,                   // 不再造假洞察:真洞察走 多面镜 / 学习面板
     pendingInsight: undefined,
     memories: [],                            // 不再预录记忆:真记忆走 Memory
     dataDepth: computeDataDepth(g),
   };
-}
-
-export function readBaohePersonalizationStage(): BaohePersonalizationStage {
-  if (typeof window === 'undefined') return 'day_34';
-  try {
-    return localStorage.getItem(PERSONALIZATION_STAGE_KEY) === 'first_use'
-      ? 'first_use'
-      : 'day_34';
-  } catch {
-    return 'day_34';
-  }
 }
 
 function todayKey(now: Date) {
@@ -210,19 +209,8 @@ export function rememberBaoheInsightShown(now = new Date()) {
 export function rememberBaoheInsightFeedback(profile: BaohePersonalizationProfile, positive: boolean, now = new Date()) {
   const insight = profile.pendingInsight;
   if (!insight) return;
-  // 死写清除:此前把 positive/negative 存进 personalization-insight-feedback:<id>,全仓从无读点。
-  // 抑制逻辑(下方 suppressed-until,有读点)才是实际生效的部分。
   if (!positive) {
     const suppressedUntil = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
     safeSetStorage(`${INSIGHT_SUPPRESSED_PREFIX}${insight.id}`, suppressedUntil);
-  }
-}
-
-export function saveBaohePersonalizationStage(stage: BaohePersonalizationStage) {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem(PERSONALIZATION_STAGE_KEY, stage);
-  } catch {
-    /* ignore */
   }
 }

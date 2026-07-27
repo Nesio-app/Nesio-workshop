@@ -10,10 +10,12 @@ import { createBlobStore } from './idb-blob-store';
 import { reportStorageDropped } from './storage-health';
 import { listInventoryItems } from './inventory';
 import { addToShopping } from '@/lib/cooking/shopping';
+import { addReceiptExpense } from './finance-sources';
+import { ledgerProgressPct, ledgerRemaining } from './period-ledger';
 
 export type TripStatus = 'planned' | 'active' | 'completed';
 export type TripNodeKind =
-  | 'flight' | 'hotel' | 'transit' | 'packing' | 'shopping' | 'budget' | 'todo';
+  | 'flight' | 'hotel' | 'transit' | 'packing' | 'shopping' | 'budget' | 'todo' | 'poi';
 
 /** booked=实心已订 · todo=描边待办 */
 export type TripNodeState = 'booked' | 'todo';
@@ -75,6 +77,16 @@ export interface TodoPayload {
   title: string; detail?: string;
 }
 
+/** 离线景点库节点(随包 POI,可导航)。 */
+export interface PoiPayload {
+  name: string;
+  lat: number;
+  lon: number;
+  country?: string;
+  type?: string;
+  wikidata?: string;
+}
+
 export type TripNodePayload =
   | { kind: 'flight'; flight: FlightPayload }
   | { kind: 'hotel'; hotel: HotelPayload }
@@ -82,7 +94,8 @@ export type TripNodePayload =
   | { kind: 'packing'; packing: PackingPayload }
   | { kind: 'shopping'; shopping: ShoppingPayload }
   | { kind: 'budget'; budget: BudgetPayload }
-  | { kind: 'todo'; todo: TodoPayload };
+  | { kind: 'todo'; todo: TodoPayload }
+  | { kind: 'poi'; poi: PoiPayload };
 
 export interface TripNode {
   id: string;
@@ -218,25 +231,37 @@ export function pushPackingNeedsToShopping(tripId: string, nodeId: string): numb
   return needs.length;
 }
 
-export function tripBudgetSummary(trip: Trip): { actual: number; budget: number; currency: string } {
+export function tripBudgetSummary(trip: Trip): {
+  actual: number;
+  budget: number;
+  currency: string;
+  progressPct: number;
+  remaining: number;
+} {
   const budgetNode = trip.nodes.find((n) => n.payload.kind === 'budget');
-  if (budgetNode && budgetNode.payload.kind === 'budget') {
-    return {
-      actual: budgetNode.payload.budget.actualTotal,
-      budget: budgetNode.payload.budget.budgetTotal,
-      currency: budgetNode.payload.budget.currency || trip.currency || '¥',
-    };
-  }
-  // 从酒店/购物节点汇总实际
   let actual = 0;
-  for (const n of trip.nodes) {
-    if (n.payload.kind === 'hotel') {
-      const h = n.payload.hotel;
-      actual += (h.pricePerNight || 0) * (h.nights || 1);
+  let budget = 0;
+  let currency = trip.currency || '¥';
+  if (budgetNode && budgetNode.payload.kind === 'budget') {
+    actual = budgetNode.payload.budget.actualTotal;
+    budget = budgetNode.payload.budget.budgetTotal;
+    currency = budgetNode.payload.budget.currency || currency;
+  } else {
+    for (const n of trip.nodes) {
+      if (n.payload.kind === 'hotel') {
+        const h = n.payload.hotel;
+        actual += (h.pricePerNight || 0) * (h.nights || 1);
+      }
+      if (n.payload.kind === 'shopping') actual += n.payload.shopping.total || 0;
     }
-    if (n.payload.kind === 'shopping') actual += n.payload.shopping.total || 0;
   }
-  return { actual, budget: trip.budgetTotal || 0, currency: trip.currency || '¥' };
+  return {
+    actual,
+    budget,
+    currency,
+    progressPct: ledgerProgressPct(actual, budget),
+    remaining: ledgerRemaining(actual, budget),
+  };
 }
 
 /** 按 dayKey 分组,保持节点顺序。 */
@@ -429,4 +454,316 @@ export function buildDemoTokyoTrip(): Trip {
     createdAt: nowIso(),
     updatedAt: nowIso(),
   };
+}
+
+export function addTripNode(tripId: string, node: Omit<TripNode, 'id'> & { id?: string }): Trip | null {
+  const t = getTrip(tripId);
+  if (!t) return null;
+  const next: TripNode = { ...node, id: node.id || uid('n') };
+  return upsertTrip({ ...t, nodes: [...t.nodes, next] });
+}
+
+export function removeTripNode(tripId: string, nodeId: string): Trip | null {
+  const t = getTrip(tripId);
+  if (!t) return null;
+  return upsertTrip({ ...t, nodes: t.nodes.filter((n) => n.id !== nodeId) });
+}
+
+/** 按天数/目的地生成打包清单,并对照物品库标 have/need。 */
+export function generatePackingList(tripId: string): Trip | null {
+  const t = getTrip(tripId);
+  if (!t) return null;
+  const base: PackingItem[] = [
+    { name: '证件/护照', status: 'need' },
+    { name: '充电器', status: 'need' },
+    { name: '转换插头', status: 'need' },
+    { name: '换洗衣物', reason: `${t.days} 天`, status: 'need' },
+    { name: '洗漱用品', status: 'need' },
+  ];
+  if (t.weatherHint?.includes('雨') || /雨|rain/i.test(t.destination)) {
+    base.push({ name: '雨具/冲锋衣', reason: '有雨', status: 'need' });
+  }
+  if (t.days >= 4) base.push({ name: '舒适步行鞋', status: 'need' });
+  const inv = new Set(listInventoryItems().map((i) => i.name.trim().toLowerCase()));
+  const items = base.map((it) => ({
+    ...it,
+    status: (inv.has(it.name.toLowerCase()) ? 'have' : 'need') as 'have' | 'need',
+  }));
+  const needN = items.filter((i) => i.status === 'need').length;
+  const packingNode: TripNode = {
+    id: uid('n'),
+    kind: 'packing',
+    state: needN ? 'todo' : 'booked',
+    timeLabel: '出发前',
+    dayKey: '_pre',
+    dayLabel: '出发前',
+    title: '打包清单',
+    subtitle: `${t.days} 天 · ${needN} 样需买`,
+    payload: {
+      kind: 'packing',
+      packing: {
+        summary: `按 ${t.destination} · ${t.days} 天${t.weatherHint ? ` · ${t.weatherHint}` : ''} 生成 — 已对照物品库`,
+        items,
+      },
+    },
+  };
+  const withoutOld = t.nodes.filter((n) => n.kind !== 'packing');
+  return upsertTrip({ ...t, nodes: [packingNode, ...withoutOld] });
+}
+
+/** 从订票确认文本解析航班/酒店节点(本地规则,不耗云)。 */
+export function parseBookingConfirmation(text: string): TripNode[] {
+  const raw = text.replace(/\r/g, '\n');
+  const nodes: TripNode[] = [];
+  const flightRe = /\b([A-Z]{2})\s?(\d{2,4})\b/g;
+  const routeRe = /([A-Z]{3})\s*[→\-~到至]\s*([A-Z]{3})/;
+  const seatRe = /(?:座位|seat)\s*[:：]?\s*([0-9]{1,2}[A-F])/i;
+  const confRe = /(?:确认号|confirmation|PNR|订座编码)\s*[:：]?\s*([A-Z0-9]{5,8})/i;
+  const hotelRe = /(?:酒店|hotel|入住)\s*[:：]?\s*([^\n]{2,40})/i;
+  const priceRe = /(?:¥|￥|CNY|RMB)\s*([\d,]+(?:\.\d+)?)/i;
+
+  let m: RegExpExecArray | null;
+  const seenFlights = new Set<string>();
+  while ((m = flightRe.exec(raw)) !== null) {
+    const flightNo = `${m[1]}${m[2]}`;
+    if (seenFlights.has(flightNo)) continue;
+    seenFlights.add(flightNo);
+    const window = raw.slice(Math.max(0, m.index - 80), m.index + 120);
+    const route = window.match(routeRe);
+    const seat = window.match(seatRe)?.[1] || raw.match(seatRe)?.[1];
+    const confirmation = window.match(confRe)?.[1] || raw.match(confRe)?.[1];
+    const fromCode = route?.[1];
+    const toCode = route?.[2];
+    nodes.push({
+      id: uid('n'),
+      kind: 'flight',
+      state: 'booked',
+      timeLabel: '',
+      dayKey: 'd1',
+      dayLabel: '行程日',
+      title: fromCode && toCode ? `${fromCode} → ${toCode}` : `航班 ${flightNo}`,
+      subtitle: [flightNo, seat ? `座位 ${seat}` : '', confirmation ? `确认 ${confirmation}` : ''].filter(Boolean).join(' · '),
+      payload: {
+        kind: 'flight',
+        flight: {
+          from: fromCode || '',
+          to: toCode || '',
+          fromCode,
+          toCode,
+          flightNo,
+          seat,
+          confirmation,
+          statusText: '已订',
+        },
+      },
+    });
+  }
+
+  const hotelName = raw.match(hotelRe)?.[1]?.trim();
+  if (hotelName) {
+    const price = Number((raw.match(priceRe)?.[1] || '').replace(/,/g, '')) || undefined;
+    nodes.push({
+      id: uid('n'),
+      kind: 'hotel',
+      state: 'booked',
+      timeLabel: '',
+      dayKey: 'd1',
+      dayLabel: '行程日',
+      title: `入住 · ${hotelName}`,
+      subtitle: price != null ? `¥${price}` : undefined,
+      payload: {
+        kind: 'hotel',
+        hotel: { name: hotelName, pricePerNight: price, nights: 1, currency: '¥' },
+      },
+    });
+  }
+  return nodes;
+}
+
+export function importBookingIntoTrip(tripId: string, text: string): number {
+  const t = getTrip(tripId);
+  if (!t) return 0;
+  const parsed = parseBookingConfirmation(text);
+  if (!parsed.length) return 0;
+  upsertTrip({ ...t, nodes: [...t.nodes, ...parsed] });
+  recomputeBudgetNode(tripId);
+  return parsed.length;
+}
+
+/** 把小票条目并入行程购物节点,并刷新预算。 */
+export function appendShoppingReceipt(
+  tripId: string,
+  lines: ShoppingLine[],
+  meta?: { title?: string; date?: string; currency?: string },
+): Trip | null {
+  const t = getTrip(tripId);
+  if (!t || !lines.length) return null;
+  const total = lines.reduce((s, l) => s + (l.price || 0), 0);
+  const node: TripNode = {
+    id: uid('n'),
+    kind: 'shopping',
+    state: 'booked',
+    timeLabel: meta?.date || '',
+    dayKey: 'shop',
+    dayLabel: '购物',
+    title: meta?.title || '购物 · 小票',
+    subtitle: total > 0 ? `${meta?.currency || '¥'}${total}` : `${lines.length} 样`,
+    payload: {
+      kind: 'shopping',
+      shopping: {
+        title: meta?.title || '购物 · 小票',
+        date: meta?.date,
+        total: total || undefined,
+        currency: meta?.currency || '¥',
+        lines,
+      },
+    },
+  };
+  const next = upsertTrip({ ...t, nodes: [...t.nodes, node] });
+  recomputeBudgetNode(tripId);
+  // 默认记入财务聚合口(不写 bank-tx);用户可日后在财务里看到「小票/旅行」旁条
+  addReceiptExpense({
+    lines,
+    date: meta?.date,
+    currency: meta?.currency || '¥',
+    source: 'travel',
+    sourceRef: `${tripId}:${node.id}`,
+    merchant: meta?.title,
+    includeInFinance: true,
+  });
+  return getTrip(tripId) || next;
+}
+
+/** 按航班/酒店/购物重算预算节点。 */
+export function recomputeBudgetNode(tripId: string): Trip | null {
+  const t = getTrip(tripId);
+  if (!t) return null;
+  let flight = 0;
+  let stay = 0;
+  let shop = 0;
+  for (const n of t.nodes) {
+    if (n.payload.kind === 'hotel') {
+      const h = n.payload.hotel;
+      stay += (h.pricePerNight || 0) * (h.nights || 1);
+    }
+    if (n.payload.kind === 'shopping') shop += n.payload.shopping.total || 0;
+    if (n.payload.kind === 'flight') {
+      // 无票价字段时不硬估;有确认即计 0,留给用户改预算
+    }
+  }
+  const actualTotal = flight + stay + shop;
+  const budgetTotal = t.budgetTotal && t.budgetTotal > 0 ? t.budgetTotal : Math.max(actualTotal, 0);
+  const budgetPayload: BudgetPayload = {
+    currency: t.currency || '¥',
+    actualTotal,
+    budgetTotal: budgetTotal || actualTotal || 0,
+    categories: [
+      { id: 'flight', label: '机票', actual: flight, budget: Math.round((budgetTotal || 0) * 0.35) },
+      { id: 'stay', label: '住宿', actual: stay, budget: Math.round((budgetTotal || 0) * 0.3) },
+      { id: 'shop', label: '购物', actual: shop, budget: Math.round((budgetTotal || 0) * 0.35) },
+    ],
+  };
+  const existing = t.nodes.find((n) => n.kind === 'budget');
+  const budgetNode: TripNode = {
+    id: existing?.id || uid('n'),
+    kind: 'budget',
+    state: 'booked',
+    timeLabel: '',
+    dayKey: '_budget',
+    dayLabel: '行程预算',
+    title: '行程预算',
+    subtitle: `实际 ¥${actualTotal.toLocaleString()} / 预算 ${(budgetPayload.budgetTotal).toLocaleString()}`,
+    payload: { kind: 'budget', budget: budgetPayload },
+  };
+  const others = t.nodes.filter((n) => n.kind !== 'budget');
+  return upsertTrip({ ...t, nodes: [...others, budgetNode], budgetTotal: budgetPayload.budgetTotal });
+}
+
+const CHECKIN_KEY = 'nesio-travel-checkin-reminders-v1';
+
+/** 本地记下值机提醒(起飞前 24h);UI 可读列表。 */
+export function setFlightCheckInReminder(tripId: string, nodeId: string, atIso?: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem(CHECKIN_KEY);
+    const list: Array<{ tripId: string; nodeId: string; at: string }> = raw ? JSON.parse(raw) : [];
+    const at = atIso || new Date(Date.now() + 86400000).toISOString();
+    const next = list.filter((x) => !(x.tripId === tripId && x.nodeId === nodeId));
+    next.push({ tripId, nodeId, at });
+    localStorage.setItem(CHECKIN_KEY, JSON.stringify(next));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function hasFlightCheckInReminder(tripId: string, nodeId: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const raw = localStorage.getItem(CHECKIN_KEY);
+    if (!raw) return false;
+    const list = JSON.parse(raw) as Array<{ tripId: string; nodeId: string }>;
+    return list.some((x) => x.tripId === tripId && x.nodeId === nodeId);
+  } catch {
+    return false;
+  }
+}
+
+/** 小票识别结果挂到哪趟行程(CameraSheet 保存后消费)。 */
+export const TRAVEL_RECEIPT_TRIP_KEY = 'nesio-travel-receipt-trip-v1';
+
+export function armTravelReceiptCapture(tripId: string): void {
+  try { sessionStorage.setItem(TRAVEL_RECEIPT_TRIP_KEY, tripId); } catch { /* */ }
+}
+
+export function consumeTravelReceiptTripId(): string | null {
+  try {
+    const id = sessionStorage.getItem(TRAVEL_RECEIPT_TRIP_KEY);
+    sessionStorage.removeItem(TRAVEL_RECEIPT_TRIP_KEY);
+    return id;
+  } catch {
+    return null;
+  }
+}
+
+/** 把离线景点加入行程时间线(描边待办=还没去)。 */
+export function addPoisToTrip(
+  tripId: string,
+  pois: Array<{ name: string; lat: number; lon: number; country?: string; type?: string; wikidata?: string }>,
+): number {
+  const t = getTrip(tripId);
+  if (!t || !pois.length) return 0;
+  const existing = new Set(
+    t.nodes.filter((n) => n.payload.kind === 'poi').map((n) => n.payload.kind === 'poi' ? n.payload.poi.name.toLowerCase() : ''),
+  );
+  const nodes: TripNode[] = [];
+  for (const p of pois) {
+    const key = p.name.toLowerCase();
+    if (existing.has(key)) continue;
+    existing.add(key);
+    nodes.push({
+      id: uid('n'),
+      kind: 'poi',
+      state: 'todo',
+      timeLabel: '',
+      dayKey: 'poi',
+      dayLabel: '想去的景点',
+      title: p.name,
+      subtitle: [p.type, p.country].filter(Boolean).join(' · ') || undefined,
+      payload: {
+        kind: 'poi',
+        poi: {
+          name: p.name,
+          lat: p.lat,
+          lon: p.lon,
+          country: p.country,
+          type: p.type,
+          wikidata: p.wikidata,
+        },
+      },
+    });
+  }
+  if (!nodes.length) return 0;
+  upsertTrip({ ...t, nodes: [...t.nodes, ...nodes] });
+  return nodes.length;
 }

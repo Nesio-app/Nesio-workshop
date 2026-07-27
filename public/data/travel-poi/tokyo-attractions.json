@@ -1,0 +1,910 @@
+{
+ "note": "东京圈 bbox 粗筛",
+ "count": 113,
+ "items": [
+  {
+   "name": "Bandit",
+   "lat": 35.625524,
+   "lon": 139.518122,
+   "country": "Japan",
+   "wikidata": "Q806326",
+   "type": "attraction"
+  },
+  {
+   "name": "Big O",
+   "lat": 35.7060725,
+   "lon": 139.7539151,
+   "country": "Japan",
+   "wikidata": "Q794709",
+   "type": "attraction"
+  },
+  {
+   "name": "Cosmo Clock 21",
+   "lat": 35.4554,
+   "lon": 139.637,
+   "country": "Japan",
+   "wikidata": "Q843426",
+   "type": "attraction"
+  },
+  {
+   "name": "Daiba 1-chōme Shōtengai",
+   "lat": 35.6292846,
+   "lon": 139.7762176,
+   "country": "Japan",
+   "wikidata": "Q11411934",
+   "type": "attraction"
+  },
+  {
+   "name": "Daikanransha",
+   "lat": 35.6263915,
+   "lon": 139.7822902,
+   "country": "Japan",
+   "wikidata": "Q751175",
+   "type": "attraction"
+  },
+  {
+   "name": "Diamond and Flower Ferris Wheel",
+   "lat": 35.6439052,
+   "lon": 139.8572257,
+   "country": "Japan",
+   "wikidata": "Q901219",
+   "type": "attraction"
+  },
+  {
+   "name": "Diving Coaster: Vanish",
+   "lat": 35.455352,
+   "lon": 139.637159,
+   "country": "Japan",
+   "wikidata": "Q1230670",
+   "type": "attraction"
+  },
+  {
+   "name": "Legoland Discovery Center Tokyo",
+   "lat": 35.6288171,
+   "lon": 139.775669,
+   "country": "Japan",
+   "wikidata": "Q30934236",
+   "type": "attraction"
+  },
+  {
+   "name": "Momonga Standing and Loop Coaster",
+   "lat": 35.624511,
+   "lon": 139.519331,
+   "country": "Japan",
+   "wikidata": "Q108822228",
+   "type": "attraction"
+  },
+  {
+   "name": "Nemo & Friends SeaRider",
+   "lat": 35.625,
+   "lon": 139.8825,
+   "country": "Japan",
+   "wikidata": "Q29897109",
+   "type": "attraction"
+  },
+  {
+   "name": "Panic Coaster – Back Daaan",
+   "lat": 35.7045,
+   "lon": 139.754,
+   "country": "Japan",
+   "wikidata": "Q65241484",
+   "type": "attraction"
+  },
+  {
+   "name": "Q11546374",
+   "lat": 35.844833,
+   "lon": 139.646417,
+   "country": "Japan",
+   "wikidata": "Q11546374",
+   "type": "attraction"
+  },
+  {
+   "name": "Raging Spirits",
+   "lat": 35.627703,
+   "lon": 139.880738,
+   "country": "Japan",
+   "wikidata": "Q267353",
+   "type": "attraction"
+  },
+  {
+   "name": "SHIBUYA SKY",
+   "lat": 35.658462,
+   "lon": 139.702264,
+   "country": "Japan",
+   "wikidata": "Q116281743",
+   "type": "attraction"
+  },
+  {
+   "name": "Shin-Yokohama Raumen Museum",
+   "lat": 35.509874,
+   "lon": 139.614537,
+   "country": "Japan",
+   "wikidata": "Q864499",
+   "type": "attraction"
+  },
+  {
+   "name": "Shitamachi Museum",
+   "lat": 35.7102,
+   "lon": 139.7726,
+   "country": "Japan",
+   "wikidata": "Q3915464",
+   "type": "attraction"
+  },
+  {
+   "name": "Sindbad's Storybook Voyage",
+   "lat": 35.6285,
+   "lon": 139.881,
+   "country": "Japan",
+   "wikidata": "Q3484881",
+   "type": "attraction"
+  },
+  {
+   "name": "Space Mountain",
+   "lat": 35.632339,
+   "lon": 139.877753,
+   "country": "Japan",
+   "wikidata": "Q7572428",
+   "type": "attraction"
+  },
+  {
+   "name": "Takanawa Fire Station Nihon-enoki Branch Office",
+   "lat": 35.635722222,
+   "lon": 139.733194444,
+   "country": "Japan",
+   "wikidata": "Q11672881",
+   "type": "attraction"
+  },
+  {
+   "name": "Thunder Dolphin",
+   "lat": 35.706336,
+   "lon": 139.753277,
+   "country": "Japan",
+   "wikidata": "Q845812",
+   "type": "attraction"
+  },
+  {
+   "name": "Tokyo City View",
+   "lat": 35.66043,
+   "lon": 139.7290554,
+   "country": "Japan",
+   "wikidata": "Q126417093",
+   "type": "attraction"
+  },
+  {
+   "name": "Tokyo Ramen Kokugikan Mai",
+   "lat": 35.628120462,
+   "lon": 139.773731765,
+   "country": "Japan",
+   "wikidata": "Q11347767",
+   "type": "attraction"
+  },
+  {
+   "name": "Tokyo Skytree Tembo Deck",
+   "lat": 35.7102266,
+   "lon": 139.810694,
+   "country": "Japan",
+   "wikidata": "Q117066302",
+   "type": "attraction"
+  },
+  {
+   "name": "Tokyo Skytree Tembo Galleria",
+   "lat": 35.710256,
+   "lon": 139.8107946,
+   "country": "Japan",
+   "wikidata": "Q117066320",
+   "type": "attraction"
+  },
+  {
+   "name": "Twist Coaster Robin",
+   "lat": 35.625317,
+   "lon": 139.519394,
+   "country": "Japan",
+   "wikidata": "Q18355292",
+   "type": "attraction"
+  },
+  {
+   "name": "White Canyon",
+   "lat": 35.625765,
+   "lon": 139.521355,
+   "country": "Japan",
+   "wikidata": "Q14754866",
+   "type": "attraction"
+  },
+  {
+   "name": "Yokohama Skywalk",
+   "lat": 35.45886111,
+   "lon": 139.67627778,
+   "country": "Japan",
+   "wikidata": "Q11542858",
+   "type": "attraction"
+  },
+  {
+   "name": "21 21 DESIGN SIGHT",
+   "lat": 35.6675,
+   "lon": 139.73027,
+   "country": "Japan",
+   "wikidata": "Q863044",
+   "type": "museum"
+  },
+  {
+   "name": "Adachi City Museum",
+   "lat": 35.784416,
+   "lon": 139.84143,
+   "country": "Japan",
+   "wikidata": "Q11636983",
+   "type": "museum"
+  },
+  {
+   "name": "Adachi Park of Living Things",
+   "lat": 35.792444,
+   "lon": 139.807222,
+   "country": "Japan",
+   "wikidata": "Q11636941",
+   "type": "museum"
+  },
+  {
+   "name": "Aqua Park Shinagawa",
+   "lat": 35.62805556,
+   "lon": 139.73527778,
+   "country": "Japan",
+   "wikidata": "Q3055859",
+   "type": "museum"
+  },
+  {
+   "name": "Arakawa Furusato Museum",
+   "lat": 35.737519,
+   "lon": 139.795418,
+   "country": "Japan",
+   "wikidata": "Q104698248",
+   "type": "museum"
+  },
+  {
+   "name": "Art Aquarium Museum",
+   "lat": 35.6713698,
+   "lon": 139.7657375,
+   "country": "Japan",
+   "wikidata": "Q116921556",
+   "type": "museum"
+  },
+  {
+   "name": "Broadcast Library",
+   "lat": 35.446222,
+   "lon": 139.642889,
+   "country": "Japan",
+   "wikidata": "Q11499008",
+   "type": "museum"
+  },
+  {
+   "name": "Bunkamura",
+   "lat": 35.660833,
+   "lon": 139.695,
+   "country": "Japan",
+   "wikidata": "Q583055",
+   "type": "museum"
+  },
+  {
+   "name": "Bunkyo Museum",
+   "lat": 35.708,
+   "lon": 139.7566,
+   "country": "Japan",
+   "wikidata": "Q11499743",
+   "type": "museum"
+  },
+  {
+   "name": "Chōfu Local History Museum",
+   "lat": 35.646898,
+   "lon": 139.536191,
+   "country": "Japan",
+   "wikidata": "Q104698232",
+   "type": "museum"
+  },
+  {
+   "name": "Edogawa Ward Natural Zoo",
+   "lat": 35.671,
+   "lon": 139.8584,
+   "country": "Japan",
+   "wikidata": "Q11551063",
+   "type": "museum"
+  },
+  {
+   "name": "Folk Museum of Higashimurayama",
+   "lat": 35.766609,
+   "lon": 139.46627,
+   "country": "Japan",
+   "wikidata": "Q104698227",
+   "type": "museum"
+  },
+  {
+   "name": "Folk Museum of Ōta City",
+   "lat": 35.588529,
+   "lon": 139.710621,
+   "country": "Japan",
+   "wikidata": "Q104708388",
+   "type": "museum"
+  },
+  {
+   "name": "Fujimino Municipal Ōi Local Museum",
+   "lat": 35.857444444,
+   "lon": 139.504777777,
+   "country": "Japan",
+   "wikidata": "Q11277080",
+   "type": "museum"
+  },
+  {
+   "name": "Fukagawa Edo Museum",
+   "lat": 35.68092,
+   "lon": 139.8007,
+   "country": "Japan",
+   "wikidata": "Q3090685",
+   "type": "museum"
+  },
+  {
+   "name": "Ichikawa Zoological & Botanical Garden",
+   "lat": 35.764778,
+   "lon": 139.965219,
+   "country": "Japan",
+   "wikidata": "Q11480258",
+   "type": "museum"
+  },
+  {
+   "name": "Ichiyo Memorial Museum",
+   "lat": 35.725556,
+   "lon": 139.792806,
+   "country": "Japan",
+   "wikidata": "Q11353179",
+   "type": "museum"
+  },
+  {
+   "name": "Inagi City Local Archives Reference Room",
+   "lat": 35.613805555,
+   "lon": 139.492305555,
+   "country": "Japan",
+   "wikidata": "Q85882958",
+   "type": "museum"
+  },
+  {
+   "name": "Inokashira Park Zoo",
+   "lat": 35.700833,
+   "lon": 139.57275,
+   "country": "Japan",
+   "wikidata": "Q10860225",
+   "type": "museum"
+  },
+  {
+   "name": "Itabashi Historical Museum",
+   "lat": 35.785471,
+   "lon": 139.643257,
+   "country": "Japan",
+   "wikidata": "Q104696866",
+   "type": "museum"
+  },
+  {
+   "name": "Japan Coast Guard Museum Yokohama",
+   "lat": 35.45430556,
+   "lon": 139.64430556,
+   "country": "Japan",
+   "wikidata": "Q6156562",
+   "type": "museum"
+  },
+  {
+   "name": "John Lennon Museum",
+   "lat": 35.89488889,
+   "lon": 139.63083333,
+   "country": "Japan",
+   "wikidata": "Q1058730",
+   "type": "museum"
+  },
+  {
+   "name": "Kanagawa Museum of Modern Literature",
+   "lat": 35.438638888,
+   "lon": 139.656083333,
+   "country": "Japan",
+   "wikidata": "Q11589405",
+   "type": "museum"
+  },
+  {
+   "name": "Kanagawa Prefectural Archaeological Artifacts Center",
+   "lat": 35.43319444,
+   "lon": 139.62766667,
+   "country": "Japan",
+   "wikidata": "Q30928683",
+   "type": "museum"
+  },
+  {
+   "name": "Katsushika City Museum",
+   "lat": 35.752917,
+   "lon": 139.843447,
+   "country": "Japan",
+   "wikidata": "Q11621071",
+   "type": "museum"
+  },
+  {
+   "name": "Katsushika Shibamata Tora-san Museum",
+   "lat": 35.75713889,
+   "lon": 139.88052778,
+   "country": "Japan",
+   "wikidata": "Q21018928",
+   "type": "museum"
+  },
+  {
+   "name": "Kawasui Kawasaki Aquarium",
+   "lat": 35.529611111,
+   "lon": 139.696305555,
+   "country": "Japan",
+   "wikidata": "Q97169050",
+   "type": "museum"
+  },
+  {
+   "name": "Kiki's Museum of Literature",
+   "lat": 35.64925,
+   "lon": 139.88225,
+   "country": "Japan",
+   "wikidata": "Q123309852",
+   "type": "museum"
+  },
+  {
+   "name": "Kunitachi Local Museum",
+   "lat": 35.678987,
+   "lon": 139.432612,
+   "country": "Japan",
+   "wikidata": "Q133257623",
+   "type": "museum"
+  },
+  {
+   "name": "Kyōdo-no-Mori",
+   "lat": 35.65611111,
+   "lon": 139.47361111,
+   "country": "Japan",
+   "wikidata": "Q3788904",
+   "type": "museum"
+  },
+  {
+   "name": "Kōnuma Folk Museum",
+   "lat": 35.851167,
+   "lon": 139.62825,
+   "country": "Japan",
+   "wikidata": "Q11675671",
+   "type": "museum"
+  },
+  {
+   "name": "Machida City Museum of Literature, Kotoba Land",
+   "lat": 35.54257222,
+   "lon": 139.45136111,
+   "country": "Japan",
+   "wikidata": "Q11578292",
+   "type": "museum"
+  },
+  {
+   "name": "Machida Squirrel Garden",
+   "lat": 35.578083,
+   "lon": 139.449722,
+   "country": "Japan",
+   "wikidata": "Q11578268",
+   "type": "museum"
+  },
+  {
+   "name": "Mega Web",
+   "lat": 35.626806,
+   "lon": 139.782528,
+   "country": "Japan",
+   "wikidata": "Q10854652",
+   "type": "museum"
+  },
+  {
+   "name": "Minato City Local History Museum",
+   "lat": 35.640083,
+   "lon": 139.726889,
+   "country": "Japan",
+   "wikidata": "Q115212362",
+   "type": "museum"
+  },
+  {
+   "name": "Museum of Logistics",
+   "lat": 35.62909,
+   "lon": 139.732234,
+   "country": "Japan",
+   "wikidata": "Q21654524",
+   "type": "museum"
+  },
+  {
+   "name": "Museum of Maritime Science",
+   "lat": 35.61944444,
+   "lon": 139.77277778,
+   "country": "Japan",
+   "wikidata": "Q1048709",
+   "type": "museum"
+  },
+  {
+   "name": "Museum of Modern Japanese Literature",
+   "lat": 35.662808,
+   "lon": 139.680929,
+   "country": "Japan",
+   "wikidata": "Q1954709",
+   "type": "museum"
+  },
+  {
+   "name": "Museum of Toshima City",
+   "lat": 35.727773,
+   "lon": 139.706728,
+   "country": "Japan",
+   "wikidata": "Q104698258",
+   "type": "museum"
+  },
+  {
+   "name": "NHK Museum of Broadcasting",
+   "lat": 35.663778,
+   "lon": 139.748278,
+   "country": "Japan",
+   "wikidata": "Q11235312",
+   "type": "museum"
+  },
+  {
+   "name": "NYK Maritime Museum",
+   "lat": 35.45027778,
+   "lon": 139.63944444,
+   "country": "Japan",
+   "wikidata": "Q6956071",
+   "type": "museum"
+  },
+  {
+   "name": "Nakagawa Funabansho Museum",
+   "lat": 35.68766667,
+   "lon": 139.84627778,
+   "country": "Japan",
+   "wikidata": "Q11364944",
+   "type": "museum"
+  },
+  {
+   "name": "National Film Archive of Japan",
+   "lat": 35.675527777,
+   "lon": 139.770611111,
+   "country": "Japan",
+   "wikidata": "Q51371009",
+   "type": "museum"
+  },
+  {
+   "name": "Nerima Shakujiikoen Furusato Museum",
+   "lat": 35.7375,
+   "lon": 139.599444,
+   "country": "Japan",
+   "wikidata": "Q11608060",
+   "type": "museum"
+  },
+  {
+   "name": "Nissan Engine Museum",
+   "lat": 35.48180556,
+   "lon": 139.66219444,
+   "country": "Japan",
+   "wikidata": "Q7040952",
+   "type": "museum"
+  },
+  {
+   "name": "Nissan Heritage Collection",
+   "lat": 35.494179,
+   "lon": 139.425034,
+   "country": "Japan",
+   "wikidata": "Q39048210",
+   "type": "museum"
+  },
+  {
+   "name": "Nogeyama Zoo",
+   "lat": 35.446556,
+   "lon": 139.622873,
+   "country": "Japan",
+   "wikidata": "Q861318",
+   "type": "museum"
+  },
+  {
+   "name": "Osaragi Jiro Memorial Museum",
+   "lat": 35.439306,
+   "lon": 139.65525,
+   "country": "Japan",
+   "wikidata": "Q11432376",
+   "type": "museum"
+  },
+  {
+   "name": "Police Museum",
+   "lat": 35.675108,
+   "lon": 139.769542,
+   "country": "Japan",
+   "wikidata": "Q11632332",
+   "type": "museum"
+  },
+  {
+   "name": "Safety Promotion Center",
+   "lat": 35.553665,
+   "lon": 139.753634,
+   "country": "Japan",
+   "wikidata": "Q3891462",
+   "type": "museum"
+  },
+  {
+   "name": "Seikei Gakuen Archives / Museum",
+   "lat": 35.710424,
+   "lon": 139.573251,
+   "country": "Japan",
+   "wikidata": "Q104698221",
+   "type": "museum"
+  },
+  {
+   "name": "Setagaya City Local Museum",
+   "lat": 35.641272,
+   "lon": 139.647245,
+   "country": "Japan",
+   "wikidata": "Q104708389",
+   "type": "museum"
+  },
+  {
+   "name": "Setagaya Literary Museum",
+   "lat": 35.6671,
+   "lon": 139.609,
+   "country": "Japan",
+   "wikidata": "Q11362100",
+   "type": "museum"
+  },
+  {
+   "name": "Shibuya Folk and Literary Shirane Memorial Museum",
+   "lat": 35.65638889,
+   "lon": 139.71255,
+   "country": "Japan",
+   "wikidata": "Q21019078",
+   "type": "museum"
+  },
+  {
+   "name": "Sodegaura City Local Museum",
+   "lat": 35.420948,
+   "lon": 139.994697,
+   "country": "Japan",
+   "wikidata": "Q104696854",
+   "type": "museum"
+  },
+  {
+   "name": "Suginami Historical Museum",
+   "lat": 35.685917,
+   "lon": 139.645447,
+   "country": "Japan",
+   "wikidata": "Q20045092",
+   "type": "museum"
+  },
+  {
+   "name": "Sumida Heritage Museum",
+   "lat": 35.713905,
+   "lon": 139.805882,
+   "country": "Japan",
+   "wikidata": "Q104698259",
+   "type": "museum"
+  },
+  {
+   "name": "Tabata Memorial Museum of Writers and Artists",
+   "lat": 35.738472,
+   "lon": 139.759278,
+   "country": "Japan",
+   "wikidata": "Q11577225",
+   "type": "museum"
+  },
+  {
+   "name": "Tama Zoological Park",
+   "lat": 35.651,
+   "lon": 139.402,
+   "country": "Japan",
+   "wikidata": "Q1413736",
+   "type": "museum"
+  },
+  {
+   "name": "The History Museum of J-Koreans",
+   "lat": 35.65154,
+   "lon": 139.73703,
+   "country": "Japan",
+   "wikidata": "Q122929555",
+   "type": "museum"
+  },
+  {
+   "name": "Toda City Museum",
+   "lat": 35.819146,
+   "lon": 139.663096,
+   "country": "Japan",
+   "wikidata": "Q11496511",
+   "type": "museum"
+  },
+  {
+   "name": "Tokorozawa Aviation Museum",
+   "lat": 35.7989,
+   "lon": 139.472,
+   "country": "Japan",
+   "wikidata": "Q1041232",
+   "type": "museum"
+  },
+  {
+   "name": "Tokyo Metropolitan Archaeological Center",
+   "lat": 35.626056,
+   "lon": 139.427722,
+   "country": "Japan",
+   "wikidata": "Q11525278",
+   "type": "museum"
+  },
+  {
+   "name": "Tokyo Sea Life Park",
+   "lat": 35.640083333,
+   "lon": 139.862166666,
+   "country": "Japan",
+   "wikidata": "Q4925165",
+   "type": "museum"
+  },
+  {
+   "name": "Train and Bus Museum",
+   "lat": 35.587858,
+   "lon": 139.592386,
+   "country": "Japan",
+   "wikidata": "Q11660619",
+   "type": "museum"
+  },
+  {
+   "name": "Transportation Museum",
+   "lat": 35.696917,
+   "lon": 139.770083,
+   "country": "Japan",
+   "wikidata": "Q10882995",
+   "type": "museum"
+  },
+  {
+   "name": "Ueno Zoo",
+   "lat": 35.7175,
+   "lon": 139.771388888,
+   "country": "Japan",
+   "wikidata": "Q162722",
+   "type": "museum"
+  },
+  {
+   "name": "Urayasu City Folk Museum",
+   "lat": 35.655222222,
+   "lon": 139.901083333,
+   "country": "Japan",
+   "wikidata": "Q11558212",
+   "type": "museum"
+  },
+  {
+   "name": "Waseda International House of Literature",
+   "lat": 35.709777777,
+   "lon": 139.719888888,
+   "country": "Japan",
+   "wikidata": "Q85880820",
+   "type": "museum"
+  },
+  {
+   "name": "Western River Railroad",
+   "lat": 35.633717,
+   "lon": 139.882425,
+   "country": "Japan",
+   "wikidata": "Q3567503",
+   "type": "museum"
+  },
+  {
+   "name": "Yokohama Anpanman Children's Museum",
+   "lat": 35.463055555,
+   "lon": 139.628722222,
+   "country": "Japan",
+   "wikidata": "Q2496472",
+   "type": "museum"
+  },
+  {
+   "name": "Yokohama Archives of History",
+   "lat": 35.4475,
+   "lon": 139.644,
+   "country": "Japan",
+   "wikidata": "Q942479",
+   "type": "museum"
+  },
+  {
+   "name": "Yokohama City Hasseiden Local Museum",
+   "lat": 35.41511111,
+   "lon": 139.66497222,
+   "country": "Japan",
+   "wikidata": "Q30929285",
+   "type": "museum"
+  },
+  {
+   "name": "Yokohama Curry Museum",
+   "lat": 35.4449,
+   "lon": 139.634,
+   "country": "Japan",
+   "wikidata": "Q1057482",
+   "type": "museum"
+  },
+  {
+   "name": "Yokohama Customs Museum",
+   "lat": 35.4495,
+   "lon": 139.642,
+   "country": "Japan",
+   "wikidata": "Q8054623",
+   "type": "museum"
+  },
+  {
+   "name": "Yokohama Doll Museum",
+   "lat": 35.44316667,
+   "lon": 139.65211111,
+   "country": "Japan",
+   "wikidata": "Q11262871",
+   "type": "museum"
+  },
+  {
+   "name": "Yokohama Marine Science Museum",
+   "lat": 35.443888888,
+   "lon": 139.650833333,
+   "country": "Japan",
+   "wikidata": "Q98381287",
+   "type": "museum"
+  },
+  {
+   "name": "Yokohama Omoshiro Aquarium",
+   "lat": 35.442944,
+   "lon": 139.644583,
+   "country": "Japan",
+   "wikidata": "Q17230652",
+   "type": "museum"
+  },
+  {
+   "name": "Yokohama Port Museum",
+   "lat": 35.453667,
+   "lon": 139.633,
+   "country": "Japan",
+   "wikidata": "Q11542838",
+   "type": "museum"
+  },
+  {
+   "name": "Yokohama Tram Museum",
+   "lat": 35.42048611,
+   "lon": 139.62456944,
+   "country": "Japan",
+   "wikidata": "Q11543182",
+   "type": "museum"
+  },
+  {
+   "name": "Yoshimura Akira Commemorative Museum of Modern Literature",
+   "lat": 35.7395,
+   "lon": 139.784194444,
+   "country": "Japan",
+   "wikidata": "Q38277897",
+   "type": "museum"
+  },
+  {
+   "name": "Yumemigasaki Zoological Park",
+   "lat": 35.549139,
+   "lon": 139.665194,
+   "country": "Japan",
+   "wikidata": "Q11431697",
+   "type": "museum"
+  },
+  {
+   "name": "Zoorasia",
+   "lat": 35.495319,
+   "lon": 139.52375,
+   "country": "Japan",
+   "wikidata": "Q3576063",
+   "type": "museum"
+  },
+  {
+   "name": "Ōsaki Park",
+   "lat": 35.88433333,
+   "lon": 139.71427778,
+   "country": "Japan",
+   "wikidata": "Q11435011",
+   "type": "museum"
+  },
+  {
+   "name": "Ōyama-kaidō Furusato-kan",
+   "lat": 35.60331667,
+   "lon": 139.61271944,
+   "country": "Japan",
+   "wikidata": "Q20043481",
+   "type": "museum"
+  },
+  {
+   "name": "Ōyama-kaidō Furusato-kan",
+   "lat": 35.603478,
+   "lon": 139.612718,
+   "country": "Japan",
+   "wikidata": "Q20043481",
+   "type": "museum"
+  }
+ ]
+}

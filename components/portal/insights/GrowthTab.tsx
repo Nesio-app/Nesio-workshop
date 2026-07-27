@@ -8,7 +8,8 @@
 
 import { useEffect, useState } from 'react';
 import { todayGrowthCards, recordGrowthAnswer, growthHistory, growthStreakDays, type GrowthCard, type GrowthAnswer } from '@/lib/portal/growth-guide';
-import { collectSeeds, generateObservation, DIMENSION_LABEL, summarizeDimensions, ringEmptyPct, deepenNudge, recentSpendItems, type Observation, type NudgeGuide } from '@/lib/portal/growth-engine';
+import { collectSeeds, generateObservation, DIMENSION_LABEL, summarizeDimensions, ringEmptyPct, deepenNudge, recentSpendItems, gradeReflection, type Observation, type NudgeGuide } from '@/lib/portal/growth-engine';
+import { REFLECTION_GRADE_LABEL } from '@/lib/portal/growth-protocols';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -18,6 +19,17 @@ import HealingTab from './HealingTab';
 import GrowthFootprint from './GrowthFootprint';
 
 const CHIP_CLASS: Record<Observation['mode'], string> = { nudge: 'emo', quiz: 'blind', trend: 'trend' };
+
+const LENS_MODE_LABEL: Record<string, { zh: string; en: string }> = {
+  soothe: { zh: '情绪 · 主动疏导', en: 'Feeling · gentle' },
+  reframe: { zh: '盲点 · 每日观察', en: 'Blind spot · daily' },
+  'action-stall': { zh: '行动 · 卡点诊断', en: 'Action · stall check' },
+  stoic: { zh: '掌控 · 控制二分', en: 'Control · dichotomy' },
+  socratic: { zh: '逻辑 · 苏格拉底', en: 'Logic · Socratic' },
+  'collision-read': { zh: '伴读 · 三岔碰撞', en: 'Reading · three forks' },
+  'biz-equation': { zh: '事业 · 心智方程', en: 'Biz · mind equation' },
+  'trend-spend': { zh: '趋势 · 主动发现', en: 'Trend · noticed' },
+};
 
 // 今天流:引擎观察优先;没有(无 key/无种子)时回落规则卡。统一成一件件过。
 type TodayItem = { key: string; t: 'obs'; o: Observation } | { key: string; t: 'rule'; c: GrowthCard };
@@ -37,6 +49,8 @@ export default function GrowthTab() {
 
   const [obs, setObs] = useState<Observation[]>([]);
   const [obsLoading, setObsLoading] = useState(true);
+  const [obsError, setObsError] = useState(false);
+  const [obsRetry, setObsRetry] = useState(0);
   const [idx, setIdx] = useState(0);          // 今天一次一件的游标
   const [freshAt, setFreshAt] = useState<string | null>(null); // 刚答完的回看流条目(滑入动效)
   const [openTrail, setOpenTrail] = useState<string | null>(null); // 点开回看的条目 key
@@ -50,20 +64,31 @@ export default function GrowthTab() {
   };
   useEffect(() => { refresh(); }, []);
 
-  // 引擎:选种子 → 逐个 AI 生成(失败/无 key → obs 为空,回落规则卡)
+  // 引擎:选种子 → 逐个 AI 生成(失败/无 key → obs 为空,回落规则卡;有种子全失败则显式错误+重试)
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      setObsLoading(true);
+      setObsError(false);
       try {
         const answered = new Set(growthHistory().map((a) => a.refId));
         const seeds = collectSeeds(Date.now(), answered, 3);
-        if (!seeds.length) { if (!cancelled) setObsLoading(false); return; }
+        if (!seeds.length) {
+          if (!cancelled) { setObs([]); setObsLoading(false); }
+          return;
+        }
         const results = await Promise.all(seeds.map((s) => generateObservation(s, en ? 'en' : 'zh')));
-        if (!cancelled) { setObs(results.filter((o): o is Observation => o !== null)); setObsLoading(false); }
-      } catch { if (!cancelled) setObsLoading(false); }
+        if (cancelled) return;
+        const ok = results.filter((o): o is Observation => o !== null);
+        setObs(ok);
+        setObsError(ok.length === 0);
+        setObsLoading(false);
+      } catch {
+        if (!cancelled) { setObs([]); setObsError(true); setObsLoading(false); }
+      }
     })();
     return () => { cancelled = true; };
-  }, [en]);
+  }, [en, obsRetry]);
 
   // 记一条回看 → 滑进回看流 → 出下一件
   function recordAndAdvance(card: GrowthCard, text: string) {
@@ -94,12 +119,17 @@ export default function GrowthTab() {
     : cards.map((c) => ({ key: c.id, t: 'rule' as const, c }));
   const current = todayItems[idx];
 
-  const basisLine = (o: Observation) => o.mode === 'nudge'
-    ? L(dict, '依据:你最近的一条记录 · 热情绪只疏导,不考你', 'From a recent note · heavy feelings get comfort, not a quiz')
-    : o.mode === 'quiz'
-      ? L(dict, '依据:你自己写下的想法 · 敌人是思维陷阱,不是你', 'From your own words · the enemy is the trap, not you')
-      : L(dict, '依据:你的真实数据 · 只是让你自己看见', 'From your real data · just so you can see it');
+  const basisLine = (o: Observation) => {
+    if (o.lensId === 'action-stall') return L(dict, '依据:未完成的承诺 · 点出卡点,给最小一步', 'From an open commitment · name the stall, one tiny step');
+    if (o.lensId === 'collision-read') return L(dict, '依据:久放的高置信记忆 · 赞同 / 质疑 / 延伸', 'From a dusty high-confidence note · agree / challenge / extend');
+    if (o.lensId === 'biz-equation') return L(dict, '依据:你的事业/内容记录 · 张丽心智方程', 'From your work notes · Zhang Li mind-share equation');
+    if (o.mode === 'nudge') return L(dict, '依据:你最近的一条记录 · 热情绪只疏导,不考你', 'From a recent note · heavy feelings get comfort, not a quiz');
+    if (o.mode === 'quiz') return L(dict, '依据:你自己写下的想法 · 敌人是思维陷阱,不是你', 'From your own words · the enemy is the trap, not you');
+    return L(dict, '依据:你的真实数据 · 只是让你自己看见', 'From your real data · just so you can see it');
+  };
 
+  const ruleDraft = current?.t === 'rule' ? (draft[current.c.id] || '') : '';
+  const ruleGrade = ruleDraft.trim() ? gradeReflection(ruleDraft, current?.t === 'rule' ? current.c.question : '') : null;
   return (
     <div className="nesio-growth">
       <div className="ng-subtabs" role="tablist">
@@ -112,19 +142,22 @@ export default function GrowthTab() {
       {tab === 'lens' ? <LensTab /> : tab === 'practice' ? <PracticeGround /> : tab === 'healing' ? <HealingTab seed={healingSeed} /> : (
         <>
           <GrowthFootprint onGoTab={(t) => setTab(t)} />
+          <p className="ng-coach-lead">
+            {L(dict, '今天教练带你看一件事 —— 启发优先,慢慢来。', 'Today your coach brings one thing — insight first, no rush.')}
+          </p>
           <p className="ng-streak">
-            {streak > 1 ? L(dict, `已连续回看 ${streak} 天 · 慢慢来`, `${streak} days in a row · no rush`) : L(dict, '慢慢来 —— 一次看清一件就好', 'No rush — one clear look at a time')}
+            {streak > 1 ? L(dict, `已连续回看 ${streak} 天`, `${streak} days in a row`) : L(dict, '一次看清一件就好', 'One clear look is enough')}
           </p>
 
-          {/* ── 心智成长环 ── */}
-          <div className="ng-sec"><span className="l">{L(dict, '心智成长', 'Mind growth')}</span><span className="r">{L(dict, '你留下觉察的地方', 'Where you left insight')}</span></div>
+          {/* ── 心智成长环(弱化仪表盘感)── */}
+          <div className="ng-sec"><span className="l">{L(dict, '你走过的面向', 'Facets you have touched')}</span><span className="r">{L(dict, '不是积分,是痕迹', 'Traces, not points')}</span></div>
           <div className="ng-mind">
             <p className="ng-mind-top">
               {total === 0
-                ? L(dict, '每答一条引导,就在一个维度上留下觉察 —— 底层模型共享,场景全是你自己的。',
-                    'Each prompt you answer leaves insight on one facet — shared models, your own scenes.')
-                : L(dict, `在 ${litCount} 个维度上留下过觉察 · 共 ${total} 次回看 —— 底层模型共享,场景全是你自己的`,
-                    `Insight on ${litCount} facets · ${total} look-backs — shared models, your own scenes`)}
+                ? L(dict, '每答一条引导,就在一个面向留下痕迹 —— 教练陪你看,不考你。',
+                    'Each prompt leaves a trace on one facet — your coach looks with you, no quiz.')
+                : L(dict, `在 ${litCount} 个面向上留下过痕迹 · 共 ${total} 次回看`,
+                    `Traces on ${litCount} facets · ${total} look-backs`)}
             </p>
             <div className="ng-dims">
               {codex.map((d) => (
@@ -141,14 +174,22 @@ export default function GrowthTab() {
 
           {/* ── 今天:一次一件 ── */}
           <div className="ng-sec">
-            <span className="l">{L(dict, '今天', 'Today')}</span>
+            <span className="l">{L(dict, '今天这一件', 'Today’s one thing')}</span>
             <span className="r">
-              {obsLoading ? L(dict, '念念在看你的记录…', 'Nessa is reading your notes…')
+              {obsLoading ? L(dict, '教练在翻你的记录…', 'Your coach is reading your notes…')
                 : todayItems.length === 0 ? L(dict, '今天很清静', 'A quiet day')
-                : idx >= todayItems.length ? L(dict, '今天做完了', 'Done for today')
-                : L(dict, `第 ${idx + 1} / ${todayItems.length} 条 · 答完再出下一条`, `${idx + 1} / ${todayItems.length} · one at a time`)}
+                : idx >= todayItems.length ? L(dict, '今天先到这里', 'That’s enough for today')
+                : L(dict, `第 ${idx + 1} 件 · 答完再出下一条`, `${idx + 1} · one at a time`)}
             </span>
           </div>
+
+          {obsError && !obsLoading && (
+            <div className="ng-done" style={{ marginBottom: 'var(--space-3)' }}>
+              <p>{L(dict, '念念这会儿没接上 —— 先用规则引导。', "Couldn't reach Nessa — using rule prompts for now.")}</p>
+              <button type="button" className="ng-btn" style={{ marginTop: 'var(--space-2)' }}
+                onClick={() => setObsRetry((n) => n + 1)}>{L(dict, '再试一次', 'Try again')}</button>
+            </div>
+          )}
 
           {obsLoading ? (
             <div className="ng-done">{L(dict, '念念在从你最近的记忆里,挑值得回头看一眼的事…', 'Nessa is picking what is worth a second look…')}</div>
@@ -170,6 +211,9 @@ export default function GrowthTab() {
               <textarea className="ng-ta" rows={2}
                 placeholder={L(dict, '答一句就够 —— 会存进回看流', 'One line is enough — saved to your trail')}
                 value={draft[current.c.id] || ''} onChange={(e) => setDraft((p) => ({ ...p, [current.c.id]: e.target.value }))} />
+              {ruleGrade != null && ruleDraft.trim().length >= 6 && (
+                <p className="ng-basis">{L(dict, `这句回看大约是「${REFLECTION_GRADE_LABEL[ruleGrade].zh}」`, `This look-back reads like “${REFLECTION_GRADE_LABEL[ruleGrade].en}”`)}</p>
+              )}
               <div className="ng-acts">
                 <button type="button" className="ng-btn" disabled={!(draft[current.c.id] || '').trim()}
                   onClick={() => recordAndAdvance(current.c, (draft[current.c.id] || '').trim())}>{L(dict, '记下这条回看', 'Save')}</button>
@@ -217,25 +261,36 @@ function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip, onGoHe
 }) {
   const chip = CHIP_CLASS[o.mode];
   const chipLabel = L(dict, DIMENSION_LABEL[o.dimension].zh, DIMENSION_LABEL[o.dimension].en);
+  const modeLabel = LENS_MODE_LABEL[o.lensId]
+    ? L(dict, LENS_MODE_LABEL[o.lensId].zh, LENS_MODE_LABEL[o.lensId].en)
+    : (o.mode === 'nudge' ? L(dict, '情绪 · 主动疏导', 'Feeling · gentle') : o.mode === 'quiz' ? L(dict, '盲点 · 每日观察', 'Blind spot · daily') : L(dict, '趋势 · 主动发现', 'Trend · noticed'));
   // 记忆原话由代码保证引出来(不靠 AI):sourceText 就是你的真实记忆/数据,永远显示
   const lead = o.mode === 'nudge' ? L(dict, '你记下 —— ', 'You noted — ') : o.mode === 'quiz' ? L(dict, '你写 ', 'You wrote ') : '';
   const memQuote = o.mode === 'trend' ? `${o.sourceText}。` : `${lead}「${o.sourceText}」。`;
   const tail = o.mode === 'quiz'
-    ? L(dict, '这句话里藏着一个常见的思维陷阱 —— 你抓得出是哪个吗?', 'A common thinking trap hides in this line — can you spot it?')
+    ? (o.lensId === 'biz-equation'
+      ? L(dict, '用张丽心智方程看 —— 此刻最短的是哪一力?', "Through Zhang Li's equation — which force is shortest now?")
+      : L(dict, '这句话里藏着一个常见的思维陷阱 —— 你抓得出是哪个吗?', 'A common thinking trap hides in this line — can you spot it?'))
     : (o.body || L(dict, '要不要陪你看看?', 'Want to look at it together?'));
 
   // 引导态:念念的引导链(情绪:疏导 + 图鉴小测)/ 明细(趋势)—— 主按钮做事,不是让你记
   const [guide, setGuide] = useState<NudgeGuide | null>(null);
   const [gpick, setGpick] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
+  const [talkError, setTalkError] = useState(false);
   const [detail, setDetail] = useState(false);
   const opened = guide !== null || detail;
   const gq = guide?.quiz;
   async function talk() {
     setLoading(true);
+    setTalkError(false);
     const g = await deepenNudge(o.sourceText, en ? 'en' : 'zh');
     setLoading(false);
-    setGuide(g ?? { reflection: L(dict, '这会儿没接上 —— 不过你已经愿意停下来看它,本身就是在照顾自己了。', "Couldn't reach me — but pausing to notice this is already care.") });
+    if (!g) {
+      setTalkError(true);
+      return;
+    }
+    setGuide(g);
   }
   const spend = detail ? recentSpendItems() : [];
   function saveNudge() {
@@ -247,8 +302,9 @@ function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip, onGoHe
 
   return (
     <div className="ng-today">
-      <span className={`ng-chip ${chip}`}>{o.mode === 'nudge' ? L(dict, '情绪 · 主动疏导', 'Feeling · gentle') : o.mode === 'quiz' ? L(dict, '盲点 · 每日观察', 'Blind spot · daily') : L(dict, '趋势 · 主动发现', 'Trend · noticed')} · {chipLabel}</span>
+      <span className={`ng-chip ${chip}`}>{modeLabel} · {chipLabel}</span>
       <p className="ng-ask"><span className="ng-mem">{memQuote}</span>{tail}</p>
+      {o.nextStep && <p className="ng-basis">{L(dict, '最小一步 · ', 'Tiny step · ')}{o.nextStep}</p>}
       <p className="ng-basis">{basis}</p>
 
       {o.mode !== 'quiz' ? (
@@ -283,14 +339,17 @@ function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip, onGoHe
               )) : <span>{L(dict, '这几笔在「财务」tab 里能看到完整明细。', 'Full details are in the Finance tab.')}</span>}
             </div>
           )}
+          {talkError && (
+            <p className="ng-basis">{L(dict, '这会儿没接上 —— 可以再试一次,或先跳过。', "Couldn't reach me — retry, or skip for now.")}</p>
+          )}
           <div className="ng-acts">
             {o.mode === 'nudge' && !guide && (
-              <button type="button" className="ng-btn" disabled={loading} onClick={() => void talk()}>{loading ? L(dict, '念念在想…', 'Nessa is thinking…') : L(dict, '和念念聊聊', 'Talk with Nessa')}</button>
+              <button type="button" className="ng-btn" disabled={loading} onClick={() => void talk()}>{loading ? L(dict, '念念在想…', 'Nessa is thinking…') : talkError ? L(dict, '再试一次', 'Try again') : L(dict, '和念念聊聊', 'Talk with Nessa')}</button>
             )}
             {o.mode === 'trend' && !detail && (
               <button type="button" className="ng-btn" onClick={() => setDetail(true)}>{L(dict, '看看明细', 'See the details')}</button>
             )}
-            {opened && (
+            {(opened || (o.mode === 'nudge' && o.nextStep)) && (
               <button type="button" className="ng-btn" onClick={saveNudge}>{L(dict, '记下这次觉察', 'Log this insight')}</button>
             )}
             <button type="button" className="ng-btn ghost" onClick={onSkip}>{o.mode === 'nudge' ? L(dict, '先不了', 'Not now') : L(dict, '知道了', 'Got it')}</button>

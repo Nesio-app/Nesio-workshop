@@ -18,6 +18,7 @@ const lifeGraphStub = {
   updateLifeNode: () => true,
   deleteLifeNode: () => true,
 };
+const ingestStub = { ingestLifeNode: (n) => lifeGraphStub.addLifeNode(n) };
 function loadTs(path, requireImpl) {
   const src = fs.readFileSync(new URL(path, import.meta.url), 'utf8');
   const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -27,7 +28,7 @@ function loadTs(path, requireImpl) {
 }
 const inv = loadTs('../lib/portal/inventory.ts', (p) => (
   p.includes('life-graph') ? lifeGraphStub
-  // 批次192:同上,补 named-places.displayStoredLocation stub(字符串样例回退 location)。
+  : p.includes('ingest-node') ? ingestStub
   : p.includes('named-places') ? { displayStoredLocation: (a) => (a && typeof a.location === 'string' ? a.location : '') }
   : ({})));
 const imp = loadTs('../lib/portal/inventory-import.ts', (p) => (p === './inventory' ? inv : ({})));
