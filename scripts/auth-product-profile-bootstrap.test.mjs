@@ -74,11 +74,15 @@ assert.match(appApiClient, /authReady\?: boolean/s, 'AuthSessionResponse must ty
 
 const portal = fs.readFileSync(portalPath, 'utf8');
 assert.match(portal, /fetch\('\/api\/auth\/session'/s, 'Portal must refresh signed-in state from the auth session endpoint.');
-assert.match(portal, /const loggedIn\s*=\s*Boolean\(data\?\.loggedIn\)/s, 'Portal must trust loggedIn for UI auth state.');
-assert.match(portal, /const sessionReady\s*=\s*loggedIn\s*&&\s*data\?\.authReady\s*!==\s*false\s*&&\s*data\?\.profileBootstrapBlocking\s*!==\s*true/s, 'Portal must treat product profile bootstrap as non-blocking while still respecting auth readiness.');
+assert.match(portal, /const loggedIn\s*=\s*Boolean\(data\.loggedIn\)/s, 'Portal must trust loggedIn for UI auth state once the session payload is definitive.');
+assert.match(portal, /const sessionReady\s*=\s*loggedIn\s*&&\s*data\.authReady\s*!==\s*false\s*&&\s*data\.profileBootstrapBlocking\s*!==\s*true/s, 'Portal must treat product profile bootstrap as non-blocking while still respecting auth readiness.');
 assert.match(portal, /markNesioOnboardingDoneForAuth\(\)/s, 'Portal must persist onboarding completion when a signed-in session is ready.');
 assert.match(portal, /window\.dispatchEvent\(new CustomEvent\(NESIO_ONBOARDING_COMPLETE_EVENT/s, 'Portal must notify onboarding when a signed-in session is ready.');
-assert.match(portal, /canUsePrivateRuntime\s*=\s*authReady\s*&&\s*authSessionLoggedIn/s, 'Portal private runtime must depend on auth-ready session, not profile bootstrap.');
+assert.match(portal, /canUsePrivateRuntime\s*=\s*authSessionLoggedIn\s*===\s*true/s, 'Portal private runtime/sync must require a definitive signed-in session (not unknown).');
+assert.match(portal, /canViewPrivateData\s*=\s*authSessionLoggedIn\s*!==\s*false/s, 'Portal UI private view must stay sticky while session is unknown (avoid demo/empty flicker).');
+assert.match(portal, /status\s*===\s*['"]session_unverified['"]/s, 'Portal must treat session_unverified as unknown, not signed-out.');
+assert.match(portal, /useState<\s*boolean\s*\|\s*null\s*>\s*\(\s*null\s*\)/s, 'Portal auth login bit must be tri-state (true/false/null).');
+assert.doesNotMatch(portal, /\.finally\(\s*\(\)\s*=>\s*\{\s*if\s*\(\s*!cancelled\s*\)\s*setAuthReady\(true\);\s*\}\s*\)\s*;\s*\n\s*window\.addEventListener/s, 'Portal must not set authReady in an outer finally that races ahead of the session fetch.');
 assert.doesNotMatch(portal, /profileBootstrapped|profileBootstrapStatus/s, 'Portal UI gate must not bounce signed-in users because product profile bootstrap is unavailable.');
 
 const onboarding = fs.readFileSync(onboardingPath, 'utf8');

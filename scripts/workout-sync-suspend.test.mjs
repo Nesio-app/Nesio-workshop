@@ -32,4 +32,13 @@ const onVisibleMatch = portal.match(/const onVisible = \(\) => \{[^}]*\}/);
 assert.ok(onVisibleMatch, '找不到 onVisible 可见性回调');
 assert.ok(!/autoSyncModulesWithCloud\(\)/.test(onVisibleMatch[0]), 'onVisible 里不得直呼 autoSyncModulesWithCloud();须走 scheduleHeavySyncBatch()');
 
-console.log('workout-sync-suspend: OK(跟练暂停重同步 + 空闲调度,绝不抢交互帧主线程)');
+// 4) 跟练浮层必须显式 pointer-events:auto —— 从洞察(Vaul)开跟练时 body 被锁成
+//    pointer-events:none;若不放行,点击穿透到下层动作库/计划,表现为「跟拍做卡死」。
+const css = fs.readFileSync(path.join(root, 'app', 'globals.css'), 'utf8');
+assert.match(
+  css,
+  /\.nesio-wp-overlay\s*\{[^}]*pointer-events:\s*auto/s,
+  '.nesio-wp-overlay 必须 pointer-events:auto(绕 Vaul body 锁,否则跟拍做点不中)',
+);
+
+console.log('workout-sync-suspend: OK(跟练暂停重同步 + 空闲调度 + 浮层可点,绝不抢交互帧主线程)');

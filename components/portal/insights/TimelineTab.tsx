@@ -43,7 +43,11 @@ import NesioSheet from '../ui/NesioSheet';
 import { computePlacesShareStats, type PlacesShareStats } from '@/lib/portal/places-share';
 import { matchPlacePhotoAsset, placePhotoOverrideId, setPlacePhotoOverride, PLACE_PHOTOS_EVENT, type GeoImageNode, type PlaceDescriptor } from '@/lib/portal/place-photos';
 import { countryDisplayName, canonicalCountryKey } from '@/lib/portal/country-normalize';
+import TravelPlanPanel from '../travel/TravelPlanPanel';
+import { listCompletedTrips, TRAVEL_TRIPS_UPDATED_EVENT, type Trip } from '@/lib/portal/travel-trips';
+import TripTimelineSheet from '../travel/TripTimelineSheet';
 
+type FootMode = 'visited' | 'plan';
 type Sub = 'timeline' | 'analytics' | 'travel' | 'world';
 
 /** 批次 77(用户点名图标问题):类别 emoji 彩圈 → 设计系统线性图标 */
@@ -228,6 +232,7 @@ export default function TimelineTab() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [trail, setTrail] = useState<PlaceVisit[]>([]);
   const [dayIdx, setDayIdx] = useState(0);
+  const [footMode, setFootMode] = useState<FootMode>('visited');
   const [sub, setSub] = useState<Sub>('timeline');
   const [placePeriod, setPlacePeriod] = useState<'day' | 'week' | 'month' | 'year'>('month'); // 地点饼图时段
   const [pieSel, setPieSel] = useState<string | null>(null); // 可交互饼图:选中的类别
@@ -244,6 +249,15 @@ export default function TimelineTab() {
   // 批次 62:地点纠正选择器(附近候选 + 手动命名,参考 Foursquare Where? 形态)
   const [placePick, setPlacePick] = useState<{ raw: string; lat?: number; lon?: number } | null>(null);
   const [shareStats, setShareStats] = useState<PlacesShareStats | null>(null); // 足迹成就卡分享
+  const [doneTrips, setDoneTrips] = useState<Trip[]>([]);
+  const [openDoneTripId, setOpenDoneTripId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const readTrips = () => setDoneTrips(listCompletedTrips());
+    readTrips();
+    window.addEventListener(TRAVEL_TRIPS_UPDATED_EVENT, readTrips);
+    return () => window.removeEventListener(TRAVEL_TRIPS_UPDATED_EVENT, readTrips);
+  }, []);
 
   useEffect(() => {
     const read = () => setTrail(loadPlaceTrail());
@@ -573,14 +587,54 @@ export default function TimelineTab() {
 
   // 「分析」并入「地点」—— 地点页先看月度概览,再看类别甜甜圈 + 最常去。
   const SUBS: Array<[Sub, string, string]> = [['timeline', '时间线', 'Timeline'], ['travel', '地点', 'Places'], ['world', '世界', 'World']];
+  const FOOT_MODES: Array<[FootMode, string, string]> = [
+    ['visited', '足迹(去过)', 'Footprints'],
+    ['plan', '计划(要去)', 'Plans'],
+  ];
 
   return (
     <div className="nesio-tl">
+      <div className="nesio-foot-modes" role="tablist" aria-label={L(dict, '足迹模式', 'Footprint mode')}>
+        {FOOT_MODES.map(([id, zh, en]) => (
+          <button
+            key={id}
+            type="button"
+            role="tab"
+            aria-selected={footMode === id}
+            className={`nesio-foot-mode${footMode === id ? ' is-active' : ''}`}
+            onClick={() => setFootMode(id)}
+          >
+            {L(dict, zh, en)}
+          </button>
+        ))}
+      </div>
+
+      {footMode === 'plan' && <TravelPlanPanel />}
+
+      {footMode === 'visited' && (
+      <>
       <div className="nesio-fin-subtabs">
         {SUBS.map(([id, zh, en]) => (
           <button key={id} type="button" className={`nesio-fin-subtab${sub === id ? ' is-active' : ''}`} onClick={() => setSub(id)}>{L(dict, zh, en)}</button>
         ))}
       </div>
+
+      {doneTrips.length > 0 && sub === 'timeline' && (
+        <div className="nesio-travel-done">
+          <p className="nesio-settings-section-label">{L(dict, '完成的行程', 'Completed trips')}</p>
+          <ul className="nesio-travel-done-list">
+            {doneTrips.slice(0, 6).map((t) => (
+              <li key={t.id}>
+                <button type="button" className="nesio-travel-done-chip" onClick={() => setOpenDoneTripId(t.id)}>
+                  <IconPlane size={14} />
+                  <span>{t.title}</span>
+                  <small>{t.endDate}</small>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* ── 时间线:当天行程 ── */}
       {sub === 'timeline' && (
@@ -1110,6 +1164,14 @@ export default function TimelineTab() {
       )}
       {/* 记忆详情提到顶层:时间线缩略图 / 到访记忆列表两条路径都能点开(自带 Vaul portal) */}
       {visitSel && <MemoryNodeDetail node={visitSel} onClose={() => setVisitSel(null)} />}
+      </>
+      )}
+
+      <TripTimelineSheet
+        tripId={openDoneTripId}
+        open={Boolean(openDoneTripId)}
+        onClose={() => setOpenDoneTripId(null)}
+      />
     </div>
   );
 }

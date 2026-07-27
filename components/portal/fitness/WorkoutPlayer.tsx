@@ -20,6 +20,11 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { suspendCloudSync } from '@/lib/portal/sync-suspend';
+import {
+  playWorkoutTempo,
+  unlockWorkoutTempoSound,
+  warmupWorkoutTempoSound,
+} from '@/lib/portal/workout-tempo-sound';
 
 export interface PlayerStep {
   exerciseId: string;
@@ -35,12 +40,10 @@ export interface PlayerSession {
   sessionId?: string;
 }
 
-// 【节拍:纯视觉,绝不碰任何设备硬件 —— 本机碰硬件就永久卡死,已多次真机验证】
-// 事实链:放声音 → 一点跟拍就永久冻死;去掉声音只留「轻震动」→ 仍会卡死。
-// 结论:这台设备/壳内 WebView **任何硬件激活**(音频、震动马达…)都可能同步阻塞主线程且不返回
-// (是阻塞不是抛错,try/catch 与错误边界都接不住)。所以跟练**只用纯界面反馈,不碰任何硬件**。
-// 节拍 = 大号次数每拍放大回弹一下(见 .nesio-wp-beat,由 repCount 变化驱动,纯 React+CSS,永不阻塞)。
-// ping 保留成空函数,只为不动各调用点;它绝不做任何会碰硬件的事。
+// 【节拍 = 视觉脉冲 + 尽力而为的短 WAV】
+// 视觉:大号次数每拍放大回弹(.nesio-wp-beat)。声音:走 workout-tempo-sound(HTMLAudio 短
+// WAV、宏任务播放、绝不碰 WebAudio/震动)。原生壳/Android WebView 默认静音防历史卡死;
+// 桌面与普通浏览器有声。Mute 按钮仍可关。
 
 const REP_TEMPO_SEC = 3; // 跟拍:每次约 3 秒(1 秒发力 + 2 秒还原)
 
@@ -69,11 +72,13 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   const [countTotal, setCountTotal] = useState(0); // 本次倒计时的总量,给进度条算百分比
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mutedRef = useRef(false);
-  mutedRef.current = muted; // 供 setInterval 闭包读到最新节拍开关
+  mutedRef.current = muted; // 供 setInterval 闭包读到最新静音态
 
-  // 节拍反馈:空函数 —— 绝不碰任何硬件(声音/震动本机都会永久卡死)。真正的节拍是纯视觉的
-  // 大号次数脉冲(.nesio-wp-beat,由 repCount 变化驱动)。保留 ping 只为不改各调用点。
-  const ping = (_freq: number, _ms = 80) => { /* no-op:不碰任何硬件,永不阻塞主线程 */ };
+  // 节拍反馈:视觉脉冲在 JSX;声音走独立模块(异步、可静音、不安全环境自动跳过)。
+  const ping = (freq: number, _ms = 80) => {
+    if (mutedRef.current) return;
+    playWorkoutTempo(freq);
+  };
 
   useSheetDismiss(true, onClose); // 挂载即打开;Escape 关闭 + 焦点回收
 
@@ -81,6 +86,9 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   // 主线程数秒。跟练是盖在 Portal 上的浮层,若不暂停,一回前台(锁屏/切换/通知后返回)整批同步就在那一帧
   // 跑,界面冻死。退出跟练时 release 会派发 resume 事件,让 Portal 补跑一次。
   useEffect(() => suspendCloudSync(), []);
+
+  // 预热节拍音(宏任务;不安全环境模块内直接跳过)。
+  useEffect(() => { warmupWorkoutTempoSound(); }, []);
 
   // 防御(修「打开跟练卡死」):session/steps 可能来自别端同步回的畸形数据(缺 steps、非数组、
   // 元素缺 exerciseId)。绝不裸解引用 —— 归一成合法 steps 数组,非法则本组件优雅关闭,不 throw。
@@ -125,8 +133,9 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   function startRepTempo() {
     if (!step) return;
     clearTimer();
+    unlockWorkoutTempoSound(); // 用户手势内解锁媒体会话(iOS)
     setRepCount(1);
-    ping(880, 80); // 第 1 次(需用户手势触发,iOS 才出声 —— 这个点击就是手势)
+    ping(880, 80); // 第 1 次
     timerRef.current = setInterval(() => {
       setRepCount((r) => {
         const next = r + 1;
@@ -267,7 +276,10 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
       {phase === 'work' && (
         <div className="nesio-wp-actions">
           {step.unit === 'sec' && countdown == null && (
-            <button type="button" className="nesio-wp-ghost" onClick={() => runCountdown(step.reps, () => { ping(1320, 240); })}>
+            <button type="button" className="nesio-wp-ghost" onClick={() => {
+              unlockWorkoutTempoSound();
+              runCountdown(step.reps, () => { ping(1320, 240); });
+            }}>
               {L(dict, `计时 ${step.reps}s`, `Time ${step.reps}s`)}
             </button>
           )}
