@@ -113,8 +113,9 @@ export async function getDevicePosition(options?: {
   enableHighAccuracy?: boolean;
 }): Promise<DeviceLatLon | null> {
   if (typeof window === 'undefined') return null;
-  const timeoutMs = options?.timeoutMs ?? 8_000;
-  const maximumAgeMs = options?.maximumAgeMs ?? 60_000;
+  // 原生壳给足时间:室内首点常 >8s;缓存最大年龄放宽。
+  const timeoutMs = options?.timeoutMs ?? (isNativePlatform() ? 18_000 : 8_000);
+  const maximumAgeMs = options?.maximumAgeMs ?? (isNativePlatform() ? 300_000 : 60_000);
   const enableHighAccuracy = options?.enableHighAccuracy ?? false;
 
   if (isNativePlatform()) {
@@ -124,18 +125,25 @@ export async function getDevicePosition(options?: {
         const req = await NesioGeolocation.requestPermissions();
         if (!granted(req)) return null;
       }
-      const pos = await NesioGeolocation.getCurrentPosition({
-        enableHighAccuracy,
-        timeout: timeoutMs,
-        maximumAge: maximumAgeMs,
-      });
-      if (!pos?.ok || typeof pos.lat !== 'number' || typeof pos.lon !== 'number') return null;
-      return {
-        lat: pos.lat,
-        lon: pos.lon,
-        accuracy: pos.accuracy ?? 0,
-        timestamp: pos.timestamp || Date.now(),
+      const attempt = async () => {
+        const pos = await NesioGeolocation.getCurrentPosition({
+          enableHighAccuracy,
+          timeout: timeoutMs,
+          maximumAge: maximumAgeMs,
+        });
+        if (!pos?.ok || typeof pos.lat !== 'number' || typeof pos.lon !== 'number') return null;
+        return {
+          lat: pos.lat,
+          lon: pos.lon,
+          accuracy: pos.accuracy ?? 0,
+          timestamp: pos.timestamp || Date.now(),
+        };
       };
+      const first = await attempt();
+      if (first) return first;
+      // 再试一次(冷启动 GPS / LocationUnknown 后)
+      await new Promise((r) => setTimeout(r, 600));
+      return await attempt();
     } catch {
       /* 原生失败再试 web */
     }
@@ -152,7 +160,7 @@ export async function getDevicePosition(options?: {
           timestamp: pos.timestamp || Date.now(),
         }),
         () => resolve(null),
-        { enableHighAccuracy, timeout: Math.min(timeoutMs, 2500), maximumAge: maximumAgeMs },
+        { enableHighAccuracy, timeout: Math.min(timeoutMs, 8_000), maximumAge: maximumAgeMs },
       );
     } catch {
       resolve(null);

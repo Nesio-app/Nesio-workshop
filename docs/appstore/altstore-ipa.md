@@ -43,6 +43,20 @@ npx cap open ios
 - 只改了线上 Web / API：**不用**重打 IPA（壳仍加载同一 `server.url`）。
 - 改了 `capacitor.config.ts`、原生插件、图标、权限文案：再跑 `npx cap sync ios` → Archive。
 
+## HealthKit（健康 App 共享列表）
+
+**免费 Apple ID + Sideloadly/AltStore 自签：HealthKit 进不了「健康 → 共享 → App」。**
+
+原因：HealthKit 需要描述文件里带 `com.apple.developer.healthkit`。免费 Personal Team 的 profile **不支持**该 capability；我们打的 unsigned IPA 也不含 entitlements，重签后系统拒绝注册 → 健康 App 永远看不到 Nesio，请求结果像 `denied`。
+
+| 路径 | 行不行 |
+|---|---|
+| 付费 Apple Developer（$99）在 App ID 开 HealthKit，用带 entitlement 的 Development/Ad Hoc 签名 | ✅ |
+| 免费侧载 / 当前 Sideloadly 流程 | ❌ |
+| **替代：数据接入 → Apple 健康 → 选导出的 zip / export.xml** | ✅ 一直可用 |
+
+Always 定位不依赖 HealthKit，可与导出文件并行使用。
+
 ## 隐私权限（相机闪退必查）
 
 `cap add ios` 生成的 `Info.plist` **默认没有**相机/相册用途说明。缺 `NSCameraUsageDescription` 时，点 📷 调 `getUserMedia` 会被 iOS **直接杀进程（闪退）**。

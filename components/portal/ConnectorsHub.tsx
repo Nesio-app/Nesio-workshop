@@ -1094,10 +1094,35 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           showToast(L(dict, '位置权限被拒绝 — 可在系统设置里打开定位后再试', 'Location denied — enable Location in Settings and retry'), false);
           return;
         }
-        const pos = await getDevicePosition({ timeoutMs: 8_000, maximumAgeMs: 30_000, enableHighAccuracy: false });
+        const pos = await getDevicePosition({ timeoutMs: 18_000, maximumAgeMs: 300_000, enableHighAccuracy: false });
+        let alwaysOk = false;
+        if (isNativePlatform()) {
+          const always = await requestAlwaysLocationPermission();
+          alwaysOk = always.always;
+          // 即使这一次没拿到点,也开足迹监听(Always 已开时后台会补点)
+          try {
+            const { ensurePlaceTrailWatch } = await import('@/lib/portal/native-geolocation');
+            void ensurePlaceTrailWatch();
+          } catch { /* ignore */ }
+        }
         if (!pos) {
+          // 权限已有但本轮无点:仍标已连接,避免「Always 开了却像没接入」
+          saveConnectorState('weather', true);
+          setConnected((p) => ({ ...p, weather: true }));
+          window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
           setSyncing(null);
-          showToast(L(dict, '暂时拿不到坐标 — 到室外或稍后再试', 'Couldn’t get coordinates — try outdoors or again later'), false);
+          showToast(
+            L(
+              dict,
+              alwaysOk
+                ? '权限已是始终,这一次没拿到实时点 — 稍后再点接入,或到窗边/室外试一次(足迹监听已开)'
+                : '暂时拿不到坐标 — 到窗边/室外再试;系统定位需开「精确位置」',
+              alwaysOk
+                ? 'Always granted but no fix this time — retry near a window; trail watch is on'
+                : 'No coordinates — try near a window outdoors; enable Precise Location',
+            ),
+            false,
+          );
           return;
         }
         // 写入天气/记忆定位缓存,让「已连接」真有实时坐标可用。
@@ -1108,11 +1133,6 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           void prefetchCaptureLocation(true);
         } catch { /* ignore */ }
 
-        let alwaysOk = false;
-        if (isNativePlatform()) {
-          const always = await requestAlwaysLocationPermission();
-          alwaysOk = always.always;
-        }
         // 立刻记一条足迹 + 开后台监听(此前只要权限、不记点 → Always 了足迹仍空)。
         try {
           const { recordVisitFromCoords, ensurePlaceTrailWatch } = await import('@/lib/portal/native-geolocation');
@@ -1174,11 +1194,18 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           const res = await syncHealthKitToStore(30);
           setSyncing(null);
           if (!res.ok || !res.metrics) {
+            const reason = res.reason || 'denied';
+            const entitlementBlocked = /entitlement|missing|unauthorized|not available|HealthKit/i.test(reason)
+              || reason === 'denied';
             showToast(
               L(
                 dict,
-                `HealthKit 未读到数据(${res.reason || 'denied'})。可到「健康 App → 共享 → App → Nesio」打开开关；或点确定后改用导出文件。`,
-                `HealthKit empty (${res.reason || 'denied'}). Open Health → Sharing → Apps → Nesio; or use export file next.`,
+                entitlementBlocked
+                  ? '直连 HealthKit 需要付费 Apple 开发者账号签名；免费 Sideloadly 进不了「健康→共享」列表。请改用导出 zip/xml。'
+                  : `HealthKit 未读到数据(${reason})。请改用导出 zip/xml。`,
+                entitlementBlocked
+                  ? 'Live HealthKit needs a paid Apple Developer signed build; free Sideloadly cannot appear in Health→Sharing. Use export zip/xml.'
+                  : `HealthKit empty (${reason}). Use export zip/xml instead.`,
               ),
               false,
             );
