@@ -28,14 +28,10 @@ const config: CapacitorConfig = {
     ],
   },
 
-  // 官方 @capacitor/geolocation + local-notifications 在 Xcode 15 + Cap 8 SPM 编不过
-  // (Swift API 被 $NonescapableTypes 门控,需 Xcode 26)。改走 App 内自研桥:
-  // NesioGeolocation / NesioLocalNotify。packageClassList 由 cap sync 维护 + 下方手工追加。
-  packageClassList: [
-    'NesioGeolocationPlugin',
-    'NesioLocalNotifyPlugin',
-    'NesioHealthKitPlugin',
-  ],
+  // 官方插件在 Xcode 15 + Cap 8 SPM 编不过 → App 内自研桥
+  // NesioGeolocation / NesioLocalNotify / NesioHealthKit。
+  // packageClassList 不写进 CapacitorConfig(类型不含该字段);
+  // 由 cap sync 后写入 ios/.../capacitor.config.json,见本地打 IPA 流程。
 
   ios: {
     // never: WebView 铺满物理屏,安全区交给 CSS env(safe-area-inset-*)。
