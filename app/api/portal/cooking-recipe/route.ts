@@ -8,7 +8,8 @@ import { guardAiRoute } from '@/lib/portal/api-auth';
 import { completeText } from '@/lib/portal/ai-complete';
 import { parseJsonBlock } from '@/lib/extraction/extraction';
 import { CUISINES } from '@/lib/cooking/food-catalog';
-import { buildRecipeGeneratePrompt, clampGeneratedRecipe } from '@/lib/cooking/recipe-generate';
+import { buildRecipeGeneratePrompt, clampGeneratedRecipe, pickRecipeTips, formatTechniqueNotes, type TechniqueTip } from '@/lib/cooking/recipe-generate';
+import tipsData from '@/public/data/cooking/tips.json';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 45;
@@ -39,7 +40,9 @@ export async function POST(req: NextRequest) {
 
   const customPrompt = typeof body?.customPrompt === 'string' ? body.customPrompt : '';
   const locale = typeof body?.locale === 'string' ? body.locale : 'zh';
-  const prompt = buildRecipeGeneratePrompt({ cuisine, ingredients, customPrompt, locale });
+  // 技法 grounding:本地语料确定性选摘(≤2 篇×700字),选不中就不带,不为凑数花 token。
+  const techniqueTips = pickRecipeTips((tipsData as { tips?: TechniqueTip[] }).tips ?? [], { ingredients, customPrompt });
+  const prompt = buildRecipeGeneratePrompt({ cuisine, ingredients, customPrompt, locale, techniqueNotes: formatTechniqueNotes(techniqueTips) });
 
   try {
     const { text } = await completeText({

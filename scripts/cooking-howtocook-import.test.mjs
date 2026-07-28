@@ -6,7 +6,7 @@
  */
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import { parseDish, parseQuantityLine, stripAnnotation, CATEGORY_MAP, TOOL_RE } from './import-howtocook.mjs';
+import { parseDish, parseQuantityLine, parseTip, stripAnnotation, deriveTools, deriveMethods, CATEGORY_MAP, TOOL_RE } from './import-howtocook.mjs';
 
 // ── 解析器:官方 template 结构的 fixture(混用 + 与 - 列表符,含工具/注解/区间) ──
 const FIXTURE = `# 测试炒肉的做法
@@ -68,6 +68,19 @@ assert.equal(parseDish('# 空菜的做法\n\n## 操作\n\n1. 无原料。\n', '�
 // ── 分类映射覆盖 dishes/ 全部非 template 目录 ──
 assert.equal(Object.keys(CATEGORY_MAP).length, 10, '10 个分类目录(template 除外)');
 
+// ── 器具/技法推导:确定性文本扫描 ──
+assert.deepEqual(deriveTools('放入电饭锅,按下煮饭键;取出后用平底锅略煎'), ['电饭煲', '平底锅'], '器具规范名(电饭锅→电饭煲)');
+assert.deepEqual(deriveTools('大火翻炒出锅'), [], '通用「锅」不算器具');
+assert.ok(deriveMethods('先炒香再转小火炖 40 分钟', '炒菜').includes('炒') && deriveMethods('先炒香再转小火炖 40 分钟', '炒菜').includes('炖'), '分类先验 + 文本扫描并集');
+assert.deepEqual(deriveMethods('放着不动', '凉拌'), ['凉拌'], '分类先验单独成立');
+
+// ── tips 技法文解析 ──
+const tip = parseTip('# 炒/煎\n\n![img](./x.jpg)\n\n## 器具\n\n* 可用普通炒锅\n', '技法');
+assert.equal(tip.title, '炒/煎', 'tips 标题');
+assert.equal(tip.group, '技法');
+assert.ok(tip.content.includes('可用普通炒锅') && !tip.content.includes('!['), '内容保留正文、去图片');
+assert.equal(parseTip('# 只有标题\n', '基础'), null, '无正文返回 null');
+
 // ── 并入后的语料形状(public/data/cooking/recipes.json) ──
 const corpus = JSON.parse(fs.readFileSync(new URL('../public/data/cooking/recipes.json', import.meta.url), 'utf8'));
 assert.ok(Array.isArray(corpus.sources) && corpus.sources.some((s) => s.id === 'howtocook') && corpus.sources.some((s) => s.id === 'cooklikehoc'), '双语料来源登记(含许可)');
@@ -81,5 +94,19 @@ for (const r of corpus.recipes) {
 }
 assert.ok(htc.filter((r) => r.quantities.length > 0).length / htc.length > 0.8, 'howtocook 八成以上带家庭份量');
 assert.ok(htc.some((r) => r.image && r.image.startsWith('htc-')), '封面图带 htc- 前缀防撞名');
+for (const r of corpus.recipes) {
+  assert.ok(Array.isArray(r.tools) && Array.isArray(r.methods), `器具/技法维度齐:${r.name}`);
+}
+assert.ok(corpus.recipes.some((r) => r.tools.includes('电饭煲')), '器具筛选有货:电饭煲');
+assert.ok(corpus.recipes.some((r) => r.tools.includes('烤箱')), '器具筛选有货:烤箱');
+
+// ── tips.json 语料形状 ──
+const tipsCorpus = JSON.parse(fs.readFileSync(new URL('../public/data/cooking/tips.json', import.meta.url), 'utf8'));
+assert.ok(tipsCorpus.sources?.some((s) => s.id === 'howtocook'), 'tips 来源登记(含许可)');
+assert.equal(tipsCorpus.count, tipsCorpus.tips.length, 'tips count 与实际一致');
+assert.ok(tipsCorpus.tips.length >= 15, `tips 语料在库(${tipsCorpus.tips.length})`);
+for (const x of tipsCorpus.tips) {
+  assert.ok(x.id && x.title && x.content && ['基础', '技法', '进阶'].includes(x.group), `tips 行结构完整:${x.id}`);
+}
 
 console.log('✅ cooking-howtocook-import contract passed');

@@ -167,7 +167,16 @@ sensitivity/retention 枚举化(中期)。
   **封面图已上(2026-07-28)**:`RecipeThumb`(无图/加载失败回退菜名首字占位,不出破图)——
   做饭首页自选列表 44px、两处联想行 32px、想做清单 44px、详情页 180px 头图(`recipeImageUrl`
   首次真正被调用)。周计划是「星期+输入框」编辑行,不适合挂图,不加。**待真机看观感。**
-  **待做**:tips/ 技法文做新手卡或 cooking-recipe RAG;器具维度(tools/methods,参考 cook.zhangjc.tech)。
+  **tips + 器具维度已收口(2026-07-28,本线欠账清零)**:
+  ① tips 技法文 18 篇 → `tips.json`(importer 顺产,基础/技法/进阶三组)——双用途:
+  「新手技法」屏(做饭首页入口,分组手风琴,轻 md 渲染,载入失败显式重试)+
+  AI 生成菜谱 grounding(`pickRecipeTips` 确定性选摘 ≤2 篇×700 字进 prompt:标题钥匙词
+  命中特殊要求/食材、荤料自动带去腥;选不中不带,不为凑数花 token)。
+  ② 器具/技法维度:importer 对两语料从步骤文本确定性推导 `tools`/`methods`
+  (704 道全量,161 道有明确器具;借鉴 cook.zhangjc.tech 数据形态,通用「锅」不算)——
+  选菜联想加器具 chips(「家里只有电饭煲能做什么」:只选器具不打字时按库存命中率推 6 道,
+  空结果显式提示)。契约:`test:cooking-howtocook`(tips/推导/语料形状)+
+  `test:cooking-recipe-ai`(grounding 接线钉子)。**美食线无挂账;真机观感待看。**
 
 - **激进审计落地(2026-07-27)**:Kill `nesio-card-feedback-v1`(DEC 改读 Signal 投影);
   停用 `guidance-ranker` / cross-region bandit **学习接线**(Today 回规则分+Preference+cooling);

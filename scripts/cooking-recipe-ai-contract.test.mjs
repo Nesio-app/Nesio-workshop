@@ -18,6 +18,11 @@ assert.match(route, /completeText/);
 const gen = read('lib/cooking/recipe-generate.ts');
 assert.match(gen, /buildRecipeGeneratePrompt/);
 assert.match(gen, /clampGeneratedRecipe/);
+// 技法 grounding:本地 tips 语料确定性选摘进 prompt(选不中不带,不为凑数花 token)。
+assert.match(gen, /pickRecipeTips/);
+assert.match(gen, /techniqueNotes/);
+assert.match(route, /pickRecipeTips/);
+assert.match(route, /tips\.json/);
 
 const store = read('lib/cooking/generated-recipes.ts');
 assert.match(store, /nesio-generated-recipes-v1/);

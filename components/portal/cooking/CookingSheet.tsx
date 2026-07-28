@@ -9,7 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
-import { IconCamera, IconCheckSquare, IconZap, IconUtensils } from '../icons';
+import { IconBookOpen, IconCamera, IconCheckSquare, IconZap, IconUtensils } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -18,7 +18,7 @@ import {
   PANTRY_CATEGORIES, type PantryItem,
 } from '@/lib/cooking/pantry';
 import { normalizeIngredient, CUISINES } from '@/lib/cooking/food-catalog';
-import { loadRecipes, recipeImageUrl, type Recipe } from '@/lib/cooking/food-data';
+import { loadRecipes, loadTips, recipeImageUrl, type Recipe, type CookingTip } from '@/lib/cooking/food-data';
 import { matchRecipe, matchRecipes, type RecipeMatch } from '@/lib/cooking/recipe-match';
 import { getShoppingList, addToShopping, toggleShoppingItem, removeShoppingItem, checkoutBought, type ShoppingItem } from '@/lib/cooking/shopping';
 import { recipeNutritionPerServing, recipeMainNutrition, lookupNutrition, type PerServing, type FoodNutrition } from '@/lib/cooking/nutrition';
@@ -36,7 +36,8 @@ type View =
   | { kind: 'needs'; match: RecipeMatch<Recipe>; from: 'home' | 'wishlist' | 'recipe' }
   | { kind: 'logmeal' }
   | { kind: 'plan' }
-  | { kind: 'generate' };
+  | { kind: 'generate' }
+  | { kind: 'tips' };
 
 export default function CookingSheet({ open, onClose, initialView }: {
   open: boolean; onClose: () => void;
@@ -149,7 +150,7 @@ export default function CookingSheet({ open, onClose, initialView }: {
                 <HomeBody
                   soon={soon} recipes={recipes} recipesErr={recipesErr} soonNames={soonNames} pantryNames={pantryNames}
                   onLoadRec={loadRec} onOpenRecipe={(m) => setView({ kind: 'recipe', match: m })}
-                  onLogMeal={startLogMeal} onCamera={openCamera}
+                  onLogMeal={startLogMeal} onCamera={openCamera} onTips={() => { setErr(''); setView({ kind: 'tips' }); }}
                   onGenerate={() => {
                     if (!guardPaidCloudAi('cooking_recipe_ai')) return;
                     setErr('');
@@ -216,6 +217,12 @@ export default function CookingSheet({ open, onClose, initialView }: {
                 <PlanBody matches={planMatches} recipes={recipes} soonNames={soonNames} pantryNames={pantryNames} onError={setErr} t={t} />
               </>
             )}
+            {view.kind === 'tips' && (
+              <>
+                <ScreenHead backLabel={t('做饭', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={t('新手技法', 'Techniques')} />
+                <TipsBody t={t} />
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -224,22 +231,27 @@ export default function CookingSheet({ open, onClose, initialView }: {
 }
 
 // ── 屏1 做饭首页 ──────────────────────────────────────────────────────────────
-function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec, onOpenRecipe, onLogMeal, onCamera, onGenerate, t }: {
+function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec, onOpenRecipe, onLogMeal, onCamera, onGenerate, onTips, t }: {
   soon: PantryItem[]; recipes: Recipe[] | null; recipesErr: boolean; soonNames: Set<string>; pantryNames: Set<string>;
   onLoadRec: () => void; onOpenRecipe: (m: RecipeMatch<Recipe>) => void; onLogMeal: () => void; onCamera: () => void;
-  onGenerate: () => void; t: TT;
+  onGenerate: () => void; onTips: () => void; t: TT;
 }) {
   // 菜谱由用户自选/输入,不再用库存自动塞固定列表。
   const [picked, setPicked] = useState<string[]>([]);
   const [adding, setAdding] = useState(false);
   const [q, setQ] = useState('');
+  const [tool, setTool] = useState('');
 
+  // 器具筛选 + 联想:「家里只有电饭煲能做什么」——只选器具不打字时,按库存命中率推 6 道。
   const suggestions = useMemo(() => {
+    if (!recipes) return [];
     const query = q.trim();
-    if (!query || !recipes) return [];
     const have = new Set(picked);
-    return recipes.filter((r) => r.name.includes(query) && !have.has(r.name)).slice(0, 6);
-  }, [q, recipes, picked]);
+    const pool = recipes.filter((r) => !have.has(r.name) && (!tool || (r.tools ?? []).includes(tool)));
+    if (query) return pool.filter((r) => r.name.includes(query)).slice(0, 6);
+    if (!tool) return [];
+    return matchRecipes(pool, pantryNames, normalizeIngredient).slice(0, 6).map((m) => m.recipe);
+  }, [q, recipes, picked, tool, pantryNames]);
 
   const rows = useMemo(() => {
     if (!recipes) return picked.map((name) => ({ name, match: null as RecipeMatch<Recipe> | null }));
@@ -254,7 +266,7 @@ function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec
     const v = (nm ?? q).trim();
     if (!v) { setAdding(false); return; }
     setPicked((prev) => (prev.includes(v) ? prev : [...prev, v]));
-    setQ(''); setAdding(false);
+    setQ(''); setTool(''); setAdding(false);
   }
   function removeDish(name: string) { setPicked((prev) => prev.filter((n) => n !== name)); }
 
@@ -268,8 +280,18 @@ function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec
               <input style={{ ...inputStyle, flex: 1 }} placeholder={t('搜或输入菜名', 'Search or type a dish')} value={q} autoFocus
                 onChange={(e) => setQ(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') addDish(); }} />
               <button type="button" onClick={() => addDish()} style={primaryBtn}>{t('加进来', 'Add')}</button>
-              <button type="button" onClick={() => { setAdding(false); setQ(''); }} style={ghostBtn}>{t('取消', 'Cancel')}</button>
+              <button type="button" onClick={() => { setAdding(false); setQ(''); setTool(''); }} style={ghostBtn}>{t('取消', 'Cancel')}</button>
             </div>
+            {/* 器具筛选:只筛库里标了该器具的菜(importer 从步骤推导) */}
+            <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
+              {TOOL_CHIPS.map(([zh, en]) => (
+                <button key={zh} type="button" onClick={() => setTool((v) => (v === zh ? '' : zh))}
+                  style={{ ...chip, ...(tool === zh ? chipOn : {}) }}>{t(zh, en)}</button>
+              ))}
+            </div>
+            {tool && suggestions.length === 0 && (
+              <p style={hintLine}>{t(`库里暂时没配到「${tool}」能做的菜 —— 换个器具,或直接打菜名。`, 'No recipes tagged for this tool yet — try another, or type a dish.')}</p>
+            )}
             {suggestions.length > 0 && (
               <div style={{ ...card, marginTop: 'var(--space-2)' }}>
                 {suggestions.map((r, i) => (
@@ -345,9 +367,20 @@ function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec
       <button type="button" onClick={onLogMeal} style={{ ...ghostBtn, width: '100%', padding: 'var(--space-3)', fontSize: 'var(--text-body)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
         <IconCamera size={16} />{t('记一餐', 'Log a meal')}
       </button>
+
+      {/* 新手技法:HowToCook tips 技法文(焯水/去腥/食品安全…) */}
+      <button type="button" onClick={onTips} style={{ ...ghostBtn, width: '100%', padding: 'var(--space-3)', fontSize: 'var(--text-body)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
+        <IconBookOpen size={16} />{t('新手技法', 'Techniques')}
+      </button>
     </>
   );
 }
+
+/** 器具筛选 chips:值对齐 importer 的 TOOL_PATTERNS 规范名(蒸锅/破壁机太常见或太小众,不进筛选)。 */
+const TOOL_CHIPS: Array<[string, string]> = [
+  ['电饭煲', 'Rice cooker'], ['烤箱', 'Oven'], ['空气炸锅', 'Air fryer'],
+  ['微波炉', 'Microwave'], ['高压锅', 'Pressure cooker'], ['平底锅', 'Pan'],
+];
 
 // ── 屏2 库存 ──────────────────────────────────────────────────────────────────
 function PantryBody({ items, shopping, onCamera, onRemove, onError, onChanged, t }: {
@@ -779,6 +812,79 @@ function NeedsBody({ match, onError, onDone, t }: { match: RecipeMatch<Recipe>; 
         <p style={{ ...hintLine, color: 'var(--status-go)' }}>{t('都齐了 · 直接开做。', 'All set — cook it now.')}</p>
       )}
     </>
+  );
+}
+
+// ── 新手技法(HowToCook tips 技法文,分组手风琴)─────────────────────────────────
+function TipsBody({ t }: { t: TT }) {
+  const [tips, setTips] = useState<CookingTip[] | null>(null);
+  const [loadErr, setLoadErr] = useState(false);
+  const [openId, setOpenId] = useState('');
+  const load = useCallback(() => {
+    setLoadErr(false);
+    loadTips().then(setTips).catch(() => setLoadErr(true));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+
+  const groups = useMemo(() => {
+    const order = ['基础', '技法', '进阶'];
+    return order
+      .map((g) => ({ group: g, items: (tips ?? []).filter((x) => x.group === g) }))
+      .filter((g) => g.items.length > 0);
+  }, [tips]);
+
+  if (loadErr) return <ErrorRow msg={t('技法文没载出来。', 'Techniques didn’t load.')} onRetry={load} t={t} />;
+  if (tips === null) return <p style={hintLine}>{t('翻翻技法…', 'Loading techniques…')}</p>;
+
+  return (
+    <>
+      {groups.map(({ group, items }) => (
+        <section key={group}>
+          <SectionHead label={t(group === '基础' ? '先看这些' : group === '技法' ? '基本技法' : '进阶一点', group === '基础' ? 'Start here' : group === '技法' ? 'Core techniques' : 'Going further')} />
+          <div style={card}>
+            {items.map((tip, i) => {
+              const open = openId === tip.id;
+              return (
+                <div key={tip.id} style={{ borderBottom: i === items.length - 1 ? 'none' : divider }}>
+                  <button type="button" onClick={() => setOpenId(open ? '' : tip.id)} aria-expanded={open}
+                    style={{ ...row, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', fontWeight: 600, color: 'var(--portal-ink)' }}>{tip.title}</span>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{open ? t('收起', 'Fold') : t('展开', 'Open')}</span>
+                  </button>
+                  {open && <TipContent content={tip.content} />}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      ))}
+      <p style={caption}>{t('摘自开源家常烹饪手册(HowToCook,公有领域),做菜前翻一眼少踩坑。', 'From the open-source HowToCook handbook (public domain).')}</p>
+    </>
+  );
+}
+
+/** tips Markdown 轻渲染:小标题加粗、列表加点、去强调记号 —— 不引 md 渲染库。 */
+function TipContent({ content }: { content: string }) {
+  const clean = (s: string) => s.replace(/\*\*([^*]+)\*\*/g, '$1').replace(/`([^`]+)`/g, '$1').trim();
+  const blocks = content.split('\n').map((line) => {
+    const h = line.match(/^#{2,}\s+(.+)/);
+    if (h) return { kind: 'head' as const, text: clean(h[1]) };
+    const b = line.match(/^\s*[-*+•]\s+(.+)/);
+    if (b) return { kind: 'bullet' as const, text: clean(b[1]) };
+    const n = line.match(/^\s*(\d+)[.、)]\s*(.+)/);
+    if (n) return { kind: 'bullet' as const, text: `${n[1]}. ${clean(n[2])}` };
+    const text = clean(line);
+    return text ? { kind: 'para' as const, text } : null;
+  }).filter(Boolean) as Array<{ kind: 'head' | 'bullet' | 'para'; text: string }>;
+
+  return (
+    <div style={{ padding: '0 var(--space-4) var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+      {blocks.map((b, i) => b.kind === 'head'
+        ? <div key={i} style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--portal-ink)', marginTop: i === 0 ? 0 : 'var(--space-2)' }}>{b.text}</div>
+        : b.kind === 'bullet'
+          ? <div key={i} style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', lineHeight: 1.7, paddingLeft: 'var(--space-3)' }}>· {b.text}</div>
+          : <div key={i} style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', lineHeight: 1.7 }}>{b.text}</div>)}
+    </div>
   );
 }
 

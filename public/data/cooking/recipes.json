@@ -102,7 +102,12 @@
      "item": "葱花"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "烫"
+   ]
   },
   {
    "name": "五彩鸡丝拌面",
@@ -186,7 +191,12 @@
      "item": "老母鸡鸡丝"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "烫"
+   ]
   },
   {
    "name": "大大大块牛腩面",
@@ -307,7 +317,11 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "大排面",
@@ -386,7 +400,13 @@
      "item": "蒜花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "炸",
+    "卤"
+   ]
   },
   {
    "name": "大盘肥肠鸡手工面",
@@ -551,7 +571,13 @@
      "item": "香菜段出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炸"
+   ]
   },
   {
    "name": "姬松茸菌子鸡汤面",
@@ -612,7 +638,12 @@
      "item": "老鸡块"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "杂粮饭",
@@ -659,7 +690,13 @@
      "item": "大豆油"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸",
+    "煮",
+    "焖"
+   ]
   },
   {
    "name": "泡椒鸡杂面",
@@ -728,7 +765,12 @@
      "item": "青菜"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "烫"
+   ]
   },
   {
    "name": "浓香整块鸡汤面",
@@ -792,7 +834,11 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "炸鸡腿时蔬面",
@@ -833,7 +879,13 @@
      "item": "蒸制后的番茄肉酱淋在"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸",
+    "炸",
+    "烫"
+   ]
   },
   {
    "name": "特色鸡汤馄饨",
@@ -892,7 +944,11 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "番茄鸡蛋面",
@@ -966,7 +1022,13 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "烫"
+   ]
   },
   {
    "name": "砂锅荠菜鲜肉馄饨",
@@ -1038,7 +1100,12 @@
      "item": "青菜煮熟出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "笋子鸡丁盖饭（包菜版）",
@@ -1146,7 +1213,13 @@
      "item": "豉油汁出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "卤",
+    "烫"
+   ]
   },
   {
    "name": "笋子鸡丁盖饭（菜苔版）",
@@ -1254,7 +1327,13 @@
      "item": "豉油汁出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "卤",
+    "烫"
+   ]
   },
   {
    "name": "米饭",
@@ -1284,7 +1363,11 @@
      "item": "大豆油"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "素面",
@@ -1348,7 +1431,11 @@
      "item": "挂面放入面篓中煮制"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "紫薯杂粮饭",
@@ -1385,7 +1472,13 @@
      "item": "大豆油"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸",
+    "煮",
+    "焖"
+   ]
   },
   {
    "name": "老母鸡汤面",
@@ -1454,7 +1547,12 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "老鸡扬米面",
@@ -1535,7 +1633,12 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "肥西老母鸡汤面",
@@ -1624,7 +1727,12 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "西红柿炒鸡蛋盖饭",
@@ -1721,7 +1829,13 @@
      "item": "卤汤"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "卤",
+    "焖"
+   ]
   },
   {
    "name": "阳春面",
@@ -1810,7 +1924,11 @@
      "item": "挂面放入面篓中煮制"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "雪菜肉丝面",
@@ -1893,7 +2011,12 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "香菇鸡汤面",
@@ -1973,7 +2096,13 @@
      "item": "的老鸡汤于面碗中"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "炖",
+    "烫"
+   ]
   },
   {
    "name": "香辣牛肉面",
@@ -2056,7 +2185,13 @@
      "item": "香菜末出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "卤",
+    "焖"
+   ]
   },
   {
    "name": "香辣牛腩面",
@@ -2102,7 +2237,13 @@
      "item": "牛腩汤汁"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸",
+    "煮",
+    "烫"
+   ]
   },
   {
    "name": "香辣鸡丁拌面",
@@ -2194,7 +2335,12 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "鱼香肉丝盖饭（包菜版）",
@@ -2281,7 +2427,12 @@
      "item": "豉油汁"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "烫"
+   ]
   },
   {
    "name": "鱼香肉丝盖饭（菜苔版）",
@@ -2368,7 +2519,12 @@
      "item": "豉油汁"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "烫"
+   ]
   },
   {
    "name": "鸡杂手擀面",
@@ -2441,7 +2597,12 @@
      "item": "香辣鸡杂摆放上层"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "凉拌莴笋丝",
@@ -2465,7 +2626,11 @@
    ],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "凉拌"
+   ]
   },
   {
    "name": "口水鸡",
@@ -2532,7 +2697,14 @@
      "item": "口水鸡料"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "凉拌",
+    "蒸"
+   ]
   },
   {
    "name": "柠檬凤爪",
@@ -2548,7 +2720,11 @@
    ],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "凉拌"
+   ]
   },
   {
    "name": "西芹花生米",
@@ -2572,7 +2748,11 @@
    ],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "凉拌"
+   ]
   },
   {
    "name": "卤大排",
@@ -2609,7 +2789,13 @@
      "item": "卤油"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "卤",
+    "炸",
+    "焖"
+   ]
   },
   {
    "name": "卤方干",
@@ -2646,7 +2832,12 @@
      "item": "卤油"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "卤",
+    "焖"
+   ]
   },
   {
    "name": "卤翅根",
@@ -2684,7 +2875,12 @@
      "item": "卤油"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "卤",
+    "焖"
+   ]
   },
   {
    "name": "卤肉肠",
@@ -2721,7 +2917,12 @@
      "item": "卤油"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "卤",
+    "焖"
+   ]
   },
   {
    "name": "卤鸡爪",
@@ -2758,7 +2959,13 @@
      "item": "卤油"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "卤",
+    "焖",
+    "腌"
+   ]
   },
   {
    "name": "卤鸡腿",
@@ -2795,7 +3002,13 @@
      "item": "卤油"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "卤",
+    "焖",
+    "腌"
+   ]
   },
   {
    "name": "咸蛋黄狮子头（卤制版）",
@@ -2817,7 +3030,12 @@
     "咸蛋黄狮子头放入卤汤中，卤制10分钟再关火焖10分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "卤",
+    "焖"
+   ]
   },
   {
    "name": "嗨嗨桶（红油串串）",
@@ -2862,7 +3080,12 @@
      "item": "白芝麻"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "卤",
+    "焖"
+   ]
   },
   {
    "name": "把子肉",
@@ -2892,7 +3115,11 @@
      "item": "卤料"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "卤"
+   ]
   },
   {
    "name": "海带结",
@@ -2924,7 +3151,11 @@
      "item": "卤料"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "卤"
+   ]
   },
   {
    "name": "薄皮青椒",
@@ -2957,7 +3188,12 @@
      "item": "卤料"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "卤",
+    "炸"
+   ]
   },
   {
    "name": "包子",
@@ -2971,7 +3207,13 @@
     "大肉包蒸制 15 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "奶黄鸡包",
@@ -2987,7 +3229,13 @@
     "蒸柜上汽后，蒸制 8 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "小米南瓜粥",
@@ -3022,7 +3270,9 @@
      "item": "水放入不锈钢桶内"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "手工春卷",
@@ -3040,7 +3290,11 @@
     "春卷放入 190℃的油中炸制 4 分钟（两面各 2 分钟）。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "手工烧麦",
@@ -3056,7 +3310,13 @@
     "蒸柜上汽后，蒸制 10 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "水煮蛋",
@@ -3072,7 +3332,14 @@
     "蒸柜上汽后，蒸制 8 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "煮"
+   ]
   },
   {
    "name": "牛肉盒",
@@ -3090,7 +3357,11 @@
     "牛肉盒放入 190℃的油中油炸 4 分钟（两面各炸 2 分钟）。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "现炸大油条",
@@ -3108,7 +3379,11 @@
     "油条放入190℃的油中炸制1 分钟（油条两面各炸30 秒），至"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "现熬豆粥",
@@ -3165,7 +3440,9 @@
      "item": "碱粉搅匀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "白米粥",
@@ -3206,7 +3483,9 @@
      "item": "水放入"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "皮蛋瘦肉粥",
@@ -3298,7 +3577,11 @@
      "item": "葱花"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "粢饭糕",
@@ -3316,7 +3599,11 @@
     "粢饭糕放入 190℃的油中油炸 3 分钟（两面各炸 1 分 30 秒）。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "糍糕",
@@ -3334,7 +3621,11 @@
     "糍糕放入190℃的油中油炸5～6 分钟（炸制3 分钟后翻面）。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "糯米杂谷饭团（奥尔良鸡肉馅）",
@@ -3350,7 +3641,13 @@
     "蒸柜上汽后，蒸制 25 分钟，出品。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "老面小笼包",
@@ -3366,7 +3663,13 @@
     "蒸柜上汽后，蒸制 10 分钟，出品。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "老面馒头",
@@ -3382,7 +3685,13 @@
     "蒸柜上汽后，蒸制10 分钟，出品。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "花卷",
@@ -3398,7 +3707,13 @@
     "蒸柜上汽后，蒸制10 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "茶叶蛋",
@@ -3410,7 +3725,13 @@
     "放入蒸柜蒸 8 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "荠菜鲜肉蒸饺",
@@ -3426,7 +3747,13 @@
     "蒸柜上汽后，蒸制 10 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "葱香酱肉包",
@@ -3442,7 +3769,13 @@
     "蒸柜上汽后，蒸制 15 分钟，出品。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "蔬菜鸡蛋卷饼",
@@ -3516,7 +3849,12 @@
      "item": "炒合菜"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "蒸"
+   ]
   },
   {
    "name": "蛋饼",
@@ -3568,7 +3906,11 @@
      "item": "盐搅拌成面糊"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煎"
+   ]
   },
   {
    "name": "赤豆糊元宵",
@@ -3617,7 +3959,13 @@
      "item": "熟红豆"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "酥皮萝卜丝馅饼",
@@ -3635,7 +3983,11 @@
     "酥皮萝卜丝馅饼放入190℃的油中油炸3 分钟（两面各炸1 分30 秒）。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "饭团",
@@ -3648,7 +4000,11 @@
     "原味肉松饭团、蜜枣谷物饭团蒸制 20 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "馒头",
@@ -3684,7 +4040,13 @@
     "蒸柜上汽后，蒸制10 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "香脆土豆丝饼",
@@ -3702,7 +4064,11 @@
     "土豆丝饼放入 190℃ 的油中油炸 40-60 秒至金黄色（炸制 30 秒后翻面）。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "香脆春卷",
@@ -3720,7 +4086,11 @@
     "春卷放入190℃的油中炸制4～5 分钟（两面各2 分钟）。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "香菇猪肉烧麦",
@@ -3736,7 +4106,13 @@
     "蒸柜上汽后，蒸制 10 分钟，出品。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "香菇青菜包（菠菜面皮）",
@@ -3752,7 +4128,13 @@
     "蒸柜上汽后，蒸制 10 分钟，出品。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "香酥牛肉饼",
@@ -3768,7 +4150,11 @@
     "牛肉馅饼放入 190℃的油中炸制 3 分钟（两面各炸 1 分 30 秒）。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "鸡丝沙汤",
@@ -3857,7 +4243,9 @@
      "item": "香菜点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "鸡汁汤包",
@@ -3873,7 +4261,13 @@
     "蒸柜上汽后，蒸制 12 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "鸡汁辣糊汤",
@@ -3954,7 +4348,11 @@
      "item": "芝麻香油出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "黑全麦鸡丁包",
@@ -3970,7 +4368,13 @@
     "蒸柜上汽后，蒸制 12 分钟，出品。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "竹荪鹿茸菇鸡汤",
@@ -4042,7 +4446,14 @@
      "item": "汤底"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "烫"
+   ]
   },
   {
    "name": "老鸡汤",
@@ -4052,7 +4463,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "肥西老母鸡汤",
@@ -4099,7 +4512,12 @@
      "item": "盐炖煮"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "菌菇鸡汤",
@@ -4128,7 +4546,13 @@
     "取特色鸡汤盅，放入焯水后的老母鸡鸡块40g、菌菇混合包20g、姜片1g、菌菇鸡汤汤底320g，盖上鸡汤盅盖，再放入上汽蒸柜中蒸制90分钟，出品。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "金牌老母鸡汤",
@@ -4174,7 +4598,12 @@
      "item": "盐炖煮"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "什锦蛋炒饭",
@@ -4231,7 +4660,11 @@
      "item": "盐"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "农家小炒肉（玉耳版本）",
@@ -4311,7 +4744,11 @@
      "item": "盐"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "农家小炒肉（玉耳版本）",
@@ -4384,7 +4821,11 @@
      "item": "玉耳"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "农家小炒肉（鸡蛋干版本）",
@@ -4464,7 +4905,11 @@
      "item": "鸡蛋干和煸炒好的肉片"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "农家小炒肉（鸡蛋干版本）",
@@ -4520,7 +4965,11 @@
      "item": "鸡蛋干和煸炒好的肉片"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "剁椒木耳炒鸡蛋",
@@ -4604,7 +5053,11 @@
      "item": "葱段"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "包菜炒鸡蛋",
@@ -4684,7 +5137,11 @@
      "item": "生抽"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "外婆菜炒鸡蛋",
@@ -4756,7 +5213,11 @@
      "item": "生抽"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "宫保鸡丁",
@@ -4823,7 +5284,11 @@
      "item": "宫保鸡丁调味酱均匀翻"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "家常土豆片",
@@ -4880,7 +5345,11 @@
      "item": "泡小米辣"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "家常小炒",
@@ -4961,7 +5430,11 @@
      "item": "油片丝"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "小炒河虾",
@@ -5040,7 +5513,12 @@
      "item": "小炒河虾料"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "蒸"
+   ]
   },
   {
    "name": "小炒脆笋",
@@ -5106,7 +5584,11 @@
      "item": "青蒜段"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "小炒花菜",
@@ -5116,7 +5598,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "小炒面筋",
@@ -5161,7 +5647,11 @@
      "item": "红椒"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "小炒香干",
@@ -5171,7 +5661,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "小炒鸡丁",
@@ -5245,7 +5739,11 @@
      "item": "藤椒油大火爆炒"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "小炒黄牛肉",
@@ -5325,7 +5823,11 @@
      "item": "青蒜或香芹翻炒"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "毛豆烧土鸡",
@@ -5418,7 +5920,11 @@
      "item": "葱段翻拌均匀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "油渣大白菜",
@@ -5478,7 +5984,12 @@
      "item": "大白菜"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "炖"
+   ]
   },
   {
    "name": "清炒春菜",
@@ -5532,7 +6043,11 @@
      "item": "水"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "清炒毛白菜",
@@ -5592,7 +6107,11 @@
      "item": "熟猪油"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "清炒油麦菜",
@@ -5643,7 +6162,11 @@
      "item": "鸡精"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "清炒莴笋片",
@@ -5722,7 +6245,12 @@
      "item": "白砂糖"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "蒸"
+   ]
   },
   {
    "name": "清炒菜心",
@@ -5771,7 +6299,11 @@
      "item": "盐"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "清炒西兰花",
@@ -5822,7 +6354,11 @@
      "item": "鸡精"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "清炒青菜",
@@ -5866,7 +6402,11 @@
      "item": "白砂糖"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "爆炒牛肉",
@@ -5932,7 +6472,11 @@
      "item": "香芹翻炒均匀出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "生炒上海青",
@@ -5976,7 +6520,11 @@
      "item": "盐"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "笋子烧肉",
@@ -6015,7 +6563,11 @@
      "item": "葱花"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "笋子鸡丁盖饭",
@@ -6120,7 +6672,13 @@
      "item": "豉油汁出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "卤",
+    "烫"
+   ]
   },
   {
    "name": "糖醋排骨",
@@ -6158,7 +6716,14 @@
      "item": "陈醋"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炖",
+    "炸"
+   ]
   },
   {
    "name": "红烧茄子",
@@ -6216,7 +6781,13 @@
      "item": "茄子"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "炖",
+    "焖"
+   ]
   },
   {
    "name": "经典毛豆烧鸡",
@@ -6303,7 +6874,11 @@
      "item": "葱段翻拌均匀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "肥肠鸡",
@@ -6490,7 +7065,14 @@
      "item": "香菜段"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炸",
+    "烫"
+   ]
   },
   {
    "name": "胡萝卜炒木耳",
@@ -6557,7 +7139,11 @@
      "item": "木耳"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "胡萝卜炒肉丝",
@@ -6638,7 +7224,11 @@
      "item": "香葱段"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "胡萝卜炒肉片",
@@ -6711,7 +7301,11 @@
      "item": "蒜花"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "胡萝卜炒鸡蛋",
@@ -6775,7 +7369,11 @@
      "item": "葱段"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "芋儿鸡",
@@ -6960,7 +7558,14 @@
      "item": "香菜段"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炸",
+    "烫"
+   ]
   },
   {
    "name": "芹菜炒香干",
@@ -7018,7 +7623,11 @@
      "item": "鸡精"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "芹菜香干炒肉丝",
@@ -7087,7 +7696,11 @@
      "item": "鸡精"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "莴笋丝炒鸡蛋",
@@ -7144,7 +7757,11 @@
      "item": "鸡精"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "菠萝咕咾肉",
@@ -7189,7 +7806,12 @@
      "item": "菠萝块炒至菠萝中心完"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "炸"
+   ]
   },
   {
    "name": "菠萝咕咾肉时蔬饭",
@@ -7226,7 +7848,11 @@
     "组合："
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "蒜泥菠菜",
@@ -7271,7 +7897,12 @@
      "item": "鸡精"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "烫"
+   ]
   },
   {
    "name": "蒜苔炒木耳",
@@ -7345,7 +7976,11 @@
      "item": "红椒丝"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "蒜苔炒香干",
@@ -7410,7 +8045,11 @@
      "item": "红椒"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "蒜苔炒鸡胗",
@@ -7485,7 +8124,11 @@
      "item": "小炒河虾料"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "蒜黄炒鸡蛋",
@@ -7549,7 +8192,11 @@
      "item": "鸡精"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "蚕豆炒虾仁",
@@ -7616,7 +8263,11 @@
      "item": "鸡精翻炒"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "蚕豆炒鸡蛋",
@@ -7680,7 +8331,11 @@
      "item": "鸡"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "西兰花炒鸡胸肉",
@@ -7739,7 +8394,11 @@
      "item": "鸡胸肉调味汁"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "西红柿炒鸡蛋",
@@ -7749,7 +8408,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "西芹炒虾仁",
@@ -7827,7 +8490,11 @@
      "item": "水"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "豆皮毛白菜",
@@ -7892,7 +8559,11 @@
      "item": "鸡精"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "贵州风味辣子鸡",
@@ -7937,7 +8608,12 @@
      "item": "炸制鸡块"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "炸"
+   ]
   },
   {
    "name": "酸辣包菜",
@@ -8010,7 +8686,11 @@
      "item": "陈醋"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "酸辣土豆丝",
@@ -8070,7 +8750,12 @@
      "item": "白醋"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "烫"
+   ]
   },
   {
    "name": "酸辣大白菜",
@@ -8150,7 +8835,11 @@
      "item": "陈醋"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "酸辣海带丝",
@@ -8209,7 +8898,11 @@
      "item": "陈醋"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "青椒毛豆米",
@@ -8277,7 +8970,11 @@
      "item": "青椒丝"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "青椒炒豆芽",
@@ -8287,7 +8984,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "青椒炒鸡蛋",
@@ -8337,7 +9038,11 @@
      "item": "鸡精"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "香椿炒鸡蛋",
@@ -8347,7 +9052,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "香菇青菜",
@@ -8411,7 +9120,11 @@
      "item": "白砂糖"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "鱼香肉丝",
@@ -8470,7 +9183,11 @@
      "item": "鱼香风味酱翻炒"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "鱼香肉丝盖饭",
@@ -8555,7 +9272,13 @@
      "item": "豉油汁"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "卤",
+    "烫"
+   ]
   },
   {
    "name": "鹌鹑蛋红烧肉",
@@ -8632,7 +9355,13 @@
      "item": "西兰花"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "黄瓜炒红肠",
@@ -8699,7 +9428,12 @@
      "item": "鸡精"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒",
+    "腌"
+   ]
   },
   {
    "name": "土豆牛腩",
@@ -8709,7 +9443,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炖"
+   ]
   },
   {
    "name": "小鸡炖蘑菇",
@@ -8765,7 +9503,12 @@
      "item": "滑子菇"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炖",
+    "炒"
+   ]
   },
   {
    "name": "梅干菜凤爪翅",
@@ -8815,7 +9558,13 @@
      "item": "红椒丁点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炖",
+    "炸",
+    "卤"
+   ]
   },
   {
    "name": "甜辣辣年糕烧鸡",
@@ -8851,7 +9600,12 @@
     "下入年糕烧开后，继续烧1分30秒至汤汁浓稠。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炖",
+    "炒"
+   ]
   },
   {
    "name": "白菜炖豆腐",
@@ -8861,7 +9615,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炖"
+   ]
   },
   {
    "name": "红烧冬瓜",
@@ -8938,7 +9696,12 @@
      "item": "老抽"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炖",
+    "炒"
+   ]
   },
   {
    "name": "红烧鱼块",
@@ -8948,7 +9711,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炖"
+   ]
   },
   {
    "name": "肉汁素鸡",
@@ -8984,7 +9751,13 @@
      "item": "素鸡片倒入锅中烧开"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炖",
+    "炸",
+    "煲"
+   ]
   },
   {
    "name": "酸菜血旺豆腐",
@@ -9086,7 +9859,12 @@
      "item": "青蒜"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炖",
+    "炒"
+   ]
   },
   {
    "name": "银鱼浦鸡蛋",
@@ -9170,7 +9948,14 @@
      "item": "葱段"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炖",
+    "炒",
+    "煮",
+    "烫"
+   ]
   },
   {
    "name": "香辣鸡杂",
@@ -9235,7 +10020,12 @@
      "item": "葱段"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炖",
+    "煮"
+   ]
   },
   {
    "name": "鸡血汤",
@@ -9274,7 +10064,12 @@
      "item": "青菜烫制"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炖",
+    "烫"
+   ]
   },
   {
    "name": "麻婆豆腐",
@@ -9284,7 +10079,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炖"
+   ]
   },
   {
    "name": "傲椒风味翅尖",
@@ -9302,7 +10101,11 @@
     "6 个鸡翅尖无需解冻直接放入170℃的油锅中炸制3 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "嗨嗨桶（炸物桶）",
@@ -9330,7 +10133,11 @@
     "出品组合：1 个鸡腿、2 个洋葱圈、2 个鸡翅尖、1 个薯饼、3 个鸡米花。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "心形鸡排",
@@ -9348,7 +10155,11 @@
     "鸡排无需解冻直接放入170℃的油锅中炸制8 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "手枪大鸡腿",
@@ -9367,7 +10178,14 @@
     "将蒸好的大鸡腿放入170℃的油锅中炸制2 分30 秒。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "炸",
+    "蒸"
+   ]
   },
   {
    "name": "棒棒虾",
@@ -9385,7 +10203,11 @@
     "棒棒虾无需解冻直接放入170℃的油锅中炸制8 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "炸肉肠",
@@ -9404,7 +10226,12 @@
     "炸制：油温升至170℃，放入肉肠炸3分30秒至肉肠浮起。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸",
+    "烤"
+   ]
   },
   {
    "name": "炸鸡排",
@@ -9422,7 +10249,11 @@
     "雪花鸡排无需解冻直接放入170℃的油锅中炸制8 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "炸鸡排（普通鸡排）",
@@ -9440,7 +10271,11 @@
     "鸡排放入170℃的油锅中炸制8分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "炸鸡排（调理鸡排）",
@@ -9461,7 +10296,11 @@
     "炸制：油温升至170℃，放入鸡排炸2分30秒至鸡排浮起。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "炸鸡腿",
@@ -9479,7 +10318,11 @@
     "解冻后的鸡腿放入170℃油中，炸制7 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "生炸大鸡腿",
@@ -9497,7 +10340,11 @@
     "生炸大鸡腿解冻后放入170℃的油锅中炸制8 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "糖糕（红糖馅）",
@@ -9515,7 +10362,11 @@
     "糖糕放入 190℃ 的油中炸制 5 分钟（两面各炸 2 分 30 秒）。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "脆皮鸡翅",
@@ -9533,7 +10384,11 @@
     "鸡翅放入170℃的油锅中炸制4分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "薯条",
@@ -9551,7 +10406,11 @@
     "薯条放入170℃的油锅中炸制8分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "香脆薯饼",
@@ -9569,7 +10428,11 @@
     "薯饼无需解冻直接放入170℃的油锅中炸制3 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "香芋地瓜丸",
@@ -9587,7 +10450,11 @@
     "香芋地瓜丸无需解冻，直接放入170℃的油锅中炸制6 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "香酥鸡米花",
@@ -9605,7 +10472,11 @@
     "6 个鸡米花无需解冻直接放入170℃的油锅中炸制3 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "鸡肉洋葱圈",
@@ -9623,7 +10494,11 @@
     "5 个鸡肉洋葱圈无需解冻直接放入170℃的油锅中炸制3 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "烤肠",
@@ -9639,7 +10514,11 @@
     "解冻后的烤肠放入120℃烤肠机中烤20 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "烤"
+   ]
   },
   {
    "name": "浇汁西兰花",
@@ -9663,7 +10542,11 @@
      "item": "西兰花"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "烫"
+   ]
   },
   {
    "name": "特色热干面",
@@ -9715,7 +10598,12 @@
      "item": "稀释芝麻酱"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "烫",
+    "煮"
+   ]
   },
   {
    "name": "白灼虾（8只）",
@@ -9748,7 +10636,12 @@
      "item": "葱油料"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "烫",
+    "煮"
+   ]
   },
   {
    "name": "菠菜蛋皮丝",
@@ -9820,7 +10713,11 @@
      "item": "大豆油"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "烫"
+   ]
   },
   {
    "name": "葱油拌面",
@@ -9865,7 +10762,12 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "烫",
+    "煮"
+   ]
   },
   {
    "name": "[葱油](/配料/葱油.md)生菜",
@@ -9895,7 +10797,11 @@
      "item": "豉油汁出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "烫"
+   ]
   },
   {
    "name": "葱油菜心",
@@ -9919,7 +10825,11 @@
      "item": "豉油汁出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "烫"
+   ]
   },
   {
    "name": "葱油菜苔",
@@ -9949,7 +10859,11 @@
      "item": "豉油汁出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "烫"
+   ]
   },
   {
    "name": "[葱油](/配料/葱油.md)青菜",
@@ -9979,7 +10893,11 @@
      "item": "豉油汁出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "烫"
+   ]
   },
   {
    "name": "香脆木耳",
@@ -10057,7 +10975,11 @@
      "item": "调味汁出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "烫"
+   ]
   },
   {
    "name": "鸡汤娃娃菜",
@@ -10067,7 +10989,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "烫"
+   ]
   },
   {
    "name": "麻辣鸡块",
@@ -10128,7 +11054,14 @@
      "item": "调味汁出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "烫",
+    "煮",
+    "炖",
+    "腌"
+   ]
   },
   {
    "name": "冒烤鸭",
@@ -10218,7 +11151,13 @@
      "item": "香菜点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "烤",
+    "烫"
+   ]
   },
   {
    "name": "嗨嗨锅（泡椒鸡米花米线）",
@@ -10302,7 +11241,12 @@
      "item": "炸制好的鸡米花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "炸"
+   ]
   },
   {
    "name": "嗨嗨锅（番茄肥牛锅）",
@@ -10374,7 +11318,11 @@
      "item": "肥牛卷煮"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "嗨嗨锅（酸菜鱼米线）",
@@ -10437,7 +11385,11 @@
      "item": "湿米线在沸水中煮"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "嗨嗨锅（鲜蔬锅）",
@@ -10506,7 +11458,11 @@
      "item": "青菜煮"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "金汤酸菜鱼",
@@ -10569,7 +11525,15 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "煮",
+    "蒸",
+    "烫"
+   ]
   },
   {
    "name": "金汤酸菜鱼（大份）",
@@ -10673,7 +11637,12 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "烫"
+   ]
   },
   {
    "name": "铜锅安格斯肥牛",
@@ -10734,7 +11703,12 @@
      "item": "肥牛片煮至肥牛片完全"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "炒"
+   ]
   },
   {
    "name": "铜锅川味水煮肉片",
@@ -10830,7 +11804,11 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "铜锅番茄虾滑",
@@ -10912,7 +11890,11 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "铜锅豆花鸡",
@@ -10979,7 +11961,12 @@
      "item": "炒线椒烧开后"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮",
+    "炒"
+   ]
   },
   {
    "name": "砂锅三鲜豆腐",
@@ -10989,7 +11976,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲"
+   ]
   },
   {
    "name": "砂锅原味鸡汤米线",
@@ -10999,7 +11990,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲"
+   ]
   },
   {
    "name": "砂锅木瓜",
@@ -11009,7 +12004,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲"
+   ]
   },
   {
    "name": "砂锅泡椒鸡米花米线",
@@ -11019,7 +12018,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲"
+   ]
   },
   {
    "name": "砂锅牛杂煲",
@@ -11061,7 +12064,12 @@
      "item": "蒜花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲",
+    "煮"
+   ]
   },
   {
    "name": "砂锅番茄米线",
@@ -11127,7 +12135,11 @@
      "item": "湿米线"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲"
+   ]
   },
   {
    "name": "砂锅盐焗鸡",
@@ -11137,7 +12149,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲"
+   ]
   },
   {
    "name": "砂锅老坛酸菜鱼",
@@ -11214,7 +12230,11 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲"
+   ]
   },
   {
    "name": "砂锅肉汁素鸡",
@@ -11288,7 +12308,14 @@
      "item": "炒螺丝椒片"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲",
+    "炒",
+    "煮",
+    "炸"
+   ]
   },
   {
    "name": "砂锅腐竹",
@@ -11359,7 +12386,13 @@
      "item": "盐"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲",
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "砂锅蒜蓉粉丝虾",
@@ -11369,7 +12402,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲"
+   ]
   },
   {
    "name": "砂锅豆花鸡",
@@ -11466,7 +12503,13 @@
      "item": "炒线椒"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲",
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "砂锅酸菜鱼",
@@ -11541,7 +12584,11 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲"
+   ]
   },
   {
    "name": "砂锅香辣鱿鱼",
@@ -11635,7 +12682,12 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲",
+    "炒"
+   ]
   },
   {
    "name": "酸菜肥肠煲",
@@ -11753,7 +12805,13 @@
      "item": "蒜花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲",
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "三色虾仁",
@@ -11814,7 +12872,13 @@
      "item": "白糖"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "农家蒸蛋",
@@ -11824,7 +12888,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "凤爪蒸豆米",
@@ -11884,7 +12952,13 @@
      "item": "老鸡汤"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "剁椒鱼头",
@@ -11916,7 +12990,13 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "剁椒鱼头（白鲢鱼头版）",
@@ -11948,7 +13028,13 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "剁椒鱼头（草鱼头版）",
@@ -11980,7 +13066,13 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "咸蛋黄狮子头（蒸制版）",
@@ -12007,7 +13099,11 @@
      "item": "葱花"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "奥尔良鸡翅",
@@ -12029,7 +13125,15 @@
     "炸制版：将解冻好的奥尔良鸡翅，放入 170℃油中，炸制 8 分钟出品。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "松糕",
@@ -12045,7 +13149,13 @@
     "蒸柜上汽后，蒸制10 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "梅菜扣肉",
@@ -12097,7 +13207,15 @@
      "item": "鸡精抓拌均匀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "卤",
+    "烫"
+   ]
   },
   {
    "name": "活珠子/凤凰蛋",
@@ -12113,7 +13231,13 @@
     "蒸柜上汽后，蒸制 30 分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "珍珠糯米肉丸",
@@ -12131,7 +13255,13 @@
     "将4颗珍珠糯米肉丸放入上汽后的蒸柜蒸制15分钟。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "番茄菌菇肉丸",
@@ -12182,7 +13312,13 @@
      "item": "番茄汤底"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "白切鸡",
@@ -12216,7 +13352,11 @@
      "item": "白切鸡料"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "百叶包肉",
@@ -12249,7 +13389,13 @@
      "item": "葱花出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "秘汁卤肉饭",
@@ -12259,7 +13405,12 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸",
+    "卤"
+   ]
   },
   {
    "name": "竹笋蒸鸡翅",
@@ -12298,7 +13449,13 @@
      "item": "鸡翅调料平铺在鸡翅块"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "粉蒸肉",
@@ -12356,7 +13513,13 @@
      "item": "米粉肉"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "粗粮盒",
@@ -12378,7 +13541,13 @@
     "将南瓜90g（两块）、红薯100g(两块）、玉米100g（两块）放入蒸柜中蒸制25 分钟"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "肉饼蒸蛋",
@@ -12388,7 +13557,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "肉饼蒸蛋（常规版）",
@@ -12447,7 +13620,13 @@
      "item": "红椒丁点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "肉饼蒸蛋（马蹄版）",
@@ -12506,7 +13685,13 @@
      "item": "红椒丁点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "胡萝卜牛肉",
@@ -12549,7 +13734,13 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "葱油鸡",
@@ -12628,7 +13819,14 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "腌"
+   ]
   },
   {
    "name": "[葱油](/配料/葱油.md)鸡（小母鸡版）",
@@ -12712,7 +13910,14 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "腌"
+   ]
   },
   {
    "name": "[葱油](/配料/葱油.md)鸡（白切鸡版）",
@@ -12764,7 +13969,13 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "[葱油](/配料/葱油.md)鸡（鸡排腿版）",
@@ -12823,7 +14034,14 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "煮"
+   ]
   },
   {
    "name": "蒜蓉娃娃菜",
@@ -12833,7 +14051,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "蒜蓉粉丝虾",
@@ -12907,7 +14129,13 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "蒸南瓜",
@@ -12926,7 +14154,13 @@
     "蒸柜上汽后，蒸制25-30分钟出品。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "蒸嫩豆腐",
@@ -12977,7 +14211,13 @@
      "item": "豉油汁出品"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "虾仁蒸鸡蛋",
@@ -12987,7 +14227,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "蜜汁南瓜",
@@ -12997,7 +14241,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "豉汁鱼块",
@@ -13026,7 +14274,13 @@
      "item": "蒸鱼调味汁"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "豌豆肉末",
@@ -13062,7 +14316,11 @@
      "item": "胡萝卜"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "酱椒蒜香片片鱼",
@@ -13122,7 +14380,14 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "烫"
+   ]
   },
   {
    "name": "酱蒸白干",
@@ -13151,7 +14416,13 @@
      "item": "蒜子"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "酱蒸豆腐",
@@ -13175,7 +14446,13 @@
      "item": "酱蒸白干料"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "酱香小河虾",
@@ -13219,7 +14496,13 @@
      "item": "拌匀的河虾平铺在香干"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "青椒蒸豆米",
@@ -13270,7 +14553,13 @@
      "item": "熟猪油"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "风干牛肉蒸白干",
@@ -13321,7 +14610,13 @@
      "item": "拌好的牛肉平铺于白干"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "香肠蒸豆干",
@@ -13376,7 +14671,13 @@
      "item": "调味水"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "香肠蒸豆米",
@@ -13436,7 +14737,13 @@
      "item": "老鸡汤"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "香芋蒸排骨",
@@ -13492,7 +14799,13 @@
      "item": "调味水"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "香辣红油鸡（小母鸡版）",
@@ -13572,7 +14885,14 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "腌"
+   ]
   },
   {
    "name": "香辣红油鸡（白切鸡版）",
@@ -13631,7 +14951,13 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "香辣红油鸡（鸡排腿版）",
@@ -13686,7 +15012,14 @@
      "item": "葱花点缀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "煮"
+   ]
   },
   {
    "name": "香辣血旺",
@@ -13696,7 +15029,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "鸡汁辣鱼",
@@ -13737,7 +15074,13 @@
      "item": "鱼块"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "三鲜豆腐汤料",
@@ -13747,7 +15090,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "剁椒酱",
@@ -13757,7 +15102,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "剁椒鱼头料",
@@ -13767,7 +15114,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "卤油",
@@ -13777,7 +15126,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "卤"
+   ]
   },
   {
    "name": "原味酸菜鱼底料",
@@ -13787,7 +15140,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "姜汁",
@@ -13797,7 +15152,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "宫保鸡丁调味酱",
@@ -13807,7 +15164,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "家常小炒料",
@@ -13817,7 +15176,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "小炒河虾料",
@@ -13827,7 +15190,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "小炒肉调味汁",
@@ -13837,7 +15204,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "小炒肉调料",
@@ -13847,7 +15218,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "小炒肉调料",
@@ -13857,7 +15232,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "果味糖醋酱",
@@ -13867,7 +15246,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "毛豆烧鸡料",
@@ -13877,7 +15258,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "水煮料调味酱",
@@ -13887,7 +15270,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "油焖茄子料",
@@ -13897,7 +15284,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "焖"
+   ]
   },
   {
    "name": "炒菜基料",
@@ -13907,7 +15298,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "番茄汤膏",
@@ -13917,7 +15312,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "糊辣油",
@@ -13927,7 +15324,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "糯米酒汁",
@@ -13937,7 +15336,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "素鸡煲调味料",
@@ -13947,7 +15348,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "煲"
+   ]
   },
   {
    "name": "肥肠鸡酱料",
@@ -13957,7 +15362,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "花椒汁",
@@ -13967,7 +15374,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "葱油",
@@ -13977,7 +15386,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "蒜蓉酱",
@@ -13987,7 +15398,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "蒸蛋料",
@@ -13997,7 +15410,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "蒸鱼调味汁",
@@ -14007,7 +15424,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "血旺料",
@@ -14017,7 +15438,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "调味料",
@@ -14027,7 +15450,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "鸡汤料",
@@ -14037,7 +15462,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "豉油汁",
@@ -14047,7 +15474,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "酱蒸白干料",
@@ -14057,7 +15486,11 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "风干牛肉酱料",
@@ -14067,7 +15500,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "鱼香风味酱",
@@ -14077,7 +15512,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "鸡杂料",
@@ -14087,7 +15524,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "鸡汁辣鱼料",
@@ -14097,7 +15536,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "鸡油料",
@@ -14107,7 +15548,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "鸡翅调料",
@@ -14117,7 +15560,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "鸡胸肉调味汁",
@@ -14127,7 +15572,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "麻婆豆腐料",
@@ -14137,7 +15584,9 @@
    "ingredients_raw": [],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "东方树叶（335mL）",
@@ -14151,7 +15600,9 @@
    ],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "农夫山泉矿泉水（运动盖）",
@@ -14165,7 +15616,9 @@
    ],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "劲酒",
@@ -14179,7 +15632,9 @@
    ],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "原味豆浆",
@@ -14221,7 +15676,9 @@
      "item": "水磨制"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "原味豆浆（冲调版本）",
@@ -14250,7 +15707,9 @@
      "item": "温开水"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "原味豆浆（现磨版本）",
@@ -14290,7 +15749,9 @@
      "item": "水磨制"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "奶皮子酸奶",
@@ -14335,7 +15796,9 @@
      "item": "菌粉搅拌均匀"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "摩登罐装可乐",
@@ -14349,7 +15812,9 @@
    ],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "摩登罐装芬达",
@@ -14363,7 +15828,9 @@
    ],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "摩登罐装雪碧",
@@ -14377,7 +15844,9 @@
    ],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "摩登零度可乐",
@@ -14391,7 +15860,9 @@
    ],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "热奶茶",
@@ -14421,7 +15892,9 @@
      "item": "生椰乳"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "猴头菇山药玉米糊",
@@ -14450,7 +15923,9 @@
      "item": "的"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "精酿啤酒330mL",
@@ -14464,7 +15939,9 @@
    ],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "红豆酒酿",
@@ -14480,7 +15957,13 @@
     "放入上汽蒸柜中蒸制 5 分钟出品。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "苹果山楂红茶",
@@ -14503,7 +15986,9 @@
      "item": "开水"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "蒙牛纯牛奶（150mL）",
@@ -14517,7 +16002,9 @@
    ],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "酒酿蛋花甜羹",
@@ -14566,7 +16053,9 @@
      "item": "水"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "银耳莲子炖梨",
@@ -14582,7 +16071,14 @@
     "放入上汽蒸柜中蒸制 5 分钟出品。"
    ],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "炖"
+   ]
   },
   {
    "name": "雪花纯生啤酒（罐装）",
@@ -14596,7 +16092,9 @@
    ],
    "steps": [],
    "quantities": [],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "鸡笼香柠檬茶",
@@ -14634,7 +16132,9 @@
      "item": "左右鸡笼香茶饮料"
     }
    ],
-   "source": "cooklikehoc"
+   "source": "cooklikehoc",
+   "tools": [],
+   "methods": []
   },
   {
    "name": "咖喱炒蟹",
@@ -14675,7 +16175,14 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 815
+   "calories": 815,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮",
+    "焖"
+   ]
   },
   {
    "name": "响油鳝丝",
@@ -14807,7 +16314,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 556
+   "calories": 556,
+   "tools": [],
+   "methods": [
+    "炒",
+    "腌"
+   ]
   },
   {
    "name": "微波葱姜黑鳕鱼",
@@ -14847,7 +16359,11 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 749
+   "calories": 749,
+   "tools": [
+    "微波炉"
+   ],
+   "methods": []
   },
   {
    "name": "水煮鱼",
@@ -14941,7 +16457,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 248
+   "calories": 248,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "腌"
+   ]
   },
   {
    "name": "清蒸生蚝",
@@ -14999,7 +16521,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 184
+   "calories": 184,
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "烫"
+   ]
   },
   {
    "name": "红烧鱼",
@@ -15084,7 +16613,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 570
+   "calories": 570,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎"
+   ]
   },
   {
    "name": "红烧鱼头",
@@ -15162,7 +16696,15 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 333
+   "calories": 333,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮",
+    "焖",
+    "腌"
+   ]
   },
   {
    "name": "红烧鲤鱼",
@@ -15235,7 +16777,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1051
+   "calories": 1051,
+   "tools": [],
+   "methods": [
+    "炒",
+    "炸",
+    "焖"
+   ]
   },
   {
    "name": "肉蟹煲",
@@ -15429,7 +16977,15 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 2111
+   "calories": 2111,
+   "tools": [],
+   "methods": [
+    "炒",
+    "炖",
+    "烤",
+    "炸",
+    "煲"
+   ]
   },
   {
    "name": "酱炖蟹",
@@ -15532,7 +17088,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 468
+   "calories": 468,
+   "tools": [],
+   "methods": [
+    "炒",
+    "蒸",
+    "炖"
+   ]
   },
   {
    "name": "黄油煎虾",
@@ -15608,7 +17170,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 741
+   "calories": 741,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎"
+   ]
   },
   {
    "name": "鳊鱼炖豆腐",
@@ -15736,7 +17303,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 524
+   "calories": 524,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "炖",
+    "腌"
+   ]
   },
   {
    "name": "鲤鱼炖白菜",
@@ -15842,7 +17416,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 792
+   "calories": 792,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "炖"
+   ]
   },
   {
    "name": "香煎翘嘴鱼",
@@ -15933,7 +17513,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 820
+   "calories": 820,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮",
+    "腌"
+   ]
   },
   {
    "name": "阳朔啤酒鱼",
@@ -16064,7 +17651,15 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1092
+   "calories": 1092,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮",
+    "焖",
+    "腌"
+   ]
   },
   {
    "name": "蛏抱蛋",
@@ -16140,7 +17735,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1229
+   "calories": 1229,
+   "tools": [],
+   "methods": [
+    "煎",
+    "煮",
+    "炸"
+   ]
   },
   {
    "name": "蒜香黄油虾",
@@ -16208,7 +17809,15 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 526
+   "calories": 526,
+   "tools": [
+    "平底锅"
+   ],
+   "methods": [
+    "炒",
+    "煎",
+    "煮"
+   ]
   },
   {
    "name": "蒜蓉虾",
@@ -16256,7 +17865,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 456
+   "calories": 456,
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "葱烧海参",
@@ -16318,7 +17931,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 299
+   "calories": 299,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎"
+   ]
   },
   {
    "name": "葱油桂鱼",
@@ -16429,7 +18047,15 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 311
+   "calories": 311,
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "腌",
+    "烫"
+   ]
   },
   {
    "name": "芥末黄油罗氏虾",
@@ -16507,7 +18133,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 637
+   "calories": 637,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮"
+   ]
   },
   {
    "name": "糖醋鲤鱼",
@@ -16619,7 +18251,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1011
+   "calories": 1011,
+   "tools": [],
+   "methods": [
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "白灼虾",
@@ -16694,7 +18331,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 519
+   "calories": 519,
+   "tools": [
+    "平底锅"
+   ],
+   "methods": []
   },
   {
    "name": "清蒸鲈鱼",
@@ -16755,7 +18396,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 385
+   "calories": 385,
+   "tools": [],
+   "methods": [
+    "蒸",
+    "腌"
+   ]
   },
   {
    "name": "烤鱼",
@@ -16863,7 +18509,18 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 2152
+   "calories": 2152,
+   "tools": [
+    "烤箱"
+   ],
+   "methods": [
+    "炒",
+    "煎",
+    "煮",
+    "烤",
+    "腌",
+    "烫"
+   ]
   },
   {
    "name": "油焖大虾",
@@ -16936,7 +18593,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 584
+   "calories": 584,
+   "tools": [],
+   "methods": [
+    "炸",
+    "焖"
+   ]
   },
   {
    "name": "干煎阿根廷红虾",
@@ -17029,7 +18691,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 309
+   "calories": 309,
+   "tools": [
+    "平底锅"
+   ],
+   "methods": [
+    "炒",
+    "煎"
+   ]
   },
   {
    "name": "小龙虾",
@@ -17140,7 +18809,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 571
+   "calories": 571,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "吐司果酱",
@@ -17166,7 +18840,9 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 223
+   "calories": 223,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "太阳蛋",
@@ -17204,7 +18880,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 113
+   "calories": 113,
+   "tools": [
+    "微波炉"
+   ],
+   "methods": []
   },
   {
    "name": "完美水煮蛋",
@@ -17249,7 +18929,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 86
+   "calories": 86,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "微波炉荷包蛋",
@@ -17297,7 +18981,11 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 169
+   "calories": 169,
+   "tools": [
+    "微波炉"
+   ],
+   "methods": []
   },
   {
    "name": "微波炉蒸蛋",
@@ -17354,7 +19042,13 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 151
+   "calories": 151,
+   "tools": [
+    "微波炉"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "微波炉蛋糕",
@@ -17419,7 +19113,13 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 308
+   "calories": 308,
+   "tools": [
+    "微波炉"
+   ],
+   "methods": [
+    "烫"
+   ]
   },
   {
    "name": "意式香肠北非蛋",
@@ -17486,7 +19186,17 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 668
+   "calories": 668,
+   "tools": [
+    "平底锅"
+   ],
+   "methods": [
+    "炒",
+    "蒸",
+    "煮",
+    "炖",
+    "焖"
+   ]
   },
   {
    "name": "手抓饼",
@@ -17571,7 +19281,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 1050
+   "calories": 1050,
+   "tools": [],
+   "methods": [
+    "煎"
+   ]
   },
   {
    "name": "桂圆红枣粥",
@@ -17613,7 +19327,13 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 617
+   "calories": 617,
+   "tools": [
+    "电饭煲"
+   ],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "水煮玉米",
@@ -17641,7 +19361,11 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 108
+   "calories": 108,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "溏心蛋",
@@ -17670,7 +19394,11 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 72
+   "calories": 72,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "煎饺",
@@ -17699,7 +19427,15 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 769
+   "calories": 769,
+   "tools": [
+    "平底锅"
+   ],
+   "methods": [
+    "煎",
+    "蒸",
+    "焖"
+   ]
   },
   {
    "name": "燕麦鸡蛋饼",
@@ -17741,7 +19477,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 535
+   "calories": 535,
+   "tools": [
+    "平底锅"
+   ],
+   "methods": []
   },
   {
    "name": "牛奶燕麦",
@@ -17772,7 +19512,14 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 421
+   "calories": 421,
+   "tools": [
+    "微波炉"
+   ],
+   "methods": [
+    "煎",
+    "煮"
+   ]
   },
   {
    "name": "空气炸锅面包片",
@@ -17794,7 +19541,14 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 254
+   "calories": 254,
+   "tools": [
+    "空气炸锅"
+   ],
+   "methods": [
+    "烤",
+    "炸"
+   ]
   },
   {
    "name": "美式炒蛋",
@@ -17842,7 +19596,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 258
+   "calories": 258,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "茶叶蛋",
@@ -17934,7 +19692,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 193
+   "calories": 193,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "蒸水蛋",
@@ -17970,7 +19732,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 143
+   "calories": 143,
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "蒸花卷",
@@ -18010,7 +19776,13 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 400
+   "calories": 400,
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "蛋煎糍粑",
@@ -18058,7 +19830,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 379
+   "calories": 379,
+   "tools": [],
+   "methods": [
+    "煎"
+   ]
   },
   {
    "name": "金枪鱼酱三明治",
@@ -18113,7 +19889,9 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 569
+   "calories": 569,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "韩国麻药鸡蛋",
@@ -18190,7 +19968,11 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 669
+   "calories": 669,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "鸡蛋三明治",
@@ -18261,7 +20043,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 560
+   "calories": 560,
+   "tools": [],
+   "methods": [
+    "煎",
+    "煮"
+   ]
   },
   {
    "name": "苏格兰蛋",
@@ -18309,7 +20096,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 599
+   "calories": 599,
+   "tools": [
+    "空气炸锅"
+   ],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "温泉蛋",
@@ -18345,7 +20138,9 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 72
+   "calories": 72,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "油酥",
@@ -18369,7 +20164,9 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 111
+   "calories": 111,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "炸串酱料",
@@ -18455,7 +20252,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 1826
+   "calories": 1826,
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "简易版炒糖色",
@@ -18506,7 +20307,11 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1028
+   "calories": 1028,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "糖醋汁",
@@ -18535,7 +20340,9 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 146
+   "calories": 146,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "葱油",
@@ -18600,7 +20407,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 2069
+   "calories": 2069,
+   "tools": [],
+   "methods": [
+    "煮",
+    "炸"
+   ]
   },
   {
    "name": "蒜香酱油",
@@ -18655,7 +20467,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 177
+   "calories": 177,
+   "tools": [],
+   "methods": [
+    "炸",
+    "烫"
+   ]
   },
   {
    "name": "蔗糖糖浆",
@@ -18688,7 +20505,9 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 400
+   "calories": 400,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "草莓酱",
@@ -18726,7 +20545,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 1940
+   "calories": 1940,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "油泼辣子",
@@ -18842,7 +20663,9 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1854
+   "calories": 1854,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "胡萝卜甜糕",
@@ -18929,7 +20752,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 374
+   "calories": 374,
+   "tools": [],
+   "methods": [
+    "炒",
+    "蒸",
+    "煮",
+    "炸"
+   ]
   },
   {
    "name": "龟苓膏",
@@ -18962,7 +20792,9 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 129
+   "calories": 129,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "魔芋蛋糕",
@@ -19047,7 +20879,15 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 234
+   "calories": 234,
+   "tools": [
+    "烤箱"
+   ],
+   "methods": [
+    "炒",
+    "烤",
+    "烫"
+   ]
   },
   {
    "name": "雪花酥",
@@ -19111,7 +20951,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1313
+   "calories": 1313,
+   "tools": [
+    "平底锅"
+   ],
+   "methods": []
   },
   {
    "name": "酸奶意式奶冻",
@@ -19162,7 +21006,9 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1034
+   "calories": 1034,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "草莓冰淇淋",
@@ -19234,7 +21080,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 1653
+   "calories": 1653,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "英式司康",
@@ -19313,7 +21161,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1197
+   "calories": 1197,
+   "tools": [
+    "烤箱"
+   ],
+   "methods": [
+    "烤"
+   ]
   },
   {
    "name": "芋泥雪媚娘",
@@ -19404,7 +21258,16 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 160
+   "calories": 160,
+   "tools": [
+    "平底锅",
+    "破壁机"
+   ],
+   "methods": [
+    "炒",
+    "蒸",
+    "煮"
+   ]
   },
   {
    "name": "红柚蛋糕",
@@ -19474,7 +21337,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 622
+   "calories": 622,
+   "tools": [
+    "空气炸锅"
+   ],
+   "methods": [
+    "烤",
+    "炸"
+   ]
   },
   {
    "name": "玛格丽特饼干",
@@ -19540,7 +21410,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 863
+   "calories": 863,
+   "tools": [
+    "烤箱"
+   ],
+   "methods": [
+    "烤"
+   ]
   },
   {
    "name": "烤蛋挞",
@@ -19588,7 +21464,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 169
+   "calories": 169,
+   "tools": [
+    "烤箱"
+   ],
+   "methods": [
+    "烤"
+   ]
   },
   {
    "name": "烤箱版巴斯克芝士蛋糕",
@@ -19624,7 +21506,14 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 266
+   "calories": 266,
+   "tools": [
+    "烤箱",
+    "微波炉"
+   ],
+   "methods": [
+    "烤"
+   ]
   },
   {
    "name": "炸鲜奶",
@@ -19702,7 +21591,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1100
+   "calories": 1100,
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "无厨师机蜂蜜面包",
@@ -19752,7 +21645,14 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 176
+   "calories": 176,
+   "tools": [
+    "烤箱",
+    "微波炉"
+   ],
+   "methods": [
+    "烤"
+   ]
   },
   {
    "name": "提拉米苏",
@@ -19829,7 +21729,9 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 809
+   "calories": 809,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "戚风蛋糕",
@@ -19912,7 +21814,18 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 274
+   "calories": 274,
+   "tools": [
+    "烤箱",
+    "空气炸锅",
+    "电饭煲"
+   ],
+   "methods": [
+    "炒",
+    "烤",
+    "炸",
+    "烫"
+   ]
   },
   {
    "name": "奥利奥冰淇淋",
@@ -19958,7 +21871,9 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1160
+   "calories": 1160,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "咖啡椰奶冻",
@@ -19993,7 +21908,11 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 162
+   "calories": 162,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "反沙芋头",
@@ -20039,7 +21958,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 397
+   "calories": 397,
+   "tools": [],
+   "methods": [
+    "炒",
+    "炸"
+   ]
   },
   {
    "name": "B52轰炸机",
@@ -20087,7 +22011,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 80
+   "calories": 80,
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "Mojito莫吉托",
@@ -20139,7 +22067,9 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 187
+   "calories": 187,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "冬瓜茶",
@@ -20178,7 +22108,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 296
+   "calories": 296,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "印度奶茶",
@@ -20265,7 +22199,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 135
+   "calories": 135,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "可乐桶",
@@ -20319,7 +22257,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 450
+   "calories": 450,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "奶茶",
@@ -20359,7 +22299,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 81
+   "calories": 81,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "杨枝甘露",
@@ -20413,7 +22355,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 661
+   "calories": 661,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "牛油果拉西",
@@ -20468,7 +22412,11 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 392
+   "calories": 392,
+   "tools": [
+    "破壁机"
+   ],
+   "methods": []
   },
   {
    "name": "酸梅汤（半成品加工）",
@@ -20515,7 +22463,9 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 603
+   "calories": 603,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "长岛冰茶",
@@ -20613,7 +22563,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 281
+   "calories": 281,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "金菲士",
@@ -20683,7 +22635,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 150
+   "calories": 150,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "金汤力",
@@ -20742,7 +22696,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 205
+   "calories": 205,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "酸梅汤",
@@ -20822,7 +22778,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 359
+   "calories": 359,
+   "tools": [],
+   "methods": [
+    "煎",
+    "煮"
+   ]
   },
   {
    "name": "酒酿醪糟",
@@ -20861,7 +22822,16 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 420
+   "calories": 420,
+   "tools": [
+    "电饭煲",
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "煲",
+    "烫"
+   ]
   },
   {
    "name": "菠萝咖啡特调",
@@ -20944,7 +22914,9 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 180
+   "calories": 180,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "耙耙柑茶",
@@ -21003,7 +22975,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 81
+   "calories": 81,
+   "tools": [
+    "破壁机"
+   ],
+   "methods": []
   },
   {
    "name": "砂糖椰子冰沙",
@@ -21039,7 +23015,9 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 231
+   "calories": 231,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "百香果橙子特调",
@@ -21125,7 +23103,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 173
+   "calories": 173,
+   "tools": [],
+   "methods": [
+    "腌"
+   ]
   },
   {
    "name": "海边落日",
@@ -21212,7 +23194,9 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 173
+   "calories": 173,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "泰国手标红茶",
@@ -21247,7 +23231,9 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 185
+   "calories": 185,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "柠檬水",
@@ -21291,7 +23277,9 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 141
+   "calories": 141,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "奇异果菠菜特调",
@@ -21351,7 +23339,11 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 184
+   "calories": 184,
+   "tools": [
+    "破壁机"
+   ],
+   "methods": []
   },
   {
    "name": "冰粉",
@@ -21398,7 +23390,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 110
+   "calories": 110,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "乡村啤酒鸭",
@@ -21499,7 +23493,11 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1324
+   "calories": 1324,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "冷吃兔",
@@ -21614,7 +23612,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 590
+   "calories": 590,
+   "tools": [],
+   "methods": [
+    "炒",
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "可乐鸡翅",
@@ -21694,7 +23698,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 960
+   "calories": 960,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮",
+    "腌"
+   ]
   },
   {
    "name": "咕噜肉",
@@ -21807,7 +23818,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 673
+   "calories": 673,
+   "tools": [],
+   "methods": [
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "商芝肉",
@@ -21933,7 +23949,14 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 1621
+   "calories": 1621,
+   "tools": [],
+   "methods": [
+    "炒",
+    "蒸",
+    "煮",
+    "炸"
+   ]
   },
   {
    "name": "孜然牛肉",
@@ -21976,7 +23999,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 612
+   "calories": 612,
+   "tools": [],
+   "methods": [
+    "炒",
+    "腌"
+   ]
   },
   {
    "name": "小炒肉",
@@ -22078,7 +24106,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 2873
+   "calories": 2873,
+   "tools": [],
+   "methods": [
+    "炒",
+    "腌"
+   ]
   },
   {
    "name": "小米辣炒肉",
@@ -22170,7 +24203,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 620
+   "calories": 620,
+   "tools": [],
+   "methods": [
+    "炒",
+    "腌"
+   ]
   },
   {
    "name": "小酥肉",
@@ -22314,7 +24352,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1939
+   "calories": 1939,
+   "tools": [],
+   "methods": [
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "尖椒炒牛肉",
@@ -22354,7 +24397,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 449
+   "calories": 449,
+   "tools": [],
+   "methods": [
+    "炒",
+    "腌"
+   ]
   },
   {
    "name": "山西过油肉",
@@ -22460,7 +24508,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 679
+   "calories": 679,
+   "tools": [],
+   "methods": [
+    "炒",
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "带把肘子",
@@ -22564,7 +24618,14 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 1037
+   "calories": 1037,
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "煮"
+   ]
   },
   {
    "name": "意式烤鸡",
@@ -22599,7 +24660,13 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 315
+   "calories": 315,
+   "tools": [
+    "烤箱"
+   ],
+   "methods": [
+    "烤"
+   ]
   },
   {
    "name": "杀猪菜",
@@ -22718,7 +24785,15 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1657
+   "calories": 1657,
+   "tools": [
+    "高压锅"
+   ],
+   "methods": [
+    "炒",
+    "煮",
+    "焖"
+   ]
   },
   {
    "name": "椒盐排条",
@@ -22812,7 +24887,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1290
+   "calories": 1290,
+   "tools": [],
+   "methods": [
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "水煮肉片",
@@ -22996,7 +25076,14 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 361
+   "calories": 361,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "腌",
+    "烫"
+   ]
   },
   {
    "name": "洋葱炒猪肉",
@@ -23025,7 +25112,11 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 979
+   "calories": 979,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "烤鸡翅",
@@ -23057,7 +25148,14 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 187
+   "calories": 187,
+   "tools": [
+    "烤箱"
+   ],
+   "methods": [
+    "烤",
+    "腌"
+   ]
   },
   {
    "name": "猪肉烩酸菜",
@@ -23155,7 +25253,14 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 1817
+   "calories": 1817,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮",
+    "焖"
+   ]
   },
   {
    "name": "甜辣烤全翅",
@@ -23260,7 +25365,15 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 775
+   "calories": 775,
+   "tools": [
+    "空气炸锅"
+   ],
+   "methods": [
+    "烤",
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "番茄红酱",
@@ -23340,7 +25453,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1955
+   "calories": 1955,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "白菜猪肉炖粉条",
@@ -23423,7 +25541,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1880
+   "calories": 1880,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "粉蒸肉",
@@ -23530,7 +25654,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1606
+   "calories": 1606,
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "腌"
+   ]
   },
   {
    "name": "糖醋里脊",
@@ -23630,7 +25761,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1573
+   "calories": 1573,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "红烧鸡翅",
@@ -23779,7 +25917,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1016
+   "calories": 1016,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "肉饼炖蛋",
@@ -23840,7 +25983,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1124
+   "calories": 1124,
+   "tools": [],
+   "methods": [
+    "蒸",
+    "炖"
+   ]
   },
   {
    "name": "腐乳肉",
@@ -23936,7 +26084,14 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 1190
+   "calories": 1190,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炖",
+    "焖"
+   ]
   },
   {
    "name": "萝卜炖羊排",
@@ -24012,7 +26167,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1259
+   "calories": 1259,
+   "tools": [
+    "高压锅"
+   ],
+   "methods": [
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "葱烧鸡腿",
@@ -24123,7 +26285,14 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 850
+   "calories": 850,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "蒜苔炒肉末",
@@ -24185,7 +26354,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 258
+   "calories": 258,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "虎皮肘子",
@@ -24278,7 +26451,18 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 1018
+   "calories": 1018,
+   "tools": [
+    "高压锅"
+   ],
+   "methods": [
+    "炒",
+    "煮",
+    "炖",
+    "烤",
+    "炸",
+    "烫"
+   ]
   },
   {
    "name": "蚂蚁上树",
@@ -24365,7 +26549,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 791
+   "calories": 791,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "豉汁排骨",
@@ -24469,7 +26658,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1513
+   "calories": 1513,
+   "tools": [],
+   "methods": [
+    "蒸",
+    "焖",
+    "腌"
+   ]
   },
   {
    "name": "辣椒炒肉",
@@ -24557,7 +26752,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 425
+   "calories": 425,
+   "tools": [],
+   "methods": [
+    "炒",
+    "腌"
+   ]
   },
   {
    "name": "香干肉丝",
@@ -24639,7 +26839,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 472
+   "calories": 472,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "鱼香肉丝",
@@ -24711,7 +26915,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 421
+   "calories": 421,
+   "tools": [],
+   "methods": [
+    "炒",
+    "腌"
+   ]
   },
   {
    "name": "麻辣香锅",
@@ -24778,7 +26987,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1050
+   "calories": 1050,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "黄油鸡",
@@ -24982,7 +27196,19 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 641
+   "calories": 641,
+   "tools": [
+    "平底锅",
+    "破壁机"
+   ],
+   "methods": [
+    "炒",
+    "煎",
+    "煮",
+    "炖",
+    "烤",
+    "腌"
+   ]
   },
   {
    "name": "黄焖鸡",
@@ -25066,7 +27292,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 766
+   "calories": 766,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "焖"
+   ]
   },
   {
    "name": "黄瓜炒肉",
@@ -25104,7 +27336,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 550
+   "calories": 550,
+   "tools": [],
+   "methods": [
+    "炒",
+    "腌"
+   ]
   },
   {
    "name": "黔式腊肠娃娃菜",
@@ -25144,7 +27381,9 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 1030
+   "calories": 1030,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "黑椒牛柳",
@@ -25220,7 +27459,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 216
+   "calories": 216,
+   "tools": [],
+   "methods": [
+    "炒",
+    "腌"
+   ]
   },
   {
    "name": "麻婆豆腐",
@@ -25269,7 +27513,11 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 476
+   "calories": 476,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "鱼香茄子",
@@ -25362,7 +27610,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 579
+   "calories": 579,
+   "tools": [],
+   "methods": [
+    "炒",
+    "炸"
+   ]
   },
   {
    "name": "香辣鸡爪煲",
@@ -25445,7 +27698,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 986
+   "calories": 986,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "煲"
+   ]
   },
   {
    "name": "香菇滑鸡",
@@ -25541,7 +27800,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 608
+   "calories": 608,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "香煎五花肉",
@@ -25574,7 +27837,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 2985
+   "calories": 2985,
+   "tools": [],
+   "methods": [
+    "煎",
+    "腌"
+   ]
   },
   {
    "name": "香干芹菜炒肉",
@@ -25678,7 +27946,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 741
+   "calories": 741,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "青椒酿",
@@ -25816,7 +28088,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1403
+   "calories": 1403,
+   "tools": [],
+   "methods": [
+    "煎",
+    "煮",
+    "焖",
+    "腌"
+   ]
   },
   {
    "name": "青椒土豆炒肉",
@@ -25910,7 +28189,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1288
+   "calories": 1288,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "醉排骨",
@@ -26010,7 +28293,11 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 934
+   "calories": 934,
+   "tools": [],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "酱牛肉",
@@ -26121,7 +28408,12 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 2265
+   "calories": 2265,
+   "tools": [],
+   "methods": [
+    "炖",
+    "腌"
+   ]
   },
   {
    "name": "酱排骨",
@@ -26220,7 +28512,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1351
+   "calories": 1351,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "贵州辣子鸡",
@@ -26284,7 +28581,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1441
+   "calories": 1441,
+   "tools": [],
+   "methods": [
+    "炒",
+    "烤",
+    "炸"
+   ]
   },
   {
    "name": "豉汁蒸白鱔",
@@ -26407,7 +28710,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 472
+   "calories": 472,
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "腌"
+   ]
   },
   {
    "name": "豆豉鲮鱼油麦菜",
@@ -26475,7 +28785,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 416
+   "calories": 416,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "西红柿牛腩",
@@ -26525,7 +28839,17 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 1569
+   "calories": 1569,
+   "tools": [
+    "高压锅"
+   ],
+   "methods": [
+    "炒",
+    "煮",
+    "炖",
+    "烤",
+    "烫"
+   ]
   },
   {
    "name": "西红柿土豆炖牛肉",
@@ -26611,7 +28935,16 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 827
+   "calories": 827,
+   "tools": [
+    "高压锅"
+   ],
+   "methods": [
+    "炒",
+    "煮",
+    "炖",
+    "烫"
+   ]
   },
   {
    "name": "血浆鸭",
@@ -26721,7 +29054,13 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 2482
+   "calories": 2482,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "腌"
+   ]
   },
   {
    "name": "荷兰豆炒腊肠",
@@ -26771,7 +29110,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 606
+   "calories": 606,
+   "tools": [],
+   "methods": [
+    "炒",
+    "蒸"
+   ]
   },
   {
    "name": "荔枝肉",
@@ -26886,7 +29230,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 681
+   "calories": 681,
+   "tools": [],
+   "methods": [
+    "炒",
+    "炸"
+   ]
   },
   {
    "name": "茭白炒肉",
@@ -26972,7 +29321,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 515
+   "calories": 515,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "芥末罗氏虾",
@@ -27085,7 +29439,15 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 579
+   "calories": 579,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮",
+    "炸",
+    "焖"
+   ]
   },
   {
    "name": "老式锅包肉",
@@ -27256,7 +29618,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 882
+   "calories": 882,
+   "tools": [],
+   "methods": [
+    "炒",
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "老妈蹄花",
@@ -27362,7 +29730,11 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1425
+   "calories": 1425,
+   "tools": [
+    "高压锅"
+   ],
+   "methods": []
   },
   {
    "name": "羊排焖面",
@@ -27411,7 +29783,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1616
+   "calories": 1616,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炖",
+    "焖"
+   ]
   },
   {
    "name": "南派红烧肉",
@@ -27517,7 +29896,16 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 3248
+   "calories": 3248,
+   "tools": [
+    "高压锅"
+   ],
+   "methods": [
+    "炒",
+    "煮",
+    "炖",
+    "烫"
+   ]
   },
   {
    "name": "简易红烧肉",
@@ -27616,7 +30004,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 2775
+   "calories": 2775,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "红烧猪蹄",
@@ -27719,7 +30114,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 639
+   "calories": 639,
+   "tools": [
+    "高压锅"
+   ],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "糖醋排骨",
@@ -27826,7 +30228,15 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1022
+   "calories": 1022,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炖",
+    "炸",
+    "焖"
+   ]
   },
   {
    "name": "空气炸锅脆皮现腌炸鸡",
@@ -27943,7 +30353,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 700
+   "calories": 700,
+   "tools": [
+    "空气炸锅"
+   ],
+   "methods": [
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "瘦肉土豆片",
@@ -28016,7 +30433,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 585
+   "calories": 585,
+   "tools": [],
+   "methods": [
+    "炒",
+    "腌"
+   ]
   },
   {
    "name": "田螺酿",
@@ -28162,7 +30584,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 533
+   "calories": 533,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "焖",
+    "烫"
+   ]
   },
   {
    "name": "猪皮冻",
@@ -28203,7 +30632,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1630
+   "calories": 1630,
+   "tools": [],
+   "methods": [
+    "煮",
+    "煲",
+    "烫"
+   ]
   },
   {
    "name": "牛排",
@@ -28320,7 +30755,16 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1605
+   "calories": 1605,
+   "tools": [
+    "微波炉",
+    "平底锅"
+   ],
+   "methods": [
+    "煎",
+    "煮",
+    "腌"
+   ]
   },
   {
    "name": "煎烤羊排",
@@ -28445,7 +30889,18 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1850
+   "calories": 1850,
+   "tools": [
+    "高压锅",
+    "平底锅"
+   ],
+   "methods": [
+    "炒",
+    "煎",
+    "煮",
+    "炖",
+    "烤"
+   ]
   },
   {
    "name": "澳门湿版免治牛肉饭",
@@ -28531,7 +30986,13 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 1011
+   "calories": 1011,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "腌"
+   ]
   },
   {
    "name": "湘祁米夫鸭",
@@ -28631,7 +31092,15 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1332
+   "calories": 1332,
+   "tools": [
+    "高压锅"
+   ],
+   "methods": [
+    "炒",
+    "蒸",
+    "煮"
+   ]
   },
   {
    "name": "湖南家常红烧肉",
@@ -28730,7 +31199,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1348
+   "calories": 1348,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "清蒸鳜鱼",
@@ -28802,7 +31277,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 359
+   "calories": 359,
+   "tools": [],
+   "methods": [
+    "炒",
+    "蒸"
+   ]
   },
   {
    "name": "淄博烧烤",
@@ -28868,7 +31348,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 650
+   "calories": 650,
+   "tools": [],
+   "methods": [
+    "烤",
+    "腌"
+   ]
   },
   {
    "name": "水煮牛肉",
@@ -28979,7 +31464,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 431
+   "calories": 431,
+   "tools": [],
+   "methods": [
+    "煮",
+    "腌"
+   ]
   },
   {
    "name": "梅菜扣肉",
@@ -29081,7 +31571,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 3756
+   "calories": 3756,
+   "tools": [],
+   "methods": [
+    "炒",
+    "蒸",
+    "煮",
+    "炸"
+   ]
   },
   {
    "name": "桂林十八酿",
@@ -29116,7 +31613,13 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 468
+   "calories": 468,
+   "tools": [],
+   "methods": [
+    "煎",
+    "煮",
+    "焖"
+   ]
   },
   {
    "name": "柱候牛腩",
@@ -29263,7 +31766,15 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 980
+   "calories": 980,
+   "tools": [
+    "高压锅"
+   ],
+   "methods": [
+    "炒",
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "枝竹羊腩煲",
@@ -29425,7 +31936,14 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 2391
+   "calories": 2391,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炖",
+    "煲"
+   ]
   },
   {
    "name": "无骨鸡爪",
@@ -29559,7 +32077,11 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 815
+   "calories": 815,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "新疆大盘鸡",
@@ -29621,7 +32143,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1108
+   "calories": 1108,
+   "tools": [],
+   "methods": [
+    "炒",
+    "炖"
+   ]
   },
   {
    "name": "徽派红烧肉",
@@ -29728,7 +32255,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 3847
+   "calories": 3847,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮",
+    "炸"
+   ]
   },
   {
    "name": "广式萝卜牛腩",
@@ -29855,7 +32389,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 483
+   "calories": 483,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "焖"
+   ]
   },
   {
    "name": "干煸仔鸡",
@@ -29977,7 +32517,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1300
+   "calories": 1300,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "巴基斯坦牛肉咖喱",
@@ -30049,7 +32596,16 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 602
+   "calories": 602,
+   "tools": [
+    "电饭煲"
+   ],
+   "methods": [
+    "炒",
+    "蒸",
+    "炖",
+    "煲"
+   ]
   },
   {
    "name": "尖叫牛蛙",
@@ -30185,7 +32741,15 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1643
+   "calories": 1643,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炸",
+    "焖",
+    "腌"
+   ]
   },
   {
    "name": "小炒黄牛肉",
@@ -30255,7 +32819,11 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 619
+   "calories": 619,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "小炒鸡肝",
@@ -30362,7 +32930,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 760
+   "calories": 760,
+   "tools": [],
+   "methods": [
+    "炒",
+    "烤"
+   ]
   },
   {
    "name": "宫保鸡丁",
@@ -30533,7 +33106,16 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1790
+   "calories": 1790,
+   "tools": [
+    "微波炉"
+   ],
+   "methods": [
+    "炒",
+    "煎",
+    "焖",
+    "腌"
+   ]
   },
   {
    "name": "姜葱捞鸡",
@@ -30601,7 +33183,15 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 549
+   "calories": 549,
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸",
+    "煮",
+    "腌"
+   ]
   },
   {
    "name": "姜炒鸡",
@@ -30689,7 +33279,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1539
+   "calories": 1539,
+   "tools": [],
+   "methods": [
+    "炒",
+    "焖",
+    "腌"
+   ]
   },
   {
    "name": "奶酪培根通心粉",
@@ -30770,7 +33366,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 728
+   "calories": 728,
+   "tools": [
+    "烤箱"
+   ],
+   "methods": [
+    "煮",
+    "烤"
+   ]
   },
   {
    "name": "奥尔良风味烤鸡腿",
@@ -30826,7 +33429,13 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 955
+   "calories": 955,
+   "tools": [
+    "烤箱"
+   ],
+   "methods": [
+    "烤"
+   ]
   },
   {
    "name": "土豆炖排骨",
@@ -30975,7 +33584,17 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 991
+   "calories": 991,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮",
+    "炖",
+    "炸",
+    "焖",
+    "烫"
+   ]
   },
   {
    "name": "回锅肉",
@@ -31063,7 +33682,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 997
+   "calories": 997,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "啤酒鸭",
@@ -31185,7 +33809,11 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 170
+   "calories": 170,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "咖喱肥牛",
@@ -31258,7 +33886,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1821
+   "calories": 1821,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "台式卤肉饭",
@@ -31376,7 +34010,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1495
+   "calories": 1495,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炖",
+    "卤"
+   ]
   },
   {
    "name": "口水鸡",
@@ -31483,7 +34124,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1392
+   "calories": 1392,
+   "tools": [],
+   "methods": [
+    "炒",
+    "烤"
+   ]
   },
   {
    "name": "卤菜",
@@ -31621,7 +34267,15 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 467
+   "calories": 467,
+   "tools": [
+    "高压锅"
+   ],
+   "methods": [
+    "凉拌",
+    "炸",
+    "卤"
+   ]
   },
   {
    "name": "凉拌鸡丝",
@@ -31704,7 +34358,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 293
+   "calories": 293,
+   "tools": [],
+   "methods": [
+    "凉拌",
+    "煮"
+   ]
   },
   {
    "name": "冬瓜酿肉",
@@ -31788,7 +34447,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 578
+   "calories": 578,
+   "tools": [],
+   "methods": [
+    "蒸",
+    "腌"
+   ]
   },
   {
    "name": "农家一碗香",
@@ -31867,7 +34531,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1638
+   "calories": 1638,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "凉皮",
@@ -31910,7 +34579,11 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 761
+   "calories": 761,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "半成品意面",
@@ -31946,7 +34619,14 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 578
+   "calories": 578,
+   "tools": [
+    "微波炉",
+    "平底锅"
+   ],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "牛油火锅底料",
@@ -32041,7 +34721,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 585
+   "calories": 585,
+   "tools": [],
+   "methods": [
+    "炒",
+    "炸"
+   ]
   },
   {
    "name": "速冻水饺",
@@ -32066,7 +34751,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 502
+   "calories": 502,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "速冻馄饨",
@@ -32102,7 +34792,16 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 540
+   "calories": 540,
+   "tools": [
+    "电饭煲"
+   ],
+   "methods": [
+    "煮",
+    "炖",
+    "煲",
+    "烫"
+   ]
   },
   {
    "name": "速冻汤圆",
@@ -32131,7 +34830,11 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 568
+   "calories": 568,
+   "tools": [
+    "微波炉"
+   ],
+   "methods": []
   },
   {
    "name": "空气炸锅鸡翅中",
@@ -32161,7 +34864,15 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 504
+   "calories": 504,
+   "tools": [
+    "空气炸锅"
+   ],
+   "methods": [
+    "烤",
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "空气炸锅羊排",
@@ -32216,7 +34927,15 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 473
+   "calories": 473,
+   "tools": [
+    "空气炸锅"
+   ],
+   "methods": [
+    "烤",
+    "炸",
+    "腌"
+   ]
   },
   {
    "name": "炸薯条",
@@ -32243,7 +34962,13 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 1132
+   "calories": 1132,
+   "tools": [
+    "空气炸锅"
+   ],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "懒人蛋挞",
@@ -32277,7 +35002,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 137
+   "calories": 137,
+   "tools": [
+    "烤箱"
+   ],
+   "methods": [
+    "烤"
+   ]
   },
   {
    "name": "奶油蘑菇汤",
@@ -32363,7 +35094,15 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 426
+   "calories": 426,
+   "tools": [
+    "平底锅",
+    "破壁机"
+   ],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "小米粥",
@@ -32398,7 +35137,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 362
+   "calories": 362,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "生汆丸子汤",
@@ -32476,7 +35217,11 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 857
+   "calories": 857,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "番茄牛肉蛋花汤",
@@ -32516,7 +35261,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 262
+   "calories": 262,
+   "tools": [],
+   "methods": [
+    "煮",
+    "腌"
+   ]
   },
   {
    "name": "皮蛋瘦肉粥",
@@ -32617,7 +35367,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 776
+   "calories": 776,
+   "tools": [
+    "电饭煲"
+   ],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "米粥",
@@ -32655,7 +35411,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 308
+   "calories": 308,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "紫菜蛋花汤",
@@ -32695,7 +35453,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 217
+   "calories": 217,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "罗宋汤",
@@ -32802,7 +35562,15 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 2006
+   "calories": 2006,
+   "tools": [
+    "平底锅"
+   ],
+   "methods": [
+    "炒",
+    "煎",
+    "腌"
+   ]
   },
   {
    "name": "腊八粥",
@@ -32961,7 +35729,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 2042
+   "calories": 2042,
+   "tools": [
+    "高压锅"
+   ],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "西红柿鸡蛋汤",
@@ -33027,7 +35801,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 258
+   "calories": 258,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "金针菇汤",
@@ -33067,7 +35845,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 149
+   "calories": 149,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "陈皮排骨汤",
@@ -33105,7 +35885,13 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 357
+   "calories": 357,
+   "tools": [],
+   "methods": [
+    "煮",
+    "炖",
+    "煲"
+   ]
   },
   {
    "name": "黄瓜皮蛋汤",
@@ -33176,7 +35962,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 311
+   "calories": 311,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "陈皮排骨汤",
@@ -33214,7 +36004,13 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 365
+   "calories": 365,
+   "tools": [],
+   "methods": [
+    "煮",
+    "炖",
+    "煲"
+   ]
   },
   {
    "name": "银耳莲子粥",
@@ -33272,7 +36068,9 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 282
+   "calories": 282,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "菌菇炖乳鸽",
@@ -33335,7 +36133,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 324
+   "calories": 324,
+   "tools": [
+    "高压锅"
+   ],
+   "methods": [
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "羊肉汤",
@@ -33420,7 +36225,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 599
+   "calories": 599,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "玉米排骨汤",
@@ -33502,7 +36312,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1724
+   "calories": 1724,
+   "tools": [],
+   "methods": [
+    "炒",
+    "炖"
+   ]
   },
   {
    "name": "朱雀汤",
@@ -33528,7 +36343,9 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 168
+   "calories": 168,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "昂刺鱼豆腐汤",
@@ -33590,7 +36407,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 321
+   "calories": 321,
+   "tools": [],
+   "methods": [
+    "煎",
+    "蒸",
+    "煮",
+    "腌"
+   ]
   },
   {
    "name": "排骨苦瓜汤",
@@ -33643,7 +36467,15 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 905
+   "calories": 905,
+   "tools": [
+    "高压锅"
+   ],
+   "methods": [
+    "炒",
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "排骨山药玉米汤",
@@ -33737,7 +36569,13 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 1054
+   "calories": 1054,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "勾芡香菇汤",
@@ -33801,7 +36639,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 146
+   "calories": 146,
+   "tools": [],
+   "methods": [
+    "煎",
+    "煮",
+    "炸"
+   ]
   },
   {
    "name": "利提巧卡",
@@ -33992,7 +36836,14 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 1019
+   "calories": 1019,
+   "tools": [
+    "烤箱"
+   ],
+   "methods": [
+    "炒",
+    "烤"
+   ]
   },
   {
    "name": "印度烤饼",
@@ -34113,7 +36964,16 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 559
+   "calories": 559,
+   "tools": [
+    "烤箱",
+    "平底锅"
+   ],
+   "methods": [
+    "蒸",
+    "烤",
+    "烫"
+   ]
   },
   {
    "name": "印度焖饭",
@@ -34316,7 +37176,16 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 730
+   "calories": 730,
+   "tools": [],
+   "methods": [
+    "炒",
+    "蒸",
+    "煮",
+    "炸",
+    "焖",
+    "腌"
+   ]
   },
   {
    "name": "可乐炒饭",
@@ -34416,7 +37285,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 913
+   "calories": 913,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "焖"
+   ]
   },
   {
    "name": "咸肉菜饭",
@@ -34502,7 +37377,16 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 847
+   "calories": 847,
+   "tools": [
+    "电饭煲"
+   ],
+   "methods": [
+    "炒",
+    "煮",
+    "焖",
+    "煲"
+   ]
   },
   {
    "name": "手工水饺",
@@ -34607,7 +37491,11 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 1313
+   "calories": 1313,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "汤面",
@@ -34643,7 +37531,11 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 565
+   "calories": 565,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "炒年糕",
@@ -34687,7 +37579,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 960
+   "calories": 960,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "炒河粉",
@@ -34728,7 +37625,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 822
+   "calories": 822,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "炒馍",
@@ -34797,7 +37699,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 767
+   "calories": 767,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "炸酱面",
@@ -34867,7 +37773,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1272
+   "calories": 1272,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炸"
+   ]
   },
   {
    "name": "热干面",
@@ -34914,7 +37826,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1341
+   "calories": 1341,
+   "tools": [],
+   "methods": [
+    "煮",
+    "烫"
+   ]
   },
   {
    "name": "照烧鸡腿饭",
@@ -35047,7 +37964,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1670
+   "calories": 1670,
+   "tools": [],
+   "methods": [
+    "煎",
+    "煮",
+    "焖",
+    "腌"
+   ]
   },
   {
    "name": "煮泡面加蛋",
@@ -35091,7 +38015,11 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 550
+   "calories": 550,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "猪油拌饭",
@@ -35161,7 +38089,9 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 420
+   "calories": 420,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "红芸豆拌饭",
@@ -35324,7 +38254,18 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1842
+   "calories": 1842,
+   "tools": [
+    "电饭煲",
+    "高压锅"
+   ],
+   "methods": [
+    "炒",
+    "蒸",
+    "煮",
+    "炖",
+    "炸"
+   ]
   },
   {
    "name": "老干妈拌面",
@@ -35359,7 +38300,11 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 502
+   "calories": 502,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "肉蛋盖饭",
@@ -35453,7 +38398,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1822
+   "calories": 1822,
+   "tools": [],
+   "methods": [
+    "煎",
+    "煮"
+   ]
   },
   {
    "name": "葱油拌面",
@@ -35527,7 +38477,13 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 355
+   "calories": 355,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炸"
+   ]
   },
   {
    "name": "蒸卤面",
@@ -35636,7 +38592,18 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1563
+   "calories": 1563,
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "炒",
+    "蒸",
+    "煮",
+    "炖",
+    "卤",
+    "焖"
+   ]
   },
   {
    "name": "蛋包饭",
@@ -35727,7 +38694,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 695
+   "calories": 695,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "蛋炒饭",
@@ -35777,7 +38748,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 853
+   "calories": 853,
+   "tools": [],
+   "methods": [
+    "炒",
+    "卤"
+   ]
   },
   {
    "name": "螺蛳粉",
@@ -35821,7 +38797,11 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 1109
+   "calories": 1109,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "酸辣蕨根粉",
@@ -35875,7 +38855,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 318
+   "calories": 318,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "醪糟小汤圆",
@@ -35903,7 +38887,11 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 957
+   "calories": 957,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "韭菜盒子",
@@ -35966,7 +38954,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 794
+   "calories": 794,
+   "tools": [],
+   "methods": [
+    "煎"
+   ]
   },
   {
    "name": "鲜肉烧卖",
@@ -36121,7 +39113,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1485
+   "calories": 1485,
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "鹰嘴豆炸饼",
@@ -36320,7 +39318,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1098
+   "calories": 1098,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炖",
+    "炸"
+   ]
   },
   {
    "name": "麻油拌面",
@@ -36388,7 +39393,11 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 451
+   "calories": 451,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "麻辣减脂荞麦面",
@@ -36469,7 +39478,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 790
+   "calories": 790,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "鲣鱼海苔玉米饭",
@@ -36498,7 +39511,15 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 383
+   "calories": 383,
+   "tools": [
+    "电饭煲",
+    "高压锅"
+   ],
+   "methods": [
+    "煮",
+    "煲"
+   ]
   },
   {
    "name": "韩式拌饭",
@@ -36595,7 +39616,17 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1080
+   "calories": 1080,
+   "tools": [
+    "电饭煲"
+   ],
+   "methods": [
+    "炒",
+    "煎",
+    "蒸",
+    "煮",
+    "煲"
+   ]
   },
   {
    "name": "陕西油泼面",
@@ -36686,7 +39717,13 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 771
+   "calories": 771,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炸"
+   ]
   },
   {
    "name": "酱拌荞麦面",
@@ -36733,7 +39770,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 475
+   "calories": 475,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "豆角焖面",
@@ -36873,7 +39914,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1386
+   "calories": 1386,
+   "tools": [],
+   "methods": [
+    "炒",
+    "烤",
+    "焖"
+   ]
   },
   {
    "name": "西红柿鸡蛋挂面",
@@ -36965,7 +40012,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 654
+   "calories": 654,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "茄子肉煎饼",
@@ -37036,7 +40088,15 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 904
+   "calories": 904,
+   "tools": [
+    "平底锅"
+   ],
+   "methods": [
+    "炒",
+    "煎",
+    "煮"
+   ]
   },
   {
    "name": "老友猪肉粉",
@@ -37085,7 +40145,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 927
+   "calories": 927,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "煮锅蒸米饭",
@@ -37113,7 +40178,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 418
+   "calories": 418,
+   "tools": [],
+   "methods": [
+    "蒸",
+    "煮"
+   ]
   },
   {
    "name": "电饭煲蒸米饭",
@@ -37139,7 +40209,14 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 442
+   "calories": 442,
+   "tools": [
+    "电饭煲"
+   ],
+   "methods": [
+    "蒸",
+    "煲"
+   ]
   },
   {
    "name": "空气炸锅照烧鸡饭",
@@ -37196,7 +40273,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1854
+   "calories": 1854,
+   "tools": [
+    "空气炸锅"
+   ],
+   "methods": [
+    "炸"
+   ]
   },
   {
    "name": "电饭煲三文鱼炊饭",
@@ -37231,7 +40314,13 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 889
+   "calories": 889,
+   "tools": [
+    "电饭煲"
+   ],
+   "methods": [
+    "煲"
+   ]
   },
   {
    "name": "芝麻烧饼",
@@ -37262,7 +40351,9 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 282
+   "calories": 282,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "烙饼",
@@ -37308,7 +40399,9 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1185
+   "calories": 1185,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "炒方便面",
@@ -37351,7 +40444,13 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 789
+   "calories": 789,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮"
+   ]
   },
   {
    "name": "炒意大利面",
@@ -37380,7 +40479,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 406
+   "calories": 406,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "炒凉粉",
@@ -37480,7 +40584,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 567
+   "calories": 567,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "火腿饭团",
@@ -37521,7 +40629,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 665
+   "calories": 665,
+   "tools": [
+    "电饭煲"
+   ],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "河南蒸面条",
@@ -37651,7 +40765,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 3066
+   "calories": 3066,
+   "tools": [],
+   "methods": [
+    "炒",
+    "蒸",
+    "煮",
+    "炖"
+   ]
   },
   {
    "name": "日式肥牛丼饭",
@@ -37714,7 +40835,16 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 774
+   "calories": 774,
+   "tools": [
+    "微波炉",
+    "电饭煲"
+   ],
+   "methods": [
+    "炒",
+    "蒸",
+    "煲"
+   ]
   },
   {
    "name": "日式咖喱饭",
@@ -37789,7 +40919,15 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 730
+   "calories": 730,
+   "tools": [
+    "微波炉"
+   ],
+   "methods": [
+    "炒",
+    "煎",
+    "煮"
+   ]
   },
   {
    "name": "披萨饼皮",
@@ -37866,7 +41004,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 537
+   "calories": 537,
+   "tools": [
+    "烤箱"
+   ],
+   "methods": [
+    "烤"
+   ]
   },
   {
    "name": "扬州炒饭",
@@ -37970,7 +41114,13 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1769
+   "calories": 1769,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮"
+   ]
   },
   {
    "name": "意式肉酱面",
@@ -38022,7 +41172,11 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 1199
+   "calories": 1199,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "微波炉腊肠煲仔饭",
@@ -38076,7 +41230,14 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 1039
+   "calories": 1039,
+   "tools": [
+    "微波炉"
+   ],
+   "methods": [
+    "煮",
+    "煲"
+   ]
   },
   {
    "name": "基础牛奶面包",
@@ -38153,7 +41314,13 @@
    ],
    "source": "howtocook",
    "difficulty": 5,
-   "calories": 2048
+   "calories": 2048,
+   "tools": [
+    "烤箱"
+   ],
+   "methods": [
+    "烤"
+   ]
   },
   {
    "name": "凉粉",
@@ -38256,7 +41423,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 539
+   "calories": 539,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "中式馅饼",
@@ -38366,7 +41537,16 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 1265
+   "calories": 1265,
+   "tools": [
+    "平底锅"
+   ],
+   "methods": [
+    "炒",
+    "煎",
+    "烤",
+    "腌"
+   ]
   },
   {
    "name": "凉拌油麦菜",
@@ -38403,7 +41583,11 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 191
+   "calories": 191,
+   "tools": [],
+   "methods": [
+    "凉拌"
+   ]
   },
   {
    "name": "凉拌豆腐",
@@ -38488,7 +41672,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 343
+   "calories": 343,
+   "tools": [],
+   "methods": [
+    "凉拌",
+    "煮"
+   ]
   },
   {
    "name": "凉拌金针菇",
@@ -38573,7 +41762,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 163
+   "calories": 163,
+   "tools": [],
+   "methods": [
+    "凉拌",
+    "煮"
+   ]
   },
   {
    "name": "凉拌黄瓜",
@@ -38608,7 +41802,12 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 107
+   "calories": 107,
+   "tools": [],
+   "methods": [
+    "凉拌",
+    "腌"
+   ]
   },
   {
    "name": "印度土豆花菜",
@@ -38745,7 +41944,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 668
+   "calories": 668,
+   "tools": [],
+   "methods": [
+    "炒",
+    "炸",
+    "焖"
+   ]
   },
   {
    "name": "印度葫芦丸子",
@@ -38910,7 +42115,14 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 571
+   "calories": 571,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "炖",
+    "炸"
+   ]
   },
   {
    "name": "家常日本豆腐",
@@ -39040,7 +42252,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 946
+   "calories": 946,
+   "tools": [
+    "平底锅"
+   ],
+   "methods": [
+    "炒",
+    "煎"
+   ]
   },
   {
    "name": "松仁玉米",
@@ -39118,7 +42337,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 580
+   "calories": 580,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "水油焖蔬菜",
@@ -39154,7 +42377,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 92
+   "calories": 92,
+   "tools": [],
+   "methods": [
+    "焖"
+   ]
   },
   {
    "name": "油醋爆蛋",
@@ -39239,7 +42466,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 471
+   "calories": 471,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "清炒花菜",
@@ -39297,7 +42526,13 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 211
+   "calories": 211,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮",
+    "焖"
+   ]
   },
   {
    "name": "清蒸南瓜",
@@ -39333,7 +42568,13 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 80
+   "calories": 80,
+   "tools": [
+    "蒸锅"
+   ],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "炒茄子",
@@ -39416,7 +42657,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 610
+   "calories": 610,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "炒青菜",
@@ -39447,7 +42692,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 152
+   "calories": 152,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "皮蛋豆腐",
@@ -39532,7 +42781,9 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 566
+   "calories": 566,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "素炒豆角",
@@ -39609,7 +42860,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 107
+   "calories": 107,
+   "tools": [],
+   "methods": [
+    "炒",
+    "焖"
+   ]
   },
   {
    "name": "红烧茄子",
@@ -39704,7 +42960,12 @@
    ],
    "source": "howtocook",
    "difficulty": 4,
-   "calories": 547
+   "calories": 547,
+   "tools": [],
+   "methods": [
+    "炒",
+    "炸"
+   ]
   },
   {
    "name": "脆皮豆腐",
@@ -39768,7 +43029,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 840
+   "calories": 840,
+   "tools": [
+    "平底锅"
+   ],
+   "methods": [
+    "煎"
+   ]
   },
   {
    "name": "茄子炖土豆",
@@ -39843,7 +43110,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 623
+   "calories": 623,
+   "tools": [],
+   "methods": [
+    "炒",
+    "炖"
+   ]
   },
   {
    "name": "葱煎豆腐",
@@ -39889,7 +43161,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 364
+   "calories": 364,
+   "tools": [
+    "平底锅"
+   ],
+   "methods": [
+    "炒",
+    "煎"
+   ]
   },
   {
    "name": "蒜蓉西兰花",
@@ -39949,7 +43228,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 187
+   "calories": 187,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "蒲烧茄子",
@@ -39989,7 +43273,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 326
+   "calories": 326,
+   "tools": [],
+   "methods": [
+    "煎",
+    "蒸"
+   ]
   },
   {
    "name": "蚝油生菜",
@@ -40057,7 +43346,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 125
+   "calories": 125,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "西红柿炒鸡蛋",
@@ -40100,7 +43393,12 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 252
+   "calories": 252,
+   "tools": [],
+   "methods": [
+    "炒",
+    "烫"
+   ]
   },
   {
    "name": "酸辣土豆丝",
@@ -40191,7 +43489,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 374
+   "calories": 374,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "金针菇日本豆腐煲",
@@ -40271,7 +43573,14 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 606
+   "calories": 606,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "焖",
+    "煲"
+   ]
   },
   {
    "name": "金钱蛋",
@@ -40374,7 +43683,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 427
+   "calories": 427,
+   "tools": [],
+   "methods": [
+    "煎",
+    "煮"
+   ]
   },
   {
    "name": "陕北熬豆角",
@@ -40433,7 +43747,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 191
+   "calories": 191,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "雷椒皮蛋",
@@ -40529,7 +43847,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 448
+   "calories": 448,
+   "tools": [],
+   "methods": [
+    "煎",
+    "炸"
+   ]
   },
   {
    "name": "鸡蛋火腿炒黄瓜",
@@ -40601,7 +43924,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 337
+   "calories": 337,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "鸡蛋花",
@@ -40651,7 +43978,11 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 107
+   "calories": 107,
+   "tools": [],
+   "methods": [
+    "烫"
+   ]
   },
   {
    "name": "微波炉鸡蛋羹",
@@ -40687,7 +44018,13 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 160
+   "calories": 160,
+   "tools": [
+    "微波炉"
+   ],
+   "methods": [
+    "烫"
+   ]
   },
   {
    "name": "蒸箱鸡蛋羹",
@@ -40747,7 +44084,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 118
+   "calories": 118,
+   "tools": [],
+   "methods": [
+    "蒸"
+   ]
   },
   {
    "name": "鸡蛋羹",
@@ -40819,7 +44160,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 168
+   "calories": 168,
+   "tools": [],
+   "methods": [
+    "蒸",
+    "煮"
+   ]
   },
   {
    "name": "韭菜炒蛋",
@@ -40851,7 +44197,11 @@
    "quantities": [],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 180
+   "calories": 180,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "话梅煮毛豆",
@@ -40891,7 +44241,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 454
+   "calories": 454,
+   "tools": [],
+   "methods": [
+    "煮"
+   ]
   },
   {
    "name": "西葫芦炒鸡蛋",
@@ -40951,7 +44305,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 224
+   "calories": 224,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "西红柿豆腐汤羹",
@@ -41042,7 +44400,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 242
+   "calories": 242,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "蚝油三鲜菇",
@@ -41173,7 +44535,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 222
+   "calories": 222,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "虎皮青椒",
@@ -41246,7 +44613,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 341
+   "calories": 341,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "蒜蓉空心菜",
@@ -41303,7 +44674,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 440
+   "calories": 440,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "蒜蓉炒芹菜",
@@ -41354,7 +44729,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 150
+   "calories": 150,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "菠菜炒鸡蛋",
@@ -41406,7 +44785,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 350
+   "calories": 350,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎"
+   ]
   },
   {
    "name": "莴笋叶煎饼",
@@ -41467,7 +44851,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 477
+   "calories": 477,
+   "tools": [],
+   "methods": [
+    "煎",
+    "炸"
+   ]
   },
   {
    "name": "芹菜拌茶树菇",
@@ -41530,7 +44919,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 127
+   "calories": 127,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "红烧冬瓜",
@@ -41624,7 +45015,14 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 519
+   "calories": 519,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮",
+    "炸"
+   ]
   },
   {
    "name": "糖拌西红柿",
@@ -41663,7 +45061,11 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 104
+   "calories": 104,
+   "tools": [],
+   "methods": [
+    "烤"
+   ]
   },
   {
    "name": "白灼菜心",
@@ -41719,7 +45121,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 86
+   "calories": 86,
+   "tools": [],
+   "methods": [
+    "煮",
+    "烫"
+   ]
   },
   {
    "name": "烤茄子",
@@ -41795,7 +45202,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 145
+   "calories": 145,
+   "tools": [
+    "烤箱"
+   ],
+   "methods": [
+    "烤"
+   ]
   },
   {
    "name": "炒滑蛋",
@@ -41835,7 +45248,13 @@
    ],
    "source": "howtocook",
    "difficulty": 1,
-   "calories": 391
+   "calories": 391,
+   "tools": [
+    "平底锅"
+   ],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "洋葱炒鸡蛋",
@@ -41891,7 +45310,13 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 562
+   "calories": 562,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "炸"
+   ]
   },
   {
    "name": "榄菜肉末四季豆",
@@ -41953,7 +45378,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 720
+   "calories": 720,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "椒盐玉米",
@@ -42011,7 +45440,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 693
+   "calories": 693,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮"
+   ]
   },
   {
    "name": "拔丝土豆",
@@ -42075,7 +45510,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1158
+   "calories": 1158,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "炸"
+   ]
   },
   {
    "name": "手撕包菜",
@@ -42183,7 +45624,11 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 1663
+   "calories": 1663,
+   "tools": [],
+   "methods": [
+    "炒"
+   ]
   },
   {
    "name": "干锅花菜",
@@ -42264,7 +45709,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 759
+   "calories": 759,
+   "tools": [],
+   "methods": [
+    "炒",
+    "焖"
+   ]
   },
   {
    "name": "小炒藕丁",
@@ -42338,7 +45788,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 214
+   "calories": 214,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "地三鲜",
@@ -42415,7 +45870,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 264
+   "calories": 264,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "炸"
+   ]
   },
   {
    "name": "包菜炒鸡蛋粉丝",
@@ -42481,7 +45942,12 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 570
+   "calories": 570,
+   "tools": [],
+   "methods": [
+    "炒",
+    "烫"
+   ]
   },
   {
    "name": "凉拌莴笋",
@@ -42551,7 +46017,13 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 295
+   "calories": 295,
+   "tools": [],
+   "methods": [
+    "凉拌",
+    "炒",
+    "煮"
+   ]
   },
   {
    "name": "凉拌木耳",
@@ -42631,7 +46103,12 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 129
+   "calories": 129,
+   "tools": [],
+   "methods": [
+    "凉拌",
+    "煮"
+   ]
   },
   {
    "name": "乾隆白菜",
@@ -42700,7 +46177,9 @@
    ],
    "source": "howtocook",
    "difficulty": 2,
-   "calories": 150
+   "calories": 150,
+   "tools": [],
+   "methods": []
   },
   {
    "name": "上汤娃娃菜",
@@ -42755,7 +46234,13 @@
    ],
    "source": "howtocook",
    "difficulty": 3,
-   "calories": 158
+   "calories": 158,
+   "tools": [],
+   "methods": [
+    "炒",
+    "煎",
+    "煮"
+   ]
   }
  ]
 }

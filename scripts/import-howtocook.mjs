@@ -110,6 +110,60 @@ export function parseDish(md, category) {
   };
 }
 
+// ── 器具/技法维度(确定性推导,借鉴 cook.zhangjc.tech 的 tools/methods 数据形态) ──
+
+/** 器具规范名 ← 文本特征。通用「锅」太泛不收;两语料一起推导。 */
+export const TOOL_PATTERNS = [
+  ['烤箱', /烤箱/],
+  ['空气炸锅', /空气炸锅/],
+  ['微波炉', /微波炉/],
+  ['电饭煲', /电饭煲|电饭锅/],
+  ['高压锅', /高压锅|压力锅/],
+  ['蒸锅', /蒸锅|蒸屉|蒸笼|蒸架|蒸柜/],
+  ['平底锅', /平底锅|煎锅/],
+  ['破壁机', /破壁机|料理机|搅拌机|榨汁机/],
+];
+
+export function deriveTools(text) {
+  return TOOL_PATTERNS.filter(([, re]) => re.test(text)).map(([name]) => name);
+}
+
+/** 烹饪法:分类先验(老乡鸡分类本身是做法) + 名字/步骤文本扫描。 */
+const CATEGORY_METHOD = { 炒菜: '炒', 蒸菜: '蒸', 炖菜: '炖', 炸品: '炸', 凉拌: '凉拌', 卤菜: '卤', 烤类: '烤', 煮锅: '煮', 砂锅菜: '煲', 烫菜: '烫' };
+const METHOD_TOKENS = ['凉拌', '炒', '煎', '蒸', '煮', '炖', '烤', '炸', '卤', '焖', '煲', '腌', '烫'];
+
+export function deriveMethods(text, category) {
+  const out = new Set();
+  if (CATEGORY_METHOD[category]) out.add(CATEGORY_METHOD[category]);
+  for (const m of METHOD_TOKENS) if (text.includes(m)) out.add(m);
+  return [...out];
+}
+
+/** 一道菜用于推导的全文:名字 + 原文配料 + 步骤。 */
+export function recipeDeriveText(r) {
+  return [r.name, ...(r.ingredients_raw || r.ingredients || []), ...(r.steps || [])].join('\n');
+}
+
+// ── tips 技法文(HowToCook tips/ 目录 → tips.json,喂新手技法卡 + AI 生成 grounding) ──
+
+/**
+ * 解析一篇 tips Markdown → { title, group, content }。
+ * content 保留原始 Markdown(去图片),UI 侧做轻渲染;结构不完整返回 null。
+ */
+export function parseTip(md, group) {
+  const lines = String(md || '').split('\n');
+  let title = '';
+  const body = [];
+  for (const line of lines) {
+    const h1 = line.match(/^#\s+(.+)/);
+    if (h1 && !title) { title = h1[1].trim(); continue; }
+    body.push(line);
+  }
+  const content = body.join('\n').replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, 8000);
+  if (!title || !content) return null;
+  return { title, group, content };
+}
+
 /** md 里第一张真实存在的本地图片(封面);无则 null。 */
 function findCoverImage(md, mdDir) {
   for (const m of String(md).matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)) {
@@ -161,7 +215,10 @@ function main() {
   const kept = (existing.recipes || [])
     .filter((r) => r.source !== 'howtocook')
     .map((r) => ({ ...r, source: r.source || 'cooklikehoc' }));
-  const recipes = [...kept, ...parsed];
+  const recipes = [...kept, ...parsed].map((r) => {
+    const text = recipeDeriveText(r);
+    return { ...r, tools: deriveTools(text), methods: deriveMethods(text, r.category) };
+  });
   const out = {
     sources: [
       { id: 'cooklikehoc', name: 'CookLikeHOC (老乡鸡, unofficial)', license: '见仓库,源自《老乡鸡菜品溯源报告》,用前核实' },
@@ -172,9 +229,28 @@ function main() {
   };
   fs.writeFileSync(recipesPath, `${JSON.stringify(out, null, 1)}\n`);
 
+  // tips 技法文 → tips.json(根目录=基础,learn=技法,advanced=进阶)。
+  const TIP_GROUPS = [['', '基础'], ['learn', '技法'], ['advanced', '进阶']];
+  const tips = [];
+  for (const [sub, group] of TIP_GROUPS) {
+    const dir = path.join(repoRoot, 'tips', sub);
+    if (!fs.existsSync(dir)) continue;
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (!entry.isFile() || !entry.name.endsWith('.md')) continue;
+      const tip = parseTip(fs.readFileSync(path.join(dir, entry.name), 'utf8'), group);
+      if (tip) tips.push({ id: entry.name.replace(/\.md$/, ''), ...tip });
+    }
+  }
+  fs.writeFileSync(path.join(projectRoot, 'public/data/cooking/tips.json'), `${JSON.stringify({
+    sources: [{ id: 'howtocook', name: 'HowToCook (Anduin2017/HowToCook) tips', license: 'Unlicense (public domain)', url: 'https://github.com/Anduin2017/HowToCook' }],
+    count: tips.length,
+    tips,
+  }, null, 1)}\n`);
+
   const withImg = parsed.filter((r) => r.image).length;
   const withQty = parsed.filter((r) => r.quantities.length).length;
-  console.log(`✅ HowToCook 并入 ${parsed.length} 道(带图 ${withImg},带家庭份量 ${withQty});保留原语料 ${kept.length} 道;总计 ${recipes.length}。`);
+  const withTool = recipes.filter((r) => r.tools.length).length;
+  console.log(`✅ HowToCook 并入 ${parsed.length} 道(带图 ${withImg},带家庭份量 ${withQty});保留原语料 ${kept.length} 道;总计 ${recipes.length}(带器具 ${withTool})。技法文 ${tips.length} 篇 → tips.json。`);
   if (skipped.length) console.log(`⚠️ 结构不完整跳过 ${skipped.length} 篇:\n  ${skipped.join('\n  ')}`);
 }
 
