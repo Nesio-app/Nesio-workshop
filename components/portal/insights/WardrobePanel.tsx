@@ -18,7 +18,7 @@ import {
 } from '@/lib/portal/wardrobe';
 import { loadWardrobePrefs, recordOutfitFeedback, buildStylistDislikes } from '@/lib/portal/wardrobe-prefs';
 import {
-  loadOutfits, saveOutfit, patchOutfit, removeOutfit, groupByMonth, retiredKeys, outfitKey,
+  loadOutfits, saveOutfit, patchOutfit, removeOutfit, groupByMonth, outfitsOn, retiredKeys, outfitKey,
   WARDROBE_OUTFITS_UPDATED, type SavedOutfit,
 } from '@/lib/portal/wardrobe-outfits';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
@@ -900,6 +900,8 @@ function SavedOutfits({ outfits, garments, thumbs, view, dict, onView, onStar, o
 }) {
   const byId = useMemo(() => new Map(garments.map((g) => [g.id, g])), [garments]);
   const months = useMemo(() => groupByMonth(outfits), [outfits]);
+  // 日历里点某一天 → 下面只列那天穿的;再点一次取消,回到整月。
+  const [pickedDay, setPickedDay] = useState<string | null>(null);
 
   if (outfits.length === 0) {
     return (
@@ -915,7 +917,9 @@ function SavedOutfits({ outfits, garments, thumbs, view, dict, onView, onStar, o
       <div style={{ ...card, opacity: o.retired ? 0.55 : 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-2)' }}>
           <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>
-            {o.date.slice(5).replace('-', dict === 'en' ? '/' : '月')}{dict === 'en' ? '' : '日'}
+            {dict === 'en'
+              ? o.date.slice(5).replace('-', '/')
+              : `${Number(o.date.slice(5, 7))}月${Number(o.date.slice(8, 10))}日`}
           </span>
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
             {o.retired ? L(dict, '已淘汰', 'Retired') : o.starred ? L(dict, '喜欢', 'Loved') : L(dict, `${pieces.length} 件`, `${pieces.length} pieces`)}
@@ -953,7 +957,7 @@ function SavedOutfits({ outfits, garments, thumbs, view, dict, onView, onStar, o
     <>
       <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
         <button type="button" style={chip(view === 'list')} onClick={() => onView('list')}>{L(dict, '列表', 'List')}</button>
-        <button type="button" style={chip(view === 'calendar')} onClick={() => onView('calendar')}>{L(dict, '按月', 'By month')}</button>
+        <button type="button" style={chip(view === 'calendar')} onClick={() => { onView('calendar'); setPickedDay(null); }}>{L(dict, '日历', 'Calendar')}</button>
       </div>
 
       {view === 'list' ? (
@@ -961,18 +965,84 @@ function SavedOutfits({ outfits, garments, thumbs, view, dict, onView, onStar, o
           {outfits.map((o) => <Row key={o.id} o={o} />)}
         </div>
       ) : (
-        months.map((m) => (
-          <div key={m.month} style={{ marginBottom: 'var(--space-4)' }}>
-            <p style={sectionLbl}>{dict === 'en' ? m.month : `${m.month.slice(0, 4)} 年 ${Number(m.month.slice(5))} 月`}
-              <span style={{ color: 'var(--portal-muted)', fontWeight: 'var(--weight-regular)' }}> {L(dict, `${m.items.length} 天`, `${m.items.length} days`)}</span>
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-              {m.items.map((o) => <Row key={o.id} o={o} />)}
+        months.map((m) => {
+          // 「N 天」要数**不同的日期**,不是数条数 —— 同一天存了两套会显示成 2 天。
+          // (和健身页那个「本周 N 次 / 七天点」是同一类口径混淆,这里数天。)
+          const days = new Set(m.items.map((o) => o.date)).size;
+          return (
+            <div key={m.month} style={{ marginBottom: 'var(--space-5)' }}>
+              <p style={sectionLbl}>{dict === 'en' ? m.month : `${m.month.slice(0, 4)} 年 ${Number(m.month.slice(5))} 月`}
+                <span style={{ color: 'var(--portal-muted)', fontWeight: 'var(--weight-regular)' }}> {L(dict, `${days} 天`, `${days} days`)}</span>
+              </p>
+              <MonthGrid month={m.month} items={m.items} dict={dict} selected={pickedDay} onPick={setPickedDay} />
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+                {(pickedDay && pickedDay.slice(0, 7) === m.month ? outfitsOn(m.items, pickedDay) : m.items).map((o) => <Row key={o.id} o={o} />)}
+              </div>
             </div>
-          </div>
-        ))
+          );
+        })
       )}
     </>
+  );
+}
+
+
+/**
+ * 一个月的日历格子:有搭配的那天亮一个点,点它只看那天的。
+ * 图15 要的是「按日历展示」—— 第一版只做了按月分组的列表(状态名还叫 calendar),
+ * 为日历写的 outfitsOn 一直没人用。这里把它补成真的日历。
+ * 周一起头,和健身页的七天点同一个约定。
+ */
+function MonthGrid({ month, items, dict, selected, onPick }: {
+  month: string; items: SavedOutfit[]; dict: string;
+  selected: string | null; onPick: (d: string | null) => void;
+}) {
+  const [y, m] = month.split('-').map(Number);
+  const first = new Date(y, m - 1, 1);
+  const lead = (first.getDay() + 6) % 7;              // 周一=0
+  const days = new Date(y, m, 0).getDate();
+  const has = new Set(items.map((o) => o.date));
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const week = dict === 'en' ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['一', '二', '三', '四', '五', '六', '日'];
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 'var(--space-1)', marginBottom: 'var(--space-1)' }}>
+        {week.map((w, i) => (
+          <span key={i} style={{ textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{w}</span>
+        ))}
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 'var(--space-1)' }}>
+        {Array.from({ length: lead }, (_, i) => <span key={`lead${i}`} />)}
+        {Array.from({ length: days }, (_, i) => {
+          const date = `${y}-${pad(m)}-${pad(i + 1)}`;
+          const on = has.has(date);
+          const sel = selected === date;
+          return (
+            <button
+              key={date}
+              type="button"
+              disabled={!on}
+              onClick={() => onPick(sel ? null : date)}
+              aria-pressed={sel}
+              aria-label={L(dict, `${m} 月 ${i + 1} 日${on ? ' · 有搭配' : ''}`, `${month}-${pad(i + 1)}${on ? ' · has outfit' : ''}`)}
+              style={{
+                aspectRatio: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+                gap: '2px', border: sel ? '1px solid var(--portal-accent-border)' : '1px solid transparent',
+                borderRadius: 'var(--radius-sm)',
+                background: sel ? 'var(--portal-accent-soft-md)' : on ? 'var(--portal-accent-soft)' : 'transparent',
+                color: on ? 'var(--portal-ink)' : 'var(--portal-muted)',
+                fontFamily: 'var(--font-sans)', fontSize: 'var(--text-xs)',
+                cursor: on ? 'pointer' : 'default', opacity: on ? 1 : 0.45, padding: 0,
+              }}
+            >
+              {i + 1}
+              <span style={{ width: 4, height: 4, borderRadius: '50%', background: on ? 'var(--portal-accent)' : 'transparent' }} />
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 

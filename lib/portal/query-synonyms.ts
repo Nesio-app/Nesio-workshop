@@ -118,11 +118,6 @@ export function expandQueryTerms(tokens: readonly string[]): string[] {
   return out;
 }
 
-/** 这个查询有没有能扩的同义词(UI 想说明「顺带也搜了英文说法」时用)。 */
-export function hasSynonyms(tokens: readonly string[]): boolean {
-  return expandQueryTerms(tokens).length > 0;
-}
-
 /**
  * 同义词**真的**在这批语料里搭上桥了吗 —— 不是「有词可扩」,是「扩出来的词确实命中了内容」。
  *

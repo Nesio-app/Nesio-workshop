@@ -55,8 +55,6 @@ const M = load();
 {
   assert.equal(M.expandQueryTerms(['zzzq', '🙂']).length, 0);
   assert.equal(M.expandQueryTerms([]).length, 0);
-  assert.equal(M.hasSynonyms(['zzzq']), false);
-  assert.equal(M.hasSynonyms(['预约']), true);
 }
 
 // ── 单字不许正向包含:「会」曾把 社会/机会/一会儿/会员卡 全拖进会议组 ──
