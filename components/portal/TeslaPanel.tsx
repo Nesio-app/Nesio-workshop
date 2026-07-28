@@ -225,12 +225,33 @@ export default function TeslaPanel() {
         marginTop: 'var(--space-5)', paddingTop: 'var(--space-4)',
         borderTop: '1px solid var(--portal-line)',
       }}>
+        {/* 2026-07-28 UI 精修(标注 图21「功能都没有看到在哪」):这块原来是三行纯文字,
+            告诉你「充电花费在洞察·财务」「位置在地点足迹」—— 指了路却没有路。
+            改成三个真能点的入口,点了直接跳过去。 */}
         <p className="nesio-settings-section-label">{L(dict, '这些数据去哪了', 'Where this data lives')}</p>
-        <ul style={{ margin: 0, paddingLeft: '1.1rem', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)', lineHeight: 1.7 }}>
-          <li>{L(dict, '充电花费 → 洞察 · 财务(和银行流水并在一起看)', 'Charging spend → Insights · Finance (alongside bank transactions)')}</li>
-          <li>{L(dict, '停车 / 充电位置 → 洞察 · 分析 · 地点足迹', 'Parking / charging locations → Insights · Analytics · Place trail')}</li>
-          <li>{L(dict, '行驶 / 充电记录 → 问一问、时间线可搜到', 'Drives / charges → searchable in Ask & Timeline')}</li>
-        </ul>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          {([
+            ['finance', L(dict, '充电花费 · 和银行流水一起看', 'Charging spend · with bank transactions')],
+            ['timeline', L(dict, '停车 / 充电位置 · 地点足迹', 'Parking / charging spots · place trail')],
+          ] as const).map(([tab, label]) => (
+            <button key={tab} type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab } }))}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)',
+                width: '100%', textAlign: 'left', cursor: 'pointer', padding: 'var(--space-3)',
+                borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'transparent',
+                color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }}>
+              {label}<span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
+            </button>
+          ))}
+          <button type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: L(dict, '充电', 'charge') } }))}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)',
+              width: '100%', textAlign: 'left', cursor: 'pointer', padding: 'var(--space-3)',
+              borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'transparent',
+              color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }}>
+            {L(dict, '行驶 / 充电记录 · 在记忆里搜', 'Drives / charges · search memories')}<span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
+          </button>
+        </div>
       </div>
     </>
   );

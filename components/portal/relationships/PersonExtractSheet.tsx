@@ -69,9 +69,12 @@ export default function PersonExtractSheet({ open, onClose }: { open: boolean; o
     setPending(null); setText(''); onClose();
   };
 
+  // 2026-07-28(标注 图20):「记给某人」失效的根因 —— 关系页在洞察(fullscreen,z-930)里,
+  // 这张卡是 bottom(z-901),开了但被整个盖住。elevated 抬到 940/941。
   return (
     <NesioSheet
       variant="bottom"
+      elevated
       open={open}
       onOpenChange={(next) => { if (!next) onClose(); }}
       card={false}

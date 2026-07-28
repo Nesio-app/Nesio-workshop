@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { getLifeGraph, updateLifeNode } from '@/lib/portal/life-graph';
+import { getLifeGraph, updateLifeNode, deleteLifeNode } from '@/lib/portal/life-graph';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { buildPersonProfile, type PersonProfile } from '@/lib/portal/relationship-profile';
 import { markContacted, lastContactLabel, CLOSENESS_META } from '@/lib/portal/relationships';
@@ -155,8 +155,10 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
 
   return (
     <>
+      {/* 2026-07-28(标注 图20):「关系点不开详情」同因:详情本来就有(改亲疏/关系词/头像/合并同一个人),只是被洞察面板盖住看不见。 */}
       <NesioSheet
         variant="bottom"
+        elevated
         open
         onOpenChange={(next) => { if (!next) onClose(); }}
         card={false}
@@ -325,6 +327,34 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
               </div>
             </div>
           )}
+
+          {/* 2026-07-28(标注 图20「可以编辑可以删除可以关联」):
+              编辑(亲疏/关系词/头像)和合并同一个人上面已经有了;这里补两件缺的 ——
+              「在记忆里找 TA」= 关联(跳记忆页按名字搜,所有提到 TA 的记录一屏看全);
+              「从关系里移除」= 删掉这个人的 person 节点(不动提到 TA 的那些记忆本身)。 */}
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+            <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }}
+              onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: p.displayName } })); }}>
+              {L(dict, '在记忆里找 TA ›', 'Find in memories ›')}
+            </button>
+            {p.nodeId && (
+              <button type="button"
+                onClick={() => {
+                  if (!p.nodeId) return;
+                  if (!confirm(L(dict, `把「${p.displayName}」从关系里移除?提到 TA 的记忆不会删。`, `Remove “${p.displayName}” from relationships? Memories mentioning them stay.`))) return;
+                  // 删失败(存储写不进)不假装成功 —— 提示用户,详情页留着。
+                  if (deleteLifeNode(p.nodeId)) {
+                    window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+                    onClose();
+                  } else {
+                    setUploadErr(L(dict, '没能移除 —— 本机存储写不进,过会儿再试。', 'Could not remove — local storage write failed. Try again.'));
+                  }
+                }}
+                style={{ padding: '0.4rem 0.9rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+                {L(dict, '从关系里移除', 'Remove')}
+              </button>
+            )}
+          </div>
 
           <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>
             {L(dict, '仅你可见 · 从你的记忆、邮件、通讯录推出', 'Only you · from your notes, email and contacts')}

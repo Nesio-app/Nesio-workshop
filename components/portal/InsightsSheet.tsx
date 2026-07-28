@@ -644,16 +644,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {mainTab === 'living' && (
           <>
             <MirrorLetterTab />
-            {labOn && (
-              <div className="nesio-insights-section" style={{ marginTop: 'var(--space-6)' }}>
-                <p className="nesio-insights-section-label">{L(dict, 'Lab · 旧认知模型(已退役)', 'Lab · Mind model (retired)')}</p>
-                <p className="nesio-settings-option-hint" style={{ margin: 0 }}>
-                  {L(dict,
-                    '7 层认知模型与节点图已退役,避免与多面镜双轨。主路径请用上方「多面镜」月度信。',
-                    'The 7-layer mind model + graph is retired to avoid a second cognition track. Use Mirror Letter above.')}
-                </p>
-              </div>
-            )}
+            {/* 2026-07-28 UI 精修(标注 图23):「Lab · 旧认知模型(已退役)」整块删掉 ——
+                一块只用来公告「这块已经没了」的墓碑,还占着镜子页底部一屏。退役这件事
+                在 STATE.md 里记着就够,不必在用户面前立牌子。 */}
           </>
         )}
         </>

@@ -17131,11 +17131,13 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 .nesio-mirror-note { margin: 0.75rem 0 0; font-size: 0.68rem; color: var(--portal-muted); text-align: center; }
 
 /* 往期存档抽屉 */
-.nesio-mirror-drawer-scrim { position: fixed; inset: 0; z-index: 60; background: rgba(20,22,28,.28); border: none; cursor: pointer; }
+.nesio-mirror-drawer-scrim { position: fixed; inset: 0; z-index: 60; background: var(--modal-backdrop-bg, rgba(16,28,54,.35)); border: none; cursor: pointer; }
+/* 2026-07-28(标注 图22「透明度调整」):抽屉原来用 --glass-bg-solid(部分主题下半透明),
+   压在信正文上时,下面那段字直接透出来和「往期的信 · 2 封」叠在一起。换成不透明面。 */
 .nesio-mirror-drawer {
   position: fixed; z-index: 61; left: 50%; bottom: 0; transform: translateX(-50%);
   width: min(30rem, 100%);
-  background: var(--glass-bg-solid);
+  background: var(--sheet-opaque, #fdfeff);
   border: 1px solid var(--portal-line); border-bottom: none;
   border-radius: var(--radius-xl, 28px) var(--radius-xl, 28px) 0 0;
   padding: 1rem 1.1rem 1.4rem;
