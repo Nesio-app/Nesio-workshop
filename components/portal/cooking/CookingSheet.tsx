@@ -702,7 +702,7 @@ function RecipeBody({ match, t }: { match: RecipeMatch<Recipe>; t: TT }) {
 
       {/* 营养 · 每份 · 四列 */}
       <section>
-        <SectionHead label={t('营养', 'Nutrition')} right={t('每份', 'per serving')} rightGo={false} />
+        <SectionHead label={t('营养', 'Nutrition')} right={per ? t(`每份 · 约 ${per.servings} 份`, `per serving · ≈${per.servings}`) : t('每份', 'per serving')} rightGo={false} />
         {per
           ? <>
               <div style={{ ...card, display: 'flex', padding: 'var(--space-4) 0' }}>
@@ -711,7 +711,8 @@ function RecipeBody({ match, t }: { match: RecipeMatch<Recipe>; t: TT }) {
                 <NutriCol v={`${per.cho}g`} label={t('碳水', 'Carbs')} />
                 <NutriCol v={`${per.fat}g`} label={t('脂肪', 'Fat')} last />
               </div>
-              <p style={caption}>{t(`估算 · 约 ${per.servings} 份 · 基于《中国食物成分表》查表 + 用量加法,非精确值。`, `Estimate · ≈${per.servings} servings · China Food Composition Table + arithmetic, not exact.`)}</p>
+              {/* 2026-07-28 标注 图26:营养表下面那行出处/免责说明划掉 —— 自己用,知道数从哪来。
+                  份数是有信息量的(决定要不要按人数缩),留在小节头右边的「每份」旁边即可。 */}
             </>
           : main && main.length > 0
             ? <>
