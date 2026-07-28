@@ -15,6 +15,7 @@ import NesioMark from './NesioMark';
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { getLifeGraph, isBulkImported, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
+import { recallByRecognition } from '@/lib/portal/photo-recall';
 import { buildMemoryContext, fmtEventDate, extractCitations } from '@/lib/portal/memory-retrieval';
 import { createCalendarEvent } from '@/lib/portal/calendar-client';
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
@@ -312,7 +313,8 @@ function BubbleMenu({ msg, onClose, onSave, onCopy, onContinue }: {
 // ─── Memory detail ─────────────────────────────────────────────────────────────
 // ─── Camera view ──────────────────────────────────────────────────────────────
 function CameraView({ onResult, onClose, autoOpen = false }: {
-  onResult: (label: string, nodes: LifeNode[]) => void;
+  /** label 空 + failure 有值 = 没认出来(诚实说明,不冒充结果)。 */
+  onResult: (label: string, nodes: LifeNode[], failure?: string) => void;
   onClose: () => void;
   autoOpen?: boolean;
 }) {
@@ -384,18 +386,17 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType }),
       });
-      const data = await res.json() as { ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string };
+      const data = await res.json() as { ok?: boolean; nodes?: Array<{ name: string; type: string; tags?: string[] }>; summary?: string };
       if (data.ok && data.nodes?.length) {
-        const names = data.nodes.map((n) => n.name).join('、');
-        const found = new Map<string, LifeNode>();
-        for (const node of data.nodes) {
-          for (const n of searchLifeGraphFuzzy(node.name, 2)) found.set(n.id, n);
-        }
-        onResult(names || data.summary || L(dict, '（未识别到）', 'Nothing recognized'), Array.from(found.values()).slice(0, 6));
+        const names = data.nodes.map((n) => n.name).join(L(dict, '、', ', '));
+        // 2026-07-28(标注 图8/图9):召回口径放宽 —— 名字 + 标签 + 一句话描述都当查询词,
+        // 「黑色钢笔」才找得到记忆里那条「笔」。原来只按 name 各查 2 条,长词对短名必空。
+        onResult(names || data.summary || L(dict, '（未识别到）', 'Nothing recognized'), recallByRecognition(data.nodes, data.summary));
       } else {
-        onResult(data.summary || L(dict, '（未识别到）', 'Nothing recognized'), []);
+        // 认不出来就说认不出来,别把失败说明塞进「识别到:…」里冒充结果。
+        onResult('', [], data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.'));
       }
-    } catch { onResult(L(dict, '识别失败', 'Recognition failed'), []); }
+    } catch { onResult('', [], L(dict, '识别没成功,再试一次。', 'Recognition did not go through — try again.')); }
     setAnalyzing(false);
   }
 
@@ -544,8 +545,12 @@ export default function NesioChatSheet({
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'image', imageBase64: b64, mimeType: mime }),
     }).then((r) => r.json()).then((data: { ok?: boolean; nodes?: Array<{ name: string }>; summary?: string }) => {
-      const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || data.summary || L(dict, '（未识别到内容）', '(nothing recognized)');
-      const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text: L(dict, `识别到：${names}\n\n可以继续问我关于这张图的问题。`, `Recognized: ${names}\n\nAsk me anything about this photo.`) };
+      // 2026-07-28(标注 图8):没认出来别说「识别到:未检测到任何生命图谱条目」—— 直说没看清。
+      const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || '';
+      const text = names
+        ? L(dict, `识别到：${names}\n\n可以继续问我关于这张图的问题。`, `Recognized: ${names}\n\nAsk me anything about this photo.`)
+        : data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.');
+      const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text };
       setMessages((prev) => { const withAi = [...prev, aiMsg]; saveHistory(withAi); return withAi; });
     }).catch(() => {
       setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: 'model', text: L(dict, '图片识别失败，请重试。', 'Image recognition failed — try again.') }]);
@@ -870,8 +875,11 @@ Edit location/value anytime in Storage.`),
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type: 'image', imageBase64: b64, mimeType: mime }),
         }).then((r) => r.json()).then((data: { ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string }) => {
-          const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || data.summary || L(dict, '（未识别到内容）', '(nothing recognized)');
-          const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text: L(dict, `识别到：${names}\n\n可以继续问我关于这张图片的问题。`, `Recognized: ${names}\n\nAsk me anything about this image.`) };
+          const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || '';
+          const text = names
+            ? L(dict, `识别到：${names}\n\n可以继续问我关于这张图片的问题。`, `Recognized: ${names}\n\nAsk me anything about this image.`)
+            : data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.');
+          const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text };
           setMessages((prev) => { const withAi = [...prev, aiMsg]; saveHistory(withAi); return withAi; });
         }).catch(() => {
           const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text: L(dict, '图片识别失败，请重试。', 'Image recognition failed — try again.') };
@@ -971,12 +979,15 @@ Edit location/value anytime in Storage.`),
     if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
   }
 
-  function handleCameraResult(label: string, nodes: LifeNode[]) {
+  function handleCameraResult(label: string, nodes: LifeNode[], failure?: string) {
     setShowCamera(false);
     const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: L(dict, '[图片] 识别图片', '[Image] Recognize image') };
-    const aiText = nodes.length > 0
+    // 2026-07-28(标注 图8):三态分开说 —— 没认出来 / 认出来但没记过 / 认出来且翻到了旧记录。
+    const aiText = failure
+      ? failure
+      : nodes.length > 0
       ? L(dict, `识别到：${label}\n\n记忆库里找到 ${nodes.length} 条相关记录：\n${nodes.map((n) => `• ${n.name}（${n.type}）`).join('\n')}`, `Recognized: ${label}\n\nFound ${nodes.length} related record(s) in your memory:\n${nodes.map((n) => `• ${n.name} (${n.type})`).join('\n')}`)
-      : L(dict, `识别到：${label}\n\n记忆库里暂时没有找到相关记录。`, `Recognized: ${label}\n\nNo related records in your memory yet.`);
+      : L(dict, `识别到：${label}\n\n这件东西还没记过 —— 要我存进记忆吗?`, `Recognized: ${label}\n\nNot in your memory yet — want me to save it?`);
     const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text: aiText };
     const next = [...messages, userMsg, aiMsg];
     setMessages(next); saveHistory(next);
@@ -1041,14 +1052,10 @@ Edit location/value anytime in Storage.`),
       {/* Header */}
       <div className="nesio-wechat-header">
         <button type="button" className="nesio-wechat-back-btn" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>←</button>
-        {/* 批次 140·设计念念节:头部品牌行 —— 念念 + 当前模式副标(按 entitlement 诚实:分层未启用即深问·云端) */}
+        {/* 2026-07-28 UI 精修(标注 图7):模式副标删掉 —— 底部分段器已经是「端上/深问」的
+            唯一事实源,标题下再复述一遍,加上每条气泡下的徽章,一屏出现三四次「深问·云端」。 */}
         <div className="nesio-wechat-brand">
           <span className="nesio-wechat-title">{L(dict, '念念', 'Nessa')}</span>
-          <span className="nesio-wechat-brand-mode">
-            {deepMode && canUsePaidCloudAi()
-              ? L(dict, '深问 · 云端 · Pro', 'Deep · cloud · Pro')
-              : L(dict, '端上简答 · 免费', 'On-device · free')}
-          </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
           <button
@@ -1162,14 +1169,8 @@ Edit location/value anytime in Storage.`),
                   )}
                   {msg.savedToMemory && <p className="nesio-wechat-saved-badge">✓ {L(dict, '已存入记忆', 'Saved to Memory')}</p>}
                 </div>
-                {/* 批次 140·设计念念节:气泡模式徽章 —— 按这条答复的真实来路诚实标(不追溯旧消息) */}
-                {!isUser && msg.answerMode && (
-                  <span className={`nesio-wechat-mode-badge nesio-wechat-mode-badge--${msg.answerMode}`}>
-                    {msg.answerMode === 'onDevice'
-                      ? L(dict, '◐ 端上答的 · 免费', '◐ On-device · free')
-                      : L(dict, '✦ 深问 · 云端', '✦ Deep · cloud')}
-                  </span>
-                )}
+                {/* 2026-07-28 UI 精修(标注 图7):逐条气泡的「✦ 深问·云端」徽章删掉 —— 每答一句挂一个,
+                    滚三屏就是三个一模一样的 chip。来路诚实标注改由底部分段器承担(它显示当前模式)。 */}
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="nesio-wechat-sources">
                     {/* 只渲染 http(s) 链接 —— 模型返回的 URL 未必可信,挡 javascript:/data: 等伪协议 */}
@@ -1354,7 +1355,7 @@ Edit location/value anytime in Storage.`),
       {/* Plus panel */}
       {showPlus && (
         <div className="nesio-wechat-plus-panel">
-          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const userMsg:UiMessage={id:nextMsgId('u'),role:'user',text:L(dict,'[图片] 识别图片','[Image] Recognize image')}; setMessages(prev=>[...prev,userMsg]); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join('、'); const found=new Map<string,LifeNode>(); for(const node of data.nodes){for(const n of searchLifeGraphFuzzy(node.name,2))found.set(n.id,n);} const nodes=Array.from(found.values()).slice(0,6); const aiText=nodes.length>0?L(dict,`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`,`Recognized: ${names}\n\nFound ${nodes.length} related record(s):\n${nodes.map(n=>`• ${n.name}`).join('\n')}`):L(dict,`识别到：${names}\n\n记忆库里暂时没有相关记录。`,`Recognized: ${names}\n\nNo related records in your memory yet.`); const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:aiText}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}else{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:data.summary||L(dict,'图片识别暂时不可用。','Image recognition is briefly unavailable.')}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}}).catch(()=>{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:L(dict,'图片识别失败，请重试。','Image recognition failed — please try again.')}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const userMsg:UiMessage={id:nextMsgId('u'),role:'user',text:L(dict,'[图片] 识别图片','[Image] Recognize image')}; setMessages(prev=>[...prev,userMsg]); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join(L(dict,'、',', ')); const nodes=recallByRecognition(data.nodes,data.summary); const aiText=nodes.length>0?L(dict,`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`,`Recognized: ${names}\n\nFound ${nodes.length} related record(s):\n${nodes.map(n=>`• ${n.name}`).join('\n')}`):L(dict,`识别到：${names}\n\n这件东西还没记过 —— 要我存进记忆吗?`,`Recognized: ${names}\n\nNot in your memory yet — want me to save it?`); const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:aiText}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}else{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:data.summary||L(dict,'这张图没看清,换个角度再拍一张试试。','Could not read this photo — try another angle.')}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}}).catch(()=>{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:L(dict,'图片识别失败，请重试。','Image recognition failed — please try again.')}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
             <span className="nesio-wechat-plus-icon"><IconImage /></span>
             <span>{L(dict, '相册', 'Photos')}</span>
           </button>

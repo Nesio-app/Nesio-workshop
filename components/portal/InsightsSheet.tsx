@@ -11,7 +11,6 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { MyExperimentWidget } from '@/components/portal/NesioExperiment';
 import { useFeatureEnabled } from '@/components/portal/use-feature-flag';
 import { computeTerritory } from '@/lib/portal/life-territory';
 import { getLifeGraph, isBulkImported } from '@/lib/portal/life-graph';
@@ -458,6 +457,34 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {/* ── Tab 1: 免费四件套(v1 规格 §2.1)── */}
         {mainTab === 'reflection' && (
           <div className="nesio-reflection-tab">
+            {/* 2026-07-28 UI 精修(标注 图11「走走看放到最上面」):这块原本排在线头之后,
+                现在提到反思页最顶 —— 一进来先撞见一条旧记录,再看统计。 */}
+            {/* ③ 走走看:衬线引原话「去年今天,你写下 ——」+ 再翻一条(偶遇感) */}
+            {(yearAgoNode || wanderNode) && (() => {
+              const node = yearAgoNode ?? wanderNode!;
+              const isYearAgo = !!yearAgoNode;
+              return (
+                <div className="nesio-insights-section">
+                  <p className="nesio-insights-section-label">{L(dict, '走走看', 'Wander')}</p>
+                  <div className="nesio-wander-card" style={{ padding: '0.9rem', borderRadius: 'var(--radius-md, 16px)', background: 'var(--portal-bg)', border: '1px solid var(--portal-line)' }}>
+                    <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--portal-muted)' }}>
+                      {isYearAgo ? L(dict, '去年今天,你写下 ——', 'A year ago today, you wrote —') : L(dict, '翻到一条 ——', 'Turned up —')}
+                    </p>
+                    <button type="button" onClick={() => openInMemory(node.name)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 0, margin: '0.45rem 0', cursor: 'pointer' }}>
+                      <span style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', lineHeight: 1.6, color: 'var(--portal-ink)' }}>「{node.name.slice(0, 60)}」</span>
+                    </button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>
+                        {new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </span>
+                      <button type="button" onClick={() => setWanderSeed((s) => s + 1)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem', fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                        <IconRefresh size={13} />{L(dict, '再翻一条', 'Another')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* 节律热力图(缩小、无侧栏文字,置顶) */}
             {realNodes.length > 0 && <RhythmHeatmap nodes={realNodes} compact />}
@@ -495,33 +522,6 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
                 </div>
               </div>
             )}
-
-            {/* ③ 走走看:衬线引原话「去年今天,你写下 ——」+ 再翻一条(偶遇感) */}
-            {(yearAgoNode || wanderNode) && (() => {
-              const node = yearAgoNode ?? wanderNode!;
-              const isYearAgo = !!yearAgoNode;
-              return (
-                <div className="nesio-insights-section">
-                  <p className="nesio-insights-section-label">{L(dict, '走走看', 'Wander')}</p>
-                  <div className="nesio-wander-card" style={{ padding: '0.9rem', borderRadius: 'var(--radius-md, 16px)', background: 'var(--portal-bg)', border: '1px solid var(--portal-line)' }}>
-                    <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--portal-muted)' }}>
-                      {isYearAgo ? L(dict, '去年今天,你写下 ——', 'A year ago today, you wrote —') : L(dict, '翻到一条 ——', 'Turned up —')}
-                    </p>
-                    <button type="button" onClick={() => openInMemory(node.name)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 0, margin: '0.45rem 0', cursor: 'pointer' }}>
-                      <span style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', lineHeight: 1.6, color: 'var(--portal-ink)' }}>「{node.name.slice(0, 60)}」</span>
-                    </button>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>
-                        {new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })}
-                      </span>
-                      <button type="button" onClick={() => setWanderSeed((s) => s + 1)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem', fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-                        <IconRefresh size={13} />{L(dict, '再翻一条', 'Another')}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
 
             {/* ④ 节律:一句话 + 迷你周柱(不做大图表) */}
             <div className="nesio-insights-section">
@@ -585,21 +585,12 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
               </div>
             )}
 
-            {/* 我的实验(Lab 功能开关,与提审隐藏同闸) */}
-            {showExperiment && (
-              <div className="nesio-insights-section">
-                <p className="nesio-insights-section-label">{L(dict, '我的实验', 'My experiment')}</p>
-                <MyExperimentWidget />
-              </div>
-            )}
+            {/* 2026-07-28 UI 精修(标注 图10):「我的实验」整块划掉 —— 常年空态 + 一个没人点的
+                「+新建实验」,占了页底一屏。同批划掉页脚那句「全部来自本地统计…」声明。
+                实验入口仍在 Lab 里,没删功能,只是不再占洞察页版面。 */}
 
             {/* NESIO 学到了什么(信任资产,§2.1 移页底) */}
             <LearningStatusPanel />
-
-            {/* 页脚诚实声明 */}
-            <p className="nesio-insights-cloud-note" style={{ marginTop: '1.25rem' }}>
-              {L(dict, '全部来自本地统计 · 无 AI 推断 · 批量导入不计入', 'All local stats · no AI inference · bulk imports excluded')}
-            </p>
           </div>
         )}
 
