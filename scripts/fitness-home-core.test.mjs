@@ -1,6 +1,7 @@
 /**
  * 行为契约:健身首页确定性核心(lib/platform/fitness-home-core.ts)。
- * 不变式 —— 时长/强度按处方推、本周进度按天去重、今天练哪个不随机。
+ * 不变式 —— 时长/强度按处方推、本周次数与七天点两个口径各自正确、
+ * 今天练哪个不随机、换过计划的旧记录不串台。
  */
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -45,14 +46,17 @@ const D = (s) => new Date(`${s}T12:00:00`);
   const today = D('2026-07-29');
   const log = [
     { date: '2026-07-27', sessionId: 'a' },
-    { date: '2026-07-27', sessionId: 'b' },   // 同一天第二次,不重复计
+    { date: '2026-07-27', sessionId: 'b' },   // 同一天第二次
     { date: '2026-07-20', sessionId: 'a' },   // 上周,不算
   ];
-  assert.equal(M.doneThisWeek(log, today), 1, '同一天两次只算一次、上周不算');
+  // 次数口径:要和 sessionsPerWeek(每周几「次」)配对,所以同一天两次算两次。
+  // 早先这里按天去重,导致健身页的环和健康仪表盘的 sessionsThisWeek 同一件事两个数。
+  assert.equal(M.doneThisWeek(log, today), 2, '本周两次都算、上周不算');
   const dots = M.weekDots(log, today);
   assert.equal(dots.length, 7);
   assert.equal(dots[0].key, '2026-07-27', '第一格是本周一');
   assert.equal(dots[0].done, true);
+  assert.equal(dots.filter((d) => d.done).length, 1, '七天点是日历口径:同一天两次只亮一个点');
   assert.equal(dots[2].isToday, true, '周三是今天');
   assert.equal(dots.filter((d) => d.isToday).length, 1, '只能有一个今天');
 }
@@ -88,6 +92,34 @@ const D = (s) => new Date(`${s}T12:00:00`);
   assert.equal(M.weekIndex(null, D('2026-07-29')), 1, '没开始 = 第 1 周');
   assert.equal(M.weekIndex('2026-07-29T00:00:00', D('2026-07-29')), 1);
   assert.equal(M.weekIndex('2026-07-01T00:00:00', D('2026-07-29')), 5);
+}
+
+// ── 换过计划:上一个计划的打卡不该算进这个计划的本周进度 ──
+{
+  const today = D('2026-07-29');
+  const log = [
+    { date: '2026-07-27', sessionId: 'lowerA', protocolId: 'strength' },
+    { date: '2026-07-28', sessionId: 'easyRun', protocolId: 'run_base' },  // 上一个计划的
+  ];
+  assert.equal(M.doneThisWeek(log, today, 'strength'), 1, '别的计划的次数不算进来');
+  assert.equal(M.doneThisWeek(log, today), 2, '不传 protocolId 则不过滤');
+  assert.equal(
+    M.pickTodaySessionIndex(['lowerA', 'upperB'], log, today, 'strength'), 1,
+    '只有本计划做过的那天被跳过',
+  );
+  // 老数据没写 protocolId → 兼容,照样算
+  assert.equal(M.doneThisWeek([{ date: '2026-07-27', sessionId: 'x' }], today, 'strength'), 1, '无 protocolId 的老记录仍计入');
+}
+
+// ── 阶段选法:今天页和健身页共用这一个,不许再各写各的 ──
+{
+  const phases = [{ weeks: 4 }, { weeks: 4 }, { weeks: 2 }];
+  assert.equal(M.pickPhaseIndex(phases, null, D('2026-07-29')), 0, '没开始 → 第一阶段');
+  assert.equal(M.pickPhaseIndex(phases, '2026-07-27T00:00:00Z', D('2026-07-29')), 0, '第 1 周 → 第一阶段');
+  assert.equal(M.pickPhaseIndex(phases, '2026-06-01T00:00:00Z', D('2026-07-01')), 1, '第 5 周 → 第二阶段');
+  assert.equal(M.pickPhaseIndex(phases, '2026-01-01T00:00:00Z', D('2026-07-29')), 2, '超出总周数 → 停在最后一个阶段');
+  assert.equal(M.pickPhaseIndex([], null, D('2026-07-29')), 0, '空计划不炸');
+  assert.equal(M.pickPhaseIndex(phases, 'not-a-date', D('2026-07-29')), 0, '烂日期不炸');
 }
 
 console.log('fitness-home-core: OK');

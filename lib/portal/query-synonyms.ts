@@ -29,7 +29,8 @@ export const SYNONYM_GROUPS: readonly (readonly string[])[] = [
   ['疫苗', '打针', 'vaccine', 'vaccination', 'immunization', 'shot'],
   ['保险', 'insurance', 'copay', 'deductible', 'claim'],
   // ── 日程 / 会议 ──
-  ['会议', '开会', '会', 'meeting', 'standup', 'sync', 'call', '1:1', 'review'],
+  // 注意别放裸单字「会」:社会/机会/一会儿/会员卡 都会被它拖进会议组(自查实测 10 条探测句中招 4 条)。
+  ['会议', '开会', 'meeting', 'standup', 'sync', 'call', '1:1', 'review'],
   ['日程', '安排', '行程', 'schedule', 'calendar', 'agenda', 'itinerary'],
   ['提醒', '记得', 'reminder', 'remind', 'due'],
   ['生日', 'birthday', 'bday'],
@@ -89,9 +90,11 @@ const INDEX: Map<string, Set<number>> = (() => {
  * 把查询词扩成同义词。返回**新增的**词(不含原词),调用方给它们更低的权重。
  *
  * 判定用「包含」而不是全等:token「医生预约」也能命中「医生」和「预约」两组。
- * 例外只给**拉丁短词**('dr'、'md'、'rx'、'cv' 这种):≤2 字母的必须全等才算,
- * 否则 'android' 里的 dr、'command' 里的 md 会到处误爆。
- * 中文两字词(医生/预约/快递)是正经词,不受这条限制。
+ * 短词必须全等才算,分两类:
+ *   · 拉丁 ≤2 字母('dr'/'md'/'rx'/'cv'):否则 'android' 里的 dr、'command' 里的 md 到处误爆;
+ *   · **任何单字**(中文的「药」「猫」「狗」这类):单字太容易成为别的词的一部分,
+ *     反向包含('药'∈'买药水')还行,正向包含就会把「一会儿」判成开会。
+ * 中文两字词(医生/预约/快递)是正经词,仍按包含匹配。
  */
 export function expandQueryTerms(tokens: readonly string[]): string[] {
   const have = new Set(tokens.map((t) => t.toLowerCase()));
@@ -100,8 +103,8 @@ export function expandQueryTerms(tokens: readonly string[]): string[] {
     const t = raw.toLowerCase().trim();
     if (!t) continue;
     for (const [term, gs] of INDEX) {
-      const latinShort = term.length <= 2 && /^[a-z]+$/.test(term);
-      const hit = latinShort ? t === term : (t.includes(term) || term.includes(t));
+      const shortTerm = [...term].length === 1 || (term.length <= 2 && /^[a-z]+$/.test(term));
+      const hit = shortTerm ? t === term : (t.includes(term) || term.includes(t));
       if (hit) for (const g of gs) groups.add(g);
     }
   }
@@ -118,4 +121,26 @@ export function expandQueryTerms(tokens: readonly string[]): string[] {
 /** 这个查询有没有能扩的同义词(UI 想说明「顺带也搜了英文说法」时用)。 */
 export function hasSynonyms(tokens: readonly string[]): boolean {
   return expandQueryTerms(tokens).length > 0;
+}
+
+/**
+ * 同义词**真的**在这批语料里搭上桥了吗 —— 不是「有词可扩」,是「扩出来的词确实命中了内容」。
+ *
+ * 给跨语言缺口提示(cross-lingual-gap)用。那套提示的判据是「问句是中文 + 语料里有一批
+ * 英文 + 没跑语义向量」→ 提醒用户「英文记录这次可能没搜到」。但同义词层上线后,
+ * 中英之间已经有一条确定性的桥了:问「医生预约」照样能捞到 "Appointment with …"。
+ * 这时候还提示,就成了「找到了,同时又说可能没找到」—— 自相矛盾,而且正是用户抱怨的
+ *「还需要提高智能」的一部分。所以只有**桥没搭上**时才保留那句提示。
+ *
+ * 用「扩出来的词命中语料」而不是「有词可扩」来判,是为了不过度消音:同义词只覆盖
+ * 四十来个生活领域,问到覆盖不到的事情时,那句提示仍然是诚实且必要的。
+ */
+export function synonymsBridged(tokens: readonly string[], corpusTexts: readonly string[]): boolean {
+  const extra = expandQueryTerms(tokens);
+  if (!extra.length) return false;
+  for (const text of corpusTexts) {
+    const t = text.toLowerCase();
+    for (const s of extra) if (t.includes(s)) return true;
+  }
+  return false;
 }

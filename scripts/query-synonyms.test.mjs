@@ -59,6 +59,16 @@ const M = load();
   assert.equal(M.hasSynonyms(['预约']), true);
 }
 
+// ── 单字不许正向包含:「会」曾把 社会/机会/一会儿/会员卡 全拖进会议组 ──
+{
+  for (const q of ['社会', '机会', '一会儿', '会员卡']) {
+    assert.equal(M.expandQueryTerms([q]).length, 0, `「${q}」不该被当成开会`);
+  }
+  // 真的问开会仍要命中
+  assert.ok(M.expandQueryTerms(['开会']).includes('meeting'), '「开会」照常命中会议组');
+  assert.ok(M.expandQueryTerms(['会议纪要']).includes('meeting'), '两字词按包含匹配,仍命中');
+}
+
 // ── 结果去重 + 确定(同样输入两次同样输出) ──
 {
   const a = M.expandQueryTerms(['医生', '看病', '门诊']);
@@ -73,6 +83,16 @@ const M = load();
   assert.ok(M.expandQueryTerms(['flight']).includes('航班'), 'flight → 航班');
   assert.ok(M.expandQueryTerms(['家长会']).includes('pta'), '家长会 → pta');
   assert.ok(M.expandQueryTerms(['牙医']).includes('dental'), '牙医 → dental');
+}
+
+// ── synonymsBridged:桥「真搭上了」才算,不是「有词可扩」就算 ──
+// 这条锁的是跨语言提示的一致性:搭上了就不该再说「英文记录可能没搜到」。
+{
+  const corpus = ['Appointment with MedPsych Integrated', '买菜', 'Team standup'];
+  assert.equal(M.synonymsBridged(['医生', '预约'], corpus), true, '扩出的 appointment 命中语料 → 搭上了');
+  assert.equal(M.synonymsBridged(['医生', '预约'], ['买菜', '遛狗']), false, '扩出来了但没命中 → 没搭上,提示要留着');
+  assert.equal(M.synonymsBridged(['zzzq'], corpus), false, '压根没得扩 → 没搭上');
+  assert.equal(M.synonymsBridged(['医生'], []), false, '空语料不算搭上');
 }
 
 console.log('query-synonyms: OK');

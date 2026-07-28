@@ -74,6 +74,8 @@ export function upsertOutfit(list: readonly SavedOutfit[], next: SavedOutfit): S
 
 // ── 存储(只有下面这段碰 localStorage)────────────────────────────────────────
 
+import { reportStorageDropped } from './storage-health';
+
 const KEY = 'nesio-wardrobe-outfits-v1';
 export const WARDROBE_OUTFITS_UPDATED = 'nesio-wardrobe-outfits-updated';
 
@@ -91,7 +93,12 @@ function persist(list: SavedOutfit[]): boolean {
     localStorage.setItem(KEY, JSON.stringify(list.slice(0, 400)));
     window.dispatchEvent(new CustomEvent(WARDROBE_OUTFITS_UPDATED));
     return true;
-  } catch { return false; }
+  } catch {
+    // 除了把 false 交给调用方显式报错,还要点亮全局「存储满了」横幅 ——
+    // 仓里另外二十来个存储模块都走这条(reportStorageDropped),不接就成了暗处。
+    reportStorageDropped();
+    return false;
+  }
 }
 
 export function saveOutfit(pieceIds: string[], date: string, patch?: Partial<SavedOutfit>): boolean {

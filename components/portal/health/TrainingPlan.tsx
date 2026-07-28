@@ -31,7 +31,7 @@ import {
 } from '@/lib/platform/training-protocol-engine';
 import {
   estimateSessionMinutes, sessionIntensity, weekDots, doneThisWeek,
-  pickTodaySessionIndex, weekIndex, dayKey,
+  pickTodaySessionIndex, weekIndex, dayKey, pickPhaseIndex,
 } from '@/lib/platform/fitness-home-core';
 import { earnPoints, POINTS_PER_FITNESS_SESSION } from '@/lib/platform/rewards-engine';
 import { loadWorkouts, deleteWorkout, WORKOUTS_UPDATED, type Workout } from '@/lib/portal/workout-store';
@@ -60,12 +60,9 @@ const INTENSITY_LABEL = {
 const DOW_ZH = ['一', '二', '三', '四', '五', '六', '日'];
 const DOW_EN = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
+// 阶段选法搬进 fitness-home-core 当唯一事实源了(今天页也要用同一个)。
 function currentPhase(p: TrainingProtocol, startedAt: string | null) {
-  if (!startedAt) return p.phases[0];
-  const weeksElapsed = Math.floor((Date.now() - Date.parse(startedAt)) / (7 * 86_400_000));
-  let acc = 0;
-  for (const ph of p.phases) { acc += ph.weeks; if (weeksElapsed < acc) return ph; }
-  return p.phases[p.phases.length - 1];
+  return p.phases[pickPhaseIndex(p.phases, startedAt, new Date())];
 }
 
 function fmtItem(it: ExercisePrescription, dict: string): string {
@@ -125,12 +122,12 @@ export default function TrainingPlan() {
     const today = new Date();
     const phase = currentPhase(active, st.startedAt);
     const ids = phase.sessions.map((s) => s.id);
-    const idx = pickTodaySessionIndex(ids, st.log, today);
+    const idx = pickTodaySessionIndex(ids, st.log, today, active.id);
     return {
       phase,
       todaySession: phase.sessions[idx] ?? phase.sessions[0],
-      dots: weekDots(st.log, today),
-      done: doneThisWeek(st.log, today),
+      dots: weekDots(st.log, today, active.id),
+      done: doneThisWeek(st.log, today, active.id),
       week: Math.min(weekIndex(st.startedAt, today), protocolWeeks(active)),
       totalWeeks: protocolWeeks(active),
       doneToday: st.log.some((e) => e.date.slice(0, 10) === dayKey(today)),

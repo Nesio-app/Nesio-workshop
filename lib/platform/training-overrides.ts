@@ -92,6 +92,8 @@ export function clampReps(n: number, unit?: 'reps' | 'min'): number {
 
 // ── 存储(只有下面这段碰 localStorage)────────────────────────────────────────
 
+import { reportStorageDropped } from '@/lib/portal/storage-health';
+
 const KEY = 'nesio-training-overrides-v1';
 export const TRAINING_OVERRIDES_UPDATED = 'nesio-training-overrides-updated';
 
@@ -112,7 +114,12 @@ function persist(ov: TrainingOverrides): boolean {
     localStorage.setItem(KEY, JSON.stringify(ov));
     window.dispatchEvent(new CustomEvent(TRAINING_OVERRIDES_UPDATED));
     return true;
-  } catch { return false; }
+  } catch {
+    // 除了把 false 交给调用方显式报错,还要点亮全局「存储满了」横幅 ——
+    // 仓里另外二十来个存储模块都走这条,不接就成了暗处。
+    reportStorageDropped();
+    return false;
+  }
 }
 
 export function setSessionItems(protocolId: string, sessionId: string, items: OverrideItem[]): boolean {
