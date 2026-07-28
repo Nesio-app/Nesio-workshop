@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { bootstrapCloudAccountProfile, buildCloudAccountProfileBootstrapMeta } from '@/lib/portal/cloud-account-profile';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
@@ -298,7 +298,9 @@ export async function GET(req: NextRequest) {
 
   if (code) {
     const session = await exchangeSupabaseCode(code, `${source.origin}${source.pathname}`);
-    const profileBootstrap = session?.access_token ? await bootstrapCloudAccountProfile(session?.access_token || '') : null;
+    // 同 import/session:profile 落库挪到响应之后,不让它挡在 redirect 前面。
+    if (session?.access_token) after(() => bootstrapCloudAccountProfile(session?.access_token).catch(() => { /* best-effort */ }));
+    const profileBootstrap = null;
     const profileBootstrapMeta = buildCloudAccountProfileBootstrapMeta(profileBootstrap);
     const target = safeRedirectUrl(req, {
       safePublicStatus: 'true',
@@ -319,7 +321,8 @@ export async function GET(req: NextRequest) {
 
   if (tokenHash && type) {
     const session = await verifySupabaseOtp(tokenHash, type);
-    const profileBootstrap = session?.access_token ? await bootstrapCloudAccountProfile(session?.access_token || '') : null;
+    if (session?.access_token) after(() => bootstrapCloudAccountProfile(session?.access_token).catch(() => { /* best-effort */ }));
+    const profileBootstrap = null;
     const profileBootstrapMeta = buildCloudAccountProfileBootstrapMeta(profileBootstrap);
     const target = safeRedirectUrl(req, {
       safePublicStatus: 'true',
