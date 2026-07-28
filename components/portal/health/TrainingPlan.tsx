@@ -10,11 +10,13 @@
  * 两处**故意没照抄**参考稿,理由写在这里免得以后又被加回去:
  *   · 「恢复度 92% · 状态极佳」—— 我们没有可信的恢复度数据源(没接 HRV / 睡眠评分)。
  *     宁可不显示也不编一个数,那一格改放本周进度环(真数据)。
- *   · 「AI 今日建议」—— 这句由规则算(距上次几天 / 本周还差几次),不叫 AI、不打云,
- *     所以也没有机器人头像。算法见 lib/platform/fitness-home-core.ts,有契约测试。
+ *   · 「AI 今日建议」—— 整条不要(用户 2026-07-28 明确说不需要)。参考稿那格的位置留给本周进度。
  *
  * 数值(约多少分钟 / 几个动作 / 强度 / 本周 N 次 / 今天练哪个)全部来自
  * fitness-home-core 的纯函数 —— 一条都不编。
+ *
+ * 2026-07-28 同批:训练日可改(标注 图8「训练计划目前是硬编码不可修改」)。
+ * 种子计划仍只读,用户的改动落在 training-overrides 叠加层上,随时可「恢复默认」。
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -29,12 +31,18 @@ import {
 } from '@/lib/platform/training-protocol-engine';
 import {
   estimateSessionMinutes, sessionIntensity, weekDots, doneThisWeek,
-  pickTodaySessionIndex, coachHint, weekIndex, dayKey,
+  pickTodaySessionIndex, weekIndex, dayKey,
 } from '@/lib/platform/fitness-home-core';
 import { earnPoints, POINTS_PER_FITNESS_SESSION } from '@/lib/platform/rewards-engine';
 import { loadWorkouts, deleteWorkout, WORKOUTS_UPDATED, type Workout } from '@/lib/portal/workout-store';
 import { workoutDisplayName, resolveExerciseName } from '@/lib/portal/workout-name';
 import { loadExerciseCatalog } from '@/lib/portal/exercise-catalog';
+import {
+  loadOverrides, mergeProtocol, hasOverrides, setSessionItems, hideSession, resetSession, resetProtocol,
+  clampSets, clampReps, TRAINING_OVERRIDES_UPDATED,
+  type TrainingOverrides, type OverrideItem, type MergeProtocol,
+} from '@/lib/platform/training-overrides';
+import { EXERCISES } from '@/lib/portal/exercise-library';
 import { IconBox, IconHistory, IconTrendingUp, IconPlay, IconClock, IconActivity, IconTarget } from '../icons';
 
 const ExerciseLibrary = dynamic(() => import('../fitness/ExerciseLibrary'), { ssr: false });
@@ -75,6 +83,10 @@ export default function TrainingPlan() {
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [openWorkoutId, setOpenWorkoutId] = useState<string | null>(null); // 图8:点开看这套训练的动作
   const [showAllSessions, setShowAllSessions] = useState(false);
+  // 图8:训练日可改 —— 用户的改动存叠加层,种子计划不动
+  const [ov, setOv] = useState<TrainingOverrides>({});
+  const [editId, setEditId] = useState<string | null>(null);
+  const [saveErr, setSaveErr] = useState('');
   const [, setCatTick] = useState(0); // 扩展库动作名要等 catalog 载入内存才解析得出 → 载好后 bump 重渲染
 
   useEffect(() => {
@@ -82,7 +94,13 @@ export default function TrainingPlan() {
     setWorkouts(loadWorkouts());
     const on = () => setWorkouts(loadWorkouts());
     window.addEventListener(WORKOUTS_UPDATED, on);
-    return () => window.removeEventListener(WORKOUTS_UPDATED, on);
+    setOv(loadOverrides());
+    const onOv = () => setOv(loadOverrides());
+    window.addEventListener(TRAINING_OVERRIDES_UPDATED, onOv);
+    return () => {
+      window.removeEventListener(WORKOUTS_UPDATED, on);
+      window.removeEventListener(TRAINING_OVERRIDES_UPDATED, onOv);
+    };
   }, []);
   // 「我的训练」若含扩展库动作(名字解析不出)→ 按需把 catalog 载进内存,让卡片/开练都显真名(含旧训练)。
   useEffect(() => {
@@ -94,7 +112,12 @@ export default function TrainingPlan() {
 
   const dictLocale: 'zh' | 'en' = dict === 'en' ? 'en' : 'zh';
   const nameOf = (w: Workout) => workoutDisplayName(w.items, w.name, dictLocale);
-  const active = st?.activeProtocolId ? protocolById(st.activeProtocolId) : undefined;
+  const seed = st?.activeProtocolId ? protocolById(st.activeProtocolId) : undefined;
+  // 显示用的计划 = 种子 + 用户改写。种子本身永远不被改脏(mergeProtocol 是纯函数)。
+  const active = useMemo(
+    () => (seed ? (mergeProtocol(seed as unknown as MergeProtocol, ov) as unknown as TrainingProtocol) : undefined),
+    [seed, ov],
+  );
 
   // ── 全部数字在这里算一次,别处只管显示 ──
   const derived = useMemo(() => {
@@ -108,7 +131,6 @@ export default function TrainingPlan() {
       todaySession: phase.sessions[idx] ?? phase.sessions[0],
       dots: weekDots(st.log, today),
       done: doneThisWeek(st.log, today),
-      hint: coachHint(st.log, today, active.sessionsPerWeek),
       week: Math.min(weekIndex(st.startedAt, today), protocolWeeks(active)),
       totalWeeks: protocolWeeks(active),
       doneToday: st.log.some((e) => e.date.slice(0, 10) === dayKey(today)),
@@ -125,6 +147,12 @@ export default function TrainingPlan() {
     setTimeout(() => setEarned(null), 2400);
   };
   const switchPlan = () => { const s = { ...st, activeProtocolId: null, startedAt: null }; saveTrainingState(s); setSt(s); };
+
+  /** 所有改写都走这里:写不进本机存储就把话说明白,不假装成功。 */
+  const commit = (ok: boolean) => {
+    if (ok) { setSaveErr(''); setOv(loadOverrides()); }
+    else setSaveErr(L(dict, '没改成 —— 本机存储写不进(隐私模式或空间满了)。', 'Could not save — local storage is unavailable.'));
+  };
 
   // ── 更多(参考稿底部四格)—— 只放真有的入口,不摆没实现的功能 ──
   const moreGrid = (
@@ -213,19 +241,11 @@ export default function TrainingPlan() {
     );
   }
 
-  const { phase, todaySession, dots, done, hint, week, totalWeeks, doneToday } = derived;
+  const { phase, todaySession, dots, done, week, totalWeeks, doneToday } = derived;
   const mins = estimateSessionMinutes(todaySession.items);
   const intensity = sessionIntensity(todaySession.items);
   const pct = Math.min(100, Math.round((done / active.sessionsPerWeek) * 100));
   const todayName = L(dict, todaySession.name.zh, todaySession.name.en);
-
-  const coachText = {
-    done_today: L(dict, '今天已经练过了 —— 剩下的时间留给恢复。', 'Done for today — the rest is recovery.'),
-    first_time: L(dict, '第一次,从今天这套开始就好,不用一次到位。', 'First one — just start with today’s session.'),
-    back_after_break: L(dict, `${hint.days} 天没来了 —— 今天轻一点也算数。`, `${hint.days} days away — going light still counts.`),
-    goal_met: L(dict, '这周的次数够了,多练的都是赚的。', 'This week’s target is met — anything more is a bonus.'),
-    on_track: L(dict, `本周还差 ${hint.left} 次 · 上次是 ${hint.days} 天前。`, `${hint.left} to go this week · last one ${hint.days}d ago.`),
-  }[hint.kind];
 
   return (
     <div className="nesio-fit">
@@ -278,7 +298,6 @@ export default function TrainingPlan() {
               </span>
             ))}
           </div>
-          <p className="nesio-fit-coach">{coachText}</p>
         </div>
       </section>
 
@@ -307,14 +326,112 @@ export default function TrainingPlan() {
               <div className="nesio-fit-card-acts">
                 <button type="button" className="nesio-fit-go" onClick={() => startWorkout(nm, toRunSteps(s.items), active.id, s.id)}>{L(dict, '开始', 'Start')}</button>
                 <button type="button" className="nesio-fit-ghost sm" onClick={() => logDone(s.id, nm)}>{L(dict, '做过了', 'Done')}</button>
+                {/* 图8「训练计划目前是硬编码不可修改」:每个训练日都能改 */}
+                <button type="button" className="nesio-fit-ghost sm" onClick={() => setEditId(editId === s.id ? null : s.id)}>
+                  {editId === s.id ? L(dict, '收起', 'Close') : L(dict, '改', 'Edit')}
+                </button>
               </div>
+              {editId === s.id && (
+                <SessionEditor
+                  protocolId={active.id}
+                  sessionId={s.id}
+                  items={s.items as OverrideItem[]}
+                  edited={!!ov[`${active.id}:${s.id}`]}
+                  dict={dict}
+                  onCommit={commit}
+                  onClose={() => setEditId(null)}
+                />
+              )}
             </div>
           );
         })}
       </div>
 
+      {saveErr && <p className="nesio-fit-err" role="alert">{saveErr}</p>}
+      {hasOverrides(active.id, ov) && (
+        <button type="button" className="nesio-fit-reset" onClick={() => {
+          if (!confirm(L(dict, '把这个计划恢复成默认?你改过的组数/动作都会还原。', 'Reset this plan to default? Your edits will be undone.'))) return;
+          commit(resetProtocol(active.id));
+        }}>{L(dict, '恢复计划默认', 'Reset plan to default')}</button>
+      )}
+
       {myWorkouts}
       {moreGrid}
+    </div>
+  );
+}
+
+/**
+ * SessionEditor — 改一个训练日(2026-07-28,标注 图8)。
+ * 能做:每个动作 ± 组数 / ± 次数、删动作、从内置动作库加一个、删掉整个训练日、恢复这天的默认。
+ * 每次改动立刻落盘(叠加层),失败通过 onCommit(false) 往上冒 —— 不静默吞。
+ */
+function SessionEditor({ protocolId, sessionId, items, edited, dict, onCommit, onClose }: {
+  protocolId: string; sessionId: string; items: OverrideItem[]; edited: boolean;
+  dict: string; onCommit: (ok: boolean) => void; onClose: () => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const write = (next: OverrideItem[]) => onCommit(setSessionItems(protocolId, sessionId, next));
+
+  const bump = (i: number, field: 'sets' | 'reps', delta: number) => {
+    const next = items.map((it, k) => {
+      if (k !== i) return it;
+      return field === 'sets'
+        ? { ...it, sets: clampSets(it.sets + delta) }
+        : { ...it, reps: clampReps(it.reps + delta, it.unit) };
+    });
+    write(next);
+  };
+
+  return (
+    <div className="nesio-fit-edit">
+      {items.map((it, i) => {
+        const ex = exerciseById(it.exerciseId);
+        const name = ex ? L(dict, ex.name.zh, ex.name.en) : it.exerciseId;
+        return (
+          <div key={`${it.exerciseId}-${i}`} className="nesio-fit-edit-row">
+            <span className="n">{name}</span>
+            <div className="stp">
+              <button type="button" onClick={() => bump(i, 'sets', -1)} aria-label={L(dict, '少一组', 'One less set')}>−</button>
+              <span>{it.sets}{L(dict, ' 组', ' sets')}</span>
+              <button type="button" onClick={() => bump(i, 'sets', 1)} aria-label={L(dict, '多一组', 'One more set')}>+</button>
+            </div>
+            <div className="stp">
+              <button type="button" onClick={() => bump(i, 'reps', -1)} aria-label={L(dict, '减', 'Less')}>−</button>
+              <span>{it.reps}{it.unit === 'min' ? L(dict, ' 分钟', 'min') : L(dict, ' 次', '')}</span>
+              <button type="button" onClick={() => bump(i, 'reps', 1)} aria-label={L(dict, '加', 'More')}>+</button>
+            </div>
+            <button type="button" className="del" onClick={() => write(items.filter((_, k) => k !== i))}
+              aria-label={L(dict, '删掉这个动作', 'Remove exercise')}>✕</button>
+          </div>
+        );
+      })}
+
+      {adding ? (
+        <div className="nesio-fit-edit-pick">
+          {EXERCISES.filter((e) => !items.some((it) => it.exerciseId === e.id)).slice(0, 24).map((e) => (
+            <button key={e.id} type="button" onClick={() => { write([...items, { exerciseId: e.id, sets: 3, reps: 10 }]); setAdding(false); }}>
+              {e.name}
+            </button>
+          ))}
+          <button type="button" className="cancel" onClick={() => setAdding(false)}>{L(dict, '取消', 'Cancel')}</button>
+        </div>
+      ) : (
+        <button type="button" className="nesio-fit-edit-add" onClick={() => setAdding(true)}>{L(dict, '+ 加个动作', '+ Add exercise')}</button>
+      )}
+
+      <div className="nesio-fit-edit-foot">
+        {edited && (
+          <button type="button" onClick={() => { onCommit(resetSession(protocolId, sessionId)); onClose(); }}>
+            {L(dict, '恢复这天的默认', 'Reset this day')}
+          </button>
+        )}
+        <button type="button" className="danger" onClick={() => {
+          if (!confirm(L(dict, '把这个训练日从计划里去掉?', 'Remove this session from the plan?'))) return;
+          onCommit(hideSession(protocolId, sessionId));
+          onClose();
+        }}>{L(dict, '不练这天', 'Drop this day')}</button>
+      </div>
     </div>
   );
 }

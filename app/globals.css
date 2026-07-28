@@ -19359,3 +19359,31 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-fit-more-cell svg { stroke: var(--portal-accent); fill: none; }
 .nesio-fit-more-cell .t { font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--portal-ink); }
 .nesio-fit-more-cell .s { font-size: var(--text-xs); color: var(--portal-muted); }
+
+/* 训练日编辑器(2026-07-28 · 标注 PDF2 图8「训练计划目前是硬编码不可修改」) */
+.nesio-fit-edit { margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px solid var(--portal-line);
+  display: flex; flex-direction: column; gap: 6px; }
+.nesio-fit-edit-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.nesio-fit-edit-row .n { flex: 1 1 100%; font-size: var(--text-xs); color: var(--portal-ink); }
+.nesio-fit-edit-row .stp { display: inline-flex; align-items: center; gap: 4px;
+  border: 1px solid var(--portal-line); border-radius: var(--radius-pill); padding: 1px 4px; }
+.nesio-fit-edit-row .stp span { font-size: var(--text-xs); color: var(--portal-muted); min-width: 3.6em; text-align: center; }
+.nesio-fit-edit-row .stp button { width: 22px; height: 22px; border: none; background: none; cursor: pointer;
+  font-family: inherit; font-size: var(--text-sm); color: var(--portal-accent); line-height: 1; }
+.nesio-fit-edit-row .del { margin-left: auto; border: none; background: none; cursor: pointer;
+  font-family: inherit; font-size: var(--text-xs); color: var(--portal-muted); padding: 2px 4px; }
+.nesio-fit-edit-add { align-self: flex-start; border: none; background: none; padding: 2px 0; cursor: pointer;
+  font-family: inherit; font-size: var(--text-xs); color: var(--portal-accent); }
+.nesio-fit-edit-pick { display: flex; flex-wrap: wrap; gap: 5px; }
+.nesio-fit-edit-pick button { border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: transparent; color: var(--portal-ink); font-family: inherit; font-size: var(--text-xs);
+  padding: 3px 9px; cursor: pointer; }
+.nesio-fit-edit-pick button.cancel { color: var(--portal-muted); border-style: dashed; }
+.nesio-fit-edit-foot { display: flex; gap: var(--space-3); margin-top: 4px; }
+.nesio-fit-edit-foot button { border: none; background: none; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: var(--text-xs); color: var(--portal-accent); }
+.nesio-fit-edit-foot button.danger { color: var(--status-risk); }
+.nesio-fit-err { margin: 0; font-size: var(--text-xs); color: var(--status-risk);
+  background: var(--status-risk-soft); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
+.nesio-fit-reset { align-self: flex-start; border: none; background: none; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: var(--text-xs); color: var(--portal-muted); text-decoration: underline; }

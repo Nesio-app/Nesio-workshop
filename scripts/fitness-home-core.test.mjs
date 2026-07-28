@@ -1,6 +1,6 @@
 /**
  * 行为契约:健身首页确定性核心(lib/platform/fitness-home-core.ts)。
- * 不变式 —— 时长/强度按处方推、本周进度按天去重、今天练哪个不随机、教练提示按规则分档。
+ * 不变式 —— 时长/强度按处方推、本周进度按天去重、今天练哪个不随机。
  */
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -81,31 +81,6 @@ const D = (s) => new Date(`${s}T12:00:00`);
     M.pickTodaySessionIndex(ids, [{ date: '2026-07-28', sessionId: 'upperB' }], today),
     '必须确定性',
   );
-}
-
-// ── 距上次几天 ──
-{
-  const today = D('2026-07-29');
-  assert.equal(M.daysSinceLast([], today), null, '没练过 = null');
-  assert.equal(M.daysSinceLast([{ date: '2026-07-29', sessionId: 'a' }], today), 0);
-  assert.equal(M.daysSinceLast([{ date: '2026-07-27', sessionId: 'a' }], today), 2);
-  // 取最近的一条,不是第一条
-  assert.equal(M.daysSinceLast([{ date: '2026-07-01', sessionId: 'a' }, { date: '2026-07-28', sessionId: 'b' }], today), 1);
-}
-
-// ── 教练提示分档 ──
-{
-  const today = D('2026-07-29');
-  assert.equal(M.coachHint([], today, 3).kind, 'first_time');
-  assert.equal(M.coachHint([{ date: '2026-07-29', sessionId: 'a' }], today, 3).kind, 'done_today');
-  assert.equal(M.coachHint([{ date: '2026-07-10', sessionId: 'a' }], today, 3).kind, 'back_after_break', '≥7 天没来');
-  assert.equal(M.coachHint([{ date: '2026-07-28', sessionId: 'a' }], today, 3).kind, 'on_track');
-  const met = M.coachHint(
-    [{ date: '2026-07-27', sessionId: 'a' }, { date: '2026-07-28', sessionId: 'b' }],
-    today, 2,
-  );
-  assert.equal(met.kind, 'goal_met', '本周次数够了');
-  assert.equal(met.left, 0);
 }
 
 // ── 第几周 ──

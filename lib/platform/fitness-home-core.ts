@@ -6,7 +6,6 @@
  *   · 时长/强度 = 从处方(组数×次数×组间休息)推,规则写死;
  *   · 本周进度 = 打卡记录数;
  *   · 今天练哪个 = 按本阶段训练日顺序轮换(本周练过的往后跳);
- *   · 教练一句话 = 规则模板(距上次几天 / 本周还差几次 / 今天已练)。
  * 参考稿里的「恢复度 92%」没做 —— 我们没有可信的恢复度数据源,宁可不显示也不编一个数。
  *
  * 纯函数、无 DOM、无存储 —— 可以直接跑单测(scripts/fitness-home-core.test.mjs)。
@@ -98,35 +97,6 @@ export function pickTodaySessionIndex(sessionIds: string[], log: LogEntry[], tod
   const doneIds = new Set(log.filter((e) => weekKeys.has(e.date.slice(0, 10))).map((e) => e.sessionId));
   const next = sessionIds.findIndex((id) => !doneIds.has(id));
   return next >= 0 ? next : 0;
-}
-
-/** 距上次训练几天;从没练过返回 null。 */
-export function daysSinceLast(log: LogEntry[], today: Date): number | null {
-  if (!log.length) return null;
-  const last = log
-    .map((e) => new Date(`${e.date.slice(0, 10)}T00:00:00`).getTime())
-    .filter((t) => !Number.isNaN(t))
-    .sort((a, b) => b - a)[0];
-  if (last == null) return null;
-  const t0 = new Date(today); t0.setHours(0, 0, 0, 0);
-  return Math.max(0, Math.round((t0.getTime() - last) / 86_400_000));
-}
-
-export type CoachKind = 'done_today' | 'first_time' | 'back_after_break' | 'on_track' | 'goal_met';
-
-/**
- * 教练一句话该说哪种 —— 规则,不是 AI。UI 层按 kind 取对应文案,顺便拿到用到的数字。
- * 口径按 warm-coach:不说「落后 / 没完成」,只说还剩什么、多久没来。
- */
-export function coachHint(log: LogEntry[], today: Date, perWeek: number): { kind: CoachKind; days: number; done: number; left: number } {
-  const done = doneThisWeek(log, today);
-  const left = Math.max(0, perWeek - done);
-  const since = daysSinceLast(log, today);
-  if (since === 0) return { kind: 'done_today', days: 0, done, left };
-  if (since == null) return { kind: 'first_time', days: 0, done, left };
-  if (left === 0) return { kind: 'goal_met', days: since, done, left };
-  if (since >= 7) return { kind: 'back_after_break', days: since, done, left };
-  return { kind: 'on_track', days: since, done, left };
 }
 
 /** 计划走到第几周(从 startedAt 起算,1-based);没开始返回 1。 */
