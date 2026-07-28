@@ -110,6 +110,10 @@ interface UiMessage {
   calendarEvents?: Array<{ summary: string; startISO: string; endISO?: string; allDay?: boolean; location?: string }>;
   calendarState?: 'idle' | 'saving' | 'ok' | 'error';
   calendarError?: string;
+  /** Google 原样的失败原因(可展开看)——不看这个就永远只知道「没成功」。 */
+  calendarDetail?: string;
+  /** 已经写进日历的那几项的下标。重试只补没成的,不重复写。 */
+  calendarDone?: number[];
   /** 🔴#2:这条回答时语义检索降级了(缺 AI 配置,只用了关键词匹配)。 */
   semanticDegraded?: boolean;
   semanticReason?: string; // 未生效的具体原因(no_key/rate_limited/provider/network/auth)
@@ -788,14 +792,34 @@ Edit location/value anytime in Storage.`),
   // 日历确认卡 → 逐个写进 Google 主日历。异步动作显式失败态(红线):失败保留可重试。
   async function confirmCalendarEvents(msg: UiMessage) {
     if (!msg.calendarEvents?.length || msg.calendarState === 'saving' || msg.calendarState === 'ok') return;
-    setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, calendarState: 'saving' as const, calendarError: undefined } : m));
+    setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, calendarState: 'saving' as const, calendarError: undefined, calendarDetail: undefined } : m));
+
+    // 已经写成功的那几项跳过 —— 之前是无脑重跑整批:3 项成了 2 项,点一次「重试」
+    // 就会把那 2 项再写进日历一遍(真的会多出重复日程)。
+    const done = new Set(msg.calendarDone ?? []);
     let firstErr = '';
-    for (const ev of msg.calendarEvents) {
+    let firstDetail = '';
+    for (let i = 0; i < msg.calendarEvents.length; i += 1) {
+      if (done.has(i)) continue;
+      const ev = msg.calendarEvents[i];
       const res = await createCalendarEvent({ summary: ev.summary, startISO: ev.startISO, endISO: ev.endISO, allDay: ev.allDay, location: ev.location });
-      if (!res.ok && !firstErr) firstErr = res.message || L(dict, '写入日历失败', 'Failed to add to calendar');
+      if (res.ok) { done.add(i); continue; }
+      if (!firstErr) {
+        firstErr = res.message || L(dict, '写入日历失败', 'Failed to add to calendar');
+        firstDetail = res.detail || res.error || '';
+      }
     }
+    const allDone = done.size === msg.calendarEvents.length;
     setMessages((prev) => {
-      const next = prev.map((m) => m.id === msg.id ? { ...m, calendarState: (firstErr ? 'error' : 'ok') as 'error' | 'ok', calendarError: firstErr || undefined } : m);
+      const next = prev.map((m) => m.id === msg.id
+        ? {
+            ...m,
+            calendarState: (allDone ? 'ok' : 'error') as 'error' | 'ok',
+            calendarError: allDone ? undefined : firstErr,
+            calendarDetail: allDone ? undefined : (firstDetail || undefined),
+            calendarDone: [...done],
+          }
+        : m);
       saveHistory(next);
       return next;
     });
@@ -1243,13 +1267,19 @@ Edit location/value anytime in Storage.`),
                 {!isUser && msg.calendarEvents && msg.calendarEvents.length > 0 && (
                   <div style={{ marginTop: 'var(--space-2)', padding: 'var(--space-3)', border: '1px solid var(--portal-accent-border)', borderRadius: 'var(--radius-md)', background: 'var(--portal-accent-soft)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                     {msg.calendarEvents.map((ev, i) => (
-                      <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '2px', opacity: msg.calendarDone?.includes(i) ? 0.55 : 1 }}>
                         <span style={{ color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{ev.summary}</span>
                         <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>
                           {[ev.allDay ? ev.startISO.slice(0, 10) : ev.startISO.replace('T', ' ').slice(0, 16), ev.location || ''].filter(Boolean).join(' · ')}
                         </span>
                       </div>
                     ))}
+                    {msg.calendarState === 'error' && msg.calendarDetail && (
+                      <details style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                        <summary style={{ cursor: 'pointer' }}>{L(dict, '看看原因', 'Why')}</summary>
+                        <p style={{ margin: 'var(--space-1) 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono, monospace)' }}>{msg.calendarDetail}</p>
+                      </details>
+                    )}
                     {msg.calendarState === 'error' && msg.calendarError && (
                       <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-xs)' }}>{msg.calendarError}</span>
                     )}
@@ -1270,7 +1300,12 @@ Edit location/value anytime in Storage.`),
                         : msg.calendarState === 'saving'
                           ? L(dict, '正在加入…', 'Adding…')
                           : msg.calendarState === 'error'
-                            ? L(dict, '重试加入日历', 'Retry')
+                            ? (() => {
+                                const left = msg.calendarEvents!.length - (msg.calendarDone?.length ?? 0);
+                                return left === msg.calendarEvents!.length
+                                  ? L(dict, '重试加入日历', 'Retry')
+                                  : L(dict, `再试剩下的 ${left} 项`, `Retry remaining ${left}`);
+                              })()
                             : L(dict, `加入日历 · ${msg.calendarEvents.length} 项`, `Add ${msg.calendarEvents.length} to calendar`)}
                     </button>
                   </div>

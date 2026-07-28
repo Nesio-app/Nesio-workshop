@@ -62,4 +62,25 @@ assert.ok(prompt.includes('2026-07-25T12:00:00+08:00'), 'prompt 含当前时间'
 assert.ok(prompt.includes('Asia/Shanghai'), 'prompt 含时区');
 assert.ok(prompt.includes('周五下午3点约牙医'), 'prompt 含原文');
 
+// ── 写入失败的两条接线契约(标注 图1「写入日历没成功」)────────────────────
+// ① Google 的真实原因必须能透到客户端。服务端一直在返回 detail,客户端从没读过,
+//    于是所有失败都塌成一句「稍后再试」—— 修不了,因为根本不知道坏在哪。
+// ② 多项写入部分成功后,重试必须只补没成的。原来无脑重跑整批:3 项成 2 项,
+//    点一次重试就会把那 2 项再写进 Google 一遍(真会多出重复日程)。
+{
+  const client = fs.readFileSync(new URL('../lib/portal/calendar-client.ts', import.meta.url), 'utf8');
+  assert.match(client, /detail\?:\s*string/, 'CreateEventResult 要有 detail');
+  assert.match(client, /detail:\s*data\.detail/, '失败分支要把服务端的 detail 透出去');
+
+  const route = fs.readFileSync(new URL('../app/api/portal/calendar/route.ts', import.meta.url), 'utf8');
+  assert.match(route, /detail:\s*errText/, '服务端写入失败要带上 Google 原文');
+
+  const chat = fs.readFileSync(new URL('../components/portal/NesioChatSheet.tsx', import.meta.url), 'utf8');
+  const fn = chat.slice(chat.indexOf('async function confirmCalendarEvents'));
+  const body = fn.slice(0, fn.indexOf('\n  }\n'));
+  assert.match(body, /done\.has\(i\)/, '重试必须跳过已写成功的项,否则会重复写进日历');
+  assert.match(body, /done\.add\(i\)/, '写成功要记下来');
+  assert.match(body, /calendarDetail/, '失败原因要存进消息,UI 才能展开看');
+}
+
 console.log('✓ calendar-create 契约通过');
