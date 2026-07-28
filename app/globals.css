@@ -19252,3 +19252,110 @@ html[data-portal-theme="night"] .nesio-foot-mode.is-active {
   background: color-mix(in srgb, var(--portal-card) 92%, var(--portal-accent-soft));
 }
 html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--portal-bg); }
+
+/* ── 健身页(2026-07-28 按参考稿重做 · 标注 PDF2 图2/图3/图4)────────────────────
+   骨架:问候 → 今天的训练大卡 → 本周进度(环 + 七天点)→ 阶段训练日横滑 → 我存的训练 → 更多四格。
+   全走主题 token;无 emoji;夜间自动跟随(颜色都来自变量)。 */
+/* 左右留白:洞察的 tab 容器不带内边距(旧版靠各自的类自带),这里自己补。 */
+.nesio-fit { display: flex; flex-direction: column; gap: var(--space-4); padding: 0 var(--space-4) var(--space-6); }
+.nesio-fit-hello { margin: 0; font-size: var(--text-h3); font-weight: var(--weight-semibold); color: var(--portal-ink); }
+.nesio-fit-sec { margin: var(--space-2) 0 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-ink); }
+.nesio-fit-sec-row { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.nesio-fit-more-link { background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
+  font-size: var(--text-xs); color: var(--portal-accent); }
+
+/* 今天的训练:整页唯一的实心主按钮在这张卡里 */
+.nesio-fit-today { background: var(--portal-card, var(--glass-bg-solid)); border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md); padding: var(--space-4); display: flex; flex-direction: column; gap: var(--space-2);
+  box-shadow: var(--shadow-card, 0 6px 18px rgba(20,30,50,.06)); }
+.nesio-fit-today-top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.nesio-fit-tag { font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--portal-accent);
+  background: var(--portal-accent-soft-md); border-radius: var(--radius-pill); padding: 2px 9px; }
+.nesio-fit-adjust { background: none; border: none; padding: 0; cursor: pointer; font-family: inherit;
+  font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-fit-today-name { margin: 0; font-size: var(--text-h2); font-weight: var(--weight-bold); color: var(--portal-ink); }
+.nesio-fit-facts { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.nesio-fit-facts span { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-fit-facts svg { stroke: var(--portal-muted); fill: none; }
+.nesio-fit-items { margin: 0; padding-left: 1.05rem; font-size: var(--text-xs); color: var(--portal-muted); line-height: 1.75; }
+.nesio-fit-items .more { list-style: none; margin-left: -1.05rem; color: var(--ng-faint, var(--portal-muted)); }
+.nesio-fit-today-acts { display: flex; gap: var(--space-2); margin-top: var(--space-1); }
+.nesio-fit-start { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  font-family: inherit; font-size: var(--text-body); font-weight: var(--weight-semibold);
+  border: none; border-radius: var(--radius-pill); padding: var(--space-3);
+  background: var(--portal-accent); color: var(--sheet-opaque, #fff); cursor: pointer; }
+.nesio-fit-start svg { stroke: currentColor; fill: none; }
+.nesio-fit-start:active { transform: scale(.985); }
+.nesio-fit-ghost { font-family: inherit; font-size: var(--text-sm); border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill); padding: var(--space-2) var(--space-4); background: transparent;
+  color: var(--portal-muted); cursor: pointer; }
+.nesio-fit-ghost.sm { padding: 4px 12px; font-size: var(--text-xs); }
+
+/* 本周进度:环 + 七天点 */
+.nesio-fit-week { display: flex; align-items: center; gap: var(--space-4);
+  background: var(--portal-card, var(--glass-bg-solid)); border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md); padding: var(--space-4); }
+.nesio-fit-ring { flex: none; width: 66px; height: 66px; border-radius: 50%;
+  background: conic-gradient(var(--portal-accent) var(--pct, 0%), var(--portal-accent-soft) 0);
+  display: grid; place-items: center; }
+.nesio-fit-ring .v { width: 52px; height: 52px; border-radius: 50%; background: var(--portal-card, var(--glass-bg-solid));
+  display: grid; place-items: center; font-size: var(--text-h3); font-weight: var(--weight-bold); color: var(--portal-ink); }
+.nesio-fit-ring .v i { font-style: normal; font-size: var(--text-xs); font-weight: var(--weight-regular); color: var(--portal-muted); }
+.nesio-fit-week-body { flex: 1; min-width: 0; }
+.nesio-fit-week-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+.nesio-fit-week-head .l { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-ink); }
+.nesio-fit-week-head .r { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-fit-dots { display: flex; gap: 6px; margin: var(--space-2) 0 0; }
+.nesio-fit-dot { width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--portal-line);
+  display: grid; place-items: center; }
+.nesio-fit-dot i { font-style: normal; font-size: 0.6rem; color: var(--portal-muted); }
+.nesio-fit-dot.is-done { background: var(--portal-accent); border-color: transparent; }
+.nesio-fit-dot.is-done i { color: var(--sheet-opaque, #fff); }
+.nesio-fit-dot.is-today { box-shadow: 0 0 0 2px var(--portal-accent-soft-md); }
+.nesio-fit-coach { margin: var(--space-2) 0 0; font-size: var(--text-xs); color: var(--portal-muted); line-height: 1.6; }
+
+/* 阶段训练日:默认横滑 */
+.nesio-fit-rail { display: flex; gap: var(--space-2); overflow-x: auto; scroll-snap-type: x mandatory;
+  margin: 0 calc(-1 * var(--space-4)); padding: 0 var(--space-4) 4px; -webkit-overflow-scrolling: touch; }
+.nesio-fit-rail::-webkit-scrollbar { display: none; }
+.nesio-fit-rail .nesio-fit-card { flex: 0 0 78%; scroll-snap-align: start; }
+.nesio-fit-list { display: flex; flex-direction: column; gap: var(--space-2); }
+.nesio-fit-card { background: var(--portal-card, var(--glass-bg-solid)); border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md); padding: var(--space-3); display: flex; flex-direction: column; gap: 5px; }
+.nesio-fit-card.is-today { border-color: var(--portal-accent-border); background: var(--portal-accent-soft); }
+.nesio-fit-card-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.nesio-fit-card-head .n { font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--portal-ink); }
+.nesio-fit-card .m { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-fit-card-acts { display: flex; gap: var(--space-2); margin-top: 4px; }
+.nesio-fit-go { font-family: inherit; font-size: var(--text-xs); font-weight: var(--weight-semibold);
+  border: none; border-radius: var(--radius-pill); padding: 5px 14px;
+  background: var(--portal-accent-soft-md); color: var(--portal-accent); cursor: pointer; }
+
+/* 我存的训练 */
+.nesio-fit-row { background: var(--portal-card, var(--glass-bg-solid)); border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md); padding: var(--space-3); }
+.nesio-fit-row-head { display: flex; align-items: center; gap: var(--space-2); }
+.nesio-fit-row-main { flex: 1; min-width: 0; text-align: left; background: none; border: none; padding: 0;
+  cursor: pointer; font-family: inherit; display: flex; flex-direction: column; gap: 2px; }
+.nesio-fit-row-main .n { font-size: var(--text-body); font-weight: var(--weight-medium); color: var(--portal-ink); }
+.nesio-fit-row-main .m { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-fit-row .nesio-fit-items { margin-top: var(--space-2); }
+.nesio-fit-del { margin-top: var(--space-2); background: none; border: none; padding: 0; cursor: pointer;
+  font-family: inherit; font-size: var(--text-xs); color: var(--status-risk); }
+
+/* 计划挑选 */
+.nesio-fit-plan-pick { text-align: left; background: var(--portal-card, var(--glass-bg-solid));
+  border: 1px solid var(--portal-line); border-radius: var(--radius-md); padding: var(--space-3);
+  cursor: pointer; font-family: inherit; display: flex; flex-direction: column; gap: 3px; }
+.nesio-fit-plan-pick .n { font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--portal-ink); }
+.nesio-fit-plan-pick .m { font-size: var(--text-xs); color: var(--portal-muted); }
+
+/* 更多:2×2 */
+.nesio-fit-more { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+.nesio-fit-more-cell { text-align: left; background: var(--portal-card, var(--glass-bg-solid));
+  border: 1px solid var(--portal-line); border-radius: var(--radius-md); padding: var(--space-3);
+  cursor: pointer; font-family: inherit; display: flex; flex-direction: column; gap: 3px; }
+.nesio-fit-more-cell:disabled { opacity: .5; cursor: default; }
+.nesio-fit-more-cell svg { stroke: var(--portal-accent); fill: none; }
+.nesio-fit-more-cell .t { font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--portal-ink); }
+.nesio-fit-more-cell .s { font-size: var(--text-xs); color: var(--portal-muted); }
