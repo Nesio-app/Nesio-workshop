@@ -155,6 +155,14 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **美食语料扩容(2026-07-28)**:HowToCook(Anduin2017,Unlicense)368 道家常菜并入
+  `public/data/cooking/recipes.json`(总 704 道,双语料 source 标注)——导入器
+  `scripts/import-howtocook.mjs`(确定性解析,幂等可重跑),每份**家庭份量**补上
+  老乡鸡出餐量缩放的缺口,难度星级/卡路里/封面图随行;工具词(烤箱/打蛋器…)不进
+  ingredients 以免匹配管线「缺烤箱」。契约 `test:cooking-howtocook`。
+  **待做**:难度/卡路里进 CookingSheet UI 与膳食计划;tips/ 技法文做新手卡或
+  cooking-recipe RAG;器具维度(tools/methods,参考 cook.zhangjc.tech 数据形态)。
+
 - **激进审计落地(2026-07-27)**:Kill `nesio-card-feedback-v1`(DEC 改读 Signal 投影);
   停用 `guidance-ranker` / cross-region bandit **学习接线**(Today 回规则分+Preference+cooling);
   退役 living-model API(410)+Lab UI+`nesio-lm-feedback`;demo personalization stage 停写;
