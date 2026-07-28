@@ -160,8 +160,12 @@ sensitivity/retention 枚举化(中期)。
   `scripts/import-howtocook.mjs`(确定性解析,幂等可重跑),每份**家庭份量**补上
   老乡鸡出餐量缩放的缺口,难度星级/卡路里/封面图随行;工具词(烤箱/打蛋器…)不进
   ingredients 以免匹配管线「缺烤箱」。契约 `test:cooking-howtocook`。
-  **待做**:难度/卡路里进 CookingSheet UI 与膳食计划;tips/ 技法文做新手卡或
-  cooking-recipe RAG;器具维度(tools/methods,参考 cook.zhangjc.tech 数据形态)。
+  **UI 对齐已做(2026-07-28)**:①「餐厅出餐量,缩着来」两处文案按 `recipe.source` 分支
+  (howtocook 是家庭每份量,原文案对它说的是错话);② 难度星级/卡路里进联想行 + 详情页;
+  ③ 修营养估算单位坑:件数单位(个/根/片)曾被当克算(「青椒 3 个」= 3g,营养系统性偏低),
+  `nutrition-core.massGrams` 白名单换算、件数不计,契约断言随行。
+  **待做**:封面图上列表卡(349/704 道有图,`recipeImageUrl` 现无人调用,需动布局+真机看);
+  tips/ 技法文做新手卡或 cooking-recipe RAG;器具维度(tools/methods,参考 cook.zhangjc.tech)。
 
 - **激进审计落地(2026-07-27)**:Kill `nesio-card-feedback-v1`(DEC 改读 Signal 投影);
   停用 `guidance-ranker` / cross-region bandit **学习接线**(Today 回规则分+Preference+cooling);

@@ -277,7 +277,7 @@ function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec
                     style={{ ...row, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: i === suggestions.length - 1 ? 'none' : divider, cursor: 'pointer' }}>
                     <Dot />
                     <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{r.category}</span>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', whiteSpace: 'nowrap' }}>{[r.category, r.difficulty ? '★'.repeat(r.difficulty) : ''].filter(Boolean).join(' · ')}</span>
                   </button>
                 ))}
               </div>
@@ -487,7 +487,7 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
                     style={{ ...row, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: i === suggestions.length - 1 ? 'none' : divider, cursor: 'pointer' }}>
                     <Dot />
                     <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{r.category}</span>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', whiteSpace: 'nowrap' }}>{[r.category, r.difficulty ? '★'.repeat(r.difficulty) : ''].filter(Boolean).join(' · ')}</span>
                   </button>
                 ))}
               </div>
@@ -676,6 +676,12 @@ function RecipeBody({ match, t }: { match: RecipeMatch<Recipe>; t: TT }) {
 
   return (
     <>
+      {(r.difficulty || r.calories != null) && (
+        <p style={{ ...hintLine, marginTop: 0 }}>{[
+          r.difficulty ? `${'★'.repeat(r.difficulty)} ${t('难度', 'difficulty')}` : '',
+          r.calories != null ? t(`约 ${r.calories} 千卡 / 份`, `≈${r.calories} kcal / serving`) : '',
+        ].filter(Boolean).join(' · ')}</p>
+      )}
       <section>
         <SectionHead label={t('步骤', 'Steps')} />
         <div style={{ ...card, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
@@ -685,7 +691,9 @@ function RecipeBody({ match, t }: { match: RecipeMatch<Recipe>; t: TT }) {
             </div>
           ))}
         </div>
-        <p style={caption}>{t('步骤里的克数是餐厅出餐量,自家做按人数缩着来。', 'Amounts are restaurant-batch sizes — scale down for home.')}</p>
+        <p style={caption}>{r.source === 'howtocook'
+          ? t('克数就是家庭每份量,照着做就行。', 'Amounts are per home serving — cook as written.')
+          : t('步骤里的克数是餐厅出餐量,自家做按人数缩着来。', 'Amounts are restaurant-batch sizes — scale down for home.')}</p>
       </section>
 
       {/* 营养 · 每份 · 四列 */}
@@ -730,7 +738,9 @@ function NeedsBody({ match, onError, onDone, t }: { match: RecipeMatch<Recipe>; 
   const rows = [...match.have.map((n) => ({ n, have: true })), ...match.missing.map((n) => ({ n, have: false }))];
   return (
     <>
-      <div style={{ ...banner, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{t('家庭份 · 已把餐厅用量缩放到家庭份', 'Scaled a restaurant portion down to a home serving')}</div>
+      <div style={{ ...banner, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{match.recipe.source === 'howtocook'
+        ? t('家庭份量 · 每份用量,可直接照做', 'Home portions — cook as written')
+        : t('家庭份 · 已把餐厅用量缩放到家庭份', 'Scaled a restaurant portion down to a home serving')}</div>
 
       <section>
         <SectionHead label={t('需要这些', 'You’ll need')} right={t('对照你的库存', 'vs your pantry')} />
