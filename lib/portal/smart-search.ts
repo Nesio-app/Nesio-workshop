@@ -15,6 +15,7 @@ import { extractContext, nodeDomain, readNodeContext, type FrontDomain } from '@
 import { parseTemporalQuery, isInSpan } from './temporal-query';
 import { emailFulltextScore } from './email-fulltext-index';
 import { tokenizeCJK } from './cjk-tokenize';
+import { expandQueryTerms } from './query-synonyms';
 
 export interface SearchUnderstood {
   people: string[];
@@ -120,6 +121,10 @@ export function smartSearch(query: string, domainFilter: FrontDomain | null = nu
 
   const ql = q.toLowerCase();
   const tokens = tokenize(q);
+  // 中英同义词扩展(PDF1 图7):中文问句要能捞到英文原文的记录
+  // (Google 日历同步下来的 "Appointment with MedPsych Integrated" 就死在这)。
+  // 确定性、零云,免费层照样有;权重压在原词之下。
+  const synonyms = expandQueryTerms(tokens);
 
   // Layer 1: Parse temporal expression from query (date-aware retrieval)
   const temporal = parseTemporalQuery(q);
@@ -157,6 +162,13 @@ export function smartSearch(query: string, domainFilter: FrontDomain | null = nu
       for (const token of tokens) {
         if (node.name.toLowerCase().includes(token)) score += 3;
         if (text.includes(token)) score += 1;
+      }
+
+      // 同义词命中:名字 +2(原词是 +3),否则文本 +1,且两者不累加 ——
+      // 原词精确命中永远排在同义命中前面,不会被「预约 → appointment」冲淡。
+      for (const s of synonyms) {
+        if (node.name.toLowerCase().includes(s)) score += 2;
+        else if (text.includes(s)) score += 1;
       }
 
       // ── 里程碑 B:邮件全文命中(本机索引,零云)────────────────────────
