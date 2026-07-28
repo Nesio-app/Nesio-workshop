@@ -13540,6 +13540,32 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-xlib-filter::-webkit-scrollbar { display: none; }
 .nesio-xlib-chip { flex-shrink: 0; padding: 0.32rem 0.75rem; border-radius: 999px; border: 1.5px solid var(--portal-line); background: none; color: var(--portal-muted); font-size: 0.78rem; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .nesio-xlib-chip.is-active { border-color: var(--portal-blue-deep); color: var(--portal-blue-deep); background: var(--portal-accent-soft); }
+/* 2026-07-28(标注 图5「加一个左侧部位栏」):部位从横向 chip 改成左侧竖栏。
+   栏 sticky 在顶上、自己滚:右边翻卡片时它不动,换部位不用先滚回页首。
+   选中态用左侧一道 3px 强调竖条(和参考图一致),不给整格上底色 —— 竖栏本来就窄,
+   满格底色在窄栏里显得脏。 */
+.nesio-xlib-split { display: flex; gap: 0.7rem; align-items: flex-start; }
+.nesio-xlib-rail {
+  flex: 0 0 3.9rem; position: sticky; top: 0; align-self: flex-start;
+  max-height: 70vh; overflow-y: auto; scrollbar-width: none;
+  display: flex; flex-direction: column;
+  border-right: 1px solid var(--portal-line);
+  padding: 0.2rem 0.35rem 0.2rem 0;
+}
+.nesio-xlib-rail::-webkit-scrollbar { display: none; }
+.nesio-xlib-rail-btn {
+  position: relative; flex-shrink: 0; width: 100%;
+  padding: 0.62rem 0.2rem; border: none; background: none; cursor: pointer;
+  font-family: var(--font-sans); font-size: 0.82rem; font-weight: var(--weight-medium, 500);
+  color: var(--portal-muted); text-align: center; white-space: nowrap;
+  border-radius: var(--radius-sm, 12px);
+}
+.nesio-xlib-rail-btn.is-active { color: var(--portal-blue-deep); font-weight: var(--weight-bold, 700); }
+.nesio-xlib-rail-btn.is-active::before {
+  content: ''; position: absolute; left: 0; top: 0.42rem; bottom: 0.42rem;
+  width: 3px; border-radius: 2px; background: var(--portal-blue-deep);
+}
+.nesio-xlib-main { flex: 1; min-width: 0; }
 .nesio-xlib-cards { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.6rem; }
 .nesio-xlib-card { border: 1px solid var(--portal-line); border-radius: 0.9rem; padding: 0.7rem 0.8rem; background: var(--glass-bg-solid); }
 .nesio-xlib-card.is-picked { border-color: var(--portal-blue-deep); }
