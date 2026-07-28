@@ -40,13 +40,12 @@ export default function LensTab() {
 
   return (
     <>
-      <p className="ng-sub">{L(dict, '挑一段记忆,套个镜头看看 —— 同一套心智模型,套在你真实的事上', 'Pick a memory, look through a lens — one model, on your own real moment')}</p>
-
+      {/* 2026-07-28 UI 精修(标注 图24):顶部两行说明划掉 —— 卡片右上角每条都写着「用镜头看看 ›」,
+          说明句只是把真正能点的东西往下推。 */}
       {memories.length === 0 ? (
         <div className="ng-done" style={{ marginTop: 16 }}>{L(dict, '先去记点什么 —— 有了记忆,就能在它上面套镜头看清楚一点。', 'Capture something first — then you can hold a lens up to it.')}</div>
       ) : (
         <div style={{ marginTop: 16 }}>
-          <div className="ng-sec"><span className="l">{L(dict, '最近的记忆', 'Recent memories')}</span><span className="r">{L(dict, '情绪重的排在前', 'heavy ones first')}</span></div>
           {memories.map(({ n, heavy }) => (
             <button key={n.id} type="button" className={`ng-mem${heavy ? ' heavy' : ''}`} onClick={() => setOpenNode(n)}>
               <div className="ng-mem-meta">
@@ -63,11 +62,6 @@ export default function LensTab() {
           ))}
         </div>
       )}
-
-      <p className="ng-quiet" style={{ marginTop: 24, textAlign: 'left', lineHeight: 1.65 }}>
-        {L(dict, '镜头库里有:前提·事实·逻辑·情绪(帮你吵)、认知扭曲识别、五问根因、事前验尸、逻辑谬误…… 拆完存回这条记忆,并记入你的心智维度。',
-          'Lenses include: premise·fact·logic·feeling, cognitive distortion, five whys, pre-mortem, fallacy… Saved back onto the memory and into your mind facets.')}
-      </p>
 
       {openNode && <MemoryLensSheet open={openNode !== null} onOpenChange={(o) => { if (!o) setOpenNode(null); }} node={openNode} />}
     </>

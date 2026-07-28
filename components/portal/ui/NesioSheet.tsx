@@ -60,6 +60,18 @@ export interface NesioSheetProps {
    * 界面,同机换人时会被肉眼看到(数据泄露)。
    */
   opaqueOverlay?: boolean;
+  /**
+   * 抬到 fullscreen 面板之上(2026-07-28,用户标注 图24「点击每个卡片没有反应」)。
+   *
+   * 默认层序是「fullscreen(929/930)盖住 bottom(900/901)」—— 因为全屏面板常从底部卡里
+   * 打开(记忆详情 → 阅读原文),必须整个盖住触发它的卡。但反过来也成立:洞察本身就是一个
+   * fullscreen 面板,它里面的「镜头」卡片再打开一个 bottom 抽屉时,抽屉落在 901,
+   * 被洞察的 930 完全盖住 —— 点了像没反应。
+   *
+   * 这种「从 fullscreen 里再开 bottom」的场合传 elevated,把这一层抬到 940/941。
+   * 不做成全局改层:全局抬会把上面那条「fullscreen 盖住触发它的 bottom」的规则弄坏。
+   */
+  elevated?: boolean;
   children: ReactNode;
 }
 
@@ -223,15 +235,16 @@ export default function NesioSheet({
   card = true,
   modal = true,
   opaqueOverlay = false,
+  elevated = false,
   children,
 }: NesioSheetProps) {
-  const panelClass = `nesio-sheet nesio-sheet--${variant}${card ? '' : ' nesio-sheet--bare'}${className ? ` ${className}` : ''}`;
+  const panelClass = `nesio-sheet nesio-sheet--${variant}${card ? '' : ' nesio-sheet--bare'}${elevated ? ' nesio-sheet--elevated' : ''}${className ? ` ${className}` : ''}`;
 
   if (variant === 'bottom') {
     return (
       <Drawer.Root open={open} onOpenChange={onOpenChange} dismissible={dismissible} modal repositionInputs={false}>
         <Drawer.Portal>
-          <Drawer.Overlay className="nesio-sheet-overlay" />
+          <Drawer.Overlay className={`nesio-sheet-overlay${elevated ? ' nesio-sheet-overlay--elevated' : ''}`} />
           <VaulContent panelClass={panelClass} panelStyle={style} ariaLabel={ariaLabel} open={open}>
             {children}
           </VaulContent>
@@ -242,7 +255,7 @@ export default function NesioSheet({
 
   // fullscreen 的遮罩用不透明页面底当底衬 —— 全屏面板常是磨砂玻璃底(半透明),
   // 需要背后有不透明层,否则在夜间(--glass-bg-solid 近全透)会透出下层。
-  const overlayClass = `nesio-sheet-overlay${variant === 'fullscreen' || opaqueOverlay ? ' nesio-sheet-overlay--opaque' : ''}`;
+  const overlayClass = `nesio-sheet-overlay${variant === 'fullscreen' || opaqueOverlay ? ' nesio-sheet-overlay--opaque' : ''}${elevated ? ' nesio-sheet-overlay--elevated' : ''}`;
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange} modal={modal}>
       <Dialog.Portal>

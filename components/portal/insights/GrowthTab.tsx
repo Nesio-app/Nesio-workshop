@@ -57,6 +57,17 @@ export default function GrowthTab() {
   const [freshAt, setFreshAt] = useState<string | null>(null); // 刚答完的回看流条目(滑入动效)
   const [openTrail, setOpenTrail] = useState<string | null>(null); // 点开回看的条目 key
 
+  /**
+   * 图23:从回看流条目回到它当时那条记忆。
+   * 回看只存了 refId / question / context,不存节点 id —— 所以按原话去记忆页搜(全 app 统一的
+   * nesio-memory-search 事件,和洞察页「拾起 / 走走看」同一条路),搜得到就落回那条详情。
+   */
+  const backToMemory = (a: GrowthAnswer) => {
+    const q = (a.context || a.question || '').replace(/^你写\s*/, '').replace(/[「」“”]/g, '').slice(0, 24).trim();
+    if (!q) return;
+    window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: q } }));
+  };
+
   const refresh = () => {
     try {
       setCards(todayGrowthCards());
@@ -175,15 +186,8 @@ export default function GrowthTab() {
           <div className="ng-gap" />
 
           {/* ── 今天:一次一件 ── */}
-          <div className="ng-sec">
-            <span className="l">{L(dict, '今天这一件', 'Today’s one thing')}</span>
-            <span className="r">
-              {obsLoading ? L(dict, '教练在翻你的记录…', 'Your coach is reading your notes…')
-                : todayItems.length === 0 ? L(dict, '今天很清静', 'A quiet day')
-                : idx >= todayItems.length ? L(dict, '今天先到这里', 'That’s enough for today')
-                : L(dict, `第 ${idx + 1} 件 · 答完再出下一条`, `${idx + 1} · one at a time`)}
-            </span>
-          </div>
+          {/* 2026-07-28 UI 精修(标注 图22):标题行「今天这一件」+ 右侧「第 N 件 / 1/3」计数删掉 ——
+              卡片自己就说明了是今天这一件,底下还有一句「今天先看这一件」,标题只是重复。 */}
 
           {obsError && !obsLoading && (
             <div className="ng-done" style={{ marginBottom: 'var(--space-3)' }}>
@@ -244,6 +248,15 @@ export default function GrowthTab() {
                     <p className="ng-tr-q">{a.question}</p>
                     <p className={`ng-tr-a${open ? '' : ' clamp'}`}>{a.answer}</p>
                     {open && a.context && <p className="ng-tr-ctx">{L(dict, '当时的数据 · ', 'The data then · ')}{a.context}</p>}
+                    {/* 2026-07-28(标注 图23「点击应该可以完全回到原来的页面」):展开后给一条回去的路 ——
+                        按当时那条记忆的原话去记忆页搜,落回它自己的详情。原来点开只能读,回不去。 */}
+                    {open && (
+                      <span className="ng-tr-back" role="link" tabIndex={0}
+                        onClick={(e) => { e.stopPropagation(); backToMemory(a); }}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); backToMemory(a); } }}>
+                        {L(dict, '回到这条记忆 ›', 'Back to this memory ›')}
+                      </span>
+                    )}
                   </button>
                 );
               })}

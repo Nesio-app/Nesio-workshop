@@ -73,7 +73,9 @@ export default function MemoryLensSheet({ open, onOpenChange, node }: { open: bo
   );
 
   return (
-    <NesioSheet variant="bottom" open={open} onOpenChange={onOpenChange} ariaLabel={L(dict, '用镜头看这条记忆', 'Look at this memory with a lens')}>
+    // elevated:这个抽屉是从洞察(fullscreen,z-930)里点开的 —— 不抬层就被整个盖住,
+    // 表现成「点了卡片没反应」(2026-07-28 标注 图24)。
+    <NesioSheet variant="bottom" elevated open={open} onOpenChange={onOpenChange} ariaLabel={L(dict, '用镜头看这条记忆', 'Look at this memory with a lens')}>
       <div className="nesio-growth">
         {!applied ? (
           <>
