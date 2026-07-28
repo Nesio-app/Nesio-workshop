@@ -8515,6 +8515,30 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
   transition: transform 0.12s ease, box-shadow 0.12s ease;
 }
 .nesio-insights-hub-tile:active { transform: scale(0.96); }
+
+/* 图6:长按进编辑态 —— 整片格子轻微抖一下,示意「现在可以拖」。
+   减少动效偏好下不抖(只留虚线描边),不给前庭敏感的人添麻烦。 */
+@keyframes nesioHubJiggle {
+  0%, 100% { transform: rotate(-0.6deg); }
+  50%      { transform: rotate(0.6deg); }
+}
+.nesio-insights-hub--editing .nesio-insights-hub-tile {
+  animation: nesioHubJiggle 0.32s ease-in-out infinite;
+  border-style: dashed;
+  cursor: grab;
+  touch-action: none;          /* 拖动时别让页面跟着滚 */
+}
+.nesio-insights-hub--editing .nesio-insights-hub-tile:active { transform: none; }
+.nesio-insights-hub-tile--dragging {
+  animation: none !important;
+  cursor: grabbing;
+  opacity: 0.85;
+  box-shadow: var(--shadow-card);
+  border-color: var(--portal-accent) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nesio-insights-hub--editing .nesio-insights-hub-tile { animation: none; }
+}
 .nesio-insights-hub-tile:hover { box-shadow: 0 4px 14px var(--portal-accent-soft-md); }
 .nesio-insights-hub-icon {
   width: 1.75rem;
