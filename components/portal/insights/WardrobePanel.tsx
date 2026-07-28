@@ -27,6 +27,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import type { CalendarEvent } from '@/lib/portal/types';
+import { IconStar } from '../icons';
 
 const TYPE_LABEL: Record<GarmentType, [string, string]> = {
   top: ['上装', 'Top'], bottom: ['下装', 'Bottoms'], outer: ['外套', 'Outerwear'],
@@ -516,12 +517,24 @@ export default function WardrobePanel() {
         <SavedOutfits
           outfits={outfits} garments={items} thumbs={thumbs} view={savedView} dict={dict}
           onView={setSavedView}
-          onStar={(o) => commitOutfit(patchOutfit(o.id, { starred: !o.starred, retired: false }))}
+          onStar={(o) => {
+            const on = !o.starred;
+            commitOutfit(patchOutfit(o.id, { starred: on, retired: false }));
+            // 点星 = 喜欢,喂进既有偏好(颜色好感 +1),别让「搭配」tab 变成一座孤岛
+            if (on) giveFeedback('like', o.pieceIds.map((id) => items.find((g) => g.id === id)).filter(Boolean) as Garment[]);
+          }}
           onRetire={(o) => {
             const next = !o.retired;
             commitOutfit(patchOutfit(o.id, { retired: next, starred: false }),
               next ? L(dict, '淘汰了 —— 以后不再推这一组', 'Retired — I won’t suggest it again') : undefined);
-            if (next) setRestyleNonce((n) => n + 1);
+            if (next) {
+              // 「以后不再推这一组」不能只是句话。喂给既有的偏好层(recordOutfitFeedback
+              // 的 dislike 会把这对上下装写进 dislikedPairs),规则版打 -10 分、
+              // 云造型师 prompt 里也会明写「别再这么搭」—— 两条推荐路径都真的避开。
+              // 原先只有命中时弹一句提醒,等于承诺了没做到的事。
+              giveFeedback('dislike', o.pieceIds.map((id) => items.find((g) => g.id === id)).filter(Boolean) as Garment[]);
+              setRestyleNonce((n) => n + 1);
+            }
           }}
           onRemove={(o) => { if (confirm(L(dict, '删掉这条搭配记录?', 'Delete this outfit record?'))) commitOutfit(removeOutfit(o.id)); }}
         />
@@ -922,7 +935,10 @@ function SavedOutfits({ outfits, garments, thumbs, view, dict, onView, onStar, o
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
           <button type="button" onClick={() => onStar(o)} style={linkish(o.starred ? 'var(--status-gentle)' : 'var(--portal-muted)')}>
-            {o.starred ? L(dict, '★ 喜欢', '★ Loved') : L(dict, '☆ 喜欢', '☆ Love it')}
+            <span style={{ color: o.starred ? 'var(--status-gentle)' : 'var(--portal-muted)', marginRight: 'var(--space-1)', display: 'inline-flex', verticalAlign: '-2px' }}>
+              <IconStar size={13} />
+            </span>
+            {o.starred ? L(dict, '喜欢', 'Loved') : L(dict, '喜欢', 'Love it')}
           </button>
           <button type="button" onClick={() => onRetire(o)} style={linkish(o.retired ? 'var(--portal-accent)' : 'var(--portal-muted)')}>
             {o.retired ? L(dict, '取消淘汰', 'Un-retire') : L(dict, '不喜欢 · 淘汰', 'Retire')}

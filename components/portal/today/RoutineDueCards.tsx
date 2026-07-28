@@ -9,6 +9,7 @@ import { useEffect, useState } from 'react';
 import { dueRoutines, markRoutineDone, ROUTINES_UPDATED_EVENT, type Routine } from '@/lib/portal/routines';
 import { protocolById, toRunSteps, loadTrainingState } from '@/lib/platform/training-protocol-engine';
 import { pickPhaseIndex, pickTodaySessionIndex } from '@/lib/platform/fitness-home-core';
+import { activeProtocol } from '@/lib/platform/training-overrides';
 import { IconClock } from '../icons';
 import { track } from '@/lib/portal/telemetry';
 import { L } from '@/lib/portal/i18n';
@@ -32,7 +33,10 @@ export function RoutineDueCards() {
   // 健身「开始练」→ 有训练计划就直接进跟练播放器,否则打开洞察健康 tab
   function startTraining(r: Routine) {
     const st = loadTrainingState();
-    const p = (r.protocolId && protocolById(r.protocolId)) || (st.activeProtocolId ? protocolById(st.activeProtocolId) : undefined);
+    const seed = (r.protocolId && protocolById(r.protocolId)) || (st.activeProtocolId ? protocolById(st.activeProtocolId) : undefined);
+    // activeProtocol:种子 + 用户改写。直接用 protocolById 的话,用户改过的组数/次数
+    // 不生效、删掉的动作照样练 —— 图8 的「计划可编辑」就只剩下健身页上的一个显示。
+    const p = seed ? activeProtocol(seed) : undefined;
     if (p) {
       // 「今天练哪个」必须和健身首页给出同一个答案 —— 共用 fitness-home-core 的选法
       // (当前阶段 + 跳过本周已练的)。以前这里是 sessions[本周次数 % 总数] 的纯轮转,

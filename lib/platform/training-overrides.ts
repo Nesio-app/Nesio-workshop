@@ -12,6 +12,8 @@
  * (scripts/training-overrides.test.mjs)。读写在下半段,只有它碰 localStorage。
  */
 
+import { reportStorageDropped } from '@/lib/portal/storage-health';
+
 export interface OverrideItem {
   exerciseId: string;
   sets: number;
@@ -92,8 +94,6 @@ export function clampReps(n: number, unit?: 'reps' | 'min'): number {
 
 // ── 存储(只有下面这段碰 localStorage)────────────────────────────────────────
 
-import { reportStorageDropped } from '@/lib/portal/storage-health';
-
 const KEY = 'nesio-training-overrides-v1';
 export const TRAINING_OVERRIDES_UPDATED = 'nesio-training-overrides-updated';
 
@@ -104,6 +104,19 @@ export function loadOverrides(): TrainingOverrides {
     return raw && typeof raw === 'object' ? raw as TrainingOverrides : {};
   } catch { return {}; }
 }
+
+/**
+ * 取「用户实际在练的那份计划」= 种子 + 用户改写。
+ *
+ * **任何要读训练内容的地方都必须走这道门。** 直接用 protocolById 拿到的是种子:
+ * 用户改过的组数/次数不生效、删掉的动作照样冒出来。第一版就踩过 —— 健身页
+ * 走的是 mergeProtocol,今天页的「开始练」却直接拿种子丢进跟练播放器,
+ * 编辑功能等于只改了个显示。
+ */
+export function activeProtocol<T extends MergeProtocol>(seed: T): T {
+  return mergeProtocol(seed, loadOverrides()) as T;
+}
+
 
 /**
  * 存改写。写不进去(隐私模式/配额满)返回 false —— 调用方必须显式告诉用户,

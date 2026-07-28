@@ -18,6 +18,8 @@ const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: fal
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { IconStar } from '../icons';
+import { loadPins, togglePin, PINS_UPDATED_EVENT } from '@/lib/portal/pins';
 
 type SubTab = 'calendar' | 'email';
 
@@ -73,7 +75,6 @@ const KEEP_RE = new RegExp([
 const ROBOT_FROM_RE = /no-?reply|donot-?reply|auto-?(confirm|reply|notif)|notification|mailer|bounce|postmaster|alerts?@|newsletter/i;
 
 /** 星标 = 节点上的一个标签(复用全 app 的标签体系,不另起存储)。 */
-const STAR_TAG = '星标';
 
 /**
  * 日程里不该出现的「不是具体事情」的条目(2026-07-28,用户标注 图29:
@@ -138,7 +139,7 @@ function SwipeRow({ row, dict, starred, dateLabel, onOpen, onStar, onDelete }: {
   };
 
   const revealing = dx > 0
-    ? { side: 'star' as const, label: starred ? L(dict, '取消星标', 'Unstar') : L(dict, '★ 星标', '★ Star'), bg: 'var(--status-gentle-soft)', fg: 'var(--status-gentle)' }
+    ? { side: 'star' as const, label: starred ? L(dict, '取消星标', 'Unstar') : L(dict, '星标', 'Star'), bg: 'var(--status-gentle-soft)', fg: 'var(--status-gentle)' }
     : { side: 'del' as const, label: L(dict, '删除', 'Delete'), bg: 'var(--status-risk-soft)', fg: 'var(--status-risk)' };
 
   return (
@@ -159,7 +160,11 @@ function SwipeRow({ row, dict, starred, dateLabel, onOpen, onStar, onDelete }: {
           transform: `translateX(${dx}px)`, transition: dx === 0 ? 'transform .18s var(--ease-out, ease)' : 'none' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-3)' }}>
           <span style={{ fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {starred && <span style={{ color: 'var(--status-gentle)', marginRight: 4 }}>★</span>}{row.title}
+            {starred && (
+              <span style={{ color: 'var(--status-gentle)', marginRight: 'var(--space-1)', display: 'inline-flex', verticalAlign: '-2px' }}>
+                <IconStar size={13} />
+              </span>
+            )}{row.title}
           </span>
           <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{dateLabel}</span>
         </div>
@@ -185,16 +190,20 @@ export default function SchedulePanel() {
   const [starred, setStarred] = useState<Set<string>>(new Set());
   const [gone, setGone] = useState<Set<string>>(new Set());
 
+  // 星标 = 全 app 那一个收藏夹(lib/portal/pins),不是这一页私有的标记。
+  // 第一版把它写成节点上的「星标」标签,结果是:这里加的星在记忆页收藏夹里看不到、
+  // 收藏夹里收的日程这里也不亮 —— 两套并行的「标记重要」,而且那个标签还会当成
+  // 普通标签显示在记忆卡上。
   useEffect(() => {
-    setStarred(new Set(nodes.filter((n) => (n.tags || []).includes(STAR_TAG)).map((n) => n.id)));
-  }, [nodes]);
+    const read = () => setStarred(new Set(loadPins()));
+    read();
+    window.addEventListener(PINS_UPDATED_EVENT, read);
+    return () => window.removeEventListener(PINS_UPDATED_EVENT, read);
+  }, []);
 
-  /** 星标落在节点标签上(和全 app 的标签同一套),不另起一份存储。 */
   const toggleStar = (r: Row) => {
-    const on = starred.has(r.id);
-    const tags = (r.node.tags || []).filter((t) => t !== STAR_TAG);
-    updateLifeNode(r.id, { tags: on ? tags : [...tags, STAR_TAG] });
-    setStarred((prev) => { const next = new Set(prev); if (on) next.delete(r.id); else next.add(r.id); return next; });
+    const on = togglePin(r.id);   // 返回切换后的状态,并广播 PINS_UPDATED_EVENT
+    setStarred((prev) => { const next = new Set(prev); if (on) next.add(r.id); else next.delete(r.id); return next; });
   };
 
   /** 删除是真删这条记忆节点 —— 先本地隐藏,写失败(返回 false)就放回来,不假装成功。 */

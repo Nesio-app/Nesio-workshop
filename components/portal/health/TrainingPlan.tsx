@@ -111,6 +111,8 @@ export default function TrainingPlan() {
   const nameOf = (w: Workout) => workoutDisplayName(w.items, w.name, dictLocale);
   const seed = st?.activeProtocolId ? protocolById(st.activeProtocolId) : undefined;
   // 显示用的计划 = 种子 + 用户改写。种子本身永远不被改脏(mergeProtocol 是纯函数)。
+  // 这里刻意用 mergeProtocol(seed, ov) 而不是 activeProtocol(seed):ov 是 state,
+  // 编辑完要立刻重渲染;activeProtocol 是给一次性读取的调用方(如今天页)用的。
   const active = useMemo(
     () => (seed ? (mergeProtocol(seed as unknown as MergeProtocol, ov) as unknown as TrainingProtocol) : undefined),
     [seed, ov],
