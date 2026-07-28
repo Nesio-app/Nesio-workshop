@@ -10,9 +10,9 @@
  * 点条目直接开这条记忆的详情(不再跳到记忆页让你自己找)。随同步/记录事件自动刷新。
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { getLifeGraph, deleteLifeNode, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 
 const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
 import { L } from '@/lib/portal/i18n';
@@ -32,6 +32,48 @@ interface Row {
 }
 
 const AD_RE = /退订|unsubscribe|优惠|促销|限时|折扣|秒杀|大促|% ?off|sale\b|coupon|deal[s]?\b/i;
+
+/**
+ * 邮件子 tab 的取舍(2026-07-28,用户标注 图1)。原话:
+ *「只显示重要邮件,个人邮箱发送的有具体内容的、不是商业广告的,学校的通知,
+ *  订购旅行信息机票酒店景点订单;不显示于银行交易信息,不显示开会通知信息。」
+ *
+ * 做法是**两级白名单**,不是一条黑名单:
+ *   ① 先毙掉明确不要的:银行流水提醒 / 会议邀请回执 / 广告;
+ *   ② 剩下的里,活人发来的(发件地址不像机器人)默认留;
+ *      机器发的只留「有具体内容」的那几类:订单物流、机票行程、酒店预订、票务、学校通知。
+ * 纯本地正则,零 AI。误杀了往 KEEP_RE 里加词即可。
+ */
+const BANK_TX_RE = new RegExp([
+  '交易提醒|入账|出账|扣款|消费提醒|余额变动|尾号\\s*\\d{4}|信用卡账单',
+  'you made a .{0,12}(transaction|transfer)|debit card|credit card (was|has been)',
+  'transaction alert|payment (posted|received|sent)|deposit (of|posted)|withdraw(al)?',
+  'alerts?@|no\\.?reply\\.alerts',
+].join('|'), 'i');
+
+const MEETING_INVITE_RE = new RegExp([
+  '会议邀请|邀请你参加|已接受邀请|已拒绝邀请|日程邀请|更新的邀请',
+  'invitation:|invited you to|has (accepted|declined)|updated invitation',
+  'calendar-notification|zoom\\.us/j/|teams\\.microsoft\\.com/l/meetup',
+].join('|'), 'i');
+
+/** 机器发的也值得留的「有具体内容」类目:订单物流 / 旅行 / 票务 / 学校。 */
+const KEEP_RE = new RegExp([
+  '订单|已发货|发货|快递|物流|运单|签收|退款|订购',
+  'order(ed)?|shipped|shipment|tracking|delivered|package|refund',
+  '机票|航班|值机|登机|行程单|行程|改签',
+  'flight|itinerary|boarding|check-?in|e-?ticket|reservation|booking|confirmation',
+  '酒店|入住|退房|民宿|景点|门票|演出|展览',
+  'hotel|check-?out|attraction|admission|ticket',
+  '学校|老师|班级|家长|家长会|作业|课表|开学|放假|校车',
+  'school|teacher|classroom|principal|district|parent|homework|semester|pta\\b',
+].join('|'), 'i');
+
+/** 发件地址像不像机器人(no-reply / 通知 / 自动确认)。 */
+const ROBOT_FROM_RE = /no-?reply|donot-?reply|auto-?(confirm|reply|notif)|notification|mailer|bounce|postmaster|alerts?@|newsletter/i;
+
+/** 星标 = 节点上的一个标签(复用全 app 的标签体系,不另起存储)。 */
+const STAR_TAG = '星标';
 
 /**
  * 日程里不该出现的「不是具体事情」的条目(2026-07-28,用户标注 图29:
@@ -57,6 +99,81 @@ function stripPrefix(name: string): string {
   return name.replace(/^(会议记录|Meeting notes)\s*·\s*/, '').trim() || name;
 }
 
+/**
+ * SwipeRow — 一条日程/邮件。2026-07-28 按标注 图1 加左右滑:
+ *   右滑(往右拖)= 星标,左滑 = 删除。跟手位移,松手过阈值才执行,没过就弹回去。
+ * 只认横向手势:纵向位移更大时立刻放手,免得把页面滚动吃掉。
+ */
+function SwipeRow({ row, dict, starred, dateLabel, onOpen, onStar, onDelete }: {
+  row: Row; dict: 'zh' | 'en'; starred: boolean; dateLabel: string;
+  onOpen: () => void; onStar: () => void; onDelete: () => void;
+}) {
+  const [dx, setDx] = useState(0);
+  const start = useRef<{ x: number; y: number; lock: 'none' | 'x' | 'y' } | null>(null);
+  const THRESHOLD = 72;
+
+  const onDown = (e: React.PointerEvent) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    start.current = { x: e.clientX, y: e.clientY, lock: 'none' };
+  };
+  const onMove = (e: React.PointerEvent) => {
+    const st = start.current;
+    if (!st) return;
+    const mx = e.clientX - st.x;
+    const my = e.clientY - st.y;
+    if (st.lock === 'none') {
+      if (Math.abs(mx) < 6 && Math.abs(my) < 6) return;
+      st.lock = Math.abs(mx) > Math.abs(my) ? 'x' : 'y';
+      if (st.lock === 'y') { start.current = null; setDx(0); return; }  // 纵向:让页面滚
+    }
+    setDx(Math.max(-140, Math.min(140, mx)));
+  };
+  const onUp = () => {
+    const moved = dx;
+    start.current = null;
+    setDx(0);
+    if (moved <= -THRESHOLD) onDelete();
+    else if (moved >= THRESHOLD) onStar();
+    else if (Math.abs(moved) < 6) onOpen();
+  };
+
+  const revealing = dx > 0
+    ? { side: 'star' as const, label: starred ? L(dict, '取消星标', 'Unstar') : L(dict, '★ 星标', '★ Star'), bg: 'var(--status-gentle-soft)', fg: 'var(--status-gentle)' }
+    : { side: 'del' as const, label: L(dict, '删除', 'Delete'), bg: 'var(--status-risk-soft)', fg: 'var(--status-risk)' };
+
+  return (
+    <div style={{ position: 'relative', borderRadius: 'var(--radius-md)', overflow: 'hidden', touchAction: 'pan-y' }}>
+      {dx !== 0 && (
+        <div aria-hidden style={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center',
+          justifyContent: revealing.side === 'star' ? 'flex-start' : 'flex-end',
+          padding: '0 var(--space-4)', background: revealing.bg, color: revealing.fg,
+          fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)',
+        }}>{revealing.label}</div>
+      )}
+      <button type="button"
+        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+        style={{ position: 'relative', display: 'block', textAlign: 'left', width: '100%', cursor: 'pointer',
+          border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)',
+          background: 'var(--glass-bg-solid, var(--portal-bg))', padding: 'var(--space-3) var(--space-4)',
+          transform: `translateX(${dx}px)`, transition: dx === 0 ? 'transform .18s var(--ease-out, ease)' : 'none' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-3)' }}>
+          <span style={{ fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {starred && <span style={{ color: 'var(--status-gentle)', marginRight: 4 }}>★</span>}{row.title}
+          </span>
+          <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{dateLabel}</span>
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '0.2rem', alignItems: 'center', flexWrap: 'wrap' }}>
+          {row.meta && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{row.meta}</span>}
+          {row.badge && (
+            <span style={{ fontSize: 'var(--text-xs)', padding: '0.05rem 0.45rem', borderRadius: 'var(--radius-pill)', background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{row.badge}</span>
+          )}
+        </div>
+      </button>
+    </div>
+  );
+}
+
 // 图29 之后不再需要 onOpenMemory —— 点条目就地开详情,不跳记忆页。
 export default function SchedulePanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -64,6 +181,29 @@ export default function SchedulePanel() {
   const [nodes, setNodes] = useState<LifeNode[]>([]);
   // 图29「点击应该直接进入对应记忆,而不是记忆页」:就地开这条记忆的详情。
   const [openNode, setOpenNode] = useState<LifeNode | null>(null);
+  // 图1「增加左滑右滑动作,删除和星标」:右滑加星、左滑删掉这条。
+  const [starred, setStarred] = useState<Set<string>>(new Set());
+  const [gone, setGone] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    setStarred(new Set(nodes.filter((n) => (n.tags || []).includes(STAR_TAG)).map((n) => n.id)));
+  }, [nodes]);
+
+  /** 星标落在节点标签上(和全 app 的标签同一套),不另起一份存储。 */
+  const toggleStar = (r: Row) => {
+    const on = starred.has(r.id);
+    const tags = (r.node.tags || []).filter((t) => t !== STAR_TAG);
+    updateLifeNode(r.id, { tags: on ? tags : [...tags, STAR_TAG] });
+    setStarred((prev) => { const next = new Set(prev); if (on) next.delete(r.id); else next.add(r.id); return next; });
+  };
+
+  /** 删除是真删这条记忆节点 —— 先本地隐藏,写失败(返回 false)就放回来,不假装成功。 */
+  const removeRow = (r: Row) => {
+    setGone((prev) => new Set(prev).add(r.id));
+    if (!deleteLifeNode(r.id)) {
+      setGone((prev) => { const next = new Set(prev); next.delete(r.id); return next; });
+    }
+  };
 
   useEffect(() => {
     const load = () => { try { setNodes(getLifeGraph()); } catch { setNodes([]); } };
@@ -123,7 +263,17 @@ export default function SchedulePanel() {
   const emailRows = useMemo<Row[]>(() => {
     return nodes
       .filter((n) => n.source === 'email')
-      .filter((n) => !AD_RE.test(n.name) && !AD_RE.test(typeof n.rawInput === 'string' ? n.rawInput : ''))
+      .filter((n) => {
+        const a = n.attributes || {};
+        const from = `${typeof a.from === 'string' ? a.from : ''} ${typeof a.sender === 'string' ? a.sender : ''}`;
+        const body = typeof n.rawInput === 'string' ? n.rawInput : '';
+        const hay = `${n.name} ${from} ${body}`;
+        if (AD_RE.test(hay)) return false;              // ① 广告
+        if (BANK_TX_RE.test(hay)) return false;          // ① 银行流水提醒
+        if (MEETING_INVITE_RE.test(hay)) return false;   // ① 开会通知/邀请回执
+        if (!ROBOT_FROM_RE.test(from)) return true;      // ② 活人发的,留
+        return KEEP_RE.test(hay);                        // ② 机器发的,只留订单/旅行/票务/学校
+      })
       .map((n) => {
         const a = n.attributes || {};
         return {
@@ -138,7 +288,7 @@ export default function SchedulePanel() {
       .sort((x, y) => (x.dateIso < y.dateIso ? 1 : x.dateIso > y.dateIso ? -1 : 0));
   }, [nodes]);
 
-  const rows = sub === 'calendar' ? calendarRows : emailRows;
+  const rows = (sub === 'calendar' ? calendarRows : emailRows).filter((r) => !gone.has(r.id));
 
   const fmtDay = (iso: string) => {
     const d = new Date(iso);
@@ -173,19 +323,8 @@ export default function SchedulePanel() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {rows.slice(0, 60).map((r) => (
-            <button key={r.id} type="button" onClick={() => setOpenNode(r.node)}
-              style={{ display: 'block', textAlign: 'left', width: '100%', cursor: 'pointer', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', background: 'var(--glass-bg-solid, var(--portal-bg))', padding: 'var(--space-3) var(--space-4)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-3)' }}>
-                <span style={{ fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
-                <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{fmtDay(r.dateIso)}</span>
-              </div>
-              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '0.2rem', alignItems: 'center', flexWrap: 'wrap' }}>
-                {r.meta && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{r.meta}</span>}
-                {r.badge && (
-                  <span style={{ fontSize: 'var(--text-xs)', padding: '0.05rem 0.45rem', borderRadius: 'var(--radius-pill)', background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{r.badge}</span>
-                )}
-              </div>
-            </button>
+            <SwipeRow key={r.id} row={r} dict={dict} starred={starred.has(r.id)} dateLabel={fmtDay(r.dateIso)}
+              onOpen={() => setOpenNode(r.node)} onStar={() => toggleStar(r)} onDelete={() => removeRow(r)} />
           ))}
         </div>
       )}

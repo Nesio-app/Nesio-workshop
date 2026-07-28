@@ -13522,20 +13522,27 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-xlib-card-head { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0; cursor: pointer; }
 .nesio-xlib-name { font-size: 0.92rem; font-weight: 700; color: var(--portal-ink); }
 .nesio-xlib-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem; }
-.nesio-xlib-tag { font-size: 0.68rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: 0.4rem; }
-.nesio-xlib-tag.tm { background: var(--portal-accent-soft); color: var(--portal-blue-deep); }
-.nesio-xlib-tag.te { background: var(--chip-green, rgba(80,160,120,0.15)); color: var(--status-gentle, #3d9f6e); }
-.nesio-xlib-tag.tv { background: var(--chip-violet, rgba(140,120,200,0.15)); color: var(--portal-muted); }
-.nesio-xlib-tag[class*="td-easy"] { background: rgba(80,160,120,0.15); color: #3d9f6e; }
-.nesio-xlib-tag[class*="td-med"] { background: rgba(224,149,74,0.16); color: #e0954a; }
-.nesio-xlib-tag[class*="td-hard"] { background: rgba(194,93,122,0.16); color: #c25d7a; }
+/* 2026-07-28 UI 精修(标注 图6「Labels 不彩色」):肌群蓝 / 器械绿 / 模式紫 / 难度三色 ——
+   一张卡上五个标签五种颜色,像贴纸墙。统一成同一种中性 chip;颜色留给真正要区分状态的地方。 */
+.nesio-xlib-tag {
+  font-size: 0.68rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: 0.4rem;
+  background: var(--portal-bg); color: var(--portal-muted); border: 1px solid var(--portal-line);
+}
 .nesio-xlib-cue { margin: 0.5rem 0 0; font-size: 0.8rem; font-style: italic; color: var(--portal-muted); line-height: 1.5; }
 .nesio-xlib-detail { margin-top: 0.5rem; border-top: 1px solid var(--portal-line); padding-top: 0.45rem; }
 .nesio-xlib-detail-label { margin: 0.4rem 0 0.15rem; font-size: 0.72rem; font-weight: 700; color: var(--portal-blue-deep); }
 .nesio-xlib-detail ul { margin: 0; padding-left: 1.1rem; font-size: 0.78rem; color: var(--portal-ink); line-height: 1.6; }
 .nesio-xlib-add { margin-top: 0.55rem; padding: 0.32rem 0.9rem; border-radius: 999px; border: 1.5px solid var(--portal-accent-border); background: none; color: var(--portal-blue-deep); font-size: 0.78rem; font-weight: 600; cursor: pointer; }
 .nesio-xlib-add.is-picked { background: var(--portal-accent-soft); }
-.nesio-xlib-draftbar { position: sticky; bottom: 0; display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.2rem; background: var(--glass-bg-solid); border-top: 1px solid var(--portal-line); }
+/* 2026-07-28(标注 图7「透明度调整」):底栏原来用 --glass-bg-solid(部分主题下半透明),
+   压在卡片上时下面的字直接透出来,「已选 2 个」和动作描述叠在一起看不清。改成不透明面 + 上方轻阴影。 */
+.nesio-xlib-draftbar {
+  position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; gap: 0.5rem;
+  padding: 0.7rem 0.6rem calc(0.7rem + env(safe-area-inset-bottom, 0px));
+  margin: 0 -0.2rem; background: var(--sheet-opaque, #fdfeff);
+  border-top: 1px solid var(--portal-line);
+  box-shadow: 0 -8px 20px -12px rgba(20, 30, 50, 0.35);
+}
 .nesio-xlib-draft-count { flex: 1; font-size: 0.82rem; font-weight: 600; color: var(--portal-ink); }
 .nesio-xlib-draft-save { padding: 0.4rem 0.9rem; border-radius: 999px; border: 1.5px solid var(--portal-accent-border); background: none; color: var(--portal-blue-deep); font-size: 0.8rem; font-weight: 600; cursor: pointer; }
 .nesio-xlib-draft-play { padding: 0.4rem 1rem; border-radius: 999px; border: none; background: var(--portal-blue-deep); color: #fff; font-size: 0.8rem; font-weight: 700; cursor: pointer; }

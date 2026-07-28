@@ -51,6 +51,7 @@ export default function TrainingPlan() {
   const [st, setSt] = useState<TrainingState | null>(null);
   const [earned, setEarned] = useState<number | null>(null);
   const [libOpen, setLibOpen] = useState(false);
+  const [openWorkoutId, setOpenWorkoutId] = useState<string | null>(null); // 图8:点开看这套训练的动作
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [, setCatTick] = useState(0); // 扩展库动作名要等 catalog 载入内存才解析得出 → 载好后 bump 重渲染
   useEffect(() => {
@@ -82,19 +83,43 @@ export default function TrainingPlan() {
       {workouts.length > 0 && (
         <>
           <p className="nesio-settings-section-label">{L(dict, '我的训练', 'My workouts')}</p>
+          {/* 2026-07-28 UI 精修(标注 图8):
+              ①「点击可以看到细节」—— 点卡片展开这套训练的动作清单(原来只有一行「2 个动作」);
+              ② 右上那个 ✕ 从常驻改成展开后才出现 —— 主操作是开练,删除不该和它并排抢手指。 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-            {workouts.map((w) => (
-              <div key={w.id} className="nesio-fin-card" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
-                <div style={{ minWidth: 0 }}>
-                  <span className="nesio-fin-card-name">{nameOf(w)}</span>
-                  <p className="nesio-fin-card-meta" style={{ marginTop: '0.15rem' }}>{L(dict, `${w.items.length} 个动作`, `${w.items.length} moves`)}</p>
+            {workouts.map((w) => {
+              const open = openWorkoutId === w.id;
+              return (
+                <div key={w.id} className="nesio-fin-card">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+                    <button type="button" onClick={() => setOpenWorkoutId(open ? null : w.id)} aria-expanded={open}
+                      style={{ minWidth: 0, flex: 1, textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit' }}>
+                      <span className="nesio-fin-card-name">{nameOf(w)}</span>
+                      <p className="nesio-fin-card-meta" style={{ marginTop: '0.15rem' }}>
+                        {L(dict, `${w.items.length} 个动作`, `${w.items.length} moves`)} · {open ? L(dict, '收起', 'hide') : L(dict, '看细节', 'details')}
+                      </p>
+                    </button>
+                    <button type="button" className="nesio-fin-review-accept" style={{ flexShrink: 0 }}
+                      onClick={() => startWorkout(nameOf(w), w.items.map((it) => ({ ...it, restSec: 45 })))}>{L(dict, '开始跟练', 'Start')}</button>
+                  </div>
+                  {open && (
+                    <>
+                      <ul style={{ margin: '0.55rem 0 0', paddingLeft: '1.1rem', fontSize: '0.8rem', color: 'var(--portal-muted)', lineHeight: 1.7 }}>
+                        {w.items.map((it, i) => (
+                          <li key={i}>
+                            {resolveExerciseName(it.exerciseId) || it.exerciseId} · {it.sets}×{it.reps}{it.unit === 'sec' ? L(dict, ' 秒', 's') : ''}
+                          </li>
+                        ))}
+                      </ul>
+                      <button type="button" onClick={() => { deleteWorkout(w.id); setOpenWorkoutId(null); setWorkouts(loadWorkouts()); }}
+                        style={{ marginTop: '0.6rem', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontSize: '0.76rem', color: 'var(--status-risk)' }}>
+                        {L(dict, '删掉这套训练', 'Delete this workout')}
+                      </button>
+                    </>
+                  )}
                 </div>
-                <div style={{ display: 'flex', gap: '0.4rem', flexShrink: 0 }}>
-                  <button type="button" className="nesio-fin-review-accept" onClick={() => startWorkout(nameOf(w), w.items.map((it) => ({ ...it, restSec: 45 })))}>{L(dict, '开始跟练', 'Start')}</button>
-                  <button type="button" className="nesio-routine-delete" aria-label={L(dict, '删除', 'Delete')} onClick={() => { deleteWorkout(w.id); setWorkouts(loadWorkouts()); }}>✕</button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
       )}
@@ -123,7 +148,6 @@ export default function TrainingPlan() {
 
   const phase = currentPhase(active, st.startedAt);
   const doneThisWeek = sessionsThisWeek(st);
-  const recentLog = st.log.slice(0, 3);
   const logDone = (sid: string, sname: string) => {
     setSt(logSession(active.id, sid));
     earnPoints(POINTS_PER_FITNESS_SESSION, 'fitness', dict === 'en' ? `Training: ${sname}` : `训练完成:${sname}`);
@@ -167,11 +191,8 @@ export default function TrainingPlan() {
         ))}
       </div>
 
-      {recentLog.length > 0 && (
-        <p className="nesio-settings-option-hint" style={{ marginTop: '0.7rem' }}>
-          {L(dict, '最近打卡:', 'Recent: ')}{recentLog.map((e) => `${e.date.slice(5)} ${L(dict, active.phases.flatMap((p) => p.sessions).find((s) => s.id === e.sessionId)?.name.zh || e.sessionId, active.phases.flatMap((p) => p.sessions).find((s) => s.id === e.sessionId)?.name.en || e.sessionId)}`).join(' · ')}
-        </p>
-      )}
+      {/* 2026-07-28(标注 图9):页脚「最近打卡:07-25 tempo · 07-25 tempo」删掉 ——
+          同一天的两条重复贴在一起,信息量为零;本周进度那行已经说了练了几次。 */}
     </div>
   );
 }
