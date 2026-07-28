@@ -899,8 +899,17 @@ function MealLogBody({ photoUrl, onError, onDone, t }: { photoUrl?: string; onEr
 }
 
 // ── 做饭计划(周)──────────────────────────────────────────────────────────────
+//
+// 2026-07-28 重做(用户标注 图28「需要重新设计」)。旧版的问题:
+//   ① 周一到周日七行长得一模一样,今天该做什么得自己数;
+//   ② 右边七个 pill 全是「需采购」——所有行同一个状态 = 等于没说,更看不出差几样;
+//   ③ 一天想换掉/今天不做饭,只能手打菜名;
+//   ④ 底部三层(「本周缺 12 样」+ 一个大按钮 + 一行说明)讲的是同一件事。
+// 现在:今天排最前并高亮;状态分「可以做 / 差 N 样(列出缺的) / 外食」;每行两个轻动作
+//(换一道 / 外食);底部收成一条「差 N 样 · 加进购物清单」。
 const WEEK_DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 const WEEK_DAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
 function PlanBody({ matches, recipes, soonNames, pantryNames, onError, t }: {
   matches: RecipeMatch<Recipe>[]; recipes: Recipe[] | null; soonNames: Set<string>; pantryNames: Set<string>; onError: (m: string) => void; t: TT;
 }) {
@@ -909,70 +918,101 @@ function PlanBody({ matches, recipes, soonNames, pantryNames, onError, t }: {
   const dict = t('zh', 'en');
   const days = dict === 'zh' ? WEEK_DAYS : WEEK_DAYS_EN;
   const plan: WeekPlan = useMemo(() => planWeek(matches, days, soonNames), [matches, soonNames, days]);
-  // 每天可自选/输入菜名;空 = 用自动排的,用户改了以输入为准。
+
+  // 每天可自选/输入菜名;空 = 外食。用户改过以输入为准。
   const [edits, setEdits] = useState<Record<string, string>>({});
   useEffect(() => {
     setEdits((prev) => {
       const next: Record<string, string> = { ...prev };
-      for (const d of plan.days) {
-        if (next[d.day] === undefined) next[d.day] = d.dishName ?? '';
-      }
+      for (const d of plan.days) if (next[d.day] === undefined) next[d.day] = d.dishName ?? '';
       return next;
     });
   }, [plan.days]);
 
-  const dayStatus = useCallback((dishName: string) => {
+  // 今天排最前:周一=1…周日=0 → 折成 0..6 的下标,再把数组转一圈。
+  const todayIdx = (new Date().getDay() + 6) % 7;
+  const ordered = useMemo(() => days.map((_, i) => days[(todayIdx + i) % days.length]), [days, todayIdx]);
+
+  /** 一道菜现在能不能做 —— 缺哪几样也一并算出来(要显示在行里)。 */
+  const dayStatus = useCallback((dishName: string): { kind: 'out' | 'ready' | 'short'; missing: string[] } => {
     const nm = dishName.trim();
-    if (!nm) return { status: '餐厅' as const, missing: 0 };
-    if (!recipes) return { status: '需采购' as const, missing: 0 };
+    if (!nm) return { kind: 'out', missing: [] };
+    if (!recipes) return { kind: 'short', missing: [] };
     const r = recipes.find((x) => x.name === nm) ?? recipes.find((x) => x.name.includes(nm) || nm.includes(x.name));
-    if (!r) return { status: '需采购' as const, missing: 0 };
+    if (!r) return { kind: 'short', missing: [] };
     const m = matchRecipe(r, pantryNames, normalizeIngredient);
-    return { status: m.canCook ? '库存够' as const : '需采购' as const, missing: m.missing.length };
+    return m.canCook ? { kind: 'ready', missing: [] } : { kind: 'short', missing: m.missing };
   }, [recipes, pantryNames]);
 
   const missingAll = useMemo(() => {
-    if (!recipes) return plan.missingAll;
     const miss = new Set<string>();
-    for (const d of days) {
-      const nm = (edits[d] ?? '').trim();
-      if (!nm) continue;
-      const r = recipes.find((x) => x.name === nm) ?? recipes.find((x) => x.name.includes(nm) || nm.includes(x.name));
-      if (!r) continue;
-      for (const x of matchRecipe(r, pantryNames, normalizeIngredient).missing) miss.add(x);
-    }
+    for (const d of days) for (const x of dayStatus(edits[d] ?? '').missing) miss.add(x);
     return [...miss];
-  }, [edits, days, recipes, pantryNames, plan.missingAll]);
+  }, [edits, days, dayStatus]);
+
+  /** 换一道:在候选里往后挪一位(确定性,不随机 —— 连点两次不会又转回来)。 */
+  const pool = useMemo(() => matches.map((m) => m.recipe.name), [matches]);
+  const swap = (day: string) => {
+    if (!pool.length) return;
+    setEdits((prev) => {
+      const cur = (prev[day] ?? '').trim();
+      const at = pool.indexOf(cur);
+      return { ...prev, [day]: pool[(at + 1 + pool.length) % pool.length] };
+    });
+  };
 
   function save() {
-    if (!missingAll.length) { setMsg(t('本周库存都够,不用买。', 'Fully stocked this week.')); setTimeout(() => setMsg(''), 1800); return; }
-    try { addToShopping(missingAll); setSaved(true); setMsg(t(`存了 ${missingAll.length} 样进「记忆」`, `${missingAll.length} saved to memory`)); setTimeout(() => setMsg(''), 2200); }
-    catch { onError(t('没存上,再试一次。', 'Could not save — try again.')); }
+    if (!missingAll.length) return;
+    try {
+      addToShopping(missingAll);
+      setSaved(true);
+      setMsg(t(`${missingAll.length} 样加进购物清单了`, `${missingAll.length} added to your shopping list`));
+      setTimeout(() => setMsg(''), 2200);
+    } catch { onError(t('没存上,再试一次。', 'Could not save — try again.')); }
   }
 
   const recipeNames = useMemo(() => (recipes ?? []).map((r) => r.name), [recipes]);
 
   return (
     <>
-      <div style={card}>
-        {days.map((day, i) => {
+      <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
+        {ordered.map((day, i) => {
           const dish = edits[day] ?? '';
           const st = dayStatus(dish);
+          const isToday = i === 0;
           return (
-            <div key={day} style={{ ...row, borderBottom: i === days.length - 1 ? 'none' : divider, alignItems: 'center' }}>
-              <span style={{ flex: 'none', width: 34, fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', fontWeight: 600 }}>{day}</span>
-              <input
-                list="cooking-plan-dishes"
-                style={{ ...inputStyle, flex: 1, minWidth: 0, padding: 'var(--space-2) var(--space-3)', border: 'none', background: 'transparent' }}
-                placeholder={t('选或输入菜名', 'Pick or type a dish')}
-                value={dish}
-                onChange={(e) => setEdits((prev) => ({ ...prev, [day]: e.target.value }))}
-              />
-              {st.status === '库存够'
-                ? <span style={{ ...pill, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{t('库存够', 'Stocked')}</span>
-                : st.status === '需采购'
-                  ? <span style={{ ...pill, background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>{t('需采购', 'To buy')}</span>
-                  : <span style={{ ...pill, background: 'var(--portal-accent-soft)', color: 'var(--portal-muted)' }}>{t('餐厅', 'Out')}</span>}
+            <div key={day} style={{
+              padding: 'var(--space-3)',
+              borderBottom: i === ordered.length - 1 ? 'none' : divider,
+              background: isToday ? 'var(--portal-accent-soft)' : 'transparent',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span style={{ flex: 'none', width: 44, fontSize: 'var(--text-xs)', fontWeight: 700, color: isToday ? 'var(--portal-accent)' : 'var(--portal-muted)' }}>
+                  {isToday ? t('今天', 'Today') : day}
+                </span>
+                <input
+                  list="cooking-plan-dishes"
+                  style={{ ...inputStyle, flex: 1, minWidth: 0, padding: 'var(--space-1) var(--space-2)', border: 'none', background: 'transparent', fontWeight: isToday ? 600 : 400 }}
+                  placeholder={t('外食 · 或选一道', 'Eating out · or pick one')}
+                  value={dish}
+                  onChange={(e) => setEdits((prev) => ({ ...prev, [day]: e.target.value }))}
+                />
+                {st.kind === 'ready' && <span style={{ ...pill, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{t('可以做', 'Ready')}</span>}
+                {st.kind === 'short' && <span style={{ ...pill, background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>{st.missing.length ? t(`差 ${st.missing.length} 样`, `${st.missing.length} short`) : t('差点料', 'Short')}</span>}
+                {st.kind === 'out' && <span style={{ ...pill, background: 'var(--portal-accent-soft-md)', color: 'var(--portal-muted)' }}>{t('外食', 'Out')}</span>}
+              </div>
+              {/* 差什么就写出来,不用点进去猜 */}
+              {st.missing.length > 0 && (
+                <p style={{ margin: '4px 0 0 52px', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{st.missing.slice(0, 4).join('、')}{st.missing.length > 4 ? '…' : ''}</p>
+              )}
+              <div style={{ display: 'flex', gap: 'var(--space-3)', margin: '6px 0 0 52px' }}>
+                {pool.length > 0 && (
+                  <button type="button" onClick={() => swap(day)} style={linkBtn}>{t('换一道', 'Swap')}</button>
+                )}
+                {dish.trim() && (
+                  <button type="button" onClick={() => setEdits((prev) => ({ ...prev, [day]: '' }))} style={linkBtn}>{t('这天外食', 'Eating out')}</button>
+                )}
+              </div>
             </div>
           );
         })}
@@ -981,15 +1021,14 @@ function PlanBody({ matches, recipes, soonNames, pantryNames, onError, t }: {
         {recipeNames.map((n) => <option key={n} value={n} />)}
       </datalist>
 
+      {/* 底部收成一条:缺多少 + 一个动作,不再是「本周缺」+ 大按钮 + 说明三层 */}
       {missingAll.length > 0 && (
-        <>
-          <button type="button" onClick={save} disabled={saved} style={{ ...primaryBtn, width: '100%', padding: 'var(--space-4)', fontSize: 'var(--text-body)', opacity: saved ? 0.55 : 1 }}>
-            {t('存进「记忆」· 一周购物清单', 'Save to memory · week’s shopping list')}
-          </button>
-          {msg && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-go)', textAlign: 'center' }}>{msg}</span>}
-        </>
+        <button type="button" onClick={save} disabled={saved}
+          style={{ ...primaryBtn, width: '100%', padding: 'var(--space-3)', fontSize: 'var(--text-body)', opacity: saved ? 0.55 : 1 }}>
+          {saved ? t('已加进购物清单', 'Added to shopping list') : t(`差 ${missingAll.length} 样 · 加进购物清单`, `${missingAll.length} short · add to shopping list`)}
+        </button>
       )}
-      {msg && !missingAll.length && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-go)', textAlign: 'center' }}>{msg}</span>}
+      {msg && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-go)', textAlign: 'center' }}>{msg}</span>}
     </>
   );
 }
@@ -1167,6 +1206,8 @@ const stepNum: React.CSSProperties = { flex: 'none', width: 24, height: 24, bord
 const pill: React.CSSProperties = { flex: 'none', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-xs)', fontWeight: 600, padding: '3px var(--space-2)', whiteSpace: 'nowrap' };
 const primaryBtn: React.CSSProperties = { border: 'none', borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent)', color: '#fff', fontWeight: 700, fontSize: 'var(--text-sm)', padding: 'var(--space-2) var(--space-4)', cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' };
 const ghostBtn: React.CSSProperties = { border: 'none', borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', fontWeight: 600, fontSize: 'var(--text-sm)', padding: 'var(--space-2) var(--space-4)', cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' };
+/* 图28:计划行里的轻动作(换一道 / 这天外食)—— 文字链,不跟主按钮抢注意力。 */
+const linkBtn: React.CSSProperties = { border: 'none', background: 'none', padding: 0, cursor: 'pointer', color: 'var(--portal-accent)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)' };
 const xBtn: React.CSSProperties = { border: 'none', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: 'var(--text-sm)', padding: 'var(--space-1)' };
 const fieldLabel: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', fontFamily: 'var(--font-sans)' };
 const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: 'var(--space-3)', border: divider, borderRadius: 'var(--radius-sm)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontSize: 'var(--text-body)', fontFamily: 'var(--font-sans)' };
