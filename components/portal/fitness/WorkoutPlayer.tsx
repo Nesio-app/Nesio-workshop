@@ -12,6 +12,7 @@ import { exerciseById, exerciseAnimFrames, MUSCLE_LABEL } from '@/lib/portal/exe
 import { catalogExerciseByIdSync, loadExerciseCatalog, catalogGifSrc } from '@/lib/portal/exercise-catalog';
 import ExerciseFigure from './ExerciseFigure';
 import ExerciseGif from './ExerciseGif';
+import { IconSpeaker } from '../icons';
 import { skillById } from '@/lib/life-domain/assets/skill-inventory';
 import { logSession } from '@/lib/platform/training-protocol-engine';
 import { earnPoints, POINTS_PER_FITNESS_SESSION } from '@/lib/platform/rewards-engine';
@@ -60,6 +61,8 @@ function resolve(id: string, dict: string): { name: string; muscles?: Array<{ n:
   return { name: id };
 }
 
+const REST_PREF_KEY = 'nesio-workout-rest-sec-v1';
+
 export default function WorkoutPlayer({ session, onClose }: { session: PlayerSession; onClose: () => void }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [idx, setIdx] = useState(0);
@@ -73,6 +76,28 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mutedRef = useRef(false);
   mutedRef.current = muted; // 供 setInterval 闭包读到最新静音态
+
+  /**
+   * 组间休息秒数(2026-07-28,标注 图10「要可以自定义休息间隔」)。
+   * 原来死用 step.restSec ?? 60,跟练中途改不了。现在存一个本机偏好:调过一次,
+   * 之后每组、每次训练都按它来。没调过(null)仍走这套训练自带的 restSec。
+   */
+  const [restPref, setRestPref] = useState<number>(() => {
+    try { return Number(localStorage.getItem(REST_PREF_KEY)) || 0; } catch { return 0; }
+  });
+  const restPrefRef = useRef(0);
+  restPrefRef.current = restPref;
+  const nudgeRest = (delta: number) => {
+    setRestPref((prev) => {
+      const base = prev || steps[idx]?.restSec || 60;
+      const next = Math.max(15, Math.min(300, base + delta));
+      try { localStorage.setItem(REST_PREF_KEY, String(next)); } catch { /* 无存储:本次仍生效 */ }
+      return next;
+    });
+    // 当前这次休息也跟着变,不用等下一组。
+    setCountdown((c) => (c == null ? c : Math.max(1, c + delta)));
+    setCountTotal((t) => Math.max(1, t + delta));
+  };
 
   // 节拍反馈:视觉脉冲在 JSX;声音走独立模块(异步、可静音、不安全环境自动跳过)。
   const ping = (freq: number, _ms = 80) => {
@@ -153,7 +178,7 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
       // 组间休息
       setSetNum((n) => n + 1);
       setPhase('rest');
-      runCountdown(step.restSec ?? 60, () => setPhase('work'));
+      runCountdown(restPrefRef.current || step.restSec || 60, () => setPhase('work'));
     } else if (idx < steps.length - 1) {
       setIdx((i) => i + 1);
       setSetNum(1);
@@ -200,7 +225,11 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
       <div className="nesio-wp-top">
         <span className="nesio-wp-progress">{L(dict, `动作 ${idx + 1}/${steps.length}`, `${idx + 1}/${steps.length}`)}</span>
         <span className="nesio-wp-session">{session.name}</span>
-        <button type="button" className="nesio-wp-close" onClick={() => setMuted((m) => !m)} aria-label={muted ? L(dict, '开声音', 'Unmute') : L(dict, '静音', 'Mute')} aria-pressed={muted}>{muted ? '🔇' : '🔊'}</button>
+        {/* 2026-07-28(标注 图10):喇叭从 emoji 换成线条图标 —— 全 app 其余图标都是描边线条,
+            只有这里蹦出一个彩色系统 emoji,不同平台还长得不一样。静音时加一道斜杠。 */}
+        <button type="button" className="nesio-wp-close" onClick={() => setMuted((m) => !m)} aria-label={muted ? L(dict, '开声音', 'Unmute') : L(dict, '静音', 'Mute')} aria-pressed={muted}>
+          <span className={`nesio-wp-mute${muted ? ' is-muted' : ''}`} aria-hidden><IconSpeaker size={17} /></span>
+        </button>
         <button type="button" className="nesio-wp-close" onClick={onClose} aria-label={L(dict, '退出', 'Exit')}>✕</button>
       </div>
       <div className="nesio-wp-body">
@@ -251,6 +280,13 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
             <p className="nesio-wp-rest-label">{L(dict, '组间休息', 'Rest')}</p>
             <p className="nesio-wp-count">{countdown ?? 0}s</p>
             <div className="nesio-wp-bar" aria-hidden><div className="nesio-wp-bar-fill" style={{ width: `${countTotal ? Math.max(0, ((countdown ?? 0) / countTotal) * 100) : 0}%` }} /></div>
+            {/* 2026-07-28(标注 图10「要可以自定义休息间隔」):当场 ±15 秒,并记住这个偏好 ——
+                下一组、下次训练都按你调过的来,不用每组都改。 */}
+            <div className="nesio-wp-restadj">
+              <button type="button" className="nesio-wp-ghost" onClick={() => nudgeRest(-15)} aria-label={L(dict, '休息减 15 秒', '15s less rest')}>−15s</button>
+              <span className="nesio-wp-restadj-now">{L(dict, `每组 ${restPref}s`, `${restPref}s per set`)}</span>
+              <button type="button" className="nesio-wp-ghost" onClick={() => nudgeRest(15)} aria-label={L(dict, '休息加 15 秒', '15s more rest')}>+15s</button>
+            </div>
             <button type="button" className="nesio-wp-ghost" onClick={skipRest}>{L(dict, '跳过休息', 'Skip rest')}</button>
           </div>
         ) : (

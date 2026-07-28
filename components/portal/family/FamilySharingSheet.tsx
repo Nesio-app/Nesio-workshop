@@ -189,15 +189,25 @@ function SetupView({ t, onDone }: { t: (a: string, b: string) => string; onDone:
 // ── 邀请码(常驻家庭板,随时可取 —— 修「创建后邀请码找不到了」)────────────────────
 function InviteSection({ inviteCode, t }: { inviteCode: string; t: (a: string, b: string) => string }) {
   const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false);   // 图24:默认收起,点「邀请家人」才显码
   if (!inviteCode) return null;
   async function copy() {
     try { await navigator.clipboard.writeText(inviteCode); setCopied(true); setTimeout(() => setCopied(false), 1500); }
     catch { /* 复制不了也没关系,码是明文摆着的,可手抄 */ }
   }
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)}
+        style={{ background: 'none', border: 'none', padding: 'var(--space-2) 0 0', cursor: 'pointer',
+          color: 'var(--portal-accent)', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)' }}>
+        {t('+ 邀请家人', '+ Invite family')}
+      </button>
+    );
+  }
   return (
-    <div style={{ ...cardStyle, padding: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+    <div style={{ ...cardStyle, marginTop: 'var(--space-2)', padding: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('邀请家人 · 让 TA 各自登录后输入这个码', 'Invite family — they enter this after signing in')}</div>
+        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('让 TA 各自登录后输入这个码', 'They enter this after signing in')}</div>
         <div style={{ fontSize: 'var(--text-h3)', fontWeight: 'var(--weight-bold)' as unknown as number, letterSpacing: '0.14em', color: 'var(--portal-accent)' }}>{inviteCode}</div>
       </div>
       <button type="button" onClick={copy} style={ghostBtn}>{copied ? t('已复制', 'Copied') : t('复制', 'Copy')}</button>
@@ -322,7 +332,9 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, dict, t
       {/* 我的攒钱目标(孩子端动机):攒够就买 XX。进度 = 现攒 / 目标。 */}
       <GoalSection familyId={familyId} me={board.me} owed={board.everyone.find((e) => e.member.id === board.me.id)?.owed ?? 0} onSaved={load} dict={dict} t={t} />
 
-      <InviteSection inviteCode={families.find((f) => f.familyId === familyId)?.inviteCode ?? ''} t={t} />
+      {/* 2026-07-28 UI 精修(标注 图24):常驻在顶部的邀请码卡删掉 —— 家庭建好之后极少再用,
+          却每次打开都占一整张卡。改成收进下面「大家」小节里的一个链接(见 InviteSection),
+          点开才显码。功能没丢,只是不再挡在最前面。 */}
 
       <section>
         <p style={sectLabel}>{t('你今天的活', 'Your chores today')}</p>
@@ -416,6 +428,8 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, dict, t
             </button>
           ))}
         </div>
+        {/* 图24:邀请码收到这儿 —— 要加人的时候才会来看「大家」,入口和场景对上了。 */}
+        <InviteSection inviteCode={families.find((f) => f.familyId === familyId)?.inviteCode ?? ''} t={t} />
       </section>
     </div>
   );

@@ -15,6 +15,7 @@ import NesioMark from './NesioMark';
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { getLifeGraph, isBulkImported, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
+import { recallByRecognition } from '@/lib/portal/photo-recall';
 import { buildMemoryContext, fmtEventDate, extractCitations } from '@/lib/portal/memory-retrieval';
 import { createCalendarEvent } from '@/lib/portal/calendar-client';
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
@@ -109,6 +110,10 @@ interface UiMessage {
   calendarEvents?: Array<{ summary: string; startISO: string; endISO?: string; allDay?: boolean; location?: string }>;
   calendarState?: 'idle' | 'saving' | 'ok' | 'error';
   calendarError?: string;
+  /** Google 原样的失败原因(可展开看)——不看这个就永远只知道「没成功」。 */
+  calendarDetail?: string;
+  /** 已经写进日历的那几项的下标。重试只补没成的,不重复写。 */
+  calendarDone?: number[];
   /** 🔴#2:这条回答时语义检索降级了(缺 AI 配置,只用了关键词匹配)。 */
   semanticDegraded?: boolean;
   semanticReason?: string; // 未生效的具体原因(no_key/rate_limited/provider/network/auth)
@@ -312,7 +317,8 @@ function BubbleMenu({ msg, onClose, onSave, onCopy, onContinue }: {
 // ─── Memory detail ─────────────────────────────────────────────────────────────
 // ─── Camera view ──────────────────────────────────────────────────────────────
 function CameraView({ onResult, onClose, autoOpen = false }: {
-  onResult: (label: string, nodes: LifeNode[]) => void;
+  /** label 空 + failure 有值 = 没认出来(诚实说明,不冒充结果)。 */
+  onResult: (label: string, nodes: LifeNode[], failure?: string) => void;
   onClose: () => void;
   autoOpen?: boolean;
 }) {
@@ -384,18 +390,17 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType }),
       });
-      const data = await res.json() as { ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string };
+      const data = await res.json() as { ok?: boolean; nodes?: Array<{ name: string; type: string; tags?: string[] }>; summary?: string };
       if (data.ok && data.nodes?.length) {
-        const names = data.nodes.map((n) => n.name).join('、');
-        const found = new Map<string, LifeNode>();
-        for (const node of data.nodes) {
-          for (const n of searchLifeGraphFuzzy(node.name, 2)) found.set(n.id, n);
-        }
-        onResult(names || data.summary || L(dict, '（未识别到）', 'Nothing recognized'), Array.from(found.values()).slice(0, 6));
+        const names = data.nodes.map((n) => n.name).join(L(dict, '、', ', '));
+        // 2026-07-28(标注 图8/图9):召回口径放宽 —— 名字 + 标签 + 一句话描述都当查询词,
+        // 「黑色钢笔」才找得到记忆里那条「笔」。原来只按 name 各查 2 条,长词对短名必空。
+        onResult(names || data.summary || L(dict, '（未识别到）', 'Nothing recognized'), recallByRecognition(data.nodes, data.summary));
       } else {
-        onResult(data.summary || L(dict, '（未识别到）', 'Nothing recognized'), []);
+        // 认不出来就说认不出来,别把失败说明塞进「识别到:…」里冒充结果。
+        onResult('', [], data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.'));
       }
-    } catch { onResult(L(dict, '识别失败', 'Recognition failed'), []); }
+    } catch { onResult('', [], L(dict, '识别没成功,再试一次。', 'Recognition did not go through — try again.')); }
     setAnalyzing(false);
   }
 
@@ -455,9 +460,9 @@ export default function NesioChatSheet({
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
-  // 批次 148·设计念念节:显式「端上 / 深问 Pro」分段。默认深问(有权益时,答复质量不降);
-  // 手动选端上 = 走本机记忆搜索(快/免费/弱),诚实不偷偷打云。无权益时深问锁,点了引导升级。
-  const [deepMode, setDeepMode] = useState(() => canUsePaidCloudAi());
+  // 有权益就深问(云端认真综合),没有就端上(本机记忆搜索)—— 不再让用户先选一次。
+  // 图7/图9 把那个分段器划掉了:自己用的东西,问个问题前不该先做选择题。
+  const deepMode = canUsePaidCloudAi();
   const [sending, setSending] = useState(false);
   // 同步的发送闭锁:setSending 是异步的,快速两次 Enter 两个闭包都读到 sending===false → 双发。
   const sendingRef = useRef(false);
@@ -544,8 +549,12 @@ export default function NesioChatSheet({
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'image', imageBase64: b64, mimeType: mime }),
     }).then((r) => r.json()).then((data: { ok?: boolean; nodes?: Array<{ name: string }>; summary?: string }) => {
-      const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || data.summary || L(dict, '（未识别到内容）', '(nothing recognized)');
-      const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text: L(dict, `识别到：${names}\n\n可以继续问我关于这张图的问题。`, `Recognized: ${names}\n\nAsk me anything about this photo.`) };
+      // 2026-07-28(标注 图8):没认出来别说「识别到:未检测到任何生命图谱条目」—— 直说没看清。
+      const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || '';
+      const text = names
+        ? L(dict, `识别到：${names}\n\n可以继续问我关于这张图的问题。`, `Recognized: ${names}\n\nAsk me anything about this photo.`)
+        : data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.');
+      const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text };
       setMessages((prev) => { const withAi = [...prev, aiMsg]; saveHistory(withAi); return withAi; });
     }).catch(() => {
       setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: 'model', text: L(dict, '图片识别失败，请重试。', 'Image recognition failed — try again.') }]);
@@ -783,14 +792,34 @@ Edit location/value anytime in Storage.`),
   // 日历确认卡 → 逐个写进 Google 主日历。异步动作显式失败态(红线):失败保留可重试。
   async function confirmCalendarEvents(msg: UiMessage) {
     if (!msg.calendarEvents?.length || msg.calendarState === 'saving' || msg.calendarState === 'ok') return;
-    setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, calendarState: 'saving' as const, calendarError: undefined } : m));
+    setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, calendarState: 'saving' as const, calendarError: undefined, calendarDetail: undefined } : m));
+
+    // 已经写成功的那几项跳过 —— 之前是无脑重跑整批:3 项成了 2 项,点一次「重试」
+    // 就会把那 2 项再写进日历一遍(真的会多出重复日程)。
+    const done = new Set(msg.calendarDone ?? []);
     let firstErr = '';
-    for (const ev of msg.calendarEvents) {
+    let firstDetail = '';
+    for (let i = 0; i < msg.calendarEvents.length; i += 1) {
+      if (done.has(i)) continue;
+      const ev = msg.calendarEvents[i];
       const res = await createCalendarEvent({ summary: ev.summary, startISO: ev.startISO, endISO: ev.endISO, allDay: ev.allDay, location: ev.location });
-      if (!res.ok && !firstErr) firstErr = res.message || L(dict, '写入日历失败', 'Failed to add to calendar');
+      if (res.ok) { done.add(i); continue; }
+      if (!firstErr) {
+        firstErr = res.message || L(dict, '写入日历失败', 'Failed to add to calendar');
+        firstDetail = res.detail || res.error || '';
+      }
     }
+    const allDone = done.size === msg.calendarEvents.length;
     setMessages((prev) => {
-      const next = prev.map((m) => m.id === msg.id ? { ...m, calendarState: (firstErr ? 'error' : 'ok') as 'error' | 'ok', calendarError: firstErr || undefined } : m);
+      const next = prev.map((m) => m.id === msg.id
+        ? {
+            ...m,
+            calendarState: (allDone ? 'ok' : 'error') as 'error' | 'ok',
+            calendarError: allDone ? undefined : firstErr,
+            calendarDetail: allDone ? undefined : (firstDetail || undefined),
+            calendarDone: [...done],
+          }
+        : m);
       saveHistory(next);
       return next;
     });
@@ -870,8 +899,11 @@ Edit location/value anytime in Storage.`),
           method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ type: 'image', imageBase64: b64, mimeType: mime }),
         }).then((r) => r.json()).then((data: { ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string }) => {
-          const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || data.summary || L(dict, '（未识别到内容）', '(nothing recognized)');
-          const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text: L(dict, `识别到：${names}\n\n可以继续问我关于这张图片的问题。`, `Recognized: ${names}\n\nAsk me anything about this image.`) };
+          const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || '';
+          const text = names
+            ? L(dict, `识别到：${names}\n\n可以继续问我关于这张图片的问题。`, `Recognized: ${names}\n\nAsk me anything about this image.`)
+            : data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.');
+          const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text };
           setMessages((prev) => { const withAi = [...prev, aiMsg]; saveHistory(withAi); return withAi; });
         }).catch(() => {
           const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text: L(dict, '图片识别失败，请重试。', 'Image recognition failed — try again.') };
@@ -971,12 +1003,15 @@ Edit location/value anytime in Storage.`),
     if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
   }
 
-  function handleCameraResult(label: string, nodes: LifeNode[]) {
+  function handleCameraResult(label: string, nodes: LifeNode[], failure?: string) {
     setShowCamera(false);
     const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: L(dict, '[图片] 识别图片', '[Image] Recognize image') };
-    const aiText = nodes.length > 0
+    // 2026-07-28(标注 图8):三态分开说 —— 没认出来 / 认出来但没记过 / 认出来且翻到了旧记录。
+    const aiText = failure
+      ? failure
+      : nodes.length > 0
       ? L(dict, `识别到：${label}\n\n记忆库里找到 ${nodes.length} 条相关记录：\n${nodes.map((n) => `• ${n.name}（${n.type}）`).join('\n')}`, `Recognized: ${label}\n\nFound ${nodes.length} related record(s) in your memory:\n${nodes.map((n) => `• ${n.name} (${n.type})`).join('\n')}`)
-      : L(dict, `识别到：${label}\n\n记忆库里暂时没有找到相关记录。`, `Recognized: ${label}\n\nNo related records in your memory yet.`);
+      : L(dict, `识别到：${label}\n\n这件东西还没记过 —— 要我存进记忆吗?`, `Recognized: ${label}\n\nNot in your memory yet — want me to save it?`);
     const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text: aiText };
     const next = [...messages, userMsg, aiMsg];
     setMessages(next); saveHistory(next);
@@ -1041,14 +1076,10 @@ Edit location/value anytime in Storage.`),
       {/* Header */}
       <div className="nesio-wechat-header">
         <button type="button" className="nesio-wechat-back-btn" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>←</button>
-        {/* 批次 140·设计念念节:头部品牌行 —— 念念 + 当前模式副标(按 entitlement 诚实:分层未启用即深问·云端) */}
+        {/* 2026-07-28 UI 精修(标注 图7):模式副标删掉 —— 底部分段器已经是「端上/深问」的
+            唯一事实源,标题下再复述一遍,加上每条气泡下的徽章,一屏出现三四次「深问·云端」。 */}
         <div className="nesio-wechat-brand">
           <span className="nesio-wechat-title">{L(dict, '念念', 'Nessa')}</span>
-          <span className="nesio-wechat-brand-mode">
-            {deepMode && canUsePaidCloudAi()
-              ? L(dict, '深问 · 云端 · Pro', 'Deep · cloud · Pro')
-              : L(dict, '端上简答 · 免费', 'On-device · free')}
-          </span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
           <button
@@ -1162,14 +1193,8 @@ Edit location/value anytime in Storage.`),
                   )}
                   {msg.savedToMemory && <p className="nesio-wechat-saved-badge">✓ {L(dict, '已存入记忆', 'Saved to Memory')}</p>}
                 </div>
-                {/* 批次 140·设计念念节:气泡模式徽章 —— 按这条答复的真实来路诚实标(不追溯旧消息) */}
-                {!isUser && msg.answerMode && (
-                  <span className={`nesio-wechat-mode-badge nesio-wechat-mode-badge--${msg.answerMode}`}>
-                    {msg.answerMode === 'onDevice'
-                      ? L(dict, '◐ 端上答的 · 免费', '◐ On-device · free')
-                      : L(dict, '✦ 深问 · 云端', '✦ Deep · cloud')}
-                  </span>
-                )}
+                {/* 2026-07-28 UI 精修(标注 图7):逐条气泡的「✦ 深问·云端」徽章删掉 —— 每答一句挂一个,
+                    滚三屏就是三个一模一样的 chip。来路诚实标注改由底部分段器承担(它显示当前模式)。 */}
                 {msg.sources && msg.sources.length > 0 && (
                   <div className="nesio-wechat-sources">
                     {/* 只渲染 http(s) 链接 —— 模型返回的 URL 未必可信,挡 javascript:/data: 等伪协议 */}
@@ -1242,13 +1267,19 @@ Edit location/value anytime in Storage.`),
                 {!isUser && msg.calendarEvents && msg.calendarEvents.length > 0 && (
                   <div style={{ marginTop: 'var(--space-2)', padding: 'var(--space-3)', border: '1px solid var(--portal-accent-border)', borderRadius: 'var(--radius-md)', background: 'var(--portal-accent-soft)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                     {msg.calendarEvents.map((ev, i) => (
-                      <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                      <div key={i} style={{ display: 'flex', flexDirection: 'column', gap: '2px', opacity: msg.calendarDone?.includes(i) ? 0.55 : 1 }}>
                         <span style={{ color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{ev.summary}</span>
                         <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>
                           {[ev.allDay ? ev.startISO.slice(0, 10) : ev.startISO.replace('T', ' ').slice(0, 16), ev.location || ''].filter(Boolean).join(' · ')}
                         </span>
                       </div>
                     ))}
+                    {msg.calendarState === 'error' && msg.calendarDetail && (
+                      <details style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                        <summary style={{ cursor: 'pointer' }}>{L(dict, '看看原因', 'Why')}</summary>
+                        <p style={{ margin: 'var(--space-1) 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono, monospace)' }}>{msg.calendarDetail}</p>
+                      </details>
+                    )}
                     {msg.calendarState === 'error' && msg.calendarError && (
                       <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-xs)' }}>{msg.calendarError}</span>
                     )}
@@ -1269,7 +1300,12 @@ Edit location/value anytime in Storage.`),
                         : msg.calendarState === 'saving'
                           ? L(dict, '正在加入…', 'Adding…')
                           : msg.calendarState === 'error'
-                            ? L(dict, '重试加入日历', 'Retry')
+                            ? (() => {
+                                const left = msg.calendarEvents!.length - (msg.calendarDone?.length ?? 0);
+                                return left === msg.calendarEvents!.length
+                                  ? L(dict, '重试加入日历', 'Retry')
+                                  : L(dict, `再试剩下的 ${left} 项`, `Retry remaining ${left}`);
+                              })()
                             : L(dict, `加入日历 · ${msg.calendarEvents.length} 项`, `Add ${msg.calendarEvents.length} to calendar`)}
                     </button>
                   </div>
@@ -1354,7 +1390,7 @@ Edit location/value anytime in Storage.`),
       {/* Plus panel */}
       {showPlus && (
         <div className="nesio-wechat-plus-panel">
-          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const userMsg:UiMessage={id:nextMsgId('u'),role:'user',text:L(dict,'[图片] 识别图片','[Image] Recognize image')}; setMessages(prev=>[...prev,userMsg]); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join('、'); const found=new Map<string,LifeNode>(); for(const node of data.nodes){for(const n of searchLifeGraphFuzzy(node.name,2))found.set(n.id,n);} const nodes=Array.from(found.values()).slice(0,6); const aiText=nodes.length>0?L(dict,`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`,`Recognized: ${names}\n\nFound ${nodes.length} related record(s):\n${nodes.map(n=>`• ${n.name}`).join('\n')}`):L(dict,`识别到：${names}\n\n记忆库里暂时没有相关记录。`,`Recognized: ${names}\n\nNo related records in your memory yet.`); const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:aiText}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}else{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:data.summary||L(dict,'图片识别暂时不可用。','Image recognition is briefly unavailable.')}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}}).catch(()=>{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:L(dict,'图片识别失败，请重试。','Image recognition failed — please try again.')}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const userMsg:UiMessage={id:nextMsgId('u'),role:'user',text:L(dict,'[图片] 识别图片','[Image] Recognize image')}; setMessages(prev=>[...prev,userMsg]); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join(L(dict,'、',', ')); const nodes=recallByRecognition(data.nodes,data.summary); const aiText=nodes.length>0?L(dict,`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`,`Recognized: ${names}\n\nFound ${nodes.length} related record(s):\n${nodes.map(n=>`• ${n.name}`).join('\n')}`):L(dict,`识别到：${names}\n\n这件东西还没记过 —— 要我存进记忆吗?`,`Recognized: ${names}\n\nNot in your memory yet — want me to save it?`); const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:aiText}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}else{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:data.summary||L(dict,'这张图没看清,换个角度再拍一张试试。','Could not read this photo — try another angle.')}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}}).catch(()=>{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:L(dict,'图片识别失败，请重试。','Image recognition failed — please try again.')}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
             <span className="nesio-wechat-plus-icon"><IconImage /></span>
             <span>{L(dict, '相册', 'Photos')}</span>
           </button>
@@ -1362,10 +1398,8 @@ Edit location/value anytime in Storage.`),
             <span className="nesio-wechat-plus-icon"><IconCamera /></span>
             <span>{L(dict, '拍摄', 'Camera')}</span>
           </button>
-          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); setVoiceMode(true); }}>
-            <span className="nesio-wechat-plus-icon"><IconMic /></span>
-            <span>{L(dict, '语音输入', 'Voice')}</span>
-          </button>
+          {/* 2026-07-28 标注 图9:「+」面板里的「语音输入」划掉 —— 输入栏右边那个麦克风
+              就是同一个功能(setVoiceMode(true)),同一屏摆两个入口是重复不是方便。 */}
           <button type="button" className="nesio-wechat-plus-item" onClick={() => filePickerRef.current?.click()}>
             <span className="nesio-wechat-plus-icon"><IconFile /></span>
             <span>{L(dict, '文件', 'File')}</span>
@@ -1390,29 +1424,10 @@ Edit location/value anytime in Storage.`),
         }}
       />
 
-      {/* 批次 148·设计念念节:显式「端上 / 深问 Pro」分段 —— 复杂题才切深问,免费够用大多数时候。
-          端上=本机记忆搜索(免费/快);深问=云端认真综合(Pro)。答复徽章按真实来路诚实标。 */}
-      <div className="nesio-wechat-mode-seg" role="tablist" aria-label={L(dict, '回答模式', 'Answer mode')}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={!deepMode}
-          className={`nesio-wechat-mode-seg-btn${!deepMode ? ' nesio-wechat-mode-seg-btn--on' : ''}`}
-          onClick={() => setDeepMode(false)}
-        >
-          ◐ {L(dict, '端上', 'On-device')}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={deepMode}
-          className={`nesio-wechat-mode-seg-btn${deepMode ? ' nesio-wechat-mode-seg-btn--on' : ''}`}
-          onClick={() => setDeepMode(true)}
-        >
-          ✦ {L(dict, '深问', 'Deep')} <span className="nesio-wechat-mode-seg-pro">Pro</span>
-        </button>
-        {/* 批次188(用户实锤):删「复杂题才需要·免费够用」提示行 —— 分段本身已自解释 */}
-      </div>
+      {/* 2026-07-28 标注 图7/图9:底部「端上 / 深问 Pro」分段器整个划掉。
+          自己用,不需要每次问问题前先选一次引擎 —— 有权益就深问,没有就端上,
+          由 canUsePaidCloudAi() 直接决定。答复气泡下的来路徽章仍照实标,
+          所以「这条是云答还是本机搜的」并没有变得不可见,只是不再要你先做选择题。 */}
 
       {/* Input bar */}
       <div className="nesio-wechat-input-bar">

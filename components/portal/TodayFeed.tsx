@@ -34,6 +34,7 @@ import { createPortal } from 'react-dom';
 import { dismissProactiveById, getProactiveCardBudget } from './today/proactive-types';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
+import CaptureBar from './today/CaptureBar';
 import { RoutineDueCards } from './today/RoutineDueCards';
 import { DailyReportCard } from './today/DailyReportCard';
 import { ThawedReminder } from './today/ThawedReminder';
@@ -302,25 +303,23 @@ export default function TodayFeed({
         {/* 冷冻到期提醒(批次 7:冷冻仓入口迁到拍一下,决定回路留在首屏) */}
         <ThawedReminder />
 
-        {/* 新建日程入口:写进 Google 主日历(一句话 / 填表单)。派事件由 Portal 开面板。 */}
-        <button
-          type="button"
-          onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-calendar-create'))}
-          style={{
-            alignSelf: 'flex-start',
-            display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)',
-            padding: 'var(--space-2) var(--space-3)',
-            border: '1px solid var(--portal-accent-border)',
-            borderRadius: 'var(--radius-pill)',
-            background: 'var(--portal-accent-soft)',
-            color: 'var(--portal-accent)',
-            fontSize: 'var(--text-sm)', fontFamily: 'var(--font-sans)',
-            fontWeight: 'var(--weight-medium)' as unknown as number,
-            cursor: 'pointer',
+        {/* 2026-07-28 UI 精修(用户标注 图4/图5):搜索/记一笔输入条搬到这儿(原「+ 新建日程」位),
+            新建日程按钮按标注删掉。输入条本体见 today/CaptureBar.tsx。 */}
+        <CaptureBar
+          value={quickAdd}
+          onChange={setQuickAdd}
+          onSubmit={() => {
+            const name = quickAdd.trim();
+            if (!name) return;
+            addCommitmentNode(name);
+            setQuickAdd('');
+            setQuickSaved(true);
+            setTimeout(() => setQuickSaved(false), 1400);
           }}
-        >
-          + {L(uiLocale, '新建日程', 'New event')}
-        </button>
+          onMic={startQuickMic}
+          recording={micState === 'recording'}
+          inputRef={quickInputRef}
+        />
 
         {/* 今日焦点 — 重要安排 / 重要日子 / 重要提醒 */}
         <TodayFocusSection
@@ -336,21 +335,6 @@ export default function TodayFeed({
           onOpenRecorder={(node) => setMeetingRecorderNode(node)}
           onFocusMode={(node) => setFocusModeNode(node)}
           onDeleteNode={(id) => deleteFocusNode(id)}
-          capture={{
-            value: quickAdd,
-            onChange: setQuickAdd,
-            onSubmit: () => {
-              const name = quickAdd.trim();
-              if (!name) return;
-              addCommitmentNode(name);
-              setQuickAdd('');
-              setQuickSaved(true);
-              setTimeout(() => setQuickSaved(false), 1400);
-            },
-            onMic: startQuickMic,
-            recording: micState === 'recording',
-            inputRef: quickInputRef,
-          }}
         />
 
         {/* 批次 132(用户「底部输入口需要删除」):独立快捷输入栏已删 ——

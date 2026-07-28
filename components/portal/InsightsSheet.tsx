@@ -4,14 +4,14 @@
  * InsightsSheet — v1 规格 §2:洞察页(个人数据 = 编辑过的刊物,不是监控台)。
  *
  * 免费层四件套(全本地统计、无 AI、批量导入不计入):
- *   ① 你在想什么(主题门)  ② 没接上的线头  ③ 走走看  ④ 一行节律
+ *   走走看(标注 图11 要求置顶)→ 节律热力 → 主题门 → 没接上的线头 → 节律 → 生命版图
+ *   (编号 ①②③④ 是当初的设计序号,不是渲染序 —— 别照编号找位置。)
  * 生命版图 = 唯一保留的图(≥90 天数据才出现,绝不以示例地形冒充)。
  * 认知 tab = Pro 多面镜月度信(只回看不预测);旧 7 层模型 + 节点图移 Lab。
  * 健康/足迹/财务/关系 tab 走功能开关(提审构建不可达)。
  */
 
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { MyExperimentWidget } from '@/components/portal/NesioExperiment';
+import { useCallback, useEffect, useMemo, useState, type ReactNode, useRef } from 'react';
 import { useFeatureEnabled } from '@/components/portal/use-feature-flag';
 import { computeTerritory } from '@/lib/portal/life-territory';
 import { getLifeGraph, isBulkImported } from '@/lib/portal/life-graph';
@@ -19,6 +19,7 @@ import type { LifeNode } from '@/lib/portal/life-graph';
 import { markFeatureUsed } from '@/lib/portal/feature-usage';
 import { isLabModeOn, LAB_MODE_EVENT } from '@/lib/portal/module-overrides';
 import { L } from '@/lib/portal/i18n';
+import { applyHubOrder, moveItem, loadHubOrder, saveHubOrder, resetHubOrder, HUB_ORDER_UPDATED } from '@/lib/portal/hub-order';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { InfoTip } from './InfoTip';
@@ -41,7 +42,6 @@ import WardrobePanel from './insights/WardrobePanel';
 import AdminOpsPanel from './insights/AdminOpsPanel';
 import TeslaPanel from './TeslaPanel';
 import TabErrorBoundary from './TabErrorBoundary';
-import LearningStatusPanel from './LearningStatusPanel';
 import { mineCrossDomain } from '@/lib/portal/cross-domain-correlations';
 import { readFactJournal, ensureFactJournal } from '@/lib/platform/fact-journal';
 
@@ -177,6 +177,138 @@ function MindPie({ items, onPick, dict }: { items: Array<[string, number]>; onPi
 
 // ── Main Component ─────────────────────────────────────────────────────────────
 
+
+// ── 洞察宫格:长按进编辑态,拖着换位置(标注 图6)─────────────────────────────
+interface HubTile { key: string; label: string; icon: React.ReactNode; tab?: MainTab; event?: string }
+
+/**
+ * 交互:
+ *   · 平时:点一下 = 打开;
+ *   · 长按 500ms = 进编辑态(整片格子轻微抖一下示意可拖);
+ *   · 编辑态里按住某格拖动,经过谁就和谁换位;松手落定并存;
+ *   · 点「完成」退出;「恢复默认」清掉自定义顺序。
+ *
+ * 用 pointer 事件而不是 HTML5 drag —— 移动端 Safari 对 draggable 支持很差,
+ * 而这个宫格主要在手机上用(仓里 SwipeRow 也是同样的理由走 pointer)。
+ */
+function HubGrid({ tiles, dict, onOpen }: { tiles: HubTile[]; dict: string; onOpen: (t: HubTile) => void }) {
+  const [order, setOrder] = useState<string[]>([]);
+  const [editing, setEditing] = useState(false);
+  // 拖拽中的 key 放 ref:pointermove 在同一次手势里连续触发,读 state 会读到
+  // 按下那一刻的闭包值(还是 null),拖动就完全不生效 —— 实测过。ref 永远是最新的。
+  // 另存一份 state 只为了给「正在拖的那格」加样式。
+  const dragRef = useRef<string | null>(null);
+  const [dragKey, setDragKey] = useState<string | null>(null);
+  // 拖动中的顺序也走 ref:同一手势里连续 setOrder,下一次 move 的闭包仍是旧值。
+  const keysRef = useRef<string[]>([]);
+  const [saveErr, setSaveErr] = useState('');
+  const holdRef = useRef<number | null>(null);
+  // 长按计时起点。手指是在「按住不动」还是在「划着滚页面」,只能靠位移区分 ——
+  // 不判这个的话,滑动洞察页时手指恰好压在某格上超过 0.5s 就会莫名其妙进编辑态。
+  const holdFromRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const read = () => setOrder(loadHubOrder());
+    read();
+    window.addEventListener(HUB_ORDER_UPDATED, read);
+    return () => window.removeEventListener(HUB_ORDER_UPDATED, read);
+  }, []);
+
+  const keys = useMemo(() => applyHubOrder(tiles.map((t) => t.key), order), [tiles, order]);
+  keysRef.current = keys;
+  const byKey = useMemo(() => new Map(tiles.map((t) => [t.key, t])), [tiles]);
+
+  const clearHold = () => {
+    if (holdRef.current !== null) { window.clearTimeout(holdRef.current); holdRef.current = null; }
+    holdFromRef.current = null;
+  };
+
+  /** 落定并存。写不进去要说出来,不许静默吞(CLAUDE.md 红线)。 */
+  const commit = (next: string[]) => {
+    setOrder(next);
+    if (!saveHubOrder(next)) setSaveErr(L(dict, '这次顺序没存下来 —— 换个顺序再试试。', 'Could not save the order — try again.'));
+    else setSaveErr('');
+  };
+
+  return (
+    <>
+      {editing && (
+        // 左右 0.25rem 和 .nesio-insights-header 对齐 —— 洞察页整体是贴边布局,
+        // 不留这一点「完成」两个字就正好压在屏幕右边缘上(实测 right=390=视口宽)。
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 0.25rem', marginBottom: 'var(--space-2)' }}>
+          <span style={{ flex: 1, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+            {L(dict, '按住拖动换位置', 'Hold and drag to reorder')}
+          </span>
+          <button type="button" onClick={() => { resetHubOrder(); setOrder([]); }} style={hubEditBtn}>{L(dict, '恢复默认', 'Reset')}</button>
+          <button type="button" onClick={() => { setEditing(false); setDragKey(null); }} style={{ ...hubEditBtn, color: 'var(--portal-accent)' }}>{L(dict, '完成', 'Done')}</button>
+        </div>
+      )}
+
+      {saveErr && (
+        <p role="alert" style={{ margin: '0 0 var(--space-2)', padding: '0 0.25rem', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)' }}>{saveErr}</p>
+      )}
+
+      <div className={`nesio-insights-hub${editing ? ' nesio-insights-hub--editing' : ''}`}>
+        {keys.map((k) => {
+          const tile = byKey.get(k);
+          if (!tile) return null;
+          return (
+            <button
+              key={k}
+              type="button"
+              className={`nesio-insights-hub-tile${dragKey === k ? ' nesio-insights-hub-tile--dragging' : ''}`}
+              aria-label={editing ? L(dict, `${tile.label} · 拖动换位置`, `${tile.label} · drag to reorder`) : tile.label}
+              onPointerDown={(e) => {
+                if (editing) {
+                  dragRef.current = k; setDragKey(k);
+                  (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+                  return;
+                }
+                clearHold();
+                holdFromRef.current = { x: e.clientX, y: e.clientY };
+                holdRef.current = window.setTimeout(() => { setEditing(true); holdRef.current = null; }, 500);
+              }}
+              onPointerMove={(e) => {
+                // 还在等长按:手指划开了就当滚页面,别进编辑态。
+                const held = holdFromRef.current;
+                if (held && (Math.abs(e.clientX - held.x) > 8 || Math.abs(e.clientY - held.y) > 8)) clearHold();
+                const dk = dragRef.current;
+                if (!editing || !dk) return;
+                const el = document.elementFromPoint(e.clientX, e.clientY)?.closest('.nesio-insights-hub-tile');
+                const overKey = el ? (el as HTMLElement).dataset.hubKey : undefined;
+                if (!overKey || overKey === dk) return;
+                const cur = keysRef.current;
+                const from = cur.indexOf(dk);
+                const to = cur.indexOf(overKey);
+                if (from < 0 || to < 0) return;
+                const next = moveItem(cur, from, to);
+                keysRef.current = next;
+                setOrder(next);   // 拖动中只改内存,松手才落盘
+              }}
+              onPointerUp={() => {
+                clearHold();
+                if (editing && dragRef.current) { commit(keysRef.current); }
+                dragRef.current = null; setDragKey(null);
+              }}
+              onPointerCancel={() => { clearHold(); dragRef.current = null; setDragKey(null); }}
+              onClick={() => { if (!editing) onOpen(tile); }}
+              data-hub-key={k}
+            >
+              <span className="nesio-insights-hub-icon" aria-hidden>{tile.icon}</span>
+              <span className="nesio-insights-hub-label">{tile.label}</span>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+}
+
+const hubEditBtn: React.CSSProperties = {
+  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+  fontFamily: 'var(--font-sans)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)',
+};
+
 export default function InsightsSheet({ onClose, canUsePrivateData = false, initialTab }: { onClose: () => void; canUsePrivateData?: boolean; initialTab?: MainTab }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [mainTab, setMainTab] = useState<MainTab>(initialTab ?? 'reflection');
@@ -230,6 +362,8 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   const showTesla = useFeatureEnabled('tesla');
   const showLiving = useFeatureEnabled('living');
   const showCooking = useFeatureEnabled('cooking');
+
+
   const tabEnabled = (t: MainTab): boolean =>
     t === 'timeline' ? showPlaces
       : t === 'health' ? showHealth
@@ -248,6 +382,20 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   useEffect(() => { if (!tabEnabled(mainTab)) setMainTab('reflection'); }, [showPlaces, showHealth, showFinance, showPeople, showInventory, showSchedule, showGrowth, showMontage, showWardrobe, showTesla, showLiving, mainTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [allNodes, setAllNodes] = useState<LifeNode[]>([]);
+
+  // 宫格的格子表(顺序无关,顺序由 HubGrid 里的 hub-order 决定)。
+  // tab = 切到本 sheet 的某个 tab;event = 打开另一个全屏面板。
+  const hubTiles = useMemo(() => {
+    const list: Array<{ key: string; label: string; icon: React.ReactNode; tab?: MainTab; event?: string }> = [];
+    for (const t of ['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule', 'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'admin'] as MainTab[]) {
+      if (!tabEnabled(t)) continue;
+      list.push({ key: t, label: tabLabel(t), icon: tabIcon(t), tab: t });
+    }
+    list.push({ key: 'chores', label: L(dict, '家务', 'Chores'), icon: <IconPeople />, event: 'nesio-open-family' });
+    if (showCooking) list.push({ key: 'cooking', label: L(dict, '美味', 'Cooking'), icon: <IconUtensils />, event: 'nesio-open-cooking' });
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dict, showCooking]);
   const [labOn, setLabOn] = useState(false);
   const [wanderSeed, setWanderSeed] = useState(() => Math.floor(Math.random() * 100_000));
 
@@ -417,40 +565,17 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       <div className="nesio-insights-body">
         {showHub ? (
           <>
-          <div className="nesio-insights-hub">
-            {(['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule', 'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'admin'] as MainTab[])
-              .filter(tabEnabled)
-              .map((t) => (
-                <button
-                  key={t}
-                  type="button"
-                  className="nesio-insights-hub-tile"
-                  onClick={() => { setMainTab(t); setShowHub(false); }}
-                >
-                  <span className="nesio-insights-hub-icon" aria-hidden>{tabIcon(t)}</span>
-                  <span className="nesio-insights-hub-label">{tabLabel(t)}</span>
-                </button>
-              ))}
-            {/* 家务 / 美味:与宫格同款(图标上、文字下),不再用下方长条卡 */}
-            <button
-              type="button"
-              className="nesio-insights-hub-tile"
-              onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-family'))}
-            >
-              <span className="nesio-insights-hub-icon" aria-hidden><IconPeople /></span>
-              <span className="nesio-insights-hub-label">{L(dict, '家务', 'Chores')}</span>
-            </button>
-            {showCooking && (
-              <button
-                type="button"
-                className="nesio-insights-hub-tile"
-                onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-cooking'))}
-              >
-                <span className="nesio-insights-hub-icon" aria-hidden><IconUtensils /></span>
-                <span className="nesio-insights-hub-label">{L(dict, '美味', 'Cooking')}</span>
-              </button>
-            )}
-          </div>
+          {/* 图6「可以调整按钮顺序」:长按任意格子进编辑态,拖着换位置,松手即存。
+              家务/美味原本是写死在 map 之后的两块 JSX —— 那样它们永远排最后、也拖不动。
+              这里把全部格子统一成一个数据数组,顺序由 hub-order 决定,渲染只管照着画。 */}
+          <HubGrid
+            tiles={hubTiles}
+            dict={dict}
+            onOpen={(tile: HubTile) => {
+              if (tile.tab) { setMainTab(tile.tab); setShowHub(false); }
+              else if (tile.event) window.dispatchEvent(new CustomEvent(tile.event));
+            }}
+          />
           </>
         ) : (
         <>
@@ -458,6 +583,34 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {/* ── Tab 1: 免费四件套(v1 规格 §2.1)── */}
         {mainTab === 'reflection' && (
           <div className="nesio-reflection-tab">
+            {/* 2026-07-28 UI 精修(标注 图11「走走看放到最上面」):这块原本排在线头之后,
+                现在提到反思页最顶 —— 一进来先撞见一条旧记录,再看统计。 */}
+            {/* ③ 走走看:衬线引原话「去年今天,你写下 ——」+ 再翻一条(偶遇感) */}
+            {(yearAgoNode || wanderNode) && (() => {
+              const node = yearAgoNode ?? wanderNode!;
+              const isYearAgo = !!yearAgoNode;
+              return (
+                <div className="nesio-insights-section">
+                  <p className="nesio-insights-section-label">{L(dict, '走走看', 'Wander')}</p>
+                  <div className="nesio-wander-card" style={{ padding: '0.9rem', borderRadius: 'var(--radius-md, 16px)', background: 'var(--portal-bg)', border: '1px solid var(--portal-line)' }}>
+                    <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--portal-muted)' }}>
+                      {isYearAgo ? L(dict, '去年今天,你写下 ——', 'A year ago today, you wrote —') : L(dict, '翻到一条 ——', 'Turned up —')}
+                    </p>
+                    <button type="button" onClick={() => openInMemory(node.name)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 0, margin: '0.45rem 0', cursor: 'pointer' }}>
+                      <span style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', lineHeight: 1.6, color: 'var(--portal-ink)' }}>「{node.name.slice(0, 60)}」</span>
+                    </button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>
+                        {new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })}
+                      </span>
+                      <button type="button" onClick={() => setWanderSeed((s) => s + 1)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem', fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
+                        <IconRefresh size={13} />{L(dict, '再翻一条', 'Another')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* 节律热力图(缩小、无侧栏文字,置顶) */}
             {realNodes.length > 0 && <RhythmHeatmap nodes={realNodes} compact />}
@@ -495,33 +648,6 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
                 </div>
               </div>
             )}
-
-            {/* ③ 走走看:衬线引原话「去年今天,你写下 ——」+ 再翻一条(偶遇感) */}
-            {(yearAgoNode || wanderNode) && (() => {
-              const node = yearAgoNode ?? wanderNode!;
-              const isYearAgo = !!yearAgoNode;
-              return (
-                <div className="nesio-insights-section">
-                  <p className="nesio-insights-section-label">{L(dict, '走走看', 'Wander')}</p>
-                  <div className="nesio-wander-card" style={{ padding: '0.9rem', borderRadius: 'var(--radius-md, 16px)', background: 'var(--portal-bg)', border: '1px solid var(--portal-line)' }}>
-                    <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--portal-muted)' }}>
-                      {isYearAgo ? L(dict, '去年今天,你写下 ——', 'A year ago today, you wrote —') : L(dict, '翻到一条 ——', 'Turned up —')}
-                    </p>
-                    <button type="button" onClick={() => openInMemory(node.name)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 0, margin: '0.45rem 0', cursor: 'pointer' }}>
-                      <span style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', lineHeight: 1.6, color: 'var(--portal-ink)' }}>「{node.name.slice(0, 60)}」</span>
-                    </button>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>
-                        {new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })}
-                      </span>
-                      <button type="button" onClick={() => setWanderSeed((s) => s + 1)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem', fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-                        <IconRefresh size={13} />{L(dict, '再翻一条', 'Another')}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
 
             {/* ④ 节律:一句话 + 迷你周柱(不做大图表) */}
             <div className="nesio-insights-section">
@@ -585,21 +711,15 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
               </div>
             )}
 
-            {/* 我的实验(Lab 功能开关,与提审隐藏同闸) */}
-            {showExperiment && (
-              <div className="nesio-insights-section">
-                <p className="nesio-insights-section-label">{L(dict, '我的实验', 'My experiment')}</p>
-                <MyExperimentWidget />
-              </div>
-            )}
+            {/* 2026-07-28 UI 精修(标注 图10):「我的实验」整块划掉 —— 常年空态 + 一个没人点的
+                「+新建实验」,占了页底一屏。同批划掉页脚那句「全部来自本地统计…」声明。
+                实验入口仍在 Lab 里,没删功能,只是不再占洞察页版面。 */}
 
-            {/* NESIO 学到了什么(信任资产,§2.1 移页底) */}
-            <LearningStatusPanel />
-
-            {/* 页脚诚实声明 */}
-            <p className="nesio-insights-cloud-note" style={{ marginTop: '1.25rem' }}>
-              {L(dict, '全部来自本地统计 · 无 AI 推断 · 批量导入不计入', 'All local stats · no AI inference · bulk imports excluded')}
-            </p>
+            {/* 2026-07-28 标注 图10:「Nesio 记得的偏好」整块也划掉 —— 和「我的实验」同一批。
+                它讲的是「本机缓存了 N 条 AI 答复 / 你更愿意被提醒的时段」这类自我说明,
+                自己用的东西不需要它汇报自己在学什么。学习本身照常跑,只是不再展示。
+                注意:摘掉这一处之后**全库再没有地方挂 LearningStatusPanel** —— 组件文件
+                留着(以后想挂回来直接 import),但现在它没有入口。别以为设置里还能看到。 */}
           </div>
         )}
 
@@ -637,7 +757,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {mainTab === 'relationships' && showPeople && <RelationshipsPanel />}
 
         {/* ── Tab: 会议(只看会议记录 + 挂没挂到日程,解决「混在一堆里找不着」)── */}
-        {mainTab === 'schedule' && <TabErrorBoundary label="schedule"><SchedulePanel onOpenMemory={openInMemory} /></TabErrorBoundary>}
+        {mainTab === 'schedule' && <TabErrorBoundary label="schedule"><SchedulePanel /></TabErrorBoundary>}
 
         {/* ── Tab: 物品(只读统计 dashboard;管理去物品页)── */}
         {mainTab === 'inventory' && <TabErrorBoundary label="inventory"><InventoryStatsPanel /></TabErrorBoundary>}
@@ -653,16 +773,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {mainTab === 'living' && (
           <>
             <MirrorLetterTab />
-            {labOn && (
-              <div className="nesio-insights-section" style={{ marginTop: 'var(--space-6)' }}>
-                <p className="nesio-insights-section-label">{L(dict, 'Lab · 旧认知模型(已退役)', 'Lab · Mind model (retired)')}</p>
-                <p className="nesio-settings-option-hint" style={{ margin: 0 }}>
-                  {L(dict,
-                    '7 层认知模型与节点图已退役,避免与多面镜双轨。主路径请用上方「多面镜」月度信。',
-                    'The 7-layer mind model + graph is retired to avoid a second cognition track. Use Mirror Letter above.')}
-                </p>
-              </div>
-            )}
+            {/* 2026-07-28 UI 精修(标注 图23):「Lab · 旧认知模型(已退役)」整块删掉 ——
+                一块只用来公告「这块已经没了」的墓碑,还占着镜子页底部一屏。退役这件事
+                在 STATE.md 里记着就够,不必在用户面前立牌子。 */}
           </>
         )}
         </>

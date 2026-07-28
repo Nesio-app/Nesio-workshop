@@ -1,9 +1,13 @@
 /**
- * POST /api/portal/avatarify — 照片 → app 主题色卡通头像(批次 95)。
+ * POST /api/portal/avatarify — 照片 → 重绘一张图。两种风格:
+ *   · style='avatar'(默认,批次 95):app 主题色卡通头像贴纸;
+ *   · style='garment'(2026-07-28,用户标注 PDF2 图16「AI 识别可以直接美化衣服,
+ *     变为白色背景干净图」):把衣服照片洗成白底干净的单品图。
  *
- * 用户点名:上传照片,AI 生成与 app 蓝青主题协调的卡通贴纸形象,预览接受
- * 后设为头像。图像生成走「会出图」的模型:Gemini 图像模型(免费层优先),
- * OpenAI gpt-image-1 兜底。都要有效 key —— 无 key/失败诚实报错,绝不假装。
+ * 只加了个 style 参数、没另起一条路由 —— 鉴权 / 付费门 / 限流 / key 解析 / 双模型兜底 /
+ * 成本上账这一整套都能直接复用,少一个要维护的花钱入口。
+ * 图像生成走「会出图」的模型:Gemini 图像模型(免费层优先),OpenAI gpt-image-1 兜底。
+ * 都要有效 key —— 无 key/失败诚实报错,绝不假装。
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
@@ -15,12 +19,27 @@ export const maxDuration = 45;
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
+export type RestyleKind = 'avatar' | 'garment';
+
 // app 主题化提示词:蓝青柔和贴纸风,保留人物特征与表情
 const STYLE_PROMPT =
   'Turn this portrait into a friendly cartoon avatar sticker. Soft rounded illustration, clean bold line art, ' +
   'warm gentle smile. Pastel blue and teal color palette matching a calm, minimal app theme. White sticker outline. ' +
   'Simple decorative background with a few soft stars, tiny flowers and light clouds in the same blue-teal palette. ' +
   "Keep the person's hairstyle, face shape and expression clearly recognizable. Head-and-shoulders framing. No text.";
+
+// 衣橱单品图(图16):抠出这件衣服、放到纯白底上,像电商详情页那种干净图。
+// 关键是**不许改衣服本身** —— 颜色/图案/版型都得是原来那件,否则衣橱里存的就不是你的衣服了。
+const GARMENT_PROMPT =
+  'Reproduce ONLY the clothing item from this photo as a clean product shot on a pure white background. ' +
+  'Remove the person, hanger, background clutter and shadows. Center the garment, lay it flat or on an invisible mannequin, ' +
+  'even soft lighting, no harsh shadow. ' +
+  'CRITICAL: keep the exact same colour, pattern, print, texture and cut as the original garment — do not restyle, ' +
+  'recolour, or redesign it. No text, no watermark, no props.';
+
+function promptFor(style: RestyleKind): string {
+  return style === 'garment' ? GARMENT_PROMPT : STYLE_PROMPT;
+}
 
 function withTimeout(ms: number): { signal: AbortSignal; done: () => void } {
   const ctrl = new AbortController();
@@ -29,7 +48,7 @@ function withTimeout(ms: number): { signal: AbortSignal; done: () => void } {
 }
 
 /** Gemini 图像生成(image-to-image):返回 { dataUrl } 或 { error }(透出真因)。 */
-async function geminiAvatar(key: string, imageBase64: string, mimeType: string): Promise<{ dataUrl?: string; error?: string }> {
+async function geminiAvatar(key: string, imageBase64: string, mimeType: string, prompt: string): Promise<{ dataUrl?: string; error?: string }> {
   // GA 的 gemini-2.5-flash-image(Nano Banana)优先;preview 别名兜底。旧的
   // 2.0-preview-image-generation 已下线(用户实测 404),不再排队,免得错误信息只剩它。
   const models = [
@@ -48,7 +67,7 @@ async function geminiAvatar(key: string, imageBase64: string, mimeType: string):
         body: JSON.stringify({
           contents: [{
             parts: [
-              { text: STYLE_PROMPT },
+              { text: prompt },
               { inline_data: { mime_type: mimeType || 'image/jpeg', data: imageBase64 } },
             ],
           }],
@@ -81,14 +100,14 @@ async function geminiAvatar(key: string, imageBase64: string, mimeType: string):
 }
 
 /** OpenAI gpt-image-1 编辑(输入图 → 风格化):返回 dataURL 或 null。 */
-async function openaiAvatar(key: string, imageBase64: string, mimeType: string): Promise<{ dataUrl?: string; error?: string }> {
+async function openaiAvatar(key: string, imageBase64: string, mimeType: string, prompt: string): Promise<{ dataUrl?: string; error?: string }> {
   const { signal, done } = withTimeout(40_000);
   try {
     const form = new FormData();
     const bytes = Buffer.from(imageBase64, 'base64');
     form.append('image', new Blob([bytes], { type: mimeType || 'image/png' }), 'input.png');
     form.append('model', 'gpt-image-1');
-    form.append('prompt', STYLE_PROMPT);
+    form.append('prompt', prompt);
     form.append('size', '1024x1024');
     const res = await fetch('https://api.openai.com/v1/images/edits', {
       method: 'POST',
@@ -111,7 +130,9 @@ export async function POST(req: NextRequest) {
   const guard = await guardAiRoute(req, 'avatarify', { limit: 10, requirePaidCloudAi: true });
   if (guard) return guard;
 
-  const body = await req.json().catch(() => ({})) as { imageBase64?: string; mimeType?: string };
+  const body = await req.json().catch(() => ({})) as { imageBase64?: string; mimeType?: string; style?: RestyleKind };
+  const style: RestyleKind = body.style === 'garment' ? 'garment' : 'avatar';
+  const prompt = promptFor(style);
   if (!body.imageBase64) {
     return NextResponse.json({ ok: false, error: 'no_image' }, { status: 400 });
   }
@@ -129,19 +150,19 @@ export async function POST(req: NextRequest) {
   const errs: string[] = [];
   let dataUrl: string | undefined;
   if (geminiKey) {
-    const g = await geminiAvatar(geminiKey, body.imageBase64, body.mimeType || 'image/jpeg');
+    const g = await geminiAvatar(geminiKey, body.imageBase64, body.mimeType || 'image/jpeg', prompt);
     dataUrl = g.dataUrl;
     if (g.error) errs.push(g.error);
   }
   if (!dataUrl && openaiKey) {
-    const o = await openaiAvatar(openaiKey, body.imageBase64, body.mimeType || 'image/jpeg');
+    const o = await openaiAvatar(openaiKey, body.imageBase64, body.mimeType || 'image/jpeg', prompt);
     dataUrl = o.dataUrl;
     if (o.error) errs.push(o.error);
   }
 
   if (!dataUrl) {
     const detail = errs.join(' · ').slice(0, 160);
-    console.error('[avatarify] generate_failed', detail);
+    console.error('[avatarify] generate_failed', style, detail);
     return NextResponse.json(
       { ok: false, error: 'generate_failed', message: `这次没生成成功:${detail || '模型忙或配额限制'}` },
       { status: 502 },

@@ -69,7 +69,8 @@ export const IconMap = make(<><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z" /><path 
 export const IconFolder = make(<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />);
 export const IconRefresh = make(<><path d="M21 12a9 9 0 1 1-2.6-6.3" /><path d="M21 3v6h-6" /></>);
 export const IconAlertTriangle = make(<><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" /></>);
-export const IconPlay = make(<path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none" />);
+// 剧场 logo:线条空心三角(2026-07-28 UI 精修 —— 实心块与其余描边图标不同语言)。
+export const IconPlay = make(<path d="M8 5.2v13.6L19 12z" />);
 export const IconGlobe = make(<><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14.5 14.5 0 0 1 0 18 14.5 14.5 0 0 1 0-18z" /></>);
 export const IconHome = make(<><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M9 22v-8h6v8" /></>);
 export const IconTrendingUp = make(<><path d="m2 17 7-7 4 4 9-9" /><path d="M15 5h7v7" /></>);

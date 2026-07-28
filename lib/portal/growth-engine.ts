@@ -12,6 +12,7 @@
  */
 import { getLifeGraph, type LifeNode } from './life-graph';
 import { loadBankTx } from './bank-tx';
+import { THINKING_TRAPS } from './thinking-catalog';
 import {
   ACTION_STALL_HINT,
   detectActionStall,
@@ -117,11 +118,18 @@ export const LENSES: Lens[] = [
       return { id: `reframe:${n.id}`, lensId: 'reframe', mode: 'quiz', sourceId: n.id, sourceText: src };
     },
     buildPrompt: (s) => `对方在记录里写下了一个带着情绪的想法:"""${s.sourceText}"""。\n做成一道温和的认知偏差小测:\n- **question 必须先用「」把 ta 这句原话引出来**(像:你写「原话」),再接一句「这句话里藏着一个常见的思维陷阱 —— 你抓得出是哪个吗?」;\n- 选出最可能的一种认知扭曲(灾难化/以偏概全/非黑即白/读心术/应该式/贴标签自责/情绪化推理),给 4 个选项(1 个最贴切 + 3 个似是而非但不对),打乱顺序;\n- explanation 先点破陷阱名,再把「具体那件事」和「我这个人不行」分开(前者能修,后者是错觉),温柔、不否定情绪。\n只输出严格 JSON:{"question":"你写「…」。这句话里藏着一个常见的思维陷阱 —— 你抓得出是哪个吗?","options":["…","…","…","…"],"correctIndex":0,"explanation":"…"}`,
-    parse: (_s, t) => {
+    parse: (s, t) => {
       const j = safeJson(t);
       if (!j?.question || !Array.isArray(j.options) || typeof j.correctIndex !== 'number') return null;
       if (isGrowthAiSlop(String(j.question))) return null;
-      return { title: '来考考这个想法', quiz: { question: j.question, options: j.options.slice(0, 4), correctIndex: Math.max(0, Math.min(3, j.correctIndex)), explanation: j.explanation || '' } };
+      // 2026-07-28(标注 图22「总是一样的」):干扰项交给模型打乱,它每次都收敛到同样那三个
+      //(情绪化推理 / 读心术 / 灾难化 / 非黑即白),连着几天做题看着像同一道。
+      // 这里改成:正确项仍由模型判定,**干扰项本地按这条记忆的 id 确定性抽** —— 不同记忆抽到不同组合,
+      // 同一条记忆重复打开又是同一组(不闪),而且干扰项一定是真实存在的认知扭曲,不是模型现编的词。
+      const correct = String(j.options[Math.max(0, Math.min(j.options.length - 1, j.correctIndex))] || '').trim();
+      if (!correct) return null;
+      const built = buildDistortionOptions(correct, s.sourceId || s.id);
+      return { title: '来考考这个想法', quiz: { question: j.question, options: built.options, correctIndex: built.correctIndex, explanation: j.explanation || '' } };
     },
   },
   // ②b 行动卡点(nudge)—— 记了却没动的承诺;dbskill 式「准备/换方向/先学」信号
@@ -338,7 +346,7 @@ export function recentSpendItems(now = Date.now(), limit = 6): Array<{ date: str
 
 /**
  * 阴影整合(IFS · 内在家庭系统)—— 从 inner-space「阴影整合舱」搬来的更深一层。
- * 把一句自我批判 / 全有全无的念头,拆成:保护者的积极意图 → 清醒自我温柔接管 → 整合洞察
+ * 把一句自我批判 / 全有全无的念头,拆成:内在小孩的积极意图 → 清醒自我温柔接管 → 整合洞察
  * → 一件此刻能做的躯体微动作。复用 inner-space 那套 C-PTSD prompt。只在重情绪下探时用。
  */
 // ── ANT(自动负性思维)实时扫描:本地词表 → 认知扭曲名,不靠 AI,即时给反馈 ──
@@ -360,6 +368,39 @@ export function scanAnts(text: string): { words: string[]; label: string } | nul
   return { words, label };
 }
 
+/**
+ * buildDistortionOptions —— 认知重评小测的四个选项(2026-07-28,标注 图22「总是一样的」)。
+ *
+ * 正确项用模型判出来的那个;另外三个从策展库的「认知扭曲」类里按 seed 确定性抽,
+ * 保证:① 不同记忆 → 不同干扰项组合;② 同一条记忆 → 每次打开都一样(不会闪);
+ * ③ 干扰项一定是真实存在的扭曲名(库里的),不是模型随口造词。
+ */
+/** 线性同余伪随机(和 thinking-catalog 同款):同一个 seed 永远同一串。 */
+function seeded(seed: number): () => number {
+  let x = seed % 2147483647;
+  if (x <= 0) x += 2147483646;
+  return () => { x = (x * 16807) % 2147483647; return (x - 1) / 2147483646; };
+}
+
+function buildDistortionOptions(correct: string, seedKey: string): { options: string[]; correctIndex: number } {
+  // 正确项可能是「灾难化 · 说明…」这种带后缀的写法,取前半段跟库里的名字比对。
+  const head = correct.split(/[·:：\-—]/)[0].trim();
+  const pool = THINKING_TRAPS
+    .filter((t) => t.category === 'distortion' && t.name !== head && !correct.includes(t.name))
+    .map((t) => t.name);
+  let h = 0;
+  for (let i = 0; i < seedKey.length; i += 1) h = (h * 31 + seedKey.charCodeAt(i)) >>> 0;
+  const rnd = seeded(h || 1);
+  const picked: string[] = [];
+  const rest = [...pool];
+  while (picked.length < 3 && rest.length) picked.push(rest.splice(Math.floor(rnd() * rest.length), 1)[0]);
+  const all = [correct, ...picked];
+  // 正确项的位置也按 seed 定,别老在 A。
+  const at = Math.floor(rnd() * all.length);
+  [all[0], all[at]] = [all[at], all[0]];
+  return { options: all, correctIndex: at };
+}
+
 export interface IFSResult { protector: string; self: string; insight: string; action: string }
 /** focus:对方自己感觉「这个声音在怕什么」(如 被抛弃 / 失控),用来让回应贴着 ta 的恐惧,而非通用模板。 */
 export async function applyIFS(sourceText: string, locale: string, focus?: string): Promise<IFSResult | null> {
@@ -369,8 +410,9 @@ export async function applyIFS(sourceText: string, locale: string, focus?: strin
   const t = await chatText(
     `你是 C-PTSD 疗愈助手。规则:不评判、不说教、禁鸡汤;用 IFS(内在家庭系统)框架,先接住再温和整合。` +
     `对方的内在独白是:"""${sourceText}"""。\n${focusLine}分四部分,温柔、口语、别用"您":\n` +
-    `- protector:以「保护者」的口吻,说清它用完美主义 / 苛责 / 焦虑在保护对方什么(它极其渴望什么、害怕什么),并谢谢它过去一直在拼命保护;\n` +
-    `- self:以「清醒自我」的口吻温柔接管 —— 现在已经安全了,有足够的理智和力量去建立边界,让这个保护者可以歇一歇;\n` +
+    `- protector:以「内在小孩」的口吻(2026-07-28 标注 图13:「保护者」太术语,用户读不进去),`+
+    `说清它用完美主义 / 苛责 / 焦虑在保护对方什么(它极其渴望什么、害怕什么),并谢谢它一直这么努力;\n` +
+    `- self:以「清醒自我」的口吻温柔接管 —— 现在已经安全了,有足够的理智和力量去建立边界,让这个内在小孩可以歇一歇;\n` +
     `- insight:一句更整合的看见(这句话背后是一个怕你不安全的部分;你的价值,不靠它挣来);\n` +
     `- action:一件 2 分钟内可执行的躯体微动作(如把手放在心口、深呼吸三次)。\n` +
     `只输出严格 JSON:{"protector":"","self":"","insight":"","action":""}`,

@@ -31,6 +31,12 @@ interface MemoryNodeDetailProps {
   onClose: () => void;
   relatedNodes?: LifeNode[];
   onOpenNode?: (node: LifeNode) => void;
+  /**
+   * 从 fullscreen 面板(洞察)内部打开时传 true —— 否则这张 bottom 卡(z-901)会被
+   * 洞察面板(z-930)整个盖住,表现成「点了没反应」(见 NesioSheet 的 elevated 注释)。
+   * 默认 false:从记忆页/今天页打开时,它自己要能被内部的全屏阅读器盖住。
+   */
+  elevated?: boolean;
 }
 
 const TYPE_LABELS_ZH: Record<string, string> = {
@@ -620,7 +626,7 @@ export default function MemoryNodeDetail(props: MemoryNodeDetailProps) {
   );
 }
 
-function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: MemoryNodeDetailProps) {
+function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevated }: MemoryNodeDetailProps) {
   // 批次 73:关联链手动管理(增/删即反馈)
   const [removedRels, setRemovedRels] = useState<Set<string>>(new Set());
   const [addedRels, setAddedRels] = useState<Array<{ targetId: string; relation: string }>>([]);
@@ -951,6 +957,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
       )}
       <NesioSheet
         variant="bottom"
+        elevated={elevated}
         open
         onOpenChange={(next) => { if (!next) onClose(); }}
         card={false}

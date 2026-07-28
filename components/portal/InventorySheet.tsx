@@ -233,8 +233,12 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   });
 
   return (
+    // 2026-07-28(标注 图11「按钮失效」)根因:洞察页的「打开物品管理」按钮**是响应的** ——
+    // 事件派了、sheet 也开了,但它是 bottom 卡(z-901),被洞察这个 fullscreen 面板(z-930)整个盖住,
+    // 看着就像按钮没反应。做饭页能从洞察打开正是因为它是 fullscreen。这里抬层到 940/941。
     <NesioSheet
       variant="bottom"
+      elevated
       open={open}
       onOpenChange={(next) => { if (!next) onClose(); }}
       card={false}

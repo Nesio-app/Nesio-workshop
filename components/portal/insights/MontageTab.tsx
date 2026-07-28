@@ -124,16 +124,14 @@ export default function MontageTab() {
 
   return (
     <div className="nesio-montage">
-      <div className="nm-hd">
-        <svg viewBox="0 0 24 24" aria-hidden><rect x="3" y="6" width="18" height="12" rx="2" /><path d="M3 9h2M3 12h2M3 15h2M19 9h2M19 12h2M19 15h2" /></svg>
-        <h1>{L(dict, '小剧场', 'Short films')}</h1>
-      </div>
-      <p className="nm-sub">{L(dict, '你的记忆,偶尔变成一小段可以看的东西', 'Your memories, now and then, become something to watch')}</p>
+      {/* 2026-07-28 UI 精修(标注 图27):页内再写一遍「小剧场」+ 一句副标题划掉 ——
+          顶栏已经写着「剧场」,进来先看见的应该是那部片子,不是又一层标题。 */}
 
       {/* ── 送你的第一部:惊喜首片 ── */}
       {gift && (
         <>
-          <div className="nm-sec"><span className="l">{L(dict, '送你的第一部', 'Your first film')}</span><span className="r">{L(dict, '已经拍好了 · 免费', 'Already made · free')}</span></div>
+          {/* 图27:「送你的第一部 · 已经拍好了 · 免费」小节头删掉 —— 卡片里那句
+              「不用你做任何事 —— 念念翻了翻你的记录,悄悄拍了一部」已经把这件事说完了。 */}
           <div className="nm-gift">
             <p className="gh">
               <svg viewBox="0 0 24 24" aria-hidden><path d="M20 12v8H4v-8M2 7h20v5H2zM12 22V7M12 7S9 2 6.5 4 9 7 12 7zM12 7s3-5 5.5-3S15 7 12 7z" /></svg>
@@ -148,14 +146,12 @@ export default function MontageTab() {
             )}
           </div>
 
-          <div className="nm-quota">
-            <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
-            <div>
-              <b>{L(dict, '《你的一周》', '“Your week”')}</b>{L(dict, '每周一自动到(照片拼贴,免费)。把某段记忆拍成 ', ' arrives every Monday (free). Turn a memory into a ')}<b>{L(dict, '厚涂动漫短片', 'painted anime short')}</b>{L(dict, '?本月还剩 ', '? ')}<b>{MONTHLY_PRO_QUOTA}</b>{L(dict, ' 次(Pro)—— 稀有的礼物,不是随手刷的。', ' left this month (Pro) — a rare gift, not an endless feed.')}
-            </div>
-          </div>
+          {/* 图27:「本月还剩 N 次短片(Pro)」配额条删掉 —— 一进来就数着次数,像在催消费。
+              配额改成挂在按钮上的小字(图28:按钮换个样子 —— 实心主按钮,不再是一条看着像禁用的浅色带)。 */}
           <button type="button" className="nm-make" onClick={() => showToast(L(dict, '挑好记忆,送去后台拍了 · 几分钟后回到片库', 'Picked — sent to render · back in your library in a few minutes'))}>
-            <svg viewBox="0 0 24 24" aria-hidden><path d="M12 5v14M5 12h14" /></svg>{L(dict, '把一段记忆拍成短片', 'Turn a memory into a film')}
+            <svg viewBox="0 0 24 24" aria-hidden><path d="M12 5v14M5 12h14" /></svg>
+            {L(dict, '把一段记忆拍成短片', 'Turn a memory into a film')}
+            <span className="nm-make-q">{L(dict, `还剩 ${MONTHLY_PRO_QUOTA} 次`, `${MONTHLY_PRO_QUOTA} left`)}</span>
           </button>
         </>
       )}
@@ -170,10 +166,8 @@ export default function MontageTab() {
       )}
       {isDemo && <p className="nm-sub" style={{ margin: '11px 0 0 0' }}>{L(dict, '下面是示例 —— 你的短片会从真实记忆生成后出现在这里。', 'Examples — your own films appear here once generated from real memories.')}</p>}
 
-      <div className="nm-privacy">
-        <svg viewBox="0 0 24 24" aria-hidden><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V8a4 4 0 0 1 8 0v3" /></svg>
-        <div>{L(dict, '都在本机生成 · 只有你能看到 · ', 'Rendered on your device · only you can see them · ')}<b>{L(dict, '分享了才出门', 'shared only if you share')}</b>{L(dict, '(每条链接只这一片,可随时收回)', ' (each link is just this one film, revocable anytime)')}</div>
-      </div>
+      {/* 图28:页脚「本机生成 · 分享了才出门」删掉 —— 片库小节头右边已经写着
+          「都在本机 · 只有你能看到」,同一句话一屏说两遍。 */}
 
       {/* ── 落差揭晓播放器(NesioSheet·Radix 居中,稳稳叠在洞察抽屉之上,不再手写 portal 漏手势)── */}
       <NesioSheet variant="center" card={false} dismissible open={playing !== null}

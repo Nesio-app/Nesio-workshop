@@ -1,5 +1,5 @@
 import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import {
   BootstrapResult,
   bootstrapCloudAccountProfile,
@@ -151,11 +151,16 @@ export async function GET() {
   // 数据审计 P0:openid 必须验签才认(伪造 openid 越权成他人身份)。无合法签名 → ''。
   const wechatOpenidCookie = verifiedWechatOpenid(cookieStore.get('baohe_wechat_openid')?.value, cookieStore.get(WECHAT_SIG_COOKIE)?.value);
 
+  // profile 落库挪到响应之后(after)——它是账号资料的初始化,**不是**登录的前置条件:
+  // buildCloudAccountProfileBootstrapMeta 三个分支全都返回 blocking:false / authReady:true,
+  // 也就是说它成不成从来不影响能不能进门。可它原本 await 在这儿,而且内部还有 3 个
+  // 串行 Supabase 往返 —— 每次开 app 的 /api/auth/session 都要等它跑完(标注 图3「登录很慢」)。
+  // after() 让响应先发出去,它在后台补;user 直接传进去,省掉重复查同一个用户那一跳。
   if (accessCookie) {
     const user = await fetchSupabaseUser(accessCookie);
     if (user?.id) {
-      const profileBootstrap = await bootstrapCloudAccountProfile(accessCookie);
-      return signedInResponse(user, Boolean(refreshCookie), null, profileBootstrap);
+      after(() => bootstrapCloudAccountProfile(accessCookie, user).catch(() => { /* best-effort */ }));
+      return signedInResponse(user, Boolean(refreshCookie), null, null);
     }
   }
 
@@ -164,8 +169,8 @@ export async function GET() {
     if (refreshedSession?.access_token) {
       const refreshedUser = await fetchSupabaseUser(refreshedSession.access_token);
       if (refreshedUser?.id) {
-        const profileBootstrap = await bootstrapCloudAccountProfile(refreshedSession.access_token);
-        return signedInResponse(refreshedUser, true, refreshedSession, profileBootstrap);
+        after(() => bootstrapCloudAccountProfile(refreshedSession.access_token, refreshedUser).catch(() => { /* best-effort */ }));
+        return signedInResponse(refreshedUser, true, refreshedSession, null);
       }
     }
     // refresh 失败先不立刻返回 —— 下面 local / 微信仍可兜底;仅生产有 Supabase 时才 sticky unverified。

@@ -12,6 +12,8 @@ import { domainInsightsContextBlock } from '@/lib/portal/domain-insights';
 import { parseTemporalQuery, isInSpan } from '@/lib/portal/temporal-query';
 import { semanticRerankMeta } from '@/lib/portal/semantic-rerank';
 import { detectCrossLingualGap } from '@/lib/portal/cross-lingual-gap.mjs';
+import { synonymsBridged } from '@/lib/portal/query-synonyms';
+import { tokenizeCJK } from '@/lib/portal/cjk-tokenize';
 import { getEmailBody } from '@/lib/portal/local-email-body';
 import { ensureEmailFulltextIndex } from '@/lib/portal/email-fulltext-index';
 
@@ -141,9 +143,14 @@ export async function buildMemoryContext(query: string, convoHint = '', includeP
   // 无端提示"英文邮件可能没找全"。用 detectCrossLingualGap 精确判定,消除误报噪音。
   // 只有「真的出了问题」才算降级:候选太少(not_needed)本就无需语义,不该吓用户。
   const realFailure = !reranked.semantic && reranked.reason !== 'not_needed';
-  const semanticDegraded = realFailure && detectCrossLingualGap({
+  const corpusTexts = graph.slice(0, 200).map((n) => `${n.name} ${n.rawInput || ''}`);
+  // 同义词层(query-synonyms)已经在中英之间架了一条确定性的桥。桥真的搭上了(扩出来的词
+  // 确实命中了语料)就别再说「英文记录可能没搜到」—— 那会变成「找到了,同时又说没找到」。
+  // 桥没搭上(问的是同义词表覆盖不到的事)时,这句提示仍然诚实,保留。
+  const bridged = synonymsBridged(tokenizeCJK(query.toLowerCase()), corpusTexts);
+  const semanticDegraded = realFailure && !bridged && detectCrossLingualGap({
     query,
-    corpusTexts: graph.slice(0, 200).map((n) => `${n.name} ${n.rawInput || ''}`),
+    corpusTexts,
     embeddingsApplied: reranked.semantic,
   }).gap;
   const semanticReason = reranked.reason;

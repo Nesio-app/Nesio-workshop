@@ -850,10 +850,13 @@ export default function Portal() {
     const rewardsHandler = () => { track('rewards_open'); setRewardsOpen(true); };
     const briefHandler = () => { track('brief_open', {}); setBriefOpen(true); };
     // 洞察浮层:底部导航 / 卡片 / 「开始练」都派事件打开;detail.tab 指定进哪个 tab(如 fitness)
+    // 2026-07-28(标注 图21):原来只认 tab==='fitness',别的一律落回默认页 ——
+    // 于是车页那几个「去财务 / 去足迹看」的入口即使派了事件也跳不过去。改成认一份白名单。
+    const INSIGHTS_TABS = new Set(['fitness', 'finance', 'timeline', 'health', 'schedule', 'inventory', 'wardrobe', 'relationships', 'growth', 'living']);
     const insightsHandler = (e: Event) => {
       const tab = (e as CustomEvent).detail?.tab;
       track('insights_open', {});
-      setInsightsTab(tab === 'fitness' ? 'fitness' : undefined);
+      setInsightsTab(typeof tab === 'string' && INSIGHTS_TABS.has(tab) ? (tab as typeof insightsTab) : undefined);
       setInsightsOpen(true);
     };
     const trainingHandler = () => { setInsightsTab('fitness'); setInsightsOpen(true); };

@@ -96,6 +96,33 @@ export function buildExtractionSystemPrompt(locale?: string): string {
   return EXTRACTION_SYSTEM_PROMPT + languageDirective(locale);
 }
 
+/**
+ * 图片专用补充指令(2026-07-28,用户标注 图8/图9:「刚存了一个笔,再拍一下就不认识了」)。
+ *
+ * 根因:通用抽取 prompt 是给「说一句/记一笔」写的 —— 它问模型「有没有值得记的**生活事件**」,
+ * 于是一张桌上放支笔的照片被判成「没有生命图谱条目」,返回 nodes:[],客户端只好显示
+ * 「识别到:未检测到任何生命图谱条目」。可模型明明看得见那支笔(图9 它把桌面描述得很细)。
+ *
+ * 所以对图片单独补一条:**看见东西就必须落成 object 节点**。识别不是找事件,是认物。
+ */
+export const IMAGE_RECOGNITION_DIRECTIVE = `
+
+IMAGE MODE — MANDATORY:
+- A photo ALWAYS yields at least one node. Never return an empty "nodes" array for a readable photo.
+- Name the main visible subject as an "object" node (e.g. a pen, a mug, a book, a plant, a receipt).
+  Use the plainest everyday word a person would use to look it up later, not a marketing description.
+- Add 1-4 more nodes for other clearly visible items worth remembering. Skip walls, floors, hands, shadows.
+- In "tags", be generous with retrieval synonyms for each item (material, colour, brand, category,
+  and the shorter/common word — e.g. for a fountain pen also tag the generic word for "pen").
+- "summary" = one plain sentence naming what is in the photo.
+- Only return zero nodes when the image is genuinely unreadable (blank, black, too blurry to name anything);
+  in that case say so in "summary".`;
+
+/** 拍照识别用的 system prompt = 通用抽取 + 图片强制落节点 + 语言指令。 */
+export function buildImageExtractionSystemPrompt(locale?: string): string {
+  return EXTRACTION_SYSTEM_PROMPT + IMAGE_RECOGNITION_DIRECTIVE + languageDirective(locale);
+}
+
 // ── Source-hinted variant (the ingest route: shortcuts / reminders / exports) ─
 
 export const SOURCE_HINTS: Record<string, string> = {

@@ -27,6 +27,16 @@ export function stripFoodName(name: string): string {
     .trim();
 }
 
+/**
+ * 质量/体积单位 → 克(ml≈g,做菜语境够用);件数单位(个/根/片/瓣…)返回 null 不计——
+ * 当克算会把「青椒 3 个」记成 3g,营养系统性偏低(HowToCook 语料件数单位多,老语料几乎全 g 没暴露)。
+ */
+const UNIT_TO_G: Record<string, number> = { g: 1, 克: 1, ml: 1, 毫升: 1, l: 1000, 升: 1000, kg: 1000, 千克: 1000 };
+export function massGrams(unit: string, amount: number): number | null {
+  const f = UNIT_TO_G[(unit || '').toLowerCase().trim()];
+  return f == null || !(amount > 0) ? null : amount * f;
+}
+
 /** 用量加法:Σ(克/100 × 每100g各营养)。给 健康页/身体账本 求一餐营养用。 */
 export function sumNutrition(entries: ReadonlyArray<{ grams: number; per100g: NutriPer100g }>): NutriTotals {
   const t: NutriTotals = { energyKCal: 0, protein: 0, fat: 0, cho: 0 };

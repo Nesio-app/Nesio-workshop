@@ -11,7 +11,7 @@ import { useMemo, useState } from 'react';
 import { growthHistory, type GrowthAnswer } from '@/lib/portal/growth-guide';
 import {
   THINKING_TRAPS, CATEGORY_LABEL, CATEGORY_ORDER, trapById, trapsMet,
-  pickDailyChallenge, nextChallenge, type Challenge, type TrapCategory,
+  pickDailyChallenge, nextChallenge, trapSource, type Challenge, type TrapCategory,
 } from '@/lib/portal/thinking-catalog';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -41,6 +41,7 @@ export default function PracticeGround() {
   const [pick, setPick] = useState<number | null>(null);
   const [filter, setFilter] = useState<TrapCategory | 'all'>('all');
   const [pop, setPop] = useState<string | null>(null);
+  const [atlasOpen, setAtlasOpen] = useState(false); // 图20:图鉴默认折叠
 
   function again() { setPick(null); setCh((c) => nextChallenge(c.trap.id, Date.now())); }
 
@@ -53,14 +54,14 @@ export default function PracticeGround() {
 
   return (
     <>
-      <p className="ng-sub">{L(dict, '想磨的时候来 —— 一条条思维陷阱,来自成熟研究,不是随口编的', 'Come to sharpen — every trap here is from real research, not made up')}</p>
-      <p className="ng-mastery">{met.size > 0 ? L(dict, `你在生活里认出过 ${met.size} 种思维陷阱了`, `You've spotted ${met.size} traps in real life`) : L(dict, '练着练着,你会越来越会认出这些陷阱', 'Keep practicing — you’ll start spotting these everywhere')}</p>
+      {/* 2026-07-28 UI 精修(标注 图18):顶部「想磨的时候来…」+「认出过 N 种陷阱」两行划掉 ——
+          进来先读两行自我介绍,今天那道题被推到屏幕外。出处改在讲解里逐条给(见 图19)。 */}
 
       {/* ── 今天一练(策展库确定性出题)── */}
       <div className="ng-sec"><span className="l">{L(dict, '今天一练', "Today's rep")}</span><span className="r">{L(dict, '闯关练习', 'Challenge')}</span></div>
       <div className="ng-today">
         <p className="ng-scene">「{ch.scene}」</p>
-        <p className="ng-ques">↓ {ch.question}</p>
+        <p className="ng-ques">{ch.question}</p>
         {ch.options.map((opt, i) => {
           const revealed = pick != null;
           const cls = !revealed ? 'ng-opt' : i === ch.correctIndex ? 'ng-opt right' : i === pick ? 'ng-opt wrong' : 'ng-opt';
@@ -78,7 +79,11 @@ export default function PracticeGround() {
             <span className="ng-chip blind" style={{ marginBottom: 10 }}>{trap.principle ? L(dict, trap.principle, trap.principle) : L(dict, cat.zh, cat.en)}</span>
             <div className="ng-lrow"><span className="k">{L(dict, '一句话识破', 'Spot it')}</span><span className="v">{trap.spot}</span></div>
             <div className="ng-lrow"><span className="k">{L(dict, '为什么中招', 'Why it lands')}</span><span className="v">{trap.why}</span></div>
-            <div className="ng-life"><span className="t">{L(dict, `出处 · ${cat.zh}`, `Source · ${cat.en}`)}</span>{trap.domain}</div>
+            {/* 图19「这些解释科学么」:原来只写学科名,看不出是谁提出的 —— 补上首次提出的文献/实验。 */}
+            <div className="ng-life">
+              <span className="t">{L(dict, `出处 · ${cat.zh}`, `Source · ${cat.en}`)}</span>
+              {trapSource(trap.id) || trap.domain}
+            </div>
             <button type="button" className="ng-btn" style={{ width: '100%', marginTop: 13 }} onClick={again}>{L(dict, '下一题 ›', 'Next ›')}</button>
           </div>
         )}
@@ -88,12 +93,13 @@ export default function PracticeGround() {
       <div className="ng-gap" />
 
       {/* ── 陷阱图鉴(策展库,分 6 类)── */}
-      <div className="ng-sec"><span className="l">{L(dict, '陷阱图鉴', 'Trap atlas')}</span><span className="r">{L(dict, '你在生活里遇见过的', 'The ones you’ve met')}</span></div>
-      <p style={{ fontSize: '0.78rem', color: 'var(--ng-faint)', margin: '0 0 11px' }}>
-        {L(dict, `${THINKING_TRAPS.length} 种思维陷阱 · 遇见 `, `${THINKING_TRAPS.length} traps · met `)}
-        <b style={{ color: 'var(--portal-accent)' }}>{met.size}</b>
-        {L(dict, ' · 来自经济学 / 心理学 / 逻辑学 / 统计学,不是抽象解锁,是在你生活里一条条认出', ' · from economics, psychology, logic, statistics — recognized in your own life')}
-      </p>
+      {/* 2026-07-28(标注 图20):右上「你在生活里遇见过的」+「37 种 · 遇见 N」计数行都划掉;
+          整块改成可折叠(默认收起)—— 图鉴是想看的时候翻的,不该每次进练习场都铺满一屏。 */}
+      <button type="button" className="ng-fold-head" aria-expanded={atlasOpen} onClick={() => setAtlasOpen((v) => !v)}>
+        <span className="l">{L(dict, '陷阱图鉴', 'Trap atlas')}</span>
+        <span className="ng-fold-caret" aria-hidden>{atlasOpen ? '⌃' : '⌄'}</span>
+      </button>
+      {atlasOpen && (<>
       <div className="ng-filters">
         <button type="button" className={filter === 'all' ? 'on' : ''} onClick={() => setFilter('all')}>{L(dict, '全部', 'All')}</button>
         {CATEGORY_ORDER.map((c) => (
@@ -102,33 +108,37 @@ export default function PracticeGround() {
       </div>
       <div className="ng-grid">
         {traps.map((t) => {
-          const idx = THINKING_TRAPS.indexOf(t);
           const isMet = met.has(t.id);
+          const flipped = pop === t.id;
           return (
-            <div key={t.id} className={`ng-cell ${isMet ? 'met' : 'locked'}`}
-              onClick={isMet ? () => setPop(pop === t.id ? null : t.id) : undefined}
-              role={isMet ? 'button' : undefined} tabIndex={isMet ? 0 : undefined}
-              onKeyDown={isMet ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPop(pop === t.id ? null : t.id); } } : undefined}>
-              <div className="cnum">{String(idx + 1).padStart(2, '0')}</div>
-              <Icon path={CATEGORY_LABEL[t.category].icon} cls="cic" />
-              <div className="cn">{L(dict, t.name, t.nameEn)}</div>
-              <div className="cs">{isMet ? L(dict, '遇见过', 'met') : L(dict, '还没遇到', 'not yet')}</div>
+            // 图20:编号去掉;遇见过的按分类上色;点一下卡片翻面,背面就是解释(不再另起一块弹层)。
+            // 没遇见过的也能翻 —— 图鉴本来就是用来读的,锁着反而没人翻。
+            <div key={t.id} className={`ng-cell ng-flip${isMet ? ' met' : ' locked'}${flipped ? ' flipped' : ''}`}
+              data-cat={t.category}
+              onClick={() => setPop(flipped ? null : t.id)}
+              role="button" tabIndex={0}
+              aria-label={L(dict, t.name, t.nameEn)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPop(flipped ? null : t.id); } }}>
+              <div className="ng-flip-in">
+                <div className="ng-flip-f">
+                  <Icon path={CATEGORY_LABEL[t.category].icon} cls="cic" />
+                  <div className="cn">{L(dict, t.name, t.nameEn)}</div>
+                  <div className="cs">{isMet ? L(dict, '遇见过', 'met') : L(dict, '还没遇到', 'not yet')}</div>
+                </div>
+                <div className="ng-flip-b">
+                  <div className="bs">{t.spot}</div>
+                  <div className="bw">{t.why}</div>
+                  {metMemory[t.id] && (
+                    <div className="be">{fmtDay(metMemory[t.id].at)} · {(metMemory[t.id].question || metMemory[t.id].context || '').slice(0, 28)}</div>
+                  )}
+                </div>
+              </div>
             </div>
           );
         })}
       </div>
-      {pop && trapById(pop) && (
-        <div className="ng-pop">
-          <p className="pt">{L(dict, trapById(pop)!.name, trapById(pop)!.nameEn)} · {L(dict, CATEGORY_LABEL[trapById(pop)!.category].zh, CATEGORY_LABEL[trapById(pop)!.category].en)}</p>
-          <div>{trapById(pop)!.spot} —— {trapById(pop)!.why}</div>
-          {metMemory[pop] && <div className="pe">{L(dict, '你在生活里撞见它:', 'You met it in life: ')}{fmtDay(metMemory[pop].at)} · {metMemory[pop].question || metMemory[pop].context}</div>}
-        </div>
-      )}
+      </>)}
 
-      <p className="ng-quiet" style={{ marginTop: 26, textAlign: 'left', lineHeight: 1.65 }}>
-        {L(dict, '题目由策展知识库确定性生成(正确答案与讲解都来自成熟研究,不是大模型随口给的);图鉴是你在生活里遇见过的陷阱。进步只跟自己比,不搞段位。',
-          'Questions are generated from a curated knowledge base (answers and explanations come from established research, not an LLM guessing). The atlas is traps you’ve met. Progress is only vs. your past self.')}
-      </p>
     </>
   );
 }
