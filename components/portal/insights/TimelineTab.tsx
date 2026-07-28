@@ -1224,8 +1224,9 @@ export default function TimelineTab() {
         </div>,
         document.body,
       )}
-      {/* 记忆详情提到顶层:时间线缩略图 / 到访记忆列表两条路径都能点开(自带 Vaul portal) */}
-      {visitSel && <MemoryNodeDetail node={visitSel} onClose={() => setVisitSel(null)} />}
+      {/* 记忆详情提到顶层:时间线缩略图 / 到访记忆列表两条路径都能点开(自带 Vaul portal)。
+          elevated:本页在洞察(fullscreen,z-930)里,详情是 bottom 卡(901)—— 不抬层会被整个盖住。 */}
+      {visitSel && <MemoryNodeDetail node={visitSel} elevated onClose={() => setVisitSel(null)} />}
 
       <TripTimelineSheet
         tripId={openDoneTripId}

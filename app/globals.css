@@ -17652,7 +17652,11 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
 /* z=901:与 sheet 原语同带 —— 洞察面板迁 NesioSheet(bottom,901)后,这层若仍在 420
    会被洞察面板整个盖住(点城市卡「没反应」的真相)。同带靠 DOM 顺序压在洞察之上,
    而从列表点开的 MemoryNodeDetail(也 901,后挂载)又自然压在本列表之上。 */
-.nesio-visitmem-overlay { position: fixed; inset: 0; z-index: 901; pointer-events: auto; display: flex; flex-direction: column; justify-content: flex-end; }
+/* 940(elevated 档):到访记忆列表从洞察时间线/世界卡里点开,portal 到 body。
+   批次 G 曾把它从 420 抬到 901 对齐当时的洞察层;后来洞察改成真全屏(929/930)
+   就又被盖回去了 —— 同一个坑第二次。改用 elevated 档 940,与 NesioSheet 的
+   .nesio-sheet-overlay--elevated 同层,洞察再改也不会重演。 */
+.nesio-visitmem-overlay { position: fixed; inset: 0; z-index: 940; pointer-events: auto; display: flex; flex-direction: column; justify-content: flex-end; }
 .nesio-visitmem-backdrop { position: absolute; inset: 0; background: var(--modal-backdrop-bg, rgba(16,28,54,0.25)); border: none; cursor: pointer; }
 .nesio-visitmem-sheet {
   position: relative;
@@ -17711,7 +17715,10 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
 }
 .nesio-placepick-cat.is-on { background: var(--portal-accent-soft); color: var(--portal-blue-deep); border-color: var(--portal-blue-deep); font-weight: 600; }
 .nesio-placepick-select { width: 100%; margin-top: 0.55rem; }
-.nesio-imgzoom-overlay { position: fixed; inset: 0; z-index: 440; display: grid; place-items: center; }
+/* 950:图片放大是从洞察时间线(fullscreen,929/930)里点开的,portal 到 body 后与洞察面板
+   同级 —— 留在 440 会被洞察整个盖住,表现成「点缩略图没反应」(第 6 次同型复发)。
+   对齐 .nesio-image-viewer 的 950(看图器永远在最上层,高过 elevated 的 940/941)。 */
+.nesio-imgzoom-overlay { position: fixed; inset: 0; z-index: 950; display: grid; place-items: center; }
 .nesio-imgzoom-backdrop { position: absolute; inset: 0; background: rgba(10, 16, 30, 0.82); border: none; cursor: pointer; }
 .nesio-imgzoom-img { position: relative; max-width: 94vw; max-height: 86dvh; border-radius: 0.8rem; box-shadow: 0 12px 48px rgba(0,0,0,0.5); }
 .nesio-globe-wrap { display: flex; flex-direction: column; align-items: center; margin: 0.5rem 0 0.75rem; }
