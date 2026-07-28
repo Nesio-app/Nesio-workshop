@@ -974,7 +974,7 @@ function SavedOutfits({ outfits, garments, thumbs, view, dict, onView, onStar, o
               <p style={sectionLbl}>{dict === 'en' ? m.month : `${m.month.slice(0, 4)} 年 ${Number(m.month.slice(5))} 月`}
                 <span style={{ color: 'var(--portal-muted)', fontWeight: 'var(--weight-regular)' }}> {L(dict, `${days} 天`, `${days} days`)}</span>
               </p>
-              <MonthGrid month={m.month} items={m.items} dict={dict} selected={pickedDay} onPick={setPickedDay} />
+              <MonthGrid month={m.month} items={m.items} thumbs={thumbs} dict={dict} selected={pickedDay} onPick={setPickedDay} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
                 {(pickedDay && pickedDay.slice(0, 7) === m.month ? outfitsOn(m.items, pickedDay) : m.items).map((o) => <Row key={o.id} o={o} />)}
               </div>
@@ -993,8 +993,8 @@ function SavedOutfits({ outfits, garments, thumbs, view, dict, onView, onStar, o
  * 为日历写的 outfitsOn 一直没人用。这里把它补成真的日历。
  * 周一起头,和健身页的七天点同一个约定。
  */
-function MonthGrid({ month, items, dict, selected, onPick }: {
-  month: string; items: SavedOutfit[]; dict: string;
+function MonthGrid({ month, items, thumbs, dict, selected, onPick }: {
+  month: string; items: SavedOutfit[]; thumbs: Record<string, string>; dict: string;
   selected: string | null; onPick: (d: string | null) => void;
 }) {
   const [y, m] = month.split('-').map(Number);
@@ -1002,6 +1002,14 @@ function MonthGrid({ month, items, dict, selected, onPick }: {
   const lead = (first.getDay() + 6) % 7;              // 周一=0
   const days = new Date(y, m, 0).getDate();
   const has = new Set(items.map((o) => o.date));
+  // 每天取一张预览图:那天最先存的那套里,第一件有图的单品。
+  // 日历的价值就在「一眼看见那天穿的什么样」,所以格子里放图不放字。
+  const preview = new Map<string, string>();
+  for (const o of items) {
+    if (preview.has(o.date)) continue;
+    const url = o.pieceIds.map((id) => thumbs[id]).find(Boolean);
+    if (url) preview.set(o.date, url);
+  }
   const pad = (n: number) => String(n).padStart(2, '0');
   const week = dict === 'en' ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['一', '二', '三', '四', '五', '六', '日'];
 
@@ -1018,6 +1026,7 @@ function MonthGrid({ month, items, dict, selected, onPick }: {
           const date = `${y}-${pad(m)}-${pad(i + 1)}`;
           const on = has.has(date);
           const sel = selected === date;
+          const img = preview.get(date);
           return (
             <button
               key={date}
@@ -1027,8 +1036,9 @@ function MonthGrid({ month, items, dict, selected, onPick }: {
               aria-pressed={sel}
               aria-label={L(dict, `${m} 月 ${i + 1} 日${on ? ' · 有搭配' : ''}`, `${month}-${pad(i + 1)}${on ? ' · has outfit' : ''}`)}
               style={{
+                position: 'relative', overflow: 'hidden',
                 aspectRatio: '1', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                gap: '2px', border: sel ? '1px solid var(--portal-accent-border)' : '1px solid transparent',
+                gap: '2px', border: sel ? '2px solid var(--portal-accent)' : '1px solid transparent',
                 borderRadius: 'var(--radius-sm)',
                 background: sel ? 'var(--portal-accent-soft-md)' : on ? 'var(--portal-accent-soft)' : 'transparent',
                 color: on ? 'var(--portal-ink)' : 'var(--portal-muted)',
@@ -1036,8 +1046,25 @@ function MonthGrid({ month, items, dict, selected, onPick }: {
                 cursor: on ? 'pointer' : 'default', opacity: on ? 1 : 0.45, padding: 0,
               }}
             >
-              {i + 1}
-              <span style={{ width: 4, height: 4, borderRadius: '50%', background: on ? 'var(--portal-accent)' : 'transparent' }} />
+              {img ? (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img} alt="" aria-hidden
+                    style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} />
+                  {/* 日期压在图上:缩到角上、加一层底,保证任何照片上都读得清 */}
+                  <span style={{
+                    position: 'absolute', left: 2, top: 2, lineHeight: 1,
+                    fontSize: '0.6rem', padding: '1px 3px', borderRadius: '4px',
+                    background: 'var(--sheet-opaque)', color: 'var(--portal-ink)', opacity: 0.9,
+                  }}>{i + 1}</span>
+                </>
+              ) : (
+                <>
+                  {i + 1}
+                  {/* 那天有搭配但单品没照片 —— 退回一个点,别让格子看着像空的 */}
+                  <span style={{ width: 4, height: 4, borderRadius: '50%', background: on ? 'var(--portal-accent)' : 'transparent' }} />
+                </>
+              )}
             </button>
           );
         })}

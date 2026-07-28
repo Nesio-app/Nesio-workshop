@@ -18,7 +18,7 @@ const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: fal
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { IconStar } from '../icons';
+import { IconStar, IconFlag } from '../icons';
 import { loadPins, togglePin, PINS_UPDATED_EVENT } from '@/lib/portal/pins';
 
 type SubTab = 'calendar' | 'email';
@@ -105,8 +105,8 @@ function stripPrefix(name: string): string {
  *   右滑(往右拖)= 星标,左滑 = 删除。跟手位移,松手过阈值才执行,没过就弹回去。
  * 只认横向手势:纵向位移更大时立刻放手,免得把页面滚动吃掉。
  */
-function SwipeRow({ row, dict, starred, dateLabel, onOpen, onStar, onDelete }: {
-  row: Row; dict: 'zh' | 'en'; starred: boolean; dateLabel: string;
+function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelete }: {
+  row: Row; kind: SubTab; dict: 'zh' | 'en'; starred: boolean; dateLabel: string;
   onOpen: () => void; onStar: () => void; onDelete: () => void;
 }) {
   const [dx, setDx] = useState(0);
@@ -138,8 +138,13 @@ function SwipeRow({ row, dict, starred, dateLabel, onOpen, onStar, onDelete }: {
     else if (Math.abs(moved) < 6) onOpen();
   };
 
+  // 日历条目用星、邮件条目用旗子 —— 背后是同一个收藏夹(pins),只是两种东西
+  // 混在一个列表里时,图标得能一眼分开(和邮件客户端「标记」的习惯一致)。
+  const Mark = kind === 'email' ? IconFlag : IconStar;
+  const markOn = kind === 'email' ? L(dict, '标记', 'Flag') : L(dict, '星标', 'Star');
+  const markOff = kind === 'email' ? L(dict, '取消标记', 'Unflag') : L(dict, '取消星标', 'Unstar');
   const revealing = dx > 0
-    ? { side: 'star' as const, label: starred ? L(dict, '取消星标', 'Unstar') : L(dict, '星标', 'Star'), bg: 'var(--status-gentle-soft)', fg: 'var(--status-gentle)' }
+    ? { side: 'star' as const, label: starred ? markOff : markOn, bg: 'var(--status-gentle-soft)', fg: 'var(--status-gentle)' }
     : { side: 'del' as const, label: L(dict, '删除', 'Delete'), bg: 'var(--status-risk-soft)', fg: 'var(--status-risk)' };
 
   return (
@@ -162,7 +167,7 @@ function SwipeRow({ row, dict, starred, dateLabel, onOpen, onStar, onDelete }: {
           <span style={{ fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {starred && (
               <span style={{ color: 'var(--status-gentle)', marginRight: 'var(--space-1)', display: 'inline-flex', verticalAlign: '-2px' }}>
-                <IconStar size={13} />
+                <Mark size={13} />
               </span>
             )}{row.title}
           </span>
@@ -332,7 +337,7 @@ export default function SchedulePanel() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {rows.slice(0, 60).map((r) => (
-            <SwipeRow key={r.id} row={r} dict={dict} starred={starred.has(r.id)} dateLabel={fmtDay(r.dateIso)}
+            <SwipeRow key={r.id} row={r} kind={sub} dict={dict} starred={starred.has(r.id)} dateLabel={fmtDay(r.dateIso)}
               onOpen={() => setOpenNode(r.node)} onStar={() => toggleStar(r)} onDelete={() => removeRow(r)} />
           ))}
         </div>
