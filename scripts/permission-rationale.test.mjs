@@ -41,6 +41,17 @@ const vis = read('../components/portal/VoiceInputSheet.tsx');
 assert.match(vis, /import \{ permissionRationale, shouldExplainPermission, markPermissionExplained \} from '@\/lib\/portal\/permission-rationale'/, '引入前置说明助手');
 assert.match(vis, /shouldExplainPermission\('microphone'\)[\s\S]{0,40}setMicPrimer\(true\)/, '首点麦克风先弹说明,不直接 start');
 assert.match(vis, /onClick=\{listening \? stopListening : handleMicTap\}/, '麦克风按钮走 handleMicTap(前置说明门)');
-assert.match(vis, /markPermissionExplained\('microphone'\)[\s\S]{0,60}startListening\(\)/, '允许后标记 + 才 start');
+// 「允许」那一步:先记下已说明,再去听。原先卡死了两者之间只准隔 60 字符,
+// 后来中间插进了「先要原生麦权限(getUserMedia)再启 Web Speech」那段就误报了 ——
+// 真正要锁的是**顺序**和**只在这条路径上 start**,不是间距。
+{
+  const at = vis.indexOf('function allowMicAndStart');
+  assert.ok(at >= 0, '「允许」入口 allowMicAndStart 不见了');
+  const body = vis.slice(at, vis.indexOf('\n  }', at));
+  const marked = body.indexOf("markPermissionExplained('microphone')");
+  const started = body.indexOf('startListening()');
+  assert.ok(marked >= 0, '允许后要标记已说明,否则每次都弹');
+  assert.ok(started > marked, '必须先标记再 start —— 反了会出现「说明还没确认就开录」');
+}
 
 console.log('permission-rationale: OK');

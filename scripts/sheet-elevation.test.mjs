@@ -1,22 +1,24 @@
 /**
  * 行为契约:从 fullscreen 面板内部再开的层,必须抬到 elevated 档。
  *
- * 为什么单独立一条测试 —— 同一个坑在标注里被报了**六次**,每次的症状都是
- *「点了没反应」,每次的根因都一样:一个 bottom 抽屉(z-900/901)从洞察这类
- * fullscreen 面板(z-929/930)内部打开,portal 到 body 后与面板同级,被面板
- * 不透明底整个盖住。已中招的:镜头库 / 日程详情 / 物品管理 / 记给某人 /
- * 关系详情 / 时间线的到访记忆列表+图片放大。
+ * 为什么单独立一条测试 —— 同一个坑被报了**八次**,每次的症状都是「点了没反应」,
+ * 每次的根因都一样:一个 bottom 抽屉(z-900/901)从洞察这类 fullscreen 面板
+ * (z-929/930)内部打开,portal 到 body 后与面板同级,被面板不透明底整个盖住。
+ * 已中招的:镜头库 / 日程详情 / 物品管理 / 记给某人 / 关系详情 /
+ * 到访记忆列表 + 图片放大 / 记一笔近况。
  *
- * 最后一次尤其说明问题:到访记忆列表在「批次 G」被从 420 抬到 901 对齐当时的
+ * 到访记忆列表那次尤其说明问题:它在「批次 G」被从 420 抬到 901 对齐**当时**的
  * 洞察层,后来洞察改成真全屏(929/930),它就又被盖回去了 —— 靠人肉记住层号
  * 不管用,所以把规则钉进测试。
  *
  * 这条测试锁四件事:
  *   ① 三档层序(bottom < fullscreen < elevated < 看图器)的实际数值;
  *   ② NesioSheet 的 elevated 接口还在、还映射到那两个类;
- *   ③ MemoryNodeDetail 还把 elevated 透传给自己的 sheet(断了 = 六处修复全废);
- *   ④ **漂移检测**:洞察子树里新写的 bottom 抽屉/自研浮层如果没抬层,直接红。
- *      这一条是防第七次的,豁免必须写进下面的表并说明理由。
+ *   ③ MemoryNodeDetail 还把 elevated 透传给自己的 sheet(断了 = 所有修复全废);
+ *   ④ **漂移检测**:凡是活在某个 fullscreen 面板里的子树(见 FULLSCREEN_SUBTREES),
+ *      新写的 bottom 抽屉/自研浮层没抬层就直接红。这一条是防第九次的,
+ *      豁免必须写进 EXEMPT_CLASSES 并说明理由 —— 而且每条豁免的**前提**
+ *      (不 portal、有 zIndex 外壳、声明顺序)都在下面单独锁住,前提一变豁免就失效。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -105,6 +107,7 @@ const FIXED_SITES = [
   ['components/portal/relationships/RelationshipDetailSheet.tsx', '洞察 → 关系 → 关系详情'],
   ['components/portal/insights/SchedulePanel.tsx', '洞察 → 日程 → 日程详情'],
   ['components/portal/insights/TimelineTab.tsx', '洞察 → 时间线 → 到访记忆详情'],
+  ['components/portal/relationships/HangNoteSheet.tsx', '洞察 → 关系 → 关系详情 → 记一笔近况'],
 ];
 /** 这个文件里所有「会落在 bottom 档」的层:自己的 bottom NesioSheet + 内嵌的记忆详情。 */
 function bottomLayerTags(src) {
@@ -122,10 +125,18 @@ for (const [file, why] of FIXED_SITES) {
   }
 }
 
-// ── ⑤ 漂移检测:洞察子树里新写的层不许留在下面 ───────────────────────────
+// ── ⑤ 漂移检测:活在 fullscreen 面板里的子树,新写的层不许留在下面 ────────
 //
-// 洞察面板本身是 fullscreen(929/930),它的所有 tab/子面板都活在里面。
-// 这些文件里 portal 到 body 的浮层,只要 z 低于 elevated 档就会被盖住。
+// 这些目录/文件的内容都渲染在某个 fullscreen 面板(929/930)内部。它们里面
+// portal 到 body 的浮层,只要 z 低于 elevated 档就会被那个面板整个盖住。
+// 新开一个全屏面板时,把它的正文子树加进这张表。
+const FULLSCREEN_SUBTREES = [
+  ['components/portal/insights', '洞察(Portal.tsx 的 fullscreen)'],
+  ['components/portal/relationships', '洞察 → 关系'],
+  ['components/portal/cooking', '做饭 · 库存(CookingSheet fullscreen)'],
+  ['components/portal/family', '家庭分享(FamilySharingSheet fullscreen)'],
+  ['components/portal/reader', '阅读器(ReaderView fullscreen)'],
+];
 
 /** 明确审阅过的豁免 —— 加进来必须写清为什么它不是 bug。 */
 const EXEMPT_CLASSES = new Map([
@@ -140,7 +151,27 @@ const EXEMPT_CLASSES = new Map([
   // 壳本身高过洞察(930),壳内的 60/61 是相对值。下面单独锁住那层壳的层号。
   ['nesio-mirror-drawer-scrim', 'MirrorLetterTab:在 zIndex:948 的 portal 壳内部'],
   ['nesio-mirror-drawer', 'MirrorLetterTab:在 zIndex:948 的 portal 壳内部'],
+  // 同 memmap:当作 ArticleReaderSheet 的 fullscreen 面板 className 用,630 是死值。
+  ['nesio-rd-overlay', 'ArticleReaderSheet:用作 NesioSheet 面板 className,实际层由 .nesio-sheet--fullscreen 决定'],
+  // ReaderView 全文件零 createPortal —— 这两个就地渲染在阅读器面板里,40/42 是相对值。
+  ['nesio-rd-selmenu', 'ReaderView:内联渲染的选字菜单,不与阅读器面板同级'],
+  ['nesio-rd-toast', 'ReaderView:内联渲染的提示条,不与阅读器面板同级'],
 ]);
+
+// 上面两条 ReaderView 豁免的前提 = 它确实不 portal。哪天改成 portal 就得重新算层。
+assert.equal(
+  /createPortal/.test(read('components/portal/reader/ReaderView.tsx')), false,
+  'ReaderView 开始用 createPortal 了 —— 选字菜单/提示条的豁免不再成立,得按 elevated 档重算层号',
+);
+
+// 面板 className 型豁免的前提 = .nesio-sheet--fullscreen 声明在它们后面(同优先级,后者胜)。
+{
+  const posFullscreen = css.indexOf('.nesio-sheet--fullscreen');
+  for (const cls of ['nesio-memmap-overlay', 'nesio-rd-overlay']) {
+    assert.ok(css.indexOf(`.${cls}`) < posFullscreen,
+      `.${cls} 声明在 .nesio-sheet--fullscreen 之后了 —— 它的死 z 会反过来覆盖 930`);
+  }
+}
 
 // 上面两条豁免的前提 = 那层壳的层号。壳被改小/删掉,豁免就不成立了 —— 在这儿锁死。
 {
@@ -166,11 +197,15 @@ for (const [, sel, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
 
 const walk = (dir) => fs.readdirSync(path.join(root, dir), { withFileTypes: true })
   .flatMap((e) => (e.isDirectory() ? walk(`${dir}/${e.name}`) : [`${dir}/${e.name}`]));
-const insightsFiles = walk('components/portal/insights').filter((f) => f.endsWith('.tsx'));
-assert.ok(insightsFiles.length > 5, '洞察子树没扫到文件 —— 目录结构变了,这条测试失效了,要跟着改');
+const hostedFiles = [];
+for (const [dir, label] of FULLSCREEN_SUBTREES) {
+  const files = walk(dir).filter((f) => f.endsWith('.tsx'));
+  assert.ok(files.length > 0, `${dir}(${label})没扫到文件 —— 目录挪了,这条守卫就形同虚设,要跟着改`);
+  hostedFiles.push(...files);
+}
 
 const offenders = [];
-for (const file of insightsFiles) {
+for (const file of hostedFiles) {
   const src = read(file);
 
   // 5a:bottom 抽屉(直接用 NesioSheet 或 MemoryNodeDetail)必须带 elevated
@@ -185,18 +220,18 @@ for (const file of insightsFiles) {
       const z = fixedZ.get(cls);
       if (z === undefined || z >= ELEVATED_FLOOR) continue;
       if (EXEMPT_CLASSES.has(cls)) continue;
-      offenders.push(`${file}: .${cls} 的 z-index=${z} < ${ELEVATED_FLOOR},会被洞察面板整个盖住`);
+      offenders.push(`${file}: .${cls} 的 z-index=${z} < ${ELEVATED_FLOOR},会被它所在的全屏面板整个盖住`);
     }
   }
 }
 
 assert.deepEqual(offenders, [], [
   '',
-  '洞察(fullscreen z-930)里有层没抬到 elevated 档 —— 这就是那六次「点了没反应」的形状:',
+  '全屏面板(z-929/930)里有层没抬到 elevated 档 —— 这就是那几次「点了没反应」的形状:',
   ...offenders.map((o) => `  · ${o}`),
   '',
   '修法二选一:NesioSheet/MemoryNodeDetail 传 elevated;自研浮层把 z-index 提到 940 以上。',
   '确认不是 bug 的,加进本文件的 EXEMPT_CLASSES 并写明理由。',
 ].join('\n'));
 
-console.log(`sheet-elevation: OK(洞察子树 ${insightsFiles.length} 个文件,零漏层)`);
+console.log(`sheet-elevation: OK(全屏宿主子树 ${hostedFiles.length} 个文件,零漏层)`);
