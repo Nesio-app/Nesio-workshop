@@ -18,7 +18,7 @@ import {
   PANTRY_CATEGORIES, type PantryItem,
 } from '@/lib/cooking/pantry';
 import { normalizeIngredient, CUISINES } from '@/lib/cooking/food-catalog';
-import { loadRecipes, type Recipe } from '@/lib/cooking/food-data';
+import { loadRecipes, recipeImageUrl, type Recipe } from '@/lib/cooking/food-data';
 import { matchRecipe, matchRecipes, type RecipeMatch } from '@/lib/cooking/recipe-match';
 import { getShoppingList, addToShopping, toggleShoppingItem, removeShoppingItem, checkoutBought, type ShoppingItem } from '@/lib/cooking/shopping';
 import { recipeNutritionPerServing, recipeMainNutrition, lookupNutrition, type PerServing, type FoodNutrition } from '@/lib/cooking/nutrition';
@@ -275,7 +275,7 @@ function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec
                 {suggestions.map((r, i) => (
                   <button key={r.name} type="button" onClick={() => addDish(r.name)}
                     style={{ ...row, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: i === suggestions.length - 1 ? 'none' : divider, cursor: 'pointer' }}>
-                    <Dot />
+                    <RecipeThumb name={r.name} image={r.image} size={32} />
                     <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
                     <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', whiteSpace: 'nowrap' }}>{[r.category, r.difficulty ? '★'.repeat(r.difficulty) : ''].filter(Boolean).join(' · ')}</span>
                   </button>
@@ -315,7 +315,7 @@ function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec
           <div style={card}>
             {rows.map((rowItem, i) => (
               <div key={rowItem.name} style={{ ...row, borderBottom: i === rows.length - 1 ? 'none' : divider }}>
-                <Dot />
+                <RecipeThumb name={rowItem.name} image={rowItem.match?.recipe.image} size={44} />
                 <button type="button"
                   onClick={() => { if (rowItem.match) onOpenRecipe(rowItem.match); }}
                   disabled={!rowItem.match}
@@ -485,7 +485,7 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
                 {suggestions.map((r, i) => (
                   <button key={r.name} type="button" onClick={() => add(r.name)}
                     style={{ ...row, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: i === suggestions.length - 1 ? 'none' : divider, cursor: 'pointer' }}>
-                    <Dot />
+                    <RecipeThumb name={r.name} image={r.image} size={32} />
                     <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
                     <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', whiteSpace: 'nowrap' }}>{[r.category, r.difficulty ? '★'.repeat(r.difficulty) : ''].filter(Boolean).join(' · ')}</span>
                   </button>
@@ -506,7 +506,7 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
           <div style={card}>
             {wishes.map((w, i) => (
               <div key={w.name} style={{ ...row, borderBottom: i === wishes.length - 1 ? 'none' : divider }}>
-                <Dot />
+                <RecipeThumb name={w.name} image={recipes?.find((x) => x.name === w.name)?.image} size={44} />
                 <button type="button" onClick={() => onOpenDish(w.name)} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-sans)' }}>
                   <div style={{ fontSize: 'var(--text-body)', fontWeight: 600, color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
                   {w.note && <div style={subText}>{w.note}</div>}
@@ -667,6 +667,7 @@ function RecipeBody({ match, t }: { match: RecipeMatch<Recipe>; t: TT }) {
   const r = match.recipe;
   const [per, setPer] = useState<PerServing | null>(null);
   const [main, setMain] = useState<FoodNutrition[] | null>(null);
+  const [heroErr, setHeroErr] = useState(false);
   useEffect(() => {
     let live = true;
     recipeNutritionPerServing(r.quantities).then((p) => { if (live) setPer(p); }).catch(() => { if (live) setPer(null); });
@@ -676,6 +677,10 @@ function RecipeBody({ match, t }: { match: RecipeMatch<Recipe>; t: TT }) {
 
   return (
     <>
+      {r.image && !heroErr && (
+        <img src={recipeImageUrl(r.image)} alt={r.name} loading="lazy" onError={() => setHeroErr(true)}
+          style={{ width: '100%', height: 180, objectFit: 'cover', borderRadius: 'var(--radius-md)', display: 'block', background: 'var(--portal-accent-soft)' }} />
+      )}
       {(r.difficulty || r.calories != null) && (
         <p style={{ ...hintLine, marginTop: 0 }}>{[
           r.difficulty ? `${'★'.repeat(r.difficulty)} ${t('难度', 'difficulty')}` : '',
@@ -1107,6 +1112,20 @@ function NutriCol({ v, label, last }: { v: string; label: string; last?: boolean
 }
 function Dot() {
   return <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--portal-accent)', flex: 'none' }} />;
+}
+/** 菜谱缩略图:无图/加载失败回退菜名首字占位(不出现破图,失败态可见但安静)。 */
+function RecipeThumb({ name, image, size }: { name: string; image?: string | null; size: number }) {
+  const [err, setErr] = useState(false);
+  const url = image ? recipeImageUrl(image) : '';
+  const box: React.CSSProperties = { width: size, height: size, borderRadius: 'var(--radius-sm)', flex: 'none' };
+  if (!url || err) {
+    return (
+      <span aria-hidden style={{ ...box, background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: size >= 40 ? 'var(--text-body)' : 'var(--text-xs)', fontWeight: 700 }}>
+        {(name || '').slice(0, 1)}
+      </span>
+    );
+  }
+  return <img src={url} alt="" loading="lazy" onError={() => setErr(true)} style={{ ...box, objectFit: 'cover', background: 'var(--portal-accent-soft)' }} />;
 }
 function qtyName(it: PantryItem): string {
   return it.quantity != null && it.quantity > 1 ? `${it.name} ×${it.quantity}` : it.name;
