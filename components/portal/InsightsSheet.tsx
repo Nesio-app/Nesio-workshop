@@ -4,7 +4,8 @@
  * InsightsSheet — v1 规格 §2:洞察页(个人数据 = 编辑过的刊物,不是监控台)。
  *
  * 免费层四件套(全本地统计、无 AI、批量导入不计入):
- *   ① 你在想什么(主题门)  ② 没接上的线头  ③ 走走看  ④ 一行节律
+ *   走走看(标注 图11 要求置顶)→ 节律热力 → 主题门 → 没接上的线头 → 节律 → 生命版图
+ *   (编号 ①②③④ 是当初的设计序号,不是渲染序 —— 别照编号找位置。)
  * 生命版图 = 唯一保留的图(≥90 天数据才出现,绝不以示例地形冒充)。
  * 认知 tab = Pro 多面镜月度信(只回看不预测);旧 7 层模型 + 节点图移 Lab。
  * 健康/足迹/财务/关系 tab 走功能开关(提审构建不可达)。
@@ -40,7 +41,6 @@ import WardrobePanel from './insights/WardrobePanel';
 import AdminOpsPanel from './insights/AdminOpsPanel';
 import TeslaPanel from './TeslaPanel';
 import TabErrorBoundary from './TabErrorBoundary';
-import LearningStatusPanel from './LearningStatusPanel';
 import { mineCrossDomain } from '@/lib/portal/cross-domain-correlations';
 import { readFactJournal, ensureFactJournal } from '@/lib/platform/fact-journal';
 
@@ -589,8 +589,11 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
                 「+新建实验」,占了页底一屏。同批划掉页脚那句「全部来自本地统计…」声明。
                 实验入口仍在 Lab 里,没删功能,只是不再占洞察页版面。 */}
 
-            {/* NESIO 学到了什么(信任资产,§2.1 移页底) */}
-            <LearningStatusPanel />
+            {/* 2026-07-28 标注 图10:「Nesio 记得的偏好」整块也划掉 —— 和「我的实验」同一批。
+                它讲的是「本机缓存了 N 条 AI 答复 / 你更愿意被提醒的时段」这类自我说明,
+                自己用的东西不需要它汇报自己在学什么。学习本身照常跑,只是不再展示。
+                注意:摘掉这一处之后**全库再没有地方挂 LearningStatusPanel** —— 组件文件
+                留着(以后想挂回来直接 import),但现在它没有入口。别以为设置里还能看到。 */}
           </div>
         )}
 

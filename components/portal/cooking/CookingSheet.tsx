@@ -21,6 +21,7 @@ import { normalizeIngredient, CUISINES } from '@/lib/cooking/food-catalog';
 import { loadRecipes, type Recipe } from '@/lib/cooking/food-data';
 import { matchRecipe, matchRecipes, type RecipeMatch } from '@/lib/cooking/recipe-match';
 import { getShoppingList, addToShopping, toggleShoppingItem, removeShoppingItem, checkoutBought, type ShoppingItem } from '@/lib/cooking/shopping';
+import { scaleAmountsInText, servingFactor } from '@/lib/cooking/scale-recipe';
 import { recipeNutritionPerServing, recipeMainNutrition, lookupNutrition, type PerServing, type FoodNutrition } from '@/lib/cooking/nutrition';
 import { getWishlist, addWish, type WishDish } from '@/lib/cooking/wishlist';
 import { addMeal, type MealSource, type MealItem } from '@/lib/cooking/meals';
@@ -668,6 +669,10 @@ function RecipeBody({ match, t }: { match: RecipeMatch<Recipe>; t: TT }) {
   }, [r.steps]);
   const [per, setPer] = useState<PerServing | null>(null);
   const [main, setMain] = useState<FoodNutrition[] | null>(null);
+  // 图26:「步骤里的克数是餐厅出餐量,自家做按人数缩着来」。
+  // per.servings 是按可食部克数估出来的原始份数;选几个人吃 → 步骤里的用量跟着缩。
+  const [eaters, setEaters] = useState<number | null>(null);
+  const factor = per && eaters ? servingFactor(eaters, per.servings) : 1;
   useEffect(() => {
     let live = true;
     recipeNutritionPerServing(r.quantities).then((p) => { if (live) setPer(p); }).catch(() => { if (live) setPer(null); });
@@ -678,11 +683,30 @@ function RecipeBody({ match, t }: { match: RecipeMatch<Recipe>; t: TT }) {
   return (
     <>
       <section>
-        <SectionHead label={t('步骤', 'Steps')} />
+        <SectionHead label={t('步骤', 'Steps')} right={per ? t(`原方 ${per.servings} 份`, `${per.servings} servings`) : undefined} rightGo={false} />
+        {/* 几个人吃 —— 选了就把步骤里的用量按比例缩。只缩用量,时间/温度/次数不动
+            (见 lib/cooking/scale-recipe.ts 的白名单)。 */}
+        {per && per.servings > 1 && (
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
+            {[1, 2, 3, 4].map((n) => (
+              <button key={n} type="button" onClick={() => setEaters((cur) => (cur === n ? null : n))} style={{
+                ...pill,
+                border: '1px solid var(--portal-line)',
+                cursor: 'pointer',
+                fontFamily: 'var(--font-sans)',
+                padding: 'var(--space-1) var(--space-3)',
+                background: eaters === n ? 'var(--portal-accent-soft-md)' : 'transparent',
+                color: eaters === n ? 'var(--portal-accent)' : 'var(--portal-muted)',
+              }}>
+                {t(`${n} 人`, `${n}`)}
+              </button>
+            ))}
+          </div>
+        )}
         <div style={{ ...card, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
           {cookSteps.map((s, i) => (
             <div key={i} style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start', fontSize: 'var(--text-sm)', lineHeight: 1.6 }}>
-              <span style={stepNum}>{i + 1}</span><span style={{ paddingTop: 2 }}>{s}</span>
+              <span style={stepNum}>{i + 1}</span><span style={{ paddingTop: 2 }}>{scaleAmountsInText(s, factor)}</span>
             </div>
           ))}
         </div>

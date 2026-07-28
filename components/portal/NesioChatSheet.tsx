@@ -460,9 +460,9 @@ export default function NesioChatSheet({
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [messages, setMessages] = useState<UiMessage[]>([]);
   const [input, setInput] = useState('');
-  // 批次 148·设计念念节:显式「端上 / 深问 Pro」分段。默认深问(有权益时,答复质量不降);
-  // 手动选端上 = 走本机记忆搜索(快/免费/弱),诚实不偷偷打云。无权益时深问锁,点了引导升级。
-  const [deepMode, setDeepMode] = useState(() => canUsePaidCloudAi());
+  // 有权益就深问(云端认真综合),没有就端上(本机记忆搜索)—— 不再让用户先选一次。
+  // 图7/图9 把那个分段器划掉了:自己用的东西,问个问题前不该先做选择题。
+  const deepMode = canUsePaidCloudAi();
   const [sending, setSending] = useState(false);
   // 同步的发送闭锁:setSending 是异步的,快速两次 Enter 两个闭包都读到 sending===false → 双发。
   const sendingRef = useRef(false);
@@ -1398,10 +1398,8 @@ Edit location/value anytime in Storage.`),
             <span className="nesio-wechat-plus-icon"><IconCamera /></span>
             <span>{L(dict, '拍摄', 'Camera')}</span>
           </button>
-          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); setVoiceMode(true); }}>
-            <span className="nesio-wechat-plus-icon"><IconMic /></span>
-            <span>{L(dict, '语音输入', 'Voice')}</span>
-          </button>
+          {/* 2026-07-28 标注 图9:「+」面板里的「语音输入」划掉 —— 输入栏右边那个麦克风
+              就是同一个功能(setVoiceMode(true)),同一屏摆两个入口是重复不是方便。 */}
           <button type="button" className="nesio-wechat-plus-item" onClick={() => filePickerRef.current?.click()}>
             <span className="nesio-wechat-plus-icon"><IconFile /></span>
             <span>{L(dict, '文件', 'File')}</span>
@@ -1426,29 +1424,10 @@ Edit location/value anytime in Storage.`),
         }}
       />
 
-      {/* 批次 148·设计念念节:显式「端上 / 深问 Pro」分段 —— 复杂题才切深问,免费够用大多数时候。
-          端上=本机记忆搜索(免费/快);深问=云端认真综合(Pro)。答复徽章按真实来路诚实标。 */}
-      <div className="nesio-wechat-mode-seg" role="tablist" aria-label={L(dict, '回答模式', 'Answer mode')}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={!deepMode}
-          className={`nesio-wechat-mode-seg-btn${!deepMode ? ' nesio-wechat-mode-seg-btn--on' : ''}`}
-          onClick={() => setDeepMode(false)}
-        >
-          ◐ {L(dict, '端上', 'On-device')}
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={deepMode}
-          className={`nesio-wechat-mode-seg-btn${deepMode ? ' nesio-wechat-mode-seg-btn--on' : ''}`}
-          onClick={() => setDeepMode(true)}
-        >
-          ✦ {L(dict, '深问', 'Deep')} <span className="nesio-wechat-mode-seg-pro">Pro</span>
-        </button>
-        {/* 批次188(用户实锤):删「复杂题才需要·免费够用」提示行 —— 分段本身已自解释 */}
-      </div>
+      {/* 2026-07-28 标注 图7/图9:底部「端上 / 深问 Pro」分段器整个划掉。
+          自己用,不需要每次问问题前先选一次引擎 —— 有权益就深问,没有就端上,
+          由 canUsePaidCloudAi() 直接决定。答复气泡下的来路徽章仍照实标,
+          所以「这条是云答还是本机搜的」并没有变得不可见,只是不再要你先做选择题。 */}
 
       {/* Input bar */}
       <div className="nesio-wechat-input-bar">
