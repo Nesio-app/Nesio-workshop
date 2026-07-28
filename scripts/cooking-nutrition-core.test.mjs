@@ -42,4 +42,18 @@ assert.equal(M.sumNutrition([]).energyKCal, 0, '空 → 0');
 // 缺项当 0
 assert.equal(M.sumNutrition([{ grams: 100, per100g: { energyKCal: 50 } }]).protein, 0, '缺蛋白字段当 0');
 
+// ── massGrams:质量/体积单位换算,件数单位不计(否则「青椒 3 个」当 3g,营养偏低) ──
+assert.equal(M.massGrams('g', 200), 200, 'g 原样');
+assert.equal(M.massGrams('克', 211), 211, '中文克');
+assert.equal(M.massGrams('kg', 1.5), 1500, 'kg → g');
+assert.equal(M.massGrams('千克', 2), 2000, '中文千克');
+assert.equal(M.massGrams('ml', 30), 30, 'ml≈g');
+assert.equal(M.massGrams('mL', 14), 14, '大小写不敏感');
+assert.equal(M.massGrams('毫升', 26), 26, '中文毫升');
+assert.equal(M.massGrams('升', 1), 1000, '升 → g');
+assert.equal(M.massGrams('个', 3), null, '件数单位不计');
+assert.equal(M.massGrams('根', 2), null, '件数单位不计');
+assert.equal(M.massGrams('', 100), null, '无单位不猜');
+assert.equal(M.massGrams('g', 0), null, '非正数不计');
+
 console.log('cooking-nutrition-core: OK');

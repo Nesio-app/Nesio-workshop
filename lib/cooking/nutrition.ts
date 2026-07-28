@@ -4,7 +4,7 @@
  * 部分食材名字对不齐(鸡胸肉↔鸡胸脯肉 等)→ 查不到就不显示,标「估算/部分」,不做假精确。
  */
 import { normalizeIngredient } from './food-catalog';
-import { parseNutriValue, stripFoodName, type NutriPer100g } from './nutrition-core';
+import { massGrams, parseNutriValue, stripFoodName, type NutriPer100g } from './nutrition-core';
 
 interface RawFood { foodName: string; energyKCal: string; protein: string; fat: string; CHO: string }
 export interface FoodNutrition extends NutriPer100g { foodName: string }
@@ -66,8 +66,8 @@ export async function recipeNutritionPerServing(
   const m = await buildIndex();
   let ek = 0, p = 0, f = 0, c = 0, matched = 0, edibleG = 0;
   for (const q of quantities) {
-    const g = q.unit === 'kg' ? q.amount * 1000 : q.amount;   // g/ml 视作克
-    if (!(g > 0)) continue;
+    const g = massGrams(q.unit, q.amount);                    // 件数单位(个/根/片)不计,不当克算
+    if (g == null) continue;
     const nm = normalizeIngredient(q.item);
     if (!nm.name) continue;
     const foods = m.get(stripFoodName(nm.name));

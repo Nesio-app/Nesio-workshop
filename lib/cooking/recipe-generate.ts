@@ -85,21 +85,60 @@ export function clampGeneratedRecipe(raw: unknown, cuisineName: string, fallback
   };
 }
 
+/** 技法文行(tips.json 的条目形状,选摘用)。 */
+export interface TechniqueTip { id: string; title: string; group: string; content: string }
+
+const MEATY_RE = /鱼|虾|蟹|肉|鸡|鸭|牛|羊|骨|贝|鱿|蛤|鳝|螺|鳕|鲈|翅|蹄|肚|肝|肠/;
+
+/**
+ * 按输入确定性选 ≤2 篇技法文给生成 prompt 做 grounding(HowToCook tips,免费本地语料):
+ * 标题词(去「学习」前缀,按 / 拆)命中「特殊要求/食材」文本 → 选;荤料自动带上「去腥」。
+ * 选不中就一篇不带 —— 不为凑数花 token。
+ */
+export function pickRecipeTips(
+  tips: readonly TechniqueTip[],
+  input: { ingredients: string[]; customPrompt?: string },
+): TechniqueTip[] {
+  const joined = input.ingredients.join(' ');
+  const hay = `${(input.customPrompt || '')} ${joined}`;
+  const picked: TechniqueTip[] = [];
+  for (const tip of tips) {
+    if (picked.length >= 2) break;
+    // 标题拆钥匙词:去 学习/使用/如何 前缀、按 / 、括号 空格 拆(「蒸（米）/炖（使用电饭煲…）」→ 蒸/炖/电饭煲…);
+    // 「肉」单字太泛剔除(否则所有荤菜都命中腌肉文,挤占名额)。
+    const keys = tip.title
+      .split(/[/、()（）\s与]+/)
+      .map((s) => s.replace(/^(学习|使用|如何)/, '').trim())
+      .filter((s) => s.length >= 1 && s !== '肉');
+    const hit = keys.some((k) => hay.includes(k)) || (tip.title.includes('去腥') && MEATY_RE.test(joined));
+    if (hit) picked.push(tip);
+  }
+  return picked;
+}
+
+/** 技法文 → prompt 附录文本(每篇截 700 字,控 token 成本);空数组返回 ''。 */
+export function formatTechniqueNotes(tips: readonly TechniqueTip[]): string {
+  return tips.map((t) => `【${t.title}】${t.content.replace(/\s+/g, ' ').trim().slice(0, 700)}`).join('\n');
+}
+
 export function buildRecipeGeneratePrompt(input: {
   cuisine: Cuisine;
   ingredients: string[];
   customPrompt?: string;
   locale?: string;
+  /** 选摘的技法参考(formatTechniqueNotes 产物),给步骤专业性托底。 */
+  techniqueNotes?: string;
 }): string {
   const isEn = (input.locale || 'zh').toLowerCase().startsWith('en');
   const list = input.ingredients.slice(0, 20).join(isEn ? ', ' : '、');
   const custom = (input.customPrompt || '').trim().slice(0, 200);
+  const notes = (input.techniqueNotes || '').trim().slice(0, 1600);
 
   if (isEn) {
     return `${input.cuisine.prompt}
 
 User ingredients: ${list}
-${custom ? `Special request: ${custom}\n` : ''}
+${custom ? `Special request: ${custom}\n` : ''}${notes ? `Technique reference (Chinese excerpts, for step accuracy — do not copy verbatim):\n${notes}\n` : ''}
 Return ONLY JSON (no markdown):
 {"name":"dish name in Chinese or English","ingredients":["..."],"steps":[{"step":1,"description":"...","time":5,"temperature":"medium"}],"cookingTime":30,"difficulty":"easy|medium|hard","tips":["..."],"category":"${input.cuisine.name}"}`;
   }
@@ -107,7 +146,7 @@ Return ONLY JSON (no markdown):
   return `${input.cuisine.prompt}
 
 用户提供的食材：${list}
-${custom ? `用户的特殊要求：${custom}\n` : ''}
+${custom ? `用户的特殊要求：${custom}\n` : ''}${notes ? `技法参考(摘自家常烹饪手册,用于提升步骤专业度,不要照抄原文)：\n${notes}\n` : ''}
 请严格按下列 JSON 返回(不要 markdown、不要其它文字)：
 {"name":"菜品名称","ingredients":["食材1"],"steps":[{"step":1,"description":"步骤描述","time":5,"temperature":"中火"}],"cookingTime":30,"difficulty":"easy|medium|hard","tips":["技巧"],"category":"${input.cuisine.name}"}`;
 }
