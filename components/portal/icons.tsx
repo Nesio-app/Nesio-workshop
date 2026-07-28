@@ -46,6 +46,8 @@ export const IconChevronRight = make(<path d="m9 6 6 6-6 6" />);
 export const IconCard = make(<><rect x="2" y="5" width="20" height="14" rx="2.5" /><path d="M2 10h20" /><path d="M6 15h4" /></>);
 export const IconHelpCircle = make(<><circle cx="12" cy="12" r="9" /><path d="M9.3 9.3a2.7 2.7 0 1 1 3.9 2.4c-.75.37-1.2.9-1.2 1.7v.35" /><path d="M12 17h.01" /></>);
 export const IconDownload = make(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5M12 15V3" /></>);
+// 加号:今天页输入条左侧「加图片/文件」。用图标而不是 + 字符 —— 字符当图标在自查里被抓过一轮。
+export const IconPlus = make(<><path d="M12 5v14M5 12h14" /></>);
 export const IconUpload = make(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 8 5-5 5 5M12 3v12" /></>);
 
 // ── 记忆节点类型 / 领域 / 天气(批次 2 全站去 emoji)──

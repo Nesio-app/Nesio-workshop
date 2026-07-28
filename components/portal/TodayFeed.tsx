@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { useProfileAvatar } from './use-profile-avatar';
 import { getPoints } from '@/lib/platform/rewards-engine';
@@ -81,6 +81,53 @@ export default function TodayFeed({
   // 批次 31:焦点下方快捷输入(用户新指令)
   const [quickAdd, setQuickAdd] = useState('');
   const [quickSaved, setQuickSaved] = useState(false);
+
+  /**
+   * 「+」上传 → 落成记忆(2026-07-28,用户给了参考图:胶囊左侧加号)。
+   *
+   * 图片走的是记忆详情「补传照片」那条现成的路(local-image-store:压缩 → IndexedDB →
+   * 挂 node.assets,本机存不上传),不另造一套。文本类文件把正文读进 rawInput。
+   * 其余类型(pdf/docx 之类二进制)**明说存不了** —— 仓里目前没有二进制附件存储,
+   * 假装收下比拒收糟得多。
+   */
+  const captureFiles = useCallback(async (files: FileList) => {
+    const list = Array.from(files).slice(0, 30);
+    if (!list.length) return;
+    const imgs = list.filter((f) => f.type.startsWith('image/'));
+    const texts = list.filter((f) => !f.type.startsWith('image/') && /\.(csv|tsv|txt|md|json|xml|ya?ml|log)$/i.test(f.name));
+    const skipped = list.length - imgs.length - texts.length;
+
+    const { addLifeNode } = await import('@/lib/portal/life-graph');
+
+    if (imgs.length) {
+      const { compressToDataUrl, putLocalImage } = await import('@/lib/portal/local-image-store');
+      const assets = [];
+      for (let i = 0; i < imgs.length; i++) {
+        const dataUrl = await compressToDataUrl(imgs[i], 1400, 0.82);
+        const id = `local-today-${Date.now()}-${i}`;
+        await putLocalImage(id, dataUrl);
+        assets.push({ id, kind: 'image' as const, local: true, mimeType: 'image/jpeg', createdAt: new Date().toISOString() });
+      }
+      addLifeNode({
+        name: imgs.length === 1 ? imgs[0].name.replace(/\.[^.]+$/, '') : `${imgs.length} 张照片`,
+        type: 'note', source: 'manual', tags: ['照片'], attributes: {}, relations: [], confidence: 1, assets,
+      });
+    }
+
+    for (const f of texts) {
+      const text = await f.text();
+      addLifeNode({
+        name: f.name.replace(/\.[^.]+$/, ''),
+        type: 'note', source: 'manual', tags: ['文件'], attributes: {}, relations: [], confidence: 1,
+        rawInput: text.slice(0, 20000),
+      });
+    }
+
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+    if (imgs.length || texts.length) { setQuickSaved(true); setTimeout(() => setQuickSaved(false), 1400); }
+    // 有存不了的就要说;不能因为「另外几个存进去了」就把这句吞掉。
+    if (skipped > 0) throw new Error(`有 ${skipped} 个文件还存不了(只收图片和文本类)。`);
+  }, []);
   // 批次 33:话筒 = 原地录音转文字直接入记忆(不跳说一句 sheet);无语音 API 才回落 sheet
   const [micState, setMicState] = useState<'idle' | 'recording'>('idle');
   const recogRef = useRef<{ stop: () => void } | null>(null);
@@ -319,6 +366,7 @@ export default function TodayFeed({
           onMic={startQuickMic}
           recording={micState === 'recording'}
           inputRef={quickInputRef}
+          onFiles={captureFiles}
         />
 
         {/* 今日焦点 — 重要安排 / 重要日子 / 重要提醒 */}
