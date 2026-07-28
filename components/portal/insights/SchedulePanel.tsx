@@ -23,6 +23,9 @@ import { loadPins, togglePin, PINS_UPDATED_EVENT } from '@/lib/portal/pins';
 
 type SubTab = 'calendar' | 'email';
 
+/** 左滑删除后留多久的反悔窗口。到点才真删。 */
+const UNDO_MS = 6000;
+
 interface Row {
   id: string;
   title: string;
@@ -194,6 +197,9 @@ export default function SchedulePanel() {
   // 图1「增加左滑右滑动作,删除和星标」:右滑加星、左滑删掉这条。
   const [starred, setStarred] = useState<Set<string>>(new Set());
   const [gone, setGone] = useState<Set<string>>(new Set());
+  // 待删(可撤销)。离开本页时立刻结算,见下面的 effect。
+  const [pending, setPending] = useState<{ row: Row; timer: number } | null>(null);
+  const [delErr, setDelErr] = useState('');
 
   // 星标 = 全 app 那一个收藏夹(lib/portal/pins),不是这一页私有的标记。
   // 第一版把它写成节点上的「星标」标签,结果是:这里加的星在记忆页收藏夹里看不到、
@@ -207,16 +213,63 @@ export default function SchedulePanel() {
   }, []);
 
   const toggleStar = (r: Row) => {
-    const on = togglePin(r.id);   // 返回切换后的状态,并广播 PINS_UPDATED_EVENT
-    setStarred((prev) => { const next = new Set(prev); if (on) next.add(r.id); else next.delete(r.id); return next; });
+    togglePin(r.id);
+    // 从**存储的真相**回读,而不是拿 togglePin 的返回值。它算的是「本该变成什么」,
+    // 配额满写不进去时照样返回 true —— 星会亮,刷新就没了(全局横幅虽然会亮,
+    // 但这一格本身在说谎)。回读一次,写没成功星就不亮,眼见即所存。
+    setStarred(new Set(loadPins()));
   };
 
-  /** 删除是真删这条记忆节点 —— 先本地隐藏,写失败(返回 false)就放回来,不假装成功。 */
-  const removeRow = (r: Row) => {
-    setGone((prev) => new Set(prev).add(r.id));
-    if (!deleteLifeNode(r.id)) {
-      setGone((prev) => { const next = new Set(prev); next.delete(r.id); return next; });
+  /**
+   * 左滑删除 —— **先隐藏,给一段撤销时间,到点才真删**。
+   *
+   * 第一版是滑一下就 deleteLifeNode:一个手势永久删掉一条记忆,既没确认也没撤销。
+   * 而全 app 别处删东西(记忆详情 / 物品 / 关系 / 搭配记录)都要确认 —— 偏偏最容易
+   * 误触的滑动手势没有出口。滑动上弹确认框又会把「快」这个唯一优点抵消掉,
+   * 所以走撤销条:符合 warm-coach「每个动作都留后路」,也不打断手势的节奏。
+   *
+   * 到点真删、或离开这一页时立刻结算(所见即所得,不会走开一趟回来它又冒出来)。
+   * 删除写失败(返回 false)就把行放回来并显式报错,不假装成功。
+   */
+  const commitDelete = (id: string) => {
+    if (!deleteLifeNode(id)) {
+      setGone((prev) => { const next = new Set(prev); next.delete(id); return next; });
+      setDelErr(L(dict, '这条没能删掉,已经放回来了。', 'Could not delete — it is back in the list.'));
     }
+  };
+
+  const removeRow = (r: Row) => {
+    if (pending) { window.clearTimeout(pending.timer); commitDelete(pending.row.id); }
+    setDelErr('');
+    setGone((prev) => new Set(prev).add(r.id));
+    const timer = window.setTimeout(() => { commitDelete(r.id); setPending(null); }, UNDO_MS);
+    setPending({ row: r, timer });
+  };
+
+  // 结算待删。① 组件卸载(切走 tab / 关掉洞察)—— 实测有效,离开就真删。
+  // ② pagehide(刷新/关页)—— **尽力而为,不保证**:图谱最终落在 IndexedDB,
+  //    异步写在页面拆卸时来不及完成(实测过:反悔窗口内硬刷新,那条会回来)。
+  //    这个失败方向是安全的(数据活着而不是消失),所以接受;但别在文案里
+  //    承诺「一定删掉了」。真要做到,得给删除加持久化的墓碑,那是另一件事。
+  const pendingRef = useRef(pending);
+  pendingRef.current = pending;
+  useEffect(() => {
+    const flush = () => {
+      const p = pendingRef.current;
+      if (!p) return;
+      window.clearTimeout(p.timer);
+      pendingRef.current = null;
+      deleteLifeNode(p.row.id);
+    };
+    window.addEventListener('pagehide', flush);
+    return () => { window.removeEventListener('pagehide', flush); flush(); };
+  }, []);
+
+  const undoDelete = () => {
+    if (!pending) return;
+    window.clearTimeout(pending.timer);
+    setGone((prev) => { const next = new Set(prev); next.delete(pending.row.id); return next; });
+    setPending(null);
   };
 
   useEffect(() => {
@@ -341,6 +394,33 @@ export default function SchedulePanel() {
               onOpen={() => setOpenNode(r.node)} onStar={() => toggleStar(r)} onDelete={() => removeRow(r)} />
           ))}
         </div>
+      )}
+
+      {/* 删除的后路:到点(UNDO_MS)才真删,这段时间里随时能拿回来。 */}
+      {pending && (
+        <div role="status" style={{
+          display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+          marginTop: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)',
+          borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)',
+          background: 'var(--status-calm-soft)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)',
+        }}>
+          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {L(dict, `「${pending.row.title}」已移走`, `Removed “${pending.row.title}”`)}
+          </span>
+          <button type="button" onClick={undoDelete} style={{
+            flexShrink: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+            fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)',
+            fontWeight: 'var(--weight-semibold)', color: 'var(--portal-accent)',
+          }}>{L(dict, '拿回来', 'Undo')}</button>
+        </div>
+      )}
+
+      {delErr && (
+        <p role="alert" style={{
+          marginTop: 'var(--space-3)', padding: 'var(--space-2) var(--space-3)',
+          borderRadius: 'var(--radius-sm)', background: 'var(--status-gentle-soft)',
+          color: 'var(--status-gentle)', fontSize: 'var(--text-xs)',
+        }}>{delErr}</p>
       )}
 
       {/* elevated:日程在洞察(fullscreen,z-930)里,详情是 bottom 卡 —— 不抬层会被整个盖住。 */}
