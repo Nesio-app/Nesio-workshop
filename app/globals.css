@@ -18488,12 +18488,15 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .ng-ifs{margin-top:var(--space-3);display:flex;flex-direction:column;gap:9px;animation:ng-reveal-in .4s var(--ng-ease)}
 .ng-ifs-part{border-radius:12px;padding:12px 14px;font-size:.92rem;line-height:1.65;border:1px solid}
 .ng-ifs-part .lbl{display:block;font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.06em;margin-bottom:5px}
-.ng-ifs-part.protector{background:var(--status-gentle-soft);border-color:var(--status-gentle)}
-.ng-ifs-part.protector .lbl{color:var(--status-gentle)}
-.ng-ifs-part.self{background:var(--portal-accent-soft);border-color:var(--portal-accent-border)}
-.ng-ifs-part.self .lbl{color:var(--portal-accent)}
-.ng-ifs-part.insight{background:var(--status-calm-soft);border-color:var(--status-calm)}
-.ng-ifs-part.insight .lbl{color:var(--status-calm)}
+/* 2026-07-28 UI 精修(标注 图13/图14「颜色太杂 / 颜色太多」):内在小孩 / 清醒的自己 / 念念的洞察
+   原本一张一个色(琥珀 / 蓝 / 灰蓝),加上时间线自己的蓝底,一屏四五种底色在打架。
+   统一成同一张中性卡,角色只靠小标签区分;强调色留给真正的操作(按钮/当前步)。 */
+.ng-ifs-part.protector,
+.ng-ifs-part.self,
+.ng-ifs-part.insight{background:var(--portal-card);border-color:var(--portal-line)}
+.ng-ifs-part.protector .lbl,
+.ng-ifs-part.self .lbl,
+.ng-ifs-part.insight .lbl{color:var(--portal-muted)}
 .ng-ifs-action{margin-top:2px;background:var(--portal-card);border:1px solid var(--portal-line);border-radius:10px;padding:9px 12px;font-size:.86rem;color:var(--portal-ink);line-height:1.5}
 
 /* 疗愈子 tab:入口按钮 + 身体层可点落地 + 阴影整合时间线 */
@@ -18510,8 +18513,9 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .ng-ground-item .tick{flex:none;width:18px;height:18px;border-radius:50%;border:1.5px solid var(--ng-faint);display:flex;align-items:center;justify-content:center;font-size:.7rem;color:#fff}
 .ng-ground-item.on{color:var(--status-calm);border-color:var(--status-calm)}
 .ng-ground-item.on .tick{background:var(--status-calm);border-color:var(--status-calm)}
-.ng-ground-step{margin-top:2px;background:var(--status-gentle-soft);border:1px solid var(--status-gentle);border-radius:10px;padding:10px 13px;font-size:.9rem;color:var(--portal-ink);line-height:1.55}
-.ng-ground-step .lbl{display:block;font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.06em;color:var(--status-gentle);margin-bottom:5px}
+/* 图14:「现在,给身体一个动作」这张琥珀卡跟着一起收敛成中性卡。 */
+.ng-ground-step{margin-top:2px;background:var(--portal-card);border:1px solid var(--portal-line);border-radius:10px;padding:10px 13px;font-size:.9rem;color:var(--portal-ink);line-height:1.55}
+.ng-ground-step .lbl{display:block;font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.06em;color:var(--portal-muted);margin-bottom:5px}
 
 /* 阴影整合时间线:当前步放大高亮 / 已完成收起 / 未来步灰 */
 .ng-tl{display:flex;flex-direction:column}
@@ -18535,12 +18539,16 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .ng-tl-q{margin:0;font-size:.9rem;font-weight:var(--weight-medium);color:var(--portal-ink);line-height:1.5}
 .ng-heal-from{margin:-2px 0 0;font-size:.74rem;color:var(--portal-accent);line-height:1.4}
 /* 情绪转盘(纯 HTML 绝对定位,iOS 安全):12 圆点环 + 中心大圈 */
-.ng-wheel{position:relative;width:min(280px,82vw);aspect-ratio:1/1;margin:8px auto 6px}
+/* 2026-07-28(标注 图15「这块太大了,右偏」):
+   ① 直径从 280/82vw 收到 232/66vw —— 原尺寸一个人占满一屏,下面的输入框和按钮全被挤出视野;
+   ② 时间线左边是 22px 轨道 + 12px 间距,轮子在卡片里居中 = 在屏幕上偏右 17px,这里补回去。 */
+.ng-wheel{position:relative;width:min(232px,66vw);aspect-ratio:1/1;margin:8px auto 6px}
+.ng-heal .ng-tl-in .ng-wheel{left:-17px}
 .ng-wheel-dot{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;padding:0;cursor:pointer;font-family:inherit}
-.ng-wheel-dot .d{width:30px;height:30px;border-radius:50%;border:1px solid rgba(255,255,255,.55);transition:transform .12s var(--ng-ease)}
+.ng-wheel-dot .d{width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,.55);transition:transform .12s var(--ng-ease)}
 .ng-wheel-dot.on .d{transform:scale(1.16);border:2.5px solid #fff;box-shadow:0 0 0 4px rgba(20,20,20,.05)}
 .ng-wheel-dot:active .d{transform:scale(1.1)}
-.ng-wheel-dot .l{font-size:.72rem;line-height:1;color:var(--portal-muted);white-space:nowrap}
+.ng-wheel-dot .l{font-size:.68rem;line-height:1;color:var(--portal-muted);white-space:nowrap}
 .ng-wheel-dot.on .l{color:var(--portal-ink);font-weight:var(--weight-semibold)}
 .ng-wheel-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:43%;aspect-ratio:1/1;border-radius:50%;background:var(--portal-card);border:1.5px solid var(--portal-line);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;transition:background .25s var(--ng-ease),border-color .25s var(--ng-ease)}
 .ng-wheel-center .nm{font-family:var(--font-portal-serif,Georgia,serif);font-size:1.15rem;font-weight:800;color:var(--portal-muted)}
