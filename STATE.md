@@ -155,6 +155,14 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **财务板块大修(2026-07-28 审计完成,施工待批)**:四路深查(maybe 数据/分析/UI × 宝盒体检)
+  收敛为 `docs/design/finance-maybe-audit-2026-07.md`。**P0 止血项含一条不可逆数据销毁路径**
+  (connector-sync 先 replace 账户再按新表过滤流水写回 + 全仓无 `await store.ready()`,
+  水合前同步可把全部流水覆盖成空且游标已推进)、summarizeMonth 符号 bug、同屏两套数据集、
+  残月比完整月、冷启动假空态。P1 手动资产+估值锚点(UI 稿 artifact fb540e24)、净值序列、
+  转账对敲负样本表、字段级规则锁。P2 基线统一口径/可操作 findings/新检测。P3 FinanceTab
+  拆分/图表统一/对账小票。maybe 是 AGPL——只借形不借码。
+
 - **美食语料扩容(2026-07-28)**:HowToCook(Anduin2017,Unlicense)368 道家常菜并入
   `public/data/cooking/recipes.json`(总 704 道,双语料 source 标注)——导入器
   `scripts/import-howtocook.mjs`(确定性解析,幂等可重跑),每份**家庭份量**补上
