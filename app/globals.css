@@ -18821,9 +18821,12 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .nm-quota{display:flex;gap:10px;align-items:flex-start;background:var(--portal-card);border:1px solid var(--portal-line);border-radius:13px;padding:12px 14px;margin:14px 0 0;font-size:.82rem;line-height:1.55}
 .nm-quota svg{width:17px;height:17px;stroke:var(--portal-accent);stroke-width:1.7;fill:none;flex:none;margin-top:2px}
 .nm-quota b{color:var(--portal-accent)}
-.nm-make{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;font-family:inherit;font-size:.92rem;font-weight:var(--weight-semibold);color:var(--portal-accent);background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:14px;padding:14px 0;cursor:pointer;margin-top:12px;transition:transform .12s var(--nm-ease)}
+/* 2026-07-28 UI 精修(标注 图28「换样子」):原来是一条浅底浅字的带子,和上面的配额卡长得一样,
+   看着像块说明而不是能按的按钮。改成实心主按钮,配额收成右边的小字。 */
+.nm-make{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;font-family:inherit;font-size:.95rem;font-weight:var(--weight-semibold);color:var(--sheet-opaque,#fff);background:var(--portal-accent);border:none;border-radius:var(--radius-pill,999px);padding:15px 18px;cursor:pointer;margin-top:16px;box-shadow:var(--shadow-card,0 6px 18px rgba(20,30,50,.10));transition:transform .12s var(--nm-ease)}
 .nm-make:active{transform:scale(.98)}
-.nm-make svg{width:18px;height:18px;stroke:var(--portal-accent);stroke-width:1.8;fill:none;stroke-linecap:round}
+.nm-make svg{width:18px;height:18px;stroke:var(--sheet-opaque,#fff);stroke-width:1.8;fill:none;stroke-linecap:round}
+.nm-make-q{margin-left:auto;font-size:.76rem;font-weight:var(--weight-medium);opacity:.75}
 
 .nm-grid2{display:grid;grid-template-columns:1fr 1fr;gap:11px}
 .nm-grid2 .nm-poster{aspect-ratio:3/4}

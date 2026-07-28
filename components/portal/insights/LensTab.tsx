@@ -23,12 +23,31 @@ export default function LensTab() {
   const en = dict === 'en';
   const [openNode, setOpenNode] = useState<LifeNode | null>(null);
 
-  // 挑可套镜头的记忆:有内容的;情绪重的排前,再按新近
+  /**
+   * 挑可套镜头的记忆(2026-07-28,用户标注 图25「没有情绪,类的应该不关联」)。
+   *
+   * 原来只筛「有内容 + 不是人/地点」,于是日历项、天气信号、亚马逊订单确认邮件全排进来了 ——
+   * 镜头是拿来看**自己的想法**的,给一条「约 4 小时后转多云」套认知扭曲镜头毫无意义。
+   *
+   * 现在两道门,都得过:
+   *   ① 来路得是你自己留下的(手记 / 语音 / 照片)—— 日历 / 邮件 / 系统信号一律不进;
+   *   ② 内容得有情绪或第一人称的判断(shouldNudge 的词表,或带「情绪」类标签)。
+   * 宁可少,不要拿系统噪音凑数。
+   */
   const memories = useMemo(() => {
     let nodes: LifeNode[] = [];
     try { nodes = getLifeGraph(); } catch { return []; }
+    const SELF_SOURCES = new Set(['manual', 'voice', 'photo']);
+    const FEELING_TAGS = ['情绪', '心情', 'mood', 'emotion', 'healing', '手记'];
     return nodes
-      .filter((n) => nodeText(n).length >= 8 && n.type !== 'person' && n.type !== 'place')
+      .filter((n) => {
+        if (nodeText(n).length < 8) return false;
+        if (n.type === 'person' || n.type === 'place') return false;
+        if (!SELF_SOURCES.has(n.source)) return false;
+        const tags = (n.tags || []).map((t) => t.toLowerCase());
+        const tagged = FEELING_TAGS.some((t) => tags.some((x) => x.includes(t.toLowerCase())));
+        return tagged || shouldNudge(nodeText(n));
+      })
       .map((n) => ({ n, heavy: shouldNudge(nodeText(n)), t: new Date(n.createdAt).getTime() }))
       .sort((a, b) => (a.heavy === b.heavy ? b.t - a.t : a.heavy ? -1 : 1))
       .slice(0, 12);
@@ -43,7 +62,7 @@ export default function LensTab() {
       {/* 2026-07-28 UI 精修(标注 图24):顶部两行说明划掉 —— 卡片右上角每条都写着「用镜头看看 ›」,
           说明句只是把真正能点的东西往下推。 */}
       {memories.length === 0 ? (
-        <div className="ng-done" style={{ marginTop: 16 }}>{L(dict, '先去记点什么 —— 有了记忆,就能在它上面套镜头看清楚一点。', 'Capture something first — then you can hold a lens up to it.')}</div>
+        <div className="ng-done" style={{ marginTop: 16 }}>{L(dict, '还没有可以拆的想法 —— 说一句或写一笔带着感受的记录,它就会出现在这里。(日历、邮件、天气这类不进镜头)', 'Nothing to unpack yet — jot or say something with a feeling in it and it shows up here. (Calendar, email and weather never do.)')}</div>
       ) : (
         <div style={{ marginTop: 16 }}>
           {memories.map(({ n, heavy }) => (

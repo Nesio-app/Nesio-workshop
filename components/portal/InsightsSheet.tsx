@@ -628,7 +628,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {mainTab === 'relationships' && showPeople && <RelationshipsPanel />}
 
         {/* ── Tab: 会议(只看会议记录 + 挂没挂到日程,解决「混在一堆里找不着」)── */}
-        {mainTab === 'schedule' && <TabErrorBoundary label="schedule"><SchedulePanel onOpenMemory={openInMemory} /></TabErrorBoundary>}
+        {mainTab === 'schedule' && <TabErrorBoundary label="schedule"><SchedulePanel /></TabErrorBoundary>}
 
         {/* ── Tab: 物品(只读统计 dashboard;管理去物品页)── */}
         {mainTab === 'inventory' && <TabErrorBoundary label="inventory"><InventoryStatsPanel /></TabErrorBoundary>}

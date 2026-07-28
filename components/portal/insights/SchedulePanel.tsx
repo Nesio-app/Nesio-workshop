@@ -6,11 +6,15 @@
  *      按时间排;挂了会议记录的日程标「有记录」,点进对应记忆。保留原会议记录闭环。
  *   ② 邮件:source=email 的节点(广告在 gmail 抽取阶段已排除 —— CATEGORY_PROMOTIONS 不进 AI);
  *      这里再加一层关键词兜底,过滤明显促销。
- * 只读 life-graph,点条目跳记忆页搜索。随同步/记录事件自动刷新。
+ * 只读 life-graph。2026-07-28 按标注 图29 收紧:日历项由近到远、只留有具体时间的真事、
+ * 点条目直接开这条记忆的详情(不再跳到记忆页让你自己找)。随同步/记录事件自动刷新。
  */
 
 import { useEffect, useMemo, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+
+const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -23,19 +27,43 @@ interface Row {
   dateIso: string;
   meta: string;       // 副行(地点/来源/收件人等)
   badge?: string;     // 「有记录」/「会议记录」
-  query: string;      // 点进记忆搜什么
+  query: string;      // 兜底:详情打不开时按原话去记忆页搜
+  node: LifeNode;     // 图29:点一下直接开这条记忆的详情
 }
 
 const AD_RE = /退订|unsubscribe|优惠|促销|限时|折扣|秒杀|大促|% ?off|sale\b|coupon|deal[s]?\b/i;
+
+/**
+ * 日程里不该出现的「不是具体事情」的条目(2026-07-28,用户标注 图29:
+ *「应该只出现有具体事情的,周期提醒、还款、缴费、课程、家务项目不显示」)。
+ *
+ * 这些多半是从待办 App(滴答清单等)当日历同步进来的循环任务 —— 它们是 checklist,
+ * 不是「几点要去哪儿见谁」。日历项里混着它们,真正要赴的约会就被淹掉了。
+ * 启发式关键词,宁可漏放几条也别误杀真日程;发现漏网的往这里加。
+ */
+const CHORE_RE = new RegExp([
+  // 还款 / 缴费 / 账单
+  '还款|缴费|账单|信用卡|房租|水电|燃气|物业|保险|续费|自动扣款|订阅',
+  'bill|payment|due|autopay|rent|invoice|insurance|renew(al)?|subscription',
+  // 家务
+  '家务|打扫|清洁|洗碗|洗衣|倒垃圾|换床单|拖地|吸尘|除螨|浇花|遛狗|喂猫',
+  'clean|laundry|wash|vacuum|trash|garbage|dishes|chore|tidy|declutter',
+  // 课程 / 周期提醒
+  '课程|上课|打卡|每日|每周|每月|定期|周期|提醒',
+  'class\\b|lesson|course|daily|weekly|monthly|recurring|reminder|routine|habit',
+].join('|'), 'i');
 
 function stripPrefix(name: string): string {
   return name.replace(/^(会议记录|Meeting notes)\s*·\s*/, '').trim() || name;
 }
 
-export default function SchedulePanel({ onOpenMemory }: { onOpenMemory: (query: string) => void }) {
+// 图29 之后不再需要 onOpenMemory —— 点条目就地开详情,不跳记忆页。
+export default function SchedulePanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [sub, setSub] = useState<SubTab>('calendar');
   const [nodes, setNodes] = useState<LifeNode[]>([]);
+  // 图29「点击应该直接进入对应记忆,而不是记忆页」:就地开这条记忆的详情。
+  const [openNode, setOpenNode] = useState<LifeNode | null>(null);
 
   useEffect(() => {
     const load = () => { try { setNodes(getLifeGraph()); } catch { setNodes([]); } };
@@ -52,10 +80,17 @@ export default function SchedulePanel({ onOpenMemory }: { onOpenMemory: (query: 
 
   const calendarRows = useMemo<Row[]>(() => {
     const out: Row[] = [];
+    // 图29「排序应该由近到远」:今天 0 点以后的先按时间正序排;更早的(已经过去的)排在后面、倒序。
+    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
     for (const n of nodes) {
       const a = n.attributes || {};
       if (n.source === 'calendar') {
         const start = typeof a.start === 'string' ? a.start : n.createdAt;
+        // 图29「全天日历不显示」:allDay 标记,或 start 只有日期没有时刻(YYYY-MM-DD)。
+        const allDay = a.allDay === true || /^\d{4}-\d{2}-\d{2}$/.test(start.trim());
+        if (allDay) continue;
+        // 图29「只出现有具体事情的」:循环提醒 / 还款缴费 / 课程 / 家务不进日程。
+        if (CHORE_RE.test(n.name)) continue;
         out.push({
           id: n.id,
           title: n.name,
@@ -63,6 +98,7 @@ export default function SchedulePanel({ onOpenMemory }: { onOpenMemory: (query: 
           meta: typeof a.location === 'string' && a.location ? a.location : (typeof a.calendarName === 'string' ? a.calendarName : ''),
           badge: a.meetingRecordId ? L(dict, '有记录', 'notes') : undefined,
           query: n.name,
+          node: n,
         });
       } else if ((n.tags || []).includes('meeting-notes') && !a.calendarNodeId) {
         // 未挂到日历的独立会议记录(Granola/录音)也留在日程里
@@ -73,10 +109,15 @@ export default function SchedulePanel({ onOpenMemory }: { onOpenMemory: (query: 
           meta: (n.tags || []).includes('Granola') ? 'Granola' : L(dict, '录音', 'Recording'),
           badge: L(dict, '会议记录', 'meeting'),
           query: stripPrefix(n.name),
+          node: n,
         });
       }
     }
-    return out.sort((x, y) => (x.dateIso < y.dateIso ? 1 : x.dateIso > y.dateIso ? -1 : 0));
+    const t0 = todayStart.getTime();
+    const ms = (r: Row) => { const v = new Date(r.dateIso).getTime(); return Number.isNaN(v) ? 0 : v; };
+    const upcoming = out.filter((r) => ms(r) >= t0).sort((x, y) => ms(x) - ms(y));   // 近 → 远
+    const past = out.filter((r) => ms(r) < t0).sort((x, y) => ms(y) - ms(x));        // 刚过去的先
+    return [...upcoming, ...past];
   }, [nodes, dict]);
 
   const emailRows = useMemo<Row[]>(() => {
@@ -91,6 +132,7 @@ export default function SchedulePanel({ onOpenMemory }: { onOpenMemory: (query: 
           dateIso: typeof a.date === 'string' ? a.date : n.createdAt,
           meta: typeof a.from === 'string' ? a.from : (typeof a.sender === 'string' ? a.sender : ''),
           query: n.name,
+          node: n,
         } as Row;
       })
       .sort((x, y) => (x.dateIso < y.dateIso ? 1 : x.dateIso > y.dateIso ? -1 : 0));
@@ -131,7 +173,7 @@ export default function SchedulePanel({ onOpenMemory }: { onOpenMemory: (query: 
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {rows.slice(0, 60).map((r) => (
-            <button key={r.id} type="button" onClick={() => onOpenMemory(r.query)}
+            <button key={r.id} type="button" onClick={() => setOpenNode(r.node)}
               style={{ display: 'block', textAlign: 'left', width: '100%', cursor: 'pointer', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', background: 'var(--glass-bg-solid, var(--portal-bg))', padding: 'var(--space-3) var(--space-4)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-3)' }}>
                 <span style={{ fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
@@ -147,6 +189,9 @@ export default function SchedulePanel({ onOpenMemory }: { onOpenMemory: (query: 
           ))}
         </div>
       )}
+
+      {/* elevated:日程在洞察(fullscreen,z-930)里,详情是 bottom 卡 —— 不抬层会被整个盖住。 */}
+      {openNode && <MemoryNodeDetail node={openNode} elevated onClose={() => setOpenNode(null)} />}
     </div>
   );
 }
