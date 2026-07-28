@@ -6,6 +6,8 @@
  *   ② 加衣服:拍照/选图存本机 + 快选类型/保暖/正式度。Pro 可「AI 识别」自动填属性(analyze
  *      clothing 模式);免费手填(拍照仍可存,永不报错)。
  *   ③ 我的衣橱:按类型分组浏览,缩略图 + 属性,支持「今天穿了」(记穿着,鼓励穿遍)/删除。
+ *   ④ 搭配(2026-07-28,标注 图15):存下来的搭配 —— 列表 / 按月日历两种看法,
+ *      点星 = 喜欢,点不喜欢 = 淘汰(记录留着但不再推这一组)。搭配以前是现算的,关掉就没了。
  * 只读/写 life-graph(衣服=object garment 节点),随 nesio-life-graph-updated 刷新。
  */
 
@@ -15,6 +17,10 @@ import {
   GARMENT_TYPES, updateGarment, type Garment, type GarmentType, type Warmth, type Formality, type OutfitPrefs,
 } from '@/lib/portal/wardrobe';
 import { loadWardrobePrefs, recordOutfitFeedback, buildStylistDislikes } from '@/lib/portal/wardrobe-prefs';
+import {
+  loadOutfits, saveOutfit, patchOutfit, removeOutfit, groupByMonth, retiredKeys, outfitKey,
+  WARDROBE_OUTFITS_UPDATED, type SavedOutfit,
+} from '@/lib/portal/wardrobe-outfits';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { L } from '@/lib/portal/i18n';
@@ -28,6 +34,16 @@ const TYPE_LABEL: Record<GarmentType, [string, string]> = {
 };
 const WARMTH_LABEL: Record<Warmth, [string, string]> = { 1: ['薄', 'Light'], 2: ['适中', 'Medium'], 3: ['保暖', 'Warm'] };
 const FORMAL_LABEL: Record<Formality, [string, string]> = { casual: ['休闲', 'Casual'], smart: ['通勤', 'Smart'], formal: ['正式', 'Formal'] };
+
+// 样式小工具:2026-07-28 从组件里提到模块级 —— 新增的 SavedOutfits(图15)也要用同一套。
+const card: React.CSSProperties = { borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', padding: 'var(--space-4)' };
+const sectionLbl: React.CSSProperties = { margin: 'var(--space-5) 0 var(--space-2)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' };
+const chip = (active: boolean): React.CSSProperties => ({
+  padding: '0.3rem 0.7rem', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-xs)', cursor: 'pointer',
+  border: `1px solid ${active ? 'transparent' : 'var(--portal-line)'}`,
+  background: active ? 'var(--portal-accent)' : 'transparent',
+  color: active ? 'var(--portal-on-accent, #fff)' : 'var(--portal-ink)',
+});
 
 /** 缩到 ≤1280px 的 jpeg dataURL,别把整张原图塞进 IndexedDB。 */
 function compressImage(file: File): Promise<{ dataUrl: string; mimeType: string }> {
@@ -118,6 +134,11 @@ export default function WardrobePanel() {
   // B｜反馈学习:本地偏好(喜欢的颜色 / 拒绝的组合),回喂规则版 + 云造型师
   const [prefs, setPrefs] = useState<OutfitPrefs>({ colorLikes: {}, dislikedItemIds: [], dislikedPairs: [] });
   const [fbFlash, setFbFlash] = useState<string | null>(null);
+  // 图15:存下来的搭配
+  const [tab, setTab] = useState<'today' | 'saved'>('today');
+  const [outfits, setOutfits] = useState<SavedOutfit[]>([]);
+  const [savedView, setSavedView] = useState<'list' | 'calendar'>('list');
+  const [outfitErr, setOutfitErr] = useState('');
   // C｜上身试穿
   const [tryonOpen, setTryonOpen] = useState(false);
   const [tryonBusy, setTryonBusy] = useState(false);
@@ -197,6 +218,21 @@ export default function WardrobePanel() {
     } finally {
       setTryonBusy(false);
     }
+  };
+
+  useEffect(() => {
+    const load2 = () => setOutfits(loadOutfits());
+    load2();
+    window.addEventListener(WARDROBE_OUTFITS_UPDATED, load2);
+    return () => window.removeEventListener(WARDROBE_OUTFITS_UPDATED, load2);
+  }, []);
+
+  /** 存/改搭配的统一出口:写不进本机存储要说出来,不假装成功。 */
+  const commitOutfit = (ok: boolean, msg?: string) => {
+    if (!ok) { setOutfitErr(L(dict, '没存上 —— 本机存储写不进(隐私模式或空间满了)。', 'Could not save — local storage is unavailable.')); return; }
+    setOutfitErr('');
+    setOutfits(loadOutfits());
+    if (msg) { setFbFlash(msg); setTimeout(() => setFbFlash(null), 2000); }
   };
 
   // 记一条反馈(👍/👎/穿了)→ 更新本地偏好 + 触发重排(dislike 会避开这套)
@@ -427,21 +463,44 @@ export default function WardrobePanel() {
   };
 
   /* ── 样式(全 token) ── */
-  const card: React.CSSProperties = { borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', padding: 'var(--space-4)' };
-  const sectionLbl: React.CSSProperties = { margin: 'var(--space-5) 0 var(--space-2)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' };
-  const chip = (active: boolean): React.CSSProperties => ({
-    padding: '0.3rem 0.7rem', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-xs)', cursor: 'pointer',
-    border: `1px solid ${active ? 'transparent' : 'var(--portal-line)'}`,
-    background: active ? 'var(--portal-accent)' : 'transparent',
-    color: active ? 'var(--portal-on-accent, #fff)' : 'var(--portal-ink)',
-  });
+  const todayIso = new Date().toISOString().slice(0, 10);
+  const retired = retiredKeys(outfits);
 
   return (
     <div className="nesio-analytics-tab">
+      {/* 图15:多一个「搭配」tab —— 存下来的搭配从这里翻 */}
+      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+        <button type="button" style={chip(tab === 'today')} onClick={() => setTab('today')}>{L(dict, '今天', 'Today')}</button>
+        <button type="button" style={chip(tab === 'saved')} onClick={() => setTab('saved')}>
+          {L(dict, `搭配 ${outfits.length}`, `Outfits ${outfits.length}`)}
+        </button>
+      </div>
+
+      {outfitErr && (
+        <p style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--status-risk)', background: 'var(--status-risk-soft)', borderRadius: 'var(--radius-sm)', padding: 'var(--space-2) var(--space-3)' }} role="alert">{outfitErr}</p>
+      )}
+
+      {tab === 'saved' ? (
+        <SavedOutfits
+          outfits={outfits} garments={items} thumbs={thumbs} view={savedView} dict={dict}
+          onView={setSavedView}
+          onStar={(o) => commitOutfit(patchOutfit(o.id, { starred: !o.starred, retired: false }))}
+          onRetire={(o) => {
+            const next = !o.retired;
+            commitOutfit(patchOutfit(o.id, { retired: next, starred: false }),
+              next ? L(dict, '淘汰了 —— 以后不再推这一组', 'Retired — I won’t suggest it again') : undefined);
+            if (next) setRestyleNonce((n) => n + 1);
+          }}
+          onRemove={(o) => { if (confirm(L(dict, '删掉这条搭配记录?', 'Delete this outfit record?'))) commitOutfit(removeOutfit(o.id)); }}
+        />
+      ) : (
+      <>
       {/* ① 今天穿这套(有 AI 造型用 AI 的,否则规则版) */}
       {(() => {
         const pieces = aiPieces ?? outfit.pieces;
         if (items.length < 2 || pieces.length === 0) return null;
+        // 图15:被淘汰过的一组不再推 —— 命中就直说,给一个「换一套」的出口(不静默换,免得看着像随机)
+        const isRetired = retired.has(outfitKey(pieces.map((p) => p.id)));
         const reasonText = aiPieces ? stylist!.reason : (dict === 'en' ? outfit.reason[1] : outfit.reason[0]);
         return (
         <div style={{ ...card, background: 'var(--portal-accent-soft-md)' }}>
@@ -469,6 +528,12 @@ export default function WardrobePanel() {
             )))}
           </div>
           {/* 图12:AI 造型贴士同批删掉(同一类「解释自己」的话)。 */}
+          {isRetired && (
+            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+              {L(dict, '这套你淘汰过 —— ', 'You retired this one — ')}
+              <button type="button" onClick={() => setRestyleNonce((n) => n + 1)} style={linkish('var(--portal-accent)')}>{L(dict, '换一套', 'restyle')}</button>
+            </p>
+          )}
           {outfit.needUmbrella && (
             <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-calm)' }}>☔ {L(dict, '今天可能下雨,记得带伞', 'Rain likely — take an umbrella')}</p>
           )}
@@ -487,9 +552,19 @@ export default function WardrobePanel() {
                   style={{ padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', cursor: 'pointer', fontSize: 'var(--text-sm)' }}>👍</button>
                 <button type="button" aria-label={L(dict, '不喜欢', 'Dislike')} onClick={() => giveFeedback('dislike', pieces)}
                   style={{ padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', cursor: 'pointer', fontSize: 'var(--text-sm)' }}>👎</button>
-                <button type="button" onClick={() => { setTryonOpen(true); setTryonResult(null); setTryonError(null); }}
+                {/* 图15:这套穿了 → 存进「搭配」,以后能翻能按月看 */}
+                <button type="button" onClick={() => {
+                  for (const p of pieces) markWorn(p.id, new Date().toISOString());
+                  giveFeedback('worn', pieces);
+                  commitOutfit(saveOutfit(pieces.map((p) => p.id), todayIso), L(dict, '存进「搭配」了', 'Saved to Outfits'));
+                  load();
+                }}
                   style={{ marginLeft: 'auto', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
-                  {L(dict, '🪞 试穿这套', '🪞 Try on')}
+                  {L(dict, '这套穿了', 'Wore this')}
+                </button>
+                <button type="button" onClick={() => { setTryonOpen(true); setTryonResult(null); setTryonError(null); }}
+                  style={{ padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
+                  {L(dict, '试穿', 'Try on')}
                 </button>
               </>
             )}
@@ -748,6 +823,99 @@ export default function WardrobePanel() {
           </div>
         </div>
       ))}
+      </>
+      )}
     </div>
   );
 }
+
+/**
+ * SavedOutfits — 存下来的搭配(2026-07-28,标注 图15)。
+ * 两种看法:列表(新→旧)/ 按月日历(哪天穿了什么,一眼看出哪几天没记)。
+ * 点星 = 喜欢;点不喜欢 = 淘汰(记录留着,但搭配不再推这一组)。
+ */
+function SavedOutfits({ outfits, garments, thumbs, view, dict, onView, onStar, onRetire, onRemove }: {
+  outfits: SavedOutfit[]; garments: Garment[]; thumbs: Record<string, string>;
+  view: 'list' | 'calendar'; dict: string;
+  onView: (v: 'list' | 'calendar') => void;
+  onStar: (o: SavedOutfit) => void; onRetire: (o: SavedOutfit) => void; onRemove: (o: SavedOutfit) => void;
+}) {
+  const byId = useMemo(() => new Map(garments.map((g) => [g.id, g])), [garments]);
+  const months = useMemo(() => groupByMonth(outfits), [outfits]);
+
+  if (outfits.length === 0) {
+    return (
+      <p className="nesio-insights-empty" style={{ marginTop: 0 }}>
+        {L(dict, '还没存过搭配 —— 在「今天」里点「这套穿了」,它就会留在这儿,以后能按月翻。', 'No outfits saved yet — tap “Wore this” on the Today tab and they’ll collect here.')}
+      </p>
+    );
+  }
+
+  const Row = ({ o }: { o: SavedOutfit }) => {
+    const pieces = o.pieceIds.map((id) => byId.get(id)).filter(Boolean) as Garment[];
+    return (
+      <div style={{ ...card, opacity: o.retired ? 0.55 : 1 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-2)' }}>
+          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>
+            {o.date.slice(5).replace('-', dict === 'en' ? '/' : '月')}{dict === 'en' ? '' : '日'}
+          </span>
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+            {o.retired ? L(dict, '已淘汰', 'Retired') : o.starred ? L(dict, '喜欢', 'Loved') : L(dict, `${pieces.length} 件`, `${pieces.length} pieces`)}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
+          {pieces.map((p) => (thumbs[p.id] ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img key={p.id} src={thumbs[p.id]} alt={p.name} title={p.name} width={52} height={52}
+              style={{ width: 52, height: 52, borderRadius: 'var(--radius-sm)', objectFit: 'cover', border: '1px solid var(--portal-line)' }} />
+          ) : (
+            <span key={p.id} style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.5rem' }}>{p.name}</span>
+          )))}
+          {pieces.length === 0 && (
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '这套里的衣服已经不在衣橱里了', 'These pieces are no longer in your wardrobe')}</span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+          <button type="button" onClick={() => onStar(o)} style={linkish(o.starred ? 'var(--status-gentle)' : 'var(--portal-muted)')}>
+            {o.starred ? L(dict, '★ 喜欢', '★ Loved') : L(dict, '☆ 喜欢', '☆ Love it')}
+          </button>
+          <button type="button" onClick={() => onRetire(o)} style={linkish(o.retired ? 'var(--portal-accent)' : 'var(--portal-muted)')}>
+            {o.retired ? L(dict, '取消淘汰', 'Un-retire') : L(dict, '不喜欢 · 淘汰', 'Retire')}
+          </button>
+          <button type="button" onClick={() => onRemove(o)} style={{ ...linkish('var(--portal-muted)'), marginLeft: 'auto' }}>{L(dict, '删记录', 'Delete')}</button>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+        <button type="button" style={chip(view === 'list')} onClick={() => onView('list')}>{L(dict, '列表', 'List')}</button>
+        <button type="button" style={chip(view === 'calendar')} onClick={() => onView('calendar')}>{L(dict, '按月', 'By month')}</button>
+      </div>
+
+      {view === 'list' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          {outfits.map((o) => <Row key={o.id} o={o} />)}
+        </div>
+      ) : (
+        months.map((m) => (
+          <div key={m.month} style={{ marginBottom: 'var(--space-4)' }}>
+            <p style={sectionLbl}>{dict === 'en' ? m.month : `${m.month.slice(0, 4)} 年 ${Number(m.month.slice(5))} 月`}
+              <span style={{ color: 'var(--portal-muted)', fontWeight: 'var(--weight-regular)' }}> {L(dict, `${m.items.length} 天`, `${m.items.length} days`)}</span>
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+              {m.items.map((o) => <Row key={o.id} o={o} />)}
+            </div>
+          </div>
+        ))
+      )}
+    </>
+  );
+}
+
+const linkish = (color: string): React.CSSProperties => ({
+  background: 'none', border: 'none', padding: 0, cursor: 'pointer',
+  fontFamily: 'var(--font-sans)', fontSize: 'var(--text-xs)', color,
+});
