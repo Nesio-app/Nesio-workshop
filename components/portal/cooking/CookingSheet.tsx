@@ -538,18 +538,32 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
       {wishes.length === 0 && !adding
         ? <p style={{ ...hintLine, lineHeight: 1.6 }}>{t('想做的菜先攒着 —— 搜库里的,或直接打菜名。点一道看步骤,或算「还缺什么」。', 'Save dishes you want — search or type. Tap for steps, or see what’s missing.')}</p>
         : (
-          <div style={card}>
-            {wishes.map((w, i) => (
-              <div key={w.name} style={{ ...row, borderBottom: i === wishes.length - 1 ? 'none' : divider }}>
-                <RecipeThumb name={w.name} image={recipes?.find((x) => x.name === w.name)?.image} size={44} />
-                <button type="button" onClick={() => onOpenDish(w.name)} style={{ flex: 1, minWidth: 0, textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-sans)' }}>
-                  <div style={{ fontSize: 'var(--text-body)', fontWeight: 600, color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
-                  {w.note && <div style={subText}>{w.note}</div>}
-                </button>
-                <button type="button" onClick={() => onCompute(w.name)} aria-label={t('算缺料', 'What’s missing')}
-                  style={{ flex: 'none', width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', fontSize: 'var(--text-sm)', fontWeight: 700, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>{t('缺', '?')}</button>
-              </div>
-            ))}
+          /* 封面卡网格。这一屏是「挑今天做哪道」——照片帮得上,所以走两列大图卡;
+             自选列表那屏是状态列表(材料齐 / 缺 3 样),行式更好扫,保持不动。
+             ⚠️ 库里只有一半的菜有图(354/704),所以无图态必须自己站得住 ——
+             见 RecipeCover:同尺寸的浅色面 + 菜名排版,不是把 32px 的字母占位放大。 */
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
+            {wishes.map((w) => {
+              const rec = recipes?.find((x) => x.name === w.name);
+              return (
+                <div key={w.name} style={{ ...card, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+                  <button type="button" onClick={() => onOpenDish(w.name)}
+                    style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-sans)' }}>
+                    <RecipeCover image={rec?.image} />
+                    <div style={{ padding: 'var(--space-3) var(--space-3) var(--space-2)' }}>
+                      <div style={{ fontSize: 'var(--text-body)', fontWeight: 600, color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{w.name}</div>
+                      <div style={{ ...subText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {w.note || [rec?.category, rec?.difficulty ? '★'.repeat(rec.difficulty) : ''].filter(Boolean).join(' · ') || t('还没配上菜谱', 'No recipe matched yet')}
+                      </div>
+                    </div>
+                  </button>
+                  <button type="button" onClick={() => onCompute(w.name)}
+                    style={{ margin: '0 var(--space-3) var(--space-3)', padding: 'var(--space-1) var(--space-2)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--portal-accent)', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                    {t('还缺什么', "What's missing")}
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
     </>
@@ -1304,6 +1318,32 @@ function Dot() {
   return <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--portal-accent)', flex: 'none' }} />;
 }
 /** 菜谱缩略图:无图/加载失败回退菜名首字占位(不出现破图,失败态可见但安静)。 */
+/**
+ * 卡片尺寸的封面图。和 RecipeThumb 的区别不只是大小 ——
+ * **无图态得自己站得住**:库里只有 354/704 道有图,如果把小缩略图那个「方块里一个字」
+ * 直接放大到 160px,半屏卡片会像一片没加载出来的破图。
+ *
+ * 第一版是无图时在封面里排菜名 —— 截图一看就废了:卡脚本来就有菜名,同一个名字
+ * 一张卡上出现两次,更像 bug。所以封面无图时只放一枚线性餐具图标(和「排一周食谱」
+ * 同一枚),安静地占住位置,名字仍然只由卡脚负责讲一次。
+ */
+function RecipeCover({ image }: { image?: string | null }) {
+  const [err, setErr] = useState(false);
+  const url = image ? recipeImageUrl(image) : '';
+  const box: React.CSSProperties = { width: '100%', aspectRatio: '4 / 3', display: 'block' };
+  if (!url || err) {
+    return (
+      <span aria-hidden style={{
+        ...box, background: 'var(--portal-accent-soft)', display: 'flex', alignItems: 'center',
+        justifyContent: 'center', color: 'var(--portal-accent-border)',
+      }}>
+        <IconUtensils size={26} />
+      </span>
+    );
+  }
+  return <img src={url} alt="" loading="lazy" onError={() => setErr(true)}
+    style={{ ...box, objectFit: 'cover', background: 'var(--portal-accent-soft)' }} />;
+}
 function RecipeThumb({ name, image, size }: { name: string; image?: string | null; size: number }) {
   const [err, setErr] = useState(false);
   const url = image ? recipeImageUrl(image) : '';
