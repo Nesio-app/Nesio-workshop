@@ -18,6 +18,7 @@ import MoodWheel from '../MoodWheel';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { useAutoGrow } from './use-auto-grow';
 
 const HEAL_EARNED_KEY = 'nesio-heal-earned';
 const todayKey = () => new Date().toISOString().slice(0, 10);
@@ -58,6 +59,8 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
   const [reply, setReply] = useState<string | null>(null);
   const [feelEm, setFeelEm] = useState<string | null>(null); // 此刻心情:接现有心情系统的 12 情绪
   const [feelNote, setFeelNote] = useState('');
+  const voiceTa = useAutoGrow();  // 文本框随字数长高(iOS 兜底)
+  const feelTa = useAutoGrow();
   const [earned, setEarned] = useState(false);
   const rank = phaseRank(phase);
   const feelEmObj = feelEm ? emotionOf(feelEm) : null;
@@ -156,7 +159,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
 
                 {st === 'active' && s.key === 'voice' && (
                   <div className="ng-tl-in">
-                    <textarea className="ng-ta" rows={2} value={voice} onChange={(e) => setVoice(e.target.value)}
+                    <textarea ref={voiceTa} className="ng-ta" rows={2} value={voice} onChange={(e) => setVoice(e.target.value)}
                       placeholder={L(dict, '我必须…… / 我应该早就…… / 全搞砸了……', 'I must… / I should have… / I ruined it all…')} />
                     {seed && (
                       <p className="ng-heal-from">{L(dict, '从你成长页那条带过来的 · 想改可以改', 'Carried over from your Growth note — edit if you like')}</p>
@@ -231,7 +234,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
                     <p className="ng-tl-q">{L(dict, '走完这一遍,此刻,是什么感觉?', 'After all that — how does this moment feel?')}</p>
                     <MoodWheel value={feelEm} onPick={setFeelEm} en={en} />
                     <p className="ng-heal-from">{L(dict, '就是你熟悉的那个心情转盘 —— 会记进心情记录,汇入情绪趋势。', 'The same mood wheel you know — saved to your mood log and emotion trends.')}</p>
-                    <textarea className="ng-ta" rows={2} value={feelNote} onChange={(e) => setFeelNote(e.target.value)}
+                    <textarea ref={feelTa} className="ng-ta" rows={2} value={feelNote} onChange={(e) => setFeelNote(e.target.value)}
                       placeholder={L(dict, '想补一句就写(可跳过)', 'Add a line if you want (optional)')} />
                     <div className="ng-acts">
                       <button type="button" className="ng-btn" disabled={!feelEm} onClick={closeLoop}>

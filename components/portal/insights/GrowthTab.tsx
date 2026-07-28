@@ -14,6 +14,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import PracticeGround from './PracticeGround';
+import { useAutoGrow } from './use-auto-grow';
 import LensTab from './LensTab';
 import HealingTab from './HealingTab';
 import GrowthFootprint from './GrowthFootprint';
@@ -45,6 +46,7 @@ export default function GrowthTab() {
   const [history, setHistory] = useState<GrowthAnswer[]>([]);
   const [streak, setStreak] = useState(0);
   const [draft, setDraft] = useState<Record<string, string>>({});
+  const growTa = useAutoGrow();   // 文本框随字数长高(iOS 兜底)
   const [quizPick, setQuizPick] = useState<Record<string, number>>({});
 
   const [obs, setObs] = useState<Observation[]>([]);
@@ -208,7 +210,7 @@ export default function GrowthTab() {
               <span className="ng-chip blind">{L(dict, '今日引导', "Today's prompt")}</span>
               <p className="ng-ask">{en ? current.c.questionEn : current.c.question}</p>
               <p className="ng-basis">{current.c.context}</p>
-              <textarea className="ng-ta" rows={2}
+              <textarea ref={growTa} className="ng-ta" rows={2}
                 placeholder={L(dict, '答一句就够 —— 会存进回看流', 'One line is enough — saved to your trail')}
                 value={draft[current.c.id] || ''} onChange={(e) => setDraft((p) => ({ ...p, [current.c.id]: e.target.value }))} />
               {ruleGrade != null && ruleDraft.trim().length >= 6 && (

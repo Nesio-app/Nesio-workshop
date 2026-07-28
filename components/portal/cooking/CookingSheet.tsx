@@ -335,10 +335,11 @@ function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec
         )}
       </section>
 
+      {/* 三个入口同一套灰底样式(用户:各种颜色去掉,不一致)。 */}
       <button type="button" onClick={onGenerate}
-        style={{ ...primaryBtn, width: '100%', padding: 'var(--space-4)', fontSize: 'var(--text-body)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
+        style={{ ...ghostBtn, width: '100%', padding: 'var(--space-3)', fontSize: 'var(--text-body)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
         <IconZap size={16} />{t('生成新菜谱', 'Generate a recipe')}
-        {!canUsePaidCloudAi() && <span style={{ ...pill, background: 'rgba(255,255,255,.22)', color: '#fff', marginLeft: 'var(--space-1)' }}>Pro</span>}
+        {!canUsePaidCloudAi() && <span style={{ ...pill, background: 'var(--portal-accent-soft-md)', color: 'var(--portal-accent)', marginLeft: 'var(--space-1)' }}>Pro</span>}
       </button>
 
       {/* 记一餐:点一下开相机 → 拍完进记一餐页 */}
@@ -586,11 +587,6 @@ function GenerateBody({ pantryItems, soonNames, locale, onDone, t }: {
 
   return (
     <>
-      <p style={{ ...hintLine, lineHeight: 1.6 }}>
-        {t('用手上的食材 + 选个菜系,云端帮你写一道带步骤的新菜(Pro)。',
-          'Use pantry ingredients + a cuisine — cloud writes a new recipe with steps (Pro).')}
-      </p>
-
       <section>
         <SectionHead label={t('会用到的食材', 'Ingredients')} right={seedIngredients.length ? t(`${seedIngredients.length} 样`, `${seedIngredients.length}`) : undefined} />
         {seedIngredients.length > 0
@@ -657,7 +653,6 @@ function GenerateBody({ pantryItems, soonNames, locale, onDone, t }: {
           <IconZap size={16} />{busy ? t('正在生成…', 'Generating…') : t('开始生成', 'Generate')}
         </button>
       </div>
-      <p style={caption}>{t('步骤会存进本机,并加进想做清单。营养仍用本地成分表估算。', 'Steps stay on-device and go to your wishlist. Nutrition still uses the local table.')}</p>
     </>
   );
 }
@@ -665,6 +660,12 @@ function GenerateBody({ pantryItems, soonNames, locale, onDone, t }: {
 // ── 屏3 菜谱详情 ──────────────────────────────────────────────────────────────
 function RecipeBody({ match, t }: { match: RecipeMatch<Recipe>; t: TT }) {
   const r = match.recipe;
+  // 小贴士不是步骤:从 steps 里拆出来单列(老乡鸡数据把「小贴士:」塞进了最后一步)。
+  const [cookSteps, cookTips] = useMemo(() => {
+    const steps: string[] = []; const tips: string[] = [];
+    for (const s of r.steps || []) (/^\s*小贴士[:：]/.test(s) ? tips : steps).push(s.replace(/^\s*小贴士[:：]\s*/, ''));
+    return [steps, tips];
+  }, [r.steps]);
   const [per, setPer] = useState<PerServing | null>(null);
   const [main, setMain] = useState<FoodNutrition[] | null>(null);
   useEffect(() => {
@@ -679,14 +680,25 @@ function RecipeBody({ match, t }: { match: RecipeMatch<Recipe>; t: TT }) {
       <section>
         <SectionHead label={t('步骤', 'Steps')} />
         <div style={{ ...card, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-          {r.steps.map((s, i) => (
+          {cookSteps.map((s, i) => (
             <div key={i} style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start', fontSize: 'var(--text-sm)', lineHeight: 1.6 }}>
               <span style={stepNum}>{i + 1}</span><span style={{ paddingTop: 2 }}>{s}</span>
             </div>
           ))}
         </div>
-        <p style={caption}>{t('步骤里的克数是餐厅出餐量,自家做按人数缩着来。', 'Amounts are restaurant-batch sizes — scale down for home.')}</p>
       </section>
+
+      {/* 小贴士不是一个步骤:单独一块,不占编号(用户标注)。 */}
+      {cookTips.length > 0 && (
+        <section>
+          <SectionHead label={t('小贴士', 'Tips')} />
+          <div style={{ ...card, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            {cookTips.map((s, i) => (
+              <p key={i} style={{ margin: 0, fontSize: 'var(--text-sm)', lineHeight: 1.6, color: 'var(--portal-muted)' }}>{s}</p>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* 营养 · 每份 · 四列 */}
       <section>
@@ -711,7 +723,6 @@ function RecipeBody({ match, t }: { match: RecipeMatch<Recipe>; t: TT }) {
                     </div>
                   ))}
                 </div>
-                <p style={caption}>{t('每100g 可食部 · 部分食材名对不齐时只显对上的,基于《中国食物成分表》,估算。', 'Per 100g edible · from China Food Composition Table, estimate.')}</p>
               </>
             : <p style={hintLine}>{main === null ? t('查营养中…', 'Looking up nutrition…') : t('这道菜的食材名暂时对不齐成分表,先不显示假数。', 'Ingredient names don’t line up with the table yet — no fake numbers.')}</p>}
       </section>
@@ -970,10 +981,6 @@ function PlanBody({ matches, recipes, soonNames, pantryNames, onError, t }: {
         {recipeNames.map((n) => <option key={n} value={n} />)}
       </datalist>
 
-      <div style={{ ...banner, background: missingAll.length ? 'var(--status-gentle-soft)' : 'var(--status-go-soft)', color: missingAll.length ? 'var(--status-gentle)' : 'var(--status-go)' }}>
-        {missingAll.length ? t(`本周缺 ${missingAll.length} 样 —— 一次性汇总成购物清单`, `${missingAll.length} short this week — one shopping list`) : t('本周库存都够 —— 不用买', 'Fully stocked — nothing to buy')}
-      </div>
-
       {missingAll.length > 0 && (
         <>
           <button type="button" onClick={save} disabled={saved} style={{ ...primaryBtn, width: '100%', padding: 'var(--space-4)', fontSize: 'var(--text-body)', opacity: saved ? 0.55 : 1 }}>
@@ -983,7 +990,6 @@ function PlanBody({ matches, recipes, soonNames, pantryNames, onError, t }: {
         </>
       )}
       {msg && !missingAll.length && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-go)', textAlign: 'center' }}>{msg}</span>}
-      <p style={caption}>{t('每天可改菜名;缺料一次性存进「记忆」当购物清单。', 'Edit each day; gaps become one shopping list in memory.')}</p>
     </>
   );
 }
@@ -1009,12 +1015,22 @@ function AddForm({ onAdded, onCancel, onError, t }: { onAdded: () => void; onCan
 
   return (
     <div style={{ ...card, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-      <input style={inputStyle} placeholder={t('食材(如「牛奶」「菠菜」)', 'Food (e.g. milk, spinach)')} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+      {/* 每格都带标题:空框看不出是什么(用户标注「这里面的字需要」)。 */}
+      <label style={fieldLabel}>{t('食材', 'Food')}
+        <input style={inputStyle} placeholder={t('如「牛奶」「菠菜」', 'e.g. milk, spinach')} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+      </label>
       <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-        <input style={{ ...inputStyle, flex: 1 }} inputMode="numeric" placeholder={t('数量(可空)', 'Qty (optional)')} value={qty} onChange={(e) => setQty(e.target.value)} />
-        <input style={{ ...inputStyle, flex: 1 }} type="date" aria-label={t('有效期', 'Expiry')} value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+        <label style={{ ...fieldLabel, flex: 1 }}>{t('数量', 'Qty')}
+          <input style={inputStyle} inputMode="numeric" placeholder={t('可空', 'optional')} value={qty} onChange={(e) => setQty(e.target.value)} />
+        </label>
+        <label style={{ ...fieldLabel, flex: 1 }}>{t('有效期', 'Expiry')}
+          <input style={inputStyle} type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+        </label>
       </div>
-      <input style={inputStyle} placeholder={t('放哪(如「冰箱」,可空)', 'Where (e.g. fridge, optional)')} value={location} onChange={(e) => setLocation(e.target.value)} />
+      <label style={fieldLabel}>{t('放哪', 'Where')}
+        <input style={inputStyle} placeholder={t('如「冰箱」,可空', 'e.g. fridge, optional')} value={location} onChange={(e) => setLocation(e.target.value)} />
+      </label>
+      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('分类', 'Category')}</span>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
         {PANTRY_CATEGORIES.map((c) => (
           <button key={c} type="button" onClick={() => setCategory((v) => (v === c ? '' : c))} style={{ ...chip, ...(category === c ? chipOn : {}) }}>{c}</button>
@@ -1152,6 +1168,7 @@ const pill: React.CSSProperties = { flex: 'none', borderRadius: 'var(--radius-pi
 const primaryBtn: React.CSSProperties = { border: 'none', borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent)', color: '#fff', fontWeight: 700, fontSize: 'var(--text-sm)', padding: 'var(--space-2) var(--space-4)', cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' };
 const ghostBtn: React.CSSProperties = { border: 'none', borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', fontWeight: 600, fontSize: 'var(--text-sm)', padding: 'var(--space-2) var(--space-4)', cursor: 'pointer', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap' };
 const xBtn: React.CSSProperties = { border: 'none', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: 'var(--text-sm)', padding: 'var(--space-1)' };
+const fieldLabel: React.CSSProperties = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', fontFamily: 'var(--font-sans)' };
 const inputStyle: React.CSSProperties = { width: '100%', boxSizing: 'border-box', padding: 'var(--space-3)', border: divider, borderRadius: 'var(--radius-sm)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontSize: 'var(--text-body)', fontFamily: 'var(--font-sans)' };
 const chip: React.CSSProperties = { border: divider, borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', padding: 'var(--space-1) var(--space-2)', cursor: 'pointer', fontFamily: 'var(--font-sans)' };
 const chipOn: React.CSSProperties = { background: 'var(--portal-accent-soft-md)', color: 'var(--portal-accent)', borderColor: 'transparent', fontWeight: 700 };
