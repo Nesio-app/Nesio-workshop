@@ -123,6 +123,8 @@ export default function WardrobePanel() {
   const [adding, setAdding] = useState(false);
   const [draft, setDraft] = useState<Draft>(EMPTY_DRAFT);
   const [aiBusy, setAiBusy] = useState(false);
+  const [beautyBusy, setBeautyBusy] = useState(false);   // 图16:白底美化中
+  const [origPhoto, setOrigPhoto] = useState<string | null>(null); // 美化前的原图,可一键换回
   const [aiError, setAiError] = useState<string | null>(null);
   const cameraRef = useRef<HTMLInputElement>(null); // 拍照(capture=environment)
   const uploadRef = useRef<HTMLInputElement>(null); // 上传本地图片(相册,无 capture)
@@ -391,13 +393,43 @@ export default function WardrobePanel() {
     }
   };
 
+  /**
+   * 图16「AI 识别可以直接美化衣服,变为白色背景干净图」。
+   * 复用 /api/portal/avatarify(加了 style='garment' 参数)—— 鉴权/付费门/限流/双模型兜底
+   * 那一整套不用再写一遍。原图先留着:美化失败或用户不满意可以一键换回去。
+   */
+  const beautify = async () => {
+    if (!draft.dataUrl) return;
+    if (!canUsePaidCloudAi()) { guardPaidCloudAi('wardrobe-ai'); return; }
+    setBeautyBusy(true); setAiError(null);
+    try {
+      const base64 = draft.dataUrl.split(',')[1] || '';
+      const res = await fetch('/api/portal/avatarify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ style: 'garment', imageBase64: base64, mimeType: draft.mimeType }),
+      });
+      const data = await res.json() as { ok?: boolean; dataUrl?: string; message?: string };
+      if (!data.ok || !data.dataUrl) throw new Error(data.message || 'no_image');
+      setOrigPhoto(draft.dataUrl);
+      setDraft((d) => ({ ...d, dataUrl: data.dataUrl!, mimeType: 'image/png' }));
+    } catch (err) {
+      // 红线:失败必须看得见,并且给退路 —— 原图还在,照样能存。
+      setAiError(err instanceof Error && err.message !== 'no_image'
+        ? L(dict, `美化没成功:${err.message}`, `Clean-up failed: ${err.message}`)
+        : L(dict, '美化没成功 —— 原图照样能存进衣橱。', 'Clean-up failed — the original photo still saves fine.'));
+    } finally {
+      setBeautyBusy(false);
+    }
+  };
+
   const save = async () => {
     const name = draft.name.trim() || L(dict, TYPE_LABEL[draft.garmentType][0], TYPE_LABEL[draft.garmentType][1]);
     const colors = draft.colors ? draft.colors.split(/[,，、]/).map((s) => s.trim()).filter(Boolean) : [];
     // 编辑模式:只改属性(照片不动)
     if (editingId) {
       updateGarment(editingId, { name, garmentType: draft.garmentType, warmth: draft.warmth, formality: draft.formality, colors });
-      setEditingId(null); setDraft(EMPTY_DRAFT); setAdding(false); setAiError(null);
+      setEditingId(null); setDraft(EMPTY_DRAFT); setAdding(false); setAiError(null); setOrigPhoto(null);
       load();
       return;
     }
@@ -410,7 +442,7 @@ export default function WardrobePanel() {
       } catch { assetId = null; /* 存图失败也让衣服进衣橱,只是没缩略图 */ }
     }
     addGarment({ name, garmentType: draft.garmentType, warmth: draft.warmth, formality: draft.formality, colors, assetId, mimeType: draft.mimeType });
-    setDraft(EMPTY_DRAFT); setAdding(false); setAiError(null);
+    setDraft(EMPTY_DRAFT); setAdding(false); setAiError(null); setOrigPhoto(null);
     load();
   };
 
@@ -699,10 +731,23 @@ export default function WardrobePanel() {
                 placeholder={L(dict, '名字(可留空)', 'Name (optional)')}
                 style={{ width: '100%', padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }} />
               {draft.dataUrl && (
-                <button type="button" onClick={recognize} disabled={aiBusy}
-                  style={{ marginTop: '0.4rem', padding: '0.35rem 0.7rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-xs)', cursor: aiBusy ? 'default' : 'pointer', opacity: aiBusy ? 0.6 : 1 }}>
-                  {aiBusy ? L(dict, '识别中…', 'Recognizing…') : L(dict, '✨ AI 识别(Pro)', '✨ AI recognize (Pro)')}
-                </button>
+                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                  <button type="button" onClick={recognize} disabled={aiBusy || beautyBusy}
+                    style={{ padding: '0.35rem 0.7rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-xs)', cursor: aiBusy ? 'default' : 'pointer', opacity: aiBusy ? 0.6 : 1 }}>
+                    {aiBusy ? L(dict, '识别中…', 'Recognizing…') : L(dict, 'AI 识别属性(Pro)', 'AI attributes (Pro)')}
+                  </button>
+                  {/* 图16:把这张照片洗成白底干净的单品图 */}
+                  <button type="button" onClick={beautify} disabled={aiBusy || beautyBusy}
+                    style={{ padding: '0.35rem 0.7rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-xs)', cursor: beautyBusy ? 'default' : 'pointer', opacity: beautyBusy ? 0.6 : 1 }}>
+                    {beautyBusy ? L(dict, '美化中…(约十几秒)', 'Cleaning up… (~15s)') : L(dict, '洗成白底图(Pro)', 'White background (Pro)')}
+                  </button>
+                  {origPhoto && (
+                    <button type="button" onClick={() => { setDraft((d) => ({ ...d, dataUrl: origPhoto })); setOrigPhoto(null); }}
+                      style={{ padding: '0.35rem 0.7rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>
+                      {L(dict, '还是用原图', 'Use original')}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -738,7 +783,7 @@ export default function WardrobePanel() {
 
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
             <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={save}>{editingId ? L(dict, '保存修改', 'Save changes') : L(dict, '存进衣橱', 'Save')}</button>
-            <button type="button" onClick={() => { setAdding(false); setEditingId(null); setAiError(null); }}
+            <button type="button" onClick={() => { setAdding(false); setEditingId(null); setAiError(null); setOrigPhoto(null); }}
               style={{ padding: '0 var(--space-4)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>{L(dict, '取消', 'Cancel')}</button>
           </div>
         </div>
