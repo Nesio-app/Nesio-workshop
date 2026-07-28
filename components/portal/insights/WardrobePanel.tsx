@@ -283,12 +283,33 @@ export default function WardrobePanel() {
   // 当前这套(AI 优先,否则规则版)—— 试穿/反馈都用它
   const currentPieces = aiPieces ?? outfit.pieces;
 
+  // 图14「上面增加 filter」:类型 / 厚薄 / 正式度 三轴,再加一个「还没穿过」——
+  // 衣橱一多,想找「那件薄的通勤上装」只能一路往下翻。
+  const [fType, setFType] = useState<GarmentType | 'all'>('all');
+  const [fWarmth, setFWarmth] = useState<Warmth | 'all'>('all');
+  const [fFormal, setFFormal] = useState<Formality | 'all'>('all');
+  const [fUnworn, setFUnworn] = useState(false);
+  const filterOn = fType !== 'all' || fWarmth !== 'all' || fFormal !== 'all' || fUnworn;
+
+  const visible = useMemo(() => items.filter((it) => {
+    if (fType !== 'all' && it.garmentType !== fType) return false;
+    if (fWarmth !== 'all' && it.warmth !== fWarmth) return false;
+    if (fFormal !== 'all' && it.formality !== fFormal) return false;
+    if (fUnworn && it.lastWornAt) return false;
+    return true;
+  }), [items, fType, fWarmth, fFormal, fUnworn]);
+
   const grouped = useMemo(() => {
     const map = new Map<GarmentType, Garment[]>();
     for (const t of GARMENT_TYPES) map.set(t, []);
-    for (const it of items) map.get(it.garmentType)?.push(it);
+    for (const it of visible) map.get(it.garmentType)?.push(it);
     return GARMENT_TYPES.map((t) => ({ type: t, list: map.get(t) || [] })).filter((g) => g.list.length > 0);
-  }, [items]);
+  }, [visible]);
+
+  // 图14「点一下进入详情页」:格子里那排小按钮(穿了 / ✎ / ✕)挤在 96px 宽里点不准,
+  // 收进详情 —— 点格子进详情,大图 + 属性 + 三个动作都在里面。
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const detail = useMemo(() => items.find((it) => it.id === detailId) || null, [items, detailId]);
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -431,24 +452,23 @@ export default function WardrobePanel() {
             </span>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, `${pieces.length} 件`, `${pieces.length} pieces`)}</span>
           </div>
-          {reasonText && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>{reasonText}</p>}
+          {/* 2026-07-28 UI 精修(标注 图12「不懂装懂」):搭配理由那段整删 ——
+              「虽然是短裤,但搭配厚实的毛衣和保暖外套,可以达到保暖效果…」这种话既不像人说的,
+              也帮不上忙。要看的是这套长什么样、点不点头,不是听它论证自己。 */}
           <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
-            {pieces.map((p) => (
-              <span key={p.id} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-sm)', background: 'var(--glass-bg-solid, var(--portal-bg))', border: '1px solid var(--portal-line)', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)' }}>
-                {thumbs[p.id] && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={thumbs[p.id]} alt="" width={20} height={20} style={{ borderRadius: 4, objectFit: 'cover' }} />
-                )}
+            {/* 图13「图片不需要文字」:有照片就只放照片(名字进 title/aria-label,读屏和长按都还在);
+                没照片的才退回文字 chip,否则一格空白没法认。 */}
+            {pieces.map((p) => (thumbs[p.id] ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img key={p.id} src={thumbs[p.id]} alt={p.name} title={p.name} width={56} height={56}
+                style={{ width: 56, height: 56, borderRadius: 'var(--radius-sm)', objectFit: 'cover', border: '1px solid var(--portal-line)' }} />
+            ) : (
+              <span key={p.id} style={{ display: 'inline-flex', alignItems: 'center', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-sm)', background: 'var(--glass-bg-solid, var(--portal-bg))', border: '1px solid var(--portal-line)', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)' }}>
                 {p.name}
               </span>
-            ))}
+            )))}
           </div>
-          {/* AI 造型贴士 */}
-          {aiPieces && stylist!.tips.length > 0 && (
-            <ul style={{ margin: 'var(--space-2) 0 0', paddingLeft: '1.1rem', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.7 }}>
-              {stylist!.tips.map((t, i) => <li key={i}>{t}</li>)}
-            </ul>
-          )}
+          {/* 图12:AI 造型贴士同批删掉(同一类「解释自己」的话)。 */}
           {outfit.needUmbrella && (
             <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-calm)' }}>☔ {L(dict, '今天可能下雨,记得带伞', 'Rain likely — take an umbrella')}</p>
           )}
@@ -560,13 +580,13 @@ export default function WardrobePanel() {
       <input ref={bulkRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={onPickBulk} />
       {!adding ? (
         <>
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
-            <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1, opacity: bulkBusy ? 0.6 : 1 }} disabled={bulkBusy} onClick={() => { setEditingId(null); setDraft(EMPTY_DRAFT); setAdding(true); setAiError(null); }}>
-              {L(dict, '+ 加一件', '+ Add one')}
-            </button>
-            <button type="button" onClick={() => bulkRef.current?.click()} disabled={bulkBusy}
-              style={{ flex: 1, padding: '0.7rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: bulkBusy ? 'default' : 'pointer', opacity: bulkBusy ? 0.6 : 1 }}>
-              {bulkBusy ? L(dict, '处理中…', 'Working…') : L(dict, '📸 批量上传', '📸 Bulk upload')}
+          {/* 图13「一个按钮,点一下可以上传可以拍照」:原来「+ 加一件」和「批量上传」并排,
+              两个入口做同一件事(把衣服弄进衣橱)。合成一个 —— 选相册可以多选(等于原批量上传),
+              也可以直接拍。系统选择器自己会给「拍照 / 照片图库」两个选项。 */}
+          <div style={{ marginTop: 'var(--space-4)' }}>
+            <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', opacity: bulkBusy ? 0.6 : 1 }} disabled={bulkBusy}
+              onClick={() => bulkRef.current?.click()}>
+              {bulkBusy ? L(dict, '处理中…', 'Working…') : L(dict, '+ 加衣服 · 拍照或选图(可多选)', '+ Add clothes · shoot or pick (multi)')}
             </button>
           </div>
           {bulkMsg && (
@@ -650,12 +670,67 @@ export default function WardrobePanel() {
       )}
 
       {/* ③ 我的衣橱(按类型分组) */}
+      {items.length > 0 && (
+        <div style={{ marginTop: 'var(--space-4)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+            <button type="button" style={chip(fType === 'all')} onClick={() => setFType('all')}>{L(dict, '全部类型', 'All types')}</button>
+            {GARMENT_TYPES.map((t) => (
+              <button key={t} type="button" style={chip(fType === t)} onClick={() => setFType(fType === t ? 'all' : t)}>{L(dict, TYPE_LABEL[t][0], TYPE_LABEL[t][1])}</button>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
+            {([1, 2, 3] as Warmth[]).map((w) => (
+              <button key={w} type="button" style={chip(fWarmth === w)} onClick={() => setFWarmth(fWarmth === w ? 'all' : w)}>{L(dict, WARMTH_LABEL[w][0], WARMTH_LABEL[w][1])}</button>
+            ))}
+            {(['casual', 'smart', 'formal'] as Formality[]).map((f) => (
+              <button key={f} type="button" style={chip(fFormal === f)} onClick={() => setFFormal(fFormal === f ? 'all' : f)}>{L(dict, FORMAL_LABEL[f][0], FORMAL_LABEL[f][1])}</button>
+            ))}
+            <button type="button" style={chip(fUnworn)} onClick={() => setFUnworn((v) => !v)}>{L(dict, '还没穿过', 'Never worn')}</button>
+          </div>
+          {filterOn && (
+            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+              {L(dict, `${visible.length} / ${items.length} 件`, `${visible.length} of ${items.length}`)}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* 图14:单品详情 —— 大图 + 属性 + 穿了/编辑/移除 */}
+      {detail && (
+        <div style={{ ...card, marginTop: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-2)' }}>
+            <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{detail.name}</span>
+            <button type="button" onClick={() => setDetailId(null)}
+              style={{ background: 'none', border: 'none', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: 0 }}>{L(dict, '收起', 'Close')}</button>
+          </div>
+          {thumbs[detail.id] && (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={thumbs[detail.id]} alt={detail.name}
+              style={{ width: '100%', marginTop: 'var(--space-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)' }} />
+          )}
+          <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>
+            {L(dict, TYPE_LABEL[detail.garmentType][0], TYPE_LABEL[detail.garmentType][1])} · {L(dict, WARMTH_LABEL[detail.warmth][0], WARMTH_LABEL[detail.warmth][1])} · {L(dict, FORMAL_LABEL[detail.formality][0], FORMAL_LABEL[detail.formality][1])}
+            {detail.lastWornAt ? ` · ${L(dict, `上次穿 ${detail.lastWornAt.slice(5, 10)}`, `worn ${detail.lastWornAt.slice(5, 10)}`)}` : ` · ${L(dict, '还没穿过', 'never worn')}`}
+          </p>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
+            <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }}
+              onClick={() => { markWorn(detail.id, new Date().toISOString()); giveFeedback('worn', [detail]); load(); }}>{L(dict, '今天穿了', 'Worn today')}</button>
+            <button type="button" onClick={() => { startEdit(detail); setDetailId(null); }}
+              style={{ padding: '0 var(--space-4)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>{L(dict, '编辑', 'Edit')}</button>
+            <button type="button" onClick={() => { if (confirm(L(dict, `从衣橱移除「${detail.name}」?`, `Remove “${detail.name}” from wardrobe?`))) { removeGarment(detail.id); setDetailId(null); load(); } }}
+              style={{ padding: '0 var(--space-4)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>{L(dict, '移除', 'Remove')}</button>
+          </div>
+        </div>
+      )}
+
       {grouped.map((g) => (
         <div key={g.type}>
           <p style={sectionLbl}>{L(dict, TYPE_LABEL[g.type][0], TYPE_LABEL[g.type][1])} <span style={{ color: 'var(--portal-muted)', fontWeight: 'var(--weight-regular)' }}>{g.list.length}</span></p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 'var(--space-2)' }}>
             {g.list.map((it) => (
-              <div key={it.id} style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid, var(--portal-bg))', overflow: 'hidden' }}>
+              <button key={it.id} type="button" onClick={() => setDetailId(it.id)}
+                aria-label={it.name}
+                style={{ padding: 0, textAlign: 'left', cursor: 'pointer', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid, var(--portal-bg))', overflow: 'hidden' }}>
                 <div style={{ aspectRatio: '1', background: 'var(--portal-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--portal-muted)', fontSize: '1.4rem' }}>
                   {thumbs[it.id] ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -667,18 +742,8 @@ export default function WardrobePanel() {
                   <p style={{ margin: '0.15rem 0 0', fontSize: '0.62rem', color: 'var(--portal-muted)' }}>
                     {L(dict, WARMTH_LABEL[it.warmth][0], WARMTH_LABEL[it.warmth][1])} · {L(dict, FORMAL_LABEL[it.formality][0], FORMAL_LABEL[it.formality][1])}
                   </p>
-                  <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.3rem' }}>
-                    <button type="button" onClick={() => { markWorn(it.id, new Date().toISOString()); giveFeedback('worn', [it]); load(); }}
-                      style={{ flex: 1, padding: '0.2rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-blue-deep)', fontSize: '0.62rem', cursor: 'pointer' }}
-                      title={L(dict, '记一次今天穿了', 'Mark worn today')}>{L(dict, '穿了', 'Worn')}</button>
-                    <button type="button" onClick={() => startEdit(it)} aria-label={L(dict, '编辑', 'Edit')}
-                      style={{ padding: '0.2rem 0.4rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: '0.62rem', cursor: 'pointer' }}>✎</button>
-                    <button type="button" onClick={() => { if (confirm(L(dict, `从衣橱移除「${it.name}」?`, `Remove “${it.name}” from wardrobe?`))) { removeGarment(it.id); load(); } }}
-                      aria-label={L(dict, '移除', 'Remove')}
-                      style={{ padding: '0.2rem 0.4rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: '0.62rem', cursor: 'pointer' }}>✕</button>
-                  </div>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>

@@ -13524,6 +13524,17 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-xlib-tags { display: flex; flex-wrap: wrap; gap: 0.3rem; margin-top: 0.35rem; }
 /* 2026-07-28 UI 精修(标注 图6「Labels 不彩色」):肌群蓝 / 器械绿 / 模式紫 / 难度三色 ——
    一张卡上五个标签五种颜色,像贴纸墙。统一成同一种中性 chip;颜色留给真正要区分状态的地方。 */
+/* 2026-07-28(标注 图10):跟练页静音键 —— 线条喇叭 + 静音时一道斜杠(不用 emoji)。 */
+.nesio-wp-mute { position: relative; display: inline-flex; }
+.nesio-wp-mute svg { stroke: currentColor; }
+.nesio-wp-mute.is-muted::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: 130%; height: 1.6px;
+  background: currentColor; transform: translate(-50%, -50%) rotate(-45deg); border-radius: 2px;
+}
+/* 图10:组间休息 ±15s 自定义 */
+.nesio-wp-restadj { display: flex; align-items: center; justify-content: center; gap: 0.6rem; margin: 0.5rem 0 0.2rem; }
+.nesio-wp-restadj-now { font-size: 0.75rem; color: var(--portal-muted); min-width: 5.5em; text-align: center; }
+
 .nesio-xlib-tag {
   font-size: 0.68rem; font-weight: 600; padding: 0.1rem 0.45rem; border-radius: 0.4rem;
   background: var(--portal-bg); color: var(--portal-muted); border: 1px solid var(--portal-line);
