@@ -17,7 +17,7 @@ function assertImageAssetCloudSync(source, label) {
   );
   assert.match(
     source,
-    /uploadCloudAsset\(\{\s*file:/s,
+    /uploadCloudAsset\(\{\s*file[,:]/s, // 允许 ES 简写 { file, ... }(e331fd8 起)
     `${label} should upload image/file input through /api/cloud/assets before or while saving Memory`,
   );
   assert.match(
@@ -52,7 +52,7 @@ function assertImageAssetCloudSync(source, label) {
   );
   assert.match(
     source,
-    /assets:\s*\[\s*assetRecord\s*\]/s,
+    /assets:\s*\[[^\n]*assetRecord\s*\]/, // 允许追加式 [...(existing || []), assetRecord](e331fd8 起,保留本地 asset 是改进)
     `${label} should store the cloud asset reference on the local LifeNode`,
   );
 }
