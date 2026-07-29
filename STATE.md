@@ -155,6 +155,27 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **反馈学习环曾经整段空转(2026-07-29 修;用户实锤「我点了稍后、不要再出现、或者
+  喜欢,不管点哪个他都会出现」)**。审计结论:不是某个动作坏了,是 per-card 这一维
+  **没有任何消费者** ——
+  ① `guidance-ranker` 在线学习 2026-07-27 已退役(`RANKER_LEARNING_ENABLED=false`),不再订总线;
+  ② `preference-store` 只认可复用维度 `{domain, card_type, alert_type, merchant}`,
+     Today 发的是 `dimension:'card'` → 直接丢弃;
+  ③ `feedback-log` 对 `today/card` 直接 `return`(指望 DEC 富路径落事实),而财务/域洞察卡
+     从不登记 `getRegisteredDecCard` → 连事实都没落;
+  ④ 「稍后」只走 `snoozeOverdue(card.nodeId)`,而这些卡根本没有 nodeId → 纯空转;
+  ⑤ 唯一残留的记忆是 cooling-store 的 2~24 小时冷却,而且渲染层 `recordDismissed(card.cardType)`
+     写的键与管线读的 `dedupKey`(多实例类型是 `type:id`)**对不上**,自适应加倍冷却从未生效。
+  **修法**:新增 `lib/portal/card-verdict.ts` —— 用户的裁决要比数据活得久。
+  稍后=3 天到期(不看内容,不依赖 nodeId)/ 不要再出现=按**事实指纹**永久静音(内容变了才放行)/
+  太多了=整类静音 30 天 / 喜欢=只改排序(补发 `dimension:'card_type'`,管线打分读
+  `getWeight('card_type', …)`)。指纹必须在 **Layer 7 AI 改写之前**算定(`ProactiveCardData.factKey`),
+  否则每天一次新改写就是一个新指纹,静音永远命中不了 —— 第一版就栽在这。
+  静音必须可反悔:`readCardVerdicts`/`clearCardVerdict`,已在「Nesio 记得的偏好」面板列出 +「重新接收」。
+  契约:`scripts/card-verdict.test.mjs`。
+  **剩余欠账**:`nesio-card-verdict-v1` 走通用 module-sync(整键 replace / LWW),
+  两端各自静音会互相覆盖;真正对的语义是 union(静音只增不减)。等跨端备份问题收敛后再看。
+
 - **API 导入源取数窗口普查(2026-07-29,用户问「健康/足迹/Granola 是不是也这样」)**:
   逐个源查代码,结论是**一类系统性问题**,不是四个孤立 bug。事实表已固化为
   `IMPORT_WINDOWS`(lib/portal/backup-inventory.ts,契约钉住)并在「数据接入」页

@@ -309,7 +309,13 @@ export function runGuidancePipelineDeferred(
     // Preference 域权重(总线投影)+ mirror domainFit 作轻加权,不另起伪智能排序器。
     const prefW = getWeight('domain', event.type);
     const mirrorW = getDomainWeight(event.type);
-    const ruleScore = priority + (Number.isFinite(prefW) ? (prefW - 0.5) * 2 : 0) + (mirrorW - 0.5);
+    // card_type 维度是 per-card 反馈唯一能落到权重上的地方(domain 策略里 snooze/dismiss 是 null,
+    // 且 wrong 留底 0.2 —— 那是「不罚题材」的语义)。「喜欢/没用/太多了」要真的改排序,就得读这一维。
+    const typeW = getWeight('card_type', event.type);
+    const ruleScore = priority
+      + (Number.isFinite(prefW) ? (prefW - 0.5) * 2 : 0)
+      + (Number.isFinite(typeW) ? (typeW - 0.5) * 2 : 0)
+      + (mirrorW - 0.5);
     // email_signal 与 domain_insight 自带图标(邮件 provider 图标 / 域图标),其余用类型固定图标。
     const icon = (event.type === 'email_signal' || event.type === 'domain_insight') && typeof event.payload.icon === 'string'
       ? event.payload.icon
@@ -333,6 +339,7 @@ export function runGuidancePipelineDeferred(
         expiresAt: computeExpiry(event),
         evidence: Array.isArray(event.payload.evidence) ? event.payload.evidence as GuidanceCard['evidence'] : undefined,
         reason: typeof event.payload.reason === 'string' ? event.payload.reason : undefined,
+        coolKey: dk,
       },
     });
   }

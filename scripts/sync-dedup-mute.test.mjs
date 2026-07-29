@@ -51,33 +51,45 @@ const P = loadTs('../components/portal/today/proactive-types.ts', {
 });
 
 const CARD = 'finance-hike-att';
-const TEXT_V1 = 'AT&T 定期扣款涨价了|AT&T 最近一笔 $53.91,此前约 $20(涨 170%)';
-const TEXT_V2 = 'AT&T 定期扣款涨价了|AT&T 最近一笔 $70.00,此前约 $53.91(涨 30%)';
+// 指纹由管线在 **AI 改写之前** 算定(useTodayData 的 factKey),这里直接用指纹值。
+const FP_V1 = 'fp-att-53.91';
+const FP_V2 = 'fp-att-70.00';
 
-assert.equal(P.isProactiveCardDismissed(CARD, TEXT_V1), false, '没关过 → 该显示');
-P.dismissProactiveById(CARD, TEXT_V1);
-assert.equal(P.isProactiveCardDismissed(CARD, TEXT_V1), true, '关掉后立刻不再显示');
+assert.equal(P.isProactiveCardDismissed(CARD, FP_V1), false, '没关过 → 该显示');
+P.dismissProactiveById(CARD, FP_V1);
+assert.equal(P.isProactiveCardDismissed(CARD, FP_V1), true, '关掉后立刻不再显示');
 
 // 关键:换一天(当日 map 失效)后,同样内容仍然静音 —— 这正是真机反复冒出来的场景
 store.set('nesio-proactive-dismissed', JSON.stringify({ [CARD]: '1999-01-01' })); // 模拟「隔天了」
 assert.equal(
-  P.isProactiveCardDismissed(CARD, TEXT_V1), true,
+  P.isProactiveCardDismissed(CARD, FP_V1), true,
   '事实没变 → 第二天也不该再冒出来(旧逻辑只记「今天已关」,所以天天回来)',
 );
 
 // 内容变了(又涨了一次)→ 是新消息,应当放行
-assert.equal(P.isProactiveCardDismissed(CARD, TEXT_V2), false, '涨价数字变了 → 属于新事实,可以再提醒');
+assert.equal(P.isProactiveCardDismissed(CARD, FP_V2), false, '涨价数字变了 → 属于新事实,可以再提醒');
 
-// 不传内容时退回「当天」语义,老调用点不受影响
+// 不传指纹时退回「当天」语义,老调用点不受影响
 assert.equal(P.isProactiveCardDismissed('other-card'), false);
 P.dismissProactiveById('other-card');
 assert.equal(P.isProactiveCardDismissed('other-card'), true, '不带指纹 → 仍是当天静音');
 
-// 调用点确实把内容传进去了(否则新语义形同虚设)
+// 指纹绝不能在这一层重算:proactive-types 拿到的 title/body 已被 Layer 7 改写过。
+assert.doesNotMatch(
+  fs.readFileSync(new URL('../components/portal/today/proactive-types.ts', import.meta.url), 'utf8'),
+  /charCodeAt/,
+  'proactive-types 不该自己对文案取哈希(改写后的文案每天都是新指纹,静音永远命中不了)',
+);
+
+// 调用点传的必须是 factKey(否则新语义形同虚设)
 const feed = fs.readFileSync(new URL('../components/portal/TodayFeed.tsx', import.meta.url), 'utf8');
-assert.match(feed, /dismissProactiveById\(card\.id, `\$\{card\.title\}\|\$\{card\.body\}`\)/, '关闭时要带上卡片当前内容');
+assert.match(feed, /dismissProactiveById\(card\.id, card\.factKey\)/, '关闭时要带上事实指纹');
 const todayData = fs.readFileSync(new URL('../components/portal/today/useTodayData.ts', import.meta.url), 'utf8');
-assert.match(todayData, /isProactiveCardDismissed\(c\.id, `\$\{c\.title\}\|\$\{c\.body\}`\)/, '过滤时也要带内容');
+assert.match(todayData, /isProactiveCardDismissed\(c\.id, c\.factKey\)/, '过滤时也要带指纹');
+// factKey 必须在 AI 改写之前算(map 里),不能在改写之后
+const fpAt = todayData.indexOf('factKey: fingerprint(');
+const aiAt = todayData.indexOf('AI Language Generation');
+assert.ok(fpAt > 0 && aiAt > fpAt, 'factKey 必须在 Layer 7 改写之前定死');
 
 // ── ③ 头像:换签前先摘掉坏 URL,不让浏览器画破图 ──
 const avatar = fs.readFileSync(new URL('../components/portal/use-profile-avatar.ts', import.meta.url), 'utf8');

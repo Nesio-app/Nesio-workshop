@@ -67,4 +67,10 @@ export interface GuidanceCard {
   evidence?: EvidenceRef[];
   /** One-line 为什么现在出现 explanation. */
   reason?: string;
+  /**
+   * 冷却键 —— 与管线内部 dedupKey 同源。渲染层记「用户关掉了」时必须用这个键,
+   * 否则多实例类型(dec_insight/object_context/domain_insight/renewal)写的是
+   * `type`、管线读的是 `type:id`,自适应冷却永远攒不到计数(真机实锤:关多少次都回来)。
+   */
+  coolKey?: string;
 }

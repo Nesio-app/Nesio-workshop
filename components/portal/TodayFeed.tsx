@@ -309,11 +309,15 @@ export default function TodayFeed({
             card={card}
             onOpen={card.nodeId ? () => { const live = getLiveMemoryNode(card.nodeId!); if (live) setGuideDetailNode(live); } : undefined}
             onDismiss={() => {
-              // 带上卡片当前说的内容 → 静音到内容变化为止(事实没变就别再冒出来)
-              dismissProactiveById(card.id, `${card.title}|${card.body}`);
+              // 带上事实指纹 → 静音到内容变化为止(事实没变就别再冒出来)。
+              // 用 factKey 而不是当前 title/body:后者已被 Layer 7 改写过,拿它当指纹永远对不上。
+              dismissProactiveById(card.id, card.factKey);
               // Record in cooling store so adaptive cooldown can kick in after repeated ignores
-              if (card.cardType) {
-                saveCoolingStore(recordDismissed(card.cardType, loadCoolingStore()));
+              // 键必须与管线读取的 dedupKey 一致(coolKey),否则多实例类型的 dismissCount
+              // 记在一个没人读的键上 —— 自适应冷却等于没接。
+              const coolKey = card.coolKey || card.cardType;
+              if (coolKey) {
+                saveCoolingStore(recordDismissed(coolKey, loadCoolingStore()));
               }
               setDismissedCardIds((prev) => { const next = new Set(prev); next.add(card.id); return next; });
             }}

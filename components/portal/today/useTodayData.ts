@@ -52,6 +52,7 @@ import { computeDomainFindings } from '@/lib/portal/domain-insights';
 import { buildCrossRegionDeliverables } from '@/lib/platform/cross-region/deliver';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { isProactiveCardDismissed, type ProactiveCardData, registerDecCards } from './proactive-types';
+import { isCardSuppressed, fingerprint } from '@/lib/portal/card-verdict';
 import { localDayKey } from '@/lib/portal/local-day';
 
 const EMPTY_SIGNAL_CARDS: RecommendationCard[] = [
@@ -315,13 +316,19 @@ export function useTodayData(canUsePrivateData: boolean) {
             icon: card.icon,
             priority: card.priority,
             cardType: card.type,
+            // 指纹在这里定死:下面 Layer 7 会用 AI 重写 title/body,若拿改写后的文字当指纹,
+            // 每次重写都算「新事实」,用户的「不要再出现」就永远对不上号。
+            factKey: fingerprint(`${card.title}|${card.body}`),
+            coolKey: card.coolKey,
             nodeId: card.nodeId,
             actions: [{ label: card.action.cta, actionType: card.action.actionType }],
             expiresAt: card.expiresAt?.toISOString(),
             evidence: card.evidence,
             reason: card.reason,
           }))
-          .filter((c) => !isProactiveCardDismissed(c.id, `${c.title}|${c.body}`))
+          // 用户裁决优先于一切:静音/稍后没到期就不出(比冷却活得久)
+          .filter((c) => !isCardSuppressed({ cardId: c.id, cardType: c.cardType, factKey: c.factKey }, now))
+          .filter((c) => !isProactiveCardDismissed(c.id, c.factKey))
           .filter((c) => !c.expiresAt || new Date(c.expiresAt).getTime() > now.getTime());
 
         // AI Language Generation (Layer 7) — enhance copy if cards exist.
