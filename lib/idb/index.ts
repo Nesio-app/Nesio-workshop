@@ -91,6 +91,53 @@ export { migrateBankData } from './migrators/bank-tx-migrator';
 export { migrateHealth } from './migrators/health-migrator';
 export { migratePersonRecords } from './migrators/person-records-migrator';
 
+// === init-hook.ts ===
+export type { InitHookOptions } from './init-hook';
+export {
+  initializeStorageOnApp,
+  resetInitializationState,
+} from './init-hook';
+
+// === storage-monitor.ts ===
+export type { StorageMetrics } from './storage-monitor';
+export {
+  getStorageMetrics,
+  recordWriteAttempt,
+  resetFailureRateStats,
+  startPeriodicStatsReset,
+  formatStorageMetrics,
+  getDetailedStorageReport,
+  shouldWarnUser,
+  getStorageProblemSummary,
+} from './storage-monitor';
+
+// === rollback.ts ===
+export {
+  initializeRollbackSystem,
+  recordIDBWriteFailure,
+  activateFallback,
+  attemptRecovery,
+  completeRecovery,
+  createBackup,
+  restoreFromBackup,
+  cleanupOldBackups,
+  getFallbackState,
+  isFallbackActive,
+  getDiagnostics as getRollbackDiagnostics,
+} from './rollback';
+
+// === health-check.ts ===
+export type { HealthCheckResult } from './health-check';
+export {
+  performHealthCheck,
+  recordDiagnostic,
+  flushDiagnostics,
+  startPeriodicHealthCheck,
+  stopPeriodicHealthCheck,
+  getPendingDiagnosticsCount,
+  getDiagnosticsReport,
+} from './health-check';
+
 /**
  * 初始化 IDB 基础设施的便捷函数。
  * 在应用启动时调用一次。

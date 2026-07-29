@@ -15,7 +15,6 @@ import { readServerTier } from '@/lib/portal/auth/server-entitlement';
 import { resolveAiKey } from '@/lib/portal/ai-keys';
 import { envValue } from '@/lib/portal/env';
 import { reportAiCall } from '@/lib/portal/ai-telemetry';
-import { getSupabaseUserId } from '@/lib/portal/integrations';
 import { cookies } from 'next/headers';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';

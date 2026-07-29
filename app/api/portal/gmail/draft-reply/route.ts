@@ -76,11 +76,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'no_context' }, { status: 400 });
   }
 
-  // 免费用户无云回复生成,返回提示
+  // 免费用户无云回复生成,返回本地兜底(空草稿提示用户升级)
   if (!canUsePaidCloudAi) {
     return NextResponse.json(
       { ok: false, error: 'pro_required', detail: '需要订阅才能使用 AI 回复生成功能。' },
-      { status: 402 },
+      { status: 200 },
     );
   }
 

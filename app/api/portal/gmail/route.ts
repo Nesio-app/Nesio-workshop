@@ -424,7 +424,6 @@ export async function GET(req: NextRequest) {
   }, req);
 
   // 获取当前用户的付费状态(用于 AI 提取决策)
-  const cookieStore = await cookies();
   const accessToken = cookieStore.get('baohe_auth_access')?.value || null;
   const userTier = await readServerTier(accessToken);
   const canUsePaidCloudAi = userTier === 'pro';

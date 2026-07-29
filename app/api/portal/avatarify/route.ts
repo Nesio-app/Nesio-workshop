@@ -159,11 +159,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'no_image' }, { status: 400 });
   }
 
-  // 免费用户无图像生成,返回提示
+  // 免费用户无图像生成,返回本地兜底(错误提示用户升级,200不402)
   if (!canUsePaidCloudAi) {
     return NextResponse.json(
       { ok: false, error: 'pro_required', message: '需要订阅才能使用卡通头像生成功能。' },
-      { status: 402 },
+      { status: 200 },
     );
   }
 

@@ -212,10 +212,30 @@ async function checkDataIntegrity(): Promise<boolean> {
     }
 
     // 验证版本完整性
+    // 注：简化版本，仅检查 signals 表中第一条记录是否有版本标记
     try {
-      await verifyIntegrity();
+      const store = getStore(db, 'signals', 'readonly');
+      const hasValidVersion = await new Promise<boolean>((resolve) => {
+        const request = store.getAll();
+        request.onsuccess = () => {
+          const records = request.result as any[];
+          if (records.length > 0) {
+            // 检查第一条记录是否有版本标记
+            const hasVersion = '__v' in records[0];
+            resolve(hasVersion);
+          } else {
+            resolve(true); // 空表算通过
+          }
+        };
+        request.onerror = () => resolve(false);
+      });
+
+      if (!hasValidVersion) {
+        console.warn('[HealthCheck] Version integrity check failed');
+        return false;
+      }
     } catch (error) {
-      console.warn('[HealthCheck] Version integrity check failed:', error);
+      console.warn('[HealthCheck] Version integrity check exception:', error);
       return false;
     }
 

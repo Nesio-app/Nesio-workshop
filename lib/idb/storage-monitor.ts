@@ -9,7 +9,7 @@
  */
 
 import { estimateDBSize } from './idb-core';
-import { getStorageHealth, formatBytes } from '@/lib/portal/storage-health';
+import { getStorageHealth, formatBytes } from '../portal/storage-health';
 
 export interface StorageMetrics {
   /** localStorage 使用百分比（0-100） */
