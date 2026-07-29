@@ -7793,6 +7793,7 @@ html[data-portal-theme="night"] .nesio-settings-option-label { color: #e8eefa; }
   border-radius: 0.75rem;
   margin-top: 0.5rem;
   border: 1px solid rgba(207,107,107,0.15);
+}
 /* 「删除数据」危险区(2026-07-29):三个红按钮从平铺收进一个可折叠入口。
    平铺时一屏三条红,违反 CLAUDE.md「不用红色制造焦虑」;而这三件事一年也未必做一次。
    收起态是中性的,只有展开后才见红 —— 红色留给真正走到那一步的人。 */
