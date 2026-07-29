@@ -20,15 +20,25 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm,
 
 const SRC = read('lib/health/lab-pdf.ts');
 const CODE = strip(SRC);
+// pdf.js 的加载 + CMap 配置 + 分行,2026-07-29 收到这一份里(阅读器导入也走它)。
+const LOADER = read('lib/portal/pdfjs-loader.ts');
+const LOADER_CODE = strip(LOADER);
 
-// ── 纯函数:把 lab-pdf.ts 里不碰 DOM 的那段抽出来跑 ─────────────────────────
+// ── 纯函数:把不碰 DOM 的那几段抽出来跑 ────────────────────────────────────
+/** 边界用**代码标识符**,不用注释/指令 —— 指令是会被清掉的(2026-07-29 就清过一次:
+ *  原来切到 `/* eslint-disable`,去掉那条 disable 之后这条测试当场炸)。 */
+function slice(src, startMark, endMark, why) {
+  const start = src.indexOf(startMark);
+  const end = endMark ? src.indexOf(endMark) : src.length;
+  assert.ok(start > 0 && end > start, `${why} 结构变了,这条测试要跟着改`);
+  return src.slice(start, end);
+}
 function loadPure() {
-  const start = SRC.indexOf('export function groupItemsIntoLines');
-  // 边界用**代码标识符**,不用注释/指令 —— 指令是会被清掉的(2026-07-29 就清过一次:
-  // 原来切到 `/* eslint-disable`,去掉那条 disable 之后这条测试当场炸)。
-  const end = SRC.indexOf('const PDF_ASSET_BASE');
-  assert.ok(start > 0 && end > start, 'lab-pdf.ts 结构变了,这条测试要跟着改');
-  const js = ts.transpileModule(SRC.slice(start, end), {
+  const src = [
+    slice(LOADER, 'export function groupItemsIntoLines', null, 'pdfjs-loader.ts'),
+    slice(SRC, 'export function looksLikeTextLayer', 'export async function readLabPdf', 'lab-pdf.ts'),
+  ].join('\n');
+  const js = ts.transpileModule(src, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   const mod = { exports: {} };
@@ -116,17 +126,21 @@ const item = (str, x, y) => ({ str, transform: [1, 0, 0, 1, x, y] });
   assert.ok(!/fetch\s*\(/.test(CODE), 'lab-pdf 里出现了 fetch —— 化验单必须全程本机');
   // CDN 加载在生产会被 CSP 拦掉(script-src 只放行 self 和 cdn.plaid.com),
   // 而且那也等于把解析依赖挂在外部主机上。必须走 npm 依赖。
-  assert.ok(!/https?:\/\/cdn\./.test(CODE), 'lab-pdf 从 CDN 拉解析库 —— CSP 会拦,而且离线不可用');
-  assert.match(CODE, /import\('pdfjs-dist'\)/, 'pdf.js 必须是动态 import 的本地依赖');
+  for (const [name, c] of [['lab-pdf', CODE], ['pdfjs-loader', LOADER_CODE]]) {
+    assert.ok(!/https?:\/\/cdn\./.test(c), `${name} 从 CDN 拉解析库 —— CSP 会拦,而且离线不可用`);
+  }
+  assert.match(LOADER_CODE, /import\('pdfjs-dist'\)/, 'pdf.js 必须是动态 import 的本地依赖');
+  // 化验单这条路必须经 openPdf 打开 —— 自己拼 getDocument 参数就会漏掉下面那几行 CMap。
+  assert.match(CODE, /openPdf\(/, 'lab-pdf 没走统一的 openPdf,CMap 配置会漏');
 
   // ── CMap:中文 PDF 的命门,不是可选优化 ──────────────────────────────────
   // 2026-07-29 实测(真机跑出来的,不是推的):不传 cMapUrl 时,一份**带文字层**的
   // 中文化验单 getTextContent() 返回 0 个文字块 —— 不报错、不抛异常。
   // 上层于是把它判成「扫描件」,推给端上 OCR(而端上还得先重出 IPA)。
   // 也就是说:少这一行,这个功能对中文用户等于完全不可用,而且**看不出是坏的**。
-  assert.match(CODE, /cMapUrl:/, 'lab-pdf 没传 cMapUrl —— 中文 PDF 会提取出 0 个字,然后被误判成扫描件');
-  assert.match(CODE, /cMapPacked:\s*true/, 'cMapPacked 必须为 true(下发的是 .bcmap 二进制表)');
-  assert.match(CODE, /standardFontDataUrl:/, '缺 standardFontDataUrl,内嵌标准字体的 PDF 会掉字');
+  assert.match(LOADER_CODE, /cMapUrl:/, '没传 cMapUrl —— 中文 PDF 会提取出 0 个字,然后被误判成扫描件');
+  assert.match(LOADER_CODE, /cMapPacked:\s*true/, 'cMapPacked 必须为 true(下发的是 .bcmap 二进制表)');
+  assert.match(LOADER_CODE, /standardFontDataUrl:/, '缺 standardFontDataUrl,内嵌标准字体的 PDF 会掉字');
   // 资源必须真的躺在 public/ 里 —— 只写路径不带文件,线上就是一串 404,
   // 表现和「没传 cMapUrl」一模一样。
   const cmapDir = new URL('../public/pdfjs/cmaps', import.meta.url);
