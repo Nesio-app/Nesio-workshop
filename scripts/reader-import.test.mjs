@@ -18,9 +18,10 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import assert from 'node:assert/strict';
 import * as fflate from 'fflate';
+import { stripComments } from './lib/strip-comments.mjs';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
-const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const strip = stripComments;
 
 const SRC = read('lib/portal/adhd-reader.ts');
 const CODE = strip(SRC);

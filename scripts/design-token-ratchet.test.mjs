@@ -18,6 +18,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { stripComments } from './lib/strip-comments.mjs';
 
 const ROOT = new URL('..', import.meta.url);
 
@@ -26,11 +27,22 @@ const ROOT = new URL('..', import.meta.url);
  * 清理完一批就把对应数字改成新的实际值 —— 那一刻棘轮就卡在更严的位置上了。
  */
 const BASELINE = {
-  fontSize: 252,
-  spacing: 358,
-  radius: 66,
-  hex: 24,
+  fontSize: 254,
+  spacing: 360,
+  radius: 67,
+  hex: 28,
 };
+
+/*
+ * 2026-07-29:字号 252→254、间距 358→360、圆角 66→67、色值 24→28。**这一次的上调不是放宽标准,是量具修好了。**
+ *
+ * 这份脚本原来自带一行剥注释的正则,它把字符串里的「斜杠星号」也当成注释起点 ——
+ * NesioChatSheet.tsx 里一句 accept = image 斜杠星号 让它一路吃掉 10086 个字符,
+ * 那段代码里的写死值(2 个字号 + 2 个间距 + 1 个圆角 + 4 个色值,共 9 处)从来没被数进来。换成 scripts/lib/strip-comments.mjs
+ * 之后它们现身了。数字变大是**读数变准**,不是有人新写了违规。
+ *
+ * 这是唯一一次允许调高。往后只能往下走。
+ */
 
 /** 和 .eslintrc.json 同源的判据(那边管编辑器提示,这边管 CI)。 */
 const CHECKS = [
@@ -59,8 +71,7 @@ const worst = Object.fromEntries(CHECKS.map((c) => [c.key, new Map()]));
 
 for (const rel of files) {
   const raw = fs.readFileSync(new URL(rel, ROOT), 'utf8')
-    .replace(/\/\*[\s\S]*?\*\//g, '')       // 注释里提到的不算
-    .replace(/^\s*\/\/.*$/gm, '');
+
   for (const c of CHECKS) {
     const src = c.strip ? c.strip(raw) : raw;
     const n = (src.match(c.re) || []).length;

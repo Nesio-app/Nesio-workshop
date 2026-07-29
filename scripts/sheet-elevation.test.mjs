@@ -23,12 +23,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { stripComments } from './lib/strip-comments.mjs';
 
 const root = new URL('..', import.meta.url).pathname;
 const read = (p) => fs.readFileSync(path.join(root, p), 'utf8');
 // 先剥掉 CSS 注释:注释会落进「选择器」那一段,而这份文件的注释里到处写着类名
 // (「与 .nesio-sheet-overlay--elevated 同层」之类),不剥就会把邻近规则的 z 认成它的。
-const css = read('app/globals.css').replace(/\/\*[\s\S]*?\*\//g, '');
+const css = stripComments(read('app/globals.css'));
 const sheet = read('components/portal/ui/NesioSheet.tsx');
 
 /**

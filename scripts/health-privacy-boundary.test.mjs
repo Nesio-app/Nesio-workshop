@@ -12,11 +12,12 @@
  */
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import { stripComments } from './lib/strip-comments.mjs';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 // 注释里的承诺不是承诺 —— 剥掉再匹配。踩过:文件头注释里正好写着要断言的那句,
 // 把真代码删掉测试照样绿。
-const code = (p) => read(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const code = (p) => stripComments(read(p));
 
 const src = code('lib/life-domain/create-signal.ts');
 

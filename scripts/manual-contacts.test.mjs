@@ -14,9 +14,10 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import assert from 'node:assert/strict';
+import { stripComments } from './lib/strip-comments.mjs';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
-const code = (p) => read(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const code = (p) => stripComments(read(p));
 
 // ── ① 改名必须搬家 ───────────────────────────────────────────────────────────
 {

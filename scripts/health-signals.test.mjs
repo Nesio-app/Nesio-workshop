@@ -13,6 +13,7 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import assert from 'node:assert/strict';
+import { stripComments } from './lib/strip-comments.mjs';
 
 const SRC = fs.readFileSync(new URL('../lib/health/health-signals.ts', import.meta.url), 'utf8');
 
@@ -21,7 +22,7 @@ const SRC = fs.readFileSync(new URL('../lib/health/health-signals.ts', import.me
  * 踩过:第一版直接对全文 match `sensitivity: 'health'`,而文件头注释里正好写着这句 ——
  * 我把真正的那行删掉做变异测试,测试照样绿。注释里的承诺不是承诺。
  */
-const CODE = SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const CODE = stripComments(SRC);
 
 // ── ① 写入闸门:只准 createSignal,不准 addLifeNode ────────────────────────────
 {
