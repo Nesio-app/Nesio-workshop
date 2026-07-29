@@ -26,7 +26,6 @@ import {
   buildListingText,
   expiryStatus,
   inventoryStats,
-  listInventoryItems,
   parseAmazonFlipCsv,
   removeInventoryItem,
   reviewDueInfo,
@@ -35,7 +34,7 @@ import {
   updateInventoryItem,
   type InventoryItem,
 } from '@/lib/portal/inventory';
-import { isFoodItem } from '@/lib/cooking/pantry';
+import { listStorageItems, countPantryItems } from '@/lib/portal/inventory-visibility';
 
 interface InventorySheetProps {
   open: boolean;
@@ -63,6 +62,9 @@ function stripEmoji(s: string): string {
 export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [items, setItems] = useState<InventoryItem[]>([]);
+  // 归「做饭 · 库存」的食材件数 —— 只用来在顶上说一句「另有 N 件在那边」,
+  // 让「收纳 18 件」和记忆页那个数对得上,而不是让用户猜剩下几件去哪了。
+  const [pantryCount, setPantryCount] = useState(0);
   const [groupFilter, setGroupFilter] = useState<string>(ALL);
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'list' | 'add' | 'detail' | 'stats' | 'sell' | 'flip'>('list');
@@ -85,7 +87,8 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const [fPrice, setFPrice] = useState('');
 
   // 食材(subtype=食材)归「做饭·库存」那张脸,物品/收纳页排除,免得护照清单里混进菠菜。
-  const refresh = () => setItems(listInventoryItems().filter((i) => !isFoodItem(i)));
+  // 判据收在 inventory-visibility(记忆页那个「收纳」球也读它)—— 各写各的正是 22 vs 18 的来源。
+  const refresh = () => { setItems(listStorageItems()); setPantryCount(countPantryItems()); };
 
   useEffect(() => {
     if (!open) return;
@@ -245,6 +248,17 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               <span className="nesio-inv-stat">{st.count} {L(dict, '件', 'items')}</span>
               {st.totalValue > 0 && <span className="nesio-inv-stat">≈ ${Math.round(st.totalValue).toLocaleString('en-US')}</span>}
               {unplacedCount > 0 && <span className="nesio-inv-stat">{unplacedCount} {L(dict, '未归位', 'unplaced')}</span>}
+              {/* 食材归另一张脸。不说这一句,用户在记忆里数出 22 条物品、这儿只有 18 件,
+                  差的 4 件就成了「东西丢了」。说出来 18 + 4 就在屏幕上对得上,还给了去处。 */}
+              {pantryCount > 0 && (
+                <button
+                  type="button"
+                  className="nesio-inv-stat nesio-inv-pantry-link"
+                  onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('nesio-open-cooking')); }}
+                >
+                  {L(dict, `另有 ${pantryCount} 件食材在「做饭 · 库存」`, `${pantryCount} more in Cooking · Pantry`)}
+                </button>
+              )}
             </div>
           ) : <span />}
           <button type="button" className="nesio-freeze-close nesio-inv-close" onClick={view === 'list' ? onClose : () => { setView('list'); setDetailId(null); }}>

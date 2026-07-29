@@ -50,7 +50,8 @@ import { L, type DictLocale } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName, stripMarkdownInline } from '@/lib/portal/node-display';
 import { isPinned, loadPins, PINS_UPDATED_EVENT, togglePin, isCore, toggleCore, loadCore, CORE_UPDATED_EVENT } from '@/lib/portal/pins';
-import { listInventoryItems, inventoryStats } from '@/lib/portal/inventory';
+import { inventoryStats } from '@/lib/portal/inventory';
+import { listStorageItems } from '@/lib/portal/inventory-visibility';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
 
@@ -1222,9 +1223,12 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
 
 
   const onThisDayNodes = useMemo(() => findOnThisDayNodes(nodes), [nodes]);
-  // 批次 113:收纳卡真数据(空间/未归位/件数/估值),随节点变化重算
+  // 批次 113:收纳卡真数据(空间/未归位/件数/估值),随节点变化重算。
+  // 2026-07-29 QA #12:这里原来读 listInventoryItems() 全量 —— 而收纳页自己滤掉了食材,
+  // 于是球上写 22 件、点进去只有 18 件。口径统一到 listStorageItems():
+  // 谁把「收纳」摆给用户看,谁就报收纳页真会显示的那批。
   const invStats = useMemo(() => {
-    const items = listInventoryItems();
+    const items = listStorageItems();
     return { ...inventoryStats(items), unfiled: items.filter((i) => !i.space).length };
   }, [nodes]);
 

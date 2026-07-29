@@ -7750,9 +7750,10 @@ html[data-portal-theme="night"] .nesio-settings-option-label { color: #e8eefa; }
   color: #059669;
 }
 
-/* 设置页的整行按钮:已并到 Button 原语(soft · md · full,危险的那条加 risk 语气)。
-   原来两条各写一份 rgba —— 蓝的写死品牌蓝(换皮肤不跟)、红的写死 rgba(207,107,107)
-   (就是 --status-risk 的分量,只是没人知道)。这里只留各自的外边距。 */
+/* 设置页那几条整行按钮的**间距**。
+   外观已经不在这儿了 —— 调用点换成 <Button variant="soft" size="md" full>(危险的加 tone="risk"),
+   这两个类名只剩「和上一条隔多远」这一件事。这就是桥接的终点:
+   先并值让视觉立刻统一,再换标签,换完旧类只留布局职责(或者干脆消失)。 */
 .nesio-settings-action-btn { margin-top: 0.85rem; }
 
 .nesio-settings-danger-btn { margin-top: var(--space-2); }
@@ -14652,6 +14653,13 @@ html[data-portal-theme="night"] .nesio-project-card-name { color: #d8e8ff; }
   background: var(--portal-accent-soft, rgba(0,0,0,0.06));
   color: var(--text-secondary, var(--portal-muted));
 }
+/* 「另有 N 件食材在做饭 · 库存」—— 它是个能点的去处,不是一句说明,所以给足按钮相。 */
+.nesio-inv-pantry-link {
+  border: 1px solid var(--portal-accent-border);
+  color: var(--portal-accent);
+  cursor: pointer;
+  font-family: inherit;
+}
 .nesio-inv-close { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
 /* 批次 172:项目页顶部三个统计框(进行中/已完成/已归档) */
 .nesio-proj-stats { display: flex; gap: 8px; padding: 0.1rem 1rem 0.7rem; }
@@ -19710,8 +19718,6 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-proactive-action-btn,
 .nesio-ob-auth-btn,
 .nesio-ob-skip-btn,
-.nesio-settings-action-btn,
-.nesio-settings-danger-btn,
 .nesio-type-action-btn,
 .nesio-collapsed-act-btn,
 .nesio-exp-cancel-btn {
@@ -19740,9 +19746,7 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-btn--full,
 .nesio-ob-primary-btn,
 .nesio-ob-auth-btn,
-.nesio-ob-skip-btn,
-.nesio-settings-action-btn,
-.nesio-settings-danger-btn { width: 100%; }
+.nesio-ob-skip-btn { width: 100%; }
 /* 按下给一点回弹 —— 但尊重「减少动态效果」 */
 .nesio-btn:active,
 .nesio-ob-primary-btn:not(:disabled):active,
@@ -19750,8 +19754,6 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-today-btn:active,
 .nesio-proactive-action-btn:active,
 .nesio-ob-auth-btn:not(:disabled):active,
-.nesio-settings-action-btn:not(:disabled):active,
-.nesio-settings-danger-btn:active,
 .nesio-type-action-btn:active,
 .nesio-collapsed-act-btn:active,
 .nesio-exp-cancel-btn:active { transform: scale(0.97); }
@@ -19761,8 +19763,7 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 }
 .nesio-btn:disabled,
 .nesio-ob-primary-btn:disabled,
-.nesio-ob-auth-btn:disabled,
-.nesio-settings-action-btn:disabled { opacity: 0.45; cursor: default; }
+.nesio-ob-auth-btn:disabled { opacity: 0.45; cursor: default; }
 .nesio-btn:disabled:active { transform: none; }
 .nesio-btn-icon { display: inline-flex; align-items: center; flex-shrink: 0; }
 
@@ -19776,8 +19777,6 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-collapsed-act-btn { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
 .nesio-btn--md,
 .nesio-today-btn,
-.nesio-settings-action-btn,
-.nesio-settings-danger-btn,
 .nesio-exp-cancel-btn { padding: 0.55rem var(--space-4); font-size: var(--text-sm); }
 .nesio-btn--lg,
 .nesio-ob-primary-btn,
@@ -19799,7 +19798,6 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 }
 .nesio-btn--soft,
 .nesio-rel-log-btn,
-.nesio-settings-action-btn,
 .nesio-type-action-btn,
 .nesio-collapsed-act-btn {
   background: var(--portal-accent-soft);
@@ -19817,8 +19815,7 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
    CLAUDE.md 文案红线:不用红色制造焦虑,普通的「取消 / 稍后」不算 risk。 */
 .nesio-btn--risk.nesio-btn--primary { background: var(--status-risk); color: #fff; }
 .nesio-btn--risk.nesio-btn--secondary { border-color: var(--status-risk); color: var(--status-risk); }
-.nesio-btn--risk.nesio-btn--soft,
-.nesio-settings-danger-btn {
+.nesio-btn--risk.nesio-btn--soft {
   background: var(--status-risk-soft);
   color: var(--status-risk);
   border-color: color-mix(in srgb, var(--status-risk) 20%, transparent);

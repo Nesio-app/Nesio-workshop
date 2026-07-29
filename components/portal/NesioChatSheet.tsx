@@ -30,6 +30,7 @@ import { formatEnvironmentContext, getCachedCalendarEvents } from '@/lib/portal/
 import { loadChatHistoryRaw, saveChatHistoryRaw, loadChatSessionsRaw, saveChatSessionsRaw, CHAT_STORE_UPDATED_EVENT } from '@/lib/portal/chat-store';
 import { track } from '@/lib/portal/telemetry';
 import { markdownToPlain } from '@/lib/portal/chat-markdown';
+import { isInternalDiagnostic } from '@/lib/portal/chat-internal-text';
 import { L } from '@/lib/portal/i18n';
 import { resolveAirport } from '@/lib/portal/airports';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -1233,7 +1234,16 @@ Edit location/value anytime in Storage.`),
                     // 模型爱用 markdown 列表/粗体作答,而气泡是纯文本渲染 ——
                     // 不脱记号的话用户看到的就是「* 7月28日（周二）」这种星号糊在正文里。
                     // 只脱记号、不渲染 HTML:聊天里混着邮件正文和日程标题,当 HTML 渲染等于开注入口子。
-                    <p className="nesio-wechat-bubble-text">{markdownToPlain(msg.text)}</p>
+                    //
+                    // 2026-07-29 QA #17:再加一道 —— 历史里存着「识别到:未检测到任何生命图谱条目」
+                    // 这种内部诊断(产生它的三个入口 07-28 已修,但**已经存下的对话**照样天天再显示一遍)。
+                    // 在这儿换成人话,不动用户的历史数据:万一判重了,原文还在。
+                    <p className="nesio-wechat-bubble-text">
+                      {msg.role === 'model' && isInternalDiagnostic(msg.text)
+                        ? L(dict, '（这条当时没答好 —— 我把内部说明发出来了。再问我一次就行。）',
+                          '(This one didn’t come out right — I sent you an internal note by mistake. Just ask me again.)')
+                        : markdownToPlain(msg.text)}
+                    </p>
                   )}
                   {msg.photos && msg.photos.length > 0 && (
                     <div className="nesio-chat-photo-hits" role="group" aria-label={L(dict, '相关照片', 'Related photos')}>

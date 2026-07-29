@@ -94,6 +94,25 @@ const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, 
   );
 
   const settings = code(read('components/portal/SettingsSheets.tsx'));
+
+  // 同步:数字变了必须说清为什么变(2026-07-29 QA #11)。
+  // 用户点一次同步,总数 2541 → 2544,提示只写「✓ 已同步」—— 那 3 条就像凭空多出来的。
+  // 其实它们是别的设备存下、这台还没有的记忆,取回来完全正确;错的是没说。
+  // importedNodeCount 本来就一直算着,只是从来没露过面。
+  {
+    const at = settings.indexOf('async function handleForceSync');
+    assert.ok(at > 0, '隐私页的「立即同步」不见了');
+    const fn = settings.slice(at, settings.indexOf('\n  }', at));
+    assert.ok(
+      /importedNodeCount/.test(fn),
+      '「立即同步」又只报一句「已同步」了 —— 记忆总数当场变大却不说来路,用户看到的就是「凭空多了 3 条」',
+    );
+    assert.ok(
+      /n > 0[\s\S]{0,400}\?[\s\S]{0,400}:/.test(fn),
+      '同步没有「什么都没变」那一支 —— 一条没取回也说「取回 0 条」同样让人犯嘀咕',
+    );
+  }
+
   // 登录态:那句「数据在哪」的说明必须跟着真实登录态走,不能写死
   const tipAt = settings.indexOf('你的数据在哪里');
   assert.ok(tipAt > 0, '隐私页的「你的数据在哪里」不见了');

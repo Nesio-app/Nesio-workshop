@@ -118,6 +118,46 @@ const CSS = read('app/globals.css');
     !/className="nesio-camera-save-btn"/.test(cam) && !/className="nesio-camera-retake-btn"/.test(cam),
     '相机的保存/重拍又用回了自己那套类 —— 两个按钮会重新长歪',
   );
+
+  // 桥接的终点是**换标签**:调用点换成 <Button>,旧类只剩布局职责(或者干脆消失)。
+  // 这一批走完全程的两处 —— 它们的旧类已经从原语的选择器组里摘掉了,
+  // 谁把 <Button> 换回 <button className="nesio-settings-…"> 就当场没样式。
+  {
+    const st = code(read('components/portal/SettingsSheets.tsx'));
+    assert.ok(/from '\.\/ui\/Button'/.test(st), '设置页没有引 Button 原语');
+    assert.ok(
+      !/<button[^>]*className="nesio-settings-(action|danger)-btn/.test(st),
+      '设置页的备份/导出/删除又变回自造按钮了 —— 那两个类已经不在原语的分组里,会渲染成裸按钮',
+    );
+    assert.ok(
+      /<Button variant="soft" size="md" tone="risk" full/.test(st),
+      '「清除所有 Memory / 删除账号」丢了 risk 语气 —— 破坏性动作必须看得出来',
+    );
+    // 反过来也钉住:那两个旧类**只准**剩间距。哪天有人往里加回 background/font-size,
+    // 就等于在原语之外又开了一份外观。
+    for (const cls of ['.nesio-settings-action-btn', '.nesio-settings-danger-btn']) {
+      const at = CSS.search(new RegExp(`\\n\\${cls} \\{`));
+      assert.ok(at > 0, `${cls} 的间距规则不见了`);
+      const own = CSS.slice(at, CSS.indexOf('}', at));
+      assert.ok(
+        /^\s*[\n.a-z-]*\{?\s*margin-top:[^;]+;\s*$/.test(own.slice(own.indexOf('{') + 1)),
+        `${cls} 又不止管间距了 —— 它现在只该有 margin-top:${own}`,
+      );
+    }
+  }
+  {
+    const nd = code(read('components/portal/MemoryNodeDetail.tsx'));
+    assert.ok(
+      !/<button[^>]*className="nesio-(ob-primary|today|settings-danger)-btn[^"]*nesio-nd-action-btn/.test(nd),
+      '记忆详情底部那一排又拆回三套自造按钮了 —— 那正是「按钮大小形状不统一」的原始现场',
+    );
+    for (const v of ['variant="primary"', 'variant="secondary"', 'variant="soft" tone="risk"']) {
+      assert.ok(
+        new RegExp(`<Button ${v.replace(/"/g, '"')} className="nesio-nd-action-btn"`).test(nd),
+        `记忆详情底部那排少了 <Button ${v}> —— 阅读/编辑/删除三档语气要分得开`,
+      );
+    }
+  }
 }
 
 // ── ⑥ .nesio-glass:液态玻璃在 WKWebView 上真能生效的那部分 ──────────────────
@@ -166,8 +206,6 @@ const CSS = read('app/globals.css');
     '.nesio-proactive-action-btn': ['.nesio-btn--secondary', '.nesio-btn--sm', '.nesio-btn--pill'],
     '.nesio-ob-auth-btn': ['.nesio-btn--secondary', '.nesio-btn--lg', '.nesio-btn--full'],
     '.nesio-ob-skip-btn': ['.nesio-btn--ghost', '.nesio-btn--sm', '.nesio-btn--full'],
-    '.nesio-settings-action-btn': ['.nesio-btn--soft', '.nesio-btn--md', '.nesio-btn--full'],
-    '.nesio-settings-danger-btn': ['.nesio-btn--risk.nesio-btn--soft', '.nesio-btn--md', '.nesio-btn--full'],
     '.nesio-type-action-btn': ['.nesio-btn--soft', '.nesio-btn--sm', '.nesio-btn--pill'],
     '.nesio-collapsed-act-btn': ['.nesio-btn--soft', '.nesio-btn--sm', '.nesio-btn--pill'],
     '.nesio-exp-cancel-btn': ['.nesio-btn--secondary', '.nesio-btn--md'],

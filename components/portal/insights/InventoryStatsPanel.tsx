@@ -7,8 +7,9 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { listInventoryItems, inventoryStats, sellPile, amazonSummary, type InventoryItem } from '@/lib/portal/inventory';
-import { isFoodItem } from '@/lib/cooking/pantry';
+import { inventoryStats, sellPile, amazonSummary, type InventoryItem } from '@/lib/portal/inventory';
+// 口径和收纳页、记忆页那个「收纳」球共用一处 —— 各写各的正是 22 vs 18 的来源。
+import { listStorageItems } from '@/lib/portal/inventory-visibility';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -19,7 +20,7 @@ export default function InventoryStatsPanel() {
 
   useEffect(() => {
     // 食材归「做饭·库存」脸,物品统计排除,免得库存数/估值把菠菜也算进去。
-    const load = () => { try { setItems(listInventoryItems().filter((i) => !isFoodItem(i))); } catch { setItems([]); } };
+    const load = () => { try { setItems(listStorageItems()); } catch { setItems([]); } };
     load();
     window.addEventListener('nesio-life-graph-updated', load);
     window.addEventListener('nesio-connectors-refreshed', load);
