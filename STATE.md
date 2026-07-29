@@ -188,7 +188,11 @@ sensitivity/retention 枚举化(中期)。
   +断档月虚线标记+去小值抬高、预算超支比例如实文字;④ 纠错闭环:批量「全部按建议」、
   「排除」改真语义「不计收支」(原为归 OTHER 仍计支出的骗人文案)、已学规则显示
   label(mch_xxx 死代码复活)、月报自动生成失败可见。plaid-multi-item 钉子按新架构更新。
-  **P3 余项**:FinanceTab 拆分(现 ~1300 行)、对账小票(需按账户快照,数据不足暂缓)。
+  **P3 拆分完成(2026-07-28,财务大修四期收官)**:FinanceTab 1300→949 行,拆出
+  RecurringPane / InvestPane / CardsPane / AcctLogo / QuickAddSheet 五个组件(纯展示,
+  数据经 props;对齐 TodayFeed 拆分先例)。顺手修:卡片页 brokerage 归投资组
+  (原被列进存款组,审计 A1)。**大修全清单收口;对账小票(需按账户快照)与
+  overview/tx 段进一步拆分列为后续可选。全程待真机验收。**
 - **财务板块大修(2026-07-28 审计完成,施工待批)**:四路深查(maybe 数据/分析/UI × 宝盒体检)
   收敛为 `docs/design/finance-maybe-audit-2026-07.md`。**P0 止血项含一条不可逆数据销毁路径**
   (connector-sync 先 replace 账户再按新表过滤流水写回 + 全仓无 `await store.ready()`,
