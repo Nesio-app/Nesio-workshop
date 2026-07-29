@@ -19,6 +19,7 @@ import { usePortalLocale } from './use-portal-locale';
 import { markBusy } from '@/lib/portal/app-busy';
 import { isPro } from '@/lib/portal/entitlement';
 import { isLabModeOn } from '@/lib/portal/module-overrides';
+import { logDropped } from '@/lib/portal/storage-health';
 
 interface ConnectorsHubProps { open: boolean; onClose: () => void; }
 
@@ -1376,10 +1377,19 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           ]);
           const clinical = parseCda(result.cdaXml);
           saveClinical(clinical);
+          // 健康镜头 H1:临床数据同步接进 Signal 主事实表 —— 不接的话它就还是一条盲肠,
+          // 问一问/时间线/相关性都看不见(存了等于没存)。幂等,重复导入不会长重复。
+          const { ensureClinicalProjected } = await import('@/lib/health/health-signals');
+          const projected = ensureClinicalProjected({ ...clinical, importedAt: new Date().toISOString() });
           if (clinical.labs.length || clinical.medications.length || clinical.conditions.length) {
-            showToast(L(dict, `临床记录:${clinical.labs.length} 项化验 · ${clinical.medications.length} 用药 · ${clinical.conditions.length} 诊断`, `Clinical: ${clinical.labs.length} labs · ${clinical.medications.length} meds · ${clinical.conditions.length} conditions`), true);
+            const tail = projected ? L(dict, ' · 已接进记忆', ' · linked to memory') : '';
+            showToast(L(dict, `临床记录:${clinical.labs.length} 项化验 · ${clinical.medications.length} 用药 · ${clinical.conditions.length} 诊断${tail}`, `Clinical: ${clinical.labs.length} labs · ${clinical.medications.length} meds · ${clinical.conditions.length} conditions${tail}`), true);
           }
-        } catch { /* 临床解析尽力而为,失败不影响健康导入 */ }
+        } catch (err) {
+          // 红线:不静默吞。临床解析失败不该拖垮健康导入,但也不该假装什么都没发生。
+          logDropped('connectors.clinical_import', err);
+          showToast(L(dict, '临床记录这部分没读出来,健康指标已照常导入', 'Clinical records could not be read; health metrics imported as usual'), false);
+        }
       }
       if (!result) {
         showToast(L(dict, 'zip 里没找到 export.xml(别选 export_cda / 子文件夹)', 'No export.xml in the zip (not export_cda / subfolders)'), false);

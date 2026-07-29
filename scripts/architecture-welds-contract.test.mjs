@@ -70,7 +70,7 @@ assert.match(read('lib/portal/capture-adapters.ts'), /booking-confirm/);
 assert.match(read('lib/portal/external-data-adapter.ts'), /registerExternalAdapter/);
 assert.match(read('lib/portal/external-data-adapter.ts'), /weather/);
 const locality = read('lib/portal/locality.ts');
-for (const id of ['bank-tx', 'expense-store', 'place-trail', 'weather', 'trip-itinerary', 'travel-poi-pack']) {
+for (const id of ['bank-tx', 'expense-store', 'place-trail', 'weather', 'trip-itinerary', 'travel-poi-pack', 'clinical-store', 'health-signals']) {
   assert.match(locality, new RegExp(`id: '${id}'`), `LOCALITY_REGISTRY 缺 ${id}`);
 }
 
