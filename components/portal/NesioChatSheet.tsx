@@ -1283,6 +1283,22 @@ Edit location/value anytime in Storage.`),
                     {msg.calendarState === 'error' && msg.calendarError && (
                       <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-xs)' }}>{msg.calendarError}</span>
                     )}
+                    {/* 2026-07-29(标注 图1「写入日历没成功」):授权不足时「重试」是错的出路 ——
+                        Google 不会追认 scope,再点一万次也还是 403。这种情况唯一能救的动作是
+                        **重新授权**(connect 路由带 prompt=consent,会重新弹同意页拿全 scope)。
+                        判据放宽到「403 / 权限 / scope」几种写法都认,宁可多给一个入口。 */}
+                    {msg.calendarState === 'error' && /403|permission|scope|insufficient|授权/i.test(`${msg.calendarError ?? ''} ${msg.calendarDetail ?? ''}`) && (
+                      <a
+                        href="/api/portal/calendar/connect"
+                        style={{
+                          alignSelf: 'flex-start', marginTop: '2px', padding: 'var(--space-2) var(--space-3)',
+                          borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)',
+                          color: 'var(--portal-accent)', fontSize: 'var(--text-sm)', textDecoration: 'none',
+                        }}
+                      >
+                        {L(dict, '重新授权「管理日程」', 'Re-authorize calendar access')}
+                      </a>
+                    )}
                     <button
                       type="button"
                       disabled={msg.calendarState === 'saving' || msg.calendarState === 'ok'}
