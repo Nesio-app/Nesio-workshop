@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
+import LoadingCard from '../ui/LoadingCard';
 import { IconTarget, IconStar, IconCamera } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale, loadProfileSettings } from '@/lib/portal/profile';
@@ -34,16 +35,23 @@ export default function FamilySharingSheet({ open, onClose }: { open: boolean; o
   const [familyId, setFamilyId] = useState('');
   const [view, setView] = useState<View>({ kind: 'board' });
 
+  // 2026-07-29:这里原本把 familyId 写进 useCallback 依赖,再在函数体里读它 —— 两个后果:
+  //   ① 每次选中家庭变化都造一个新函数,下面那个 effect 就跟着重跑一次,白拉一趟;
+  //   ② 「退出家庭」那条路会拿**旧闭包**调它(familyId 还是老值),
+  //      `!familyId` 判假 → 不重选家庭 → 落进「不 loading、无报错、也没内容」的空屏。
+  // 改成用 setFamilyId 的函数式更新拿当前值,回调只依赖空数组 —— 拉一次、选得准。
   const refreshFamilies = useCallback(async () => {
     setLoading(true); setLoadErr('');
     // 打开时把「我」的账号名字/头像同步到成员行(身份自成一套,不匹配 People)。best-effort。
     try { const p = loadProfileSettings(); await syncMyFamilyProfile(p.displayName, p.avatarUrl || ''); } catch { /* 首次未入伙时无行可更,忽略 */ }
     const r = await listFamilies();
     if (!r.ok) { setLoadErr(r.error); setLoading(false); return; }
-    setFamilies(r.data.families);
-    if (r.data.families.length && !familyId) setFamilyId(r.data.families[0].familyId);
+    const list = r.data.families;
+    setFamilies(list);
+    // 当前选中的家庭还在列表里就保持,否则(首次进 / 刚退出)落到第一个。
+    setFamilyId((cur) => (cur && list.some((f) => f.familyId === cur) ? cur : (list[0]?.familyId ?? '')));
     setLoading(false);
-  }, [familyId]);
+  }, []);
 
   useEffect(() => { if (open) void refreshFamilies(); }, [open, refreshFamilies]);
 
@@ -62,7 +70,16 @@ export default function FamilySharingSheet({ open, onClose }: { open: boolean; o
         />
 
         <div style={{ flex: 1, overflowY: 'auto', padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
-          {loading && <Muted>{t('加载中…', 'Loading…')}</Muted>}
+          {/* 等待态必须看得出「在动」,并且**有尽头** —— 数据层已带 12s 超时,
+              这里再挂一道 15s 兜底:再久也不许停在加载态(CLAUDE.md 红线)。 */}
+          {loading && (
+            <LoadingCard
+              label={t('正在打开家里的账本…', 'Opening the family board…')}
+              lines={3}
+              timeoutMs={15_000}
+              onTimeout={() => { setLoading(false); setLoadErr('timeout'); }}
+            />
+          )}
           {!loading && loadErr && <ErrorRow msg={t('没连上,稍后再试一次。', 'Could not load — try again shortly.')} onRetry={refreshFamilies} t={t} />}
 
           {!loading && !loadErr && families.length === 0 && (
@@ -86,7 +103,7 @@ export default function FamilySharingSheet({ open, onClose }: { open: boolean; o
               person={view.person}
               me={me}
               onChanged={refreshFamilies}
-              onLeft={() => { setView({ kind: 'board' }); setFamilyId(''); void refreshFamilies(); }}
+              onLeft={() => { setView({ kind: 'board' }); void refreshFamilies(); }}
               dict={dict}
               t={t}
             />
@@ -114,9 +131,6 @@ const cardStyle: React.CSSProperties = { background: 'var(--portal-bg)', border:
 const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-3)', borderBottom: '1px solid var(--portal-line)' };
 const sectLabel: React.CSSProperties = { fontSize: 'var(--text-xs)', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--portal-muted)', fontWeight: 'var(--weight-semibold)' as unknown as number, margin: '0 0 var(--space-2)' };
 
-function Muted({ children }: { children: React.ReactNode }) {
-  return <p style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-sm)', textAlign: 'center', padding: 'var(--space-6)' }}>{children}</p>;
-}
 function ErrorRow({ msg, onRetry, t }: { msg: string; onRetry: () => void; t: (a: string, b: string) => string }) {
   return (
     <div style={{ ...cardStyle, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
@@ -312,7 +326,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, dict, t
   }
 
   if (err && !board) return <ErrorRow msg={t('没连上,稍后再试。', 'Could not load — try again.')} onRetry={load} t={t} />;
-  if (!board) return <Muted>{t('加载中…', 'Loading…')}</Muted>;
+  if (!board) return <LoadingCard label={t('正在读家庭板…', 'Loading the board…')} lines={3} />;
 
   // 名字/头像来自成员自己的账号资料(family_members 行),不匹配 People。
   const memberOf = (id: string) => board.everyone.find((e) => e.member.id === id)?.member;
@@ -591,7 +605,7 @@ function LedgerScreen({ familyId, person, me, onChanged, onLeft, dict, t }: {
   }
 
   if (err && !ledger) return <ErrorRow msg={t('没连上,稍后再试。', 'Could not load — try again.')} onRetry={load} t={t} />;
-  if (!ledger) return <Muted>{t('加载中…', 'Loading…')}</Muted>;
+  if (!ledger) return <LoadingCard label={t('正在读账本…', 'Loading the ledger…')} lines={3} />;
 
   const history: Array<{ id: string; title: string; date: string; delta: number; payoutId?: string }> = [
     ...ledger.approved.map((c) => ({ id: c.id, title: choreTitle(c, t), date: c.approvedAt?.slice(0, 10) ?? c.dueDate, delta: c.value })),

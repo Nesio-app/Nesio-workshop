@@ -16,6 +16,7 @@ import { usePortalLocale } from '../use-portal-locale';
 import PracticeGround from './PracticeGround';
 import { useAutoGrow } from './use-auto-grow';
 import LensTab from './LensTab';
+import SegTabs from '../ui/SegTabs';
 import HealingTab from './HealingTab';
 import GrowthFootprint from './GrowthFootprint';
 
@@ -145,12 +146,18 @@ export default function GrowthTab() {
   const ruleGrade = ruleDraft.trim() ? gradeReflection(ruleDraft, current?.t === 'rule' ? current.c.question : '') : null;
   return (
     <div className="nesio-growth">
-      <div className="ng-subtabs" role="tablist">
-        <button type="button" role="tab" aria-selected={tab === 'home'} className={tab === 'home' ? 'on' : ''} onClick={() => setTab('home')}>{L(dict, '成长', 'Growth')}</button>
-        <button type="button" role="tab" aria-selected={tab === 'lens'} className={tab === 'lens' ? 'on' : ''} onClick={() => setTab('lens')}>{L(dict, '镜头', 'Lenses')}</button>
-        <button type="button" role="tab" aria-selected={tab === 'practice'} className={tab === 'practice' ? 'on' : ''} onClick={() => setTab('practice')}>{L(dict, '练习场', 'Practice')}</button>
-        <button type="button" role="tab" aria-selected={tab === 'healing'} className={tab === 'healing' ? 'on' : ''} onClick={() => { setHealingSeed(null); setTab('healing'); }}>{L(dict, '疗愈', 'Healing')}</button>
-      </div>
+      {/* 2026-07-29:原 .ng-subtabs 是全站五套 tab 之一,统一到 SegTabs。 */}
+      <SegTabs
+        items={[
+          { key: 'home' as SubTab, label: L(dict, '成长', 'Growth') },
+          { key: 'lens' as SubTab, label: L(dict, '镜头', 'Lenses') },
+          { key: 'practice' as SubTab, label: L(dict, '练习场', 'Practice') },
+          { key: 'healing' as SubTab, label: L(dict, '疗愈', 'Healing') },
+        ]}
+        active={tab}
+        onSelect={(k) => { if (k === 'healing') setHealingSeed(null); setTab(k); }}
+        ariaLabel={L(dict, '成长视图', 'Growth view')}
+      />
 
       {tab === 'lens' ? <LensTab /> : tab === 'practice' ? <PracticeGround /> : tab === 'healing' ? <HealingTab seed={healingSeed} /> : (
         <>

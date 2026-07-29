@@ -24,6 +24,7 @@ import { computeRiskScores, type RiskCategory } from '@/lib/portal/health-risk';
 import { buildMonthlyHealthReport, persistHealthReportToMemory, autoPersistLastMonthHealthReport, healthMonths } from '@/lib/portal/health-report';
 import { healthReportRichHtml } from '@/lib/portal/health-report-visual';
 import { IconLock } from '../icons';
+import SegTabs from '../ui/SegTabs';
 import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 import BodyLedgerPanel, { BodyLedgerQuickLinks } from './BodyLedgerPanel';
 import BeautyCarePanel from './BeautyCarePanel';
@@ -402,6 +403,7 @@ function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
 // ── 概览 / 分析 / 身体账本 / 护理 ──
 type HealthView = 'overview' | 'analysis' | 'ledger' | 'care';
 
+// 2026-07-29:改用全站唯一的分段控件 SegTabs(原 .nesio-health-subtabs 是五套之一)。
 function HealthSubTabs({ view, onChange, dict }: { view: HealthView; onChange: (v: HealthView) => void; dict: string }) {
   const tabs: Array<[HealthView, string, string]> = [
     ['overview', '概览', 'Overview'],
@@ -410,14 +412,12 @@ function HealthSubTabs({ view, onChange, dict }: { view: HealthView; onChange: (
     ['care', '护理', 'Care'],
   ];
   return (
-    <div className="nesio-health-subtabs" role="tablist" aria-label={L(dict, '健康视图', 'Health view')}>
-      {tabs.map(([v, zh, en]) => (
-        <button key={v} type="button" role="tab" aria-selected={view === v}
-          className={`nesio-health-subtab${view === v ? ' is-active' : ''}`} onClick={() => onChange(v)}>
-          {L(dict, zh, en)}
-        </button>
-      ))}
-    </div>
+    <SegTabs
+      items={tabs.map(([v, zh, en]) => ({ key: v, label: L(dict, zh, en) }))}
+      active={view}
+      onSelect={onChange}
+      ariaLabel={L(dict, '健康视图', 'Health view')}
+    />
   );
 }
 

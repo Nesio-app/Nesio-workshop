@@ -809,6 +809,27 @@ body {
   }
 }
 
+/* 统一骨架条(components/portal/ui/LoadingCard.tsx)。
+   2026-07-29:家务/车页的等待态原本是一行裸灰字,看不出在动 → 像卡死。
+   全部走 token,四套皮肤 + 夜间自动跟随。 */
+.nesio-skeleton-bar {
+  display: block;
+  height: 0.62rem;
+  border-radius: var(--radius-pill, 999px);
+  background: linear-gradient(
+    90deg,
+    var(--portal-accent-soft) 0%,
+    var(--portal-accent-soft-md) 50%,
+    var(--portal-accent-soft) 100%
+  );
+  background-size: 200% 100%;
+  animation: portal-shimmer 1.3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .nesio-skeleton-bar { animation: none; }
+}
+
 .portal-tools {
   margin: 0.15rem 0 0.35rem;
 }
@@ -13265,27 +13286,6 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-health-updated { font-size: 0.72rem; color: var(--portal-muted); margin: 0 0 0.25rem; }
 
 /* ── 健康 Pro:概览/分析 二级切换 ── */
-.nesio-health-subtabs {
-  display: flex;
-  padding: 3px;
-  gap: 3px;
-  border-radius: var(--radius-pill, 999px);
-  background: var(--portal-surface-2, rgba(127, 127, 127, 0.08));
-  margin: 0 0 0.85rem;
-}
-.nesio-health-subtab {
-  flex: 1;
-  padding: 0.5rem 0;
-  border-radius: var(--radius-pill, 999px);
-  font-size: 0.86rem;
-  font-weight: 600;
-  color: var(--portal-muted);
-}
-.nesio-health-subtab.is-active {
-  background: var(--sheet-opaque, #fff);
-  color: var(--portal-ink);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-}
 
 /* 身体账本 / 护理(健康 × 美味) */
 .nesio-body-ledger, .nesio-beauty-care { display: flex; flex-direction: column; gap: var(--space-3); }
@@ -13434,7 +13434,6 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 }
 
 /* 四 tab 时字号略收 */
-.nesio-health-subtabs .nesio-health-subtab { font-size: 0.78rem; padding: 0.45rem 0; }
 
 /* 隐私横条 */
 .nesio-health-privacy {
@@ -16821,6 +16820,22 @@ html[data-portal-theme="night"] .nesio-exp-card:hover {
 
 .nesio-tl-realmap { position: relative; overflow: hidden; border-radius: 14px; margin-top: 0.85rem; background: var(--portal-hairline); }
 .nesio-tl-realmap img { max-width: none; user-select: none; pointer-events: none; }
+
+/* 2026-07-29(用户标注「足迹页 OSM 瓦片高饱和鲜绿明黄,与全局柔和粉灰不搭」):
+   OSM 标准底图(mapnik)是给通用导航调的 —— 公园鲜绿、主干道明黄,
+   放进低饱和暖灰界面里像贴了张别人家的图。这里不换瓦片源(自建/商用底图要另花钱),
+   只在渲染层压饱和 + 轻微暖偏,让底图退到背景去,点位和轨迹(SVG 覆盖层,不吃这个 filter)
+   才是主角。夜间再压亮度,别在暗底上糊出一块白。 */
+.nesio-map-tile {
+  filter: saturate(0.32) sepia(0.14) contrast(0.94) brightness(1.04);
+}
+html[data-portal-theme="night"] .nesio-map-tile {
+  filter: saturate(0.28) sepia(0.1) contrast(0.9) brightness(0.72);
+}
+@media (prefers-contrast: more) {
+  /* 无障碍:要求高对比时不再压饱和,底图按原样给足对比 */
+  .nesio-map-tile { filter: none; }
+}
 .nesio-tl-map-attr { position: absolute; right: 6px; bottom: 4px; font-size: 0.56rem; color: #333; background: rgba(255,255,255,0.72); padding: 0 4px; border-radius: 4px; text-decoration: none; }
 
 .nesio-tl-rhythm { display: flex; gap: 3px; margin-top: 0.4rem; }
@@ -17451,6 +17466,10 @@ html[data-portal-theme="night"][data-palette="bluegray-rose"] .portal-root {
   /* 批次 106:深底带灰粉色温(泛红暖炭)+ 暖白字,不吃夜间基座的冷蓝中性。 */
   --portal-bg:#1c1517; --portal-ink:#efe8e7; --portal-muted:rgba(239,232,231,0.56); --portal-line:rgba(212,154,148,0.15);
   --portal-cool:#241b1d; --portal-warm:#281d1e; --portal-neutral:#221a1c; --sheet-opaque:#241a1d;
+  /* 2026-07-29:夜间 --portal-card 原本只在基座里定义(#16233a 冷蓝),四套暖皮肤都没覆盖 ——
+     于是暖调夜间界面上,所有「卡片/选中块」都是一块冷蓝(分段控件选中态最明显)。
+     和同块里的 --sheet-opaque 保持同一色系。 */
+  --portal-card:#241a1d;
   --portal-bg-gradient:
     radial-gradient(ellipse 92% 66% at 70% 2%, rgba(170,104,98,0.40), transparent 60%),
     linear-gradient(165deg,#312228 0%,#291c20 55%,#20161a 100%);
@@ -17470,6 +17489,7 @@ html[data-portal-theme="night"][data-palette="milktea"] .portal-root {
   /* 批次 106:深底带奶茶色温(泛褐暖炭)+ 暖奶白字。 */
   --portal-bg:#1d1811; --portal-ink:#f0eadf; --portal-muted:rgba(240,234,223,0.56); --portal-line:rgba(211,186,140,0.15);
   --portal-cool:#201f16; --portal-warm:#241f15; --portal-neutral:#201d15; --sheet-opaque:#221c14;
+  --portal-card:#221c14;
   --portal-bg-gradient:
     radial-gradient(ellipse 92% 66% at 70% 2%, rgba(160,132,80,0.36), transparent 60%),
     linear-gradient(165deg,#2e2417 0%,#251d12 55%,#1c160d 100%);
@@ -17495,6 +17515,7 @@ html[data-portal-theme="night"][data-palette="haze-blue"] .portal-root {
   --status-go:#6fb893; --status-go-soft:rgba(111,184,147,0.18);
   --status-gentle:#d9ab63; --status-gentle-soft:rgba(217,171,99,0.18);
   --status-calm:#9fb0c2; --status-calm-soft:rgba(159,176,194,0.16);
+  --portal-card:#16233a;
 }
 
 /* ④ 灰绿·治愈 · 夜 */
@@ -17505,6 +17526,7 @@ html[data-portal-theme="night"][data-palette="sage"] .portal-root {
   /* 批次 106:深底带灰绿色温(泛绿暖炭)+ 微绿暖白字。 */
   --portal-bg:#161c17; --portal-ink:#eaf0ec; --portal-muted:rgba(234,240,236,0.56); --portal-line:rgba(156,192,176,0.15);
   --portal-cool:#1a221b; --portal-warm:#1b211a; --portal-neutral:#191f1a; --sheet-opaque:#182016;
+  --portal-card:#182016;
   --portal-bg-gradient:
     radial-gradient(ellipse 92% 66% at 70% 2%, rgba(104,150,124,0.32), transparent 60%),
     linear-gradient(165deg,#202d24 0%,#18211b 55%,#101711 100%);
@@ -18891,9 +18913,56 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .ng-hint .x{font-size:.74rem;color:var(--portal-muted);background:none;border:none;cursor:pointer;flex:none;padding:2px 4px}
 
 /* ── 成长下的三子 tab(成长/练习场/镜头)+ 镜头 tab 的记忆挑选卡 ── */
-.ng-subtabs{display:flex;gap:4px;background:var(--portal-accent-soft);border-radius:12px;padding:4px;margin-bottom:20px}
-.ng-subtabs button{flex:1;font-family:inherit;font-size:.82rem;font-weight:var(--weight-medium);color:var(--portal-muted);background:none;border:none;border-radius:9px;padding:8px 0;cursor:pointer;transition:color .15s var(--ng-ease),background .15s var(--ng-ease)}
-.ng-subtabs button.on{color:var(--portal-accent);background:var(--portal-card);font-weight:var(--weight-semibold);box-shadow:0 1px 2px rgba(20,20,20,.05)}
+/* ══ 分段控件(唯一实现)══ components/portal/ui/SegTabs.tsx
+   2026-07-29:此前健康/成长/美味/日程/衣橱各写了一套 tab,四五种长相。
+   这里是收敛后的那一套 —— 改这里就是改全站。全 token,昼夜/四皮肤自动跟随。 */
+.nesio-seg {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--portal-accent-soft);
+  margin: 0 0 var(--space-3);
+}
+.nesio-seg-tab {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.32rem;
+  min-width: 0;
+  padding: 0.5rem 0.4rem;
+  border: none;
+  border-radius: var(--radius-pill, 999px);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--portal-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: color .15s ease, background .15s ease;
+}
+.nesio-seg-tab.is-active {
+  background: var(--portal-card, var(--sheet-opaque, #fff));
+  color: var(--portal-accent);
+  font-weight: var(--weight-semibold);
+  box-shadow: 0 1px 2px rgba(20, 20, 20, .06);
+}
+.nesio-seg-tab:focus-visible { outline: 2px solid var(--portal-accent-border); outline-offset: 1px; }
+.nesio-seg-badge {
+  flex-shrink: 0;
+  font-size: 0.66rem;
+  font-weight: var(--weight-medium);
+  font-variant-numeric: tabular-nums;
+  color: var(--portal-muted);
+}
+.nesio-seg-tab.is-active .nesio-seg-badge { color: var(--portal-accent); }
+.nesio-seg--sm .nesio-seg-tab { font-size: var(--text-xs); padding: 0.4rem 0.35rem; }
+@media (prefers-reduced-motion: reduce) { .nesio-seg-tab { transition: none; } }
+
 
 .ng-mem{display:block;width:100%;text-align:left;font-family:inherit;background:var(--portal-card);border:1px solid var(--portal-line);border-radius:16px;padding:14px 15px;margin-bottom:10px;cursor:pointer;transition:border-color .12s var(--ng-ease),transform .12s var(--ng-ease)}
 .ng-mem:hover{border-color:var(--portal-accent-border)}
@@ -18931,7 +19000,13 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .nm-gift .gh svg{width:16px;height:16px;stroke:var(--portal-accent);stroke-width:1.8;fill:none;flex:none}
 
 .nm-poster{position:relative;border-radius:15px;overflow:hidden;cursor:pointer;aspect-ratio:16/11;display:flex;flex-direction:column;justify-content:flex-end;color:#fff;border:1px solid rgba(0,0,0,.12);width:100%;padding:0;background:var(--portal-accent-soft);background-size:cover;background-position:center}
-.nm-poster .sh{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.66),rgba(0,0,0,.05) 55%,transparent)}
+/* 2026-07-29(用户标注「剧场缩略图高饱和绿色草地插画风,和浅粉低饱和卡片不是一套」):
+   海报图是内容(示例片 / 以后是用户自己的短片),不该去改图本身。这里在既有的压暗层上
+   加一道 backdrop-filter 压饱和 —— 它只作用于**身后**的海报底图,
+   标题/时长/播放键是同级更高的绘制层,不受影响,文字对比度不掉。
+   (-webkit- 前缀是给 iOS Safari 的;不支持 backdrop-filter 的老浏览器退回原样,不报错。) */
+.nm-poster .sh{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.66),rgba(0,0,0,.05) 55%,transparent);
+  -webkit-backdrop-filter:saturate(.5) sepia(.12);backdrop-filter:saturate(.5) sepia(.12)}
 .nm-poster .txt{position:relative;padding:13px 14px;text-align:left}
 .nm-poster .t{font-size:1.05rem;font-weight:var(--weight-semibold);margin:0;text-shadow:0 1px 6px rgba(0,0,0,.45)}
 .nm-poster .s{font-size:.8rem;opacity:.94;margin:3px 0 0;line-height:1.4;text-shadow:0 1px 5px rgba(0,0,0,.45)}

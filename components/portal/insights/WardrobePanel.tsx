@@ -27,7 +27,8 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import type { CalendarEvent } from '@/lib/portal/types';
-import { IconStar } from '../icons';
+import SegTabs from '../ui/SegTabs';
+import { IconStar, IconThumbUp, IconThumbDown, IconCamera, IconAlertTriangle, IconRain, IconRefresh, IconMirror, IconHanger, GarmentIcon } from '../icons';
 
 const TYPE_LABEL: Record<GarmentType, [string, string]> = {
   top: ['上装', 'Top'], bottom: ['下装', 'Bottoms'], outer: ['外套', 'Outerwear'],
@@ -501,13 +502,18 @@ export default function WardrobePanel() {
 
   return (
     <div className="nesio-analytics-tab">
-      {/* 图15:多一个「搭配」tab —— 存下来的搭配从这里翻 */}
-      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-        <button type="button" style={chip(tab === 'today')} onClick={() => setTab('today')}>{L(dict, '今天', 'Today')}</button>
-        <button type="button" style={chip(tab === 'saved')} onClick={() => setTab('saved')}>
-          {L(dict, `搭配 ${outfits.length}`, `Outfits ${outfits.length}`)}
-        </button>
-      </div>
+      {/* 图15:多一个「搭配」tab —— 存下来的搭配从这里翻。
+          2026-07-29:原本是裸 chip 按钮(连容器都没有),是全站五套 tab 里最不像 tab 的一套 →
+          统一到 SegTabs。chip() 保留给下面的**筛选**用 —— 那才是 chip 的本职。 */}
+      <SegTabs
+        items={[
+          { key: 'today' as const, label: L(dict, '今天', 'Today') },
+          { key: 'saved' as const, label: L(dict, '搭配', 'Outfits'), badge: outfits.length },
+        ]}
+        active={tab}
+        onSelect={setTab}
+        ariaLabel={L(dict, '衣橱视图', 'Wardrobe view')}
+      />
 
       {outfitErr && (
         <p style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--status-risk)', background: 'var(--status-risk-soft)', borderRadius: 'var(--radius-sm)', padding: 'var(--space-2) var(--space-3)' }} role="alert">{outfitErr}</p>
@@ -550,9 +556,9 @@ export default function WardrobePanel() {
         return (
         <div style={{ ...card, background: 'var(--portal-accent-soft-md)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-2)' }}>
-            <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>
-              👔 {L(dict, '今天穿这套', 'Today’s outfit')}
-              {aiPieces && <span style={{ marginLeft: '0.4rem', fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--portal-blue-deep)' }}>✨ {L(dict, 'AI 造型', 'AI styled')}</span>}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>
+              <IconHanger size={17} />{L(dict, '今天穿这套', 'Today’s outfit')}
+              {aiPieces && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--portal-blue-deep)' }}><IconStar size={12} />{L(dict, 'AI 造型', 'AI styled')}</span>}
             </span>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, `${pieces.length} 件`, `${pieces.length} pieces`)}</span>
           </div>
@@ -580,11 +586,11 @@ export default function WardrobePanel() {
             </p>
           )}
           {outfit.needUmbrella && (
-            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-calm)' }}>☔ {L(dict, '今天可能下雨,记得带伞', 'Rain likely — take an umbrella')}</p>
+            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-calm)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}><IconRain size={13} />{L(dict, '今天可能下雨,记得带伞', 'Rain likely — take an umbrella')}</p>
           )}
           {/* 规则版的季节冲突提示(AI 造型时不显示,AI 自己会避开) */}
           {!aiPieces && outfit.mismatch && (
-            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>⚠ {dict === 'en' ? outfit.mismatch[1] : outfit.mismatch[0]}</p>
+            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}><IconAlertTriangle size={13} />{dict === 'en' ? outfit.mismatch[1] : outfit.mismatch[0]}</p>
           )}
           {/* B｜反馈:喜欢/不喜欢 → 越用越懂你(免费+Pro 都有) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
@@ -594,9 +600,9 @@ export default function WardrobePanel() {
               <>
                 <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '这套怎么样?', 'Like this?')}</span>
                 <button type="button" aria-label={L(dict, '喜欢', 'Like')} onClick={() => giveFeedback('like', pieces)}
-                  style={{ padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', cursor: 'pointer', fontSize: 'var(--text-sm)' }}>👍</button>
+                  style={{ display: 'inline-flex', padding: '0.3rem 0.55rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer' }}><IconThumbUp size={15} /></button>
                 <button type="button" aria-label={L(dict, '不喜欢', 'Dislike')} onClick={() => giveFeedback('dislike', pieces)}
-                  style={{ padding: '0.2rem 0.5rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', cursor: 'pointer', fontSize: 'var(--text-sm)' }}>👎</button>
+                  style={{ display: 'inline-flex', padding: '0.3rem 0.55rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer' }}><IconThumbDown size={15} /></button>
                 {/* 图15:这套穿了 → 存进「搭配」,以后能翻能按月看 */}
                 <button type="button" onClick={() => {
                   for (const p of pieces) markWorn(p.id, new Date().toISOString());
@@ -622,7 +628,7 @@ export default function WardrobePanel() {
               </span>
               <button type="button" onClick={() => setRestyleNonce((n) => n + 1)} disabled={stylistBusy}
                 style={{ flexShrink: 0, padding: '0.3rem 0.7rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-xs)', cursor: stylistBusy ? 'default' : 'pointer', opacity: stylistBusy ? 0.6 : 1 }}>
-                {L(dict, '✨ 换一套', '✨ Restyle')}
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}><IconRefresh size={12} />{L(dict, '换一套', 'Restyle')}</span>
               </button>
             </div>
           )}
@@ -641,7 +647,7 @@ export default function WardrobePanel() {
         <div style={{ ...card, marginTop: 'var(--space-3)', background: 'var(--glass-bg-solid, var(--portal-bg))' }}>
           <input ref={bodyFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onPickBody} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>🪞 {L(dict, '上身试穿', 'Virtual try-on')}</span>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><IconMirror size={15} />{L(dict, '上身试穿', 'Virtual try-on')}</span>
             <button type="button" onClick={() => setTryonOpen(false)} aria-label={L(dict, '收起', 'Close')}
               style={{ background: 'none', border: 'none', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
           </div>
@@ -665,7 +671,7 @@ export default function WardrobePanel() {
                   {bodyThumb ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={bodyThumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : L(dict, '📷 全身照', '📷 Full body')}
+                  ) : <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}><IconCamera size={18} />{L(dict, '全身照', 'Full body')}</span>}
                 </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
@@ -723,9 +729,9 @@ export default function WardrobePanel() {
           {!editingId && (
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
             <button type="button" onClick={() => cameraRef.current?.click()}
-              style={{ flex: 1, padding: '0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: 'pointer' }}>{L(dict, '📷 拍照', '📷 Camera')}</button>
+              style={{ flex: 1, padding: '0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: 'pointer' }}>{L(dict, '拍照', 'Camera')}</button>
             <button type="button" onClick={() => uploadRef.current?.click()}
-              style={{ flex: 1, padding: '0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: 'pointer' }}>{L(dict, '🖼 上传照片', '🖼 Upload photo')}</button>
+              style={{ flex: 1, padding: '0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: 'pointer' }}>{L(dict, '上传照片', 'Upload photo')}</button>
           </div>
           )}
           <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
@@ -736,7 +742,7 @@ export default function WardrobePanel() {
               {draft.dataUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img src={draft.dataUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : '👕'}
+              ) : <GarmentIcon type={draft.garmentType} size={26} />}
             </button>
             )}
             <div style={{ flex: 1, minWidth: 0 }}>
@@ -868,7 +874,7 @@ export default function WardrobePanel() {
                   {thumbs[it.id] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={thumbs[it.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : '👕'}
+                  ) : <GarmentIcon type={it.garmentType} size={26} />}
                 </div>
                 <div style={{ padding: '0.4rem 0.5rem' }}>
                   <p style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</p>
@@ -955,10 +961,16 @@ function SavedOutfits({ outfits, garments, thumbs, view, dict, onView, onStar, o
 
   return (
     <>
-      <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-        <button type="button" style={chip(view === 'list')} onClick={() => onView('list')}>{L(dict, '列表', 'List')}</button>
-        <button type="button" style={chip(view === 'calendar')} onClick={() => { onView('calendar'); setPickedDay(null); }}>{L(dict, '日历', 'Calendar')}</button>
-      </div>
+      <SegTabs
+        size="sm"
+        items={[
+          { key: 'list' as const, label: L(dict, '列表', 'List') },
+          { key: 'calendar' as const, label: L(dict, '日历', 'Calendar') },
+        ]}
+        active={view}
+        onSelect={(k) => { onView(k); if (k === 'calendar') setPickedDay(null); }}
+        ariaLabel={L(dict, '搭配看法', 'Outfit view')}
+      />
 
       {view === 'list' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>

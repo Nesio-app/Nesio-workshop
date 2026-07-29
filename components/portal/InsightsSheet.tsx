@@ -24,7 +24,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { InfoTip } from './InfoTip';
 import {
-  IconRefresh, IconTrendingUp, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconDownload, IconAlertTriangle, IconBookmark,
+  IconRefresh, IconTrendingUp, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconDownload, IconAlertTriangle, IconBookmark, IconHanger,
   IconBulb, IconTarget, IconPlay, IconHeartPulse, IconActivity, IconMapPin, IconCard, IconBox, IconUser, IconCar, IconMirror,
   IconGear, IconPeople, IconUtensils,
 } from './icons';
@@ -340,7 +340,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       case 'schedule': return <IconCalendar />;
       case 'finance': return <IconCard />;
       case 'inventory': return <IconBox />;
-      case 'wardrobe': return <IconBookmark />;
+      case 'wardrobe': return <IconHanger />;
       case 'relationships': return <IconUser />;
       case 'tesla': return <IconCar />;
       case 'living': return <IconMirror />;
@@ -394,8 +394,14 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
     list.push({ key: 'chores', label: L(dict, '家务', 'Chores'), icon: <IconPeople />, event: 'nesio-open-family' });
     if (showCooking) list.push({ key: 'cooking', label: L(dict, '美味', 'Cooking'), icon: <IconUtensils />, event: 'nesio-open-cooking' });
     return list;
+    // 2026-07-29(标注「宫格图标排列顺序不固定」的真因):这里原本只依赖 [dict, showCooking]。
+    // useFeatureEnabled 是「先返回 defaultOn,effect 跑完才读到真实开关」——
+    // 首帧算出来的是**默认开关**下的格子表,等真实开关落地时这个 memo 却不重算,
+    // 于是同一账号能看到两种格子集/顺序:showCooking 的真实值恰好与默认不同 → 重算(正确的一份);
+    // 恰好相同 → 不重算(首帧那份错的留着)。所有开关都必须进依赖,格子表才是确定的。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dict, showCooking]);
+  }, [dict, showCooking, showPlaces, showExperiment, showHealth, showFinance, showPeople,
+      showInventory, showSchedule, showGrowth, showMontage, showWardrobe, showTesla, showLiving]);
   const [labOn, setLabOn] = useState(false);
   const [wanderSeed, setWanderSeed] = useState(() => Math.floor(Math.random() * 100_000));
 

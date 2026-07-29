@@ -9,6 +9,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
+import SegTabs from '../ui/SegTabs';
 import { IconBookOpen, IconCamera, IconCheckSquare, IconZap, IconUtensils } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -146,7 +147,7 @@ export default function CookingSheet({ open, onClose, initialView }: {
 
             {view.kind === 'home' && (
               <>
-                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} />
+                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} title={t('美味', 'Cooking')} />
                 <SubTabs active="home" onSelect={setTopView} t={t} />
                 <HomeBody
                   soon={soon} recipes={recipes} recipesErr={recipesErr} soonNames={soonNames} pantryNames={pantryNames}
@@ -170,21 +171,21 @@ export default function CookingSheet({ open, onClose, initialView }: {
             )}
             {view.kind === 'wishlist' && (
               <>
-                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} />
+                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} title={t('想做清单', 'Want to cook')} />
                 <SubTabs active="wishlist" onSelect={setTopView} t={t} />
                 <WishlistBody wishes={wishes} recipes={recipes} onCompute={(n) => computeNeeds(n, 'wishlist')} onOpenDish={openRecipeByName} onPlan={() => setView({ kind: 'plan' })} onError={setErr} onChanged={reload} onCamera={openCamera} t={t} />
               </>
             )}
             {view.kind === 'recipe' && (
               <>
-                <ScreenHead backLabel={t('做饭', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={view.match.recipe.name} />
+                <ScreenHead backLabel={t('美味', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={view.match.recipe.name} />
                 <RecipeBody match={view.match} t={t} />
               </>
             )}
             {view.kind === 'needs' && (
               <>
                 <ScreenHead
-                  backLabel={view.from === 'wishlist' ? t('想做清单', 'Want to cook') : view.from === 'recipe' ? view.match.recipe.name : t('做饭', 'Cooking')}
+                  backLabel={view.from === 'wishlist' ? t('想做清单', 'Want to cook') : view.from === 'recipe' ? view.match.recipe.name : t('美味', 'Cooking')}
                   onBack={() => setView(view.from === 'wishlist' ? { kind: 'wishlist' } : view.from === 'recipe' ? { kind: 'recipe', match: view.match } : { kind: 'home' })}
                   title={view.match.recipe.name} />
                 <NeedsBody match={view.match} onError={setErr} onDone={() => setView({ kind: 'home' })} t={t} />
@@ -192,13 +193,13 @@ export default function CookingSheet({ open, onClose, initialView }: {
             )}
             {view.kind === 'logmeal' && (
               <>
-                <ScreenHead backLabel={t('做饭', 'Cooking')} onBack={finishLogMeal} title={t('记一餐', 'Log a meal')} />
+                <ScreenHead backLabel={t('美味', 'Cooking')} onBack={finishLogMeal} title={t('记一餐', 'Log a meal')} />
                 <MealLogBody photoUrl={mealPhoto} onError={setErr} onDone={finishLogMeal} t={t} />
               </>
             )}
             {view.kind === 'generate' && (
               <>
-                <ScreenHead backLabel={t('做饭', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={t('生成新菜谱', 'Generate a recipe')} />
+                <ScreenHead backLabel={t('美味', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={t('生成新菜谱', 'Generate a recipe')} />
                 <GenerateBody
                   pantryItems={items}
                   soonNames={soonNames}
@@ -220,7 +221,7 @@ export default function CookingSheet({ open, onClose, initialView }: {
             )}
             {view.kind === 'tips' && (
               <>
-                <ScreenHead backLabel={t('做饭', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={t('新手技法', 'Techniques')} />
+                <ScreenHead backLabel={t('美味', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={t('新手技法', 'Techniques')} />
                 <TipsBody t={t} />
               </>
             )}
@@ -1285,24 +1286,19 @@ function SectionHead({ label, right, rightGo }: { label: string; right?: string;
   );
 }
 /** 做饭内部子 tab:做饭 / 库存 / 想做清单(在洞察下,做饭的子导航)。 */
+// 2026-07-29:这套内联 tab 是全站五套之一,收敛到 SegTabs。
 function SubTabs({ active, onSelect, t }: { active: 'home' | 'pantry' | 'wishlist'; onSelect: (k: 'home' | 'pantry' | 'wishlist') => void; t: TT }) {
-  const tabs: Array<{ k: 'home' | 'pantry' | 'wishlist'; label: string }> = [
-    { k: 'home', label: t('做饭', 'Cook') },
-    { k: 'pantry', label: t('库存', 'Pantry') },
-    { k: 'wishlist', label: t('想做清单', 'Wishlist') },
-  ];
   return (
-    <div style={{ display: 'flex', gap: 'var(--space-1)', background: 'var(--portal-accent-soft)', borderRadius: 'var(--radius-pill)', padding: 3 }}>
-      {tabs.map((tb) => {
-        const on = tb.k === active;
-        return (
-          <button key={tb.k} type="button" onClick={() => onSelect(tb.k)}
-            style={{ flex: 1, border: 'none', borderRadius: 'var(--radius-pill)', padding: 'var(--space-2) 0', fontSize: 'var(--text-sm)', fontWeight: on ? 700 : 600, fontFamily: 'var(--font-sans)', cursor: 'pointer', background: on ? 'var(--portal-card)' : 'transparent', color: on ? 'var(--portal-accent)' : 'var(--portal-muted)', boxShadow: on ? 'var(--shadow-card)' : 'none' }}>
-            {tb.label}
-          </button>
-        );
-      })}
-    </div>
+    <SegTabs
+      items={[
+        { key: 'home' as const, label: t('做饭', 'Cook') },
+        { key: 'pantry' as const, label: t('库存', 'Pantry') },
+        { key: 'wishlist' as const, label: t('想做清单', 'Wishlist') },
+      ]}
+      active={active}
+      onSelect={onSelect}
+      ariaLabel={t('美味视图', 'Cooking view')}
+    />
   );
 }
 

@@ -21,11 +21,24 @@ const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 
 export type RestyleKind = 'avatar' | 'garment';
 
-// app 主题化提示词:蓝青柔和贴纸风,保留人物特征与表情
+// app 主题化提示词。
+//
+// 2026-07-29(用户标注「App Logo 和用户头像渲染风格割裂」):旧词要的是
+// 「pastel blue and teal + 白色贴纸描边 + 星星小花云朵」—— 三处都和站内对不上:
+//   ① 蓝青调是**旧**主题色。现在有 4 套可切换皮肤(灰粉/奶茶/雾蓝/苔绿),
+//      指定任何一个具体色相都会和其中三套打架 → 改成低饱和中性暖调,四套皮肤都不冲突。
+//   ② 星星/小花/云朵这类贴纸装饰是「2D 扁平卡通插画」观感的主要来源,
+//      而品牌标记 NesioMark 是磨砂玻璃质感的水晶体 → 去掉装饰,背景改成一层
+//      柔和径向渐变,呼应水晶的体积感,让两者站在同一种渲染语言里。
+//   ③ 站内图标系统是细描边(strokeWidth 1.8),旧词却要 "clean bold line art" → 改细描边。
+// 皮肤是用户可切的、生成图是静态的,所以头像只能取「和四套都相处得好」的中性解,
+// 而不是去追某一套的强调色。
 const STYLE_PROMPT =
-  'Turn this portrait into a friendly cartoon avatar sticker. Soft rounded illustration, clean bold line art, ' +
-  'warm gentle smile. Pastel blue and teal color palette matching a calm, minimal app theme. White sticker outline. ' +
-  'Simple decorative background with a few soft stars, tiny flowers and light clouds in the same blue-teal palette. ' +
+  'Turn this portrait into a friendly cartoon avatar. Soft rounded illustration with thin, delicate line work ' +
+  '(not bold outlines), gentle smile, subtle soft shading that gives a light sense of volume. ' +
+  'Muted, low-saturation, warm-neutral color palette — soft greys, warm taupe and dusty rose — calm and minimal, ' +
+  'no bright or vivid colors. Background is a single smooth radial gradient in the same muted palette: ' +
+  'no stars, no flowers, no clouds, no stickers, no decorative props, no sticker outline. ' +
   "Keep the person's hairstyle, face shape and expression clearly recognizable. Head-and-shoulders framing. No text.";
 
 // 衣橱单品图(图16):抠出这件衣服、放到纯白底上,像电商详情页那种干净图。

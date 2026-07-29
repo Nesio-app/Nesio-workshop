@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import LoadingCard from './ui/LoadingCard';
 
 interface TeslaDrive {
   vehicleId: string;
@@ -45,10 +46,16 @@ export default function TeslaPanel() {
   const [drives, setDrives] = useState<TeslaDrive[]>([]);
   const [charges, setCharges] = useState<TeslaCharge[]>([]);
 
+  // 2026-07-29(用户标注「车页卡死在『正在向车问好…』」的真因):这条 fetch 原本没有超时。
+  // 车在深度休眠时 Tesla 侧可能几十秒不回,连接半挂时浏览器更是无限等 ——
+  // 于是 setState('ready'|'error') 都执行不到,页面就永远停在「正在向车问好…」。
+  // 15s 到点主动 abort → 走下面的 catch → 显式失败态 + 再试一次(CLAUDE.md 红线)。
   const load = useCallback(async () => {
     setState('loading');
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 15_000);
     try {
-      const res = await fetch('/api/portal/tesla', { cache: 'no-store' });
+      const res = await fetch('/api/portal/tesla', { cache: 'no-store', signal: ctrl.signal });
       const data = await res.json() as { ok?: boolean; error?: string; drives?: TeslaDrive[]; charges?: TeslaCharge[] };
       if (!data.ok) {
         setErrMsg(data.error === 'not_connected' || data.error === 'token_expired'
@@ -68,8 +75,10 @@ export default function TeslaPanel() {
         .then((m) => m.refreshTesla({ drives: (data.drives || []) as never[], charges: (data.charges || []) as never[] }))
         .catch(() => {});
     } catch {
-      setErrMsg(L(dict, '网络没接上,稍后再试一次。', 'Network hiccup — try again shortly.'));
+      setErrMsg(L(dict, '这次没等到车的回应 —— 它可能在深度休眠。稍后再试一次。', 'The car did not answer this time — it may be in deep sleep. Try again shortly.'));
       setState('error');
+    } finally {
+      clearTimeout(timer);
     }
   }, [dict]);
 
@@ -117,13 +126,13 @@ export default function TeslaPanel() {
   };
 
   if (state === 'loading') {
-    return <p className="nesio-settings-option-hint">{L(dict, '正在向车问好…', 'Checking in with the car…')}</p>;
+    return <LoadingCard label={L(dict, '正在向车问好…', 'Checking in with the car…')} lines={3} />;
   }
 
   if (state === 'error') {
     return (
-      <div>
-        <p className="nesio-settings-option-hint">{errMsg}</p>
+      <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', padding: 'var(--space-4)' }}>
+        <p className="nesio-settings-option-hint" style={{ margin: 0 }}>{errMsg}</p>
         <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: '0.6rem' }} onClick={() => void load()}>
           {L(dict, '再试一次', 'Try again')}
         </button>

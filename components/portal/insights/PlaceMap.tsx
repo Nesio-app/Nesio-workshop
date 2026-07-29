@@ -83,7 +83,7 @@ export default function PlaceMap({ points, path, height = 200 }: { points: MapPo
       {tiles.map((t) => (
         // OSM 栅格瓦片,惰性加载;地图不可交互(纯概览),点位才是主角
         // eslint-disable-next-line @next/next/no-img-element
-        <img key={t.key} src={`https://tile.openstreetmap.org/${z}/${t.x}/${t.y}.png`} alt="" loading="lazy" draggable={false}
+        <img key={t.key} src={`https://tile.openstreetmap.org/${z}/${t.x}/${t.y}.png`} alt="" className="nesio-map-tile" loading="lazy" draggable={false}
           style={{ position: 'absolute', left: t.px, top: t.py, width: TILE, height: TILE }} />
       ))}
       {path && path.length >= 2 && (

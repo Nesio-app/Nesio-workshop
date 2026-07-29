@@ -16,6 +16,7 @@ import { getLifeGraph, deleteLifeNode, updateLifeNode, type LifeNode } from '@/l
 
 const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
 import { L } from '@/lib/portal/i18n';
+import SegTabs from '../ui/SegTabs';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { IconStar, IconFlag } from '../icons';
@@ -365,21 +366,22 @@ export default function SchedulePanel() {
       : `${d.getMonth() + 1}月${d.getDate()}日`;
   };
 
-  const chip = (id: SubTab, label: string) => (
-    <button type="button"
-      className={`nesio-settings-option${sub === id ? ' nesio-settings-option--active' : ''}`}
-      style={{ flex: 1, justifyContent: 'center' }}
-      onClick={() => setSub(id)}>
-      <span className="nesio-settings-option-label">{label}</span>
-    </button>
-  );
+
 
   return (
     <div className="nesio-analytics-tab">
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: 'var(--space-3)' }}>
-        {chip('calendar', L(dict, `日历项 ${calendarRows.length}`, `Calendar ${calendarRows.length}`))}
-        {chip('email', L(dict, `邮件 ${emailRows.length}`, `Mail ${emailRows.length}`))}
-      </div>
+      {/* 2026-07-29:这两个 tab 原本借的是 .nesio-settings-option ——「设置行」的样式,
+          既不是 tab、也和另外四套 tab 都不一样。统一到 SegTabs;
+          条数从 label 里拆出来走 badge,两个 tab 的文字才对得齐。 */}
+      <SegTabs
+        items={[
+          { key: 'calendar' as SubTab, label: L(dict, '日历项', 'Calendar'), badge: calendarRows.length },
+          { key: 'email' as SubTab, label: L(dict, '邮件', 'Mail'), badge: emailRows.length },
+        ]}
+        active={sub}
+        onSelect={setSub}
+        ariaLabel={L(dict, '日程视图', 'Schedule view')}
+      />
 
       {rows.length === 0 ? (
         <p className="nesio-insights-empty">
