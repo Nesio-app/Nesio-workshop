@@ -226,7 +226,12 @@ export default function TeslaPanel() {
         </div>
       ))}
 
-      {/* 数据去向:直接回答「连了但数据在哪」——沉淀分散在足迹/财务,这里指路。 */}
+      {/* 数据去向:直接回答「连了但数据在哪」——沉淀分散在足迹/财务,这里指路。
+          ⚠️ 一条车数据都没有时**不要显示这块**。这三行回答的是「我的车数据去哪了」,
+          还没连车 / Tesla 还没回数据的时候,点过去财务和足迹里根本没有车的东西 ——
+          用户点了一圈发现三个入口都「不管用」(原始报告第 19 条)。
+          空态该说的是「怎么连」,那句提示上面已经在讲了。 */}
+      {(hasVehicle || history.length > 0) && (
       <div style={{
         marginTop: 'var(--space-5)', paddingTop: 'var(--space-4)',
         borderTop: '1px solid var(--portal-line)',
@@ -259,6 +264,7 @@ export default function TeslaPanel() {
           </button>
         </div>
       </div>
+      )}
     </>
   );
 }
