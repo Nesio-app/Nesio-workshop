@@ -217,18 +217,49 @@ export function snoozeOverdue(nodeId: string, days: number) {
 
 const PROACTIVE_DISMISS_KEY = 'nesio-proactive-dismissed';
 
-export function dismissProactiveById(cardId: string) {
+/**
+ * 静音表:cardId → 被静音时这张卡说了什么(内容指纹)。
+ *
+ * 由来(真机):「AT&T 定期扣款涨价了」这类**事实型**卡片,用户取消多少次都会
+ * 第二天再冒出来 —— 因为旧逻辑只记「今天已关」。可事实没变,重复通知就是纯骚扰,
+ * 也直接违背 warm-coach 的「每个提示都要有『不再提醒』出口」。
+ *
+ * 新语义:**静音到内容变化为止**。指纹取卡片自己显示的文字(标题+正文)——
+ * AT&T 若再涨到 $70,文字变了、指纹变了,卡片理应重新出现;只要还在说同一件事,
+ * 就永远闭嘴。不需要各数据源额外配合。
+ */
+const PROACTIVE_MUTED_KEY = 'nesio-proactive-muted-v1';
+
+function fingerprintOf(text: string): string {
+  let h = 0;
+  for (let i = 0; i < text.length; i++) { h = (h * 31 + text.charCodeAt(i)) | 0; }
+  return String(h);
+}
+
+export function dismissProactiveById(cardId: string, contentText?: string) {
   try {
     const map: Record<string, string> = JSON.parse(localStorage.getItem(PROACTIVE_DISMISS_KEY) || '{}');
     map[cardId] = localDayKey();
     localStorage.setItem(PROACTIVE_DISMISS_KEY, JSON.stringify(map));
   } catch { /* ignore */ }
+  if (!contentText) return;
+  try {
+    const muted: Record<string, string> = JSON.parse(localStorage.getItem(PROACTIVE_MUTED_KEY) || '{}');
+    muted[cardId] = fingerprintOf(contentText);
+    localStorage.setItem(PROACTIVE_MUTED_KEY, JSON.stringify(muted));
+  } catch { /* ignore */ }
 }
 
-export function isProactiveCardDismissed(cardId: string): boolean {
+export function isProactiveCardDismissed(cardId: string, contentText?: string): boolean {
   try {
     const map: Record<string, string> = JSON.parse(localStorage.getItem(PROACTIVE_DISMISS_KEY) || '{}');
-    return map[cardId] === localDayKey();
+    if (map[cardId] === localDayKey()) return true;
+  } catch { /* ignore */ }
+  if (!contentText) return false;
+  try {
+    const muted: Record<string, string> = JSON.parse(localStorage.getItem(PROACTIVE_MUTED_KEY) || '{}');
+    // 说的还是同一件事 → 保持静音;内容变了 → 放行(那是新消息)
+    return muted[cardId] === fingerprintOf(contentText);
   } catch { return false; }
 }
 

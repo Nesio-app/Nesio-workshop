@@ -321,7 +321,7 @@ export function useTodayData(canUsePrivateData: boolean) {
             evidence: card.evidence,
             reason: card.reason,
           }))
-          .filter((c) => !isProactiveCardDismissed(c.id))
+          .filter((c) => !isProactiveCardDismissed(c.id, `${c.title}|${c.body}`))
           .filter((c) => !c.expiresAt || new Date(c.expiresAt).getTime() > now.getTime());
 
         // AI Language Generation (Layer 7) — enhance copy if cards exist.

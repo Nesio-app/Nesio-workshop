@@ -309,7 +309,8 @@ export default function TodayFeed({
             card={card}
             onOpen={card.nodeId ? () => { const live = getLiveMemoryNode(card.nodeId!); if (live) setGuideDetailNode(live); } : undefined}
             onDismiss={() => {
-              dismissProactiveById(card.id);
+              // 带上卡片当前说的内容 → 静音到内容变化为止(事实没变就别再冒出来)
+              dismissProactiveById(card.id, `${card.title}|${card.body}`);
               // Record in cooling store so adaptive cooldown can kick in after repeated ignores
               if (card.cardType) {
                 saveCoolingStore(recordDismissed(card.cardType, loadCoolingStore()));
