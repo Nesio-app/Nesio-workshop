@@ -164,6 +164,13 @@ const CSS = read('app/globals.css');
     '.nesio-rel-log-btn': ['.nesio-btn--soft', '.nesio-btn--sm', '.nesio-btn--pill'],
     '.nesio-today-btn': ['.nesio-btn--md', '.nesio-btn--pill'],
     '.nesio-proactive-action-btn': ['.nesio-btn--secondary', '.nesio-btn--sm', '.nesio-btn--pill'],
+    '.nesio-ob-auth-btn': ['.nesio-btn--secondary', '.nesio-btn--lg', '.nesio-btn--full'],
+    '.nesio-ob-skip-btn': ['.nesio-btn--ghost', '.nesio-btn--sm', '.nesio-btn--full'],
+    '.nesio-settings-action-btn': ['.nesio-btn--soft', '.nesio-btn--md', '.nesio-btn--full'],
+    '.nesio-settings-danger-btn': ['.nesio-btn--risk.nesio-btn--soft', '.nesio-btn--md', '.nesio-btn--full'],
+    '.nesio-type-action-btn': ['.nesio-btn--soft', '.nesio-btn--sm', '.nesio-btn--pill'],
+    '.nesio-collapsed-act-btn': ['.nesio-btn--soft', '.nesio-btn--sm', '.nesio-btn--pill'],
+    '.nesio-exp-cancel-btn': ['.nesio-btn--secondary', '.nesio-btn--md'],
   };
   for (const [old, sels] of Object.entries(BRIDGED)) {
     for (const sel of sels) {
@@ -193,18 +200,62 @@ const CSS = read('app/globals.css');
       + '  在 :root, .portal-root 里给它们一个映射(别名到已有 token)即可。',
     );
   }
-  // 旧类只该剩布局职责(外边距/投影),尺寸颜色不许自己再写一份
-  const at = CSS.search(/\n\.nesio-ob-primary-btn \{/);
-  assert.ok(at > 0, '.nesio-ob-primary-btn 的自有声明块不见了');
-  const own = CSS.slice(at, CSS.indexOf('}', at));
-  for (const forbidden of ['font-size', 'padding', 'background', 'border-radius', 'width']) {
-    assert.ok(
-      !own.includes(`${forbidden}:`),
-      `.nesio-ob-primary-btn 又自己写了 ${forbidden} —— 桥接就白做了,它会重新和原语分叉`,
-    );
+  // ── 旧类自己那块只该剩布局职责,而且**位置也算数** ────────────────────────
+  // 桥接是靠选择器分组做的,同权重下**文件里靠后的赢**。旧类的自有声明大多写在
+  // 原语那一段之前(几千行之前),所以它再写一遍 padding/background 不是「又分叉了」,
+  // 是**那行根本不生效** —— 改了没反应,比分叉更难查。这一批就踩到过:
+  // .nesio-ob-skip-btn 的 muted 文字色写在原地,被后面的 .nesio-btn--ghost 分组顶掉,
+  // 「跳过」会跟「继续」一样是强调色。真正要保留的差异得写在原语之后。
+  const PRIM_AT = CSS.search(/\n\.nesio-btn,/);
+  assert.ok(PRIM_AT > 0, 'Button 原语那一段不见了');
+  const GEOMETRY = ['font-size', 'padding', 'background', 'border-radius', 'width', 'color'];
+  // 只查**裸类名**那条(权重 0,1,0,和原语分组一模一样,靠位置分胜负)。
+  // `:active` / `:hover` / `:disabled` 是 0,2,0,压得住分组,那些留给各自的旧类自己管。
+  for (const old of Object.keys(BRIDGED)) {
+    const own = new RegExp(`^\\${old}\\s*\\{([^}]*)\\}`, 'gm');
+    for (const m of CSS.matchAll(own)) {
+      if (m.index > PRIM_AT) continue;            // 写在原语之后 = 有意的覆盖,放行
+      for (const forbidden of GEOMETRY) {
+        assert.ok(
+          !new RegExp(`(^|;)\\s*${forbidden}:`).test(m[1]),
+          `${old} 在原语之前(第 ~${CSS.slice(0, m.index).split('\n').length} 行)又写了 ${forbidden} —— `
+          + '同权重下后面的原语分组会把它顶掉,这行不生效。要保留的差异请写到原语那一段之后。',
+        );
+      }
+    }
+  }
+  // 夜间覆盖同理,而且更隐蔽:它权重比原语高(0,2,0),写死的 hex 会把跟皮肤走的 token
+  // 顶掉,而页面看着「有夜间色」所以没人会怀疑(.nesio-type-action-btn 的 #93c5fd、
+  // .nesio-today-btn--ghost 的 #8fa3c0 都是这么潜伏下来的)。修饰类(--ghost/--primary)
+  // 一并算进来 —— 它们是同一个按钮的另一半。
+  for (const old of Object.keys(BRIDGED)) {
+    const night = new RegExp(`(html\\[data-portal-theme[^{]*\\${old}[a-z0-9-]*[^{]*)\\{([^}]*)\\}`, 'g');
+    for (const m of CSS.matchAll(night)) {
+      assert.ok(
+        !/#[0-9a-fA-F]{3,8}\b/.test(m[2].replace(/var\([^)]*,\s*#[0-9a-fA-F]{3,8}\)/g, '')),
+        `这条夜间覆盖写死了色值,换皮肤时这个按钮不会跟着变:\n    ${m[1].trim()}`,
+      );
+    }
   }
   // 投影也得跟皮肤走(原来写死 rgba(88,140,227,.35),灰粉皮肤下是蓝影子配陶红按钮)
-  assert.ok(!/rgba\(88, ?140, ?227/.test(own), '.nesio-ob-primary-btn 的投影又写死品牌蓝了');
+  const shadowAt = CSS.search(/\n\.nesio-ob-primary-btn \{/);
+  assert.ok(shadowAt > 0, '.nesio-ob-primary-btn 的自有声明块不见了');
+  assert.ok(
+    !/rgba\(88, ?140, ?227/.test(CSS.slice(shadowAt, CSS.indexOf('}', shadowAt))),
+    '.nesio-ob-primary-btn 的投影又写死品牌蓝了',
+  );
+
+  // ── 等高层必须排在原语之后 ────────────────────────────────────────────────
+  // .nesio-nd-action-btn 是把记忆详情底部那一排「掰」等高的一层,靠 source-order 生效。
+  // 它原来在原语之前 —— 桥接把那一排的三个基类挪到更后面,它就压不住了(删除键会比
+  // 旁边的阅读键矮一截、圆角也不一样)。
+  const rowAt = CSS.search(/\n\.nesio-nd-action-btn \{/);
+  assert.ok(rowAt > 0, '.nesio-nd-action-btn 不见了');
+  assert.ok(
+    rowAt > PRIM_AT,
+    '.nesio-nd-action-btn 跑到 Button 原语前面去了 —— 它压不住基类的 padding/radius/font,'
+    + '记忆详情底部那一排会重新一高一矮',
+  );
 }
 
 console.log('button-primitive: OK(契约对得上 · 变体齐 · 走 token · 有禁用/按下态 · 相机已迁)');

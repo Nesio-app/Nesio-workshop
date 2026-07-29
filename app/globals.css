@@ -5004,10 +5004,12 @@ html[data-portal-theme="night"] .nesio-today-card-title { color: #e8eefa; }
 
 .nesio-today-btn:active { opacity: 0.75; transform: scale(0.97); }
 
+/* 底色和投影都从当前皮肤的强调色派生 —— 原来写死 --portal-blue-deep + rgba(88,140,227,.3),
+   换到灰粉/苔绿皮肤时是「陶红按钮拖一道蓝影子」(和 .nesio-ob-primary-btn 一模一样的毛病)。 */
 .nesio-today-btn--primary {
-  background: var(--portal-blue-deep);
-  color: #fff;
-  box-shadow: 0 2px 8px rgba(88,140,227,0.3);
+  background: var(--portal-accent);
+  color: var(--portal-on-accent, #fff);
+  box-shadow: 0 2px 8px color-mix(in srgb, var(--portal-accent) 30%, transparent);
 }
 
 .nesio-today-btn--ghost {
@@ -5019,7 +5021,7 @@ html[data-portal-theme="night"] .nesio-today-card-title { color: #e8eefa; }
 html[data-portal-theme="night"] .nesio-today-btn--ghost {
   background: rgba(255,255,255,0.08);
   border-color: rgba(255,255,255,0.12);
-  color: #8fa3c0;
+  color: var(--portal-muted);
 }
 
 /* Audio card */
@@ -7248,39 +7250,28 @@ html[data-portal-theme="night"] .nesio-ob-input {
   box-shadow: 0 4px 16px color-mix(in srgb, var(--portal-accent) 32%, transparent);
 }
 
+/* 第三方登录按钮:尺寸/边框/底色已并到 Button 原语(secondary · lg · full),
+   这里只留它自己的事 —— 按钮之间的间距。
+   原来的 rgba(88,140,227,·) 写死品牌蓝,换到灰粉皮肤时边框还是蓝的;
+   夜间那条单独的覆盖也随之删掉 —— secondary 用的 --portal-ink/--portal-line 本来就昼夜两套。 */
 .nesio-ob-auth-btn {
-  width: 100%;
-  padding: 0.75rem 1rem;
-  border: 1.5px solid rgba(88, 140, 227, 0.22);
-  border-radius: 0.85rem;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: var(--portal-ink);
-  background: rgba(88, 140, 227, 0.04);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.65rem;
-  margin-bottom: 0.6rem;
+  margin-bottom: var(--space-2);
   transition: background 0.15s, border-color 0.15s;
 }
 
-html[data-portal-theme="night"] .nesio-ob-auth-btn { color: #e8eefa; background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.12); }
+.nesio-ob-auth-btn:hover { background: var(--portal-accent-soft); border-color: var(--portal-accent-border); }
 
-.nesio-ob-auth-btn:hover { background: rgba(88, 140, 227, 0.09); border-color: rgba(88, 140, 227, 0.35); }
-
+/* Google 品牌蓝 —— CLAUDE.md 明确的例外:第三方 logo 的品牌色不跟皮肤走。 */
 .nesio-ob-auth-btn--google {
   border-color: rgba(66, 133, 244, 0.35);
   background: rgba(66, 133, 244, 0.04);
 }
 
+/* 「跳过」是 warm-coach 红线要求的出口:必须在,但不该抢主按钮的视线。
+   所以并到 ghost + sm;它比 ghost 更淡的那档文字色写在 Button 原语那一段的末尾
+   —— 写在这里会被后面的 .nesio-btn--ghost 分组覆盖(同权重、后者赢)。 */
 .nesio-ob-skip-btn {
-  font-size: 0.78rem;
-  color: var(--portal-muted);
-  padding: 0.4rem;
   margin-top: 0.1rem;
-  display: block;
-  text-align: center;
 }
 
 .nesio-ob-error {
@@ -7759,31 +7750,12 @@ html[data-portal-theme="night"] .nesio-settings-option-label { color: #e8eefa; }
   color: #059669;
 }
 
-.nesio-settings-action-btn {
-  width: 100%;
-  text-align: center;
-  padding: 0.65rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--portal-blue-deep);
-  background: rgba(88,140,227,0.07);
-  border-radius: 0.75rem;
-  margin-top: 0.85rem;
-  border: 1px solid rgba(88,140,227,0.15);
-}
+/* 设置页的整行按钮:已并到 Button 原语(soft · md · full,危险的那条加 risk 语气)。
+   原来两条各写一份 rgba —— 蓝的写死品牌蓝(换皮肤不跟)、红的写死 rgba(207,107,107)
+   (就是 --status-risk 的分量,只是没人知道)。这里只留各自的外边距。 */
+.nesio-settings-action-btn { margin-top: 0.85rem; }
 
-.nesio-settings-danger-btn {
-  width: 100%;
-  text-align: center;
-  padding: 0.65rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--status-risk);
-  background: rgba(207,107,107,0.07);
-  border-radius: 0.75rem;
-  margin-top: 0.5rem;
-  border: 1px solid rgba(207,107,107,0.15);
-}
+.nesio-settings-danger-btn { margin-top: var(--space-2); }
 
 /* ─── Subscription ─── */
 /* ── Subscription / Trial ── */
@@ -8370,28 +8342,20 @@ html[data-portal-theme="night"] .nesio-type-header-strip {
 }
 .nesio-type-event-time-icon { font-size: 1rem; }
 
+/* 记忆详情里的「打开文件 / 看地图 / 进会议」:已并到 Button 原语(soft · sm · pill)。
+   这里只留边框和过渡。--meeting 那档原来写的是 #10b981 / #059669 —— CLAUDE.md 点名废弃的
+   那套绿,和全站的 --status-go 差着一截,并排就是两种绿。 */
 .nesio-type-action-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-size: 0.82rem;
-  font-weight: 700;
-  padding: 0.45rem 1rem;
-  border-radius: 999px;
-  background: rgba(88,140,227,0.1);
-  color: var(--portal-blue-deep);
-  text-decoration: none;
-  border: 1.5px solid rgba(88,140,227,0.2);
-  cursor: pointer;
+  border-color: var(--portal-accent-border);
   transition: background 0.15s;
 }
-.nesio-type-action-btn:hover { background: rgba(88,140,227,0.18); }
+.nesio-type-action-btn:hover { background: var(--portal-accent-soft-md); }
 .nesio-type-action-btn--meeting {
-  background: rgba(16, 185, 129, 0.1);
-  color: #059669;
-  border-color: rgba(90,158,122,0.2);
+  background: var(--status-go-soft);
+  color: var(--status-go);
+  border-color: color-mix(in srgb, var(--status-go) 25%, transparent);
 }
-.nesio-type-action-btn--meeting:hover { background: rgba(90,158,122,0.18); }
+.nesio-type-action-btn--meeting:hover { background: color-mix(in srgb, var(--status-go) 22%, transparent); }
 
 .nesio-type-thumb {
   width: 100%;
@@ -8469,8 +8433,11 @@ html[data-portal-theme="night"] .nesio-type-header-strip {
 }
 
 html[data-portal-theme="night"] .nesio-type-header-label { color: #c7d4f5; }
-html[data-portal-theme="night"] .nesio-commitment-toggle { color: #a78bfa; }
-html[data-portal-theme="night"] .nesio-type-action-btn { color: #93c5fd; }
+/* #a78bfa 是 CLAUDE.md 点名废弃的那套紫;--portal-cool-accent 昼夜各有一档,不用手写。 */
+html[data-portal-theme="night"] .nesio-commitment-toggle { color: var(--portal-cool-accent); }
+/* (原来这里给 .nesio-type-action-btn 单写了个夜间蓝 #93c5fd。并到 soft 变体之后
+   它的字色就是 --portal-accent —— 那个 token 本来就昼夜两套、还跟皮肤走,
+   留着这行反而把皮肤色顶掉。) */
 
 /* ─── Today Empty State ─── */
 .nesio-today-empty {
@@ -15427,10 +15394,8 @@ html[data-portal-theme="night"] .nesio-create-project-input {
   color: #fff; font-size: 0.8rem; font-weight: 600; border: none; cursor: pointer;
 }
 .nesio-exp-create-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.nesio-exp-cancel-btn {
-  padding: 0.5rem 0.9rem; border-radius: 8px; background: var(--portal-line);
-  color: var(--portal-muted); font-size: 0.8rem; border: none; cursor: pointer;
-}
+/* (这里原来还有一份 .nesio-exp-cancel-btn —— 和 300 行后的那份同名同权重,
+   后者全盘覆盖,这份从写下来那天起就没生效过。删掉,免得下次有人改错地方。) */
 .nesio-exp-add-btn {
   align-self: flex-start; padding: 0.35rem 0.9rem; border-radius: 1rem; font-size: 0.78rem;
   background: var(--portal-line); border: 1px dashed var(--portal-muted); cursor: pointer;
@@ -15742,15 +15707,10 @@ html[data-portal-theme="night"] .nesio-create-project-input {
   transition: opacity var(--dur-fast);
 }
 .nesio-exp-next-btn:disabled, .nesio-exp-create-btn:disabled { opacity: 0.4; cursor: default; }
+/* 实验向导的「取消 / 上一步」:已并到 Button 原语(secondary · md)。
+   只留 flex:1 —— 和旁边的主按钮平分一行。文字色见 Button 原语那一段末尾。 */
 .nesio-exp-cancel-btn {
   flex: 1;
-  padding: 0.65rem 1rem;
-  border: 1px solid var(--portal-line);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  color: var(--portal-muted);
-  font-size: var(--text-sm);
-  cursor: pointer;
 }
 
 /* ════════════════════════════════════════════════
@@ -17788,13 +17748,9 @@ html[data-palette="sage"]:not([data-portal-theme="night"])          { background
 
 /* 日历项展开:两个小按钮并排(此前链接通栏胶囊+记录另起一行,且 emoji 在文案里) */
 .nesio-collapsed-actions { display: flex; gap: 0.5rem; margin-top: 0.45rem; }
-.nesio-collapsed-act-btn {
-  display: inline-flex; align-items: center; gap: 0.3rem;
-  font-size: 0.76rem; font-weight: 500; color: var(--portal-blue-deep);
-  background: var(--portal-accent-soft); border: none; border-radius: 999px;
-  padding: 0.32rem 0.75rem; cursor: pointer; text-decoration: none;
-  transition: background 0.15s;
-}
+/* 日历卡里的「加入会议 / 记录」:已并到 Button 原语(soft · sm · pill)。
+   它和上面那条 .nesio-type-action-btn 干的是同一件事,以前一个 0.76rem 一个 0.82rem。 */
+.nesio-collapsed-act-btn { transition: background 0.15s; }
 .nesio-collapsed-act-btn:active { background: var(--portal-accent-soft-md); }
 
 /* 话筒收进「记下来」输入框内(用户设计稿) */
@@ -18727,25 +18683,8 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
   .nesio-sheet { border: 2px solid var(--portal-ink); }
 }
 
-/* 记忆详情底部动作按钮:统一几何(高度/圆角/字号/触控目标),各自保留颜色身份
-   (阅读=主强调实心 / 编辑·取消=中性描边 / 删除=风险)。真机反馈「按钮大小形状不统一」。
-   放文件末尾,确保 source-order 覆盖各按钮基类的 padding/radius/font/height。 */
-.nesio-nd-action-btn {
-  flex: 1;
-  width: auto;
-  height: 46px;
-  min-height: 0;
-  box-sizing: border-box;
-  padding: 0 1rem;
-  border-radius: var(--radius-pill, 999px);
-  font-size: 0.88rem;
-  font-weight: var(--weight-semibold, 600);
-  margin-top: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-}
+/* (.nesio-nd-action-btn 原来在这里 —— 它靠 source-order 压住各按钮基类的几何,
+   而 Button 原语那一段在文件更后面,留在这儿就压不住了。已挪到原语之后。) */
 /* ══════════════════════════════════════════════════════════════════════════
    成长引擎 v2(artifact 1170dd28 / 59587b8d / d7bd8990)—— 走 portal 主题 token
    字体/动效统一:--ng-ease 贯穿三页;颜色全部映射到 --portal-* / --status-*。
@@ -19768,7 +19707,14 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-ob-primary-btn,
 .nesio-rel-log-btn,
 .nesio-today-btn,
-.nesio-proactive-action-btn {
+.nesio-proactive-action-btn,
+.nesio-ob-auth-btn,
+.nesio-ob-skip-btn,
+.nesio-settings-action-btn,
+.nesio-settings-danger-btn,
+.nesio-type-action-btn,
+.nesio-collapsed-act-btn,
+.nesio-exp-cancel-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -19788,21 +19734,35 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-ob-primary-btn,
 .nesio-rel-log-btn,
 .nesio-today-btn,
-.nesio-proactive-action-btn { border-radius: var(--radius-pill); }
+.nesio-proactive-action-btn,
+.nesio-type-action-btn,
+.nesio-collapsed-act-btn { border-radius: var(--radius-pill); }
 .nesio-btn--full,
-.nesio-ob-primary-btn { width: 100%; }
+.nesio-ob-primary-btn,
+.nesio-ob-auth-btn,
+.nesio-ob-skip-btn,
+.nesio-settings-action-btn,
+.nesio-settings-danger-btn { width: 100%; }
 /* 按下给一点回弹 —— 但尊重「减少动态效果」 */
 .nesio-btn:active,
 .nesio-ob-primary-btn:not(:disabled):active,
 .nesio-rel-log-btn:active,
 .nesio-today-btn:active,
-.nesio-proactive-action-btn:active { transform: scale(0.97); }
+.nesio-proactive-action-btn:active,
+.nesio-ob-auth-btn:not(:disabled):active,
+.nesio-settings-action-btn:not(:disabled):active,
+.nesio-settings-danger-btn:active,
+.nesio-type-action-btn:active,
+.nesio-collapsed-act-btn:active,
+.nesio-exp-cancel-btn:active { transform: scale(0.97); }
 @media (prefers-reduced-motion: reduce) {
   .nesio-btn { transition: none; }
   .nesio-btn:active { transform: none; }
 }
 .nesio-btn:disabled,
-.nesio-ob-primary-btn:disabled { opacity: 0.45; cursor: default; }
+.nesio-ob-primary-btn:disabled,
+.nesio-ob-auth-btn:disabled,
+.nesio-settings-action-btn:disabled { opacity: 0.45; cursor: default; }
 .nesio-btn:disabled:active { transform: none; }
 .nesio-btn-icon { display: inline-flex; align-items: center; flex-shrink: 0; }
 
@@ -19810,11 +19770,18 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
    (相机那对以前是 0.5rem/0.78rem 配 0.55rem/0.8rem,肉眼就能看出错位)。 */
 .nesio-btn--sm,
 .nesio-rel-log-btn,
-.nesio-proactive-action-btn { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+.nesio-proactive-action-btn,
+.nesio-ob-skip-btn,
+.nesio-type-action-btn,
+.nesio-collapsed-act-btn { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
 .nesio-btn--md,
-.nesio-today-btn { padding: 0.55rem var(--space-4); font-size: var(--text-sm); }
+.nesio-today-btn,
+.nesio-settings-action-btn,
+.nesio-settings-danger-btn,
+.nesio-exp-cancel-btn { padding: 0.55rem var(--space-4); font-size: var(--text-sm); }
 .nesio-btn--lg,
-.nesio-ob-primary-btn { padding: var(--space-3) var(--space-5); font-size: var(--text-body); }
+.nesio-ob-primary-btn,
+.nesio-ob-auth-btn { padding: var(--space-3) var(--space-5); font-size: var(--text-body); }
 
 /* 四种变体。颜色一律从 --portal-accent / --status-risk 派生,换皮肤自动跟随。 */
 .nesio-btn--primary,
@@ -19823,17 +19790,23 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   color: var(--portal-on-accent, #fff);
 }
 .nesio-btn--secondary,
-.nesio-proactive-action-btn {
+.nesio-proactive-action-btn,
+.nesio-ob-auth-btn,
+.nesio-exp-cancel-btn {
   background: transparent;
   border-color: var(--portal-line);
   color: var(--portal-ink);
 }
 .nesio-btn--soft,
-.nesio-rel-log-btn {
+.nesio-rel-log-btn,
+.nesio-settings-action-btn,
+.nesio-type-action-btn,
+.nesio-collapsed-act-btn {
   background: var(--portal-accent-soft);
   color: var(--portal-accent);
 }
-.nesio-btn--ghost {
+.nesio-btn--ghost,
+.nesio-ob-skip-btn {
   background: none;
   color: var(--portal-accent);
   padding-left: var(--space-2);
@@ -19844,5 +19817,37 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
    CLAUDE.md 文案红线:不用红色制造焦虑,普通的「取消 / 稍后」不算 risk。 */
 .nesio-btn--risk.nesio-btn--primary { background: var(--status-risk); color: #fff; }
 .nesio-btn--risk.nesio-btn--secondary { border-color: var(--status-risk); color: var(--status-risk); }
-.nesio-btn--risk.nesio-btn--soft { background: var(--status-risk-soft); color: var(--status-risk); }
+.nesio-btn--risk.nesio-btn--soft,
+.nesio-settings-danger-btn {
+  background: var(--status-risk-soft);
+  color: var(--status-risk);
+  border-color: color-mix(in srgb, var(--status-risk) 20%, transparent);
+}
 .nesio-btn--risk.nesio-btn--ghost { color: var(--status-risk); }
+
+/* 桥接的旧类里,少数几个有**该保留的**差异 —— 写在这里而不是它们自己那块,
+   因为上面的分组在文件里更靠后,同权重下会把靠前的声明覆盖掉(这一版差点踩到)。 */
+.nesio-ob-skip-btn,
+.nesio-exp-cancel-btn { color: var(--portal-muted); }
+
+/* 记忆详情底部那一排(阅读/编辑/删除/保存/取消)统一几何:等宽等高、同一个圆角。
+   这个类的存在本身就是病征 —— 那一排的四个按钮分别挂着 .nesio-ob-primary-btn /
+   .nesio-today-btn--ghost / .nesio-settings-danger-btn 三套不同的自造按钮,高度各不相同,
+   于是又加一层把它们**掰**齐(真机反馈「按钮大小形状不统一」)。三套现在都并到原语上了,
+   这一层只剩几何职责。必须排在原语之后:它靠 source-order 压住基类的 padding/radius/font。 */
+.nesio-nd-action-btn {
+  flex: 1;
+  width: auto;
+  height: 46px;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold, 600);
+  margin-top: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}

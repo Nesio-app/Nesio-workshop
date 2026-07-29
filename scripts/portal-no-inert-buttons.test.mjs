@@ -25,6 +25,7 @@ const inertButtons = [];
 
 for (const file of walk(portalDir)) {
   const source = readFileSync(file, 'utf8');
+  const isPrimitive = relative(root, file).replace(/\\/g, '/').startsWith('components/portal/ui/');
   const buttonPatterns = [
     /<button\b[\s\S]*?<\/button>/g,
     /<button\b(?:(?!<\/button>)[\s\S])*?\/>/g,
@@ -41,7 +42,11 @@ for (const file of walk(portalDir)) {
         /onMouseDown=/.test(block) ||
         /type=["']submit["']/.test(block) ||
         /disabled=/.test(block) ||
-        /aria-disabled=/.test(block);
+        /aria-disabled=/.test(block) ||
+        // components/portal/ui/ 下是**原语**:它自己不定义动作,而是把调用方传的
+        // onClick/disabled 原样转下去({...rest})。这种按钮不是「点了没反应」,
+        // 真正要防的死按钮在调用点 —— 那一层照常被这条规则扫。
+        (isPrimitive && /\{\.\.\.(rest|props)\}/.test(block));
       if (!isInteractive) {
         inertButtons.push(`${relative(root, file)}:${lineFor(source, match.index)}`);
       }
