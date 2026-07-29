@@ -101,7 +101,12 @@ export default function FinanceTab() {
   const [acctFilter, setAcctFilter] = useState<string>('all'); // 批次 40:按卡筛选
   const [rev, setRev] = useState(0); // 规则改动后强制重算
   const [flowEditId, setFlowEditId] = useState<string | null>(null);
-  const [hydrated, setHydrated] = useState(false); // P0:IDB 水合完成才允许判「空」
+  // 三态,不是两态。原来是 hydrated: boolean,而 bankDataReady() 的 catch 里直接
+  // setHydrated(true) —— 也就是**把「读不出来」当成「没有数据」**:IDB 打不开的那一次,
+  // 界面就说「还没有银行流水,去连接 Plaid」,而流水其实好端端躺在本机。
+  // 用户实测到的正是这个:同一个财务页在「有完整数据」和「完全空白」之间跳变。
+  // (CLAUDE.md 红线:失败必须看得见,不许伪装成空。)
+  const [hydrateState, setHydrateState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [quickAdd, setQuickAdd] = useState<null | { seg: 'expense' | 'income' | 'asset'; assetId?: string }>(null); // P1:全局「+」(带资产上下文)
 
   useEffect(() => {
@@ -117,7 +122,7 @@ export default function FinanceTab() {
     };
     reload();
     // P0:冷启动区分「加载中/真没数据」—— IDB 水合完成前不给假空态。
-    bankDataReady().then(() => { setHydrated(true); reload(); }).catch(() => setHydrated(true));
+    bankDataReady().then(() => { setHydrateState('ready'); reload(); }).catch(() => setHydrateState('error'));
     // P1 竞态修复:手动资产/快照 store 水合完成的 emit 可能早于监听挂载 —— ready 后强刷一次
     finAssetsReady().then(() => setRev((r) => r + 1)).catch(() => { /* 水合失败按空处理 */ });
     // 数据搬 IDB 后:水合完成/同步后派发 nesio-bank-updated → 重读(冷启动空窗自愈)。
@@ -219,10 +224,24 @@ export default function FinanceTab() {
 
   if (txs.length === 0) {
     // P0:水合未完成 = 加载中,不是没数据 —— 此前已连接用户每次冷启动都先看到「去连接」闪屏。
-    if (!hydrated) {
+    if (hydrateState === 'loading') {
       return (
         <div className="nesio-analytics-tab">
           <p className="nesio-insights-empty">{L(dict, '正在读取本机流水…', 'Loading local transactions…')}</p>
+        </div>
+      );
+    }
+    if (hydrateState === 'error') {
+      // 读不出来 ≠ 没有。说清楚是哪种,并给一条出路 —— 否则用户会以为数据没了。
+      return (
+        <div className="nesio-analytics-tab">
+          <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>
+            {L(dict, '本机流水这次没读出来(浏览器存储没打开成功),数据还在,不是丢了。', "Couldn't open local transaction storage this time — your data is still there.")}
+          </p>
+          <button type="button" className="nesio-fin-review-accept" style={{ marginTop: '0.5rem' }}
+            onClick={() => { setHydrateState('loading'); bankDataReady().then(() => { setHydrateState('ready'); setRev((r) => r + 1); }).catch(() => setHydrateState('error')); }}>
+            {L(dict, '重试', 'Retry')}
+          </button>
         </div>
       );
     }

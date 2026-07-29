@@ -142,4 +142,23 @@ const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, 
   );
 }
 
+// ── ⑦ 「读不出来」不许伪装成「没有数据」 ─────────────────────────────────────
+// 财务页原来是 hydrated: boolean,而 bankDataReady() 的 catch 里直接 setHydrated(true)——
+// IDB 打不开的那一次,界面就说「还没有银行流水,去连接 Plaid」,而流水好端端躺在本机。
+// 用户实测:同一个页面在「有完整数据」和「完全空白」之间跳变。
+{
+  const fin = code(read('components/portal/finance/FinanceTab.tsx'));
+  assert.ok(
+    /hydrateState/.test(fin) && !/setHydrated\(true\)/.test(fin),
+    '财务页又把水合失败当成「没有数据」了 —— 读不出来和真没有必须分开(CLAUDE.md 红线:失败要看得见)',
+  );
+  assert.ok(/'loading' \| 'ready' \| 'error'/.test(fin), '水合状态不是三态,失败态会被吞掉');
+  // 必须框在**首次水合**那一处。只搜 catch(() => setHydrateState('error')) 不够 ——
+  // 重试按钮里有一模一样的一句,把初次水合改成 'ready' 测试照样绿(变异测试抓到的)。
+  assert.ok(
+    /bankDataReady\(\)\.then\(\(\) => \{ setHydrateState\('ready'\); reload\(\); \}\)\.catch\(\(\) => setHydrateState\('error'\)\)/.test(fin),
+    '首次水合失败没有落到 error 态 —— 又会把「读不出来」显示成「还没有银行流水」',
+  );
+}
+
 console.log('qa-ui-truth: OK(file input 可点 · 头像手势 · 深链自增号 · 一件事一个数 · 攒钱进度 · 提醒可关)');
