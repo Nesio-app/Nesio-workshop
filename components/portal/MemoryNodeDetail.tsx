@@ -20,6 +20,7 @@ const AssignChoreLazy = dynamicImport(() => import('./family/AssignChoreButton')
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
+import Button from './ui/Button';
 import MemoryLensSheet from './MemoryLensSheet';
 import { shouldNudge } from '@/lib/portal/lens';
 const TYPE_BG_DETAIL: Record<string, string> = {
@@ -1459,20 +1460,23 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
 
       {/* Actions */}
           <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.25rem' }}>
+            {/* 这一排以前是三套不同的自造按钮拼出来的(ob-primary / today--ghost / settings-danger),
+                高度各不相同,只好再加一层 .nesio-nd-action-btn 把它们掰齐。现在统一走 Button 原语,
+                那一层只剩「同一行等宽等高」的几何职责。 */}
             {editing ? (
               <>
-                <button type="button" className="nesio-ob-primary-btn nesio-nd-action-btn" onClick={saveEdit}>{L(dict, '保存', 'Save')}</button>
-                <button type="button" className="nesio-today-btn nesio-today-btn--ghost nesio-nd-action-btn" onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</button>
+                <Button variant="primary" className="nesio-nd-action-btn" onClick={saveEdit}>{L(dict, '保存', 'Save')}</Button>
+                <Button variant="secondary" className="nesio-nd-action-btn" onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</Button>
               </>
             ) : (
               <>
                 {/* 批次 33:阅读入口顶部有(替换✕),底部也放回来一份 —— 用户反馈顶部那颗找不到 */}
                 {readableText && (
-                  <button type="button" className="nesio-ob-primary-btn nesio-nd-action-btn" onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
+                  <Button variant="primary" className="nesio-nd-action-btn" onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</Button>
                 )}
                 {/* 批次 37:回复按钮移到顶部「阅读」旁,底部不再重复 */}
-                <button type="button" className="nesio-today-btn nesio-today-btn--ghost nesio-nd-action-btn" onClick={startEdit}>{L(dict, '编辑', 'Edit')}</button>
-                <button type="button" className="nesio-settings-danger-btn nesio-nd-action-btn" onClick={handleDelete}>{L(dict, '删除', 'Delete')}</button>
+                <Button variant="secondary" className="nesio-nd-action-btn" onClick={startEdit}>{L(dict, '编辑', 'Edit')}</Button>
+                <Button variant="soft" tone="risk" className="nesio-nd-action-btn" onClick={handleDelete}>{L(dict, '删除', 'Delete')}</Button>
               </>
             )}
           </div>

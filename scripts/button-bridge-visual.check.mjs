@@ -10,23 +10,31 @@
  *
  * 不进 test:contracts:它要 playwright + chromium,CI 里没有。改完桥接手动跑一次:
  *   node scripts/button-bridge-visual.check.mjs
+ * (容器里 chromium 不在默认位置时:CHROMIUM_PATH=/opt/pw-browsers/chromium-*\/chrome-linux/chrome)
  */
 import { chromium } from 'playwright';
 import fs from 'node:fs';
 
 const CSS = fs.readFileSync('app/globals.css', 'utf8');
+
+/**
+ * 只比**桥接中**的旧类 —— 调用点还是 <button className="旧类">,靠选择器分组蹭原语的声明。
+ *
+ * 已经换完标签的(settings-action / settings-danger)**故意不在这里**:它们的规则写在原语之前、
+ * 权重又一样,往里塞什么属性都不生效,所以「外观没变」对它们是句恒真的话。
+ * 第一版真把它们写进来了,变异测试塞回一个 background 照样全绿才发现 —— 那是个自我安慰的断言。
+ * 那两个类「只准剩 margin-top」由 button-primitive.test.mjs 的静态断言守着,那条变异会红。
+ */
 const PAIRS = [
-  ['nesio-ob-primary-btn',     'nesio-btn nesio-btn--primary nesio-btn--lg nesio-btn--pill nesio-btn--full'],
-  ['nesio-rel-log-btn',        'nesio-btn nesio-btn--soft nesio-btn--sm nesio-btn--pill'],
-  ['nesio-today-btn',          'nesio-btn nesio-btn--md nesio-btn--pill'],
+  ['nesio-ob-primary-btn',      'nesio-btn nesio-btn--primary nesio-btn--lg nesio-btn--pill nesio-btn--full'],
+  ['nesio-rel-log-btn',         'nesio-btn nesio-btn--soft nesio-btn--sm nesio-btn--pill'],
+  ['nesio-today-btn',           'nesio-btn nesio-btn--md nesio-btn--pill'],
   ['nesio-proactive-action-btn','nesio-btn nesio-btn--secondary nesio-btn--sm nesio-btn--pill'],
-  ['nesio-ob-auth-btn',        'nesio-btn nesio-btn--secondary nesio-btn--lg nesio-btn--full'],
-  ['nesio-ob-skip-btn',        'nesio-btn nesio-btn--ghost nesio-btn--sm nesio-btn--full'],
-  ['nesio-settings-action-btn','nesio-btn nesio-btn--soft nesio-btn--md nesio-btn--full'],
-  ['nesio-settings-danger-btn','nesio-btn nesio-btn--soft nesio-btn--md nesio-btn--full nesio-btn--risk'],
-  ['nesio-type-action-btn',    'nesio-btn nesio-btn--soft nesio-btn--sm nesio-btn--pill'],
-  ['nesio-collapsed-act-btn',  'nesio-btn nesio-btn--soft nesio-btn--sm nesio-btn--pill'],
-  ['nesio-exp-cancel-btn',     'nesio-btn nesio-btn--secondary nesio-btn--md'],
+  ['nesio-ob-auth-btn',         'nesio-btn nesio-btn--secondary nesio-btn--lg nesio-btn--full'],
+  ['nesio-ob-skip-btn',         'nesio-btn nesio-btn--ghost nesio-btn--sm nesio-btn--full'],
+  ['nesio-type-action-btn',     'nesio-btn nesio-btn--soft nesio-btn--sm nesio-btn--pill'],
+  ['nesio-collapsed-act-btn',   'nesio-btn nesio-btn--soft nesio-btn--sm nesio-btn--pill'],
+  ['nesio-exp-cancel-btn',      'nesio-btn nesio-btn--secondary nesio-btn--md'],
 ];
 // 只比「统一性」相关的几何 + 底色/字色;各自保留的差异(外边距、描边、flex)不比。
 const PROPS = ['fontSize', 'paddingTop', 'paddingLeft', 'borderRadius', 'backgroundColor', 'color', 'fontWeight'];

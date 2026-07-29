@@ -33,6 +33,7 @@ import { canUse, getTier, hasProOverride, hasPaidPro, refreshServerEntitlement, 
 import { isValidBackup } from '@/lib/portal/full-backup';
 import { pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, buildCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
 import { localDayKey } from '@/lib/portal/local-day';
+import Button from './ui/Button';
 
 interface SheetProps { open: boolean; onClose: () => void; }
 
@@ -452,13 +453,23 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       .catch(() => {});
   }, []);
   useEffect(() => { if (open) loadDiag(); }, [open, loadDiag]);
+  /**
+   * 2026-07-29 QA #11:用户点了一次同步,总数从 2541 变成 2544,报的是「✓ 已同步」——
+   * 于是那 3 条看着像**凭空多出来**的。其实它们是别的设备存下、这台机器还没有的记忆,
+   * 同步把它们取回来了,完全正确;错的是**没说**。同一个数字,说清来路就是功能,
+   * 不说就是 bug。importedNodeCount 本来就一直算着,只是从来没露过面。
+   */
   async function handleForceSync() {
     setDiagSyncMsg(L(dict, '同步中…', 'Syncing…'));
     try {
-      await Promise.all([syncMemoryWithCloud({ force: true }), syncProfileWithCloud()]);
-      setDiagSyncMsg(L(dict, '✓ 已同步 · 下拉刷新看结果', '✓ Synced · pull to refresh'));
+      const [mem] = await Promise.all([syncMemoryWithCloud({ force: true }), syncProfileWithCloud()]);
+      const n = mem.importedNodeCount;
+      setDiagSyncMsg(n > 0
+        ? L(dict, `✓ 已同步 · 从云端取回 ${n} 条这台设备还没有的记忆 · 下拉刷新看结果`,
+          `✓ Synced · pulled ${n} ${n === 1 ? 'memory' : 'memories'} this device didn't have yet · pull to refresh`)
+        : L(dict, '✓ 已同步 · 本机和云端本来就一致,没有新增', '✓ Synced · already up to date, nothing new'));
       loadDiag();
-    } catch { setDiagSyncMsg(L(dict, '同步失败', 'Sync failed')); }
+    } catch { setDiagSyncMsg(L(dict, '同步没能完成,过一会儿再试', 'Sync didn’t go through — try again in a bit')); }
   }
   // 批次208:手动「立即巡查」—— 绕过每天一次闸,当场跑 Layer ③ 巡查测信噪比(web 上即可测,不必进 Apple)。
   async function handleRunSweep() {
@@ -763,12 +774,12 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           : L(dict, '存到 Nesio 云(登录即用,免费跨端同步 —— 换浏览器也拉得回)。', 'Saved to Nesio cloud (free once you sign in; syncs across devices, so a new browser can pull it back).')}
       </p>
 
-      <button type="button" className="nesio-settings-action-btn" onClick={handleBackupChosen} disabled={cloudState === 'pushing' || driveState === 'busy'}>
+      <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleBackupChosen} disabled={cloudState === 'pushing' || driveState === 'busy'}>
         {(cloudState === 'pushing' || driveState === 'busy') ? L(dict, '正在备份…', 'Backing up…') : L(dict, '备份', 'Back up')}
-      </button>
-      <button type="button" className="nesio-settings-action-btn" onClick={handleRestoreChosen} disabled={cloudRestoreState === 'pulling' || driveState === 'busy'}>
+      </Button>
+      <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleRestoreChosen} disabled={cloudRestoreState === 'pulling' || driveState === 'busy'}>
         {(cloudRestoreState === 'pulling') ? L(dict, '正在恢复…', 'Restoring…') : L(dict, '从云恢复', 'Restore from cloud')}
-      </button>
+      </Button>
       {/* 状态:仅当前所用目的地会填充 */}
       {cloudState === 'done' && (
         <p style={{ fontSize: '0.75rem', marginTop: 4, color: 'var(--status-go)' }}>
@@ -787,26 +798,26 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       )}
       {driveMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: driveState === 'error' ? 'var(--status-risk)' : 'var(--status-go)' }}>{driveMsg}</p>}
 
-      <button type="button" className="nesio-settings-action-btn" onClick={handleExportLocal} disabled={exportBusy}>
+      <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleExportLocal} disabled={exportBusy}>
         {exportBusy ? L(dict, '正在导出…', 'Exporting…') : L(dict, '导出全部(记忆 + 学到的偏好,下载 JSON)', 'Export everything (memories + learned prefs, JSON)')}
-      </button>
-      <button type="button" className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}>
+      </Button>
+      <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}>
         {L(dict, '导入备份', 'Import backup')}
-      </button>
+      </Button>
       <input ref={importRef} type="file" accept="application/json,.json" className="nesio-visually-hidden" onChange={handleImportFile} />
       {restoreMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
 
-      <button type="button" className="nesio-settings-danger-btn" onClick={clearAllMemory}>
+      <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={clearAllMemory}>
         {deleted ? L(dict, '✓ 已清除', '✓ Cleared') : L(dict, '清除所有 Memory', 'Clear all memories')}
-      </button>
-      <button type="button" className="nesio-settings-danger-btn" style={{ marginTop: '0.4rem', opacity: 0.85 }} onClick={clearAllLocalData}>
+      </Button>
+      <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" style={{ marginTop: '0.4rem', opacity: 0.85 }} onClick={clearAllLocalData}>
         {L(dict, '彻底删除本机全部数据', 'Delete all local data')}
-      </button>
+      </Button>
 
       {/* App Store 5.1.1 强制:App 内账号删除(云端 + 本机 + 登出)。 */}
-      <button type="button" className="nesio-settings-danger-btn" style={{ marginTop: '0.4rem' }} onClick={deleteAccountAndData}>
+      <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" style={{ marginTop: '0.4rem' }} onClick={deleteAccountAndData}>
         {L(dict, '删除账号与云端数据', 'Delete account & cloud data')}
-      </button>
+      </Button>
       {deleteMsg && <p className="nesio-settings-option-hint" style={{ margin: '0.4rem 0 0', color: 'var(--status-risk)' }}>{deleteMsg}</p>}
 
       {/* 图3:原顶部说明整段挪到最下面收尾 */}
