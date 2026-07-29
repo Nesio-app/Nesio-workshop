@@ -7,6 +7,7 @@
  */
 
 import { reportStorageDropped } from './storage-health';
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 
 /** 重复计划分类(批次 45):自定义/健身/家务/吃药。健身可挂训练计划。 */
 export type RoutineCategory = 'general' | 'fitness' | 'chore' | 'meds';
@@ -68,7 +69,7 @@ export function deleteRoutine(id: string): void {
 }
 
 function todayStr(now: Date): string {
-  return now.toISOString().slice(0, 10);
+  return localDayKey(now);
 }
 
 /** 到点且今天还没完成/跳过的 routine。 */

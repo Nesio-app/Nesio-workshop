@@ -307,7 +307,10 @@ const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, da
 const syncCore2 = fs.readFileSync(new URL('../lib/portal/providers/connector-sync.ts', import.meta.url), 'utf8');
 assert.ok(/r\.pending/.test(hub), 'syncPlaid 处理 pending 可见状态');
 assert.ok(/syncPlaid\(retry \+ 1\)/.test(hub), 'pending 时自动重试');
-assert.ok(/slice\(0, 5000\)/.test(syncCore2), '本机保留上限 5000');
+// P0 大修:合并抽成 bank-tx.mergeBankTxForSync 纯函数(cap 默认 5000),connector-sync 只调用
+assert.ok(/mergeBankTxForSync/.test(syncCore2), '合并走纯函数(可单测)');
+const bankSrc2 = fs.readFileSync(new URL('../lib/portal/providers/bank-tx.ts', import.meta.url), 'utf8');
+assert.ok(/cap = 5000/.test(bankSrc2), '本机保留上限 5000(bank-tx 纯核心)');
 assert.ok(/saveHoldings/.test(syncCore2), '财务㉗:同步回包的持仓落本机 store');
 assert.ok(/runPlaidSync/.test(hub), 'Hub 收编到 connector-sync 核心,不留双实现');
 

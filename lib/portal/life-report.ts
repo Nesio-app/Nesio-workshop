@@ -8,6 +8,7 @@
 
 import { readFactJournal, ensureFactJournal, type JournalRow } from '@/lib/platform/fact-journal';
 import { loadPlaceTrail, buildPlaceTimeline, displayLabel } from '@/lib/portal/place-trail';
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 
 export interface LifeReport {
   startKey: string;
@@ -41,7 +42,7 @@ function calendarDays(startKey: string, endKey: string): number {
 
 /** 聚合 [startKey, endKey](含两端,'YYYY-MM-DD')。调用前确保 journal 已回填该区间。 */
 export function buildLifeReport(startKey: string, endKey: string): LifeReport {
-  ensureFactJournal(Math.min(370, calendarDays(startKey, new Date().toISOString().slice(0, 10)) + 1));
+  ensureFactJournal(Math.min(370, calendarDays(startKey, localDayKey()) + 1));
   const rows: JournalRow[] = readFactJournal(400).filter((r) => inRange(r.dateKey, startKey, endKey));
 
   const sums: LifeReport['sums'] = {};

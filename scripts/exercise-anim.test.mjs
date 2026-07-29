@@ -13,7 +13,7 @@ function loadTs(rel) {
   const src = fs.readFileSync(new URL(rel, import.meta.url), 'utf8');
   const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const mod = { exports: {} };
-  vm.runInNewContext(js, { module: mod, exports: mod.exports, require: () => ({}), console, Date, Math, Number, Array, Object, String, RegExp, parseFloat });
+  vm.runInNewContext(js, { module: mod, exports: mod.exports, require: () => ({}), console, Date, Math, Number, Array, Object, String, RegExp, parseFloat, process: { env: {} } });
   return mod.exports;
 }
 

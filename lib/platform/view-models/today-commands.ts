@@ -222,6 +222,7 @@ export function pinNodeToTodayFocus(nodeId: string): boolean {
 export function addCommitmentNode(name: string): FocusNode {
   const node = ingestLifeNode({ name, type: 'commitment', source: 'manual', confidence: 1, tags: [], attributes: {}, relations: [] });
   // 操作类动作不冒充 useful(2026-07-27);真正的卡反馈仍走 emitFeedback。
-  broadcast();
+  // 不再补发 broadcast:ingestLifeNode → saveAll 已派发 nesio-life-graph-updated,
+  // 这里再发一次 = 整条 Today 重算管线跑两遍(QA 速记提交冻结的一半成本)。
   return { id: node.id, name: node.name, type: node.type, rawInput: node.rawInput, createdAt: node.createdAt, attributes: node.attributes };
 }

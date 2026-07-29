@@ -50,3 +50,41 @@ export function saveWorkout(input: { name: string; items: WorkoutItem[] }): Work
 export function deleteWorkout(id: string): void {
   persist(loadWorkouts().filter((w) => w.id !== id));
 }
+
+// ── 完成历史(修「自定义训练练完哪儿都不记」):任何来源的跟练完成都记一笔。
+// 健康页负荷判断、健身 tab「最近」、回溯建议都以此为准 —— 不再只认训练计划的打卡。
+
+export interface WorkoutSessionLog {
+  date: string;   // 本地日键 YYYY-MM-DD
+  name: string;
+  moves: number;
+}
+
+const HISTORY_KEY = 'nesio-workout-history-v1';
+
+function localDay(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function loadWorkoutHistory(): WorkoutSessionLog[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const v = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    return Array.isArray(v) ? (v as WorkoutSessionLog[]) : [];
+  } catch { return []; }
+}
+
+export function logWorkoutSession(name: string, moves: number, now: Date = new Date()): void {
+  if (typeof window === 'undefined') return;
+  const list = [{ date: localDay(now), name, moves }, ...loadWorkoutHistory()].slice(0, 500);
+  try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list)); } catch { reportStorageDropped(); }
+  window.dispatchEvent(new CustomEvent(WORKOUTS_UPDATED));
+}
+
+/** 本周(周一为周初,本地日键)完成的跟练次数 —— 含自定义/生成/计划全部来源。 */
+export function workoutSessionsThisWeek(now: Date = new Date()): number {
+  const day = (now.getDay() + 6) % 7; // Mon=0
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - day);
+  const from = localDay(monday);
+  return loadWorkoutHistory().filter((e) => e.date >= from && e.date <= localDay(now)).length;
+}

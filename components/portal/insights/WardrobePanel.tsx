@@ -280,8 +280,17 @@ export default function WardrobePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
-  // 规则版(免费/兜底)——始终算,离线可用;带上用户偏好
-  const outfit = useMemo(() => suggestOutfit(items, weatherCtx, new Date().toISOString(), prefs), [items, weatherCtx, prefs]);
+  // 规则版(免费/兜底)——始终算,离线可用;带上用户偏好。
+  // 日戳用本地时间平移的 ISO(直接 toISOString 是 UTC,美东晚上会把穿搭记到「明天」—— QA 日期错位)。
+  const localIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString();
+  // 👎 后规则版也要可见地换一套(QA:免费档点「换一套」结果不变):
+  // 把刚否决过的单品从池里拿掉再排;衣服太少避无可避时如实用全池(不假装换了)。
+  const outfitPool = useMemo(() => {
+    const avoid = new Set(prefs.dislikedItemIds.slice(-6));
+    const filtered = items.filter((i) => !avoid.has(i.id));
+    return filtered.length >= 2 ? filtered : items;
+  }, [items, prefs]);
+  const outfit = useMemo(() => suggestOutfit(outfitPool, weatherCtx, localIso(), prefs), [outfitPool, weatherCtx, prefs, restyleNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pro 云造型师:随衣橱/场合变化 or「重新造型」重算。失败置 stylistError,展示时回落规则版。
   useEffect(() => {
@@ -380,6 +389,11 @@ export default function WardrobePanel() {
       if (!data.ok || !data.nodes?.length) throw new Error(data.error || 'no_result');
       const n = data.nodes[0];
       const a = n.attributes || {};
+      // 识别结果说这不是衣服(毯子/抱枕…)→ 如实提示,不硬塞进衣橱分类
+      if (String(a.garmentType) === 'not_clothing') {
+        setAiError(L(dict, `识别结果:${n.name || '这张照片'} 不像是能穿的衣物 —— 若确实要收进衣橱,手动选个分类保存。`, `This looks like ${n.name || 'a non-wearable item'}, not clothing — pick a category manually if you still want it in the wardrobe.`));
+        return;
+      }
       setDraft((d) => ({
         ...d,
         name: typeof n.name === 'string' && n.name.trim() ? n.name.trim() : d.name,

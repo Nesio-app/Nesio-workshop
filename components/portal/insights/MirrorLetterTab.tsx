@@ -58,6 +58,16 @@ function FilterDropdown<T extends string>({
   leading?: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  // Esc 只关这个下拉,别冒泡到 Radix 把整个洞察大弹窗连锅端(QA:Esc 关全层)。
+  // capture 阶段抢在 Radix 的 document 监听前面。
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { e.stopPropagation(); e.preventDefault(); setOpen(false); }
+    };
+    document.addEventListener('keydown', onKey, true);
+    return () => document.removeEventListener('keydown', onKey, true);
+  }, [open]);
   const current = options.find((o) => o.id === value);
   return (
     <div className="nesio-mirror-filter">

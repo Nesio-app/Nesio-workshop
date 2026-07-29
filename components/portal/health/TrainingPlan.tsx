@@ -34,18 +34,20 @@ import {
   pickTodaySessionIndex, weekIndex, dayKey, pickPhaseIndex,
 } from '@/lib/platform/fitness-home-core';
 import { earnPoints, POINTS_PER_FITNESS_SESSION } from '@/lib/platform/rewards-engine';
-import { loadWorkouts, deleteWorkout, WORKOUTS_UPDATED, type Workout } from '@/lib/portal/workout-store';
+import { loadWorkouts, deleteWorkout, logWorkoutSession, WORKOUTS_UPDATED, type Workout } from '@/lib/portal/workout-store';
 import { workoutDisplayName, resolveExerciseName } from '@/lib/portal/workout-name';
 import { loadExerciseCatalog } from '@/lib/portal/exercise-catalog';
+import { loadLastWorkout, FOCUS_OPTIONS, type LastWorkoutRecord } from '@/lib/portal/workout-generate';
 import {
   loadOverrides, mergeProtocol, hasOverrides, setSessionItems, hideSession, resetSession, resetProtocol,
   clampSets, clampReps, TRAINING_OVERRIDES_UPDATED,
   type TrainingOverrides, type OverrideItem, type MergeProtocol,
 } from '@/lib/platform/training-overrides';
 import { EXERCISES } from '@/lib/portal/exercise-library';
-import { IconBox, IconHistory, IconTrendingUp, IconPlay, IconClock, IconActivity, IconTarget } from '../icons';
+import { IconBox, IconHistory, IconTrendingUp, IconPlay, IconClock, IconActivity, IconTarget, IconZap } from '../icons';
 
 const ExerciseLibrary = dynamic(() => import('../fitness/ExerciseLibrary'), { ssr: false });
+const WorkoutGenSheet = dynamic(() => import('../fitness/WorkoutGenSheet'), { ssr: false });
 
 function startWorkout(name: string, steps: Array<{ exerciseId: string; sets: number; reps: number; unit: 'reps' | 'sec'; restSec?: number }>, protocolId?: string, sessionId?: string) {
   window.dispatchEvent(new CustomEvent('nesio-start-workout', { detail: { name, steps, protocolId, sessionId } }));
@@ -77,6 +79,11 @@ export default function TrainingPlan() {
   const [st, setSt] = useState<TrainingState | null>(null);
   const [earned, setEarned] = useState<number | null>(null);
   const [libOpen, setLibOpen] = useState(false);
+  // 以下三个来自 QA 分支(2026-07-29 合并):「今天练什么」两问生成 / 上次练了什么 /
+  // 换计划二次确认(一点就跳选择页,像把进度清了 —— 其实打卡记录都在,但得说清楚再动)。
+  const [genOpen, setGenOpen] = useState(false);
+  const [lastRec, setLastRec] = useState<LastWorkoutRecord | null>(null);
+  const [confirmSwitch, setConfirmSwitch] = useState(false);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [openWorkoutId, setOpenWorkoutId] = useState<string | null>(null); // 图8:点开看这套训练的动作
   const [showAllSessions, setShowAllSessions] = useState(false);
@@ -89,7 +96,8 @@ export default function TrainingPlan() {
   useEffect(() => {
     setSt(loadTrainingState());
     setWorkouts(loadWorkouts());
-    const on = () => setWorkouts(loadWorkouts());
+    setLastRec(loadLastWorkout());
+    const on = () => { setWorkouts(loadWorkouts()); setLastRec(loadLastWorkout()); };
     window.addEventListener(WORKOUTS_UPDATED, on);
     setOv(loadOverrides());
     const onOv = () => setOv(loadOverrides());
@@ -138,14 +146,34 @@ export default function TrainingPlan() {
 
   if (!st) return null;
 
+  // 当天同一节只算一次(QA:一天连点 N 次白赚积分,还把负荷统计灌假)
+  const todayKey = dayKey(new Date());
+  const doneSessionsToday = new Set((st.log || []).filter((e) => e.date.slice(0, 10) === todayKey).map((e) => e.sessionId));
   const logDone = (sid: string, sname: string) => {
-    if (!active) return;
+    if (!active || doneSessionsToday.has(sid)) return;
     setSt(logSession(active.id, sid));
+    logWorkoutSession(sname, active.phases.flatMap((p) => p.sessions).find((s) => s.id === sid)?.items.length ?? 0);
     earnPoints(POINTS_PER_FITNESS_SESSION, 'fitness', dict === 'en' ? `Training: ${sname}` : `训练完成:${sname}`);
     setEarned(POINTS_PER_FITNESS_SESSION);
     setTimeout(() => setEarned(null), 2400);
   };
-  const switchPlan = () => { const s = { ...st, activeProtocolId: null, startedAt: null }; saveTrainingState(s); setSt(s); };
+  const switchPlan = () => {
+    // 一点就跳选择页会让人以为进度被清了 —— 先给一次「再点一次确认」,并说明打卡记录保留。
+    if (!confirmSwitch) { setConfirmSwitch(true); setTimeout(() => setConfirmSwitch(false), 4000); return; }
+    setConfirmSwitch(false);
+    const s = { ...st, activeProtocolId: null, startedAt: null };
+    saveTrainingState(s); setSt(s);
+  };
+
+  // 回溯小签:上次练了什么 · 多久前(没历史不显示,不施压)
+  const lastHint = (() => {
+    if (!lastRec?.focus) return null;
+    const label = FOCUS_OPTIONS.find(([k]) => k === lastRec.focus);
+    if (!label) return null;
+    const days = Math.max(0, Math.floor((Date.now() - Date.parse(`${lastRec.date}T00:00:00`)) / 86_400_000));
+    const when = days === 0 ? L(dict, '今天', 'today') : days === 1 ? L(dict, '昨天', 'yesterday') : days === 2 ? L(dict, '前天', '2 days ago') : L(dict, `${days} 天前`, `${days} days ago`);
+    return L(dict, `上次练了 ${label[1]} · ${when}`, `Last: ${label[2]} · ${when}`);
+  })();
 
   /** 所有改写都走这里:写不进本机存储就把话说明白,不假装成功。 */
   const commit = (ok: boolean) => {
@@ -176,11 +204,32 @@ export default function TrainingPlan() {
         <button type="button" className="nesio-fit-more-cell" onClick={switchPlan} disabled={!active}>
           <IconTarget size={18} />
           <span className="t">{L(dict, '换个计划', 'Switch plan')}</span>
-          <span className="s">{active ? L(dict, active.name.zh, active.name.en) : L(dict, '还没选', 'None yet')}</span>
+          <span className="s">{confirmSwitch ? L(dict, '再点一次确认', 'Tap again') : active ? L(dict, active.name.zh, active.name.en) : L(dict, '还没选', 'None yet')}</span>
         </button>
       </div>
       {libOpen && <ExerciseLibrary open onClose={() => setLibOpen(false)} />}
+      {genOpen && <WorkoutGenSheet open onClose={() => { setGenOpen(false); setLastRec(loadLastWorkout()); }} />}
     </>
+  );
+
+  // 「今天练什么」两问生成(合并自 QA 分支):决策疲劳最小的一条路,排在最前。
+  const genCard = (
+    <section className="nesio-fit-today" style={{ marginBottom: 'var(--space-3)' }}>
+      <h3 className="nesio-fit-today-name">{L(dict, '今天练什么', 'What to train today')}</h3>
+      <p className="nesio-fit-hello" style={{ margin: '0.2rem 0 0' }}>
+        {L(dict, '说说手边有什么器械、想练哪块,给你配一套,直接开练。', 'Tell it your equipment and focus — get a set, start right away.')}
+      </p>
+      {lastHint && (
+        <span style={{ display: 'inline-block', fontSize: '0.68rem', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', borderRadius: 'var(--radius-pill)', padding: '0.15rem 0.55rem', marginTop: '0.4rem' }}>
+          {lastHint}
+        </span>
+      )}
+      <div className="nesio-fit-today-acts">
+        <button type="button" className="nesio-fit-start" onClick={() => setGenOpen(true)}>
+          <IconZap size={16} />{L(dict, '配一套', 'Put a set together')}
+        </button>
+      </div>
+    </section>
   );
 
   // ── 我存的训练(动作库自由组合存下来的)—— 图8:点开看细节,删除收进展开区 ──
@@ -234,6 +283,7 @@ export default function TrainingPlan() {
             </button>
           ))}
         </div>
+        {genCard}
         {myWorkouts}
         {moreGrid}
       </div>
@@ -253,11 +303,16 @@ export default function TrainingPlan() {
         {doneToday ? L(dict, '今天练过了。', 'You trained today.') : L(dict, '今天是训练的好日子。', 'Good day to train.')}
       </p>
 
+      {genCard}
+
       {/* ② 今天的训练:练什么 / 多久 / 多重,一个主按钮 */}
       <section className="nesio-fit-today">
         <div className="nesio-fit-today-top">
           <span className="nesio-fit-tag">{L(dict, GOAL_LABEL[active.goal][0], GOAL_LABEL[active.goal][1])}</span>
-          <button type="button" className="nesio-fit-adjust" onClick={switchPlan}>{L(dict, '调整计划', 'Adjust')}</button>
+          <button type="button" className="nesio-fit-adjust" onClick={switchPlan}
+            style={confirmSwitch ? { color: 'var(--status-gentle)' } : undefined}>
+            {confirmSwitch ? L(dict, '再点一次确认(打卡记录保留)', 'Tap again (log is kept)') : L(dict, '调整计划', 'Adjust')}
+          </button>
         </div>
         <h3 className="nesio-fit-today-name">{todayName}</h3>
         <div className="nesio-fit-facts">
@@ -273,9 +328,20 @@ export default function TrainingPlan() {
           <button type="button" className="nesio-fit-start" onClick={() => startWorkout(todayName, toRunSteps(todaySession.items), active.id, todaySession.id)}>
             <IconPlay size={16} />{L(dict, '开始跟练', 'Start')}
           </button>
-          <button type="button" className="nesio-fit-ghost" onClick={() => logDone(todaySession.id, todayName)}>{L(dict, '做过了', 'Done')}</button>
+          <button type="button" className="nesio-fit-ghost" onClick={() => logDone(todaySession.id, todayName)}
+            disabled={doneSessionsToday.has(todaySession.id)}
+            style={doneSessionsToday.has(todaySession.id) ? { opacity: 0.55 } : undefined}>
+            {doneSessionsToday.has(todaySession.id) ? L(dict, '今天已打卡', 'Logged today') : L(dict, '做过了', 'Done')}
+          </button>
         </div>
       </section>
+
+      {/* 计划周期走完如实说(QA:4 周计划到第 8 周界面一模一样,像什么都没发生) */}
+      {week >= totalWeeks && (
+        <p className="nesio-fit-hello" style={{ color: 'var(--status-gentle)' }}>
+          {L(dict, `这个计划的 ${totalWeeks} 周走完了 —— 可以换一个,或按当前阶段再走一轮。`, `The ${totalWeeks}-week cycle is complete — switch plans, or run this phase again.`)}
+        </p>
+      )}
 
       {earned != null && <div className="nesio-rewards-flash">{L(dict, `训练打卡 +${earned} 积分`, `Session logged +${earned} pts`)}</div>}
 
@@ -324,7 +390,11 @@ export default function TrainingPlan() {
               </ul>
               <div className="nesio-fit-card-acts">
                 <button type="button" className="nesio-fit-go" onClick={() => startWorkout(nm, toRunSteps(s.items), active.id, s.id)}>{L(dict, '开始', 'Start')}</button>
-                <button type="button" className="nesio-fit-ghost sm" onClick={() => logDone(s.id, nm)}>{L(dict, '做过了', 'Done')}</button>
+                <button type="button" className="nesio-fit-ghost sm" onClick={() => logDone(s.id, nm)}
+                  disabled={doneSessionsToday.has(s.id)}
+                  style={doneSessionsToday.has(s.id) ? { opacity: 0.55 } : undefined}>
+                  {doneSessionsToday.has(s.id) ? L(dict, '今天已打卡', 'Logged today') : L(dict, '做过了', 'Done')}
+                </button>
                 {/* 图8「训练计划目前是硬编码不可修改」:每个训练日都能改 */}
                 <button type="button" className="nesio-fit-ghost sm" onClick={() => setEditId(editId === s.id ? null : s.id)}>
                   {editId === s.id ? L(dict, '收起', 'Close') : L(dict, '改', 'Edit')}

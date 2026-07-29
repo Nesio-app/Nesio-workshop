@@ -13,10 +13,11 @@ import { IconCamera, IconImage, NodeTypeIcon } from './icons';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { consolidateAmazonOrder } from '@/lib/portal/amazon-order';
 import { appendShoppingReceipt, consumeTravelReceiptTripId } from '@/lib/portal/travel-trips';
-import { addReceiptExpense } from '@/lib/portal/finance-sources';
+import { addReceiptExpense, defaultFinanceCurrency } from '@/lib/portal/finance-sources';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { localDayKey } from '@/lib/portal/local-day';
 
 // ── Similarity check (拍照发现已有) ────────────────────────────────────────
 
@@ -795,8 +796,8 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
         if (lines.length) {
           appendShoppingReceipt(travelTripId, lines, {
             title: L(dict, '购物 · 小票', 'Shopping · receipt'),
-            date: new Date().toISOString().slice(0, 10),
-            currency: '¥',
+            date: localDayKey(),
+            currency: defaultFinanceCurrency(),
           });
         }
       } else {
@@ -814,12 +815,12 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
           const fingerprint = lines.map((l) => `${l.name}:${l.price || 0}`).join('|').slice(0, 80);
           addReceiptExpense({
             lines,
-            date: new Date().toISOString().slice(0, 10),
-            currency: '¥',
+            date: localDayKey(),
+            currency: defaultFinanceCurrency(),
             source: 'receipt',
             merchant,
             includeInFinance: true,
-            sourceRef: `camera:${new Date().toISOString().slice(0, 10)}:${fingerprint}`,
+            sourceRef: `camera:${localDayKey()}:${fingerprint}`,
           });
         }
       }

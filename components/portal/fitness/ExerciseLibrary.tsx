@@ -11,9 +11,11 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import {
-  filterExercises, EQUIP_LABEL, MOVE_LABEL, DIFF_LABEL,
+  filterExercises, exerciseAnimFrames, EQUIP_LABEL, MOVE_LABEL, DIFF_LABEL,
   type Exercise, type MoveTag,
 } from '@/lib/portal/exercise-library';
+import { isTimedExercise } from '@/lib/portal/workout-generate';
+import ExerciseFigure from './ExerciseFigure';
 import {
   loadExerciseCatalog, filterCatalog, catalogGifSrc, CATALOG_EQUIP_LABEL, CATALOG_PART_LABEL,
   type CatalogExercise,
@@ -31,7 +33,8 @@ import type { PlayerStep } from './WorkoutPlayer';
 import { useSheetDismiss } from '@/lib/portal/use-sheet-dismiss';
 import { useSheetDrag } from '../use-sheet-drag';
 
-const HOLD_IDS = new Set(['side-plank', 'deadbug', 'prone-swimmer', 'cat-cow', '9090']);
+// 静态/伸展类按秒计(修「拉伸也 3×10 次」的假剂量);spiderman/toetouch 是保持型伸展
+const HOLD_IDS = new Set(['side-plank', 'deadbug', 'prone-swimmer', 'cat-cow', '9090', 'spiderman', 'toetouch']);
 function defaultItem(ex: Exercise): WorkoutItem {
   return HOLD_IDS.has(ex.id) ? { exerciseId: ex.id, sets: 3, reps: 30, unit: 'sec' } : { exerciseId: ex.id, sets: 3, reps: 10, unit: 'reps' };
 }
@@ -46,7 +49,17 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
   const [equip, setEquip] = useState<string>('all');
   const [move, setMove] = useState<MoveTag | 'all'>('all');
   const [openId, setOpenId] = useState<string | null>(null);
-  const [draft, setDraft] = useState<WorkoutItem[]>([]);
+  // 草稿落 localStorage:误触背板 / Escape / 下滑关掉 sheet 不再吞掉挑了半天的动作
+  const [draft, setDraft] = useState<WorkoutItem[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const v = JSON.parse(localStorage.getItem('nesio-xlib-draft-v1') || '[]');
+      return Array.isArray(v) ? (v as WorkoutItem[]).filter((d) => d && typeof d.exerciseId === 'string') : [];
+    } catch { return []; }
+  });
+  useEffect(() => {
+    try { localStorage.setItem('nesio-xlib-draft-v1', JSON.stringify(draft)); } catch { /* 草稿丢失可重挑,不上报 */ }
+  }, [draft]);
   const [flash, setFlash] = useState('');
   const [catalog, setCatalog] = useState<CatalogExercise[] | null>(null);
   const [catStatus, setCatStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -100,8 +113,12 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
   const toggleDraft = (ex: Exercise) => {
     setDraft((prev) => prev.some((d) => d.exerciseId === ex.id) ? prev.filter((d) => d.exerciseId !== ex.id) : [...prev, defaultItem(ex)]);
   };
-  const toggleDraftId = (id: string) => {
-    setDraft((prev) => prev.some((d) => d.exerciseId === id) ? prev.filter((d) => d.exerciseId !== id) : [...prev, { exerciseId: id, sets: 3, reps: 10, unit: 'reps' }]);
+  // 扩展库剂量按动作性质给默认(修「平板撑也 3×10 次」):静态→3×30s,腹→3×12,其余 3×10
+  const toggleDraftCat = (ex: CatalogExercise) => {
+    const item: WorkoutItem = isTimedExercise(ex)
+      ? { exerciseId: ex.id, sets: 3, reps: 30, unit: 'sec' }
+      : { exerciseId: ex.id, sets: 3, reps: ex.target === 'abs' ? 12 : 10, unit: 'reps' };
+    setDraft((prev) => prev.some((d) => d.exerciseId === ex.id) ? prev.filter((d) => d.exerciseId !== ex.id) : [...prev, item]);
   };
 
   const startPlay = () => {
@@ -203,6 +220,10 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
                   <p className="nesio-xlib-cue">{ex.neural[0] || ex.cues[0]}</p>
                   {expanded && (
                     <div className="nesio-xlib-detail">
+                      {/* 有帧的精选动作展开即见演示 ——「带演示图」说到做到(合并自 QA 分支) */}
+                      {exerciseAnimFrames(ex).length > 0 && (
+                        <ExerciseFigure frames={exerciseAnimFrames(ex)} fps={ex.anim?.fps} pingpong={ex.anim?.pingpong} alt={ex.name} />
+                      )}
                       <p className="nesio-xlib-detail-label">{L(dict, '技术要点', 'Cues')}</p>
                       <ul>{ex.cues.map((c, i) => <li key={i}>{c}</li>)}</ul>
                       {ex.warnings.length > 0 && <>
@@ -267,7 +288,7 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
                               </>}
                             </div>
                           )}
-                          <button type="button" className={`nesio-xlib-add${picked ? ' is-picked' : ''}`} onClick={() => toggleDraftId(ex.id)}>
+                          <button type="button" className={`nesio-xlib-add${picked ? ' is-picked' : ''}`} onClick={() => toggleDraftCat(ex)}>
                             {picked ? L(dict, '已加入 ✓', 'Added ✓') : L(dict, '+ 加入', '+ Add')}
                           </button>
                         </div>

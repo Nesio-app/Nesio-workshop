@@ -24,6 +24,7 @@ import { createBlobStore } from '@/lib/portal/idb-blob-store';
 import { reportStorageDropped } from '@/lib/portal/storage-health';
 import type { FocusNode } from '@/lib/platform/view-models/today-view-model';
 import { firstNodeDate } from '@/lib/platform/node-dates';
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -264,7 +265,7 @@ export function selectReviewCandidate(
   store: DormantStore,
   now: Date = new Date(),
 ): DormantCandidate | null {
-  const today = now.toISOString().slice(0, 10);
+  const today = localDayKey(now);
 
   // Priority 1: soft-archive resurface — show after 90 days, once only
   for (const node of allNodes) {

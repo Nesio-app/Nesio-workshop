@@ -1561,7 +1561,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                     </button>
                   ) : isConn && (c.method === 'token' || c.method === 'server') ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexShrink: 0 }}>
-                      <button type="button" className="nesio-connector-connect" onClick={() => c.method === 'server' ? syncFlomo(c) : syncToken(c)} disabled={isSync}>{isSync ? '…' : L(dict, '同步', 'Sync')}</button>
+                      <button type="button" className="nesio-connector-connect" onClick={() => c.method === 'server' ? syncFlomo(c) : syncToken(c)} disabled={isSync}>{isSync ? <span className="nesio-sync-spin" aria-hidden /> : L(dict, '同步', 'Sync')}</button>
                       {/* 批次 38:Notion 选择要同步哪些数据库(表) */}
                       {c.id === 'notion' && (
                         <button type="button" className="nesio-connector-connect" style={{ background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)' }} onClick={() => openNotionPicker()} disabled={notionDbLoading}>{notionDbLoading ? '…' : L(dict, '选表', 'Pick tables')}</button>
@@ -1570,7 +1570,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                     </div>
                   ) : isConn && c.method === 'oauth' ? (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', flexShrink: 0 }}>
-                      <button type="button" className="nesio-connector-connect" onClick={() => syncOAuth(c)} disabled={isSync}>{isSync ? '…' : L(dict, '同步', 'Sync')}</button>
+                      <button type="button" className="nesio-connector-connect" onClick={() => syncOAuth(c)} disabled={isSync}>{isSync ? <span className="nesio-sync-spin" aria-hidden /> : L(dict, '同步', 'Sync')}</button>
                       {/* 批次 27:Plaid 连了一家还想连别家 —— 已连接也给「+银行」再开一次 Link */}
                       {c.id === 'plaid' && (
                         <button type="button" className="nesio-connector-connect" style={{ background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)' }} onClick={() => connectPlaid()} disabled={isSync}>{L(dict, '+ 银行', '+ Bank')}</button>

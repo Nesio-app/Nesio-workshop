@@ -155,6 +155,147 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **UI QA 报告修复第一批(2026-07-29;报告约 50 条,先修阻断与误导)**:
+  **已修** —— ① 致命:清数据/新用户「归入账号」对话框被自己的不透明遮罩(929)盖死
+  (opaqueOverlay 非全屏面板抬到 930,.nesio-sheet--over-opaque);② /admin 鉴权 fail-open
+  (未配 Supabase 整段跳过密钥校验 → 改为无条件要 NESIO_ADMIN_SECRET,没配即 503);
+  ③ 记忆搜索乱串返回 1473 条(classifyDomain 零命中兜底 'life' 域被当真域给全域 +6 →
+  置信 ≥0.5 才让域参与加分);④ 财务净资产 -$1,294 漏 23.5 万投资(assetSummaryWithHoldings:
+  投资账户无 balance 用持仓市值兜底;卡片/总览 hero、combinedNetWorth/快照同步换口径,
+  卡片 hero 并入手动资产与负债明细);⑤ 「成功率 10000%」(analyst 与 metrics 路由
+  小数/百分数口径打架 → okRateFrac 归一);⑥ 日期错位一天(UTC 日键):衣橱穿搭/健康
+  月报生成于/记账锚点/训练记录改本地日键;⑦ 车页三条指路死链 → 真跳板块
+  (nesio-open-insights 深链扩到全部 MainTab + 洞察已开时就地切板块;记忆搜索跳转
+  自动关洞察浮层 —— 也修「问念念被弹窗盖住」同类);⑧ 会员页「试用剩 21 天」vs
+  「已是 Pro」打架(isPaidPro 优先);⑨ 换计划无确认 → 二次确认(说明打卡保留);
+  ⑩ 今天列表底部被悬浮导航压住(5.5→6.5rem);⑪ 记忆筛选后头部计数不更新
+  (命中/总数);⑫ 详情页泄露 epistemic/generator 等内部字段(列表预览同步藏);
+  ⑬ 详情弹窗加可见 ✕;⑭ 静息心率 62→77 标「平稳」(判向叠加相对水平口径)。
+  **第二批(2026-07-29,三路诊断 agent 后全修)**:
+  ● **死按钮群总根因**:洞察是 fullscreen sheet(930),从它里面开的 bottom/center 还是
+  901 → 全被压在下面,看不见还吃掉下一次点击(=「点两次才生效」)。修:原语三态 +
+  遮罩全部同层 930,层叠交给 DOM 顺序(后开永远盖先开,两个方向都对);
+  visitmem/imgzoom 陪同抬 935/940。一次性复活:物品页按钮、关系联系人详情/记给某人、
+  剧场播放器、足迹地点卡。另修:物品分类行/标签变真入口;衣橱卡片图片区=打开编辑;
+  👎 落盘 dislikedItemIds + 免费档规则版真换一套(避开刚否决的单品);镜子下拉 Esc
+  capture 只关自己;足迹「标记当前位置」点击即出「正在取定位…」;日程行经搜索跳转链路
+  本就通(双击修复后可用)。
+  ● **性能**(速记提交/切页 10-45s 冻结):nesio-life-graph-updated 风暴 → useTodayData
+  合并窗 400ms 拖尾一次;addCommitmentNode 去掉重复 broadcast(整条管线跑两遍);
+  全图 JSON.stringify 落盘改 400ms 合并窗 + pagehide 冲刷;MemoryTab:typeCounts/facet/
+  pinned/core 全 memo + Map 索引、搜索/显示全部改增量渲染上限(+100)、搜索按键防抖
+  250ms;whenIdle 兜底 3s→10s(不再在手势中间开跑)。
+  ● **状态污染**:jot 草稿乱码 = 语音 interim 半句实时落盘 + 键被云同步复活 →
+  只落最终稿、卸载停识别器、读入验长度、键入 CACHE_KEYS(不再跨设备回灌);
+  rose 主题 = 缺省键硬编码 bluegray-rose → 缺省回品牌蓝(THEME_BOOT + getPalette 同改);
+  积分 0→150 = 云端恢复(按设计,存疑留观察);Lab「Pro 解锁(测试)」构建旗标才渲染
+  (NEXT_PUBLIC_ENABLE_PRO_OVERRIDE,产线摇树掉)+ 覆盖位键入 CACHE_KEYS 不同步;
+  cloud_mirror 断网 60s 熔断、learning_pull 补单飞+20s 节流+离线跳过(控制台不再刷屏)。
+  ● **数据质量**:donut 小扇形也标数(可见加总=中心总数);库存 addPantry 同名 upsert
+  (并数量/取更早效期)+ 菜谱食材去重;衣橱视觉识别加 not_clothing 出口 + 建议器
+  非穿戴正则兜底(毯/枕/帘…);睡眠区间合并防重叠重计 + 有分期来源优先 + 16h 生理帽
+  (修 21.5h/97.3h);身高/体重/BMI 月值改中位数(修 7 个月 ±6cm);指标区间标「月均」
+  (修 672 超 400–492);血糖 min/max/TIR 统一 90 天窗 + 「峰值」改「90 天最高」;
+  足迹月卡锚定真实当前月 + live ping 带本地时区偏移;flomo markdown 剥离
+  (stripMarkdownInline:导入层 + 标题/预览/详情引文/走走看/线头五处显示层,
+  2191 条旧数据显示层即净);问候语「最近的一件今天到期」。UTC 日键清理:
+  「现在→日键」语义 26 处全改本地(lib 层内联防 vm 测试壳,组件层用
+  lib/portal/local-day);历史时间戳分桶口径不动(移动已有数据归属日风险大)。
+  **仍欠(小尾巴)**:cloud-module-sync 一次同步内 buildCombinedBackup 读两遍 +
+  contentHash 不让步(微优化);日程行点开节点详情(现为搜索跳转);积分云恢复加
+  「已恢复 N 分」回执;outbox 重试无退避;VoiceInputSheet chunk 预取;记忆页挂载时
+  200 条顺序 POST 回填;健身「练过的/身体数据」卡在源码中不存在(疑 QA 构建不一致,
+  待对版本)。全程待真机复验。
+- **健身板块:「今天练什么」生成入口 + 假功能修复批(2026-07-29,用户批)**:
+  评估 workout.lol —— 视频库**不借**(639 条系 MuscleWiki 抓取转存自家 S3,版权不净、
+  外链不可控;本地 1324 GIF 已全量),只借「器械先行 → 选部位 → 一键成套」的入口形。
+  **新增**:workout-generate(纯规则槽位抽样,主 4 辅 2,rng 可注入;器械偏好
+  nesio-workout-equip-v1;回溯 nesio-workout-last-v1 + suggestNextFocus 推→拉→腿轮换)·
+  WorkoutGenSheet(两屏 NesioSheet:两问 → 草稿逐行「换一个」,失败态+重试)·
+  健身 tab 入口卡(回溯小签「上次练了 X · N 天前」)。契约 test:workout-generate。
+  **假功能修复(三路审计 16 条,全部核实后修)**:① 完成历史 nesio-workout-history-v1
+  (自定义/生成/计划跟练完成都记;健康页负荷判断改取 max(计划打卡, 完成历史),
+  「最近打卡」含全部来源 —— 修「自定义练完哪儿都不记、负荷永远说偏少」);
+  ② 健身 routine 卡恢复出卡(批次 175 静默隐藏但 RoutineSheet 一直在承诺);
+  ③ 计划动作 SKILL_TO_CATALOG 手选映射 15 个 → 跟练有演示图+中文要点(原纯文字);
+  ④ base-path 修复(exerciseAnimDir / 节拍 WAV,子路径部署 404);⑤ 壳内静音策略如实
+  显示 🔇 + 解锁联动;⑥ 打卡回执(对勾描线,不再无声消失)+ 当天防重复(积分不可刷);
+  ⑦ 长计时 mm:ss(修「计时 1800s」);⑧ 扩展库剂量按性质(静态 3×30s/腹 3×12);
+  ⑨ 动作库草稿落盘(误关不丢);⑩ 精选卡展开渲染已有帧;⑪ 播放器 GIF 失败态可见;
+  ⑫ 计划周期走完如实提示。
+  **仍欠**:剂量编辑器(存的训练不可改组数次数)、跑步长计时无 wake-lock/后台处理、
+  计划单阶段无真进阶内容、row_erg/bike 无演示映射、catalog/ 126MB Gym visual GIF
+  版权 tripwire(公开部署须清,见 public/exercise-anim/.gitignore)、全程待真机验收。
+- **财务板块大修(施工中;P0 止血已落 2026-07-28)**:P0 全清 —— ① 数据销毁路径钉死
+  (bankDataReady 水合前置 + 先读后替换 + 疑似清空保险丝 bankTxWriteAllowed,合并抽纯函数
+  mergeBankTxForSync);② summarizeMonth/accountMonth 符号化(正数 INCOME 冲减收入、
+  refund 流出不再倒扣两次);③ 统一数据集 loadCombinedFinanceTx(FinanceTab/aggregate/
+  domain-insights 同源,修同屏两套数);④ 残月环比改「与上月同进度相比」(throughDay);
+  ⑤ 冷启动区分加载中/未连接 + 同步失败态落盘透传(loadBankSyncStatus);
+  ⑥ Fidelity 定投分流(investmentAccountIds + 券商描述符兜底 → transfer,股利仍收入)。
+  契约 test:finance-p0;现有 10 套财务契约全存活;tsc+build 绿。
+  **用户拍板**:币种不考虑;UI 按 v3.3 稿(artifact fb540e24,8 屏);接 Plaid recurring API(P2)。
+  **P1 已落(2026-07-28,数据层+UI 全接完)**:finance-assets(手动资产/锚点即值/净值日快照,
+  createBlobStore 自动进备份+云同步)· receipt-match(小票↔银行候选+否决负样本)·
+  finance-sources 扩 income/channelId/linkedBankTxId + addManualEntry ·
+  聚合并入 domainIncome。UI:QuickAddSheet(全局「+ 记一笔」三段合一,NesioSheet bottom)·
+  总览净值 hero(Plaid+手动+快照曲线)· 卡片页手动资产列表(该盘点了琥珀提示/更新/移除)·
+  小票旁条「可能是同一笔 → 关联/不是」。契约 test:finance-assets;
+  sheet-allowlist/i18n/inert-buttons/颜色 token 全过;tsc+build 绿。**待真机验手感。**
+  **P2 已落(2026-07-28,分析升级)**:① 投资收益:investIncomeYTD(当年股利/利息+按月,
+  数据现成 INCOME_DIVIDENDS 标注)· portfolioCheckup(集中度/配置/买卖回顾,借 ai-hedge-fund
+  确定性因子形)· 投资页(死枚举转真页:今日变化/收益/持仓/体检,快照口径如实);
+  ② 订阅监控页(死枚举转真页:7 天将至/变化置顶(涨价/新增/疑似停了=两周期没扣款,信息蓝)
+  /稳定收起;负担率与列表同一份数据);③ 基线剔除数据集最老残月;④ finding id 稳定化
+  (r.key,Today 去重不再失效);⑤ guidelines 补 4 条(FICO 30%/JPMC 6 周缓冲/CFPB×2);
+  ⑥ **折旧与持有成本(用户拍板)**:assetDepreciation(锚点差)+ assetHoldingCosts
+  (Expense 扩 assetId/assetCostKind:税金/维修/保险,「+」支出段可关联资产,
+  卡片页资产行显示「折旧/今年持有(税金·维修)」);⑦ 繁体「約」修正。
+  契约:finance-assets 扩 P2 断言;insight/features 两处旧钉按新行为更新;全套财务契约+build 绿。
+  **尾巴已收 + P3 第一批(2026-07-28)**:① Plaid /transactions/recurring/get 接入
+  (服务端逐 token 拉、失败静默跳过;客户端存 nesio-plaid-recurring-v1;订阅页
+  「Plaid 识别的补充」区 —— 并集展示,本地为准);② findings 可点(kind→子页映射,
+  死文字变入口);③ 图表统一:环形图前 6+其他(对齐月报)、趋势图去双重编码只留柱
+  +断档月虚线标记+去小值抬高、预算超支比例如实文字;④ 纠错闭环:批量「全部按建议」、
+  「排除」改真语义「不计收支」(原为归 OTHER 仍计支出的骗人文案)、已学规则显示
+  label(mch_xxx 死代码复活)、月报自动生成失败可见。plaid-multi-item 钉子按新架构更新。
+  **全面自查 + 修复(2026-07-29,三路审计:UI 按钮/逻辑链路/全量契约链)**:
+  P0 修 —— ① 空态死锁(没连银行永远点不到「+」,手动记账链路不可达 → 空态加入口);
+  ② 手动/小票默认币种写死 ¥ → defaultFinanceCurrency(银行主币种同源;USD 用户手动账
+  此前被 KPI 静默排除,CameraSheet 同修);③ domainExpenseTotal 把收入当支出 → kind 过滤;
+  ④ Plaid 游标推进+客户端拒写=交易永久丢失 → 失败路径清 enrich 标记解锁 full 重拉。
+  P1 修 —— txFlow 投资参数改**默认**(引用恒等 memo;一次修掉 needsReview/detectRecurring/
+  categoryBaseline/budget/交易行/fact-journal 六处「列表说支出、KPI 不算」分裂);
+  connector-sync 失败早退提前+孤儿复活兜底收窄(仅账户表空);finding kind 拼写
+  (upcoming_bill);「+」挪子 tab 行首(小屏行尾溢出);「更新」带资产上下文;
+  小票 taken 集+关联唯一性+悬空自愈;investIncomeYTD 限投资账户;recurringStreams
+  「全挂≠没订阅」语义;切段清分类;渠道互斥;幽灵渠道过滤;formatMoney 币种补传;
+  InvestPane/RecurringPane 空态;死代码清理(12 个 import/废 memo/死枚举)。
+  全量契约链 3 处过期钉修复(2 处主干 e331fd8 漂移 + 1 处本次拆分)。
+  **三件挂账已清(2026-07-29,用户批)**:① 现金渠道余额按 maybe 语义推算
+  (channelBalance = 最新盘点锚点 + 其后该渠道收支累加;净值/卡片页/幽灵过滤同步切换);
+  ② portfolioCheckup 买卖次数按 invSubtype 语义判(route 透传 subtype,入金/费用不再
+  冒充交易,老数据退回符号判);③ 口径统一:趋势柱/预算 spent/风险预警 net-surge/
+  月报净支出+环比+预算块 全部与 KPI 同含域内支出(opts.domainNet 通道,默认 0 兼容;
+  FinanceTab 统一传入,自动月报按上月聚合传)。契约:channelBalance 断言入 finance-assets。
+  **微动效借形(2026-07-29,用户批)**:评估 pqoqubbw/icons —— 不引库(motion 依赖
+  + 第二套图标系统 = 孤岛,否决),只借「关键时刻一次描线」的形:纯 CSS 落两处 ——
+  ① 连接器「同步」忙碌态由文字省略号改小圆弧旋转(.nesio-sync-spin,复用 nesioSpin);
+  ② QuickAddSheet 保存成功一拍(对勾描线 .nesio-check-draw + status-go 底,700ms 后关)。
+  均守 prefers-reduced-motion;不碰 icons.tsx 与图标契约。
+  **P3 拆分完成(2026-07-28,财务大修四期收官)**:FinanceTab 1300→949 行,拆出
+  RecurringPane / InvestPane / CardsPane / AcctLogo / QuickAddSheet 五个组件(纯展示,
+  数据经 props;对齐 TodayFeed 拆分先例)。顺手修:卡片页 brokerage 归投资组
+  (原被列进存款组,审计 A1)。**大修全清单收口;对账小票(需按账户快照)与
+  overview/tx 段进一步拆分列为后续可选。全程待真机验收。**
+- **财务板块大修(2026-07-28 审计完成,施工待批)**:四路深查(maybe 数据/分析/UI × 宝盒体检)
+  收敛为 `docs/design/finance-maybe-audit-2026-07.md`。**P0 止血项含一条不可逆数据销毁路径**
+  (connector-sync 先 replace 账户再按新表过滤流水写回 + 全仓无 `await store.ready()`,
+  水合前同步可把全部流水覆盖成空且游标已推进)、summarizeMonth 符号 bug、同屏两套数据集、
+  残月比完整月、冷启动假空态。P1 手动资产+估值锚点(UI 稿 artifact fb540e24)、净值序列、
+  转账对敲负样本表、字段级规则锁。P2 基线统一口径/可操作 findings/新检测。P3 FinanceTab
+  拆分/图表统一/对账小票。maybe 是 AGPL——只借形不借码。
+
 - **美食语料扩容(2026-07-28)**:HowToCook(Anduin2017,Unlicense)368 道家常菜并入
   `public/data/cooking/recipes.json`(总 704 道,双语料 source 标注)——导入器
   `scripts/import-howtocook.mjs`(确定性解析,幂等可重跑),每份**家庭份量**补上

@@ -47,7 +47,7 @@ import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { DomainIcon, IconActivity, IconBox, IconBookmark, IconCalendar, IconCamera, IconCheckSquare, IconFolder, IconMail, IconMapPin, IconMic, IconNote, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
-import { displayNodeName } from '@/lib/portal/node-display';
+import { displayNodeName, stripMarkdownInline } from '@/lib/portal/node-display';
 import { isPinned, loadPins, PINS_UPDATED_EVENT, togglePin, isCore, toggleCore, loadCore, CORE_UPDATED_EVENT } from '@/lib/portal/pins';
 import { listInventoryItems, inventoryStats } from '@/lib/portal/inventory';
 import { usePortalLocale } from './use-portal-locale';
@@ -353,13 +353,13 @@ function cleanMemoryPreview(node: LifeNode, dict: DictLocale = 'zh'): string {
   if (aiSummary) return aiSummary.slice(0, 44);
   // 批次 59:属性兜底改走可见名单 —— 位置戳/信号基建/内部字段绝不上卡片面
   // (此前 Object.values 全量拼接,capturedLat/Lon 裸坐标直接糊在卡片上)。
-  const PREVIEW_HIDDEN = /^(capturedLat|capturedLon|capturedPlace|lat|lon|signalId|signalSource|signalType|signalVersion|occurredAt|capturedAt|externalId|calendarId|calendarName|subtasksJson|done|doneAt|focusPinnedOn|retentionPolicy|sensitivity|schemaVersion|sourceNodeId|emailId|messageId|htmlLink|context|userTags|status)$/;
+  const PREVIEW_HIDDEN = /^(capturedLat|capturedLon|capturedPlace|lat|lon|signalId|signalSource|signalType|signalVersion|occurredAt|capturedAt|externalId|calendarId|calendarName|subtasksJson|done|doneAt|focusPinnedOn|retentionPolicy|sensitivity|schemaVersion|sourceNodeId|emailId|messageId|htmlLink|context|userTags|status|epistemic|generator|provenance|confidence)$/;
   const attrPreview = Object.entries(node.attributes)
     .filter(([k, v]) => !PREVIEW_HIDDEN.test(k) && typeof v === 'string' && v.trim())
     .map(([, v]) => v as string)
     .join(' · ');
   const raw = node.rawInput || attrPreview;
-  const cleaned = raw
+  const cleaned = stripMarkdownInline(raw) // 先剥 ![]() / ** / [text](url)(QA:flomo 预览满屏原始 markdown)
     .replace(node.name, '')
     // CARD SPEC(老数据兜底):老邮件 rawInput 形如「来自 X <a@b.com>: 正文」,
     // 从未被剥头 —— 卡片正文直接糊「来自 Namecheap <billing@...>」这类乱码。
@@ -1067,9 +1067,12 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     window.addEventListener(PINS_UPDATED_EVENT, read);
     return () => window.removeEventListener(PINS_UPDATED_EVENT, read);
   }, []);
-  const pinnedNodes = pinIds
-    .map((id) => nodes.find((n) => n.id === id))
-    .filter((n): n is LifeNode => Boolean(n));
+  // 2328 节点规模下 O(pin×N) 的 find 每次渲染都重跑 → useMemo + Map 索引(QA 性能修)
+  const nodeById = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
+  const pinnedNodes = useMemo(
+    () => pinIds.map((id) => nodeById.get(id)).filter((n): n is LifeNode => Boolean(n)),
+    [pinIds, nodeById],
+  );
   // 核心记忆(批次 114):与收藏平行的更高一档,记忆罐第一颗球
   const [coreIds, setCoreIds] = useState<string[]>([]);
   useEffect(() => {
@@ -1078,9 +1081,10 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     window.addEventListener(CORE_UPDATED_EVENT, read);
     return () => window.removeEventListener(CORE_UPDATED_EVENT, read);
   }, []);
-  const coreNodes = coreIds
-    .map((id) => nodes.find((n) => n.id === id))
-    .filter((n): n is LifeNode => Boolean(n));
+  const coreNodes = useMemo(
+    () => coreIds.map((id) => nodeById.get(id)).filter((n): n is LifeNode => Boolean(n)),
+    [coreIds, nodeById],
+  );
   // 批次 168(用户定案):三球各自开独立页(不再就地展开)。收藏夹=手动收藏+维度 filter,
   // 物品收纳=中间球开收纳,项目=项目页。去掉核心记忆球。
   const [favPageOpen, setFavPageOpen] = useState(false);
@@ -1158,12 +1162,19 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   // Narrator cards
   const narratorCards = useMemo(() => buildNarratorCards(nodes, dict), [nodes, dict]);
 
+  // 按键防抖 250ms(QA 性能修):smartSearch 每击键全图打分,2328 节点下打字即卡
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+  useEffect(() => {
+    const t = window.setTimeout(() => setDebouncedQuery(query), 250);
+    return () => window.clearTimeout(t);
+  }, [query]);
+
   // Smart search (text/entity rank, synchronous)
   const { nodes: textRankedNodes, understood } = useMemo(
-    () => query.trim()
-      ? smartSearch(query, null)
+    () => debouncedQuery.trim()
+      ? smartSearch(debouncedQuery, null)
       : { nodes: [], understood: { people: [], places: [], objects: [], domain: null } as SearchUnderstood },
-    [query],
+    [debouncedQuery],
   );
 
   // Semantic re-rank (async embedding blend): text order shows immediately,
@@ -1171,15 +1182,15 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const [smartNodes, setSmartNodes] = useState<LifeNode[]>([]);
   useEffect(() => {
     setSmartNodes(textRankedNodes);
-    if (!query.trim() || textRankedNodes.length < 3) return;
+    if (!debouncedQuery.trim() || textRankedNodes.length < 3) return;
     let cancelled = false;
     // 隐私红线:未登录/未知态不把私密外部节点(邮件正文)送云 embed —— rerank 早于展示过滤,
     // 故必须在这层就把 canUsePrivateData 传进去,别等渲染层 visibleMemoryNodes 才拦(正文已过云)。
-    void semanticRerank(query, textRankedNodes, undefined, canUsePrivateData).then((reranked) => {
+    void semanticRerank(debouncedQuery, textRankedNodes, undefined, canUsePrivateData).then((reranked) => {
       if (!cancelled) setSmartNodes(reranked);
     });
     return () => { cancelled = true; };
-  }, [query, textRankedNodes, canUsePrivateData]);
+  }, [debouncedQuery, textRankedNodes, canUsePrivateData]);
 
   const hasUnderstoodEntities = understood.people.length + understood.places.length + understood.objects.length > 0;
 
@@ -1202,16 +1213,19 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     ? visibleMemoryNodes(smartNodes, canUsePrivateData).filter((n) => !typeFilter || matchesFilter(n, typeFilter))
     : visibleNodes;
 
-  const visibleItems = showAll || query ? results : results.slice(0, displayLimit);
+  // 永远有渲染上限(QA 冻结修):搜索/「显示全部」曾一次挂 2000+ 张卡冻死主线程。
+  // 搜索模式起步 30,浏览模式起步 displayLimit;「更多」按钮每次 +100,增量到底。
+  const visibleItems = results.slice(0, query ? Math.max(displayLimit, 30) : displayLimit);
 
-  const typeCounts = nodes.reduce<Record<string, number>>((acc, n) => {
+  // 全量 reduce/filter 从每渲染重算改为随 nodes 记忆(QA 性能修)
+  const typeCounts = useMemo(() => nodes.reduce<Record<string, number>>((acc, n) => {
     acc[n.type] = (acc[n.type] ?? 0) + 1;
     return acc;
-  }, {});
-  const facetCounts = {
+  }, {}), [nodes]);
+  const facetCounts = useMemo(() => ({
     'facet:plan': nodes.filter((n) => n.attributes?.planContainer || n.attributes?.planImported).length,
     'facet:list': nodes.filter((n) => n.attributes?.checklist).length,
-  };
+  }), [nodes]);
 
 
   const onThisDayNodes = useMemo(() => findOnThisDayNodes(nodes), [nodes]);
@@ -1345,9 +1359,12 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 <>
                   <div className="nesio-section-header" style={{ marginTop: '0.25rem' }}>
                     {/* 批次 112:对齐 mockup —— 「全部记忆 · N 条 · 可搜」 */}
-                    <span className="nesio-section-title">
+    <span className="nesio-section-title">
                       {L(dict, '全部记忆', 'All memories')}
-                      <span className="nesio-section-title-sub"> · {L(dict, `${nodes.length} 条 · 可搜`, `${nodes.length} · search`)}</span>
+                      {/* 筛选中显示「命中 / 总数」——不再一直挂 2328(QA:筛到健康 7 条,头部还写全部) */}
+                      <span className="nesio-section-title-sub"> · {typeFilter
+                        ? L(dict, `${visibleNodes.length} / ${nodes.length} 条`, `${visibleNodes.length} / ${nodes.length}`)
+                        : L(dict, `${nodes.length} 条 · 可搜`, `${nodes.length} · search`)}</span>
                     </span>
                     <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                       {typeFilter && (
@@ -1480,18 +1497,14 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
             </div>
           ) : null}
 
-          {/* Show more — incremental: +20 each tap, final tap shows all */}
-          {!showAll && results.length > displayLimit && (
+          {/* Show more — 增量渲染,绝不一次挂全量(2328 张卡 = 冻结) */}
+          {results.length > visibleItems.length && (
             <button
               type="button"
               className="nesio-memory-more-btn"
-              onClick={() => {
-                const next = displayLimit + 20;
-                if (next >= results.length) setShowAll(true);
-                else setDisplayLimit(next);
-              }}
+              onClick={() => setDisplayLimit(Math.max(displayLimit, visibleItems.length) + 100)}
             >
-              {copy.more(results.length - displayLimit)}
+              {copy.more(results.length - visibleItems.length)}
             </button>
           )}
 

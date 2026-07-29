@@ -80,7 +80,7 @@ export interface BudgetProgress {
 }
 
 /** 某月预算进度。总口径 = 净支出(与 KPI 一致);分类口径 = 该类支出合计。 */
-export function budgetProgress(txs: BankTx[], ym: string, budget: BudgetConfig): BudgetProgress {
+export function budgetProgress(txs: BankTx[], ym: string, budget: BudgetConfig, opts?: { domainNet?: number }): BudgetProgress {
   const rules = loadFlowRules();
   const evidence = expenseMerchants(txs);
   const spentByCat = new Map<string, number>();
@@ -101,7 +101,7 @@ export function budgetProgress(txs: BankTx[], ym: string, budget: BudgetConfig):
   const totalBudget = budget.total ?? Object.values(budget.categories).reduce((s, v) => s + v, 0);
   const total = totalBudget > 0
     ? (() => {
-        const spent = summarizeMonth(txs, ym).net;
+        const spent = summarizeMonth(txs, ym).net + (opts?.domainNet ?? 0); // 口径统一:与 KPI 同含域内(小票/手动)支出
         return { budget: totalBudget, spent, left: Math.round((totalBudget - spent) * 100) / 100, ratio: Math.round((spent / totalBudget) * 100) / 100 };
       })()
     : null;

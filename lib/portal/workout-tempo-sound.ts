@@ -12,8 +12,9 @@
 import { isNativePlatform } from './platform-capabilities';
 
 const FORCE_KEY = 'nesio-workout-sound-force-v1';
-const TICK_SRC = '/assets/sounds/workout-tick.wav';
-const DING_SRC = '/assets/sounds/workout-ding.wav';
+// base-path 感知(修 GitHub Pages 子路径部署下 WAV 404 → 全程无声还无解释)
+const TICK_SRC = `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/assets/sounds/workout-tick.wav`;
+const DING_SRC = `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/assets/sounds/workout-ding.wav`;
 
 let tickEl: HTMLAudioElement | null = null;
 let dingEl: HTMLAudioElement | null = null;

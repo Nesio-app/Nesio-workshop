@@ -3,6 +3,7 @@
  * KPI 卡打头、每日睡眠/步数柱图(带参考线)、指标档案表、跨域观察、
  * 临床提示色点、体检分项。自包含 HTML,打印即彩色 PDF;非诊断。
  */
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 import type { HealthMetrics } from './apple-health';
 import { evaluateHealthFindings } from './health-clinical';
 import { computeRiskScores } from './health-risk';
@@ -119,7 +120,7 @@ export function healthReportRichHtml(
 
   return docShell(
     title,
-    `${L(`生成于 ${now.toISOString().slice(0, 10)} · 覆盖 ${facts.length} 天 · 数据只存本机 · 非 LLM`, `Generated ${now.toISOString().slice(0, 10)} · ${facts.length} days covered · on-device · no LLM`)}${facts.length ? '' : ` <span style="color:${MUTED}">${L('(该月暂无日级数据)', '(no daily data this month)')}</span>`}`,
+    `${L(`生成于 ${localDayKey(now)} · 覆盖 ${facts.length} 天 · 数据只存本机 · 非 LLM`, `Generated ${localDayKey(now)} · ${facts.length} days covered · on-device · no LLM`)}${facts.length ? '' : ` <span style="color:${MUTED}">${L('(该月暂无日级数据)', '(no daily data this month)')}</span>`}`,
     B.join('\n'),
   );
 }

@@ -628,7 +628,16 @@ function unionNodesById(a: LifeNode[], b: LifeNode[]): LifeNode[] {
   return Array.from(byId.values());
 }
 
-function persistGraphToIdb(nodes: LifeNode[]): void {
+// 落盘合并窗:每次写图都同步 JSON.stringify 全图(2328 节点)是速记提交冻结的主因之一。
+// 400ms 内的连续写只落一次(取最后一份);pagehide 时强制冲刷,快速关页不丢。
+let persistTimer: ReturnType<typeof setTimeout> | null = null;
+let persistPending: LifeNode[] | null = null;
+
+function flushPersistNow(): void {
+  if (persistTimer != null) { clearTimeout(persistTimer); persistTimer = null; }
+  const nodes = persistPending;
+  persistPending = null;
+  if (!nodes) return;
   import('./idb-blob-store').then((mod) => {
     const idb = mod.idbBackend;
     if (!idb) return;
@@ -638,6 +647,16 @@ function persistGraphToIdb(nodes: LifeNode[]): void {
       }).catch(() => {});
     });
   }).catch(() => {});
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushPersistNow);
+}
+
+function persistGraphToIdb(nodes: LifeNode[]): void {
+  persistPending = nodes;
+  if (persistTimer != null) return; // 已有窗口:只更新待写快照
+  persistTimer = setTimeout(() => { persistTimer = null; flushPersistNow(); }, 400);
 }
 
 function hydrateGraphOnce(): void {

@@ -17,9 +17,10 @@ import { pickRetrospect, type Retrospect } from '@/lib/portal/retrospect';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { localDayKey } from '@/lib/portal/local-day';
 
 const RETRO_DISMISS_KEY = 'nesio-retro-dismissed-v1';
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+function todayStr() { return localDayKey(); }
 
 export default function RetrospectCard({ onOpen }: { onOpen: (nodeId: string) => void }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());

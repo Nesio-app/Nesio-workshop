@@ -231,7 +231,7 @@ function PostMealBody({ health, dict }: { health: HealthMetrics | null; dict: st
         <>
           <div className="nesio-bl-stats">
             <div><small>{L(dict, '平均', 'Avg')}</small><b>{g.avg}</b><span>{g.unit}</span></div>
-            <div><small>{L(dict, '峰值', 'Peak')}</small><b>{g.max}</b><span>{g.unit}</span></div>
+            <div><small>{L(dict, '90 天最高', '90d high')}</small><b>{g.max}</b><span>{g.unit}</span></div>
             <div><small>TIR</small><b>{g.tirPct}%</b><span /></div>
           </div>
           <HourlyGlucoseChart hourly={g.hourly} unit={g.unit} dict={dict} />

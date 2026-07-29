@@ -143,6 +143,8 @@ export function signalWriteMode(): SignalWriteMode {
 // 匿名会话云镜像降噪(2026-07-04 QA P2 修复):未登录时镜像注定 401,
 // 收到一次后本会话不再发(登录流程会导航/刷新页面,标志自然复位)。
 let cloudMirrorAuthBlocked = false;
+// 离线降噪(QA:断网时批量入节点 → 连刷 7 条 Failed to fetch):网络错后 60 秒内不再试。
+let cloudMirrorOfflineUntil = 0;
 
 export async function writeCloudSignal(signal: Signal): Promise<{ ok: boolean; status: string }> {
   if (typeof window === 'undefined' || typeof fetch !== 'function') {
@@ -150,6 +152,9 @@ export async function writeCloudSignal(signal: Signal): Promise<{ ok: boolean; s
   }
   if (cloudMirrorAuthBlocked) {
     return { ok: false, status: 'skipped_not_signed_in' };
+  }
+  if (Date.now() < cloudMirrorOfflineUntil || (typeof navigator !== 'undefined' && navigator.onLine === false)) {
+    return { ok: false, status: 'skipped_offline' };
   }
   try {
     const response = await fetch('/api/cloud/signals', {
@@ -165,6 +170,7 @@ export async function writeCloudSignal(signal: Signal): Promise<{ ok: boolean; s
     if (!response.ok) return { ok: false, status: `http_${response.status}` };
     return { ok: true, status: 'cloud_mirror_attempted' };
   } catch (err) {
+    cloudMirrorOfflineUntil = Date.now() + 60_000; // 网络挂了:1 分钟内的后续镜像直接跳过,不刷屏
     logDropped('signal.cloud_mirror', err); // B3 可观测:云镜像失败别哑吞
     return { ok: false, status: 'cloud_mirror_failed' };
   }

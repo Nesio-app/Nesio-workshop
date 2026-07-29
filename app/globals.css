@@ -4812,7 +4812,9 @@ html[data-portal-theme="night"] .nesio-logo-night { display: inline-block !impor
 .nesio-today-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 0.5rem 1.1rem calc(5.5rem + env(safe-area-inset-bottom));
+  /* 6.5rem:悬浮导航(底 0.5rem + 高约 3.2rem)+ 余量 —— QA 实测 390×844 下
+     「还有 N 件小事」行被导航压了一截,5.5rem 不够。 */
+  padding: 0.5rem 1.1rem calc(6.5rem + env(safe-area-inset-bottom));
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain; /* iOS PWA:触底橡皮筋会拖动 fixed 层露出 html 兜底色(底部色带) */
 }
@@ -18328,6 +18330,24 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 }
 @keyframes nesioSpin { to { transform: rotate(360deg); } }
 
+/* 财务微动效(借形 pqoqubbw/icons,不引依赖):关键时刻一次描线/旋转,Calm≠Dead。
+   同步中 = 小圆弧旋转(替代文字省略号);保存成功 = 对勾一次性描线。 */
+.nesio-sync-spin {
+  display: inline-block; width: 11px; height: 11px;
+  border: 2px solid currentColor; border-right-color: transparent;
+  border-radius: 50%; vertical-align: -1px;
+  animation: nesioSpin 0.7s linear infinite;
+}
+.nesio-check-draw {
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: nesioCheckDraw 0.45s var(--ease-out, ease-out) forwards;
+}
+@keyframes nesioCheckDraw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .nesio-sync-spin { animation: none; }
+  .nesio-check-draw { animation: none; stroke-dashoffset: 0; }
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    NesioSheet 原语(施工单 W0)—— 全仓 sheet/modal 唯一容器的视觉层。
    底座:bottom=Vaul(JS 内联 transform 驱动拖拽/弹簧),center/fullscreen=
@@ -18339,10 +18359,14 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .nesio-sheet-overlay {
   position: fixed;
   inset: 0;
-  /* 900/901:压过所有遗留 sheet 遮罩(≤730)—— 迁移期原语常在旧式 role=dialog
-     里嵌套打开(如 node-detail=450),必须浮其上;仍低于日期选择器/录音/收据
-     等特殊模态(1010–1200),让它们能再叠在原语之上。 */
-  z-index: 900;
+  /* 930(QA 死按钮群总根因修):原语的 overlay/panel/fullscreen 全部同层,
+     由 DOM 顺序(= 打开顺序)决定谁在上 —— 后开的永远盖住先开的。
+     旧分层(bottom/center=901 < fullscreen=930)只考虑了「从 bottom 卡开全屏」,
+     反方向(洞察全屏里开 bottom/center:物品页/关系详情/剧场播放器/地点卡…)
+     全被压在全屏底下 = 看不见还拦截下一次点击(「点两次才生效」)。
+     同层 + Radix/Vaul 按打开顺序 append 到 body,两个方向都正确。
+     仍高于全部遗留 sheet(≤730),低于特殊模态(948–1200)。 */
+  z-index: 930;
   background: var(--modal-backdrop-bg, rgba(16, 28, 54, 0.25));
 }
 /* fullscreen 底衬:不透明页面底,给半透明(磨砂玻璃)全屏面板兜底,防夜间透出下层。
@@ -18361,13 +18385,18 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
    面板从来没抬起来过(RelationshipDetailSheet 的「挂一条 / 移除」一直是死的)。
    用双类提特异度,不依赖声明顺序 —— 这条规则以后被挪到哪儿都成立。 */
 .nesio-sheet.nesio-sheet--elevated { z-index: 941; }
+/* 来自 QA 分支:opaqueOverlay + 非全屏时,面板必须抬到不透明遮罩(929)之上,
+   否则被自己的遮罩盖死(「归入账号」强制对话框整屏纯色、点不动)。
+   与上面 elevated 档不冲突:930 高过 929、低过 940。 */
+.nesio-sheet.nesio-sheet--over-opaque { z-index: 930; }
+
 .nesio-sheet-overlay[data-state='open'] { animation: nesioSheetFade var(--dur, 0.3s) var(--ease-out); }
 .nesio-sheet-overlay[data-state='closed'] { animation: nesioSheetFadeOut var(--dur-fast, 0.2s) var(--ease-out); }
 
-/* panel 公共:面/字色/滚动 */
+/* panel 公共:面/字色/滚动。z 与 overlay/fullscreen 同层(930),打开顺序即层叠顺序 */
 .nesio-sheet {
   position: fixed;
-  z-index: 901;
+  z-index: 930;
   color: var(--portal-ink);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -18472,8 +18501,8 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
    下拉关不掉。入场交给 Vaul,这里清掉自带动画。 */
 .nesio-sheet--bottom.nesio-sheet--bare { animation: none; }
 
-/* fullscreen:全屏面板。z=930 压过 bottom/center 面板(901)—— 从 bottom 卡里
-   打开的全屏面板(阅读器等)要完整盖住触发卡,配合 --opaque 底衬(929)。
+/* fullscreen:全屏面板。与全部原语同层(930)—— 层叠由打开顺序(DOM append)决定:
+   从 bottom 卡开的阅读器盖住卡,从全屏洞察开的 bottom 卡盖住洞察,两个方向都对。
    用 inset:0 贴满可视 WebView,不要再用 height/max-height:100lvh —— iOS 动态视口下
    视口单位与 fixed inset 不一致时,底下会露缝或整页上推。默认壳吃安全区;
    洞察等自管顶栏的页面在业务 class 里把 padding 清零。 */

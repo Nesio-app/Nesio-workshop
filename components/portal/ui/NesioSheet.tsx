@@ -238,7 +238,11 @@ export default function NesioSheet({
   elevated = false,
   children,
 }: NesioSheetProps) {
-  const panelClass = `nesio-sheet nesio-sheet--${variant}${card ? '' : ' nesio-sheet--bare'}${elevated ? ' nesio-sheet--elevated' : ''}${className ? ` ${className}` : ''}`;
+  // opaqueOverlay + 非全屏:面板必须抬到不透明遮罩(929)之上,否则被自己的遮罩盖死
+  // (清空本地数据后的「归入账号」强制对话框整屏纯色、看不见点不动 —— QA 致命 bug①)。
+  const overOpaque = opaqueOverlay && variant !== 'fullscreen' ? ' nesio-sheet--over-opaque' : '';
+  // elevated:从 fullscreen 面板内部再开的层(940/941)。两者互不冲突,一起挂。
+  const panelClass = `nesio-sheet nesio-sheet--${variant}${card ? '' : ' nesio-sheet--bare'}${overOpaque}${elevated ? ' nesio-sheet--elevated' : ''}${className ? ` ${className}` : ''}`;
 
   if (variant === 'bottom') {
     return (

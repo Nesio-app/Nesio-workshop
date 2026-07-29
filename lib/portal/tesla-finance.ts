@@ -62,3 +62,22 @@ export function loadTeslaChargeTx(): BankTx[] {
   }
   return out;
 }
+
+/* ---------- P0:统一财务数据集(修「同屏两套数」) ---------- */
+
+import { loadBankTx, loadBankAccounts } from '@/lib/portal/bank-tx';
+
+/** 财务全量流水 = 银行 ∪ Tesla 充电(显示层合并,单一读口)。
+ *  FinanceTab / financeMonthAggregate / domain-insights 必须同用本函数 ——
+ *  此前各自取数,总览「本月支出」与「净支出」跑在两个数据集上。 */
+export function loadCombinedFinanceTx(): BankTx[] {
+  const bank = loadBankTx();
+  const tesla = loadTeslaChargeTx();
+  return tesla.length ? [...bank, ...tesla] : bank;
+}
+
+/** 财务全量账户 = Plaid 账户 ∪ Tesla 合成账户(有充电流水才出现)。 */
+export function loadCombinedFinanceAccounts(): BankAccount[] {
+  const accts = loadBankAccounts();
+  return loadTeslaChargeTx().length ? [...accts, teslaFinAccount()] : accts;
+}

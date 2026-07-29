@@ -19,9 +19,10 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { useAutoGrow } from './use-auto-grow';
+import { localDayKey } from '@/lib/portal/local-day';
 
 const HEAL_EARNED_KEY = 'nesio-heal-earned';
-const todayKey = () => new Date().toISOString().slice(0, 10);
+const todayKey = () => localDayKey();
 const earnedToday = () => { try { return localStorage.getItem(HEAL_EARNED_KEY) === todayKey(); } catch { return false; } };
 const markEarnedToday = () => { try { localStorage.setItem(HEAL_EARNED_KEY, todayKey()); } catch { /* 无存储 */ } };
 

@@ -5,9 +5,10 @@
  * (median/MAD,不被单月尖峰污染)、数据不足返回 null 不硬算。不落库、不读存储
  * (调用方传入 loadBankTx()/loadBankAccounts() 的结果)。
  */
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 import {
   summarizeMonth, availableMonths, detectRecurring, effectiveCategory, txFlow, loadFlowRules,
-  expenseMerchants, median, ymOf, merchantKey,
+  expenseMerchants, median, ymOf, merchantKey, investmentAccountIds,
   type BankTx, type BankAccount, type RecurringCharge, type Holding,
 } from './bank-tx';
 
@@ -25,7 +26,10 @@ export interface CategoryBaseline {
 /** 近 6 个**完整**月(不含当前月)该类月支出基线;历史不足 3 个月返回 null(不硬算)。 */
 export function categoryBaseline(txs: BankTx[], category: string, now: Date = new Date()): CategoryBaseline | null {
   const curYm = ymOf(now);
-  const months = availableMonths(txs).filter((m) => m < curYm).slice(0, 6);
+  // P2:数据集最老的月份几乎必然是 Plaid 回填残月(会拉低 median)—— 从基线剔除。
+  const all = availableMonths(txs);
+  const oldest = all[all.length - 1];
+  const months = all.filter((m) => m < curYm && m !== oldest).slice(0, 6);
   if (months.length < 3) return null;
   const rules = loadFlowRules();
   const evidence = expenseMerchants(txs);
@@ -234,7 +238,7 @@ export function balanceProjection(
 
   let bal = start;
   let min = start;
-  let minDate = now.toISOString().slice(0, 10);
+  let minDate = localDayKey(now);
   let negativeDate: string | null = null;
   for (const e of events) {
     bal += e.delta;
@@ -327,4 +331,93 @@ export function portfolioSummary(holdings: Holding[]): PortfolioSummary | null {
   const concentrated = positions.length > 1 && top && top.pct > 30 ? top : null;
 
   return { totalValue: r2(totalValue), gain, gainPct, positions, byType, concentrated };
+}
+
+/* ---------- P2:投资收益(当年股利/利息)+ 组合体检 + 订阅变化分组 ---------- */
+
+/** 当年股利/利息(数据现成:投资流水入库即标 INCOME_DIVIDENDS / INCOME_INTEREST_EARNED)。
+ *  byMonth 为 1-12 月股利+利息合计(小柱图用)。金额取 -amount(进账为负)。 */
+export function investIncomeYTD(txs: BankTx[], year = new Date().getFullYear(), accountIds?: Set<string>): {
+  dividends: number; interest: number; byMonth: number[];
+} {
+  let dividends = 0, interest = 0;
+  const byMonth = Array.from({ length: 12 }, () => 0);
+  for (const t of txs) {
+    const d = t.categoryDetail || '';
+    if (d !== 'INCOME_DIVIDENDS' && d !== 'INCOME_INTEREST_EARNED') continue;
+    // 逻辑审计 #9b:传 accountIds 时只算投资账户 —— 储蓄利息不冒充投资收益
+    if (accountIds && (!t.accountId || !accountIds.has(t.accountId))) continue;
+    if (Number((t.date || '').slice(0, 4)) !== year) continue;
+    const v = -t.amount; // 进账为负 → 收益为正;冲正自然抵扣
+    if (d === 'INCOME_DIVIDENDS') dividends += v; else interest += v;
+    const m = Number((t.date || '').slice(5, 7));
+    if (m >= 1 && m <= 12) byMonth[m - 1] += v;
+  }
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  return { dividends: r2(dividends), interest: r2(interest), byMonth: byMonth.map(r2) };
+}
+
+export interface PortfolioCheckup {
+  /** 集中度:第一大持仓与前三占比(0-100)。 */
+  topName: string; topPct: number; top3Pct: number;
+  /** 配置:按 Plaid security type 聚合占比。 */
+  allocation: Array<{ type: string; pct: number }>;
+  /** 交易回顾(纯回溯,当年买/卖次数)。 */
+  buys: number; sells: number;
+}
+
+/** 组合体检(借 ai-hedge-fund 确定性因子的形,全部本地数据;不给买卖建议)。 */
+export function portfolioCheckup(holdings: Holding[], txs: BankTx[], year = new Date().getFullYear()): PortfolioCheckup | null {
+  const hs = holdings.filter((h) => (h.value || 0) > 0);
+  const total = hs.reduce((s, h) => s + h.value, 0);
+  if (!(total > 0)) return null;
+  const sorted = [...hs].sort((a, b) => b.value - a.value);
+  const pct = (v: number) => Math.round((v / total) * 100);
+  const alloc = new Map<string, number>();
+  for (const h of hs) alloc.set(h.type || 'other', (alloc.get(h.type || 'other') || 0) + h.value);
+  // 交易回顾:投资账户内当年正数=买入、负数(非收益类)=卖出/转出,保守只计带 accountId 的
+  const invest = investmentAccountIds();
+  let buys = 0, sells = 0;
+  for (const t of txs) {
+    if (!t.accountId || !invest.has(t.accountId)) continue;
+    if (Number((t.date || '').slice(0, 4)) !== year) continue;
+    if ((t.categoryDetail || '').startsWith('INCOME_')) continue;
+    // 逻辑审计 #9a:有 subtype 就按语义判(入金/出金/费用不算交易);老数据退回符号判
+    const st = (t.invSubtype || '').toLowerCase();
+    if (st) {
+      if (/buy/.test(st)) buys += 1;
+      else if (/sell/.test(st)) sells += 1;
+      // deposit/withdrawal/fee/transfer 等:不是买卖,不计
+    } else if (t.amount > 0) buys += 1;
+    else if (t.amount < 0) sells += 1;
+  }
+  return {
+    topName: sorted[0].ticker || sorted[0].name,
+    topPct: pct(sorted[0].value),
+    top3Pct: pct(sorted.slice(0, 3).reduce((s, h) => s + h.value, 0)),
+    allocation: [...alloc.entries()].map(([type, v]) => ({ type, pct: pct(v) })).sort((a, b) => b.pct - a.pct),
+    buys, sells,
+  };
+}
+
+export interface RecurringChanges {
+  hiked: RecurringCharge[];    // 涨价(recurringPriceHikes 命中)
+  fresh: RecurringCharge[];    // 新增(首见 ≤45 天)
+  stalled: RecurringCharge[];  // 疑似停了(已 2 个周期没扣款)—— 可能是省钱好事,信息蓝不用红
+  steady: RecurringCharge[];   // 稳定
+}
+
+/** 订阅监控分组(纯函数):变化的置顶看,稳定的收起注意力。 */
+export function recurringChanges(recurring: RecurringCharge[], now = new Date()): RecurringChanges {
+  const hikedKeys = new Set(recurringPriceHikes(recurring).map((h) => h.key));
+  const out: RecurringChanges = { hiked: [], fresh: [], stalled: [], steady: [] };
+  for (const r of recurring) {
+    const last = new Date(`${r.lastDate}T00:00:00`).getTime();
+    const daysSince = (now.getTime() - last) / 86400000;
+    if (hikedKeys.has(r.key)) out.hiked.push(r);
+    else if (r.count <= 2 && daysSince <= 45) out.fresh.push(r);
+    else if (daysSince > r.cadenceDays * 2 + 5) out.stalled.push(r);
+    else out.steady.push(r);
+  }
+  return out;
 }

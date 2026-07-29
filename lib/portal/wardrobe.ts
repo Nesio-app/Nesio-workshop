@@ -300,7 +300,9 @@ export function suggestOutfit(
   const { target, needOuter } = warmthForTemp(ctx.repTempC);
   const need = ctx.formalNeed;
   const todayMs = Date.parse(todayIso) || 0;
-  const byType = (t: GarmentType) => wardrobe.filter((g) => g.garmentType === t);
+  // 非穿戴物兜底过滤(QA:「摇椅盖毯」被视觉模型硬归成外套,AI 造型把毯子当衣服推荐)
+  const NON_WEARABLE_RE = /毯|被子|抱枕|枕头|窗帘|地垫|地毯|坐垫|毛巾|blanket|throw|pillow|cushion|curtain|rug|towel/i;
+  const byType = (t: GarmentType) => wardrobe.filter((g) => g.garmentType === t && !NON_WEARABLE_RE.test(g.name));
 
   const pieces: Garment[] = [];
   const gaps: GarmentType[] = [];

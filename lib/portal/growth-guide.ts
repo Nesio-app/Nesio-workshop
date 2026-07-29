@@ -9,6 +9,7 @@
  *  3) dusty_memory:高置信但 ≥21 天没再碰的记忆 → 这条还重要吗?
  * 日幂等:同一天出同一批卡;已回答的(kind+refId)不再出。
  */
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 import { getLifeGraph } from './life-graph';
 import { loadBankTx } from './bank-tx';
 import { createSignal } from '../life-domain/create-signal';
@@ -143,7 +144,7 @@ function dustyMemoryCard(now: number, dayKey: string): GrowthCard | null {
 
 /** 今日引导卡(≤limit 张;已回答的不再出;规则顺序=优先级)。 */
 export function todayGrowthCards(limit = 2, now = Date.now()): GrowthCard[] {
-  const dayKey = new Date(now).toISOString().slice(0, 10);
+  const dayKey = localDayKey(new Date(now));
   const answered = answeredKeys();
   const out: GrowthCard[] = [];
   for (const make of [commitmentReviewCard, spendShiftCard, (t: number) => dustyMemoryCard(t, dayKey)]) {

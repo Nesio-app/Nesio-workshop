@@ -15,6 +15,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { computeFitnessInsight, type FitnessInsight } from '@/lib/platform/fitness-integrator';
 import { loadTrainingState, sessionsThisWeek, protocolById } from '@/lib/platform/training-protocol-engine';
+import { workoutSessionsThisWeek } from '@/lib/portal/workout-store';
 import { healthNarrative, analyzeSeries } from '@/lib/portal/health-narrative';
 import { mineRelationships } from '@/lib/portal/health-correlations';
 import { loadClinical, type StoredClinical } from '@/lib/portal/clinical-store';
@@ -395,7 +396,8 @@ function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
         <span className="nesio-health-card-date">{m.latestDate.slice(5).replace('-', '/')}</span>
       )}
       {hasTrend && <Sparkline series={m.series} />}
-      {hasTrend && <span className="nesio-health-card-range">{L(dict, `近 ${m.series.length} 个月`, `${m.series.length}mo`)} · {fmt(Math.min(...m.series.map((s) => s.v)), m.decimals)}–{fmt(Math.max(...m.series.map((s) => s.v)), m.decimals)}</span>}
+      {/* series 是月聚合值,区间标「月均」——否则当日值(单日观测)超出月均区间像自打脸(QA:672 vs 400–492) */}
+      {hasTrend && <span className="nesio-health-card-range">{L(dict, `近 ${m.series.length} 个月月均`, `${m.series.length}mo avg`)} · {fmt(Math.min(...m.series.map((s) => s.v)), m.decimals)}–{fmt(Math.max(...m.series.map((s) => s.v)), m.decimals)}</span>}
     </div>
   );
 }
@@ -591,7 +593,14 @@ export default function HealthDashboard() {
     return () => window.removeEventListener('nesio-health-updated', onUpdate);
   }, []);
 
+  // 训练负荷不依赖 Apple Health(修「没导 XML 就永远看不到训练面板」):
+  // 次数取 计划打卡 与 完成历史(自定义/生成的跟练也算)的较大者 —— 两边有重叠,取 max 不重计。
+  const tsAll = loadTrainingState();
+  const activeProtoAll = tsAll.activeProtocolId ? protocolById(tsAll.activeProtocolId) : undefined;
+  const weekSessions = Math.max(sessionsThisWeek(tsAll), workoutSessionsThisWeek());
+
   if (!data || data.metrics.length === 0) {
+    const emptyInsight = computeFitnessInsight([], weekSessions, activeProtoAll?.sessionsPerWeek ?? null);
     return (
       <div className="nesio-health-dash">
         <HealthSubTabs view={view} onChange={setView} dict={dict} />
@@ -605,6 +614,8 @@ export default function HealthDashboard() {
                 这块早退分支原本什么都不给,等于「没导过 Apple Health 就用不了健康镜头」。 */}
             <HealthLensRow onRecord={() => setRecordOpen(true)} onScan={() => setScanOpen(true)} dict={dict} />
             <HealthLensCards onOpenMetric={setOpenMetric} />
+            {/* 合并 QA 分支:没有 Apple Health 也可能有本机训练记录,有就先给一块 */}
+            {emptyInsight.signals.length > 0 && <FitnessPanel insight={emptyInsight} dict={dict} />}
             <p className="nesio-insights-empty" style={{ marginBottom: 0 }}>
               {L(dict,
                 '还没有 Apple Health 指标。身体账本仍可用「美味 · 记一餐」;护理看护肤物品。完整曲线请到「设置 → 数据接入 → Apple Health」上传导出。',
@@ -628,9 +639,7 @@ export default function HealthDashboard() {
   }
 
   const importedLabel = new Date(data.importedAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' });
-  const ts = loadTrainingState();
-  const activeProto = ts.activeProtocolId ? protocolById(ts.activeProtocolId) : undefined;
-  const insight = computeFitnessInsight(data.metrics, sessionsThisWeek(ts), activeProto?.sessionsPerWeek ?? null);
+  const insight = computeFitnessInsight(data.metrics, weekSessions, activeProtoAll?.sessionsPerWeek ?? null);
 
   const rels = data.daily ? mineRelationships(data.daily) : [];
   const dayLedger = buildDayLedger(todayYmd(), { rings: data.activityRings });

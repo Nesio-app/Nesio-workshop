@@ -52,6 +52,7 @@ import { computeDomainFindings } from '@/lib/portal/domain-insights';
 import { buildCrossRegionDeliverables } from '@/lib/platform/cross-region/deliver';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { isProactiveCardDismissed, type ProactiveCardData, registerDecCards } from './proactive-types';
+import { localDayKey } from '@/lib/portal/local-day';
 
 const EMPTY_SIGNAL_CARDS: RecommendationCard[] = [
   {
@@ -330,7 +331,7 @@ export function useTodayData(canUsePrivateData: boolean) {
         let newProactiveCards = rawProactiveCards;
         if (rawProactiveCards.length > 0) {
           const LANG_CACHE_KEY = 'nesio-guidance-lang-cache-v1';
-          const cacheSig = `${new Date().toISOString().slice(0, 10)}|${rawProactiveCards.map((c) => c.id + c.title).join('§')}`;
+          const cacheSig = `${localDayKey()}|${rawProactiveCards.map((c) => c.id + c.title).join('§')}`;
           let cachedCopy: Array<{ id: string; title: string; body: string }> | null = null;
           try {
             const raw = JSON.parse(localStorage.getItem(LANG_CACHE_KEY) || 'null') as { sig: string; cards: Array<{ id: string; title: string; body: string }> } | null;
@@ -423,6 +424,14 @@ export function useTodayData(canUsePrivateData: boolean) {
     }
 
     const refresh = () => { void applyViewModel(); };
+    // 事件风暴合并窗(QA 冻结主因):每次写图都会派发 nesio-life-graph-updated,
+    // 而 applyViewModel 是整条重算管线(全图 map + 域洞察 + guidance)。连接器同步/批量导入
+    // 一秒内派发几十次 → 每次都全量重算 = 10-45s 冻结。合并为 400ms 拖尾一次。
+    let refreshTimer: number | null = null;
+    const refreshSoon = () => {
+      if (refreshTimer != null) return;
+      refreshTimer = window.setTimeout(() => { refreshTimer = null; void applyViewModel(); }, 400);
+    };
     // 卡片反馈 → 统一反馈总线扇出到所有订阅者(事实日志 + guidance-ranker + 三原语)。
     // reasoning-engine 保持无依赖叶子,走它派发的 nesio-feedback-recorded 事件;
     // 这里把旧动词翻成统一 FeedbackEvent schema(not_now→snooze)投进总线,不再手工直调各 learner。
@@ -440,10 +449,10 @@ export function useTodayData(canUsePrivateData: boolean) {
       if (canUsePrivateData) setDisplayName(loadProfileSettings().displayName || '');
       refresh();
     };
-    window.addEventListener('nesio-life-graph-updated', refresh);
-    window.addEventListener('nesio-connectors-refreshed', refresh);
-    window.addEventListener('nesio-weather-updated', refresh);
-    window.addEventListener('nesio-calendar-updated', refresh);
+    window.addEventListener('nesio-life-graph-updated', refreshSoon);
+    window.addEventListener('nesio-connectors-refreshed', refreshSoon);
+    window.addEventListener('nesio-weather-updated', refreshSoon);
+    window.addEventListener('nesio-calendar-updated', refreshSoon);
     window.addEventListener('nesio-feedback-recorded', onFeedback);
     window.addEventListener(PROFILE_UPDATED_EVENT, onProfile);
 
@@ -451,10 +460,11 @@ export function useTodayData(canUsePrivateData: boolean) {
       cancelled = true;
       if (emailPollInterval) clearInterval(emailPollInterval);
       gmailCleanup?.();
-      window.removeEventListener('nesio-life-graph-updated', refresh);
-      window.removeEventListener('nesio-connectors-refreshed', refresh);
-      window.removeEventListener('nesio-weather-updated', refresh);
-      window.removeEventListener('nesio-calendar-updated', refresh);
+      if (refreshTimer != null) window.clearTimeout(refreshTimer);
+      window.removeEventListener('nesio-life-graph-updated', refreshSoon);
+      window.removeEventListener('nesio-connectors-refreshed', refreshSoon);
+      window.removeEventListener('nesio-weather-updated', refreshSoon);
+      window.removeEventListener('nesio-calendar-updated', refreshSoon);
       window.removeEventListener('nesio-feedback-recorded', onFeedback);
       window.removeEventListener(PROFILE_UPDATED_EVENT, onProfile);
     };

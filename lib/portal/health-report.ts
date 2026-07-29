@@ -48,7 +48,9 @@ export function buildMonthlyHealthReport(
   const lines: string[] = [];
   const title = L(`${ym} 健康月报`, `Health monthly report · ${ym}`);
   lines.push(`# ${title}`, '');
-  lines.push(L(`生成于 ${now.toISOString().slice(0, 10)} · 数据来自 Apple Health 导入,只存本机 · 确定性规则生成(非 LLM)`, `Generated ${now.toISOString().slice(0, 10)} · from Apple Health export, on-device · deterministic rules (no LLM)`));
+  // 本地日期(toISOString 是 UTC:美东晚上生成的报告会标成「明天」)
+  const genDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  lines.push(L(`生成于 ${genDay} · 数据来自 Apple Health 导入,只存本机 · 确定性规则生成(非 LLM)`, `Generated ${genDay} · from Apple Health export, on-device · deterministic rules (no LLM)`));
 
   // ── 本月速览 ──
   const sleep = pick(facts, 'sleepH');

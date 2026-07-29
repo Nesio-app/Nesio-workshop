@@ -82,12 +82,31 @@ function zIndexOf(cls) {
   for (const [name, v] of Object.entries({ bottomOverlay, bottomPanel, fsOverlay, fsPanel, elOverlay, elPanel, viewer })) {
     assert.equal(typeof v, 'number', `${name} 必须在 globals.css 里显式声明 z-index`);
   }
-  assert.ok(bottomOverlay < bottomPanel, '遮罩要在面板下');
-  assert.ok(bottomPanel < fsOverlay, 'fullscreen 必须盖住触发它的 bottom 卡(记忆详情→阅读原文那条路)');
-  assert.ok(fsOverlay < fsPanel);
-  assert.ok(fsPanel < elOverlay, 'elevated 必须高过 fullscreen —— 这就是六次「点了没反应」的解药');
-  assert.ok(elOverlay < elPanel);
+  // 2026-07-29:层叠模型换了一次(QA 分支「死按钮总根因」),这里的断言跟着换。
+  //
+  // 旧模型:bottom(900/901) < fullscreen(929/930),靠**数值**分层。
+  //   只考虑了「从 bottom 卡里开全屏」这一个方向;反过来(洞察全屏里开 bottom/center:
+  //   物品页 / 关系详情 / 剧场播放器 / 地点卡…)一律被压在全屏底下 —— 看不见,
+  //   还拦住下一次点击,表现成「点两次才生效」。
+  // 新模型:bottom 与 fullscreen **同层**(都 930),层叠交给 DOM 顺序 ——
+  //   Radix/Vaul 都是 portal 到 body,后开的后 append,天然盖住先开的,两个方向都对。
+  //   同一层里 Overlay 先渲染、Content 后渲染,所以面板天然在自己的遮罩之上。
+  // 所以:同层是**设计**,不是 bug → 用 <= 而不是 <。
+  // elevated 档保留并仍然严格更高:它解决的是另一件事 ——
+  //   有些子层不是「后开的」(同一次渲染里就挂着),DOM 顺序救不了,必须显式抬。
+  assert.ok(bottomOverlay <= bottomPanel, '面板不能低于自己的遮罩(同层可以,DOM 顺序会让面板在上)');
+  assert.ok(fsOverlay <= fsPanel, 'fullscreen 面板不能低于自己的不透明底');
+  assert.ok(
+    Math.max(bottomPanel, fsPanel) < elOverlay,
+    'elevated 必须严格高过 bottom / fullscreen —— 这就是八次「点了没反应」的解药',
+  );
+  assert.ok(elOverlay < elPanel, 'elevated 面板必须高过自己的遮罩');
   assert.ok(elPanel < viewer, '看图器永远在最上层');
+  // over-opaque:opaqueOverlay + 非全屏时,面板要盖过自己的不透明遮罩(否则整屏纯色点不动)。
+  const overOpaque = zIndexOf('nesio-sheet--over-opaque');
+  assert.equal(typeof overOpaque, 'number', 'over-opaque 档必须显式声明 z-index');
+  assert.ok(overOpaque > fsOverlay, 'over-opaque 面板必须高过不透明遮罩,否则被自己盖死');
+  assert.ok(overOpaque < elOverlay, 'over-opaque 不该高到 elevated 档里去');
 }
 
 // ── ①b 声明了不等于生效:elevated 那条得在级联里真的赢过基类 ────────────────

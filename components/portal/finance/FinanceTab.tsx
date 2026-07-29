@@ -9,12 +9,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import FamilyDataCard from '../relationships/FamilyDataCard';
 import {
-  loadBankTx, loadBankAccounts, availableMonths, categoryBreakdown, topMerchants,
-  monthlyTrend, needsReview, suggestCategory, setMerchantRule, effectiveCategory,
-  accountMonth, formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
+  availableMonths, categoryBreakdown, topMerchants,
+  needsReview, suggestCategory, setMerchantRule, effectiveCategory,
+  formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
-  loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummary, expenseMerchants,
+  loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummaryWithHoldings, expenseMerchants,
   loadHoldings, setMerchantRuleFor, setFlowRuleFor, loadRuleLabels,
+  bankDataReady, loadBankSyncStatus,
   type BankTx, type BankAccount, type TxFlow, type Holding,
 } from '@/lib/portal/bank-tx';
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
@@ -22,8 +23,15 @@ import {
 import { financeFindings } from '@/lib/portal/finance-insight';
 import { computeFinanceScores } from '@/lib/portal/finance-risk';
 import { incomeBreakdown, detectIncome, portfolioSummary, recurringPriceHikes } from '@/lib/portal/finance-features';
-import { removeBankAccount } from '@/lib/portal/bank-tx';
-import { loadTeslaChargeTx, teslaFinAccount } from '@/lib/portal/tesla-finance';
+import { loadCombinedFinanceTx, loadCombinedFinanceAccounts } from '@/lib/portal/tesla-finance';
+import QuickAddSheet from './QuickAddSheet';
+import RecurringPane from './RecurringPane';
+import CardsPane from './CardsPane';
+import AcctLogo from './AcctLogo';
+import InvestPane from './InvestPane';
+import { listManualAssets, manualNetWorth, loadNetWorthSeries, finAssetsReady, FIN_ASSETS_EVENT } from '@/lib/portal/finance-assets';
+import { receiptMatchCandidates, rejectPair, loadRejectedPairs } from '@/lib/portal/receipt-match';
+import { linkExpenseToBankTx, loadDomainExpenses } from '@/lib/portal/finance-sources';
 import { domainExpenseTotal, listExpenses, EXPENSES_EVENT, type Expense } from '@/lib/portal/finance-sources';
 import { financeMonthAggregate } from '@/lib/portal/finance-aggregate';
 import { loadBudget, saveBudget, hasBudget, suggestBudget, budgetProgress, type BudgetConfig } from '@/lib/portal/finance-budget';
@@ -37,7 +45,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
-type Sub = 'overview' | 'spending' | 'budget' | 'tx' | 'recurring' | 'invest' | 'cards';
+type Sub = 'overview' | 'spending' | 'tx' | 'recurring' | 'invest' | 'cards'; // 'budget' 死枚举已删(预算在总览渲染)
 
 function monthLabel(ym: string, dict: string): string {
   const [y, m] = ym.split('-');
@@ -52,11 +60,16 @@ function FinanceDonut({ slices, centerTop, centerVal }: { slices: Array<{ catego
   const R = 52;
   const C = 2 * Math.PI * R;
   let acc = 0;
+  // P3 图表统一:与月报(finance-report-visual)同口径 —— 前 6 类 + 其余合并「其他」,
+  // 修「屏幕版第 9 类以后直接消失、环上出现空缺」的双口径。
+  const top = slices.slice(0, 6);
+  const restPct = slices.slice(6).reduce((s, x) => s + x.pct, 0);
+  const shown = restPct > 0 ? [...top, { category: 'OTHER_REST', pct: restPct }] : top;
   return (
     <svg viewBox="0 0 140 140" width="132" height="132" style={{ display: 'block', margin: '0 auto' }}>
       <g transform="translate(70,70) rotate(-90)">
         <circle r={R} fill="none" stroke="var(--portal-line)" strokeWidth="14" />
-        {slices.slice(0, 8).map((s, i) => {
+        {shown.map((s, i) => {
           const len = (s.pct / 100) * C;
           const seg = <circle key={s.category} r={R} fill="none" stroke={DONUT_COLORS[i % DONUT_COLORS.length]} strokeWidth="14" strokeLinecap="butt" strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-acc} />;
           acc += len;
@@ -70,21 +83,6 @@ function FinanceDonut({ slices, centerTop, centerVal }: { slices: Array<{ catego
 }
 
 /** 财务⑩:机构 logo(Plaid base64;缺失用机构/账户名首字母色块,底色用机构主色)。 */
-function AcctLogo({ a, size = 22 }: { a: BankAccount; size?: number }) {
-  if (a.logo) {
-    const src = a.logo.startsWith('data:') ? a.logo : `data:image/png;base64,${a.logo}`;
-    // eslint-disable-next-line @next/next/no-img-element
-    return <img className="nesio-fin-acct-logo" src={src} alt="" width={size} height={size} />;
-  }
-  const ch = (a.institution || a.name || '?').trim().charAt(0).toUpperCase();
-  return (
-    <span
-      className="nesio-fin-acct-badge"
-      style={{ width: size, height: size, fontSize: size * 0.55, background: a.color || 'var(--portal-accent-soft)', color: a.color ? '#fff' : 'var(--portal-accent)' }}
-      aria-hidden
-    >{ch}</span>
-  );
-}
 
 /** 财务⑲:商户 logo(Plaid 富化 URL;缺失由调用方不渲染,不占位)。 */
 function MLogo({ src }: { src: string }) {
@@ -103,44 +101,67 @@ export default function FinanceTab() {
   const [acctFilter, setAcctFilter] = useState<string>('all'); // 批次 40:按卡筛选
   const [rev, setRev] = useState(0); // 规则改动后强制重算
   const [flowEditId, setFlowEditId] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false); // P0:IDB 水合完成才允许判「空」
+  const [quickAdd, setQuickAdd] = useState<null | { seg: 'expense' | 'income' | 'asset'; assetId?: string }>(null); // P1:全局「+」(带资产上下文)
 
   useEffect(() => {
     const reload = () => {
-      // Tesla 充电花费:兑现「充电花费自动进财务」。在显示层并进流水(不写 bank-tx
-      // 存储 —— 避开 Plaid 权威 replace 冲掉 + 孤儿过滤误杀),数据以 signal 为单一真源。
-      const bank = loadBankTx();
-      const tesla = loadTeslaChargeTx();
-      const loaded = tesla.length ? [...bank, ...tesla] : bank;
+      // P0:统一数据集单一读口(银行 ∪ Tesla)—— financeMonthAggregate / domain-insights 同源,
+      // 修「总览两个 KPI 跑在两个数据集上」。
+      const loaded = loadCombinedFinanceTx();
       setTxs(loaded);
-      const accts = loadBankAccounts();
-      setAccounts(tesla.length ? [...accts, teslaFinAccount()] : accts);
+      setAccounts(loadCombinedFinanceAccounts());
       setHoldings(loadHoldings());
       const av = availableMonths(loaded);
       if (av.length) setYm((cur) => (av.includes(cur) ? cur : av[0])); // 不覆盖用户已选月份
     };
     reload();
+    // P0:冷启动区分「加载中/真没数据」—— IDB 水合完成前不给假空态。
+    bankDataReady().then(() => { setHydrated(true); reload(); }).catch(() => setHydrated(true));
+    // P1 竞态修复:手动资产/快照 store 水合完成的 emit 可能早于监听挂载 —— ready 后强刷一次
+    finAssetsReady().then(() => setRev((r) => r + 1)).catch(() => { /* 水合失败按空处理 */ });
     // 数据搬 IDB 后:水合完成/同步后派发 nesio-bank-updated → 重读(冷启动空窗自愈)。
     window.addEventListener('nesio-bank-updated', reload);
     // Tesla 同步后派发 nesio-connectors-refreshed → 新充电花费即时进财务。
     window.addEventListener('nesio-connectors-refreshed', reload);
     window.addEventListener(EXPENSES_EVENT, reload);
+    // P1:手动资产/锚点变动 → 净值 hero 与账户页即时刷新
+    const onAssets = () => setRev((r) => r + 1);
+    window.addEventListener(FIN_ASSETS_EVENT, onAssets);
     return () => {
       window.removeEventListener('nesio-bank-updated', reload);
       window.removeEventListener('nesio-connectors-refreshed', reload);
       window.removeEventListener(EXPENSES_EVENT, reload);
+      window.removeEventListener(FIN_ASSETS_EVENT, onAssets);
     };
   }, []);
 
   const months = useMemo(() => availableMonths(txs), [txs]);
-  const summary = useMemo(() => financeMonthAggregate(ym), [txs, ym, rev]);
-  const prevSummary = useMemo(() => financeMonthAggregate(prevYm(ym)), [txs, ym, rev]);
+  // P0·同进度对比:当前月是残月,环比基准取上月「同进度」(截至今天同一日),否则假省钱/假超支。
+  const isCurMonth = ym === ymOf();
+  const todayDay = new Date().getDate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const summary = useMemo(() => financeMonthAggregate(ym, { txs }), [txs, ym, rev]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const prevSummary = useMemo(
+    () => financeMonthAggregate(prevYm(ym), { txs, ...(isCurMonth ? { throughDay: todayDay } : {}) }),
+    [txs, ym, rev, isCurMonth, todayDay],
+  );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const cats = useMemo(() => categoryBreakdown(txs, ym), [txs, ym, rev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const merchants = useMemo(() => topMerchants(txs, ym, 6), [txs, ym, rev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const findings = useMemo(() => financeFindings(txs, accounts, ym), [txs, accounts, ym, rev]);
-  const trend = useMemo(() => monthlyTrend(txs, 6), [txs]);
+  const findings = useMemo(
+    () => financeFindings(txs, accounts, ym, { domainNet: summary.domainNet, prevDomainNet: prevSummary.domainNet }),
+    [txs, accounts, ym, rev, summary.domainNet, prevSummary.domainNet],
+  );
+  // 口径统一:趋势柱与 KPI 同含域内支出(此前同屏两个「净支出」差一个小票的量)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const trend = useMemo(
+    () => availableMonths(txs).slice(0, 6).reverse().map((m) => ({ ym: m, net: financeMonthAggregate(m, { txs }).net })),
+    [txs, rev],
+  );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const review = useMemo(() => needsReview(txs, ym), [txs, ym, rev]);
   const monthTx = useMemo(() => txs.filter((t) => (t.date || '').slice(0, 7) === ym).sort((a, b) => (b.date || '').localeCompare(a.date || '')), [txs, ym]);
@@ -156,13 +177,21 @@ export default function FinanceTab() {
   // 财务⑪:退款证据 —— 交易行的类型标签与月度统计同口径(没买过的商户进账不是退款)。
   // ⚠️ hooks 必须全部在下面的空态早退**之前**(hook 数量随渲染变化会让 React 整页抛错)。
   const refundEvidence = useMemo(() => expenseMerchants(txs), [txs]);
+  // P1:手动资产 + 净值(Plaid∪手动,币种按拍板简单相加)+ 快照序列(净值 hero 小曲线)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const manualAssets = useMemo(() => listManualAssets(), [rev]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const nwSeries = useMemo(() => loadNetWorthSeries(), [rev, txs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const rejectedPairs = useMemo(() => loadRejectedPairs(), [rev]);
   // 财务⑮:L3 财务体检(应急金/储蓄率/订阅负担,分项带出处;数据不齐的项不出)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const scores = useMemo(() => computeFinanceScores(txs, accounts), [txs, accounts, rev]);
   // 财务㉒:预算(总额 + 分类;「按习惯生成」用近 6 月基线起草)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const budget = useMemo(() => loadBudget(), [rev]);
-  const bp = useMemo(() => budgetProgress(txs, ym, budget), [txs, ym, budget]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const bp = useMemo(() => budgetProgress(txs, ym, budget, { domainNet: summary.domainNet }), [txs, ym, budget, summary.domainNet]);
   // 跨域小票/旅行支出(不写 bank-tx,旁条展示)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const domainSpend = useMemo(() => domainExpenseTotal(ym), [ym, rev, txs]);
@@ -172,23 +201,47 @@ export default function FinanceTab() {
     [ym, rev, txs],
   );
   // 财务㉗:投资组合(持仓聚合;⚠️ 同样必须在空态早退之前)
-  const portfolio = useMemo(() => portfolioSummary(holdings), [holdings]);
   const [budgetNote, setBudgetNote] = useState('');
   const [reportMsg, setReportMsg] = useState(''); // 财务㉓:月报动作反馈(可见状态,不静默)
   // 财务㉔:月初自动补生成上月月报并存记忆(每设备每月一次,幂等,localStorage 标记)
   useEffect(() => {
     if (!txs.length) return;
     try {
-      const outcome = autoPersistLastMonthReport(txs, accounts, new Date(), dict);
+      const lastYm = prevYm(ymOf());
+      const outcome = autoPersistLastMonthReport(txs, accounts, new Date(), dict, {
+        domainNet: financeMonthAggregate(lastYm, { txs }).domainNet,
+        prevDomainNet: financeMonthAggregate(prevYm(lastYm), { txs }).domainNet,
+      });
       if (outcome === 'created') setReportMsg(L(dict, `已自动生成 ${prevYm(ymOf())} 月报并存入记忆`, `Auto-saved the ${prevYm(ymOf())} report to memory`));
-    } catch { /* 自动补失败静默,手动入口仍在 */ }
+    } catch { setReportMsg(L(dict, '上月月报自动生成没成功 —— 「下载彩色月报」按钮仍可手动生成。', 'Auto report failed — the manual report button still works.')); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txs, accounts]);
 
   if (txs.length === 0) {
+    // P0:水合未完成 = 加载中,不是没数据 —— 此前已连接用户每次冷启动都先看到「去连接」闪屏。
+    if (!hydrated) {
+      return (
+        <div className="nesio-analytics-tab">
+          <p className="nesio-insights-empty">{L(dict, '正在读取本机流水…', 'Loading local transactions…')}</p>
+        </div>
+      );
+    }
+    const st = loadBankSyncStatus();
     return (
       <div className="nesio-analytics-tab">
-        <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Go to Settings → Data sources → Bank feed · Plaid, connect and Sync.')}</p>
+        {st && !st.ok && (
+          <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>
+            {st.error === 'relink_required'
+              ? L(dict, '银行授权已过期 —— 到「设置 → 数据接入」点「修复」重新授权。', 'Bank authorization expired — go to Settings → Data sources and tap Repair.')
+              : L(dict, `上次同步没成功(${st.error || 'unknown'}),稍后再试或到「设置 → 数据接入」看看。`, `Last sync failed (${st.error || 'unknown'}) — retry later or check Settings → Data sources.`)}
+          </p>
+        )}
+        <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」;现金账也可以直接手动记。', 'No bank transactions yet. Connect via Settings → Data sources → Plaid, or just add cash entries by hand.')}</p>
+        {/* UI 审计 P0-1:此前「+」只在主分支渲染,没连银行的用户永远点不到 —— 死锁解除 */}
+        <button type="button" className="nesio-fin-review-accept" style={{ marginTop: '0.5rem' }}
+          onClick={() => setQuickAdd({ seg: 'expense' })}>{L(dict, '＋ 记一笔(现金 / 红包 / 资产)', '＋ Add entry (cash / income / asset)')}</button>
+        <QuickAddSheet open={quickAdd != null} initialSeg={quickAdd?.seg} initialAssetId={quickAdd?.assetId}
+          onClose={() => setQuickAdd(null)} onSaved={() => setRev((r) => r + 1)} />
         {domainSpend.count > 0 && (
           <div style={{ marginTop: '0.75rem' }}>
             <p className="nesio-settings-section-label">{L(dict, '本月小票 / 旅行', 'Receipts / travel this month')}</p>
@@ -215,16 +268,20 @@ export default function FinanceTab() {
 
   // 设计:总览顶部补 —— 本月支出(毛)+ 环比、念念一句话小结、消费×人(真数据)
   const grossSpend = cats.reduce((s, c) => s + c.total, 0) + (summary.domainNet || 0);
-  const prevGross = categoryBreakdown(txs, prevYm(ym)).reduce((s, c) => s + c.total, 0) + (prevSummary.domainNet || 0);
+  // P0:当前月环比基准 = 上月同进度(prevSummary 已按 throughDay 截断,分类同口径)
+  const prevGross = categoryBreakdown(txs, prevYm(ym), isCurMonth ? { throughDay: todayDay } : undefined).reduce((s, c) => s + c.total, 0) + (prevSummary.domainNet || 0);
   const spendDelta = prevGross >= 50 ? Math.round(((grossSpend - prevGross) / prevGross) * 100) : null;
+  const vsLabel = isCurMonth ? L(dict, '与上月同进度相比', 'vs same point last month') : L(dict, '环比上月', 'vs last month');
   // 念念一句话:省/多花 + 本周待付账单(都来自真数据,不编)
   const nessaSummary = (() => {
     const parts: string[] = [];
     if (spendDelta !== null && spendDelta !== 0) {
       const topCat = cats[0] ? categoryLabel(cats[0].category, dict) : '';
+      const vsZh = isCurMonth ? '比上月同期' : '比上月';
+      const vsEn = isCurMonth ? 'vs same point last month' : 'vs last month';
       parts.push(spendDelta < 0
-        ? L(dict, `这月比上月省了 ${-spendDelta}%${topCat ? `,${topCat} 花得最多` : ''}。`, `Down ${-spendDelta}% vs last month${topCat ? `; ${topCat} led spending` : ''}.`)
-        : L(dict, `这月比上月多花了 ${spendDelta}%${topCat ? `,主要在${topCat}` : ''}。`, `Up ${spendDelta}% vs last month${topCat ? `, mostly ${topCat}` : ''}.`));
+        ? L(dict, `这月${vsZh}省了 ${-spendDelta}%${topCat ? `,${topCat} 花得最多` : ''}。`, `Down ${-spendDelta}% ${vsEn}${topCat ? `; ${topCat} led spending` : ''}.`)
+        : L(dict, `这月${vsZh}多花了 ${spendDelta}%${topCat ? `,主要在${topCat}` : ''}。`, `Up ${spendDelta}% ${vsEn}${topCat ? `, mostly ${topCat}` : ''}.`));
     }
     if (upcoming.items.length > 0) parts.push(L(dict, `还有 ${upcoming.items.length} 笔账单这周要付。`, `${upcoming.items.length} bill(s) due this week.`));
     return parts.join('');
@@ -237,13 +294,9 @@ export default function FinanceTab() {
     const pretty = (k: string) => /[a-z]/i.test(k) ? k.replace(/\b\w/g, (m) => m.toUpperCase()) : k;
     return [...byKey.entries()].map(([k, v]) => ({ key: k, name: pretty(k), total: v.total, title: v.titles.length === 1 ? v.titles[0] : '' })).sort((a, b) => b.total - a.total).slice(0, 5);
   })();
-  // 卡片页分组:存款(存 depository)/ 负债(信用卡+贷款)/ 投资走 portfolio
-  const isLiabAcct = (a: BankAccount) => ['credit', 'loan'].includes((a.type || '').toLowerCase());
-  const isInvestAcct = (a: BankAccount) => (a.type || '').toLowerCase() === 'investment';
-  const depositAccts = accounts.filter((a) => !isLiabAcct(a) && !isInvestAcct(a));
-  const liabAccts = accounts.filter(isLiabAcct);
   // 设计:4 个子页 —— 总览 / 支出 / 交易 / 卡片。预算并入总览,定期并入交易,投资并入卡片。
-  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['spending', '支出', 'Spending'], ['tx', '交易', 'Transactions'], ['cards', '卡片', 'Cards']];
+  // P2:订阅/投资从死枚举变真页面(订阅监控 = 变化置顶+14 天账单;投资 = 收益导向)
+  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['spending', '支出', 'Spending'], ['tx', '交易', 'Tx'], ['recurring', '订阅', 'Recurring'], ['invest', '投资', 'Invest'], ['cards', '卡片', 'Cards']];
   function markNotRecurring(key: string) { setRecurRule(key, 'no'); setRev((r) => r + 1); } // 财务㉚:传流的 merchantKey,改名不丢
   function removeMerchantRule(name: string) { setMerchantRule(name, ''); setRev((r) => r + 1); }
   function removeFlowRule(name: string) { setFlowRule(name, ''); setRev((r) => r + 1); }
@@ -281,10 +334,17 @@ export default function FinanceTab() {
       )}
 
       <div className="nesio-fin-subtabs">
+        {/* P1 全局「+」记一笔:放行首(子 tab 行横向可滚,行尾在小屏会被挤出视口) */}
+        <button type="button" className="nesio-fin-subtab" style={{ fontWeight: 700, color: 'var(--portal-accent)' }}
+          onClick={() => setQuickAdd({ seg: 'expense' })} aria-label={L(dict, '记一笔(支出 / 收入 / 资产估值)', 'Quick add (expense / income / asset)')}>
+          {L(dict, '＋记', '＋Add')}
+        </button>
         {SUBS.map(([id, zh, en]) => (
           <button key={id} type="button" className={`nesio-fin-subtab${sub === id ? ' is-active' : ''}`} onClick={() => setSub(id)}>{L(dict, zh, en)}</button>
         ))}
       </div>
+      <QuickAddSheet open={quickAdd != null} initialSeg={quickAdd?.seg} initialAssetId={quickAdd?.assetId}
+        currency={summary.currency || undefined} onClose={() => setQuickAdd(null)} onSaved={() => setRev((r) => r + 1)} />
 
       {/* ── 总览 ── */}
       {sub === 'overview' && (
@@ -307,7 +367,7 @@ export default function FinanceTab() {
             const dateStr = syncedAt ? new Date(syncedAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' }) : '';
             return (
               <p className="nesio-fin-datanote" style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', margin: '0 0 0.5rem' }}>
-                {syncedAt && L(dict, `数据截至 ${dateStr}`, `As of ${dateStr}`)}
+                {syncedAt && L(dict, `数据截至 ${dateStr}`, `As of ${dateStr}`)}{netDelta !== null || spendDelta !== null ? ` · ${vsLabel}` : ''}
                 {excluded > 0 && `${syncedAt ? ' · ' : ''}${L(dict, `另有 ${excluded} 笔其他币种未计入`, `${excluded} txn(s) in other currencies excluded`)}`}
               </p>
             );
@@ -318,6 +378,34 @@ export default function FinanceTab() {
               <span>{nessaSummary}</span>
             </div>
           )}
+          {/* P1 净值 hero:Plaid + 手动资产(锚点),快照曲线(同步时落点,LOCF 语义,只回看) */}
+          {(() => {
+            const s = assetSummaryWithHoldings(accounts, holdings); // 投资账户无 balance 时用持仓市值兜底
+            const manualNet = manualNetWorth(manualAssets);
+            if (s.net === 0 && manualNet === 0) return null;
+            const total = Math.round((s.net + manualNet) * 100) / 100;
+            const pts = [...nwSeries].sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-60);
+            const vals = pts.map((p) => p.plaidNet + p.manualNet);
+            const min = Math.min(...vals), max = Math.max(...vals);
+            const span = max - min || 1;
+            const path = vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${(i / Math.max(1, vals.length - 1)) * 300},${34 - ((v - min) / span) * 28}`).join(' ');
+            return (
+              <div className="nesio-fin-assets" style={{ marginBottom: '0.6rem' }}>
+                <span className="nesio-fin-asset-l">{L(dict, '净资产 · 含手动资产', 'Net worth · incl. manual assets')}</span>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                  <span style={{ fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{total < 0 ? '-' : ''}{formatMoney(Math.abs(total), summary.currency)}</span>
+                  {manualNet !== 0 && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, `含手动 ${formatMoney(Math.abs(manualNet), summary.currency)}`, `manual ${formatMoney(Math.abs(manualNet), summary.currency)}`)}</span>}
+                </div>
+                {vals.length >= 2 && (
+                  <svg viewBox="0 0 300 36" style={{ width: '100%', height: 36 }} aria-hidden>
+                    <path d={path} fill="none" stroke="var(--portal-accent)" strokeWidth="2" />
+                    <circle cx="300" cy={34 - ((vals[vals.length - 1] - min) / span) * 28} r="3" fill="var(--portal-accent)" />
+                  </svg>
+                )}
+                {vals.length < 2 && <span className="nesio-fin-score-hint">{L(dict, '多同步几天,这里会长出净值曲线(每次同步记一个点)。', 'Sync a few more days and a net-worth curve grows here (one point per sync).')}</span>}
+              </div>
+            );
+          })()}
           <div className="nesio-fin-kpis">
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '本月支出', 'This month')}</span><span className="nesio-fin-kpi-v">{formatMoney(grossSpend, summary.currency)}</span>{spendDelta !== null && <span className={`nesio-fin-delta${spendDelta > 0 ? ' up' : ' down'}`}>{spendDelta > 0 ? '+' : ''}{spendDelta}%</span>}</div>
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '净支出', 'Net spend')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.net, summary.currency)}</span>{netDelta !== null && <span className={`nesio-fin-delta${netDelta > 0 ? ' up' : ' down'}`}>{netDelta > 0 ? '+' : ''}{netDelta}%</span>}</div>
@@ -325,7 +413,7 @@ export default function FinanceTab() {
           </div>
           {domainSpend.count > 0 && (
             <>
-              <p className="nesio-settings-section-label">{L(dict, '小票 / 旅行', 'Receipts / travel')}</p>
+              <p className="nesio-settings-section-label">{L(dict, '手动 / 小票 / 旅行', 'Manual / receipts / travel')}</p>
               <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: '-0.35rem' }}>
                 {L(
                   dict,
@@ -334,12 +422,38 @@ export default function FinanceTab() {
                 )}
               </p>
               <div className="nesio-fin-personspend" style={{ marginBottom: '0.8rem' }}>
-                {domainRows.slice(0, 5).map((e) => (
-                  <div key={e.id} className="nesio-fin-person-row">
-                    <span className="nesio-fin-person-name">{e.merchant || e.note || (e.source === 'travel' ? L(dict, '旅行', 'Travel') : L(dict, '小票', 'Receipt'))}</span>
-                    <span className="nesio-fin-person-amt">{e.currency}{e.amount}</span>
-                  </div>
-                ))}
+                {domainRows.slice(0, 5).map((e) => {
+                  // P1 小票对账:金额±1% + 日期±3天 + 商户词,给一条候选;「不是」进否决记忆。
+                  const takenTxIds = new Set(loadDomainExpenses().map((x) => x.linkedBankTxId).filter((v): v is string => Boolean(v)));
+                  const cand = receiptMatchCandidates(
+                    { id: e.id, amount: e.amount, occurredAt: e.occurredAt, merchant: e.merchant },
+                    txs, { rejected: rejectedPairs, taken: takenTxIds, max: 1 },
+                  )[0];
+                  return (
+                    <div key={e.id}>
+                      <div className="nesio-fin-person-row">
+                        <span className="nesio-fin-person-name">{e.merchant || e.note || (e.source === 'travel' ? L(dict, '旅行', 'Travel') : L(dict, '小票', 'Receipt'))}</span>
+                        <span className="nesio-fin-person-amt" style={e.kind === 'income' ? { color: 'var(--status-go)' } : undefined}>{e.kind === 'income' ? '+' : ''}{e.currency}{e.amount}</span>
+                      </div>
+                      {cand && (
+                        <div className="nesio-fin-person-row" style={{ paddingLeft: '0.6rem' }}>
+                          <span className="nesio-fin-person-name" style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>
+                            {L(dict, `银行流水可能是同一笔:${cand.name.slice(0, 18)} · ${cand.date.slice(5)}`, `Likely same in bank feed: ${cand.name.slice(0, 18)} · ${cand.date.slice(5)}`)}
+                          </span>
+                          <button type="button" className="nesio-fin-monthnav" style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-accent)' }}
+                            onClick={() => { if (linkExpenseToBankTx(e.id, cand.id)) setRev((r) => r + 1); else setReportMsg(L(dict, '关联没成功,刷新后再试。', 'Link failed — refresh and retry.')); }}>
+                            {L(dict, '关联', 'Link')}
+                          </button>
+                          <button type="button" className="nesio-fin-monthnav" style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}
+                            onClick={() => { rejectPair(e.id, cand.id); setRev((r) => r + 1); }}>
+                            {L(dict, '不是', 'No')}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: '0.2rem' }}>{L(dict, '关联后小票变成那笔银行流水的明细,不再双计。', 'Linked receipts become detail of the bank txn — no double counting.')}</p>
               </div>
             </>
           )}
@@ -374,12 +488,30 @@ export default function FinanceTab() {
               <p className="nesio-settings-section-label">{L(dict, '风险预警', 'Risk alerts')}</p>
               <div className="nesio-fin-alerts">
                 {/* 统一判定(financeFindings):flag=真实风险 → risk 红;attention=可关注 → warn 琥珀 */}
-                {findings.map((f) => (
-                  <div key={f.id} className={`nesio-fin-alert nesio-fin-alert--${f.severity === 'flag' ? 'risk' : 'warn'}`}>
-                    <p className="nesio-fin-alert-title">{L(dict, f.title[0], f.title[1])}</p>
-                    <p className="nesio-fin-alert-body">{L(dict, f.detail[0], f.detail[1])}</p>
-                  </div>
-                ))}
+                {findings.map((f) => {
+                  // P2 尾巴:findings 可点 —— 按 kind 跳到能采取行动的子页(死文字 → 入口)
+                  const FINDING_SUB: Record<string, Sub> = {
+                    anomaly: 'tx', fee_audit: 'tx',
+                    subscription_hike: 'recurring', new_recurring: 'recurring', upcoming_bill: 'recurring',
+                    cash_runway: 'cards', balance_risk: 'cards', savings_rate: 'spending',
+                  };
+                  const target = FINDING_SUB[f.kind];
+                  const inner = (
+                    <>
+                      <p className="nesio-fin-alert-title">{L(dict, f.title[0], f.title[1])}{target ? ' ›' : ''}</p>
+                      <p className="nesio-fin-alert-body">{L(dict, f.detail[0], f.detail[1])}</p>
+                    </>
+                  );
+                  return target ? (
+                    <button key={f.id} type="button" onClick={() => setSub(target)}
+                      className={`nesio-fin-alert nesio-fin-alert--${f.severity === 'flag' ? 'risk' : 'warn'}`}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                      {inner}
+                    </button>
+                  ) : (
+                    <div key={f.id} className={`nesio-fin-alert nesio-fin-alert--${f.severity === 'flag' ? 'risk' : 'warn'}`}>{inner}</div>
+                  );
+                })}
                 {/* 待归类是页面工作流提示(不是域判定),不进统一层,单独保留 */}
                 {review.length > 0 && (
                   <div className="nesio-fin-alert nesio-fin-alert--info">
@@ -407,31 +539,23 @@ export default function FinanceTab() {
                     : delta < -8
                       ? L(dict, `本月净支出比上月低约 ${Math.abs(delta)}% —— 节奏在往下走。`, `Net spend is ~${Math.abs(delta)}% below last month — the pace is easing.`)
                       : L(dict, '本月净支出与上月接近 —— 先稳住再说。', 'Net spend is close to last month — hold steady.');
-                // DataEase 启发:面积折线 + 柱对照,同一数据两面读(深度 vs 形状)
-                const W = 100; const H = 36;
-                const pts = trend.map((t, i) => {
-                  const x = trend.length > 1 ? (i / (trend.length - 1)) * W : W / 2;
-                  const y = H - (Math.max(0, t.net) / max) * (H - 2);
-                  return `${x.toFixed(1)},${y.toFixed(1)}`;
-                });
-                const area = `0,${H} ${pts.join(' ')} ${W},${H}`;
+                // P3 图表统一:去双重编码(原面积图+柱图画同一份数据,纯冗余)——只留柱
+                // (带月份标签与数值,断档月天然可见);小值不再抬高到 4%(破坏比例)。
                 return (
                   <>
                     <p className="nesio-fin-insight-line">{narrative}</p>
-                    <div className="nesio-fin-trend-area" aria-hidden>
-                      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="72" preserveAspectRatio="none">
-                        <polygon points={area} fill="var(--portal-accent-soft)" />
-                        <polyline points={pts.join(' ')} fill="none" stroke="var(--portal-blue-deep)" strokeWidth="1.6" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-                      </svg>
-                    </div>
                     <div className="nesio-fin-trend">
-                      {trend.map((t) => (
-                        <div key={t.ym} className="nesio-fin-trend-col">
-                          <span className="nesio-fin-trend-val">{formatMoney(t.net, summary.currency)}</span>
-                          <div className="nesio-fin-trend-bar-wrap"><div className={`nesio-fin-trend-bar${t.ym === ym ? ' is-cur' : ''}`} style={{ height: `${Math.max(4, Math.round((t.net / max) * 100))}%` }} /></div>
-                          <span className="nesio-fin-trend-lbl">{t.ym.slice(5)}</span>
-                        </div>
-                      ))}
+                      {trend.map((t, i) => {
+                        const prevMonth = trend[i - 1];
+                        const gapBefore = prevMonth && prevYm(t.ym) !== prevMonth.ym; // 断档月:标记不连续,别画成相邻
+                        return (
+                          <div key={t.ym} className="nesio-fin-trend-col" style={gapBefore ? { borderLeft: '1px dashed var(--portal-line)', marginLeft: 2, paddingLeft: 2 } : undefined}>
+                            <span className="nesio-fin-trend-val">{formatMoney(t.net, summary.currency)}</span>
+                            <div className="nesio-fin-trend-bar-wrap"><div className={`nesio-fin-trend-bar${t.ym === ym ? ' is-cur' : ''}`} style={{ height: `${Math.max(1, Math.round((Math.max(0, t.net) / max) * 100))}%` }} /></div>
+                            <span className="nesio-fin-trend-lbl">{t.ym.slice(5)}{gapBefore ? '·' : ''}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </>
                 );
@@ -474,7 +598,7 @@ export default function FinanceTab() {
             }}>{L(dict, '下载彩色月报', 'Download report')}</button>
             <button type="button" className="nesio-fin-flowopt" onClick={() => {
               try {
-                const r = buildMonthlyReport(txs, accounts, ym, dict);
+                const r = buildMonthlyReport(txs, accounts, ym, dict, new Date(), { domainNet: summary.domainNet, prevDomainNet: prevSummary.domainNet });
                 const outcome = persistReportToMemory(r);
                 setReportMsg(outcome === 'created'
                   ? L(dict, `已把 ${r.ym} 月报存入记忆,「问一问」可检索`, `Report ${r.ym} saved to memory — Ask can cite it`)
@@ -563,7 +687,14 @@ export default function FinanceTab() {
           {review.length > 0 && (
             <>
               <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, `规则审核 · ${review.length} 笔待归类`, `Review · ${review.length} to categorize`)}</p>
-              {review.slice(0, 1).map((t) => {
+              {/* P3 纠错闭环:批量「全部按建议」(原来一次只出 1 笔,12 笔要点 12 次) */}
+              {review.length > 1 && (
+                <button type="button" className="nesio-fin-review-accept" style={{ marginBottom: '0.4rem' }}
+                  onClick={() => { for (const t of review) setMerchantRuleFor(t, suggestCategory(t.name).category); setRev((r) => r + 1); }}>
+                  {L(dict, `全部按建议归类(${review.length} 笔,每笔都可再改)`, `Accept all suggestions (${review.length}, each editable later)`)}
+                </button>
+              )}
+              {review.slice(0, 3).map((t) => {
                 const sug = suggestCategory(t.name);
                 return (
                   <div key={t.id} className="nesio-fin-review">
@@ -575,7 +706,8 @@ export default function FinanceTab() {
                       {COMMON_EXPENSE_CATEGORIES.filter((c) => c !== sug.category).slice(0, 2).map((c) => (
                         <button key={c} type="button" className="nesio-fin-review-alt" onClick={() => resolveReview(t, c)}>{categoryLabel(c, dict)}</button>
                       ))}
-                      <button type="button" className="nesio-fin-review-skip" onClick={() => resolveReview(t, 'OTHER')}>{L(dict, '排除', 'Exclude')}</button>
+                      {/* P3:原「排除」实为归类 OTHER(仍计入支出),文案骗人 —— 改真语义:不计收支(转账流) */}
+                      <button type="button" className="nesio-fin-review-skip" onClick={() => { setFlowRuleFor(t, 'transfer'); setRev((r) => r + 1); }}>{L(dict, '不计收支', 'Not spend')}</button>
                     </div>
                   </div>
                 );
@@ -664,13 +796,13 @@ export default function FinanceTab() {
               <div className="nesio-fin-rules">
                 {Object.entries(learnedRules.merchant).map(([name, cat]) => (
                   <div key={`m-${name}`} className="nesio-fin-rule">
-                    <span className="nesio-fin-rule-txt">{name} <span className="nesio-fin-rule-arrow">→</span> {categoryLabel(cat, dict)}</span>
+                    <span className="nesio-fin-rule-txt">{learnedRules.labels[name] || name} <span className="nesio-fin-rule-arrow">→</span> {categoryLabel(cat, dict)}</span>
                     <button type="button" className="nesio-fin-rule-x" onClick={() => removeMerchantRule(name)} aria-label={L(dict, '删除规则', 'Remove rule')}>✕</button>
                   </div>
                 ))}
                 {Object.entries(learnedRules.flow).map(([name, flow]) => (
                   <div key={`f-${name}`} className="nesio-fin-rule">
-                    <span className="nesio-fin-rule-txt">{name} <span className="nesio-fin-rule-arrow">→</span> {L(dict, TX_FLOW_LABELS[flow][0], TX_FLOW_LABELS[flow][1])}</span>
+                    <span className="nesio-fin-rule-txt">{learnedRules.labels[name] || name} <span className="nesio-fin-rule-arrow">→</span> {L(dict, TX_FLOW_LABELS[flow][0], TX_FLOW_LABELS[flow][1])}</span>
                     <button type="button" className="nesio-fin-rule-x" onClick={() => removeFlowRule(name)} aria-label={L(dict, '删除规则', 'Remove rule')}>✕</button>
                   </div>
                 ))}
@@ -749,6 +881,7 @@ export default function FinanceTab() {
                 <span className="nesio-fin-budget-hero-l">{L(dict, `${monthLabel(ym, dict)} · 还可以花`, `${monthLabel(ym, dict)} · left for spending`)}</span>
                 <span className={`nesio-fin-budget-left${total.left < 0 ? ' is-over' : ''}`}>{total.left < 0 ? `-${formatMoney(-total.left)}` : formatMoney(total.left)}</span>
                 <div className="nesio-fin-bar"><div className={`nesio-fin-bar-fill${total.ratio > 1 ? ' is-over' : ''}`} style={{ width: `${Math.min(100, Math.round(total.ratio * 100))}%` }} /></div>
+                {total.ratio > 1 && <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, `超出 ${Math.round((total.ratio - 1) * 100)}%`, `${Math.round((total.ratio - 1) * 100)}% over`)}</p>}
                 <span className="nesio-fin-budget-hero-sub">{L(dict, `已用 ${formatMoney(total.spent)} / 预算 ${formatMoney(total.budget)}`, `${formatMoney(total.spent)} of ${formatMoney(total.budget)}`)}{perDay != null ? L(dict, ` · 每天约 ${formatMoney(perDay)} × ${daysLeft} 天`, ` · ~${formatMoney(perDay)}/day for ${daysLeft}d`) : ''}{total.left < 0 ? L(dict, ' · 超一点没关系,月中调整来得及', ' · a little over is okay — adjust mid-month') : ''}</span>
                 <label className="nesio-fin-budget-rowedit">
                   {L(dict, '月总预算', 'Monthly total')}
@@ -814,123 +947,16 @@ export default function FinanceTab() {
       })()}
 
       {/* ── 卡片:净资产 hero + 存款 / 投资 / 负债 分组 ── */}
+
+      {/* P2 订阅监控(P3 拆分 → RecurringPane) */}
+      {sub === 'recurring' && <RecurringPane txs={txs} recurring={recurring} currency={summary.currency} dict={dict} />}
+      {/* P2 投资(P3 拆分 → InvestPane) */}
+      {sub === 'invest' && <InvestPane txs={txs} holdings={holdings} nwSeries={nwSeries} currency={summary.currency} dict={dict} />}
+      {/* 账户页(P3 拆分 → CardsPane:Plaid 分组 + 资产小结 + 持仓 + 手动资产) */}
       {sub === 'cards' && (
-        accounts.length === 0 ? (
-          <p className="nesio-insights-option-hint nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没有账户信息。到「设置 → 数据接入」点银行「同步」一次,就会拉到你的卡/账户(余额、消费、退款分卡显示)。', 'No account info yet. Tap Sync on the bank connector once (Settings → Data sources) to pull your cards/accounts (per-card balance, spend, refunds).')}</p>
-        ) : (() => {
-          const s = assetSummary(accounts);
-          const fmtGain = (g: number) => (g >= 0 ? `+${formatMoney(g)}` : `-${formatMoney(-g)}`);
-          const gainColor = (g: number) => (g >= 0 ? 'var(--status-go)' : 'var(--status-gentle)');
-          const invIncome = incomeBreakdown(txs, ym).filter((x) => x.detail === 'INCOME_DIVIDENDS' || x.detail === 'INCOME_INTEREST_EARNED');
-          const invIncomeTotal = invIncome.reduce((n, x) => n + x.total, 0);
-          // 一行账户:logo + 名字 + 类型/本月消费(负债:类型/额度利用)+ 余额 + 移除
-          const acctRow = (a: BankAccount, liability: boolean) => {
-            const m = accountMonth(txs, a.id, ym);
-            const tl = accountTypeLabel(a);
-            const isCredit = (a.type || '').toLowerCase() === 'credit';
-            const util = isCredit && a.balance != null && (a.limit ?? 0) > 0 ? `${Math.round((Math.max(0, a.balance) / (a.limit as number)) * 100)}%` : '';
-            const sub = liability
-              ? [L(dict, tl[0], tl[1]), util ? L(dict, `已用 ${util}`, `${util} used`) : ''].filter(Boolean).join(' · ')
-              : [L(dict, tl[0], tl[1]), m.count > 0 ? L(dict, `本月 -${formatMoney(m.spend, a.currency)}`, `this mo -${formatMoney(m.spend, a.currency)}`) : ''].filter(Boolean).join(' · ');
-            const bal = a.balance != null ? (liability ? `-${formatMoney(a.balance, a.currency)}` : formatMoney(a.balance, a.currency)) : '';
-            return (
-              <div key={a.id} className="nesio-fin-acctrow">
-                <AcctLogo a={a} size={20} />
-                <div className="nesio-fin-acctrow-body">
-                  <span className="nesio-fin-acctrow-name">{a.name}{a.mask ? ` ····${a.mask}` : ''}</span>
-                  {sub && <span className="nesio-fin-acctrow-sub">{sub}</span>}
-                </div>
-                <span className={`nesio-fin-acctrow-bal${liability ? ' is-neg' : ''}`}>{bal}</span>
-                <button type="button" className="nesio-fin-rule-x" onClick={() => { removeBankAccount(a.id); setRev((r) => r + 1); }} aria-label={L(dict, '移除此账户(重复或失效副本;仍连接的账户同步时会回来)', 'Remove this account (duplicates/stale; still-linked accounts return on sync)')}>✕</button>
-              </div>
-            );
-          };
-          return (
-            <>
-              {/* 净资产 hero(黑卡)*/}
-              {!(s.deposits === 0 && s.investments === 0 && s.creditOwed === 0 && s.loanOwed === 0) && (
-                <div className="nesio-fin-networth">
-                  <span className="nesio-fin-networth-l">{L(dict, '净资产', 'Net worth')}</span>
-                  <span className="nesio-fin-networth-v">{s.net < 0 ? `-${formatMoney(-s.net)}` : formatMoney(s.net)}</span>
-                  <span className="nesio-fin-networth-sub">{L(dict, `存款 ${formatMoney(s.deposits)}`, `Cash ${formatMoney(s.deposits)}`)}{s.investments > 0 ? ` · ${L(dict, `投资 ${formatMoney(s.investments)}`, `Investments ${formatMoney(s.investments)}`)}` : ''}</span>
-                </div>
-              )}
-
-              {/* 存款 */}
-              {depositAccts.length > 0 && (<>
-                <p className="nesio-fin-group-h">{L(dict, '存款', 'Cash')}</p>
-                <div className="nesio-fin-acctgroup">{depositAccts.map((a) => acctRow(a, false))}</div>
-              </>)}
-
-              {/* 投资(portfolio)*/}
-              {portfolio && (<>
-                <p className="nesio-fin-group-h">{L(dict, '投资', 'Investing')}</p>
-                <div className="nesio-fin-assets">
-                  <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '总市值', 'Market value')}</span>{formatMoney(portfolio.totalValue)}</span>
-                  {portfolio.gain !== null && (
-                    <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '浮动盈亏', 'Unrealized')}</span><span style={{ color: gainColor(portfolio.gain) }}>{fmtGain(portfolio.gain)}{portfolio.gainPct !== null ? ` (${portfolio.gainPct >= 0 ? '+' : ''}${portfolio.gainPct}%)` : ''}</span></span>
-                  )}
-                  <span className="nesio-fin-asset"><span className="nesio-fin-asset-l">{L(dict, '持仓', 'Positions')}</span>{portfolio.positions.length}</span>
-                </div>
-                {(() => {
-                  // 现金观察(用户定持仓透视三件套之三;纯统计,只观察不建议):
-                  // 现金 = 存款账户正余额 + 组合内现金类;资产 = 现金 + 非现金持仓市值。
-                  const depositCash = depositAccts.reduce((sum, a) => sum + (typeof a.balance === 'number' && a.balance > 0 ? a.balance : 0), 0);
-                  const portfolioCash = portfolio.byType.filter((x) => x.label === '现金').reduce((sum, x) => sum + x.value, 0);
-                  const cash = depositCash + portfolioCash;
-                  const assets = cash + (portfolio.totalValue - portfolioCash);
-                  if (!(assets > 0) || cash <= 0) return null;
-                  const pct = Math.round((cash / assets) * 100);
-                  return (
-                    <p className="nesio-fin-score-hint" style={{ marginTop: '0.6rem' }}>
-                      {L(dict,
-                        `现金 ${formatMoney(cash)},占可见资产的 ${pct}%。${pct >= 35 ? '如果这是刻意留的安全垫,很好;如果只是没顾上,它正在被通胀慢慢磨。' : ''}`,
-                        `Cash ${formatMoney(cash)} — ${pct}% of visible assets.${pct >= 35 ? " If it's a deliberate cushion, great; if it just piled up, inflation is quietly grinding it." : ''}`)}
-                    </p>
-                  );
-                })()}
-                {portfolio.concentrated && (
-                  <p className="nesio-fin-score-hint" style={{ marginTop: '0.6rem' }}>{L(dict,
-                    `${portfolio.concentrated.ticker || portfolio.concentrated.name} 占了组合的 ${portfolio.concentrated.pct}% —— 集中不是错,只是波动会更贴着这一只走;有空可以想想要不要分散一点。`,
-                    `${portfolio.concentrated.ticker || portfolio.concentrated.name} is ${portfolio.concentrated.pct}% of the portfolio — concentration isn't wrong, but volatility will track this one closely; worth thinking about when you have a moment.`)}</p>
-                )}
-                <p className="nesio-settings-section-label" style={{ marginTop: '0.8rem' }}>{L(dict, '组合结构', 'Allocation')}</p>
-                <div className="nesio-fin-cats">
-                  {portfolio.byType.map((x) => (
-                    <div key={x.label} className="nesio-fin-cat">
-                      <div className="nesio-fin-cat-top"><span className="nesio-fin-cat-name">{x.label}</span><span className="nesio-fin-cat-amt">{formatMoney(x.value)} · {x.pct}%</span></div>
-                      <div className="nesio-fin-bar"><div className="nesio-fin-bar-fill" style={{ width: `${Math.min(100, x.pct)}%` }} /></div>
-                    </div>
-                  ))}
-                </div>
-                <div className="nesio-fin-recurlist" style={{ marginTop: '0.6rem' }}>
-                  {portfolio.positions.map((p) => (
-                    <div key={`${p.ticker || p.name}`} className="nesio-fin-recur">
-                      <div className="nesio-fin-recur-main">
-                        <span className="nesio-fin-recur-name">{p.ticker ? `${p.ticker} · ` : ''}{p.name}</span>
-                        <span className="nesio-fin-recur-meta">{p.typeLabel} · {L(dict, `${p.quantity} 份`, `${p.quantity} sh`)} · {p.pct}%</span>
-                      </div>
-                      <span className="nesio-fin-recur-amt" style={{ textAlign: 'right' }}>{formatMoney(p.value)}{p.gain !== null && <span style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: gainColor(p.gain) }}>{fmtGain(p.gain)}</span>}</span>
-                    </div>
-                  ))}
-                </div>
-                {invIncomeTotal > 0 && (
-                  <p className="nesio-fin-score-hint" style={{ marginTop: '0.6rem' }}>{L(dict,
-                    `${monthLabel(ym, dict)} 投资收益 ${formatMoney(invIncomeTotal)}`,
-                    `${monthLabel(ym, dict)} investment income ${formatMoney(invIncomeTotal)}`)}</p>
-                )}
-              </>)}
-
-              {/* 负债 */}
-              {liabAccts.length > 0 && (<>
-                <p className="nesio-fin-group-h">{L(dict, '负债', 'Liabilities')}</p>
-                <div className="nesio-fin-acctgroup">{liabAccts.map((a) => acctRow(a, true))}</div>
-              </>)}
-
-              <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, '重复 / 失效副本可移除;仍连接的账户同步时会回来。', 'Duplicate / stale copies can be removed; still-linked accounts return on sync.')}</p>
-            </>
-          );
-        })()
+        <CardsPane txs={txs} accounts={accounts} holdings={holdings} manualAssets={manualAssets}
+          ym={ym} currency={summary.currency} dict={dict}
+          onQuickAddAsset={(assetId) => setQuickAdd({ seg: 'asset', ...(assetId ? { assetId } : {}) })} onChanged={() => setRev((r) => r + 1)} />
       )}
 
       <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>{L(dict, '流水明细只存本机 · 随时可断开', 'Details stay on-device · disconnect anytime')}</p>

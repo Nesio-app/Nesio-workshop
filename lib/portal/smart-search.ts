@@ -112,11 +112,15 @@ export function smartSearch(query: string, domainFilter: FrontDomain | null = nu
 
   // AI-parse the query (rule-based extractContext — zero API cost).
   const qCtx = extractContext(q);
+  // classifyDomain 零命中时兜底返回 'life'(置信 0.25)—— 那不是「查询在问 life 域」,
+  // 不能拿去给全体同域节点 +6(QA 实测:搜乱串 "test123" 返回 1473 条全部 life 记忆)。
+  // 只有置信 ≥0.5(真有关键词命中)才让域参与加分。
+  const qDomain = (qCtx.confidence?.ai ?? 0) >= 0.5 ? ((qCtx.domain as FrontDomain | undefined) || null) : null;
   const understood: SearchUnderstood = {
     people: qCtx.people || [],
     places: qCtx.places || [],
     objects: qCtx.objects || [],
-    domain: (qCtx.domain as FrontDomain | undefined) || null,
+    domain: qDomain,
   };
 
   const ql = q.toLowerCase();

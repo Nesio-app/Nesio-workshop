@@ -83,8 +83,10 @@ export default function InventoryStatsPanel() {
       {st.byCategory.length > 0 && (
         <>
           <p style={sectionLbl}>{L(dict, '按分类', 'By category')}</p>
+          {/* 长得像入口就得是入口(QA):点分类行进物品页 */}
           {st.byCategory.slice(0, 8).map((c) => (
-            <div key={c.category} style={{ margin: '0 0 var(--space-2)' }}>
+            <button key={c.category} type="button" onClick={openInventory}
+              style={{ display: 'block', width: '100%', margin: '0 0 var(--space-2)', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', marginBottom: '0.2rem' }}>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.category}</span>
                 <span style={{ color: 'var(--portal-muted)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{c.count}</span>
@@ -92,7 +94,7 @@ export default function InventoryStatsPanel() {
               <div style={{ height: 6, borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)' }}>
                 <div style={{ height: '100%', borderRadius: 'var(--radius-pill)', width: `${Math.round((c.count / maxCat) * 100)}%`, background: 'var(--portal-accent)' }} />
               </div>
-            </div>
+            </button>
           ))}
         </>
       )}
@@ -103,9 +105,10 @@ export default function InventoryStatsPanel() {
           <p style={sectionLbl}>{L(dict, '常用标签', 'Top tags')}</p>
           <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
             {st.topTags.map((t) => (
-              <span key={t.tag} style={{ padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-xs)', background: 'var(--portal-accent-soft)', border: '1px solid var(--portal-line)', color: 'var(--portal-ink)' }}>
+              <button key={t.tag} type="button" onClick={openInventory}
+                style={{ padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-xs)', background: 'var(--portal-accent-soft)', border: '1px solid var(--portal-line)', color: 'var(--portal-ink)', cursor: 'pointer', fontFamily: 'inherit' }}>
                 {t.tag} <span style={{ color: 'var(--portal-muted)' }}>{t.count}</span>
-              </span>
+              </button>
             ))}
           </div>
         </>

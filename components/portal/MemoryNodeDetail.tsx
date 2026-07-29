@@ -11,7 +11,7 @@ import EmailComposeSheet from './EmailComposeSheet';
 import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare, IconFile} from './icons';
 import { L } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
-import { displayNodeName } from '@/lib/portal/node-display';
+import { displayNodeName, stripMarkdownInline } from '@/lib/portal/node-display';
 import dynamicImport from 'next/dynamic';
 const ReaderSheetLazy = dynamicImport(() => import('./ArticleReaderSheet'), { ssr: false });
 const PlacePickerLazy = dynamicImport(() => import('./PlacePickerSheet'), { ssr: false });
@@ -192,6 +192,8 @@ const HIDDEN_ATTRIBUTE_KEYS = new Set([
   'signalId', 'signalSource', 'signalType', 'signalVersion',
   'occuredAt', 'occurredAt', 'capturedAt', 'retentionPolicy', 'sensitivity',
   'sourceNodeId', 'schemaVersion',
+  // 认知谱系内部字段(QA:详情页露出「epistemic: observation」「generator: manual」)
+  'epistemic', 'generator', 'provenance', 'confidence',
   // Type-specific (handled in sections)
   'note', 'price', 'purchaseDate', 'expiry', 'store', 'merchant', 'subtype', 'paymentMethod',
   // 电商/物流事件:预计到货由 EventSection 单独渲染,不在通用属性区重复
@@ -984,6 +986,11 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
           ) : (
             <h2 className="nesio-settings-sheet-title" title={n.name}>{displayTitle(displayNodeName(n.name, dict))}</h2>
           )}
+          {/* 可见关闭出口(QA:只能 Esc/下滑关,触屏用户不知道怎么退) */}
+          <button type="button" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}
+            style={{ flexShrink: 0, marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--portal-muted)', fontSize: '1rem', padding: '0.2rem 0.35rem', lineHeight: 1 }}>
+            ✕
+          </button>
         </div>
 
         {/* Expanded edit form — type-specific fields */}
@@ -1238,7 +1245,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             <div className="nesio-node-raw" style={{ marginTop: '0.75rem' }}>
               <p className="nesio-settings-section-label">{isEmailNode ? L(dict, '原始记录 · 邮件原文', 'Original · email') : L(dict, '原始记录', 'Original note')}</p>
               <p style={{ fontSize: '0.88rem', color: 'var(--portal-muted)', fontStyle: 'italic' }}>
-                &ldquo;{rawExpanded || (n.rawInput || '').length <= 180 ? n.rawInput : `${(n.rawInput || '').slice(0, 180)}…`}&rdquo;
+                &ldquo;{(() => { const raw = stripMarkdownInline(n.rawInput || ''); return rawExpanded || raw.length <= 180 ? raw : `${raw.slice(0, 180)}…`; })()}&rdquo;
               </p>
               {(n.rawInput || '').length > 180 && (
                 <button type="button" className="nesio-node-link-add" onClick={() => setRawExpanded((v) => !v)}>

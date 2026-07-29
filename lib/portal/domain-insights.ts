@@ -13,6 +13,7 @@ import { loadHealthMetrics } from './health-store';
 import { evaluateHealthFindings, type ClinicalFinding } from './health-clinical';
 import { computeRiskScores, type RiskScore } from './health-risk';
 import { loadBankTx, loadBankAccounts, prevYm, ymOf, formatMoney } from './bank-tx';
+import { loadCombinedFinanceTx } from './tesla-finance';
 import { financeFindings, type FinanceFinding } from './finance-insight';
 import { computeFinanceScores } from './finance-risk';
 import { findFinanceGuidelines } from './finance-guidelines';
@@ -69,9 +70,10 @@ export function computeDomainFindings(): DomainFindingSet {
     }
   } catch { /* 域数据缺失/解析失败不影响其余域 */ }
 
-  // 财务:异常/涨价/现金流/账单(引擎已只出值得提示的)
+  // 财务:异常/涨价/现金流/账单(引擎已只出值得提示的)。
+  // P0:与 FinanceTab 同一统一数据集(含 Tesla)—— 此前各自取数,两个输出面各说各话。
   try {
-    const txs = loadBankTx();
+    const txs = loadCombinedFinanceTx();
     if (txs.length) finance = financeFindings(txs, loadBankAccounts());
   } catch { /* ignore */ }
 

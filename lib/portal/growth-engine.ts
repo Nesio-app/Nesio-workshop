@@ -10,6 +10,7 @@
  *     但题是你的真实想法)/ trend(趋势卡)。
  * 生成走 /api/portal/chat(登录+限流);无 key/失败时上层回落规则卡。
  */
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 import { getLifeGraph, type LifeNode } from './life-graph';
 import { loadBankTx } from './bank-tx';
 import { THINKING_TRAPS } from './thinking-catalog';
@@ -249,7 +250,7 @@ export const LENSES: Lens[] = [
       const parcels = recent.filter((t) => /amazon|快递|shop|购物|delivery/i.test(`${t.name} ${t.category || ''}`));
       const spend = parcels.reduce((a, b) => a + b.amount, 0);
       if (parcels.length < 4 || spend < 80) return null;
-      return { id: `trend-spend:${new Date(now).toISOString().slice(0, 10)}`, lensId: 'trend-spend', mode: 'trend', sourceId: 'finance-week', sourceText: `近 7 天购物/快递 ${parcels.length} 笔,共 $${spend.toFixed(0)}`, meta: { count: parcels.length, spend: Math.round(spend) } };
+      return { id: `trend-spend:${localDayKey(new Date(now))}`, lensId: 'trend-spend', mode: 'trend', sourceId: 'finance-week', sourceText: `近 7 天购物/快递 ${parcels.length} 笔,共 $${spend.toFixed(0)}`, meta: { count: parcels.length, spend: Math.round(spend) } };
     },
     buildPrompt: (s) => `观察到一个真实的花销趋势(数字见此,别重复念):${s.sourceText}。\n用一句温和、不说教、不制造焦虑的话,问对方要不要自己看看这个趋势(像:不是说该省 —— 是你自己想看看吗?)。中文。只输出这一句。`,
     parse: (_s, t) => parseNudgeBody('一个小趋势', t),

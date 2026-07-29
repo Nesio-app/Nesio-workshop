@@ -14,6 +14,7 @@
 import { createBlobStore } from '@/lib/portal/idb-blob-store';
 import { reportStorageDropped } from '@/lib/portal/storage-health';
 import type { WindowUrgency } from './types';
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 
 const STORE_KEY = 'nesio-guidance-cooling';
 
@@ -62,7 +63,7 @@ export function isOnCooldown(
 }
 
 export function recordShown(eventType: string, store: CoolingStore): CoolingStore {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDayKey();
   const existing = store[eventType];
   const sameDay = existing?.lastShownAt.startsWith(today) ?? false;
   return {
