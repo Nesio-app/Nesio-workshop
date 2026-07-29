@@ -49,6 +49,7 @@ const MemoryNodeDetailLazy = dynamic(() => import('./MemoryNodeDetail'), { ssr: 
 const FamilyTodayStrip = dynamic(() => import('./today/FamilyTodayStrip'), { ssr: false });
 import MemoryFlashBanner, { useMemoryFlash } from './MemoryFlashBanner';
 import WrappedCard, { useWrappedTrigger } from './WrappedCard';
+import { takeCloudRestoreReceipt, restoreReceiptText } from '@/lib/portal/cloud-restore-receipt';
 
 // ---- Main TodayFeed component ----
 
@@ -77,6 +78,8 @@ export default function TodayFeed({
     return () => window.removeEventListener('nesio-rewards-updated', sync);
   }, []);
   const [guideDetailNode, setGuideDetailNode] = useState<LiveMemoryNode | null>(null); // 批次 83:引导卡点开详情
+  // 云端往本机填过数据时的一次性回执(QA:积分 0→150 像被人乱改)。读一次即清。
+  const [restoreNote, setRestoreNote] = useState<string | null>(null);
   // 批次 31:焦点下方快捷输入(用户新指令)
   const [quickAdd, setQuickAdd] = useState('');
   const [quickSaved, setQuickSaved] = useState(false);
@@ -152,6 +155,11 @@ export default function TodayFeed({
 
 
   const uiLocale = portalLocaleToDictionaryLocale(usePortalLocale());
+  // 回执只在挂载时读一次(读即清):模块同步触发的 reload 之后也能如期出现
+  useEffect(() => {
+    const r = takeCloudRestoreReceipt();
+    if (r) setRestoreNote(restoreReceiptText(r, uiLocale));
+  }, [uiLocale]);
   // 批次 13:profile store 的缺省名是 zh「我」,英文界面下按语言回落 Me
   // P1-6:称呼是本机数据(引导里填的),显示不需要登录 —— 此前 canUsePrivateData 门
   // 让匿名用户填了「J」头像还是「Me」(称呼存了但没接到显示)。
@@ -264,6 +272,13 @@ export default function TodayFeed({
       <div className="nesio-today-scroll">
         {/* §1 ①安心态收据(宋体 = Nesio 的声音):先兑现承诺,再看今天 */}
         <p className="nesio-today-receipt nesio-serif-voice">{receiptLine}</p>
+
+        {/* 云端往本机填过数据时的一次性回执(QA:积分 0→150 像被人乱改)。读一次即清。 */}
+        {restoreNote && (
+          <p style={{ margin: '0 0 0.6rem', fontSize: '0.72rem', lineHeight: 1.6, color: 'var(--portal-muted)' }}>
+            {restoreNote}
+          </p>
+        )}
 
         {/* 家庭家务闭环的今天页一端:分给我的家务可当场完成;有人做完了在这收到回响。空则不渲染。
             仅登录(canUsePrivateData)才挂载 —— 登出用户不白打一次 401。 */}

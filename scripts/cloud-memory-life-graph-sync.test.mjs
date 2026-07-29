@@ -140,7 +140,9 @@ assert.ok(
 
 assert.match(
   lifeGraph,
-  /catch\s*\([^)]*\)\s*\{[\s\S]*markCloudSyncFailed/,
+  // 逐条版 markCloudSyncFailed 与批量版 markCloudSyncMany(..., 'failed') 都算数 ——
+  // 钉的是「catch 里必须把失败落账」这条行为,不是某个函数名。
+  /catch\s*\([^)]*\)\s*\{[\s\S]*(markCloudSyncFailed|markCloudSyncMany\([^)]*'failed')/,
   'cloud sync failures must be recorded so local-first Memory does not silently pretend cloud persistence succeeded.',
 );
 assert.match(

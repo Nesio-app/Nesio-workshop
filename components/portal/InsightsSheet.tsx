@@ -37,6 +37,9 @@ import HealthDashboard from './health/HealthDashboard';
 import TrainingPlan from './health/TrainingPlan';
 import RelationshipsPanel from './relationships/RelationshipsPanel';
 import SchedulePanel from './insights/SchedulePanel';
+import dynamic from 'next/dynamic';
+
+const MemoryNodeDetailLazy = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 import InventoryStatsPanel from './insights/InventoryStatsPanel';
 import WardrobePanel from './insights/WardrobePanel';
 import AdminOpsPanel from './insights/AdminOpsPanel';
@@ -185,6 +188,8 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   const [mainTab, setMainTab] = useState<MainTab>(initialTab ?? 'reflection');
   // 洞察改版:首页是入口宫格(showHub),点卡进板块;有 initialTab(深链)时直达板块。
   const [showHub, setShowHub] = useState(!initialTab);
+  // 日程行点开详情(此前只能跳关键词搜索,标题多半零命中 → 像死按钮)
+  const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
   // 洞察已打开时的板块深链(如车页「充电花费 → 财务」):initialTab 变化要能就地切板块,
   // 不能只认挂载那一次(否则打开状态下深链没反应 = 死链接)。
   useEffect(() => {
@@ -645,7 +650,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {mainTab === 'relationships' && showPeople && <RelationshipsPanel />}
 
         {/* ── Tab: 会议(只看会议记录 + 挂没挂到日程,解决「混在一堆里找不着」)── */}
-        {mainTab === 'schedule' && <TabErrorBoundary label="schedule"><SchedulePanel onOpenMemory={openInMemory} /></TabErrorBoundary>}
+        {mainTab === 'schedule' && <TabErrorBoundary label="schedule"><SchedulePanel onOpenMemory={openInMemory} onOpenNode={setDetailNodeId} /></TabErrorBoundary>}
 
         {/* ── Tab: 物品(只读统计 dashboard;管理去物品页)── */}
         {mainTab === 'inventory' && <TabErrorBoundary label="inventory"><InventoryStatsPanel /></TabErrorBoundary>}
@@ -677,6 +682,13 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         )}
 
       </div>
+
+      {/* 日程行点开的记录详情。层叠已统一(原语同层,后开在上),从洞察里开不再被盖住。 */}
+      {detailNodeId && (() => {
+        const node = getLifeGraph().find((n) => n.id === detailNodeId) || null;
+        if (!node) return null;
+        return <MemoryNodeDetailLazy node={node} onClose={() => setDetailNodeId(null)} />;
+      })()}
     </div>
   );
 }

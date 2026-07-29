@@ -32,7 +32,12 @@ function stripPrefix(name: string): string {
   return name.replace(/^(会议记录|Meeting notes)\s*·\s*/, '').trim() || name;
 }
 
-export default function SchedulePanel({ onOpenMemory }: { onOpenMemory: (query: string) => void }) {
+export default function SchedulePanel({ onOpenMemory, onOpenNode }: {
+  onOpenMemory: (query: string) => void;
+  /** 直接打开这条记录的详情。r.id 就是真实节点 id —— 此前一律走关键词搜索,
+   *  而邮件/日历标题拿去全库搜多半零命中,点了像没反应(QA 死按钮)。 */
+  onOpenNode?: (nodeId: string) => void;
+}) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [sub, setSub] = useState<SubTab>('calendar');
   const [nodes, setNodes] = useState<LifeNode[]>([]);
@@ -131,7 +136,7 @@ export default function SchedulePanel({ onOpenMemory }: { onOpenMemory: (query: 
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {rows.slice(0, 60).map((r) => (
-            <button key={r.id} type="button" onClick={() => onOpenMemory(r.query)}
+            <button key={r.id} type="button" onClick={() => (onOpenNode ? onOpenNode(r.id) : onOpenMemory(r.query))}
               style={{ display: 'block', textAlign: 'left', width: '100%', cursor: 'pointer', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', background: 'var(--glass-bg-solid, var(--portal-bg))', padding: 'var(--space-3) var(--space-4)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-3)' }}>
                 <span style={{ fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
