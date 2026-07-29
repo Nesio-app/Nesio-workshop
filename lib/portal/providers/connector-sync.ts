@@ -47,6 +47,10 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
     if (Array.isArray(data.holdings) && data.holdings.length) {
       bank.saveHoldings(data.holdings as never); // 财务㉗:持仓快照,非空才替换
     }
+    // P2 尾巴:Plaid 官方定期流(订阅页并集展示;空数组也存 —— 全取消也是事实)
+    if (Array.isArray((data as { recurringStreams?: unknown[] }).recurringStreams)) {
+      bank.savePlaidRecurring((data as { recurringStreams: never[] }).recurringStreams);
+    }
     if (!data.ok) { bank.saveBankSyncStatus({ ok: false, error: data.error || 'unknown' }); return fail(data.error || 'unknown'); }
     // 增量合并(纯核心,可单测):按 id upsert、删 removed、日期降序留最近 5000 笔
     const { merged, fresh } = bank.mergeBankTxForSync(existing, data.transactions || [], data.removedIds || []);

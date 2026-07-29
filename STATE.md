@@ -181,7 +181,14 @@ sensitivity/retention 枚举化(中期)。
   (Expense 扩 assetId/assetCostKind:税金/维修/保险,「+」支出段可关联资产,
   卡片页资产行显示「折旧/今年持有(税金·维修)」);⑦ 繁体「約」修正。
   契约:finance-assets 扩 P2 断言;insight/features 两处旧钉按新行为更新;全套财务契约+build 绿。
-  **P2 余项**:Plaid /transactions/recurring/get 接入(服务端,单独一刀);findings 加可点 action。
+  **尾巴已收 + P3 第一批(2026-07-28)**:① Plaid /transactions/recurring/get 接入
+  (服务端逐 token 拉、失败静默跳过;客户端存 nesio-plaid-recurring-v1;订阅页
+  「Plaid 识别的补充」区 —— 并集展示,本地为准);② findings 可点(kind→子页映射,
+  死文字变入口);③ 图表统一:环形图前 6+其他(对齐月报)、趋势图去双重编码只留柱
+  +断档月虚线标记+去小值抬高、预算超支比例如实文字;④ 纠错闭环:批量「全部按建议」、
+  「排除」改真语义「不计收支」(原为归 OTHER 仍计支出的骗人文案)、已学规则显示
+  label(mch_xxx 死代码复活)、月报自动生成失败可见。plaid-multi-item 钉子按新架构更新。
+  **P3 余项**:FinanceTab 拆分(现 ~1300 行)、对账小票(需按账户快照,数据不足暂缓)。
 - **财务板块大修(2026-07-28 审计完成,施工待批)**:四路深查(maybe 数据/分析/UI × 宝盒体检)
   收敛为 `docs/design/finance-maybe-audit-2026-07.md`。**P0 止血项含一条不可逆数据销毁路径**
   (connector-sync 先 replace 账户再按新表过滤流水写回 + 全仓无 `await store.ready()`,

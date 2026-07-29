@@ -1125,3 +1125,31 @@ export function formatMoney(amount: number, currency = 'USD'): string {
   const body = Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: hasCents ? 2 : 0, maximumFractionDigits: hasCents ? 2 : 0 });
   return sym ? `${sym}${body}` : `${body} ${currency}`;
 }
+
+/* ---------- P2 尾巴:Plaid 官方定期流(与本地 detectRecurring 并集,本地为准) ---------- */
+
+export const PLAID_RECURRING_KEY = 'nesio-plaid-recurring-v1';
+
+export interface PlaidRecurringStream {
+  name: string; amount: number; currency: string; frequency: string;
+  lastDate: string; nextDate?: string; isActive: boolean; direction: 'inflow' | 'outflow';
+}
+
+export function savePlaidRecurring(streams: PlaidRecurringStream[]): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(PLAID_RECURRING_KEY, JSON.stringify(streams.slice(0, 100))); } catch { reportStorageDropped(); }
+}
+
+export function loadPlaidRecurring(): PlaidRecurringStream[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const v = JSON.parse(localStorage.getItem(PLAID_RECURRING_KEY) || '[]') as PlaidRecurringStream[];
+    return Array.isArray(v) ? v : [];
+  } catch { return []; }
+}
+
+/** Plaid 流里本地没识别到的(按归一化名对比)—— 订阅页「Plaid 补充」区,覆盖广度归 Plaid,可解释性归本地。 */
+export function plaidOnlyRecurring(streams: PlaidRecurringStream[], local: RecurringCharge[]): PlaidRecurringStream[] {
+  const seen = new Set(local.map((r) => normalizeMerchant(r.name)));
+  return streams.filter((s) => s.direction === 'outflow' && s.isActive && !seen.has(normalizeMerchant(s.name)));
+}

@@ -15,7 +15,7 @@ import {
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
   loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummary, expenseMerchants,
   loadHoldings, setMerchantRuleFor, setFlowRuleFor, loadRuleLabels,
-  bankDataReady, loadBankSyncStatus, investmentAccountIds,
+  bankDataReady, loadBankSyncStatus, investmentAccountIds, loadPlaidRecurring, plaidOnlyRecurring,
   type BankTx, type BankAccount, type TxFlow, type Holding,
 } from '@/lib/portal/bank-tx';
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
@@ -62,11 +62,16 @@ function FinanceDonut({ slices, centerTop, centerVal }: { slices: Array<{ catego
   const R = 52;
   const C = 2 * Math.PI * R;
   let acc = 0;
+  // P3 图表统一:与月报(finance-report-visual)同口径 —— 前 6 类 + 其余合并「其他」,
+  // 修「屏幕版第 9 类以后直接消失、环上出现空缺」的双口径。
+  const top = slices.slice(0, 6);
+  const restPct = slices.slice(6).reduce((s, x) => s + x.pct, 0);
+  const shown = restPct > 0 ? [...top, { category: 'OTHER_REST', pct: restPct }] : top;
   return (
     <svg viewBox="0 0 140 140" width="132" height="132" style={{ display: 'block', margin: '0 auto' }}>
       <g transform="translate(70,70) rotate(-90)">
         <circle r={R} fill="none" stroke="var(--portal-line)" strokeWidth="14" />
-        {slices.slice(0, 8).map((s, i) => {
+        {shown.map((s, i) => {
           const len = (s.pct / 100) * C;
           const seg = <circle key={s.category} r={R} fill="none" stroke={DONUT_COLORS[i % DONUT_COLORS.length]} strokeWidth="14" strokeLinecap="butt" strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-acc} />;
           acc += len;
@@ -211,7 +216,7 @@ export default function FinanceTab() {
     try {
       const outcome = autoPersistLastMonthReport(txs, accounts, new Date(), dict);
       if (outcome === 'created') setReportMsg(L(dict, `已自动生成 ${prevYm(ymOf())} 月报并存入记忆`, `Auto-saved the ${prevYm(ymOf())} report to memory`));
-    } catch { /* 自动补失败静默,手动入口仍在 */ }
+    } catch { setReportMsg(L(dict, '上月月报自动生成没成功 —— 「下载彩色月报」按钮仍可手动生成。', 'Auto report failed — the manual report button still works.')); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [txs, accounts]);
 
@@ -484,12 +489,30 @@ export default function FinanceTab() {
               <p className="nesio-settings-section-label">{L(dict, '风险预警', 'Risk alerts')}</p>
               <div className="nesio-fin-alerts">
                 {/* 统一判定(financeFindings):flag=真实风险 → risk 红;attention=可关注 → warn 琥珀 */}
-                {findings.map((f) => (
-                  <div key={f.id} className={`nesio-fin-alert nesio-fin-alert--${f.severity === 'flag' ? 'risk' : 'warn'}`}>
-                    <p className="nesio-fin-alert-title">{L(dict, f.title[0], f.title[1])}</p>
-                    <p className="nesio-fin-alert-body">{L(dict, f.detail[0], f.detail[1])}</p>
-                  </div>
-                ))}
+                {findings.map((f) => {
+                  // P2 尾巴:findings 可点 —— 按 kind 跳到能采取行动的子页(死文字 → 入口)
+                  const FINDING_SUB: Record<string, Sub> = {
+                    anomaly: 'tx', fee_audit: 'tx',
+                    subscription_hike: 'recurring', new_recurring: 'recurring', upcoming_bills: 'recurring',
+                    cash_runway: 'cards', balance_risk: 'cards', savings_rate: 'spending',
+                  };
+                  const target = FINDING_SUB[f.kind];
+                  const inner = (
+                    <>
+                      <p className="nesio-fin-alert-title">{L(dict, f.title[0], f.title[1])}{target ? ' ›' : ''}</p>
+                      <p className="nesio-fin-alert-body">{L(dict, f.detail[0], f.detail[1])}</p>
+                    </>
+                  );
+                  return target ? (
+                    <button key={f.id} type="button" onClick={() => setSub(target)}
+                      className={`nesio-fin-alert nesio-fin-alert--${f.severity === 'flag' ? 'risk' : 'warn'}`}
+                      style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+                      {inner}
+                    </button>
+                  ) : (
+                    <div key={f.id} className={`nesio-fin-alert nesio-fin-alert--${f.severity === 'flag' ? 'risk' : 'warn'}`}>{inner}</div>
+                  );
+                })}
                 {/* 待归类是页面工作流提示(不是域判定),不进统一层,单独保留 */}
                 {review.length > 0 && (
                   <div className="nesio-fin-alert nesio-fin-alert--info">
@@ -517,31 +540,23 @@ export default function FinanceTab() {
                     : delta < -8
                       ? L(dict, `本月净支出比上月低约 ${Math.abs(delta)}% —— 节奏在往下走。`, `Net spend is ~${Math.abs(delta)}% below last month — the pace is easing.`)
                       : L(dict, '本月净支出与上月接近 —— 先稳住再说。', 'Net spend is close to last month — hold steady.');
-                // DataEase 启发:面积折线 + 柱对照,同一数据两面读(深度 vs 形状)
-                const W = 100; const H = 36;
-                const pts = trend.map((t, i) => {
-                  const x = trend.length > 1 ? (i / (trend.length - 1)) * W : W / 2;
-                  const y = H - (Math.max(0, t.net) / max) * (H - 2);
-                  return `${x.toFixed(1)},${y.toFixed(1)}`;
-                });
-                const area = `0,${H} ${pts.join(' ')} ${W},${H}`;
+                // P3 图表统一:去双重编码(原面积图+柱图画同一份数据,纯冗余)——只留柱
+                // (带月份标签与数值,断档月天然可见);小值不再抬高到 4%(破坏比例)。
                 return (
                   <>
                     <p className="nesio-fin-insight-line">{narrative}</p>
-                    <div className="nesio-fin-trend-area" aria-hidden>
-                      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="72" preserveAspectRatio="none">
-                        <polygon points={area} fill="var(--portal-accent-soft)" />
-                        <polyline points={pts.join(' ')} fill="none" stroke="var(--portal-blue-deep)" strokeWidth="1.6" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-                      </svg>
-                    </div>
                     <div className="nesio-fin-trend">
-                      {trend.map((t) => (
-                        <div key={t.ym} className="nesio-fin-trend-col">
-                          <span className="nesio-fin-trend-val">{formatMoney(t.net, summary.currency)}</span>
-                          <div className="nesio-fin-trend-bar-wrap"><div className={`nesio-fin-trend-bar${t.ym === ym ? ' is-cur' : ''}`} style={{ height: `${Math.max(4, Math.round((t.net / max) * 100))}%` }} /></div>
-                          <span className="nesio-fin-trend-lbl">{t.ym.slice(5)}</span>
-                        </div>
-                      ))}
+                      {trend.map((t, i) => {
+                        const prevMonth = trend[i - 1];
+                        const gapBefore = prevMonth && prevYm(t.ym) !== prevMonth.ym; // 断档月:标记不连续,别画成相邻
+                        return (
+                          <div key={t.ym} className="nesio-fin-trend-col" style={gapBefore ? { borderLeft: '1px dashed var(--portal-line)', marginLeft: 2, paddingLeft: 2 } : undefined}>
+                            <span className="nesio-fin-trend-val">{formatMoney(t.net, summary.currency)}</span>
+                            <div className="nesio-fin-trend-bar-wrap"><div className={`nesio-fin-trend-bar${t.ym === ym ? ' is-cur' : ''}`} style={{ height: `${Math.max(1, Math.round((Math.max(0, t.net) / max) * 100))}%` }} /></div>
+                            <span className="nesio-fin-trend-lbl">{t.ym.slice(5)}{gapBefore ? '·' : ''}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </>
                 );
@@ -673,7 +688,14 @@ export default function FinanceTab() {
           {review.length > 0 && (
             <>
               <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, `规则审核 · ${review.length} 笔待归类`, `Review · ${review.length} to categorize`)}</p>
-              {review.slice(0, 1).map((t) => {
+              {/* P3 纠错闭环:批量「全部按建议」(原来一次只出 1 笔,12 笔要点 12 次) */}
+              {review.length > 1 && (
+                <button type="button" className="nesio-fin-review-accept" style={{ marginBottom: '0.4rem' }}
+                  onClick={() => { for (const t of review) setMerchantRuleFor(t, suggestCategory(t.name).category); setRev((r) => r + 1); }}>
+                  {L(dict, `全部按建议归类(${review.length} 笔,每笔都可再改)`, `Accept all suggestions (${review.length}, each editable later)`)}
+                </button>
+              )}
+              {review.slice(0, 3).map((t) => {
                 const sug = suggestCategory(t.name);
                 return (
                   <div key={t.id} className="nesio-fin-review">
@@ -685,7 +707,8 @@ export default function FinanceTab() {
                       {COMMON_EXPENSE_CATEGORIES.filter((c) => c !== sug.category).slice(0, 2).map((c) => (
                         <button key={c} type="button" className="nesio-fin-review-alt" onClick={() => resolveReview(t, c)}>{categoryLabel(c, dict)}</button>
                       ))}
-                      <button type="button" className="nesio-fin-review-skip" onClick={() => resolveReview(t, 'OTHER')}>{L(dict, '排除', 'Exclude')}</button>
+                      {/* P3:原「排除」实为归类 OTHER(仍计入支出),文案骗人 —— 改真语义:不计收支(转账流) */}
+                      <button type="button" className="nesio-fin-review-skip" onClick={() => { setFlowRuleFor(t, 'transfer'); setRev((r) => r + 1); }}>{L(dict, '不计收支', 'Not spend')}</button>
                     </div>
                   </div>
                 );
@@ -774,13 +797,13 @@ export default function FinanceTab() {
               <div className="nesio-fin-rules">
                 {Object.entries(learnedRules.merchant).map(([name, cat]) => (
                   <div key={`m-${name}`} className="nesio-fin-rule">
-                    <span className="nesio-fin-rule-txt">{name} <span className="nesio-fin-rule-arrow">→</span> {categoryLabel(cat, dict)}</span>
+                    <span className="nesio-fin-rule-txt">{learnedRules.labels[name] || name} <span className="nesio-fin-rule-arrow">→</span> {categoryLabel(cat, dict)}</span>
                     <button type="button" className="nesio-fin-rule-x" onClick={() => removeMerchantRule(name)} aria-label={L(dict, '删除规则', 'Remove rule')}>✕</button>
                   </div>
                 ))}
                 {Object.entries(learnedRules.flow).map(([name, flow]) => (
                   <div key={`f-${name}`} className="nesio-fin-rule">
-                    <span className="nesio-fin-rule-txt">{name} <span className="nesio-fin-rule-arrow">→</span> {L(dict, TX_FLOW_LABELS[flow][0], TX_FLOW_LABELS[flow][1])}</span>
+                    <span className="nesio-fin-rule-txt">{learnedRules.labels[name] || name} <span className="nesio-fin-rule-arrow">→</span> {L(dict, TX_FLOW_LABELS[flow][0], TX_FLOW_LABELS[flow][1])}</span>
                     <button type="button" className="nesio-fin-rule-x" onClick={() => removeFlowRule(name)} aria-label={L(dict, '删除规则', 'Remove rule')}>✕</button>
                   </div>
                 ))}
@@ -859,6 +882,7 @@ export default function FinanceTab() {
                 <span className="nesio-fin-budget-hero-l">{L(dict, `${monthLabel(ym, dict)} · 还可以花`, `${monthLabel(ym, dict)} · left for spending`)}</span>
                 <span className={`nesio-fin-budget-left${total.left < 0 ? ' is-over' : ''}`}>{total.left < 0 ? `-${formatMoney(-total.left)}` : formatMoney(total.left)}</span>
                 <div className="nesio-fin-bar"><div className={`nesio-fin-bar-fill${total.ratio > 1 ? ' is-over' : ''}`} style={{ width: `${Math.min(100, Math.round(total.ratio * 100))}%` }} /></div>
+                {total.ratio > 1 && <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, `超出 ${Math.round((total.ratio - 1) * 100)}%`, `${Math.round((total.ratio - 1) * 100)}% over`)}</p>}
                 <span className="nesio-fin-budget-hero-sub">{L(dict, `已用 ${formatMoney(total.spent)} / 预算 ${formatMoney(total.budget)}`, `${formatMoney(total.spent)} of ${formatMoney(total.budget)}`)}{perDay != null ? L(dict, ` · 每天约 ${formatMoney(perDay)} × ${daysLeft} 天`, ` · ~${formatMoney(perDay)}/day for ${daysLeft}d`) : ''}{total.left < 0 ? L(dict, ' · 超一点没关系,月中调整来得及', ' · a little over is okay — adjust mid-month') : ''}</span>
                 <label className="nesio-fin-budget-rowedit">
                   {L(dict, '月总预算', 'Monthly total')}
@@ -1083,6 +1107,26 @@ export default function FinanceTab() {
             )}
             <p className="nesio-settings-section-label" style={{ marginTop: '0.8rem' }}>{L(dict, `稳定的 · ${ch.steady.length} 项`, `Steady · ${ch.steady.length}`)}</p>
             {ch.steady.slice(0, 8).map((r) => row(r, L(dict, '稳定', 'steady'), 'down'))}
+            {(() => {
+              // P2 尾巴:Plaid 官方定期流并集 —— 本地没识别到的补充展示(覆盖广度归 Plaid)
+              const extra = plaidOnlyRecurring(loadPlaidRecurring(), recurring);
+              if (!extra.length) return null;
+              return (
+                <>
+                  <p className="nesio-settings-section-label" style={{ marginTop: '0.8rem' }}>{L(dict, `Plaid 识别的补充 · ${extra.length} 项`, `From Plaid · ${extra.length}`)}</p>
+                  {extra.slice(0, 6).map((s) => (
+                    <div key={`plaid-${s.name}-${s.lastDate}`} className="nesio-fin-acctrow">
+                      <div className="nesio-fin-acctrow-body">
+                        <span className="nesio-fin-acctrow-name">{s.name}</span>
+                        <span className="nesio-fin-acctrow-sub">{s.frequency.toLowerCase()}{s.nextDate ? L(dict, ` · 下次约 ${s.nextDate}`, ` · next ~${s.nextDate}`) : ''}</span>
+                      </div>
+                      <span className="nesio-fin-acctrow-bal">{formatMoney(s.amount, s.currency)}</span>
+                      <span className="nesio-fin-delta down">Plaid</span>
+                    </div>
+                  ))}
+                </>
+              );
+            })()}
             <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, '「疑似停了」= 已两个周期没扣款 —— 可能是省钱好事,确认一下就行。快到期的会出现在 Today。', '“Maybe ended” = two cycles missed — possibly good news. Due-soon items surface in Today.')}</p>
           </>
         );

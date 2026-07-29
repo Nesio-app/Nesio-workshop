@@ -339,7 +339,43 @@ export async function GET(req: NextRequest) {
     // 权威快照:每个存活 token 的 accounts/get 都成功 → 客户端可整体替换账户表
     const authoritative = keptAccountsOk.length > 0 && keptAccountsOk.every(Boolean);
 
+    // P2 尾巴:Plaid 官方定期流(/transactions/recurring/get)—— 与本地 detectRecurring 并集,
+    // 冲突时本地为准(可解释);失败不阻断(个别机构/沙盒未开通该产品属常态)。
+    interface PlaidStream {
+      description?: string; merchant_name?: string | null; is_active?: boolean;
+      frequency?: string; last_date?: string; predicted_next_date?: string;
+      average_amount?: { amount?: number }; last_amount?: { amount?: number; iso_currency_code?: string | null };
+    }
+    const recurringStreams: Array<{ name: string; amount: number; currency: string; frequency: string; lastDate: string; nextDate?: string; isActive: boolean; direction: 'inflow' | 'outflow' }> = [];
+    for (const accessToken of keptTokens) {
+      try {
+        const rec = await plaidPost('/transactions/recurring/get', { access_token: accessToken }) as {
+          inflow_streams?: PlaidStream[]; outflow_streams?: PlaidStream[]; error_code?: string;
+        };
+        if (rec.error_code) continue; // 产品未开通/机构不支持:静默跳过,本地检测兜底
+        const push = (arr: PlaidStream[] | undefined, direction: 'inflow' | 'outflow') => {
+          for (const s of arr ?? []) {
+            const amount = Math.abs(s.last_amount?.amount ?? s.average_amount?.amount ?? 0);
+            if (!(amount > 0)) continue;
+            recurringStreams.push({
+              name: s.merchant_name || s.description || 'Recurring',
+              amount: Math.round(amount * 100) / 100,
+              currency: s.last_amount?.iso_currency_code || 'USD',
+              frequency: s.frequency || 'MONTHLY',
+              lastDate: s.last_date || '',
+              ...(s.predicted_next_date ? { nextDate: s.predicted_next_date } : {}),
+              isActive: s.is_active !== false,
+              direction,
+            });
+          }
+        };
+        push(rec.inflow_streams, 'inflow');
+        push(rec.outflow_streams, 'outflow');
+      } catch { /* 单 token 失败不影响其余 */ }
+    }
+
     const response = NextResponse.json({
+      recurringStreams: recurringStreams.slice(0, 100),
       relink: anyRelink || undefined,
       relinkIndexes: relinkIndexes.length ? relinkIndexes : undefined,
       prunedDead: deadTokenIndexes.size || undefined,
