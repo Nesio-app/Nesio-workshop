@@ -141,3 +141,36 @@
 ---
 
 *四路探查原始报告很长，本文是收敛后的单一事实源；改动落地时逐条销号并更新 STATE.md。*
+
+---
+
+## 四、施工自查（2026-07-28,开工前;UI 稿 = artifact fb540e24 v3.3 八屏）
+
+### 改动量盘点
+
+| 期 | 涉及文件 | 规模估计 |
+|---|---|---|
+| P0 止血 | providers/bank-tx.ts(符号化/txFlow 投资参数/ready/保险丝/throughDay ~115 行) · providers/connector-sync.ts(重排+保险丝+状态落盘) · finance-aggregate.ts(opts) · tesla-finance.ts(combined loader) · FinanceTab.tsx(hydrated/错误横幅/同进度) · domain-insights.ts | ~400 行改动 + 新契约;fin-display / finance-report / finance-recurring / finance-rule-keys 四套现有契约钉着 txFlow/summarizeMonth,逐条核对(正常路径符号不变,预期多数断言存活) |
+| P1 数据模型 | **新** finance-assets.ts(手动资产+锚点+净值/投资日快照序列,IDB store ~250) · finance-sources.ts(Expense 扩 kind:'income' + channelId ~40) · **新** receipt-match.ts(小票↔银行候选+负样本 ~120) · connector-sync(落日快照) · **新** QuickAddSheet.tsx(~250) | ~800 行新增 + 契约×3 |
+| P2 分析 | finance-features(股利利息 YTD/组合体检因子 ~150) · finance-insight(findings 加 action/稳定 id ~80) · 统一口径共享函数 · 订阅监控数据拼装(算法全现成) · guidelines 补 4 条 | ~350 行 |
+| P3 UI | FinanceTab 939 行拆 ~8 个子组件(Overview/Spending/Tx/Accounts/Checkup/Recurring/InvestDetail/QuickAdd),图表统一到 finance-report-visual | ~2000 行重排(多为搬运) |
+
+### 自查修正(三处方案更正)
+
+1. **手动流水不伪造 BankTx**:「+」记的收支走 finance-sources(Expense 扩展),不写 bank-tx 存储
+   (绕开 Plaid replace 冲掉 + 孤儿过滤两个坑)——与 Tesla 显示层合并同一模式;financeMonthAggregate
+   的 domainNet 通道扩成 domainNet+domainIncome。交易列表显示层 union。
+2. **小票不双计的实现点**:关联后 Expense 记 linkedBankTxId,`listExpenses(financeOnly)` 聚合时
+   排除已关联行 —— 一行过滤,银行流水为记账层。
+3. **多币种净值先分列不折算**:房(CNY)与 Plaid(USD)不能裸加;宝盒无汇率源,净值 hero 按币种
+   分列小计(诚实),汇率折算(maybe 的 LOCF+免费源 ECB)列为后续可选。
+
+### 继续挖掘项(开工中带着做)
+
+- **新 IDB store 必须进备份/云同步枚举**(buildCombinedBackup + cloud-module-sync)——手动资产
+  换端就丢 = 违反 workshop 全数据云端化;此前方案漏了这条,P1 验收标准里补上。
+- **已实现盈亏比预想可行**:24 个月投资流水有买卖价与数量,简化 FIFO 可算「今年卖出实现盈亏」
+  ——从「诚实缺席」升级为 P2 候选。
+- Plaid /investments 的 fees 字段是否已拉(费用拖累因子)——路由里待查。
+- 家务虚拟账本隔离:P1 契约加断言(chores play money 不进任何新汇总)。
+- FinanceTab 拆分时 hooks 顺序陷阱(空态早退注释已警告),拆分批次要保 hooks 全量在早退前。
