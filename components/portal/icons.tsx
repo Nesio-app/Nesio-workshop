@@ -111,6 +111,12 @@ export const IconWatch = make(<><circle cx="12" cy="12" r="4.8" /><path d="M9.2 
 export const IconThumbUp = make(<><path d="M7 10.5v11" /><path d="M15 5.9 14 10h5.8a2 2 0 0 1 2 2.6l-2.4 8a2 2 0 0 1-1.9 1.4H4a2 2 0 0 1-2-2v-7.5a2 2 0 0 1 2-2h2.8a2 2 0 0 0 1.8-1.1L12 2a3.1 3.1 0 0 1 3 3.9z" /></>);
 export const IconThumbDown = make(<><path d="M17 13.5v-11" /><path d="M9 18.1 10 14H4.2a2 2 0 0 1-2-2.6l2.4-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-2.8a2 2 0 0 0-1.8 1.1L12 22a3.1 3.1 0 0 1-3-3.9z" /></>);
 
+/** 叶子(休眠/自然,替代 🌿) */
+export const IconLeaf = make(<><path d="M4 20c0-8 5.5-13 16-13 0 9-5 14-12.5 14H4z" /><path d="M9 15c1.8-3.4 4.3-5.6 8-7" /></>);
+
+/** 步行(足迹时间线的出行方式,配 IconCar 用) */
+export const IconWalk = make(<><circle cx="13" cy="4" r="1.8" /><path d="M11 21l1.6-5.4-2.6-2.2.8-4.6 3.2 1.4 2.6 2.6" /><path d="M8.2 9.4 6 12M12.6 15.6 15 21" /></>);
+
 /** 衣物类别 → 描边图标。衣橱里所有缩略图占位、类别标题都走这里,不再一律 👕。 */
 export function GarmentIcon({ type, size = 20 }: { type: string; size?: number }) {
   switch (type) {
@@ -160,15 +166,34 @@ export function WeatherIcon({ condition, size = 16 }: { condition: string; size?
   return <IconCloudSun size={size} />;
 }
 
-/** 引导卡 emoji 图标 → 描边图标(卡片数据/缓存里仍是 emoji 字符串,渲染层统一转换) */
-export function GuidanceIcon({ icon, size = 18 }: { icon: string; size?: number }) {
-  const map: Record<string, React.ComponentType<{ size?: number }>> = {
-    '✈️': IconPlane, '🏥': IconHeartPulse, '⏰': IconClock, '🎂': IconGift,
-    '💝': IconStar, '🧳': IconMap, '🎙': IconMic, '📩': IconMail,
-    '💪': IconActivity, '🧥': IconCloud, '☂️': IconRain, '📦': IconBox,
-    '💡': IconBulb, '🗓': IconCalendar, '✅': IconCheckCircle, '🌙': IconMoon,
-    '🎈': IconBalloon, '✨': IconStar,
-  };
-  const C = map[icon];
+/**
+ * emoji → 描边图标的**渲染层**转换表。
+ *
+ * 为什么留着 emoji:好几处数据层(引导卡缓存、工具箱清单、旧记录)里存的就是 emoji 字符串,
+ * 有的还跨版本/跨仓共享。改数据层要迁移历史数据,风险远大于收益 ——
+ * 所以数据层照旧,**渲染层一律换成站内描边图标**。
+ * 2026-07-29:从 GuidanceIcon 里提出来通用化,工具箱等处也走这张表(此前它们直接渲染 emoji)。
+ */
+const EMOJI_ICON: Record<string, React.ComponentType<{ size?: number }>> = {
+  '✈️': IconPlane, '🏥': IconHeartPulse, '⏰': IconClock, '🎂': IconGift,
+  '💝': IconStar, '🧳': IconMap, '🎙': IconMic, '📩': IconMail,
+  '💪': IconActivity, '🧥': IconCloud, '☂️': IconRain, '📦': IconBox,
+  '💡': IconBulb, '🗓': IconCalendar, '✅': IconCheckCircle, '🌙': IconMoon,
+  '🎈': IconBalloon, '✨': IconStar,
+  // 工具箱 / 今天页卡片(2026-07-29 补)
+  '📖': IconBookOpen, '🏋️': IconActivity, '🏋': IconActivity, '🌱': IconLeaf,
+  '🚗': IconCar, '💊': IconHeartPulse, '🏡': IconHome, '⚡': IconZap, '⚡️': IconZap,
+  '✦': IconStar, '📝': IconNote, '📬': IconMail, '📌': IconFlag, '📍': IconMapPin,
+  '🕊️': IconBalloon, '🕊': IconBalloon, '🌿': IconLeaf, '🎁': IconGift, '☁': IconCloud, '☁️': IconCloud,
+};
+
+/** 任意 emoji 字符串 → 描边图标(表里没有就退回便签图标,绝不把 emoji 漏到界面上) */
+export function EmojiIcon({ icon, size = 18 }: { icon: string; size?: number }) {
+  const C = EMOJI_ICON[icon];
   return C ? <C size={size} /> : <IconNote size={size} />;
+}
+
+/** 引导卡 emoji 图标 → 描边图标(保留原名,内部走同一张表) */
+export function GuidanceIcon({ icon, size = 18 }: { icon: string; size?: number }) {
+  return <EmojiIcon icon={icon} size={size} />;
 }

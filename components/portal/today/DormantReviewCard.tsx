@@ -9,6 +9,7 @@
 import { getReviewTier, type DormantCandidate } from '@/lib/platform/dormant-engine';
 import { t } from '@/lib/portal/i18n';
 import { usePortalLocale } from '../use-portal-locale';
+import { IconBalloon, IconLeaf, IconClock } from '../icons';
 
 export function DormantReviewCard({
   candidate,
@@ -33,7 +34,7 @@ export function DormantReviewCard({
     return (
       <li className="nesio-collapsed-item nesio-dormant-card nesio-dormant-card--soft-archive">
         <div className="nesio-collapsed-row">
-          <span className="nesio-collapsed-icon">🕊️</span>
+          <span className="nesio-collapsed-icon" aria-hidden><IconBalloon size={16} /></span>
           <div className="nesio-dormant-content">
             <span className="nesio-review-kicker">{locale === 'en' ? 'Looking back' : '回顾'}</span>
             <span className="nesio-dormant-question">{t(locale, 'dormantSoftArchiveQuestion')}</span>
@@ -56,7 +57,7 @@ export function DormantReviewCard({
     return (
       <li className="nesio-collapsed-item nesio-dormant-card nesio-dormant-card--overdue">
         <div className="nesio-collapsed-row">
-          <span className="nesio-collapsed-icon">⏰</span>
+          <span className="nesio-collapsed-icon" aria-hidden><IconClock size={16} /></span>
           <div className="nesio-dormant-content">
             <span className="nesio-review-kicker">{locale === 'en' ? 'Looking back' : '回顾'}</span>
             <span className="nesio-dormant-question">
@@ -83,7 +84,7 @@ export function DormantReviewCard({
   return (
     <li className={`nesio-collapsed-item nesio-dormant-card${tier === 'letting-go' ? ' nesio-dormant-card--letting-go' : ''}`}>
       <div className="nesio-collapsed-row">
-        <span className="nesio-collapsed-icon">🌿</span>
+        <span className="nesio-collapsed-icon" aria-hidden><IconLeaf size={16} /></span>
         <div className="nesio-dormant-content">
             <span className="nesio-review-kicker">{locale === 'en' ? 'Looking back' : '回顾'}</span>
           <span className="nesio-dormant-question">{question}</span>

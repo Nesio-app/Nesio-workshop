@@ -18,6 +18,7 @@ import { t } from '@/lib/portal/i18n';
 import type { PortalStringKey } from '@/lib/portal/i18n';
 import { formatStatusSummaryLine, type ToolForShellState } from './tool-state';
 import ToolGrid from './ToolGrid';
+import { EmojiIcon } from './icons';
 
 interface LaunchSurfaceContext {
   viewerRole: 'public' | 'tester' | 'personal_lab';
@@ -291,7 +292,8 @@ export default function ToolsTreasurePopup({
                   onClick={tool ? () => onOpenTool(tool) : () => handleRequestToolAccess(entry.id, entry.name)}
                 >
                   <span className="portal-treasure-data-icon" aria-hidden>
-                    {entry.icon}
+                    {/* 2026-07-29:数据层仍是 emoji 字符串(跨仓共享的工具清单),渲染层统一转描边图标 */}
+                    <EmojiIcon icon={entry.icon} size={20} />
                   </span>
                   <span className="portal-treasure-data-copy">
                     <b>{entry.name}</b>
@@ -318,7 +320,7 @@ export default function ToolsTreasurePopup({
                 className={selectedToolboxAction?.id === tool.id ? 'is-selected' : ''}
                 onClick={() => handleAddTool(tool.id, label)}
               >
-                <span className="portal-treasure-screen-icon" aria-hidden>{tool.icon}</span>
+                <span className="portal-treasure-screen-icon" aria-hidden><EmojiIcon icon={tool.icon} size={22} /></span>
                 <b>{label}</b>
                 <small>{selectedToolboxAction?.id === tool.id ? t(locale, 'toolboxAdded') : t(locale, 'toolboxAdd')}</small>
               </button>
@@ -348,7 +350,7 @@ export default function ToolsTreasurePopup({
                 className={selectedToolboxAction?.id === pack.id ? 'is-selected' : ''}
                 onClick={() => handleSelectPackage(pack.id, label)}
               >
-                <span aria-hidden>{pack.icon}</span>
+                <span aria-hidden><EmojiIcon icon={pack.icon} size={18} /></span>
                 <b>{label}</b>
                 <small>{t(locale, pack.descriptionKey)}</small>
               </button>

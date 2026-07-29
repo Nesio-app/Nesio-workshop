@@ -14,6 +14,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import LoadingCard from './ui/LoadingCard';
+import { fetchWithTimeout } from '@/lib/portal/fetch-timeout';
 
 interface TeslaDrive {
   vehicleId: string;
@@ -52,10 +53,8 @@ export default function TeslaPanel() {
   // 15s 到点主动 abort → 走下面的 catch → 显式失败态 + 再试一次(CLAUDE.md 红线)。
   const load = useCallback(async () => {
     setState('loading');
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), 15_000);
     try {
-      const res = await fetch('/api/portal/tesla', { cache: 'no-store', signal: ctrl.signal });
+      const res = await fetchWithTimeout('/api/portal/tesla', { cache: 'no-store' }, 15_000);
       const data = await res.json() as { ok?: boolean; error?: string; drives?: TeslaDrive[]; charges?: TeslaCharge[] };
       if (!data.ok) {
         setErrMsg(data.error === 'not_connected' || data.error === 'token_expired'
@@ -77,8 +76,6 @@ export default function TeslaPanel() {
     } catch {
       setErrMsg(L(dict, '这次没等到车的回应 —— 它可能在深度休眠。稍后再试一次。', 'The car did not answer this time — it may be in deep sleep. Try again shortly.'));
       setState('error');
-    } finally {
-      clearTimeout(timer);
     }
   }, [dict]);
 

@@ -4,6 +4,7 @@
  * 纯 fetch,不 import 服务端模块(client 安全)。
  */
 import type { Cadence } from '@/lib/family/chores-core';
+import { fetchWithTimeout } from '@/lib/portal/fetch-timeout';
 
 export type ChoreStateView = 'todo' | 'done' | 'approved' | 'paid';
 export interface FamilyMemberView { id: string; name: string; canApprove: boolean; needsApproval: boolean; canRecordPayout: boolean; email?: string; avatarUrl?: string; goalAmount?: number; goalLabel?: string; }
@@ -36,19 +37,13 @@ export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };
  * fetch 不带 signal 时,网关不回 / 连接半挂,浏览器会**一直**等下去 ——
  * 于是 setLoading(false) 永远不执行,加载态就停在那儿,看起来像卡死。
  * 12s 到点就当 network 处理,UI 拿到显式失败态 + 重试(CLAUDE.md 红线)。
+ * 超时实现走共用的 fetchWithTimeout,全站只有那一份。
  */
 const TIMEOUT_MS = 12_000;
 
 async function api<T>(url: string, init?: RequestInit): Promise<ApiResult<T>> {
   try {
-    const ctrl = new AbortController();
-    const timer = setTimeout(() => ctrl.abort(), TIMEOUT_MS);
-    let res: Response;
-    try {
-      res = await fetch(url, { cache: 'no-store', signal: ctrl.signal, ...init });
-    } finally {
-      clearTimeout(timer);
-    }
+    const res = await fetchWithTimeout(url, { cache: 'no-store', ...init }, TIMEOUT_MS);
     // 平台超时回非 JSON —— 安全解析,别炸进 catch 误报网络
     let body: unknown = null;
     try { body = JSON.parse(await res.text()); } catch { /* 网关页 */ }

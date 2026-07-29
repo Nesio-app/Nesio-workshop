@@ -14,6 +14,7 @@ import {
 } from '@/lib/portal/body-ledger';
 import { getMeals } from '@/lib/cooking/meals';
 import { L } from '@/lib/portal/i18n';
+import SegTabs from '../ui/SegTabs';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { IconUtensils, IconZap, IconChevronRight, IconCheckCircle } from '../icons';
@@ -352,24 +353,17 @@ export default function BodyLedgerPanel({
 
   return (
     <div className="nesio-body-ledger">
-      <div className="nesio-bl-tabs" role="tablist" aria-label={L(dict, '身体账本', 'Body ledger')}>
-        {([
+      {/* 2026-07-29:原 .nesio-bl-tabs 是全站分段控件的第 6 套,收敛到 SegTabs。 */}
+      <SegTabs
+        items={([
           ['today', '今日账本', 'Today'],
           ['postmeal', '餐后血糖', 'Post-meal'],
           ['reaction', '稳 / 飙', 'Steady / spike'],
-        ] as const).map(([id, zh, en]) => (
-          <button
-            key={id}
-            type="button"
-            role="tab"
-            aria-selected={section === id}
-            className={`nesio-bl-tab${section === id ? ' is-active' : ''}`}
-            onClick={() => setSection(id)}
-          >
-            {L(dict, zh, en)}
-          </button>
-        ))}
-      </div>
+        ] as const).map(([id, zh, en]) => ({ key: id, label: L(dict, zh, en) }))}
+        active={section}
+        onSelect={setSection}
+        ariaLabel={L(dict, '身体账本', 'Body ledger')}
+      />
 
       {section === 'today' && (
         <TodayBody

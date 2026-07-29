@@ -712,7 +712,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         )}
         {/* 批次202:跨端同步诊断 —— 每端一眼看出 版本/登录/身份戳,定位为何不同步 */}
         <div style={{ marginTop: '0.55rem', paddingTop: '0.45rem', borderTop: '1px solid var(--portal-line)', fontSize: '0.62rem', color: 'var(--portal-muted)', lineHeight: 1.7 }}>
-          <div>{L(dict, '同步诊断', 'Sync diag')} · {L(dict, '构建', 'build')} <b>{buildSha}</b> · {signedIn ? L(dict, '已登录', 'signed in') : <b style={{ color: 'var(--status-risk)' }}>{L(dict, '⚠ 未登录', '⚠ signed out')}</b>}</div>
+          <div>{L(dict, '同步诊断', 'Sync diag')} · {L(dict, '构建', 'build')} <b>{buildSha}</b> · {signedIn ? L(dict, '已登录', 'signed in') : <b style={{ color: 'var(--status-risk)' }}>{L(dict, '未登录', 'signed out')}</b>}</div>
           <div>{L(dict, '身份戳', 'identity')} · {L(dict, '本机', 'local')} {fmtAt(diagLocalAt)} · {L(dict, '云端', 'cloud')} {fmtAt(diagCloudAt)}</div>
           <button type="button" onClick={handleForceSync} style={{ marginTop: 5, fontSize: '0.66rem', padding: '0.25rem 0.65rem', borderRadius: 8, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-blue-deep)', cursor: 'pointer' }}>{L(dict, '立即同步(记忆+头像名字)', 'Sync now')}</button>
           {diagSyncMsg && <span style={{ marginLeft: 8 }}>{diagSyncMsg}</span>}
@@ -737,7 +737,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       {/* 备份与恢复(图2:去掉「云同步与备份」标题与登录同步行,直接进备份目的地) */}
       <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', margin: '1.2rem 0 0.3rem' }}>{L(dict, '备份到哪里', 'Back up to')}</p>
       <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-        {([['drive', L(dict, '☁ Google Drive · 免费', '☁ Google Drive · Free')], ['nesio', L(dict, `☁ Nesio 云${cloudEntitled ? '' : ' · Pro 免费'}`, `☁ Nesio cloud${cloudEntitled ? '' : ' · free with Pro'}`)]] as const).map(([d, label]) => (
+        {([['drive', L(dict, 'Google Drive · 免费', 'Google Drive · Free')], ['nesio', L(dict, `Nesio 云${cloudEntitled ? '' : ' · Pro 免费'}`, `Nesio cloud${cloudEntitled ? '' : ' · free with Pro'}`)]] as const).map(([d, label]) => (
           <button key={d} type="button" onClick={() => pickBackupDest(d)}
             style={{ flex: 1, padding: '0.4rem 0.5rem', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer',
               border: `1px solid ${backupDest === d ? 'var(--portal-accent-border)' : 'var(--portal-line)'}`,

@@ -18,7 +18,7 @@ import {
 import { wallHHMM, dateKeyToLocalDate } from '@/lib/portal/place-time.mjs';
 import { monthlyPlaceComparison, weekRhythm, footprintHighlights } from '@/lib/portal/place-stats';
 import PlaceMap from './PlaceMap';
-import { IconHome, IconUtensils, IconCard, IconActivity, IconBriefcase, IconPlane, IconBed, IconHeartPulse, IconBook, IconSun, IconStar, IconMapPin, NodeTypeIcon } from '../icons';
+import { IconHome, IconUtensils, IconCard, IconActivity, IconBriefcase, IconPlane, IconBed, IconHeartPulse, IconBook, IconSun, IconStar, IconMapPin, IconCar, IconWalk, NodeTypeIcon } from '../icons';
 import { displayNodeName } from '@/lib/portal/node-display';
 
 // 到访记忆列表:类型 → 图标底色(与记忆详情类型条同一套 chip 语义色)
@@ -37,6 +37,7 @@ const PlacePickerSheet = dynamic(() => import('../PlacePickerSheet'), { ssr: fal
 const Globe = dynamic(() => import('./Globe'), { ssr: false });
 const PlacesShareSheet = dynamic(() => import('../PlacesShareSheet'), { ssr: false });
 import { L } from '@/lib/portal/i18n';
+import SegTabs from '../ui/SegTabs';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import NesioSheet from '../ui/NesioSheet';
@@ -663,7 +664,7 @@ export default function TimelineTab() {
             >
               {locateBusy
                 ? L(dict, '正在定位…', 'Locating…')
-                : L(dict, '📍 标记当前位置(验证定位)', '📍 Mark here (prove GPS)')}
+                : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><IconMapPin size={14} />{L(dict, '标记当前位置(验证定位)', 'Mark here (prove GPS)')}</span>}
             </button>
           </div>
           {locateMsg && (
@@ -689,13 +690,15 @@ export default function TimelineTab() {
               'The map only plots visits in your trail (including Google Timeline imports), not a live GPS blue dot. Use “Mark here” to prove current location.',
             )}
           </p>
-          {/* 设计对齐 Google Timeline:🚗 驾车 · 🚶 步行 · 📍 到访(有分模式数据就分开显示)*/}
+          {/* 设计对齐 Google Timeline:驾车 · 步行 · 到访(有分模式数据就分开显示)。
+              2026-07-29:图标从原生 emoji(🚗🚶📍)换成站内描边图标 —— emoji 在各平台
+              长相不一,和旁边的线性图标也不是一套。 */}
           {(() => {
             const moves = journey.filter((it): it is Extract<typeof it, { kind: 'move' }> => it.kind === 'move');
             const sum = (m: 'drive' | 'walk') => moves.filter((it) => it.mode === m).reduce((a, it) => ({ km: a.km + it.km, min: a.min + it.durationMin }), { km: 0, min: 0 });
             const drive = sum('drive');
             const walk = sum('walk');
-            const jstat = (icon: string, km: number, min: number, label: string) => (
+            const jstat = (icon: React.ReactNode, km: number, min: number, label: string) => (
               <div className="nesio-tl-jstat">
                 <span className="nesio-tl-jstat-ic" aria-hidden>{icon}</span>
                 <div className="nesio-tl-jstat-body">
@@ -706,11 +709,11 @@ export default function TimelineTab() {
             );
             return (
               <div className="nesio-tl-stats nesio-tl-stats--journey">
-                {drive.km > 0 && jstat('🚗', drive.km, drive.min, '')}
-                {walk.km > 0 && jstat('🚶', walk.km, walk.min, '')}
-                {drive.km === 0 && walk.km === 0 && stats.moveKm > 0 && jstat('🚗', stats.moveKm, 0, '')}
+                {drive.km > 0 && jstat(<IconCar size={15} />, drive.km, drive.min, '')}
+                {walk.km > 0 && jstat(<IconWalk size={15} />, walk.km, walk.min, '')}
+                {drive.km === 0 && walk.km === 0 && stats.moveKm > 0 && jstat(<IconCar size={15} />, stats.moveKm, 0, '')}
                 <div className="nesio-tl-jstat">
-                  <span className="nesio-tl-jstat-ic" aria-hidden>📍</span>
+                  <span className="nesio-tl-jstat-ic" aria-hidden><IconMapPin size={15} /></span>
                   <div className="nesio-tl-jstat-body">
                     <span className="nesio-tl-jstat-v">{stats.visits}</span>
                     <span className="nesio-tl-jstat-sub">{L(dict, '到访', 'visits')}</span>
@@ -746,7 +749,7 @@ export default function TimelineTab() {
               </div>
             ) : (
               <div key={i} className="nesio-tl-item nesio-tl-item--move">
-                <span className="nesio-tl-move-icon" aria-hidden>{it.mode === 'walk' ? '🚶' : it.mode === 'drive' ? '🚗' : '·'}</span>
+                <span className="nesio-tl-move-icon" aria-hidden>{it.mode === 'walk' ? <IconWalk size={14} /> : it.mode === 'drive' ? <IconCar size={14} /> : '·'}</span>
                 <span className="nesio-tl-move-text">{modeLabel(it.mode)} · {L(dict, `约 ${fmtDist(it.km)}`, `~${fmtDist(it.km)}`)}{it.durationMin >= 1 ? ` · ${fmtDur(it.durationMin)}` : ''}</span>
               </div>
             ))}
@@ -904,18 +907,20 @@ export default function TimelineTab() {
           <p className="nesio-insights-empty">{L(dict, '还没有地点。多授权定位、或导入 Google 时间轴,这里会按类别攒出你去过的地方。', 'No places yet. Grant location or import Google Timeline and your visited places gather here by category.')}</p>
         ) : (
           <>
-            {/* 日/周/月/年 —— 四段平分一整行 */}
-            <div className="nesio-tl-seg nesio-tl-seg--4" role="tablist" aria-label={L(dict, '时段', 'Period')}>
-              {(['day', 'week', 'month', 'year'] as const).map((p) => (
-                <button key={p} type="button" role="tab" aria-selected={placePeriod === p}
-                  className={`nesio-tl-seg-opt${placePeriod === p ? ' is-on' : ''}`}
-                  onClick={() => { setPlacePeriod(p); setPieSel(null); }}>
-                  {L(dict,
-                    p === 'day' ? '日' : p === 'week' ? '周' : p === 'month' ? '月' : '年',
-                    p === 'day' ? 'Day' : p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year')}
-                </button>
-              ))}
-            </div>
+            {/* 日/周/月/年 —— 四段平分一整行。
+                2026-07-29:原 .nesio-tl-seg 是全站分段控件的第 7 套,收敛到 SegTabs。 */}
+            <SegTabs
+              size="sm"
+              items={(['day', 'week', 'month', 'year'] as const).map((p) => ({
+                key: p,
+                label: L(dict,
+                  p === 'day' ? '日' : p === 'week' ? '周' : p === 'month' ? '月' : '年',
+                  p === 'day' ? 'Day' : p === 'week' ? 'Week' : p === 'month' ? 'Month' : 'Year'),
+              }))}
+              active={placePeriod}
+              onSelect={(p) => { setPlacePeriod(p); setPieSel(null); }}
+              ariaLabel={L(dict, '时段', 'Period')}
+            />
 
             {placeShare.length === 0 ? (
               <p className="nesio-insights-empty" style={{ marginTop: '1rem' }}>{L(dict, '这段时间还没有地点记录 —— 换个时段看看。', 'No places in this period — try another range.')}</p>

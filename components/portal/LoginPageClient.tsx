@@ -5,6 +5,7 @@ import NesioMark from './NesioMark';
 import { loadProfileSettings, saveProfileSettings, type PortalLocale } from '@/lib/portal/profile';
 import { getAuthRedirectTo, importSupabaseHashSession } from '@/lib/portal/auth-client';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
+import { IconMail } from './icons';
 
 type AuthState = 'idle' | 'loading' | 'email_sent' | 'error';
 type AuthMode = 'login' | 'register';
@@ -167,7 +168,7 @@ export default function LoginPageClient() {
 
         {state === 'email_sent' ? (
           <div className="nesio-login-sent">
-            <div style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: '0.75rem' }}>📬</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem', color: 'var(--portal-accent)' }} aria-hidden><IconMail size={38} /></div>
             <h2 className="nesio-ob-step-title">{zh ? '查一下邮件' : 'Check your email'}</h2>
             <p className="nesio-ob-step-sub">{zh ? `登录链接已发到 ${email}，点击链接完成登录。` : `A sign-in link was sent to ${email}.`}</p>
             <a href="/" className="nesio-ob-primary-btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: '1rem' }}>

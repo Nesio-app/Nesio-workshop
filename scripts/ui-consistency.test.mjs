@@ -29,6 +29,8 @@ const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, 
     'components/portal/insights/SchedulePanel.tsx',
     'components/portal/insights/WardrobePanel.tsx',
     'components/portal/cooking/CookingSheet.tsx',
+    // 2026-07-29 复审补录:这两处也是各写一套(第 6、7 套),一并收编
+    'components/portal/health/BodyLedgerPanel.tsx',
   ];
   for (const f of CALLERS) {
     const c = code(read(f));
@@ -40,7 +42,7 @@ const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, 
   assert.match(css, /\.nesio-seg\s*\{/, 'globals.css 里没有 .nesio-seg —— SegTabs 会渲染成裸按钮');
   assert.match(css, /\.nesio-seg-tab\.is-active\s*\{/, '.nesio-seg-tab.is-active 缺失 —— 选中态看不出来');
   // 旧的四套必须彻底删掉:留在 CSS 里就会被下一个人再引用,不一致立刻回来。
-  for (const dead of ['.nesio-health-subtab', '.ng-subtabs']) {
+  for (const dead of ['.nesio-health-subtab', '.ng-subtabs', '.nesio-bl-tab', '.nesio-tl-seg']) {
     assert.ok(!css.includes(dead), `旧分段控件样式 ${dead} 还在 globals.css 里 —— 删干净,否则会被重新引用`);
   }
   // 日程那套借的是「设置行」样式当 tab,最不像 tab 的一处
@@ -55,15 +57,27 @@ const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, 
 // 用户看到的是「卡死在加载中…」/「卡死在正在向车问好…」。动效再好看也救不了
 // 一条永不返回的 fetch —— 超时才是修复本身。
 {
-  const fam = code(read('lib/family/family-client.ts'));
-  assert.match(fam, /new AbortController\(\)/, 'family-client 的 fetch 没有超时 —— 家务页会永远停在加载态');
-  assert.match(fam, /signal:\s*ctrl\.signal/, 'family-client 造了 AbortController 却没把 signal 传给 fetch(等于没超时)');
-  assert.match(fam, /setTimeout\(\(\)\s*=>\s*ctrl\.abort\(\)/, 'family-client 有 signal 但没人 abort 它');
+  // 超时实现只有一份:lib/portal/fetch-timeout.ts。它本身必须真的会 abort。
+  const helper = code(read('lib/portal/fetch-timeout.ts'));
+  assert.match(helper, /new AbortController\(\)/, 'fetchWithTimeout 没有 AbortController —— 它就不是「带超时」的 fetch');
+  assert.match(helper, /setTimeout\(\(\)\s*=>\s*ctrl\.abort\(\)/, 'fetchWithTimeout 造了 controller 却没人到点 abort');
+  assert.match(helper, /signal:\s*ctrl\.signal/, 'fetchWithTimeout 没把 signal 传给 fetch(等于没超时)');
+  // 调用方自己的 signal 不能被吃掉 —— 直接覆盖会悄悄废掉「组件卸载时取消」。
+  assert.match(helper, /addEventListener\('abort'/, 'fetchWithTimeout 覆盖了调用方的 signal 而没有合流,调用方的取消能力被吃掉了');
 
-  const tesla = code(read('components/portal/TeslaPanel.tsx'));
-  assert.match(tesla, /new AbortController\(\)/, 'TeslaPanel 的 fetch 没有超时 —— 车深度休眠时会永远停在「正在向车问好…」');
-  assert.match(tesla, /signal:\s*ctrl\.signal/, 'TeslaPanel 造了 AbortController 却没把 signal 传给 fetch');
-  assert.match(tesla, /setTimeout\(\(\)\s*=>\s*ctrl\.abort\(\)/, 'TeslaPanel 有 signal 但没人 abort 它');
+  // 三个曾经/可能卡死的加载路径必须走它,而不是裸 fetch。
+  for (const [f, why] of [
+    ['lib/family/family-client.ts', '家务页会永远停在「加载中…」'],
+    ['components/portal/TeslaPanel.tsx', '车深度休眠时会永远停在「正在向车问好…」'],
+    ['components/portal/insights/AdminOpsPanel.tsx', '运营页会永远停在加载态'],
+  ]) {
+    const c = code(read(f));
+    assert.match(c, /fetchWithTimeout\(/, `${f} 的 fetch 没有超时 —— ${why}`);
+    assert.ok(
+      !/(?<!With)\bfetch\(/.test(c.replace(/fetchWithTimeout\(/g, 'FWT(')),
+      `${f} 里还有裸 fetch( —— 漏掉的那条照样会把界面挂死`,
+    );
+  }
 
   // 等待态本身也要是卡片 + 骨架,不是一行裸灰字(用户原话:「裸文字、无卡片、无动效」)。
   // 光断言「文件里有 LoadingCard」不够 —— 三处等待态里退化一处照样绿(变异测试抓到的)。
@@ -85,11 +99,15 @@ const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, 
   assert.match(read('app/globals.css'), /\.nesio-skeleton-bar\s*\{/, '骨架条样式没了 —— LoadingCard 会渲染成空白');
 }
 
-// 口径:彩色 emoji(0x1F000+)+ Misc Symbols(☔ ⚠ ⚡ 这一段,0x2600–0x26FF)。
-// **不**算 Dingbats(0x2700–0x27BF)—— ✓ ✕ ✎ 是排版符号,全站在用,不是 emoji。
+// 什么算「原生 emoji」:**默认就以彩色 emoji 呈现**的字符。
+//   · 0x1F000–0x1FAFF 整段(👕 🚗 🎁 …);
+//   · 0x2600–0x27BF 这一段是混的 —— ☔ ⚡ ⏰ 是彩色 emoji,而 ★ ✓ ✕ ✎ ☑ 是**排版符号**,
+//     全站拿来当难度星/勾叉在用,不该被当成 emoji 抓。所以这段只列默认彩显的那几个。
+//   · 任何字符 + U+FE0F(emoji 变体选择符)一律算 —— ⚠️ 就是靠它变彩的。
+const DEFAULT_EMOJI_2600 = new Set([...'⌚⌛⏩⏪⏫⏬⏰⏳☔☕♈♉♊♋♌♍♎♏♐♑♒♓♿⚓⚡⚪⚫⚽⚾⛄⛅⛎⛔⛪⛲⛳⛵⛺⛽']);
 const isEmoji = (ch) => {
   const c = ch.codePointAt(0);
-  return (c >= 0x1f000 && c <= 0x1faff) || (c >= 0x2600 && c <= 0x26ff) || c === 0xfe0f;
+  return (c >= 0x1f000 && c <= 0x1faff) || DEFAULT_EMOJI_2600.has(ch) || c === 0xfe0f;
 };
 
 // ── ③ 衣橱里不许再出现原生 emoji ─────────────────────────────────────────────
@@ -107,17 +125,49 @@ const isEmoji = (ch) => {
   assert.match(ins, /case 'wardrobe': return <IconHanger \/>/, '洞察宫格的衣橱图标又变回书签了');
 }
 
-// ── ④ 404 不许脱离主题 ───────────────────────────────────────────────────────
-// 原来是硬编码 #588ce3 + 系统 emoji 指南针,整站换成暖调皮肤后它还是蓝的。
-{
-  const nf = code(read('app/not-found.tsx'));
+// ── ④ 三个「出错页」都不许脱离主题 ──────────────────────────────────────────
+// 原来 not-found / error / global-error 三份都是硬编码 #588ce3 + 系统 emoji。
+// 上一轮只修了 not-found,另两份是同一个模板复制出来的 —— 一起锁,否则改一个漏两个。
+for (const f of ['app/not-found.tsx', 'app/error.tsx', 'app/global-error.tsx']) {
+  const nf = code(read(f));
   // 先摘掉 var(--x, #fff) 这种**兜底**值(那是 token 缺失时的最后一道,全站惯例),
   // 剩下任何裸色值都算硬编码。
   const nfColors = nf.replace(/var\([^)]*,\s*#[0-9a-fA-F]{3,8}\)/g, '');
   assert.ok(!/#[0-9a-fA-F]{3,8}\b/.test(nfColors),
-    `404 页又硬编码色值了(${(nfColors.match(/#[0-9a-fA-F]{3,8}\b/g) || []).join(' ')})—— 全站有四套可切换皮肤,写死的颜色只对其中一套`);
-  assert.match(nf, /var\(--portal-accent\)/, '404 的主按钮没有走强调色 token');
-  assert.ok(![...nf].some(isEmoji), '404 页又用回系统 emoji 了');
+    `${f} 又硬编码色值了(${(nfColors.match(/#[0-9a-fA-F]{3,8}\b/g) || []).join(' ')})—— 全站有四套可切换皮肤,写死的颜色只对其中一套`);
+  assert.match(nf, /var\(--portal-accent[,)]/, `${f} 的主按钮没有走强调色 token`);
+  assert.ok(![...nf].some(isEmoji), `${f} 又用回系统 emoji 了`);
+}
+
+// ── ⑤ 界面上不许出现原生 emoji(全 components 扫,不只衣橱)────────────────────
+// 数据层可以继续存 emoji 字符串(跨版本/跨仓共享,迁移代价大),但渲染层必须过
+// icons.tsx 的 EmojiIcon 转成描边图标。这条盯的是**渲染**,所以放行三类:
+//   · icons.tsx 里那张转换表本身;
+//   · 聊天的 emoji 表情选择器(那是用户要发的内容,不是 UI 图标);
+//   · 纯数据常量行(icon: '📖' / emoji: '⚡' 这种,渲染层会转)。
+{
+  const SKIP = ['components/portal/icons.tsx'];
+  const offenders = [];
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(new URL(`../${dir}`, import.meta.url), { withFileTypes: true })) {
+      const rel = `${dir}/${e.name}`;
+      if (e.isDirectory()) { walk(rel); continue; }
+      if (!/\.(tsx|ts)$/.test(e.name) || SKIP.includes(rel)) continue;
+      const c = code(read(rel));
+      c.split('\n').forEach((line, i) => {
+        if (!/[<>{]/.test(line)) return;                       // 非 JSX/表达式行不看
+        // 纯数据常量行(icon: '📖' / emoji: '⚡'):渲染层会经 EmojiIcon 转换,放行
+        if (/\b(icon|emoji)\s*:\s*(s\.\w+\s*\|\|\s*)?'/.test(line) && !/<[A-Za-z]/.test(line)) return;
+        if (/\].map\(\(em\)/.test(line) || /'😊'/.test(line)) return; // 表情选择器
+        if ([...line].some(isEmoji)) offenders.push(`${rel}:${i + 1} ${line.trim().slice(0, 80)}`);
+      });
+    }
+  };
+  walk('components');
+  assert.equal(
+    offenders.length, 0,
+    `界面上又出现原生 emoji(渲染层必须走 icons.tsx 的 EmojiIcon):\n  ${offenders.join('\n  ')}`,
+  );
 }
 
 console.log('ui-consistency: OK(分段控件唯一 · 加载态有尽头 · 衣橱无 emoji · 404 跟主题)');

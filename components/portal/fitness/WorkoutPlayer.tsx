@@ -207,7 +207,7 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
     return (
       <div className="nesio-wp-overlay">
         <div className="nesio-wp-done">
-          <p className="nesio-wp-done-title">{L(dict, '练完了 💪', 'Workout done 💪')}</p>
+          <p className="nesio-wp-done-title">{L(dict, '练完了', 'Workout done')}</p>
           <p className="nesio-wp-done-sub">{L(dict, `${steps.length} 个动作 · 打卡 +${POINTS_PER_FITNESS_SESSION} 积分`, `${steps.length} exercises · +${POINTS_PER_FITNESS_SESSION} pts`)}</p>
           <button type="button" className="nesio-wp-primary" onClick={finish}>{L(dict, '完成打卡', 'Log it')}</button>
         </div>

@@ -10,6 +10,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
+import { fetchWithTimeout } from '@/lib/portal/fetch-timeout';
+import LoadingCard from '../ui/LoadingCard';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
@@ -136,7 +138,9 @@ export default function AdminOpsPanel() {
   const load = useCallback(async (withSecret: string) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/metrics', { headers: withSecret ? { 'x-nesio-admin-secret': withSecret } : {} });
+      // 2026-07-29:裸 fetch 无超时 —— 后台指标接口卡住时,下面那句 `if (!data)` 的
+      // 「加载中…」就永远退不掉(和家务/车两页同一个病)。走带上限的 fetch。
+      const res = await fetchWithTimeout('/api/admin/metrics', { headers: withSecret ? { 'x-nesio-admin-secret': withSecret } : {} });
       const json = await res.json() as Metrics;
       setData(json);
       if (json.ok) { try { localStorage.setItem(SECRET_KEY, withSecret); } catch { /* ignore */ } }
@@ -192,7 +196,7 @@ export default function AdminOpsPanel() {
   }
 
   if (!data) {
-    return <div className="nesio-analytics-tab"><p className="nesio-insights-empty" style={{ marginTop: 0 }}>{L(dict, '加载中…', 'Loading…')}</p></div>;
+    return <div className="nesio-analytics-tab"><LoadingCard label={L(dict, '正在读后台指标…', 'Loading backend metrics…')} lines={3} /></div>;
   }
 
   const srcBad = (data.sources && (!data.sources.telemetryEvents.ok || !data.sources.productEvents.ok));

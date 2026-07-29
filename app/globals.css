@@ -13289,21 +13289,6 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 
 /* 身体账本 / 护理(健康 × 美味) */
 .nesio-body-ledger, .nesio-beauty-care { display: flex; flex-direction: column; gap: var(--space-3); }
-.nesio-bl-tabs {
-  display: flex; gap: 4px; padding: 3px;
-  border-radius: var(--radius-pill);
-  background: var(--portal-surface-2, rgba(127, 127, 127, 0.08));
-}
-.nesio-bl-tab {
-  flex: 1; border: 0; background: transparent; cursor: pointer;
-  padding: 0.45rem 0.2rem; border-radius: var(--radius-pill);
-  font-family: var(--font-sans); font-size: var(--text-xs); font-weight: var(--weight-semibold);
-  color: var(--portal-muted);
-}
-.nesio-bl-tab.is-active {
-  background: var(--sheet-opaque, #fff); color: var(--portal-ink);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-}
 .nesio-bl-section { display: flex; flex-direction: column; gap: var(--space-3); }
 .nesio-bl-lede {
   margin: 0; font-family: var(--font-serif);
@@ -13990,16 +13975,6 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 .nesio-tl-cat-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.35rem; font-size: 0.82rem; color: var(--portal-ink); }
 
 /* ── 地点 tab(设计稿③):周/月/年 segmented + 饼图 + 图例 + 最常去排行 ── */
-.nesio-tl-seg {
-  display: flex; width: 12rem; margin-top: 0.9rem; padding: 3px;
-  background: color-mix(in srgb, var(--portal-ink) 4%, transparent);
-  border: 1px solid var(--portal-line); border-radius: 0.7rem;
-}
-.nesio-tl-seg-opt {
-  flex: 1; text-align: center; padding: 0.38rem 0; border: none; background: none;
-  font-size: 0.8rem; font-weight: 700; color: var(--portal-muted); cursor: pointer; border-radius: 0.52rem;
-}
-.nesio-tl-seg-opt.is-on { background: var(--glass-bg-solid); color: var(--portal-ink); box-shadow: 0 1px 4px rgba(0,0,0,.08); }
 .nesio-tl-donutwrap { display: flex; align-items: center; gap: 1.25rem; margin-top: 1.3rem; }
 .nesio-tl-donut {
   width: 9.4rem; height: 9.4rem; border-radius: 50%; flex-shrink: 0; position: relative;
@@ -14014,7 +13989,6 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 .nesio-tl-donut-ctr b { font-size: 1.6rem; font-weight: 800; color: var(--portal-ink); }
 .nesio-tl-donut-ctr small { font-size: 0.66rem; font-weight: 700; color: var(--portal-muted); }
 /* 四段平分一整行 */
-.nesio-tl-seg--4 { width: 100%; }
 /* 可交互甜甜圈:图例贴饼里 + 点扇形出详情 */
 .nesio-tl-donut2wrap { display: flex; justify-content: center; margin-top: 1.3rem; }
 .nesio-tl-donut2 { position: relative; width: 12.5rem; height: 12.5rem; }

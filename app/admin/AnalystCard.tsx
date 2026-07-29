@@ -157,7 +157,7 @@ export function AnalystCard({ secret }: { secret: string }) {
             fontSize: '0.64rem', color: 'var(--portal-muted)', marginLeft: 'auto', cursor: 'pointer',
             background: 'transparent', border: 'none', padding: 0, textDecoration: 'underline',
           }}>
-            🧠 学到了什么 · 历史 {L.historyDays} 天 · 静音 {L.mutedByFeedback} {showLearn ? '▲' : '▼'}
+            学到了什么 · 历史 {L.historyDays} 天 · 静音 {L.mutedByFeedback} {showLearn ? '▲' : '▼'}
           </button>
         )}
       </div>

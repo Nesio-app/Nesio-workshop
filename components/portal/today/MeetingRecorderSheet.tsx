@@ -1,6 +1,6 @@
 'use client';
 
-import { IconMic } from '../icons';
+import { IconMic, IconNote } from '../icons';
 
 /**
  * MeetingRecorderSheet — 会议记录 sheet:Web Speech 中文转写 + 手动输入,
@@ -167,7 +167,7 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
 
         {saved ? (
           <div className="nesio-recorder-saved">
-            <span className="nesio-recorder-saved-icon">📝</span>
+            <span className="nesio-recorder-saved-icon" aria-hidden><IconNote size={22} /></span>
             <p className="nesio-recorder-saved-title">{L(dict, '会议记录已保存', 'Meeting notes saved')}</p>
             {extraction && (extraction.todo?.length || extraction.inferred?.length) ? (
               <div className="nesio-recorder-actions-result">
