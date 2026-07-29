@@ -152,7 +152,6 @@ async function fetchAskResponse(query: string, candidates: LifeNode[]): Promise<
           answer: `找到 ${localHits.result.length} 条相关记录`,
           aggregations: [],
           webSearchUsed: false,
-          source: 'local' as const,
         };
       },
       // Cloud: 云端对话式问答（付费用户走这路）
@@ -187,7 +186,13 @@ async function fetchAskResponse(query: string, candidates: LifeNode[]): Promise<
           aggregations?: AskAggregation[];
           webSearchUsed?: boolean;
         };
-        return { ...data, source: 'cloud' as const };
+        return {
+          ok: data.ok === true,
+          matches: data.matches || [],
+          answer: data.answer || '',
+          aggregations: data.aggregations || [],
+          webSearchUsed: data.webSearchUsed || false,
+        };
       }
     );
 

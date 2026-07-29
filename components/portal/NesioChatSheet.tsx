@@ -444,7 +444,6 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
               type: 'tag',
             })),
             summary: localResult.result.text || L(dict, '（本地识别）', 'Local recognition'),
-            source: 'local' as const,
           };
         },
         // Cloud: 云端 AI 识别（付费用户走这路）
@@ -453,8 +452,12 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
             method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType }),
           });
-          const data = await res.json() as { ok?: boolean; nodes?: Array<{ name: string; type: string; tags?: string[] }>; summary?: string };
-          return { ...data, source: 'cloud' as const };
+          const data = await res.json() as { ok: boolean; nodes?: Array<{ name: string; type: string; tags?: string[] }>; summary?: string };
+          return {
+            ok: data.ok === true,
+            nodes: data.nodes || [],
+            summary: data.summary || L(dict, '（云端识别）', 'Cloud recognition'),
+          };
         }
       );
 
@@ -462,7 +465,7 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
       if (data.ok && data.nodes?.length) {
         const names = data.nodes.map((n) => n.name).join(L(dict, '、', ', '));
         // 显示识别来源（本地/云端）
-        const sourceHint = data.source === 'local'
+        const sourceHint = result.source === 'local'
           ? L(dict, '（本地识别）', '(local)')
           : '';
         onResult(

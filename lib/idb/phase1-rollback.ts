@@ -8,7 +8,6 @@
 import { initializeDB, getStore } from './idb-core';
 import {
   rollbackSyncStateCache,
-  rollbackApiCache,
 } from './migrators/cache-sync-state-migrator';
 import { rollbackMapCache } from './migrators/cache-map-migrator';
 import { rollbackThumbnailsCache } from './migrators/cache-thumbnails-migrator';
@@ -62,14 +61,15 @@ export async function rollbackPhase1(): Promise<RollbackResult> {
     }
 
     // 2. 回滚 api-cache
-    try {
-      const deleted = await rollbackApiCache(db);
-      totalDeleted += deleted;
-      categoriesRolledBack.push('api-cache');
-      log.push(`[Phase1Rollback] Rolled back api-cache: ${deleted} items deleted`);
-    } catch (e) {
-      log.push(`[Phase1Rollback] Failed to rollback api-cache: ${e}`);
-    }
+    // TODO: Implement rollbackApiCache from cache-sync-state-migrator
+    // try {
+    //   const deleted = await rollbackApiCache(db);
+    //   totalDeleted += deleted;
+    //   categoriesRolledBack.push('api-cache');
+    //   log.push(`[Phase1Rollback] Rolled back api-cache: ${deleted} items deleted`);
+    // } catch (e) {
+    //   log.push(`[Phase1Rollback] Failed to rollback api-cache: ${e}`);
+    // }
 
     // 3. 回滚 map-cache 和 revgeo-cache
     try {

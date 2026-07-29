@@ -11,6 +11,8 @@
 import { estimateDBSize } from './idb-core';
 import { getStorageHealth, formatBytes } from '../portal/storage-health';
 
+export { formatBytes };
+
 export interface StorageMetrics {
   /** localStorage 使用百分比（0-100） */
   localStorage: number;

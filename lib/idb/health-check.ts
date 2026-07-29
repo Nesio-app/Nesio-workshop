@@ -18,7 +18,7 @@ import { verifyIntegrity, getGlobalLamportClock } from './version-manager';
 const HEALTH_CHECK_INTERVAL = 5 * 60 * 1000; // 5 分钟
 const DIAGNOSTICS_BATCH_SIZE = 10; // 每批最多上报 10 条
 
-interface HealthCheckResult {
+export interface HealthCheckResult {
   timestamp: number;
   isHealthy: boolean;
   checks: {
@@ -72,9 +72,10 @@ export async function performHealthCheck(): Promise<HealthCheckResult> {
     }
 
     // 检查 2: 配额
+    let quotaData = null;
     try {
-      const quota = await checkQuota();
-      checks.quotaOk = quota.usage < quota.quota * 0.95; // 允许 95% 使用
+      quotaData = await checkQuota();
+      checks.quotaOk = quotaData ? quotaData.usage < quotaData.quota * 0.95 : false; // 允许 95% 使用
     } catch (error) {
       errors.push(`Quota check failed: ${error instanceof Error ? error.message : String(error)}`);
     }
@@ -94,7 +95,7 @@ export async function performHealthCheck(): Promise<HealthCheckResult> {
     }
 
     // 获取指标
-    const quota = await checkQuota();
+    const quota = quotaData || { usage: 0, quota: 1, percentUsed: 0 };
     const metrics = {
       usedBytes: quota.usage,
       quotaBytes: quota.quota,

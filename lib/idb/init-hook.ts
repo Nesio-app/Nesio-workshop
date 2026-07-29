@@ -117,11 +117,15 @@ export async function initializeStorageOnApp(
       try {
         const quota = await checkQuota();
         notify?.('quota-check-complete', quota);
-        console.log('[InitHook] Storage quota:', {
-          usage: `${(quota.usage / (1024 * 1024)).toFixed(2)} MB`,
-          quota: `${(quota.quota / (1024 * 1024)).toFixed(2)} MB`,
-          percent: `${Math.round((quota.usage / quota.quota) * 100)}%`,
-        });
+        if (quota) {
+          console.log('[InitHook] Storage quota:', {
+            usage: `${(quota.usage / (1024 * 1024)).toFixed(2)} MB`,
+            quota: `${(quota.quota / (1024 * 1024)).toFixed(2)} MB`,
+            percent: `${Math.round((quota.usage / quota.quota) * 100)}%`,
+          });
+        } else {
+          console.warn('[InitHook] Storage quota not available');
+        }
       } catch (error) {
         console.warn('[InitHook] Quota check failed:', error);
         notify?.('quota-check-error', error);
