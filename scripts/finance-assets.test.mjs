@@ -66,7 +66,10 @@ assert.equal(rm.receiptMatchCandidates(receipt, pool, { taken: new Set(['t1', 't
 const srcTxt = fs.readFileSync(new URL('../lib/portal/finance-sources.ts', import.meta.url), 'utf8');
 assert.match(srcTxt, /kind\?: 'expense' \| 'income'/, 'Expense 扩 kind');
 assert.match(srcTxt, /addManualEntry/, '手工写入门 addManualEntry 存在');
-assert.match(srcTxt, /linkedBankTxId\) continue/, 'financeOnly 聚合排除已关联小票(防双计)');
+// 自查修正:排除加了「流水仍存在」自愈判断(悬空关联不再让钱两边同时消失)
+assert.match(srcTxt, /bankIdCache\.has\(e\.linkedBankTxId\)\) continue/, 'financeOnly 聚合排除已关联小票(防双计,带悬空自愈)');
+assert.match(srcTxt, /defaultFinanceCurrency/, '手动/小票默认币种与银行主币种同源(不再写死 ¥)');
+assert.match(srcTxt, /e\.linkedBankTxId === bankTxId\)\) return false/, '同一笔银行流水只能挂一张小票');
 const aggTxt = fs.readFileSync(new URL('../lib/portal/finance-aggregate.ts', import.meta.url), 'utf8');
 assert.match(aggTxt, /domainIncome/, '聚合并入手动收入');
 const csTxt = fs.readFileSync(new URL('../lib/portal/providers/connector-sync.ts', import.meta.url), 'utf8');

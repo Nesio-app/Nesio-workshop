@@ -248,12 +248,21 @@ const INVEST_XFER_RE = /FID BKG|FIDELITY|VANGUARD|SCHWAB|ROBINHOOD|WEALTHFRONT|B
 /** 投资类账户 id 集合(txFlow 用:投资账户内的流转不是消费)。 */
 const INVEST_ACCT_TYPES = new Set(['investment', 'brokerage']);
 const INVEST_ACCT_SUBTYPES = new Set(['brokerage', 'ira', 'roth', '401k', '403b', 'hsa', '529', 'mutual fund', 'pension', 'retirement']);
-export function investmentAccountIds(accounts: BankAccount[] = loadBankAccounts()): Set<string> {
+function computeInvestIds(accounts: BankAccount[]): Set<string> {
   const out = new Set<string>();
   for (const a of accounts) {
     if (INVEST_ACCT_TYPES.has((a.type || '').toLowerCase()) || INVEST_ACCT_SUBTYPES.has((a.subtype || '').toLowerCase())) out.add(a.id);
   }
   return out;
+}
+// 引用恒等 memo:store 缓存数组换引用(save/水合)才重算 —— txFlow 每行调用也不贵。
+let investCacheSrc: unknown = Symbol('init');
+let investCacheVal = new Set<string>();
+export function investmentAccountIds(accounts?: BankAccount[]): Set<string> {
+  if (accounts) return computeInvestIds(accounts);
+  const raw = accountsStore.load();
+  if (raw !== investCacheSrc) { investCacheSrc = raw; investCacheVal = computeInvestIds(loadBankAccounts()); }
+  return investCacheVal;
 }
 
 /**
@@ -264,7 +273,7 @@ export function investmentAccountIds(accounts: BankAccount[] = loadBankAccounts(
  * (定投买入/卖出/内部划拨)一律 transfer —— Fidelity 每周定投不再算「支出」;股利/利息
  * (INCOME_DIVIDENDS 等)仍是收入。账户不明时按券商描述符兜底。
  */
-export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string>, investAccounts?: Set<string>): TxFlow {
+export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string>, investAccounts: Set<string> = investmentAccountIds()): TxFlow {
   const forced = ruleFor(rules, t);
   if (forced) return forced;
   const cat = (t.category || '').toUpperCase();

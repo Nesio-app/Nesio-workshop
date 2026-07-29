@@ -9,13 +9,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import FamilyDataCard from '../relationships/FamilyDataCard';
 import {
-  loadBankTx, loadBankAccounts, availableMonths, categoryBreakdown, topMerchants,
+  availableMonths, categoryBreakdown, topMerchants,
   monthlyTrend, needsReview, suggestCategory, setMerchantRule, effectiveCategory,
-  accountMonth, formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
+  formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
   loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummary, expenseMerchants,
   loadHoldings, setMerchantRuleFor, setFlowRuleFor, loadRuleLabels,
-  bankDataReady, loadBankSyncStatus, investmentAccountIds,
+  bankDataReady, loadBankSyncStatus,
   type BankTx, type BankAccount, type TxFlow, type Holding,
 } from '@/lib/portal/bank-tx';
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
@@ -23,18 +23,13 @@ import {
 import { financeFindings } from '@/lib/portal/finance-insight';
 import { computeFinanceScores } from '@/lib/portal/finance-risk';
 import { incomeBreakdown, detectIncome, portfolioSummary, recurringPriceHikes } from '@/lib/portal/finance-features';
-import { removeBankAccount } from '@/lib/portal/bank-tx';
 import { loadCombinedFinanceTx, loadCombinedFinanceAccounts } from '@/lib/portal/tesla-finance';
 import QuickAddSheet from './QuickAddSheet';
 import RecurringPane from './RecurringPane';
 import CardsPane from './CardsPane';
 import AcctLogo from './AcctLogo';
 import InvestPane from './InvestPane';
-import {
-  listManualAssets, assetCurrentValue, manualNetWorth, removeManualAsset,
-  loadNetWorthSeries, recordNetWorthSnapshot, FIN_ASSETS_EVENT,
-  assetDepreciation, assetHoldingCosts, type ManualAsset,
-} from '@/lib/portal/finance-assets';
+import { listManualAssets, manualNetWorth, loadNetWorthSeries, finAssetsReady, FIN_ASSETS_EVENT } from '@/lib/portal/finance-assets';
 import { receiptMatchCandidates, rejectPair, loadRejectedPairs } from '@/lib/portal/receipt-match';
 import { linkExpenseToBankTx, loadDomainExpenses } from '@/lib/portal/finance-sources';
 import { domainExpenseTotal, listExpenses, EXPENSES_EVENT, type Expense } from '@/lib/portal/finance-sources';
@@ -50,7 +45,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
-type Sub = 'overview' | 'spending' | 'budget' | 'tx' | 'recurring' | 'invest' | 'cards';
+type Sub = 'overview' | 'spending' | 'tx' | 'recurring' | 'invest' | 'cards'; // 'budget' 死枚举已删(预算在总览渲染)
 
 function monthLabel(ym: string, dict: string): string {
   const [y, m] = ym.split('-');
@@ -107,7 +102,7 @@ export default function FinanceTab() {
   const [rev, setRev] = useState(0); // 规则改动后强制重算
   const [flowEditId, setFlowEditId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false); // P0:IDB 水合完成才允许判「空」
-  const [quickAdd, setQuickAdd] = useState<null | 'expense' | 'income' | 'asset'>(null); // P1:全局「+」
+  const [quickAdd, setQuickAdd] = useState<null | { seg: 'expense' | 'income' | 'asset'; assetId?: string }>(null); // P1:全局「+」(带资产上下文)
 
   useEffect(() => {
     const reload = () => {
@@ -123,6 +118,8 @@ export default function FinanceTab() {
     reload();
     // P0:冷启动区分「加载中/真没数据」—— IDB 水合完成前不给假空态。
     bankDataReady().then(() => { setHydrated(true); reload(); }).catch(() => setHydrated(true));
+    // P1 竞态修复:手动资产/快照 store 水合完成的 emit 可能早于监听挂载 —— ready 后强刷一次
+    finAssetsReady().then(() => setRev((r) => r + 1)).catch(() => { /* 水合失败按空处理 */ });
     // 数据搬 IDB 后:水合完成/同步后派发 nesio-bank-updated → 重读(冷启动空窗自愈)。
     window.addEventListener('nesio-bank-updated', reload);
     // Tesla 同步后派发 nesio-connectors-refreshed → 新充电花费即时进财务。
@@ -195,7 +192,6 @@ export default function FinanceTab() {
     [ym, rev, txs],
   );
   // 财务㉗:投资组合(持仓聚合;⚠️ 同样必须在空态早退之前)
-  const portfolio = useMemo(() => portfolioSummary(holdings), [holdings]);
   const [budgetNote, setBudgetNote] = useState('');
   const [reportMsg, setReportMsg] = useState(''); // 财务㉓:月报动作反馈(可见状态,不静默)
   // 财务㉔:月初自动补生成上月月报并存记忆(每设备每月一次,幂等,localStorage 标记)
@@ -227,7 +223,12 @@ export default function FinanceTab() {
               : L(dict, `上次同步没成功(${st.error || 'unknown'}),稍后再试或到「设置 → 数据接入」看看。`, `Last sync failed (${st.error || 'unknown'}) — retry later or check Settings → Data sources.`)}
           </p>
         )}
-        <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Go to Settings → Data sources → Bank feed · Plaid, connect and Sync.')}</p>
+        <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」;现金账也可以直接手动记。', 'No bank transactions yet. Connect via Settings → Data sources → Plaid, or just add cash entries by hand.')}</p>
+        {/* UI 审计 P0-1:此前「+」只在主分支渲染,没连银行的用户永远点不到 —— 死锁解除 */}
+        <button type="button" className="nesio-fin-review-accept" style={{ marginTop: '0.5rem' }}
+          onClick={() => setQuickAdd({ seg: 'expense' })}>{L(dict, '＋ 记一笔(现金 / 红包 / 资产)', '＋ Add entry (cash / income / asset)')}</button>
+        <QuickAddSheet open={quickAdd != null} initialSeg={quickAdd?.seg} initialAssetId={quickAdd?.assetId}
+          onClose={() => setQuickAdd(null)} onSaved={() => setRev((r) => r + 1)} />
         {domainSpend.count > 0 && (
           <div style={{ marginTop: '0.75rem' }}>
             <p className="nesio-settings-section-label">{L(dict, '本月小票 / 旅行', 'Receipts / travel this month')}</p>
@@ -320,16 +321,17 @@ export default function FinanceTab() {
       )}
 
       <div className="nesio-fin-subtabs">
+        {/* P1 全局「+」记一笔:放行首(子 tab 行横向可滚,行尾在小屏会被挤出视口) */}
+        <button type="button" className="nesio-fin-subtab" style={{ fontWeight: 700, color: 'var(--portal-accent)' }}
+          onClick={() => setQuickAdd({ seg: 'expense' })} aria-label={L(dict, '记一笔(支出 / 收入 / 资产估值)', 'Quick add (expense / income / asset)')}>
+          {L(dict, '＋记', '＋Add')}
+        </button>
         {SUBS.map(([id, zh, en]) => (
           <button key={id} type="button" className={`nesio-fin-subtab${sub === id ? ' is-active' : ''}`} onClick={() => setSub(id)}>{L(dict, zh, en)}</button>
         ))}
-        {/* P1 全局「+」记一笔:支出/收入/资产估值三合一,记的都混入统一财务口径 */}
-        <button type="button" className="nesio-fin-subtab" style={{ marginLeft: 'auto', fontWeight: 700, color: 'var(--portal-accent)' }}
-          onClick={() => setQuickAdd('expense')} aria-label={L(dict, '记一笔(支出 / 收入 / 资产估值)', 'Quick add (expense / income / asset)')}>
-          {L(dict, '+ 记一笔', '+ Add')}
-        </button>
       </div>
-      <QuickAddSheet key={quickAdd ?? 'closed'} open={quickAdd != null} initialSeg={quickAdd ?? 'expense'} onClose={() => setQuickAdd(null)} onSaved={() => setRev((r) => r + 1)} />
+      <QuickAddSheet open={quickAdd != null} initialSeg={quickAdd?.seg} initialAssetId={quickAdd?.assetId}
+        currency={summary.currency || undefined} onClose={() => setQuickAdd(null)} onSaved={() => setRev((r) => r + 1)} />
 
       {/* ── 总览 ── */}
       {sub === 'overview' && (
@@ -398,7 +400,7 @@ export default function FinanceTab() {
           </div>
           {domainSpend.count > 0 && (
             <>
-              <p className="nesio-settings-section-label">{L(dict, '小票 / 旅行', 'Receipts / travel')}</p>
+              <p className="nesio-settings-section-label">{L(dict, '手动 / 小票 / 旅行', 'Manual / receipts / travel')}</p>
               <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: '-0.35rem' }}>
                 {L(
                   dict,
@@ -409,15 +411,16 @@ export default function FinanceTab() {
               <div className="nesio-fin-personspend" style={{ marginBottom: '0.8rem' }}>
                 {domainRows.slice(0, 5).map((e) => {
                   // P1 小票对账:金额±1% + 日期±3天 + 商户词,给一条候选;「不是」进否决记忆。
+                  const takenTxIds = new Set(loadDomainExpenses().map((x) => x.linkedBankTxId).filter((v): v is string => Boolean(v)));
                   const cand = receiptMatchCandidates(
                     { id: e.id, amount: e.amount, occurredAt: e.occurredAt, merchant: e.merchant },
-                    txs, { rejected: rejectedPairs, max: 1 },
+                    txs, { rejected: rejectedPairs, taken: takenTxIds, max: 1 },
                   )[0];
                   return (
                     <div key={e.id}>
                       <div className="nesio-fin-person-row">
                         <span className="nesio-fin-person-name">{e.merchant || e.note || (e.source === 'travel' ? L(dict, '旅行', 'Travel') : L(dict, '小票', 'Receipt'))}</span>
-                        <span className="nesio-fin-person-amt">{e.currency}{e.amount}</span>
+                        <span className="nesio-fin-person-amt" style={e.kind === 'income' ? { color: 'var(--status-go)' } : undefined}>{e.kind === 'income' ? '+' : ''}{e.currency}{e.amount}</span>
                       </div>
                       {cand && (
                         <div className="nesio-fin-person-row" style={{ paddingLeft: '0.6rem' }}>
@@ -425,7 +428,7 @@ export default function FinanceTab() {
                             {L(dict, `银行流水可能是同一笔:${cand.name.slice(0, 18)} · ${cand.date.slice(5)}`, `Likely same in bank feed: ${cand.name.slice(0, 18)} · ${cand.date.slice(5)}`)}
                           </span>
                           <button type="button" className="nesio-fin-monthnav" style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-accent)' }}
-                            onClick={() => { if (linkExpenseToBankTx(e.id, cand.id)) setRev((r) => r + 1); }}>
+                            onClick={() => { if (linkExpenseToBankTx(e.id, cand.id)) setRev((r) => r + 1); else setReportMsg(L(dict, '关联没成功,刷新后再试。', 'Link failed — refresh and retry.')); }}>
                             {L(dict, '关联', 'Link')}
                           </button>
                           <button type="button" className="nesio-fin-monthnav" style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}
@@ -476,7 +479,7 @@ export default function FinanceTab() {
                   // P2 尾巴:findings 可点 —— 按 kind 跳到能采取行动的子页(死文字 → 入口)
                   const FINDING_SUB: Record<string, Sub> = {
                     anomaly: 'tx', fee_audit: 'tx',
-                    subscription_hike: 'recurring', new_recurring: 'recurring', upcoming_bills: 'recurring',
+                    subscription_hike: 'recurring', new_recurring: 'recurring', upcoming_bill: 'recurring',
                     cash_runway: 'cards', balance_risk: 'cards', savings_rate: 'spending',
                   };
                   const target = FINDING_SUB[f.kind];
@@ -935,12 +938,12 @@ export default function FinanceTab() {
       {/* P2 订阅监控(P3 拆分 → RecurringPane) */}
       {sub === 'recurring' && <RecurringPane txs={txs} recurring={recurring} currency={summary.currency} dict={dict} />}
       {/* P2 投资(P3 拆分 → InvestPane) */}
-      {sub === 'invest' && <InvestPane txs={txs} holdings={holdings} nwSeries={nwSeries} dict={dict} />}
+      {sub === 'invest' && <InvestPane txs={txs} holdings={holdings} nwSeries={nwSeries} currency={summary.currency} dict={dict} />}
       {/* 账户页(P3 拆分 → CardsPane:Plaid 分组 + 资产小结 + 持仓 + 手动资产) */}
       {sub === 'cards' && (
         <CardsPane txs={txs} accounts={accounts} holdings={holdings} manualAssets={manualAssets}
           ym={ym} currency={summary.currency} dict={dict}
-          onQuickAddAsset={() => setQuickAdd('asset')} onChanged={() => setRev((r) => r + 1)} />
+          onQuickAddAsset={(assetId) => setQuickAdd({ seg: 'asset', ...(assetId ? { assetId } : {}) })} onChanged={() => setRev((r) => r + 1)} />
       )}
 
       <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>{L(dict, '流水明细只存本机 · 随时可断开', 'Details stay on-device · disconnect anytime')}</p>

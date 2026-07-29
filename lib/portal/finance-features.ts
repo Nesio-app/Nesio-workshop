@@ -336,7 +336,7 @@ export function portfolioSummary(holdings: Holding[]): PortfolioSummary | null {
 
 /** 当年股利/利息(数据现成:投资流水入库即标 INCOME_DIVIDENDS / INCOME_INTEREST_EARNED)。
  *  byMonth 为 1-12 月股利+利息合计(小柱图用)。金额取 -amount(进账为负)。 */
-export function investIncomeYTD(txs: BankTx[], year = new Date().getFullYear()): {
+export function investIncomeYTD(txs: BankTx[], year = new Date().getFullYear(), accountIds?: Set<string>): {
   dividends: number; interest: number; byMonth: number[];
 } {
   let dividends = 0, interest = 0;
@@ -344,6 +344,8 @@ export function investIncomeYTD(txs: BankTx[], year = new Date().getFullYear()):
   for (const t of txs) {
     const d = t.categoryDetail || '';
     if (d !== 'INCOME_DIVIDENDS' && d !== 'INCOME_INTEREST_EARNED') continue;
+    // 逻辑审计 #9b:传 accountIds 时只算投资账户 —— 储蓄利息不冒充投资收益
+    if (accountIds && (!t.accountId || !accountIds.has(t.accountId))) continue;
     if (Number((t.date || '').slice(0, 4)) !== year) continue;
     const v = -t.amount; // 进账为负 → 收益为正;冲正自然抵扣
     if (d === 'INCOME_DIVIDENDS') dividends += v; else interest += v;

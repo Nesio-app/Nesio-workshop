@@ -14,6 +14,9 @@ export default function RecurringPane({ txs, recurring, currency, dict }: {
   txs: BankTx[]; recurring: RecurringCharge[]; currency: string; dict: string;
 }) {
   const upcoming = upcomingRecurring(txs, 7);
+  if (!recurring.length) {
+    return <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, '还没识别到定期扣款。多同步几个月流水,订阅 / 账单会自动出现在这里。', 'No recurring charges detected yet — sync a few more months and subscriptions will appear here.')}</p>;
+  }
         const mature = recurring.filter((r) => r.status === 'mature');
         const load = subscriptionLoad(txs, mature); // 与页内列表同一份数据(口径统一)
         const inc = detectIncome(txs);

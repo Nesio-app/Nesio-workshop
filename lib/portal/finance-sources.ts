@@ -6,7 +6,7 @@
 
 import { createBlobStore } from '@/lib/portal/idb-blob-store';
 import { reportStorageDropped } from '@/lib/portal/storage-health';
-import { loadBankTx, type BankTx } from '@/lib/portal/bank-tx';
+import { dominantCurrency, loadBankTx, type BankTx } from '@/lib/portal/bank-tx';
 
 export type ExpenseSource = 'bank' | 'receipt' | 'travel' | 'tesla' | 'manual';
 
@@ -51,6 +51,15 @@ function uid(prefix: string): string {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+/** P0 修(逻辑审计 #1):手动/小票默认币种必须与银行主币种同源 —— 写死 '¥' 会让 USD 用户的
+ *  每一笔手动账被 KPI 聚合当「异币种」静默排除。无银行数据时回退 ¥(纯手动中文用户)。 */
+export function defaultFinanceCurrency(): string {
+  try {
+    const c = dominantCurrency(loadBankTx());
+    return c || '¥';
+  } catch { return '¥'; }
+}
+
 export function loadDomainExpenses(): Expense[] {
   const raw = store.load();
   return Array.isArray(raw) ? raw : [];
@@ -72,7 +81,7 @@ export function addExpense(input: Omit<Expense, 'id' | 'createdAt'> & { id?: str
         id: list[idx].id,
         createdAt: list[idx].createdAt,
         includeInFinance: input.includeInFinance !== false,
-        currency: input.currency || list[idx].currency || '¥',
+        currency: input.currency || list[idx].currency || defaultFinanceCurrency(),
       };
       list[idx] = updated;
       saveDomainExpenses(list);
@@ -84,7 +93,7 @@ export function addExpense(input: Omit<Expense, 'id' | 'createdAt'> & { id?: str
     id: input.id || uid('exp'),
     createdAt: new Date().toISOString(),
     includeInFinance: input.includeInFinance !== false,
-    currency: input.currency || '¥',
+    currency: input.currency || defaultFinanceCurrency(),
   };
   list.unshift(row);
   saveDomainExpenses(list.slice(0, 2000));
@@ -101,7 +110,7 @@ export function addManualEntry(input: {
   return addExpense({
     amount: input.amount,
     kind: input.kind,
-    currency: input.currency || '¥',
+    currency: input.currency || defaultFinanceCurrency(),
     occurredAt: input.date || new Date().toISOString().slice(0, 10),
     source: 'manual',
     ...(input.category ? { category: input.category } : {}),
@@ -117,6 +126,8 @@ export function linkExpenseToBankTx(expenseId: string, bankTxId: string | null):
   const list = loadDomainExpenses();
   const idx = list.findIndex((e) => e.id === expenseId);
   if (idx < 0) return false;
+  // P2 修(逻辑审计 #3d):同一笔银行流水只能挂一张小票 —— 双关联会让两笔真实支出都退出 KPI
+  if (bankTxId && list.some((e) => e.id !== expenseId && e.linkedBankTxId === bankTxId)) return false;
   if (bankTxId) list[idx] = { ...list[idx], linkedBankTxId: bankTxId };
   else { const { linkedBankTxId: _drop, ...rest } = list[idx]; list[idx] = rest as Expense; }
   saveDomainExpenses(list);
@@ -140,7 +151,7 @@ export function addReceiptExpense(input: {
   const names = input.lines.map((l) => l.name).filter(Boolean).slice(0, 4).join('、');
   return addExpense({
     amount,
-    currency: input.currency || '¥',
+    currency: input.currency || defaultFinanceCurrency(),
     occurredAt: (input.date || new Date().toISOString().slice(0, 10)).slice(0, 10),
     source: input.source || 'receipt',
     sourceRef: input.sourceRef,
@@ -183,6 +194,7 @@ export function listExpenses(
   ym: string,
   opts?: { includeBank?: boolean; includeDomain?: boolean; financeOnly?: boolean },
 ): Expense[] {
+  let bankIdCache: Set<string> | null = null;
   const includeBank = opts?.includeBank !== false;
   const includeDomain = opts?.includeDomain !== false;
   const financeOnly = opts?.financeOnly !== false;
@@ -200,7 +212,12 @@ export function listExpenses(
     for (const e of loadDomainExpenses()) {
       if (ymOf(e.occurredAt) !== ym) continue;
       if (financeOnly && !e.includeInFinance) continue;
-      if (financeOnly && e.linkedBankTxId) continue; // P1:已关联银行流水 → 明细层,KPI 以银行为准(防双计)
+      if (financeOnly && e.linkedBankTxId) {
+        // P2 修(逻辑审计 #3e):关联的流水可能已消失(removedIds/5000 截断/孤儿过滤)——
+        // 只在流水仍存在时才排除,否则自愈回落为普通域内行,这笔钱不再两边同时消失。
+        if (bankIdCache == null) bankIdCache = new Set(loadBankTx().map((t) => t.id));
+        if (bankIdCache.has(e.linkedBankTxId)) continue;
+      }
       out.push(e);
     }
   }
@@ -214,11 +231,14 @@ export function domainExpenseTotal(ym: string): { total: number; count: number; 
   const rows = listExpenses(ym, { includeBank: false, includeDomain: true, financeOnly: true });
   const bySource: Record<string, number> = {};
   let total = 0;
+  let count = 0;
   for (const e of rows) {
+    if (e.kind === 'income') continue; // P0 修:手动收入(红包/工资)不是支出,不进「小票/旅行」合计
     total += e.amount;
+    count += 1;
     bySource[e.source] = (bySource[e.source] || 0) + e.amount;
   }
-  return { total, count: rows.length, bySource };
+  return { total, count, bySource };
 }
 
 /** 测试/诊断:清空域内支出(不动银行)。 */

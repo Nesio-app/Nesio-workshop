@@ -188,6 +188,22 @@ sensitivity/retention 枚举化(中期)。
   +断档月虚线标记+去小值抬高、预算超支比例如实文字;④ 纠错闭环:批量「全部按建议」、
   「排除」改真语义「不计收支」(原为归 OTHER 仍计支出的骗人文案)、已学规则显示
   label(mch_xxx 死代码复活)、月报自动生成失败可见。plaid-multi-item 钉子按新架构更新。
+  **全面自查 + 修复(2026-07-29,三路审计:UI 按钮/逻辑链路/全量契约链)**:
+  P0 修 —— ① 空态死锁(没连银行永远点不到「+」,手动记账链路不可达 → 空态加入口);
+  ② 手动/小票默认币种写死 ¥ → defaultFinanceCurrency(银行主币种同源;USD 用户手动账
+  此前被 KPI 静默排除,CameraSheet 同修);③ domainExpenseTotal 把收入当支出 → kind 过滤;
+  ④ Plaid 游标推进+客户端拒写=交易永久丢失 → 失败路径清 enrich 标记解锁 full 重拉。
+  P1 修 —— txFlow 投资参数改**默认**(引用恒等 memo;一次修掉 needsReview/detectRecurring/
+  categoryBaseline/budget/交易行/fact-journal 六处「列表说支出、KPI 不算」分裂);
+  connector-sync 失败早退提前+孤儿复活兜底收窄(仅账户表空);finding kind 拼写
+  (upcoming_bill);「+」挪子 tab 行首(小屏行尾溢出);「更新」带资产上下文;
+  小票 taken 集+关联唯一性+悬空自愈;investIncomeYTD 限投资账户;recurringStreams
+  「全挂≠没订阅」语义;切段清分类;渠道互斥;幽灵渠道过滤;formatMoney 币种补传;
+  InvestPane/RecurringPane 空态;死代码清理(12 个 import/废 memo/死枚举)。
+  全量契约链 3 处过期钉修复(2 处主干 e331fd8 漂移 + 1 处本次拆分)。
+  **已知未修(记账)**:现金渠道余额不随记账推算(锚点模型自洽但对用户是空承诺,
+  待拍板:推算 or 降级为标签)、portfolioCheckup buys/sells 混入金/费(需 route 透传
+  subtype)、月报/预算/趋势与 KPI 的 domainNet 口径统一(audit #6,P3 后续)。
   **P3 拆分完成(2026-07-28,财务大修四期收官)**:FinanceTab 1300→949 行,拆出
   RecurringPane / InvestPane / CardsPane / AcctLogo / QuickAddSheet 五个组件(纯展示,
   数据经 props;对齐 TodayFeed 拆分先例)。顺手修:卡片页 brokerage 归投资组

@@ -13,7 +13,7 @@ import { IconCamera, IconImage, NodeTypeIcon } from './icons';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { consolidateAmazonOrder } from '@/lib/portal/amazon-order';
 import { appendShoppingReceipt, consumeTravelReceiptTripId } from '@/lib/portal/travel-trips';
-import { addReceiptExpense } from '@/lib/portal/finance-sources';
+import { addReceiptExpense, defaultFinanceCurrency } from '@/lib/portal/finance-sources';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -796,7 +796,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
           appendShoppingReceipt(travelTripId, lines, {
             title: L(dict, '购物 · 小票', 'Shopping · receipt'),
             date: new Date().toISOString().slice(0, 10),
-            currency: '¥',
+            currency: defaultFinanceCurrency(),
           });
         }
       } else {
@@ -815,7 +815,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
           addReceiptExpense({
             lines,
             date: new Date().toISOString().slice(0, 10),
-            currency: '¥',
+            currency: defaultFinanceCurrency(),
             source: 'receipt',
             merchant,
             includeInFinance: true,

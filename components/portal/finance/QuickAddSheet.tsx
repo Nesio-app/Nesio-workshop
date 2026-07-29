@@ -7,7 +7,7 @@
  * 每个异步动作有显式失败态;NesioSheet 原语(bottom);全用设计 token。
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -18,6 +18,7 @@ import {
   type ManualAssetKind,
 } from '@/lib/portal/finance-assets';
 import { COMMON_EXPENSE_CATEGORIES, categoryLabel } from '@/lib/portal/tx-category';
+import { formatMoney } from '@/lib/portal/bank-tx';
 
 type Seg = 'expense' | 'income' | 'asset';
 
@@ -34,13 +35,24 @@ const ANCHOR_NOTES: Array<[string, string]> = [
   ['市场参考', 'Market ref'], ['银行评估', 'Bank appraisal'], ['盘点', 'Recount'], ['自己估的', 'My estimate'],
 ];
 
-export default function QuickAddSheet({ open, onClose, onSaved, initialSeg }: {
+export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, initialAssetId, currency }: {
   open: boolean; onClose: () => void; onSaved: () => void; initialSeg?: Seg;
+  /** 从资产行「更新」进入时预选该资产(丢上下文会让锚点记错对象)。 */
+  initialAssetId?: string;
+  /** 记账币种 —— 必须与银行主币种同源,否则 KPI 聚合会把手动账静默排除(P0 修)。 */
+  currency?: string;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const t = (zh: string, en: string) => L(dict, zh, en);
 
   const [seg, setSeg] = useState<Seg>(initialSeg ?? 'expense');
+  // 打开时应用入口上下文(不靠 key 重挂 —— 那会杀掉 Vaul 关闭动画)
+  useEffect(() => {
+    if (!open) return;
+    setSeg(initialSeg ?? 'expense');
+    setAssetId(initialAssetId ?? '');
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialSeg, initialAssetId]);
   const [amount, setAmount] = useState('');
   const [cat, setCat] = useState('');
   const [note, setNote] = useState('');
@@ -84,7 +96,7 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg }: {
           ch = addManualAsset({ name: newChannel.trim(), kind: 'cash', value: 0, isChannel: true }).id;
         }
         const row = addManualEntry({
-          amount: v, kind: seg,
+          amount: v, kind: seg, ...(currency ? { currency } : {}),
           ...(cat ? { category: cat } : {}), ...(note.trim() ? { note: note.trim() } : {}), ...(ch ? { channelId: ch } : {}),
           ...(seg === 'expense' && costAssetId ? { assetId: costAssetId, assetCostKind: costKind } : {}),
         });
@@ -119,7 +131,7 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg }: {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-4) var(--space-6)' }}>
         <div style={{ display: 'flex', background: 'var(--portal-accent-soft)', borderRadius: 'var(--radius-sm)', padding: 3 }}>
           {([['expense', '支出', 'Expense'], ['income', '收入', 'Income'], ['asset', '资产 · 估值', 'Asset']] as Array<[Seg, string, string]>).map(([id, zh, en]) => (
-            <button key={id} type="button" onClick={() => { setSeg(id); setErr(''); }}
+            <button key={id} type="button" onClick={() => { setSeg(id); setCat(''); setCostAssetId(''); setErr(''); }}
               style={{ flex: 1, border: 'none', padding: '8px 0', borderRadius: 9, fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', background: seg === id ? 'var(--portal-card)' : 'transparent', color: seg === id ? 'var(--portal-accent)' : 'var(--portal-muted)' }}>
               {L(dict, zh, en)}
             </button>
@@ -138,7 +150,7 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg }: {
               <p style={label}>{t('渠道(可空:现金 / 红包等银行拍不到的)', 'Channel (optional: cash / red packet…)')}</p>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {channels.map((c) => (
-                  <button key={c.id} type="button" style={chip(channelId === c.id)} onClick={() => setChannelId((v) => (v === c.id ? '' : c.id))}>{c.name}</button>
+                  <button key={c.id} type="button" style={chip(channelId === c.id)} onClick={() => { setChannelId((v) => (v === c.id ? '' : c.id)); setNewChannel(''); }}>{c.name}</button>
                 ))}
                 <input style={{ ...input, width: 110, padding: '5px 10px', fontSize: 'var(--text-xs)' }}
                   placeholder={t('+ 新渠道', '+ New channel')} value={newChannel}
@@ -188,7 +200,7 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg }: {
                 {assets.map((a) => (
                   <button key={a.id} type="button" style={chip(assetId === a.id)}
                     onClick={() => { setAssetId((v) => (v === a.id ? '' : a.id)); setNewAssetName(''); }}>
-                    {a.name} · {assetCurrentValue(a)}
+                    {a.name} · {formatMoney(assetCurrentValue(a))}
                   </button>
                 ))}
                 <input style={{ ...input, width: 120, padding: '5px 10px', fontSize: 'var(--text-xs)' }}
@@ -210,7 +222,7 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg }: {
               <p style={label}>{t('依据(会存进锚点)', 'Basis (saved with the anchor)')}</p>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 {ANCHOR_NOTES.map(([zh, en]) => (
-                  <button key={zh} type="button" style={chip(anchorNote === zh)} onClick={() => setAnchorNote((v) => (v === zh ? '' : zh))}>{L(dict, zh, en)}</button>
+                  <button key={zh} type="button" style={chip(anchorNote === L(dict, zh, en))} onClick={() => { const lbl = L(dict, zh, en); setAnchorNote((v) => (v === lbl ? '' : lbl)); }}>{L(dict, zh, en)}</button>
                 ))}
               </div>
             </div>

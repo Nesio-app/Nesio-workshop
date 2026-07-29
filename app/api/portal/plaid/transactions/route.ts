@@ -347,12 +347,14 @@ export async function GET(req: NextRequest) {
       average_amount?: { amount?: number }; last_amount?: { amount?: number; iso_currency_code?: string | null };
     }
     const recurringStreams: Array<{ name: string; amount: number; currency: string; frequency: string; lastDate: string; nextDate?: string; isActive: boolean; direction: 'inflow' | 'outflow' }> = [];
+    let recurringOk = false; // 至少一个 token 成功才回字段 —— 全挂时字段缺席,客户端保留上次好数据
     for (const accessToken of keptTokens) {
       try {
         const rec = await plaidPost('/transactions/recurring/get', { access_token: accessToken }) as {
           inflow_streams?: PlaidStream[]; outflow_streams?: PlaidStream[]; error_code?: string;
         };
         if (rec.error_code) continue; // 产品未开通/机构不支持:静默跳过,本地检测兜底
+        recurringOk = true;
         const push = (arr: PlaidStream[] | undefined, direction: 'inflow' | 'outflow') => {
           for (const s of arr ?? []) {
             const amount = Math.abs(s.last_amount?.amount ?? s.average_amount?.amount ?? 0);
@@ -375,7 +377,7 @@ export async function GET(req: NextRequest) {
     }
 
     const response = NextResponse.json({
-      recurringStreams: recurringStreams.slice(0, 100),
+      ...(recurringOk ? { recurringStreams: recurringStreams.slice(0, 100) } : {}),
       relink: anyRelink || undefined,
       relinkIndexes: relinkIndexes.length ? relinkIndexes : undefined,
       prunedDead: deadTokenIndexes.size || undefined,

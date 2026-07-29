@@ -66,7 +66,8 @@ const bank = loadTs('../lib/portal/providers/bank-tx.ts', (p) =>
 
 // ── 源码级接线 ──
 {
-  const tab = fs.readFileSync(new URL('../components/portal/finance/FinanceTab.tsx', import.meta.url), 'utf8');
+  // P3 拆分:账户行渲染移入 CardsPane(FinanceTab 只留骨架)
+  const tab = fs.readFileSync(new URL('../components/portal/finance/CardsPane.tsx', import.meta.url), 'utf8');
   assert.ok(/\['credit',\s*'loan'\]\.includes/.test(tab), 'loan 账户余额标「欠款」(和信用卡同)');
   assert.ok(tab.includes('s.loanOwed') && tab.includes('负债'), '净资产计入贷款(负债分组)');
   assert.ok(tab.includes('浮动盈亏') && tab.includes('portfolio.gain'), '卡片页投资组显示浮动盈亏(未实现盈亏)');

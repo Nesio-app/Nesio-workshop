@@ -35,28 +35,35 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
     const bank = await import('@/lib/portal/bank-tx');
     // P0 数据安全①:IDB 水合完成才动存储 —— 水合前 load()=[] 会把整库流水写空且游标已推进。
     await bank.bankDataReady();
-    // P0 数据安全②:先读后替换 —— existing 用**旧账户表**口径读;若孤儿过滤把全库滤空
-    // (账户快照可疑),以原始库为合并基准,不让一次坏快照定生死。
-    const rawExisting = bank.loadBankTxRaw();
-    const filteredExisting = bank.loadBankTx();
-    const existing = filteredExisting.length === 0 && rawExisting.length > 0 ? rawExisting : filteredExisting;
+    // 失败早退提到一切写入之前(逻辑审计 #10):失败响应不该动本机任何存储。
+    if (!data.ok) { bank.saveBankSyncStatus({ ok: false, error: data.error || 'unknown' }); return fail(data.error || 'unknown'); }
     if (data.accounts?.length) {
-      // 财务⑧:账户全量拉齐(authoritative)时整体替换,让重复授权的旧账户退场
+      // 财务⑧:账户全量拉齐(authoritative)时整体替换,让重复授权的旧账户退场。
+      // 权威快照先落地,随后按**新账户表**读 existing —— 孤儿在本次 merge 就退场
+      // (逻辑审计 #10:旧顺序下孤儿要等下个周期,且兜底会无限复活死数据)。
       bank.saveBankAccounts(data.accounts as Array<{ id: string; name: string; currency: string }>, { replace: data.authoritative === true });
     }
     if (Array.isArray(data.holdings) && data.holdings.length) {
       bank.saveHoldings(data.holdings as never); // 财务㉗:持仓快照,非空才替换
     }
-    // P2 尾巴:Plaid 官方定期流(订阅页并集展示;空数组也存 —— 全取消也是事实)
+    // P2 尾巴:Plaid 官方定期流(订阅页并集展示)。字段缺席 = 本次拉取失败,保留上次好数据;
+    // 字段存在(含空数组)= 真实结果,照存(全取消也是事实)。
     if (Array.isArray((data as { recurringStreams?: unknown[] }).recurringStreams)) {
       bank.savePlaidRecurring((data as { recurringStreams: never[] }).recurringStreams);
     }
-    if (!data.ok) { bank.saveBankSyncStatus({ ok: false, error: data.error || 'unknown' }); return fail(data.error || 'unknown'); }
+    const rawExisting = bank.loadBankTxRaw();
+    const filteredExisting = bank.loadBankTx();
+    // 兜底仅限「账户表为空」(水合可疑/首次):账户表非空时孤儿过滤是有依据的,不复活死数据。
+    const existing = filteredExisting.length === 0 && rawExisting.length > 0 && bank.loadBankAccounts().length === 0
+      ? rawExisting : filteredExisting;
     // 增量合并(纯核心,可单测):按 id upsert、删 removed、日期降序留最近 5000 笔
     const { merged, fresh } = bank.mergeBankTxForSync(existing, data.transactions || [], data.removedIds || []);
     // P0 数据安全③:疑似清空保险丝 —— 已有可观数据、合并结果却为空 → 拒写并显式报错。
     if (!bank.bankTxWriteAllowed(rawExisting.length, merged.length)) {
       bank.saveBankSyncStatus({ ok: false, error: 'local_write_guard' });
+      // 逻辑审计 #2:游标已在服务端推进,本批交易若不补救即永久丢失 ——
+      // 清全量标记让下次同步走 full=1 重拉(该标记本是一次性,这里是唯一的找回入口)。
+      try { localStorage.removeItem('nesio-plaid-enrich-v1'); } catch { /* ignore */ }
       return fail('local_write_guard');
     }
     bank.saveBankTx(merged);
@@ -75,7 +82,11 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
       ...(data.relinkIndexes?.length ? { relinkIndexes: data.relinkIndexes } : {}),
       ...(inv ? { investments: { accounts: inv.accounts || 0, holdings: inv.holdings || 0, transactions: inv.transactions || 0, error: inv.error } } : {}),
     };
-  } catch { return fail('network'); }
+  } catch {
+    // 同上:fetch 可能已成功且游标已推进,解析/写入异常也要解锁 full 重拉,别把这批交易永久丢掉。
+    try { localStorage.removeItem('nesio-plaid-enrich-v1'); } catch { /* ignore */ }
+    return fail('network');
+  }
 }
 
 /* ---------- Flomo 笔记(全量翻页,按 slug 去重只进增量) ---------- */

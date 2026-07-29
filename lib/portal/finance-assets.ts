@@ -57,6 +57,11 @@ const seriesStore = createBlobStore<NetWorthSnapshot[]>({
   validate: (v) => Array.isArray(v), onWriteError: reportStorageDropped,
 });
 
+/** 冷启动竞态修复:两个 store 水合完成(FinanceTab 等它再判空,不丢首个 emit)。 */
+export function finAssetsReady(): Promise<void> {
+  return Promise.all([assetsStore.ready(), seriesStore.ready()]).then(() => undefined);
+}
+
 function emit(): void {
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(FIN_ASSETS_EVENT));
 }

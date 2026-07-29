@@ -6,7 +6,7 @@
  */
 
 import {
-  accountMonth, accountTypeLabel, assetSummary, formatMoney, removeBankAccount, holdingsGainLoss,
+  accountMonth, accountTypeLabel, assetSummary, formatMoney, removeBankAccount,
   type BankTx, type BankAccount, type Holding,
 } from '@/lib/portal/bank-tx';
 import { incomeBreakdown, portfolioSummary } from '@/lib/portal/finance-features';
@@ -20,7 +20,7 @@ import AcctLogo from './AcctLogo';
 
 export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, currency, dict, onQuickAddAsset, onChanged }: {
   txs: BankTx[]; accounts: BankAccount[]; holdings: Holding[]; manualAssets: ManualAsset[];
-  ym: string; currency: string; dict: string; onQuickAddAsset: () => void; onChanged: () => void;
+  ym: string; currency: string; dict: string; onQuickAddAsset: (assetId?: string) => void; onChanged: () => void;
 }) {
   const portfolio = portfolioSummary(holdings);
   // 卡片页分组:存款 / 负债(信用卡+贷款);投资走 portfolio。P0 审计修过的口径:brokerage 也算投资。
@@ -158,14 +158,16 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
             ? <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, '房、车、现金、加密…银行拍不到的,点「+ 记一笔 → 资产·估值」记进来,一起进净值。', 'Home, car, cash, crypto — add via “+ Add → Asset” and they join your net worth.')}</p>
             : (() => {
               const allExpenses = loadDomainExpenses(); // P2 持有成本归集(税金/维修,当年)
-              return manualAssets.map((a: ManualAsset) => {
+              // 幽灵渠道过滤:0 值、仅初始锚点的 cash 渠道(记账不推算余额,盘点后才有意义)
+              const shown = manualAssets.filter((a) => !(a.isChannel && assetCurrentValue(a) === 0 && a.anchors.length <= 1));
+              return shown.map((a: ManualAsset) => {
               const latest = a.anchors[0];
               const staleDays = latest ? Math.floor((Date.now() - new Date(`${latest.date}T00:00:00`).getTime()) / 86400000) : 0;
               const dep = assetDepreciation(a);
               const costs = assetHoldingCosts(a.id, allExpenses);
               const costBits = [
-                dep > 0 ? L(dict, `折旧 -${formatMoney(dep)}`, `depr. -${formatMoney(dep)}`) : '',
-                costs.total > 0 ? L(dict, `今年持有 ${formatMoney(costs.total)}(税金 ${formatMoney(costs.tax)} · 维修 ${formatMoney(costs.repair)})`, `holding ${formatMoney(costs.total)} YTD (tax ${formatMoney(costs.tax)} · repair ${formatMoney(costs.repair)})`) : '',
+                dep > 0 ? L(dict, `折旧 -${formatMoney(dep, currency)}`, `depr. -${formatMoney(dep, currency)}`) : '',
+                costs.total > 0 ? L(dict, `今年持有 ${formatMoney(costs.total, currency)}(税金 ${formatMoney(costs.tax, currency)} · 维修 ${formatMoney(costs.repair, currency)})`, `holding ${formatMoney(costs.total, currency)} YTD (tax ${formatMoney(costs.tax, currency)} · repair ${formatMoney(costs.repair, currency)})`) : '',
               ].filter(Boolean).join(' · ');
               return (
                 <div key={a.id} className="nesio-fin-acctrow">
@@ -178,10 +180,10 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
                     {costBits && <span className="nesio-fin-acctrow-sub">{costBits}</span>}
                   </div>
                   <span className={`nesio-fin-acctrow-bal${a.classification === 'liability' ? ' is-neg' : ''}`}>
-                    {a.classification === 'liability' ? '-' : ''}{formatMoney(assetCurrentValue(a))}
+                    {a.classification === 'liability' ? '-' : ''}{formatMoney(assetCurrentValue(a), currency)}
                   </span>
                   <button type="button" className="nesio-fin-monthnav" style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-accent)' }}
-                    onClick={() => onQuickAddAsset()}>{L(dict, '更新', 'Update')}</button>
+                    onClick={() => onQuickAddAsset(a.id)}>{L(dict, '更新', 'Update')}</button>
                   <button type="button" className="nesio-fin-rule-x" aria-label={L(dict, '移除此资产(锚点历史一并删除)', 'Remove this asset (anchors deleted too)')}
                     onClick={() => { removeManualAsset(a.id); recordNetWorthSnapshot(); onChanged(); }}>✕</button>
                 </div>
