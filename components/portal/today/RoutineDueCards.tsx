@@ -20,8 +20,9 @@ export function RoutineDueCards() {
   const [due, setDue] = useState<Routine[]>([]);
 
   useEffect(() => {
-    // 批次 175:健身链先不做 —— 健身 routine 卡一律不出(老健身例行静默隐藏,数据保留不删)。
-    const read = () => setDue(dueRoutines().filter((r) => r.category !== 'fitness'));
+    // 健身 routine 卡恢复出卡(批次 175 曾静默隐藏,但 RoutineSheet 一直在承诺「到点出开始练」——
+    // 承诺什么就兑现什么;「开始练」直连训练计划/跟练播放器)。
+    const read = () => setDue(dueRoutines());
     read();
     const timer = setInterval(read, 60_000);
     window.addEventListener(ROUTINES_UPDATED_EVENT, read);

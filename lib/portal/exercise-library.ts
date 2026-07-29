@@ -144,9 +144,9 @@ export function exerciseById(id: string): Exercise | undefined {
   return EXERCISES.find((e) => e.id === id);
 }
 
-/** 动图帧目录约定:public/exercise-anim/<id>/ 。 */
+/** 动图帧目录约定:public/exercise-anim/<id>/ 。base-path 感知(子路径部署下否则 404)。 */
 export function exerciseAnimDir(id: string): string {
-  return `/exercise-anim/${id}`;
+  return `${process.env.NEXT_PUBLIC_BASE_PATH || ''}/exercise-anim/${id}`;
 }
 
 /** 返回某动作的定格帧 src 数组(按 f00…fNN 顺序);无动图返回空数组。 */

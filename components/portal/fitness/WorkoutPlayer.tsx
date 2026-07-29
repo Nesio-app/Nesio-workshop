@@ -14,6 +14,8 @@ import ExerciseFigure from './ExerciseFigure';
 import ExerciseGif from './ExerciseGif';
 import { skillById } from '@/lib/life-domain/assets/skill-inventory';
 import { logSession } from '@/lib/platform/training-protocol-engine';
+import { recordWorkoutDone, CURATED_TAG_TARGET } from '@/lib/portal/workout-generate';
+import { logWorkoutSession } from '@/lib/portal/workout-store';
 import { earnPoints, POINTS_PER_FITNESS_SESSION } from '@/lib/platform/rewards-engine';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -24,6 +26,7 @@ import {
   playWorkoutTempo,
   unlockWorkoutTempoSound,
   warmupWorkoutTempoSound,
+  isWorkoutTempoSoundMutedByPolicy,
 } from '@/lib/portal/workout-tempo-sound';
 
 export interface PlayerStep {
@@ -47,6 +50,14 @@ export interface PlayerSession {
 
 const REP_TEMPO_SEC = 3; // 跟拍:每次约 3 秒(1 秒发力 + 2 秒还原)
 
+// 训练计划的动作 id(skill-inventory)→ 目录标准条目:计划跟练也有演示图 + 中文要点,
+// 不再是光秃秃一个名字(修「计划动作全是纯文字」)。id 逐个对照 exercise-catalog.json 手选。
+const SKILL_TO_CATALOG: Record<string, string> = {
+  squat: '0043', front_squat: '0042', rdl: '0085', bench: '0025', ohp: '0091', row: '0027',
+  db_press: '0289', goblet_squat: '1760', pullup: '0652', pushup: '0662', lunge: '0336',
+  plank: '2135', deadlift: '0032', kb_swing: '0549', run: '0685',
+};
+
 function resolve(id: string, dict: string): { name: string; muscles?: Array<{ n: string; t: 'p' | 's' }>; cues?: string[]; neural?: string[]; animFrames?: string[]; animFps?: number; animPingpong?: boolean; gif?: string } {
   const ex = exerciseById(id);
   if (ex) {
@@ -56,7 +67,13 @@ function resolve(id: string, dict: string): { name: string; muscles?: Array<{ n:
   const cat = catalogExerciseByIdSync(id);
   if (cat) return { name: cat.nameZh || cat.name, muscles: cat.target ? [{ n: cat.target, t: 'p' }] : undefined, cues: cat.cues, gif: cat.media ? catalogGifSrc(cat.media) : undefined };
   const sk = skillById(id);
-  if (sk) return { name: dict === 'en' ? sk.name.en : sk.name.zh };
+  if (sk) {
+    const bridged = SKILL_TO_CATALOG[id] ? catalogExerciseByIdSync(SKILL_TO_CATALOG[id]) : undefined;
+    return {
+      name: dict === 'en' ? sk.name.en : sk.name.zh,
+      ...(bridged ? { cues: bridged.cues, gif: bridged.media ? catalogGifSrc(bridged.media) : undefined, muscles: bridged.target ? [{ n: bridged.target, t: 'p' as const }] : undefined } : {}),
+    };
+  }
   return { name: id };
 }
 
@@ -67,7 +84,9 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   const [phase, setPhase] = useState<'work' | 'rest' | 'done'>('work');
   const [countdown, setCountdown] = useState<number | null>(null);
   const [repCount, setRepCount] = useState(0); // 跟拍进行中的当前次数(0 = 未跟拍)
-  const [muted, setMuted] = useState(false);
+  // 壳内(iOS/Android WebView)默认按策略静音 —— 图标如实显示 🔇,不再谎报有声(修「按钮是假的」)
+  const [muted, setMuted] = useState(() => isWorkoutTempoSoundMutedByPolicy());
+  const [logged, setLogged] = useState(false); // 打卡回执:落盘后短暂展示再关,不再无声消失
   const [showCues, setShowCues] = useState(false); // 指导文字默认收起,点「动作要点」才展开
   const [countTotal, setCountTotal] = useState(0); // 本次倒计时的总量,给进度条算百分比
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -173,9 +192,23 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
   function skipRest() { clearTimer(); setCountdown(null); setPhase('work'); }
 
   function finish() {
+    if (logged) return;
     if (session.protocolId && session.sessionId) logSession(session.protocolId, session.sessionId);
     earnPoints(POINTS_PER_FITNESS_SESSION, 'fitness', dict === 'en' ? `Workout: ${session.name}` : `跟练完成:${session.name}`);
-    onClose();
+    // 完成历史:自定义/生成/计划一视同仁都记一笔(修「自定义训练练完哪儿都不记」;
+    // 健康页负荷判断与「今天练什么」的回溯建议都读它)。
+    logWorkoutSession(session.name, steps.length);
+    const targets: string[] = [];
+    for (const s of steps) {
+      const cat = catalogExerciseByIdSync(s.exerciseId);
+      if (cat?.target) { targets.push(cat.target); continue; }
+      const cur = exerciseById(s.exerciseId);
+      if (cur) for (const tg of cur.tags) { const tt = CURATED_TAG_TARGET[tg]; if (tt) targets.push(tt); }
+    }
+    recordWorkoutDone(session.name, targets);
+    // 回执一拍(对勾描线)再关 —— 打卡不再无声消失
+    setLogged(true);
+    window.setTimeout(onClose, 900);
   }
 
   if (phase === 'done') {
@@ -184,7 +217,18 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
         <div className="nesio-wp-done">
           <p className="nesio-wp-done-title">{L(dict, '练完了 💪', 'Workout done 💪')}</p>
           <p className="nesio-wp-done-sub">{L(dict, `${steps.length} 个动作 · 打卡 +${POINTS_PER_FITNESS_SESSION} 积分`, `${steps.length} exercises · +${POINTS_PER_FITNESS_SESSION} pts`)}</p>
-          <button type="button" className="nesio-wp-primary" onClick={finish}>{L(dict, '完成打卡', 'Log it')}</button>
+          <button type="button" className="nesio-wp-primary" onClick={finish} disabled={logged}
+            style={logged ? { background: 'var(--status-go)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 } : undefined}>
+            {logged ? (
+              <>
+                <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                  <path className="nesio-check-draw" d="M3 8.5 6.5 12 13 4.5" pathLength={1}
+                    stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+                {L(dict, `已打卡 +${POINTS_PER_FITNESS_SESSION}`, `Logged +${POINTS_PER_FITNESS_SESSION}`)}
+              </>
+            ) : L(dict, '完成打卡', 'Log it')}
+          </button>
         </div>
       </div>
     );
@@ -192,6 +236,8 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
 
   if (!step || !ex) return null;
   const hasCues = Boolean((ex.cues && ex.cues.length > 0) || (ex.neural && ex.neural[0]));
+  // 长计时(计划里的跑步 30/50 分钟)按 mm:ss 显示,不再出「计时 1800s」这种鬼话
+  const fmtSec = (s: number) => (s >= 120 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `${s}s`);
   // 主图默认放到最大;跟拍/计时进行时(下面出现大号数字)自动缩小,给数字+按钮腾地方 → 两不耽误。
   const figureClass = `nesio-wp-figure${repCount > 0 || countdown != null ? ' is-compact' : ''}`;
 
@@ -200,7 +246,7 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
       <div className="nesio-wp-top">
         <span className="nesio-wp-progress">{L(dict, `动作 ${idx + 1}/${steps.length}`, `${idx + 1}/${steps.length}`)}</span>
         <span className="nesio-wp-session">{session.name}</span>
-        <button type="button" className="nesio-wp-close" onClick={() => setMuted((m) => !m)} aria-label={muted ? L(dict, '开声音', 'Unmute') : L(dict, '静音', 'Mute')} aria-pressed={muted}>{muted ? '🔇' : '🔊'}</button>
+        <button type="button" className="nesio-wp-close" onClick={() => { const next = !muted; if (!next) unlockWorkoutTempoSound(); setMuted(next); }} aria-label={muted ? L(dict, '开声音', 'Unmute') : L(dict, '静音', 'Mute')} aria-pressed={muted}>{muted ? '🔇' : '🔊'}</button>
         <button type="button" className="nesio-wp-close" onClick={onClose} aria-label={L(dict, '退出', 'Exit')}>✕</button>
       </div>
       <div className="nesio-wp-body">
@@ -214,7 +260,7 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
             className={figureClass}
           />
         ) : ex.gif ? (
-          <ExerciseGif src={ex.gif} alt={ex.name} className={figureClass} />
+          <ExerciseGif src={ex.gif} alt={ex.name} className={figureClass} fallbackText={L(dict, '演示图没加载出来 —— 展开「动作要点」跟着做也行', 'Demo image failed to load — follow the cues instead')} />
         ) : null}
         {/* 动作名 + 「动作要点」收起按钮同一行(要点紧跟名字后面)。 */}
         <div className="nesio-wp-namerow">
@@ -243,7 +289,7 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
 
         <div className="nesio-wp-setline">
           {L(dict, `第 ${setNum} / ${step.sets} 组`, `Set ${setNum} / ${step.sets}`)}
-          <span className="nesio-wp-target">{step.unit === 'sec' ? L(dict, `${step.reps} 秒`, `${step.reps}s`) : L(dict, `${step.reps} 次`, `×${step.reps}`)}</span>
+          <span className="nesio-wp-target">{step.unit === 'sec' ? (step.reps >= 120 ? L(dict, `${Math.round(step.reps / 60)} 分钟`, `${Math.round(step.reps / 60)} min`) : L(dict, `${step.reps} 秒`, `${step.reps}s`)) : L(dict, `${step.reps} 次`, `×${step.reps}`)}</span>
         </div>
 
         {phase === 'rest' ? (
@@ -258,7 +304,7 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
             {/* 秒数动作:大数字 + 倒计时条 */}
             {step.unit === 'sec' && countdown != null && (
               <div className="nesio-wp-timer">
-                <p className="nesio-wp-count nesio-wp-count--work">{countdown}s</p>
+                <p className="nesio-wp-count nesio-wp-count--work">{fmtSec(countdown)}</p>
                 <div className="nesio-wp-bar" aria-hidden><div className="nesio-wp-bar-fill" style={{ width: `${countTotal ? Math.max(0, (countdown / countTotal) * 100) : 0}%` }} /></div>
               </div>
             )}
@@ -280,7 +326,7 @@ export default function WorkoutPlayer({ session, onClose }: { session: PlayerSes
               unlockWorkoutTempoSound();
               runCountdown(step.reps, () => { ping(1320, 240); });
             }}>
-              {L(dict, `计时 ${step.reps}s`, `Time ${step.reps}s`)}
+              {step.reps >= 120 ? L(dict, `计时 ${Math.round(step.reps / 60)} 分钟`, `Time ${Math.round(step.reps / 60)} min`) : L(dict, `计时 ${step.reps}s`, `Time ${step.reps}s`)}
             </button>
           )}
           {step.unit === 'reps' && (

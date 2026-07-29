@@ -155,6 +155,26 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **健身板块:「今天练什么」生成入口 + 假功能修复批(2026-07-29,用户批)**:
+  评估 workout.lol —— 视频库**不借**(639 条系 MuscleWiki 抓取转存自家 S3,版权不净、
+  外链不可控;本地 1324 GIF 已全量),只借「器械先行 → 选部位 → 一键成套」的入口形。
+  **新增**:workout-generate(纯规则槽位抽样,主 4 辅 2,rng 可注入;器械偏好
+  nesio-workout-equip-v1;回溯 nesio-workout-last-v1 + suggestNextFocus 推→拉→腿轮换)·
+  WorkoutGenSheet(两屏 NesioSheet:两问 → 草稿逐行「换一个」,失败态+重试)·
+  健身 tab 入口卡(回溯小签「上次练了 X · N 天前」)。契约 test:workout-generate。
+  **假功能修复(三路审计 16 条,全部核实后修)**:① 完成历史 nesio-workout-history-v1
+  (自定义/生成/计划跟练完成都记;健康页负荷判断改取 max(计划打卡, 完成历史),
+  「最近打卡」含全部来源 —— 修「自定义练完哪儿都不记、负荷永远说偏少」);
+  ② 健身 routine 卡恢复出卡(批次 175 静默隐藏但 RoutineSheet 一直在承诺);
+  ③ 计划动作 SKILL_TO_CATALOG 手选映射 15 个 → 跟练有演示图+中文要点(原纯文字);
+  ④ base-path 修复(exerciseAnimDir / 节拍 WAV,子路径部署 404);⑤ 壳内静音策略如实
+  显示 🔇 + 解锁联动;⑥ 打卡回执(对勾描线,不再无声消失)+ 当天防重复(积分不可刷);
+  ⑦ 长计时 mm:ss(修「计时 1800s」);⑧ 扩展库剂量按性质(静态 3×30s/腹 3×12);
+  ⑨ 动作库草稿落盘(误关不丢);⑩ 精选卡展开渲染已有帧;⑪ 播放器 GIF 失败态可见;
+  ⑫ 计划周期走完如实提示。
+  **仍欠**:剂量编辑器(存的训练不可改组数次数)、跑步长计时无 wake-lock/后台处理、
+  计划单阶段无真进阶内容、row_erg/bike 无演示映射、catalog/ 126MB Gym visual GIF
+  版权 tripwire(公开部署须清,见 public/exercise-anim/.gitignore)、全程待真机验收。
 - **财务板块大修(施工中;P0 止血已落 2026-07-28)**:P0 全清 —— ① 数据销毁路径钉死
   (bankDataReady 水合前置 + 先读后替换 + 疑似清空保险丝 bankTxWriteAllowed,合并抽纯函数
   mergeBankTxForSync);② summarizeMonth/accountMonth 符号化(正数 INCOME 冲减收入、
