@@ -124,6 +124,8 @@ export interface ActiveCardBrief {
 export interface TasteFacts {
   /** 每组「有用/太多」计数,如 { 财务: [3,0], 日程: [1,2] }。 */
   groupCounts: Record<string, [useful: number, tooMuch: number]>;
+  /** 用户点名「该提醒我」的漏报(标题):同类信号出卡门槛必须调低。 */
+  wantedTitles?: string[];
 }
 
 function fence(text: string): string {
@@ -202,6 +204,9 @@ declined 每条:{ "fingerprint": "...", "reason": "≤15字,为什么不值得�
 - 时区:${opts.timezone}  今天:${opts.todayISO}
 - 过去 30 天反馈:${taste || '(还没有反馈)'}
 - 「太多」多的组,出卡门槛调高一档;不改变 severity 3 的必出。
+${(opts.taste?.wantedTitles || []).length > 0
+    ? `- 用户点名「该提醒我」的漏报(你之前 declined 错了,同类信号门槛调低):\n${(opts.taste!.wantedTitles!).slice(0, 8).map((t) => `  · ${fence(t)}`).join('\n')}`
+    : ''}
 
 ## 已有活跃卡(判断归并用)
 ${active || '(无)'}

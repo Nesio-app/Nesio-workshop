@@ -17,7 +17,7 @@ import {
   type ArchiveShownEntry, type ArchiveVerdict,
 } from '@/lib/portal/card-archive';
 import { recordCardVerdict } from '@/lib/portal/card-verdict';
-import { readJudgeStats } from '@/lib/portal/guidance-judge-auto';
+import { readJudgeStats, requeueFingerprint } from '@/lib/portal/guidance-judge-auto';
 import { resolveCardTarget, openCardTarget } from '@/lib/portal/card-target';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -176,7 +176,12 @@ export default function CardArchivePanel({ onOpenNode }: { onOpenNode?: (nodeId:
           <button
             type="button" className="nesio-unmute-btn" style={{ flexShrink: 0 }}
             disabled={e.wanted}
-            onClick={() => { markDeclinedWanted(e.id); refresh(); }}
+            onClick={() => {
+              // 反馈闭环两半:记事实(prompt 口味段带上) + 摘出已判集合(下次打开重判这条)
+              markDeclinedWanted(e.id);
+              requeueFingerprint(e.id);
+              refresh();
+            }}
           >
             {e.wanted ? L(dict, '已记下', 'Noted') : L(dict, '该提醒我', 'Wanted this')}
           </button>

@@ -189,6 +189,11 @@ export function archiveStats(): ArchiveStats {
   };
 }
 
+/** 「该提醒我」的漏报标题(新→旧)—— 回灌判决 prompt,同类信号门槛调低。 */
+export function wantedDeclinedTitles(limit = 8): string[] {
+  return load().declined.filter((e) => e.wanted).slice(-limit).reverse().map((e) => e.title);
+}
+
 /** 隐私清除。 */
 export function resetCardArchive(): void {
   if (typeof localStorage === 'undefined') return;

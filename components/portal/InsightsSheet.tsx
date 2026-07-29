@@ -11,7 +11,6 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { MyExperimentWidget } from '@/components/portal/NesioExperiment';
 import { useFeatureEnabled } from '@/components/portal/use-feature-flag';
 import { computeTerritory } from '@/lib/portal/life-territory';
 import { getLifeGraph, isBulkImported } from '@/lib/portal/life-graph';
@@ -596,14 +595,6 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
                     </li>
                   ))}
                 </ul>
-              </div>
-            )}
-
-            {/* 我的实验(Lab 功能开关,与提审隐藏同闸) */}
-            {showExperiment && (
-              <div className="nesio-insights-section">
-                <p className="nesio-insights-section-label">{L(dict, '我的实验', 'My experiment')}</p>
-                <MyExperimentWidget />
               </div>
             )}
 

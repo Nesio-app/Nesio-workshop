@@ -30,7 +30,7 @@ import {
   type JudgedCard,
 } from '@/lib/platform/guidance-engine/ai-judge';
 import { applyGuidanceGates, type GateCard } from '@/lib/platform/guidance-engine/guidance-gates';
-import { archiveDeclined, archiveShownCard, archiveStats } from './card-archive';
+import { archiveDeclined, archiveShownCard, archiveStats, wantedDeclinedTitles } from './card-archive';
 import { isCardSuppressed } from './card-verdict';
 import { logDropped } from './storage-health';
 import type { CalendarEvent } from './types';
@@ -348,7 +348,8 @@ export async function maybeRunJudgeBatch(
     .filter((c) => isCardInWindow(c, localDayISO(now)))
     .map((c) => ({ fingerprint: c.fingerprints[0], title: c.title, group: c.group }));
 
-  const taste = { groupCounts: archiveStats().groupCounts };
+  // 口味 = 档案事实:分组有用/太多计数 + 用户点名的漏报(「该提醒我」调低同类门槛)。
+  const taste = { groupCounts: archiveStats().groupCounts, wantedTitles: wantedDeclinedTitles() };
 
   try {
     const res = await fetch('/api/portal/guidance-judge', {
@@ -518,6 +519,17 @@ export function judgeNeedsFallback(now: Date = new Date()): boolean {
   const anyLive = l.cards.some((c) => isCardInWindow(c, localDayISO(now)));
   if (anyLive) return false;
   return l.stats.lastOkAt === null || l.stats.lastError !== null;
+}
+
+/**
+ * 「该提醒我」的另一半:把该指纹从已判集合里摘掉 → 下次打开重判,
+ * 且届时 prompt 里带着「用户点名该提醒」的事实 —— 反馈闭环的执行端,不只是记个数。
+ */
+export function requeueFingerprint(fp: string): void {
+  if (typeof window === 'undefined' || !fp) return;
+  const l = readLedger();
+  if (!l.judged.includes(fp)) return;
+  writeLedger({ ...l, judged: l.judged.filter((j) => j !== fp), lastRunAt: null });
 }
 
 /** 隐私清除。 */

@@ -103,6 +103,15 @@ const panel = fs.readFileSync(new URL('../components/portal/insights/CardArchive
 assert.match(panel, /recordCardVerdict\(\{ cardId: entry\.id/, '影子卡的改判要桥进静音层 —— 实弹切换那天直接生效');
 assert.match(panel, /resolveCardTarget\(/, '跳转必须走 resolver(目标不让 AI 决定);解析不出就不渲染按钮');
 
+// 反馈必须切实被用到(用户红线):
+// ①「该提醒我」两半闭环 —— 记事实(喂 prompt)+ 摘出已判集合(重判)
+const auto2 = fs.readFileSync(new URL('../lib/portal/guidance-judge-auto.ts', import.meta.url), 'utf8');
+assert.match(auto2, /wantedTitles: wantedDeclinedTitles\(\)/, '「该提醒我」的标题要进判决口味段');
+assert.match(panel, /requeueFingerprint\(e\.id\)/, '「该提醒我」要触发该指纹重判');
+// ② 今天页手势与档案是同一本账
+const cardCmp = fs.readFileSync(new URL('../components/portal/today/ProactiveGuidanceCard.tsx', import.meta.url), 'utf8');
+assert.match(cardCmp, /recordArchiveVerdict\(card\.factKey/, '手势表态(有用/没用/太多)回写档案');
+
 const target = fs.readFileSync(new URL('../lib/portal/card-target.ts', import.meta.url), 'utf8');
 assert.ok(!/target\s*[:=][^\n]*card\.(action|payload)/.test(target), 'resolver 不读 AI 输出的任何 target 字段');
 

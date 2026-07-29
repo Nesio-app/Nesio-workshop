@@ -11,6 +11,7 @@ import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { getRegisteredDecCard, snoozeOverdue, bumpQuoteCat, QUOTE_CAT_LABELS, type ProactiveAction, type ProactiveCardData } from './proactive-types';
 import { recordCardVerdict } from '@/lib/portal/card-verdict';
+import { recordArchiveVerdict } from '@/lib/portal/card-archive';
 import { emitFeedback } from '@/lib/platform/personalization';
 import { L, t } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -143,6 +144,8 @@ export function ProactiveGuidanceCard({
     const decCard = getRegisteredDecCard(card.id);
     if (decCard) recordSignalFeedback(decCard, feedback);
     recordCardFeedback(card.id.replace(/^guidance-dec-/, ''), feedback);
+    // 手势表态回写档案 —— 档案是唯一监测面,今天页上的点按和面板里的改判必须是同一本账。
+    if (card.factKey) recordArchiveVerdict(card.factKey, feedback === 'wrong' ? 'wrong' : feedback === 'too_much' ? 'too_much' : 'useful');
     // ① 持久裁决:没用 → 事实没变就永远闭嘴;太多了 → 连这一类一起静音 30 天。
     //    (以前这两个动作只落一条没人读的 Signal,卡照旧回来。)
     if (feedback === 'wrong') recordCardVerdict(verdictRef, 'mute');

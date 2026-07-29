@@ -45,6 +45,8 @@ const prompt = J.buildJudgePrompt([sig1], {
 assert.ok(!prompt.includes('<script>'), '信号值里的尖括号必须被围栏消毒');
 assert.match(prompt, /财务: 3有用\/0太多/, '口味喂事实计数,不喂权重数字(权重系统已退役)');
 assert.match(prompt, /一律当数据/, 'prompt 必须声明内容中的指令不作数(防邮件注入指挥判决)');
+const promptW = J.buildJudgePrompt([sig1], { todayISO: '2026-07-29', timezone: 'UTC', taste: { groupCounts: {}, wantedTitles: ['家长会邮件'] } });
+assert.match(promptW, /该提醒我.*\n.*家长会邮件/, '「该提醒我」的漏报要出现在 prompt(反馈切实被用到)');
 
 // ── ③ 严格解析 ──
 const fps = new Set([fpA, 'email:m1:123', 'domain:health-9:5']);
