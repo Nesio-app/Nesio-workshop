@@ -57,6 +57,11 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
     }
     bank.saveBankTx(merged);
     bank.saveBankSyncStatus({ ok: true });
+    // P1:同步成功落一条当日净值/投资快照(按日 upsert 幂等)——「今天 +$860」的数据源。
+    try {
+      const { recordNetWorthSnapshot } = await import('@/lib/portal/finance-assets');
+      recordNetWorthSnapshot();
+    } catch { /* 快照失败不影响同步结果 */ }
     try { localStorage.setItem('nesio-bank-synced-at', new Date().toISOString()); } catch { /* quota */ }
     if (full) { try { localStorage.setItem('nesio-plaid-enrich-v1', '1'); } catch { /* quota */ } }
     const withLogo = merged.filter((t) => (t as { merchantLogo?: string }).merchantLogo).length;

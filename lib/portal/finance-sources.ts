@@ -24,6 +24,12 @@ export interface Expense {
   placeId?: string;
   /** false = 只记域内(如旅行预算),不计入财务月汇总 */
   includeInFinance: boolean;
+  /** P1「+」记一笔:income = 收入(红包/现金收入…);缺省 = expense(老数据兼容)。 */
+  kind?: 'expense' | 'income';
+  /** P1 资金渠道:手动 cash 资产(finance-assets isChannel)的 id;Plaid 账户则用 accountId 语义。 */
+  channelId?: string;
+  /** P1 小票对账:已关联的银行流水 id —— 关联后本行降级为明细层,不再进月汇总(防双计)。 */
+  linkedBankTxId?: string;
   createdAt: string;
 }
 
@@ -79,6 +85,36 @@ export function addExpense(input: Omit<Expense, 'id' | 'createdAt'> & { id?: str
   list.unshift(row);
   saveDomainExpenses(list.slice(0, 2000));
   return row;
+}
+
+/** P1「+」记一笔:手动收支(spec 写了却一直没接 UI 的手工写入门)。amount 恒正,方向由 kind 表达。 */
+export function addManualEntry(input: {
+  amount: number; kind: 'expense' | 'income';
+  date?: string; category?: string; note?: string; channelId?: string; currency?: string;
+}): Expense | null {
+  if (!(input.amount > 0)) return null;
+  return addExpense({
+    amount: input.amount,
+    kind: input.kind,
+    currency: input.currency || '¥',
+    occurredAt: input.date || new Date().toISOString().slice(0, 10),
+    source: 'manual',
+    ...(input.category ? { category: input.category } : {}),
+    ...(input.note ? { note: input.note } : {}),
+    ...(input.channelId ? { channelId: input.channelId } : {}),
+    includeInFinance: true,
+  });
+}
+
+/** P1 小票对账:关联/解除银行流水(关联后 financeOnly 聚合自动排除,防双计)。 */
+export function linkExpenseToBankTx(expenseId: string, bankTxId: string | null): boolean {
+  const list = loadDomainExpenses();
+  const idx = list.findIndex((e) => e.id === expenseId);
+  if (idx < 0) return false;
+  if (bankTxId) list[idx] = { ...list[idx], linkedBankTxId: bankTxId };
+  else { const { linkedBankTxId: _drop, ...rest } = list[idx]; list[idx] = rest as Expense; }
+  saveDomainExpenses(list);
+  return true;
 }
 
 /** 小票多行 → 一笔合计支出(默认记入财务)。 */
@@ -158,6 +194,7 @@ export function listExpenses(
     for (const e of loadDomainExpenses()) {
       if (ymOf(e.occurredAt) !== ym) continue;
       if (financeOnly && !e.includeInFinance) continue;
+      if (financeOnly && e.linkedBankTxId) continue; // P1:已关联银行流水 → 明细层,KPI 以银行为准(防双计)
       out.push(e);
     }
   }
