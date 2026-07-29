@@ -388,7 +388,8 @@ function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
         <span className="nesio-health-card-date">{m.latestDate.slice(5).replace('-', '/')}</span>
       )}
       {hasTrend && <Sparkline series={m.series} />}
-      {hasTrend && <span className="nesio-health-card-range">{L(dict, `近 ${m.series.length} 个月`, `${m.series.length}mo`)} · {fmt(Math.min(...m.series.map((s) => s.v)), m.decimals)}–{fmt(Math.max(...m.series.map((s) => s.v)), m.decimals)}</span>}
+      {/* series 是月聚合值,区间标「月均」——否则当日值(单日观测)超出月均区间像自打脸(QA:672 vs 400–492) */}
+      {hasTrend && <span className="nesio-health-card-range">{L(dict, `近 ${m.series.length} 个月月均`, `${m.series.length}mo avg`)} · {fmt(Math.min(...m.series.map((s) => s.v)), m.decimals)}–{fmt(Math.max(...m.series.map((s) => s.v)), m.decimals)}</span>}
     </div>
   );
 }

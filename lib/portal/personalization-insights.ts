@@ -1,6 +1,7 @@
 import { getLifeGraph } from './life-graph';
 import { hasHealthData } from './health-store';
 import { hasBankTxData } from './bank-tx';
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 
 export type BaohePersonalizationStage = 'first_use' | 'day_34';
 
@@ -163,7 +164,7 @@ export function getBaohePersonalizationProfile(
 }
 
 function todayKey(now: Date) {
-  return now.toISOString().slice(0, 10);
+  return localDayKey(now);
 }
 
 function safeGetStorage(key: string): string | null {

@@ -48,6 +48,8 @@ export function whenIdle(fn: () => void): void {
   const ric = (window as unknown as {
     requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number;
   }).requestIdleCallback;
-  if (typeof ric === 'function') { ric(() => fn(), { timeout: 3000 }); }
+  // timeout 10s(原 3s):3 秒连续交互后强制在手势中间开跑 = 正是「用着用着冻住」的窗口;
+  // 拉长让重活尽量等真空闲,10s 兜底保证最终一定会跑(不做就永不同步更糟)。
+  if (typeof ric === 'function') { ric(() => fn(), { timeout: 10_000 }); }
   else { setTimeout(fn, 1200); }
 }

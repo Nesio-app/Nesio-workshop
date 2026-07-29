@@ -10,6 +10,7 @@
  * 「其他」恒为中性灰(刻意降噪);状态色沿用 warm-coach 规则——红仅真实风险,
  * 超支/涨幅用琥珀。文字一律用墨色/次色,不穿数据色(色相由旁边的色块承载)。
  */
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 import {
   summarizeMonth, prevYm, categoryBreakdown, topMerchants, detectRecurring, upcomingRecurring,
   formatMoney, assetSummary, accountTypeLabel, loadHoldings,
@@ -218,7 +219,7 @@ ${portfolio.concentrated ? `<p class="muted small">${esc(L(`${portfolio.concentr
 
   return docShell(
     title,
-    L(`生成于 ${now.toISOString().slice(0, 10)} · 数据只存本机 · 确定性规则生成(非 LLM)`, `Generated ${now.toISOString().slice(0, 10)} · on-device data · deterministic rules (no LLM)`),
+    L(`生成于 ${localDayKey(now)} · 数据只存本机 · 确定性规则生成(非 LLM)`, `Generated ${localDayKey(now)} · on-device data · deterministic rules (no LLM)`),
     B.join('\n'),
   );
 }

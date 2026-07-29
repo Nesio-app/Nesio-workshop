@@ -439,13 +439,13 @@ function monthlySeriesAvg(daily: Map<string, number>, transform: (v: number) => 
 class HealthAggregator {
   private sumDay = new Map<string, Map<string, Map<string, number>>>(); // key → day → source → sum
   private latest = new Map<string, { d: string; v: number; pd: string; pv: number }>();
-  private monthlyLatest = new Map<string, Map<string, { sum: number; count: number }>>(); // latest 类指标的按月均值
-  private sleepMs = new Map<string, Map<string, number>>(); // night → source → ms(finalize 时每夜取最大源)
+  private monthlyLatest = new Map<string, Map<string, { sum: number; count: number; vals?: number[] }>>(); // latest 类指标的按月均值(身高/体重类另存原始值取中位数)
+  private sleepMs = new Map<string, Map<string, Array<[number, number]>>>(); // night → source → [start,end] 段(finalize 区间合并,重叠不重计)
   private mindMin = new Map<string, number>();
   private workoutList: Array<{ type: string; label: string; duration: string; start: string; distKm: number; kcal: number }> = [];
   workouts = 0;
   // A:血糖深度采集(全部按 mg/dL 规范单位累计;显示时再按用户单位换算)。
-  private gluDay = new Map<string, { sum: number; count: number; min: number; max: number }>();
+  private gluDay = new Map<string, { sum: number; count: number; min: number; max: number; inRange: number; below: number; above: number }>();
   private gluHour = new Map<number, { sum: number; count: number }>();
   private glu = { count: 0, sum: 0, sumSq: 0, inRange: 0, below: 0, above: 0, mmol: false };
   // C:睡眠分期(夜 → 来源 → 各期毫秒)与活动三环(日期 → 三环值+目标)。
@@ -462,10 +462,11 @@ class HealthAggregator {
   private feedGlucose(r: Rec, mgdl: number) {
     const day = r.startDate.slice(0, 10);
     if (!day) return;
-    const g = this.gluDay.get(day) || { sum: 0, count: 0, min: Infinity, max: -Infinity };
+    const g = this.gluDay.get(day) || { sum: 0, count: 0, min: Infinity, max: -Infinity, inRange: 0, below: 0, above: 0 };
     g.sum += mgdl; g.count += 1;
     if (mgdl < g.min) g.min = mgdl;
     if (mgdl > g.max) g.max = mgdl;
+    if (mgdl < 70) g.below += 1; else if (mgdl > 180) g.above += 1; else g.inRange += 1;
     this.gluDay.set(day, g);
     const hour = Number(r.startDate.slice(11, 13));
     if (Number.isFinite(hour)) {
@@ -519,8 +520,8 @@ class HealthAggregator {
           this.pushLatest(def.key, r.startDate.slice(0, 10), sv);
           if (!mm) { mm = new Map(); this.monthlyLatest.set(def.key, mm); }
           const ym = r.startDate.slice(0, 7);
-          const b = mm.get(ym) || { sum: 0, count: 0 };
-          b.sum += sv; b.count += 1; mm.set(ym, b);
+          const b = mm.get(ym) || { sum: 0, count: 0, vals: [] as number[] };
+          b.sum += sv; b.count += 1; (b.vals ??= []).push(sv); mm.set(ym, b);
         }
       } else if (def.agg === 'sleep') {
         for (const r of records(text, def.hk)) {
@@ -531,11 +532,17 @@ class HealthAggregator {
           // latest/prev 变成同一晚两段相比(如 6.0h ▲ 较上次 +5.3)。
           const key = sleepNightKey(r.startDate);
           if (!key) continue;
-          const ms = Math.max(0, parseAppleDate(r.endDate) - parseAppleDate(r.startDate));
-          if (asleep) {
+          const t0 = parseAppleDate(r.startDate);
+          const t1 = parseAppleDate(r.endDate);
+          const ms = Math.max(0, t1 - t0);
+          if (asleep && ms > 0) {
+            // 存原始区间而非累加(QA「21.5h」根因之一):同源的概况 Asleep 段与
+            // AsleepCore/Deep/REM 细分段时间重叠,裸加会 2–3× 翻倍;finalize 区间合并。
             let s = this.sleepMs.get(key);
             if (!s) { s = new Map(); this.sleepMs.set(key, s); }
-            s.set(r.sourceName, (s.get(r.sourceName) || 0) + ms); // 按来源分开,finalize 取最大源
+            const list = s.get(r.sourceName) || [];
+            list.push([t0, t1]);
+            s.set(r.sourceName, list);
           }
           // C:分期(iOS 16+ 才有 Core/Deep/REM;旧版只有 Asleep → 计入 total 但无分期)。
           let st = this.sleepStage.get(key);
@@ -642,7 +649,18 @@ class HealthAggregator {
         const c = this.latest.get(def.key);
         if (!c) continue;
         const mm = this.monthlyLatest.get(def.key);
-        const series = mm ? [...mm.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-60).map(([ym, b]) => ({ ym, v: round(b.sum / b.count, def.decimals) })) : [];
+        // 近恒定的身体量(身高/体重/BMI)月值取中位数:多来源噪声(手动条目/单位换算/估算值)
+        // 会把算术均值搅出「身高 7 个月波动 6cm」这种鬼话;中位数不吃离群点。
+        const MEDIAN_KEYS = new Set(['height', 'weight', 'bmi']);
+        const monthVal = (b: { sum: number; count: number; vals?: number[] }): number => {
+          if (MEDIAN_KEYS.has(def.key) && b.vals && b.vals.length) {
+            const s = [...b.vals].sort((x, y) => x - y);
+            const m = s.length % 2 ? s[(s.length - 1) / 2] : (s[s.length / 2 - 1] + s[s.length / 2]) / 2;
+            return m;
+          }
+          return b.sum / b.count;
+        };
+        const series = mm ? [...mm.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-60).map(([ym, b]) => ({ ym, v: round(monthVal(b), def.decimals) })) : [];
         out.push({ ...toMetric(def), latest: round(c.v, def.decimals), latestDate: c.d, prev: Number.isNaN(c.pv) ? null : round(c.pv, def.decimals), prevDate: c.pd || undefined, series });
       } else if (def.agg === 'sleep') {
         if (!this.sleepMs.size) continue;
@@ -688,6 +706,19 @@ class HealthAggregator {
    *  概况 Asleep 段 + 细分 Core/Deep/REM 段(时间重叠),把它们全 /Asleep/ 求和会 2–3× 翻倍
    *  (用户见「21.5h」)。有分期就用 Core+Deep+REM(彼此不重叠),否则用通用 Asleep 求和。 */
   private sleepAsleepByNight(): Map<string, number> {
+    // 区间合并:同源重叠段(概况 Asleep × 分期段)只算一次
+    const mergedMs = (list: Array<[number, number]>): number => {
+      if (!list.length) return 0;
+      const sorted = [...list].sort((a, b) => a[0] - b[0]);
+      let total = 0; let [cs, ce] = sorted[0];
+      for (let i = 1; i < sorted.length; i++) {
+        const [s, e] = sorted[i];
+        if (s <= ce) ce = Math.max(ce, e);
+        else { total += ce - cs; [cs, ce] = [s, e]; }
+      }
+      return total + (ce - cs);
+    };
+    const MAX_NIGHT_MS = 16 * 3_600_000; // 生理上限兜底(修「区间 4.8–97.3h」的离谱值)
     const byNight = new Map<string, Map<string, number>>();
     const nights = new Set<string>([...this.sleepMs.keys(), ...this.sleepStage.keys()]);
     for (const night of nights) {
@@ -695,10 +726,21 @@ class HealthAggregator {
       const genSrc = this.sleepMs.get(night);
       const srcNames = new Set<string>([...(stageSrc ? stageSrc.keys() : []), ...(genSrc ? genSrc.keys() : [])]);
       const sources = new Map<string, number>();
+      let anyStaged = false;
       for (const s of srcNames) {
         const st = stageSrc?.get(s);
         const staged = st ? st.core + st.deep + st.rem : 0;
-        sources.set(s, staged > 0 ? staged : (genSrc?.get(s) ?? 0));
+        if (staged > 0) anyStaged = true;
+        const v = staged > 0 ? staged : mergedMs(genSrc?.get(s) ?? []);
+        sources.set(s, Math.min(v, MAX_NIGHT_MS));
+      }
+      // 有分期的来源(手表)比只有概况段的来源(手机/三方 app)可信 —— 后者曾以
+      // 虚高的重叠和赢下 max,把整页「最近睡眠」顶到 21.5h。
+      if (anyStaged) {
+        for (const s of srcNames) {
+          const st = stageSrc?.get(s);
+          if (!st || st.core + st.deep + st.rem <= 0) sources.delete(s);
+        }
       }
       byNight.set(night, sources);
     }
@@ -746,10 +788,14 @@ class HealthAggregator {
     const meanMgdl = this.glu.sum / n;
     const variance = Math.max(0, this.glu.sumSq / n - meanMgdl * meanMgdl);
     const cv = meanMgdl > 0 ? (Math.sqrt(variance) / meanMgdl) * 100 : 0;
-    const daily = [...this.gluDay.entries()]
-      .sort((a, b) => a[0].localeCompare(b[0]))
-      .slice(-90)
-      .map(([date, g]) => ({ date, avg: dv(g.sum / g.count), min: dv(g.min), max: dv(g.max) }));
+    // 统一窗口(QA:峰值 15.3 是多年前的单点、TIR 却是全历史 —— 同卡两个口径像自相矛盾):
+    // min/max/TIR 全部与图表同窗(近 90 个有数据日)。
+    const last90 = [...this.gluDay.entries()].sort((a, b) => a[0].localeCompare(b[0])).slice(-90);
+    const daily = last90.map(([date, g]) => ({ date, avg: dv(g.sum / g.count), min: dv(g.min), max: dv(g.max) }));
+    const w = last90.reduce((acc, [, g]) => {
+      acc.count += g.count; acc.inRange += g.inRange; acc.min = Math.min(acc.min, g.min); acc.max = Math.max(acc.max, g.max);
+      return acc;
+    }, { count: 0, inRange: 0, min: Infinity, max: -Infinity });
     const hourly = [...this.gluHour.entries()]
       .sort((a, b) => a[0] - b[0])
       .map(([hour, h]) => ({ hour, avg: dv(h.sum / h.count) }));
@@ -757,11 +803,11 @@ class HealthAggregator {
       unit: mmol ? 'mmol/L' : 'mg/dL',
       count: n,
       avg: dv(meanMgdl),
-      min: dv(Math.min(...[...this.gluDay.values()].map((g) => g.min))),
-      max: dv(Math.max(...[...this.gluDay.values()].map((g) => g.max))),
+      min: dv(w.min),
+      max: dv(w.max),
       cv: Math.round(cv * 10) / 10,
       gmi: Math.round((3.31 + 0.02392 * meanMgdl) * 10) / 10,
-      tirPct: Math.round((this.glu.inRange / n) * 1000) / 10,
+      tirPct: w.count > 0 ? Math.round((w.inRange / w.count) * 1000) / 10 : Math.round((this.glu.inRange / n) * 1000) / 10,
       belowPct: Math.round((this.glu.below / n) * 1000) / 10,
       abovePct: Math.round((this.glu.above / n) * 1000) / 10,
       targetLow: mmol ? 3.9 : 70,

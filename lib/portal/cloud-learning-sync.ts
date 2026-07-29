@@ -36,8 +36,19 @@ let pushTimer: ReturnType<typeof setTimeout> | null = null;
 /**
  * 从云回灌学习态并 union 合并进本地。登录态由路由层判断(未登录 → settings.ok=false,静默)。
  */
+// 节流 + 单飞(QA:前后台切几下、离线时连刷 cloud.learning_pull 报错):
+// 与 cloud-memory-sync/cloud-module-sync 同款防线,此前独缺。
+let learningPullInFlight = false;
+let learningPullLastAt = 0;
+const LEARNING_PULL_MIN_INTERVAL_MS = 20_000;
+
 export async function pullLearningFromCloud(): Promise<{ ok: boolean; merged: number }> {
   if (typeof window === 'undefined') return { ok: false, merged: 0 };
+  if (learningPullInFlight) return { ok: false, merged: 0 };
+  if (Date.now() - learningPullLastAt < LEARNING_PULL_MIN_INTERVAL_MS) return { ok: false, merged: 0 };
+  if (typeof navigator !== 'undefined' && navigator.onLine === false) return { ok: false, merged: 0 };
+  learningPullInFlight = true;
+  learningPullLastAt = Date.now();
   try {
     const client = createAppApiClient();
     const res = await client.fetchCloudProfileSettings();
@@ -63,6 +74,8 @@ export async function pullLearningFromCloud(): Promise<{ ok: boolean; merged: nu
   } catch (err) {
     logDropped('cloud.learning_pull', err);
     return { ok: false, merged: 0 };
+  } finally {
+    learningPullInFlight = false;
   }
 }
 

@@ -17633,7 +17633,7 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
 /* z=901:与 sheet 原语同带 —— 洞察面板迁 NesioSheet(bottom,901)后,这层若仍在 420
    会被洞察面板整个盖住(点城市卡「没反应」的真相)。同带靠 DOM 顺序压在洞察之上,
    而从列表点开的 MemoryNodeDetail(也 901,后挂载)又自然压在本列表之上。 */
-.nesio-visitmem-overlay { position: fixed; inset: 0; z-index: 901; pointer-events: auto; display: flex; flex-direction: column; justify-content: flex-end; }
+.nesio-visitmem-overlay { position: fixed; inset: 0; z-index: 935; /* 高于原语层 930:从洞察足迹里打开必须可见(QA 死按钮) */ pointer-events: auto; display: flex; flex-direction: column; justify-content: flex-end; }
 .nesio-visitmem-backdrop { position: absolute; inset: 0; background: var(--modal-backdrop-bg, rgba(16,28,54,0.25)); border: none; cursor: pointer; }
 .nesio-visitmem-sheet {
   position: relative;
@@ -17692,7 +17692,7 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
 }
 .nesio-placepick-cat.is-on { background: var(--portal-accent-soft); color: var(--portal-blue-deep); border-color: var(--portal-blue-deep); font-weight: 600; }
 .nesio-placepick-select { width: 100%; margin-top: 0.55rem; }
-.nesio-imgzoom-overlay { position: fixed; inset: 0; z-index: 440; display: grid; place-items: center; }
+.nesio-imgzoom-overlay { position: fixed; inset: 0; z-index: 940; /* 从 visitmem(935)里再放大,须在其上 */ display: grid; place-items: center; }
 .nesio-imgzoom-backdrop { position: absolute; inset: 0; background: rgba(10, 16, 30, 0.82); border: none; cursor: pointer; }
 .nesio-imgzoom-img { position: relative; max-width: 94vw; max-height: 86dvh; border-radius: 0.8rem; box-shadow: 0 12px 48px rgba(0,0,0,0.5); }
 .nesio-globe-wrap { display: flex; flex-direction: column; align-items: center; margin: 0.5rem 0 0.75rem; }
@@ -18243,28 +18243,31 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 .nesio-sheet-overlay {
   position: fixed;
   inset: 0;
-  /* 900/901:压过所有遗留 sheet 遮罩(≤730)—— 迁移期原语常在旧式 role=dialog
-     里嵌套打开(如 node-detail=450),必须浮其上;仍低于日期选择器/录音/收据
-     等特殊模态(1010–1200),让它们能再叠在原语之上。 */
-  z-index: 900;
+  /* 930(QA 死按钮群总根因修):原语的 overlay/panel/fullscreen 全部同层,
+     由 DOM 顺序(= 打开顺序)决定谁在上 —— 后开的永远盖住先开的。
+     旧分层(bottom/center=901 < fullscreen=930)只考虑了「从 bottom 卡开全屏」,
+     反方向(洞察全屏里开 bottom/center:物品页/关系详情/剧场播放器/地点卡…)
+     全被压在全屏底下 = 看不见还拦截下一次点击(「点两次才生效」)。
+     同层 + Radix/Vaul 按打开顺序 append 到 body,两个方向都正确。
+     仍高于全部遗留 sheet(≤730),低于特殊模态(948–1200)。 */
+  z-index: 930;
   background: var(--modal-backdrop-bg, rgba(16, 28, 54, 0.25));
 }
 /* fullscreen 底衬:不透明页面底,给半透明(磨砂玻璃)全屏面板兜底,防夜间透出下层。
    z=929/930:全屏面板常从 bottom 卡(900/901)里打开(如记忆详情→阅读原文),
    必须整个盖住触发它的 bottom 卡,否则卡片会从半透明面板里透出来(实测「阅读器透明」)。
    仍低于 image-viewer(950)/镜信抽屉(948)/日期选择器等特殊模态(1010–1200)。 */
-.nesio-sheet-overlay--opaque { background: var(--portal-bg, #f4f8fd); z-index: 929; }
-/* opaqueOverlay 的非全屏面板:抬到不透明遮罩之上(930,与 fullscreen 同层)。
-   不加这条,center/bottom 面板(901)会被自己的 929 遮罩整个盖住 = 看不见点不动
-   (新用户/清数据后的「归入账号」强制对话框曾因此把人锁死在纯色屏前)。 */
+.nesio-sheet-overlay--opaque { background: var(--portal-bg, #f4f8fd); z-index: 930; }
+/* over-opaque 标记保留(语义:该面板必须盖过自己的不透明遮罩)——统一同层后靠
+   DOM 顺序天然成立,这里只兜底显式声明。 */
 .nesio-sheet.nesio-sheet--over-opaque { z-index: 930; }
 .nesio-sheet-overlay[data-state='open'] { animation: nesioSheetFade var(--dur, 0.3s) var(--ease-out); }
 .nesio-sheet-overlay[data-state='closed'] { animation: nesioSheetFadeOut var(--dur-fast, 0.2s) var(--ease-out); }
 
-/* panel 公共:面/字色/滚动 */
+/* panel 公共:面/字色/滚动。z 与 overlay/fullscreen 同层(930),打开顺序即层叠顺序 */
 .nesio-sheet {
   position: fixed;
-  z-index: 901;
+  z-index: 930;
   color: var(--portal-ink);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
@@ -18369,8 +18372,8 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
    下拉关不掉。入场交给 Vaul,这里清掉自带动画。 */
 .nesio-sheet--bottom.nesio-sheet--bare { animation: none; }
 
-/* fullscreen:全屏面板。z=930 压过 bottom/center 面板(901)—— 从 bottom 卡里
-   打开的全屏面板(阅读器等)要完整盖住触发卡,配合 --opaque 底衬(929)。
+/* fullscreen:全屏面板。与全部原语同层(930)—— 层叠由打开顺序(DOM append)决定:
+   从 bottom 卡开的阅读器盖住卡,从全屏洞察开的 bottom 卡盖住洞察,两个方向都对。
    用 inset:0 贴满可视 WebView,不要再用 height/max-height:100lvh —— iOS 动态视口下
    视口单位与 fixed inset 不一致时,底下会露缝或整页上推。默认壳吃安全区;
    洞察等自管顶栏的页面在业务 class 里把 padding 清零。 */

@@ -18,6 +18,7 @@ import { track } from '@/lib/portal/telemetry';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { localDayKey } from '@/lib/portal/local-day';
 
 export function ExperimentCheckinCard() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -27,7 +28,7 @@ export function ExperimentCheckinCard() {
 
   useEffect(() => {
     const read = () => {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDayKey();
       const active = loadExperiments().find(
         (e) => !e.concluded && !e.dataPoints.some((p) => p.date === today),
       );
@@ -59,7 +60,7 @@ export function ExperimentCheckinCard() {
     const all = loadExperiments();
     const target = all.find((e) => e.id === exp.id);
     if (!target) return;
-    target.dataPoints.push({ date: new Date().toISOString().slice(0, 10), iv, dv, ...(note ? { note } : {}) });
+    target.dataPoints.push({ date: localDayKey(), iv, dv, ...(note ? { note } : {}) });
     saveExperiments(all);
     track('experiment_checkin', { from: 'today_card' });
     window.dispatchEvent(new CustomEvent('nesio-experiments-updated'));

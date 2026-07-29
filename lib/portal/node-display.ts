@@ -18,8 +18,27 @@ const MOMENT_EMOTIONS: Array<[zh: string, en: string]> = [
  * 尖括号邮件头片段 <no-reply@…>、裸邮件地址 return@amazon.com、Re:/Fwd:/回复: 前缀。
  * 原文本身不动(存储是历史事实、详情页「原始记录」折叠区仍看得到);只清显示层标题。
  */
+/**
+ * 剥行内 markdown 记号(QA:2191 条 flomo 笔记标题/正文原样露出 `![](https://…favicon.i`、
+ * 走走看轮播露出 `**`)。图片语法整体删掉,链接留文字,加粗/斜体/行内码只留内容。
+ * 只作用显示层 —— 存储原文不动。
+ */
+export function stripMarkdownInline(text: string): string {
+  return text
+    .replace(/!\[[^\]]*\]\([^)]*\)?/g, ' ')   // ![alt](url) 整体删(截断的半个也删)
+    .replace(/!\[\]?\(?$/g, ' ')                // 行尾被截断的 ![ / ![]( 残骸
+    .replace(/\[([^\]]*)\]\(([^)]*)\)?/g, '$1') // [text](url) → text
+    .replace(/(\*\*|__)(.*?)\1/g, '$2')          // **bold** / __bold__
+    .replace(/(\*\*|__)/g, '')                   // 落单的 ** / __
+    .replace(/`([^`]*)`/g, '$1')                 // `code`
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')          // # 标题记号
+    .replace(/^\s{0,3}>\s?/gm, '')               // > 引用记号
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 export function cleanTitleNoise(name: string): string {
-  const s = name
+  const s = stripMarkdownInline(name)
     .replace(/<[^>]*>/g, ' ')                              // <no-reply@info.thorne.com>
     .replace(/\b[\w.+-]+@[\w.-]+\.\w{2,}\b/g, ' ')          // return@amazon.com
     .replace(/^\s*(?:re|fwds?|fw|回复|答复|转发)\s*[:：]\s*/i, '') // Re: / Fwd: / 回复:

@@ -27,6 +27,7 @@ import { addMeal, type MealSource, type MealItem } from '@/lib/cooking/meals';
 import { planWeek, type WeekPlan } from '@/lib/cooking/meal-plan-core';
 import { saveGeneratedRecipe, findGeneratedRecipe } from '@/lib/cooking/generated-recipes';
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
+import { localDayKey } from '@/lib/portal/local-day';
 
 type View =
   | { kind: 'home' }
@@ -560,7 +561,8 @@ function GenerateBody({ pantryItems, soonNames, locale, onDone, t }: {
   onDone: (r: Recipe) => void; t: TT;
 }) {
   const pantryNames = useMemo(
-    () => pantryItems.map((i) => normalizeIngredient(i.name).name).filter(Boolean),
+    // 去重(QA:同名食材两条 → 菜谱食材清单「黄瓜」列两次)
+    () => [...new Set(pantryItems.map((i) => normalizeIngredient(i.name).name).filter(Boolean))],
     [pantryItems],
   );
   const seedIngredients = useMemo(() => {
@@ -935,7 +937,7 @@ function MealLogBody({ photoUrl, onError, onDone, t }: { photoUrl?: string; onEr
     }
     if (!next.length) { onError(t('先加一样吃的(输入名字后点「加」,或填完直接「记入」)。', 'Add a food name first — tap Add, or fill the name and Log.')); return; }
     try {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = localDayKey();
       addMeal({ source, items: next, energyKCal: nutri?.ek ?? 0, protein: nutri?.p ?? 0, fat: nutri?.f ?? 0, cho: nutri?.c ?? 0, occurredAt: today });
       setSaved(true); setTimeout(onDone, 800);
     } catch { onError(t('没记上,再试一次。', 'Could not save — try again.')); }

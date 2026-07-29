@@ -15,6 +15,7 @@ import { MyExperimentWidget } from '@/components/portal/NesioExperiment';
 import { useFeatureEnabled } from '@/components/portal/use-feature-flag';
 import { computeTerritory } from '@/lib/portal/life-territory';
 import { getLifeGraph, isBulkImported } from '@/lib/portal/life-graph';
+import { stripMarkdownInline } from '@/lib/portal/node-display';
 import type { LifeNode } from '@/lib/portal/life-graph';
 import { markFeatureUsed } from '@/lib/portal/feature-usage';
 import { isLabModeOn, LAB_MODE_EVENT } from '@/lib/portal/module-overrides';
@@ -146,13 +147,15 @@ function MindPie({ items, onPick, dict }: { items: Array<[string, number]>; onPi
             );
           })}
         </svg>
-        {/* 符号 + 次数嵌在扇形里(占比≥7% 才放得下);HTML 叠层,不吃点击 */}
-        {arcs.filter(({ c }) => c / total >= 0.07).map(({ tag, c, mid }) => {
+        {/* 符号 + 次数嵌在扇形里;小扇形(<7%)只放数字省下图标位 —— 每片都得有数,
+            否则可见数字加总 ≠ 中心总数,像算错账(QA:6639 vs 6343)。 */}
+        {arcs.map(({ tag, c, mid }) => {
           const [lx, ly] = mindPolar(50, 50, 35.5, mid);
           const dim = sel != null && sel !== tag;
+          const small = c / total < 0.07;
           return (
             <div key={tag} className="nesio-mindpie2-slice" style={{ left: `${lx}%`, top: `${ly}%`, opacity: dim ? 0.35 : 1 }}>
-              {mindIcon(tag)}<span className="nesio-mindpie2-cnt">{c}</span>
+              {!small && mindIcon(tag)}<span className="nesio-mindpie2-cnt">{c}</span>
             </div>
           );
         })}
@@ -487,7 +490,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
                     return (
                       <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.7rem' }}>
                         <div style={{ minWidth: 0 }}>
-                          <p style={{ margin: 0, fontWeight: 600, color: 'var(--portal-ink)', fontSize: '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>「{t.name.slice(0, 22)}」</p>
+                          <p style={{ margin: 0, fontWeight: 600, color: 'var(--portal-ink)', fontSize: '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>「{stripMarkdownInline(t.name).slice(0, 22)}」</p>
                           <p style={{ margin: '0.12rem 0 0', fontSize: '0.7rem', color: 'var(--portal-muted)' }}>{L(dict, `${days} 天前提过,没再碰`, `mentioned ${days}d ago, not since`)}</p>
                         </div>
                         <button type="button" onClick={() => openInMemory(t.name)}
@@ -513,7 +516,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
                       {isYearAgo ? L(dict, '去年今天,你写下 ——', 'A year ago today, you wrote —') : L(dict, '翻到一条 ——', 'Turned up —')}
                     </p>
                     <button type="button" onClick={() => openInMemory(node.name)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 0, margin: '0.45rem 0', cursor: 'pointer' }}>
-                      <span style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', lineHeight: 1.6, color: 'var(--portal-ink)' }}>「{node.name.slice(0, 60)}」</span>
+                      <span style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', lineHeight: 1.6, color: 'var(--portal-ink)' }}>「{stripMarkdownInline(node.name).slice(0, 60)}」</span>
                     </button>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>

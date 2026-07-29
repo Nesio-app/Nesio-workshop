@@ -87,11 +87,17 @@ export default function TodayFeed({
 
   // 批次 163:记一笔草稿持久化 —— 没点记下就退出 App,下次进来这条还在。
   useEffect(() => {
-    try { const d = localStorage.getItem('nesio-jot-draft-v1'); if (d) setQuickAdd(d); } catch { /* ignore */ }
+    // 读入防线(QA:草稿里出现从未输入过的「关注chong」):超长/非字符串一律丢弃
+    try { const d = localStorage.getItem('nesio-jot-draft-v1'); if (d && typeof d === 'string' && d.length <= 2000) setQuickAdd(d); } catch { /* ignore */ }
   }, []);
   useEffect(() => {
+    // 语音识别进行中的 interim 半句不落盘(QA 乱码草稿根因):识别引擎的中间猜测
+    // 每帧都在变,落盘等于把听错的半句永久写死;等 onend 出最终稿再由本 effect 落。
+    if (micState === 'recording') return;
     try { if (quickAdd) localStorage.setItem('nesio-jot-draft-v1', quickAdd); else localStorage.removeItem('nesio-jot-draft-v1'); } catch { /* ignore */ }
-  }, [quickAdd]);
+  }, [quickAdd, micState]);
+  // 卸载时停掉识别器(QA:导航走开后识别器还活着,环境音继续往草稿里写)
+  useEffect(() => () => { recogRef.current?.stop(); }, []);
 
   function startQuickMic() {
     // 批次 37 重做:边说边把文字写进输入框(interim 实时可见),说完文字留在框里
@@ -216,7 +222,7 @@ export default function TodayFeed({
     }
     if (actionable > 0) {
       return `${prefix}${L(uiLocale,
-        `今天有 ${actionable} 件要紧的,最近一件 ${nextHint}。`,
+        `今天有 ${actionable} 件要紧的,最近的一件${nextHint}。`,
         `${actionable} thing${actionable > 1 ? 's' : ''} need you today — nearest ${nextHint}.`)}`;
     }
     if (isEvening) {

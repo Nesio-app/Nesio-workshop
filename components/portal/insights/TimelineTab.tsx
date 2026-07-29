@@ -577,7 +577,8 @@ export default function TimelineTab() {
   async function markHereNow() {
     if (locateBusy) return;
     setLocateBusy(true);
-    setLocateMsg(null);
+    // 点下去立刻有可见状态(QA:定位要等 8-15s,期间毫无反馈像死按钮)
+    setLocateMsg({ ok: true, text: L(dict, '正在取定位…(最多等 15 秒;室内可能拿不到)', 'Locating… (up to 15s; may fail indoors)') });
     try {
       const { getDevicePosition, recordVisitFromCoords, ensurePlaceTrailWatch } = await import('@/lib/portal/native-geolocation');
       const pos = await getDevicePosition({ timeoutMs: 15_000, maximumAgeMs: 30_000, enableHighAccuracy: true });

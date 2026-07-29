@@ -7,6 +7,7 @@
 import { createBlobStore } from '@/lib/portal/idb-blob-store';
 import { reportStorageDropped } from '@/lib/portal/storage-health';
 import { dominantCurrency, loadBankTx, type BankTx } from '@/lib/portal/bank-tx';
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 
 export type ExpenseSource = 'bank' | 'receipt' | 'travel' | 'tesla' | 'manual';
 
@@ -111,7 +112,7 @@ export function addManualEntry(input: {
     amount: input.amount,
     kind: input.kind,
     currency: input.currency || defaultFinanceCurrency(),
-    occurredAt: input.date || new Date().toISOString().slice(0, 10),
+    occurredAt: input.date || localDayKey(),
     source: 'manual',
     ...(input.category ? { category: input.category } : {}),
     ...(input.note ? { note: input.note } : {}),
@@ -152,7 +153,7 @@ export function addReceiptExpense(input: {
   return addExpense({
     amount,
     currency: input.currency || defaultFinanceCurrency(),
-    occurredAt: (input.date || new Date().toISOString().slice(0, 10)).slice(0, 10),
+    occurredAt: (input.date || localDayKey()).slice(0, 10),
     source: input.source || 'receipt',
     sourceRef: input.sourceRef,
     merchant: input.merchant,

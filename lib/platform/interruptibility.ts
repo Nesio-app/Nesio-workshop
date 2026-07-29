@@ -9,6 +9,7 @@
  */
 
 import { readFeedbackLog } from '@/lib/platform/personalization';
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 import { loadPlaceTrail } from '@/lib/portal/place-trail';
 import {
   trainInterruptibility, predictAccept, contextFromTime, INTERRUPTIBILITY_DEFAULTS,
@@ -22,7 +23,7 @@ function currentActivity(now: Date): string {
   try {
     const trail = loadPlaceTrail() as Array<{ at?: string; lat?: number; lon?: number }>;
     if (!Array.isArray(trail) || trail.length < 2) return 'unknown';
-    const today = now.toISOString().slice(0, 10);
+    const today = localDayKey(now);
     const todayPts = trail.filter((p) => String(p.at || '').slice(0, 10) === today && p.lat != null);
     if (todayPts.length === 0) return 'unknown';
     if (todayPts.length >= 2) {

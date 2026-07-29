@@ -5,6 +5,7 @@
  * (median/MAD,不被单月尖峰污染)、数据不足返回 null 不硬算。不落库、不读存储
  * (调用方传入 loadBankTx()/loadBankAccounts() 的结果)。
  */
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 import {
   summarizeMonth, availableMonths, detectRecurring, effectiveCategory, txFlow, loadFlowRules,
   expenseMerchants, median, ymOf, merchantKey, investmentAccountIds,
@@ -237,7 +238,7 @@ export function balanceProjection(
 
   let bal = start;
   let min = start;
-  let minDate = now.toISOString().slice(0, 10);
+  let minDate = localDayKey(now);
   let negativeDate: string | null = null;
   for (const e of events) {
     bal += e.delta;

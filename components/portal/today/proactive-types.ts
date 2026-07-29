@@ -6,6 +6,7 @@
 import { L } from '@/lib/portal/i18n';
 import type { EvidenceRef } from '@/lib/portal/reasoning-engine';
 import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
+import { localDayKey } from '@/lib/portal/local-day';
 
 export interface ProactiveAction {
   label: string;
@@ -219,7 +220,7 @@ const PROACTIVE_DISMISS_KEY = 'nesio-proactive-dismissed';
 export function dismissProactiveById(cardId: string) {
   try {
     const map: Record<string, string> = JSON.parse(localStorage.getItem(PROACTIVE_DISMISS_KEY) || '{}');
-    map[cardId] = new Date().toISOString().slice(0, 10);
+    map[cardId] = localDayKey();
     localStorage.setItem(PROACTIVE_DISMISS_KEY, JSON.stringify(map));
   } catch { /* ignore */ }
 }
@@ -227,7 +228,7 @@ export function dismissProactiveById(cardId: string) {
 export function isProactiveCardDismissed(cardId: string): boolean {
   try {
     const map: Record<string, string> = JSON.parse(localStorage.getItem(PROACTIVE_DISMISS_KEY) || '{}');
-    return map[cardId] === new Date().toISOString().slice(0, 10);
+    return map[cardId] === localDayKey();
   } catch { return false; }
 }
 

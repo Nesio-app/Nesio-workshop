@@ -30,6 +30,7 @@ import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
 import { canUse, getTier, hasProOverride, hasPaidPro, refreshServerEntitlement, setProEntitlement, trialDaysLeft, TIER_UPDATED_EVENT } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
 import { pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, buildCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
+import { localDayKey } from '@/lib/portal/local-day';
 
 interface SheetProps { open: boolean; onClose: () => void; }
 
@@ -565,7 +566,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `nesio-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `nesio-backup-${localDayKey()}.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -884,6 +885,9 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
         </span>
       </button>
 
+      {/* QA ⑤:测试开关不进对外正式部署 —— 显式构建旗标才渲染(静态可分析,产线 bundle 直接摇树掉);
+          dev 默认放行,个人自部署想用就在环境里设 NEXT_PUBLIC_ENABLE_PRO_OVERRIDE=1。 */}
+      {(process.env.NODE_ENV === 'development' || process.env.NEXT_PUBLIC_ENABLE_PRO_OVERRIDE === '1') && (
       <button type="button"
         className={`nesio-settings-option${proOn ? ' nesio-settings-option--active' : ''}`}
         onClick={() => { const next = !proOn; setProEntitlement(next); setProOn(next); }}>
@@ -897,6 +901,7 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
           {proOn ? '✓' : '○'}
         </span>
       </button>
+      )}
 
       {/* 批次176/186:每日简报走 Portal 全局挂载 nesio-open-brief(agent 本地 briefOpen 会双挂载 + 死路径 import)。
           批次192 合并(安全审计#5):简报=AI 例程(Pro),免费走升级引导不旁路 —— Pro 门 + 全局派发合一。 */}

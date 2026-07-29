@@ -15,6 +15,7 @@ import { loadBudget, hasBudget, budgetProgress } from './finance-budget';
 import { categoryLabel, categoryDetailLabel } from './tx-category';
 import { updateLifeNode, getLifeGraph } from './life-graph';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 
 export interface MonthlyReport {
   ym: string;
@@ -55,7 +56,7 @@ export function buildMonthlyReport(
   const title = L(`${ym} 财务月报`, `Finance monthly report · ${ym}`);
   lines.push(`# ${title}`);
   lines.push('');
-  lines.push(L(`生成于 ${now.toISOString().slice(0, 10)} · 数据只存本机 · 确定性规则生成(非 LLM)`, `Generated ${now.toISOString().slice(0, 10)} · on-device data · deterministic rules (no LLM)`));
+  lines.push(L(`生成于 ${localDayKey(now)} · 数据只存本机 · 确定性规则生成(非 LLM)`, `Generated ${localDayKey(now)} · on-device data · deterministic rules (no LLM)`));
 
   // ── 本月速览 ──
   const saved = Math.round((s.income - s.net) * 100) / 100;

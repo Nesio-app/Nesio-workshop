@@ -106,7 +106,7 @@ function CollapsedTaskItem({
 // 批次 29:消除的焦点项要留得住 —— 之前 dismissed 只在内存,重新挂载/刷新就全回来了。
 // 按当天持久化;次日自然复活(焦点本就是每日的)。
 const FOCUS_DISMISS_KEY = 'nesio-focus-dismissed-v1';
-function todayStr() { return new Date().toISOString().slice(0, 10); }
+function todayStr() { return localDayKey(); }
 function loadDismissedToday(): Set<string> {
   if (typeof window === 'undefined') return new Set();
   try {

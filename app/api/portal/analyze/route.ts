@@ -58,13 +58,13 @@ const SYSTEM_PROMPT = EXTRACTION_SYSTEM_PROMPT;
 // 缺字段用户手改 —— 永不盲信。
 function buildClothingPrompt(uiLocale?: string): string {
   const isEn = (uiLocale || 'zh').toLowerCase().startsWith('en');
-  return `You are a wardrobe assistant. The image is ONE clothing item. Identify it and return ONLY valid JSON, no markdown fences:
+  return `You are a wardrobe assistant. The image should be ONE clothing item. Identify it and return ONLY valid JSON, no markdown fences:
 {
   "summary": "${isEn ? 'one short sentence naming the item' : '一句话描述这件衣服'}",
   "nodes": [{
     "name": "${isEn ? 'short item name, e.g. \"navy oxford shirt\"' : '简短名字,如「藏青牛津衬衫」'}",
     "attributes": {
-      "garmentType": "one of: top | bottom | outer | dress | shoes | accessory",
+      "garmentType": "one of: top | bottom | outer | dress | shoes | accessory | not_clothing",
       "warmth": 1,                     // 1 thin, 2 medium, 3 warm
       "formality": "one of: casual | smart | formal",
       "colors": "${isEn ? 'comma-separated colors' : '逗号分隔的颜色词'}",
@@ -72,7 +72,7 @@ function buildClothingPrompt(uiLocale?: string): string {
     }
   }]
 }
-RULES: garmentType/warmth/formality MUST use the exact allowed values. Guess reasonably from the photo. Output ${isEn ? 'English' : 'Chinese'} for name/colors/material.`;
+RULES: garmentType/warmth/formality MUST use the exact allowed values. If the object is NOT something a person wears (blanket, pillow, curtain, rug, towel…), set garmentType to "not_clothing" — never force it into a garment category. Guess reasonably from the photo. Output ${isEn ? 'English' : 'Chinese'} for name/colors/material.`;
 }
 
 const ASK_SYSTEM_PROMPT = `You are Nesio, a personal life assistant embedded in a user's memory app.

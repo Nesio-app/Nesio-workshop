@@ -243,7 +243,14 @@ export default function WardrobePanel() {
   // 规则版(免费/兜底)——始终算,离线可用;带上用户偏好。
   // 日戳用本地时间平移的 ISO(直接 toISOString 是 UTC,美东晚上会把穿搭记到「明天」—— QA 日期错位)。
   const localIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString();
-  const outfit = useMemo(() => suggestOutfit(items, weatherCtx, localIso(), prefs), [items, weatherCtx, prefs]); // eslint-disable-line react-hooks/exhaustive-deps
+  // 👎 后规则版也要可见地换一套(QA:免费档点「换一套」结果不变):
+  // 把刚否决过的单品从池里拿掉再排;衣服太少避无可避时如实用全池(不假装换了)。
+  const outfitPool = useMemo(() => {
+    const avoid = new Set(prefs.dislikedItemIds.slice(-6));
+    const filtered = items.filter((i) => !avoid.has(i.id));
+    return filtered.length >= 2 ? filtered : items;
+  }, [items, prefs]);
+  const outfit = useMemo(() => suggestOutfit(outfitPool, weatherCtx, localIso(), prefs), [outfitPool, weatherCtx, prefs, restyleNonce]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pro 云造型师:随衣橱/场合变化 or「重新造型」重算。失败置 stylistError,展示时回落规则版。
   useEffect(() => {
@@ -321,6 +328,11 @@ export default function WardrobePanel() {
       if (!data.ok || !data.nodes?.length) throw new Error(data.error || 'no_result');
       const n = data.nodes[0];
       const a = n.attributes || {};
+      // 识别结果说这不是衣服(毯子/抱枕…)→ 如实提示,不硬塞进衣橱分类
+      if (String(a.garmentType) === 'not_clothing') {
+        setAiError(L(dict, `识别结果:${n.name || '这张照片'} 不像是能穿的衣物 —— 若确实要收进衣橱,手动选个分类保存。`, `This looks like ${n.name || 'a non-wearable item'}, not clothing — pick a category manually if you still want it in the wardrobe.`));
+        return;
+      }
       setDraft((d) => ({
         ...d,
         name: typeof n.name === 'string' && n.name.trim() ? n.name.trim() : d.name,
@@ -658,12 +670,16 @@ export default function WardrobePanel() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 'var(--space-2)' }}>
             {g.list.map((it) => (
               <div key={it.id} style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid, var(--portal-bg))', overflow: 'hidden' }}>
-                <div style={{ aspectRatio: '1', background: 'var(--portal-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--portal-muted)', fontSize: '1.4rem' }}>
-                  {thumbs[it.id] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={thumbs[it.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : '👕'}
-                </div>
+                {/* 点卡片图片区 = 打开编辑(QA:卡片打不开详情;录入回执也承诺了「点每件可补属性」) */}
+                <button type="button" onClick={() => startEdit(it)} aria-label={L(dict, `查看/编辑「${it.name}」`, `View/edit “${it.name}”`)}
+                  style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'none', cursor: 'pointer' }}>
+                  <div style={{ aspectRatio: '1', background: 'var(--portal-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--portal-muted)', fontSize: '1.4rem' }}>
+                    {thumbs[it.id] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={thumbs[it.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : '👕'}
+                  </div>
+                </button>
                 <div style={{ padding: '0.4rem 0.5rem' }}>
                   <p style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</p>
                   <p style={{ margin: '0.15rem 0 0', fontSize: '0.62rem', color: 'var(--portal-muted)' }}>

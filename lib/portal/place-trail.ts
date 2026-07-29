@@ -110,7 +110,14 @@ export function recordLiveVisit(rawLabel: string, lat?: number, lon?: number): v
     (v) => v.label === label && now - new Date(v.ts).getTime() < 2 * 3_600_000,
   );
   if (recentSame) return;
-  save([{ ts: new Date().toISOString(), label, lat, lon, source: 'live' }, ...trail]);
+  // 带本地时区偏移的 ISO(QA 计数错位):纯 Z 时间戳会按浏览器时区分日,与带偏移的
+  // 历史事件(Tesla 等)分日口径不一致 → 深夜的点在不同视图落到不同的「天」。
+  const d = new Date();
+  const off = -d.getTimezoneOffset();
+  const sign = off >= 0 ? '+' : '-';
+  const pad = (x: number) => String(Math.trunc(Math.abs(x))).padStart(2, '0');
+  const tsLocal = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${pad(off / 60)}:${pad(off % 60)}`;
+  save([{ ts: tsLocal, label, lat, lon, source: 'live' }, ...trail]);
 }
 
 /**

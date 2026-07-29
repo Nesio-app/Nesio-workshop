@@ -4,6 +4,7 @@
  * UI 决定 toast/重试;失败都有明确 error(设计红线:异步动作必有可见失败态)。
  */
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
+import { stripMarkdownInline } from '@/lib/portal/node-display';
 
 /* ---------- Plaid 银行流水(增量游标在服务端 cookie;本机 IDB 留最近 5000 笔) ---------- */
 
@@ -114,14 +115,16 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
     let imported = 0;
     for (let i = 0; i < batch.length; i += FLOMO_INGEST_CHUNK) {
       for (const m of batch.slice(i, i + FLOMO_INGEST_CHUNK)) {
+        // 先剥 markdown 再截断(QA:标题曾是 `![](https://flomoapp.com/favicon.i` 这种半截图片语法)
+        const plain = stripMarkdownInline(m.content.replace(/<[^>]+>/g, ' '));
         ingestLifeNode({
           type: 'preference',
-          name: m.content.replace(/<[^>]+>/g, '').slice(0, 40),
+          name: plain.slice(0, 40),
           attributes: { source: 'Flomo', created: m.created_at, flomoSlug: m.slug || '' },
           relations: [],
           tags: ['Flomo', ...(m.tags || [])],
           confidence: 0.9,
-          rawInput: m.content.replace(/<[^>]+>/g, '').slice(0, 200),
+          rawInput: plain.slice(0, 200),
           source: 'manual',
         });
         imported++;

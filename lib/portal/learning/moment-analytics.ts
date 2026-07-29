@@ -10,6 +10,7 @@
  */
 
 import { LifeNode } from '../life-graph';
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 
 // ── Russell 2D 情绪坐标（效价 × 唤醒度）────────────────────────────────────────
 export const EMOTION_COORDS: Record<string, [number, number]> = {
@@ -132,7 +133,7 @@ export function defaultCusumState(): CusumState {
 export function cusumUpdate(
   state: CusumState,
   emotionId: string,
-  today = new Date().toISOString().slice(0, 10),
+  today = localDayKey(),
 ): { state: CusumState; alert: boolean } {
   const valence = emotionValence(emotionId);
   const newSum = Math.max(0, state.sum + (0 - valence) - CUSUM_SLACK);

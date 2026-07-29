@@ -11,7 +11,7 @@ import EmailComposeSheet from './EmailComposeSheet';
 import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare } from './icons';
 import { L } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
-import { displayNodeName } from '@/lib/portal/node-display';
+import { displayNodeName, stripMarkdownInline } from '@/lib/portal/node-display';
 import dynamicImport from 'next/dynamic';
 const ReaderSheetLazy = dynamicImport(() => import('./ArticleReaderSheet'), { ssr: false });
 const PlacePickerLazy = dynamicImport(() => import('./PlacePickerSheet'), { ssr: false });
@@ -1238,7 +1238,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
             <div className="nesio-node-raw" style={{ marginTop: '0.75rem' }}>
               <p className="nesio-settings-section-label">{isEmailNode ? L(dict, '原始记录 · 邮件原文', 'Original · email') : L(dict, '原始记录', 'Original note')}</p>
               <p style={{ fontSize: '0.88rem', color: 'var(--portal-muted)', fontStyle: 'italic' }}>
-                &ldquo;{rawExpanded || (n.rawInput || '').length <= 180 ? n.rawInput : `${(n.rawInput || '').slice(0, 180)}…`}&rdquo;
+                &ldquo;{(() => { const raw = stripMarkdownInline(n.rawInput || ''); return rawExpanded || raw.length <= 180 ? raw : `${raw.slice(0, 180)}…`; })()}&rdquo;
               </p>
               {(n.rawInput || '').length > 180 && (
                 <button type="button" className="nesio-node-link-add" onClick={() => setRawExpanded((v) => !v)}>

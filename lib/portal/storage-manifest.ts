@@ -50,6 +50,9 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-backup-synced-entrycount-v1',    // cloud-backup 高水位
   'nesio-cloud-backup-last-v1',           // cloud-backup 上次推送标记
   'nesio-backup-first-sync-done-v1',      // legacy 首次同步标志
+  // 单设备草稿/测试位 —— 云同步会让它们「删了又复活」(QA:草稿乱码清不掉、测试 Pro 位跨设备扩散)
+  'nesio-jot-draft-v1',                   // 速记草稿:本机暂存,别跨设备回灌
+  'nesio-pro-entitlement-v1',             // Lab 测试 Pro 覆盖位:绝不该同步到真设备
 ]);
 // 注意:**不要**在这里放裸 `geo` —— 它会误伤足迹主数据键 `nesio-place-geo-v1`
 // (`-geo-` 被判成缓存 → 从云备份里被剔除 → 换浏览器足迹永远同步不过去,已踩过)。

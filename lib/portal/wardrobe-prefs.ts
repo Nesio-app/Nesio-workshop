@@ -58,6 +58,11 @@ export function recordOutfitFeedback(kind: FeedbackKind, pieces: readonly PieceL
       if (!p.dislikedPairs.includes(k)) p.dislikedPairs.push(k);
       if (p.dislikedPairs.length > MAX_PAIRS) p.dislikedPairs = p.dislikedPairs.slice(-MAX_PAIRS);
     }
+    // 单品级否决也落盘(QA:👎 曾几乎什么都不记 —— colors 常为空、非上下装组合没 pair 可记)
+    for (const g of pieces) {
+      if (!p.dislikedItemIds.includes(g.id)) p.dislikedItemIds.push(g.id);
+    }
+    if (p.dislikedItemIds.length > MAX_PAIRS * 2) p.dislikedItemIds = p.dislikedItemIds.slice(-MAX_PAIRS * 2);
   }
   save(p);
   return p;

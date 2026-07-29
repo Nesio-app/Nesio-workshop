@@ -12,6 +12,7 @@
  * 成本按路由**粗估**(数量级,非账单 —— 与 estimateCostUsd 的「not a bill」一致)。
  */
 import { envValue } from '@/lib/portal/env';
+const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 
 // 单次调用粗估美元(输入+输出合计的量级)。宁可估高一点,熔断偏保守。
 const ROUTE_COST_USD: Record<string, number> = {
@@ -38,7 +39,7 @@ let day = '';
 let spentUsd = 0;
 
 function today(): string {
-  return new Date().toISOString().slice(0, 10);
+  return localDayKey();
 }
 function roll(): void {
   const d = today();

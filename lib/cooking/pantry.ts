@@ -20,6 +20,7 @@ import {
   daysLeftOf, sortPantry, consumeDecision,
   PANTRY_CATEGORIES, type PantryItem, type PantryCategory,
 } from './pantry-core';
+import { normalizeIngredient } from './food-catalog';
 
 // 纯逻辑对外从这里透出,消费者只 import 一个模块。
 export { daysLeftOf, expiringPantry, PANTRY_CATEGORIES } from './pantry-core';
@@ -57,8 +58,25 @@ export interface NewPantryItem {
   name: string; quantity?: number; expiry?: string; location?: string; category?: string;
 }
 
-/** 进货:加一件食材(subtype=食材,后台标 → 自动进过期提醒 + 云同步)。返回新节点 id。 */
+/** 进货:加一件食材(subtype=食材,后台标 → 自动进过期提醒 + 云同步)。返回节点 id。
+ *  同名 upsert(QA:两条「黄瓜」一条带效期一条不带 → 同时出现在「快过期」和「充足」,
+ *  生成菜谱还重复计):已有同名食材 → 合并数量、补上更早的非空效期,不再新建。 */
 export function addPantry(input: NewPantryItem): string {
+  const key = normalizeIngredient(input.name).name || input.name.trim();
+  const existing = listPantry().find((i) => (normalizeIngredient(i.name).name || i.name) === key);
+  if (existing) {
+    const inv = listInventoryItems().find((i) => i.id === existing.id);
+    if (inv) {
+      const mergedQty = (inv.quantity ?? 1) + (input.quantity ?? 1);
+      const mergedExpiry = [inv.expiry, input.expiry].filter(Boolean).sort()[0]; // 取更早的非空效期
+      updateInventoryItem(existing.id, {
+        quantity: mergedQty,
+        ...(mergedExpiry ? { expiry: mergedExpiry } : {}),
+        ...(input.location ? { location: input.location } : {}),
+      });
+      return existing.id;
+    }
+  }
   const node = addInventoryItem({
     name: input.name,
     quantity: input.quantity,

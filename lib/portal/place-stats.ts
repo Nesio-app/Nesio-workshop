@@ -62,7 +62,10 @@ export function monthlyPlaceComparison(visits: PlaceVisit[]): MonthlyComparison 
     }
   }
 
-  const currentKey = monthOf(days[0].dateKey);
+  // 锚定真实当前月(QA:标题拿「最新有数据的那天」当本月 —— 8 月没数据时还写「7月足迹」)
+  const nowD = new Date();
+  const realNow = `${nowD.getFullYear()}-${String(nowD.getMonth() + 1).padStart(2, '0')}`;
+  const currentKey = realNow >= monthOf(days[0].dateKey) ? realNow : monthOf(days[0].dateKey);
   const prevKey = prevMonthKey(currentKey);
 
   const collect = (mk: string): MonthPlaceStats => {

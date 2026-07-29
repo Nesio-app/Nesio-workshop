@@ -8,6 +8,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { welchTTest } from '@/lib/portal/moment-analytics';
+import { localDayKey } from '@/lib/portal/local-day';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -519,7 +520,7 @@ export function LogPanel({ exp, onLog }: { exp: Experiment; onLog: (iv: number, 
   const [scaleDv, setScaleDv] = useState(0);
   const [boolIv, setBoolIv] = useState<boolean | null>(null);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDayKey();
   const alreadyLogged = exp.dataPoints.some((p) => p.date === today);
 
   function submit() {
@@ -770,7 +771,7 @@ function ExperimentCard({ exp, onOpen, onQuickLog }: CardProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const insight = computeInsight(exp, dict);
   const progress = exp.dataPoints.length;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDayKey();
   const loggedToday = exp.dataPoints.some((p) => p.date === today);
 
   const lastPt = exp.dataPoints[exp.dataPoints.length - 1];
@@ -837,7 +838,7 @@ export function MyExperimentWidget() {
   }, [experiments]);
 
   const handleLog = useCallback((expId: string, iv: number, dv: number, note: string) => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDayKey();
     mutate(experiments.map((e) => e.id !== expId ? e : {
       ...e,
       dataPoints: [...e.dataPoints.filter((p) => p.date !== today), { date: today, iv, dv, note }],
