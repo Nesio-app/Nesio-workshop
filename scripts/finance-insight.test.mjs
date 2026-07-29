@@ -133,7 +133,8 @@ const atx = (id, date, name, amount, category, accountId = 'a1') => ({ id, date,
 {
   const creep = [atx('c1', iso(70 * dayMs), 'StreamCo', 18, 'ENTERTAINMENT'), atx('c2', iso(40 * dayMs), 'StreamCo', 18, 'ENTERTAINMENT'), atx('c3', iso(10 * dayMs), 'StreamCo', 19.2, 'ENTERTAINMENT')];
   const f = financeFindings(creep).find((x) => x.kind === 'subscription_hike');
-  assert.ok(f && f.id === 'finance-hike-StreamCo', '+6.7% 爬升要报且 id 兼容');
+  // P2:id 改用 merchantKey(entity 优先/归一名兜底)—— 商户改描述符不再生成新 id(Today 去重稳定)
+  assert.ok(f && f.id.startsWith('finance-hike-') && f.id.toLowerCase().includes('streamco'), '+6.7% 爬升要报且 id 稳定(merchantKey)');
 }
 
 // e) 余额风险:30 天投影转负 → flag;余额充足不报

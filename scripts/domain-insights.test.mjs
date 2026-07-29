@@ -21,6 +21,8 @@ function makeCtx(opts) {
       if (p === './health-clinical') return { evaluateHealthFindings: () => opts.findings };
       if (p === './health-risk') return { computeRiskScores: () => opts.risks };
       if (p === './bank-tx') return { loadBankTx: () => opts.txs, loadBankAccounts: () => [] };
+      // P0:财务改走统一数据集(银行∪Tesla)单一读口
+      if (p === './tesla-finance') return { loadCombinedFinanceTx: () => opts.txs };
       if (p === './finance-insight') return { financeFindings: () => opts.finance };
       if (p === './place-trail') return { loadPlaceTrail: () => opts.visits ?? [] };
       if (p === './place-insight') return { placeFindings: () => opts.place ?? [] };

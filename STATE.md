@@ -171,8 +171,17 @@ sensitivity/retention 枚举化(中期)。
   总览净值 hero(Plaid+手动+快照曲线)· 卡片页手动资产列表(该盘点了琥珀提示/更新/移除)·
   小票旁条「可能是同一笔 → 关联/不是」。契约 test:finance-assets;
   sheet-allowlist/i18n/inert-buttons/颜色 token 全过;tsc+build 绿。**待真机验手感。**
-  下一期 P2:分析升级(基线统一口径/可操作 findings/股利利息 YTD/订阅监控页/
-  Plaid recurring API/组合体检因子)。
+  **P2 已落(2026-07-28,分析升级)**:① 投资收益:investIncomeYTD(当年股利/利息+按月,
+  数据现成 INCOME_DIVIDENDS 标注)· portfolioCheckup(集中度/配置/买卖回顾,借 ai-hedge-fund
+  确定性因子形)· 投资页(死枚举转真页:今日变化/收益/持仓/体检,快照口径如实);
+  ② 订阅监控页(死枚举转真页:7 天将至/变化置顶(涨价/新增/疑似停了=两周期没扣款,信息蓝)
+  /稳定收起;负担率与列表同一份数据);③ 基线剔除数据集最老残月;④ finding id 稳定化
+  (r.key,Today 去重不再失效);⑤ guidelines 补 4 条(FICO 30%/JPMC 6 周缓冲/CFPB×2);
+  ⑥ **折旧与持有成本(用户拍板)**:assetDepreciation(锚点差)+ assetHoldingCosts
+  (Expense 扩 assetId/assetCostKind:税金/维修/保险,「+」支出段可关联资产,
+  卡片页资产行显示「折旧/今年持有(税金·维修)」);⑦ 繁体「約」修正。
+  契约:finance-assets 扩 P2 断言;insight/features 两处旧钉按新行为更新;全套财务契约+build 绿。
+  **P2 余项**:Plaid /transactions/recurring/get 接入(服务端,单独一刀);findings 加可点 action。
 - **财务板块大修(2026-07-28 审计完成,施工待批)**:四路深查(maybe 数据/分析/UI × 宝盒体检)
   收敛为 `docs/design/finance-maybe-audit-2026-07.md`。**P0 止血项含一条不可逆数据销毁路径**
   (connector-sync 先 replace 账户再按新表过滤流水写回 + 全仓无 `await store.ready()`,

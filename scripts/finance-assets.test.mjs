@@ -72,4 +72,53 @@ assert.match(aggTxt, /domainIncome/, '聚合并入手动收入');
 const csTxt = fs.readFileSync(new URL('../lib/portal/providers/connector-sync.ts', import.meta.url), 'utf8');
 assert.match(csTxt, /recordNetWorthSnapshot/, '同步成功落净值快照');
 
+// ── P2:折旧/持有成本/投资收益/组合体检/订阅分组 ──
+assert.equal(assets.assetDepreciation({ anchors: [{ date: '2026-01-01', value: 180 }, { date: '2026-07-01', value: 148 }] }), 32, '折旧=最早−最新(车贬值)');
+assert.equal(assets.assetDepreciation({ anchors: [{ date: '2026-01-01', value: 100 }, { date: '2026-07-01', value: 130 }] }), 0, '升值资产折旧为 0');
+const costs = assets.assetHoldingCosts('a1', [
+  { assetId: 'a1', assetCostKind: 'tax', amount: 300, occurredAt: '2026-04-01' },
+  { assetId: 'a1', assetCostKind: 'repair', amount: 120, occurredAt: '2026-06-01' },
+  { assetId: 'a1', amount: 50, occurredAt: '2025-06-01' },          // 往年不计
+  { assetId: 'a2', assetCostKind: 'tax', amount: 999, occurredAt: '2026-04-01' }, // 别的资产
+  { assetId: 'a1', kind: 'income', amount: 10, occurredAt: '2026-04-02' },        // 收入不计
+], 2026);
+assert.equal(costs.total, 420, '持有成本=税金 300+维修 120(当年口径)');
+assert.equal(costs.tax, 300); assert.equal(costs.repair, 120); assert.equal(costs.count, 2);
+
+const feats = loadTs('../lib/portal/finance-features.ts', (p) => p === './bank-tx' ? {
+  investmentAccountIds: () => new Set(['fid']),
+  summarizeMonth: () => ({ net: 0, income: 0, currency: 'USD' }), availableMonths: () => [],
+  detectRecurring: () => [], effectiveCategory: () => '', txFlow: () => 'expense',
+  loadFlowRules: () => ({}), expenseMerchants: () => new Set(), median: (a) => a[0] ?? 0,
+  ymOf: () => '2026-07', merchantKey: (t) => t.name,
+} : {});
+const itx = (date, amount, detail, accountId = 'fid') => ({ id: date + detail + amount, date, amount, currency: 'USD', category: 'INCOME', categoryDetail: detail, accountId, name: 'x' });
+const ytd = feats.investIncomeYTD([
+  itx('2026-03-10', -31, 'INCOME_DIVIDENDS'), itx('2026-06-10', -40, 'INCOME_DIVIDENDS'),
+  itx('2026-02-01', -5, 'INCOME_INTEREST_EARNED'), itx('2025-03-10', -99, 'INCOME_DIVIDENDS'),
+], 2026);
+assert.equal(ytd.dividends, 71, '当年股利聚合(往年不计)');
+assert.equal(ytd.interest, 5, '利息单列');
+assert.equal(ytd.byMonth[2], 31, '按月分桶(3 月)');
+const checkup = feats.portfolioCheckup(
+  [{ accountId: 'fid', name: 'FXAIX', ticker: 'FXAIX', type: 'mutual fund', quantity: 1, value: 600, currency: 'USD' },
+   { accountId: 'fid', name: 'AAPL', ticker: 'AAPL', type: 'equity', quantity: 1, value: 400, currency: 'USD' }],
+  [itx('2026-05-01', 500, ''), itx('2026-05-08', 500, ''), itx('2026-06-01', -200, '')], 2026);
+assert.equal(checkup.topPct, 60, '集中度:第一大 60%');
+assert.equal(checkup.buys, 2); assert.equal(checkup.sells, 1, '交易回顾(收益类不算卖出)');
+const rec = (key, lastDate, count, cadenceDays = 30) => ({ key, name: key, category: '', avgAmount: 10, count, lastDate, nextEstimate: '2026-08-01', cadenceDays, cadenceLabel: ['月付', 'Monthly'], currency: 'USD', latestAmount: 10, baselineAmount: 10, status: 'mature' });
+const ch = feats.recurringChanges([rec('steady', '2026-07-20', 6), rec('stalled', '2026-05-01', 6), rec('fresh', '2026-07-15', 2)], new Date('2026-07-28T00:00:00'));
+assert.equal(ch.stalled[0].key, 'stalled', '两个周期没扣款 → 疑似停了');
+assert.equal(ch.fresh[0].key, 'fresh', '首见 ≤45 天 → 新增');
+assert.equal(ch.steady[0].key, 'steady');
+
+// 静态钉:稳定 finding id(商户改描述符不再重复提醒)+ guidelines 补条
+const insightTxt = fs.readFileSync(new URL('../lib/portal/finance-insight.ts', import.meta.url), 'utf8');
+assert.match(insightTxt, /finance-new-recur-\$\{r\.key\}/, 'new-recur 用稳定 key');
+assert.match(insightTxt, /finance-hike-\$\{r\.key\}/, 'hike 用稳定 key');
+const glTxt = fs.readFileSync(new URL('../lib/portal/finance-guidelines.ts', import.meta.url), 'utf8');
+for (const topic of ['finance-score-credit-utilization', 'finance-cash-runway', 'finance-upcoming-bills', 'finance-net-surge']) {
+  assert.ok(glTxt.includes(`'${topic}'`), `guidelines 补条:${topic}`);
+}
+
 console.log('finance-assets: OK');

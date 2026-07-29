@@ -77,7 +77,7 @@ export function computeFinanceScores(txs: BankTx[], accounts: BankAccount[] = []
         value: `${pct}%`,
         category,
         detail: [
-          `近几个月收入约 ${formatMoney(income.monthlyIncome, ccy)}/月,结余約 ${pct}%;50/30/20 法则建议 20% 归储蓄`,
+          `近几个月收入约 ${formatMoney(income.monthlyIncome, ccy)}/月,结余约 ${pct}%;50/30/20 法则建议 20% 归储蓄`,
           `~${formatMoney(income.monthlyIncome, ccy)}/mo income, saving ~${pct}%; the 50/30/20 rule suggests 20% to savings`,
         ],
         source: '50/30/20 预算法则(Warren)',

@@ -37,9 +37,10 @@ const foodTotals = [90, 100, 110, 100, 105, 95];
 const baseTxs = foodTotals.map((v, i) => tx(`f${i}`, `2026-0${i + 1}-10`, 'Grocer', v));
 baseTxs.push(tx('cur', '2026-07-10', 'Grocer', 999)); // 当前月大额,不得进基线
 const b = feat.categoryBaseline(baseTxs, 'FOOD_AND_DRINK', NOW);
+// P2:数据集最老月(2026-01,视为 Plaid 回填残月)剔除出基线 → 取 5 个完整月 [100,110,100,105,95]
 assert.equal(b.median, 100, '基线中位数');
 assert.equal(b.mad, 5, '基线 MAD');
-assert.equal(b.months, 6, '取近 6 个完整月');
+assert.equal(b.months, 5, '剔除最老残月后取 5 个完整月');
 assert.ok(Math.abs(feat.baselineZ(400, b) - 40.47) < 0.1, 'modified z = 0.6745·(v−med)/MAD');
 // MAD=0(常数月)→ z 不可判
 const flat = [100, 100, 100].map((v, i) => tx(`c${i}`, `2026-0${i + 4}-10`, 'Grocer', v));

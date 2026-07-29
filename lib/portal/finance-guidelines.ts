@@ -13,6 +13,27 @@ export interface FinanceGuidelineSnippet {
 
 const CORPUS: FinanceGuidelineSnippet[] = [
   {
+    // P2 补欠账:文档承诺的 FICO 30% 一直没进语料
+    topic: 'finance-score-credit-utilization',
+    text: ['FICO 口径:信用卡利用率(欠款÷额度)建议保持在 30% 以下;低利用率通常对信用分更有利。', 'FICO guidance: keep credit utilization (balance ÷ limit) under 30%; lower utilization generally helps your score.'],
+    source: 'myFICO — Credit Utilization', url: 'https://www.myfico.com/credit-education/credit-scores/amount-of-debt',
+  },
+  {
+    topic: 'finance-cash-runway',
+    text: ['现金流缓冲:JPMorgan Chase Institute 研究显示,家庭需要约 6 周的收支缓冲才能平稳应对波动。', 'Cash buffer: JPMorgan Chase Institute research suggests households need ~6 weeks of take-home income as a buffer to weather volatility.'],
+    source: 'JPMorgan Chase Institute — Weathering Volatility', url: 'https://www.jpmorganchase.com/institute/all-topics/financial-health-wealth-creation/weathering-volatility-2',
+  },
+  {
+    topic: 'finance-upcoming-bills',
+    text: ['CFPB 建议:把账单日与发薪日对齐/错峰,是避免透支费与逾期费最直接的手段。', 'CFPB tip: aligning bill due dates with paydays is the most direct way to avoid overdraft and late fees.'],
+    source: 'CFPB — Bill calendar', url: 'https://www.consumerfinance.gov/about-us/blog/how-bill-calendar-can-help-you-stay-track/',
+  },
+  {
+    topic: 'finance-net-surge',
+    text: ['预算实践:单月支出激增本身不是问题,值得区分「一次性大额」与「习惯漂移」——前者标记排除,后者才需调整。', 'Budgeting practice: a one-month spike is not itself a problem — distinguish one-off purchases (exclude them) from habit drift (worth adjusting).'],
+    source: 'CFPB — Track your spending', url: 'https://www.consumerfinance.gov/consumer-tools/budgeting/',
+  },
+  {
     topic: 'finance-score-emergency-fund',
     text: ['通行共识:应急金以 3–6 个月生活支出为参考目标;从一个小目标(如 $500)起步也有效。', 'Common guideline: aim for 3–6 months of living expenses in emergency savings; starting with a small goal (e.g. $500) works too.'],
     source: 'Fidelity Viewpoints / St. Louis Fed Page One Economics', url: 'https://www.fidelity.com/viewpoints/personal-finance/save-for-an-emergency',

@@ -56,8 +56,12 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg }: {
 
   const channels = useMemo(() => listManualAssets().filter((a) => a.isChannel), [open, seg]); // eslint-disable-line react-hooks/exhaustive-deps
   const assets = useMemo(() => listManualAssets(), [open, seg]); // eslint-disable-line react-hooks/exhaustive-deps
+  // P2 持有成本:支出可关联到房/车等固定资产(税金/维修…),归集到资产名下、照常进月支出
+  const costAssets = useMemo(() => assets.filter((a) => !a.isChannel && a.kind !== 'loan'), [assets]);
+  const [costAssetId, setCostAssetId] = useState('');
+  const [costKind, setCostKind] = useState<'tax' | 'repair' | 'insurance' | 'other'>('other');
 
-  const reset = () => { setAmount(''); setCat(''); setNote(''); setChannelId(''); setNewChannel(''); setAssetId(''); setNewAssetName(''); setAnchorNote(''); setErr(''); };
+  const reset = () => { setAmount(''); setCat(''); setNote(''); setChannelId(''); setNewChannel(''); setAssetId(''); setNewAssetName(''); setAnchorNote(''); setCostAssetId(''); setCostKind('other'); setErr(''); };
 
   function save() {
     const v = Number(amount);
@@ -79,7 +83,11 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg }: {
         if (!ch && newChannel.trim()) {
           ch = addManualAsset({ name: newChannel.trim(), kind: 'cash', value: 0, isChannel: true }).id;
         }
-        const row = addManualEntry({ amount: v, kind: seg, ...(cat ? { category: cat } : {}), ...(note.trim() ? { note: note.trim() } : {}), ...(ch ? { channelId: ch } : {}) });
+        const row = addManualEntry({
+          amount: v, kind: seg,
+          ...(cat ? { category: cat } : {}), ...(note.trim() ? { note: note.trim() } : {}), ...(ch ? { channelId: ch } : {}),
+          ...(seg === 'expense' && costAssetId ? { assetId: costAssetId, assetCostKind: costKind } : {}),
+        });
         if (!row) throw new Error('entry_failed');
       }
       reset();
@@ -148,6 +156,23 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg }: {
                 ))}
               </div>
             </div>
+            {seg === 'expense' && costAssets.length > 0 && (
+              <div>
+                <p style={label}>{t('关联资产(可空:税金 / 维修记到房、车名下)', 'Tie to asset (optional: tax / repair)')}</p>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {costAssets.map((a) => (
+                    <button key={a.id} type="button" style={chip(costAssetId === a.id)} onClick={() => setCostAssetId((v) => (v === a.id ? '' : a.id))}>{a.name}</button>
+                  ))}
+                </div>
+                {costAssetId && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+                    {([['tax', '税金', 'Tax'], ['repair', '维修', 'Repair'], ['insurance', '保险', 'Insurance'], ['other', '其他', 'Other']] as Array<['tax' | 'repair' | 'insurance' | 'other', string, string]>).map(([k, zh, en]) => (
+                      <button key={k} type="button" style={chip(costKind === k)} onClick={() => setCostKind(k)}>{L(dict, zh, en)}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <div>
               <p style={label}>{t('备注(可空)', 'Note (optional)')}</p>
               <input style={input} placeholder={t('例:外婆给的红包', 'e.g. red packet from grandma')} value={note} onChange={(e) => setNote(e.target.value)} />

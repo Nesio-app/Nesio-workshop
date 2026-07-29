@@ -142,7 +142,7 @@ function newRecurringFindings(txs: BankTx[]): FinanceFinding[] {
     const firstMs = Date.parse(r.lastDate) - r.cadenceDays * (r.count - 1) * 86_400_000;
     if (Date.now() - firstMs > 90 * 86_400_000) continue;
     out.push({
-      id: `finance-new-recur-${r.name}`,
+      id: `finance-new-recur-${r.key}`,
       kind: 'new_recurring',
       severity: 'attention',
       title: [`新识别到定期扣款:${r.name}`, `New recurring charge: ${r.name}`],
@@ -204,7 +204,7 @@ function subscriptionHikeFindings(txs: BankTx[]): FinanceFinding[] {
     if (r.latestAmount < r.baselineAmount * 1.05 || rise < 1) continue;
     const pct = Math.round((rise / r.baselineAmount) * 100);
     out.push({
-      id: `finance-hike-${r.name}`,
+      id: `finance-hike-${r.key}`,
       kind: 'subscription_hike',
       severity: pct >= 25 ? 'flag' : 'attention',
       title: [`${r.name} 定期扣款涨价了`, `${r.name} recurring charge went up`],

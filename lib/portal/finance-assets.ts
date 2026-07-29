@@ -160,3 +160,34 @@ export function investDailyChange(series: readonly NetWorthSnapshot[]): { delta:
   const delta = Math.round((cur.investTotal - prev.investTotal) * 100) / 100;
   return { delta, pct: Math.round((delta / prev.investTotal) * 10000) / 100, fromDate: prev.date };
 }
+
+/* ---------- P2:折旧与持有成本(用户拍板:固定资产要记折旧/税金/维修) ---------- */
+
+/** 折旧(纯回溯):最早锚点 − 最新锚点,>0 才有意义(车贬值);升值资产返回 0。 */
+export function assetDepreciation(a: Pick<ManualAsset, 'anchors'>): number {
+  if (a.anchors.length < 2) return 0;
+  const sorted = [...a.anchors].sort((x, y) => (x.date < y.date ? 1 : -1));
+  const dep = sorted[sorted.length - 1].value - sorted[0].value;
+  return dep > 0 ? Math.round(dep * 100) / 100 : 0;
+}
+
+export interface AssetCosts { tax: number; repair: number; insurance: number; other: number; total: number; count: number }
+
+/** 资产持有成本归集(税金/维修/保险…):关联到该资产的支出,当年口径。纯函数。 */
+export function assetHoldingCosts(
+  assetId: string,
+  expenses: ReadonlyArray<{ assetId?: string; assetCostKind?: string; amount: number; occurredAt: string; kind?: string }>,
+  year = new Date().getFullYear(),
+): AssetCosts {
+  const out: AssetCosts = { tax: 0, repair: 0, insurance: 0, other: 0, total: 0, count: 0 };
+  for (const e of expenses) {
+    if (e.assetId !== assetId || e.kind === 'income') continue;
+    if (Number((e.occurredAt || '').slice(0, 4)) !== year) continue;
+    const k = (e.assetCostKind || 'other') as keyof AssetCosts;
+    if (k === 'tax' || k === 'repair' || k === 'insurance' || k === 'other') out[k] += e.amount;
+    out.total += e.amount;
+    out.count += 1;
+  }
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  return { tax: r2(out.tax), repair: r2(out.repair), insurance: r2(out.insurance), other: r2(out.other), total: r2(out.total), count: out.count };
+}

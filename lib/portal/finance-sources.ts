@@ -30,6 +30,10 @@ export interface Expense {
   channelId?: string;
   /** P1 小票对账:已关联的银行流水 id —— 关联后本行降级为明细层,不再进月汇总(防双计)。 */
   linkedBankTxId?: string;
+  /** P2 资产持有成本:关联的手动资产 id(税金/维修记到房/车名下,同时照常计入月支出)。 */
+  assetId?: string;
+  /** P2 持有成本类型(仅 assetId 存在时有意义)。 */
+  assetCostKind?: 'tax' | 'repair' | 'insurance' | 'other';
   createdAt: string;
 }
 
@@ -91,6 +95,7 @@ export function addExpense(input: Omit<Expense, 'id' | 'createdAt'> & { id?: str
 export function addManualEntry(input: {
   amount: number; kind: 'expense' | 'income';
   date?: string; category?: string; note?: string; channelId?: string; currency?: string;
+  assetId?: string; assetCostKind?: 'tax' | 'repair' | 'insurance' | 'other';
 }): Expense | null {
   if (!(input.amount > 0)) return null;
   return addExpense({
@@ -102,6 +107,7 @@ export function addManualEntry(input: {
     ...(input.category ? { category: input.category } : {}),
     ...(input.note ? { note: input.note } : {}),
     ...(input.channelId ? { channelId: input.channelId } : {}),
+    ...(input.assetId ? { assetId: input.assetId, assetCostKind: input.assetCostKind || 'other' } : {}),
     includeInFinance: true,
   });
 }

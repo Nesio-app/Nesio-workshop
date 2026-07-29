@@ -22,16 +22,18 @@ import {
 // 另有一套 alerts 判定(函数级双实现),两个输出面据同一份流水各说各话,已删并由契约钉死不回潮。
 import { financeFindings } from '@/lib/portal/finance-insight';
 import { computeFinanceScores } from '@/lib/portal/finance-risk';
-import { incomeBreakdown, detectIncome, portfolioSummary, recurringPriceHikes } from '@/lib/portal/finance-features';
+import { incomeBreakdown, detectIncome, portfolioSummary, recurringPriceHikes, investIncomeYTD, portfolioCheckup, recurringChanges, subscriptionLoad } from '@/lib/portal/finance-features';
+import { investDailyChange } from '@/lib/portal/finance-assets';
 import { removeBankAccount } from '@/lib/portal/bank-tx';
 import { loadCombinedFinanceTx, loadCombinedFinanceAccounts } from '@/lib/portal/tesla-finance';
 import QuickAddSheet from './QuickAddSheet';
 import {
   listManualAssets, assetCurrentValue, manualNetWorth, removeManualAsset,
-  loadNetWorthSeries, recordNetWorthSnapshot, FIN_ASSETS_EVENT, type ManualAsset,
+  loadNetWorthSeries, recordNetWorthSnapshot, FIN_ASSETS_EVENT,
+  assetDepreciation, assetHoldingCosts, type ManualAsset,
 } from '@/lib/portal/finance-assets';
 import { receiptMatchCandidates, rejectPair, loadRejectedPairs } from '@/lib/portal/receipt-match';
-import { linkExpenseToBankTx } from '@/lib/portal/finance-sources';
+import { linkExpenseToBankTx, loadDomainExpenses } from '@/lib/portal/finance-sources';
 import { domainExpenseTotal, listExpenses, EXPENSES_EVENT, type Expense } from '@/lib/portal/finance-sources';
 import { financeMonthAggregate } from '@/lib/portal/finance-aggregate';
 import { loadBudget, saveBudget, hasBudget, suggestBudget, budgetProgress, type BudgetConfig } from '@/lib/portal/finance-budget';
@@ -291,7 +293,8 @@ export default function FinanceTab() {
   const depositAccts = accounts.filter((a) => !isLiabAcct(a) && !isInvestAcct(a));
   const liabAccts = accounts.filter(isLiabAcct);
   // 设计:4 个子页 —— 总览 / 支出 / 交易 / 卡片。预算并入总览,定期并入交易,投资并入卡片。
-  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['spending', '支出', 'Spending'], ['tx', '交易', 'Transactions'], ['cards', '卡片', 'Cards']];
+  // P2:订阅/投资从死枚举变真页面(订阅监控 = 变化置顶+14 天账单;投资 = 收益导向)
+  const SUBS: Array<[Sub, string, string]> = [['overview', '总览', 'Overview'], ['spending', '支出', 'Spending'], ['tx', '交易', 'Tx'], ['recurring', '订阅', 'Recurring'], ['invest', '投资', 'Invest'], ['cards', '卡片', 'Cards']];
   function markNotRecurring(key: string) { setRecurRule(key, 'no'); setRev((r) => r + 1); } // 财务㉚:传流的 merchantKey,改名不丢
   function removeMerchantRule(name: string) { setMerchantRule(name, ''); setRev((r) => r + 1); }
   function removeFlowRule(name: string) { setFlowRule(name, ''); setRev((r) => r + 1); }
@@ -1040,15 +1043,127 @@ export default function FinanceTab() {
         })()
       )}
 
+      {/* P2 订阅监控:三层 —— 未来 14 天(别忘账单)→ 变化了的(涨价/新增/疑似停了)→ 稳定的 */}
+      {sub === 'recurring' && (() => {
+        const mature = recurring.filter((r) => r.status === 'mature');
+        const load = subscriptionLoad(txs, mature); // 与页内列表同一份数据(口径统一)
+        const inc = detectIncome(txs);
+        const loadPct = inc && inc.monthlyIncome > 0 ? Math.round((load.monthly / inc.monthlyIncome) * 100) : null;
+        const up = upcoming; // 7 天;下方分组覆盖更远
+        const ch = recurringChanges(recurring);
+        const row = (r: (typeof recurring)[number], pill: string, pillCls: string) => (
+          <div key={r.key} className="nesio-fin-acctrow">
+            <div className="nesio-fin-acctrow-body">
+              <span className="nesio-fin-acctrow-name">{r.name}</span>
+              <span className="nesio-fin-acctrow-sub">{L(dict, r.cadenceLabel[0], r.cadenceLabel[1])} · {L(dict, `下次约 ${r.nextEstimate}`, `next ~${r.nextEstimate}`)}{r.status === 'predicted' ? L(dict, ' · 待确认', ' · unconfirmed') : ''}</span>
+            </div>
+            <span className="nesio-fin-acctrow-bal">{formatMoney(r.latestAmount || r.avgAmount, r.currency)}</span>
+            <span className={`nesio-fin-delta ${pillCls}`}>{pill}</span>
+          </div>
+        );
+        return (
+          <>
+            <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>
+              {L(dict, `每月约 ${formatMoney(load.monthly, summary.currency)} · ${mature.length} 项已成熟${loadPct != null ? ` · 占收入 ${loadPct}%` : ''}${recurring.length > mature.length ? ` · 另 ${recurring.length - mature.length} 项待确认` : ''}`,
+                `~${formatMoney(load.monthly, summary.currency)}/mo · ${mature.length} confirmed${loadPct != null ? ` · ${loadPct}% of income` : ''}${recurring.length > mature.length ? ` · ${recurring.length - mature.length} unconfirmed` : ''}`)}
+            </p>
+            {up.items.length > 0 && (
+              <>
+                <p className="nesio-settings-section-label">{L(dict, '接下来 7 天', 'Next 7 days')}</p>
+                {up.items.map((r) => row(r, L(dict, '快到了', 'due soon'), 'up'))}
+              </>
+            )}
+            {(ch.hiked.length > 0 || ch.fresh.length > 0 || ch.stalled.length > 0) && (
+              <>
+                <p className="nesio-settings-section-label" style={{ marginTop: '0.8rem' }}>{L(dict, '变化了的 · 先看这几个', 'Changed — look here first')}</p>
+                {ch.hiked.map((r) => row(r, L(dict, `涨了`, 'up'), 'up'))}
+                {ch.fresh.map((r) => row(r, L(dict, '新增', 'new'), 'up'))}
+                {ch.stalled.map((r) => row(r, L(dict, '疑似停了', 'maybe ended'), 'down'))}
+              </>
+            )}
+            <p className="nesio-settings-section-label" style={{ marginTop: '0.8rem' }}>{L(dict, `稳定的 · ${ch.steady.length} 项`, `Steady · ${ch.steady.length}`)}</p>
+            {ch.steady.slice(0, 8).map((r) => row(r, L(dict, '稳定', 'steady'), 'down'))}
+            <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, '「疑似停了」= 已两个周期没扣款 —— 可能是省钱好事,确认一下就行。快到期的会出现在 Today。', '“Maybe ended” = two cycles missed — possibly good news. Due-soon items surface in Today.')}</p>
+          </>
+        );
+      })()}
+
+      {/* P2 投资:收益导向 —— 今日变化 / 当年股利利息 / 持仓 / 组合体检(不给买卖建议) */}
+      {sub === 'invest' && (() => {
+        const daily = investDailyChange(nwSeries);
+        const ytd = investIncomeYTD(txs);
+        const checkup = portfolioCheckup(holdings, txs);
+        const hs = [...holdings].sort((a, b) => b.value - a.value);
+        const maxM = Math.max(...ytd.byMonth, 1);
+        return (
+          <>
+            {daily && (
+              <p className="nesio-fin-alert-note" style={{ textAlign: 'left', color: daily.delta >= 0 ? 'var(--status-go)' : 'var(--portal-muted)' }}>
+                {L(dict, `今天 ${daily.delta >= 0 ? '+' : ''}${formatMoney(Math.abs(daily.delta))} (${daily.pct >= 0 ? '+' : ''}${daily.pct}%) · 与上次同步(${daily.fromDate})比`,
+                  `Today ${daily.delta >= 0 ? '+' : ''}${formatMoney(Math.abs(daily.delta))} (${daily.pct}%) · vs last sync (${daily.fromDate})`)}
+              </p>
+            )}
+            {(ytd.dividends > 0 || ytd.interest > 0) && (
+              <>
+                <p className="nesio-settings-section-label">{L(dict, '今年到现在 · 收益', 'This year · income')}</p>
+                <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, `股利 ${formatMoney(ytd.dividends)} · 利息 ${formatMoney(ytd.interest)}`, `Dividends ${formatMoney(ytd.dividends)} · interest ${formatMoney(ytd.interest)}`)}</p>
+                <svg viewBox="0 0 280 30" style={{ width: '100%', maxWidth: 320 }} aria-label={L(dict, '股利利息按月', 'Monthly dividends/interest')}>
+                  {ytd.byMonth.map((v, i) => (
+                    <rect key={i} x={i * 23 + 2} y={28 - (v / maxM) * 26} width={16} height={Math.max(1, (v / maxM) * 26)} rx={2}
+                      fill={v > 0 ? 'var(--portal-accent)' : 'var(--portal-line)'} />
+                  ))}
+                </svg>
+              </>
+            )}
+            {hs.length > 0 && (
+              <>
+                <p className="nesio-settings-section-label" style={{ marginTop: '0.6rem' }}>{L(dict, `持仓 · ${hs.length} 项`, `Holdings · ${hs.length}`)}</p>
+                {hs.slice(0, 8).map((h, i) => {
+                  const gain = typeof h.costBasis === 'number' && h.costBasis > 0 ? Math.round(((h.value - h.costBasis) / h.costBasis) * 100) : null;
+                  return (
+                    <div key={`${h.accountId}-${h.ticker || h.name}-${i}`} className="nesio-fin-acctrow">
+                      <div className="nesio-fin-acctrow-body">
+                        <span className="nesio-fin-acctrow-name">{h.ticker ? `${h.ticker} · ` : ''}{h.name}</span>
+                        <span className="nesio-fin-acctrow-sub">{L(dict, `${h.quantity} 份`, `${h.quantity} sh`)}{typeof h.costBasis === 'number' && h.costBasis > 0 ? L(dict, ` · 成本 ${formatMoney(h.costBasis, h.currency)}`, ` · cost ${formatMoney(h.costBasis, h.currency)}`) : ''}</span>
+                      </div>
+                      <span className="nesio-fin-acctrow-bal">{formatMoney(h.value, h.currency)}{gain != null && <span style={{ display: 'block', fontSize: '0.65rem', color: gain >= 0 ? 'var(--status-go)' : 'var(--status-gentle)', textAlign: 'right' }}>{gain >= 0 ? '+' : ''}{gain}%</span>}</span>
+                    </div>
+                  );
+                })}
+              </>
+            )}
+            {checkup && (
+              <>
+                <p className="nesio-settings-section-label" style={{ marginTop: '0.6rem' }}>{L(dict, '组合体检 · 本地确定性计算', 'Portfolio checkup · local & deterministic')}</p>
+                <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>
+                  {L(dict,
+                    `集中度:${checkup.topName} 占 ${checkup.topPct}% · 前三占 ${checkup.top3Pct}%。配置:${checkup.allocation.slice(0, 3).map((x) => `${x.type} ${x.pct}%`).join(' · ')}。今年买 ${checkup.buys} 次 · 卖 ${checkup.sells} 次。`,
+                    `Concentration: ${checkup.topName} ${checkup.topPct}% · top-3 ${checkup.top3Pct}%. Mix: ${checkup.allocation.slice(0, 3).map((x) => `${x.type} ${x.pct}%`).join(' · ')}. ${checkup.buys} buys · ${checkup.sells} sells this year.`)}
+                </p>
+              </>
+            )}
+            <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, '价格是上次同步的快照,不是实时行情;只陈述事实,不给买卖建议。', 'Prices are last-sync snapshots, not live quotes; facts only, no advice.')}</p>
+          </>
+        );
+      })()}
+
       {/* P1:手动资产(与 Plaid 账户同页同列,不设独立手动账本)—— 锚点估值,「+」也能进 */}
       {sub === 'cards' && (
         <>
           <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '手动资产 · 锚点估值', 'Manual assets · anchored values')}</p>
           {manualAssets.length === 0
             ? <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, '房、车、现金、加密…银行拍不到的,点「+ 记一笔 → 资产·估值」记进来,一起进净值。', 'Home, car, cash, crypto — add via “+ Add → Asset” and they join your net worth.')}</p>
-            : manualAssets.map((a: ManualAsset) => {
+            : (() => {
+              const allExpenses = loadDomainExpenses(); // P2 持有成本归集(税金/维修,当年)
+              return manualAssets.map((a: ManualAsset) => {
               const latest = a.anchors[0];
               const staleDays = latest ? Math.floor((Date.now() - new Date(`${latest.date}T00:00:00`).getTime()) / 86400000) : 0;
+              const dep = assetDepreciation(a);
+              const costs = assetHoldingCosts(a.id, allExpenses);
+              const costBits = [
+                dep > 0 ? L(dict, `折旧 -${formatMoney(dep)}`, `depr. -${formatMoney(dep)}`) : '',
+                costs.total > 0 ? L(dict, `今年持有 ${formatMoney(costs.total)}(税金 ${formatMoney(costs.tax)} · 维修 ${formatMoney(costs.repair)})`, `holding ${formatMoney(costs.total)} YTD (tax ${formatMoney(costs.tax)} · repair ${formatMoney(costs.repair)})`) : '',
+              ].filter(Boolean).join(' · ');
               return (
                 <div key={a.id} className="nesio-fin-acctrow">
                   <div className="nesio-fin-acctrow-body">
@@ -1057,6 +1172,7 @@ export default function FinanceTab() {
                       {latest ? L(dict, `锚点 ${latest.date}${latest.note ? ` · ${latest.note}` : ''}`, `anchor ${latest.date}${latest.note ? ` · ${latest.note}` : ''}`) : ''}
                       {staleDays > 90 ? L(dict, ' · 该盘点了', ' · time to recount') : ''}
                     </span>
+                    {costBits && <span className="nesio-fin-acctrow-sub">{costBits}</span>}
                   </div>
                   <span className={`nesio-fin-acctrow-bal${a.classification === 'liability' ? ' is-neg' : ''}`}>
                     {a.classification === 'liability' ? '-' : ''}{formatMoney(assetCurrentValue(a))}
@@ -1067,7 +1183,8 @@ export default function FinanceTab() {
                     onClick={() => { removeManualAsset(a.id); recordNetWorthSnapshot(); setRev((r) => r + 1); }}>✕</button>
                 </div>
               );
-            })}
+              });
+            })()}
         </>
       )}
 
