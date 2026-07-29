@@ -170,6 +170,60 @@ for (const s of ps) {
   assert.equal(s.actual, run.actual[s.ym], '真值取自同一张表');
 }
 
+// ── 定期账单:日期算术 ──
+assert.equal(F.addDaysStr('2026-01-31', 1), '2026-02-01', '跨月');
+assert.equal(F.addDaysStr('2026-02-28', 1), '2026-03-01', '平年 2 月底');
+assert.equal(F.addDaysStr('2024-02-28', 1), '2024-02-29', '闰年 2 月底');
+assert.equal(F.daysBetween('2026-01-01', '2026-01-31'), 30);
+assert.equal(F.daysBetween('2026-01-31', '2026-01-01'), -30, '反向为负');
+
+// ── 定期商户识别 ──
+const bills = [];
+for (let i = 0; i < 6; i++) {
+  bills.push({ date: F.addDaysStr('2026-01-05', i * 30), amount: 15.99, key: 'netflix' });
+  bills.push({ date: F.addDaysStr('2026-01-12', i * 30), amount: 9.99, key: 'spotify' });
+}
+bills.push({ date: '2026-03-03', amount: 42, key: 'oneoff' }); // 只出现一次
+assert.deepEqual([...F.recurringKeys(bills)], ['netflix', 'spotify'], '一次性商户不算定期');
+assert.ok(!F.recurringKeys(bills).includes('oneoff'));
+
+// ── 下次扣款日:间隔中位数 ──
+// cutoff 5/4:看得到 1/5、2/4、3/6、4/5 四次;5/5 那次在 cutoff 之后,**必须不可见**
+const vis6 = F.visibleAt(bills, '2026-05-04');
+assert.ok(!vis6.some((r) => r.key === 'netflix' && r.date === '2026-05-05'), '5/5 是未来,不可见');
+const nd = F.predictNextChargeDate(vis6, 'netflix');
+assert.ok(nd && nd > '2026-05-04', `应给出未来日期,实际 ${nd}`);
+assert.equal(nd, '2026-05-05', '最后可见 4/5 + 间隔中位数 30 天 = 5/5');
+// 不足 3 次不硬猜
+assert.equal(F.predictNextChargeDate(F.visibleAt(bills, '2026-02-10'), 'netflix'), null, '只有 2 次扣款 → 不猜');
+// 一次跳票不该带偏节奏(中位数抗离群)
+const skipped = [
+  { date: '2026-01-05', amount: 10, key: 'x' }, { date: '2026-02-04', amount: 10, key: 'x' },
+  { date: '2026-03-06', amount: 10, key: 'x' }, { date: '2026-07-05', amount: 10, key: 'x' }, // 跳了 4 个月
+  { date: '2026-08-04', amount: 10, key: 'x' },
+];
+assert.equal(F.daysBetween('2026-08-04', F.predictNextChargeDate(skipped, 'x')), 30, '中位数忽略那次 121 天的跳票');
+
+// ── 下次扣款金额 ──
+const priced = [
+  { date: '2026-01-05', amount: 10, key: 'y' }, { date: '2026-02-05', amount: 10, key: 'y' },
+  { date: '2026-03-05', amount: 10, key: 'y' }, { date: '2026-04-05', amount: 99, key: 'y' }, // 一次异常
+];
+assert.equal(F.predictNextChargeAmount(priced, 'y'), 10, '中位数抗一次性异常金额');
+assert.equal(F.naiveNextChargeAmount(priced, 'y'), 99, '笨基线就是上一笔');
+
+// ── 定期回测:防泄漏 + 样本对齐 ──
+const recDate = F.backtestRecurring(bills, 'date');
+assert.ok(recDate.samples.length > 0, '有样本');
+for (const s of recDate.samples) {
+  assert.ok(s.actual > 0, '真实间隔为正');
+  assert.ok(s.pred > 0 && s.naive > 0, '预测与基线都是正的天数');
+}
+const recAmt = F.backtestRecurring(bills, 'amount');
+assert.ok(recAmt.samples.every((s) => s.actual === 15.99 || s.actual === 9.99), '金额真值取自真实扣款');
+// 固定金额订阅 → 预测应完美
+assert.equal(F.scoreSamples('amt', recAmt.samples).mae, 0, '金额恒定时误差为 0');
+
 // ── 门槛常量对外可见(改门槛必须是显式决定)──
 assert.equal(F.MIN_SAMPLES, 8);
 assert.equal(F.MIN_SKILL, 0.05);

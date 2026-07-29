@@ -120,6 +120,114 @@ export function naiveMedian3(visible: readonly FlowRow[], cutoff: string): numbe
   return Math.round(median(vals) * 100) / 100;
 }
 
+// ── 定期账单:稀疏数据里唯一有结构的部分 ────────────────────────────
+//
+// 首轮真实回测的教训:每月仅约 5 笔时,「月底总支出」被单笔消费落在月末还是月初
+// 主宰,任何方法的区间都会宽到没法看 —— 那是**预测目标本身不可预测**,不是方法不好。
+// 但同一份数据里,订阅/账单是周期性的:它该来的时候就会来。把预测目标换成
+// 「下一笔定期账单何时扣、扣多少」,信噪比完全不同,而且真的改变决策(提前知道要扣钱)。
+
+export interface RecurringGuess {
+  key: string;
+  nextDate: string;
+  amount: number;
+}
+
+/** 同一商户的历史扣款日期(升序)。 */
+function chargesOf(visible: readonly FlowRow[], key: string): FlowRow[] {
+  return visible.filter((r) => r.key === key && r.amount > 0).sort((a, b) => (a.date < b.date ? -1 : 1));
+}
+
+/** 日期字符串加天数(UTC 锚点,避开 DST)。 */
+export function addDaysStr(date: string, n: number): string {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
+
+export function daysBetween(a: string, b: string): number {
+  return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86_400_000);
+}
+
+/**
+ * 候选:下一笔扣款日 = 最近一次扣款 + 历史间隔中位数。
+ * 用中位数而非均值 —— 一次补扣/跳票不该把整个节奏带偏。
+ * 少于 3 次扣款 → 返回 null(两点连线不算规律,不硬猜)。
+ */
+export function predictNextChargeDate(visible: readonly FlowRow[], key: string): string | null {
+  const list = chargesOf(visible, key);
+  if (list.length < 3) return null;
+  const gaps: number[] = [];
+  for (let i = 1; i < list.length; i++) gaps.push(daysBetween(list[i - 1].date, list[i].date));
+  const cadence = Math.round(median(gaps));
+  if (cadence < 5 || cadence > 400) return null; // 太密(同日多笔)或太疏(年费以上)不做
+  return addDaysStr(list[list.length - 1].date, cadence);
+}
+
+/** 笨基线:下一笔就在「上次 + 30 天」(当所有账单都是月付)。 */
+export function naiveNextChargeDate(visible: readonly FlowRow[], key: string): string | null {
+  const list = chargesOf(visible, key);
+  if (list.length < 3) return null;
+  return addDaysStr(list[list.length - 1].date, 30);
+}
+
+/** 候选:下一笔金额 = 历史金额中位数(抗一次性涨价/促销)。 */
+export function predictNextChargeAmount(visible: readonly FlowRow[], key: string): number | null {
+  const list = chargesOf(visible, key);
+  if (list.length < 3) return null;
+  return Math.round(median(list.map((r) => r.amount)) * 100) / 100;
+}
+
+/** 笨基线:下一笔金额 = 上一笔金额。 */
+export function naiveNextChargeAmount(visible: readonly FlowRow[], key: string): number | null {
+  const list = chargesOf(visible, key);
+  if (list.length < 3) return null;
+  return list[list.length - 1].amount;
+}
+
+/** 出现 ≥minCount 次的商户键 —— 只有这些才谈得上「定期」。 */
+export function recurringKeys(rows: readonly FlowRow[], minCount = 4): string[] {
+  const c = new Map<string, number>();
+  for (const r of rows) if (r.amount > 0 && r.key) c.set(r.key, (c.get(r.key) || 0) + 1);
+  return [...c.entries()].filter(([, n]) => n >= minCount).map(([k]) => k).sort();
+}
+
+/**
+ * 定期账单回测:对每个商户的每一次扣款(第 4 次起),站在**前一次扣款当天**预测
+ * 下一次的日期与金额,再与真实值对账。
+ * 日期误差单位是「天」,金额误差单位是钱 —— 两者分开评分,不混为一谈。
+ */
+export function backtestRecurring(
+  rows: readonly FlowRow[],
+  mode: 'date' | 'amount',
+): { samples: Sample[]; naiveSamples: Sample[] } {
+  const samples: Sample[] = [];
+  const naiveSamples: Sample[] = [];
+  for (const key of recurringKeys(rows)) {
+    const list = chargesOf(rows, key);
+    for (let i = 3; i < list.length; i++) {
+      const cutoff = list[i - 1].date;              // 站在上一次扣款当天
+      const visible = visibleAt(rows, cutoff);      // ← 同一道防泄漏闸
+      const truth = list[i];
+      if (mode === 'date') {
+        const p = predictNextChargeDate(visible, key);
+        const nv = naiveNextChargeDate(visible, key);
+        if (!p || !nv) continue;
+        // 用「距 cutoff 的天数」当数值,误差即天数差
+        samples.push({ cutoff, ym: ymOf(truth.date), pred: daysBetween(cutoff, p), actual: daysBetween(cutoff, truth.date), naive: daysBetween(cutoff, nv) });
+        naiveSamples.push(samples[samples.length - 1]);
+      } else {
+        const p = predictNextChargeAmount(visible, key);
+        const nv = naiveNextChargeAmount(visible, key);
+        if (p == null || nv == null) continue;
+        samples.push({ cutoff, ym: ymOf(truth.date), pred: p, actual: truth.amount, naive: nv });
+        naiveSamples.push(samples[samples.length - 1]);
+      }
+    }
+  }
+  return { samples, naiveSamples };
+}
+
 // ── 统计工具 ────────────────────────────────────────────────────────────
 
 export function median(vals: readonly number[]): number {

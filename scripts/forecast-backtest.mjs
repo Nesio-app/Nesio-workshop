@@ -218,6 +218,27 @@ for (const r of reports) {
   console.log('');
 }
 
+// ── 定期账单(稀疏数据里唯一有结构的部分)────────────────────────────
+const recKeys = F.recurringKeys(rows);
+console.log('── 定期账单预测(与月底总额无关的另一条线)');
+console.log(`   识别到有规律的商户 ${recKeys.length} 个(出现 ≥4 次)`);
+if (recKeys.length === 0) {
+  console.log('   没有足够规律的商户 —— 这条线在当前数据上无从谈起。\n');
+} else {
+  for (const mode of ['date', 'amount']) {
+    const { samples } = F.backtestRecurring(rows, mode);
+    const label = mode === 'date' ? '下次扣款日(误差单位:天)' : '下次扣款金额(误差单位:钱)';
+    const rep = F.scoreSamples(label, samples);
+    console.log(`   ── ${label}`);
+    if (rep.n === 0) { console.log('      无样本\n'); continue; }
+    console.log(`      样本 ${rep.n} 次 · 平均误差 ${rep.mae} · 平均偏差率 ${rep.mape}%`);
+    console.log(`      笨基线误差 ${rep.naiveMae} · 技能分 ${rep.skill >= 0 ? '+' : ''}${(rep.skill * 100).toFixed(1)}%`);
+    console.log(`      区间(p80):±${rep.p80Pct}%`);
+    console.log(`      ${VERDICT_ZH[rep.verdict]} — ${rep.note}`);
+    console.log('');
+  }
+}
+
 const adopted = reports.filter((r) => r.verdict === 'adopt');
 console.log('══════════════════════════════════════════════════════════════');
 if (thin) {
