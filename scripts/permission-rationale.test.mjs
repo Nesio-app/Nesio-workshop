@@ -41,6 +41,7 @@ const vis = read('../components/portal/VoiceInputSheet.tsx');
 assert.match(vis, /import \{ permissionRationale, shouldExplainPermission, markPermissionExplained \} from '@\/lib\/portal\/permission-rationale'/, '引入前置说明助手');
 assert.match(vis, /shouldExplainPermission\('microphone'\)[\s\S]{0,40}setMicPrimer\(true\)/, '首点麦克风先弹说明,不直接 start');
 assert.match(vis, /onClick=\{listening \? stopListening : handleMicTap\}/, '麦克风按钮走 handleMicTap(前置说明门)');
-assert.match(vis, /markPermissionExplained\('microphone'\)[\s\S]{0,60}startListening\(\)/, '允许后标记 + 才 start');
+// e331fd8 起:标记与 start 之间插入原生 getUserMedia 权限请求(壳内先要系统麦权限)——窗口放宽,语义不变
+assert.match(vis, /markPermissionExplained\('microphone'\)[\s\S]{0,400}startListening\(\)/, '允许后标记 + 才 start');
 
 console.log('permission-rationale: OK');
