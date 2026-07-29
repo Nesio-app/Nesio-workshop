@@ -6,14 +6,17 @@
  *   node scripts/forecast-backtest.mjs --data ~/nesio-backup-2026-07-29.json
  *   node scripts/forecast-backtest.mjs --data <备份> --cutoff-day 10
  *
- * 备份文件来自 App 内「设置 → 数据与隐私 → 导出」,形状 { entries: { key: jsonString } },
- * 本脚本只读 nesio-bank-tx-v1。**全程离线,不发任何网络请求,不写回任何文件。**
+ * 备份文件来自 App 内「设置 → 数据与隐私 → 导出」,形状 { entries: { key: jsonString } }。
+ * 读:nesio-bank-tx-v1(流水)、nesio-bank-accounts-v1(账户类型)、nesio-expenses-v1
+ * (手动记账)。**全程离线,不发任何网络请求,不写回任何文件。**
  *
  * 口径说明(重要,别看漏):
- *   这里用 `amount > 0` 近似「支出」,并剔除明显的转账/还款描述,没有跑完整的 txFlow
- *   (那条链要 localStorage 和学习到的规则)。所以**绝对误差**会比真实口径略糙;
- *   但模型和笨基线吃的是同一份过滤结果,**技能分(相对好坏)依然可信** —— 而技能分
- *   才是「这个预测器要不要做」的判据。
+ *   支出 = 非投资/贷款账户 且 amount > 0 且 描述不像转账还款。
+ *   投资账户按 App 的 txFlow 口径剔除 —— 实测教训:不剔的话,券商账户的股利/利息/
+ *   管理费碎账会被当成消费,把「月度总额中位数」压到 $1.52,整份画像失真。
+ *   仍未跑完整 txFlow(那条链要 localStorage 与学到的规则),所以**绝对误差**略糙;
+ *   但模型与笨基线吃同一份过滤结果,**技能分(相对好坏)可信** —— 而技能分才是
+ *   「这个预测器要不要做」的判据。
  */
 
 import fs from 'node:fs';
@@ -82,8 +85,30 @@ function rowsFromBackup(file) {
   const txs = parseEntry(entries, 'nesio-bank-tx-v1');
   if (!Array.isArray(txs)) throw new Error('备份里没有 nesio-bank-tx-v1 数组(还没连银行,或这台设备没拉到流水)');
 
+  // 按 App 口径排除投资/贷款账户(bank-tx.txFlow 把它们归 transfer,不计支出)。
+  // 不做这一步的后果实测过:Fidelity 之类券商账户的股利/利息/管理费碎账被当成消费,
+  // 「月度总额中位数 $1.52」——那不是消费画像,是口径错了。
+  const accounts = parseEntry(entries, 'nesio-bank-accounts-v1');
+  const acctType = new Map();
+  if (Array.isArray(accounts)) {
+    for (const a of accounts) if (a && a.id) acctType.set(a.id, String(a.type || '').toLowerCase());
+  }
+  const NON_SPEND_ACCT = new Set(['investment', 'brokerage', 'loan']);
+  const isSpendAcct = (t) => {
+    const ty = acctType.get(t.accountId);
+    return !(ty && NON_SPEND_ACCT.has(ty));
+  };
+
+  // 账户类型分布(诊断:这 N 笔到底来自哪类账户)
+  const byType = {};
+  for (const t of txs) {
+    const ty = acctType.get(t?.accountId) || '(未知账户)';
+    byType[ty] = (byType[ty] || 0) + 1;
+  }
+
   const bankRows = txs
     .filter((t) => t && typeof t.date === 'string' && Number.isFinite(t.amount))
+    .filter(isSpendAcct)
     .filter((t) => t.amount > 0)
     .filter((t) => !TRANSFER_RE.test(`${t.name || ''} ${t.category || ''}`))
     .map((t) => ({ date: t.date.slice(0, 10), amount: t.amount, key: t.merchantId || t.name || '' }));
@@ -98,7 +123,7 @@ function rowsFromBackup(file) {
     : [];
 
   const rows = [...bankRows, ...manualRows].sort((a, b) => (a.date < b.date ? -1 : 1));
-  return { rows, total: txs.length, bankRows: bankRows.length, manualRows: manualRows.length, inv, totalKeys };
+  return { rows, total: txs.length, bankRows: bankRows.length, manualRows: manualRows.length, inv, totalKeys, byType, acctCount: acctType.size };
 }
 
 /** 内置合成样例:12 个月,月基线 3000 + 噪声 + 月初房租 —— 只为自检管线,不代表真实数据。 */
@@ -135,7 +160,7 @@ try {
   console.error(`✗ 读数据失败:${e.message}`);
   process.exit(1);
 }
-const { rows, total, inv, totalKeys, bankRows, manualRows } = src;
+const { rows, total, inv, totalKeys, bankRows, manualRows, byType, acctCount } = src;
 const months = F.monthsPresent(rows);
 
 console.log('');
@@ -149,6 +174,15 @@ if (inv) {
   for (const it of inv) {
     const shown = it.n == null ? '缺失' : `${it.n}`;
     console.log(`   ${it.label.padEnd(16, ' ')} ${shown}`);
+  }
+  console.log('');
+  if (byType && Object.keys(byType).length) {
+    console.log('');
+    console.log(`   流水按账户类型分布(共 ${acctCount} 个账户):`);
+    for (const [ty, n] of Object.entries(byType).sort((a, b) => b[1] - a[1])) {
+      const excluded = ['investment', 'brokerage', 'loan'].includes(ty);
+      console.log(`     ${String(ty).padEnd(18, ' ')} ${String(n).padStart(5, ' ')} 笔${excluded ? '   ← 按 App 口径不计支出' : ''}`);
+    }
   }
   console.log('');
   console.log(`   银行流水计入支出 ${bankRows} 笔 · 手动记账计入 ${manualRows} 笔`);
