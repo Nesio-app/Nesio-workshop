@@ -10797,6 +10797,19 @@ html[data-portal-theme="night"] .nesio-wechat-bubble--ai {
 .nesio-wechat-bubble--user .nesio-wechat-bubble-text { color: #fff; }
 
 /* 端上 CLIP 照片命中:答复气泡里的缩略图行(点开放大) */
+/* 你发出去的图:气泡里的缩略图(2026-07-29 标注 A9-a —— 原来只有一句「[图片] 识别图片」)。
+   存的是 200px 的 jpeg,所以这里给固定上限尺寸,别让它被放大糊掉。 */
+.nesio-chat-sent-thumb {
+  display: block;
+  max-width: 180px;
+  max-height: 180px;
+  width: auto;
+  height: auto;
+  border-radius: var(--radius-sm, 12px);
+  margin-bottom: 0.35rem;
+  object-fit: cover;
+}
+
 .nesio-chat-photo-hits {
   display: flex;
   flex-wrap: wrap;

@@ -22,6 +22,7 @@ import NesioSheet from '../ui/NesioSheet';
 import { recognizeOnDevice, visionAvailability, unavailableMessage, type VisionUnavailableReason } from '@/lib/native/vision';
 import { parseLabReport, abnormalCount, findReportDate, flagOf, type ParsedLabRow } from '@/lib/health/lab-parse';
 import { recordLab, SELF_PERSON_KEY } from '@/lib/health/health-signals';
+import { readLabPdf } from '@/lib/health/lab-pdf';
 import { buildRelationships } from '@/lib/portal/relationships';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 import { L } from '@/lib/portal/i18n';
@@ -30,8 +31,10 @@ import { usePortalLocale } from '../use-portal-locale';
 
 type Phase =
   | { s: 'pick' }
-  | { s: 'reading' }
-  | { s: 'blocked'; reason: VisionUnavailableReason }   // 端上不可用 —— 说清楚 + 去手填
+  // step 区分「在读 PDF」和「在认字」—— 两者耗时差一个量级,一句「识别中」会让人以为卡了
+  | { s: 'reading'; step: 'pdf' | 'ocr' }
+  // fromScan:扫描件 PDF 走到这里时,该说的不是「拍清楚点」而是「这份是图片型 PDF」
+  | { s: 'blocked'; reason: VisionUnavailableReason; fromScan?: boolean }
   | { s: 'failed'; message: string }                    // 识别没成 —— 可重试
   | { s: 'empty'; text: string }                        // 认出字了但一条指标都解不出来
   | { s: 'confirm'; rows: Row[]; date: string };
@@ -52,25 +55,68 @@ export default function LabScanSheet({
   const [saveErr, setSaveErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const pdfRef = useRef<HTMLInputElement>(null);
 
   const people = useMemo(() => {
     if (!open) return [];
     try { return buildRelationships(getLifeGraph()).slice(0, 12); } catch { return []; }
   }, [open]);
 
+  /** 拿到整份文字之后的共同收尾:解析 → 空 → 确认屏。图片/PDF 两条路都汇到这里。 */
+  const finishWithText = useCallback((text: string) => {
+    const rows = parseLabReport(text);
+    if (!rows.length) { setPhase({ s: 'empty', text }); return; }
+    // 日期解不出来就用今天 —— 但这是**用户可见可改**的一个输入框,不是背地里替他定的。
+    setPhase({ s: 'confirm', rows: rows.map((x) => ({ ...x, keep: true })), date: findReportDate(text) || today() });
+  }, []);
+
   const run = useCallback(async (file: File) => {
-    setPhase({ s: 'reading' });
+    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+
+    // ── PDF ────────────────────────────────────────────────────────────────
+    // 2026-07-29:用户问「也可以是上传的 pdf 么」。能,而且**多数情况比拍照更好** ——
+    // 医院系统出的 PDF 带文字层,直接读文字:零 OCR 误差、不用端上 Vision、网页端也能用。
+    // 只有扫描件(整页是一张图)才退回 Vision 那条路。
+    if (isPdf) {
+      setPhase({ s: 'reading', step: 'pdf' });
+      let read;
+      try {
+        read = await readLabPdf(file);
+      } catch {
+        setPhase({ s: 'failed', message: t('这份 PDF 打不开 —— 可能是加密的,或者文件不完整。',
+          'Could not open this PDF — it may be encrypted or incomplete.') });
+        return;
+      }
+
+      if (read.kind === 'text') { finishWithText(read.lines.join('\n')); return; }
+
+      // 扫描件:每页渲染成图,逐张过端上识别
+      const avail = await visionAvailability();
+      if (!avail.available) {
+        setPhase({ s: 'blocked', reason: avail.reason || 'plugin_missing', fromScan: true });
+        return;
+      }
+      setPhase({ s: 'reading', step: 'ocr' });
+      const texts: string[] = [];
+      for (const img of read.images) {
+        const r = await recognizeOnDevice(img);
+        if (!r.ok) { setPhase({ s: 'failed', message: r.message }); return; }
+        texts.push(r.text);
+      }
+      finishWithText(texts.join('\n'));
+      return;
+    }
+
+    // ── 图片 ───────────────────────────────────────────────────────────────
+    setPhase({ s: 'reading', step: 'ocr' });
     const avail = await visionAvailability();
     if (!avail.available) { setPhase({ s: 'blocked', reason: avail.reason || 'plugin_missing' }); return; }
 
     const r = await recognizeOnDevice(file);
     if (!r.ok) { setPhase({ s: 'failed', message: r.message }); return; }
-
-    const rows = parseLabReport(r.text);
-    if (!rows.length) { setPhase({ s: 'empty', text: r.text }); return; }
-    // 日期解不出来就用今天 —— 但这是**用户可见可改**的一个输入框,不是背地里替他定的。
-    setPhase({ s: 'confirm', rows: rows.map((x) => ({ ...x, keep: true })), date: findReportDate(r.text) || today() });
-  }, []);
+    finishWithText(r.text);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finishWithText, dict]);
 
   const reset = () => { setPhase({ s: 'pick' }); setSaveErr(null); };
 
@@ -126,13 +172,21 @@ export default function LabScanSheet({
         {phase.s === 'pick' && (
           <>
             <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>
-              {t('把整张单子放平、拍清楚。识别在这台手机上完成,图片不会离开设备。',
-                'Lay the report flat and shoot it clearly. Recognition runs on this phone — the image never leaves the device.')}
+              {t('拍一张,或直接选体检中心给的 PDF。全程在这台设备上完成,文件不会离开。',
+                'Take a photo, or pick the PDF your lab sent. Everything runs on this device — the file never leaves.')}
             </p>
             <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: '0.8rem' }}
               onClick={() => fileRef.current?.click()}>
-              {t('拍照 / 选一张', 'Take or choose a photo')}
+              {t('拍照', 'Take a photo')}
             </button>
+            <button type="button" className="nesio-rel-log-btn" style={{ width: '100%', marginTop: '0.5rem' }}
+              onClick={() => pdfRef.current?.click()}>
+              {t('选文件 · PDF 或图片', 'Choose a file · PDF or image')}
+            </button>
+            <p className="nesio-settings-option-hint" style={{ marginTop: '0.5rem' }}>
+              {t('带文字的 PDF 是直接读文字的 —— 比拍照准,也不需要端上识别。',
+                'A text-based PDF is read directly — more accurate than a photo, and no on-device OCR needed.')}
+            </p>
             <button type="button" className="nesio-rel-log-btn" style={{ width: '100%', marginTop: '0.5rem' }} onClick={goManual}>
               {t('手填也行', 'Type it in instead')}
             </button>
@@ -140,13 +194,23 @@ export default function LabScanSheet({
         )}
 
         {phase.s === 'reading' && (
-          <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{t('在这台手机上认字…', 'Reading on this phone…')}</p>
+          <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>
+            {phase.step === 'pdf'
+              ? t('在读这份 PDF…', 'Reading the PDF…')
+              : t('在这台设备上认字…', 'Reading on this device…')}
+          </p>
         )}
 
         {/* 端上不可用:说清楚为什么 + 给出路。绝不偷偷改走云端。 */}
         {phase.s === 'blocked' && (
           <div role="alert">
-            <p className="nesio-rel-detail-err" style={{ marginTop: 0 }}>{unavailableMessage(phase.reason)}</p>
+            {phase.fromScan && (
+              <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>
+                {t('这份 PDF 是扫描件(整页就是一张图),没有可以直接读的文字 —— 只能走识别。',
+                  'This PDF is a scan (each page is an image) with no text to read — it needs OCR.')}
+              </p>
+            )}
+            <p className="nesio-rel-detail-err" style={{ marginTop: phase.fromScan ? '0.4rem' : 0 }}>{unavailableMessage(phase.reason)}</p>
             <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: '0.6rem' }} onClick={goManual}>
               {t('手填这张单子', 'Type this report in')}
             </button>
@@ -157,8 +221,8 @@ export default function LabScanSheet({
           <div role="alert">
             <p className="nesio-rel-detail-err" style={{ marginTop: 0 }}>{phase.message}</p>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
-              <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }} onClick={() => fileRef.current?.click()}>
-                {t('再拍一张', 'Try another photo')}
+              <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }} onClick={() => pdfRef.current?.click()}>
+                {t('换一个文件', 'Try another file')}
               </button>
               <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }} onClick={goManual}>
                 {t('手填', 'Type it in')}
@@ -174,8 +238,8 @@ export default function LabScanSheet({
                 'Text was read, but no metric rows matched — the layout may be unusual.')}
             </p>
             <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
-              <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }} onClick={() => fileRef.current?.click()}>
-                {t('再拍一张', 'Try another photo')}
+              <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }} onClick={() => pdfRef.current?.click()}>
+                {t('换一个文件', 'Try another file')}
               </button>
               <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }} onClick={goManual}>
                 {t('手填', 'Type it in')}
@@ -228,7 +292,9 @@ export default function LabScanSheet({
                     <input className="nesio-ob-input" style={{ flex: 2 }} inputMode="decimal" value={String(r.value)}
                       aria-label={t('数值', 'Value')}
                       onChange={(e) => patch(i, { value: Number(e.target.value) })} />
-                    <input className="nesio-ob-input" style={{ flex: 1 }} value={r.unit || ''} maxLength={16} placeholder={t('单位', 'Unit')}
+                    {/* 单位那格要比数值宽:「10^9/L」「mmol/L」在等宽四格里会被截成
+                        「10^9」「mmol」—— 值是全的,但看起来像解析漏了。 */}
+                    <input className="nesio-ob-input" style={{ flex: 1.6 }} value={r.unit || ''} maxLength={16} placeholder={t('单位', 'Unit')}
                       aria-label={t('单位', 'Unit')}
                       onChange={(e) => patch(i, { unit: e.target.value })} />
                     <input className="nesio-ob-input" style={{ flex: 1 }} inputMode="decimal" value={r.low ?? ''} placeholder={t('下限', 'Low')}
@@ -261,6 +327,15 @@ export default function LabScanSheet({
           </>
         )}
 
+        {/* 两个 input 是有意分开的:带 capture 的那个在手机上会**直接开相机**,
+            选不到文件管理器里的 PDF。想选 PDF 必须有一个不带 capture 的。 */}
+        <input ref={pdfRef} type="file" accept="application/pdf,image/*" hidden
+          onChange={(e) => {
+            const f = e.currentTarget.files?.[0];
+            e.currentTarget.value = '';
+            if (f) void run(f);
+          }} />
+
         <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden
           onChange={(e) => {
             // 先把 File 抓出来再清 value —— 反了的话 FileList 当场变空,表现是「点了没反应」。踩过。
@@ -270,7 +345,7 @@ export default function LabScanSheet({
           }} />
 
         <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>
-          {t('识别在本机完成 · 健康信息参考,不作诊断', 'Recognition runs on-device · for reference, not a diagnosis')}
+          {t('读取与识别都在本机完成 · 健康信息参考,不作诊断', 'Reading and recognition run on-device · for reference, not a diagnosis')}
         </p>
       </div>
     </NesioSheet>

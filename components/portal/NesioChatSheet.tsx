@@ -96,6 +96,12 @@ interface UiMessage {
   sources?: Array<{ title: string; url: string }>;
   refs?: MsgRef[];
   savedToMemory?: boolean;
+  /**
+   * 2026-07-29(标注 A9-a):用户发的图,气泡里直接显示缩略图。
+   * 存的是**缩到 200px 的 jpeg**,不是原图 —— 聊天历史整条存进 localStorage,
+   * 塞原图两三张就把配额撑爆,后果是整段历史写不进去(不是少一张图那么轻)。
+   */
+  imageThumb?: string;
   /** 批次 140:这条答复的真实来路 —— 云端 AI(深问)还是本机记忆搜索(端上)。气泡徽章据此诚实标注。 */
   answerMode?: 'onDevice' | 'cloud';
   /** 批次 68:动作块 —— 澄清选项芯片 / 行程条目确认卡(点确认才真正入库) */
@@ -273,6 +279,36 @@ function loadHistory(): UiMessage[] {
     return raw.filter((m) => m.text?.trim());
   } catch { return []; }
 }
+/**
+ * 缩成气泡里够用的小图。
+ * 200px / jpeg 0.65 ≈ 8–15KB,一条历史(最多 MAX_STORED 条)加起来还在 localStorage
+ * 的安全区里。**必须缩** —— 直接存原图 dataURL 会让 saveHistory 抛 QuotaExceeded,
+ * 而那个 catch 是静默的:表现是「聊天记录突然不保存了」,查起来毫无线索。
+ * 缩不动(canvas 不可用等)就返回 null,宁可不显示缩略图,也不拿原图去撑爆配额。
+ */
+const THUMB_PX = 200;
+function makeThumb(dataUrl: string): Promise<string | null> {
+  return new Promise((resolve) => {
+    try {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const scale = Math.min(1, THUMB_PX / Math.max(img.width, img.height));
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          const ctx = canvas.getContext('2d');
+          if (!ctx) { resolve(null); return; }
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.65));
+        } catch { resolve(null); }
+      };
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    } catch { resolve(null); }
+  });
+}
+
 function saveHistory(msgs: UiMessage[]) {
   try {
     saveChatHistoryRaw(msgs.filter((m) => m.role !== 'status').slice(-MAX_STORED));
@@ -317,8 +353,9 @@ function BubbleMenu({ msg, onClose, onSave, onCopy, onContinue }: {
 // ─── Memory detail ─────────────────────────────────────────────────────────────
 // ─── Camera view ──────────────────────────────────────────────────────────────
 function CameraView({ onResult, onClose, autoOpen = false }: {
-  /** label 空 + failure 有值 = 没认出来(诚实说明,不冒充结果)。 */
-  onResult: (label: string, nodes: LifeNode[], failure?: string) => void;
+  /** label 空 + failure 有值 = 没认出来(诚实说明,不冒充结果)。
+   *  imageDataUrl:这次识别的原图 —— 上层缩成缩略图挂在气泡上(标注 A9-a)。 */
+  onResult: (label: string, nodes: LifeNode[], failure?: string, imageDataUrl?: string) => void;
   onClose: () => void;
   autoOpen?: boolean;
 }) {
@@ -395,16 +432,17 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
         const names = data.nodes.map((n) => n.name).join(L(dict, '、', ', '));
         // 2026-07-28(标注 图8/图9):召回口径放宽 —— 名字 + 标签 + 一句话描述都当查询词,
         // 「黑色钢笔」才找得到记忆里那条「笔」。原来只按 name 各查 2 条,长词对短名必空。
-        onResult(names || data.summary || L(dict, '（未识别到）', 'Nothing recognized'), recallByRecognition(data.nodes, data.summary));
+        onResult(names || data.summary || L(dict, '（未识别到）', 'Nothing recognized'), recallByRecognition(data.nodes, data.summary), undefined, dataUrl);
       } else {
         // 认不出来就说认不出来,别把失败说明塞进「识别到:…」里冒充结果。
         // 2026-07-29(标注 图8):但**零条目不等于零线索** —— 模型常在 summary 里写了
         // 「一支黑色的钢笔」,我们却因为 nodes 为空连找都不找,直接回「没找到相关记录」。
         // 拿描述再召回一次:找到了就照实说是从描述里找的。
         const recalled = data.summary ? recallByRecognition([], data.summary) : [];
-        onResult('', recalled, data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.'));
+        onResult('', recalled, data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.'), dataUrl);
       }
-    } catch { onResult('', [], L(dict, '识别没成功,再试一次。', 'Recognition did not go through — try again.')); }
+      // 失败也要把图带上 —— 「哪张图没认出来」本身就是信息,气泡里空着反而看不懂在说哪张。
+    } catch { onResult('', [], L(dict, '识别没成功,再试一次。', 'Recognition did not go through — try again.'), dataUrl); }
     setAnalyzing(false);
   }
 
@@ -1007,9 +1045,15 @@ Edit location/value anytime in Storage.`),
     if (longPressRef.current) { clearTimeout(longPressRef.current); longPressRef.current = null; }
   }
 
-  function handleCameraResult(label: string, nodes: LifeNode[], failure?: string) {
+  async function handleCameraResult(label: string, nodes: LifeNode[], failure?: string, imageDataUrl?: string) {
     setShowCamera(false);
-    const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: L(dict, '[图片] 识别图片', '[Image] Recognize image') };
+    // 标注 A9-a:气泡里显示你发的那张图,而不是一句「[图片] 识别图片」的占位。
+    const thumb = imageDataUrl ? await makeThumb(imageDataUrl) : null;
+    const userMsg: UiMessage = {
+      id: `u-${Date.now()}`, role: 'user',
+      text: L(dict, '[图片] 识别图片', '[Image] Recognize image'),
+      ...(thumb ? { imageThumb: thumb } : {}),
+    };
     // 2026-07-28(标注 图8):三态分开说 —— 没认出来 / 认出来但没记过 / 认出来且翻到了旧记录。
     const aiText = failure
       ? failure
@@ -1178,7 +1222,15 @@ Edit location/value anytime in Storage.`),
                   onPointerCancel={cancelBubbleLongPress}
                   onContextMenu={(e) => { e.preventDefault(); if (!isUser) setMenuMsg(msg); }}
                 >
-                  <p className="nesio-wechat-bubble-text">{msg.text}</p>
+                  {msg.imageThumb && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={msg.imageThumb} alt={L(dict, '你发的图片', 'Image you sent')}
+                      className="nesio-chat-sent-thumb" />
+                  )}
+                  {/* 有缩略图时,「[图片] 识别图片」这句占位就没必要再占一行了 */}
+                  {!(msg.imageThumb && /^\[图片\]|^\[Image\]/.test(msg.text)) && (
+                    <p className="nesio-wechat-bubble-text">{msg.text}</p>
+                  )}
                   {msg.photos && msg.photos.length > 0 && (
                     <div className="nesio-chat-photo-hits" role="group" aria-label={L(dict, '相关照片', 'Related photos')}>
                       {msg.photos.map((p) => (
@@ -1410,7 +1462,7 @@ Edit location/value anytime in Storage.`),
       {/* Plus panel */}
       {showPlus && (
         <div className="nesio-wechat-plus-panel">
-          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const userMsg:UiMessage={id:nextMsgId('u'),role:'user',text:L(dict,'[图片] 识别图片','[Image] Recognize image')}; setMessages(prev=>[...prev,userMsg]); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join(L(dict,'、',', ')); const nodes=recallByRecognition(data.nodes,data.summary); const aiText=nodes.length>0?L(dict,`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`,`Recognized: ${names}\n\nFound ${nodes.length} related record(s):\n${nodes.map(n=>`• ${n.name}`).join('\n')}`):L(dict,`识别到：${names}\n\n这件东西还没记过 —— 要我存进记忆吗?`,`Recognized: ${names}\n\nNot in your memory yet — want me to save it?`); const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:aiText}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}else{const recalled=data.summary?recallByRecognition([],data.summary):[];const base=data.summary||L(dict,'这张图没看清,换个角度再拍一张试试。','Could not read this photo — try another angle.');const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:recalled.length>0?L(dict,`${base}\n\n从描述里找到 ${recalled.length} 条相关记录：\n${recalled.map(n=>`• ${n.name}`).join('\n')}`,`${base}\n\nFound ${recalled.length} related record(s) from the description:\n${recalled.map(n=>`• ${n.name}`).join('\n')}`):base}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}}).catch(()=>{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:L(dict,'图片识别失败，请重试。','Image recognition failed — please try again.')}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const uid=nextMsgId('u'); const userMsg:UiMessage={id:uid,role:'user',text:L(dict,'[图片] 识别图片','[Image] Recognize image')}; setMessages(prev=>[...prev,userMsg]); /* A9-a:缩略图是异步做出来的,先把消息放上去再回填,别让气泡等着缩图 */ void makeThumb(dataUrl).then((th)=>{ if(th) setMessages(prev=>prev.map(m=>m.id===uid?{...m,imageThumb:th}:m)); }); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join(L(dict,'、',', ')); const nodes=recallByRecognition(data.nodes,data.summary); const aiText=nodes.length>0?L(dict,`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`,`Recognized: ${names}\n\nFound ${nodes.length} related record(s):\n${nodes.map(n=>`• ${n.name}`).join('\n')}`):L(dict,`识别到：${names}\n\n这件东西还没记过 —— 要我存进记忆吗?`,`Recognized: ${names}\n\nNot in your memory yet — want me to save it?`); const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:aiText}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}else{const recalled=data.summary?recallByRecognition([],data.summary):[];const base=data.summary||L(dict,'这张图没看清,换个角度再拍一张试试。','Could not read this photo — try another angle.');const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:recalled.length>0?L(dict,`${base}\n\n从描述里找到 ${recalled.length} 条相关记录：\n${recalled.map(n=>`• ${n.name}`).join('\n')}`,`${base}\n\nFound ${recalled.length} related record(s) from the description:\n${recalled.map(n=>`• ${n.name}`).join('\n')}`):base}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}}).catch(()=>{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:L(dict,'图片识别失败，请重试。','Image recognition failed — please try again.')}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
             <span className="nesio-wechat-plus-icon"><IconImage /></span>
             <span>{L(dict, '相册', 'Photos')}</span>
           </button>
