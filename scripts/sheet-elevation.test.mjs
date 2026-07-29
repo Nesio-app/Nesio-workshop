@@ -52,11 +52,17 @@ function jsxOpenTags(src, name) {
   return out;
 }
 
-/** 取某个类选择器上声明的 z-index(取全文件里的最大值 —— 后面的覆盖前面的)。 */
+/**
+ * 取某个类选择器上声明的 z-index(取全文件里的最大值 —— 后面的覆盖前面的)。
+ *
+ * 尾部同时排掉 `.`:否则查基类 `.nesio-sheet` 时会把复合选择器
+ * `.nesio-sheet.nesio-sheet--elevated{z-index:941}` 也算成基类,基类被读成 941,
+ * 上面的层序断言就全乱了(实测踩过)。查修饰符类不受影响 —— 它们在选择器末尾。
+ */
 function zIndexOf(cls) {
   let z;
   for (const [, sel, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
-    if (!new RegExp(`\\.${cls}(?![\\w-])`).test(sel)) continue;
+    if (!new RegExp(`\\.${cls}(?![\\w.-])`).test(sel)) continue;
     const m = body.match(/z-index\s*:\s*(\d+)/);
     if (m) z = z === undefined ? +m[1] : Math.max(z, +m[1]);
   }
@@ -82,6 +88,42 @@ function zIndexOf(cls) {
   assert.ok(fsPanel < elOverlay, 'elevated 必须高过 fullscreen —— 这就是六次「点了没反应」的解药');
   assert.ok(elOverlay < elPanel);
   assert.ok(elPanel < viewer, '看图器永远在最上层');
+}
+
+// ── ①b 声明了不等于生效:elevated 那条得在级联里真的赢过基类 ────────────────
+//
+// 2026-07-29 实测:上面这一整段一直是绿的,而**面板从来没抬起来过**。
+// `.nesio-sheet--elevated{z-index:941}` 写在基类 `.nesio-sheet{z-index:901}` 前面,
+// 同特异度后者胜 —— 浏览器里量出来的面板是 901,而它自己的遮罩正确抬到了 940。
+// 结果:抽屉被自己的遮罩整个盖住,里面每个按钮都点不动(RelationshipDetailSheet 的
+// 「挂一条 / 移除」一直是死的)。上面只比了**声明值**,没比谁赢 —— 数字对,级联输了。
+// 直接算「一个 elevated 底部抽屉最终拿到的 z-index」—— 按级联规则(特异度,再比声明序)
+// 挑赢家,而不是看某一条声明了什么。这才是浏览器里量到的那个数。
+{
+  const PANEL_CLASSES = ['nesio-sheet', 'nesio-sheet--bottom', 'nesio-sheet--bare', 'nesio-sheet--elevated', 'nesio-settings-sheet-card'];
+  const rules = [...css.matchAll(/([^{}]+)\{([^{}]*)\}/g)];
+  let win = null; // { spec, order, z }
+  rules.forEach(([, selGroup, body], order) => {
+    const m = body.match(/z-index\s*:\s*(\d+)/);
+    if (!m) return;
+    for (const sel of selGroup.split(',')) {
+      const s = sel.trim();
+      // 只认「纯类选择器串」(.a.b.c),别的形态(后代/伪类/属性)一律跳过 —— 这里只需要覆盖
+      // 面板自身那几条规则,判不准就不判,不要瞎猜。
+      if (!/^(\.[\w-]+)+$/.test(s)) continue;
+      const classes = s.match(/\.[\w-]+/g).map((c) => c.slice(1));
+      if (!classes.every((c) => PANEL_CLASSES.includes(c))) continue;
+      const spec = classes.length;
+      if (!win || spec > win.spec || (spec === win.spec && order > win.order)) win = { spec, order, z: +m[1] };
+    }
+  });
+  assert.ok(win, '算不出 elevated 面板的最终 z-index —— 选择器形态变了,这条断言要跟着改');
+  assert.equal(
+    win.z, 941,
+    `elevated 底部抽屉最终拿到的 z-index 是 ${win.z},不是 941。`
+    + `遮罩在 940 —— 面板低于自己的遮罩 = 抽屉被自己盖住,里面每个按钮都点不动。`
+    + `(2026-07-29 实测过:那时 .nesio-sheet--elevated 写在基类 .nesio-sheet 前面,同特异度输给了后者。)`,
+  );
 }
 
 // ── ② NesioSheet 的 elevated 接口还在 ────────────────────────────────────

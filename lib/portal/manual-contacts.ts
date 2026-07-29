@@ -116,9 +116,13 @@ export function renameContact(oldKey: string, nodeId: string | null, next: Manua
   const name = next.name.trim();
   if (!name) return oldKey;
   const newKey = contactKeyOf({ name, email: next.email });
-  if (nodeId) {
-    const node = getLifeGraph().find((n) => n.id === nodeId);
-    if (node) updateLifeNode(nodeId, { name, attributes: { ...(node.attributes || {}), ...attrsOf(next) } });
+  const node = nodeId ? getLifeGraph().find((n) => n.id === nodeId) : undefined;
+  if (node) {
+    updateLifeNode(node.id, { name, attributes: { ...(node.attributes || {}), ...attrsOf(next) } });
+  } else {
+    // 从邮件/relations 推出来的人**没有 person 节点** —— 无处可写,改了名字等于没改。
+    // 这时候现建一个:改名这个动作本身就说明用户认领了这个人。
+    addManualContact(next);
   }
   if (newKey === oldKey) { notify(); return oldKey; }
 

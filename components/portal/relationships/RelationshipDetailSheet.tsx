@@ -8,7 +8,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react';
-import { getLifeGraph, updateLifeNode, deleteLifeNode } from '@/lib/portal/life-graph';
+import { getLifeGraph, updateLifeNode } from '@/lib/portal/life-graph';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { buildPersonProfile, type PersonProfile } from '@/lib/portal/relationship-profile';
 import { markContacted, lastContactLabel, CLOSENESS_META } from '@/lib/portal/relationships';
@@ -18,9 +18,12 @@ import {
   loadPersonRecords, deletePersonRecord,
   RECORD_CATEGORY_MAP, type PersonRecord,
 } from '@/lib/portal/person-records';
+import { removeContact } from '@/lib/portal/manual-contacts';
 import RelationGraph from '../RelationGraph';
 import { RecordCatIcon } from './record-icons';
 import HangNoteSheet from './HangNoteSheet';
+import ContactEditSheet from './ContactEditSheet';
+import PersonLinksSection from './PersonLinksSection';
 import { IconLock } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -70,6 +73,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   const fileRef = useRef<HTMLInputElement>(null);
   const [records, setRecords] = useState<PersonRecord[]>([]);
   const [hangOpen, setHangOpen] = useState(false); // 「挂一条」独立确认卡弹窗
+  const [editOpen, setEditOpen] = useState(false); // 编辑资料(名字/邮箱/电话/生日/备注)
   const [relDraft, setRelDraft] = useState(''); // 图4:关系词编辑草稿
   const [mergeDraft, setMergeDraft] = useState(''); // 数据审计 #4:合并同一个人的另一个名字
 
@@ -328,32 +332,34 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
             </div>
           )}
 
-          {/* 2026-07-28(标注 图20「可以编辑可以删除可以关联」):
-              编辑(亲疏/关系词/头像)和合并同一个人上面已经有了;这里补两件缺的 ——
-              「在记忆里找 TA」= 关联(跳记忆页按名字搜,所有提到 TA 的记录一屏看全);
-              「从关系里移除」= 删掉这个人的 person 节点(不动提到 TA 的那些记忆本身)。 */}
+          {/* 健康 / 家务活 关联(2026-07-29 People 升级)—— 点一个人能看到 TA 关联的东西 */}
+          <PersonLinksSection personKey={p.key} email={p.email} />
+
+          {/* 编辑 / 关联 / 移除。
+              2026-07-29:移除按钮此前只在有 person 节点时才出现 —— 从邮件和 relations
+              推出来的人(占大多数)根本没有移除入口。现在一律给,走 removeContact:
+              有节点就真删,没节点标 hidden 让推导层跳过。否则「删了又回来」。 */}
           <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+            <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }} onClick={() => setEditOpen(true)}>
+              {L(dict, '编辑资料', 'Edit details')}
+            </button>
             <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }}
               onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: p.displayName } })); }}>
               {L(dict, '在记忆里找 TA ›', 'Find in memories ›')}
             </button>
-            {p.nodeId && (
-              <button type="button"
-                onClick={() => {
-                  if (!p.nodeId) return;
-                  if (!confirm(L(dict, `把「${p.displayName}」从关系里移除?提到 TA 的记忆不会删。`, `Remove “${p.displayName}” from relationships? Memories mentioning them stay.`))) return;
-                  // 删失败(存储写不进)不假装成功 —— 提示用户,详情页留着。
-                  if (deleteLifeNode(p.nodeId)) {
-                    window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-                    onClose();
-                  } else {
-                    setUploadErr(L(dict, '没能移除 —— 本机存储写不进,过会儿再试。', 'Could not remove — local storage write failed. Try again.'));
-                  }
-                }}
-                style={{ padding: '0.4rem 0.9rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
-                {L(dict, '从关系里移除', 'Remove')}
-              </button>
-            )}
+            <button type="button"
+              onClick={() => {
+                if (!confirm(L(dict, `把「${p.displayName}」从关系里移除?提到 TA 的记忆不会删。`, `Remove “${p.displayName}” from relationships? Memories mentioning them stay.`))) return;
+                // 删失败(存储写不进)不假装成功 —— 提示用户,详情页留着。
+                if (removeContact(p.key, p.nodeId)) {
+                  onClose();
+                } else {
+                  setUploadErr(L(dict, '没能移除 —— 本机存储写不进,过会儿再试。', 'Could not remove — local storage write failed. Try again.'));
+                }
+              }}
+              style={{ padding: '0.4rem 0.9rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+              {L(dict, '从关系里移除', 'Remove')}
+            </button>
           </div>
 
           <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>
@@ -361,6 +367,24 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
           </p>
         </div>
       </NesioSheet>
+
+      {/* 改名会换身份键 —— renameContact 把记录/覆盖/别名一起搬。改完 key 可能变了,
+          详情页停在旧 key 上就成了空壳,所以直接关掉让面板按新 key 重新进。 */}
+      <ContactEditSheet
+        open={editOpen}
+        onClose={() => setEditOpen(false)}
+        contactKey={p.key}
+        nodeId={p.nodeId}
+        initial={{
+          name: p.displayName,
+          email: p.email || '',
+          birthday: p.birthday || '',
+          relation: c?.relation || '',
+          phone: typeof getLifeGraph().find((n) => n.id === p.nodeId)?.attributes?.phone === 'string'
+            ? String(getLifeGraph().find((n) => n.id === p.nodeId)?.attributes?.phone) : '',
+        }}
+        onSaved={(nextKey) => { if (nextKey !== p.key) onClose(); else rebuild(); }}
+      />
 
       {hangOpen && (
         <HangNoteSheet

@@ -22,6 +22,7 @@ import { usePortalLocale } from '../use-portal-locale';
 import RelationshipDetailSheet from './RelationshipDetailSheet';
 import FamilySummary from './FamilySummary';
 import PersonExtractSheet from './PersonExtractSheet';
+import ContactEditSheet from './ContactEditSheet';
 import { buildFamilyDigest } from '@/lib/portal/family-digest';
 import { ENTITY_ALIASES_EVENT } from '@/lib/portal/entity-resolution';
 
@@ -60,6 +61,7 @@ export default function RelationshipsPanel() {
   const [activeGroup, setActiveGroup] = useState<string | null>(null); // null=全部;桶 id 或原始分组名
   const [showMore, setShowMore] = useState(false);
   const [extractOpen, setExtractOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const [expandedTiers, setExpandedTiers] = useState<Record<Closeness, boolean>>({ core: false, close: false, acquaintance: false });
 
   const rebuild = () => {
@@ -90,14 +92,20 @@ export default function RelationshipsPanel() {
     rebuild();
   };
 
+  // 空态也得能加人 —— 此前这里是条死路:没人 → 只告诉你「去连 Gmail」,
+  // 想手动录第一个人没有任何入口。
   if (contacts.length === 0) {
     return (
       <div className="nesio-health-dash">
-        <p className="nesio-insights-empty" style={{ marginBottom: 0 }}>
+        <p className="nesio-insights-empty">
           {L(dict,
-            '还没认出你圈子里的人。记录里提到人名(如「和 Linda 吃饭」),或到「设置 → 数据接入」连上 Gmail,这里就会列出你联系的人、多久没联系、该主动找谁。',
-            'No one in your circle yet. Mention people in your notes (e.g. "dinner with Linda"), or connect Gmail in Settings → Data sources, and this will surface who you talk to, how long since contact, and who to reach out to.')}
+            '还没认出你圈子里的人。可以直接加一个,也可以在记录里提到人名(如「和 Linda 吃饭」),或到「设置 → 数据接入」连上 Gmail —— 这里就会列出你联系的人、多久没联系、该主动找谁。',
+            'No one in your circle yet. Add someone directly, mention people in your notes (e.g. "dinner with Linda"), or connect Gmail in Settings → Data sources — this will then surface who you talk to, how long since contact, and who to reach out to.')}
         </p>
+        <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%' }} onClick={() => setAddOpen(true)}>
+          {L(dict, '＋ 加一个人', '＋ Add someone')}
+        </button>
+        <ContactEditSheet open={addOpen} onClose={() => setAddOpen(false)} onSaved={(k) => { rebuild(); setOpenKey(k); }} />
       </div>
     );
   }
@@ -123,9 +131,14 @@ export default function RelationshipsPanel() {
         <p className="nesio-health-updated" style={{ margin: 0 }}>
           {L(dict, `${shown.length} 位联系人 · ${dueList.length} 位这周想问候`, `${shown.length} people · ${dueList.length} to reach out`)}
         </p>
-        <button type="button" className="nesio-rel-log-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} onClick={() => setExtractOpen(true)}>
-          <IconCamera size={14} />{L(dict, '记给某人', 'Log to…')}
-        </button>
+        <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+          <button type="button" className="nesio-rel-log-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} onClick={() => setExtractOpen(true)}>
+            <IconCamera size={14} />{L(dict, '记给某人', 'Log to…')}
+          </button>
+          <button type="button" className="nesio-rel-log-btn" onClick={() => setAddOpen(true)}>
+            {L(dict, '＋ 加人', '＋ Add')}
+          </button>
+        </div>
       </div>
 
       {(presentBuckets.length > 0 || moreGroups.length > 0) && (
@@ -228,6 +241,8 @@ export default function RelationshipsPanel() {
 
       {openKey && <RelationshipDetailSheet contactKey={openKey} onClose={() => setOpenKey(null)} />}
       <PersonExtractSheet open={extractOpen} onClose={() => setExtractOpen(false)} />
+      {/* 加完直接打开 TA 的详情页 —— 加人的下一步几乎总是「给 TA 记点什么」 */}
+      <ContactEditSheet open={addOpen} onClose={() => setAddOpen(false)} onSaved={(k) => { rebuild(); setOpenKey(k); }} />
     </div>
   );
 }
