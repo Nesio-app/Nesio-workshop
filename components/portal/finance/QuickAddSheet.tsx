@@ -7,7 +7,7 @@
  * 每个异步动作有显式失败态;NesioSheet 原语(bottom);全用设计 token。
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -51,6 +51,7 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
     if (!open) return;
     setSeg(initialSeg ?? 'expense');
     setAssetId(initialAssetId ?? '');
+    setSaved(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, initialSeg, initialAssetId]);
   const [amount, setAmount] = useState('');
@@ -65,6 +66,10 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
   const [anchorNote, setAnchorNote] = useState('');
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
+  // 保存成功的一拍:对勾描线(借形 pqoqubbw/icons,纯 CSS)→ 短停后再关,不打断关闭动画
+  const [saved, setSaved] = useState(false);
+  const closeTimer = useRef<number | null>(null);
+  useEffect(() => () => { if (closeTimer.current != null) window.clearTimeout(closeTimer.current); }, []);
 
   const channels = useMemo(() => listManualAssets().filter((a) => a.isChannel), [open, seg]); // eslint-disable-line react-hooks/exhaustive-deps
   const assets = useMemo(() => listManualAssets(), [open, seg]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -102,9 +107,11 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
         });
         if (!row) throw new Error('entry_failed');
       }
-      reset();
       onSaved();
-      onClose();
+      setSaved(true);
+      closeTimer.current = window.setTimeout(() => {
+        setSaved(false); reset(); onClose();
+      }, 700);
     } catch {
       setErr(t('没存上 —— 再试一次。', 'Could not save — try again.'));
     } finally {
@@ -127,7 +134,7 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
   };
 
   return (
-    <NesioSheet variant="bottom" open={open} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }} ariaLabel={t('记一笔', 'Quick add')}>
+    <NesioSheet variant="bottom" open={open} onOpenChange={(o) => { if (!o) { if (closeTimer.current != null) window.clearTimeout(closeTimer.current); setSaved(false); reset(); onClose(); } }} ariaLabel={t('记一笔', 'Quick add')}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-4) var(--space-6)' }}>
         <div style={{ display: 'flex', background: 'var(--portal-accent-soft)', borderRadius: 'var(--radius-sm)', padding: 3 }}>
           {([['expense', '支出', 'Expense'], ['income', '收入', 'Income'], ['asset', '资产 · 估值', 'Asset']] as Array<[Seg, string, string]>).map(([id, zh, en]) => (
@@ -234,9 +241,17 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
 
         {err && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--status-risk)', margin: 0 }}>{err}</p>}
 
-        <button type="button" onClick={save} disabled={saving}
-          style={{ border: 'none', borderRadius: 'var(--radius-sm)', padding: '12px', fontSize: 'var(--text-body)', fontWeight: 600, fontFamily: 'var(--font-sans)', cursor: 'pointer', background: 'var(--portal-accent)', color: '#fff', opacity: saving ? 0.6 : 1 }}>
-          {saving ? t('保存中…', 'Saving…') : t('保存', 'Save')}
+        <button type="button" onClick={save} disabled={saving || saved}
+          style={{ border: 'none', borderRadius: 'var(--radius-sm)', padding: '12px', fontSize: 'var(--text-body)', fontWeight: 600, fontFamily: 'var(--font-sans)', cursor: 'pointer', background: saved ? 'var(--status-go)' : 'var(--portal-accent)', color: '#fff', opacity: saving ? 0.6 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+          {saved ? (
+            <>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
+                <path className="nesio-check-draw" d="M3 8.5 6.5 12 13 4.5" pathLength={1}
+                  stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              {t('记下了', 'Saved')}
+            </>
+          ) : saving ? t('保存中…', 'Saving…') : t('保存', 'Save')}
         </button>
         <button type="button" onClick={() => { reset(); onClose(); }}
           style={{ border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '10px', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-sans)', cursor: 'pointer', background: 'transparent', color: 'var(--portal-accent)' }}>

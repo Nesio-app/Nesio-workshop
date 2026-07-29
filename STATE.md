@@ -207,6 +207,11 @@ sensitivity/retention 枚举化(中期)。
   冒充交易,老数据退回符号判);③ 口径统一:趋势柱/预算 spent/风险预警 net-surge/
   月报净支出+环比+预算块 全部与 KPI 同含域内支出(opts.domainNet 通道,默认 0 兼容;
   FinanceTab 统一传入,自动月报按上月聚合传)。契约:channelBalance 断言入 finance-assets。
+  **微动效借形(2026-07-29,用户批)**:评估 pqoqubbw/icons —— 不引库(motion 依赖
+  + 第二套图标系统 = 孤岛,否决),只借「关键时刻一次描线」的形:纯 CSS 落两处 ——
+  ① 连接器「同步」忙碌态由文字省略号改小圆弧旋转(.nesio-sync-spin,复用 nesioSpin);
+  ② QuickAddSheet 保存成功一拍(对勾描线 .nesio-check-draw + status-go 底,700ms 后关)。
+  均守 prefers-reduced-motion;不碰 icons.tsx 与图标契约。
   **P3 拆分完成(2026-07-28,财务大修四期收官)**:FinanceTab 1300→949 行,拆出
   RecurringPane / InvestPane / CardsPane / AcctLogo / QuickAddSheet 五个组件(纯展示,
   数据经 props;对齐 TodayFeed 拆分先例)。顺手修:卡片页 brokerage 归投资组

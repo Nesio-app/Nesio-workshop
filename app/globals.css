@@ -18212,6 +18212,24 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
 }
 @keyframes nesioSpin { to { transform: rotate(360deg); } }
 
+/* 财务微动效(借形 pqoqubbw/icons,不引依赖):关键时刻一次描线/旋转,Calm≠Dead。
+   同步中 = 小圆弧旋转(替代文字省略号);保存成功 = 对勾一次性描线。 */
+.nesio-sync-spin {
+  display: inline-block; width: 11px; height: 11px;
+  border: 2px solid currentColor; border-right-color: transparent;
+  border-radius: 50%; vertical-align: -1px;
+  animation: nesioSpin 0.7s linear infinite;
+}
+.nesio-check-draw {
+  stroke-dasharray: 1; stroke-dashoffset: 1;
+  animation: nesioCheckDraw 0.45s var(--ease-out, ease-out) forwards;
+}
+@keyframes nesioCheckDraw { to { stroke-dashoffset: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  .nesio-sync-spin { animation: none; }
+  .nesio-check-draw { animation: none; stroke-dashoffset: 0; }
+}
+
 /* ══════════════════════════════════════════════════════════════════════
    NesioSheet 原语(施工单 W0)—— 全仓 sheet/modal 唯一容器的视觉层。
    底座:bottom=Vaul(JS 内联 transform 驱动拖拽/弹簧),center/fullscreen=
