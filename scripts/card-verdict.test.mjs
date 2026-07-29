@@ -116,15 +116,13 @@ assert.doesNotMatch(
 const todayData = fs.readFileSync(new URL('../components/portal/today/useTodayData.ts', import.meta.url), 'utf8');
 assert.match(todayData, /isCardSuppressed\(\{ cardId: c\.id, cardType: c\.cardType, factKey: c\.factKey \}, now\)/, '出卡前要按裁决过滤');
 
-// 管线打分读 card_type 权重,否则「喜欢」改不到排序
-const pipeline = fs.readFileSync(new URL('../lib/platform/guidance-engine/guidance-pipeline.ts', import.meta.url), 'utf8');
-assert.match(pipeline, /getWeight\('card_type', event\.type\)/, '排序要读 card_type 权重');
-assert.match(pipeline, /coolKey: dk/, '冷却键要随卡带到渲染层');
-
-// 冷却键错位:渲染层记 dismiss 必须用 coolKey(= dedupKey),不能用 cardType
+// 硬拆后(2026-07-29):规则管线/冷却已物理删除。裁决层的消费者换成三门 ——
+// loadLiveJudgedCards 的静音门必须读 isCardSuppressed(承诺①在新世界的执行点)。
+const auto = fs.readFileSync(new URL('../lib/portal/guidance-judge-auto.ts', import.meta.url), 'utf8');
+assert.match(auto, /isMuted: \(c\) => isCardSuppressed\(/, '出卡门必须消费裁决层(静音无上诉)');
+// 「知道了」的落点:判决卡当日日键静默(冷却的全部合法遗产)
 const feed = fs.readFileSync(new URL('../components/portal/TodayFeed.tsx', import.meta.url), 'utf8');
-assert.match(feed, /const coolKey = card\.coolKey \|\| card\.cardType/, '关卡计数要记在管线读得到的键上');
-assert.match(feed, /recordDismissed\(coolKey, loadCoolingStore\(\)\)/, 'recordDismissed 用 coolKey');
+assert.match(feed, /dismissJudgedCard\(card\.factKey\)/, '判决卡 dismiss 记当日日键');
 
 // card_type 确实在 Preference 的可复用维度里(不然补发也白搭)
 const pref = fs.readFileSync(new URL('../lib/platform/personalization/preference-store.ts', import.meta.url), 'utf8');

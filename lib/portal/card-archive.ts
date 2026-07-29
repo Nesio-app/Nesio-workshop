@@ -7,8 +7,7 @@
  *   · 「没说的」(declined):AI 判过但没给窗口的信号 + 理由 + 「这条该提醒我」。
  *     漏报的唯一监测面 —— 整个转向的起因就是正则漏掉家长会,没有这个清单无法验证 AI 是否重蹈覆辙。
  *
- * 双轨:lane='rules'(老管线卡,whyNow 位置记 type+priority,给影子期留对照物)/
- *       lane='shadow'(AI 影子判决,不上屏只入档)。
+ * 双轨:lane='rules'(老管线卡 —— 硬拆后仅剩历史条目)/ lane='ai'(AI 判决,实弹出卡即它)。
  * key = 源指纹(rules 卡用 factKey)。指纹永远算在源内容上,AI 改写不参与 —— v1 尸检结论。
  *
  * 上限:90 天 + shown≤400 / declined≤200 条。写失败走 storage-health(红线:不许静默吞)。
@@ -24,7 +23,7 @@ export const ARCHIVE_MAX_DECLINED = 200;
 /** 改判率警示线:shown 里被判「不该出/太多」的比例超过它 → 档案顶部亮警示。 */
 export const ARCHIVE_ALARM_RATIO = 0.15;
 
-export type ArchiveLane = 'rules' | 'shadow';
+export type ArchiveLane = 'rules' | 'ai';
 export type ArchiveVerdict = 'useful' | 'too_much' | 'wrong' | 'repeat' | 'should_have_told';
 
 export interface ArchiveShownEntry {

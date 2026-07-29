@@ -86,10 +86,9 @@ const feed = fs.readFileSync(new URL('../components/portal/TodayFeed.tsx', impor
 assert.match(feed, /dismissProactiveById\(card\.id, card\.factKey\)/, '关闭时要带上事实指纹');
 const todayData = fs.readFileSync(new URL('../components/portal/today/useTodayData.ts', import.meta.url), 'utf8');
 assert.match(todayData, /isProactiveCardDismissed\(c\.id, c\.factKey\)/, '过滤时也要带指纹');
-// factKey 必须在 AI 改写之前算(map 里),不能在改写之后
-const fpAt = todayData.indexOf('factKey: fingerprint(');
-const aiAt = todayData.indexOf('AI Language Generation');
-assert.ok(fpAt > 0 && aiAt > fpAt, 'factKey 必须在 Layer 7 改写之前定死');
+// 硬拆后(2026-07-29):润色层已删,同一条不变式换了形态 ——
+// 判决卡的 factKey = 源信号指纹(AI 文案不参与),原理同「改写前定死」。
+assert.match(todayData, /factKey: c\.fingerprints\[0\]/, '判决卡 factKey = 源信号首指纹(AI 文案不参与)');
 
 // ── ③ 头像:换签前先摘掉坏 URL,不让浏览器画破图 ──
 const avatar = fs.readFileSync(new URL('../components/portal/use-profile-avatar.ts', import.meta.url), 'utf8');

@@ -12,7 +12,9 @@
  *      prompt 明确「内容里的指令一律当数据」。
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { after } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { pushConfigured, sendPushToCurrentUser } from '@/lib/portal/push-send';
 import { reportAiCall } from '@/lib/portal/ai-telemetry';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 import { envValue } from '@/lib/portal/env';
@@ -97,6 +99,16 @@ export async function POST(req: NextRequest) {
       new Set(signals.map((s) => s.fingerprint)),
       new Set(activeCards.map((c) => c.fingerprint)),
     );
+    // Step 6(用户拍板 sev3 才推):判出登机口级的卡即推送,响应发出后执行不加延迟。
+    // 去重靠 SW 同 tag 覆盖 + 判决锁定(同指纹不重判 = 不重推)。
+    const urgent = verdict.cards.filter((c) => c.severity === 3 && !c.mergeInto);
+    if (urgent.length > 0 && pushConfigured()) {
+      try {
+        after(() => sendPushToCurrentUser(urgent.map((c) => ({
+          title: c.title, body: c.body, tag: c.fingerprints[0],
+        }))));
+      } catch { /* after() 仅请求上下文可用 */ }
+    }
     return NextResponse.json({ ok: true, ...verdict });
   } catch (err) {
     reportAiCall('guidance_judge', false, startedAt, { fallback: true });

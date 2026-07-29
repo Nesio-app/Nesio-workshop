@@ -189,11 +189,35 @@ sensitivity/retention 枚举化(中期)。
   (温度取整防指纹抖动)走 domain 源进判决。
   ● **隐私清除确认免做**:档案/judge ledger/verdict 全是 `nesio-` 前缀 localStorage,
   storage-manifest 的 purgeLocalData 自动覆盖;只有独立 IDB 才需手工挂 purge。
-  **待办(按设计顺序,先加后删)**:Step 4 影子对照一周后逐源实弹(日历→Plaid/邮件→记忆);
-  Step 5 拆除(8 层/17 枚举/正则词典/cooling/llm-sweep/
-  guidance-language 润色 —— **改判率 <15% 前不许拆**);Step 6 推送(sev3 才推)。
+  **Step 4-6 硬拆到底(2026-07-29 同日,用户拍板「硬拆到底」跳过影子对照周)**:
+  ● **实弹**:出卡源 = loadLiveJudgedCards(ledger 窗口重算+三门+临近保底,同步免费);
+  文案即判决文案(润色层删除);卡轻点走 resolver;「知道了」= dismissJudgedCard 当日日键;
+  severity 3 豁免展示配额(TodayFeed urgent 通道);AI 不可用 → 结构化兜底 + 可见提示行。
+  免费档 canUsePaidCloudAi 前置拦下不出网(paid-cloud-gate 契约改钉这里)。
+  ● **物理删除 13 文件**:guidance-pipeline / source-adapters / interrupt-evaluator /
+  cooling-store / consequence-rules / action-window / actionability / attention-budget /
+  guidance-ranker / llm-sweep(+auto+route)/ guidance-language 路由。types.ts 瘦身只剩
+  DomainInsightItem(衣橱/跨区仍引)。**正则病灶真机实锤后拆**:GitHub PR 邮件标题的「健身」
+  被 LEXICON.health 抓成「今天的健康打卡」+打卡按钮 —— specialDays/healthItems 两条正则路径
+  刻意不喂判决(生日走 relationship person 节点,健康走 health 域判定)。keyword-lexicon 保留
+  但降级为邮件候选粗筛(召回),不再决定卡类型。attention-engine 保留(FOCUS 区日历排序,
+  不属出卡管线)。DEC 卡/穿搭折成 extras domain 信号进判决(面不丢,出不出归 AI)。
+  cloud-learning-sync 剥离 ranker(学习态只剩偏好,旧 blob trainLog 读时忽略)。
+  ● **契约随拆重写**:删 test:llm-sweep/guidance-ranker/guidance-holiday-fallback;
+  card-verdict 改钉三门消费(isMuted→isCardSuppressed / dismissJudgedCard);
+  sync-dedup-mute 的「改写前定死指纹」改钉「factKey=源信号首指纹」;finance-insight/
+  health-guidance-bridge/node-provenance/relationship-insight 改钉 gatherDomainInsights→判决批
+  新链路;cloud-learning-sync/paid-cloud-gate/server-entitlement/ai-route-provider-parity/
+  context-adapters/silent-failure-observability 同步更新。
+  ● **Step 6 推送(用户拍板:设置页开关、sev3 才推)**:web-push 依赖 + 
+  supabase-push-subscriptions-v1.sql(**需部署侧 apply**)+ /api/portal/push-subscribe
+  (登记/退订,service-role 写)+ push-send(判决路由 after() 里对 sev3 新卡发推,
+  410/404 清死端点)+ 设置页「重要提醒推送」开关(权限只在开关处要,失败态可见)。
+  **部署侧动作**:apply 上述 SQL + 配 NEXT_PUBLIC_VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY /
+  VAPID_SUBJECT(未配则推送整体 inert)。
+  **风险如实记录**:AI 判决在真机零次运行的状态下上了实弹(用户明示拍板)——
+  AI 挂/无 key 时 Today 只有结构化兜底;档案(洞察·回望)是唯一监测面,上线头几天盯改判率。
   继承债:ledger/档案/verdict 三个 key 跨端要 union 语义,暂不进 module-sync 整键 replace。
-  两个设计拍板已按推荐值实现待用户复核:临近保底(<2h→sev3)与 sev3 配额豁免。
 
 - **反馈学习环曾经整段空转(2026-07-29 修;用户实锤「我点了稍后、不要再出现、或者
   喜欢,不管点哪个他都会出现」)**。审计结论:不是某个动作坏了,是 per-card 这一维

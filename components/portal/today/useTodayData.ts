@@ -13,50 +13,26 @@ import { loadProfileSettings, portalLocaleToDictionaryLocale, PROFILE_UPDATED_EV
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { buildDailyReport, type DailyReport } from '@/lib/portal/daily-report';
 import { autoPersistTodayReport } from '@/lib/portal/daily-report-persist';
-import { loadSweepEvents, maybeRunSweep } from '@/lib/portal/llm-sweep-auto';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext, type TodayReceipt } from '@/lib/platform/view-models/today-view-model';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
-import { scoreCalendarEvents } from '@/lib/platform/attention-engine';
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import { loadDormantStore, evaluateDormancy, type DormantStore } from '@/lib/platform/dormant-engine';
-import { runGuidancePipelineDeferred } from '@/lib/platform/guidance-engine/guidance-pipeline';
 import { emitFeedback, type Reaction } from '@/lib/platform/personalization';
-import { getEnergyState } from '@/lib/platform/energy-state';
 import type { RecommendationCard } from '@/lib/portal/reasoning-engine';
-import { getBestInterruptionHours } from '@/lib/portal/mirror-profile';
-import { topActiveHours } from '@/lib/portal/feature-usage';
-import { rememberAI, recallAI, sig } from '@/lib/portal/ai-cache';
-import {
-  calendarEventsToGuidanceEvents,
-  emailSignalsToGuidanceEvents,
-  specialDaysToGuidanceEvents,
-  focusNodesToGuidanceEvents,
-  weatherToGuidanceEvents,
-  healthNodesToGuidanceEvents,
-  healthFindingsToGuidanceEvents,
-  financeFindingsToGuidanceEvents,
-  placeFindingsToGuidanceEvents,
-  inventoryFindingsToGuidanceEvents,
-  moodFindingsToGuidanceEvents,
-  relationshipFindingsToGuidanceEvents,
-  readingFindingsToGuidanceEvents,
-  crossRegionToGuidanceEvents,
-  objectContextEvents,
-  outfitFindingsToGuidanceEvents,
-  type WeatherSnapshot,
-  decCardsToGuidanceEvents,
-} from '@/lib/platform/guidance-engine/source-adapters';
+import type { WeatherSnapshot } from '@/lib/portal/providers/weather';
 import { listWardrobe, outfitFindings, inferFormalNeed } from '@/lib/portal/wardrobe';
-import { computeDomainFindings, gatherDomainInsights } from '@/lib/portal/domain-insights';
-import { maybeRunJudgeShadow, type JudgeWeatherInput } from '@/lib/portal/guidance-judge-auto';
+import { gatherDomainInsights } from '@/lib/portal/domain-insights';
+import {
+  maybeRunJudgeBatch, loadLiveJudgedCards, judgeNeedsFallback, type JudgeWeatherInput,
+} from '@/lib/portal/guidance-judge-auto';
+import { buildFallbackCards } from '@/lib/platform/guidance-engine/fallback-cards';
+import { resolveCardTarget } from '@/lib/portal/card-target';
 import { listInventoryItems } from '@/lib/portal/inventory';
 import { loadBankAccounts, loadPlaidLiabilities } from '@/lib/portal/bank-tx';
-import { buildCrossRegionDeliverables } from '@/lib/platform/cross-region/deliver';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
-import { isProactiveCardDismissed, type ProactiveCardData, registerDecCards } from './proactive-types';
+import { isProactiveCardDismissed, type ProactiveCardData } from './proactive-types';
 import { isCardSuppressed, fingerprint } from '@/lib/portal/card-verdict';
-import { localDayKey } from '@/lib/portal/local-day';
 
 const EMPTY_SIGNAL_CARDS: RecommendationCard[] = [
   {
@@ -214,67 +190,11 @@ export function useTodayData(canUsePrivateData: boolean) {
         // Load email signals from quick scan (20min TTL cache)
         const latestEmailSignals = await loadEmailSignals(canUsePrivateData);
 
-        // ── Guidance Engine pipeline ──────────────────────────────────────
+        // ── AI 判决层(实弹,2026-07-29 用户拍板硬拆 —— 8 层规则管线已物理删除)──
+        // 真机实锤的病灶:GitHub PR 邮件标题里的「健身」被 LEXICON.health 抓成「今天的健康打卡」
+        // 还配了打卡按钮。正则不懂上下文 —— 分类路径全部拆除,信号原样进判决,AI 看得出那是 PR 通知。
         const calEvents = readPortalCache<{ events?: CalendarEvent[] }>(PORTAL_CACHE_KEYS.calendar)?.events ?? [];
         const weather = readPortalCache<WeatherSnapshot>(PORTAL_CACHE_KEYS.weather);
-        const scored = scoreCalendarEvents(calEvents, now);
-
-        registerDecCards(updated.cards); // 反馈环回写:完整卡(含 evidenceSignalIds)登记
-        const baseGuidanceEvents = [
-          // DEC 域引擎卡(证据门控)— 此前 runDEC 输出被丢弃,现与其他源同台仲裁
-          ...decCardsToGuidanceEvents(updated.cards),
-          ...calendarEventsToGuidanceEvents(calEvents, now),
-          ...emailSignalsToGuidanceEvents(latestEmailSignals),
-          ...specialDaysToGuidanceEvents(updated.proactiveContext.upcomingSpecialDays, now),
-          ...focusNodesToGuidanceEvents(updated.focusNodes, now),
-          ...weatherToGuidanceEvents(weather),
-          ...healthNodesToGuidanceEvents(updated.proactiveContext.healthItems),
-          // 健康/财务/地图判定接入主循环 —— 与 问一问/简报同读一份判定源(computeDomainFindings),
-          // 消除输出面口径漂移。呈现仍各走各的(这里经七层仲裁、达标项不打扰;问一问走文本投影)。
-          ...(() => {
-            const df = computeDomainFindings();
-            return [
-              ...healthFindingsToGuidanceEvents(df.health.findings, df.health.risks),
-              ...financeFindingsToGuidanceEvents(df.finance),
-              ...placeFindingsToGuidanceEvents(df.location),
-              ...inventoryFindingsToGuidanceEvents(df.inventory),
-              ...moodFindingsToGuidanceEvents(df.mood),
-              ...relationshipFindingsToGuidanceEvents(df.relationship),
-              ...readingFindingsToGuidanceEvents(df.reading),
-              // 跨区 P2:已过同意/新鲜度/可打断性/预算门的跨区关联,进七层管线主动投递
-              ...crossRegionToGuidanceEvents(buildCrossRegionDeliverables(now)),
-            ];
-          })(),
-          // 穿搭:今日天气(冷热/降水)+ 今天的日程(正式度)→ 每日一套。规则版免费/端上;
-          // 衣橱空则不打扰、太少给轻引导。点卡打开洞察「衣橱」tab。
-          ...(() => {
-            const w = weather as (WeatherSnapshot & { tempMinC?: number; tempMaxC?: number; precipProb?: number }) | null;
-            const isToday = (iso?: string) => {
-              if (!iso) return false;
-              const d = new Date(iso);
-              return !Number.isNaN(d.getTime())
-                && d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
-            };
-            const todayCal = calEvents.filter((e) => isToday(e.start));
-            const outfitCtx = {
-              repTempC: w?.tempMinC ?? w?.temperatureC ?? null,
-              tempMinC: w?.tempMinC ?? null,
-              tempMaxC: w?.tempMaxC ?? null,
-              precipProb: w?.precipProb ?? null,
-              formalNeed: inferFormalNeed(todayCal),
-            };
-            return outfitFindingsToGuidanceEvents(outfitFindings(listWardrobe(), outfitCtx, now.toISOString()));
-          })(),
-        ];
-        const guidanceEvents = [
-          ...baseGuidanceEvents,
-          // 批次197:接回 objectContextEvents(此前是死代码,零调用点)—— 拿临近事件(开会/出行/
-          // 就诊/生日)去比对你的物品,把「带名片/带护照/7天前吹风快过期物品」这类情境提物顶出来。
-          ...objectContextEvents(baseGuidanceEvents, updated.allNodes, now),
-          // 批次207:开放世界 Layer ③ —— 从缓存 ledger 读巡查抽出的到期/续期 finding(免费、本地重算窗口);
-          // 每日一次的付费巡查(maybeRunSweep,见下)只负责填 ledger,不阻塞出卡。
-          ...loadSweepEvents(updated.allNodes, now),
-        ];
 
         const uiLocale = portalLocaleToDictionaryLocale(loadProfileSettings().locale);
 
@@ -294,13 +214,10 @@ export function useTodayData(canUsePrivateData: boolean) {
           const report = buildDailyReport(reportInput);
           if (!stale()) setTodayReport(profile.dailyReportEnabled && !report.empty ? report : null);
           autoPersistTodayReport(reportInput, { enabled: profile.dailyReportEnabled, now });
-          // 批次207:开放世界 Layer ③ —— 搭日报的车,每日一次巡查低置信捕捉(付费门在路由端)。
-          // fire-and-forget:填 ledger 供下次渲染的 loadSweepEvents 读;不阻塞本轮出卡。
-          void maybeRunSweep(updated.allNodes, { now });
-          // AI 判决层影子模式(设计定稿 2026-07-29 Step 3):结构化信号批量送判,
-          // 结果只进档案不上屏(老管线继续出卡),攒对照数据。取数惰性(30min 闸后才算),
-          // 付费门在路由端(guardAiRoute + requirePaidCloudAi)。
-          void maybeRunJudgeShadow(
+          // AI 判决(实弹):结构化信号批量送判,落 ledger;取数惰性(30min 闸后才算)。
+          // 付费门双层:客户端 canUsePaidCloudAi 前置拦下(免费档不出网),路由端
+          // guardAiRoute + requirePaidCloudAi 强制。llm-sweep 已被吸收拆除。
+          if (canUsePaidCloudAi()) void maybeRunJudgeBatch(
             () => ({
               calendarEvents: calEvents,
               emailSignals: latestEmailSignals,
@@ -312,122 +229,94 @@ export function useTodayData(canUsePrivateData: boolean) {
                 const names = new Map(loadBankAccounts().map((a) => [a.id, a.name]));
                 return loadPlaidLiabilities().map((l) => ({ ...l, accountName: names.get(l.accountId) }));
               })(),
+              // 记忆节点:只有带日期的进(替代 llm-sweep 的低置信巡查)
+              memoryNodes: updated.focusNodes,
+              // 其他产品面折成 domain 信号:DEC 深度发现 + 每日穿搭。
+              // 刻意不喂:specialDays/healthItems(两条正则路径,就是「健身打卡」误判的病根;
+              // 生日走 relationship 域的 person 节点数据,健康走 health 域判定)。
+              extras: [
+                ...updated.cards.map((c) => ({ id: c.id, domain: c.domainLabel || 'dec', title: c.title, detail: c.body })),
+                ...(() => {
+                  const w = weather as (WeatherSnapshot & { tempMinC?: number; tempMaxC?: number; precipProb?: number }) | null;
+                  const todayCal = calEvents.filter((e) => e.start && new Date(e.start).toDateString() === now.toDateString());
+                  return outfitFindings(listWardrobe(), {
+                    repTempC: w?.tempMinC ?? w?.temperatureC ?? null,
+                    tempMinC: w?.tempMinC ?? null,
+                    tempMaxC: w?.tempMaxC ?? null,
+                    precipProb: w?.precipProb ?? null,
+                    formalNeed: inferFormalNeed(todayCal),
+                  }, now.toISOString()).map((f) => ({ id: f.id, domain: 'outfit', title: f.title[0], detail: f.body[0] }));
+                })(),
+              ],
             }),
             { now, uiLocale: uiLocale === 'en' ? 'en' : undefined },
           );
         }
-        // deferred:出卡但先不写「已展示」(冷却/ranker),等确认这轮结果真的上屏再 commit
-        // —— 否则慢轮被 runSeqRef 丢弃时,卡被记成已展示却从未出现,下一轮全被冷却拦掉。
-        const { cards: guidanceCards, commitShown } = runGuidancePipelineDeferred({
-          locale: uiLocale,
-          events: guidanceEvents,
-          scoredCalendar: scored,
-          now,
-          energy: getEnergyState(now),
-          // 自动调工作流:好时段 = 学到的偏好时段 ∪ 你实际活跃的时段(在你真在用 App 时才出卡)
-          goodHours: [...new Set([...getBestInterruptionHours(), ...topActiveHours(4)])],
-        });
-        const rawProactiveCards: ProactiveCardData[] = guidanceCards
-          .map((card) => ({
-            id: card.id,
-            title: card.title,
-            body: card.body,
-            confidence: 90,
-            sourceTags: [],
-            icon: card.icon,
-            priority: card.priority,
-            cardType: card.type,
-            // 指纹在这里定死:下面 Layer 7 会用 AI 重写 title/body,若拿改写后的文字当指纹,
-            // 每次重写都算「新事实」,用户的「不要再出现」就永远对不上号。
-            factKey: fingerprint(`${card.title}|${card.body}`),
-            coolKey: card.coolKey,
-            nodeId: card.nodeId,
-            actions: [{ label: card.action.cta, actionType: card.action.actionType }],
-            expiresAt: card.expiresAt?.toISOString(),
-            evidence: card.evidence,
-            reason: card.reason,
-          }))
-          // 用户裁决优先于一切:静音/稍后没到期就不出(比冷却活得久)
-          .filter((c) => !isCardSuppressed({ cardId: c.id, cardType: c.cardType, factKey: c.factKey }, now))
-          .filter((c) => !isProactiveCardDismissed(c.id, c.factKey))
-          .filter((c) => !c.expiresAt || new Date(c.expiresAt).getTime() > now.getTime());
+        // ── 出卡:ledger 窗口重算 + 三门(同步免费)。文案就是判决文案,润色层已拆。──
+        const live = loadLiveJudgedCards(now, 3);
+        const GROUP_ICON: Record<string, string> = { 日程: '🗓️', 财务: '💳', 健康: '🌿', 物品: '📦', 人: '🎂', 其他: '💡' };
+        let newProactiveCards: ProactiveCardData[] = live
+          .map((c) => {
+            const target = resolveCardTarget(c.fingerprints);
+            return {
+              id: `judge-${c.fingerprints[0]}`,
+              title: c.title,
+              body: c.body,
+              confidence: 90,
+              sourceTags: [],
+              icon: GROUP_ICON[c.group] ?? '💡',
+              priority: c.severity * 3,
+              urgent: c.severity === 3,
+              cardType: c.group,
+              // 指纹 = 源信号指纹(AI 文案不参与)—— 静音「事实没变就永远闭嘴」的锚。
+              factKey: c.fingerprints[0],
+              fingerprints: c.fingerprints,
+              nodeId: target?.kind === 'node' ? target.nodeId : undefined,
+              actions: [],
+              reason: c.whyNow,
+              expiresAt: `${c.showUntil}T23:59:59`,
+            } satisfies ProactiveCardData;
+          })
+          .filter((c) => !isProactiveCardDismissed(c.id, c.factKey));
 
-        // AI Language Generation (Layer 7) — enhance copy if cards exist.
-        // Cached per card-set per day: the same cards used to trigger a fresh
-        // AI rewrite on every app open (pipeline runs on load + 4 events +
-        // 20-min poll), burning quota for identical output.
-        let newProactiveCards = rawProactiveCards;
-        if (rawProactiveCards.length > 0) {
-          const LANG_CACHE_KEY = 'nesio-guidance-lang-cache-v1';
-          const cacheSig = `${localDayKey()}|${rawProactiveCards.map((c) => c.id + c.title).join('§')}`;
-          let cachedCopy: Array<{ id: string; title: string; body: string }> | null = null;
-          try {
-            const raw = JSON.parse(localStorage.getItem(LANG_CACHE_KEY) || 'null') as { sig: string; cards: Array<{ id: string; title: string; body: string }> } | null;
-            if (raw?.sig === cacheSig) cachedCopy = raw.cards;
-          } catch { /* ignore */ }
-
-          // 安全审计 #2:引导语润色是付费云,后台被动增强 —— 免费(分层启用后)静默跳过,用原始文案,不打云、不弹窗。
-          if (!cachedCopy && canUsePaidCloudAi()) {
-            try {
-              const langRes = await fetch('/api/portal/guidance-language', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  cards: guidanceCards.map((c) => ({
-                    id: c.id, type: c.type, icon: c.icon,
-                    title: c.title, body: c.body, priority: c.priority,
-                    action: c.action, expiresAt: c.expiresAt?.toISOString(), nodeId: c.nodeId,
-                  })),
-                  userName: displayName || undefined,
-                }),
-              });
-              if (langRes.ok) {
-                const langData = await langRes.json() as { ok: boolean; cards: Array<{ id: string; title: string; body: string }> };
-                if (langData.ok && langData.cards.length === rawProactiveCards.length) {
-                  cachedCopy = langData.cards;
-                  try { localStorage.setItem(LANG_CACHE_KEY, JSON.stringify({ sig: cacheSig, cards: cachedCopy })); } catch { /* ignore */ }
-                }
-              }
-            } catch { /* fall back to rule-generated copy */ }
-
-            if (cachedCopy) {
-              // 从 AI 的改写里学:逐卡记住(以卡片内容为键,跨天可复用),离线也能给出 AI 级文案
-              for (let i = 0; i < rawProactiveCards.length; i++) {
-                const c = cachedCopy[i];
-                if (c) rememberAI('guidance-lang', sig(rawProactiveCards[i].id + '|' + rawProactiveCards[i].title), { title: c.title, body: c.body });
-              }
-            } else {
-              // AI 离线 + 今日缓存未命中 → 复用过去 AI 给过的同款改写;凑不齐就退回原文(下方按长度判定)
-              const recalled = rawProactiveCards.map((card) => recallAI<{ title: string; body: string }>('guidance-lang', sig(card.id + '|' + card.title)));
-              if (recalled.every(Boolean)) {
-                cachedCopy = rawProactiveCards.map((card, i) => ({ id: card.id, title: recalled[i]!.title, body: recalled[i]!.body }));
-              }
-            }
-          }
-
-          if (cachedCopy && cachedCopy.length === rawProactiveCards.length) {
-            newProactiveCards = rawProactiveCards.map((card, i) => ({
-              ...card,
-              title: cachedCopy![i]?.title || card.title,
-              body: cachedCopy![i]?.body || card.body,
-            }));
-          }
+        // 承诺④:AI 从没成功过/最近失败且没有任何窗口内判决 → 结构化兜底(零分类),
+        // 可见地标注(sourceTags 含 fallback,渲染层据此亮「AI 判决暂不可用」行,不许静默降级)。
+        if (newProactiveCards.length === 0 && judgeNeedsFallback(now)) {
+          const names = new Map(loadBankAccounts().map((a) => [a.id, a.name]));
+          newProactiveCards = buildFallbackCards({
+            calendarEvents: calEvents
+              .map((e) => ({ id: e.id, title: e.title, startMs: Date.parse(e.start), endMs: e.end ? Date.parse(e.end) : undefined }))
+              .filter((e) => !Number.isNaN(e.startMs)),
+            expiryItems: listInventoryItems().filter((i) => i.expiry).map((i) => ({ id: i.id, name: i.name, expiry: i.expiry! })),
+            dueBills: loadPlaidLiabilities().map((l) => ({ id: l.accountId, account: names.get(l.accountId) || l.accountId, dueDate: l.dueDate, minPayment: l.minPayment })),
+          }, now)
+            .map((f) => ({
+              id: f.id,
+              title: f.title,
+              body: f.body,
+              confidence: 100,
+              sourceTags: ['fallback'],
+              icon: '📌',
+              priority: f.severity * 3,
+              urgent: f.severity === 3,
+              cardType: '提醒',
+              factKey: fingerprint(`${f.title}|${f.body}`),
+              actions: [],
+            } satisfies ProactiveCardData))
+            .filter((c) => !isProactiveCardDismissed(c.id, c.factKey));
         }
+        // 用户裁决优先于一切:静音门已在 loadLiveJudgedCards 内执行;兜底卡也过一遍
+        newProactiveCards = newProactiveCards
+          .filter((c) => !isCardSuppressed({ cardId: c.id, cardType: c.cardType, factKey: c.factKey }, now));
 
-        if (!stale()) {
-          // 批次 76(用户定案「不要闪来闪去」):合并不替换 —— 已在场的卡届内常驻
-          // (冷却机制会让它们下一轮不再返回,旧逻辑整组替换 = 卡片闪没)。
-          // 移除只有两条路:用户亲手划走 / 卡片自然过期(cardExpiry)。
-          if (newProactiveCards.length > 0) {
-            setProactiveCards((prev) => {
-              const seen = new Set(prev.map((c) => c.id));
-              return [...prev, ...newProactiveCards.filter((c) => !seen.has(c.id))].slice(0, 6);
-            });
-          }
-          commitShown(); // 这轮结果确认上屏,才记「已展示」(冷却 + ranker 特征)
+        if (!stale() && newProactiveCards.length > 0) {
+          // 批次 76(用户定案「不要闪来闪去」):合并不替换 —— 已在场的卡届内常驻。
+          // 移除只有两条路:用户亲手划走 / 卡片自然过期(showUntil)。
+          setProactiveCards((prev) => {
+            const seen = new Set(prev.map((c) => c.id));
+            return [...prev, ...newProactiveCards.filter((c) => !seen.has(c.id))].slice(0, 6);
+          });
         }
-        // 管线空窗时的兜底轮播移到 TodayFeed 渲染层(buildRotatingFallback):
-        // 那里能看到「被 dismiss 后还剩几张」,保证未来预测区永远有内容。
       }
     };
     void applyViewModel();

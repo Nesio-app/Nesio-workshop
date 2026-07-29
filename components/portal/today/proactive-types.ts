@@ -28,8 +28,12 @@ export interface ProactiveCardData {
    * 「不要再出现」永远对不上号。所以指纹必须在管线出卡处一次定死。
    */
   factKey?: string;
-  /** 冷却键 —— 与 guidance-pipeline 的 dedupKey 同源(多实例类型是 `type:id`)。 */
+  /** @deprecated 冷却已随规则管线拆除(2026-07-29);留字段兼容旧存量,渲染层不再读。 */
   coolKey?: string;
+  /** AI 判决卡的源指纹列表 —— resolver 跳转与合并来源展示用。 */
+  fingerprints?: string[];
+  /** severity 3(登机口级):豁免展示配额,不被 slice 截掉。 */
+  urgent?: boolean;
   nodeId?: string;
   actions?: ProactiveAction[];
   expiresAt?: string;  // ISO — card auto-hides after this time (Google Now lifecycle)

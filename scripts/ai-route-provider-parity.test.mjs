@@ -18,7 +18,6 @@ const read = (rel) => fs.readFileSync(path.join(root, rel), 'utf8');
 // ── ① 活跃 AI 路由:走共享客户端(living-model 已 410 退役,单独断言)──
 for (const rel of [
   'app/api/portal/proactive/route.ts',
-  'app/api/portal/guidance-language/route.ts',
 ]) {
   const src = read(rel);
   assert.ok(/from ['"]@\/lib\/portal\/ai-complete['"]/.test(src), `${rel} 引共享 AI 客户端`);

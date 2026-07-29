@@ -6,10 +6,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { pushSupported, isPushEnabled, enablePush, disablePush } from '@/lib/portal/push-notify';
 import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, profileIdentityUpdatedAt, saveProfileSettings, touchProfileIdentity, type PortalLocale } from '@/lib/portal/profile';
 import { pushProfileToCloud, syncProfileWithCloud } from '@/lib/portal/cloud-profile-sync';
 import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
-import { runSweepNow } from '@/lib/portal/llm-sweep-auto';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { L, t } from '@/lib/portal/i18n';
@@ -156,6 +156,25 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
       return !v;
     });
   }
+  // Step 6 推送开关(用户拍板:权限只在这里要,不自动弹)。失败态可见(hint 换文案)。
+  const [pushOn, setPushOn] = useState(false);
+  const [pushMsg, setPushMsg] = useState('');
+  useEffect(() => { setPushOn(isPushEnabled()); }, []);
+  async function togglePush() {
+    if (pushOn) {
+      await disablePush();
+      setPushOn(false); setPushMsg('');
+      return;
+    }
+    setPushMsg(L(dict, '正在开启…', 'Enabling…'));
+    const r = await enablePush();
+    if (r.ok) { setPushOn(true); setPushMsg(''); }
+    else {
+      setPushMsg(r.reason === 'denied'
+        ? L(dict, '浏览器没给通知权限,可在系统设置里打开后重试', 'Notification permission denied — enable it in system settings and retry')
+        : L(dict, '没开成,稍后再试', 'Could not enable — try again later'));
+    }
+  }
 
   const [prefsOpen, setPrefsOpen] = useState(false);
   const toneOpts: Array<{ id: ToneStyle; label: string; hint: string }> = [
@@ -201,6 +220,22 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
           {hapticsOn ? '✓' : '○'}
         </span>
       </button>
+      {/* Step 6:重要提醒推送(sev3 才推 —— 登机口/就诊/还款截止级;开关在这要权限,不自动弹) */}
+      {pushSupported() && (
+        <button type="button"
+          className={`nesio-settings-option${pushOn ? ' nesio-settings-option--active' : ''}`}
+          onClick={() => { void togglePush(); }}>
+          <div>
+            <span className="nesio-settings-option-label">{L(dict, '重要提醒推送', 'Critical reminders push')}</span>
+            <span className="nesio-settings-option-hint">
+              {pushMsg || L(dict, '只推真正要紧的(登机/就诊/还款截止),一天最多几条', 'Only truly urgent ones (boarding, appointments, due bills)')}
+            </span>
+          </div>
+          <span className={`nesio-settings-space-check${pushOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+            {pushOn ? '✓' : '○'}
+          </span>
+        </button>
+      )}
       {/* 批次 56:记忆自动定位 —— 开启即请求手机定位权限(权限时刻在这里,不在记录途中) */}
       <button type="button"
         className={`nesio-settings-option${captureLocOn ? ' nesio-settings-option--active' : ''}`}
@@ -444,7 +479,6 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const [diagLocalAt, setDiagLocalAt] = useState('');
   const [diagCloudAt, setDiagCloudAt] = useState('');
   const [diagSyncMsg, setDiagSyncMsg] = useState('');
-  const [diagSweepMsg, setDiagSweepMsg] = useState('');
   const loadDiag = useCallback(() => {
     setDiagLocalAt(profileIdentityUpdatedAt());
     createAppApiClient().fetchCloudProfileSettings()
@@ -459,20 +493,6 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       setDiagSyncMsg(L(dict, '✓ 已同步 · 下拉刷新看结果', '✓ Synced · pull to refresh'));
       loadDiag();
     } catch { setDiagSyncMsg(L(dict, '同步失败', 'Sync failed')); }
-  }
-  // 批次208:手动「立即巡查」—— 绕过每天一次闸,当场跑 Layer ③ 巡查测信噪比(web 上即可测,不必进 Apple)。
-  async function handleRunSweep() {
-    setDiagSweepMsg(L(dict, '巡查中…', 'Sweeping…'));
-    try {
-      const r = await runSweepNow(getLifeGraph());
-      if (!r.ok) {
-        setDiagSweepMsg(L(dict, `巡查未成:${r.note || '失败'}`, `Sweep failed: ${r.note || ''}`));
-      } else if (r.candidates === 0) {
-        setDiagSweepMsg(L(dict, '没有可巡查的低置信线索(先记一条藏了到期日的东西再试)', 'No low-confidence candidates yet'));
-      } else {
-        setDiagSweepMsg(L(dict, `✓ 送 ${r.candidates} 条 → 抽出 ${r.findings} 条 · 回今日下拉刷新看卡`, `✓ ${r.candidates} sent → ${r.findings} found · pull to refresh Today`));
-      }
-    } catch { setDiagSweepMsg(L(dict, '巡查失败', 'Sweep failed')); }
   }
   const fmtAt = (iso: string) => (iso ? iso.slice(5, 16).replace('T', ' ') : '—');
   const pickBackupDest = (d: 'drive' | 'nesio') => {
@@ -753,8 +773,6 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           {diagSyncMsg && <span style={{ marginLeft: 8 }}>{diagSyncMsg}</span>}
           {/* 批次208:手动跑 Layer ③ 巡查(测试低置信捕捉里的到期/续期信噪比,web 上即可,不必进 Apple) */}
           <div style={{ marginTop: 6 }}>
-            <button type="button" onClick={handleRunSweep} style={{ fontSize: '0.66rem', padding: '0.25rem 0.65rem', borderRadius: 8, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-blue-deep)', cursor: 'pointer' }}>{L(dict, '立即巡查(找漏掉的到期/续期)', 'Run sweep now')}</button>
-            {diagSweepMsg && <span style={{ marginLeft: 8 }}>{diagSweepMsg}</span>}
           </div>
         </div>
       </div>

@@ -15,19 +15,9 @@ import {
   touchNode, getReviewTier,
   type DormantStore, type DormantCandidate,
 } from '@/lib/platform/dormant-engine';
-import { runGuidancePipeline, TODAY_CARD_BUDGET } from '@/lib/platform/guidance-engine/guidance-pipeline';
 import { recordCardFeedback, type EvidenceRef } from '@/lib/portal/reasoning-engine';
-import { loadCoolingStore, recordDismissed, saveCoolingStore } from '@/lib/platform/guidance-engine/cooling-store';
-import {
-  calendarEventsToGuidanceEvents,
-  emailSignalsToGuidanceEvents,
-  specialDaysToGuidanceEvents,
-  focusNodesToGuidanceEvents,
-  weatherToGuidanceEvents,
-  healthNodesToGuidanceEvents,
-  type WeatherSnapshot,
-  decCardsToGuidanceEvents,
-} from '@/lib/platform/guidance-engine/source-adapters';
+import { dismissJudgedCard } from '@/lib/portal/guidance-judge-auto';
+import { resolveCardTarget, openCardTarget } from '@/lib/portal/card-target';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import dynamic from 'next/dynamic';
 import { createPortal } from 'react-dom';
@@ -187,26 +177,32 @@ export default function TodayFeed({
   // 不硬凑 —— 轮播兜底(历史上的今天/小技巧)已废除,「页面活着」由收据首行负责。
   const hourNow = new Date().getHours();
   const isEvening = hourNow >= 21;
-  const cardBudget = Math.min(TODAY_CARD_BUDGET, getProactiveCardBudget(), isEvening ? 2 : 1);
+  const cardBudget = Math.min(3, getProactiveCardBudget(), isEvening ? 2 : 1);
   // 架构审查 #2:统一仲裁 —— 置顶抢占的节点,其引导卡不再重复出现
   const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null);
   const guidanceNodeIds = useMemo(() => proactiveCards.map((c) => c.nodeId).filter((x): x is string => Boolean(x)), [proactiveCards]);
-  const activeProactiveCards = proactiveCards
+  // 配额只管噪音不管安全:severity 3(urgent)豁免截断,登机口不能被「今天已出一张」挡住。
+  const visibleProactive = proactiveCards
     .filter((c) => !dismissedCardIds.has(c.id) && (!c.nodeId || c.nodeId !== pinnedNodeId)
-      && (!c.expiresAt || new Date(c.expiresAt).getTime() > Date.now()))
-    .slice(0, cardBudget);
+      && (!c.expiresAt || new Date(c.expiresAt).getTime() > Date.now()));
+  const activeProactiveCards = [
+    ...visibleProactive.filter((c) => c.urgent),
+    ...visibleProactive.filter((c) => !c.urgent).slice(0, cardBudget),
+  ];
+  const showFallbackNote = activeProactiveCards.some((c) => c.sourceTags.includes('fallback'));
 
-  // 卡片档案(设计定稿 2026-07-29 Step 1):真实上屏的规则卡双轨入档 ——
-  // 影子期 AI 判决与它同屏对照。key=factKey(AI 改写前的源指纹),whyNow 位置记 type+priority。
+  // 卡片档案:真实上屏即入档(times 累计)。AI 判决卡在判决时已建条,这里 bump;
+  // 兜底/遗留卡记 rules lane。档案是唯一监测面,出一次记一次。
   useEffect(() => {
     for (const card of activeProactiveCards) {
+      const isJudge = card.id.startsWith('judge-');
       archiveShownCard({
-        id: `rules:${card.factKey || card.id}`,
-        lane: 'rules',
+        id: isJudge ? (card.factKey || card.id) : `rules:${card.factKey || card.id}`,
+        lane: isJudge ? 'ai' : 'rules',
         group: card.cardType || '其他',
         title: card.title,
         body: card.body,
-        whyNow: card.reason || `${card.cardType ?? 'card'} · p${card.priority}`,
+        whyNow: card.reason || '',
         evidence: [],
         severity: Math.max(0, Math.min(3, Math.round(card.priority / 3))),
         gates: [],
@@ -322,23 +318,30 @@ export default function TodayFeed({
           />
         )}
 
-        {/* 未来引导卡 — up to 2, each independently dismissable */}
+        {/* AI 判决不可用时的兜底提示(承诺④:降级必须可见,不许静默) */}
+        {showFallbackNote && (
+          <p className="nesio-settings-option-hint" style={{ margin: '0 0 var(--space-2)' }}>
+            {L(uiLocale, 'AI 判断暂不可用,先看这些确定的。', 'AI judging unavailable — here are the certain ones.')}
+          </p>
+        )}
+
+        {/* 未来引导卡 — AI 判决出的卡;点开走 resolver,关掉记当日日键 */}
         {activeProactiveCards.map((card) => (
           <ProactiveGuidanceCard
             key={card.id}
             card={card}
-            onOpen={card.nodeId ? () => { const live = getLiveMemoryNode(card.nodeId!); if (live) setGuideDetailNode(live); } : undefined}
+            onOpen={card.nodeId
+              ? () => { const live = getLiveMemoryNode(card.nodeId!); if (live) setGuideDetailNode(live); }
+              : card.fingerprints
+                ? () => { const t = resolveCardTarget(card.fingerprints!); if (t) openCardTarget(t); }
+                : undefined}
             onDismiss={() => {
-              // 带上事实指纹 → 静音到内容变化为止(事实没变就别再冒出来)。
-              // 用 factKey 而不是当前 title/body:后者已被 Layer 7 改写过,拿它当指纹永远对不上。
-              dismissProactiveById(card.id, card.factKey);
-              // Record in cooling store so adaptive cooldown can kick in after repeated ignores
-              // 键必须与管线读取的 dedupKey 一致(coolKey),否则多实例类型的 dismissCount
-              // 记在一个没人读的键上 —— 自适应冷却等于没接。
-              const coolKey = card.coolKey || card.cardType;
-              if (coolKey) {
-                saveCoolingStore(recordDismissed(coolKey, loadCoolingStore()));
+              // 判决卡:「知道了」= 当日日键静默(三门之一);兜底/遗留卡走旧 dismissed 存储。
+              // 冷却(自适应 2-24h)已随规则管线拆除 —— 用户裁决(card-verdict)与日键是仅存的记忆。
+              if (card.id.startsWith('judge-') && card.factKey) {
+                dismissJudgedCard(card.factKey);
               }
+              dismissProactiveById(card.id, card.factKey);
               setDismissedCardIds((prev) => { const next = new Set(prev); next.add(card.id); return next; });
             }}
             onMarkDone={(nodeId) => markFocusNodeDone(nodeId)}

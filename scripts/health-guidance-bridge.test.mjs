@@ -1,60 +1,20 @@
 /**
- * 行为契约:健康四层 → guidance 事件桥。
- * 验证:只把红旗/可关注(②)+ 高/中风险(③)升成 health_insight 事件;info/正常/low 不打扰;
- * 红旗排前;最多 3 条;payload 带 severity + 双语 title/body + reason(供 Today 卡渲染)。
+ * 行为契约:健康判定 → Today 的链路(2026-07-29 硬拆后新形态)。
+ * 旧 bridge(healthFindingsToGuidanceEvents,规则分类+封顶)已随 8 层管线物理拆除;
+ * 现在健康判定经 gatherDomainInsights 文本投影 → AI 判决(收敛与出卡契约见
+ * test:guidance-judge / test:guidance-gates)。这里钉链路不断:
+ *   ① domain-insights 仍聚合健康 findings/risks(单一判定源不变);
+ *   ② Today 编排层把 domainInsights 喂进判决批。
  */
 import fs from 'node:fs';
-import vm from 'node:vm';
-import ts from 'typescript';
 import assert from 'node:assert/strict';
 
-const src = fs.readFileSync(new URL('../lib/platform/guidance-engine/source-adapters.ts', import.meta.url), 'utf8');
-const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-const mod = { exports: {} };
-// 别的适配器有外部依赖,但本桥函数只用入参、不触及它们 → require 全桩成空对象即可加载。
-vm.runInNewContext(js, { module: mod, exports: mod.exports, require: () => ({}), console });
-const { healthFindingsToGuidanceEvents } = mod.exports;
+const di = fs.readFileSync(new URL('../lib/portal/domain-insights.ts', import.meta.url), 'utf8');
+assert.match(di, /evaluateHealthFindings/, '域聚合仍读健康判定引擎');
+assert.match(di, /computeRiskScores/, '域聚合仍读健康风险引擎');
+assert.match(di, /gatherDomainInsights/, '文本投影出口存在(判决批的输入)');
 
-const finding = (id, severity) => ({ id, severity, title: [`${id}-zh`, `${id}-en`], detail: ['d-zh', 'd-en'], source: '共识X' });
-const score = (id, category) => ({ id, label: [`${id}-zh`, `${id}-en`], value: '值', category, detail: ['rd-zh', 'rd-en'], source: '常模Y' });
+const td = fs.readFileSync(new URL('../components/portal/today/useTodayData.ts', import.meta.url), 'utf8');
+assert.match(td, /domainInsights: gatherDomainInsights\(\)/, 'Today 把全域判定(含健康)喂进 AI 判决批');
 
-// info / low 不打扰
-assert.equal(healthFindingsToGuidanceEvents([finding('a', 'info')], []).length, 0, 'info 不出卡');
-assert.equal(healthFindingsToGuidanceEvents([], [score('b', 'low')]).length, 0, 'low 风险不出卡');
-assert.equal(healthFindingsToGuidanceEvents([], [score('c', 'info')]).length, 0, 'info 风险不出卡');
-
-// flag / attention / high / moderate 出卡,类型正确
-const one = healthFindingsToGuidanceEvents([finding('tbr', 'flag')], []);
-assert.equal(one.length, 1);
-assert.equal(one[0].type, 'domain_insight', '类型:通用 domain_insight');
-assert.equal(one[0].payload.domain, 'health', 'payload 标注 health 域');
-assert.equal(one[0].payload.icon, '🩺', '域图标随 payload');
-assert.equal(one[0].payload.severity, 'flag');
-assert.equal(one[0].confidence, 84, 'flag 置信 84');
-assert.equal(one[0].payload.titleZh, 'tbr-zh'); assert.equal(one[0].payload.titleEn, 'tbr-en');
-assert.match(String(one[0].payload.bodyZh), /依据 共识X/, 'body 带出处');
-assert.match(String(one[0].payload.reason), /健康/, 'reason 供「为什么现在出现」');
-assert.equal(one[0].id, 'health-tbr', 'id 稳定(供逐实例去重/冷却)');
-
-// 高风险归一成 flag 词汇(供 window/action 统一分支)
-const hi = healthFindingsToGuidanceEvents([], [score('bmi', 'high')]);
-assert.equal(hi[0].payload.severity, 'flag', 'high 风险归一为 flag');
-assert.equal(hi[0].id, 'health-risk-bmi');
-// 中风险归一成 attention
-const mod2 = healthFindingsToGuidanceEvents([], [score('gmi', 'moderate')]);
-assert.equal(mod2[0].payload.severity, 'attention', 'moderate 风险归一为 attention');
-assert.equal(mod2[0].confidence, 68);
-
-// 红旗排前
-const mixed = healthFindingsToGuidanceEvents([finding('att', 'attention'), finding('flag', 'flag')], []);
-assert.equal(mixed[0].payload.severity, 'flag', '红旗必须排在可关注前');
-
-// 最多 3 条
-const many = healthFindingsToGuidanceEvents(
-  [finding('f1', 'flag'), finding('f2', 'flag'), finding('a1', 'attention'), finding('a2', 'attention')],
-  [score('r1', 'high'), score('r2', 'moderate')],
-);
-assert.equal(many.length, 3, '最多 3 条,避免 Today 变体检报告');
-assert.ok(many.every((e) => e.payload.severity === 'flag'), '3 条应先占满红旗');
-
-console.log('health-guidance-bridge: OK');
+console.log('health-guidance-bridge: OK(判定源不变 · 经判决批流入 Today)');

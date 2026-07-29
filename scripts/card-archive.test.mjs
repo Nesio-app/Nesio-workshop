@@ -35,7 +35,7 @@ const A = loadTs('../lib/portal/card-archive.ts', {
 const T0 = new Date('2026-07-29T10:00:00Z');
 const plus = (days) => new Date(T0.getTime() + days * 86_400_000);
 const mkShown = (id, over = {}) => ({
-  id, lane: 'shadow', group: '财务', title: `卡${id}`, body: 'b', whyNow: 'w',
+  id, lane: 'ai', group: '财务', title: `卡${id}`, body: 'b', whyNow: 'w',
   evidence: ['plaid:due=2026-07-31'], severity: 2, gates: [], ...over,
 });
 
@@ -55,8 +55,8 @@ assert.equal(A.readArchive().shown[0].verdict.v, 'useful', '点错了可以改')
 
 // ── 没说的:幂等 + 该提醒我 ──
 A.archiveDeclined([
-  { id: 'd1', lane: 'shadow', title: '家长会邮件', reason: '像广告' },
-  { id: 'd1', lane: 'shadow', title: '家长会邮件', reason: '像广告' },
+  { id: 'd1', lane: 'ai', title: '家长会邮件', reason: '像广告' },
+  { id: 'd1', lane: 'ai', title: '家长会邮件', reason: '像广告' },
 ], T0);
 assert.equal(A.readArchive().declined.length, 1, '同 id 幂等');
 A.markDeclinedWanted('d1', T0);
@@ -84,7 +84,7 @@ assert.equal(arc.shown[0].id, 'new');
 // ── 条数上限 ──
 store.clear();
 const cap = A.ARCHIVE_MAX_DECLINED;
-A.archiveDeclined(Array.from({ length: cap + 30 }, (_, i) => ({ id: `d${i}`, lane: 'shadow', title: 't', reason: 'r' })), T0);
+A.archiveDeclined(Array.from({ length: cap + 30 }, (_, i) => ({ id: `d${i}`, lane: 'ai', title: 't', reason: 'r' })), T0);
 assert.equal(A.readArchive().declined.length, cap, `declined 封顶 ${cap}`);
 
 // ── 写失败不许静默吞(红线) ──
@@ -93,8 +93,8 @@ assert.match(src, /reportStorageDropped\(\)/, '存储写失败必须走 storage-
 
 // ── 接线 ──
 const feed = fs.readFileSync(new URL('../components/portal/TodayFeed.tsx', import.meta.url), 'utf8');
-assert.match(feed, /archiveShownCard\(\{\s*\n?\s*id: `rules:\$\{card\.factKey/, '真实上屏的规则卡要双轨入档(id=AI 改写前的 factKey)');
-assert.match(feed, /lane: 'rules'/, '规则卡走 rules lane');
+assert.match(feed, /archiveShownCard\(\{/, '真实上屏的卡要入档(times 累计)');
+assert.match(feed, /isJudge \? 'ai' : 'rules'/, '判决卡 ai lane、兜底/遗留卡 rules lane');
 
 const sheet = fs.readFileSync(new URL('../components/portal/InsightsSheet.tsx', import.meta.url), 'utf8');
 assert.match(sheet, /<CardArchivePanel onOpenNode=\{setDetailNodeId\}/, '档案面板挂在洞察·回望,节点跳转接 MemoryNodeDetail');

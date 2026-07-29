@@ -47,8 +47,8 @@ export default function CardArchivePanel({ onOpenNode }: { onOpenNode?: (nodeId:
 
   function verdict(entry: ArchiveShownEntry, v: ArchiveVerdict) {
     recordArchiveVerdict(entry.id, v);
-    // 影子卡的改判要接进静音层:实弹切换那天,这些裁决直接生效。
-    if (entry.lane === 'shadow') {
+    // AI 卡的改判直接接进静音层(实弹:下一轮出卡即生效)。
+    if (entry.lane === 'ai') {
       if (v === 'wrong' || v === 'repeat') {
         recordCardVerdict({ cardId: entry.id, cardType: entry.group, factKey: entry.id }, 'mute');
       } else if (v === 'too_much') {
@@ -76,8 +76,8 @@ export default function CardArchivePanel({ onOpenNode }: { onOpenNode?: (nodeId:
 
       <p className="nesio-settings-option-hint" style={{ margin: '0 0 var(--space-2)' }}>
         {L(dict,
-          `出过 ${stats.shownCount} 张 · 你表态 ${stats.verdictCount} 次${judge.batches > 0 ? ` · 影子判决 ${judge.batches} 批(${judge.judgedSignals} 条信号)` : ''}`,
-          `${stats.shownCount} shown · ${stats.verdictCount} rated${judge.batches > 0 ? ` · ${judge.batches} shadow batches (${judge.judgedSignals} signals)` : ''}`)}
+          `出过 ${stats.shownCount} 张 · 你表态 ${stats.verdictCount} 次${judge.batches > 0 ? ` · AI 判决 ${judge.batches} 批(${judge.judgedSignals} 条信号)` : ''}`,
+          `${stats.shownCount} shown · ${stats.verdictCount} rated${judge.batches > 0 ? ` · ${judge.batches} AI batches (${judge.judgedSignals} signals)` : ''}`)}
       </p>
 
       {stats.alarm && (
@@ -89,8 +89,8 @@ export default function CardArchivePanel({ onOpenNode }: { onOpenNode?: (nodeId:
       )}
       {judge.lastError && (
         <p className="nesio-health-story-line" style={{ color: 'var(--status-gentle)' }}>
-          {L(dict, `最近一次影子判决没成功(${judge.lastError}),下次打开会重试。`,
-            `Last shadow batch failed (${judge.lastError}); will retry on next open.`)}
+          {L(dict, `最近一次 AI 判决没成功(${judge.lastError}),下次打开会重试。`,
+            `Last AI batch failed (${judge.lastError}); will retry on next open.`)}
         </p>
       )}
 
@@ -122,7 +122,7 @@ export default function CardArchivePanel({ onOpenNode }: { onOpenNode?: (nodeId:
                 {e.title}
               </span>
               <span className="nesio-settings-option-hint" style={{ margin: 0, flexShrink: 0 }}>
-                {e.lane === 'shadow' ? 'AI' : L(dict, '规则', 'rules')} · {e.group} · {e.lastAt.slice(5, 10)}
+                {e.lane === 'ai' ? 'AI' : L(dict, '规则', 'rules')} · {e.group} · {e.lastAt.slice(5, 10)}
                 {e.verdict ? ` · ${L(dict, VERDICT_LABEL[e.verdict.v][0], VERDICT_LABEL[e.verdict.v][1])}` : ''}
               </span>
             </button>

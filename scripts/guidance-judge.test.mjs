@@ -119,12 +119,12 @@ assert.match(metrics, /cost_usd/, 'admin 成本汇总必须优先真实 cost_usd
 assert.match(metrics, /guidance_judge/, 'admin 拍平单价表也要有 guidance_judge 兜底');
 
 const today = fs.readFileSync(new URL('../components/portal/today/useTodayData.ts', import.meta.url), 'utf8');
-assert.match(today, /void maybeRunJudgeShadow\(/, '影子判决要在 Today 数据编排层被触发(fire-and-forget)');
-assert.ok(today.indexOf('void maybeRunJudgeShadow') > today.indexOf('if (canUsePrivateData) {'), '影子判决在私据门之内触发');
+assert.match(today, /void maybeRunJudgeBatch\(/, '判决批要在 Today 数据编排层被触发(fire-and-forget)');
+assert.ok(today.indexOf('void maybeRunJudgeBatch') > today.indexOf('if (canUsePrivateData) {'), '判决批在私据门之内触发');
 
 const auto = fs.readFileSync(new URL('../lib/portal/guidance-judge-auto.ts', import.meta.url), 'utf8');
-assert.match(auto, /lane: 'shadow'/, '影子判决结果只进档案(shadow lane),不上屏');
-assert.ok(!auto.includes('setProactiveCards'), '影子模式绝不碰出卡状态');
+assert.match(auto, /lane: 'ai'/, '判决结果按 ai lane 入档');
+assert.ok(!auto.includes('setProactiveCards'), '编排层不直接碰渲染状态(出卡经 loadLiveJudgedCards 由 useTodayData 消费)');
 assert.match(auto, /if \(w\.alert\)/, '天气官方告警(NWS)要进判决信号 —— 取了一直没用过的字段');
 assert.match(auto, /Math\.round\(w\.tempMinC/, '日常天气温度取整防指纹抖动(小数变化不该触发重判)');
 assert.match(auto, /judgeFingerprint\('plaid', liab\.accountId/, 'Plaid 负债(还款日)要进判决信号 —— 最高优先数据缺口');
@@ -138,5 +138,14 @@ const sync = fs.readFileSync(new URL('../lib/portal/providers/connector-sync.ts'
 assert.match(sync, /savePlaidLiabilities/, '客户端要把 liabilities 落盘');
 const bank = fs.readFileSync(new URL('../lib/portal/providers/bank-tx.ts', import.meta.url), 'utf8');
 assert.match(bank, /PLAID_LIABILITIES_KEY = 'nesio-plaid-liabilities-v1'/, '存储键固定(nesio- 前缀 → 隐私清除自动覆盖)');
+
+// 实弹钉(硬拆 2026-07-29):出卡链路 + 兜底可见
+assert.match(auto, /export function loadLiveJudgedCards/, '实弹出卡加载器存在');
+assert.match(today, /loadLiveJudgedCards\(now, 3\)/, 'Today 从 ledger 出卡(窗口重算+三门)');
+assert.match(today, /judgeNeedsFallback\(now\)/, 'AI 不可用要有兜底判断');
+assert.match(today, /buildFallbackCards\(/, '兜底走结构化零分类');
+const feedSrc = fs.readFileSync(new URL('../components/portal/TodayFeed.tsx', import.meta.url), 'utf8');
+assert.match(feedSrc, /showFallbackNote/, '兜底降级必须可见(不许静默)');
+assert.match(feedSrc, /c\.urgent/, 'severity 3 豁免展示配额');
 
 console.log('guidance-judge: OK(指纹白名单 / 严格解析 / 窗口钳制 / severity 封顶 / 归并防幻觉 / 红线四要件 / admin 真实成本)');

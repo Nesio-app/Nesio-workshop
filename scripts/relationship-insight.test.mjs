@@ -134,11 +134,10 @@ assert.ok(di.includes('relationshipFindings({ nodes: getLifeGraph()'), 'computeD
 assert.ok(di.includes("relationship: '人缘'"), 'gatherDomainInsights 标签含人缘');
 
 // ── guidance 适配器 + Today 主循环 spread ──
-const sa = fs.readFileSync(new URL('../lib/platform/guidance-engine/source-adapters.ts', import.meta.url), 'utf8');
-assert.ok(sa.includes('export function relationshipFindingsToGuidanceEvents'), '人缘 guidance 适配器存在');
-assert.ok(sa.includes("insightsToGuidanceEvents('relationship'"), '适配器接通用脊柱(domain=relationship)');
-
+// 硬拆后链路(2026-07-29):人缘判定经 gatherDomainInsights → AI 判决批流入 Today。
+const di2 = fs.readFileSync(new URL('../lib/portal/domain-insights.ts', import.meta.url), 'utf8');
+assert.ok(di2.includes('relationshipFindings'), '域聚合仍读人缘判定引擎');
 const td = fs.readFileSync(new URL('../components/portal/today/useTodayData.ts', import.meta.url), 'utf8');
-assert.ok(td.includes('relationshipFindingsToGuidanceEvents(df.relationship)'), 'Today 主循环 spread 人缘洞察');
+assert.ok(td.includes('domainInsights: gatherDomainInsights()'), 'Today 把全域判定(含人缘)喂进 AI 判决批');
 
 console.log('relationship-insight: OK');
