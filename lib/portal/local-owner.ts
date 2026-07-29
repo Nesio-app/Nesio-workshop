@@ -62,6 +62,7 @@ export async function purgeAllLocalUserData(): Promise<void> {
     purgeLocalData(localStorage);                         // 本机 localStorage key 收口清除(保留 auth)
     await purgeIdbBlobs();                                // IDB blob(健康/临床/地点)
     await purgeLocalImages();                             // 记忆照片独立 IDB(nesio-images)
+    await (await import('./local-file-store')).purgeLocalFiles();  // 记忆附件独立 IDB(nesio-files)
     await (await import('./local-email-body')).purgeEmailBodies(); // 邮件全文独立 IDB(nesio-email-bodies)
   } catch (err) { logDropped('local_owner.purge', err); }
 }
@@ -79,6 +80,7 @@ export async function purgeLocalUserDataForLogout(): Promise<void> {
     purgeLocalData(localStorage);                         // 本机 localStorage 用户数据(含记忆图 key)——纯本地删,不传导云
     await purgeIdbBlobs();                                // 健康/临床/地点 IDB(本地 clear)
     await purgeLocalImages();                             // 记忆照片 IDB(本地 clear)
+    await (await import('./local-file-store')).purgeLocalFiles();  // 记忆附件 IDB(本地 clear)
     await (await import('./local-email-body')).purgeEmailBodies(); // 邮件全文 IDB(本地 clear)
     try { localStorage.removeItem(OWNER_KEY); } catch { /* ignore */ } // 清主人记录:回到干净设备
   } catch (err) { logDropped('local_owner.logout_purge', err); }

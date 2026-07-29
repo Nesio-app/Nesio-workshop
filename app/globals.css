@@ -19486,3 +19486,18 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   background: var(--status-risk-soft); border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3); }
 .nesio-fit-reset { align-self: flex-start; border: none; background: none; padding: 0; cursor: pointer;
   font-family: inherit; font-size: var(--text-xs); color: var(--portal-muted); text-decoration: underline; }
+
+/* 记忆详情·本机附件行(pdf/docx…):图标 · 名字/大小 · 打开。
+   不做内嵌预览 —— 各格式各要一个渲染器,而「能打开」已解决「存进去看不见」。 */
+.nesio-nd-file-row {
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3);
+}
+.nesio-nd-file-icon { flex: none; color: var(--portal-accent); display: grid; place-items: center; }
+.nesio-nd-file-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.nesio-nd-file-name {
+  font-size: var(--text-sm); font-weight: 600; color: var(--portal-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nesio-nd-file-sub { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-nd-file-open { flex: none; text-decoration: none; }

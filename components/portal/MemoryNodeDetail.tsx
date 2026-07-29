@@ -8,7 +8,7 @@ import type { LocationMeta } from './LocationPicker';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import LocationPicker from './LocationPicker';
 import EmailComposeSheet from './EmailComposeSheet';
-import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare } from './icons';
+import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare, IconFile} from './icons';
 import { L } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName } from '@/lib/portal/node-display';
@@ -1316,12 +1316,17 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             if (galleryAssets.length === 0) return null;
             return (
             <>
-              <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>{L(dict, '图片线索', 'Image clues')}</p>
+              <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>{L(dict, '附件', 'Attachments')}</p>
               <div style={{ display: 'grid', gap: '0.6rem' }}>
                 {galleryAssets.map((asset) => {
                   const key = asset.id || asset.storagePath || asset.label || 'asset';
                   const previewUrl = assetUrls[key];
                   const isImage = asset.kind === 'image' || asset.mimeType?.startsWith('image/');
+                  // 附件(pdf/docx/xlsx…)存在 nesio-files,是 Blob 不是 dataURL —— 单独一行,点了下载/打开。
+                  // 不做内嵌预览:各种格式各要一个渲染器,而「能打开」已经解决了「存进去看不见」。
+                  if (asset.kind === 'file' && asset.local) {
+                    return <LocalFileRow key={key} assetId={asset.id} label={asset.label || n.name} dict={dict} />;
+                  }
                   return (
                     <div key={key} className="nesio-type-asset-card">
                       {isImage && previewUrl ? (
@@ -1452,4 +1457,54 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
       </NesioSheet>
     </>
   );
+}
+
+
+/**
+ * 本机附件一行:名字 · 大小 · 打开。附件存的是 Blob(nesio-files),
+ * 所以 URL 要 createObjectURL 现造,并在卸载时 revoke —— 不 revoke 就是内存泄漏。
+ * 取不到(被清过/换了设备)要明说,不能留一个点了没反应的按钮。
+ */
+function LocalFileRow({ assetId, label, dict }: { assetId: string; label: string; dict: string }) {
+  const [meta, setMeta] = useState<{ name: string; size: number } | null>(null);
+  const [gone, setGone] = useState(false);
+  const urlRef = useRef<string>('');
+  useEffect(() => {
+    let live = true;
+    void import('@/lib/portal/local-file-store').then(({ getLocalFile }) => getLocalFile(assetId)).then((rec) => {
+      if (!live) return;
+      if (!rec?.blob) { setGone(true); return; }
+      urlRef.current = URL.createObjectURL(rec.blob);
+      setMeta({ name: rec.name || label, size: rec.size || rec.blob.size });
+    }).catch(() => { if (live) setGone(true); });
+    return () => {
+      live = false;
+      if (urlRef.current) { URL.revokeObjectURL(urlRef.current); urlRef.current = ''; }
+    };
+  }, [assetId, label]);
+
+  return (
+    <div className="nesio-type-asset-card nesio-nd-file-row">
+      <span className="nesio-nd-file-icon" aria-hidden><IconFile size={18} /></span>
+      <span className="nesio-nd-file-meta">
+        <span className="nesio-nd-file-name">{meta?.name || label}</span>
+        <span className="nesio-nd-file-sub">
+          {gone
+            ? L(dict, '这个附件在本机找不到了', 'This attachment is no longer on this device')
+            : meta ? prettyFileSize(meta.size) : L(dict, '读取中…', 'Loading…')}
+        </span>
+      </span>
+      {meta && !gone && (
+        <a className="nesio-node-action-secondary nesio-nd-file-open" href={urlRef.current} download={meta.name} target="_blank" rel="noreferrer">
+          {L(dict, '打开', 'Open')}
+        </a>
+      )}
+    </div>
+  );
+}
+function prettyFileSize(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return '0 KB';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${Math.round((n / 1024 / 1024) * 10) / 10} MB`;
 }

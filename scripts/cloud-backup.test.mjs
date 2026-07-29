@@ -14,7 +14,7 @@ import * as fflate from 'fflate';
 const src = fs.readFileSync(new URL('../lib/portal/cloud-backup.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 
-function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKeys = [], idbInit = {}, localImages = {}, withReload = false, realWebApis = false, realCompression = false } = {}) {
+function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKeys = [], idbInit = {}, localImages = {}, localFiles = {}, withReload = false, realWebApis = false, realCompression = false } = {}) {
   const lsMap = new Map(Object.entries(lsInit));
   const localStorage = {
     getItem: (k) => (lsMap.has(k) ? lsMap.get(k) : null),
@@ -24,6 +24,7 @@ function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKey
   let lastFetch = null;
   let lastRestore = null;
   let restoredImages = null;
+  let restoredFiles = null;
   const idbStore = new Map(Object.entries(idbInit));
   const idbBackend = {
     get: async (k) => (idbStore.has(k) ? idbStore.get(k) : null),
@@ -68,6 +69,11 @@ function makeCtx({ lsInit = {}, fbEntries = {}, idbBlobs = {}, fetchImpl, idbKey
         isIdbBlobKey: (k) => idbKeys.includes(k) || k === 'nesio-life-graph-v1',
         registerIdbBlobKey: (k) => { if (!idbKeys.includes(k)) idbKeys.push(k); },
         idbBackend,
+      };
+      // 附件 store(nesio-files):和照片同一批收口,桩也得同一处给,否则 buildCombinedBackup 直接炸。
+      if (p === './local-file-store') return {
+        collectLocalFiles: async () => ({ ...localFiles }),
+        restoreLocalFiles: async (m) => { restoredFiles = { ...m }; return Object.keys(m).length; },
       };
       if (p === './local-image-store') return {
         collectLocalImages: async () => ({ ...localImages }),

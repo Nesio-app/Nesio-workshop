@@ -83,50 +83,82 @@ export default function TodayFeed({
   const [quickSaved, setQuickSaved] = useState(false);
 
   /**
-   * 「+」上传 → 落成记忆(2026-07-28,用户给了参考图:胶囊左侧加号)。
+   * 「+」上传 → 落成记忆(2026-07-28)。
    *
-   * 图片走的是记忆详情「补传照片」那条现成的路(local-image-store:压缩 → IndexedDB →
-   * 挂 node.assets,本机存不上传),不另造一套。文本类文件把正文读进 rawInput。
-   * 其余类型(pdf/docx 之类二进制)**明说存不了** —— 仓里目前没有二进制附件存储,
-   * 假装收下比拒收糟得多。
+   * **不按类型白名单收,按体积设限** —— 白名单永远会漏掉某个「常见类型」,
+   * 而用户要的是「都能收」。所以三条分流按能力划,不按后缀划:
+   *   · 图片   → local-image-store(压缩,能出缩略图);
+   *   · 文本类 → 正文进 rawInput(这样能被本地检索搜到,是纯二进制给不了的);
+   *   · 其余   → local-file-store(原样存 Blob,pdf/docx/xlsx/zip… 一视同仁)。
+   * 超过 MAX_FILE_BYTES 的明确拒收,不截断 —— 截断的 pdf 是坏文件,比没有更糟。
    */
-  const captureFiles = useCallback(async (files: FileList) => {
-    const list = Array.from(files).slice(0, 30);
+  const captureFiles = useCallback(async (files: File[]) => {
+    const list = files.slice(0, 30);
     if (!list.length) return;
-    const imgs = list.filter((f) => f.type.startsWith('image/'));
-    const texts = list.filter((f) => !f.type.startsWith('image/') && /\.(csv|tsv|txt|md|json|xml|ya?ml|log)$/i.test(f.name));
-    const skipped = list.length - imgs.length - texts.length;
+    // ⚠️ 走 ingestLifeNode,不是 addLifeNode —— 后者是底层写,业务层直调会绕过主事实表
+    //    (scripts/write-gate-addLifeNode.test.mjs 明文禁止)。我第一版就是直调 addLifeNode,
+    //    表现是「文件存进 IDB 了,记忆一条没有」,右上角计数纹丝不动。
+    const { ingestLifeNode } = await import('@/lib/life-domain/ingest-node');
+    const { MAX_FILE_BYTES, prettyBytes, putLocalFile } = await import('@/lib/portal/local-file-store');
 
-    const { addLifeNode } = await import('@/lib/portal/life-graph');
+    const isImage = (f: File) => f.type.startsWith('image/');
+    const isTextish = (f: File) => !isImage(f) && (f.type.startsWith('text/') || /\.(csv|tsv|txt|md|json|xml|ya?ml|log)$/i.test(f.name));
+
+    const imgs = list.filter(isImage);
+    const texts = list.filter(isTextish);
+    const bins = list.filter((f) => !isImage(f) && !isTextish(f));
+    const tooBig = [...bins, ...imgs].filter((f) => f.size > MAX_FILE_BYTES);
+    const failed: string[] = tooBig.map((f) => `${f.name}(${prettyBytes(f.size)})`);
 
     if (imgs.length) {
       const { compressToDataUrl, putLocalImage } = await import('@/lib/portal/local-image-store');
       const assets = [];
       for (let i = 0; i < imgs.length; i++) {
+        if (imgs[i].size > MAX_FILE_BYTES) continue;
         const dataUrl = await compressToDataUrl(imgs[i], 1400, 0.82);
         const id = `local-today-${Date.now()}-${i}`;
-        await putLocalImage(id, dataUrl);
-        assets.push({ id, kind: 'image' as const, local: true, mimeType: 'image/jpeg', createdAt: new Date().toISOString() });
+        const ok = await putLocalImage(id, dataUrl);
+        if (!ok) { failed.push(imgs[i].name); continue; }
+        assets.push({ id, kind: 'image' as const, local: true, mimeType: 'image/jpeg', label: imgs[i].name, createdAt: new Date().toISOString() });
       }
-      addLifeNode({
-        name: imgs.length === 1 ? imgs[0].name.replace(/\.[^.]+$/, '') : `${imgs.length} 张照片`,
-        type: 'note', source: 'manual', tags: ['照片'], attributes: {}, relations: [], confidence: 1, assets,
-      });
+      if (assets.length) {
+        ingestLifeNode({
+          name: assets.length === 1 ? imgs[0].name.replace(/\.[^.]+$/, '') : `${assets.length} 张照片`,
+          type: 'note', source: 'manual', tags: ['照片'], attributes: {}, relations: [], confidence: 1, assets,
+        });
+      }
     }
 
     for (const f of texts) {
       const text = await f.text();
-      addLifeNode({
+      ingestLifeNode({
         name: f.name.replace(/\.[^.]+$/, ''),
         type: 'note', source: 'manual', tags: ['文件'], attributes: {}, relations: [], confidence: 1,
         rawInput: text.slice(0, 20000),
       });
     }
 
+    for (let i = 0; i < bins.length; i++) {
+      const f = bins[i];
+      if (f.size > MAX_FILE_BYTES) continue;
+      const id = `localfile-${Date.now()}-${i}`;
+      const mimeType = f.type || 'application/octet-stream';
+      const ok = await putLocalFile(id, f, { name: f.name, mimeType, size: f.size });
+      if (!ok) { failed.push(f.name); continue; }
+      ingestLifeNode({
+        name: f.name.replace(/\.[^.]+$/, ''),
+        type: 'note', source: 'manual', tags: ['文件'], attributes: { fileName: f.name, fileSize: String(f.size) },
+        relations: [], confidence: 1,
+        assets: [{ id, kind: 'file' as const, local: true, mimeType, label: f.name, createdAt: new Date().toISOString() }],
+      });
+    }
+
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-    if (imgs.length || texts.length) { setQuickSaved(true); setTimeout(() => setQuickSaved(false), 1400); }
-    // 有存不了的就要说;不能因为「另外几个存进去了」就把这句吞掉。
-    if (skipped > 0) throw new Error(`有 ${skipped} 个文件还存不了(只收图片和文本类)。`);
+    if (list.length > failed.length) { setQuickSaved(true); setTimeout(() => setQuickSaved(false), 1400); }
+    // 存不下的必须说,哪怕同一批里别的存进去了 —— 不能因为「大部分成功」就把失败的吞掉。
+    if (failed.length) {
+      throw new Error(`${failed.slice(0, 3).join('、')} 没存进去(单个上限 ${prettyBytes(MAX_FILE_BYTES)})。`);
+    }
   }, []);
   // 批次 33:话筒 = 原地录音转文字直接入记忆(不跳说一句 sheet);无语音 API 才回落 sheet
   const [micState, setMicState] = useState<'idle' | 'recording'>('idle');

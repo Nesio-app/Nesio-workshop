@@ -13,9 +13,9 @@
  * 「+」上传落到哪:
  *   · 图片 → 压缩存 IndexedDB,建一条带照片的记忆(复用记忆详情「补传照片」那条路,
  *     lib/portal/local-image-store,本机存不上传);
- *   · 文本类文件(.txt/.md/.csv/.json…)→ 正文读进记忆的 rawInput。
- *   · 其余(pdf/docx 之类二进制)→ **明说存不了**,不假装收下。仓里目前没有二进制附件存储,
- *     聊天页的文件上传支持的也正是这一批文本类型;为这条输入框单独造一套不在本次范围。
+ *   · 文本类文件(.txt/.md/.csv/.json…)→ 正文读进 rawInput(这样能被本地检索搜到);
+ *   · 其余(pdf/docx/xlsx/zip…)→ lib/portal/local-file-store 原样存 Blob。
+ * 不按类型白名单收,按体积设限 —— 白名单永远会漏掉某个「常见类型」。
  */
 import { useRef, useState, type RefObject } from 'react';
 import { IconMic, IconPlus } from '../icons';
@@ -31,7 +31,7 @@ export interface CaptureBarProps {
   recording: boolean;
   inputRef: RefObject<HTMLTextAreaElement | null>;
   /** 上传落库。由 TodayFeed 提供(它才知道怎么建节点);没给就不显示「+」。 */
-  onFiles?: (files: FileList) => Promise<void>;
+  onFiles?: (files: File[]) => Promise<void>;
 }
 
 /** 输入框随字数长高(和成长页文本框同一套手感)。 */
@@ -40,8 +40,11 @@ function growJot(el: HTMLTextAreaElement) {
   el.style.height = `${Math.min(el.scrollHeight, 8 * 16)}px`;
 }
 
-/** 能收的:图片 + 文本类。和聊天页文件上传保持同一批,不各写一份。 */
-export const CAPTURE_ACCEPT = 'image/*,.csv,.tsv,.txt,.md,.json,.xml,.yaml,.yml,.log';
+/**
+ * 不限类型 —— 用户要的是「常见文件类型都能收」,而白名单永远会漏掉某一个。
+ * 拦截改在体积上(见 local-file-store 的 MAX_FILE_BYTES),那才是真正的约束。
+ */
+export const CAPTURE_ACCEPT = '';
 
 export default function CaptureBar(capture: CaptureBarProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -49,8 +52,8 @@ export default function CaptureBar(capture: CaptureBarProps) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
-  async function take(files: FileList | null) {
-    if (!files?.length || !capture.onFiles) return;
+  async function take(files: File[]) {
+    if (!files.length || !capture.onFiles) return;
     setBusy(true); setErr('');
     try {
       await capture.onFiles(files);
@@ -80,10 +83,12 @@ export default function CaptureBar(capture: CaptureBarProps) {
               <input
                 ref={fileRef}
                 type="file"
-                accept={CAPTURE_ACCEPT}
+                {...(CAPTURE_ACCEPT ? { accept: CAPTURE_ACCEPT } : {})}
                 multiple
                 hidden
-                onChange={(e) => { const f = e.currentTarget.files; e.currentTarget.value = ''; void take(f); }}
+                // ⚠️ 先快照成数组再清 value:input.value = '' 会把 FileList 一起清空,
+                //    先清后读拿到的是空表,表现是「点了没反应、也不报错」。踩过。
+                onChange={(e) => { const picked = Array.from(e.currentTarget.files || []); e.currentTarget.value = ''; void take(picked); }}
               />
             </>
           )}
