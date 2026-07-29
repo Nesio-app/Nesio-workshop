@@ -45,10 +45,13 @@ export interface FinanceFinding {
 const MIN_BASE = 50;
 
 // ── ② 异常支出:净支出环比激增 + 单类支出激增(复用 summarizeMonth / categoryBreakdown)──
-function anomalyFindings(txs: BankTx[], ym: string): FinanceFinding[] {
+function anomalyFindings(txs: BankTx[], ym: string, opts?: { domainNet?: number; prevDomainNet?: number }): FinanceFinding[] {
   const out: FinanceFinding[] = [];
-  const cur = summarizeMonth(txs, ym);
-  const prev = summarizeMonth(txs, prevYm(ym));
+  // 口径统一:净支出与 KPI 同含域内(小票/手动)支出 —— 此前风险预警与页面 KPI 各说各话
+  const curBase = summarizeMonth(txs, ym);
+  const prevBase = summarizeMonth(txs, prevYm(ym));
+  const cur = { ...curBase, net: Math.round((curBase.net + (opts?.domainNet ?? 0)) * 100) / 100 };
+  const prev = { ...prevBase, net: Math.round((prevBase.net + (opts?.prevDomainNet ?? 0)) * 100) / 100 };
 
   // 净支出环比激增(>50%,两月都够大)。>100% 记 flag,否则 attention。
   if (prev.net >= MIN_BASE && cur.net >= MIN_BASE && cur.net > prev.net * 1.5) {
@@ -278,10 +281,11 @@ export function financeFindings(
   txs: BankTx[],
   accounts: BankAccount[] = [],
   ym: string = availableMonths(txs)[0] ?? '',
+  opts?: { domainNet?: number; prevDomainNet?: number },
 ): FinanceFinding[] {
   if (!txs.length || !ym) return [];
   const all = [
-    ...anomalyFindings(txs, ym),
+    ...anomalyFindings(txs, ym, opts),
     ...subscriptionHikeFindings(txs),
     ...cashRunwayFindings(txs, accounts),
     ...upcomingBillFindings(txs),

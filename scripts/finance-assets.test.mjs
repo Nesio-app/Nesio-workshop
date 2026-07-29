@@ -124,4 +124,21 @@ for (const topic of ['finance-score-credit-utilization', 'finance-cash-runway', 
   assert.ok(glTxt.includes(`'${topic}'`), `guidelines 补条:${topic}`);
 }
 
+// ── 渠道余额推算(用户拍板:锚点=盘点复位点 + 其后收支累加) ──
+const wallet = { id: 'ch1', anchors: [{ date: '2026-07-10', value: 100 }] };
+assert.equal(assets.channelBalance(wallet, [
+  { channelId: 'ch1', kind: 'income', amount: 200, occurredAt: '2026-07-15' },
+  { channelId: 'ch1', amount: 30, occurredAt: '2026-07-20' },
+  { channelId: 'ch1', amount: 99, occurredAt: '2026-07-01' },  // 盘点前:已被盘点吸收
+  { channelId: 'other', amount: 50, occurredAt: '2026-07-16' }, // 别的渠道
+]), 270, '余额 = 盘点 100 + 收 200 − 支 30(盘点前/他渠道不计)');
+assert.equal(assets.channelBalance({ id: 'ch2', anchors: [] }, [
+  { channelId: 'ch2', kind: 'income', amount: 88, occurredAt: '2026-07-15' },
+]), 88, '无盘点:纯累加');
+assert.equal(
+  assets.manualNetWorth(
+    [{ id: 'ch1', name: 'w', kind: 'cash', classification: 'asset', isChannel: true, anchors: [{ date: '2026-07-10', value: 100 }], createdAt: '' }],
+    [{ channelId: 'ch1', kind: 'income', amount: 200, occurredAt: '2026-07-15' }],
+  ), 300, '净值里的渠道用推算余额');
+
 console.log('finance-assets: OK');

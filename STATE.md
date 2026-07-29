@@ -201,9 +201,12 @@ sensitivity/retention 枚举化(中期)。
   「全挂≠没订阅」语义;切段清分类;渠道互斥;幽灵渠道过滤;formatMoney 币种补传;
   InvestPane/RecurringPane 空态;死代码清理(12 个 import/废 memo/死枚举)。
   全量契约链 3 处过期钉修复(2 处主干 e331fd8 漂移 + 1 处本次拆分)。
-  **已知未修(记账)**:现金渠道余额不随记账推算(锚点模型自洽但对用户是空承诺,
-  待拍板:推算 or 降级为标签)、portfolioCheckup buys/sells 混入金/费(需 route 透传
-  subtype)、月报/预算/趋势与 KPI 的 domainNet 口径统一(audit #6,P3 后续)。
+  **三件挂账已清(2026-07-29,用户批)**:① 现金渠道余额按 maybe 语义推算
+  (channelBalance = 最新盘点锚点 + 其后该渠道收支累加;净值/卡片页/幽灵过滤同步切换);
+  ② portfolioCheckup 买卖次数按 invSubtype 语义判(route 透传 subtype,入金/费用不再
+  冒充交易,老数据退回符号判);③ 口径统一:趋势柱/预算 spent/风险预警 net-surge/
+  月报净支出+环比+预算块 全部与 KPI 同含域内支出(opts.domainNet 通道,默认 0 兼容;
+  FinanceTab 统一传入,自动月报按上月聚合传)。契约:channelBalance 断言入 finance-assets。
   **P3 拆分完成(2026-07-28,财务大修四期收官)**:FinanceTab 1300→949 行,拆出
   RecurringPane / InvestPane / CardsPane / AcctLogo / QuickAddSheet 五个组件(纯展示,
   数据经 props;对齐 TodayFeed 拆分先例)。顺手修:卡片页 brokerage 归投资组

@@ -437,6 +437,7 @@ export async function GET(req: NextRequest) {
             currency: t.iso_currency_code || '',
             category: c.category,
             categoryDetail: c.detail,
+            invSubtype: t.subtype || t.type || undefined, // 组合体检:买卖 vs 入金/费用要靠它区分
           };
         }),
       ],

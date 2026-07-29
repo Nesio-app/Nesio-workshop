@@ -11,7 +11,7 @@ import {
 } from '@/lib/portal/bank-tx';
 import { incomeBreakdown, portfolioSummary } from '@/lib/portal/finance-features';
 import {
-  assetCurrentValue, assetDepreciation, assetHoldingCosts, removeManualAsset, recordNetWorthSnapshot,
+  assetCurrentValue, assetDepreciation, assetHoldingCosts, channelBalance, removeManualAsset, recordNetWorthSnapshot,
   type ManualAsset,
 } from '@/lib/portal/finance-assets';
 import { loadDomainExpenses } from '@/lib/portal/finance-sources';
@@ -158,8 +158,8 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
             ? <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, '房、车、现金、加密…银行拍不到的,点「+ 记一笔 → 资产·估值」记进来,一起进净值。', 'Home, car, cash, crypto — add via “+ Add → Asset” and they join your net worth.')}</p>
             : (() => {
               const allExpenses = loadDomainExpenses(); // P2 持有成本归集(税金/维修,当年)
-              // 幽灵渠道过滤:0 值、仅初始锚点的 cash 渠道(记账不推算余额,盘点后才有意义)
-              const shown = manualAssets.filter((a) => !(a.isChannel && assetCurrentValue(a) === 0 && a.anchors.length <= 1));
+              // 渠道余额按记账推算(锚点=盘点复位点);仍为 0 且无历史的渠道不占行
+              const shown = manualAssets.filter((a) => !a.isChannel || channelBalance(a, allExpenses) !== 0 || a.anchors.length > 1);
               return shown.map((a: ManualAsset) => {
               const latest = a.anchors[0];
               const staleDays = latest ? Math.floor((Date.now() - new Date(`${latest.date}T00:00:00`).getTime()) / 86400000) : 0;
@@ -180,7 +180,7 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
                     {costBits && <span className="nesio-fin-acctrow-sub">{costBits}</span>}
                   </div>
                   <span className={`nesio-fin-acctrow-bal${a.classification === 'liability' ? ' is-neg' : ''}`}>
-                    {a.classification === 'liability' ? '-' : ''}{formatMoney(assetCurrentValue(a), currency)}
+                    {a.classification === 'liability' ? '-' : ''}{formatMoney(a.isChannel ? channelBalance(a, allExpenses) : assetCurrentValue(a), currency)}
                   </span>
                   <button type="button" className="nesio-fin-monthnav" style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-accent)' }}
                     onClick={() => onQuickAddAsset(a.id)}>{L(dict, '更新', 'Update')}</button>

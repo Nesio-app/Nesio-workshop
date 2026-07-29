@@ -27,11 +27,15 @@ const pct = (v: number) => `${Math.round(v * 100)}%`;
 
 export function buildMonthlyReport(
   txs: BankTx[], accounts: BankAccount[], ym: string, dict: string = 'zh', now: Date = new Date(),
+  opts?: { domainNet?: number; prevDomainNet?: number },
 ): MonthlyReport {
   const zh = dict !== 'en';
   const monthTxs = txs.filter((t) => (t.date || '').slice(0, 7) === ym);
-  const s = summarizeMonth(txs, ym);
-  const prev = summarizeMonth(txs, prevYm(ym));
+  // 口径统一:月报净支出与页面 KPI 同含域内(小票/手动)支出 —— 下载的数字不再对不上屏幕
+  const sBase = summarizeMonth(txs, ym);
+  const prevBase = summarizeMonth(txs, prevYm(ym));
+  const s = { ...sBase, net: Math.round((sBase.net + (opts?.domainNet ?? 0)) * 100) / 100 };
+  const prev = { ...prevBase, net: Math.round((prevBase.net + (opts?.prevDomainNet ?? 0)) * 100) / 100 };
   const cats = categoryBreakdown(txs, ym);
   const merchants = topMerchants(txs, ym, 8);
   const recurring = detectRecurring(txs);
@@ -119,7 +123,7 @@ export function buildMonthlyReport(
 
   // ── 预算执行 ──
   if (hasBudget(budget)) {
-    const bp = budgetProgress(txs, ym, budget);
+    const bp = budgetProgress(txs, ym, budget, { domainNet: opts?.domainNet ?? 0 }); // 与月报净支出同口径
     lines.push('', `## ${L('预算执行', 'Budget')}`, '');
     if (bp.total) lines.push(L(`总预算 ${formatMoney(bp.total.budget, s.currency)},已用 ${formatMoney(bp.total.spent, s.currency)},${bp.total.left >= 0 ? `还可以花 ${formatMoney(bp.total.left, s.currency)}` : `超出 ${formatMoney(-bp.total.left, s.currency)}(月中调整来得及)`}`, `Budget ${formatMoney(bp.total.budget, s.currency)}, spent ${formatMoney(bp.total.spent, s.currency)}, ${bp.total.left >= 0 ? `left ${formatMoney(bp.total.left, s.currency)}` : `over by ${formatMoney(-bp.total.left, s.currency)}`}`));
     for (const c of bp.perCategory) {
@@ -226,12 +230,13 @@ const AUTO_KEY = 'nesio-fin-report-auto-v1';
  */
 export function autoPersistLastMonthReport(
   txs: BankTx[], accounts: BankAccount[], now: Date = new Date(), dict: string = 'zh',
+  opts?: { domainNet?: number; prevDomainNet?: number },
 ): 'created' | 'updated' | 'skipped' {
   if (typeof window === 'undefined' || !txs.length) return 'skipped';
   const lastYm = prevYm(ymOf(now));
   try { if (localStorage.getItem(AUTO_KEY) === lastYm) return 'skipped'; } catch { /* ignore */ }
   if (!txs.some((t) => (t.date || '').slice(0, 7) === lastYm)) return 'skipped';
-  const outcome = persistReportToMemory(buildMonthlyReport(txs, accounts, lastYm, dict, now));
+  const outcome = persistReportToMemory(buildMonthlyReport(txs, accounts, lastYm, dict, now, opts));
   try { localStorage.setItem(AUTO_KEY, lastYm); } catch { /* ignore */ }
   return outcome;
 }

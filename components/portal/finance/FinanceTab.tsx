@@ -10,7 +10,7 @@ import { useEffect, useMemo, useState } from 'react';
 import FamilyDataCard from '../relationships/FamilyDataCard';
 import {
   availableMonths, categoryBreakdown, topMerchants,
-  monthlyTrend, needsReview, suggestCategory, setMerchantRule, effectiveCategory,
+  needsReview, suggestCategory, setMerchantRule, effectiveCategory,
   formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
   loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummary, expenseMerchants,
@@ -152,8 +152,16 @@ export default function FinanceTab() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const merchants = useMemo(() => topMerchants(txs, ym, 6), [txs, ym, rev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const findings = useMemo(() => financeFindings(txs, accounts, ym), [txs, accounts, ym, rev]);
-  const trend = useMemo(() => monthlyTrend(txs, 6), [txs]);
+  const findings = useMemo(
+    () => financeFindings(txs, accounts, ym, { domainNet: summary.domainNet, prevDomainNet: prevSummary.domainNet }),
+    [txs, accounts, ym, rev, summary.domainNet, prevSummary.domainNet],
+  );
+  // 口径统一:趋势柱与 KPI 同含域内支出(此前同屏两个「净支出」差一个小票的量)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const trend = useMemo(
+    () => availableMonths(txs).slice(0, 6).reverse().map((m) => ({ ym: m, net: financeMonthAggregate(m, { txs }).net })),
+    [txs, rev],
+  );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const review = useMemo(() => needsReview(txs, ym), [txs, ym, rev]);
   const monthTx = useMemo(() => txs.filter((t) => (t.date || '').slice(0, 7) === ym).sort((a, b) => (b.date || '').localeCompare(a.date || '')), [txs, ym]);
@@ -182,7 +190,8 @@ export default function FinanceTab() {
   // 财务㉒:预算(总额 + 分类;「按习惯生成」用近 6 月基线起草)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const budget = useMemo(() => loadBudget(), [rev]);
-  const bp = useMemo(() => budgetProgress(txs, ym, budget), [txs, ym, budget]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const bp = useMemo(() => budgetProgress(txs, ym, budget, { domainNet: summary.domainNet }), [txs, ym, budget, summary.domainNet]);
   // 跨域小票/旅行支出(不写 bank-tx,旁条展示)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const domainSpend = useMemo(() => domainExpenseTotal(ym), [ym, rev, txs]);
@@ -198,7 +207,11 @@ export default function FinanceTab() {
   useEffect(() => {
     if (!txs.length) return;
     try {
-      const outcome = autoPersistLastMonthReport(txs, accounts, new Date(), dict);
+      const lastYm = prevYm(ymOf());
+      const outcome = autoPersistLastMonthReport(txs, accounts, new Date(), dict, {
+        domainNet: financeMonthAggregate(lastYm, { txs }).domainNet,
+        prevDomainNet: financeMonthAggregate(prevYm(lastYm), { txs }).domainNet,
+      });
       if (outcome === 'created') setReportMsg(L(dict, `已自动生成 ${prevYm(ymOf())} 月报并存入记忆`, `Auto-saved the ${prevYm(ymOf())} report to memory`));
     } catch { setReportMsg(L(dict, '上月月报自动生成没成功 —— 「下载彩色月报」按钮仍可手动生成。', 'Auto report failed — the manual report button still works.')); }
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -585,7 +598,7 @@ export default function FinanceTab() {
             }}>{L(dict, '下载彩色月报', 'Download report')}</button>
             <button type="button" className="nesio-fin-flowopt" onClick={() => {
               try {
-                const r = buildMonthlyReport(txs, accounts, ym, dict);
+                const r = buildMonthlyReport(txs, accounts, ym, dict, new Date(), { domainNet: summary.domainNet, prevDomainNet: prevSummary.domainNet });
                 const outcome = persistReportToMemory(r);
                 setReportMsg(outcome === 'created'
                   ? L(dict, `已把 ${r.ym} 月报存入记忆,「问一问」可检索`, `Report ${r.ym} saved to memory — Ask can cite it`)

@@ -32,6 +32,7 @@ export interface BankTx {
   lat?: number;             // 消费坐标(线下,可接足迹)
   lon?: number;
   lowConfidence?: boolean;  // Plaid 分类置信度低 —— 可主动请用户纠正
+  invSubtype?: string;      // 投资流水的 Plaid subtype(buy/sell/deposit/fee…),组合体检用
 }
 
 /** 财务⑲:商户归并键 —— Plaid 官方实体 id 优先("NETFLIX.COM 866-…"/"Netflix Inc" 同 id),

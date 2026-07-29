@@ -14,6 +14,7 @@
 import { createBlobStore } from './idb-blob-store';
 import { reportStorageDropped } from './storage-health';
 import { loadBankAccounts, assetSummary, loadHoldings } from './bank-tx';
+import { loadDomainExpenses } from './finance-sources';
 
 export const FIN_ASSETS_KEY = 'nesio-fin-assets-v1';
 export const FIN_NETWORTH_SERIES_KEY = 'nesio-fin-networth-series-v1';
@@ -114,17 +115,42 @@ export function assetCurrentValue(a: Pick<ManualAsset, 'anchors'>): number {
   return sortAnchors(a.anchors)[0]?.value ?? 0;
 }
 
-/** 手动净值 = Σ asset − Σ liability(纯函数,可单测)。 */
-export function manualNetWorth(assets: readonly ManualAsset[]): number {
+/** 渠道余额(用户拍板:补上推算)= 最新锚点(盘点)+ 锚点日之后该渠道的 收入−支出。
+ *  maybe 的 balance-with-anchors 语义:锚点是硬复位点,其间按记账事实累加 —— 记账终于会动余额。 */
+export function channelBalance(
+  a: Pick<ManualAsset, 'id' | 'anchors'>,
+  expenses: ReadonlyArray<{ channelId?: string; kind?: string; amount: number; occurredAt: string }>,
+): number {
+  const anchor = sortAnchors(a.anchors)[0];
+  let bal = anchor?.value ?? 0;
+  const since = anchor?.date ?? '';
+  for (const e of expenses) {
+    if (e.channelId !== a.id) continue;
+    if (since && (e.occurredAt || '') <= since) continue; // 盘点日及之前的已被盘点吸收
+    bal += (e.kind === 'income' ? 1 : -1) * e.amount;
+  }
+  return Math.round(bal * 100) / 100;
+}
+
+/** 手动净值 = Σ asset − Σ liability;渠道用推算余额(传 expenses 时),其余用锚点值。 */
+export function manualNetWorth(
+  assets: readonly ManualAsset[],
+  expenses?: ReadonlyArray<{ channelId?: string; kind?: string; amount: number; occurredAt: string }>,
+): number {
   let net = 0;
-  for (const a of assets) net += (a.classification === 'liability' ? -1 : 1) * assetCurrentValue(a);
+  for (const a of assets) {
+    const v = a.isChannel && expenses ? channelBalance(a, expenses) : assetCurrentValue(a);
+    net += (a.classification === 'liability' ? -1 : 1) * v;
+  }
   return Math.round(net * 100) / 100;
 }
 
 /** 总净值 = Plaid 口径 + 手动(币种按用户拍板不折算,简单相加)。 */
 export function combinedNetWorth(): { plaidNet: number; manualNet: number; net: number } {
   const plaidNet = assetSummary(loadBankAccounts()).net;
-  const manualNet = manualNetWorth(listManualAssets());
+  let manualNet: number;
+  try { manualNet = manualNetWorth(listManualAssets(), loadDomainExpenses()); }
+  catch { manualNet = manualNetWorth(listManualAssets()); }
   return { plaidNet, manualNet, net: Math.round((plaidNet + manualNet) * 100) / 100 };
 }
 

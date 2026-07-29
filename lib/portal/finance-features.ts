@@ -381,7 +381,14 @@ export function portfolioCheckup(holdings: Holding[], txs: BankTx[], year = new 
     if (!t.accountId || !invest.has(t.accountId)) continue;
     if (Number((t.date || '').slice(0, 4)) !== year) continue;
     if ((t.categoryDetail || '').startsWith('INCOME_')) continue;
-    if (t.amount > 0) buys += 1; else if (t.amount < 0) sells += 1;
+    // 逻辑审计 #9a:有 subtype 就按语义判(入金/出金/费用不算交易);老数据退回符号判
+    const st = (t.invSubtype || '').toLowerCase();
+    if (st) {
+      if (/buy/.test(st)) buys += 1;
+      else if (/sell/.test(st)) sells += 1;
+      // deposit/withdrawal/fee/transfer 等:不是买卖,不计
+    } else if (t.amount > 0) buys += 1;
+    else if (t.amount < 0) sells += 1;
   }
   return {
     topName: sorted[0].ticker || sorted[0].name,
