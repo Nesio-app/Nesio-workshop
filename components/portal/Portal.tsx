@@ -463,6 +463,11 @@ export default function Portal() {
   const [freezeOpen, setFreezeOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false); // 洞察全屏浮层(底部导航第 3 个 tab / nesio-open-insights 事件打开)
   const [insightsTab, setInsightsTab] = useState<InsightsMainTab | undefined>(undefined);
+  // 深链的「第几次」。只传 tab 的话,**同一个 tab 连点第二次 state 值没变** ——
+  // InsightsSheet 那边 useEffect([initialTab]) 就不会再触发,表现是这一行死了、别的行还好
+  // (用户原话:「充电花费」和「行驶记录」能跳,只有「停车/充电位置」这一行是死的 ——
+  //  其实是那一次他已经在 timeline 上了)。带个自增号,每次派发都算一次新的深链。
+  const [insightsNonce, setInsightsNonce] = useState(0);
   const [proGate, setProGate] = useState<string | null>(null); // 非 null = 显示 Pro 升级引导(值=功能名)
   // 跨账号本地数据冲突(P0 隐私):登录后本机数据归属与当前用户不符 → 阻断处理
   const [ownerConflict, setOwnerConflict] = useState<
@@ -863,9 +868,10 @@ export default function Portal() {
       const tab = (e as CustomEvent).detail?.tab;
       track('insights_open', {});
       setInsightsTab(typeof tab === 'string' && INSIGHTS_TABS.has(tab) ? (tab as InsightsMainTab) : undefined);
+      setInsightsNonce((n) => n + 1);
       setInsightsOpen(true);
     };
-    const trainingHandler = () => { setInsightsTab('fitness'); setInsightsOpen(true); };
+    const trainingHandler = () => { setInsightsTab('fitness'); setInsightsNonce((n) => n + 1); setInsightsOpen(true); };
     const workoutHandler = (e: Event) => { track('workout_start', {}); setWorkoutKey((k) => k + 1); setWorkoutSession((e as CustomEvent).detail); };
     const proGateHandler = (e: Event) => {
       const feature = (e as CustomEvent).detail?.feature || 'pro';
@@ -1455,7 +1461,7 @@ export default function Portal() {
           className="nesio-insights-sheet-card"
           ariaLabel={L(dict, 'Nesio 的洞察', "Nesio's insights")}
         >
-          <InsightsSheet onClose={() => setInsightsOpen(false)} canUsePrivateData={canViewPrivateData} initialTab={insightsTab} />
+          <InsightsSheet onClose={() => setInsightsOpen(false)} canUsePrivateData={canViewPrivateData} initialTab={insightsTab} tabNonce={insightsNonce} />
         </NesioSheet>
       )}
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />

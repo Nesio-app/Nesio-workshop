@@ -230,8 +230,10 @@ function InviteSection({ inviteCode, t }: { inviteCode: string; t: (a: string, b
 }
 
 // ── 我的攒钱目标(孩子端动机 · 复用 .nesio-reward-progress)────────────────────────
-function GoalSection({ familyId, me, owed, onSaved, dict, t }: {
-  familyId: string; me: FamilyMemberView; owed: number; onSaved: () => void; dict: Dict; t: (a: string, b: string) => string;
+function GoalSection({ familyId, me, saved, onSaved, dict, t }: {
+  // saved = 累计挣到的(earned),不是 owed。owed 是「还没发的工钱」,发一次就掉一截、
+  // 发多了还会变负 —— 拿它当攒钱进度,进度条会倒退甚至显示「¥-20.00 / ¥100.00」。
+  familyId: string; me: FamilyMemberView; saved: number; onSaved: () => void; dict: Dict; t: (a: string, b: string) => string;
 }) {
   const goal = me.goalAmount ?? 0;
   const [open, setOpen] = useState(false);
@@ -273,8 +275,8 @@ function GoalSection({ familyId, me, owed, onSaved, dict, t }: {
     );
   }
 
-  const reached = owed >= goal;
-  const pct = Math.max(0, Math.min(100, Math.round((owed / goal) * 100)));
+  const reached = saved >= goal;
+  const pct = goal > 0 ? Math.max(0, Math.min(100, Math.round((saved / goal) * 100))) : 0;
   return (
     <div style={{ ...cardStyle, padding: 'var(--space-4)', background: reached ? 'var(--status-go-soft)' : 'var(--portal-accent-soft)', borderColor: 'transparent' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
@@ -289,7 +291,7 @@ function GoalSection({ familyId, me, owed, onSaved, dict, t }: {
       <p className="nesio-reward-progress-label" style={{ color: reached ? 'var(--status-go)' : 'var(--portal-muted)' }}>
         {reached
           ? t(`攒够了!可以买 ${me.goalLabel || '它'} 了`, `Goal reached — you can get ${me.goalLabel || 'it'}!`)
-          : t(`${money(owed, dict)} / ${money(goal, dict)} · 还差 ${money(Math.max(0, goal - owed), dict)}`, `${money(owed, dict)} / ${money(goal, dict)} · ${money(Math.max(0, goal - owed), dict)} to go`)}
+          : t(`${money(Math.max(0, saved), dict)} / ${money(goal, dict)} · 还差 ${money(Math.max(0, goal - saved), dict)}`, `${money(Math.max(0, saved), dict)} / ${money(goal, dict)} · ${money(Math.max(0, goal - saved), dict)} to go`)}
       </p>
     </div>
   );
@@ -344,7 +346,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, dict, t
       {err && <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}>{t('那一下没成,再试一次。', 'That didn’t go through — try again.')}</span>}
 
       {/* 我的攒钱目标(孩子端动机):攒够就买 XX。进度 = 现攒 / 目标。 */}
-      <GoalSection familyId={familyId} me={board.me} owed={board.everyone.find((e) => e.member.id === board.me.id)?.owed ?? 0} onSaved={load} dict={dict} t={t} />
+      <GoalSection familyId={familyId} me={board.me} saved={board.everyone.find((e) => e.member.id === board.me.id)?.earned ?? 0} onSaved={load} dict={dict} t={t} />
 
       {/* 2026-07-28 UI 精修(标注 图24):常驻在顶部的邀请码卡删掉 —— 家庭建好之后极少再用,
           却每次打开都占一整张卡。改成收进下面「大家」小节里的一个链接(见 InviteSection),

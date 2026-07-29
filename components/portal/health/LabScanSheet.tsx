@@ -329,14 +329,14 @@ export default function LabScanSheet({
 
         {/* 两个 input 是有意分开的:带 capture 的那个在手机上会**直接开相机**,
             选不到文件管理器里的 PDF。想选 PDF 必须有一个不带 capture 的。 */}
-        <input ref={pdfRef} type="file" accept="application/pdf,image/*" hidden
+        <input ref={pdfRef} type="file" accept="application/pdf,image/*" className="nesio-visually-hidden"
           onChange={(e) => {
             const f = e.currentTarget.files?.[0];
             e.currentTarget.value = '';
             if (f) void run(f);
           }} />
 
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden
+        <input ref={fileRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden"
           onChange={(e) => {
             // 先把 File 抓出来再清 value —— 反了的话 FileList 当场变空,表现是「点了没反应」。踩过。
             const f = e.currentTarget.files?.[0];

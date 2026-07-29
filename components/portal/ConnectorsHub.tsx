@@ -1475,8 +1475,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   return (
     <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '数据接入', 'Data sources')}>
       <input ref={fileRef} type="file" accept=".xml,.zip" style={{ display: 'none' }} onChange={handleHealthFile} />
-      <input ref={photosRef} type="file" accept="image/*" multiple hidden onChange={(e) => { void handleBatchPhotos(e.target.files); e.target.value = ''; }} />
-      <input ref={timelineRef} type="file" accept="application/json,.json" hidden onChange={(e) => { void handleTimelineFile(e.target.files); e.target.value = ''; }} />
+      <input ref={photosRef} type="file" accept="image/*" multiple className="nesio-visually-hidden" onChange={(e) => { void handleBatchPhotos(e.target.files); e.target.value = ''; }} />
+      <input ref={timelineRef} type="file" accept="application/json,.json" className="nesio-visually-hidden" onChange={(e) => { void handleTimelineFile(e.target.files); e.target.value = ''; }} />
       <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
       <div className={`nesio-settings-sheet-card${expanded ? ' nesio-settings-sheet-card--expanded' : ''}`} style={cardStyle}>
         <div className="nesio-sheet-handle" {...handleProps} />

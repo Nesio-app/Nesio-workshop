@@ -295,9 +295,13 @@ export function TodayFocusSection({
       {/* 批次 107:时间线 —— 心情作「现在」第一拍 + 竖轨串起下面的要紧事(设计规范今天页) */}
       <div className="nesio-focus-timeline">
         <div data-tour="mood"><MoodBeat /></div>
+        {/* 空态那块是**纯说明**,不是按钮。原来只有一行居中的「✓ 没有到点的事」套在
+            虚线圆角盒子里 —— 用户当成胶囊按钮点了半天没反应。补上早就写好却没用上的
+            那句提示(todayFocusEmptyHint),让它读起来像空态说明;左对齐,也不再像个按钮。 */}
         {isEmpty ? (
           <div className="nesio-focus-empty nesio-focus-empty--tl">
-            <p>{t(locale, 'todayFocusEmpty')}</p>
+            <p className="nesio-focus-empty-title">{t(locale, 'todayFocusEmpty')}</p>
+            <p className="nesio-focus-empty-hint">{t(locale, 'todayFocusEmptyHint')}</p>
           </div>
         ) : (
           <div className="nesio-attention-layout">

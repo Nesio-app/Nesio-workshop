@@ -18,7 +18,7 @@ export interface BoardView {
   familyId: string; me: FamilyMemberView;
   myChoresToday: ChoreInstanceView[]; toReview: ChoreInstanceView[];
   assigned: ChoreInstanceView[];
-  everyone: Array<{ member: FamilyMemberView; owed: number }>;
+  everyone: Array<{ member: FamilyMemberView; owed: number; earned: number }>;
 }
 export interface EventAssignmentView {
   assigned: boolean; assigneeId?: string; assigneeName?: string;

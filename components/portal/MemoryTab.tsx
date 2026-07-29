@@ -20,6 +20,7 @@ import {
   updateLifeNode,
   type LifeNode,
 } from '@/lib/portal/life-graph';
+import { visibleMemoryNodes, isWeatherNode } from '@/lib/portal/memory-visibility';
 import { pinNodeToTodayFocus } from '@/lib/platform/view-models/today-commands';
 import { DOMAINS } from '@/lib/life-domain';
 import { isFeatureEnabled } from '@/lib/portal/module-overrides';
@@ -462,16 +463,8 @@ function getPersonInitials(name: string) {
   return { initials: name.slice(0, 1), bg: bgs[name.charCodeAt(0) % bgs.length] };
 }
 
-/** 天气快照是环境信号,进 Memory 只会制造噪音(用户反馈「存在意义不明」)。 */
-function isWeatherNode(n: LifeNode): boolean {
-  const tags = n.tags || [];
-  return tags.includes('weather') || tags.includes('weather.forecast') || /天气信号$|^天气$/.test(n.name);
-}
-
-function visibleMemoryNodes(nodes: LifeNode[], canUse: boolean): LifeNode[] {
-  const base = nodes.filter((n) => !isWeatherNode(n));
-  return canUse ? base : base.filter((n) => !isPrivateExternalNode(n));
-}
+// isWeatherNode / visibleMemoryNodes 已收到 lib/portal/memory-visibility.ts ——
+// 设置页的「N 条记忆」也要用同一份判据,否则两处各报一个数(QA #10)。
 
 function shareTextForNode(node: LifeNode, dict: DictLocale): string {
   const tags = node.tags?.length ? `\n${L(dict, '标签：', 'Tags: ')}${node.tags.map((t) => `#${t}`).join(' ')}` : '';

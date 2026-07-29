@@ -109,6 +109,8 @@ export default function NesioProfileCard() {
   // 生成中弹窗;预览可「用卡通头像 / 用原照片 / 取消」;失败给原图兜底。
   async function handleAvatarFile(file: File | undefined) {
     if (!file) return;
+    // 真选了图才关账户页 —— 关得太早(点按钮就关)会让「取消选图」看起来像误触把页面关了。
+    setActiveSheet(null);
     setAvatarError('');
     let originalDataUrl = '';
     try {
@@ -201,7 +203,9 @@ export default function NesioProfileCard() {
             type="file"
             accept="image/*"
             className="nesio-visually-hidden"
-            onChange={(event) => handleAvatarFile(event.currentTarget.files?.[0])}
+            // 先把 File 取出来再清 value:清空 value 会把 FileList 一起清掉,
+            // 而不清的话「选同一张图第二次」不会触发 change(表现是第二次点没反应)。
+            onChange={(event) => { const f = event.currentTarget.files?.[0]; event.currentTarget.value = ''; void handleAvatarFile(f); }}
           />
 
           {/* 批次 6:数字统计改「返回今天」——设置页最常见的下一步 */}
@@ -279,7 +283,14 @@ export default function NesioProfileCard() {
       )}
 
       {/* Sub-sheets */}
-      <AccountSheet open={activeSheet === 'account'} onClose={() => setActiveSheet(null)} onOpenMembership={() => setActiveSheet('subscription')} onPickAvatar={() => { setActiveSheet(null); setTimeout(() => avatarInputRef.current?.click(), 80); }} />
+      {/* 「更换头像」必须**同步**地在这次点击里 click 那个 file input。
+          原来写的是 setActiveSheet(null) + setTimeout(…, 80) —— 两个后果都真实发生了:
+            ① 定时器里的 click() 已经不在用户手势的调用栈里,iOS 的 WKWebView 会**静默忽略**
+               file input 的程序化 click(桌面 Chrome 反而能开,所以本地测不出来);
+            ② 界面上先看到账户弹窗被关掉,然后什么都没发生 —— 用户原话「反而直接把账户弹窗关掉了」。
+          现在:点了立刻开选择器,账户页留着;真选了图再由 handleAvatarFile 关页进卡通化预览
+          (取消选图 → 账户页原样还在,不会莫名其妙消失)。 */}
+      <AccountSheet open={activeSheet === 'account'} onClose={() => setActiveSheet(null)} onOpenMembership={() => setActiveSheet('subscription')} onPickAvatar={() => { avatarInputRef.current?.click(); }} />
       <AppearanceSheet open={activeSheet === 'appearance'} onClose={() => setActiveSheet(null)} />
       <PrivacySheet open={activeSheet === 'privacy'} onClose={() => setActiveSheet(null)} onOpenConnect={() => setActiveSheet('connectors')} />
       <SubscriptionSheet open={activeSheet === 'subscription'} onClose={() => setActiveSheet(null)} />

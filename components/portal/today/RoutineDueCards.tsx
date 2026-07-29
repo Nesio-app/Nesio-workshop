@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from 'react';
-import { dueRoutines, markRoutineDone, ROUTINES_UPDATED_EVENT, type Routine } from '@/lib/portal/routines';
+import { dueRoutines, markRoutineDone, deleteRoutine, ROUTINES_UPDATED_EVENT, type Routine } from '@/lib/portal/routines';
 import { protocolById, toRunSteps, loadTrainingState } from '@/lib/platform/training-protocol-engine';
 import { pickPhaseIndex, pickTodaySessionIndex } from '@/lib/platform/fitness-home-core';
 import { activeProtocol } from '@/lib/platform/training-overrides';
@@ -92,6 +92,13 @@ export function RoutineDueCards() {
                 >
                   {L(dict, '今天跳过', 'Skip today')}
                 </button>
+                <button
+                  type="button"
+                  className="nesio-proactive-action-btn nesio-proactive-action-btn--snooze"
+                  onClick={() => { deleteRoutine(r.id); track('routine_delete', {}); }}
+                >
+                  {L(dict, '不再提醒', 'Stop this')}
+                </button>
               </div>
             </div>
           </div>
@@ -130,6 +137,17 @@ export function RoutineDueCards() {
                   onClick={() => { markRoutineDone(r.id); track('routine_skip', {}); }}
                 >
                   {L(dict, '今天跳过', 'Skip today')}
+                </button>
+                {/* 「不再提醒」 —— 这卡原来只有「完成 / 今天跳过」,两个都是**今天**的出口,
+                    要真正停掉这条提醒得跑去设置里翻。整卡本身也不可点(用户试过:点了没反应),
+                    于是一条不想要的提醒每天都会再来一次。CLAUDE.md 红线:每个提示都要有
+                    「跳过 / 稍后 / 不再提醒」三个出口,这里缺的正是最后一个。 */}
+                <button
+                  type="button"
+                  className="nesio-proactive-action-btn nesio-proactive-action-btn--snooze"
+                  onClick={() => { deleteRoutine(r.id); track('routine_delete', {}); }}
+                >
+                  {L(dict, '不再提醒', 'Stop this')}
                 </button>
               </div>
             </div>

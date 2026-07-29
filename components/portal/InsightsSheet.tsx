@@ -312,16 +312,18 @@ const hubEditBtn: React.CSSProperties = {
   fontFamily: 'var(--font-sans)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)',
 };
 
-export default function InsightsSheet({ onClose, canUsePrivateData = false, initialTab }: { onClose: () => void; canUsePrivateData?: boolean; initialTab?: MainTab }) {
+export default function InsightsSheet({ onClose, canUsePrivateData = false, initialTab, tabNonce = 0 }: { onClose: () => void; canUsePrivateData?: boolean; initialTab?: MainTab; tabNonce?: number }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [mainTab, setMainTab] = useState<MainTab>(initialTab ?? 'reflection');
   // 洞察改版:首页是入口宫格(showHub),点卡进板块;有 initialTab(深链)时直达板块。
   const [showHub, setShowHub] = useState(!initialTab);
   // 洞察已打开时的板块深链(如车页「充电花费 → 财务」):initialTab 变化要能就地切板块,
   // 不能只认挂载那一次(否则打开状态下深链没反应 = 死链接)。
+  // tabNonce 必须在依赖里:只依赖 initialTab 的话,**同一个板块深链点第二次**
+  // (已经在足迹页 → 回车页 → 再点「停车/充电位置」)值没变,effect 不跑,那一行就成了死链。
   useEffect(() => {
     if (initialTab) { setMainTab(initialTab); setShowHub(false); }
-  }, [initialTab]);
+  }, [initialTab, tabNonce]);
   const tabLabel = (t: MainTab): string =>
     t === 'reflection' ? L(dict, '洞察', 'Insights')
       : t === 'growth' ? L(dict, '成长', 'Growth')

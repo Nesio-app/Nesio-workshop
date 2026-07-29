@@ -100,7 +100,7 @@ export default function PersonExtractSheet({ open, onClose }: { open: boolean; o
                 <IconCamera size={15} />{L(dict, '拍/传', 'Photo')}
               </button>
             </div>
-            <input ref={photoRef} type="file" accept="image/*" capture="environment" hidden
+            <input ref={photoRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden"
               onChange={(e) => { void onPickPhoto(e.target.files?.[0]); e.currentTarget.value = ''; }} />
             {err && <p className="nesio-rel-detail-err" role="alert">{err}</p>}
           </div>

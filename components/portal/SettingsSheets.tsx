@@ -21,6 +21,7 @@ import { captureLocationEnabled, setCaptureLocationEnabled } from '@/lib/portal/
 import { getFontScale, applyFontScale, type FontScale } from '@/lib/portal/font-scale';
 import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
+import { visibleMemoryNodes } from '@/lib/portal/memory-visibility';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
@@ -624,7 +625,10 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     // 图谱已迁 IDB(异步水合):首次 getLifeGraph() 在水合完成前返回空 seed。只读一次会把
     // 「我的数据」定格成「0 条记忆」——用户来这核实隐私,却读到谎报的 0(洞察面板同源却因
     // 晚开、水合已完成而正确)。订阅 nesio-life-graph-updated,水合/增删后重读,口径一致。
-    const readCount = () => setNodeCount(getLifeGraph().length);
+    // 口径必须和记忆库首页一致。原来这里读的是 getLifeGraph().length(原始全量),
+    // 而记忆页报的是 visibleMemoryNodes(滤掉天气快照那类环境信号)——
+    // 同一时刻两处一个 2541 一个 2534,用户当场就发现了(QA #10)。
+    const readCount = () => setNodeCount(visibleMemoryNodes(getLifeGraph(), true).length);
     readCount();
     window.addEventListener('nesio-life-graph-updated', readCount);
     setCloudState('idle');
@@ -699,7 +703,12 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
 
       {/* 数据主权面板 — local-first 从架构卖点变成可感知的安全感 */}
       <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.08))', borderRadius: 14, padding: '0.8rem 1rem', marginBottom: '0.9rem' }}>
-        <p style={{ fontSize: '0.72rem', fontWeight: 600, margin: '0 0 0.4rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}><IconLock size={14} /> {L(dict, '你的数据在哪里', 'Where your data lives')}<InfoTip text={L(dict, '记忆存在本设备 localStorage;未登录、未授权或未选择接入的日历、邮件、健康和文件内容永远不会被加载;登录后才开启跨设备云同步。', "Memories live in this device's localStorage. Calendar, mail, health and files are never loaded unless you sign in, authorize and connect them. Cross-device cloud sync starts only after sign-in.")} /></p>
+        <p style={{ fontSize: '0.72rem', fontWeight: 600, margin: '0 0 0.4rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}><IconLock size={14} /> {L(dict, '你的数据在哪里', 'Where your data lives')}{/* ⚠️ 这段原来是**写死**的,恒说「未登录…登录后才开启跨设备云同步」——
+    而它右边那格是动态的,已登录时写着「✓ 已登录 · 云同步已开」。
+    同一屏里「已登录」和「未登录」同时出现,用户当场就发现了。文案必须跟着真实登录态走。 */}
+<InfoTip text={signedIn
+  ? L(dict, '记忆存在本设备 localStorage,并已开启跨设备云同步;没有授权、没有接入的日历、邮件、健康和文件内容,永远不会被加载。', "Memories live in this device's localStorage and are synced across your devices. Calendar, mail, health and files are never loaded unless you authorize and connect them.")
+  : L(dict, '记忆存在本设备 localStorage;未登录、未授权或未选择接入的日历、邮件、健康和文件内容永远不会被加载;登录后才开启跨设备云同步。', "Memories live in this device's localStorage. Calendar, mail, health and files are never loaded unless you sign in, authorize and connect them. Cross-device cloud sync starts only after sign-in.")} /></p>
         <div style={{ display: 'flex', gap: '1.2rem', fontSize: '0.7rem', lineHeight: 1.6 }}>
           <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>{nodeCount}</span><br />{L(dict, '条记忆,全在本机', 'memories, all on this device')}</div>
           <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>{signedIn ? '✓' : '0'}</span><br />{signedIn ? L(dict, '已登录 · 云同步已开', 'signed in · cloud sync on') : L(dict, '未登录 · 仅本机', 'signed out · on-device only')}</div>
@@ -784,7 +793,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       <button type="button" className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}>
         {L(dict, '导入备份', 'Import backup')}
       </button>
-      <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={handleImportFile} />
+      <input ref={importRef} type="file" accept="application/json,.json" className="nesio-visually-hidden" onChange={handleImportFile} />
       {restoreMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
 
       <button type="button" className="nesio-settings-danger-btn" onClick={clearAllMemory}>
@@ -1083,20 +1092,28 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
         // 服务端确认的付费 Pro 永远优先 —— 否则试用期内的付费用户会看到
         // 顶部「免费试用剩 N 天」+ 底部「你已是 Pro 会员」同页打架(QA ⑥)。
         const pro = isPaidPro || (getTier() === 'pro' && days <= 0);
+        // ⚠️ pro 必须管住**整张卡**,不只是那枚徽章。
+        // 上一轮修 QA⑥ 时只把 badge 接上了 pro,标题和描述还在看 days > 0 ——
+        // 于是「试用期内已经付费」的账号同屏出现:徽章 PRO + 标题「前 21 天全功能免费…
+        // 试用结束自动回到免费版」+ 页尾「✓ 你已是 Pro 会员」,三句话互相打架。
         return (
           <div className="nesio-sub-status-card">
             <div className="nesio-sub-status-badge nesio-sub-status-badge--free">
               {pro ? 'PRO' : days > 0 ? L(dict, `免费试用 · 剩 ${days} 天`, `Free trial · ${days}d left`) : t(locale, 'subBadgeFree')}
             </div>
             <p className="nesio-sub-status-title">
-              {days > 0
-                ? L(dict, '前 21 天全功能免费', 'First 21 days, everything unlocked')
-                : t(locale, 'subFreeTitle')}
+              {pro
+                ? L(dict, '你已是 Pro 会员', "You're on Pro")
+                : days > 0
+                  ? L(dict, '前 21 天全功能免费', 'First 21 days, everything unlocked')
+                  : t(locale, 'subFreeTitle')}
             </p>
             <p className="nesio-sub-status-desc">
-              {days > 0
-                ? L(dict, '3 周,刚好养成一个记录的好习惯。试用结束自动回到免费版,不扣费。', 'Three weeks — just long enough to build a note-taking habit. Afterwards you return to Free; nothing is charged.')
-                : t(locale, 'subFreeDesc')}
+              {pro
+                ? L(dict, '订阅生效中,全部功能已解锁。可在支付渠道随时管理或取消。', 'Subscription active — everything is unlocked. Manage or cancel anytime via your payment provider.')
+                : days > 0
+                  ? L(dict, '3 周,刚好养成一个记录的好习惯。试用结束自动回到免费版,不扣费。', 'Three weeks — just long enough to build a note-taking habit. Afterwards you return to Free; nothing is charged.')
+                  : t(locale, 'subFreeDesc')}
             </p>
           </div>
         );
@@ -1121,21 +1138,27 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
         </p>
       </div>
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.1rem' }}>{t(locale, 'subFuturePlans')}</p>
-      {PLAN_PREVIEWS.map((plan) => (
-        <div key={plan.id} className="nesio-sub-upgrade-row">
-          <div className="nesio-sub-upgrade-info">
-            <p className="nesio-sub-upgrade-name">{L(dict, plan.name, plan.nameEn)}</p>
-            <p className="nesio-sub-upgrade-desc">{L(dict, plan.desc, plan.descEn)}</p>
-          </div>
-          <div className="nesio-sub-upgrade-right">
-            <p className="nesio-sub-upgrade-price">{plan.price}<span>{L(dict, plan.cycle, plan.cycleEn)}</span></p>
-            <span style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-pill)', padding: '0.15rem 0.55rem', whiteSpace: 'nowrap' }}>
-              {t(locale, 'subPlanned')}
-            </span>
-          </div>
-        </div>
-      ))}
+      {/* 已经是付费会员就别再摆一排「规划中」的价格 —— 那看着像「还没开卖」,
+          和上面刚说的「订阅生效中」正好对撞(用户报的第三重矛盾)。 */}
+      {!isPaidPro && (
+        <>
+          <p className="nesio-settings-section-label" style={{ marginTop: '1.1rem' }}>{t(locale, 'subFuturePlans')}</p>
+          {PLAN_PREVIEWS.map((plan) => (
+            <div key={plan.id} className="nesio-sub-upgrade-row">
+              <div className="nesio-sub-upgrade-info">
+                <p className="nesio-sub-upgrade-name">{L(dict, plan.name, plan.nameEn)}</p>
+                <p className="nesio-sub-upgrade-desc">{L(dict, plan.desc, plan.descEn)}</p>
+              </div>
+              <div className="nesio-sub-upgrade-right">
+                <p className="nesio-sub-upgrade-price">{plan.price}<span>{L(dict, plan.cycle, plan.cycleEn)}</span></p>
+                {/* 这不是按钮,是状态标。原来是实线描边 pill,和站内可点的 chip 长得一模一样,
+                    用户挨个点过去发现「点不动」。虚线 + 更淡 = 一眼看出是标记不是入口。 */}
+                <span className="nesio-sub-plan-flag">{t(locale, 'subPlanned')}</span>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
 
       {isPaidPro ? (
         <div style={{ marginTop: '1.2rem', padding: '0.9rem 1rem', borderRadius: 12, textAlign: 'center', background: 'var(--portal-card, #fff)', border: '1px solid var(--status-gentle, #6cbf84)' }}>

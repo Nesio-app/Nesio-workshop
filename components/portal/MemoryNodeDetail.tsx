@@ -1085,7 +1085,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                 type="file"
                 accept="image/*"
                 multiple
-                hidden
+                className="nesio-visually-hidden"
                 onChange={(e) => { const f = e.currentTarget.files; e.currentTarget.value = ''; void addPhotos(f); }}
               />
               {photoErr && (

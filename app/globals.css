@@ -9816,13 +9816,42 @@ html[data-portal-theme="night"] .nesio-trend-chart-card { background: rgba(255,2
   padding: 0;
 }
 
+/* 会员页价格档右侧的「规划中」——状态标,不是入口。
+   虚线边框 + 无背景,和站内那些可点的实线 chip 明确区分开。 */
+.nesio-sub-plan-flag {
+  font-size: 0.66rem;
+  color: var(--portal-muted);
+  border: 1px dashed var(--portal-line);
+  border-radius: var(--radius-pill);
+  padding: 0.15rem 0.55rem;
+  white-space: nowrap;
+  background: none;
+  cursor: default;
+}
+
+/* 空态说明,不是按钮。居中 + 单行曾让它看着像可点的胶囊(用户点了半天没反应),
+   所以这里左对齐、两行、去掉那份「按钮感」。 */
 .nesio-focus-empty {
   background: var(--glass-bg-solid);
   border: 1px dashed var(--portal-line);
-  border-radius: 1rem;
-  padding: 1rem;
-  text-align: center;
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
   font-size: 0.83rem;
+  color: var(--portal-muted);
+  cursor: default;
+}
+
+.nesio-focus-empty-title {
+  margin: 0;
+  font-weight: var(--weight-medium);
+  color: var(--portal-ink);
+}
+
+.nesio-focus-empty-hint {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  line-height: 1.55;
   color: var(--portal-muted);
 }
 

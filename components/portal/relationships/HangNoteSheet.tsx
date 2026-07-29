@@ -208,7 +208,7 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
                   <IconCamera size={16} />{L(dict, '拍 / 传', 'Photo')}
                 </button>
               </div>
-              <input ref={photoRef} type="file" accept="image/*" capture="environment" hidden
+              <input ref={photoRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden"
                 onChange={(e) => { void onPickPhoto(e.target.files?.[0]); e.currentTarget.value = ''; }} />
             </div>
             {err && <p className="nesio-rel-detail-err" role="alert">{err}</p>}

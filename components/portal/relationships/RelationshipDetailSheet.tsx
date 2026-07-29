@@ -188,7 +188,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
             )}</span>
           </button>
           <input
-            ref={fileRef} type="file" accept="image/*" hidden
+            ref={fileRef} type="file" accept="image/*" className="nesio-visually-hidden"
             onChange={(e) => { void onPickAvatar(e.target.files?.[0]); e.currentTarget.value = ''; }}
           />
           <div className="nesio-rel-detail-id">

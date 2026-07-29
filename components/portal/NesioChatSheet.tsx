@@ -483,7 +483,7 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
           </div>
         </>
       )}
-      <input ref={fileRef} type="file" accept="image/*" className="nesio-hidden" onChange={handleFile} />
+      <input ref={fileRef} type="file" accept="image/*" className="nesio-visually-hidden" onChange={handleFile} />
     </div>
   );
 }

@@ -85,7 +85,10 @@ export default function CaptureBar(capture: CaptureBarProps) {
                 type="file"
                 {...(CAPTURE_ACCEPT ? { accept: CAPTURE_ACCEPT } : {})}
                 multiple
-                hidden
+                // ⚠️ 不能用 hidden(= display:none)。iOS 的 WKWebView 对**不参与布局**的
+                // file input 会忽略程序化 click() —— 桌面 Chrome 照开,所以本地测不出来,
+                // 装到手机上就是「点『+』完全没反应,也不报错」。visually-hidden 保留布局盒子。
+                className="nesio-visually-hidden"
                 // ⚠️ 先快照成数组再清 value:input.value = '' 会把 FileList 一起清空,
                 //    先清后读拿到的是空表,表现是「点了没反应、也不报错」。踩过。
                 onChange={(e) => { const picked = Array.from(e.currentTarget.files || []); e.currentTarget.value = ''; void take(picked); }}
