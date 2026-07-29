@@ -143,7 +143,7 @@ async function openaiAvatar(key: string, imageBase64: string, mimeType: string, 
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await guardAiRoute(req, 'avatarify', { limit: 10 });
+  const guard = await guardAiRoute(req, 'avatarify', { limit: 10, requirePaidCloudAi: true });
   if (guard) return guard;
 
   // 获取当前用户的付费状态
