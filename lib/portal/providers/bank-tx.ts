@@ -80,9 +80,64 @@ export function loadBankTx(): BankTx[] {
   return filterToKnownAccounts(base, loadBankAccounts());
 }
 
+/** 原始流水(不过孤儿过滤)。同步合并的兜底基准:账户快照可疑时不让过滤结果定生死。 */
+export function loadBankTxRaw(): BankTx[] {
+  const raw = txStore.load();
+  return Array.isArray(raw) ? raw.filter((t) => t && Number.isFinite(t.amount) && typeof t.date === 'string') : [];
+}
+
+/** P0 数据安全:流水/账户/持仓三个 IDB store 水合完成。**任何同步写入前必须 await**——
+ * 水合前 load() 恒为 null,曾造成「整库流水被覆盖成空且游标已推进」的不可逆销毁路径。 */
+export function bankDataReady(): Promise<void> {
+  return Promise.all([txStore.ready(), accountsStore.ready(), holdingsStore.ready()]).then(() => undefined);
+}
+
 /** 写入流水(供 ConnectorsHub.syncPlaid)。 */
 export function saveBankTx(txs: BankTx[]): void {
   txStore.save(txs);
+}
+
+/** 增量合并纯核心(可单测):按 id upsert、删 removed、日期降序留最近 cap 笔。 */
+export function mergeBankTxForSync(
+  existing: readonly BankTx[],
+  incoming: readonly BankTx[],
+  removedIds: readonly string[],
+  cap = 5000,
+): { merged: BankTx[]; fresh: number } {
+  const removed = new Set(removedIds);
+  const byId = new Map<string, BankTx>();
+  for (const t of existing) if (!removed.has(t.id)) byId.set(t.id, t);
+  let fresh = 0;
+  for (const t of incoming) { if (!byId.has(t.id)) fresh++; byId.set(t.id, t); }
+  const merged = [...byId.values()]
+    .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
+    .slice(0, cap);
+  return { merged, fresh };
+}
+
+/** 疑似清空保险丝(对齐 cloud-backup entryCount===0 先例):已有可观数据、合并结果却为空 → 拒写。 */
+export function bankTxWriteAllowed(existingCount: number, mergedCount: number): boolean {
+  return !(existingCount > 0 && mergedCount === 0);
+}
+
+/* ---------- P0:同步状态持久化(财务页可见失败态,不再只活在 ConnectorsHub) ---------- */
+
+export const BANK_SYNC_STATUS_KEY = 'nesio-bank-sync-status-v1';
+
+export interface BankSyncStatus { ok: boolean; error?: string; at: string }
+
+export function loadBankSyncStatus(): BankSyncStatus | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const v = JSON.parse(localStorage.getItem(BANK_SYNC_STATUS_KEY) || 'null') as BankSyncStatus | null;
+    return v && typeof v.ok === 'boolean' ? v : null;
+  } catch { return null; }
+}
+
+export function saveBankSyncStatus(s: Omit<BankSyncStatus, 'at'>): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(BANK_SYNC_STATUS_KEY, JSON.stringify({ ...s, at: new Date().toISOString() })); }
+  catch { reportStorageDropped(); }
 }
 
 /** 是否已有流水数据(供 personalization has-data 门,避免直读已迁走的 localStorage)。 */
@@ -187,17 +242,36 @@ export function expenseMerchants(txs: BankTx[]): Set<string> {
   return out;
 }
 
+// P0·Fidelity 定投:券商侧买卖/划拨描述符 —— 账户信息缺失时的名字兜底。定投不是消费,是钱换了个地方。
+const INVEST_XFER_RE = /FID BKG|FIDELITY|VANGUARD|SCHWAB|ROBINHOOD|WEALTHFRONT|BETTERMENT|AUTO ?INVEST|RECURRING INVEST|定投/i;
+
+/** 投资类账户 id 集合(txFlow 用:投资账户内的流转不是消费)。 */
+const INVEST_ACCT_TYPES = new Set(['investment', 'brokerage']);
+const INVEST_ACCT_SUBTYPES = new Set(['brokerage', 'ira', 'roth', '401k', '403b', 'hsa', '529', 'mutual fund', 'pension', 'retirement']);
+export function investmentAccountIds(accounts: BankAccount[] = loadBankAccounts()): Set<string> {
+  const out = new Set<string>();
+  for (const a of accounts) {
+    if (INVEST_ACCT_TYPES.has((a.type || '').toLowerCase()) || INVEST_ACCT_SUBTYPES.has((a.subtype || '').toLowerCase())) out.add(a.id);
+  }
+  return out;
+}
+
 /**
  * 交易类型:用户规则优先,否则按 Plaid 分类自动判(转账/还款/收入不计收支)。
  * 财务⑪:传入 evidence(expenseMerchants)时,负数交易只有该商户买过才算 refund,
  * 否则归 transfer —— PayPal 收款/亲友转入此前被记成「退款」倒扣净支出。不传保持旧行为。
+ * P0·定投区分:传 investAccounts(investmentAccountIds)时,投资账户内的非 INCOME 交易
+ * (定投买入/卖出/内部划拨)一律 transfer —— Fidelity 每周定投不再算「支出」;股利/利息
+ * (INCOME_DIVIDENDS 等)仍是收入。账户不明时按券商描述符兜底。
  */
-export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string>): TxFlow {
+export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string>, investAccounts?: Set<string>): TxFlow {
   const forced = ruleFor(rules, t);
   if (forced) return forced;
   const cat = (t.category || '').toUpperCase();
   if (/INCOME/.test(cat)) return 'income';
   if (/TRANSFER|LOAN_PAYMENT/.test(cat)) return 'transfer';
+  if (t.accountId && investAccounts?.has(t.accountId)) return 'transfer';
+  if (INVEST_XFER_RE.test(t.name || '')) return 'transfer';
   if (!cat) {
     // 分类缺失(Plaid 老账户/未增强常见):正数=花出去仍是可靠支出;负数=进账时无法区分
     // 退款/收入/转账,一律当 transfer 不计收支 —— 避免把工资/转账当退款倒扣净支出。
@@ -261,19 +335,35 @@ export function excludedTxCount(txs: BankTx[], ym: string): number {
   return txs.filter((t) => txYm(t) === ym && ccyOf(t) !== ccy).length;
 }
 
-export function summarizeMonth(txs: BankTx[], ym: string): MonthSummary {
-  const monthTxs = txs.filter((t) => txYm(t) === ym);
+/** 交易的「日」(1-31);解析不出返回 0(不会被 throughDay 过滤掉)。 */
+function dayOf(t: BankTx): number {
+  const d = Number((t.date || '').slice(8, 10));
+  return Number.isFinite(d) ? d : 0;
+}
+
+export interface SummarizeOpts {
+  /** P0·同进度对比:只统计 ≤ 该日的交易 —— 拿「残月」比「完整月」的环比全是假信号,
+   *  当月环比应比上月同进度(maybe Period.comparison_label 思想)。 */
+  throughDay?: number;
+}
+
+export function summarizeMonth(txs: BankTx[], ym: string, opts?: SummarizeOpts): MonthSummary {
+  const limitDay = opts?.throughDay;
+  const monthTxs = txs.filter((t) => txYm(t) === ym && (limitDay == null || dayOf(t) <= limitDay));
   // 只汇总主币种的交易 —— 跨币种裸加($100 + ¥700 = 800)会给出任何币种下都不存在的数字。
   const ccy = dominantCurrency(monthTxs.length ? monthTxs : txs);
   const flowRules = loadFlowRules();
   const evidence = expenseMerchants(txs); // 财务⑪:退款要有"买过"的证据,否则按转账不计收支
+  const invest = investmentAccountIds();  // P0:定投/券商内部流转不计收支
   let gross = 0, refunds = 0, income = 0, count = 0;
   for (const t of monthTxs) {
     if (ccyOf(t) !== ccy) continue;
-    const f = txFlow(t, flowRules, evidence);
-    if (f === 'expense') { gross += Math.abs(t.amount); count += 1; }
-    else if (f === 'refund' || f === 'rebate') { refunds += Math.abs(t.amount); count += 1; } // 返还与退款同口径冲抵支出
-    else if (f === 'income') income += Math.abs(t.amount);
+    const f = txFlow(t, flowRules, evidence, invest);
+    // P0·符号化口径(Plaid:正=流出,负=进账)。此前一刀切 Math.abs:正数 INCOME(收入冲正)
+    // 被加进收入、手动标 refund 的流出被倒扣两次。现按符号计:异向交易自然冲抵。
+    if (f === 'expense') { gross += t.amount; count += 1; }
+    else if (f === 'refund' || f === 'rebate') { refunds += -t.amount; count += 1; } // 进账(负)→ 正冲抵
+    else if (f === 'income') income += -t.amount;
     // transfer / 还款:不计收支
   }
   return {
@@ -299,9 +389,9 @@ export interface CategorySlice {
 // +946%),读者得到的是惊吓不是信息;这类只标「新增」或干脆不标。
 const DELTA_MIN_BASE = 50;
 
-export function categoryBreakdown(txs: BankTx[], ym: string): CategorySlice[] {
-  const cur = sumByCategory(txs, ym);
-  const prev = sumByCategory(txs, prevYm(ym));
+export function categoryBreakdown(txs: BankTx[], ym: string, opts?: SummarizeOpts): CategorySlice[] {
+  const cur = sumByCategory(txs, ym, opts);
+  const prev = sumByCategory(txs, prevYm(ym), opts);
   const grand = [...cur.values()].reduce((a, b) => a + b, 0) || 1;
   return [...cur.entries()]
     .map(([category, total]) => {
@@ -312,13 +402,15 @@ export function categoryBreakdown(txs: BankTx[], ym: string): CategorySlice[] {
     .sort((a, b) => b.total - a.total);
 }
 
-function sumByCategory(txs: BankTx[], ym: string): Map<string, number> {
+function sumByCategory(txs: BankTx[], ym: string, opts?: SummarizeOpts): Map<string, number> {
   const m = new Map<string, number>();
   const rules = loadMerchantRules();
   const flowRules = loadFlowRules();
+  const invest = investmentAccountIds();
+  const limitDay = opts?.throughDay;
   const ccy = monthCurrency(txs, ym); // 当月主币种,与 summarizeMonth/KPI 同口径
   for (const t of txs) {
-    if (txYm(t) !== ym || ccyOf(t) !== ccy || txFlow(t, flowRules) !== 'expense') continue;
+    if (txYm(t) !== ym || ccyOf(t) !== ccy || (limitDay != null && dayOf(t) > limitDay) || txFlow(t, flowRules, undefined, invest) !== 'expense') continue;
     const cat = effectiveCategory(t, rules) || '未分类';
     m.set(cat, (m.get(cat) || 0) + Math.abs(t.amount));
   }
@@ -335,11 +427,12 @@ export interface MerchantAgg {
 export function topMerchants(txs: BankTx[], ym: string, n = 5): MerchantAgg[] {
   const m = new Map<string, { total: number; count: number }>();
   const flowRules = loadFlowRules();
+  const invest = investmentAccountIds();
   const ccy = monthCurrency(txs, ym); // 当月主币种,与 KPI 同口径
   // 财务⑲:按商户实体归并(entity id 优先)——"NETFLIX.COM 866-…"/"Netflix Inc" 合成一行
   const meta = new Map<string, { name: string; logo?: string }>();
   for (const t of txs) {
-    if (txYm(t) !== ym || ccyOf(t) !== ccy || txFlow(t, flowRules) !== 'expense') continue;
+    if (txYm(t) !== ym || ccyOf(t) !== ccy || txFlow(t, flowRules, undefined, invest) !== 'expense') continue;
     const key = merchantKey(t) || '未知商户';
     const cur = m.get(key) || { total: 0, count: 0 };
     cur.total += Math.abs(t.amount);
@@ -519,18 +612,19 @@ export function holdingsGainLoss(holdings: Holding[]): { value: number; cost: nu
   return { value: round2(value), cost: round2(cost), gain: round2(gain), gainPct: cost > 0 ? round2((gain / cost) * 100) : 0 };
 }
 
-/** 某账户某月的消费/退款/笔数。 */
+/** 某账户某月的消费/退款/笔数。P0:与 summarizeMonth 同一符号化口径 + 定投分流。 */
 export function accountMonth(txs: BankTx[], accountId: string, ym: string): { spend: number; refund: number; count: number } {
   let spend = 0, refund = 0, count = 0;
   const flowRules = loadFlowRules();
   const evidence = expenseMerchants(txs);
+  const invest = investmentAccountIds();
   const acctTxs = txs.filter((t) => t.accountId === accountId);
   const ccy = dominantCurrency(acctTxs.length ? acctTxs : txs); // 单账户按其主币种,避免跨币种裸加
   for (const t of txs) {
     if (t.accountId !== accountId || txYm(t) !== ym || ccyOf(t) !== ccy) continue;
-    const f = txFlow(t, flowRules, evidence);
-    if (f === 'expense') { spend += Math.abs(t.amount); count += 1; }
-    else if (f === 'refund' || f === 'rebate') { refund += Math.abs(t.amount); count += 1; }
+    const f = txFlow(t, flowRules, evidence, invest);
+    if (f === 'expense') { spend += t.amount; count += 1; }
+    else if (f === 'refund' || f === 'rebate') { refund += -t.amount; count += 1; }
   }
   return { spend: round2(spend), refund: round2(refund), count };
 }

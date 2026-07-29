@@ -3,7 +3,8 @@
  * @see docs/design/finance-aggregator-spec.md
  */
 
-import { loadBankTx, summarizeMonth, type MonthSummary } from '@/lib/portal/bank-tx';
+import { summarizeMonth, type MonthSummary, type BankTx } from '@/lib/portal/bank-tx';
+import { loadCombinedFinanceTx } from '@/lib/portal/tesla-finance';
 import { listExpenses } from '@/lib/portal/finance-sources';
 
 export interface FinanceMonthAggregate extends MonthSummary {
@@ -22,10 +23,20 @@ function normCur(c: string): string {
  * 银行月汇总 + 同币种域内开销。
  * 异币种不进 KPI（避免 ¥ 混进 USD），由 FinanceTab 旁条另显。
  */
-export function financeMonthAggregate(ym: string): FinanceMonthAggregate {
-  const txs = loadBankTx();
-  const bank = summarizeMonth(txs, ym);
-  const domain = listExpenses(ym, { includeBank: false, includeDomain: true, financeOnly: true });
+export function financeMonthAggregate(
+  ym: string,
+  opts?: {
+    /** 复用调用方已加载的统一数据集(P0:FinanceTab 与本函数必须同源,含 Tesla)。 */
+    txs?: BankTx[];
+    /** 同进度对比:只统计 ≤ 该日(残月环比 → 上月同进度)。 */
+    throughDay?: number;
+  },
+): FinanceMonthAggregate {
+  const txs = opts?.txs ?? loadCombinedFinanceTx();
+  const bank = summarizeMonth(txs, ym, opts?.throughDay != null ? { throughDay: opts.throughDay } : undefined);
+  const limitDay = opts?.throughDay;
+  const domain = listExpenses(ym, { includeBank: false, includeDomain: true, financeOnly: true })
+    .filter((e) => limitDay == null || Number((e.occurredAt || '').slice(8, 10) || 0) <= limitDay);
   const bankCur = normCur(bank.currency || 'USD');
   let domainNet = 0;
   let domainCount = 0;

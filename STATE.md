@@ -155,6 +155,17 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **财务板块大修(施工中;P0 止血已落 2026-07-28)**:P0 全清 —— ① 数据销毁路径钉死
+  (bankDataReady 水合前置 + 先读后替换 + 疑似清空保险丝 bankTxWriteAllowed,合并抽纯函数
+  mergeBankTxForSync);② summarizeMonth/accountMonth 符号化(正数 INCOME 冲减收入、
+  refund 流出不再倒扣两次);③ 统一数据集 loadCombinedFinanceTx(FinanceTab/aggregate/
+  domain-insights 同源,修同屏两套数);④ 残月环比改「与上月同进度相比」(throughDay);
+  ⑤ 冷启动区分加载中/未连接 + 同步失败态落盘透传(loadBankSyncStatus);
+  ⑥ Fidelity 定投分流(investmentAccountIds + 券商描述符兜底 → transfer,股利仍收入)。
+  契约 test:finance-p0;现有 10 套财务契约全存活;tsc+build 绿。
+  **用户拍板**:币种不考虑;UI 按 v3.3 稿(artifact fb540e24,8 屏);接 Plaid recurring API(P2)。
+  下一期 P1:手动资产+锚点+净值/投资日快照(须进备份+云同步枚举)、「+」记一笔(finance-sources
+  扩 income)、小票↔银行对账(receipt-match+负样本)。
 - **财务板块大修(2026-07-28 审计完成,施工待批)**:四路深查(maybe 数据/分析/UI × 宝盒体检)
   收敛为 `docs/design/finance-maybe-audit-2026-07.md`。**P0 止血项含一条不可逆数据销毁路径**
   (connector-sync 先 replace 账户再按新表过滤流水写回 + 全仓无 `await store.ready()`,

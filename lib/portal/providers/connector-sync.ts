@@ -32,29 +32,31 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
       relinkIndexes?: number[];
       investments?: { accounts?: number; holdings?: number; transactions?: number; error?: string };
     };
+    const bank = await import('@/lib/portal/bank-tx');
+    // P0 数据安全①:IDB 水合完成才动存储 —— 水合前 load()=[] 会把整库流水写空且游标已推进。
+    await bank.bankDataReady();
+    // P0 数据安全②:先读后替换 —— existing 用**旧账户表**口径读;若孤儿过滤把全库滤空
+    // (账户快照可疑),以原始库为合并基准,不让一次坏快照定生死。
+    const rawExisting = bank.loadBankTxRaw();
+    const filteredExisting = bank.loadBankTx();
+    const existing = filteredExisting.length === 0 && rawExisting.length > 0 ? rawExisting : filteredExisting;
     if (data.accounts?.length) {
-      const { saveBankAccounts } = await import('@/lib/portal/bank-tx');
       // 财务⑧:账户全量拉齐(authoritative)时整体替换,让重复授权的旧账户退场
-      saveBankAccounts(data.accounts as Array<{ id: string; name: string; currency: string }>, { replace: data.authoritative === true });
+      bank.saveBankAccounts(data.accounts as Array<{ id: string; name: string; currency: string }>, { replace: data.authoritative === true });
     }
     if (Array.isArray(data.holdings) && data.holdings.length) {
-      const { saveHoldings } = await import('@/lib/portal/bank-tx');
-      saveHoldings(data.holdings as never); // 财务㉗:持仓快照,非空才替换
+      bank.saveHoldings(data.holdings as never); // 财务㉗:持仓快照,非空才替换
     }
-    if (!data.ok) return fail(data.error || 'unknown');
-    // 增量合并:按 id upsert、删 removed、日期降序留最近 5000 笔
-    const { loadBankTx, saveBankTx } = await import('@/lib/portal/bank-tx');
-    type Tx = { id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string };
-    const existing: Tx[] = loadBankTx();
-    const removed = new Set(data.removedIds || []);
-    const byId = new Map<string, Tx>();
-    for (const t of existing) if (!removed.has(t.id)) byId.set(t.id, t);
-    let fresh = 0;
-    for (const t of (data.transactions || [])) { if (!byId.has(t.id)) fresh++; byId.set(t.id, t); }
-    const merged = [...byId.values()]
-      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
-      .slice(0, 5000);
-    saveBankTx(merged);
+    if (!data.ok) { bank.saveBankSyncStatus({ ok: false, error: data.error || 'unknown' }); return fail(data.error || 'unknown'); }
+    // 增量合并(纯核心,可单测):按 id upsert、删 removed、日期降序留最近 5000 笔
+    const { merged, fresh } = bank.mergeBankTxForSync(existing, data.transactions || [], data.removedIds || []);
+    // P0 数据安全③:疑似清空保险丝 —— 已有可观数据、合并结果却为空 → 拒写并显式报错。
+    if (!bank.bankTxWriteAllowed(rawExisting.length, merged.length)) {
+      bank.saveBankSyncStatus({ ok: false, error: 'local_write_guard' });
+      return fail('local_write_guard');
+    }
+    bank.saveBankTx(merged);
+    bank.saveBankSyncStatus({ ok: true });
     try { localStorage.setItem('nesio-bank-synced-at', new Date().toISOString()); } catch { /* quota */ }
     if (full) { try { localStorage.setItem('nesio-plaid-enrich-v1', '1'); } catch { /* quota */ } }
     const withLogo = merged.filter((t) => (t as { merchantLogo?: string }).merchantLogo).length;

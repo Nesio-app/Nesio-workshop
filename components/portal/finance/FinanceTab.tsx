@@ -15,6 +15,7 @@ import {
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
   loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummary, expenseMerchants,
   loadHoldings, setMerchantRuleFor, setFlowRuleFor, loadRuleLabels,
+  bankDataReady, loadBankSyncStatus, investmentAccountIds,
   type BankTx, type BankAccount, type TxFlow, type Holding,
 } from '@/lib/portal/bank-tx';
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
@@ -23,7 +24,7 @@ import { financeFindings } from '@/lib/portal/finance-insight';
 import { computeFinanceScores } from '@/lib/portal/finance-risk';
 import { incomeBreakdown, detectIncome, portfolioSummary, recurringPriceHikes } from '@/lib/portal/finance-features';
 import { removeBankAccount } from '@/lib/portal/bank-tx';
-import { loadTeslaChargeTx, teslaFinAccount } from '@/lib/portal/tesla-finance';
+import { loadCombinedFinanceTx, loadCombinedFinanceAccounts } from '@/lib/portal/tesla-finance';
 import { domainExpenseTotal, listExpenses, EXPENSES_EVENT, type Expense } from '@/lib/portal/finance-sources';
 import { financeMonthAggregate } from '@/lib/portal/finance-aggregate';
 import { loadBudget, saveBudget, hasBudget, suggestBudget, budgetProgress, type BudgetConfig } from '@/lib/portal/finance-budget';
@@ -103,22 +104,22 @@ export default function FinanceTab() {
   const [acctFilter, setAcctFilter] = useState<string>('all'); // 批次 40:按卡筛选
   const [rev, setRev] = useState(0); // 规则改动后强制重算
   const [flowEditId, setFlowEditId] = useState<string | null>(null);
+  const [hydrated, setHydrated] = useState(false); // P0:IDB 水合完成才允许判「空」
 
   useEffect(() => {
     const reload = () => {
-      // Tesla 充电花费:兑现「充电花费自动进财务」。在显示层并进流水(不写 bank-tx
-      // 存储 —— 避开 Plaid 权威 replace 冲掉 + 孤儿过滤误杀),数据以 signal 为单一真源。
-      const bank = loadBankTx();
-      const tesla = loadTeslaChargeTx();
-      const loaded = tesla.length ? [...bank, ...tesla] : bank;
+      // P0:统一数据集单一读口(银行 ∪ Tesla)—— financeMonthAggregate / domain-insights 同源,
+      // 修「总览两个 KPI 跑在两个数据集上」。
+      const loaded = loadCombinedFinanceTx();
       setTxs(loaded);
-      const accts = loadBankAccounts();
-      setAccounts(tesla.length ? [...accts, teslaFinAccount()] : accts);
+      setAccounts(loadCombinedFinanceAccounts());
       setHoldings(loadHoldings());
       const av = availableMonths(loaded);
       if (av.length) setYm((cur) => (av.includes(cur) ? cur : av[0])); // 不覆盖用户已选月份
     };
     reload();
+    // P0:冷启动区分「加载中/真没数据」—— IDB 水合完成前不给假空态。
+    bankDataReady().then(() => { setHydrated(true); reload(); }).catch(() => setHydrated(true));
     // 数据搬 IDB 后:水合完成/同步后派发 nesio-bank-updated → 重读(冷启动空窗自愈)。
     window.addEventListener('nesio-bank-updated', reload);
     // Tesla 同步后派发 nesio-connectors-refreshed → 新充电花费即时进财务。
@@ -132,8 +133,16 @@ export default function FinanceTab() {
   }, []);
 
   const months = useMemo(() => availableMonths(txs), [txs]);
-  const summary = useMemo(() => financeMonthAggregate(ym), [txs, ym, rev]);
-  const prevSummary = useMemo(() => financeMonthAggregate(prevYm(ym)), [txs, ym, rev]);
+  // P0·同进度对比:当前月是残月,环比基准取上月「同进度」(截至今天同一日),否则假省钱/假超支。
+  const isCurMonth = ym === ymOf();
+  const todayDay = new Date().getDate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const summary = useMemo(() => financeMonthAggregate(ym, { txs }), [txs, ym, rev]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const prevSummary = useMemo(
+    () => financeMonthAggregate(prevYm(ym), { txs, ...(isCurMonth ? { throughDay: todayDay } : {}) }),
+    [txs, ym, rev, isCurMonth, todayDay],
+  );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const cats = useMemo(() => categoryBreakdown(txs, ym), [txs, ym, rev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -186,8 +195,24 @@ export default function FinanceTab() {
   }, [txs, accounts]);
 
   if (txs.length === 0) {
+    // P0:水合未完成 = 加载中,不是没数据 —— 此前已连接用户每次冷启动都先看到「去连接」闪屏。
+    if (!hydrated) {
+      return (
+        <div className="nesio-analytics-tab">
+          <p className="nesio-insights-empty">{L(dict, '正在读取本机流水…', 'Loading local transactions…')}</p>
+        </div>
+      );
+    }
+    const st = loadBankSyncStatus();
     return (
       <div className="nesio-analytics-tab">
+        {st && !st.ok && (
+          <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>
+            {st.error === 'relink_required'
+              ? L(dict, '银行授权已过期 —— 到「设置 → 数据接入」点「修复」重新授权。', 'Bank authorization expired — go to Settings → Data sources and tap Repair.')
+              : L(dict, `上次同步没成功(${st.error || 'unknown'}),稍后再试或到「设置 → 数据接入」看看。`, `Last sync failed (${st.error || 'unknown'}) — retry later or check Settings → Data sources.`)}
+          </p>
+        )}
         <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Go to Settings → Data sources → Bank feed · Plaid, connect and Sync.')}</p>
         {domainSpend.count > 0 && (
           <div style={{ marginTop: '0.75rem' }}>
@@ -215,16 +240,20 @@ export default function FinanceTab() {
 
   // 设计:总览顶部补 —— 本月支出(毛)+ 环比、念念一句话小结、消费×人(真数据)
   const grossSpend = cats.reduce((s, c) => s + c.total, 0) + (summary.domainNet || 0);
-  const prevGross = categoryBreakdown(txs, prevYm(ym)).reduce((s, c) => s + c.total, 0) + (prevSummary.domainNet || 0);
+  // P0:当前月环比基准 = 上月同进度(prevSummary 已按 throughDay 截断,分类同口径)
+  const prevGross = categoryBreakdown(txs, prevYm(ym), isCurMonth ? { throughDay: todayDay } : undefined).reduce((s, c) => s + c.total, 0) + (prevSummary.domainNet || 0);
   const spendDelta = prevGross >= 50 ? Math.round(((grossSpend - prevGross) / prevGross) * 100) : null;
+  const vsLabel = isCurMonth ? L(dict, '与上月同进度相比', 'vs same point last month') : L(dict, '环比上月', 'vs last month');
   // 念念一句话:省/多花 + 本周待付账单(都来自真数据,不编)
   const nessaSummary = (() => {
     const parts: string[] = [];
     if (spendDelta !== null && spendDelta !== 0) {
       const topCat = cats[0] ? categoryLabel(cats[0].category, dict) : '';
+      const vsZh = isCurMonth ? '比上月同期' : '比上月';
+      const vsEn = isCurMonth ? 'vs same point last month' : 'vs last month';
       parts.push(spendDelta < 0
-        ? L(dict, `这月比上月省了 ${-spendDelta}%${topCat ? `,${topCat} 花得最多` : ''}。`, `Down ${-spendDelta}% vs last month${topCat ? `; ${topCat} led spending` : ''}.`)
-        : L(dict, `这月比上月多花了 ${spendDelta}%${topCat ? `,主要在${topCat}` : ''}。`, `Up ${spendDelta}% vs last month${topCat ? `, mostly ${topCat}` : ''}.`));
+        ? L(dict, `这月${vsZh}省了 ${-spendDelta}%${topCat ? `,${topCat} 花得最多` : ''}。`, `Down ${-spendDelta}% ${vsEn}${topCat ? `; ${topCat} led spending` : ''}.`)
+        : L(dict, `这月${vsZh}多花了 ${spendDelta}%${topCat ? `,主要在${topCat}` : ''}。`, `Up ${spendDelta}% ${vsEn}${topCat ? `, mostly ${topCat}` : ''}.`));
     }
     if (upcoming.items.length > 0) parts.push(L(dict, `还有 ${upcoming.items.length} 笔账单这周要付。`, `${upcoming.items.length} bill(s) due this week.`));
     return parts.join('');
@@ -307,7 +336,7 @@ export default function FinanceTab() {
             const dateStr = syncedAt ? new Date(syncedAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' }) : '';
             return (
               <p className="nesio-fin-datanote" style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', margin: '0 0 0.5rem' }}>
-                {syncedAt && L(dict, `数据截至 ${dateStr}`, `As of ${dateStr}`)}
+                {syncedAt && L(dict, `数据截至 ${dateStr}`, `As of ${dateStr}`)}{netDelta !== null || spendDelta !== null ? ` · ${vsLabel}` : ''}
                 {excluded > 0 && `${syncedAt ? ' · ' : ''}${L(dict, `另有 ${excluded} 笔其他币种未计入`, `${excluded} txn(s) in other currencies excluded`)}`}
               </p>
             );
@@ -927,7 +956,7 @@ export default function FinanceTab() {
                 <div className="nesio-fin-acctgroup">{liabAccts.map((a) => acctRow(a, true))}</div>
               </>)}
 
-              <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, '重复 / 失效副本可移除;仍连接的账户同步时会回来。', 'Duplicate / stale copies can be removed; still-linked accounts return on sync.')}</p>
+              <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, '重复 / 失效副本可移除;移除后其本机交易也会在下次同步时清掉(仍连接的账户会连数据一起回来)。', 'Duplicate / stale copies can be removed; their local transactions are also cleared on next sync (still-linked accounts return with data).')}</p>
             </>
           );
         })()
