@@ -282,13 +282,52 @@ html[data-portal-theme="night"] .portal-root {
   --status-risk-soft:   rgba(224, 133, 133, 0.18);
 }
 
+/* 玻璃面。2026-07-29 增强 —— 用户问能不能引 liquid-glass-react:不能。
+   那个库的核心是 backdrop-filter 叠一层 SVG feDisplacementMap 做折射位移,
+   而 **WebKit 不支持这个组合**(README 自己写着「Safari and Firefox only partially
+   support the effect (displacement will not be visible)」)。IPA 是 Capacitor 打包,
+   里面跑的正是 WKWebView = Safari 引擎(Apple 强制 iOS 上所有浏览器都用 WebKit,
+   iOS Chrome 也不例外),所以那句说的正是我们的 App。它还强制依赖鼠标追踪做弹性形变,
+   手机上直接落空。
+   WKWebView 上真能出效果的是这几件,下面补齐:提饱和 + 顶部镜面反光 + 低电量降级。
+   (真正的系统级 Liquid Glass —— iOS 26 的 .glassEffect() —— 只能在原生层用,
+    也就是 Capacitor 壳里 WebView 之外的部分。那是另一件事。) */
 .nesio-glass {
+  position: relative;
   background: var(--glass-bg-solid);
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card), var(--glass-highlight);
-  backdrop-filter: blur(var(--glass-blur));
-  -webkit-backdrop-filter: blur(var(--glass-blur));
+  /* saturate 是玻璃感的关键一半:只模糊不提饱和,底下的颜色会发灰发脏。
+     -webkit- 前缀必须留着,Safari 至今要它 —— 少了这行 iOS 上一点模糊都没有。 */
+  backdrop-filter: blur(var(--glass-blur)) saturate(1.6);
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(1.6);
+}
+
+/* 顶部镜面反光 —— 玻璃的「一道光」。伪元素:不占布局,也不吃指针事件。 */
+.nesio-glass::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 42%;
+  border-radius: inherit;
+  background: linear-gradient(to bottom, color-mix(in srgb, #fff 26%, transparent), transparent);
+  pointer-events: none;
+}
+html[data-portal-theme="night"] .nesio-glass::before {
+  /* 深色底上那道白光要压到几乎看不见,否则是一条刺眼的亮边 */
+  background: linear-gradient(to bottom, color-mix(in srgb, #fff 7%, transparent), transparent);
+}
+
+/* backdrop-filter 每帧都要重采样背景。系统说要省电 / 减少透明度时退成实底 ——
+   这条对 iOS 尤其重要:低电量模式下满屏模糊会明显掉帧。 */
+@media (prefers-reduced-transparency: reduce), (prefers-reduced-motion: reduce) {
+  .nesio-glass {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    background: var(--glass-bg-pop);
+  }
+  .nesio-glass::before { display: none; }
 }
 
 .nesio-glass-pop {

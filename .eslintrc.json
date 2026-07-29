@@ -9,8 +9,30 @@
           {
             "selector": "Literal[value=/#[0-9a-fA-F]{6}\\b/]",
             "message": "设计系统 adherence:裸 hex 色值 — 请用 design token(var(--...)),规则源自设计系统 _adherence.oxlintrc.json。"
+          },
+          {
+            "selector": "Property[key.name='fontSize'] > Literal[value=/^[0-9.]+(rem|px|em)$/]",
+            "message": "设计系统 adherence:写死的字号 — 用 var(--text-xs/sm/body/h3/h2/h1/display)。两个挨着的按钮一个 0.78rem 一个 0.8rem,肉眼就看得出歪(相机那对踩过)。"
+          },
+          {
+            "selector": "Property[key.name='borderRadius'] > Literal[value=/^([0-9.]+(rem|px|em)?|[0-9]+)$/]",
+            "message": "设计系统 adherence:写死的圆角 — 用 var(--radius-sm/md/xl/pill)。chips/buttons=sm,卡片=md,sheet=xl,胶囊=pill。"
+          },
+          {
+            "selector": "Property[key.name=/^(padding|margin|gap)$/] > Literal[value=/[0-9.]+rem/]",
+            "message": "设计系统 adherence:写死的间距 — 用 var(--space-1..16)(4px 网格)。"
+          },
+          {
+            "selector": "Property[key.name='fontWeight'] > Literal[value=/^[0-9]+$/]",
+            "message": "设计系统 adherence:写死的字重 — 用 var(--weight-regular/medium/semibold/bold)。"
           }
         ]
+      }
+    },
+    {
+      "files": ["components/portal/ui/**/*.tsx"],
+      "rules": {
+        "no-restricted-syntax": "off"
       }
     }
   ]

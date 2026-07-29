@@ -117,4 +117,37 @@ const CSS = read('app/globals.css');
   );
 }
 
+// ── ⑥ .nesio-glass:液态玻璃在 WKWebView 上真能生效的那部分 ──────────────────
+// 用户问过能不能引 liquid-glass-react。不能:它的核心(SVG feDisplacementMap 折射)
+// WebKit 不支持,而 IPA 里跑的正是 WKWebView。这个类给的是**真能出效果**的三件事。
+{
+  const at = CSS.indexOf('.nesio-glass {');
+  assert.ok(at > 0, '.nesio-glass 不见了');
+  const blk = CSS.slice(at, CSS.indexOf('}', at));
+  // Safari 至今要 -webkit- 前缀,少了这行在 iOS 上就是**完全没有模糊**
+  assert.ok(
+    /-webkit-backdrop-filter:\s*blur/.test(blk),
+    '.nesio-glass 少了 -webkit-backdrop-filter —— iOS(也就是你的 IPA)上一点模糊都不会有',
+  );
+  assert.ok(/backdrop-filter:\s*blur/.test(blk), '.nesio-glass 少了标准 backdrop-filter');
+  // 提饱和是玻璃感的另一半:只模糊不提饱和,底下的颜色会发灰
+  assert.ok(/saturate\(/.test(blk), '.nesio-glass 只剩模糊没有提饱和 —— 玻璃底下的颜色会发灰发脏');
+  // 内描边高光 = 玻璃的厚度感。它走 --glass-highlight token(昼夜两套值),不是写死的
+  assert.ok(/var\(--glass-highlight\)/.test(blk), '.nesio-glass 少了内描边高光 —— 会退化成普通毛玻璃');
+  assert.ok(
+    /--glass-highlight:\s*inset/.test(CSS),
+    '--glass-highlight 不再是 inset 高光了',
+  );
+  // 行首锚定:夜间那条 `html[...] .nesio-glass::before` 含同样的子串,
+  // 只用 includes 会被它喂饱(变异测试抓到的)。
+  assert.ok(/\n\.nesio-glass::before \{/.test(CSS), '.nesio-glass 少了顶部镜面反光');
+  // 低电量/减少透明度时必须退成实底 —— 满屏 backdrop-filter 在 iOS 上会明显掉帧
+  assert.ok(
+    /prefers-reduced-transparency[\s\S]{0,400}backdrop-filter: none/.test(CSS),
+    '.nesio-glass 没有降级路径 —— 低电量模式下满屏模糊会掉帧',
+  );
+  // 颜色跟皮肤走
+  assert.ok(/background:\s*var\(--glass-bg-/.test(blk), '.nesio-glass 的底色没走 token');
+}
+
 console.log('button-primitive: OK(契约对得上 · 变体齐 · 走 token · 有禁用/按下态 · 相机已迁)');
