@@ -85,7 +85,8 @@ export type CloudBackupError =
   | 'cloud_not_configured'   // 云未开(路由 503)
   | 'too_large'              // 超 8MB(路由 413,或本地预检)
   | 'upload_failed'          // 路由 5xx
-  | 'network';               // fetch 抛错
+  | 'build_failed'           // 本机构建备份失败(IDB 读失败 / 数据过大)—— 不是网络问题
+  | 'network';               // fetch 抛错 / 超时
 
 export interface CloudBackupResult {
   ok: boolean;
@@ -165,6 +166,8 @@ function gunzipToString(bytes: Uint8Array): string | null {
 
 /** 网络抖动重试次数(手机弱网/通话中传输易中断,自动重试省得用户反复手点)。 */
 const NETWORK_RETRIES = 2;
+/** 单次上传超时:超过就当失败并重试,绝不无限期挂着(手机弱网实测卡在「正在备份…」)。 */
+const UPLOAD_TIMEOUT_MS = 60_000;
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => { setTimeout(resolve, ms); });
 }
@@ -186,7 +189,10 @@ export async function pushBackupToCloud(opts: { skipIfFewerThan?: number } = {})
     entryCount = Object.keys(backup.entries).length;
     bytes = new Blob([payload]).size;
   } catch {
-    return { ok: false, error: 'network' };
+    // 此前一律报 'network' —— 把「本机构建备份失败」谎报成「网络不好」,
+    // 用户会去反复检查 WiFi,而真正的原因在本机(IDB 读失败 / 数据过大 stringify 抛错)。
+    // 报错必须指向真实原因,否则用户永远修不好。
+    return { ok: false, error: 'build_failed' };
   }
 
   // 交接清单红线「空浏览器绝不用空数据盖云端」的保险丝:0 条目备份绝不上云 —— 一份空的
@@ -222,7 +228,16 @@ export async function pushBackupToCloud(opts: { skipIfFewerThan?: number } = {})
       const form = new FormData();
       form.append('file', file);
       form.append('purpose', 'backup');
-      const res = await fetch('/api/cloud/assets', { method: 'POST', body: form, cache: 'no-store' });
+      // 超时闸(60s):此前无超时 —— 手机弱网下 fetch 可以一直挂着不返回,
+      // 按钮就永远停在「正在备份…」。挂着不是失败态,红线要求每个异步动作都有可见结局。
+      // 用 AbortSignal.timeout 而非手搓计时器:不必自己管 clearTimeout,
+      // 且环境不支持时(老 Safari / 测试沙箱)自然降级为无超时,不改变其余行为。
+      const signal = typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
+        ? AbortSignal.timeout(UPLOAD_TIMEOUT_MS)
+        : undefined;
+      const res = await fetch('/api/cloud/assets', {
+        method: 'POST', body: form, cache: 'no-store', ...(signal ? { signal } : {}),
+      });
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; storagePath?: string; error?: string };
       if (!res.ok || !data.ok || !data.storagePath) {
         lastError = mapHttpError(res.status);

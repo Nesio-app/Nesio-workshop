@@ -482,6 +482,16 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
 
   async function handleDriveBackup() {
     setDriveState('busy'); setDriveMsg('');
+    try {
+      await runDriveBackup();
+    } catch {
+      // 动态 import / 打包过程抛错时也要有结局,不让按钮停在「正在备份…」
+      setDriveState('error');
+      setDriveMsg(L(dict, '这次没备份成功,稍后再试一次。', "Backup didn't complete — try again shortly."));
+    }
+  }
+
+  async function runDriveBackup() {
     const { pushBackupToDrive } = await import('@/lib/portal/drive-backup');
     const r = await pushBackupToDrive();
     if (r.ok) { setDriveState('done'); setDriveMsg(L(dict, '✓ 已免费备份到你的 Google Drive', '✓ Backed up free to your Google Drive')); }
@@ -519,20 +529,32 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       case 'not_signed_in': return L(dict, '先登录(上方入口),才能同步到你的云账户。', 'Sign in first (link above) to sync to your cloud account.');
       case 'cloud_not_configured': return L(dict, '云同步暂未开启,稍后再试。', "Cloud sync isn't enabled yet — try again later.");
       case 'too_large': return L(dict, '数据超过 8MB 单次上限,先导出到本地留一份。', 'Data is over the 8MB limit — export a local copy for now.');
-      default: return L(dict, '这次没传上去。检查网络后可以再试一次。', "Didn't go through. Check your connection and try again.");
+      // 构建失败是本机的事,别让用户去查 WiFi(此前一律报「检查网络」,方向就指错了)
+      case 'build_failed': return L(dict, '这次没能把数据打包好 —— 不是网络问题。先用下面的「导出全部」留一份到本机,再把这条告诉我们。', "Couldn't package your data — this isn't a network issue. Use “Export everything” below to keep a local copy, then let us know.");
+      case 'upload_failed': return L(dict, '服务器没收下这份备份,过一会儿再试一次。', 'The server rejected this backup — please try again shortly.');
+      default: return L(dict, '这次没传上去(可能是网络慢或超时)。稍后再试一次。', "Didn't go through (slow network or timeout). Try again in a bit.");
     }
   }
 
   async function handleCloudBackup() {
     setCloudState('pushing');
     setCloudError(null);
-    const result = await pushBackupToCloud();
-    if (result.ok) {
-      setCloudState('done');
-      setCloudBackupAt(result.at || new Date().toISOString());
-    } else {
+    // 兜底 try/catch:此前没有 —— pushBackupToCloud 内部若**抛错**(而不是返回错误结果,
+    // 例如 gzip / Blob 在超大 payload 上抛),这里的 await 直接 reject,
+    // 状态就永远停在 pushing,按钮卡死在「正在备份…」(手机实测)。
+    // 红线:每个异步动作都必须有可见结局,挂着不算结局。
+    try {
+      const result = await pushBackupToCloud();
+      if (result.ok) {
+        setCloudState('done');
+        setCloudBackupAt(result.at || new Date().toISOString());
+      } else {
+        setCloudState('error');
+        setCloudError(result.error || 'network');
+      }
+    } catch {
       setCloudState('error');
-      setCloudError(result.error || 'network');
+      setCloudError('build_failed');
     }
   }
 
@@ -546,13 +568,19 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     if (!confirm(L(dict, '从云恢复:把云端备份合并回本机(仅补缺,不覆盖已有数据)。完成后会自动刷新。确认继续？', 'Restore from cloud: merges your cloud backup into this device (fills gaps, keeps existing). It will refresh when done. Continue?'))) return;
     setCloudRestoreState('pulling');
     setCloudRestoreError(null);
-    const result = await pullBackupFromCloud('merge');
-    if (result.ok) {
-      setCloudRestoreState('idle');
-      setTimeout(() => window.location.reload(), 700); // reload 让各 store 重新水合
-    } else {
+    // 同「备份」:内部抛错时也要有结局,否则按钮永远停在「正在恢复…」
+    try {
+      const result = await pullBackupFromCloud('merge');
+      if (result.ok) {
+        setCloudRestoreState('idle');
+        setTimeout(() => window.location.reload(), 700); // reload 让各 store 重新水合
+      } else {
+        setCloudRestoreState('error');
+        setCloudRestoreError(result.error || 'network');
+      }
+    } catch {
       setCloudRestoreState('error');
-      setCloudRestoreError(result.error || 'network');
+      setCloudRestoreError('network');
     }
   }
 
