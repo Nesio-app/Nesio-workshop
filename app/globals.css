@@ -70,6 +70,27 @@
      别名映射到 portal 体系,昼夜自动跟随,一处修全站。 */
   --text-primary: var(--portal-ink);
   --text-secondary: var(--portal-muted);
+  /* ── 别名:被引用但从未定义过的 --portal-* ────────────────────────────────
+     2026-07-29 扫出来的:全站 35 处在写 var(--portal-border) / var(--portal-text) /
+     var(--portal-surface) 这类名字,而它们**在本仓从来没有定义过** ——
+     一直在吃后面那个 fallback(rgba(0,0,0,.1) / #555 / #fff…)。
+     后果是静默的:那些边框和文字既不跟昼夜、也不跟皮肤,永远是写死的一个值,
+     而且因为有 fallback,页面看起来「正常」,没人会发现。
+     映射到 portal 体系,一处修全站(和上面那批 storage 系旧 token 同一个办法)。
+     契约 scripts/button-primitive.test.mjs 盯着:以后再引用未定义的 --portal-* 会红。 */
+  --portal-border: var(--portal-line);
+  --portal-hairline: var(--portal-line);
+  --portal-text: var(--portal-ink);
+  --portal-text-secondary: var(--portal-muted);
+  --portal-surface: var(--portal-card);
+  --portal-card-bg: var(--portal-card);
+  /* 次级面(比卡片再退一层的浅底) */
+  --portal-surface-2: var(--portal-accent-soft);
+  --portal-green: var(--status-go);
+  /* 强调色上面的文字。四套皮肤的强调色都够深,白字都可读;
+     哪天出现浅色强调皮肤,在那套皮肤的块里覆盖这一个变量即可。 */
+  --portal-on-accent: #fff;
+
   --text-tertiary: var(--portal-muted);
   --accent-primary: var(--portal-accent);
   --accent-primary-dim: var(--portal-accent-soft);
@@ -4977,13 +4998,9 @@ html[data-portal-theme="night"] .nesio-today-card-title { color: #e8eefa; }
   margin-top: 0.25rem;
 }
 
-.nesio-today-btn {
-  padding: 0.5rem 1.1rem;
-  border-radius: 999px;
-  font-size: 0.82rem;
-  font-weight: 600;
-  transition: opacity 0.15s, transform 0.15s;
-}
+/* 尺寸/圆角/字重/过渡都并到原语的 md 那批声明里了。这个类本身已经没有独有属性,
+   留一个空规则没意义 —— 它现在纯粹是「挂进原语选择器组」的那个名字,
+   颜色由 --primary / --ghost / --night 三个修饰类各自决定。 */
 
 .nesio-today-btn:active { opacity: 0.75; transform: scale(0.97); }
 
@@ -11457,21 +11474,17 @@ html[data-portal-theme="night"] .nesio-wechat-mode-btn { color: #b9d0f0; }
   margin-top: 0.65rem;
   flex-wrap: wrap;
 }
+/* 尺寸/圆角/底色/描边并到原语的 secondary+sm 那批声明里了。
+   ⚠️ 顺带修一个一直没人发现的:原来这里写的是 var(--portal-border) 和
+   var(--portal-text-secondary) —— 这两个 token **在本仓从来没有定义过**,
+   一直在吃后面的 fallback(rgba(0,0,0,.1) / #555)。也就是说这批按钮的描边和文字色
+   既不跟昼夜、也不跟皮肤,永远是那两个写死值。并进原语后自动跟随。
+   这里只剩它自己特有的:内联不伸缩 + 保证 44px 触摸高度。 */
 .nesio-proactive-action-btn {
-  /* 批次 3:不再撑满整行 — 内联小按钮,卡片高度不被动作区拉爆 */
   flex: 0 0 auto;
   min-width: 0;
   min-height: var(--tap-min, 44px);
-  padding: 0.3rem 1rem;
-  border-radius: 20px;
-  border: 1.5px solid var(--portal-border, rgba(0,0,0,.1));
-  background: transparent;
-  font-size: 0.76rem;
-  font-weight: 600;
-  cursor: pointer;
-  color: var(--portal-text-secondary, #555);
   white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
 }
 .nesio-proactive-action-btn:hover { background: rgba(0,0,0,.05); }
 .nesio-proactive-action-btn--dismiss { color: var(--portal-accent, #4a90d9); border-color: var(--portal-accent, #4a90d9); }
@@ -13875,9 +13888,11 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 
 /* ─── 关系 tab 头 + 记给某人入口(人缘 1c)─── */
 .nesio-rel-head-row { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; margin-top: 0.9rem; }
+/* 尺寸/圆角/底色都并到 Button 原语的 soft+sm 那批声明里了(见上面的选择器分组)。
+   这里只剩它自己特有的:不参与 flex 伸缩 + 一道描边。 */
 .nesio-rel-log-btn {
-  flex: none; font-size: 0.78rem; font-weight: 600; padding: 0.3rem 0.7rem; border-radius: 999px;
-  background: var(--portal-accent-soft-md); color: var(--portal-blue-deep); border: 1px solid var(--portal-accent-border); cursor: pointer;
+  flex: none;
+  border: 1px solid var(--portal-accent-border);
 }
 .nesio-rel-log-btn:active { background: var(--portal-accent-border); }
 
@@ -19750,7 +19765,10 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
    视觉立刻和 <Button variant="primary" size="lg" full> 一致,零回归风险。
    调用点可以之后一批批换成 <Button>,换完就把这里的旧类名删掉。 */
 .nesio-btn,
-.nesio-ob-primary-btn {
+.nesio-ob-primary-btn,
+.nesio-rel-log-btn,
+.nesio-today-btn,
+.nesio-proactive-action-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -19767,12 +19785,18 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   -webkit-tap-highlight-color: transparent;
 }
 .nesio-btn--pill,
-.nesio-ob-primary-btn { border-radius: var(--radius-pill); }
+.nesio-ob-primary-btn,
+.nesio-rel-log-btn,
+.nesio-today-btn,
+.nesio-proactive-action-btn { border-radius: var(--radius-pill); }
 .nesio-btn--full,
 .nesio-ob-primary-btn { width: 100%; }
 /* 按下给一点回弹 —— 但尊重「减少动态效果」 */
 .nesio-btn:active,
-.nesio-ob-primary-btn:not(:disabled):active { transform: scale(0.97); }
+.nesio-ob-primary-btn:not(:disabled):active,
+.nesio-rel-log-btn:active,
+.nesio-today-btn:active,
+.nesio-proactive-action-btn:active { transform: scale(0.97); }
 @media (prefers-reduced-motion: reduce) {
   .nesio-btn { transition: none; }
   .nesio-btn:active { transform: none; }
@@ -19784,8 +19808,11 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 
 /* 三档尺寸。同一档的主/次按钮尺寸**必须**一致 —— 挨着放才不会一高一矮
    (相机那对以前是 0.5rem/0.78rem 配 0.55rem/0.8rem,肉眼就能看出错位)。 */
-.nesio-btn--sm { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
-.nesio-btn--md { padding: 0.55rem var(--space-4); font-size: var(--text-sm); }
+.nesio-btn--sm,
+.nesio-rel-log-btn,
+.nesio-proactive-action-btn { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+.nesio-btn--md,
+.nesio-today-btn { padding: 0.55rem var(--space-4); font-size: var(--text-sm); }
 .nesio-btn--lg,
 .nesio-ob-primary-btn { padding: var(--space-3) var(--space-5); font-size: var(--text-body); }
 
@@ -19795,12 +19822,14 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   background: var(--portal-accent);
   color: var(--portal-on-accent, #fff);
 }
-.nesio-btn--secondary {
+.nesio-btn--secondary,
+.nesio-proactive-action-btn {
   background: transparent;
   border-color: var(--portal-line);
   color: var(--portal-ink);
 }
-.nesio-btn--soft {
+.nesio-btn--soft,
+.nesio-rel-log-btn {
   background: var(--portal-accent-soft);
   color: var(--portal-accent);
 }

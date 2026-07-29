@@ -158,10 +158,40 @@ const CSS = read('app/globals.css');
 // 先把它挂到 Button 原语**同一批声明**上(CSS 选择器分组),值从此只有一处、
 // 视觉立刻统一、零回归。调用点之后一批批换成 <Button>,换完再删这个类名。
 {
-  const bridged = ['.nesio-btn--primary', '.nesio-btn--lg', '.nesio-btn--pill', '.nesio-btn--full'];
-  for (const sel of bridged) {
-    const re = new RegExp(`\\${sel},\\s*\\n\\.nesio-ob-primary-btn`);
-    assert.ok(re.test(CSS), `.nesio-ob-primary-btn 没有和 ${sel} 共用声明 —— 那 41 个按钮会重新长歪`);
+  // 每个旧类要挂到哪几组声明上。桥接一个就在这里记一笔 —— 解开会当场红。
+  const BRIDGED = {
+    '.nesio-ob-primary-btn': ['.nesio-btn--primary', '.nesio-btn--lg', '.nesio-btn--pill', '.nesio-btn--full'],
+    '.nesio-rel-log-btn': ['.nesio-btn--soft', '.nesio-btn--sm', '.nesio-btn--pill'],
+    '.nesio-today-btn': ['.nesio-btn--md', '.nesio-btn--pill'],
+    '.nesio-proactive-action-btn': ['.nesio-btn--secondary', '.nesio-btn--sm', '.nesio-btn--pill'],
+  };
+  for (const [old, sels] of Object.entries(BRIDGED)) {
+    for (const sel of sels) {
+      // 选择器组里可能夹着别的类名,所以只要求「sel 之后、下一个 { 之前」出现这个旧类
+      const at = CSS.indexOf(`${sel},`);
+      const at2 = at < 0 ? CSS.indexOf(`${sel} {`) : at;
+      assert.ok(at2 > 0, `${sel} 这组声明不见了`);
+      const selectorList = CSS.slice(at2, CSS.indexOf('{', at2));
+      assert.ok(
+        selectorList.includes(old),
+        `${old} 没有和 ${sel} 共用声明 —— 那批按钮会和原语重新分叉`,
+      );
+    }
+  }
+  // ── 引用的 --portal-* 必须都有定义 ──────────────────────────────────────
+  // 2026-07-29 扫出来 8 个名字(--portal-border/-text/-surface/-hairline/
+  // -card-bg/-green/-text-secondary/-on-accent)全站 35 处在用,却**从来没定义过**,
+  // 一直在吃后面的 fallback。后果是静默的:那些边框和文字既不跟昼夜也不跟皮肤,
+  // 而且因为有 fallback 页面看着「正常」,没人会发现。这条断言让它不可能再发生。
+  {
+    const used = new Set([...CSS.matchAll(/var\((--portal-[a-z0-9-]+)[,)]/g)].map((m) => m[1]));
+    const defined = new Set([...CSS.matchAll(/^\s*(--portal-[a-z0-9-]+):/gm)].map((m) => m[1]));
+    const ghosts = [...used].filter((t) => !defined.has(t)).sort();
+    assert.equal(
+      ghosts.length, 0,
+      `这些 --portal-* token 被引用却从没定义过,只会永远吃 fallback(不跟主题、不跟皮肤):\n  ${ghosts.join('\n  ')}\n`
+      + '  在 :root, .portal-root 里给它们一个映射(别名到已有 token)即可。',
+    );
   }
   // 旧类只该剩布局职责(外边距/投影),尺寸颜色不许自己再写一份
   const at = CSS.search(/\n\.nesio-ob-primary-btn \{/);
