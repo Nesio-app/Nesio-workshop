@@ -48,7 +48,9 @@ import {
   decCardsToGuidanceEvents,
 } from '@/lib/platform/guidance-engine/source-adapters';
 import { listWardrobe, outfitFindings, inferFormalNeed } from '@/lib/portal/wardrobe';
-import { computeDomainFindings } from '@/lib/portal/domain-insights';
+import { computeDomainFindings, gatherDomainInsights } from '@/lib/portal/domain-insights';
+import { maybeRunJudgeShadow } from '@/lib/portal/guidance-judge-auto';
+import { listInventoryItems } from '@/lib/portal/inventory';
 import { buildCrossRegionDeliverables } from '@/lib/platform/cross-region/deliver';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { isProactiveCardDismissed, type ProactiveCardData, registerDecCards } from './proactive-types';
@@ -294,6 +296,18 @@ export function useTodayData(canUsePrivateData: boolean) {
           // 批次207:开放世界 Layer ③ —— 搭日报的车,每日一次巡查低置信捕捉(付费门在路由端)。
           // fire-and-forget:填 ledger 供下次渲染的 loadSweepEvents 读;不阻塞本轮出卡。
           void maybeRunSweep(updated.allNodes, { now });
+          // AI 判决层影子模式(设计定稿 2026-07-29 Step 3):结构化信号批量送判,
+          // 结果只进档案不上屏(老管线继续出卡),攒对照数据。取数惰性(30min 闸后才算),
+          // 付费门在路由端(guardAiRoute + requirePaidCloudAi)。
+          void maybeRunJudgeShadow(
+            () => ({
+              calendarEvents: calEvents,
+              emailSignals: latestEmailSignals,
+              inventoryItems: listInventoryItems(),
+              domainInsights: gatherDomainInsights(),
+            }),
+            { now, uiLocale: uiLocale === 'en' ? 'en' : undefined },
+          );
         }
         // deferred:出卡但先不写「已展示」(冷却/ranker),等确认这轮结果真的上屏再 commit
         // —— 否则慢轮被 runSeqRef 丢弃时,卡被记成已展示却从未出现,下一轮全被冷却拦掉。

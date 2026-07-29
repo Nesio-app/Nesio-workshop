@@ -32,6 +32,7 @@ import { createAppApiClient } from '@/lib/portal/app-api-client';
 import dynamic from 'next/dynamic';
 import { createPortal } from 'react-dom';
 import { dismissProactiveById, getProactiveCardBudget } from './today/proactive-types';
+import { archiveShownCard } from '@/lib/portal/card-archive';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
 import { RoutineDueCards } from './today/RoutineDueCards';
@@ -194,6 +195,25 @@ export default function TodayFeed({
     .filter((c) => !dismissedCardIds.has(c.id) && (!c.nodeId || c.nodeId !== pinnedNodeId)
       && (!c.expiresAt || new Date(c.expiresAt).getTime() > Date.now()))
     .slice(0, cardBudget);
+
+  // 卡片档案(设计定稿 2026-07-29 Step 1):真实上屏的规则卡双轨入档 ——
+  // 影子期 AI 判决与它同屏对照。key=factKey(AI 改写前的源指纹),whyNow 位置记 type+priority。
+  useEffect(() => {
+    for (const card of activeProactiveCards) {
+      archiveShownCard({
+        id: `rules:${card.factKey || card.id}`,
+        lane: 'rules',
+        group: card.cardType || '其他',
+        title: card.title,
+        body: card.body,
+        whyNow: card.reason || `${card.cardType ?? 'card'} · p${card.priority}`,
+        evidence: [],
+        severity: Math.max(0, Math.min(3, Math.round(card.priority / 3))),
+        gates: [],
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 以卡片 id 序列为准,避免对象引用抖动重复入档
+  }, [activeProactiveCards.map((c) => c.id).join('|')]);
 
   // §1 ①收据首行 → 批次 80(用户定案「都记着呢N条意义不大」):
   // 称呼(首次设置的名字) + 时段问候 + **一条最有用的信息**

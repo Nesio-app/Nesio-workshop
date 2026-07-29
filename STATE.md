@@ -155,6 +155,34 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **Guidance 全 AI 化(设计定稿 2026-07-29;Step 0-3 已落地,影子模式运行中)**:
+  用户拍板把 8 层规则管线(severity 表/窗口/打分/预算/冷却/排序/AI 润色)换成
+  **1 个 AI 判决层 + 3 道承诺门 + 1 个档案**。规则从「判断内容」退到「执行承诺」。
+  设计要点(都是审计换来的,别回退):① 指纹 = hash(决策相关字段白名单),算在**源信号**上,
+  AI 输出不参与(v1 静音失效尸检);② 判决与时间无关({showFrom,showUntil} 绝对日期,
+  本地日键每日免费重算),缓存键=指纹 → 判过永不重判(稳定性,措辞一变静音就失效);
+  ③ 跨批归并:prompt 带活跃卡清单,mergeInto 只认真活跃卡,归并不改文案不解封不复活;
+  ④ 严格解析在服务端:幻觉指纹丢弃/6 分组封闭/窗口钳制≤14天/纯文本源(email/memory)
+  severity 封顶 1(结构化字段才配 ≥2 —— 也是邮件注入的爆炸半径钳制);⑤ 三门:静音
+  (永不再出,severity 3 也无上诉)/当日 dismiss(cooling 的全部合法遗产)/配额(定序:
+  sev 降序→showUntil 近→结构化优先;**sev3 豁免** —— 承诺管噪音不管安全);⑥ 兜底
+  **零分类零正则**(今明全部日历事件+物品今明效期+账单≤3天 —— 家长会不再因不认得而漏);
+  ⑦ 档案双清单(洞察·回望):「说了的」(规则/影子双轨+whyNow+证据+门记录+改判,改判率
+  >15% 亮琥珀)+「没说的」(AI declined+理由+「该提醒我」——**漏报的唯一监测面**);
+  ⑧ 跳转 resolver 从指纹前缀确定性推导(AI 的 target 字段废弃;解析不出=不渲染按钮);
+  ⑨ 影子模式:判决只进档案不上屏,老管线继续出卡,攒对照;影子改判桥进 card-verdict,
+  实弹切换那天直接生效;⑩ 成本 admin 全捕捉:/api/portal/guidance-judge 走 completeText
+  (真实 token+cost_usd 进 telemetry_events),/admin AI 成本面板改为**优先真实 cost_usd**
+  (原为拍平常数)。文件:lib/platform/guidance-engine/{ai-judge,guidance-gates,fallback-cards}.ts ·
+  lib/portal/{card-archive,card-target,guidance-judge-auto}.ts · app/api/portal/guidance-judge ·
+  components/portal/insights/CardArchivePanel.tsx(挂洞察·回望「我的实验」槽位旁)。
+  契约:test:guidance-judge / test:guidance-gates / test:card-archive(均可注入 now)。
+  **待办(按设计顺序,先加后删)**:Step 4 影子对照一周后逐源实弹(日历→Plaid/邮件→记忆;
+  Plaid /liabilities 接入随 Step 4);Step 5 拆除(8 层/17 枚举/正则词典/cooling/llm-sweep/
+  guidance-language 润色 —— **改判率 <15% 前不许拆**);Step 6 推送(sev3 才推)。
+  继承债:ledger/档案/verdict 三个 key 跨端要 union 语义,暂不进 module-sync 整键 replace。
+  两个设计拍板已按推荐值实现待用户复核:临近保底(<2h→sev3)与 sev3 配额豁免。
+
 - **反馈学习环曾经整段空转(2026-07-29 修;用户实锤「我点了稍后、不要再出现、或者
   喜欢,不管点哪个他都会出现」)**。审计结论:不是某个动作坏了,是 per-card 这一维
   **没有任何消费者** ——

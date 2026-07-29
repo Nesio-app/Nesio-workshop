@@ -27,6 +27,7 @@ const ROUTE_COST_USD: Record<string, number> = {
   living_model: 0.02,
   health_insight: 0.02,
   guidance_language: 0.004,
+  guidance_judge: 0.01,
   daily_brief: 0.004,
   llm_sweep: 0.006,
   embed: 0.0002,

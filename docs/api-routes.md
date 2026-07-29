@@ -24,6 +24,7 @@ Auth legend:
 | POST /api/portal/tts | guard | 10/min |
 | POST /api/portal/daily-brief | guard | 15/min |
 | POST /api/portal/guidance-language | guard | 20/min |
+| POST /api/portal/guidance-judge | guardAiRoute + requirePaidCloudAi | 6/min | AI 判决层(影子模式):结构化信号批量判卡;completeText 真实 token+cost_usd 上账,/admin 按 route=guidance_judge 汇总 |
 | POST /api/portal/living-model | guard | 10/min |
 | POST /api/portal/mirror-letter | guard | 6/min |
 | POST /api/portal/insights | guard | 15/min |

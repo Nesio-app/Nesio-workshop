@@ -1,0 +1,339 @@
+/**
+ * AI 判决层客户端编排(影子模式,Step 3)—— 设计定稿 2026-07-29。
+ *
+ * 影子期语义:打开 app 时把**未判过**的新信号打包送 /api/portal/guidance-judge,
+ * 判决结果**只进档案不上屏**(老管线继续出卡),攒一周对照数据后由用户拍板切实弹。
+ *
+ * 继承 llm-sweep-auto 的骨架:ledger 记账(每指纹这辈子最多送一次)+ 网络失败不记账可重试。
+ * 与它的差异(设计升级):
+ *   · 指纹 = hash(决策相关字段),不是节点 id —— 字段变了自动重判(llm-sweep 是终身一次)。
+ *   · 跨批合并:请求带「当前活跃卡清单」,AI 可 mergeInto 归并(同一趟航班的日历+邮件不出两张)。
+ *   · 口味 = 档案统计的事实(不喂权重数字 —— 权重系统已退役)。
+ *   · 首次上线只回溯 BACKFILL_DAYS(30 天)内的信号,不灌巨批。
+ *   · 每批 ≤ BATCH_MAX_SIGNALS,打开 app 都会再跑,超出的下批补上,不丢。
+ *
+ * 成本可观测:路由侧 completeText 自动 reportAiCall(真实 token+cost_usd 进 telemetry_events,
+ * /admin「AI 调用与成本」按 route=guidance_judge 汇总);本地 ledger.stats 记批次/信号数供档案页显示。
+ */
+import {
+  BACKFILL_DAYS,
+  BATCH_MAX_SIGNALS,
+  SIGNAL_FIELD_MAX,
+  STRUCTURED_SOURCES,
+  fingerprintSource,
+  isCardInWindow,
+  judgeFingerprint,
+  type ActiveCardBrief,
+  type DeclinedJudgment,
+  type JudgeSignal,
+  type JudgedCard,
+} from '@/lib/platform/guidance-engine/ai-judge';
+import { applyGuidanceGates, type GateCard } from '@/lib/platform/guidance-engine/guidance-gates';
+import { archiveDeclined, archiveShownCard, archiveStats } from './card-archive';
+import { isCardSuppressed } from './card-verdict';
+import { logDropped } from './storage-health';
+import type { CalendarEvent } from './types';
+import type { EmailSignal } from '@/lib/platform/email-signals';
+import type { DomainInsight } from './domain-insights';
+import type { InventoryItem } from './inventory';
+
+const LEDGER_KEY = 'nesio-guidance-judge-ledger-v1';
+/** 同一批判决之间的最小间隔:打开 app 即判,但别在一次会话里反复打。 */
+const MIN_RUN_INTERVAL_MS = 30 * 60_000;
+
+interface StoredCard extends JudgedCard {
+  judgedAt: string;
+}
+
+export interface JudgeStats {
+  batches: number;
+  judgedSignals: number;
+  cardsMade: number;
+  declinedCount: number;
+  lastOkAt: string | null;
+  lastError: string | null;
+}
+
+interface Ledger {
+  /** 已送判的指纹(字段变了指纹变,自动算新信号)。 */
+  judged: string[];
+  cards: StoredCard[];
+  lastRunAt: string | null;
+  stats: JudgeStats;
+}
+
+const EMPTY_STATS: JudgeStats = { batches: 0, judgedSignals: 0, cardsMade: 0, declinedCount: 0, lastOkAt: null, lastError: null };
+const EMPTY: Ledger = { judged: [], cards: [], lastRunAt: null, stats: EMPTY_STATS };
+
+function readLedger(): Ledger {
+  if (typeof window === 'undefined') return { ...EMPTY };
+  try {
+    const raw = localStorage.getItem(LEDGER_KEY);
+    if (!raw) return { ...EMPTY, stats: { ...EMPTY_STATS } };
+    const p = JSON.parse(raw) as Partial<Ledger>;
+    return {
+      judged: Array.isArray(p.judged) ? p.judged : [],
+      cards: Array.isArray(p.cards) ? p.cards : [],
+      lastRunAt: typeof p.lastRunAt === 'string' ? p.lastRunAt : null,
+      stats: { ...EMPTY_STATS, ...(p.stats && typeof p.stats === 'object' ? p.stats : {}) },
+    };
+  } catch {
+    return { ...EMPTY, stats: { ...EMPTY_STATS } };
+  }
+}
+
+function writeLedger(l: Ledger): void {
+  try {
+    // judged 集合只增不减会无限膨胀:窗口早已过去的卡的指纹仍要留着防重判,
+    // 但上限 2000,超了裁最老的(最坏情况 = 极老信号被重判一次,可接受)。
+    const trimmed: Ledger = { ...l, judged: l.judged.slice(-2000), cards: l.cards.slice(-300) };
+    localStorage.setItem(LEDGER_KEY, JSON.stringify(trimmed));
+  } catch (err) {
+    logDropped('guidance-judge.ledger', err);
+  }
+}
+
+function localDayISO(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// ── 信号采集(结构化字段直取,零分类) ─────────────────────────────────────────
+
+function hash31(text: string): string {
+  let h = 0;
+  for (let i = 0; i < text.length; i += 1) h = (h * 31 + text.charCodeAt(i)) | 0;
+  return String(h);
+}
+
+const DAY_MS = 86_400_000;
+
+export interface JudgeSignalInput {
+  calendarEvents?: readonly CalendarEvent[];
+  emailSignals?: readonly EmailSignal[];
+  inventoryItems?: readonly InventoryItem[];
+  domainInsights?: readonly DomainInsight[];
+}
+
+/**
+ * 原始数据 → JudgeSignal[]。只挑决策相关字段,长文本截断(为上下文质量)。
+ * 记忆节点刻意不在影子 v1(最脏的源最后接 —— 施工顺序 Step 4)。
+ */
+export function collectJudgeSignals(input: JudgeSignalInput, now: Date = new Date()): JudgeSignal[] {
+  const signals: JudgeSignal[] = [];
+  const backfillFloor = now.getTime() - BACKFILL_DAYS * DAY_MS;
+  const horizon = now.getTime() + 14 * DAY_MS;
+
+  for (const e of input.calendarEvents || []) {
+    const startMs = Date.parse(e.start);
+    if (Number.isNaN(startMs) || startMs < now.getTime() - DAY_MS || startMs > horizon) continue;
+    const fields = {
+      title: e.title.slice(0, 200),
+      start: e.start,
+      end: e.end ?? null,
+      location: e.location?.slice(0, 200) ?? null,
+      description: e.description?.slice(0, SIGNAL_FIELD_MAX) ?? null,
+    };
+    signals.push({ fingerprint: judgeFingerprint('calendar', e.id, fields), source: 'calendar', fields, anchorId: e.id });
+  }
+
+  for (const s of input.emailSignals || []) {
+    const dateMs = Date.parse(s.date);
+    if (!Number.isNaN(dateMs) && dateMs < backfillFloor) continue;
+    const fields = {
+      subject: s.subject.slice(0, 300),
+      from: s.from.slice(0, 120),
+      date: s.date,
+    };
+    signals.push({ fingerprint: judgeFingerprint('email', s.id, fields), source: 'email', fields, anchorId: s.id });
+  }
+
+  for (const item of input.inventoryItems || []) {
+    if (!item.expiry) continue;
+    const expMs = Date.parse(`${item.expiry}T00:00:00`);
+    if (Number.isNaN(expMs) || expMs < now.getTime() - DAY_MS || expMs > horizon) continue;
+    const fields = { name: item.name.slice(0, 120), expiry: item.expiry, location: item.location?.slice(0, 80) ?? null };
+    signals.push({ fingerprint: judgeFingerprint('inventory', item.id, fields), source: 'inventory', fields, anchorId: item.id });
+  }
+
+  for (const d of input.domainInsights || []) {
+    // DomainInsight 无稳定 id:域+标题的 hash 即身份(标题变 = 新判定 = 新信号,正确)。
+    const id = `${d.domain}-${hash31(d.title)}`;
+    const fields = { domain: d.domain, kind: d.severity, stat: d.title.slice(0, 200), detail: d.detail.slice(0, 400) };
+    signals.push({ fingerprint: judgeFingerprint('domain', id, fields), source: 'domain', fields });
+  }
+
+  return signals;
+}
+
+// ── 影子判决 ─────────────────────────────────────────────────────────────────
+
+/** 影子卡当时会被哪些门拦 —— 进档案,让「如果实弹它出不出」可查。 */
+function gatesForShadowCard(card: JudgedCard, now: Date): string[] {
+  const gateCard: GateCard = {
+    fingerprints: card.fingerprints,
+    group: card.group,
+    severity: card.severity,
+    showFrom: card.showFrom,
+    showUntil: card.showUntil,
+    hasStructuredSource: card.fingerprints.some((fp) => {
+      const src = fingerprintSource(fp);
+      return src !== null && STRUCTURED_SOURCES.has(src);
+    }),
+  };
+  const { blocked } = applyGuidanceGates([gateCard], {
+    localDayISO: localDayISO(now),
+    nowMs: now.getTime(),
+    isMuted: (c) =>
+      isCardSuppressed({ cardId: c.fingerprints[0], cardType: c.group, factKey: c.fingerprints[0] }, now),
+    dismissedToday: new Set(),
+    budget: 99, // 单卡评估不做配额判断(配额是全局性质,实弹期才有意义)
+  });
+  return blocked.map((b) => b.gate);
+}
+
+function signalTitle(s: JudgeSignal): string {
+  const f = s.fields;
+  return String(f.title ?? f.subject ?? f.name ?? f.stat ?? f.account ?? s.fingerprint).slice(0, 40);
+}
+
+export interface ShadowRunResult {
+  status: 'ran' | 'skipped' | 'failed';
+  sent?: number;
+  cards?: number;
+  declined?: number;
+  note?: string;
+}
+
+/**
+ * 影子判决一批。fire-and-forget(调用方不必 await)。
+ * 失败不记账 —— 信号保留,下次打开重试;错误落 stats.lastError 供档案页显示(失败不许静默)。
+ */
+export async function maybeRunJudgeShadow(
+  input: JudgeSignalInput | (() => JudgeSignalInput),
+  opts: { now?: Date; uiLocale?: string; force?: boolean } = {},
+): Promise<ShadowRunResult> {
+  if (typeof window === 'undefined') return { status: 'skipped', note: 'ssr' };
+  const now = opts.now ?? new Date();
+  const ledger = readLedger();
+  if (!opts.force && ledger.lastRunAt && now.getTime() - Date.parse(ledger.lastRunAt) < MIN_RUN_INTERVAL_MS) {
+    return { status: 'skipped', note: 'interval' };
+  }
+
+  const judged = new Set(ledger.judged);
+  // 取数是惰性的:interval 闸先挡,免得每次渲染都跑一遍 gatherDomainInsights/listInventoryItems。
+  const resolved = typeof input === 'function' ? input() : input;
+  const fresh = collectJudgeSignals(resolved, now).filter((s) => !judged.has(s.fingerprint));
+  if (fresh.length === 0) {
+    writeLedger({ ...ledger, lastRunAt: now.toISOString() });
+    return { status: 'skipped', note: 'no-new-signals' };
+  }
+  const batch = fresh.slice(0, BATCH_MAX_SIGNALS);
+
+  const activeCards: ActiveCardBrief[] = ledger.cards
+    .filter((c) => isCardInWindow(c, localDayISO(now)))
+    .map((c) => ({ fingerprint: c.fingerprints[0], title: c.title, group: c.group }));
+
+  const taste = { groupCounts: archiveStats().groupCounts };
+
+  try {
+    const res = await fetch('/api/portal/guidance-judge', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        signals: batch,
+        activeCards,
+        taste,
+        todayISO: localDayISO(now),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+        uiLocale: opts.uiLocale,
+      }),
+    });
+    const data = res.ok ? await res.json() : null;
+    if (!data?.ok) {
+      const note = data?.error || `route ${res.status}`;
+      writeLedger({ ...ledger, stats: { ...ledger.stats, lastError: String(note) } });
+      return { status: 'failed', note: String(note) };
+    }
+
+    const cards: JudgedCard[] = Array.isArray(data.cards) ? data.cards : [];
+    const declined: DeclinedJudgment[] = Array.isArray(data.declined) ? data.declined : [];
+    const judgedAt = now.toISOString();
+
+    // 归并:mergeInto 指向已有活跃卡 → 追加指纹与证据,不改文案、不解封、不复活(设计定稿语义)。
+    const nextCards = [...ledger.cards];
+    const freshCards: StoredCard[] = [];
+    for (const card of cards) {
+      const host = card.mergeInto ? nextCards.find((c) => c.fingerprints[0] === card.mergeInto) : undefined;
+      if (host) {
+        host.fingerprints = Array.from(new Set([...host.fingerprints, ...card.fingerprints]));
+        host.evidence = Array.from(new Set([...host.evidence, ...card.evidence])).slice(0, 8);
+      } else {
+        freshCards.push({ ...card, judgedAt });
+      }
+    }
+    nextCards.push(...freshCards);
+
+    // 入档:说了的(影子 lane,附「当时会被哪些门拦」)+ 没说的。
+    for (const card of freshCards) {
+      archiveShownCard(
+        {
+          id: card.fingerprints[0],
+          lane: 'shadow',
+          group: card.group,
+          title: card.title,
+          body: card.body,
+          whyNow: card.whyNow,
+          evidence: card.evidence,
+          severity: card.severity,
+          showFrom: card.showFrom,
+          showUntil: card.showUntil,
+          fingerprints: card.fingerprints,
+          gates: gatesForShadowCard(card, now),
+        },
+        now,
+      );
+    }
+    const titleByFp = new Map(batch.map((s) => [s.fingerprint, signalTitle(s)]));
+    archiveDeclined(
+      declined.map((d) => ({
+        id: d.fingerprint,
+        lane: 'shadow' as const,
+        title: titleByFp.get(d.fingerprint) ?? d.fingerprint,
+        reason: d.reason,
+      })),
+      now,
+    );
+
+    writeLedger({
+      judged: [...ledger.judged, ...batch.map((s) => s.fingerprint)],
+      cards: nextCards,
+      lastRunAt: now.toISOString(),
+      stats: {
+        batches: ledger.stats.batches + 1,
+        judgedSignals: ledger.stats.judgedSignals + batch.length,
+        cardsMade: ledger.stats.cardsMade + freshCards.length,
+        declinedCount: ledger.stats.declinedCount + declined.length,
+        lastOkAt: now.toISOString(),
+        lastError: null,
+      },
+    });
+    return { status: 'ran', sent: batch.length, cards: freshCards.length, declined: declined.length };
+  } catch (err) {
+    logDropped('guidance-judge.shadow', err);
+    const ledgerNow = readLedger();
+    writeLedger({ ...ledgerNow, stats: { ...ledgerNow.stats, lastError: 'network' } });
+    return { status: 'failed', note: 'network' };
+  }
+}
+
+/** 档案页显示影子运行状态(批次/信号数/最近错误)。 */
+export function readJudgeStats(): JudgeStats & { lastRunAt: string | null } {
+  const l = readLedger();
+  return { ...l.stats, lastRunAt: l.lastRunAt };
+}
+
+/** 隐私清除。 */
+export function resetJudgeLedger(): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.removeItem(LEDGER_KEY); } catch { /* 无害 */ }
+}

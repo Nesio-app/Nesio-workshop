@@ -165,28 +165,31 @@ export async function GET(req: NextRequest) {
   for (const r of product.rows) productByType.set(r.event_type, (productByType.get(r.event_type) || 0) + 1);
 
   // ── AI 调用统计与成本估算(server ai_route 事件,30 天) ──
-  // 单价是量级估算(美元/次),用于看趋势与占比,不是账单。
+  // 成本优先用 props.cost_usd(completeText 按真实 token 计的价);没有的调用退回
+  // 每路由拍平单价(量级估算)。影子判决(guidance_judge)的花费靠这里被完整捕捉汇总。
   const COST_PER_CALL: Record<string, number> = {
     chat: 0.004, daily_brief: 0.001, tts: 0.015, analyze: 0.002,
-    guidance_language: 0.001, insights: 0.002, narrative: 0.002,
+    guidance_language: 0.001, guidance_judge: 0.01, insights: 0.002, narrative: 0.002,
   };
-  const aiByRoute = new Map<string, { calls: number; okCalls: number; latencySum: number }>();
+  const aiByRoute = new Map<string, { calls: number; okCalls: number; latencySum: number; costSum: number; costFreeCalls: number }>();
   for (const r of telemetry.rows) {
     if (r.name !== 'ai_route' || new Date(r.at).getTime() < cut(30)) continue;
-    const p = (r.props || {}) as { route?: string; ok?: boolean; latency_ms?: number };
+    const p = (r.props || {}) as { route?: string; ok?: boolean; latency_ms?: number; cost_usd?: number };
     const route = typeof p.route === 'string' ? p.route : 'unknown';
-    if (!aiByRoute.has(route)) aiByRoute.set(route, { calls: 0, okCalls: 0, latencySum: 0 });
+    if (!aiByRoute.has(route)) aiByRoute.set(route, { calls: 0, okCalls: 0, latencySum: 0, costSum: 0, costFreeCalls: 0 });
     const a = aiByRoute.get(route)!;
     a.calls += 1;
     if (p.ok === true) a.okCalls += 1;
     a.latencySum += typeof p.latency_ms === 'number' ? p.latency_ms : 0;
+    if (typeof p.cost_usd === 'number' && Number.isFinite(p.cost_usd)) a.costSum += p.cost_usd;
+    else a.costFreeCalls += 1;
   }
   const aiRoutes = [...aiByRoute.entries()].map(([route, a]) => ({
     route,
     calls: a.calls,
     okRate: Math.round((a.okCalls / Math.max(1, a.calls)) * 100),
     avgLatencyMs: Math.round(a.latencySum / Math.max(1, a.calls)),
-    estCostUsd: Math.round(a.calls * (COST_PER_CALL[route] ?? 0.002) * 1000) / 1000,
+    estCostUsd: Math.round((a.costSum + a.costFreeCalls * (COST_PER_CALL[route] ?? 0.002)) * 1000) / 1000,
   })).sort((x, y) => y.estCostUsd - x.estCostUsd);
   const aiTotals = {
     calls: aiRoutes.reduce((sum, r) => sum + r.calls, 0),

@@ -46,6 +46,7 @@ import AdminOpsPanel from './insights/AdminOpsPanel';
 import TeslaPanel from './TeslaPanel';
 import TabErrorBoundary from './TabErrorBoundary';
 import LearningStatusPanel from './LearningStatusPanel';
+import CardArchivePanel from './insights/CardArchivePanel';
 import { mineCrossDomain } from '@/lib/portal/cross-domain-correlations';
 import { readFactJournal, ensureFactJournal } from '@/lib/platform/fact-journal';
 
@@ -605,6 +606,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
                 <MyExperimentWidget />
               </div>
             )}
+
+            {/* 卡片档案(AI 判决层的监测面):「Nesio 说过什么」与下面的「记得什么」并排 */}
+            <CardArchivePanel onOpenNode={setDetailNodeId} />
 
             {/* NESIO 学到了什么(信任资产,§2.1 移页底) */}
             <LearningStatusPanel />
