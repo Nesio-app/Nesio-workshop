@@ -125,5 +125,18 @@ assert.ok(today.indexOf('void maybeRunJudgeShadow') > today.indexOf('if (canUseP
 const auto = fs.readFileSync(new URL('../lib/portal/guidance-judge-auto.ts', import.meta.url), 'utf8');
 assert.match(auto, /lane: 'shadow'/, '影子判决结果只进档案(shadow lane),不上屏');
 assert.ok(!auto.includes('setProactiveCards'), '影子模式绝不碰出卡状态');
+assert.match(auto, /if \(w\.alert\)/, '天气官方告警(NWS)要进判决信号 —— 取了一直没用过的字段');
+assert.match(auto, /Math\.round\(w\.tempMinC/, '日常天气温度取整防指纹抖动(小数变化不该触发重判)');
+assert.match(auto, /judgeFingerprint\('plaid', liab\.accountId/, 'Plaid 负债(还款日)要进判决信号 —— 最高优先数据缺口');
+assert.match(auto, /getEmailBody\(s\.anchorId!\)/, '本机邮件全文要喂给判决(指纹只认白名单字段,附加正文不改指纹)');
+
+// Plaid /liabilities 链路:服务端拉取 + 字段缺席语义 + 客户端落盘
+const plaidRoute = fs.readFileSync(new URL('../app/api/portal/plaid/transactions/route.ts', import.meta.url), 'utf8');
+assert.match(plaidRoute, /plaidPost\('\/liabilities\/get'/, '服务端要调 /liabilities/get(信用卡还款日此前没有任何来源)');
+assert.match(plaidRoute, /liabilitiesOk \? \{ liabilities:/, '全挂时字段缺席(客户端保留上次好数据),与 recurring 同语义');
+const sync = fs.readFileSync(new URL('../lib/portal/providers/connector-sync.ts', import.meta.url), 'utf8');
+assert.match(sync, /savePlaidLiabilities/, '客户端要把 liabilities 落盘');
+const bank = fs.readFileSync(new URL('../lib/portal/providers/bank-tx.ts', import.meta.url), 'utf8');
+assert.match(bank, /PLAID_LIABILITIES_KEY = 'nesio-plaid-liabilities-v1'/, '存储键固定(nesio- 前缀 → 隐私清除自动覆盖)');
 
 console.log('guidance-judge: OK(指纹白名单 / 严格解析 / 窗口钳制 / severity 封顶 / 归并防幻觉 / 红线四要件 / admin 真实成本)');

@@ -49,8 +49,9 @@ import {
 } from '@/lib/platform/guidance-engine/source-adapters';
 import { listWardrobe, outfitFindings, inferFormalNeed } from '@/lib/portal/wardrobe';
 import { computeDomainFindings, gatherDomainInsights } from '@/lib/portal/domain-insights';
-import { maybeRunJudgeShadow } from '@/lib/portal/guidance-judge-auto';
+import { maybeRunJudgeShadow, type JudgeWeatherInput } from '@/lib/portal/guidance-judge-auto';
 import { listInventoryItems } from '@/lib/portal/inventory';
+import { loadBankAccounts, loadPlaidLiabilities } from '@/lib/portal/bank-tx';
 import { buildCrossRegionDeliverables } from '@/lib/platform/cross-region/deliver';
 import { cloudSignalRowsToSignals, type CloudSignalRow } from '@/lib/life-domain/signal-search';
 import { isProactiveCardDismissed, type ProactiveCardData, registerDecCards } from './proactive-types';
@@ -305,6 +306,12 @@ export function useTodayData(canUsePrivateData: boolean) {
               emailSignals: latestEmailSignals,
               inventoryItems: listInventoryItems(),
               domainInsights: gatherDomainInsights(),
+              weather: weather as JudgeWeatherInput | null,
+              // Plaid 负债:还款日是结构化字段,联表出账户名给判决用人话称呼
+              plaidLiabilities: (() => {
+                const names = new Map(loadBankAccounts().map((a) => [a.id, a.name]));
+                return loadPlaidLiabilities().map((l) => ({ ...l, accountName: names.get(l.accountId) }));
+              })(),
             }),
             { now, uiLocale: uiLocale === 'en' ? 'en' : undefined },
           );

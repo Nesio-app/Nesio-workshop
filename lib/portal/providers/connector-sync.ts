@@ -52,6 +52,11 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
     if (Array.isArray((data as { recurringStreams?: unknown[] }).recurringStreams)) {
       bank.savePlaidRecurring((data as { recurringStreams: never[] }).recurringStreams);
     }
+    // Guidance 全 AI 化 Step 4 前置:Plaid 负债(信用卡还款日/最低还款)。语义与 recurring 同:
+    // 字段缺席 = 本次拉取失败保留旧数据;字段存在(含空)= 真实结果照存。
+    if (Array.isArray((data as { liabilities?: unknown[] }).liabilities)) {
+      bank.savePlaidLiabilities((data as { liabilities: never[] }).liabilities);
+    }
     const rawExisting = bank.loadBankTxRaw();
     const filteredExisting = bank.loadBankTx();
     // 兜底仅限「账户表为空」(水合可疑/首次):账户表非空时孤儿过滤是有依据的,不复活死数据。

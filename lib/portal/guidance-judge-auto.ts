@@ -107,11 +107,39 @@ function hash31(text: string): string {
 
 const DAY_MS = 86_400_000;
 
+/**
+ * 天气快照(portal cache 里的 WeatherSnapshot 宽形状)。
+ * alert 是 NWS 官方告警**字符串**(fetchNWSAlert 已挑 Extreme/Severe 优先、截断 80 字)——
+ * 取了一直没用过,现在喂给判决。
+ */
+export interface JudgeWeatherInput {
+  temperatureC?: number | null;
+  condition?: string;
+  forecastNote?: string;
+  tempMinC?: number | null;
+  tempMaxC?: number | null;
+  precipProb?: number | null;
+  alert?: string | null;
+}
+
+/** Plaid 负债行(loadPlaidLiabilities)+ 调用方联表出的账户名。 */
+export interface JudgeLiabilityInput {
+  accountId: string;
+  kind: string;
+  dueDate: string; // YYYY-MM-DD
+  minPayment?: number;
+  statementBalance?: number;
+  isOverdue?: boolean;
+  accountName?: string;
+}
+
 export interface JudgeSignalInput {
   calendarEvents?: readonly CalendarEvent[];
   emailSignals?: readonly EmailSignal[];
   inventoryItems?: readonly InventoryItem[];
   domainInsights?: readonly DomainInsight[];
+  weather?: JudgeWeatherInput | null;
+  plaidLiabilities?: readonly JudgeLiabilityInput[];
 }
 
 /**
@@ -147,6 +175,22 @@ export function collectJudgeSignals(input: JudgeSignalInput, now: Date = new Dat
     signals.push({ fingerprint: judgeFingerprint('email', s.id, fields), source: 'email', fields, anchorId: s.id });
   }
 
+  // Plaid 负债:还款日在 [过去7天(逾期仍要说), +14天] 窗口内的才进批。
+  // 月度循环天然自续:下个账期 dueDate 变 → 新指纹 → 重判,无需额外逻辑。
+  for (const liab of input.plaidLiabilities || []) {
+    const dueMs = Date.parse(`${liab.dueDate}T00:00:00`);
+    if (Number.isNaN(dueMs) || dueMs < now.getTime() - 7 * DAY_MS || dueMs > horizon) continue;
+    const fields = {
+      account: (liab.accountName || liab.accountId).slice(0, 80),
+      dueDate: liab.dueDate,
+      minPayment: liab.minPayment ?? null,
+      balance: liab.statementBalance ?? null,
+      kind: liab.kind,
+      overdue: liab.isOverdue ?? null,
+    };
+    signals.push({ fingerprint: judgeFingerprint('plaid', liab.accountId, fields), source: 'plaid', fields });
+  }
+
   for (const item of input.inventoryItems || []) {
     if (!item.expiry) continue;
     const expMs = Date.parse(`${item.expiry}T00:00:00`);
@@ -160,6 +204,28 @@ export function collectJudgeSignals(input: JudgeSignalInput, now: Date = new Dat
     const id = `${d.domain}-${hash31(d.title)}`;
     const fields = { domain: d.domain, kind: d.severity, stat: d.title.slice(0, 200), detail: d.detail.slice(0, 400) };
     signals.push({ fingerprint: judgeFingerprint('domain', id, fields), source: 'domain', fields });
+  }
+
+  // 天气走 domain 源(结构化 —— 官方告警配得上 severity ≥2;日常冷暖 AI 自己掂量)。
+  const w = input.weather;
+  if (w) {
+    if (w.alert) {
+      const fields = { domain: 'weather', kind: 'alert', stat: String(w.alert).slice(0, 200), detail: '' };
+      signals.push({
+        fingerprint: judgeFingerprint('domain', `weather-alert-${hash31(fields.stat)}`, fields),
+        source: 'domain', fields,
+      });
+    }
+    if (w.temperatureC != null) {
+      // 每天一条日常天气;温度取整防指纹抖动(小数变化不该触发重判)。
+      const day = localDayISO(now);
+      const fields = {
+        domain: 'weather', kind: 'daily',
+        stat: `${day} ${Math.round(w.tempMinC ?? w.temperatureC)}~${Math.round(w.tempMaxC ?? w.temperatureC)}°C ${w.condition ?? ''}${w.precipProb != null ? ` 降水${Math.round(w.precipProb)}%` : ''}`.trim(),
+        detail: String(w.forecastNote ?? '').slice(0, 200),
+      };
+      signals.push({ fingerprint: judgeFingerprint('domain', `weather-${day}`, fields), source: 'domain', fields });
+    }
   }
 
   return signals;
@@ -228,6 +294,20 @@ export async function maybeRunJudgeShadow(
     return { status: 'skipped', note: 'no-new-signals' };
   }
   const batch = fresh.slice(0, BATCH_MAX_SIGNALS);
+
+  // 邮件正文:本机 IDB 全文(里程碑 A)喂给判决 —— 指纹只认白名单字段,
+  // 附加正文不改指纹(静音/去重稳定)。取不到就只有 subject/from,照常判。
+  try {
+    const { getEmailBody } = await import('./local-email-body');
+    await Promise.all(
+      batch
+        .filter((s) => s.source === 'email' && s.anchorId)
+        .map(async (s) => {
+          const body = await getEmailBody(s.anchorId!);
+          if (body) s.fields = { ...s.fields, body: body.slice(0, SIGNAL_FIELD_MAX) };
+        }),
+    );
+  } catch { /* 正文是增强不是前提 */ }
 
   const activeCards: ActiveCardBrief[] = ledger.cards
     .filter((c) => isCardInWindow(c, localDayISO(now)))

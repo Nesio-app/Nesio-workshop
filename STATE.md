@@ -177,8 +177,20 @@ sensitivity/retention 枚举化(中期)。
   lib/portal/{card-archive,card-target,guidance-judge-auto}.ts · app/api/portal/guidance-judge ·
   components/portal/insights/CardArchivePanel.tsx(挂洞察·回望「我的实验」槽位旁)。
   契约:test:guidance-judge / test:guidance-gates / test:card-archive(均可注入 now)。
-  **待办(按设计顺序,先加后删)**:Step 4 影子对照一周后逐源实弹(日历→Plaid/邮件→记忆;
-  Plaid /liabilities 接入随 Step 4);Step 5 拆除(8 层/17 枚举/正则词典/cooling/llm-sweep/
+  **数据缺口补齐(2026-07-29 第二批,影子判决的输入面拉满)**:
+  ● **Plaid /liabilities/get 接入**(用户定的最高优先缺口 —— 9 张卡的还款日/最低还款
+  此前没有任何来源):transactions 路由与 recurring 同款容错(单 token 失败不阻断、
+  产品未开通静默跳过、全挂字段缺席保留旧数据),归一 {accountId,kind,dueDate,minPayment,
+  statementBalance,isOverdue};客户端 `nesio-plaid-liabilities-v1`(bank-tx save/load);
+  judge 信号窗口 [过去7天(逾期仍要说), +14天],月度账期 dueDate 变 → 新指纹 → 自动重判。
+  ● **邮件正文喂判决**:批内 email 信号从本机 IDB(getEmailBody,里程碑 A)取全文 ≤4k
+  附进 fields —— 指纹只认白名单字段,附正文不改指纹(静音/去重稳定)。
+  ● **天气告警接线**:WeatherSnapshot.alert(NWS 字符串,取了一直没用过)+ 日常天气
+  (温度取整防指纹抖动)走 domain 源进判决。
+  ● **隐私清除确认免做**:档案/judge ledger/verdict 全是 `nesio-` 前缀 localStorage,
+  storage-manifest 的 purgeLocalData 自动覆盖;只有独立 IDB 才需手工挂 purge。
+  **待办(按设计顺序,先加后删)**:Step 4 影子对照一周后逐源实弹(日历→Plaid/邮件→记忆);
+  Step 5 拆除(8 层/17 枚举/正则词典/cooling/llm-sweep/
   guidance-language 润色 —— **改判率 <15% 前不许拆**);Step 6 推送(sev3 才推)。
   继承债:ledger/档案/verdict 三个 key 跨端要 union 语义,暂不进 module-sync 整键 replace。
   两个设计拍板已按推荐值实现待用户复核:临近保底(<2h→sev3)与 sev3 配额豁免。
