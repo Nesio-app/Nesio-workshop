@@ -39,9 +39,31 @@ const TRACKED: Array<{ key: string; label: [string, string]; critical: boolean }
   { key: 'nesio-fin-assets-v1', label: ['手动资产', 'Manual assets'], critical: false },
   { key: 'nesio-fin-networth-series-v1', label: ['净值快照', 'Net-worth snapshots'], critical: false },
   { key: 'nesio-place-trail-v1', label: ['地点足迹', 'Place trail'], critical: false },
+  { key: 'nesio-calendar-local-v1', label: ['日历', 'Calendar'], critical: false },
   { key: 'nesio-health-v1', label: ['健康指标', 'Health metrics'], critical: false },
   { key: 'nesio-workouts-v1', label: ['我的训练', 'My workouts'], critical: false },
   { key: 'nesio-workout-history-v1', label: ['训练打卡', 'Workout log'], critical: false },
+];
+
+/**
+ * 各 API 导入源的**取数窗口**(2026-07-29 逐个源查代码得出)。
+ * 这不是 bug 清单,是事实清单 —— 但合在一起会得到一个反直觉的结论:
+ * 一个把「回溯 > 预测」写进公理的 App,导进来的数据大部分只有「最近」和「未来」。
+ * 用户看到某个板块"内容很少"时,先对这张表,而不是先怀疑同步坏了。
+ */
+export const IMPORT_WINDOWS: Array<{
+  source: [string, string];
+  window: [string, string];
+  /** true = 存在历史回填路径;false = 结构上拿不到更早的数据 */
+  canBackfill: boolean;
+}> = [
+  { source: ['银行流水 · Plaid', 'Bank · Plaid'], window: ['首次全量回填(上限 5000 笔),之后增量', 'Full backfill (5000 cap), then incremental'], canBackfill: true },
+  { source: ['投资流水 · Plaid', 'Investments · Plaid'], window: ['近 24 个月(transactions 产品不覆盖投资账户,另走 investments)', 'Last 24 months (separate product)'], canBackfill: true },
+  { source: ['日历 · Google', 'Calendar · Google'], window: ['**只拉未来 90 天**,不拉任何过去', '**Next 90 days only** — no past events'], canBackfill: false },
+  { source: ['邮件 · Gmail', 'Mail · Gmail'], window: ['首次近 30 天,之后增量', 'First sync: last 30 days, then incremental'], canBackfill: false },
+  { source: ['会议 · Granola', 'Meetings · Granola'], window: ['最多近 30 天(接口只接受 this_week/last_week/last_30_days)', 'Max last 30 days (API offers no wider range)'], canBackfill: false },
+  { source: ['健康 · Apple Health', 'Health · Apple Health'], window: ['导出文件里有多少就有多少(全历史)', 'Whatever the export file contains (full history)'], canBackfill: true },
+  { source: ['足迹 · 实时/时间轴导入', 'Places · live + Timeline import'], window: ['实时点靠后台定位;历史靠手动导入 Google 时间轴 JSON', 'Live pings + manual Google Timeline JSON import'], canBackfill: true },
 ];
 
 const PHOTO_PREFIX = 'local-image:';

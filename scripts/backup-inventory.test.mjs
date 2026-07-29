@@ -81,4 +81,19 @@ assert.match(en, /Memories 2328/);
 assert.ok(!/MB/.test(en), '未知体积不硬报 0 MB');
 assert.match(B.inventoryWarning(inv2, 'en'), /Bank transactions/);
 
-console.log('backup-inventory: OK(装箱单 + 主数据空即可疑 + 回执不吹牛)');
+// ── 导入窗口清单:事实表,防止「窗口悄悄变了但文档还写着老的」 ──
+assert.ok(Array.isArray(B.IMPORT_WINDOWS) && B.IMPORT_WINDOWS.length >= 7, '每个 API 导入源都要在表里');
+const cal = B.IMPORT_WINDOWS.find((w) => /日历/.test(w.source[0]));
+assert.ok(cal && /未来/.test(cal.window[0]) && cal.canBackfill === false,
+  '日历只拉未来、无历史回填 —— 这条最反直觉,必须钉住');
+const granola = B.IMPORT_WINDOWS.find((w) => /Granola/.test(w.source[0]));
+assert.ok(granola && granola.canBackfill === false, 'Granola 无更宽范围可选');
+const plaid = B.IMPORT_WINDOWS.find((w) => /Plaid/.test(w.source[0]));
+assert.ok(plaid && plaid.canBackfill === true, 'Plaid 有全量回填');
+for (const w of B.IMPORT_WINDOWS) {
+  assert.equal(w.source.length, 2, '中英双语');
+  assert.equal(w.window.length, 2);
+  assert.equal(typeof w.canBackfill, 'boolean');
+}
+
+console.log('backup-inventory: OK(装箱单 + 主数据空即可疑 + 回执不吹牛 + 导入窗口事实表)');
