@@ -30,6 +30,9 @@ const ROUTE_COST_USD: Record<string, number> = {
   daily_brief: 0.004,
   llm_sweep: 0.006,
   embed: 0.0002,
+  gmail: 0.008,
+  gmail_quick: 0.004,
+  gmail_draft_reply: 0.003,
 };
 const DEFAULT_COST_USD = 0.005;
 /** 真实部署(Vercel)上没配 env 时的兜底日上限(每实例·美元)。安全网,非账单;可用 env 调高/调低/设 0 关闭。 */

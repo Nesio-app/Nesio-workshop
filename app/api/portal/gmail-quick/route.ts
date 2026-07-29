@@ -15,6 +15,9 @@ import { buildEmailSignal, type EmailSignal } from '@/lib/platform/email-signals
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 import { parseJsonBlock } from '@/lib/extraction/extraction';
 import { envValue } from '@/lib/portal/env';
+import { readServerTier } from '@/lib/portal/auth/server-entitlement';
+import { reportAiCall } from '@/lib/portal/ai-telemetry';
+import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 
@@ -93,8 +96,8 @@ async function fetchMetadata(accessToken: string): Promise<GmailMeta[]> {
 // 降级原则:AI 无 key / 超时 / 解析失败 → 全放行(退回纯规则,不因 AI 抽风漏提醒)。
 const AI_JUDGE_TIMEOUT_MS = 6000;
 
-async function filterByAiActionability(candidates: EmailSignal[]): Promise<EmailSignal[]> {
-  if (candidates.length === 0 || !aiProviderAvailable()) return candidates;
+async function filterByAiActionability(candidates: EmailSignal[], canUsePaidCloudAi: boolean = false): Promise<EmailSignal[]> {
+  if (candidates.length === 0 || !aiProviderAvailable() || !canUsePaidCloudAi) return candidates;
 
   const list = candidates
     .map((s, i) => `${i}. [${s.type}] 主题：${s.subject}　发件人：${s.from}`)
@@ -107,17 +110,20 @@ ${list}
 
 只返回 JSON 数组,元素为值得出卡的邮件序号(从 0 开始),如 [0,2]。都不值得则返回 []。`;
 
+  const startedAt = Date.now();
   try {
     const judged = await Promise.race([
-      completeText({ prompt, maxTokens: 200, responseFormat: 'json', route: 'gmail-quick-actionability' }),
+      completeText({ prompt, maxTokens: 200, responseFormat: 'json', route: 'gmail_quick' }),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), AI_JUDGE_TIMEOUT_MS)),
     ]);
     if (!judged) return candidates; // 超时 → 降级全放行
+    reportAiCall('gmail_quick', true, startedAt);
     const keep = parseJsonBlock<number[]>(judged.text || '[]');
     if (!Array.isArray(keep)) return candidates; // 解析失败 → 降级全放行
     const keepSet = new Set(keep.map(Number));
     return candidates.filter((_, i) => keepSet.has(i)); // AI 返回 [] = 都不值得,尊重它
   } catch {
+    reportAiCall('gmail_quick', false, startedAt);
     return candidates; // AI 出错 → 降级全放行
   }
 }
@@ -130,6 +136,12 @@ export async function GET(req: NextRequest) {
   if (!hasSession && !hasLabAccess(req)) {
     return NextResponse.json({ ok: false, error: 'auth_required', signals: [] }, { status: 401 });
   }
+
+  // 获取当前用户的付费状态(用于 AI 可执行性判定)
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get('baohe_auth_access')?.value || null;
+  const userTier = await readServerTier(accessToken);
+  const canUsePaidCloudAi = userTier === 'pro';
 
   const tokens = await getIntegrationToken('gmail');
   if (!tokens) {
@@ -169,7 +181,7 @@ export async function GET(req: NextRequest) {
   }
 
   // ③ AI 可执行性门:对已过正则+标签的候选逐条判「值不值得今天出卡」(降级见 helper)。
-  const surfaced = await filterByAiActionability(signals);
+  const surfaced = await filterByAiActionability(signals, canUsePaidCloudAi);
   surfaced.sort((a, b) => b.priority - a.priority);
   return NextResponse.json({ ok: true, signals: surfaced });
 }

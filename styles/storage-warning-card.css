@@ -1,0 +1,221 @@
+/**
+ * styles/storage-warning-card.css
+ *
+ * StorageWarningCard 组件的样式。
+ * 使用设计系统 CSS 变量，支持日间和夜间主题。
+ */
+
+.storage-warning-card {
+  --warning-bg: var(--status-gentle-soft);
+  --warning-border: var(--status-gentle);
+  --warning-text: var(--status-gentle);
+
+  display: flex;
+  gap: var(--space-3);
+  flex-direction: column;
+  padding: var(--space-4);
+  margin: var(--space-3) 0;
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--warning-border);
+  background-color: var(--warning-bg);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.storage-warning-card.storage-warning-danger {
+  --warning-bg: var(--status-risk-soft);
+  --warning-border: var(--status-risk);
+  --warning-text: var(--status-risk);
+}
+
+.storage-warning-content {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.storage-warning-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  line-height: 1;
+  margin-top: 2px;
+}
+
+.storage-warning-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.storage-warning-title {
+  margin: 0 0 var(--space-1) 0;
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--warning-text);
+}
+
+.storage-warning-description {
+  margin: 0 0 var(--space-2) 0;
+  font-size: var(--text-sm);
+  color: var(--portal-muted);
+  line-height: 1.5;
+}
+
+.storage-warning-progress {
+  margin: var(--space-2) 0 0 0;
+  font-size: var(--text-sm);
+  color: var(--portal-muted);
+  font-weight: var(--weight-medium);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+.storage-warning-details {
+  margin-top: var(--space-2);
+}
+
+.storage-warning-details summary {
+  cursor: pointer;
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  padding: var(--space-1);
+  margin: calc(var(--space-1) * -1);
+  border-radius: var(--radius-sm);
+  transition: background-color 150ms ease;
+}
+
+.storage-warning-details summary:hover {
+  background-color: rgba(88, 140, 227, 0.1);
+}
+
+.storage-warning-details ul {
+  list-style: none;
+  padding: var(--space-2) 0 0 0;
+  margin: 0;
+  border-top: 1px solid rgba(88, 140, 227, 0.1);
+}
+
+.storage-warning-details li {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  padding: var(--space-1) 0;
+  word-break: break-word;
+}
+
+.storage-warning-details code {
+  background-color: rgba(30, 42, 58, 0.05);
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+  font-size: 0.85em;
+}
+
+html[data-portal-theme='night'] .storage-warning-details code {
+  background-color: rgba(255, 255, 255, 0.08);
+}
+
+.storage-warning-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  padding-top: var(--space-2);
+  border-top: 1px solid rgba(88, 140, 227, 0.1);
+}
+
+.storage-warning-btn {
+  flex: 1;
+  min-width: 100px;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+  transition: all 150ms ease;
+  font-family: var(--font-sans);
+}
+
+.storage-warning-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.storage-warning-cleanup {
+  background-color: var(--status-gentle);
+  color: white;
+  flex: 1.5;
+}
+
+.storage-warning-cleanup:not(:disabled):hover,
+.storage-warning-cleanup:not(:disabled):active {
+  background-color: var(--status-gentle);
+  opacity: 0.9;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(201, 146, 63, 0.2);
+}
+
+.storage-warning-close {
+  background-color: var(--status-gentle);
+  color: white;
+  flex: 1;
+}
+
+.storage-warning-close:not(:disabled):hover {
+  background-color: var(--status-gentle);
+  opacity: 0.9;
+}
+
+.storage-warning-secondary,
+.storage-warning-dismiss {
+  background-color: transparent;
+  color: var(--warning-text);
+  border: 1px solid var(--warning-border);
+}
+
+.storage-warning-secondary:not(:disabled):hover,
+.storage-warning-dismiss:not(:disabled):hover {
+  background-color: rgba(201, 146, 63, 0.1);
+}
+
+.storage-warning-danger .storage-warning-secondary,
+.storage-warning-danger .storage-warning-dismiss {
+  border-color: var(--status-risk);
+  color: var(--status-risk);
+}
+
+.storage-warning-danger .storage-warning-secondary:not(:disabled):hover,
+.storage-warning-danger .storage-warning-dismiss:not(:disabled):hover {
+  background-color: rgba(207, 107, 107, 0.1);
+}
+
+/* 响应式设计 */
+@media (max-width: 480px) {
+  .storage-warning-card {
+    padding: var(--space-3);
+    gap: var(--space-2);
+  }
+
+  .storage-warning-actions {
+    flex-direction: column;
+  }
+
+  .storage-warning-btn {
+    width: 100%;
+    flex: none;
+  }
+}
+
+/* 深色模式覆盖 */
+html[data-portal-theme='night'] .storage-warning-card {
+  --warning-bg: rgba(201, 146, 63, 0.15);
+}
+
+html[data-portal-theme='night'] .storage-warning-card.storage-warning-danger {
+  --warning-bg: rgba(207, 107, 107, 0.15);
+}

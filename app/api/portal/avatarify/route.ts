@@ -11,8 +11,11 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
+import { readServerTier } from '@/lib/portal/auth/server-entitlement';
 import { resolveAiKey } from '@/lib/portal/ai-keys';
 import { envValue } from '@/lib/portal/env';
+import { reportAiCall } from '@/lib/portal/ai-telemetry';
+import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 45;
@@ -140,14 +143,28 @@ async function openaiAvatar(key: string, imageBase64: string, mimeType: string, 
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await guardAiRoute(req, 'avatarify', { limit: 10, requirePaidCloudAi: true });
+  const guard = await guardAiRoute(req, 'avatarify', { limit: 10 });
   if (guard) return guard;
+
+  // 获取当前用户的付费状态
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get('baohe_auth_access')?.value || null;
+  const userTier = await readServerTier(accessToken);
+  const canUsePaidCloudAi = userTier === 'pro';
 
   const body = await req.json().catch(() => ({})) as { imageBase64?: string; mimeType?: string; style?: RestyleKind };
   const style: RestyleKind = body.style === 'garment' ? 'garment' : 'avatar';
   const prompt = promptFor(style);
   if (!body.imageBase64) {
     return NextResponse.json({ ok: false, error: 'no_image' }, { status: 400 });
+  }
+
+  // 免费用户无图像生成,返回提示
+  if (!canUsePaidCloudAi) {
+    return NextResponse.json(
+      { ok: false, error: 'pro_required', message: '需要订阅才能使用卡通头像生成功能。' },
+      { status: 402 },
+    );
   }
 
   const geminiKey = resolveAiKey('gemini');
@@ -162,18 +179,24 @@ export async function POST(req: NextRequest) {
   // Gemini 免费层优先(用户侧成本低),失败落 OpenAI gpt-image-1
   const errs: string[] = [];
   let dataUrl: string | undefined;
+  const startedAt = Date.now();
+  let aiSucceeded = false;
+
   if (geminiKey) {
     const g = await geminiAvatar(geminiKey, body.imageBase64, body.mimeType || 'image/jpeg', prompt);
     dataUrl = g.dataUrl;
     if (g.error) errs.push(g.error);
+    if (dataUrl) aiSucceeded = true;
   }
   if (!dataUrl && openaiKey) {
     const o = await openaiAvatar(openaiKey, body.imageBase64, body.mimeType || 'image/jpeg', prompt);
     dataUrl = o.dataUrl;
     if (o.error) errs.push(o.error);
+    if (dataUrl) aiSucceeded = true;
   }
 
   if (!dataUrl) {
+    reportAiCall('avatarify', false, startedAt);
     const detail = errs.join(' · ').slice(0, 160);
     console.error('[avatarify] generate_failed', style, detail);
     return NextResponse.json(
@@ -181,5 +204,7 @@ export async function POST(req: NextRequest) {
       { status: 502 },
     );
   }
+
+  reportAiCall('avatarify', true, startedAt);
   return NextResponse.json({ ok: true, dataUrl });
 }
