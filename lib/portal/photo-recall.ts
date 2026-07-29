@@ -36,6 +36,24 @@ function widen(term: string): string[] {
 }
 
 /**
+ * 从一句话描述里切出可能是「东西」的词块。
+ *
+ * 不做分词(仓里没有中文分词器,也不该为这个引一个)。按标点和常见虚词切,
+ * 再剥掉数量词前缀 —— 「一支黑色的钢笔」→「黑色的钢笔」→ widen 会继续切出「钢笔」「笔」。
+ * 宁可多切几个没用的词(多查几次本地模糊搜索而已),也不要漏掉唯一那条线索。
+ */
+export function chunksOf(text: string): string[] {
+  return text
+    .split(/[，。、；：,.;:!?！？\n]|包括|以及|还有|和|上面有|里面有/)
+    .map((s) => s.trim()
+      // 「一支」「几个」「两把」这类数量词前缀去掉
+      .replace(/^[一二三四五六七八九十两几数][只支个把条张台部件件套双]/, '')
+      .replace(/^(的|了|是|在|有)+/, '')
+      .trim())
+    .filter((s) => s.length >= 2 && s.length <= 12);
+}
+
+/**
  * 按识别结果在本机记忆里找相关条目。
  * @param things 识别出的物件(name/tags)
  * @param summary 识别的一句话描述,兜底查询词
@@ -47,7 +65,14 @@ export function recallByRecognition(things: RecognizedThing[], summary?: string,
     terms.push(...widen(t.name));
     for (const tag of t.tags || []) terms.push(...widen(tag));
   }
-  if (summary) terms.push(summary);
+  if (summary) {
+    terms.push(summary);
+    // 2026-07-29:抽取返回**零条目**时,整段描述就是唯一线索 —— 而整段话拿去
+    // searchLifeGraphFuzzy 几乎必然落空(它是按词命中的)。所以再从描述里切出名词性词块
+    // 单独查一遍。用户报的正是这个:模型明明在描述里说了「一支黑色的钢笔」,
+    // 我们却因为 nodes 为空连找都不找,回一句「记忆库里暂时没有找到相关记录」。
+    for (const chunk of chunksOf(summary)) terms.push(...widen(chunk));
+  }
   // 词长的先查(更精确),命中次数多的排前面。
   const seen = new Set<string>();
   const hits = new Map<string, { node: LifeNode; score: number }>();
