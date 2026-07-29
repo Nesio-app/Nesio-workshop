@@ -240,8 +240,10 @@ export default function WardrobePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
-  // 规则版(免费/兜底)——始终算,离线可用;带上用户偏好
-  const outfit = useMemo(() => suggestOutfit(items, weatherCtx, new Date().toISOString(), prefs), [items, weatherCtx, prefs]);
+  // 规则版(免费/兜底)——始终算,离线可用;带上用户偏好。
+  // 日戳用本地时间平移的 ISO(直接 toISOString 是 UTC,美东晚上会把穿搭记到「明天」—— QA 日期错位)。
+  const localIso = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60_000).toISOString();
+  const outfit = useMemo(() => suggestOutfit(items, weatherCtx, localIso(), prefs), [items, weatherCtx, prefs]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Pro 云造型师:随衣橱/场合变化 or「重新造型」重算。失败置 stylistError,展示时回落规则版。
   useEffect(() => {
@@ -668,7 +670,7 @@ export default function WardrobePanel() {
                     {L(dict, WARMTH_LABEL[it.warmth][0], WARMTH_LABEL[it.warmth][1])} · {L(dict, FORMAL_LABEL[it.formality][0], FORMAL_LABEL[it.formality][1])}
                   </p>
                   <div style={{ display: 'flex', gap: '0.3rem', marginTop: '0.3rem' }}>
-                    <button type="button" onClick={() => { markWorn(it.id, new Date().toISOString()); giveFeedback('worn', [it]); load(); }}
+                    <button type="button" onClick={() => { markWorn(it.id, localIso()); giveFeedback('worn', [it]); load(); }}
                       style={{ flex: 1, padding: '0.2rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-blue-deep)', fontSize: '0.62rem', cursor: 'pointer' }}
                       title={L(dict, '记一次今天穿了', 'Mark worn today')}>{L(dict, '穿了', 'Worn')}</button>
                     <button type="button" onClick={() => startEdit(it)} aria-label={L(dict, '编辑', 'Edit')}

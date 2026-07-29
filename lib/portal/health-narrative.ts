@@ -21,7 +21,10 @@ export function analyzeSeries(series: Array<{ ym: string; v: number }>): SeriesP
   const tail = vals.slice(-third).reduce((a, b) => a + b, 0) / third;
   const spread = Math.max(...vals) - Math.min(...vals) || 1;
   const rel = (tail - head) / spread;
-  const dir: SeriesPattern['dir'] = rel > 0.15 ? 'up' : rel < -0.15 ? 'down' : 'flat';
+  // 双口径判向(QA:静息心率 62→77 却说「平稳」):离群点会把 spread 撑大、把真实趋势
+  // 稀释成 flat —— 再叠加「相对水平变化」口径,首末段均值差超过水平的 10% 就不算平稳。
+  const relLevel = Math.abs(head) > 1e-9 ? (tail - head) / Math.abs(head) : 0;
+  const dir: SeriesPattern['dir'] = (rel > 0.15 || relLevel > 0.1) ? 'up' : (rel < -0.15 || relLevel < -0.1) ? 'down' : 'flat';
 
   let peakIdx = 0;
   let valleyIdx = 0;

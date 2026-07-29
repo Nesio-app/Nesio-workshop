@@ -74,20 +74,19 @@ export async function GET(req: NextRequest) {
   if (isRateLimited(req, 'admin_metrics', { limit: 30, windowMs: 60_000 })) {
     return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 });
   }
-  const hasSupabase = Boolean(envValue('SUPABASE_URL') && envValue('SUPABASE_ANON_KEY'));
-  if (hasSupabase) {
-    const secret = envValue('NESIO_ADMIN_SECRET');
-    if (!secret) {
-      return NextResponse.json(
-        { ok: false, error: 'admin_not_configured', hint: 'Vercel 环境变量设置 NESIO_ADMIN_SECRET 后重新部署' },
-        { status: 503 },
-      );
-    }
-    const provided = req.headers.get('x-nesio-admin-secret')?.trim() || '';
-    // 批次191:admin 密钥用常量时间比较(safeEqual),避免 === 短路的计时侧信道。
-    if (!safeEqual(provided, secret)) {
-      return NextResponse.json({ ok: false, error: 'admin_secret_required' }, { status: 401 });
-    }
+  // 门禁无条件生效(修 QA:未配 Supabase 时整段鉴权被跳过 = /admin 裸奔)。
+  // 没配密钥 → 503 拒绝,而不是放行。
+  const secret = envValue('NESIO_ADMIN_SECRET');
+  if (!secret) {
+    return NextResponse.json(
+      { ok: false, error: 'admin_not_configured', hint: 'Vercel 环境变量设置 NESIO_ADMIN_SECRET 后重新部署' },
+      { status: 503 },
+    );
+  }
+  const provided = req.headers.get('x-nesio-admin-secret')?.trim() || '';
+  // 批次191:admin 密钥用常量时间比较(safeEqual),避免 === 短路的计时侧信道。
+  if (!safeEqual(provided, secret)) {
+    return NextResponse.json({ ok: false, error: 'admin_secret_required' }, { status: 401 });
   }
 
   const since60 = new Date(Date.now() - 60 * 86_400_000).toISOString();

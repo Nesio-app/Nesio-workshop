@@ -55,6 +55,8 @@ export default function TrainingPlan() {
   const [libOpen, setLibOpen] = useState(false);
   const [genOpen, setGenOpen] = useState(false);
   const [lastRec, setLastRec] = useState<LastWorkoutRecord | null>(null);
+  // 换计划二次确认(QA:一点就跳选择页,像把进度清了 —— 其实打卡记录都在,但得说清楚再动)
+  const [confirmSwitch, setConfirmSwitch] = useState(false);
   const [workouts, setWorkouts] = useState<Workout[]>([]);
   const [, setCatTick] = useState(0); // 扩展库动作名要等 catalog 载入内存才解析得出 → 载好后 bump 重渲染
   useEffect(() => {
@@ -169,7 +171,12 @@ export default function TrainingPlan() {
     setEarned(POINTS_PER_FITNESS_SESSION);
     setTimeout(() => setEarned(null), 2400);
   };
-  const switchPlan = () => { const s = { ...st, activeProtocolId: null, startedAt: null }; saveTrainingState(s); setSt(s); };
+  const switchPlan = () => {
+    if (!confirmSwitch) { setConfirmSwitch(true); setTimeout(() => setConfirmSwitch(false), 4000); return; }
+    setConfirmSwitch(false);
+    const s = { ...st, activeProtocolId: null, startedAt: null };
+    saveTrainingState(s); setSt(s);
+  };
 
   return (
     <div>
@@ -179,7 +186,7 @@ export default function TrainingPlan() {
           <span className="nesio-fin-recur-hero-l">{L(dict, active.name.zh, active.name.en)}</span>
           <span style={{ fontSize: '0.7rem', color: 'var(--portal-blue-deep)' }}>{L(dict, `本周 ${doneThisWeek}/${active.sessionsPerWeek} 次 · ${phase.name.zh}`, `${doneThisWeek}/${active.sessionsPerWeek} this week · ${phase.name.en}`)}</span>
         </div>
-        <button type="button" onClick={switchPlan} style={{ flexShrink: 0, fontSize: '0.72rem', color: 'var(--portal-blue-deep)', background: 'none', border: '1px solid var(--portal-accent-border)', borderRadius: 999, padding: '0.25rem 0.6rem', cursor: 'pointer' }}>{L(dict, '换计划', 'Change')}</button>
+        <button type="button" onClick={switchPlan} style={{ flexShrink: 0, fontSize: '0.72rem', color: confirmSwitch ? 'var(--status-gentle)' : 'var(--portal-blue-deep)', background: 'none', border: `1px solid ${confirmSwitch ? 'var(--status-gentle)' : 'var(--portal-accent-border)'}`, borderRadius: 999, padding: '0.25rem 0.6rem', cursor: 'pointer' }}>{confirmSwitch ? L(dict, '再点一次确认(打卡记录会保留)', 'Tap again to confirm (log is kept)') : L(dict, '换计划', 'Change')}</button>
       </div>
 
       {planLapsed && (

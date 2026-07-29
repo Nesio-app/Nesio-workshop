@@ -1073,7 +1073,9 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
     <SheetWrap open={open} onClose={onClose} title={L(dict, '会员与权益', 'Membership')}>
       {(() => {
         const days = trialDaysLeft();
-        const pro = getTier() === 'pro' && days <= 0; // 真 Pro(非试用)
+        // 服务端确认的付费 Pro 永远优先 —— 否则试用期内的付费用户会看到
+        // 顶部「免费试用剩 N 天」+ 底部「你已是 Pro 会员」同页打架(QA ⑥)。
+        const pro = isPaidPro || (getTier() === 'pro' && days <= 0);
         return (
           <div className="nesio-sub-status-card">
             <div className="nesio-sub-status-badge nesio-sub-status-badge--free">

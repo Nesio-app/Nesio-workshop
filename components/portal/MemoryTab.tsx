@@ -353,7 +353,7 @@ function cleanMemoryPreview(node: LifeNode, dict: DictLocale = 'zh'): string {
   if (aiSummary) return aiSummary.slice(0, 44);
   // 批次 59:属性兜底改走可见名单 —— 位置戳/信号基建/内部字段绝不上卡片面
   // (此前 Object.values 全量拼接,capturedLat/Lon 裸坐标直接糊在卡片上)。
-  const PREVIEW_HIDDEN = /^(capturedLat|capturedLon|capturedPlace|lat|lon|signalId|signalSource|signalType|signalVersion|occurredAt|capturedAt|externalId|calendarId|calendarName|subtasksJson|done|doneAt|focusPinnedOn|retentionPolicy|sensitivity|schemaVersion|sourceNodeId|emailId|messageId|htmlLink|context|userTags|status)$/;
+  const PREVIEW_HIDDEN = /^(capturedLat|capturedLon|capturedPlace|lat|lon|signalId|signalSource|signalType|signalVersion|occurredAt|capturedAt|externalId|calendarId|calendarName|subtasksJson|done|doneAt|focusPinnedOn|retentionPolicy|sensitivity|schemaVersion|sourceNodeId|emailId|messageId|htmlLink|context|userTags|status|epistemic|generator|provenance|confidence)$/;
   const attrPreview = Object.entries(node.attributes)
     .filter(([k, v]) => !PREVIEW_HIDDEN.test(k) && typeof v === 'string' && v.trim())
     .map(([, v]) => v as string)
@@ -1345,9 +1345,12 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 <>
                   <div className="nesio-section-header" style={{ marginTop: '0.25rem' }}>
                     {/* 批次 112:对齐 mockup —— 「全部记忆 · N 条 · 可搜」 */}
-                    <span className="nesio-section-title">
+    <span className="nesio-section-title">
                       {L(dict, '全部记忆', 'All memories')}
-                      <span className="nesio-section-title-sub"> · {L(dict, `${nodes.length} 条 · 可搜`, `${nodes.length} · search`)}</span>
+                      {/* 筛选中显示「命中 / 总数」——不再一直挂 2328(QA:筛到健康 7 条,头部还写全部) */}
+                      <span className="nesio-section-title-sub"> · {typeFilter
+                        ? L(dict, `${visibleNodes.length} / ${nodes.length} 条`, `${visibleNodes.length} / ${nodes.length}`)
+                        : L(dict, `${nodes.length} 条 · 可搜`, `${nodes.length} · search`)}</span>
                     </span>
                     <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                       {typeFilter && (

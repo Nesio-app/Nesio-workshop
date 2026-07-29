@@ -44,6 +44,7 @@ const RewardsStoreSheet = dynamic(() => import('./RewardsStoreSheet'), { ssr: fa
 const DailyBriefSheet = dynamic(() => import('./DailyBriefSheet').then((m) => m.DailyBriefSheet), { ssr: false });
 // 洞察 = 全屏浮层(非 surface):提到 Portal 层,底部导航从任意页都能开。1143 行,开时才加载。
 const InsightsSheet = dynamic(() => import('./InsightsSheet'), { ssr: false });
+type InsightsMainTab = import('./InsightsSheet').MainTab;
 import { DEFAULT_PORTAL_CONFIG } from '@/lib/portal/defaults';
 import { openToolHref } from '@/lib/portal/open-tool';
 import {
@@ -461,7 +462,7 @@ export default function Portal() {
   const [briefOpen, setBriefOpen] = useState(false); // 批次 176:每日简报全局挂载(例行卡 + Lab demo 都派 nesio-open-brief 打开)
   const [freezeOpen, setFreezeOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false); // 洞察全屏浮层(底部导航第 3 个 tab / nesio-open-insights 事件打开)
-  const [insightsTab, setInsightsTab] = useState<'fitness' | undefined>(undefined);
+  const [insightsTab, setInsightsTab] = useState<InsightsMainTab | undefined>(undefined);
   const [proGate, setProGate] = useState<string | null>(null); // 非 null = 显示 Pro 升级引导(值=功能名)
   // 跨账号本地数据冲突(P0 隐私):登录后本机数据归属与当前用户不符 → 阻断处理
   const [ownerConflict, setOwnerConflict] = useState<
@@ -853,7 +854,9 @@ export default function Portal() {
     const insightsHandler = (e: Event) => {
       const tab = (e as CustomEvent).detail?.tab;
       track('insights_open', {});
-      setInsightsTab(tab === 'fitness' ? 'fitness' : undefined);
+      // 深链支持全部板块(原来只认 fitness → 车页「→ 财务/足迹」等指路行全是死链)
+      const INSIGHT_TABS: ReadonlySet<string> = new Set(['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule', 'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'admin']);
+      setInsightsTab(typeof tab === 'string' && INSIGHT_TABS.has(tab) ? (tab as InsightsMainTab) : undefined);
       setInsightsOpen(true);
     };
     const trainingHandler = () => { setInsightsTab('fitness'); setInsightsOpen(true); };
@@ -868,6 +871,7 @@ export default function Portal() {
     const memorySearchHandler = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.resent) return; // 补发的那次别再切面/再补发
+      setInsightsOpen(false); // 从洞察里跳记忆搜索:浮层不关会盖住记忆页(「表面死按钮」根因之一)
       setActiveSurface((s) => {
         if (s === 'memory') return s;
         setTimeout(() => {

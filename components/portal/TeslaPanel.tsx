@@ -226,11 +226,19 @@ export default function TeslaPanel() {
         borderTop: '1px solid var(--portal-line)',
       }}>
         <p className="nesio-settings-section-label">{L(dict, '这些数据去哪了', 'Where this data lives')}</p>
-        <ul style={{ margin: 0, paddingLeft: '1.1rem', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)', lineHeight: 1.7 }}>
-          <li>{L(dict, '充电花费 → 洞察 · 财务(和银行流水并在一起看)', 'Charging spend → Insights · Finance (alongside bank transactions)')}</li>
-          <li>{L(dict, '停车 / 充电位置 → 洞察 · 分析 · 地点足迹', 'Parking / charging locations → Insights · Analytics · Place trail')}</li>
-          <li>{L(dict, '行驶 / 充电记录 → 问一问、时间线可搜到', 'Drives / charges → searchable in Ask & Timeline')}</li>
-        </ul>
+        {/* 长得像链接就得是链接(QA:三行带箭头全是死的)—— 点击真跳对应板块 */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          {([
+            [L(dict, '充电花费 → 财务(和银行流水并在一起看)', 'Charging spend → Finance (alongside bank transactions)'), () => window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab: 'finance' } }))],
+            [L(dict, '停车 / 充电位置 → 地点足迹', 'Parking / charging locations → Place trail'), () => window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab: 'timeline' } }))],
+            [L(dict, '行驶 / 充电记录 → 在记忆里搜「充电」', 'Drives / charges → search “charging” in Memory'), () => window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: L(dict, '充电', 'charging') } }))],
+          ] as Array<[string, () => void]>).map(([txt, go]) => (
+            <button key={txt} type="button" onClick={go}
+              style={{ border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', padding: '4px 0', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)', lineHeight: 1.7, fontFamily: 'var(--font-sans)' }}>
+              {txt} <span aria-hidden style={{ color: 'var(--portal-accent)' }}>›</span>
+            </button>
+          ))}
+        </div>
       </div>
     </>
   );

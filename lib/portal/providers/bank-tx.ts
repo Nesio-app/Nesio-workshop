@@ -609,6 +609,17 @@ export function assetSummary(accounts: BankAccount[], currency = 'USD'): { depos
   };
 }
 
+/** 资产小结 + 持仓兜底:Plaid 投资账户常只回持仓、不回 balance → assetSummary.investments
+ *  为 0,净资产整块漏掉投资(QA 实测:净资产 -$1,294,同页却列着 $235k 持仓)。
+ *  投资余额为 0 而持仓有市值时,用持仓市值补上;有余额时以余额为准(不重计)。 */
+export function assetSummaryWithHoldings(accounts: BankAccount[], holdings: Holding[], currency = 'USD'): ReturnType<typeof assetSummary> {
+  const s = assetSummary(accounts, currency);
+  if (s.investments !== 0) return s;
+  const hv = round2(holdings.reduce((sum, h) => sum + (h.value || 0), 0));
+  if (hv <= 0) return s;
+  return { ...s, investments: hv, net: round2(s.net + hv) };
+}
+
 /** 免费最大化·Plaid A:投资组合未实现盈亏 = Σ市值 − Σ成本(有成本的持仓才计)。
  *  value/costBasis 早已存了,只是从没做减法呈现。gainPct 相对成本。 */
 export function holdingsGainLoss(holdings: Holding[]): { value: number; cost: number; gain: number; gainPct: number } {

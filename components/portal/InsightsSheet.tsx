@@ -47,7 +47,7 @@ import { readFactJournal, ensureFactJournal } from '@/lib/platform/fact-journal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'fitness' | 'timeline' | 'schedule' | 'finance' | 'inventory' | 'wardrobe' | 'relationships' | 'tesla' | 'living' | 'admin';
+export type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'fitness' | 'timeline' | 'schedule' | 'finance' | 'inventory' | 'wardrobe' | 'relationships' | 'tesla' | 'living' | 'admin';
 
 const DAY_MS = 86_400_000;
 
@@ -182,6 +182,11 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   const [mainTab, setMainTab] = useState<MainTab>(initialTab ?? 'reflection');
   // 洞察改版:首页是入口宫格(showHub),点卡进板块;有 initialTab(深链)时直达板块。
   const [showHub, setShowHub] = useState(!initialTab);
+  // 洞察已打开时的板块深链(如车页「充电花费 → 财务」):initialTab 变化要能就地切板块,
+  // 不能只认挂载那一次(否则打开状态下深链没反应 = 死链接)。
+  useEffect(() => {
+    if (initialTab) { setMainTab(initialTab); setShowHub(false); }
+  }, [initialTab]);
   const tabLabel = (t: MainTab): string =>
     t === 'reflection' ? L(dict, '洞察', 'Insights')
       : t === 'growth' ? L(dict, '成长', 'Growth')

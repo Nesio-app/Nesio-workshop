@@ -225,7 +225,10 @@ export default function NesioSheet({
   opaqueOverlay = false,
   children,
 }: NesioSheetProps) {
-  const panelClass = `nesio-sheet nesio-sheet--${variant}${card ? '' : ' nesio-sheet--bare'}${className ? ` ${className}` : ''}`;
+  // opaqueOverlay + 非全屏:面板必须抬到不透明遮罩(929)之上,否则被自己的遮罩盖死
+  // (清空本地数据后的「归入账号」强制对话框整屏纯色、看不见点不动 —— QA 致命 bug①)。
+  const overOpaque = opaqueOverlay && variant !== 'fullscreen' ? ' nesio-sheet--over-opaque' : '';
+  const panelClass = `nesio-sheet nesio-sheet--${variant}${card ? '' : ' nesio-sheet--bare'}${overOpaque}${className ? ` ${className}` : ''}`;
 
   if (variant === 'bottom') {
     return (

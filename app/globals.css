@@ -4791,7 +4791,9 @@ html[data-portal-theme="night"] .nesio-logo-night { display: inline-block !impor
 .nesio-today-scroll {
   flex: 1;
   overflow-y: auto;
-  padding: 0.5rem 1.1rem calc(5.5rem + env(safe-area-inset-bottom));
+  /* 6.5rem:悬浮导航(底 0.5rem + 高约 3.2rem)+ 余量 —— QA 实测 390×844 下
+     「还有 N 件小事」行被导航压了一截,5.5rem 不够。 */
+  padding: 0.5rem 1.1rem calc(6.5rem + env(safe-area-inset-bottom));
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain; /* iOS PWA:触底橡皮筋会拖动 fixed 层露出 html 兜底色(底部色带) */
 }
@@ -18252,6 +18254,10 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
    必须整个盖住触发它的 bottom 卡,否则卡片会从半透明面板里透出来(实测「阅读器透明」)。
    仍低于 image-viewer(950)/镜信抽屉(948)/日期选择器等特殊模态(1010–1200)。 */
 .nesio-sheet-overlay--opaque { background: var(--portal-bg, #f4f8fd); z-index: 929; }
+/* opaqueOverlay 的非全屏面板:抬到不透明遮罩之上(930,与 fullscreen 同层)。
+   不加这条,center/bottom 面板(901)会被自己的 929 遮罩整个盖住 = 看不见点不动
+   (新用户/清数据后的「归入账号」强制对话框曾因此把人锁死在纯色屏前)。 */
+.nesio-sheet.nesio-sheet--over-opaque { z-index: 930; }
 .nesio-sheet-overlay[data-state='open'] { animation: nesioSheetFade var(--dur, 0.3s) var(--ease-out); }
 .nesio-sheet-overlay[data-state='closed'] { animation: nesioSheetFadeOut var(--dur-fast, 0.2s) var(--ease-out); }
 

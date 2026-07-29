@@ -13,7 +13,7 @@ import {
   needsReview, suggestCategory, setMerchantRule, effectiveCategory,
   formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
-  loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummary, expenseMerchants,
+  loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummaryWithHoldings, expenseMerchants,
   loadHoldings, setMerchantRuleFor, setFlowRuleFor, loadRuleLabels,
   bankDataReady, loadBankSyncStatus,
   type BankTx, type BankAccount, type TxFlow, type Holding,
@@ -380,7 +380,7 @@ export default function FinanceTab() {
           )}
           {/* P1 净值 hero:Plaid + 手动资产(锚点),快照曲线(同步时落点,LOCF 语义,只回看) */}
           {(() => {
-            const s = assetSummary(accounts);
+            const s = assetSummaryWithHoldings(accounts, holdings); // 投资账户无 balance 时用持仓市值兜底
             const manualNet = manualNetWorth(manualAssets);
             if (s.net === 0 && manualNet === 0) return null;
             const total = Math.round((s.net + manualNet) * 100) / 100;

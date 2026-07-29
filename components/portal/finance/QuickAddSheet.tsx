@@ -87,7 +87,9 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
     try {
       if (seg === 'asset') {
         if (assetId) {
-          const ok = addAssetAnchor(assetId, { date: new Date().toISOString().slice(0, 10), value: v, ...(anchorNote ? { note: anchorNote } : {}) });
+          const d = new Date(); // 本地日键(UTC 会把晚上记的锚点标成明天)
+          const localDay = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          const ok = addAssetAnchor(assetId, { date: localDay, value: v, ...(anchorNote ? { note: anchorNote } : {}) });
           if (!ok) throw new Error('anchor_failed');
         } else {
           const name = newAssetName.trim();

@@ -167,7 +167,9 @@ export function inferFocus(targets: string[]): FocusBucket | null {
 /** 跟练完成时记一笔(任何来源:生成的 / 自定义 / 计划),给下次的回溯建议用。 */
 export function recordWorkoutDone(name: string, targets: string[], now: Date = new Date()): void {
   if (typeof window === 'undefined') return;
-  const rec: LastWorkoutRecord = { date: now.toISOString().slice(0, 10), name, focus: inferFocus(targets) };
+  // 本地日键(不走 UTC —— 美东晚上练完别记成「明天」)
+  const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const rec: LastWorkoutRecord = { date: day, name, focus: inferFocus(targets) };
   try { localStorage.setItem(LAST_KEY, JSON.stringify(rec)); } catch { reportStorageDropped(); }
 }
 

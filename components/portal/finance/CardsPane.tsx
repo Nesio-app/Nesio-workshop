@@ -6,12 +6,12 @@
  */
 
 import {
-  accountMonth, accountTypeLabel, assetSummary, formatMoney, removeBankAccount,
+  accountMonth, accountTypeLabel, assetSummaryWithHoldings, formatMoney, removeBankAccount,
   type BankTx, type BankAccount, type Holding,
 } from '@/lib/portal/bank-tx';
 import { incomeBreakdown, portfolioSummary } from '@/lib/portal/finance-features';
 import {
-  assetCurrentValue, assetDepreciation, assetHoldingCosts, channelBalance, removeManualAsset, recordNetWorthSnapshot,
+  assetCurrentValue, assetDepreciation, assetHoldingCosts, channelBalance, manualNetWorth, removeManualAsset, recordNetWorthSnapshot,
   type ManualAsset,
 } from '@/lib/portal/finance-assets';
 import { loadDomainExpenses } from '@/lib/portal/finance-sources';
@@ -37,7 +37,12 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
         accounts.length === 0 ? (
           <p className="nesio-insights-option-hint nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没有账户信息。到「设置 → 数据接入」点银行「同步」一次,就会拉到你的卡/账户(余额、消费、退款分卡显示)。', 'No account info yet. Tap Sync on the bank connector once (Settings → Data sources) to pull your cards/accounts (per-card balance, spend, refunds).')}</p>
         ) : (() => {
-          const s = assetSummary(accounts);
+          // 口径修复(QA:净资产 -$1,294 vs 同页 $235k 持仓):投资账户无 balance 时用持仓
+          // 市值兜底;手动资产(渠道/房车锚点)与本页下方列表同源,一并计入,与总览 hero 一致。
+          const s = assetSummaryWithHoldings(accounts, holdings);
+          let mNet = 0;
+          try { mNet = manualNetWorth(manualAssets, loadDomainExpenses()); } catch { mNet = manualNetWorth(manualAssets); }
+          const heroNet = Math.round((s.net + mNet) * 100) / 100;
           const fmtGain = (g: number) => (g >= 0 ? `+${formatMoney(g)}` : `-${formatMoney(-g)}`);
           const gainColor = (g: number) => (g >= 0 ? 'var(--status-go)' : 'var(--status-gentle)');
           const invIncome = incomeBreakdown(txs, ym).filter((x) => x.detail === 'INCOME_DIVIDENDS' || x.detail === 'INCOME_INTEREST_EARNED');
@@ -66,12 +71,17 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
           };
           return (
             <>
-              {/* 净资产 hero(黑卡)*/}
-              {!(s.deposits === 0 && s.investments === 0 && s.creditOwed === 0 && s.loanOwed === 0) && (
+              {/* 净资产 hero(黑卡):存款 + 投资(持仓兜底)+ 手动资产 − 负债,与页内列表一致 */}
+              {!(s.deposits === 0 && s.investments === 0 && s.creditOwed === 0 && s.loanOwed === 0 && mNet === 0) && (
                 <div className="nesio-fin-networth">
                   <span className="nesio-fin-networth-l">{L(dict, '净资产', 'Net worth')}</span>
-                  <span className="nesio-fin-networth-v">{s.net < 0 ? `-${formatMoney(-s.net)}` : formatMoney(s.net)}</span>
-                  <span className="nesio-fin-networth-sub">{L(dict, `存款 ${formatMoney(s.deposits)}`, `Cash ${formatMoney(s.deposits)}`)}{s.investments > 0 ? ` · ${L(dict, `投资 ${formatMoney(s.investments)}`, `Investments ${formatMoney(s.investments)}`)}` : ''}</span>
+                  <span className="nesio-fin-networth-v">{heroNet < 0 ? `-${formatMoney(-heroNet)}` : formatMoney(heroNet)}</span>
+                  <span className="nesio-fin-networth-sub">
+                    {L(dict, `存款 ${formatMoney(s.deposits)}`, `Cash ${formatMoney(s.deposits)}`)}
+                    {s.investments > 0 ? ` · ${L(dict, `投资 ${formatMoney(s.investments)}`, `Investments ${formatMoney(s.investments)}`)}` : ''}
+                    {mNet !== 0 ? ` · ${L(dict, `手动 ${mNet < 0 ? '-' : ''}${formatMoney(Math.abs(mNet))}`, `Manual ${mNet < 0 ? '-' : ''}${formatMoney(Math.abs(mNet))}`)}` : ''}
+                    {s.creditOwed + s.loanOwed > 0 ? ` · ${L(dict, `负债 -${formatMoney(s.creditOwed + s.loanOwed)}`, `Debt -${formatMoney(s.creditOwed + s.loanOwed)}`)}` : ''}
+                  </span>
                 </div>
               )}
 

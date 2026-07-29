@@ -186,6 +186,8 @@ const HIDDEN_ATTRIBUTE_KEYS = new Set([
   'signalId', 'signalSource', 'signalType', 'signalVersion',
   'occuredAt', 'occurredAt', 'capturedAt', 'retentionPolicy', 'sensitivity',
   'sourceNodeId', 'schemaVersion',
+  // 认知谱系内部字段(QA:详情页露出「epistemic: observation」「generator: manual」)
+  'epistemic', 'generator', 'provenance', 'confidence',
   // Type-specific (handled in sections)
   'note', 'price', 'purchaseDate', 'expiry', 'store', 'merchant', 'subtype', 'paymentMethod',
   // 电商/物流事件:预计到货由 EventSection 单独渲染,不在通用属性区重复
@@ -977,6 +979,11 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
           ) : (
             <h2 className="nesio-settings-sheet-title" title={n.name}>{displayTitle(displayNodeName(n.name, dict))}</h2>
           )}
+          {/* 可见关闭出口(QA:只能 Esc/下滑关,触屏用户不知道怎么退) */}
+          <button type="button" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}
+            style={{ flexShrink: 0, marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--portal-muted)', fontSize: '1rem', padding: '0.2rem 0.35rem', lineHeight: 1 }}>
+            ✕
+          </button>
         </div>
 
         {/* Expanded edit form — type-specific fields */}

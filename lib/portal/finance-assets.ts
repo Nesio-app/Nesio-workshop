@@ -13,7 +13,7 @@
 
 import { createBlobStore } from './idb-blob-store';
 import { reportStorageDropped } from './storage-health';
-import { loadBankAccounts, assetSummary, loadHoldings } from './bank-tx';
+import { loadBankAccounts, assetSummaryWithHoldings, loadHoldings } from './bank-tx';
 import { loadDomainExpenses } from './finance-sources';
 
 export const FIN_ASSETS_KEY = 'nesio-fin-assets-v1';
@@ -145,9 +145,9 @@ export function manualNetWorth(
   return Math.round(net * 100) / 100;
 }
 
-/** 总净值 = Plaid 口径 + 手动(币种按用户拍板不折算,简单相加)。 */
+/** 总净值 = Plaid 口径(投资账户无 balance 时用持仓市值兜底)+ 手动(币种按用户拍板不折算,简单相加)。 */
 export function combinedNetWorth(): { plaidNet: number; manualNet: number; net: number } {
-  const plaidNet = assetSummary(loadBankAccounts()).net;
+  const plaidNet = assetSummaryWithHoldings(loadBankAccounts(), loadHoldings()).net;
   let manualNet: number;
   try { manualNet = manualNetWorth(listManualAssets(), loadDomainExpenses()); }
   catch { manualNet = manualNetWorth(listManualAssets()); }
