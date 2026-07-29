@@ -6430,15 +6430,18 @@ html[data-portal-theme="night"] .nesio-voice-confirm-chip {
   margin-top: 0.15rem;
 }
 
+/* 主按钮。和「重拍」是一对,所以内边距/圆角/字号要对齐(以前 0.5/0.78rem vs 0.55/0.8rem,
+   两个挨着的按钮高度差一截)。投影原来写死品牌蓝的 rgba —— 换到灰粉皮肤就是
+   一团蓝影子挂在陶红按钮下面;改成从当前强调色派生。 */
 .nesio-camera-save-btn {
-  background: var(--portal-blue-deep);
-  color: #fff;
-  padding: 0.5rem 1.1rem;
-  border-radius: 999px;
-  font-size: 0.78rem;
-  font-weight: 600;
+  background: var(--portal-accent);
+  color: var(--portal-on-accent, #fff);
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
   white-space: nowrap;
-  box-shadow: 0 2px 10px rgba(88,140,227,0.4);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--portal-accent) 38%, transparent);
 }
 
 .nesio-camera-controls {
@@ -9124,12 +9127,27 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
   padding-bottom: calc(0.85rem + env(safe-area-inset-bottom, 0px) + var(--kb-inset, 0px));
 }
 
+/* 识别结果的一句说明。独占一行 —— 它以前和右边那排 chip 同处一个 flex 行,
+   被挤成一条五六个字宽的竖列。字号/行高/字重全部走 token,和站内正文一致。 */
 .nesio-camera-result-summary {
-  font-size: 0.78rem;
-  color: var(--portal-blue-deep);
-  margin-bottom: 0.65rem;
-  font-weight: 500;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--portal-muted);
+  margin: 0 0 var(--space-2);
+  font-weight: var(--weight-regular);
 }
+
+/* 识别动作行:自己一行,横向可滚(四个 chip 在窄屏上不再换行挤压说明文字) */
+.nesio-camera-result-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+.nesio-camera-result-actions::-webkit-scrollbar { display: none; }
 
 .nesio-camera-result-nodes {
   display: flex;
@@ -9224,14 +9242,18 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
   gap: 0.5rem;
 }
 
+/* 「重拍」是**次级按钮**,和左边的「存入记忆」成对出现。
+   原来它写的是白色系半透明底 + 写死的灰蓝字 —— 那套是给深色取景屏配的,
+   而这个按钮只出现在结果面板(浅底)上:底和边全都看不见,只剩一行裸蓝字,
+   和旁边的实心主按钮完全不成对(用户圈的就是这两个)。改成规范的描边次级按钮。 */
 .nesio-camera-retake-btn {
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: #8fa3c0;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.12);
-  border-radius: 999px;
-  padding: 0.55rem 1rem;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-ink);
+  background: transparent;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill);
+  padding: 0.55rem 1.1rem;
   flex-shrink: 0;
 }
 
@@ -9335,8 +9357,8 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
   padding: 0.3rem 0.65rem;
   border-radius: 0.5rem;
   background: transparent;
-  border: 1.5px dashed rgba(74,144,217,0.4);
-  color: #8fa3c0;
+  border: 1.5px dashed var(--portal-accent-border);
+  color: var(--portal-accent);
   font-size: 0.75rem;
   cursor: pointer;
   white-space: nowrap;

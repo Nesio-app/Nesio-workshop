@@ -209,4 +209,45 @@ const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, 
   assert.ok(/tok\('--status-go'/.test(globe), '地球到访国高亮没有走 token');
 }
 
+// ── ⑨ 相机页:看结果 / 存好之后不是取景,得回到站内配色 ──────────────────────
+// 取景屏用深色是对的(全屏画面要压暗),但结果页和「已保存」页是普通表单页。
+// 原来只有 phase==='result' 挂 --result(浅色壳),'saved' 漏了 ——
+// 存完那一屏顶栏和底栏当场退回深蓝黑,和整个浅色 app 割裂。
+{
+  const cam = code(read('components/portal/CameraSheet.tsx'));
+  // 断言必须钉在 lightShell 那一行上:取景器的显示条件里也有
+  // `phase === 'result' || phase === 'saved'` 这串,只搜子串会被它喂饱(变异测试抓到的)。
+  assert.ok(
+    /const lightShell = phase === 'result' \|\| phase === 'saved';/.test(cam),
+    '相机的浅色壳又只认 result 了 —— 存好那一屏会退回深蓝黑底',
+  );
+  // 结果页的说明文字必须独占一行(和 chip 行同处一个 flex 会被压成竖条)
+  assert.ok(
+    /<p className="nesio-camera-result-summary">\{result\.summary\}<\/p>/.test(cam),
+    '识别说明又被塞回按钮行里了 —— 中文会被压成五六字宽的竖列',
+  );
+  assert.ok(/nesio-camera-result-actions/.test(cam), '识别动作 chip 没有自己一行');
+  // 标签框不放示例文案(灰字看着像已经填好了)
+  const tagAt = cam.indexOf('nesio-camera-tag-input');
+  if (tagAt > 0) {
+    assert.ok(!/#钥匙/.test(cam), '标签框又放回 #钥匙 #门口 那串示例了');
+  }
+  // 主按钮 / 次按钮成对:两者的字号和内边距要一致,颜色都跟皮肤
+  const css = read('app/globals.css');
+  // 取**基础声明块**,不是 --result 那条单行覆盖(它排在前面,indexOf 会先撞上它)。
+  const blockOf = (sel) => {
+    const at = css.indexOf(`\n${sel} {`);
+    assert.ok(at > 0, `${sel} 的基础声明块不见了`);
+    return css.slice(at, css.indexOf('}', at));
+  };
+  const save = blockOf('.nesio-camera-save-btn');
+  const retake = blockOf('.nesio-camera-retake-btn');
+  assert.ok(!/#fff;|#8fa3c0/.test(retake), '「重拍」又用回写死的灰蓝字 —— 浅底上它会只剩一行裸字');
+  assert.ok(/var\(--portal-accent\)/.test(save), '「存入记忆」没跟随皮肤强调色');
+  assert.ok(!/rgba\(88,140,227/.test(save), '主按钮投影又写死品牌蓝了 —— 换皮肤会是蓝影子配陶红按钮');
+  for (const [name, blk] of [['save', save], ['retake', retake]]) {
+    assert.ok(/font-size: var\(--text-sm\)/.test(blk), `${name} 按钮字号没走 token —— 两个挨着的按钮会差一截`);
+  }
+}
+
 console.log('qa-ui-truth: OK(file input 可点 · 头像手势 · 深链自增号 · 一件事一个数 · 攒钱进度 · 提醒可关)');
