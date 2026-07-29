@@ -30,9 +30,12 @@ import './ai-cache';
 import './providers/calendar-local-store';
 import './chat-store';
 import { collectLocalImages, restoreLocalImages } from './local-image-store';
+import { collectLocalFiles, restoreLocalFiles } from './local-file-store';
 
 /** 备份里照片条目的键前缀(隐私审计:让导出/恢复覆盖记忆照片)。 */
 const LOCAL_IMAGE_PREFIX = 'local-image:';
+// 附件(pdf/docx…)和照片同一口径:默认不入云备份(控体积),本机导出/全量备份才带。
+const LOCAL_FILE_PREFIX = 'local-file:';
 
 /** 记忆图谱现主存 IDB(localStorage 5MB 太小)。登记后备份/恢复/清理把它当 IDB blob。 */
 const LIFE_GRAPH_KEY = 'nesio-life-graph-v1';
@@ -128,6 +131,9 @@ export async function buildCombinedBackup(opts: { includeImages?: boolean } = {}
   if (opts.includeImages) {
     const images = await collectLocalImages();
     for (const [id, url] of Object.entries(images)) backup.entries[`${LOCAL_IMAGE_PREFIX}${id}`] = url;
+    // 附件跟着同一个开关走 —— 「导出你的全部数据」漏掉 pdf 和漏掉图片是同一种不完整。
+    const files = await collectLocalFiles();
+    for (const [id, rec] of Object.entries(files)) backup.entries[`${LOCAL_FILE_PREFIX}${id}`] = JSON.stringify(rec);
   }
   return backup;
 }
@@ -282,12 +288,16 @@ export async function restoreCombinedBackup(backup: FullBackup, mode: RestoreMod
   const lsEntries: Record<string, string> = {};
   const idbEntries: Record<string, string> = {};
   const imageEntries: Record<string, string> = {};
+  const fileEntries: Record<string, { name?: string; mimeType?: string; size?: number; dataUrl?: string }> = {};
   // 批次 54 保险丝:登记表理论上已完整(顶部静态引入),但任何 >200KB 的条目
   // 都绝不许进 localStorage —— 一条就能占掉配额的 4%,几条就复刻「存储满」惨案;
   // IDB 对超额 key 是无害的(多存一份也能被各 store 的水合正常读走)。
   const IDB_SIZE_FUSE = 200 * 1024;
   for (const [k, v] of Object.entries(backup.entries)) {
     if (k.startsWith(LOCAL_IMAGE_PREFIX)) imageEntries[k.slice(LOCAL_IMAGE_PREFIX.length)] = v;
+    else if (k.startsWith(LOCAL_FILE_PREFIX)) {
+      try { fileEntries[k.slice(LOCAL_FILE_PREFIX.length)] = JSON.parse(String(v)); } catch { /* 单条坏了不拖垮整批 */ }
+    }
     else if (isIdbBlobKey(k) || (typeof v === 'string' && v.length > IDB_SIZE_FUSE)) idbEntries[k] = v;
     else lsEntries[k] = v;
   }
@@ -295,6 +305,9 @@ export async function restoreCombinedBackup(backup: FullBackup, mode: RestoreMod
   let imagesRestored = 0;
   if (Object.keys(imageEntries).length > 0) {
     try { imagesRestored = await restoreLocalImages(imageEntries); } catch { /* 图恢复失败不阻塞其余 */ }
+  }
+  if (Object.keys(fileEntries).length > 0) {
+    try { await restoreLocalFiles(fileEntries); } catch { /* 附件恢复失败不阻塞其余 */ }
   }
 
   const ls = restoreFullBackup(localStorage, { ...backup, entries: lsEntries }, mode);

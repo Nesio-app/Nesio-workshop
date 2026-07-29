@@ -69,9 +69,12 @@ export default function PersonExtractSheet({ open, onClose }: { open: boolean; o
     setPending(null); setText(''); onClose();
   };
 
+  // 2026-07-28(标注 图20):「记给某人」失效的根因 —— 关系页在洞察(fullscreen,z-930)里,
+  // 这张卡是 bottom(z-901),开了但被整个盖住。elevated 抬到 940/941。
   return (
     <NesioSheet
       variant="bottom"
+      elevated
       open={open}
       onOpenChange={(next) => { if (!next) onClose(); }}
       card={false}
@@ -97,7 +100,7 @@ export default function PersonExtractSheet({ open, onClose }: { open: boolean; o
                 <IconCamera size={15} />{L(dict, '拍/传', 'Photo')}
               </button>
             </div>
-            <input ref={photoRef} type="file" accept="image/*" capture="environment" hidden
+            <input ref={photoRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden"
               onChange={(e) => { void onPickPhoto(e.target.files?.[0]); e.currentTarget.value = ''; }} />
             {err && <p className="nesio-rel-detail-err" role="alert">{err}</p>}
           </div>

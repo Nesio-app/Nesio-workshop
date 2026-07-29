@@ -24,6 +24,8 @@ export const LOCALITY_REGISTRY: LocalityEntry[] = [
   { id: 'place-trail', locality: 'device-authoritative', note: '足迹 IDB' },
   { id: 'named-places', locality: 'device-authoritative', note: '命名地点' },
   { id: 'apple-health', locality: 'device-authoritative', note: 'Apple Health 导入本机' },
+  { id: 'clinical-store', locality: 'device-authoritative', note: '临床 blob nesio-clinical-v1(化验/用药/诊断)' },
+  { id: 'health-signals', locality: 'device-authoritative', note: '健康四类 Signal;RLS 补完前不进云同步' },
   { id: 'health-insight-api', locality: 'cloud-inference', note: '本机事实 + 云推理' },
   { id: 'weather', locality: 'cloud-only', note: 'Open-Meteo；可短缓存' },
   { id: 'flight-status', locality: 'cloud-only', note: '预留：实时航班' },

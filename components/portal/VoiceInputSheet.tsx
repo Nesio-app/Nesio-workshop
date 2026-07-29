@@ -676,7 +676,7 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
         {/* 批次189:贴图片 + 详情(日期/重复)折叠 —— 只在「说一句」模式,问一问不需要 */}
         {!isAskMode && sendState !== 'confirm' && sendState !== 'saved' && (
           <div className="nesio-voice-extras">
-            <input ref={imgInputRef} type="file" accept="image/*" hidden onChange={(e) => { void pickImage(e.target.files?.[0]); e.target.value = ''; }} />
+            <input ref={imgInputRef} type="file" accept="image/*" className="nesio-visually-hidden" onChange={(e) => { void pickImage(e.target.files?.[0]); e.target.value = ''; }} />
             {imageDataUrl ? (
               <span className="nesio-voice-imgchip">
                 <img src={imageDataUrl} alt="" />

@@ -21,9 +21,11 @@ import { captureLocationEnabled, setCaptureLocationEnabled } from '@/lib/portal/
 import { getFontScale, applyFontScale, type FontScale } from '@/lib/portal/font-scale';
 import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
+import { visibleMemoryNodes } from '@/lib/portal/memory-visibility';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
+import { purgeLocalFiles } from '@/lib/portal/local-file-store';
 import { getTelemetryDeviceId } from '@/lib/portal/telemetry';
 import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab, isLabModeOn, getPalette, setPalette, PALETTES, type PaletteId } from '@/lib/portal/module-overrides';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
@@ -32,6 +34,7 @@ import { isValidBackup } from '@/lib/portal/full-backup';
 import { pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, buildCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
 import { inventoryBackup, inventorySummary, inventoryWarning } from '@/lib/portal/backup-inventory';
 import { localDayKey } from '@/lib/portal/local-day';
+import Button from './ui/Button';
 
 interface SheetProps { open: boolean; onClose: () => void; }
 
@@ -311,13 +314,14 @@ export const ToneSheet = GeneralSheet;
 // ── 档案(批次 138·设计「档案与账户分开」):昵称 + 头像,从账户拆出 ──
 // 图3:ProfileSheet(档案页)已删除 —— 昵称与更换头像并入 AccountSheet(账户)。
 
-// ── 外观与语言(批次 138:从通用拆出;明暗 + 语言。配色仍在「数据与隐私·实验功能」预览门控下)──
+// ── 外观与语言(批次 138:从通用拆出;明暗 + 字号 + 语言。2026-07-29:配色色卡从 Lab 搬进来)──
 export function AppearanceSheet({ open, onClose }: SheetProps) {
   const locale = usePortalLocale();
   const dict = portalLocaleToDictionaryLocale(locale);
   const [theme, setTheme] = useState<ThemeChoice>('auto');
   const [themeSaveIssue, setThemeSaveIssue] = useState('');
   const [fontScale, setFontScale] = useState<FontScale>('md');
+  const [palette, setPaletteState] = useState<PaletteId>('');
 
   useEffect(() => {
     if (!open) return;
@@ -325,6 +329,7 @@ export function AppearanceSheet({ open, onClose }: SheetProps) {
       const th = localStorage.getItem(THEME_KEY);
       setTheme(th === 'day' || th === 'night' ? th : 'auto');
       setFontScale(getFontScale());
+      setPaletteState(getPalette());
     } catch { /* ignore */ }
   }, [open]);
 
@@ -375,6 +380,29 @@ export function AppearanceSheet({ open, onClose }: SheetProps) {
       {themeSaveIssue && (
         <p style={{ marginTop: '0.4rem', fontSize: '0.76rem', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
       )}
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>
+        {L(dict, '配色', 'Palette')}
+        <InfoTip text={L(dict, '点一张即时全站换装,再点「默认蓝」还原。', 'Tap a card to reskin instantly; tap Default blue to restore.')} />
+      </p>
+      <div className="nesio-palette-grid">
+        {/* 默认蓝 */}
+        <button type="button"
+          className={`nesio-palette-card${palette === '' ? ' nesio-palette-card--on' : ''}`}
+          onClick={() => { setPalette(''); setPaletteState(''); }}>
+          <span className="nesio-palette-sw" data-p="default" />
+          <span className="nesio-palette-name">{L(dict, '默认蓝', 'Default blue')}</span>
+        </button>
+        {PALETTES.map((p) => (
+          <button key={p.id} type="button"
+            className={`nesio-palette-card${palette === p.id ? ' nesio-palette-card--on' : ''}`}
+            onClick={() => { setPalette(p.id); setPaletteState(p.id); }}>
+            <span className="nesio-palette-sw" data-p={p.id} />
+            <span className="nesio-palette-name">{L(dict, p.zh, p.en)}</span>
+            <span className="nesio-palette-hint">{p.hint}</span>
+          </button>
+        ))}
+      </div>
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '字体大小', 'Text size')}<InfoTip text={L(dict, '整体放大界面文字与间距;标准 = 跟随系统设置。', 'Scales the whole UI text & spacing; Standard = follow system.')} /></p>
       <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -486,13 +514,23 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       .catch(() => {});
   }, []);
   useEffect(() => { if (open) loadDiag(); }, [open, loadDiag]);
+  /**
+   * 2026-07-29 QA #11:用户点了一次同步,总数从 2541 变成 2544,报的是「✓ 已同步」——
+   * 于是那 3 条看着像**凭空多出来**的。其实它们是别的设备存下、这台机器还没有的记忆,
+   * 同步把它们取回来了,完全正确;错的是**没说**。同一个数字,说清来路就是功能,
+   * 不说就是 bug。importedNodeCount 本来就一直算着,只是从来没露过面。
+   */
   async function handleForceSync() {
     setDiagSyncMsg(L(dict, '同步中…', 'Syncing…'));
     try {
-      await Promise.all([syncMemoryWithCloud({ force: true }), syncProfileWithCloud()]);
-      setDiagSyncMsg(L(dict, '✓ 已同步 · 下拉刷新看结果', '✓ Synced · pull to refresh'));
+      const [mem] = await Promise.all([syncMemoryWithCloud({ force: true }), syncProfileWithCloud()]);
+      const n = mem.importedNodeCount;
+      setDiagSyncMsg(n > 0
+        ? L(dict, `✓ 已同步 · 从云端取回 ${n} 条这台设备还没有的记忆 · 下拉刷新看结果`,
+          `✓ Synced · pulled ${n} ${n === 1 ? 'memory' : 'memories'} this device didn't have yet · pull to refresh`)
+        : L(dict, '✓ 已同步 · 本机和云端本来就一致,没有新增', '✓ Synced · already up to date, nothing new'));
       loadDiag();
-    } catch { setDiagSyncMsg(L(dict, '同步失败', 'Sync failed')); }
+    } catch { setDiagSyncMsg(L(dict, '同步没能完成,过一会儿再试', 'Sync didn’t go through — try again in a bit')); }
   }
   const fmtAt = (iso: string) => (iso ? iso.slice(5, 16).replace('T', ' ') : '—');
   const pickBackupDest = (d: 'drive' | 'nesio') => {
@@ -679,7 +717,10 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     // 图谱已迁 IDB(异步水合):首次 getLifeGraph() 在水合完成前返回空 seed。只读一次会把
     // 「我的数据」定格成「0 条记忆」——用户来这核实隐私,却读到谎报的 0(洞察面板同源却因
     // 晚开、水合已完成而正确)。订阅 nesio-life-graph-updated,水合/增删后重读,口径一致。
-    const readCount = () => setNodeCount(getLifeGraph().length);
+    // 口径必须和记忆库首页一致。原来这里读的是 getLifeGraph().length(原始全量),
+    // 而记忆页报的是 visibleMemoryNodes(滤掉天气快照那类环境信号)——
+    // 同一时刻两处一个 2541 一个 2534,用户当场就发现了(QA #10)。
+    const readCount = () => setNodeCount(visibleMemoryNodes(getLifeGraph(), true).length);
     readCount();
     window.addEventListener('nesio-life-graph-updated', readCount);
     setCloudState('idle');
@@ -709,6 +750,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       purgeLocalData(localStorage);                         // localStorage 全部本机 key 收口清除(保留 auth)
       void purgeIdbBlobs();                                 // IDB blob(健康/临床/地点)一并清 —— 别漏
       void purgeLocalImages();                              // 隐私审计:记忆照片在独立 IDB(nesio-images),必须一并清,否则「删除」留图在本机
+      void purgeLocalFiles();                               // 同上:附件在 nesio-files,漏了就把 pdf 留在设备上
       void import('@/lib/portal/local-email-body').then(({ purgeEmailBodies }) => purgeEmailBodies()); // 邮件全文独立 IDB(nesio-email-bodies)一并清
     } catch { /* ignore */ }
     setNodeCount(0);
@@ -741,7 +783,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     // 云删成功 → 清本机 + 登出
     try {
       getLifeGraph().forEach((n) => deleteLifeNode(n.id));
-      purgeLocalData(localStorage); void purgeIdbBlobs(); void purgeLocalImages();
+      purgeLocalData(localStorage); void purgeIdbBlobs(); void purgeLocalImages(); void purgeLocalFiles();
       await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     } catch { /* ignore */ }
     setDeleteMsg(L(dict, '✓ 账号与全部数据已删除,正在登出…', '✓ Account and all data deleted, signing out…'));
@@ -753,7 +795,12 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
 
       {/* 数据主权面板 — local-first 从架构卖点变成可感知的安全感 */}
       <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.08))', borderRadius: 14, padding: '0.8rem 1rem', marginBottom: '0.9rem' }}>
-        <p style={{ fontSize: '0.72rem', fontWeight: 600, margin: '0 0 0.4rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}><IconLock size={14} /> {L(dict, '你的数据在哪里', 'Where your data lives')}<InfoTip text={L(dict, '记忆存在本设备 localStorage;未登录、未授权或未选择接入的日历、邮件、健康和文件内容永远不会被加载;登录后才开启跨设备云同步。', "Memories live in this device's localStorage. Calendar, mail, health and files are never loaded unless you sign in, authorize and connect them. Cross-device cloud sync starts only after sign-in.")} /></p>
+        <p style={{ fontSize: '0.72rem', fontWeight: 600, margin: '0 0 0.4rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}><IconLock size={14} /> {L(dict, '你的数据在哪里', 'Where your data lives')}{/* ⚠️ 这段原来是**写死**的,恒说「未登录…登录后才开启跨设备云同步」——
+    而它右边那格是动态的,已登录时写着「✓ 已登录 · 云同步已开」。
+    同一屏里「已登录」和「未登录」同时出现,用户当场就发现了。文案必须跟着真实登录态走。 */}
+<InfoTip text={signedIn
+  ? L(dict, '记忆存在本设备 localStorage,并已开启跨设备云同步;没有授权、没有接入的日历、邮件、健康和文件内容,永远不会被加载。', "Memories live in this device's localStorage and are synced across your devices. Calendar, mail, health and files are never loaded unless you authorize and connect them.")
+  : L(dict, '记忆存在本设备 localStorage;未登录、未授权或未选择接入的日历、邮件、健康和文件内容永远不会被加载;登录后才开启跨设备云同步。', "Memories live in this device's localStorage. Calendar, mail, health and files are never loaded unless you sign in, authorize and connect them. Cross-device cloud sync starts only after sign-in.")} /></p>
         <div style={{ display: 'flex', gap: '1.2rem', fontSize: '0.7rem', lineHeight: 1.6 }}>
           <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>{nodeCount}</span><br />{L(dict, '条记忆,全在本机', 'memories, all on this device')}</div>
           <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>{signedIn ? '✓' : '0'}</span><br />{signedIn ? L(dict, '已登录 · 云同步已开', 'signed in · cloud sync on') : L(dict, '未登录 · 仅本机', 'signed out · on-device only')}</div>
@@ -767,7 +814,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         )}
         {/* 批次202:跨端同步诊断 —— 每端一眼看出 版本/登录/身份戳,定位为何不同步 */}
         <div style={{ marginTop: '0.55rem', paddingTop: '0.45rem', borderTop: '1px solid var(--portal-line)', fontSize: '0.62rem', color: 'var(--portal-muted)', lineHeight: 1.7 }}>
-          <div>{L(dict, '同步诊断', 'Sync diag')} · {L(dict, '构建', 'build')} <b>{buildSha}</b> · {signedIn ? L(dict, '已登录', 'signed in') : <b style={{ color: 'var(--status-risk)' }}>{L(dict, '⚠ 未登录', '⚠ signed out')}</b>}</div>
+          <div>{L(dict, '同步诊断', 'Sync diag')} · {L(dict, '构建', 'build')} <b>{buildSha}</b> · {signedIn ? L(dict, '已登录', 'signed in') : <b style={{ color: 'var(--status-risk)' }}>{L(dict, '未登录', 'signed out')}</b>}</div>
           <div>{L(dict, '身份戳', 'identity')} · {L(dict, '本机', 'local')} {fmtAt(diagLocalAt)} · {L(dict, '云端', 'cloud')} {fmtAt(diagCloudAt)}</div>
           <button type="button" onClick={handleForceSync} style={{ marginTop: 5, fontSize: '0.66rem', padding: '0.25rem 0.65rem', borderRadius: 8, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-blue-deep)', cursor: 'pointer' }}>{L(dict, '立即同步(记忆+头像名字)', 'Sync now')}</button>
           {diagSyncMsg && <span style={{ marginLeft: 8 }}>{diagSyncMsg}</span>}
@@ -790,7 +837,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       {/* 备份与恢复(图2:去掉「云同步与备份」标题与登录同步行,直接进备份目的地) */}
       <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', margin: '1.2rem 0 0.3rem' }}>{L(dict, '备份到哪里', 'Back up to')}</p>
       <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-        {([['drive', L(dict, '☁ Google Drive · 免费', '☁ Google Drive · Free')], ['nesio', L(dict, `☁ Nesio 云${cloudEntitled ? '' : ' · Pro 免费'}`, `☁ Nesio cloud${cloudEntitled ? '' : ' · free with Pro'}`)]] as const).map(([d, label]) => (
+        {([['drive', L(dict, 'Google Drive · 免费', 'Google Drive · Free')], ['nesio', L(dict, `Nesio 云${cloudEntitled ? '' : ' · Pro 免费'}`, `Nesio cloud${cloudEntitled ? '' : ' · free with Pro'}`)]] as const).map(([d, label]) => (
           <button key={d} type="button" onClick={() => pickBackupDest(d)}
             style={{ flex: 1, padding: '0.4rem 0.5rem', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer',
               border: `1px solid ${backupDest === d ? 'var(--portal-accent-border)' : 'var(--portal-line)'}`,
@@ -806,11 +853,14 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           : L(dict, '存到 Nesio 云(登录即用,免费跨端同步 —— 换浏览器也拉得回)。', 'Saved to Nesio cloud (free once you sign in; syncs across devices, so a new browser can pull it back).')}
       </p>
 
-      <button type="button" className="nesio-settings-action-btn" onClick={handleBackupChosen} disabled={cloudState === 'pushing' || driveState === 'busy'}>
+      {/* 2026-07-29:备份/恢复并成一组 —— 平时做的是「备份」,「恢复」是出事那天才用一次。
+          两个等重的整行按钮并排,等于让不常用的那个天天占同样的分量。
+          主动作实心整行,反向动作降成一行文字链。导出/导入同理(见下)。 */}
+      <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleBackupChosen} disabled={cloudState === 'pushing' || driveState === 'busy'}>
         {(cloudState === 'pushing' || driveState === 'busy') ? L(dict, '正在备份…', 'Backing up…') : L(dict, '备份', 'Back up')}
-      </button>
-      <button type="button" className="nesio-settings-action-btn" onClick={handleRestoreChosen} disabled={cloudRestoreState === 'pulling' || driveState === 'busy'}>
-        {(cloudRestoreState === 'pulling') ? L(dict, '正在恢复…', 'Restoring…') : L(dict, '从云恢复', 'Restore from cloud')}
+      </Button>
+      <button type="button" className="nesio-settings-inline-link" onClick={handleRestoreChosen} disabled={cloudRestoreState === 'pulling' || driveState === 'busy'}>
+        {(cloudRestoreState === 'pulling') ? L(dict, '正在恢复…', 'Restoring…') : L(dict, '从云恢复 ›', 'Restore from cloud ›')}
       </button>
       {/* 状态:仅当前所用目的地会填充 */}
       {cloudState === 'done' && (
@@ -830,28 +880,39 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       )}
       {driveMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: driveState === 'error' ? 'var(--status-risk)' : 'var(--status-go)' }}>{driveMsg}</p>}
 
-      <button type="button" className="nesio-settings-action-btn" onClick={handleExportLocal} disabled={exportBusy}>
+      <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleExportLocal} disabled={exportBusy}>
         {exportBusy ? L(dict, '正在导出…', 'Exporting…') : L(dict, '导出全部(记忆 + 学到的偏好,下载 JSON)', 'Export everything (memories + learned prefs, JSON)')}
+      </Button>
+      <button type="button" className="nesio-settings-inline-link" onClick={() => importRef.current?.click()}>
+        {L(dict, '导入备份 ›', 'Import backup ›')}
       </button>
-      <button type="button" className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}>
-        {L(dict, '导入备份', 'Import backup')}
-      </button>
-      <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={handleImportFile} />
+      <input ref={importRef} type="file" accept="application/json,.json" className="nesio-visually-hidden" onChange={handleImportFile} />
       {restoreMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
       {exportWarn && <p style={{ fontSize: '0.75rem', marginTop: 4, lineHeight: 1.6, color: 'var(--status-gentle)' }}>{exportWarn}</p>}
 
-      <button type="button" className="nesio-settings-danger-btn" onClick={clearAllMemory}>
-        {deleted ? L(dict, '✓ 已清除', '✓ Cleared') : L(dict, '清除所有 Memory', 'Clear all memories')}
-      </button>
-      <button type="button" className="nesio-settings-danger-btn" style={{ marginTop: '0.4rem', opacity: 0.85 }} onClick={clearAllLocalData}>
-        {L(dict, '彻底删除本机全部数据', 'Delete all local data')}
-      </button>
+      {/* 2026-07-29:三个红按钮原来是平铺的,一屏三条红 —— CLAUDE.md 红线明写「不用红色制造焦虑」,
+          而且这三件事一年也未必做一次,却天天占着视线。收进一个入口,点开才展开。
+          注意用 <details> 而不是 state:折叠这件事不需要 React 参与,原生元素自带无障碍语义。 */}
+      <details className="nesio-settings-danger-zone">
+        <summary className="nesio-settings-danger-summary">
+          {L(dict, '删除数据', 'Delete data')}
+          <span className="nesio-settings-option-hint" style={{ display: 'block', marginTop: '0.2rem' }}>
+            {L(dict, '清除记忆 / 删本机数据 / 删账号 —— 点开选', 'Clear memories / wipe this device / delete account')}
+          </span>
+        </summary>
 
-      {/* App Store 5.1.1 强制:App 内账号删除(云端 + 本机 + 登出)。 */}
-      <button type="button" className="nesio-settings-danger-btn" style={{ marginTop: '0.4rem' }} onClick={deleteAccountAndData}>
-        {L(dict, '删除账号与云端数据', 'Delete account & cloud data')}
-      </button>
-      {deleteMsg && <p className="nesio-settings-option-hint" style={{ margin: '0.4rem 0 0', color: 'var(--status-risk)' }}>{deleteMsg}</p>}
+        <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={clearAllMemory}>
+          {deleted ? L(dict, '✓ 已清除', '✓ Cleared') : L(dict, '清除所有 Memory', 'Clear all memories')}
+        </Button>
+        <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" style={{ opacity: 0.85 }} onClick={clearAllLocalData}>
+          {L(dict, '彻底删除本机全部数据', 'Delete all local data')}
+        </Button>
+        {/* App Store 5.1.1 强制:App 内账号删除(云端 + 本机 + 登出)。 */}
+        <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={deleteAccountAndData}>
+          {L(dict, '删除账号与云端数据', 'Delete account & cloud data')}
+        </Button>
+        {deleteMsg && <p className="nesio-settings-option-hint" style={{ margin: '0.4rem 0 0', color: 'var(--status-risk)' }}>{deleteMsg}</p>}
+      </details>
 
       {/* 图3:原顶部说明整段挪到最下面收尾 */}
       <p className="nesio-settings-sheet-desc" style={{ marginTop: '1.5rem', marginBottom: 0 }}>{L(dict, '只整理你放进来的内容。你可以看见它记住了什么、存在哪、也可以随时删除。', 'Only what you put in gets organized. You can see what it remembers, where it lives, and delete it anytime.')}</p>
@@ -973,32 +1034,9 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
         <span className="nesio-settings-option-hint" aria-hidden style={{ fontSize: '1.1rem' }}>›</span>
       </button>
 
-      <div className="nesio-settings-option" style={{ display: 'block' }}>
-        <span className="nesio-settings-option-label">
-          {L(dict, `低饱和配色(预览)${palette ? ' · 已开启' : ''}`, `Low-saturation palette (preview)${palette ? ' · on' : ''}`)}
-        </span>
-        <span className="nesio-settings-option-hint">
-          {L(dict, '莫兰迪 4 套色卡,点一张即时全站换装,再点「默认蓝」还原。', 'Four Morandi palettes — tap a card to reskin instantly; tap Default blue to restore.')}
-        </span>
-        <div className="nesio-palette-grid">
-          {/* 默认蓝 */}
-          <button type="button"
-            className={`nesio-palette-card${palette === '' ? ' nesio-palette-card--on' : ''}`}
-            onClick={() => { setPalette(''); setPaletteState(''); }}>
-            <span className="nesio-palette-sw" data-p="default" />
-            <span className="nesio-palette-name">{L(dict, '默认蓝', 'Default blue')}</span>
-          </button>
-          {PALETTES.map((p) => (
-            <button key={p.id} type="button"
-              className={`nesio-palette-card${palette === p.id ? ' nesio-palette-card--on' : ''}`}
-              onClick={() => { setPalette(p.id); setPaletteState(p.id); }}>
-              <span className="nesio-palette-sw" data-p={p.id} />
-              <span className="nesio-palette-name">{L(dict, p.zh, p.en)}</span>
-              <span className="nesio-palette-hint">{p.hint}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* 2026-07-29:配色色卡搬到「外观与语言」。
+          它是**日常设置**(和明暗、字号、语言并列),不是实验功能 ——
+          藏在 Lab 里既难找,又让「点一张即时全站换装」这句承诺看着像内测玩具。 */}
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.5rem' }}>{L(dict, '功能开关中心', 'Feature switches')}</p>
       <p className="nesio-settings-option-hint" style={{ margin: '0 0 0.6rem' }}>
@@ -1136,20 +1174,28 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
         // 服务端确认的付费 Pro 永远优先 —— 否则试用期内的付费用户会看到
         // 顶部「免费试用剩 N 天」+ 底部「你已是 Pro 会员」同页打架(QA ⑥)。
         const pro = isPaidPro || (getTier() === 'pro' && days <= 0);
+        // ⚠️ pro 必须管住**整张卡**,不只是那枚徽章。
+        // 上一轮修 QA⑥ 时只把 badge 接上了 pro,标题和描述还在看 days > 0 ——
+        // 于是「试用期内已经付费」的账号同屏出现:徽章 PRO + 标题「前 21 天全功能免费…
+        // 试用结束自动回到免费版」+ 页尾「✓ 你已是 Pro 会员」,三句话互相打架。
         return (
           <div className="nesio-sub-status-card">
             <div className="nesio-sub-status-badge nesio-sub-status-badge--free">
               {pro ? 'PRO' : days > 0 ? L(dict, `免费试用 · 剩 ${days} 天`, `Free trial · ${days}d left`) : t(locale, 'subBadgeFree')}
             </div>
             <p className="nesio-sub-status-title">
-              {days > 0
-                ? L(dict, '前 21 天全功能免费', 'First 21 days, everything unlocked')
-                : t(locale, 'subFreeTitle')}
+              {pro
+                ? L(dict, '你已是 Pro 会员', "You're on Pro")
+                : days > 0
+                  ? L(dict, '前 21 天全功能免费', 'First 21 days, everything unlocked')
+                  : t(locale, 'subFreeTitle')}
             </p>
             <p className="nesio-sub-status-desc">
-              {days > 0
-                ? L(dict, '3 周,刚好养成一个记录的好习惯。试用结束自动回到免费版,不扣费。', 'Three weeks — just long enough to build a note-taking habit. Afterwards you return to Free; nothing is charged.')
-                : t(locale, 'subFreeDesc')}
+              {pro
+                ? L(dict, '订阅生效中,全部功能已解锁。可在支付渠道随时管理或取消。', 'Subscription active — everything is unlocked. Manage or cancel anytime via your payment provider.')
+                : days > 0
+                  ? L(dict, '3 周,刚好养成一个记录的好习惯。试用结束自动回到免费版,不扣费。', 'Three weeks — just long enough to build a note-taking habit. Afterwards you return to Free; nothing is charged.')
+                  : t(locale, 'subFreeDesc')}
             </p>
           </div>
         );
@@ -1174,21 +1220,27 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
         </p>
       </div>
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.1rem' }}>{t(locale, 'subFuturePlans')}</p>
-      {PLAN_PREVIEWS.map((plan) => (
-        <div key={plan.id} className="nesio-sub-upgrade-row">
-          <div className="nesio-sub-upgrade-info">
-            <p className="nesio-sub-upgrade-name">{L(dict, plan.name, plan.nameEn)}</p>
-            <p className="nesio-sub-upgrade-desc">{L(dict, plan.desc, plan.descEn)}</p>
-          </div>
-          <div className="nesio-sub-upgrade-right">
-            <p className="nesio-sub-upgrade-price">{plan.price}<span>{L(dict, plan.cycle, plan.cycleEn)}</span></p>
-            <span style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-pill)', padding: '0.15rem 0.55rem', whiteSpace: 'nowrap' }}>
-              {t(locale, 'subPlanned')}
-            </span>
-          </div>
-        </div>
-      ))}
+      {/* 已经是付费会员就别再摆一排「规划中」的价格 —— 那看着像「还没开卖」,
+          和上面刚说的「订阅生效中」正好对撞(用户报的第三重矛盾)。 */}
+      {!isPaidPro && (
+        <>
+          <p className="nesio-settings-section-label" style={{ marginTop: '1.1rem' }}>{t(locale, 'subFuturePlans')}</p>
+          {PLAN_PREVIEWS.map((plan) => (
+            <div key={plan.id} className="nesio-sub-upgrade-row">
+              <div className="nesio-sub-upgrade-info">
+                <p className="nesio-sub-upgrade-name">{L(dict, plan.name, plan.nameEn)}</p>
+                <p className="nesio-sub-upgrade-desc">{L(dict, plan.desc, plan.descEn)}</p>
+              </div>
+              <div className="nesio-sub-upgrade-right">
+                <p className="nesio-sub-upgrade-price">{plan.price}<span>{L(dict, plan.cycle, plan.cycleEn)}</span></p>
+                {/* 这不是按钮,是状态标。原来是实线描边 pill,和站内可点的 chip 长得一模一样,
+                    用户挨个点过去发现「点不动」。虚线 + 更淡 = 一眼看出是标记不是入口。 */}
+                <span className="nesio-sub-plan-flag">{t(locale, 'subPlanned')}</span>
+              </div>
+            </div>
+          ))}
+        </>
+      )}
 
       {isPaidPro ? (
         <div style={{ marginTop: '1.2rem', padding: '0.9rem 1rem', borderRadius: 12, textAlign: 'center', background: 'var(--portal-card, #fff)', border: '1px solid var(--status-gentle, #6cbf84)' }}>

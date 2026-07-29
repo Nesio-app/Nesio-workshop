@@ -101,8 +101,11 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
   const anySensitive = pending?.some((r) => RECORD_CATEGORY_MAP[r.category].sensitive) || (manual && RECORD_CATEGORY_MAP[form.category].sensitive);
 
   return (
+    // elevated:这张卡是从「关系详情」(它自己就是 elevated=941,又开在洞察 fullscreen 里)
+    // 再点开的 —— 留在 bottom 档(901)会被上面两层一起盖住,表现成「点了没反应」。
     <NesioSheet
       variant="bottom"
+      elevated
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
       card={false}
@@ -205,7 +208,7 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
                   <IconCamera size={16} />{L(dict, '拍 / 传', 'Photo')}
                 </button>
               </div>
-              <input ref={photoRef} type="file" accept="image/*" capture="environment" hidden
+              <input ref={photoRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden"
                 onChange={(e) => { void onPickPhoto(e.target.files?.[0]); e.currentTarget.value = ''; }} />
             </div>
             {err && <p className="nesio-rel-detail-err" role="alert">{err}</p>}

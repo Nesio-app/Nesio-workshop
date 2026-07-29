@@ -189,7 +189,10 @@ export interface BoardView {
   myChoresToday: ChoreInstance[];
   toReview: ChoreInstance[];        // 仅 can_approve 才非空
   assigned: ChoreInstance[];        // 所有已安排(todo/done)的活,含未来到期 —— 让「谁被派了什么、什么状态」可见
-  everyone: Array<{ member: FamilyMember; owed: number }>;
+  // earned = 累计挣到的(只增不减),owed = earned − 已发放。
+  // 攒钱目标的进度必须用 earned:用 owed 的话,家长一发工钱进度条就倒退,
+  // 发多了甚至变负数 —— 用户看到的「¥-20.00 / ¥100.00 · 还差 ¥120.00」就是这么来的。
+  everyone: Array<{ member: FamilyMember; owed: number; earned: number }>;
 }
 
 /** 家庭板:我今天的活 + (可审核才有的)待审队列 + 全家余额。区块按权限,能力仍服务端判。 */
@@ -217,10 +220,10 @@ export async function getBoard(actor: FamilyActor, familyId: string, todayKey: s
     .filter((c) => c.state === 'todo' || c.state === 'done')
     .sort((a, b) => (a.dueDate < b.dueDate ? -1 : a.dueDate > b.dueDate ? 1 : 0));
 
-  const everyone = memberRows.map((m) => ({
-    member: memberFromRow(m),
-    owed: computeBalance(m.user_id, instances, payouts).owed,
-  }));
+  const everyone = memberRows.map((m) => {
+    const bal = computeBalance(m.user_id, instances, payouts);
+    return { member: memberFromRow(m), owed: bal.owed, earned: bal.earned };
+  });
 
   return { ok: true, value: { familyId, me, myChoresToday, toReview, assigned, everyone } };
 }

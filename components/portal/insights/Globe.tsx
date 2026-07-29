@@ -157,17 +157,20 @@ export default function Globe({ countries, size = 300, onTap }: {
       ctx.fillStyle = P.land; ctx.fill();
       ctx.strokeStyle = P.landStroke; ctx.lineWidth = 0.5; ctx.stroke();
 
-      // 5. 到访国(荧光黄绿 + 发光,参考「点亮足迹」)
+      // 5. 到访国(点亮 + 发光)。颜色取当前皮肤的「完成/到过」色,不再写死荧光黄绿 ——
+      //    换了皮肤整个地球都变了,只有到访国还是那抹荧光绿,一眼就出戏。
+      //    Canvas 读不了 CSS 变量,所以经上面那个 tok() 从 computed style 里取。
+      const visitedFill = tok('--status-go', isDay ? '#8fbf6a' : '#7fae63');
       ctx.save();
-      ctx.shadowColor = 'rgba(190, 242, 100, 0.85)';
+      ctx.shadowColor = tok('--status-go-soft', 'rgba(190, 242, 100, 0.85)');
       ctx.shadowBlur = 14;
       ctx.beginPath();
       for (const f of feats) if (visitedRef.current.has(f.properties.name || '')) path(f as GeoPermissibleObjects);
-      ctx.fillStyle = '#c9ef7d'; ctx.fill();
+      ctx.fillStyle = visitedFill; ctx.fill();
       ctx.restore();
       ctx.beginPath();
       for (const f of feats) if (visitedRef.current.has(f.properties.name || '')) path(f as GeoPermissibleObjects);
-      ctx.strokeStyle = 'rgba(120, 160, 40, 0.6)'; ctx.lineWidth = 0.6; ctx.stroke();
+      ctx.strokeStyle = tok('--status-go', 'rgba(120, 160, 40, 0.6)'); ctx.lineWidth = 0.6; ctx.stroke();
     }
 
     // 5.5 晨昏线(批次 69,用户点名):真实太阳位置 → 夜半球加阴影,

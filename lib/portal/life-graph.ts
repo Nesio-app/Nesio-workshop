@@ -6,6 +6,7 @@
 import { mergeConflictingNodes } from './life-node-merge';
 import { emailFulltextScore } from './email-fulltext-index';
 import { tokenizeCJK } from './cjk-tokenize';
+import { expandQueryTerms } from './query-synonyms';
 
 export type LifeNodeType =
   | 'person'
@@ -1182,6 +1183,10 @@ export function searchLifeGraphFuzzy(query: string, limit = 6): LifeNode[] {
   const q = query.toLowerCase().trim();
   if (!q) return getRecentNodes(limit);
   const tokens = queryTokens(q);
+  // 中英同义词扩展(PDF1 图7):问「医生预约」也要能捞到英文的
+  // "Appointment with MedPsych Integrated"。权重刻意压在原词之下,
+  // 精确命中永远排在同义命中前面。
+  const synonyms = expandQueryTerms(tokens);
   return loadAll()
     .map((node) => {
       const text = nodeSearchText(node);
@@ -1197,6 +1202,12 @@ export function searchLifeGraphFuzzy(query: string, limit = 6): LifeNode[] {
         if (node.name.toLowerCase().includes(token)) score += 4;
         if (node.tags?.some((tag) => tag.toLowerCase().includes(token))) score += 3;
         if (text.includes(token)) score += 1;
+      }
+      // 同义词:名字命中 +2(原词是 +4),否则文本命中 +1,且不与名字分累加 ——
+      // 保证「原词精确命中」永远压过「同义词命中」。
+      for (const s of synonyms) {
+        if (nameLower.includes(s)) score += 2;
+        else if (text.includes(s)) score += 1;
       }
       // 里程碑 B:邮件正文(≤1500 预览之外)命中 —— 本机全文索引补分,零云。
       if (node.source === 'email') {

@@ -12,6 +12,7 @@ import { searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import { NodeTypeIcon } from './icons';
 
 // ── Hook ─────────────────────────────────────────────────────────────────────
 
@@ -105,7 +106,9 @@ export default function MemoryFlashBanner({ nodes, onDismiss }: Props) {
       <div className="mem-flash-list">
         {nodes.map((node) => (
           <div key={node.id} className="mem-flash-node">
-            <span className="mem-flash-node-type">{TYPE_EMOJI[node.type] ?? '📌'}</span>
+            {/* 2026-07-29:这里原本自带一张 emoji 表(👤📅🤝💚⭐📍📦)——
+                icons.tsx 早就有 NodeTypeIcon 做同一件事,两套并存就是站内 emoji/描边图标混用的来源。 */}
+            <span className="mem-flash-node-type" aria-hidden><NodeTypeIcon type={node.type} size={16} /></span>
             <div className="mem-flash-node-body">
               <p className="mem-flash-node-name">{node.name}</p>
               {node.rawInput && node.rawInput !== node.name && (
@@ -121,13 +124,3 @@ export default function MemoryFlashBanner({ nodes, onDismiss }: Props) {
     </div>
   );
 }
-
-const TYPE_EMOJI: Partial<Record<string, string>> = {
-  person:       '👤',
-  event:        '📅',
-  commitment:   '🤝',
-  health_state: '💚',
-  preference:   '⭐',
-  place:        '📍',
-  object:       '📦',
-};

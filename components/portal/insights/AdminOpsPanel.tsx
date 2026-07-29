@@ -10,6 +10,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
+import { fetchWithTimeout } from '@/lib/portal/fetch-timeout';
+import LoadingCard from '../ui/LoadingCard';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
@@ -136,7 +138,9 @@ export default function AdminOpsPanel() {
   const load = useCallback(async (withSecret: string) => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/metrics', { headers: withSecret ? { 'x-nesio-admin-secret': withSecret } : {} });
+      // 2026-07-29:裸 fetch 无超时 —— 后台指标接口卡住时,下面那句 `if (!data)` 的
+      // 「加载中…」就永远退不掉(和家务/车两页同一个病)。走带上限的 fetch。
+      const res = await fetchWithTimeout('/api/admin/metrics', { headers: withSecret ? { 'x-nesio-admin-secret': withSecret } : {} });
       const json = await res.json() as Metrics;
       setData(json);
       if (json.ok) { try { localStorage.setItem(SECRET_KEY, withSecret); } catch { /* ignore */ } }
@@ -192,7 +196,7 @@ export default function AdminOpsPanel() {
   }
 
   if (!data) {
-    return <div className="nesio-analytics-tab"><p className="nesio-insights-empty" style={{ marginTop: 0 }}>{L(dict, '加载中…', 'Loading…')}</p></div>;
+    return <div className="nesio-analytics-tab"><LoadingCard label={L(dict, '正在读后台指标…', 'Loading backend metrics…')} lines={3} /></div>;
   }
 
   const srcBad = (data.sources && (!data.sources.telemetryEvents.ok || !data.sources.productEvents.ok));
@@ -224,7 +228,23 @@ export default function AdminOpsPanel() {
           <span style={{ ...label, display: 'block', marginTop: '0.2rem' }}>{L(dict, '30 天设备 · 点看明细', 'Devices / 30d · tap')}</span>
         </button>
         <button type="button" onClick={() => setShowDims((v) => !v)} style={{ ...card, textAlign: 'left', cursor: 'pointer' }}>
-          <span style={{ ...big, color: (data.smartness?.score ?? 0) >= 70 ? 'var(--status-go)' : (data.smartness?.score ?? 0) >= 50 ? 'var(--status-gentle)' : 'var(--status-risk)' }}>{data.smartness?.score ?? '—'}</span>
+          {/* 2026-07-29:此前只有这一格把数字染成青绿/琥珀/红,旁边三格是黑的,又没有图例 ——
+              「为什么就它有颜色」无从得知。改成:数字与邻格同色,颜色移到**带文字的**档位徽章上,
+              自己就是图例。 */}
+          <span style={big}>{data.smartness?.score ?? '—'}</span>
+          {typeof data.smartness?.score === 'number' && (() => {
+            const s = data.smartness.score;
+            const [zh, en, fg, bg] = s >= 70
+              ? ['良好', 'Good', 'var(--status-go)', 'var(--status-go-soft)']
+              : s >= 50
+                ? ['一般', 'Fair', 'var(--status-gentle)', 'var(--status-gentle-soft)']
+                : ['待打磨', 'Needs work', 'var(--status-calm)', 'var(--status-calm-soft)'];
+            return (
+              <span style={{ marginLeft: '0.4rem', padding: '0.1rem 0.45rem', borderRadius: 'var(--radius-pill)', fontSize: '0.62rem', fontWeight: 'var(--weight-medium)', color: fg, background: bg, verticalAlign: 'middle' }}>
+                {L(dict, zh, en)}
+              </span>
+            );
+          })()}
           <span style={{ ...label, display: 'block', marginTop: '0.2rem' }}>{L(dict, '聪明度 · 点看五维', 'Smartness · tap')}</span>
         </button>
       </div>

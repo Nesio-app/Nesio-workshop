@@ -6,7 +6,12 @@ import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import dynamic from 'next/dynamic';
 import TodayFeed from './TodayFeed';
 import MemoryTab from './MemoryTab';
-import TellNesioSheet, { type CaptureMode } from './TellNesioSheet';
+/**
+ * 2026-07-29:删掉 TellNesioSheet(点中间键先弹「拍/说/收」三个扇形按钮那一层)。
+ * 中间键现在**一按直达相机**;另外两个动作在别处本来就有更近的入口
+ * (说 = 输入框右边的话筒,收 = 输入框左边的「+」)。这一层是纯中转,删掉少一次点击。
+ */
+type CaptureMode = 'camera' | 'voice' | 'share';
 import PortalBottomNav from './PortalBottomNav';
 import PortalOnboarding from './PortalOnboarding';
 import InstallPrompt from './InstallPrompt';
@@ -96,7 +101,7 @@ const FIRST_MEMORY_RECEIPT_KEY = 'nesio-first-memory-receipt-shown-v1';
 const HAPTIC_FEEDBACK_KEY = 'nesio-haptic-feedback-enabled-v1';
 const ASK_GUIDE_KEY = 'nesio-ask-guide-seen-v1';
 
-type ActiveSurface = 'today' | 'tell' | 'memory';
+type ActiveSurface = 'today' | 'memory';
 type AuthSessionPayload = {
   ok?: boolean;
   user?: { id?: string; email?: string };
@@ -463,6 +468,11 @@ export default function Portal() {
   const [freezeOpen, setFreezeOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false); // 洞察全屏浮层(底部导航第 3 个 tab / nesio-open-insights 事件打开)
   const [insightsTab, setInsightsTab] = useState<InsightsMainTab | undefined>(undefined);
+  // 深链的「第几次」。只传 tab 的话,**同一个 tab 连点第二次 state 值没变** ——
+  // InsightsSheet 那边 useEffect([initialTab]) 就不会再触发,表现是这一行死了、别的行还好
+  // (用户原话:「充电花费」和「行驶记录」能跳,只有「停车/充电位置」这一行是死的 ——
+  //  其实是那一次他已经在 timeline 上了)。带个自增号,每次派发都算一次新的深链。
+  const [insightsNonce, setInsightsNonce] = useState(0);
   const [proGate, setProGate] = useState<string | null>(null); // 非 null = 显示 Pro 升级引导(值=功能名)
   // 跨账号本地数据冲突(P0 隐私):登录后本机数据归属与当前用户不符 → 阻断处理
   const [ownerConflict, setOwnerConflict] = useState<
@@ -826,7 +836,6 @@ export default function Portal() {
 
   // Allow TodayFeed empty state / other surfaces to open Tell Nesio or capture directly
   useEffect(() => {
-    const handler = () => setActiveSurface((s) => s === 'tell' ? 'today' : 'tell');
     const voiceHandler = () => { track('capture_voice_open'); setCaptureMode('voice'); };
     const moodHandler = () => { track('mood_open'); setMoodOpen(true); };
     const freezeHandler = () => {
@@ -854,15 +863,22 @@ export default function Portal() {
     const rewardsHandler = () => { track('rewards_open'); setRewardsOpen(true); };
     const briefHandler = () => { track('brief_open', {}); setBriefOpen(true); };
     // 洞察浮层:底部导航 / 卡片 / 「开始练」都派事件打开;detail.tab 指定进哪个 tab(如 fitness)
+    // 2026-07-28(标注 图21):原来只认 tab==='fitness',别的一律落回默认页 ——
+    // 于是车页那几个「去财务 / 去足迹看」的入口即使派了事件也跳不过去。改成认一份白名单。
+    // 2026-07-29 合并 QA 分支:白名单补齐**全部**板块 —— 原来漏了 reflection/montage/tesla/admin,
+    // 那几个板块的深链(车页「→ 财务/足迹」等指路行)派了事件也落回默认页,看着像死链。
+    const INSIGHTS_TABS: ReadonlySet<string> = new Set([
+      'reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule',
+      'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'admin',
+    ]);
     const insightsHandler = (e: Event) => {
       const tab = (e as CustomEvent).detail?.tab;
       track('insights_open', {});
-      // 深链支持全部板块(原来只认 fitness → 车页「→ 财务/足迹」等指路行全是死链)
-      const INSIGHT_TABS: ReadonlySet<string> = new Set(['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule', 'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'admin']);
-      setInsightsTab(typeof tab === 'string' && INSIGHT_TABS.has(tab) ? (tab as InsightsMainTab) : undefined);
+      setInsightsTab(typeof tab === 'string' && INSIGHTS_TABS.has(tab) ? (tab as InsightsMainTab) : undefined);
+      setInsightsNonce((n) => n + 1);
       setInsightsOpen(true);
     };
-    const trainingHandler = () => { setInsightsTab('fitness'); setInsightsOpen(true); };
+    const trainingHandler = () => { setInsightsTab('fitness'); setInsightsNonce((n) => n + 1); setInsightsOpen(true); };
     const workoutHandler = (e: Event) => { track('workout_start', {}); setWorkoutKey((k) => k + 1); setWorkoutSession((e as CustomEvent).detail); };
     const proGateHandler = (e: Event) => {
       const feature = (e as CustomEvent).detail?.feature || 'pro';
@@ -885,7 +901,6 @@ export default function Portal() {
     };
     window.addEventListener('nesio-memory-search', memorySearchHandler);
     window.addEventListener('nesio-pro-gate', proGateHandler);
-    window.addEventListener('nesio-open-tell', handler);
     window.addEventListener('nesio-open-voice', voiceHandler);
     window.addEventListener('nesio-open-mood', moodHandler);
     window.addEventListener('nesio-open-freeze', freezeHandler);
@@ -903,7 +918,6 @@ export default function Portal() {
     return () => {
       window.removeEventListener('nesio-memory-search', memorySearchHandler);
       window.removeEventListener('nesio-pro-gate', proGateHandler);
-      window.removeEventListener('nesio-open-tell', handler);
       window.removeEventListener('nesio-open-voice', voiceHandler);
       window.removeEventListener('nesio-open-mood', moodHandler);
       window.removeEventListener('nesio-open-freeze', freezeHandler);
@@ -1297,27 +1311,14 @@ export default function Portal() {
             <TodayFeed canUsePrivateData={canViewPrivateData} onOpenMemory={() => setActiveSurface('memory')} />
           )}
           {!onboardingActive && activeSurface === 'memory' && <MemoryTab canUsePrivateData={canViewPrivateData} />}
-          {!onboardingActive && activeSurface === 'tell' && (
-            <TodayFeed canUsePrivateData={canViewPrivateData} onOpenMemory={() => setActiveSurface('memory')} />
-          )}
         </div>
-
-        <TellNesioSheet
-          open={activeSurface === 'tell'}
-          onClose={() => setActiveSurface('today')}
-          onCapture={(mode, file) => {
-            if (mode === 'voice') setVoiceIntent('note');
-            if (mode === 'camera') setCameraFile(file ?? null);
-            setCaptureMode(mode);
-          }}
-        />
 
         {!onboardingActive && (
           <PortalBottomNav
             activeSurface={activeSurface}
             locale={locale}
             onToday={() => setActiveSurface('today')}
-            onTell={() => setActiveSurface(activeSurface === 'tell' ? 'today' : 'tell')}
+            onCamera={(file) => { setCameraFile(file); setCaptureMode('camera'); }}
             onAsk={handleAskFromCenterButton}
             onInsights={() => { setInsightsTab(undefined); setInsightsOpen(true); }}
             insightsActive={insightsOpen}
@@ -1452,7 +1453,7 @@ export default function Portal() {
           className="nesio-insights-sheet-card"
           ariaLabel={L(dict, 'Nesio 的洞察', "Nesio's insights")}
         >
-          <InsightsSheet onClose={() => setInsightsOpen(false)} canUsePrivateData={canViewPrivateData} initialTab={insightsTab} />
+          <InsightsSheet onClose={() => setInsightsOpen(false)} canUsePrivateData={canViewPrivateData} initialTab={insightsTab} tabNonce={insightsNonce} />
         </NesioSheet>
       )}
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />

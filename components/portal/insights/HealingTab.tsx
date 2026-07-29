@@ -3,13 +3,13 @@
 /**
  * HealingTab — 洞察「成长 · 疗愈」子 tab(inner-space 整合)。
  * 参与式引导仪式(照旧版 inner-shelter 的阴影整合舱):不是弹几张卡让你读,而是一步步陪你走 ——
- *   ① 你自己写下心里的声音(实时扫出思维陷阱)→ ② 先自己感觉它在怕什么 → ③ 看见保护者 →
+ *   ① 你自己写下心里的声音(实时扫出思维陷阱)→ ② 先自己感觉它在怕什么 → ③ 看见内在小孩 →
  *   ④ 清醒自我接管、对它说一句 → ⑤ 落到身体真做一遍(才发分)。
  * 视觉做成时间线:当前步放大高亮,已完成收起,未来步灰。积分每天一次,只奖励真做完躯体动作。
  * 全程走 app 主题 token + 统一 --ng-ease,无 emoji。
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { collectSeeds, applyIFS, scanAnts, type Seed, type IFSResult } from '@/lib/portal/growth-engine';
 import { recordGrowthAnswer } from '@/lib/portal/growth-guide';
 import { earnPoints, POINTS_PER_HEALING } from '@/lib/platform/rewards-engine';
@@ -18,6 +18,7 @@ import MoodWheel from '../MoodWheel';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { useAutoGrow } from './use-auto-grow';
 import { localDayKey } from '@/lib/portal/local-day';
 
 const HEAL_EARNED_KEY = 'nesio-heal-earned';
@@ -59,16 +60,67 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
   const [reply, setReply] = useState<string | null>(null);
   const [feelEm, setFeelEm] = useState<string | null>(null); // 此刻心情:接现有心情系统的 12 情绪
   const [feelNote, setFeelNote] = useState('');
+  const voiceTa = useAutoGrow();  // 文本框随字数长高(iOS 兜底)
+  const feelTa = useAutoGrow();
   const [earned, setEarned] = useState(false);
+  // 图16:「已存进回看」改成弹一下就消失的提示,不在页面常驻。
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (toastTimer.current) clearTimeout(toastTimer.current); }, []);
   const rank = phaseRank(phase);
   const feelEmObj = feelEm ? emotionOf(feelEm) : null;
 
   const fears = en
     ? ['Being left', 'Losing control', 'Not enough', 'Getting hurt again', "Can't say"]
     : ['被抛弃', '失控', '不够好', '再次受伤', '说不清'];
-  const replyLines = en
-    ? ['“Thank you for protecting me — I can slow down now.”', '“I see you. You’ve worked so hard.”', '“Let me take this one — you can rest.”']
-    : ['「谢谢你想保护我,现在我可以慢一点。」', '「我看见你了,你辛苦了。」', '「这次让我来,你可以歇一歇。」'];
+  // 2026-07-28(标注 图13:「选项没变过」):回应句从固定三条改成按「它在怕什么」选出的池子,
+  // 同一份恐惧下也按当天轮换起点 —— 每次走这一遍,给的话都跟这次的恐惧对得上,而不是三句万金油。
+  const replyPool: Record<string, [string, string][]> = {
+    被抛弃: [
+      ['「我不会走。这次我留下来陪你。」', '“I’m not leaving. I’m staying with you this time.”'],
+      ['「就算我做不好,我也还在这儿。」', '“Even if I get it wrong, I’m still here.”'],
+      ['「你值得被留下,不用表现换。」', '“You deserve to be kept — you don’t have to earn it.”'],
+      ['「我看见你怕一个人了。」', '“I see how afraid you are of being alone.”'],
+    ],
+    失控: [
+      ['「不用你一直盯着,我接手一会儿。」', '“You don’t have to keep watch — I’ll take it for a while.”'],
+      ['「乱一点也没关系,我在。」', '“A bit of mess is okay. I’m here.”'],
+      ['「这次让我来,你可以歇一歇。」', '“Let me take this one — you can rest.”'],
+      ['「握不住全部,是正常的。」', '“Not holding all of it is normal.”'],
+    ],
+    不够好: [
+      ['「你的价值不用它挣来。」', '“Your worth isn’t something it has to earn.”'],
+      ['「已经够了 —— 真的。」', '“It’s already enough — really.”'],
+      ['「谢谢你想保护我,现在我可以慢一点。」', '“Thank you for protecting me — I can slow down now.”'],
+      ['「我看见你一直在拼。」', '“I see how hard you’ve been trying.”'],
+    ],
+    再次受伤: [
+      ['「我会看着点,你不用一直紧绷。」', '“I’ll keep watch — you don’t have to stay braced.”'],
+      ['「上次的疼我记得,不怪你怕。」', '“I remember how it hurt. Of course you’re afraid.”'],
+      ['「我们可以慢慢来,随时停。」', '“We can go slow, and stop any time.”'],
+      ['「我看见你了,你辛苦了。」', '“I see you. You’ve worked so hard.”'],
+    ],
+    说不清: [
+      ['「说不清也没关系,先待一会儿。」', '“It’s okay not to have words — let’s just sit here.”'],
+      ['「我不急着弄明白你。」', '“I’m not in a hurry to figure you out.”'],
+      ['「你在就行,不用解释。」', '“You being here is enough — no explaining.”'],
+      ['「我看见你了,你辛苦了。」', '“I see you. You’ve worked so hard.”'],
+    ],
+  };
+  const replyLines = useMemo(() => {
+    // 英文 chip 文案和中文 key 对不上,这里映射回同一份池子,英文用户也能拿到贴着恐惧的话。
+    const EN_TO_KEY: Record<string, string> = {
+      'Being left': '被抛弃', 'Losing control': '失控', 'Not enough': '不够好',
+      'Getting hurt again': '再次受伤', "Can't say": '说不清',
+    };
+    const raw = fear ? (EN_TO_KEY[fear] || fear) : '';
+    const key = raw && replyPool[raw] ? raw : '不够好';
+    const pool = replyPool[key];
+    // 每天换一个起点 —— 不引入随机,刷新页面不会跳来跳去,但天天走不会年年一样。
+    const off = Math.floor(Date.now() / 86_400_000) % pool.length;
+    return Array.from({ length: 3 }, (_, i) => pool[(off + i) % pool.length]).map(([zh, e]) => (en ? e : zh));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fear, en]);
 
   async function pickFear(f: string) {
     setFear(f);
@@ -102,6 +154,9 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
       markEarnedToday(); setEarned(true);
     }
     setPhase('done');
+    setToast(L(dict, '已存进回看 —— 你真的陪自己走完了一次。', 'Saved — you walked yourself through it.'));
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
   }
 
   function restart() {
@@ -112,8 +167,8 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
   const steps: { key: typeof PHASES[number]; n: number; title: string; sum: string }[] = [
     { key: 'voice', n: 1, title: L(dict, '说出此刻心里的声音', 'Name the voice inside'), sum: voice ? `「${voice.slice(0, 16)}${voice.length > 16 ? '…' : ''}」` : '' },
     { key: 'fear', n: 2, title: L(dict, '它在怕什么', 'What it fears'), sum: fear || '' },
-    { key: 'protector', n: 3, title: L(dict, '看见保护者', 'Meet the protector'), sum: L(dict, '已看见它在守着你', 'Seen — it was guarding you') },
-    { key: 'self', n: 4, title: L(dict, '清醒自我接管', 'Your calm self leads'), sum: reply ? reply.replace(/[「」“”]/g, '').slice(0, 18) : L(dict, '让保护者歇一歇', 'Let the protector rest') },
+    { key: 'protector', n: 3, title: L(dict, '看见内在小孩', 'Meet the inner child'), sum: L(dict, '已看见它在守着你', 'Seen — it was guarding you') },
+    { key: 'self', n: 4, title: L(dict, '清醒自我接管', 'Your calm self leads'), sum: reply ? reply.replace(/[「」“”]/g, '').slice(0, 18) : L(dict, '让它歇一歇', 'Let it rest') },
     { key: 'body', n: 5, title: L(dict, '落到身体,真做一遍', 'Ground it in the body'), sum: L(dict, '已做一遍', 'Done') },
     { key: 'feel', n: 6, title: L(dict, '此刻,心里怎么样', 'How you feel now'), sum: feelEmObj ? `${en ? feelEmObj.labelEn : feelEmObj.label}` : '' },
   ];
@@ -124,10 +179,11 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
 
   return (
     <div className="nesio-growth ng-heal">
-      <p className="ng-streak">{L(dict, '越重的地方,越值得慢慢待 —— 这里不考你,一步步陪你落地。', 'The heaviest places deserve the slowest care — one step at a time.')}</p>
+      {/* 2026-07-28(标注 图17):顶部那句「这里不考你,一步步陪你落地」划掉 —— 页面一进来先读一句安抚文案,
+          真正想做的事(落地清单)被推下去。安抚由内容本身承担,不再写在标语里。 */}
 
       {/* ── 身体层:此刻先落地(可点掉) ── */}
-      <div className="ng-sec"><span className="l">{L(dict, '此刻先落地', 'Ground first')}</span><span className="r">{groundDone ? L(dict, '落地了 · 身体安全了', 'Grounded · you’re safe') : L(dict, '心跳快就先做这个', 'Racing? do this first')}</span></div>
+      <div className="ng-sec"><span className="l">{L(dict, '回到当下', 'Back to now')}</span><span className="r">{groundDone ? L(dict, '落地了 · 身体安全了', 'Grounded · you’re safe') : L(dict, '心跳快就先做这个', 'Racing? do this first')}</span></div>
       <div className="ng-ground">
         <p className="ng-ground-lead">{L(dict, '一项项点掉,不用想:', 'Tap them off, no thinking:')}</p>
         <div className="ng-ground-list">
@@ -157,7 +213,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
 
                 {st === 'active' && s.key === 'voice' && (
                   <div className="ng-tl-in">
-                    <textarea className="ng-ta" rows={2} value={voice} onChange={(e) => setVoice(e.target.value)}
+                    <textarea ref={voiceTa} className="ng-ta" rows={2} value={voice} onChange={(e) => setVoice(e.target.value)}
                       placeholder={L(dict, '我必须…… / 我应该早就…… / 全搞砸了……', 'I must… / I should have… / I ruined it all…')} />
                     {seed && (
                       <p className="ng-heal-from">{L(dict, '从你成长页那条带过来的 · 想改可以改', 'Carried over from your Growth note — edit if you like')}</p>
@@ -172,7 +228,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
                     {ants && (
                       <div className="ng-ant">
                         <p className="ng-ant-h">{L(dict, `念念注意到「${ants.label}」`, `Nessa noticed “${ants.label}”`)}</p>
-                        <p className="ng-ant-b">{L(dict, '这不是你的错 —— 是保护者在用它唯一会的方式照顾你。', 'Not your fault — it’s a protector caring the only way it knows.')}</p>
+                        <p className="ng-ant-b">{L(dict, '这不是你的错 —— 是那个内在小孩在用它唯一会的方式照顾你。', 'Not your fault — it’s the inner child caring the only way it knows.')}</p>
                         <div className="ng-ant-ch">{ants.words.map((w) => <span key={w} className="ng-ant-w">{w}</span>)}</div>
                       </div>
                     )}
@@ -197,7 +253,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
                       <p className="ng-quiet">{L(dict, '念念在陪你看…', 'Nessa is with you…')}</p>
                     ) : (
                       <>
-                        <div className="ng-ifs-part protector"><span className="lbl">{L(dict, '保护者', 'The protector')}</span>{ifs.protector}</div>
+                        <div className="ng-ifs-part protector"><span className="lbl">{L(dict, '内在小孩', 'The inner child')}</span>{ifs.protector}</div>
                         <div className="ng-acts"><button type="button" className="ng-btn" onClick={() => setPhase('self')}>{L(dict, '继续', 'Continue')}</button></div>
                       </>
                     )}
@@ -208,7 +264,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
                   <div className="ng-tl-in">
                     <div className="ng-ifs-part self"><span className="lbl">{L(dict, '清醒的自己', 'Your calm self')}</span>{ifs.self}</div>
                     {ifs.insight && <div className="ng-ifs-part insight"><span className="lbl">{L(dict, '念念的洞察', 'Nessa’s read')}</span>{ifs.insight}</div>}
-                    <p className="ng-tl-q">{L(dict, '对这个保护者说一句(点一句,或跳过):', 'Say one thing to it (tap one, or skip):')}</p>
+                    <p className="ng-tl-q">{L(dict, '对这个内在小孩说一句(点一句,或跳过):', 'Say one thing to it (tap one, or skip):')}</p>
                     <div className="ng-heal-chips col">
                       {replyLines.map((r) => (
                         <button key={r} type="button" className={`ng-heal-chip line${reply === r ? ' on' : ''}`} onClick={() => setReply(r)}>{r}</button>
@@ -232,7 +288,7 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
                     <p className="ng-tl-q">{L(dict, '走完这一遍,此刻,是什么感觉?', 'After all that — how does this moment feel?')}</p>
                     <MoodWheel value={feelEm} onPick={setFeelEm} en={en} />
                     <p className="ng-heal-from">{L(dict, '就是你熟悉的那个心情转盘 —— 会记进心情记录,汇入情绪趋势。', 'The same mood wheel you know — saved to your mood log and emotion trends.')}</p>
-                    <textarea className="ng-ta" rows={2} value={feelNote} onChange={(e) => setFeelNote(e.target.value)}
+                    <textarea ref={feelTa} className="ng-ta" rows={2} value={feelNote} onChange={(e) => setFeelNote(e.target.value)}
                       placeholder={L(dict, '想补一句就写(可跳过)', 'Add a line if you want (optional)')} />
                     <div className="ng-acts">
                       <button type="button" className="ng-btn" disabled={!feelEm} onClick={closeLoop}>
@@ -254,16 +310,17 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
             <div className="ng-loop-arrow" aria-hidden>↓</div>
             <div className="ng-loop-row now"><span className="k">{L(dict, '此刻', 'Now')}</span><span className="v">{feelEmObj && <span className="ng-mdot" style={{ background: feelEmObj.color }} aria-hidden />}{feelEmObj ? (en ? feelEmObj.labelEn : feelEmObj.label) : ''}{feelNote.trim() ? ` · ${feelNote.trim()}` : ''}</span></div>
           </div>
-          <p className="ng-done" style={{ marginTop: 12 }}>
-            {L(dict, '已存进回看 —— 你真的陪自己走完了一次。', 'Saved — you walked yourself through it.')}
-          </p>
+          {/* 2026-07-28(标注 图16):「已存进回看」改成弹出后自动消失的提示(见 closeLoop 里的 toast),
+              不再在页面上常驻一整块 —— 走完一遍最该看见的是前后对照,不是一句系统回执。 */}
           <div className="ng-acts">
             <button type="button" className="ng-btn ghost" onClick={restart}>{L(dict, '再走一遍', 'Again')}</button>
           </div>
         </div>
       )}
 
-      <p className="ng-todaynote">{L(dict, '回看留在「成长」的回看流里 —— 这里不追积分。', 'Look-backs live in the Growth trail — no points chase here.')}</p>
+      {/* 2026-07-28(标注 图16):页脚「回看留在「成长」的回看流里」删掉 —— 存哪儿是实现细节,用户不需要每次都被告知。 */}
+
+      {toast && <div className="nm-toast" role="status">{toast}</div>}
     </div>
   );
 }

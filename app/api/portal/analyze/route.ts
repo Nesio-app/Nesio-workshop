@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GEMINI_MODEL_FALLBACKS } from '@/lib/portal/ai-provider-chain.mjs';
 import { createSignal } from '@/lib/life-domain/create-signal';
 import { normalizePhotoToSignal, normalizeVoiceToSignal } from '@/lib/life-domain/normalizers';
-import { EXTRACTION_SYSTEM_PROMPT, buildExtractionSystemPrompt, languageDirective, parseJsonBlock } from '@/lib/extraction/extraction';
+import { EXTRACTION_SYSTEM_PROMPT, buildExtractionSystemPrompt, buildImageExtractionSystemPrompt, languageDirective, parseJsonBlock } from '@/lib/extraction/extraction';
 import { isRateLimited, isPortalRequestAuthorized } from '@/lib/portal/api-auth';
 import { resolveAiKey } from '@/lib/portal/ai-keys';
 import { envValue } from '@/lib/portal/env';
@@ -391,9 +391,13 @@ export async function POST(req: NextRequest) {
     // 输出语言跟随 UI(英文用户不该拿到中文 name/summary/tags)。
     const isEn = (body.uiLocale || 'zh').toLowerCase().startsWith('en');
     // 衣橱识别用专属 prompt(结构化属性);其余走通用抽取。默认路径不变。
+    // 2026-07-28(标注 图8/图9):拍照走图片专用 prompt —— 通用抽取会把「桌上一支笔」判成
+    // 「没有生命图谱条目」返回空 nodes,于是刚存过的东西再拍一次也认不出来。
     const extractionPrompt = (isImage && body.mode === 'clothing')
       ? buildClothingPrompt(body.uiLocale)
-      : buildExtractionSystemPrompt(body.uiLocale);
+      : isImage
+        ? buildImageExtractionSystemPrompt(body.uiLocale)
+        : buildExtractionSystemPrompt(body.uiLocale);
 
     // 有鉴权但之前无限流:单个会话可无节流刷最贵的视觉/grounding 调用(每请求最多 4 次外部 AI)。
     if (aiAllowed && isRateLimited(req, 'analyze', { limit: 20 })) {

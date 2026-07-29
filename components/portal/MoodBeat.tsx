@@ -65,7 +65,6 @@ function readLatestMoodToday(): Beat | null {
 
 export default function MoodBeat() {
   const onOpenMood = () => window.dispatchEvent(new CustomEvent('nesio-open-mood'));
-  const onOpenTrend = () => window.dispatchEvent(new CustomEvent('nesio-open-mood-trend'));
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [beat, setBeat] = useState<Beat | null>(null);
   const [ready, setReady] = useState(false);
@@ -96,8 +95,13 @@ export default function MoodBeat() {
   }
 
   // 已记:符号 + 标题都染上当天情绪色(取盘里同一 var(--emotion-<id>))。
-  // 主区点击 = 再记一次心情(恢复入口 + 支持一天多记:每记一次是新节点,第一拍显示最新);
-  // 「看这周趋势」降为 sub 行次级链接(避免嵌套按钮,外层用 div)。
+  // 整块点一下 = 再记一次(支持一天多记:每记一次是新节点,第一拍显示最新)。
+  //
+  // 2026-07-29 用户实锤:删掉底下那行「09:57 · 记录 · 再记一次 · 这周趋势 ›」。
+  //   · 时间和「记录」两个字是**元数据**,不是这一拍要说的事;
+  //   · 「再记一次」和整块点击是同一个动作,摆两遍;
+  //   · 「这周趋势」是回顾,不属于今天页的「现在」—— 挪去健康页(那里才是看走势的地方)。
+  // 留下的正是用户要的那半:情绪词 + 能量环。
   const moodC = beat.emotionId ? `var(--emotion-${beat.emotionId})` : 'var(--portal-muted)';
   return (
     <div
@@ -114,12 +118,6 @@ export default function MoodBeat() {
           {beat.hasEmotion && <EnergyRing level={beat.energyLevel} />}
         </span>
       </button>
-      <span className="nesio-tl-sub nesio-tl-sub--mood">
-        {beat.time} · {L(dict, '记录', 'logged')} ·{' '}
-        <button type="button" className="nesio-tl-mood-again" onClick={onOpenMood}>{L(dict, '再记一次', 'log again')}</button>
-        {' · '}
-        <button type="button" className="nesio-tl-mood-trend" onClick={onOpenTrend}>{L(dict, '这周趋势 ›', 'this week ›')}</button>
-      </span>
     </div>
   );
 }

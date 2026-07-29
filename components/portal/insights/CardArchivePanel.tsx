@@ -65,8 +65,7 @@ export default function CardArchivePanel({ onOpenNode }: { onOpenNode?: (nodeId:
     else openCardTarget(target);
   }
 
-  const hasAnything = archive.shown.length > 0 || archive.declined.length > 0 || judge.batches > 0;
-  if (!hasAnything) return null; // 空档案不占版面:第一张卡出现后自然长出来
+  const empty = archive.shown.length === 0 && archive.declined.length === 0 && judge.batches === 0;
 
   return (
     <div className="nesio-fit-panel" style={{ marginBottom: 'var(--space-3)' }}>
@@ -75,9 +74,12 @@ export default function CardArchivePanel({ onOpenNode }: { onOpenNode?: (nodeId:
       </p>
 
       <p className="nesio-settings-option-hint" style={{ margin: '0 0 var(--space-2)' }}>
-        {L(dict,
-          `出过 ${stats.shownCount} 张 · 你表态 ${stats.verdictCount} 次${judge.batches > 0 ? ` · AI 判决 ${judge.batches} 批(${judge.judgedSignals} 条信号)` : ''}`,
-          `${stats.shownCount} shown · ${stats.verdictCount} rated${judge.batches > 0 ? ` · ${judge.batches} AI batches (${judge.judgedSignals} signals)` : ''}`)}
+        {empty
+          ? L(dict, 'AI 判过的每张卡都会记在这里:说了的可以改判,没说的可以点「该提醒我」。第一批判决跑完就有内容。',
+              'Every AI-judged card lands here: rate what was said, reclaim what was held. Content appears after the first batch.')
+          : L(dict,
+            `出过 ${stats.shownCount} 张 · 你表态 ${stats.verdictCount} 次${judge.batches > 0 ? ` · AI 判决 ${judge.batches} 批(${judge.judgedSignals} 条信号)` : ''}`,
+            `${stats.shownCount} shown · ${stats.verdictCount} rated${judge.batches > 0 ? ` · ${judge.batches} AI batches (${judge.judgedSignals} signals)` : ''}`)}
       </p>
 
       {stats.alarm && (

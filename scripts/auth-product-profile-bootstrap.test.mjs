@@ -46,6 +46,22 @@ for (const [label, filePath] of [
 
 const callback = fs.readFileSync(callbackPath, 'utf8');
 assert.match(callback, /bootstrapCloudAccountProfile\([^)]*session\?\.access_token/s, 'auth callback must bootstrap after Supabase code/OTP session exchange.');
+
+// 2026-07-28(标注 图2/图3「登录卡住 / 很慢」):profile 落库**不许挡在登录关键路径上**。
+// 它内部有 3 个串行 Supabase 往返,而它的 meta 三个分支全是 blocking:false / authReady:true
+// —— 也就是从来不影响能不能进门,却让每次登录/每次开 app 都要等它跑完。
+// 三条路由一律改成 after()(响应先发出,它在后台补)。这里锁住「必须 bootstrap」
+// **并且**「必须在 after() 里」——只锁前者的话,下次很容易又被 await 回关键路径上。
+for (const [label, source] of [
+  ['auth callback route', callback],
+  ['auth import route', fs.readFileSync(importPath, 'utf8')],
+  ['auth session route', fs.readFileSync(sessionPath, 'utf8')],
+]) {
+  assert.match(source, /after\(\(\)\s*=>\s*bootstrapCloudAccountProfile\(/s,
+    `${label}: profile bootstrap must run in after(), not block the response.`);
+  assert.doesNotMatch(source, /await\s+bootstrapCloudAccountProfile\(/s,
+    `${label}: profile bootstrap must not be awaited on the auth hot path.`);
+}
 assert.match(callback, /profileBootstrapStatus/s, 'auth callback redirect must expose safe product profile bootstrap status.');
 assert.match(callback, /profileBootstrapBlocking/s, 'auth callback redirect must mark product profile bootstrap as non-blocking.');
 assert.match(callback, /authReady/s, 'auth callback redirect must expose whether auth is ready independent of profile bootstrap.');

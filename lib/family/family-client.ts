@@ -4,6 +4,7 @@
  * 纯 fetch,不 import 服务端模块(client 安全)。
  */
 import type { Cadence } from '@/lib/family/chores-core';
+import { fetchWithTimeout } from '@/lib/portal/fetch-timeout';
 
 export type ChoreStateView = 'todo' | 'done' | 'approved' | 'paid';
 export interface FamilyMemberView { id: string; name: string; canApprove: boolean; needsApproval: boolean; canRecordPayout: boolean; email?: string; avatarUrl?: string; goalAmount?: number; goalLabel?: string; }
@@ -17,7 +18,7 @@ export interface BoardView {
   familyId: string; me: FamilyMemberView;
   myChoresToday: ChoreInstanceView[]; toReview: ChoreInstanceView[];
   assigned: ChoreInstanceView[];
-  everyone: Array<{ member: FamilyMemberView; owed: number }>;
+  everyone: Array<{ member: FamilyMemberView; owed: number; earned: number }>;
 }
 export interface EventAssignmentView {
   assigned: boolean; assigneeId?: string; assigneeName?: string;
@@ -31,9 +32,18 @@ export interface LedgerView {
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
+/**
+ * 2026-07-29(用户标注「家务页卡死在『加载中…』」的真因):这里原本没有超时。
+ * fetch 不带 signal 时,网关不回 / 连接半挂,浏览器会**一直**等下去 ——
+ * 于是 setLoading(false) 永远不执行,加载态就停在那儿,看起来像卡死。
+ * 12s 到点就当 network 处理,UI 拿到显式失败态 + 重试(CLAUDE.md 红线)。
+ * 超时实现走共用的 fetchWithTimeout,全站只有那一份。
+ */
+const TIMEOUT_MS = 12_000;
+
 async function api<T>(url: string, init?: RequestInit): Promise<ApiResult<T>> {
   try {
-    const res = await fetch(url, { cache: 'no-store', ...init });
+    const res = await fetchWithTimeout(url, { cache: 'no-store', ...init }, TIMEOUT_MS);
     // 平台超时回非 JSON —— 安全解析,别炸进 catch 误报网络
     let body: unknown = null;
     try { body = JSON.parse(await res.text()); } catch { /* 网关页 */ }

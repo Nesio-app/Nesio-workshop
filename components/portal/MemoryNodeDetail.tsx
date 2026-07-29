@@ -8,7 +8,8 @@ import type { LocationMeta } from './LocationPicker';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import LocationPicker from './LocationPicker';
 import EmailComposeSheet from './EmailComposeSheet';
-import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare } from './icons';
+import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare, IconFile} from './icons';
+import { isTopicTag } from '@/lib/portal/topic-tags';
 import { L } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName, stripMarkdownInline } from '@/lib/portal/node-display';
@@ -19,6 +20,7 @@ const AssignChoreLazy = dynamicImport(() => import('./family/AssignChoreButton')
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
+import Button from './ui/Button';
 import MemoryLensSheet from './MemoryLensSheet';
 import { shouldNudge } from '@/lib/portal/lens';
 const TYPE_BG_DETAIL: Record<string, string> = {
@@ -31,6 +33,12 @@ interface MemoryNodeDetailProps {
   onClose: () => void;
   relatedNodes?: LifeNode[];
   onOpenNode?: (node: LifeNode) => void;
+  /**
+   * 从 fullscreen 面板(洞察)内部打开时传 true —— 否则这张 bottom 卡(z-901)会被
+   * 洞察面板(z-930)整个盖住,表现成「点了没反应」(见 NesioSheet 的 elevated 注释)。
+   * 默认 false:从记忆页/今天页打开时,它自己要能被内部的全屏阅读器盖住。
+   */
+  elevated?: boolean;
 }
 
 const TYPE_LABELS_ZH: Record<string, string> = {
@@ -350,15 +358,26 @@ function EventSection({ node }: {
           </span>
         </div>
       )}
-      {location && (
-        <div className="nesio-node-attr-row">
-          <span className="nesio-node-attr-key">{L(dict, '地点', 'Location')}</span>
-          {mapLink
-            ? <a href={mapLink} target="_blank" rel="noopener noreferrer" className="nesio-node-attr-val nesio-node-attr-link">{location}</a>
-            : <span className="nesio-node-attr-val">{location}</span>
-          }
-        </div>
-      )}
+      {location && (() => {
+        // Google 日历里,Zoom / Teams / Meet 这些会议软件是把**会议链接**写进 location 字段的
+        // (它们那边就这么设计)。原样挂在「地点」下面语义不对,而且一长串 URL 也没法看。
+        // 认出来就改叫「会议链接」,并做成能点的 —— 对用户比一个假地点有用得多。
+        const meetingUrl = /^https?:\/\//i.test(location.trim()) ? location.trim() : '';
+        const label = meetingUrl ? L(dict, '会议链接', 'Meeting link') : L(dict, '地点', 'Location');
+        const shown = meetingUrl
+          ? (() => { try { return new URL(meetingUrl).hostname.replace(/^www\./, ''); } catch { return meetingUrl; } })()
+          : location;
+        const href = meetingUrl || mapLink;
+        return (
+          <div className="nesio-node-attr-row">
+            <span className="nesio-node-attr-key">{label}</span>
+            {href
+              ? <a href={href} target="_blank" rel="noopener noreferrer" className="nesio-node-attr-val nesio-node-attr-link">{shown}</a>
+              : <span className="nesio-node-attr-val">{shown}</span>
+            }
+          </div>
+        );
+      })()}
       {participants && <InfoRow label={L(dict, '参与者', 'People')} value={participants} />}
       {/* CARD SPEC 关键信息:电商/物流类邮件事件的语义键值行(商家/类型/预计到货) */}
       <InfoRow label={L(dict, '商家', 'Merchant')} value={attr(node, 'store', 'merchant')} />
@@ -622,7 +641,7 @@ export default function MemoryNodeDetail(props: MemoryNodeDetailProps) {
   );
 }
 
-function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: MemoryNodeDetailProps) {
+function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevated }: MemoryNodeDetailProps) {
   // 批次 73:关联链手动管理(增/删即反馈)
   const [removedRels, setRemovedRels] = useState<Set<string>>(new Set());
   const [addedRels, setAddedRels] = useState<Array<{ targetId: string; relation: string }>>([]);
@@ -953,6 +972,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
       )}
       <NesioSheet
         variant="bottom"
+        elevated={elevated}
         open
         onOpenChange={(next) => { if (!next) onClose(); }}
         card={false}
@@ -1078,7 +1098,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
                 type="file"
                 accept="image/*"
                 multiple
-                hidden
+                className="nesio-visually-hidden"
                 onChange={(e) => { const f = e.currentTarget.files; e.currentTarget.value = ''; void addPhotos(f); }}
               />
               {photoErr && (
@@ -1272,6 +1292,10 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
             let graph: LifeNode[] = [];
             try { graph = getLifeGraph(); } catch { /* ignore */ }
             const doors = n.tags
+              // 只有**主题**才配成门。来源标记(Flomo/Notion…)和层级前缀(「主题」)
+              // 点进去等于「全部导入内容」,没有筛选意义 —— 用户看到的
+              // 「Flomo · 1917 条」「主题 · 21 条」就是这么冒出来的。
+              .filter(isTopicTag)
               .map((t) => ({ t, count: graph.filter((x) => x.id !== n.id && x.tags?.includes(t)).length + 1 }))
               .filter((d) => d.count >= 3)
               .sort((a, b) => b.count - a.count)
@@ -1316,12 +1340,17 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
             if (galleryAssets.length === 0) return null;
             return (
             <>
-              <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>{L(dict, '图片线索', 'Image clues')}</p>
+              <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>{L(dict, '附件', 'Attachments')}</p>
               <div style={{ display: 'grid', gap: '0.6rem' }}>
                 {galleryAssets.map((asset) => {
                   const key = asset.id || asset.storagePath || asset.label || 'asset';
                   const previewUrl = assetUrls[key];
                   const isImage = asset.kind === 'image' || asset.mimeType?.startsWith('image/');
+                  // 附件(pdf/docx/xlsx…)存在 nesio-files,是 Blob 不是 dataURL —— 单独一行,点了下载/打开。
+                  // 不做内嵌预览:各种格式各要一个渲染器,而「能打开」已经解决了「存进去看不见」。
+                  if (asset.kind === 'file' && asset.local) {
+                    return <LocalFileRow key={key} assetId={asset.id} label={asset.label || n.name} dict={dict} />;
+                  }
                   return (
                     <div key={key} className="nesio-type-asset-card">
                       {isImage && previewUrl ? (
@@ -1431,20 +1460,23 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
 
       {/* Actions */}
           <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.25rem' }}>
+            {/* 这一排以前是三套不同的自造按钮拼出来的(ob-primary / today--ghost / settings-danger),
+                高度各不相同,只好再加一层 .nesio-nd-action-btn 把它们掰齐。现在统一走 Button 原语,
+                那一层只剩「同一行等宽等高」的几何职责。 */}
             {editing ? (
               <>
-                <button type="button" className="nesio-ob-primary-btn nesio-nd-action-btn" onClick={saveEdit}>{L(dict, '保存', 'Save')}</button>
-                <button type="button" className="nesio-today-btn nesio-today-btn--ghost nesio-nd-action-btn" onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</button>
+                <Button variant="primary" className="nesio-nd-action-btn" onClick={saveEdit}>{L(dict, '保存', 'Save')}</Button>
+                <Button variant="secondary" className="nesio-nd-action-btn" onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</Button>
               </>
             ) : (
               <>
                 {/* 批次 33:阅读入口顶部有(替换✕),底部也放回来一份 —— 用户反馈顶部那颗找不到 */}
                 {readableText && (
-                  <button type="button" className="nesio-ob-primary-btn nesio-nd-action-btn" onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</button>
+                  <Button variant="primary" className="nesio-nd-action-btn" onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</Button>
                 )}
                 {/* 批次 37:回复按钮移到顶部「阅读」旁,底部不再重复 */}
-                <button type="button" className="nesio-today-btn nesio-today-btn--ghost nesio-nd-action-btn" onClick={startEdit}>{L(dict, '编辑', 'Edit')}</button>
-                <button type="button" className="nesio-settings-danger-btn nesio-nd-action-btn" onClick={handleDelete}>{L(dict, '删除', 'Delete')}</button>
+                <Button variant="secondary" className="nesio-nd-action-btn" onClick={startEdit}>{L(dict, '编辑', 'Edit')}</Button>
+                <Button variant="soft" tone="risk" className="nesio-nd-action-btn" onClick={handleDelete}>{L(dict, '删除', 'Delete')}</Button>
               </>
             )}
           </div>
@@ -1452,4 +1484,54 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode }: Memo
       </NesioSheet>
     </>
   );
+}
+
+
+/**
+ * 本机附件一行:名字 · 大小 · 打开。附件存的是 Blob(nesio-files),
+ * 所以 URL 要 createObjectURL 现造,并在卸载时 revoke —— 不 revoke 就是内存泄漏。
+ * 取不到(被清过/换了设备)要明说,不能留一个点了没反应的按钮。
+ */
+function LocalFileRow({ assetId, label, dict }: { assetId: string; label: string; dict: string }) {
+  const [meta, setMeta] = useState<{ name: string; size: number } | null>(null);
+  const [gone, setGone] = useState(false);
+  const urlRef = useRef<string>('');
+  useEffect(() => {
+    let live = true;
+    void import('@/lib/portal/local-file-store').then(({ getLocalFile }) => getLocalFile(assetId)).then((rec) => {
+      if (!live) return;
+      if (!rec?.blob) { setGone(true); return; }
+      urlRef.current = URL.createObjectURL(rec.blob);
+      setMeta({ name: rec.name || label, size: rec.size || rec.blob.size });
+    }).catch(() => { if (live) setGone(true); });
+    return () => {
+      live = false;
+      if (urlRef.current) { URL.revokeObjectURL(urlRef.current); urlRef.current = ''; }
+    };
+  }, [assetId, label]);
+
+  return (
+    <div className="nesio-type-asset-card nesio-nd-file-row">
+      <span className="nesio-nd-file-icon" aria-hidden><IconFile size={18} /></span>
+      <span className="nesio-nd-file-meta">
+        <span className="nesio-nd-file-name">{meta?.name || label}</span>
+        <span className="nesio-nd-file-sub">
+          {gone
+            ? L(dict, '这个附件在本机找不到了', 'This attachment is no longer on this device')
+            : meta ? prettyFileSize(meta.size) : L(dict, '读取中…', 'Loading…')}
+        </span>
+      </span>
+      {meta && !gone && (
+        <a className="nesio-node-action-secondary nesio-nd-file-open" href={urlRef.current} download={meta.name} target="_blank" rel="noreferrer">
+          {L(dict, '打开', 'Open')}
+        </a>
+      )}
+    </div>
+  );
+}
+function prettyFileSize(n: number): string {
+  if (!Number.isFinite(n) || n <= 0) return '0 KB';
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${Math.round((n / 1024 / 1024) * 10) / 10} MB`;
 }

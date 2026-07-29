@@ -219,9 +219,12 @@ export function featureCatalog(zh: boolean): FeatureDef[] {
     {
       key: 'capture',
       title: L('有什么想记的,随手说一句', 'Anything to remember? Just say it'),
-      body: L('长按中间按钮,说「备用钥匙放在玄关」—— 记过就能找回,不用再存在脑子里。', 'Hold the center button: "Spare keys in the hallway." Noted once, found anytime.'),
-      ctaLabel: L('记一笔', 'Jot it'),
-      openEvent: 'nesio-open-tell',
+      // 2026-07-29:中间键改成「一按直达相机」,这张卡讲的是「说一句」——
+      // 直接指语音入口。原来指的 nesio-open-tell 是那层已删掉的三按钮中转,
+      // 而且文案里的「长按中间按钮」早就和实际行为对不上了(长按是问一问)。
+      body: L('点输入框右边的话筒,说「备用钥匙放在玄关」—— 记过就能找回,不用再存在脑子里。', 'Tap the mic beside the input: "Spare keys in the hallway." Noted once, found anytime.'),
+      ctaLabel: L('说一句', 'Say it'),
+      openEvent: 'nesio-open-voice',
     },
   ];
 }

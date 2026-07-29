@@ -46,6 +46,8 @@ export const IconChevronRight = make(<path d="m9 6 6 6-6 6" />);
 export const IconCard = make(<><rect x="2" y="5" width="20" height="14" rx="2.5" /><path d="M2 10h20" /><path d="M6 15h4" /></>);
 export const IconHelpCircle = make(<><circle cx="12" cy="12" r="9" /><path d="M9.3 9.3a2.7 2.7 0 1 1 3.9 2.4c-.75.37-1.2.9-1.2 1.7v.35" /><path d="M12 17h.01" /></>);
 export const IconDownload = make(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5M12 15V3" /></>);
+// 加号:今天页输入条左侧「加图片/文件」。用图标而不是 + 字符 —— 字符当图标在自查里被抓过一轮。
+export const IconPlus = make(<><path d="M12 5v14M5 12h14" /></>);
 export const IconUpload = make(<><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 8 5-5 5 5M12 3v12" /></>);
 
 // ── 记忆节点类型 / 领域 / 天气(批次 2 全站去 emoji)──
@@ -69,7 +71,8 @@ export const IconMap = make(<><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2z" /><path 
 export const IconFolder = make(<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />);
 export const IconRefresh = make(<><path d="M21 12a9 9 0 1 1-2.6-6.3" /><path d="M21 3v6h-6" /></>);
 export const IconAlertTriangle = make(<><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" /><path d="M12 9v4M12 17h.01" /></>);
-export const IconPlay = make(<path d="M7 4.5v15l12-7.5z" fill="currentColor" stroke="none" />);
+// 剧场 logo:线条空心三角(2026-07-28 UI 精修 —— 实心块与其余描边图标不同语言)。
+export const IconPlay = make(<path d="M8 5.2v13.6L19 12z" />);
 export const IconGlobe = make(<><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14.5 14.5 0 0 1 0 18 14.5 14.5 0 0 1 0-18z" /></>);
 export const IconHome = make(<><path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><path d="M9 22v-8h6v8" /></>);
 export const IconTrendingUp = make(<><path d="m2 17 7-7 4 4 9-9" /><path d="M15 5h7v7" /></>);
@@ -88,6 +91,44 @@ export const IconRain = make(<><path d="M17.5 15a4.5 4.5 0 0 0 .4-9A7 7 0 0 0 4.
 export const IconMirror = make(<><rect x="6" y="3" width="12" height="18" rx="2" /><path d="M9 8h6M9 12h4M9 16h5" /></>);
 /** 家人 / 家务入口 */
 export const IconPeople = make(<><path d="M9 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM17 11a2.5 2.5 0 1 0 0-5" /><path d="M4 20v-1a5 5 0 0 1 10 0v1M15.5 15.5A5 5 0 0 1 20 20v1" /></>);
+
+// ── 衣橱(2026-07-29:入口曾误用 IconBookmark「收藏夹」,衣物卡一律 👕 emoji)──
+/** 衣橱入口 —— 衣架 */
+export const IconHanger = make(<><path d="M12 8.2V6.6a2 2 0 1 1 2-2" /><path d="m12 8.2-8.3 6.3a1.3 1.3 0 0 0 .8 2.3h15a1.3 1.3 0 0 0 .8-2.3z" /></>);
+/** 上装 —— T恤 */
+export const IconShirt = make(<path d="M8.2 3 4 5.4l1.5 4.2 2.4-.9V21h8.2V8.7l2.4.9L20 5.4 15.8 3a3.9 3.9 0 0 1-7.6 0z" />);
+/** 下装 —— 长裤 */
+export const IconPants = make(<><path d="M6.5 3h11l.8 18h-4.5L12 11.5 10.2 21H5.7z" /><path d="M6.7 7.4h10.6" /></>);
+/** 外套 —— 开襟 + 领口 */
+export const IconJacket = make(<><path d="M9 3 4.6 5.4 3.4 9.8l2.4.9V21h12.4V10.7l2.4-.9-1.2-4.4L15 3l-3 3.1z" /><path d="M12 6.1V21" /></>);
+/** 连衣裙 */
+export const IconDress = make(<><path d="M9.2 3h5.6l-1.2 4.4L18 21H6l4.4-13.6z" /><path d="M9.2 3 12 5.1 14.8 3" /></>);
+/** 鞋 */
+export const IconShoe = make(<><path d="M2 18.8v-6.3h2.7l2.9 2 4.6.8c2.9.5 5.3 1.2 7.2 2.2.9.5 1.4 1.3 1.4 2.3v.7H3.2A1.2 1.2 0 0 1 2 19.3z" /><path d="M4.7 12.5v3.4" /></>);
+/** 配饰 —— 腕表 */
+export const IconWatch = make(<><circle cx="12" cy="12" r="4.8" /><path d="M9.2 7.5 9.6 3h4.8l.4 4.5M9.2 16.5l.4 4.5h4.8l.4-4.5" /></>);
+/** 喜欢 / 不喜欢(替代 👍👎)*/
+export const IconThumbUp = make(<><path d="M7 10.5v11" /><path d="M15 5.9 14 10h5.8a2 2 0 0 1 2 2.6l-2.4 8a2 2 0 0 1-1.9 1.4H4a2 2 0 0 1-2-2v-7.5a2 2 0 0 1 2-2h2.8a2 2 0 0 0 1.8-1.1L12 2a3.1 3.1 0 0 1 3 3.9z" /></>);
+export const IconThumbDown = make(<><path d="M17 13.5v-11" /><path d="M9 18.1 10 14H4.2a2 2 0 0 1-2-2.6l2.4-8A2 2 0 0 1 6.5 2H20a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-2.8a2 2 0 0 0-1.8 1.1L12 22a3.1 3.1 0 0 1-3-3.9z" /></>);
+
+/** 叶子(休眠/自然,替代 🌿) */
+export const IconLeaf = make(<><path d="M4 20c0-8 5.5-13 16-13 0 9-5 14-12.5 14H4z" /><path d="M9 15c1.8-3.4 4.3-5.6 8-7" /></>);
+
+/** 步行(足迹时间线的出行方式,配 IconCar 用) */
+export const IconWalk = make(<><circle cx="13" cy="4" r="1.8" /><path d="M11 21l1.6-5.4-2.6-2.2.8-4.6 3.2 1.4 2.6 2.6" /><path d="M8.2 9.4 6 12M12.6 15.6 15 21" /></>);
+
+/** 衣物类别 → 描边图标。衣橱里所有缩略图占位、类别标题都走这里,不再一律 👕。 */
+export function GarmentIcon({ type, size = 20 }: { type: string; size?: number }) {
+  switch (type) {
+    case 'top': return <IconShirt size={size} />;
+    case 'bottom': return <IconPants size={size} />;
+    case 'outer': return <IconJacket size={size} />;
+    case 'dress': return <IconDress size={size} />;
+    case 'shoes': return <IconShoe size={size} />;
+    case 'accessory': return <IconWatch size={size} />;
+    default: return <IconHanger size={size} />;
+  }
+}
 
 /** 记忆节点类型 → 描边图标(替代 👤📦📍📅🤝🩷⭐ emoji 映射) */
 export function NodeTypeIcon({ type, size = 16 }: { type: string; size?: number }) {
@@ -125,15 +166,34 @@ export function WeatherIcon({ condition, size = 16 }: { condition: string; size?
   return <IconCloudSun size={size} />;
 }
 
-/** 引导卡 emoji 图标 → 描边图标(卡片数据/缓存里仍是 emoji 字符串,渲染层统一转换) */
-export function GuidanceIcon({ icon, size = 18 }: { icon: string; size?: number }) {
-  const map: Record<string, React.ComponentType<{ size?: number }>> = {
-    '✈️': IconPlane, '🏥': IconHeartPulse, '⏰': IconClock, '🎂': IconGift,
-    '💝': IconStar, '🧳': IconMap, '🎙': IconMic, '📩': IconMail,
-    '💪': IconActivity, '🧥': IconCloud, '☂️': IconRain, '📦': IconBox,
-    '💡': IconBulb, '🗓': IconCalendar, '✅': IconCheckCircle, '🌙': IconMoon,
-    '🎈': IconBalloon, '✨': IconStar,
-  };
-  const C = map[icon];
+/**
+ * emoji → 描边图标的**渲染层**转换表。
+ *
+ * 为什么留着 emoji:好几处数据层(引导卡缓存、工具箱清单、旧记录)里存的就是 emoji 字符串,
+ * 有的还跨版本/跨仓共享。改数据层要迁移历史数据,风险远大于收益 ——
+ * 所以数据层照旧,**渲染层一律换成站内描边图标**。
+ * 2026-07-29:从 GuidanceIcon 里提出来通用化,工具箱等处也走这张表(此前它们直接渲染 emoji)。
+ */
+const EMOJI_ICON: Record<string, React.ComponentType<{ size?: number }>> = {
+  '✈️': IconPlane, '🏥': IconHeartPulse, '⏰': IconClock, '🎂': IconGift,
+  '💝': IconStar, '🧳': IconMap, '🎙': IconMic, '📩': IconMail,
+  '💪': IconActivity, '🧥': IconCloud, '☂️': IconRain, '📦': IconBox,
+  '💡': IconBulb, '🗓': IconCalendar, '✅': IconCheckCircle, '🌙': IconMoon,
+  '🎈': IconBalloon, '✨': IconStar,
+  // 工具箱 / 今天页卡片(2026-07-29 补)
+  '📖': IconBookOpen, '🏋️': IconActivity, '🏋': IconActivity, '🌱': IconLeaf,
+  '🚗': IconCar, '💊': IconHeartPulse, '🏡': IconHome, '⚡': IconZap, '⚡️': IconZap,
+  '✦': IconStar, '📝': IconNote, '📬': IconMail, '📌': IconFlag, '📍': IconMapPin,
+  '🕊️': IconBalloon, '🕊': IconBalloon, '🌿': IconLeaf, '🎁': IconGift, '☁': IconCloud, '☁️': IconCloud,
+};
+
+/** 任意 emoji 字符串 → 描边图标(表里没有就退回便签图标,绝不把 emoji 漏到界面上) */
+export function EmojiIcon({ icon, size = 18 }: { icon: string; size?: number }) {
+  const C = EMOJI_ICON[icon];
   return C ? <C size={size} /> : <IconNote size={size} />;
+}
+
+/** 引导卡 emoji 图标 → 描边图标(保留原名,内部走同一张表) */
+export function GuidanceIcon({ icon, size = 18 }: { icon: string; size?: number }) {
+  return <EmojiIcon icon={icon} size={size} />;
 }

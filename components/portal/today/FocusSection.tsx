@@ -282,22 +282,27 @@ export function TodayFocusSection({
     <div className="nesio-focus-section">
       <MemoryFlashBanner nodes={flashNodes} onDismiss={dismissFlash} />
 
-      <div className="nesio-focus-header" data-tour="breakdown">
-        <h2 className="nesio-focus-title">
-          {t(locale, 'todayFocusTitle')}
-          <span className="nesio-focus-subtitle"> · {t(locale, 'todayFocusSubtitle')}</span>
-        </h2>
-        <div className="nesio-focus-header-right">
-          {doneToday > 0 && <span className="nesio-focus-done-badge">✓ {doneToday}</span>}
+      {/* 2026-07-29 用户实锤删掉「接下来 · 今天要紧的几件」这行小标题:
+          下面那条时间线本身就在讲这件事,标题只是把同一句话再说一遍(批次 188 已经因为
+          同样的重叠删过问候语里的「接下来:X」)。今天完成数那枚徽章留着 —— 它是数据不是标题。 */}
+      {doneToday > 0 && (
+        <div className="nesio-focus-header" data-tour="breakdown">
+          <div className="nesio-focus-header-right">
+            <span className="nesio-focus-done-badge">✓ {doneToday}</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 批次 107:时间线 —— 心情作「现在」第一拍 + 竖轨串起下面的要紧事(设计规范今天页) */}
       <div className="nesio-focus-timeline">
         <div data-tour="mood"><MoodBeat /></div>
+        {/* 空态那块是**纯说明**,不是按钮。原来只有一行居中的「✓ 没有到点的事」套在
+            虚线圆角盒子里 —— 用户当成胶囊按钮点了半天没反应。补上早就写好却没用上的
+            那句提示(todayFocusEmptyHint),让它读起来像空态说明;左对齐,也不再像个按钮。 */}
         {isEmpty ? (
           <div className="nesio-focus-empty nesio-focus-empty--tl">
-            <p>{t(locale, 'todayFocusEmpty')}</p>
+            <p className="nesio-focus-empty-title">{t(locale, 'todayFocusEmpty')}</p>
+            <p className="nesio-focus-empty-hint">{t(locale, 'todayFocusEmptyHint')}</p>
           </div>
         ) : (
           <div className="nesio-attention-layout">
@@ -322,7 +327,9 @@ export function TodayFocusSection({
                   aria-expanded={false}
                   onClick={() => setCollapsed(false)}
                 >
-                  <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>⋯</span>
+                  {/* 2026-07-29:去掉行首那个孤零零的 ⋯ 圆点 —— 时间线上每个圆点都代表
+                      「一件真实发生的事」,而这一条是**入口**不是事件,挂个点在轨道上
+                      反而像多出一件没内容的事。 */}
                   <span className="nesio-collapsed-task-body">
                     <span className="nesio-collapsed-kicker">{L(dict, '稍后', 'Later')}</span>
                     <span className="nesio-collapsed-title">{L(dict, `还有 ${restCount} 件小事`, `${restCount} more small things`)}</span>
@@ -349,49 +356,8 @@ export function TodayFocusSection({
         </div>
         )}
 
-        {/* 批次 128→132·记一笔·话筒常驻末节点(虚线草稿位)= 唯一极简输入入口(底部输入栏已删)。
-            点话筒=原地录音(实时转文字写进这里)、点文字直接打字,都内联不跳页。回车 → 生成一条实线节点。 */}
-        {capture && (
-          <div className={`nesio-tl-capture${capture.recording ? ' nesio-tl-capture--rec' : ''}${capture.value.trim() ? ' nesio-tl-capture--filled' : ''}`}>
-            <button
-              type="button"
-              className="nesio-tl-capture-mic"
-              aria-label={capture.recording ? L(dict, '说完了,点击保存', 'Done — tap to save') : L(dict, '说一句', 'Say something')}
-              onClick={capture.onMic}
-            >
-              <IconMic size={13} />
-            </button>
-            <form
-              className="nesio-tl-capture-form"
-              onSubmit={(e) => { e.preventDefault(); capture.onSubmit(); }}
-            >
-              {/* 批次 166:动作按钮放进输入框里(右下角),不再另起一行 */}
-              <div className={`nesio-tl-capture-box${capture.value.trim() ? ' nesio-tl-capture-box--filled' : ''}`}>
-                <textarea
-                  ref={capture.inputRef}
-                  className="nesio-tl-capture-input"
-                  rows={1}
-                  value={capture.value}
-                  onChange={(e) => { capture.onChange(e.target.value); growJot(); }}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); capture.onSubmit(); } }}
-                  onFocus={(e) => {
-                    // 批次 167→171:键盘错位 —— 聚焦后等键盘升起,把输入框滚到刚好可见(nearest,
-                    // 不再 center 留大空隙);优先用 visualViewport 精确定位到键盘上沿。
-                    const el = e.currentTarget;
-                    setTimeout(() => { try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch { /* ignore */ } }, 320);
-                  }}
-                  placeholder={L(dict, '点话筒说一句,或记一下…', 'Tap the mic to speak, or jot…')}
-                />
-                {capture.value.trim() && (
-                  <div className="nesio-tl-capture-actions">
-                    {/* 批次 169:记下 = 小号实心 ↑ 圆钮(去掉全屏/虚线态) */}
-                    <button type="submit" className="nesio-tl-capture-send" aria-label={L(dict, '记下', 'Jot')}>↑</button>
-                  </div>
-                )}
-              </div>
-            </form>
-          </div>
-        )}
+        {/* 2026-07-28 UI 精修(用户标注 图4/图5):记一笔输入条已上移到时间线上方,
+            即原「+ 新建日程」的位置 —— 见 today/CaptureBar.tsx。此处不再渲染。 */}
 
       </div>
 

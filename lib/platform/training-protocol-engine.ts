@@ -129,11 +129,9 @@ export function toRunSteps(items: ExercisePrescription[]): RunStep[] {
 }
 
 /** 本周该做的下一个 session:用第一阶段的训练日按本周完成数轮换。 */
-export function nextSessionOf(p: TrainingProtocol, doneThisWeek: number): SessionTemplate | undefined {
-  const phase = p.phases[0];
-  if (!phase?.sessions.length) return undefined;
-  return phase.sessions[doneThisWeek % phase.sessions.length];
-}
+// nextSessionOf 已删(2026-07-28 自查)。它按 `phases[0].sessions[本周次数 % 总数]` 纯轮转,
+// 既忽略用户当前处在哪个阶段,也会把已经练过的那天再排一次 —— 和健身首页的选法给出不同答案。
+// 唯一事实源现在是 fitness-home-core 的 pickPhaseIndex + pickTodaySessionIndex,两个页面共用。
 
 // ── 用户状态:选中的计划 + 执行日志 ──
 export interface TrainingState {

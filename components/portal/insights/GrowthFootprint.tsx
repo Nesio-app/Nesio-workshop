@@ -53,6 +53,7 @@ export default function GrowthFootprint({ onGoTab }: { onGoTab: (t: 'practice' |
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const en = dict === 'en';
   const [f, setF] = useState<Foot | null>(null);
+  const [open, setOpen] = useState(false); // 图21:统计细节默认折叠
   useEffect(() => { try { setF(compute(en)); } catch { /* 空态兜底 */ } }, [en]);
   if (!f) return null;
 
@@ -68,7 +69,13 @@ export default function GrowthFootprint({ onGoTab }: { onGoTab: (t: 'practice' |
 
   return (
     <div className="ng-fp">
-      <div className="ng-fp-hd"><span className="l">{L(dict, '成长足迹', 'Your footprint')}</span><span className="r">{L(dict, '你一路留下的觉察', 'The insight you’ve left')}</span></div>
+      {/* 2026-07-28 UI 精修(标注 图21「折叠进成长足迹」):四个数字方块 + 这周节奏 + 8 周曲线
+          原本一进成长页就铺满一屏,把「今天这一件」挤到屏幕外。现在收进标题下,想看再展开;
+          那句「从 X 月 X 日算起,你回头看了自己 N 次」留在外面 —— 一句话就够代表足迹了。 */}
+      <button type="button" className="ng-fp-hd ng-fp-hd--btn" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+        <span className="l">{L(dict, '成长足迹', 'Your footprint')}</span>
+        <span className="ng-fold-caret" aria-hidden>{open ? '⌃' : '⌄'}</span>
+      </button>
 
       {f.total === 0 ? (
         <p className="ng-fp-empty">{L(dict, '还没开始留下觉察 —— 答一条今天的引导,足迹就从这里长出来。', 'No insight left yet — answer today’s prompt and your trail starts here.')}</p>
@@ -81,6 +88,7 @@ export default function GrowthFootprint({ onGoTab }: { onGoTab: (t: 'practice' |
             <b>{f.total}</b>{L(dict, ' 次。', f.total === 1 ? ' time.' : ' times.')}
           </p>
 
+          {open && (<>
           <div className="ng-fp-grid">
             <div className="ng-fp-tile"><p className="n">{f.streak}<span>{L(dict, ' 天', 'd')}</span></p><p className="k">{L(dict, '连续回看', 'Streak')}</p></div>
             <div className="ng-fp-tile"><p className="n">{f.daysJourneyed}<span>{L(dict, ' 天', 'd')}</span></p><p className="k">{L(dict, '已经走过', 'Days in')}</p></div>
@@ -107,6 +115,7 @@ export default function GrowthFootprint({ onGoTab }: { onGoTab: (t: 'practice' |
               </svg>
             </div>
           )}
+          </>)}
         </>
       )}
     </div>

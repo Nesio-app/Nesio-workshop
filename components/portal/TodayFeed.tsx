@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { useProfileAvatar } from './use-profile-avatar';
 import { getPoints } from '@/lib/platform/rewards-engine';
@@ -25,6 +25,7 @@ import { dismissProactiveById, getProactiveCardBudget } from './today/proactive-
 import { archiveShownCard } from '@/lib/portal/card-archive';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
+import CaptureBar from './today/CaptureBar';
 import { RoutineDueCards } from './today/RoutineDueCards';
 import { DailyReportCard } from './today/DailyReportCard';
 import { ThawedReminder } from './today/ThawedReminder';
@@ -73,7 +74,133 @@ export default function TodayFeed({
   const [restoreNote, setRestoreNote] = useState<string | null>(null);
   // 批次 31:焦点下方快捷输入(用户新指令)
   const [quickAdd, setQuickAdd] = useState('');
-  const [quickSaved, setQuickSaved] = useState(false);
+  const uiLocale = portalLocaleToDictionaryLocale(usePortalLocale());
+  /**
+   * 「+」传完东西之后那条回执。
+   *
+   * 2026-07-29:这个 state 之前**被 set 了却从来没有渲染** —— 整份文件搜不到第二处引用。
+   * 所以传完什么反馈都没有,用户不知道到底存没存进去(这正是要补的「已存入」提示)。
+   * 现在存成功先报一句,识别结果回来了再把它补进同一条回执里。
+   */
+  const [quickSaved, setQuickSaved] = useState<string>('');
+
+  /**
+   * 「+」上传 → 落成记忆(2026-07-28)。
+   *
+   * **不按类型白名单收,按体积设限** —— 白名单永远会漏掉某个「常见类型」,
+   * 而用户要的是「都能收」。所以三条分流按能力划,不按后缀划:
+   *   · 图片   → local-image-store(压缩,能出缩略图);
+   *   · 文本类 → 正文进 rawInput(这样能被本地检索搜到,是纯二进制给不了的);
+   *   · 其余   → local-file-store(原样存 Blob,pdf/docx/xlsx/zip… 一视同仁)。
+   * 超过 MAX_FILE_BYTES 的明确拒收,不截断 —— 截断的 pdf 是坏文件,比没有更糟。
+   */
+  /**
+   * 存好之后认一下这张图是什么(2026-07-29「加号要更智能」)。
+   *
+   * 和「收进来」那条路的差别只在**顺序**:先把东西收好(本机、确定成功),
+   * 再去问一下这是什么。所以识别失败不影响已经存好的那条记忆 ——
+   * 认出来了就改个看得懂的名字,认不出来就保持文件名原样,不打扰。
+   *
+   * 免费用户不发这一趟(云识图是付费档);先缩再发,不然原图直接 413(见 image-payload.ts)。
+   */
+  const recognizeSavedImage = useCallback(async (file: File, nodeId: string) => {
+    try {
+      const { canUsePaidCloudAi } = await import('@/lib/portal/entitlement');
+      if (!canUsePaidCloudAi()) return;   // 后台动作:免费静默跳过,不弹升级
+      const { fileToUploadPayload } = await import('@/lib/portal/image-payload');
+      const { base64, mimeType } = await fileToUploadPayload(file);
+      const res = await fetch('/api/portal/analyze', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType, uiLocale }),
+      });
+      if (!res.ok) return;
+      const data = await res.json() as { ok?: boolean; nodes?: Array<{ name?: string; tags?: string[] }> };
+      const first = data.nodes?.[0];
+      if (!data.ok || !first?.name) return;
+      const { updateLifeNode } = await import('@/lib/portal/life-graph');
+      updateLifeNode(nodeId, { name: first.name, tags: ['照片', ...(first.tags || [])].slice(0, 6) });
+      window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+      setQuickSaved(L(uiLocale, `已存入 · 认出是「${first.name}」`, `Saved · recognized "${first.name}"`));
+      setTimeout(() => setQuickSaved(''), 4000);
+    } catch { /* 认不出来不打扰 —— 东西已经存好了,这只是锦上添花 */ }
+  }, [uiLocale]);
+
+  const captureFiles = useCallback(async (files: File[]) => {
+    const list = files.slice(0, 30);
+    if (!list.length) return;
+    // ⚠️ 走 ingestLifeNode,不是 addLifeNode —— 后者是底层写,业务层直调会绕过主事实表
+    //    (scripts/write-gate-addLifeNode.test.mjs 明文禁止)。我第一版就是直调 addLifeNode,
+    //    表现是「文件存进 IDB 了,记忆一条没有」,右上角计数纹丝不动。
+    const { ingestLifeNode } = await import('@/lib/life-domain/ingest-node');
+    const { MAX_FILE_BYTES, prettyBytes, putLocalFile } = await import('@/lib/portal/local-file-store');
+
+    const isImage = (f: File) => f.type.startsWith('image/');
+    const isTextish = (f: File) => !isImage(f) && (f.type.startsWith('text/') || /\.(csv|tsv|txt|md|json|xml|ya?ml|log)$/i.test(f.name));
+
+    const imgs = list.filter(isImage);
+    const texts = list.filter(isTextish);
+    const bins = list.filter((f) => !isImage(f) && !isTextish(f));
+    const tooBig = [...bins, ...imgs].filter((f) => f.size > MAX_FILE_BYTES);
+    const failed: string[] = tooBig.map((f) => `${f.name}(${prettyBytes(f.size)})`);
+
+    if (imgs.length) {
+      const { compressToDataUrl, putLocalImage } = await import('@/lib/portal/local-image-store');
+      const assets = [];
+      for (let i = 0; i < imgs.length; i++) {
+        if (imgs[i].size > MAX_FILE_BYTES) continue;
+        const dataUrl = await compressToDataUrl(imgs[i], 1400, 0.82);
+        const id = `local-today-${Date.now()}-${i}`;
+        const ok = await putLocalImage(id, dataUrl);
+        if (!ok) { failed.push(imgs[i].name); continue; }
+        assets.push({ id, kind: 'image' as const, local: true, mimeType: 'image/jpeg', label: imgs[i].name, createdAt: new Date().toISOString() });
+      }
+      if (assets.length) {
+        const node = ingestLifeNode({
+          name: assets.length === 1 ? imgs[0].name.replace(/\.[^.]+$/, '') : `${assets.length} 张照片`,
+          type: 'note', source: 'manual', tags: ['照片'], attributes: {}, relations: [], confidence: 1, assets,
+        });
+        // 2026-07-29「提高智能」:存进去只是第一步 —— 顺手认一下这是什么,
+        // 把文件名(IMG_9740 这种)换成看得懂的名字,并打上识别到的标签。
+        // 存已经成功了,识别是加分项:认不出来就保持原样,**绝不因此报错**。
+        void recognizeSavedImage(imgs[0], node.id);
+      }
+    }
+
+    for (const f of texts) {
+      const text = await f.text();
+      ingestLifeNode({
+        name: f.name.replace(/\.[^.]+$/, ''),
+        type: 'note', source: 'manual', tags: ['文件'], attributes: {}, relations: [], confidence: 1,
+        rawInput: text.slice(0, 20000),
+      });
+    }
+
+    for (let i = 0; i < bins.length; i++) {
+      const f = bins[i];
+      if (f.size > MAX_FILE_BYTES) continue;
+      const id = `localfile-${Date.now()}-${i}`;
+      const mimeType = f.type || 'application/octet-stream';
+      const ok = await putLocalFile(id, f, { name: f.name, mimeType, size: f.size });
+      if (!ok) { failed.push(f.name); continue; }
+      ingestLifeNode({
+        name: f.name.replace(/\.[^.]+$/, ''),
+        type: 'note', source: 'manual', tags: ['文件'], attributes: { fileName: f.name, fileSize: String(f.size) },
+        relations: [], confidence: 1,
+        assets: [{ id, kind: 'file' as const, local: true, mimeType, label: f.name, createdAt: new Date().toISOString() }],
+      });
+    }
+
+    if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+    const saved = list.length - failed.length;
+    if (saved > 0) {
+      setQuickSaved(L(uiLocale, `已存入 ${saved} 项`, `Saved ${saved} item${saved > 1 ? 's' : ''}`));
+      setTimeout(() => setQuickSaved(''), 4000);
+    }
+    // 存不下的必须说,哪怕同一批里别的存进去了 —— 不能因为「大部分成功」就把失败的吞掉。
+    if (failed.length) {
+      throw new Error(`${failed.slice(0, 3).join('、')} 没存进去(单个上限 ${prettyBytes(MAX_FILE_BYTES)})。`);
+    }
+  }, []);
   // 批次 33:话筒 = 原地录音转文字直接入记忆(不跳说一句 sheet);无语音 API 才回落 sheet
   const [micState, setMicState] = useState<'idle' | 'recording'>('idle');
   const recogRef = useRef<{ stop: () => void } | null>(null);
@@ -145,12 +272,6 @@ export default function TodayFeed({
   const [focusModeNode, setFocusModeNode] = useState<FocusNode | null>(null);
 
 
-  const uiLocale = portalLocaleToDictionaryLocale(usePortalLocale());
-  // 回执只在挂载时读一次(读即清):模块同步触发的 reload 之后也能如期出现
-  useEffect(() => {
-    const r = takeCloudRestoreReceipt();
-    if (r) setRestoreNote(restoreReceiptText(r, uiLocale));
-  }, [uiLocale]);
   // 批次 13:profile store 的缺省名是 zh「我」,英文界面下按语言回落 Me
   // P1-6:称呼是本机数据(引导里填的),显示不需要登录 —— 此前 canUsePrivateData 门
   // 让匿名用户填了「J」头像还是「Me」(称呼存了但没接到显示)。
@@ -222,7 +343,12 @@ export default function TodayFeed({
     const hello = hourNow < 11
       ? L(uiLocale, '早', 'Morning')
       : isEvening ? L(uiLocale, '晚上好', 'Evening') : L(uiLocale, '下午好', 'Afternoon');
-    const prefix = name ? `${name},${hello}。` : `${hello}。`;
+    // 标点也得跟着语言走。原来这里写死的是中文全角逗号+句号,英文界面下拼出来的是
+    // 「婧,Morning。Note anything — …」—— 半句英文配一对中文标点。
+    // 英文里称呼也该在问候后面(Morning, 婧.),不是前面。
+    const prefix = uiLocale === 'en'
+      ? (name ? `${hello}, ${name}. ` : `${hello}. `)
+      : (name ? `${name},${hello}。` : `${hello}。`);
 
     if (receipt.realTotal === 0) {
       return `${prefix}${L(uiLocale, '记点什么,我替你记着。', "Note anything — I'll hold it for you.")}`;
@@ -351,25 +477,30 @@ export default function TodayFeed({
         {/* 冷冻到期提醒(批次 7:冷冻仓入口迁到拍一下,决定回路留在首屏) */}
         <ThawedReminder />
 
-        {/* 新建日程入口:写进 Google 主日历(一句话 / 填表单)。派事件由 Portal 开面板。 */}
-        <button
-          type="button"
-          onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-calendar-create'))}
-          style={{
-            alignSelf: 'flex-start',
-            display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)',
-            padding: 'var(--space-2) var(--space-3)',
-            border: '1px solid var(--portal-accent-border)',
-            borderRadius: 'var(--radius-pill)',
-            background: 'var(--portal-accent-soft)',
-            color: 'var(--portal-accent)',
-            fontSize: 'var(--text-sm)', fontFamily: 'var(--font-sans)',
-            fontWeight: 'var(--weight-medium)' as unknown as number,
-            cursor: 'pointer',
+        {/* 2026-07-28 UI 精修(用户标注 图4/图5):搜索/记一笔输入条搬到这儿(原「+ 新建日程」位),
+            新建日程按钮按标注删掉。输入条本体见 today/CaptureBar.tsx。 */}
+        <CaptureBar
+          value={quickAdd}
+          onChange={setQuickAdd}
+          onSubmit={() => {
+            const name = quickAdd.trim();
+            if (!name) return;
+            addCommitmentNode(name);
+            setQuickAdd('');
+            setQuickSaved(L(uiLocale, '已记下', 'Noted'));
+            setTimeout(() => setQuickSaved(''), 2000);
           }}
-        >
-          + {L(uiLocale, '新建日程', 'New event')}
-        </button>
+          onMic={startQuickMic}
+          recording={micState === 'recording'}
+          inputRef={quickInputRef}
+          onFiles={captureFiles}
+        />
+        {/* 存进去了要说一声。这条回执之前**只被 set、从来没渲染** ——
+            于是「+」传完文件、记一笔按了「记下」,界面上什么反应都没有。
+            识别结果回来了会把同一条改写成「已存入 · 认出是「…」」。 */}
+        {quickSaved && (
+          <p className="nesio-tl-capture-receipt" role="status">{quickSaved}</p>
+        )}
 
         {/* 今日焦点 — 重要安排 / 重要日子 / 重要提醒 */}
         <TodayFocusSection
@@ -385,21 +516,6 @@ export default function TodayFeed({
           onOpenRecorder={(node) => setMeetingRecorderNode(node)}
           onFocusMode={(node) => setFocusModeNode(node)}
           onDeleteNode={(id) => deleteFocusNode(id)}
-          capture={{
-            value: quickAdd,
-            onChange: setQuickAdd,
-            onSubmit: () => {
-              const name = quickAdd.trim();
-              if (!name) return;
-              addCommitmentNode(name);
-              setQuickAdd('');
-              setQuickSaved(true);
-              setTimeout(() => setQuickSaved(false), 1400);
-            },
-            onMic: startQuickMic,
-            recording: micState === 'recording',
-            inputRef: quickInputRef,
-          }}
         />
 
         {/* 批次 132(用户「底部输入口需要删除」):独立快捷输入栏已删 ——

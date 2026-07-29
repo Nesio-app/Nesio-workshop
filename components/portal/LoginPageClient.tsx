@@ -5,6 +5,7 @@ import NesioMark from './NesioMark';
 import { loadProfileSettings, saveProfileSettings, type PortalLocale } from '@/lib/portal/profile';
 import { getAuthRedirectTo, importSupabaseHashSession } from '@/lib/portal/auth-client';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
+import { IconMail } from './icons';
 
 type AuthState = 'idle' | 'loading' | 'email_sent' | 'error';
 type AuthMode = 'login' | 'register';
@@ -12,10 +13,12 @@ type AuthMode = 'login' | 'register';
 async function startAuth(provider: string, authMode: AuthMode, email?: string): Promise<{ ok: boolean; url?: string; error?: string; status?: number }> {
   try {
     const redirectTo = getAuthRedirectTo();
+    // 10 秒不回就当网络问题 —— 原来没有超时,这一跳卡住按钮就永远停在「跳转中…」。
     const res = await fetch('/api/auth/start', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ provider, authMode, email, redirectTo }),
+      signal: (() => { try { return AbortSignal.timeout(10_000); } catch { return undefined; } })(),
     });
     const text = await res.text();
     const data = text ? JSON.parse(text) as { ok?: boolean; url?: string; error?: string } : {};
@@ -24,6 +27,10 @@ async function startAuth(provider: string, authMode: AuthMode, email?: string): 
 }
 
 function friendlyAuthError(error: string | undefined, zh: boolean): string {
+  // 服务端说 ok 但没给跳转地址 —— 罕见,但不给话说就成了「点了没反应」。
+  if (error === 'no_redirect_url') {
+    return zh ? '没拿到跳转地址,再试一次。' : "Didn't get a redirect link — try again.";
+  }
   if (error === 'provider_not_configured' || error === 'missing_supabase_config') {
     return zh ? '登录服务还没有配置好，请先本地使用。' : 'Sign-in is not configured yet. You can use Nesio locally.';
   }
@@ -80,20 +87,39 @@ export default function LoginPageClient() {
     return () => { cancelled = true; };
   }, []);
 
-  async function handleGoogle() {
+
+  /**
+   * 走 OAuth。原来的写法有个死胡同:setState('loading') 之后,只有拿到 url 并且
+   * 浏览器真的跳走才会变。拿到 ok 但 url 是空的、或者赋值了 location 却没跳成,
+   * 按钮就永久停在「跳转中…」(标注 图2 那张)。这里补两条退路:
+   *   · url 空 → 当失败处理,给可点的错误;
+   *   · 跳转指令发出后 12 秒还站在这一页 → 说明没跳成,恢复按钮并说明白。
+   */
+  async function startOauthFlow(provider: 'google' | 'apple') {
     setState('loading'); setError('');
     try { localStorage.setItem('nesio-auth-intent-v1', tab); } catch { /* ignore */ }
-    const r = await startAuth('google', tab);
-    if (r.ok && r.url) { window.location.href = r.url; }
-    else { setError(friendlyAuthError(r.error, zh)); setState('error'); }
+    const r = await startAuth(provider, tab);
+    if (!r.ok || !r.url) {
+      setError(friendlyAuthError(r.ok ? 'no_redirect_url' : r.error, zh));
+      setState('error');
+      return;
+    }
+    window.setTimeout(() => {
+      setState((cur) => {
+        if (cur !== 'loading') return cur;
+        setError(zh ? '没跳过去 —— 再点一次试试。' : "Didn't get through — tap again.");
+        return 'error';
+      });
+    }, 12_000);
+    window.location.href = r.url;
+  }
+
+  async function handleGoogle() {
+    await startOauthFlow('google');
   }
 
   async function handleApple() {
-    setState('loading'); setError('');
-    try { localStorage.setItem('nesio-auth-intent-v1', tab); } catch { /* ignore */ }
-    const r = await startAuth('apple', tab);
-    if (r.ok && r.url) { window.location.href = r.url; }
-    else { setError(friendlyAuthError(r.error, zh)); setState('error'); }
+    await startOauthFlow('apple');
   }
 
   async function handleEmail() {
@@ -142,7 +168,7 @@ export default function LoginPageClient() {
 
         {state === 'email_sent' ? (
           <div className="nesio-login-sent">
-            <div style={{ fontSize: '2.5rem', textAlign: 'center', marginBottom: '0.75rem' }}>📬</div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem', color: 'var(--portal-accent)' }} aria-hidden><IconMail size={38} /></div>
             <h2 className="nesio-ob-step-title">{zh ? '查一下邮件' : 'Check your email'}</h2>
             <p className="nesio-ob-step-sub">{zh ? `登录链接已发到 ${email}，点击链接完成登录。` : `A sign-in link was sent to ${email}.`}</p>
             <a href="/" className="nesio-ob-primary-btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: '1rem' }}>

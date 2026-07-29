@@ -14,6 +14,7 @@ import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { consolidateAmazonOrder } from '@/lib/portal/amazon-order';
 import { appendShoppingReceipt, consumeTravelReceiptTripId } from '@/lib/portal/travel-trips';
 import { addReceiptExpense, defaultFinanceCurrency } from '@/lib/portal/finance-sources';
+import Button from './ui/Button';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -1165,8 +1166,14 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
 
   if (!open) return null;
 
+  // --result = 浅色壳(跟主题/皮肤走)。取景时用深色是对的(全屏画面要压暗),
+  // 但**看结果和存完之后不是取景**,那两屏得回到站内配色。
+  // 原来只有 phase==='result' 挂这个类,'saved' 漏了 —— 存完那一屏顶栏和底栏
+  // 当场退回深蓝黑,和整个浅色 app 割裂(用户圈出来的就是这两条)。
+  const lightShell = phase === 'result' || phase === 'saved';
+
   return (
-    <div className={`nesio-camera-sheet${phase === 'result' ? ' nesio-camera-sheet--result' : ''}`} role="dialog" aria-modal="true" aria-label={L(dict, '拍一下', 'Snap')}>
+    <div className={`nesio-camera-sheet${lightShell ? ' nesio-camera-sheet--result' : ''}`} role="dialog" aria-modal="true" aria-label={L(dict, '拍一下', 'Snap')}>
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       {/* Native camera — opens the iOS system camera directly (reliable, no
           persistent stream/indicator). Triggered by a user tap. */}
@@ -1287,9 +1294,13 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
 
           {qrChips}
 
-          {/* Bounding-box selection button — top of result, next to summary */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
-            <p className="nesio-camera-result-summary" style={{ margin: 0, flex: 1 }}>{result.summary}</p>
+          {/* 说明文字**自己一行**。原来它和右边四个 chip 挤在同一个 flex 行里、还带 flex:1,
+              于是中文被压成一个五六字宽的竖条(「照片已/就绪,/填个名/字(标/签可/选)就/能存。」),
+              和旁边的按钮糊在一起。字号/行高走 token,不再自己写死 0.78rem。 */}
+          <p className="nesio-camera-result-summary">{result.summary}</p>
+
+          {/* 识别动作行:AI 识别 / 圈选 / 订单 / 搜记忆 */}
+          <div className="nesio-camera-result-actions">
             {capturedPreview && (
               <button type="button" className="nesio-camera-select-btn" onClick={analyzeFullImage}>
                 {L(dict, 'AI 识别', 'Scan')}
@@ -1436,7 +1447,9 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
             <input
               value={extraTags}
               onChange={(e) => setExtraTags(e.target.value)}
-              placeholder={L(dict, '#钥匙 #门口 #Linda礼物', '#keys #entry #LindaGift')}
+              /* 标签框不放示例文案 —— 一串 #钥匙 #门口 #Linda礼物 灰字看着像已经填好了,
+                 而这一栏本来就是可选的。留空,上面那行「标签」标题已经说清是什么。 */
+              placeholder=""
               aria-label={L(dict, '图片标签', 'Image tags')}
               autoComplete="off"
               autoCorrect="off"
@@ -1447,17 +1460,18 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
           </label>
 
           <div className="nesio-camera-result-actions">
-            <button
-              type="button"
-              className="nesio-camera-save-btn"
+            {/* 主 / 次一对,同一档尺寸 —— 走 Button 原语后两者的高度、圆角、字号
+                由同一处决定,不会再各写各的(以前 0.5rem/0.78rem 配 0.55rem/0.8rem,挨着看是歪的)。 */}
+            <Button
+              variant="primary"
               onClick={saveAll}
               disabled={saving || editedNodes.filter((n) => !n.deleted).length === 0}
             >
               {saving
                 ? L(dict, '保存中…', 'Saving…')
-                : L(dict, `存入 Memory (${editedNodes.filter((n) => !n.deleted).length} 条)`, `Save to Memory (${editedNodes.filter((n) => !n.deleted).length})`)}
-            </button>
-            <button type="button" className="nesio-camera-retake-btn" onClick={retake}>{L(dict, '重拍', 'Retake')}</button>
+                : L(dict, `存入记忆 (${editedNodes.filter((n) => !n.deleted).length} 条)`, `Save to Memory (${editedNodes.filter((n) => !n.deleted).length})`)}
+            </Button>
+            <Button variant="secondary" onClick={retake}>{L(dict, '重拍', 'Retake')}</Button>
           </div>
 
         </div>
@@ -1489,9 +1503,9 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
 
       {phase === 'saved' && (
         <div className="nesio-camera-result-panel" style={{ textAlign: 'center', padding: '1.5rem 1.25rem' }}>
-          <p style={{ color: 'var(--status-go)', fontSize: '2rem', margin: 0, lineHeight: 1 }}>✓</p>
-          <p style={{ color: 'var(--status-go)', fontSize: '1.1rem', fontWeight: 700, marginTop: '0.5rem' }}>{L(dict, '已存入 Memory', 'Saved to Memory')}</p>
-          <p style={{ color: 'var(--portal-muted)', fontSize: '0.85rem', marginTop: '0.25rem' }}>{L(dict, '在「记忆」里查看', 'View it in Memory')}</p>
+          <p style={{ color: 'var(--status-go)', fontSize: 'var(--text-display)', margin: 0, lineHeight: 1 }}>✓</p>
+          <p style={{ color: 'var(--portal-ink)', fontSize: 'var(--text-h3)', fontWeight: 'var(--weight-semibold)' as unknown as number, marginTop: 'var(--space-2)' }}>{L(dict, '已存入记忆', 'Saved to Memory')}</p>
+          <p style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-sm)', marginTop: 'var(--space-1)' }}>{L(dict, '在「记忆」里查看', 'View it in Memory')}</p>
         </div>
       )}
 

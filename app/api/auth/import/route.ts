@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse, after } from 'next/server';
 import { bootstrapCloudAccountProfile, buildCloudAccountProfileBootstrapMeta } from '@/lib/portal/cloud-account-profile';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
@@ -152,8 +152,10 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const profileBootstrap = await bootstrapCloudAccountProfile(accessToken);
-  const profileBootstrapMeta = buildCloudAccountProfileBootstrapMeta(profileBootstrap);
+  // profile 落库不挡登录(它的 meta 三个分支全是 blocking:false / authReady:true),
+  // 挪到响应之后跑;user 传进去,省掉重复查同一个用户。桥页拿到响应立刻就能跳走。
+  after(() => bootstrapCloudAccountProfile(accessToken, user).catch(() => { /* best-effort */ }));
+  const profileBootstrapMeta = buildCloudAccountProfileBootstrapMeta(null);
   const authProvider = normalizeAuthProvider(user.app_metadata?.provider);
 
   const response = safeJson({

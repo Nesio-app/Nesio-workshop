@@ -122,6 +122,12 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
       for (const m of batch.slice(i, i + FLOMO_INGEST_CHUNK)) {
         // 先剥 markdown 再截断(QA:标题曾是 `![](https://flomoapp.com/favicon.i` 这种半截图片语法)
         const plain = stripMarkdownInline(m.content.replace(/<[^>]+>/g, ' '));
+        // 只有标签、没有正文的 flomo 笔记不进记忆。
+        // flomo 里这种条目很常见(建标签时随手留的一行 `#主题/健身`),导进来就是一条
+        // 名字叫「#主题/健身」、正文也是「#主题/健身」的「记忆」—— 用户在记忆库里
+        // 搜「健身」,第一条命中的就是这个内部分类标签本身(QA #14)。
+        const withoutTags = plain.replace(/#[^\s#]+/g, '').trim();
+        if (!withoutTags) continue;
         ingestLifeNode({
           type: 'preference',
           name: plain.slice(0, 40),

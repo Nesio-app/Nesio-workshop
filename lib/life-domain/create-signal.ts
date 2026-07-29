@@ -123,6 +123,18 @@ function inferRetention(input: CreateSignalInput): RetentionPolicy {
   return 'Normal';
 }
 
+/**
+ * 只留本机、永不上云的信号。
+ *
+ * 目前一条:`sensitivity === 'health'`。云端 Signal 表的行级权限(RLS)还没补完,
+ * 在那之前健康事实(化验值、在用药、症状、就诊)一律不镜像 —— 产品红线。
+ * 这不是「暂时关掉」的开关,是「补完 RLS 之前不许开」的闸门:放开要改这个函数,
+ * 改它会被 scripts/health-signals.test.mjs 拦住,逼你把这个决定说出口。
+ */
+export function isDeviceOnlySignal(signal: Pick<Signal, 'sensitivity'>): boolean {
+  return signal.sensitivity === 'health';
+}
+
 export function signalWriteMode(): SignalWriteMode {
   if (typeof window === 'undefined' || typeof fetch !== 'function') return 'local_first';
   return 'cloud_mirror_pending';
@@ -211,7 +223,10 @@ export function createSignalWithNode(input: CreateSignalInput): { signal: Signal
       .then((ok) => { if (!ok) logDropped('signal.idb_write', 'put returned false'); })
       .catch((err) => logDropped('signal.idb_write', err));
   }
-  if (signalWriteMode() === 'cloud_mirror_pending') {
+  // 健康数据不进云 —— 云端 Signal 表的 RLS 补完之前,健康事实只留本机(产品红线)。
+  // 这条闸门放在写入路径里而不是交给调用方,是因为「记得传 false」是必然会忘的事:
+  // 忘一次就是化验单和用药记录静默上云。要放开只能改这里,改这里会被契约测试拦下。
+  if (signalWriteMode() === 'cloud_mirror_pending' && !isDeviceOnlySignal(signal)) {
     void writeCloudSignal(signal);
   }
   return { signal, nodeId: node.id };

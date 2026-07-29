@@ -25,9 +25,14 @@ import { computeRiskScores, type RiskCategory } from '@/lib/portal/health-risk';
 import { buildMonthlyHealthReport, persistHealthReportToMemory, autoPersistLastMonthHealthReport, healthMonths } from '@/lib/portal/health-report';
 import { healthReportRichHtml } from '@/lib/portal/health-report-visual';
 import { IconLock } from '../icons';
+import SegTabs from '../ui/SegTabs';
 import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 import BodyLedgerPanel, { BodyLedgerQuickLinks } from './BodyLedgerPanel';
 import BeautyCarePanel from './BeautyCarePanel';
+import HealthLensCards from './HealthLensCards';
+import HealthRecordSheet from './HealthRecordSheet';
+import MetricDetailSheet from './MetricDetailSheet';
+import LabScanSheet from './LabScanSheet';
 import type { BodyLedgerSection } from '@/lib/portal/body-ledger';
 import { buildDayLedger, ledgerPrompt, todayYmd } from '@/lib/portal/body-ledger';
 
@@ -81,9 +86,12 @@ function Sparkline({ series }: { series: Array<{ ym: string; v: number }> }) {
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="26" preserveAspectRatio="none" style={{ marginTop: '0.35rem', overflow: 'visible' }}>
       <polyline points={pts} fill="none" stroke="var(--portal-blue-deep)" strokeWidth="1.6" strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
-      {pat && (() => { const p = xy(pat.peakIdx); return <circle cx={p.x} cy={p.y} r="2.2" fill="#e0954a" />; })()}
-      {pat && (() => { const p = xy(pat.valleyIdx); return <circle cx={p.x} cy={p.y} r="2.2" fill="#3d9f6e" />; })()}
-      {pat?.anomalyIdx != null && (() => { const p = xy(pat.anomalyIdx); return <circle cx={p.x} cy={p.y} r="2.6" fill="none" stroke="#c25d7a" strokeWidth="1.4" />; })()}
+      {/* 2026-07-29:这三个色值原本是硬编码(#e0954a/#3d9f6e/#c25d7a),违反配色红线 ——
+          夜间主题下不跟着翻转。换成 token:高峰=琥珀、低谷=完成绿、异常=中性信息色。
+          异常刻意**不用** --status-risk:一次离群点不是风险,红色只留给真实风险。 */}
+      {pat && (() => { const p = xy(pat.peakIdx); return <circle cx={p.x} cy={p.y} r="2.2" fill="var(--status-gentle)" />; })()}
+      {pat && (() => { const p = xy(pat.valleyIdx); return <circle cx={p.x} cy={p.y} r="2.2" fill="var(--status-go)" />; })()}
+      {pat?.anomalyIdx != null && (() => { const p = xy(pat.anomalyIdx); return <circle cx={p.x} cy={p.y} r="2.6" fill="none" stroke="var(--status-calm)" strokeWidth="1.4" />; })()}
       <circle cx={W} cy={xy(series.length - 1).y} r="2" fill="var(--portal-blue-deep)" />
     </svg>
   );
@@ -222,6 +230,16 @@ function MoodCard({ mood, dict }: { mood: MoodAnalysis; dict: string }) {
         </svg>
       )}
       <span className="nesio-health-card-range">{L(dict, `近 ${d.length} 天 · ${mood.count} 次记录`, `${d.length}d · ${mood.count} logs`)}</span>
+      {/* 2026-07-29:「这周趋势」从今天页搬到这里。
+          今天页那一拍讲的是**此刻**,回顾走势不属于那儿;而这张卡本来就在讲情绪,
+          趋势面板是它的自然下一层。原来那个入口挂在今天页,等于把「看过去」塞进了「现在」。 */}
+      <button
+        type="button"
+        className="nesio-health-card-link"
+        onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-mood-trend'))}
+      >
+        {L(dict, '看这周趋势 ›', 'This week ›')}
+      </button>
     </div>
   );
 }
@@ -397,6 +415,7 @@ function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
 // ── 概览 / 分析 / 身体账本 / 护理 ──
 type HealthView = 'overview' | 'analysis' | 'ledger' | 'care';
 
+// 2026-07-29:改用全站唯一的分段控件 SegTabs(原 .nesio-health-subtabs 是五套之一)。
 function HealthSubTabs({ view, onChange, dict }: { view: HealthView; onChange: (v: HealthView) => void; dict: string }) {
   const tabs: Array<[HealthView, string, string]> = [
     ['overview', '概览', 'Overview'],
@@ -405,14 +424,12 @@ function HealthSubTabs({ view, onChange, dict }: { view: HealthView; onChange: (
     ['care', '护理', 'Care'],
   ];
   return (
-    <div className="nesio-health-subtabs" role="tablist" aria-label={L(dict, '健康视图', 'Health view')}>
-      {tabs.map(([v, zh, en]) => (
-        <button key={v} type="button" role="tab" aria-selected={view === v}
-          className={`nesio-health-subtab${view === v ? ' is-active' : ''}`} onClick={() => onChange(v)}>
-          {L(dict, zh, en)}
-        </button>
-      ))}
-    </div>
+    <SegTabs
+      items={tabs.map(([v, zh, en]) => ({ key: v, label: L(dict, zh, en) }))}
+      active={view}
+      onSelect={onChange}
+      ariaLabel={L(dict, '健康视图', 'Health view')}
+    />
   );
 }
 
@@ -523,6 +540,30 @@ function TopRelationship({ data, dict }: { data: HealthMetrics; dict: string }) 
   );
 }
 
+/**
+ * 健康镜头的捕捉入口。规格把它画成右下角 FAB「拍化验单」;
+ * 拍照 OCR 押后了(见 lib/health/health-signals.ts 的说明),所以现在是「记一条」——
+ * 同一个位置、同一条确认路径,OCR 到位后只是把表单预填好。
+ * 入口不能等 OCR:等了,没导过 Apple 健康记录的人就一条都记不进来。
+ */
+function HealthLensRow({ onRecord, onScan, dict }: { onRecord: () => void; onScan: () => void; dict: string }) {
+  return (
+    <div className="nesio-rel-head-row" style={{ marginTop: '0.4rem' }}>
+      <p className="nesio-health-updated" style={{ margin: 0 }}>
+        {L(dict, '化验 · 用药 · 就诊', 'Labs · meds · visits')}
+      </p>
+      <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+        <button type="button" className="nesio-rel-log-btn" onClick={onScan}>
+          {L(dict, '拍化验单', 'Scan report')}
+        </button>
+        <button type="button" className="nesio-rel-log-btn" onClick={onRecord}>
+          {L(dict, '＋ 记一条', '＋ Log')}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function HealthDashboard() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [data, setData] = useState<HealthMetrics | null>(null);
@@ -531,6 +572,9 @@ export default function HealthDashboard() {
   const [view, setView] = useState<HealthView>('overview');
   const [ledgerSection, setLedgerSection] = useState<BodyLedgerSection>('today');
 
+  const [recordOpen, setRecordOpen] = useState(false);      // 健康镜头:记一条(化验/用药/症状/就诊)
+  const [scanOpen, setScanOpen] = useState(false);          // 健康镜头 B 屏:拍化验单(端上识别)
+  const [openMetric, setOpenMetric] = useState<string | null>(null); // 健康镜头 C 屏:指标详情
   const [reportMsg, setReportMsg] = useState(''); // 健康月报动作反馈(可见状态,不静默)
   // 月初自动补生成上月健康月报并存记忆(每设备每月一次,幂等)。
   // ⚠️ hooks 必须全部在下面的空态早退之前(hook 数量随渲染变化会让 React 整页抛错)。
@@ -576,6 +620,11 @@ export default function HealthDashboard() {
         {view === 'care' && <BeautyCarePanel />}
         {(view === 'overview' || view === 'analysis') && (
           <>
+            {/* 健康镜头不依赖 Apple Health —— 化验/用药/就诊是另一套数据源。
+                这块早退分支原本什么都不给,等于「没导过 Apple Health 就用不了健康镜头」。 */}
+            <HealthLensRow onRecord={() => setRecordOpen(true)} onScan={() => setScanOpen(true)} dict={dict} />
+            <HealthLensCards onOpenMetric={setOpenMetric} />
+            {/* 合并 QA 分支:没有 Apple Health 也可能有本机训练记录,有就先给一块 */}
             {emptyInsight.signals.length > 0 && <FitnessPanel insight={emptyInsight} dict={dict} />}
             <p className="nesio-insights-empty" style={{ marginBottom: 0 }}>
               {L(dict,
@@ -592,6 +641,9 @@ export default function HealthDashboard() {
             <FamilyDataCard kind="health" />
           </>
         )}
+        <HealthRecordSheet open={recordOpen} onClose={() => setRecordOpen(false)} />
+        <MetricDetailSheet metric={openMetric} onClose={() => setOpenMetric(null)} />
+        <LabScanSheet open={scanOpen} onClose={() => setScanOpen(false)} onManual={() => setRecordOpen(true)} />
       </div>
     );
   }
@@ -639,6 +691,9 @@ export default function HealthDashboard() {
               </div>
             </div>
           )}
+          {/* 健康镜头(2026-07-29):化验/用药/就诊三卡 —— 读 Signal 主事实表 */}
+          <HealthLensRow onRecord={() => setRecordOpen(true)} onScan={() => setScanOpen(true)} dict={dict} />
+          <HealthLensCards onOpenMetric={setOpenMetric} />
           <NenSummaryCard data={data} dict={dict} />
           <TodayPicks data={data} dict={dict} onOpen={() => setView('analysis')} />
           <BodyLedgerQuickLinks dict={dict} onOpen={openLedger} />
@@ -765,6 +820,10 @@ export default function HealthDashboard() {
           </p>
         </>
       ) : null}
+
+      <HealthRecordSheet open={recordOpen} onClose={() => setRecordOpen(false)} />
+      <MetricDetailSheet metric={openMetric} onClose={() => setOpenMetric(null)} />
+      <LabScanSheet open={scanOpen} onClose={() => setScanOpen(false)} onManual={() => setRecordOpen(true)} />
     </div>
   );
 }

@@ -244,7 +244,7 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
         <div style={pinch ? { position: 'absolute', inset: 0, transform: `scale(${pinch.scale})`, transformOrigin: `${pinch.midX}px ${pinch.midY}px` } : { position: 'absolute', inset: 0 }}>
         {tiles.map((t) => (
           // eslint-disable-next-line @next/next/no-img-element
-          <img key={t.key} src={`https://tile.openstreetmap.org/${view!.z}/${t.x}/${t.y}.png`} alt="" loading="lazy" draggable={false}
+          <img key={t.key} src={`https://tile.openstreetmap.org/${view!.z}/${t.x}/${t.y}.png`} alt="" className="nesio-map-tile" loading="lazy" draggable={false}
             style={{ position: 'absolute', left: t.px, top: t.py, width: TILE, height: TILE, pointerEvents: 'none' }} />
         ))}
         {view && clusters.map((c, i) => {

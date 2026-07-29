@@ -13,6 +13,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import LoadingCard from './ui/LoadingCard';
+import { fetchWithTimeout } from '@/lib/portal/fetch-timeout';
 
 interface TeslaDrive {
   vehicleId: string;
@@ -45,10 +47,14 @@ export default function TeslaPanel() {
   const [drives, setDrives] = useState<TeslaDrive[]>([]);
   const [charges, setCharges] = useState<TeslaCharge[]>([]);
 
+  // 2026-07-29(用户标注「车页卡死在『正在向车问好…』」的真因):这条 fetch 原本没有超时。
+  // 车在深度休眠时 Tesla 侧可能几十秒不回,连接半挂时浏览器更是无限等 ——
+  // 于是 setState('ready'|'error') 都执行不到,页面就永远停在「正在向车问好…」。
+  // 15s 到点主动 abort → 走下面的 catch → 显式失败态 + 再试一次(CLAUDE.md 红线)。
   const load = useCallback(async () => {
     setState('loading');
     try {
-      const res = await fetch('/api/portal/tesla', { cache: 'no-store' });
+      const res = await fetchWithTimeout('/api/portal/tesla', { cache: 'no-store' }, 15_000);
       const data = await res.json() as { ok?: boolean; error?: string; drives?: TeslaDrive[]; charges?: TeslaCharge[] };
       if (!data.ok) {
         setErrMsg(data.error === 'not_connected' || data.error === 'token_expired'
@@ -68,7 +74,7 @@ export default function TeslaPanel() {
         .then((m) => m.refreshTesla({ drives: (data.drives || []) as never[], charges: (data.charges || []) as never[] }))
         .catch(() => {});
     } catch {
-      setErrMsg(L(dict, '网络没接上,稍后再试一次。', 'Network hiccup — try again shortly.'));
+      setErrMsg(L(dict, '这次没等到车的回应 —— 它可能在深度休眠。稍后再试一次。', 'The car did not answer this time — it may be in deep sleep. Try again shortly.'));
       setState('error');
     }
   }, [dict]);
@@ -117,13 +123,13 @@ export default function TeslaPanel() {
   };
 
   if (state === 'loading') {
-    return <p className="nesio-settings-option-hint">{L(dict, '正在向车问好…', 'Checking in with the car…')}</p>;
+    return <LoadingCard label={L(dict, '正在向车问好…', 'Checking in with the car…')} lines={3} />;
   }
 
   if (state === 'error') {
     return (
-      <div>
-        <p className="nesio-settings-option-hint">{errMsg}</p>
+      <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', padding: 'var(--space-4)' }}>
+        <p className="nesio-settings-option-hint" style={{ margin: 0 }}>{errMsg}</p>
         <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: '0.6rem' }} onClick={() => void load()}>
           {L(dict, '再试一次', 'Try again')}
         </button>
@@ -220,26 +226,45 @@ export default function TeslaPanel() {
         </div>
       ))}
 
-      {/* 数据去向:直接回答「连了但数据在哪」——沉淀分散在足迹/财务,这里指路。 */}
+      {/* 数据去向:直接回答「连了但数据在哪」——沉淀分散在足迹/财务,这里指路。
+          ⚠️ 一条车数据都没有时**不要显示这块**。这三行回答的是「我的车数据去哪了」,
+          还没连车 / Tesla 还没回数据的时候,点过去财务和足迹里根本没有车的东西 ——
+          用户点了一圈发现三个入口都「不管用」(原始报告第 19 条)。
+          空态该说的是「怎么连」,那句提示上面已经在讲了。 */}
+      {(hasVehicle || history.length > 0) && (
       <div style={{
         marginTop: 'var(--space-5)', paddingTop: 'var(--space-4)',
         borderTop: '1px solid var(--portal-line)',
       }}>
+        {/* 2026-07-28 UI 精修(标注 图21「功能都没有看到在哪」):这块原来是三行纯文字,
+            告诉你「充电花费在洞察·财务」「位置在地点足迹」—— 指了路却没有路。
+            改成三个真能点的入口,点了直接跳过去。 */}
         <p className="nesio-settings-section-label">{L(dict, '这些数据去哪了', 'Where this data lives')}</p>
-        {/* 长得像链接就得是链接(QA:三行带箭头全是死的)—— 点击真跳对应板块 */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {([
-            [L(dict, '充电花费 → 财务(和银行流水并在一起看)', 'Charging spend → Finance (alongside bank transactions)'), () => window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab: 'finance' } }))],
-            [L(dict, '停车 / 充电位置 → 地点足迹', 'Parking / charging locations → Place trail'), () => window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab: 'timeline' } }))],
-            [L(dict, '行驶 / 充电记录 → 在记忆里搜「充电」', 'Drives / charges → search “charging” in Memory'), () => window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: L(dict, '充电', 'charging') } }))],
-          ] as Array<[string, () => void]>).map(([txt, go]) => (
-            <button key={txt} type="button" onClick={go}
-              style={{ border: 'none', background: 'none', textAlign: 'left', cursor: 'pointer', padding: '4px 0', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)', lineHeight: 1.7, fontFamily: 'var(--font-sans)' }}>
-              {txt} <span aria-hidden style={{ color: 'var(--portal-accent)' }}>›</span>
+            ['finance', L(dict, '充电花费 · 和银行流水一起看', 'Charging spend · with bank transactions')],
+            ['timeline', L(dict, '停车 / 充电位置 · 地点足迹', 'Parking / charging spots · place trail')],
+          ] as const).map(([tab, label]) => (
+            <button key={tab} type="button"
+              onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab } }))}
+              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)',
+                width: '100%', textAlign: 'left', cursor: 'pointer', padding: 'var(--space-3)',
+                borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'transparent',
+                color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }}>
+              {label}<span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
             </button>
           ))}
+          <button type="button"
+            onClick={() => window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: L(dict, '充电', 'charge') } }))}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)',
+              width: '100%', textAlign: 'left', cursor: 'pointer', padding: 'var(--space-3)',
+              borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'transparent',
+              color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }}>
+            {L(dict, '行驶 / 充电记录 · 在记忆里搜', 'Drives / charges · search memories')}<span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
+          </button>
         </div>
       </div>
+      )}
     </>
   );
 }

@@ -10,7 +10,8 @@ interface PortalBottomNavProps {
   activeSurface: 'today' | 'tell' | 'memory';
   locale?: PortalLocale;
   onToday: () => void;
-  onTell: () => void;
+  /** 拍到了 —— 直接把文件交给相机结果流(CameraSheet)。 */
+  onCamera: (file: File) => void;
   onAsk?: () => void;
   onInsights: () => void;
   insightsActive?: boolean;
@@ -23,13 +24,14 @@ export default function PortalBottomNav({
   activeSurface,
   locale = 'zh',
   onToday,
-  onTell,
+  onCamera,
   onInsights,
   insightsActive = false,
   onChatOpen,
 }: PortalBottomNavProps) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firedRef = useRef(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
 
   const startPress = (e: React.PointerEvent) => {
     e.preventDefault();
@@ -43,7 +45,14 @@ export default function PortalBottomNav({
 
   const endPress = () => {
     if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null; }
-    if (!firedRef.current) onTell();
+    // 2026-07-29:点一下 = **直接开相机**,不再先弹「拍/说/收」那三个扇形按钮。
+    // 那一步是纯中转:三个里最常用的就是拍,另外两个在别处都有入口
+    // (说 = 输入框右边的话筒,收 = 输入框左边的 +)。
+    //
+    // ⚠️ click() 必须留在这个同步栈里。iOS 的 WKWebView 只认用户手势栈里的
+    // 程序化 click,挪进 setTimeout / await 之后就是「点了没反应,也不报错」——
+    // 本会话已经因为这条规律修过两个 bug(隐藏 file input、更换头像)。
+    if (!firedRef.current) cameraInputRef.current?.click();
     firedRef.current = false;
   };
 
@@ -85,6 +94,22 @@ export default function PortalBottomNav({
         {/* 批次 13:白底 PWA PNG 换成无底色矢量 logo,昼夜双资产 */}
         <NesioMark className="nesio-bottom-nav-center-icon" />
       </button>
+      {/* 直达系统相机。批次 93 实测:iOS PWA 的 getUserMedia 取景框是黑的,
+          所以走 capture="environment" 让系统相机全屏打开,拍完回 CameraSheet 结果流。
+          ⚠️ 用 visually-hidden 而不是 display:none —— 不参与布局的 file input
+          在 WKWebView 上会**静默忽略** click()(qa-ui-truth 那条契约管的就是这个)。 */}
+      <input
+        ref={cameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="nesio-visually-hidden"
+        onChange={(e) => {
+          const file = e.currentTarget.files?.[0];
+          e.currentTarget.value = '';
+          if (file) onCamera(file);
+        }}
+      />
 
       {/* Insights — 全屏浮层(洞察),非 surface;点开由 Portal 渲染 */}
       <button

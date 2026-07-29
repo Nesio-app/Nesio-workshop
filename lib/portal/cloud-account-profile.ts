@@ -71,6 +71,19 @@ function normalizeProviders(user: SupabaseUserResponse): string[] {
   return provider ? [provider] : [];
 }
 
+
+/**
+ * 登录链路上的每一跳都必须能超时。
+ *
+ * 这几个 Supabase 往返原本一个超时都没有 —— Supabase 冷启动或网络抖一下,
+ * 桥页就永远停在「正在完成登录」(标注 图2/图3 报的就是卡住和很慢)。
+ * 8 秒到点就当失败:profile 落库是 best-effort,宁可不建,不能挡着人进门。
+ */
+const HOP_TIMEOUT_MS = 8000;
+function hopSignal(): AbortSignal | undefined {
+  try { return AbortSignal.timeout(HOP_TIMEOUT_MS); } catch { return undefined; }
+}
+
 async function fetchSupabaseUser(config: CloudRuntimeConfig, accessToken: string): Promise<SupabaseUserResponse | null> {
   if (!accessToken) return null;
   const response = await fetch(`${config.supabaseUrl}/auth/v1/user`, {
@@ -79,6 +92,7 @@ async function fetchSupabaseUser(config: CloudRuntimeConfig, accessToken: string
       Authorization: `Bearer ${accessToken}`,
     },
     cache: 'no-store',
+    signal: hopSignal(),
   });
   if (!response.ok) return null;
   return response.json() as Promise<SupabaseUserResponse>;
@@ -113,6 +127,7 @@ async function findExistingUserProfile(config: CloudRuntimeConfig, identityKey: 
       Prefer: 'return=representation',
     }),
     cache: 'no-store',
+    signal: hopSignal(),
   });
 
   if (!response.ok) {
@@ -169,13 +184,23 @@ function buildUserProfileRow(user: SupabaseUserResponse) {
   };
 }
 
-export async function bootstrapCloudAccountProfile(accessToken?: string | null): Promise<BootstrapResult> {
+/**
+ * @param knownUser 调用方**已经查到的** Supabase user。
+ *
+ * 不传的话这里会自己再查一遍 —— 而 /api/auth/import 和 /api/auth/session 两处
+ * 都是刚刚用同一个 token 查过 user 才调过来的,等于同一个用户在登录关键路径上
+ * 被查了两次,白白多一个 RTT。传进来就省掉。
+ */
+export async function bootstrapCloudAccountProfile(
+  accessToken?: string | null,
+  knownUser?: SupabaseUserResponse | null,
+): Promise<BootstrapResult> {
   const config = getCloudConfig();
   if (!config.configured) return { ok: true, skipped: true, reason: 'cloud_not_configured' };
   if (!accessToken) return { ok: true, skipped: true, reason: 'missing_access_token' };
 
   try {
-    const user = await fetchSupabaseUser(config, accessToken);
+    const user = knownUser ?? await fetchSupabaseUser(config, accessToken);
     const row = user ? buildUserProfileRow(user) : null;
     if (!row) return { ok: false, reason: 'invalid_user' };
 
@@ -199,6 +224,7 @@ export async function bootstrapCloudAccountProfile(accessToken?: string | null):
       headers: serviceRoleRestHeaders(config, {
         Prefer: 'resolution=merge-duplicates,return=minimal',
       }),
+      signal: hopSignal(),
       body: JSON.stringify(row),
       cache: 'no-store',
     });

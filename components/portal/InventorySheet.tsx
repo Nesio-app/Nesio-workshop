@@ -26,7 +26,6 @@ import {
   buildListingText,
   expiryStatus,
   inventoryStats,
-  listInventoryItems,
   parseAmazonFlipCsv,
   removeInventoryItem,
   reviewDueInfo,
@@ -35,7 +34,7 @@ import {
   updateInventoryItem,
   type InventoryItem,
 } from '@/lib/portal/inventory';
-import { isFoodItem } from '@/lib/cooking/pantry';
+import { listStorageItems, countPantryItems } from '@/lib/portal/inventory-visibility';
 
 interface InventorySheetProps {
   open: boolean;
@@ -45,8 +44,6 @@ interface InventorySheetProps {
 const ALL = '__all__';
 const UNPLACED = '__unplaced__';
 
-// 批次 133·预览图占位色(设计:每条物品有预览图;真图缩略未加载时用柔和莫兰迪色块占位,确定性取色)
-const PREVIEW_COLORS = ['#d3b0ac', '#d3b79a', '#a9bcd0', '#b6c7ac', '#c8b3c6', '#cdbfa6', '#b0c4c0'];
 // 批次 179:物品分类改下拉预设 + 自定义(用户实锤「下拉框选项,客户可以自定义」)
 const CATEGORY_PRESETS: Array<[string, string]> = [
   ['日用品', 'Household'], ['护肤', 'Skincare'], ['电子', 'Electronics'], ['服饰', 'Apparel'],
@@ -54,11 +51,6 @@ const CATEGORY_PRESETS: Array<[string, string]> = [
   ['母婴', 'Baby'], ['收藏', 'Collectible'],
 ];
 const CAT_CUSTOM = '__custom__';
-function previewColor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return PREVIEW_COLORS[h % PREVIEW_COLORS.length];
-}
 // 批次 170:去 emoji —— 位置/分组名里残留的 🏠 等图形字符全清掉(设计:一律线性,无 emoji)
 function stripEmoji(s: string): string {
   return s
@@ -70,6 +62,9 @@ function stripEmoji(s: string): string {
 export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [items, setItems] = useState<InventoryItem[]>([]);
+  // 归「做饭 · 库存」的食材件数 —— 只用来在顶上说一句「另有 N 件在那边」,
+  // 让「收纳 18 件」和记忆页那个数对得上,而不是让用户猜剩下几件去哪了。
+  const [pantryCount, setPantryCount] = useState(0);
   const [groupFilter, setGroupFilter] = useState<string>(ALL);
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'list' | 'add' | 'detail' | 'stats' | 'sell' | 'flip'>('list');
@@ -92,7 +87,8 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const [fPrice, setFPrice] = useState('');
 
   // 食材(subtype=食材)归「做饭·库存」那张脸,物品/收纳页排除,免得护照清单里混进菠菜。
-  const refresh = () => setItems(listInventoryItems().filter((i) => !isFoodItem(i)));
+  // 判据收在 inventory-visibility(记忆页那个「收纳」球也读它)—— 各写各的正是 22 vs 18 的来源。
+  const refresh = () => { setItems(listStorageItems()); setPantryCount(countPantryItems()); };
 
   useEffect(() => {
     if (!open) return;
@@ -233,8 +229,12 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   });
 
   return (
+    // 2026-07-28(标注 图11「按钮失效」)根因:洞察页的「打开物品管理」按钮**是响应的** ——
+    // 事件派了、sheet 也开了,但它是 bottom 卡(z-901),被洞察这个 fullscreen 面板(z-930)整个盖住,
+    // 看着就像按钮没反应。做饭页能从洞察打开正是因为它是 fullscreen。这里抬层到 940/941。
     <NesioSheet
       variant="bottom"
+      elevated
       open={open}
       onOpenChange={(next) => { if (!next) onClose(); }}
       card={false}
@@ -248,6 +248,17 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               <span className="nesio-inv-stat">{st.count} {L(dict, '件', 'items')}</span>
               {st.totalValue > 0 && <span className="nesio-inv-stat">≈ ${Math.round(st.totalValue).toLocaleString('en-US')}</span>}
               {unplacedCount > 0 && <span className="nesio-inv-stat">{unplacedCount} {L(dict, '未归位', 'unplaced')}</span>}
+              {/* 食材归另一张脸。不说这一句,用户在记忆里数出 22 条物品、这儿只有 18 件,
+                  差的 4 件就成了「东西丢了」。说出来 18 + 4 就在屏幕上对得上,还给了去处。 */}
+              {pantryCount > 0 && (
+                <button
+                  type="button"
+                  className="nesio-inv-stat nesio-inv-pantry-link"
+                  onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('nesio-open-cooking')); }}
+                >
+                  {L(dict, `另有 ${pantryCount} 件食材在「做饭 · 库存」`, `${pantryCount} more in Cooking · Pantry`)}
+                </button>
+              )}
             </div>
           ) : <span />}
           <button type="button" className="nesio-freeze-close nesio-inv-close" onClick={view === 'list' ? onClose : () => { setView('list'); setDetailId(null); }}>

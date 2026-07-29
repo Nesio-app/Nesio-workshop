@@ -28,6 +28,14 @@ export interface CreateEventResult {
   event?: CreatedEvent;
   error?: string;
   message?: string;
+  /**
+   * Google 原样返回的错误文本(服务端已截到 300 字)。
+   *
+   * 服务端一直在返回它,客户端却从没读过 —— 于是任何写入失败都塌成一句
+   * 「写入日历没成功,稍后再试。」,连是权限没给、日历不存在、还是配额满了都看不出来
+   * (标注 图1 报的就是这个,当时无从下手)。自己用的东西,得能看见真话。
+   */
+  detail?: string;
 }
 
 export async function createCalendarEvent(input: CreateEventInput): Promise<CreateEventResult> {
@@ -47,6 +55,7 @@ export async function createCalendarEvent(input: CreateEventInput): Promise<Crea
         ok: false,
         error: data.error || `http_${res.status}`,
         message: data.message || '写入日历没成功,稍后再试一次。',
+        detail: data.detail,
       };
     }
     return data;

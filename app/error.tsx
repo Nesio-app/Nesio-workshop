@@ -42,19 +42,29 @@ export default function RouteError({
   return (
     <div style={{
       minHeight: '60vh', display: 'flex', flexDirection: 'column',
-      alignItems: 'center', justifyContent: 'center', gap: 12, padding: 24, textAlign: 'center',
+      alignItems: 'center', justifyContent: 'center', gap: 'var(--space-3)',
+      padding: 'var(--space-6)', textAlign: 'center',
+      color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)',
     }}>
-      <span style={{ fontSize: '2rem' }} aria-hidden>😵‍💫</span>
-      <p style={{ fontSize: '1rem', fontWeight: 600, margin: 0 }}>页面出了点问题</p>
-      <p style={{ fontSize: '0.8rem', opacity: 0.7, margin: 0 }}>
+      {/* 2026-07-29:这页和 not-found 是同一个病 —— 系统 emoji + 写死的蓝按钮 #588ce3。
+          全站有四套可切换皮肤,写死的蓝只对其中一套。换成 token + 内联描边图标。 */}
+      <svg viewBox="0 0 24 24" width={32} height={32} fill="none" stroke="currentColor"
+        strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+        style={{ color: 'var(--status-gentle)' }} aria-hidden>
+        <path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+        <path d="M12 9v4M12 17h.01" />
+      </svg>
+      <p style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)', margin: 0 }}>页面出了点问题</p>
+      <p style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', margin: 0 }}>
         {isChunkErr ? '刚更新了新版本,正在为你刷新…' : '数据都在本地，没有丢。点下面重试,或刷新页面。'}
       </p>
       <button
         type="button"
         onClick={() => { try { window.location.reload(); } catch { reset(); } }}
         style={{
-          marginTop: 8, padding: '0.5rem 1.5rem', borderRadius: 999,
-          border: 'none', background: '#588ce3', color: '#fff', fontSize: '0.9rem', cursor: 'pointer',
+          marginTop: 'var(--space-2)', padding: '0.5rem 1.5rem', borderRadius: 'var(--radius-pill)',
+          border: 'none', background: 'var(--portal-accent)', color: 'var(--portal-on-accent, #fff)',
+          fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: 'pointer',
         }}
       >
         重试

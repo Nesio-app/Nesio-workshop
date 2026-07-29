@@ -17,7 +17,9 @@ function assertImageAssetCloudSync(source, label) {
   );
   assert.match(
     source,
-    /uploadCloudAsset\(\{\s*file[,:]/s, // 允许 ES 简写 { file, ... }(e331fd8 起)
+    // `file:` 或 ES 简写 `file,` 都算 —— CameraSheet 重构后把源文件存进了同名局部量
+    // (`const file = sourceFile`),写成 `{ file, purpose }`,只认冒号会把好代码判红。
+    /uploadCloudAsset\(\{\s*file\s*[,:]/s,
     `${label} should upload image/file input through /api/cloud/assets before or while saving Memory`,
   );
   assert.match(
@@ -52,7 +54,9 @@ function assertImageAssetCloudSync(source, label) {
   );
   assert.match(
     source,
-    /assets:\s*\[[^\n]*assetRecord\s*\]/, // 允许追加式 [...(existing || []), assetRecord](e331fd8 起,保留本地 asset 是改进)
+    // 允许「追加」写法 `assets: [...已有, assetRecord]`,不只认「整替」`[assetRecord]`。
+    // CameraSheet 在云上传之前就已经存了一条本地图 asset,整替会把它抹掉 —— 追加才是对的。
+    /assets:\s*\[[\s\S]{0,120}?\bassetRecord\s*\]/s,
     `${label} should store the cloud asset reference on the local LifeNode`,
   );
 }

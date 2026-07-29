@@ -43,7 +43,7 @@ export default function RewardsStore() {
       return;
     }
     if (res.ok) {
-      setFlash(L(dict, `🎁 兑换成功:${r.title}`, `🎁 Redeemed: ${r.title}`));
+      setFlash(L(dict, `兑换成功:${r.title}`, `Redeemed: ${r.title}`));
       setTimeout(() => setFlash(''), 2200);
       refresh();
       return;

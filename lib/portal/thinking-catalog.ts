@@ -216,3 +216,64 @@ export function trapsMet(history: Array<{ question?: string; answer?: string; co
   for (const t of THINKING_TRAPS) if (hay.includes(t.name)) met.add(t.id);
   return met;
 }
+
+/**
+ * 每条陷阱的**原始出处**(2026-07-28,用户标注 图19「这些解释科学么」)。
+ *
+ * 图鉴一直是策展的、不是大模型现编的 —— 但屏幕上只显示学科名(「认知偏差」「逻辑学」),
+ * 看不出是谁在哪篇提出的,所以看着像随口写的。这里把提出者 / 出处补上并显示在讲解里:
+ * 有名有姓有年份,读者自己能去查。
+ *
+ * 编写口径:优先给**首次提出/命名**的那篇;心理学条目给经典实验,逻辑谬误给古典出处 +
+ * 现代非形式逻辑教科书里的标准名。不确定的宁可写学科传统,也不编具体文献。
+ */
+export const TRAP_SOURCES: Record<string, string> = {
+  // 逻辑谬误:古典出处 / 首次命名
+  gambler: '拉普拉斯《概率的哲学随笔》(1814);现代表述见 Tversky & Kahneman《小数法则的信念》(1971)',
+  slippery: '非形式逻辑标准谬误;系统分析见 Walton《Slippery Slope Arguments》(1992)',
+  circular: '亚里士多德《前分析篇》—— 窃取论题(petitio principii)',
+  bandwagon: '非形式逻辑「诉诸群众」;从众的实证基础见 Asch 线段判断实验(1951)',
+  equivocation: '亚里士多德《辩谬篇》—— 歧义谬误',
+  strawman: '非形式逻辑标准谬误;现代讨论见 Talisse & Aikin《Two Forms of the Straw Man》(2006)',
+  'appeal-emotion': '亚里士多德《修辞学》中 pathos 的误用;Walton《Appeal to Pity》(1997)',
+  'ad-hominem': '洛克《人类理解论》(1690) 首次命名 argumentum ad hominem',
+  'appeal-tradition': '摩尔《伦理学原理》(1903) 的「自然主义谬误」—— 从「本来如此」推不出「就该如此」',
+  'appeal-ignorance': '洛克《人类理解论》(1690) 命名 argumentum ad ignorantiam',
+  'tu-quoque': '非形式逻辑;人身攻击(ad hominem)的一个子型,古典拉丁名 tu quoque',
+  'cherry-picking': '统计学「选择性报告」;后果讨论见 Ioannidis《Why Most Published Research Findings Are False》(2005)',
+  'false-dilemma': '非形式逻辑标准谬误 —— 假二分(false dichotomy)',
+  'post-hoc': '拉丁 post hoc ergo propter hoc;因果判别方法见 Mill《逻辑体系》(1843)',
+  // 认知偏差:经典实验
+  anchoring: 'Tversky & Kahneman, Science (1974) —— 转盘实验',
+  confirmation: 'Wason 四卡片选择任务(1960);综述见 Nickerson (1998)',
+  availability: 'Tversky & Kahneman, Cognitive Psychology (1973)',
+  representativeness: 'Kahneman & Tversky (1972);「Linda 问题」见 Tversky & Kahneman (1983)',
+  hindsight: 'Fischhoff, J. Exp. Psychol.: HPP (1975) —— 「我早就知道会这样」效应',
+  // 决策偏差:行为经济学
+  'sunk-cost': 'Arkes & Blumer《The Psychology of Sunk Cost》(1985)',
+  'loss-aversion': 'Kahneman & Tversky 前景理论, Econometrica (1979)',
+  'mental-accounting': 'Thaler《Mental Accounting and Consumer Choice》, Marketing Science (1985)',
+  overconfidence: 'Lichtenstein, Fischhoff & Phillips (1982);三种形态的区分见 Moore & Healy (2008)',
+  'status-quo': 'Samuelson & Zeckhauser《Status Quo Bias in Decision Making》(1988)',
+  endowment: 'Thaler (1980);马克杯实验见 Kahneman, Knetsch & Thaler (1990)',
+  // 统计偏差
+  survivorship: 'Wald 二战轰炸机弹孔分析(1943)—— 只看得到飞回来的那些',
+  selection: 'Berkson (1946) 的入院率偏倚;流行病学标准偏倚之一',
+  'omitted-variable': '计量经济学标准结果 —— 遗漏变量偏误(见 Wooldridge 教材)',
+  'correlation-causation': 'Pearson (1897) 论虚假相关;因果判据见 Bradford Hill (1965)',
+  // 认知扭曲:CBT
+  overgeneralize: 'Beck 认知疗法(1963/1976);十大扭曲清单见 Burns《伯恩斯新情绪疗法》(1980)',
+  catastrophize: 'Ellis 理性情绪行为疗法(1957);Beck 认知疗法',
+  labeling: 'Burns《伯恩斯新情绪疗法》(1980) 十大认知扭曲',
+  'mind-reading': 'Beck (1976);Burns (1980) 归入「妄下结论」',
+  'emotional-reasoning': 'Burns《伯恩斯新情绪疗法》(1980)',
+  should: 'Ellis 的「必须化」(musturbation), REBT (1957);Burns (1980)',
+  // 心理效应
+  halo: 'Thorndike《A Constant Error in Psychological Ratings》(1920)',
+  'dunning-kruger': 'Kruger & Dunning, J. Personality and Social Psychology (1999)',
+};
+
+/** 取某条陷阱的出处;没登记就退回学科名(绝不编)。 */
+export function trapSource(id: string): string | null {
+  return TRAP_SOURCES[id] || null;
+}
