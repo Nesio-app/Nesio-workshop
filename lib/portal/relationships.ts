@@ -266,6 +266,9 @@ export function buildRelationships(
   const overrides = loadRelationshipOverrides(); // 图4:用户手动改过的亲疏/关系词覆盖推断
   const out: Contact[] = [];
   for (const a of acc.values()) {
+    // 用户手动移除过的人:推导层跳过。推出来的联系人删不掉(下次重算又冒出来),
+    // 只能在这里认这条覆盖 —— 否则「移除」按钮点了等于没点。
+    if (overrides[a.key]?.hidden) continue;
     const logged = contactLog[a.key] || null;
     const groups = Array.from(groupsByKey.get(a.key) || []);
     // 一次性会议与会人降噪:只当过一次 participant、无分组、无联系记录 → 不列入(路人不是关系)。

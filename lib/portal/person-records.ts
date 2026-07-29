@@ -93,3 +93,36 @@ export function deletePersonRecord(id: string): void {
   saveAll(all);
   if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-person-records-updated'));
 }
+
+/** 改一条已挂的记录(标题/详情/日期/金额/分类)。id 不存在返回 false。 */
+export function updatePersonRecord(id: string, patch: Partial<Omit<PersonRecord, 'id' | 'createdAt' | 'personKey'>>): boolean {
+  const all = loadAllPersonRecords();
+  const i = all.findIndex((r) => r.id === id);
+  if (i < 0) return false;
+  all[i] = { ...all[i], ...patch };
+  saveAll(all);
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-person-records-updated'));
+  return true;
+}
+
+/**
+ * 把挂在某人身上的全部记录搬到新的身份键。
+ *
+ * 用在改名:Contact.key 从名字/邮箱派生,改名 = 换 key。不搬的话,
+ * 用户改一个名字,TA 的医疗/药物/健康记录当场失联 —— 表现就是「数据丢了」。
+ * 返回搬了几条。
+ */
+export function movePersonRecords(fromKey: string, toKey: string): number {
+  const from = fromKey.trim().toLowerCase();
+  const to = toKey.trim().toLowerCase();
+  if (!from || !to || from === to) return 0;
+  const all = loadAllPersonRecords();
+  let moved = 0;
+  for (const r of all) {
+    if (r.personKey === from) { r.personKey = to; moved += 1; }
+  }
+  if (!moved) return 0;
+  saveAll(all);
+  if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-person-records-updated'));
+  return moved;
+}
