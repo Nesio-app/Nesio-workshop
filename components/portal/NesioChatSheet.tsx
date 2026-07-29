@@ -37,6 +37,8 @@ import { resolveAirport } from '@/lib/portal/airports';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import MemoryFlashBanner, { useMemoryFlash } from '@/components/portal/MemoryFlashBanner';
+import { executeWithDataProtection } from '@/lib/portal/client-flow-control';
+import { recognizeImageLocally } from '@/lib/portal/local-tier0-handlers';
 import { IconCamera, IconFile, IconHistory, IconImage, IconKeyboard, IconLink, IconMic, IconSmile, NodeTypeIcon, IconPlane, IconBed, IconUtensils, IconCar, IconCard, IconBook, IconCheckSquare, IconNote, IconMapPin, IconCalendar, IconBox, IconHelpCircle } from './icons';
 import EmailComposeSheet from './EmailComposeSheet';
 
@@ -427,26 +429,65 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
     try {
       const [header, base64] = dataUrl.split(',');
       const mimeType = header.match(/:(.*?);/)?.[1] || 'image/jpeg';
-      const res = await fetch('/api/portal/analyze', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType }),
-      });
-      const data = await res.json() as { ok?: boolean; nodes?: Array<{ name: string; type: string; tags?: string[] }>; summary?: string };
+
+      // Phase 2: 客户端前置分流 + 数据保护
+      const result = await executeWithDataProtection(
+        'image',
+        { dataUrl, mimeType },
+        // Tier 0: 本地图片识别（免费用户走这路）
+        async () => {
+          const localResult = await recognizeImageLocally(dataUrl);
+          return {
+            ok: true,
+            nodes: localResult.result.tags.map(tag => ({
+              name: tag,
+              type: 'tag',
+            })),
+            summary: localResult.result.text || L(dict, '（本地识别）', 'Local recognition'),
+            source: 'local' as const,
+          };
+        },
+        // Cloud: 云端 AI 识别（付费用户走这路）
+        async () => {
+          const res = await fetch('/api/portal/analyze', {
+            method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType }),
+          });
+          const data = await res.json() as { ok?: boolean; nodes?: Array<{ name: string; type: string; tags?: string[] }>; summary?: string };
+          return { ...data, source: 'cloud' as const };
+        }
+      );
+
+      const data = result.data;
       if (data.ok && data.nodes?.length) {
         const names = data.nodes.map((n) => n.name).join(L(dict, '、', ', '));
-        // 2026-07-28(标注 图8/图9):召回口径放宽 —— 名字 + 标签 + 一句话描述都当查询词,
-        // 「黑色钢笔」才找得到记忆里那条「笔」。原来只按 name 各查 2 条,长词对短名必空。
-        onResult(names || data.summary || L(dict, '（未识别到）', 'Nothing recognized'), recallByRecognition(data.nodes, data.summary), undefined, dataUrl);
+        // 显示识别来源（本地/云端）
+        const sourceHint = data.source === 'local'
+          ? L(dict, '（本地识别）', '(local)')
+          : '';
+        onResult(
+          (names || data.summary || L(dict, '（未识别到）', 'Nothing recognized')) + sourceHint,
+          recallByRecognition(data.nodes, data.summary),
+          undefined,
+          dataUrl
+        );
       } else {
-        // 认不出来就说认不出来,别把失败说明塞进「识别到:…」里冒充结果。
-        // 2026-07-29(标注 图8):但**零条目不等于零线索** —— 模型常在 summary 里写了
-        // 「一支黑色的钢笔」,我们却因为 nodes 为空连找都不找,直接回「没找到相关记录」。
-        // 拿描述再召回一次:找到了就照实说是从描述里找的。
         const recalled = data.summary ? recallByRecognition([], data.summary) : [];
-        onResult('', recalled, data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.'), dataUrl);
+        onResult(
+          '',
+          recalled,
+          data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.'),
+          dataUrl
+        );
       }
-      // 失败也要把图带上 —— 「哪张图没认出来」本身就是信息,气泡里空着反而看不懂在说哪张。
-    } catch { onResult('', [], L(dict, '识别没成功,再试一次。', 'Recognition did not go through — try again.'), dataUrl); }
+    } catch (error) {
+      onResult(
+        '',
+        [],
+        L(dict, '识别没成功,再试一次。', 'Recognition did not go through — try again.'),
+        dataUrl
+      );
+    }
     setAnalyzing(false);
   }
 
@@ -590,6 +631,9 @@ export default function NesioChatSheet({
     const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: L(dict, `［图片］${pending.name || '这张图'}`, `[Image] ${pending.name || 'this photo'}`) };
     setMessages((prev) => { const next = [...prev, userMsg]; return next; });
     // 记忆详情里的图是本机图库原图,同样可能越过请求体上限 —— 先过一遍缩图判据。
+    // Phase 2: 后台识图改为检查付费权限（免费用户跳过）
+    if (!canUsePaidCloudAi()) return; // 免费用户不触发云识别
+
     void dataUrlToUploadPayload(dataUrl).then(({ base64, mimeType }) => fetch('/api/portal/analyze', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType }),
@@ -947,21 +991,41 @@ Edit location/value anytime in Storage.`),
         void makeThumb(`data:${mimeType};base64,${base64}`).then((th) => {
           if (th) setMessages((prev) => prev.map((m) => (m.id === uid ? { ...m, imageThumb: th } : m)));
         });
-        const r = await fetch('/api/portal/analyze', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType }),
-        });
-        if (!r.ok) throw new Error(`http_${r.status}`);
-        const data = await r.json() as { ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string };
+
+        // Phase 2: 使用分流逻辑处理图片识别
+        const result = await executeWithDataProtection(
+          'image',
+          { base64, mimeType },
+          async () => {
+            const localResult = await recognizeImageLocally(`data:${mimeType};base64,${base64}`);
+            return {
+              ok: true,
+              nodes: localResult.result.tags.map(tag => ({ name: tag, type: 'tag' })),
+              summary: localResult.result.text || L(dict, '（本地识别）', 'Local recognition'),
+              source: 'local',
+            };
+          },
+          async () => {
+            const r = await fetch('/api/portal/analyze', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType }),
+            });
+            if (!r.ok) throw new Error(`http_${r.status}`);
+            return r.json() as Promise<{ ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string }>;
+          }
+        );
+
+        const data = result.data;
         let aiText: string;
         if (data.ok && data.nodes?.length) {
           const names = data.nodes.map((n) => n.name).join(L(dict, '、', ', '));
           const nodes = recallByRecognition(data.nodes, data.summary);
+          const sourceHint = result.source === 'local' ? L(dict, '（本地识别）', ' (local)') : '';
           aiText = nodes.length > 0
-            ? L(dict, `识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map((n) => `• ${n.name}`).join('\n')}`,
-              `Recognized: ${names}\n\nFound ${nodes.length} related record(s):\n${nodes.map((n) => `• ${n.name}`).join('\n')}`)
-            : L(dict, `识别到：${names}\n\n这件东西还没记过 —— 要我存进记忆吗?`,
-              `Recognized: ${names}\n\nNot in your memory yet — want me to save it?`);
+            ? L(dict, `识别到：${names}${sourceHint}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map((n) => `• ${n.name}`).join('\n')}`,
+              `Recognized: ${names}${sourceHint}\n\nFound ${nodes.length} related record(s):\n${nodes.map((n) => `• ${n.name}`).join('\n')}`)
+            : L(dict, `识别到：${names}${sourceHint}\n\n这件东西还没记过 —— 要我存进记忆吗?`,
+              `Recognized: ${names}${sourceHint}\n\nNot in your memory yet — want me to save it?`);
         } else {
           const recalled = data.summary ? recallByRecognition([], data.summary) : [];
           const base = data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.');
@@ -991,17 +1055,35 @@ Edit location/value anytime in Storage.`),
       try {
         // 先缩再发 —— 原图 base64 会越过 Vercel 的 4.5MB 请求体上限(见 image-payload.ts)。
         const { base64, mimeType } = await fileToUploadPayload(file);
-        const r = await fetch('/api/portal/analyze', {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType }),
-        });
-        // 非 2xx 的响应体常常不是 JSON(413/502 是 HTML)。直接 r.json() 会抛出去,
-        // 于是「太大」和「服务端挂了」都被说成同一句「识别失败」。
-        if (!r.ok) throw new Error(`http_${r.status}`);
-        const data = await r.json() as { ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string };
+
+        // Phase 2: 使用分流逻辑处理图片识别
+        const result = await executeWithDataProtection(
+          'image',
+          { base64, mimeType },
+          async () => {
+            const localResult = await recognizeImageLocally(`data:${mimeType};base64,${base64}`);
+            return {
+              ok: true,
+              nodes: localResult.result.tags.map(tag => ({ name: tag, type: 'tag' })),
+              summary: localResult.result.text || L(dict, '（本地识别）', 'Local recognition'),
+              source: 'local',
+            };
+          },
+          async () => {
+            const r = await fetch('/api/portal/analyze', {
+              method: 'POST', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType }),
+            });
+            if (!r.ok) throw new Error(`http_${r.status}`);
+            return r.json() as Promise<{ ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string }>;
+          }
+        );
+
+        const data = result.data;
         const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || '';
+        const sourceHint = result.source === 'local' ? L(dict, '（本地识别）', ' (local)') : '';
         const text = names
-          ? L(dict, `识别到：${names}\n\n可以继续问我关于这张图片的问题。`, `Recognized: ${names}\n\nAsk me anything about this image.`)
+          ? L(dict, `识别到：${names}${sourceHint}\n\n可以继续问我关于这张图片的问题。`, `Recognized: ${names}${sourceHint}\n\nAsk me anything about this image.`)
           : data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.');
         const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text };
         setMessages((prev) => { const withAi = [...prev, aiMsg]; saveHistory(withAi); return withAi; });

@@ -74,6 +74,7 @@ export {
   startPeriodicCleanup,
   stopPeriodicCleanup,
   getCleanupStats,
+  getPhase1CleanupStats,
 } from './cleanup';
 
 // === migration-runner.ts ===
@@ -90,6 +91,35 @@ export { migrateLifeGraph } from './migrators/life-graph-migrator';
 export { migrateBankData } from './migrators/bank-tx-migrator';
 export { migrateHealth } from './migrators/health-migrator';
 export { migratePersonRecords } from './migrators/person-records-migrator';
+
+// === Phase 1 Cache Migrators ===
+export type { CacheSyncStateMigrationResult } from './migrators/cache-sync-state-migrator';
+export {
+  migrateSyncStateCache,
+  verifySyncStateCache,
+  rollbackSyncStateCache,
+} from './migrators/cache-sync-state-migrator';
+
+export type { CacheApiCacheMigrationResult } from './migrators/cache-api-cache-migrator';
+export {
+  migrateApiCache,
+  verifyApiCache,
+  rollbackApiCache,
+} from './migrators/cache-api-cache-migrator';
+
+export type { CacheMapMigrationResult } from './migrators/cache-map-migrator';
+export {
+  migrateMapCache,
+  verifyMapCache,
+  rollbackMapCache,
+} from './migrators/cache-map-migrator';
+
+export type { CacheThumbnailsMigrationResult } from './migrators/cache-thumbnails-migrator';
+export {
+  migrateThumbnailsCache,
+  verifyThumbnailsCache,
+  rollbackThumbnailsCache,
+} from './migrators/cache-thumbnails-migrator';
 
 // === init-hook.ts ===
 export type { InitHookOptions } from './init-hook';
@@ -109,7 +139,72 @@ export {
   getDetailedStorageReport,
   shouldWarnUser,
   getStorageProblemSummary,
+  getMigrationProgress,
 } from './storage-monitor';
+
+// === integrity-checker.ts ===
+export type { IntegrityCheckResult } from './integrity-checker';
+export {
+  generateChecksum,
+  verifyChecksum,
+  verifyMigration,
+  performSamplingVerification,
+  performFullVerification,
+  getLocalStorageKeySize,
+  getTotalLocalStorageSize,
+} from './integrity-checker';
+
+// === backup-manager.ts ===
+export type { BackupItem, BackupSummary } from './backup-manager';
+export {
+  createBackup,
+  hasBackup,
+  restoreFromBackup,
+  listBackups,
+  cleanupOldBackups,
+  deleteBackups,
+  getTotalBackupSize,
+  getBackupSummary,
+} from './backup-manager';
+
+// === migration-validator.ts ===
+export type { MigrationValidationResult } from './migration-validator';
+export {
+  validateMigration,
+  validateMultipleMigrations,
+  generateValidationReport,
+} from './migration-validator';
+
+// === sync-queue-engine.ts ===
+export type { SyncQueueEntry } from './sync-queue-engine';
+export {
+  enqueueSyncItem,
+  dequeueSyncItem,
+  markSyncItemSucceeded,
+  markSyncItemFailed,
+  getSyncQueueStats,
+  getPendingRetryItems,
+  cleanupSucceededItems,
+} from './sync-queue-engine';
+
+// === phase1-migration.ts ===
+export type { Phase1MigrationResult } from './phase1-migration';
+export {
+  executePhase1Migration,
+  getLastMigrationLog,
+  generateMigrationReport,
+} from './phase1-migration';
+
+// === phase1-rollback.ts ===
+export type { RollbackResult } from './phase1-rollback';
+export {
+  rollbackPhase1,
+  rollbackSingleKey,
+  rollbackCategory,
+  getLastRollbackLog,
+  getAllRollbackLogs,
+  cleanupOldRollbackLogs,
+} from './phase1-rollback';
 
 // === rollback.ts ===
 export {

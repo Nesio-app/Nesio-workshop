@@ -173,6 +173,116 @@ export async function getDetailedStorageReport(): Promise<string> {
 }
 
 /**
+ * 获取 Phase 1 迁移进度。
+ * 返回已迁移和待迁移的缓存键统计。
+ */
+export async function getMigrationProgress(): Promise<{
+  migratedCount: number;
+  pendingCount: number;
+  totalCount: number;
+  progressPercent: number;
+  categories: Array<{
+    name: string;
+    migrated: number;
+    pending: number;
+  }>;
+}> {
+  try {
+    const categories = [
+      { name: 'sync-state', pattern: /^nesio-sync-state-/ },
+      { name: 'api-cache', pattern: /^nesio-api-cache-/ },
+      { name: 'map-cache', pattern: /^nesio-map-cache-/ },
+      { name: 'revgeo-cache', pattern: /^nesio-revgeo-cache-v1$/ },
+      { name: 'avatar-thumb', pattern: /^nesio-avatar-thumb-/ },
+      { name: 'tips-shown', pattern: /^nesio-tips-shown-/ },
+      { name: 'onboarding', pattern: /^nesio-onboarding-/ },
+    ];
+
+    // 计算 localStorage 中的待迁移键
+    const localStoragePending: Record<string, number> = {};
+    for (const cat of categories) {
+      localStoragePending[cat.name] = 0;
+    }
+
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+
+      for (const cat of categories) {
+        if (cat.pattern.test(key)) {
+          localStoragePending[cat.name]++;
+        }
+      }
+    }
+
+    // 计算 IDB 中的已迁移键
+    const { initializeDB, getStore } = await import('./idb-core');
+    const db = await initializeDB();
+    const store = getStore(db, 'ui-cache', 'readonly');
+
+    const migrated: Record<string, number> = {};
+    for (const cat of categories) {
+      migrated[cat.name] = 0;
+    }
+
+    const getAllRequest = store.getAll();
+
+    return new Promise((resolve) => {
+      getAllRequest.onsuccess = () => {
+        const items = getAllRequest.result as any[];
+        for (const item of items) {
+          if (item.category && migrated.hasOwnProperty(item.category)) {
+            migrated[item.category]++;
+          }
+        }
+
+        const categoryStats = categories.map((cat) => ({
+          name: cat.name,
+          migrated: migrated[cat.name] || 0,
+          pending: localStoragePending[cat.name] || 0,
+        }));
+
+        const migratedCount = Object.values(migrated).reduce((a, b) => a + b, 0);
+        const pendingCount = Object.values(localStoragePending).reduce((a, b) => a + b, 0);
+        const totalCount = migratedCount + pendingCount;
+        const progressPercent = totalCount > 0 ? Math.round((migratedCount / totalCount) * 100) : 0;
+
+        resolve({
+          migratedCount,
+          pendingCount,
+          totalCount,
+          progressPercent,
+          categories: categoryStats,
+        });
+      };
+
+      getAllRequest.onerror = () => {
+        resolve({
+          migratedCount: 0,
+          pendingCount: 0,
+          totalCount: 0,
+          progressPercent: 0,
+          categories: categories.map((cat) => ({
+            name: cat.name,
+            migrated: 0,
+            pending: localStoragePending[cat.name] || 0,
+          })),
+        });
+      };
+    });
+  } catch (error) {
+    console.error('[StorageMonitor] Failed to get migration progress:', error);
+    return {
+      migratedCount: 0,
+      pendingCount: 0,
+      totalCount: 0,
+      progressPercent: 0,
+      categories: [],
+    };
+  }
+}
+
+/**
  * 检查是否应该触发用户警告。
  * 返回 true 如果 localStorage > 80% 或 total > 90%。
  */

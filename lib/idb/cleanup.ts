@@ -325,6 +325,7 @@ export async function getCleanupStats(): Promise<{
   moduleDataItemCount: number;
   queueItemCount: number;
   estimatedTotalSize: number;
+  cacheByCategory?: Record<string, number>;
 }> {
   try {
     const db = await initializeDB();
@@ -354,6 +355,22 @@ export async function getCleanupStats(): Promise<{
         countRequest.onsuccess = () => resolve(countRequest.result);
         countRequest.onerror = () => resolve(0);
       }),
+      // 获取缓存项按类别的分布
+      new Promise<Record<string, number>>((resolve) => {
+        const store = getStore(db, 'ui-cache', 'readonly');
+        const getAllRequest = store.getAll();
+        getAllRequest.onsuccess = () => {
+          const items = getAllRequest.result as any[];
+          const byCategory: Record<string, number> = {};
+          for (const item of items) {
+            if (item.category) {
+              byCategory[item.category] = (byCategory[item.category] || 0) + 1;
+            }
+          }
+          resolve(byCategory);
+        };
+        getAllRequest.onerror = () => resolve({});
+      }),
     ]);
 
     return {
@@ -362,6 +379,7 @@ export async function getCleanupStats(): Promise<{
       moduleDataItemCount: counts[2],
       queueItemCount: counts[3],
       estimatedTotalSize: (counts[0] + counts[1] + counts[2] + counts[3]) * 1024, // 粗略估计 1KB/item
+      cacheByCategory: counts[4] as Record<string, number>,
     };
   } catch (error) {
     console.error('[Cleanup] Failed to get stats:', error);
@@ -371,6 +389,89 @@ export async function getCleanupStats(): Promise<{
       moduleDataItemCount: 0,
       queueItemCount: 0,
       estimatedTotalSize: 0,
+      cacheByCategory: {},
+    };
+  }
+}
+
+/**
+ * 获取 Phase 1 缓存清理统计。
+ * 返回已迁移到 IDB 的缓存项统计。
+ */
+export async function getPhase1CleanupStats(): Promise<{
+  syncStateCount: number;
+  apiCacheCount: number;
+  mapCacheCount: number;
+  revgeoCacheCount: number;
+  avatarThumbCount: number;
+  tipsShownCount: number;
+  onboardingCount: number;
+  totalCount: number;
+  totalSize: number;
+}> {
+  try {
+    const db = await initializeDB();
+    const store = getStore(db, 'ui-cache', 'readonly');
+    const getAllRequest = store.getAll();
+
+    return new Promise((resolve) => {
+      getAllRequest.onsuccess = () => {
+        const items = getAllRequest.result as any[];
+        const stats = {
+          syncStateCount: 0,
+          apiCacheCount: 0,
+          mapCacheCount: 0,
+          revgeoCacheCount: 0,
+          avatarThumbCount: 0,
+          tipsShownCount: 0,
+          onboardingCount: 0,
+          totalCount: 0,
+          totalSize: 0,
+        };
+
+        for (const item of items) {
+          if (item.category === 'sync-state') stats.syncStateCount++;
+          if (item.category === 'api-cache') stats.apiCacheCount++;
+          if (item.category === 'map-cache') stats.mapCacheCount++;
+          if (item.category === 'revgeo-cache') stats.revgeoCacheCount++;
+          if (item.category === 'avatar-thumb') stats.avatarThumbCount++;
+          if (item.category === 'tips-shown') stats.tipsShownCount++;
+          if (item.category === 'onboarding') stats.onboardingCount++;
+
+          stats.totalSize += JSON.stringify(item).length;
+        }
+
+        stats.totalCount = items.length;
+
+        resolve(stats);
+      };
+
+      getAllRequest.onerror = () => {
+        resolve({
+          syncStateCount: 0,
+          apiCacheCount: 0,
+          mapCacheCount: 0,
+          revgeoCacheCount: 0,
+          avatarThumbCount: 0,
+          tipsShownCount: 0,
+          onboardingCount: 0,
+          totalCount: 0,
+          totalSize: 0,
+        });
+      };
+    });
+  } catch (error) {
+    console.error('[Cleanup] Failed to get Phase 1 stats:', error);
+    return {
+      syncStateCount: 0,
+      apiCacheCount: 0,
+      mapCacheCount: 0,
+      revgeoCacheCount: 0,
+      avatarThumbCount: 0,
+      tipsShownCount: 0,
+      onboardingCount: 0,
+      totalCount: 0,
+      totalSize: 0,
     };
   }
 }
