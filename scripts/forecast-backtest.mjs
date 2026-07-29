@@ -44,19 +44,61 @@ const cutoffDay = Number(arg('--cutoff-day', 15));
 // 转账/还款/内部划账:不是消费,进来会把两边基线一起搅浑
 const TRANSFER_RE = /transfer|payment thank|autopay|online payment|credit card payment|直接借记|还款|转账|信用卡还款|内部转账/i;
 
+function parseEntry(entries, key) {
+  const v = entries?.[key];
+  if (v == null) return null;
+  try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; }
+}
+
+/**
+ * 备份清单体检:先把文件里到底有什么摊开。
+ * 「App 里 3000+ 笔,导出只有 127 笔」时,这一步直接分辨是**导出漏了**
+ * 还是**导出的那台设备本来就没拉全**(流水走云同步,新设备要等拉完)。
+ */
+function inventory(entries) {
+  const KEYS = [
+    ['nesio-bank-tx-v1', '银行流水'],
+    ['nesio-bank-accounts-v1', '银行账户'],
+    ['nesio-expenses-v1', '手动记账/域内支出'],
+    ['nesio-fin-assets-v1', '手动资产'],
+    ['nesio-fin-networth-series-v1', '净值快照'],
+    ['nesio-life-graph-v1', '生命图谱节点'],
+  ];
+  const out = [];
+  for (const [k, label] of KEYS) {
+    const v = parseEntry(entries, k);
+    const n = Array.isArray(v) ? v.length : v == null ? null : '(非数组)';
+    out.push({ key: k, label, n });
+  }
+  return out;
+}
+
 function rowsFromBackup(file) {
   const raw = JSON.parse(fs.readFileSync(file, 'utf8'));
   const entries = raw?.entries || raw;
-  const txRaw = entries?.['nesio-bank-tx-v1'];
-  if (!txRaw) throw new Error('备份里没有 nesio-bank-tx-v1(还没连银行,或导出时被过滤掉了)');
-  const txs = typeof txRaw === 'string' ? JSON.parse(txRaw) : txRaw;
-  if (!Array.isArray(txs)) throw new Error('nesio-bank-tx-v1 不是数组');
-  const rows = txs
+  const inv = inventory(entries);
+  const totalKeys = Object.keys(entries || {}).length;
+
+  const txs = parseEntry(entries, 'nesio-bank-tx-v1');
+  if (!Array.isArray(txs)) throw new Error('备份里没有 nesio-bank-tx-v1 数组(还没连银行,或这台设备没拉到流水)');
+
+  const bankRows = txs
     .filter((t) => t && typeof t.date === 'string' && Number.isFinite(t.amount))
     .filter((t) => t.amount > 0)
     .filter((t) => !TRANSFER_RE.test(`${t.name || ''} ${t.category || ''}`))
     .map((t) => ({ date: t.date.slice(0, 10), amount: t.amount, key: t.merchantId || t.name || '' }));
-  return { rows, total: txs.length };
+
+  // 手动记账(现金/红包渠道等)—— App 的财务口径含它,回测此前漏读了
+  const exps = parseEntry(entries, 'nesio-expenses-v1');
+  const manualRows = Array.isArray(exps)
+    ? exps
+      .filter((e) => e && typeof e.occurredAt === 'string' && Number.isFinite(e.amount))
+      .filter((e) => e.includeInFinance !== false && e.kind !== 'income')
+      .map((e) => ({ date: e.occurredAt.slice(0, 10), amount: Math.abs(e.amount), key: e.merchant || e.category || 'manual' }))
+    : [];
+
+  const rows = [...bankRows, ...manualRows].sort((a, b) => (a.date < b.date ? -1 : 1));
+  return { rows, total: txs.length, bankRows: bankRows.length, manualRows: manualRows.length, inv, totalKeys };
 }
 
 /** 内置合成样例:12 个月,月基线 3000 + 噪声 + 月初房租 —— 只为自检管线,不代表真实数据。 */
@@ -93,13 +135,25 @@ try {
   console.error(`✗ 读数据失败:${e.message}`);
   process.exit(1);
 }
-const { rows, total } = src;
+const { rows, total, inv, totalKeys, bankRows, manualRows } = src;
 const months = F.monthsPresent(rows);
 
 console.log('');
 console.log('══════════════════════════════════════════════════════════════');
 console.log(`  预测回测 · ${dataPath ? path.basename(dataPath) : '内置合成样例(非真实数据)'}`);
 console.log('══════════════════════════════════════════════════════════════');
+
+if (inv) {
+  console.log('── 备份清单(先确认这份文件到底装了什么)');
+  console.log(`   备份共 ${totalKeys} 个键`);
+  for (const it of inv) {
+    const shown = it.n == null ? '缺失' : `${it.n}`;
+    console.log(`   ${it.label.padEnd(16, ' ')} ${shown}`);
+  }
+  console.log('');
+  console.log(`   银行流水计入支出 ${bankRows} 笔 · 手动记账计入 ${manualRows} 笔`);
+  console.log('');
+}
 console.log(`  原始流水 ${total} 笔 → 计入支出 ${rows.length} 笔`);
 console.log(`  覆盖月份 ${months.length} 个:${months[0] || '—'} … ${months[months.length - 1] || '—'}`);
 console.log(`  预测时点:每月 ${cutoffDay} 号(只看当天及以前的流水)`);
