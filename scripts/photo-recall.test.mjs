@@ -15,9 +15,10 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import ts from 'typescript';
 import assert from 'node:assert/strict';
+import { stripComments } from './lib/strip-comments.mjs';
 
 const SRC = fs.readFileSync(new URL('../lib/portal/photo-recall.ts', import.meta.url), 'utf8');
-const code = SRC.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const code = stripComments(SRC);
 
 // ── 两条路都必须跑召回(零条目那条最容易被漏)────────────────────────────────
 {

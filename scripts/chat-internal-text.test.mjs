@@ -15,10 +15,11 @@ import { pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
+import { stripComments } from './lib/strip-comments.mjs';
 
 const root = new URL('..', import.meta.url);
 const read = (p) => fs.readFileSync(new URL(p, root), 'utf8');
-const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const code = stripComments;
 
 // TS → JS(这个模块是纯正则,没有依赖,直接剥掉类型注解跑真函数,不做字符串断言)
 const ts = read('lib/portal/chat-internal-text.ts');

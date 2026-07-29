@@ -16,10 +16,11 @@
  */
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import { stripComments } from './lib/strip-comments.mjs';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
 /** 剥注释再断言 —— 本仓踩过多次「注释里提了一句就把断言喂饱了」。 */
-const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const code = stripComments;
 
 // ── ① 分段控件只有一套 ────────────────────────────────────────────────────────
 {

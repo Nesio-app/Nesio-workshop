@@ -14,9 +14,10 @@
  */
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import { stripComments } from './lib/strip-comments.mjs';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
-const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const code = stripComments;
 
 const SRC = code(read('components/portal/ui/Button.tsx'));
 const CSS = read('app/globals.css');

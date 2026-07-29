@@ -31,6 +31,7 @@ import { loadChatHistoryRaw, saveChatHistoryRaw, loadChatSessionsRaw, saveChatSe
 import { track } from '@/lib/portal/telemetry';
 import { markdownToPlain } from '@/lib/portal/chat-markdown';
 import { isInternalDiagnostic } from '@/lib/portal/chat-internal-text';
+import { fileToUploadPayload, dataUrlToUploadPayload, describeUploadFailure } from '@/lib/portal/image-payload';
 import { L } from '@/lib/portal/i18n';
 import { resolveAirport } from '@/lib/portal/airports';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -415,9 +416,10 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]; if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => void analyze(ev.target?.result as string);
-    reader.readAsDataURL(file);
+    // 必须先缩:原图 base64 越过 Vercel 的 4.5MB 请求体上限就是 413,
+    // 而 413 的响应体不是 JSON,r.json() 抛错后只会显示一句「识别失败」(见 image-payload.ts)。
+    const { base64, mimeType } = await fileToUploadPayload(file);
+    void analyze(`data:${mimeType};base64,${base64}`);
   }
 
   async function analyze(dataUrl: string) {
@@ -585,14 +587,13 @@ export default function NesioChatSheet({
     } catch { /* ignore */ }
     if (!pending?.url) return;
     const dataUrl = pending.url;
-    const b64 = dataUrl.split(',')[1] || '';
-    const mime = dataUrl.match(/:(.*?);/)?.[1] || 'image/jpeg';
     const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: L(dict, `［图片］${pending.name || '这张图'}`, `[Image] ${pending.name || 'this photo'}`) };
     setMessages((prev) => { const next = [...prev, userMsg]; return next; });
-    fetch('/api/portal/analyze', {
+    // 记忆详情里的图是本机图库原图,同样可能越过请求体上限 —— 先过一遍缩图判据。
+    void dataUrlToUploadPayload(dataUrl).then(({ base64, mimeType }) => fetch('/api/portal/analyze', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'image', imageBase64: b64, mimeType: mime }),
-    }).then((r) => r.json()).then((data: { ok?: boolean; nodes?: Array<{ name: string }>; summary?: string }) => {
+      body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType }),
+    })).then((r) => { if (!r.ok) throw new Error(`http_${r.status}`); return r.json(); }).then((data: { ok?: boolean; nodes?: Array<{ name: string }>; summary?: string }) => {
       // 2026-07-28(标注 图8):没认出来别说「识别到:未检测到任何生命图谱条目」—— 直说没看清。
       const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || '';
       const text = names
@@ -600,8 +601,8 @@ export default function NesioChatSheet({
         : data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.');
       const aiMsg: UiMessage = { id: `a-${Date.now()}`, role: 'model', text };
       setMessages((prev) => { const withAi = [...prev, aiMsg]; saveHistory(withAi); return withAi; });
-    }).catch(() => {
-      setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: 'model', text: L(dict, '图片识别失败，请重试。', 'Image recognition failed — try again.') }]);
+    }).catch((err) => {
+      setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: 'model', text: describeUploadFailure(err, dict !== 'en') }]);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -924,6 +925,59 @@ Edit location/value anytime in Storage.`),
     navigator.clipboard.writeText(msg.text).catch(() => undefined);
   }
 
+  /**
+   * 「+」菜单里的「识别图片」:选一张 → 识别 → 顺带在记忆里找相关的。
+   *
+   * 2026-07-29:这段原来是**写在 JSX 里的一整行 inline 处理器**(2500 字符),
+   * 和 handleFileUpload 的图片分支干同一件事却各写各的 —— 于是「传图发原图」这个 bug
+   * 得在两个地方分别修。提出来放这儿,两处共用同一套缩图和同一套失败文案。
+   */
+  function pickAndRecognizeImage() {
+    const inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'image/*';
+    inp.onchange = async (e) => {
+      const f = (e.target as HTMLInputElement).files?.[0];
+      if (!f) return;
+      const uid = nextMsgId('u');
+      setMessages((prev) => [...prev, { id: uid, role: 'user', text: L(dict, '[图片] 识别图片', '[Image] Recognize image') }]);
+      try {
+        // 缩略图是异步做出来的,先把消息放上去再回填,别让气泡等着缩图
+        const { base64, mimeType } = await fileToUploadPayload(f);
+        void makeThumb(`data:${mimeType};base64,${base64}`).then((th) => {
+          if (th) setMessages((prev) => prev.map((m) => (m.id === uid ? { ...m, imageThumb: th } : m)));
+        });
+        const r = await fetch('/api/portal/analyze', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType }),
+        });
+        if (!r.ok) throw new Error(`http_${r.status}`);
+        const data = await r.json() as { ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string };
+        let aiText: string;
+        if (data.ok && data.nodes?.length) {
+          const names = data.nodes.map((n) => n.name).join(L(dict, '、', ', '));
+          const nodes = recallByRecognition(data.nodes, data.summary);
+          aiText = nodes.length > 0
+            ? L(dict, `识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map((n) => `• ${n.name}`).join('\n')}`,
+              `Recognized: ${names}\n\nFound ${nodes.length} related record(s):\n${nodes.map((n) => `• ${n.name}`).join('\n')}`)
+            : L(dict, `识别到：${names}\n\n这件东西还没记过 —— 要我存进记忆吗?`,
+              `Recognized: ${names}\n\nNot in your memory yet — want me to save it?`);
+        } else {
+          const recalled = data.summary ? recallByRecognition([], data.summary) : [];
+          const base = data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.');
+          aiText = recalled.length > 0
+            ? L(dict, `${base}\n\n从描述里找到 ${recalled.length} 条相关记录：\n${recalled.map((n) => `• ${n.name}`).join('\n')}`,
+              `${base}\n\nFound ${recalled.length} related record(s) from the description:\n${recalled.map((n) => `• ${n.name}`).join('\n')}`)
+            : base;
+        }
+        setMessages((prev) => { const withAi = [...prev, { id: nextMsgId('a'), role: 'model' as const, text: aiText }]; saveHistory(withAi); return withAi; });
+      } catch (err) {
+        setMessages((prev) => [...prev, { id: nextMsgId('a'), role: 'model', text: describeUploadFailure(err, dict !== 'en') }]);
+      }
+    };
+    inp.click();
+  }
+
   async function handleFileUpload(file: File) {
     setShowPlus(false);
     const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
@@ -932,29 +986,29 @@ Edit location/value anytime in Storage.`),
 
     // 图片 → 走识别流程
     if (isImage) {
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        const dataUrl = ev.target?.result as string;
-        const [hdr, b64] = dataUrl.split(',');
-        const mime = hdr.match(/:(.*?);/)?.[1] || 'image/jpeg';
-        const userMsg: UiMessage = { id: nextMsgId('u'), role: 'user', text: L(dict, `［图片］这是什么？`, `[Image] What's this?`) };
-        setMessages((prev) => [...prev, userMsg]); // 函数式追加,别覆盖并发发送的消息
-        fetch('/api/portal/analyze', {
+      const userMsg: UiMessage = { id: nextMsgId('u'), role: 'user', text: L(dict, `［图片］这是什么？`, `[Image] What's this?`) };
+      setMessages((prev) => [...prev, userMsg]); // 函数式追加,别覆盖并发发送的消息
+      try {
+        // 先缩再发 —— 原图 base64 会越过 Vercel 的 4.5MB 请求体上限(见 image-payload.ts)。
+        const { base64, mimeType } = await fileToUploadPayload(file);
+        const r = await fetch('/api/portal/analyze', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ type: 'image', imageBase64: b64, mimeType: mime }),
-        }).then((r) => r.json()).then((data: { ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string }) => {
-          const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || '';
-          const text = names
-            ? L(dict, `识别到：${names}\n\n可以继续问我关于这张图片的问题。`, `Recognized: ${names}\n\nAsk me anything about this image.`)
-            : data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.');
-          const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text };
-          setMessages((prev) => { const withAi = [...prev, aiMsg]; saveHistory(withAi); return withAi; });
-        }).catch(() => {
-          const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text: L(dict, '图片识别失败，请重试。', 'Image recognition failed — try again.') };
-          setMessages((prev) => [...prev, aiMsg]);
+          body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType }),
         });
-      };
-      reader.readAsDataURL(file);
+        // 非 2xx 的响应体常常不是 JSON(413/502 是 HTML)。直接 r.json() 会抛出去,
+        // 于是「太大」和「服务端挂了」都被说成同一句「识别失败」。
+        if (!r.ok) throw new Error(`http_${r.status}`);
+        const data = await r.json() as { ok?: boolean; nodes?: Array<{ name: string; type: string }>; summary?: string };
+        const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || '';
+        const text = names
+          ? L(dict, `识别到：${names}\n\n可以继续问我关于这张图片的问题。`, `Recognized: ${names}\n\nAsk me anything about this image.`)
+          : data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.');
+        const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text };
+        setMessages((prev) => { const withAi = [...prev, aiMsg]; saveHistory(withAi); return withAi; });
+      } catch (err) {
+        const aiMsg: UiMessage = { id: nextMsgId('a'), role: 'model', text: describeUploadFailure(err, dict !== 'en') };
+        setMessages((prev) => [...prev, aiMsg]);
+      }
       return;
     }
 
@@ -1476,8 +1530,7 @@ Edit location/value anytime in Storage.`),
       {/* Plus panel */}
       {showPlus && (
         <div className="nesio-wechat-plus-panel">
-          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); const inp = document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.onchange=(e)=>{ const f=(e.target as HTMLInputElement).files?.[0]; if(!f) return; const reader=new FileReader(); reader.onload=(ev)=>{ const dataUrl=ev.target?.result as string; const [hdr,b64]=dataUrl.split(','); const mime=hdr.match(/:(.*?);/)?.[1]||'image/jpeg'; const uid=nextMsgId('u'); const userMsg:UiMessage={id:uid,role:'user',text:L(dict,'[图片] 识别图片','[Image] Recognize image')}; setMessages(prev=>[...prev,userMsg]); /* A9-a:缩略图是异步做出来的,先把消息放上去再回填,别让气泡等着缩图 */ void makeThumb(dataUrl).then((th)=>{ if(th) setMessages(prev=>prev.map(m=>m.id===uid?{...m,imageThumb:th}:m)); }); fetch('/api/portal/analyze',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image',imageBase64:b64,mimeType:mime})}).then(r=>r.json()).then((data:{ ok?:boolean; nodes?:Array<{name:string;type:string}>; summary?:string })=>{ if(data.ok&&data.nodes?.length){const names=data.nodes.map(n=>n.name).join(L(dict,'、',', ')); const nodes=recallByRecognition(data.nodes,data.summary); const aiText=nodes.length>0?L(dict,`识别到：${names}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map(n=>`• ${n.name}`).join('\n')}`,`Recognized: ${names}\n\nFound ${nodes.length} related record(s):\n${nodes.map(n=>`• ${n.name}`).join('\n')}`):L(dict,`识别到：${names}\n\n这件东西还没记过 —— 要我存进记忆吗?`,`Recognized: ${names}\n\nNot in your memory yet — want me to save it?`); const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:aiText}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}else{const recalled=data.summary?recallByRecognition([],data.summary):[];const base=data.summary||L(dict,'这张图没看清,换个角度再拍一张试试。','Could not read this photo — try another angle.');const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:recalled.length>0?L(dict,`${base}\n\n从描述里找到 ${recalled.length} 条相关记录：\n${recalled.map(n=>`• ${n.name}`).join('\n')}`,`${base}\n\nFound ${recalled.length} related record(s) from the description:\n${recalled.map(n=>`• ${n.name}`).join('\n')}`):base}; setMessages(prev=>{const withAi=[...prev,aiMsg]; saveHistory(withAi); return withAi;});}}).catch(()=>{const aiMsg:UiMessage={id:nextMsgId('a'),role:'model',text:L(dict,'图片识别失败，请重试。','Image recognition failed — please try again.')}; setMessages(prev=>[...prev,aiMsg]);});}; reader.readAsDataURL(f);}; inp.click(); }}>
-            <span className="nesio-wechat-plus-icon"><IconImage /></span>
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); pickAndRecognizeImage(); }}>            <span className="nesio-wechat-plus-icon"><IconImage /></span>
             <span>{L(dict, '相册', 'Photos')}</span>
           </button>
           <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); setCameraAutoOpen(true); setShowCamera(true); }}>

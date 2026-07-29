@@ -11,9 +11,10 @@
  */
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import { stripComments } from './lib/strip-comments.mjs';
 
 const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8');
-const code = (p) => read(p).replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+const code = (p) => stripComments(read(p));
 
 const SWIFT = 'treasurebox-ios/ios/App/App/NesioVisionPlugin.swift';
 const PBX = 'treasurebox-ios/ios/App/App.xcodeproj/project.pbxproj';

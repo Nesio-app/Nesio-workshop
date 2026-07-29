@@ -7750,6 +7750,50 @@ html[data-portal-theme="night"] .nesio-settings-option-label { color: #e8eefa; }
   color: #059669;
 }
 
+/* 反向动作的文字链(从云恢复 / 导入备份)。和主动作同一组,但分量差一档 ——
+   平时做的是备份和导出,恢复/导入是出事那天才用一次(2026-07-29 七按钮整合)。 */
+.nesio-settings-inline-link {
+  display: block;
+  width: 100%;
+  margin-top: var(--space-2);
+  padding: var(--space-2) 0;
+  border: none;
+  background: none;
+  text-align: center;
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-accent);
+  cursor: pointer;
+}
+.nesio-settings-inline-link:disabled { opacity: 0.45; cursor: default; }
+
+/* 「删除数据」危险区(2026-07-29):三个红按钮从平铺收进一个可折叠入口。
+   平铺时一屏三条红,违反 CLAUDE.md「不用红色制造焦虑」;而这三件事一年也未必做一次。
+   收起态是中性的,只有展开后才见红 —— 红色留给真正走到那一步的人。 */
+.nesio-settings-danger-zone {
+  margin-top: var(--space-4);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+}
+.nesio-settings-danger-summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-ink);
+  list-style: none;
+}
+.nesio-settings-danger-summary::-webkit-details-marker { display: none; }
+.nesio-settings-danger-summary::after {
+  content: '›';
+  float: right;
+  color: var(--portal-muted);
+  transition: transform var(--motion-fast, 120ms) ease;
+}
+.nesio-settings-danger-zone[open] > .nesio-settings-danger-summary::after { transform: rotate(90deg); }
+.nesio-settings-danger-zone[open] > .nesio-settings-danger-summary { margin-bottom: var(--space-2); }
+
 /* 设置页那几条整行按钮的**间距**。
    外观已经不在这儿了 —— 调用点换成 <Button variant="soft" size="md" full>(危险的加 tone="risk"),
    这两个类名只剩「和上一条隔多远」这一件事。这就是桥接的终点:
@@ -13644,6 +13688,19 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-health-card-delta.down { background: rgba(16,185,129,0.14); color: #047857; }
 .nesio-health-card-date { font-size: 0.66rem; color: var(--portal-muted); align-self: flex-start; }
 .nesio-health-card-range { font-size: 0.62rem; color: var(--portal-muted); }
+/* 情绪卡里的「看这周趋势 ›」—— 从今天页搬过来的入口(2026-07-29)。次级链接相,不抢卡片主数值。 */
+.nesio-health-card-link {
+  align-self: flex-start;
+  margin-top: var(--space-2);
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-accent);
+  cursor: pointer;
+}
 
 /* 批次 40:运动状态(cross-domain integrator) */
 .nesio-fit-panel { margin-top: 0.6rem; padding: 0.9rem 1rem; border-radius: 14px; border: 1px solid var(--portal-line); background: var(--glass-bg-solid); }
@@ -14660,6 +14717,15 @@ html[data-portal-theme="night"] .nesio-project-card-name { color: #d8e8ff; }
   cursor: pointer;
   font-family: inherit;
 }
+/* 「+」传完 / 记一笔之后那条回执(2026-07-29:之前这个 state 根本没渲染)。
+   贴在输入条下面、和它同宽,几秒后自己消失。用 status-go 说「成好了」,不抢视线。 */
+.nesio-tl-capture-receipt {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--status-go);
+  animation: nesio-receipt-in var(--motion-fast, 160ms) ease;
+}
+@keyframes nesio-receipt-in { from { opacity: 0; transform: translateY(-2px); } to { opacity: 1; transform: none; } }
 .nesio-inv-close { position: absolute; right: 0; top: 50%; transform: translateY(-50%); }
 /* 批次 172:项目页顶部三个统计框(进行中/已完成/已归档) */
 .nesio-proj-stats { display: flex; gap: 8px; padding: 0.1rem 1rem 0.7rem; }

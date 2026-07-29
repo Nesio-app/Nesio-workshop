@@ -80,7 +80,15 @@ export default function TodayFeed({
   const [guideDetailNode, setGuideDetailNode] = useState<LiveMemoryNode | null>(null); // 批次 83:引导卡点开详情
   // 批次 31:焦点下方快捷输入(用户新指令)
   const [quickAdd, setQuickAdd] = useState('');
-  const [quickSaved, setQuickSaved] = useState(false);
+  const uiLocale = portalLocaleToDictionaryLocale(usePortalLocale());
+  /**
+   * 「+」传完东西之后那条回执。
+   *
+   * 2026-07-29:这个 state 之前**被 set 了却从来没有渲染** —— 整份文件搜不到第二处引用。
+   * 所以传完什么反馈都没有,用户不知道到底存没存进去(这正是要补的「已存入」提示)。
+   * 现在存成功先报一句,识别结果回来了再把它补进同一条回执里。
+   */
+  const [quickSaved, setQuickSaved] = useState<string>('');
 
   /**
    * 「+」上传 → 落成记忆(2026-07-28)。
@@ -92,6 +100,37 @@ export default function TodayFeed({
    *   · 其余   → local-file-store(原样存 Blob,pdf/docx/xlsx/zip… 一视同仁)。
    * 超过 MAX_FILE_BYTES 的明确拒收,不截断 —— 截断的 pdf 是坏文件,比没有更糟。
    */
+  /**
+   * 存好之后认一下这张图是什么(2026-07-29「加号要更智能」)。
+   *
+   * 和「收进来」那条路的差别只在**顺序**:先把东西收好(本机、确定成功),
+   * 再去问一下这是什么。所以识别失败不影响已经存好的那条记忆 ——
+   * 认出来了就改个看得懂的名字,认不出来就保持文件名原样,不打扰。
+   *
+   * 免费用户不发这一趟(云识图是付费档);先缩再发,不然原图直接 413(见 image-payload.ts)。
+   */
+  const recognizeSavedImage = useCallback(async (file: File, nodeId: string) => {
+    try {
+      const { canUsePaidCloudAi } = await import('@/lib/portal/entitlement');
+      if (!canUsePaidCloudAi()) return;   // 后台动作:免费静默跳过,不弹升级
+      const { fileToUploadPayload } = await import('@/lib/portal/image-payload');
+      const { base64, mimeType } = await fileToUploadPayload(file);
+      const res = await fetch('/api/portal/analyze', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType, uiLocale }),
+      });
+      if (!res.ok) return;
+      const data = await res.json() as { ok?: boolean; nodes?: Array<{ name?: string; tags?: string[] }> };
+      const first = data.nodes?.[0];
+      if (!data.ok || !first?.name) return;
+      const { updateLifeNode } = await import('@/lib/portal/life-graph');
+      updateLifeNode(nodeId, { name: first.name, tags: ['照片', ...(first.tags || [])].slice(0, 6) });
+      window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+      setQuickSaved(L(uiLocale, `已存入 · 认出是「${first.name}」`, `Saved · recognized "${first.name}"`));
+      setTimeout(() => setQuickSaved(''), 4000);
+    } catch { /* 认不出来不打扰 —— 东西已经存好了,这只是锦上添花 */ }
+  }, [uiLocale]);
+
   const captureFiles = useCallback(async (files: File[]) => {
     const list = files.slice(0, 30);
     if (!list.length) return;
@@ -122,10 +161,14 @@ export default function TodayFeed({
         assets.push({ id, kind: 'image' as const, local: true, mimeType: 'image/jpeg', label: imgs[i].name, createdAt: new Date().toISOString() });
       }
       if (assets.length) {
-        ingestLifeNode({
+        const node = ingestLifeNode({
           name: assets.length === 1 ? imgs[0].name.replace(/\.[^.]+$/, '') : `${assets.length} 张照片`,
           type: 'note', source: 'manual', tags: ['照片'], attributes: {}, relations: [], confidence: 1, assets,
         });
+        // 2026-07-29「提高智能」:存进去只是第一步 —— 顺手认一下这是什么,
+        // 把文件名(IMG_9740 这种)换成看得懂的名字,并打上识别到的标签。
+        // 存已经成功了,识别是加分项:认不出来就保持原样,**绝不因此报错**。
+        void recognizeSavedImage(imgs[0], node.id);
       }
     }
 
@@ -154,7 +197,11 @@ export default function TodayFeed({
     }
 
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-    if (list.length > failed.length) { setQuickSaved(true); setTimeout(() => setQuickSaved(false), 1400); }
+    const saved = list.length - failed.length;
+    if (saved > 0) {
+      setQuickSaved(L(uiLocale, `已存入 ${saved} 项`, `Saved ${saved} item${saved > 1 ? 's' : ''}`));
+      setTimeout(() => setQuickSaved(''), 4000);
+    }
     // 存不下的必须说,哪怕同一批里别的存进去了 —— 不能因为「大部分成功」就把失败的吞掉。
     if (failed.length) {
       throw new Error(`${failed.slice(0, 3).join('、')} 没存进去(单个上限 ${prettyBytes(MAX_FILE_BYTES)})。`);
@@ -231,7 +278,6 @@ export default function TodayFeed({
   const [focusModeNode, setFocusModeNode] = useState<FocusNode | null>(null);
 
 
-  const uiLocale = portalLocaleToDictionaryLocale(usePortalLocale());
   // 批次 13:profile store 的缺省名是 zh「我」,英文界面下按语言回落 Me
   // P1-6:称呼是本机数据(引导里填的),显示不需要登录 —— 此前 canUsePrivateData 门
   // 让匿名用户填了「J」头像还是「Me」(称呼存了但没接到显示)。
@@ -403,14 +449,20 @@ export default function TodayFeed({
             if (!name) return;
             addCommitmentNode(name);
             setQuickAdd('');
-            setQuickSaved(true);
-            setTimeout(() => setQuickSaved(false), 1400);
+            setQuickSaved(L(uiLocale, '已记下', 'Noted'));
+            setTimeout(() => setQuickSaved(''), 2000);
           }}
           onMic={startQuickMic}
           recording={micState === 'recording'}
           inputRef={quickInputRef}
           onFiles={captureFiles}
         />
+        {/* 存进去了要说一声。这条回执之前**只被 set、从来没渲染** ——
+            于是「+」传完文件、记一笔按了「记下」,界面上什么反应都没有。
+            识别结果回来了会把同一条改写成「已存入 · 认出是「…」」。 */}
+        {quickSaved && (
+          <p className="nesio-tl-capture-receipt" role="status">{quickSaved}</p>
+        )}
 
         {/* 今日焦点 — 重要安排 / 重要日子 / 重要提醒 */}
         <TodayFocusSection
