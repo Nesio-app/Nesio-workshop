@@ -18,7 +18,7 @@ const todayFeed = [
   // Today 表面文案已入 i18n 字典(REG-004),文案断言随之覆盖字典
   read('lib/portal/i18n.ts'),
 ].join('\n');
-const tellSheet = read('components/portal/TellNesioSheet.tsx');
+// TellNesioSheet 已在 main 9bf0c5a8(今天页三处删改:中间键直达相机)删除 —— 扇形入口断言随之退役。
 const voiceSheet = read('components/portal/VoiceInputSheet.tsx');
 const profileCard = read('components/portal/NesioProfileCard.tsx');
 const loginPage = read('components/portal/LoginPageClient.tsx');
@@ -136,11 +136,8 @@ assert.match(bottomNav, /问一问|长按/, 'Center N button must document the l
 assert.match(bottomNav, /draggable=\{false\}|onContextMenu=\{\(e\) => e\.preventDefault\(\)\}/, 'Center N image must suppress iOS image callout/share sheet during long press.');
 // Fan label evolved 上传 → 分析文件 → 分享 → 收进来(批次 99 设计规范 v1 命名:
 // 「分享」是别处的系统词,宝盒是替你收着 —— 视角站在盒子这边,收成「收进来/Keep」)。
-assert.match(tellSheet, /label:\s*'收进来'/, 'Center N third fan action should say 收进来 (design-spec v1 naming; 分享 was the OS word).');
 // Design evolved: 说一句 is the primary capture action and carries an
 // explicit accent (accent: true). Guarded intent now: at most ONE accent.
-assert.match(tellSheet, /accent: true/, 'Fan actions may accent exactly the primary capture action.');
-assert.equal((tellSheet.match(/accent: true/g) || []).length, 1, 'Only one fan action may carry the accent.');
 assert.match(voiceSheet, /setTimeout\(\(\) => inputRef\.current\?\.focus\(\),\s*120\)/, 'Voice and Ask sheets should focus typed input first.');
 // 2026-07-04 批次 2:说一句 sheet 的会议记录入口按用户指示整体移除(会议记录只从 Today 焦点卡进入);
 // 原守护意图「Ask 模式不得出现会议记录入口」由入口不存在自动满足。

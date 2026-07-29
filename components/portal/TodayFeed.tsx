@@ -358,19 +358,26 @@ export default function TodayFeed({
     // 批次188(用户实锤:问候「接下来:X」与下面第一张焦点卡是**同一件事**,UI/算法重叠)——
     // 问候不再复述具体事项(焦点卡已经在讲这件事,还能点开拆解),只保留「几件要紧 + 最近多近」
     // 的概览,时间提示不带事件名 → 与焦点列表分工:问候=一眼概览,卡片=具体+可操作。
-    let nextHint = '';
+    // 用户实锤逻辑错(2026-07-29):「今天有 8 件,最近的一件明天」—— 原计数把未来所有
+    // 带时点的节点都算进"今天"。改:只数**日期是今天**的;「最近一件」整个去掉(只报件数)。
+    const sameLocalDay = (iso: string) => {
+      const d = new Date(iso);
+      const t = new Date();
+      return !Number.isNaN(d.getTime()) && d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+    };
     let actionable = 0;
     for (const n of focusNodes) {
       const hint = focusTimeHint(n, uiLocale);
       if (!hint || hint === L(uiLocale, '刚记录', 'just noted') || hint === L(uiLocale, '已过期', 'expired')) continue;
       if (GREETING_NOISE_RE.test(n.name)) continue; // 别人的 OOO/请假不当"你的一件事"
-      if (!nextHint) nextHint = hint;
+      const dateStr = String(n.attributes?.date ?? n.attributes?.dueDate ?? n.attributes?.eventDate ?? '');
+      if (!dateStr || !sameLocalDay(dateStr)) continue;
       actionable++;
     }
     if (actionable > 0) {
       return `${prefix}${L(uiLocale,
-        `今天有 ${actionable} 件要紧的,最近的一件${nextHint}。`,
-        `${actionable} thing${actionable > 1 ? 's' : ''} need you today — nearest ${nextHint}.`)}`;
+        `今天有 ${actionable} 件要紧的。`,
+        `${actionable} thing${actionable > 1 ? 's' : ''} need you today.`)}`;
     }
     if (isEvening) {
       return receipt.todayCount > 0

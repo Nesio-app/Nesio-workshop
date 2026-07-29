@@ -278,6 +278,13 @@ export function useTodayData(canUsePrivateData: boolean) {
             } satisfies ProactiveCardData;
           })
           .filter((c) => !isProactiveCardDismissed(c.id, c.factKey));
+        // 事件到了当天的判决卡让位时间线(当天日程=时间线地盘;临近提醒由置顶卡承担)
+        newProactiveCards = newProactiveCards.filter((c) => {
+          const src = live.find((l) => l.fingerprints[0] === c.factKey);
+          if (!src?.eventStartMs) return true;
+          const d = new Date(src.eventStartMs);
+          return !(d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate());
+        });
 
         // 承诺④:AI 从没成功过/最近失败且没有任何窗口内判决 → 结构化兜底(零分类),
         // 可见地标注(sourceTags 含 fallback,渲染层据此亮「AI 判决暂不可用」行,不许静默降级)。
@@ -286,7 +293,8 @@ export function useTodayData(canUsePrivateData: boolean) {
           newProactiveCards = buildFallbackCards({
             calendarEvents: calEvents
               .map((e) => ({ id: e.id, title: e.title, startMs: Date.parse(e.start), endMs: e.end ? Date.parse(e.end) : undefined }))
-              .filter((e) => !Number.isNaN(e.startMs)),
+              // 当天=时间线地盘,兜底也只收明天的
+              .filter((e) => !Number.isNaN(e.startMs) && new Date(e.startMs).getDate() !== now.getDate()),
             expiryItems: listInventoryItems().filter((i) => i.expiry).map((i) => ({ id: i.id, name: i.name, expiry: i.expiry! })),
             dueBills: loadPlaidLiabilities().map((l) => ({ id: l.accountId, account: names.get(l.accountId) || l.accountId, dueDate: l.dueDate, minPayment: l.minPayment })),
           }, now)
@@ -304,6 +312,13 @@ export function useTodayData(canUsePrivateData: boolean) {
               actions: [],
             } satisfies ProactiveCardData))
             .filter((c) => !isProactiveCardDismissed(c.id, c.factKey));
+        // 事件到了当天的判决卡让位时间线(当天日程=时间线地盘;临近提醒由置顶卡承担)
+        newProactiveCards = newProactiveCards.filter((c) => {
+          const src = live.find((l) => l.fingerprints[0] === c.factKey);
+          if (!src?.eventStartMs) return true;
+          const d = new Date(src.eventStartMs);
+          return !(d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate());
+        });
         }
         // 用户裁决优先于一切:静音门已在 loadLiveJudgedCards 内执行;兜底卡也过一遍
         newProactiveCards = newProactiveCards

@@ -169,9 +169,12 @@ export function collectJudgeSignals(input: JudgeSignalInput, now: Date = new Dat
   const backfillFloor = now.getTime() - BACKFILL_DAYS * DAY_MS;
   const horizon = now.getTime() + 14 * DAY_MS;
 
+  // 当天日程是时间线的地盘(用户拍板 2026-07-29):过了 0 点的当日事件只在时间线显示,
+  // 判决层只收**明天 0 点以后**的 —— 一天以上的才按 AI 规则进引导卡。
+  const tomorrow0 = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
   for (const e of input.calendarEvents || []) {
     const startMs = Date.parse(e.start);
-    if (Number.isNaN(startMs) || startMs < now.getTime() - DAY_MS || startMs > horizon) continue;
+    if (Number.isNaN(startMs) || startMs < tomorrow0 || startMs > horizon) continue;
     const fields = {
       title: e.title.slice(0, 200),
       start: e.start,

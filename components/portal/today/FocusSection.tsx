@@ -209,16 +209,11 @@ export function TodayFocusSection({
   const pinnedIdForReport = pinned?.id ?? null;
   useEffect(() => { onPinnedResolved?.(pinnedIdForReport); }, [pinnedIdForReport, onPinnedResolved]);
 
-  // ── Special days (today / tomorrow) ──
-  // 纪念日此前从不查裁决(任务节点查了它没查)—— 静音过的生日照样回来。补上。
-  const nearSpecialDays = specialDays
-    .filter((d) => d.daysUntil <= 1)
-    .filter((d) => !isCardSuppressed({ cardId: d.nodeId, factKey: d.nodeId }));
-
-  const showDormant = verdict.showDormant && dormantCandidate && !dormantDismissed.has(dormantCandidate.node.id);
-
-  const collapsedCount = rest.length + taskNodes.length + nearSpecialDays.length + (showDormant ? 1 : 0);
-  const dormantNodeId = dormantCandidate?.node.id;
+  // 纪念日与休眠复访已移出时间线(用户拍板 2026-07-29):
+  // 生日走判决层 relationship 域(person 数据,正则路径全退);休眠复访不属「今天的日程」,
+  // 回忆面由回顾卡承担。specialDays prop 留着(移除属渲染层决定,数据层不动)。
+  void specialDays; void dormantDismissed;
+  const collapsedCount = rest.length + taskNodes.length;
   const isEmpty = !pinned && collapsedCount === 0;
 
   const doneToday = doneIds.size;
@@ -244,19 +239,6 @@ export function TodayFocusSection({
     ...rest.map((obj) => (
       <CollapsedCalItem key={obj.id} obj={obj} onOpenRecorder={() => setCalRecorderEvent(obj.event)} />
     )),
-    ...nearSpecialDays.map((item) => (
-      <li key={item.nodeId} className="nesio-collapsed-item">
-        {/* 批次 111:纪念日也做成时间线节点(圆点在轨上 + 日期 kicker) */}
-        <div className="nesio-collapsed-row">
-          {/* 批次 129:纪念日节点圆内嵌礼物符号 */}
-          <span className="nesio-collapsed-dot nesio-collapsed-dot--clock" aria-hidden><IconGift size={13} /></span>
-          <span className="nesio-collapsed-task-body">
-            <span className="nesio-collapsed-kicker">{item.daysUntil === 0 ? t(locale, 'todayLabelToday') : t(locale, 'todayLabelTomorrow')}</span>
-            <span className="nesio-collapsed-title">{item.name}</span>
-          </span>
-        </div>
-      </li>
-    )),
     ...taskNodes.map((node) => (
       <CollapsedTaskItem
         key={node.id}
@@ -270,16 +252,6 @@ export function TodayFocusSection({
         onFocusMode={onFocusMode ? () => onFocusMode(node) : undefined}
       />
     )),
-    ...(showDormant && dormantCandidate && dormantNodeId ? [(
-      <DormantReviewCard
-        key="dormant"
-        candidate={dormantCandidate}
-        onDo={() => { const next = applyReviewAction(dormantNodeId, 'do'); onSetDormantStore(next); setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; }); if (dormantCandidate.kind !== 'soft-archive') onFocusMode?.(dormantCandidate.node); }}
-        onSnooze={() => { const next = applyReviewAction(dormantNodeId, 'snooze'); onSetDormantStore(next); setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; }); }}
-        onArchive={() => { const next = applyReviewAction(dormantNodeId, 'archive'); onSetDormantStore(next); setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; }); }}
-        onFinalize={() => { const next = applyReviewAction(dormantNodeId, 'finalize'); onSetDormantStore(next); setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; }); }}
-      />
-    )] : []),
   ];
   // 批次 117(用户定「除心情最多显示 2 个」):时间线心情 + 至多 2 个要紧事,
   // 置顶卡算 1 个(有置顶卡则折叠区只露 1)。多出来的收成「稍后 · 还有 N 件」+ 号节点。
