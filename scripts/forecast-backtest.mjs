@@ -75,15 +75,15 @@ function fixtureRows() {
   return { rows, total: rows.length };
 }
 
-// ── 候选清单 ──
-const CANDIDATES = [
-  { name: '月底支出 · 日均外推', predict: F.predictMonthEndRunRate },
-  { name: '月底支出 · 已发生+同期尾段中位数', predict: F.predictMonthEndTailMedian },
-];
-const NAIVES = [
-  { name: '上月即本月', fn: F.naiveLastMonth },
-  { name: '近3月中位数', fn: F.naiveMedian3 },
-];
+// ── 候选清单(候选与笨基线一起跑,才能算共同可比月份)──
+const CAND_NAMES = ['日均外推', '已发生+同期尾段中位数'];
+const NAIVE_NAMES = ['上月即本月', '近3月中位数'];
+const PREDICTORS = {
+  '日均外推': F.predictMonthEndRunRate,
+  '已发生+同期尾段中位数': F.predictMonthEndTailMedian,
+  '上月即本月': F.naiveLastMonth,
+  '近3月中位数': F.naiveMedian3,
+};
 
 // ── 跑 ──
 let src;
@@ -110,35 +110,77 @@ if (months.length < 3) {
   process.exit(0);
 }
 
+// ── 数据体检:先判断这份数据配不配下结论 ────────────────────────────
+// 首轮教训:MAE 只有 85 但偏差率 82%,反推月度总额仅百余元 —— 那不是真实开销,
+// 是某张很少用的卡。在这种数据上比「谁更准」,比的是谁更会拟合噪音。
+const perMonth = months.map((m) => rows.filter((r) => F.ymOf(r.date) === m).length);
+const monthTotals = months.map((m) => F.monthTotal(rows, m));
+const medCount = F.median(perMonth);
+const medTotal = F.median(monthTotals);
+const emptyish = perMonth.filter((c) => c < 3).length;
+
+console.log('── 数据体检');
+console.log(`   每月笔数中位数 ${medCount} 笔 · 月度总额中位数 ${medTotal}`);
+console.log(`   笔数 <3 的月份:${emptyish}/${months.length}`);
+const thin = medCount < 10;
+if (thin) {
+  console.log('   ⚠️  这份数据偏薄(每月中位数 <10 笔)。真实生活的月消费很难只有这么几笔 ——');
+  console.log('      更可能是只连了一张少用的卡,或 Plaid 只拉到很浅的历史。');
+  console.log('      **薄数据上的技能分主要在比拟合噪音的能力,下面的结论只能当管线自检看。**');
+}
+console.log('');
+
+// ── 配对回测:所有预测器同跑,只在共同可比月份上比分 ────────────────
+const run = F.backtestPaired(rows, cutoffDay, PREDICTORS);
+console.log('── 可比性');
+console.log(`   走查月份 ${run.months.length} 个 · 全体都开得了口的 ${run.common.length} 个(横向比较只在这些月上做)`);
+for (const n of Object.keys(PREDICTORS)) {
+  const cov = run.coverage[n];
+  const flag = cov < F.MIN_COVERAGE ? '  ← 开口率过低' : '';
+  console.log(`   ${n}:能开口 ${Math.round(cov * 100)}%${flag}`);
+}
+console.log('');
+
 const reports = [];
-for (const c of CANDIDATES) {
-  for (const nv of NAIVES) {
-    const samples = F.backtest(rows, { cutoffDay, predict: c.predict, naive: nv.fn });
-    reports.push({ ...F.scoreSamples(`${c.name}  vs  ${nv.name}`, samples), samples });
+for (const c of CAND_NAMES) {
+  for (const nv of NAIVE_NAMES) {
+    const samples = F.pairedSamples(run, c, nv);
+    reports.push(F.scoreSamples(`${c}  vs  ${nv}`, samples, run.coverage[c]));
   }
 }
 
-const VERDICT_ZH = { adopt: '✅ 采纳', reject: '❌ 否决', unproven: '⚠️  存疑' };
+const VERDICT_ZH = {
+  adopt: '✅ 采纳', reject: '❌ 否决', unproven: '⚠️  存疑',
+  unusable: '🚫 不可用', sparse: '🕳️  开口太少',
+};
 for (const r of reports) {
   console.log(`── ${r.name}`);
-  if (r.n === 0) { console.log('   无有效样本(数据不足)\n'); continue; }
-  console.log(`   样本 ${r.n} 次 · 平均误差 ${r.mae} · 平均偏差率 ${r.mape}%`);
+  if (r.n === 0) { console.log('   无共同可比样本\n'); continue; }
+  console.log(`   样本 ${r.n} 次(共同月份) · 平均误差 ${r.mae} · 平均偏差率 ${r.mape}%`);
   console.log(`   笨基线误差 ${r.naiveMae} · 技能分 ${r.skill >= 0 ? '+' : ''}${(r.skill * 100).toFixed(1)}%`);
   console.log(`   系统性倾向 ${r.bias > 0 ? `高估 ${r.bias}` : r.bias < 0 ? `低估 ${Math.abs(r.bias)}` : '无'}`);
-  console.log(`   区间(p80):±${r.p80Pct}%  ← 若采纳,这就是该给用户看的带宽`);
+  console.log(`   区间(p80):±${r.p80Pct}%${r.p80Pct > F.MAX_P80_PCT ? `  ← 超出可呈现上限 ±${F.MAX_P80_PCT}%` : ''}`);
   console.log(`   ${VERDICT_ZH[r.verdict]} — ${r.note}`);
   console.log('');
 }
 
 const adopted = reports.filter((r) => r.verdict === 'adopt');
 console.log('══════════════════════════════════════════════════════════════');
+if (thin) {
+  console.log('  ⚠️  数据偏薄,下面的裁决不作数 —— 先把真实流水补全再跑一次。');
+}
 if (adopted.length === 0) {
-  console.log('  结论:没有候选赢过笨办法 —— 按约定,这一批不上线。');
-  console.log('  (要么换预测方法,要么承认这件事就该用「上月即本月」)');
+  console.log('  结论:没有候选同时满足「赢过笨基线 + 区间能给人看 + 开得了口」。');
+  console.log('  按约定,这一批不上线。');
+  const nearMiss = reports.filter((r) => r.verdict === 'unusable');
+  if (nearMiss.length) {
+    console.log(`  (${nearMiss.length} 个赢了笨基线但区间太宽 —— 赢过笨办法 ≠ 能用)`);
+  }
 } else {
-  const best = adopted.sort((a, b) => b.skill - a.skill)[0];
-  console.log(`  结论:${adopted.length} 个候选达标,最佳 = ${best.name}`);
-  console.log(`  上线时应呈现:点估计 ± ${best.p80Pct}%(依据:过去 ${best.n} 次回测的 p80 残差)`);
+  const best = adopted.sort((a, b) => a.p80Pct - b.p80Pct)[0]; // 按可用性排,不按技能分
+  console.log(`  结论:${adopted.length} 个候选全部达标,最佳 = ${best.name}`);
+  console.log(`  上线时应呈现:点估计 ± ${best.p80Pct}%(依据:${best.n} 次共同月份回测的 p80 残差)`);
+  console.log(`  注意 ${best.bias > 0 ? `系统性高估 ${best.bias}` : `系统性低估 ${Math.abs(best.bias)}`},呈现时应先做偏差校正。`);
 }
 console.log('══════════════════════════════════════════════════════════════');
 console.log('');
