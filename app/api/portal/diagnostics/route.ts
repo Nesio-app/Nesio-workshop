@@ -8,7 +8,8 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { guardAiRoute } from '@/lib/portal/api-auth';
+import { isPortalRequestAuthorized } from '@/lib/portal/api-auth';
+import { requireAdmin } from '@/lib/portal/auth/admin-gate';
 
 interface DiagnosticEvent {
   timestamp: number;
@@ -38,14 +39,10 @@ interface DiagnosticsPayload {
  * { ok: true, recorded: number }
  */
 export async function POST(request: NextRequest) {
-  // 安全检查（CLAUDE.md 规则）
-  const guardResult = await guardAiRoute(request, {
-    action: 'record-diagnostics',
-    log: true,
-  });
-
-  if (!guardResult.allowed) {
-    return NextResponse.json({ error: guardResult.reason }, { status: 403 });
+  // 轻量会话检查（记录诊断事件）
+  const authorized = await isPortalRequestAuthorized(request);
+  if (!authorized) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
@@ -118,14 +115,10 @@ export async function POST(request: NextRequest) {
  * - ?hours=24 （查询最近 N 小时）
  */
 export async function GET(request: NextRequest) {
-  // 安全检查（需要管理员权限）
-  const guardResult = await guardAiRoute(request, {
-    action: 'read-diagnostics',
-    requireAdmin: true,
-  });
-
-  if (!guardResult.allowed) {
-    return NextResponse.json({ error: guardResult.reason }, { status: 403 });
+  // 需要管理员权限查询诊断统计
+  const adminCheck = requireAdmin(request, 'read-diagnostics');
+  if (adminCheck) {
+    return adminCheck;
   }
 
   // 这里通常会从数据库查询统计信息
