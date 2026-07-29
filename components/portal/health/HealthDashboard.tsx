@@ -30,6 +30,7 @@ import BeautyCarePanel from './BeautyCarePanel';
 import HealthLensCards from './HealthLensCards';
 import HealthRecordSheet from './HealthRecordSheet';
 import MetricDetailSheet from './MetricDetailSheet';
+import LabScanSheet from './LabScanSheet';
 import type { BodyLedgerSection } from '@/lib/portal/body-ledger';
 import { buildDayLedger, ledgerPrompt, todayYmd } from '@/lib/portal/body-ledger';
 
@@ -533,15 +534,20 @@ function TopRelationship({ data, dict }: { data: HealthMetrics; dict: string }) 
  * 同一个位置、同一条确认路径,OCR 到位后只是把表单预填好。
  * 入口不能等 OCR:等了,没导过 Apple 健康记录的人就一条都记不进来。
  */
-function HealthLensRow({ onRecord, dict }: { onRecord: () => void; dict: string }) {
+function HealthLensRow({ onRecord, onScan, dict }: { onRecord: () => void; onScan: () => void; dict: string }) {
   return (
     <div className="nesio-rel-head-row" style={{ marginTop: '0.4rem' }}>
       <p className="nesio-health-updated" style={{ margin: 0 }}>
         {L(dict, '化验 · 用药 · 就诊', 'Labs · meds · visits')}
       </p>
-      <button type="button" className="nesio-rel-log-btn" onClick={onRecord}>
-        {L(dict, '＋ 记一条', '＋ Log')}
-      </button>
+      <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
+        <button type="button" className="nesio-rel-log-btn" onClick={onScan}>
+          {L(dict, '拍化验单', 'Scan report')}
+        </button>
+        <button type="button" className="nesio-rel-log-btn" onClick={onRecord}>
+          {L(dict, '＋ 记一条', '＋ Log')}
+        </button>
+      </div>
     </div>
   );
 }
@@ -555,6 +561,7 @@ export default function HealthDashboard() {
   const [ledgerSection, setLedgerSection] = useState<BodyLedgerSection>('today');
 
   const [recordOpen, setRecordOpen] = useState(false);      // 健康镜头:记一条(化验/用药/症状/就诊)
+  const [scanOpen, setScanOpen] = useState(false);          // 健康镜头 B 屏:拍化验单(端上识别)
   const [openMetric, setOpenMetric] = useState<string | null>(null); // 健康镜头 C 屏:指标详情
   const [reportMsg, setReportMsg] = useState(''); // 健康月报动作反馈(可见状态,不静默)
   // 月初自动补生成上月健康月报并存记忆(每设备每月一次,幂等)。
@@ -596,7 +603,7 @@ export default function HealthDashboard() {
           <>
             {/* 健康镜头不依赖 Apple Health —— 化验/用药/就诊是另一套数据源。
                 这块早退分支原本什么都不给,等于「没导过 Apple Health 就用不了健康镜头」。 */}
-            <HealthLensRow onRecord={() => setRecordOpen(true)} dict={dict} />
+            <HealthLensRow onRecord={() => setRecordOpen(true)} onScan={() => setScanOpen(true)} dict={dict} />
             <HealthLensCards onOpenMetric={setOpenMetric} />
             <p className="nesio-insights-empty" style={{ marginBottom: 0 }}>
               {L(dict,
@@ -615,6 +622,7 @@ export default function HealthDashboard() {
         )}
         <HealthRecordSheet open={recordOpen} onClose={() => setRecordOpen(false)} />
         <MetricDetailSheet metric={openMetric} onClose={() => setOpenMetric(null)} />
+        <LabScanSheet open={scanOpen} onClose={() => setScanOpen(false)} onManual={() => setRecordOpen(true)} />
       </div>
     );
   }
@@ -665,7 +673,7 @@ export default function HealthDashboard() {
             </div>
           )}
           {/* 健康镜头(2026-07-29):化验/用药/就诊三卡 —— 读 Signal 主事实表 */}
-          <HealthLensRow onRecord={() => setRecordOpen(true)} dict={dict} />
+          <HealthLensRow onRecord={() => setRecordOpen(true)} onScan={() => setScanOpen(true)} dict={dict} />
           <HealthLensCards onOpenMetric={setOpenMetric} />
           <NenSummaryCard data={data} dict={dict} />
           <TodayPicks data={data} dict={dict} onOpen={() => setView('analysis')} />
@@ -796,6 +804,7 @@ export default function HealthDashboard() {
 
       <HealthRecordSheet open={recordOpen} onClose={() => setRecordOpen(false)} />
       <MetricDetailSheet metric={openMetric} onClose={() => setOpenMetric(null)} />
+      <LabScanSheet open={scanOpen} onClose={() => setScanOpen(false)} onManual={() => setRecordOpen(true)} />
     </div>
   );
 }
