@@ -29,6 +29,7 @@ import { refreshLocation } from '@/lib/portal/location-store';
 import { formatEnvironmentContext, getCachedCalendarEvents } from '@/lib/portal/environment';
 import { loadChatHistoryRaw, saveChatHistoryRaw, loadChatSessionsRaw, saveChatSessionsRaw, CHAT_STORE_UPDATED_EVENT } from '@/lib/portal/chat-store';
 import { track } from '@/lib/portal/telemetry';
+import { markdownToPlain } from '@/lib/portal/chat-markdown';
 import { L } from '@/lib/portal/i18n';
 import { resolveAirport } from '@/lib/portal/airports';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -1229,7 +1230,10 @@ Edit location/value anytime in Storage.`),
                   )}
                   {/* 有缩略图时,「[图片] 识别图片」这句占位就没必要再占一行了 */}
                   {!(msg.imageThumb && /^\[图片\]|^\[Image\]/.test(msg.text)) && (
-                    <p className="nesio-wechat-bubble-text">{msg.text}</p>
+                    // 模型爱用 markdown 列表/粗体作答,而气泡是纯文本渲染 ——
+                    // 不脱记号的话用户看到的就是「* 7月28日（周二）」这种星号糊在正文里。
+                    // 只脱记号、不渲染 HTML:聊天里混着邮件正文和日程标题,当 HTML 渲染等于开注入口子。
+                    <p className="nesio-wechat-bubble-text">{markdownToPlain(msg.text)}</p>
                   )}
                   {msg.photos && msg.photos.length > 0 && (
                     <div className="nesio-chat-photo-hits" role="group" aria-label={L(dict, '相关照片', 'Related photos')}>

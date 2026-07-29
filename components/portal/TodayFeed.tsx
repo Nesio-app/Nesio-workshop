@@ -278,7 +278,12 @@ export default function TodayFeed({
     const hello = hourNow < 11
       ? L(uiLocale, '早', 'Morning')
       : isEvening ? L(uiLocale, '晚上好', 'Evening') : L(uiLocale, '下午好', 'Afternoon');
-    const prefix = name ? `${name},${hello}。` : `${hello}。`;
+    // 标点也得跟着语言走。原来这里写死的是中文全角逗号+句号,英文界面下拼出来的是
+    // 「婧,Morning。Note anything — …」—— 半句英文配一对中文标点。
+    // 英文里称呼也该在问候后面(Morning, 婧.),不是前面。
+    const prefix = uiLocale === 'en'
+      ? (name ? `${hello}, ${name}. ` : `${hello}. `)
+      : (name ? `${name},${hello}。` : `${hello}。`);
 
     if (receipt.realTotal === 0) {
       return `${prefix}${L(uiLocale, '记点什么,我替你记着。', "Note anything — I'll hold it for you.")}`;

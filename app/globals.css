@@ -9641,6 +9641,27 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   cursor: pointer;
   box-sizing: border-box;
 }
+/* 清空草稿。淡、无底色 —— 它不该抢「记下」那枚实心圆钮的注意力,
+   但必须存在:草稿会持久化,在这之前没有任何删掉它的入口。 */
+.nesio-today-root button.nesio-tl-capture-clear,
+.nesio-tl-capture-clear {
+  flex: none;
+  width: 26px; height: 26px;
+  min-width: 26px; min-height: 26px;
+  margin: 0;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  color: var(--portal-muted);
+  font-size: 1.05rem;
+  line-height: 1;
+  display: grid; place-items: center;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.nesio-tl-capture-clear:hover { color: var(--portal-ink); }
+
 /* 批次 163·记一笔输入框(用户实锤「看不到」)—— 从无框透明改成可见输入框,随字增高 */
 .nesio-tl-capture-form { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
 .nesio-tl-capture-input {

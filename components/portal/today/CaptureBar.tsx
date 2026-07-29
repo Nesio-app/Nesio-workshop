@@ -111,6 +111,20 @@ export default function CaptureBar(capture: CaptureBarProps) {
             placeholder={L(dict, '问一问、找一找,或记一下…', 'Ask, find, or jot…')}
           />
 
+          {/* 清空。草稿是持久化的(没点记下就退出,下次进来还在),而在这之前**没有任何删掉它的入口** ——
+              用户碰到一条自己从没打过的草稿(语音把环境音听成了字),只能一个字一个字退,
+              连清 localStorage 都没用:页面还开着,React state 里那份会立刻写回去。 */}
+          {capture.value.trim() && (
+            <button
+              type="button"
+              className="nesio-tl-capture-clear"
+              aria-label={L(dict, '清空', 'Clear')}
+              onClick={() => { capture.onChange(''); capture.inputRef.current?.focus(); }}
+            >
+              ×
+            </button>
+          )}
+
           {/* 填了字 → 右边那枚圆钮从「话筒」变「记下」。同一个位置,不再多摆一个按钮。 */}
           {capture.value.trim() ? (
             <button type="submit" className="nesio-tl-capture-send" aria-label={L(dict, '记下', 'Jot')}>↑</button>

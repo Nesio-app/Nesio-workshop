@@ -19,6 +19,7 @@ import { stripMarkdownInline } from '@/lib/portal/node-display';
 import type { LifeNode } from '@/lib/portal/life-graph';
 import { markFeatureUsed } from '@/lib/portal/feature-usage';
 import { isLabModeOn, LAB_MODE_EVENT } from '@/lib/portal/module-overrides';
+import { isTopicTag } from '@/lib/portal/topic-tags';
 import { L } from '@/lib/portal/i18n';
 import { applyHubOrder, moveItem, loadHubOrder, saveHubOrder, resetHubOrder, HUB_ORDER_UPDATED } from '@/lib/portal/hub-order';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -52,8 +53,8 @@ export type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'fitness'
 
 const DAY_MS = 86_400_000;
 
-/** 系统标记(normalizer 系统标 / 导入标),不是主题,永不成门。 */
-const SYSTEM_TAGS = new Set(['联系人', '手动记录', '月报', 'Voice', '手写']);
+// 「什么算主题」已收到 lib/portal/topic-tags.ts —— 详情页的主题门用同一份判据,
+// 否则两处各写一份名单,一处漏了来源标记就会冒出「Flomo · 1917 条」这种假主题。
 
 
 // ── Widget: 节律热力图(周×星期,记录密度)────────────────────────────────
@@ -456,7 +457,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       const srcLabel = SOURCE_LABEL[n.source] || '';
       if (srcLabel) seen.add(srcLabel);
       for (const t of n.tags ?? []) {
-        if (!t || SYSTEM_TAGS.has(t)) continue;
+        if (!t || !isTopicTag(t)) continue;
         seen.add(CANON[t.toLowerCase()] || t);
       }
       for (const k of seen) freq.set(k, (freq.get(k) ?? 0) + 1);

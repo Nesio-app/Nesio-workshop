@@ -556,6 +556,11 @@ export function objectContextEvents(
       source: 'memory',
       confidence: 70,
       payload: {
+        // 引导卡的文案由 guidance-pipeline 按 payload.titleZh / titleEn 选语言,
+        // 只给 title 的话英文界面下会原样吐中文(用户实锤:切到 English 后
+        // 菜单都翻了,提醒卡还是「XX 即将过期」)。物品名本身是用户数据,不翻。
+        titleZh: `${node.name} 即将过期`,
+        titleEn: `${node.name} expires soon`,
         itemName: node.name,
         location: loc,
         expiryDate: expiry,

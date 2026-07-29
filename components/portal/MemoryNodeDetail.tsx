@@ -9,6 +9,7 @@ import { createAppApiClient } from '@/lib/portal/app-api-client';
 import LocationPicker from './LocationPicker';
 import EmailComposeSheet from './EmailComposeSheet';
 import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare, IconFile} from './icons';
+import { isTopicTag } from '@/lib/portal/topic-tags';
 import { L } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName, stripMarkdownInline } from '@/lib/portal/node-display';
@@ -356,15 +357,26 @@ function EventSection({ node }: {
           </span>
         </div>
       )}
-      {location && (
-        <div className="nesio-node-attr-row">
-          <span className="nesio-node-attr-key">{L(dict, '地点', 'Location')}</span>
-          {mapLink
-            ? <a href={mapLink} target="_blank" rel="noopener noreferrer" className="nesio-node-attr-val nesio-node-attr-link">{location}</a>
-            : <span className="nesio-node-attr-val">{location}</span>
-          }
-        </div>
-      )}
+      {location && (() => {
+        // Google 日历里,Zoom / Teams / Meet 这些会议软件是把**会议链接**写进 location 字段的
+        // (它们那边就这么设计)。原样挂在「地点」下面语义不对,而且一长串 URL 也没法看。
+        // 认出来就改叫「会议链接」,并做成能点的 —— 对用户比一个假地点有用得多。
+        const meetingUrl = /^https?:\/\//i.test(location.trim()) ? location.trim() : '';
+        const label = meetingUrl ? L(dict, '会议链接', 'Meeting link') : L(dict, '地点', 'Location');
+        const shown = meetingUrl
+          ? (() => { try { return new URL(meetingUrl).hostname.replace(/^www\./, ''); } catch { return meetingUrl; } })()
+          : location;
+        const href = meetingUrl || mapLink;
+        return (
+          <div className="nesio-node-attr-row">
+            <span className="nesio-node-attr-key">{label}</span>
+            {href
+              ? <a href={href} target="_blank" rel="noopener noreferrer" className="nesio-node-attr-val nesio-node-attr-link">{shown}</a>
+              : <span className="nesio-node-attr-val">{shown}</span>
+            }
+          </div>
+        );
+      })()}
       {participants && <InfoRow label={L(dict, '参与者', 'People')} value={participants} />}
       {/* CARD SPEC 关键信息:电商/物流类邮件事件的语义键值行(商家/类型/预计到货) */}
       <InfoRow label={L(dict, '商家', 'Merchant')} value={attr(node, 'store', 'merchant')} />
@@ -1279,6 +1291,10 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             let graph: LifeNode[] = [];
             try { graph = getLifeGraph(); } catch { /* ignore */ }
             const doors = n.tags
+              // 只有**主题**才配成门。来源标记(Flomo/Notion…)和层级前缀(「主题」)
+              // 点进去等于「全部导入内容」,没有筛选意义 —— 用户看到的
+              // 「Flomo · 1917 条」「主题 · 21 条」就是这么冒出来的。
+              .filter(isTopicTag)
               .map((t) => ({ t, count: graph.filter((x) => x.id !== n.id && x.tags?.includes(t)).length + 1 }))
               .filter((d) => d.count >= 3)
               .sort((a, b) => b.count - a.count)
