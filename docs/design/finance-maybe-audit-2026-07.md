@@ -162,8 +162,18 @@
    的 domainNet 通道扩成 domainNet+domainIncome。交易列表显示层 union。
 2. **小票不双计的实现点**:关联后 Expense 记 linkedBankTxId,`listExpenses(financeOnly)` 聚合时
    排除已关联行 —— 一行过滤,银行流水为记账层。
-3. **多币种净值先分列不折算**:房(CNY)与 Plaid(USD)不能裸加;宝盒无汇率源,净值 hero 按币种
-   分列小计(诚实),汇率折算(maybe 的 LOCF+免费源 ECB)列为后续可选。
+3. ~~多币种净值分列~~ **用户拍板(2026-07-28):不考虑币种** —— 净值简单相加,不分列不折算;
+   P0 的「七函数多币种加固」不做,现有主币种过滤原样保留。
+
+### 用户拍板与追加决策(2026-07-28)
+
+- **币种**:不考虑(上条)。
+- **Plaid `/transactions/recurring/get` 接入(P2,订阅监控)**:PFC 分类已在用;专门的定期流 API
+  未接 —— 同 token 零额外授权,策略「Plaid 流 ∪ 本地 detectRecurring,冲突本地为准」。
+- **该删/该改清单(并进各期)**:删「排除」按钮(实为归 OTHER,骗人;真排除用 excluded 标志)、
+  删屏幕版环形图(统一到月报那套)、删趋势图双重编码(留面积)、删 Sub 三个死枚举(订阅/投资
+  变真页面)、删单笔审核限制与原始 id 显示、置信度改用 suggestCategory 真值、
+  autoPersistLastMonthReport 补可见失败态、统一 includePredicted 口径、修繁体「約」。
 
 ### 继续挖掘项(开工中带着做)
 
