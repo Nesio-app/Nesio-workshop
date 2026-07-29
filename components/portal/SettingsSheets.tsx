@@ -30,6 +30,7 @@ import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
 import { canUse, getTier, hasProOverride, hasPaidPro, refreshServerEntitlement, setProEntitlement, trialDaysLeft, TIER_UPDATED_EVENT } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
 import { pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, buildCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
+import { inventoryBackup, inventorySummary, inventoryWarning } from '@/lib/portal/backup-inventory';
 import { localDayKey } from '@/lib/portal/local-day';
 
 interface SheetProps { open: boolean; onClose: () => void; }
@@ -410,6 +411,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const [deleted, setDeleted] = useState(false);
   const [deleteMsg, setDeleteMsg] = useState<string | null>(null);
   const [restoreMsg, setRestoreMsg] = useState('');
+  const [exportWarn, setExportWarn] = useState<string | null>(null); // 导出装箱单里主数据为空时的提醒
   const [exportBusy, setExportBusy] = useState(false);
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
@@ -560,9 +562,11 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     if (exportBusy) return;
     setExportBusy(true);
     setRestoreMsg('');
+    setExportWarn(null);
     try {
       const backup = await buildCombinedBackup({ includeImages: true });
-      const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+      const payload = JSON.stringify(backup);
+      const blob = new Blob([payload], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -571,7 +575,11 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
-      setRestoreMsg(L(dict, '✓ 已导出到本机', '✓ Exported to your device'));
+      // 装箱单回执:「随时导出你的全部数据」是承诺,**无法验证的承诺等于没有承诺**。
+      // 导完就地报清各主数据条数;主数据空了显式提醒(多半是这台设备没同步完)。
+      const inv = inventoryBackup(backup.entries, blob.size);
+      setRestoreMsg(inventorySummary(inv, dict));
+      setExportWarn(inventoryWarning(inv, dict));
     } catch {
       setRestoreMsg(L(dict, '导出失败,请重试', 'Export failed — please try again'));
     } finally {
@@ -784,6 +792,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       </button>
       <input ref={importRef} type="file" accept="application/json,.json" hidden onChange={handleImportFile} />
       {restoreMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
+      {exportWarn && <p style={{ fontSize: '0.75rem', marginTop: 4, lineHeight: 1.6, color: 'var(--status-gentle)' }}>{exportWarn}</p>}
 
       <button type="button" className="nesio-settings-danger-btn" onClick={clearAllMemory}>
         {deleted ? L(dict, '✓ 已清除', '✓ Cleared') : L(dict, '清除所有 Memory', 'Clear all memories')}
