@@ -18,6 +18,7 @@ import {
 import { DormantReviewCard } from './DormantReviewCard';
 import { PinnedAttentionCard, CollapsedCalItem } from './CalendarCards';
 import { isMeetingNode } from './meeting-node';
+import { recordCardVerdict, isCardSuppressed } from '@/lib/portal/card-verdict';
 import { FocusCardDetail, FOCUS_TYPE_ICON } from './FocusCardDetail';
 import { MeetingRecorderSheet } from './MeetingRecorderSheet';
 import MemoryFlashBanner, { useMemoryFlash } from '../MemoryFlashBanner';
@@ -199,14 +200,20 @@ export function TodayFocusSection({
     taskIds: rawTaskNodes.map((n) => n.id),
     guidanceClaims: guidanceNodeIds ?? [],
   });
-  const taskNodes = rawTaskNodes.filter((n) => verdict.taskIds.includes(n.id));
+  const taskNodes = rawTaskNodes
+    .filter((n) => verdict.taskIds.includes(n.id))
+    // 裁决层消费端:「没用」过的节点不再占今天(跨天生效,不只当天)
+    .filter((n) => !isCardSuppressed({ cardId: n.id, factKey: n.id }));
 
   // 置顶结果回传组合根(TodayFeed 隐藏被置顶抢占的引导卡)
   const pinnedIdForReport = pinned?.id ?? null;
   useEffect(() => { onPinnedResolved?.(pinnedIdForReport); }, [pinnedIdForReport, onPinnedResolved]);
 
   // ── Special days (today / tomorrow) ──
-  const nearSpecialDays = specialDays.filter((d) => d.daysUntil <= 1);
+  // 纪念日此前从不查裁决(任务节点查了它没查)—— 静音过的生日照样回来。补上。
+  const nearSpecialDays = specialDays
+    .filter((d) => d.daysUntil <= 1)
+    .filter((d) => !isCardSuppressed({ cardId: d.nodeId, factKey: d.nodeId }));
 
   const showDormant = verdict.showDormant && dormantCandidate && !dormantDismissed.has(dormantCandidate.node.id);
 
@@ -225,6 +232,9 @@ export function TodayFocusSection({
   // 并当天从今天移除(持久化,次日不复活缠人)。不删节点 —— 记忆页仍在,只是不占今天。
   function handleNotUseful(id: string) {
     recordCardFeedback(id, 'wrong');
+    // 接裁决层(Today 审计 2026-07-29):此前只当天移除 = 和主动卡修之前一样的死路。
+    // 「没用」= 该节点事实没变就别再占今天(mute 按 id 永久,节点在记忆页仍在)。
+    recordCardVerdict({ cardId: id, factKey: id }, 'mute');
     setDismissed((prev) => { const next = new Set(prev); next.add(id); persistDismissed(next); return next; });
   }
 

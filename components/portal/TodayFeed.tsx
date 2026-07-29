@@ -10,12 +10,6 @@ import { usePortalLocale } from './use-portal-locale';
 import { L } from '@/lib/portal/i18n';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, deleteFocusNode, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem, getLiveMemoryNode, type LiveMemoryNode } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
-import {
-  loadDormantStore, evaluateDormancy, selectReviewCandidate, applyReviewAction,
-  touchNode, getReviewTier,
-  type DormantStore, type DormantCandidate,
-} from '@/lib/platform/dormant-engine';
-import { recordCardFeedback, type EvidenceRef } from '@/lib/portal/reasoning-engine';
 import { dismissJudgedCard } from '@/lib/portal/guidance-judge-auto';
 import { resolveCardTarget, openCardTarget } from '@/lib/portal/card-target';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
@@ -31,7 +25,6 @@ import { DailyReportCard } from './today/DailyReportCard';
 import { ThawedReminder } from './today/ThawedReminder';
 import { ReengageNudgeCard } from './today/ReengageNudgeCard';
 import { TodayFocusSection } from './today/FocusSection';
-import { NightTimeline } from './today/NightTimeline';
 import { useTodayData } from './today/useTodayData';
 import { FocusModeSheet } from './today/FocusModeSheet';
 import { MeetingRecorderSheet } from './today/MeetingRecorderSheet';
@@ -299,6 +292,10 @@ export default function TodayFeed({
   const hourNow = new Date().getHours();
   const isEvening = hourNow >= 21;
   const cardBudget = Math.min(3, getProactiveCardBudget(), isEvening ? 2 : 1);
+  // 「安静」模式(getProactiveCardBudget()===0)此前只管判决卡 —— 回顾/Wrapped/回访/例行/实验
+  // 五张旁路 nudge 卡照出不误,用户设了安静还是被打扰(Today 审计 2026-07-29)。
+  // 日报(显式开关)/解冻(用户自设承诺)/家庭(共享义务)不属打扰,不受此闸。
+  const quietAll = getProactiveCardBudget() === 0;
   // 架构审查 #2:统一仲裁 —— 置顶抢占的节点,其引导卡不再重复出现
   const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null);
   const guidanceNodeIds = useMemo(() => proactiveCards.map((c) => c.nodeId).filter((x): x is string => Boolean(x)), [proactiveCards]);
@@ -428,16 +425,16 @@ export default function TodayFeed({
 
         {/* 批次 105:回顾卡(去年今日)—— 念念翻出一条旧记忆,放问候下面(设计规范今天页第 2 段)。
             周年/月纪念优先;没有符合的不渲染。点开复用 MemoryNodeDetail。 */}
-        <RetrospectCard onOpen={(id) => { const live = getLiveMemoryNode(id); if (live) setGuideDetailNode(live); }} />
+        {!quietAll && <RetrospectCard onOpen={(id) => { const live = getLiveMemoryNode(id); if (live) setGuideDetailNode(live); }} />}
 
         {/* 季度 Wrapped 卡片 */}
-        {showWrapped && <WrappedCard onDismiss={dismissWrapped} />}
+        {!quietAll && showWrapped && <WrappedCard onDismiss={dismissWrapped} />}
 
         {/* 每日图文日报(未来预测区首张;仅登录 + 开关开 + 有内容时,todayReport 已受私据门)*/}
         {canUsePrivateData && <DailyReportCard report={todayReport} />}
 
         {/* 回访再触达:来过好几回但某功能没碰过 → 轻轻探一句(全局两天一条,可稍后/不再提醒)*/}
-        {canUsePrivateData && (
+        {canUsePrivateData && !quietAll && (
           <ReengageNudgeCard
             nodes={allNodes}
             onOpenInsights={() => window.dispatchEvent(new CustomEvent('nesio-open-insights'))}
@@ -524,8 +521,8 @@ export default function TodayFeed({
             记一笔输入内联进时间线「记一笔·话筒」节点(唯一极简输入入口)。 */}
 
         {/* 实验打卡(批次 8:按用户要求放到最下面) */}
-        <RoutineDueCards />
-        <ExperimentCheckinCard />
+        {!quietAll && <RoutineDueCards />}
+        {!quietAll && <ExperimentCheckinCard />}
 
         {/* 批次 169:用户实锤去掉底部「想到什么…」提示行 */}
       </div>
