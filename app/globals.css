@@ -7223,22 +7223,13 @@ html[data-portal-theme="night"] .nesio-ob-input {
 .nesio-ob-input::placeholder { color: var(--portal-muted); }
 
 /* Buttons */
+/* 尺寸/颜色/圆角/按下反馈都已并到 Button 原语那批声明里(见上面的选择器分组)。
+   这里只剩它**自己的布局职责**:表单里一列按钮之间的外边距。
+   投影原来写死 rgba(88,140,227,.35) —— 换到灰粉皮肤就是蓝影子配陶红按钮,改成派生。 */
 .nesio-ob-primary-btn {
-  width: 100%;
-  padding: 0.85rem;
-  background: var(--portal-blue-deep);
-  color: #fff;
-  border-radius: 999px;
-  font-size: 0.92rem;
-  font-weight: 700;
-  text-align: center;
-  box-shadow: 0 4px 16px rgba(88, 140, 227, 0.35);
-  transition: opacity 0.15s, transform 0.15s;
-  margin-bottom: 0.6rem;
+  margin-bottom: var(--space-3);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--portal-accent) 32%, transparent);
 }
-
-.nesio-ob-primary-btn:disabled { opacity: 0.45; }
-.nesio-ob-primary-btn:not(:disabled):active { transform: scale(0.97); }
 
 .nesio-ob-auth-btn {
   width: 100%;
@@ -19754,7 +19745,12 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
    这里是那份契约唯一的样式落点:尺寸、圆角、字号、按下反馈全部走 token,
    颜色跟随当前皮肤。新板块直接用 <Button>,不要再起新类。
    ══════════════════════════════════════════════════════════════════ */
-.nesio-btn {
+/* 旧类桥接:.nesio-ob-primary-btn 是全站最大的一套自造主按钮(41 处调用)。
+   不改那 41 处 JSX,而是把它挂到**同一批声明**上 —— 值从此只有一处,
+   视觉立刻和 <Button variant="primary" size="lg" full> 一致,零回归风险。
+   调用点可以之后一批批换成 <Button>,换完就把这里的旧类名删掉。 */
+.nesio-btn,
+.nesio-ob-primary-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -19770,15 +19766,19 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   transition: opacity var(--motion-fast, 120ms) ease, transform var(--motion-fast, 120ms) ease;
   -webkit-tap-highlight-color: transparent;
 }
-.nesio-btn--pill { border-radius: var(--radius-pill); }
-.nesio-btn--full { width: 100%; }
+.nesio-btn--pill,
+.nesio-ob-primary-btn { border-radius: var(--radius-pill); }
+.nesio-btn--full,
+.nesio-ob-primary-btn { width: 100%; }
 /* 按下给一点回弹 —— 但尊重「减少动态效果」 */
-.nesio-btn:active { transform: scale(0.97); }
+.nesio-btn:active,
+.nesio-ob-primary-btn:not(:disabled):active { transform: scale(0.97); }
 @media (prefers-reduced-motion: reduce) {
   .nesio-btn { transition: none; }
   .nesio-btn:active { transform: none; }
 }
-.nesio-btn:disabled { opacity: 0.45; cursor: default; }
+.nesio-btn:disabled,
+.nesio-ob-primary-btn:disabled { opacity: 0.45; cursor: default; }
 .nesio-btn:disabled:active { transform: none; }
 .nesio-btn-icon { display: inline-flex; align-items: center; flex-shrink: 0; }
 
@@ -19786,10 +19786,12 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
    (相机那对以前是 0.5rem/0.78rem 配 0.55rem/0.8rem,肉眼就能看出错位)。 */
 .nesio-btn--sm { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
 .nesio-btn--md { padding: 0.55rem var(--space-4); font-size: var(--text-sm); }
-.nesio-btn--lg { padding: var(--space-3) var(--space-5); font-size: var(--text-body); }
+.nesio-btn--lg,
+.nesio-ob-primary-btn { padding: var(--space-3) var(--space-5); font-size: var(--text-body); }
 
 /* 四种变体。颜色一律从 --portal-accent / --status-risk 派生,换皮肤自动跟随。 */
-.nesio-btn--primary {
+.nesio-btn--primary,
+.nesio-ob-primary-btn {
   background: var(--portal-accent);
   color: var(--portal-on-accent, #fff);
 }

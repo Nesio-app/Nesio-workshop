@@ -64,23 +64,26 @@ const CSS = read('app/globals.css');
 
 // ── ② 每个变体 × 每个尺寸都得有样式,不能渲染成裸按钮 ─────────────────────────
 {
+  // 允许选择器分组:旧类(如 .nesio-ob-primary-btn)会被挂到同一批声明上做桥接,
+  // 那时选择器长这样 `.nesio-btn--lg,\n.nesio-ob-primary-btn {` —— 只认独占一行会假红。
+  const hasRule = (cls) => new RegExp(`\\${cls}\\s*[,{]`).test(CSS);
   for (const v of ['primary', 'secondary', 'soft', 'ghost']) {
-    assert.ok(CSS.includes(`.nesio-btn--${v} {`), `变体 ${v} 没有样式 —— 会渲染成浏览器默认按钮`);
+    assert.ok(hasRule(`.nesio-btn--${v}`), `变体 ${v} 没有样式 —— 会渲染成浏览器默认按钮`);
   }
   for (const s of ['sm', 'md', 'lg']) {
-    assert.ok(CSS.includes(`.nesio-btn--${s} {`), `尺寸 ${s} 没有样式`);
+    assert.ok(hasRule(`.nesio-btn--${s}`), `尺寸 ${s} 没有样式`);
   }
   assert.ok(CSS.includes('.nesio-btn--risk.nesio-btn--primary'), 'risk 语气没有样式');
 }
 
 // ── ③ 尺寸和颜色一律走 token(这正是「不统一」的病根)───────────────────────
 {
-  const at = CSS.indexOf('.nesio-btn {');
+  const at = CSS.search(/\n\.nesio-btn[,{ ]/);
   assert.ok(at > 0, 'Button 基础样式不见了');
   const block = CSS.slice(at, CSS.indexOf('/* ══', at + 10) > 0 ? CSS.indexOf('/* ══', at + 10) : at + 4000);
   // 三档尺寸的字号必须是 token —— 写死 rem 就是「两个挨着的按钮差一截」的来源
   for (const s of ['sm', 'md', 'lg']) {
-    const m = new RegExp(`\\.nesio-btn--${s} \\{[^}]*font-size:\\s*var\\(--text-`).test(block);
+    const m = new RegExp(`\\.nesio-btn--${s}[,\\s][^{]*\\{[^}]*font-size:\\s*var\\(--text-`).test(block);
     assert.ok(m, `尺寸 ${s} 的字号没走 --text-* token`);
   }
   // 颜色必须从当前皮肤派生,不许写死
@@ -96,8 +99,8 @@ const CSS = read('app/globals.css');
 {
   // 要带花括号:只搜 '.nesio-btn:disabled' 会被下面那条
   // `.nesio-btn:disabled:active { transform: none }` 喂饱(变异测试抓到的)。
-  assert.ok(/\.nesio-btn:disabled \{/.test(CSS), '禁用态没有样式 —— 看不出按钮不能点');
-  assert.ok(CSS.includes('.nesio-btn:active'), '没有按下反馈');
+  assert.ok(/\.nesio-btn:disabled[,\s][^{]*\{/.test(CSS), '禁用态没有样式 —— 看不出按钮不能点');
+  assert.ok(/\.nesio-btn:active[,\s]/.test(CSS), '没有按下反馈');
   assert.ok(
     /prefers-reduced-motion[\s\S]{0,220}\.nesio-btn:active \{ transform: none/.test(CSS),
     '按下的缩放没有尊重「减少动态效果」',
@@ -148,6 +151,30 @@ const CSS = read('app/globals.css');
   );
   // 颜色跟皮肤走
   assert.ok(/background:\s*var\(--glass-bg-/.test(blk), '.nesio-glass 的底色没走 token');
+}
+
+// ── ⑦ 旧类桥接:最大的一套自造主按钮已并到原语的声明上 ──────────────────────
+// .nesio-ob-primary-btn 有 41 处调用,一次改 41 处 JSX 风险大;
+// 先把它挂到 Button 原语**同一批声明**上(CSS 选择器分组),值从此只有一处、
+// 视觉立刻统一、零回归。调用点之后一批批换成 <Button>,换完再删这个类名。
+{
+  const bridged = ['.nesio-btn--primary', '.nesio-btn--lg', '.nesio-btn--pill', '.nesio-btn--full'];
+  for (const sel of bridged) {
+    const re = new RegExp(`\\${sel},\\s*\\n\\.nesio-ob-primary-btn`);
+    assert.ok(re.test(CSS), `.nesio-ob-primary-btn 没有和 ${sel} 共用声明 —— 那 41 个按钮会重新长歪`);
+  }
+  // 旧类只该剩布局职责(外边距/投影),尺寸颜色不许自己再写一份
+  const at = CSS.search(/\n\.nesio-ob-primary-btn \{/);
+  assert.ok(at > 0, '.nesio-ob-primary-btn 的自有声明块不见了');
+  const own = CSS.slice(at, CSS.indexOf('}', at));
+  for (const forbidden of ['font-size', 'padding', 'background', 'border-radius', 'width']) {
+    assert.ok(
+      !own.includes(`${forbidden}:`),
+      `.nesio-ob-primary-btn 又自己写了 ${forbidden} —— 桥接就白做了,它会重新和原语分叉`,
+    );
+  }
+  // 投影也得跟皮肤走(原来写死 rgba(88,140,227,.35),灰粉皮肤下是蓝影子配陶红按钮)
+  assert.ok(!/rgba\(88, ?140, ?227/.test(own), '.nesio-ob-primary-btn 的投影又写死品牌蓝了');
 }
 
 console.log('button-primitive: OK(契约对得上 · 变体齐 · 走 token · 有禁用/按下态 · 相机已迁)');
