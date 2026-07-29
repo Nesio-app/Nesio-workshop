@@ -467,7 +467,9 @@ export default function TodayFeed({
               if (card.id.startsWith('judge-') && card.factKey) {
                 dismissJudgedCard(card.factKey);
               }
-              dismissProactiveById(card.id, card.factKey);
+              // 只记当日,不带 factKey —— 带了就是按指纹永久静音,会把「喜欢」「稍后」也一并
+              // 永久闭嘴(用户实锤审计 2026-07-29)。永久语义只属于「没用」(card-verdict mute)。
+              dismissProactiveById(card.id);
               setDismissedCardIds((prev) => { const next = new Set(prev); next.add(card.id); return next; });
             }}
             onMarkDone={(nodeId) => markFocusNodeDone(nodeId)}

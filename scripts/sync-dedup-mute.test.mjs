@@ -83,7 +83,10 @@ assert.doesNotMatch(
 
 // 调用点传的必须是 factKey(否则新语义形同虚设)
 const feed = fs.readFileSync(new URL('../components/portal/TodayFeed.tsx', import.meta.url), 'utf8');
-assert.match(feed, /dismissProactiveById\(card\.id, card\.factKey\)/, '关闭时要带上事实指纹');
+// 2026-07-29 语义修正:关闭(含喜欢/稍后的收尾)只记当日,**不带指纹** ——
+// 带了就是永久静音,「喜欢」会反向变成永久闭嘴。永久语义只走 card-verdict 的 mute。
+assert.match(feed, /dismissProactiveById\(card\.id\);/, '关闭只记当日,不做指纹永久静音');
+assert.ok(!/dismissProactiveById\(card\.id, card\.factKey\)/.test(feed), '喜欢/稍后不得落入指纹永久静音');
 const todayData = fs.readFileSync(new URL('../components/portal/today/useTodayData.ts', import.meta.url), 'utf8');
 assert.match(todayData, /isProactiveCardDismissed\(c\.id, c\.factKey\)/, '过滤时也要带指纹');
 // 硬拆后(2026-07-29):润色层已删,同一条不变式换了形态 ——

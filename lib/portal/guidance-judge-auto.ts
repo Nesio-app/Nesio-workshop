@@ -209,10 +209,11 @@ export function collectJudgeSignals(input: JudgeSignalInput, now: Date = new Dat
     signals.push({ fingerprint: judgeFingerprint('plaid', liab.accountId, fields), source: 'plaid', fields });
   }
 
+  // 物品效期窗 30 天(药/化妆品/食品一视同仁 —— 用效期字段说话,不分类)。
   for (const item of input.inventoryItems || []) {
     if (!item.expiry) continue;
     const expMs = Date.parse(`${item.expiry}T00:00:00`);
-    if (Number.isNaN(expMs) || expMs < now.getTime() - DAY_MS || expMs > horizon) continue;
+    if (Number.isNaN(expMs) || expMs < now.getTime() - DAY_MS || expMs > now.getTime() + 30 * DAY_MS) continue;
     const fields = { name: item.name.slice(0, 120), expiry: item.expiry, location: item.location?.slice(0, 80) ?? null };
     signals.push({ fingerprint: judgeFingerprint('inventory', item.id, fields), source: 'inventory', fields, anchorId: item.id });
   }
@@ -224,13 +225,14 @@ export function collectJudgeSignals(input: JudgeSignalInput, now: Date = new Dat
     signals.push({ fingerprint: judgeFingerprint('domain', id, fields), source: 'domain', fields });
   }
 
-  // 记忆节点:只收带日期且日期在窗口内的(title/date 是指纹字段,正文只作判断素材)。
+  // 记忆节点:只收带日期的。窗放到 180 天 —— 护照/签证/保修这类长周期续期必须早进判决
+  // (AI 会给合适的 showFrom 提前量;14 天窗会把「2027 年到期的护照」拦到只剩两周才说,太晚)。
   for (const n of input.memoryNodes || []) {
     const a = n.attributes || {};
     const date = String(a.date ?? a.dueDate ?? a.eventDate ?? a.expiry ?? '');
     if (!date) continue;
     const dateMs = Date.parse(date);
-    if (Number.isNaN(dateMs) || dateMs < now.getTime() - DAY_MS || dateMs > horizon) continue;
+    if (Number.isNaN(dateMs) || dateMs < now.getTime() - DAY_MS || dateMs > now.getTime() + 180 * DAY_MS) continue;
     const fields = { title: n.name.slice(0, 200), date, detail: (n.rawInput || '').slice(0, 400) };
     signals.push({ fingerprint: judgeFingerprint('memory', n.id, fields), source: 'memory', fields, anchorId: n.id });
   }
@@ -323,7 +325,13 @@ export async function maybeRunJudgeBatch(
   const judged = new Set(ledger.judged);
   // 取数是惰性的:interval 闸先挡,免得每次渲染都跑一遍 gatherDomainInsights/listInventoryItems。
   const resolved = typeof input === 'function' ? input() : input;
-  const fresh = collectJudgeSignals(resolved, now).filter((s) => !judged.has(s.fingerprint));
+  const collected = collectJudgeSignals(resolved, now);
+  // 长周期催办:卡的窗口走完了、但源信号还活着(护照还没到期/账单还没过)→ 摘出重判。
+  // AI 按新的时间距离给新窗 —— 提前 90 天说一次、30 天再说、7 天再说,自然形成阶梯。
+  // 被静音的不受影响:重判产出同指纹卡,静音门照拦(承诺①不被绕过)。
+  const today = localDayISO(now);
+  const expiredFps = new Set(ledger.cards.filter((c) => c.showUntil < today).flatMap((c) => c.fingerprints));
+  const fresh = collected.filter((s) => !judged.has(s.fingerprint) || expiredFps.has(s.fingerprint));
   if (fresh.length === 0) {
     writeLedger({ ...ledger, lastRunAt: now.toISOString() });
     return { status: 'skipped', note: 'no-new-signals' };
@@ -427,7 +435,7 @@ export async function maybeRunJudgeBatch(
     );
 
     writeLedger({
-      judged: [...ledger.judged, ...batch.map((s) => s.fingerprint)],
+      judged: Array.from(new Set([...ledger.judged, ...batch.map((s) => s.fingerprint)])),
       cards: nextCards,
       lastRunAt: now.toISOString(),
       stats: {
