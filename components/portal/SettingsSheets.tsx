@@ -278,13 +278,14 @@ export const ToneSheet = GeneralSheet;
 // ── 档案(批次 138·设计「档案与账户分开」):昵称 + 头像,从账户拆出 ──
 // 图3:ProfileSheet(档案页)已删除 —— 昵称与更换头像并入 AccountSheet(账户)。
 
-// ── 外观与语言(批次 138:从通用拆出;明暗 + 语言。配色仍在「数据与隐私·实验功能」预览门控下)──
+// ── 外观与语言(批次 138:从通用拆出;明暗 + 字号 + 语言。2026-07-29:配色色卡从 Lab 搬进来)──
 export function AppearanceSheet({ open, onClose }: SheetProps) {
   const locale = usePortalLocale();
   const dict = portalLocaleToDictionaryLocale(locale);
   const [theme, setTheme] = useState<ThemeChoice>('auto');
   const [themeSaveIssue, setThemeSaveIssue] = useState('');
   const [fontScale, setFontScale] = useState<FontScale>('md');
+  const [palette, setPaletteState] = useState<PaletteId>('');
 
   useEffect(() => {
     if (!open) return;
@@ -292,6 +293,7 @@ export function AppearanceSheet({ open, onClose }: SheetProps) {
       const th = localStorage.getItem(THEME_KEY);
       setTheme(th === 'day' || th === 'night' ? th : 'auto');
       setFontScale(getFontScale());
+      setPaletteState(getPalette());
     } catch { /* ignore */ }
   }, [open]);
 
@@ -342,6 +344,29 @@ export function AppearanceSheet({ open, onClose }: SheetProps) {
       {themeSaveIssue && (
         <p style={{ marginTop: '0.4rem', fontSize: '0.76rem', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
       )}
+
+      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>
+        {L(dict, '配色', 'Palette')}
+        <InfoTip text={L(dict, '点一张即时全站换装,再点「默认蓝」还原。', 'Tap a card to reskin instantly; tap Default blue to restore.')} />
+      </p>
+      <div className="nesio-palette-grid">
+        {/* 默认蓝 */}
+        <button type="button"
+          className={`nesio-palette-card${palette === '' ? ' nesio-palette-card--on' : ''}`}
+          onClick={() => { setPalette(''); setPaletteState(''); }}>
+          <span className="nesio-palette-sw" data-p="default" />
+          <span className="nesio-palette-name">{L(dict, '默认蓝', 'Default blue')}</span>
+        </button>
+        {PALETTES.map((p) => (
+          <button key={p.id} type="button"
+            className={`nesio-palette-card${palette === p.id ? ' nesio-palette-card--on' : ''}`}
+            onClick={() => { setPalette(p.id); setPaletteState(p.id); }}>
+            <span className="nesio-palette-sw" data-p={p.id} />
+            <span className="nesio-palette-name">{L(dict, p.zh, p.en)}</span>
+            <span className="nesio-palette-hint">{p.hint}</span>
+          </button>
+        ))}
+      </div>
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '字体大小', 'Text size')}<InfoTip text={L(dict, '整体放大界面文字与间距;标准 = 跟随系统设置。', 'Scales the whole UI text & spacing; Standard = follow system.')} /></p>
       <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -774,12 +799,15 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           : L(dict, '存到 Nesio 云(登录即用,免费跨端同步 —— 换浏览器也拉得回)。', 'Saved to Nesio cloud (free once you sign in; syncs across devices, so a new browser can pull it back).')}
       </p>
 
+      {/* 2026-07-29:备份/恢复并成一组 —— 平时做的是「备份」,「恢复」是出事那天才用一次。
+          两个等重的整行按钮并排,等于让不常用的那个天天占同样的分量。
+          主动作实心整行,反向动作降成一行文字链。导出/导入同理(见下)。 */}
       <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleBackupChosen} disabled={cloudState === 'pushing' || driveState === 'busy'}>
         {(cloudState === 'pushing' || driveState === 'busy') ? L(dict, '正在备份…', 'Backing up…') : L(dict, '备份', 'Back up')}
       </Button>
-      <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleRestoreChosen} disabled={cloudRestoreState === 'pulling' || driveState === 'busy'}>
-        {(cloudRestoreState === 'pulling') ? L(dict, '正在恢复…', 'Restoring…') : L(dict, '从云恢复', 'Restore from cloud')}
-      </Button>
+      <button type="button" className="nesio-settings-inline-link" onClick={handleRestoreChosen} disabled={cloudRestoreState === 'pulling' || driveState === 'busy'}>
+        {(cloudRestoreState === 'pulling') ? L(dict, '正在恢复…', 'Restoring…') : L(dict, '从云恢复 ›', 'Restore from cloud ›')}
+      </button>
       {/* 状态:仅当前所用目的地会填充 */}
       {cloudState === 'done' && (
         <p style={{ fontSize: '0.75rem', marginTop: 4, color: 'var(--status-go)' }}>
@@ -801,24 +829,35 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleExportLocal} disabled={exportBusy}>
         {exportBusy ? L(dict, '正在导出…', 'Exporting…') : L(dict, '导出全部(记忆 + 学到的偏好,下载 JSON)', 'Export everything (memories + learned prefs, JSON)')}
       </Button>
-      <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}>
-        {L(dict, '导入备份', 'Import backup')}
-      </Button>
+      <button type="button" className="nesio-settings-inline-link" onClick={() => importRef.current?.click()}>
+        {L(dict, '导入备份 ›', 'Import backup ›')}
+      </button>
       <input ref={importRef} type="file" accept="application/json,.json" className="nesio-visually-hidden" onChange={handleImportFile} />
       {restoreMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
 
-      <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={clearAllMemory}>
-        {deleted ? L(dict, '✓ 已清除', '✓ Cleared') : L(dict, '清除所有 Memory', 'Clear all memories')}
-      </Button>
-      <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" style={{ marginTop: '0.4rem', opacity: 0.85 }} onClick={clearAllLocalData}>
-        {L(dict, '彻底删除本机全部数据', 'Delete all local data')}
-      </Button>
+      {/* 2026-07-29:三个红按钮原来是平铺的,一屏三条红 —— CLAUDE.md 红线明写「不用红色制造焦虑」,
+          而且这三件事一年也未必做一次,却天天占着视线。收进一个入口,点开才展开。
+          注意用 <details> 而不是 state:折叠这件事不需要 React 参与,原生元素自带无障碍语义。 */}
+      <details className="nesio-settings-danger-zone">
+        <summary className="nesio-settings-danger-summary">
+          {L(dict, '删除数据', 'Delete data')}
+          <span className="nesio-settings-option-hint" style={{ display: 'block', marginTop: '0.2rem' }}>
+            {L(dict, '清除记忆 / 删本机数据 / 删账号 —— 点开选', 'Clear memories / wipe this device / delete account')}
+          </span>
+        </summary>
 
-      {/* App Store 5.1.1 强制:App 内账号删除(云端 + 本机 + 登出)。 */}
-      <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" style={{ marginTop: '0.4rem' }} onClick={deleteAccountAndData}>
-        {L(dict, '删除账号与云端数据', 'Delete account & cloud data')}
-      </Button>
-      {deleteMsg && <p className="nesio-settings-option-hint" style={{ margin: '0.4rem 0 0', color: 'var(--status-risk)' }}>{deleteMsg}</p>}
+        <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={clearAllMemory}>
+          {deleted ? L(dict, '✓ 已清除', '✓ Cleared') : L(dict, '清除所有 Memory', 'Clear all memories')}
+        </Button>
+        <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" style={{ opacity: 0.85 }} onClick={clearAllLocalData}>
+          {L(dict, '彻底删除本机全部数据', 'Delete all local data')}
+        </Button>
+        {/* App Store 5.1.1 强制:App 内账号删除(云端 + 本机 + 登出)。 */}
+        <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={deleteAccountAndData}>
+          {L(dict, '删除账号与云端数据', 'Delete account & cloud data')}
+        </Button>
+        {deleteMsg && <p className="nesio-settings-option-hint" style={{ margin: '0.4rem 0 0', color: 'var(--status-risk)' }}>{deleteMsg}</p>}
+      </details>
 
       {/* 图3:原顶部说明整段挪到最下面收尾 */}
       <p className="nesio-settings-sheet-desc" style={{ marginTop: '1.5rem', marginBottom: 0 }}>{L(dict, '只整理你放进来的内容。你可以看见它记住了什么、存在哪、也可以随时删除。', 'Only what you put in gets organized. You can see what it remembers, where it lives, and delete it anytime.')}</p>
@@ -940,32 +979,9 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
         <span className="nesio-settings-option-hint" aria-hidden style={{ fontSize: '1.1rem' }}>›</span>
       </button>
 
-      <div className="nesio-settings-option" style={{ display: 'block' }}>
-        <span className="nesio-settings-option-label">
-          {L(dict, `低饱和配色(预览)${palette ? ' · 已开启' : ''}`, `Low-saturation palette (preview)${palette ? ' · on' : ''}`)}
-        </span>
-        <span className="nesio-settings-option-hint">
-          {L(dict, '莫兰迪 4 套色卡,点一张即时全站换装,再点「默认蓝」还原。', 'Four Morandi palettes — tap a card to reskin instantly; tap Default blue to restore.')}
-        </span>
-        <div className="nesio-palette-grid">
-          {/* 默认蓝 */}
-          <button type="button"
-            className={`nesio-palette-card${palette === '' ? ' nesio-palette-card--on' : ''}`}
-            onClick={() => { setPalette(''); setPaletteState(''); }}>
-            <span className="nesio-palette-sw" data-p="default" />
-            <span className="nesio-palette-name">{L(dict, '默认蓝', 'Default blue')}</span>
-          </button>
-          {PALETTES.map((p) => (
-            <button key={p.id} type="button"
-              className={`nesio-palette-card${palette === p.id ? ' nesio-palette-card--on' : ''}`}
-              onClick={() => { setPalette(p.id); setPaletteState(p.id); }}>
-              <span className="nesio-palette-sw" data-p={p.id} />
-              <span className="nesio-palette-name">{L(dict, p.zh, p.en)}</span>
-              <span className="nesio-palette-hint">{p.hint}</span>
-            </button>
-          ))}
-        </div>
-      </div>
+      {/* 2026-07-29:配色色卡搬到「外观与语言」。
+          它是**日常设置**(和明暗、字号、语言并列),不是实验功能 ——
+          藏在 Lab 里既难找,又让「点一张即时全站换装」这句承诺看着像内测玩具。 */}
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.5rem' }}>{L(dict, '功能开关中心', 'Feature switches')}</p>
       <p className="nesio-settings-option-hint" style={{ margin: '0 0 0.6rem' }}>

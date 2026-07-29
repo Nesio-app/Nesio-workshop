@@ -6,7 +6,12 @@ import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import dynamic from 'next/dynamic';
 import TodayFeed from './TodayFeed';
 import MemoryTab from './MemoryTab';
-import TellNesioSheet, { type CaptureMode } from './TellNesioSheet';
+/**
+ * 2026-07-29:删掉 TellNesioSheet(点中间键先弹「拍/说/收」三个扇形按钮那一层)。
+ * 中间键现在**一按直达相机**;另外两个动作在别处本来就有更近的入口
+ * (说 = 输入框右边的话筒,收 = 输入框左边的「+」)。这一层是纯中转,删掉少一次点击。
+ */
+type CaptureMode = 'camera' | 'voice' | 'share';
 import PortalBottomNav from './PortalBottomNav';
 import PortalOnboarding from './PortalOnboarding';
 import InstallPrompt from './InstallPrompt';
@@ -96,7 +101,7 @@ const FIRST_MEMORY_RECEIPT_KEY = 'nesio-first-memory-receipt-shown-v1';
 const HAPTIC_FEEDBACK_KEY = 'nesio-haptic-feedback-enabled-v1';
 const ASK_GUIDE_KEY = 'nesio-ask-guide-seen-v1';
 
-type ActiveSurface = 'today' | 'tell' | 'memory';
+type ActiveSurface = 'today' | 'memory';
 type AuthSessionPayload = {
   ok?: boolean;
   user?: { id?: string; email?: string };
@@ -828,7 +833,6 @@ export default function Portal() {
 
   // Allow TodayFeed empty state / other surfaces to open Tell Nesio or capture directly
   useEffect(() => {
-    const handler = () => setActiveSurface((s) => s === 'tell' ? 'today' : 'tell');
     const voiceHandler = () => { track('capture_voice_open'); setCaptureMode('voice'); };
     const moodHandler = () => { track('mood_open'); setMoodOpen(true); };
     const freezeHandler = () => {
@@ -894,7 +898,6 @@ export default function Portal() {
     };
     window.addEventListener('nesio-memory-search', memorySearchHandler);
     window.addEventListener('nesio-pro-gate', proGateHandler);
-    window.addEventListener('nesio-open-tell', handler);
     window.addEventListener('nesio-open-voice', voiceHandler);
     window.addEventListener('nesio-open-mood', moodHandler);
     window.addEventListener('nesio-open-freeze', freezeHandler);
@@ -912,7 +915,6 @@ export default function Portal() {
     return () => {
       window.removeEventListener('nesio-memory-search', memorySearchHandler);
       window.removeEventListener('nesio-pro-gate', proGateHandler);
-      window.removeEventListener('nesio-open-tell', handler);
       window.removeEventListener('nesio-open-voice', voiceHandler);
       window.removeEventListener('nesio-open-mood', moodHandler);
       window.removeEventListener('nesio-open-freeze', freezeHandler);
@@ -1306,27 +1308,14 @@ export default function Portal() {
             <TodayFeed canUsePrivateData={canViewPrivateData} onOpenMemory={() => setActiveSurface('memory')} />
           )}
           {!onboardingActive && activeSurface === 'memory' && <MemoryTab canUsePrivateData={canViewPrivateData} />}
-          {!onboardingActive && activeSurface === 'tell' && (
-            <TodayFeed canUsePrivateData={canViewPrivateData} onOpenMemory={() => setActiveSurface('memory')} />
-          )}
         </div>
-
-        <TellNesioSheet
-          open={activeSurface === 'tell'}
-          onClose={() => setActiveSurface('today')}
-          onCapture={(mode, file) => {
-            if (mode === 'voice') setVoiceIntent('note');
-            if (mode === 'camera') setCameraFile(file ?? null);
-            setCaptureMode(mode);
-          }}
-        />
 
         {!onboardingActive && (
           <PortalBottomNav
             activeSurface={activeSurface}
             locale={locale}
             onToday={() => setActiveSurface('today')}
-            onTell={() => setActiveSurface(activeSurface === 'tell' ? 'today' : 'tell')}
+            onCamera={(file) => { setCameraFile(file); setCaptureMode('camera'); }}
             onAsk={handleAskFromCenterButton}
             onInsights={() => { setInsightsTab(undefined); setInsightsOpen(true); }}
             insightsActive={insightsOpen}

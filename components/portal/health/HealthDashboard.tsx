@@ -230,6 +230,16 @@ function MoodCard({ mood, dict }: { mood: MoodAnalysis; dict: string }) {
         </svg>
       )}
       <span className="nesio-health-card-range">{L(dict, `近 ${d.length} 天 · ${mood.count} 次记录`, `${d.length}d · ${mood.count} logs`)}</span>
+      {/* 2026-07-29:「这周趋势」从今天页搬到这里。
+          今天页那一拍讲的是**此刻**,回顾走势不属于那儿;而这张卡本来就在讲情绪,
+          趋势面板是它的自然下一层。原来那个入口挂在今天页,等于把「看过去」塞进了「现在」。 */}
+      <button
+        type="button"
+        className="nesio-health-card-link"
+        onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-mood-trend'))}
+      >
+        {L(dict, '看这周趋势 ›', 'This week ›')}
+      </button>
     </div>
   );
 }

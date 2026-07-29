@@ -93,6 +93,10 @@ export default function MoodTrendSheet({ open, onClose }: { open: boolean; onClo
   return (
     <NesioSheet
       variant="bottom"
+      // 2026-07-29:趋势入口从今天页搬到了健康页(洞察是 fullscreen 浮层)。
+      // 普通 bottom 是 z-901,会被洞察那层整个盖住 —— 表现是「点了没反应」,
+      // 而这个坑本会话已经踩过一次(收纳页从洞察打开时同样被盖)。抬到 941。
+      elevated
       open={open}
       onOpenChange={(next) => { if (!next) onClose(); }}
       card={false}

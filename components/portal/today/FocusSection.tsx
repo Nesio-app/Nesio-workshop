@@ -282,15 +282,16 @@ export function TodayFocusSection({
     <div className="nesio-focus-section">
       <MemoryFlashBanner nodes={flashNodes} onDismiss={dismissFlash} />
 
-      <div className="nesio-focus-header" data-tour="breakdown">
-        <h2 className="nesio-focus-title">
-          {t(locale, 'todayFocusTitle')}
-          <span className="nesio-focus-subtitle"> · {t(locale, 'todayFocusSubtitle')}</span>
-        </h2>
-        <div className="nesio-focus-header-right">
-          {doneToday > 0 && <span className="nesio-focus-done-badge">✓ {doneToday}</span>}
+      {/* 2026-07-29 用户实锤删掉「接下来 · 今天要紧的几件」这行小标题:
+          下面那条时间线本身就在讲这件事,标题只是把同一句话再说一遍(批次 188 已经因为
+          同样的重叠删过问候语里的「接下来:X」)。今天完成数那枚徽章留着 —— 它是数据不是标题。 */}
+      {doneToday > 0 && (
+        <div className="nesio-focus-header" data-tour="breakdown">
+          <div className="nesio-focus-header-right">
+            <span className="nesio-focus-done-badge">✓ {doneToday}</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* 批次 107:时间线 —— 心情作「现在」第一拍 + 竖轨串起下面的要紧事(设计规范今天页) */}
       <div className="nesio-focus-timeline">
@@ -326,7 +327,9 @@ export function TodayFocusSection({
                   aria-expanded={false}
                   onClick={() => setCollapsed(false)}
                 >
-                  <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>⋯</span>
+                  {/* 2026-07-29:去掉行首那个孤零零的 ⋯ 圆点 —— 时间线上每个圆点都代表
+                      「一件真实发生的事」,而这一条是**入口**不是事件,挂个点在轨道上
+                      反而像多出一件没内容的事。 */}
                   <span className="nesio-collapsed-task-body">
                     <span className="nesio-collapsed-kicker">{L(dict, '稍后', 'Later')}</span>
                     <span className="nesio-collapsed-title">{L(dict, `还有 ${restCount} 件小事`, `${restCount} more small things`)}</span>
