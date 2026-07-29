@@ -14,6 +14,7 @@ import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { consolidateAmazonOrder } from '@/lib/portal/amazon-order';
 import { appendShoppingReceipt, consumeTravelReceiptTripId } from '@/lib/portal/travel-trips';
 import { addReceiptExpense, defaultFinanceCurrency } from '@/lib/portal/finance-sources';
+import Button from './ui/Button';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -1459,17 +1460,18 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
           </label>
 
           <div className="nesio-camera-result-actions">
-            <button
-              type="button"
-              className="nesio-camera-save-btn"
+            {/* 主 / 次一对,同一档尺寸 —— 走 Button 原语后两者的高度、圆角、字号
+                由同一处决定,不会再各写各的(以前 0.5rem/0.78rem 配 0.55rem/0.8rem,挨着看是歪的)。 */}
+            <Button
+              variant="primary"
               onClick={saveAll}
               disabled={saving || editedNodes.filter((n) => !n.deleted).length === 0}
             >
               {saving
                 ? L(dict, '保存中…', 'Saving…')
-                : L(dict, `存入 Memory (${editedNodes.filter((n) => !n.deleted).length} 条)`, `Save to Memory (${editedNodes.filter((n) => !n.deleted).length})`)}
-            </button>
-            <button type="button" className="nesio-camera-retake-btn" onClick={retake}>{L(dict, '重拍', 'Retake')}</button>
+                : L(dict, `存入记忆 (${editedNodes.filter((n) => !n.deleted).length} 条)`, `Save to Memory (${editedNodes.filter((n) => !n.deleted).length})`)}
+            </Button>
+            <Button variant="secondary" onClick={retake}>{L(dict, '重拍', 'Retake')}</Button>
           </div>
 
         </div>

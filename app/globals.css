@@ -19707,3 +19707,72 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 }
 .nesio-nd-file-sub { font-size: var(--text-xs); color: var(--portal-muted); }
 .nesio-nd-file-open { flex: none; text-decoration: none; }
+
+/* ══════════════════════════════════════════════════════════════════
+   Button 原语 —— components/portal/ui/Button.tsx(2026-07-29)
+   设计系统 _adherence.oxlintrc.json 里早就写好了这个契约,只是一直没有实现,
+   于是每个板块各写各的按钮(至少七八套),同一屏里两个按钮长得不像一家。
+   这里是那份契约唯一的样式落点:尺寸、圆角、字号、按下反馈全部走 token,
+   颜色跟随当前皮肤。新板块直接用 <Button>,不要再起新类。
+   ══════════════════════════════════════════════════════════════════ */
+.nesio-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-family: inherit;
+  font-weight: var(--weight-semibold);
+  line-height: 1.2;
+  cursor: pointer;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: opacity var(--motion-fast, 120ms) ease, transform var(--motion-fast, 120ms) ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.nesio-btn--pill { border-radius: var(--radius-pill); }
+.nesio-btn--full { width: 100%; }
+/* 按下给一点回弹 —— 但尊重「减少动态效果」 */
+.nesio-btn:active { transform: scale(0.97); }
+@media (prefers-reduced-motion: reduce) {
+  .nesio-btn { transition: none; }
+  .nesio-btn:active { transform: none; }
+}
+.nesio-btn:disabled { opacity: 0.45; cursor: default; }
+.nesio-btn:disabled:active { transform: none; }
+.nesio-btn-icon { display: inline-flex; align-items: center; flex-shrink: 0; }
+
+/* 三档尺寸。同一档的主/次按钮尺寸**必须**一致 —— 挨着放才不会一高一矮
+   (相机那对以前是 0.5rem/0.78rem 配 0.55rem/0.8rem,肉眼就能看出错位)。 */
+.nesio-btn--sm { padding: var(--space-2) var(--space-3); font-size: var(--text-xs); }
+.nesio-btn--md { padding: 0.55rem var(--space-4); font-size: var(--text-sm); }
+.nesio-btn--lg { padding: var(--space-3) var(--space-5); font-size: var(--text-body); }
+
+/* 四种变体。颜色一律从 --portal-accent / --status-risk 派生,换皮肤自动跟随。 */
+.nesio-btn--primary {
+  background: var(--portal-accent);
+  color: var(--portal-on-accent, #fff);
+}
+.nesio-btn--secondary {
+  background: transparent;
+  border-color: var(--portal-line);
+  color: var(--portal-ink);
+}
+.nesio-btn--soft {
+  background: var(--portal-accent-soft);
+  color: var(--portal-accent);
+}
+.nesio-btn--ghost {
+  background: none;
+  color: var(--portal-accent);
+  padding-left: var(--space-2);
+  padding-right: var(--space-2);
+}
+
+/* risk 只给**真实的破坏性动作**(删除账号、清空数据)。
+   CLAUDE.md 文案红线:不用红色制造焦虑,普通的「取消 / 稍后」不算 risk。 */
+.nesio-btn--risk.nesio-btn--primary { background: var(--status-risk); color: #fff; }
+.nesio-btn--risk.nesio-btn--secondary { border-color: var(--status-risk); color: var(--status-risk); }
+.nesio-btn--risk.nesio-btn--soft { background: var(--status-risk-soft); color: var(--status-risk); }
+.nesio-btn--risk.nesio-btn--ghost { color: var(--status-risk); }
