@@ -25,6 +25,13 @@ import { computeFinanceScores } from '@/lib/portal/finance-risk';
 import { incomeBreakdown, detectIncome, portfolioSummary, recurringPriceHikes } from '@/lib/portal/finance-features';
 import { removeBankAccount } from '@/lib/portal/bank-tx';
 import { loadCombinedFinanceTx, loadCombinedFinanceAccounts } from '@/lib/portal/tesla-finance';
+import QuickAddSheet from './QuickAddSheet';
+import {
+  listManualAssets, assetCurrentValue, manualNetWorth, removeManualAsset,
+  loadNetWorthSeries, recordNetWorthSnapshot, FIN_ASSETS_EVENT, type ManualAsset,
+} from '@/lib/portal/finance-assets';
+import { receiptMatchCandidates, rejectPair, loadRejectedPairs } from '@/lib/portal/receipt-match';
+import { linkExpenseToBankTx } from '@/lib/portal/finance-sources';
 import { domainExpenseTotal, listExpenses, EXPENSES_EVENT, type Expense } from '@/lib/portal/finance-sources';
 import { financeMonthAggregate } from '@/lib/portal/finance-aggregate';
 import { loadBudget, saveBudget, hasBudget, suggestBudget, budgetProgress, type BudgetConfig } from '@/lib/portal/finance-budget';
@@ -105,6 +112,7 @@ export default function FinanceTab() {
   const [rev, setRev] = useState(0); // 规则改动后强制重算
   const [flowEditId, setFlowEditId] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false); // P0:IDB 水合完成才允许判「空」
+  const [quickAdd, setQuickAdd] = useState<null | 'expense' | 'income' | 'asset'>(null); // P1:全局「+」
 
   useEffect(() => {
     const reload = () => {
@@ -125,10 +133,14 @@ export default function FinanceTab() {
     // Tesla 同步后派发 nesio-connectors-refreshed → 新充电花费即时进财务。
     window.addEventListener('nesio-connectors-refreshed', reload);
     window.addEventListener(EXPENSES_EVENT, reload);
+    // P1:手动资产/锚点变动 → 净值 hero 与账户页即时刷新
+    const onAssets = () => setRev((r) => r + 1);
+    window.addEventListener(FIN_ASSETS_EVENT, onAssets);
     return () => {
       window.removeEventListener('nesio-bank-updated', reload);
       window.removeEventListener('nesio-connectors-refreshed', reload);
       window.removeEventListener(EXPENSES_EVENT, reload);
+      window.removeEventListener(FIN_ASSETS_EVENT, onAssets);
     };
   }, []);
 
@@ -165,6 +177,13 @@ export default function FinanceTab() {
   // 财务⑪:退款证据 —— 交易行的类型标签与月度统计同口径(没买过的商户进账不是退款)。
   // ⚠️ hooks 必须全部在下面的空态早退**之前**(hook 数量随渲染变化会让 React 整页抛错)。
   const refundEvidence = useMemo(() => expenseMerchants(txs), [txs]);
+  // P1:手动资产 + 净值(Plaid∪手动,币种按拍板简单相加)+ 快照序列(净值 hero 小曲线)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const manualAssets = useMemo(() => listManualAssets(), [rev]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const nwSeries = useMemo(() => loadNetWorthSeries(), [rev, txs]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const rejectedPairs = useMemo(() => loadRejectedPairs(), [rev]);
   // 财务⑮:L3 财务体检(应急金/储蓄率/订阅负担,分项带出处;数据不齐的项不出)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const scores = useMemo(() => computeFinanceScores(txs, accounts), [txs, accounts, rev]);
@@ -313,7 +332,13 @@ export default function FinanceTab() {
         {SUBS.map(([id, zh, en]) => (
           <button key={id} type="button" className={`nesio-fin-subtab${sub === id ? ' is-active' : ''}`} onClick={() => setSub(id)}>{L(dict, zh, en)}</button>
         ))}
+        {/* P1 全局「+」记一笔:支出/收入/资产估值三合一,记的都混入统一财务口径 */}
+        <button type="button" className="nesio-fin-subtab" style={{ marginLeft: 'auto', fontWeight: 700, color: 'var(--portal-accent)' }}
+          onClick={() => setQuickAdd('expense')} aria-label={L(dict, '记一笔(支出 / 收入 / 资产估值)', 'Quick add (expense / income / asset)')}>
+          {L(dict, '+ 记一笔', '+ Add')}
+        </button>
       </div>
+      <QuickAddSheet key={quickAdd ?? 'closed'} open={quickAdd != null} initialSeg={quickAdd ?? 'expense'} onClose={() => setQuickAdd(null)} onSaved={() => setRev((r) => r + 1)} />
 
       {/* ── 总览 ── */}
       {sub === 'overview' && (
@@ -347,6 +372,34 @@ export default function FinanceTab() {
               <span>{nessaSummary}</span>
             </div>
           )}
+          {/* P1 净值 hero:Plaid + 手动资产(锚点),快照曲线(同步时落点,LOCF 语义,只回看) */}
+          {(() => {
+            const s = assetSummary(accounts);
+            const manualNet = manualNetWorth(manualAssets);
+            if (s.net === 0 && manualNet === 0) return null;
+            const total = Math.round((s.net + manualNet) * 100) / 100;
+            const pts = [...nwSeries].sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-60);
+            const vals = pts.map((p) => p.plaidNet + p.manualNet);
+            const min = Math.min(...vals), max = Math.max(...vals);
+            const span = max - min || 1;
+            const path = vals.map((v, i) => `${i === 0 ? 'M' : 'L'}${(i / Math.max(1, vals.length - 1)) * 300},${34 - ((v - min) / span) * 28}`).join(' ');
+            return (
+              <div className="nesio-fin-assets" style={{ marginBottom: '0.6rem' }}>
+                <span className="nesio-fin-asset-l">{L(dict, '净资产 · 含手动资产', 'Net worth · incl. manual assets')}</span>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+                  <span style={{ fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{total < 0 ? '-' : ''}{formatMoney(Math.abs(total), summary.currency)}</span>
+                  {manualNet !== 0 && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, `含手动 ${formatMoney(Math.abs(manualNet), summary.currency)}`, `manual ${formatMoney(Math.abs(manualNet), summary.currency)}`)}</span>}
+                </div>
+                {vals.length >= 2 && (
+                  <svg viewBox="0 0 300 36" style={{ width: '100%', height: 36 }} aria-hidden>
+                    <path d={path} fill="none" stroke="var(--portal-accent)" strokeWidth="2" />
+                    <circle cx="300" cy={34 - ((vals[vals.length - 1] - min) / span) * 28} r="3" fill="var(--portal-accent)" />
+                  </svg>
+                )}
+                {vals.length < 2 && <span className="nesio-fin-score-hint">{L(dict, '多同步几天,这里会长出净值曲线(每次同步记一个点)。', 'Sync a few more days and a net-worth curve grows here (one point per sync).')}</span>}
+              </div>
+            );
+          })()}
           <div className="nesio-fin-kpis">
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '本月支出', 'This month')}</span><span className="nesio-fin-kpi-v">{formatMoney(grossSpend, summary.currency)}</span>{spendDelta !== null && <span className={`nesio-fin-delta${spendDelta > 0 ? ' up' : ' down'}`}>{spendDelta > 0 ? '+' : ''}{spendDelta}%</span>}</div>
             <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '净支出', 'Net spend')}</span><span className="nesio-fin-kpi-v">{formatMoney(summary.net, summary.currency)}</span>{netDelta !== null && <span className={`nesio-fin-delta${netDelta > 0 ? ' up' : ' down'}`}>{netDelta > 0 ? '+' : ''}{netDelta}%</span>}</div>
@@ -363,12 +416,37 @@ export default function FinanceTab() {
                 )}
               </p>
               <div className="nesio-fin-personspend" style={{ marginBottom: '0.8rem' }}>
-                {domainRows.slice(0, 5).map((e) => (
-                  <div key={e.id} className="nesio-fin-person-row">
-                    <span className="nesio-fin-person-name">{e.merchant || e.note || (e.source === 'travel' ? L(dict, '旅行', 'Travel') : L(dict, '小票', 'Receipt'))}</span>
-                    <span className="nesio-fin-person-amt">{e.currency}{e.amount}</span>
-                  </div>
-                ))}
+                {domainRows.slice(0, 5).map((e) => {
+                  // P1 小票对账:金额±1% + 日期±3天 + 商户词,给一条候选;「不是」进否决记忆。
+                  const cand = receiptMatchCandidates(
+                    { id: e.id, amount: e.amount, occurredAt: e.occurredAt, merchant: e.merchant },
+                    txs, { rejected: rejectedPairs, max: 1 },
+                  )[0];
+                  return (
+                    <div key={e.id}>
+                      <div className="nesio-fin-person-row">
+                        <span className="nesio-fin-person-name">{e.merchant || e.note || (e.source === 'travel' ? L(dict, '旅行', 'Travel') : L(dict, '小票', 'Receipt'))}</span>
+                        <span className="nesio-fin-person-amt">{e.currency}{e.amount}</span>
+                      </div>
+                      {cand && (
+                        <div className="nesio-fin-person-row" style={{ paddingLeft: '0.6rem' }}>
+                          <span className="nesio-fin-person-name" style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>
+                            {L(dict, `银行流水可能是同一笔:${cand.name.slice(0, 18)} · ${cand.date.slice(5)}`, `Likely same in bank feed: ${cand.name.slice(0, 18)} · ${cand.date.slice(5)}`)}
+                          </span>
+                          <button type="button" className="nesio-fin-monthnav" style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-accent)' }}
+                            onClick={() => { if (linkExpenseToBankTx(e.id, cand.id)) setRev((r) => r + 1); }}>
+                            {L(dict, '关联', 'Link')}
+                          </button>
+                          <button type="button" className="nesio-fin-monthnav" style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}
+                            onClick={() => { rejectPair(e.id, cand.id); setRev((r) => r + 1); }}>
+                            {L(dict, '不是', 'No')}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: '0.2rem' }}>{L(dict, '关联后小票变成那笔银行流水的明细,不再双计。', 'Linked receipts become detail of the bank txn — no double counting.')}</p>
               </div>
             </>
           )}
@@ -960,6 +1038,37 @@ export default function FinanceTab() {
             </>
           );
         })()
+      )}
+
+      {/* P1:手动资产(与 Plaid 账户同页同列,不设独立手动账本)—— 锚点估值,「+」也能进 */}
+      {sub === 'cards' && (
+        <>
+          <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '手动资产 · 锚点估值', 'Manual assets · anchored values')}</p>
+          {manualAssets.length === 0
+            ? <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, '房、车、现金、加密…银行拍不到的,点「+ 记一笔 → 资产·估值」记进来,一起进净值。', 'Home, car, cash, crypto — add via “+ Add → Asset” and they join your net worth.')}</p>
+            : manualAssets.map((a: ManualAsset) => {
+              const latest = a.anchors[0];
+              const staleDays = latest ? Math.floor((Date.now() - new Date(`${latest.date}T00:00:00`).getTime()) / 86400000) : 0;
+              return (
+                <div key={a.id} className="nesio-fin-acctrow">
+                  <div className="nesio-fin-acctrow-body">
+                    <span className="nesio-fin-acctrow-name">{a.name}</span>
+                    <span className="nesio-fin-acctrow-sub">
+                      {latest ? L(dict, `锚点 ${latest.date}${latest.note ? ` · ${latest.note}` : ''}`, `anchor ${latest.date}${latest.note ? ` · ${latest.note}` : ''}`) : ''}
+                      {staleDays > 90 ? L(dict, ' · 该盘点了', ' · time to recount') : ''}
+                    </span>
+                  </div>
+                  <span className={`nesio-fin-acctrow-bal${a.classification === 'liability' ? ' is-neg' : ''}`}>
+                    {a.classification === 'liability' ? '-' : ''}{formatMoney(assetCurrentValue(a))}
+                  </span>
+                  <button type="button" className="nesio-fin-monthnav" style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-accent)' }}
+                    onClick={() => setQuickAdd('asset')}>{L(dict, '更新', 'Update')}</button>
+                  <button type="button" className="nesio-fin-rule-x" aria-label={L(dict, '移除此资产(锚点历史一并删除)', 'Remove this asset (anchors deleted too)')}
+                    onClick={() => { removeManualAsset(a.id); recordNetWorthSnapshot(); setRev((r) => r + 1); }}>✕</button>
+                </div>
+              );
+            })}
+        </>
       )}
 
       <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>{L(dict, '流水明细只存本机 · 随时可断开', 'Details stay on-device · disconnect anytime')}</p>

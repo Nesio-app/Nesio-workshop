@@ -1,0 +1,211 @@
+'use client';
+
+/**
+ * QuickAddSheet — 财务全局「+」记一笔(财务大修 P1;设计=artifact fb540e24 屏 5)。
+ * 三段合一:支出 / 收入 / 资产·估值 —— 没有独立「手动账本」,记的东西全部混入统一财务口径:
+ * 收支走 finance-sources.addManualEntry(唯一账口),资产/估值走 finance-assets 锚点。
+ * 每个异步动作有显式失败态;NesioSheet 原语(bottom);全用设计 token。
+ */
+
+import { useMemo, useState } from 'react';
+import NesioSheet from '../ui/NesioSheet';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from '../use-portal-locale';
+import { addManualEntry } from '@/lib/portal/finance-sources';
+import {
+  listManualAssets, addManualAsset, addAssetAnchor, assetCurrentValue, recordNetWorthSnapshot,
+  type ManualAssetKind,
+} from '@/lib/portal/finance-assets';
+import { COMMON_EXPENSE_CATEGORIES, categoryLabel } from '@/lib/portal/tx-category';
+
+type Seg = 'expense' | 'income' | 'asset';
+
+const INCOME_CATS: Array<[string, string, string]> = [
+  ['GIFT', '人情往来', 'Gift'], ['SALARY', '工资', 'Salary'], ['BONUS', '奖金', 'Bonus'], ['OTHER', '其他', 'Other'],
+];
+
+const ASSET_KINDS: Array<[ManualAssetKind, string, string]> = [
+  ['property', '房产', 'Property'], ['vehicle', '车', 'Vehicle'], ['cash', '现金渠道', 'Cash'],
+  ['crypto', '加密', 'Crypto'], ['collect', '收藏', 'Collectible'], ['loan', '欠款', 'Loan'],
+];
+
+const ANCHOR_NOTES: Array<[string, string]> = [
+  ['市场参考', 'Market ref'], ['银行评估', 'Bank appraisal'], ['盘点', 'Recount'], ['自己估的', 'My estimate'],
+];
+
+export default function QuickAddSheet({ open, onClose, onSaved, initialSeg }: {
+  open: boolean; onClose: () => void; onSaved: () => void; initialSeg?: Seg;
+}) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  const t = (zh: string, en: string) => L(dict, zh, en);
+
+  const [seg, setSeg] = useState<Seg>(initialSeg ?? 'expense');
+  const [amount, setAmount] = useState('');
+  const [cat, setCat] = useState('');
+  const [note, setNote] = useState('');
+  const [channelId, setChannelId] = useState('');
+  const [newChannel, setNewChannel] = useState('');
+  // 资产段:选已有资产记锚点,或新建
+  const [assetId, setAssetId] = useState('');
+  const [newAssetName, setNewAssetName] = useState('');
+  const [assetKind, setAssetKind] = useState<ManualAssetKind>('property');
+  const [anchorNote, setAnchorNote] = useState('');
+  const [err, setErr] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const channels = useMemo(() => listManualAssets().filter((a) => a.isChannel), [open, seg]); // eslint-disable-line react-hooks/exhaustive-deps
+  const assets = useMemo(() => listManualAssets(), [open, seg]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const reset = () => { setAmount(''); setCat(''); setNote(''); setChannelId(''); setNewChannel(''); setAssetId(''); setNewAssetName(''); setAnchorNote(''); setErr(''); };
+
+  function save() {
+    const v = Number(amount);
+    if (!Number.isFinite(v) || v <= 0) { setErr(t('金额要大于 0。', 'Amount must be above 0.')); return; }
+    setSaving(true); setErr('');
+    try {
+      if (seg === 'asset') {
+        if (assetId) {
+          const ok = addAssetAnchor(assetId, { date: new Date().toISOString().slice(0, 10), value: v, ...(anchorNote ? { note: anchorNote } : {}) });
+          if (!ok) throw new Error('anchor_failed');
+        } else {
+          const name = newAssetName.trim();
+          if (!name) { setErr(t('给资产起个名字。', 'Name the asset first.')); setSaving(false); return; }
+          addManualAsset({ name, kind: assetKind, value: v, ...(anchorNote ? { note: anchorNote } : {}) });
+        }
+        recordNetWorthSnapshot(); // 资产变动即刻反映到净值曲线
+      } else {
+        let ch = channelId;
+        if (!ch && newChannel.trim()) {
+          ch = addManualAsset({ name: newChannel.trim(), kind: 'cash', value: 0, isChannel: true }).id;
+        }
+        const row = addManualEntry({ amount: v, kind: seg, ...(cat ? { category: cat } : {}), ...(note.trim() ? { note: note.trim() } : {}), ...(ch ? { channelId: ch } : {}) });
+        if (!row) throw new Error('entry_failed');
+      }
+      reset();
+      onSaved();
+      onClose();
+    } catch {
+      setErr(t('没存上 —— 再试一次。', 'Could not save — try again.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const chip = (on: boolean): React.CSSProperties => ({
+    border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '5px 10px',
+    fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)', cursor: 'pointer',
+    background: on ? 'var(--portal-accent-soft-md)' : 'transparent',
+    color: on ? 'var(--portal-accent)' : 'var(--portal-muted)',
+    borderColor: on ? 'transparent' : 'var(--portal-line)', fontWeight: on ? 700 : 400,
+  });
+  const label: React.CSSProperties = { fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: '0 0 4px' };
+  const input: React.CSSProperties = {
+    width: '100%', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)',
+    padding: '10px 12px', fontSize: 'var(--text-body)', background: 'var(--portal-bg)',
+    color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)',
+  };
+
+  return (
+    <NesioSheet variant="bottom" open={open} onOpenChange={(o) => { if (!o) { reset(); onClose(); } }} ariaLabel={t('记一笔', 'Quick add')}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-4) var(--space-6)' }}>
+        <div style={{ display: 'flex', background: 'var(--portal-accent-soft)', borderRadius: 'var(--radius-sm)', padding: 3 }}>
+          {([['expense', '支出', 'Expense'], ['income', '收入', 'Income'], ['asset', '资产 · 估值', 'Asset']] as Array<[Seg, string, string]>).map(([id, zh, en]) => (
+            <button key={id} type="button" onClick={() => { setSeg(id); setErr(''); }}
+              style={{ flex: 1, border: 'none', padding: '8px 0', borderRadius: 9, fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', background: seg === id ? 'var(--portal-card)' : 'transparent', color: seg === id ? 'var(--portal-accent)' : 'var(--portal-muted)' }}>
+              {L(dict, zh, en)}
+            </button>
+          ))}
+        </div>
+
+        <div>
+          <p style={label}>{seg === 'asset' ? t('估值金额', 'Value') : t('金额', 'Amount')}</p>
+          <input style={{ ...input, fontSize: 'var(--text-h2)', fontWeight: 700 }} inputMode="decimal" placeholder="0"
+            value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
+        </div>
+
+        {seg !== 'asset' && (
+          <>
+            <div>
+              <p style={label}>{t('渠道(可空:现金 / 红包等银行拍不到的)', 'Channel (optional: cash / red packet…)')}</p>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {channels.map((c) => (
+                  <button key={c.id} type="button" style={chip(channelId === c.id)} onClick={() => setChannelId((v) => (v === c.id ? '' : c.id))}>{c.name}</button>
+                ))}
+                <input style={{ ...input, width: 110, padding: '5px 10px', fontSize: 'var(--text-xs)' }}
+                  placeholder={t('+ 新渠道', '+ New channel')} value={newChannel}
+                  onChange={(e) => { setNewChannel(e.target.value); setChannelId(''); }} />
+              </div>
+            </div>
+            <div>
+              <p style={label}>{t('分类', 'Category')}</p>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {(seg === 'expense'
+                  ? COMMON_EXPENSE_CATEGORIES.slice(0, 8).map((c) => [c, categoryLabel(c, 'zh'), categoryLabel(c, 'en')] as [string, string, string])
+                  : INCOME_CATS
+                ).map(([id, zh, en]) => (
+                  <button key={id} type="button" style={chip(cat === id)} onClick={() => setCat((v) => (v === id ? '' : id))}>{L(dict, zh, en)}</button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <p style={label}>{t('备注(可空)', 'Note (optional)')}</p>
+              <input style={input} placeholder={t('例:外婆给的红包', 'e.g. red packet from grandma')} value={note} onChange={(e) => setNote(e.target.value)} />
+            </div>
+          </>
+        )}
+
+        {seg === 'asset' && (
+          <>
+            <div>
+              <p style={label}>{t('给谁记(选已有 = 记一条新估值锚点)', 'Which asset (existing = new anchor)')}</p>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {assets.map((a) => (
+                  <button key={a.id} type="button" style={chip(assetId === a.id)}
+                    onClick={() => { setAssetId((v) => (v === a.id ? '' : a.id)); setNewAssetName(''); }}>
+                    {a.name} · {assetCurrentValue(a)}
+                  </button>
+                ))}
+                <input style={{ ...input, width: 120, padding: '5px 10px', fontSize: 'var(--text-xs)' }}
+                  placeholder={t('+ 新资产名', '+ New asset')} value={newAssetName}
+                  onChange={(e) => { setNewAssetName(e.target.value); setAssetId(''); }} />
+              </div>
+            </div>
+            {!assetId && (
+              <div>
+                <p style={label}>{t('类型', 'Kind')}</p>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {ASSET_KINDS.map(([k, zh, en]) => (
+                    <button key={k} type="button" style={chip(assetKind === k)} onClick={() => setAssetKind(k)}>{L(dict, zh, en)}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div>
+              <p style={label}>{t('依据(会存进锚点)', 'Basis (saved with the anchor)')}</p>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                {ANCHOR_NOTES.map(([zh, en]) => (
+                  <button key={zh} type="button" style={chip(anchorNote === zh)} onClick={() => setAnchorNote((v) => (v === zh ? '' : zh))}>{L(dict, zh, en)}</button>
+                ))}
+              </div>
+            </div>
+            <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: 0, lineHeight: 1.6 }}>
+              {t('锚点是带日期的事实,随时可再记;净值曲线在锚点之间按直线补齐 —— 只回看,不预测。', 'Anchors are dated facts you can re-record anytime; the curve interpolates between them — retrospective only.')}
+            </p>
+          </>
+        )}
+
+        {err && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--status-risk)', margin: 0 }}>{err}</p>}
+
+        <button type="button" onClick={save} disabled={saving}
+          style={{ border: 'none', borderRadius: 'var(--radius-sm)', padding: '12px', fontSize: 'var(--text-body)', fontWeight: 600, fontFamily: 'var(--font-sans)', cursor: 'pointer', background: 'var(--portal-accent)', color: '#fff', opacity: saving ? 0.6 : 1 }}>
+          {saving ? t('保存中…', 'Saving…') : t('保存', 'Save')}
+        </button>
+        <button type="button" onClick={() => { reset(); onClose(); }}
+          style={{ border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '10px', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-sans)', cursor: 'pointer', background: 'transparent', color: 'var(--portal-accent)' }}>
+          {t('先不记', 'Not now')}
+        </button>
+      </div>
+    </NesioSheet>
+  );
+}

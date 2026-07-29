@@ -164,8 +164,15 @@ sensitivity/retention 枚举化(中期)。
   ⑥ Fidelity 定投分流(investmentAccountIds + 券商描述符兜底 → transfer,股利仍收入)。
   契约 test:finance-p0;现有 10 套财务契约全存活;tsc+build 绿。
   **用户拍板**:币种不考虑;UI 按 v3.3 稿(artifact fb540e24,8 屏);接 Plaid recurring API(P2)。
-  下一期 P1:手动资产+锚点+净值/投资日快照(须进备份+云同步枚举)、「+」记一笔(finance-sources
-  扩 income)、小票↔银行对账(receipt-match+负样本)。
+  **P1 已落(2026-07-28,数据层+UI 全接完)**:finance-assets(手动资产/锚点即值/净值日快照,
+  createBlobStore 自动进备份+云同步)· receipt-match(小票↔银行候选+否决负样本)·
+  finance-sources 扩 income/channelId/linkedBankTxId + addManualEntry ·
+  聚合并入 domainIncome。UI:QuickAddSheet(全局「+ 记一笔」三段合一,NesioSheet bottom)·
+  总览净值 hero(Plaid+手动+快照曲线)· 卡片页手动资产列表(该盘点了琥珀提示/更新/移除)·
+  小票旁条「可能是同一笔 → 关联/不是」。契约 test:finance-assets;
+  sheet-allowlist/i18n/inert-buttons/颜色 token 全过;tsc+build 绿。**待真机验手感。**
+  下一期 P2:分析升级(基线统一口径/可操作 findings/股利利息 YTD/订阅监控页/
+  Plaid recurring API/组合体检因子)。
 - **财务板块大修(2026-07-28 审计完成,施工待批)**:四路深查(maybe 数据/分析/UI × 宝盒体检)
   收敛为 `docs/design/finance-maybe-audit-2026-07.md`。**P0 止血项含一条不可逆数据销毁路径**
   (connector-sync 先 replace 账户再按新表过滤流水写回 + 全仓无 `await store.ready()`,
