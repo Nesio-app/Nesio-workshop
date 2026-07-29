@@ -55,7 +55,9 @@ function monthLabel(ym: string, dict: string): string {
 }
 
 // 批次 40:分类支出环形图(纯 SVG,无依赖)
-const DONUT_COLORS = ['#588ce3', '#e0954a', '#3d9f6e', '#c98a2d', '#7c6ee6', '#c25d7a', '#2f9d8f', '#9aa7b8'];
+// 类别色走设计系统的 --viz-*(见 globals.css 那段说明):换皮肤时饼图跟着变饱和度,
+// 而 8 个色相位仍然分散 —— 相邻扇区还是分得开。原来这 8 个是写死的 hex,换肤纹丝不动。
+const DONUT_COLORS = Array.from({ length: 8 }, (_, i) => `var(--viz-${i + 1})`);
 function FinanceDonut({ slices, centerTop, centerVal }: { slices: Array<{ category: string; pct: number }>; centerTop: string; centerVal: string }) {
   const R = 52;
   const C = 2 * Math.PI * R;

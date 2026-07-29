@@ -34,17 +34,21 @@ function splitLabel(label: string): [string, string] {
   return [line1, line2];
 }
 
-/** 星图配色:按节点类型的实心色(昼夜通用,白字可读) */
+/**
+ * 星图配色:按节点类型取设计系统的类别色 --viz-*(见 globals.css 那段说明)。
+ * 原来是 7 个写死的 hex —— 换皮肤时整个界面都变了,只有这张关系图纹丝不动。
+ * 现在跟着皮肤压饱和,而 7 个色相位仍然分散(相邻节点还是分得开)。
+ */
 const TYPE_FILL: Record<string, string> = {
-  person: '#7c6ee6',
-  object: '#4a90d9',
-  place: '#3d9f6e',
-  event: '#c98a2d',
-  commitment: '#9a5fd0',
-  health_state: '#c25d7a',
-  preference: '#2f9d8f',
+  person: 'var(--viz-5)',
+  object: 'var(--viz-1)',
+  place: 'var(--viz-3)',
+  event: 'var(--viz-4)',
+  commitment: 'var(--viz-6)',
+  health_state: 'var(--viz-2)',
+  preference: 'var(--viz-7)',
 };
-const DEFAULT_FILL = '#5b7fb9';
+const DEFAULT_FILL = 'var(--viz-8)';
 
 const NODE_R = 24;
 const MIN_ZOOM = 0.35;
@@ -298,7 +302,7 @@ export default function RelationGraph({
                 textAnchor="middle"
                 fontSize={11}
                 fontWeight={600}
-                fill="#ffffff"
+                fill="var(--portal-on-accent, #fff)"
                 style={{ pointerEvents: 'none' }}
               >
                 {l1}
@@ -310,7 +314,7 @@ export default function RelationGraph({
                   textAnchor="middle"
                   fontSize={11}
                   fontWeight={600}
-                  fill="#ffffff"
+                  fill="var(--portal-on-accent, #fff)"
                   style={{ pointerEvents: 'none' }}
                 >
                   {l2}

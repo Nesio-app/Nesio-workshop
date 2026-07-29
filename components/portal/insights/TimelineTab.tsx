@@ -82,11 +82,17 @@ const CAT_PIE_COLORS = [
   'var(--portal-cool-accent)', 'var(--portal-accent)', 'var(--portal-muted)',
 ];
 
+// 16 类地点映射到设计系统的 8 个类别色位(--viz-1..8,见 globals.css)。
+// 原来是 16 个写死的 hex —— 换皮肤时足迹图上的点一个都不变。
+// 映射按「气质就近」合并:住/宿同位、买/逛同位、吃/咖啡同位…… 同屏很少同时出现 16 类,
+// 合并后仍然分得开;而且现在整套会跟着皮肤压饱和,不再像贴纸糊在柔和界面上。
 const DOT_COLOR: Record<PlaceCategory, string> = {
-  home: '#588ce3', work: '#7b5ea7', grocery: '#4f9e57', shopping: '#e8888f', food: '#e0954a',
-  cafe: '#a5713f', fitness: '#d6559e', park: '#3e9e7e', culture: '#8a6fd0', education: '#5a7bd0',
-  entertainment: '#d98a4a', health: '#c25d7a',
-  lodging: '#5a8fc2', transit: '#3aa6a0', place: '#4a7c5f', unknown: '#9aa7b8',
+  home: 'var(--viz-1)', lodging: 'var(--viz-1)',
+  work: 'var(--viz-5)', education: 'var(--viz-5)', culture: 'var(--viz-5)',
+  grocery: 'var(--viz-3)', park: 'var(--viz-3)',
+  shopping: 'var(--viz-6)', health: 'var(--viz-6)', fitness: 'var(--viz-6)',
+  food: 'var(--viz-2)', cafe: 'var(--viz-2)', entertainment: 'var(--viz-2)',
+  transit: 'var(--viz-7)', place: 'var(--viz-4)', unknown: 'var(--viz-8)',
 };
 
 // ── 可交互甜甜圈:图例贴在饼里(%),点扇形高亮 + 中心出详情 ──

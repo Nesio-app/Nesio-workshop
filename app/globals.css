@@ -17404,6 +17404,43 @@ html[data-portal-theme="night"] .nesio-map-tile {
 .nesio-brief-ref-chip:active { background: var(--portal-accent-soft, rgba(0,0,0,0.04)); }
 .nesio-brief-ref-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 12rem; }
 
+
+/* ══════════════════════════════════════════════════════════════════
+   数据可视化调色板 —— 换肤时**唯一**还留在组件里写死的东西(2026-07-29 QA 第 25 条)
+   饼图 8 色、关系图 7 类节点、地点 16 类,原来各自在组件里硬编码 hex。
+   实测过:换皮肤时整个界面都变了,只有这些图纹丝不动 —— 这就是「换肤不是真全站」的实处。
+   这里放的是**类别色**,和 --status-* 性质不同:它们的职责是让相邻扇区/节点互相分得开,
+   所以色相必须保持分散(全拉成同色系就读不出来了),但饱和度要跟当前皮肤的气质对齐。
+   Canvas 组件用 getComputedStyle 读(设计系统里既有的例外)。
+   ══════════════════════════════════════════════════════════════════ */
+:root, .portal-root {
+  --viz-1:#588ce3; --viz-2:#e0954a; --viz-3:#3d9f6e; --viz-4:#c98a2d;
+  --viz-5:#7c6ee6; --viz-6:#c25d7a; --viz-7:#2f9d8f; --viz-8:#9aa7b8;
+}
+/* 四套莫兰迪皮肤:同样 8 个色相位,饱和度压到和皮肤一致 —— 不然图表在柔和界面里像贴纸 */
+html[data-palette="bluegray-rose"]:not([data-portal-theme="night"]), html[data-palette="bluegray-rose"]:not([data-portal-theme="night"]) .portal-root {
+  --viz-1:#8a9db3; --viz-2:#c08a6f; --viz-3:#7d9b91; --viz-4:#b8956b;
+  --viz-5:#9b8fae; --viz-6:#c07f79; --viz-7:#7f9e99; --viz-8:#a8adb5;
+}
+html[data-palette="milktea"]:not([data-portal-theme="night"]), html[data-palette="milktea"]:not([data-portal-theme="night"]) .portal-root {
+  --viz-1:#9a9578; --viz-2:#c09a63; --viz-3:#8a9b72; --viz-4:#a98f66;
+  --viz-5:#a08f80; --viz-6:#c0907e; --viz-7:#849688; --viz-8:#b0a892;
+}
+html[data-palette="haze-blue"]:not([data-portal-theme="night"]), html[data-palette="haze-blue"]:not([data-portal-theme="night"]) .portal-root {
+  --viz-1:#7d9fc4; --viz-2:#c2996d; --viz-3:#6f9e88; --viz-4:#b39468;
+  --viz-5:#8f92bd; --viz-6:#b98290; --viz-7:#6f9c9c; --viz-8:#9daab8;
+}
+html[data-palette="sage"]:not([data-portal-theme="night"]), html[data-palette="sage"]:not([data-portal-theme="night"]) .portal-root {
+  --viz-1:#7f9a92; --viz-2:#b8945f; --viz-3:#6e9b70; --viz-4:#a89463;
+  --viz-5:#8e9483; --viz-6:#b1867d; --viz-7:#699b91; --viz-8:#a3aca0;
+}
+/* 夜间:整体提亮(深底上原色会发闷),四套皮肤共用一组 —— 夜里色相差异本来就更难分,
+   压饱和只会更糟,所以夜间反而保持较高明度。 */
+html[data-portal-theme="night"], html[data-portal-theme="night"] .portal-root {
+  --viz-1:#7fb0f0; --viz-2:#e8a866; --viz-3:#5fbb8c; --viz-4:#dda954;
+  --viz-5:#9b8ff0; --viz-6:#dd7f9c; --viz-7:#4fb8a8; --viz-8:#aab7c8;
+}
+
 /* ══════════════════════════════════════════════════════════════════
    批次 31→98 · 低饱和配色 · 莫兰迪 4 套色卡(设计规范 v1)
    单开关升级为 4 选 1(html[data-palette=X]),只覆写 token,一处切换全站换装。

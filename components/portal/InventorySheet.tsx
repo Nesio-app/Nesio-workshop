@@ -45,8 +45,6 @@ interface InventorySheetProps {
 const ALL = '__all__';
 const UNPLACED = '__unplaced__';
 
-// 批次 133·预览图占位色(设计:每条物品有预览图;真图缩略未加载时用柔和莫兰迪色块占位,确定性取色)
-const PREVIEW_COLORS = ['#d3b0ac', '#d3b79a', '#a9bcd0', '#b6c7ac', '#c8b3c6', '#cdbfa6', '#b0c4c0'];
 // 批次 179:物品分类改下拉预设 + 自定义(用户实锤「下拉框选项,客户可以自定义」)
 const CATEGORY_PRESETS: Array<[string, string]> = [
   ['日用品', 'Household'], ['护肤', 'Skincare'], ['电子', 'Electronics'], ['服饰', 'Apparel'],
@@ -54,11 +52,6 @@ const CATEGORY_PRESETS: Array<[string, string]> = [
   ['母婴', 'Baby'], ['收藏', 'Collectible'],
 ];
 const CAT_CUSTOM = '__custom__';
-function previewColor(name: string): string {
-  let h = 0;
-  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) >>> 0;
-  return PREVIEW_COLORS[h % PREVIEW_COLORS.length];
-}
 // 批次 170:去 emoji —— 位置/分组名里残留的 🏠 等图形字符全清掉(设计:一律线性,无 emoji)
 function stripEmoji(s: string): string {
   return s

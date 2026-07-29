@@ -161,4 +161,52 @@ const code = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, 
   );
 }
 
+// ── ⑧ 换肤要真全站:数据可视化的类别色也得跟着皮肤走 ─────────────────────────
+// 2026-07-29 实测(真浏览器读 computed style):所有**结构色**(背景/强调/文字/边框)
+// 早就是全站跟随的 —— 首页和设置页拿到的 token 完全一致。
+// 真正换不动的是饼图 / 关系图 / 地点点位那三组**写死在组件里的类别调色板**:
+// 换了皮肤整个界面都柔和了,只有这些图还是原来的高饱和色,像贴纸糊在上面。
+// 收进 --viz-1..8(globals.css),每套皮肤一组:色相位保持分散(相邻扇区仍分得开),
+// 饱和度跟皮肤对齐。
+{
+  const css = read('app/globals.css');
+  assert.ok(/:root, \.portal-root \{[\s\S]{0,400}--viz-1:/.test(css), '--viz-* 类别色板没有在根上声明');
+  // 必须**在那套皮肤自己的规则块里**找,不能只搜「选择器后面 N 个字符内出现 --viz-1」——
+  // 窗口一大就会读到下一套皮肤的声明,把某套漏了照样绿(变异测试抓到的)。
+  const blockFor = (sel) => {
+    const re = new RegExp(`html\\[data-palette="${sel}"\\][^{]*\\{([^}]*)\\}`, 'g');
+    return [...css.matchAll(re)].map((m) => m[1]);
+  };
+  for (const skin of ['bluegray-rose', 'milktea', 'haze-blue', 'sage']) {
+    const blocks = blockFor(skin);
+    assert.ok(
+      blocks.some((b) => Array.from({ length: 8 }, (_, i) => `--viz-${i + 1}:`).every((k) => b.includes(k))),
+      `皮肤 ${skin} 没有给全 --viz-1..8 —— 换到这套皮肤时图表会退回默认高饱和色,和界面打架`,
+    );
+  }
+  assert.ok(/data-portal-theme="night"[\s\S]{0,600}--viz-1:/.test(css), '夜间没有给 --viz-* 提亮值');
+
+  // 三个可视化组件必须用 token,不许再写死类别色
+  for (const [f, what] of [
+    ['components/portal/finance/FinanceTab.tsx', '财务饼图'],
+    ['components/portal/RelationGraph.tsx', '关系星图'],
+    ['components/portal/insights/TimelineTab.tsx', '足迹地点点位'],
+  ]) {
+    const c = code(read(f));
+    assert.ok(/var\(--viz-/.test(c), `${what}没有用 --viz-* 类别色 —— 换肤时它不会跟着变`);
+  }
+  // 那三组原来的写死色板不许回来(挑各自最有代表性的一个值)
+  for (const [f, hex, what] of [
+    ['components/portal/finance/FinanceTab.tsx', '#e0954a', '饼图'],
+    ['components/portal/RelationGraph.tsx', '#7c6ee6', '关系图节点'],
+    ['components/portal/insights/TimelineTab.tsx', '#d6559e', '地点点位'],
+  ]) {
+    assert.ok(!code(read(f)).includes(hex), `${what}又写死了 ${hex}`);
+  }
+  // 地球的「到访国」高亮曾是写死的荧光黄绿,换任何皮肤都不变
+  const globe = code(read('components/portal/insights/Globe.tsx'));
+  assert.ok(!globe.includes("'#c9ef7d'"), '地球到访国高亮又写死成荧光黄绿了');
+  assert.ok(/tok\('--status-go'/.test(globe), '地球到访国高亮没有走 token');
+}
+
 console.log('qa-ui-truth: OK(file input 可点 · 头像手势 · 深链自增号 · 一件事一个数 · 攒钱进度 · 提醒可关)');
