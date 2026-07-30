@@ -979,13 +979,19 @@ export function mergeCloudMemorySnapshot(snapshot: { nodes?: unknown[]; assets?:
   return { importedNodeCount, importedAssetCount: incomingAssets.length };
 }
 
-export async function backfillLocalLifeGraphToCloud({ limit = 200 }: { limit?: number } = {}): Promise<{
+export async function backfillLocalLifeGraphToCloud({ limit = 200, ids }: { limit?: number; ids?: string[] } = {}): Promise<{
   attemptedNodeCount: number;
   attemptedAssetCount: number;
 }> {
   if (!cloudMemorySyncEnabled()) return { attemptedNodeCount: 0, attemptedAssetCount: 0 };
   const nodes = loadAll();
-  const backfillNodes = nodes.slice(0, limit);
+  // ids 指定时只补这些(同步体检查出「本地有云端没有」后的定点补传)。
+  // 不指定时维持老行为:取最新 limit 条 —— 注意这**不是全量**,图是新→旧排序,
+  // 老节点若当初没成功 upsert 就永远轮不到。全量补齐请走 auditGraphConsistency
+  // 查出缺失 id 再传进来(graph-consistency.ts)。
+  const backfillNodes = ids
+    ? nodes.filter((n) => ids.includes(n.id))
+    : nodes.slice(0, limit);
   const backfillAssets = backfillNodes.flatMap((node) =>
     (node.assets || []).map((asset) => ({ ...asset, nodeId: node.id })),
   );

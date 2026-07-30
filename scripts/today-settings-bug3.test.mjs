@@ -109,7 +109,10 @@ assert.ok(!privacyCode.includes('清除记忆 / 删本机数据 / 删账号'), '
 assert.ok(privacyCode.includes("'删除数据'"), '「删除数据」四个字要留着');
 assert.ok(!privacyCode.includes('导出全部(记忆 + 学到的偏好,下载 JSON)'), '并排后按钮上只留动词');
 // 备份/从云恢复、导出/导入各成一排
-const rows = privacy.match(/nesio-settings-btn-row/g) || [];
+// ⚠️ 数 privacyCode(已剥注释)而不是 privacy 原文 —— 本仓反复踩的坑:
+// 一句解释「为什么不复用 nesio-settings-btn-row」的注释就会被计入,把计数顶到 3。
+// 契约要数的是真实标记,不是我们写给自己看的字。
+const rows = privacyCode.match(/nesio-settings-btn-row/g) || [];
 assert.ok(rows.length === 2, `要有两排成对按钮(备份/恢复 · 导出/导入),现在 ${rows.length} 处`);
 assert.ok(/\.nesio-settings-btn-row \{[\s\S]*?display: flex/.test(css), '成对按钮排要有对应样式');
 // 两排里的四个按钮都还接着原来的处理函数(别把功能一起排版掉了)
