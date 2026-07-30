@@ -19011,7 +19011,6 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .ng-fp-trend .spark .ar{fill:var(--portal-accent-soft)}
 .ng-fp-trend .spark .ln{fill:none;stroke:var(--portal-accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .ng-fp-trend .spark .dot{fill:var(--portal-accent);stroke:var(--portal-card);stroke-width:1.5}
-.ng-todaynote{font-size:.75rem;color:var(--ng-faint);margin:13px 2px 0;text-align:center}
 .ng-done{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:16px;padding:16px;font-size:.9rem;color:var(--portal-accent);text-align:center;line-height:1.55}
 
 /* quiz 选项 + 揭晓 */

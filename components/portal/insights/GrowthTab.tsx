@@ -235,7 +235,8 @@ export default function GrowthTab({ onOpenNode }: { onOpenNode?: (nodeId: string
                   onClick={() => recordAndAdvance(current.c, (draft[current.c.id] || '').trim())}>{L(dict, '记下这条回看', 'Save')}</button>
                 <button type="button" className="ng-btn ghost" onClick={skip}>{L(dict, '先跳过', 'Skip')}</button>
               </div>
-              <p className="ng-todaynote">{L(dict, '今天先看这一件。', 'Just this one for today.')}</p>
+              {/* Bug4 图8「底部字删掉」:回看卡下面那句「今天先看这一件。」删掉 ——
+                  卡里本来就只有一件,这句话是在解释一件显而易见的事。 */}
             </div>
           )}
 
