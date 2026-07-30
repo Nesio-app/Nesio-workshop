@@ -727,20 +727,33 @@ function unionNodesById(a: LifeNode[], b: LifeNode[]): LifeNode[] {
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 let persistPending: LifeNode[] | null = null;
 
+// 上次落盘时每片的 JSON(会话内)。写的时候只落**变了的片** —— 改一条今年的记忆
+// 不再重写历史几年的数据。空 Map = 下次全量重写(首次/迁移后)。
+let lastShardJson = new Map<string, string>();
+
 function flushPersistNow(): void {
   if (persistTimer != null) { clearTimeout(persistTimer); persistTimer = null; }
   const nodes = persistPending;
   persistPending = null;
   if (!nodes) return;
-  import('./idb-blob-store').then((mod) => {
-    const idb = mod.idbBackend;
-    if (!idb) return;
-    idb.set(STORAGE_KEY, JSON.stringify(nodes)).catch(() => {
+  void (async () => {
+    try {
+      const [{ idbBackend }, shards] = await Promise.all([
+        import('./idb-blob-store'),
+        import('./life-graph-shards'),
+      ]);
+      if (!idbBackend) return;
+      const res = await shards.writeGraphShards(idbBackend, nodes, lastShardJson);
+      lastShardJson = res.nextJson;
+    } catch {
+      // 写盘失败必须可见(红线:不许吞掉会丢数据的存储写失败)。
+      // 同时把分片缓存清空 —— 下次写全量重来,免得「以为写过了」而跳过某片。
+      lastShardJson = new Map();
       import('./storage-health').then(({ STORAGE_FULL_EVENT, getStorageHealth }) => {
         window.dispatchEvent(new CustomEvent(STORAGE_FULL_EVENT, { detail: getStorageHealth() }));
       }).catch(() => {});
-    });
-  }).catch(() => {});
+    }
+  })();
 }
 
 if (typeof window !== 'undefined') {
@@ -760,8 +773,27 @@ function hydrateGraphOnce(): void {
     const { idbBackend } = mod;
     mod.registerIdbBlobKey?.(STORAGE_KEY); // 让备份/恢复/清理把图谱当 IDB blob
     try {
-      const raw = await idbBackend.get(STORAGE_KEY);
-      const idbNodes = raw ? (JSON.parse(raw) as LifeNode[]) : null;
+      const shards = await import('./life-graph-shards');
+      mod.registerIdbBlobKey?.(shards.GRAPH_SHARD_INDEX_KEY);
+      // 旧的单 blob → 分片。先写后验再删:对不上就保留旧 blob,下次重来(见该模块注释)。
+      await shards.migrateLegacyBlobToShards(idbBackend, STORAGE_KEY).catch(() => null);
+
+      const read = await shards.readGraphShards(idbBackend);
+
+      // ⚠️ 有片没读出来:这时 read.nodes **不是全量**。什么都别做 ——
+      // 不覆盖 memCache(界面会突然空掉)、不回写(会把没读出来的片抹掉)。
+      // 放开 graphHydrated 让下次读写再试一次;分片写缓存作废,免得基于半张图做增量。
+      if (read && !read.complete) {
+        lastShardJson = new Map();
+        graphHydrated = false;
+        import('./storage-health').then(({ logDropped }) => logDropped('graph.shard_read_incomplete', new Error('partial shard read'))).catch(() => {});
+        return;
+      }
+      if (read?.shards?.length) {
+        for (const sh of read.shards) mod.registerIdbBlobKey?.(shards.shardStorageKey(sh));
+      }
+
+      const idbNodes = read ? read.nodes : null;
       const seed = memCache ?? seedFromLocalStorage();
       if (memDirty) {
         // 本会话已写:memCache 最新,与旧 IDB union(补 IDB 独有,不复活已删)后回写
@@ -771,13 +803,16 @@ function hydrateGraphOnce(): void {
       } else if (Array.isArray(idbNodes) && idbNodes.length) {
         memCache = idbNodes; // 未写过 + IDB 有数据:IDB 权威
       } else {
-        if (seed.length) persistGraphToIdb(seed); // IDB 空:首次迁移 localStorage → IDB
+        if (seed.length) persistGraphToIdb(seed); // IDB 空:首次迁移 localStorage → 分片
         memCache = seed;
       }
       try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
       window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-    } catch { /* 水合失败:保持 localStorage 播种,不删 localStorage,下次重试 */ }
-  }).catch(() => {});
+    } catch {
+      // 水合失败:保持 localStorage 播种,不删 localStorage,放开重入让下次再试
+      graphHydrated = false;
+    }
+  }).catch(() => { graphHydrated = false; });
 }
 
 function loadAll(): LifeNode[] {
