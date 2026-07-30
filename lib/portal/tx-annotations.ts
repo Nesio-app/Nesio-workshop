@@ -25,6 +25,7 @@
 
 import { reportStorageDropped } from './storage-health';
 import { deleteLocalFile } from './local-file-store';
+import { validateAllocation } from './ledger-allocation';
 import { linkTxToPerson, unlinkTxFromPerson, attachAssetToTx, detachAssetFromTx, type BridgeResult } from './tx-graph-bridge';
 
 export interface TxAttachment {
@@ -39,6 +40,18 @@ export interface TxAnnotation {
   people?: string[];
   attachments?: TxAttachment[];
   note?: string;
+  /**
+   * 分摊:这一笔钱拆到多个分类/人。
+   *
+   * **合计必须等于原额**(`validateAllocation` 卡到分)。差一分都不存 ——
+   * 「大致分了一下」的分摊比不分更糟:分类汇总会少一块钱,而你看不出来少在哪。
+   *
+   * 分摊**不改变原额**,它是一个视图。总额聚合永远读原额,只有按分类/按人
+   * 汇总时才走分摊(`allocationForCategoryTotals` 定的规矩)。
+   */
+  splits?: Array<{ target: string; amount: number; note?: string }>;
+  /** 按月摊(年费/保险):`{ startMonth: '2026-01', months: 12 }`。同样只是视图。 */
+  amortize?: { startMonth: string; months: number };
 }
 
 const KEY = 'nesio-fin-tx-annotations-v1';
@@ -59,7 +72,11 @@ export function txAnnotationOf(txId: string, all?: Record<string, TxAnnotation>)
 /** 有没有批注(行上是否显示「人/附件」小标)。 */
 export function hasTxAnnotation(a: TxAnnotation | undefined): boolean {
   if (!a) return false;
-  return Boolean((a.people && a.people.length) || (a.attachments && a.attachments.length) || (a.note && a.note.trim()));
+  // 分摊也算「有批注」—— 漏掉的话存进去的分摊会被当成空键当场删掉。
+  return Boolean(
+    (a.people && a.people.length) || (a.attachments && a.attachments.length) || (a.note && a.note.trim())
+    || (a.splits && a.splits.length) || a.amortize,
+  );
 }
 
 /**
@@ -104,6 +121,44 @@ export function toggleTxPerson(txId: string, personKey: string): TxWriteResult {
   const cur = txAnnotationOf(txId).people || [];
   const k = personKey.trim().toLowerCase();
   return setTxPeople(txId, cur.includes(k) ? cur.filter((p) => p !== k) : [...cur, k]);
+}
+
+export type SplitResult =
+  | { ok: true }
+  | { ok: false; reason: 'sum_mismatch'; delta: number }
+  | { ok: false; reason: 'nonpositive' | 'empty' | 'duplicate_target' | 'write_failed' };
+
+/**
+ * 存分摊。**合计必须等于原额,差一分都不存。**
+ *
+ * 为什么这么硬:「大致分了一下」的分摊比不分更糟 —— 按分类汇总时会少一块钱,
+ * 而你根本看不出来少在哪。`validateAllocation` 卡到分,这里只是把它的结论存下来。
+ *
+ * 失败原因原样返回(尤其 `delta`:还差多少没分),UI 能直接显示「还剩 $3.20 要摊」,
+ * 而不是一句没用的「合计不对」。
+ */
+export function setTxSplits(
+  txId: string, total: number,
+  splits: ReadonlyArray<{ target: string; amount: number; note?: string }>,
+): SplitResult {
+  const v = validateAllocation(total, splits);
+  if (!v.ok) return v.reason === 'sum_mismatch' ? { ok: false, reason: 'sum_mismatch', delta: v.delta } : { ok: false, reason: v.reason };
+  return write(txId, { splits: v.splits }) ? { ok: true } : { ok: false, reason: 'write_failed' };
+}
+
+/** 撤掉分摊 —— 这一笔回到「整笔算在它自己的分类下」。 */
+export function clearTxSplits(txId: string): boolean {
+  return write(txId, { splits: [] });
+}
+
+/** 按月摊(年费/保险)。同样只是视图:不生成十二条新交易,原额不动。 */
+export function setTxAmortize(txId: string, startMonth: string, months: number): boolean {
+  if (!/^\d{4}-\d{2}$/.test(startMonth) || !(months >= 1)) return false;
+  return write(txId, { amortize: { startMonth, months } });
+}
+
+export function clearTxAmortize(txId: string): boolean {
+  return write(txId, { amortize: undefined });
 }
 
 export function setTxNote(txId: string, note: string): boolean {

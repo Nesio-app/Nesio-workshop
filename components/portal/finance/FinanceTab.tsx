@@ -41,9 +41,11 @@ import { buildMonthlyReport, persistReportToMemory, autoPersistLastMonthReport }
 import { reportRichHtml } from '@/lib/portal/finance-report-visual';
 import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES } from '@/lib/portal/tx-category';
 import { loadAllPersonRecords } from '@/lib/portal/person-records';
+import { splitEvenly } from '@/lib/portal/ledger-allocation';
 import {
   loadTxAnnotations, txAnnotationOf, hasTxAnnotation, toggleTxPerson, setTxNote,
   addTxAttachment, removeTxAttachment, TX_ANNOTATIONS_EVENT, type TxAnnotation,
+  setTxSplits, clearTxSplits, setTxAmortize, clearTxAmortize,
 } from '@/lib/portal/tx-annotations';
 import { putLocalFile, prettyBytes, MAX_FILE_BYTES } from '@/lib/portal/local-file-store';
 import { getLifeGraph } from '@/lib/portal/life-graph';
@@ -223,8 +225,124 @@ function SpendChartPager({ merchants, incomes, currency, dict, chart, onChart }:
  * 关联人/附件/备注存 tx-annotations 覆盖层(按 tx.id),下一次 Plaid 同步不会冲掉;
  * 附件本体进 local-file-store(IndexedDB)。写失败一律出可见错误,不假成功。
  */
-function TxEditPanel({ txId, flow, dict, onFlow, contacts }: {
+/**
+ * TxSplitEditor — 一笔支出分摊到多个分类/人;年费按月摊。
+ *
+ * 两条规矩写在 UI 上而不只在数据层:
+ *   · **差一分都不存**。`validateAllocation` 返回 delta,这里直接显示「还剩 $x 要摊」——
+ *     只说「合计不对」的话你不知道还差多少。
+ *   · **分摊不改原额**。它是视图:总额聚合永远读原额,只有按分类/按人汇总才走分摊。
+ *     两边都算就是同一笔钱按两套口径各算一次。
+ */
+function TxSplitEditor({ txId, total, dict, contacts, onChanged }: {
+  txId: string; total: number; dict: string;
+  contacts: Array<{ key: string; name: string }>;
+  onChanged: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<Array<{ target: string; amount: string }>>([]);
+  const [err, setErr] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [months, setMonths] = useState('');
+
+  const existing = txAnnotationOf(txId).splits || [];
+  const amort = txAnnotationOf(txId).amortize;
+
+  const start = () => {
+    setRows(existing.length
+      ? existing.map((s) => ({ target: s.target, amount: String(s.amount) }))
+      : splitEvenly(total, 2).map((s) => ({ target: '', amount: String(s.amount) })));
+    setOpen(true); setErr(null); setSaved(false);
+  };
+
+  const save = () => {
+    setSaved(false);
+    const parsed = rows
+      .map((r) => ({ target: r.target.trim(), amount: Number(r.amount) }))
+      .filter((r) => r.target || r.amount);
+    const r = setTxSplits(txId, total, parsed);
+    if (r.ok) { setErr(null); setSaved(true); setOpen(false); onChanged(); return; }
+    setErr(
+      r.reason === 'sum_mismatch'
+        ? (r.delta > 0
+            ? L(dict, `还剩 ${r.delta.toFixed(2)} 没分完。`, `${r.delta.toFixed(2)} still to allocate.`)
+            : L(dict, `分多了 ${Math.abs(r.delta).toFixed(2)}。`, `Over-allocated by ${Math.abs(r.delta).toFixed(2)}.`))
+        : r.reason === 'duplicate_target' ? L(dict, '同一个去处出现了两次 —— 合起来写一行更清楚。', 'Same target twice — merge them into one row.')
+        : r.reason === 'nonpositive' ? L(dict, '每一份都要大于 0。', 'Every share must be greater than 0.')
+        : r.reason === 'empty' ? L(dict, '先填一行。', 'Add a row first.')
+        : L(dict, '没存进去,可能空间满了。', "Couldn't save — storage may be full."),
+    );
+  };
+
+  return (
+    <div className="nesio-fin-txedit-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+        <button type="button" className={`nesio-fin-flowopt${existing.length ? ' is-active' : ''}`} onClick={() => (open ? setOpen(false) : start())}>
+          {existing.length
+            ? L(dict, `已分摊 ${existing.length} 份`, `Split ${existing.length} ways`)
+            : L(dict, '分摊', 'Split')}
+        </button>
+        {existing.length > 0 && (
+          <button type="button" className="nesio-fin-flowopt" onClick={() => { clearTxSplits(txId); onChanged(); setOpen(false); }}>
+            {L(dict, '撤销分摊', 'Undo split')}
+          </button>
+        )}
+        {/* 按月摊:年费/保险。同样不生成新交易,原额不动。 */}
+        <input className="nesio-fin-split-months" inputMode="numeric" placeholder={L(dict, '按月摊(月数)', 'Amortize (months)')}
+          value={months} onChange={(e) => setMonths(e.target.value)}
+          onBlur={() => {
+            const m = Number(months);
+            if (!months.trim()) return;
+            if (!Number.isFinite(m) || m < 1) { setErr(L(dict, '月数要是大于 0 的整数。', 'Months must be a positive number.')); return; }
+            const now = new Date();
+            const ok = setTxAmortize(txId, `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`, Math.round(m));
+            if (!ok) setErr(L(dict, '没存进去,可能空间满了。', "Couldn't save — storage may be full."));
+            else { setErr(null); onChanged(); }
+          }} />
+        {amort && (
+          <button type="button" className="nesio-fin-flowopt is-active" onClick={() => { clearTxAmortize(txId); onChanged(); }}>
+            {L(dict, `每月摊 ${amort.months} 期 ✕`, `${amort.months}-month amortize ✕`)}
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="nesio-fin-split-rows">
+          {rows.map((r, i) => (
+            <div key={i} className="nesio-fin-split-row">
+              <input className="nesio-fin-split-target" placeholder={L(dict, '分类 / 人', 'Category / person')}
+                list="nesio-split-targets" value={r.target}
+                onChange={(e) => setRows((v) => v.map((x, j) => (j === i ? { ...x, target: e.target.value } : x)))} />
+              <input className="nesio-fin-split-amt" inputMode="decimal" placeholder="0.00" value={r.amount}
+                onChange={(e) => setRows((v) => v.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
+              <button type="button" className="nesio-fin-flowopt" aria-label={L(dict, '删这一行', 'Remove row')}
+                onClick={() => setRows((v) => v.filter((_, j) => j !== i))}>✕</button>
+            </div>
+          ))}
+          <datalist id="nesio-split-targets">
+            {contacts.slice(0, 24).map((c) => <option key={c.key} value={c.name} />)}
+          </datalist>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+            <button type="button" className="nesio-fin-flowopt" onClick={() => setRows((v) => [...v, { target: '', amount: '' }])}>
+              {L(dict, '加一份', 'Add share')}
+            </button>
+            <button type="button" className="nesio-fin-flowopt" onClick={() => setRows(splitEvenly(total, Math.max(2, rows.length)).map((s, i) => ({ target: rows[i]?.target || '', amount: String(s.amount) })))}>
+              {L(dict, '平均分', 'Split evenly')}
+            </button>
+            <button type="button" className="nesio-fin-flowopt is-active" onClick={save}>{L(dict, '存', 'Save')}</button>
+          </div>
+        </div>
+      )}
+      {err && <p className="nesio-claim-err" role="alert">{err}</p>}
+      {saved && <p className="nesio-fin-score-hint">{L(dict, '分摊已存 —— 按分类汇总时会用它。', 'Split saved — category totals will use it.')}</p>}
+    </div>
+  );
+}
+
+function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts }: {
   txId: string;
+  /** 这一笔的原额(绝对值)。分摊要拿它卡合计 —— 差一分都不存。 */
+  txAmount: number;
   flow: TxFlow;
   dict: string;
   onFlow: (f: TxFlow) => void;
@@ -333,6 +451,11 @@ function TxEditPanel({ txId, flow, dict, onFlow, contacts }: {
           <p className="nesio-fin-score-hint">{L(dict, '还没有可选的人 —— 先去关系页加一个。', 'No people yet — add one on the People page first.')}</p>
         )
       )}
+
+      {/* 分摊:把这一笔拆到多个分类/人。**合计必须等于原额**,差一分都不存 ——
+          「大致分了一下」的分摊比不分更糟:按分类汇总会少一块钱,而你看不出少在哪。
+          分摊不改原额,它是一个视图;总额聚合永远读原额。 */}
+      <TxSplitEditor txId={txId} total={txAmount} dict={dict} contacts={contacts} onChanged={() => setAnn(txAnnotationOf(txId))} />
 
       {atts.length > 0 && (
         <ul className="nesio-hang-att-list">
@@ -1083,7 +1206,7 @@ export default function FinanceTab() {
                     </div>
                   </div>
                   {flowEditId === t.id && (
-                    <TxEditPanel txId={t.id} flow={f} dict={dict} contacts={pickContacts}
+                    <TxEditPanel txId={t.id} txAmount={Math.abs(t.amount)} flow={f} dict={dict} contacts={pickContacts}
                       onFlow={(opt) => applyFlow(t, opt)} />
                   )}
                 </div>
