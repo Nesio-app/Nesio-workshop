@@ -171,6 +171,36 @@ export function listPlannedTrips(): Trip[] {
     .sort((a, b) => a.startDate.localeCompare(b.startDate));
 }
 
+/**
+ * 把「还没完成」的行程按**日期**分成三组(2026-07-30 真机实锤:
+ * 一趟 `2026-07-28 → 2026-08-01` 的行程被列在「即将出发」下面 —— 起始日期
+ * 已经是过去的了,它明明已经在路上)。
+ *
+ * 根因是拿**状态**当日期用:listPlannedTrips 把 planned 和 active 一起返回,
+ * 而标题只写了「即将出发」。状态是用户/导入流程标的,不一定跟得上日历。
+ * **日期是硬事实,状态是软标记** —— 分组按日期。
+ *
+ * 第三组「已经过去了」尤其重要:它把「这趟其实结束了,只是没人标完成」这件事
+ * 说出来,而不是继续假装它要出发。
+ */
+export function groupTripsByTime(trips: readonly Trip[], now: Date = new Date()): {
+  upcoming: Trip[];   // 还没开始
+  ongoing: Trip[];    // 已经在路上
+  overdue: Trip[];    // 结束日期都过了,却还没标完成
+} {
+  const p = (n: number) => String(n).padStart(2, '0');
+  const today = `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
+  const upcoming: Trip[] = []; const ongoing: Trip[] = []; const overdue: Trip[] = [];
+  for (const t of trips) {
+    const start = (t.startDate || '').slice(0, 10);
+    const end = (t.endDate || '').slice(0, 10) || start;
+    if (start && start > today) upcoming.push(t);
+    else if (end && end < today) overdue.push(t);
+    else ongoing.push(t);   // 含日期缺失/看不懂的 —— 归到「在路上」比归到「即将出发」诚实
+  }
+  return { upcoming, ongoing, overdue };
+}
+
 export function listCompletedTrips(): Trip[] {
   return loadTrips()
     .filter((t) => t.status === 'completed')

@@ -468,6 +468,16 @@ export default function TimelineTab() {
     };
     const placeOf = (label: string) => {
       const g = geo[label];
+      /* 「Unknown」不是地名,是**「我不知道这是哪」的记号**(2026-07-30 真机实锤:
+         「去过最北的地方 · Unknown」)。原样印出去,用户会以为自己去过一个叫 Unknown
+         的地方。有城市/国家就用它顶上;都没有就实话实说 ——
+         这张卡本来就带坐标,说「还没认出来」不丢信息,只是不再假装认识。 */
+      if (isGenericPlace(label)) {
+        const named = [g?.city, g?.country].filter(Boolean).join(' · ');
+        return named
+          ? { name: named, sub: '' }
+          : { name: L(dict, '还没认出这个地方', 'Not identified yet'), sub: '' };
+      }
       const disp = displayLabel(label);
       const base = disp.split(',')[0].trim() || disp; // 「名, 城, 国」变体只留名,后缀让位副行
       const suffix = disp.slice(base.length).replace(/^\s*,\s*/, '').trim();

@@ -7,6 +7,7 @@
 import { buildPlaceTimeline, haversineKm, placeKey, loadPlaceGeo, type PlaceVisit } from './place-trail';
 import { dateKeyToLocalDate, wallHour } from './place-time.mjs';
 import { distinctCountryCount } from './country-normalize';
+import { isGenericPlaceLabel } from './geo';
 
 export interface MonthPlaceStats {
   /** 'YYYY-MM' */
@@ -144,9 +145,24 @@ export interface FootprintHighlights {
   monthly: Array<{ monthKey: string; places: number }>;
 }
 
-/** 回顾页:全历史的纪录与趋势(Wrapped 形态,纯本机推导)。 */
-export function footprintHighlights(visits: PlaceVisit[]): FootprintHighlights | null {
-  const days = buildPlaceTimeline(visits, 3650);
+/**
+ * 回顾页:全历史的纪录与趋势(Wrapped 形态,纯本机推导)。
+ *
+ * ── 2026-07-30 真机实锤,两处「纪录」在说谎 ──────────────────────────
+ * ① **未来的日子被当成历史纪录**:真机上「最长停留 8月9日」「最忙一天 10月27日」
+ *    「最远一天 12月24日」—— 而今天是 7 月 30。一件还没发生的事不可能已经
+ *    「停留最久」。源头多半是导入数据里的坏年份/时区,但**这里必须自己挡住**:
+ *    「纪录」这个词的意思就是已经发生过。
+ * ② **占位符地名被当成正式地名**:「最长停留 Unknown」。Unknown 是「没认出来」
+ *    的记号,不是一个地方的名字。把它印在纪录卡上,用户会以为自己去过一个叫
+ *    Unknown 的地方。
+ * 两条都用正向判据:够格上榜的日子必须**已经过去**;够格上榜的地名必须**认出来了**。
+ */
+export function footprintHighlights(visits: PlaceVisit[], now: Date = new Date()): FootprintHighlights | null {
+  const all = buildPlaceTimeline(visits, 3650);
+  // ① 只认今天及以前 —— 「纪录」的意思就是已经发生过
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const days = all.filter((d) => d.dateKey <= todayKey);
   if (!days.length) return null;
 
   const allPlaces = new Set<string>();
@@ -170,8 +186,13 @@ export function footprintHighlights(visits: PlaceVisit[]): FootprintHighlights |
       const set = monthPlaces.get(mk) || new Set<string>();
       set.add(k);
       monthPlaces.set(mk, set);
-      // 「最长停留」只认地点级纪录:排除家(在家过夜天然最长,没信息量)
-      if (s.category !== 'home' && (!longestStay || s.durationMin > longestStay.min)) {
+      // 「最长停留」只认地点级纪录:
+      //   · 排除家(在家过夜天然最长,没信息量);
+      //   · ② 排除**没认出名字的地方**(Unknown / 裸坐标那类占位符)——
+      //     它不是一个地名,是「我不知道这是哪」的记号。印在纪录卡上,
+      //     用户会以为自己去过一个叫 Unknown 的地方。
+      if (s.category !== 'home' && !isGenericPlaceLabel(s.label)
+          && (!longestStay || s.durationMin > longestStay.min)) {
         longestStay = { label: s.label, min: s.durationMin, dateKey: day.dateKey };
       }
       const n = segs[i + 1];
