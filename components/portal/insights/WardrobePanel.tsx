@@ -27,6 +27,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import type { CalendarEvent } from '@/lib/portal/types';
 import SegTabs from '../ui/SegTabs';
+import SpendClaimRow from '../finance/SpendClaimRow';
 import { IconStar, IconThumbUp, IconThumbDown, IconCamera, IconAlertTriangle, IconRain, IconRefresh, GarmentIcon } from '../icons';
 
 const TYPE_LABEL: Record<GarmentType, [string, string]> = {
@@ -943,6 +944,20 @@ export default function WardrobePanel() {
             {L(dict, TYPE_LABEL[detail.garmentType][0], TYPE_LABEL[detail.garmentType][1])} · {L(dict, WARMTH_LABEL[detail.warmth][0], WARMTH_LABEL[detail.warmth][1])} · {L(dict, FORMAL_LABEL[detail.formality][0], FORMAL_LABEL[detail.formality][1])}
             {detail.lastWornAt ? ` · ${L(dict, `上次穿 ${detail.lastWornAt.slice(5, 10)}`, `worn ${detail.lastWornAt.slice(5, 10)}`)}` : ` · ${L(dict, '还没穿过', 'never worn')}`}
           </p>
+          {/* 「这笔钱是哪一笔」——记了价格才出现。认领的是银行里已有的那笔流水,
+              不是再记一笔账(刷卡买的话 Plaid 早有了,再记就是双计)。 */}
+          <SpendClaimRow
+            itemNodeId={detail.node.id}
+            item={{
+              id: detail.id,
+              name: detail.name,
+              price: detail.price ?? 0,
+              occurredAt: detail.purchasedAt || '',
+              ...(detail.name ? { merchant: detail.name } : {}),
+            }}
+            dict={dict}
+            onChanged={load}
+          />
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
             <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }}
               onClick={() => { markWorn(detail.id, new Date().toISOString()); giveFeedback('worn', [detail]); load(); }}>{L(dict, '今天穿了', 'Worn today')}</button>

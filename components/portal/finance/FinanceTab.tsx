@@ -244,7 +244,24 @@ function TxEditPanel({ txId, flow, dict, onFlow, contacts }: {
     || (/[a-z]/i.test(key) ? key.replace(/\b\w/g, (m) => m.toUpperCase()) : key);
 
   const togglePerson = (key: string) => {
-    setErr(toggleTxPerson(txId, key) ? null : failed);
+    const r = toggleTxPerson(txId, key);
+    // 两个失败是两回事,不能都说「失败了」:
+    //   · ok=false   —— 财务页这行都没存下(空间满了之类)
+    //   · graphOk=false —— 财务页存下了,但**那个人的页面看不到这笔钱**,记忆库也搜不到。
+    //     这正是加这条桥要修的毛病,所以它绝不能自己静默。
+    if (!r.ok) setErr(failed);
+    else if (!r.graphOk) {
+      setErr(
+        r.reason === 'no_person_node'
+          ? L(dict, `已记在这笔交易上。不过「${nameOf(key)}」还不是通讯录里的联系人,所以 TA 的关系页暂时看不到这笔钱 —— 去关系页把 TA 加进来就会自动接上。`,
+               `Saved on this transaction. “${nameOf(key)}” isn't a contact yet, so it won't show on their page — add them in People and it'll connect.`)
+          : r.reason === 'no_tx_node'
+            ? L(dict, '已记在这笔交易上。这笔流水还没同步进记忆,所以暂时只有财务页看得到 —— 下次同步后会自动补上。',
+                 "Saved here. This transaction hasn't synced into memory yet, so only Finance shows it for now — the next sync will connect it.")
+            : L(dict, '已记在这笔交易上,但没能连到记忆里 —— 别处暂时看不到。',
+                 "Saved here, but couldn't connect it to memory — other pages won't show it yet."),
+      );
+    } else setErr(null);
     setAnn(txAnnotationOf(txId));
   };
 
@@ -263,9 +280,15 @@ function TxEditPanel({ txId, flow, dict, onFlow, contacts }: {
       const meta = { name: f.name, mimeType: f.type || 'application/octet-stream', size: f.size };
       const stored = await putLocalFile(assetId, f, meta);
       // 红线:本体没存进就不要在列表里挂一个指向空气的附件。
-      if (!stored || !addTxAttachment(txId, { assetId, ...meta })) {
+      const added = stored ? addTxAttachment(txId, { assetId, ...meta }) : null;
+      if (!stored || !added?.ok) {
         setErr(L(dict, `「${f.name}」没能存进本机 —— 可能空间满了,清点空间再试。`, `Couldn't store “${f.name}” — device storage may be full.`));
         continue;
+      }
+      // 存下了但没挂到记忆节点上:财务页看得到,记忆详情/问一问取不到。说清楚。
+      if (!added.graphOk) {
+        setErr(L(dict, `「${f.name}」已存好,但还没连进记忆 —— 下次同步后记忆详情里也能看到。`,
+          `“${f.name}” is saved, but not linked into memory yet — the next sync will connect it.`));
       }
     }
     setAnn(txAnnotationOf(txId));

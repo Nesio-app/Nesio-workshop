@@ -54,12 +54,20 @@ function load(rel, mocks = {}) {
       deleteLocalFile: async (a) => { deleted.push(a); },
       createBlobStore: () => ({ load: () => [], save: () => {} }),
       normalizeCategory: (c) => c, categoryLabel: (c) => c,
+      // tx-graph-bridge:批注是**两写**(财务页覆盖层 + 图)。这里不 stub 成空操作 ——
+      // 记下每一次调用,好在下面钉住「确实往图上写了」。只写覆盖层的话
+      // Linda 的关系页看不到这笔钱,那正是这条桥要修的毛病。
+      linkTxToPerson: (txId, k) => { bridge.push(['link', txId, k]); return { graphOk: true }; },
+      unlinkTxFromPerson: (txId, k) => { bridge.push(['unlink', txId, k]); return { graphOk: true }; },
+      attachAssetToTx: (txId, a) => { bridge.push(['attach', txId, a.id]); return { graphOk: true }; },
+      detachAssetFromTx: (txId, id) => { bridge.push(['detach', txId, id]); return { graphOk: true }; },
       ...(mocks[id] || {}),
     }),
   });
   return mod.exports;
 }
 
+const bridge = [];   // tx-graph-bridge 的调用流水,给「确实两写了」那几条断言用
 const results = [];
 const check = (name, fn) => {
   try { fn(); results.push(['PASS', name, '']); }
@@ -71,8 +79,24 @@ const ann = load('lib/portal/tx-annotations.ts');
 
 check('①a 关联人 round-trip', () => {
   store.clear();
-  assert.strictEqual(ann.setTxPeople('tx1', ['Linda']), true, '写入应成功');
+  assert.strictEqual(ann.setTxPeople('tx1', ['Linda']).ok, true, '写入应成功');
   looseDeepEqual([...ann.txAnnotationOf('tx1').people], ['linda'], '应归一成小写');
+});
+
+check('①a2 关联人**同时写到图上** —— 只写财务页的话别处根本看不到', () => {
+  store.clear(); bridge.length = 0;
+  ann.setTxPeople('tx1', ['Linda']);
+  looseDeepEqual(bridge, [['link', 'tx1', 'linda']],
+    '关联只落在财务页覆盖层 —— Linda 的关系页看不到这笔钱,记忆库也搜不到。这正是这条桥要修的毛病');
+});
+
+check('①a3 取消关联时图上也要断开(否则关系页留一条幽灵关联)', () => {
+  store.clear();
+  ann.setTxPeople('tx1', ['linda', 'bob']);
+  bridge.length = 0;
+  ann.setTxPeople('tx1', ['linda']);
+  looseDeepEqual(bridge, [['unlink', 'tx1', 'bob']],
+    '按差集增删:没变的人不该重连(重连会把关联的建立时间冲掉),去掉的人必须真断开');
 });
 
 check('①b 关联人去重 + 去空', () => {
@@ -119,6 +143,13 @@ check('①f 写失败返回 false 且上报 storage-dropped(红线)', () => {
   failWrites = false;
   assert.strictEqual(ok, false, '写不进必须返回 false,不许假成功');
   assert.ok(events.some((e) => e.type === 'storage-dropped'), '必须上报存储失败(不许静默吞)');
+});
+
+check('①e2 附件**同时挂到流水节点** —— 只写覆盖层的话记忆详情/问一问取不到', () => {
+  store.clear(); bridge.length = 0;
+  ann.addTxAttachment('tx1', { assetId: 'inv-1', name: '发票.png', mimeType: 'image/png', size: 9 });
+  looseDeepEqual(bridge, [['attach', 'tx1', 'inv-1']],
+    '附件没挂进 node.assets —— 这张发票除了财务页哪儿都看不到');
 });
 
 check('①g 删附件连 IndexedDB 本体一起删(不留孤儿)', () => {
