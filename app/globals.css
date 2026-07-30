@@ -8905,7 +8905,11 @@ html[data-portal-theme="night"] .nesio-insights-narrative { background: var(--po
 }
 
 /* ─── Analytics Tab ─── */
-.nesio-analytics-tab { padding-top: 0.25rem; }
+/* bug2:财务/洞察区字体跟随设计系统(不许继承到系统兜底以外的自造字体) */
+.nesio-analytics-tab { padding-top: 0.25rem; font-family: var(--font-sans); }
+/* bug2:折叠节(风险预警/财务体检/商户 Top/收入来源/已学规则) */
+.nesio-fin-fold > summary::-webkit-details-marker { display: none; }
+.nesio-fin-fold > summary { user-select: none; }
 
 /* Donut chart */
 .nesio-donut-wrap {
@@ -9927,7 +9931,8 @@ html[data-portal-theme="night"] .nesio-trend-chart-card { background: rgba(255,2
 }
 .nesio-tl-title {
   grid-column: 2;
-  font-size: 0.98rem; font-weight: 600; color: var(--portal-ink); line-height: 1.35;
+  /* bug2:时间线内容不要粗体 —— 与问候同一档常规字重 */
+  font-size: 0.98rem; font-weight: var(--weight-regular); color: var(--portal-ink); line-height: 1.35;
   margin-top: 1px;
 }
 .nesio-tl-sub {
@@ -12980,7 +12985,7 @@ html[data-portal-theme="night"] .nesio-collapsed-icon { color: #cfe0f7; }
 html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check { border-color: rgba(207, 224, 247, 0.55); }
 .nesio-collapsed-title {
   font-size: 0.96rem;
-  font-weight: 600;
+  font-weight: var(--weight-regular); /* bug2:时间线内容不要粗体 */
   color: var(--portal-ink);
   line-height: 1.35;
   white-space: normal;
@@ -13261,85 +13266,85 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 
 /* 批次 27:支出分析 */
 .nesio-fin-monthbar { display: flex; align-items: center; justify-content: center; gap: 1rem; margin: 0.2rem 0 0.9rem; }
-.nesio-fin-monthnav { width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 1.1rem; line-height: 1; cursor: pointer; }
+.nesio-fin-monthnav { width: 2rem; height: 2rem; border-radius: 50%; border: 1px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); font-size: var(--text-h3); line-height: 1; cursor: pointer; }
 .nesio-fin-monthnav:disabled { opacity: 0.35; cursor: default; }
-.nesio-fin-month { font-size: 0.85rem; font-weight: 600; color: var(--portal-ink); min-width: 7rem; text-align: center; }
+.nesio-fin-month { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-ink); min-width: 7rem; text-align: center; }
 .nesio-fin-cats { display: flex; flex-direction: column; gap: 0.9rem; margin-top: 0.5rem; }
 .nesio-fin-cat-top { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 0.4rem; }
-.nesio-fin-cat-name { font-size: 0.86rem; color: var(--portal-ink); }
-.nesio-fin-cat-amt { font-size: 0.86rem; font-weight: 600; color: var(--portal-ink); }
-.nesio-fin-delta { margin-left: 0.4rem; font-size: 0.72rem; font-weight: 600; }
+.nesio-fin-cat-name { font-size: var(--text-sm); color: var(--portal-ink); }
+.nesio-fin-cat-amt { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-ink); }
+.nesio-fin-delta { margin-left: 0.4rem; font-size: var(--text-xs); font-weight: var(--weight-semibold); }
 /* 财务④:支出上涨是提醒不是风险,红色仅留给真实安全/到期风险(warm-coach)→ 琥珀 */
 .nesio-fin-delta.up { color: var(--status-gentle, #c9923f); }
 .nesio-fin-delta.down { color: var(--status-go, #3a9d6a); }
-.nesio-fin-delta.is-new { color: var(--portal-muted); font-weight: 500; }
+.nesio-fin-delta.is-new { color: var(--portal-muted); font-weight: var(--weight-medium); }
 .nesio-fin-bar { height: 7px; border-radius: 4px; background: var(--portal-accent-soft); overflow: hidden; }
 .nesio-fin-bar-fill { height: 100%; border-radius: 4px; background: var(--portal-accent); transition: width 0.4s ease; }
 .nesio-fin-merchants { display: flex; flex-direction: column; }
 .nesio-fin-merchant { display: flex; align-items: center; justify-content: space-between; padding: 0.7rem 0; border-bottom: 1px solid var(--portal-line); }
 .nesio-fin-merchant:last-child { border-bottom: none; }
-.nesio-fin-merchant-name { font-size: 0.88rem; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-merchant-name { font-size: var(--text-sm); color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nesio-fin-merchant-right { display: flex; align-items: baseline; gap: 0.6rem; flex-shrink: 0; }
-.nesio-fin-merchant-amt { font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); }
-.nesio-fin-merchant-cnt { font-size: 0.72rem; color: var(--portal-muted); }
+.nesio-fin-merchant-amt { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-ink); }
+.nesio-fin-merchant-cnt { font-size: var(--text-xs); color: var(--portal-muted); }
 /* 批次 29:财务子分类 tab + 交易明细 */
 .nesio-fin-subtabs { display: flex; gap: 0.4rem; margin: 0.2rem 0 1rem; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-.nesio-fin-subtab { flex-shrink: 0; border: 1px solid var(--portal-line); background: transparent; color: var(--portal-muted); border-radius: 999px; padding: 0.3rem 0.85rem; font-size: 0.8rem; cursor: pointer; }
-.nesio-fin-subtab.is-active { background: var(--portal-accent-soft); color: var(--portal-accent); border-color: var(--portal-accent-border); font-weight: 600; }
+.nesio-fin-subtab { flex-shrink: 0; border: 1px solid var(--portal-line); background: transparent; color: var(--portal-muted); border-radius: 999px; padding: 0.3rem 0.85rem; font-size: var(--text-sm); cursor: pointer; }
+.nesio-fin-subtab.is-active { background: var(--portal-accent-soft); color: var(--portal-accent); border-color: var(--portal-accent-border); font-weight: var(--weight-semibold); }
 .nesio-fin-txlist { display: flex; flex-direction: column; }
 .nesio-fin-txrow { display: flex; align-items: center; gap: 0.7rem; padding: 0.65rem 0; border-bottom: 1px solid var(--portal-line); }
 .nesio-fin-txrow:last-child { border-bottom: none; }
-.nesio-fin-txdate { flex-shrink: 0; width: 3rem; font-size: 0.72rem; color: var(--portal-muted); font-variant-numeric: tabular-nums; }
+.nesio-fin-txdate { flex-shrink: 0; width: 3rem; font-size: var(--text-xs); color: var(--portal-muted); font-variant-numeric: tabular-nums; }
 .nesio-fin-txmid { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
 /* 财务㉕:长商户名允许两行(单行省略把 AUTOPAY PAYME… 裁得没信息) */
-.nesio-fin-txname { font-size: 0.86rem; color: var(--portal-ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
-.nesio-fin-txcat { font-size: 0.66rem; color: var(--portal-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nesio-fin-txamt { flex-shrink: 0; font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
+.nesio-fin-txname { font-size: var(--text-sm); color: var(--portal-ink); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
+.nesio-fin-txcat { font-size: var(--text-xs); color: var(--portal-muted); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-txamt { flex-shrink: 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-ink); font-variant-numeric: tabular-nums; }
 .nesio-fin-txamt.is-refund { color: var(--status-go, #3a9d6a); }
 /* 批次 33:交易类型标签 + 分流纠正 */
-.nesio-fin-txflow { display: inline-flex; align-items: center; align-self: flex-start; max-width: 100%; min-width: 0; border: none; background: none; padding: 0; font-size: 0.66rem; color: var(--portal-muted); cursor: pointer; }
+.nesio-fin-txflow { display: inline-flex; align-items: center; align-self: flex-start; max-width: 100%; min-width: 0; border: none; background: none; padding: 0; font-size: var(--text-xs); color: var(--portal-muted); cursor: pointer; }
 .nesio-fin-txflow::before { content: ''; display: inline-block; flex-shrink: 0; width: 6px; height: 6px; border-radius: 50%; margin-right: 4px; background: var(--portal-muted); }
 /* 财务④:「支出」两字不许被 CJK 断行拆开;分类名过长时单行省略号,不再折行错位 */
 .nesio-fin-txflow-l { white-space: nowrap; flex-shrink: 0; }
 .nesio-fin-txflow--expense::before { background: #588ce3; }
 .nesio-fin-txflow--refund::before { background: #3a9d6a; }
 .nesio-fin-txflow--rebate::before { background: var(--status-calm, #6b8fc9); } /* 财务⑤:返还/报销(卡权益 credit),信息蓝区别于退款绿 */
-.nesio-fin-txflow--income::before { background: #e0954a; }
+.nesio-fin-txflow--income::before { background: var(--status-gentle); } /* bug2:裸 hex 收回 token */
 .nesio-fin-txflow--transfer::before { background: #9aa7b8; }
 .nesio-fin-flowpick { display: flex; gap: 0.4rem; flex-wrap: wrap; padding: 0.5rem 0 0.7rem; }
-.nesio-fin-flowopt { border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.3rem 0.75rem; background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.76rem; cursor: pointer; }
-.nesio-fin-flowopt.is-active { background: var(--portal-accent-soft); color: var(--portal-accent); border-color: var(--portal-accent-border); font-weight: 600; }
+.nesio-fin-flowopt { border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.3rem 0.75rem; background: var(--glass-bg-solid); color: var(--portal-ink); font-size: var(--text-xs); cursor: pointer; }
+.nesio-fin-flowopt.is-active { background: var(--portal-accent-soft); color: var(--portal-accent); border-color: var(--portal-accent-border); font-weight: var(--weight-semibold); }
 /* 财务㉒:预算(超支用琥珀,红仅真实风险) */
 .nesio-fin-budget-hero { display: flex; flex-direction: column; gap: 0.45rem; border: 1px solid var(--portal-line); border-radius: var(--radius-md, 16px); padding: 0.9rem 1rem; background: var(--portal-accent-soft); }
-.nesio-fin-budget-hero-l { font-size: 0.74rem; color: var(--portal-muted); }
-.nesio-fin-budget-left { font-size: 1.7rem; font-weight: 800; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
+.nesio-fin-budget-hero-l { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-fin-budget-left { font-size: var(--text-h1); font-weight: var(--weight-bold); color: var(--portal-ink); font-variant-numeric: tabular-nums; }
 .nesio-fin-budget-left.is-over { color: var(--status-gentle); }
 .nesio-fin-bar-fill.is-over { background: var(--status-gentle); }
-.nesio-fin-budget-hero-sub { font-size: 0.72rem; color: var(--portal-muted); }
-.nesio-fin-budget-rowedit { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: 0.78rem; color: var(--portal-muted); margin-top: 0.2rem; }
-.nesio-fin-budget-input { width: 6.5rem; border: 1px solid var(--portal-line); border-radius: var(--radius-sm, 12px); padding: 0.25rem 0.5rem; font-size: 0.82rem; color: var(--portal-ink); background: var(--glass-bg-solid); font-variant-numeric: tabular-nums; }
+.nesio-fin-budget-hero-sub { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-fin-budget-rowedit { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; font-size: var(--text-xs); color: var(--portal-muted); margin-top: 0.2rem; }
+.nesio-fin-budget-input { width: 6.5rem; border: 1px solid var(--portal-line); border-radius: var(--radius-sm, 12px); padding: 0.25rem 0.5rem; font-size: var(--text-sm); color: var(--portal-ink); background: var(--glass-bg-solid); font-variant-numeric: tabular-nums; }
 .nesio-fin-budget-add { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; margin-top: 0.9rem; } /* 财务㉜:窄屏换行,月报按钮不再被挤出屏外 */
 /* 财务⑲:商户 logo(Plaid 富化,缺失不占位) */
 .nesio-fin-mlogo { border-radius: 4px; object-fit: contain; vertical-align: -0.2em; margin-right: 5px; background: var(--glass-bg-solid); flex-shrink: 0; }
 /* 财务⑰:定期「待确认」早识别标(中性,不焦虑) */
-.nesio-fin-recur-badge { margin-left: 0.4rem; font-size: 0.62rem; font-weight: 500; color: var(--status-calm, #6b8fc9); border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.05rem 0.45rem; vertical-align: 0.1em; }
+.nesio-fin-recur-badge { margin-left: 0.4rem; font-size: var(--text-xs); font-weight: var(--weight-medium); color: var(--status-calm, #6b8fc9); border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.05rem 0.45rem; vertical-align: 0.1em; }
 /* 财务⑮:财务体检分项(L3 评分,红只给真实风险) */
 .nesio-fin-scores { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.4rem; }
 .nesio-fin-score { border: 1px solid var(--portal-line); border-radius: var(--radius-md, 16px); padding: 0.6rem 0.85rem; background: var(--glass-bg-solid); }
-.nesio-fin-score-top { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); }
+.nesio-fin-score-top { display: flex; justify-content: space-between; align-items: baseline; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-ink); }
 .nesio-fin-score-val { font-variant-numeric: tabular-nums; }
 .nesio-fin-score-val.is-info { color: var(--status-go); }
 .nesio-fin-score-val.is-low { color: var(--status-calm); }
 .nesio-fin-score-val.is-moderate { color: var(--status-gentle); }
 .nesio-fin-score-val.is-high { color: var(--status-risk); }
-.nesio-fin-score-hint { font-size: 0.7rem; color: var(--portal-muted); margin-top: 0.2rem; }
+.nesio-fin-score-hint { font-size: var(--text-xs); color: var(--portal-muted); margin-top: 0.2rem; }
 /* 财务⑩:机构 logo / 首字母色块;交易行账户归属;资产小结 */
 .nesio-fin-acct-logo { border-radius: 50%; object-fit: contain; background: var(--glass-bg-solid); vertical-align: -0.3em; flex-shrink: 0; }
-.nesio-fin-acct-badge { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: 600; vertical-align: -0.3em; flex-shrink: 0; }
-.nesio-fin-txacct { display: inline-flex; align-items: center; gap: 5px; font-size: 0.66rem; color: var(--portal-muted); margin-top: 0.1rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-acct-badge { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-weight: var(--weight-semibold); vertical-align: -0.3em; flex-shrink: 0; }
+.nesio-fin-txacct { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-xs); color: var(--portal-muted); margin-top: 0.1rem; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nesio-fin-assets { display: flex; flex-wrap: wrap; gap: 0.5rem 1.2rem; padding: 0.8rem 1rem; margin-bottom: 0.9rem; border: 1px solid var(--portal-line); border-radius: var(--radius-md, 16px); background: var(--portal-accent-soft); }
-.nesio-fin-asset { display: flex; flex-direction: column; gap: 0.15rem; font-size: 0.9rem; font-weight: 600; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
-.nesio-fin-asset-l { font-size: 0.68rem; font-weight: 400; color: var(--portal-muted); }
+.nesio-fin-asset { display: flex; flex-direction: column; gap: 0.15rem; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-ink); font-variant-numeric: tabular-nums; }
+.nesio-fin-asset-l { font-size: var(--text-xs); font-weight: 400; color: var(--portal-muted); }
 
 /* 设计对齐:Plaid 只存本机 chip / 念念一句话 / 消费×人 / 卡片页分组 */
 .nesio-fin-plaidchip {
@@ -13370,9 +13375,9 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-personspend { display: flex; flex-direction: column; margin-bottom: 0.5rem; }
 .nesio-fin-person-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.5rem 0.1rem; border-bottom: 1px solid var(--portal-line); }
 .nesio-fin-person-row:last-child { border-bottom: none; }
-.nesio-fin-person-av { flex-shrink: 0; width: 1.9rem; height: 1.9rem; border-radius: 0.55rem; display: grid; place-items: center; font-size: 0.82rem; font-weight: 700; background: var(--portal-accent-soft-md); color: var(--portal-blue-deep); }
-.nesio-fin-person-name { flex: 1; min-width: 0; font-size: 0.88rem; font-weight: 600; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nesio-fin-person-amt { font-size: 0.88rem; font-weight: 700; color: var(--portal-ink); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.nesio-fin-person-av { flex-shrink: 0; width: 1.9rem; height: 1.9rem; border-radius: 0.55rem; display: grid; place-items: center; font-size: var(--text-sm); font-weight: var(--weight-bold); background: var(--portal-accent-soft-md); color: var(--portal-blue-deep); }
+.nesio-fin-person-name { flex: 1; min-width: 0; font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-person-amt { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--portal-ink); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 
 /* 卡片页:净资产黑卡 + 分组标题 + 账户行 */
 .nesio-fin-networth {
@@ -13381,89 +13386,92 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
   border-radius: var(--radius-md, 16px); padding: 1.1rem 1.2rem; margin-bottom: 1.1rem;
 }
 html[data-portal-theme="night"] .nesio-fin-networth { background: #10151f; border: 1px solid rgba(255,255,255,0.08); }
-.nesio-fin-networth-l { font-size: 0.74rem; opacity: 0.75; }
-.nesio-fin-networth-v { font-size: 1.9rem; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
-.nesio-fin-networth-sub { font-size: 0.72rem; opacity: 0.7; font-variant-numeric: tabular-nums; }
-.nesio-fin-group-h { font-size: 0.7rem; font-weight: 700; color: var(--portal-muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 1rem 0.15rem 0.5rem; }
+.nesio-fin-networth-l { font-size: var(--text-xs); opacity: 0.75; }
+.nesio-fin-networth-v { font-size: var(--text-h1); font-weight: var(--weight-bold); font-variant-numeric: tabular-nums; letter-spacing: -0.01em; }
+.nesio-fin-networth-sub { font-size: var(--text-xs); opacity: 0.7; font-variant-numeric: tabular-nums; }
+.nesio-fin-group-h { font-size: var(--text-xs); font-weight: var(--weight-bold); color: var(--portal-muted); text-transform: uppercase; letter-spacing: 0.05em; margin: 1rem 0.15rem 0.5rem; }
 .nesio-fin-acctgroup { border: 1px solid var(--portal-line); border-radius: var(--radius-md, 16px); background: var(--glass-bg-solid); overflow: hidden; }
 html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,255,0.04); }
 .nesio-fin-acctrow { display: flex; align-items: center; gap: 0.7rem; padding: 0.7rem 0.85rem; border-bottom: 1px solid var(--portal-line); }
 .nesio-fin-acctrow:last-child { border-bottom: none; }
 .nesio-fin-acctrow-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.1rem; }
-.nesio-fin-acctrow-name { font-size: 0.9rem; font-weight: 700; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nesio-fin-acctrow-sub { font-size: 0.7rem; color: var(--portal-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nesio-fin-acctrow-bal { font-size: 0.95rem; font-weight: 800; color: var(--portal-ink); font-variant-numeric: tabular-nums; flex-shrink: 0; }
+.nesio-fin-acctrow-name { font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-acctrow-sub { font-size: var(--text-xs); color: var(--portal-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-acctrow-bal { font-size: var(--text-body); font-weight: var(--weight-bold); color: var(--portal-ink); font-variant-numeric: tabular-nums; flex-shrink: 0; }
 .nesio-fin-acctrow-bal.is-neg { color: var(--status-risk); }
 
 /* 批次 31:总览 KPI + 预警 + 趋势;交易审核;分卡 */
 /* 财务㉕:三列窄卡防截断 —— 标签不折行、金额可断行不裁切、字号收敛 */
 .nesio-fin-kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.45rem; margin-bottom: 1rem; }
 .nesio-fin-kpi { display: flex; flex-direction: column; gap: 0.2rem; padding: 0.65rem 0.6rem; border: 1px solid var(--portal-line); border-radius: 12px; background: var(--glass-bg-solid); min-width: 0; }
-.nesio-fin-kpi-l { font-size: 0.64rem; color: var(--portal-muted); white-space: nowrap; }
-.nesio-fin-kpi-v { font-size: 0.98rem; font-weight: 700; color: var(--portal-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.25; }
+.nesio-fin-kpi-l { font-size: var(--text-xs); color: var(--portal-muted); white-space: nowrap; }
+.nesio-fin-kpi-v { font-size: 0.98rem; font-weight: var(--weight-bold); color: var(--portal-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.25; }
 .nesio-fin-alerts { display: flex; flex-direction: column; gap: 0.5rem; }
 .nesio-fin-alert { padding: 0.65rem 0.8rem; border-radius: 12px; border: 1px solid var(--portal-line); }
-.nesio-fin-alert--risk { border-color: var(--status-risk, #d9534f); background: color-mix(in srgb, var(--status-risk, #d9534f) 8%, transparent); }
-.nesio-fin-alert--warn { border-color: #e0954a; background: color-mix(in srgb, #e0954a 9%, transparent); }
+/* bug2 配色红线:--warn 那两行原本是裸硬编码 #e0954a / #c77b2e(夜间主题不跟着翻转),
+   --risk 的 fallback #d9534f 也不是设计系统里任何值(token 是 #cf6b6b)= 偷偷混入的第二套红。
+   全部收回 token。 */
+.nesio-fin-alert--risk { border-color: var(--status-risk); background: color-mix(in srgb, var(--status-risk) 8%, transparent); }
+.nesio-fin-alert--warn { border-color: var(--status-gentle); background: color-mix(in srgb, var(--status-gentle) 9%, transparent); }
 .nesio-fin-alert--info { background: var(--glass-bg-solid); }
-.nesio-fin-alert-title { margin: 0; font-size: 0.86rem; font-weight: 700; color: var(--portal-ink); }
-.nesio-fin-alert--risk .nesio-fin-alert-title { color: var(--status-risk, #d9534f); }
-.nesio-fin-alert--warn .nesio-fin-alert-title { color: #c77b2e; }
-.nesio-fin-alert-body { margin: 0.15rem 0 0; font-size: 0.76rem; color: var(--portal-muted); }
-.nesio-fin-alert-note { font-size: 0.64rem; color: var(--portal-muted); margin: 0.4rem 0 0; text-align: right; }
+.nesio-fin-alert-title { margin: 0; font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--portal-ink); }
+.nesio-fin-alert--risk .nesio-fin-alert-title { color: var(--status-risk); }
+.nesio-fin-alert--warn .nesio-fin-alert-title { color: var(--status-gentle); }
+.nesio-fin-alert-body { margin: 0.15rem 0 0; font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-fin-alert-note { font-size: var(--text-xs); color: var(--portal-muted); margin: 0.4rem 0 0; text-align: right; }
 .nesio-fin-trend { display: flex; align-items: flex-end; gap: 0.4rem; height: 7rem; }
 .nesio-fin-trend-col { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.2rem; height: 100%; justify-content: flex-end; }
-.nesio-fin-trend-val { font-size: 0.56rem; color: var(--portal-muted); }
+.nesio-fin-trend-val { font-size: var(--text-xs); color: var(--portal-muted); }
 .nesio-fin-trend-bar-wrap { flex: 1; width: 70%; display: flex; align-items: flex-end; }
 .nesio-fin-trend-bar { width: 100%; min-height: 4px; background: var(--portal-accent-soft-lg, var(--portal-accent-soft)); border-radius: 4px 4px 0 0; }
 .nesio-fin-trend-bar.is-cur { background: var(--portal-accent); }
-.nesio-fin-trend-lbl { font-size: 0.62rem; color: var(--portal-muted); }
+.nesio-fin-trend-lbl { font-size: var(--text-xs); color: var(--portal-muted); }
 .nesio-fin-trend-area { margin: 0 0 var(--space-2); border-radius: var(--radius-md); overflow: hidden; background: var(--portal-bg); border: 1px solid var(--portal-line); }
 .nesio-fin-insight-line { margin: 0 0 var(--space-2); font-size: var(--text-sm); color: var(--portal-ink); line-height: 1.45; }
 .nesio-fin-review { border: 1px solid var(--portal-accent-border); border-radius: 14px; padding: 0.8rem; background: var(--portal-accent-soft); }
-.nesio-fin-review-title { margin: 0; font-size: 0.9rem; font-weight: 700; color: var(--portal-ink); }
-.nesio-fin-review-sug { margin: 0.3rem 0 0.6rem; font-size: 0.76rem; color: var(--portal-muted); }
+.nesio-fin-review-title { margin: 0; font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--portal-ink); }
+.nesio-fin-review-sug { margin: 0.3rem 0 0.6rem; font-size: var(--text-xs); color: var(--portal-muted); }
 .nesio-fin-review-btns { display: flex; flex-wrap: wrap; gap: 0.4rem; }
-.nesio-fin-review-accept { border: none; border-radius: 999px; padding: 0.35rem 0.9rem; background: var(--portal-accent); color: #fff; font-size: 0.78rem; font-weight: 600; cursor: pointer; }
-.nesio-fin-review-alt, .nesio-fin-review-skip { border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.35rem 0.8rem; background: var(--glass-bg-solid); color: var(--portal-ink); font-size: 0.78rem; cursor: pointer; }
+.nesio-fin-review-accept { border: none; border-radius: 999px; padding: 0.35rem 0.9rem; background: var(--portal-accent); color: #fff; font-size: var(--text-xs); font-weight: var(--weight-semibold); cursor: pointer; }
+.nesio-fin-review-alt, .nesio-fin-review-skip { border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.35rem 0.8rem; background: var(--glass-bg-solid); color: var(--portal-ink); font-size: var(--text-xs); cursor: pointer; }
 .nesio-fin-review-skip { color: var(--portal-muted); margin-left: auto; }
 .nesio-fin-card { padding: 0.85rem 0.9rem; border: 1px solid var(--portal-line); border-radius: 14px; background: var(--glass-bg-solid); margin-bottom: 0.7rem; }
 .nesio-fin-card-top { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; }
-.nesio-fin-card-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; flex: 1; font-size: 0.92rem; font-weight: 700; color: var(--portal-ink); }
+.nesio-fin-card-name { display: inline-flex; align-items: center; gap: 6px; min-width: 0; flex: 1; font-size: 0.92rem; font-weight: var(--weight-bold); color: var(--portal-ink); }
 /* 财务㉕:长账户名最多两行省略,不再被右侧余额挤成一词一行的竖排 */
 .nesio-fin-card-name-t { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; min-width: 0; line-height: 1.3; }
 .nesio-fin-card-bal { flex-shrink: 0; text-align: right; max-width: 46%; overflow-wrap: anywhere; }
-.nesio-fin-card-bal { font-size: 0.95rem; font-weight: 700; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
-.nesio-fin-card-sub { margin: 0.15rem 0 0.4rem; font-size: 0.68rem; color: var(--portal-muted); text-transform: capitalize; }
-.nesio-fin-card-meta { margin: 0; font-size: 0.74rem; color: var(--portal-muted); }
+.nesio-fin-card-bal { font-size: var(--text-body); font-weight: var(--weight-bold); color: var(--portal-ink); font-variant-numeric: tabular-nums; }
+.nesio-fin-card-sub { margin: 0.15rem 0 0.4rem; font-size: var(--text-xs); color: var(--portal-muted); text-transform: capitalize; }
+.nesio-fin-card-meta { margin: 0; font-size: var(--text-xs); color: var(--portal-muted); }
 
 /* 批次 40:分类支出环形图 + 交易卡后四位 */
 .nesio-fin-donut-wrap { display: flex; align-items: center; gap: 0.8rem; padding: 0.5rem 0 1rem; }
 .nesio-fin-donut-legend { flex: 1; display: flex; flex-direction: column; gap: 0.3rem; min-width: 0; }
-.nesio-fin-donut-leg { display: flex; align-items: center; gap: 0.4rem; font-size: 0.76rem; }
+.nesio-fin-donut-leg { display: flex; align-items: center; gap: 0.4rem; font-size: var(--text-xs); }
 .nesio-fin-donut-dot { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
 .nesio-fin-donut-cat { color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nesio-fin-donut-pct { margin-left: auto; color: var(--portal-muted); font-variant-numeric: tabular-nums; }
-.nesio-fin-txmask { font-size: 0.7rem; color: var(--portal-muted); font-variant-numeric: tabular-nums; }
+.nesio-fin-txmask { font-size: var(--text-xs); color: var(--portal-muted); font-variant-numeric: tabular-nums; }
 .nesio-fin-filterbar { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-.nesio-fin-select { flex: 1; min-width: 8rem; font-size: 0.82rem; padding: 0.4rem 0.6rem; border-radius: 10px; border: 1px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); }
+.nesio-fin-select { flex: 1; min-width: 8rem; font-size: var(--text-sm); padding: 0.4rem 0.6rem; border-radius: 10px; border: 1px solid var(--portal-line); background: var(--glass-bg-solid); color: var(--portal-ink); }
 
 /* 批次 39:定期账单 + 已学规则 */
 .nesio-fin-recur-hero { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.9rem 1rem; border-radius: 14px; background: var(--portal-accent-soft); border: 1px solid var(--portal-accent-border); }
-.nesio-fin-recur-hero-l { font-size: 0.82rem; font-weight: 600; color: var(--portal-blue-deep); }
-.nesio-fin-recur-hero-v { font-size: 1.25rem; font-weight: 800; color: var(--portal-blue-deep); font-variant-numeric: tabular-nums; }
+.nesio-fin-recur-hero-l { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-blue-deep); }
+.nesio-fin-recur-hero-v { font-size: var(--text-h2); font-weight: var(--weight-bold); color: var(--portal-blue-deep); font-variant-numeric: tabular-nums; }
 .nesio-fin-recurlist { display: flex; flex-direction: column; }
 .nesio-fin-recur { display: flex; align-items: center; justify-content: space-between; gap: 0.6rem; padding: 0.7rem 0; border-bottom: 1px solid var(--portal-line); }
 .nesio-fin-recur:last-child { border-bottom: none; }
 .nesio-fin-recur-main { min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
-.nesio-fin-recur-name { font-size: 0.9rem; font-weight: 600; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nesio-fin-recur-meta { font-size: 0.7rem; color: var(--portal-muted); }
-.nesio-fin-recur-amt { flex-shrink: 0; font-size: 0.95rem; font-weight: 700; color: var(--portal-ink); font-variant-numeric: tabular-nums; }
+.nesio-fin-recur-name { font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-recur-meta { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-fin-recur-amt { flex-shrink: 0; font-size: var(--text-body); font-weight: var(--weight-bold); color: var(--portal-ink); font-variant-numeric: tabular-nums; }
 .nesio-fin-rules { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.5rem; }
 .nesio-fin-rule { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 0.7rem; border-radius: 10px; background: var(--portal-surface-2, rgba(127,127,127,0.06)); }
-.nesio-fin-rule-txt { font-size: 0.8rem; color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-fin-rule-txt { font-size: var(--text-sm); color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nesio-fin-rule-arrow { color: var(--portal-muted); }
-.nesio-fin-rule-x { flex-shrink: 0; width: 1.6rem; height: 1.6rem; border-radius: 50%; border: none; background: transparent; color: var(--portal-muted); font-size: 0.9rem; cursor: pointer; }
+.nesio-fin-rule-x { flex-shrink: 0; width: 1.6rem; height: 1.6rem; border-radius: 50%; border: none; background: transparent; color: var(--portal-muted); font-size: var(--text-sm); cursor: pointer; }
 .nesio-fin-rule-x:active { background: var(--portal-line); }
 
 /* 批次 39:健康 Dashboard */
@@ -13476,8 +13484,11 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-body-ledger, .nesio-beauty-care { display: flex; flex-direction: column; gap: var(--space-3); }
 .nesio-bl-section { display: flex; flex-direction: column; gap: var(--space-3); }
 .nesio-bl-lede {
-  margin: 0; font-family: var(--font-serif);
-  font-size: var(--text-h3); font-weight: var(--weight-semibold); color: var(--portal-ink);
+  /* bug2(护理页「字体不符合要求」):原来是 --font-serif + semibold —— Noto Serif SC 在 iOS
+     上没有本地字体,级联落到系统衬线,渲出来偏粗且带繁体字形,与同页其余文字两种字。
+     统一到设计系统正文 sans + 常规字重。 */
+  margin: 0; font-family: var(--font-sans);
+  font-size: var(--text-h3); font-weight: var(--weight-regular); color: var(--portal-ink);
 }
 .nesio-bl-goalrow {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
@@ -17473,7 +17484,10 @@ html[data-portal-theme="night"] .nesio-map-tile {
    给它真正的存在感与留白,读起来是她在说话,不是一行状态文案。 */
 .nesio-today-receipt {
   margin: 0.9rem 0.15rem 1.15rem;
-  font-size: 1.22rem;
+  /* bug2:与时间线同一套字 —— sans(简体优先)+ 常规字重,不加粗、不落衬线繁体字形 */
+  font-family: var(--font-sans);
+  font-size: var(--text-h3);
+  font-weight: var(--weight-regular);
   line-height: 1.55;
   letter-spacing: 0.005em;
   color: var(--portal-ink);

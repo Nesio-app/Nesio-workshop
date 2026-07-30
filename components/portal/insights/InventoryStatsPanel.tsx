@@ -7,12 +7,60 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { inventoryStats, sellPile, amazonSummary, type InventoryItem } from '@/lib/portal/inventory';
+import { inventoryStats, type InventoryItem } from '@/lib/portal/inventory';
 // 口径和收纳页、记忆页那个「收纳」球共用一处 —— 各写各的正是 22 vs 18 的来源。
 import { listStorageItems } from '@/lib/portal/inventory-visibility';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+
+/**
+ * bug2:物品分类由横条列表改成饼图(纯 SVG,无依赖)。类别色走设计系统 --viz-1..8,
+ * 换皮肤跟着变;前 7 类 + 其余合并「其他」,免得小切片挤成毛刺。点任意处进物品页。
+ */
+const PIE_COLORS = Array.from({ length: 8 }, (_, i) => `var(--viz-${i + 1})`);
+function CategoryPie({ rows, onOpen, dict }: {
+  rows: Array<{ category: string; count: number }>; onOpen: () => void; dict: string;
+}) {
+  const total = rows.reduce((s, r) => s + r.count, 0);
+  if (!total) return null;
+  const top = rows.slice(0, 7);
+  const restCount = rows.slice(7).reduce((s, r) => s + r.count, 0);
+  const shown = restCount > 0
+    ? [...top, { category: L(dict, '其他', 'Other'), count: restCount }]
+    : top;
+  const R = 52;
+  const C = 2 * Math.PI * R;
+  let acc = 0;
+  const slices = shown.map((r, i) => {
+    const pct = (r.count / total) * 100;
+    const len = (pct / 100) * C;
+    const node = (
+      <circle key={r.category} r={R} fill="none" stroke={PIE_COLORS[i % PIE_COLORS.length]}
+        strokeWidth="26" strokeLinecap="butt" strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-acc} />
+    );
+    acc += len;
+    return { node, pct: Math.round(pct), row: r, color: PIE_COLORS[i % PIE_COLORS.length] };
+  });
+  return (
+    <button type="button" onClick={onOpen}
+      style={{ display: 'block', width: '100%', marginTop: 'var(--space-5)', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+      {/* 半径 52 + 描边 26 ⇒ 实心饼(内圈归零),不是环 */}
+      <svg viewBox="0 0 140 140" width="140" height="140" style={{ display: 'block', margin: '0 auto' }} aria-label={L(dict, '物品分类占比', 'Items by category')}>
+        <g transform="translate(70,70) rotate(-90)">{slices.map((s) => s.node)}</g>
+      </svg>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1) var(--space-3)', marginTop: 'var(--space-2)' }}>
+        {slices.map((s) => (
+          <span key={s.row.category} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--text-xs)', color: 'var(--portal-ink)' }}>
+            <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flexShrink: 0 }} />
+            {s.row.category}
+            <span style={{ color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>{s.row.count} · {s.pct}%</span>
+          </span>
+        ))}
+      </div>
+    </button>
+  );
+}
 
 export default function InventoryStatsPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -31,8 +79,6 @@ export default function InventoryStatsPanel() {
   }, []);
 
   const st = useMemo(() => inventoryStats(items), [items]);
-  const sp = useMemo(() => sellPile(items), [items]);
-  const amz = useMemo(() => amazonSummary(items), [items]);
 
   const openInventory = () => window.dispatchEvent(new CustomEvent('nesio-open-inventory'));
 
@@ -80,68 +126,10 @@ export default function InventoryStatsPanel() {
         {L(dict, `已归位 ${placed} · 未归位 ${unplaced} · ${st.spaces} 个空间 · ${st.containers} 个容器`, `${placed} placed · ${unplaced} unplaced · ${st.spaces} spaces · ${st.containers} bins`)}
       </p>
 
-      {/* 按分类 */}
-      {st.byCategory.length > 0 && (
-        <>
-          <p style={sectionLbl}>{L(dict, '按分类', 'By category')}</p>
-          {/* 长得像入口就得是入口(QA):点分类行进物品页 */}
-          {st.byCategory.slice(0, 8).map((c) => (
-            <button key={c.category} type="button" onClick={openInventory}
-              style={{ display: 'block', width: '100%', margin: '0 0 var(--space-2)', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', marginBottom: '0.2rem' }}>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.category}</span>
-                <span style={{ color: 'var(--portal-muted)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{c.count}</span>
-              </div>
-              <div style={{ height: 6, borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)' }}>
-                <div style={{ height: '100%', borderRadius: 'var(--radius-pill)', width: `${Math.round((c.count / maxCat) * 100)}%`, background: 'var(--portal-accent)' }} />
-              </div>
-            </button>
-          ))}
-        </>
-      )}
+      {/* bug2:分类横条图 → 饼图,「按分类」黑体小标题删掉(饼图自带图例) */}
+      {st.byCategory.length > 0 && <CategoryPie rows={st.byCategory} onOpen={openInventory} dict={dict} />}
 
-      {/* 常用标签 */}
-      {st.topTags.length > 0 && (
-        <>
-          <p style={sectionLbl}>{L(dict, '常用标签', 'Top tags')}</p>
-          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
-            {st.topTags.map((t) => (
-              <button key={t.tag} type="button" onClick={openInventory}
-                style={{ padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-xs)', background: 'var(--portal-accent-soft)', border: '1px solid var(--portal-line)', color: 'var(--portal-ink)', cursor: 'pointer', fontFamily: 'inherit' }}>
-                {t.tag} <span style={{ color: 'var(--portal-muted)' }}>{t.count}</span>
-              </button>
-            ))}
-          </div>
-        </>
-      )}
-
-      {/* 在处理:卖闲置 + 亚马逊转卖(点卡进物品页) */}
-      {(sp.items.length > 0 || amz.count > 0) && (
-        <>
-          <p style={sectionLbl}>{L(dict, '在处理', 'In progress')}</p>
-          <div style={{ display: 'grid', gridTemplateColumns: amz.count > 0 ? '1fr 1fr' : '1fr', gap: 'var(--space-2)' }}>
-            <button type="button" onClick={openInventory} style={{ ...card, textAlign: 'left', cursor: 'pointer' }}>
-              <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{L(dict, '卖闲置堆', 'Sell pile')}</span>
-              <span style={{ display: 'block', marginTop: '0.3rem', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-                {L(dict, `${sp.items.length} 件 · 约 $${Math.round(sp.totalValue).toLocaleString('en-US')}`, `${sp.items.length} items · ≈$${Math.round(sp.totalValue).toLocaleString('en-US')}`)}
-              </span>
-            </button>
-            {amz.count > 0 && (
-              <button type="button" onClick={openInventory} style={{ ...card, textAlign: 'left', cursor: 'pointer' }}>
-                <span style={{ display: 'block', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{L(dict, '亚马逊转卖', 'Amazon flip')}</span>
-                <span style={{ display: 'block', marginTop: '0.3rem', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-                  {L(dict, `${amz.count} 件 · 已赚 $${Math.round(amz.realizedProfit).toLocaleString('en-US')}`, `${amz.count} items · $${Math.round(amz.realizedProfit).toLocaleString('en-US')} earned`)}
-                </span>
-                {amz.reviewDue > 0 && (
-                  <span style={{ display: 'inline-block', marginTop: '0.4rem', padding: '0.1rem 0.5rem', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-xs)', background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>
-                    {L(dict, `${amz.reviewDue} 件待留评`, `${amz.reviewDue} to review`)}
-                  </span>
-                )}
-              </button>
-            )}
-          </div>
-        </>
-      )}
+      {/* bug2:「常用标签」「在处理」两节按图注删除 */}
 
       <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-5)' }} onClick={openInventory}>
         {L(dict, '打开物品管理', 'Open Items')}

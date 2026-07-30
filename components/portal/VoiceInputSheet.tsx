@@ -30,6 +30,8 @@ import { permissionRationale, shouldExplainPermission, markPermissionExplained }
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
+import { executeWithDataProtection } from '@/lib/portal/client-flow-control';
+import { searchMemoriesLocally } from '@/lib/portal/local-tier0-handlers';
 
 interface VoiceInputSheetProps {
   open: boolean;
@@ -131,54 +133,90 @@ function mergeTags(...groups: Array<string[] | undefined>): string[] {
 async function fetchAskResponse(query: string, candidates: LifeNode[]): Promise<AskApiResponse> {
   const empty: AskApiResponse = { nodes: [], answer: '', aggregations: [], webSearchUsed: false };
   if (!candidates.length) return empty;
-  const res = await fetch('/api/portal/analyze', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
-    body: JSON.stringify({
-      type: 'ask',
-      uiLocale: loadProfileSettings().locale,
-      content: JSON.stringify({
-        query,
-        totalNodeCount: candidates.length,
-        candidates: candidates.slice(0, 60).map((node) => ({
-          id: node.id,
-          type: node.type,
-          name: node.name,
-          tags: node.tags,
-          source: node.source,
-          rawInput: node.rawInput,
-          attributes: node.attributes,
-          relations: node.relations,
-        })),
-      }),
-    }),
-  });
-  // 500/402/429/超时 是**故障**,不是「空结果」—— 抛错让调用方走显式失败态,别把基础设施
-  // 故障伪装成「没找到线索」(红线)。genuine 空答由下面 200 响应的 !data.ok && !answer 处理。
-  if (!res.ok) throw new Error(`ask_failed_${res.status}`);
-  const data = await res.json() as {
-    ok?: boolean;
-    matches?: Array<{ id?: string; name?: string; reason?: string }>;
-    answer?: string;
-    aggregations?: AskAggregation[];
-    webSearchUsed?: boolean;
-  };
-  if (!data.ok && !data.answer) return empty;
-  // Build reason lookup
-  const reasonMap = new Map<string, string>();
-  data.matches?.forEach((m) => {
-    if (m.id) reasonMap.set(m.id, m.reason || '');
-    if (m.name) reasonMap.set(m.name, m.reason || '');
-  });
-  const matchedNodes: AskResult[] = candidates
-    .filter((n) => reasonMap.has(n.id) || reasonMap.has(n.name))
-    .map((n) => ({ id: n.id, name: n.name, source: n.source || '', reason: reasonMap.get(n.id) || reasonMap.get(n.name) || '' }));
-  return {
-    nodes: matchedNodes,
-    answer: data.answer || '',
-    aggregations: data.aggregations || [],
-    webSearchUsed: data.webSearchUsed || false,
-  };
+
+  // Phase 2: 客户端前置分流 + 数据保护
+  try {
+    const result = await executeWithDataProtection(
+      'voice',
+      { query, candidateCount: candidates.length },
+      // Tier 0: 本地语义搜索（免费用户走这路）
+      async () => {
+        const localHits = await searchMemoriesLocally(query, 6);
+        return {
+          ok: true,
+          matches: localHits.result.map((node) => ({
+            id: node.id,
+            name: node.name,
+            reason: '本地搜索匹配',
+          })),
+          answer: `找到 ${localHits.result.length} 条相关记录`,
+          aggregations: [],
+          webSearchUsed: false,
+        };
+      },
+      // Cloud: 云端对话式问答（付费用户走这路）
+      async () => {
+        const res = await fetch('/api/portal/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
+          body: JSON.stringify({
+            type: 'ask',
+            uiLocale: loadProfileSettings().locale,
+            content: JSON.stringify({
+              query,
+              totalNodeCount: candidates.length,
+              candidates: candidates.slice(0, 60).map((node) => ({
+                id: node.id,
+                type: node.type,
+                name: node.name,
+                tags: node.tags,
+                source: node.source,
+                rawInput: node.rawInput,
+                attributes: node.attributes,
+                relations: node.relations,
+              })),
+            }),
+          }),
+        });
+        if (!res.ok) throw new Error(`ask_failed_${res.status}`);
+        const data = await res.json() as {
+          ok?: boolean;
+          matches?: Array<{ id?: string; name?: string; reason?: string }>;
+          answer?: string;
+          aggregations?: AskAggregation[];
+          webSearchUsed?: boolean;
+        };
+        return {
+          ok: data.ok === true,
+          matches: data.matches || [],
+          answer: data.answer || '',
+          aggregations: data.aggregations || [],
+          webSearchUsed: data.webSearchUsed || false,
+        };
+      }
+    );
+
+    const data = result.data;
+    if (!data.ok && !data.answer) return empty;
+    // Build reason lookup
+    const reasonMap = new Map<string, string>();
+    data.matches?.forEach((m) => {
+      if (m.id) reasonMap.set(m.id, m.reason || '');
+      if (m.name) reasonMap.set(m.name, m.reason || '');
+    });
+    const matchedNodes: AskResult[] = candidates
+      .filter((n) => reasonMap.has(n.id) || reasonMap.has(n.name))
+      .map((n) => ({ id: n.id, name: n.name, source: n.source || '', reason: reasonMap.get(n.id) || reasonMap.get(n.name) || '' }));
+    return {
+      nodes: matchedNodes,
+      answer: data.answer || '',
+      aggregations: data.aggregations || [],
+      webSearchUsed: data.webSearchUsed || false,
+    };
+  } catch (error) {
+    // 失败时返回空结果（由上层 UI 显示失败消息）
+    return empty;
+  }
 }
 
 // ---- 日期时间选择器 ----

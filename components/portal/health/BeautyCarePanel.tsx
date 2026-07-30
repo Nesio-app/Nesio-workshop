@@ -39,9 +39,6 @@ export default function BeautyCarePanel() {
   return (
     <div className="nesio-beauty-care">
       <p className="nesio-bl-lede">{L(dict, '护理 · 护肤与美容', 'Care · skincare & beauty')}</p>
-      <p className="nesio-trip-footnote">
-        {L(dict, '挂在健康页:皮肤护理是身体账的一部分。物品分类选「护肤」就会出现在这里。', 'Lives under Health — skincare is part of the body ledger. Tag items as Skincare to list them here.')}
-      </p>
 
       {items.length === 0 ? (
         <div className="nesio-bl-empty-block">

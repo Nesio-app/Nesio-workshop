@@ -43,6 +43,10 @@ const AUTH_RE = /(^|[-_])(auth|session|tokens?|openid|access|refresh|provider|se
 
 // 可再生缓存/节流 —— 不进备份、删除无损(与旧 full-backup EXCLUDE 合并,单一真源)。
 export const CACHE_KEYS = new Set<string>([
+  // IDB 迁移的按设备簿记(2026-07-30 合并 main 后补登记):每台设备各自迁各自的,
+  // 跨端同步这两个键只会让新设备以为「已经迁过了」而跳过迁移。
+  'nesio-migration-completed-v1',
+  'nesio-migration-log-v1',
   'nesio-email-signals-cache',
   'nesio-guidance-lang-cache-v1',
   'nesio-daily-brief-v2',

@@ -847,7 +847,9 @@ export default function Portal() {
       if (!canOpenFreeze()) { track('pro_gate_shown', { feature: 'freeze' }); setProGate('freeze'); return; }
       track('freeze_open'); setFreezeOpen(true);
     };
-    const inventoryHandler = () => { track('inventory_open'); setInventoryOpen(true); };
+    // bug2(护理页死按钮):从洞察浮层(z=901)里点「去物品」,物品页开在浮层之下看不见 ——
+    // 与记忆搜索同根因,先关洞察再开。
+    const inventoryHandler = () => { track('inventory_open'); setInsightsOpen(false); setInventoryOpen(true); };
     const calendarCreateHandler = () => { track('calendar_create_open'); setCalendarCreateOpen(true); };
     const familyHandler = () => { track('family_sharing_open'); setFamilyOpen(true); };
     const cookingHandler = () => { track('cooking_open'); setCookingOpen(true); };
@@ -862,6 +864,8 @@ export default function Portal() {
     const openCameraHandler = (e: Event) => {
       const file = (e as CustomEvent).detail?.file as File | undefined;
       track('travel_camera_open');
+      // bug2(护理页死按钮):相机 z=400 在洞察浮层(901)之下,先关洞察。
+      setInsightsOpen(false);
       setPantryIntake(false); setCameraFile(file ?? null); setCaptureMode('camera');
     };
     const rewardsHandler = () => { track('rewards_open'); setRewardsOpen(true); };

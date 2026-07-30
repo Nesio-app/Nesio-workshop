@@ -278,15 +278,8 @@ export function TodayFocusSection({
       {/* 批次 107:时间线 —— 心情作「现在」第一拍 + 竖轨串起下面的要紧事(设计规范今天页) */}
       <div className="nesio-focus-timeline">
         <div data-tour="mood"><MoodBeat /></div>
-        {/* 空态那块是**纯说明**,不是按钮。原来只有一行居中的「✓ 没有到点的事」套在
-            虚线圆角盒子里 —— 用户当成胶囊按钮点了半天没反应。补上早就写好却没用上的
-            那句提示(todayFocusEmptyHint),让它读起来像空态说明;左对齐,也不再像个按钮。 */}
-        {isEmpty ? (
-          <div className="nesio-focus-empty nesio-focus-empty--tl">
-            <p className="nesio-focus-empty-title">{t(locale, 'todayFocusEmpty')}</p>
-            <p className="nesio-focus-empty-hint">{t(locale, 'todayFocusEmptyHint')}</p>
-          </div>
-        ) : (
+        {/* bug2:「✓ 没有到点的事」空态卡整块删除 —— 没事就该什么都不说,不占一张卡。 */}
+        {isEmpty ? null : (
           <div className="nesio-attention-layout">
 
           {/* ── Slot 1: Must Not Miss ── */}
@@ -301,37 +294,46 @@ export function TodayFocusSection({
                 此前 onClick 跳记忆页、collapsed state 成孤儿,点了没有折叠反应)。去记忆页仍走顶部「全部」。 */}
           {collapsedNodes.length > 0 && (
             <div className="nesio-collapsed-section">
-              <ul className="nesio-collapsed-list">{collapsed ? shownNodes : collapsedNodes}</ul>
-              {restCount > 0 && (collapsed ? (
-                <button
-                  type="button"
-                  className="nesio-collapsed-row nesio-tl-more"
-                  aria-expanded={false}
-                  onClick={() => setCollapsed(false)}
-                >
-                  {/* 2026-07-29:去掉行首那个孤零零的 ⋯ 圆点 —— 时间线上每个圆点都代表
-                      「一件真实发生的事」,而这一条是**入口**不是事件,挂个点在轨道上
-                      反而像多出一件没内容的事。 */}
-                  <span className="nesio-collapsed-task-body">
-                    <span className="nesio-collapsed-kicker">{L(dict, '稍后', 'Later')}</span>
-                    <span className="nesio-collapsed-title">{L(dict, `还有 ${restCount} 件小事`, `${restCount} more small things`)}</span>
-                    <span className="nesio-tl-more-sub">{L(dict, '点开看看,我先替你收着 ›', "Tap to see them — I've kept them ›")}</span>
-                  </span>
-                </button>
-              ) : (
-                /* 批次 182(用户实锤):摊开后只留一个向上箭头收起,字全删 */
-                <button
-                  type="button"
-                  className="nesio-collapsed-row nesio-tl-fold"
-                  aria-expanded
-                  aria-label={L(dict, '收起', 'Collapse')}
-                  onClick={() => setCollapsed(true)}
-                >
-                  <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>
-                    <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M6 15l6-6 6 6" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  </span>
-                </button>
-              ))}
+              {/* bug2「稍后位置漂移」:展开/收起入口原来挂在 <ul> 外面 —— 时间线竖轨只画到 <ul>
+                  结尾,这一行就浮在轨道下方,且随折叠状态左右缩进不同,读起来像跑位了。
+                  改成列表里的一个 <li>,和上面各拍同一条轨、同一缩进,位置不再变。 */}
+              <ul className="nesio-collapsed-list">
+                {collapsed ? shownNodes : collapsedNodes}
+                {restCount > 0 && (
+                  <li>
+                    {collapsed ? (
+                      <button
+                        type="button"
+                        className="nesio-collapsed-row nesio-tl-more"
+                        aria-expanded={false}
+                        onClick={() => setCollapsed(false)}
+                      >
+                        {/* 2026-07-29:去掉行首那个孤零零的 ⋯ 圆点 —— 时间线上每个圆点都代表
+                            「一件真实发生的事」,而这一条是**入口**不是事件,挂个点在轨道上
+                            反而像多出一件没内容的事。 */}
+                        <span className="nesio-collapsed-task-body">
+                          <span className="nesio-collapsed-kicker">{L(dict, '稍后', 'Later')}</span>
+                          <span className="nesio-collapsed-title">{L(dict, `还有 ${restCount} 件小事`, `${restCount} more small things`)}</span>
+                          {/* bug2:「点开看看,我先替你收着」删除 —— 整行本身就是那个动作 */}
+                        </span>
+                      </button>
+                    ) : (
+                      /* 批次 182(用户实锤):摊开后只留一个向上箭头收起,字全删 */
+                      <button
+                        type="button"
+                        className="nesio-collapsed-row nesio-tl-fold"
+                        aria-expanded
+                        aria-label={L(dict, '收起', 'Collapse')}
+                        onClick={() => setCollapsed(true)}
+                      >
+                        <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>
+                          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.4"><path d="M6 15l6-6 6 6" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                        </span>
+                      </button>
+                    )}
+                  </li>
+                )}
+              </ul>
             </div>
           )}
 

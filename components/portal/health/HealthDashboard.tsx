@@ -16,7 +16,7 @@ import { usePortalLocale } from '../use-portal-locale';
 import { computeFitnessInsight, type FitnessInsight } from '@/lib/platform/fitness-integrator';
 import { loadTrainingState, sessionsThisWeek, protocolById } from '@/lib/platform/training-protocol-engine';
 import { workoutSessionsThisWeek } from '@/lib/portal/workout-store';
-import { healthNarrative, analyzeSeries } from '@/lib/portal/health-narrative';
+import { analyzeSeries } from '@/lib/portal/health-narrative';
 import { mineRelationships } from '@/lib/portal/health-correlations';
 import { loadClinical, type StoredClinical } from '@/lib/portal/clinical-store';
 import { readLaunchSurfaceContextFromBrowser } from '@/lib/portal/launch-surface.mjs';
@@ -24,17 +24,14 @@ import { evaluateHealthFindings, type Severity } from '@/lib/portal/health-clini
 import { computeRiskScores, type RiskCategory } from '@/lib/portal/health-risk';
 import { buildMonthlyHealthReport, persistHealthReportToMemory, autoPersistLastMonthHealthReport, healthMonths } from '@/lib/portal/health-report';
 import { healthReportRichHtml } from '@/lib/portal/health-report-visual';
-import { IconLock } from '../icons';
 import SegTabs from '../ui/SegTabs';
 import { guardPaidCloudAi } from '@/lib/portal/entitlement';
-import BodyLedgerPanel, { BodyLedgerQuickLinks } from './BodyLedgerPanel';
+import BodyLedgerPanel, { PostMealBody, ReactionBody } from './BodyLedgerPanel';
 import BeautyCarePanel from './BeautyCarePanel';
 import HealthLensCards from './HealthLensCards';
 import HealthRecordSheet from './HealthRecordSheet';
 import MetricDetailSheet from './MetricDetailSheet';
 import LabScanSheet from './LabScanSheet';
-import type { BodyLedgerSection } from '@/lib/portal/body-ledger';
-import { buildDayLedger, ledgerPrompt, todayYmd } from '@/lib/portal/body-ledger';
 
 const TREND_HEADLINE: Record<FitnessInsight['trend'], [string, string]> = {
   up: ['体能上升中', 'Fitness rising'], flat: ['体能维持中', 'Holding steady'], down: ['体能下降中', 'Fitness dipping'], unknown: ['数据积累中', 'Gathering data'],
@@ -283,9 +280,9 @@ function AiInsightPanel({ data, dict }: { data: HealthMetrics; dict: string }) {
     }
   }
 
+  // bug2:AI 解读按钮留下,其余说明文字删除
   return (
     <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
-      <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, 'AI 综合解读', 'AI synthesis')}</p>
       {status === 'done' ? (
         <>
           {text.split('\n').filter(Boolean).map((line, i) => <p key={i} className="nesio-health-story-line">{line}</p>)}
@@ -301,7 +298,6 @@ function AiInsightPanel({ data, dict }: { data: HealthMetrics; dict: string }) {
           {status === 'loading' ? L(dict, '生成中…', 'Generating…') : L(dict, '让 AI 解读我的健康数据', 'Let AI interpret my health data')}
         </button>
       )}
-      <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{L(dict, '基于上面已算出的关系,数据只发给模型生成建议,不下诊断', 'Built on the relationships above; not a diagnosis')}</p>
     </div>
   );
 }
@@ -433,67 +429,88 @@ function HealthSubTabs({ view, onChange, dict }: { view: HealthView; onChange: (
   );
 }
 
-// 隐私横条:健康/医疗/药物 只存本机
-function PrivacyBanner({ dict }: { dict: string }) {
-  return (
-    <div className="nesio-health-privacy">
-      <IconLock size={13} />
-      <span>{L(dict, '健康 / 医疗 / 药物 · 只存本机,不上传云端', 'Health / medical / meds · on-device, never uploaded')}</span>
-    </div>
-  );
+// bug2:今日精选用户可自行设置哪些进入精选(本机偏好;默认全开,「活动」也可加入)
+const PICKS_KEY = 'nesio-health-picks-v1';
+function loadPickPrefs(): Record<string, boolean> {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(PICKS_KEY) || '{}') as Record<string, boolean>; } catch { return {}; }
+}
+function savePickPrefs(p: Record<string, boolean>): void {
+  try { localStorage.setItem(PICKS_KEY, JSON.stringify(p)); } catch { /* 界面偏好,丢了重选即可 */ }
 }
 
-// 概览:念念安抚式小结(确定性叙事,非 AI;焦虑内容留给「分析」,这里先安抚)
-function NenSummaryCard({ data, dict }: { data: HealthMetrics; dict: string }) {
-  const lines = healthNarrative(data.metrics, dict).slice(0, 2);
-  if (!lines.length) return null;
-  return (
-    <div className="nesio-health-nen">
-      <span className="nesio-health-nen-avatar" aria-hidden>{L(dict, '念', 'N')}</span>
-      <p className="nesio-health-nen-text">{lines.join(' ')}</p>
-    </div>
-  );
-}
-
-// 概览:今日精选(点任意卡进「分析」看深度)
+// 概览:今日精选(点任意卡进「分析」看深度;右上「编辑」自选哪些进精选)
 function TodayPicks({ data, dict, onOpen }: { data: HealthMetrics; dict: string; onOpen: () => void }) {
   type Pick = { key: string; dot: string; label: string; value: string; unit?: string; sub: string };
-  const picks: Pick[] = [];
+  const [prefs, setPrefs] = useState<Record<string, boolean>>(() => loadPickPrefs());
+  const [editing, setEditing] = useState(false);
+  const all: Pick[] = [];
   if (data.activityRings) {
     const a = data.activityRings;
     const rr: Array<[number, number]> = [[a.move, a.moveGoal], [a.exercise, a.exerciseGoal], [a.stand, a.standGoal]];
     const pct = Math.round(rr.map(([v, g]) => (g > 0 ? Math.min(100, (v / g) * 100) : 0)).reduce((s, x) => s + x, 0) / 3);
-    picks.push({ key: 'rings', dot: 'var(--status-gentle)', label: L(dict, '活动三环', 'Activity'), value: `${pct}`, unit: '%', sub: pct >= 100 ? L(dict, '已合上', 'closed') : L(dict, '还差一点合上', 'almost closed') });
+    all.push({ key: 'rings', dot: 'var(--status-gentle)', label: L(dict, '活动三环', 'Activity'), value: `${pct}`, unit: '%', sub: pct >= 100 ? L(dict, '已合上', 'closed') : L(dict, '还差一点合上', 'almost closed') });
   }
   if (data.sleepStages) {
     const s = data.sleepStages;
-    picks.push({ key: 'sleep', dot: 'var(--status-calm)', label: L(dict, '睡眠', 'Sleep'), value: s.total.toFixed(1), unit: 'h', sub: L(dict, `达标 · 深睡 ${s.deep.toFixed(1)}h`, `deep ${s.deep.toFixed(1)}h`) });
+    all.push({ key: 'sleep', dot: 'var(--status-calm)', label: L(dict, '睡眠', 'Sleep'), value: s.total.toFixed(1), unit: 'h', sub: L(dict, `达标 · 深睡 ${s.deep.toFixed(1)}h`, `deep ${s.deep.toFixed(1)}h`) });
   }
   if (data.glucose) {
-    picks.push({ key: 'glu', dot: 'var(--status-go)', label: L(dict, '血糖达标', 'Glucose'), value: `${data.glucose.tirPct}`, unit: '%', sub: L(dict, 'TIR 稳', 'TIR steady') });
+    all.push({ key: 'glu', dot: 'var(--status-go)', label: L(dict, '血糖达标', 'Glucose'), value: `${data.glucose.tirPct}`, unit: '%', sub: L(dict, 'TIR 稳', 'TIR steady') });
   }
   if (data.mood) {
     const tl: [string, string] = data.mood.tone === 'pleasant' ? ['偏积极', 'Pleasant'] : data.mood.tone === 'unpleasant' ? ['偏低落', 'Low'] : ['中性', 'Neutral'];
     const v = data.mood.avgValence;
-    picks.push({ key: 'mood', dot: 'var(--portal-cool-accent)', label: L(dict, '情绪', 'Mood'), value: L(dict, tl[0], tl[1]), sub: L(dict, `效价 ${v > 0 ? '+' : ''}${v}`, `valence ${v > 0 ? '+' : ''}${v}`) });
+    all.push({ key: 'mood', dot: 'var(--portal-cool-accent)', label: L(dict, '情绪', 'Mood'), value: L(dict, tl[0], tl[1]), sub: L(dict, `效价 ${v > 0 ? '+' : ''}${v}`, `valence ${v > 0 ? '+' : ''}${v}`) });
   }
-  if (!picks.length) return null;
+  // 「活动」组指标也可加入精选(步数)
+  const steps = data.metrics.find((m) => m.key === 'steps' || m.group === 'activity');
+  if (steps) {
+    all.push({ key: `metric-${steps.key}`, dot: 'var(--portal-blue-deep)', label: L(dict, steps.label[0], steps.label[1]), value: fmt(steps.latest, steps.decimals), unit: steps.unit, sub: steps.latestDate.slice(5).replace('-', '/') });
+  }
+  if (!all.length) return null;
+  const enabled = all.filter((p) => prefs[p.key] !== false);
+  const toggle = (key: string) => {
+    const next = { ...prefs, [key]: prefs[key] === false };
+    setPrefs(next); savePickPrefs(next);
+  };
   return (
     <>
-      <p className="nesio-insights-section-label">{L(dict, '今日精选', 'Today')}</p>
-      <div className="nesio-health-picks">
-        {picks.map((p) => (
-          <button key={p.key} type="button" className="nesio-health-pick" onClick={onOpen}>
-            <span className="nesio-health-pick-top">
-              <span className="nesio-health-pick-dot" style={{ background: p.dot }} aria-hidden />
-              {p.label}
-              <span className="nesio-health-pick-chev" aria-hidden>›</span>
-            </span>
-            <span className="nesio-health-pick-val">{p.value}{p.unit && <small>{p.unit}</small>}</span>
-            <span className="nesio-health-pick-sub">{p.sub}</span>
-          </button>
-        ))}
-      </div>
+      <p className="nesio-insights-section-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <span>{L(dict, '今日精选', 'Today')}</span>
+        <button type="button" onClick={() => setEditing((v) => !v)}
+          style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-xs)', color: 'var(--portal-accent)', padding: 0 }}>
+          {editing ? L(dict, '完成', 'Done') : L(dict, '编辑', 'Edit')}
+        </button>
+      </p>
+      {editing && (
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
+          {all.map((p) => {
+            const on = prefs[p.key] !== false;
+            return (
+              <button key={p.key} type="button" onClick={() => toggle(p.key)}
+                style={{ border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-pill)', padding: '4px 10px', fontSize: 'var(--text-xs)', fontFamily: 'var(--font-sans)', cursor: 'pointer', background: on ? 'var(--portal-accent-soft-md)' : 'transparent', color: on ? 'var(--portal-accent)' : 'var(--portal-muted)' }}>
+                {on ? '✓ ' : ''}{p.label}
+              </button>
+            );
+          })}
+        </div>
+      )}
+      {enabled.length > 0 && (
+        <div className="nesio-health-picks">
+          {enabled.map((p) => (
+            <button key={p.key} type="button" className="nesio-health-pick" onClick={onOpen}>
+              <span className="nesio-health-pick-top">
+                <span className="nesio-health-pick-dot" style={{ background: p.dot }} aria-hidden />
+                {p.label}
+                <span className="nesio-health-pick-chev" aria-hidden>›</span>
+              </span>
+              <span className="nesio-health-pick-val">{p.value}{p.unit && <small>{p.unit}</small>}</span>
+              <span className="nesio-health-pick-sub">{p.sub}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </>
   );
 }
@@ -514,7 +531,6 @@ function TopFinding({ data, dict, onOpen }: { data: HealthMetrics; dict: string;
         <span className="nesio-health-topfind-badge" style={{ color: SEV_COLOR[top.severity] }}>● {L(dict, SEV_LABEL[top.severity][0], SEV_LABEL[top.severity][1])}</span>
         <span className="nesio-health-topfind-body">
           <b>{L(dict, top.title[0], top.title[1])}</b> — {L(dict, top.detail[0], top.detail[1])}
-          <span className="nesio-health-topfind-src">{L(dict, `依据:${top.source} · 详见「分析」`, `${top.source} · see Analysis`)}</span>
         </span>
       </button>
     </>
@@ -570,7 +586,6 @@ export default function HealthDashboard() {
   const [clinical, setClinical] = useState<StoredClinical | null>(null);
   const [labMode, setLabMode] = useState(false);
   const [view, setView] = useState<HealthView>('overview');
-  const [ledgerSection, setLedgerSection] = useState<BodyLedgerSection>('today');
 
   const [recordOpen, setRecordOpen] = useState(false);      // 健康镜头:记一条(化验/用药/症状/就诊)
   const [scanOpen, setScanOpen] = useState(false);          // 健康镜头 B 屏:拍化验单(端上识别)
@@ -614,9 +629,7 @@ export default function HealthDashboard() {
     return (
       <div className="nesio-health-dash">
         <HealthSubTabs view={view} onChange={setView} dict={dict} />
-        {view === 'ledger' && (
-          <BodyLedgerPanel key={ledgerSection} health={data} initialSection={ledgerSection} />
-        )}
+        {view === 'ledger' && <BodyLedgerPanel health={data} />}
         {view === 'care' && <BeautyCarePanel />}
         {(view === 'overview' || view === 'analysis') && (
           <>
@@ -631,13 +644,6 @@ export default function HealthDashboard() {
                 '还没有 Apple Health 指标。身体账本仍可用「美味 · 记一餐」;护理看护肤物品。完整曲线请到「设置 → 数据接入 → Apple Health」上传导出。',
                 'No Apple Health metrics yet. Body ledger still works from Cooking meals; Care lists skincare items. For full curves, upload an export in Settings → Data sources → Apple Health.')}
             </p>
-            <BodyLedgerQuickLinks
-              dict={dict}
-              onOpen={(sec) => {
-                if (sec === 'care') setView('care');
-                else { setLedgerSection(sec); setView('ledger'); }
-              }}
-            />
             <FamilyDataCard kind="health" />
           </>
         )}
@@ -648,55 +654,24 @@ export default function HealthDashboard() {
     );
   }
 
-  const importedLabel = new Date(data.importedAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' });
   const insight = computeFitnessInsight(data.metrics, weekSessions, activeProtoAll?.sessionsPerWeek ?? null);
 
   const rels = data.daily ? mineRelationships(data.daily) : [];
-  const dayLedger = buildDayLedger(todayYmd(), { rings: data.activityRings });
-  const blPrompt = ledgerPrompt(dayLedger, dict !== 'en');
-
-  function openLedger(sec: BodyLedgerSection) {
-    if (sec === 'care') { setView('care'); return; }
-    setLedgerSection(sec);
-    setView('ledger');
-  }
 
   return (
     <div className="nesio-health-dash">
       <HealthSubTabs view={view} onChange={setView} dict={dict} />
 
-      {view === 'ledger' && (
-        <BodyLedgerPanel
-          key={ledgerSection}
-          health={data}
-          initialSection={ledgerSection}
-        />
-      )}
+      {view === 'ledger' && <BodyLedgerPanel health={data} />}
       {view === 'care' && <BeautyCarePanel />}
 
       {view === 'overview' ? (
-        /* ── 概览:一眼看懂 + 先安抚(焦虑细节收进「分析」)── */
+        /* ── 概览(bug2):第一行隐私 badge 删;黄卡/绿卡迁身体账本;快捷进入删;精选可自选 ── */
         <>
-          <PrivacyBanner dict={dict} />
-          {blPrompt && (
-            <div className="nesio-bl-active-card">
-              <p>{blPrompt}</p>
-              <div className="nesio-bl-active-actions">
-                <button type="button" className="nesio-trip-action" onClick={() => openLedger('today')}>
-                  {L(dict, '看账本', 'Open ledger')}
-                </button>
-                <button type="button" className="nesio-trip-action" onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-cooking'))}>
-                  {L(dict, '去美味', 'Cooking')}
-                </button>
-              </div>
-            </div>
-          )}
           {/* 健康镜头(2026-07-29):化验/用药/就诊三卡 —— 读 Signal 主事实表 */}
           <HealthLensRow onRecord={() => setRecordOpen(true)} onScan={() => setScanOpen(true)} dict={dict} />
           <HealthLensCards onOpenMetric={setOpenMetric} />
-          <NenSummaryCard data={data} dict={dict} />
           <TodayPicks data={data} dict={dict} onOpen={() => setView('analysis')} />
-          <BodyLedgerQuickLinks dict={dict} onOpen={openLedger} />
           <TopFinding data={data} dict={dict} onOpen={() => setView('analysis')} />
           <TopRelationship data={data} dict={dict} />
           <button type="button" className="nesio-health-goanalysis" onClick={() => setView('analysis')}>
@@ -704,67 +679,71 @@ export default function HealthDashboard() {
           </button>
         </>
       ) : view === 'analysis' ? (
-        /* ── 分析:深看全部(专项 + 判定 + 指标组 + 月报 + 临床)── */
+        /* ── 分析(bug2):顶部指标计数/画像文字删;专项折叠;餐后血糖 + 稳/飙迁入 ── */
         <>
-          <p className="nesio-health-updated">{L(dict, `${data.metrics.length} 项指标 · 锻炼 ${data.workouts} 次 · 导入于 ${importedLabel}`, `${data.metrics.length} metrics · ${data.workouts} workouts · imported ${importedLabel}`)}</p>
-          {data.profile && (data.profile.age || data.profile.sex || data.profile.bloodType) && (
-            <p className="nesio-settings-option-hint" style={{ margin: '0.1rem 0 0' }}>
-              {[data.profile.age ? L(dict, `${data.profile.age} 岁`, `${data.profile.age}y`) : '', data.profile.sex ? L(dict, ({ male: '男', female: '女' } as Record<string, string>)[data.profile.sex] || data.profile.sex, data.profile.sex) : '', data.profile.bloodType ? L(dict, `${data.profile.bloodType} 型`, data.profile.bloodType) : ''].filter(Boolean).join(' · ')}
-            </p>
+          {/* 专项(折叠) */}
+          {(insight.signals.length > 0 || data.activityRings || data.sleepStages || data.mood || data.glucose) && (
+            <details className="nesio-fin-fold" style={{ marginTop: '0.6rem' }}>
+              <summary className="nesio-settings-section-label" style={{ cursor: 'pointer', listStyle: 'none', marginTop: 0 }}>{L(dict, '专项', 'Deep dive')} ›</summary>
+              {insight.signals.length > 0 && <FitnessPanel insight={insight} dict={dict} />}
+              {(data.activityRings || data.sleepStages || data.mood) && (
+                <div className="nesio-health-grid" style={{ marginTop: '0.5rem' }}>
+                  {data.activityRings && <ActivityRingsCard a={data.activityRings} dict={dict} />}
+                  {data.sleepStages && <SleepStagesCard s={data.sleepStages} dict={dict} />}
+                  {data.mood && <MoodCard mood={data.mood} dict={dict} />}
+                </div>
+              )}
+              {data.glucose && (
+                <div className="nesio-health-grid" style={{ marginTop: '0.5rem' }}>
+                  <GlucoseCard g={data.glucose} dict={dict} />
+                </div>
+              )}
+            </details>
           )}
 
-          {/* 专项 */}
-          {(insight.signals.length > 0 || data.activityRings || data.sleepStages || data.mood || data.glucose) && (
-            <p className="nesio-settings-section-label" style={{ marginTop: '0.6rem' }}>{L(dict, '专项', 'Deep dive')}</p>
-          )}
-          {insight.signals.length > 0 && <FitnessPanel insight={insight} dict={dict} />}
-          {(data.activityRings || data.sleepStages || data.mood) && (
-            <div className="nesio-health-grid" style={{ marginTop: '0.5rem' }}>
-              {data.activityRings && <ActivityRingsCard a={data.activityRings} dict={dict} />}
-              {data.sleepStages && <SleepStagesCard s={data.sleepStages} dict={dict} />}
-              {data.mood && <MoodCard mood={data.mood} dict={dict} />}
-            </div>
-          )}
-          {data.glucose && (
-            <div className="nesio-health-grid" style={{ marginTop: '0.5rem' }}>
-              <GlucoseCard g={data.glucose} dict={dict} />
-            </div>
-          )}
+          {/* bug2:身体账本的「餐后血糖」「稳 / 飙」内容迁入分析页 */}
+          <details className="nesio-fin-fold" style={{ marginTop: '0.6rem' }}>
+            <summary className="nesio-settings-section-label" style={{ cursor: 'pointer', listStyle: 'none', marginTop: 0 }}>{L(dict, '餐后血糖', 'Post-meal glucose')} ›</summary>
+            <PostMealBody health={data} dict={dict} />
+          </details>
+          <details className="nesio-fin-fold" style={{ marginTop: '0.6rem' }}>
+            <summary className="nesio-settings-section-label" style={{ cursor: 'pointer', listStyle: 'none', marginTop: 0 }}>{L(dict, '稳 / 飙', 'Steady / spike')} ›</summary>
+            <ReactionBody health={data} dict={dict} />
+          </details>
 
           {/* 判定:指南接地 + 已验证评分(红只给真红旗,每条带出处 + 非诊断) */}
           <FindingsCard data={data} dict={dict} />
           <RiskCard data={data} dict={dict} />
 
-          {/* 跨板块关系(统计非因果) */}
+          {/* 跨板块关系(统计非因果;bug2:底部说明文字删) */}
           {rels.length > 0 && (
             <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
               <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '跨板块关系', 'Cross-domain relationships')} <span className="nesio-connector-soon" style={{ background: 'var(--portal-surface-2, rgba(127,127,127,0.1))', color: 'var(--portal-muted)' }}>{L(dict, '统计非因果', 'correlation')}</span></p>
               {rels.map((rel) => (
                 <p key={rel.key} className="nesio-health-story-line">
-                  <span style={{ display: 'inline-block', minWidth: 42, fontSize: '0.62rem', fontWeight: 600, color: rel.strength === 'strong' ? 'var(--status-go)' : 'var(--portal-muted)' }}>
+                  <span style={{ display: 'inline-block', minWidth: 42, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)' as never, color: rel.strength === 'strong' ? 'var(--status-go)' : 'var(--portal-muted)' }}>
                     {rel.strength === 'strong' ? L(dict, '强', 'strong') : L(dict, '中', 'mod')} · n={rel.n}
                   </span>
                   {L(dict, rel.insight[0], rel.insight[1])}
                 </p>
               ))}
-              <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{L(dict, '统计相关,非因果 · 基于你的每日数据(非 AI)', 'Statistical correlation, not causation · from your daily data (not AI)')}</p>
             </div>
           )}
 
           {/* 在关系之上,让念念生成人话建议(不下诊断) */}
           {(data.glucose || (data.daily && data.daily.length >= 7)) && <AiInsightPanel data={data} dict={dict} />}
 
-          {/* 指标组 */}
+          {/* 指标组(bug2:折叠,活动等各组收起) */}
           {GROUPS.map((g) => {
             const items = data.metrics.filter((m) => m.group === g.key);
             if (!items.length) return null;
             return (
-              <div key={g.key}>
-                <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, g.zh, g.en)}</p>
+              <details key={g.key} className="nesio-fin-fold" style={{ marginTop: '0.6rem' }}>
+                <summary className="nesio-settings-section-label" style={{ cursor: 'pointer', listStyle: 'none', marginTop: 0 }}>{L(dict, g.zh, g.en)} ›</summary>
                 <div className="nesio-health-grid">
                   {items.map((m) => <MetricCard key={m.key} m={m} dict={dict} />)}
                 </div>
-              </div>
+              </details>
             );
           })}
 

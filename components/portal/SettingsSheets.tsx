@@ -793,51 +793,20 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   return (
     <SheetWrap open={open} onClose={onClose} title={L(dict, '数据与隐私', 'Data & privacy')}>
 
-      {/* 数据主权面板 — local-first 从架构卖点变成可感知的安全感 */}
-      <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.08))', borderRadius: 14, padding: '0.8rem 1rem', marginBottom: '0.9rem' }}>
-        <p style={{ fontSize: '0.72rem', fontWeight: 600, margin: '0 0 0.4rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}><IconLock size={14} /> {L(dict, '你的数据在哪里', 'Where your data lives')}{/* ⚠️ 这段原来是**写死**的,恒说「未登录…登录后才开启跨设备云同步」——
-    而它右边那格是动态的,已登录时写着「✓ 已登录 · 云同步已开」。
-    同一屏里「已登录」和「未登录」同时出现,用户当场就发现了。文案必须跟着真实登录态走。 */}
-<InfoTip text={signedIn
-  ? L(dict, '记忆存在本设备 localStorage,并已开启跨设备云同步;没有授权、没有接入的日历、邮件、健康和文件内容,永远不会被加载。', "Memories live in this device's localStorage and are synced across your devices. Calendar, mail, health and files are never loaded unless you authorize and connect them.")
-  : L(dict, '记忆存在本设备 localStorage;未登录、未授权或未选择接入的日历、邮件、健康和文件内容永远不会被加载;登录后才开启跨设备云同步。', "Memories live in this device's localStorage. Calendar, mail, health and files are never loaded unless you sign in, authorize and connect them. Cross-device cloud sync starts only after sign-in.")} /></p>
-        <div style={{ display: 'flex', gap: '1.2rem', fontSize: '0.7rem', lineHeight: 1.6 }}>
-          <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>{nodeCount}</span><br />{L(dict, '条记忆,全在本机', 'memories, all on this device')}</div>
-          <div><span style={{ fontSize: '1rem', fontWeight: 700 }}>{signedIn ? '✓' : '0'}</span><br />{signedIn ? L(dict, '已登录 · 云同步已开', 'signed in · cloud sync on') : L(dict, '未登录 · 仅本机', 'signed out · on-device only')}</div>
-          <div>
-            <span style={{ fontSize: '1rem', fontWeight: 700 }}>{lastBackupAt ? new Date(lastBackupAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' }) : L(dict, '还没有', 'never')}</span><br />
-            {lastBackupAt ? L(dict, '上次备份', 'last backup') : L(dict, '备份过', 'backed up')}
-          </div>
-        </div>
-        {!lastBackupAt && (
-          <p style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', margin: '0.4rem 0 0' }}>{L(dict, '你的数据你拥有 —— 一键导出,记忆、健康、学到的偏好全带走,换手机也不会丢。', 'Your data is yours — export once and take your memories, health and learned preferences anywhere.')}</p>
-        )}
-        {/* 批次202:跨端同步诊断 —— 每端一眼看出 版本/登录/身份戳,定位为何不同步 */}
-        <div style={{ marginTop: '0.55rem', paddingTop: '0.45rem', borderTop: '1px solid var(--portal-line)', fontSize: '0.62rem', color: 'var(--portal-muted)', lineHeight: 1.7 }}>
-          <div>{L(dict, '同步诊断', 'Sync diag')} · {L(dict, '构建', 'build')} <b>{buildSha}</b> · {signedIn ? L(dict, '已登录', 'signed in') : <b style={{ color: 'var(--status-risk)' }}>{L(dict, '未登录', 'signed out')}</b>}</div>
-          <div>{L(dict, '身份戳', 'identity')} · {L(dict, '本机', 'local')} {fmtAt(diagLocalAt)} · {L(dict, '云端', 'cloud')} {fmtAt(diagCloudAt)}</div>
-          <button type="button" onClick={handleForceSync} style={{ marginTop: 5, fontSize: '0.66rem', padding: '0.25rem 0.65rem', borderRadius: 8, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-blue-deep)', cursor: 'pointer' }}>{L(dict, '立即同步(记忆+头像名字)', 'Sync now')}</button>
-          {diagSyncMsg && <span style={{ marginLeft: 8 }}>{diagSyncMsg}</span>}
-          {/* 批次208:手动跑 Layer ③ 巡查(测试低置信捕捉里的到期/续期信噪比,web 上即可,不必进 Apple) */}
-          <div style={{ marginTop: 6 }}>
-          </div>
-        </div>
-      </div>
+      {/* bug2:「你的数据在哪里」整块删除(数据主权面板 + 同步诊断) */}
 
-      {/* 图5:数据接入从「记录习惯」并入这里 —— 连接数据源(ConnectorsHub) */}
+      {/* 图5:数据接入从「记录习惯」并入这里 —— 连接数据源(ConnectorsHub);bug2:说明文字删除 */}
       <p className="nesio-settings-section-label">{L(dict, '数据接入', 'Connect data')}</p>
       <button type="button" className="nesio-settings-option" onClick={onOpenConnect}>
         <div>
           <span className="nesio-settings-option-label">{L(dict, '连接数据源', 'Connected sources')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, 'Gmail · 日历 · Notion · 健康 · 银行 …', 'Gmail · Calendar · Notion · Health · Bank …')}</span>
         </div>
         <span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
       </button>
 
-      {/* 备份与恢复(图2:去掉「云同步与备份」标题与登录同步行,直接进备份目的地) */}
-      <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', margin: '1.2rem 0 0.3rem' }}>{L(dict, '备份到哪里', 'Back up to')}</p>
-      <div style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
-        {([['drive', L(dict, 'Google Drive · 免费', 'Google Drive · Free')], ['nesio', L(dict, `Nesio 云${cloudEntitled ? '' : ' · Pro 免费'}`, `Nesio cloud${cloudEntitled ? '' : ' · free with Pro'}`)]] as const).map(([d, label]) => (
+      {/* 备份与恢复(bug2:「备份到哪里」标题删除;第一个按钮改名「Google 云」;说明文字删除) */}
+      <div style={{ display: 'flex', gap: 8, margin: '1.2rem 0 6px' }}>
+        {([['drive', L(dict, 'Google 云', 'Google cloud')], ['nesio', L(dict, `Nesio 云${cloudEntitled ? '' : ' · Pro 免费'}`, `Nesio cloud${cloudEntitled ? '' : ' · free with Pro'}`)]] as const).map(([d, label]) => (
           <button key={d} type="button" onClick={() => pickBackupDest(d)}
             style={{ flex: 1, padding: '0.4rem 0.5rem', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer',
               border: `1px solid ${backupDest === d ? 'var(--portal-accent-border)' : 'var(--portal-line)'}`,
@@ -847,11 +816,6 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           </button>
         ))}
       </div>
-      <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', margin: '0 0 0.4rem' }}>
-        {backupDest === 'drive'
-          ? L(dict, '存到你自己的 Google Drive(免费,私有文件夹);没连 Google 会自动改用 Nesio 云兜底。', 'Saved to your own Google Drive (free, private folder); falls back to Nesio cloud if Google isn\'t connected.')
-          : L(dict, '存到 Nesio 云(登录即用,免费跨端同步 —— 换浏览器也拉得回)。', 'Saved to Nesio cloud (free once you sign in; syncs across devices, so a new browser can pull it back).')}
-      </p>
 
       {/* 2026-07-29:备份/恢复并成一组 —— 平时做的是「备份」,「恢复」是出事那天才用一次。
           两个等重的整行按钮并排,等于让不常用的那个天天占同样的分量。

@@ -138,13 +138,16 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
   return (
     <NesioSheet variant="bottom" open={open} onOpenChange={(o) => { if (!o) { if (closeTimer.current != null) window.clearTimeout(closeTimer.current); setSaved(false); reset(); onClose(); } }} ariaLabel={t('记一笔', 'Quick add')}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: 'var(--space-2) var(--space-4) var(--space-6)' }}>
-        <div style={{ display: 'flex', background: 'var(--portal-accent-soft)', borderRadius: 'var(--radius-sm)', padding: 3 }}>
-          {([['expense', '支出', 'Expense'], ['income', '收入', 'Income'], ['asset', '资产 · 估值', 'Asset']] as Array<[Seg, string, string]>).map(([id, zh, en]) => (
-            <button key={id} type="button" onClick={() => { setSeg(id); setCat(''); setCostAssetId(''); setErr(''); }}
-              style={{ flex: 1, border: 'none', padding: '8px 0', borderRadius: 9, fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', fontWeight: 600, cursor: 'pointer', background: seg === id ? 'var(--portal-card)' : 'transparent', color: seg === id ? 'var(--portal-accent)' : 'var(--portal-muted)' }}>
-              {L(dict, zh, en)}
-            </button>
-          ))}
+        {/* bug2:3 个 tab 删除 —— 只留一个「记什么」label 区分支出 / 收入 / 固定资产 */}
+        <div>
+          <p style={label}>{t('记什么', 'Type')}</p>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {([['expense', '支出', 'Expense'], ['income', '收入', 'Income'], ['asset', '固定资产', 'Asset']] as Array<[Seg, string, string]>).map(([id, zh, en]) => (
+              <button key={id} type="button" style={chip(seg === id)} onClick={() => { setSeg(id); setCat(''); setCostAssetId(''); setErr(''); }}>
+                {L(dict, zh, en)}
+              </button>
+            ))}
+          </div>
         </div>
 
         <div>

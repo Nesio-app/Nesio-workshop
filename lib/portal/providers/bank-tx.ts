@@ -547,6 +547,24 @@ export function removeBankAccount(id: string): void {
   accountsStore.save(loadBankAccounts().filter((a) => a.id !== id));
 }
 
+// 账户自定义名称:本机覆盖层,不改 Plaid 原始 name(同步合并不会冲掉)。
+const ACCT_NAME_KEY = 'nesio-bank-acct-names-v1';
+export function loadAccountNames(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(ACCT_NAME_KEY) || '{}') as Record<string, string>; } catch { return {}; }
+}
+export function setAccountName(id: string, name: string): void {
+  if (typeof window === 'undefined') return;
+  const all = loadAccountNames();
+  const v = name.trim();
+  if (v) all[id] = v; else delete all[id];
+  try { localStorage.setItem(ACCT_NAME_KEY, JSON.stringify(all)); } catch { reportStorageDropped(); return; }
+  window.dispatchEvent(new CustomEvent('nesio-bank-updated'));
+}
+export function displayAccountName(a: Pick<BankAccount, 'id' | 'name'>, names?: Record<string, string>): string {
+  return (names || loadAccountNames())[a.id] || a.name;
+}
+
 export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boolean }): void {
   if (opts?.replace && accounts.length > 0) {
     accountsStore.save(accounts.filter((a) => a?.id));
@@ -807,6 +825,15 @@ export interface RecurringCharge {
   currency: string;
   latestAmount: number;   // 最近一笔金额(供「订阅涨价」比对)
   baselineAmount: number; // 此前各笔的中位数(无历史时 = latestAmount)
+  /**
+   * bug2:此前各笔的**最大值**(无历史时 = latestAmount)。
+   * 涨价判定要用它把「双档账单」和「真涨价」分开:AT&T 这类把话费与宽带归并成一条流的,
+   * 金额在 $20/$53.91 两档间跳,median 落在低档 → 每次出现高档都被报成「涨 170%」。
+   * latest ≤ 历史最大值 = 这个价位以前就出现过 = 不是涨价。
+   */
+  baselineMax: number;
+  /** 金额离散度(变异系数)。账单类流会绕过 cv<0.2 的门,下游据此判断基线是否可信。 */
+  amountCv: number;
   // 财务⑰:mature = ≥3 笔成熟(Plaid 同口径);predicted = 早识别(2 笔规律,或知名订阅
   // 品牌 1 笔按月假设)。predicted 只作展示提示,不进订阅负担/余额投影等统计。
   status: 'mature' | 'predicted';
@@ -1057,6 +1084,8 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
         currency: last.currency || 'USD',
         latestAmount: round2(amts2[amts2.length - 1]),
         baselineAmount: round2(amts2[0]),
+        baselineMax: round2(Math.max(...amts2.slice(0, -1), amts2[0])),
+        amountCv: Math.round(coeffVar(amts2) * 100) / 100,
         status: 'predicted',
         logo: [...sorted2].reverse().find((t) => t.merchantLogo)?.merchantLogo,
       });
@@ -1087,6 +1116,7 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
     const latestAmount = round2(amts[amts.length - 1]);
     const priorAmts = amts.slice(0, -1);
     const baselineAmount = priorAmts.length ? round2(median(priorAmts)) : latestAmount;
+    const baselineMax = priorAmts.length ? round2(Math.max(...priorAmts)) : latestAmount;
 
     // ── 账单判定(手动覆盖优先)──
     const override = ruleFor(recurRules, last);
@@ -1111,6 +1141,8 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
       currency: last.currency || 'USD',
       latestAmount,
       baselineAmount,
+      baselineMax,
+      amountCv: Math.round(cv * 100) / 100,
       status: 'mature',
       logo: [...sorted].reverse().find((t) => t.merchantLogo)?.merchantLogo,
     });
@@ -1118,15 +1150,24 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
   return out.sort((a, b) => a.nextEstimate.localeCompare(b.nextEstimate));
 }
 
-/** 未来 n 天内预计的定期扣款汇总。 */
+/**
+ * 未来 n 天内预计的定期扣款汇总。
+ * bug2:窗口曾是 `now − 1 天 ~ now + n 天`(共 n+1 天),标题却写「未来 7 天」——
+ * 昨天的那笔也会被算进「未来」。改成从今天零点起算的严格 n 天窗口。
+ * 金额用 latestAmount(最近一笔实付)而非历史均值,与「涨价」那条同源 —— 否则
+ * AT&T 在「未来账单」里按 $45.83 出现、在涨价条里按 $53.91 出现,用户对不上账。
+ */
 export function upcomingRecurring(txs: BankTx[], withinDays = 7): { items: RecurringCharge[]; total: number } {
-  const now = Date.now();
-  const horizon = now + withinDays * 86_400_000;
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const from = startOfToday.getTime();
+  const horizon = from + withinDays * 86_400_000;
   const items = detectRecurring(txs).filter((r) => {
     const t = Date.parse(r.nextEstimate);
-    return t >= now - 86_400_000 && t <= horizon;
+    return t >= from && t <= horizon;
   });
-  return { items, total: Math.round(items.reduce((s, r) => s + r.avgAmount, 0) * 100) / 100 };
+  const total = items.reduce((s, r) => s + (r.latestAmount || r.avgAmount), 0);
+  return { items, total: Math.round(total * 100) / 100 };
 }
 
 /* ---------- 批次 31:月度趋势 ---------- */

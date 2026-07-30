@@ -417,7 +417,10 @@ export default function TodayFeed({
 
       <div className="nesio-today-scroll">
         {/* §1 ①安心态收据(宋体 = Nesio 的声音):先兑现承诺,再看今天 */}
-        <p className="nesio-today-receipt nesio-serif-voice">{receiptLine}</p>
+        {/* bug2:问候不再走衬线「嗓音」体 —— Noto Serif SC 在 iOS 上没有本地字体,
+            级联落到 Hiragino Mincho/系统衬线,渲出来偏粗且带繁体字形,和下面时间线两种字。
+            改回设计系统正文 sans(--font-sans,Noto Sans SC 简体优先)+ 常规字重。 */}
+        <p className="nesio-today-receipt">{receiptLine}</p>
 
         {/* 云端往本机填过数据时的一次性回执(QA:积分 0→150 像被人乱改)。读一次即清。 */}
         {restoreNote && (

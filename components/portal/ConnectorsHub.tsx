@@ -17,10 +17,11 @@ import { InfoTip } from './InfoTip';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { markBusy } from '@/lib/portal/app-busy';
-import { isPro } from '@/lib/portal/entitlement';
+import { isPro, canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { IMPORT_WINDOWS } from '@/lib/portal/backup-inventory';
 import { isLabModeOn } from '@/lib/portal/module-overrides';
 import { logDropped } from '@/lib/portal/storage-health';
+import { executeBackgroundCloudOnly } from '@/lib/portal/client-flow-control';
 
 interface ConnectorsHubProps { open: boolean; onClose: () => void; }
 
@@ -803,8 +804,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           data.nodes!.forEach((n) => ingestLifeNode({ ...n, source: 'email' } as NodeInput));
           localStorage.setItem('nesio-gmail-last-sync', String(Date.now()));
         }
+        // Phase 2: 后台富化改为检查付费权限（免费用户跳过）
         // 云 AI 抽取后台富化(不阻塞本次同步;失败无声)—— 保留 AI 语义节点,同时同步不再超时。
-        void enrichGmailInBackground(0);
+        if (canUsePaidCloudAi()) {
+          void enrichGmailInBackground(0);
+        }
         parts.push(L(dict, `邮件:读取 ${data.emailCount ?? data.messages?.length ?? 0} 封,提取 ${nodeCount} 条`, `Mail: read ${data.emailCount ?? data.messages?.length ?? 0}, extracted ${nodeCount}`));
       } else {
         allOk = false;

@@ -108,7 +108,7 @@ export default function CaptureBar(capture: CaptureBarProps) {
               const el = e.currentTarget;
               setTimeout(() => { try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch { /* ignore */ } }, 320);
             }}
-            placeholder={L(dict, '问一问、找一找,或记一下…', 'Ask, find, or jot…')}
+            placeholder=""
           />
 
           {/* 清空。草稿是持久化的(没点记下就退出,下次进来还在),而在这之前**没有任何删掉它的入口** ——

@@ -111,7 +111,7 @@ export default function MoodBeat() {
       <span className="nesio-tl-dot nesio-tl-dot--mood" aria-hidden><MoodRipple /></span>
       <button type="button" className="nesio-tl-mood-main" onClick={onOpenMood}
         aria-label={L(dict, '再记一次心情', 'Log mood again')}>
-        <span className="nesio-tl-time">{L(dict, '今天', 'Today')}</span>
+        {/* bug2:「今天」两字删掉 —— 这一拍本身就是「现在」,再标一次日期是同话重说 */}
         {/* 批次 128·新时间线规格:情绪词后缀环形能量表(弧长=高低,替掉「能量高/中/低」文字) */}
         <span className="nesio-tl-title">
           <span className="nesio-mood-word">{L(dict, beat.label, beat.labelEn)}</span>
