@@ -173,6 +173,13 @@ sensitivity/retention 枚举化(中期)。
   `lib/portal/asset-care.ts`,附件压过存本机 IDB;「做饭计划」重做成**美食日历**
   (一天三顿、只显示排过的、点进详情页编辑),新增 `lib/cooking/meal-calendar.ts`。
   ● **新 key**:`nesio-asset-care-v1`、`nesio-meal-calendar-v1`(均 durable,已登记)。
+  ● **自查复盘发现的漏项**(图6「念念还记得的内容逻辑正确吗?」我一开始只改了按钮名、
+  没回答那个问题):它对 tag **一视同仁**地取交集,而记忆上的标签一大半不是主题 ——
+  来源(邮件/flomo/日历)、采集方式(手记/Voice)、内部维度(domain:/facet:)。
+  任意两条邮件都共享「邮件」,于是「你 X/Y 也记过类似的一次」对**几乎任何一条记忆**
+  都会出现而两条毫无关系 —— 和「健身邮件被认成健康打卡」是同一族的错。
+  改:抽成纯函数 `lensEcho`(lib/portal/lens.ts),只认 `isTopicTag`、把共享的那个标签
+  印出来让用户能检验、≥2 条更早的才敢叫「模式」。契约 `test:lens-echo`。
   ● 顺带修 `test:ui-consistency` 回归:引导卡分组图标此前直接写 emoji,改走 icons.tsx 具名键。
 
 - **本机存储 key 全量普查(2026-07-29;161 个 key)**:根因是

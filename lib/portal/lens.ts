@@ -119,3 +119,51 @@ function safeJson(text: string): { layers?: Array<{ k?: string; v?: string }>; c
     try { return JSON.parse(m[0]); } catch { return null; }
   }
 }
+
+/* ── 念念还记得(Bug4 图6:「内容逻辑正确吗?」)────────────────────────────── */
+
+/**
+ * 一条记忆的「回声」:更早那条**共享同一个主题标签**的记忆。
+ *
+ * 原来的写法对 tag 一视同仁地取交集,而记忆上挂的标签一大半根本不是主题 ——
+ * 采集方式(手记 / Voice)、来源(邮件 / flomo / 日历)、内部维度(domain: / facet:)。
+ * 任意两条邮件都共享「邮件」,于是这句「你 X/Y 也记过类似的一次」对几乎任何一条
+ * 记忆都会出现,而两条之间毫无关系 —— 和「健身邮件被认成健康打卡」是同一族的错。
+ *
+ * 纯函数,不读全局:传入这条 + 全部,自己判。isTopicTag 是仓库里「什么算主题」的唯一判据。
+ */
+export interface LensEcho {
+  /** 共享的那个主题标签 —— 印出来才让这句话可被用户检验 */
+  tag: string;
+  /** 更早那条的时间 */
+  at: string;
+  /** 更早的同标签记忆一共几条 */
+  count: number;
+  /** ≥2 条才敢叫「模式」。n=1 说模式是硬凑 */
+  many: boolean;
+}
+
+export function lensEcho(
+  node: { id: string; createdAt: string; tags?: string[] },
+  all: ReadonlyArray<{ id: string; createdAt: string; tags?: string[] }>,
+  isTopic: (t: string) => boolean,
+): LensEcho | null {
+  const norm = (t: unknown) => String(t ?? '').trim();
+  const mine = (node.tags || [])
+    .map(norm)
+    .filter((t) => t && isTopic(t) && !/^(domain:|facet:)/i.test(t));
+  if (!mine.length) return null;
+  const self = new Date(node.createdAt).getTime();
+  if (Number.isNaN(self)) return null;
+  const earlier = all.filter((x) => {
+    if (x.id === node.id) return false;
+    const t = new Date(x.createdAt).getTime();
+    if (Number.isNaN(t) || t >= self) return false;
+    return (x.tags || []).some((tg) => mine.includes(norm(tg)));
+  });
+  if (!earlier.length) return null;
+  const sorted = [...earlier].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  const prev = sorted[0];
+  const tag = (prev.tags || []).map(norm).find((t) => mine.includes(t)) || '';
+  return { tag, at: prev.createdAt, count: sorted.length, many: sorted.length >= 2 };
+}
