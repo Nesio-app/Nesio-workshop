@@ -19,7 +19,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import TeslaPanel from './TeslaPanel';
 import {
-  listManualAssets, addManualAsset, addAssetAnchor, removeManualAsset,
+  listManualAssets, addManualAsset, addAssetAnchor, removeManualAsset, bindAssetToTesla,
   assetCurrentValue, assetHoldingCosts, FIN_ASSETS_EVENT,
   type ManualAsset, type ManualAssetKind,
 } from '@/lib/portal/finance-assets';
@@ -47,9 +47,15 @@ const todayStr = () => {
 };
 const money = (n: number) => `$${n.toLocaleString(undefined, { maximumFractionDigits: 0 })}`;
 
+/** #10:接口来的那几辆车(名字 + id),用来把手动录的车认到同一辆上。 */
+export interface TeslaVehicleRef { vehicleId: string; name: string }
+
 export default function AssetsPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [tab, setTab] = useState<AssetTab>('property');
+  // #10:「JingBell」(接口)和「Model Y」($0 手动空壳)是同一辆车的两半 ——
+  // TeslaPanel 把它认到的车报上来,车资产卡上就能一键认亲。
+  const [teslaVehicles, setTeslaVehicles] = useState<TeslaVehicleRef[]>([]);
   const [tick, setTick] = useState(0);
   const bump = useCallback(() => setTick((n) => n + 1), []);
 
@@ -83,7 +89,7 @@ export default function AssetsPanel() {
       {/* 车 tab 顶部是接口来的实时快照(状态/里程/充电/能耗),只读,不在手动录入范围内。 */}
       {tab === 'vehicle' && (
         <div className="nesio-assets-live">
-          <TeslaPanel />
+          <TeslaPanel onVehicles={setTeslaVehicles} boundIds={assets.map((a) => a.teslaVehicleId || '').filter(Boolean)} />
         </div>
       )}
 
@@ -93,6 +99,7 @@ export default function AssetsPanel() {
         expenses={expenses}
         people={people}
         dict={dict}
+        teslaVehicles={tab === 'vehicle' ? teslaVehicles : []}
       />
     </div>
   );
@@ -100,12 +107,13 @@ export default function AssetsPanel() {
 
 /* ── 资产清单 + 新增 ──────────────────────────────────────────────── */
 
-function AssetList({ kind, assets, expenses, people, dict }: {
+function AssetList({ kind, assets, expenses, people, dict, teslaVehicles }: {
   kind: ManualAssetKind;
   assets: ManualAsset[];
   expenses: ReturnType<typeof loadDomainExpenses>;
   people: Array<{ key: string; name: string }>;
   dict: string;
+  teslaVehicles: TeslaVehicleRef[];
 }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
@@ -141,6 +149,7 @@ function AssetList({ kind, assets, expenses, people, dict }: {
           dict={dict}
           open={openId === a.id}
           onToggle={() => setOpenId(openId === a.id ? null : a.id)}
+          teslaVehicles={teslaVehicles}
         />
       ))}
 
@@ -170,18 +179,20 @@ function AssetList({ kind, assets, expenses, people, dict }: {
 
 /* ── 单件资产:估值 + 记录 ─────────────────────────────────────────── */
 
-function AssetCard({ asset, expenses, people, dict, open, onToggle }: {
+function AssetCard({ asset, expenses, people, dict, open, onToggle, teslaVehicles }: {
   asset: ManualAsset;
   expenses: ReturnType<typeof loadDomainExpenses>;
   people: Array<{ key: string; name: string }>;
   dict: string;
   open: boolean;
   onToggle: () => void;
+  teslaVehicles: TeslaVehicleRef[];
 }) {
   const [reval, setReval] = useState(false);
   const [rv, setRv] = useState('');
   const [rnote, setRnote] = useState('');
 
+  const boundVehicle = teslaVehicles.find((v) => v.vehicleId === asset.teslaVehicleId) || null;
   const cur = assetCurrentValue(asset);
   const costs = assetHoldingCosts(asset.id, expenses);
   const records = listCareRecords(asset.id);
@@ -215,6 +226,7 @@ function AssetCard({ asset, expenses, people, dict, open, onToggle }: {
           {asset.anchors.length > 1 && ` · ${L(dict, `${asset.anchors.length} 次估值`, `${asset.anchors.length} valuations`)}`}
           {costs.total > 0 && ` · ${L(dict, `今年花了 ${money(costs.total)}`, `${money(costs.total)} this year`)}`}
           {!latest && asset.anchors.length === 0 && L(dict, '还没记过估值 —— 点开填一个', 'No valuation yet — tap to add one')}
+          {boundVehicle && ` · ${L(dict, `就是上面那辆「${boundVehicle.name}」`, `same car as “${boundVehicle.name}” above`)}`}
         </span>
 
         {/* 下次要做的事 —— 收起状态也显示,这是这张卡唯一会「找你」的信息。 */}
@@ -252,6 +264,21 @@ function AssetCard({ asset, expenses, people, dict, open, onToggle }: {
                   {an.note && <span className="note">{an.note}</span>}
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* #10:两套车数据认亲。绑上之后卡头会写明「就是上面那辆」——
+              两张卡还在(用户明说「分开也不影响」),但至少不再互不相干。 */}
+          {teslaVehicles.length > 0 && (
+            <div className="nesio-assets-bindrow">
+              <span className="nesio-assets-bindlabel">{L(dict, '这是哪辆车', 'Which car is this')}</span>
+              <select className="nesio-assets-input" value={asset.teslaVehicleId || ''}
+                onChange={(e) => bindAssetToTesla(asset.id, e.target.value)}>
+                <option value="">{L(dict, '没绑(各显各的)', 'Not linked')}</option>
+                {teslaVehicles.map((v) => (
+                  <option key={v.vehicleId} value={v.vehicleId}>{v.name}</option>
+                ))}
+              </select>
             </div>
           )}
 

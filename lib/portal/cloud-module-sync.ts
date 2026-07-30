@@ -21,6 +21,8 @@ import { logDropped } from './storage-health';
 import { isDedicatedSyncKey, DEDICATED_SYNC_PREFIXES } from './sync-ownership';
 import { recordCloudRestore } from './cloud-restore-receipt';
 import { isBackupKey } from './storage-manifest';
+// #29:银行流水/账户是「按 id 的集合」,云端那份只能并进来,不能整键替换
+import { idFieldFor, mergeIdSets } from './module-merge';
 import { yieldToMain } from './yield-main';
 
 // 归属:记忆图/头像身份/学习态/邮件全文 各有专属引擎(见 sync-ownership.ts),通用模块同步一律让路,
@@ -207,6 +209,28 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
     const localVal = localEntries[key];
     if (localVal === json) { state[key] = { hash: contentHash(json), syncedAt: stamp }; continue; } // 已一致
     const localMissing = localVal === undefined;
+
+    // ── #29(2026-07-30):有些模块是「一堆按 id 的记录」,不是一张快照 ──────────
+    // 银行流水/账户在本机就是并集语义(按 id upsert、账户只增合并),而这里的
+    // last-write-wins 云端赢时是**整键替换** —— 两台设备的 Plaid 窗口/进度不同,
+    // 谁后写谁赢,对方独有的那些就没了。用户看到的「同一入口三种互不相干的状态」
+    // 就是这么来的。这类 key 只能**并进来**。
+    // (life-graph 早就因为同一个理由被排除在外,银行流水是同一类东西,漏在了里面。)
+    const idField = idFieldFor(key);
+    if (idField) {
+      const m = mergeIdSets(localVal, json, idField);
+      if (m) {
+        if (m.json !== localVal) {
+          applyEntries[key] = m.json;
+          if (localMissing) { newlyAdded++; filledKeys.push(key); }
+        }
+        // **故意不写 state**:并集通常是本机和云端的超集,得让接下来的 push 把它带上去。
+        // 写了 state 就等于说「已经和云端一致」,那些本机独有的记录再也传不出去。
+        continue;
+      }
+      // 解析不出数组(格式变了)→ 落回下面原来的判据,不硬来
+    }
+
     const localUnchangedSinceSync = !localMissing && state[key]?.hash === contentHash(localVal);
     // 反遮盖闸(通用防丢):**绝不用明显更小/更空的云端值覆盖本机非空值**。真机踩过——积分/
     // 跟练等「每设备进度」被一台空浏览器的空状态盖掉。云端这份不到本机一半大 → 疑似空/被清,

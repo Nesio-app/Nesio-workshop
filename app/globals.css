@@ -17838,6 +17838,63 @@ html[data-palette="sage"]:not([data-portal-theme="night"]), html[data-palette="s
    FAB/活动态/链接在夜里也跟皮肤走。双属性选择器 (0,2,1) 压过夜间基座 (0,1,1)。 */
 
 /* ① 蓝灰·灰粉 · 夜 */
+/* ── #23:换肤要连**卡面和文字**一起换 ─────────────────────────────────────────
+   用户报「换肤只在设置页生效,首页、记忆库还是原来的色调」。第一次查我比错了地方
+   (只对了 `:root, .portal-root` 那 8 个 --viz-*),结论是「都覆盖了」—— 错的。
+   真正声明日间默认的是 `.portal-root`,112 个 token;四套色卡只改了其中 33 个。
+   漏掉的那批里有:
+
+     --glass-bg-solid  全站用了 102 次(几乎每张卡、每张 sheet 的底色)
+     --portal-card     27 次      --portal-text  14 次
+     --glass-bg / -pop / -raised / -border / -highlight、--modal-card-bg、--portal-surface…
+
+   也就是说:换肤只换了强调色和页面背景,**卡面还是白的、文字还是原来的灰**。
+   设置页大量用 accent 着色,所以看起来变了;首页/记忆库满屏是卡片,自然「没怎么变」。
+   用户看到的是真的。
+
+   这里把这批「表面色」接到各色卡已经调好的值上。用 color-mix 之前先写一个平值,
+   不支持的浏览器保留前者(渐进增强,不新增依赖)。
+
+   **有意不换的**(和情绪色/地表色同一类,是语义不是皮肤):
+     · --status-risk / -soft / -stop / -warn —— 红是「真实风险」的语义色(CLAUDE.md),
+       跟着皮肤走会让某些配色下的风险提示和强调色分不开;
+     · 一切非颜色 token(间距/圆角/字号/字重/动效/层级)。 */
+html[data-palette]:not([data-portal-theme="night"]),
+html[data-palette]:not([data-portal-theme="night"]) .portal-root {
+  --portal-text: var(--portal-ink);
+  --portal-text-secondary: var(--portal-muted);
+  --portal-fg: var(--portal-ink);
+  --portal-border: var(--portal-line);
+  --portal-hairline: var(--portal-line);
+
+  /* 卡面:各色卡自己的页面底色往白里提 —— 纯白在暖色/灰绿皮肤下会显得「贴不上去」 */
+  --portal-card: #ffffff;
+  --portal-card: color-mix(in srgb, var(--portal-bg) 30%, #ffffff);
+  --portal-surface: var(--portal-card);
+  --portal-surface-2: var(--portal-bg);
+  --portal-card-bg: var(--portal-card);
+  --share-card-surface: var(--portal-card);
+
+  --glass-bg-solid: #ffffff;
+  --glass-bg-solid: color-mix(in srgb, var(--portal-bg) 30%, #ffffff);
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg: color-mix(in srgb, var(--portal-bg) 26%, rgba(255, 255, 255, 0.86));
+  --glass-bg-raised: var(--glass-bg-solid);
+  --glass-bg-pop: var(--glass-bg-solid);
+  --glass-border: var(--portal-line);
+  --glass-highlight: var(--portal-accent-soft);
+
+  --modal-card-bg: var(--glass-bg-solid);
+  /* 遮罩也跟着皮肤走一点 —— 纯黑遮罩压在暖色皮肤上会显得脏 */
+  --modal-backdrop-bg: rgba(20, 20, 24, 0.32);
+  --modal-backdrop-bg: color-mix(in srgb, var(--portal-ink) 34%, transparent);
+  --border-subtle: var(--portal-line);
+  --accent-primary: var(--portal-accent);
+  --accent-primary-dim: var(--portal-accent-soft-md);
+  --portal-green: var(--status-go);
+  --portal-on-accent: #ffffff;
+}
+
 html[data-portal-theme="night"][data-palette="bluegray-rose"],
 html[data-portal-theme="night"][data-palette="bluegray-rose"] .portal-root {
   --portal-blue-deep:#d49a94; --portal-blue-mid:#c08d87; --portal-blue-light:#4a3634;
@@ -20727,3 +20784,59 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   font-size: var(--text-xs);
   color: var(--portal-muted);
 }
+
+/* #26:「Jing / Jing Duan / DUAN JING」这类疑似同一个人的候选。
+   摆在关系页最上面,但**不自动合并** —— 合并不可撤销,拍板的是人。 */
+.nesio-rel-mergehint {
+  border: 1px solid var(--portal-accent-border);
+  background: var(--portal-accent-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.nesio-rel-mergehint-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.nesio-rel-mergehint-text {
+  flex: 1;
+  min-width: 12rem;
+  font-size: var(--text-sm);
+  color: var(--portal-ink);
+  line-height: 1.6;
+}
+.nesio-rel-mergehint-actions { display: flex; gap: var(--space-2); flex: none; }
+.nesio-rel-mergehint-btn {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-accent);
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-accent-border);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+  min-height: 32px;
+  cursor: pointer;
+}
+.nesio-rel-mergehint-btn.ghost { color: var(--portal-muted); border-color: var(--portal-line); }
+.nesio-rel-mergehint-foot { margin: 0; font-size: var(--text-xs); color: var(--portal-muted); line-height: 1.6; }
+
+/* #10:车资产卡上的「这是哪辆车」—— 把接口来的那半和手动记的那半认到一起。 */
+.nesio-assets-bindrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+  flex-wrap: wrap;
+}
+.nesio-assets-bindlabel {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  flex: none;
+}
+.nesio-assets-bindrow .nesio-assets-input { flex: 1; min-width: 10rem; }

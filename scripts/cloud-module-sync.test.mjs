@@ -17,6 +17,12 @@ import * as fflate from 'fflate';
 const src = fs.readFileSync(new URL('../lib/portal/cloud-module-sync.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 
+// #29:并集判据用**真的那一份**,不打桩 —— 打了桩这条契约就管不住它了。
+const mergeSrc = fs.readFileSync(new URL('../lib/portal/module-merge.ts', import.meta.url), 'utf8');
+const mergeJs = ts.transpileModule(mergeSrc, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+const mergeMod = { exports: {} };
+vm.runInNewContext(mergeJs, { module: mergeMod, exports: mergeMod.exports, JSON, Map, Set, String, Object, Array, Number });
+
 function makeCtx({ lsInit = {}, localEntries = {}, fetchImpl, withReload = false, ssBroken = false } = {}) {
   const lsMap = new Map(Object.entries(lsInit));
   const localStorage = {
@@ -54,6 +60,7 @@ function makeCtx({ lsInit = {}, localEntries = {}, fetchImpl, withReload = false
       // isBackupKey:测试用的都是 durable 应用 key(nesio-*-v1),按真值等价返回 true;
       // 专属/前缀行在此之前已被 isDedicatedSyncKey 跳过。
       if (p === './storage-manifest') return { isBackupKey: (k) => k.startsWith('nesio-') && !k.startsWith('email-body:') && !k.startsWith('reader-book:') && !k.startsWith('place-image:') && k !== 'nesio-module-sync-state-v1' };
+      if (p === './module-merge') return mergeMod.exports;
       if (p === './cloud-email-sync') return { EMAIL_BODY_MODULE_PREFIX: 'email-body:' };
       // 专属引擎归属:记忆图 + 邮件/书籍行让路(与 sync-ownership 真值等价,覆盖测试用到的 key)。
       if (p === './sync-ownership') return {

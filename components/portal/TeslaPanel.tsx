@@ -53,7 +53,12 @@ interface TeslaEnergyPayload {
 
 type LoadState = 'loading' | 'ready' | 'error';
 
-export default function TeslaPanel() {
+export default function TeslaPanel({ onVehicles, boundIds }: {
+  /** #10:把认到的车报给上层(资产页据此让手动录的车认到同一辆上)。 */
+  onVehicles?: (v: Array<{ vehicleId: string; name: string }>) => void;
+  /** 已经被某件手动资产绑走的车 —— 在这块上标一句,免得用户以为它俩没关系。 */
+  boundIds?: string[];
+} = {}) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [state, setState] = useState<LoadState>('loading');
   const [errMsg, setErrMsg] = useState('');
@@ -96,6 +101,13 @@ export default function TeslaPanel() {
       setCharges(data.charges || []);
       setEnergy(data.energy || {});
       setState('ready');
+      // #10:把车报上去。用 name 而不是 id 展示 —— 用户认得的是「JingBell」,不是一串数字。
+      if (onVehicles) {
+        const seen = new Map<string, string>();
+        for (const d of data.drives || []) if (d.vehicleId && !seen.has(d.vehicleId)) seen.set(d.vehicleId, d.displayName || `Tesla ${d.vehicleId.slice(-4)}`);
+        for (const c of data.charges || []) if (c.vehicleId && c.batteryLevel != null && !seen.has(c.vehicleId)) seen.set(c.vehicleId, c.displayName || `Tesla ${c.vehicleId.slice(-4)}`);
+        onVehicles([...seen.entries()].map(([vehicleId, name]) => ({ vehicleId, name })));
+      }
       // 车的接口只回「此刻」——图 4 那条曲线只能在**看过的时刻**攒。
       // 攒完立刻重读:这一次的点也要出现在图上,不用等下次开页面。
       try {
@@ -118,7 +130,7 @@ export default function TeslaPanel() {
       setErrMsg(L(dict, '这次没等到车的回应 —— 它可能在深度休眠。稍后再试一次。', 'The car did not answer this time — it may be in deep sleep. Try again shortly.'));
       setState('error');
     }
-  }, [dict]);
+  }, [dict, onVehicles]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -214,6 +226,13 @@ export default function TeslaPanel() {
               <p style={{ fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{name}</p>
               <span className="nesio-settings-option-hint">{shiftLabel(v.drive?.shiftState)}</span>
             </div>
+            {/* #10:这辆车已经和下面某件手动记的车认成同一辆了 —— 说一句,
+                免得「JingBell」和「Model Y」看起来还是两台互不相干的车。 */}
+            {(boundIds || []).includes(vid) && (
+              <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>
+                {L(dict, '下面那条车产记录说的就是它。', 'The car asset below refers to this one.')}
+              </p>
+            )}
             {battery != null && (
               <div style={{ marginTop: 'var(--space-3)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>

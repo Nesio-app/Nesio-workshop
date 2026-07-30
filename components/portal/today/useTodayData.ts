@@ -328,7 +328,9 @@ export function useTodayData(canUsePrivateData: boolean) {
               .filter((e) => !Number.isNaN(e.startMs) && new Date(e.startMs).getDate() !== now.getDate()),
             expiryItems: listInventoryItems().filter((i) => i.expiry).map((i) => ({ id: i.id, name: i.name, expiry: i.expiry! })),
             dueBills: loadPlaidLiabilities().map((l) => ({ id: l.accountId, account: names.get(l.accountId) || l.accountId, dueDate: l.dueDate, minPayment: l.minPayment })),
-          }, now)
+            // #24:兜底卡的模板词得跟着界面语言走 —— 英文界面下它原来是中文的
+            // (事件标题 / 物品名 / 账户名是用户自己的数据,照旧原样)
+          }, now, uiLocale)
             .map((f) => ({
               id: f.id,
               title: f.title,

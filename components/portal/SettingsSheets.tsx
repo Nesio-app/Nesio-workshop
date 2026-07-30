@@ -504,9 +504,27 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   useEffect(() => {
     try { const v = localStorage.getItem('nesio-backup-dest'); if (v === 'nesio' || v === 'drive') setBackupDest(v); } catch { /* ignore */ }
   }, []);
-  // 「跨端同步诊断」那块(版本/身份戳)按标注早已从界面删掉,留下的 state 也一并清掉 ——
-  // 算了没人看的东西只会让下一个人以为它还在工作。留着的是下面那颗「立即同步」。
   const [diagSyncMsg, setDiagSyncMsg] = useState('');
+  /**
+   * #23(2026-07-30):用户报「换肤只在设置页生效,首页还是粉的」。查下来四套色卡对
+   * `--portal-*` / `--status-*` 那整组 token **一个不漏都覆盖了**,找不到能解释那一屏的机制;
+   * 最可能的解释是那台设备还在跑**旧构建**(iOS PWA 后台驻留的页面从不重新加载)。
+   *
+   * 可这件事**用户没法自己确认** —— 界面上没有任何地方写着「你现在跑的是哪一版」。
+   * 版本比对逻辑早就有(Portal 里回前台自动刷),但它是静默的:
+   * 一个静默的自愈机制在「它到底有没有生效」这种问题上等于不存在。
+   * 所以这里补一行看得见的:这台设备的构建 vs 线上部署,不一样就给一颗强制刷新。
+   */
+  const localBuild = (process.env.NEXT_PUBLIC_BUILD_SHA || 'dev').slice(0, 7);
+  const [liveBuild, setLiveBuild] = useState('');
+  useEffect(() => {
+    if (!open) return;
+    fetch('/api/version', { cache: 'no-store' })
+      .then((r) => r.json())
+      .then((d: { v?: string }) => setLiveBuild(String(d?.v || '').slice(0, 7)))
+      .catch(() => setLiveBuild(''));
+  }, [open]);
+  const buildStale = Boolean(liveBuild && liveBuild !== 'dev' && localBuild !== 'dev' && liveBuild !== localBuild);
   /**
    * 2026-07-29 QA #11:用户点了一次同步,总数从 2541 变成 2544,报的是「✓ 已同步」——
    * 于是那 3 条看着像**凭空多出来**的。其实它们是别的设备存下、这台机器还没有的记忆,
@@ -981,7 +999,22 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         {deleteMsg && <p className="nesio-settings-option-hint" style={{ margin: '0.4rem 0 0', color: 'var(--status-risk)' }}>{deleteMsg}</p>}
       </details>
 
-      {/* bug3 p44:底部那段说明删掉 —— 这一页每个按钮都在做那件事,不需要再用一段话复述。 */}
+      {/* #23:这台设备到底在跑哪一版 —— 「界面没跟着变」十有八九是这里对不上。
+          原来这个比对是静默自愈的,而静默的自愈机制在「它有没有生效」这种问题上等于不存在。 */}
+      <p className="nesio-settings-option-hint" style={{ marginTop: '1.2rem', lineHeight: 1.7 }}>
+        {L(dict, `这台设备的版本 ${localBuild}`, `This device is on build ${localBuild}`)}
+        {liveBuild ? L(dict, ` · 线上 ${liveBuild}`, ` · live ${liveBuild}`) : ''}
+        {buildStale && (
+          <>
+            <br />
+            {L(dict, '和线上不一样 —— 界面没跟着更新多半是这个原因。', 'Different from live — that is usually why the UI looks out of date.')}
+            <button type="button" onClick={() => window.location.reload()}
+              style={{ marginLeft: 'var(--space-2)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--portal-accent)', fontWeight: 'var(--weight-semibold)', fontFamily: 'var(--font-sans)', fontSize: 'inherit' }}>
+              {L(dict, '取新版', 'Get the new build')}
+            </button>
+          </>
+        )}
+      </p>
     </SheetWrap>
   );
 }
