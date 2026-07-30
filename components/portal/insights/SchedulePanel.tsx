@@ -28,6 +28,11 @@ import {
 } from '@/lib/portal/schedule-filters';
 import { mailStatusLine, mailBadges, toneVars } from '@/lib/portal/mail-badges';
 import { searchTokens, matchesSearch } from '@/lib/portal/schedule-search';
+import {
+  listReminders, addReminder, removeReminder, completeReminder, reopenReminder,
+  parseWallClock, scheduleRemindersReady, SCHEDULE_REMINDERS_EVENT,
+  REMINDER_KINDS, type Reminder, type ReminderKind,
+} from '@/lib/portal/schedule-reminders';
 import { ensureEmailFulltextIndex, emailFulltextReady, emailFulltextScore } from '@/lib/portal/email-fulltext-index';
 
 // 2026-07-30 用户:「目前邮件是只有收件,没有发件箱」。
@@ -277,6 +282,163 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
         )}
       </button>
     </div>
+  );
+}
+
+/**
+ * RemindersSection —— 我自己设的、有明确时间的提醒(2026-07-30 用户要求:
+ *「日程里面可以增加我明确设置时间的提醒项目么,比如家务活,比如账单 due 等」)。
+ *
+ * 为什么**不**塞进上面那份 Row 列表里,而是单独一段:
+ *   ① 它不是一条记忆。Row 上挂着 LifeNode,点开走 MemoryNodeDetail、左滑走
+ *      deleteLifeNode —— 提醒没有节点,硬塞进去就得造一个假节点,然后删除会去
+ *      删一个不存在的 id(失败),详情会打开一条不存在的记忆。
+ *   ② 它的动作不一样:提醒要的是「做好了」(重复的往后滚一期),不是「星标」。
+ *   ③ 最要紧的:上面那份列表有 CHORE_RE —— 还款/缴费/家务/课程一律挡在门外。
+ *      那条规则针对的是**从待办 App 同步进来的**循环任务(会把真约会淹掉);
+ *      而用户亲手敲的家务和账单,一个字都不该被关键词吃掉。分开放,规则就不会打架。
+ *
+ * 搜索照样管它 —— 用户搜「房租」时不会在意这条是提醒还是日历项。
+ */
+function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonly string[] }) {
+  const [items, setItems] = useState<Reminder[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [title, setTitle] = useState('');
+  const [at, setAt] = useState('');
+  const [kind, setKind] = useState<ReminderKind>('other');
+  const [repeat, setRepeat] = useState<'once' | 'weekly' | 'monthly'>('once');
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    const read = () => setItems(listReminders());
+    void scheduleRemindersReady().then(read);
+    read();
+    window.addEventListener(SCHEDULE_REMINDERS_EVENT, read);
+    return () => window.removeEventListener(SCHEDULE_REMINDERS_EVENT, read);
+  }, []);
+
+  const kindLabel = (k: ReminderKind) => L(dict,
+    k === 'chore' ? '家务' : k === 'bill' ? '账单' : '其它',
+    k === 'chore' ? 'Chore' : k === 'bill' ? 'Bill' : 'Other');
+
+  const openForm = () => {
+    // 预填明天早上 9 点 —— 空着让人现敲年月日很烦,填「现在」又会立刻变成一条待处理的。
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(9, 0, 0, 0);
+    const p = (n: number) => String(n).padStart(2, '0');
+    setAt(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T09:00`);
+    setErr('');
+    setAdding(true);
+  };
+
+  const submit = () => {
+    const created = addReminder({
+      title, at, kind,
+      ...(repeat === 'weekly' ? { everyDays: 7 } : repeat === 'monthly' ? { everyMonths: 1 } : {}),
+    });
+    // 从**存储的真相**回读,不信 addReminder 的返回值:配额满时它照样能造出对象,
+    // 界面上多一条、刷新就没了。写没进去就说出来,不假装成功。
+    const after = listReminders();
+    setItems(after);
+    if (!created || !after.some((r) => r.id === created.id)) {
+      setErr(L(dict, '这条没能存下来,先记在别处吧 —— 稍后再试一次。',
+                    'Could not save this one — try again in a moment.'));
+      return;
+    }
+    setAdding(false); setTitle(''); setErr('');
+  };
+
+  const now = Date.now();
+  const shown = items.filter((r) => matchesSearch(
+    { title: r.title, meta: kindLabel(r.kind), body: r.note || '' }, tokens));
+
+  // 搜索中且这一段没有命中 → 整段收起来,免得空标题占着位置误导「提醒都没了」。
+  if (tokens.length > 0 && shown.length === 0) return null;
+
+  return (
+    <section className="nesio-remind">
+      <div className="nesio-remind-head">
+        <h4 className="nesio-remind-title">{L(dict, '我设的提醒', 'My reminders')}</h4>
+        <button type="button" className="nesio-remind-add" onClick={() => (adding ? setAdding(false) : openForm())}>
+          {adding ? L(dict, '稍后', 'Later') : L(dict, '加一条', 'Add')}
+        </button>
+      </div>
+
+      {adding && (
+        <div className="nesio-remind-form">
+          <input className="nesio-schedfilter-input" value={title} onChange={(e) => setTitle(e.target.value)}
+            placeholder={L(dict, '要做什么(如:交房租)', 'What is it (e.g. pay rent)')} />
+          <input className="nesio-schedfilter-input" type="datetime-local" value={at}
+            onChange={(e) => setAt(e.target.value)} aria-label={L(dict, '什么时候', 'When')} />
+          <div className="nesio-remind-row" role="group" aria-label={L(dict, '类型', 'Kind')}>
+            {REMINDER_KINDS.map((k) => (
+              <button key={k} type="button"
+                className={`nesio-schedfilter-chip${kind === k ? ' on' : ''}`}
+                onClick={() => setKind(k)}>{kindLabel(k)}</button>
+            ))}
+          </div>
+          <div className="nesio-remind-row" role="group" aria-label={L(dict, '重复', 'Repeat')}>
+            {([['once', '只此一次', 'Once'], ['weekly', '每周', 'Weekly'], ['monthly', '每月', 'Monthly']] as const).map(([v, zh, en]) => (
+              <button key={v} type="button"
+                className={`nesio-schedfilter-chip${repeat === v ? ' on' : ''}`}
+                onClick={() => setRepeat(v)}>{L(dict, zh, en)}</button>
+            ))}
+          </div>
+          <button type="button" className="nesio-schedfilter-btn pri"
+            disabled={!title.trim() || !parseWallClock(at)}
+            onClick={submit}>{L(dict, '记下来', 'Save')}</button>
+          {err && <p role="alert" className="nesio-remind-err">{err}</p>}
+        </div>
+      )}
+
+      {shown.length === 0 ? (
+        <p className="nesio-remind-empty">
+          {L(dict, '还没有 —— 家务、账单到期这些自己设的时间,记在这里就不会被日历里的筛选吃掉。',
+                'Nothing yet — chores and bill due dates you set yourself live here.')}
+        </p>
+      ) : (
+        <ul className="nesio-remind-list">
+          {shown.map((r) => {
+            const when = parseWallClock(r.at);
+            const overdue = !r.doneAt && when !== null && when.getTime() < now;
+            const whenText = when
+              ? (dict === 'en'
+                  ? when.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                  : `${when.getMonth() + 1}月${when.getDate()}日 ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`)
+              : r.at;
+            const repeatText = r.everyMonths ? L(dict, '每月', 'Monthly') : r.everyDays === 7 ? L(dict, '每周', 'Weekly') : '';
+            return (
+              <li key={r.id} className={`nesio-remind-item${r.doneAt ? ' done' : ''}`}>
+                <div className="nesio-remind-main">
+                  <span className="nesio-remind-name">{r.title}</span>
+                  <span className="nesio-remind-when">
+                    {whenText}
+                    {repeatText && ` · ${repeatText}`}
+                    {` · ${kindLabel(r.kind)}`}
+                    {/* warm-coach:不说「逾期」,不用红色。到点没做只是「还有一件事」。 */}
+                    {overdue && ` · ${L(dict, '还等着', 'still waiting')}`}
+                  </span>
+                </div>
+                <div className="nesio-remind-acts">
+                  {r.doneAt ? (
+                    <button type="button" className="nesio-remind-act" onClick={() => { reopenReminder(r.id); setItems(listReminders()); }}>
+                      {L(dict, '撤销', 'Undo')}
+                    </button>
+                  ) : (
+                    <button type="button" className="nesio-remind-act" onClick={() => { completeReminder(r.id); setItems(listReminders()); }}>
+                      {L(dict, '做好了', 'Done')}
+                    </button>
+                  )}
+                  <button type="button" className="nesio-remind-act" onClick={() => { removeReminder(r.id); setItems(listReminders()); }}
+                    aria-label={L(dict, `删掉「${r.title}」`, `Delete “${r.title}”`)}>✕</button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
 
@@ -728,6 +890,9 @@ export default function SchedulePanel() {
           {L(dict, '写一封', 'Write one')}
         </button>
       )}
+
+      {/* 我自己设的提醒(家务 / 账单 due)。只在日历那格 —— 它是「日程」,不是邮件。 */}
+      {sub === 'calendar' && <RemindersSection dict={dict} tokens={tokens} />}
 
       {rows.length === 0 ? (
         <p className="nesio-insights-empty">

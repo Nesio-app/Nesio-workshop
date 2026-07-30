@@ -149,6 +149,9 @@ const KNOWN_KEYS = new Map([
   ["nesio-bank-acct-names-v1", "durable"],
   ["nesio-meal-calendar-v1", "durable"],
   ["nesio-schedule-filters-v1", "durable"],
+  // 用户自己敲进去的提醒(家务/账单 due)。换台设备后从头开始**不正确** —— 那是他
+  // 亲手写下的东西,丢了就是丢了,所以 durable。
+  ["nesio-schedule-reminders-v1", "durable"],
   ["nesio-migration-completed-v1", "cache"],
   ["nesio-migration-log-v1", "cache"],
   ["nesio-entity-aliases-v1", "durable"],
