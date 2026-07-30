@@ -17,6 +17,10 @@ import LoadingCard from './ui/LoadingCard';
 import { fetchWithTimeout } from '@/lib/portal/fetch-timeout';
 // #11:「未插枪」和「本次已充 27.2 kWh」不能同屏;「还没有充电记录」也不能跟它同屏
 import { chargeEnergyLine, hasAnyChargeRecord } from '@/lib/portal/tesla-charge-copy';
+// 2026-07-30 用户点名:「特斯拉的 API 是有能源,位置 API 的,目前一直未实现。
+// 如果可以,做成图 2,和 4 这样的可视化,在车的页面。」
+import { TeslaLocationMap, EnergyFlowRow, EnergyDaysChart, BatteryTimeline, type EnergyLive, type EnergyDay } from './TeslaCharts';
+import { recordTeslaReadings, readTeslaLog, type TeslaLogPoint } from '@/lib/portal/tesla-history';
 
 interface TeslaDrive {
   vehicleId: string;
@@ -40,6 +44,13 @@ interface TeslaCharge {
   location?: string;
 }
 
+interface TeslaEnergyPayload {
+  live?: EnergyLive[];
+  days?: EnergyDay[];
+  /** 'scope' = 这枚 token 没有 energy_device_data(要重新授权一次);'fetch' = 这次没取到。 */
+  unavailable?: string;
+}
+
 type LoadState = 'loading' | 'ready' | 'error';
 
 export default function TeslaPanel() {
@@ -48,6 +59,8 @@ export default function TeslaPanel() {
   const [errMsg, setErrMsg] = useState('');
   const [drives, setDrives] = useState<TeslaDrive[]>([]);
   const [charges, setCharges] = useState<TeslaCharge[]>([]);
+  const [energy, setEnergy] = useState<TeslaEnergyPayload>({});
+  const [log, setLog] = useState<TeslaLogPoint[]>([]);
 
   // 2026-07-29(用户标注「车页卡死在『正在向车问好…』」的真因):这条 fetch 原本没有超时。
   // 车在深度休眠时 Tesla 侧可能几十秒不回,连接半挂时浏览器更是无限等 ——
@@ -68,7 +81,7 @@ export default function TeslaPanel() {
     setState('loading');
     try {
       const res = await fetchWithTimeout('/api/portal/tesla', { cache: 'no-store' }, 15_000);
-      const data = await res.json() as { ok?: boolean; error?: string; drives?: TeslaDrive[]; charges?: TeslaCharge[] };
+      const data = await res.json() as { ok?: boolean; error?: string; drives?: TeslaDrive[]; charges?: TeslaCharge[]; energy?: TeslaEnergyPayload };
       if (!mine()) return;   // 已经有更新的一趟在飞,旧结果一律丢弃
       if (!data.ok) {
         setErrMsg(data.error === 'not_connected' || data.error === 'token_expired'
@@ -81,7 +94,20 @@ export default function TeslaPanel() {
       }
       setDrives(data.drives || []);
       setCharges(data.charges || []);
+      setEnergy(data.energy || {});
       setState('ready');
+      // 车的接口只回「此刻」——图 4 那条曲线只能在**看过的时刻**攒。
+      // 攒完立刻重读:这一次的点也要出现在图上,不用等下次开页面。
+      try {
+        const byVehicle = new Map<string, { vehicleId: string; batteryPct?: number | null; odometerMi?: number | null; chargingState?: string }>();
+        for (const d of data.drives || []) byVehicle.set(d.vehicleId, { vehicleId: d.vehicleId, odometerMi: d.odometerMi ?? null });
+        for (const c of data.charges || []) {
+          if (c.batteryLevel == null) continue;
+          byVehicle.set(c.vehicleId, { ...byVehicle.get(c.vehicleId), vehicleId: c.vehicleId, batteryPct: c.batteryLevel, chargingState: c.chargingState });
+        }
+        recordTeslaReadings([...byVehicle.values()]);
+      } catch { /* 攒失败不影响看车;写失败已在 recordTeslaReadings 里上报 */ }
+      setLog(readTeslaLog());
       // 顺手沉淀:面板刚拉到的新鲜快照复用给足迹/财务/信号管线(externalId 去重,
       // 不会重复计),停车点/充电站即时进地图足迹、充电花费进财务 —— 看一眼车,数据就更新。
       void import('@/lib/portal/connectors')
@@ -225,6 +251,39 @@ export default function TeslaPanel() {
       {hasVehicle && !hasAnyLocation && (
         <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-3)' }}>
           {L(dict, '位置没授权 —— 到设置 → 数据接入里重连一次 Tesla 就有了。', 'Location not granted — reconnect Tesla in Settings → Data sources.')}
+        </p>
+      )}
+
+      {/* 图 2:车在地图上的位置。复用足迹那张 PlaceMap(OSM 瓦片,零依赖),
+          不为这一处再引一套地图。没坐标时它自己返回 null。 */}
+      <TeslaLocationMap dict={dict} vehicles={[...liveByVehicle.entries()].map(([vid, v]) => ({
+        vehicleId: vid,
+        name: v.drive?.displayName || v.charge?.displayName || `Tesla ${vid.slice(-4)}`,
+        lat: v.drive?.latitude ?? null,
+        lon: v.drive?.longitude ?? null,
+        batteryPct: v.charge?.batteryLevel ?? null,
+        parked: v.drive?.shiftState !== 'D' && v.drive?.shiftState !== 'R',
+      }))} />
+
+      {/* 图 4 的第一条:车的电量随时间。点少于 2 个时自己返回 null —— 一个点连不成线,
+          硬画一条平线会让人以为「电量一直没变」。 */}
+      <BatteryTimeline log={log} dict={dict} />
+
+      {/* 家里的能源产品(太阳能 / Powerwall)。授权里没勾 energy_device_data 时如实说 ——
+          直接显示「没有能源产品」会把「没授权」说成「你家没有」,那是两回事。 */}
+      {(energy.live?.length ?? 0) > 0 && (
+        <>
+          <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-4)' }}>
+            {L(dict, '家里的能源', 'Home energy')}
+          </p>
+          {energy.live!.map((e) => <EnergyFlowRow key={e.siteId} live={e} dict={dict} />)}
+        </>
+      )}
+      <EnergyDaysChart days={energy.days || []} dict={dict} />
+      {energy.unavailable === 'scope' && (
+        <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-3)' }}>
+          {L(dict, '家里的能源数据还没授权 —— 到设置 → 数据接入里重连一次 Tesla 就有了(授权页勾上 Energy Product Information)。',
+            'Home energy is not authorized yet — reconnect Tesla in Settings → Data sources and allow Energy Product Information.')}
         </p>
       )}
 

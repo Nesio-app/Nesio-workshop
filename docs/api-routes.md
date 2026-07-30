@@ -62,6 +62,7 @@ Auth legend:
 | GET /api/portal/drive | guardAiRoute (20/min) + Google OAuth token (drive.appdata) — 拉回云备份 |
 | GET /api/portal/tasks | guardAiRoute (20/min) + Google OAuth token (tasks) — 读 Google Tasks 待办 |
 | GET /api/portal/people | guardAiRoute (20/min) + Google OAuth token (contacts.readonly) — 读通讯录→person 节点(人缘管理);runPeopleSync 消费 |
+| GET /api/portal/tesla | isPortalRequestAuthorized + rate limit (20/min) + Tesla OAuth token — 只读快照:车辆(drive/charge/vehicle_state)+ **能源产品**(2026-07-30 补:`/api/1/products` → `energy_sites/{id}/live_status` 与 `history?kind=energy&period=day`)。能源与车辆**分开失败**:没有能源产品或 token 缺 `energy_device_data` 时只让 energy 为空,不影响车辆数据 |
 | GET /api/auth/session | open (reports session state) |
 
 ## OAuth flows (pre-auth by design)

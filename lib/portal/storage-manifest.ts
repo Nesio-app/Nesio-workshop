@@ -48,6 +48,9 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-migration-completed-v1',
   'nesio-migration-log-v1',
   'nesio-email-signals-cache',
+  // 车的电量时间线(看车这一页的副产物)。换台设备从零开始完全正确 ——
+  // 它不是用户录进来的东西,没必要进备份、上云。
+  'nesio-tesla-battery-log-v1',
   'nesio-guidance-lang-cache-v1',
   // 语音简报的遗留缓存(功能 2026-07-30 已删)。**故意留在这张表里**:老设备的
   // localStorage 里可能还躺着这个值,一旦从 CACHE_KEYS 拿掉,keyKind() 的默认值是

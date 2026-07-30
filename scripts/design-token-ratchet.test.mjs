@@ -29,8 +29,8 @@ const ROOT = new URL('..', import.meta.url);
 const BASELINE = {
   fontSize: 254,
   spacing: 360,
-  radius: 67,
-  hex: 28,
+  radius: 66,
+  hex: 27,
 };
 
 /*

@@ -36,7 +36,11 @@ export const TESLA_AUDIENCE = envValue('TESLA_AUDIENCE') || TESLA_FLEET_BASE;
 // openid + offline_access are required to receive a refresh token.
 // vehicle_location 是**独立**权限:没有它,drive_state 的经纬度一律返回 null ——
 // 停车/充电位置进不了足迹(用户实锤「地址页没有」的根因)。加上后需重新授权一次生效。
-export const TESLA_SCOPES = 'openid offline_access vehicle_device_data vehicle_location vehicle_charging_cmds';
+// energy_device_data:用户的授权页里「Energy Product Information」本来就是勾上的,
+// 可 scope 串里一直没有它 —— 于是家里那套能源产品(太阳能 / Powerwall)的数据
+// 一次都没取过。用户原话:「特斯拉的 API 是有能源,位置 API 的,目前一直未实现」。
+// 加上之后需要**重新授权一次**才生效(scope 是发 token 时定死的)。
+export const TESLA_SCOPES = 'openid offline_access vehicle_device_data vehicle_location vehicle_charging_cmds energy_device_data';
 
 export function teslaConfigured(): boolean {
   return Boolean(envValue('TESLA_CLIENT_ID') && envValue('TESLA_CLIENT_SECRET'));
@@ -199,6 +203,34 @@ export interface TeslaCharge {
   location?: string;
 }
 
+/** 能源产品(太阳能 / Powerwall)的**此刻**:功率流向 + 电池电量。 */
+export interface TeslaEnergyLive {
+  siteId: string;
+  siteName?: string;
+  at: string;
+  /** kW。太阳能发了多少。 */
+  solarKw?: number | null;
+  /** kW。家里在用多少。 */
+  loadKw?: number | null;
+  /** kW。正 = 从电网买,负 = 往电网卖。 */
+  gridKw?: number | null;
+  /** kW。正 = 电池在放电,负 = 在充电。 */
+  batteryKw?: number | null;
+  /** %。家用电池剩多少。 */
+  batteryPct?: number | null;
+}
+
+/** 能源产品的**这些天**:按天的进出电量(kWh)。 */
+export interface TeslaEnergyDay {
+  siteId: string;
+  /** YYYY-MM-DD(本地日,Tesla 按站点时区给) */
+  date: string;
+  solarKwh?: number | null;
+  fromGridKwh?: number | null;
+  toGridKwh?: number | null;
+  homeKwh?: number | null;
+}
+
 interface TeslaGetResult { status: number; data: unknown }
 
 async function teslaGet(path: string, accessToken: string): Promise<TeslaGetResult> {
@@ -293,4 +325,75 @@ export async function collectTeslaData(accessToken: string): Promise<{ status: n
   }
 
   return { status: 200, drives, charges };
+}
+
+/**
+ * 能源产品快照(2026-07-30,用户点名要的那半边)。
+ *
+ * 与车辆分开取、**分开失败**:家里没有太阳能/Powerwall 的人,这里天然是空的,
+ * 不能因此把车辆数据也拖没了。所以路由那边 best-effort 调它,
+ * 任何非 200 都只让 energy 为空,不影响 drives/charges。
+ *
+ * 两样东西:
+ *   · live_status —— 此刻的功率流向(太阳能 / 家用 / 电网 / 电池)+ 电池电量;
+ *   · history?kind=energy&period=day —— 按天的进出电量,给曲线用。
+ *     曲线必须来自**真的历史接口**,不是把此刻这一个点重复画成一条线。
+ */
+export async function collectTeslaEnergy(accessToken: string): Promise<{
+  status: number; live: TeslaEnergyLive[]; days: TeslaEnergyDay[];
+}> {
+  const productsRes = await teslaGet('/api/1/products', accessToken);
+  if (productsRes.status === 401) return { status: 401, live: [], days: [] };
+  if (productsRes.status !== 200) return { status: productsRes.status, live: [], days: [] };
+
+  const products = ((productsRes.data as { response?: Array<Record<string, unknown>> })?.response) || [];
+  // 能源站点才有 energy_site_id;车辆行没有,直接跳过。
+  const sites = products
+    .map((p) => ({
+      siteId: String(p.energy_site_id ?? ''),
+      siteName: (p.site_name as string) || undefined,
+    }))
+    .filter((s) => s.siteId && s.siteId !== 'undefined');
+
+  const live: TeslaEnergyLive[] = [];
+  const days: TeslaEnergyDay[] = [];
+
+  for (const s of sites) {
+    const at = new Date().toISOString();
+    const ls = await teslaGet(`/api/1/energy_sites/${s.siteId}/live_status`, accessToken);
+    if (ls.status === 401) return { status: 401, live, days };
+    const r = (ls.data as { response?: Record<string, unknown> })?.response;
+    if (r) {
+      const w = (k: string) => (typeof r[k] === 'number' ? Math.round((r[k] as number) / 10) / 100 : null);  // W → kW,两位
+      live.push({
+        siteId: s.siteId,
+        siteName: s.siteName,
+        at,
+        solarKw: w('solar_power'),
+        loadKw: w('load_power'),
+        gridKw: w('grid_power'),
+        batteryKw: w('battery_power'),
+        batteryPct: typeof r.percentage_charged === 'number' ? Math.round(r.percentage_charged as number) : null,
+      });
+    }
+
+    const hist = await teslaGet(`/api/1/energy_sites/${s.siteId}/history?kind=energy&period=day`, accessToken);
+    if (hist.status === 401) return { status: 401, live, days };
+    const rows = ((hist.data as { response?: { time_series?: Array<Record<string, unknown>> } })?.response?.time_series) || [];
+    for (const row of rows) {
+      const stamp = typeof row.timestamp === 'string' ? row.timestamp : '';
+      if (!stamp) continue;
+      const kwh = (k: string) => (typeof row[k] === 'number' ? Math.round((row[k] as number) / 10) / 100 : null);
+      days.push({
+        siteId: s.siteId,
+        date: stamp.slice(0, 10),
+        solarKwh: kwh('solar_energy_exported'),
+        fromGridKwh: kwh('grid_energy_imported'),
+        toGridKwh: kwh('grid_energy_exported_from_solar'),
+        homeKwh: kwh('consumer_energy_imported_from_grid'),
+      });
+    }
+  }
+
+  return { status: 200, live, days };
 }
