@@ -10,6 +10,8 @@ import { usePortalLocale } from './use-portal-locale';
 import { L } from '@/lib/portal/i18n';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, deleteFocusNode, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem, getLiveMemoryNode, type LiveMemoryNode } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
+import { settleMentions, type PendingMention } from '@/lib/portal/mention';
+import { linkNodes } from '@/lib/portal/life-graph';
 import { dismissJudgedCard, judgeState, clearJudgeError } from '@/lib/portal/guidance-judge-auto';
 
 /**
@@ -81,6 +83,8 @@ export default function TodayFeed({
   const [restoreNote, setRestoreNote] = useState<string | null>(null);
   // 批次 31:焦点下方快捷输入(用户新指令)
   const [quickAdd, setQuickAdd] = useState('');
+  /** 打 @ 选过的记忆。提交时按「名字还在不在文本里」结算(见 CaptureBar 的 onMention)。 */
+  const [pendingMentions, setPendingMentions] = useState<PendingMention[]>([]);
   const uiLocale = portalLocaleToDictionaryLocale(usePortalLocale());
   /**
    * 「+」传完东西之后那条回执。
@@ -544,12 +548,31 @@ export default function TodayFeed({
         <CaptureBar
           value={quickAdd}
           onChange={setQuickAdd}
+          onMention={(m) => setPendingMentions((prev) => [...prev, m])}
           onSubmit={() => {
             const name = quickAdd.trim();
             if (!name) return;
-            addCommitmentNode(name);
+            const created = addCommitmentNode(name);
+            // @提及**在这里结算**:只连名字还留在最终文本里的那些。
+            // 打了某个名字又把它删掉,就不该连 —— 文本是纯的,这是唯一诚实的判据。
+            // (注释里别举真人名当例子:隐私边界那条契约扫的是整个文件,不剥注释。)
+            // 连不上不拦提交:这条记录本身是你要的东西,为了一条关联把它丢掉更糟;
+            // 但也不静默 —— 连不上就在回执里说。
+            const settled = settleMentions(quickAdd, pendingMentions);
+            let linked = 0;
+            for (const m of settled) {
+              try { if (linkNodes(created.id, m.id, 'user_linked').ok) linked += 1; } catch { /* 见下面的回执 */ }
+            }
+            setPendingMentions([]);
             setQuickAdd('');
-            setQuickSaved(L(uiLocale, '已记下', 'Noted'));
+            setQuickSaved(
+              settled.length === 0
+                ? L(uiLocale, '已记下', 'Noted')
+                : linked === settled.length
+                  ? L(uiLocale, `已记下 · 关联了 ${linked} 条`, `Noted · linked ${linked}`)
+                  // 一条都没连上/只连上一部分要说出来 —— 静默的话你会以为连上了
+                  : L(uiLocale, `已记下,但有 ${settled.length - linked} 条没能关联上`, `Noted, but ${settled.length - linked} link(s) failed`),
+            );
             setTimeout(() => setQuickSaved(''), 2000);
           }}
           onMic={startQuickMic}

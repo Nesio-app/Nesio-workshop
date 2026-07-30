@@ -21,6 +21,7 @@ import {
   type LifeNode,
 } from '@/lib/portal/life-graph';
 import { isTxShadow } from '@/lib/portal/tx-node';
+import { rankRelatedNodes } from '@/lib/portal/related-nodes';
 import { visibleMemoryNodes, isWeatherNode } from '@/lib/portal/memory-visibility';
 import { pinNodeToTodayFocus } from '@/lib/platform/view-models/today-commands';
 import { DOMAINS } from '@/lib/life-domain';
@@ -305,30 +306,20 @@ function extractKeywords(text: string): string[] {
  *  批量导入的节点只有显式关系才算相关;一个真实信号都没有 → 不显示,不硬凑。 */
 const RELATED_SYSTEM_TAGS = new Set(['联系人', '手动记录', '月报', 'Voice', '手写']);
 
+/**
+ * 找相关记忆。排序逻辑抽到 `lib/portal/related-nodes.ts` —— 那里能真跑测试。
+ *
+ * **显式关联全部排在最前,不截断**;后面才用标签/关键词猜的补到上限。
+ * 合起来之后**不要再截断** —— 那等于把显式关联又挤掉了(反证时踩到过)。
+ */
 function findRelatedNodes(target: LifeNode, allNodes: LifeNode[]): LifeNode[] {
-  const targetWords = extractKeywords(`${target.name} ${target.rawInput || ''}`);
-  const targetTags = new Set((target.tags || []).filter((t) => !RELATED_SYSTEM_TAGS.has(t)));
-  return allNodes
-    .filter((n) => n.id !== target.id && !isWeatherNode(n))
-    .map((node) => {
-      let score = 0;
-      const explicit = Boolean(
-        target.relations?.some((r) => r.targetId === node.id) ||
-        node.relations?.some((r) => r.targetId === target.id),
-      );
-      if (explicit) score += 10;
-      score += (node.tags || []).filter((t) => targetTags.has(t)).length * 3;
-      const nodeWords = extractKeywords(`${node.name} ${node.rawInput || ''}`);
-      score += targetWords.filter((w) => nodeWords.includes(w)).length * 2;
-      if (!explicit && isBulkImported(node)) score = 0;
-      return { node, score };
-    })
-    .filter((s) => s.score >= 2)
-    // 批次 53:同分(循环日历的每一次 Sprint 计划分数一样)按日期升序,读起来是时间线
-    .sort((a, b) => b.score - a.score
-      || String(a.node.attributes?.start ?? a.node.createdAt).localeCompare(String(b.node.attributes?.start ?? b.node.createdAt)))
-    .slice(0, 5)
-    .map((s) => s.node);
+  const { explicit, guessed } = rankRelatedNodes(target, allNodes, {
+    extractKeywords,
+    isExcluded: (n) => isWeatherNode(n as LifeNode),
+    isBulkImported: (n) => isBulkImported(n as LifeNode),
+    systemTags: RELATED_SYSTEM_TAGS,
+  });
+  return [...explicit, ...guessed] as LifeNode[];
 }
 
 function findOnThisDayNodes(nodes: LifeNode[]): LifeNode[] {
