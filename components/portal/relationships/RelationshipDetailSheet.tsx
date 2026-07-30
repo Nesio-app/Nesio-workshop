@@ -11,7 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { getLifeGraph, updateLifeNode } from '@/lib/portal/life-graph';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { buildPersonProfile, type PersonProfile } from '@/lib/portal/relationship-profile';
-import { markContacted, lastContactLabel, CLOSENESS_META } from '@/lib/portal/relationships';
+import { markContacted, lastContactLabel, CLOSENESS_META, RELATION_TAGS } from '@/lib/portal/relationships';
 import { setRelationshipOverride, type OverrideCloseness } from '@/lib/portal/relationship-overrides';
 import { mergeEntity } from '@/lib/portal/entity-resolution';
 import {
@@ -19,6 +19,7 @@ import {
   RECORD_CATEGORY_MAP, type PersonRecord,
 } from '@/lib/portal/person-records';
 import { removeContact } from '@/lib/portal/manual-contacts';
+import { deleteLocalFile } from '@/lib/portal/local-file-store';
 import RelationGraph from '../RelationGraph';
 import { RecordCatIcon } from './record-icons';
 import HangNoteSheet from './HangNoteSheet';
@@ -143,9 +144,20 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
     }
   };
 
-  const removeRecord = (id: string) => deletePersonRecord(id);
+  // 删记录连附件一起删 —— 附件唯一副本在本机 IndexedDB,只删记录会留下永远取不回的孤儿 blob。
+  const removeRecord = (id: string) => {
+    const rec = records.find((r) => r.id === id);
+    for (const a of rec?.attachments || []) void deleteLocalFile(a.assetId);
+    deletePersonRecord(id);
+  };
 
   const c = p.contact;
+  // 关系标签(bug3):固定表 + 表外的当前值(推出来的英文关系词)当第一个 chip,能看见也能取消
+  const relTags = relDraft && !RELATION_TAGS.some((t) => t.zh === relDraft)
+    ? [{ zh: relDraft, en: relDraft }, ...RELATION_TAGS]
+    : RELATION_TAGS;
+  const personNode = p.nodeId ? getLifeGraph().find((n) => n.id === p.nodeId) : undefined;
+  const attrStr = (k: string) => (typeof personNode?.attributes?.[k] === 'string' ? String(personNode.attributes[k]) : '');
   // 3 stats(设计稿):上次联系 / 提到 N次 / 认识 N天。认识天数 = 距最早往来记录的天数。
   const knownDays = (() => {
     const times = p.timeline.map((t) => (t.at ? Date.parse(t.at) : NaN)).filter((n) => Number.isFinite(n));
@@ -192,7 +204,14 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
             onChange={(e) => { void onPickAvatar(e.target.files?.[0]); e.currentTarget.value = ''; }}
           />
           <div className="nesio-rel-detail-id">
-            <h2 className="nesio-settings-sheet-title" style={{ margin: 0 }}>{p.displayName}</h2>
+            {/* bug3:「挂一条」改名「记录」并挪到名字同一行 —— 记一条是这页最常做的事,
+                原来它埋在下面的分区标题右侧,要滚下去才看得到。 */}
+            <div className="nesio-rel-detail-name-row">
+              <h2 className="nesio-settings-sheet-title" style={{ margin: 0 }}>{p.displayName}</h2>
+              <button type="button" className="nesio-rel-rec-add" onClick={() => setHangOpen(true)}>
+                {L(dict, '记录', 'Log')}
+              </button>
+            </div>
             <div className="nesio-rel-detail-pills">
               {p.isFamily && <span className="nesio-rel-pill nesio-rel-pill--fam">{L(dict, '家庭', 'Family')}</span>}
               {c && <span className="nesio-rel-pill">{L(dict, CLOSENESS_META[c.closeness].zh, CLOSENESS_META[c.closeness].en)}</span>}
@@ -238,15 +257,23 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                   </button>
                 ))}
               </div>
-              <input type="text" className="nesio-ob-input"
-                placeholder={L(dict, '关系词,如:同事、大学同学(留空=自动)', 'Relationship, e.g. coworker (blank = auto)')}
-                value={relDraft} maxLength={16}
-                onChange={(e) => setRelDraft(e.target.value)}
-                onBlur={() => setRelationshipOverride(p.key, { relation: relDraft.trim() })}
-                onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur(); }} />
-              <p className="nesio-settings-option-hint" style={{ margin: '0.35rem 0 0' }}>
-                {L(dict, '改了只影响这个人的亲疏与联系节奏,仅你可见。', "Only affects this person's closeness & reminder cadence — visible only to you.")}
-              </p>
+              {/* bug3:关系词改成选 tag —— 表里没有的旧值(数据推出来的英文关系词)当第一个 chip 显示,点一下可取消 */}
+              <div className="nesio-rel-chips" role="group" aria-label={L(dict, '关系', 'Relationship')}>
+                {relTags.map((t) => {
+                  const on = relDraft === t.zh;
+                  return (
+                    <button key={t.zh} type="button" aria-pressed={on}
+                      className={`nesio-rel-chip${on ? ' nesio-rel-chip--on' : ''}`}
+                      onClick={() => {
+                        const next = on ? '' : t.zh;
+                        setRelDraft(next);
+                        setRelationshipOverride(p.key, { relation: next });
+                      }}>
+                      {L(dict, t.zh, t.en)}
+                    </button>
+                  );
+                })}
+              </div>
               {/* 数据审计 #4:实体解析 —— 同一个人被记成两个名字(如「妈妈」和「母亲」)时,合并成一个 */}
               <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.6rem' }}>
                 <input type="text" className="nesio-ob-input" style={{ flex: 1 }}
@@ -275,16 +302,11 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
             </div>
           )}
 
-          {/* 挂在 TA 身上(成绩/消费/位置/医疗/药物/健康)*/}
+          {/* 挂在 TA 身上(成绩/消费/位置/医疗/药物/健康)。加入口已挪到名字行(bug3) */}
           <div style={{ marginTop: '1rem' }}>
-            <div className="nesio-rel-rec-head">
-              <p className="nesio-settings-section-label" style={{ margin: 0 }}>{L(dict, '挂在 TA 身上', 'Attached to them')}</p>
-              <button type="button" className="nesio-rel-rec-add" onClick={() => setHangOpen(true)}>
-                {L(dict, '＋ 挂一条', '＋ Add')}
-              </button>
-            </div>
+            <p className="nesio-settings-section-label" style={{ margin: 0 }}>{L(dict, '挂在 TA 身上', 'Attached to them')}</p>
 
-            {records.length > 0 ? (
+            {records.length > 0 && (
               <div className="nesio-rel-rec-list">
                 {records.map((r) => {
                   const meta = RECORD_CATEGORY_MAP[r.category];
@@ -298,6 +320,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                           {r.date ? ` · ${new Date(r.date).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' })}` : ''}
                           {r.detail ? ` · ${r.detail}` : ''}
                           {meta.sensitive ? L(dict, ' · 仅你可见', ' · only you') : ''}
+                          {r.attachments?.length ? L(dict, ` · ${r.attachments.length} 个附件`, ` · ${r.attachments.length} file(s)`) : ''}
                         </span>
                       </div>
                       {meta.sensitive && (
@@ -308,10 +331,6 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                   );
                 })}
               </div>
-            ) : (
-              <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>
-                {L(dict, '把成绩、消费、位置,或医疗/药物/健康按人记在这里(敏感项仅你可见 · 不进 AI)。', 'Attach achievements, spending, places — or medical/medication/health, per person (sensitive — only you, never sent to AI).')}
-              </p>
             )}
           </div>
 
@@ -380,8 +399,9 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
           email: p.email || '',
           birthday: p.birthday || '',
           relation: c?.relation || '',
-          phone: typeof getLifeGraph().find((n) => n.id === p.nodeId)?.attributes?.phone === 'string'
-            ? String(getLifeGraph().find((n) => n.id === p.nodeId)?.attributes?.phone) : '',
+          phone: attrStr('phone'),
+          address: attrStr('address'),
+          note: attrStr('note'),
         }}
         onSaved={(nextKey) => { if (nextKey !== p.key) onClose(); else rebuild(); }}
       />

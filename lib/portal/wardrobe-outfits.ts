@@ -23,6 +23,13 @@ export interface SavedOutfit {
   starred?: boolean;
   /** 点不喜欢 = 淘汰(不再推这一组,但记录留着) */
   retired?: boolean;
+  /**
+   * 这条是「计划」而不是「穿过」(bug3:列表长按可以选那天穿 → 日历上占一格)。
+   * 计划到了那天点「穿了」就把这个标去掉,记录转成真穿过 —— 所以「穿过几次」只数没这个标的。
+   */
+  planned?: boolean;
+  /** 这一组的上身试穿图(local-image-store 的 assetId)—— 日历格子优先显示它。 */
+  tryonAssetId?: string;
   /** 存的时刻(同一天存了几套时用来定先后) */
   at: string;
 }
@@ -51,6 +58,24 @@ export function groupByMonth(list: readonly SavedOutfit[]): Array<{ month: strin
 /** 某一天穿的(可能不止一套)。 */
 export function outfitsOn(list: readonly SavedOutfit[], date: string): SavedOutfit[] {
   return sortOutfits(list.filter((o) => o.date === date));
+}
+
+/**
+ * 这一组真穿过几次(bug3:列表栏显示已经穿过几次)。
+ * 只数「不是计划」的记录 —— 排在日历上还没到那天的不算穿过。
+ */
+export function wornCount(list: readonly SavedOutfit[], pieceIds: readonly string[]): number {
+  const k = outfitKey(pieceIds);
+  return list.filter((o) => !o.planned && outfitKey(o.pieceIds) === k).length;
+}
+
+/** 这一组最近一次的上身试穿图 —— 同一套排到别的日子时不用重新生成。 */
+export function tryonOf(list: readonly SavedOutfit[], pieceIds: readonly string[]): string | null {
+  const k = outfitKey(pieceIds);
+  for (const o of sortOutfits(list)) {
+    if (o.tryonAssetId && outfitKey(o.pieceIds) === k) return o.tryonAssetId;
+  }
+  return null;
 }
 
 /** 被淘汰过的组合 key 集合 —— 搭配算法据此避开。 */

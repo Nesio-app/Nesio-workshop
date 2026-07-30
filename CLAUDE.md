@@ -52,6 +52,10 @@
 - Google / Apple 第三方 logo SVG 里的品牌色
 - `MoodSheet.tsx` 里情绪轮的情绪颜色（`#FFD166`, `#FF8FAB` 等）——这是情绪语义调色板，不是 UI 强调色
 - Canvas 2D context 不支持 CSS 变量，用 `getComputedStyle` 读取后使用
+- `Globe.tsx` 里地表色板（海 / 陆 / 干旱带 / 苔原 / 冰盖）——这是**被描绘的内容**，
+  不是 UI 色：卫星照的海在夜间也是蓝的，跟着主题翻转反而是错的。同 `MoodSheet` 情绪色一类。
+  但球面上的 **UI 叠加层**（到访高亮等）必须走 token（该文件里已用 `tok('--status-go', …)`
+  从 computed style 读）——「内容色写死、UI 色走 token」是这里的分界线，别把两边搞混。
 
 ### 字体规则
 

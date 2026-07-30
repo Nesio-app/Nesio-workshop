@@ -57,12 +57,18 @@ export default function HealthRecordSheet({ open, onClose, onSaved }: { open: bo
   const [place, setPlace] = useState('');
   const [dept, setDept] = useState('');
   const [note, setNote] = useState('');
+  // bug3 p41:就诊加医生(可从 People 里挑,挑了就带上归一 key)+ 保险 + 价格
+  const [doctor, setDoctor] = useState('');
+  const [doctorKey, setDoctorKey] = useState('');
+  const [insurance, setInsurance] = useState('');
+  const [price, setPrice] = useState('');
 
   useEffect(() => {
     if (!open) return;
     setErr(null); setDate(today());
     setName(''); setValue(''); setUnit(''); setLow(''); setHigh('');
     setDose(''); setFreq(''); setSeverity(1); setPlace(''); setDept(''); setNote('');
+    setDoctor(''); setDoctorKey(''); setInsurance(''); setPrice('');
   }, [open]);
 
   // 成员:本人 + 有名字的联系人(家人排前面 —— 健康数据多半是给家里人记的)
@@ -99,9 +105,17 @@ export default function HealthRecordSheet({ open, onClose, onSaved }: { open: bo
         setBusy(true);
         recordSymptom({ name: name.trim(), severity, note: note.trim() || undefined, personKey, date });
       } else {
-        if (!place.trim() && !dept.trim() && !note.trim()) { setErr(t('至少填一项(医院 / 科室 / 记一句)。', 'Fill at least one field.')); return; }
+        if (!place.trim() && !dept.trim() && !note.trim() && !doctor.trim()) { setErr(t('至少填一项(医院 / 科室 / 医生 / 记一句)。', 'Fill at least one field.')); return; }
         setBusy(true);
-        recordVisit({ place: place.trim() || undefined, department: dept.trim() || undefined, note: note.trim() || undefined, personKey, date });
+        recordVisit({
+          place: place.trim() || undefined, department: dept.trim() || undefined, note: note.trim() || undefined,
+          doctor: doctor.trim() || undefined,
+          // 只有真从 People 里挑的才带 key —— 手打一个名字不等于关系页里有这个人
+          doctorKey: doctorKey || undefined,
+          insurance: insurance.trim() || undefined,
+          price: num(price), currency: num(price) !== undefined ? 'USD' : undefined,
+          personKey, date,
+        });
       }
       onSaved?.();
       onClose();
@@ -216,6 +230,37 @@ export default function HealthRecordSheet({ open, onClose, onSaved }: { open: bo
             <input id="hr-place" className="nesio-ob-input" value={place} maxLength={40} onChange={(e) => setPlace(e.target.value)} />
             <label className="nesio-settings-section-label" htmlFor="hr-dept" style={{ marginTop: '0.7rem' }}>{t('科室', 'Department')}</label>
             <input id="hr-dept" className="nesio-ob-input" value={dept} maxLength={24} onChange={(e) => setDept(e.target.value)} />
+
+            {/* bug3 p41:医生名字 —— 可以直接打,也可以从 People 里挑(挑了就关联上) */}
+            <label className="nesio-settings-section-label" htmlFor="hr-doctor" style={{ marginTop: '0.7rem' }}>{t('医生', 'Doctor')}</label>
+            <input id="hr-doctor" className="nesio-ob-input" value={doctor} maxLength={40}
+              onChange={(e) => { setDoctor(e.target.value); setDoctorKey(''); }} />
+            {people.length > 0 && (
+              <div className="nesio-rel-chips" style={{ marginTop: '0.4rem' }}>
+                {people.slice(0, 8).map((p) => (
+                  <button key={p.key} type="button"
+                    className={`nesio-rel-chip${doctorKey === p.key ? ' nesio-rel-chip--on' : ''}`}
+                    onClick={() => {
+                      // 再点一次取消关联(名字留着,只是不再指向 People 里那个人)
+                      if (doctorKey === p.key) { setDoctorKey(''); return; }
+                      setDoctor(p.name); setDoctorKey(p.key);
+                    }}>{p.name}</button>
+                ))}
+              </div>
+            )}
+
+            {/* bug3 p41:保险 + 价格 —— 就诊多半连着一笔钱,记在这条上才对得起来 */}
+            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.7rem' }}>
+              <div style={{ flex: 2 }}>
+                <label className="nesio-settings-section-label" htmlFor="hr-ins">{t('保险', 'Insurance')}</label>
+                <input id="hr-ins" className="nesio-ob-input" value={insurance} maxLength={40} onChange={(e) => setInsurance(e.target.value)} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <label className="nesio-settings-section-label" htmlFor="hr-price">{t('价格', 'Price')}</label>
+                <input id="hr-price" className="nesio-ob-input" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value)} />
+              </div>
+            </div>
+
             <label className="nesio-settings-section-label" htmlFor="hr-note" style={{ marginTop: '0.7rem' }}>{t('记一句', 'Note')}</label>
             <input id="hr-note" className="nesio-ob-input" value={note} maxLength={120} placeholder={t('医生说了什么、下次什么时候来', 'What the doctor said, next visit')} onChange={(e) => setNote(e.target.value)} />
           </>

@@ -343,9 +343,11 @@ export function TodayFocusSection({
                         aria-expanded={false}
                         onClick={() => setCollapsed(false)}
                       >
-                        {/* 2026-07-29:去掉行首那个孤零零的 ⋯ 圆点 —— 时间线上每个圆点都代表
-                            「一件真实发生的事」,而这一条是**入口**不是事件,挂个点在轨道上
-                            反而像多出一件没内容的事。 */}
+                        {/* bug3 p43:圆点加回来 —— 标注写明「稍后左边对应时间线上应该是圆形
+                            中间三个点的符号」。2026-07-29 那次是按「入口不是事件」删掉的,
+                            但删了之后这一行的文字比上面每一拍都往左突出一截,读起来像跑位;
+                            补回 ⋯ 圈,缩进跟上面对齐,「稍后」也就和标题同一条左边线了。 */}
+                        <span className="nesio-collapsed-dot nesio-tl-more-plus" aria-hidden>⋯</span>
                         <span className="nesio-collapsed-task-body">
                           <span className="nesio-collapsed-kicker">{L(dict, '稍后', 'Later')}</span>
                           <span className="nesio-collapsed-title">{L(dict, `还有 ${restCount} 件小事`, `${restCount} more small things`)}</span>

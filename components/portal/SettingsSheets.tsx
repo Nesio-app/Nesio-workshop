@@ -22,6 +22,7 @@ import { getFontScale, applyFontScale, type FontScale } from '@/lib/portal/font-
 import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { visibleMemoryNodes } from '@/lib/portal/memory-visibility';
+import { auditGraphConsistency, consistencyVerdict, repairMissingInCloud, type GraphConsistencyReport } from '@/lib/portal/graph-consistency';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
@@ -480,6 +481,11 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const importRef = useRef<HTMLInputElement>(null);
   // 云备份(付费,规划中):状态机 idle→pushing→done/error,失败必可见(设计红线)。
   const [cloudState, setCloudState] = useState<'idle' | 'pushing' | 'done' | 'error'>('idle');
+  // 同步体检(地基 F2):回答「我的记忆全在吗」。只读 + 显式触发 —— 拉全量云快照,
+  // 不该在启动路径上跑。修复(补传)是另一颗按钮,永远由用户点。
+  const [auditState, setAuditState] = useState<'idle' | 'running' | 'done' | 'repairing' | 'failed'>('idle');
+  const [auditReport, setAuditReport] = useState<GraphConsistencyReport | null>(null);
+  const [auditFail, setAuditFail] = useState<string>('');
   const [cloudError, setCloudError] = useState<CloudBackupError | null>(null);
   const [cloudBackupAt, setCloudBackupAt] = useState<string | null>(null);
   const [cloudEntitled, setCloudEntitled] = useState(false);
@@ -565,6 +571,32 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   // 备份/恢复走用户选的目的地(Drive 失败自动兜底 Nesio 已在 handleDriveBackup 内)
   const handleBackupChosen = () => (backupDest === 'drive' ? handleDriveBackup() : handleCloudBackup());
   const handleRestoreChosen = () => (backupDest === 'drive' ? handleDriveRestore() : handleCloudRestore());
+
+  async function runSyncAudit() {
+    setAuditState('running'); setAuditFail(''); setAuditReport(null);
+    const res = await auditGraphConsistency();
+    if (!res.ok) {
+      // 红线:异步动作必须有可见失败态。三种原因分开说 —— 「没登录」不是「坏了」。
+      setAuditFail(res.reason === 'not_signed_in'
+        ? L(dict, '还没登录,云端这一侧还没有东西可比。', 'Not signed in yet — there is no cloud side to compare.')
+        : L(dict, '这次没连上云,待会儿再试一次。', "Couldn't reach the cloud — try again in a bit."));
+      setAuditState('failed');
+      return;
+    }
+    setAuditReport(res.report); setAuditState('done');
+  }
+
+  async function repairSyncGap() {
+    if (!auditReport?.missingInCloud.length) return;
+    setAuditState('repairing');
+    try {
+      await repairMissingInCloud(auditReport.missingInCloud);
+      await runSyncAudit(); // 补完立刻重测,数字要自己说话,不靠「应该好了」
+    } catch {
+      setAuditFail(L(dict, '补传没成功,待会儿再试一次。', "Couldn't finish uploading — try again in a bit."));
+      setAuditState('failed');
+    }
+  }
   async function handleDriveRestore() {
     if (!confirm(L(dict, '从 Google Drive 恢复:把云端备份合并回本机(仅补缺,不覆盖已有)。完成后自动刷新。继续?', 'Restore from Google Drive: merges the backup into this device (fills gaps, keeps existing). Refreshes when done. Continue?'))) return;
     setDriveState('busy'); setDriveMsg('');
@@ -795,8 +827,8 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
 
       {/* bug2:「你的数据在哪里」整块删除(数据主权面板 + 同步诊断) */}
 
-      {/* 图5:数据接入从「记录习惯」并入这里 —— 连接数据源(ConnectorsHub);bug2:说明文字删除 */}
-      <p className="nesio-settings-section-label">{L(dict, '数据接入', 'Connect data')}</p>
+      {/* 图5:数据接入从「记录习惯」并入这里 —— 连接数据源(ConnectorsHub);bug2:说明文字删除。
+          bug3 p44:「数据接入」这个小标题也删了 —— 下面那行按钮自己就叫「连接数据源」。 */}
       <button type="button" className="nesio-settings-option" onClick={onOpenConnect}>
         <div>
           <span className="nesio-settings-option-label">{L(dict, '连接数据源', 'Connected sources')}</span>
@@ -817,15 +849,17 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         ))}
       </div>
 
-      {/* 2026-07-29:备份/恢复并成一组 —— 平时做的是「备份」,「恢复」是出事那天才用一次。
-          两个等重的整行按钮并排,等于让不常用的那个天天占同样的分量。
-          主动作实心整行,反向动作降成一行文字链。导出/导入同理(见下)。 */}
-      <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleBackupChosen} disabled={cloudState === 'pushing' || driveState === 'busy'}>
-        {(cloudState === 'pushing' || driveState === 'busy') ? L(dict, '正在备份…', 'Backing up…') : L(dict, '备份', 'Back up')}
-      </Button>
-      <button type="button" className="nesio-settings-inline-link" onClick={handleRestoreChosen} disabled={cloudRestoreState === 'pulling' || driveState === 'busy'}>
-        {(cloudRestoreState === 'pulling') ? L(dict, '正在恢复…', 'Restoring…') : L(dict, '从云恢复 ›', 'Restore from cloud ›')}
-      </button>
+      {/* bug3 p44:「备份 / 从云恢复」放一排,「导出 / 导入」放一排(见下)。
+          2026-07-29 曾按「主动作整行 + 反向动作文字链」拆成两行 —— 标注要的是成对并排,
+          一眼看出这是一对互逆操作;两个都是整行按钮就没有这个信息了,所以改成 2 列。 */}
+      <div className="nesio-settings-btn-row">
+        <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleBackupChosen} disabled={cloudState === 'pushing' || driveState === 'busy'}>
+          {(cloudState === 'pushing' || driveState === 'busy') ? L(dict, '正在备份…', 'Backing up…') : L(dict, '备份', 'Back up')}
+        </Button>
+        <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleRestoreChosen} disabled={cloudRestoreState === 'pulling' || driveState === 'busy'}>
+          {(cloudRestoreState === 'pulling') ? L(dict, '正在恢复…', 'Restoring…') : L(dict, '从云恢复', 'Restore')}
+        </Button>
+      </div>
       {/* 状态:仅当前所用目的地会填充 */}
       {cloudState === 'done' && (
         <p style={{ fontSize: '0.75rem', marginTop: 4, color: 'var(--status-go)' }}>
@@ -844,12 +878,74 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       )}
       {driveMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: driveState === 'error' ? 'var(--status-risk)' : 'var(--status-go)' }}>{driveMsg}</p>}
 
-      <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleExportLocal} disabled={exportBusy}>
-        {exportBusy ? L(dict, '正在导出…', 'Exporting…') : L(dict, '导出全部(记忆 + 学到的偏好,下载 JSON)', 'Export everything (memories + learned prefs, JSON)')}
-      </Button>
-      <button type="button" className="nesio-settings-inline-link" onClick={() => importRef.current?.click()}>
-        {L(dict, '导入备份 ›', 'Import backup ›')}
-      </button>
+      {/* 同步体检(地基 F2)。此前这里只报「N 条记忆,全在本机」—— 那是**本地**条数,
+          回答不了「云端也有吗」。同步机制齐备但没人能验:backfill 默认只补最新 200 条,
+          老节点若当初没上去就永远不会被发现。这块把它变成可回答的。 */}
+      {/* 用独立的 audit-row,不复用 nesio-settings-btn-row —— 那个类钉的是 bug3 p44 的
+          「两排**成对**按钮」(备份/恢复、导出/导入),契约按出现次数校验。而这一行常态
+          只有一颗按钮(补传仅在真有缺口时才出现),本来就不是一对。 */}
+      <div className="nesio-settings-audit-row">
+        <Button variant="soft" size="md" full className="nesio-settings-action-btn"
+          onClick={runSyncAudit} disabled={auditState === 'running' || auditState === 'repairing'}
+          title={L(dict, '比对本机与云端的记忆条目,列出差在哪', 'Compare local vs cloud memories and list the gaps')}>
+          {auditState === 'running' ? L(dict, '正在核对…', 'Checking…') : L(dict, '同步体检', 'Sync check')}
+        </Button>
+        {auditReport && auditReport.missingInCloud.length > 0 && (
+          <Button variant="soft" size="md" full className="nesio-settings-action-btn"
+            onClick={repairSyncGap} disabled={auditState === 'repairing'}>
+            {auditState === 'repairing'
+              ? L(dict, '正在补传…', 'Uploading…')
+              : L(dict, `补传 ${auditReport.missingInCloud.length} 条`, `Upload ${auditReport.missingInCloud.length}`)}
+          </Button>
+        )}
+      </div>
+      {auditState === 'failed' && auditFail && (
+        <p style={{ fontSize: '0.75rem', marginTop: 4, color: 'var(--portal-muted)' }}>{auditFail}</p>
+      )}
+      {auditReport && (auditState === 'done' || auditState === 'repairing') && (() => {
+        const verdict = consistencyVerdict(auditReport);
+        const pending = new Set(auditReport.pendingDeletes);
+        const cloudOnly = auditReport.missingLocally.filter((id) => !pending.has(id));
+        return (
+          <p style={{ fontSize: '0.75rem', marginTop: 4, lineHeight: 1.7,
+            color: verdict === 'clean' ? 'var(--status-go)' : verdict === 'repairable' ? 'var(--status-gentle)' : 'var(--status-risk)' }}>
+            {verdict === 'clean'
+              ? L(dict, `✓ 本机 ${auditReport.localCount} 条,云端 ${auditReport.cloudCount} 条,一一对得上。`,
+                  `✓ ${auditReport.localCount} local, ${auditReport.cloudCount} in cloud — all matched.`)
+              : L(dict, `本机 ${auditReport.localCount} 条 · 云端 ${auditReport.cloudCount} 条`,
+                  `${auditReport.localCount} local · ${auditReport.cloudCount} in cloud`)}
+            {auditReport.missingInCloud.length > 0 && (
+              <><br />{L(dict, `· ${auditReport.missingInCloud.length} 条还没上云 —— 点右边补传就好。`,
+                `· ${auditReport.missingInCloud.length} not yet in the cloud — tap Upload to fix.`)}</>
+            )}
+            {/* 挂起的删除单独说清楚:它让云端看起来「多」,但那是正常的中间态,不是丢数据 */}
+            {auditReport.pendingDeletes.length > 0 && (
+              <><br />{L(dict, `· ${auditReport.pendingDeletes.length} 条删除还在等联网,云端暂时还留着。`,
+                `· ${auditReport.pendingDeletes.length} deletions waiting to reach the cloud.`)}</>
+            )}
+            {cloudOnly.length > 0 && (
+              <><br />{L(dict, `· 云端有 ${cloudOnly.length} 条本机没有 —— 多半是别的设备记的,下次打开会自己拉回来。`,
+                `· ${cloudOnly.length} in the cloud but not here — likely from another device; they'll arrive on next open.`)}</>
+            )}
+            {auditReport.stuckCount > 0 && (
+              <><br />{L(dict, `· ${auditReport.stuckCount} 条同步一直没成功,重试也不会自己好 —— 备份一份留底更稳妥。`,
+                `· ${auditReport.stuckCount} keep failing to sync — a manual backup is the safer move.`)}</>
+            )}
+          </p>
+        );
+      })()}
+
+      {/* 并排后放不下长标题,按钮上只留动词;导出的到底是什么放进 title(长按/悬停可见)。 */}
+      <div className="nesio-settings-btn-row">
+        <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleExportLocal} disabled={exportBusy}
+          title={L(dict, '导出全部:记忆 + 学到的偏好,下载 JSON', 'Export everything: memories + learned prefs, JSON')}>
+          {exportBusy ? L(dict, '正在导出…', 'Exporting…') : L(dict, '导出', 'Export')}
+        </Button>
+        <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}
+          title={L(dict, '从备份 JSON 导入', 'Import from a backup JSON')}>
+          {L(dict, '导入', 'Import')}
+        </Button>
+      </div>
       <input ref={importRef} type="file" accept="application/json,.json" className="nesio-visually-hidden" onChange={handleImportFile} />
       {restoreMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
       {exportWarn && <p style={{ fontSize: '0.75rem', marginTop: 4, lineHeight: 1.6, color: 'var(--status-gentle)' }}>{exportWarn}</p>}
@@ -858,11 +954,10 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           而且这三件事一年也未必做一次,却天天占着视线。收进一个入口,点开才展开。
           注意用 <details> 而不是 state:折叠这件事不需要 React 参与,原生元素自带无障碍语义。 */}
       <details className="nesio-settings-danger-zone">
+        {/* bug3 p45:只留「删除数据」四个字 —— 副标题那行把三个选项提前念了一遍,
+            而点开就能看见它们本身。 */}
         <summary className="nesio-settings-danger-summary">
           {L(dict, '删除数据', 'Delete data')}
-          <span className="nesio-settings-option-hint" style={{ display: 'block', marginTop: '0.2rem' }}>
-            {L(dict, '清除记忆 / 删本机数据 / 删账号 —— 点开选', 'Clear memories / wipe this device / delete account')}
-          </span>
         </summary>
 
         <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={clearAllMemory}>
@@ -878,8 +973,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         {deleteMsg && <p className="nesio-settings-option-hint" style={{ margin: '0.4rem 0 0', color: 'var(--status-risk)' }}>{deleteMsg}</p>}
       </details>
 
-      {/* 图3:原顶部说明整段挪到最下面收尾 */}
-      <p className="nesio-settings-sheet-desc" style={{ marginTop: '1.5rem', marginBottom: 0 }}>{L(dict, '只整理你放进来的内容。你可以看见它记住了什么、存在哪、也可以随时删除。', 'Only what you put in gets organized. You can see what it remembers, where it lives, and delete it anytime.')}</p>
+      {/* bug3 p44:底部那段说明删掉 —— 这一页每个按钮都在做那件事,不需要再用一段话复述。 */}
     </SheetWrap>
   );
 }

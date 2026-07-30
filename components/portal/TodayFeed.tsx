@@ -45,7 +45,6 @@ import { useTodayData } from './today/useTodayData';
 import { FocusModeSheet } from './today/FocusModeSheet';
 import { MeetingRecorderSheet } from './today/MeetingRecorderSheet';
 
-const MoodTrendSheet = dynamic(() => import('./MoodTrendSheet'), { ssr: false });
 const MemoryNodeDetailLazy = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 const FamilyTodayStrip = dynamic(() => import('./today/FamilyTodayStrip'), { ssr: false });
 import MemoryFlashBanner, { useMemoryFlash } from './MemoryFlashBanner';
@@ -70,7 +69,6 @@ export default function TodayFeed({
     proactiveCards, setProactiveCards,
     dismissedCardIds, setDismissedCardIds,
   } = useTodayData(canUsePrivateData);
-  const [moodTrendOpen, setMoodTrendOpen] = useState(false);
   const [points, setPoints] = useState(0); // App 级积分(奖品商城),顶栏徽章
   useEffect(() => {
     const sync = () => { try { setPoints(getPoints()); } catch { /* SSR / 无存储 */ } };
@@ -210,8 +208,12 @@ export default function TodayFeed({
       throw new Error(`${failed.slice(0, 3).join('、')} 没存进去(单个上限 ${prettyBytes(MAX_FILE_BYTES)})。`);
     }
   }, []);
-  // 批次 33:话筒 = 原地录音转文字直接入记忆(不跳说一句 sheet);无语音 API 才回落 sheet
+  // 批次 33:话筒 = 原地录音转文字直接入记忆(不跳说一句 sheet)。
+  // bug3 p42:原来「识别起不来」这几条分支会回落去开「说一句」sheet —— 而 iOS PWA 上
+  // SpeechRecognition 本来就不存在,于是点话筒**每次**都是弹出那张 sheet,正是标注要去掉的。
+  // 现在一律不再开 sheet:说清楚这台设备听不了,并把光标放进输入框让人直接打字。
   const [micState, setMicState] = useState<'idle' | 'recording'>('idle');
+  const [micErr, setMicErr] = useState('');
   const recogRef = useRef<{ stop: () => void } | null>(null);
   const quickInputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -231,14 +233,26 @@ export default function TodayFeed({
 
   function startQuickMic() {
     // 批次 37 重做:边说边把文字写进输入框(interim 实时可见),说完文字留在框里
-    // 由用户回车确认;识别起不来(iOS PWA 常见)立刻回落说一句 sheet,绝不装死。
+    // 由用户回车确认;识别起不来(iOS PWA 常见)给可见提示 + 落到打字,绝不装死、也不换页。
+    // 红线:每个 async 动作都要有显式失败态 —— 这里的失败态就是 micErr。
+    const cannotListen = (why: string) => {
+      setMicState('idle');
+      recogRef.current = null;
+      setMicErr(why);
+      // 听不了就让人能立刻打字 —— 换页(开 sheet)只会把已经打的半句弄丢
+      setTimeout(() => quickInputRef.current?.focus(), 0);
+    };
+    const noEngine = () => cannotListen(L(uiLocale,
+      '这台设备的浏览器不支持语音输入 —— 直接打字也一样能记。',
+      "This browser can't do voice input — typing works just as well."));
     type SR = { new (): { lang: string; interimResults: boolean; continuous: boolean; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void } };
     const w = window as unknown as { SpeechRecognition?: SR; webkitSpeechRecognition?: SR };
     const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
-    if (!Ctor) { window.dispatchEvent(new CustomEvent('nesio-open-voice')); return; }
+    if (!Ctor) { noEngine(); return; }
     if (micState === 'recording') { recogRef.current?.stop(); return; }
+    setMicErr('');
     let recog: InstanceType<SR>;
-    try { recog = new Ctor(); } catch { window.dispatchEvent(new CustomEvent('nesio-open-voice')); return; }
+    try { recog = new Ctor(); } catch { noEngine(); return; }
     recog.lang = uiLocale === 'en' ? 'en-US' : 'zh-CN';
     recog.interimResults = true;
     recog.continuous = false;
@@ -251,30 +265,19 @@ export default function TodayFeed({
     recog.onend = () => {
       setMicState('idle');
       recogRef.current = null;
-      // 一个字都没听到(常见于权限/引擎没起来)→ 回落说一句 sheet
-      if (!got) window.dispatchEvent(new CustomEvent('nesio-open-voice'));
+      // 一个字都没听到(常见于权限没给/引擎没起来)—— 说出来,不换页
+      if (!got) cannotListen(L(uiLocale, '没听到声音 —— 检查一下麦克风权限,或者直接打字。', "Didn't catch anything — check mic permission, or just type."));
     };
-    recog.onerror = () => {
-      setMicState('idle');
-      recogRef.current = null;
-      window.dispatchEvent(new CustomEvent('nesio-open-voice'));
-    };
+    recog.onerror = () => cannotListen(L(uiLocale, '语音输入没起来 —— 再点一次,或者直接打字。', 'Voice input failed — tap again, or just type.'));
     recogRef.current = recog;
     setMicState('recording');
     try { recog.start(); } catch {
-      setMicState('idle');
-      recogRef.current = null;
-      window.dispatchEvent(new CustomEvent('nesio-open-voice'));
+      cannotListen(L(uiLocale, '语音输入没起来 —— 再点一次,或者直接打字。', 'Voice input failed — tap again, or just type.'));
     }
   }
-  // 心情第一拍「看趋势」→ 情绪趋势 sheet(洞察浮层现由 Portal 层挂载,见 nesio-open-insights)
-  useEffect(() => {
-    const openMoodTrend = () => setMoodTrendOpen(true);
-    window.addEventListener('nesio-open-mood-trend', openMoodTrend);
-    return () => {
-      window.removeEventListener('nesio-open-mood-trend', openMoodTrend);
-    };
-  }, []);
+  // 情绪趋势面板不再挂在这里:入口在健康分析页(MoodTrendCard 自己挂 sheet)。
+  // 原来靠 window 事件跨页开,而洞察是浮层 —— activeSurface 是「记忆」时今天页
+  // 根本没挂载,监听不存在,点了就真没反应。
 
   // Proactive cards: up to 2, each independently dismissable
   const [meetingRecorderNode, setMeetingRecorderNode] = useState<FocusNode | null>(null);
@@ -553,6 +556,8 @@ export default function TodayFeed({
           recording={micState === 'recording'}
           inputRef={quickInputRef}
           onFiles={captureFiles}
+          micError={micErr}
+          onDismissMicError={() => setMicErr('')}
         />
         {/* 存进去了要说一声。这条回执之前**只被 set、从来没渲染** ——
             于是「+」传完文件、记一笔按了「记下」,界面上什么反应都没有。
@@ -621,9 +626,9 @@ export default function TodayFeed({
           }}
         />
       )}
-
-      {/* 批次 136:情绪趋势(心情第一拍「看趋势」进来) */}
-      <MoodTrendSheet open={moodTrendOpen} onClose={() => setMoodTrendOpen(false)} />
+      {/* 情绪趋势面板不在这里 —— 已迁健康分析页(MoodTrendCard 自己挂 sheet)。
+          原来靠 window 事件跨页开,而洞察是浮层:activeSurface 是「记忆」时今天页
+          没挂载,点了没反应。合并 main 时这一块按 main 的删除保留。 */}
     </div>
   );
 }

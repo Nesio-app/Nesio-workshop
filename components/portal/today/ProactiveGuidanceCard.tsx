@@ -46,7 +46,6 @@ export function ProactiveGuidanceCard({
   const hasActions = card.actions && card.actions.length > 0;
   // 批次 13:金句卡特殊化 — 无图标、动作是「存到记忆」而不是有用/不准
   const isQuote = card.id === 'fallback-quote';
-  const [evidenceOpen, setEvidenceOpen] = useState(false);
   const [feedbackGiven, setFeedbackGiven] = useState(false);
   const [savedQuote, setSavedQuote] = useState(false);
   // 批次 33 用户定案:按钮全撤,手势接管 —— 左滑=没用 / 右滑=稍后提醒 / 双击=有用
@@ -195,24 +194,10 @@ export function ProactiveGuidanceCard({
         <div className="nesio-proactive-card-text" onClick={() => { if (Math.abs(dx) < 6) onOpen?.(); }} style={onOpen ? { cursor: 'pointer' } : undefined}>
           <p className="nesio-proactive-card-title">{card.title}</p>
           {isQuote ? <QuoteBody body={card.body} /> : <p className="nesio-proactive-card-body">{card.body}</p>}
-          {card.evidence && card.evidence.length > 0 && (
-            <div style={{ marginTop: '0.3rem' }}>
-              <button
-                type="button"
-                onClick={() => setEvidenceOpen((v) => !v)}
-                style={{ fontSize: '0.66rem', color: 'var(--portal-blue-deep)', background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
-              >
-                {t(locale, 'guidanceEvidenceTemplate', { chevron: evidenceOpen ? '▾' : '▸', count: card.evidence.length })}
-              </button>
-              {evidenceOpen && (
-                <ul style={{ margin: '0.25rem 0 0', paddingLeft: '1rem', fontSize: '0.66rem', color: 'var(--portal-muted)', lineHeight: 1.5 }}>
-                  {card.evidence.map((e, i) => (
-                    <li key={i}>{e.label}：{e.value}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          )}
+          {/* bug3 p46/47:「依据 ▸ N 条」展开块整块删掉(来源行在 bug2 已删)——
+              卡片正文已经把「为什么给你看这条」说清楚了,再挂一层可展开的内部依据
+              是把系统的推理过程摆到用户面前。card.evidence 数据保留:
+              evidenceSignalIds 仍要喂反馈环(见 handleAction 的 recordSignalFeedback)。 */}
           {hasActions && (
             <div className="nesio-proactive-card-actions">
               {/* 批次 33:「好的」这类纯收起按钮撤除(手势接管);只留真动作(完成/改天) */}

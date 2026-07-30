@@ -4,9 +4,9 @@
  * 足迹「计划」tab — 即将出发列表 + 新建行程 / 粘贴订票确认导入。
  */
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
-  listPlannedTrips, createBlankTrip, deleteTrip, importBookingIntoTrip,
+  listPlannedTrips, createBlankTrip, importBookingIntoTrip,
   TRAVEL_TRIPS_UPDATED_EVENT, type Trip,
 } from '@/lib/portal/travel-trips';
 import { ensureTravelPoiLoaded } from '@/lib/portal/travel-poi';
@@ -38,6 +38,7 @@ export default function TravelPlanPanel() {
   const [importText, setImportText] = useState('');
   const [importMsg, setImportMsg] = useState<string | null>(null);
   const [importErr, setImportErr] = useState<string | null>(null);
+  const bookingFileRef = useRef<HTMLInputElement>(null);
 
   function reload() {
     setTrips(listPlannedTrips());
@@ -65,6 +66,19 @@ export default function TravelPlanPanel() {
     setDest('');
     setOpenId(trip.id);
     reload();
+  }
+
+  /** 上传订票确认文件 → 读成文本填进框。读不了要说出来。 */
+  async function onPickBooking(file: File | undefined) {
+    if (!file) return;
+    setImportErr(null);
+    try {
+      const text = await file.text();
+      if (!text.trim()) { setImportErr(L(dict, '这个文件是空的。', 'That file is empty.')); return; }
+      setImportText(text.slice(0, 20000));
+    } catch {
+      setImportErr(L(dict, '这个文件读不了 —— 换个 .txt / .eml,或直接粘贴正文。', "Couldn't read that file — try a .txt/.eml, or paste the text."));
+    }
   }
 
   function doImport() {
@@ -126,14 +140,8 @@ export default function TravelPlanPanel() {
               </span>
               <IconChevronRight size={16} />
             </button>
-            <button
-              type="button"
-              className="nesio-travel-plan-del"
-              aria-label={L(dict, '删除行程', 'Delete trip')}
-              onClick={() => { deleteTrip(t.id); reload(); }}
-            >
-              ×
-            </button>
+            {/* bug3:卡片右侧那个 ✕ 删掉 —— 一次误触就没了整趟行程,而且没有确认。
+                要删行程去时间线里删(有确认)。 */}
           </li>
         ))}
       </ul>
@@ -196,9 +204,15 @@ export default function TravelPlanPanel() {
             </p>
           )}
           {importMsg && <p className="nesio-trip-msg" role="status">{importMsg}</p>}
+          {/* bug3:「粘贴预定按钮不管用」—— 没有剪贴板权限/内容时,原来这条路是死的。
+              补一个「上传」把 .txt/.eml 读进文本框,再点「识别」。 */}
+          <input ref={bookingFileRef} type="file" accept=".txt,.eml,.md,text/plain,message/rfc822"
+            className="nesio-visually-hidden"
+            onChange={(e) => { void onPickBooking(e.target.files?.[0]); e.currentTarget.value = ''; }} />
           <div className="nesio-travel-plan-form-actions">
             <button type="button" className="nesio-trip-action" onClick={() => { setMode('idle'); setImportErr(null); }}>{L(dict, '取消', 'Cancel')}</button>
-            <button type="button" className="nesio-trip-primary" onClick={doImport}>{L(dict, '识别并创建', 'Parse & create')}</button>
+            <button type="button" className="nesio-trip-action" onClick={() => bookingFileRef.current?.click()}>{L(dict, '上传', 'Upload')}</button>
+            <button type="button" className="nesio-trip-primary" onClick={doImport} disabled={!importText.trim()}>{L(dict, '识别', 'Parse')}</button>
           </div>
         </div>
       )}

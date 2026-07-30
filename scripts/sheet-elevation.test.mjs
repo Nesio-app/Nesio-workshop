@@ -165,7 +165,6 @@ function zIndexOf(cls) {
 const FIXED_SITES = [
   ['components/portal/MemoryLensSheet.tsx', '洞察 → 镜头 → 镜头库抽屉'],
   ['components/portal/InventorySheet.tsx', '洞察 → 物品管理'],
-  ['components/portal/relationships/PersonExtractSheet.tsx', '洞察 → 关系 → 记给某人'],
   ['components/portal/relationships/RelationshipDetailSheet.tsx', '洞察 → 关系 → 关系详情'],
   ['components/portal/insights/SchedulePanel.tsx', '洞察 → 日程 → 日程详情'],
   ['components/portal/insights/TimelineTab.tsx', '洞察 → 时间线 → 到访记忆详情'],

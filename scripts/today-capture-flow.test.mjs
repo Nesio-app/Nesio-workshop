@@ -93,7 +93,7 @@ const code = stripComments;
 {
   const health = code(read('components/portal/health/HealthDashboard.tsx'));
   assert.ok(
-    /nesio-open-mood-trend/.test(health),
+    /<MoodTrendCard\b/.test(health),
     '健康页没有心情趋势入口 —— 从今天页删掉之后就没地方看走势了',
   );
   const trend = code(read('components/portal/MoodTrendSheet.tsx'));

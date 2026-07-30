@@ -15,7 +15,6 @@ import { guardAiRoute } from '@/lib/portal/api-auth';
 import { NOTION_API, NOTION_VERSION, notionHeaders, queryDataSourceRows, getDataSourceSchema, discoverDatabases, primaryDataSourceId } from '@/lib/portal/notion-api';
 import { foldSourcesToMemories, type NotionPageRow } from '@/lib/portal/notion-fold';
 import type { NotionSourceSchema } from '@/lib/portal/notion-classify';
-import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 import { getIntegrationTokenRefreshed } from '@/lib/portal/integrations';
 
 export const dynamic = 'force-dynamic';
@@ -62,40 +61,6 @@ async function fetchPageText(token: string, pageId: string): Promise<string> {
     }
     return texts.filter(Boolean).join('\n').slice(0, 1500);
   } catch { return ''; }
-}
-
-async function extractNodes(pages: Array<{ title: string; text: string; url?: string }>): Promise<{ nodes: object[]; summary: string }> {
-  if (!aiProviderAvailable() || !pages.length) return { nodes: [], summary: '无内容' };
-
-  const docText = pages.map((p) => `页面：${p.title}\n内容：${p.text}`).join('\n\n───\n\n');
-
-  const prompt = `你是 Nesio 的 Notion 解析器。从以下 Notion 页面中提取人物、项目、承诺、任务、想法等生活记忆节点。
-
-输出 JSON：
-{
-  "nodes": [{
-    "type": "person|object|place|event|commitment|preference",
-    "name": "简短名称",
-    "attributes": { "source": "Notion", "page": "页面名" },
-    "relations": [{"targetId": "关联", "relation": "关系"}],
-    "tags": ["Notion", "标签"],
-    "confidence": 0.85,
-    "rawInput": "原始摘要"
-  }],
-  "summary": "一句话总结"
-}
-
-只提取有意义的信息，忽略模板和空白页。只输出 JSON。
-
-Notion 内容：
-${docText.slice(0, 5000)}`;
-
-  try {
-    const { text: raw } = await completeText({ prompt, maxTokens: 2048 });
-    const jsonStr = raw.match(/```(?:json)?\s*([\s\S]*?)```/)?.[1]?.trim() || raw.trim();
-    const parsed = JSON.parse(jsonStr) as { nodes?: object[]; summary?: string };
-    return { nodes: parsed.nodes || [], summary: parsed.summary || '提取完成' };
-  } catch { return { nodes: [], summary: '解析失败' }; }
 }
 
 /** 行里抽 title 列文本(供 titleSamples 判日历维度表)。 */
@@ -234,14 +199,14 @@ export async function POST(req: NextRequest) {
   );
   const contentPages = pageContents.filter((p) => p.text || p.title !== 'Untitled');
 
-  const { nodes, summary } = await extractNodes(contentPages);
-
-  // 批次 31:没配 Gemini(或 AI 解析空)时,别丢数据 —— 直接把每个 Notion 页面
-  // 存成可读的记忆节点(标题 + 正文),用户至少能看到、能读。
-  // 修「重同步堆重复」:兜底节点与页面 1:1,带上 notionPageId,ingestLifeNode 按
-  //(source + notionPageId)幂等 upsert,重复点"同步"不再成倍入库。
-  // (AI 提取路径每页可能产出多个实体,无法用单个 pageId 作幂等键,故仅兜底路径去重。)
-  const finalNodes = nodes.length ? nodes : contentPages.map((p) => ({
+  // 一页一条,带 notionPageId —— ingestLifeNode 据此幂等 upsert,重复点「同步」不成倍入库。
+  //
+  // 2026-07-30:这里原本还有一条**云 AI 抽取**分支(extractNodes),优先级高于本路径,
+  // 已整条删除。理由不是省钱,是它**结构上无法去重**:一页可能抽出多个实体,拿不到
+  // 稳定幂等键(旧注释自己写着「故仅兜底路径去重」)。于是「配了 Gemini」这个环境变量
+  // 变成了一个开关 —— 一打开,重同步就开始成倍堆记忆。一条兜底比主路径更正确的分支,
+  // 就不该是兜底。现在只有这一条路:一页一条、可读、幂等。
+  const finalNodes = contentPages.map((p) => ({
     // 批次 143:外部笔记落 note 类型(不再挤进 preference 大杂烩)
     type: 'note',
     name: (p.title || 'Notion').slice(0, 60),
@@ -255,8 +220,8 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     ok: true,
     nodes: finalNodes,
-    summary: nodes.length ? summary : `导入 ${contentPages.length} 个 Notion 页面`,
+    summary: `导入 ${contentPages.length} 个 Notion 页面`,
     pageCount: pages.length,
-    aiUsed: nodes.length > 0,
+    aiUsed: false, // 这条路不再走云 AI(见上)。客户端据此显示「按页面标题/正文存入」。
   });
 }
