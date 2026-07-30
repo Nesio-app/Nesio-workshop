@@ -1487,7 +1487,7 @@ Edit location/value anytime in Storage.`),
                     {msg.calendarState === 'error' && msg.calendarDetail && (
                       <details style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
                         <summary style={{ cursor: 'pointer' }}>{L(dict, '看看原因', 'Why')}</summary>
-                        <p style={{ margin: 'var(--space-1) 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'var(--font-mono, monospace)' }}>{msg.calendarDetail}</p>
+                        <p style={{ margin: 'var(--space-1) 0 0', whiteSpace: 'pre-wrap', wordBreak: 'break-word', fontFamily: 'monospace' }}>{msg.calendarDetail}</p>
                       </details>
                     )}
                     {msg.calendarState === 'error' && msg.calendarError && (

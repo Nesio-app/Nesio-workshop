@@ -33,7 +33,7 @@
   --chip-leaf:   #dcfce7;
   --chip-lemon:  #fef9c3;
   --chip-frost:  #ecfdf5;
-  --chip-fog:    #f0f4ff;
+  --chip-fog:    var(--portal-accent-soft);   /* 原 #f0f4ff —— CLAUDE.md 点名废弃 */
   --chip-periwinkle: #8b9cf6;
 
   /* Avatar pastels(人物首字头像,比 chip 深一档) */
@@ -45,7 +45,7 @@
   --avatar-violet: #ddd6fe;
 
   /* Insight accents(洞察分组/类型强调色) */
-  --accent-info:  #3b82f6;
+  --accent-info:  var(--portal-blue-deep);    /* 原 #3b82f6 —— CLAUDE.md 点名废弃 */
   --accent-slate: #64748b;
   --accent-rose:  #ec4899;
   --accent-muted: #94a3b8;
@@ -13762,7 +13762,7 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-health-card-unit { font-size: 0.75rem; font-weight: 600; color: var(--portal-muted); margin-left: 0.25rem; }
 .nesio-health-card-delta { font-size: 0.68rem; font-weight: 600; padding: 0.12rem 0.5rem; border-radius: 999px; align-self: flex-start; background: var(--portal-line); color: var(--portal-muted); }
 .nesio-health-card-delta.up { background: rgba(88,140,227,0.14); color: var(--portal-blue-deep); }
-.nesio-health-card-delta.down { background: rgba(16,185,129,0.14); color: #047857; }
+.nesio-health-card-delta.down { background: var(--status-go-soft); color: var(--status-go); }  /* 原 rgba(16,185,129,.14)/#047857 —— 废弃绿 */
 .nesio-health-card-date { font-size: 0.66rem; color: var(--portal-muted); align-self: flex-start; }
 .nesio-health-card-range { font-size: 0.62rem; color: var(--portal-muted); }
 /* 情绪卡里的「看这周趋势 ›」—— 从今天页搬过来的入口(2026-07-29)。次级链接相,不抢卡片主数值。 */
