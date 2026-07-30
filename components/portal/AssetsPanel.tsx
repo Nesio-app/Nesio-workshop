@@ -197,24 +197,34 @@ function AssetCard({ asset, expenses, people, dict, open, onToggle }: {
 
   return (
     <div className="nesio-assets-card">
+      {/* #9(2026-07-30 真机:「家」「Model Y」这两行点了没反应)——
+          原来只有**名字那一行**是 <button>,高度就是一行字(约 24px);
+          它下面的日期行、「下次…」行都在按钮外面。用户看见的是一整块卡片,
+          手指落在名字底下那两行时,当然「没有任何反应」。
+          不是逻辑坏了,是**可点区域比它看起来的样子小得多** ——
+          这跟「按了没反应」在用户那里是同一件事。
+          现在整块头部(名字 + 估值 + 日期 + 下次)都在按钮里,并给足 44px 高。 */}
       <button type="button" className="nesio-assets-head" onClick={onToggle} aria-expanded={open}>
-        <span className="n">{asset.name}</span>
-        <span className="v">{money(cur)}</span>
-        <span className="c" aria-hidden>{open ? '⌄' : '›'}</span>
-      </button>
-      <p className="nesio-assets-sub">
-        {latest?.date}{latest?.note ? ` · ${latest.note}` : ''}
-        {asset.anchors.length > 1 && ` · ${L(dict, `${asset.anchors.length} 次估值`, `${asset.anchors.length} valuations`)}`}
-        {costs.total > 0 && ` · ${L(dict, `今年花了 ${money(costs.total)}`, `${money(costs.total)} this year`)}`}
-      </p>
+        <span className="nesio-assets-head-top">
+          <span className="n">{asset.name}</span>
+          <span className="v">{money(cur)}</span>
+          <span className="c" aria-hidden>{open ? '⌄' : '›'}</span>
+        </span>
+        <span className="nesio-assets-sub">
+          {latest?.date}{latest?.note ? ` · ${latest.note}` : ''}
+          {asset.anchors.length > 1 && ` · ${L(dict, `${asset.anchors.length} 次估值`, `${asset.anchors.length} valuations`)}`}
+          {costs.total > 0 && ` · ${L(dict, `今年花了 ${money(costs.total)}`, `${money(costs.total)} this year`)}`}
+          {!latest && asset.anchors.length === 0 && L(dict, '还没记过估值 —— 点开填一个', 'No valuation yet — tap to add one')}
+        </span>
 
-      {/* 下次要做的事 —— 收起状态也显示,这是这张卡唯一会「找你」的信息。 */}
-      {due.length > 0 && (
-        <p className="nesio-assets-due">
-          {L(dict, '下次 ', 'Next ')}{due[0].nextDate} · {due[0].title}
-          {due.length > 1 && L(dict, ` (还有 ${due.length - 1} 项)`, ` (+${due.length - 1})`)}
-        </p>
-      )}
+        {/* 下次要做的事 —— 收起状态也显示,这是这张卡唯一会「找你」的信息。 */}
+        {due.length > 0 && (
+          <span className="nesio-assets-due">
+            {L(dict, '下次 ', 'Next ')}{due[0].nextDate} · {due[0].title}
+            {due.length > 1 && L(dict, ` (还有 ${due.length - 1} 项)`, ` (+${due.length - 1})`)}
+          </span>
+        )}
+      </button>
 
       {open && (
         <div className="nesio-assets-body">

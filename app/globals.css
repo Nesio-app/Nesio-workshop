@@ -20182,11 +20182,15 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   padding: var(--space-3);
   margin-bottom: var(--space-3);
 }
+/* #9:整块头部都是可点区域(原来只有名字那一行是按钮,高约 24px ——
+   看起来是一整块卡,手指落在日期行上就「没有任何反应」)。min-height 给足 44px。 */
 .nesio-assets-head {
   display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
   width: 100%;
+  min-height: 44px;
   background: none;
   border: none;
   padding: 0;
@@ -20194,12 +20198,20 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   font-family: var(--font-sans);
   text-align: left;
 }
-.nesio-assets-head .n { flex: 1; min-width: 0; font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nesio-assets-head .v { flex: none; font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--portal-accent); font-variant-numeric: tabular-nums; }
-.nesio-assets-head .c { flex: none; color: var(--portal-muted); }
-.nesio-assets-sub { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--portal-muted); line-height: 1.5; }
+.nesio-assets-head:active { opacity: 0.72; }
+.nesio-assets-head-top {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+}
+.nesio-assets-head-top .n { flex: 1; min-width: 0; font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-assets-head-top .v { flex: none; font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--portal-accent); font-variant-numeric: tabular-nums; }
+.nesio-assets-head-top .c { flex: none; color: var(--portal-muted); }
+.nesio-assets-sub { display: block; margin: 0; font-size: var(--text-xs); color: var(--portal-muted); line-height: 1.5; }
 .nesio-assets-due {
-  margin: var(--space-2) 0 0;
+  display: block;
+  margin: var(--space-1) 0 0;
   font-size: var(--text-xs);
   color: var(--status-gentle);
   background: var(--status-gentle-soft);

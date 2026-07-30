@@ -11,6 +11,8 @@ import NesioSheet from '../ui/NesioSheet';
 import LoadingCard from '../ui/LoadingCard';
 import { IconCamera } from '../icons';
 import { L } from '@/lib/portal/i18n';
+// #38:「2026-08-06」紧挨在「你今天的活」下面会被读成今天 —— 先说相对今天是什么时候
+import { relativeFutureLabel } from '@/lib/portal/time-labels';
 import { portalLocaleToDictionaryLocale, loadProfileSettings } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import {
@@ -70,8 +72,11 @@ export default function FamilySharingSheet({ open, onClose, onToday }: {
       <div style={{ display: 'flex', flexDirection: 'column', height: '100%', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }}>
         {/* bug3:「家庭分享」这个标题删掉;左边回洞察、右边回今天 —— 与其他页面同一套页头。
             账本子页时左边先回家庭板。 */}
+        {/* #37(2026-07-30 真机):页头只剩一个「‹ 洞察」,不写自己叫什么 ——
+            从九宫格点进来的人看到的是一块没有名字的页面。
+            左边说的是「点它去哪」,中间说的是「你现在在哪」,两件事不能互相顶替。 */}
         <Header
-          title={view.kind === 'ledger' ? `${view.person.name}${t(' 的账本', "’s ledger")}` : ''}
+          title={view.kind === 'ledger' ? `${view.person.name}${t(' 的账本', "’s ledger")}` : t('家务', 'Chores')}
           backLabel={view.kind === 'ledger' ? t('返回', 'Back') : t('洞察', 'Insights')}
           onBack={view.kind === 'ledger' ? () => setView({ kind: 'board' }) : onClose}
           onToday={onToday ?? onClose}
@@ -251,6 +256,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, dict, t
   const [err, setErr] = useState('');
   const [busyId, setBusyId] = useState('');
   const [showAssigned, setShowAssigned] = useState(false);   // 已安排默认折叠(周期家务会铺很多条)
+  const [openAssigned, setOpenAssigned] = useState('');       // #38:展开某一组看它的每一条实例
 
   const load = useCallback(async () => {
     setErr('');
@@ -334,11 +340,12 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, dict, t
 
       {board.assigned.length > 0 && (() => {
         // 按 标题+被分派人 归并 —— 周期家务(每天铺一条)收成一行,不刷屏。
-        const groups = new Map<string, { title: string; assigneeId: string; count: number; earliest: string; done: number }>();
+        const groups = new Map<string, { title: string; assigneeId: string; count: number; earliest: string; done: number; items: ChoreInstanceView[] }>();
         for (const c of board.assigned) {
           const key = `${choreTitle(c, t)}|${c.assigneeId}`;
-          const g = groups.get(key) ?? { title: choreTitle(c, t), assigneeId: c.assigneeId, count: 0, earliest: c.dueDate, done: 0 };
+          const g = groups.get(key) ?? { title: choreTitle(c, t), assigneeId: c.assigneeId, count: 0, earliest: c.dueDate, done: 0, items: [] };
           g.count += 1;
+          g.items.push(c);
           if (c.state === 'approved' || c.state === 'paid') g.done += 1;
           if (c.dueDate < g.earliest) g.earliest = c.dueDate;
           groups.set(key, g);
@@ -352,19 +359,44 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, dict, t
             </button>
             {showAssigned && (
               <div style={cardStyle}>
-                {rows.map((g, i) => (
-                  <div key={`${g.title}-${g.assigneeId}`} style={{ ...rowStyle, borderBottom: i === rows.length - 1 ? 'none' : rowStyle.borderBottom }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>
-                        {g.title}{g.count > 1 ? ` · ×${g.count}` : ''}
-                      </div>
-                      <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-                        {t('交给', 'for')} {displayName(g.assigneeId)}
-                        {g.count > 1 ? ` · ${t('完成', 'done')} ${g.done}/${g.count} · ${t('自', 'from')} ${g.earliest}` : ` · ${g.earliest}`}
-                      </div>
+                {/* #38(2026-07-30 真机):这些行原来是**纯 <div>**,长得跟上面「大家」里
+                    那些能点的行一模一样,点下去却什么都不发生 —— 假死行。
+                    现在点开显示这组的每一条实例(哪天、什么状态)。
+                    同时:日期原来只印一个「2026-08-06」,紧挨在「你今天的活」下面,
+                    看起来就像今天要做的。改成先说**相对今天**是什么时候
+                    (「一周后 · 8/6」),让它不可能被读成今天。 */}
+                {rows.map((g, i) => {
+                  const open = openAssigned === `${g.title}|${g.assigneeId}`;
+                  return (
+                    <div key={`${g.title}-${g.assigneeId}`} style={{ borderBottom: i === rows.length - 1 ? 'none' : '1px solid var(--portal-line)' }}>
+                      <button type="button" aria-expanded={open}
+                        onClick={() => setOpenAssigned(open ? '' : `${g.title}|${g.assigneeId}`)}
+                        style={{ ...rowStyle, width: '100%', minHeight: 44, textAlign: 'left', background: 'transparent', border: 'none', borderBottom: 'none', cursor: 'pointer' }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>
+                            {g.title}{g.count > 1 ? ` · ×${g.count}` : ''}
+                          </div>
+                          <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                            {t('交给', 'for')} {displayName(g.assigneeId)}
+                            {g.count > 1 ? ` · ${t('完成', 'done')} ${g.done}/${g.count}` : ''}
+                            {' · '}{relativeFutureLabel(g.earliest, new Date(), dict)} · {g.earliest.slice(5).replace('-', '/')}
+                          </div>
+                        </div>
+                        <span aria-hidden style={{ color: 'var(--portal-muted)' }}>{open ? '⌄' : '›'}</span>
+                      </button>
+                      {open && (
+                        <div style={{ padding: '0 var(--space-3) var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                          {[...g.items].sort((a, b) => (a.dueDate < b.dueDate ? -1 : 1)).map((c) => (
+                            <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                              <span>{relativeFutureLabel(c.dueDate, new Date(), dict)} · {c.dueDate}</span>
+                              <span>{assignedStateLabel(c.state, t)}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>

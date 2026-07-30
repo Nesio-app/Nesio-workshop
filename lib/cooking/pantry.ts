@@ -96,6 +96,22 @@ export function consumePantry(id: string, now = new Date()): boolean {
   return d.remove ? removeInventoryItem(id) : updateInventoryItem(id, { quantity: d.nextQty });
 }
 
+/**
+ * 改一件食材(#39,2026-07-30 真机:「黄瓜」卡片点了没反应,而且它标着「过期」——
+ * 效期是导入时按默认保质期估出来的,估错了用户却**没有任何地方能改**)。
+ *
+ * 只开三样:数量 / 效期 / 放哪。名字不在这里改 —— 改名会打断同名合并的键,
+ * 那是另一件事,该在物品页做。
+ * 效期传空串 = 「这东西没有效期」,把它从「快过期」里彻底摘掉(不是把日期改远)。
+ */
+export function updatePantry(id: string, patch: { quantity?: number | null; expiry?: string; location?: string }): boolean {
+  return updateInventoryItem(id, {
+    ...(patch.quantity !== undefined ? { quantity: patch.quantity ?? undefined } : {}),
+    ...(patch.expiry !== undefined ? { expiry: patch.expiry } : {}),
+    ...(patch.location !== undefined ? { location: patch.location } : {}),
+  });
+}
+
 /** 直接删除一件食材(整条去掉,不是用掉一份)。 */
 export function removePantry(id: string): boolean {
   return removeInventoryItem(id);
