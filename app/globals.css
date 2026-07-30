@@ -20699,3 +20699,39 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-mailtag-rule-check { flex: none; color: var(--portal-accent); }
 /* 禁用的筛选/选择 chip —— 看得出点不了,而不是点了没反应 */
 .nesio-schedfilter-chip[disabled] { opacity: 0.45; cursor: default; }
+
+/* ── 「这笔钱是哪一笔」认领行(衣橱 / 美味 / 发票共用) ───────────────────── */
+.nesio-claim-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
+.nesio-claim-done { font-size: var(--text-xs); color: var(--status-go); font-weight: var(--weight-medium); }
+.nesio-claim-hint { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-claim-block { margin-top: var(--space-2); }
+.nesio-claim-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.nesio-claim-item { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3); border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: var(--glass-bg-solid); flex-wrap: wrap; }
+.nesio-claim-item-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.nesio-claim-item-name { font-size: var(--text-sm); color: var(--portal-ink); font-weight: var(--weight-medium);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-claim-item-meta { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-claim-item-acts { display: flex; gap: var(--space-2); flex-shrink: 0; }
+.nesio-claim-err { margin: var(--space-2) 0 0; font-size: var(--text-xs); color: var(--status-risk); }
+
+/* ── 行程建议卡（这封邮件像一次行程，要建吗？） ────────────────────────── */
+.nesio-trip-suggests { display: flex; flex-direction: column; gap: var(--space-2); margin-bottom: var(--space-3); }
+.nesio-trip-suggest { padding: var(--space-3); border: 1px solid var(--portal-accent-border);
+  border-radius: var(--radius-md); background: var(--portal-accent-soft); }
+.nesio-trip-suggest-text { margin: 0 0 var(--space-2); font-size: var(--text-sm); color: var(--portal-ink); }
+.nesio-trip-suggest-acts { display: flex; gap: var(--space-2); }
+
+/* ── 交易分摊编辑器 ─────────────────────────────────────────────────────── */
+.nesio-fin-split-rows { display: flex; flex-direction: column; gap: var(--space-2); margin-top: var(--space-2); }
+.nesio-fin-split-row { display: flex; gap: var(--space-2); align-items: center; }
+.nesio-fin-split-target { flex: 1; min-width: 0; padding: 0.3rem 0.6rem; border: 1px solid var(--portal-line);
+  border-radius: var(--radius-sm); background: var(--glass-bg-solid); color: var(--portal-ink);
+  font-size: var(--text-xs); font-family: var(--font-sans); }
+.nesio-fin-split-amt { width: 88px; padding: 0.3rem 0.6rem; border: 1px solid var(--portal-line);
+  border-radius: var(--radius-sm); background: var(--glass-bg-solid); color: var(--portal-ink);
+  font-size: var(--text-xs); font-family: var(--font-sans); text-align: right; }
+.nesio-fin-split-months { width: 130px; padding: 0.3rem 0.6rem; border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill); background: var(--glass-bg-solid); color: var(--portal-ink);
+  font-size: var(--text-xs); font-family: var(--font-sans); }

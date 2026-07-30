@@ -348,6 +348,9 @@ export default function Portal() {
   // 批次 70:行程↔确认邮件确定性自动挂钩(纯规则,图谱一变就去抖调和)
   useEffect(() => {
     void import('@/lib/portal/plan-links').then((m) => m.initPlanLinks()).catch(() => {});
+    // 月度小结:让「我这个月练了什么」搜得到。只折本机有流水的那些域,
+    // 边界写在 monthly-digest.ts 文件尾。
+    void import('@/lib/portal/monthly-digest').then((m) => m.refreshMonthlyDigestsOnBoot()).catch(() => {});
   }, []);
   // 批次 85:懒加载 chunk 跨部署失效的全局兜底(错误页之外的路径,
   // 比如事件回调里的 dynamic import 被拒)—— 同一把 5 分钟防循环锁。

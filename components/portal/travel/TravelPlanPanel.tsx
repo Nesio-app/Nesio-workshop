@@ -4,12 +4,13 @@
  * 足迹「计划」tab — 即将出发列表 + 新建行程 / 粘贴订票确认导入。
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   listPlannedTrips, createBlankTrip, importBookingIntoTrip,
   TRAVEL_TRIPS_UPDATED_EVENT, type Trip,
 } from '@/lib/portal/travel-trips';
 import { ensureTravelPoiLoaded } from '@/lib/portal/travel-poi';
+import { suggestTripsFromEmails, acceptTripSuggestion, dismissTripSuggestion, type TripSuggestion } from '@/lib/portal/trip-suggest';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -25,6 +26,62 @@ function addDaysYmd(ymd: string, days: number): string {
   const d = new Date(`${ymd}T12:00:00`);
   d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/**
+ * TripSuggestCards —— 「这封邮件像一次行程,要建吗?」
+ *
+ * **建议,不自动建**。自动建行程等于系统替你判断「你要去这趟」,而这个判断
+ * 错起来是不可见的:你不会知道它错了,只会发现列表里多了个不认识的东西。
+ * 详见 lib/portal/trip-suggest.ts 文件头。
+ *
+ * 每张卡都有「不再提醒」—— 没有出口的提示就是骚扰。
+ */
+function TripSuggestCards({ dict, onCreated }: { dict: string; onCreated: () => void }) {
+  const [list, setList] = useState<TripSuggestion[]>([]);
+  const [err, setErr] = useState<string | null>(null);
+
+  const refresh = useCallback(() => {
+    try { setList(suggestTripsFromEmails()); } catch { setList([]); }
+  }, []);
+  useEffect(() => { refresh(); }, [refresh]);
+
+  if (!list.length) return null;
+
+  return (
+    <div className="nesio-trip-suggests">
+      {list.map((s) => (
+        <div key={s.emailNodeId} className="nesio-trip-suggest">
+          <p className="nesio-trip-suggest-text">
+            {L(dict, `这封邮件像一次 ${s.title} 的行程,要建吗？`, `This email looks like a ${s.title} trip — create it?`)}
+          </p>
+          <div className="nesio-trip-suggest-acts">
+            <button type="button" className="nesio-fin-flowopt is-active" onClick={() => {
+              const r = acceptTripSuggestion(s);
+              if (!r.ok) {
+                // 两种失败要分开说:行程压根没建 vs 建好了但没连上那封邮件。
+                // 后者不回滚 —— 行程本身是你要的东西。
+                setErr(r.reason === 'create_failed'
+                  ? L(dict, '没能建起来,再试一次。', "Couldn't create it — try again.")
+                  : L(dict, '行程建好了,但没连上那封邮件 —— 稍后可以在行程里手动关联。',
+                       "Trip created, but it isn't linked to the email — you can link it manually later."));
+              } else setErr(null);
+              refresh();
+              onCreated();
+            }}>{L(dict, '建', 'Create')}</button>
+            <button type="button" className="nesio-fin-flowopt" onClick={() => {
+              // 写失败要说 —— 悄悄没存下的话它下次又冒出来,你会以为按钮坏了。
+              if (!dismissTripSuggestion(s.emailNodeId)) {
+                setErr(L(dict, '这次没记住「不再提醒」,可能存储满了。', "Couldn't remember that — storage may be full."));
+              }
+              refresh();
+            }}>{L(dict, '不用', 'No thanks')}</button>
+          </div>
+        </div>
+      ))}
+      {err && <p className="nesio-claim-err" role="alert">{err}</p>}
+    </div>
+  );
 }
 
 export default function TravelPlanPanel() {
@@ -121,6 +178,8 @@ export default function TravelPlanPanel() {
         <h3 className="nesio-travel-plan-title">{L(dict, '即将出发', 'Starting soon')}</h3>
         <span className="nesio-travel-plan-count">{L(dict, `${trips.length} 段`, `${trips.length} trip${trips.length === 1 ? '' : 's'}`)}</span>
       </div>
+
+      <TripSuggestCards dict={dict} onCreated={reload} />
 
       {trips.length === 0 && mode === 'idle' && (
         <div className="nesio-travel-plan-empty">

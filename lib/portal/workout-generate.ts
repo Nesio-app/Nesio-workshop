@@ -146,6 +146,8 @@ export interface LastWorkoutRecord {
 }
 
 const LAST_KEY = 'nesio-workout-last-v1';
+/** 训练流水 —— 「我上周训练了什么」问的是历史,只存 last 是答不上来的。 */
+const HISTORY_KEY = 'nesio-workout-history-v1';
 
 /** 精选 18(exercise-library)的肌群标签 → 目录 target,回溯归因对两套动作库一视同仁。 */
 export const CURATED_TAG_TARGET: Record<string, string> = {
@@ -171,6 +173,26 @@ export function recordWorkoutDone(name: string, targets: string[], now: Date = n
   const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   const rec: LastWorkoutRecord = { date: day, name, focus: inferFocus(targets) };
   try { localStorage.setItem(LAST_KEY, JSON.stringify(rec)); } catch { reportStorageDropped(); }
+  // 只存「最后一次」的话,「我上周训练了什么」永远答不上来 —— 那个问题问的是**历史**,
+  // 而历史从来没被留下过(2026-07-30 审计:矩阵里这一格是红的,根因就在这行)。
+  // 从现在起追加一条流水;月度小结(monthly-digest)从这里折。
+  // 只留最近 400 条:一天一次也够一年多,再多对「这个月练了什么」没有意义。
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const prev = raw ? (JSON.parse(raw) as LastWorkoutRecord[]) : [];
+    const next = [rec, ...(Array.isArray(prev) ? prev : [])].slice(0, 400);
+    localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+  } catch { reportStorageDropped(); }
+}
+
+/** 训练流水(新→旧)。给「我上周训练了什么」和月度小结用。 */
+export function loadWorkoutHistory(): LastWorkoutRecord[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    const arr = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((r) => r && typeof r.date === 'string') : [];
+  } catch { return []; }
 }
 
 export function loadLastWorkout(): LastWorkoutRecord | null {
