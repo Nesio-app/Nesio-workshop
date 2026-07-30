@@ -78,6 +78,10 @@ export async function POST(req: NextRequest) {
   // Build nodes: one summary + top tasks
   const topTasks = Array.from(byTask.entries()).sort(([, a], [, b]) => b - a).slice(0, 5);
   const today = new Date().toLocaleDateString('zh-CN');
+  // 幂等键:这些是「近 7 天」的**滚动汇总**,不是事件本身 —— 同一天重复同步应当覆盖,
+  // 而不是再堆一套。按 ISO 日期做键(zh-CN 的日期串带本地化,不适合当 id)。
+  // 不加的话 externalKey() 认不出任何键(ingest-node.ts:90),每点一次同步多 6 条。
+  const dayKey = new Date().toISOString().slice(0, 10);
 
   const nodes: object[] = [
     {
@@ -89,6 +93,7 @@ export async function POST(req: NextRequest) {
         entries: String(completed.length),
         period: '近7天',
         date: today,
+        externalId: `toggl:weekly:${dayKey}`,
       },
       relations: [],
       tags: ['Toggl', '时间记录'],
@@ -98,7 +103,7 @@ export async function POST(req: NextRequest) {
     ...topTasks.map(([task, sec]) => ({
       type: 'event' as const,
       name: task,
-      attributes: { source: 'Toggl', duration: formatDuration(sec), date: today },
+      attributes: { source: 'Toggl', duration: formatDuration(sec), date: today, externalId: `toggl:task:${dayKey}:${task.slice(0, 40)}` },
       relations: [],
       tags: ['Toggl', '时间记录'],
       confidence: 0.9,

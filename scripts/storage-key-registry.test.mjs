@@ -147,6 +147,7 @@ const KNOWN_KEYS = new Map([
   ["nesio-energy-baseline-v1", "durable"],
   ["nesio-asset-care-v1", "durable"],
   ["nesio-bank-acct-names-v1", "durable"],
+  ["nesio-fin-tx-annotations-v1", "durable"],
   ["nesio-meal-calendar-v1", "durable"],
   ["nesio-schedule-filters-v1", "durable"],
   // 用户自己敲进去的提醒(家务/账单 due)。换台设备后从头开始**不正确** —— 那是他
@@ -179,6 +180,9 @@ const KNOWN_KEYS = new Map([
   ["nesio-hub-order-v1", "durable"],
   ["nesio-img-hash-v1", "durable"],
   ["nesio-life-graph-v1", "durable"],
+  // 分片索引(地基 F3:图谱按年切片)。片本身是 `nesio-life-graph-v1:<年>` / `:x`,
+  // 键名由模板拼出,扫描器只看得见这个索引 —— 索引和片是同一份用户数据,同为 durable。
+  ["nesio-life-graph-v1:index", "durable"],
   ["nesio-living-model-v1", "durable"],
   ["nesio-local-owner-v1", "durable"],
   ["nesio-med-log-v1", "durable"],

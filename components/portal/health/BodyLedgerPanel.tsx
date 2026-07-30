@@ -19,7 +19,7 @@ import { healthNarrative } from '@/lib/portal/health-narrative';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { IconUtensils, IconChevronRight } from '../icons';
+import { IconPlus } from '../icons';
 
 function ProgressRow({
   label, value, goal, unit,
@@ -143,9 +143,8 @@ function TodayBody({
         <ProgressRow label={L(dict, '碳水', 'Carbs')} value={ledger.carbs} goal={ledger.goals.carbsG} unit="g" />
       </div>
 
-      {prompt && (
-        <div className="nesio-bl-prompt" role="status">{prompt}</div>
-      )}
+      {/* bug3 p38:「蛋白还差约…可从冰箱补一餐」这块琥珀卡挪到「分析」
+          (见 BodyLedgerAnalysisCards)—— 账本这一屏只留目标 + 今日进度 + 补餐建议。 */}
 
       {ledger.proteinGap > 0 && (
         <div className="nesio-bl-dinner">
@@ -181,33 +180,44 @@ function TodayBody({
         </div>
       )}
 
-      <div className="nesio-bl-meals">
-        <p className="nesio-insights-section-label">{L(dict, '今日已记', 'Logged today')}</p>
-        {ledger.meals.length === 0 ? (
-          <button type="button" className="nesio-bl-emptycta" onClick={onLogMeal}>
-            <IconUtensils size={18} />
-            {L(dict, '去美味记一餐', 'Log a meal in Cooking')}
-            <IconChevronRight size={16} />
-          </button>
-        ) : (
-          <ul className="nesio-bl-meal-list">
-            {ledger.meals.map((m) => (
-              <li key={m.id}>
-                <span className="nesio-bl-meal-ico"><IconUtensils size={14} /></span>
-                <span className="nesio-bl-meal-main">
-                  <b>{m.items.map((i) => i.name).filter(Boolean).slice(0, 3).join(' · ') || L(dict, '一餐', 'Meal')}</b>
-                  <small>{m.source} · {Math.round(m.energyKCal)} kcal · P{Math.round(m.protein)}g</small>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      <p className="nesio-trip-footnote">
-        {L(dict, '蛋白目标会随今日锻炼分钟轻轻上调;数据来自美味「记一餐」+ Apple Health 活动三环。', 'Protein goal eases up with today’s exercise minutes; data from Cooking meals + Apple Health rings.')}
-      </p>
+      {/* bug3 p37:「今日已记」整块删掉(标签 + 去美味记一餐 + 下面那句小字)——
+          今日进度那三条已经把「记了多少」说清楚了,再列一遍是重复。 */}
     </div>
+  );
+}
+
+/**
+ * BodyLedgerAnalysisCards — bug3 p38:身体账本顶部那两块小结卡挪来「分析」。
+ *   · 念卡(体重/静息心率小结):去掉「念」符号,只留文字
+ *   · 琥珀卡(蛋白还差 / 热量预算)
+ * 放在分析页顶部:这两块都是「读数解读」,属于分析而不是记账。
+ */
+export function BodyLedgerAnalysisCards({ health, dict }: { health: HealthMetrics | null; dict: string }) {
+  const [ledger, setLedger] = useState<DayLedger>(() => buildDayLedger(todayYmd(), { rings: health?.activityRings }));
+  useEffect(() => {
+    const reload = () => setLedger(buildDayLedger(todayYmd(), { rings: health?.activityRings }));
+    reload();
+    window.addEventListener('nesio-life-graph-updated', reload);
+    window.addEventListener('nesio-health-updated', reload);
+    return () => {
+      window.removeEventListener('nesio-life-graph-updated', reload);
+      window.removeEventListener('nesio-health-updated', reload);
+    };
+  }, [health]);
+
+  const lines = health ? healthNarrative(health.metrics, dict).slice(0, 2) : [];
+  const prompt = ledgerPrompt(ledger, dict !== 'en');
+  if (lines.length === 0 && !prompt) return null;
+  return (
+    <>
+      {lines.length > 0 && (
+        // bug3:去掉「念」符号 —— 一句读数小结不需要挂个头像来宣示是谁说的
+        <div className="nesio-health-nen">
+          <p className="nesio-health-nen-text">{lines.join(' ')}</p>
+        </div>
+      )}
+      {prompt && <div className="nesio-bl-prompt" role="status">{prompt}</div>}
+    </>
   );
 }
 
@@ -252,61 +262,19 @@ export function PostMealBody({ health, dict }: { health: HealthMetrics | null; d
   );
 }
 
-export function ReactionBody({ health, dict }: { health: HealthMetrics | null; dict: string }) {
-  const rows = useMemo(
-    () => rankFoodReactions(getMeals(), health?.daily, { minN: 2, limit: 10 }),
-    [health],
-  );
-  const unit = health?.glucose?.unit || 'mg/dL';
-  const nMeals = getMeals().length;
-
-  return (
-    <div className="nesio-bl-section">
-      <p className="nesio-bl-lede">{L(dict, '哪些让你稳 / 飙', 'What keeps you steady / spikes')}</p>
-      <p className="nesio-trip-footnote">
-        {L(dict, `近 ${nMeals} 餐 · 同日血糖振幅均值(探索性)`, `Last ${nMeals} meals · same-day glucose amplitude (exploratory)`)}
-      </p>
-      {rows.length === 0 ? (
-        <p className="nesio-trip-footnote">
-          {L(dict, '样本还少 —— 多记几餐并导入血糖后,这里会出现「稳 / 飙」排序。不是医疗结论。',
-            'Too few samples yet — log more meals and import glucose to rank steady vs spike. Not a medical verdict.')}
-        </p>
-      ) : (
-        <ul className="nesio-bl-rank">
-          {rows.map((r) => {
-            const rise = mgDlToDisplay(r.avgRise, unit === 'mmol/L' ? 'mmol/L' : 'mg/dL');
-            const maxW = Math.max(...rows.map((x) => Math.abs(x.avgRise)), 1);
-            const w = Math.round((Math.abs(r.avgRise) / maxW) * 100);
-            return (
-              <li key={r.name}>
-                <div className="nesio-bl-rank-row">
-                  <span className="nesio-bl-rank-name">{r.name}</span>
-                  <span className={`nesio-bl-rank-val${r.tone === 'spike' ? ' is-spike' : ' is-stable'}`}>
-                    +{rise}{unit === 'mmol/L' ? '' : ''}
-                  </span>
-                </div>
-                <div className={`nesio-bl-rank-bar${r.tone === 'spike' ? ' is-spike' : ' is-stable'}`} aria-hidden>
-                  <div style={{ width: `${w}%` }} />
-                </div>
-                <small className="nesio-bl-rank-n">n={r.n} · {r.tone === 'spike' ? L(dict, '偏飙(探索)', 'spike-ish') : L(dict, '偏稳(探索)', 'steadier')}</small>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-      <p className="nesio-trip-footnote">
-        {L(dict, '基于同日血糖振幅与餐名共现 —— 模式值得留意,不是最终医学判断。', 'Based on same-day glucose amplitude co-occurring with foods — a pattern to notice, not a clinical call.')}
-      </p>
-    </div>
-  );
-}
+// bug3 p40:ReactionBody(「哪些让你稳 / 飙」整块)删除 —— 内容并进了分析页的「健康提示」,
+// 用同一种行样式渲染(见 HealthDashboard 的 FindingsCard),不再是单独一屏排行榜。
 
 export default function BodyLedgerPanel({
-  health,
+  health, onRecord, onScan,
 }: {
   health: HealthMetrics | null;
   /** bug2:子 tab 已删,保留签名兼容旧调用点。 */
   initialSection?: BodyLedgerSection;
+  /** bug3 p41:「记一条」从概览挪来这里 —— 打开手填那张表。 */
+  onRecord?: () => void;
+  /** bug3 p41:加号 —— 打开拍化验单(里面既能上传 PDF/图片,也能端上智能拍照)。 */
+  onScan?: () => void;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [ledger, setLedger] = useState<DayLedger>(() => buildDayLedger(todayYmd(), { rings: health?.activityRings }));
@@ -350,15 +318,26 @@ export default function BodyLedgerPanel({
     window.dispatchEvent(new CustomEvent('nesio-open-cooking'));
   }
 
-  // bug2:概览的绿色念卡(体重/静息心率小结)迁到身体账本
-  const nenLines = health ? healthNarrative(health.metrics, dict).slice(0, 2) : [];
-
+  // bug2 把概览的念卡迁到了身体账本;bug3 p38 又往前挪一层 —— 现在它和琥珀卡
+  // 一起由 BodyLedgerAnalysisCards 渲染在「分析」页,这一屏只剩账本本体。
   return (
     <div className="nesio-body-ledger">
-      {nenLines.length > 0 && (
-        <div className="nesio-health-nen">
-          <span className="nesio-health-nen-avatar" aria-hidden>{L(dict, '念', 'N')}</span>
-          <p className="nesio-health-nen-text">{nenLines.join(' ')}</p>
+      {/* bug3 p41:只留一个「记一条」+ 一个加号(加号里上传或智能拍照都行)——
+          原来概览页那行「拍化验单 / ＋记一条」已删。 */}
+      {(onRecord || onScan) && (
+        <div className="nesio-bl-logrow">
+          {onRecord && (
+            <button type="button" className="nesio-rel-log-btn" onClick={onRecord}>
+              {L(dict, '记一条', 'Log a record')}
+            </button>
+          )}
+          {onScan && (
+            <button type="button" className="nesio-bl-logplus" onClick={onScan}
+              aria-label={L(dict, '上传或智能拍照', 'Upload or smart capture')}
+              title={L(dict, '上传或智能拍照', 'Upload or smart capture')}>
+              <IconPlus size={16} />
+            </button>
+          )}
         </div>
       )}
       <TodayBody

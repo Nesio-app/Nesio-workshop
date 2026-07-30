@@ -35,26 +35,33 @@ export default function InvestPane({ txs, holdings, accounts, nwSeries, currency
             `Today ${daily.delta >= 0 ? '+' : ''}${formatMoney(Math.abs(daily.delta), currency)} (${daily.pct >= 0 ? '+' : ''}${daily.pct}%) · vs last sync (${daily.fromDate})`)}
         </p>
       )}
-      {(ytd.dividends > 0 || ytd.interest > 0) && (
-        <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, `今年到现在:股利 ${formatMoney(ytd.dividends, currency)} · 利息 ${formatMoney(ytd.interest, currency)}`, `YTD: dividends ${formatMoney(ytd.dividends, currency)} · interest ${formatMoney(ytd.interest, currency)}`)}</p>
-      )}
+      {/* bug3:顶上那行「今年到现在:股利 … · 利息 …」灰字按标注删掉 */}
       {groups.map((g) => {
         const a = acctById.get(g.accountId);
         const label = a ? `${displayAccountName(a, names)}${a.mask ? ` ····${a.mask}` : ''}` : L(dict, '其他账户', 'Other account');
         return (
           <div key={g.accountId} style={{ marginTop: 'var(--space-3)' }}>
-            <p className="nesio-fin-group-h">{label} · {formatMoney(g.total, currency)}</p>
+            {/* bug3:账户名用正文黑体 —— nesio-fin-group-h 是小型大写 + 字距,英文账户名读起来像标签 */}
+            <p className="nesio-fin-group-h nesio-fin-group-h--plain">{label} · {formatMoney(g.total, currency)}</p>
             {g.list.map((h, i) => {
               const gain = typeof h.costBasis === 'number' && h.costBasis > 0 ? Math.round(((h.value - h.costBasis) / h.costBasis) * 100) : null;
               return (
                 <div key={`${h.accountId}-${h.ticker || h.name}-${i}`} className="nesio-fin-acctrow">
                   <div className="nesio-fin-acctrow-body">
-                    <span className="nesio-fin-acctrow-name">{h.ticker ? `${h.ticker} · ` : ''}{h.name}</span>
+                    {/* bug3:不显示基金的文字名称(「Fidelity Concord…」占满一行还被截断),
+                        只留 ticker;没有 ticker 的才退回名字。持仓字重按系统正文,不加粗。 */}
+                    <span className="nesio-fin-acctrow-name" style={{ fontWeight: 'var(--weight-regular)' }}>{h.ticker || h.name}</span>
                     {typeof h.costBasis === 'number' && h.costBasis > 0 && (
                       <span className="nesio-fin-acctrow-sub">{L(dict, `成本 ${formatMoney(h.costBasis, h.currency)}`, `cost ${formatMoney(h.costBasis, h.currency)}`)}</span>
                     )}
                   </div>
-                  <span className="nesio-fin-acctrow-bal">{formatMoney(h.value, h.currency)}{gain != null && <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: gain >= 0 ? 'var(--status-go)' : 'var(--status-gentle)', textAlign: 'right' }}>{gain >= 0 ? '+' : ''}{gain}%</span>}</span>
+                  {/* bug3:「绿色收益是指什么时间段」—— 它是持有至今(相对成本价)的累计收益,
+                      不是今日/今年。把口径写在数字旁边,别让人猜。 */}
+                  <span className="nesio-fin-acctrow-bal">{formatMoney(h.value, h.currency)}{gain != null && (
+                    <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: gain >= 0 ? 'var(--status-go)' : 'var(--status-gentle)', textAlign: 'right' }}>
+                      {gain >= 0 ? '+' : ''}{gain}% <span style={{ color: 'var(--portal-muted)' }}>{L(dict, '持有至今', 'since buy')}</span>
+                    </span>
+                  )}</span>
                 </div>
               );
             })}

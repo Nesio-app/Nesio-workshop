@@ -7814,18 +7814,13 @@ html[data-portal-theme="night"] .nesio-settings-option-label { color: #e8eefa; }
   cursor: pointer;
 }
 
-.nesio-settings-danger-btn {
-  width: 100%;
-  text-align: center;
-  padding: 0.65rem;
-  font-size: 0.82rem;
-  font-weight: 600;
-  color: var(--status-risk);
-  background: rgba(207,107,107,0.07);
-  border-radius: 0.75rem;
-  margin-top: 0.5rem;
-  border: 1px solid rgba(207,107,107,0.15);
-}
+/* ⚠️ 这里原来有一份 .nesio-settings-danger-btn 的完整外观(width/padding/font/background/
+   border-radius/border)。它在 5ebf58b「再并七套按钮」时已被删除 —— 外观归 Button 原语,
+   这个旧类只留「和上一条隔多远」。合并 #265 时它被带了回来,于是:
+     ① 与原语打架(source order 决定谁赢,视觉又开始飘)
+     ② rgba(207,107,107,…) 是写死的色值,违反配色红线(夜间不跟着翻)
+   test:button-primitive 正是钉这条,合并后它在 main 上单独也是红的。此处按原样删掉,
+   只保留下方那条 margin-only 规则。 */
 /* 「删除数据」危险区(2026-07-29):三个红按钮从平铺收进一个可折叠入口。
    平铺时一屏三条红,违反 CLAUDE.md「不用红色制造焦虑」;而这三件事一年也未必做一次。
    收起态是中性的,只有展开后才见红 —— 红色留给真正走到那一步的人。 */
@@ -9723,7 +9718,9 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 6px 2px 2px 0;
+  /* bug3 p43:输入框和下面时间线第一拍之间原来只隔 2px,挤在一起像同一块 ——
+     下内边距拉开到 --space-4,让「输入」和「时间线」是两件事。 */
+  padding: 6px 2px var(--space-4) 0;
   position: relative;
   z-index: 1;
 }
@@ -9932,6 +9929,10 @@ html[data-portal-theme="night"] .nesio-trend-chart-card { background: rgba(255,2
 .nesio-trend-bar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
 .nesio-trend-bar { width: 14px; min-height: 6px; border-radius: 999px; transition: height 0.3s; }
 .nesio-trend-bar--today { box-shadow: 0 0 0 3px color-mix(in srgb, var(--portal-muted) 22%, transparent); }
+/* 健康分析页的心情趋势入口卡:同一套柱子,压扁成缩略图(不重写一份柱状图) */
+.nesio-trend-bars--mini { height: 62px; gap: var(--space-2); margin-top: var(--space-1); }
+.nesio-trend-bars--mini .nesio-trend-bar { width: 10px; }
+.nesio-health-moodtrend { margin-top: var(--space-2); }
 .nesio-trend-bar-lab { font-size: 0.7rem; color: var(--portal-muted); }
 .nesio-trend-bar-lab--today { color: var(--portal-ink); font-weight: 700; }
 .nesio-trend-narr { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.75rem 0.85rem; border: 1px solid var(--portal-line); border-radius: 14px; margin-bottom: 1.1rem; }
@@ -13659,19 +13660,7 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
   background: var(--status-go-soft, #d9ece1);
   margin-bottom: 0.9rem;
 }
-.nesio-health-nen-avatar {
-  flex-shrink: 0;
-  width: 26px;
-  height: 26px;
-  border-radius: 9px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--status-go, #5a9e7a);
-  color: #fff;
-  font-size: 0.82rem;
-  font-weight: 700;
-}
+/* bug3 p38:「念」头像方块删了(标注:去掉念字符号)—— 类名已无引用,规则一并清掉 */
 .nesio-health-nen-text {
   margin: 0;
   font-size: 0.86rem;
@@ -14035,6 +14024,118 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-rel-av--3 { background: #9a9060; }
 .nesio-rel-av--4 { background: #7f96b3; }
 .nesio-rel-av--5 { background: #a9906a; }
+/* bug3:通讯录同步来的 Gmail 头像 —— 有真头像就别用字母块 */
+.nesio-rel-av--img { object-fit: cover; background: var(--portal-accent-soft); }
+
+/* bug3:定期账单金额右对齐 —— 一列数字要能上下对齐比大小 */
+.nesio-fin-recur-amt--right { margin-left: auto; text-align: right; min-width: 5.5rem; }
+
+/* bug3:账户名用正文黑体(投资页)—— group-h 的小型大写+字距把英文账户名弄成了标签 */
+.nesio-fin-group-h--plain {
+  text-transform: none; letter-spacing: normal;
+  font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-ink);
+}
+
+/* bug3 p44:设置里成对的互逆操作并排一排(备份/从云恢复 · 导出/导入) */
+.nesio-settings-btn-row { display: flex; gap: var(--space-2); align-items: stretch; }
+/* 同步体检那一行:体检 + (有缺口时)补传。与 .nesio-settings-btn-row 分开 ——
+   那个是「成对互逆操作」的栅格,这一行常态只有一颗按钮。 */
+.nesio-settings-audit-row { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+.nesio-settings-audit-row > * { flex: 1; }
+
+.nesio-settings-btn-row > * { flex: 1; min-width: 0; }
+
+/* bug3 p41:身体账本顶部的记录入口 —— 一个「记一条」+ 一个加号(上传或智能拍照) */
+.nesio-bl-logrow { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
+.nesio-bl-logplus {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 2rem; height: 2rem; flex-shrink: 0; cursor: pointer;
+  border: 1px solid var(--portal-accent-border); border-radius: var(--radius-pill);
+  background: var(--portal-accent-soft); color: var(--portal-accent);
+}
+/* bug3:每一笔流水的「修改」区(流向 / 关联人 / 备注 / 附件) */
+.nesio-fin-txfoot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
+.nesio-fin-txedit-btn {
+  flex-shrink: 0; border: none; background: transparent; cursor: pointer;
+  font-size: var(--text-xs); color: var(--portal-accent); padding: 0.1rem 0;
+}
+.nesio-fin-txedit { padding-bottom: 0.7rem; }
+.nesio-fin-txedit-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: var(--space-2); }
+.nesio-fin-input {
+  width: 100%; border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  padding: 0.4rem 0.6rem; font-size: var(--text-sm); color: var(--portal-ink);
+  background: var(--glass-bg-solid); font-family: var(--font-sans);
+}
+
+/* bug3:商户 / 收入来源 双页交互饼图(左右滑动切换) */
+.nesio-fin-chartpager { touch-action: pan-y; }
+.nesio-fin-chartpager-head {
+  display: flex; align-items: center; justify-content: center;
+  gap: var(--space-2); margin-bottom: var(--space-2);
+}
+.nesio-fin-chartpager-arrow {
+  border: 1px solid var(--portal-line); background: transparent; color: var(--portal-accent);
+  border-radius: var(--radius-pill); width: 1.75rem; height: 1.75rem; line-height: 1;
+  font-size: var(--text-body); cursor: pointer; flex-shrink: 0;
+}
+.nesio-fin-chartpager-dots { display: flex; justify-content: center; gap: 0.35rem; margin-top: var(--space-2); }
+.nesio-fin-chartpager-dot {
+  width: 0.35rem; height: 0.35rem; border-radius: var(--radius-pill);
+  background: var(--portal-line);
+}
+.nesio-fin-chartpager-dot.is-on { background: var(--portal-accent); }
+
+/* bug3:「N 月足迹」左右月份选择器 */
+.nesio-tl-month-nav { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.nesio-tl-month-arrow {
+  flex: 0 0 auto; min-width: 2rem; height: 2rem; border-radius: var(--radius-sm);
+  border: 1px solid var(--portal-line); background: transparent; color: var(--portal-accent);
+  font-family: var(--font-sans); font-size: var(--text-body); cursor: pointer;
+}
+.nesio-tl-month-arrow:disabled { opacity: 0.35; cursor: default; }
+
+/* bug3:机场/车站输入框的离线候选下拉(行程加航班) */
+.nesio-hub-menu {
+  list-style: none; margin: var(--space-1) 0 0; padding: var(--space-1);
+  position: absolute; left: 0; right: 0; top: 100%; z-index: 5;
+  max-height: 15rem; overflow-y: auto;
+  background: var(--sheet-opaque, var(--portal-bg)); border: 1px solid var(--portal-accent-border);
+  border-radius: var(--radius-sm); box-shadow: var(--shadow-md, 0 8px 24px rgba(16, 28, 54, 0.14));
+}
+.nesio-hub-option {
+  display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left;
+  padding: var(--space-2); border: none; background: none; cursor: pointer;
+  font-family: var(--font-sans); color: var(--portal-ink);
+}
+.nesio-hub-option b { font-size: var(--text-sm); font-weight: var(--weight-medium); }
+.nesio-hub-option small { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-hub-option:active { background: var(--portal-accent-soft); }
+
+/* bug3:记一条时挂的附件清单(唯一副本在本机 IndexedDB) */
+.nesio-hang-att-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: var(--space-1); }
+.nesio-hang-att {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2); border-radius: var(--radius-sm);
+  background: var(--portal-accent-soft); font-size: var(--text-xs);
+}
+.nesio-hang-att-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--portal-ink); }
+.nesio-hang-att-size { flex-shrink: 0; color: var(--portal-muted); }
+
+/* bug3:详情页名字与「记录」按钮同一行 */
+.nesio-rel-detail-name-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+
+/* bug3:联系人表单里「输入框 + 一个动作」的行(写信 / 打电话 / 导航) */
+.nesio-ct-field-row { display: flex; align-items: center; gap: var(--space-2); }
+.nesio-ct-field-row > .nesio-ob-input { flex: 1; min-width: 0; }
+.nesio-ct-field-act {
+  flex-shrink: 0; width: 2.6rem; height: 2.6rem; border-radius: var(--radius-sm);
+  display: grid; place-items: center; text-decoration: none;
+  border: 1px solid var(--portal-accent-border); background: var(--portal-accent-soft);
+  color: var(--portal-accent);
+}
+.nesio-ct-field-act:active { background: var(--portal-accent-soft-md); }
+/* 没填内容时不给可点的假象 */
+.nesio-ct-field-act.is-off { border-color: var(--portal-line); background: transparent; color: var(--portal-muted); opacity: 0.45; }
 
 /* ─── 按人分类的数据(人缘㊄)─── */
 .nesio-rel-rec-head { display: flex; align-items: center; justify-content: space-between; }
@@ -18125,10 +18226,17 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
   margin: 0.5rem 0 0.75rem;
   padding: 0.9rem 0.6rem 0.7rem;
   border-radius: 1.2rem;
+  /* bug3「背景是宇宙」:多撒几颗星 + 一层极淡的银河带,两个主题同用 */
   background:
-    radial-gradient(circle at 22% 16%, rgba(148, 189, 255, 0.14) 0 2px, transparent 3px),
-    radial-gradient(circle at 78% 30%, rgba(148, 189, 255, 0.12) 0 1.5px, transparent 2.5px),
-    radial-gradient(circle at 60% 82%, rgba(148, 189, 255, 0.1) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 22% 16%, rgba(214, 232, 255, 0.55) 0 1.4px, transparent 2.2px),
+    radial-gradient(circle at 78% 30%, rgba(214, 232, 255, 0.45) 0 1.2px, transparent 2px),
+    radial-gradient(circle at 60% 82%, rgba(214, 232, 255, 0.4) 0 1.2px, transparent 2px),
+    radial-gradient(circle at 12% 62%, rgba(214, 232, 255, 0.35) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 42% 8%, rgba(214, 232, 255, 0.4) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 88% 68%, rgba(214, 232, 255, 0.32) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 33% 92%, rgba(214, 232, 255, 0.28) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 68% 52%, rgba(214, 232, 255, 0.24) 0 0.9px, transparent 1.6px),
+    linear-gradient(118deg, transparent 34%, rgba(150, 178, 235, 0.07) 50%, transparent 66%),
     radial-gradient(circle at 50% 28%, #101d3c 0%, #070d1f 62%, #04070f 100%);
   overflow: hidden;
 }
@@ -18358,16 +18466,9 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
 }
 
 /* ── 批次 75:白天主题的地球舞台(夜空只属于夜晚) ── */
-html[data-portal-theme='day'] .nesio-globe-stage,
-html[data-portal-theme='day'] .nesio-globe-fsov {
-  background: radial-gradient(circle at 50% 30%, #dbeafe 0%, #b6d3f2 60%, #93bbe8 100%);
-}
-html[data-portal-theme='day'] .nesio-globe-stats {
-  background: rgba(255, 255, 255, 0.65);
-  border-color: rgba(30, 64, 120, 0.15);
-  color: #1e3a5f;
-}
-html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 0.55); }
+/* bug3:白天也要星空 —— 「背景是宇宙」。原来 day 主题把地球舞台盖成浅蓝天空,
+   球体飘在蓝底上完全没有太空感。两个主题统一用夜空底(见 .nesio-globe-stage)。 */
+/* 舞台是星空底,统计胶囊/提示字在两个主题下都用浅色(day 的深色文字在星空上读不清) */
 
 /* ── 批次 77:问卷卡(多题带选项一次提交) + 选中态 ── */
 .nesio-chat-quiz {
@@ -18666,8 +18767,11 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
    940/941 —— 高过 fullscreen 的 929/930,仍低于 image-viewer(950)与特殊模态(1010–1200)。
    2026-07-28 标注 图24:不加这一层,抽屉落在 901 被洞察面板整个盖住 = 点了没反应。 */
 .nesio-sheet-overlay--elevated { z-index: 940; }
-/* blur:背景虚化(Bug4 图11 收藏夹)。只给显式传 blurOverlay 的浮层开 —— 全局开会让
-   低端机每次开抽屉都重绘整页。不透明遮罩下虚化没有意义,故与 --opaque 互斥使用。 */
+/* blur:遮罩毛玻璃。两个来源同一诉求 —— bug3「挂一条 / 打包清单打开后背景虚化」与
+   Bug4 图11「收藏夹弹层背景虚化」。层序不变,只把背后内容虚掉,注意力落在这张卡上。
+   只给显式传 blurOverlay 的浮层开(全局开会让低端机每次开抽屉都重绘整页);
+   不透明遮罩下虚化没有意义,故与 --opaque 互斥使用。
+   reduced-transparency 下面的媒体查询会把 backdrop-filter 关掉、退成纯遮罩。 */
 .nesio-sheet-overlay--blur {
   backdrop-filter: blur(14px) saturate(120%);
   -webkit-backdrop-filter: blur(14px) saturate(120%);
@@ -18848,6 +18952,7 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 /* ② reduced-transparency:遮罩实底,不透穿背景 */
 @media (prefers-reduced-transparency: reduce) {
   .nesio-sheet-overlay { background: rgba(16, 28, 54, 0.55); }
+  .nesio-sheet-overlay--blur { backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 /* ③ contrast:实边框 */
 @media (prefers-contrast: more) {

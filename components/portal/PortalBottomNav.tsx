@@ -123,10 +123,12 @@ export default function PortalBottomNav({
         aria-label={L(portalLocaleToDictionaryLocale(locale), '洞察', 'Insights')}
         aria-current={insightsActive ? 'page' : undefined}
       >
-        {/* 品牌晶体:多切面钻石,呼应 Nesio,区别于今天(钟)/记忆(立方) */}
+        {/* 品牌晶体:钻石轮廓,呼应 Nesio,区别于今天(钟)/记忆(立方)。
+            bug3 p44「洞察符号钻石简化」:原来里面还有三条切面线(横线 + 两条斜线),
+            在 22px 的导航图标里挤成一团糊 —— 只留外轮廓 + 一条腰线,形还在,不糊了。 */}
         <svg className="nesio-bottom-nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-          <path d="M6 3h12l3 5-9 13L3 8z" />
-          <path d="M3 8h18M9 3 7.5 8 12 21M15 3l1.5 5L12 21" />
+          <path d="M6 4h12l3 5-9 11L3 9z" />
+          <path d="M3 9h18" />
         </svg>
         <span className="nesio-bottom-nav-label">{t(locale, 'navInsights')}</span>
       </button>

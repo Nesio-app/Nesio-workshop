@@ -28,9 +28,30 @@ export interface Contact {
   reachOut: boolean;             // 超期该联系
   overdueRatio: number;          // daysSince / cadence,排序用
   groups: string[];              // Google 联系人分组(家人/同事/自建组),关系 tab 按此筛选
+  /** Gmail/通讯录头像 URL(person 节点 attributes.photo,Google People API 拉的非默认头像)。 */
+  photo: string | null;
 }
 
 const CADENCE: Record<Closeness, number> = { core: 14, close: 30, acquaintance: 90 };
+
+/**
+ * 关系标签固定选项(bug3:关系改「选 tag」,不再自由填写)。
+ * 值原样存进 Contact.relation,所以每一项都要能被下面的 CORE_RE / CLOSE_RE 认出来 ——
+ * 否则选了「父母」亲疏还是算「一般」。改这个表时对着两个正则核一遍。
+ */
+export const RELATION_TAGS: Array<{ zh: string; en: string }> = [
+  { zh: '伴侣', en: 'Partner' },
+  { zh: '父母', en: 'Parent' },
+  { zh: '子女', en: 'Child' },
+  { zh: '兄弟姐妹', en: 'Sibling' },
+  { zh: '家人', en: 'Family' },
+  { zh: '朋友', en: 'Friend' },
+  { zh: '同事', en: 'Coworker' },
+  { zh: '同学', en: 'Classmate' },
+  { zh: '邻居', en: 'Neighbor' },
+  { zh: '客户', en: 'Client' },
+  { zh: '医生', en: 'Doctor' },
+];
 
 // 关系词 → 亲疏。中英混合匹配。
 const CORE_RE = /家人|亲人|配偶|伴侣|老婆|老公|妻|夫|父|母|爸|妈|儿|女|兄|弟|姐|妹|family|spouse|partner|wife|husband|mother|father|mom|dad|son|daughter|brother|sister|parent/i;
@@ -186,6 +207,7 @@ export function buildRelationships(
 ): Contact[] {
   const acc = new Map<string, Acc>();
   const groupsByKey = new Map<string, Set<string>>();  // key → Google 分组名(排除内部标记)
+  const photoByKey = new Map<string, string>();        // key → Gmail 头像 URL(左侧显示真头像,不是字母块)
   const selfIds = selfIdentityKeys(self);
   // 数据审计 #4:实体解析 —— 别名表一趟只加载一次;身份键走 resolveEntityKey,让「妈妈/母亲」
   // 「Linda/linda@x.com」这类同一实体的不同写法收敛成一个联系人(无别名配置时=旧的规范化行为)。
@@ -242,6 +264,14 @@ export function buildRelationships(
     // person 节点本身
     if (n.type === 'person' && n.name) {
       bump(n.name, n.name, nodeIso, null);
+      // 头像:通讯录同步存在 attributes.photo。名字与邮箱两个 key 都记,联系人由哪条线索
+      // 汇聚出来都能取到头像。
+      const ph = typeof n.attributes?.photo === 'string' ? n.attributes.photo.trim() : '';
+      if (ph) {
+        photoByKey.set(resolveEntityKey(n.name, aliases), ph);
+        const pe = typeof n.attributes?.email === 'string' ? n.attributes.email : '';
+        if (pe) photoByKey.set(resolveEntityKey(pe, aliases), ph);
+      }
       // 分组标签(排除内部「联系人」标记)→ 供关系 tab 按组筛选;名字与邮箱两个 key 都记
       const gs = (n.tags || []).filter((t) => t && t !== '联系人');
       if (gs.length) {
@@ -285,7 +315,7 @@ export function buildRelationships(
     out.push({
       key: a.key, name: a.name, relation, closeness,
       mentions: a.mentions, lastContactAt: last, daysSince, cadenceDays, reachOut, overdueRatio,
-      groups,
+      groups, photo: photoByKey.get(a.key) || null,
     });
   }
 

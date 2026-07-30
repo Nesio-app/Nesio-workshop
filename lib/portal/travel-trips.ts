@@ -45,6 +45,11 @@ export interface TransitPayload {
 export interface PackingItem {
   name: string; reason?: string;
   status: 'have' | 'need'; // need−have
+  /**
+   * 物品库里这件东西放在哪(bug3:「每一项根据物品库,显示需买或者位置」)。
+   * 只在 status==='have' 时有值;对照是自动做的,不再需要用户点「对照物品库」。
+   */
+  place?: string;
 }
 
 export interface PackingPayload {
@@ -123,6 +128,11 @@ export interface Trip {
   days: number;
   weatherHint?: string;
   budgetTotal?: number;
+  /**
+   * 用户手改过的分类预算(bug3:预算页分类行「无法点无法编辑」)。
+   * recomputeBudgetNode 必须尊重它 —— 否则一按「按节点重算」就把用户改的数抹掉。
+   */
+  budgetByCategory?: Record<string, number>;
   currency?: string;
   nodes: TripNode[];
   createdAt: string;
@@ -205,11 +215,19 @@ export function refreshPackingAgainstInventory(tripId: string, nodeId: string): 
   if (!t) return null;
   const node = t.nodes.find((n) => n.id === nodeId);
   if (!node || node.payload.kind !== 'packing') return t;
-  const invNames = new Set(listInventoryItems().map((i) => i.name.trim().toLowerCase()));
-  const items = node.payload.packing.items.map((it) => ({
-    ...it,
-    status: (invNames.has(it.name.trim().toLowerCase()) ? 'have' : 'need') as 'have' | 'need',
-  }));
+  // 名字 → 位置。有位置就把它带到打包项上,让每一行直接显示「在哪」而不是只显示「已有」。
+  const invPlace = new Map<string, string>();
+  for (const i of listInventoryItems()) {
+    const k = i.name.trim().toLowerCase();
+    if (!k) continue;
+    if (!invPlace.has(k)) invPlace.set(k, (i.location || '').trim());
+  }
+  const items = node.payload.packing.items.map((it) => {
+    const k = it.name.trim().toLowerCase();
+    const has = invPlace.has(k);
+    const place = has ? (invPlace.get(k) || '') : '';
+    return { ...it, status: (has ? 'have' : 'need') as 'have' | 'need', ...(place ? { place } : {}) };
+  });
   const needCount = items.filter((i) => i.status === 'need').length;
   return updateNode(tripId, nodeId, {
     subtitle: needCount > 0
@@ -484,11 +502,19 @@ export function generatePackingList(tripId: string): Trip | null {
     base.push({ name: '雨具/冲锋衣', reason: '有雨', status: 'need' });
   }
   if (t.days >= 4) base.push({ name: '舒适步行鞋', status: 'need' });
-  const inv = new Set(listInventoryItems().map((i) => i.name.trim().toLowerCase()));
-  const items = base.map((it) => ({
-    ...it,
-    status: (inv.has(it.name.toLowerCase()) ? 'have' : 'need') as 'have' | 'need',
-  }));
+  // 自动对照物品库(bug3:「对照物品库按钮不需要,自动对照」),并把位置带上 ——
+  // 每一行于是能直接显示「需买」或者「在哪」。
+  const invPlace = new Map<string, string>();
+  for (const i of listInventoryItems()) {
+    const k = i.name.trim().toLowerCase();
+    if (k && !invPlace.has(k)) invPlace.set(k, (i.location || '').trim());
+  }
+  const items: PackingItem[] = base.map((it) => {
+    const k = it.name.trim().toLowerCase();
+    const has = invPlace.has(k);
+    const place = has ? (invPlace.get(k) || '') : '';
+    return { ...it, status: has ? 'have' : 'need', ...(place ? { place } : {}) };
+  });
   const needN = items.filter((i) => i.status === 'need').length;
   const packingNode: TripNode = {
     id: uid('n'),
@@ -652,16 +678,28 @@ export function recomputeBudgetNode(tripId: string): Trip | null {
     }
   }
   const actualTotal = flight + stay + shop;
-  const budgetTotal = t.budgetTotal && t.budgetTotal > 0 ? t.budgetTotal : Math.max(actualTotal, 0);
+  const over = t.budgetByCategory || {};
+  const hasOverride = Object.keys(over).length > 0;
+  // 用户改过分类预算 → 总预算 = 各分类之和(改了分类总额还是老数字最容易被当成 bug);
+  // 没改过 → 沿用老逻辑(手填总额,或退回实际花费),再按 35/30/35 摊到三类。
+  const autoTotal = t.budgetTotal && t.budgetTotal > 0 ? t.budgetTotal : Math.max(actualTotal, 0);
+  const share: Record<string, number> = {
+    flight: Math.round(autoTotal * 0.35), stay: Math.round(autoTotal * 0.3), shop: Math.round(autoTotal * 0.35),
+  };
+  const catBudget = (id: string) => (Number.isFinite(over[id]) ? Number(over[id]) : share[id] || 0);
+  const categories = [
+    { id: 'flight', label: '机票', actual: flight, budget: catBudget('flight') },
+    { id: 'stay', label: '住宿', actual: stay, budget: catBudget('stay') },
+    { id: 'shop', label: '购物', actual: shop, budget: catBudget('shop') },
+  ];
+  const budgetTotal = hasOverride
+    ? categories.reduce((a, c) => a + c.budget, 0)
+    : (autoTotal || actualTotal || 0);
   const budgetPayload: BudgetPayload = {
     currency: t.currency || '¥',
     actualTotal,
-    budgetTotal: budgetTotal || actualTotal || 0,
-    categories: [
-      { id: 'flight', label: '机票', actual: flight, budget: Math.round((budgetTotal || 0) * 0.35) },
-      { id: 'stay', label: '住宿', actual: stay, budget: Math.round((budgetTotal || 0) * 0.3) },
-      { id: 'shop', label: '购物', actual: shop, budget: Math.round((budgetTotal || 0) * 0.35) },
-    ],
+    budgetTotal,
+    categories,
   };
   const existing = t.nodes.find((n) => n.kind === 'budget');
   const budgetNode: TripNode = {
@@ -677,6 +715,18 @@ export function recomputeBudgetNode(tripId: string): Trip | null {
   };
   const others = t.nodes.filter((n) => n.kind !== 'budget');
   return upsertTrip({ ...t, nodes: [...others, budgetNode], budgetTotal: budgetPayload.budgetTotal });
+}
+
+/**
+ * 改某一类的预算(bug3:预算页每一行要能点、能改)。
+ * 写进 Trip.budgetByCategory 后重算预算节点 —— 覆盖是持久的,「按节点重算」不会抹掉。
+ */
+export function setCategoryBudget(tripId: string, categoryId: string, budget: number): Trip | null {
+  const t = getTrip(tripId);
+  if (!t) return null;
+  const amt = Math.max(0, Math.round(Number(budget) || 0));
+  upsertTrip({ ...t, budgetByCategory: { ...(t.budgetByCategory || {}), [categoryId]: amt } });
+  return recomputeBudgetNode(tripId);
 }
 
 const CHECKIN_KEY = 'nesio-travel-checkin-reminders-v1';

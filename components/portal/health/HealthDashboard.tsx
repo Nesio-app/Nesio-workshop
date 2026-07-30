@@ -26,9 +26,13 @@ import { buildMonthlyHealthReport, persistHealthReportToMemory, autoPersistLastM
 import { healthReportRichHtml } from '@/lib/portal/health-report-visual';
 import SegTabs from '../ui/SegTabs';
 import { guardPaidCloudAi } from '@/lib/portal/entitlement';
-import BodyLedgerPanel, { PostMealBody, ReactionBody } from './BodyLedgerPanel';
+import BodyLedgerPanel, { PostMealBody, BodyLedgerAnalysisCards } from './BodyLedgerPanel';
+// bug3 p40:「稳 / 飙」并进健康提示 —— 排序本身还是同一个确定性函数,只是渲染换了地方
+import { rankFoodReactions, mgDlToDisplay } from '@/lib/portal/body-ledger';
+import { getMeals } from '@/lib/cooking/meals';
 import BeautyCarePanel from './BeautyCarePanel';
 import HealthLensCards from './HealthLensCards';
+import MoodTrendCard from './MoodTrendCard';
 import HealthRecordSheet from './HealthRecordSheet';
 import MetricDetailSheet from './MetricDetailSheet';
 import LabScanSheet from './LabScanSheet';
@@ -227,16 +231,10 @@ function MoodCard({ mood, dict }: { mood: MoodAnalysis; dict: string }) {
         </svg>
       )}
       <span className="nesio-health-card-range">{L(dict, `近 ${d.length} 天 · ${mood.count} 次记录`, `${d.length}d · ${mood.count} logs`)}</span>
-      {/* 2026-07-29:「这周趋势」从今天页搬到这里。
-          今天页那一拍讲的是**此刻**,回顾走势不属于那儿;而这张卡本来就在讲情绪,
-          趋势面板是它的自然下一层。原来那个入口挂在今天页,等于把「看过去」塞进了「现在」。 */}
-      <button
-        type="button"
-        className="nesio-health-card-link"
-        onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-mood-trend'))}
-      >
-        {L(dict, '看这周趋势 ›', 'This week ›')}
-      </button>
+      {/* 趋势入口**不在这张卡上**:这张卡讲的是 Apple Health 的 State of Mind,
+          而趋势读的是 App 自己的情绪盘记录 —— 挂在这里等于给趋势加了一道
+          「必须导过 Apple Health」的假门(用户实测就是「我没见到」)。
+          入口已独立成 MoodTrendCard,直接摆在分析页第一屏。 */}
     </div>
   );
 }
@@ -295,7 +293,8 @@ function AiInsightPanel({ data, dict }: { data: HealthMetrics; dict: string }) {
         </>
       ) : (
         <button type="button" className="nesio-connector-connect" disabled={status === 'loading'} onClick={() => void run()}>
-          {status === 'loading' ? L(dict, '生成中…', 'Generating…') : L(dict, '让 AI 解读我的健康数据', 'Let AI interpret my health data')}
+          {/* bug3 p39:按钮改名「智能解读」—— 用户不关心是谁在解读,只关心这一下能得到什么 */}
+          {status === 'loading' ? L(dict, '生成中…', 'Generating…') : L(dict, '智能解读', 'Smart read')}
         </button>
       )}
     </div>
@@ -342,18 +341,45 @@ function ClinicalCard({ c, dict }: { c: StoredClinical; dict: string }) {
 // 批次 49:健康提示卡 —— 指南接地的确定性判定(①目标 + ②模式),依严重度着色 + 出处。
 function FindingsCard({ data, dict }: { data: HealthMetrics; dict: string }) {
   const findings = evaluateHealthFindings({ glucose: data.glucose, sleepStages: data.sleepStages, metrics: data.metrics });
-  if (!findings.length) return null;
+  // bug3 p40:「哪些让你稳 / 飙」不再单开一个折叠 —— 它本质就是一条提示,并进健康提示里,
+  // 用同一种行样式(● 标签 + 标题 — 明细 + 依据),不再是另一套排行榜观感。
+  const unit = data.glucose?.unit === 'mmol/L' ? 'mmol/L' : 'mg/dL';
+  const reactions = rankFoodReactions(getMeals(), data.daily, { minN: 2, limit: 5 });
+  if (!findings.length && !reactions.length) return null;
   const color: Record<Severity, string> = { flag: 'var(--status-risk)', attention: 'var(--status-gentle)', info: 'var(--status-go)' };
   const dot: Record<Severity, [string, string]> = { flag: ['需留意', 'flag'], attention: ['可关注', 'watch'], info: ['正常', 'ok'] };
+  // 行样式抽成常量:两个来源(指南判定 / 稳飙)必须长得一模一样 —— 标注要的就是「风格一致」,
+  // 靠复制粘贴保证不了,下一次改一处就会走形。
+  const rowStyle = { display: 'flex', gap: '0.5rem', alignItems: 'baseline', marginBottom: '0.35rem' } as const;
+  const dotStyle = { flexShrink: 0, minWidth: 44, fontSize: '0.62rem', fontWeight: 600 } as const;
+  const srcStyle = { display: 'block', fontSize: '0.62rem', color: 'var(--portal-muted)' } as const;
   return (
     <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
       <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '健康提示 · 依据指南', 'Health flags · guideline-based')}</p>
+      {reactions.map((r) => {
+        // 偏飙 = 可关注(琥珀);偏稳 = 正常(绿)。红只留给真红旗,不拿吃饭制造焦虑。
+        const sev: Severity = r.tone === 'spike' ? 'attention' : 'info';
+        const rise = mgDlToDisplay(r.avgRise, unit);
+        return (
+          <div key={`rx-${r.name}`} style={rowStyle}>
+            <span style={{ ...dotStyle, color: color[sev] }}>● {L(dict, dot[sev][0], dot[sev][1])}</span>
+            <span className="nesio-health-story-line" style={{ margin: 0 }}>
+              <b>{r.name}</b> — {r.tone === 'spike'
+                ? L(dict, `同日血糖振幅偏大 +${rise} ${unit}`, `larger same-day glucose swing +${rise} ${unit}`)
+                : L(dict, `同日血糖比较稳 +${rise} ${unit}`, `steadier same-day glucose +${rise} ${unit}`)}
+              <span style={srcStyle}>
+                {L(dict, `依据:同日血糖振幅与餐名共现(探索性,n=${r.n})`, `source: same-day glucose amplitude co-occurrence (exploratory, n=${r.n})`)}
+              </span>
+            </span>
+          </div>
+        );
+      })}
       {findings.map((f) => (
-        <div key={f.id} style={{ display: 'flex', gap: '0.5rem', alignItems: 'baseline', marginBottom: '0.35rem' }}>
-          <span style={{ flexShrink: 0, minWidth: 44, fontSize: '0.62rem', fontWeight: 600, color: color[f.severity] }}>● {L(dict, dot[f.severity][0], dot[f.severity][1])}</span>
+        <div key={f.id} style={rowStyle}>
+          <span style={{ ...dotStyle, color: color[f.severity] }}>● {L(dict, dot[f.severity][0], dot[f.severity][1])}</span>
           <span className="nesio-health-story-line" style={{ margin: 0 }}>
             <b>{L(dict, f.title[0], f.title[1])}</b> — {L(dict, f.detail[0], f.detail[1])}
-            <span style={{ display: 'block', fontSize: '0.62rem', color: 'var(--portal-muted)' }}>{L(dict, `依据:${f.source}`, `source: ${f.source}`)}</span>
+            <span style={srcStyle}>{L(dict, `依据:${f.source}`, `source: ${f.source}`)}</span>
           </span>
         </div>
       ))}
@@ -562,23 +588,9 @@ function TopRelationship({ data, dict }: { data: HealthMetrics; dict: string }) 
  * 同一个位置、同一条确认路径,OCR 到位后只是把表单预填好。
  * 入口不能等 OCR:等了,没导过 Apple 健康记录的人就一条都记不进来。
  */
-function HealthLensRow({ onRecord, onScan, dict }: { onRecord: () => void; onScan: () => void; dict: string }) {
-  return (
-    <div className="nesio-rel-head-row" style={{ marginTop: '0.4rem' }}>
-      <p className="nesio-health-updated" style={{ margin: 0 }}>
-        {L(dict, '化验 · 用药 · 就诊', 'Labs · meds · visits')}
-      </p>
-      <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
-        <button type="button" className="nesio-rel-log-btn" onClick={onScan}>
-          {L(dict, '拍化验单', 'Scan report')}
-        </button>
-        <button type="button" className="nesio-rel-log-btn" onClick={onRecord}>
-          {L(dict, '＋ 记一条', '＋ Log')}
-        </button>
-      </div>
-    </div>
-  );
-}
+// bug3 p41:原来概览页顶上那行(「化验 · 用药 · 就诊」标签 + 拍化验单 + ＋记一条)整条删掉 ——
+// 记一条挪进「身体账本」,并且只留一个「记一条」+ 一个加号(加号里既能上传也能智能拍照,
+// 见 BodyLedgerPanel 的 onRecord / onScan)。
 
 export default function HealthDashboard() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -629,16 +641,18 @@ export default function HealthDashboard() {
     return (
       <div className="nesio-health-dash">
         <HealthSubTabs view={view} onChange={setView} dict={dict} />
-        {view === 'ledger' && <BodyLedgerPanel health={data} />}
+        {view === 'ledger' && <BodyLedgerPanel health={data} onRecord={() => setRecordOpen(true)} onScan={() => setScanOpen(true)} />}
         {view === 'care' && <BeautyCarePanel />}
         {(view === 'overview' || view === 'analysis') && (
           <>
             {/* 健康镜头不依赖 Apple Health —— 化验/用药/就诊是另一套数据源。
                 这块早退分支原本什么都不给,等于「没导过 Apple Health 就用不了健康镜头」。 */}
-            <HealthLensRow onRecord={() => setRecordOpen(true)} onScan={() => setScanOpen(true)} dict={dict} />
             <HealthLensCards onOpenMetric={setOpenMetric} />
             {/* 合并 QA 分支:没有 Apple Health 也可能有本机训练记录,有就先给一块 */}
             {emptyInsight.signals.length > 0 && <FitnessPanel insight={emptyInsight} dict={dict} />}
+            {/* 心情趋势读的是 App 自己的情绪盘记录 —— 这条早退分支(没导 Apple Health)
+                同样要给,否则「没导过 Apple Health 就看不到自己记的心情」。 */}
+            <MoodTrendCard dict={dict} />
             <p className="nesio-insights-empty" style={{ marginBottom: 0 }}>
               {L(dict,
                 '还没有 Apple Health 指标。身体账本仍可用「美味 · 记一餐」;护理看护肤物品。完整曲线请到「设置 → 数据接入 → Apple Health」上传导出。',
@@ -662,14 +676,14 @@ export default function HealthDashboard() {
     <div className="nesio-health-dash">
       <HealthSubTabs view={view} onChange={setView} dict={dict} />
 
-      {view === 'ledger' && <BodyLedgerPanel health={data} />}
+      {view === 'ledger' && <BodyLedgerPanel health={data} onRecord={() => setRecordOpen(true)} onScan={() => setScanOpen(true)} />}
       {view === 'care' && <BeautyCarePanel />}
 
       {view === 'overview' ? (
         /* ── 概览(bug2):第一行隐私 badge 删;黄卡/绿卡迁身体账本;快捷进入删;精选可自选 ── */
         <>
-          {/* 健康镜头(2026-07-29):化验/用药/就诊三卡 —— 读 Signal 主事实表 */}
-          <HealthLensRow onRecord={() => setRecordOpen(true)} onScan={() => setScanOpen(true)} dict={dict} />
+          {/* 健康镜头(2026-07-29):化验/用药/就诊三卡 —— 读 Signal 主事实表。
+              bug3 p41:上面那行入口(标签 + 拍化验单 + ＋记一条)删掉,入口只留在身体账本。 */}
           <HealthLensCards onOpenMetric={setOpenMetric} />
           <TodayPicks data={data} dict={dict} onOpen={() => setView('analysis')} />
           <TopFinding data={data} dict={dict} onOpen={() => setView('analysis')} />
@@ -679,8 +693,15 @@ export default function HealthDashboard() {
           </button>
         </>
       ) : view === 'analysis' ? (
-        /* ── 分析(bug2):顶部指标计数/画像文字删;专项折叠;餐后血糖 + 稳/飙迁入 ── */
+        /* ── 分析(bug2):顶部指标计数/画像文字删;专项折叠;餐后血糖迁入
+              bug3 p38:身体账本顶部的读数小结卡(去掉「念」符号)+ 蛋白琥珀卡挪来这里 ── */
         <>
+          <BodyLedgerAnalysisCards health={data} dict={dict} />
+
+          {/* bug3 p43「心情趋势显示在健康分析页」:摆在第一屏、不进「专项」折叠、
+              不挂 data.mood 门 —— 折叠 + Apple Health 门就是上一版「我没见到」的原因。 */}
+          <MoodTrendCard dict={dict} />
+
           {/* 专项(折叠) */}
           {(insight.signals.length > 0 || data.activityRings || data.sleepStages || data.mood || data.glucose) && (
             <details className="nesio-fin-fold" style={{ marginTop: '0.6rem' }}>
@@ -701,14 +722,11 @@ export default function HealthDashboard() {
             </details>
           )}
 
-          {/* bug2:身体账本的「餐后血糖」「稳 / 飙」内容迁入分析页 */}
+          {/* bug2:身体账本的「餐后血糖」迁入分析页。
+              bug3 p40:「稳 / 飙」这个折叠删掉 —— 内容并进了下面的「健康提示」。 */}
           <details className="nesio-fin-fold" style={{ marginTop: '0.6rem' }}>
             <summary className="nesio-settings-section-label" style={{ cursor: 'pointer', listStyle: 'none', marginTop: 0 }}>{L(dict, '餐后血糖', 'Post-meal glucose')} ›</summary>
             <PostMealBody health={data} dict={dict} />
-          </details>
-          <details className="nesio-fin-fold" style={{ marginTop: '0.6rem' }}>
-            <summary className="nesio-settings-section-label" style={{ cursor: 'pointer', listStyle: 'none', marginTop: 0 }}>{L(dict, '稳 / 飙', 'Steady / spike')} ›</summary>
-            <ReactionBody health={data} dict={dict} />
           </details>
 
           {/* 判定:指南接地 + 已验证评分(红只给真红旗,每条带出处 + 非诊断) */}
@@ -752,8 +770,8 @@ export default function HealthDashboard() {
             const ym = healthMonths(data.daily)[0] ?? new Date().toISOString().slice(0, 7);
             return (
               <>
-                <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '健康月报', 'Monthly report')}</p>
-                <div className="nesio-fin-budget-add">
+                {/* bug3 p39:「健康月报」这个标题删了 —— 按钮文字自己说了是月报 */}
+                <div className="nesio-fin-budget-add" style={{ marginTop: '1.25rem' }}>
                   <button type="button" className="nesio-fin-flowopt" onClick={() => {
                     try {
                       const blob = new Blob([healthReportRichHtml(data, ym, dict)], { type: 'text/html;charset=utf-8' });
@@ -764,7 +782,7 @@ export default function HealthDashboard() {
                       setTimeout(() => URL.revokeObjectURL(a.href), 5000);
                       setReportMsg(L(dict, `已下载 ${ym} 彩色健康月报(.html,双击打开)`, `Colorful health report for ${ym} downloaded (.html)`));
                     } catch { setReportMsg(L(dict, '月报生成失败,请重试', 'Report failed — try again')); }
-                  }}>{L(dict, '下载彩色月报', 'Download report')}</button>
+                  }}>{L(dict, '彩色月报', 'Report')}</button>
                   <button type="button" className="nesio-fin-flowopt" onClick={() => {
                     try {
                       const outcome = persistHealthReportToMemory(buildMonthlyHealthReport(data, ym, dict));
@@ -772,17 +790,9 @@ export default function HealthDashboard() {
                         ? L(dict, `已把 ${ym} 健康月报存入记忆,「问一问」可检索`, `Health report ${ym} saved to memory`)
                         : L(dict, `已更新记忆里的 ${ym} 健康月报`, `Updated the ${ym} health report in memory`));
                     } catch { setReportMsg(L(dict, '存入记忆失败,请重试', 'Save to Memory failed — try again')); }
-                  }}>{L(dict, '存入记忆', 'Save to Memory')}</button>
-                  <button type="button" className="nesio-fin-flowopt" onClick={() => {
-                    try {
-                      const w = window.open('', '_blank');
-                      if (!w) { setReportMsg(L(dict, '弹窗被拦截,请允许弹窗后重试', 'Popup blocked — allow popups and retry')); return; }
-                      w.document.write(healthReportRichHtml(data, ym, dict));
-                      w.document.close();
-                      setTimeout(() => { try { w.focus(); w.print(); } catch { /* 用户手动打印 */ } }, 350);
-                      setReportMsg(L(dict, '已打开打印视图(打印 → 存为 PDF)', 'Print view opened (Print → Save as PDF)'));
-                    } catch { setReportMsg(L(dict, '打印视图打开失败,请重试', 'Print view failed — try again')); }
-                  }}>{L(dict, '打印 / 存 PDF', 'Print / PDF')}</button>
+                  }}>{L(dict, '存记忆', 'To Memory')}</button>
+                  {/* bug3 p39:「打印 / 存 PDF」删掉 —— 彩色月报下载的就是可直接打印的 HTML,
+                      系统自带打印即可,不必在这里再放一个按钮。 */}
                 </div>
                 {reportMsg && <p className="nesio-settings-option-hint">{reportMsg}</p>}
               </>
@@ -794,9 +804,7 @@ export default function HealthDashboard() {
 
           <FamilyDataCard kind="health" />
 
-          <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>
-            {L(dict, '数据只存本机 · 随时可断开;取最近导入的最新读数', 'On-device only · disconnect anytime; latest readings from your import')}
-          </p>
+          {/* bug3 p39:底部「数据只存本机 · …」那行小字删掉(隐私说明在设置里,不必每页复述) */}
         </>
       ) : null}
 

@@ -38,6 +38,8 @@ export interface ManualContactInput {
   birthday?: string;
   relation?: string;
   note?: string;
+  /** 住址(bug3:表单加地址字段,详情/表单里可一键调系统默认地图导航)。 */
+  address?: string;
 }
 
 /** 联系人身份键:有邮箱用归一邮箱,否则用小写名。与 buildRelationships 的口径一致。 */
@@ -63,6 +65,7 @@ function attrsOf(input: ManualContactInput): Record<string, string> {
   if (input.phone?.trim()) a.phone = input.phone.trim();
   if (input.birthday?.trim()) a.birthday = input.birthday.trim();
   if (input.note?.trim()) a.note = input.note.trim();
+  if (input.address?.trim()) a.address = input.address.trim();
   return a;
 }
 

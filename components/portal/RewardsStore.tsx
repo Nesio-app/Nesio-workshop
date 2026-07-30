@@ -13,6 +13,7 @@ import {
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
+import FamilyGoalCard from './family/FamilyGoalCard';
 
 export default function RewardsStore() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -69,6 +70,10 @@ export default function RewardsStore() {
       <p className="nesio-freeze-hint" style={{ marginTop: 0 }}>
         {L(dict, '忍住没买的东西存这儿当愿望。做成事赚积分,攒够就奖励自己。', 'Things you resisted buying wait here as wishes. Earn points by getting things done, then reward yourself.')}
       </p>
+
+      {/* bug3:攒钱目标(愿望)从「家庭分享」板搬到这里 —— 两个愿望不该拆在两个页面。
+          没入伙的人看不到这一块。 */}
+      <FamilyGoalCard />
 
       {/* 待兑换 */}
       <div className="nesio-freeze-section">

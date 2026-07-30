@@ -11,12 +11,12 @@ import {
   loadPlaceTrail, PLACE_TRAIL_UPDATED_EVENT,
   timelineDays, buildDayJourney, dayStats,
   clusterPlaces, categoryTimeShare,
-  displayLabel, setPlaceAlias, isGenericPlace,
-  placesByCategory, PLACE_CATEGORY_META, setPlaceCategory, worldByCountry, loadPlaceGeo,
+  displayLabel, isGenericPlace,
+  placesByCategory, PLACE_CATEGORY_META, worldByCountry, loadPlaceGeo,
   type PlaceVisit, type PlaceCategory, type JourneyItem, type PlaceCluster,
 } from '@/lib/portal/place-trail';
 import { wallHHMM, dateKeyToLocalDate } from '@/lib/portal/place-time.mjs';
-import { monthlyPlaceComparison, weekRhythm, footprintHighlights } from '@/lib/portal/place-stats';
+import { monthlyPlaceComparison, footprintHighlights } from '@/lib/portal/place-stats';
 import PlaceMap from './PlaceMap';
 import { IconHome, IconUtensils, IconCard, IconActivity, IconBriefcase, IconPlane, IconBed, IconHeartPulse, IconBook, IconSun, IconStar, IconMapPin, IconCar, IconWalk, NodeTypeIcon } from '../icons';
 import { displayNodeName } from '@/lib/portal/node-display';
@@ -45,8 +45,6 @@ import { computePlacesShareStats, type PlacesShareStats } from '@/lib/portal/pla
 import { matchPlacePhotoAsset, placePhotoOverrideId, setPlacePhotoOverride, PLACE_PHOTOS_EVENT, type GeoImageNode, type PlaceDescriptor } from '@/lib/portal/place-photos';
 import { countryDisplayName, canonicalCountryKey } from '@/lib/portal/country-normalize';
 import TravelPlanPanel from '../travel/TravelPlanPanel';
-import { listCompletedTrips, TRAVEL_TRIPS_UPDATED_EVENT, type Trip } from '@/lib/portal/travel-trips';
-import TripTimelineSheet from '../travel/TripTimelineSheet';
 
 type Sub = 'timeline' | 'analytics' | 'travel' | 'world' | 'plan';
 
@@ -69,13 +67,7 @@ function catIconSvg(cat: PlaceCategory): ReactNode {
   }
 }
 
-const CAT: Record<PlaceCategory, [string, string]> = {
-  home: ['家', 'Home'], work: ['公司', 'Work'], grocery: ['超市', 'Grocery'], shopping: ['购物', 'Shopping'],
-  food: ['餐饮', 'Food'], cafe: ['咖啡', 'Café'], fitness: ['运动', 'Sports'], park: ['公园', 'Park'],
-  culture: ['文化', 'Culture'], education: ['学校', 'School'],
-  entertainment: ['娱乐', 'Entertainment'], health: ['医疗', 'Health'], lodging: ['住宿', 'Lodging'],
-  transit: ['交通', 'Transit'], unknown: ['未知', 'Unknown'], place: ['其他地点', 'Other places'],
-};
+/* (原来的 CAT 标签表随「类别时长占比」一起删掉 —— 分类名统一走 PLACE_CATEGORY_META,一套真相) */
 // 地点饼图配色:走设计 token(莫兰迪辅助色),top5 + 其他循环取用,不硬编码色值。
 const CAT_PIE_COLORS = [
   'var(--status-gentle)', 'var(--status-go)', 'var(--status-calm)',
@@ -242,10 +234,6 @@ export default function TimelineTab() {
   const [placePeriod, setPlacePeriod] = useState<'day' | 'week' | 'month' | 'year'>('month'); // 地点饼图时段
   const [pieSel, setPieSel] = useState<string | null>(null); // 可交互饼图:选中的类别
   const [worldCountry, setWorldCountry] = useState<string | null>(null); // 世界:点进某国看城市明信片
-  const [editRaw, setEditRaw] = useState<string | null>(null);
-  const [editVal, setEditVal] = useState('');
-  const [expandedCat, setExpandedCat] = useState<string | null>(null); // 批次 39:地点分类展开
-  const [catPickFor, setCatPickFor] = useState<string | null>(null); // 批次 40:给地点手动选类别
   const [memMapOpen, setMemMapOpen] = useState(false); // 批次 59:地图上的记忆
   const [visitMems, setVisitMems] = useState<{ title: string; nodes: LifeNode[] } | null>(null); // 批次 61:点「记了 N 条」看具体记忆
   const [visitSel, setVisitSel] = useState<LifeNode | null>(null);
@@ -256,15 +244,6 @@ export default function TimelineTab() {
   const [shareStats, setShareStats] = useState<PlacesShareStats | null>(null); // 足迹成就卡分享
   const [locateBusy, setLocateBusy] = useState(false);
   const [locateMsg, setLocateMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [doneTrips, setDoneTrips] = useState<Trip[]>([]);
-  const [openDoneTripId, setOpenDoneTripId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const readTrips = () => setDoneTrips(listCompletedTrips());
-    readTrips();
-    window.addEventListener(TRAVEL_TRIPS_UPDATED_EVENT, readTrips);
-    return () => window.removeEventListener(TRAVEL_TRIPS_UPDATED_EVENT, readTrips);
-  }, []);
 
   useEffect(() => {
     const read = () => setTrail(loadPlaceTrail());
@@ -297,11 +276,20 @@ export default function TimelineTab() {
     }).map((g) => g.n);
   };
   const stats = useMemo(() => dayStats(journey), [journey]);
-  const clusters = useMemo(() => clusterPlaces(trail, 10), [trail]);
-  const catShare = useMemo(() => categoryTimeShare(trail), [trail]);
-  const monthly = useMemo(() => monthlyPlaceComparison(trail), [trail]);
-  const rhythm = useMemo(() => weekRhythm(trail), [trail]);
+  // bug3:「7 月足迹」改成可左右翻月(0 = 最近有数据的那个月,往右退一个月 +1)
+  const [monthBack, setMonthBack] = useState(0);
+  const monthly = useMemo(() => monthlyPlaceComparison(trail, monthBack), [trail, monthBack]);
   const highlights = useMemo(() => footprintHighlights(trail), [trail]);
+
+  // bug3:进「地点」页就用系统定位落一个当前点 + 打开持续监听 —— 具体地点靠这个认,
+  // 不再等用户去按「标记当前位置」。一次挂载只跑一次,静默(只有失败才出提示)。
+  const autoLocatedRef = useRef(false);
+  useEffect(() => {
+    if (sub !== 'travel' || autoLocatedRef.current) return;
+    autoLocatedRef.current = true;
+    void markHereNow(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sub]);
   const mapPoints = useMemo(() => clusterPlaces(trail, 14)
     .filter((c) => c.lat != null && c.lon != null)
     .map((c) => ({ lat: c.lat!, lon: c.lon!, label: displayLabel(c.label), weightMin: c.totalMin, color: DOT_COLOR[c.category] })), [trail]);
@@ -327,7 +315,7 @@ export default function TimelineTab() {
     for (const c of clusterPlaces(placePeriodTrail, 99999)) catCount.set(c.category, (catCount.get(c.category) || 0) + 1);
     const top = raw.slice(0, 5).map((c, i) => ({
       key: String(c.category), category: c.category,
-      label: L(dict, CAT[c.category][0], CAT[c.category][1]),
+      label: L(dict, PLACE_CATEGORY_META[c.category].zh, PLACE_CATEGORY_META[c.category].en),
       pct: c.pct, min: c.totalMin, count: catCount.get(c.category) || 0,
       // 无分类(unknown)用白填充 + 中间问号;其余走莫兰迪 token 环。
       color: c.category === 'unknown' ? 'var(--sheet-opaque, #fff)' : CAT_PIE_COLORS[i],
@@ -575,21 +563,25 @@ export default function TimelineTab() {
   };
   const modeLabel = (m: 'walk' | 'drive' | 'move') => m === 'walk' ? L(dict, '步行', 'Walking') : m === 'drive' ? L(dict, '驾车', 'Driving') : L(dict, '移动', 'Move');
 
-  function saveRename() {
-    if (editRaw !== null) setPlaceAlias(editRaw, editVal);
-    setEditRaw(null); setEditVal('');
-  }
 
-  /** 当场打点证明定位:取 GPS → 反查地名 → 写入足迹 → 跳到今天。地图本来只画库里的点,没有蓝点。 */
-  async function markHereNow() {
+  /**
+   * 取系统定位 → 反查地名 → 落进足迹。
+   *
+   * bug3「反向识别具体地点失效 / 利用系统定位系统」:原来这是个手动的「标记当前位置(验证定位)」
+   * 按钮 —— 用户得自己想起来按一下,不按就永远只有历史导入的点,具体地点当然认不出来。
+   * 现在改成**进「地点」页自动跑一次**(打开定位监听 ensurePlaceTrailWatch 持续供点),
+   * 手动按钮删掉。只在失败时才出提示,成功静默(不打扰)。
+   */
+  async function markHereNow(silent = false) {
     if (locateBusy) return;
     setLocateBusy(true);
-    // 点下去立刻有可见状态(QA:定位要等 8-15s,期间毫无反馈像死按钮)
-    setLocateMsg({ ok: true, text: L(dict, '正在取定位…(最多等 15 秒;室内可能拿不到)', 'Locating… (up to 15s; may fail indoors)') });
+    // 手动触发时立刻给可见状态(定位要等 8-15s);自动跑不吵。
+    if (!silent) setLocateMsg({ ok: true, text: L(dict, '正在取定位…(最多等 15 秒;室内可能拿不到)', 'Locating… (up to 15s; may fail indoors)') });
     try {
       const { getDevicePosition, recordVisitFromCoords, ensurePlaceTrailWatch } = await import('@/lib/portal/native-geolocation');
       const pos = await getDevicePosition({ timeoutMs: 15_000, maximumAgeMs: 30_000, enableHighAccuracy: true });
       if (!pos) {
+        // 失败必须看得见(哪怕是自动跑的)—— 否则「地点认不出来」永远查不到原因。
         setLocateMsg({
           ok: false,
           text: L(dict, '拿不到坐标 — 确认系统已允许定位,到窗边/室外再试', 'No coordinates — allow Location, try near a window/outdoors'),
@@ -597,24 +589,21 @@ export default function TimelineTab() {
         return;
       }
       await recordVisitFromCoords(pos.lat, pos.lon);
-      void ensurePlaceTrailWatch();
+      void ensurePlaceTrailWatch(); // 打开系统持续定位:之后的到访自动进库,不靠用户按按钮
       setTrail(loadPlaceTrail());
-      setDayIdx(0);
-      setSub('timeline');
+      if (!silent) { setDayIdx(0); setSub('timeline'); }
       let label = `${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}`;
       try {
         const { reverseGeocode } = await import('@/lib/portal/providers/weather');
         const g = await reverseGeocode(pos.lat, pos.lon);
         label = g.label || g.city || label;
       } catch { /* 坐标也够证明 */ }
-      setLocateMsg({
-        ok: true,
-        text: L(
-          dict,
-          `已标记当前位置: ${label}（${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}）· 地图只显示足迹点,不是实时蓝点`,
-          `Marked here: ${label} (${pos.lat.toFixed(5)}, ${pos.lon.toFixed(5)}) · map shows trail points, not a live blue dot`,
-        ),
-      });
+      if (!silent) {
+        setLocateMsg({
+          ok: true,
+          text: L(dict, `记下了当前位置:${label}`, `Saved current location: ${label}`),
+        });
+      }
     } catch {
       setLocateMsg({ ok: false, text: L(dict, '定位失败,稍后再试', 'Locate failed — try again') });
     } finally {
@@ -661,19 +650,8 @@ export default function TimelineTab() {
             <span className="nesio-tl-day">{dayLabel(dateKey)}</span>
             <button type="button" className="nesio-fin-monthnav" disabled={dayIdx <= 0} onClick={() => setDayIdx((i) => Math.max(0, i - 1))} aria-label={L(dict, '后一天', 'Next day')}>›</button>
           </div>
-          <div style={{ display: 'flex', gap: '0.5rem', margin: '0 0 0.75rem', alignItems: 'stretch' }}>
-            <button
-              type="button"
-              className="nesio-ob-primary-btn"
-              style={{ flex: 1, fontSize: '0.82rem', padding: '0.55rem 0.75rem' }}
-              disabled={locateBusy}
-              onClick={() => { void markHereNow(); }}
-            >
-              {locateBusy
-                ? L(dict, '正在定位…', 'Locating…')
-                : <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}><IconMapPin size={14} />{L(dict, '标记当前位置(验证定位)', 'Mark here (prove GPS)')}</span>}
-            </button>
-          </div>
+          {/* bug3:「标记当前位置(验证定位)」按钮删掉 —— 它是调试期的自证工具,
+              定位现在由系统持续供给(见 markHereNow 仍保留给「地点纠正」用)。 */}
           {locateMsg && (
             <p
               style={{
@@ -690,13 +668,7 @@ export default function TimelineTab() {
               {locateMsg.text}
             </p>
           )}
-          <p style={{ margin: '0 0 0.85rem', fontSize: '0.72rem', color: 'var(--portal-muted)', lineHeight: 1.4 }}>
-            {L(
-              dict,
-              '地图只画「足迹库」里的到访(含 Google 时间轴导入),不是实时导航蓝点。上面 2450+ 打点多半是历史导入;要证明现在定位,请点「标记当前位置」。',
-              'The map only plots visits in your trail (including Google Timeline imports), not a live GPS blue dot. Use “Mark here” to prove current location.',
-            )}
-          </p>
+          {/* bug3:「地图只画足迹库里的到访…请点标记当前位置」这段说明按标注删掉 */}
           {/* 设计对齐 Google Timeline:驾车 · 步行 · 到访(有分模式数据就分开显示)。
               2026-07-29:图标从原生 emoji(🚗🚶📍)换成站内描边图标 —— emoji 在各平台
               长相不一,和旁边的线性图标也不是一套。 */}
@@ -770,10 +742,17 @@ export default function TimelineTab() {
           {/* ── 月度概览(Google Timeline Insights 形态):数字 + 环比 ── 「分析」并入 */}
           {monthly && (
             <div className="nesio-tl-month">
-              <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>
-                {L(dict, `${Number(monthly.current.monthKey.slice(5, 7))} 月足迹`, `${new Date(monthly.current.monthKey + '-01T00:00:00').toLocaleString('en-US', { month: 'long' })} footprint`)}
-                {monthly.prevHasData && <span className="nesio-tl-month-vs">{L(dict, ' · 对比上月', ' · vs last month')}</span>}
-              </p>
+              {/* bug3:月份左右选择器 —— 原来只能看「最近那个月」,别的月份根本进不去 */}
+              <div className="nesio-tl-month-nav">
+                <button type="button" className="nesio-tl-month-arrow" aria-label={L(dict, '上一个月', 'Previous month')}
+                  onClick={() => setMonthBack((n) => n + 1)}>‹</button>
+                <p className="nesio-settings-section-label" style={{ margin: 0 }}>
+                  {L(dict, `${Number(monthly.current.monthKey.slice(5, 7))} 月足迹`, `${new Date(monthly.current.monthKey + '-01T00:00:00').toLocaleString('en-US', { month: 'long' })} footprint`)}
+                  {monthly.prevHasData && <span className="nesio-tl-month-vs">{L(dict, ' · 对比上月', ' · vs last month')}</span>}
+                </p>
+                <button type="button" className="nesio-tl-month-arrow" aria-label={L(dict, '下一个月', 'Next month')}
+                  disabled={monthBack === 0} onClick={() => setMonthBack((n) => Math.max(0, n - 1))}>›</button>
+              </div>
               <div className="nesio-tl-month-grid">
                 {([
                   [monthly.current.places, monthly.prev.places, L(dict, '个地点', 'places')],
@@ -792,22 +771,10 @@ export default function TimelineTab() {
                   </div>
                 ))}
               </div>
-              {/* 图5:说清「到访」计的是什么(用户反馈「8 次到访指哪个数据不清晰」) */}
-              <p className="nesio-settings-option-hint" style={{ margin: '0.5rem 0 0' }}>
-                {L(dict,
-                  '地点=去过的不同地方;到访=停留计次(同一地方去多次分开算);移动=路上里程。',
-                  'Places = distinct spots visited; Visits = stop count (repeat trips counted separately); km moved = distance on the road.')}
-              </p>
+              {/* bug3:这段名词解释和下面那行「累计:…」按标注一起删掉 */}
             </div>
           )}
 
-          {highlights && (
-            <p className="nesio-settings-option-hint" style={{ marginTop: '0.4rem' }}>
-              {L(dict,
-                `累计:${highlights.totalPlaces} 个地点 · ${highlights.activeDays} 天 · ${highlights.totalKm} km · 最长连续外出 ${highlights.maxStreak} 天${highlights.countries ? ` · ${highlights.countries} 国 ${highlights.cities} 城` : ''}`,
-                `All-time: ${highlights.totalPlaces} places · ${highlights.activeDays} days · ${highlights.totalKm} km · ${highlights.maxStreak}-day streak${highlights.countries ? ` · ${highlights.countries} countries` : ''}`)}
-            </p>
-          )}
 
           {/* ── 真实地图概览(批次 59:点一下进入可缩放的「地图上的记忆」)── */}
           {mapPoints.length > 0 && (
@@ -817,29 +784,7 @@ export default function TimelineTab() {
             </button>
           )}
 
-          {/* ── 生活节奏:星期 × 时段外出热力 ── */}
-          {rhythm.max > 1 && (
-            <>
-              <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '生活节奏 · 外出时间', 'Weekly rhythm · time outside')}</p>
-              <div className="nesio-tl-rhythm">
-                <div className="nesio-tl-rhythm-col nesio-tl-rhythm-col--labels">
-                  <span />
-                  {(['清晨', '上午', '下午', '傍晚', '夜'] as const).map((zh, i) => (
-                    <span key={i} className="nesio-tl-rhythm-rowlabel">{L(dict, zh, ['Dawn', 'AM', 'PM', 'Eve', 'Night'][i])}</span>
-                  ))}
-                </div>
-                {rhythm.grid.map((col, wd) => (
-                  <div key={wd} className="nesio-tl-rhythm-col">
-                    <span className="nesio-tl-rhythm-collabel">{L(dict, ['一', '二', '三', '四', '五', '六', '日'][wd], ['M', 'T', 'W', 'T', 'F', 'S', 'S'][wd])}</span>
-                    {col.map((min, b) => (
-                      <span key={b} className="nesio-tl-rhythm-cell" style={{ opacity: min ? 0.25 + (min / rhythm.max) * 0.75 : 1, background: min ? 'var(--portal-accent)' : 'var(--portal-hairline)' }}
-                        title={`${Math.round(min / 60)}h`} />
-                    ))}
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
+          {/* bug3:「生活节奏 · 外出时间」热力格按标注划掉删除 */}
 
           {highlights && (highlights.longestStay || highlights.busiestDay || highlights.farthestDay) && (
             <>
@@ -875,35 +820,8 @@ export default function TimelineTab() {
             </>
           )}
 
-          <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '常去地点 · 点名字可纠正', 'Frequent places · tap name to fix')}</p>
-          {/* 批次 61:「找真名」手动卡撤除 —— 反查已两级自动化(天气链→服务端 geocode),
-              坐标名条目会在下一次定位时自动改名认亲,不再需要手动按钮 */}
-          <div className="nesio-tl-clusters">
-            {clusters.map((c) => (
-              <div key={c.label} className="nesio-tl-cluster">
-                <span className={`nesio-pt-dot nesio-pt-dot--${c.category}`} aria-hidden style={{ position: 'static', boxShadow: 'none' }} />
-                {editRaw === c.label ? (
-                  <input className="nesio-tl-rename-input" value={editVal} autoFocus onChange={(e) => setEditVal(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') saveRename(); if (e.key === 'Escape') { setEditRaw(null); } }} onBlur={saveRename} placeholder={pretty(c)} />
-                ) : (
-                  <button type="button" className="nesio-tl-cluster-name nesio-tl-cluster-name--btn" onClick={() => setPlacePick({ raw: c.label, lat: c.lat ?? undefined, lon: c.lon ?? undefined })}>
-                    {pretty(c)}
-                    {c.generic && displayLabel(c.label) === c.label && c.lat != null && <span className="nesio-tl-alias-orig"> · {c.lat.toFixed(2)},{c.lon!.toFixed(2)}</span>}
-                  </button>
-                )}
-                <span className="nesio-tl-cluster-meta">{fmtDur(c.totalMin)} · {L(dict, `${c.visits} 次`, `${c.visits}×`)}{c.visits > 1 ? L(dict, ` · 均 ${fmtDur(Math.round(c.totalMin / c.visits))}`, ` · avg ${fmtDur(Math.round(c.totalMin / c.visits))}`) : ''}</span>
-              </div>
-            ))}
-          </div>
-
-          <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '类别时长占比', 'Time by category')}</p>
-          <div className="nesio-tl-cats">
-            {catShare.filter((c) => c.pct > 0).map((c) => (
-              <div key={c.category} className="nesio-tl-cat">
-                <div className="nesio-tl-cat-top"><span>{L(dict, CAT[c.category][0], CAT[c.category][1])}</span><span>{c.pct}%</span></div>
-                <div className="nesio-fin-bar"><div className={`nesio-fin-bar-fill nesio-tl-catbar--${c.category}`} style={{ width: `${Math.max(3, c.pct)}%` }} /></div>
-              </div>
-            ))}
-          </div>
+          {/* bug3:「常去地点 · 点名字可纠正」与「类别时长占比」两块按标注删除。
+              地点纠正入口仍在下面「最常去」列表里(点地点即可改),没有丢功能。 */}
 
         </>
       )}
@@ -974,46 +892,9 @@ export default function TimelineTab() {
               </>
             )}
 
-            {/* 按类别浏览(保留纠正分类工具,作饼图下钻)*/}
-            <p className="nesio-settings-section-label" style={{ marginTop: '1.4rem' }}>{L(dict, '按类别浏览 · 点地点可纠正分类', 'Browse by category · tap to reclassify')}</p>
-            <div className="nesio-tl-catgrid">
-              {placeCats.map((g) => {
-                const meta = PLACE_CATEGORY_META[g.category];
-                const open = expandedCat === g.category;
-                return (
-                  <div key={g.category} className={`nesio-tl-catcard${open ? ' is-open' : ''}`}>
-                    <button type="button" className="nesio-tl-catcard-head" onClick={() => setExpandedCat(open ? null : g.category)}>
-                      <span className="nesio-tl-catcard-sym" aria-hidden>{catIconSvg(g.category)}</span>
-                      <span className="nesio-tl-catcard-name">{L(dict, meta.zh, meta.en)}</span>
-                      <span className="nesio-tl-catcard-count">{L(dict, `${g.count} 个地点`, `${g.count} places`)}</span>
-                      <span className="nesio-tl-catcard-chev">{open ? '▾' : '›'}</span>
-                    </button>
-                    {open && (
-                      <div className="nesio-tl-catcard-list">
-                        {g.places.slice(0, 30).map((c) => (
-                          <div key={c.label}>
-                            <button type="button" className="nesio-tl-catplace" onClick={() => setCatPickFor(catPickFor === c.label ? null : c.label)}>
-                              <span className="nesio-tl-catplace-name">{displayLabel(c.label)}</span>
-                              <span className="nesio-tl-catplace-meta">{L(dict, `${c.visits} 次 · ${dateKeyToLocalDate(c.lastTs.slice(0, 10)).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' })}`, `${c.visits}× · ${dateKeyToLocalDate(c.lastTs.slice(0, 10)).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`)}</span>
-                            </button>
-                            {catPickFor === c.label && (
-                              <div className="nesio-tl-catpick">
-                                {(['grocery', 'shopping', 'food', 'cafe', 'fitness', 'park', 'culture', 'education', 'entertainment', 'health', 'lodging', 'transit', 'work', 'home', 'place'] as PlaceCategory[]).map((cat) => (
-                                  <button key={cat} type="button" className="nesio-tl-catpick-chip" onClick={() => { setPlaceCategory(c.label, cat); setCatPickFor(null); }}>
-                                    {PLACE_CATEGORY_META[cat].sym} {L(dict, PLACE_CATEGORY_META[cat].zh, PLACE_CATEGORY_META[cat].en)}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                        {g.places.length > 30 && <p className="nesio-tl-catplace-more">{L(dict, `还有 ${g.places.length - 30} 个…`, `+${g.places.length - 30} more…`)}</p>}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            {/* bug3:「按类别浏览 · 点地点可纠正分类」整块按标注删掉 ——
+                环形图本身就是按类别的入口(点一块就下钻),这里是重复的第二套。
+                纠正分类的入口保留在饼图下钻出来的「最常去」列表里。 */}
           </>
         )
       )}
@@ -1032,7 +913,7 @@ export default function TimelineTab() {
             size={300}
             onTap={() => setGlobeFull(true)}
           />
-          <span className="nesio-globe-stage-hint">{L(dict, '拖动旋转 · 点一下全屏', 'Drag to spin · tap for fullscreen')}</span>
+          {/* bug3:「拖动旋转 · 点一下全屏」这行字删掉 —— 地球本来就会转,点了就全屏 */}
         </div>
       )}
       {sub === 'world' && !worldCountry && worldHighlights.length > 0 && (
@@ -1042,31 +923,16 @@ export default function TimelineTab() {
               <span className="nesio-globe-hl-kicker">{h.kicker}</span>
               <span className="nesio-globe-hl-main">{h.main}</span>
               {h.sub ? <span className="nesio-globe-hl-sub">{h.sub}</span> : null}
-              {h.coord ? <span className="nesio-globe-hl-coord">{h.coord}</span> : null}
+              {/* bug3:经纬度删掉 —— 「N35°48′ W78°50′」对人没有意义,地名和城市已经在上面两行 */}
             </div>
           ))}
         </div>
       )}
-      {/* 完成的行程沉在「世界」—— 点「完成 · 进世界」后出现在这里 */}
-      {sub === 'world' && doneTrips.length > 0 && (
-        <div className="nesio-travel-done">
-          <p className="nesio-settings-section-label">{L(dict, '完成的行程', 'Completed trips')}</p>
-          <ul className="nesio-travel-done-list">
-            {doneTrips.slice(0, 12).map((t) => (
-              <li key={t.id}>
-                <button type="button" className="nesio-travel-done-chip" onClick={() => setOpenDoneTripId(t.id)}>
-                  <IconPlane size={14} />
-                  <span>{t.title}</span>
-                  <small>{t.endDate}</small>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* bug3:「完成的行程」整块按标注删掉 —— 行程走完就是足迹本身,
+          不需要在世界页再摆一排 chip(「完成 · 进世界」那颗按钮也一起删了)。 */}
 
       {/* ── 世界(设计稿④):先国家卡,点 › 进城市明信片 ── */}
-      {sub === 'world' && world.length === 0 && doneTrips.length === 0 && (
+      {sub === 'world' && world.length === 0 && (
         <p className="nesio-insights-empty">{L(dict, '还没有国家信息。开着「记忆自动定位」正常使用,地名和国家会随打点自动解析,这里就会按国家聚合。', 'No country data yet. Keep auto-locate on — places and countries resolve as you go, and countries gather here.')}</p>
       )}
       {sub === 'world' && world.length > 0 && !worldCountry && (
@@ -1142,7 +1008,7 @@ export default function TimelineTab() {
         );
       })()}
 
-      <p className="nesio-place-trail-count">{L(dict, `共 ${trail.length} 个打点`, `${trail.length} points total`)}</p>
+      {/* bug3:底部「共 N 个打点」删掉 —— 上面每一块已经各自报数,这一行只是重复 */}
 
       {/* 批次 59:地图上的记忆(全屏可缩放) */}
       <MemoryMapSheet open={memMapOpen} onClose={() => setMemMapOpen(false)} />
@@ -1240,11 +1106,6 @@ export default function TimelineTab() {
           elevated:本页在洞察(fullscreen,z-930)里,详情是 bottom 卡(901)—— 不抬层会被整个盖住。 */}
       {visitSel && <MemoryNodeDetail node={visitSel} elevated onClose={() => setVisitSel(null)} />}
 
-      <TripTimelineSheet
-        tripId={openDoneTripId}
-        open={Boolean(openDoneTripId)}
-        onClose={() => setOpenDoneTripId(null)}
-      />
     </div>
   );
 }

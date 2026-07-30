@@ -1,30 +1,26 @@
 'use client';
 
 /**
- * HangNoteSheet — 「挂一条」(设计稿:挂在 TA 身上)。从人物页 + 挂一条打开,范围锁定这个人。
+ * HangNoteSheet — 给一个人记一条(从人物页的「记录」打开,范围锁定这个人)。
  *
- * 两态:
- *  · 起手 —— 说一句 / 拍传,不先填表(也可「手动填」)。念念自动归类、认日期、贴标签。
- *  · 确认卡 —— 念念认出来 → 提取标题 + 念念贴的标签(分类 + 日期)+ 敏感项自动只存本机 → 挂到 TA。
+ * bug3 之前这里是两态:先「说一句 / 拍传」让云端 AI 抽取 → 再看确认卡。用户把起手页整页划掉,
+ * 要求「直接进入手动输入」——所以现在只有一态:分类 chip + 一个输入框 + 一个加号(传照片/文件)
+ * + 确认。零云调用 —— 云端人物抽取路由这里不再调(契约测试钉死,免得悄悄接回来)。
  *
- * 功能以现有为准:AI 提取走 /api/portal/person-extract(guardAiRoute);落库走 addPersonRecord;
- * 敏感三类(医疗/药物/健康)由 person-records 的 sensitive 标决定「只存本机、不进 AI/洞察」。
+ * 附件是唯一副本:走 local-file-store(IndexedDB),写失败必须可见,不静默丢。
  */
 import { useRef, useState } from 'react';
 import {
   addPersonRecord, RECORD_CATEGORIES, RECORD_CATEGORY_MAP,
-  type PersonRecordCategory,
+  type PersonRecordCategory, type PersonRecordAttachment,
 } from '@/lib/portal/person-records';
-import { imageToDataUrl } from '@/lib/portal/image-util';
+import { putLocalFile, prettyBytes, MAX_FILE_BYTES } from '@/lib/portal/local-file-store';
 import { RecordCatIcon } from './record-icons';
-import { IconMic, IconCamera, IconLock } from '../icons';
+import { IconPlus } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import NesioSheet from '../ui/NesioSheet';
-import { guardPaidCloudAi } from '@/lib/portal/entitlement';
-
-type Extracted = { category: PersonRecordCategory; title: string; detail?: string; date?: string; amount?: number };
 
 interface Props {
   personKey: string;
@@ -36,186 +32,133 @@ interface Props {
 
 export default function HangNoteSheet({ personKey, personName, subtitle, avatarInitial, onClose }: Props) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  const [category, setCategory] = useState<PersonRecordCategory>('achievement');
   const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [files, setFiles] = useState<PersonRecordAttachment[]>([]);
   const [err, setErr] = useState<string | null>(null);
-  const [pending, setPending] = useState<Extracted[] | null>(null);
-  const [manual, setManual] = useState(false);
-  const [form, setForm] = useState<{ category: PersonRecordCategory; title: string; detail: string; date: string; amount: string }>(
-    { category: 'achievement', title: '', detail: '', date: '', amount: '' },
-  );
+  const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
-  const photoRef = useRef<HTMLInputElement>(null);
+  const pickRef = useRef<HTMLInputElement>(null);
 
-  const doExtract = async (payload: { text?: string; image?: string }) => {
-    if (!guardPaidCloudAi('person_extract')) return; // 安全审计 #2:AI 抽取付费云,免费→升级引导
-    setErr(null); setBusy(true); setPending(null);
-    try {
-      const res = await fetch('/api/portal/person-extract', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
-      });
-      const data = await res.json().catch(() => null) as { ok?: boolean; records?: Extracted[] } | null;
-      if (!res.ok || !data?.ok) throw new Error('extract_failed');
-      const recs = Array.isArray(data.records) ? data.records : [];
-      if (!recs.length) { setErr(L(dict, '没认出可记录的信息,换个说法/清晰点的照片,或手动填。', "Couldn't find anything to log — rephrase, use a clearer photo, or fill it in manually.")); return; }
-      setPending(recs);
-    } catch {
-      setErr(L(dict, '识别没成功,稍后再试,或手动填。', "Couldn't process that — try again, or fill it in manually."));
-    } finally { setBusy(false); }
-  };
-  const runText = () => { const t = text.trim(); if (t && !busy) void doExtract({ text: t }); };
-  const onPickPhoto = async (file: File | undefined) => {
-    if (!file || busy) return;
-    setErr(null); setBusy(true); setPending(null);
-    try {
-      const image = await imageToDataUrl(file);
-      await doExtract({ image, ...(text.trim() ? { text: text.trim() } : {}) });
-    } catch {
-      setErr(L(dict, '这张图没能读取,换一张再试。', "Couldn't read that image — try another."));
-      setBusy(false);
+  const meta = RECORD_CATEGORY_MAP[category];
+
+  const onPick = async (list: FileList | null) => {
+    const picked = Array.from(list || []);
+    if (!picked.length) return;
+    setErr(null);
+    setBusy(true);
+    const added: PersonRecordAttachment[] = [];
+    for (const f of picked) {
+      if (f.size > MAX_FILE_BYTES) {
+        setErr(L(dict, `「${f.name}」有 ${prettyBytes(f.size)},超过 ${prettyBytes(MAX_FILE_BYTES)} 上限,换个小一点的。`,
+          `“${f.name}” is ${prettyBytes(f.size)} — over the ${prettyBytes(MAX_FILE_BYTES)} limit.`));
+        continue;
+      }
+      const assetId = `pr-att-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+      const ok = await putLocalFile(assetId, f, { name: f.name, mimeType: f.type || 'application/octet-stream', size: f.size });
+      // 红线:存不进就说出来,别在列表里挂一个指向空气的附件。
+      if (!ok) {
+        setErr(L(dict, `「${f.name}」没能存进本机 —— 可能空间满了,清点空间再试。`, `Couldn't store “${f.name}” — device storage may be full.`));
+        continue;
+      }
+      added.push({ assetId, name: f.name, mimeType: f.type || 'application/octet-stream', size: f.size });
     }
+    if (added.length) setFiles((prev) => [...prev, ...added]);
+    setBusy(false);
   };
 
-  const done = () => { setSaved(true); window.setTimeout(onClose, 900); };
-  const savePending = () => {
-    if (!pending) return;
-    for (const r of pending) {
-      addPersonRecord({ personKey, category: r.category, title: r.title,
-        ...(r.detail ? { detail: r.detail } : {}), ...(r.date ? { date: r.date } : {}),
-        ...(typeof r.amount === 'number' ? { amount: r.amount } : {}) });
-    }
-    done();
-  };
-  const saveManual = () => {
-    const title = form.title.trim();
+  const save = () => {
+    const title = text.trim();
     if (!title) return;
-    addPersonRecord({ personKey, category: form.category, title,
-      ...(form.detail.trim() ? { detail: form.detail.trim() } : {}),
-      ...(form.date ? { date: form.date } : {}),
-      ...(form.amount && !Number.isNaN(Number(form.amount)) ? { amount: Number(form.amount) } : {}) });
-    done();
+    addPersonRecord({
+      personKey, category, title,
+      ...(meta.money && amount && !Number.isNaN(Number(amount)) ? { amount: Number(amount) } : {}),
+      ...(files.length ? { attachments: files } : {}),
+    });
+    setSaved(true);
+    window.setTimeout(onClose, 900);
   };
-
-  const setPendingCategory = (i: number, cat: PersonRecordCategory) =>
-    setPending((prev) => prev ? prev.map((r, j) => (j === i ? { ...r, category: cat } : r)) : prev);
-  const anySensitive = pending?.some((r) => RECORD_CATEGORY_MAP[r.category].sensitive) || (manual && RECORD_CATEGORY_MAP[form.category].sensitive);
 
   return (
-    // elevated:这张卡是从「关系详情」(它自己就是 elevated=941,又开在洞察 fullscreen 里)
-    // 再点开的 —— 留在 bottom 档(901)会被上面两层一起盖住,表现成「点了没反应」。
+    // elevated:这张卡从「关系详情」(自己就是 elevated,又开在洞察 fullscreen 里)再点开。
+    // blurOverlay:bug3 要求打开后背后背景虚化。
     <NesioSheet
       variant="bottom"
       elevated
+      blurOverlay
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
       card={false}
       className="nesio-settings-sheet-card nesio-hang-card"
-      ariaLabel={L(dict, `挂在 ${personName} 身上`, `Attach to ${personName}`)}
+      ariaLabel={L(dict, `记一条给 ${personName}`, `Log for ${personName}`)}
     >
-
-        {/* 头:挂在 TA 身上 */}
-        <div className="nesio-hang-head">
-          <span className="nesio-hang-avatar" aria-hidden>{avatarInitial || Array.from(personName.trim())[0] || '·'}</span>
-          <div className="nesio-hang-head-id">
-            <p className="nesio-hang-head-title">{L(dict, `挂在 ${personName} 身上`, `Attach to ${personName}`)}</p>
-            {subtitle && <p className="nesio-hang-head-sub">{subtitle}</p>}
-          </div>
+      {/* 头:只显示名字(bug3:原来是「挂在 X 身上」,啰嗦) */}
+      <div className="nesio-hang-head">
+        <span className="nesio-hang-avatar" aria-hidden>{avatarInitial || Array.from(personName.trim())[0] || '·'}</span>
+        <div className="nesio-hang-head-id">
+          <p className="nesio-hang-head-title">{personName}</p>
+          {subtitle && <p className="nesio-hang-head-sub">{subtitle}</p>}
         </div>
+      </div>
 
-        {saved ? (
-          <p className="nesio-hang-saved">{L(dict, `记到 ${personName} 身上了`, `Saved to ${personName}`)}</p>
-        ) : pending ? (
-          <>
-            {/* 念念确认语 */}
-            <p className="nesio-hang-nessa">
-              <span className="nesio-hang-nessa-kicker">{L(dict, '念念', 'Nessa')}</span>
-              {L(dict,
-                `记到 ${personName} 身上了。${anySensitive ? '健康项只你可见、不进 AI。' : '我已经归好类了。'}`,
-                `Saving to ${personName}.${anySensitive ? ' Health items stay private to you, never sent to AI.' : ' Sorted and dated.'}`)}
-            </p>
-            {pending.map((r, i) => {
-              const meta = RECORD_CATEGORY_MAP[r.category];
-              return (
-                <div key={i} className="nesio-hang-confirm">
-                  <span className="nesio-hang-confirm-badge">{L(dict, '说一句 · 刚刚', 'Just now')}</span>
-                  <p className="nesio-hang-confirm-title">{r.title}{typeof r.amount === 'number' ? ` · ${r.amount}` : ''}</p>
-                  <p className="nesio-hang-confirm-tagline">{L(dict, '— 念念贴的', '— tagged by Nessa')}</p>
-                  <div className="nesio-hang-tags">
-                    {/* 分类 chip:点循环换类(错了一眼改) */}
-                    <button type="button" className={`nesio-hang-tag nesio-hang-tag--cat${meta.sensitive ? ' is-sensitive' : ''}`}
-                      onClick={() => { const list = RECORD_CATEGORIES; const idx = list.findIndex((x) => x.key === r.category); setPendingCategory(i, list[(idx + 1) % list.length].key); }}>
-                      <RecordCatIcon category={r.category} size={12} /> {L(dict, meta.zh, meta.en)}
-                    </button>
-                    {r.date && <span className="nesio-hang-tag"># {r.date}</span>}
-                  </div>
-                  <div className="nesio-hang-lock">
-                    <IconLock size={12} />
-                    {meta.sensitive
-                      ? L(dict, `${meta.zh} · 仅你可见,不进 AI`, `${meta.en} · only you, never sent to AI`)
-                      : L(dict, `${meta.zh} · 存进 TA 的档案`, `${meta.en} · to their profile`)}
-                  </div>
-                </div>
-              );
-            })}
-            <button type="button" className="nesio-ob-primary-btn nesio-hang-primary" onClick={savePending}>
-              {L(dict, `挂到 ${personName} 身上`, `Attach to ${personName}`)}
+      {saved ? (
+        <p className="nesio-hang-saved">{L(dict, `记到 ${personName} 身上了`, `Saved to ${personName}`)}</p>
+      ) : (
+        <div className="nesio-hang-body">
+          <div className="nesio-rel-chips">
+            {RECORD_CATEGORIES.map((cat) => (
+              <button key={cat.key} type="button"
+                className={`nesio-rel-chip${category === cat.key ? ' nesio-rel-chip--on' : ''}`}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                onClick={() => setCategory(cat.key)}>
+                <RecordCatIcon category={cat.key} size={13} /> {L(dict, cat.zh, cat.en)}
+              </button>
+            ))}
+          </div>
+
+          {/* 一个输入框 + 一个加号(传照片 / 文件) */}
+          <div className="nesio-ct-field-row">
+            <input className="nesio-rel-rec-input" style={{ flex: 1, minWidth: 0 }}
+              value={text} maxLength={120} autoFocus
+              placeholder={L(dict, '记一条', 'Log something')}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' && text.trim()) save(); }} />
+            <button type="button" className="nesio-ct-field-act" disabled={busy}
+              onClick={() => pickRef.current?.click()}
+              aria-label={L(dict, '传照片或文件', 'Attach photo or file')}
+              title={L(dict, '传照片或文件', 'Attach photo or file')}>
+              <IconPlus size={16} />
             </button>
-            <button type="button" className="nesio-hang-redo" onClick={() => { setPending(null); }}>{L(dict, '改一下 ›', 'Redo ›')}</button>
-          </>
-        ) : manual ? (
-          <div className="nesio-hang-body">
-            <div className="nesio-rel-chips">
-              {RECORD_CATEGORIES.map((cat) => (
-                <button key={cat.key} type="button"
-                  className={`nesio-rel-chip${form.category === cat.key ? ' nesio-rel-chip--on' : ''}`}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
-                  onClick={() => setForm((f) => ({ ...f, category: cat.key }))}>
-                  <RecordCatIcon category={cat.key} size={13} /> {L(dict, cat.zh, cat.en)}
-                </button>
+          </div>
+          <input ref={pickRef} type="file" multiple accept="image/*,application/pdf" className="nesio-visually-hidden"
+            onChange={(e) => { void onPick(e.target.files); e.currentTarget.value = ''; }} />
+
+          {meta.money && (
+            <input className="nesio-rel-rec-input" type="number" inputMode="decimal"
+              placeholder={L(dict, '金额', 'Amount')} value={amount} onChange={(e) => setAmount(e.target.value)} />
+          )}
+
+          {files.length > 0 && (
+            <ul className="nesio-hang-att-list">
+              {files.map((f) => (
+                <li key={f.assetId} className="nesio-hang-att">
+                  <span className="nesio-hang-att-name">{f.name}</span>
+                  <span className="nesio-hang-att-size">{prettyBytes(f.size)}</span>
+                  <button type="button" className="nesio-rel-rec-del" aria-label={L(dict, '移除', 'Remove')}
+                    onClick={() => setFiles((prev) => prev.filter((x) => x.assetId !== f.assetId))}>✕</button>
+                </li>
               ))}
-            </div>
-            <input className="nesio-rel-rec-input" placeholder={L(dict, '标题(如「期末年级第一」)', 'Title')} value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} />
-            <input className="nesio-rel-rec-input" placeholder={L(dict, '备注(可选)', 'Note (optional)')} value={form.detail} onChange={(e) => setForm((f) => ({ ...f, detail: e.target.value }))} />
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <input className="nesio-rel-rec-input" type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} style={{ flex: 1 }} />
-              {RECORD_CATEGORY_MAP[form.category].money && (
-                <input className="nesio-rel-rec-input" type="number" inputMode="decimal" placeholder={L(dict, '金额', 'Amount')} value={form.amount} onChange={(e) => setForm((f) => ({ ...f, amount: e.target.value }))} style={{ flex: 1 }} />
-              )}
-            </div>
-            {RECORD_CATEGORY_MAP[form.category].sensitive && (
-              <div className="nesio-hang-lock"><IconLock size={12} />{L(dict, '敏感信息:仅你可见 · 跨端同步 · 不进 AI', 'Sensitive — only you, synced across your devices, never sent to AI')}</div>
-            )}
-            <button type="button" className="nesio-ob-primary-btn nesio-hang-primary" onClick={saveManual}>{L(dict, `挂到 ${personName} 身上`, `Attach to ${personName}`)}</button>
-            <button type="button" className="nesio-hang-redo" onClick={() => setManual(false)}>{L(dict, '‹ 用说的', '‹ Speak instead')}</button>
-          </div>
-        ) : (
-          <div className="nesio-hang-body">
-            <p className="nesio-hang-nessa">
-              <span className="nesio-hang-nessa-kicker">{L(dict, '念念', 'Nessa')}</span>
-              {L(dict, `说一句关于 ${personName} 的事就行,我来归类、认日期。`, `Just say something about ${personName} — I'll sort and date it.`)}
-            </p>
-            <div className="nesio-hang-input-card">
-              <textarea
-                className="nesio-hang-input" rows={2}
-                placeholder={L(dict, '如「期末年级第一 6月2日」「爸爸每天一片氨氯地平」…', 'e.g. "1st in grade, Jun 2", "one amlodipine daily"…')}
-                value={text} onChange={(e) => setText(e.target.value)}
-              />
-              <div className="nesio-hang-cap-row">
-                <button type="button" className="nesio-hang-cap nesio-hang-cap--primary" onClick={runText} disabled={busy}>
-                  <IconMic size={16} />{busy ? L(dict, '识别中…', 'Reading…') : L(dict, '说一句', 'Speak')}
-                </button>
-                <button type="button" className="nesio-hang-cap" onClick={() => photoRef.current?.click()} disabled={busy}>
-                  <IconCamera size={16} />{L(dict, '拍 / 传', 'Photo')}
-                </button>
-              </div>
-              <input ref={photoRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden"
-                onChange={(e) => { void onPickPhoto(e.target.files?.[0]); e.currentTarget.value = ''; }} />
-            </div>
-            {err && <p className="nesio-rel-detail-err" role="alert">{err}</p>}
-            <div className="nesio-hang-lock nesio-hang-lock--foot"><IconLock size={12} />{L(dict, '敏感项(医疗 / 药物 / 健康)仅你可见 · 不进 AI', 'Sensitive (medical / medication / health) — only you, never sent to AI')}</div>
-            <button type="button" className="nesio-hang-redo" onClick={() => setManual(true)}>{L(dict, '想自己填? 手动填 ›', 'Prefer to type it? Fill in manually ›')}</button>
-          </div>
-        )}
+            </ul>
+          )}
+
+          {err && <p className="nesio-rel-detail-err" role="alert">{err}</p>}
+
+          <button type="button" className="nesio-ob-primary-btn nesio-hang-primary" disabled={busy || !text.trim()} onClick={save}>
+            {L(dict, '确认', 'Confirm')}
+          </button>
+        </div>
+      )}
     </NesioSheet>
   );
 }

@@ -46,8 +46,9 @@ function prevMonthKey(monthKey: string): string {
 /**
  * 月度足迹概览 + 环比。
  * 「本月」取**最近一个有数据的月份**(导入历史停在过去时也能看),不是空的当前日历月。
+ * monthOffset:0 = 那个锚定月;1 = 再往前一个月……(bug3 的左右月份选择器)。
  */
-export function monthlyPlaceComparison(visits: PlaceVisit[]): MonthlyComparison | null {
+export function monthlyPlaceComparison(visits: PlaceVisit[], monthOffset = 0): MonthlyComparison | null {
   const days = buildPlaceTimeline(visits, 3650);
   if (!days.length) return null;
 
@@ -65,7 +66,10 @@ export function monthlyPlaceComparison(visits: PlaceVisit[]): MonthlyComparison 
   // 锚定真实当前月(QA:标题拿「最新有数据的那天」当本月 —— 8 月没数据时还写「7月足迹」)
   const nowD = new Date();
   const realNow = `${nowD.getFullYear()}-${String(nowD.getMonth() + 1).padStart(2, '0')}`;
-  const currentKey = realNow >= monthOf(days[0].dateKey) ? realNow : monthOf(days[0].dateKey);
+  const anchorKey = realNow >= monthOf(days[0].dateKey) ? realNow : monthOf(days[0].dateKey);
+  // bug3:「7 月足迹」要能左右翻月 —— offset 从锚定月往回数几个月。
+  let currentKey = anchorKey;
+  for (let i = 0; i < Math.max(0, Math.trunc(monthOffset)); i++) currentKey = prevMonthKey(currentKey);
   const prevKey = prevMonthKey(currentKey);
 
   const collect = (mk: string): MonthPlaceStats => {

@@ -108,8 +108,19 @@ export function suggestPoisForDestination(destination: string, opts?: {
 }): TravelPoi[] {
   const limit = opts?.limit ?? 24;
   const type = opts?.type || 'all';
-  const q = (opts?.query || '').trim().toLowerCase();
-  const city = matchCityKey(destination);
+  const rawQ = (opts?.query || '').trim();
+  const q = rawQ.toLowerCase();
+  /**
+   * bug3「无下拉框选项,我们已经有本地景点数据」的根因:
+   * 离线包里的景点名是英文/罗马字(「Kiyomizu-dera」),用户搜的是中文(「京都」)——
+   * 名字里当然一个都不包含,于是一条都出不来,看着像「没有下拉选项」。
+   * 修法:先把搜索词当**城市**认(matchCityKey 认中文/日文/罗马字别名)。认出来就按那座城市
+   * 的圈子给候选,不再要求名字包含搜索词;认不出来才退回按名字包含。
+   */
+  const queryCity = rawQ ? matchCityKey(rawQ) : null;
+  const city = queryCity || matchCityKey(destination);
+  // 搜索词命中城市时,名字匹配这一条不再生效(否则「京都」还是把 Kyoto 的景点全滤掉)
+  const nameQuery = queryCity ? '' : q;
   const pool: TravelPoi[] =
     city === 'tokyo' && tokyoCache?.length
       ? tokyoCache
@@ -125,9 +136,9 @@ export function suggestPoisForDestination(destination: string, opts?: {
       score = 500;
     }
     if (type !== 'all' && p.type !== type) score += 5000;
-    if (q) {
+    if (nameQuery) {
       const hay = `${p.name} ${p.type || ''} ${p.country || ''}`.toLowerCase();
-      if (!hay.includes(q)) score += 8000;
+      if (!hay.includes(nameQuery)) score += 8000;
       else score -= 50;
     }
     // 联合国教科文/名所略抬

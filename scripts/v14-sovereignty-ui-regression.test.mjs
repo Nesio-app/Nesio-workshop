@@ -18,7 +18,9 @@ const todayFeed = [
   // Today 表面文案已入 i18n 字典(REG-004),文案断言随之覆盖字典
   read('lib/portal/i18n.ts'),
 ].join('\n');
-// TellNesioSheet 已在 main 9bf0c5a8(今天页三处删改:中间键直达相机)删除 —— 扇形入口断言随之退役。
+// TellNesioSheet(中间键的扇形中转层)已在 9bf0c5a8 整体删除 —— 中间键现在直达相机,
+// 不再有「先弹三个扇形选项」这一层。扇形入口的那几条文案/强调色断言随之退役,
+// 改为反向钉住它不许回来(见下方 existsSync 断言 + today-capture-flow 契约)。
 const voiceSheet = read('components/portal/VoiceInputSheet.tsx');
 const profileCard = read('components/portal/NesioProfileCard.tsx');
 const loginPage = read('components/portal/LoginPageClient.tsx');
@@ -83,15 +85,13 @@ assert.match(
   /x-baohe-access-mode['"]\s*:\s*['"]personal_lab|personal_lab/,
   'Camera image analysis should request lab AI when lab mode is enabled.',
 );
+// 匿名门从路由自己的 ai_auth_required 分支收进了 guardAiRoute:它在 handler 第一行
+// 就验真会话(不过就 401),所以「匿名时不许假装识别」现在由「进不来」保证。
+// 断言随之改成钉住这道门确实在最前面 —— 别把它挪到 body 解析/云调用之后。
 assert.match(
   analyzeRoute,
-  /ai_auth_required/,
-  'Analyze API must not silently run fake image extraction when anonymous AI is blocked.',
-);
-assert.match(
-  analyzeRoute,
-  /isPortalRequestAuthorized/,
-  'Analyze API should verify real session via isPortalRequestAuthorized while anonymous calls remain gated.',
+  /export async function POST\(req: NextRequest\) \{[\s\S]{0,300}?await guardAiRoute\(req, 'analyze'/,
+  'Analyze API must gate on guardAiRoute before doing any work (no fake extraction for anonymous callers).',
 );
 
 assert.match(
@@ -134,10 +134,13 @@ assert.doesNotMatch(todayFeed, /nesio-today-brand-name">Nesio/, 'Today header sh
 assert.match(bottomNav, /onPointerDown=\{startPress\}/, 'Center N button must expose long-press ask behavior.');
 assert.match(bottomNav, /问一问|长按/, 'Center N button must document the long-press ask affordance.');
 assert.match(bottomNav, /draggable=\{false\}|onContextMenu=\{\(e\) => e\.preventDefault\(\)\}/, 'Center N image must suppress iOS image callout/share sheet during long press.');
-// Fan label evolved 上传 → 分析文件 → 分享 → 收进来(批次 99 设计规范 v1 命名:
-// 「分享」是别处的系统词,宝盒是替你收着 —— 视角站在盒子这边,收成「收进来/Keep」)。
-// Design evolved: 说一句 is the primary capture action and carries an
-// explicit accent (accent: true). Guarded intent now: at most ONE accent.
+// 扇形三动作(说一句 / 拍一下 / 收进来 + 只许一个强调色)随 TellNesioSheet 一起废除 ——
+// 中间键直达相机,没有中转层就没有扇形。原意图「中间键只有一个主动作」现在由
+// today-capture-flow 契约(TellNesioSheet 不许存在)+ 下面的 bottomNav 断言承担。
+assert.ok(
+  !fs.existsSync(new URL('../components/portal/TellNesioSheet.tsx', import.meta.url)),
+  '中间键的扇形中转层已删除,不许回来(否则两套交互并存)',
+);
 assert.match(voiceSheet, /setTimeout\(\(\) => inputRef\.current\?\.focus\(\),\s*120\)/, 'Voice and Ask sheets should focus typed input first.');
 // 2026-07-04 批次 2:说一句 sheet 的会议记录入口按用户指示整体移除(会议记录只从 Today 焦点卡进入);
 // 原守护意图「Ask 模式不得出现会议记录入口」由入口不存在自动满足。

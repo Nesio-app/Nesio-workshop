@@ -6,13 +6,15 @@
 
 import { useState } from 'react';
 import {
-  refreshPackingAgainstInventory, pushPackingNeedsToShopping,
+  pushPackingNeedsToShopping,
   setFlightCheckInReminder, hasFlightCheckInReminder, armTravelReceiptCapture,
-  generatePackingList, recomputeBudgetNode, updateNode,
+  generatePackingList, recomputeBudgetNode, updateNode, setCategoryBudget, removeTripNode,
   type TripNode, type FlightPayload, type HotelPayload,
-  type ShoppingPayload, type PackingPayload, type BudgetPayload, type PoiPayload,
+  type ShoppingPayload, type PackingPayload, type BudgetPayload, type PoiPayload, type TodoPayload,
 } from '@/lib/portal/travel-trips';
 import { poiTypeLabel } from '@/lib/portal/travel-poi';
+import { listInventoryItems } from '@/lib/portal/inventory';
+import SnapButton from '../SnapButton';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -92,15 +94,23 @@ export function HotelDetail({ hotel, dict }: { hotel: HotelPayload; dict: string
   const searchMaps = hotel.address || hotel.name
     ? `https://www.openstreetmap.org/search?query=${encodeURIComponent(hotel.address || hotel.name)}`
     : null;
+  // bug3「地图没有显示」根因:没坐标时只给一块可点的假地图 —— 而订票导入拆出来的酒店
+  // 十有八九没有 lat/lon。改成用地址/名字当查询直接嵌一张 OSM 图(mlat/mlon 缺失时
+  // OSM 的 embed 需要 bbox,所以这里退一步用 search 页嵌入),点进去还是系统地图。
+  const query = (hotel.address || hotel.name || '').trim();
 
   return (
     <div className="nesio-trip-detail">
       {osmEmbed ? (
         <iframe className="nesio-trip-map" title={hotel.name} src={osmEmbed} loading="lazy" />
       ) : (
-        <a className="nesio-trip-mapfake" href={searchMaps || mapsUrl || '#'} target="_blank" rel="noreferrer">
+        <a className="nesio-trip-mapfake" href={mapsUrl || searchMaps || '#'} target="_blank" rel="noreferrer">
           <IconMapPin size={32} />
           <span>{L(dict, '在地图里看位置', 'Open in maps')}</span>
+          {/* 地址太粗(只有「北京」这种)时说清楚为什么没有小地图 —— 别让它像坏了 */}
+          {query.length > 0 && query.length <= 4 && (
+            <small>{L(dict, '地址只到城市 —— 补上街道就能显示小地图', 'Address is city-level — add the street to show a mini map')}</small>
+          )}
         </a>
       )}
       <div className="nesio-trip-card">
@@ -160,16 +170,10 @@ export function ShoppingDetail({
           </div>
         ))}
       </div>
-      <button
-        type="button"
-        className="nesio-trip-primary"
-        onClick={() => {
-          armTravelReceiptCapture(tripId);
-          window.dispatchEvent(new CustomEvent('nesio-open-camera'));
-        }}
-      >
+      <SnapButton className="nesio-trip-primary" beforeOpen={() => armTravelReceiptCapture(tripId)}
+        ariaLabel={L(dict, '拍小票 · 记入本行程', 'Snap receipt · add to trip')}>
         <IconCamera size={16} /> {L(dict, '拍小票 · 记入本行程', 'Snap receipt · add to trip')}
-      </button>
+      </SnapButton>
     </div>
   );
 }
@@ -181,10 +185,35 @@ export function PackingDetail({
 }) {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [openNeed, setOpenNeed] = useState<string | null>(null);
   const needs = packing.items.filter((i) => i.status === 'need');
 
-  function refresh() {
-    refreshPackingAgainstInventory(tripId, nodeId);
+  /** 物品库里名字相近的候选(纯本地字符串包含,零云)。 */
+  function candidates(name: string): Array<{ id: string; name: string; location: string }> {
+    const q = name.trim().toLowerCase();
+    if (!q) return [];
+    const keys = q.split(/[\s/、,,]+/).filter((k) => k.length >= 2);
+    return listInventoryItems()
+      .filter((i) => {
+        const n = i.name.trim().toLowerCase();
+        return n.includes(q) || q.includes(n) || keys.some((k) => n.includes(k));
+      })
+      .slice(0, 8)
+      .map((i) => ({ id: i.id, name: i.name, location: i.location || '' }));
+  }
+
+  /** 「就是这个」:把这一项标成已有 + 记下位置(以后自动对照就能对上这个名字)。 */
+  function markHave(needName: string, invName: string, place: string) {
+    const items = packing.items.map((it) => (it.name === needName
+      ? { ...it, status: 'have' as const, name: invName, ...(place ? { place } : {}) }
+      : it));
+    const needN = items.filter((i) => i.status === 'need').length;
+    updateNode(tripId, nodeId, {
+      subtitle: needN > 0 ? `${items.length} 样 · ${needN} 样需买` : `${items.length} 样 · 齐了`,
+      state: needN > 0 ? 'todo' : 'booked',
+      payload: { kind: 'packing', packing: { ...packing, items } },
+    });
+    setOpenNeed(null);
     onChanged();
   }
 
@@ -193,10 +222,10 @@ export function PackingDetail({
     try {
       const n = pushPackingNeedsToShopping(tripId, nodeId);
       setMsg(n > 0
-        ? L(dict, `已把「需买」${n} 样存进购物清单`, `Saved ${n} “to buy” items to shopping list`)
+        ? L(dict, `记下了 ${n} 样要买的`, `Saved ${n} items to buy`)
         : L(dict, '没有需买的', 'Nothing to buy'));
     } catch {
-      setErr(L(dict, '没存进购物清单,再试一次', 'Could not save to shopping list — try again'));
+      setErr(L(dict, '没存进去,再试一次', 'Could not save — try again'));
     }
   }
 
@@ -210,30 +239,61 @@ export function PackingDetail({
       {packing.summary && (
         <div className="nesio-trip-banner nesio-trip-banner--gentle">{packing.summary}</div>
       )}
-      <p className="nesio-trip-detail-lede">{L(dict, '要带 · need − have', 'To bring · need − have')}</p>
+      {/* bug3:「要带 · need − have」这行删掉(清单本身就是要带的);每一项按物品库显示
+          「需买」或者「在哪」,不再需要「对照物品库」按钮 —— 生成时已自动对照。 */}
       <div className="nesio-trip-card nesio-trip-card--list">
         {packing.items.map((it, i) => (
           <div key={i} className="nesio-trip-pack-row">
             <div className="nesio-trip-shop-main">
               <b>{it.name}{it.reason ? `(${it.reason})` : ''}</b>
-              {it.status === 'need' && <small>{L(dict, '物品里没有', 'Not in inventory')}</small>}
+              {it.status === 'have' && it.place && <small>{it.place}</small>}
             </div>
-            <span className={`nesio-trip-tag${it.status === 'have' ? ' is-have' : ' is-need'}`}>
-              {it.status === 'have' ? L(dict, '已有', 'Have') : L(dict, '需买', 'To buy')}
-            </span>
+            {it.status === 'need' ? (
+              /* bug3:「需买」可点 —— 点开在最下面给候选清单(同名物品/相近物品) */
+              <button type="button" className="nesio-trip-tag is-need" aria-expanded={openNeed === it.name}
+                onClick={() => setOpenNeed(openNeed === it.name ? null : it.name)}>
+                {L(dict, '需买', 'To buy')}
+              </button>
+            ) : (
+              <span className="nesio-trip-tag is-have">{it.place ? it.place : L(dict, '已有', 'Have')}</span>
+            )}
           </div>
         ))}
       </div>
+
+      {/* 点「需买」→ 候选清单落在最下面(物品库里名字相近的,可能就是它) */}
+      {openNeed && (
+        <div className="nesio-trip-card nesio-trip-card--list">
+          <p className="nesio-trip-detail-lede" style={{ margin: 0, padding: 'var(--space-2)' }}>
+            {L(dict, `「${openNeed}」的候选`, `Candidates for “${openNeed}”`)}
+          </p>
+          {candidates(openNeed).length === 0 ? (
+            <p className="nesio-trip-footnote" style={{ padding: '0.8rem' }}>
+              {L(dict, '物品库里找不到相近的 —— 存入记忆后,以后拍到就能对上。', 'Nothing similar in your inventory — save it and future photos will match.')}
+            </p>
+          ) : candidates(openNeed).map((c) => (
+            <div key={c.id} className="nesio-trip-shop-row">
+              <span className="nesio-trip-shop-ico"><IconBox size={16} /></span>
+              <div className="nesio-trip-shop-main">
+                <b>{c.name}</b>
+                {c.location && <small>{c.location}</small>}
+              </div>
+              <button type="button" className="nesio-trip-tag is-have" onClick={() => markHave(openNeed, c.name, c.location)}>
+                {L(dict, '就是这个', "That's it")}
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="nesio-trip-actions">
-        <button type="button" className="nesio-trip-action" onClick={refresh}>
-          <IconCheckCircle size={16} /> {L(dict, '对照物品库', 'Match inventory')}
-        </button>
         <button type="button" className="nesio-trip-action" onClick={regen}>
           {L(dict, '重新生成', 'Regenerate')}
         </button>
       </div>
+      {/* bug3:按钮改「存入记忆」—— 把候选清单里的「需买」记下来(仍进购物清单,那就是记忆里的一条) */}
       <button type="button" className="nesio-trip-primary" onClick={pushNeeds} disabled={!needs.length}>
-        {L(dict, `把「需买」${needs.length} 样存进购物清单`, `Save ${needs.length} “to buy” to shopping list`)}
+        {L(dict, '存入记忆', 'Save to memory')}
       </button>
       {msg && <p className="nesio-trip-msg" role="status">{msg}</p>}
       {err && (
@@ -252,6 +312,9 @@ export function BudgetDetail({
   tripId: string; budget: BudgetPayload; dict: string; onChanged: () => void;
 }) {
   const currency = budget.currency || '¥';
+  // bug3:「无法点无法编辑」—— 点一行进编辑,改这一类的预算(存 Trip.budgetByCategory,重算不抹)
+  const [editCat, setEditCat] = useState<string | null>(null);
+  const [draft, setDraft] = useState('');
   const pct = budget.budgetTotal > 0 ? Math.min(100, Math.round((budget.actualTotal / budget.budgetTotal) * 100)) : 0;
   const remain = budget.budgetTotal - budget.actualTotal;
 
@@ -273,37 +336,52 @@ export function BudgetDetail({
 
       <div className="nesio-trip-section-head">
         <span>{L(dict, '按类别 · 实际 vs 预算', 'By category · actual vs budget')}</span>
-        <button
-          type="button"
+        {/* bug3:「拍照没有直接进入拍一张的智能相机 / 拍照按钮启动口不对」——
+            SnapButton 自己在用户手势里调起系统相机,拿到图再交给识别页,不再停在选择页。 */}
+        <SnapButton
           className="nesio-trip-link"
-          onClick={() => {
-            armTravelReceiptCapture(tripId);
-            window.dispatchEvent(new CustomEvent('nesio-open-camera'));
-          }}
-        >
-          {L(dict, '拍小票入账', 'Scan receipt')}
-        </button>
+          label={L(dict, '拍小票入账', 'Scan receipt')}
+          beforeOpen={() => armTravelReceiptCapture(tripId)}
+        />
       </div>
 
       {budget.categories.map((c) => {
         const over = c.actual > c.budget;
         const delta = Math.abs(c.actual - c.budget);
         const fill = c.budget > 0 ? Math.min(100, (c.actual / c.budget) * 100) : 0;
+        const editing = editCat === c.id;
         return (
           <div key={c.id} className="nesio-trip-card nesio-trip-cat">
-            <div className="nesio-trip-cat-top">
+            <button type="button" className="nesio-trip-cat-top" style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', font: 'inherit', color: 'inherit' }}
+              aria-expanded={editing}
+              onClick={() => { setEditCat(editing ? null : c.id); setDraft(String(c.budget)); }}>
               <span className="nesio-trip-cat-ico">{c.id === 'flight' ? <IconPlane size={16} /> : c.id === 'stay' ? <IconBed size={16} /> : <IconCard size={16} />}</span>
               <b>{c.label}</b>
               <span>{currency}{c.actual.toLocaleString()} / {c.budget.toLocaleString()}</span>
-            </div>
+            </button>
             <div className={`nesio-trip-budget-bar${over ? ' is-over' : ''}`} aria-hidden>
               <div className="nesio-trip-budget-bar-fill" style={{ width: `${fill}%` }} />
             </div>
-            <div className={`nesio-trip-cat-note${over ? ' is-over' : ''}`}>
-              {over
-                ? L(dict, `超 ${currency}${delta.toLocaleString()}`, `Over ${currency}${delta.toLocaleString()}`)
-                : L(dict, `剩 ${currency}${delta.toLocaleString()}`, `${currency}${delta.toLocaleString()} left`)}
-            </div>
+            {editing ? (
+              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginTop: 'var(--space-2)' }}>
+                <input type="number" inputMode="decimal" value={draft} onChange={(e) => setDraft(e.target.value)}
+                  aria-label={L(dict, `${c.label}预算`, `${c.label} budget`)}
+                  style={{ flex: 1, minWidth: 0, padding: '0.4rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)' }} />
+                <button type="button" className="nesio-trip-primary" style={{ flex: '0 0 auto' }}
+                  onClick={() => { setCategoryBudget(tripId, c.id, Number(draft) || 0); setEditCat(null); onChanged(); }}>
+                  {L(dict, '存', 'Save')}
+                </button>
+                <button type="button" className="nesio-trip-action" style={{ flex: '0 0 auto' }} onClick={() => setEditCat(null)}>
+                  {L(dict, '取消', 'Cancel')}
+                </button>
+              </div>
+            ) : (
+              <div className={`nesio-trip-cat-note${over ? ' is-over' : ''}`}>
+                {over
+                  ? L(dict, `超 ${currency}${delta.toLocaleString()}`, `Over ${currency}${delta.toLocaleString()}`)
+                  : L(dict, `剩 ${currency}${delta.toLocaleString()}`, `${currency}${delta.toLocaleString()} left`)}
+              </div>
+            )}
           </div>
         );
       })}
@@ -416,11 +494,55 @@ export function TripNodeDetailBody({
       </div>
     );
   }
+  return <TodoDetail tripId={tripId} nodeId={node.id} todo={p.todo} dict={dict} onChanged={onChanged} />;
+}
+
+/**
+ * 待办详情(bug3:「输入后需要可以点开再次编辑或者删除」)。
+ * 原来点开只是把标题原样念一遍 —— 加错一个字就只能干看着。
+ */
+function TodoDetail({ tripId, nodeId, todo, dict, onChanged }: {
+  tripId: string; nodeId: string; todo: TodoPayload; dict: string; onChanged: () => void;
+}) {
+  const [title, setTitle] = useState(todo.title);
+  const [detail, setDetail] = useState(todo.detail || '');
+  const [saved, setSaved] = useState(false);
+  const dirty = title.trim() !== todo.title || detail.trim() !== (todo.detail || '');
+
   return (
     <div className="nesio-trip-detail">
-      <div className="nesio-trip-card">
-        <Row label={L(dict, '待办', 'To-do')} value={p.todo.title} />
-        <Row label={L(dict, '说明', 'Notes')} value={p.todo.detail} />
+      <div className="nesio-trip-card" style={{ padding: 'var(--space-3)', display: 'grid', gap: 'var(--space-2)' }}>
+        <label style={{ display: 'grid', gap: 'var(--space-1)' }}>
+          <span className="nesio-trip-kv-k">{L(dict, '待办', 'To-do')}</span>
+          <input className="nesio-rel-rec-input" value={title} maxLength={80} onChange={(e) => { setTitle(e.target.value); setSaved(false); }} />
+        </label>
+        <label style={{ display: 'grid', gap: 'var(--space-1)' }}>
+          <span className="nesio-trip-kv-k">{L(dict, '说明', 'Notes')}</span>
+          <input className="nesio-rel-rec-input" value={detail} maxLength={160} onChange={(e) => { setDetail(e.target.value); setSaved(false); }} />
+        </label>
+      </div>
+      {saved && <p className="nesio-trip-msg" role="status">{L(dict, '改好了', 'Saved')}</p>}
+      <button type="button" className="nesio-trip-primary" disabled={!dirty || !title.trim()}
+        onClick={() => {
+          const t = title.trim();
+          updateNode(tripId, nodeId, {
+            title: t,
+            payload: { kind: 'todo', todo: { title: t, ...(detail.trim() ? { detail: detail.trim() } : {}) } },
+          });
+          setSaved(true);
+          onChanged();
+        }}>
+        {L(dict, '保存修改', 'Save changes')}
+      </button>
+      <div className="nesio-trip-actions">
+        <button type="button" className="nesio-trip-action" style={{ color: 'var(--status-risk)' }}
+          onClick={() => {
+            if (!confirm(L(dict, `删掉「${todo.title}」?`, `Delete “${todo.title}”?`))) return;
+            removeTripNode(tripId, nodeId);
+            onChanged();
+          }}>
+          {L(dict, '删掉这条', 'Delete')}
+        </button>
       </div>
     </div>
   );

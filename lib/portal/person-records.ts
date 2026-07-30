@@ -19,7 +19,18 @@ export interface PersonRecord {
   detail?: string;
   date?: string;              // ISO(可选)
   amount?: number;            // 消费类金额(可选)
+  /** 附件(bug3:记一条时可用加号传照片/文件)。只存 IndexedDB 里的引用,不把 dataURL
+   *  塞进 localStorage —— 一张手机原图就能把这条记录的存储配额吃满。 */
+  attachments?: PersonRecordAttachment[];
   createdAt: string;          // ISO
+}
+
+export interface PersonRecordAttachment {
+  /** local-file-store 的 assetId(唯一副本在本机 IndexedDB)。 */
+  assetId: string;
+  name: string;
+  mimeType: string;
+  size: number;
 }
 
 export interface RecordCategoryMeta {

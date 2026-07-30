@@ -118,7 +118,9 @@ assert.equal(ch.steady[0].key, 'steady');
 // 静态钉:稳定 finding id(商户改描述符不再重复提醒)+ guidelines 补条
 const insightTxt = fs.readFileSync(new URL('../lib/portal/finance-insight.ts', import.meta.url), 'utf8');
 assert.match(insightTxt, /finance-new-recur-\$\{r\.key\}/, 'new-recur 用稳定 key');
-assert.match(insightTxt, /finance-hike-\$\{r\.key\}/, 'hike 用稳定 key');
+// 变量名在数值口径审计(7762fa3)里从 r 改成了 h;钉的是「用 merchantKey 这类稳定 key」,
+// 不是钉某个循环变量名 —— 两种写法都认。
+assert.match(insightTxt, /finance-hike-\$\{[a-z]+\.key\}/, 'hike 用稳定 key');
 const glTxt = fs.readFileSync(new URL('../lib/portal/finance-guidelines.ts', import.meta.url), 'utf8');
 for (const topic of ['finance-score-credit-utilization', 'finance-cash-runway', 'finance-upcoming-bills', 'finance-net-surge']) {
   assert.ok(glTxt.includes(`'${topic}'`), `guidelines 补条:${topic}`);

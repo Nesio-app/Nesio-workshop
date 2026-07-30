@@ -79,9 +79,17 @@ export interface HealthVisitPayload {
   personKey: string;
   place?: string;            // 医院/诊所
   department?: string;       // 科室
+  /** 医生名字。bug3:填的是 people 里的人时,doctorKey 记归一 key,详情才连得回关系页。 */
   doctor?: string;
+  /** 关联到 People 的归一 key(小写名/邮箱);手填的陌生医生没有这个字段。 */
+  doctorKey?: string;
   reason?: string;
   note?: string;
+  /** 保险(名称/计划),bug3:就诊往往连着一笔钱,记在这条上才对得起来。 */
+  insurance?: string;
+  /** 自付价格。写进 payload 而不是另起一笔账 —— 是不是要进财务由用户在财务页决定。 */
+  price?: number;
+  currency?: string;
 }
 
 // ── 纯函数(可单测,不碰 DOM/存储)────────────────────────────────────────────

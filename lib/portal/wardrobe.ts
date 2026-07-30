@@ -234,11 +234,19 @@ function scoreGarment(g: Garment, target: Warmth, need: Formality, todayMs: numb
   return warmthFit + formalFit + freshness + prefBias(g, prefs);
 }
 
-function pickBest(pool: Garment[], target: Warmth, need: Formality, todayMs: number, prefs: OutfitPrefs = EMPTY_PREFS): Garment | null {
+/**
+ * 池里挑第 rotate 好的一件(rotate=0 即最佳)。
+ *
+ * bug3「推荐逻辑还需要优化」的一半根因:原来永远只取最高分那件,于是「换一套」在
+ * 免费档点了没反应 —— 输入没变,确定性算法当然给同一个答案。给一个环形游标,
+ * 「换一套」就真的往下换一件,转一圈回到最佳。
+ */
+function pickBest(pool: Garment[], target: Warmth, need: Formality, todayMs: number, prefs: OutfitPrefs = EMPTY_PREFS, rotate = 0): Garment | null {
   if (pool.length === 0) return null;
-  return pool
+  const ranked = pool
     .map((g) => ({ g, s: scoreGarment(g, target, need, todayMs, prefs) }))
-    .sort((a, b) => b.s - a.s)[0].g;
+    .sort((a, b) => b.s - a.s);
+  return ranked[((rotate % ranked.length) + ranked.length) % ranked.length].g;
 }
 
 /* ── 审美/协调:季节 · 色彩 · 上下装联合评分(避免「毛衣配短裤」这类乱搭) ── */
@@ -291,12 +299,28 @@ function pairScore(top: Garment, bottom: Garment, target: Warmth, need: Formalit
  * 每日穿搭(纯规则)。按天气定保暖档+是否外套、按日历定正式度,从衣橱各类挑最合适一件组一套。
  * 衣橱为空/太少 → pieces 为空(由 outfitFindings 决定是否出引导卡)。
  */
+/** suggestOutfit 的可选项(bug3「推荐逻辑还需要优化」)。 */
+export interface OutfitOptions {
+  /** 「换一套」的环形游标:每点一次 +1,依次给次好的组合,转一圈回到最佳。 */
+  rotate?: number;
+  /**
+   * 明确避开的组合 key(outfitKey 口径)—— 用户淘汰过的那几组。
+   * 以前淘汰只在展示层「命中了才提示一句」,算法照样推;现在从候选里真的剔掉。
+   */
+  avoidKeys?: readonly string[];
+}
+
 export function suggestOutfit(
   wardrobe: readonly Garment[],
   ctx: OutfitContext,
   todayIso: string,
   prefs: OutfitPrefs = EMPTY_PREFS,
+  opts: OutfitOptions = {},
 ): OutfitSuggestion {
+  const rotate = Math.max(0, Math.trunc(opts.rotate ?? 0));
+  const avoid = new Set(opts.avoidKeys ?? []);
+  // 组合 key:与 wardrobe-outfits 的 outfitKey 同口径(id 排序后拼),避免跨文件依赖。
+  const comboKey = (ids: readonly string[]) => [...ids].sort().join('|');
   const { target, needOuter } = warmthForTemp(ctx.repTempC);
   const need = ctx.formalNeed;
   const todayMs = Date.parse(todayIso) || 0;
@@ -313,13 +337,23 @@ export function suggestOutfit(
   // 两者不全但有连衣裙 → 连衣裙(本身自洽)。手头只有乱搭的一对时仍给出,但诚实标注 mismatch。
   const tops = byType('top');
   const bottoms = byType('bottom');
-  const dress = pickBest(byType('dress'), target, need, todayMs, prefs);
+  const dress = pickBest(byType('dress'), target, need, todayMs, prefs, rotate);
   if (tops.length && bottoms.length) {
-    let best: { top: Garment; bottom: Garment; s: number } | null = null;
+    // 所有上×下组合按联合分排序,剔掉淘汰过的,再按 rotate 取第几好的一对。
+    // (原来只取最高分那一对 → 淘汰了也照推、点「换一套」也不动。)
+    const pairs: Array<{ top: Garment; bottom: Garment; s: number }> = [];
     for (const tp of tops) for (const bt of bottoms) {
-      const s = pairScore(tp, bt, target, need, todayMs, prefs);
-      if (!best || s > best.s) best = { top: tp, bottom: bt, s };
+      if (avoid.has(comboKey([tp.id, bt.id]))) continue;
+      pairs.push({ top: tp, bottom: bt, s: pairScore(tp, bt, target, need, todayMs, prefs) });
     }
+    pairs.sort((a, b) => b.s - a.s);
+    // 全被淘汰过 → 不硬留空(空搭配比重复搭配更没用),退回不过滤那一版
+    const pool = pairs.length ? pairs : (() => {
+      const all: Array<{ top: Garment; bottom: Garment; s: number }> = [];
+      for (const tp of tops) for (const bt of bottoms) all.push({ top: tp, bottom: bt, s: pairScore(tp, bt, target, need, todayMs, prefs) });
+      return all.sort((a, b) => b.s - a.s);
+    })();
+    const best = pool[rotate % pool.length];
     if (best) {
       pieces.push(best.top, best.bottom);
       if (incoherent(best.top, best.bottom)) mismatch = incoherenceNote(best.top, best.bottom);
@@ -327,22 +361,22 @@ export function suggestOutfit(
   } else if (dress) {
     pieces.push(dress);
   } else {
-    const top = pickBest(tops, target, need, todayMs, prefs);
-    const bottom = pickBest(bottoms, target, need, todayMs, prefs);
+    const top = pickBest(tops, target, need, todayMs, prefs, rotate);
+    const bottom = pickBest(bottoms, target, need, todayMs, prefs, rotate);
     if (top) pieces.push(top); else want(false, 'top');
     if (bottom) pieces.push(bottom); else want(false, 'bottom');
   }
 
   // 外套(冷时)
   if (needOuter) {
-    const outer = pickBest(byType('outer'), target, need, todayMs, prefs);
+    const outer = pickBest(byType('outer'), target, need, todayMs, prefs, rotate);
     if (outer) pieces.push(outer); else want(false, 'outer');
   }
   // 鞋
-  const shoes = pickBest(byType('shoes'), target, need, todayMs);
+  const shoes = pickBest(byType('shoes'), target, need, todayMs, EMPTY_PREFS, rotate);
   if (shoes) pieces.push(shoes); else want(false, 'shoes');
   // 配饰(有就加一件,可选,不计缺口)
-  const accessory = pickBest(byType('accessory'), target, need, todayMs);
+  const accessory = pickBest(byType('accessory'), target, need, todayMs, EMPTY_PREFS, rotate);
   if (accessory) pieces.push(accessory);
 
   const needUmbrella = ctx.precipProb != null && ctx.precipProb >= 50;
