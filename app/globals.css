@@ -4704,8 +4704,18 @@ body:has(.nesio-mood-overlay) .nesio-bottom-nav::before {
 
 /* Bug4 图12:洞察宫格首页把导航抬到全屏遮罩(929/930)之上。
    931 —— 刚好压过洞察面板,仍低于 elevated(940)/image-viewer(950)/特殊模态,
-   所以从洞察里再开的抽屉照样盖得住导航。只在宫格首页挂,进板块页立刻摘掉。 */
-.nesio-bottom-nav--above-overlay { z-index: 931; }
+   所以从洞察里再开的抽屉照样盖得住导航。只在宫格首页挂,进板块页立刻摘掉。
+
+   **pointer-events 和 z-index 是一对,少一个就是「看得见点不着」**
+   (2026-07-30 用户第二次报同一处:「Bar 在洞察里不管用」)。
+   洞察是 Radix Dialog 的 modal 层,它挂载时 DismissableLayer 会把
+   `document.body.style.pointerEvents` 设成 none,只有 dialog 自己是 auto ——
+   所以光抬 z-index 只解决了「露出来」,点击照样被 body 那层吃掉。
+   上一轮修的就是一半:导航露出来了,按下去没有任何反应。 */
+.nesio-bottom-nav--above-overlay {
+  z-index: 931;
+  pointer-events: auto;
+}
 
 /* 时间线每一行的 ✕(2026-07-30 用户要求:每条后面都能移走)。
    ✕ 本体只有 12px,不给最小尺寸就是又一个点不中的目标 —— 走 --tap-min。 */
@@ -20627,3 +20637,65 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   left: 0;
   color: var(--portal-accent);
 }
+
+/* ── 邮件右下角那个可改的标签(2026-07-30)──────────────────────────────
+   为什么它是 span[role=button] 而不是 <button>:整行本来就是一个 <button>,
+   HTML 不许 button 里再套 button。tap 目标靠这里保住 —— 胶囊本体只有十几 px 高,
+   不给最小尺寸就是又一个点不中的目标(和时间线那个 ✕ 同一个坑)。 */
+.nesio-mailtag {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--text-xs);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+}
+.nesio-mailtag--editable {
+  cursor: pointer;
+  min-height: var(--tap-min, 44px);
+  /* 44px 的可点区域,但看着还是个小胶囊 —— 上下用透明边把热区撑开,不撑高行 */
+  margin: calc(-1 * var(--space-3)) 0;
+  padding: var(--space-3) var(--space-2);
+  /* 一条虚下划线,提示「这个能改」;不加颜色,免得和状态色打架 */
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+
+/* 「以后这个发件人都这样」那一行(邮件标签修正面板)。
+   自己一套,不借 .nesio-settings-option —— ui-consistency 契约禁止 SchedulePanel
+   引用那套设置行样式(它防的是拿设置行当 tab)。 */
+.nesio-mailtag-rule {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  text-align: left;
+  margin-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  min-height: var(--tap-min, 44px);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg-solid, var(--portal-bg));
+  cursor: pointer;
+}
+.nesio-mailtag-rule.on {
+  border-color: var(--portal-accent-border);
+  background: var(--portal-accent-soft);
+}
+.nesio-mailtag-rule-label {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--portal-ink);
+}
+.nesio-mailtag-rule-hint {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--portal-muted);
+}
+.nesio-mailtag-rule-check { flex: none; color: var(--portal-accent); }
+/* 禁用的筛选/选择 chip —— 看得出点不了,而不是点了没反应 */
+.nesio-schedfilter-chip[disabled] { opacity: 0.45; cursor: default; }

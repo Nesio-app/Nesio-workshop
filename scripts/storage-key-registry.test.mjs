@@ -156,6 +156,9 @@ const KNOWN_KEYS = new Map([
   // 邮件里认出的「安排」我处理过没有(加进日程了 / 不用了)。「不用了」是一个决定 ——
   // 在手机上按掉的建议换到电脑上又冒出来,等于这个决定没被记住,所以 durable。
   ["nesio-mail-suggest-v1", "durable"],
+  // 邮件标签分错了我改的那些(这一封的修正 + 我显式勾的发件人规则)。
+  // 这是**我的判断**,不是算出来的缓存 —— 换台设备从头开始 = 纠正过的又全错回去。
+  ["nesio-mail-tag-fix-v1", "durable"],
   ["nesio-migration-completed-v1", "cache"],
   ["nesio-migration-log-v1", "cache"],
   ["nesio-entity-aliases-v1", "durable"],

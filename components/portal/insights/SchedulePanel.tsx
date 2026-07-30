@@ -18,6 +18,7 @@ const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: fal
 const EmailComposeSheet = dynamic(() => import('../EmailComposeSheet'), { ssr: false });
 import { L } from '@/lib/portal/i18n';
 import SegTabs from '../ui/SegTabs';
+import NesioSheet from '../ui/NesioSheet';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { IconStar, IconFlag } from '../icons';
@@ -27,8 +28,14 @@ import {
   scheduleFiltersReady, SCHEDULE_FILTERS_EVENT, type CustomFilter,
 } from '@/lib/portal/schedule-filters';
 import { mailStatusLine, mailBadges, toneVars } from '@/lib/portal/mail-badges';
+import { extractEmailLocal } from '@/lib/portal/email-extract-local';
+import {
+  loadMailTagFix, resolveMailKind, mailTagFixReady, fixMailTag, senderKeyOf,
+  clearMailTagFix, removeSenderRule,
+  MAIL_TAG_FIX_EVENT, MAIL_TAG_KINDS, type MailTagFixStore, type MailTagFix,
+} from '@/lib/portal/mail-tag-fix';
 import { searchTokens, matchesSearch } from '@/lib/portal/schedule-search';
-import { suggestScheduleFromEmail } from '@/lib/portal/email-schedule-suggest';
+import { suggestScheduleFromEmail, alreadyScheduled, type ScheduledSlot } from '@/lib/portal/email-schedule-suggest';
 import {
   loadSuggestState, markSuggest, mailSuggestReady, MAIL_SUGGEST_EVENT, type SuggestVerdict,
 } from '@/lib/portal/mail-suggest-state';
@@ -149,9 +156,13 @@ function stripPrefix(name: string): string {
  *   右滑(往右拖)= 星标,左滑 = 删除。跟手位移,松手过阈值才执行,没过就弹回去。
  * 只认横向手势:纵向位移更大时立刻放手,免得把页面滚动吃掉。
  */
-function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelete }: {
+function SwipeRow({ row, kind, dict, starred, dateLabel, fixes, onOpen, onStar, onDelete, onFixTag }: {
   row: Row; kind: SubTab; dict: 'zh' | 'en'; starred: boolean; dateLabel: string;
+  /** 用户改过的标签(这一封 / 发件人规则)。见 lib/portal/mail-tag-fix.ts。 */
+  fixes: MailTagFixStore;
   onOpen: () => void; onStar: () => void; onDelete: () => void;
+  /** 点了类型标签 → 打开修正选择器。日历项没有这回事,所以可缺省。 */
+  onFixTag?: () => void;
 }) {
   const [dx, setDx] = useState(0);
   const start = useRef<{ x: number; y: number; lock: 'none' | 'x' | 'y' } | null>(null);
@@ -221,11 +232,36 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
     : { side: 'del' as const, label: L(dict, '删除', 'Delete'), bg: 'var(--status-risk-soft)', fg: 'var(--status-risk)' };
 
   /* ── 状态一行 + 右下角标签(2026-07-30 用户要求)────────────────────────
-     字段都是 gmail 路由抽好存在节点上的;缺就什么都不画(见 lib/portal/mail-badges.ts)。
-     日历项没有这些字段,自然是空 —— 不用为它加分支。 */
-  const attrs = row.node.attributes || {};
+     字段本来只在 **Gmail 重新同步**时由路由写进节点。真机实锤(用户:「说在邮件预览
+     条目里显示一些状态信息,没有见到」):收件箱里两百多封**全是老节点**,一个字段都没有,
+     于是状态行和标签一条都不出现 —— 功能做了,但对已有数据完全不存在,
+     而用户无从知道这一点,只会以为没做。
+
+     所以这里补一层**客户端兜底**:节点上没有 orderStatus/kindHint 时,就地拿节点已有的
+     标题 + 摘要/正文预览再抽一次(extractEmailLocal 是纯函数、零成本、零网络)。
+     立即生效、不等同步、连同步窗口之外的老邮件也有。
+     hasAttachment 抽不出来(要 Gmail 的 payload)—— 那个只能等同步,没有就不画,不猜。 */
+  const attrs = useMemo(() => {
+    const a = row.node.attributes || {};
+    if (kind === 'calendar') return a;                    // 日历项没有这些字段,不白跑正则
+    if (a.orderStatus || a.moneyFlow || a.kindHint) return a;  // 同步时已经写好了
+    const local = extractEmailLocal(
+      row.title,
+      typeof a.from === 'string' ? a.from : '',
+      row.body,
+    );
+    return { ...a, ...local } as typeof a;
+  }, [row.node.attributes, row.title, row.body, kind]);
   const status = mailStatusLine(attrs, dict);
-  const badges = mailBadges(attrs, dict);
+  /* 类型标签的最终值:**这一封的修正 > 发件人规则 > 自动判定**(硬优先级)。
+     用户亲手改过的那一封,不管规则怎么写、自动判定多有把握,都以他改的为准 ——
+     反过来就是「我知道你说了什么,但我觉得我更对」。 */
+  const emailId = typeof attrs.emailId === 'string' ? attrs.emailId : '';
+  const fromAddr = typeof attrs.from === 'string' ? attrs.from : '';
+  const resolvedKind = kind === 'calendar'
+    ? null
+    : resolveMailKind(typeof attrs.kindHint === 'string' ? attrs.kindHint : undefined, emailId, fromAddr, fixes);
+  const badges = mailBadges({ ...attrs, kindHint: resolvedKind ?? undefined }, dict);
 
   return (
     <div style={{ position: 'relative', borderRadius: 'var(--radius-md)', overflow: 'hidden', touchAction: 'pan-y' }}>
@@ -276,11 +312,28 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-1)', marginTop: 'var(--space-1)' }}>
             {badges.map((b) => {
               const v = toneVars(b.tone);
+              // 「有附件」是事实,不是判断,改不了;类型标签(订单/账单/预约/私人)才可改。
+              const editable = Boolean(onFixTag) && b.id !== 'attachment';
               return (
-                <span key={b.id} style={{
-                  fontSize: 'var(--text-xs)', padding: '0 var(--space-2)',
-                  borderRadius: 'var(--radius-pill)', background: v.bg, color: v.fg,
-                }}>{b.label}</span>
+                <span
+                  key={b.id}
+                  /* 为什么是 span[role=button] 而不是 <button>:整行本来就是一个 <button>,
+                     HTML 不许 button 里再套 button。把标签挪出去做兄弟节点又会脱离文档流、
+                     滑动时不跟手。这是权衡后的取舍 —— 键盘可达性用 tabIndex + onKeyDown 补齐,
+                     tap 目标由 CSS 保到 --tap-min。 */
+                  {...(editable ? {
+                    role: 'button' as const,
+                    tabIndex: 0,
+                    title: L(dict, '分错了?点一下改', 'Wrong tag? Tap to fix'),
+                    onClick: (e: React.MouseEvent) => { e.stopPropagation(); onFixTag!(); },
+                    onKeyDown: (e: React.KeyboardEvent) => {
+                      if (e.key !== 'Enter' && e.key !== ' ') return;
+                      e.preventDefault(); e.stopPropagation(); onFixTag!();
+                    },
+                  } : {})}
+                  className={editable ? 'nesio-mailtag nesio-mailtag--editable' : 'nesio-mailtag'}
+                  style={{ background: v.bg, color: v.fg }}
+                >{b.label}</span>
               );
             })}
           </div>
@@ -323,8 +376,8 @@ function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonl
   }, []);
 
   const kindLabel = (k: ReminderKind) => L(dict,
-    k === 'chore' ? '家务' : k === 'bill' ? '账单' : '其它',
-    k === 'chore' ? 'Chore' : k === 'bill' ? 'Bill' : 'Other');
+    k === 'chore' ? '家务' : k === 'bill' ? '账单' : k === 'event' ? '日程' : '其它',
+    k === 'chore' ? 'Chore' : k === 'bill' ? 'Bill' : k === 'event' ? 'Event' : 'Other');
 
   const openForm = () => {
     // 预填明天早上 9 点 —— 空着让人现敲年月日很烦,填「现在」又会立刻变成一条待处理的。
@@ -461,7 +514,12 @@ function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonl
  *
  * 处理过的记在 mail-suggest-state,同一封不问第二遍。
  */
-function MailSuggestions({ dict, rows }: { dict: 'zh' | 'en'; rows: Row[] }) {
+function MailSuggestions({ dict, rows, taken }: {
+  dict: 'zh' | 'en';
+  rows: Row[];
+  /** 日程里**已经有**的那些时刻(日历项 + 我设的提醒)。用来查重。 */
+  taken: ScheduledSlot[];
+}) {
   const [state, setState] = useState<Record<string, SuggestVerdict>>({});
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState('');
@@ -480,18 +538,27 @@ function MailSuggestions({ dict, rows }: { dict: 'zh' | 'en'; rows: Row[] }) {
       const eid = typeof r.node.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
       if (!eid || state[eid]) continue;
       const hit = suggestScheduleFromEmail(r.title, r.body, r.dateIso);
-      if (hit) out.push({ row: r, eid, at: hit.at, snippet: hit.snippet });
+      if (!hit) continue;
+      /* 日程里已经有了就别再问一遍(2026-07-30 用户实锤:一封 "THIS SATURDAY —
+         Virtual Orientation" 被加成了提醒,而同一场活动本来就在 Google 日历里,
+         同一件事在同一页出现两遍、名字还不一样,看着像两个约)。
+         不提示就是不提示 —— 不必解释「因为日历里有了所以没提」,少一条建议没人会注意到。 */
+      const ms = parseWallClock(hit.at)?.getTime();
+      if (typeof ms === 'number' && alreadyScheduled(ms, r.title, taken)) continue;
+      out.push({ row: r, eid, at: hit.at, snippet: hit.snippet });
       if (out.length >= 12) break;   // 一次最多问 12 封;再多就不是「问一句」了
     }
     return out;
-  }, [rows, state]);
+  }, [rows, state, taken]);
 
   if (!cands.length) return null;
 
   const decide = (c: { row: Row; eid: string; at: string }, verdict: SuggestVerdict) => {
     setErr('');
     if (verdict === 'added') {
-      const created = addReminder({ title: c.row.title, at: c.at, kind: 'other', sourceEmailId: c.eid });
+      // 从邮件确认过来的是一个**约**,不是家务/账单 —— 用户原话:
+      // 「邮件里添加过来的称谓正常日程,不是我的提醒」。
+      const created = addReminder({ title: c.row.title, at: c.at, kind: 'event', sourceEmailId: c.eid });
       // 从存储回读 —— 写没进去就说出来,不能「按了没反应」也不能假装成功
       if (!created || !listReminders().some((r) => r.id === created.id)) {
         setErr(L(dict, '这条没能加进日程,稍后再试一次。', 'Could not add it — try again in a moment.'));
@@ -548,6 +615,126 @@ function MailSuggestions({ dict, rows }: { dict: 'zh' | 'en'; rows: Row[] }) {
   );
 }
 
+/**
+ * MailTagFixSheet —— 标签分错了,自己改(2026-07-30 用户:
+ * 「邮件里,某个 tag 分错了,我怎么改,系统会学习到么?」)。
+ *
+ * 「学习」在这里被**拆成两半**,而且第二半必须用户自己勾:
+ *   ① 选一个新标签(或「去掉」)→ **这一封**永久记住,永远盖过自动判定;
+ *   ② 下面那个勾选框才是「以后这个发件人都这样」—— 默认不勾。
+ *
+ * 不做隐式泛化(「你改了一封 Chase 的,所有 Chase 自动跟着变」):
+ * 那样改一次会有几十封信悄悄变样,而用户不知道发生了什么、也不知道去哪儿撤销。
+ * 和「把邮件标题里的『健身』猜成健康打卡」是同一类错 —— 系统替他做了个他没同意的推广。
+ */
+function MailTagFixSheet({ row, dict, onClose }: { row: Row; dict: 'zh' | 'en'; onClose: () => void }) {
+  const [alsoSender, setAlsoSender] = useState(false);
+  const a = row.node.attributes || {};
+  const emailId = typeof a.emailId === 'string' ? a.emailId : '';
+  const from = typeof a.from === 'string' ? a.from : '';
+  const sender = senderKeyOf(from);
+
+  const label = (k: MailTagFix) => L(dict,
+    k === 'order' ? '订单' : k === 'bill' ? '账单' : k === 'booking' ? '预约' : k === 'personal' ? '私人' : '去掉标签',
+    k === 'order' ? 'Order' : k === 'bill' ? 'Bill' : k === 'booking' ? 'Booking' : k === 'personal' ? 'Personal' : 'No tag');
+
+  const apply = (k: MailTagFix) => {
+    fixMailTag(emailId, k, { from, alsoSender });
+    onClose();
+  };
+
+  /* 「恢复自动」的两条路,分开给 —— 合成一个按钮会说谎:
+     清掉这一封的修正之后,如果发件人规则还在,标签照样被规则改着,
+     而按钮上写着「恢复自动判定」。 */
+  const fixes = loadMailTagFix();
+  const hasMine = Boolean(emailId && fixes.byEmail[emailId]);
+  const hasRule = Boolean(sender && fixes.bySender[sender]);
+
+  return (
+    <NesioSheet
+      variant="bottom"
+      open
+      elevated
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-settings-sheet-card"
+      ariaLabel={L(dict, '改这条的标签', 'Fix this tag')}
+    >
+      <div className="nesio-brief-head">
+        <div>
+          <p className="nesio-brief-greeting">{L(dict, '这条应该是', 'This one is')}</p>
+          <p className="nesio-brief-date">{row.title}</p>
+        </div>
+        <button type="button" className="nesio-voice-sheet-close" onClick={onClose}
+          aria-label={L(dict, '关闭', 'Close')}>✕</button>
+      </div>
+      <div className="nesio-settings-sheet-body">
+        {/* 没有 emailId 就**改不了**,而且要在选项**上面**说清楚。
+            自查发现的洞:此前这行提示挂在选项下面、选项照常能点,而 fixMailTag 对空 id
+            直接 return —— 用户点一下、面板关掉、标签没变,那行小字他根本没看到。
+            「按了没反应」的教科书案例,而且是我自己写的。 */}
+        {!emailId && (
+          <p role="alert" className="nesio-remind-err" style={{ marginBottom: 'var(--space-3)' }}>
+            {L(dict, '这条改不了 —— 它没有邮件 id,多半是同步早期留下的旧记录。下次同步后就能改了。',
+                  'Cannot change this one — it has no email id (an old record from an earlier sync).')}
+          </p>
+        )}
+        <div className="nesio-remind-row">
+          {([...MAIL_TAG_KINDS, 'none'] as MailTagFix[]).map((k) => (
+            <button key={k} type="button" className="nesio-schedfilter-chip"
+              disabled={!emailId} onClick={() => apply(k)}>
+              {label(k)}
+            </button>
+          ))}
+        </div>
+
+        {/* 第二半:**默认不勾**。勾了才写发件人规则。 */}
+        {sender && (
+          /* 用自己的类,不借 .nesio-settings-option —— ui-consistency 契约禁止 SchedulePanel
+             引用那套「设置行」样式(它防的是拿设置行当 tab)。借过来虽然这一处语义没错,
+             但会给下一个人开口子,而且契约不区分用途。自己写一个,两边都干净。 */
+          <button
+            type="button"
+            className={`nesio-mailtag-rule${alsoSender ? ' on' : ''}`}
+            aria-pressed={alsoSender}
+            onClick={() => setAlsoSender((v) => !v)}
+          >
+            <span>
+              <span className="nesio-mailtag-rule-label">
+                {L(dict, `以后 ${sender} 都这样`, `Apply to all from ${sender}`)}
+              </span>
+              <span className="nesio-mailtag-rule-hint">
+                {L(dict, '不勾就只改这一封。勾了会立刻影响这个发件人的其它邮件。',
+                      'Unchecked changes just this email. Checked affects every email from this sender.')}
+              </span>
+            </span>
+            <span className="nesio-mailtag-rule-check" aria-hidden>{alsoSender ? '✓' : '○'}</span>
+          </button>
+        )}
+
+        {/* 改过之后才给「恢复自动」—— 没改过时点它什么都不会变,那就是个假按钮。 */}
+        {(hasMine || hasRule) && (
+          <div className="nesio-remind-row" style={{ marginTop: 'var(--space-3)' }}>
+            {hasMine && (
+              <button type="button" className="nesio-schedfilter-chip"
+                onClick={() => { clearMailTagFix(emailId); onClose(); }}>
+                {L(dict, '恢复自动判定', 'Back to automatic')}
+              </button>
+            )}
+            {hasRule && (
+              <button type="button" className="nesio-schedfilter-chip"
+                onClick={() => { removeSenderRule(sender); onClose(); }}>
+                {L(dict, `删掉「${sender} 都这样」这条规则`, `Remove the rule for ${sender}`)}
+              </button>
+            )}
+          </div>
+        )}
+
+      </div>
+    </NesioSheet>
+  );
+}
+
 // 图29 之后不再需要 onOpenMemory —— 点条目就地开详情,不跳记忆页。
 export default function SchedulePanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -570,6 +757,16 @@ export default function SchedulePanel() {
   const [fKeyword, setFKeyword] = useState('');
   // 搜索框(2026-07-30)。不落盘 —— 和筛选同理,记住上次的搜索词会让人以为数据少了。
   const [q, setQ] = useState('');
+  // 用户改过的标签(这一封 / 发件人规则)。见 lib/portal/mail-tag-fix.ts —— 只记他改的,不隐式泛化。
+  const [tagFixes, setTagFixes] = useState<MailTagFixStore>({ byEmail: {}, bySender: {} });
+  const [fixing, setFixing] = useState<Row | null>(null);
+  useEffect(() => {
+    const read = () => setTagFixes(loadMailTagFix());
+    void mailTagFixReady().then(read);
+    read();
+    window.addEventListener(MAIL_TAG_FIX_EVENT, read);
+    return () => window.removeEventListener(MAIL_TAG_FIX_EVENT, read);
+  }, []);
   // 本机全文索引好了没。没好之前只能搜到标题/发件人/正文预览,得说出来。
   const [ftReady, setFtReady] = useState(false);
   useEffect(() => {
@@ -877,6 +1074,25 @@ export default function SchedulePanel() {
   useEffect(() => {
     if (activeChip && !chips.some((c) => c.id === activeChip)) setActiveChip(null);
   }, [chips, activeChip]);
+  /* 日程里**已经占着**的时刻:日历项 + 我自己设的提醒。
+     邮件建议拿它查重 —— 已经有的事不再问第二遍。 */
+  const takenSlots = useMemo<ScheduledSlot[]>(() => {
+    const out: ScheduledSlot[] = [];
+    for (const r of calendarRows) {
+      const ms = new Date(r.dateIso).getTime();
+      if (Number.isFinite(ms)) out.push({ ms, title: r.title });
+    }
+    try {
+      for (const r of listReminders()) {
+        if (r.doneAt) continue;
+        const d = parseWallClock(r.at);
+        if (d) out.push({ ms: d.getTime(), title: r.title });
+      }
+    } catch { /* 读不到提醒不影响查重的另一半 */ }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarRows, nodes]);
+
   const chosen = activeChip ? chips.find((c) => c.id === activeChip) ?? null : null;
   const rows = chosen ? baseRows.filter((r) => matchesChip(r, chosen)) : baseRows;
 
@@ -1002,7 +1218,7 @@ export default function SchedulePanel() {
 
       {/* 收件里像是有约的那几封,问一句要不要进日程。用**未经搜索/筛选**的全量
           (emailRows)—— 这件事和「我这会儿在找什么」无关,不该被搜索框藏起来。 */}
-      {sub === 'email' && <MailSuggestions dict={dict} rows={emailRows} />}
+      {sub === 'email' && <MailSuggestions dict={dict} rows={emailRows} taken={takenSlots} />}
 
       {rows.length === 0 ? (
         <p className="nesio-insights-empty">
@@ -1024,7 +1240,9 @@ export default function SchedulePanel() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {rows.slice(0, 60).map((r) => (
             <SwipeRow key={r.id} row={r} kind={sub} dict={dict} starred={starred.has(r.id)} dateLabel={fmtDay(r.dateIso)}
-              onOpen={() => setOpenNode(r.node)} onStar={() => toggleStar(r)} onDelete={() => removeRow(r)} />
+              fixes={tagFixes}
+              onOpen={() => setOpenNode(r.node)} onStar={() => toggleStar(r)} onDelete={() => removeRow(r)}
+              onFixTag={sub === 'calendar' ? undefined : () => setFixing(r)} />
           ))}
         </div>
       )}
@@ -1061,6 +1279,8 @@ export default function SchedulePanel() {
       {/* 写一封:发出去后会随下一次 Gmail 同步回到上面的列表(Gmail 的 SENT 是唯一真源,
           这里不另存一份本地副本 —— 两份账最后一定对不上)。 */}
       {composeOpen && <EmailComposeSheet open onClose={() => setComposeOpen(false)} context={{}} />}
+      {/* 标签分错了,自己改(2026-07-30 用户:「某个 tag 分错了,我怎么改」)。 */}
+      {fixing && <MailTagFixSheet row={fixing} dict={dict} onClose={() => setFixing(null)} />}
     </div>
   );
 }

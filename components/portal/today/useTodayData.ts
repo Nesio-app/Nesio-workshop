@@ -11,8 +11,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { loadProfileSettings, portalLocaleToDictionaryLocale, PROFILE_UPDATED_EVENT } from '@/lib/portal/profile';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
-import { autoPersistTodayReport, reportAnchor } from '@/lib/portal/daily-report-persist';
-import { collectDailyReportExtras, outfitNoteFor, collectOrders } from '@/lib/portal/daily-report-sources';
+import { autoPersistTodayReport, reportAnchor, readYesterdayInsights } from '@/lib/portal/daily-report-persist';
+import { collectDailyReportExtras, outfitNoteFor, collectOrders, aheadEvents } from '@/lib/portal/daily-report-sources';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext, type TodayReceipt } from '@/lib/platform/view-models/today-view-model';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
@@ -231,6 +231,12 @@ export function useTodayData(canUsePrivateData: boolean) {
             // 用 updated.allNodes,不用 allNodes 那个 state —— 后者是**上一轮渲染**的值
             // (本轮的 setAllNodes 就在几行之前,还没生效),会让日报比列表慢一天。
             orders: collectOrders(updated.allNodes),
+            // 日历那部分的「往前看」在这里合流 —— events 就在手上,回存储再读一遍
+            // 只会读到另一个快照。
+            ahead: [...extras.ahead, ...aheadEvents(calEvents, anchor)],
+            // 「新进展」的基线:昨天那份日报里的原始判定集。没有就退回出快照,
+            // 标题也跟着从「新进展」换成「这几面」——不装作有进展。
+            yesterdayInsights: readYesterdayInsights(updated.allNodes, now),
           };
           /* 这一页只负责**定稿落库**,不再往 Today 画卡(2026-07-30 用户定案:
              「今天不要入口,用弹出卡片,在洞察开入口」)。

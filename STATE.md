@@ -132,6 +132,21 @@
   文案遵循设计系统"温暖教练"语音(禁感叹号/禁"逾期失败")。
 - 兄弟目录不是全是垃圾:adhd-flow-ios/web、health-web、storage-web、fitness/web、
   tools/secretary 是 bundle-toolbox 的**构建输入**。
+- **每次上 prod,先把别的 agent 分支上「今天的」提交一起带上**(用户 2026-07-30 定的规矩)。
+  这个仓不止一个 agent 在写:机器人分支(`claude/home-desktop-robot-setup-*`)每天都在推,
+  它的活如果不合进来就一直停在分支上,用户在生产上根本看不到 —— 反复发生过。
+  开工前跑一遍:
+  ```
+  git fetch origin
+  for b in $(git for-each-ref --format='%(refname:short)' refs/remotes/origin | grep -v 'origin/main$\|origin/HEAD'); do
+    n=$(git rev-list --count origin/main..$b); [ "$n" = 0 ] && continue
+    echo "$(git log -1 --format=%cs $b)  $n 条  $b"
+  done | sort -r
+  ```
+  **只合日期是今天的**(老分支多半是已废弃的实验,合进来是引回归)。合完照常跑
+  tsc + test:security + test:contracts + build,再连同自己的改动一起进 PR。
+  已知会冲突的一处:`database/schema/supabase-backend-v1-bundle.sql` 头部的生成时间戳,
+  取较新的那份即可。
 
 ## v1 产品规格执行状态(2026-07-10)
 
