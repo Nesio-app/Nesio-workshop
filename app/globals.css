@@ -9659,7 +9659,9 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  padding: 6px 2px 2px 0;
+  /* bug3 p43:输入框和下面时间线第一拍之间原来只隔 2px,挤在一起像同一块 ——
+     下内边距拉开到 --space-4,让「输入」和「时间线」是两件事。 */
+  padding: 6px 2px var(--space-4) 0;
   position: relative;
   z-index: 1;
 }
@@ -13970,6 +13972,10 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
   text-transform: none; letter-spacing: normal;
   font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-ink);
 }
+
+/* bug3 p44:设置里成对的互逆操作并排一排(备份/从云恢复 · 导出/导入) */
+.nesio-settings-btn-row { display: flex; gap: var(--space-2); align-items: stretch; }
+.nesio-settings-btn-row > * { flex: 1; min-width: 0; }
 
 /* bug3 p41:身体账本顶部的记录入口 —— 一个「记一条」+ 一个加号(上传或智能拍照) */
 .nesio-bl-logrow { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-2); }
