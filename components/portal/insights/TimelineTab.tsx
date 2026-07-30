@@ -45,8 +45,6 @@ import { computePlacesShareStats, type PlacesShareStats } from '@/lib/portal/pla
 import { matchPlacePhotoAsset, placePhotoOverrideId, setPlacePhotoOverride, PLACE_PHOTOS_EVENT, type GeoImageNode, type PlaceDescriptor } from '@/lib/portal/place-photos';
 import { countryDisplayName, canonicalCountryKey } from '@/lib/portal/country-normalize';
 import TravelPlanPanel from '../travel/TravelPlanPanel';
-import { listCompletedTrips, TRAVEL_TRIPS_UPDATED_EVENT, type Trip } from '@/lib/portal/travel-trips';
-import TripTimelineSheet from '../travel/TripTimelineSheet';
 
 type Sub = 'timeline' | 'analytics' | 'travel' | 'world' | 'plan';
 
@@ -256,15 +254,6 @@ export default function TimelineTab() {
   const [shareStats, setShareStats] = useState<PlacesShareStats | null>(null); // 足迹成就卡分享
   const [locateBusy, setLocateBusy] = useState(false);
   const [locateMsg, setLocateMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [doneTrips, setDoneTrips] = useState<Trip[]>([]);
-  const [openDoneTripId, setOpenDoneTripId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const readTrips = () => setDoneTrips(listCompletedTrips());
-    readTrips();
-    window.addEventListener(TRAVEL_TRIPS_UPDATED_EVENT, readTrips);
-    return () => window.removeEventListener(TRAVEL_TRIPS_UPDATED_EVENT, readTrips);
-  }, []);
 
   useEffect(() => {
     const read = () => setTrail(loadPlaceTrail());
@@ -1032,7 +1021,7 @@ export default function TimelineTab() {
             size={300}
             onTap={() => setGlobeFull(true)}
           />
-          <span className="nesio-globe-stage-hint">{L(dict, '拖动旋转 · 点一下全屏', 'Drag to spin · tap for fullscreen')}</span>
+          {/* bug3:「拖动旋转 · 点一下全屏」这行字删掉 —— 地球本来就会转,点了就全屏 */}
         </div>
       )}
       {sub === 'world' && !worldCountry && worldHighlights.length > 0 && (
@@ -1042,31 +1031,16 @@ export default function TimelineTab() {
               <span className="nesio-globe-hl-kicker">{h.kicker}</span>
               <span className="nesio-globe-hl-main">{h.main}</span>
               {h.sub ? <span className="nesio-globe-hl-sub">{h.sub}</span> : null}
-              {h.coord ? <span className="nesio-globe-hl-coord">{h.coord}</span> : null}
+              {/* bug3:经纬度删掉 —— 「N35°48′ W78°50′」对人没有意义,地名和城市已经在上面两行 */}
             </div>
           ))}
         </div>
       )}
-      {/* 完成的行程沉在「世界」—— 点「完成 · 进世界」后出现在这里 */}
-      {sub === 'world' && doneTrips.length > 0 && (
-        <div className="nesio-travel-done">
-          <p className="nesio-settings-section-label">{L(dict, '完成的行程', 'Completed trips')}</p>
-          <ul className="nesio-travel-done-list">
-            {doneTrips.slice(0, 12).map((t) => (
-              <li key={t.id}>
-                <button type="button" className="nesio-travel-done-chip" onClick={() => setOpenDoneTripId(t.id)}>
-                  <IconPlane size={14} />
-                  <span>{t.title}</span>
-                  <small>{t.endDate}</small>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+      {/* bug3:「完成的行程」整块按标注删掉 —— 行程走完就是足迹本身,
+          不需要在世界页再摆一排 chip(「完成 · 进世界」那颗按钮也一起删了)。 */}
 
       {/* ── 世界(设计稿④):先国家卡,点 › 进城市明信片 ── */}
-      {sub === 'world' && world.length === 0 && doneTrips.length === 0 && (
+      {sub === 'world' && world.length === 0 && (
         <p className="nesio-insights-empty">{L(dict, '还没有国家信息。开着「记忆自动定位」正常使用,地名和国家会随打点自动解析,这里就会按国家聚合。', 'No country data yet. Keep auto-locate on — places and countries resolve as you go, and countries gather here.')}</p>
       )}
       {sub === 'world' && world.length > 0 && !worldCountry && (
@@ -1142,7 +1116,7 @@ export default function TimelineTab() {
         );
       })()}
 
-      <p className="nesio-place-trail-count">{L(dict, `共 ${trail.length} 个打点`, `${trail.length} points total`)}</p>
+      {/* bug3:底部「共 N 个打点」删掉 —— 上面每一块已经各自报数,这一行只是重复 */}
 
       {/* 批次 59:地图上的记忆(全屏可缩放) */}
       <MemoryMapSheet open={memMapOpen} onClose={() => setMemMapOpen(false)} />
@@ -1240,11 +1214,6 @@ export default function TimelineTab() {
           elevated:本页在洞察(fullscreen,z-930)里,详情是 bottom 卡(901)—— 不抬层会被整个盖住。 */}
       {visitSel && <MemoryNodeDetail node={visitSel} elevated onClose={() => setVisitSel(null)} />}
 
-      <TripTimelineSheet
-        tripId={openDoneTripId}
-        open={Boolean(openDoneTripId)}
-        onClose={() => setOpenDoneTripId(null)}
-      />
     </div>
   );
 }
