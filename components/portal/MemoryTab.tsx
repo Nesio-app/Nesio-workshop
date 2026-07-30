@@ -51,7 +51,7 @@ import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName, stripMarkdownInline } from '@/lib/portal/node-display';
 import { isPinned, loadPins, PINS_UPDATED_EVENT, togglePin, isCore, toggleCore, loadCore, CORE_UPDATED_EVENT } from '@/lib/portal/pins';
 import { inventoryStats } from '@/lib/portal/inventory';
-import { listStorageItems } from '@/lib/portal/inventory-visibility';
+import { listStorageItems, storageHeadline } from '@/lib/portal/inventory-visibility';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
 
@@ -1226,9 +1226,13 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   // 2026-07-29 QA #12:这里原来读 listInventoryItems() 全量 —— 而收纳页自己滤掉了食材,
   // 于是球上写 22 件、点进去只有 18 件。口径统一到 listStorageItems():
   // 谁把「收纳」摆给用户看,谁就报收纳页真会显示的那批。
+  // 2026-07-30 bug #15 复发:上一轮统一了「哪些东西算收纳」,球和清单终于是同一批东西,
+  // 但用户还是看到 22 vs 18 —— 剩下的分歧在「件」这个字指什么:
+  // 球读的是 Σ 数量(一盒 5 支笔算 5),清单顶上的「全部 N」是行数。
+  // 两个数都对,却共用一个字。门面上报的必须是**你点进去会看到的行数**。
   const invStats = useMemo(() => {
     const items = listStorageItems();
-    return { ...inventoryStats(items), unfiled: items.filter((i) => !i.space).length };
+    return { ...inventoryStats(items), ...storageHeadline(items), unfiled: items.filter((i) => !i.space).length };
   }, [nodes]);
 
   function openNodeDetail(node: LifeNode) {
@@ -1318,7 +1322,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   <button type="button" className="nesio-mem-jar" onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-inventory'))}>
                     <span className="nesio-mem-jar-ball" data-halo="storage" aria-hidden><IconBox size={24} /></span>
                     <span className="nesio-mem-jar-name">{L(dict, '收纳', 'Storage')}</span>
-                    <span className="nesio-mem-jar-sub">{L(dict, `${invStats.count} 件`, `${invStats.count} items`)}</span>
+                    <span className="nesio-mem-jar-sub">{L(dict, `${invStats.rows} 件`, `${invStats.rows} items`)}</span>
                   </button>
                   {/* 批次 168:项目 → 独立页 */}
                   <button type="button" className="nesio-mem-jar" onClick={() => setProjPageOpen(true)}>

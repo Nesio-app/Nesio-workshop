@@ -46,3 +46,28 @@ export function countWardrobeItems(): number {
 export function countPantryItems(): number {
   return listInventoryItems().filter(isFoodItem).length;
 }
+
+/**
+ * 「收纳」这张脸报的那个数(2026-07-30,bug #15 复发)。
+ *
+ * 上一轮把「哪些东西算收纳」统一了(listStorageItems),球和清单终于是同一批东西。
+ * 但用户还是看到 22 vs 18 —— 因为剩下的分歧在**「件」这个字指什么**:
+ *   · 球读的是 inventoryStats().count,那是 **Σ 数量**(一盒 5 支笔算 5);
+ *   · 清单顶上的「全部 N」是 **行数**(那盒笔算 1 行)。
+ * 两个数都对,可它们共用同一个字。用户点进去只会数出 18 行,自然觉得「东西变少了」。
+ *
+ * 定死:**门面上的数 = 你点进去会看到的行数**。数量总数是附加信息,
+ * 只在两者不同时补一句,不抢主位。
+ */
+export interface StorageHeadline {
+  /** 点进去会看到多少行 —— 门面上就报这个。 */
+  rows: number;
+  /** Σ 数量(一盒 5 支笔算 5)。 */
+  pieces: number;
+}
+
+export function storageHeadline(items: readonly InventoryItem[]): StorageHeadline {
+  let pieces = 0;
+  for (const i of items) pieces += i.quantity != null && i.quantity > 0 ? i.quantity : 1;
+  return { rows: items.length, pieces };
+}

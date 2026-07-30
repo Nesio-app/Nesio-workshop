@@ -7,10 +7,9 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { pushSupported, isPushEnabled, enablePush, disablePush } from '@/lib/portal/push-notify';
-import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, profileIdentityUpdatedAt, saveProfileSettings, touchProfileIdentity, type PortalLocale } from '@/lib/portal/profile';
+import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, saveProfileSettings, touchProfileIdentity, type PortalLocale } from '@/lib/portal/profile';
 import { pushProfileToCloud, syncProfileWithCloud } from '@/lib/portal/cloud-profile-sync';
 import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
-import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { L, t } from '@/lib/portal/i18n';
 import { usePortalLocale } from './use-portal-locale';
@@ -505,18 +504,9 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   useEffect(() => {
     try { const v = localStorage.getItem('nesio-backup-dest'); if (v === 'nesio' || v === 'drive') setBackupDest(v); } catch { /* ignore */ }
   }, []);
-  // 批次202:跨端同步诊断 —— 每端一眼看出 版本/登录/身份戳,定位「为何不同步」。
-  const buildSha = (process.env.NEXT_PUBLIC_BUILD_SHA || 'dev').slice(0, 7);
-  const [diagLocalAt, setDiagLocalAt] = useState('');
-  const [diagCloudAt, setDiagCloudAt] = useState('');
+  // 「跨端同步诊断」那块(版本/身份戳)按标注早已从界面删掉,留下的 state 也一并清掉 ——
+  // 算了没人看的东西只会让下一个人以为它还在工作。留着的是下面那颗「立即同步」。
   const [diagSyncMsg, setDiagSyncMsg] = useState('');
-  const loadDiag = useCallback(() => {
-    setDiagLocalAt(profileIdentityUpdatedAt());
-    createAppApiClient().fetchCloudProfileSettings()
-      .then((r) => setDiagCloudAt(r.ok && typeof r.settings?.identityUpdatedAt === 'string' ? r.settings.identityUpdatedAt : ''))
-      .catch(() => {});
-  }, []);
-  useEffect(() => { if (open) loadDiag(); }, [open, loadDiag]);
   /**
    * 2026-07-29 QA #11:用户点了一次同步,总数从 2541 变成 2544,报的是「✓ 已同步」——
    * 于是那 3 条看着像**凭空多出来**的。其实它们是别的设备存下、这台机器还没有的记忆,
@@ -532,10 +522,8 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         ? L(dict, `✓ 已同步 · 从云端取回 ${n} 条这台设备还没有的记忆 · 下拉刷新看结果`,
           `✓ Synced · pulled ${n} ${n === 1 ? 'memory' : 'memories'} this device didn't have yet · pull to refresh`)
         : L(dict, '✓ 已同步 · 本机和云端本来就一致,没有新增', '✓ Synced · already up to date, nothing new'));
-      loadDiag();
     } catch { setDiagSyncMsg(L(dict, '同步没能完成,过一会儿再试', 'Sync didn’t go through — try again in a bit')); }
   }
-  const fmtAt = (iso: string) => (iso ? iso.slice(5, 16).replace('T', ' ') : '—');
   const pickBackupDest = (d: 'drive' | 'nesio') => {
     setBackupDest(d);
     try { localStorage.setItem('nesio-backup-dest', d); } catch { /* ignore */ }
@@ -899,6 +887,21 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       {auditState === 'failed' && auditFail && (
         <p style={{ fontSize: '0.75rem', marginTop: 4, color: 'var(--portal-muted)' }}>{auditFail}</p>
       )}
+
+      {/* #14 后半:用户点了一次同步,总数从 2541 变成 2544,只报了「✓ 已同步」——
+          那 3 条看着像**凭空多出来**的。其实它们是别的设备存下、这台机器还没有的记忆。
+          handleForceSync 早就把这句话算好了(importedNodeCount),但**这颗按钮和这行字
+          从来没有被渲染过** —— 又一处「写了没接上」。同一个数字,说清来路就是功能,
+          不说就是 bug。 */}
+      <div className="nesio-settings-audit-row">
+        <Button variant="soft" size="md" full className="nesio-settings-action-btn"
+          onClick={handleForceSync} disabled={diagSyncMsg === L(dict, '同步中…', 'Syncing…')}>
+          {L(dict, '立即同步', 'Sync now')}
+        </Button>
+      </div>
+      {diagSyncMsg && (
+        <p style={{ fontSize: '0.75rem', marginTop: 4, lineHeight: 1.7, color: 'var(--portal-muted)' }}>{diagSyncMsg}</p>
+      )}
       {auditReport && (auditState === 'done' || auditState === 'repairing') && (() => {
         const verdict = consistencyVerdict(auditReport);
         const pending = new Set(auditReport.pendingDeletes);
@@ -906,11 +909,19 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         return (
           <p style={{ fontSize: '0.75rem', marginTop: 4, lineHeight: 1.7,
             color: verdict === 'clean' ? 'var(--status-go)' : verdict === 'repairable' ? 'var(--status-gentle)' : 'var(--status-risk)' }}>
+            {/* #14:这里原来写「本机 2541 条」,而记忆库首页写「2534 条」,用户当场就发现了。
+                两个数各有各的对 —— 体检必须比对**全部节点**(天气快照那类环境信号也要上云),
+                记忆库报的是**用户会当成记忆的那些**。错的是共用一个「条」字。
+                所以先报记忆数(和记忆库对得上),再把「另有 N 条环境信号也在同步」说出来。 */}
             {verdict === 'clean'
-              ? L(dict, `✓ 本机 ${auditReport.localCount} 条,云端 ${auditReport.cloudCount} 条,一一对得上。`,
-                  `✓ ${auditReport.localCount} local, ${auditReport.cloudCount} in cloud — all matched.`)
-              : L(dict, `本机 ${auditReport.localCount} 条 · 云端 ${auditReport.cloudCount} 条`,
-                  `${auditReport.localCount} local · ${auditReport.cloudCount} in cloud`)}
+              ? L(dict, `✓ 记忆 ${auditReport.localMemoryCount} 条,云端 ${auditReport.cloudCount} 条,一一对得上。`,
+                  `✓ ${auditReport.localMemoryCount} memories, ${auditReport.cloudCount} in cloud — all matched.`)
+              : L(dict, `记忆 ${auditReport.localMemoryCount} 条 · 云端 ${auditReport.cloudCount} 条`,
+                  `${auditReport.localMemoryCount} memories · ${auditReport.cloudCount} in cloud`)}
+            {auditReport.localCount > auditReport.localMemoryCount && (
+              <><br />{L(dict, `· 另有 ${auditReport.localCount - auditReport.localMemoryCount} 条环境信号(天气快照那类)也在同步,不计入记忆。`,
+                `· ${auditReport.localCount - auditReport.localMemoryCount} environment signals (weather snapshots etc.) also sync; not counted as memories.`)}</>
+            )}
             {auditReport.missingInCloud.length > 0 && (
               <><br />{L(dict, `· ${auditReport.missingInCloud.length} 条还没上云 —— 点右边补传就好。`,
                 `· ${auditReport.missingInCloud.length} not yet in the cloud — tap Upload to fix.`)}</>
