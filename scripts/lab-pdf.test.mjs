@@ -36,7 +36,10 @@ function slice(src, startMark, endMark, why) {
 }
 function loadPure() {
   const src = [
-    slice(LOADER, 'export function groupItemsIntoLines', null, 'pdfjs-loader.ts'),
+    // 起点是 groupItemsIntoRows 而不是 groupItemsIntoLines —— 后者现在是前者的薄封装
+    // (2026-07-30 加了带坐标的版本给 statement 解析用,全仓仍只有一套分行逻辑)。
+    // 从 Lines 切会漏掉它依赖的 Rows,当场 ReferenceError。
+    slice(LOADER, 'export function groupItemsIntoRows', null, 'pdfjs-loader.ts'),
     slice(SRC, 'export function looksLikeTextLayer', 'export async function readLabPdf', 'lab-pdf.ts'),
   ].join('\n');
   const js = ts.transpileModule(src, {
