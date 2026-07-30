@@ -83,6 +83,10 @@ export async function POST(req: NextRequest) {
           sourceApp: 'wechat',
           author,
           bookId: b.bookId,
+          // 幂等键:ingestLifeNode 的 externalKey() 只认 emailId / notionPageId / externalId
+          //(lib/life-domain/ingest-node.ts:90)。此前只写 bookId,它不在名单里 ——
+          // 于是每点一次同步,15 本书就整套重新入库一遍。一本书一条,重同步 = 更新划线。
+          externalId: `weread:${b.bookId}`,
           highlightCount: highlights.length,
           article: body, // ArticleReaderSheet 可读
         },

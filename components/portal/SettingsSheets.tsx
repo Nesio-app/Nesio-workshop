@@ -22,6 +22,7 @@ import { getFontScale, applyFontScale, type FontScale } from '@/lib/portal/font-
 import { PROACTIVE_LEVEL_KEY } from './today/proactive-types';
 import { deleteLifeNode, getLifeGraph } from '@/lib/portal/life-graph';
 import { visibleMemoryNodes } from '@/lib/portal/memory-visibility';
+import { auditGraphConsistency, consistencyVerdict, repairMissingInCloud, type GraphConsistencyReport } from '@/lib/portal/graph-consistency';
 import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
@@ -480,6 +481,11 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const importRef = useRef<HTMLInputElement>(null);
   // 云备份(付费,规划中):状态机 idle→pushing→done/error,失败必可见(设计红线)。
   const [cloudState, setCloudState] = useState<'idle' | 'pushing' | 'done' | 'error'>('idle');
+  // 同步体检(地基 F2):回答「我的记忆全在吗」。只读 + 显式触发 —— 拉全量云快照,
+  // 不该在启动路径上跑。修复(补传)是另一颗按钮,永远由用户点。
+  const [auditState, setAuditState] = useState<'idle' | 'running' | 'done' | 'repairing' | 'failed'>('idle');
+  const [auditReport, setAuditReport] = useState<GraphConsistencyReport | null>(null);
+  const [auditFail, setAuditFail] = useState<string>('');
   const [cloudError, setCloudError] = useState<CloudBackupError | null>(null);
   const [cloudBackupAt, setCloudBackupAt] = useState<string | null>(null);
   const [cloudEntitled, setCloudEntitled] = useState(false);
@@ -565,6 +571,32 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   // 备份/恢复走用户选的目的地(Drive 失败自动兜底 Nesio 已在 handleDriveBackup 内)
   const handleBackupChosen = () => (backupDest === 'drive' ? handleDriveBackup() : handleCloudBackup());
   const handleRestoreChosen = () => (backupDest === 'drive' ? handleDriveRestore() : handleCloudRestore());
+
+  async function runSyncAudit() {
+    setAuditState('running'); setAuditFail(''); setAuditReport(null);
+    const res = await auditGraphConsistency();
+    if (!res.ok) {
+      // 红线:异步动作必须有可见失败态。三种原因分开说 —— 「没登录」不是「坏了」。
+      setAuditFail(res.reason === 'not_signed_in'
+        ? L(dict, '还没登录,云端这一侧还没有东西可比。', 'Not signed in yet — there is no cloud side to compare.')
+        : L(dict, '这次没连上云,待会儿再试一次。', "Couldn't reach the cloud — try again in a bit."));
+      setAuditState('failed');
+      return;
+    }
+    setAuditReport(res.report); setAuditState('done');
+  }
+
+  async function repairSyncGap() {
+    if (!auditReport?.missingInCloud.length) return;
+    setAuditState('repairing');
+    try {
+      await repairMissingInCloud(auditReport.missingInCloud);
+      await runSyncAudit(); // 补完立刻重测,数字要自己说话,不靠「应该好了」
+    } catch {
+      setAuditFail(L(dict, '补传没成功,待会儿再试一次。', "Couldn't finish uploading — try again in a bit."));
+      setAuditState('failed');
+    }
+  }
   async function handleDriveRestore() {
     if (!confirm(L(dict, '从 Google Drive 恢复:把云端备份合并回本机(仅补缺,不覆盖已有)。完成后自动刷新。继续?', 'Restore from Google Drive: merges the backup into this device (fills gaps, keeps existing). Refreshes when done. Continue?'))) return;
     setDriveState('busy'); setDriveMsg('');
@@ -845,6 +877,63 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         </p>
       )}
       {driveMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: driveState === 'error' ? 'var(--status-risk)' : 'var(--status-go)' }}>{driveMsg}</p>}
+
+      {/* 同步体检(地基 F2)。此前这里只报「N 条记忆,全在本机」—— 那是**本地**条数,
+          回答不了「云端也有吗」。同步机制齐备但没人能验:backfill 默认只补最新 200 条,
+          老节点若当初没上去就永远不会被发现。这块把它变成可回答的。 */}
+      {/* 用独立的 audit-row,不复用 nesio-settings-btn-row —— 那个类钉的是 bug3 p44 的
+          「两排**成对**按钮」(备份/恢复、导出/导入),契约按出现次数校验。而这一行常态
+          只有一颗按钮(补传仅在真有缺口时才出现),本来就不是一对。 */}
+      <div className="nesio-settings-audit-row">
+        <Button variant="soft" size="md" full className="nesio-settings-action-btn"
+          onClick={runSyncAudit} disabled={auditState === 'running' || auditState === 'repairing'}
+          title={L(dict, '比对本机与云端的记忆条目,列出差在哪', 'Compare local vs cloud memories and list the gaps')}>
+          {auditState === 'running' ? L(dict, '正在核对…', 'Checking…') : L(dict, '同步体检', 'Sync check')}
+        </Button>
+        {auditReport && auditReport.missingInCloud.length > 0 && (
+          <Button variant="soft" size="md" full className="nesio-settings-action-btn"
+            onClick={repairSyncGap} disabled={auditState === 'repairing'}>
+            {auditState === 'repairing'
+              ? L(dict, '正在补传…', 'Uploading…')
+              : L(dict, `补传 ${auditReport.missingInCloud.length} 条`, `Upload ${auditReport.missingInCloud.length}`)}
+          </Button>
+        )}
+      </div>
+      {auditState === 'failed' && auditFail && (
+        <p style={{ fontSize: '0.75rem', marginTop: 4, color: 'var(--portal-muted)' }}>{auditFail}</p>
+      )}
+      {auditReport && (auditState === 'done' || auditState === 'repairing') && (() => {
+        const verdict = consistencyVerdict(auditReport);
+        const pending = new Set(auditReport.pendingDeletes);
+        const cloudOnly = auditReport.missingLocally.filter((id) => !pending.has(id));
+        return (
+          <p style={{ fontSize: '0.75rem', marginTop: 4, lineHeight: 1.7,
+            color: verdict === 'clean' ? 'var(--status-go)' : verdict === 'repairable' ? 'var(--status-gentle)' : 'var(--status-risk)' }}>
+            {verdict === 'clean'
+              ? L(dict, `✓ 本机 ${auditReport.localCount} 条,云端 ${auditReport.cloudCount} 条,一一对得上。`,
+                  `✓ ${auditReport.localCount} local, ${auditReport.cloudCount} in cloud — all matched.`)
+              : L(dict, `本机 ${auditReport.localCount} 条 · 云端 ${auditReport.cloudCount} 条`,
+                  `${auditReport.localCount} local · ${auditReport.cloudCount} in cloud`)}
+            {auditReport.missingInCloud.length > 0 && (
+              <><br />{L(dict, `· ${auditReport.missingInCloud.length} 条还没上云 —— 点右边补传就好。`,
+                `· ${auditReport.missingInCloud.length} not yet in the cloud — tap Upload to fix.`)}</>
+            )}
+            {/* 挂起的删除单独说清楚:它让云端看起来「多」,但那是正常的中间态,不是丢数据 */}
+            {auditReport.pendingDeletes.length > 0 && (
+              <><br />{L(dict, `· ${auditReport.pendingDeletes.length} 条删除还在等联网,云端暂时还留着。`,
+                `· ${auditReport.pendingDeletes.length} deletions waiting to reach the cloud.`)}</>
+            )}
+            {cloudOnly.length > 0 && (
+              <><br />{L(dict, `· 云端有 ${cloudOnly.length} 条本机没有 —— 多半是别的设备记的,下次打开会自己拉回来。`,
+                `· ${cloudOnly.length} in the cloud but not here — likely from another device; they'll arrive on next open.`)}</>
+            )}
+            {auditReport.stuckCount > 0 && (
+              <><br />{L(dict, `· ${auditReport.stuckCount} 条同步一直没成功,重试也不会自己好 —— 备份一份留底更稳妥。`,
+                `· ${auditReport.stuckCount} keep failing to sync — a manual backup is the safer move.`)}</>
+            )}
+          </p>
+        );
+      })()}
 
       {/* 并排后放不下长标题,按钮上只留动词;导出的到底是什么放进 title(长按/悬停可见)。 */}
       <div className="nesio-settings-btn-row">

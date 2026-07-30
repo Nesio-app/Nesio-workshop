@@ -14017,6 +14017,11 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 
 /* bug3 p44:设置里成对的互逆操作并排一排(备份/从云恢复 · 导出/导入) */
 .nesio-settings-btn-row { display: flex; gap: var(--space-2); align-items: stretch; }
+/* 同步体检那一行:体检 + (有缺口时)补传。与 .nesio-settings-btn-row 分开 ——
+   那个是「成对互逆操作」的栅格,这一行常态只有一颗按钮。 */
+.nesio-settings-audit-row { display: flex; gap: var(--space-2); margin-top: var(--space-3); }
+.nesio-settings-audit-row > * { flex: 1; }
+
 .nesio-settings-btn-row > * { flex: 1; min-width: 0; }
 
 /* bug3 p41:身体账本顶部的记录入口 —— 一个「记一条」+ 一个加号(上传或智能拍照) */

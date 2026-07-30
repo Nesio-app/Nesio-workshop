@@ -924,13 +924,34 @@ export function mergeCloudMemorySnapshot(snapshot: { nodes?: unknown[]; assets?:
     incomingAssetsByNodeId.set(asset.nodeId, current);
   }
 
+  // ⚠️ 删除意图优先于云快照(2026-07-30,财务账本地基体检查出的丢数据路径)。
+  //
+  // syncMemoryWithCloud 的顺序是「① 先拉云合并 → ② 再重试挂起的 delete」。
+  // 离线时删掉一条 → 这条还在云上 → ① 把它合回本地(复活)→ ② 才把云端删掉。
+  // 净结果:云端对了,**本地那条永远留着**,而且它的 outbox 记录已被标 synced,
+  // 再也不会被删第二次。用户看到的是「删了又回来,再删一次才真没了」。
+  //
+  // outbox 里还留着 delete:<id> == 这条删除尚未确认送达云端。此刻云快照必然是
+  // 删除之前的旧视图,不能拿它覆盖用户的删除意图。等 ② 成功后 outbox 条目被移除,
+  // 后续快照里也不会再有这个 id,自然收敛。
+  //
+  // 只挡 delete,不挡 upsert —— upsert 的冲突由下面的 last-write-wins 处理。
+  const pendingDeleteIds = new Set<string>();
+  try {
+    for (const item of loadCloudSyncOutboxMap().values()) {
+      if (item.operation === 'delete') pendingDeleteIds.add(item.resourceId);
+    }
+  } catch { /* outbox 读不出来时按老路走:宁可多合一条,也不阻断同步 */ }
+
   const nodesById = new Map<string, LifeNode>();
   for (const localNode of loadAll()) nodesById.set(localNode.id, localNode);
   // 批次198(P1 前台自动同步的安全前提):last-write-wins,不再「云端无条件胜」。
   // 此前 `{...local, ...incoming}` 让云端标量字段无条件覆盖本地 —— 一旦登录后自动拉云打开,
   // 陈旧云快照会盖掉本地更新的编辑 → 丢数据。改为按 attributes.updatedAt(数据审计#3 的
   // 编辑时刻,退化 createdAt)取新者的标量字段,较旧一侧独有字段仍保留;资产两侧永远并集。
+  let skippedDeletedCount = 0;
   for (const incomingNode of incomingNodes) {
+    if (pendingDeleteIds.has(incomingNode.id)) { skippedDeletedCount += 1; continue; } // 见上:删除意图优先
     const localNode = nodesById.get(incomingNode.id);
     const mergedAssets = mergeLifeNodeAssets(
       mergeLifeNodeAssets(localNode?.assets, incomingNode.assets),
@@ -949,19 +970,28 @@ export function mergeCloudMemorySnapshot(snapshot: { nodes?: unknown[]; assets?:
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
   );
   saveAll(mergedNodes);
+  // 报数要诚实:被删除意图挡下的那些没有合进来,不能算「已导入」
+  //(否则「已恢复 N 条」会比实际多,用户对不上数)。
+  const importedNodeCount = incomingNodes.length - skippedDeletedCount;
   window.dispatchEvent(new CustomEvent('nesio-life-graph-cloud-hydrated', {
-    detail: { importedNodeCount: incomingNodes.length, importedAssetCount: incomingAssets.length },
+    detail: { importedNodeCount, importedAssetCount: incomingAssets.length },
   }));
-  return { importedNodeCount: incomingNodes.length, importedAssetCount: incomingAssets.length };
+  return { importedNodeCount, importedAssetCount: incomingAssets.length };
 }
 
-export async function backfillLocalLifeGraphToCloud({ limit = 200 }: { limit?: number } = {}): Promise<{
+export async function backfillLocalLifeGraphToCloud({ limit = 200, ids }: { limit?: number; ids?: string[] } = {}): Promise<{
   attemptedNodeCount: number;
   attemptedAssetCount: number;
 }> {
   if (!cloudMemorySyncEnabled()) return { attemptedNodeCount: 0, attemptedAssetCount: 0 };
   const nodes = loadAll();
-  const backfillNodes = nodes.slice(0, limit);
+  // ids 指定时只补这些(同步体检查出「本地有云端没有」后的定点补传)。
+  // 不指定时维持老行为:取最新 limit 条 —— 注意这**不是全量**,图是新→旧排序,
+  // 老节点若当初没成功 upsert 就永远轮不到。全量补齐请走 auditGraphConsistency
+  // 查出缺失 id 再传进来(graph-consistency.ts)。
+  const backfillNodes = ids
+    ? nodes.filter((n) => ids.includes(n.id))
+    : nodes.slice(0, limit);
   const backfillAssets = backfillNodes.flatMap((node) =>
     (node.assets || []).map((asset) => ({ ...asset, nodeId: node.id })),
   );

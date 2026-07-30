@@ -260,7 +260,9 @@ const ITEMS = [
 
   // ── 设置(p44–p45)──
   ['119', 'p44 备份 / 从云恢复 一排', () => /nesio-settings-btn-row/.test(privacy) && privacy.includes('handleBackupChosen') && privacy.includes('handleRestoreChosen')],
-  ['120', 'p44 导出 / 导入 一排', () => (privacy.match(/nesio-settings-btn-row/g) || []).length === 2 && privacy.includes('handleExportLocal')],
+  // 数 privacyCode(剥注释)不是 privacy 原文 —— 一句提到该类名的注释就会把计数顶到 3
+  //(本仓反复踩的坑,item 86 也栽在同一处)。
+  ['120', 'p44 导出 / 导入 一排', () => (privacyCode.match(/nesio-settings-btn-row/g) || []).length === 2 && privacy.includes('handleExportLocal')],
   ['121', 'p44 删底部说明', () => !privacyCode.includes('只整理你放进来的内容')],
   ['122', 'p44 删「数据接入」', () => !privacyCode.includes("'数据接入'")],
   ['123', 'p45「删除数据」只留四字', () => privacyCode.includes("'删除数据'") && !privacyCode.includes('清除记忆 / 删本机数据 / 删账号')],
