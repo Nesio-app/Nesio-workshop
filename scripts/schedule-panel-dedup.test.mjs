@@ -52,4 +52,25 @@ assert.match(panel, /new Date\(x\.dateIso\)\.getTime\(\)/, '邮件按绝对时�
 assert.match(gmail, /CATEGORY_PROMOTIONS/, 'labelIds 里的 Gmail 系统分类是 mailCategory 的来源');
 assert.match(gmail, /mailCategory: cat/, '分类结果要落到节点 attributes 供下游消费');
 
-console.log('schedule-panel-dedup: OK(富化不抹字段 / 无主节点丢弃 / 跨日历去重 / 用 Gmail 官方分类)');
+// ── ④ 收件 / 发件必须分开(2026-07-30 用户:「目前邮件是只有收件,没有发件箱」)──
+//
+// 数据其实一直在同步:messages.list 不带 labelIds 时返回除 SPAM/TRASH 外的全部邮件,
+// 已发送的早就进来了。缺的是**方向**这个字段 —— 节点上从没记过,于是自己发的邮件
+// 因为「发件人不像机器人」被当成活人来信,**混在收件里**。所以钉两头:
+assert.match(gmail, /labelIds \|\| \[\]\)\.includes\('SENT'\)/, '方向必须用 Gmail 自己的 SENT 标签判,不许拿发件人猜');
+assert.match(gmail, /mailDirection: mailDirection\(m\)/, '兜底路径要把方向写进节点');
+assert.match(gmail, /mailDirection: mailDirection\(src\)/, 'AI 富化路径也要写方向(按**这一封**判,不能按发件人汇总 —— 自己发的邮件发件人就是自己)');
+assert.match(panel, /\.filter\(\(n\) => !isSent\(n\)\)/, '收件那格必须把已发送排除掉,否则又混回去');
+assert.match(panel, /mailDirection === 'sent'/, '「是我发的」的判据要落在节点字段上');
+// 老节点没有这个字段 —— 必须当收件,不能让旧数据凭空从收件里消失
+assert.match(
+  panel, /const isSent = \(n: LifeNode\) => \(n\.attributes \|\| \{\}\)\.mailDirection === 'sent'/,
+  '缺字段时要落到 false(当收件)—— 这次改动之前同步的邮件没有方向,不能让它们从收件里消失',
+);
+// 发件不该走收件那套取舍:你自己发出去的,按定义就都值得看见
+const sentBlock = panel.slice(panel.indexOf('const sentRows'), panel.indexOf('const baseRows'));
+for (const gate of ['AD_RE', 'BANK_TX_RE', 'MEETING_INVITE_RE', 'ROBOT_FROM_RE', 'KEEP_RE']) {
+  assert.ok(!sentBlock.includes(gate), `发件箱不该套用收件的过滤(${gate})—— 自己发出去的没有「值不值得看见」的问题`);
+}
+
+console.log('schedule-panel-dedup: OK(富化不抹字段 / 无主节点丢弃 / 跨日历去重 / 用 Gmail 官方分类 / 收发分开)');

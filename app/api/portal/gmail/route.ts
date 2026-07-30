@@ -150,6 +150,18 @@ function emailAddrOf(s: string): string {
   return (m ? m[1] : '').trim().toLowerCase();
 }
 
+/**
+ * 这封是我发的还是收到的(2026-07-30 用户:「目前邮件是只有收件,没有发件箱」)。
+ *
+ * 其实**一直在同步** —— messages.list 不带 labelIds 时返回除 SPAM/TRASH 外的全部邮件,
+ * 已发送的那些早就进来了。缺的不是数据,是**方向**这个字段:节点上从没记过,
+ * 于是日程页只能拿发件人猜,而自己发的邮件发件人就是自己 —— 混在收件里认不出来。
+ * SENT 是 Gmail 自己打的标签,直接用,不猜。
+ */
+function mailDirection(msg: GmailMessage): 'sent' | 'received' {
+  return (msg.labelIds || []).includes('SENT') ? 'sent' : 'received';
+}
+
 /** 按发件人邮箱汇 Gmail 系统分类(供 AI 提取的节点也能带上通知/重要/mailCategory,不再只在兜底打)。 */
 function mailClassBySender(msgs: GmailMessage[]): Map<string, { category: ReturnType<typeof mailCategory>; important: boolean }> {
   const map = new Map<string, { category: ReturnType<typeof mailCategory>; important: boolean }>();
@@ -296,6 +308,9 @@ async function extractNodes(messages: GmailMessage[], canUsePaidCloudAi: boolean
             emailId,
             // 邮件时间以**邮件头**为准:AI 抽取常不带 date,缺了下游只能退回 createdAt 排序。
             ...(src ? { date: header(src, 'date'), from: header(src, 'from') } : {}),
+            // 方向按**这一封**判(不是按发件人汇总):自己发的邮件发件人就是自己,
+            // 按 sender 归并的 cls 分不出方向。
+            ...(src ? { mailDirection: mailDirection(src), ...(mailDirection(src) === 'sent' ? { to: header(src, 'to') } : {}) } : {}),
             ...(cls ? { mailCategory: cls.category } : {}),
           },
         };
@@ -481,6 +496,9 @@ export async function GET(req: NextRequest) {
           from,
           emailId: m.id,
           mailCategory: cat,
+          // 我发的 / 收到的 —— Gmail 的 SENT 标签,不靠发件人猜
+          mailDirection: mailDirection(m),
+          ...(mailDirection(m) === 'sent' ? { to: header(m, 'to') } : {}),
           // CARD SPEC:列表卡第二行优先读 summary(干净摘要)—— 兜底路径用 Gmail 自带
           // snippet(正文首句预览,无邮件头),不再靠渲染层从「来自 X: …」rawInput 里现剥。
           ...(m.snippet ? { summary: m.snippet.slice(0, 120) } : {}),

@@ -15,6 +15,7 @@ import dynamic from 'next/dynamic';
 import { getLifeGraph, deleteLifeNode, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 
 const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
+const EmailComposeSheet = dynamic(() => import('../EmailComposeSheet'), { ssr: false });
 import { L } from '@/lib/portal/i18n';
 import SegTabs from '../ui/SegTabs';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -26,7 +27,11 @@ import {
   scheduleFiltersReady, SCHEDULE_FILTERS_EVENT, type CustomFilter,
 } from '@/lib/portal/schedule-filters';
 
-type SubTab = 'calendar' | 'email';
+// 2026-07-30 用户:「目前邮件是只有收件,没有发件箱」。
+// 拆成收件 / 发件两格 —— 不是加个筛选标签,因为两者该走**不同的规则**:
+// 收件那格有一整套「什么值得留」的取舍(广告/银行流水/会议回执毙掉、机器发的只留几类);
+// 发件不需要任何取舍 —— 你自己发出去的,按定义就都值得看见。
+type SubTab = 'calendar' | 'email' | 'sent';
 
 /** 左滑删除后留多久的反悔窗口。到点才真删。 */
 const UNDO_MS = 6000;
@@ -245,6 +250,7 @@ export default function SchedulePanel() {
   const [customs, setCustoms] = useState<CustomFilter[]>([]);
   const [activeChip, setActiveChip] = useState<string | null>(null);
   const [addingFilter, setAddingFilter] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);   // 发件箱里直接写一封
   const [fName, setFName] = useState('');
   const [fKeyword, setFKeyword] = useState('');
   useEffect(() => {
@@ -397,9 +403,15 @@ export default function SchedulePanel() {
     return [...upcoming, ...past];
   }, [nodes, dict]);
 
+  /** 这条是不是我发出去的。老节点没有这个字段 → 当收件(和改之前的行为一致,不让旧数据凭空消失)。 */
+  const isSent = (n: LifeNode) => (n.attributes || {}).mailDirection === 'sent';
+
   const emailRows = useMemo<Row[]>(() => {
     return nodes
       .filter((n) => n.source === 'email')
+      // 已发送的挪去「发件」那格 —— 此前它们混在收件里认不出来:
+      // 自己发的邮件发件人就是自己,ROBOT_FROM_RE 认不出是机器,于是当「活人发的」留下了。
+      .filter((n) => !isSent(n))
       .filter((n) => {
         const a = n.attributes || {};
         const from = `${typeof a.from === 'string' ? a.from : ''} ${typeof a.sender === 'string' ? a.sender : ''}`;
@@ -454,7 +466,39 @@ export default function SchedulePanel() {
       });
   }, [nodes, dict]);
 
-  const baseRows = (sub === 'calendar' ? calendarRows : emailRows).filter((r) => !gone.has(r.id));
+  /**
+   * 发件箱。规则刻意只有一条:是我发的就显示。
+   * 收件那格的一整套取舍(广告/银行/会议回执/机器发件人白名单)在这里**一条都不用** ——
+   * 你自己按了发送的东西,没有「值不值得看见」的问题。
+   */
+  const sentRows = useMemo<Row[]>(() => nodes
+    .filter((n) => n.source === 'email' && isSent(n))
+    .map((n) => {
+      const a = n.attributes || {};
+      const to = typeof a.to === 'string' ? a.to : '';
+      return {
+        id: n.id,
+        title: n.name,
+        dateIso: typeof a.date === 'string' ? a.date : n.createdAt,
+        // 收件看「谁发来的」,发件看「发给谁」—— 副行换一个方向。
+        meta: to ? L(dict, `发给 ${to}`, `To ${to}`) : L(dict, '我发出的', 'Sent by me'),
+        query: n.name,
+        node: n,
+        googleLabels: (n.tags || []).includes('重要') ? [L(dict, '重要', 'Important')] : [],
+      } as Row;
+    })
+    // 同一封只留一条(与收件同样的兜底:历史上曾建过无 emailId 的副本)
+    .filter((r, i, arr) => {
+      const eid = typeof r.node.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
+      if (!eid) return true;
+      return arr.findIndex((o) => o.node.attributes?.emailId === eid) === i;
+    })
+    .sort((x, y) => (new Date(y.dateIso).getTime() || 0) - (new Date(x.dateIso).getTime() || 0)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  [nodes, dict]);
+
+  const baseRows = (sub === 'calendar' ? calendarRows : sub === 'sent' ? sentRows : emailRows)
+    .filter((r) => !gone.has(r.id));
 
   /* ── 一排筛选标签(2026-07-30 用户要求)────────────────────────────────
      标签面 = Google 自己的分类(日历名 / Gmail 系统分类与重要性)+ 用户自建的关键词。
@@ -489,7 +533,8 @@ export default function SchedulePanel() {
       <SegTabs
         items={[
           { key: 'calendar' as SubTab, label: L(dict, '日历项', 'Calendar'), badge: calendarRows.length },
-          { key: 'email' as SubTab, label: L(dict, '邮件', 'Mail'), badge: emailRows.length },
+          { key: 'email' as SubTab, label: L(dict, '收件', 'Inbox'), badge: emailRows.length },
+          { key: 'sent' as SubTab, label: L(dict, '发件', 'Sent'), badge: sentRows.length },
         ]}
         active={sub}
         onSelect={setSub}
@@ -551,6 +596,15 @@ export default function SchedulePanel() {
         </div>
       )}
 
+      {/* 发件箱的入口不只是「看已发送」—— 在这一格里写一封新的才是完整闭环。
+          写信面板(EmailComposeSheet)本来只挂在记忆详情和聊天里,从日程页够不着。 */}
+      {sub === 'sent' && (
+        <button type="button" className="nesio-schedfilter-btn pri" style={{ width: '100%', marginBottom: 'var(--space-2)' }}
+          onClick={() => setComposeOpen(true)}>
+          {L(dict, '写一封', 'Write one')}
+        </button>
+      )}
+
       {rows.length === 0 ? (
         <p className="nesio-insights-empty">
           {/* 筛出 0 条 ≠ 没有数据。不说清是筛没的,用户会以为东西丢了。 */}
@@ -558,7 +612,11 @@ export default function SchedulePanel() {
             ? L(dict, `「${chosen.label}」下没有 —— 点上面的「全部」看回来。`, `Nothing under “${chosen.label}” — tap All to see everything.`)
             : sub === 'calendar'
               ? L(dict, '还没有日程 —— 到「设置 → 数据接入」连 Google 日历,或连 Granola 同步会议。', 'No schedule yet — connect Google Calendar or Granola in Data sources.')
-              : L(dict, '还没有邮件 —— 到「设置 → 数据接入」连 Gmail 同步(广告已自动过滤)。', 'No mail yet — connect Gmail in Data sources (ads auto-filtered).')}
+              : sub === 'sent'
+                // 发件箱是这次新加的 —— 老同步下来的邮件节点没有方向字段,得等下一次同步补上。
+                // 空着的时候把这件事说清楚,而不是让人以为「我明明发过邮件」。
+                ? L(dict, '这里还没有 —— 已发送是随 Gmail 同步一起进来的,下次同步后就有了(这之前同步的邮件没记方向,会在下次同步时补上)。', 'Nothing here yet — sent mail arrives with the next Gmail sync (mail synced before this update gets its direction filled in then).')
+                : L(dict, '还没有邮件 —— 到「设置 → 数据接入」连 Gmail 同步(广告已自动过滤)。', 'No mail yet — connect Gmail in Data sources (ads auto-filtered).')}
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
@@ -598,6 +656,9 @@ export default function SchedulePanel() {
 
       {/* elevated:日程在洞察(fullscreen,z-930)里,详情是 bottom 卡 —— 不抬层会被整个盖住。 */}
       {openNode && <MemoryNodeDetail node={openNode} elevated onClose={() => setOpenNode(null)} />}
+      {/* 写一封:发出去后会随下一次 Gmail 同步回到上面的列表(Gmail 的 SENT 是唯一真源,
+          这里不另存一份本地副本 —— 两份账最后一定对不上)。 */}
+      {composeOpen && <EmailComposeSheet open onClose={() => setComposeOpen(false)} context={{}} />}
     </div>
   );
 }
