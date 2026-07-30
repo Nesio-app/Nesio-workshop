@@ -241,10 +241,9 @@ const KNOWN_KEYS = new Map([
   ["nesio-wardrobe-prefs-v1", "durable"],
   ["nesio-weather-last-geo-v1", "durable"],
   ["nesio-workout-equip-v1", "durable"],
-  ["nesio-workout-history-v1", "durable"],
-  ["nesio-workout-last-v1", "durable"],
   // 训练流水。durable:换台设备「我上周练了什么」不该从零开始 —— 那是你干过的事,不是缓存。
   ["nesio-workout-history-v1", "durable"],
+  ["nesio-workout-last-v1", "durable"],
   ["nesio-workout-rest-sec-v1", "durable"],
   ["nesio-workout-sound-force-v1", "durable"],
   ["nesio-workouts-v1", "durable"],
