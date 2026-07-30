@@ -1177,6 +1177,90 @@ export function addLifeNode(node: Omit<LifeNode, 'id' | 'createdAt'>): LifeNode 
   return newNode;
 }
 
+/**
+ * 批量 upsert —— **一次 loadAll、一次 saveAll**。
+ *
+ * 为什么必须有这条路:`addLifeNode` 每条都 loadAll + saveAll 整图。灌几千条就是
+ * O(n²) 写盘 + 主线程长时间独占 → iOS 直接杀标签。这不是假设,flomo 就是这么闪退的
+ * (见 connector-sync.ts:102 那条注释)。银行流水是同一个量级。
+ *
+ * `byExternalKey` 由调用方传:命中就**合并** attributes 原地更新(新值优先、旧值补位,
+ * 同 ingestLifeNode 的规矩 —— 整块替换会把上一次写进去的字段抹掉),没命中就新建。
+ *
+ * 云同步/事实库仍然逐条发,但那些是异步的、不占主线程 —— 真正致命的是同步写盘。
+ */
+export function upsertLifeNodesBatch(
+  inputs: ReadonlyArray<Omit<LifeNode, 'id' | 'createdAt'>>,
+  keyOf: (attrs: LifeNode['attributes']) => string | null,
+): { created: number; updated: number } {
+  if (!inputs.length) return { created: 0, updated: 0 };
+  const nodes = loadAll();
+  const index = new Map<string, number>();
+  for (let i = 0; i < nodes.length; i++) {
+    const k = keyOf(nodes[i].attributes);
+    if (k && !index.has(k)) index.set(k, i);
+  }
+  const stamp = new Date().toISOString();
+  const touched: LifeNode[] = [];
+  let created = 0; let updated = 0;
+  const fresh: LifeNode[] = [];
+  // 同一批里出现两次同键的,第二次要合进**这一批刚建的那个**,不能再建一个。
+  // (拿 index 存 -1 当占位会在下一次命中时读到 nodes[-1] = undefined 然后炸。)
+  const freshByKey = new Map<string, LifeNode>();
+  for (const input of inputs) {
+    const k = keyOf(input.attributes);
+    const at = k ? index.get(k) : undefined;
+    const pendingFresh = k ? freshByKey.get(k) : undefined;
+    if (pendingFresh) {
+      const merged: LifeNode = {
+        ...pendingFresh, ...input,
+        id: pendingFresh.id, createdAt: pendingFresh.createdAt,
+        attributes: { ...pendingFresh.attributes, ...(input.attributes || {}), updatedAt: stamp },
+      };
+      const i = fresh.indexOf(pendingFresh);
+      if (i >= 0) fresh[i] = merged;
+      freshByKey.set(k!, merged);
+      const t = touched.indexOf(pendingFresh);
+      if (t >= 0) touched[t] = merged;
+      continue;
+    }
+    if (at !== undefined) {
+      const prev = nodes[at];
+      const merged: LifeNode = {
+        ...prev, ...input,
+        id: prev.id, createdAt: prev.createdAt,   // 命中的是同一个节点,身份不许被 input 顶掉
+        attributes: { ...prev.attributes, ...(input.attributes || {}), updatedAt: stamp },
+      };
+      nodes[at] = merged;
+      touched.push(merged);
+      updated += 1;
+    } else {
+      const node: LifeNode = {
+        ...input,
+        id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        createdAt: stamp,
+        attributes: {
+          ...input.attributes,
+          updatedAt: typeof input.attributes?.updatedAt === 'string' ? input.attributes.updatedAt : stamp,
+        },
+      };
+      fresh.push(node);
+      touched.push(node);
+      if (k) freshByKey.set(k, node);
+      created += 1;
+    }
+  }
+  // 新节点一次性插到最前(逐条 unshift 是 O(n²))
+  const next = fresh.length ? [...fresh, ...nodes] : nodes;
+  saveAll(next);
+  for (const n of touched) {
+    nodeFactSink?.upsert(n);
+    void syncLifeGraphUpsertToCloud(n);
+    syncLifeNodeSignalToCloud(n);
+  }
+  return { created, updated };
+}
+
 export function updateLifeNode(id: string, patch: Partial<LifeNode>): boolean {
   const nodes = loadAll();
   const idx = nodes.findIndex((n) => n.id === id);
