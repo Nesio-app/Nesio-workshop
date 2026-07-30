@@ -269,7 +269,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const label: React.CSSProperties = { display: 'block', fontSize: '0.78rem', color: 'var(--text-secondary)', margin: '0.7rem 0 0.3rem' };
   const chip = (active: boolean): React.CSSProperties => ({
     padding: '0.32rem 0.7rem', borderRadius: 999, fontSize: '0.8rem', whiteSpace: 'nowrap',
-    border: `1px solid ${active ? 'var(--accent-primary, #5b8cff)' : 'var(--border-subtle, rgba(255,255,255,0.12))'}`,
+    border: `1px solid ${active ? 'var(--accent-primary, #5b8cff)' : 'var(--portal-line)'}`,
     background: active ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent',
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
   });
@@ -410,7 +410,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                           </span>
                         </span>
                         {exp && (
-                          <span style={{ flexShrink: 0, fontSize: '0.7rem', color: exp === 'expired' ? 'var(--status-stop, #ef4444)' : 'var(--status-warn, #f59e0b)' }}>
+                          <span style={{ flexShrink: 0, fontSize: '0.7rem', color: exp === 'expired' ? 'var(--status-risk)' : 'var(--status-gentle)' }}>
                             {exp === 'expired' ? L(dict, '已过期', 'Expired') : L(dict, '临期', 'Expiring')}
                           </span>
                         )}
@@ -442,7 +442,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               {/* 物品②:CSV 批量导入(仅名称必填;同文件导两次会重复) */}
               <button
                 type="button"
-                style={{ flex: 1, borderRadius: 12, border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.82rem' }}
+                style={{ flex: 1, borderRadius: 12, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--text-secondary)', fontSize: '0.82rem' }}
                 onClick={() => fileRef.current?.click()}
               >
                 {L(dict, '导入 CSV', 'Import CSV')}
@@ -651,7 +651,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                       </button>
                       {/* 物品⑥:一键复制转卖文案(纯模板),贴去闲鱼/FB Marketplace */}
                       <button type="button" onClick={() => copyListing(i)}
-                        style={{ flexShrink: 0, padding: '0 0.6rem', borderRadius: 12, border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: copiedId === i.id ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: copiedId === i.id ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
+                        style={{ flexShrink: 0, padding: '0 0.6rem', borderRadius: 12, border: '1px solid var(--portal-line)', background: copiedId === i.id ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: copiedId === i.id ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: '0.76rem', whiteSpace: 'nowrap' }}>
                         {copiedId === i.id ? `✓ ${L(dict, '已复制', 'Copied')}` : L(dict, '复制文案', 'Copy ad')}
                       </button>
                     </div>
@@ -825,7 +825,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
       <p style={{ margin: '0.3rem 0', fontSize: '1rem' }}>
         {item.name}
         {exp && (
-          <span style={{ marginLeft: 8, fontSize: '0.72rem', color: exp === 'expired' ? 'var(--status-stop, #ef4444)' : 'var(--status-warn, #f59e0b)' }}>
+          <span style={{ marginLeft: 8, fontSize: '0.72rem', color: exp === 'expired' ? 'var(--status-risk)' : 'var(--status-gentle)' }}>
             {exp === 'expired' ? L(dict, '已过期', 'Expired') : L(dict, '临期', 'Expiring soon')}
           </span>
         )}
@@ -925,7 +925,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
 
       <button
         type="button"
-        style={{ width: '100%', marginTop: '1rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: item.forSale ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+        style={{ width: '100%', marginTop: '1rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--portal-line)', background: item.forSale ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem' }}
         onClick={() => { updateInventoryItem(item.id, { forSale: !item.forSale }); onChanged(); }}
       >
         {item.forSale ? L(dict, '已在卖闲置堆 · 点击取消', 'In sell pile · tap to remove') : L(dict, '标记出售(进卖闲置堆)', 'Mark for sale')}
@@ -933,7 +933,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
       {/* 物品④:物品本身变容器(收纳箱等);解除只摘 flag,不动已放进去的物品 */}
       <button
         type="button"
-        style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: item.isContainer ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+        style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--portal-line)', background: item.isContainer ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem' }}
         onClick={() => { updateInventoryItem(item.id, { isContainer: !item.isContainer }); onChanged(); }}
       >
         {item.isContainer
@@ -952,7 +952,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
       )}
       <button
         type="button"
-        style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--border-subtle, rgba(255,255,255,0.12))', background: 'transparent', color: 'var(--status-stop, #ef4444)', fontSize: '0.85rem' }}
+        style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--status-risk)', fontSize: '0.85rem' }}
         onClick={() => { if (window.confirm(L(dict, '删除这件物品?', 'Delete this item?'))) { removeInventoryItem(item.id); onDeleted(); } }}
       >
         {L(dict, '删除物品', 'Delete item')}

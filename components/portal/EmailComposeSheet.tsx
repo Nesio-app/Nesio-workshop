@@ -182,7 +182,7 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
     }
   }
 
-  const label = { fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '0.25rem', display: 'block' } as const;
+  const label = { fontSize: '0.72rem', color: 'var(--portal-muted)', marginBottom: '0.25rem', display: 'block' } as const;
 
   return (
     <NesioSheet
@@ -217,7 +217,7 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
             <input className="nesio-ob-input" value={subject} onChange={(e) => setSubject(e.target.value)} style={{ marginBottom: '0.6rem' }} />
 
             {/* AI 起草区 */}
-            <div style={{ background: 'var(--surface-2, rgba(127,127,127,0.06))', borderRadius: 12, padding: '0.7rem', marginBottom: '0.7rem' }}>
+            <div style={{ background: 'var(--portal-accent-soft)', borderRadius: 12, padding: '0.7rem', marginBottom: '0.7rem' }}>
               <label style={label}>{L(dict, '想表达什么?(可选,交给 AI 起草)', 'What to say? (optional — let AI draft it)')}</label>
               <input
                 className="nesio-ob-input"
@@ -234,9 +234,9 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
                     onClick={() => setTone(tone === t.key ? '' : t.key)}
                     style={{
                       fontSize: '0.72rem', padding: '0.25rem 0.6rem', borderRadius: 999,
-                      border: `1px solid ${tone === t.key ? 'var(--accent, #10b981)' : 'var(--border, rgba(127,127,127,0.3))'}`,
-                      background: tone === t.key ? 'var(--accent, #10b981)' : 'transparent',
-                      color: tone === t.key ? '#fff' : 'var(--text-muted)',
+                      border: `1px solid ${tone === t.key ? 'var(--portal-accent)' : 'var(--portal-line)'}`,
+                      background: tone === t.key ? 'var(--portal-accent)' : 'transparent',
+                      color: tone === t.key ? '#fff' : 'var(--portal-muted)',
                       cursor: 'pointer',
                     }}
                   >
@@ -277,13 +277,13 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
               </p>
             )}
 
-            {error && <p style={{ color: 'var(--status-stop, #ef4444)', fontSize: '0.8rem', marginTop: '0.5rem' }}>{error}</p>}
+            {error && <p style={{ color: 'var(--status-risk)', fontSize: '0.8rem', marginTop: '0.5rem' }}>{error}</p>}
 
             <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.8rem' }}>
               <button
                 type="button"
                 onClick={onClose}
-                style={{ flex: 1, padding: '0.7rem', borderRadius: 12, border: '1px solid var(--border, rgba(127,127,127,0.3))', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.9rem' }}
+                style={{ flex: 1, padding: '0.7rem', borderRadius: 12, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: '0.9rem' }}
               >
                 {L(dict, '取消', 'Cancel')}
               </button>
@@ -297,7 +297,7 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
                 {sending ? L(dict, '发送中…', 'Sending…') : L(dict, '发送', 'Send')}
               </button>
             </div>
-            <p style={{ fontSize: '0.68rem', color: 'var(--text-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
+            <p style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
               {L(dict, '以你的 Gmail 账号发送 · 每封都由你亲手点发送', 'Sent from your Gmail · you send every message yourself')}
             </p>
           </div>

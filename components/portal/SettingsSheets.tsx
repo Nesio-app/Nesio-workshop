@@ -1116,9 +1116,9 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
                   type="button"
                   onClick={() => setModuleOverride(m.id, val)}
                   style={{
-                    flex: 1, padding: '0.3rem 0', fontSize: '0.72rem', borderRadius: 'var(--radius)',
+                    flex: 1, padding: '0.3rem 0', fontSize: '0.72rem', borderRadius: 'var(--radius-sm)',
                     border: '0.5px solid var(--portal-border)',
-                    background: cur === val ? 'var(--portal-accent-soft, var(--portal-hover))' : 'transparent',
+                    background: cur === val ? 'var(--portal-accent-soft)' : 'transparent',
                     color: cur === val ? 'var(--portal-accent, var(--portal-fg))' : 'var(--portal-muted)',
                     fontWeight: cur === val ? 600 : 400,
                   }}
