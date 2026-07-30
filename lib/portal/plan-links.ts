@@ -9,7 +9,7 @@
  * 弱模型/无 key 时照样工作 —— 这层永远是端上纯规则。
  */
 
-import { getLifeGraph, updateLifeNode, type LifeNode } from './life-graph';
+import { getLifeGraph, linkNodes, updateLifeNode, type LifeNode } from './life-graph';
 import { nearestNodeDate } from '@/lib/platform/node-dates';
 
 export interface TravelAnchors {
@@ -114,14 +114,11 @@ export function reconcilePlanEmailLinks(): number {
         && planDays !== null && [...ea.dateKeys].some((k) => planDays.has(k));
       if (!byFlight && !byPnr && !byRoute) continue;
 
-      updateLifeNode(plan.id, {
-        relations: [...(plan.relations || []), { targetId: email.id, relation: 'confirmed_by_email' }],
-      });
-      if (!alreadyLinked(email, plan.id)) {
-        updateLifeNode(email.id, {
-          relations: [...(email.relations || []), { targetId: plan.id, relation: 'confirms_plan' }],
-        });
-      }
+      // R1:一次读写把两边写完。原来是两次 updateLifeNode —— 第二次失败就留下
+      // 半条关联(行程能看到邮件、邮件看不到行程),没有任何界面会报错。
+      // 反向关系由 RELATION_INVERSE 自动推(confirmed_by_email ↔ confirms_plan)。
+      const res = linkNodes(plan.id, email.id, 'confirmed_by_email');
+      if (!res.ok) continue;
       linked += 1;
       break; // 一个行程认一封主确认邮件,避免噪声连线
     }

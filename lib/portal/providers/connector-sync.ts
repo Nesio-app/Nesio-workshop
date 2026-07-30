@@ -75,6 +75,17 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
     }
     bank.saveBankTx(merged);
     bank.saveBankSyncStatus({ ok: true });
+    // 每一笔流水在记忆图里有一个轻量节点 —— 可搜、可关联、可被问一问引用。
+    // 流水没有等级:关联没关联都一样进图(见 lib/portal/tx-node.ts 文件头)。
+    // 走批量 upsert + 分块让出主线程 —— 逐条 ingestLifeNode 是 O(n²) 写盘,
+    // flomo 就是这么把 iOS 标签写死的(见本文件 runFlomoSync 上面那条注释)。
+    // 不 await:流水已经存好了,记忆那一侧慢一点不该拖住同步的返回。
+    void (async () => {
+      try {
+        const { syncTxNodes } = await import('@/lib/portal/tx-node');
+        await syncTxNodes(merged);
+      } catch { /* 记忆侧没建成不影响流水本身;下次同步靠幂等键补 */ }
+    })();
     // P1:同步成功落一条当日净值/投资快照(按日 upsert 幂等)——「今天 +$860」的数据源。
     try {
       const { recordNetWorthSnapshot } = await import('@/lib/portal/finance-assets');

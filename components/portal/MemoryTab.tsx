@@ -20,6 +20,7 @@ import {
   updateLifeNode,
   type LifeNode,
 } from '@/lib/portal/life-graph';
+import { isTxShadow } from '@/lib/portal/tx-node';
 import { visibleMemoryNodes, isWeatherNode } from '@/lib/portal/memory-visibility';
 import { pinNodeToTodayFocus } from '@/lib/platform/view-models/today-commands';
 import { DOMAINS } from '@/lib/life-domain';
@@ -1000,6 +1001,7 @@ function buildMemGraphEdges(nodes: LifeNode[]): GEdge[] {
 export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  const [showTx, setShowTx] = useState(false); // 交易默认收起(见 visibleNodes 那段注释)
   const [showObjectMap, setShowObjectMap] = useState(false);
   const [showRelationGraph, setShowRelationGraph] = useState(false);
   const [locale, setLocale] = useState<PortalLocale>(() => loadProfileSettings().locale);
@@ -1195,12 +1197,19 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     return n.type === filter;
   };
 
+  // 交易:照常进图、照常可搜、照常能被关联,但**默认列表里收进一个可展开的分组**。
+  // 理由:交易是靠搜索和 dashboard 用的(用户 2026-07-30 定的),逐条铺开会把手记、
+  // 照片、心情这些真的会翻的东西挤没。搜索和按类型筛选时**不折叠** ——
+  // 那时候你就是在找它。
+  const txCount = useMemo(() => nodes.filter(isTxShadow).length, [nodes]);
+
   // Filtered nodes for browse mode
   const visibleNodes = useMemo(() => {
     let result = nodes;
     if (typeFilter) result = result.filter((n) => matchesFilter(n, typeFilter));
+    else if (!showTx) result = result.filter((n) => !isTxShadow(n));
     return result;
-  }, [nodes, typeFilter]);
+  }, [nodes, typeFilter, showTx]);
 
   const results = query.trim()
     ? visibleMemoryNodes(smartNodes, canUsePrivateData).filter((n) => !typeFilter || matchesFilter(n, typeFilter))
@@ -1475,6 +1484,23 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                 emptyText={L(dict, '暂无记忆节点', 'No memory nodes yet')}
               />
             </div>
+          )}
+
+          {/* 交易分组:默认收起。它们照常在图里、照常可搜可关联 ——
+              只是不在默认列表里逐条铺开(用户 2026-07-30 定的)。
+              搜索时不显示这一条:那时候列表里本来就该有交易。 */}
+          {!showObjectMap && !isSearching && !typeFilter && txCount > 0 && (
+            <button
+              type="button"
+              className="nesio-fin-flowopt"
+              style={{ width: '100%', marginBottom: 'var(--space-2)', textAlign: 'left' }}
+              aria-expanded={showTx}
+              onClick={() => setShowTx((v) => !v)}
+            >
+              {showTx
+                ? L(dict, `收起交易(${txCount} 笔)`, `Hide transactions (${txCount})`)
+                : L(dict, `交易 · ${txCount} 笔 —— 展开`, `Transactions · ${txCount} — show`)}
+            </button>
           )}
 
           {/* Memory grid */}

@@ -807,6 +807,11 @@ function hydrateGraphOnce(): void {
         memCache = seed;
       }
       try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
+      // R1 存量修复:把「targetId 存的是人名」那类悬空关联就地修好。
+      // 只在真有悬空关联时才写盘(repairDanglingRelations 自己判),所以每次启动
+      // 跑一遍不花钱。放在这里而不是给个按钮 —— 那些关系界面上根本渲染不出来,
+      // 用户不知道它存在,也就永远不会去点那个按钮。
+      try { repairDanglingRelations(); } catch { /* 修不动就保持原样,不挡启动 */ }
       window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
     } catch {
       // 水合失败:保持 localStorage 播种,不删 localStorage,放开重入让下次再试
@@ -1172,6 +1177,90 @@ export function addLifeNode(node: Omit<LifeNode, 'id' | 'createdAt'>): LifeNode 
   return newNode;
 }
 
+/**
+ * 批量 upsert —— **一次 loadAll、一次 saveAll**。
+ *
+ * 为什么必须有这条路:`addLifeNode` 每条都 loadAll + saveAll 整图。灌几千条就是
+ * O(n²) 写盘 + 主线程长时间独占 → iOS 直接杀标签。这不是假设,flomo 就是这么闪退的
+ * (见 connector-sync.ts:102 那条注释)。银行流水是同一个量级。
+ *
+ * `byExternalKey` 由调用方传:命中就**合并** attributes 原地更新(新值优先、旧值补位,
+ * 同 ingestLifeNode 的规矩 —— 整块替换会把上一次写进去的字段抹掉),没命中就新建。
+ *
+ * 云同步/事实库仍然逐条发,但那些是异步的、不占主线程 —— 真正致命的是同步写盘。
+ */
+export function upsertLifeNodesBatch(
+  inputs: ReadonlyArray<Omit<LifeNode, 'id' | 'createdAt'>>,
+  keyOf: (attrs: LifeNode['attributes']) => string | null,
+): { created: number; updated: number } {
+  if (!inputs.length) return { created: 0, updated: 0 };
+  const nodes = loadAll();
+  const index = new Map<string, number>();
+  for (let i = 0; i < nodes.length; i++) {
+    const k = keyOf(nodes[i].attributes);
+    if (k && !index.has(k)) index.set(k, i);
+  }
+  const stamp = new Date().toISOString();
+  const touched: LifeNode[] = [];
+  let created = 0; let updated = 0;
+  const fresh: LifeNode[] = [];
+  // 同一批里出现两次同键的,第二次要合进**这一批刚建的那个**,不能再建一个。
+  // (拿 index 存 -1 当占位会在下一次命中时读到 nodes[-1] = undefined 然后炸。)
+  const freshByKey = new Map<string, LifeNode>();
+  for (const input of inputs) {
+    const k = keyOf(input.attributes);
+    const at = k ? index.get(k) : undefined;
+    const pendingFresh = k ? freshByKey.get(k) : undefined;
+    if (pendingFresh) {
+      const merged: LifeNode = {
+        ...pendingFresh, ...input,
+        id: pendingFresh.id, createdAt: pendingFresh.createdAt,
+        attributes: { ...pendingFresh.attributes, ...(input.attributes || {}), updatedAt: stamp },
+      };
+      const i = fresh.indexOf(pendingFresh);
+      if (i >= 0) fresh[i] = merged;
+      freshByKey.set(k!, merged);
+      const t = touched.indexOf(pendingFresh);
+      if (t >= 0) touched[t] = merged;
+      continue;
+    }
+    if (at !== undefined) {
+      const prev = nodes[at];
+      const merged: LifeNode = {
+        ...prev, ...input,
+        id: prev.id, createdAt: prev.createdAt,   // 命中的是同一个节点,身份不许被 input 顶掉
+        attributes: { ...prev.attributes, ...(input.attributes || {}), updatedAt: stamp },
+      };
+      nodes[at] = merged;
+      touched.push(merged);
+      updated += 1;
+    } else {
+      const node: LifeNode = {
+        ...input,
+        id: `node-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+        createdAt: stamp,
+        attributes: {
+          ...input.attributes,
+          updatedAt: typeof input.attributes?.updatedAt === 'string' ? input.attributes.updatedAt : stamp,
+        },
+      };
+      fresh.push(node);
+      touched.push(node);
+      if (k) freshByKey.set(k, node);
+      created += 1;
+    }
+  }
+  // 新节点一次性插到最前(逐条 unshift 是 O(n²))
+  const next = fresh.length ? [...fresh, ...nodes] : nodes;
+  saveAll(next);
+  for (const n of touched) {
+    nodeFactSink?.upsert(n);
+    void syncLifeGraphUpsertToCloud(n);
+    syncLifeNodeSignalToCloud(n);
+  }
+  return { created, updated };
+}
+
 export function updateLifeNode(id: string, patch: Partial<LifeNode>): boolean {
   const nodes = loadAll();
   const idx = nodes.findIndex((n) => n.id === id);
@@ -1187,6 +1276,177 @@ export function updateLifeNode(id: string, patch: Partial<LifeNode>): boolean {
   void syncLifeGraphUpsertToCloud(nodes[idx]);
   syncLifeNodeSignalToCloud(nodes[idx]);
   return true;
+}
+
+// ── 双向关联(R1)────────────────────────────────────────────────────────────
+
+/**
+ * 关系类型 → 反向关系。**关联天然是双向的**:
+ * 「这封邮件确认了这个行程」的另一面就是「这个行程由这封邮件确认」。
+ * 只写一边的话,从另一头点进去看不到 —— 而人不会知道自己站在哪一头。
+ *
+ * 不在表里的关系走对称(自己是自己的反面),`user_linked` 就是这一类。
+ */
+export const RELATION_INVERSE: Readonly<Record<string, string>> = {
+  confirmed_by_email: 'confirms_plan',
+  confirms_plan: 'confirmed_by_email',
+  part_of_plan: 'plan_item',
+  plan_item: 'part_of_plan',
+  has_checklist: 'checklist_of',
+  checklist_of: 'has_checklist',
+};
+
+export function inverseRelation(relation: string): string {
+  return RELATION_INVERSE[relation] ?? relation;
+}
+
+export type LinkResult =
+  | { ok: true; created: boolean }
+  | { ok: false; reason: 'self' | 'missing_from' | 'missing_to' | 'bad_relation' };
+
+/**
+ * 把两个节点关联起来 —— **一次读写把两边都写完**。
+ *
+ * 为什么不是两次 updateLifeNode:那样第二次失败(节点刚被删/存储写不进去)时
+ * 会留下**半条关联** —— 从 A 点进去看得到 B,从 B 点进去看不到 A。
+ * 这种状态没有任何界面会报错,只是「有时候能看到、有时候看不到」,
+ * 是最难查的一类。这里一次 loadAll → 两处改 → 一次 saveAll,要么都成要么都不成。
+ *
+ * 三条前置校验,不满足直接返回原因(调用方据此给提示,不许静默吞掉):
+ *   · **targetId 必须是真实节点 id**。曾经有代码把「人名」塞进 targetId
+ *     (life-graph 的语音解析),那种关系指向不存在的东西,界面上永远渲染不出来,
+ *     图谱里却一直占着位置。
+ *   · 不许自己关自己。
+ *   · 关系名不许为空。
+ *
+ * 幂等:同一对 + 同一关系重复调用不会写第二条(`created: false`)。
+ */
+export function linkNodes(fromId: string, toId: string, relation: string): LinkResult {
+  const rel = (relation || '').trim();
+  if (!rel) return { ok: false, reason: 'bad_relation' };
+  if (fromId === toId) return { ok: false, reason: 'self' };
+  const nodes = loadAll();
+  const i = nodes.findIndex((n) => n.id === fromId);
+  if (i < 0) return { ok: false, reason: 'missing_from' };
+  const j = nodes.findIndex((n) => n.id === toId);
+  if (j < 0) return { ok: false, reason: 'missing_to' };
+
+  const inv = inverseRelation(rel);
+  const hasFwd = (nodes[i].relations || []).some((r) => r.targetId === toId && r.relation === rel);
+  const hasBack = (nodes[j].relations || []).some((r) => r.targetId === fromId && r.relation === inv);
+  if (hasFwd && hasBack) return { ok: true, created: false };
+
+  const stamp = new Date().toISOString();
+  if (!hasFwd) {
+    nodes[i] = {
+      ...nodes[i],
+      relations: [...(nodes[i].relations || []), { targetId: toId, relation: rel }],
+      attributes: { ...nodes[i].attributes, updatedAt: stamp },
+    };
+  }
+  if (!hasBack) {
+    nodes[j] = {
+      ...nodes[j],
+      relations: [...(nodes[j].relations || []), { targetId: fromId, relation: inv }],
+      attributes: { ...nodes[j].attributes, updatedAt: stamp },
+    };
+  }
+  saveAll(nodes);
+  for (const n of [nodes[i], nodes[j]]) {
+    nodeFactSink?.upsert(n);
+    void syncLifeGraphUpsertToCloud(n);
+    syncLifeNodeSignalToCloud(n);
+  }
+  return { ok: true, created: true };
+}
+
+/** 解除关联 —— 同样两边一起,同样一次读写。返回 false = 本来就没这条。 */
+export function unlinkNodes(fromId: string, toId: string, relation: string): boolean {
+  const nodes = loadAll();
+  const i = nodes.findIndex((n) => n.id === fromId);
+  const j = nodes.findIndex((n) => n.id === toId);
+  if (i < 0 && j < 0) return false;
+  const inv = inverseRelation(relation);
+  let changed = false;
+  const stamp = new Date().toISOString();
+  if (i >= 0) {
+    const next = (nodes[i].relations || []).filter((r) => !(r.targetId === toId && r.relation === relation));
+    if (next.length !== (nodes[i].relations || []).length) {
+      nodes[i] = { ...nodes[i], relations: next, attributes: { ...nodes[i].attributes, updatedAt: stamp } };
+      changed = true;
+    }
+  }
+  if (j >= 0) {
+    const next = (nodes[j].relations || []).filter((r) => !(r.targetId === fromId && r.relation === inv));
+    if (next.length !== (nodes[j].relations || []).length) {
+      nodes[j] = { ...nodes[j], relations: next, attributes: { ...nodes[j].attributes, updatedAt: stamp } };
+      changed = true;
+    }
+  }
+  if (!changed) return false;
+  saveAll(nodes);
+  for (const idx of [i, j]) {
+    if (idx < 0) continue;
+    nodeFactSink?.upsert(nodes[idx]);
+    void syncLifeGraphUpsertToCloud(nodes[idx]);
+    syncLifeNodeSignalToCloud(nodes[idx]);
+  }
+  return true;
+}
+
+/**
+ * 找出 targetId 指不到任何节点的关系(悬空关联)。
+ *
+ * 存量数据里确实有:语音解析那条 `owned_by` 把**人名**当成了 targetId。
+ * 这种关系界面上永远渲染不出来(渲染层要 `g.find(x => x.id === targetId)`),
+ * 但它一直在图里占着位置、进备份、上云、参与去重键计算。
+ */
+export function danglingRelations(nodes: readonly LifeNode[]): Array<{ nodeId: string; targetId: string; relation: string }> {
+  const ids = new Set(nodes.map((n) => n.id));
+  const out: Array<{ nodeId: string; targetId: string; relation: string }> = [];
+  for (const n of nodes) {
+    for (const r of n.relations || []) {
+      if (!ids.has(r.targetId)) out.push({ nodeId: n.id, targetId: r.targetId, relation: r.relation });
+    }
+  }
+  return out;
+}
+
+/**
+ * 修存量的悬空关联:能按名字找到对应节点就改成真 id,找不到就把名字**移进属性**
+ * 再删掉这条关系。
+ *
+ * 为什么不直接删:那个名字是用户说过的信息(「Linda 的娃娃」),删了就没了。
+ * 移进 `attributes.owner` 之后它仍然可搜、可显示,只是不再冒充一条关系。
+ */
+export function repairDanglingRelations(): { fixed: number; movedToAttributes: number } {
+  const nodes = loadAll();
+  if (!nodes.length) return { fixed: 0, movedToAttributes: 0 };
+  const ids = new Set(nodes.map((n) => n.id));
+  const byName = new Map<string, string>();
+  for (const n of nodes) {
+    const k = (n.name || '').trim().toLowerCase();
+    if (k && !byName.has(k)) byName.set(k, n.id);
+  }
+  let fixed = 0; let moved = 0; let touched = false;
+  for (let i = 0; i < nodes.length; i++) {
+    const rels = nodes[i].relations || [];
+    if (!rels.some((r) => !ids.has(r.targetId))) continue;
+    const attrs = { ...nodes[i].attributes };
+    const next: LifeNode['relations'] = [];
+    for (const r of rels) {
+      if (ids.has(r.targetId)) { next.push(r); continue; }
+      const resolved = byName.get(r.targetId.trim().toLowerCase());
+      if (resolved && resolved !== nodes[i].id) { next.push({ ...r, targetId: resolved }); fixed += 1; continue; }
+      // 名字保住,关系丢掉
+      if (!attrs[r.relation]) attrs[r.relation] = r.targetId;
+      moved += 1;
+    }
+    nodes[i] = { ...nodes[i], relations: next, attributes: attrs };
+    touched = true;
+  }
+  if (touched) saveAll(nodes);
+  return { fixed, movedToAttributes: moved };
 }
 
 /**
@@ -1322,7 +1582,11 @@ export function parseManualCapture(text: string): Omit<LifeNode, 'id' | 'created
 
   if (location) node.attributes['location'] = location;
   if (personName) {
-    node.relations.push({ targetId: personName, relation: 'owned_by' });
+    // ⚠️ 这里**不许**写 relations。以前是 `{ targetId: personName, relation: 'owned_by' }` ——
+    // targetId 存的是人名而不是节点 id,于是这条关系指向一个不存在的东西:
+    // 界面永远渲染不出来(渲染层要 g.find(x => x.id === targetId)),
+    // 但它一直在图里占位、进备份、上云、参与去重键计算。
+    // 名字存进属性即可;真要连到人节点,由 linkNodes(用真 id)在节点落库之后做。
     node.attributes['owner'] = personName;
   }
 

@@ -42,6 +42,10 @@ export interface Garment {
   assetId: string | null; // 首张图 assetId(缩略图用 getLocalImage 读)
   lastWornAt: string | null;
   wearCount: number;
+  /** 买这件花了多少。null = 没记。见 NewGarment.price 那条注释:它不自动记账,是用来认领银行流水的。 */
+  price: number | null;
+  currency: string | null;
+  purchasedAt: string | null;
 }
 
 /* ───────────────────────── 投影 / CRUD ───────────────────────── */
@@ -77,6 +81,10 @@ export function toGarment(node: LifeNode): Garment {
     assetId: img?.id ?? null,
     lastWornAt: typeof a.lastWornAt === 'string' ? a.lastWornAt : null,
     wearCount: Number(a.wearCount) || 0,
+    // 写进去要读得回来 —— 只写不读的字段等于没写
+    price: a.price != null && Number.isFinite(Number(a.price)) ? Number(a.price) : null,
+    currency: typeof a.currency === 'string' ? a.currency : null,
+    purchasedAt: typeof a.purchasedAt === 'string' ? a.purchasedAt : null,
   };
 }
 
@@ -99,6 +107,16 @@ export interface NewGarment {
   seasons?: string[];
   assetId?: string | null;   // 已存进本机图库(putLocalImage)的照片 id
   mimeType?: string;
+  /**
+   * 买这件花了多少(正数)。**不自动记一笔支出** —— 刷卡买的话 Plaid 已经有那条流水,
+   * 再记一笔就是双计。这个字段的用途是让这件衣服能去**认领**银行里的那笔钱
+   * (spendableAmount → receiptMatchCandidates),认领之后才有「这件衣服花了多少」。
+   */
+  price?: number;
+  /** 币种。缺省跟随财务主币种,由调用方补。 */
+  currency?: string;
+  /** 买入日 YYYY-MM-DD。配对要靠它 —— 没有日期就只能靠金额,配错概率大得多。 */
+  purchasedAt?: string;
 }
 
 /** 建一件衣服(object 节点)。照片由调用方先 putLocalImage,这里只挂 asset 引用。 */
@@ -114,6 +132,11 @@ export function addGarment(input: NewGarment): LifeNode {
   if (input.colors?.length) attributes.colors = input.colors.map((c) => c.trim()).filter(Boolean).join(',');
   if (input.material?.trim()) attributes.material = input.material.trim();
   if (input.seasons?.length) attributes.seasons = input.seasons.map((s) => s.trim()).filter(Boolean).join(',');
+  if (typeof input.price === 'number' && Number.isFinite(input.price) && input.price > 0) {
+    attributes.price = Math.round(input.price * 100) / 100;
+    if (input.currency) attributes.currency = input.currency;
+    if (input.purchasedAt) attributes.purchasedAt = input.purchasedAt;
+  }
   const assets = input.assetId
     ? [{ id: input.assetId, kind: 'image' as const, local: true, mimeType: input.mimeType || 'image/jpeg' }]
     : undefined;
