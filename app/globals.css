@@ -13266,7 +13266,7 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
 .nesio-fin-txflow--expense::before { background: #588ce3; }
 .nesio-fin-txflow--refund::before { background: #3a9d6a; }
 .nesio-fin-txflow--rebate::before { background: var(--status-calm, #6b8fc9); } /* 财务⑤:返还/报销(卡权益 credit),信息蓝区别于退款绿 */
-.nesio-fin-txflow--income::before { background: #e0954a; }
+.nesio-fin-txflow--income::before { background: var(--status-gentle); } /* bug2:裸 hex 收回 token */
 .nesio-fin-txflow--transfer::before { background: #9aa7b8; }
 .nesio-fin-flowpick { display: flex; gap: 0.4rem; flex-wrap: wrap; padding: 0.5rem 0 0.7rem; }
 .nesio-fin-flowopt { border: 1px solid var(--portal-line); border-radius: 999px; padding: 0.3rem 0.75rem; background: var(--glass-bg-solid); color: var(--portal-ink); font-size: var(--text-xs); cursor: pointer; }
@@ -13365,12 +13365,15 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-fin-kpi-v { font-size: 0.98rem; font-weight: var(--weight-bold); color: var(--portal-ink); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; line-height: 1.25; }
 .nesio-fin-alerts { display: flex; flex-direction: column; gap: 0.5rem; }
 .nesio-fin-alert { padding: 0.65rem 0.8rem; border-radius: 12px; border: 1px solid var(--portal-line); }
-.nesio-fin-alert--risk { border-color: var(--status-risk, #d9534f); background: color-mix(in srgb, var(--status-risk, #d9534f) 8%, transparent); }
-.nesio-fin-alert--warn { border-color: #e0954a; background: color-mix(in srgb, #e0954a 9%, transparent); }
+/* bug2 配色红线:--warn 那两行原本是裸硬编码 #e0954a / #c77b2e(夜间主题不跟着翻转),
+   --risk 的 fallback #d9534f 也不是设计系统里任何值(token 是 #cf6b6b)= 偷偷混入的第二套红。
+   全部收回 token。 */
+.nesio-fin-alert--risk { border-color: var(--status-risk); background: color-mix(in srgb, var(--status-risk) 8%, transparent); }
+.nesio-fin-alert--warn { border-color: var(--status-gentle); background: color-mix(in srgb, var(--status-gentle) 9%, transparent); }
 .nesio-fin-alert--info { background: var(--glass-bg-solid); }
 .nesio-fin-alert-title { margin: 0; font-size: var(--text-sm); font-weight: var(--weight-bold); color: var(--portal-ink); }
-.nesio-fin-alert--risk .nesio-fin-alert-title { color: var(--status-risk, #d9534f); }
-.nesio-fin-alert--warn .nesio-fin-alert-title { color: #c77b2e; }
+.nesio-fin-alert--risk .nesio-fin-alert-title { color: var(--status-risk); }
+.nesio-fin-alert--warn .nesio-fin-alert-title { color: var(--status-gentle); }
 .nesio-fin-alert-body { margin: 0.15rem 0 0; font-size: var(--text-xs); color: var(--portal-muted); }
 .nesio-fin-alert-note { font-size: var(--text-xs); color: var(--portal-muted); margin: 0.4rem 0 0; text-align: right; }
 .nesio-fin-trend { display: flex; align-items: flex-end; gap: 0.4rem; height: 7rem; }
