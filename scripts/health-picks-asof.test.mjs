@@ -104,6 +104,13 @@ const TODAY = '2026-07-30';
     '旧写法(把 latestDate 切成 07/05 当副标小字印上)必须删掉 —— 那就是 #27 本身');
   assert.match(picks, /allToday \?/,
     '标题必须是条件的。写死「今日精选」的话,前面所有判据都白算');
+  // 2026-07-30 自查(变异测试抓到的):上面几条只证明「算过了」,
+  // 不证明「印出来了」。把副标改回 {p.sub} 一样绿 —— 那正是 #27 本身。
+  assert.match(picks, /nesio-health-pick-sub">\{subOf\(p, i\)\}/,
+    '算出来的那句话必须真的落在卡片副标上。只算不印 = 什么都没修');
+  assert.match(picks, /const subOf = \(p: Pick, i: number\)/, 'subOf 还在');
+  assert.match(picks, /enabled\.map\(\(p, i\) =>/,
+    'notes 是按 enabled 的顺序算的,渲染也必须按同一个下标取 —— 错位就会把别人的日期安在这张卡上');
 
   // 数据没被删:步数依然进 all
   assert.match(picks, /metric-\$\{steps\.key\}/,

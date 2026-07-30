@@ -47,13 +47,23 @@ export function splitEventLocation(raw: string | null | undefined): SplitLocatio
   try { host = new URL(meetingUrl).hostname.replace(/^www\./, '').toLowerCase(); } catch { host = ''; }
   const knownMeeting = !!host && MEETING_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
 
-  // 摘掉所有 URL,剩下的才有资格叫地点。顺手清掉摘完留下的孤立标点/连接词。
-  const place: string = s
-    .replace(URL_RE, ' ')
-    .replace(/\b(join|link|url|meeting|会议|链接|入口)\b/gi, ' ')
-    .replace(/[·|,，、\-–—()（）:：]+/g, ' ')
-    .replace(/\s+/g, ' ')
+  // 摘掉 URL,剩下的才有资格叫地点。
+  //
+  // 2026-07-30 自查发现:上一版在这里做了「顺手清理」—— 把 meeting/会议/链接 这些词
+  // 和所有标点一并抹掉。结果是**把用户写的地址搅烂了**:
+  //   「Room 3-A, Building 2 https://…」→「Room 3 A Building 2」(连字符和逗号没了)
+  //   「朝阳区建国路 88 号 · SOHO 3 期 …」→ 中点被吃掉
+  // 这条 bug 本来就是「不该动的东西被动了」,修的时候再动一次用户的字,是同一个错。
+  //
+  // 现在只做一件事:**按 URL 切开,把每一段两端的分隔符削掉**。文字内部一个字都不碰。
+  const trimEdges = (x: string) => x
+    .replace(/^[\s·|,，、\-–—:：(（]+/, '')
+    .replace(/[\s·|,，、\-–—:：)）]+$/, '')
     .trim();
+  const place: string = s.split(URL_RE)
+    .map(trimEdges)
+    .filter(Boolean)
+    .join(' · ');
 
   return { place, meetingUrl, knownMeeting };
 }

@@ -40,7 +40,13 @@ function loadTs(rel) {
 /* ══ ① 资产卡:整块头部都在按钮里,且给足 44px ══════════════════════ */
 {
   const src = read('components/portal/AssetsPanel.tsx');
-  const head = src.slice(src.indexOf('className="nesio-assets-head"'), src.indexOf('{open && ('));
+  // 2026-07-30 自查(变异测试抓到的):原来切到 `{open && (` 为止再找 nesio-assets-sub ——
+  // 那只证明「它在这一段文字里」,不证明「它在按钮**内部**」。
+  // 中间插一个 </button> 照样绿,而那正是 #9 的原样。改成切到**按钮自己的闭合标签**。
+  const btnStart = src.indexOf('<button type="button" className="nesio-assets-head"');
+  assert.ok(btnStart > 0, '头部按钮还在');
+  const btnEnd = src.indexOf('</button>', btnStart);
+  const head = src.slice(btnStart, btnEnd);
 
   assert.match(head, /nesio-assets-sub/,
     '日期/估值那一行必须**在按钮里面** —— 它原来在按钮外面,' +

@@ -70,7 +70,12 @@ function loadTs(rel) {
   // 接线
   const panel = read('components/portal/TeslaPanel.tsx');
   assert.match(panel, /chargeEnergyLine\(/, '面板要真的用这套判据');
-  assert.match(panel, /anyChargeRecord/, '空态也要走它');
+  // 2026-07-30 自查(变异测试抓到的):光断言「文件里有 anyChargeRecord」不够 ——
+  // 变量还在、渲染里改成 {false 一样绿。要盯**渲染的那个条件**。
+  assert.match(panel, /\{anyChargeRecord\s*\n\s*\? L\(dict, '这一段的读数在上面/,
+    '空态那句话必须由 anyChargeRecord 决定 —— 否则「上面写着 27.2 kWh」和' +
+    '「还没有充电记录」照样能同屏');
+  assert.match(panel, /const anyChargeRecord = hasAnyChargeRecord\(/, '判据来自那一份共用函数');
   assert.doesNotMatch(panel, /本次已充 \$\{v\.charge\.energyAddedKwh\}/,
     '旧写法(不问状态直接冠上「本次」)必须删掉 —— 那就是 #11 本身');
 

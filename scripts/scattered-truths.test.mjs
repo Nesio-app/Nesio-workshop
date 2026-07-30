@@ -60,6 +60,20 @@ function loadTs(rel) {
   assert.equal(real.meetingUrl, '', '真地址里没有链接');
   assert.equal(real.place, '123 Main St, Cary NC', '真地址一个字都不能动');
 
+  // 2026-07-30 自查抓到的:上一版在摘 URL 的同时「顺手清理」了标点和 meeting/会议 这些词,
+  // 结果把用户写的地址搅烂了。这条 bug 本来就是「不该动的东西被动了」——
+  // 修的时候再动一次用户的字,是同一个错。
+  assert.equal(
+    splitEventLocation('Room 3-A, Building 2 https://fmr.zoom.us/j/1').place,
+    'Room 3-A, Building 2',
+    '连字符和逗号是地址的一部分。「Room 3 A Building 2」不是同一个地方',
+  );
+  assert.equal(
+    splitEventLocation('朝阳区建国路 88 号 · SOHO 3 期 https://meeting.tencent.com/x').place,
+    '朝阳区建国路 88 号 · SOHO 3 期',
+    '中文地址里的中点也是内容,不是待清理的噪音',
+  );
+
   assert.equal(splitEventLocation('').place, '');
   assert.equal(splitEventLocation(null).meetingUrl, '');
   assert.equal(shortUrlLabel('https://fmr.zoom.us/j/1'), 'fmr.zoom.us', '一长串 URL 没法看,给域名');
@@ -119,6 +133,16 @@ function loadTs(rel) {
     '同名仍然按 500 米走(两家同名店不会挨这么近)');
   assert.match(src, /两个\*\*不同的真地名\*\*永远不合/,
     '真的去了两个地方就是两次到访 —— 这一条不能被顺手放宽');
+
+  // 2026-07-30 自查抓到的:放开「无名点按坐标合并」之后,原来那句
+  // `if (v.label.length < last.label.length)` 就有了新后果 ——
+  // 「Unknown」只有 7 个字符,合并 `Starbucks Reserve`(17)时会把真地名顶掉。
+  assert.match(src, /if \(lastGeneric && !vGeneric\) last\.label = v\.label;/,
+    '认出来的名字永远赢占位符');
+  assert.match(src, /else if \(!lastGeneric && !vGeneric && v\.label\.length < last\.label\.length\)/,
+    '「短基名优先」只在两边都是真名字时才适用 —— 它本来就是给同名后缀变体用的');
+  assert.doesNotMatch(src, /\n\s*if \(v\.label\.length < last\.label\.length\) last\.label = v\.label;/,
+    '旧的无条件短名优先要拆掉 —— 留着 Unknown 就会把真地名顶掉');
 }
 
 /* ══ #35 心理镜头是给「人说的话」准备的 ═══════════════════════════ */

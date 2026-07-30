@@ -79,6 +79,47 @@ function loadTs(rel) {
 
   const vis = read('lib/portal/memory-visibility.ts');
   assert.match(vis, /isTagOnlyImport/, '展示层也要认得出已经进来的那些');
+
+  // 2026-07-30 自查抓到的:上一版对**所有**节点生效 —— 用户自己手打的一条
+  // 「#健身 #跑步」也会被藏起来。这条 bug 说的是**导入产生的空壳**,不是用户写的东西。
+  assert.match(vis, /IMPORT_SOURCES/,
+    '判据里必须带上「它是导进来的」这一半 —— 少了它就是拿修 bug 当借口藏用户的字');
+  assert.match(vis, /if \(!IMPORT_SOURCES\.has\(src\) && !tagged\) return false;/,
+    '没有导入来源标记的一律不算「导入空壳」,直接放行');
+
+  // 行为验证:同样一串「只有标签」的文字,导入来的藏、手打的留
+  {
+    const js = ts.transpileModule(read('lib/portal/memory-visibility.ts'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    const tagJs = ts.transpileModule(read('lib/portal/topic-tags.ts'), {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    const tagMod = { exports: {} };
+    vm.runInNewContext(tagJs, { module: tagMod, exports: tagMod.exports, String, Set, RegExp, Object });
+    const mod = { exports: {} };
+    vm.runInNewContext(js, {
+      module: mod, exports: mod.exports,
+      require: (m) => (m.includes('topic-tags') ? tagMod.exports : { isPrivateExternalNode: () => false }),
+      String, Set, Map, Array, Object, RegExp, Boolean,
+    });
+    const { isTagOnlyImport } = mod.exports;
+    assert.equal(
+      isTagOnlyImport({ name: '#主题/健身', rawInput: '#主题/健身', attributes: { source: 'Flomo' }, tags: ['Flomo'] }),
+      true,
+      '截图里那一条:flomo 建标签时随手留的一行',
+    );
+    assert.equal(
+      isTagOnlyImport({ name: '#健身 #跑步', rawInput: '#健身 #跑步', attributes: {}, tags: [] }),
+      false,
+      '用户自己手打的纯标签笔记**必须留着** —— 那是他写的字,不是导入的空壳',
+    );
+    assert.equal(
+      isTagOnlyImport({ name: '今天练了腿', rawInput: '#健身 今天练了腿', attributes: { source: 'Flomo' }, tags: ['Flomo'] }),
+      false,
+      '有正文的导入笔记同样要留着',
+    );
+  }
   assert.match(vis, /!isWeatherNode\(n\) && !isTagOnlyImport\(n\)/,
     'visibleMemoryNodes 是「一条记忆算不算数」的唯一判据 —— ' +
     '记忆页和设置页的计数都走它,滤在这里两边才不会又各报一个数');
