@@ -4704,8 +4704,18 @@ body:has(.nesio-mood-overlay) .nesio-bottom-nav::before {
 
 /* Bug4 图12:洞察宫格首页把导航抬到全屏遮罩(929/930)之上。
    931 —— 刚好压过洞察面板,仍低于 elevated(940)/image-viewer(950)/特殊模态,
-   所以从洞察里再开的抽屉照样盖得住导航。只在宫格首页挂,进板块页立刻摘掉。 */
-.nesio-bottom-nav--above-overlay { z-index: 931; }
+   所以从洞察里再开的抽屉照样盖得住导航。只在宫格首页挂,进板块页立刻摘掉。
+
+   **pointer-events 和 z-index 是一对,少一个就是「看得见点不着」**
+   (2026-07-30 用户第二次报同一处:「Bar 在洞察里不管用」)。
+   洞察是 Radix Dialog 的 modal 层,它挂载时 DismissableLayer 会把
+   `document.body.style.pointerEvents` 设成 none,只有 dialog 自己是 auto ——
+   所以光抬 z-index 只解决了「露出来」,点击照样被 body 那层吃掉。
+   上一轮修的就是一半:导航露出来了,按下去没有任何反应。 */
+.nesio-bottom-nav--above-overlay {
+  z-index: 931;
+  pointer-events: auto;
+}
 
 /* 时间线每一行的 ✕(2026-07-30 用户要求:每条后面都能移走)。
    ✕ 本体只有 12px,不给最小尺寸就是又一个点不中的目标 —— 走 --tap-min。 */

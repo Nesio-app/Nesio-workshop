@@ -157,3 +157,48 @@ export function suggestScheduleFromEmail(
     snippet,
   };
 }
+
+/* ── 查重:日程里已经有了就别再建议一遍 ────────────────────────────────
+   2026-07-30 真机实锤(用户:「如果日程已经有了,就不重复。要自动检查」):
+   一封 "THIS SATURDAY — Virtual Orientation" 的邮件被确认加成了提醒,
+   而同一场活动 "Sea Cadets Virtual Orientation" 本来就在 Google 日历里 ——
+   同一件事在同一页出现两遍,而且名字还不一样,看着像两个约。               */
+
+/** 日程里已有的一条(日历项 / 我设的提醒都归一成这个形状)。 */
+export interface ScheduledSlot {
+  /** 绝对时刻(毫秒) */
+  ms: number;
+  title: string;
+}
+
+const normTitle = (t: string) => (t || '').replace(/\s+/g, '').toLowerCase();
+
+/**
+ * 这件事日程里是不是已经有了。
+ *
+ * 判据只有两条,都**保守且可解释**:
+ *   ① 标题去空格、忽略大小写后**完全相同**;
+ *   ② 时刻相差在 toleranceMin 以内。
+ *
+ * ② 是主力:一个人同一天的同一个钟点,不会有两件不同的约。
+ * 刻意**不做**标题的模糊/语义相似 —— "THIS SATURDAY — Virtual Orientation" 和
+ * "Sea Cadets Virtual Orientation" 字面上共同的只有 "Virtual Orientation",
+ * 靠公共子串去认,既会把两场真的不同的会判成同一件,也认不出改了名的同一件事。
+ * 时间才是这件事的身份。
+ */
+export function alreadyScheduled(
+  atMs: number,
+  title: string,
+  existing: readonly ScheduledSlot[],
+  toleranceMin = 60,
+): boolean {
+  if (!Number.isFinite(atMs)) return false;
+  const tol = toleranceMin * 60_000;
+  const key = normTitle(title);
+  for (const e of existing) {
+    if (!Number.isFinite(e.ms)) continue;
+    if (key && normTitle(e.title) === key) return true;
+    if (Math.abs(e.ms - atMs) <= tol) return true;
+  }
+  return false;
+}

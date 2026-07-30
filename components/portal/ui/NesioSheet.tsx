@@ -148,6 +148,10 @@ function useFocusTrap(ref: RefObject<HTMLElement | null>, active: boolean) {
       if (!t || el.contains(t)) return;
       if (t.hasAttribute?.('data-radix-focus-guard')) return;
       if (t.closest?.('[role="dialog"], [aria-modal="true"], [data-vaul-drawer], [data-radix-portal]')) return;
+      // 被**故意抬到浮层之上**的底部导航(洞察宫格页,见 .nesio-bottom-nav--above-overlay):
+      // 它是设计上就该能点的东西。不放行的话,手指点上去先 focus、焦点立刻被这里拽回 sheet,
+      // 点击在某些浏览器上就此丢掉 —— 又一个「看得见点不着」。
+      if (t.closest?.('.nesio-bottom-nav--above-overlay')) return;
       focusFirst();
     };
     // 焦点掉到 body(异步 setState 卸载了当前控件)→ 下一帧拉回。

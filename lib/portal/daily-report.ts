@@ -47,7 +47,7 @@ export interface DailyReportReminder {
   title: string;
   /** 墙上时钟 `YYYY-MM-DDTHH:mm` */
   at: string;
-  kind?: 'chore' | 'bill' | 'other';
+  kind?: 'chore' | 'bill' | 'event' | 'other';
 }
 
 /** 各域确定性引擎的判定(gatherDomainInsights 的形状,原样带过来)。 */
@@ -361,7 +361,9 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
      「一切正常」不进这一段 —— 没有要你动的事,这一段整段不出现。 */
   const reminderLines = todayReminders.slice(0, ACTION_QUOTA.reminders).map((r) => {
     const t = wallClockTime(r.at);
-    const kind = r.kind === 'bill' ? tt(locale, '账单', 'Bill') : r.kind === 'chore' ? tt(locale, '家务', 'Chore') : '';
+    const kind = r.kind === 'bill' ? tt(locale, '账单', 'Bill')
+      : r.kind === 'chore' ? tt(locale, '家务', 'Chore')
+        : r.kind === 'event' ? tt(locale, '日程', 'Event') : '';
     return `${t ? t + ' ' : ''}${r.title}${kind ? ` · ${kind}` : ''}`;
   });
   const flagLines = flags.slice(0, ACTION_QUOTA.flags).map((it) => insightLine(it, locale));

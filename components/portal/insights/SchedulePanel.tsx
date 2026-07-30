@@ -27,8 +27,9 @@ import {
   scheduleFiltersReady, SCHEDULE_FILTERS_EVENT, type CustomFilter,
 } from '@/lib/portal/schedule-filters';
 import { mailStatusLine, mailBadges, toneVars } from '@/lib/portal/mail-badges';
+import { extractEmailLocal } from '@/lib/portal/email-extract-local';
 import { searchTokens, matchesSearch } from '@/lib/portal/schedule-search';
-import { suggestScheduleFromEmail } from '@/lib/portal/email-schedule-suggest';
+import { suggestScheduleFromEmail, alreadyScheduled, type ScheduledSlot } from '@/lib/portal/email-schedule-suggest';
 import {
   loadSuggestState, markSuggest, mailSuggestReady, MAIL_SUGGEST_EVENT, type SuggestVerdict,
 } from '@/lib/portal/mail-suggest-state';
@@ -221,9 +222,26 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
     : { side: 'del' as const, label: L(dict, '删除', 'Delete'), bg: 'var(--status-risk-soft)', fg: 'var(--status-risk)' };
 
   /* ── 状态一行 + 右下角标签(2026-07-30 用户要求)────────────────────────
-     字段都是 gmail 路由抽好存在节点上的;缺就什么都不画(见 lib/portal/mail-badges.ts)。
-     日历项没有这些字段,自然是空 —— 不用为它加分支。 */
-  const attrs = row.node.attributes || {};
+     字段本来只在 **Gmail 重新同步**时由路由写进节点。真机实锤(用户:「说在邮件预览
+     条目里显示一些状态信息,没有见到」):收件箱里两百多封**全是老节点**,一个字段都没有,
+     于是状态行和标签一条都不出现 —— 功能做了,但对已有数据完全不存在,
+     而用户无从知道这一点,只会以为没做。
+
+     所以这里补一层**客户端兜底**:节点上没有 orderStatus/kindHint 时,就地拿节点已有的
+     标题 + 摘要/正文预览再抽一次(extractEmailLocal 是纯函数、零成本、零网络)。
+     立即生效、不等同步、连同步窗口之外的老邮件也有。
+     hasAttachment 抽不出来(要 Gmail 的 payload)—— 那个只能等同步,没有就不画,不猜。 */
+  const attrs = useMemo(() => {
+    const a = row.node.attributes || {};
+    if (kind === 'calendar') return a;                    // 日历项没有这些字段,不白跑正则
+    if (a.orderStatus || a.moneyFlow || a.kindHint) return a;  // 同步时已经写好了
+    const local = extractEmailLocal(
+      row.title,
+      typeof a.from === 'string' ? a.from : '',
+      row.body,
+    );
+    return { ...a, ...local } as typeof a;
+  }, [row.node.attributes, row.title, row.body, kind]);
   const status = mailStatusLine(attrs, dict);
   const badges = mailBadges(attrs, dict);
 
@@ -323,8 +341,8 @@ function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonl
   }, []);
 
   const kindLabel = (k: ReminderKind) => L(dict,
-    k === 'chore' ? '家务' : k === 'bill' ? '账单' : '其它',
-    k === 'chore' ? 'Chore' : k === 'bill' ? 'Bill' : 'Other');
+    k === 'chore' ? '家务' : k === 'bill' ? '账单' : k === 'event' ? '日程' : '其它',
+    k === 'chore' ? 'Chore' : k === 'bill' ? 'Bill' : k === 'event' ? 'Event' : 'Other');
 
   const openForm = () => {
     // 预填明天早上 9 点 —— 空着让人现敲年月日很烦,填「现在」又会立刻变成一条待处理的。
@@ -461,7 +479,12 @@ function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonl
  *
  * 处理过的记在 mail-suggest-state,同一封不问第二遍。
  */
-function MailSuggestions({ dict, rows }: { dict: 'zh' | 'en'; rows: Row[] }) {
+function MailSuggestions({ dict, rows, taken }: {
+  dict: 'zh' | 'en';
+  rows: Row[];
+  /** 日程里**已经有**的那些时刻(日历项 + 我设的提醒)。用来查重。 */
+  taken: ScheduledSlot[];
+}) {
   const [state, setState] = useState<Record<string, SuggestVerdict>>({});
   const [open, setOpen] = useState(false);
   const [err, setErr] = useState('');
@@ -480,18 +503,27 @@ function MailSuggestions({ dict, rows }: { dict: 'zh' | 'en'; rows: Row[] }) {
       const eid = typeof r.node.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
       if (!eid || state[eid]) continue;
       const hit = suggestScheduleFromEmail(r.title, r.body, r.dateIso);
-      if (hit) out.push({ row: r, eid, at: hit.at, snippet: hit.snippet });
+      if (!hit) continue;
+      /* 日程里已经有了就别再问一遍(2026-07-30 用户实锤:一封 "THIS SATURDAY —
+         Virtual Orientation" 被加成了提醒,而同一场活动本来就在 Google 日历里,
+         同一件事在同一页出现两遍、名字还不一样,看着像两个约)。
+         不提示就是不提示 —— 不必解释「因为日历里有了所以没提」,少一条建议没人会注意到。 */
+      const ms = parseWallClock(hit.at)?.getTime();
+      if (typeof ms === 'number' && alreadyScheduled(ms, r.title, taken)) continue;
+      out.push({ row: r, eid, at: hit.at, snippet: hit.snippet });
       if (out.length >= 12) break;   // 一次最多问 12 封;再多就不是「问一句」了
     }
     return out;
-  }, [rows, state]);
+  }, [rows, state, taken]);
 
   if (!cands.length) return null;
 
   const decide = (c: { row: Row; eid: string; at: string }, verdict: SuggestVerdict) => {
     setErr('');
     if (verdict === 'added') {
-      const created = addReminder({ title: c.row.title, at: c.at, kind: 'other', sourceEmailId: c.eid });
+      // 从邮件确认过来的是一个**约**,不是家务/账单 —— 用户原话:
+      // 「邮件里添加过来的称谓正常日程,不是我的提醒」。
+      const created = addReminder({ title: c.row.title, at: c.at, kind: 'event', sourceEmailId: c.eid });
       // 从存储回读 —— 写没进去就说出来,不能「按了没反应」也不能假装成功
       if (!created || !listReminders().some((r) => r.id === created.id)) {
         setErr(L(dict, '这条没能加进日程,稍后再试一次。', 'Could not add it — try again in a moment.'));
@@ -877,6 +909,25 @@ export default function SchedulePanel() {
   useEffect(() => {
     if (activeChip && !chips.some((c) => c.id === activeChip)) setActiveChip(null);
   }, [chips, activeChip]);
+  /* 日程里**已经占着**的时刻:日历项 + 我自己设的提醒。
+     邮件建议拿它查重 —— 已经有的事不再问第二遍。 */
+  const takenSlots = useMemo<ScheduledSlot[]>(() => {
+    const out: ScheduledSlot[] = [];
+    for (const r of calendarRows) {
+      const ms = new Date(r.dateIso).getTime();
+      if (Number.isFinite(ms)) out.push({ ms, title: r.title });
+    }
+    try {
+      for (const r of listReminders()) {
+        if (r.doneAt) continue;
+        const d = parseWallClock(r.at);
+        if (d) out.push({ ms: d.getTime(), title: r.title });
+      }
+    } catch { /* 读不到提醒不影响查重的另一半 */ }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarRows, nodes]);
+
   const chosen = activeChip ? chips.find((c) => c.id === activeChip) ?? null : null;
   const rows = chosen ? baseRows.filter((r) => matchesChip(r, chosen)) : baseRows;
 
@@ -1002,7 +1053,7 @@ export default function SchedulePanel() {
 
       {/* 收件里像是有约的那几封,问一句要不要进日程。用**未经搜索/筛选**的全量
           (emailRows)—— 这件事和「我这会儿在找什么」无关,不该被搜索框藏起来。 */}
-      {sub === 'email' && <MailSuggestions dict={dict} rows={emailRows} />}
+      {sub === 'email' && <MailSuggestions dict={dict} rows={emailRows} taken={takenSlots} />}
 
       {rows.length === 0 ? (
         <p className="nesio-insights-empty">

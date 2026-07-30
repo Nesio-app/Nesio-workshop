@@ -21,8 +21,13 @@ import { reportStorageDropped } from './storage-health';
 export const SCHEDULE_REMINDERS_KEY = 'nesio-schedule-reminders-v1';
 export const SCHEDULE_REMINDERS_EVENT = 'nesio-schedule-reminders-updated';
 
-export type ReminderKind = 'chore' | 'bill' | 'other';
-export const REMINDER_KINDS: ReminderKind[] = ['chore', 'bill', 'other'];
+/**
+ * 'event' 是 2026-07-30 加的:从邮件确认过来的是一个**约**(看诊/面试/活动),
+ * 用户原话「邮件里添加过来的称谓正常日程,不是我的提醒」—— 它在列表里该显示成
+ * 「日程」,而不是和倒垃圾、交房租并列成「其它」。
+ */
+export type ReminderKind = 'chore' | 'bill' | 'event' | 'other';
+export const REMINDER_KINDS: ReminderKind[] = ['chore', 'bill', 'event', 'other'];
 
 export interface Reminder {
   id: string;
