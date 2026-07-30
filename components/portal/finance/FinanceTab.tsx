@@ -26,6 +26,7 @@ import { incomeBreakdown, detectIncome, portfolioSummary, recurringPriceHikes } 
 import { loadCombinedFinanceTx, loadCombinedFinanceAccounts } from '@/lib/portal/tesla-finance';
 import QuickAddSheet from './QuickAddSheet';
 import ReconcileSheet from './ReconcileSheet';
+import RefundPairs from './RefundPairs';
 import CardsPane from './CardsPane';
 import AcctLogo from './AcctLogo';
 import InvestPane from './InvestPane';
@@ -962,6 +963,9 @@ export default function FinanceTab() {
             {L(dict, '上传对账单核对(只在本机解析,不上传)', 'Check a statement (parsed on this device)')}
           </button>
           <ReconcileSheet open={reconcileOpen} onClose={() => setReconcileOpen(false)} onSaved={() => setRev((r) => r + 1)} />
+          {/* L4:退款配对。放在交易页 —— 退款本身就是一条交易,配的也是同一页里的另一条。
+              建议 + 确认,不自动生效:配错会让两笔真实的钱互相抵消,而且看不出来。 */}
+          <RefundPairs txs={txs} currency={summary.currency || undefined} onChanged={() => setRev((r) => r + 1)} />
           {review.length > 0 && (
             <>
               <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, `规则审核 · ${review.length} 笔待归类`, `Review · ${review.length} to categorize`)}</p>
