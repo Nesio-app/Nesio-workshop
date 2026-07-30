@@ -10,28 +10,13 @@ import { usePortalLocale } from './use-portal-locale';
 import { L } from '@/lib/portal/i18n';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, deleteFocusNode, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem, getLiveMemoryNode, type LiveMemoryNode } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
-import {
-  loadDormantStore, evaluateDormancy, selectReviewCandidate, applyReviewAction,
-  touchNode, getReviewTier,
-  type DormantStore, type DormantCandidate,
-} from '@/lib/platform/dormant-engine';
-import { runGuidancePipeline, TODAY_CARD_BUDGET } from '@/lib/platform/guidance-engine/guidance-pipeline';
-import { recordCardFeedback, type EvidenceRef } from '@/lib/portal/reasoning-engine';
-import { loadCoolingStore, recordDismissed, saveCoolingStore } from '@/lib/platform/guidance-engine/cooling-store';
-import {
-  calendarEventsToGuidanceEvents,
-  emailSignalsToGuidanceEvents,
-  specialDaysToGuidanceEvents,
-  focusNodesToGuidanceEvents,
-  weatherToGuidanceEvents,
-  healthNodesToGuidanceEvents,
-  type WeatherSnapshot,
-  decCardsToGuidanceEvents,
-} from '@/lib/platform/guidance-engine/source-adapters';
+import { dismissJudgedCard } from '@/lib/portal/guidance-judge-auto';
+import { resolveCardTarget, openCardTarget } from '@/lib/portal/card-target';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import dynamic from 'next/dynamic';
 import { createPortal } from 'react-dom';
 import { dismissProactiveById, getProactiveCardBudget } from './today/proactive-types';
+import { archiveShownCard } from '@/lib/portal/card-archive';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
 import CaptureBar from './today/CaptureBar';
@@ -40,7 +25,6 @@ import { DailyReportCard } from './today/DailyReportCard';
 import { ThawedReminder } from './today/ThawedReminder';
 import { ReengageNudgeCard } from './today/ReengageNudgeCard';
 import { TodayFocusSection } from './today/FocusSection';
-import { NightTimeline } from './today/NightTimeline';
 import { useTodayData } from './today/useTodayData';
 import { FocusModeSheet } from './today/FocusModeSheet';
 import { MeetingRecorderSheet } from './today/MeetingRecorderSheet';
@@ -50,6 +34,7 @@ const MemoryNodeDetailLazy = dynamic(() => import('./MemoryNodeDetail'), { ssr: 
 const FamilyTodayStrip = dynamic(() => import('./today/FamilyTodayStrip'), { ssr: false });
 import MemoryFlashBanner, { useMemoryFlash } from './MemoryFlashBanner';
 import WrappedCard, { useWrappedTrigger } from './WrappedCard';
+import { takeCloudRestoreReceipt, restoreReceiptText } from '@/lib/portal/cloud-restore-receipt';
 
 // ---- Main TodayFeed component ----
 
@@ -78,6 +63,8 @@ export default function TodayFeed({
     return () => window.removeEventListener('nesio-rewards-updated', sync);
   }, []);
   const [guideDetailNode, setGuideDetailNode] = useState<LiveMemoryNode | null>(null); // 批次 83:引导卡点开详情
+  // 云端往本机填过数据时的一次性回执(QA:积分 0→150 像被人乱改)。读一次即清。
+  const [restoreNote, setRestoreNote] = useState<string | null>(null);
   // 批次 31:焦点下方快捷输入(用户新指令)
   const [quickAdd, setQuickAdd] = useState('');
   const uiLocale = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -304,14 +291,43 @@ export default function TodayFeed({
   // 不硬凑 —— 轮播兜底(历史上的今天/小技巧)已废除,「页面活着」由收据首行负责。
   const hourNow = new Date().getHours();
   const isEvening = hourNow >= 21;
-  const cardBudget = Math.min(TODAY_CARD_BUDGET, getProactiveCardBudget(), isEvening ? 2 : 1);
+  const cardBudget = Math.min(3, getProactiveCardBudget(), isEvening ? 2 : 1);
+  // 「安静」模式(getProactiveCardBudget()===0)此前只管判决卡 —— 回顾/Wrapped/回访/例行/实验
+  // 五张旁路 nudge 卡照出不误,用户设了安静还是被打扰(Today 审计 2026-07-29)。
+  // 日报(显式开关)/解冻(用户自设承诺)/家庭(共享义务)不属打扰,不受此闸。
+  const quietAll = getProactiveCardBudget() === 0;
   // 架构审查 #2:统一仲裁 —— 置顶抢占的节点,其引导卡不再重复出现
   const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null);
   const guidanceNodeIds = useMemo(() => proactiveCards.map((c) => c.nodeId).filter((x): x is string => Boolean(x)), [proactiveCards]);
-  const activeProactiveCards = proactiveCards
+  // 配额只管噪音不管安全:severity 3(urgent)豁免截断,登机口不能被「今天已出一张」挡住。
+  const visibleProactive = proactiveCards
     .filter((c) => !dismissedCardIds.has(c.id) && (!c.nodeId || c.nodeId !== pinnedNodeId)
-      && (!c.expiresAt || new Date(c.expiresAt).getTime() > Date.now()))
-    .slice(0, cardBudget);
+      && (!c.expiresAt || new Date(c.expiresAt).getTime() > Date.now()));
+  const activeProactiveCards = [
+    ...visibleProactive.filter((c) => c.urgent),
+    ...visibleProactive.filter((c) => !c.urgent).slice(0, cardBudget),
+  ];
+  const showFallbackNote = activeProactiveCards.some((c) => c.sourceTags.includes('fallback'));
+
+  // 卡片档案:真实上屏即入档(times 累计)。AI 判决卡在判决时已建条,这里 bump;
+  // 兜底/遗留卡记 rules lane。档案是唯一监测面,出一次记一次。
+  useEffect(() => {
+    for (const card of activeProactiveCards) {
+      const isJudge = card.id.startsWith('judge-');
+      archiveShownCard({
+        id: isJudge ? (card.factKey || card.id) : `rules:${card.factKey || card.id}`,
+        lane: isJudge ? 'ai' : 'rules',
+        group: card.cardType || '其他',
+        title: card.title,
+        body: card.body,
+        whyNow: card.reason || '',
+        evidence: [],
+        severity: Math.max(0, Math.min(3, Math.round(card.priority / 3))),
+        gates: [],
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 以卡片 id 序列为准,避免对象引用抖动重复入档
+  }, [activeProactiveCards.map((c) => c.id).join('|')]);
 
   // §1 ①收据首行 → 批次 80(用户定案「都记着呢N条意义不大」):
   // 称呼(首次设置的名字) + 时段问候 + **一条最有用的信息**
@@ -342,19 +358,26 @@ export default function TodayFeed({
     // 批次188(用户实锤:问候「接下来:X」与下面第一张焦点卡是**同一件事**,UI/算法重叠)——
     // 问候不再复述具体事项(焦点卡已经在讲这件事,还能点开拆解),只保留「几件要紧 + 最近多近」
     // 的概览,时间提示不带事件名 → 与焦点列表分工:问候=一眼概览,卡片=具体+可操作。
-    let nextHint = '';
+    // 用户实锤逻辑错(2026-07-29):「今天有 8 件,最近的一件明天」—— 原计数把未来所有
+    // 带时点的节点都算进"今天"。改:只数**日期是今天**的;「最近一件」整个去掉(只报件数)。
+    const sameLocalDay = (iso: string) => {
+      const d = new Date(iso);
+      const t = new Date();
+      return !Number.isNaN(d.getTime()) && d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+    };
     let actionable = 0;
     for (const n of focusNodes) {
       const hint = focusTimeHint(n, uiLocale);
       if (!hint || hint === L(uiLocale, '刚记录', 'just noted') || hint === L(uiLocale, '已过期', 'expired')) continue;
       if (GREETING_NOISE_RE.test(n.name)) continue; // 别人的 OOO/请假不当"你的一件事"
-      if (!nextHint) nextHint = hint;
+      const dateStr = String(n.attributes?.date ?? n.attributes?.dueDate ?? n.attributes?.eventDate ?? '');
+      if (!dateStr || !sameLocalDay(dateStr)) continue;
       actionable++;
     }
     if (actionable > 0) {
       return `${prefix}${L(uiLocale,
-        `今天有 ${actionable} 件要紧的,最近的一件${nextHint}。`,
-        `${actionable} thing${actionable > 1 ? 's' : ''} need you today — nearest ${nextHint}.`)}`;
+        `今天有 ${actionable} 件要紧的。`,
+        `${actionable} thing${actionable > 1 ? 's' : ''} need you today.`)}`;
     }
     if (isEvening) {
       return receipt.todayCount > 0
@@ -399,40 +422,61 @@ export default function TodayFeed({
             改回设计系统正文 sans(--font-sans,Noto Sans SC 简体优先)+ 常规字重。 */}
         <p className="nesio-today-receipt">{receiptLine}</p>
 
+        {/* 云端往本机填过数据时的一次性回执(QA:积分 0→150 像被人乱改)。读一次即清。 */}
+        {restoreNote && (
+          <p style={{ margin: '0 0 0.6rem', fontSize: '0.72rem', lineHeight: 1.6, color: 'var(--portal-muted)' }}>
+            {restoreNote}
+          </p>
+        )}
+
         {/* 家庭家务闭环的今天页一端:分给我的家务可当场完成;有人做完了在这收到回响。空则不渲染。
             仅登录(canUsePrivateData)才挂载 —— 登出用户不白打一次 401。 */}
         {canUsePrivateData && <FamilyTodayStrip />}
 
         {/* 批次 105:回顾卡(去年今日)—— 念念翻出一条旧记忆,放问候下面(设计规范今天页第 2 段)。
             周年/月纪念优先;没有符合的不渲染。点开复用 MemoryNodeDetail。 */}
-        <RetrospectCard onOpen={(id) => { const live = getLiveMemoryNode(id); if (live) setGuideDetailNode(live); }} />
+        {!quietAll && <RetrospectCard onOpen={(id) => { const live = getLiveMemoryNode(id); if (live) setGuideDetailNode(live); }} />}
 
         {/* 季度 Wrapped 卡片 */}
-        {showWrapped && <WrappedCard onDismiss={dismissWrapped} />}
+        {!quietAll && showWrapped && <WrappedCard onDismiss={dismissWrapped} />}
 
         {/* 每日图文日报(未来预测区首张;仅登录 + 开关开 + 有内容时,todayReport 已受私据门)*/}
         {canUsePrivateData && <DailyReportCard report={todayReport} />}
 
         {/* 回访再触达:来过好几回但某功能没碰过 → 轻轻探一句(全局两天一条,可稍后/不再提醒)*/}
-        {canUsePrivateData && (
+        {canUsePrivateData && !quietAll && (
           <ReengageNudgeCard
             nodes={allNodes}
             onOpenInsights={() => window.dispatchEvent(new CustomEvent('nesio-open-insights'))}
           />
         )}
 
-        {/* 未来引导卡 — up to 2, each independently dismissable */}
+        {/* AI 判决不可用时的兜底提示(承诺④:降级必须可见,不许静默) */}
+        {showFallbackNote && (
+          <p className="nesio-settings-option-hint" style={{ margin: '0 0 var(--space-2)' }}>
+            {L(uiLocale, 'AI 判断暂不可用,先看这些确定的。', 'AI judging unavailable — here are the certain ones.')}
+          </p>
+        )}
+
+        {/* 未来引导卡 — AI 判决出的卡;点开走 resolver,关掉记当日日键 */}
         {activeProactiveCards.map((card) => (
           <ProactiveGuidanceCard
             key={card.id}
             card={card}
-            onOpen={card.nodeId ? () => { const live = getLiveMemoryNode(card.nodeId!); if (live) setGuideDetailNode(live); } : undefined}
+            onOpen={card.nodeId
+              ? () => { const live = getLiveMemoryNode(card.nodeId!); if (live) setGuideDetailNode(live); }
+              : card.fingerprints
+                ? () => { const t = resolveCardTarget(card.fingerprints!); if (t) openCardTarget(t); }
+                : undefined}
             onDismiss={() => {
-              dismissProactiveById(card.id);
-              // Record in cooling store so adaptive cooldown can kick in after repeated ignores
-              if (card.cardType) {
-                saveCoolingStore(recordDismissed(card.cardType, loadCoolingStore()));
+              // 判决卡:「知道了」= 当日日键静默(三门之一);兜底/遗留卡走旧 dismissed 存储。
+              // 冷却(自适应 2-24h)已随规则管线拆除 —— 用户裁决(card-verdict)与日键是仅存的记忆。
+              if (card.id.startsWith('judge-') && card.factKey) {
+                dismissJudgedCard(card.factKey);
               }
+              // 只记当日,不带 factKey —— 带了就是按指纹永久静音,会把「喜欢」「稍后」也一并
+              // 永久闭嘴(用户实锤审计 2026-07-29)。永久语义只属于「没用」(card-verdict mute)。
+              dismissProactiveById(card.id);
               setDismissedCardIds((prev) => { const next = new Set(prev); next.add(card.id); return next; });
             }}
             onMarkDone={(nodeId) => markFocusNodeDone(nodeId)}
@@ -487,8 +531,8 @@ export default function TodayFeed({
             记一笔输入内联进时间线「记一笔·话筒」节点(唯一极简输入入口)。 */}
 
         {/* 实验打卡(批次 8:按用户要求放到最下面) */}
-        <RoutineDueCards />
-        <ExperimentCheckinCard />
+        {!quietAll && <RoutineDueCards />}
+        {!quietAll && <ExperimentCheckinCard />}
 
         {/* 批次 169:用户实锤去掉底部「想到什么…」提示行 */}
       </div>

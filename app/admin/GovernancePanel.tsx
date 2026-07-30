@@ -31,9 +31,16 @@ interface GovResponse {
 }
 
 const STATUS_ORDER: GovStatus[] = ['enforced', 'report-only', 'dormant', 'drifted', 'dead'];
+// 走 design token(此前是五个写死的十六进制,夜间主题下不跟随 —— 仓库红线)。
 const STATUS_COLOR: Record<GovStatus, string> = {
-  enforced: '#2e9e6b', 'report-only': '#c98a1a', dormant: '#6b6f9e', drifted: '#d64545', dead: '#8a8f99',
+  enforced: 'var(--status-go)',
+  'report-only': 'var(--status-gentle)',
+  dormant: 'var(--status-calm)',
+  drifted: 'var(--status-risk)',
+  dead: 'var(--portal-muted)',
 };
+/** 快照过期阈值:超过这么多天就明说「这几个数是旧的」(Bug4 图14 数据准确性)。 */
+const SNAPSHOT_STALE_DAYS = 14;
 
 const card: React.CSSProperties = {
   background: 'var(--glass-bg-raised)', border: '1px solid var(--glass-border)',
@@ -80,10 +87,21 @@ export function GovernancePanel({ secret }: { secret: string }) {
   const total = summary?.total ?? (map?.length ?? 0);
   const risky = (map ?? []).filter((e) => e.status === 'drifted' || e.status === 'dead');
 
+  // Bug4 图14「治理数据准确性」:这一版面把两种数据混在一起印 ——
+  // 治理面总数是**请求时现算**的(summarizeGovernance()),就绪模块/数据总线来自
+  // **构建期快照**(governance-snapshot.json,要跑 report:governance-docs 才刷)。
+  // 之前三张卡长得一模一样,读的人会以为都是实时的。这里在脚注里各自注明,
+  // 并在快照太旧时明着标出来。
+  const snapAgeDays = data.generatedAt
+    ? Math.floor((Date.now() - new Date(data.generatedAt).getTime()) / 86400000)
+    : null;
+  const snapStale = snapAgeDays !== null && snapAgeDays > SNAPSHOT_STALE_DAYS;
+  const snapFoot = (extra: string) =>
+    `${extra} · 构建期快照${snapAgeDays === null ? '' : snapAgeDays <= 0 ? ',今天刷的' : `,${snapAgeDays} 天前`}`;
   const kpis: Array<[string, string, string]> = [
-    ['治理面总数', String(total), '跨 7 层'],
-    ['就绪模块', `${snapshot?.summary?.readyModuleCount ?? '—'} / ${snapshot?.summary?.moduleCount ?? '—'}`, `${snapshot?.summary?.externalLinkCount ?? '—'} 个外部链接`],
-    ['数据总线·孤立键', `${snapshot?.dataBus?.orphanedDataKeyCount ?? '—'} / ${snapshot?.dataBus?.dataKeyCount ?? '—'}`, `仅 ${snapshot?.dataBus?.connectedDataKeyCount ?? '—'} 个已连接`],
+    ['治理面总数', String(total), `跨 ${Object.keys(groupMeta ?? {}).length} 层 · 实时`],
+    ['就绪模块', `${snapshot?.summary?.readyModuleCount ?? '—'} / ${snapshot?.summary?.moduleCount ?? '—'}`, snapFoot(`${snapshot?.summary?.externalLinkCount ?? '—'} 个外部链接`)],
+    ['数据总线·孤立键', `${snapshot?.dataBus?.orphanedDataKeyCount ?? '—'} / ${snapshot?.dataBus?.dataKeyCount ?? '—'}`, snapFoot(`仅 ${snapshot?.dataBus?.connectedDataKeyCount ?? '—'} 个已连接`)],
   ];
 
   return (
@@ -91,8 +109,10 @@ export function GovernancePanel({ secret }: { secret: string }) {
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
         <h2 style={{ fontSize: '1rem', margin: 0, color: 'var(--portal-ink)' }}>软件治理地图</h2>
         <span style={{ fontSize: '0.7rem', color: 'var(--portal-muted)' }}>
-          聚合状态 <b style={{ color: STATUS_COLOR.drifted }}>{snapshot?.status ?? '—'}</b>
+          {/* 之前不管状态是什么都染成红色(写死 STATUS_COLOR.drifted),ok 也显示成告警。 */}
+          聚合状态 <b style={{ color: snapshot?.status === 'ok' ? 'var(--status-go)' : snapshot?.status === 'warn' ? 'var(--status-gentle)' : 'var(--status-risk)' }}>{snapshot?.status ?? '—'}</b>
           {data.generatedAt ? ` · 快照 ${data.generatedAt.slice(0, 10)}` : ''}
+          {snapStale && <b style={{ color: 'var(--status-gentle)', marginLeft: 6 }}>快照已过期,跑 npm run report:governance-docs</b>}
         </span>
       </div>
 

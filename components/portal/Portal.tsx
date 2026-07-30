@@ -473,6 +473,8 @@ export default function Portal() {
   // (用户原话:「充电花费」和「行驶记录」能跳,只有「停车/充电位置」这一行是死的 ——
   //  其实是那一次他已经在 timeline 上了)。带个自增号,每次派发都算一次新的深链。
   const [insightsNonce, setInsightsNonce] = useState(0);
+  // 洞察是否停在宫格首页 —— 首页要露出底部导航(Bug4 图12)。由 InsightsSheet 回报。
+  const [insightsHub, setInsightsHub] = useState(false);
   const [proGate, setProGate] = useState<string | null>(null); // 非 null = 显示 Pro 升级引导(值=功能名)
   // 跨账号本地数据冲突(P0 隐私):登录后本机数据归属与当前用户不符 → 阻断处理
   const [ownerConflict, setOwnerConflict] = useState<
@@ -616,6 +618,11 @@ export default function Portal() {
       })();
     };
     const scheduleHeavySyncBatch = () => whenIdle(runHeavySyncBatch);
+    // 语音 sheet 的 chunk 预取:点麦克风时才下载会有一段「点了没反应」的空白
+    // (真机上常与图谱事件风暴撞在一起,更像卡死)。空闲时先拉好,点开即出。
+    whenIdle(() => { void import('./VoiceInputSheet').catch(() => {}); });
+    // 一次性自愈(2026-07-29):清历史邮件重复节点 + 已拆模块的孤儿 key。幂等,跑过即零开销。
+    whenIdle(() => { void import('@/lib/portal/storage-heal').then((m) => m.runStorageHealOnce()).catch(() => {}); });
     scheduleHeavySyncBatch(); // 挂载/登录:也推到空闲,不阻塞首屏交互
     const unregisterLearningPush = registerLearningAutoPush();
     // 批次205:改名字/头像/语言/教练/日报/主题任一 → 防抖自动推上云,别端拉取即一致。
@@ -880,6 +887,14 @@ export default function Portal() {
       setInsightsOpen(true);
     };
     const trainingHandler = () => { setInsightsTab('fitness'); setInsightsNonce((n) => n + 1); setInsightsOpen(true); };
+    // Bug4 图25-30:全屏子页(美味等)右上角的「今天」—— 一步回今天,不是逐层往回退。
+    // 关掉洞察浮层再切面,否则浮层还盖着,点了像没反应。
+    const goTodayHandler = () => {
+      setInsightsOpen(false);
+      setCookingOpen(false);
+      setInventoryOpen(false);
+      setActiveSurface('today');
+    };
     const workoutHandler = (e: Event) => { track('workout_start', {}); setWorkoutKey((k) => k + 1); setWorkoutSession((e as CustomEvent).detail); };
     const proGateHandler = (e: Event) => {
       const feature = (e as CustomEvent).detail?.feature || 'pro';
@@ -915,6 +930,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-brief', briefHandler);
     window.addEventListener('nesio-open-insights', insightsHandler);
     window.addEventListener('nesio-open-training', trainingHandler);
+    window.addEventListener('nesio-go-today', goTodayHandler);
     window.addEventListener('nesio-start-workout', workoutHandler);
     return () => {
       window.removeEventListener('nesio-memory-search', memorySearchHandler);
@@ -932,6 +948,7 @@ export default function Portal() {
       window.removeEventListener('nesio-open-brief', briefHandler);
       window.removeEventListener('nesio-open-insights', insightsHandler);
       window.removeEventListener('nesio-open-training', trainingHandler);
+      window.removeEventListener('nesio-go-today', goTodayHandler);
       window.removeEventListener('nesio-start-workout', workoutHandler);
     };
   }, []);
@@ -1318,11 +1335,14 @@ export default function Portal() {
           <PortalBottomNav
             activeSurface={activeSurface}
             locale={locale}
-            onToday={() => setActiveSurface('today')}
+            // Bug4 图12:洞察首页的右上「今天」按钮删了,回今天全靠这颗导航键 ——
+            // 它必须同时把洞察浮层关掉,否则点了看起来「没反应」(浮层还盖着)。
+            onToday={() => { setInsightsOpen(false); setActiveSurface('today'); }}
             onCamera={(file) => { setCameraFile(file); setCaptureMode('camera'); }}
             onAsk={handleAskFromCenterButton}
             onInsights={() => { setInsightsTab(undefined); setInsightsOpen(true); }}
             insightsActive={insightsOpen}
+            aboveOverlay={insightsOpen && insightsHub}
             onChatOpen={() => setChatOpen(true)}
           />
         )}
@@ -1454,7 +1474,7 @@ export default function Portal() {
           className="nesio-insights-sheet-card"
           ariaLabel={L(dict, 'Nesio 的洞察', "Nesio's insights")}
         >
-          <InsightsSheet onClose={() => setInsightsOpen(false)} canUsePrivateData={canViewPrivateData} initialTab={insightsTab} tabNonce={insightsNonce} />
+          <InsightsSheet onClose={() => setInsightsOpen(false)} canUsePrivateData={canViewPrivateData} initialTab={insightsTab} tabNonce={insightsNonce} onHubChange={setInsightsHub} />
         </NesioSheet>
       )}
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />

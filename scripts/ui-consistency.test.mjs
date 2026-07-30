@@ -30,8 +30,10 @@ const code = stripComments;
     'components/portal/insights/SchedulePanel.tsx',
     'components/portal/insights/WardrobePanel.tsx',
     'components/portal/cooking/CookingSheet.tsx',
-    // 2026-07-29 复审补录:这两处也是各写一套(第 6、7 套),一并收编
-    'components/portal/health/BodyLedgerPanel.tsx',
+    // 2026-07-29 复审补录:这两处也是各写一套(第 6、7 套),一并收编。
+    // 2026-07-30 移除 BodyLedgerPanel:main 的 bug2 批把它的三个子 tab 整个删了
+    // (今日账本内容直接作为主体),这份名单钉的是「有 tab 就得用 SegTabs」,
+    // 没有 tab 的文件留在名单里只会让契约红在一件已经做对的事上。
   ];
   for (const f of CALLERS) {
     const c = code(read(f));

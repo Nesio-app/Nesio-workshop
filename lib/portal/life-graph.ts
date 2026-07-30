@@ -343,6 +343,51 @@ function queueCloudSyncOutboxItem(
   saveCloudSyncOutboxMap(items);
 }
 
+/**
+ * 批量版:一次读、全部改、一次写。
+ * 逐条版在 N 条循环里各自「读整张表 → 改一格 → 写回整张表」,是 O(N²) 的序列化;
+ * 回填 200 条时四个阶段合计约 800 次全表读写 —— 打开记忆页卡顿的真实来源之一。
+ */
+function queueCloudSyncOutboxItems(resourceIds: readonly string[], operation: CloudSyncOperation): void {
+  if (!resourceIds.length) return;
+  const items = loadCloudSyncOutboxMap();
+  const now = new Date().toISOString();
+  for (const resourceId of resourceIds) {
+    const key = cloudSyncRecordKey(resourceId, operation);
+    const current = items.get(key);
+    items.set(key, {
+      resourceId,
+      operation,
+      queuedAt: current?.queuedAt || now,
+      updatedAt: now,
+      attempts: current?.attempts || 0,
+    });
+  }
+  saveCloudSyncOutboxMap(items);
+}
+
+/** 批量记一次投递尝试(同上,一次读写)。 */
+function updateCloudSyncOutboxAttempts(resourceIds: readonly string[], operation: CloudSyncOperation): void {
+  if (!resourceIds.length) return;
+  const items = loadCloudSyncOutboxMap();
+  const now = new Date().toISOString();
+  for (const resourceId of resourceIds) {
+    const key = cloudSyncRecordKey(resourceId, operation);
+    const current = items.get(key);
+    if (!current) continue;
+    items.set(key, { ...current, updatedAt: now, attempts: current.attempts + 1 });
+  }
+  saveCloudSyncOutboxMap(items);
+}
+
+/** 批量出队(成功后清理)。 */
+function removeCloudSyncOutboxItems(resourceIds: readonly string[], operation: CloudSyncOperation): void {
+  if (!resourceIds.length) return;
+  const items = loadCloudSyncOutboxMap();
+  for (const resourceId of resourceIds) items.delete(cloudSyncRecordKey(resourceId, operation));
+  saveCloudSyncOutboxMap(items);
+}
+
 function updateCloudSyncOutboxAttempt(resourceId: string, operation: CloudSyncOperation): void {
   const items = loadCloudSyncOutboxMap();
   const key = cloudSyncRecordKey(resourceId, operation);
@@ -389,6 +434,32 @@ function saveCloudSyncRecordMap(records: Map<string, LifeGraphCloudSyncRecord>):
 function cloudSyncErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
   return 'cloud_memory_sync_failed';
+}
+
+/** 批量标待发 / 已同步 / 失败:同样一次读写(见 queueCloudSyncOutboxItems 的说明)。 */
+function markCloudSyncMany(
+  resourceIds: readonly string[],
+  operation: CloudSyncOperation,
+  status: 'pending' | 'synced' | 'failed',
+  error?: unknown,
+): void {
+  if (!resourceIds.length) return;
+  const records = loadCloudSyncRecordMap();
+  const now = new Date().toISOString();
+  for (const resourceId of resourceIds) {
+    const key = cloudSyncRecordKey(resourceId, operation);
+    const current = records.get(key);
+    records.set(key, {
+      resourceId,
+      operation,
+      status,
+      attempts: status === 'pending' ? (current?.attempts || 0) + 1 : (current?.attempts || 1),
+      updatedAt: now,
+      lastSyncedAt: status === 'synced' ? now : current?.lastSyncedAt,
+      ...(status === 'failed' ? { lastError: cloudSyncErrorMessage(error) } : {}),
+    });
+  }
+  saveCloudSyncRecordMap(records);
 }
 
 function markCloudSyncPending(resourceId: string, operation: CloudSyncOperation): void {
@@ -488,8 +559,28 @@ async function cloudFetchWithSmartError(
     const transient = CLOUD_TRANSIENT_ERRORS.has(errorCode) || response.status === 503 || response.status === 401;
     return { ok: false, transient, error: errorCode };
   } catch {
-    return { ok: false, transient: false, error: 'cloud_memory_network_error' };
+    // 网络错(断网/超时)是**暂时**的:标 failed 会把它踢出重试队列、还刷屏报错。
+    // 归 transient → 留在 pending,等退避窗口到了再试。
+    return { ok: false, transient: true, error: 'cloud_memory_network_error' };
   }
+}
+
+/** 指数退避:第 N 次尝试后至少等 min(30s × 2^N, 6h) 再重试。 */
+const RETRY_BASE_MS = 30_000;
+const RETRY_MAX_MS = 6 * 3_600_000;
+/** 单轮重试条数上限 —— 此前无上限,离线时会顺序发几百个注定失败的请求。 */
+const RETRY_BATCH_CAP = 25;
+
+export function retryBackoffMs(attempts: number): number {
+  return Math.min(RETRY_BASE_MS * Math.pow(2, Math.max(0, attempts)), RETRY_MAX_MS);
+}
+
+/** 到点了吗?(attempts 越多等越久;没有 updatedAt 的老记录立即可试) */
+export function isRetryDue(record: { attempts?: number; updatedAt?: string }, now = Date.now()): boolean {
+  if (!record.updatedAt) return true;
+  const last = Date.parse(record.updatedAt);
+  if (!Number.isFinite(last)) return true;
+  return now - last >= retryBackoffMs(record.attempts || 0);
 }
 
 async function syncLifeGraphUpsertToCloud(node: LifeNode): Promise<void> {
@@ -538,9 +629,12 @@ export async function retryLifeGraphCloudSync(): Promise<{
 }> {
   if (!cloudMemorySyncEnabled()) return { retriedCount: 0, succeededCount: 0, failedCount: 0 };
 
-  const retryRecords = getLifeGraphCloudSyncRecords().filter(
-    (record) => record.status === 'pending' || record.status === 'failed',
-  );
+  // 退避 + 限量:离线时此前会顺序发几百个注定失败的请求(控制台刷屏 + 白耗主线程)。
+  // 现在只取「退避窗口已到」的前 N 条,重试次数越多等得越久。
+  const now = Date.now();
+  const retryRecords = getLifeGraphCloudSyncRecords().filter((record) => record.status === 'pending' || record.status === 'failed')
+    .filter((record) => isRetryDue(record, now))
+    .slice(0, RETRY_BATCH_CAP);
   const outboxItemsByKey = loadCloudSyncOutboxMap();
   // 权威源:待发的节点内容从图谱按 id 取回(outbox 只留 id,不再存副本)
   const graphById = new Map(loadAll().map((n) => [n.id, n]));
@@ -875,12 +969,13 @@ export async function backfillLocalLifeGraphToCloud({ limit = 200 }: { limit?: n
     return { attemptedNodeCount: 0, attemptedAssetCount: 0 };
   }
 
-  for (const node of backfillNodes) {
-    queueCloudSyncOutboxItem(node, 'backfill');
-    markCloudSyncPending(node.id, 'backfill');
-  }
+  // 批量记账:此前逐条调用,200 个节点 × 四阶段 ≈ 800 次全表读写(O(N²) 序列化),
+  // 是「打开记忆页冻住」的真实来源之一。现在每个阶段只读写一次。
+  const backfillIds = backfillNodes.map((n) => n.id);
+  queueCloudSyncOutboxItems(backfillIds, 'backfill');
+  markCloudSyncMany(backfillIds, 'backfill', 'pending');
   try {
-    for (const node of backfillNodes) updateCloudSyncOutboxAttempt(node.id, 'backfill');
+    updateCloudSyncOutboxAttempts(backfillIds, 'backfill');
     const response = await fetch(CLOUD_MEMORY_ENDPOINT, {
       method: 'POST',
       credentials: 'include',
@@ -890,13 +985,11 @@ export async function backfillLocalLifeGraphToCloud({ limit = 200 }: { limit?: n
       body: JSON.stringify({ nodes: backfillNodes, assets: backfillAssets, backfill: true }),
     });
     if (!response.ok) throw new Error('cloud_memory_sync_failed');
-    for (const node of backfillNodes) {
-      markCloudSyncSynced(node.id, 'backfill');
-      removeCloudSyncOutboxItem(node.id, 'backfill');
-      syncLifeNodeSignalToCloud(node);
-    }
+    markCloudSyncMany(backfillIds, 'backfill', 'synced');
+    removeCloudSyncOutboxItems(backfillIds, 'backfill');
+    for (const node of backfillNodes) syncLifeNodeSignalToCloud(node);
   } catch (error) {
-    for (const node of backfillNodes) markCloudSyncFailed(node.id, 'backfill', error);
+    markCloudSyncMany(backfillIds, 'backfill', 'failed', error);
   }
 
   return { attemptedNodeCount: backfillNodes.length, attemptedAssetCount: backfillAssets.length };

@@ -376,8 +376,44 @@ export async function GET(req: NextRequest) {
       } catch { /* 单 token 失败不影响其余 */ }
     }
 
+    // Guidance 全 AI 化 Step 4 前置:/liabilities/get —— 信用卡还款日/最低还款/账单余额是
+    // **结构化字段**(9 张卡 $5,672 债务此前没有任何到期提醒来源)。与 recurring 同款容错:
+    // 产品未开通静默跳过、单 token 失败不阻断、全挂时字段缺席(客户端保留上次好数据)。
+    interface PlaidLiabilityRow {
+      account_id?: string; next_payment_due_date?: string | null; minimum_payment_amount?: number | null;
+      last_statement_balance?: number | null; is_overdue?: boolean | null;
+    }
+    const liabilities: Array<{ accountId: string; kind: 'credit' | 'mortgage' | 'student'; dueDate: string; minPayment?: number; statementBalance?: number; isOverdue?: boolean }> = [];
+    let liabilitiesOk = false;
+    for (const accessToken of keptTokens) {
+      try {
+        const liab = await plaidPost('/liabilities/get', { access_token: accessToken }) as {
+          liabilities?: { credit?: PlaidLiabilityRow[]; mortgage?: PlaidLiabilityRow[]; student?: PlaidLiabilityRow[] }; error_code?: string;
+        };
+        if (liab.error_code) continue;
+        liabilitiesOk = true;
+        const pushLiab = (arr: PlaidLiabilityRow[] | undefined, kind: 'credit' | 'mortgage' | 'student') => {
+          for (const row of arr ?? []) {
+            if (!row.account_id || !row.next_payment_due_date) continue; // 没到期日的负债对提醒无用
+            liabilities.push({
+              accountId: row.account_id,
+              kind,
+              dueDate: row.next_payment_due_date,
+              ...(row.minimum_payment_amount != null ? { minPayment: Math.round(row.minimum_payment_amount * 100) / 100 } : {}),
+              ...(row.last_statement_balance != null ? { statementBalance: Math.round(row.last_statement_balance * 100) / 100 } : {}),
+              ...(row.is_overdue != null ? { isOverdue: row.is_overdue } : {}),
+            });
+          }
+        };
+        pushLiab(liab.liabilities?.credit, 'credit');
+        pushLiab(liab.liabilities?.mortgage, 'mortgage');
+        pushLiab(liab.liabilities?.student, 'student');
+      } catch { /* 单 token 失败不影响其余 */ }
+    }
+
     const response = NextResponse.json({
       ...(recurringOk ? { recurringStreams: recurringStreams.slice(0, 100) } : {}),
+      ...(liabilitiesOk ? { liabilities: liabilities.slice(0, 60) } : {}),
       relink: anyRelink || undefined,
       relinkIndexes: relinkIndexes.length ? relinkIndexes : undefined,
       prunedDead: deadTokenIndexes.size || undefined,

@@ -4,7 +4,7 @@
  * TeslaPanel — Tesla 数据视图(纯内容,无外壳)。
  * 被两处复用,不留双实现:
  *   ① TeslaSheet(数据接入 → Tesla 行「数据」)—— 包一层 bottom sheet 外壳;
- *   ② 洞察「车」tab —— 常驻入口,便于长期观察数据到没到、去了哪。
+ *   ② 洞察「资产 → 车」tab(AssetsPanel)—— 常驻入口,便于长期观察数据到没到、去了哪。
  * 只读 GET /api/portal/tesla 的实时快照;顺手把新鲜快照喂给 refreshTesla,
  * 让停车点/充电站即时进足迹、充电花费进财务(externalId 去重,不重复计)。
  */
@@ -182,17 +182,13 @@ export default function TeslaPanel() {
         );
       })}
 
-      {/* 有车却没坐标:提示重连以授权位置(vehicle_location 是独立权限)——否则足迹永远空 */}
+      {/* Bug4 图24「车 tab 这些字都不要,显示现在的状态」:那段「想把停车/充电位置记进足迹?
+          到设置 → 数据接入 → Tesla 重连…」的说明删掉 —— 它讲的是接线,不是车的状态。
+          没拿到坐标时留一行可点的短提示就够,真要重连的人点它直接过去。 */}
       {hasVehicle && !hasAnyLocation && (
-        <div style={{
-          marginTop: 'var(--space-3)', padding: 'var(--space-3)',
-          borderRadius: 'var(--radius-md)', background: 'var(--status-calm-soft)',
-          fontSize: 'var(--text-sm)', color: 'var(--portal-ink)', lineHeight: 1.6,
-        }}>
-          {L(dict,
-            '想把停车 / 充电位置记进足迹?到「设置 → 数据接入 → Tesla」重新连接一次 —— 这次会请求位置权限(Tesla 把 GPS 单列为一项权限,之前没带上)。',
-            'Want parking / charging spots in your Place trail? Reconnect Tesla in Settings → Data sources — this time it asks for location (Tesla gates GPS behind a separate permission that was missing before).')}
-        </div>
+        <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-3)' }}>
+          {L(dict, '位置没授权 —— 到设置 → 数据接入里重连一次 Tesla 就有了。', 'Location not granted — reconnect Tesla in Settings → Data sources.')}
+        </p>
       )}
 
       <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-4)' }}>
@@ -226,45 +222,9 @@ export default function TeslaPanel() {
         </div>
       ))}
 
-      {/* 数据去向:直接回答「连了但数据在哪」——沉淀分散在足迹/财务,这里指路。
-          ⚠️ 一条车数据都没有时**不要显示这块**。这三行回答的是「我的车数据去哪了」,
-          还没连车 / Tesla 还没回数据的时候,点过去财务和足迹里根本没有车的东西 ——
-          用户点了一圈发现三个入口都「不管用」(原始报告第 19 条)。
-          空态该说的是「怎么连」,那句提示上面已经在讲了。 */}
-      {(hasVehicle || history.length > 0) && (
-      <div style={{
-        marginTop: 'var(--space-5)', paddingTop: 'var(--space-4)',
-        borderTop: '1px solid var(--portal-line)',
-      }}>
-        {/* 2026-07-28 UI 精修(标注 图21「功能都没有看到在哪」):这块原来是三行纯文字,
-            告诉你「充电花费在洞察·财务」「位置在地点足迹」—— 指了路却没有路。
-            改成三个真能点的入口,点了直接跳过去。 */}
-        <p className="nesio-settings-section-label">{L(dict, '这些数据去哪了', 'Where this data lives')}</p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-          {([
-            ['finance', L(dict, '充电花费 · 和银行流水一起看', 'Charging spend · with bank transactions')],
-            ['timeline', L(dict, '停车 / 充电位置 · 地点足迹', 'Parking / charging spots · place trail')],
-          ] as const).map(([tab, label]) => (
-            <button key={tab} type="button"
-              onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab } }))}
-              style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)',
-                width: '100%', textAlign: 'left', cursor: 'pointer', padding: 'var(--space-3)',
-                borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'transparent',
-                color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }}>
-              {label}<span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
-            </button>
-          ))}
-          <button type="button"
-            onClick={() => window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: L(dict, '充电', 'charge') } }))}
-            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)',
-              width: '100%', textAlign: 'left', cursor: 'pointer', padding: 'var(--space-3)',
-              borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'transparent',
-              color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }}>
-            {L(dict, '行驶 / 充电记录 · 在记忆里搜', 'Drives / charges · search memories')}<span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
-          </button>
-        </div>
-      </div>
-      )}
+      {/* Bug4 图24:「这些数据去哪了」那三行指路入口删掉 —— 车 tab 现在是资产页里的一块,
+          它该显示的是这辆车现在什么样(状态 / 里程 / 充电 / 能耗),不是一张站内地图。
+          充电花费本来就已经进了财务、位置进了足迹,那两个板块自己在导航里。 */}
     </>
   );
 }

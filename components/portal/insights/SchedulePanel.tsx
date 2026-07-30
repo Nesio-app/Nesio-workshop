@@ -323,8 +323,18 @@ export default function SchedulePanel() {
     }
     const t0 = todayStart.getTime();
     const ms = (r: Row) => { const v = new Date(r.dateIso).getTime(); return Number.isNaN(v) ? 0 : v; };
-    const upcoming = out.filter((r) => ms(r) >= t0).sort((x, y) => ms(x) - ms(y));   // 近 → 远
-    const past = out.filter((r) => ms(r) < t0).sort((x, y) => ms(y) - ms(x));        // 刚过去的先
+    // 展示层去重(真机 2026-07-29:同一场会两条)。同步侧按 calendarId / `标题|start 原文` 去重,
+    // 但**订阅了同一场会的多个日历**给出的 start 字符串时区写法可能不同(Z / +08:00),
+    // 原文比对认不出是同一件事。这里按「标题|绝对时刻」再收一次,时区写法差异自然抹平。
+    const seen = new Set<string>();
+    const deduped = out.filter((r) => {
+      const k = `${r.title}|${ms(r)}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    const upcoming = deduped.filter((r) => ms(r) >= t0).sort((x, y) => ms(x) - ms(y));   // 近 → 远
+    const past = deduped.filter((r) => ms(r) < t0).sort((x, y) => ms(y) - ms(x));        // 刚过去的先
     return [...upcoming, ...past];
   }, [nodes, dict]);
 
@@ -336,9 +346,17 @@ export default function SchedulePanel() {
         const from = `${typeof a.from === 'string' ? a.from : ''} ${typeof a.sender === 'string' ? a.sender : ''}`;
         const body = typeof n.rawInput === 'string' ? n.rawInput : '';
         const hay = `${n.name} ${from} ${body}`;
-        if (AD_RE.test(hay)) return false;              // ① 广告
+        // ⓪ Gmail 自己的分类标签优先(gmail 路由已把 labelIds 归一成 mailCategory 存在节点上):
+        //    promotions/social 是 Google 的判定,比这里猜关键词准得多;没有该字段的老节点
+        //    (或非 Gmail 来源)才退回下面的本地正则。
+        const cat = typeof a.mailCategory === 'string' ? a.mailCategory : '';
+        if (cat === 'promotions' || cat === 'social') return false;
+        if (!cat && AD_RE.test(hay)) return false;       // ① 广告(仅无官方分类时靠正则猜)
         if (BANK_TX_RE.test(hay)) return false;          // ① 银行流水提醒
         if (MEETING_INVITE_RE.test(hay)) return false;   // ① 开会通知/邀请回执
+        // Gmail 标了 IMPORTANT 的(节点带「重要」tag)直接留 —— Google 的重要性预测看的是
+        // 你自己的收信行为,比白名单更贴个人。
+        if ((n.tags || []).includes('重要')) return true;
         if (!ROBOT_FROM_RE.test(from)) return true;      // ② 活人发的,留
         return KEEP_RE.test(hay);                        // ② 机器发的,只留订单/旅行/票务/学校
       })
@@ -353,7 +371,19 @@ export default function SchedulePanel() {
           node: n,
         } as Row;
       })
-      .sort((x, y) => (x.dateIso < y.dateIso ? 1 : x.dateIso > y.dateIso ? -1 : 0));
+      // 展示层去重:同一封邮件(emailId)只留一条。同步侧已按 emailId upsert,
+      // 这里兜住历史遗留的重复节点(富化认不出源邮件时曾建过无 emailId 的副本)。
+      .filter((r, i, arr) => {
+        const eid = typeof r.node.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
+        if (!eid) return true;
+        return arr.findIndex((o) => o.node.attributes?.emailId === eid) === i;
+      })
+      // 邮件时间以邮件头为准;字符串比大小对 RFC2822 头(「Tue, 29 Jul…」)是错的,按时刻排。
+      .sort((x, y) => {
+        const mx = new Date(x.dateIso).getTime() || 0;
+        const my = new Date(y.dateIso).getTime() || 0;
+        return my - mx;
+      });
   }, [nodes]);
 
   const rows = (sub === 'calendar' ? calendarRows : emailRows).filter((r) => !gone.has(r.id));

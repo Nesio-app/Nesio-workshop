@@ -185,6 +185,10 @@ const EMOJI_ICON: Record<string, React.ComponentType<{ size?: number }>> = {
   '🚗': IconCar, '💊': IconHeartPulse, '🏡': IconHome, '⚡': IconZap, '⚡️': IconZap,
   '✦': IconStar, '📝': IconNote, '📬': IconMail, '📌': IconFlag, '📍': IconMapPin,
   '🕊️': IconBalloon, '🕊': IconBalloon, '🌿': IconLeaf, '🎁': IconGift, '☁': IconCloud, '☁️': IconCloud,
+  // 具名键(2026-07-30):新代码用这些,不再往上游塞 emoji ——
+  // emoji 只在这张表里出现一次(为老数据留的兼容入口),渲染层永远拿到描边图标。
+  calendar: IconCalendar, card: IconCard, health: IconLeaf, box: IconBox,
+  person: IconGift, idea: IconBulb,
 };
 
 /** 任意 emoji 字符串 → 描边图标(表里没有就退回便签图标,绝不把 emoji 漏到界面上) */

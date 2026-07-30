@@ -116,3 +116,10 @@ Use the `/browse` skill from gstack for all web browsing. Never use `mcp__claude
 - **New API routes that spend money or read private data must call
   `guardAiRoute`** (lib/portal/api-auth.ts) and be added to
   docs/api-routes.md.
+- **New localStorage keys must be registered** in
+  `scripts/storage-key-registry.test.mjs` (KNOWN_KEYS). Unregistered keys
+  default to `durable` — meaning they silently enter the backup file and get
+  cloud-synced. This already leaked connector tokens and the admin secret
+  once. Decide the class with one question: *is it correct for this value to
+  start from scratch on a new device?* Yes → `cache`, no → `durable`,
+  credential → `auth` (+ AUTH_KEYS). See docs/storage-keys.md.

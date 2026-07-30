@@ -117,8 +117,14 @@ export function ingestLifeNode(input: IngestNodeInput): LifeNode {
   if (key) {
     const existing = getLifeGraph().find((n) => externalKey(n.attributes) === key);
     if (existing) {
-      updateLifeNode(existing.id, input);           // 覆盖内容(id/createdAt 保留)
-      node = { ...existing, ...input };             // input 无 id/createdAt → 沿用旧的
+      // ⚠️ attributes 必须**合并**,不能整体替换(updateLifeNode 是顶层浅合并 →
+      // patch.attributes 会整块盖掉旧的)。真机病灶 2026-07-29:Gmail 同步先用本地抽取
+      // 落节点(带 date/summary/article/store/eta/amount/orderNo/trackingNo),随后的
+      // 云 AI 富化 upsert 只带 AI 那几个字段 → 上述全被抹掉,日程页邮件的日期集体退回
+      // createdAt(看起来"所有邮件都是今天")。新值优先,旧值补位。
+      const mergedInput = { ...input, attributes: { ...existing.attributes, ...(input.attributes || {}) } };
+      updateLifeNode(existing.id, mergedInput);     // 覆盖内容(id/createdAt 保留)
+      node = { ...existing, ...mergedInput };       // input 无 id/createdAt → 沿用旧的
     } else {
       node = addLifeNode(input);
     }

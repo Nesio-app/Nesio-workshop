@@ -52,6 +52,11 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
     if (Array.isArray((data as { recurringStreams?: unknown[] }).recurringStreams)) {
       bank.savePlaidRecurring((data as { recurringStreams: never[] }).recurringStreams);
     }
+    // Guidance 全 AI 化 Step 4 前置:Plaid 负债(信用卡还款日/最低还款)。语义与 recurring 同:
+    // 字段缺席 = 本次拉取失败保留旧数据;字段存在(含空)= 真实结果照存。
+    if (Array.isArray((data as { liabilities?: unknown[] }).liabilities)) {
+      bank.savePlaidLiabilities((data as { liabilities: never[] }).liabilities);
+    }
     const rawExisting = bank.loadBankTxRaw();
     const filteredExisting = bank.loadBankTx();
     // 兜底仅限「账户表为空」(水合可疑/首次):账户表非空时孤儿过滤是有依据的,不复活死数据。
@@ -170,6 +175,8 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
       .map((n) => [n.attributes.calendarId as string, n] as const),
   );
   let added = 0;
+  // 本次同步已落过的 calendarId 与 名字|start —— 去重表建于循环之前,新建的节点不在里面
+  const seenThisRun = new Set<string>();
   for (const evAny of events) {
     const start = evAny.start as string | undefined;
     const title = evAny.title as string | undefined;
@@ -193,6 +200,14 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
       }
       continue;
     }
+    // ⚠️ 本次循环内也要防重:同一次同步里两条同名同时间的事件(订阅了同一个会议的
+    // 多个日历时很常见)会各建一个节点 —— 因为去重表是循环开始前建的、建完节点又不回填。
+    // 症状:每次同步灌一批重复,下次同步开头的自愈再删掉,日历项计数在 51/39 之间来回跳。
+    // 先占位再 ingest,保证「同一批里同一场会只落一个」。
+    const dupKey = `${title}|${start}`;
+    if (seenThisRun.has(calId) || seenThisRun.has(dupKey)) continue;
+    seenThisRun.add(calId);
+    seenThisRun.add(dupKey);
     ingestLifeNode({
       name: title,
       type: 'event',

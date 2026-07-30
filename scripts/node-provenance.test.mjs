@@ -48,13 +48,8 @@ assert.equal(nodeConfidenceToGuidance({}), 70, '缺失 → 保守 0.7 → 70');
 assert.equal(nodeConfidenceToGuidance({ confidence: 1.5 }), 100, '超界 → 夹到 100');
 
 // ── 接线契约:guidance 聚焦适配器 ──
-const adapters = read('../lib/platform/guidance-engine/source-adapters.ts');
-assert.match(adapters, /import \{ isNodeUncertain, nodeConfidenceToGuidance \} from '@\/lib\/portal\/node-provenance'/, '引入共享 provenance');
-assert.match(adapters, /const uncertain = isNodeUncertain\(node\)/, '每个聚焦节点算 uncertain');
-assert.match(adapters, /confOf\s*=\s*\(base: number\)[\s\S]{0,80}nodeConfidenceToGuidance\(node\)\s*:\s*base/, 'confOf:uncertain 时降到真实抽取置信,否则保原值');
-// 四个聚焦卡置信度都过 confOf(不再写死高置信冒充用户确认)
-assert.ok((adapters.match(/confidence: confOf\(/g) || []).length >= 4, 'flight/renewal/expiry/deadline 四处置信都过 confOf');
-assert.ok(!/source: 'memory', confidence: 8[85],/.test(adapters), '不再有写死的 confidence: 88/85(已换 confOf)');
+// (source-adapters 已随规则管线拆除 2026-07-29:置信度处理改由 AI 判决层承担 ——
+// 低置信节点与其余信号同台进判决批,severity 封顶等钳制见 test:guidance-judge。)
 
 // ── FocusNode 透传 confidence ──
 const vm2 = read('../lib/platform/view-models/today-view-model.ts');

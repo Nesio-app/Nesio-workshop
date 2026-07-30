@@ -22,6 +22,18 @@ export interface ProactiveCardData {
   icon: string;
   priority: number;
   cardType?: string;
+  /**
+   * 事实指纹 —— 取 AI 改写**之前**的原始标题+正文。
+   * 渲染出来的文案会被 Layer 7 重写,拿它当指纹的话每次重写都算「新事实」,
+   * 「不要再出现」永远对不上号。所以指纹必须在管线出卡处一次定死。
+   */
+  factKey?: string;
+  /** @deprecated 冷却已随规则管线拆除(2026-07-29);留字段兼容旧存量,渲染层不再读。 */
+  coolKey?: string;
+  /** AI 判决卡的源指纹列表 —— resolver 跳转与合并来源展示用。 */
+  fingerprints?: string[];
+  /** severity 3(登机口级):豁免展示配额,不被 slice 截掉。 */
+  urgent?: boolean;
   nodeId?: string;
   actions?: ProactiveAction[];
   expiresAt?: string;  // ISO — card auto-hides after this time (Google Now lifecycle)
@@ -217,18 +229,46 @@ export function snoozeOverdue(nodeId: string, days: number) {
 
 const PROACTIVE_DISMISS_KEY = 'nesio-proactive-dismissed';
 
-export function dismissProactiveById(cardId: string) {
+/**
+ * 静音表:cardId → 被静音时这张卡说了什么(内容指纹)。
+ *
+ * 由来(真机):「AT&T 定期扣款涨价了」这类**事实型**卡片,用户取消多少次都会
+ * 第二天再冒出来 —— 因为旧逻辑只记「今天已关」。可事实没变,重复通知就是纯骚扰,
+ * 也直接违背 warm-coach 的「每个提示都要有『不再提醒』出口」。
+ *
+ * 新语义:**静音到内容变化为止**。传进来的是**事实指纹**(ProactiveCardData.factKey,
+ * 由管线在 AI 改写之前一次算定)—— AT&T 若再涨到 $70,指纹变了,卡片理应重新出现;
+ * 只要还在说同一件事,就永远闭嘴。
+ *
+ * 注意这里**不再自己对文案取哈希**:渲染出来的 title/body 已被 Layer 7 重写过,
+ * 拿它算指纹的话,每天一次新改写就是一个新指纹,静音永远命中不了(第一版就栽在这)。
+ */
+const PROACTIVE_MUTED_KEY = 'nesio-proactive-muted-v1';
+
+export function dismissProactiveById(cardId: string, factKey?: string) {
   try {
     const map: Record<string, string> = JSON.parse(localStorage.getItem(PROACTIVE_DISMISS_KEY) || '{}');
     map[cardId] = localDayKey();
     localStorage.setItem(PROACTIVE_DISMISS_KEY, JSON.stringify(map));
   } catch { /* ignore */ }
+  if (!factKey) return;
+  try {
+    const muted: Record<string, string> = JSON.parse(localStorage.getItem(PROACTIVE_MUTED_KEY) || '{}');
+    muted[cardId] = factKey;
+    localStorage.setItem(PROACTIVE_MUTED_KEY, JSON.stringify(muted));
+  } catch { /* ignore */ }
 }
 
-export function isProactiveCardDismissed(cardId: string): boolean {
+export function isProactiveCardDismissed(cardId: string, factKey?: string): boolean {
   try {
     const map: Record<string, string> = JSON.parse(localStorage.getItem(PROACTIVE_DISMISS_KEY) || '{}');
-    return map[cardId] === localDayKey();
+    if (map[cardId] === localDayKey()) return true;
+  } catch { /* ignore */ }
+  if (!factKey) return false;
+  try {
+    const muted: Record<string, string> = JSON.parse(localStorage.getItem(PROACTIVE_MUTED_KEY) || '{}');
+    // 说的还是同一件事 → 保持静音;内容变了 → 放行(那是新消息)
+    return muted[cardId] === factKey;
   } catch { return false; }
 }
 

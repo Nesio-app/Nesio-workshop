@@ -10,6 +10,9 @@ import { recordCardFeedback } from '@/lib/portal/reasoning-engine';
 import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { getRegisteredDecCard, snoozeOverdue, bumpQuoteCat, QUOTE_CAT_LABELS, type ProactiveAction, type ProactiveCardData } from './proactive-types';
+import { recordCardVerdict } from '@/lib/portal/card-verdict';
+import { recordArchiveVerdict } from '@/lib/portal/card-archive';
+import { emitFeedback } from '@/lib/platform/personalization';
 import { L, t } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -70,9 +73,7 @@ export function ProactiveGuidanceCard({
     setDx(0);
     if (ddx < -64) { handleFeedback('wrong'); return; }               // 左滑 = 没用
     if (ddx > 64) {                                                    // 右滑 = 稍后提醒
-      if (card.nodeId) snoozeOverdue(card.nodeId, 1);
-      setGestureAck('later');
-      setTimeout(onDismiss, 700);
+      handleSnooze();
       return;
     }
     // 双击 = 有用(带确认提示)
@@ -111,9 +112,26 @@ export function ProactiveGuidanceCard({
     handleFeedback('too_much');
   }
 
+  /** 这张卡的持久身份:id + 类型 + 事实指纹(管线出卡时定死,不受 AI 改写影响)。 */
+  const verdictRef = { cardId: card.id, cardType: card.cardType, factKey: card.factKey };
+
+  /**
+   * 稍后 —— 以前只有 `snoozeOverdue(card.nodeId, 1)`,而财务/域洞察卡根本没有 nodeId,
+   * 于是「稍后」对它们等于什么都没做(真机:点几次都第二天照旧)。现在无论有没有
+   * nodeId 都写卡片裁决(3 天),nodeId 那条保留给待办节点的既有语义。
+   */
+  function handleSnooze() {
+    recordCardVerdict(verdictRef, 'snooze');
+    if (card.nodeId) snoozeOverdue(card.nodeId, 1);
+    emitFeedback({ surface: 'today', dimension: 'card', key: card.id, reaction: 'snooze', at: new Date().toISOString() });
+    if (card.cardType) emitFeedback({ surface: 'today', dimension: 'card_type', key: card.cardType, reaction: 'snooze', at: new Date().toISOString() });
+    setGestureAck('later');
+    setTimeout(onDismiss, 700);
+  }
+
   function handleAction(action: ProactiveAction) {
-    if (action.actionType === 'snooze' && card.nodeId) snoozeOverdue(card.nodeId, 7);
-    else if (action.actionType === 'done' && card.nodeId) onMarkDone?.(card.nodeId);
+    if (action.actionType === 'snooze') { handleSnooze(); return; }
+    if (action.actionType === 'done' && card.nodeId) onMarkDone?.(card.nodeId);
     // 无论 dismiss / 缺 nodeId / 未知 actionType,都至少收起这张卡 —— 不留"点了没反应"的死按钮。
     onDismiss();
   }
@@ -125,6 +143,17 @@ export function ProactiveGuidanceCard({
     const decCard = getRegisteredDecCard(card.id);
     if (decCard) recordSignalFeedback(decCard, feedback);
     recordCardFeedback(card.id.replace(/^guidance-dec-/, ''), feedback);
+    // 手势表态回写档案 —— 档案是唯一监测面,今天页上的点按和面板里的改判必须是同一本账。
+    if (card.factKey) recordArchiveVerdict(card.factKey, feedback === 'wrong' ? 'wrong' : feedback === 'too_much' ? 'too_much' : 'useful');
+    // ① 持久裁决:没用 → 事实没变就永远闭嘴;太多了 → 连这一类一起静音 30 天。
+    //    (以前这两个动作只落一条没人读的 Signal,卡照旧回来。)
+    if (feedback === 'wrong') recordCardVerdict(verdictRef, 'mute');
+    else if (feedback === 'too_much') recordCardVerdict(verdictRef, 'mute_type');
+    // ② 权重:per-card 的 dimension:'card' 不在 Preference 的可复用维度里(会被丢弃),
+    //    补发一条 card_type —— 这是「喜欢/没用」真正能改到下次排序的唯一通路。
+    if (card.cardType) {
+      emitFeedback({ surface: 'today', dimension: 'card_type', key: card.cardType, reaction: feedback, at: new Date().toISOString() });
+    }
     // 云端产品事件(best-effort):反馈进 telemetry 面,供 DEC 质量回看
     void createAppApiClient().recordCloudProductEvent({
       eventType: 'today.card.feedback',

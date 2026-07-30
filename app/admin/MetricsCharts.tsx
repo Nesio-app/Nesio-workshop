@@ -6,6 +6,7 @@
  * 只做渲染;数据获取/范围切换在 page.tsx 容器里。
  */
 
+import { useState } from 'react';
 import {
   Area, Bar, BarChart, CartesianGrid, Cell, ComposedChart, Line,
   Pie, PieChart, PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar,
@@ -56,13 +57,23 @@ export function TrendChart({ data, prev }: { data: DailyPoint[]; prev?: DailyPoi
 }
 
 /** Top 事件横向条形图 */
+const TOP_EVENT_LABEL_W = 150;
+/** Bug4 图17:名字默认右对齐(贴着条形起点),长短不一时左边缘是锯齿状,读起来要来回找。
+    自绘 tick,统一钉在轴区左边缘。 */
+function TopEventTick({ x, y, payload }: { x?: number; y?: number; payload?: { value?: string } }) {
+  return (
+    <text x={(x ?? 0) - TOP_EVENT_LABEL_W} y={y ?? 0} dy={4} textAnchor="start" fontSize={11} fill={INK}>
+      {String(payload?.value ?? '')}
+    </text>
+  );
+}
 export function TopEventsChart({ data }: { data: Array<{ name: string; count: number }> }) {
   const height = Math.max(120, data.length * 34);
   return (
     <ResponsiveContainer width="100%" height={height}>
       <BarChart data={data} layout="vertical" margin={{ top: 0, right: 24, left: 8, bottom: 0 }}>
         <XAxis type="number" hide />
-        <YAxis type="category" dataKey="name" width={150} tick={{ fontSize: 11, fill: INK }} tickLine={false} axisLine={false} />
+        <YAxis type="category" dataKey="name" width={TOP_EVENT_LABEL_W} tick={<TopEventTick />} tickLine={false} axisLine={false} />
         <Tooltip contentStyle={tooltipStyle} formatter={(v) => [String(v), '次']} cursor={{ fill: 'var(--portal-accent-soft)' }} />
         <Bar dataKey="count" fill={ACCENT} radius={[0, 4, 4, 0]} barSize={16}
           label={{ position: 'right', fontSize: 11, fill: MUTED }} />
@@ -149,26 +160,40 @@ export function FeedbackDonut({ useful, wrong, tooMuch }: { useful: number; wron
     { name: '不准', value: wrong, color: GENTLE },
     { name: '不再提醒', value: tooMuch, color: MUTED },
   ];
+  // Bug4 图15:右边那张图例是「看图的人自己做连线题」——颜色→名字→数字要在两处来回对。
+  // 改成:图例整块删掉,环心直接写字;点(或悬停)某一瓣,环心换成那一瓣。默认停在「有用」。
+  // Hook 必须在任何 return 之前(空态那条早退在下面)。
+  const [active, setActive] = useState(0);
   if (total === 0) {
     return <p style={{ fontSize: '0.75rem', color: MUTED }}>还没有反馈 — 今日卡出现后,用户点「有用/不准」会汇到这里。</p>;
   }
+  const cur = data[Math.min(active, data.length - 1)];
+  const pct = Math.round((cur.value / total) * 100);
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-      <ResponsiveContainer width={120} height={120}>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+      <ResponsiveContainer width="100%" height={168}>
         <PieChart>
-          <Pie data={data} dataKey="value" innerRadius={38} outerRadius={56} paddingAngle={2} stroke="none">
-            {data.map((d) => <Cell key={d.name} fill={d.color} />)}
+          <Pie
+            data={data}
+            dataKey="value"
+            innerRadius={54}
+            outerRadius={78}
+            paddingAngle={2}
+            stroke="none"
+            isAnimationActive={false}
+            onMouseEnter={(_, i) => setActive(i)}
+            onClick={(_, i) => setActive(i)}
+          >
+            {data.map((d, i) => (
+              <Cell key={d.name} fill={d.color} opacity={i === active ? 1 : 0.42} cursor="pointer" />
+            ))}
           </Pie>
-          <Tooltip contentStyle={tooltipStyle} />
         </PieChart>
       </ResponsiveContainer>
-      <div>
-        {data.map((d) => (
-          <div key={d.name} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.78rem', color: INK, marginBottom: 4 }}>
-            <span style={{ width: 8, height: 8, borderRadius: 4, background: d.color, display: 'inline-block' }} />
-            {d.name} · {d.value}({Math.round((d.value / total) * 100)}%)
-          </div>
-        ))}
+      <div style={{ position: 'absolute', textAlign: 'center', pointerEvents: 'none' }}>
+        <p style={{ margin: 0, fontSize: '1.35rem', fontWeight: 700, color: cur.color }}>{pct}%</p>
+        <p style={{ margin: 0, fontSize: '0.74rem', color: INK }}>{cur.name}</p>
+        <p style={{ margin: 0, fontSize: '0.68rem', color: MUTED }}>{cur.value} / {total} 次</p>
       </div>
     </div>
   );

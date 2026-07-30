@@ -20,10 +20,30 @@ export interface VideoMontage {
   gift?: boolean;           // 送你的第一部(零操作自动拍好的惊喜首片,做 hero)
   feel?: string;            // 落差揭晓的「说中你」结尾句(播放揭晓 + 分享卡用)
   sourceNote?: string;      // 取材来源/你写下的原话(播放开头亮出来 + 怎么做到解释)
+  /**
+   * Bug4 图21「让按钮功能实现」:端上真能做出来的那一种短片 ——
+   * 拿你自己记忆里的照片和原话,在本机排成一段会自己走的画面。
+   * 有 slides 就走幻灯播放器(不需要 videoUrl,也不需要任何后端)。
+   */
+  slides?: MontageSlide[];
 }
+
+export interface MontageSlide {
+  /** 图片在 IndexedDB 本机图库里的 assetId(getLocalImage 读) */
+  assetId: string;
+  /** 这张图配的那句话 —— 用户自己写的,不生成、不改写 */
+  caption?: string;
+  /** 这一张来自哪个记忆节点(点开可回到原记忆) */
+  nodeId?: string;
+}
+
+/** 每张停留时长。3.2s 是「看清楚 + 不拖沓」的折中,整片时长 = 张数 × 它。 */
+export const SLIDE_MS = 3200;
 
 /** Pro 月额度(UI stub;真实计费/额度扣减在 Lab 端生成时,后续接 entitlement)。 */
 export const MONTHLY_PRO_QUOTA = 2;
+
+import { reportStorageDropped } from './storage-health';
 
 const KEY = 'nesio-video-montage-v1';
 
@@ -35,9 +55,44 @@ export function loadMontages(): VideoMontage[] {
   } catch { return []; }
 }
 
-export function saveMontage(m: VideoMontage): void {
+export function saveMontage(m: VideoMontage): boolean {
   const all = loadMontages().filter((x) => x.id !== m.id);
-  try { localStorage.setItem(KEY, JSON.stringify([m, ...all].slice(0, 60))); } catch { /* quota */ }
+  try {
+    localStorage.setItem(KEY, JSON.stringify([m, ...all].slice(0, 60)));
+    return true;
+  } catch {
+    // 红线:写失败会丢用户刚做的片子,不能静默 —— 派可见事件,并让调用方能报错。
+    reportStorageDropped();
+    return false;
+  }
+}
+
+/**
+ * 从真实记忆节点拼一部本机短片(Bug4 图21)。
+ * 只用节点里已有的东西:第一张图当海报底、用户自己写的原话当字幕。
+ * 不调 AI、不写文案、不上传 —— 拼不出来就返回 null,由调用方告诉用户为什么。
+ */
+export function buildMemoryMontage(
+  picks: Array<{ nodeId: string; assetId: string; caption?: string; createdAt?: string }>,
+  opts: { title: string; id: string } ,
+): VideoMontage | null {
+  const slides: MontageSlide[] = picks
+    .filter((p) => p.assetId)
+    .map((p) => ({ assetId: p.assetId, caption: (p.caption || '').trim() || undefined, nodeId: p.nodeId }));
+  if (slides.length === 0) return null;
+  const firstLine = slides.find((s) => s.caption)?.caption || '';
+  return {
+    id: opts.id,
+    title: opts.title,
+    storyLine: firstLine,
+    poster: '',                       // 海报即第一张 slide,播放/卡片按 assetId 现读
+    createdAt: new Date().toISOString(),
+    durationSec: Math.round((slides.length * SLIDE_MS) / 1000),
+    kind: 'memory',
+    status: 'ready',
+    sourceNote: firstLine || undefined,
+    slides,
+  };
 }
 
 export function deleteMontage(id: string): void {

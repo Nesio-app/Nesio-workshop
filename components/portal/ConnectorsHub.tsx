@@ -18,6 +18,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { markBusy } from '@/lib/portal/app-busy';
 import { isPro, canUsePaidCloudAi } from '@/lib/portal/entitlement';
+import { IMPORT_WINDOWS } from '@/lib/portal/backup-inventory';
 import { isLabModeOn } from '@/lib/portal/module-overrides';
 import { logDropped } from '@/lib/portal/storage-health';
 import { executeBackgroundCloudOnly } from '@/lib/portal/client-flow-control';
@@ -1680,6 +1681,33 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
               </div>
             );
           })}
+
+          {/* 各接入的取数窗口:用户看到某板块「内容很少」时,先对这张表再怀疑同步坏了。
+              合起来还揭示一件事 —— 一个把「回溯>预测」写进公理的 App,导进来的数据
+              大部分只有「最近」和「未来」。这是事实,不藏着。 */}
+          <details style={{ marginTop: '0.9rem', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', padding: '0.15rem 0.75rem' }}>
+            <summary style={{ cursor: 'pointer', padding: '0.6rem 0', fontSize: '0.82rem', color: 'var(--portal-muted)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: 'var(--portal-ink)', fontWeight: 600 }}>{L(dict, '各接入能拿到多久的数据', 'How far back each source reaches')}</span>
+              <span aria-hidden>▾</span>
+            </summary>
+            <div style={{ paddingBottom: '0.6rem' }}>
+              {IMPORT_WINDOWS.map((w) => (
+                <div key={w.source[0]} style={{ padding: '0.45rem 0', borderTop: '1px solid var(--portal-line)' }}>
+                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--portal-ink)' }}>
+                    {L(dict, w.source[0], w.source[1])}
+                    {!w.canBackfill && (
+                      <span style={{ marginLeft: 6, fontSize: '0.66rem', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', borderRadius: 999, padding: '0.05rem 0.4rem' }}>
+                        {L(dict, '拿不到更早', 'no earlier data')}
+                      </span>
+                    )}
+                  </p>
+                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.72rem', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
+                    {L(dict, w.window[0], w.window[1]).replace(/\*\*/g, '')}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </details>
 
           {/* ── 开发中 · 折叠二级(以后慢慢开发的接入不占主列表) ── */}
           <details className="nesio-conn-dev-group" style={{ marginTop: '0.9rem', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', padding: '0.15rem 0.75rem' }}>

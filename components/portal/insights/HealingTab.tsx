@@ -30,6 +30,15 @@ const PHASES = ['voice', 'fear', 'protector', 'self', 'body', 'feel'] as const;
 type Phase = typeof PHASES[number] | 'done';
 const phaseRank = (p: Phase) => (p === 'done' ? PHASES.length : PHASES.indexOf(p));
 
+/** AI 不可用时的躯体动作兜底池 —— 按天轮换,别让它看起来「从没变过」。 */
+const FALLBACK_ACTIONS = (dict: 'zh' | 'en') => [
+  L(dict, '把两只脚踩实地面,数出五样你现在看得见的东西。', 'Plant both feet, name five things you can see right now.'),
+  L(dict, '松开下颌和肩膀,让手臂垂下来抖一抖。', 'Unclench your jaw and shoulders; let your arms hang and shake them out.'),
+  L(dict, '开一扇窗,把气长长地吐出去,吐到不能再吐。', 'Open a window and breathe all the way out, until there is nothing left.'),
+  L(dict, '用手掌搓热,轻轻捂在眼睛上,待十秒。', 'Rub your palms warm, cup them over your eyes, stay ten seconds.'),
+  L(dict, '倒一杯温水,慢慢喝完,只做这一件事。', 'Pour a glass of warm water and drink it slowly — just that.'),
+];
+
 export default function HealingTab({ seed }: { seed?: string | null }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const en = dict === 'en';
@@ -132,7 +141,8 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
       protector: L(dict, '你心里有个部分,一直用最严的方式守着你 —— 它怕你不安全,才这么逼你。谢谢它一直在。', 'A part of you has guarded you the hardest way it knows — because it feared you weren’t safe. Thank it for staying.'),
       self: L(dict, '但现在你已经安全了,有力量建立边界 —— 可以让它先歇一歇。', 'But you’re safe now, and strong enough to set boundaries — it can rest.'),
       insight: L(dict, '这句话背后是一个怕你受伤的部分;你的价值,不靠它挣来。', 'Behind these words is a part afraid you’ll be hurt — your worth isn’t earned by it.'),
-      action: L(dict, '把手放在心口,深呼吸三次,对自己说「我已经足够了」。', 'Hand on your heart, three slow breaths — “I am already enough.”'),
+      // 兜底也得换着来:AI 挂了时若永远是同一句,症状和「提示没变过」一模一样。按天轮换。
+      action: FALLBACK_ACTIONS(dict)[Math.floor(Date.now() / 86_400_000) % FALLBACK_ACTIONS(dict).length],
     });
   }
 
@@ -278,21 +288,21 @@ export default function HealingTab({ seed }: { seed?: string | null }) {
                   <div className="ng-tl-in">
                     <div className="ng-ground-step"><span className="lbl">{L(dict, '现在,给身体一个动作', 'Now, one thing for the body')}</span>{ifs.action}</div>
                     <div className="ng-acts">
-                      <button type="button" className="ng-btn" onClick={() => setPhase('feel')}>{L(dict, '我按着做了一遍', 'I did it')}</button>
+                      <button type="button" className="ng-btn" onClick={() => setPhase('feel')}>{L(dict, '做完', 'Done')}</button>
                     </div>
                   </div>
                 )}
 
                 {st === 'active' && s.key === 'feel' && (
                   <div className="ng-tl-in">
-                    <p className="ng-tl-q">{L(dict, '走完这一遍,此刻,是什么感觉?', 'After all that — how does this moment feel?')}</p>
+                    {/* 2026-07-29 标注(Bug4 P1):问句与「就是你熟悉的那个心情转盘…」说明句都划掉 ——
+                        转盘本身就在问这件事,两句字只是把输入框和按钮往下推。 */}
                     <MoodWheel value={feelEm} onPick={setFeelEm} en={en} />
-                    <p className="ng-heal-from">{L(dict, '就是你熟悉的那个心情转盘 —— 会记进心情记录,汇入情绪趋势。', 'The same mood wheel you know — saved to your mood log and emotion trends.')}</p>
                     <textarea ref={feelTa} className="ng-ta" rows={2} value={feelNote} onChange={(e) => setFeelNote(e.target.value)}
                       placeholder={L(dict, '想补一句就写(可跳过)', 'Add a line if you want (optional)')} />
                     <div className="ng-acts">
                       <button type="button" className="ng-btn" disabled={!feelEm} onClick={closeLoop}>
-                        {L(dict, '记下此刻 · 存进回看', 'Log this moment · save')}
+                        {L(dict, '记下', 'Log it')}
                       </button>
                     </div>
                   </div>

@@ -1215,3 +1215,31 @@ export function plaidOnlyRecurring(streams: PlaidRecurringStream[], local: Recur
   const seen = new Set(local.map((r) => normalizeMerchant(r.name)));
   return streams.filter((s) => s.direction === 'outflow' && s.isActive && !seen.has(normalizeMerchant(s.name)));
 }
+
+/* ---------- Guidance 全 AI 化 Step 4 前置:Plaid 负债(/liabilities/get) ---------- */
+/* 信用卡还款日/最低还款/账单余额是结构化字段 —— 判决层与兜底卡的财务到期唯一来源。 */
+
+export const PLAID_LIABILITIES_KEY = 'nesio-plaid-liabilities-v1';
+
+export interface PlaidLiability {
+  accountId: string;
+  kind: 'credit' | 'mortgage' | 'student';
+  /** YYYY-MM-DD,下次还款日。 */
+  dueDate: string;
+  minPayment?: number;
+  statementBalance?: number;
+  isOverdue?: boolean;
+}
+
+export function savePlaidLiabilities(liabilities: PlaidLiability[]): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(PLAID_LIABILITIES_KEY, JSON.stringify(liabilities.slice(0, 60))); } catch { reportStorageDropped(); }
+}
+
+export function loadPlaidLiabilities(): PlaidLiability[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const v = JSON.parse(localStorage.getItem(PLAID_LIABILITIES_KEY) || '[]') as PlaidLiability[];
+    return Array.isArray(v) ? v.filter((l) => l && l.accountId && l.dueDate) : [];
+  } catch { return []; }
+}

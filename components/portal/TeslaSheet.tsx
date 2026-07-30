@@ -2,7 +2,7 @@
 
 /**
  * TeslaSheet — Tesla 数据独立视图(连接器行点「数据」直接看车)。
- * 只是 bottom-sheet 外壳 + 拖拽;内容全在 TeslaPanel(与洞察「车」tab 复用同一份,
+ * 只是 bottom-sheet 外壳 + 拖拽;内容全在 TeslaPanel(与洞察「资产 → 车」tab 复用同一份,
  * 不留双实现)。数据的长期沉淀:停车点进足迹、充电花费进财务、行程/充电落 Signal。
  */
 
