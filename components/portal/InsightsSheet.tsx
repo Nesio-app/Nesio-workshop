@@ -757,7 +757,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {/* ── Tab: 成长(引导卡 + 回看流 + 框架书架,v0 规则版零 AI 成本)── */}
         {mainTab === 'growth' && (
           <div className="nesio-analytics-tab">
-            <GrowthTab />
+            <GrowthTab onOpenNode={setDetailNodeId} />
           </div>
         )}
 

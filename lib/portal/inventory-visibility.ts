@@ -19,9 +19,23 @@
 import { isFoodItem } from '../cooking/pantry';
 import { listInventoryItems, type InventoryItem } from './inventory';
 
-/** 「收纳」这张脸管的东西:所有物品减去食材。 */
+/** 衣物:衣橱那张脸管的东西(节点属性 garment,与 lib/portal/wardrobe 的 listWardrobe 同一判据)。 */
+function isGarment(i: InventoryItem): boolean {
+  return i.node?.attributes?.garment === true;
+}
+
+/**
+ * 「收纳」这张脸管的东西:所有物品**减去食材、减去衣物**。
+ * 2026-07-29 标注(Bug4 P10「第一个显示物品数量,除了食材,衣服」):
+ * 衣物此前还留在收纳数里,于是「物品 / 衣橱 / 食材」三个数加起来大于总数 —— 又一笔对不上的账。
+ */
 export function listStorageItems(): InventoryItem[] {
-  return listInventoryItems().filter((i) => !isFoodItem(i));
+  return listInventoryItems().filter((i) => !isFoodItem(i) && !isGarment(i));
+}
+
+/** 归「衣橱」那张脸的件数(收纳页三个统计里的第二个)。 */
+export function countWardrobeItems(): number {
+  return listInventoryItems().filter(isGarment).length;
 }
 
 /**

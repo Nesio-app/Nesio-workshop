@@ -19,6 +19,7 @@ import LensTab from './LensTab';
 import SegTabs from '../ui/SegTabs';
 import HealingTab from './HealingTab';
 import GrowthFootprint from './GrowthFootprint';
+import { getLifeGraph } from '@/lib/portal/life-graph';
 
 const CHIP_CLASS: Record<Observation['mode'], string> = { nudge: 'emo', quiz: 'blind', trend: 'trend' };
 
@@ -37,7 +38,7 @@ const LENS_MODE_LABEL: Record<string, { zh: string; en: string }> = {
 type TodayItem = { key: string; t: 'obs'; o: Observation } | { key: string; t: 'rule'; c: GrowthCard };
 type SubTab = 'home' | 'lens' | 'practice' | 'healing';
 
-export default function GrowthTab() {
+export default function GrowthTab({ onOpenNode }: { onOpenNode?: (nodeId: string) => void } = {}) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const en = dict === 'en';
   const [tab, setTab] = useState<SubTab>('home');
@@ -59,11 +60,17 @@ export default function GrowthTab() {
   const [openTrail, setOpenTrail] = useState<string | null>(null); // 点开回看的条目 key
 
   /**
-   * 图23:从回看流条目回到它当时那条记忆。
-   * 回看只存了 refId / question / context,不存节点 id —— 所以按原话去记忆页搜(全 app 统一的
-   * nesio-memory-search 事件,和洞察页「拾起 / 走走看」同一条路),搜得到就落回那条详情。
+   * 从回看流条目回到它当时那条记忆。
+   * 2026-07-29 标注(Bug4 P7「点回看,要进入对应具体记忆,不是搜索列表」):
+   * 回看条目其实**存了 refId**(derivedFrom 就是它),之前却一直按原话去记忆页搜 ——
+   * 搜出一页结果让用户自己找,而且原话截断 24 字常常零命中。改为:refId 能在图谱里
+   * 找到就直接开那条详情;实在找不到(节点被删)才退回搜索。
    */
   const backToMemory = (a: GrowthAnswer) => {
+    if (a.refId) {
+      const node = getLifeGraph().find((n) => n.id === a.refId);
+      if (node) { onOpenNode?.(node.id); return; }
+    }
     const q = (a.context || a.question || '').replace(/^你写\s*/, '').replace(/[「」“”]/g, '').slice(0, 24).trim();
     if (!q) return;
     window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: q } }));
@@ -162,12 +169,8 @@ export default function GrowthTab() {
       {tab === 'lens' ? <LensTab /> : tab === 'practice' ? <PracticeGround /> : tab === 'healing' ? <HealingTab seed={healingSeed} /> : (
         <>
           <GrowthFootprint onGoTab={(t) => setTab(t)} />
-          <p className="ng-coach-lead">
-            {L(dict, '今天教练带你看一件事 —— 启发优先,慢慢来。', 'Today your coach brings one thing — insight first, no rush.')}
-          </p>
-          <p className="ng-streak">
-            {streak > 1 ? L(dict, `已连续回看 ${streak} 天`, `${streak} days in a row`) : L(dict, '一次看清一件就好', 'One clear look is enough')}
-          </p>
+          {/* 2026-07-29 标注(Bug4 P9):「今天教练带你看一件事」与「已连续回看 N 天」两句划掉 ——
+              过渡文案不承载信息,下面的卡片本身就是那一件事。 */}
 
           {/* ── 心智成长环(弱化仪表盘感)── */}
           <div className="ng-sec"><span className="l">{L(dict, '你走过的面向', 'Facets you have touched')}</span><span className="r">{L(dict, '不是积分,是痕迹', 'Traces, not points')}</span></div>
@@ -366,7 +369,7 @@ function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip, onGoHe
           )}
           <div className="ng-acts">
             {o.mode === 'nudge' && !guide && (
-              <button type="button" className="ng-btn" disabled={loading} onClick={() => void talk()}>{loading ? L(dict, '念念在想…', 'Nessa is thinking…') : talkError ? L(dict, '再试一次', 'Try again') : L(dict, '和念念聊聊', 'Talk with Nessa')}</button>
+              <button type="button" className="ng-btn" disabled={loading} onClick={() => void talk()}>{loading ? L(dict, '念念在想…', 'Nessa is thinking…') : talkError ? L(dict, '再试一次', 'Try again') : L(dict, '念念', 'Nessa')}</button>
             )}
             {o.mode === 'trend' && !detail && (
               <button type="button" className="ng-btn" onClick={() => setDetail(true)}>{L(dict, '看看明细', 'See the details')}</button>
@@ -374,15 +377,13 @@ function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip, onGoHe
             {(opened || (o.mode === 'nudge' && o.nextStep)) && (
               <button type="button" className="ng-btn" onClick={saveNudge}>{L(dict, '记下这次觉察', 'Log this insight')}</button>
             )}
-            <button type="button" className="ng-btn ghost" onClick={onSkip}>{o.mode === 'nudge' ? L(dict, '先不了', 'Not now') : L(dict, '知道了', 'Got it')}</button>
+            {/* 2026-07-29 标注(Bug4 P8「下面三个按钮并排:念念、疗愈馆、稍后」):
+                疗愈馆原来是下面独立一行的通栏按钮,和上面两个动作分了两行。并成一排。 */}
+            {o.mode === 'nudge' && (
+              <button type="button" className="ng-btn ifs" onClick={onGoHealing}>{L(dict, '疗愈馆', 'Healing')}</button>
+            )}
+            <button type="button" className="ng-btn ghost" onClick={onSkip}>{o.mode === 'nudge' ? L(dict, '稍后', 'Later') : L(dict, '知道了', 'Got it')}</button>
           </div>
-          {o.mode === 'nudge' && (
-            <button type="button" className="ng-healing-btn" onClick={onGoHealing}>
-              {L(dict, '这条有点重 —— 去疗愈馆和它待一会儿', 'This one sits heavy — sit with it in the Healing room')}
-              <span aria-hidden> ›</span>
-            </button>
-          )}
-          <p className="ng-todaynote">{L(dict, '今天先看这一件。', 'Just this one for today.')}</p>
         </>
       ) : o.quiz ? (
         <>

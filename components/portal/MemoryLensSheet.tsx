@@ -79,8 +79,8 @@ export default function MemoryLensSheet({ open, onOpenChange, node }: { open: bo
       <div className="nesio-growth">
         {!applied ? (
           <>
-            <p style={{ fontSize: '1.05rem', fontWeight: 'var(--weight-semibold)', margin: '0 0 3px', color: 'var(--portal-ink)' }}>{L(dict, '用一个镜头看这条记忆', 'Look at this memory with a lens')}</p>
-            <p style={{ fontSize: '0.8rem', color: 'var(--portal-muted)', margin: '0 0 8px' }}>{L(dict, '同一套心智模型,套在你自己真实的事上', 'One mental model, applied to your own real moment')}</p>
+            {/* 2026-07-29 标注(Bug4 P4):标题与副标题划掉 —— 弹层本身就是"挑个镜头",
+                两行说明只是把镜头列表往下推。sheet 的 ariaLabel 已承担无障碍标题。 */}
             {recommended.length > 0 && <>
               <p className="ng-lbl">{L(dict, '为这条推荐', 'Picked for this one')}</p>
               {recommended.map((l) => <LensRow key={l.id} l={l} rec />)}
@@ -122,7 +122,7 @@ export default function MemoryLensSheet({ open, onOpenChange, node }: { open: bo
                 {saved ? (
                   <div className="ng-done" style={{ marginTop: 13 }}>{L(dict, `已存 · 记入「${DIMENSION_LABEL[applied.dim].zh}」维度 · 这条记忆现在带着你的回看`, `Saved · logged to “${DIMENSION_LABEL[applied.dim].en}” · this memory now carries your reflection`)}</div>
                 ) : (
-                  <button type="button" className="ng-btn" style={{ width: '100%', marginTop: 13 }} onClick={saveBack}>{L(dict, '存进这条记忆的回看', 'Save into this memory')}</button>
+                  <button type="button" className="ng-btn" style={{ width: '100%', marginTop: 13 }} onClick={saveBack}>{L(dict, '存入记忆', 'Save to memory')}</button>
                 )}
               </>
             ) : null}
