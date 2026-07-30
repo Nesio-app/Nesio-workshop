@@ -173,6 +173,9 @@ const KNOWN_KEYS = new Map([
   ["nesio-hub-order-v1", "durable"],
   ["nesio-img-hash-v1", "durable"],
   ["nesio-life-graph-v1", "durable"],
+  // 分片索引(地基 F3:图谱按年切片)。片本身是 `nesio-life-graph-v1:<年>` / `:x`,
+  // 键名由模板拼出,扫描器只看得见这个索引 —— 索引和片是同一份用户数据,同为 durable。
+  ["nesio-life-graph-v1:index", "durable"],
   ["nesio-living-model-v1", "durable"],
   ["nesio-local-owner-v1", "durable"],
   ["nesio-med-log-v1", "durable"],

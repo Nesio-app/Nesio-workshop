@@ -317,7 +317,12 @@ export async function restoreCombinedBackup(backup: FullBackup, mode: RestoreMod
   const idbCorruptKeys: string[] = [];
   for (const [k, v] of Object.entries(idbEntries)) {
     try {
-      if (k === LIFE_GRAPH_KEY && mode === 'merge') {
+      // 分片键(nesio-life-graph-v1:<年> / :x)与整图键同属图谱,必须走同一套 union 语义。
+      // 不加这一条,分片会落到下面的「merge 模式下已有就跳过」——换机合并时
+      // **备份里的记忆一条都进不来**(正是下面那条注释当初要避免的事)。
+      // 索引键不参与 merge:它是片名清单,由 writeGraphShards 在水合时按实际片重算。
+      const isGraphShard = k.startsWith(`${LIFE_GRAPH_KEY}:`) && k !== `${LIFE_GRAPH_KEY}:index`;
+      if ((k === LIFE_GRAPH_KEY || isGraphShard) && mode === 'merge') {
         // 图谱 merge = 按节点 id union(新者胜),不是「已有就跳过」——否则换机合并
         // 拿不到备份里的记忆。备份该条损坏则记 corrupt、保留本机(不空覆盖)。
         const merged = mergeGraphJson(await idbBackend.get(k), v);
