@@ -4707,6 +4707,27 @@ body:has(.nesio-mood-overlay) .nesio-bottom-nav::before {
    所以从洞察里再开的抽屉照样盖得住导航。只在宫格首页挂,进板块页立刻摘掉。 */
 .nesio-bottom-nav--above-overlay { z-index: 931; }
 
+/* 时间线每一行的 ✕(2026-07-30 用户要求:每条后面都能移走)。
+   ✕ 本体只有 12px,不给最小尺寸就是又一个点不中的目标 —— 走 --tap-min。 */
+.nesio-tl-x {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min, 44px);
+  min-height: var(--tap-min, 44px);
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) 0;
+  border: none;
+  background: transparent;
+  color: var(--portal-muted);
+  font-size: var(--text-sm);
+  line-height: 1;
+  opacity: 0.6;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+.nesio-tl-x:active { opacity: 1; }
+
 html[data-portal-theme="night"] .nesio-bottom-nav {
   background: rgba(20, 32, 58, 0.88);
   border-color: rgba(88,140,227,0.18);
@@ -20148,3 +20169,46 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-assets-rec .r { flex: none; display: flex; align-items: center; gap: var(--space-2); }
 .nesio-assets-rec .a { font-size: var(--text-sm); color: var(--portal-ink); font-variant-numeric: tabular-nums; }
 .nesio-assets-rec .x { background: none; border: none; color: var(--portal-muted); cursor: pointer; padding: 0 var(--space-1); font-size: var(--text-sm); }
+
+/* ── 引导卡详情(2026-07-30:任何卡都点得开「它凭什么出现」)────────────────── */
+.nesio-cardetail {
+  padding: var(--space-4) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-family: var(--font-sans);
+}
+.nesio-cardetail-head { display: flex; align-items: center; gap: var(--space-2); }
+.nesio-cardetail-head .ic { flex: none; display: inline-flex; color: var(--portal-accent); }
+.nesio-cardetail-head .t { flex: 1; min-width: 0; margin: 0; font-size: var(--text-h3); font-weight: var(--weight-semibold); color: var(--portal-ink); line-height: 1.35; }
+.nesio-cardetail-head .x {
+  flex: none; min-width: var(--tap-min, 44px); min-height: var(--tap-min, 44px);
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) 0;
+  border: none; background: none; color: var(--portal-muted);
+  font-size: var(--text-sm); cursor: pointer; font-family: var(--font-sans);
+}
+.nesio-cardetail-body { margin: 0; font-size: var(--text-body); color: var(--portal-ink); line-height: 1.65; }
+.nesio-cardetail-label {
+  margin: var(--space-3) 0 0; font-size: var(--text-xs); color: var(--portal-muted);
+  letter-spacing: var(--tracking-label, 0.14em);
+}
+.nesio-cardetail-why { margin: 0; font-size: var(--text-sm); color: var(--portal-ink); line-height: 1.6; }
+.nesio-cardetail-ev { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-1); }
+.nesio-cardetail-ev li { min-width: 0; }
+.nesio-cardetail-ev .go,
+.nesio-cardetail-ev .flat {
+  display: flex; align-items: baseline; gap: var(--space-2); width: 100%;
+  min-height: var(--tap-min, 44px);
+  font-size: var(--text-sm); font-family: var(--font-sans); text-align: left;
+  border: none; background: none; padding: 0; color: var(--portal-ink);
+}
+.nesio-cardetail-ev .go { cursor: pointer; }
+.nesio-cardetail-ev .k { flex: none; color: var(--portal-muted); }
+.nesio-cardetail-ev .v { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-cardetail-ev .arr { flex: none; color: var(--portal-accent); }
+.nesio-cardetail-tags { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.nesio-cardetail-tags .tag {
+  font-size: var(--text-xs); color: var(--portal-muted);
+  background: var(--portal-accent-soft); border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill); padding: var(--space-1) var(--space-3);
+}

@@ -526,10 +526,49 @@ export function loadLiveJudgedCards(now: Date = new Date(), budget = 3): LiveJud
  * 兜底是承诺 ④:AI 挂了仍出确定性的那几条,且必须**可见地**说明这是兜底(不许静默降级)。
  */
 export function judgeNeedsFallback(now: Date = new Date()): boolean {
+  return judgeState(now).kind !== 'live';
+}
+
+/**
+ * 判决层现在到底处于什么状态 —— 渲染层据此决定说什么话。
+ *
+ * 2026-07-30 真机实锤(截图:一张兜底卡 + 「AI 判断暂不可用」):这句话是错的。
+ * 原来的判据是 `lastOkAt === null || lastError !== null`,可 `lastOkAt` 只在
+ * **成功判过一批**时才写。以下几种情况它都是 null,而它们没有一个是「不可用」:
+ *   · 免费档 —— useTodayData 里 canUsePaidCloudAi() 为假时压根没调用过判决;
+ *   · 30 分钟闸没到点(status='skipped', note='interval');
+ *   · 根本没有新信号可判(status='skipped', note='no-new-signals')——
+ *     全新装机、或今天确实没什么可判的,都会落在这里。
+ * 于是「还没问过」被说成了「问了但坏了」,吓人且不可行动。
+ *
+ * 现在分三种:
+ *   live   —— 有窗口内的判决卡,一切正常;
+ *   idle   —— 判决层没出卡,但也没失败(没什么可判 / 没到点 / 免费档)。这不是故障,
+ *             兜底卡照出,但**不许**说「不可用」;
+ *   failed —— 真的失败过(HTTP 4xx/5xx、网络断、服务端解析拒绝),error 带原因。
+ *             这一种才该亮红线要求的「可见失败态 + 重试」。
+ */
+export type JudgeState =
+  | { kind: 'live' }
+  | { kind: 'idle' }
+  | { kind: 'failed'; error: string };
+
+export function judgeState(now: Date = new Date()): JudgeState {
   const l = readLedger();
-  const anyLive = l.cards.some((c) => isCardInWindow(c, localDayISO(now)));
-  if (anyLive) return false;
-  return l.stats.lastOkAt === null || l.stats.lastError !== null;
+  if (l.cards.some((c) => isCardInWindow(c, localDayISO(now)))) return { kind: 'live' };
+  if (l.stats.lastError) return { kind: 'failed', error: l.stats.lastError };
+  return { kind: 'idle' };
+}
+
+/**
+ * 「再试一次」:清掉错误 + 清掉 30 分钟闸的水位,让下一次 maybeRunJudgeBatch 立刻真跑。
+ * 不清 judged —— 已判过的指纹不该因为一次重试就重新花钱。
+ */
+export function clearJudgeError(): void {
+  if (typeof window === 'undefined') return;
+  const l = readLedger();
+  if (!l.stats.lastError && l.lastRunAt === null) return;
+  writeLedger({ ...l, lastRunAt: null, stats: { ...l.stats, lastError: null } });
 }
 
 /**

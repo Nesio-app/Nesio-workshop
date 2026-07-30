@@ -382,6 +382,8 @@ export function useTodayData(canUsePrivateData: boolean) {
       if (canUsePrivateData) setDisplayName(loadProfileSettings().displayName || '');
       refresh();
     };
+    // 「再试一次」按钮:clearJudgeError() 已把错误与闸的水位清掉,这里只负责再跑一遍。
+    window.addEventListener('nesio-today-refresh', refreshSoon);
     window.addEventListener('nesio-life-graph-updated', refreshSoon);
     window.addEventListener('nesio-connectors-refreshed', refreshSoon);
     window.addEventListener('nesio-weather-updated', refreshSoon);
@@ -394,6 +396,7 @@ export function useTodayData(canUsePrivateData: boolean) {
       if (emailPollInterval) clearInterval(emailPollInterval);
       gmailCleanup?.();
       if (refreshTimer != null) window.clearTimeout(refreshTimer);
+      window.removeEventListener('nesio-today-refresh', refreshSoon);
       window.removeEventListener('nesio-life-graph-updated', refreshSoon);
       window.removeEventListener('nesio-connectors-refreshed', refreshSoon);
       window.removeEventListener('nesio-weather-updated', refreshSoon);
