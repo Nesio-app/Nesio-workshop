@@ -102,31 +102,28 @@ export default function Globe({ countries, size = 300, onTap }: {
     const isDay = themeAttr === 'day'
       || (themeAttr !== 'night' && !(window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false));
     // Canvas 不认 CSS 变量 —— 按设计系统例外,用 getComputedStyle 读官方 token 后使用。
-    // 海洋走品牌 ramp(灰粉皮肤下=陶棕系),随皮肤/主题自动变,不再硬编码蓝。
+    // bug3:「地球换成真实航拍图,背景是宇宙」——
+    // 原来海洋跟着品牌色走(灰粉皮肤下整颗球是陶棕的),看着像一张示意图而不是地球。
+    // 现在固定成卫星影像的观感:深蓝海洋 + 绿褐陆地 + 极地冰盖,两个主题同一套,
+    // 舞台背景在 globals.css 里统一改成星空。到访国仍用主题的「完成」色点亮(那是我们的信息层)。
+    //
+    // ⚠️ 真正的航拍**照片**需要一张等距柱状投影的卫星底图(如 NASA Blue Marble)。
+    //    本仓没有这个素材、也不该联网去取 —— 素材到位后只需在这里把「海洋/陆地填色」
+    //    换成按 proj.invert 逐像素采样那张图即可,其余(旋转/晨昏/到访高亮)不用动。
     const cs = getComputedStyle(document.documentElement);
     const tok = (n: string, fb: string) => (cs.getPropertyValue(n).trim() || fb);
-    const deep = tok('--portal-blue-deep', isDay ? '#5f7890' : '#8fb4de');
-    const mid = tok('--portal-blue-mid', isDay ? '#a9c2d5' : '#6f95c8');
-    const lightC = tok('--portal-blue-light', isDay ? '#dceaf3' : '#2c3f5a');
-    const neutral = tok('--portal-neutral', isDay ? '#e6eef9' : '#16243c');
-    const line = tok('--portal-line', 'rgba(127,127,127,0.16)');
-    const P = isDay
-      ? {
-          halo: `color-mix(in srgb, ${deep} 22%, transparent)`,
-          ocean: [lightC, mid, deep] as const,
-          grat: 'rgba(255,255,255,0.28)',
-          land: neutral,
-          landStroke: line,
-          night: 'rgba(40,40,50,0.12)',
-        }
-      : {
-          halo: `color-mix(in srgb, ${deep} 30%, transparent)`,
-          ocean: [lightC, mid, deep] as const,
-          grat: 'rgba(255,255,255,0.08)',
-          land: neutral,
-          landStroke: line,
-          night: 'rgba(2, 6, 18, 0.5)',
-        };
+    const P = {
+      halo: 'rgba(120, 178, 255, 0.30)',
+      // 海:近赤道浅、边缘深(球体感);数值取自卫星影像常见的海色
+      ocean: ['#2b6ca8', '#17497f', '#0a2a53'] as const,
+      grat: 'rgba(255,255,255,0.07)',
+      land: '#5d7b4a',        // 温带植被
+      landDry: '#9c8455',     // 干旱/沙漠带
+      landCold: '#8fa08c',    // 高纬苔原
+      ice: '#e8f1f6',         // 极地冰盖
+      landStroke: 'rgba(255,255,255,0.10)',
+      night: 'rgba(2, 6, 18, 0.52)',
+    };
     const { yaw, pitch } = rotRef.current;
     const proj = geoOrthographic().translate([C, C]).scale(R).rotate([yaw, pitch]).clipAngle(90);
     const path = geoPath(proj, ctx);
@@ -151,11 +148,34 @@ export default function Globe({ countries, size = 300, onTap }: {
 
     const feats = featuresRef.current;
     if (feats) {
-      // 4. 陆地(未到访:深色地块)
-      ctx.beginPath();
-      for (const f of feats) if (!visitedRef.current.has(f.properties.name || '')) path(f as GeoPermissibleObjects);
-      ctx.fillStyle = P.land; ctx.fill();
-      ctx.strokeStyle = P.landStroke; ctx.lineWidth = 0.5; ctx.stroke();
+      // 4. 陆地(未到访):按纬度分三带上色 —— 干旱带(回归线附近)/温带/高纬苔原。
+      //    比一块纯色更像卫星图,又不需要任何贴图素材。
+      const band = (f: CountryFeature): string => {
+        const c = geoCentroid(f as GeoPermissibleObjects);
+        const lat = Math.abs(c[1]);
+        if (lat >= 60) return P.landCold;
+        if (lat >= 15 && lat <= 33) return P.landDry;
+        return P.land;
+      };
+      for (const fill of [P.landDry, P.land, P.landCold]) {
+        ctx.beginPath();
+        for (const f of feats) {
+          if (visitedRef.current.has(f.properties.name || '')) continue;
+          if (band(f) !== fill) continue;
+          path(f as GeoPermissibleObjects);
+        }
+        ctx.fillStyle = fill; ctx.fill();
+        ctx.strokeStyle = P.landStroke; ctx.lineWidth = 0.5; ctx.stroke();
+      }
+      // 4.5 极地冰盖:两个极冠(半透明白),让南北极不再是一片海蓝
+      ctx.save();
+      ctx.globalAlpha = 0.82;
+      for (const poleLat of [90, -90]) {
+        ctx.beginPath();
+        path(geoCircle().center([0, poleLat]).radius(23)());
+        ctx.fillStyle = P.ice; ctx.fill();
+      }
+      ctx.restore();
 
       // 5. 到访国(点亮 + 发光)。颜色取当前皮肤的「完成/到过」色,不再写死荧光黄绿 ——
       //    换了皮肤整个地球都变了,只有到访国还是那抹荧光绿,一眼就出戏。

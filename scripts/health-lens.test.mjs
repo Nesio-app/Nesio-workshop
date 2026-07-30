@@ -71,7 +71,9 @@ const code = (p) => stripComments(read(p));
 {
   const dash = read('components/portal/health/HealthDashboard.tsx');
   const earlyReturn = dash.indexOf('if (!data || data.metrics.length === 0)');
-  const mainReturn = dash.indexOf('const importedLabel');
+  // 早退分支的下界锚点:原来是 `const importedLabel`(bug2 删小字时一并删了),
+  // 改用早退之后第一行主流程计算 —— 它必须留着,否则整页没数据可算。
+  const mainReturn = dash.indexOf('const insight = computeFitnessInsight(data.metrics');
   assert.ok(earlyReturn > 0 && mainReturn > earlyReturn, 'HealthDashboard 的空态早退分支找不到了');
   const emptyBranch = dash.slice(earlyReturn, mainReturn);
   assert.match(

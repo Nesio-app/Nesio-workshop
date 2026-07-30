@@ -114,13 +114,12 @@ const code = stripComments;
     );
   }
 
-  // 登录态:那句「数据在哪」的说明必须跟着真实登录态走,不能写死
-  const tipAt = settings.indexOf('你的数据在哪里');
-  assert.ok(tipAt > 0, '隐私页的「你的数据在哪里」不见了');
-  const tip = settings.slice(tipAt, tipAt + 900);
+  // 登录态:「你的数据在哪里」整块已按用户标注(bug2 批·设置数据与隐私)删掉 ——
+  // 它当年的病(写死成「未登录」与旁边「已登录」同屏打架)随块一起消失。这里只钉死
+  // 「别再长回来一个写死登录态的说明块」。
   assert.ok(
-    /InfoTip text=\{signedIn/.test(tip),
-    '「你的数据在哪里」又写死成「未登录…登录后才开启云同步」了 —— 而它旁边那格写着「已登录 · 云同步已开」,同屏打架',
+    !settings.includes('你的数据在哪里'),
+    '「你的数据在哪里」块又回来了 —— 它已按标注删除;要重加必须让文案跟真实登录态走',
   );
 
   // 会员页:pro 必须管住整张状态卡,不能只管那枚徽章
@@ -139,13 +138,16 @@ const code = stripComments;
 // owed = earned − 已发放。家长一发工钱进度就倒退,发多了直接变负 ——
 // 用户看到的是「¥-20.00 / ¥100.00 · 还差 ¥120.00」。
 {
+  // bug3:这块已按标注从「家庭分享」搬进奖励模块(愿望集成到 rewards)。断言跟着搬,
+  // 病根不变 —— 进度分母必须是 earned(累计挣到的),不是 owed(还没发的工钱)。
+  const goal = code(read('components/portal/family/FamilyGoalCard.tsx'));
+  assert.ok(/\.earned/.test(goal), '攒钱进度没有取 earned(累计挣到的)');
+  assert.ok(/const reached = earned >= goal/.test(goal), '「攒够了」必须拿 earned 判 —— 用 owed 发过工钱之后永远达不到');
+  assert.ok(!/\bowed\b/.test(goal), '攒钱目标卡里不许出现 owed —— 它一发工钱就掉,进度会倒退甚至变负');
   const fam = code(read('components/portal/family/FamilySharingSheet.tsx'));
-  assert.ok(/saved:\s*number/.test(fam), '攒钱目标又改回按 owed 算了');
-  assert.ok(/saved=\{[\s\S]{0,120}?\.earned/.test(fam), '攒钱进度没有取 earned(累计挣到的)');
-  assert.ok(
-    !/const reached = owed >= goal/.test(fam),
-    '「攒够了」还在拿 owed 判 —— 发过工钱之后永远达不到',
-  );
+  assert.ok(!/GoalSection/.test(fam), '家庭板里不许再留一份攒钱目标 —— 两个愿望拆在两页就是原问题');
+  const store = code(read('components/portal/RewardsStore.tsx'));
+  assert.ok(/FamilyGoalCard/.test(store), '奖励模块必须挂上攒钱目标卡(愿望集成到 rewards)');
   const server = code(read('lib/family/family-server.ts'));
   assert.ok(/earned:\s*bal\.earned/.test(server), '服务端没把 earned 发给客户端,前端算不出真实攒钱进度');
 }

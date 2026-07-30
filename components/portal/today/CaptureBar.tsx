@@ -32,6 +32,13 @@ export interface CaptureBarProps {
   inputRef: RefObject<HTMLTextAreaElement | null>;
   /** 上传落库。由 TodayFeed 提供(它才知道怎么建节点);没给就不显示「+」。 */
   onFiles?: (files: File[]) => Promise<void>;
+  /**
+   * bug3 p42:话筒听不了时的可见失败态。原来这几种情况会去开「说一句」sheet ——
+   * iOS PWA 上 SpeechRecognition 根本不存在,于是点话筒每次都跳那张 sheet(标注要去掉)。
+   * 现在不换页,就在输入条下面说清楚,人可以直接打字。
+   */
+  micError?: string;
+  onDismissMicError?: () => void;
 }
 
 /** 输入框随字数长高(和成长页文本框同一套手感)。 */
@@ -147,6 +154,17 @@ export default function CaptureBar(capture: CaptureBarProps) {
           <button type="button" className="nesio-tl-capture-retry" onClick={() => fileRef.current?.click()}>
             {L(dict, '重试', 'Retry')}
           </button>
+        </p>
+      )}
+
+      {capture.micError && (
+        <p className="nesio-tl-capture-err" role="alert">
+          {capture.micError}
+          {capture.onDismissMicError && (
+            <button type="button" className="nesio-tl-capture-retry" onClick={capture.onDismissMicError}>
+              {L(dict, '知道了', 'Got it')}
+            </button>
+          )}
         </p>
       )}
     </div>

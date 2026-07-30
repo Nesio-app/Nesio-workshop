@@ -12,6 +12,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { IconBox, IconChevronRight, IconCamera } from '../icons';
+import SnapButton from '../SnapButton';
 
 export default function BeautyCarePanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -32,21 +33,18 @@ export default function BeautyCarePanel() {
     window.dispatchEvent(new CustomEvent('nesio-open-inventory'));
   }
 
-  function openCamera() {
-    window.dispatchEvent(new CustomEvent('nesio-open-camera'));
-  }
-
   return (
     <div className="nesio-beauty-care">
-      <p className="nesio-bl-lede">{L(dict, '护理 · 护肤与美容', 'Care · skincare & beauty')}</p>
-
+      {/* bug3 p36:「护理 · 护肤与美容」标题和空态那句小字都删了 —— tab 名已经说了这是护理页,
+          两个按钮自己就说明了要干什么。 */}
       {items.length === 0 ? (
         <div className="nesio-bl-empty-block">
-          <p>{L(dict, '还没有护肤类物品 —— 拍瓶瓶罐罐,或到物品里加一条「护肤」。', 'No skincare items yet — snap a bottle, or add one under Inventory → Skincare.')}</p>
           <div className="nesio-bl-empty-actions">
-            <button type="button" className="nesio-trip-action" onClick={openCamera}>
+            {/* bug3:「拍一拍」原来只派 nesio-open-camera(不带图),相机停在选择页 ——
+                改走 SnapButton:按钮自己持 capture 相机,拿到图再派事件,直接进识别。 */}
+            <SnapButton className="nesio-trip-action" ariaLabel={L(dict, '拍一拍', 'Snap')}>
               <IconCamera size={16} /> {L(dict, '拍一拍', 'Snap')}
-            </button>
+            </SnapButton>
             <button type="button" className="nesio-trip-primary" style={{ width: 'auto' }} onClick={openInventory}>
               {L(dict, '去物品', 'Inventory')}
             </button>

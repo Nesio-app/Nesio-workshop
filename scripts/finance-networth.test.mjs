@@ -69,8 +69,16 @@ const bank = loadTs('../lib/portal/providers/bank-tx.ts', (p) =>
   // P3 拆分:账户行渲染移入 CardsPane(FinanceTab 只留骨架)
   const tab = fs.readFileSync(new URL('../components/portal/finance/CardsPane.tsx', import.meta.url), 'utf8');
   assert.ok(/\['credit',\s*'loan'\]\.includes/.test(tab), 'loan 账户余额标「欠款」(和信用卡同)');
-  assert.ok(tab.includes('s.loanOwed') && tab.includes('负债'), '净资产计入贷款(负债分组)');
-  assert.ok(tab.includes('浮动盈亏') && tab.includes('portfolio.gain'), '卡片页投资组显示浮动盈亏(未实现盈亏)');
+  assert.ok(tab.includes('负债'), '卡片页仍按「负债」分组列出信用卡/贷款账户');
+  // bug2 标注把「净资产 / 投资组」这两块从卡片页删了(卡片页只列账户);
+  // 口径本身没变,只是搬了地方 —— 断言跟着搬,别让「搬走」被读成「取消」:
+  //   · 贷款计入负债、从净资产里减掉 → assetSummary(providers/bank-tx.ts)
+  //   · 浮动盈亏 → 总览页的「投资」卡(FinanceTab)
+  const bankSrc = fs.readFileSync(new URL('../lib/portal/providers/bank-tx.ts', import.meta.url), 'utf8');
+  assert.ok(/net: round2\(deposits \+ investments - creditOwed - loanOwed\)/.test(bankSrc),
+    '净资产必须减掉贷款欠款(loanOwed)');
+  const finTab = fs.readFileSync(new URL('../components/portal/finance/FinanceTab.tsx', import.meta.url), 'utf8');
+  assert.ok(finTab.includes('portfolio.gain'), '浮动盈亏(未实现盈亏)必须显示在总览的「投资」卡上');
   const rep = fs.readFileSync(new URL('../lib/portal/finance-report.ts', import.meta.url), 'utf8');
   assert.ok(rep.includes('loanOwed') && /\['credit',\s*'loan'\]/.test(rep), '月报文本也含贷款 + loan 标欠款');
 }

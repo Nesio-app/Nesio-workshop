@@ -1,0 +1,1606 @@
+{
+"note": "离线交通枢纽库(机场 IATA + 主要高铁/城际车站)。坐标为公开机场/车站位置,随包发布,无网可用。",
+"count": 160,
+"items": [
+{
+"code": "PEK",
+"name": "Beijing Capital Intl",
+"city": "Beijing",
+"cityZh": "北京",
+"country": "China",
+"lat": 40.0801,
+"lon": 116.5846,
+"kind": "airport"
+},
+{
+"code": "PKX",
+"name": "Beijing Daxing Intl",
+"city": "Beijing",
+"cityZh": "北京",
+"country": "China",
+"lat": 39.5098,
+"lon": 116.4106,
+"kind": "airport"
+},
+{
+"code": "PVG",
+"name": "Shanghai Pudong Intl",
+"city": "Shanghai",
+"cityZh": "上海",
+"country": "China",
+"lat": 31.1443,
+"lon": 121.8083,
+"kind": "airport"
+},
+{
+"code": "SHA",
+"name": "Shanghai Hongqiao Intl",
+"city": "Shanghai",
+"cityZh": "上海",
+"country": "China",
+"lat": 31.1979,
+"lon": 121.3363,
+"kind": "airport"
+},
+{
+"code": "CAN",
+"name": "Guangzhou Baiyun Intl",
+"city": "Guangzhou",
+"cityZh": "广州",
+"country": "China",
+"lat": 23.3924,
+"lon": 113.2988,
+"kind": "airport"
+},
+{
+"code": "SZX",
+"name": "Shenzhen Bao'an Intl",
+"city": "Shenzhen",
+"cityZh": "深圳",
+"country": "China",
+"lat": 22.6393,
+"lon": 113.8106,
+"kind": "airport"
+},
+{
+"code": "CTU",
+"name": "Chengdu Shuangliu Intl",
+"city": "Chengdu",
+"cityZh": "成都",
+"country": "China",
+"lat": 30.5785,
+"lon": 103.9471,
+"kind": "airport"
+},
+{
+"code": "TFU",
+"name": "Chengdu Tianfu Intl",
+"city": "Chengdu",
+"cityZh": "成都",
+"country": "China",
+"lat": 30.3125,
+"lon": 104.4415,
+"kind": "airport"
+},
+{
+"code": "CKG",
+"name": "Chongqing Jiangbei Intl",
+"city": "Chongqing",
+"cityZh": "重庆",
+"country": "China",
+"lat": 29.7192,
+"lon": 106.6417,
+"kind": "airport"
+},
+{
+"code": "XIY",
+"name": "Xi'an Xianyang Intl",
+"city": "Xi'an",
+"cityZh": "西安",
+"country": "China",
+"lat": 34.4471,
+"lon": 108.7516,
+"kind": "airport"
+},
+{
+"code": "KMG",
+"name": "Kunming Changshui Intl",
+"city": "Kunming",
+"cityZh": "昆明",
+"country": "China",
+"lat": 25.1019,
+"lon": 102.9292,
+"kind": "airport"
+},
+{
+"code": "HGH",
+"name": "Hangzhou Xiaoshan Intl",
+"city": "Hangzhou",
+"cityZh": "杭州",
+"country": "China",
+"lat": 30.2295,
+"lon": 120.4347,
+"kind": "airport"
+},
+{
+"code": "NKG",
+"name": "Nanjing Lukou Intl",
+"city": "Nanjing",
+"cityZh": "南京",
+"country": "China",
+"lat": 31.742,
+"lon": 118.8622,
+"kind": "airport"
+},
+{
+"code": "WUH",
+"name": "Wuhan Tianhe Intl",
+"city": "Wuhan",
+"cityZh": "武汉",
+"country": "China",
+"lat": 30.7838,
+"lon": 114.2081,
+"kind": "airport"
+},
+{
+"code": "CSX",
+"name": "Changsha Huanghua Intl",
+"city": "Changsha",
+"cityZh": "长沙",
+"country": "China",
+"lat": 28.1892,
+"lon": 113.2196,
+"kind": "airport"
+},
+{
+"code": "TSN",
+"name": "Tianjin Binhai Intl",
+"city": "Tianjin",
+"cityZh": "天津",
+"country": "China",
+"lat": 39.1244,
+"lon": 117.3462,
+"kind": "airport"
+},
+{
+"code": "TAO",
+"name": "Qingdao Jiaodong Intl",
+"city": "Qingdao",
+"cityZh": "青岛",
+"country": "China",
+"lat": 36.3614,
+"lon": 120.0864,
+"kind": "airport"
+},
+{
+"code": "DLC",
+"name": "Dalian Zhoushuizi Intl",
+"city": "Dalian",
+"cityZh": "大连",
+"country": "China",
+"lat": 38.9657,
+"lon": 121.5386,
+"kind": "airport"
+},
+{
+"code": "SYX",
+"name": "Sanya Phoenix Intl",
+"city": "Sanya",
+"cityZh": "三亚",
+"country": "China",
+"lat": 18.3029,
+"lon": 109.4122,
+"kind": "airport"
+},
+{
+"code": "HAK",
+"name": "Haikou Meilan Intl",
+"city": "Haikou",
+"cityZh": "海口",
+"country": "China",
+"lat": 19.9349,
+"lon": 110.4589,
+"kind": "airport"
+},
+{
+"code": "XMN",
+"name": "Xiamen Gaoqi Intl",
+"city": "Xiamen",
+"cityZh": "厦门",
+"country": "China",
+"lat": 24.544,
+"lon": 118.1272,
+"kind": "airport"
+},
+{
+"code": "URC",
+"name": "Urumqi Diwopu Intl",
+"city": "Urumqi",
+"cityZh": "乌鲁木齐",
+"country": "China",
+"lat": 43.9071,
+"lon": 87.4742,
+"kind": "airport"
+},
+{
+"code": "LXA",
+"name": "Lhasa Gonggar",
+"city": "Lhasa",
+"cityZh": "拉萨",
+"country": "China",
+"lat": 29.2978,
+"lon": 90.9119,
+"kind": "airport"
+},
+{
+"code": "BJPCN",
+"name": "Beijing South Railway Station",
+"city": "Beijing",
+"cityZh": "北京",
+"country": "China",
+"lat": 39.8652,
+"lon": 116.3786,
+"kind": "rail"
+},
+{
+"code": "SHHCN",
+"name": "Shanghai Hongqiao Railway Station",
+"city": "Shanghai",
+"cityZh": "上海",
+"country": "China",
+"lat": 31.1943,
+"lon": 121.32,
+"kind": "rail"
+},
+{
+"code": "GZQCN",
+"name": "Guangzhou South Railway Station",
+"city": "Guangzhou",
+"cityZh": "广州",
+"country": "China",
+"lat": 22.9884,
+"lon": 113.2686,
+"kind": "rail"
+},
+{
+"code": "SZBCN",
+"name": "Shenzhen North Railway Station",
+"city": "Shenzhen",
+"cityZh": "深圳",
+"country": "China",
+"lat": 22.6098,
+"lon": 114.0294,
+"kind": "rail"
+},
+{
+"code": "HZECN",
+"name": "Hangzhou East Railway Station",
+"city": "Hangzhou",
+"cityZh": "杭州",
+"country": "China",
+"lat": 30.2907,
+"lon": 120.213,
+"kind": "rail"
+},
+{
+"code": "XAECN",
+"name": "Xi'an North Railway Station",
+"city": "Xi'an",
+"cityZh": "西安",
+"country": "China",
+"lat": 34.376,
+"lon": 108.942,
+"kind": "rail"
+},
+{
+"code": "CDECN",
+"name": "Chengdu East Railway Station",
+"city": "Chengdu",
+"cityZh": "成都",
+"country": "China",
+"lat": 30.632,
+"lon": 104.142,
+"kind": "rail"
+},
+{
+"code": "WHECN",
+"name": "Wuhan Railway Station",
+"city": "Wuhan",
+"cityZh": "武汉",
+"country": "China",
+"lat": 30.607,
+"lon": 114.423,
+"kind": "rail"
+},
+{
+"code": "HKG",
+"name": "Hong Kong Intl",
+"city": "Hong Kong",
+"cityZh": "香港",
+"country": "Hong Kong",
+"lat": 22.308,
+"lon": 113.9185,
+"kind": "airport"
+},
+{
+"code": "MFM",
+"name": "Macau Intl",
+"city": "Macau",
+"cityZh": "澳门",
+"country": "Macau",
+"lat": 22.1496,
+"lon": 113.5915,
+"kind": "airport"
+},
+{
+"code": "TPE",
+"name": "Taiwan Taoyuan Intl",
+"city": "Taipei",
+"cityZh": "台北",
+"country": "Taiwan",
+"lat": 25.0777,
+"lon": 121.2328,
+"kind": "airport"
+},
+{
+"code": "TSA",
+"name": "Taipei Songshan",
+"city": "Taipei",
+"cityZh": "台北",
+"country": "Taiwan",
+"lat": 25.0694,
+"lon": 121.5521,
+"kind": "airport"
+},
+{
+"code": "KHH",
+"name": "Kaohsiung Intl",
+"city": "Kaohsiung",
+"cityZh": "高雄",
+"country": "Taiwan",
+"lat": 22.5771,
+"lon": 120.3499,
+"kind": "airport"
+},
+{
+"code": "HND",
+"name": "Tokyo Haneda",
+"city": "Tokyo",
+"cityZh": "东京",
+"country": "Japan",
+"lat": 35.5494,
+"lon": 139.7798,
+"kind": "airport"
+},
+{
+"code": "NRT",
+"name": "Tokyo Narita Intl",
+"city": "Tokyo",
+"cityZh": "东京",
+"country": "Japan",
+"lat": 35.772,
+"lon": 140.3929,
+"kind": "airport"
+},
+{
+"code": "KIX",
+"name": "Kansai Intl",
+"city": "Osaka",
+"cityZh": "大阪",
+"country": "Japan",
+"lat": 34.4273,
+"lon": 135.244,
+"kind": "airport"
+},
+{
+"code": "ITM",
+"name": "Osaka Itami",
+"city": "Osaka",
+"cityZh": "大阪",
+"country": "Japan",
+"lat": 34.7855,
+"lon": 135.4382,
+"kind": "airport"
+},
+{
+"code": "NGO",
+"name": "Chubu Centrair Intl",
+"city": "Nagoya",
+"cityZh": "名古屋",
+"country": "Japan",
+"lat": 34.8584,
+"lon": 136.8054,
+"kind": "airport"
+},
+{
+"code": "CTS",
+"name": "New Chitose",
+"city": "Sapporo",
+"cityZh": "札幌",
+"country": "Japan",
+"lat": 42.7752,
+"lon": 141.6923,
+"kind": "airport"
+},
+{
+"code": "FUK",
+"name": "Fukuoka",
+"city": "Fukuoka",
+"cityZh": "福冈",
+"country": "Japan",
+"lat": 33.5859,
+"lon": 130.451,
+"kind": "airport"
+},
+{
+"code": "OKA",
+"name": "Naha",
+"city": "Okinawa",
+"cityZh": "冲绳",
+"country": "Japan",
+"lat": 26.1958,
+"lon": 127.6459,
+"kind": "airport"
+},
+{
+"code": "TYOST",
+"name": "Tokyo Station (Shinkansen)",
+"city": "Tokyo",
+"cityZh": "东京",
+"country": "Japan",
+"lat": 35.6812,
+"lon": 139.7671,
+"kind": "rail"
+},
+{
+"code": "KYOST",
+"name": "Kyoto Station (Shinkansen)",
+"city": "Kyoto",
+"cityZh": "京都",
+"country": "Japan",
+"lat": 34.9858,
+"lon": 135.7588,
+"kind": "rail"
+},
+{
+"code": "ICN",
+"name": "Incheon Intl",
+"city": "Seoul",
+"cityZh": "首尔",
+"country": "South Korea",
+"lat": 37.4602,
+"lon": 126.4407,
+"kind": "airport"
+},
+{
+"code": "GMP",
+"name": "Gimpo Intl",
+"city": "Seoul",
+"cityZh": "首尔",
+"country": "South Korea",
+"lat": 37.5583,
+"lon": 126.7906,
+"kind": "airport"
+},
+{
+"code": "PUS",
+"name": "Gimhae Intl",
+"city": "Busan",
+"cityZh": "釜山",
+"country": "South Korea",
+"lat": 35.1795,
+"lon": 128.9382,
+"kind": "airport"
+},
+{
+"code": "SIN",
+"name": "Singapore Changi",
+"city": "Singapore",
+"cityZh": "新加坡",
+"country": "Singapore",
+"lat": 1.3644,
+"lon": 103.9915,
+"kind": "airport"
+},
+{
+"code": "BKK",
+"name": "Suvarnabhumi",
+"city": "Bangkok",
+"cityZh": "曼谷",
+"country": "Thailand",
+"lat": 13.69,
+"lon": 100.7501,
+"kind": "airport"
+},
+{
+"code": "DMK",
+"name": "Don Mueang",
+"city": "Bangkok",
+"cityZh": "曼谷",
+"country": "Thailand",
+"lat": 13.9126,
+"lon": 100.6068,
+"kind": "airport"
+},
+{
+"code": "HKT",
+"name": "Phuket Intl",
+"city": "Phuket",
+"cityZh": "普吉",
+"country": "Thailand",
+"lat": 8.1132,
+"lon": 98.3169,
+"kind": "airport"
+},
+{
+"code": "KUL",
+"name": "Kuala Lumpur Intl",
+"city": "Kuala Lumpur",
+"cityZh": "吉隆坡",
+"country": "Malaysia",
+"lat": 2.7456,
+"lon": 101.7099,
+"kind": "airport"
+},
+{
+"code": "CGK",
+"name": "Soekarno-Hatta Intl",
+"city": "Jakarta",
+"cityZh": "雅加达",
+"country": "Indonesia",
+"lat": -6.1256,
+"lon": 106.6558,
+"kind": "airport"
+},
+{
+"code": "DPS",
+"name": "Ngurah Rai Intl",
+"city": "Bali",
+"cityZh": "巴厘岛",
+"country": "Indonesia",
+"lat": -8.7482,
+"lon": 115.1672,
+"kind": "airport"
+},
+{
+"code": "MNL",
+"name": "Ninoy Aquino Intl",
+"city": "Manila",
+"cityZh": "马尼拉",
+"country": "Philippines",
+"lat": 14.5086,
+"lon": 121.0195,
+"kind": "airport"
+},
+{
+"code": "SGN",
+"name": "Tan Son Nhat Intl",
+"city": "Ho Chi Minh City",
+"cityZh": "胡志明市",
+"country": "Vietnam",
+"lat": 10.8188,
+"lon": 106.652,
+"kind": "airport"
+},
+{
+"code": "HAN",
+"name": "Noi Bai Intl",
+"city": "Hanoi",
+"cityZh": "河内",
+"country": "Vietnam",
+"lat": 21.2212,
+"lon": 105.8072,
+"kind": "airport"
+},
+{
+"code": "DEL",
+"name": "Indira Gandhi Intl",
+"city": "Delhi",
+"cityZh": "德里",
+"country": "India",
+"lat": 28.5562,
+"lon": 77.1,
+"kind": "airport"
+},
+{
+"code": "BOM",
+"name": "Chhatrapati Shivaji Intl",
+"city": "Mumbai",
+"cityZh": "孟买",
+"country": "India",
+"lat": 19.0896,
+"lon": 72.8656,
+"kind": "airport"
+},
+{
+"code": "BLR",
+"name": "Kempegowda Intl",
+"city": "Bengaluru",
+"cityZh": "班加罗尔",
+"country": "India",
+"lat": 13.1986,
+"lon": 77.7066,
+"kind": "airport"
+},
+{
+"code": "CMB",
+"name": "Bandaranaike Intl",
+"city": "Colombo",
+"cityZh": "科伦坡",
+"country": "Sri Lanka",
+"lat": 7.1808,
+"lon": 79.8841,
+"kind": "airport"
+},
+{
+"code": "KTM",
+"name": "Tribhuvan Intl",
+"city": "Kathmandu",
+"cityZh": "加德满都",
+"country": "Nepal",
+"lat": 27.6966,
+"lon": 85.3591,
+"kind": "airport"
+},
+{
+"code": "DXB",
+"name": "Dubai Intl",
+"city": "Dubai",
+"cityZh": "迪拜",
+"country": "UAE",
+"lat": 25.2532,
+"lon": 55.3657,
+"kind": "airport"
+},
+{
+"code": "AUH",
+"name": "Zayed Intl",
+"city": "Abu Dhabi",
+"cityZh": "阿布扎比",
+"country": "UAE",
+"lat": 24.433,
+"lon": 54.6511,
+"kind": "airport"
+},
+{
+"code": "DOH",
+"name": "Hamad Intl",
+"city": "Doha",
+"cityZh": "多哈",
+"country": "Qatar",
+"lat": 25.2731,
+"lon": 51.608,
+"kind": "airport"
+},
+{
+"code": "IST",
+"name": "Istanbul",
+"city": "Istanbul",
+"cityZh": "伊斯坦布尔",
+"country": "Turkey",
+"lat": 41.2753,
+"lon": 28.7519,
+"kind": "airport"
+},
+{
+"code": "TLV",
+"name": "Ben Gurion",
+"city": "Tel Aviv",
+"cityZh": "特拉维夫",
+"country": "Israel",
+"lat": 32.0114,
+"lon": 34.8867,
+"kind": "airport"
+},
+{
+"code": "JED",
+"name": "King Abdulaziz Intl",
+"city": "Jeddah",
+"cityZh": "吉达",
+"country": "Saudi Arabia",
+"lat": 21.6796,
+"lon": 39.1565,
+"kind": "airport"
+},
+{
+"code": "LHR",
+"name": "London Heathrow",
+"city": "London",
+"cityZh": "伦敦",
+"country": "United Kingdom",
+"lat": 51.47,
+"lon": -0.4543,
+"kind": "airport"
+},
+{
+"code": "LGW",
+"name": "London Gatwick",
+"city": "London",
+"cityZh": "伦敦",
+"country": "United Kingdom",
+"lat": 51.1537,
+"lon": -0.1821,
+"kind": "airport"
+},
+{
+"code": "STN",
+"name": "London Stansted",
+"city": "London",
+"cityZh": "伦敦",
+"country": "United Kingdom",
+"lat": 51.886,
+"lon": 0.2389,
+"kind": "airport"
+},
+{
+"code": "CDG",
+"name": "Paris Charles de Gaulle",
+"city": "Paris",
+"cityZh": "巴黎",
+"country": "France",
+"lat": 49.0097,
+"lon": 2.5479,
+"kind": "airport"
+},
+{
+"code": "ORY",
+"name": "Paris Orly",
+"city": "Paris",
+"cityZh": "巴黎",
+"country": "France",
+"lat": 48.7233,
+"lon": 2.3794,
+"kind": "airport"
+},
+{
+"code": "AMS",
+"name": "Amsterdam Schiphol",
+"city": "Amsterdam",
+"cityZh": "阿姆斯特丹",
+"country": "Netherlands",
+"lat": 52.3105,
+"lon": 4.7683,
+"kind": "airport"
+},
+{
+"code": "FRA",
+"name": "Frankfurt",
+"city": "Frankfurt",
+"cityZh": "法兰克福",
+"country": "Germany",
+"lat": 50.0379,
+"lon": 8.5622,
+"kind": "airport"
+},
+{
+"code": "MUC",
+"name": "Munich",
+"city": "Munich",
+"cityZh": "慕尼黑",
+"country": "Germany",
+"lat": 48.3537,
+"lon": 11.775,
+"kind": "airport"
+},
+{
+"code": "BER",
+"name": "Berlin Brandenburg",
+"city": "Berlin",
+"cityZh": "柏林",
+"country": "Germany",
+"lat": 52.3667,
+"lon": 13.5033,
+"kind": "airport"
+},
+{
+"code": "MAD",
+"name": "Adolfo Suárez Madrid–Barajas",
+"city": "Madrid",
+"cityZh": "马德里",
+"country": "Spain",
+"lat": 40.4936,
+"lon": -3.5668,
+"kind": "airport"
+},
+{
+"code": "BCN",
+"name": "Barcelona El Prat",
+"city": "Barcelona",
+"cityZh": "巴塞罗那",
+"country": "Spain",
+"lat": 41.2974,
+"lon": 2.0833,
+"kind": "airport"
+},
+{
+"code": "FCO",
+"name": "Rome Fiumicino",
+"city": "Rome",
+"cityZh": "罗马",
+"country": "Italy",
+"lat": 41.8003,
+"lon": 12.2389,
+"kind": "airport"
+},
+{
+"code": "MXP",
+"name": "Milan Malpensa",
+"city": "Milan",
+"cityZh": "米兰",
+"country": "Italy",
+"lat": 45.6306,
+"lon": 8.7281,
+"kind": "airport"
+},
+{
+"code": "VCE",
+"name": "Venice Marco Polo",
+"city": "Venice",
+"cityZh": "威尼斯",
+"country": "Italy",
+"lat": 45.5053,
+"lon": 12.3519,
+"kind": "airport"
+},
+{
+"code": "ZRH",
+"name": "Zurich",
+"city": "Zurich",
+"cityZh": "苏黎世",
+"country": "Switzerland",
+"lat": 47.4647,
+"lon": 8.5492,
+"kind": "airport"
+},
+{
+"code": "GVA",
+"name": "Geneva",
+"city": "Geneva",
+"cityZh": "日内瓦",
+"country": "Switzerland",
+"lat": 46.2381,
+"lon": 6.109,
+"kind": "airport"
+},
+{
+"code": "VIE",
+"name": "Vienna",
+"city": "Vienna",
+"cityZh": "维也纳",
+"country": "Austria",
+"lat": 48.1103,
+"lon": 16.5697,
+"kind": "airport"
+},
+{
+"code": "CPH",
+"name": "Copenhagen",
+"city": "Copenhagen",
+"cityZh": "哥本哈根",
+"country": "Denmark",
+"lat": 55.618,
+"lon": 12.656,
+"kind": "airport"
+},
+{
+"code": "ARN",
+"name": "Stockholm Arlanda",
+"city": "Stockholm",
+"cityZh": "斯德哥尔摩",
+"country": "Sweden",
+"lat": 59.6519,
+"lon": 17.9186,
+"kind": "airport"
+},
+{
+"code": "OSL",
+"name": "Oslo Gardermoen",
+"city": "Oslo",
+"cityZh": "奥斯陆",
+"country": "Norway",
+"lat": 60.1976,
+"lon": 11.1004,
+"kind": "airport"
+},
+{
+"code": "HEL",
+"name": "Helsinki-Vantaa",
+"city": "Helsinki",
+"cityZh": "赫尔辛基",
+"country": "Finland",
+"lat": 60.3172,
+"lon": 24.9633,
+"kind": "airport"
+},
+{
+"code": "LIS",
+"name": "Lisbon Humberto Delgado",
+"city": "Lisbon",
+"cityZh": "里斯本",
+"country": "Portugal",
+"lat": 38.7742,
+"lon": -9.1342,
+"kind": "airport"
+},
+{
+"code": "DUB",
+"name": "Dublin",
+"city": "Dublin",
+"cityZh": "都柏林",
+"country": "Ireland",
+"lat": 53.4213,
+"lon": -6.2701,
+"kind": "airport"
+},
+{
+"code": "BRU",
+"name": "Brussels",
+"city": "Brussels",
+"cityZh": "布鲁塞尔",
+"country": "Belgium",
+"lat": 50.9014,
+"lon": 4.4844,
+"kind": "airport"
+},
+{
+"code": "PRG",
+"name": "Prague Václav Havel",
+"city": "Prague",
+"cityZh": "布拉格",
+"country": "Czechia",
+"lat": 50.1008,
+"lon": 14.26,
+"kind": "airport"
+},
+{
+"code": "WAW",
+"name": "Warsaw Chopin",
+"city": "Warsaw",
+"cityZh": "华沙",
+"country": "Poland",
+"lat": 52.1657,
+"lon": 20.9671,
+"kind": "airport"
+},
+{
+"code": "BUD",
+"name": "Budapest Ferenc Liszt",
+"city": "Budapest",
+"cityZh": "布达佩斯",
+"country": "Hungary",
+"lat": 47.4298,
+"lon": 19.2611,
+"kind": "airport"
+},
+{
+"code": "ATH",
+"name": "Athens Eleftherios Venizelos",
+"city": "Athens",
+"cityZh": "雅典",
+"country": "Greece",
+"lat": 37.9364,
+"lon": 23.9445,
+"kind": "airport"
+},
+{
+"code": "SVO",
+"name": "Moscow Sheremetyevo",
+"city": "Moscow",
+"cityZh": "莫斯科",
+"country": "Russia",
+"lat": 55.9726,
+"lon": 37.4146,
+"kind": "airport"
+},
+{
+"code": "KEF",
+"name": "Keflavík Intl",
+"city": "Reykjavik",
+"cityZh": "雷克雅未克",
+"country": "Iceland",
+"lat": 63.985,
+"lon": -22.6056,
+"kind": "airport"
+},
+{
+"code": "LDNSP",
+"name": "London St Pancras Intl (Eurostar)",
+"city": "London",
+"cityZh": "伦敦",
+"country": "United Kingdom",
+"lat": 51.532,
+"lon": -0.1263,
+"kind": "rail"
+},
+{
+"code": "PARGN",
+"name": "Paris Gare du Nord (Eurostar)",
+"city": "Paris",
+"cityZh": "巴黎",
+"country": "France",
+"lat": 48.8809,
+"lon": 2.3553,
+"kind": "rail"
+},
+{
+"code": "AMSCS",
+"name": "Amsterdam Centraal",
+"city": "Amsterdam",
+"cityZh": "阿姆斯特丹",
+"country": "Netherlands",
+"lat": 52.3791,
+"lon": 4.9003,
+"kind": "rail"
+},
+{
+"code": "JFK",
+"name": "New York JFK",
+"city": "New York",
+"cityZh": "纽约",
+"country": "United States",
+"lat": 40.6413,
+"lon": -73.7781,
+"kind": "airport"
+},
+{
+"code": "EWR",
+"name": "Newark Liberty Intl",
+"city": "New York",
+"cityZh": "纽约",
+"country": "United States",
+"lat": 40.6895,
+"lon": -74.1745,
+"kind": "airport"
+},
+{
+"code": "LGA",
+"name": "New York LaGuardia",
+"city": "New York",
+"cityZh": "纽约",
+"country": "United States",
+"lat": 40.7769,
+"lon": -73.874,
+"kind": "airport"
+},
+{
+"code": "LAX",
+"name": "Los Angeles Intl",
+"city": "Los Angeles",
+"cityZh": "洛杉矶",
+"country": "United States",
+"lat": 33.9416,
+"lon": -118.4085,
+"kind": "airport"
+},
+{
+"code": "SFO",
+"name": "San Francisco Intl",
+"city": "San Francisco",
+"cityZh": "旧金山",
+"country": "United States",
+"lat": 37.6213,
+"lon": -122.379,
+"kind": "airport"
+},
+{
+"code": "SJC",
+"name": "San Jose Mineta Intl",
+"city": "San Jose",
+"cityZh": "圣何塞",
+"country": "United States",
+"lat": 37.3639,
+"lon": -121.9289,
+"kind": "airport"
+},
+{
+"code": "OAK",
+"name": "Oakland Intl",
+"city": "Oakland",
+"cityZh": "奥克兰",
+"country": "United States",
+"lat": 37.7126,
+"lon": -122.2197,
+"kind": "airport"
+},
+{
+"code": "SEA",
+"name": "Seattle-Tacoma Intl",
+"city": "Seattle",
+"cityZh": "西雅图",
+"country": "United States",
+"lat": 47.4502,
+"lon": -122.3088,
+"kind": "airport"
+},
+{
+"code": "ORD",
+"name": "Chicago O'Hare Intl",
+"city": "Chicago",
+"cityZh": "芝加哥",
+"country": "United States",
+"lat": 41.9742,
+"lon": -87.9073,
+"kind": "airport"
+},
+{
+"code": "MDW",
+"name": "Chicago Midway",
+"city": "Chicago",
+"cityZh": "芝加哥",
+"country": "United States",
+"lat": 41.7868,
+"lon": -87.7522,
+"kind": "airport"
+},
+{
+"code": "ATL",
+"name": "Hartsfield-Jackson Atlanta Intl",
+"city": "Atlanta",
+"cityZh": "亚特兰大",
+"country": "United States",
+"lat": 33.6407,
+"lon": -84.4277,
+"kind": "airport"
+},
+{
+"code": "DFW",
+"name": "Dallas/Fort Worth Intl",
+"city": "Dallas",
+"cityZh": "达拉斯",
+"country": "United States",
+"lat": 32.8998,
+"lon": -97.0403,
+"kind": "airport"
+},
+{
+"code": "IAH",
+"name": "Houston George Bush Intl",
+"city": "Houston",
+"cityZh": "休斯顿",
+"country": "United States",
+"lat": 29.9902,
+"lon": -95.3368,
+"kind": "airport"
+},
+{
+"code": "DEN",
+"name": "Denver Intl",
+"city": "Denver",
+"cityZh": "丹佛",
+"country": "United States",
+"lat": 39.8561,
+"lon": -104.6737,
+"kind": "airport"
+},
+{
+"code": "PHX",
+"name": "Phoenix Sky Harbor Intl",
+"city": "Phoenix",
+"cityZh": "凤凰城",
+"country": "United States",
+"lat": 33.4342,
+"lon": -112.0116,
+"kind": "airport"
+},
+{
+"code": "LAS",
+"name": "Harry Reid Intl",
+"city": "Las Vegas",
+"cityZh": "拉斯维加斯",
+"country": "United States",
+"lat": 36.084,
+"lon": -115.1537,
+"kind": "airport"
+},
+{
+"code": "MIA",
+"name": "Miami Intl",
+"city": "Miami",
+"cityZh": "迈阿密",
+"country": "United States",
+"lat": 25.7959,
+"lon": -80.287,
+"kind": "airport"
+},
+{
+"code": "MCO",
+"name": "Orlando Intl",
+"city": "Orlando",
+"cityZh": "奥兰多",
+"country": "United States",
+"lat": 28.4312,
+"lon": -81.3081,
+"kind": "airport"
+},
+{
+"code": "BOS",
+"name": "Boston Logan Intl",
+"city": "Boston",
+"cityZh": "波士顿",
+"country": "United States",
+"lat": 42.3656,
+"lon": -71.0096,
+"kind": "airport"
+},
+{
+"code": "DCA",
+"name": "Reagan Washington National",
+"city": "Washington",
+"cityZh": "华盛顿",
+"country": "United States",
+"lat": 38.8512,
+"lon": -77.0402,
+"kind": "airport"
+},
+{
+"code": "IAD",
+"name": "Washington Dulles Intl",
+"city": "Washington",
+"cityZh": "华盛顿",
+"country": "United States",
+"lat": 38.9531,
+"lon": -77.4565,
+"kind": "airport"
+},
+{
+"code": "PHL",
+"name": "Philadelphia Intl",
+"city": "Philadelphia",
+"cityZh": "费城",
+"country": "United States",
+"lat": 39.8744,
+"lon": -75.2424,
+"kind": "airport"
+},
+{
+"code": "RDU",
+"name": "Raleigh-Durham Intl",
+"city": "Raleigh",
+"cityZh": "罗利",
+"country": "United States",
+"lat": 35.8801,
+"lon": -78.788,
+"kind": "airport"
+},
+{
+"code": "CLT",
+"name": "Charlotte Douglas Intl",
+"city": "Charlotte",
+"cityZh": "夏洛特",
+"country": "United States",
+"lat": 35.2144,
+"lon": -80.9473,
+"kind": "airport"
+},
+{
+"code": "MSP",
+"name": "Minneapolis-St Paul Intl",
+"city": "Minneapolis",
+"cityZh": "明尼阿波利斯",
+"country": "United States",
+"lat": 44.8848,
+"lon": -93.2223,
+"kind": "airport"
+},
+{
+"code": "DTW",
+"name": "Detroit Metropolitan",
+"city": "Detroit",
+"cityZh": "底特律",
+"country": "United States",
+"lat": 42.2162,
+"lon": -83.3554,
+"kind": "airport"
+},
+{
+"code": "SLC",
+"name": "Salt Lake City Intl",
+"city": "Salt Lake City",
+"cityZh": "盐湖城",
+"country": "United States",
+"lat": 40.7899,
+"lon": -111.9791,
+"kind": "airport"
+},
+{
+"code": "SAN",
+"name": "San Diego Intl",
+"city": "San Diego",
+"cityZh": "圣迭戈",
+"country": "United States",
+"lat": 32.7338,
+"lon": -117.1933,
+"kind": "airport"
+},
+{
+"code": "PDX",
+"name": "Portland Intl",
+"city": "Portland",
+"cityZh": "波特兰",
+"country": "United States",
+"lat": 45.5898,
+"lon": -122.5951,
+"kind": "airport"
+},
+{
+"code": "AUS",
+"name": "Austin-Bergstrom Intl",
+"city": "Austin",
+"cityZh": "奥斯汀",
+"country": "United States",
+"lat": 30.1975,
+"lon": -97.6664,
+"kind": "airport"
+},
+{
+"code": "HNL",
+"name": "Daniel K. Inouye Intl",
+"city": "Honolulu",
+"cityZh": "檀香山",
+"country": "United States",
+"lat": 21.3187,
+"lon": -157.9224,
+"kind": "airport"
+},
+{
+"code": "ANC",
+"name": "Ted Stevens Anchorage Intl",
+"city": "Anchorage",
+"cityZh": "安克雷奇",
+"country": "United States",
+"lat": 61.1743,
+"lon": -149.9962,
+"kind": "airport"
+},
+{
+"code": "YYZ",
+"name": "Toronto Pearson Intl",
+"city": "Toronto",
+"cityZh": "多伦多",
+"country": "Canada",
+"lat": 43.6777,
+"lon": -79.6248,
+"kind": "airport"
+},
+{
+"code": "YVR",
+"name": "Vancouver Intl",
+"city": "Vancouver",
+"cityZh": "温哥华",
+"country": "Canada",
+"lat": 49.1967,
+"lon": -123.1815,
+"kind": "airport"
+},
+{
+"code": "YUL",
+"name": "Montréal-Trudeau Intl",
+"city": "Montreal",
+"cityZh": "蒙特利尔",
+"country": "Canada",
+"lat": 45.4706,
+"lon": -73.7408,
+"kind": "airport"
+},
+{
+"code": "YYC",
+"name": "Calgary Intl",
+"city": "Calgary",
+"cityZh": "卡尔加里",
+"country": "Canada",
+"lat": 51.1315,
+"lon": -114.0106,
+"kind": "airport"
+},
+{
+"code": "MEX",
+"name": "Mexico City Intl",
+"city": "Mexico City",
+"cityZh": "墨西哥城",
+"country": "Mexico",
+"lat": 19.4361,
+"lon": -99.0719,
+"kind": "airport"
+},
+{
+"code": "CUN",
+"name": "Cancún Intl",
+"city": "Cancun",
+"cityZh": "坎昆",
+"country": "Mexico",
+"lat": 21.0365,
+"lon": -86.8771,
+"kind": "airport"
+},
+{
+"code": "NYCPS",
+"name": "New York Penn Station (Amtrak)",
+"city": "New York",
+"cityZh": "纽约",
+"country": "United States",
+"lat": 40.7506,
+"lon": -73.9935,
+"kind": "rail"
+},
+{
+"code": "GRU",
+"name": "São Paulo Guarulhos Intl",
+"city": "Sao Paulo",
+"cityZh": "圣保罗",
+"country": "Brazil",
+"lat": -23.4356,
+"lon": -46.4731,
+"kind": "airport"
+},
+{
+"code": "GIG",
+"name": "Rio de Janeiro Galeão Intl",
+"city": "Rio de Janeiro",
+"cityZh": "里约热内卢",
+"country": "Brazil",
+"lat": -22.81,
+"lon": -43.2506,
+"kind": "airport"
+},
+{
+"code": "EZE",
+"name": "Buenos Aires Ezeiza Intl",
+"city": "Buenos Aires",
+"cityZh": "布宜诺斯艾利斯",
+"country": "Argentina",
+"lat": -34.8222,
+"lon": -58.5358,
+"kind": "airport"
+},
+{
+"code": "SCL",
+"name": "Santiago Arturo Merino Benítez Intl",
+"city": "Santiago",
+"cityZh": "圣地亚哥",
+"country": "Chile",
+"lat": -33.3898,
+"lon": -70.7944,
+"kind": "airport"
+},
+{
+"code": "LIM",
+"name": "Lima Jorge Chávez Intl",
+"city": "Lima",
+"cityZh": "利马",
+"country": "Peru",
+"lat": -12.0219,
+"lon": -77.1143,
+"kind": "airport"
+},
+{
+"code": "BOG",
+"name": "Bogotá El Dorado Intl",
+"city": "Bogota",
+"cityZh": "波哥大",
+"country": "Colombia",
+"lat": 4.7016,
+"lon": -74.1469,
+"kind": "airport"
+},
+{
+"code": "CAI",
+"name": "Cairo Intl",
+"city": "Cairo",
+"cityZh": "开罗",
+"country": "Egypt",
+"lat": 30.1219,
+"lon": 31.4056,
+"kind": "airport"
+},
+{
+"code": "JNB",
+"name": "Johannesburg O.R. Tambo Intl",
+"city": "Johannesburg",
+"cityZh": "约翰内斯堡",
+"country": "South Africa",
+"lat": -26.1392,
+"lon": 28.246,
+"kind": "airport"
+},
+{
+"code": "CPT",
+"name": "Cape Town Intl",
+"city": "Cape Town",
+"cityZh": "开普敦",
+"country": "South Africa",
+"lat": -33.9715,
+"lon": 18.6021,
+"kind": "airport"
+},
+{
+"code": "NBO",
+"name": "Nairobi Jomo Kenyatta Intl",
+"city": "Nairobi",
+"cityZh": "内罗毕",
+"country": "Kenya",
+"lat": -1.3192,
+"lon": 36.9278,
+"kind": "airport"
+},
+{
+"code": "ADD",
+"name": "Addis Ababa Bole Intl",
+"city": "Addis Ababa",
+"cityZh": "亚的斯亚贝巴",
+"country": "Ethiopia",
+"lat": 8.9779,
+"lon": 38.7993,
+"kind": "airport"
+},
+{
+"code": "CMN",
+"name": "Casablanca Mohammed V Intl",
+"city": "Casablanca",
+"cityZh": "卡萨布兰卡",
+"country": "Morocco",
+"lat": 33.3675,
+"lon": -7.59,
+"kind": "airport"
+},
+{
+"code": "SYD",
+"name": "Sydney Kingsford Smith",
+"city": "Sydney",
+"cityZh": "悉尼",
+"country": "Australia",
+"lat": -33.9399,
+"lon": 151.1753,
+"kind": "airport"
+},
+{
+"code": "MEL",
+"name": "Melbourne Tullamarine",
+"city": "Melbourne",
+"cityZh": "墨尔本",
+"country": "Australia",
+"lat": -37.669,
+"lon": 144.841,
+"kind": "airport"
+},
+{
+"code": "BNE",
+"name": "Brisbane",
+"city": "Brisbane",
+"cityZh": "布里斯班",
+"country": "Australia",
+"lat": -27.3842,
+"lon": 153.1175,
+"kind": "airport"
+},
+{
+"code": "PER",
+"name": "Perth",
+"city": "Perth",
+"cityZh": "珀斯",
+"country": "Australia",
+"lat": -31.9403,
+"lon": 115.967,
+"kind": "airport"
+},
+{
+"code": "AKL",
+"name": "Auckland",
+"city": "Auckland",
+"cityZh": "奥克兰",
+"country": "New Zealand",
+"lat": -37.0082,
+"lon": 174.785,
+"kind": "airport"
+},
+{
+"code": "CHC",
+"name": "Christchurch",
+"city": "Christchurch",
+"cityZh": "基督城",
+"country": "New Zealand",
+"lat": -43.4894,
+"lon": 172.532,
+"kind": "airport"
+}
+]
+}

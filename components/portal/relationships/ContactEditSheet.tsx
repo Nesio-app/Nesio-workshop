@@ -13,7 +13,9 @@
 
 import { useEffect, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
-import { addManualContact, updateManualContact, renameContact, contactKeyOf } from '@/lib/portal/manual-contacts';
+import { addManualContact, updateManualContact, renameContact } from '@/lib/portal/manual-contacts';
+import { RELATION_TAGS } from '@/lib/portal/relationships';
+import { IconMail, IconPhone, IconNavigate } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -25,6 +27,7 @@ export interface ContactDraft {
   birthday?: string;
   relation?: string;
   note?: string;
+  address?: string;
 }
 
 interface Props {
@@ -38,7 +41,18 @@ interface Props {
   onSaved?: (key: string) => void;
 }
 
-const EMPTY: ContactDraft = { name: '', email: '', phone: '', birthday: '', relation: '', note: '' };
+const EMPTY: ContactDraft = { name: '', email: '', phone: '', birthday: '', relation: '', note: '', address: '' };
+
+/** 行内动作按钮(写信 / 打电话 / 导航):都走系统 URL scheme,没值就禁用,不做假按钮。 */
+function FieldAction({ href, label, disabled, children }: { href: string; label: string; disabled: boolean; children: React.ReactNode }) {
+  if (disabled) {
+    return <span className="nesio-ct-field-act is-off" aria-hidden>{children}</span>;
+  }
+  return (
+    <a className="nesio-ct-field-act" href={href} aria-label={label} title={label}
+      target="_blank" rel="noreferrer">{children}</a>
+  );
+}
 
 export default function ContactEditSheet({ open, onClose, contactKey, nodeId, initial, onSaved }: Props) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -54,9 +68,16 @@ export default function ContactEditSheet({ open, onClose, contactKey, nodeId, in
   const set = (k: keyof ContactDraft) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setDraft((d) => ({ ...d, [k]: e.target.value }));
 
-  // 改名 = 换身份键。提前算出来,好在按钮上方把「记录会跟着搬」说清楚。
-  const willRename = editing && draft.name.trim()
-    && contactKeyOf({ name: draft.name, email: draft.email }) !== contactKey;
+  // 关系标签:固定表 + 当前值(数据推出来的关系词可能不在表里,得能看见也能取消)
+  const relTags = (() => {
+    const cur = (draft.relation || '').trim();
+    if (!cur || RELATION_TAGS.some((t) => t.zh === cur)) return RELATION_TAGS;
+    return [{ zh: cur, en: cur }, ...RELATION_TAGS];
+  })();
+  const mailTo = (draft.email || '').trim();
+  // tel: 只留数字 / + / 号,别把「(919) 555-0100」原样塞进 URL
+  const telNumber = (draft.phone || '').replace(/[^\d+#*]/g, '');
+  const addr = (draft.address || '').trim();
 
   const save = () => {
     const name = draft.name.trim();
@@ -103,47 +124,62 @@ export default function ContactEditSheet({ open, onClose, contactKey, nodeId, in
         <input id="ct-name" className="nesio-ob-input" value={draft.name} maxLength={40} autoFocus
           placeholder={L(dict, '怎么称呼 TA', 'What you call them')} onChange={set('name')} />
 
-        <label className="nesio-settings-section-label" htmlFor="ct-rel" style={{ marginTop: '0.7rem' }}>{L(dict, '关系', 'Relationship')}</label>
-        <input id="ct-rel" className="nesio-ob-input" value={draft.relation || ''} maxLength={16}
-          placeholder={L(dict, '如:妈妈、同事、大学同学', 'e.g. mom, coworker')} onChange={set('relation')} />
+        {/* bug3:关系改成选 tag —— 自由填写的结果是「同事/同事们/工作同事」三种写法算三种关系 */}
+        <p className="nesio-settings-section-label" style={{ marginTop: '0.7rem' }}>{L(dict, '关系', 'Relationship')}</p>
+        <div className="nesio-rel-chips" role="group" aria-label={L(dict, '关系', 'Relationship')}>
+          {relTags.map((t) => {
+            const on = (draft.relation || '') === t.zh;
+            return (
+              <button key={t.zh} type="button" aria-pressed={on}
+                className={`nesio-rel-chip${on ? ' nesio-rel-chip--on' : ''}`}
+                onClick={() => setDraft((d) => ({ ...d, relation: on ? '' : t.zh }))}>
+                {L(dict, t.zh, t.en)}
+              </button>
+            );
+          })}
+        </div>
 
         <label className="nesio-settings-section-label" htmlFor="ct-email" style={{ marginTop: '0.7rem' }}>{L(dict, '邮箱', 'Email')}</label>
-        <input id="ct-email" className="nesio-ob-input" type="email" value={draft.email || ''} maxLength={80}
-          placeholder={L(dict, '有的话填上 —— 邮件往来会自动认到 TA', 'If you have it — emails will match to them')} onChange={set('email')} />
+        <div className="nesio-ct-field-row">
+          <input id="ct-email" className="nesio-ob-input" type="email" value={draft.email || ''} maxLength={80}
+            placeholder={L(dict, '有的话填上 —— 邮件往来会自动认到 TA', 'If you have it — emails will match to them')} onChange={set('email')} />
+          <FieldAction href={`mailto:${encodeURIComponent(mailTo)}`} disabled={!mailTo}
+            label={L(dict, '给 TA 写信', 'Write to them')}><IconMail size={16} /></FieldAction>
+        </div>
 
         <label className="nesio-settings-section-label" htmlFor="ct-phone" style={{ marginTop: '0.7rem' }}>{L(dict, '电话', 'Phone')}</label>
-        <input id="ct-phone" className="nesio-ob-input" type="tel" value={draft.phone || ''} maxLength={32}
-          placeholder={L(dict, '选填', 'Optional')} onChange={set('phone')} />
+        <div className="nesio-ct-field-row">
+          <input id="ct-phone" className="nesio-ob-input" type="tel" value={draft.phone || ''} maxLength={32}
+            onChange={set('phone')} />
+          <FieldAction href={`tel:${telNumber}`} disabled={!telNumber}
+            label={L(dict, '打给 TA', 'Call them')}><IconPhone size={16} /></FieldAction>
+        </div>
+
+        <label className="nesio-settings-section-label" htmlFor="ct-addr" style={{ marginTop: '0.7rem' }}>{L(dict, '地址', 'Address')}</label>
+        <div className="nesio-ct-field-row">
+          <input id="ct-addr" className="nesio-ob-input" value={draft.address || ''} maxLength={120}
+            onChange={set('address')} />
+          {/* maps.apple.com:iOS 交给系统默认地图,Android/桌面浏览器落到网页地图 */}
+          <FieldAction href={`https://maps.apple.com/?q=${encodeURIComponent(addr)}`} disabled={!addr}
+            label={L(dict, '导航过去', 'Navigate there')}><IconNavigate size={16} /></FieldAction>
+        </div>
 
         <label className="nesio-settings-section-label" htmlFor="ct-bday" style={{ marginTop: '0.7rem' }}>{L(dict, '生日', 'Birthday')}</label>
         <input id="ct-bday" className="nesio-ob-input" type="date" value={draft.birthday || ''} onChange={set('birthday')} />
 
         <label className="nesio-settings-section-label" htmlFor="ct-note" style={{ marginTop: '0.7rem' }}>{L(dict, '备注', 'Note')}</label>
-        <input id="ct-note" className="nesio-ob-input" value={draft.note || ''} maxLength={120}
-          placeholder={L(dict, '想记住的一句话', 'Anything worth remembering')} onChange={set('note')} />
-
-        {willRename && (
-          <p className="nesio-settings-option-hint" style={{ margin: '0.7rem 0 0' }}>
-            {L(dict,
-              '名字/邮箱变了 —— 挂在 TA 身上的记录(含健康)会一起搬过来,旧名字以后也还认得出。',
-              'Name/email changed — everything attached to them (health included) moves along, and the old name still resolves to them.')}
-          </p>
-        )}
+        <input id="ct-note" className="nesio-ob-input" value={draft.note || ''} maxLength={120} onChange={set('note')} />
 
         {err && <p className="nesio-rel-detail-err" role="alert" style={{ marginTop: '0.7rem' }}>{err}</p>}
 
         <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
           <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }} onClick={onClose}>
-            {L(dict, '先不改', 'Not now')}
+            {L(dict, '取消', 'Cancel')}
           </button>
           <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} disabled={busy || !draft.name.trim()} onClick={save}>
             {busy ? L(dict, '存着…', 'Saving…') : L(dict, '保存', 'Save')}
           </button>
         </div>
-
-        <p className="nesio-settings-option-hint" style={{ marginTop: '0.8rem', textAlign: 'center' }}>
-          {L(dict, '只存本机 · 仅你可见', 'On this device only · just for you')}
-        </p>
       </div>
     </NesioSheet>
   );

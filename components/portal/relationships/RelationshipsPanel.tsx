@@ -11,17 +11,16 @@
 import { useEffect, useState } from 'react';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 import {
-  buildRelationships, markContacted, lastContactLabel,
+  buildRelationships, lastContactLabel,
   CLOSENESS_META, type Contact, type Closeness,
 } from '@/lib/portal/relationships';
 import { getLocalOwner } from '@/lib/portal/local-owner';
-import { IconCamera, IconHelpCircle } from '../icons';
+import { IconHelpCircle } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { loadProfileSettings, portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import RelationshipDetailSheet from './RelationshipDetailSheet';
 import FamilySummary from './FamilySummary';
-import PersonExtractSheet from './PersonExtractSheet';
 import ContactEditSheet from './ContactEditSheet';
 import { buildFamilyDigest } from '@/lib/portal/family-digest';
 import { ENTITY_ALIASES_EVENT } from '@/lib/portal/entity-resolution';
@@ -54,13 +53,25 @@ function initialOf(name: string): string {
   return t ? Array.from(t)[0].toUpperCase() : '·';
 }
 
+/** 左侧头像:通讯录同步来的 Gmail 头像优先,没有才退回莫兰迪字母块(图片 404 也退回)。 */
+function ContactAvatar({ c }: { c: Contact }) {
+  const [broken, setBroken] = useState(false);
+  if (c.photo && !broken) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element -- Google 头像是外域任意 URL,不走 next/image 优化
+      <img className="nesio-rel-av nesio-rel-av--img" src={c.photo} alt="" loading="lazy" decoding="async"
+        referrerPolicy="no-referrer" onError={() => setBroken(true)} />
+    );
+  }
+  return <span className={`nesio-rel-av ${avatarClass(c.name)}`} aria-hidden>{initialOf(c.name)}</span>;
+}
+
 export default function RelationshipsPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [openKey, setOpenKey] = useState<string | null>(null);
   const [activeGroup, setActiveGroup] = useState<string | null>(null); // null=全部;桶 id 或原始分组名
   const [showMore, setShowMore] = useState(false);
-  const [extractOpen, setExtractOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [expandedTiers, setExpandedTiers] = useState<Record<Closeness, boolean>>({ core: false, close: false, acquaintance: false });
 
@@ -86,11 +97,6 @@ export default function RelationshipsPanel() {
       window.removeEventListener(ENTITY_ALIASES_EVENT, onUpdate);
     };
   }, []);
-
-  const onContacted = (key: string) => {
-    markContacted(key);
-    rebuild();
-  };
 
   // 空态也得能加人 —— 此前这里是条死路:没人 → 只告诉你「去连 Gmail」,
   // 想手动录第一个人没有任何入口。
@@ -127,20 +133,6 @@ export default function RelationshipsPanel() {
 
   return (
     <div className="nesio-health-dash">
-      <div className="nesio-rel-head-row">
-        <p className="nesio-health-updated" style={{ margin: 0 }}>
-          {L(dict, `${shown.length} 位联系人 · ${dueList.length} 位这周想问候`, `${shown.length} people · ${dueList.length} to reach out`)}
-        </p>
-        <div style={{ display: 'inline-flex', gap: '0.4rem' }}>
-          <button type="button" className="nesio-rel-log-btn" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }} onClick={() => setExtractOpen(true)}>
-            <IconCamera size={14} />{L(dict, '记给某人', 'Log to…')}
-          </button>
-          <button type="button" className="nesio-rel-log-btn" onClick={() => setAddOpen(true)}>
-            {L(dict, '＋ 加人', '＋ Add')}
-          </button>
-        </div>
-      </div>
-
       {(presentBuckets.length > 0 || moreGroups.length > 0) && (
         <div className="nesio-rel-chips" role="tablist" aria-label={L(dict, '联系人分组', 'Contact groups')}>
           <button type="button" role="tab" aria-selected={!activeGroup} className={`nesio-rel-chip${!activeGroup ? ' nesio-rel-chip--on' : ''}`} onClick={() => setActiveGroup(null)}>
@@ -208,20 +200,13 @@ export default function RelationshipsPanel() {
                   onClick={() => setOpenKey(c.key)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpenKey(c.key); } }}
                 >
-                  <span className={`nesio-rel-av ${avatarClass(c.name)}`} aria-hidden>{initialOf(c.name)}</span>
+                  <ContactAvatar c={c} />
                   <span className="nesio-rel-row-body">
                     <span className="nesio-rel-name">{c.name}</span>
                     <span className="nesio-rel-sub">
                       {c.relation ? `${c.relation} · ` : ''}{dict === 'en' ? `mentioned ${c.mentions}×` : `提到 ${c.mentions} 次`} · {L(dict, `上次${lastContactLabel(c, dict)}`, `last ${lastContactLabel(c, 'en')}`)}
                     </span>
                   </span>
-                  <button
-                    type="button"
-                    className={`nesio-rel-touch-btn nesio-rel-touch-btn--sm${c.reachOut ? ' nesio-rel-touch-btn--due' : ''}`}
-                    onClick={(e) => { e.stopPropagation(); onContacted(c.key); }}
-                  >
-                    {c.reachOut ? L(dict, '该问候了', 'Say hi') : L(dict, '联系过了', 'Reached out')}
-                  </button>
                 </div>
               ))}
             </div>
@@ -235,12 +220,12 @@ export default function RelationshipsPanel() {
         );
       })}
 
-      <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>
-        {L(dict, '仅你可见 · 从你的记忆和邮件推出,不进 AI', 'Only you · derived from your notes and email, not AI')}
-      </p>
+      {/* 加人挪到最下边(bug3):列表是这一页的主体,加人是偶发动作,不该占顶部黄金位 */}
+      <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: '1rem' }} onClick={() => setAddOpen(true)}>
+        {L(dict, '＋ 加人', '＋ Add someone')}
+      </button>
 
       {openKey && <RelationshipDetailSheet contactKey={openKey} onClose={() => setOpenKey(null)} />}
-      <PersonExtractSheet open={extractOpen} onClose={() => setExtractOpen(false)} />
       {/* 加完直接打开 TA 的详情页 —— 加人的下一步几乎总是「给 TA 记点什么」 */}
       <ContactEditSheet open={addOpen} onClose={() => setAddOpen(false)} onSaved={(k) => { rebuild(); setOpenKey(k); }} />
     </div>

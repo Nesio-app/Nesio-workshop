@@ -795,8 +795,8 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
 
       {/* bug2:「你的数据在哪里」整块删除(数据主权面板 + 同步诊断) */}
 
-      {/* 图5:数据接入从「记录习惯」并入这里 —— 连接数据源(ConnectorsHub);bug2:说明文字删除 */}
-      <p className="nesio-settings-section-label">{L(dict, '数据接入', 'Connect data')}</p>
+      {/* 图5:数据接入从「记录习惯」并入这里 —— 连接数据源(ConnectorsHub);bug2:说明文字删除。
+          bug3 p44:「数据接入」这个小标题也删了 —— 下面那行按钮自己就叫「连接数据源」。 */}
       <button type="button" className="nesio-settings-option" onClick={onOpenConnect}>
         <div>
           <span className="nesio-settings-option-label">{L(dict, '连接数据源', 'Connected sources')}</span>
@@ -817,15 +817,17 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         ))}
       </div>
 
-      {/* 2026-07-29:备份/恢复并成一组 —— 平时做的是「备份」,「恢复」是出事那天才用一次。
-          两个等重的整行按钮并排,等于让不常用的那个天天占同样的分量。
-          主动作实心整行,反向动作降成一行文字链。导出/导入同理(见下)。 */}
-      <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleBackupChosen} disabled={cloudState === 'pushing' || driveState === 'busy'}>
-        {(cloudState === 'pushing' || driveState === 'busy') ? L(dict, '正在备份…', 'Backing up…') : L(dict, '备份', 'Back up')}
-      </Button>
-      <button type="button" className="nesio-settings-inline-link" onClick={handleRestoreChosen} disabled={cloudRestoreState === 'pulling' || driveState === 'busy'}>
-        {(cloudRestoreState === 'pulling') ? L(dict, '正在恢复…', 'Restoring…') : L(dict, '从云恢复 ›', 'Restore from cloud ›')}
-      </button>
+      {/* bug3 p44:「备份 / 从云恢复」放一排,「导出 / 导入」放一排(见下)。
+          2026-07-29 曾按「主动作整行 + 反向动作文字链」拆成两行 —— 标注要的是成对并排,
+          一眼看出这是一对互逆操作;两个都是整行按钮就没有这个信息了,所以改成 2 列。 */}
+      <div className="nesio-settings-btn-row">
+        <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleBackupChosen} disabled={cloudState === 'pushing' || driveState === 'busy'}>
+          {(cloudState === 'pushing' || driveState === 'busy') ? L(dict, '正在备份…', 'Backing up…') : L(dict, '备份', 'Back up')}
+        </Button>
+        <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleRestoreChosen} disabled={cloudRestoreState === 'pulling' || driveState === 'busy'}>
+          {(cloudRestoreState === 'pulling') ? L(dict, '正在恢复…', 'Restoring…') : L(dict, '从云恢复', 'Restore')}
+        </Button>
+      </div>
       {/* 状态:仅当前所用目的地会填充 */}
       {cloudState === 'done' && (
         <p style={{ fontSize: '0.75rem', marginTop: 4, color: 'var(--status-go)' }}>
@@ -844,12 +846,17 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       )}
       {driveMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: driveState === 'error' ? 'var(--status-risk)' : 'var(--status-go)' }}>{driveMsg}</p>}
 
-      <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleExportLocal} disabled={exportBusy}>
-        {exportBusy ? L(dict, '正在导出…', 'Exporting…') : L(dict, '导出全部(记忆 + 学到的偏好,下载 JSON)', 'Export everything (memories + learned prefs, JSON)')}
-      </Button>
-      <button type="button" className="nesio-settings-inline-link" onClick={() => importRef.current?.click()}>
-        {L(dict, '导入备份 ›', 'Import backup ›')}
-      </button>
+      {/* 并排后放不下长标题,按钮上只留动词;导出的到底是什么放进 title(长按/悬停可见)。 */}
+      <div className="nesio-settings-btn-row">
+        <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleExportLocal} disabled={exportBusy}
+          title={L(dict, '导出全部:记忆 + 学到的偏好,下载 JSON', 'Export everything: memories + learned prefs, JSON')}>
+          {exportBusy ? L(dict, '正在导出…', 'Exporting…') : L(dict, '导出', 'Export')}
+        </Button>
+        <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}
+          title={L(dict, '从备份 JSON 导入', 'Import from a backup JSON')}>
+          {L(dict, '导入', 'Import')}
+        </Button>
+      </div>
       <input ref={importRef} type="file" accept="application/json,.json" className="nesio-visually-hidden" onChange={handleImportFile} />
       {restoreMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
       {exportWarn && <p style={{ fontSize: '0.75rem', marginTop: 4, lineHeight: 1.6, color: 'var(--status-gentle)' }}>{exportWarn}</p>}
@@ -858,11 +865,10 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           而且这三件事一年也未必做一次,却天天占着视线。收进一个入口,点开才展开。
           注意用 <details> 而不是 state:折叠这件事不需要 React 参与,原生元素自带无障碍语义。 */}
       <details className="nesio-settings-danger-zone">
+        {/* bug3 p45:只留「删除数据」四个字 —— 副标题那行把三个选项提前念了一遍,
+            而点开就能看见它们本身。 */}
         <summary className="nesio-settings-danger-summary">
           {L(dict, '删除数据', 'Delete data')}
-          <span className="nesio-settings-option-hint" style={{ display: 'block', marginTop: '0.2rem' }}>
-            {L(dict, '清除记忆 / 删本机数据 / 删账号 —— 点开选', 'Clear memories / wipe this device / delete account')}
-          </span>
         </summary>
 
         <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={clearAllMemory}>
@@ -878,8 +884,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         {deleteMsg && <p className="nesio-settings-option-hint" style={{ margin: '0.4rem 0 0', color: 'var(--status-risk)' }}>{deleteMsg}</p>}
       </details>
 
-      {/* 图3:原顶部说明整段挪到最下面收尾 */}
-      <p className="nesio-settings-sheet-desc" style={{ marginTop: '1.5rem', marginBottom: 0 }}>{L(dict, '只整理你放进来的内容。你可以看见它记住了什么、存在哪、也可以随时删除。', 'Only what you put in gets organized. You can see what it remembers, where it lives, and delete it anytime.')}</p>
+      {/* bug3 p44:底部那段说明删掉 —— 这一页每个按钮都在做那件事,不需要再用一段话复述。 */}
     </SheetWrap>
   );
 }

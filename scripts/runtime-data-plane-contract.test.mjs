@@ -116,8 +116,15 @@ assert.match(ingest, /isPortalRequestAuthorized/, 'Ingest 花钱 AI 门必须验
 const analyze = read('app/api/portal/analyze/route.ts');
 assert.match(analyze, /normalizePhotoToSignal|normalizeVoiceToSignal/, 'Analyze route must normalize capture results into Signal input.');
 assert.match(analyze, /createSignal/, 'Analyze route must expose the Signal write path for captures.');
-assert.match(analyze, /isPortalRequestAuthorized/, 'Analyze 花钱 AI 门必须验真会话(isPortalRequestAuthorized),不再只看 cookie 存在。');
+// analyze 的验真已收进 guardAiRoute(它内部第一件事就是 isPortalRequestAuthorized,
+// 顺带拿到限流 + 日预算熔断 + 权益门)。所以这里认两种写法之一,并另外钉住
+// guardAiRoute 自己确实在验真 —— 不然「换成 guardAiRoute」就成了偷偷拆门的后路。
+assert.match(analyze, /isPortalRequestAuthorized|guardAiRoute\(req, 'analyze'/,
+  'Analyze 花钱 AI 门必须验真会话(直接调 isPortalRequestAuthorized,或走 guardAiRoute)。');
 assert.doesNotMatch(analyze, /hasSignedInCookie/, 'Analyze 不再用可伪造的 cookie-presence 门(hasSignedInCookie 已移除)。');
+const aiGuard = read('lib/portal/auth/api-auth.ts');
+assert.match(aiGuard, /export async function guardAiRoute[\s\S]{0,400}isPortalRequestAuthorized\(req, opts\)/,
+  'guardAiRoute 必须先验真会话 —— 所有走它的花钱路由都靠这一条。');
 
 const gmail = read('app/api/portal/gmail/route.ts');
 assert.match(gmail, /metadataOnly/, 'Gmail route must preserve metadata-only default.');

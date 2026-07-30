@@ -837,6 +837,16 @@ export interface RecurringCharge {
   // 财务⑰:mature = ≥3 笔成熟(Plaid 同口径);predicted = 早识别(2 笔规律,或知名订阅
   // 品牌 1 笔按月假设)。predicted 只作展示提示,不进订阅负担/余额投影等统计。
   status: 'mature' | 'predicted';
+  /**
+   * 用户在订阅详情里点过「确认是定期」(bug3:「待确认字样不会消失,在确认后」)。
+   *
+   * 根因:status 只由「够不够 3 笔」决定,手动确认只是让这条**进得了**列表,
+   * 标签照旧写「待确认」—— 于是用户点了确认,界面纹丝不动。
+   * 但 status 还兼着「基线可不可信」的职责(涨价判定要求 mature),所以不能直接改成 mature:
+   * 2 笔的中位数当基线会造出假涨价。拆成两个字段:status = 证据够不够,confirmed = 人认过。
+   * 界面只在 `status === 'predicted' && !confirmed` 时才显示「待确认」。
+   */
+  confirmed?: boolean;
   logo?: string; // 财务⑲:商户 logo URL(Plaid 富化;可缺)
 }
 
@@ -1087,6 +1097,7 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
         baselineMax: round2(Math.max(...amts2.slice(0, -1), amts2[0])),
         amountCv: Math.round(coeffVar(amts2) * 100) / 100,
         status: 'predicted',
+        confirmed: ruleFor(recurRules, last) === 'yes',
         logo: [...sorted2].reverse().find((t) => t.merchantLogo)?.merchantLogo,
       });
       continue;
