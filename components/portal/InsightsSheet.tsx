@@ -18,6 +18,7 @@ import { getLifeGraph, isBulkImported } from '@/lib/portal/life-graph';
 import { stripMarkdownInline } from '@/lib/portal/node-display';
 import type { LifeNode } from '@/lib/portal/life-graph';
 import { markFeatureUsed } from '@/lib/portal/feature-usage';
+import { looseThreads } from '@/lib/portal/loose-threads';
 import { isLabModeOn, LAB_MODE_EVENT } from '@/lib/portal/module-overrides';
 import { isTopicTag } from '@/lib/portal/topic-tags';
 import { L } from '@/lib/portal/i18n';
@@ -454,6 +455,13 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   // 打开洞察即视为「用过洞察」,回访再触达提醒不再叨扰这一项(仅登录态记)
   useEffect(() => { if (canUsePrivateData) markFeatureUsed('insights'); }, [canUsePrivateData]);
 
+  /* 每切到一个面,也记一次(2026-07-30 用户要「好久没关注的面」)。
+     在这之前 markFeatureUsed 全仓只记了 'insights' 一个 key —— 也就是说
+     「哪个面多久没看了」这个问题**根本没有数据能回答**。这一行就是那个数据源。
+     注意它是**从现在开始记**:没有记录的面一律不判断(见 domainNeglect 的正向判据),
+     否则新装 App 第二天就会被告知「你三周没看健康了」—— 那是假的。 */
+  useEffect(() => { if (canUsePrivateData) markFeatureUsed(`tab:${mainTab}`); }, [mainTab, canUsePrivateData]);
+
   useEffect(() => {
     // 私据门:非私有运行态不把私人记录读进内存(纵深防御,配合下方 fail-closed 渲染门)
     if (!canUsePrivateData) { setAllNodes([]); return; }
@@ -503,18 +511,10 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       .slice(0, 6);
   }, [realNodes]);
 
-  // ② 没接上的线头:>30 天没再碰、没完成的想法/承诺(person/place/健康是实体,不算线头)
-  const threads = useMemo(() => {
-    const now = Date.now();
-    return realNodes
-      .filter((n) => {
-        if (n.type === 'person' || n.type === 'place' || n.type === 'health_state') return false;
-        if (n.attributes?.done === true) return false;
-        if (n.lastConfirmedAt && n.lastConfirmedAt !== n.createdAt) return false;
-        return (now - new Date(n.createdAt).getTime()) > 30 * DAY_MS;
-      })
-      .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-  }, [realNodes]);
+  // ② 没接上的线头。判据已抽到 lib/portal/loose-threads.ts —— 日报也要用同一份,
+  //    两处各写一遍必然漂移(一边改了阈值另一边没改,洞察说 3 条、日报说 5 条,
+  //    而两边都言之凿凿)。
+  const threads = useMemo(() => looseThreads(realNodes), [realNodes]);
 
   // ③ 走走看:随机翻一条 + 去年今天
   const wanderNode = useMemo(() => {

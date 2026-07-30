@@ -24,6 +24,9 @@ import { listReminders } from './schedule-reminders';
 import { listWardrobe, suggestOutfit, inferFormalNeed } from './wardrobe';
 import { getDayPlan } from '@/lib/cooking/meal-calendar';
 import { listInventoryItems } from './inventory';
+import { loadFeatureUsage } from './feature-usage';
+import { looseThreads } from './loose-threads';
+import { getLifeGraph } from './life-graph';
 import { loadTrainingState, protocolById } from '@/lib/platform/training-protocol-engine';
 import { activeProtocol } from '@/lib/platform/training-overrides';
 import { pickPhaseIndex, pickTodaySessionIndex } from '@/lib/platform/fitness-home-core';
@@ -42,6 +45,8 @@ export interface DailyReportExtras {
   orders: DailyReportOrder[];
   /** 未来两周里确定会发生的事(已知日期,无推算) */
   ahead: DailyReportAhead[];
+  /** 我自己说过想做、却一直没动的那几条(见 loose-threads) */
+  threads: string[];
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -88,7 +93,7 @@ export function collectOrders(nodes: readonly Orderish[], limit = 4): DailyRepor
  * @param now 定稿时刻(当天 08:00)。判「今天」用它,不用真实当前时间。
  */
 export function collectDailyReportExtras(now: Date = new Date()): DailyReportExtras {
-  const out: DailyReportExtras = { reminders: [], domainInsights: [], meals: [], orders: [], ahead: [] };
+  const out: DailyReportExtras = { reminders: [], domainInsights: [], meals: [], orders: [], ahead: [], threads: [] };
   if (typeof window === 'undefined') return out;
   const todayKey = dayKeyOf(now);
 
@@ -149,6 +154,61 @@ export function collectDailyReportExtras(now: Date = new Date()): DailyReportExt
     }
   } catch { /* ignore */ }
 
+  /* ⑥ 好久没关注的面(2026-07-30 用户点名要的)。
+     **没有变化本身是一种变化** —— 所以它当成一条 domainInsight 塞进去,
+     自然走差分那条路:越过阈值那天算「新出现」,之后每天都在就不再刷屏。 */
+  try {
+    for (const it of domainNeglect(now)) out.domainInsights.push(it);
+  } catch { /* ignore */ }
+
+  /* ⑦ 没接上的线头 —— 我对「未来机会」的答复。
+     Nesio 唯一有依据说「机会」的,是**你自己说过想做、却一直没动的事**,
+     不是我觉得你该干什么。后者需要判断「什么对你好」,那是这个仓库的红线;
+     而且推不准会连累前面那些确定的部分。 */
+  try {
+    out.threads = looseThreads(getLifeGraph(), now.getTime()).slice(0, 2).map((n) => n.name);
+  } catch { /* ignore */ }
+
+  return out;
+}
+
+/** 洞察页里那几个面 → 日报里的域名(和 DOMAIN_LABEL 对得上)。 */
+const TAB_DOMAIN: Record<string, string> = {
+  health: 'health',
+  finance: 'finance',
+  timeline: 'location',
+  inventory: 'inventory',
+  relationships: 'relationship',
+  reflection: 'reading',
+};
+
+/** 多久没打开算「好久没关注」。三周 —— 再短会烦。 */
+const NEGLECT_DAYS = 21;
+
+/**
+ * 好久没关注的面。
+ *
+ * 判据是**正向**的:必须**曾经打开过**(used 里有这个 key),然后超过 NEGLECT_DAYS 天没再打开。
+ * 「从来没打开过」一律不算 —— 那不是「疏于关注」,那是「你可能压根不用这个功能」,
+ * 而且新装 App 第二天就被告知「你三周没看健康了」是彻头彻尾的假话。
+ * (数据源是 2026-07-30 才在洞察页切 tab 时开始记的,所以头三周这一段本来就该是空的。)
+ */
+export function domainNeglect(now: Date = new Date()): DailyReportDomainInsight[] {
+  const out: DailyReportDomainInsight[] = [];
+  if (typeof window === 'undefined') return out;
+  const used = loadFeatureUsage().used || {};
+  for (const [tab, domain] of Object.entries(TAB_DOMAIN)) {
+    const last = used[`tab:${tab}`];
+    if (typeof last !== 'number' || !Number.isFinite(last)) continue;   // 从没打开过 → 不判断
+    const days = Math.floor((now.getTime() - last) / 86_400_000);
+    if (days < NEGLECT_DAYS) continue;
+    out.push({
+      domain,
+      severity: 'attention',
+      title: `${days} 天没看了`,
+      detail: '不是提醒你有问题,只是它这阵子没在你眼前',
+    });
+  }
   return out;
 }
 

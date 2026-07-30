@@ -290,4 +290,39 @@ const EIGHT = new Date(2026, 6, 30, 8, 0);
     'Today 不再有日报卡(用户定案:「今天不要入口,用弹出卡片,在洞察开入口」)');
 }
 
+/* ── ⑦ 好久没关注的面 + 没接上的线头(2026-07-30 用户点名要的两项)────── */
+{
+  const { domainNeglect } = loadTs('lib/portal/daily-report-sources.ts');
+  // 这个模块要读一堆 store,vm 里 window 是 undefined → 它会直接返回空数组。
+  // 这里只钉**判据的形状**,真实取数在下面的源码级断言里钉。
+  assert.equal(domainNeglect(new Date()).length, 0, 'SSR/无 window 时不瞎猜');
+
+  const src = strip(read('lib/portal/daily-report-sources.ts'));
+  assert.match(src, /typeof last !== 'number'[\s\S]{0,40}continue;/,
+    '**从没打开过的面一律不判断** —— 那不是「疏于关注」,那是「你可能压根不用这个功能」。' +
+    '而且数据源是 2026-07-30 才开始记的,不这么写的话新装 App 第二天就会被告知' +
+    '「你三周没看健康了」—— 彻头彻尾的假话');
+  assert.match(src, /NEGLECT_DAYS = 21/, '三周 —— 再短会烦');
+
+  // 数据源必须真的在记。此前 markFeatureUsed 全仓只记了 'insights' 一个 key,
+  // 也就是说「哪个面多久没看了」根本没有数据能回答。
+  const insights = strip(read('components/portal/InsightsSheet.tsx'));
+  assert.match(insights, /markFeatureUsed\(`tab:\$\{mainTab\}`\)/,
+    '每切一个面要记一次 —— 不记的话上面那条判据永远拿不到数据,这一路等于没做');
+
+  // 线头判据只准有**一份**。两处各写一遍必然漂移:一边改了阈值另一边没改,
+  // 洞察页说 3 条线头、日报说 5 条,而两边都言之凿凿。
+  assert.doesNotMatch(insights, /lastConfirmedAt !== n\.createdAt/,
+    '线头判据已抽到 lib/portal/loose-threads.ts —— 洞察页不许再内联一份');
+  assert.match(insights, /looseThreads\(/, '洞察页改用那一份');
+  assert.match(src, /looseThreads\(/, '日报用的也是同一份');
+
+  // 线头在日报里要**说清它是什么**
+  const r = buildDailyReport({ now: EIGHT, threads: ['学一下 SQL 窗口函数'], memoryNotes: ['去年今天…'] });
+  const mem = r.sections.find((s) => s.id === 'memory').lines;
+  assert.match(mem[mem.length - 1], /^还没接上:/,
+    '线头要带前缀 —— 不加的话它和「去年今天你写下」混成一堆,看着像又一条怀旧,' +
+    '而它其实是一件你自己搁下的事');
+}
+
 console.log('daily-report-crossface: OK(8 点定稿 / 整天窗口 / 跨面配额 / 正向准入 / 邮件不复述 / 默认开)');

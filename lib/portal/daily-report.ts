@@ -112,6 +112,15 @@ export interface DailyReportInput {
   yesterdayInsights?: DailyReportDomainInsight[];
   /** 未来两周里确定会发生的事(已知日期,无推算) */
   ahead?: DailyReportAhead[];
+  /**
+   * 我自己说过想做、却一直没动的那几条(见 lib/portal/loose-threads.ts)。
+   *
+   * 这是对「未来机会」的答复。Nesio 唯一**有依据**说「机会」的,就是这个 ——
+   * 「你该学这个 / 这本书适合你 / 该联系某人了」那种需要判断「什么对你好」,
+   * 是这个仓库的红线;而且一旦推不准,会连累前面那些确定的部分:
+   * 用户开始怀疑整份日报,连「牛奶后天过期」都不信了。
+   */
+  threads?: string[];
 }
 
 /**
@@ -479,7 +488,16 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
   }
 
   /* ── ⑥ 念念还记得 ──────────────────────────────────────────── */
-  if (notes.length) sections.push({ id: 'memory', title: tt(locale, '念念还记得', 'From your memory'), lines: notes });
+  const threads = (input.threads || []).filter(Boolean).slice(0, 2);
+  const memoryLines = [
+    ...notes,
+    // 线头跟在回忆后面,并且**说清它是什么** —— 不加这个前缀的话它和「去年今天你写下」
+    // 混成一堆,看着像又一条怀旧,而它其实是一件你自己搁下的事。
+    ...threads.map((t) => tt(locale, `还没接上:${t}`, `Still open: ${t}`)),
+  ];
+  if (memoryLines.length) {
+    sections.push({ id: 'memory', title: tt(locale, '念念还记得', 'From your memory'), lines: memoryLines });
+  }
 
   /* ── 一句话概览 ─────────────────────────────────────────────── */
   const headlineParts: string[] = [];
@@ -512,7 +530,7 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
     && todayEvents.length === 0 && upcoming.length === 0
     && actionLines.length === 0 && domainLines.length === 0
     && todayLines.length === 0 && aheadAll.length === 0
-    && emails.length === 0 && notes.length === 0;
+    && emails.length === 0 && memoryLines.length === 0;
 
   return { date: todayKey, title, greeting, headline, sections, markdown, empty };
 }

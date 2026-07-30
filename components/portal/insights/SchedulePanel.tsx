@@ -18,6 +18,7 @@ const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: fal
 const EmailComposeSheet = dynamic(() => import('../EmailComposeSheet'), { ssr: false });
 import { L } from '@/lib/portal/i18n';
 import SegTabs from '../ui/SegTabs';
+import NesioSheet from '../ui/NesioSheet';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { IconStar, IconFlag } from '../icons';
@@ -28,6 +29,10 @@ import {
 } from '@/lib/portal/schedule-filters';
 import { mailStatusLine, mailBadges, toneVars } from '@/lib/portal/mail-badges';
 import { extractEmailLocal } from '@/lib/portal/email-extract-local';
+import {
+  loadMailTagFix, resolveMailKind, mailTagFixReady, fixMailTag, senderKeyOf,
+  MAIL_TAG_FIX_EVENT, MAIL_TAG_KINDS, type MailTagFixStore, type MailTagFix,
+} from '@/lib/portal/mail-tag-fix';
 import { searchTokens, matchesSearch } from '@/lib/portal/schedule-search';
 import { suggestScheduleFromEmail, alreadyScheduled, type ScheduledSlot } from '@/lib/portal/email-schedule-suggest';
 import {
@@ -150,9 +155,13 @@ function stripPrefix(name: string): string {
  *   右滑(往右拖)= 星标,左滑 = 删除。跟手位移,松手过阈值才执行,没过就弹回去。
  * 只认横向手势:纵向位移更大时立刻放手,免得把页面滚动吃掉。
  */
-function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelete }: {
+function SwipeRow({ row, kind, dict, starred, dateLabel, fixes, onOpen, onStar, onDelete, onFixTag }: {
   row: Row; kind: SubTab; dict: 'zh' | 'en'; starred: boolean; dateLabel: string;
+  /** 用户改过的标签(这一封 / 发件人规则)。见 lib/portal/mail-tag-fix.ts。 */
+  fixes: MailTagFixStore;
   onOpen: () => void; onStar: () => void; onDelete: () => void;
+  /** 点了类型标签 → 打开修正选择器。日历项没有这回事,所以可缺省。 */
+  onFixTag?: () => void;
 }) {
   const [dx, setDx] = useState(0);
   const start = useRef<{ x: number; y: number; lock: 'none' | 'x' | 'y' } | null>(null);
@@ -243,7 +252,15 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
     return { ...a, ...local } as typeof a;
   }, [row.node.attributes, row.title, row.body, kind]);
   const status = mailStatusLine(attrs, dict);
-  const badges = mailBadges(attrs, dict);
+  /* 类型标签的最终值:**这一封的修正 > 发件人规则 > 自动判定**(硬优先级)。
+     用户亲手改过的那一封,不管规则怎么写、自动判定多有把握,都以他改的为准 ——
+     反过来就是「我知道你说了什么,但我觉得我更对」。 */
+  const emailId = typeof attrs.emailId === 'string' ? attrs.emailId : '';
+  const fromAddr = typeof attrs.from === 'string' ? attrs.from : '';
+  const resolvedKind = kind === 'calendar'
+    ? null
+    : resolveMailKind(typeof attrs.kindHint === 'string' ? attrs.kindHint : undefined, emailId, fromAddr, fixes);
+  const badges = mailBadges({ ...attrs, kindHint: resolvedKind ?? undefined }, dict);
 
   return (
     <div style={{ position: 'relative', borderRadius: 'var(--radius-md)', overflow: 'hidden', touchAction: 'pan-y' }}>
@@ -294,11 +311,28 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-1)', marginTop: 'var(--space-1)' }}>
             {badges.map((b) => {
               const v = toneVars(b.tone);
+              // 「有附件」是事实,不是判断,改不了;类型标签(订单/账单/预约/私人)才可改。
+              const editable = Boolean(onFixTag) && b.id !== 'attachment';
               return (
-                <span key={b.id} style={{
-                  fontSize: 'var(--text-xs)', padding: '0 var(--space-2)',
-                  borderRadius: 'var(--radius-pill)', background: v.bg, color: v.fg,
-                }}>{b.label}</span>
+                <span
+                  key={b.id}
+                  /* 为什么是 span[role=button] 而不是 <button>:整行本来就是一个 <button>,
+                     HTML 不许 button 里再套 button。把标签挪出去做兄弟节点又会脱离文档流、
+                     滑动时不跟手。这是权衡后的取舍 —— 键盘可达性用 tabIndex + onKeyDown 补齐,
+                     tap 目标由 CSS 保到 --tap-min。 */
+                  {...(editable ? {
+                    role: 'button' as const,
+                    tabIndex: 0,
+                    title: L(dict, '分错了?点一下改', 'Wrong tag? Tap to fix'),
+                    onClick: (e: React.MouseEvent) => { e.stopPropagation(); onFixTag!(); },
+                    onKeyDown: (e: React.KeyboardEvent) => {
+                      if (e.key !== 'Enter' && e.key !== ' ') return;
+                      e.preventDefault(); e.stopPropagation(); onFixTag!();
+                    },
+                  } : {})}
+                  className={editable ? 'nesio-mailtag nesio-mailtag--editable' : 'nesio-mailtag'}
+                  style={{ background: v.bg, color: v.fg }}
+                >{b.label}</span>
               );
             })}
           </div>
@@ -580,6 +614,96 @@ function MailSuggestions({ dict, rows, taken }: {
   );
 }
 
+/**
+ * MailTagFixSheet —— 标签分错了,自己改(2026-07-30 用户:
+ * 「邮件里,某个 tag 分错了,我怎么改,系统会学习到么?」)。
+ *
+ * 「学习」在这里被**拆成两半**,而且第二半必须用户自己勾:
+ *   ① 选一个新标签(或「去掉」)→ **这一封**永久记住,永远盖过自动判定;
+ *   ② 下面那个勾选框才是「以后这个发件人都这样」—— 默认不勾。
+ *
+ * 不做隐式泛化(「你改了一封 Chase 的,所有 Chase 自动跟着变」):
+ * 那样改一次会有几十封信悄悄变样,而用户不知道发生了什么、也不知道去哪儿撤销。
+ * 和「把邮件标题里的『健身』猜成健康打卡」是同一类错 —— 系统替他做了个他没同意的推广。
+ */
+function MailTagFixSheet({ row, dict, onClose }: { row: Row; dict: 'zh' | 'en'; onClose: () => void }) {
+  const [alsoSender, setAlsoSender] = useState(false);
+  const a = row.node.attributes || {};
+  const emailId = typeof a.emailId === 'string' ? a.emailId : '';
+  const from = typeof a.from === 'string' ? a.from : '';
+  const sender = senderKeyOf(from);
+
+  const label = (k: MailTagFix) => L(dict,
+    k === 'order' ? '订单' : k === 'bill' ? '账单' : k === 'booking' ? '预约' : k === 'personal' ? '私人' : '去掉标签',
+    k === 'order' ? 'Order' : k === 'bill' ? 'Bill' : k === 'booking' ? 'Booking' : k === 'personal' ? 'Personal' : 'No tag');
+
+  const apply = (k: MailTagFix) => {
+    fixMailTag(emailId, k, { from, alsoSender });
+    onClose();
+  };
+
+  return (
+    <NesioSheet
+      variant="bottom"
+      open
+      elevated
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-settings-sheet-card"
+      ariaLabel={L(dict, '改这条的标签', 'Fix this tag')}
+    >
+      <div className="nesio-brief-head">
+        <div>
+          <p className="nesio-brief-greeting">{L(dict, '这条应该是', 'This one is')}</p>
+          <p className="nesio-brief-date">{row.title}</p>
+        </div>
+        <button type="button" className="nesio-voice-sheet-close" onClick={onClose}
+          aria-label={L(dict, '关闭', 'Close')}>✕</button>
+      </div>
+      <div className="nesio-settings-sheet-body">
+        <div className="nesio-remind-row">
+          {([...MAIL_TAG_KINDS, 'none'] as MailTagFix[]).map((k) => (
+            <button key={k} type="button" className="nesio-schedfilter-chip" onClick={() => apply(k)}>
+              {label(k)}
+            </button>
+          ))}
+        </div>
+
+        {/* 第二半:**默认不勾**。勾了才写发件人规则。 */}
+        {sender && (
+          /* 用自己的类,不借 .nesio-settings-option —— ui-consistency 契约禁止 SchedulePanel
+             引用那套「设置行」样式(它防的是拿设置行当 tab)。借过来虽然这一处语义没错,
+             但会给下一个人开口子,而且契约不区分用途。自己写一个,两边都干净。 */
+          <button
+            type="button"
+            className={`nesio-mailtag-rule${alsoSender ? ' on' : ''}`}
+            aria-pressed={alsoSender}
+            onClick={() => setAlsoSender((v) => !v)}
+          >
+            <span>
+              <span className="nesio-mailtag-rule-label">
+                {L(dict, `以后 ${sender} 都这样`, `Apply to all from ${sender}`)}
+              </span>
+              <span className="nesio-mailtag-rule-hint">
+                {L(dict, '不勾就只改这一封。勾了会立刻影响这个发件人的其它邮件。',
+                      'Unchecked changes just this email. Checked affects every email from this sender.')}
+              </span>
+            </span>
+            <span className="nesio-mailtag-rule-check" aria-hidden>{alsoSender ? '✓' : '○'}</span>
+          </button>
+        )}
+
+        {!emailId && (
+          <p role="alert" className="nesio-remind-err" style={{ marginTop: 'var(--space-3)' }}>
+            {L(dict, '这条没有邮件 id,改不了 —— 它多半是同步早期留下的旧记录。',
+                  'No email id on this one — it is an old record from an earlier sync.')}
+          </p>
+        )}
+      </div>
+    </NesioSheet>
+  );
+}
+
 // 图29 之后不再需要 onOpenMemory —— 点条目就地开详情,不跳记忆页。
 export default function SchedulePanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -602,6 +726,16 @@ export default function SchedulePanel() {
   const [fKeyword, setFKeyword] = useState('');
   // 搜索框(2026-07-30)。不落盘 —— 和筛选同理,记住上次的搜索词会让人以为数据少了。
   const [q, setQ] = useState('');
+  // 用户改过的标签(这一封 / 发件人规则)。见 lib/portal/mail-tag-fix.ts —— 只记他改的,不隐式泛化。
+  const [tagFixes, setTagFixes] = useState<MailTagFixStore>({ byEmail: {}, bySender: {} });
+  const [fixing, setFixing] = useState<Row | null>(null);
+  useEffect(() => {
+    const read = () => setTagFixes(loadMailTagFix());
+    void mailTagFixReady().then(read);
+    read();
+    window.addEventListener(MAIL_TAG_FIX_EVENT, read);
+    return () => window.removeEventListener(MAIL_TAG_FIX_EVENT, read);
+  }, []);
   // 本机全文索引好了没。没好之前只能搜到标题/发件人/正文预览,得说出来。
   const [ftReady, setFtReady] = useState(false);
   useEffect(() => {
@@ -1075,7 +1209,9 @@ export default function SchedulePanel() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {rows.slice(0, 60).map((r) => (
             <SwipeRow key={r.id} row={r} kind={sub} dict={dict} starred={starred.has(r.id)} dateLabel={fmtDay(r.dateIso)}
-              onOpen={() => setOpenNode(r.node)} onStar={() => toggleStar(r)} onDelete={() => removeRow(r)} />
+              fixes={tagFixes}
+              onOpen={() => setOpenNode(r.node)} onStar={() => toggleStar(r)} onDelete={() => removeRow(r)}
+              onFixTag={sub === 'calendar' ? undefined : () => setFixing(r)} />
           ))}
         </div>
       )}
@@ -1112,6 +1248,8 @@ export default function SchedulePanel() {
       {/* 写一封:发出去后会随下一次 Gmail 同步回到上面的列表(Gmail 的 SENT 是唯一真源,
           这里不另存一份本地副本 —— 两份账最后一定对不上)。 */}
       {composeOpen && <EmailComposeSheet open onClose={() => setComposeOpen(false)} context={{}} />}
+      {/* 标签分错了,自己改(2026-07-30 用户:「某个 tag 分错了,我怎么改」)。 */}
+      {fixing && <MailTagFixSheet row={fixing} dict={dict} onClose={() => setFixing(null)} />}
     </div>
   );
 }
