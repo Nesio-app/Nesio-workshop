@@ -72,6 +72,11 @@ export interface NesioSheetProps {
    * 不做成全局改层:全局抬会把上面那条「fullscreen 盖住触发它的 bottom」的规则弄坏。
    */
   elevated?: boolean;
+  /**
+   * 遮罩加毛玻璃虚化(2026-07-30,Bug4 图11「收藏夹弹层背景虚化」)。
+   * 默认关:虚化整页在低端机上掉帧,只给「内容要被读、背景要退场」的浮层开。
+   */
+  blurOverlay?: boolean;
   children: ReactNode;
 }
 
@@ -236,6 +241,7 @@ export default function NesioSheet({
   modal = true,
   opaqueOverlay = false,
   elevated = false,
+  blurOverlay = false,
   children,
 }: NesioSheetProps) {
   // opaqueOverlay + 非全屏:面板必须抬到不透明遮罩(929)之上,否则被自己的遮罩盖死
@@ -248,7 +254,7 @@ export default function NesioSheet({
     return (
       <Drawer.Root open={open} onOpenChange={onOpenChange} dismissible={dismissible} modal repositionInputs={false}>
         <Drawer.Portal>
-          <Drawer.Overlay className={`nesio-sheet-overlay${elevated ? ' nesio-sheet-overlay--elevated' : ''}`} />
+          <Drawer.Overlay className={`nesio-sheet-overlay${elevated ? ' nesio-sheet-overlay--elevated' : ''}${blurOverlay ? ' nesio-sheet-overlay--blur' : ''}`} />
           <VaulContent panelClass={panelClass} panelStyle={style} ariaLabel={ariaLabel} open={open}>
             {children}
           </VaulContent>
@@ -259,7 +265,7 @@ export default function NesioSheet({
 
   // fullscreen 的遮罩用不透明页面底当底衬 —— 全屏面板常是磨砂玻璃底(半透明),
   // 需要背后有不透明层,否则在夜间(--glass-bg-solid 近全透)会透出下层。
-  const overlayClass = `nesio-sheet-overlay${variant === 'fullscreen' || opaqueOverlay ? ' nesio-sheet-overlay--opaque' : ''}${elevated ? ' nesio-sheet-overlay--elevated' : ''}`;
+  const overlayClass = `nesio-sheet-overlay${variant === 'fullscreen' || opaqueOverlay ? ' nesio-sheet-overlay--opaque' : ''}${elevated ? ' nesio-sheet-overlay--elevated' : ''}${blurOverlay ? ' nesio-sheet-overlay--blur' : ''}`;
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange} modal={modal}>
       <Dialog.Portal>

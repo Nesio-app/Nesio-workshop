@@ -748,6 +748,7 @@ function FavoritesSheet({ pinnedNodes, onClose, onOpenNode, onLongPressNode }: {
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
       card={false}
+      blurOverlay
       className="nesio-project-detail-sheet nesio-fav-sheet"
       ariaLabel={L(dict, '收藏夹', 'Saved')}
     >
@@ -769,11 +770,9 @@ function FavoritesSheet({ pinnedNodes, onClose, onOpenNode, onLongPressNode }: {
           </div>
         )}
         {shown.length === 0 ? (
-          <p className="nesio-project-detail-empty">
-            {!tag
-              ? L(dict, '还没有收藏。长按记忆卡 → 收藏到首页。', 'Nothing saved yet. Long-press a card → Save.')
-              : L(dict, '这个标签下还没有收藏', 'Nothing under this tag yet')}
-          </p>
+          // Bug4 图11:总空态那句教程文案删掉(界面本身已经说明它是收藏夹)。
+          // 标签筛完为空还留一句 —— 那不是教程,是「你筛了但没有」的必要反馈。
+          tag ? <p className="nesio-project-detail-empty">{L(dict, '这个标签下还没有收藏', 'Nothing under this tag yet')}</p> : null
         ) : (
           <div className="nesio-memory-grid" style={{ padding: '0 1rem 1rem' }}>
             {shown.map((n) => (

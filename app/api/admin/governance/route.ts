@@ -2,7 +2,8 @@
  * GET /api/admin/governance — 管理员治理面板的只读 API。
  *
  * 数据源(全静态,无需数据库):
- *   - lib/portal/contracts/governance-map.mjs:29 个治理面的单一来源(status/path/治理什么/消费方)
+ *   - lib/portal/contracts/governance-map.mjs:治理面的单一来源(status/path/治理什么/消费方)。
+ *     数量以文件为准 —— 这里不再写死一个数字(写死过「29」,实际 21,面板照着它对不上)。
  *   - lib/portal/contracts/governance-snapshot.json:report:modules 的实时数字快照
  *     (serverless 里不能直接跑 report:modules —— 它要用 node:fs 读源文件,生产 bundle 里没有;
  *      所以用构建期生成、提交进仓的快照。跑 `npm run report:governance-docs` 刷新。)

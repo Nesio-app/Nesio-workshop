@@ -171,31 +171,54 @@ export async function GET(req: NextRequest) {
     chat: 0.004, daily_brief: 0.001, tts: 0.015, analyze: 0.002,
     guidance_language: 0.001, guidance_judge: 0.01, insights: 0.002, narrative: 0.002,
   };
-  const aiByRoute = new Map<string, { calls: number; okCalls: number; latencySum: number; costSum: number; costFreeCalls: number }>();
+  // Bug4 图18「成本数据准确性核对」,这一轮修掉三处会让数字说谎的地方:
+  //  ① 延迟均值原来拿 latencySum / calls —— 没带 latency_ms 的调用按 0 参与平均,
+  //     漏报越多显示越快。改成只除以「真报了延迟的那些调用」。
+  //  ② 成功率/延迟的总计原来是拿**各路由已经取整的百分比**再加权平均,取整误差被放大。
+  //     改成从原始计数直接算。
+  //  ③ 成本原来只给一个 ≈$X,看不出里面有多少是真 token 价、多少是拍脑袋单价。
+  //     每条路由带上 measuredCalls / measuredCostUsd,前端能直说「实测占几成」。
+  const aiByRoute = new Map<string, { calls: number; okCalls: number; latencySum: number; latencyCalls: number; costSum: number; costFreeCalls: number }>();
   for (const r of telemetry.rows) {
     if (r.name !== 'ai_route' || new Date(r.at).getTime() < cut(30)) continue;
     const p = (r.props || {}) as { route?: string; ok?: boolean; latency_ms?: number; cost_usd?: number };
     const route = typeof p.route === 'string' ? p.route : 'unknown';
-    if (!aiByRoute.has(route)) aiByRoute.set(route, { calls: 0, okCalls: 0, latencySum: 0, costSum: 0, costFreeCalls: 0 });
+    if (!aiByRoute.has(route)) aiByRoute.set(route, { calls: 0, okCalls: 0, latencySum: 0, latencyCalls: 0, costSum: 0, costFreeCalls: 0 });
     const a = aiByRoute.get(route)!;
     a.calls += 1;
     if (p.ok === true) a.okCalls += 1;
-    a.latencySum += typeof p.latency_ms === 'number' ? p.latency_ms : 0;
+    if (typeof p.latency_ms === 'number' && Number.isFinite(p.latency_ms)) { a.latencySum += p.latency_ms; a.latencyCalls += 1; }
     if (typeof p.cost_usd === 'number' && Number.isFinite(p.cost_usd)) a.costSum += p.cost_usd;
     else a.costFreeCalls += 1;
   }
+  const round3 = (n: number) => Math.round(n * 1000) / 1000;
   const aiRoutes = [...aiByRoute.entries()].map(([route, a]) => ({
     route,
     calls: a.calls,
     okRate: Math.round((a.okCalls / Math.max(1, a.calls)) * 100),
-    avgLatencyMs: Math.round(a.latencySum / Math.max(1, a.calls)),
-    estCostUsd: Math.round((a.costSum + a.costFreeCalls * (COST_PER_CALL[route] ?? 0.002)) * 1000) / 1000,
+    avgLatencyMs: a.latencyCalls ? Math.round(a.latencySum / a.latencyCalls) : 0,
+    estCostUsd: round3(a.costSum + a.costFreeCalls * (COST_PER_CALL[route] ?? 0.002)),
+    /** 这条路由里有多少次带了真实 token 价(其余按拍平单价估) */
+    measuredCalls: a.calls - a.costFreeCalls,
+    /** 其中实测部分的金额 —— 与 estCostUsd 一对照就知道估算成分有多少 */
+    measuredCostUsd: round3(a.costSum),
   })).sort((x, y) => y.estCostUsd - x.estCostUsd);
+  const rawAgg = [...aiByRoute.entries()].reduce((s, [route, a]) => ({
+    calls: s.calls + a.calls,
+    okCalls: s.okCalls + a.okCalls,
+    latencySum: s.latencySum + a.latencySum,
+    latencyCalls: s.latencyCalls + a.latencyCalls,
+    cost: s.cost + a.costSum + a.costFreeCalls * (COST_PER_CALL[route] ?? 0.002),
+    measuredCost: s.measuredCost + a.costSum,
+    measuredCalls: s.measuredCalls + (a.calls - a.costFreeCalls),
+  }), { calls: 0, okCalls: 0, latencySum: 0, latencyCalls: 0, cost: 0, measuredCost: 0, measuredCalls: 0 });
   const aiTotals = {
-    calls: aiRoutes.reduce((sum, r) => sum + r.calls, 0),
-    estCostUsd: Math.round(aiRoutes.reduce((sum, r) => sum + r.estCostUsd, 0) * 1000) / 1000,
-    okRate: aiRoutes.length ? Math.round(aiRoutes.reduce((sum, r) => sum + r.okRate * r.calls, 0) / Math.max(1, aiRoutes.reduce((sum, r) => sum + r.calls, 0))) : null,
-    avgLatencyMs: aiRoutes.length ? Math.round(aiRoutes.reduce((sum, r) => sum + r.avgLatencyMs * r.calls, 0) / Math.max(1, aiRoutes.reduce((sum, r) => sum + r.calls, 0))) : null,
+    calls: rawAgg.calls,
+    estCostUsd: round3(rawAgg.cost),
+    measuredCostUsd: round3(rawAgg.measuredCost),
+    measuredCalls: rawAgg.measuredCalls,
+    okRate: rawAgg.calls ? Math.round((rawAgg.okCalls / rawAgg.calls) * 100) : null,
+    avgLatencyMs: rawAgg.latencyCalls ? Math.round(rawAgg.latencySum / rawAgg.latencyCalls) : null,
   };
 
   // ── 聪明度(0-100 五维,样本不足的维度按 50 中性并标注) ──
@@ -243,23 +266,28 @@ export async function GET(req: NextRequest) {
   }));
 
   // ── 客户端错误聚合(client_error 遥测,30 天)——错误自己来找你 ──
-  const errAgg = new Map<string, { count: number; devices: Set<string>; lastAt: string; kind: string; message: string }>();
+  // Bug4 图15:原来只往前端送 kind/message/次数 —— 报错在哪个文件、第一次什么时候出现,
+  // 这两条排查时最先要看的信息在聚合这一步就被丢了。补上 source 与 firstAt。
+  const errAgg = new Map<string, { count: number; devices: Set<string>; lastAt: string; firstAt: string; kind: string; message: string; source: string }>();
   for (const r of telemetry.rows) {
     if (r.name !== 'client_error' || new Date(r.at).getTime() < cut(30)) continue;
-    const p = (r.props || {}) as { kind?: string; message?: string };
+    const p = (r.props || {}) as { kind?: string; message?: string; source?: string };
     const kind = typeof p.kind === 'string' ? p.kind : 'error';
     const message = typeof p.message === 'string' ? p.message : 'unknown';
+    const source = typeof p.source === 'string' ? p.source : '';
     const sig = `${kind}:${message}`;
-    if (!errAgg.has(sig)) errAgg.set(sig, { count: 0, devices: new Set(), lastAt: r.at, kind, message });
+    if (!errAgg.has(sig)) errAgg.set(sig, { count: 0, devices: new Set(), lastAt: r.at, firstAt: r.at, kind, message, source });
     const e = errAgg.get(sig)!;
     e.count += 1;
     e.devices.add(r.device_id);
     if (r.at > e.lastAt) e.lastAt = r.at;
+    if (r.at < e.firstAt) e.firstAt = r.at;
+    if (!e.source && source) e.source = source;
   }
   const clientErrors = [...errAgg.values()]
     .sort((a, b) => b.count - a.count)
     .slice(0, 10)
-    .map((e) => ({ kind: e.kind, message: e.message, count: e.count, devices: e.devices.size, lastAt: e.lastAt }));
+    .map((e) => ({ kind: e.kind, message: e.message, source: e.source, count: e.count, devices: e.devices.size, lastAt: e.lastAt, firstAt: e.firstAt }));
 
   // ── 洞察引擎:面板不该让人自己找问题——规则先替你看一遍 ──
   const dayEvents = (offsetDays: number, spanDays: number) =>
@@ -349,7 +377,9 @@ export async function GET(req: NextRequest) {
     devMap.set(r.device_id, d);
     if (new Date(r.at).getTime() >= cut(30) && !IGNORE_EVENTS.has(r.name)) {
       featCount.set(r.name, (featCount.get(r.name) || 0) + 1);
-      hours[new Date(r.at).getHours()] += 1; // 服务端(UTC)小时
+      // 明确按 **UTC** 分桶(以前写的是 getHours(),那是「服务端本机时区」——
+      // 部署在哪就是哪个时区,换个 region 数据就悄悄挪位)。前端按看的人的时区旋转。
+      hours[new Date(r.at).getUTCHours()] += 1;
       activeDaySet.add(dayKey(r.at));
     }
   }

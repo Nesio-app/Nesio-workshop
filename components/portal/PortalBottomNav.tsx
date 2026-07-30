@@ -15,6 +15,8 @@ interface PortalBottomNavProps {
   onAsk?: () => void;
   onInsights: () => void;
   insightsActive?: boolean;
+  /** 抬到全屏浮层的遮罩之上(洞察宫格首页要露出导航,Bug4 图12)。 */
+  aboveOverlay?: boolean;
   onChatOpen: () => void;
 }
 
@@ -27,6 +29,7 @@ export default function PortalBottomNav({
   onCamera,
   onInsights,
   insightsActive = false,
+  aboveOverlay = false,
   onChatOpen,
 }: PortalBottomNavProps) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -62,7 +65,7 @@ export default function PortalBottomNav({
   };
 
   return (
-    <nav className="nesio-bottom-nav" aria-label={L(portalLocaleToDictionaryLocale(locale), '主导航', 'Main navigation')}>
+    <nav className={`nesio-bottom-nav${aboveOverlay ? ' nesio-bottom-nav--above-overlay' : ''}`} aria-label={L(portalLocaleToDictionaryLocale(locale), '主导航', 'Main navigation')}>
       {/* Today */}
       <button
         type="button"

@@ -94,10 +94,12 @@ export function installErrorTracking(): void {
     const sig = `${kind}:${message.slice(0, 60)}`;
     if (seen.has(sig) || seen.size > 20) return;
     seen.add(sig);
+    // Bug4 图15:80 字的报错在面板上几乎必然被截断成一句半,看不出是哪。
+    // 放宽到 200(仍然只有 message,不带 stack、不带用户数据),source 留全路径。
     track('client_error', {
       kind,
-      message: message.slice(0, 80),
-      ...(source ? { source: source.slice(0, 80) } : {}),
+      message: message.slice(0, 200),
+      ...(source ? { source: source.slice(0, 160) } : {}),
     });
   };
   window.addEventListener('error', (e) => report('error', String(e.message || 'unknown'), e.filename));

@@ -317,7 +317,7 @@ const hubEditBtn: React.CSSProperties = {
   fontFamily: 'var(--font-sans)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)',
 };
 
-export default function InsightsSheet({ onClose, canUsePrivateData = false, initialTab, tabNonce = 0 }: { onClose: () => void; canUsePrivateData?: boolean; initialTab?: MainTab; tabNonce?: number }) {
+export default function InsightsSheet({ onClose, canUsePrivateData = false, initialTab, tabNonce = 0, onHubChange }: { onClose: () => void; canUsePrivateData?: boolean; initialTab?: MainTab; tabNonce?: number; onHubChange?: (hub: boolean) => void }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [mainTab, setMainTab] = useState<MainTab>(initialTab ?? 'reflection');
   // 洞察改版:首页是入口宫格(showHub),点卡进板块;有 initialTab(深链)时直达板块。
@@ -331,6 +331,10 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   useEffect(() => {
     if (initialTab) { setMainTab(initialTab); setShowHub(false); }
   }, [initialTab, tabNonce]);
+  // Bug4 图12:宫格首页要露出底部导航(它在全屏遮罩底下)。宫格状态是本组件私有的,
+  // 告诉 Portal 一声,由它把导航抬到遮罩之上;进板块页再放回去(板块页有自己的返回栏)。
+  useEffect(() => { onHubChange?.(showHub); }, [showHub, onHubChange]);
+  useEffect(() => () => { onHubChange?.(false); }, [onHubChange]);
   const tabLabel = (t: MainTab): string =>
     t === 'reflection' ? L(dict, '洞察', 'Insights')
       : t === 'growth' ? L(dict, '成长', 'Growth')
@@ -573,17 +577,19 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   }
 
   return (
-    <div className="nesio-insights-sheet">
-      {/* Header:首页显「洞察」,板块内显返回 + 板块名 */}
-      <div className="nesio-insights-header">
-        {!showHub && (
+    <div className={`nesio-insights-sheet${showHub ? ' nesio-insights-sheet--hub' : ''}`}>
+      {/* Header:板块内显返回 + 板块名。
+          Bug4 图12:宫格首页不再自带标题栏 —— 底部导航的「洞察」已经亮着(它就是页名),
+          右上「今天」也和导航第一个 tab 重复。首页的导航交给底部 bar,这里整条不渲染。 */}
+      {!showHub && (
+        <div className="nesio-insights-header">
           <button type="button" className="nesio-insights-back" onClick={() => setShowHub(true)} aria-label={L(dict, '返回', 'Back')}>‹</button>
-        )}
-        <div className="nesio-insights-title-row">
-          <h2 className="nesio-insights-title">{showHub ? L(dict, '洞察', 'Insights') : tabLabel(mainTab)}</h2>
+          <div className="nesio-insights-title-row">
+            <h2 className="nesio-insights-title">{tabLabel(mainTab)}</h2>
+          </div>
+          <button type="button" className="nesio-insights-close" onClick={onClose} aria-label={L(dict, '回到今天', 'Back to Today')}>{L(dict, '今天', 'Today')}</button>
         </div>
-        <button type="button" className="nesio-insights-close" onClick={onClose} aria-label={L(dict, '回到今天', 'Back to Today')}>{L(dict, '今天', 'Today')}</button>
-      </div>
+      )}
 
       <div className="nesio-insights-body">
         {showHub ? (

@@ -473,6 +473,8 @@ export default function Portal() {
   // (用户原话:「充电花费」和「行驶记录」能跳,只有「停车/充电位置」这一行是死的 ——
   //  其实是那一次他已经在 timeline 上了)。带个自增号,每次派发都算一次新的深链。
   const [insightsNonce, setInsightsNonce] = useState(0);
+  // 洞察是否停在宫格首页 —— 首页要露出底部导航(Bug4 图12)。由 InsightsSheet 回报。
+  const [insightsHub, setInsightsHub] = useState(false);
   const [proGate, setProGate] = useState<string | null>(null); // 非 null = 显示 Pro 升级引导(值=功能名)
   // 跨账号本地数据冲突(P0 隐私):登录后本机数据归属与当前用户不符 → 阻断处理
   const [ownerConflict, setOwnerConflict] = useState<
@@ -1319,11 +1321,14 @@ export default function Portal() {
           <PortalBottomNav
             activeSurface={activeSurface}
             locale={locale}
-            onToday={() => setActiveSurface('today')}
+            // Bug4 图12:洞察首页的右上「今天」按钮删了,回今天全靠这颗导航键 ——
+            // 它必须同时把洞察浮层关掉,否则点了看起来「没反应」(浮层还盖着)。
+            onToday={() => { setInsightsOpen(false); setActiveSurface('today'); }}
             onCamera={(file) => { setCameraFile(file); setCaptureMode('camera'); }}
             onAsk={handleAskFromCenterButton}
             onInsights={() => { setInsightsTab(undefined); setInsightsOpen(true); }}
             insightsActive={insightsOpen}
+            aboveOverlay={insightsOpen && insightsHub}
             onChatOpen={() => setChatOpen(true)}
           />
         )}
@@ -1455,7 +1460,7 @@ export default function Portal() {
           className="nesio-insights-sheet-card"
           ariaLabel={L(dict, 'Nesio 的洞察', "Nesio's insights")}
         >
-          <InsightsSheet onClose={() => setInsightsOpen(false)} canUsePrivateData={canViewPrivateData} initialTab={insightsTab} tabNonce={insightsNonce} />
+          <InsightsSheet onClose={() => setInsightsOpen(false)} canUsePrivateData={canViewPrivateData} initialTab={insightsTab} tabNonce={insightsNonce} onHubChange={setInsightsHub} />
         </NesioSheet>
       )}
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />

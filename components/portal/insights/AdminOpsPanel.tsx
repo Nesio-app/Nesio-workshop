@@ -26,7 +26,7 @@ interface Metrics {
   sources?: { telemetryEvents: { ok: boolean; error?: string }; productEvents: { ok: boolean; error?: string } };
   windows?: { today: { events: number; devices: number }; week: { events: number; devices: number }; month: { events: number; devices: number } };
   insights?: Array<{ severity: 'go' | 'gentle' | 'risk'; title: string; detail: string; advice: string }>;
-  ai?: { totals: { calls: number; estCostUsd: number; okRate: number | null; avgLatencyMs: number | null }; routes: Array<{ route: string; calls: number; okRate: number; avgLatencyMs: number; estCostUsd: number }> };
+  ai?: { totals: { calls: number; estCostUsd: number; measuredCostUsd?: number; measuredCalls?: number; okRate: number | null; avgLatencyMs: number | null }; routes: Array<{ route: string; calls: number; okRate: number; avgLatencyMs: number; estCostUsd: number; measuredCalls?: number; measuredCostUsd?: number }> };
   smartness?: { score: number; dims?: Array<{ dim: string; score: number; thin: boolean }> };
   clientErrors?: Array<{ kind: string; message: string; count: number; devices: number; lastAt: string }>;
   deviceList?: Array<{ id: string; events: number; firstAt: string; lastAt: string }>;
@@ -305,14 +305,20 @@ export default function AdminOpsPanel() {
       {data.behavior && (data.behavior.topFeatures.length > 0) && (() => {
         const b = data.behavior!;
         const maxFeat = Math.max(1, ...b.topFeatures.map((f) => f.count));
-        const maxHour = Math.max(1, ...b.activeHours);
-        const peakHour = b.activeHours.indexOf(maxHour);
+        // Bug4 图19:服务端按 UTC 分桶,这里旋转成**看这一页的人自己的时区** ——
+        // 「高峰 13:00」在纽约人眼里应该是早上 9 点,不该逼他心算减 4。
+        // 用当下的偏移一次性旋转:30 天窗口内跨夏令时最多差 1 小时,对「看高峰在哪」够用。
+        const tzShift = -Math.round(new Date().getTimezoneOffset() / 60);
+        const localHours = Array.from({ length: 24 }, (_, i) => b.activeHours[(i - tzShift + 48) % 24] ?? 0);
+        const tzName = (() => { try { return Intl.DateTimeFormat().resolvedOptions().timeZone || '本地'; } catch { return '本地'; } })();
+        const maxHour = Math.max(1, ...localHours);
+        const peakHour = localHours.indexOf(maxHour);
         return (
           <>
-            <p style={sectionLbl}>{L(dict, '行为画像(30 天,你自己)', 'Behavior profile / 30d')}</p>
+            <p style={sectionLbl}>{L(dict, '行为画像', 'Behavior profile')}</p>
             <div style={card}>
               <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--portal-ink)', lineHeight: 1.6 }}>
-                {L(dict, `活跃 ${b.activeDays30} 天 · 最常用「${featLabel(b.topFeatures[0].name, false)}」· 高峰 ${peakHour}:00(UTC)附近`, `${b.activeDays30} active days · top “${featLabel(b.topFeatures[0].name, true)}” · peak ~${peakHour}:00 UTC`)}
+                {L(dict, `活跃 ${b.activeDays30} 天 · 最常用「${featLabel(b.topFeatures[0].name, false)}」· 高峰 ${peakHour}:00 附近`, `${b.activeDays30} active days · top “${featLabel(b.topFeatures[0].name, true)}” · peak ~${peakHour}:00`)}
               </p>
               {/* Top 功能 */}
               <p style={{ ...label, margin: 'var(--space-3) 0 var(--space-2)' }}>{L(dict, '最常用', 'Most used')}</p>
@@ -328,9 +334,9 @@ export default function AdminOpsPanel() {
                 </div>
               ))}
               {/* 活跃时段 24h 小柱 */}
-              <p style={{ ...label, margin: 'var(--space-3) 0 var(--space-2)' }}>{L(dict, '活跃时段(0–23 时 · UTC)', 'Active hours (0–23 · UTC)')}</p>
+              <p style={{ ...label, margin: 'var(--space-3) 0 var(--space-2)' }}>{L(dict, `活跃时段(0–23 时 · ${tzName})`, `Active hours (0–23 · ${tzName})`)}</p>
               <div style={{ display: 'flex', alignItems: 'flex-end', gap: 1, height: 40 }}>
-                {b.activeHours.map((h, i) => (
+                {localHours.map((h, i) => (
                   <div key={i} title={`${i}:00 · ${h}`} style={{ flex: 1, height: `${Math.max(3, Math.round((h / maxHour) * 100))}%`, background: h > 0 ? 'var(--portal-accent)' : 'var(--portal-line)', borderRadius: '1px 1px 0 0' }} />
                 ))}
               </div>
@@ -382,17 +388,36 @@ export default function AdminOpsPanel() {
         <p style={label}>{L(dict, '暂无 AI 调用记录。', 'No AI calls yet.')}</p>
       ) : (
         <div style={{ ...card, padding: 'var(--space-3)' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.7fr 0.7fr', fontSize: '0.62rem', color: 'var(--portal-muted)', paddingBottom: '0.3rem' }}>
-            <span>{L(dict, '路由', 'Route')}</span><span>{L(dict, '次数', 'Calls')}</span><span>{L(dict, '成功', 'OK')}</span><span>{L(dict, '估算', 'Cost')}</span>
+          {/* Bug4 图18:这张表以前只给一个 ≈$X,看不出哪些是真 token 价、哪些是拍平单价猜的。
+              下面一行直说实测覆盖率,每条路由的金额也在实测比例不足时标出来。 */}
+          {(() => {
+            const t = data.ai!.totals;
+            const cov = t.calls ? Math.round(((t.measuredCalls ?? 0) / t.calls) * 100) : 0;
+            return (
+              <p style={{ ...label, margin: '0 0 var(--space-2)', lineHeight: 1.5 }}>
+                {L(dict,
+                  `${cov}% 的调用带回了真实 token 价(合计 $${t.measuredCostUsd ?? 0});其余按每路由拍平单价估。延迟只统计真报了耗时的调用。`,
+                  `${cov}% of calls carry real token cost ($${t.measuredCostUsd ?? 0}); the rest use a flat per-route estimate. Latency counts only calls that reported it.`)}
+              </p>
+            );
+          })()}
+          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.7fr 0.9fr', fontSize: '0.62rem', color: 'var(--portal-muted)', paddingBottom: '0.3rem' }}>
+            <span>{L(dict, '路由', 'Route')}</span><span>{L(dict, '次数', 'Calls')}</span><span>{L(dict, '成功', 'OK')}</span><span>{L(dict, '花费', 'Cost')}</span>
           </div>
-          {data.ai!.routes.slice(0, 8).map((r) => (
-            <div key={r.route} style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.7fr 0.7fr', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', padding: '0.25rem 0', borderTop: '1px solid var(--portal-line)', fontVariantNumeric: 'tabular-nums' }}>
-              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.route}</span>
-              <span>{r.calls}</span>
-              <span style={{ color: r.okRate >= 95 ? 'var(--status-go)' : r.okRate >= 85 ? 'var(--status-gentle)' : 'var(--status-risk)' }}>{r.okRate}%</span>
-              <span>${r.estCostUsd}</span>
-            </div>
-          ))}
+          {data.ai!.routes.slice(0, 8).map((r) => {
+            const measured = r.measuredCalls ?? 0;
+            const allMeasured = measured >= r.calls;
+            return (
+              <div key={r.route} style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.7fr 0.9fr', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', padding: '0.25rem 0', borderTop: '1px solid var(--portal-line)', fontVariantNumeric: 'tabular-nums' }}>
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.route}</span>
+                <span>{r.calls}</span>
+                <span style={{ color: r.okRate >= 95 ? 'var(--status-go)' : r.okRate >= 85 ? 'var(--status-gentle)' : 'var(--status-risk)' }}>{r.okRate}%</span>
+                <span title={allMeasured ? L(dict, '全部按真实 token 价', 'All from real token cost') : L(dict, `${measured}/${r.calls} 次有真实价,其余为估算`, `${measured}/${r.calls} measured, rest estimated`)}>
+                  {allMeasured ? '' : '≈'}${r.estCostUsd}
+                </span>
+              </div>
+            );
+          })}
         </div>
       )}
 
