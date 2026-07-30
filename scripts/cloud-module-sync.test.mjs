@@ -227,4 +227,45 @@ function cloudRow(moduleKey, json, updatedAt = '2026-07-25T00:00:00.000Z') {
   assert.equal(broken.ctx._reloaded(), false, 'sessionStorage 写不进 → 不 reload(防隐私模式无限刷屏)');
 }
 
+// 8. #29 并集:集合型 key(银行流水)—— 云端那份**只能并进来**,不许整键替换。
+//    这是端到端的:走真的 pullModulesFromCloud、真的 module-merge,断言落地下去的那份内容。
+//    (只 grep「调了 mergeIdSets」是不够的 —— 把结果丢掉照样绿,变异测试抓到过。)
+{
+  const local = JSON.stringify([
+    { id: 'L1', date: '2026-07-10', amount: -12 },
+    { id: 'BOTH', date: '2026-07-09', amount: -34 },
+  ]);
+  const cloud = JSON.stringify([
+    { id: 'BOTH', date: '2026-07-09', amount: -34 },
+    { id: 'C1', date: '2026-07-08', amount: -56 },
+  ]);
+  const rows = [cloudRow('nesio-bank-tx-v1', cloud)];
+  const fetchImpl = async (url) => (String(url).startsWith('/api/cloud/module-data')
+    ? { ok: true, status: 200, json: async () => ({ ok: true, modules: rows }) }
+    : { ok: false, status: 404, json: async () => ({}) });
+
+  const { mod, ctx } = makeCtx({ localEntries: { 'nesio-bank-tx-v1': local }, fetchImpl });
+  const r = await mod.pullModulesFromCloud();
+  assert.equal(r.applied, 1, '并集和本机不同 → 要落地');
+  assert.equal(r.newlyAdded, 0, '本机原本就有这个模块,不算「新设备首次填充」,不该 reload');
+
+  const applied = ctx._restoreApplied();
+  assert.ok(applied && applied.entries['nesio-bank-tx-v1'], '并集必须真的落地 —— 算完丢掉等于没修');
+  const ids = JSON.parse(applied.entries['nesio-bank-tx-v1']).map((t) => t.id).sort().join(',');
+  assert.equal(ids, 'BOTH,C1,L1',
+    '本机独有的 L1 不许被抹掉,云端独有的 C1 要并进来 —— ' +
+    '整键替换正是「同一个财务入口三种互不相干的状态」的来源');
+
+  // 快照型 key 不受影响:仍走原来的 last-write-wins
+  const rows2 = [cloudRow('nesio-fin-budget-v1', '{"cap":100}')];
+  const f2 = async (url) => (String(url).startsWith('/api/cloud/module-data')
+    ? { ok: true, status: 200, json: async () => ({ ok: true, modules: rows2 }) }
+    : { ok: false, status: 404, json: async () => ({}) });
+  const b = makeCtx({ localEntries: {}, fetchImpl: f2 });
+  const rb = await b.mod.pullModulesFromCloud();
+  assert.equal(rb.applied, 1, '预算是快照,照旧按原来的判据落地 —— 别顺手改了别人的语义');
+  assert.equal(b.ctx._restoreApplied().entries['nesio-fin-budget-v1'], '{"cap":100}');
+}
+
+
 console.log('cloud-module-sync: OK');

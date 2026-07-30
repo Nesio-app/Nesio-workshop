@@ -25,7 +25,7 @@ import ContactEditSheet from './ContactEditSheet';
 import { buildFamilyDigest } from '@/lib/portal/family-digest';
 import { ENTITY_ALIASES_EVENT, mergeEntity } from '@/lib/portal/entity-resolution';
 // #26:「Jing / Jing Duan / DUAN JING」是同一个人 —— 规范化对词序无能为力,得把候选挑出来
-import { suggestPersonMerges } from '@/lib/portal/person-merge-suggest';
+import { suggestPersonMerges, loadDismissedMerges, dismissMerge, withoutDismissed } from '@/lib/portal/person-merge-suggest';
 
 const GROUPS: Closeness[] = ['core', 'close', 'acquaintance'];
 // 单层最多先渲染这么多行,其余「显示全部」再展开 —— 防「导入了几千个 Google 联系人 →
@@ -75,8 +75,10 @@ export default function RelationshipsPanel() {
   const [activeGroup, setActiveGroup] = useState<string | null>(null); // null=全部;桶 id 或原始分组名
   const [showMore, setShowMore] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  // #26:说过「不是同一个人」的配对,本次会话里不再问第二遍(不落盘 —— 判据一改就该重新问)
+  // #26:说过「不是同一个人」的配对要**记住**。自查时发现最初只放在 state 里 ——
+  // 刷新一次就又问一遍,那正是用户这一轮报的「说过的话不算数」那一类毛病。
   const [dismissedMerges, setDismissedMerges] = useState<string[]>([]);
+  useEffect(() => { setDismissedMerges(loadDismissedMerges()); }, []);
   const [expandedTiers, setExpandedTiers] = useState<Record<Closeness, boolean>>({ core: false, close: false, acquaintance: false });
 
   const rebuild = () => {
@@ -141,8 +143,7 @@ export default function RelationshipsPanel() {
      规范化只到大小写/空白,对**词序反过来**无能为力(通讯录 姓+名 vs 邮件署名 名+姓)。
      这里把候选挑出来摆在最上面。**不自动合并** —— 合并不可撤销,而「同名不同人」
      在现实里很常见;系统替人做这个决定,错一次就把两个人的记录搅在一起,再也分不开。 */
-  const mergeHints = suggestPersonMerges(contacts.map((c) => c.name))
-    .filter((h) => !dismissedMerges.includes(`${h.canonical}|${h.alias}`));
+  const mergeHints = withoutDismissed(suggestPersonMerges(contacts.map((c) => c.name)), dismissedMerges);
 
   return (
     <div className="nesio-health-dash">
@@ -163,7 +164,7 @@ export default function RelationshipsPanel() {
                   {L(dict, '合并', 'Merge')}
                 </button>
                 <button type="button" className="nesio-rel-mergehint-btn ghost"
-                  onClick={() => setDismissedMerges((v) => [...v, `${h.canonical}|${h.alias}`])}>
+                  onClick={() => setDismissedMerges(dismissMerge(h.canonical, h.alias))}>
                   {L(dict, '不是', 'Not the same')}
                 </button>
               </span>

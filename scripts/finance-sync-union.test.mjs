@@ -142,6 +142,19 @@ const { mergeIdSets, idFieldFor, ID_SET_MODULES, MERGE_CAP } = loadTs('lib/porta
   const lwwAt = sync.indexOf('const cloudWouldShrink');
   assert.ok(idAt > 0 && lwwAt > idAt, '并集分支要在 last-write-wins 判据之前');
 
+  // 2026-07-30 自查发现:落地是**直接写 IDB** 的(restoreCombinedBackup → idbBackend.set),
+  // 绕过了各 blob store;而 store 的水合是记忆化的,第一次之后再也不重读。
+  // 于是数据已经落库了、页面上还是旧那份,要等下次冷启动才看得见 ——
+  // 而「本机已有、这次并进来一些」这条路**不会 reload**,恰恰是并集修好之后最常走的路。
+  // 不补这一步,#29 这个修复在当前会话里等于没生效。
+  assert.match(sync, /await rehydrateIdbBlobs\(appliedKeys\);/,
+    '落地之后必须让对应的 store 重读 —— 否则合并进来的数据这一整个会话都看不见');
+  const idb = read('lib/portal/idb-blob-store.ts');
+  assert.match(idb, /export async function rehydrateIdbBlobs/, '得有这么个入口');
+  assert.match(idb, /  function refresh\(\): Promise<void> \{\s*\n\s*hydratePromise = hydrate\(\);/,
+    'refresh 必须**重置** hydratePromise —— 沿用记忆化的那个等于什么都没做');
+  assert.match(idb, /registerBlobRefresh\(opts\.key, refresh\);/, '每个 store 都要登记进去');
+
   // 本机侧的并集语义还在(它们是这条判据的前提)
   assert.match(read('lib/portal/providers/bank-tx.ts'), /export function mergeBankTxForSync/,
     '本机按 id upsert —— 云端也必须按同一种语义来');

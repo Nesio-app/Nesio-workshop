@@ -196,6 +196,7 @@ const KNOWN_KEYS = new Map([
   ["nesio-module-overrides-v1", "durable"],
   ["nesio-named-places", "durable"],
   ["nesio-notion-db-v1", "durable"],
+  ["nesio-person-merge-dismissed-v1", "durable"],
   ["nesio-person-records-v1", "durable"],
   ["nesio-pins-v1", "durable"],
   ["nesio-place-alias-v1", "durable"],

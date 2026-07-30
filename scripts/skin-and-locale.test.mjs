@@ -172,6 +172,17 @@ function loadTs(rel) {
     '合并这一下必须由用户点 —— 系统替人做这个决定,错一次两个人的记录就再也分不开');
   assert.match(panel, /不可撤销/, '得把「不可撤销」写在按钮旁边');
   assert.match(panel, /'不是', 'Not the same'/, '也得能说「不是同一个人」');
+  // 2026-07-30 自查:最初「不是」只放在组件 state 里,刷新一次就又问一遍 ——
+  // 那正是用户这一轮报的「说过的话不算数」那一类毛病,在这儿犯同一个就说不过去。
+  assert.match(panel, /setDismissedMerges\(dismissMerge\(h\.canonical, h\.alias\)\)/,
+    '说过「不是」要落盘,不能只活在这次会话里');
+  assert.match(panel, /setDismissedMerges\(loadDismissedMerges\(\)\)/, '下次打开要读回来');
+  const lib = read('lib/portal/person-merge-suggest.ts');
+  assert.match(lib, /const pairKey = \(canonical: string, alias: string\): string => \[canonical, alias\]\.sort\(\)/,
+    '(A,B) 和 (B,A) 是同一对 —— 不排序的话换个方向又会问一遍');
+  assert.match(read('scripts/storage-key-registry.test.mjs'), /\["nesio-person-merge-dismissed-v1", "durable"\]/,
+    '这是用户的判断,不是缓存 —— 换台设备重新问一遍是错的,所以 durable;' +
+    '不登记的话默认也是 durable,但登记才有人守着');
 }
 
 /* ══ #10 手动录的车能认到接口那辆上 ═══════════════════════════════ */
@@ -184,7 +195,9 @@ function loadTs(rel) {
 
   const panel = read('components/portal/AssetsPanel.tsx');
   assert.match(panel, /bindAssetToTesla\(asset\.id, e\.target\.value\)/, '车资产卡上要有这个入口');
-  assert.match(panel, /就是上面那辆/, '绑上之后卡头要写明,不然还是看着像两台车');
+  assert.match(panel, /\{boundVehicle && ` · \$\{L\(dict, `就是上面那辆/,
+    '绑上之后卡头要写明(条件挂在 boundVehicle 上)—— ' +
+    '包一层 {false && …} 照样能骗过只找文案的断言,变异测试抓到过');
   assert.match(panel, /teslaVehicles=\{tab === 'vehicle' \? teslaVehicles : \[\]\}/,
     '只有车 tab 才谈得上绑车 —— 房产卡上不该冒出一个「这是哪辆车」');
 

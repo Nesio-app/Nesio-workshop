@@ -21,6 +21,7 @@ import { logDropped } from './storage-health';
 import { isDedicatedSyncKey, DEDICATED_SYNC_PREFIXES } from './sync-ownership';
 import { recordCloudRestore } from './cloud-restore-receipt';
 import { isBackupKey } from './storage-manifest';
+import { rehydrateIdbBlobs } from './idb-blob-store';
 // #29:银行流水/账户是「按 id 的集合」,云端那份只能并进来,不能整键替换
 import { idFieldFor, mergeIdSets } from './module-merge';
 import { yieldToMain } from './yield-main';
@@ -253,6 +254,12 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
     };
     try {
       await restoreCombinedBackup(backup, 'replace');
+      // 2026-07-30 自查发现:restoreCombinedBackup 是**直接写 IDB** 的,绕过了各 blob store;
+      // 而 store 的水合是记忆化的,第一次之后再也不重读 —— 数据已经落库了,页面上还是旧那份,
+      // 要等下次冷启动才看得见。只有 newlyAdded>0 那条路会 reload,
+      // 「本机已有、这次并进来一些」这条路不会 —— 那正是并集修好之后最常走的路。
+      // 让对应的 store 重读一遍(hydrate 末尾会 emit,监听组件跟着刷新)。
+      await rehydrateIdbBlobs(appliedKeys);
       // 数据被悄悄改变而用户不知道,本身就是问题(QA:积分 0→150)。留一条一次性回执。
       recordCloudRestore(filledKeys);
     } catch (err) { logDropped('cloud.module_sync_apply', err); }
