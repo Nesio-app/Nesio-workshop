@@ -14,6 +14,8 @@ import type { HealthMetrics, HealthNode } from '@/lib/portal/apple-health';
 import { readLaunchSurfaceContextFromBrowser } from '@/lib/portal/launch-surface.mjs';
 import { L } from '@/lib/portal/i18n';
 import { InfoTip } from './InfoTip';
+// #21:登录态只有一个答案 —— 各处自己 fetch 一遍就会「已登录」和「未登录」同屏
+import { useSessionState } from './use-session-state';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { markBusy } from '@/lib/portal/app-busy';
@@ -131,7 +133,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const [plaidChain, setPlaidChain] = useState<{ count: number } | null>(null);
   // P0 隐私:连接私有数据源(邮箱/日历/银行/Notion/Flomo)必须先登录 —— 匿名授权=无主
   // token,换人用这台设备就能看到你的邮件。null=未知(网络失败不误伤),false 才拦。
-  const [signedIn, setSignedIn] = useState<boolean | null>(null);
+  // #21:三态照旧(null = 问不出来,不误伤),但答案来自唯一那份
+  const session = useSessionState(open);
+  const signedIn: boolean | null = session.state === 'unknown' ? null : session.state === 'signed-in';
   const [importPct, setImportPct] = useState<number | null>(null); // 健康大文件导入进度(0–100)
   const [counts, setCounts] = useState<Record<string, number>>({});
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
@@ -152,11 +156,6 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
 
   useEffect(() => {
     if (!open) return;
-    // 私有数据源连接门:查一次会话(失败=未知,不误伤)
-    fetch('/api/auth/session', { cache: 'no-store' })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: { loggedIn?: boolean } | null) => { if (d != null) setSignedIn(Boolean(d.loggedIn)); })
-      .catch(() => {});
     const savedConn = loadConnectors();
     // 批次 37:有 Notion token 就算已连接 —— 连接(token 有效)和有没有共享页面是两回事。
     // 之前只在「同步成功且返回了页面」才翻成已连接,导致 token 已存但没共享页面时按钮

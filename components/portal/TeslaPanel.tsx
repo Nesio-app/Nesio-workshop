@@ -9,12 +9,14 @@
  * 让停车点/充电站即时进足迹、充电花费进财务(externalId 去重,不重复计)。
  */
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import LoadingCard from './ui/LoadingCard';
 import { fetchWithTimeout } from '@/lib/portal/fetch-timeout';
+// #11:「未插枪」和「本次已充 27.2 kWh」不能同屏;「还没有充电记录」也不能跟它同屏
+import { chargeEnergyLine, hasAnyChargeRecord } from '@/lib/portal/tesla-charge-copy';
 
 interface TeslaDrive {
   vehicleId: string;
@@ -51,11 +53,23 @@ export default function TeslaPanel() {
   // 车在深度休眠时 Tesla 侧可能几十秒不回,连接半挂时浏览器更是无限等 ——
   // 于是 setState('ready'|'error') 都执行不到,页面就永远停在「正在向车问好…」。
   // 15s 到点主动 abort → 走下面的 catch → 显式失败态 + 再试一次(CLAUDE.md 红线)。
+  // #12(2026-07-30 真机:「正在向车问好…」这条加载条一直不消失):
+  // 上一轮已经给 fetch 加了超时,但那是**数据层**的一道闸。真机上还会有两种漏法:
+  //   ① abort 没能生效(标签页被挂起、AbortSignal 被 polyfill 吃掉)→ 谁也不来收尾;
+  //   ② 语言切换让 load 重建、effect 重跑,**两个请求在飞**;先发的后回,
+  //      把已经 ready 的界面又推回 loading / 覆盖成旧结果。
+  // 所以这里补两样:一个请求序号(只认最后一次的结果),
+  // 和 LoadingCard 自己的 timeoutMs 兜底 —— 等待态必须**有尽头**(CLAUDE.md 红线)。
+  const reqRef = useRef(0);
+
   const load = useCallback(async () => {
+    const seq = ++reqRef.current;
+    const mine = () => reqRef.current === seq;
     setState('loading');
     try {
       const res = await fetchWithTimeout('/api/portal/tesla', { cache: 'no-store' }, 15_000);
       const data = await res.json() as { ok?: boolean; error?: string; drives?: TeslaDrive[]; charges?: TeslaCharge[] };
+      if (!mine()) return;   // 已经有更新的一趟在飞,旧结果一律丢弃
       if (!data.ok) {
         setErrMsg(data.error === 'not_connected' || data.error === 'token_expired'
           ? L(dict, 'Tesla 还没连上(或授权已失效)—— 到「设置 → 数据接入 → Tesla」连接一次。', 'Tesla is not linked yet (or auth expired) — connect it from Settings → Data sources → Tesla.')
@@ -74,6 +88,7 @@ export default function TeslaPanel() {
         .then((m) => m.refreshTesla({ drives: (data.drives || []) as never[], charges: (data.charges || []) as never[] }))
         .catch(() => {});
     } catch {
+      if (!mine()) return;
       setErrMsg(L(dict, '这次没等到车的回应 —— 它可能在深度休眠。稍后再试一次。', 'The car did not answer this time — it may be in deep sleep. Try again shortly.'));
       setState('error');
     }
@@ -97,6 +112,11 @@ export default function TeslaPanel() {
   // 有车但一个坐标都没回 = 多半没授权 vehicle_location(独立权限)→ 位置进不了足迹。
   const hasVehicle = liveByVehicle.size > 0;
   const hasAnyLocation = drives.some((d) => d.latitude != null && d.longitude != null);
+
+  const anyChargeRecord = hasAnyChargeRecord(
+    history.length,
+    [...liveByVehicle.values()].map((v) => v.charge?.energyAddedKwh),
+  );
 
   const monthAgo = Date.now() - 30 * 86_400_000;
   const recent = history.filter((c) => new Date(c.at).getTime() >= monthAgo);
@@ -123,7 +143,18 @@ export default function TeslaPanel() {
   };
 
   if (state === 'loading') {
-    return <LoadingCard label={L(dict, '正在向车问好…', 'Checking in with the car…')} lines={3} />;
+    return (
+      <LoadingCard
+        label={L(dict, '正在向车问好…', 'Checking in with the car…')}
+        lines={3}
+        timeoutMs={20_000}
+        onTimeout={() => {
+          reqRef.current += 1;   // 迟到的响应不许再把界面推回去
+          setErrMsg(L(dict, '这次没等到车的回应 —— 它可能在深度休眠。稍后再试一次。', 'The car did not answer this time — it may be in deep sleep. Try again shortly.'));
+          setState('error');
+        }}
+      />
+    );
   }
 
   if (state === 'error') {
@@ -161,7 +192,13 @@ export default function TeslaPanel() {
               <div style={{ marginTop: 'var(--space-3)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>
                   <span>{L(dict, '电量', 'Battery')} {battery}% · {chargingLabel(v.charge?.chargingState)}</span>
-                  {v.charge?.energyAddedKwh ? <span>{L(dict, `本次已充 ${v.charge.energyAddedKwh} kWh`, `+${v.charge.energyAddedKwh} kWh this session`)}</span> : null}
+                  {/* #11:charge_energy_added 断枪后仍保留上一段的读数。不问状态就冠上
+                      「本次」,就成了「未插枪」和「本次已充 27.2 kWh」同屏。
+                      「本次」这个词是有前提的 —— 得真的在这一段里。 */}
+                  {(() => {
+                    const line = chargeEnergyLine(v.charge?.chargingState, v.charge?.energyAddedKwh);
+                    return line ? <span>{L(dict, line.zh, line.en)}</span> : null;
+                  })()}
                 </div>
                 <div style={{ height: 6, borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)', marginTop: 'var(--space-2)', overflow: 'hidden' }}>
                   <div style={{
@@ -201,9 +238,14 @@ export default function TeslaPanel() {
             `Last 30 days: ${recent.length} sessions · ${recentKwh.toFixed(1)} kWh${recentCost > 0 ? ` · $${recentCost.toFixed(2)} total (tracked in Finance)` : ''}`)}
         </p>
       )}
+      {/* #11:原判据是 `history.length === 0`,而 history 只收**没有电量字段的历史行** ——
+          那条带电量的实时行根本不在里面。于是「上面写着 27.2 kWh」和
+          「还没有充电记录」可以同时为真。空态的判据必须是「这一屏一个充电数字都没有」。 */}
       {history.length === 0 ? (
         <p className="nesio-settings-option-hint">
-          {L(dict, '还没有充电记录 —— 下次充电后这里就有了。', 'No charging sessions yet — they will show up after your next charge.')}
+          {anyChargeRecord
+            ? L(dict, '这一段的读数在上面 —— 整段完成后会落成一条记录。', 'The reading above is from the current session — it becomes a record once the session closes.')
+            : L(dict, '还没有充电记录 —— 下次充电后这里就有了。', 'No charging sessions yet — they will show up after your next charge.')}
         </p>
       ) : history.slice(0, 20).map((c, i) => (
         <div key={`${c.at}-${i}`} style={{

@@ -27,6 +27,8 @@ import RoutineSheet from './RoutineSheet';
 import PreviewGuidesSheet from './PreviewGuidesSheet';
 import { getTier, trialDaysLeft, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { L } from '@/lib/portal/i18n';
+import { useSessionState } from './use-session-state';
+import { invalidateSession } from '@/lib/portal/session-state';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
@@ -42,8 +44,10 @@ export default function NesioProfileCard() {
   const locale = usePortalLocale();
   const dict = portalLocaleToDictionaryLocale(locale);
   const [activeSheet, setActiveSheet] = useState<ActiveSheet>(null);
-  const [isSignedIn, setIsSignedIn] = useState(false);
-  const [accountEmail, setAccountEmail] = useState('');
+  // #21:登录态只有一个答案。初值写死 false 就是「未登录」这半句的来源 ——
+  // unknown 时不下结论,那条「登录以跨设备同步」的横幅也不闪一下再消失。
+  const session = useSessionState(true);
+  const isSignedIn = session.state === 'signed-in';
   const [avatarError, setAvatarError] = useState('');
   const avatarInputRef = useRef<HTMLInputElement | null>(null);
   // 批次 95/96:上传头像自动卡通化
@@ -56,15 +60,6 @@ export default function NesioProfileCard() {
   useEffect(() => {
     const profile = loadProfileSettings();
     if (profile.displayName) setDisplayName(profile.displayName);
-
-    // Check auth session(P1-6:顺带取邮箱,账号区显示「登录的是谁」)
-    fetch('/api/auth/session')
-      .then((r) => r.json())
-      .then((d: { loggedIn?: boolean; user?: { email?: string } }) => {
-        setIsSignedIn(Boolean(d?.loggedIn));
-        setAccountEmail(d?.user?.email || '');
-      })
-      .catch(() => {});
 
   }, []);
 
@@ -81,7 +76,7 @@ export default function NesioProfileCard() {
     } catch { /* ignore */ }
     clearProfileIdentity(); // 清除后 PROFILE_UPDATED_EVENT 会让头像自行清空
     setDisplayName(L(dict, '我', 'Me'));
-    setIsSignedIn(false);
+    invalidateSession();   // 登出后下一次读取重新问服务器,不吃缓存
     window.location.href = '/';
   }
 

@@ -22,6 +22,8 @@ import { loadClinical, type StoredClinical } from '@/lib/portal/clinical-store';
 import { readLaunchSurfaceContextFromBrowser } from '@/lib/portal/launch-surface.mjs';
 import { evaluateHealthFindings, type Severity } from '@/lib/portal/health-clinical';
 import { computeRiskScores, type RiskCategory } from '@/lib/portal/health-risk';
+// #28:「血糖正常」和「GMI 偏高」同屏 —— 两边都对,得有一句话说清它们量的不是同一件事
+import { glucoseReconcileNote } from '@/lib/portal/health-reconcile';
 import { buildMonthlyHealthReport, persistHealthReportToMemory, autoPersistLastMonthHealthReport, healthMonths } from '@/lib/portal/health-report';
 import { healthReportRichHtml } from '@/lib/portal/health-report-visual';
 import SegTabs from '../ui/SegTabs';
@@ -394,6 +396,11 @@ function FindingsCard({ data, dict }: { data: HealthMetrics; dict: string }) {
 function RiskCard({ data, dict }: { data: HealthMetrics; dict: string }) {
   const scores = computeRiskScores({ metrics: data.metrics, glucose: data.glucose, profile: data.profile });
   if (!scores.length) return null;
+  /* #28:同屏「血糖达标率良好 / 血糖稳定 = 正常」和「GMI 5.9% · 偏高(糖尿病前期区间)」
+     看着互相打架。三条各自都对 —— TIR 说时间、CV 说起伏、GMI 说平均线,量的不是同一件事。
+     错的是没有任何一句话说明这一点。不删任何一条结论(删了才是骗人),只把关系讲清楚。 */
+  const findings = evaluateHealthFindings({ metrics: data.metrics, glucose: data.glucose });
+  const note = glucoseReconcileNote(findings, scores);
   const color: Record<RiskCategory, string> = { high: 'var(--status-risk)', moderate: 'var(--status-gentle)', low: 'var(--status-go)', info: 'var(--portal-muted)' };
   return (
     <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
@@ -407,6 +414,11 @@ function RiskCard({ data, dict }: { data: HealthMetrics; dict: string }) {
           </p>
         </div>
       ))}
+      {note && (
+        <p className="nesio-settings-option-hint" style={{ margin: '0.4rem 0 0', lineHeight: 1.6, color: 'var(--portal-ink)' }}>
+          {L(dict, note[0], note[1])}
+        </p>
+      )}
       <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{L(dict, '对照已发表评分/常模,数据齐才计算;非诊断', 'Against published scores/norms; computed only when inputs are present; not a diagnosis')}</p>
     </div>
   );

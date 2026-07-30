@@ -16,6 +16,7 @@ import { L, t } from '@/lib/portal/i18n';
 import { usePortalLocale } from './use-portal-locale';
 import { IconChevronRight, IconHalfMoon, IconLink, IconLock, IconMoon, IconShield, IconSun } from './icons';
 import { InfoTip } from './InfoTip';
+import { useSessionState } from './use-session-state';
 import NesioSheet from './ui/NesioSheet';
 import { captureLocationEnabled, setCaptureLocationEnabled } from '@/lib/portal/capture-location';
 import { getFontScale, applyFontScale, type FontScale } from '@/lib/portal/font-scale';
@@ -496,18 +497,14 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const [driveMsg, setDriveMsg] = useState('');
   // 备份目的地选择器:'drive'=Google Drive(免费)/ 'nesio'=Nesio 云(兜底)。默认免费的 Drive。
   const [backupDest, setBackupDest] = useState<'drive' | 'nesio'>('drive');
-  // 批次 151(QA #8):云状态此前写死「0 · 未登录」,不读真实登录态。取真会话,如实显示。
-  const [signedIn, setSignedIn] = useState(false);
+  // #21:这里原来自己 fetch 一遍 /api/auth/session,初值写死 false —— 一路请求慢一点,
+  // 屏幕上就同时出现「已登录」和「未登录」。登录态只有一个答案,走 useSessionState。
+  // (顺带:signedIn 此前算出来根本没人用,是「写了没接上」。)
+  const session = useSessionState(open);
+  const signedIn = session.state === 'signed-in';
   useEffect(() => {
     try { const v = localStorage.getItem('nesio-backup-dest'); if (v === 'nesio' || v === 'drive') setBackupDest(v); } catch { /* ignore */ }
   }, []);
-  useEffect(() => {
-    if (!open) return;
-    fetch('/api/auth/session', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((d: { loggedIn?: boolean }) => setSignedIn(Boolean(d?.loggedIn)))
-      .catch(() => {});
-  }, [open]);
   // 批次202:跨端同步诊断 —— 每端一眼看出 版本/登录/身份戳,定位「为何不同步」。
   const buildSha = (process.env.NEXT_PUBLIC_BUILD_SHA || 'dev').slice(0, 7);
   const [diagLocalAt, setDiagLocalAt] = useState('');
@@ -1225,17 +1222,17 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
     ).catch(() => {});
   }
 
+  // #22(2026-07-30 真机复发):同一屏「试用中 / 规划中 / 你已是 Pro 会员」三句话打架。
+  // 上一轮把状态卡接上了 pro,但**页面另外两处还在看 isPaidPro** ——
+  // 两个判据管三块内容,只要它们分歧(本机 tier=pro 而服务端没确认付费),
+  // 矛盾就会原样回来。会员状态在这一屏只能有一个判据,算一次,处处用它。
+  const trialDays = trialDaysLeft();
+  const pro = isPaidPro || (getTier() === 'pro' && trialDays <= 0);
+
   return (
     <SheetWrap open={open} onClose={onClose} title={L(dict, '会员与权益', 'Membership')}>
       {(() => {
-        const days = trialDaysLeft();
-        // 服务端确认的付费 Pro 永远优先 —— 否则试用期内的付费用户会看到
-        // 顶部「免费试用剩 N 天」+ 底部「你已是 Pro 会员」同页打架(QA ⑥)。
-        const pro = isPaidPro || (getTier() === 'pro' && days <= 0);
-        // ⚠️ pro 必须管住**整张卡**,不只是那枚徽章。
-        // 上一轮修 QA⑥ 时只把 badge 接上了 pro,标题和描述还在看 days > 0 ——
-        // 于是「试用期内已经付费」的账号同屏出现:徽章 PRO + 标题「前 21 天全功能免费…
-        // 试用结束自动回到免费版」+ 页尾「✓ 你已是 Pro 会员」,三句话互相打架。
+        const days = trialDays;
         return (
           <div className="nesio-sub-status-card">
             <div className="nesio-sub-status-badge nesio-sub-status-badge--free">
@@ -1280,7 +1277,7 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
 
       {/* 已经是付费会员就别再摆一排「规划中」的价格 —— 那看着像「还没开卖」,
           和上面刚说的「订阅生效中」正好对撞(用户报的第三重矛盾)。 */}
-      {!isPaidPro && (
+      {!pro && (
         <>
           <p className="nesio-settings-section-label" style={{ marginTop: '1.1rem' }}>{t(locale, 'subFuturePlans')}</p>
           {PLAN_PREVIEWS.map((plan) => (
@@ -1300,7 +1297,7 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
         </>
       )}
 
-      {isPaidPro ? (
+      {pro ? (
         <div style={{ marginTop: '1.2rem', padding: '0.9rem 1rem', borderRadius: 12, textAlign: 'center', background: 'var(--portal-card, #fff)', border: '1px solid var(--status-gentle, #6cbf84)' }}>
           <p style={{ fontWeight: 600, margin: 0, color: 'var(--status-gentle, #4a9d63)' }}>{L(dict, '✓ 你已是 Pro 会员', "✓ You're a Pro member")}</p>
           <p style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', margin: '0.35rem 0 0' }}>{L(dict, '订阅生效中,感谢支持。可在支付渠道管理或取消。', 'Subscription active — thank you. Manage or cancel via your payment provider.')}</p>
@@ -1338,8 +1335,11 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
 export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: SheetProps & { onOpenMembership: () => void; onPickAvatar: () => void }) {
   const locale = usePortalLocale();
   const dict = portalLocaleToDictionaryLocale(locale);
-  const [email, setEmail] = useState('');
-  const [loggedIn, setLoggedIn] = useState(false);
+  // #21:登录态只有一个答案(见 lib/portal/session-state)。
+  // 「问不出来」保持 unknown,不倒退成「未登录」—— 那正是「已登录」和「未登录」同屏的由来。
+  const session = useSessionState(open);
+  const loggedIn = session.state === 'signed-in';
+  const email = session.email;
   const [name, setName] = useState('');
   const [savedTip, setSavedTip] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1349,13 +1349,6 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
     const p = loadProfileSettings();
     setName(p.displayName && p.displayName !== '我' ? p.displayName : '');
     setSavedTip(false);
-    fetch('/api/auth/session', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((d: { loggedIn?: boolean; user?: { email?: string } }) => {
-        setLoggedIn(Boolean(d?.loggedIn));
-        setEmail(d?.user?.email || '');
-      })
-      .catch(() => {});
   }, [open]);
 
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);
