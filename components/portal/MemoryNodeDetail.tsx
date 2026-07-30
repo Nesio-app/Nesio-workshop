@@ -2,7 +2,7 @@
 
 import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
-import { deleteLifeNode, getLifeGraph, searchLifeGraphFuzzy, updateLifeNode, type LifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
+import { deleteLifeNode, getLifeGraph, linkNodes, searchLifeGraphFuzzy, unlinkNodes, updateLifeNode, type LifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
 import { displayStoredLocation } from '@/lib/portal/named-places';
 import type { LocationMeta } from './LocationPicker';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
@@ -1153,10 +1153,11 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             const removeRel = (r: { targetId: string; relation: string }) => {
               try {
                 setRemovedRels((prev) => new Set(prev).add(`${r.relation}:${r.targetId}`));
-                const liveN = g.find((x) => x.id === n.id);
-                if (liveN) updateLifeNode(n.id, { relations: (liveN.relations || []).filter((x) => !(x.targetId === r.targetId && x.relation === r.relation)) });
-                const t = g.find((x) => x.id === r.targetId);
-                if (t) updateLifeNode(t.id, { relations: (t.relations || []).filter((x) => x.targetId !== n.id) });
+                // R1:走 unlinkNodes —— 一次读写把两边解完。
+                // 原来反向那次是 `filter(x => x.targetId !== n.id)`,把**所有**指回来的关系
+                // 都删了:两个节点之间有两种关系时(比如 user_linked + has_checklist),
+                // 解掉一种会把另一种一起带走,而这边还留着。
+                unlinkNodes(n.id, r.targetId, r.relation);
                 logLinkFeedback({ action: 'removed', relation: r.relation, from: n.id, to: r.targetId });
               } catch (err) { console.error('[link] remove_failed', err); setLinkError(`解除出错:${err instanceof Error ? err.message : String(err)}`.slice(0, 120)); }
             };
@@ -1164,8 +1165,9 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               try {
                 if (t.id === n.id || rels.some((x) => x.targetId === t.id)) { setLinkPicking(false); setLinkQuery(''); return; }
                 const liveN = g.find((x) => x.id === n.id);
-                updateLifeNode(n.id, { relations: [...(liveN?.relations || []), { targetId: t.id, relation: 'user_linked' }] });
-                updateLifeNode(t.id, { relations: [...((g.find((x) => x.id === t.id)?.relations) || []), { targetId: n.id, relation: 'user_linked' }] });
+                // R1:一次读写把两边写完 —— 原来是两次 updateLifeNode,
+                // 第二次失败就留下半条关联(这边看得到、那边看不到),没有界面会报错。
+                linkNodes(n.id, t.id, 'user_linked');
                 setAddedRels((prev) => [...prev, { targetId: t.id, relation: 'user_linked' }]);
                 logLinkFeedback({ action: 'added', relation: 'user_linked', from: n.id, to: t.id });
               } catch (err) {
