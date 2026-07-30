@@ -13974,6 +13974,47 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 /* bug3:通讯录同步来的 Gmail 头像 —— 有真头像就别用字母块 */
 .nesio-rel-av--img { object-fit: cover; background: var(--portal-accent-soft); }
 
+/* bug3:定期账单金额右对齐 —— 一列数字要能上下对齐比大小 */
+.nesio-fin-recur-amt--right { margin-left: auto; text-align: right; min-width: 5.5rem; }
+
+/* bug3:账户名用正文黑体(投资页)—— group-h 的小型大写+字距把英文账户名弄成了标签 */
+.nesio-fin-group-h--plain {
+  text-transform: none; letter-spacing: normal;
+  font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-ink);
+}
+
+/* bug3:每一笔流水的「修改」区(流向 / 关联人 / 附件 / 备注) */
+.nesio-fin-txfoot { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); min-width: 0; }
+.nesio-fin-txedit-btn {
+  flex-shrink: 0; border: none; background: transparent; cursor: pointer;
+  font-size: var(--text-xs); color: var(--portal-accent); padding: 0.1rem 0;
+}
+.nesio-fin-txedit { padding-bottom: 0.7rem; }
+.nesio-fin-txedit-row { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: var(--space-2); }
+.nesio-fin-input {
+  width: 100%; border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  padding: 0.4rem 0.6rem; font-size: var(--text-sm); color: var(--portal-ink);
+  background: var(--glass-bg-solid); font-family: var(--font-sans);
+}
+
+/* bug3:商户 / 收入来源 双页交互饼图(左右滑动切换) */
+.nesio-fin-chartpager { touch-action: pan-y; }
+.nesio-fin-chartpager-head {
+  display: flex; align-items: center; justify-content: center;
+  gap: var(--space-2); margin-bottom: var(--space-2);
+}
+.nesio-fin-chartpager-arrow {
+  border: 1px solid var(--portal-line); background: transparent; color: var(--portal-accent);
+  border-radius: var(--radius-pill); width: 1.75rem; height: 1.75rem; line-height: 1;
+  font-size: var(--text-body); cursor: pointer; flex-shrink: 0;
+}
+.nesio-fin-chartpager-dots { display: flex; justify-content: center; gap: 0.35rem; margin-top: var(--space-2); }
+.nesio-fin-chartpager-dot {
+  width: 0.35rem; height: 0.35rem; border-radius: var(--radius-pill);
+  background: var(--portal-line);
+}
+.nesio-fin-chartpager-dot.is-on { background: var(--portal-accent); }
+
 /* bug3:「N 月足迹」左右月份选择器 */
 .nesio-tl-month-nav { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .nesio-tl-month-arrow {

@@ -20,6 +20,7 @@ import {
 import { loadDomainExpenses } from '@/lib/portal/finance-sources';
 import { L } from '@/lib/portal/i18n';
 import AcctLogo from './AcctLogo';
+import { IconCheck } from '../icons';
 import NesioSheet from '../ui/NesioSheet';
 
 export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, currency, dict, onQuickAddAsset, onChanged }: {
@@ -29,6 +30,9 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
   // 账户详情页(点行进入):改名 / 本月消费明细 / 移除
   const [detailId, setDetailId] = useState<string | null>(null);
   const [nameDraft, setNameDraft] = useState('');
+  // bug3:「点击动作完成后页面没有消失,也看不出来是否成功,其实成功了」——
+  // 保存后给一句明确回执(2 秒后自己消失),按钮本身改成对勾图标。
+  const [nameSaved, setNameSaved] = useState(false);
   const names = loadAccountNames();
   const isLiabAcct = (a: BankAccount) => ['credit', 'loan'].includes((a.type || '').toLowerCase());
   const isInvestAcct = (a: BankAccount) => ['investment', 'brokerage'].includes((a.type || '').toLowerCase());
@@ -146,12 +150,19 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
             <div>
               <p style={{ margin: '0 0 4px', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '自定义名称', 'Custom name')}</p>
               <div style={{ display: 'flex', gap: 6 }}>
-                <input value={nameDraft} onChange={(e) => setNameDraft(e.target.value)} placeholder={detailAcct.name}
+                <input value={nameDraft} onChange={(e) => { setNameDraft(e.target.value); setNameSaved(false); }} placeholder={detailAcct.name}
                   style={{ flex: 1, border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', fontSize: 'var(--text-sm)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }} />
-                <button type="button" className="nesio-fin-review-accept" onClick={() => { setAccountName(detailAcct.id, nameDraft); onChanged(); }}>
-                  {L(dict, '保存', 'Save')}
+                {/* bug3:「保存」两个字换成对勾 */}
+                <button type="button" className="nesio-fin-review-accept" aria-label={L(dict, '保存名称', 'Save name')}
+                  onClick={() => { setAccountName(detailAcct.id, nameDraft); setNameSaved(true); onChanged(); window.setTimeout(() => setNameSaved(false), 2000); }}>
+                  <IconCheck size={15} />
                 </button>
               </div>
+              {nameSaved && (
+                <p role="status" style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-go)' }}>
+                  {L(dict, '✓ 改好了', '✓ Saved')}
+                </p>
+              )}
             </div>
             {detailTxs.length > 0 && (
               <div>
@@ -167,7 +178,9 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
                 </div>
               </div>
             )}
-            <button type="button" className="nesio-fin-flowopt" onClick={() => { removeBankAccount(detailAcct.id); setDetailId(null); onChanged(); }}>
+            {/* bug3:底部这行字改红色 —— 它是破坏性动作,不该和普通选项一个颜色 */}
+            <button type="button" className="nesio-fin-flowopt" style={{ color: 'var(--status-risk)' }}
+              onClick={() => { removeBankAccount(detailAcct.id); setDetailId(null); onChanged(); }}>
               {L(dict, '移除此账户(仍连接的账户同步时会回来)', 'Remove account (returns on next sync if still linked)')}
             </button>
           </div>
