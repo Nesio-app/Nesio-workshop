@@ -59,6 +59,51 @@ function stripEmoji(s: string): string {
     .trim();
 }
 
+/**
+ * bug2:物品分类由横条列表改成饼图(纯 SVG,无依赖)。类别色走 --viz-1..8(换皮肤跟着变);
+ * 前 7 类 + 其余合并「其他」,免得小切片挤成毛刺。图例自带类别名,黑体小标题因此可以撤掉。
+ */
+const INV_PIE_COLORS = Array.from({ length: 8 }, (_, i) => `var(--viz-${i + 1})`);
+function InventoryCategoryPie({ rows, dict }: {
+  rows: Array<{ category: string; count: number }>; dict: string;
+}) {
+  const total = rows.reduce((s, r) => s + r.count, 0);
+  if (!total) return null;
+  const top = rows.slice(0, 7);
+  const restCount = rows.slice(7).reduce((s, r) => s + r.count, 0);
+  const shown = restCount > 0 ? [...top, { category: L(dict, '其他', 'Other'), count: restCount }] : top;
+  const R = 52;
+  const C = 2 * Math.PI * R;
+  let acc = 0;
+  const slices = shown.map((r, i) => {
+    const pct = (r.count / total) * 100;
+    const len = (pct / 100) * C;
+    const node = (
+      <circle key={r.category} r={R} fill="none" stroke={INV_PIE_COLORS[i % INV_PIE_COLORS.length]}
+        strokeWidth="26" strokeLinecap="butt" strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-acc} />
+    );
+    acc += len;
+    return { node, pct: Math.round(pct), row: r, color: INV_PIE_COLORS[i % INV_PIE_COLORS.length] };
+  });
+  return (
+    <div style={{ marginTop: 'var(--space-5)' }}>
+      {/* 半径 52 + 描边 26 ⇒ 实心饼(内圈归零),不是环 */}
+      <svg viewBox="0 0 140 140" width="140" height="140" style={{ display: 'block', margin: '0 auto' }} aria-label={L(dict, '物品分类占比', 'Items by category')}>
+        <g transform="translate(70,70) rotate(-90)">{slices.map((s) => s.node)}</g>
+      </svg>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1) var(--space-3)', marginTop: 'var(--space-2)' }}>
+        {slices.map((s) => (
+          <span key={s.row.category} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--text-xs)', color: 'var(--portal-ink)' }}>
+            <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flexShrink: 0 }} />
+            {s.row.category}
+            <span style={{ color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>{s.row.count} · {s.pct}%</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -530,7 +575,6 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
           const unplaced = items.filter((i) => !i.space).length;
           const placed = totalItems - unplaced;
           const placedPct = totalItems ? Math.round((placed / totalItems) * 100) : 0;
-          const maxCat = Math.max(1, ...st.byCategory.map((c) => c.count));
 
           const card: React.CSSProperties = { borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', padding: 'var(--space-4)' };
           const kv: React.CSSProperties = { display: 'block', fontSize: 'var(--text-h2)', fontWeight: 'var(--weight-bold)', color: 'var(--portal-ink)', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' };
@@ -561,23 +605,8 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                 {L(dict, `已归位 ${placed} · 未归位 ${unplaced} · ${st.spaces} 个空间 · ${st.containers} 个容器`, `${placed} placed · ${unplaced} unplaced · ${st.spaces} spaces · ${st.containers} bins`)}
               </p>
 
-              {/* 按分类(横向条,主强调色) */}
-              {st.byCategory.length > 0 && (
-                <>
-                  <p style={sectionLbl}>{L(dict, '按分类', 'By category')}</p>
-                  {st.byCategory.slice(0, 8).map((c) => (
-                    <div key={c.category} style={{ margin: '0 0 var(--space-2)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', marginBottom: '0.2rem' }}>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.category}</span>
-                        <span style={{ color: 'var(--portal-muted)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{c.count}</span>
-                      </div>
-                      <div style={{ height: 6, borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)' }}>
-                        <div style={{ height: '100%', borderRadius: 'var(--radius-pill)', width: `${Math.round((c.count / maxCat) * 100)}%`, background: 'var(--portal-accent)' }} />
-                      </div>
-                    </div>
-                  ))}
-                </>
-              )}
+              {/* bug2:分类横条 → 饼图,「按分类」黑体小标题删掉(饼图自带图例) */}
+              {st.byCategory.length > 0 && <InventoryCategoryPie rows={st.byCategory} dict={dict} />}
 
               {/* bug2:「常用标签」「在处理」两节按图注删除 */}
             </div>

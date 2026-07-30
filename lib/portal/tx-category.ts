@@ -138,7 +138,45 @@ const DETAIL_META: Record<string, [string, string]> = {
   INCOME_INTEREST_EARNED: ['利息收入', 'Interest earned'],
   INCOME_DIVIDENDS: ['分红', 'Dividends'],
   INCOME_TAX_REFUND: ['退税', 'Tax refund'],
+  // bug2(收入来源那一列出现「Contractor / Salary / Transfer From Apps」英文):
+  // 中文界面下未命中 DETAIL_META 的键会被 prettify 兜成 Title Case 英文,读起来像半拉子。
+  // Plaid income / transfer_in 的其余枚举在此补齐中文。
+  INCOME_OTHER_INCOME: ['其他收入', 'Other income'],
+  INCOME_RETIREMENT_PENSION: ['退休金', 'Pension'],
+  INCOME_UNEMPLOYMENT: ['失业金', 'Unemployment'],
+  INCOME_RENTAL: ['租金收入', 'Rental income'],
+  TRANSFER_IN_CASH_ADVANCES_AND_LOANS: ['借入', 'Cash advance / loan'],
+  TRANSFER_IN_DEPOSIT: ['存入', 'Deposit'],
+  TRANSFER_IN_INVESTMENT_AND_RETIREMENT_FUNDS: ['投资转入', 'Investment transfer in'],
+  TRANSFER_IN_SAVINGS: ['储蓄转入', 'Savings transfer in'],
+  TRANSFER_IN_ACCOUNT_TRANSFER: ['账户互转', 'Account transfer'],
 };
+
+/**
+ * 自由文本收入来源的中文映射。Plaid 除枚举外还会给自由文本(Contractor / Salary /
+ * Transfer From Apps),中文界面下 prettify 会把它变成 Title Case 英文 —— 半拉子。
+ * 这里按关键词给中文名;**不能**统一压成「其他收入」,否则不同来源会显示成同名两行。
+ */
+const FREE_TEXT_INCOME: Array<[RegExp, string]> = [
+  [/contractor|freelance|1099/i, '劳务收入'],
+  [/payroll|salary|wage/i, '工资'],
+  [/bonus/i, '奖金'],
+  [/commission/i, '佣金'],
+  [/transfer\s*from|from\s*apps|zelle|venmo|paypal|cash\s*app/i, '转入'],
+  [/refund|rebate|cashback/i, '退款 / 返现'],
+  [/interest/i, '利息收入'],
+  [/dividend/i, '分红'],
+  [/rent/i, '租金收入'],
+  [/reimburse/i, '报销'],
+];
+
+/** 中文界面下给自由文本收入来源一个中文名;认不出来的保留原文(信息不能丢)。 */
+function localizeFreeTextIncome(detail: string, dict: string): string {
+  const pretty = prettify(detail);
+  if (dict === 'en') return pretty;
+  for (const [re, zh] of FREE_TEXT_INCOME) if (re.test(detail)) return zh;
+  return pretty; // 认不出的保留原文 —— 压成「其他收入」会让多个来源显示成同名行
+}
 
 /**
  * detailed 细分类显示名:命中表 → 友好名;*_OTHER_*(如 FOOD_AND_DRINK_OTHER_FOOD_AND_DRINK)
@@ -153,5 +191,6 @@ export function categoryDetailLabel(detail: string, dict: string = 'zh'): string
   for (const p of Object.keys(PFC_META)) {
     if (d.startsWith(`${p}_`)) return prettify(d.slice(p.length + 1));
   }
-  return prettify(d);
+  // 收入来源列表把 detail 直接当标题展示,自由文本在中文界面下要有中文名
+  return localizeFreeTextIncome(d, dict);
 }

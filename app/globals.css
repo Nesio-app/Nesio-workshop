@@ -13438,8 +13438,11 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-body-ledger, .nesio-beauty-care { display: flex; flex-direction: column; gap: var(--space-3); }
 .nesio-bl-section { display: flex; flex-direction: column; gap: var(--space-3); }
 .nesio-bl-lede {
-  margin: 0; font-family: var(--font-serif);
-  font-size: var(--text-h3); font-weight: var(--weight-semibold); color: var(--portal-ink);
+  /* bug2(护理页「字体不符合要求」):原来是 --font-serif + semibold —— Noto Serif SC 在 iOS
+     上没有本地字体,级联落到系统衬线,渲出来偏粗且带繁体字形,与同页其余文字两种字。
+     统一到设计系统正文 sans + 常规字重。 */
+  margin: 0; font-family: var(--font-sans);
+  font-size: var(--text-h3); font-weight: var(--weight-regular); color: var(--portal-ink);
 }
 .nesio-bl-goalrow {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);

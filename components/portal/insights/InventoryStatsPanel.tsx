@@ -14,6 +14,54 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
+/**
+ * bug2:物品分类由横条列表改成饼图(纯 SVG,无依赖)。类别色走设计系统 --viz-1..8,
+ * 换皮肤跟着变;前 7 类 + 其余合并「其他」,免得小切片挤成毛刺。点任意处进物品页。
+ */
+const PIE_COLORS = Array.from({ length: 8 }, (_, i) => `var(--viz-${i + 1})`);
+function CategoryPie({ rows, onOpen, dict }: {
+  rows: Array<{ category: string; count: number }>; onOpen: () => void; dict: string;
+}) {
+  const total = rows.reduce((s, r) => s + r.count, 0);
+  if (!total) return null;
+  const top = rows.slice(0, 7);
+  const restCount = rows.slice(7).reduce((s, r) => s + r.count, 0);
+  const shown = restCount > 0
+    ? [...top, { category: L(dict, '其他', 'Other'), count: restCount }]
+    : top;
+  const R = 52;
+  const C = 2 * Math.PI * R;
+  let acc = 0;
+  const slices = shown.map((r, i) => {
+    const pct = (r.count / total) * 100;
+    const len = (pct / 100) * C;
+    const node = (
+      <circle key={r.category} r={R} fill="none" stroke={PIE_COLORS[i % PIE_COLORS.length]}
+        strokeWidth="26" strokeLinecap="butt" strokeDasharray={`${len} ${C - len}`} strokeDashoffset={-acc} />
+    );
+    acc += len;
+    return { node, pct: Math.round(pct), row: r, color: PIE_COLORS[i % PIE_COLORS.length] };
+  });
+  return (
+    <button type="button" onClick={onOpen}
+      style={{ display: 'block', width: '100%', marginTop: 'var(--space-5)', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+      {/* 半径 52 + 描边 26 ⇒ 实心饼(内圈归零),不是环 */}
+      <svg viewBox="0 0 140 140" width="140" height="140" style={{ display: 'block', margin: '0 auto' }} aria-label={L(dict, '物品分类占比', 'Items by category')}>
+        <g transform="translate(70,70) rotate(-90)">{slices.map((s) => s.node)}</g>
+      </svg>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1) var(--space-3)', marginTop: 'var(--space-2)' }}>
+        {slices.map((s) => (
+          <span key={s.row.category} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--text-xs)', color: 'var(--portal-ink)' }}>
+            <span aria-hidden style={{ width: 8, height: 8, borderRadius: 2, background: s.color, flexShrink: 0 }} />
+            {s.row.category}
+            <span style={{ color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>{s.row.count} · {s.pct}%</span>
+          </span>
+        ))}
+      </div>
+    </button>
+  );
+}
+
 export default function InventoryStatsPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [items, setItems] = useState<InventoryItem[]>([]);
@@ -78,25 +126,8 @@ export default function InventoryStatsPanel() {
         {L(dict, `已归位 ${placed} · 未归位 ${unplaced} · ${st.spaces} 个空间 · ${st.containers} 个容器`, `${placed} placed · ${unplaced} unplaced · ${st.spaces} spaces · ${st.containers} bins`)}
       </p>
 
-      {/* 按分类 */}
-      {st.byCategory.length > 0 && (
-        <>
-          <p style={sectionLbl}>{L(dict, '按分类', 'By category')}</p>
-          {/* 长得像入口就得是入口(QA):点分类行进物品页 */}
-          {st.byCategory.slice(0, 8).map((c) => (
-            <button key={c.category} type="button" onClick={openInventory}
-              style={{ display: 'block', width: '100%', margin: '0 0 var(--space-2)', padding: 0, border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', marginBottom: '0.2rem' }}>
-                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.category}</span>
-                <span style={{ color: 'var(--portal-muted)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{c.count}</span>
-              </div>
-              <div style={{ height: 6, borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)' }}>
-                <div style={{ height: '100%', borderRadius: 'var(--radius-pill)', width: `${Math.round((c.count / maxCat) * 100)}%`, background: 'var(--portal-accent)' }} />
-              </div>
-            </button>
-          ))}
-        </>
-      )}
+      {/* bug2:分类横条图 → 饼图,「按分类」黑体小标题删掉(饼图自带图例) */}
+      {st.byCategory.length > 0 && <CategoryPie rows={st.byCategory} onOpen={openInventory} dict={dict} />}
 
       {/* bug2:「常用标签」「在处理」两节按图注删除 */}
 
