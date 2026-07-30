@@ -33,6 +33,28 @@ const portal = code(read('components/portal/Portal.tsx'));
   assert.ok(z < 940, `抬层 z=${z} 压到了 elevated(940)—— 从洞察里再开的抽屉会被导航挡住`);
 }
 
+/* ── ①' 抬了 z-index 还得给 pointer-events ─────────────────────────────
+   2026-07-30 用户**第二次**报同一处:「Bar 在洞察里不管用」。
+   上一轮只修了 z-index —— 那只解决了「露出来」。洞察是 Radix Dialog 的 modal 层,
+   它挂载时 DismissableLayer 会把 `document.body.style.pointerEvents` 设成 none,
+   只有 dialog 自己是 auto。所以导航虽然画在最上面,点击照样被 body 那层吃掉:
+   看得见、点不着,而且和「代码写错了」在表现上一模一样。
+
+   **z-index 和 pointer-events 是一对**,在被 modal 盖住的世界里少给一个就等于没做。 */
+{
+  const block = css.match(/\.nesio-bottom-nav--above-overlay\s*\{[^}]*\}/);
+  assert.ok(block, '.nesio-bottom-nav--above-overlay 不见了');
+  assert.match(block[0], /pointer-events:\s*auto/,
+    'Radix modal 会把 body 设成 pointer-events:none —— 只抬 z-index 的话导航' +
+    '「看得见点不着」。这一处已经因此报过两次了');
+
+  // 焦点陷阱也得放行它:点按钮会先 focus,焦点被拽回 sheet 会把这次点击丢掉。
+  const sheet = code(read('components/portal/ui/NesioSheet.tsx'));
+  assert.match(sheet, /nesio-bottom-nav--above-overlay/,
+    'NesioSheet 的焦点陷阱要放行这条导航 —— 否则手指点上去先 focus、' +
+    '焦点立刻被拽回 sheet,点击在某些浏览器上就此丢掉');
+}
+
 // ── ② 导航上每个「会打开点什么」的回调,都得先关洞察浮层 ──
 {
   const navProps = portal.match(/<PortalBottomNav[\s\S]*?\/>/);

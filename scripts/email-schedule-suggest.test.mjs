@@ -34,7 +34,7 @@ function loadTs(rel) {
   return mod.exports;
 }
 
-const { suggestScheduleFromEmail } = loadTs('lib/portal/email-schedule-suggest.ts');
+const { suggestScheduleFromEmail, alreadyScheduled } = loadTs('lib/portal/email-schedule-suggest.ts');
 const SENT = '2026-07-30T10:00:00Z';
 
 /* ── ① 日期 + 钟点齐全才认 ────────────────────────────────────────── */
@@ -135,6 +135,50 @@ const SENT = '2026-07-30T10:00:00Z';
   const reg = read('scripts/storage-key-registry.test.mjs');
   assert.match(reg, /\["nesio-mail-suggest-v1", "durable"\]/,
     '「不用了」是一个决定 —— 在手机上按掉的建议换台设备又冒出来,等于没记住');
+}
+
+/* ── ⑦ 查重:日程里已经有了就不再问一遍 ─────────────────────────────
+   2026-07-30 真机实锤(用户:「如果日程已经有了,就不重复。要自动检查」):
+   一封 "THIS SATURDAY — Virtual Orientation" 被确认加成了提醒,而同一场活动
+   "Sea Cadets Virtual Orientation" 本来就在 Google 日历里 —— 同一件事在同一页
+   出现两遍,名字还不一样,看着像两个约。 */
+{
+  const at = (h, m = 0) => new Date(2026, 7, 1, h, m).getTime();
+  const cal = [{ ms: at(9, 0), title: 'Sea Cadets Virtual Orientation' }];
+
+  assert.ok(
+    alreadyScheduled(at(9, 0), 'THIS SATURDAY — Virtual Orientation', cal),
+    '同一个钟点上已经有事了 —— 不管两边名字写得多不一样,那就是同一件事。' +
+    '时间才是一个约的身份',
+  );
+  assert.ok(alreadyScheduled(at(9, 45), 'x', cal), '±60 分钟内算同一件');
+  assert.ok(!alreadyScheduled(at(14, 0), '完全不同的下午会', cal), '差了 5 小时就是两件事,别误杀');
+
+  // 标题一模一样也算(哪怕时间被改过)
+  assert.ok(
+    alreadyScheduled(at(20, 0), '  sea cadets   VIRTUAL orientation ', cal),
+    '标题去空格、忽略大小写后相同 → 同一件事',
+  );
+
+  // **不做模糊/语义相似** —— 那既会把两场真不同的会判成一件,也认不出改了名的同一件。
+  assert.ok(
+    !alreadyScheduled(at(14, 0), 'Virtual Orientation 第二场', cal),
+    '不许靠公共子串认 —— "Virtual Orientation" 这种词组两场不同的活动都会有',
+  );
+
+  assert.ok(!alreadyScheduled(NaN, 'x', cal), '算不出时刻就不下判断(宁可多问一次)');
+}
+
+/* ── ⑧ 从邮件确认过来的是「日程」,不是「其它」 ───────────────────── */
+{
+  const panel = strip(read('components/portal/insights/SchedulePanel.tsx'));
+  assert.match(panel, /kind: 'event', sourceEmailId/,
+    "从邮件加进来的要标成 'event' —— 用户原话:「邮件里添加过来的称谓正常日程," +
+    '不是我的提醒」。和倒垃圾、交房租并列成「其它」是分错了类');
+  assert.match(panel, /alreadyScheduled\(ms, r\.title, taken\)/,
+    '建议之前必须先查重 —— 日历里已经有的事不该再问一遍');
+  const rem = strip(read('lib/portal/schedule-reminders.ts'));
+  assert.match(rem, /'chore' \| 'bill' \| 'event' \| 'other'/, "ReminderKind 要有 'event'");
 }
 
 console.log('email-schedule-suggest: OK(日期+钟点齐全才认 / 不认相对词 / 不凑远处 / 确认才写)');

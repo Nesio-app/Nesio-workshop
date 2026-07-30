@@ -47,7 +47,7 @@ export interface DailyReportReminder {
   title: string;
   /** 墙上时钟 `YYYY-MM-DDTHH:mm` */
   at: string;
-  kind?: 'chore' | 'bill' | 'other';
+  kind?: 'chore' | 'bill' | 'event' | 'other';
 }
 
 /** 各域确定性引擎的判定(gatherDomainInsights 的形状,原样带过来)。 */
@@ -56,6 +56,21 @@ export interface DailyReportDomainInsight {
   severity: 'flag' | 'attention';
   title: string;
   detail: string;
+}
+
+/**
+ * 「往前看」的一条 —— 未来两周里**确定会发生**的事。
+ *
+ * 红线:这里**只放已知日期,不放任何推算**(2026-07-30 定,用户拍板窗口 14 天)。
+ * 「照这个花法这个月餐饮会超」那类推测第一版一律不做:一旦推不准,它会连累
+ * 前面那些确定的部分 —— 用户开始怀疑整份日报,连「牛奶后天过期」都不信了。
+ * 将来真要加推测,必须**逐条标明口径和依据**,并且和这一段分开放。
+ */
+export interface DailyReportAhead {
+  /** YYYY-MM-DD */
+  date: string;
+  title: string;
+  kind: 'event' | 'reminder' | 'expiry';
 }
 
 /** 在途订单今天有动静的那几条(来自邮件本地抽取的 orderStatus / eta)。 */
@@ -90,6 +105,22 @@ export interface DailyReportInput {
   meals?: string[];
   /** 在途订单今天的动静 */
   orders?: DailyReportOrder[];
+  /**
+   * **昨天那份日报里的判定集**(原始,未格式化)。有它才能出「新进展」——
+   * 差分而不是快照。没有(第一天 / 老节点)就退回出快照,标题也跟着换,不装作有进展。
+   */
+  yesterdayInsights?: DailyReportDomainInsight[];
+  /** 未来两周里确定会发生的事(已知日期,无推算) */
+  ahead?: DailyReportAhead[];
+  /**
+   * 我自己说过想做、却一直没动的那几条(见 lib/portal/loose-threads.ts)。
+   *
+   * 这是对「未来机会」的答复。Nesio 唯一**有依据**说「机会」的,就是这个 ——
+   * 「你该学这个 / 这本书适合你 / 该联系某人了」那种需要判断「什么对你好」,
+   * 是这个仓库的红线;而且一旦推不准,会连累前面那些确定的部分:
+   * 用户开始怀疑整份日报,连「牛奶后天过期」都不信了。
+   */
+  threads?: string[];
 }
 
 /**
@@ -99,7 +130,8 @@ export type DailyReportSectionId =
   | 'action'    // 要你动:到点的提醒 / flag 级判定 / 到货
   | 'calendar'  // 按时间走
   | 'today'     // 今天的底色:天气 / 穿 / 吃 / 练
-  | 'domain'    // 变了什么:attention 级判定
+  | 'domain'    // 新进展(有昨天可比时是差分)/ 这几面(第一天时是快照)
+  | 'ahead'     // 往前看:未来两周确定会发生的事(默认折叠)
   | 'email'     // 邮件:只给一行汇总 + 出口,不复述内容
   | 'memory';   // 念念还记得
 
@@ -138,6 +170,21 @@ const MAX_DOMAIN = 4;
 const MAX_PER_DOMAIN = 2;
 /** 今天的日程最多列几条,余下折成「还有 N 件」。 */
 const MAX_EVENTS = 6;
+/**
+ * 「新进展」里**渐变**最多占几条。
+ *
+ * 有些指标每天必然动一格(「和妈妈上次通话 11 天前 → 12 天前」「还剩 3 天到期 → 2 天」)。
+ * 那是时间在走,不是进展。不给它单独封顶的话,这一段会天天被这类句子占满,
+ * 而真正的事件(新冒出来的 / 不再提示的)被挤到看不见 —— 那是「一类饿死另一类」的老病。
+ * 所以排序是 **新出现 → 不再提示 → 渐变**,渐变垫底且封顶。
+ * (不去猜「哪个指标算自然流逝」—— 那要语义判断,正是这个仓库反复踩的坑;
+ *  改用配额,并且把两个数值都摆出来让用户自己看。)
+ */
+const MAX_CHANGED = 2;
+/** 「往前看」最多列几条 —— 两周的东西全倒出来能有二三十条。 */
+const MAX_AHEAD = 6;
+/** 「往前看」的窗口:两周(2026-07-30 用户拍板)。 */
+export const AHEAD_DAYS = 14;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 function dateKey(d: Date): string { return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; }
@@ -241,6 +288,48 @@ function insightLine(it: DailyReportDomainInsight, locale: 'zh' | 'en'): string 
   return `${tag} · ${it.title}${it.detail ? ` —— ${it.detail}` : ''}`;
 }
 
+/**
+ * 判定的**稳定 key** —— 同一件事在不同日子必须算同一个 key。
+ *
+ * title 里带着数值(「空腹血糖 7 天均值 6.4」)。原样比的话,昨天 6.7、今天 6.4
+ * 会被判成「昨天那条没了 + 今天新出一条」—— 那是最典型的假差分,而且两条都错。
+ * 把数字抹成 # 再比。同一个 domain 内抹完撞车的概率很低,而且撞车的后果是
+ * 「本该报变化的报成了没变化」—— 安全方向(少说一句,不是说错一句)。
+ */
+function insightKey(it: DailyReportDomainInsight): string {
+  return `${it.domain}|${it.title.replace(/[\d.]+/g, '#')}`;
+}
+
+interface InsightDiff {
+  fresh: DailyReportDomainInsight[];                                      // 今天新出现的
+  changed: Array<{ now: DailyReportDomainInsight; before: string }>;      // 还在,但数值变了
+  gone: DailyReportDomainInsight[];                                       // 昨天有、今天不再提示
+}
+
+/**
+ * 和昨天那份日报比,算出**进展**。
+ *
+ * 为什么要差分:快照说的是「血糖 6.4」,那不是进展;「从 6.7 降到 6.4」才是。
+ * 天天推同一句快照,读第三天就会被当成噪音自动跳过 —— 而它本来是这份日报里
+ * 最有价值的一段。
+ */
+export function diffInsights(
+  today: readonly DailyReportDomainInsight[],
+  yesterday: readonly DailyReportDomainInsight[],
+): InsightDiff {
+  const before = new Map(yesterday.map((it) => [insightKey(it), it]));
+  const todayKeys = new Set(today.map(insightKey));
+  const fresh: DailyReportDomainInsight[] = [];
+  const changed: InsightDiff['changed'] = [];
+  for (const it of today) {
+    const was = before.get(insightKey(it));
+    if (!was) { fresh.push(it); continue; }
+    if (was.title !== it.title) changed.push({ now: it, before: was.title });
+  }
+  const gone = yesterday.filter((it) => !todayKeys.has(insightKey(it)));
+  return { fresh, changed, gone };
+}
+
 /** 跨面前瞻日报生成(纯函数)。 */
 export function buildDailyReport(input: DailyReportInput): DailyReport {
   const locale: 'zh' | 'en' = input.locale === 'en' ? 'en' : 'zh';
@@ -281,7 +370,9 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
      「一切正常」不进这一段 —— 没有要你动的事,这一段整段不出现。 */
   const reminderLines = todayReminders.slice(0, ACTION_QUOTA.reminders).map((r) => {
     const t = wallClockTime(r.at);
-    const kind = r.kind === 'bill' ? tt(locale, '账单', 'Bill') : r.kind === 'chore' ? tt(locale, '家务', 'Chore') : '';
+    const kind = r.kind === 'bill' ? tt(locale, '账单', 'Bill')
+      : r.kind === 'chore' ? tt(locale, '家务', 'Chore')
+        : r.kind === 'event' ? tt(locale, '日程', 'Event') : '';
     return `${t ? t + ' ' : ''}${r.title}${kind ? ` · ${kind}` : ''}`;
   });
   const flagLines = flags.slice(0, ACTION_QUOTA.flags).map((it) => insightLine(it, locale));
@@ -321,10 +412,67 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
     sections.push({ id: 'today', title: tt(locale, '今天', 'Today'), lines: todayLines });
   }
 
-  /* ── ④ 变了什么(attention 级)───────────────────────────────── */
-  const domainLines = attentions.map((it) => insightLine(it, locale));
+  /* ── ④ 新进展(有昨天可比)/ 这几面(第一天)──────────────────────
+     快照说的是「血糖 6.4」,那不是进展;「从 6.7 降到 6.4」才是。天天推同一句快照,
+     读第三天就会被当成噪音自动跳过 —— 而这本该是整份日报里最有价值的一段。
+     没有昨天的冻结件时退回快照,**标题也跟着换** —— 不装作有进展。 */
+  const yesterday = input.yesterdayInsights;
+  let domainLines: string[];
+  let domainTitle: string;
+  if (yesterday && yesterday.length) {
+    const d = diffInsights(insights, yesterday);
+    // 真事件优先:新出现 → 不再提示;渐变垫底且封顶(见 MAX_CHANGED)。
+    const lines: string[] = [];
+    for (const it of d.fresh) lines.push(`${insightLine(it, locale)}${tt(locale, ' · 新', ' · new')}`);
+    for (const it of d.gone) {
+      const label = DOMAIN_LABEL[it.domain];
+      const tag = label ? tt(locale, label[0], label[1]) : it.domain;
+      lines.push(`${tag} · ${it.title}${tt(locale, ' · 不再提示了', ' · cleared')}`);
+    }
+    for (const c of d.changed.slice(0, MAX_CHANGED)) {
+      lines.push(`${insightLine(c.now, locale)}${tt(locale, ` · 昨天是「${c.before}」`, ` · was “${c.before}”`)}`);
+    }
+    domainLines = lines.slice(0, MAX_DOMAIN);
+    domainTitle = tt(locale, '新进展', 'What moved');
+  } else {
+    domainLines = attentions.map((it) => insightLine(it, locale));
+    domainTitle = tt(locale, '这几面', 'Across your life');
+  }
   if (domainLines.length) {
-    sections.push({ id: 'domain', title: tt(locale, '这几面有变化', 'What changed'), lines: domainLines });
+    sections.push({ id: 'domain', title: domainTitle, lines: domainLines });
+  }
+
+  /* ── ⑤ 往前看:未来两周确定会发生的事 ────────────────────────────
+     **只有已知日期,没有任何推算**(见 DailyReportAhead 的红线)。
+     按日期由近到远;超出配额的如实说「还有 N 件」,不静默截断。 */
+  /* 窗口在**这里**也过一遍。采集端(daily-report-sources)已经过滤过,但那是好意,
+     不是保证 —— 调用方多传一条超窗的进来,纯函数照单全收的话,「两周」这个标题就在说谎,
+     而且契约在纯函数这一侧根本测不到。自己的输出自己负责。 */
+  const aheadFrom = todayKey;
+  const aheadUntilDate = new Date(now); aheadUntilDate.setDate(aheadUntilDate.getDate() + AHEAD_DAYS);
+  const aheadUntil = dateKey(aheadUntilDate);
+  const aheadAll = (input.ahead || [])
+    .filter((a) => a && a.title && /^\d{4}-\d{2}-\d{2}$/.test(a.date))
+    .filter((a) => a.date > aheadFrom && a.date <= aheadUntil)   // 今天不算(今天有自己的段)
+    .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  if (aheadAll.length) {
+    const fmtDay = (ymd: string) => {
+      const d = new Date(`${ymd}T12:00:00`);
+      if (Number.isNaN(d.getTime())) return ymd;
+      return locale === 'en'
+        ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        : `${d.getMonth() + 1}月${d.getDate()}日`;
+    };
+    const kindTag = (k: DailyReportAhead['kind']) => (
+      k === 'reminder' ? tt(locale, '提醒', 'Reminder')
+        : k === 'expiry' ? tt(locale, '到期', 'Expires')
+          : tt(locale, '日程', 'Event'));
+    const shown = aheadAll.slice(0, MAX_AHEAD);
+    const lines = shown.map((a) => `${fmtDay(a.date)} ${a.title} · ${kindTag(a.kind)}`);
+    if (aheadAll.length > MAX_AHEAD) {
+      lines.push(tt(locale, `还有 ${aheadAll.length - MAX_AHEAD} 件`, `${aheadAll.length - MAX_AHEAD} more`));
+    }
+    sections.push({ id: 'ahead', title: tt(locale, '往前看 · 两周', 'Two weeks ahead'), lines });
   }
 
   /* ── ⑤ 邮件:只给一行汇总 + 出口,**不复述内容** ────────────────
@@ -340,7 +488,16 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
   }
 
   /* ── ⑥ 念念还记得 ──────────────────────────────────────────── */
-  if (notes.length) sections.push({ id: 'memory', title: tt(locale, '念念还记得', 'From your memory'), lines: notes });
+  const threads = (input.threads || []).filter(Boolean).slice(0, 2);
+  const memoryLines = [
+    ...notes,
+    // 线头跟在回忆后面,并且**说清它是什么** —— 不加这个前缀的话它和「去年今天你写下」
+    // 混成一堆,看着像又一条怀旧,而它其实是一件你自己搁下的事。
+    ...threads.map((t) => tt(locale, `还没接上:${t}`, `Still open: ${t}`)),
+  ];
+  if (memoryLines.length) {
+    sections.push({ id: 'memory', title: tt(locale, '念念还记得', 'From your memory'), lines: memoryLines });
+  }
 
   /* ── 一句话概览 ─────────────────────────────────────────────── */
   const headlineParts: string[] = [];
@@ -372,8 +529,8 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
   const empty = !wText
     && todayEvents.length === 0 && upcoming.length === 0
     && actionLines.length === 0 && domainLines.length === 0
-    && todayLines.length === 0
-    && emails.length === 0 && notes.length === 0;
+    && todayLines.length === 0 && aheadAll.length === 0
+    && emails.length === 0 && memoryLines.length === 0;
 
   return { date: todayKey, title, greeting, headline, sections, markdown, empty };
 }

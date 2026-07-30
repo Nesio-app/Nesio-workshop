@@ -20,7 +20,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
 import {
-  IconNote, IconCloudSun, IconCalendar, IconMail, IconBook, IconCheckSquare, IconTrendingUp,
+  IconNote, IconCloudSun, IconCalendar, IconMail, IconBook, IconCheckSquare, IconTrendingUp, IconClock,
 } from './icons';
 
 // 段落图标。Record<DailyReportSectionId, …> 是穷举类型 —— 日报加新段时这里漏一个
@@ -29,7 +29,8 @@ const SECTION_ICON: Record<DailyReport['sections'][number]['id'], React.Componen
   action: IconCheckSquare,     // 先处理这几件
   calendar: IconCalendar,      // 今日日程
   today: IconCloudSun,         // 今天(天气/穿/吃/练)
-  domain: IconTrendingUp,      // 这几面有变化
+  domain: IconTrendingUp,      // 新进展 / 这几面
+  ahead: IconClock,            // 往前看(未来两周)
   email: IconMail,
   memory: IconBook,
 };
