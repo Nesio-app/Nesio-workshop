@@ -13,7 +13,7 @@
  * 车 tab 在这套之上多一块实时快照(TeslaPanel:状态/里程/充电/能耗),那块是接口来的,只读。
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -28,6 +28,7 @@ import {
   listCareRecords, addCareRecord, removeCareRecord, upcomingCare, nextDueDate,
   ASSET_CARE_EVENT, type CareKind, type CareRecord,
 } from '@/lib/portal/asset-care';
+import { compressToDataUrl, putLocalImage, getLocalImage } from '@/lib/portal/local-image-store';
 import { buildRelationships } from '@/lib/portal/relationships';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 
@@ -278,7 +279,29 @@ function CareSection({ assetId, records, people, dict }: {
   const [date, setDate] = useState(todayStr());
   const [amount, setAmount] = useState('');
   const [provider, setProvider] = useState('');   // personKey 或自由文本
+  const [contact, setContact] = useState('');
   const [every, setEvery] = useState('');
+  // 附件(合同/发票/维修单):压过再落 IndexedDB,这里只留 assetId。
+  const [files, setFiles] = useState<string[]>([]);
+  const [upErr, setUpErr] = useState('');
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function pickFiles(list: FileList | null) {
+    if (!list?.length) return;
+    setUpErr('');
+    const added: string[] = [];
+    for (const f of Array.from(list).slice(0, 5)) {
+      try {
+        const url = await compressToDataUrl(f);
+        const id = `care-att-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+        if (await putLocalImage(id, url)) added.push(id);
+        else setUpErr(L(dict, '存不下了 —— 本机空间满了。', 'Could not save — device storage is full.'));
+      } catch {
+        setUpErr(L(dict, '这张没读出来,换一张试试。', 'Could not read that file — try another.'));
+      }
+    }
+    if (added.length) setFiles((cur) => [...cur, ...added]);
+  }
 
   function submit() {
     if (!kind || !title.trim()) return;
@@ -300,9 +323,12 @@ function CareSection({ assetId, records, people, dict }: {
       ...(hasAmt ? { amount: amt } : {}),
       ...(exp ? { expenseId: exp.id } : {}),
       ...(person ? { providerPersonId: person.key, providerName: person.name } : provider.trim() ? { providerName: provider.trim() } : {}),
+      ...(contact.trim() ? { providerContact: contact.trim() } : {}),
+      ...(files.length ? { attachments: files } : {}),
       ...(Number(every) > 0 ? { everyMonths: Number(every) } : {}),
     });
-    setKind(null); setTitle(''); setAmount(''); setProvider(''); setEvery(''); setDate(todayStr());
+    setKind(null); setTitle(''); setAmount(''); setProvider(''); setContact(''); setEvery(''); setDate(todayStr());
+    setFiles([]); setUpErr('');
   }
 
   return (
@@ -331,6 +357,15 @@ function CareSection({ assetId, records, people, dict }: {
           <datalist id={`care-people-${assetId}`}>
             {people.map((p) => <option key={p.key} value={p.key}>{p.name}</option>)}
           </datalist>
+          <input className="nesio-assets-input" value={contact} onChange={(e) => setContact(e.target.value)}
+            placeholder={L(dict, '联系方式(电话 / 微信 / 邮箱,可空)', 'Contact (phone / email, optional)')} />
+          {/* 附件:合同、发票、维修单拍一张存着 —— 压过再落本机 IndexedDB,不上传。 */}
+          <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+            onChange={(e) => { void pickFiles(e.target.files); e.target.value = ''; }} />
+          <button type="button" className="nesio-assets-link" onClick={() => fileRef.current?.click()}>
+            {files.length ? L(dict, `已附 ${files.length} 张 · 再加一张`, `${files.length} attached · add more`) : L(dict, '+ 附一张单据', '+ Attach a document')}
+          </button>
+          {upErr && <p className="nesio-settings-option-hint" style={{ margin: 0, color: 'var(--status-risk)' }}>{upErr}</p>}
           {kind !== 'tax' && (
             <input className="nesio-assets-input" value={every} onChange={(e) => setEvery(e.target.value)}
               inputMode="numeric" placeholder={L(dict, '多久做一次(月;空=一次性)', 'Every N months (blank = one-off)')} />
@@ -354,6 +389,7 @@ function CareSection({ assetId, records, people, dict }: {
             <span className="m">
               {r.date}
               {r.providerName ? ` · ${r.providerName}` : ''}
+              {r.providerContact ? ` · ${r.providerContact}` : ''}
               {r.everyMonths ? L(dict, ` · 每 ${r.everyMonths} 个月`, ` · every ${r.everyMonths}mo`) : ''}
               {r.nextDate ? L(dict, ` · 下次 ${r.nextDate}`, ` · next ${r.nextDate}`) : ''}
             </span>
@@ -362,7 +398,42 @@ function CareSection({ assetId, records, people, dict }: {
             {r.amount ? <span className="a">{money(r.amount)}</span> : null}
             <button type="button" className="x" aria-label={L(dict, '删除', 'Delete')} onClick={() => removeCareRecord(r.id)}>✕</button>
           </div>
+          {(r.attachments?.length ?? 0) > 0 && <CareAttachments ids={r.attachments!} dict={dict} />}
         </div>
+      ))}
+    </div>
+  );
+}
+
+/** 记录上的单据缩略图。图存在 IndexedDB,这里按需读、卸载时释放 objectURL。 */
+function CareAttachments({ ids, dict }: { ids: string[]; dict: string }) {
+  const [urls, setUrls] = useState<Record<string, string>>({});
+  const madeRef = useRef<string[]>([]);
+  const key = ids.join(',');
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      for (const id of key.split(',')) {
+        if (!alive || !id) continue;
+        const u = await getLocalImage(id);
+        if (!alive || !u) continue;
+        madeRef.current.push(u);
+        setUrls((m) => ({ ...m, [id]: u }));
+      }
+    })();
+    return () => { alive = false; };
+  }, [key]);
+  useEffect(() => () => { madeRef.current.forEach((u) => { try { URL.revokeObjectURL(u); } catch { /* 已释放 */ } }); }, []);
+  return (
+    <div style={{ width: '100%', display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
+      {ids.map((id) => (
+        <a key={id} href={urls[id] || undefined} target="_blank" rel="noreferrer"
+          aria-label={L(dict, '看这张单据', 'Open document')}
+          style={{
+            width: 48, height: 48, borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)',
+            background: `${urls[id] ? `url(${urls[id]}) center/cover no-repeat` : 'var(--portal-accent-soft)'}`,
+            display: 'block',
+          }} />
       ))}
     </div>
   );

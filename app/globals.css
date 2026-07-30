@@ -20122,7 +20122,7 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   cursor: pointer;
 }
 .nesio-assets-chip.on { background: var(--portal-accent); color: var(--sheet-opaque, #fff); }
-.nesio-assets-rec { display: flex; align-items: baseline; gap: var(--space-2); padding: var(--space-2) 0; border-top: 1px solid var(--portal-line); }
+.nesio-assets-rec { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) 0; border-top: 1px solid var(--portal-line); }
 .nesio-assets-rec .l { flex: 1; min-width: 0; }
 .nesio-assets-rec .t { display: block; font-size: var(--text-sm); color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nesio-assets-rec .m { display: block; font-size: var(--text-xs); color: var(--portal-muted); }

@@ -11,6 +11,7 @@
 
 import { createBlobStore } from './idb-blob-store';
 import { reportStorageDropped } from './storage-health';
+import { deleteLocalImage } from './local-image-store';
 
 export const ASSET_CARE_KEY = 'nesio-asset-care-v1';
 export const ASSET_CARE_EVENT = 'nesio-asset-care-updated';
@@ -33,6 +34,13 @@ export interface CareRecord {
   /** 服务方:优先关联到 people 里的人;没有对应的人就留个名字。 */
   providerPersonId?: string;
   providerName?: string;
+  /** 服务方联系方式(电话/微信/邮箱,原样存,不解析)。 */
+  providerContact?: string;
+  /**
+   * 附件(合同/发票/维修单的照片)。存的是 local-image-store 的 assetId,
+   * 图本身在 IndexedDB —— 这张表里只放 id,不塞 dataURL(会把 blob 撑爆)。
+   */
+  attachments?: string[];
   /** 周期(月)。填了才算「会再来一次」的事,才有下次时间。 */
   everyMonths?: number;
   /** 下次什么时候 YYYY-MM-DD。没显式填就按 date + everyMonths 推。 */
@@ -87,6 +95,8 @@ export function removeCareRecord(id: string): CareRecord | null {
   const hit = all.find((r) => r.id === id) || null;
   if (!hit) return null;
   store.save(all.filter((r) => r.id !== id));
+  // 附件跟着记录一起走 —— 留在 IDB 里就是没人认领的孤儿图,只占空间。
+  for (const a of hit.attachments ?? []) void deleteLocalImage(a);
   return hit;
 }
 
