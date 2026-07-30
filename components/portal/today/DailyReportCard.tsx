@@ -11,19 +11,42 @@ import type { DailyReport, DailyReportSection } from '@/lib/portal/daily-report'
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { IconNote, IconCloudSun, IconCalendar, IconMail, IconBook } from '../icons';
+import { IconNote, IconCloudSun, IconCalendar, IconMail, IconBook, IconCheckSquare, IconTrendingUp } from '../icons';
 
+// 2026-07-30 跨面改版:段落从 4 个变 6 个。加新段时这张表必须同步 ——
+// Record<DailyReportSectionId, …> 是穷举类型,漏一个 tsc 直接红,不会静默渲染成空图标。
 const SECTION_ICON: Record<DailyReportSection['id'], React.ComponentType<{ size?: number }>> = {
-  weather: IconCloudSun,
-  calendar: IconCalendar,
+  action: IconCheckSquare,     // 先处理这几件
+  calendar: IconCalendar,      // 今日日程
+  today: IconCloudSun,         // 今天(天气/穿/吃/练)
+  domain: IconTrendingUp,      // 这几面有变化
   email: IconMail,
   memory: IconBook,
 };
 
-export function DailyReportCard({ report }: { report: DailyReport | null }) {
+export function DailyReportCard({ report, pending = false }: { report: DailyReport | null; pending?: boolean }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [open, setOpen] = useState(false);
-  if (!report) return null;
+
+  /* 还没到 08:00 —— 说清楚它几点来,而不是让这块地方空着。
+     2026-07-30 用户拍板「早上 8 点定稿、当天不再变」;天没亮时当天的天气/邮件本来
+     也没同步全,先出一份再在中午自己改口,正是他要治的那个毛病。 */
+  if (!report) {
+    if (!pending) return null;
+    return (
+      <div className="nesio-proactive-card" style={{ borderColor: 'var(--portal-line)' }}>
+        <div className="nesio-proactive-card-inner">
+          <span className="nesio-proactive-card-icon" aria-hidden><IconNote size={18} /></span>
+          <div className="nesio-proactive-card-text">
+            <p className="nesio-proactive-card-title">{L(dict, '今日日报', 'Daily report')}</p>
+            <p className="nesio-proactive-card-body">
+              {L(dict, '早上 8:00 出 —— 到点后它一整天不再变。', 'Ready at 8:00 — then it stays put all day.')}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -41,8 +64,9 @@ export function DailyReportCard({ report }: { report: DailyReport | null }) {
             onClick={() => setOpen((v) => !v)}
             aria-expanded={open}
             style={{
-              marginTop: '0.5rem', fontSize: '0.74rem', fontWeight: 600,
-              padding: '0.28rem 0.7rem', borderRadius: 'var(--radius-sm, 12px)',
+              marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)',
+              padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-sm, 12px)',
+              minHeight: 'var(--tap-min, 44px)',
               border: '1px solid var(--portal-accent-border)', background: 'transparent',
               color: 'var(--portal-accent)', cursor: 'pointer',
             }}
@@ -51,21 +75,22 @@ export function DailyReportCard({ report }: { report: DailyReport | null }) {
           </button>
 
           {open && (
-            <div style={{ marginTop: '0.6rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+            <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
               {report.sections.map((s) => {
                 const SectionIcon = SECTION_ICON[s.id];
                 return (
                 <div key={s.id}>
-                  <p style={{ margin: 0, fontSize: '0.76rem', fontWeight: 600, color: 'var(--portal-ink)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <p style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                     <SectionIcon size={15} /> {s.title}
                   </p>
-                  <ul style={{ margin: '0.2rem 0 0', paddingLeft: '1.1rem', color: 'var(--portal-muted)', fontSize: '0.76rem', lineHeight: 1.55 }}>
+                  <ul style={{ margin: 'var(--space-1) 0 0', paddingLeft: 'var(--space-4)', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', lineHeight: 1.55 }}>
                     {s.lines.map((line, i) => <li key={i}>{line}</li>)}
                   </ul>
                 </div>
               );})}
-              <p style={{ margin: 0, fontSize: '0.68rem', color: 'var(--portal-muted)' }}>
-                {L(dict, '已存进记忆 · 在「记忆」里可回看', 'Saved to Memory — revisit it under Memory')}
+              <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                {L(dict, '早上 8:00 定稿 · 已存进记忆,洞察页可回看往日',
+                        'Fixed at 8:00 · saved to Memory — past days under Insights')}
               </p>
             </div>
           )}

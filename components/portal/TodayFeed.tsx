@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { portalLocaleToDictionaryLocale, loadProfileSettings } from '@/lib/portal/profile';
+import { reportDue } from '@/lib/portal/daily-report-persist';
 import { useProfileAvatar } from './use-profile-avatar';
 import { getPoints } from '@/lib/platform/rewards-engine';
 import NesioMark from './NesioMark';
@@ -466,7 +467,13 @@ export default function TodayFeed({
         {!quietAll && showWrapped && <WrappedCard onDismiss={dismissWrapped} />}
 
         {/* 每日图文日报(未来预测区首张;仅登录 + 开关开 + 有内容时,todayReport 已受私据门)*/}
-        {canUsePrivateData && <DailyReportCard report={todayReport} />}
+        {/* pending:开着日报但还没到 08:00 —— 卡上说清它几点来,而不是空着一块。 */}
+        {canUsePrivateData && (
+          <DailyReportCard
+            report={todayReport}
+            pending={loadProfileSettings().dailyReportEnabled && !reportDue(new Date())}
+          />
+        )}
 
         {/* 回访再触达:来过好几回但某功能没碰过 → 轻轻探一句(全局两天一条,可稍后/不再提醒)*/}
         {canUsePrivateData && !quietAll && (

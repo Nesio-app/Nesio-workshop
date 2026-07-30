@@ -1,7 +1,17 @@
 /**
- * 行为契约:每日图文日报生成器(块1,纯函数)。
- * 锁死:前瞻(今天/临近安排)、天气区间、邮件/记忆分节、headline 概览、markdown 形状、
- * 空态判定(自动预生成据此跳过)、externalId 幂等键(同一天稳定)。
+ * 行为契约:每日日报生成器(纯函数)。
+ * 锁死:日程升序、天气区间与降水概率、记忆分节、headline 概览、markdown 形状、
+ * 无 emoji、空态判定(自动预生成据此跳过)、externalId 幂等键(同一天稳定)。
+ *
+ * ── 2026-07-30 改了三条,都是**用户拍板推翻旧行为**,不是回归 ──────────────
+ *   ① 天气不再独立成节 —— 并进「今天」那一段(和 穿什么/吃什么/练什么 放一起)。
+ *      跨面改版后天气只是「今天的底色」之一,单独一节撑不起来。
+ *   ② 日程窗口从「今天剩余」改成**当天整天**。用户定了「早上 8 点定稿、当天不再变」,
+ *      而人可能中午才打开这份「早上八点的日报」—— 用「今天剩余」的话早上那场会
+ *      就从里面消失了,跟他早上看到的对不上。
+ *   ③ 邮件从「列出亮点」改成**只给一行汇总 + 出口**。用户已经收到一份从邮件总结的
+ *      日报,在这儿再抄一遍是更差的重复品,还会把只有 Nesio 知道的那几段挤下去。
+ * 这三条的新判据在 scripts/daily-report-crossface.test.mjs 里正面钉住。
  */
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -26,7 +36,7 @@ const iso = (h, m = 0) => new Date(2026, 6, 9, h, m, 0).toISOString();
     events: [
       { title: '牙医', start: iso(15, 0), location: '诊所' },
       { title: '晨会', start: iso(9, 30) },
-      { title: '昨天的事', start: iso(6, 0) }, // 早于 now-30min → 不算今天剩余
+      { title: '一早已经开完的会', start: iso(6, 0) }, // 当天整天窗口 → 照样列(见文件头②)
     ],
     emailHighlights: ['账单到期提醒', '快递已发货'],
     memoryNotes: ['给妈妈买降压药'],
@@ -34,15 +44,16 @@ const iso = (h, m = 0) => new Date(2026, 6, 9, h, m, 0).toISOString();
   assert.equal(r.empty, false, '有内容不空');
   const cal = r.sections.find((s) => s.id === 'calendar');
   assert.ok(cal, '有日程节');
-  // 今日剩余按时间升序:晨会(9:30)在牙医(15:00)前;过去的事不列
-  assert.ok(cal.lines[0].includes('晨会'), '今日日程按时间升序,晨会在前');
-  assert.ok(cal.lines.some((l) => l.includes('牙医')), '牙医在列');
-  assert.ok(!cal.lines.some((l) => l.includes('昨天的事')), '已过去的安排不列入今日剩余');
-  assert.ok(r.sections.some((s) => s.id === 'weather' && s.lines[0].includes('18~27°C')), '天气报区间');
-  assert.ok(r.sections.some((s) => s.id === 'weather' && s.lines[0].includes('降水概率 60%')), '高降水概率并入');
-  assert.ok(r.sections.some((s) => s.id === 'email' && s.lines.length === 2), '邮件亮点分节');
+  // 当天整天,按时间升序
+  assert.ok(cal.lines[0].includes('一早已经开完的会'), '当天日程按时间升序(最早的在前)');
+  assert.ok(cal.lines.some((l) => l.includes('晨会')) && cal.lines.some((l) => l.includes('牙医')), '其余都在列');
+  const today = r.sections.find((s) => s.id === 'today');
+  assert.ok(today && today.lines[0].includes('18~27°C'), '天气报区间(现在并进「今天」那一段)');
+  assert.ok(today.lines[0].includes('降水概率 60%'), '高降水概率并入');
+  const mail = r.sections.find((s) => s.id === 'email');
+  assert.equal(mail.lines.length, 1, '邮件只给一行汇总,不复述内容(见文件头③)');
   assert.ok(r.sections.some((s) => s.id === 'memory' && s.lines[0].includes('降压药')), '记忆提醒分节');
-  assert.ok(/今天 2 个安排/.test(r.headline), 'headline 概览今日安排数(仅今天剩余的 2 个)');
+  assert.ok(/今天 3 个安排/.test(r.headline), 'headline 概览当天安排数');
   assert.ok(r.title.startsWith('每日日报'), 'title 字段');
   assert.ok(r.markdown.startsWith(`# ${r.title}`), 'markdown 标题 = title');
   assert.ok(r.markdown.includes('## 今日日程'), 'markdown 含日程节');
@@ -54,6 +65,7 @@ const iso = (h, m = 0) => new Date(2026, 6, 9, h, m, 0).toISOString();
   const r = buildDailyReport({ now: NOW, locale: 'zh', events: [], weather: { temperatureC: 20, condition: '晴' } });
   const cal = r.sections.find((s) => s.id === 'calendar');
   assert.ok(cal.lines[0].includes('专注深度工作'), '空日程给深度工作文案');
+  assert.ok(r.sections.some((s) => s.id === 'today'), '天气在「今天」那一段');
   assert.equal(r.empty, false, '有天气 → 非空');
 }
 

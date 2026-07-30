@@ -20425,3 +20425,65 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-schedfilter-btn.pri { background: var(--portal-accent); color: var(--sheet-opaque, #fff); border-color: var(--portal-accent); }
 .nesio-schedfilter-btn:disabled { opacity: 0.45; cursor: default; }
 .nesio-schedfilter-hint { margin: 0; font-size: var(--text-xs); color: var(--portal-muted); line-height: 1.5; }
+
+/* ── 往日日报(洞察页,2026-07-30)──────────────────────────────────────── */
+.nesio-drhist-list { list-style: none; margin: 0; padding: 0; }
+.nesio-drhist-item {
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md);
+  background: var(--glass-bg-solid, var(--portal-bg));
+  margin-bottom: var(--space-2);
+  overflow: hidden;
+}
+.nesio-drhist-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: var(--space-3) var(--space-4);
+  min-height: var(--tap-min, 44px);
+}
+.nesio-drhist-date {
+  flex: none;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-accent);
+}
+.nesio-drhist-headline {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nesio-drhist-body {
+  padding: 0 var(--space-4) var(--space-3);
+  border-top: 1px solid var(--portal-line);
+}
+.nesio-drhist-h {
+  margin: var(--space-3) 0 var(--space-1);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-ink);
+}
+.nesio-drhist-li {
+  margin: 0 0 var(--space-1);
+  padding-left: var(--space-3);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--portal-muted);
+  position: relative;
+}
+.nesio-drhist-li::before {
+  content: '·';
+  position: absolute;
+  left: 0;
+  color: var(--portal-accent);
+}

@@ -12,7 +12,8 @@ import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { loadProfileSettings, portalLocaleToDictionaryLocale, PROFILE_UPDATED_EVENT } from '@/lib/portal/profile';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { buildDailyReport, type DailyReport } from '@/lib/portal/daily-report';
-import { autoPersistTodayReport } from '@/lib/portal/daily-report-persist';
+import { autoPersistTodayReport, reportAnchor, reportDue, readTodayReport } from '@/lib/portal/daily-report-persist';
+import { collectDailyReportExtras, outfitNoteFor, collectOrders } from '@/lib/portal/daily-report-sources';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext, type TodayReceipt } from '@/lib/platform/view-models/today-view-model';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
@@ -198,22 +199,52 @@ export function useTodayData(canUsePrivateData: boolean) {
 
         const uiLocale = portalLocaleToDictionaryLocale(loadProfileSettings().locale);
 
-        // 每日 AI 图文日报(块3):私据门已在此 if(canUsePrivateData) 内 —— 取材日历/邮件/记忆。
-        // 开着才生成 + 每日幂等自动存记忆(autoPersistTodayReport 内部再判开关/空/当天已生成)。
+        /* ── 每日日报(2026-07-30 跨面改版)────────────────────────────────
+           私据门已在此 if(canUsePrivateData) 内 —— 取材日历/邮件/记忆/各域判定。
+
+           **定稿口径 = 当天 08:00**(用户拍板「早上 8 点、当天不再变」)。
+           PWA 没有可靠后台定时,所以做不到 8 点整跑一次;改成把 now 钉在 08:00 ——
+           buildDailyReport 是纯函数,同样输入必然同样输出,钉死 now 就是定稿。
+           10 点才打开也拿到「早上八点那份」,里面照样有 9 点那场会。
+           早于 8 点则不出今天这份(reportDue 为假)—— 天没亮时当天的天气/邮件本来
+           也没同步全,出一份半成品再在中午自己改口,正是用户抱怨的那件事。 */
         {
           const profile = loadProfileSettings();
+          const anchor = reportAnchor(now);
+          const due = reportDue(now);
+          const todayEvents = calEvents.filter((e) => {
+            const t = new Date(e.start).getTime();
+            const d0 = new Date(anchor); d0.setHours(0, 0, 0, 0);
+            const d1 = new Date(anchor); d1.setHours(23, 59, 59, 999);
+            return Number.isFinite(t) && t >= d0.getTime() && t <= d1.getTime();
+          });
+          // 跨面取数:七个域走已有的单一判定源,另加提醒/健身/吃/在途订单。
+          const extras = collectDailyReportExtras(anchor);
           const reportInput = {
             displayName: profile.displayName,
-            now,
+            now: anchor,
             locale: uiLocale,
-            weather: weather ? { temperatureC: weather.temperatureC, condition: weather.condition, forecastNote: weather.forecastNote } : undefined,
+            weather: weather ? { temperatureC: weather.temperatureC, condition: weather.condition, forecastNote: weather.forecastNote, tempMinC: weather.tempMinC, tempMaxC: weather.tempMaxC, precipProb: weather.precipProb } : undefined,
             events: calEvents.map((e) => ({ title: e.title, start: e.start, end: e.end, location: e.location, calendarName: e.calendarName })),
             emailHighlights: latestEmailSignals.map((s) => s.cardTitle || s.subject).filter(Boolean).slice(0, 3),
             memoryNotes: updated.memoryNotes.slice(0, 3),
+            ...extras,
+            // 穿什么要今天的天气 + 今天的日历当输入,这两样这里手上就有,
+            // 不回存储再读一遍(会读到另一个快照)。
+            outfitNote: outfitNoteFor(weather ?? undefined, todayEvents, anchor),
+            // 用 updated.allNodes,不用 allNodes 那个 state —— 后者是**上一轮渲染**的值
+            // (本轮的 setAllNodes 就在几行之前,还没生效),会让日报比列表慢一天。
+            orders: collectOrders(updated.allNodes),
           };
-          const report = buildDailyReport(reportInput);
-          if (!stale()) setTodayReport(profile.dailyReportEnabled && !report.empty ? report : null);
           autoPersistTodayReport(reportInput, { enabled: profile.dailyReportEnabled, now });
+          // 优先读**今天已经冻结的那一份**(存记忆时连 sections 一起存了)。
+          // 只钉 now 是不够的 —— 日历窗口本来就是整天,锚点几乎不影响它;白天真正会变的是
+          // **输入**:新邮件到了、某个域的判定翻了。不读回冻结件的话,同一天刷新两次
+          // 还是两份不同的日报,用户抱怨的就是这个。冻结件缺失(第一次 / 老节点)才现算。
+          const frozen = readTodayReport(updated.allNodes, now);
+          const report = frozen ?? buildDailyReport(reportInput);
+          // 还没到点就先不出 —— 卡上会说「今天的日报早上 8:00 见」(见 DailyReportCard)。
+          if (!stale()) setTodayReport(profile.dailyReportEnabled && due && !report.empty ? report : null);
           // AI 判决(实弹):结构化信号批量送判,落 ledger;取数惰性(30min 闸后才算)。
           // 付费门双层:客户端 canUsePaidCloudAi 前置拦下(免费档不出网),路由端
           // guardAiRoute + requirePaidCloudAi 强制。llm-sweep 已被吸收拆除。

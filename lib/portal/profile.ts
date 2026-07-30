@@ -86,7 +86,7 @@ export function portalLocaleToDictionaryLocale(locale: PortalLocale): 'zh' | 'en
 
 export function loadProfileSettings(fallbackName = '我'): PortalProfileSettings {
   if (typeof window === 'undefined') {
-    return { displayName: fallbackName, avatarUrl: '', avatarStoragePath: '', locale: 'zh', coachStyle: 'warm', dailyReportEnabled: false };
+    return { displayName: fallbackName, avatarUrl: '', avatarStoragePath: '', locale: 'zh', coachStyle: 'warm', dailyReportEnabled: true };
   }
   try {
     const localeRaw = localStorage.getItem(KEYS.locale);
@@ -100,10 +100,17 @@ export function loadProfileSettings(fallbackName = '我'): PortalProfileSettings
       avatarStoragePath: localStorage.getItem(KEYS.avatarStoragePath) || '',
       locale,
       coachStyle,
-      dailyReportEnabled: localStorage.getItem(KEYS.dailyReportEnabled) === '1',
+      // 2026-07-30 用户拍板:每日日报**默认开**。
+      // 判据写成 !== '0' 而不是 === '1' —— 差别在**明确关过的人**:
+      //   · 从没设过(null)→ 开(新默认)
+      //   · 设过 '1' → 开
+      //   · 设过 '0' → **关**(他亲手关的,不许被新默认覆盖回来)
+      // 写成 === '1' 的话老用户全都是关的,「默认开」等于没生效;
+      // 写成 `raw !== '0'` 之外的任何宽松写法都会把「亲手关掉」这个决定抹掉。
+      dailyReportEnabled: localStorage.getItem(KEYS.dailyReportEnabled) !== '0',
     };
   } catch {
-    return { displayName: fallbackName, avatarUrl: '', avatarStoragePath: '', locale: 'zh', coachStyle: 'warm', dailyReportEnabled: false };
+    return { displayName: fallbackName, avatarUrl: '', avatarStoragePath: '', locale: 'zh', coachStyle: 'warm', dailyReportEnabled: true };
   }
 }
 
