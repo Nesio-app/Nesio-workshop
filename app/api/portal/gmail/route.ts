@@ -267,19 +267,32 @@ async function extractNodes(messages: GmailMessage[]): Promise<object[]> {
     }
     return undefined;
   };
-  return parsed.map((n) => {
-    const attrs = (n.attributes && typeof n.attributes === 'object') ? { ...(n.attributes as Record<string, unknown>) } : {};
-    const emailId = findSourceId(attrs, n.name);
-    const cls = byEmail.get(emailAddrOf(String(attrs.source ?? attrs.from ?? '')));
-    const tags = Array.isArray(n.tags) ? [...n.tags] : [];
-    if (cls?.category === 'updates' && !tags.includes('通知')) tags.push('通知');
-    if (cls?.important && !tags.includes('重要')) tags.push('重要');
-    return {
-      ...n,
-      tags,
-      attributes: { ...attrs, ...(emailId ? { emailId } : {}), ...(cls ? { mailCategory: cls.category } : {}) },
-    };
-  });
+  const byId = new Map(messages.map((m) => [m.id, m] as const));
+  return parsed
+    .map((n) => {
+      const attrs = (n.attributes && typeof n.attributes === 'object') ? { ...(n.attributes as Record<string, unknown>) } : {};
+      const emailId = findSourceId(attrs, n.name);
+      const cls = byEmail.get(emailAddrOf(String(attrs.source ?? attrs.from ?? '')));
+      const tags = Array.isArray(n.tags) ? [...n.tags] : [];
+      if (cls?.category === 'updates' && !tags.includes('通知')) tags.push('通知');
+      if (cls?.important && !tags.includes('重要')) tags.push('重要');
+      // 认不出源邮件 → 没有 emailId → 客户端 externalKey 为 null → 每轮富化都新建一个节点
+      // (真机:同一封邮件在日程页出现多条)。宁可丢这条富化,也不制造去重不掉的重复。
+      if (!emailId) return null;
+      const src = byId.get(emailId);
+      return {
+        ...n,
+        tags,
+        attributes: {
+          ...attrs,
+          emailId,
+          // 邮件时间以**邮件头**为准:AI 抽取常不带 date,缺了下游只能退回 createdAt 排序。
+          ...(src ? { date: header(src, 'date'), from: header(src, 'from') } : {}),
+          ...(cls ? { mailCategory: cls.category } : {}),
+        },
+      };
+    })
+    .filter((n): n is NonNullable<typeof n> => n !== null);
 }
 
 function metadataPreview(messages: GmailMessage[]) {
