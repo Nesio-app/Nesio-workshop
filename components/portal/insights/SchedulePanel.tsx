@@ -21,6 +21,10 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { IconStar, IconFlag } from '../icons';
 import { loadPins, togglePin, PINS_UPDATED_EVENT } from '@/lib/portal/pins';
+import {
+  buildChips, matchesChip, listCustomFilters, addCustomFilter, removeCustomFilter,
+  scheduleFiltersReady, SCHEDULE_FILTERS_EVENT, type CustomFilter,
+} from '@/lib/portal/schedule-filters';
 
 type SubTab = 'calendar' | 'email';
 
@@ -35,6 +39,12 @@ interface Row {
   badge?: string;     // 「有记录」/「会议记录」
   query: string;      // 兜底:详情打不开时按原话去记忆页搜
   node: LifeNode;     // 图29:点一下直接开这条记忆的详情
+  /**
+   * Google 自己给的标签(2026-07-30 用户要求「用谷歌的 filter 先筛选」):
+   * 日历项 = 事件来自哪个日历;邮件 = Gmail 系统分类 + 重要性预测。
+   * 这些不是我们猜的,所以最适合当默认筛选面。
+   */
+  googleLabels: string[];
 }
 
 const AD_RE = /退订|unsubscribe|优惠|促销|限时|折扣|秒杀|大促|% ?off|sale\b|coupon|deal[s]?\b/i;
@@ -201,6 +211,19 @@ export default function SchedulePanel() {
   // 待删(可撤销)。离开本页时立刻结算,见下面的 effect。
   const [pending, setPending] = useState<{ row: Row; timer: number } | null>(null);
   const [delErr, setDelErr] = useState('');
+  // 一排筛选标签(2026-07-30):自定义定义落盘,选中项不落盘。
+  const [customs, setCustoms] = useState<CustomFilter[]>([]);
+  const [activeChip, setActiveChip] = useState<string | null>(null);
+  const [addingFilter, setAddingFilter] = useState(false);
+  const [fName, setFName] = useState('');
+  const [fKeyword, setFKeyword] = useState('');
+  useEffect(() => {
+    const read = () => setCustoms(listCustomFilters());
+    void scheduleFiltersReady().then(read);
+    read();
+    window.addEventListener(SCHEDULE_FILTERS_EVENT, read);
+    return () => window.removeEventListener(SCHEDULE_FILTERS_EVENT, read);
+  }, []);
 
   // 星标 = 全 app 那一个收藏夹(lib/portal/pins),不是这一页私有的标记。
   // 第一版把它写成节点上的「星标」标签,结果是:这里加的星在记忆页收藏夹里看不到、
@@ -307,6 +330,11 @@ export default function SchedulePanel() {
           badge: a.meetingRecordId ? L(dict, '有记录', 'notes') : undefined,
           query: n.name,
           node: n,
+          googleLabels: [
+            // 来自哪个日历 —— Google 日历里用户自己分的那些栏,天然就是他要的筛选面
+            ...(typeof a.calendarName === 'string' && a.calendarName ? [a.calendarName] : []),
+            ...(a.meetingRecordId ? [L(dict, '有记录', 'Has notes')] : []),
+          ],
         });
       } else if ((n.tags || []).includes('meeting-notes') && !a.calendarNodeId) {
         // 未挂到日历的独立会议记录(Granola/录音)也留在日程里
@@ -318,6 +346,7 @@ export default function SchedulePanel() {
           badge: L(dict, '会议记录', 'meeting'),
           query: stripPrefix(n.name),
           node: n,
+          googleLabels: [L(dict, '会议记录', 'Meeting notes')],
         });
       }
     }
@@ -362,6 +391,7 @@ export default function SchedulePanel() {
       })
       .map((n) => {
         const a = n.attributes || {};
+        const cat = typeof a.mailCategory === 'string' ? a.mailCategory : '';
         return {
           id: n.id,
           title: n.name,
@@ -369,6 +399,14 @@ export default function SchedulePanel() {
           meta: typeof a.from === 'string' ? a.from : (typeof a.sender === 'string' ? a.sender : ''),
           query: n.name,
           node: n,
+          // Gmail 自己的判定:重要性预测 + 系统分类。promotions/social 在上面已被毙掉,
+          // 所以这里长不出那两个标签 —— 正合「只给筛得出东西的标签」。
+          googleLabels: [
+            ...((n.tags || []).includes('重要') ? [L(dict, '重要', 'Important')] : []),
+            ...(cat === 'updates' ? [L(dict, '通知', 'Updates')] : []),
+            ...(cat === 'forums' ? [L(dict, '论坛', 'Forums')] : []),
+            ...(cat === 'personal' ? [L(dict, '个人', 'Personal')] : []),
+          ],
         } as Row;
       })
       // 展示层去重:同一封邮件(emailId)只留一条。同步侧已按 emailId upsert,
@@ -384,9 +422,24 @@ export default function SchedulePanel() {
         const my = new Date(y.dateIso).getTime() || 0;
         return my - mx;
       });
-  }, [nodes]);
+  }, [nodes, dict]);
 
-  const rows = (sub === 'calendar' ? calendarRows : emailRows).filter((r) => !gone.has(r.id));
+  const baseRows = (sub === 'calendar' ? calendarRows : emailRows).filter((r) => !gone.has(r.id));
+
+  /* ── 一排筛选标签(2026-07-30 用户要求)────────────────────────────────
+     标签面 = Google 自己的分类(日历名 / Gmail 系统分类与重要性)+ 用户自建的关键词。
+     两个 tab 各算各的:日历名不该出现在邮件那一排。
+     选中项**不落盘** —— 记住上次的筛选会让人下次进来以为数据少了。 */
+  const chips = useMemo(
+    () => buildChips(baseRows, customs),
+    // baseRows 每次渲染都是新数组,用它当依赖会每帧重算;按内容摘要算。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseRows.map((r) => `${r.id}:${r.googleLabels.join('|')}`).join(','), customs],
+  );
+  // 切 tab 时清掉选中 —— 邮件那排的标签在日历里根本不存在,留着就是筛出 0 条。
+  useEffect(() => { setActiveChip(null); }, [sub]);
+  const chosen = activeChip ? chips.find((c) => c.id === activeChip) ?? null : null;
+  const rows = chosen ? baseRows.filter((r) => matchesChip(r, chosen)) : baseRows;
 
   const fmtDay = (iso: string) => {
     const d = new Date(iso);
@@ -413,11 +466,69 @@ export default function SchedulePanel() {
         ariaLabel={L(dict, '日程视图', 'Schedule view')}
       />
 
+      {/* ── 一排筛选标签(2026-07-30 用户要求「用谷歌的 filter 先筛选,我也可以自定义」)──
+          左边是 Google 自己给的(日历名 / Gmail 系统分类与重要性),右边是用户自建的关键词。
+          Google 标签只在**当前数据里真有**的时候才出现;自定义标签哪怕这会儿命中 0 条
+          也留着 —— 那是用户亲手建的东西,悄悄藏起来他会以为丢了(数字会写 0)。 */}
+      {(chips.length > 0 || customs.length > 0 || baseRows.length > 0) && (
+        <div className="nesio-schedfilter">
+          <div className="nesio-schedfilter-row" role="group" aria-label={L(dict, '筛选', 'Filters')}>
+            <button
+              type="button"
+              className={`nesio-schedfilter-chip${activeChip === null ? ' on' : ''}`}
+              onClick={() => setActiveChip(null)}
+            >
+              {L(dict, '全部', 'All')} <span className="n">{baseRows.length}</span>
+            </button>
+            {chips.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={`nesio-schedfilter-chip${activeChip === c.id ? ' on' : ''}${c.kind === 'custom' ? ' mine' : ''}`}
+                onClick={() => setActiveChip(activeChip === c.id ? null : c.id)}
+                onContextMenu={c.kind === 'custom' ? (e) => { e.preventDefault(); removeCustomFilter(c.id); if (activeChip === c.id) setActiveChip(null); } : undefined}
+                title={c.kind === 'custom' ? L(dict, `自定义 · 含「${c.keyword}」(长按/右键删)`, `Custom · contains “${c.keyword}”`) : undefined}
+              >
+                {c.label} <span className="n">{c.count}</span>
+              </button>
+            ))}
+            <button type="button" className="nesio-schedfilter-add" onClick={() => setAddingFilter((v) => !v)}
+              aria-label={L(dict, '自定义一个筛选', 'Add a filter')}>+</button>
+          </div>
+
+          {addingFilter && (
+            <div className="nesio-schedfilter-form">
+              <input className="nesio-schedfilter-input" value={fName} onChange={(e) => setFName(e.target.value)}
+                placeholder={L(dict, '叫什么(如:孩子学校)', 'Name it')} />
+              <input className="nesio-schedfilter-input" value={fKeyword} onChange={(e) => setFKeyword(e.target.value)}
+                placeholder={L(dict, '含哪个词', 'Contains which word')} />
+              <div className="nesio-schedfilter-actions">
+                <button type="button" className="nesio-schedfilter-btn" onClick={() => { setAddingFilter(false); setFName(''); setFKeyword(''); }}>
+                  {L(dict, '稍后', 'Later')}
+                </button>
+                <button type="button" className="nesio-schedfilter-btn pri" disabled={!fName.trim() || !fKeyword.trim()}
+                  onClick={() => { addCustomFilter(fName, fKeyword); setAddingFilter(false); setFName(''); setFKeyword(''); }}>
+                  {L(dict, '加进来', 'Add')}
+                </button>
+              </div>
+              {/* 说清它到底怎么匹配 —— 用户能预测结果,才敢用。不做隐式语义匹配。 */}
+              <p className="nesio-schedfilter-hint">
+                {L(dict, '按词筛:标题或发件人/地点里含这个词就算。不区分大小写。',
+                      'Keyword filter: matches the title or the sender/location line. Case-insensitive.')}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
       {rows.length === 0 ? (
         <p className="nesio-insights-empty">
-          {sub === 'calendar'
-            ? L(dict, '还没有日程 —— 到「设置 → 数据接入」连 Google 日历,或连 Granola 同步会议。', 'No schedule yet — connect Google Calendar or Granola in Data sources.')
-            : L(dict, '还没有邮件 —— 到「设置 → 数据接入」连 Gmail 同步(广告已自动过滤)。', 'No mail yet — connect Gmail in Data sources (ads auto-filtered).')}
+          {/* 筛出 0 条 ≠ 没有数据。不说清是筛没的,用户会以为东西丢了。 */}
+          {chosen
+            ? L(dict, `「${chosen.label}」下没有 —— 点上面的「全部」看回来。`, `Nothing under “${chosen.label}” — tap All to see everything.`)
+            : sub === 'calendar'
+              ? L(dict, '还没有日程 —— 到「设置 → 数据接入」连 Google 日历,或连 Granola 同步会议。', 'No schedule yet — connect Google Calendar or Granola in Data sources.')
+              : L(dict, '还没有邮件 —— 到「设置 → 数据接入」连 Gmail 同步(广告已自动过滤)。', 'No mail yet — connect Gmail in Data sources (ads auto-filtered).')}
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>

@@ -148,6 +148,7 @@ const KNOWN_KEYS = new Map([
   ["nesio-asset-care-v1", "durable"],
   ["nesio-bank-acct-names-v1", "durable"],
   ["nesio-meal-calendar-v1", "durable"],
+  ["nesio-schedule-filters-v1", "durable"],
   ["nesio-migration-completed-v1", "cache"],
   ["nesio-migration-log-v1", "cache"],
   ["nesio-entity-aliases-v1", "durable"],
