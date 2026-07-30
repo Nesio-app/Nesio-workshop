@@ -4702,6 +4702,11 @@ body:has(.nesio-mood-overlay) .nesio-bottom-nav::before {
   width: min(calc(100vw - 2rem), 22rem);
 }
 
+/* Bug4 图12:洞察宫格首页把导航抬到全屏遮罩(929/930)之上。
+   931 —— 刚好压过洞察面板,仍低于 elevated(940)/image-viewer(950)/特殊模态,
+   所以从洞察里再开的抽屉照样盖得住导航。只在宫格首页挂,进板块页立刻摘掉。 */
+.nesio-bottom-nav--above-overlay { z-index: 931; }
+
 html[data-portal-theme="night"] .nesio-bottom-nav {
   background: rgba(20, 32, 58, 0.88);
   border-color: rgba(88,140,227,0.18);
@@ -5246,6 +5251,12 @@ html[data-portal-theme="night"] .nesio-memory-search { color: #e8eefa; }
 }
 
 .nesio-search-understood-chip {
+  /* 2026-07-29 标注(Bug4 P7「符号和字显示同一行」):chip 是行内块,图标 svg 默认按基线排,
+     中文字号下会被挤成上下两行。inline-flex + 居中对齐,图标和字锁在一行。 */
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
   font-size: 0.72rem;
   font-weight: 500;
   color: var(--portal-blue-deep);
@@ -7768,6 +7779,27 @@ html[data-portal-theme="night"] .nesio-settings-option-label { color: #e8eefa; }
 }
 .nesio-settings-inline-link:disabled { opacity: 0.45; cursor: default; }
 
+/* 「你让我先别说的」清单里的「重新接收」—— 行内小胶囊,静音必须一键解得掉 */
+.nesio-unmute-btn {
+  flex: none;
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+  font-family: var(--font-sans);
+  font-weight: var(--weight-medium);
+  color: var(--portal-accent);
+  background: var(--portal-accent-soft);
+  border: 1px solid var(--portal-accent-border);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+/* ⚠️ 这里原来有一份 .nesio-settings-danger-btn 的完整外观(width/padding/font/background/
+   border-radius/border)。它在 5ebf58b「再并七套按钮」时已被删除 —— 外观归 Button 原语,
+   这个旧类只留「和上一条隔多远」。合并 #265 时它被带了回来,于是:
+     ① 与原语打架(source order 决定谁赢,视觉又开始飘)
+     ② rgba(207,107,107,…) 是写死的色值,违反配色红线(夜间不跟着翻)
+   test:button-primitive 正是钉这条,合并后它在 main 上单独也是红的。此处按原样删掉,
+   只保留下方那条 margin-only 规则。 */
 /* 「删除数据」危险区(2026-07-29):三个红按钮从平铺收进一个可折叠入口。
    平铺时一屏三条红,违反 CLAUDE.md「不用红色制造焦虑」;而这三件事一年也未必做一次。
    收起态是中性的,只有展开后才见红 —— 红色留给真正走到那一步的人。 */
@@ -8727,6 +8759,12 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
   padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
 }
 .nesio-insights-body::-webkit-scrollbar { display: none; }
+/* Bug4 图12:宫格首页没有标题栏了 —— 状态栏安全区改由 body 自己吃;
+   底部给悬浮导航让位(导航被抬到遮罩之上,不留位就压住最后一行格子)。 */
+.nesio-insights-sheet--hub .nesio-insights-body {
+  padding-top: calc(0.75rem + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(5.6rem + env(safe-area-inset-bottom, 0px));
+}
 
 /* Narrative */
 .nesio-insights-narrative {
@@ -17220,6 +17258,19 @@ html[data-portal-theme="night"] .nesio-map-tile {
 .nesio-rhythm-heat--compact { gap: 2px; margin: 0 0 0.9rem; }
 .nesio-rhythm-heat--compact .nesio-rhythm-heat-row { gap: 2px; }
 .nesio-rhythm-heat--compact .nesio-rhythm-heat-cell { flex: 1 1 0; width: auto; height: 8px; border-radius: 2px; aspect-ratio: auto; }
+/* Bug4 图22:格子下面的月份标尺。它不是格子,别继承格子的高度/背景/圆角。 */
+.nesio-rhythm-heat-months { margin-top: 2px; }
+.nesio-rhythm-heat-month {
+  aspect-ratio: auto;
+  height: auto;
+  background: none;
+  border-radius: 0;
+  font-size: 0.58rem;
+  line-height: 1;
+  color: var(--portal-muted);
+  white-space: nowrap;
+  overflow: visible;
+}
 
 /* 图5:反复在想 —— 饼图 + 图例 */
 /* 「反复在想」可交互甜甜圈(对齐足迹地点饼图 .nesio-tl-donut2) */
@@ -18686,11 +18737,14 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
    940/941 —— 高过 fullscreen 的 929/930,仍低于 image-viewer(950)与特殊模态(1010–1200)。
    2026-07-28 标注 图24:不加这一层,抽屉落在 901 被洞察面板整个盖住 = 点了没反应。 */
 .nesio-sheet-overlay--elevated { z-index: 940; }
-/* bug3「背景虚化」:遮罩加毛玻璃。层序不变,只是把背后内容虚掉,注意力落在这张卡上。
+/* blur:遮罩毛玻璃。两个来源同一诉求 —— bug3「挂一条 / 打包清单打开后背景虚化」与
+   Bug4 图11「收藏夹弹层背景虚化」。层序不变,只把背后内容虚掉,注意力落在这张卡上。
+   只给显式传 blurOverlay 的浮层开(全局开会让低端机每次开抽屉都重绘整页);
+   不透明遮罩下虚化没有意义,故与 --opaque 互斥使用。
    reduced-transparency 下面的媒体查询会把 backdrop-filter 关掉、退成纯遮罩。 */
 .nesio-sheet-overlay--blur {
-  backdrop-filter: blur(14px) saturate(1.1);
-  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  backdrop-filter: blur(14px) saturate(120%);
+  -webkit-backdrop-filter: blur(14px) saturate(120%);
 }
 /* ⚠️ 面板这条必须比基类 .nesio-sheet 特异度高。
    2026-07-29 实测:原来写成单类 `.nesio-sheet--elevated`,而基类 `.nesio-sheet{z-index:901}`
@@ -18923,7 +18977,7 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .ng-ask{font-size:1.06rem;line-height:1.55;font-weight:var(--weight-semibold);margin:0 0 8px;text-wrap:pretty;color:var(--portal-ink)}
 .ng-ask .ng-mem{color:var(--portal-accent)}
 .ng-basis{font-size:.75rem;color:var(--ng-faint);margin:0 0 14px;padding-left:12px;border-left:2px solid var(--portal-accent-border);line-height:1.5}
-.ng-ta{width:100%;font-family:inherit;font-size:.92rem;color:var(--portal-ink);background:var(--portal-bg);
+.ng-ta{width:100%;font-family:var(--font-sans);font-size:var(--text-body);color:var(--portal-ink);background:var(--portal-bg);
   border:1px solid var(--portal-line);border-radius:11px;padding:11px 12px;resize:vertical;line-height:1.55;
   /* 2026-07-28 UI 精修:文本框随字数长高(写长了不再挤在两行里)。
      field-sizing 支持的浏览器直接生效;不支持的走 JS 兜底(autoGrow)。 */
@@ -18939,8 +18993,8 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 
 /* 阴影整合(IFS):三个内在部分各一色(守护/清醒/洞察),走主题 token */
 .ng-ifs{margin-top:var(--space-3);display:flex;flex-direction:column;gap:9px;animation:ng-reveal-in .4s var(--ng-ease)}
-.ng-ifs-part{border-radius:12px;padding:12px 14px;font-size:.92rem;line-height:1.65;border:1px solid}
-.ng-ifs-part .lbl{display:block;font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.06em;margin-bottom:5px}
+.ng-ifs-part{border-radius:12px;padding:12px 14px;font-family:var(--font-sans);font-size:var(--text-body);font-weight:var(--weight-regular);line-height:1.65;border:1px solid}
+.ng-ifs-part .lbl{display:block;font-size:var(--text-xs);font-weight:var(--weight-semibold);letter-spacing:.06em;margin-bottom:5px}
 /* 2026-07-28 UI 精修(标注 图13/图14「颜色太杂 / 颜色太多」):内在小孩 / 清醒的自己 / 念念的洞察
    原本一张一个色(琥珀 / 蓝 / 灰蓝),加上时间线自己的蓝底,一屏四五种底色在打架。
    统一成同一张中性卡,角色只靠小标签区分;强调色留给真正的操作(按钮/当前步)。 */
@@ -18967,8 +19021,8 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .ng-ground-item.on{color:var(--status-calm);border-color:var(--status-calm)}
 .ng-ground-item.on .tick{background:var(--status-calm);border-color:var(--status-calm)}
 /* 图14:「现在,给身体一个动作」这张琥珀卡跟着一起收敛成中性卡。 */
-.ng-ground-step{margin-top:2px;background:var(--portal-card);border:1px solid var(--portal-line);border-radius:10px;padding:10px 13px;font-size:.9rem;color:var(--portal-ink);line-height:1.55}
-.ng-ground-step .lbl{display:block;font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.06em;color:var(--portal-muted);margin-bottom:5px}
+.ng-ground-step{margin-top:2px;background:var(--portal-card);border:1px solid var(--portal-line);border-radius:10px;padding:10px 13px;font-family:var(--font-sans);font-size:var(--text-body);font-weight:var(--weight-regular);color:var(--portal-ink);line-height:1.55}
+.ng-ground-step .lbl{display:block;font-size:var(--text-xs);font-weight:var(--weight-semibold);letter-spacing:.06em;color:var(--portal-muted);margin-bottom:5px}
 
 /* 阴影整合时间线:当前步放大高亮 / 已完成收起 / 未来步灰 */
 .ng-tl{display:flex;flex-direction:column}
@@ -18996,7 +19050,10 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
    ① 直径从 280/82vw 收到 232/66vw —— 原尺寸一个人占满一屏,下面的输入框和按钮全被挤出视野;
    ② 时间线左边是 22px 轨道 + 12px 间距,轮子在卡片里居中 = 在屏幕上偏右 17px,这里补回去。 */
 .ng-wheel{position:relative;width:min(232px,66vw);aspect-ratio:1/1;margin:8px auto 6px}
-.ng-heal .ng-tl-in .ng-wheel{left:-17px}
+/* 2026-07-29 标注(Bug4 P1「整个心情框缩小,现在右边太多空白」):
+   原来轮子在疗愈时间线里左移 17px 去对齐屏幕中线,代价是卡片内右侧空出一条。
+   改成卡片内正常居中 + 再收一档尺寸 —— 框自身变小,左右均衡。 */
+.ng-heal .ng-tl-in .ng-wheel{width:min(196px,56vw);margin:4px auto 2px}
 .ng-wheel-dot{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px;background:none;border:none;padding:0;cursor:pointer;font-family:inherit}
 .ng-wheel-dot .d{width:26px;height:26px;border-radius:50%;border:1px solid rgba(255,255,255,.55);transition:transform .12s var(--ng-ease)}
 .ng-wheel-dot.on .d{transform:scale(1.16);border:2.5px solid #fff;box-shadow:0 0 0 4px rgba(20,20,20,.05)}
@@ -19064,7 +19121,6 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .ng-fp-trend .spark .ar{fill:var(--portal-accent-soft)}
 .ng-fp-trend .spark .ln{fill:none;stroke:var(--portal-accent);stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 .ng-fp-trend .spark .dot{fill:var(--portal-accent);stroke:var(--portal-card);stroke-width:1.5}
-.ng-todaynote{font-size:.75rem;color:var(--ng-faint);margin:13px 2px 0;text-align:center}
 .ng-done{background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:16px;padding:16px;font-size:.9rem;color:var(--portal-accent);text-align:center;line-height:1.55}
 
 /* quiz 选项 + 揭晓 */
@@ -19124,7 +19180,7 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .ng-lrow .k{flex:none;width:78px;font-size:.76rem;font-weight:var(--weight-semibold);color:var(--portal-accent)}
 .ng-lrow .v{font-size:.88rem;line-height:1.6;color:var(--portal-ink)}
 .ng-lrow .v b{color:var(--status-gentle)}
-.ng-life{margin-top:12px;padding:12px 13px;background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:12px;font-size:.86rem;line-height:1.6;color:var(--portal-ink)}
+.ng-life{margin-top:12px;padding:12px 13px;background:var(--portal-accent-soft);border:1px solid var(--portal-accent-border);border-radius:12px;font-family:var(--font-sans);font-size:var(--text-sm);line-height:1.6;color:var(--portal-ink)}
 .ng-life .t{font-size:.68rem;font-weight:var(--weight-semibold);letter-spacing:.03em;color:var(--portal-accent);display:block;margin-bottom:4px}
 .ng-quiet{font-size:.75rem;color:var(--ng-faint);text-align:center;margin:12px 2px 0}
 
@@ -19269,11 +19325,11 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .ng-mem:hover{border-color:var(--portal-accent-border)}
 .ng-mem:active{transform:scale(.99)}
 .ng-mem.heavy{border-color:var(--ng-warm)}
-.ng-mem-meta{display:flex;align-items:center;gap:8px;font-size:.73rem;color:var(--ng-faint);margin-bottom:8px;flex-wrap:wrap}
+.ng-mem-meta{display:flex;align-items:center;gap:8px;font-size:var(--text-xs);color:var(--ng-faint);margin-bottom:8px;flex-wrap:wrap}
 .ng-mem-meta .dot{width:5px;height:5px;border-radius:50%;background:var(--portal-accent);flex:none}
 .ng-mem.heavy .ng-mem-meta .dot{background:var(--ng-warm)}
 .ng-mem-meta .go{margin-left:auto;color:var(--portal-accent);font-weight:var(--weight-semibold)}
-.ng-mem-text{font-size:.95rem;line-height:1.6;color:var(--portal-ink);margin:0 0 9px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
+.ng-mem-text{font-family:var(--font-sans);font-size:var(--text-body);font-weight:var(--weight-regular);line-height:1.6;color:var(--portal-ink);margin:0 0 9px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
 .ng-mem-tags{display:flex;gap:6px;flex-wrap:wrap}
 .ng-mem-tag{font-size:.7rem;color:var(--portal-muted);background:var(--portal-bg);border:1px solid var(--portal-line);border-radius:6px;padding:2px 8px}
 
@@ -19353,6 +19409,23 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .nm-prow{display:flex;gap:10px;margin-top:6px}
 .nm-prow button{flex:1;font-family:inherit;font-size:.85rem;font-weight:var(--weight-semibold);border-radius:11px;padding:12px 0;cursor:pointer;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.13);color:#fff}
 .nm-prow button.pri{background:#fff;color:#1a1a1a;border-color:#fff}
+
+/* 记忆短片(Bug4 图21):本机幻灯播放 + 挑素材面板。
+   幻灯没有 <video>,整块画面就是一张背景图,点它翻下一张。 */
+.nm-slides{cursor:pointer;transition:background-image .3s var(--nm-ease)}
+.nm-slide-n{position:absolute;right:11px;bottom:10px;z-index:3;font-size:.7rem;font-weight:var(--weight-semibold);color:#fff;background:rgba(0,0,0,.5);border-radius:6px;padding:2px 7px;font-variant-numeric:tabular-nums}
+.nm-pick{padding:14px 16px calc(16px + env(safe-area-inset-bottom,0px));display:flex;flex-direction:column;gap:12px;max-height:78vh}
+.nm-pick-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.nm-pick-head .t{font-size:var(--text-sm);color:var(--portal-ink);font-weight:var(--weight-medium)}
+.nm-pick-head .n{font-size:var(--text-sm);color:var(--portal-accent);font-weight:var(--weight-semibold);font-variant-numeric:tabular-nums}
+.nm-pick-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px;overflow-y:auto;flex:1;min-height:0}
+.nm-pick-cell{position:relative;aspect-ratio:1;border-radius:12px;border:2px solid transparent;background:var(--portal-accent-soft) center/cover no-repeat;cursor:pointer;padding:0}
+.nm-pick-cell.on{border-color:var(--portal-accent)}
+.nm-pick-cell .ord{position:absolute;top:5px;left:5px;min-width:20px;height:20px;border-radius:999px;background:var(--portal-accent);color:var(--sheet-opaque,#fff);font-size:.7rem;font-weight:var(--weight-bold);display:flex;align-items:center;justify-content:center}
+.nm-pick-foot{display:flex;gap:10px}
+.nm-pick-foot button{flex:1;font-family:inherit;font-size:var(--text-sm);font-weight:var(--weight-semibold);border-radius:var(--radius-pill,999px);padding:12px 0;cursor:pointer;border:1px solid var(--portal-line);background:var(--glass-bg-solid);color:var(--portal-ink)}
+.nm-pick-foot button.pri{background:var(--portal-accent);color:var(--sheet-opaque,#fff);border-color:var(--portal-accent)}
+.nm-pick-foot button.pri:disabled{opacity:.45;cursor:default}
 
 /* 分享卡(病毒单元;内容在 NesioSheet 居中面里) */
 .nm-sharecard{width:250px;border-radius:20px;overflow:hidden;background:#1a1a1a;box-shadow:0 20px 60px rgba(0,0,0,.5)}
@@ -20032,3 +20105,136 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   justify-content: center;
   line-height: 1;
 }
+
+/* ── 资产页(Bug4 图23-24:原「车」页 → 房产 tab + 车 tab)────────────────── */
+.nesio-assets-tabs {
+  display: flex;
+  gap: var(--space-1);
+  background: var(--portal-line);
+  border-radius: var(--radius-sm);
+  padding: 3px;
+  margin-bottom: var(--space-3);
+}
+.nesio-assets-tab {
+  flex: 1;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-muted);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+.nesio-assets-tab.on { background: var(--glass-bg-solid); color: var(--portal-ink); }
+.nesio-assets-live { padding-bottom: var(--space-4); margin-bottom: var(--space-4); border-bottom: 1px solid var(--portal-line); }
+
+.nesio-assets-card {
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.nesio-assets-head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--font-sans);
+  text-align: left;
+}
+.nesio-assets-head .n { flex: 1; min-width: 0; font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-assets-head .v { flex: none; font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--portal-accent); font-variant-numeric: tabular-nums; }
+.nesio-assets-head .c { flex: none; color: var(--portal-muted); }
+.nesio-assets-sub { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--portal-muted); line-height: 1.5; }
+.nesio-assets-due {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--status-gentle);
+  background: var(--status-gentle-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+}
+.nesio-assets-body { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--portal-line); }
+
+.nesio-assets-form { display: flex; flex-direction: column; gap: var(--space-2); margin: var(--space-2) 0; }
+.nesio-assets-input {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--portal-ink);
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  width: 100%;
+  min-width: 0;
+}
+.nesio-assets-row2 { display: flex; gap: var(--space-2); }
+.nesio-assets-row2 > * { flex: 1; min-width: 0; }
+.nesio-assets-btn {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-ink);
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill);
+  padding: var(--space-2) var(--space-3);
+  cursor: pointer;
+}
+.nesio-assets-btn.pri { background: var(--portal-accent); color: var(--sheet-opaque, #fff); border-color: var(--portal-accent); }
+.nesio-assets-btn:disabled { opacity: .45; cursor: default; }
+.nesio-assets-add {
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-accent);
+  background: var(--portal-accent-soft);
+  border: 1px dashed var(--portal-accent-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  cursor: pointer;
+}
+.nesio-assets-link {
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-accent);
+  background: none;
+  border: none;
+  padding: var(--space-2) 0;
+  cursor: pointer;
+}
+.nesio-assets-link.danger { color: var(--status-risk); display: block; margin-top: var(--space-3); }
+
+.nesio-assets-anchors { display: flex; flex-direction: column; gap: var(--space-1); margin: var(--space-2) 0; }
+.nesio-assets-anchor { display: flex; gap: var(--space-2); font-size: var(--text-xs); color: var(--portal-muted); font-variant-numeric: tabular-nums; }
+.nesio-assets-anchor .note { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.nesio-assets-care { margin-top: var(--space-3); }
+.nesio-assets-carehead { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.nesio-assets-chip {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-accent);
+  background: var(--portal-accent-soft);
+  border: 1px solid var(--portal-accent-border);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+  cursor: pointer;
+}
+.nesio-assets-chip.on { background: var(--portal-accent); color: var(--sheet-opaque, #fff); }
+.nesio-assets-rec { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-2); padding: var(--space-2) 0; border-top: 1px solid var(--portal-line); }
+.nesio-assets-rec .l { flex: 1; min-width: 0; }
+.nesio-assets-rec .t { display: block; font-size: var(--text-sm); color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-assets-rec .m { display: block; font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-assets-rec .r { flex: none; display: flex; align-items: center; gap: var(--space-2); }
+.nesio-assets-rec .a { font-size: var(--text-sm); color: var(--portal-ink); font-variant-numeric: tabular-nums; }
+.nesio-assets-rec .x { background: none; border: none; color: var(--portal-muted); cursor: pointer; padding: 0 var(--space-1); font-size: var(--text-sm); }

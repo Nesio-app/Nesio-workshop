@@ -308,10 +308,10 @@ export default function TripTimelineSheet({
         </div>
       </NesioSheet>
 
-      {/* backdropBlur:bug3「打包清单…背景要虚化」—— 节点详情统一虚化背景 */}
+      {/* blurOverlay:bug3「打包清单…背景要虚化」—— 节点详情统一虚化背景 */}
       <NesioSheet
         variant="bottom"
-        backdropBlur
+        blurOverlay
         open={Boolean(detailNode)}
         onOpenChange={(v) => { if (!v) setDetailNode(null); }}
         card={false}

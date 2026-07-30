@@ -18,9 +18,9 @@ const todayFeed = [
   // Today 表面文案已入 i18n 字典(REG-004),文案断言随之覆盖字典
   read('lib/portal/i18n.ts'),
 ].join('\n');
-// TellNesioSheet(中间键的扇形中转层)已在 9bf0c5a 整体删除 —— 中间键现在直达相机,
-// 不再有「先弹三个扇形选项」这一层。today-capture-flow 契约反向钉住它不许回来,
-// 所以这里原来那几条扇形文案/强调色断言随之作废(见下方说明)。
+// TellNesioSheet(中间键的扇形中转层)已在 9bf0c5a8 整体删除 —— 中间键现在直达相机,
+// 不再有「先弹三个扇形选项」这一层。扇形入口的那几条文案/强调色断言随之退役,
+// 改为反向钉住它不许回来(见下方 existsSync 断言 + today-capture-flow 契约)。
 const voiceSheet = read('components/portal/VoiceInputSheet.tsx');
 const profileCard = read('components/portal/NesioProfileCard.tsx');
 const loginPage = read('components/portal/LoginPageClient.tsx');

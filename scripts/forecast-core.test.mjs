@@ -126,8 +126,108 @@ assert.ok(spread.p80Pct > 0 && spread.p80Pct <= 20, `p80 应落在真实残差�
 const errsSorted = [0, 1, 2, 3, 3, 5, 5, 10, 10, 20];
 assert.equal(spread.p80Pct, F.quantile(errsSorted, 0.8), 'p80 就是残差分布的 p80,没有别的来源');
 
+// ── 绝对可用性门槛:赢过笨基线 ≠ 能用(首轮真实回测的教训)──
+// 技能分很高,但区间 ±100% → 「月底大概花 1000,上下浮动一千」,不许上线。
+const wide = F.scoreSamples('wide', [
+  mk(10, 100, 500), mk(190, 100, 500), mk(20, 100, 500), mk(180, 100, 500),
+  mk(30, 100, 500), mk(170, 100, 500), mk(40, 100, 500), mk(160, 100, 500),
+  mk(50, 100, 500), mk(150, 100, 500),
+]);
+assert.ok(wide.skill > F.MIN_SKILL, `技能分应远超门槛,实际 ${wide.skill}`);
+assert.ok(wide.p80Pct > F.MAX_P80_PCT, `区间应超上限,实际 ±${wide.p80Pct}%`);
+assert.equal(wide.verdict, 'unusable', '赢了笨基线但区间没法给人看 → 不可用,不许上线');
+
+// ── 开口率门槛:三分之二时候说不出话的预测器,再准也不是功能 ──
+const rarely = F.scoreSamples('rarely', Array.from({ length: 10 }, () => mk(101, 100, 130)), 0.33);
+assert.equal(rarely.verdict, 'sparse', '开口率 33% → 判 sparse');
+assert.equal(rarely.coverage, 0.33);
+// 开口率达标时不受影响
+assert.equal(F.scoreSamples('ok', Array.from({ length: 10 }, () => mk(101, 100, 130)), 0.9).verdict, 'adopt');
+
+// ── 配对回测:横向比较只能在共同可比月份上做 ──
+// 造一个「A 只在有月初消费时开口、B 一直开口」的局面,验证 common 与 coverage。
+const pairRows = [];
+for (const ym of ['2026-01', '2026-02', '2026-03', '2026-04', '2026-05']) {
+  if (ym !== '2026-03') pairRows.push({ date: `${ym}-05`, amount: 200 }); // 3 月没有月初消费
+  pairRows.push({ date: `${ym}-25`, amount: 100 });
+}
+const run = F.backtestPaired(pairRows, 15, {
+  A: F.predictMonthEndRunRate,          // 本月 15 号前没花钱 → null
+  B: (v, c) => (F.naiveLastMonth(v, c) ?? 0) + 1, // 永远给得出值(除首月)
+  N: F.naiveLastMonth,
+});
+assert.ok(!run.months.includes('2026-05'), '残月不进走查');
+assert.ok(run.values.A['2026-03'] == null, '3 月 15 号前无消费 → A 开不了口');
+assert.ok(!run.common.includes('2026-03'), '有人开不了口的月份不进共同集');
+assert.ok(run.common.every((ym) => run.values.A[ym] != null && run.values.N[ym] != null), 'common 里所有预测器都有值');
+assert.ok(run.coverage.A < 1, `A 的开口率应 <100%,实际 ${run.coverage.A}`);
+
+// pairedSamples 只在 common 上取,且三方对齐
+const ps = F.pairedSamples(run, 'A', 'N');
+assert.equal(ps.length, run.common.length, '样本数 = 共同月份数');
+for (const s of ps) {
+  assert.ok(Number.isFinite(s.pred) && Number.isFinite(s.naive) && Number.isFinite(s.actual), '三个值都齐');
+  assert.equal(s.actual, run.actual[s.ym], '真值取自同一张表');
+}
+
+// ── 定期账单:日期算术 ──
+assert.equal(F.addDaysStr('2026-01-31', 1), '2026-02-01', '跨月');
+assert.equal(F.addDaysStr('2026-02-28', 1), '2026-03-01', '平年 2 月底');
+assert.equal(F.addDaysStr('2024-02-28', 1), '2024-02-29', '闰年 2 月底');
+assert.equal(F.daysBetween('2026-01-01', '2026-01-31'), 30);
+assert.equal(F.daysBetween('2026-01-31', '2026-01-01'), -30, '反向为负');
+
+// ── 定期商户识别 ──
+const bills = [];
+for (let i = 0; i < 6; i++) {
+  bills.push({ date: F.addDaysStr('2026-01-05', i * 30), amount: 15.99, key: 'netflix' });
+  bills.push({ date: F.addDaysStr('2026-01-12', i * 30), amount: 9.99, key: 'spotify' });
+}
+bills.push({ date: '2026-03-03', amount: 42, key: 'oneoff' }); // 只出现一次
+assert.deepEqual([...F.recurringKeys(bills)], ['netflix', 'spotify'], '一次性商户不算定期');
+assert.ok(!F.recurringKeys(bills).includes('oneoff'));
+
+// ── 下次扣款日:间隔中位数 ──
+// cutoff 5/4:看得到 1/5、2/4、3/6、4/5 四次;5/5 那次在 cutoff 之后,**必须不可见**
+const vis6 = F.visibleAt(bills, '2026-05-04');
+assert.ok(!vis6.some((r) => r.key === 'netflix' && r.date === '2026-05-05'), '5/5 是未来,不可见');
+const nd = F.predictNextChargeDate(vis6, 'netflix');
+assert.ok(nd && nd > '2026-05-04', `应给出未来日期,实际 ${nd}`);
+assert.equal(nd, '2026-05-05', '最后可见 4/5 + 间隔中位数 30 天 = 5/5');
+// 不足 3 次不硬猜
+assert.equal(F.predictNextChargeDate(F.visibleAt(bills, '2026-02-10'), 'netflix'), null, '只有 2 次扣款 → 不猜');
+// 一次跳票不该带偏节奏(中位数抗离群)
+const skipped = [
+  { date: '2026-01-05', amount: 10, key: 'x' }, { date: '2026-02-04', amount: 10, key: 'x' },
+  { date: '2026-03-06', amount: 10, key: 'x' }, { date: '2026-07-05', amount: 10, key: 'x' }, // 跳了 4 个月
+  { date: '2026-08-04', amount: 10, key: 'x' },
+];
+assert.equal(F.daysBetween('2026-08-04', F.predictNextChargeDate(skipped, 'x')), 30, '中位数忽略那次 121 天的跳票');
+
+// ── 下次扣款金额 ──
+const priced = [
+  { date: '2026-01-05', amount: 10, key: 'y' }, { date: '2026-02-05', amount: 10, key: 'y' },
+  { date: '2026-03-05', amount: 10, key: 'y' }, { date: '2026-04-05', amount: 99, key: 'y' }, // 一次异常
+];
+assert.equal(F.predictNextChargeAmount(priced, 'y'), 10, '中位数抗一次性异常金额');
+assert.equal(F.naiveNextChargeAmount(priced, 'y'), 99, '笨基线就是上一笔');
+
+// ── 定期回测:防泄漏 + 样本对齐 ──
+const recDate = F.backtestRecurring(bills, 'date');
+assert.ok(recDate.samples.length > 0, '有样本');
+for (const s of recDate.samples) {
+  assert.ok(s.actual > 0, '真实间隔为正');
+  assert.ok(s.pred > 0 && s.naive > 0, '预测与基线都是正的天数');
+}
+const recAmt = F.backtestRecurring(bills, 'amount');
+assert.ok(recAmt.samples.every((s) => s.actual === 15.99 || s.actual === 9.99), '金额真值取自真实扣款');
+// 固定金额订阅 → 预测应完美
+assert.equal(F.scoreSamples('amt', recAmt.samples).mae, 0, '金额恒定时误差为 0');
+
 // ── 门槛常量对外可见(改门槛必须是显式决定)──
 assert.equal(F.MIN_SAMPLES, 8);
 assert.equal(F.MIN_SKILL, 0.05);
+assert.equal(F.MAX_P80_PCT, 25);
+assert.equal(F.MIN_COVERAGE, 0.8);
 
 console.log('forecast-core: OK(防泄漏 + 技能分 + 残差区间 + 裁决门槛)');

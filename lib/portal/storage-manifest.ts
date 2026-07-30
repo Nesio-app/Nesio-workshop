@@ -27,11 +27,26 @@ export function isAppKey(key: string): boolean {
   return APP_PREFIXES.some((p) => key.startsWith(p));
 }
 
-// 登录票据 —— 明确列举 + 模式兜底(auth/session/token/openid/access/refresh)。
-const AUTH_RE = /(^|[-_])(auth|session|token|openid|access|refresh|provider)([-_]|$)|wechat_openid/i;
+// 凭证 —— 明确列举 + 模式兜底。**绝不进备份文件、绝不上云。**
+// 2026-07-29 安全审计:两个真凭证键此前被判成 durable(= 进备份 JSON + 走模块同步上云):
+//   · nesio-connector-tokens-v1 —— Notion/Tesla 等连接器的原始令牌。正则写的是 `token([-_]|$)`,
+//     而键名是复数 `tokens-v1` → 不匹配。改 `tokens?`。
+//   · nesio_admin_secret —— /admin 管理密钥。正则里压根没有 `secret` 这个词。
+// 教训:凭证识别靠"猜词"必然漏;下面既扩正则,也给一张明确的名单兜底。
+export const AUTH_KEYS = new Set<string>([
+  'nesio-connector-tokens-v1',  // 连接器原始令牌(Gmail/日历/Notion 走 Supabase 按身份跨端,本机这份是镜像)
+  'nesio_admin_secret',         // /admin 管理密钥
+  'nesio-plaid-link-token',     // Plaid Link 一次性 token
+  'nesio-auth-intent-v1',       // 登录意图暂存
+]);
+const AUTH_RE = /(^|[-_])(auth|session|tokens?|openid|access|refresh|provider|secrets?|credentials?|apikey)([-_]|$)|wechat_openid/i;
 
 // 可再生缓存/节流 —— 不进备份、删除无损(与旧 full-backup EXCLUDE 合并,单一真源)。
 export const CACHE_KEYS = new Set<string>([
+  // IDB 迁移的按设备簿记(2026-07-30 合并 main 后补登记):每台设备各自迁各自的,
+  // 跨端同步这两个键只会让新设备以为「已经迁过了」而跳过迁移。
+  'nesio-migration-completed-v1',
+  'nesio-migration-log-v1',
   'nesio-email-signals-cache',
   'nesio-guidance-lang-cache-v1',
   'nesio-daily-brief-v2',
@@ -53,6 +68,35 @@ export const CACHE_KEYS = new Set<string>([
   // 单设备草稿/测试位 —— 云同步会让它们「删了又复活」(QA:草稿乱码清不掉、测试 Pro 位跨设备扩散)
   'nesio-jot-draft-v1',                   // 速记草稿:本机暂存,别跨设备回灌
   'nesio-pro-entitlement-v1',             // Lab 测试 Pro 覆盖位:绝不该同步到真设备
+  // AI 判决层(2026-07-29 硬拆后新增)。三个都是**按设备**的簿记,不是用户数据:
+  'nesio-guidance-judge-ledger-v1',       // 判决账本(已判指纹+卡):整键 replace 会让两端互相
+                                          //   抹掉对方的判决;各判各的成本可接受,数据错乱不可接受
+  'nesio-judge-dismissed-v1',             // 「知道了」当日日键静默:今天的事,明天自动失效
+  'nesio-push-enabled-v1',                // 推送开关:**每个浏览器**自己的订阅,跨端同步会让
+                                          //   别的设备显示"已开"却收不到推送(它没订阅)
+  'nesio-storage-heal-v1',                // 一次性自愈的完成标记
+  // 档案是**观测面**,不是用户数据:整键 replace 同步会让两端互相抹掉对方的记录(静默丢反馈)。
+  // 真正承重的那部分(静音裁决)另走 nesio-card-verdict-v1(durable,跨端跟人走)。
+  // 代价如实:换设备/重装后档案从零开始 —— 90 天滚动窗的观测面,可接受。
+  'nesio-card-archive-v1',
+  // ── 2026-07-29 全量普查补登:以下**全是按设备的簿记或日键 UI 状态**,此前默认 durable,
+  //    意味着它们进备份、并被当用户数据整键 replace 同步 —— 既是无谓 churn,也会两端互抹。
+  //    (判据:换台设备后这个值"从头开始"是否**正确**?是 → cache。)
+  'nesio-chunk-reload', 'nesio-chunk-reload-at', 'nesio-version-reload',   // 加载失败/版本重载标记
+  'nesio-connectors-autosync-at-v1',                                       // 自动同步节流水位
+  'nesio-bank-synced-at', 'nesio-drive-backup-at', 'nesio-last-backup-at', // 各同步的"上次时间"
+  'nesio-place-image-sync-state-v1', 'nesio-reader-sync-state-v1',         // 同步簿记(同 email-sync-state)
+  'nesio-life-graph-cloud-sync-v1', 'nesio-life-graph-cloud-sync-outbox-v1', // 云同步水位与待发队列
+  'nesio-family-strip-fetch-at-v1',                                        // 取数节流
+  'nesio-plaid-enrich-v1',                                                 // 一次性全量回填标记
+  'nesio-pending-ask-image', 'nesio-pending-ask-text',                     // 待发问暂存(会话级)
+  'nesio-storage-alert-snooze-v1',                                         // 存储告警节流
+  'nesio-server-entitlement-v1',                                           // 服务端权益缓存(跨端各自问服务端)
+  'nesio-today-cards-v1', 'nesio-today-dismissed-v1',                      // 今天页日键卡片状态
+  'nesio-focus-dismissed-v1', 'nesio-proactive-dismissed',                 // 当天收起(用户裁决另走 card-verdict)
+  'nesio-xlib-draft-v1',                                                   // 动作库草稿(同 jot-draft:本机暂存)
+  'nesio-heal-earned', 'nesio-wrapped-last',                               // 日键计分 / 上次展示
+  'nesio-a2hs-dismissed-until', 'nesio-ask-guide-seen-v1', 'nesio-retro-dismissed-v1', // UI 一次性标记
 ]);
 // 注意:**不要**在这里放裸 `geo` —— 它会误伤足迹主数据键 `nesio-place-geo-v1`
 // (`-geo-` 被判成缓存 → 从云备份里被剔除 → 换浏览器足迹永远同步不过去,已踩过)。
@@ -63,7 +107,7 @@ const CACHE_RE = /(^|[-_])(cache|last-sync|last-location|warned-at|shown|geocode
 export type StorageKind = 'auth' | 'cache' | 'durable';
 
 export function keyKind(key: string): StorageKind {
-  if (AUTH_RE.test(key)) return 'auth';
+  if (AUTH_KEYS.has(key) || AUTH_RE.test(key)) return 'auth';
   if (CACHE_KEYS.has(key) || CACHE_RE.test(key)) return 'cache';
   return 'durable';
 }

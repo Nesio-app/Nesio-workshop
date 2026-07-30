@@ -48,10 +48,18 @@ export default function LensTab() {
         const tagged = FEELING_TAGS.some((t) => tags.some((x) => x.includes(t.toLowerCase())));
         return tagged || shouldNudge(nodeText(n));
       })
+      // 2026-07-29 标注(Bug4 P5「按时间顺序显示」):原来先按「情绪重」分组再按时间,
+      // 于是列表看着像乱序(7/29、7/25、7/29…)。改成**纯时间倒序**,新的在前。
       .map((n) => ({ n, heavy: shouldNudge(nodeText(n)), t: new Date(n.createdAt).getTime() }))
-      .sort((a, b) => (a.heavy === b.heavy ? b.t - a.t : a.heavy ? -1 : 1))
+      .sort((a, b) => b.t - a.t)
       .slice(0, 12);
   }, []);
+
+  // 标注(Bug4 P5「只显示前三个,其他折叠」):默认三条,其余收进「还有 N 条」。
+  const [expanded, setExpanded] = useState(false);
+  const VISIBLE = 3;
+  const shownMemories = expanded ? memories : memories.slice(0, VISIBLE);
+  const hiddenCount = memories.length - shownMemories.length;
 
   const fmtDay = (iso: string) => en
     ? new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
@@ -65,10 +73,10 @@ export default function LensTab() {
         <div className="ng-done" style={{ marginTop: 16 }}>{L(dict, '还没有可以拆的想法 —— 说一句或写一笔带着感受的记录,它就会出现在这里。(日历、邮件、天气这类不进镜头)', 'Nothing to unpack yet — jot or say something with a feeling in it and it shows up here. (Calendar, email and weather never do.)')}</div>
       ) : (
         <div style={{ marginTop: 16 }}>
-          {memories.map(({ n, heavy }) => (
+          {shownMemories.map(({ n, heavy }) => (
             <button key={n.id} type="button" className={`ng-mem${heavy ? ' heavy' : ''}`} onClick={() => setOpenNode(n)}>
               <div className="ng-mem-meta">
-                <span className="dot" />
+                {/* 标注(Bug4 P5「日期前不要圆点」):圆点不承载信息,情绪重已由边框色表达 */}
                 {fmtDay(n.createdAt)}
                 {heavy && ` · ${L(dict, '情绪重', 'heavy')}`}
                 <span className="go">{L(dict, '用镜头看看 ›', 'Look ›')}</span>
@@ -79,6 +87,16 @@ export default function LensTab() {
               )}
             </button>
           ))}
+          {hiddenCount > 0 && (
+            <button type="button" className="ng-btn ghost" style={{ width: '100%' }} onClick={() => setExpanded(true)}>
+              {L(dict, `还有 ${hiddenCount} 条`, `${hiddenCount} more`)}
+            </button>
+          )}
+          {expanded && memories.length > VISIBLE && (
+            <button type="button" className="ng-btn ghost" style={{ width: '100%' }} onClick={() => setExpanded(false)}>
+              {L(dict, '收起', 'Collapse')}
+            </button>
+          )}
         </div>
       )}
 

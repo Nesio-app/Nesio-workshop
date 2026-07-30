@@ -19,6 +19,7 @@ import { buildCombinedBackup, restoreCombinedBackup } from './cloud-backup';
 import type { FullBackup } from './full-backup';
 import { logDropped } from './storage-health';
 import { isDedicatedSyncKey, DEDICATED_SYNC_PREFIXES } from './sync-ownership';
+import { recordCloudRestore } from './cloud-restore-receipt';
 import { isBackupKey } from './storage-manifest';
 import { yieldToMain } from './yield-main';
 
@@ -107,26 +108,39 @@ async function localModuleEntries(): Promise<Record<string, string>> {
 /**
  * 推送本机**已变**的模块(逐行 upsert)。未变的不推(增量、省流量),失败不写 state(下次重推)。
  */
-export async function pushModulesToCloud(): Promise<{ pushed: number }> {
+export async function pushModulesToCloud(
+  /** 同一轮同步里已读过的快照。**仅当 pull 没有落地任何改动时才可复用** ——
+   *  否则会拿 pull 前的旧值把刚拉下来的新值顶回去。 */
+  reuseEntries?: Record<string, string>,
+): Promise<{ pushed: number; skipped?: string[] }> {
   if (typeof window === 'undefined') return { pushed: 0 };
   let entries: Record<string, string>;
-  try { entries = await localModuleEntries(); } catch { return { pushed: 0 }; }
+  if (reuseEntries) entries = reuseEntries;
+  else { try { entries = await localModuleEntries(); } catch { return { pushed: 0 }; } }
   const state = readState();
   const now = new Date().toISOString();
   const modules: Array<{ moduleKey: string; data: { gz: string }; updatedAt: string }> = [];
   const staged: ModuleSyncState = {};
   let packed = 0;
+  const skipped: string[] = []; // 超限/压缩失败的模块 —— 必须让调用方知道
   for (const [key, value] of Object.entries(entries)) {
     const h = contentHash(value);
     if (state[key]?.hash === h) continue; // 未变
     // 大 blob(健康/财务/足迹)同步 gzip 在主线程 —— 每压一条让出一拍,避免整段循环冻住 UI。
     if (packed++ > 0) await yieldToMain();
     const gz = await packValue(value);
-    if (!gz || gz.length > MAX_MODULE_PACKED_BYTES) continue; // 压缩失败/极端超限:跳过
+    if (!gz || gz.length > MAX_MODULE_PACKED_BYTES) {
+      // 红线:存储/同步失败不得静默吞掉。此前直接 continue —— 一个超限模块
+      // (流水/健康这类大 blob 最容易中招)会**永远**同步不上去,且全程无任何信号,
+      // 用户只会发现「换台设备数据少了一块」却查不到原因。
+      logDropped('cloud.module_too_large', new Error(`${key}: ${gz ? `${Math.round(gz.length / 1024)}KB packed` : 'pack failed'}`));
+      skipped.push(key);
+      continue;
+    }
     modules.push({ moduleKey: key, data: { gz }, updatedAt: now });
     staged[key] = { hash: h, syncedAt: now };
   }
-  if (!modules.length) return { pushed: 0 };
+  if (!modules.length) return { pushed: 0, skipped };
 
   let pushed = 0;
   for (let i = 0; i < modules.length; i += POST_BATCH) {
@@ -145,13 +159,13 @@ export async function pushModulesToCloud(): Promise<{ pushed: number }> {
     } catch { break; }
   }
   if (pushed) writeState(state);
-  return { pushed };
+  return { pushed, skipped };
 }
 
 /**
  * 拉取云端全部模块行,按模块级 last-write-wins 落地。返回应用/新增计数(新增>0 → 调用方 reload)。
  */
-export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAdded: number }> {
+export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAdded: number; localEntries?: Record<string, string> }> {
   if (typeof window === 'undefined') return { applied: 0, newlyAdded: 0 };
   let rows: Array<{ moduleKey?: string; data?: unknown; updatedAt?: string | null }>;
   try {
@@ -172,6 +186,8 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
   const state = readState();
   const applyEntries: Record<string, string> = {};
   let newlyAdded = 0;
+  // 本机原本没有、由云端填进来的 key —— 用户看到的数会因此变化,得留个回执说清来源
+  const filledKeys: string[] = [];
 
   for (const row of rows) {
     const key = row.moduleKey;
@@ -199,7 +215,7 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
     if ((localMissing || localUnchangedSinceSync) && !cloudWouldShrink) {
       // 本机没有 → 填充(换端关键路径);或本机自上次同步未改 → 云端更新胜。
       applyEntries[key] = json;
-      if (localMissing) newlyAdded++;
+      if (localMissing) { newlyAdded++; filledKeys.push(key); }
       state[key] = { hash: contentHash(json), syncedAt: stamp };
     }
     // 否则(本机改过、或云端疑似空):本机胜,保留(等 push 覆盖云端),**不动 state** 以便下次重推。
@@ -211,7 +227,11 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
     const backup: FullBackup = {
       format: 'nesio-full-backup', version: 1, exportedAt: new Date().toISOString(), entries: applyEntries,
     };
-    try { await restoreCombinedBackup(backup, 'replace'); } catch (err) { logDropped('cloud.module_sync_apply', err); }
+    try {
+      await restoreCombinedBackup(backup, 'replace');
+      // 数据被悄悄改变而用户不知道,本身就是问题(QA:积分 0→150)。留一条一次性回执。
+      recordCloudRestore(filledKeys);
+    } catch (err) { logDropped('cloud.module_sync_apply', err); }
   }
   writeState(state);
   // 推进增量水位到本次拉到的最大 updated_at(含被跳过的行——它们也已「见过」)。下次只拉更新的。
@@ -221,7 +241,8 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
     if (typeof u === 'string' && u && (maxSeen === null || Date.parse(u) > Date.parse(maxSeen))) maxSeen = u;
   }
   if (maxSeen) writeSince(maxSeen);
-  return { applied: appliedKeys.length, newlyAdded };
+  // 把已读快照回传给同一轮的 push 复用(调用方只在 applied === 0 时才可用它)
+  return { applied: appliedKeys.length, newlyAdded, localEntries };
 }
 
 /**
@@ -235,7 +256,7 @@ export async function autoSyncModulesWithCloud(opts: { force?: boolean } = {}): 
   inFlight = true;
   lastSyncAt = now;
   try {
-    const { newlyAdded } = await pullModulesFromCloud();
+    const { newlyAdded, applied, localEntries } = await pullModulesFromCloud();
     // 水合刷新每个页面加载最多一次(sessionStorage 闸)—— 防「某 key 永远判缺失」时 reload 无限刷屏
     // (真机踩过:历史遗留云端行被误判缺失导致一闪一闪)。正常冷启动首拉只会触发一次,足够水合。
     if (newlyAdded > 0 && typeof window.location?.reload === 'function') {
@@ -256,7 +277,9 @@ export async function autoSyncModulesWithCloud(opts: { force?: boolean } = {}): 
         return;
       }
     }
-    await pushModulesToCloud();
+    // 一轮同步里 buildCombinedBackup 此前被读两遍(整个 localStorage + 全部 IDB blob 各读两次)。
+    // pull 没落地任何改动时,本机状态与刚才读的快照一致 → 直接复用,省掉一次全量读。
+    await pushModulesToCloud(applied === 0 ? localEntries : undefined);
   } catch (err) {
     logDropped('cloud.module_sync', err);
   } finally {

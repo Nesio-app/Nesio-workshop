@@ -1,5 +1,5 @@
 /**
- * 学习态跨端银行(批次199 P2)—— 把「被纠偏的 ranker + 学到的偏好」这份用户级 harness
+ * 学习态跨端银行(批次199 P2;2026-07-29 ranker 随规则管线物理拆除,只剩偏好)—— 把「学到的偏好」这份用户级 harness
  * 存进账号级云,换机/重装/多端都带得走。这是战略里「②级 harness(抄不走的私有累积)」
  * 真正落袋的那一步 —— 此前它只躺在设备本地 localStorage,换机即蒸发。
  *
@@ -8,23 +8,21 @@
  *   ① 载荷(trainLog + 偏好)→ POST /api/cloud/assets(purpose=learning,按身份隔离,8MB 上限);
  *   ② 短指针 {path,n,at} → profile_settings.learningRef(JSONB,按身份同步,新设备照账号找得到)。
  *
- * 反回归(关键):跨端合并走**无损 union**(importRankerTrainLog 按样本去重回放),不是
- * 「权重 last-write-wins」—— 后者会让陈旧设备把别端更多的学习覆盖掉(回退)。偏好走非覆盖 seed。
+ * 反回归(关键):偏好回灌走**非覆盖 seed**(不盖本地已学)—— 不是「last-write-wins」,
+ * 后者会让陈旧设备把别端更多的学习覆盖掉(回退)。
  *
  * 免费(P3):durability = 护城河,不查任何付费权益门。best-effort:未登录/未配置/离线静默。
  */
 import { createAppApiClient } from './app-api-client';
 import { logDropped } from './storage-health';
-import {
-  exportRankerTrainLog, importRankerTrainLog, rankerTrainCount, type TrainExample,
-} from '@/lib/platform/guidance-engine/guidance-ranker';
 import { exportPreferenceState, restorePreferenceState } from '@/lib/platform/personalization/preference-store';
 import { onFeedback } from '@/lib/platform/personalization/feedback-bus';
 
 interface LearningBlob {
   v: 1;
   at: string;
-  trainLog: TrainExample[];
+  /** 遗留字段:ranker 已物理拆除(2026-07-29),旧端上传的 trainLog 读时忽略。 */
+  trainLog?: unknown[];
   preference: Record<string, Record<string, number>>;
 }
 interface LearningRef { path: string; n: number; at: string }
@@ -68,9 +66,9 @@ export async function pullLearningFromCloud(): Promise<{ ok: boolean; merged: nu
     if (!blob || blob.v !== 1) return { ok: false, merged: 0 };
 
     lastSyncedPath = ref.path;
-    const r = importRankerTrainLog(Array.isArray(blob.trainLog) ? blob.trainLog : []);
+    // ranker 已拆:trainLog 忽略(旧端 blob 兼容),只回灌偏好(非覆盖 seed)。
     restorePreferenceState(blob.preference || {});
-    return { ok: true, merged: r.merged };
+    return { ok: true, merged: Object.keys(blob.preference || {}).length };
   } catch (err) {
     logDropped('cloud.learning_pull', err);
     return { ok: false, merged: 0 };
@@ -85,11 +83,10 @@ export async function pullLearningFromCloud(): Promise<{ ok: boolean; merged: nu
 export async function pushLearningToCloud(): Promise<{ ok: boolean }> {
   if (typeof window === 'undefined') return { ok: false };
   try {
-    const trainLog = exportRankerTrainLog();
     const preference = exportPreferenceState();
-    if (!trainLog.length && !Object.keys(preference).length) return { ok: false };
+    if (!Object.keys(preference).length) return { ok: false };
 
-    const blob: LearningBlob = { v: 1, at: new Date().toISOString(), trainLog, preference };
+    const blob: LearningBlob = { v: 1, at: new Date().toISOString(), preference };
     const file = new File([JSON.stringify(blob)], 'nesio-learning.json', { type: 'text/plain' });
     const form = new FormData();
     form.append('file', file);
@@ -101,7 +98,7 @@ export async function pushLearningToCloud(): Promise<{ ok: boolean }> {
     // 指针写进 profile_settings —— 先读现有设置再合并,别清掉别的设置(displayName/locale…)。
     const client = createAppApiClient();
     const cur = await client.fetchCloudProfileSettings();
-    const ref: LearningRef = { path: data.storagePath, n: trainLog.length, at: blob.at };
+    const ref: LearningRef = { path: data.storagePath, n: Object.keys(preference).length, at: blob.at };
     // 批次204:检查指针写云是否真成功(和 profile 同款:此前无脑 return ok:true,把
     // learningRef 写失败吞了 —— 这正是学习态跨端在 203 前从没真正工作的原因)。
     const saved = await client.saveCloudProfileSettings({
@@ -122,7 +119,7 @@ export async function pushLearningToCloud(): Promise<{ ok: boolean }> {
  */
 export async function syncLearningWithCloud(): Promise<void> {
   await pullLearningFromCloud();
-  if (rankerTrainCount() > 0 || Object.keys(exportPreferenceState()).length > 0) {
+  if (Object.keys(exportPreferenceState()).length > 0) {
     void pushLearningToCloud();
   }
 }

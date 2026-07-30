@@ -6,10 +6,10 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { pushSupported, isPushEnabled, enablePush, disablePush } from '@/lib/portal/push-notify';
 import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, profileIdentityUpdatedAt, saveProfileSettings, touchProfileIdentity, type PortalLocale } from '@/lib/portal/profile';
 import { pushProfileToCloud, syncProfileWithCloud } from '@/lib/portal/cloud-profile-sync';
 import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
-import { runSweepNow } from '@/lib/portal/llm-sweep-auto';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { L, t } from '@/lib/portal/i18n';
@@ -32,6 +32,7 @@ import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
 import { canUse, getTier, hasProOverride, hasPaidPro, refreshServerEntitlement, setProEntitlement, trialDaysLeft, TIER_UPDATED_EVENT } from '@/lib/portal/entitlement';
 import { isValidBackup } from '@/lib/portal/full-backup';
 import { pushBackupToCloud, pullBackupFromCloud, restoreCombinedBackup, buildCombinedBackup, hasCloudEntitlement, lastCloudBackup, type CloudBackupError, type CloudRestoreError } from '@/lib/portal/cloud-backup';
+import { inventoryBackup, inventorySummary, inventoryWarning } from '@/lib/portal/backup-inventory';
 import { localDayKey } from '@/lib/portal/local-day';
 import Button from './ui/Button';
 
@@ -158,6 +159,25 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
       return !v;
     });
   }
+  // Step 6 推送开关(用户拍板:权限只在这里要,不自动弹)。失败态可见(hint 换文案)。
+  const [pushOn, setPushOn] = useState(false);
+  const [pushMsg, setPushMsg] = useState('');
+  useEffect(() => { setPushOn(isPushEnabled()); }, []);
+  async function togglePush() {
+    if (pushOn) {
+      await disablePush();
+      setPushOn(false); setPushMsg('');
+      return;
+    }
+    setPushMsg(L(dict, '正在开启…', 'Enabling…'));
+    const r = await enablePush();
+    if (r.ok) { setPushOn(true); setPushMsg(''); }
+    else {
+      setPushMsg(r.reason === 'denied'
+        ? L(dict, '浏览器没给通知权限,可在系统设置里打开后重试', 'Notification permission denied — enable it in system settings and retry')
+        : L(dict, '没开成,稍后再试', 'Could not enable — try again later'));
+    }
+  }
 
   const [prefsOpen, setPrefsOpen] = useState(false);
   const toneOpts: Array<{ id: ToneStyle; label: string; hint: string }> = [
@@ -203,6 +223,22 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
           {hapticsOn ? '✓' : '○'}
         </span>
       </button>
+      {/* Step 6:重要提醒推送(sev3 才推 —— 登机口/就诊/还款截止级;开关在这要权限,不自动弹) */}
+      {pushSupported() && (
+        <button type="button"
+          className={`nesio-settings-option${pushOn ? ' nesio-settings-option--active' : ''}`}
+          onClick={() => { void togglePush(); }}>
+          <div>
+            <span className="nesio-settings-option-label">{L(dict, '重要提醒推送', 'Critical reminders push')}</span>
+            <span className="nesio-settings-option-hint">
+              {pushMsg || L(dict, '只推真正要紧的(登机/就诊/还款截止),一天最多几条', 'Only truly urgent ones (boarding, appointments, due bills)')}
+            </span>
+          </div>
+          <span className={`nesio-settings-space-check${pushOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+            {pushOn ? '✓' : '○'}
+          </span>
+        </button>
+      )}
       {/* 批次 56:记忆自动定位 —— 开启即请求手机定位权限(权限时刻在这里,不在记录途中) */}
       <button type="button"
         className={`nesio-settings-option${captureLocOn ? ' nesio-settings-option--active' : ''}`}
@@ -438,6 +474,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const [deleted, setDeleted] = useState(false);
   const [deleteMsg, setDeleteMsg] = useState<string | null>(null);
   const [restoreMsg, setRestoreMsg] = useState('');
+  const [exportWarn, setExportWarn] = useState<string | null>(null); // 导出装箱单里主数据为空时的提醒
   const [exportBusy, setExportBusy] = useState(false);
   const [lastBackupAt, setLastBackupAt] = useState<string | null>(null);
   const importRef = useRef<HTMLInputElement>(null);
@@ -470,7 +507,6 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const [diagLocalAt, setDiagLocalAt] = useState('');
   const [diagCloudAt, setDiagCloudAt] = useState('');
   const [diagSyncMsg, setDiagSyncMsg] = useState('');
-  const [diagSweepMsg, setDiagSweepMsg] = useState('');
   const loadDiag = useCallback(() => {
     setDiagLocalAt(profileIdentityUpdatedAt());
     createAppApiClient().fetchCloudProfileSettings()
@@ -496,20 +532,6 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       loadDiag();
     } catch { setDiagSyncMsg(L(dict, '同步没能完成,过一会儿再试', 'Sync didn’t go through — try again in a bit')); }
   }
-  // 批次208:手动「立即巡查」—— 绕过每天一次闸,当场跑 Layer ③ 巡查测信噪比(web 上即可测,不必进 Apple)。
-  async function handleRunSweep() {
-    setDiagSweepMsg(L(dict, '巡查中…', 'Sweeping…'));
-    try {
-      const r = await runSweepNow(getLifeGraph());
-      if (!r.ok) {
-        setDiagSweepMsg(L(dict, `巡查未成:${r.note || '失败'}`, `Sweep failed: ${r.note || ''}`));
-      } else if (r.candidates === 0) {
-        setDiagSweepMsg(L(dict, '没有可巡查的低置信线索(先记一条藏了到期日的东西再试)', 'No low-confidence candidates yet'));
-      } else {
-        setDiagSweepMsg(L(dict, `✓ 送 ${r.candidates} 条 → 抽出 ${r.findings} 条 · 回今日下拉刷新看卡`, `✓ ${r.candidates} sent → ${r.findings} found · pull to refresh Today`));
-      }
-    } catch { setDiagSweepMsg(L(dict, '巡查失败', 'Sweep failed')); }
-  }
   const fmtAt = (iso: string) => (iso ? iso.slice(5, 16).replace('T', ' ') : '—');
   const pickBackupDest = (d: 'drive' | 'nesio') => {
     setBackupDest(d);
@@ -518,6 +540,16 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
 
   async function handleDriveBackup() {
     setDriveState('busy'); setDriveMsg('');
+    try {
+      await runDriveBackup();
+    } catch {
+      // 动态 import / 打包过程抛错时也要有结局,不让按钮停在「正在备份…」
+      setDriveState('error');
+      setDriveMsg(L(dict, '这次没备份成功,稍后再试一次。', "Backup didn't complete — try again shortly."));
+    }
+  }
+
+  async function runDriveBackup() {
     const { pushBackupToDrive } = await import('@/lib/portal/drive-backup');
     const r = await pushBackupToDrive();
     if (r.ok) { setDriveState('done'); setDriveMsg(L(dict, '✓ 已免费备份到你的 Google Drive', '✓ Backed up free to your Google Drive')); }
@@ -555,20 +587,32 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       case 'not_signed_in': return L(dict, '先登录(上方入口),才能同步到你的云账户。', 'Sign in first (link above) to sync to your cloud account.');
       case 'cloud_not_configured': return L(dict, '云同步暂未开启,稍后再试。', "Cloud sync isn't enabled yet — try again later.");
       case 'too_large': return L(dict, '数据超过 8MB 单次上限,先导出到本地留一份。', 'Data is over the 8MB limit — export a local copy for now.');
-      default: return L(dict, '这次没传上去。检查网络后可以再试一次。', "Didn't go through. Check your connection and try again.");
+      // 构建失败是本机的事,别让用户去查 WiFi(此前一律报「检查网络」,方向就指错了)
+      case 'build_failed': return L(dict, '这次没能把数据打包好 —— 不是网络问题。先用下面的「导出全部」留一份到本机,再把这条告诉我们。', "Couldn't package your data — this isn't a network issue. Use “Export everything” below to keep a local copy, then let us know.");
+      case 'upload_failed': return L(dict, '服务器没收下这份备份,过一会儿再试一次。', 'The server rejected this backup — please try again shortly.');
+      default: return L(dict, '这次没传上去(可能是网络慢或超时)。稍后再试一次。', "Didn't go through (slow network or timeout). Try again in a bit.");
     }
   }
 
   async function handleCloudBackup() {
     setCloudState('pushing');
     setCloudError(null);
-    const result = await pushBackupToCloud();
-    if (result.ok) {
-      setCloudState('done');
-      setCloudBackupAt(result.at || new Date().toISOString());
-    } else {
+    // 兜底 try/catch:此前没有 —— pushBackupToCloud 内部若**抛错**(而不是返回错误结果,
+    // 例如 gzip / Blob 在超大 payload 上抛),这里的 await 直接 reject,
+    // 状态就永远停在 pushing,按钮卡死在「正在备份…」(手机实测)。
+    // 红线:每个异步动作都必须有可见结局,挂着不算结局。
+    try {
+      const result = await pushBackupToCloud();
+      if (result.ok) {
+        setCloudState('done');
+        setCloudBackupAt(result.at || new Date().toISOString());
+      } else {
+        setCloudState('error');
+        setCloudError(result.error || 'network');
+      }
+    } catch {
       setCloudState('error');
-      setCloudError(result.error || 'network');
+      setCloudError('build_failed');
     }
   }
 
@@ -582,13 +626,19 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     if (!confirm(L(dict, '从云恢复:把云端备份合并回本机(仅补缺,不覆盖已有数据)。完成后会自动刷新。确认继续？', 'Restore from cloud: merges your cloud backup into this device (fills gaps, keeps existing). It will refresh when done. Continue?'))) return;
     setCloudRestoreState('pulling');
     setCloudRestoreError(null);
-    const result = await pullBackupFromCloud('merge');
-    if (result.ok) {
-      setCloudRestoreState('idle');
-      setTimeout(() => window.location.reload(), 700); // reload 让各 store 重新水合
-    } else {
+    // 同「备份」:内部抛错时也要有结局,否则按钮永远停在「正在恢复…」
+    try {
+      const result = await pullBackupFromCloud('merge');
+      if (result.ok) {
+        setCloudRestoreState('idle');
+        setTimeout(() => window.location.reload(), 700); // reload 让各 store 重新水合
+      } else {
+        setCloudRestoreState('error');
+        setCloudRestoreError(result.error || 'network');
+      }
+    } catch {
       setCloudRestoreState('error');
-      setCloudRestoreError(result.error || 'network');
+      setCloudRestoreError('network');
     }
   }
 
@@ -598,9 +648,11 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     if (exportBusy) return;
     setExportBusy(true);
     setRestoreMsg('');
+    setExportWarn(null);
     try {
       const backup = await buildCombinedBackup({ includeImages: true });
-      const blob = new Blob([JSON.stringify(backup)], { type: 'application/json' });
+      const payload = JSON.stringify(backup);
+      const blob = new Blob([payload], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -609,7 +661,11 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
-      setRestoreMsg(L(dict, '✓ 已导出到本机', '✓ Exported to your device'));
+      // 装箱单回执:「随时导出你的全部数据」是承诺,**无法验证的承诺等于没有承诺**。
+      // 导完就地报清各主数据条数;主数据空了显式提醒(多半是这台设备没同步完)。
+      const inv = inventoryBackup(backup.entries, blob.size);
+      setRestoreMsg(inventorySummary(inv, dict));
+      setExportWarn(inventoryWarning(inv, dict));
     } catch {
       setRestoreMsg(L(dict, '导出失败,请重试', 'Export failed — please try again'));
     } finally {
@@ -803,6 +859,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       </div>
       <input ref={importRef} type="file" accept="application/json,.json" className="nesio-visually-hidden" onChange={handleImportFile} />
       {restoreMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
+      {exportWarn && <p style={{ fontSize: '0.75rem', marginTop: 4, lineHeight: 1.6, color: 'var(--status-gentle)' }}>{exportWarn}</p>}
 
       {/* 2026-07-29:三个红按钮原来是平铺的,一屏三条红 —— CLAUDE.md 红线明写「不用红色制造焦虑」,
           而且这三件事一年也未必做一次,却天天占着视线。收进一个入口,点开才展开。

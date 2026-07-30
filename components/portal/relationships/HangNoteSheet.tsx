@@ -82,11 +82,11 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
 
   return (
     // elevated:这张卡从「关系详情」(自己就是 elevated,又开在洞察 fullscreen 里)再点开。
-    // backdropBlur:bug3 要求打开后背后背景虚化。
+    // blurOverlay:bug3 要求打开后背后背景虚化。
     <NesioSheet
       variant="bottom"
       elevated
-      backdropBlur
+      blurOverlay
       open
       onOpenChange={(next) => { if (!next) onClose(); }}
       card={false}

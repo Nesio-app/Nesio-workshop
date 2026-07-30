@@ -12,7 +12,7 @@ const cases = [
   ['../lib/portal/cloud-memory-sync.ts', ["logDropped('cloud.memory_sync'"]],
   ['../lib/portal/cloud-profile-sync.ts', ["logDropped('cloud.profile_push'", "logDropped('cloud.profile_sync'"]],
   ['../lib/portal/cloud-learning-sync.ts', ["logDropped('cloud.learning_pull'", "logDropped('cloud.learning_push'"]],
-  ['../lib/portal/llm-sweep-auto.ts', ["logDropped('sweep.auto'", "logDropped('sweep.run_now'"]],
+  ['../lib/portal/guidance-judge-auto.ts', ["logDropped('guidance-judge.shadow'", "logDropped('guidance-judge.ledger'"]],
 ];
 
 for (const [path, needles] of cases) {

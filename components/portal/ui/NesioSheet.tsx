@@ -73,11 +73,13 @@ export interface NesioSheetProps {
    */
   elevated?: boolean;
   /**
-   * 遮罩加毛玻璃(bug3:「挂一条 / 打包清单打开后面背景虚化」)。
-   * 只影响遮罩的视觉,不动层序 —— 背后内容仍在,只是虚掉,让注意力落在这张卡上。
-   * reduced-transparency 下自动退成纯遮罩(见 globals.css)。
+   * 遮罩加毛玻璃虚化。两个来源同一诉求:bug3「挂一条 / 打包清单打开后背景虚化」+
+   * Bug4 图11「收藏夹弹层背景虚化」。原来两边各起了一个 prop 名(backdropBlur /
+   * blurOverlay)指向同一个 class —— 合并时统一成 blurOverlay,一个行为只留一个名字。
+   * 默认关:虚化整页在低端机上掉帧,只给「内容要被读、背景要退场」的浮层开。
+   * 只影响遮罩视觉,不动层序;reduced-transparency 下自动退成纯遮罩(见 globals.css)。
    */
-  backdropBlur?: boolean;
+  blurOverlay?: boolean;
   children: ReactNode;
 }
 
@@ -242,7 +244,7 @@ export default function NesioSheet({
   modal = true,
   opaqueOverlay = false,
   elevated = false,
-  backdropBlur = false,
+  blurOverlay = false,
   children,
 }: NesioSheetProps) {
   // opaqueOverlay + 非全屏:面板必须抬到不透明遮罩(929)之上,否则被自己的遮罩盖死
@@ -250,7 +252,7 @@ export default function NesioSheet({
   const overOpaque = opaqueOverlay && variant !== 'fullscreen' ? ' nesio-sheet--over-opaque' : '';
   // elevated:从 fullscreen 面板内部再开的层(940/941)。两者互不冲突,一起挂。
   const panelClass = `nesio-sheet nesio-sheet--${variant}${card ? '' : ' nesio-sheet--bare'}${overOpaque}${elevated ? ' nesio-sheet--elevated' : ''}${className ? ` ${className}` : ''}`;
-  const blurClass = backdropBlur ? ' nesio-sheet-overlay--blur' : '';
+  const blurClass = blurOverlay ? ' nesio-sheet-overlay--blur' : '';
 
   if (variant === 'bottom') {
     return (

@@ -155,6 +155,164 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **Bug4 图文对照 30 页(2026-07-30,已做完)**:一份逐页标注的截图 PDF,页 N 的文字说的是
+  页 N+1 的那张图。分四批落地(`5fdef9b3` / `28efa1c1` / `a4343477` / `24cc43fc` + 自查回补)。
+  改动集中在**删多余文案**与**把说明改成能用的功能**两类,几处涉及数据正确性:
+  ● **admin 面板的数字会说谎**(图18):延迟均值把没报耗时的调用按 0 计入(漏报越多显示越快);
+  总计的成功率/延迟拿各路由**已取整**的百分比再加权;成本只给一个 ≈$X,看不出几成是真
+  token 价。三处全修,面板直说实测覆盖率、估算行标 ≈。
+  ● **时区**(图19):活跃时段按服务端 `getHours()` 分桶 —— 那是「部署在哪就是哪个时区」,
+  换 region 数据会悄悄挪位。改 `getUTCHours()` 明确分桶,前端按看的人的时区旋转。
+  ● **治理面板混了两种数据**(图14):治理面总数是请求时现算的,就绪模块/数据总线来自
+  构建期快照,三张卡长得一样。现各自注明并在快照超 14 天时标出;`聚合状态` 此前不论
+  ok/warn 一律染红;五个写死十六进制改 token;路由注释里写死的「29 个治理面」实际是 21。
+  ● **新功能**(原来只是壳):剧场按钮从「弹 toast」变成真的本机记忆短片(挑记忆里的照片,
+  按点选顺序播,字幕只用用户自己写的原话,不上传不调 AI);「车」页扩成**资产页**
+  (房产 tab + 车 tab),估值走手动锚点(用户拍板方案 1,零外部依赖),税费/维修/保养的钱
+  进财务(`addManualEntry` 带 assetId),不花钱的那半(谁做的/多久一次/下次)进新的
+  `lib/portal/asset-care.ts`,附件压过存本机 IDB;「做饭计划」重做成**美食日历**
+  (一天三顿、只显示排过的、点进详情页编辑),新增 `lib/cooking/meal-calendar.ts`。
+  ● **新 key**:`nesio-asset-care-v1`、`nesio-meal-calendar-v1`(均 durable,已登记)。
+  ● 顺带修 `test:ui-consistency` 回归:引导卡分组图标此前直接写 emoji,改走 icons.tsx 具名键。
+
+- **本机存储 key 全量普查(2026-07-29;161 个 key)**:根因是
+  `storage-manifest.keyKind()` 默认返回 `durable` —— **新 key 不登记就自动获得
+  「进备份 + 整键 replace 上云」**。捡出两类真事故:
+  ● **凭证泄露(安全)**:`nesio-connector-tokens-v1`(Notion/Tesla 原始令牌)与
+  `nesio_admin_secret`(/admin 管理密钥)双双判成 durable → 明文进备份 JSON 并推到
+  云端 user_module_data。根因是靠猜词识别:正则写 `token([-_]|$)` 认不出复数
+  `tokens-v1`,更没有 `secret`。修:扩正则(`tokens?`/`secrets?`/`credentials?`/`apikey`)
+  + 明确的 `AUTH_KEYS` 名单兜底。
+  ● **按设备簿记被当用户数据**:同步水位/云同步 outbox/今天页日键卡片状态/草稿等
+  **24 个键**改判 cache(此前每轮 churn 上云,且整键 replace 两端互抹)。
+  ● **系统性修复**:新增契约 `test:storage-key-registry`(**已进 CI 安全链**)——
+  在册 161 个 key,源码里出现未登记的 key、或在册键分类漂移、或凭证误判、或核心
+  用户数据被误判成缓存,四者任一即红。判据写进 CLAUDE.md 与 `docs/storage-keys.md`:
+  「换台设备后这个值从头开始是否正确?」是→cache,否→durable,凭证→auth。
+  ● **一次性自愈** `lib/portal/storage-heal.ts`(Portal whenIdle,幂等):清历史邮件
+  重复节点(同 emailId 保最早;无 emailId 的**仅当**有同名正主时才删 —— 没正主的是
+  老同步真数据,宁可冗余不误删)+ 清 11 个已拆模块的孤儿 key。契约 `test:storage-heal`。
+
+- **日程页重复与日期(2026-07-29,真机截图实锤)**:三个病灶。
+  ● **富化抹字段(核心,影响面远超日程页)**:`ingestLifeNode` 的 externalKey upsert 走
+  `updateLifeNode`,而后者是**顶层浅合并** → `patch.attributes` 整块盖掉旧的。Gmail 先用
+  本地抽取落节点(带 date/summary/article/store/eta/amount/orderNo/trackingNo),随后云 AI
+  富化只带 AI 那几个字段 → 上述**全被抹掉**,邮件日期退回 createdAt(看起来"所有邮件
+  都是今天")。修:upsert 合并 attributes(新值优先、旧值补位)—— 同时修好判决层邮件
+  信号与记忆详情的字段缺失。
+  ● **无主富化节点**:AI 认不出源邮件时没有 emailId → externalKey 为 null → 每轮富化新建
+  一个去重不掉的重复。修:认不出就丢弃这条富化;能认出的补上邮件头 date/from。
+  ● **跨日历同一场会**:多日历订阅同一场会,start 时区写法不同(Z / +08:00),同步侧按
+  原文比对认不出。修:展示层按「标题|绝对时刻」再收一次。
+  ● 另:日程页此前**完全没用 Gmail 的分类字段**(路由早已把 labelIds 归一成 `mailCategory`
+  存进节点,下游却在用本地正则猜广告)。改为 promotions/social 用 Google 判定直接毙、
+  IMPORTANT 直接留,本地正则降级为无官方分类时的兜底;邮件排序改按绝对时刻
+  (RFC2822 头字符串比大小是错的)。契约 `test:schedule-panel-dedup`。
+
+- **Guidance 全 AI 化(设计定稿 2026-07-29;Step 0-3 已落地,影子模式运行中)**:
+  用户拍板把 8 层规则管线(severity 表/窗口/打分/预算/冷却/排序/AI 润色)换成
+  **1 个 AI 判决层 + 3 道承诺门 + 1 个档案**。规则从「判断内容」退到「执行承诺」。
+  设计要点(都是审计换来的,别回退):① 指纹 = hash(决策相关字段白名单),算在**源信号**上,
+  AI 输出不参与(v1 静音失效尸检);② 判决与时间无关({showFrom,showUntil} 绝对日期,
+  本地日键每日免费重算),缓存键=指纹 → 判过永不重判(稳定性,措辞一变静音就失效);
+  ③ 跨批归并:prompt 带活跃卡清单,mergeInto 只认真活跃卡,归并不改文案不解封不复活;
+  ④ 严格解析在服务端:幻觉指纹丢弃/6 分组封闭/窗口钳制≤14天/纯文本源(email/memory)
+  severity 封顶 1(结构化字段才配 ≥2 —— 也是邮件注入的爆炸半径钳制);⑤ 三门:静音
+  (永不再出,severity 3 也无上诉)/当日 dismiss(cooling 的全部合法遗产)/配额(定序:
+  sev 降序→showUntil 近→结构化优先;**sev3 豁免** —— 承诺管噪音不管安全);⑥ 兜底
+  **零分类零正则**(今明全部日历事件+物品今明效期+账单≤3天 —— 家长会不再因不认得而漏);
+  ⑦ 档案双清单(洞察·回望):「说了的」(规则/影子双轨+whyNow+证据+门记录+改判,改判率
+  >15% 亮琥珀)+「没说的」(AI declined+理由+「该提醒我」——**漏报的唯一监测面**);
+  ⑧ 跳转 resolver 从指纹前缀确定性推导(AI 的 target 字段废弃;解析不出=不渲染按钮);
+  ⑨ 影子模式:判决只进档案不上屏,老管线继续出卡,攒对照;影子改判桥进 card-verdict,
+  实弹切换那天直接生效;⑩ 成本 admin 全捕捉:/api/portal/guidance-judge 走 completeText
+  (真实 token+cost_usd 进 telemetry_events),/admin AI 成本面板改为**优先真实 cost_usd**
+  (原为拍平常数)。文件:lib/platform/guidance-engine/{ai-judge,guidance-gates,fallback-cards}.ts ·
+  lib/portal/{card-archive,card-target,guidance-judge-auto}.ts · app/api/portal/guidance-judge ·
+  components/portal/insights/CardArchivePanel.tsx(挂洞察·回望「我的实验」槽位旁)。
+  契约:test:guidance-judge / test:guidance-gates / test:card-archive(均可注入 now)。
+  **数据缺口补齐(2026-07-29 第二批,影子判决的输入面拉满)**:
+  ● **Plaid /liabilities/get 接入**(用户定的最高优先缺口 —— 9 张卡的还款日/最低还款
+  此前没有任何来源):transactions 路由与 recurring 同款容错(单 token 失败不阻断、
+  产品未开通静默跳过、全挂字段缺席保留旧数据),归一 {accountId,kind,dueDate,minPayment,
+  statementBalance,isOverdue};客户端 `nesio-plaid-liabilities-v1`(bank-tx save/load);
+  judge 信号窗口 [过去7天(逾期仍要说), +14天],月度账期 dueDate 变 → 新指纹 → 自动重判。
+  ● **邮件正文喂判决**:批内 email 信号从本机 IDB(getEmailBody,里程碑 A)取全文 ≤4k
+  附进 fields —— 指纹只认白名单字段,附正文不改指纹(静音/去重稳定)。
+  ● **天气告警接线**:WeatherSnapshot.alert(NWS 字符串,取了一直没用过)+ 日常天气
+  (温度取整防指纹抖动)走 domain 源进判决。
+  ● **隐私清除确认免做**:档案/judge ledger/verdict 全是 `nesio-` 前缀 localStorage,
+  storage-manifest 的 purgeLocalData 自动覆盖;只有独立 IDB 才需手工挂 purge。
+  **Step 4-6 硬拆到底(2026-07-29 同日,用户拍板「硬拆到底」跳过影子对照周)**:
+  ● **实弹**:出卡源 = loadLiveJudgedCards(ledger 窗口重算+三门+临近保底,同步免费);
+  文案即判决文案(润色层删除);卡轻点走 resolver;「知道了」= dismissJudgedCard 当日日键;
+  severity 3 豁免展示配额(TodayFeed urgent 通道);AI 不可用 → 结构化兜底 + 可见提示行。
+  免费档 canUsePaidCloudAi 前置拦下不出网(paid-cloud-gate 契约改钉这里)。
+  ● **物理删除 13 文件**:guidance-pipeline / source-adapters / interrupt-evaluator /
+  cooling-store / consequence-rules / action-window / actionability / attention-budget /
+  guidance-ranker / llm-sweep(+auto+route)/ guidance-language 路由。types.ts 瘦身只剩
+  DomainInsightItem(衣橱/跨区仍引)。**正则病灶真机实锤后拆**:GitHub PR 邮件标题的「健身」
+  被 LEXICON.health 抓成「今天的健康打卡」+打卡按钮 —— specialDays/healthItems 两条正则路径
+  刻意不喂判决(生日走 relationship person 节点,健康走 health 域判定)。keyword-lexicon 保留
+  但降级为邮件候选粗筛(召回),不再决定卡类型。attention-engine 保留(FOCUS 区日历排序,
+  不属出卡管线)。DEC 卡/穿搭折成 extras domain 信号进判决(面不丢,出不出归 AI)。
+  cloud-learning-sync 剥离 ranker(学习态只剩偏好,旧 blob trainLog 读时忽略)。
+  ● **契约随拆重写**:删 test:llm-sweep/guidance-ranker/guidance-holiday-fallback;
+  card-verdict 改钉三门消费(isMuted→isCardSuppressed / dismissJudgedCard);
+  sync-dedup-mute 的「改写前定死指纹」改钉「factKey=源信号首指纹」;finance-insight/
+  health-guidance-bridge/node-provenance/relationship-insight 改钉 gatherDomainInsights→判决批
+  新链路;cloud-learning-sync/paid-cloud-gate/server-entitlement/ai-route-provider-parity/
+  context-adapters/silent-failure-observability 同步更新。
+  ● **Step 6 推送(用户拍板:设置页开关、sev3 才推)**:web-push 依赖 + 
+  supabase-push-subscriptions-v1.sql(**需部署侧 apply**)+ /api/portal/push-subscribe
+  (登记/退订,service-role 写)+ push-send(判决路由 after() 里对 sev3 新卡发推,
+  410/404 清死端点)+ 设置页「重要提醒推送」开关(权限只在开关处要,失败态可见)。
+  **部署侧动作**:apply 上述 SQL + 配 NEXT_PUBLIC_VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY /
+  VAPID_SUBJECT(未配则推送整体 inert)。
+  **风险如实记录**:AI 判决在真机零次运行的状态下上了实弹(用户明示拍板)——
+  AI 挂/无 key 时 Today 只有结构化兜底;档案(洞察·回望)是唯一监测面,上线头几天盯改判率。
+  继承债:ledger/档案/verdict 三个 key 跨端要 union 语义,暂不进 module-sync 整键 replace。
+
+- **反馈学习环曾经整段空转(2026-07-29 修;用户实锤「我点了稍后、不要再出现、或者
+  喜欢,不管点哪个他都会出现」)**。审计结论:不是某个动作坏了,是 per-card 这一维
+  **没有任何消费者** ——
+  ① `guidance-ranker` 在线学习 2026-07-27 已退役(`RANKER_LEARNING_ENABLED=false`),不再订总线;
+  ② `preference-store` 只认可复用维度 `{domain, card_type, alert_type, merchant}`,
+     Today 发的是 `dimension:'card'` → 直接丢弃;
+  ③ `feedback-log` 对 `today/card` 直接 `return`(指望 DEC 富路径落事实),而财务/域洞察卡
+     从不登记 `getRegisteredDecCard` → 连事实都没落;
+  ④ 「稍后」只走 `snoozeOverdue(card.nodeId)`,而这些卡根本没有 nodeId → 纯空转;
+  ⑤ 唯一残留的记忆是 cooling-store 的 2~24 小时冷却,而且渲染层 `recordDismissed(card.cardType)`
+     写的键与管线读的 `dedupKey`(多实例类型是 `type:id`)**对不上**,自适应加倍冷却从未生效。
+  **修法**:新增 `lib/portal/card-verdict.ts` —— 用户的裁决要比数据活得久。
+  稍后=3 天到期(不看内容,不依赖 nodeId)/ 不要再出现=按**事实指纹**永久静音(内容变了才放行)/
+  太多了=整类静音 30 天 / 喜欢=只改排序(补发 `dimension:'card_type'`,管线打分读
+  `getWeight('card_type', …)`)。指纹必须在 **Layer 7 AI 改写之前**算定(`ProactiveCardData.factKey`),
+  否则每天一次新改写就是一个新指纹,静音永远命中不了 —— 第一版就栽在这。
+  静音必须可反悔:`readCardVerdicts`/`clearCardVerdict`,已在「Nesio 记得的偏好」面板列出 +「重新接收」。
+  契约:`scripts/card-verdict.test.mjs`。
+  **剩余欠账**:`nesio-card-verdict-v1` 走通用 module-sync(整键 replace / LWW),
+  两端各自静音会互相覆盖;真正对的语义是 union(静音只增不减)。等跨端备份问题收敛后再看。
+
+- **API 导入源取数窗口普查(2026-07-29,用户问「健康/足迹/Granola 是不是也这样」)**:
+  逐个源查代码,结论是**一类系统性问题**,不是四个孤立 bug。事实表已固化为
+  `IMPORT_WINDOWS`(lib/portal/backup-inventory.ts,契约钉住)并在「数据接入」页
+  折叠展示 —— 用户看到某板块内容少时先对表,别再误判成同步坏了。
+  ● **日历:只拉未来 90 天,一条过去的都不拉**(calendar/route.ts:238 `timeMin = now`,
+  maxResults 80/50)。这条最反直觉:一个把「回溯>预测」写进公理的 App,日历里只有未来。
+  QA 报告的「202 条日历项」不是同步不全,是设计如此。
+  ● **Gmail:首次仅 `newer_than:30d`**,之后增量(gmail/route.ts:193)。181 封同理。
+  ● **Granola:接口只接受 this_week/last_week/last_30_days**,最多 30 天,无更宽选项。
+  ● Plaid:分页正确(50 页 × 100,`has_more` 为真就继续,上限 5000),**是唯一有
+  真全量回填的源**;但 `/transactions/sync` 产品**不覆盖投资账户**,券商流水另走
+  `/investments/transactions`(近 24 个月)—— 这解释了 24 账户仅 127 笔:
+  多为投资账户碎账,消费卡可能压根没连。
+  ● 健康:Apple Health 导出文件里有多少是多少(全历史),瓶颈在用户导不导。
+  ● 足迹:上限 20000(非瓶颈);历史靠手动导 Google 时间轴 JSON,实时点靠后台定位。
+  **结论与欠账**:三个源(日历/Gmail/Granola)结构上拿不到更早数据,而 App 的立身之本
+  是回溯 —— 这是**产品级缺口**,不是修个参数的事(日历可加历史回填参数;Gmail 可加
+  一次性深挖;Granola 受上游 API 限制)。已如实呈现给用户,**是否补回填待用户拍板**。
+
 - **预测功能(实验版;2026-07-29 用户批「先离线回测」)**:评估 MiroFish(多 Agent 模拟
   预测,AGPL + Zep 云记忆)**核心不借** —— 方向与「回溯>预测」公理相反、要把生命图谱
   送第三方云。改为自研,立场三条:① 预测必须可证伪(每条记录做出时间/区间/依据,
@@ -171,6 +329,27 @@ sensitivity/retention 枚举化(中期)。
   关键发现:仓库 42 个导出函数本就接受可注入 `now`,天然可回测,无需改造。
   合成样例首轮即淘汰「日均外推」(技能分 −301%:月初房租被摊到全月 → 系统性高估),
   「已发生+同期尾段中位数」+22.6% 达标、p80 带宽 ±6.9%。
+  **首轮真实回测(18 个月 / 94 笔)与后续修正**:结果不是「能不能做」,而是暴露了
+  三件事。① [我的 bug] 不同开口率的预测器被并排排序(日均外推 6 个月、尾段中位数
+  16 个月,MAE 算的不是同一批月份)→ 新增 backtestPaired,横向比较只在共同月份;
+  ② [我的漏洞] 裁决只比相对好坏 → 首轮四个候选全「采纳」,其中技能分 +60% 的那个
+  区间是 ±107%(「大概花 1000,上下浮动一千」)→ 补 MAX_P80_PCT=25 与
+  MIN_COVERAGE=0.8,verdict 增 unusable/sparse,最佳候选改按可用性排序;
+  ③ [目标选错] 每月约 5 笔的密度下,「月底总支出」被单笔消费落在月末还是月初主宰,
+  **是预测目标本身不可预测**,不是方法不好 → 增开「定期账单」候选线
+  (下次扣款日/金额,间隔与金额均取中位数抗跳票与一次性异常)。
+  合成样例上:日期线判「否决」——**不是不准,是「上次+30天」一样准**(技能分 +0.0%,
+  平均误差 0.56 天),即回测台在说「别写复杂算法」;金额线赢 21% 但区间 ±58% 判不可用。
+  口径修正:回测此前只读 nesio-bank-tx-v1,比 App 的 loadCombinedFinanceTx 还窄 →
+  已补读 nesio-expenses-v1(手动记账/现金红包渠道)。
+  **数据悬案(待用户确认)**:导出备份里流水 127 笔,用户称 App 内应有 3000+。
+  已查证导出链路无结构性缺陷(collectIdbBlobs 直接枚举 IDB 全部键、IDB 值覆盖
+  localStorage、键名与 createBlobStore 一致),故加「备份清单体检」把答案摊开:
+  若清单显示流水 3000+ 则是读取问题、显示 127 但记忆 2000+ 则是该设备未同步完、
+  几乎全缺则是导出 bug。**此悬案未清前,前述所有裁决不作数。**
+  **顺带产出(独立价值)**:`lib/portal/backup-inventory.ts` + 导出装箱单回执 ——
+  「随时导出你的全部数据」此前无从验证,现在导完就地报清各主数据条数与体积,
+  主数据缺失或 0 条时琥珀提醒(空数组比缺键更迷惑人)。契约 test:backup-inventory。
   **下一步(等用户跑真实数据)**:`npm run forecast:backtest -- --data <导出备份>`,
   按真实技能分决定做哪几个;通过的才接 UI。候选池待扩:现金流最低点/转负日
   (balanceProjection 已在,但缺历史每日余额,回测可行性待评)、下一笔定期账单日期与
@@ -223,11 +402,23 @@ sensitivity/retention 枚举化(中期)。
   2191 条旧数据显示层即净);问候语「最近的一件今天到期」。UTC 日键清理:
   「现在→日键」语义 26 处全改本地(lib 层内联防 vm 测试壳,组件层用
   lib/portal/local-day);历史时间戳分桶口径不动(移动已有数据归属日风险大)。
-  **仍欠(小尾巴)**:cloud-module-sync 一次同步内 buildCombinedBackup 读两遍 +
-  contentHash 不让步(微优化);日程行点开节点详情(现为搜索跳转);积分云恢复加
-  「已恢复 N 分」回执;outbox 重试无退避;VoiceInputSheet chunk 预取;记忆页挂载时
-  200 条顺序 POST 回填;健身「练过的/身体数据」卡在源码中不存在(疑 QA 构建不一致,
-  待对版本)。全程待真机复验。
+  **小尾巴已清(2026-07-29)**:① 回填记账 O(N²) → 批量(200 节点 × 四阶段 ≈ 800 次
+  全表读写,是打开记忆页卡顿的真实来源;诊断报告说的「200 次顺序 POST」不确 ——
+  请求本就是一次批量 POST,贵在记账);② outbox 重试补指数退避(30s×2^n,封顶 6h)
+  + 单轮 25 条上限,且**网络错改判 transient** —— 此前断网一次就被标永久失败、
+  踢出重试队列,还顺序发几百个注定失败的请求;③ 一轮同步内 buildCombinedBackup
+  读两遍 → pull 未落地任何改动时复用快照(落地了就必须重读,否则会用 pull 前的旧值
+  把刚拉下来的新值顶回去);④ 云端填数留一次性回执(lib/portal/cloud-restore-receipt.ts,
+  今天页读一次即清)—— 积分 0→150 查证是按设计的跨设备恢复,但**数据被悄悄改变
+  而用户不知道本身就是问题**;⑤ 日程行改为直接打开节点详情(r.id 本就是真实节点 id,
+  此前一律跳关键词搜索、标题拿去全库搜多半零命中 = 像死按钮),洞察内挂
+  MemoryNodeDetail(层叠统一后从洞察开不再被盖);⑥ VoiceInputSheet chunk 空闲预取。
+  契约 test:cloud-retry-backoff。顺带更新一条既有钉子:catch 里落账失败改用批量函数,
+  钉子放宽为「认两种写法」——钉的是行为不是函数名。
+  **仍欠**:健身「练过的/身体数据」卡在源码中不存在(疑 QA 构建不一致,待对版本);
+  剂量编辑器;跑步长计时无 wake-lock;contentHash 不让步(微优化)。
+  **全程待真机复验 —— 本会话 20+ commit 一次真机都没验过,尤其 sheet 层叠统一
+  影响全 App 每一个弹窗。**
 - **健身板块:「今天练什么」生成入口 + 假功能修复批(2026-07-29,用户批)**:
   评估 workout.lol —— 视频库**不借**(639 条系 MuscleWiki 抓取转存自家 S3,版权不净、
   外链不可控;本地 1324 GIF 已全量),只借「器械先行 → 选部位 → 一键成套」的入口形。

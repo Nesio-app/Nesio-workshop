@@ -58,9 +58,12 @@ export function useProfileAvatar(enabled: boolean = true): {
   }, [enabled, fetchFreshUrl]);
 
   const refreshAvatar = useCallback(() => {
+    // 先把坏掉的 URL 摘掉再去换新的:签名 URL 过期时,<img> 会先渲染成浏览器的
+    // 「破图」图标(真机看到的那个蓝色问号方块),等换签回来才恢复。
+    // 立刻置空 → 退回首字母占位,过程中不出现破图。
+    setAvatarUrl('');
     const path = loadProfileSettings().avatarStoragePath;
     if (path) fetchFreshUrl(path);
-    else setAvatarUrl('');
   }, [fetchFreshUrl]);
 
   return { avatarUrl, refreshAvatar };

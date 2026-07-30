@@ -44,7 +44,9 @@ for (const [file, feature] of GATED) {
 
 {
   const today = read('components/portal/today/useTodayData.ts');
-  assert.ok(/!cachedCopy && canUsePaidCloudAi\(\)/.test(today), '引导语润色分层启用后静默跳过');
+  // 硬拆后(2026-07-29):润色层已删;等价的门是 AI 判决批的免费档前置拦截(不出网),
+  // 路由端 guardAiRoute + requirePaidCloudAi 仍是唯一强制点。
+  assert.ok(/if \(canUsePaidCloudAi\(\)\) void maybeRunJudgeBatch\(/.test(today), 'AI 判决批免费档前置拦下,不出网');
 }
 
 // ── #3 email_reply 死门接线 ──

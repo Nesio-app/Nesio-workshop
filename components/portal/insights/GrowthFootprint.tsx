@@ -72,10 +72,16 @@ export default function GrowthFootprint({ onGoTab }: { onGoTab: (t: 'practice' |
       {/* 2026-07-28 UI 精修(标注 图21「折叠进成长足迹」):四个数字方块 + 这周节奏 + 8 周曲线
           原本一进成长页就铺满一屏,把「今天这一件」挤到屏幕外。现在收进标题下,想看再展开;
           那句「从 X 月 X 日算起,你回头看了自己 N 次」留在外面 —— 一句话就够代表足迹了。 */}
-      <button type="button" className="ng-fp-hd ng-fp-hd--btn" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
-        <span className="l">{L(dict, '成长足迹', 'Your footprint')}</span>
-        <span className="ng-fold-caret" aria-hidden>{open ? '⌃' : '⌄'}</span>
-      </button>
+      {/* 2026-07-29 标注(Bug4 P9「折叠没有效果」):可展开的内容整块在 f.total > 0 分支里,
+          而空态照样渲染折叠箭头 —— 点了当然没反应。没内容就不给箭头(退回纯标题)。 */}
+      {f.total === 0 ? (
+        <div className="ng-fp-hd"><span className="l">{L(dict, '成长足迹', 'Your footprint')}</span></div>
+      ) : (
+        <button type="button" className="ng-fp-hd ng-fp-hd--btn" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          <span className="l">{L(dict, '成长足迹', 'Your footprint')}</span>
+          <span className="ng-fold-caret" aria-hidden>{open ? '⌃' : '⌄'}</span>
+        </button>
+      )}
 
       {f.total === 0 ? (
         <p className="ng-fp-empty">{L(dict, '还没开始留下觉察 —— 答一条今天的引导,足迹就从这里长出来。', 'No insight left yet — answer today’s prompt and your trail starts here.')}</p>

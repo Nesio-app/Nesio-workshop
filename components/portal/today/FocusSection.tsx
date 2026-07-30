@@ -18,6 +18,7 @@ import {
 import { DormantReviewCard } from './DormantReviewCard';
 import { PinnedAttentionCard, CollapsedCalItem } from './CalendarCards';
 import { isMeetingNode } from './meeting-node';
+import { recordCardVerdict, isCardSuppressed } from '@/lib/portal/card-verdict';
 import { FocusCardDetail, FOCUS_TYPE_ICON } from './FocusCardDetail';
 import { MeetingRecorderSheet } from './MeetingRecorderSheet';
 import MemoryFlashBanner, { useMemoryFlash } from '../MemoryFlashBanner';
@@ -199,19 +200,20 @@ export function TodayFocusSection({
     taskIds: rawTaskNodes.map((n) => n.id),
     guidanceClaims: guidanceNodeIds ?? [],
   });
-  const taskNodes = rawTaskNodes.filter((n) => verdict.taskIds.includes(n.id));
+  const taskNodes = rawTaskNodes
+    .filter((n) => verdict.taskIds.includes(n.id))
+    // 裁决层消费端:「没用」过的节点不再占今天(跨天生效,不只当天)
+    .filter((n) => !isCardSuppressed({ cardId: n.id, factKey: n.id }));
 
   // 置顶结果回传组合根(TodayFeed 隐藏被置顶抢占的引导卡)
   const pinnedIdForReport = pinned?.id ?? null;
   useEffect(() => { onPinnedResolved?.(pinnedIdForReport); }, [pinnedIdForReport, onPinnedResolved]);
 
-  // ── Special days (today / tomorrow) ──
-  const nearSpecialDays = specialDays.filter((d) => d.daysUntil <= 1);
-
-  const showDormant = verdict.showDormant && dormantCandidate && !dormantDismissed.has(dormantCandidate.node.id);
-
-  const collapsedCount = rest.length + taskNodes.length + nearSpecialDays.length + (showDormant ? 1 : 0);
-  const dormantNodeId = dormantCandidate?.node.id;
+  // 纪念日与休眠复访已移出时间线(用户拍板 2026-07-29):
+  // 生日走判决层 relationship 域(person 数据,正则路径全退);休眠复访不属「今天的日程」,
+  // 回忆面由回顾卡承担。specialDays prop 留着(移除属渲染层决定,数据层不动)。
+  void specialDays; void dormantDismissed;
+  const collapsedCount = rest.length + taskNodes.length;
   const isEmpty = !pinned && collapsedCount === 0;
 
   const doneToday = doneIds.size;
@@ -225,6 +227,9 @@ export function TodayFocusSection({
   // 并当天从今天移除(持久化,次日不复活缠人)。不删节点 —— 记忆页仍在,只是不占今天。
   function handleNotUseful(id: string) {
     recordCardFeedback(id, 'wrong');
+    // 接裁决层(Today 审计 2026-07-29):此前只当天移除 = 和主动卡修之前一样的死路。
+    // 「没用」= 该节点事实没变就别再占今天(mute 按 id 永久,节点在记忆页仍在)。
+    recordCardVerdict({ cardId: id, factKey: id }, 'mute');
     setDismissed((prev) => { const next = new Set(prev); next.add(id); persistDismissed(next); return next; });
   }
 
@@ -233,19 +238,6 @@ export function TodayFocusSection({
   const collapsedNodes: React.ReactNode[] = [
     ...rest.map((obj) => (
       <CollapsedCalItem key={obj.id} obj={obj} onOpenRecorder={() => setCalRecorderEvent(obj.event)} />
-    )),
-    ...nearSpecialDays.map((item) => (
-      <li key={item.nodeId} className="nesio-collapsed-item">
-        {/* 批次 111:纪念日也做成时间线节点(圆点在轨上 + 日期 kicker) */}
-        <div className="nesio-collapsed-row">
-          {/* 批次 129:纪念日节点圆内嵌礼物符号 */}
-          <span className="nesio-collapsed-dot nesio-collapsed-dot--clock" aria-hidden><IconGift size={13} /></span>
-          <span className="nesio-collapsed-task-body">
-            <span className="nesio-collapsed-kicker">{item.daysUntil === 0 ? t(locale, 'todayLabelToday') : t(locale, 'todayLabelTomorrow')}</span>
-            <span className="nesio-collapsed-title">{item.name}</span>
-          </span>
-        </div>
-      </li>
     )),
     ...taskNodes.map((node) => (
       <CollapsedTaskItem
@@ -260,16 +252,6 @@ export function TodayFocusSection({
         onFocusMode={onFocusMode ? () => onFocusMode(node) : undefined}
       />
     )),
-    ...(showDormant && dormantCandidate && dormantNodeId ? [(
-      <DormantReviewCard
-        key="dormant"
-        candidate={dormantCandidate}
-        onDo={() => { const next = applyReviewAction(dormantNodeId, 'do'); onSetDormantStore(next); setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; }); if (dormantCandidate.kind !== 'soft-archive') onFocusMode?.(dormantCandidate.node); }}
-        onSnooze={() => { const next = applyReviewAction(dormantNodeId, 'snooze'); onSetDormantStore(next); setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; }); }}
-        onArchive={() => { const next = applyReviewAction(dormantNodeId, 'archive'); onSetDormantStore(next); setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; }); }}
-        onFinalize={() => { const next = applyReviewAction(dormantNodeId, 'finalize'); onSetDormantStore(next); setDormantDismissed((p) => { const n = new Set(p); n.add(dormantNodeId); return n; }); }}
-      />
-    )] : []),
   ];
   // 批次 117(用户定「除心情最多显示 2 个」):时间线心情 + 至多 2 个要紧事,
   // 置顶卡算 1 个(有置顶卡则折叠区只露 1)。多出来的收成「稍后 · 还有 N 件」+ 号节点。

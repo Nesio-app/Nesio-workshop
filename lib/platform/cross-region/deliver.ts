@@ -13,7 +13,7 @@ import { CROSS_REGION_COLUMNS, columnLabel } from './detect';
 import { getConsentedDomains } from './consent';
 import { rankCrossRegionByBandit } from './bandit';
 import { currentAcceptProbability } from '@/lib/platform/interruptibility';
-import type { DomainInsightItem } from '@/lib/platform/guidance-engine/source-adapters';
+import type { DomainInsightItem } from '@/lib/platform/guidance-engine/types';
 
 const COOLDOWN_KEY = 'nesio-cross-region-delivery-cooldown-v1';
 type CooldownLog = Record<string, { at: string; bucket: string }>;

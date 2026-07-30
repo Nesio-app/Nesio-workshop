@@ -417,7 +417,7 @@ function buildReason(ctx: OutfitContext, target: Warmth, needOuter: boolean, nee
 
 /* ───────────────────────── Today 域接入(domain_insight) ───────────────────────── */
 
-import type { DomainInsightItem } from '@/lib/platform/guidance-engine/source-adapters';
+import type { DomainInsightItem } from '@/lib/platform/guidance-engine/types';
 
 const GARMENT_LABEL: Record<GarmentType, [string, string]> = {
   top: ['上装', 'top'], bottom: ['下装', 'bottoms'], outer: ['外套', 'jacket'],

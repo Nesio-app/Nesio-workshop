@@ -29,14 +29,21 @@ interface Metrics {
   topEvents7d?: Array<{ name: string; count: number }>;
   daily60d?: DailyPoint[];
   funnel30d?: Array<{ step: string; devices: number }>;
-  ai?: { totals: { calls: number; estCostUsd: number; okRate: number | null; avgLatencyMs: number | null }; routes: Array<{ route: string; calls: number; okRate: number; avgLatencyMs: number; estCostUsd: number }> };
+  ai?: { totals: { calls: number; estCostUsd: number; measuredCostUsd?: number; measuredCalls?: number; okRate: number | null; avgLatencyMs: number | null }; routes: Array<{ route: string; calls: number; okRate: number; avgLatencyMs: number; estCostUsd: number; measuredCalls?: number; measuredCostUsd?: number }> };
   smartness?: { score: number; dims: Array<{ dim: string; score: number; thin: boolean }> };
-  clientErrors?: Array<{ kind: string; message: string; count: number; devices: number; lastAt: string }>;
+  clientErrors?: Array<{ kind: string; message: string; source?: string; count: number; devices: number; lastAt: string; firstAt?: string }>;
   roadmapVotes?: Array<{ id: string; title: string; status: string; avg: number | null; count: number }>;
   experiments?: Array<{ id: string; name: string; enabled: boolean; variants: Array<{ variant: string; devices: number }> }>;
   cardFeedback30d?: { useful: number; wrong: number; too_much: number; other: number };
   productEvents30d?: Array<{ type: string; count: number }>;
 }
+
+/** 产品事件的人话名(Bug4 图14)。没登记的照原样印,不猜、不硬翻。 */
+const PRODUCT_EVENT_LABEL: Record<string, string> = {
+  'today.card.feedback': '给今日卡打了反馈',
+  'feature.wish': '给未来功能投了票',
+  'plan.notify_optin': '打开了提醒推送',
+};
 
 const card: React.CSSProperties = {
   background: 'var(--glass-bg-raised)', border: '1px solid var(--glass-border)',
@@ -58,6 +65,7 @@ export default function AdminPage() {
   const [data, setData] = useState<Metrics | null>(null);
   const [loading, setLoading] = useState(false);
   const [range, setRange] = useState<RangeDays>(14);
+  const [errOpen, setErrOpen] = useState<string | null>(null); // 展开中的客户端错误(Bug4 图15)
   const [autoRefresh, setAutoRefresh] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -132,7 +140,12 @@ export default function AdminPage() {
   return (
     <main style={{ maxWidth: 880, margin: '0 auto', padding: '1.2rem 1rem 4rem', fontFamily: 'var(--font-sans)' }}>
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1rem' }}>
-        <h1 style={{ fontSize: 'var(--text-h2)', color: 'var(--portal-ink)', margin: 0 }}>Nesio 数据面板</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          {/* Bug4 图13:这一页原本是条单行道 —— 进来之后既没有返回,也没法退出登录,
+              只能靠浏览器后退或手动改地址栏。左边给「回 App」,右边给「退出」。 */}
+          <a href="/" style={{ ...chip(false), textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>‹ 回 App</a>
+          <h1 style={{ fontSize: 'var(--text-h2)', color: 'var(--portal-ink)', margin: 0 }}>Nesio 数据面板</h1>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
           {RANGES.map((r) => (
             <button key={r} type="button" style={chip(range === r)} onClick={() => setRange(r)}>{r} 天</button>
@@ -147,6 +160,20 @@ export default function AdminPage() {
           <button type="button" style={chip(false)} onClick={exportCsv} disabled={!data?.ok} title="导出全部数据为 CSV(Excel 可直接打开)">
             ⤓ CSV
           </button>
+          {data?.ok && (
+            <button
+              type="button"
+              style={{ ...chip(false), color: 'var(--status-risk)', borderColor: 'var(--status-risk)' }}
+              title="清掉本机存的管理密钥"
+              onClick={() => {
+                localStorage.removeItem(SECRET_KEY);
+                setSecret(''); setSaved(false); setData(null);
+                setData({ ok: false, error: 'admin_secret_required' });
+              }}
+            >
+              退出
+            </button>
+          )}
         </div>
       </header>
 
@@ -228,7 +255,8 @@ export default function AdminPage() {
           {/* ── 趋势 ── */}
           <section style={{ ...card, marginBottom: '0.9rem' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-              <p style={{ ...label, margin: 0 }}>{range} 天趋势 — 事件(面积)/ 设备(绿线)/ 上一周期(灰虚线)</p>
+              {/* Bug4 图17:图例原来是「事件/设备/上一周期」三个内部词,看图的人得先翻译一遍。 */}
+              <p style={{ ...label, margin: 0 }}>最近 {range} 天 — 蓝色面积 = 用了多少次 · 绿线 = 多少台设备在用 · 灰虚线 = 上一个 {range} 天</p>
               <span style={label}>{data.generatedAt ? `更新 ${new Date(data.generatedAt).toLocaleTimeString('zh-CN')}` : ''}</span>
             </div>
             <TrendChart data={daily} prev={prevDaily.length === daily.length ? prevDaily : undefined} />
@@ -237,13 +265,13 @@ export default function AdminPage() {
           {/* ── Top 事件 + 漏斗 ── */}
           <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.7rem', marginBottom: '0.9rem' }}>
             <div style={card}>
-              <p style={{ ...label, margin: '0 0 0.6rem' }}>Top 事件(7 天)</p>
+              <p style={{ ...label, margin: '0 0 0.6rem' }}>用得最多的动作(7 天)</p>
               {(data.topEvents7d?.length ?? 0) === 0
                 ? <p style={{ ...label }}>暂无数据 — 遥测刚接通,等它累积。</p>
                 : <TopEventsChart data={data.topEvents7d!} />}
             </div>
             <div style={card}>
-              <p style={{ ...label, margin: '0 0 0.6rem' }}>使用漏斗(30 天,按设备 · 百分比为相对上一步)</p>
+              <p style={{ ...label, margin: '0 0 0.6rem' }}>一路走到哪一步(30 天,按设备算 · 百分比是「上一步里还剩多少人」)</p>
               <FunnelSteps data={data.funnel30d || []} />
             </div>
           </section>
@@ -258,27 +286,37 @@ export default function AdminPage() {
               {data.smartness && <SmartnessRadar dims={data.smartness.dims} />}
             </div>
             <div style={card}>
-              <p style={{ ...label, margin: '0 0 0.4rem' }}>
-                AI 调用与成本(30 天,成本为量级估算)
+              <p style={{ ...label, margin: '0 0 0.2rem' }}>
+                AI 调用与成本(30 天)
                 {data.ai && <span style={{ marginLeft: 8, color: 'var(--portal-ink)' }}>共 {data.ai.totals.calls} 次 · ≈ ${data.ai.totals.estCostUsd}</span>}
               </p>
+              {/* Bug4 图18:「量级估算」是一句免责声明,不是信息 —— 直接说清有几成是真价。 */}
+              {data.ai && data.ai.totals.calls > 0 && (
+                <p style={{ ...label, margin: '0 0 0.4rem', letterSpacing: 0 }}>
+                  其中 {Math.round(((data.ai.totals.measuredCalls ?? 0) / data.ai.totals.calls) * 100)}% 的调用带回了真实 token 价(${data.ai.totals.measuredCostUsd ?? 0}),
+                  其余按每路由拍平单价估;带 ≈ 的行含估算成分。延迟只算真报了耗时的调用。
+                </p>
+              )}
               {(data.ai?.routes.length ?? 0) === 0
                 ? <p style={label}>暂无 AI 调用记录 — 服务端落库 2026-07-04 接通,用一次听简报/问一问就有了。</p>
                 : (
                   <div style={{ overflowX: 'auto' }}>
                     <div style={{ minWidth: 420 }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.7fr 0.7fr 0.8fr 0.7fr', fontSize: '0.68rem', color: 'var(--portal-muted)', padding: '0 0 0.3rem' }}>
-                      <span>路由</span><span>次数</span><span>成功</span><span>延迟</span><span>估算</span>
+                      <span>路由</span><span>次数</span><span>成功</span><span>延迟</span><span>花费</span>
                     </div>
-                    {data.ai!.routes.map((r) => (
+                    {data.ai!.routes.map((r) => {
+                      const allMeasured = (r.measuredCalls ?? 0) >= r.calls;
+                      return (
                       <div key={r.route} style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.7fr 0.7fr 0.8fr 0.7fr', fontSize: '0.76rem', color: 'var(--portal-ink)', padding: '0.22rem 0', borderTop: '1px solid var(--portal-line)' }}>
                         <span>{r.route}</span>
                         <span>{r.calls}</span>
                         <span style={{ color: r.okRate >= 95 ? 'var(--status-go)' : r.okRate >= 85 ? 'var(--status-gentle)' : 'var(--status-risk)' }}>{r.okRate}%</span>
                         <span>{r.avgLatencyMs}ms</span>
-                        <span>${r.estCostUsd}</span>
+                        <span title={allMeasured ? '全部按真实 token 价' : `${r.measuredCalls ?? 0}/${r.calls} 次有真实价,其余为估算`}>{allMeasured ? '' : '≈'}${r.estCostUsd}</span>
                       </div>
-                    ))}
+                      );
+                    })}
                     </div>
                   </div>
                 )}
@@ -288,7 +326,12 @@ export default function AdminPage() {
           {/* ── 功能许愿(Roadmap 评分)+ 实验 ── */}
           <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.7rem', marginBottom: '0.9rem' }}>
             <div style={card}>
-              <p style={{ ...label, margin: '0 0 0.6rem' }}>功能许愿榜(用户在设置 → 投票给未来功能 里打分)</p>
+              {/* Bug4 图16:榜单是死是活看不出来 —— 补一句数据从哪来、★ 和「待投票」各是什么意思。 */}
+              <p style={{ ...label, margin: '0 0 0.2rem' }}>功能许愿榜</p>
+              <p style={{ ...label, margin: '0 0 0.6rem', letterSpacing: 0 }}>
+                候选功能写在 lib/portal/roadmap.ts 里(改代码才增删);★ 分和票数是真实用户票,
+                来自「设置 → 投票给未来功能」,一人一功能一票、可改。写「待投票」= 这条还一票没有。
+              </p>
               {data.roadmapVotes?.map((v) => (
                 <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0', borderTop: '1px solid var(--portal-line)', fontSize: '0.78rem', color: 'var(--portal-ink)' }}>
                   <span>
@@ -300,7 +343,12 @@ export default function AdminPage() {
               ))}
             </div>
             <div style={card}>
-              <p style={{ ...label, margin: '0 0 0.6rem' }}>A/B 实验(代码注册表 lib/portal/experiments.ts,注册即用)</p>
+              {/* Bug4 图15:原来只写了「注册表在哪个文件」,看的人不知道这块在说什么。 */}
+              <p style={{ ...label, margin: '0 0 0.2rem' }}>A/B 实验</p>
+              <p style={{ ...label, margin: '0 0 0.6rem', letterSpacing: 0 }}>
+                同一个功能做两版,按设备随机分。下面每行是一个实验,后面是各版本分到了多少台设备
+                —— 分得均不均,决定了这个实验的结果能不能信。实验在 lib/portal/experiments.ts 里登记,登记即生效。
+              </p>
               {(data.experiments?.length ?? 0) === 0 && <p style={label}>暂无注册实验</p>}
               {data.experiments?.map((e) => (
                 <div key={e.id} style={{ padding: '0.3rem 0', borderTop: '1px solid var(--portal-line)' }}>
@@ -318,17 +366,40 @@ export default function AdminPage() {
 
           {/* ── 客户端错误(错误自己来找你) ── */}
           <section style={{ ...card, marginBottom: '0.9rem', ...(data.clientErrors?.length ? { borderColor: 'var(--status-risk)' } : {}) }}>
-            <p style={{ ...label, margin: '0 0 0.5rem' }}>客户端错误(30 天,来自用户浏览器的自动上报)</p>
+            <p style={{ ...label, margin: '0 0 0.2rem' }}>用户那边报的错(30 天)</p>
+            <p style={{ ...label, margin: '0 0 0.5rem', letterSpacing: 0 }}>
+              用户浏览器崩了会自动送一条过来(只送报错文字和文件名,不带任何个人数据)。点一行看全文。
+            </p>
             {(data.clientErrors?.length ?? 0) === 0
               ? <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--status-go)' }}>✓ 没有错误上报 — 用户端一切干净。</p>
-              : data.clientErrors!.map((e) => (
-                <div key={`${e.kind}:${e.message}`} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', padding: '0.35rem 0', borderTop: '1px solid var(--portal-line)', fontSize: '0.76rem' }}>
-                  <span style={{ color: 'var(--portal-ink)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    <span style={{ color: 'var(--status-risk)', marginRight: 6 }}>{e.kind}</span>{e.message}
-                  </span>
-                  <span style={{ color: 'var(--portal-muted)', whiteSpace: 'nowrap' }}>×{e.count} · {e.devices} 台 · {e.lastAt.slice(5, 16).replace('T', ' ')}</span>
-                </div>
-              ))}
+              : data.clientErrors!.map((e) => {
+                const sig = `${e.kind}:${e.message}`;
+                const open = errOpen === sig;
+                return (
+                  <div key={sig} style={{ padding: '0.35rem 0', borderTop: '1px solid var(--portal-line)', fontSize: '0.76rem' }}>
+                    {/* Bug4 图15:一行截断的报错等于没有报错 —— 点开给全文 + 出错文件 + 第一次出现。 */}
+                    <button
+                      type="button"
+                      onClick={() => setErrOpen(open ? null : sig)}
+                      style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit' }}
+                    >
+                      <span style={{ color: 'var(--portal-ink)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        <span style={{ color: 'var(--status-risk)', marginRight: 6 }}>{e.kind}</span>{e.message}
+                      </span>
+                      <span style={{ color: 'var(--portal-muted)', whiteSpace: 'nowrap' }}>×{e.count} · {e.devices} 台 · {e.lastAt.slice(5, 16).replace('T', ' ')}</span>
+                    </button>
+                    {open && (
+                      <div style={{ marginTop: '0.4rem', padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--portal-accent-soft)' }}>
+                        <p style={{ margin: 0, color: 'var(--portal-ink)', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{e.message}</p>
+                        {e.source && <p style={{ ...label, margin: '0.35rem 0 0', letterSpacing: 0, wordBreak: 'break-all' }}>出错文件:{e.source}</p>}
+                        <p style={{ ...label, margin: '0.2rem 0 0', letterSpacing: 0 }}>
+                          第一次 {e.firstAt ? e.firstAt.slice(0, 16).replace('T', ' ') : '—'} · 最近一次 {e.lastAt.slice(0, 16).replace('T', ' ')} · 影响 {e.devices} 台设备
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
           </section>
 
           {/* ── 反馈 + 产品事件 ── */}
@@ -342,11 +413,12 @@ export default function AdminPage() {
               />
             </div>
             <div style={card}>
-              <p style={{ ...label, margin: '0 0 0.6rem' }}>产品事件(30 天,已登录用户)</p>
+              <p style={{ ...label, margin: '0 0 0.6rem' }}>用户主动做的事(30 天,已登录用户)</p>
               {(data.productEvents30d?.length ?? 0) === 0 && <p style={label}>暂无数据</p>}
               {data.productEvents30d?.map((e) => (
                 <div key={e.type} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--portal-ink)', marginBottom: '0.35rem' }}>
-                  <span>{e.type}</span><span>{e.count}</span>
+                  {/* Bug4 图14:原来直接印内部事件名(today.card.feedback…),看板的人得先认代码。 */}
+                  <span title={e.type}>{PRODUCT_EVENT_LABEL[e.type] || e.type}</span><span>{e.count}</span>
                 </div>
               ))}
             </div>

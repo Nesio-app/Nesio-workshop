@@ -34,7 +34,7 @@ import {
   updateInventoryItem,
   type InventoryItem,
 } from '@/lib/portal/inventory';
-import { listStorageItems, countPantryItems } from '@/lib/portal/inventory-visibility';
+import { listStorageItems, countPantryItems, countWardrobeItems } from '@/lib/portal/inventory-visibility';
 
 interface InventorySheetProps {
   open: boolean;
@@ -110,6 +110,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   // 归「做饭 · 库存」的食材件数 —— 只用来在顶上说一句「另有 N 件在那边」,
   // 让「收纳 18 件」和记忆页那个数对得上,而不是让用户猜剩下几件去哪了。
   const [pantryCount, setPantryCount] = useState(0);
+  const [wardrobeCount, setWardrobeCount] = useState(0);
   const [groupFilter, setGroupFilter] = useState<string>(ALL);
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'list' | 'add' | 'detail' | 'stats' | 'sell' | 'flip'>('list');
@@ -133,7 +134,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
 
   // 食材(subtype=食材)归「做饭·库存」那张脸,物品/收纳页排除,免得护照清单里混进菠菜。
   // 判据收在 inventory-visibility(记忆页那个「收纳」球也读它)—— 各写各的正是 22 vs 18 的来源。
-  const refresh = () => { setItems(listStorageItems()); setPantryCount(countPantryItems()); };
+  const refresh = () => { setItems(listStorageItems()); setPantryCount(countPantryItems()); setWardrobeCount(countWardrobeItems()); };
 
   useEffect(() => {
     if (!open) return;
@@ -288,20 +289,29 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
     >
         {/* 批次 170:去「收纳」标题;统计挪中间上方,方块容器徽章 */}
         <div className="nesio-freeze-header nesio-inv-header">
+          {/* 2026-07-29 标注(Bug4 P10):三个统计位改成「物品 / 衣橱 / 食材」三个口径 ——
+              原来是「件数 / 估值 / 未归位」+ 一句食材去处,四个 chip 讲的是四件事,
+              而用户要的是三类东西各有多少、且各自点得进去。物品数**排除食材与衣服**,
+              否则三个数字加起来比总数大,又是一笔对不上的账。 */}
           {view === 'list' && items.length > 0 ? (
             <div className="nesio-inv-stats">
-              <span className="nesio-inv-stat">{st.count} {L(dict, '件', 'items')}</span>
-              {st.totalValue > 0 && <span className="nesio-inv-stat">≈ ${Math.round(st.totalValue).toLocaleString('en-US')}</span>}
-              {unplacedCount > 0 && <span className="nesio-inv-stat">{unplacedCount} {L(dict, '未归位', 'unplaced')}</span>}
-              {/* 食材归另一张脸。不说这一句,用户在记忆里数出 22 条物品、这儿只有 18 件,
-                  差的 4 件就成了「东西丢了」。说出来 18 + 4 就在屏幕上对得上,还给了去处。 */}
+              <span className="nesio-inv-stat">{st.count} {L(dict, '件物品', 'items')}</span>
+              {wardrobeCount > 0 && (
+                <button
+                  type="button"
+                  className="nesio-inv-stat nesio-inv-pantry-link"
+                  onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab: 'wardrobe' } })); }}
+                >
+                  {L(dict, `${wardrobeCount} 件衣橱`, `${wardrobeCount} in wardrobe`)}
+                </button>
+              )}
               {pantryCount > 0 && (
                 <button
                   type="button"
                   className="nesio-inv-stat nesio-inv-pantry-link"
                   onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('nesio-open-cooking')); }}
                 >
-                  {L(dict, `另有 ${pantryCount} 件食材在「做饭 · 库存」`, `${pantryCount} more in Cooking · Pantry`)}
+                  {L(dict, `${pantryCount} 件食材`, `${pantryCount} ingredients`)}
                 </button>
               )}
             </div>
@@ -354,10 +364,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               </p>
             ) : (
               <>
-                {/* 批次 133·设计:物品·最近更新在前 */}
-                <p style={{ margin: '0.2rem 0 0.5rem', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
-                  {L(dict, '物品 · 最近更新在前', 'Items · latest first')}
-                </p>
+                {/* 2026-07-29 标注(Bug4 P10):「物品 · 最近更新在前」删掉 —— 排序规则不必占一行字。 */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '44vh', overflowY: 'auto', paddingBottom: 4 }}>
                   {visible.map((i) => {
                     const exp = expiryStatus(i);

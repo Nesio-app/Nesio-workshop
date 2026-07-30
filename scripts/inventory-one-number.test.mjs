@@ -23,9 +23,15 @@ const code = stripComments;
 {
   const src = code(read('lib/portal/inventory-visibility.ts'));
   assert.ok(/export function listStorageItems\(\)/.test(src), 'listStorageItems 不见了');
+  // 2026-07-29 标注(Bug4 P10)后口径扩为「全量减食材**减衣物**」——
+  // 收纳页三个统计(物品/衣橱/食材)必须互斥,否则三个数加起来大于总数。
   assert.ok(
-    /listInventoryItems\(\)\.filter\(\(i\) => !isFoodItem\(i\)\)/.test(src),
-    'listStorageItems 不再是「全量减食材」—— 收纳页显示的和它报的数就会重新分家',
+    /listInventoryItems\(\)\.filter\(\(i\) => !isFoodItem\(i\) && !isGarment\(i\)\)/.test(src),
+    'listStorageItems 不再是「全量减食材减衣物」—— 收纳页显示的和它报的数就会重新分家',
+  );
+  assert.ok(
+    /export function countWardrobeItems\(\)/.test(src),
+    'countWardrobeItems 不见了 —— 收纳页三个统计的第二个靠它',
   );
   assert.ok(
     /export function countPantryItems\(\)/.test(src),

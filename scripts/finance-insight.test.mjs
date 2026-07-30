@@ -77,20 +77,8 @@ assert.equal(financeFindings([], []).length, 0, '无交易返回空');
 // 现金流:无存款账户 → 不出跑道
 assert.equal(financeFindings(txs, []).filter((f) => f.kind === 'cash_runway').length, 0, '无账户余额不算跑道');
 
-// ── bridge:financeFindingsToGuidanceEvents ──
-const adaptersSrc = fs.readFileSync(new URL('../lib/platform/guidance-engine/source-adapters.ts', import.meta.url), 'utf8');
-const adaptersJs = ts.transpileModule(adaptersSrc, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-const aMod = { exports: {} };
-vm.runInNewContext(adaptersJs, { module: aMod, exports: aMod.exports, require: () => ({}), console });
-const { financeFindingsToGuidanceEvents } = aMod.exports;
-
-const evts = financeFindingsToGuidanceEvents(findings);
-assert.ok(evts.length >= 1 && evts.length <= 3, 'bridge 封顶 3 条');
-assert.ok(evts.every((e) => e.type === 'domain_insight'), '类型:通用 domain_insight');
-assert.ok(evts.every((e) => e.payload.domain === 'finance'), 'payload 标注 finance 域');
-assert.equal(evts[0].payload.severity, 'flag', 'bridge 红旗优先');
-assert.ok(evts[0].payload.titleZh && evts[0].payload.bodyZh && evts[0].payload.reason, 'payload 带双语 + reason');
-assert.match(String(evts[0].payload.reason), /财务/, 'reason 标注财务来源');
+// ── bridge 段已随规则管线拆除(2026-07-29):财务判定现经 gatherDomainInsights →
+// AI 判决(test:guidance-judge)流入 Today;判定引擎本身的行为契约在上面,不动。 ──
 
 // ══ 财务⑭(L2 判定层扩展)══
 const dayMs = 86_400_000;
