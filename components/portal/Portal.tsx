@@ -619,6 +619,8 @@ export default function Portal() {
     // 语音 sheet 的 chunk 预取:点麦克风时才下载会有一段「点了没反应」的空白
     // (真机上常与图谱事件风暴撞在一起,更像卡死)。空闲时先拉好,点开即出。
     whenIdle(() => { void import('./VoiceInputSheet').catch(() => {}); });
+    // 一次性自愈(2026-07-29):清历史邮件重复节点 + 已拆模块的孤儿 key。幂等,跑过即零开销。
+    whenIdle(() => { void import('@/lib/portal/storage-heal').then((m) => m.runStorageHealOnce()).catch(() => {}); });
     scheduleHeavySyncBatch(); // 挂载/登录:也推到空闲,不阻塞首屏交互
     const unregisterLearningPush = registerLearningAutoPush();
     // 批次205:改名字/头像/语言/教练/日报/主题任一 → 防抖自动推上云,别端拉取即一致。

@@ -53,6 +53,17 @@ export const CACHE_KEYS = new Set<string>([
   // 单设备草稿/测试位 —— 云同步会让它们「删了又复活」(QA:草稿乱码清不掉、测试 Pro 位跨设备扩散)
   'nesio-jot-draft-v1',                   // 速记草稿:本机暂存,别跨设备回灌
   'nesio-pro-entitlement-v1',             // Lab 测试 Pro 覆盖位:绝不该同步到真设备
+  // AI 判决层(2026-07-29 硬拆后新增)。三个都是**按设备**的簿记,不是用户数据:
+  'nesio-guidance-judge-ledger-v1',       // 判决账本(已判指纹+卡):整键 replace 会让两端互相
+                                          //   抹掉对方的判决;各判各的成本可接受,数据错乱不可接受
+  'nesio-judge-dismissed-v1',             // 「知道了」当日日键静默:今天的事,明天自动失效
+  'nesio-push-enabled-v1',                // 推送开关:**每个浏览器**自己的订阅,跨端同步会让
+                                          //   别的设备显示"已开"却收不到推送(它没订阅)
+  'nesio-storage-heal-v1',                // 一次性自愈的完成标记
+  // 档案是**观测面**,不是用户数据:整键 replace 同步会让两端互相抹掉对方的记录(静默丢反馈)。
+  // 真正承重的那部分(静音裁决)另走 nesio-card-verdict-v1(durable,跨端跟人走)。
+  // 代价如实:换设备/重装后档案从零开始 —— 90 天滚动窗的观测面,可接受。
+  'nesio-card-archive-v1',
 ]);
 // 注意:**不要**在这里放裸 `geo` —— 它会误伤足迹主数据键 `nesio-place-geo-v1`
 // (`-geo-` 被判成缓存 → 从云备份里被剔除 → 换浏览器足迹永远同步不过去,已踩过)。
