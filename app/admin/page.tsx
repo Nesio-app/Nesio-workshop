@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Delta, FeedbackDonut, FunnelSteps, InsightCard, SmartnessRadar, TopEventsChart, TrendChart, type DailyPoint } from './MetricsCharts';
+import { telemetryLabel } from '@/lib/portal/telemetry-labels';
 import { UserAccess } from './UserAccess';
 import { GovernancePanel } from './GovernancePanel';
 import { AnalystCard } from './AnalystCard';
@@ -36,6 +37,38 @@ interface Metrics {
   experiments?: Array<{ id: string; name: string; enabled: boolean; variants: Array<{ variant: string; devices: number }> }>;
   cardFeedback30d?: { useful: number; wrong: number; too_much: number; other: number };
   productEvents30d?: Array<{ type: string; count: number }>;
+}
+
+/**
+ * 报错 → 下一步该看哪里(Bug4 图15「点开后要说怎么修」)。
+ *
+ * 只按**报错自己的形态**给方向,不猜业务原因 —— 说得出「先看哪里」就够,
+ * 说不出就如实说「按出错文件定位」,不编。顺序:具体形态优先,kind 兜底。
+ */
+function fixHint(kind: string, message: string): string {
+  const m = message.toLowerCase();
+  if (/loading chunk|chunkloaderror|dynamically imported module/.test(m)) {
+    return '换版后旧页面去拿旧构建的分包了。用户刷新即好;要根治就在发版后提示刷新(检测 buildSha 变化)。';
+  }
+  if (/quotaexceeded|exceeded the quota|storage.*full/.test(m)) {
+    return '本机存储写满了。看 storage-manifest 的分类是否有该判 cache 的键被当成 durable 一直堆;storage-health 的告警事件也应该已经弹给用户了。';
+  }
+  if (/load failed|failed to fetch|networkerror|network request failed|aborted/.test(m)) {
+    return '请求没回来(超时 / 离线 / 接口 5xx)。先在上面「AI 调用与成本」表里看同期哪条路由成功率掉了;若都正常,多半是用户网络,确认那次调用有失败 UI 而不是静默转圈。';
+  }
+  if (/cannot read propert|undefined is not an object|null is not an object|of undefined|of null/.test(m)) {
+    return '取了空值上的字段。按下面的出错文件定位;这类多半是同步回来的数据缺字段 —— 检查该处有没有对可选字段做兜底。';
+  }
+  if (/json|unexpected token .* in json|parse/.test(m)) {
+    return '解析返回体失败 —— 接口回的不是预期 JSON(常见是网关的 HTML 错误页)。在那个 fetch 处加非 200 分支,别直接 .json()。';
+  }
+  if (kind === 'boundary') {
+    return '组件渲染时抛了异常,被错误边界兜住。按出错文件定位那个组件;渲染期抛错基本都是坏数据进了渲染层。';
+  }
+  if (kind === 'rejection') {
+    return '有个 Promise 没人 catch。按出错文件定位,给它补 catch 并落一个可见的失败态(仓库红线:异步动作必须有可见失败态)。';
+  }
+  return '按下面的「出错文件」定位;再用「第一次出现」的时间对一下是哪次发版引入的。';
 }
 
 /** 产品事件的人话名(Bug4 图14)。没登记的照原样印,不猜、不硬翻。 */
@@ -268,11 +301,12 @@ export default function AdminPage() {
               <p style={{ ...label, margin: '0 0 0.6rem' }}>用得最多的动作(7 天)</p>
               {(data.topEvents7d?.length ?? 0) === 0
                 ? <p style={{ ...label }}>暂无数据 — 遥测刚接通,等它累积。</p>
-                : <TopEventsChart data={data.topEvents7d!} />}
+                : <TopEventsChart data={data.topEvents7d!.map((e) => ({ ...e, name: telemetryLabel(e.name) }))} />}
             </div>
             <div style={card}>
               <p style={{ ...label, margin: '0 0 0.6rem' }}>一路走到哪一步(30 天,按设备算 · 百分比是「上一步里还剩多少人」)</p>
-              <FunnelSteps data={data.funnel30d || []} />
+              {/* Bug4 图17「事件说人话」:漏斗的每一级也是原始事件名,一并过表。 */}
+              <FunnelSteps data={(data.funnel30d || []).map((f) => ({ ...f, step: telemetryLabel(f.step) }))} />
             </div>
           </section>
 
@@ -345,9 +379,15 @@ export default function AdminPage() {
             <div style={card}>
               {/* Bug4 图15:原来只写了「注册表在哪个文件」,看的人不知道这块在说什么。 */}
               <p style={{ ...label, margin: '0 0 0.2rem' }}>A/B 实验</p>
+              {/* Bug4 图15 上写的是「怎么用」——不是「是什么」。所以这里写的是**步骤**。 */}
               <p style={{ ...label, margin: '0 0 0.6rem', letterSpacing: 0 }}>
-                同一个功能做两版,按设备随机分。下面每行是一个实验,后面是各版本分到了多少台设备
-                —— 分得均不均,决定了这个实验的结果能不能信。实验在 lib/portal/experiments.ts 里登记,登记即生效。
+                同一个功能做两版、按设备随机分,用来判断哪一版更好。怎么用:
+                ① 在 <code>lib/portal/experiments.ts</code> 里加一条(id / 名字 / 变体名 / enabled),登记即生效;
+                ② 代码里用 <code>getVariant(&apos;实验id&apos;)</code> 取这台设备分到哪一版,按它渲染,
+                并在真正露出时调一次 <code>trackExposure(&apos;实验id&apos;)</code> —— 不埋曝光,下面的设备数就是空的;
+                ③ 回这里看各版本分到多少台设备 —— 分得太偏(比如 9:1)结果就不能信,先等样本;
+                ④ 看效果不在这张表,看上面的「一路走到哪一步」和「今日卡反馈」在实验期间有没有分化;
+                ⑤ 定了就把输的那版从代码里删掉,别把 enabled 关了留着 —— 留着就是下一个人的坑。
               </p>
               {(data.experiments?.length ?? 0) === 0 && <p style={label}>暂无注册实验</p>}
               {data.experiments?.map((e) => (
@@ -395,6 +435,16 @@ export default function AdminPage() {
                         <p style={{ ...label, margin: '0.2rem 0 0', letterSpacing: 0 }}>
                           第一次 {e.firstAt ? e.firstAt.slice(0, 16).replace('T', ' ') : '—'} · 最近一次 {e.lastAt.slice(0, 16).replace('T', ' ')} · 影响 {e.devices} 台设备
                         </p>
+                        {/* Bug4 图15「点开后要说怎么修」:光有报错文字还是要人自己去猜从哪下手。
+                            按报错的形态给一条**下一步**,不是给答案 —— 说得出「先看哪里」就够了。 */}
+                        {(() => {
+                          const fix = fixHint(e.kind, e.message);
+                          return (
+                            <p style={{ margin: '0.45rem 0 0', fontSize: '0.76rem', color: 'var(--portal-ink)', lineHeight: 1.6 }}>
+                              <b style={{ color: 'var(--portal-accent)' }}>怎么修</b> · {fix}
+                            </p>
+                          );
+                        })()}
                       </div>
                     )}
                   </div>

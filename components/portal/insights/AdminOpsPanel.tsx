@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
+import { telemetryLabel } from '@/lib/portal/telemetry-labels';
 import { fetchWithTimeout } from '@/lib/portal/fetch-timeout';
 import LoadingCard from '../ui/LoadingCard';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -112,19 +113,10 @@ function Radar({ dims }: { dims: Array<{ dim: string; score: number; thin: boole
 
 const SEV_COLOR: Record<string, string> = { go: 'var(--status-go)', gentle: 'var(--status-gentle)', risk: 'var(--status-risk)' };
 
-// 埋点事件名 → 人话(画像用);没映射的显示原名
-const FEATURE_LABEL: Record<string, [string, string]> = {
-  app_open: ['打开 App', 'Open app'], mood_open: ['记心情', 'Mood'], capture_voice_open: ['说一句', 'Voice note'],
-  chat_send: ['问一问/聊天', 'Chat'], memory_saved: ['存记忆', 'Save memory'], first_memory: ['首条记忆', 'First memory'],
-  workout_start: ['开始跟练', 'Workout'], insights_open: ['开洞察', 'Open insights'], inventory_open: ['物品', 'Items'],
-  rewards_open: ['奖品商城', 'Rewards'], brief_play: ['听简报', 'Brief'], brief_open: ['简报', 'Brief'],
-  freeze_open: ['冷冻仓', 'Vault'], pro_gate_shown: ['碰到 Pro 门', 'Pro gate'], mood_open2: ['心情', 'Mood'],
-  capture_camera_open: ['拍一下', 'Camera'], feature_used: ['用功能', 'Feature'],
-};
-const featLabel = (name: string, en: boolean): string => {
-  const m = FEATURE_LABEL[name];
-  return m ? (en ? m[1] : m[0]) : name;
-};
+// 埋点事件名 → 人话:走共享表 lib/portal/telemetry-labels.ts(Bug4 图17)。
+// 这里原本自带一份 16 条的私表,还混进了三个根本不存在的事件名
+// (mood_open2 / capture_camera_open / feature_used)—— 两处各写一份必然对不齐。
+const featLabel = (name: string, en: boolean): string => telemetryLabel(name, en);
 
 export default function AdminOpsPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
