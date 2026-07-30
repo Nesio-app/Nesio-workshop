@@ -27,6 +27,8 @@ import {
   scheduleFiltersReady, SCHEDULE_FILTERS_EVENT, type CustomFilter,
 } from '@/lib/portal/schedule-filters';
 import { mailStatusLine, mailBadges, toneVars } from '@/lib/portal/mail-badges';
+import { searchTokens, matchesSearch } from '@/lib/portal/schedule-search';
+import { ensureEmailFulltextIndex, emailFulltextReady, emailFulltextScore } from '@/lib/portal/email-fulltext-index';
 
 // 2026-07-30 用户:「目前邮件是只有收件,没有发件箱」。
 // 拆成收件 / 发件两格 —— 不是加个筛选标签,因为两者该走**不同的规则**:
@@ -51,6 +53,19 @@ interface Row {
    * 这些不是我们猜的,所以最适合当默认筛选面。
    */
   googleLabels: string[];
+  /**
+   * 搜索用的正文面(2026-07-30 用户:「模糊搜索,包括全文和 title」)。
+   * 这里放的是**节点上带的**预览(summary / article / 原文片段);邮件的完整全文只存
+   * 本机 IndexedDB(隐私红线不上云),那部分靠 email-fulltext-index 另外查。
+   */
+  body: string;
+}
+
+/** 节点上能当正文用的那几个字段,拼一起(截断,免得几百条 × 1500 字每次输入都全量小写)。 */
+function bodyOf(n: LifeNode): string {
+  const a = n.attributes || {};
+  const pick = (v: unknown) => (typeof v === 'string' ? v : '');
+  return `${pick(a.summary)} ${pick(a.article)} ${pick(a.description)} ${n.rawInput || ''}`.slice(0, 2000);
 }
 
 const AD_RE = /退订|unsubscribe|优惠|促销|限时|折扣|秒杀|大促|% ?off|sale\b|coupon|deal[s]?\b/i;
@@ -285,6 +300,16 @@ export default function SchedulePanel() {
   const [composeOpen, setComposeOpen] = useState(false);   // 发件箱里直接写一封
   const [fName, setFName] = useState('');
   const [fKeyword, setFKeyword] = useState('');
+  // 搜索框(2026-07-30)。不落盘 —— 和筛选同理,记住上次的搜索词会让人以为数据少了。
+  const [q, setQ] = useState('');
+  // 本机全文索引好了没。没好之前只能搜到标题/发件人/正文预览,得说出来。
+  const [ftReady, setFtReady] = useState(false);
+  useEffect(() => {
+    if (emailFulltextReady()) { setFtReady(true); return; }
+    let alive = true;
+    void ensureEmailFulltextIndex().then(() => { if (alive) setFtReady(emailFulltextReady()); });
+    return () => { alive = false; };
+  }, []);
   useEffect(() => {
     const read = () => setCustoms(listCustomFilters());
     void scheduleFiltersReady().then(read);
@@ -403,6 +428,7 @@ export default function SchedulePanel() {
             ...(typeof a.calendarName === 'string' && a.calendarName ? [a.calendarName] : []),
             ...(a.meetingRecordId ? [L(dict, '有记录', 'Has notes')] : []),
           ],
+          body: bodyOf(n),
         });
       } else if ((n.tags || []).includes('meeting-notes') && !a.calendarNodeId) {
         // 未挂到日历的独立会议记录(Granola/录音)也留在日程里
@@ -415,6 +441,7 @@ export default function SchedulePanel() {
           query: stripPrefix(n.name),
           node: n,
           googleLabels: [L(dict, '会议记录', 'Meeting notes')],
+          body: bodyOf(n),
         });
       }
     }
@@ -491,6 +518,7 @@ export default function SchedulePanel() {
             ...(cat === 'forums' ? [L(dict, '论坛', 'Forums')] : []),
             ...(cat === 'personal' ? [L(dict, '个人', 'Personal')] : []),
           ],
+          body: bodyOf(n),
         } as Row;
       })
       // 展示层去重:同一封邮件(emailId)只留一条。同步侧已按 emailId upsert,
@@ -527,6 +555,7 @@ export default function SchedulePanel() {
         query: n.name,
         node: n,
         googleLabels: (n.tags || []).includes('重要') ? [L(dict, '重要', 'Important')] : [],
+        body: bodyOf(n),
       } as Row;
     })
     // 同一封只留一条(与收件同样的兜底:历史上曾建过无 emailId 的副本)
@@ -539,12 +568,33 @@ export default function SchedulePanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   [nodes, dict]);
 
-  const baseRows = (sub === 'calendar' ? calendarRows : sub === 'sent' ? sentRows : emailRows)
+  const allRows = (sub === 'calendar' ? calendarRows : sub === 'sent' ? sentRows : emailRows)
     .filter((r) => !gone.has(r.id));
+
+  /* ── 搜索(2026-07-30 用户:「日历和邮件增加搜索,模糊搜索,包括全文和 title」)──
+     命中面三层:标题 / 副行 / 节点上的正文预览 —— 这三层是同步的,输入即筛。
+     第四层是**本机全文**:邮件正文只存本机 IndexedDB(隐私红线不上云),
+     由 email-fulltext-index 提供一个同步查询 + 后台水合。索引没好之前全文那层查不到,
+     这件事必须**显式告诉用户**(见下面的 ftHint)—— 不然他会以为「这封信不在里面」。 */
+  const tokens = useMemo(() => searchTokens(q), [q]);
+  const searched = useMemo(() => {
+    if (!tokens.length) return allRows;
+    return allRows.filter((r) => {
+      const eid = typeof r.node.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
+      const ftHas = eid ? (tk: string) => emailFulltextScore(eid, [tk], '') > 0 : undefined;
+      return matchesSearch(r, tokens, ftHas);
+    });
+    // allRows 每次渲染都是新数组;按内容摘要当依赖。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRows.map((r) => r.id).join(','), tokens.join(' '), ftReady]);
+
+  const baseRows = searched;
 
   /* ── 一排筛选标签(2026-07-30 用户要求)────────────────────────────────
      标签面 = Google 自己的分类(日历名 / Gmail 系统分类与重要性)+ 用户自建的关键词。
      两个 tab 各算各的:日历名不该出现在邮件那一排。
+     标签是**在搜索结果之上**长出来的:数字必须等于点下去真能看到的条数,
+     否则「工作 12」点进去只有 3 条,比没有这个数字更糟。
      选中项**不落盘** —— 记住上次的筛选会让人下次进来以为数据少了。 */
   const chips = useMemo(
     () => buildChips(baseRows, customs),
@@ -554,6 +604,11 @@ export default function SchedulePanel() {
   );
   // 切 tab 时清掉选中 —— 邮件那排的标签在日历里根本不存在,留着就是筛出 0 条。
   useEffect(() => { setActiveChip(null); }, [sub]);
+  // 搜索把某个 Google 标签筛没了时也要松开它,否则没有任何标签高亮、
+  // 列表却是全量 —— 界面在说一件和事实不符的事。
+  useEffect(() => {
+    if (activeChip && !chips.some((c) => c.id === activeChip)) setActiveChip(null);
+  }, [chips, activeChip]);
   const chosen = activeChip ? chips.find((c) => c.id === activeChip) ?? null : null;
   const rows = chosen ? baseRows.filter((r) => matchesChip(r, chosen)) : baseRows;
 
@@ -582,6 +637,33 @@ export default function SchedulePanel() {
         onSelect={setSub}
         ariaLabel={L(dict, '日程视图', 'Schedule view')}
       />
+
+      {/* ── 搜索(2026-07-30 用户要求「日历和邮件增加搜索,模糊搜索,包括全文和 title」)──
+          放在筛选标签**上面**:先搜后筛,标签的数字也跟着搜索结果走。 */}
+      <div className="nesio-schedsearch">
+        <input
+          className="nesio-schedsearch-input"
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={sub === 'calendar'
+            ? L(dict, '搜日程:标题、地点、日历名…', 'Search: title, place, calendar…')
+            : L(dict, '搜邮件:标题、发件人、正文…', 'Search: subject, sender, body…')}
+          aria-label={L(dict, '搜索', 'Search')}
+        />
+        {q && (
+          <button type="button" className="nesio-schedsearch-clear" onClick={() => setQ('')}
+            aria-label={L(dict, '清空搜索', 'Clear search')}>✕</button>
+        )}
+      </div>
+      {/* 全文那一层还没准备好时说清楚 —— 否则「搜不到」会被当成「这封信不在里面」。
+          这不是错误,所以用中性色,也不给重试按钮:它自己会好。 */}
+      {tokens.length > 0 && sub !== 'calendar' && !ftReady && (
+        <p className="nesio-schedsearch-hint">
+          {L(dict, '正文全文还在本机准备中,这会儿搜的是标题、发件人和摘要。',
+                'Full text is still loading on this device — searching title, sender and preview for now.')}
+        </p>
+      )}
 
       {/* ── 一排筛选标签(2026-07-30 用户要求「用谷歌的 filter 先筛选,我也可以自定义」)──
           左边是 Google 自己给的(日历名 / Gmail 系统分类与重要性),右边是用户自建的关键词。
@@ -649,8 +731,11 @@ export default function SchedulePanel() {
 
       {rows.length === 0 ? (
         <p className="nesio-insights-empty">
-          {/* 筛出 0 条 ≠ 没有数据。不说清是筛没的,用户会以为东西丢了。 */}
-          {chosen
+          {/* 筛出 0 条 ≠ 没有数据。不说清是筛没的,用户会以为东西丢了。
+              搜索和标签是两件事,分开说 —— 「搜不到」和「这个标签下没有」要给不同的出口。 */}
+          {tokens.length > 0
+            ? L(dict, `搜「${q.trim()}」没有找到 —— 换个词,或清空搜索看全部。`, `Nothing matches “${q.trim()}” — try another word, or clear the search.`)
+            : chosen
             ? L(dict, `「${chosen.label}」下没有 —— 点上面的「全部」看回来。`, `Nothing under “${chosen.label}” — tap All to see everything.`)
             : sub === 'calendar'
               ? L(dict, '还没有日程 —— 到「设置 → 数据接入」连 Google 日历,或连 Granola 同步会议。', 'No schedule yet — connect Google Calendar or Granola in Data sources.')

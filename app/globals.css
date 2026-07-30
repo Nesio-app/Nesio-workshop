@@ -20213,6 +20213,51 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   border-radius: var(--radius-pill); padding: var(--space-1) var(--space-3);
 }
 
+/* ── 日程页的搜索框(2026-07-30)────────────────────────────────────────── */
+.nesio-schedsearch { position: relative; margin-top: var(--space-3); }
+.nesio-schedsearch-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--portal-ink);
+  background: var(--glass-bg-solid, var(--portal-bg));
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill);
+  /* 右边留出清空按钮的位置 */
+  padding: var(--space-2) var(--space-8) var(--space-2) var(--space-4);
+  min-height: var(--tap-min, 44px);
+}
+.nesio-schedsearch-input:focus {
+  outline: none;
+  border-color: var(--portal-accent-border);
+  background: var(--portal-accent-soft);
+}
+/* iOS 自带的 search 清除叉和我们自己的会叠在一起 */
+.nesio-schedsearch-input::-webkit-search-cancel-button { display: none; }
+.nesio-schedsearch-clear {
+  position: absolute;
+  right: var(--space-1);
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: var(--tap-min, 44px);
+  min-height: var(--tap-min, 44px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  color: var(--portal-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.nesio-schedsearch-hint {
+  margin: var(--space-2) 0 0;
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+}
+
 /* ── 日程页的一排筛选标签(2026-07-30)──────────────────────────────────── */
 .nesio-schedfilter { margin: var(--space-3) 0 var(--space-2); }
 .nesio-schedfilter-row {
