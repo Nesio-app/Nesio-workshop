@@ -10,13 +10,17 @@
  * - 开关:profile.dailyReportEnabled(默认关,设置里开)。
  */
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { buildDailyReport, dailyReportExternalId, type DailyReport, type DailyReportInput } from './daily-report';
+import { buildDailyReport, dailyReportExternalId, type DailyReport, type DailyReportInput, type DailyReportDomainInsight } from './daily-report';
 
 const AUTO_KEY = 'nesio-daily-report-auto-v1';
 const TAGS = ['日报', 'AI'];
 
 /** 存/更新今天的日报到记忆(externalId 幂等)。空日报跳过。 */
-export function persistDailyReportToMemory(report: DailyReport): 'saved' | 'skipped' {
+export function persistDailyReportToMemory(
+  report: DailyReport,
+  /** 今天的原始判定集 —— 明天用它算差分。 */
+  insights?: readonly DailyReportDomainInsight[],
+): 'saved' | 'skipped' {
   if (report.empty) return 'skipped';
   ingestLifeNode({
     type: 'event',
@@ -36,6 +40,9 @@ export function persistDailyReportToMemory(report: DailyReport): 'saved' | 'skip
       // 新邮件到了、某个域的判定翻了、提醒被打勾。所以把成品也存下来,
       // 之后一整天都读这一份,不再拿新数据重排。
       snapshot: JSON.stringify({ greeting: report.greeting, headline: report.headline, sections: report.sections }),
+      // 明天算「新进展」要拿今天的**原始判定集**去比。存格式化后的 sections 是不够的:
+      // 那已经是拼好的句子,反解析既脆又会把「6.4」这种数值弄丢。
+      insights: JSON.stringify(insights ?? []),
       epistemic: 'system_summary',
       generator: 'rule:daily-report',
     },
@@ -97,7 +104,7 @@ export function autoPersistTodayReport(
   let lastAutoDate: string | null = null;
   try { lastAutoDate = localStorage.getItem(AUTO_KEY); } catch { /* 读失败按未生成处理 */ }
   if (!shouldAutoPersistDailyReport({ enabled: opts.enabled, lastAutoDate, report, due: reportDue(now) })) return 'skipped';
-  const outcome = persistDailyReportToMemory(report);
+  const outcome = persistDailyReportToMemory(report, input.domainInsights);
   if (outcome === 'saved') {
     // 标记写失败无害:externalId 幂等,下次至多原地重写一次,不必打扰用户。
     try { localStorage.setItem(AUTO_KEY, report.date); } catch { /* ignore */ }
@@ -148,6 +155,29 @@ export function readTodayReport(
   return reportFromNode(nodes.find(
     (n) => n.attributes?.kind === 'daily-report' && n.attributes?.externalId === key,
   ));
+}
+
+/**
+ * 读**昨天**那份日报里的原始判定集 —— 今天算「新进展」要拿它当基线。
+ * 没有(第一天 / 老节点 / 昨天没生成)就返回 undefined,日报据此退回出快照,
+ * 并把标题从「新进展」换成「这几面」—— 不装作有进展。
+ */
+export function readYesterdayInsights(
+  nodes: ReadonlyArray<ReportNode>,
+  now: Date = new Date(),
+): DailyReportDomainInsight[] | undefined {
+  const y = reportAnchor(now);
+  y.setDate(y.getDate() - 1);
+  const key = dailyReportExternalId(y);
+  const hit = nodes.find((n) => n.attributes?.kind === 'daily-report' && n.attributes?.externalId === key);
+  const raw = hit?.attributes?.insights;
+  if (typeof raw !== 'string' || !raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as DailyReportDomainInsight[];
+    return Array.isArray(parsed) && parsed.length ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /**

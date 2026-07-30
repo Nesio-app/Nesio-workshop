@@ -23,13 +23,15 @@ import { gatherDomainInsights } from './domain-insights';
 import { listReminders } from './schedule-reminders';
 import { listWardrobe, suggestOutfit, inferFormalNeed } from './wardrobe';
 import { getDayPlan } from '@/lib/cooking/meal-calendar';
+import { listInventoryItems } from './inventory';
 import { loadTrainingState, protocolById } from '@/lib/platform/training-protocol-engine';
 import { activeProtocol } from '@/lib/platform/training-overrides';
 import { pickPhaseIndex, pickTodaySessionIndex } from '@/lib/platform/fitness-home-core';
 import type { CalendarEvent } from './types';
 import type {
-  DailyReportDomainInsight, DailyReportReminder, DailyReportOrder,
+  DailyReportDomainInsight, DailyReportReminder, DailyReportOrder, DailyReportAhead,
 } from './daily-report';
+import { AHEAD_DAYS } from './daily-report';
 
 /** 各面收齐后的那一小把东西 —— 正好是 DailyReportInput 的跨面扩展部分。 */
 export interface DailyReportExtras {
@@ -38,6 +40,8 @@ export interface DailyReportExtras {
   fitnessSession?: string;
   meals: string[];
   orders: DailyReportOrder[];
+  /** 未来两周里确定会发生的事(已知日期,无推算) */
+  ahead: DailyReportAhead[];
 }
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -84,7 +88,7 @@ export function collectOrders(nodes: readonly Orderish[], limit = 4): DailyRepor
  * @param now 定稿时刻(当天 08:00)。判「今天」用它,不用真实当前时间。
  */
 export function collectDailyReportExtras(now: Date = new Date()): DailyReportExtras {
-  const out: DailyReportExtras = { reminders: [], domainInsights: [], meals: [], orders: [] };
+  const out: DailyReportExtras = { reminders: [], domainInsights: [], meals: [], orders: [], ahead: [] };
   if (typeof window === 'undefined') return out;
   const todayKey = dayKeyOf(now);
 
@@ -122,6 +126,52 @@ export function collectDailyReportExtras(now: Date = new Date()): DailyReportExt
     out.meals = [plan.breakfast, plan.lunch, plan.dinner].filter((x): x is string => Boolean(x));
   } catch { /* ignore */ }
 
+  /* ⑤ 往前看:未来两周确定会发生的事。**只收已知日期,不做任何推算**
+     (见 DailyReportAhead 的红线)。日历那部分由调用方补 —— 它手上就有 events,
+     从存储再读一遍只会读到另一个快照。 */
+  const from = dayKeyOf(now);
+  const until = new Date(now); until.setDate(until.getDate() + AHEAD_DAYS);
+  const untilKey = dayKeyOf(until);
+  const inWindow = (ymd: string) => ymd > from && ymd <= untilKey;   // 今天不算(今天有自己的段)
+
+  try {
+    for (const r of listReminders()) {
+      if (r.doneAt) continue;
+      const d = r.at.slice(0, 10);
+      if (inWindow(d)) out.ahead.push({ date: d, title: r.title, kind: 'reminder' });
+    }
+  } catch { /* ignore */ }
+
+  try {
+    for (const it of listInventoryItems()) {
+      if (!it.expiry) continue;
+      if (inWindow(it.expiry)) out.ahead.push({ date: it.expiry, title: it.name, kind: 'expiry' });
+    }
+  } catch { /* ignore */ }
+
+  return out;
+}
+
+/**
+ * 未来两周的日历项 → 「往前看」。
+ * 单独一个函数,因为 events 在调用方手上(useTodayData 刚从缓存读出来)——
+ * 回存储再读一遍只会读到另一个快照。
+ */
+export function aheadEvents(
+  events: readonly { title?: string; start?: string }[],
+  now: Date = new Date(),
+): DailyReportAhead[] {
+  const from = dayKeyOf(now);
+  const until = new Date(now); until.setDate(until.getDate() + AHEAD_DAYS);
+  const untilKey = dayKeyOf(until);
+  const out: DailyReportAhead[] = [];
+  for (const e of events) {
+    if (!e.title || !e.start) continue;
+    const d = new Date(e.start);
+    if (Number.isNaN(d.getTime())) continue;
+    const ymd = dayKeyOf(d);
+    if (ymd > from && ymd <= untilKey) out.push({ date: ymd, title: e.title, kind: 'event' });
+  }
   return out;
 }
 

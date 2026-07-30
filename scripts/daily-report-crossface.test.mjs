@@ -34,7 +34,7 @@ function loadTs(rel) {
   return mod.exports;
 }
 
-const { buildDailyReport } = loadTs('lib/portal/daily-report.ts');
+const { buildDailyReport, diffInsights } = loadTs('lib/portal/daily-report.ts');
 
 const iso = (h, m = 0) => new Date(2026, 6, 30, h, m).toISOString();
 const NOON = new Date(2026, 6, 30, 12, 0);
@@ -160,6 +160,82 @@ const EIGHT = new Date(2026, 6, 30, 8, 0);
   assert.match(today, /下肢 A/, '今天该练哪个');
   assert.match(today, /灰卫衣/, '今天穿什么');
   assert.match(today, /番茄炒蛋/, '今天吃什么');
+}
+
+/* ── ③' 新进展 = 和昨天的**差分**,不是快照 ───────────────────────────
+   快照说「血糖 6.4」,那不是进展;「从 6.7 降到 6.4」才是。天天推同一句快照,
+   读第三天就会被当成噪音跳过 —— 而这本该是整份日报里最有价值的一段。 */
+{
+  const ins = (domain, title) => ({ domain, severity: 'attention', title, detail: 'x' });
+  const yest = [ins('health', '空腹血糖 7 天均值 6.7'), ins('inventory', '牛奶到期'), ins('reading', '还剩 45 页')];
+  const today = [ins('health', '空腹血糖 7 天均值 6.4'), ins('reading', '还剩 40 页'), ins('finance', 'Netflix 涨价')];
+
+  const d = diffInsights(today, yest);
+  assert.equal(d.fresh.map((x) => x.title).join(','), 'Netflix 涨价', '今天新冒出来的');
+  assert.equal(d.gone.map((x) => x.title).join(','), '牛奶到期', '昨天有、今天不再提示的');
+  assert.equal(d.changed.length, 2, '还在但数值变了的');
+  assert.equal(d.changed[0].before, '空腹血糖 7 天均值 6.7', '要带上昨天那个值,不然「变了」是句空话');
+
+  // **稳定 key**:数值变了不算「昨天那条没了 + 今天新出一条」。这是最典型的假差分,
+  // 而且一次错两条。
+  assert.ok(!d.fresh.some((x) => x.domain === 'health'), '血糖那条不是「新出现」—— 它昨天就在');
+  assert.ok(!d.gone.some((x) => x.domain === 'health'), '血糖那条也不是「不再提示」');
+
+  const r = buildDailyReport({ now: EIGHT, domainInsights: today, yesterdayInsights: yest });
+  const sec = r.sections.find((s) => s.id === 'domain');
+  assert.equal(sec.title, '新进展', '有昨天可比时叫「新进展」');
+  // 顺序:真事件(新出现/不再提示)在前,渐变垫底 —— 否则每天必然动一格的那些指标
+  // (「上次通话 11 天前 → 12 天前」)会把真事件挤到看不见。
+  assert.match(sec.lines[0], /新$/, '新出现的排最前');
+  assert.match(sec.lines[1], /不再提示了$/, '不再提示的次之(真事件)');
+  assert.match(sec.lines[2], /昨天是/, '渐变垫底');
+
+  // 没有昨天可比时:退回快照,**标题跟着换** —— 不装作有进展
+  const first = buildDailyReport({ now: EIGHT, domainInsights: today });
+  assert.equal(first.sections.find((s) => s.id === 'domain').title, '这几面',
+    '第一天没有基线,只能出快照 —— 那就别叫「新进展」,那是在说谎');
+
+  /*
+   * 差分的**基线链路**必须真的接上,这三条缺一条整个功能就静默退化:
+   * 不存原始判定集 → 明天读不到基线 → 永远出快照、永远叫「这几面」。
+   * 而那条退化路径**本身是合法的**(第一天就该那样),所以不会报错、不会有人发现。
+   * 这是最该钉的那种洞。(第一版漏了,注入回归时当场发现契约抓不住。)
+   */
+  const persist2 = strip(read('lib/portal/daily-report-persist.ts'));
+  assert.match(persist2, /insights: JSON\.stringify\(/,
+    '落库要存**原始判定集**(不是格式化后的 sections)—— sections 已经是拼好的句子,' +
+    '反解析既脆又会把「6.4」这种数值弄丢');
+  assert.match(persist2, /export function readYesterdayInsights/, '要能读回昨天那份基线');
+  const hook2 = strip(read('components/portal/today/useTodayData.ts'));
+  assert.match(hook2, /yesterdayInsights: readYesterdayInsights\(/,
+    '基线要真的喂进日报 —— 不喂的话前面两条都白做,日报还是天天出快照');
+  assert.match(hook2, /ahead: \[/, '「往前看」也要真的接上');
+}
+
+/* ── ③'' 往前看:窗口 14 天,纯函数**自己**过滤 ─────────────────────── */
+{
+  const day = (off) => {
+    const x = new Date(2026, 6, 30); x.setDate(x.getDate() + off);
+    const p = (n) => String(n).padStart(2, '0');
+    return `${x.getFullYear()}-${p(x.getMonth() + 1)}-${p(x.getDate())}`;
+  };
+  const r = buildDailyReport({
+    now: EIGHT,
+    ahead: [
+      { date: day(0), title: '今天的', kind: 'event' },
+      { date: day(1), title: '明天的', kind: 'event' },
+      { date: day(14), title: '第 14 天', kind: 'event' },
+      { date: day(15), title: '第 15 天', kind: 'event' },
+    ],
+  });
+  const lines = r.sections.find((s) => s.id === 'ahead').lines.join('|');
+  assert.match(lines, /明天的/);
+  assert.match(lines, /第 14 天/, '窗口含第 14 天(用户拍板:看两周)');
+  assert.doesNotMatch(lines, /第 15 天/,
+    '超窗的不许进 —— 采集端已经过滤过,但那是好意不是保证:' +
+    '调用方多传一条进来,纯函数照单全收的话「两周」这个标题就在说谎,' +
+    '而且契约在纯函数这一侧根本测不到。自己的输出自己负责');
+  assert.doesNotMatch(lines, /今天的/, '今天不算 —— 今天有它自己那几段');
 }
 
 /* ── ④ 正向准入:没事就不出那一段;empty 不能靠 sections.length ──────── */
