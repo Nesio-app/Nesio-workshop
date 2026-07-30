@@ -155,6 +155,40 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **本机存储 key 全量普查(2026-07-29;161 个 key)**:根因是
+  `storage-manifest.keyKind()` 默认返回 `durable` —— **新 key 不登记就自动获得
+  「进备份 + 整键 replace 上云」**。捡出两类真事故:
+  ● **凭证泄露(安全)**:`nesio-connector-tokens-v1`(Notion/Tesla 原始令牌)与
+  `nesio_admin_secret`(/admin 管理密钥)双双判成 durable → 明文进备份 JSON 并推到
+  云端 user_module_data。根因是靠猜词识别:正则写 `token([-_]|$)` 认不出复数
+  `tokens-v1`,更没有 `secret`。修:扩正则(`tokens?`/`secrets?`/`credentials?`/`apikey`)
+  + 明确的 `AUTH_KEYS` 名单兜底。
+  ● **按设备簿记被当用户数据**:同步水位/云同步 outbox/今天页日键卡片状态/草稿等
+  **24 个键**改判 cache(此前每轮 churn 上云,且整键 replace 两端互抹)。
+  ● **系统性修复**:新增契约 `test:storage-key-registry`(**已进 CI 安全链**)——
+  在册 161 个 key,源码里出现未登记的 key、或在册键分类漂移、或凭证误判、或核心
+  用户数据被误判成缓存,四者任一即红。判据写进 CLAUDE.md 与 `docs/storage-keys.md`:
+  「换台设备后这个值从头开始是否正确?」是→cache,否→durable,凭证→auth。
+  ● **一次性自愈** `lib/portal/storage-heal.ts`(Portal whenIdle,幂等):清历史邮件
+  重复节点(同 emailId 保最早;无 emailId 的**仅当**有同名正主时才删 —— 没正主的是
+  老同步真数据,宁可冗余不误删)+ 清 11 个已拆模块的孤儿 key。契约 `test:storage-heal`。
+
+- **日程页重复与日期(2026-07-29,真机截图实锤)**:三个病灶。
+  ● **富化抹字段(核心,影响面远超日程页)**:`ingestLifeNode` 的 externalKey upsert 走
+  `updateLifeNode`,而后者是**顶层浅合并** → `patch.attributes` 整块盖掉旧的。Gmail 先用
+  本地抽取落节点(带 date/summary/article/store/eta/amount/orderNo/trackingNo),随后云 AI
+  富化只带 AI 那几个字段 → 上述**全被抹掉**,邮件日期退回 createdAt(看起来"所有邮件
+  都是今天")。修:upsert 合并 attributes(新值优先、旧值补位)—— 同时修好判决层邮件
+  信号与记忆详情的字段缺失。
+  ● **无主富化节点**:AI 认不出源邮件时没有 emailId → externalKey 为 null → 每轮富化新建
+  一个去重不掉的重复。修:认不出就丢弃这条富化;能认出的补上邮件头 date/from。
+  ● **跨日历同一场会**:多日历订阅同一场会,start 时区写法不同(Z / +08:00),同步侧按
+  原文比对认不出。修:展示层按「标题|绝对时刻」再收一次。
+  ● 另:日程页此前**完全没用 Gmail 的分类字段**(路由早已把 labelIds 归一成 `mailCategory`
+  存进节点,下游却在用本地正则猜广告)。改为 promotions/social 用 Google 判定直接毙、
+  IMPORTANT 直接留,本地正则降级为无官方分类时的兜底;邮件排序改按绝对时刻
+  (RFC2822 头字符串比大小是错的)。契约 `test:schedule-panel-dedup`。
+
 - **Guidance 全 AI 化(设计定稿 2026-07-29;Step 0-3 已落地,影子模式运行中)**:
   用户拍板把 8 层规则管线(severity 表/窗口/打分/预算/冷却/排序/AI 润色)换成
   **1 个 AI 判决层 + 3 道承诺门 + 1 个档案**。规则从「判断内容」退到「执行承诺」。

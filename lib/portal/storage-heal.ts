@@ -27,6 +27,12 @@ const RETIRED_KEYS = [
   'nesio-ranker-learning-retired-purge-v1',    // ranker 退役时的一次性清理标记
   'nesio-llm-sweep-ledger-v1',                 // llm-sweep 巡查账本(判决层已吸收其职责)
   'nesio-guidance-lang-cache-v1',              // Layer 7 润色缓存(润色层已删)
+  // 更早批次退役的死壳(2026-07-29 全量普查捡出):模块已删/功能已废,值还在占位。
+  'nesio-cross-region-bandit-retired-purge-v1', // cross-region bandit 退役清理标记(bandit 本身已退役)
+  'treasurebox-personalization-demo-stage',     // 个性化演示阶段(死壳)
+  'nesio-theme-lowsat-v1',                      // 低饱和主题(已废弃)
+  'baohe_lab_mode',                             // Lab 模式旧键(已被 module-overrides 取代)
+  'nesio-node-embeddings-v1',                   // 语义重排旧向量缓存(已迁 IndexedDB)
 ];
 
 export interface HealReport {
