@@ -125,10 +125,27 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
 }) {
   const [dx, setDx] = useState(0);
   const start = useRef<{ x: number; y: number; lock: 'none' | 'x' | 'y' } | null>(null);
+  /**
+   * 这一次手势是不是「不再是一次点击」了 —— 越过 slop、变成纵向滚动、或被系统接管。
+   *
+   * 2026-07-30 用户实锤:「日程里的上下滑动,很容易打开某个具体的条目」。两个洞叠在一起:
+   *   ① 纵向锁定时只做了 `start.current = null; setDx(0)`,没留下「这次是滚动」的记号。
+   *      松手时 onUp 看到 dx === 0,`Math.abs(0) < 6` 成立 → **当成点击,打开条目**。
+   *      也就是说:任何在条目上起手的上下滑,只要手指最后抬在这一条上,就会打开它。
+   *   ② onPointerCancel 直接复用了 onUp。cancel 的语义是「这个手势被接管/中止了」,
+   *      浏览器接管滚动时就发它 —— 同样 dx === 0 → 又是一次误开。
+   *
+   * 修法:把「滑动」和「点击」彻底分家 —— 指针事件只负责位移与左右滑动作,
+   * **打开交给真正的 click**(顺带把键盘 Enter/Space 也修好了:此前这是个
+   * 没有 onClick 的 <button>,键盘根本打不开),滑动过的那一次把随后的 click 吃掉。
+   */
+  const swiped = useRef(false);
   const THRESHOLD = 72;
+  const SLOP = 6;
 
   const onDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    swiped.current = false;
     start.current = { x: e.clientX, y: e.clientY, lock: 'none' };
   };
   const onMove = (e: React.PointerEvent) => {
@@ -137,7 +154,9 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
     const mx = e.clientX - st.x;
     const my = e.clientY - st.y;
     if (st.lock === 'none') {
-      if (Math.abs(mx) < 6 && Math.abs(my) < 6) return;
+      if (Math.abs(mx) < SLOP && Math.abs(my) < SLOP) return;
+      // 一旦越过 slop,这次手势就不再是「点」了 —— 无论它后来往哪个方向走。
+      swiped.current = true;
       st.lock = Math.abs(mx) > Math.abs(my) ? 'x' : 'y';
       if (st.lock === 'y') { start.current = null; setDx(0); return; }  // 纵向:让页面滚
     }
@@ -147,9 +166,19 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
     const moved = dx;
     start.current = null;
     setDx(0);
+    // 只判左右滑的两个动作;「打开」不在这里 —— 见下面的 onClickRow。
     if (moved <= -THRESHOLD) onDelete();
     else if (moved >= THRESHOLD) onStar();
-    else if (Math.abs(moved) < 6) onOpen();
+  };
+  const onCancel = () => {
+    // 被系统接管(滚动)或中止:什么都不执行,并且把随后可能来的 click 也吃掉。
+    start.current = null;
+    setDx(0);
+    swiped.current = true;
+  };
+  const onClickRow = () => {
+    if (swiped.current) { swiped.current = false; return; }  // 这一次是滑动,不是点击
+    onOpen();
   };
 
   // 日历条目用星、邮件条目用旗子 —— 背后是同一个收藏夹(pins),只是两种东西
@@ -172,7 +201,8 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
         }}>{revealing.label}</div>
       )}
       <button type="button"
-        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onCancel}
+        onClick={onClickRow}
         style={{ position: 'relative', display: 'block', textAlign: 'left', width: '100%', cursor: 'pointer',
           border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)',
           background: 'var(--glass-bg-solid, var(--portal-bg))', padding: 'var(--space-3) var(--space-4)',

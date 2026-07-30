@@ -358,6 +358,7 @@
     "test:nav-above-overlay": "node scripts/nav-above-overlay.test.mjs",
     "test:timeline-admission": "node scripts/timeline-admission.test.mjs",
     "test:schedule-filters": "node scripts/schedule-filters.test.mjs",
+    "test:gesture-cancel-not-tap": "node scripts/gesture-cancel-not-tap.test.mjs",
     "test:schedule-panel-dedup": "node scripts/schedule-panel-dedup.test.mjs",
     "test:storage-heal": "node scripts/storage-heal.test.mjs",
     "test:storage-key-registry": "node scripts/storage-key-registry.test.mjs",
