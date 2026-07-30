@@ -28,9 +28,11 @@ function grab(name) {
   assert.ok(m, `抽到 ${name}`);
   return m[0];
 }
-const sandbox = {};
+const sandbox = { JSON, Array, Object, String, Number, Date };
 vm.createContext(sandbox);
-vm.runInContext([grab('shouldAutoPersistDailyReport'), grab('listDailyReports'),
+// listDailyReports 依赖 reportFromNode(解析冻结件),一并抽进来 ——
+// 2026-07-30 加冻结件时漏了它,这份契约当场 ReferenceError 红了,是它自己抓到的。
+vm.runInContext([grab('shouldAutoPersistDailyReport'), grab('reportFromNode'), grab('listDailyReports'),
   'globalThis.__x = { shouldAutoPersistDailyReport, listDailyReports };'].join('\n'), sandbox);
 const { shouldAutoPersistDailyReport, listDailyReports } = sandbox.__x;
 

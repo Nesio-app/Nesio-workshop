@@ -53,7 +53,7 @@ import { readFactJournal, ensureFactJournal } from '@/lib/platform/fact-journal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-const DailyReportHistory = dynamic(() => import('./insights/DailyReportHistory'), { ssr: false });
+const DailyReportPanel = dynamic(() => import('./insights/DailyReportPanel'), { ssr: false });
 
 export type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'fitness' | 'timeline' | 'schedule' | 'finance' | 'inventory' | 'wardrobe' | 'relationships' | 'tesla' | 'living' | 'admin';
 
@@ -644,9 +644,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {/* ── Tab 1: 免费四件套(v1 规格 §2.1)── */}
         {mainTab === 'reflection' && (
           <div className="nesio-reflection-tab">
-            {/* 往日日报(2026-07-30):日报早就存进记忆了,listDailyReports 也早写好、
-                零 UI 在用 —— 这一段几乎是白捡的。没有历史时它自己不渲染。 */}
-            <DailyReportHistory />
+            {/* 每日日报的**唯一入口**(2026-07-30 用户定案:「今天不要入口,用弹出卡片,
+                在洞察开入口」)。今天那份置顶,往日在下,点开都弹同一个层。 */}
+            <DailyReportPanel />
             {/* 2026-07-28 UI 精修(标注 图11「走走看放到最上面」):这块原本排在线头之后,
                 现在提到反思页最顶 —— 一进来先撞见一条旧记录,再看统计。 */}
             {/* ③ 走走看:衬线引原话「去年今天,你写下 ——」+ 再翻一条(偶遇感) */}

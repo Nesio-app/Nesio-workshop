@@ -1,8 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
-import { portalLocaleToDictionaryLocale, loadProfileSettings } from '@/lib/portal/profile';
-import { reportDue } from '@/lib/portal/daily-report-persist';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { useProfileAvatar } from './use-profile-avatar';
 import { getPoints } from '@/lib/platform/rewards-engine';
 import NesioMark from './NesioMark';
@@ -39,7 +38,6 @@ import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
 import CaptureBar from './today/CaptureBar';
 import { RoutineDueCards } from './today/RoutineDueCards';
-import { DailyReportCard } from './today/DailyReportCard';
 import { ThawedReminder } from './today/ThawedReminder';
 import { ReengageNudgeCard } from './today/ReengageNudgeCard';
 import { TodayFocusSection } from './today/FocusSection';
@@ -65,7 +63,7 @@ export default function TodayFeed({
 }) {
   const {
     displayName,
-    memoryCount, memoryNotes, todayReport,
+    memoryCount, memoryNotes,
     focusNodes, allNodes, receipt,
     dormantStore, setDormantStore,
     calendarEvents, proactiveContext,
@@ -466,14 +464,12 @@ export default function TodayFeed({
         {/* 季度 Wrapped 卡片 */}
         {!quietAll && showWrapped && <WrappedCard onDismiss={dismissWrapped} />}
 
-        {/* 每日图文日报(未来预测区首张;仅登录 + 开关开 + 有内容时,todayReport 已受私据门)*/}
-        {/* pending:开着日报但还没到 08:00 —— 卡上说清它几点来,而不是空着一块。 */}
-        {canUsePrivateData && (
-          <DailyReportCard
-            report={todayReport}
-            pending={loadProfileSettings().dailyReportEnabled && !reportDue(new Date())}
-          />
-        )}
+        {/* 每日日报**不在这里** —— 2026-07-30 用户定案:「今天不要入口,用弹出卡片,
+            在洞察开入口」。它是一份读物,不是一张待办卡:Today 这一列每张卡都在要求你
+            做点什么(拍一下、回一句、划掉),日报却是「坐下来看两分钟」,混在里面既不像
+            卡片也不像文章,还天天占着最上面那块地方。入口见洞察页 → 洞察 → 每日日报。
+            **定稿与落库仍然在这一页触发**(useTodayData 里的 autoPersistTodayReport)——
+            只是不再往这里画一张卡。 */}
 
         {/* 回访再触达:来过好几回但某功能没碰过 → 轻轻探一句(全局两天一条,可稍后/不再提醒)*/}
         {canUsePrivateData && !quietAll && (

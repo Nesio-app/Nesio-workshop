@@ -105,40 +105,60 @@ export function autoPersistTodayReport(
   return outcome;
 }
 
+/** 记忆节点(存的是日报)。 */
+type ReportNode = { name?: string; rawInput?: string; attributes?: Record<string, unknown> };
+
+/**
+ * 一个记忆节点 → 完整的 DailyReport(含 sections)。
+ *
+ * 冻结件存在 attributes.snapshot 里。老节点(2026-07-30 之前存的)没有这个字段 ——
+ * 返回 null,让调用方各自决定是现算还是不显示;**绝不半截拼一份**
+ * (只有 markdown 没有 sections 的话,UI 只能渲染出个空壳)。
+ */
+function reportFromNode(n: ReportNode | undefined): DailyReport | null {
+  if (!n) return null;
+  const raw = n.attributes?.snapshot;
+  if (typeof raw !== 'string' || !raw) return null;
+  try {
+    const snap = JSON.parse(raw) as Pick<DailyReport, 'greeting' | 'headline' | 'sections'>;
+    if (!Array.isArray(snap?.sections)) return null;
+    return {
+      date: String(n.attributes?.date ?? ''),
+      title: n.name || '',
+      greeting: snap.greeting || '',
+      headline: snap.headline || '',
+      sections: snap.sections,
+      markdown: n.rawInput || '',
+      empty: false,
+    };
+  } catch {
+    return null;   // 存坏了就当没有,不给一份半截的
+  }
+}
+
 /**
  * 读今天已定稿的那份(从记忆里,不重算)。
  * 当天第一次生成之后,界面上看到的必须一直是**这一份** —— 这就是「当天不再变」。
  */
 export function readTodayReport(
-  nodes: ReadonlyArray<{ name?: string; rawInput?: string; attributes?: Record<string, unknown> }>,
+  nodes: ReadonlyArray<ReportNode>,
   now: Date = new Date(),
 ): DailyReport | null {
   const key = dailyReportExternalId(reportAnchor(now));
-  const hit = nodes.find((n) => n.attributes?.kind === 'daily-report' && n.attributes?.externalId === key);
-  if (!hit) return null;
-  const raw = hit.attributes?.snapshot;
-  if (typeof raw !== 'string' || !raw) return null;   // 老节点没存 snapshot → 当没冻结,现算
-  try {
-    const snap = JSON.parse(raw) as Pick<DailyReport, 'greeting' | 'headline' | 'sections'>;
-    if (!Array.isArray(snap?.sections)) return null;
-    return {
-      date: String(hit.attributes?.date ?? ''),
-      title: hit.name || '',
-      greeting: snap.greeting || '',
-      headline: snap.headline || '',
-      sections: snap.sections,
-      markdown: hit.rawInput || '',
-      empty: false,
-    };
-  } catch {
-    return null;   // 存坏了就现算,不给一份半截的
-  }
+  return reportFromNode(nodes.find(
+    (n) => n.attributes?.kind === 'daily-report' && n.attributes?.externalId === key,
+  ));
 }
 
-/** 读记忆里已存的每日日报(供洞察页历史;调用方注入 life graph 快照,便于测试)。 */
+/**
+ * 读记忆里已存的每日日报(供洞察页历史;调用方注入 life graph 快照,便于测试)。
+ * 带上 report(完整冻结件)—— 点开往日那天要能渲染出和当天一模一样的版面。
+ * 老节点没有冻结件时 report 为 null,列表里仍然列出来(有 markdown 可看),
+ * 但点开不给一份半截的。
+ */
 export function listDailyReports(
-  nodes: ReadonlyArray<{ name?: string; rawInput?: string; attributes?: Record<string, unknown>; createdAt?: string }>,
-): Array<{ date: string; title: string; headline: string; markdown: string }> {
+  nodes: ReadonlyArray<ReportNode & { createdAt?: string }>,
+): Array<{ date: string; title: string; headline: string; markdown: string; report: DailyReport | null }> {
   return nodes
     .filter((n) => n.attributes?.kind === 'daily-report' && typeof n.attributes?.date === 'string')
     .map((n) => ({
@@ -146,6 +166,7 @@ export function listDailyReports(
       title: n.name || '',
       headline: typeof n.attributes?.headline === 'string' ? n.attributes.headline : '',
       markdown: n.rawInput || '',
+      report: reportFromNode(n),
     }))
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0)); // 最近在前
 }

@@ -71,10 +71,25 @@ const EIGHT = new Date(2026, 6, 30, 8, 0);
     '落库必须连 sections 一起存下来 —— 只存 markdown 的话 UI 渲染不了,只能拿新数据重排');
   assert.match(persist, /export function readTodayReport/, '要有「读今天冻结的那份」');
 
+  /*
+   * 显示端**只读冻结件,一行 build 都不许有**(2026-07-30 用户把入口从 Today 挪到洞察
+   * 之后收紧的)。此前的写法是「有冻结件就用,没有就现算兜底」——那个兜底就是个后门:
+   * 冻结件因为任何原因读不到(老节点 / 存坏了 / 还没落库),界面就悄悄回到「每次刷新
+   * 都重排」,而用户看不出区别。现在唯一的显示处是洞察页的 DailyReportPanel,
+   * 它只 readTodayReport / listDailyReports,不 import buildDailyReport ——
+   * 「当天不再变」因此是硬的,没有任何一处会拿新数据现算一份出来。
+   */
+  const panel = strip(read('components/portal/insights/DailyReportPanel.tsx'));
+  assert.match(panel, /readTodayReport\(/, '今天那份从冻结件读');
+  assert.match(panel, /listDailyReports\(/, '往日那几份也从冻结件读,不回溯生成');
+  assert.doesNotMatch(panel, /buildDailyReport/,
+    '显示端不许 build —— 现算的兜底是个后门:冻结件一读不到就悄悄回到「每次刷新都重排」,' +
+    '而用户看不出区别');
+
   const hook = strip(read('components/portal/today/useTodayData.ts'));
-  assert.match(hook, /const frozen = readTodayReport\(/, '显示前先读冻结件');
-  assert.match(hook, /frozen \?\? buildDailyReport\(/,
-    '有冻结件就用冻结件,**现算只是兜底** —— 反过来写(先算、算不出才读)等于没冻');
+  assert.match(hook, /autoPersistTodayReport\(/, '定稿落库仍然只有 Today 这一处');
+  assert.doesNotMatch(hook, /setTodayReport/,
+    'Today 不再持有日报 state —— 入口已挪到洞察(用户定案:「今天不要入口,用弹出卡片」)');
 }
 
 /* ── ② 日程窗口 = 当天整天,不是「从现在起」 ────────────────────────── */
@@ -185,8 +200,18 @@ const EIGHT = new Date(2026, 6, 30, 8, 0);
   assert.match(profile, /KEYS\.dailyReportEnabled\) !== '0'/,
     "默认开必须写成 !== '0':=== '1' 会让所有老用户都是关的(默认开等于没生效);" +
     '而任何比 !== \'0\' 更宽松的写法都会把「用户亲手关掉」这个决定抹掉');
-  const card = strip(read('components/portal/today/DailyReportCard.tsx'));
-  assert.match(card, /pending/, '还没到 08:00 时要说清它几点来,不能空着一块地方');
+  const panel = strip(read('components/portal/insights/DailyReportPanel.tsx'));
+  assert.match(panel, /reportDue\(new Date\(\)\)/,
+    '还没到 08:00 时要说清它几点来,不能空着一块地方');
+  // 关掉日报的人,洞察页也不该立着一块空地
+  assert.match(panel, /if \(!enabled\) return null/, '关掉了就整段不出现');
+  // 老节点没有冻结件 → 点开是空壳。要么禁用要么说明,不做「点了没反应」的假按钮。
+  assert.match(panel, /disabled=\{!r\.report\}/,
+    '没有冻结件的往日不许做成能点的按钮 —— 点开一个空壳比不给这个入口更糟');
+
+  const today = strip(read('components/portal/TodayFeed.tsx'));
+  assert.doesNotMatch(today, /DailyReportCard/,
+    'Today 不再有日报卡(用户定案:「今天不要入口,用弹出卡片,在洞察开入口」)');
 }
 
 console.log('daily-report-crossface: OK(8 点定稿 / 整天窗口 / 跨面配额 / 正向准入 / 邮件不复述 / 默认开)');

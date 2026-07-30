@@ -11,8 +11,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { loadProfileSettings, portalLocaleToDictionaryLocale, PROFILE_UPDATED_EVENT } from '@/lib/portal/profile';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
-import { buildDailyReport, type DailyReport } from '@/lib/portal/daily-report';
-import { autoPersistTodayReport, reportAnchor, reportDue, readTodayReport } from '@/lib/portal/daily-report-persist';
+import { autoPersistTodayReport, reportAnchor } from '@/lib/portal/daily-report-persist';
 import { collectDailyReportExtras, outfitNoteFor, collectOrders } from '@/lib/portal/daily-report-sources';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext, type TodayReceipt } from '@/lib/platform/view-models/today-view-model';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
@@ -103,7 +102,6 @@ export function useTodayData(canUsePrivateData: boolean) {
   const [displayName, setDisplayName] = useState('');
   const [memoryCount, setMemoryCount] = useState(0);
   const [memoryNotes, setMemoryNotes] = useState<readonly string[]>([]);
-  const [todayReport, setTodayReport] = useState<DailyReport | null>(null);
   const [focusNodes, setFocusNodes] = useState<readonly FocusNode[]>([]);
   const [allNodes, setAllNodes] = useState<readonly FocusNode[]>([]);
   const [receipt, setReceipt] = useState<TodayReceipt>({ realTotal: 0, todayCount: 0, yesterdayCount: 0 });
@@ -172,7 +170,6 @@ export function useTodayData(canUsePrivateData: boolean) {
       if (stale()) return;
       setMemoryCount(updated.memoryCount);
       setMemoryNotes(updated.memoryNotes);
-      if (!canUsePrivateData && !stale()) setTodayReport(null); // 登出:清私据派生的日报
       setFocusNodes(updated.focusNodes);
       setAllNodes(updated.allNodes);
       setReceipt(updated.receipt);
@@ -211,7 +208,6 @@ export function useTodayData(canUsePrivateData: boolean) {
         {
           const profile = loadProfileSettings();
           const anchor = reportAnchor(now);
-          const due = reportDue(now);
           const todayEvents = calEvents.filter((e) => {
             const t = new Date(e.start).getTime();
             const d0 = new Date(anchor); d0.setHours(0, 0, 0, 0);
@@ -236,15 +232,12 @@ export function useTodayData(canUsePrivateData: boolean) {
             // (本轮的 setAllNodes 就在几行之前,还没生效),会让日报比列表慢一天。
             orders: collectOrders(updated.allNodes),
           };
+          /* 这一页只负责**定稿落库**,不再往 Today 画卡(2026-07-30 用户定案:
+             「今天不要入口,用弹出卡片,在洞察开入口」)。
+             展示唯一在洞察页的 DailyReportPanel,而它**只读冻结件、不 build** ——
+             这样「当天不再变」是硬的:没有任何一处会拿新数据现算一份出来。
+             autoPersistTodayReport 内部自己会用 08:00 锚点 build 并判 due/空/当天已生成。 */
           autoPersistTodayReport(reportInput, { enabled: profile.dailyReportEnabled, now });
-          // 优先读**今天已经冻结的那一份**(存记忆时连 sections 一起存了)。
-          // 只钉 now 是不够的 —— 日历窗口本来就是整天,锚点几乎不影响它;白天真正会变的是
-          // **输入**:新邮件到了、某个域的判定翻了。不读回冻结件的话,同一天刷新两次
-          // 还是两份不同的日报,用户抱怨的就是这个。冻结件缺失(第一次 / 老节点)才现算。
-          const frozen = readTodayReport(updated.allNodes, now);
-          const report = frozen ?? buildDailyReport(reportInput);
-          // 还没到点就先不出 —— 卡上会说「今天的日报早上 8:00 见」(见 DailyReportCard)。
-          if (!stale()) setTodayReport(profile.dailyReportEnabled && due && !report.empty ? report : null);
           // AI 判决(实弹):结构化信号批量送判,落 ledger;取数惰性(30min 闸后才算)。
           // 付费门双层:客户端 canUsePaidCloudAi 前置拦下(免费档不出网),路由端
           // guardAiRoute + requirePaidCloudAi 强制。llm-sweep 已被吸收拆除。
@@ -439,7 +432,7 @@ export function useTodayData(canUsePrivateData: boolean) {
 
   return {
     displayName,
-    memoryCount, memoryNotes, todayReport,
+    memoryCount, memoryNotes,
     focusNodes, allNodes, receipt,
     dormantStore, setDormantStore,
     calendarEvents, proactiveContext,

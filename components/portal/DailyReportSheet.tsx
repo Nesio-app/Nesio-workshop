@@ -1,0 +1,91 @@
+'use client';
+
+/**
+ * DailyReportSheet —— 每日日报的弹出层(2026-07-30 用户定案:
+ * 「今天不要入口,用弹出卡片,在洞察开入口」)。
+ *
+ * 为什么从 Today 挪走:日报是一份**读物**,不是一张待办卡。Today 那一列每张卡都在
+ * 要求你做点什么(拍一下、回一句、划掉),而日报是「坐下来看两分钟」——
+ * 混在里面既不像卡片也不像文章,还天天占着最上面那块地方。
+ * 收进洞察页当一段,点开弹出全屏读,各归各位。
+ *
+ * 只渲染,不生成:日报的定稿与落库仍然只有 useTodayData 一处
+ * (见 daily-report-persist 的 08:00 锚点 + 冻结件)。这里给什么就画什么 ——
+ * 两处都能写的话,今天这份到底是谁定的稿就说不清了。
+ */
+
+import type { DailyReport } from '@/lib/portal/daily-report';
+import { L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
+import { usePortalLocale } from './use-portal-locale';
+import NesioSheet from './ui/NesioSheet';
+import {
+  IconNote, IconCloudSun, IconCalendar, IconMail, IconBook, IconCheckSquare, IconTrendingUp,
+} from './icons';
+
+// 段落图标。Record<DailyReportSectionId, …> 是穷举类型 —— 日报加新段时这里漏一个
+// tsc 直接红,不会静默渲染成空图标。
+const SECTION_ICON: Record<DailyReport['sections'][number]['id'], React.ComponentType<{ size?: number }>> = {
+  action: IconCheckSquare,     // 先处理这几件
+  calendar: IconCalendar,      // 今日日程
+  today: IconCloudSun,         // 今天(天气/穿/吃/练)
+  domain: IconTrendingUp,      // 这几面有变化
+  email: IconMail,
+  memory: IconBook,
+};
+
+export default function DailyReportSheet({
+  report, elevated = false, onClose,
+}: {
+  report: DailyReport;
+  /** 从洞察(fullscreen,z-930)里打开时必须抬层,否则会被整个盖住。 */
+  elevated?: boolean;
+  onClose: () => void;
+}) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+
+  return (
+    <NesioSheet
+      variant="bottom"
+      open
+      elevated={elevated}
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-settings-sheet-card"
+      ariaLabel={report.title}
+    >
+      <div className="nesio-brief-head">
+        <div>
+          <p className="nesio-brief-greeting">
+            <span style={{ display: 'inline-flex', verticalAlign: '-3px', marginRight: 'var(--space-2)' }}>
+              <IconNote size={16} />
+            </span>
+            {report.title}
+          </p>
+          <p className="nesio-brief-date">{report.headline}</p>
+        </div>
+        <button type="button" className="nesio-voice-sheet-close" onClick={onClose}
+          aria-label={L(dict, '关闭', 'Close')}>✕</button>
+      </div>
+
+      <div className="nesio-settings-sheet-body">
+        {report.sections.map((s) => {
+          const SectionIcon = SECTION_ICON[s.id];
+          return (
+            <div key={s.id} className="nesio-drsheet-section">
+              <p className="nesio-drsheet-h">
+                <SectionIcon size={15} /> {s.title}
+              </p>
+              <ul className="nesio-drsheet-ul">
+                {s.lines.map((line, i) => <li key={i}>{line}</li>)}
+              </ul>
+            </div>
+          );
+        })}
+        <p className="nesio-drsheet-foot">
+          {L(dict, '早上 8:00 定稿 · 这一天不再变', 'Fixed at 8:00 · unchanged for the rest of the day')}
+        </p>
+      </div>
+    </NesioSheet>
+  );
+}
