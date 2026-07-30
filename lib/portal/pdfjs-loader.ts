@@ -89,8 +89,22 @@ export async function openPdf(data: ArrayBuffer | Uint8Array): Promise<PdfDoc> {
   }).promise;
 }
 
+/** 分好行之后的一行:除了拼好的文本,**保留每一块的 x**。 */
+export interface PdfLine {
+  /** PDF 坐标系的 y(向上增长)。同一行的块 y 相同。 */
+  y: number;
+  /** 行内各块,已按 x 从左到右排好。 */
+  cells: Array<{ x: number; text: string }>;
+  /** 各块用单空格拼起来的整行文本。 */
+  text: string;
+}
+
 /**
- * 把一页的文字块按 y 重新分成行,行内按 x 从左到右拼。
+ * 把一页的文字块按 y 重新分成行,行内按 x 从左到右排 —— **保留坐标**的版本。
+ *
+ * 为什么要保留 x:银行 statement 靠**列位置**定方向(借列 / 贷列 / 余额列)。
+ * 只拿到拼好的一行字符串,「1,234.56」到底是支出、收入还是当日余额就分不出来,
+ * 而这三者认错任何一个,整份对账都是错的。见 lib/portal/statement-parse.ts。
  *
  * @param tolerance 同一行的 y 容差(pt)。给 2.5:小于半个字高。
  *   太小 → 同一行里字号略有差异的块(比如加粗的「↑」)会被拆成两行;
@@ -98,7 +112,7 @@ export async function openPdf(data: ArrayBuffer | Uint8Array): Promise<PdfDoc> {
  *
  * 纯函数,不碰 pdf.js —— 所以可以直接喂假数据单测。
  */
-export function groupItemsIntoLines(items: readonly PdfTextItem[], tolerance = 2.5): string[] {
+export function groupItemsIntoRows(items: readonly PdfTextItem[], tolerance = 2.5): PdfLine[] {
   const rows: Array<{ y: number; parts: Array<{ x: number; s: string }> }> = [];
   for (const it of items) {
     const s = typeof it.str === 'string' ? it.str : '';
@@ -115,14 +129,28 @@ export function groupItemsIntoLines(items: readonly PdfTextItem[], tolerance = 2
   return rows
     // PDF 的 y 向上,所以**降序**才是从上到下(写成升序会把整份文档读反 —— 表头跑到最后)
     .sort((a, b) => b.y - a.y)
-    .map((r) => r.parts
-      .sort((a, b) => a.x - b.x)
-      // 块之间补一个空格:pdf.js 常把「5.6」和「mmol/L」拆成两块,不补就粘成「5.6mmol/L」,
-      // 而下游找单位/词边界靠的是空白。多余的空格由下游自己吸收。
-      .map((p) => p.s.trim())
-      .filter(Boolean)
-      .join(' ')
-      .replace(/\s{2,}/g, ' ')
-      .trim())
-    .filter(Boolean);
+    .map((r) => {
+      const cells = r.parts
+        .sort((a, b) => a.x - b.x)
+        .map((p) => ({ x: p.x, text: p.s.trim() }))
+        .filter((c) => c.text);
+      return {
+        y: r.y,
+        cells,
+        // 块之间补一个空格:pdf.js 常把「5.6」和「mmol/L」拆成两块,不补就粘成「5.6mmol/L」,
+        // 而下游找单位/词边界靠的是空白。多余的空格由下游自己吸收。
+        text: cells.map((c) => c.text).join(' ').replace(/\s{2,}/g, ' ').trim(),
+      };
+    })
+    .filter((r) => r.text);
+}
+
+/**
+ * 同上,只要拼好的行文本。化验单和阅读器用的就是这个签名,别改。
+ *
+ * 它现在是 groupItemsIntoRows 的薄封装 —— 全仓**只有一套分行逻辑**。
+ * 两套的话,哪天有人调了容差只调一边,两个功能就会对同一份 PDF 给出不同的行。
+ */
+export function groupItemsIntoLines(items: readonly PdfTextItem[], tolerance = 2.5): string[] {
+  return groupItemsIntoRows(items, tolerance).map((r) => r.text);
 }
