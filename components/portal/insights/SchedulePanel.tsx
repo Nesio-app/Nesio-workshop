@@ -256,15 +256,16 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '0.2rem', alignItems: 'center', flexWrap: 'wrap' }}>
           {row.meta && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{row.meta}</span>}
+          {/* 和下面那排标签用同一套 padding —— 同一张卡里两种大小的胶囊会显得没对齐 */}
           {row.badge && (
-            <span style={{ fontSize: 'var(--text-xs)', padding: '0.05rem 0.45rem', borderRadius: 'var(--radius-pill)', background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{row.badge}</span>
+            <span style={{ fontSize: 'var(--text-xs)', padding: '0 var(--space-2)', borderRadius: 'var(--radius-pill)', background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{row.badge}</span>
           )}
         </div>
 
         {/* 在途订单 / 银行流水走到哪一步了(+ 到货时间、金额)。 */}
         {status && (
           <div style={{
-            marginTop: '0.25rem', fontSize: 'var(--text-xs)',
+            marginTop: 'var(--space-1)', fontSize: 'var(--text-xs)',
             fontWeight: 'var(--weight-medium)', color: toneVars(status.tone).fg,
             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
           }}>{status.text}</div>
@@ -272,12 +273,12 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
 
         {/* 右下角:订单 / 账单 / 预约 / 私人 / 有附件。认不出来就一个都不画。 */}
         {badges.length > 0 && (
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-1)', marginTop: '0.3rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-1)', marginTop: 'var(--space-1)' }}>
             {badges.map((b) => {
               const v = toneVars(b.tone);
               return (
                 <span key={b.id} style={{
-                  fontSize: 'var(--text-xs)', padding: '0.05rem 0.45rem',
+                  fontSize: 'var(--text-xs)', padding: '0 var(--space-2)',
                   borderRadius: 'var(--radius-pill)', background: v.bg, color: v.fg,
                 }}>{b.label}</span>
               );

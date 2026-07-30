@@ -59,15 +59,28 @@ function collectDates(hay: string): Found[] {
 
 function collectTimes(hay: string): FoundTime[] {
   const out: FoundTime[] = [];
-  // 14:00 / 9:30
-  for (const m of hay.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)) {
-    out.push({ index: m.index ?? 0, h: Number(m[1]), mi: Number(m[2]) });
-  }
+
+  /*
+   * **am/pm 先扫,而且要把它盖住的位置记下来。**
+   *
+   * 「Sat, Aug 3 at 7:30 PM」里,`7:30` 同时能被 24 小时制那条正则认走 —— 两条命中
+   * 起点相同,后来的挤不掉先来的,于是 7:30 PM 变成了早上 7:30(真机踩到:
+   * 一场晚餐订位被排到了清晨)。谁更具体谁先说话:带 PM 的那条信息量严格更大。
+   */
+  const claimed = new Set<number>();
   // 2pm / 2:30 p.m.
   for (const m of hay.matchAll(/\b(1[0-2]|0?[1-9])(?::([0-5]\d))?\s*([ap])\.?\s?m\.?\b/gi)) {
     let h = Number(m[1]) % 12;
     if (m[3].toLowerCase() === 'p') h += 12;
-    out.push({ index: m.index ?? 0, h, mi: m[2] ? Number(m[2]) : 0 });
+    const index = m.index ?? 0;
+    claimed.add(index);
+    out.push({ index, h, mi: m[2] ? Number(m[2]) : 0 });
+  }
+  // 14:00 / 9:30(跳过已经被 am/pm 认走的那几处)
+  for (const m of hay.matchAll(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g)) {
+    const index = m.index ?? 0;
+    if (claimed.has(index)) continue;
+    out.push({ index, h: Number(m[1]), mi: Number(m[2]) });
   }
   // 下午两点半 / 早上 10 点 / 晚上8点15分
   for (const m of hay.matchAll(/(上午|下午|早上|晚上|中午)?\s*(\d{1,2})\s*[点時时](?:\s*(\d{1,2})\s*分|\s*(半))?/g)) {

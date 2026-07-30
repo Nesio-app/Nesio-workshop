@@ -119,27 +119,48 @@ export function extractEmailLocal(subject: string, from: string, text: string): 
 
   if (TODO_RE.test(hay)) out.todoHint = true;
 
-  /* ── 状态 / 资金方向 / 类型(2026-07-30)──────────────────────────────
-     干草堆比上面窄:只看主题 + 正文开头(见 STATUS_SCAN_BODY_CHARS)。 */
-  const statusHay = `${subject || ''}\n${(text || '').slice(0, STATUS_SCAN_BODY_CHARS)}`;
+  /* ── 状态 / 资金方向 / 类型(2026-07-30)────────────────────────────── */
+  const subj = subject || '';
+  const bodyHead = (text || '').slice(0, STATUS_SCAN_BODY_CHARS);
 
-  // 订单状态:同时命中多条时取**更终态**的那一条(数组顺序就是从早到晚,
-  // 所以不 break —— 后面的会覆盖前面的)。一封「您的退款已处理(原订单已发货)」
-  // 该显示的是退款,不是发货。
-  for (const [status, re] of ORDER_STATUS_RES) if (re.test(statusHay)) out.orderStatus = status;
+  // 同时命中多条时取**更终态**的那一条(数组顺序就是从早到晚,所以不 break)。
+  const pickOrder = (h: string): EmailLocalFields['orderStatus'] => {
+    let v: EmailLocalFields['orderStatus'];
+    for (const [status, re] of ORDER_STATUS_RES) if (re.test(h)) v = status;
+    return v;
+  };
+  // 取**第一条**命中(数组顺序即从具体到笼统:退款 > 收款 > 扣款 > 付款 > 待还)。
+  const pickMoney = (h: string): EmailLocalFields['moneyFlow'] => {
+    for (const [flow, re] of MONEY_FLOW_RES) if (re.test(h)) return flow;
+    return undefined;
+  };
 
-  // 资金方向:取**第一条**命中(数组顺序即从具体到笼统:退款 > 收款 > 扣款 > 付款 > 待还)。
-  for (const [flow, re] of MONEY_FLOW_RES) {
-    if (re.test(statusHay)) { out.moneyFlow = flow; break; }
-  }
+  /*
+   * **主题说了算,主题没说才看正文开头。**
+   *
+   * 真机踩到的:一封主题写着「您的订单已发货」的信,正文里有一句
+   * 「如订单已取消,款项原路退回」—— 那是条款,不是状态。把主题和正文混成一个
+   * 干草堆搜,「已取消」比「已发货」更终态,于是一封发货通知被标成了「已取消」。
+   * 条件从句的写法千变万化(如/若/如需/if you cancel/to cancel a refund…),
+   * 一条条去排除是打地鼠;而**商家把状态写在主题里**是行业惯例 ——
+   * 主题是他自己下的结论,正文里的同样的词只是背景说明。
+   */
+  const orderStatus = pickOrder(subj) ?? pickOrder(bodyHead);
+  if (orderStatus) out.orderStatus = orderStatus;
+  const moneyFlow = pickMoney(subj) ?? pickMoney(bodyHead);
+  if (moneyFlow) out.moneyFlow = moneyFlow;
 
   // 类型:只在有**正面证据**时给,而且证据越具体的排越前。
   // 这里**没有兜底分支** —— 「凡是没被认出来的都算私人」正是这个仓库反复踩的坑
   // (「健身」被认成健康打卡是同一族)。私人与否由 Gmail 自己的 CATEGORY_PERSONAL
   // 说了算,在 gmail 路由里补,不在这里猜。
-  if (BOOKING_RE.test(statusHay)) out.kindHint = 'booking';           // 「预约/reservation」是极具体的词
+  const kindHay = `${subj}\n${bodyHead}`;
+  if (BOOKING_RE.test(kindHay)) out.kindHint = 'booking';           // 「预约/reservation」是极具体的词
   else if (out.orderStatus || out.orderNo || out.trackingNo) out.kindHint = 'order';
-  else if (BILL_RE.test(statusHay) || out.moneyFlow) out.kindHint = 'bill';
+  // 「账单」要的是**欠着一笔钱**的证据:一张账单/发票,或者明写的应还。
+  // 不能是「只要认出资金方向就算账单」—— 那样一条「Zelle 收到 60 块」也会被贴上
+  // 账单标签,而那是一笔转账,不是任何人的账单。
+  else if (BILL_RE.test(kindHay) || out.moneyFlow === 'due') out.kindHint = 'bill';
 
   return out;
 }

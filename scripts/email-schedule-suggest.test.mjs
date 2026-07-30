@@ -49,6 +49,14 @@ const SENT = '2026-07-30T10:00:00Z';
 
   const iso = suggestScheduleFromEmail('Install window 2026-08-03 09:00', '', SENT);
   assert.equal(iso.at, '2026-08-03T09:00');
+
+  // 真机踩到:一场晚餐订位被排到了清晨。`7:30` 同时能被 24 小时制那条正则认走,
+  // 两条命中起点相同、后来的挤不掉先来的,于是 7:30 PM 成了早上 7:30。
+  const dinner = suggestScheduleFromEmail(
+    'Your reservation is confirmed', 'Sat, Aug 3 at 7:30 PM · 2 guests', SENT);
+  assert.equal(dinner.at, '2026-08-03T19:30',
+    '带 PM 的写法信息量严格更大,必须盖过同一位置上的裸 7:30 —— ' +
+    '否则晚上七点半的订位会被排到早上七点半');
 }
 
 /* ── ② 缺一条就不认(这是正向判据的全部意义)────────────────────── */

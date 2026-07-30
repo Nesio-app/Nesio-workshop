@@ -87,6 +87,34 @@ const { mailStatusLine, mailBadges } = loadTs('lib/portal/mail-badges.ts');
   }
 }
 
+/* ── ②' 主题说了算:正文里的条款从句不许改写状态(真机踩到)────────── */
+{
+  // 一封发货通知,正文里带着「如订单已取消,款项原路退回」这类**条款**。
+  // 混成一个干草堆搜,「已取消」比「已发货」更终态 —— 发货通知就被标成了已取消。
+  const r = extractEmailLocal('您的订单已发货', 'no-reply@shop.example.com',
+    '预计 8月3日 送达。订单号:SH2938471203。如订单已取消,款项原路退回。');
+  assert.equal(r.orderStatus, 'shipped',
+    '主题里商家自己下了结论(已发货),正文里同样的词只是背景说明。' +
+    '条件从句的写法千变万化(如/若/如需/if you cancel…),一条条排除是打地鼠 —— ' +
+    '规则必须是「主题说了算,主题没说才看正文开头」');
+
+  // 主题没说时,正文开头仍然要能兜住(否则这条规则就把功能关掉了一半)
+  const b = extractEmailLocal('Amazon.com', 'ship@amazon.com', 'Your package has shipped.');
+  assert.equal(b.orderStatus, 'shipped', '主题不说状态时,正文开头照旧要认');
+}
+
+/* ── ③' 「账单」要有欠钱的证据,不是「认出资金方向就算」────────────── */
+{
+  const zelle = extractEmailLocal('Zelle: You received $60.00', 'alerts@bank.example.com', 'Janice sent you $60.00.');
+  assert.equal(zelle.moneyFlow, 'received', '这是一笔收款');
+  assert.notEqual(zelle.kindHint, 'bill',
+    '收到一笔转账不是任何人的账单。「只要认出资金方向就贴账单」是又一次' +
+    '「凡是没被拦住的都算数」—— 账单要的是账单/发票本身,或者明写的应还');
+
+  const stmt = extractEmailLocal('Your statement is ready — minimum payment due', 'alerts@bank.example.com', '');
+  assert.equal(stmt.kindHint, 'bill', '真的账单还是要认出来');
+}
+
 /* ── ④ 同时命中时取更终态的那条 ────────────────────────────────────── */
 {
   const r = extractEmailLocal('您的退款已处理(原订单已发货)', 'shop@example.com', '');
@@ -112,6 +140,13 @@ const { mailStatusLine, mailBadges } = loadTs('lib/portal/mail-badges.ts');
   // 到货时间只属于订单 —— 银行邮件里的日期是账单日,不是「预计送达」。
   const bank = mailStatusLine({ moneyFlow: 'charged', eta: 'Aug 3' }, 'zh');
   assert.ok(bank && !bank.text.includes('Aug 3'), '银行邮件不许把账单日说成「预计到货」');
+
+  // eta 是原文片段,常自带「预计」「Arriving」。不剥就印成「预计 预计 8月3日」。
+  const dup = mailStatusLine({ orderStatus: 'shipped', eta: '预计 8月3日' }, 'zh');
+  assert.ok(!/预计\s*预计/.test(dup.text), `不许印成「${dup.text}」—— eta 自带的那个词要剥掉`);
+  assert.ok(dup.text.includes('8月3日'), '剥的是开头那一个词,日期本身原样保留');
+  const dupEn = mailStatusLine({ orderStatus: 'shipped', eta: 'Arriving Sat, Aug 2' }, 'en');
+  assert.ok(!/ETA\s+Arriving/i.test(dupEn.text), `英文同理:不许印成「${dupEn.text}」`);
 
   const b = mailBadges({ kindHint: 'order', hasAttachment: true }, 'zh');
   assert.equal(b.map((x) => x.label).join(','), '订单,有附件');

@@ -73,7 +73,11 @@ export function mailStatusLine(src: MailBadgeSource, dict: string): { text: stri
 
   const parts = [L(dict, head[0], head[1])];
   // 到货时间只在订单类里说 —— 银行邮件里的日期是账单日,不是「到货」。
-  const eta = str(src.eta).trim();
+  // eta 是**原文片段**,常常自己就带着「预计」「Arriving」这些词;不剥掉就会印成
+  // 「预计 预计 8月3日」。剥的是开头那一个词,后面的日期原样保留。
+  const eta = str(src.eta).trim()
+    .replace(/^(?:预计(?:送达|到货|收到)?|送达|到货|arriv\w*|deliver\w*|expected|estimated)\s*/i, '')
+    .trim();
   if (order && eta) parts.push(L(dict, `预计 ${eta}`, `ETA ${eta}`));
   const amount = str(src.amount).trim();
   if (amount) parts.push(amount);
