@@ -37,6 +37,8 @@ export interface Reminder {
   everyMonths?: number;
   /** 只此一次的那种,做完打个勾。重复的那种做完是往后滚,不留勾。 */
   doneAt?: string;
+  /** 从哪封邮件确认过来的(2026-07-30 的邮件→日程建议)。用户点确认后才会有。 */
+  sourceEmailId?: string;
   createdAt: string;
 }
 
@@ -118,6 +120,7 @@ function sanitize(r: unknown): Reminder | null {
     ...(x.everyDays ? { everyDays: Number(x.everyDays) } : {}),
     ...(x.everyMonths ? { everyMonths: Number(x.everyMonths) } : {}),
     ...(x.doneAt ? { doneAt: String(x.doneAt) } : {}),
+    ...(x.sourceEmailId ? { sourceEmailId: String(x.sourceEmailId) } : {}),
     createdAt: typeof x.createdAt === 'string' ? x.createdAt : new Date().toISOString(),
   };
 }
@@ -134,7 +137,7 @@ export function listReminders(): Reminder[] {
 
 export function addReminder(input: {
   title: string; at: string; kind?: ReminderKind; note?: string;
-  everyDays?: number; everyMonths?: number;
+  everyDays?: number; everyMonths?: number; sourceEmailId?: string;
 }): Reminder | null {
   const title = input.title.trim();
   if (!title || !parseWallClock(input.at)) return null;
@@ -146,6 +149,7 @@ export function addReminder(input: {
     ...(input.note?.trim() ? { note: input.note.trim() } : {}),
     ...(input.everyDays && input.everyDays > 0 ? { everyDays: input.everyDays } : {}),
     ...(input.everyMonths && input.everyMonths > 0 ? { everyMonths: input.everyMonths } : {}),
+    ...(input.sourceEmailId ? { sourceEmailId: input.sourceEmailId } : {}),
     createdAt: new Date().toISOString(),
   };
   store.save([...listReminders(), r].slice(0, 500));

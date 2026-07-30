@@ -28,6 +28,10 @@ import {
 } from '@/lib/portal/schedule-filters';
 import { mailStatusLine, mailBadges, toneVars } from '@/lib/portal/mail-badges';
 import { searchTokens, matchesSearch } from '@/lib/portal/schedule-search';
+import { suggestScheduleFromEmail } from '@/lib/portal/email-schedule-suggest';
+import {
+  loadSuggestState, markSuggest, mailSuggestReady, MAIL_SUGGEST_EVENT, type SuggestVerdict,
+} from '@/lib/portal/mail-suggest-state';
 import {
   listReminders, addReminder, removeReminder, completeReminder, reopenReminder,
   parseWallClock, scheduleRemindersReady, SCHEDULE_REMINDERS_EVENT,
@@ -438,6 +442,107 @@ function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonl
           })}
         </ul>
       )}
+    </section>
+  );
+}
+
+/**
+ * MailSuggestions —— 邮件里像是有约,问一句要不要进日程(2026-07-30 用户要求:
+ *「邮件里可以识别明确带有时间的安排,直接放入日程,或者弹出一个提示框,让我确认」)。
+ *
+ * 用户给了两条路,这里走**确认**那条。不是保守,是因为两条路的代价不对称:
+ * 自动写进去错了他不会知道,只会发现日程里多了不认识的东西,而且不知道该去哪儿改;
+ * 弹一次确认错了,代价是他按一下「不用了」。
+ *
+ * 判据在 lib/portal/email-schedule-suggest.ts 里,苛刻到近乎吝啬(必须同时有
+ * 明确日历日期 + 明确钟点 + 两者挨得很近)。宁可漏掉一封真有约的信 —— 用户还能
+ * 自己在上面那段加 —— 也不要弹一个莫名其妙的框:那种框弹三次,他就再也不看了。
+ *
+ * 处理过的记在 mail-suggest-state,同一封不问第二遍。
+ */
+function MailSuggestions({ dict, rows }: { dict: 'zh' | 'en'; rows: Row[] }) {
+  const [state, setState] = useState<Record<string, SuggestVerdict>>({});
+  const [open, setOpen] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    const read = () => setState(loadSuggestState());
+    void mailSuggestReady().then(read);
+    read();
+    window.addEventListener(MAIL_SUGGEST_EVENT, read);
+    return () => window.removeEventListener(MAIL_SUGGEST_EVENT, read);
+  }, []);
+
+  const cands = useMemo(() => {
+    const out: Array<{ row: Row; eid: string; at: string; snippet: string }> = [];
+    for (const r of rows) {
+      const eid = typeof r.node.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
+      if (!eid || state[eid]) continue;
+      const hit = suggestScheduleFromEmail(r.title, r.body, r.dateIso);
+      if (hit) out.push({ row: r, eid, at: hit.at, snippet: hit.snippet });
+      if (out.length >= 12) break;   // 一次最多问 12 封;再多就不是「问一句」了
+    }
+    return out;
+  }, [rows, state]);
+
+  if (!cands.length) return null;
+
+  const decide = (c: { row: Row; eid: string; at: string }, verdict: SuggestVerdict) => {
+    setErr('');
+    if (verdict === 'added') {
+      const created = addReminder({ title: c.row.title, at: c.at, kind: 'other', sourceEmailId: c.eid });
+      // 从存储回读 —— 写没进去就说出来,不能「按了没反应」也不能假装成功
+      if (!created || !listReminders().some((r) => r.id === created.id)) {
+        setErr(L(dict, '这条没能加进日程,稍后再试一次。', 'Could not add it — try again in a moment.'));
+        return;
+      }
+    }
+    markSuggest(c.eid, verdict);
+    setState(loadSuggestState());
+  };
+
+  const fmt = (at: string) => {
+    const d = parseWallClock(at);
+    if (!d) return at;
+    return dict === 'en'
+      ? d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+      : `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+
+  return (
+    <section className="nesio-remind">
+      <div className="nesio-remind-head">
+        <h4 className="nesio-remind-title">
+          {L(dict, `这 ${cands.length} 封信里像是写了时间`, `${cands.length} email(s) look like they have a time`)}
+        </h4>
+        <button type="button" className="nesio-remind-add" onClick={() => setOpen((v) => !v)}>
+          {open ? L(dict, '收起', 'Hide') : L(dict, '看看', 'Review')}
+        </button>
+      </div>
+
+      {open && (
+        <ul className="nesio-remind-list">
+          {cands.map((c) => (
+            <li key={c.eid} className="nesio-remind-item">
+              <div className="nesio-remind-main">
+                <span className="nesio-remind-name">{c.row.title}</span>
+                {/* 把原文里认出来的那一小段摆出来 —— 让用户自己判断我认得对不对,
+                    而不是让他相信一个看不见依据的结论。 */}
+                <span className="nesio-remind-when">{fmt(c.at)} · 「{c.snippet}」</span>
+              </div>
+              <div className="nesio-remind-acts">
+                <button type="button" className="nesio-remind-act" onClick={() => decide(c, 'added')}>
+                  {L(dict, '加进来', 'Add')}
+                </button>
+                <button type="button" className="nesio-remind-act" onClick={() => decide(c, 'dismissed')}>
+                  {L(dict, '不用了', 'No')}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {err && <p role="alert" className="nesio-remind-err">{err}</p>}
     </section>
   );
 }
@@ -893,6 +998,10 @@ export default function SchedulePanel() {
 
       {/* 我自己设的提醒(家务 / 账单 due)。只在日历那格 —— 它是「日程」,不是邮件。 */}
       {sub === 'calendar' && <RemindersSection dict={dict} tokens={tokens} />}
+
+      {/* 收件里像是有约的那几封,问一句要不要进日程。用**未经搜索/筛选**的全量
+          (emailRows)—— 这件事和「我这会儿在找什么」无关,不该被搜索框藏起来。 */}
+      {sub === 'email' && <MailSuggestions dict={dict} rows={emailRows} />}
 
       {rows.length === 0 ? (
         <p className="nesio-insights-empty">
