@@ -94,11 +94,9 @@ export type ClaimResult =
  * 确认认领。**要求那笔流水在图里有节点** —— 关联写在 `relations` 上,
  * 而 `linkNodes` 只收真节点 id(R1 定的规矩:targetId 不许是业务键)。
  *
- * ⚠️ 这就是目前的**卡点**:BankTx 不是 LifeNode(见
- * docs/design/module-link-matrix.md 财务那格)。所以调用方必须先把那笔流水
- * 「升格」成一个节点(懒升格:只给你真的动过的那几笔建节点,不是几千条全塞进图),
- * 再把节点 id 传进来。升格那一步还没做 —— 这个函数已经按升格之后的样子写好,
- * 传不进节点 id 就诚实返回 `no_tx_node`,不假装成功。
+ * 每一笔流水在图里都有一个轻量节点(`tx-node.ts`,同步时建、一视同仁),
+ * 所以调用方拿 `findTxNode(tx.id)` 就能拿到 id。
+ * 拿不到时(节点还没同步过来)诚实返回 `no_tx_node`,不假装成功。
  */
 export function claimSpend(itemNodeId: string, txNodeId: string): ClaimResult {
   if (!txNodeId) return { ok: false, reason: 'no_tx_node' };

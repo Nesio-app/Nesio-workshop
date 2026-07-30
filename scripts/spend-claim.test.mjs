@@ -100,13 +100,96 @@ check('②c 影子只转述,不许改流水的权威值(源码层)', () => {
   assert.ok(/txAmount: tx\.amount/.test(c), '金额字段名要带 tx 前缀,免得和账本自己的 amount 语义混起来');
 });
 
-check('②d 升格**不在同步流程里**被顺手调用', () => {
-  for (const f of ['lib/portal/providers/connector-sync.ts', 'lib/portal/tesla-finance.ts']) {
-    let c;
-    try { c = strip(read(f)); } catch { continue; }
-    assert.ok(!/ensureTxNode/.test(c),
-      `${f} 在同步里调了 ensureTxNode —— 那等于把几千条流水全塞进记忆图,记忆库会被淹掉`);
-  }
+check('②d 流水**没有等级**:同步进来就建节点,不看你有没有关联过它', () => {
+  // 2026-07-30 更正:第一版做成「你第一次关联它时才建节点」的懒升格 —— 错的。
+  // 那让流水的地位取决于你有没有碰过它,后果是「关联过的那笔能搜到,旁边一模一样
+  // 的那笔搜不到」。现在同步即建,一视同仁。
+  const c = strip(read('lib/portal/providers/connector-sync.ts'));
+  assert.ok(/syncTxNodes\(/.test(c),
+    '同步里没有建节点 —— 那些流水在记忆那一侧不存在:搜不到、问一问引用不到、不能被关联');
+  const at = c.indexOf('saveBankTx(merged)');
+  assert.ok(at > 0 && c.indexOf('syncTxNodes(') > at,
+    '建节点在 saveBankTx 之前 —— 流水还没落库就先建影子,失败时会留下指向不存在流水的节点');
+  const tn = strip(read('lib/portal/tx-node.ts'));
+  assert.ok(!/ensureTxNode/.test(tn), '懒升格的入口还留着 —— 会有人照着它继续按「有没有关联」建节点');
+});
+
+check('②e 批量写:一次 loadAll/saveAll + 分块让出主线程(否则 iOS 直接被杀)', () => {
+  const tn = strip(read('lib/portal/tx-node.ts'));
+  assert.ok(/upsertLifeNodesBatch\(/.test(tn),
+    '逐条 ingestLifeNode 灌几千条 = O(n²) 写盘 —— flomo 就是这么把 iOS 标签写死的');
+  assert.ok(/setTimeout\(/.test(tn), '没有在块之间让出事件循环,主线程会被长时间独占');
+  assert.ok(/TX_NODE_CAP/.test(tn), '没有单次上限 —— 首灌超量会一次性写爆');
+  const lg = strip(read('lib/portal/life-graph.ts'));
+  const fn = lg.slice(lg.indexOf('export function upsertLifeNodesBatch'), lg.indexOf('export function updateLifeNode'));
+  assert.strictEqual((fn.match(/saveAll\(/g) || []).length, 1,
+    '批量写里 saveAll 不止一次 —— 那就退回逐条写了,批量的意义没了');
+  assert.strictEqual((fn.match(/loadAll\(/g) || []).length, 1, '批量写里 loadAll 不止一次');
+});
+
+/** 真跑批量写:切出那一段,注入假存储 —— 只查「freshByKey 在不在源码里」钉不住任何东西。 */
+function loadBatchWriter(store) {
+  const lg = read('lib/portal/life-graph.ts');
+  const from = lg.indexOf('export function upsertLifeNodesBatch');
+  const to = lg.indexOf('export function updateLifeNode');
+  assert.ok(from > 0 && to > from, 'life-graph 的批量写结构变了 —— 这条测试要跟着改');
+  const js = ts.transpileModule(lg.slice(from, to), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  const m = { exports: {} };
+  vm.runInNewContext(js, {
+    module: m, exports: m.exports, JSON, Array, Object, Set, Map, Number, Math, String, Boolean, Date,
+    loadAll: () => store.nodes,
+    saveAll: (n) => { store.saves += 1; store.nodes = n; },
+    nodeFactSink: null, syncLifeGraphUpsertToCloud: () => {}, syncLifeNodeSignalToCloud: () => {},
+    require: () => ({}),
+  });
+  return m.exports;
+}
+const keyOf = (a) => (typeof a?.externalId === 'string' ? a.externalId : null);
+const input = (ext, name) => ({ type: 'event', name, source: 'system', confidence: 1, relations: [], tags: [], attributes: { externalId: ext } });
+
+check('②f 同一批里出现两次同键 → 只建一个节点(而且不许读到 nodes[-1] 炸掉)', () => {
+  const store = { nodes: [], saves: 0 };
+  const B = loadBatchWriter(store);
+  const r = B.upsertLifeNodesBatch([input('plaidtx:1', 'A'), input('plaidtx:1', 'A 改名'), input('plaidtx:2', 'B')], keyOf);
+  assert.strictEqual(store.nodes.length, 2, `同批重复键建出了 ${store.nodes.length} 个节点`);
+  assert.strictEqual(r.created, 2);
+  assert.strictEqual(store.nodes.find((n) => n.attributes.externalId === 'plaidtx:1').name, 'A 改名',
+    '同批第二次没合并进第一次建的那个');
+  assert.strictEqual(store.saves, 1);
+});
+
+check('②f2 命中已有节点时不许换 id —— 换了关联就全断了', () => {
+  const store = { nodes: [{ id: 'old', createdAt: 'X', name: 'A', attributes: { externalId: 'plaidtx:1', keep: 1 }, relations: [], tags: [], type: 'event', source: 'system', confidence: 1 }], saves: 0 };
+  const B = loadBatchWriter(store);
+  // 输入里**带上** id/createdAt —— 类型上 Omit 掉了,但运行时挡不住调用方漏传
+  // (比如从云端拿回来的对象直接丢进来)。不带的话 {...prev, ...input} 本来就保住了
+  // prev 的 id,这条断言钉不住任何东西 —— 自查反证时抓到的。
+  const r = B.upsertLifeNodesBatch(
+    [{ ...input('plaidtx:1', 'A 新名'), id: 'leaked', createdAt: 'Y' }],
+    keyOf,
+  );
+  assert.strictEqual(r.updated, 1);
+  assert.strictEqual(store.nodes.length, 1, '命中了却又建了一个');
+  assert.strictEqual(store.nodes[0].id, 'old', 'id 被 input 顶掉了 —— 那等于换了一个节点,指向它的关联全断');
+  assert.strictEqual(store.nodes[0].createdAt, 'X');
+  assert.strictEqual(store.nodes[0].name, 'A 新名');
+  assert.strictEqual(store.nodes[0].attributes.keep, 1, 'attributes 被整块替换 —— 上次写进去的字段会被抹掉');
+});
+
+check('②g 记忆库默认列表把交易收进可展开分组,但**搜索时不折叠**', () => {
+  const m = strip(read('components/portal/MemoryTab.tsx'));
+  assert.ok(/isTxShadow/.test(m), '记忆库没识别交易节点');
+  assert.ok(/!showTx\) result = result\.filter\(\(n\) => !isTxShadow\(n\)\)/.test(m),
+    '默认列表没把交易收起来 —— 几千条会把手记/照片/心情挤没');
+  assert.ok(/!isSearching && !typeFilter && txCount > 0/.test(m),
+    '搜索或按类型筛选时还显示折叠条 —— 那时候你就是在找它,不该再折');
+  // 折叠只影响**浏览**列表;搜索走的是 results 的另一条分支,不许被过滤
+  const at = m.indexOf('const results = query.trim()');
+  const line = m.slice(at, m.indexOf(';', at + 30));
+  assert.ok(!/isTxShadow/.test(line),
+    '搜索结果里也把交易过滤掉了 —— 那「可搜」就是假的');
 });
 
 // ── ③ 一笔流水只能被一件东西认领 ────────────────────────────────────────────
