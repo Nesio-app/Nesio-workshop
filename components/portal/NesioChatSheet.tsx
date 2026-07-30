@@ -215,9 +215,15 @@ function archiveSession(messages: UiMessage[]): void {
   const real = messages.filter((m) => m.role !== 'status' && m.text?.trim());
   if (real.length === 0) return;
   const firstUser = real.find((m) => m.role === 'user');
+  // #19:气泡那一层已经把内部诊断换成人话了,但**历史列表的标题**没走这道 ——
+  // 一段没有用户发言的对话,标题就直接取了模型那句「识别到:未检测到任何生命图谱条目」。
+  // 一个漏口就够用户看见一次。
+  const titleSource = firstUser?.text
+    || real.find((m) => !isInternalDiagnostic(m.text))?.text
+    || '';
   const session: ChatSession = {
     id: `s-${Date.now()}`,
-    title: (firstUser?.text || real[0].text).slice(0, 30),
+    title: (titleSource || real[0].text).slice(0, 30),
     at: new Date().toISOString(),
     messages: real.slice(-MAX_STORED),
   };
@@ -1310,7 +1316,10 @@ Edit location/value anytime in Storage.`),
                   setShowHistory(false);
                 }}
               >
-                <span className="nesio-chat-history-item-title">{s.title}</span>
+                {/* 早先存下的标题里可能已经躺着一句内部诊断 —— 渲染这一层也挡一道,不改历史数据 */}
+                <span className="nesio-chat-history-item-title">
+                  {isInternalDiagnostic(s.title) ? L(dict, '(那次没答好)', '(that one went wrong)') : markdownToPlain(s.title)}
+                </span>
                 <span className="nesio-chat-history-item-date">
                   {new Date(s.at).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' })} · {s.messages.length} {L(dict, '条', 'msgs')}
                 </span>

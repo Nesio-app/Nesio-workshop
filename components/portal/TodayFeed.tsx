@@ -17,15 +17,25 @@ import { dismissJudgedCard, judgeState, clearJudgeError } from '@/lib/portal/gui
  * 服务端回的 error 码。直接印这些字符串等于没说,但也**不能编** —— 认不出就
  * 原样带出去,至少能 grep 到。
  */
+/**
+ * #13(2026-07-30 真机):首页问候语底下出现过一整条系统级报错当正文。
+ *
+ * 最后那行原来是 `return err;` —— **认不出来的错误码就原样印到首页最上面**。
+ * 用户看到的是一句说给程序听的话,而它占着问候语正下方那块最显眼的地方。
+ *
+ * 判据改成正向的:只说**我们认识的那几个原因**;认不出来就说「这次没连上」,
+ * 原始错误留在 title 里(要查的人查得到,不用摊在脸上)。
+ * 降级仍然可见(承诺④:不许静默),只是不再用内部语言说话。
+ */
 function judgeReason(err: string, locale: string): string {
-  const e = err.toLowerCase();
-  if (e.includes('401') || e.includes('unauthorized') || e.includes('not_signed_in')) return L(locale, '需要先登录', 'sign-in needed');
+  const e = String(err || '').toLowerCase();
+  if (e.includes('401') || e.includes('unauthorized') || e.includes('not_signed_in')) return L(locale, '要先登录', 'sign-in needed');
   if (e.includes('403') || e.includes('forbidden') || e.includes('paid')) return L(locale, '这台设备没开这项', 'not enabled here');
-  if (e.includes('429') || e.includes('rate')) return L(locale, '这会儿太频繁了', 'rate limited');
-  if (e.includes('network') || e.includes('fetch')) return L(locale, '网络没通', 'network down');
-  if (e.startsWith('route 5') || e.includes('500') || e.includes('502') || e.includes('503')) return L(locale, '服务端出错', 'server error');
-  if (e.includes('parse') || e.includes('bad_json')) return L(locale, '返回看不懂', 'bad response');
-  return err;
+  if (e.includes('429') || e.includes('rate')) return L(locale, '刚问得有点勤', 'asked too often just now');
+  if (e.includes('network') || e.includes('fetch')) return L(locale, '网没连上', 'offline');
+  if (e.startsWith('route 5') || e.includes('500') || e.includes('502') || e.includes('503')) return L(locale, '那边在忙', 'busy on our side');
+  if (e.includes('parse') || e.includes('bad_json')) return L(locale, '这次没读懂', "couldn't read the reply");
+  return L(locale, '这次没连上', "didn't get through");
 }
 import { resolveCardTarget, openCardTarget } from '@/lib/portal/card-target';
 import ProactiveCardDetail from './today/ProactiveCardDetail';
@@ -485,8 +495,9 @@ export default function TodayFeed({
         {/* AI 判决**失败**时的兜底提示(承诺④:降级必须可见,不许静默)。
             idle(没什么可判/没到点/免费档)不是失败,不在这里说话。 */}
         {judgeFailed && (
-          <p className="nesio-settings-option-hint" style={{ margin: '0 0 var(--space-2)' }}>
-            {L(uiLocale, `AI 判断这次没成(${judgeReason(judgeFailed, uiLocale)}),先看这些确定的。`, `AI judging failed (${judgeReason(judgeFailed, uiLocale)}) — here are the certain ones.`)}
+          <p className="nesio-settings-option-hint" style={{ margin: '0 0 var(--space-2)' }} title={judgeFailed}>
+            {/* 原始错误码留在 title 里 —— 要查的人查得到,不用摊在问候语底下。 */}
+            {L(uiLocale, `${judgeReason(judgeFailed, uiLocale)},这次先按确定的排。`, `${judgeReason(judgeFailed, uiLocale)} — showing the certain ones for now.`)}
             <button
               type="button"
               disabled={retrying}

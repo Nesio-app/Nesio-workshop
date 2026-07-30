@@ -24,6 +24,8 @@ import { evaluateHealthFindings, type Severity } from '@/lib/portal/health-clini
 import { computeRiskScores, type RiskCategory } from '@/lib/portal/health-risk';
 // #28:「血糖正常」和「GMI 偏高」同屏 —— 两边都对,得有一句话说清它们量的不是同一件事
 import { glucoseReconcileNote } from '@/lib/portal/health-reconcile';
+// #20:模型回复里的 markdown 记号 —— 念念那边已经在用同一个函数,这里之前漏了
+import { markdownToPlain } from '@/lib/portal/chat-markdown';
 import { buildMonthlyHealthReport, persistHealthReportToMemory, autoPersistLastMonthHealthReport, healthMonths } from '@/lib/portal/health-report';
 import { healthReportRichHtml } from '@/lib/portal/health-report-visual';
 import SegTabs from '../ui/SegTabs';
@@ -287,7 +289,11 @@ function AiInsightPanel({ data, dict }: { data: HealthMetrics; dict: string }) {
     <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
       {status === 'done' ? (
         <>
-          {text.split('\n').filter(Boolean).map((line, i) => <p key={i} className="nesio-health-story-line">{line}</p>)}
+          {/* #20:模型很自然地用 markdown 列表回答,而这里是纯文本渲染 ——
+              星号原样糊在正文里。念念那边 2026-07-29 已经修过一次(markdownToPlain),
+              这一处漏了:同一个 bug 在两个模块各犯一遍,就是因为没走同一个函数。
+              仍然**不渲染 HTML** —— 这段文字里带着健康读数,当 HTML 渲染是开注入口子。 */}
+          {markdownToPlain(text).split('\n').filter(Boolean).map((line, i) => <p key={i} className="nesio-health-story-line">{line}</p>)}
           <button type="button" className="nesio-connector-connect" style={{ marginTop: '0.4rem', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)' }} onClick={() => void run()}>{L(dict, '重新生成', 'Regenerate')}</button>
         </>
       ) : status === 'error' ? (

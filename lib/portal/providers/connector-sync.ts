@@ -5,6 +5,7 @@
  */
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { stripMarkdownInline } from '@/lib/portal/node-display';
+import { isTagOnlyText } from '@/lib/portal/topic-tags';
 
 /* ---------- Plaid 银行流水(增量游标在服务端 cookie;本机 IDB 留最近 5000 笔) ---------- */
 
@@ -126,8 +127,9 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
         // flomo 里这种条目很常见(建标签时随手留的一行 `#主题/健身`),导进来就是一条
         // 名字叫「#主题/健身」、正文也是「#主题/健身」的「记忆」—— 用户在记忆库里
         // 搜「健身」,第一条命中的就是这个内部分类标签本身(QA #14)。
-        const withoutTags = plain.replace(/#[^\s#]+/g, '').trim();
-        if (!withoutTags) continue;
+        // 判据收在 topic-tags.isTagOnlyText —— 展示层(memory-visibility)用的是同一份,
+        // 否则「入库时挡住的」和「展示时滤掉的」会慢慢漂成两套。
+        if (!plain.trim() || isTagOnlyText(plain)) continue;
         ingestLifeNode({
           type: 'preference',
           name: plain.slice(0, 40),
