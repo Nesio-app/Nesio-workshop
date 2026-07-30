@@ -17,6 +17,16 @@ import * as fflate from 'fflate';
 const src = fs.readFileSync(new URL('../lib/portal/cloud-module-sync.ts', import.meta.url), 'utf8');
 const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
 
+// module-merge 用**真实现**注入(它是纯函数、无依赖)。桩成空的话「银行流水走并集」
+// 这条路径在本文件里就永远走不到,而它正是 2026-07-30 修的那个丢数据的根因。
+const mergeSrc = fs.readFileSync(new URL('../lib/portal/module-merge.ts', import.meta.url), 'utf8');
+const mergeJs = ts.transpileModule(mergeSrc, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+const moduleMerge = (() => {
+  const m = { exports: {} };
+  vm.runInNewContext(mergeJs, { module: m, exports: m.exports, JSON, Array, Object, Set, Map, Number, Math, String, Boolean, Date, RegExp, require: () => ({}) });
+  return m.exports;
+})();
+
 function makeCtx({ lsInit = {}, localEntries = {}, fetchImpl, withReload = false, ssBroken = false } = {}) {
   const lsMap = new Map(Object.entries(lsInit));
   const localStorage = {
@@ -50,6 +60,7 @@ function makeCtx({ lsInit = {}, localEntries = {}, fetchImpl, withReload = false
         restoreCombinedBackup: async (backup, mode) => { restoreApplied = { entries: backup.entries, mode }; return { restoredKeys: 0, idbRestored: Object.keys(backup.entries).length, skippedKeys: [], corruptKeys: [] }; },
       };
       if (p === './storage-health') return { logDropped: () => {} };
+      if (p === './module-merge') return moduleMerge;
       if (p === './yield-main') return { yieldToMain: async () => {} };
       // isBackupKey:测试用的都是 durable 应用 key(nesio-*-v1),按真值等价返回 true;
       // 专属/前缀行在此之前已被 isDedicatedSyncKey 跳过。
@@ -218,6 +229,43 @@ function cloudRow(moduleKey, json, updatedAt = '2026-07-25T00:00:00.000Z') {
   const broken = makeCtx({ localEntries: {}, fetchImpl, withReload: true, ssBroken: true });
   await broken.mod.autoSyncModulesWithCloud({ force: true });
   assert.equal(broken.ctx._reloaded(), false, 'sessionStorage 写不进 → 不 reload(防隐私模式无限刷屏)');
+}
+
+// 8. 银行流水:并集,不许整键替换(2026-07-30 真机丢数据的根因)。
+//    这一条是**端到端**的:走真正的 pull 路径,不是单测 mergeModuleJson。
+//    场景:本机(A)有 500 笔、云端(B)有 300 笔,而且 A 自上次同步以来「没改过」——
+//    正是这个组合会让模块级 LWW 判「云端胜」然后整键替换,A 独有的 500 笔当场消失。
+{
+  const aTxs = Array.from({ length: 500 }, (_, i) => ({ id: `a${i}`, date: '2026-07-01', name: 'A', amount: 1 }));
+  const bTxs = Array.from({ length: 300 }, (_, i) => ({ id: `b${i}`, date: '2026-07-02', name: 'B', amount: 2 }));
+  const aJson = JSON.stringify(aTxs);
+  // 关键:把 A 的哈希写进 state,模拟「本机自上次同步以来没改过」→ 原来会判云端胜
+  const stateHash = (() => {
+    let h = 0; for (let i = 0; i < aJson.length; i++) { h = (h * 31 + aJson.charCodeAt(i)) | 0; }
+    return String(h);
+  })();
+  const rows = [cloudRow('nesio-bank-tx-v1', JSON.stringify(bTxs))];
+  const fetchImpl = async (url) => (String(url).startsWith('/api/cloud/module-data')
+    ? { ok: true, status: 200, json: async () => ({ ok: true, modules: rows }) }
+    : { ok: false, status: 404, json: async () => ({}) });
+  const { mod, ctx } = makeCtx({
+    localEntries: { 'nesio-bank-tx-v1': aJson },
+    lsInit: { 'nesio-module-sync-state-v1': JSON.stringify({ 'nesio-bank-tx-v1': { hash: stateHash, syncedAt: '2026-07-01T00:00:00Z' } }) },
+    fetchImpl,
+  });
+  await mod.pullModulesFromCloud();
+  const applied = ctx._restoreApplied();
+  const landed = applied?.entries?.['nesio-bank-tx-v1'];
+  assert.ok(landed, '并集结果没落地');
+  assert.equal(JSON.parse(landed).length, 800,
+    `整键替换把本机独有的流水吃掉了(落地 ${JSON.parse(landed).length} 笔,应该是 800)`);
+  // 并完不写 state:本机现在是超集,必须被当成「改过」才会推上云,
+  // 否则另一台设备永远拿不到那 500 笔。
+  // 用 _lsMap 读 —— 写成 ctx._ls?.(...) 的话那个方法根本不存在,
+  // 断言恒真等于没写(自查时抓到的)。
+  const st = JSON.parse(ctx._lsMap.get('nesio-module-sync-state-v1') || '{}');
+  assert.ok(!st['nesio-bank-tx-v1'] || st['nesio-bank-tx-v1'].hash === stateHash,
+    '并集分支写了新 state —— 超集会被当成「已同步」,永远推不上去');
 }
 
 console.log('cloud-module-sync: OK');
