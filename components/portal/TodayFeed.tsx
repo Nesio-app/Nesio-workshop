@@ -29,7 +29,6 @@ import { useTodayData } from './today/useTodayData';
 import { FocusModeSheet } from './today/FocusModeSheet';
 import { MeetingRecorderSheet } from './today/MeetingRecorderSheet';
 
-const MoodTrendSheet = dynamic(() => import('./MoodTrendSheet'), { ssr: false });
 const MemoryNodeDetailLazy = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 const FamilyTodayStrip = dynamic(() => import('./today/FamilyTodayStrip'), { ssr: false });
 import MemoryFlashBanner, { useMemoryFlash } from './MemoryFlashBanner';
@@ -54,7 +53,6 @@ export default function TodayFeed({
     proactiveCards, setProactiveCards,
     dismissedCardIds, setDismissedCardIds,
   } = useTodayData(canUsePrivateData);
-  const [moodTrendOpen, setMoodTrendOpen] = useState(false);
   const [points, setPoints] = useState(0); // App 级积分(奖品商城),顶栏徽章
   useEffect(() => {
     const sync = () => { try { setPoints(getPoints()); } catch { /* SSR / 无存储 */ } };
@@ -261,14 +259,9 @@ export default function TodayFeed({
       cannotListen(L(uiLocale, '语音输入没起来 —— 再点一次,或者直接打字。', 'Voice input failed — tap again, or just type.'));
     }
   }
-  // 心情第一拍「看趋势」→ 情绪趋势 sheet(洞察浮层现由 Portal 层挂载,见 nesio-open-insights)
-  useEffect(() => {
-    const openMoodTrend = () => setMoodTrendOpen(true);
-    window.addEventListener('nesio-open-mood-trend', openMoodTrend);
-    return () => {
-      window.removeEventListener('nesio-open-mood-trend', openMoodTrend);
-    };
-  }, []);
+  // 情绪趋势面板不再挂在这里:入口在健康分析页(MoodTrendCard 自己挂 sheet)。
+  // 原来靠 window 事件跨页开,而洞察是浮层 —— activeSurface 是「记忆」时今天页
+  // 根本没挂载,监听不存在,点了就真没反应。
 
   // Proactive cards: up to 2, each independently dismissable
   const [meetingRecorderNode, setMeetingRecorderNode] = useState<FocusNode | null>(null);
@@ -568,9 +561,6 @@ export default function TodayFeed({
         <MemoryNodeDetailLazy node={guideDetailNode} onClose={() => setGuideDetailNode(null)} />,
         document.body,
       )}
-
-      {/* 批次 136:情绪趋势(心情第一拍「看趋势」进来) */}
-      <MoodTrendSheet open={moodTrendOpen} onClose={() => setMoodTrendOpen(false)} />
     </div>
   );
 }

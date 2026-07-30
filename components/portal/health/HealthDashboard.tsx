@@ -32,6 +32,7 @@ import { rankFoodReactions, mgDlToDisplay } from '@/lib/portal/body-ledger';
 import { getMeals } from '@/lib/cooking/meals';
 import BeautyCarePanel from './BeautyCarePanel';
 import HealthLensCards from './HealthLensCards';
+import MoodTrendCard from './MoodTrendCard';
 import HealthRecordSheet from './HealthRecordSheet';
 import MetricDetailSheet from './MetricDetailSheet';
 import LabScanSheet from './LabScanSheet';
@@ -230,16 +231,10 @@ function MoodCard({ mood, dict }: { mood: MoodAnalysis; dict: string }) {
         </svg>
       )}
       <span className="nesio-health-card-range">{L(dict, `近 ${d.length} 天 · ${mood.count} 次记录`, `${d.length}d · ${mood.count} logs`)}</span>
-      {/* 2026-07-29:「这周趋势」从今天页搬到这里。
-          今天页那一拍讲的是**此刻**,回顾走势不属于那儿;而这张卡本来就在讲情绪,
-          趋势面板是它的自然下一层。原来那个入口挂在今天页,等于把「看过去」塞进了「现在」。 */}
-      <button
-        type="button"
-        className="nesio-health-card-link"
-        onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-mood-trend'))}
-      >
-        {L(dict, '看这周趋势 ›', 'This week ›')}
-      </button>
+      {/* 趋势入口**不在这张卡上**:这张卡讲的是 Apple Health 的 State of Mind,
+          而趋势读的是 App 自己的情绪盘记录 —— 挂在这里等于给趋势加了一道
+          「必须导过 Apple Health」的假门(用户实测就是「我没见到」)。
+          入口已独立成 MoodTrendCard,直接摆在分析页第一屏。 */}
     </div>
   );
 }
@@ -655,6 +650,9 @@ export default function HealthDashboard() {
             <HealthLensCards onOpenMetric={setOpenMetric} />
             {/* 合并 QA 分支:没有 Apple Health 也可能有本机训练记录,有就先给一块 */}
             {emptyInsight.signals.length > 0 && <FitnessPanel insight={emptyInsight} dict={dict} />}
+            {/* 心情趋势读的是 App 自己的情绪盘记录 —— 这条早退分支(没导 Apple Health)
+                同样要给,否则「没导过 Apple Health 就看不到自己记的心情」。 */}
+            <MoodTrendCard dict={dict} />
             <p className="nesio-insights-empty" style={{ marginBottom: 0 }}>
               {L(dict,
                 '还没有 Apple Health 指标。身体账本仍可用「美味 · 记一餐」;护理看护肤物品。完整曲线请到「设置 → 数据接入 → Apple Health」上传导出。',
@@ -699,6 +697,10 @@ export default function HealthDashboard() {
               bug3 p38:身体账本顶部的读数小结卡(去掉「念」符号)+ 蛋白琥珀卡挪来这里 ── */
         <>
           <BodyLedgerAnalysisCards health={data} dict={dict} />
+
+          {/* bug3 p43「心情趋势显示在健康分析页」:摆在第一屏、不进「专项」折叠、
+              不挂 data.mood 门 —— 折叠 + Apple Health 门就是上一版「我没见到」的原因。 */}
+          <MoodTrendCard dict={dict} />
 
           {/* 专项(折叠) */}
           {(insight.signals.length > 0 || data.activityRings || data.sleepStages || data.mood || data.glucose) && (

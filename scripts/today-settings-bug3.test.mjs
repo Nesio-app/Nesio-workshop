@@ -62,10 +62,41 @@ assert.ok(/evidence\?: EvidenceRef\[\]/.test(read('components/portal/today/proac
   'card.evidence 字段要保留 —— 删的是展示,不是数据(evidenceSignalIds 还要喂反馈环)');
 assert.ok(/recordSignalFeedback/.test(card), '反馈环仍要在(证据 UI 删了,学习不能跟着停)');
 
-// ── ⑥ 心情趋势在健康分析页(bug2 已做,这里只是别让它漂回今天页)──
-assert.ok(/nesio-open-mood-trend/.test(read('components/portal/health/HealthDashboard.tsx')),
-  '「看这周趋势」入口必须在健康页(情绪卡上)');
-assert.ok(!/看这周趋势/.test(feedCode), '今天页不许再挂「看这周趋势」入口');
+// ── ⑥ 心情趋势在健康分析页 ──
+// 这条第一版只断言「HealthDashboard 里有那个事件名」,于是漏掉了真正的毛病:
+// 入口挂在 MoodCard(`data.mood &&` = Apple Health 的 State of Mind)上、还埋在
+// 「专项」折叠里,而趋势数据来自 App 自己的情绪盘 —— 用情绪盘记心情的人有数据
+// 却没入口(用户实测:「心情趋势挪到健康页?我没见到」)。所以现在钉**可达性**。
+{
+  const dashRaw = read('components/portal/health/HealthDashboard.tsx');
+  const dash = strip(dashRaw);
+  assert.ok(/<MoodTrendCard\b/.test(dash), '健康页必须挂心情趋势卡(MoodTrendCard)');
+  // ① 不许再被 Apple Health 的 data.mood 门住
+  for (const m of dash.matchAll(/.*<MoodTrendCard\b.*/g)) {
+    assert.ok(!/data\.mood/.test(m[0]),
+      '心情趋势卡不许挂 data.mood 门 —— 趋势读的是情绪盘记录,跟 Apple Health 无关');
+  }
+  assert.ok(!/看这周趋势|nesio-open-mood-trend/.test(dash),
+    '趋势入口不许再回到 MoodCard 上(那张卡本身就被 data.mood 门着)');
+  // ② 不许埋进「专项」折叠:分析页里必须出现在那个 details 之前
+  const analysis = dash.slice(dash.indexOf("<BodyLedgerAnalysisCards"));
+  const iCard = analysis.indexOf('<MoodTrendCard');
+  const iFold = analysis.indexOf("'专项'");
+  assert.ok(iCard >= 0 && iFold >= 0 && iCard < iFold,
+    '心情趋势卡必须在「专项」折叠之前(埋进折叠 = 用户找不到)');
+  // ③ 没导过 Apple Health 的早退分支也要给 —— 那才是最可能只有情绪盘数据的人
+  const early = dash.slice(dash.indexOf('data.metrics.length === 0'), dash.indexOf('const insight = computeFitnessInsight'));
+  assert.ok(/<MoodTrendCard\b/.test(early),
+    '没有 Apple Health 指标的早退分支也要挂趋势卡,否则「没导过 Apple Health 就看不到自己记的心情」');
+  // ④ 卡自己挂 sheet,不靠 window 事件跨页开(洞察是浮层,今天页可能没挂载)
+  const card = strip(read('components/portal/health/MoodTrendCard.tsx'));
+  assert.ok(/<MoodTrendSheet\b/.test(card) && !/dispatchEvent/.test(card),
+    '趋势卡要自己挂 MoodTrendSheet;靠 window 事件的话,activeSurface 是「记忆」时监听方没挂载,点了没反应');
+  assert.ok(/readMoodTrend/.test(card) && /readMoodTrend/.test(strip(read('components/portal/MoodTrendSheet.tsx'))),
+    '卡和面板必须复用同一份聚合(lib/portal/mood-trend),不许各算一套');
+}
+assert.ok(!/看这周趋势|MoodTrendSheet/.test(feedCode),
+  '今天页不许再挂趋势入口/面板 —— 回顾走势属于健康页');
 
 // ── ⑦ 设置 · 数据与隐私 ──
 const set = read('components/portal/SettingsSheets.tsx');

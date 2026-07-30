@@ -9908,6 +9908,10 @@ html[data-portal-theme="night"] .nesio-trend-chart-card { background: rgba(255,2
 .nesio-trend-bar-track { flex: 1; width: 100%; display: flex; align-items: flex-end; justify-content: center; }
 .nesio-trend-bar { width: 14px; min-height: 6px; border-radius: 999px; transition: height 0.3s; }
 .nesio-trend-bar--today { box-shadow: 0 0 0 3px color-mix(in srgb, var(--portal-muted) 22%, transparent); }
+/* 健康分析页的心情趋势入口卡:同一套柱子,压扁成缩略图(不重写一份柱状图) */
+.nesio-trend-bars--mini { height: 62px; gap: var(--space-2); margin-top: var(--space-1); }
+.nesio-trend-bars--mini .nesio-trend-bar { width: 10px; }
+.nesio-health-moodtrend { margin-top: var(--space-2); }
 .nesio-trend-bar-lab { font-size: 0.7rem; color: var(--portal-muted); }
 .nesio-trend-bar-lab--today { color: var(--portal-ink); font-weight: 700; }
 .nesio-trend-narr { display: flex; gap: 0.6rem; align-items: flex-start; padding: 0.75rem 0.85rem; border: 1px solid var(--portal-line); border-radius: 14px; margin-bottom: 1.1rem; }

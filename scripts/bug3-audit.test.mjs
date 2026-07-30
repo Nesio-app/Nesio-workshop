@@ -57,6 +57,7 @@ const F = {
   ledger: read('components/portal/health/BodyLedgerPanel.tsx'),
   dash: read('components/portal/health/HealthDashboard.tsx'),
   lens: read('components/portal/health/HealthLensCards.tsx'),
+  moodCard: read('components/portal/health/MoodTrendCard.tsx'),
   hrSheet: read('components/portal/health/HealthRecordSheet.tsx'),
   hSignals: read('lib/health/health-signals.ts'),
   feed: read('components/portal/TodayFeed.tsx'),
@@ -236,7 +237,23 @@ const ITEMS = [
   // ── 今天页(p42–p47)──
   ['113', 'p42 话筒只启用语音输入,不开说一说', () => !/nesio-open-voice/.test(C.feed) && /const cannotListen = /.test(F.feed)],
   ['114', 'p43 输入框与时间线加间距', () => /padding: 6px 2px var\(--space-4\) 0/.test(F.css)],
-  ['115', 'p43 心情趋势在健康分析页', () => /nesio-open-mood-trend/.test(F.dash) && !/看这周趋势/.test(C.feed)],
+  // 这条第一版只查了「事件名在不在」,于是漏了真问题:入口挂在 MoodCard(data.mood
+  // = Apple Health)上、还埋在「专项」折叠里,而趋势读的是情绪盘记录 —— 有数据没入口。
+  // 现在钉可达性:独立卡 + 无 Apple Health 门 + 在折叠之前 + 空指标分支也给。
+  ['115', 'p43 心情趋势在健康分析页(可达:无 data.mood 门、不在折叠里)', () => {
+    const d = C.dash;
+    if (!/<MoodTrendCard\b/.test(d)) return false;
+    if ([...d.matchAll(/.*<MoodTrendCard\b.*/g)].some((m) => /data\.mood/.test(m[0]))) return false;
+    if (/看这周趋势|nesio-open-mood-trend/.test(d)) return false;
+    const a = d.slice(d.indexOf('<BodyLedgerAnalysisCards'));
+    const iCard = a.indexOf('<MoodTrendCard'), iFold = a.indexOf("'专项'");
+    if (!(iCard >= 0 && iFold > iCard)) return false;
+    const early = d.slice(d.indexOf('data.metrics.length === 0'), d.indexOf('const insight = computeFitnessInsight'));
+    if (!/<MoodTrendCard\b/.test(early)) return false;
+    // 卡自己挂 sheet(靠 window 事件的话,今天页没挂载时点了没反应)+ 复用同一份聚合
+    return /<MoodTrendSheet\b/.test(C.moodCard) && !/dispatchEvent/.test(C.moodCard) && /readMoodTrend/.test(C.moodCard)
+      && !/看这周趋势|MoodTrendSheet/.test(C.feed);
+  }],
   ['116', 'p43「稍后」加圆形三点节点并对齐', () => /nesio-collapsed-dot nesio-tl-more-plus[\s\S]{0,80}⋯/.test(F.focusSec)],
   ['117', 'p44 洞察钻石简化', () => (F.nav.slice(F.nav.indexOf('品牌晶体'), F.nav.indexOf('</svg>', F.nav.indexOf('品牌晶体'))).match(/<path /g) || []).length === 2],
   ['118', 'p46/47 删引导卡「依据」块', () => !/guidanceEvidenceTemplate/.test(C.guideCard) && !/guidanceEvidenceTemplate/.test(F.i18n) && /recordSignalFeedback/.test(F.guideCard)],
