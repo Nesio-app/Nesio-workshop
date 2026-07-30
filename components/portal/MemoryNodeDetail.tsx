@@ -1139,14 +1139,34 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               related_plan: [<IconLink key="i" size={13} />, '相关计划', 'Related plan'],
               has_checklist: [<IconCheckSquare key="i" size={13} />, '对应清单', 'Checklist'],
               user_linked: [<IconLink key="i" size={13} />, '手动关联', 'Linked'],
+              // 2026-07-30 反链保底:下面这几个原来**不在表里**,后果是关联建了但详情页
+              // 一条都不显示 —— 上周刚做的「这笔钱关联了谁」在这里是隐形的。
+              checklist_of: [<IconCheckSquare key="i" size={13} />, '所属清单', 'Checklist of'],
+              involves_person: [<IconLink key="i" size={13} />, '相关的人', 'Person involved'],
+              paid_by_tx: [<IconLink key="i" size={13} />, '对应这笔钱', 'Paid by'],
             };
+            /**
+             * ⚠️ 关系名**不做白名单过滤**。
+             *
+             * 原来是 `Boolean(REL_LABEL[x.r.relation])` —— 表里没有的关系类型直接从
+             * 界面上消失。那意味着每加一种关系,都要有人记得回来改这张表,
+             * 忘了就是「关联明明建了,详情页什么都没有」,而且不报错。
+             * 上周新增的 involves_person / paid_by_tx 就正好踩中,checklist_of 更是
+             * 一直漏着(从清单那一侧看不到它属于谁)。
+             *
+             * 现在:认得的用它自己的标签,不认得的走通用标签**照样显示**。
+             * 宁可显示一个笼统的「关联」,也不要让一条真实存在的边凭空消失。
+             */
+            const relMeta = (rel: string): [ReactNode, string, string] =>
+              REL_LABEL[rel] ?? [<IconLink key="i" size={13} />, '关联', 'Linked'];
             const rels = [
               ...(n.relations || []).filter((r) => !removedRels.has(`${r.relation}:${r.targetId}`)),
               ...addedRels,
             ];
             const live = rels
               .map((r) => ({ r, node: g.find((x) => x.id === r.targetId) }))
-              .filter((x): x is { r: { targetId: string; relation: string }; node: LifeNode } => Boolean(x.node) && Boolean(REL_LABEL[x.r.relation]));
+              // 只要目标节点还在就显示 —— 关系名不认得不是隐藏它的理由
+              .filter((x): x is { r: { targetId: string; relation: string }; node: LifeNode } => Boolean(x.node));
             // 批次 94(用户实锤关联记忆闪退):onClick 里抛的错 React 错误边界
             // 抓不到(只抓 render),会冒到全局 → 批次 85 处理器可能触发重载 =
             // 看起来「闪退」。addRel/removeRel 全包 try/catch,任何异常只吞不炸。
@@ -1184,8 +1204,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                 {live.map(({ r, node: t }) => (
                   <div key={`${r.relation}-${r.targetId}`} className="nesio-node-link-row">
                     <button type="button" className="nesio-node-link-chip" onClick={() => onOpenNode?.(t)}>
-                      <span>{REL_LABEL[r.relation][0]}</span>
-                      <span className="nesio-node-link-kind">{L(dict, REL_LABEL[r.relation][1], REL_LABEL[r.relation][2])}</span>
+                      <span>{relMeta(r.relation)[0]}</span>
+                      <span className="nesio-node-link-kind">{L(dict, relMeta(r.relation)[1], relMeta(r.relation)[2])}</span>
                       <span className="nesio-node-link-name">{t.name.slice(0, 24)}</span>
                     </button>
                     <button type="button" className="nesio-node-link-x" aria-label={L(dict, '解除关联', 'Unlink')} onClick={() => removeRel(r)}>✕</button>
