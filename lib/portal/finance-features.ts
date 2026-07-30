@@ -135,6 +135,29 @@ export function incomeBreakdown(txs: BankTx[], ym: string): IncomeSlice[] {
 
 export interface MonthCashflow { ym: string; income: number; net: number; saved: number }
 
+/**
+ * 月净支出基线 = 近 6 个**完整**月的 net 中位数(≥2 个有效月才给数)。
+ *
+ * bug2「检查正确性」的根因收口:此前「应急金」用这套(6 完整月 + net),而「现金流跑道」
+ * 在 finance-insight 里另算一套(3 个月 + 含当前残月 + gross 不扣退款),同一份存款算出
+ * 1.5 和 1.3 两个月数,同屏自相矛盾;更糟的是 1.3 跨过了 <1.5 的 flag 门槛,凭空多出一条
+ * 红色预警。口径只留这一处,两边都调它。
+ *
+ * @param throughDomainNet 域内支出(小票/旅行)月均;传入则并进分母,与总览 KPI 同口径。
+ */
+export function monthlyNetSpendBaseline(
+  txs: BankTx[], now: Date = new Date(), opts?: { domainMonthly?: number },
+): number | null {
+  const curYm = ymOf(now);
+  const nets = availableMonths(txs)
+    .filter((m) => m < curYm) // 残月天数不全,进 median 会把基线拉低
+    .slice(0, 6)
+    .map((m) => summarizeMonth(txs, m).net)
+    .filter((n) => n >= 50); // 月净支出过低时比率无意义
+  if (nets.length < 2) return null;
+  return median(nets) + Math.max(0, opts?.domainMonthly || 0);
+}
+
 /** 近 n 个月(含当前月,时间升序)的 收入/净支出/结余(= income − net)。 */
 export function monthlyCashflow(txs: BankTx[], n = 6): MonthCashflow[] {
   return availableMonths(txs).slice(0, n).reverse().map((ym) => {
@@ -148,11 +171,19 @@ export function monthlyCashflow(txs: BankTx[], n = 6): MonthCashflow[] {
 export interface SubscriptionLoad { monthly: number; count: number; items: Array<{ name: string; monthly: number }> }
 
 /** 定期账单统一月化(avg × 30.44 ÷ 周期天数)后的合计 —— 「每月固定要出去多少」。 */
-export function subscriptionLoad(txs: BankTx[], recurring: RecurringCharge[] = detectRecurring(txs)): SubscriptionLoad {
-  const items = recurring.map((r) => ({
-    name: r.name,
-    monthly: Math.round(((r.avgAmount * AVG_MONTH_DAYS) / Math.max(1, r.cadenceDays)) * 100) / 100,
-  }));
+export function subscriptionLoad(
+  txs: BankTx[],
+  recurring: RecurringCharge[] = detectRecurring(txs),
+  /** bug2:排除不可退订的固定支出(房租水电/贷款还款)—— 它们不属于「订阅负担」。 */
+  opts?: { excludeCategories?: string[] },
+): SubscriptionLoad {
+  const skip = new Set(opts?.excludeCategories || []);
+  const items = recurring
+    .filter((r) => !skip.has(r.category))
+    .map((r) => ({
+      name: r.name,
+      monthly: Math.round(((r.avgAmount * AVG_MONTH_DAYS) / Math.max(1, r.cadenceDays)) * 100) / 100,
+    }));
   return {
     monthly: Math.round(items.reduce((s, x) => s + x.monthly, 0) * 100) / 100,
     count: items.length,
@@ -183,6 +214,13 @@ export function recurringPriceHikes(recurring: RecurringCharge[]): PriceHike[] {
     const from = r.baselineAmount;
     const to = r.latestAmount;
     if (!(from > 0) || !(to > from)) continue;
+    // bug2:双档账单不是涨价。AT&T 这类把话费与宽带归并成一条流的,金额在两档之间跳,
+    // median 落在低档 → 每次出现高档都被报成「涨 170%」。若这个价位历史上出现过
+    // (latest ≤ 历史最大值),就不是涨价,只是又走到了高的那一档。
+    if (to <= r.baselineMax) continue;
+    // 同理,金额本身极不稳定(CV 高)时中位数不是可信基线 —— 账单类流会绕过
+    // detectRecurring 里的 cv<0.2 门,所以这一层要自己挡一次。
+    if (r.amountCv > 0.5) continue;
     const delta = to - from;
     if (delta < 0.5 || delta / from < 0.05) continue;  // 噪音门:> $0.5 且 > 5%
     out.push({

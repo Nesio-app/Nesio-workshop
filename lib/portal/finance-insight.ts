@@ -19,12 +19,19 @@ import {
   formatMoney,
   dominantCurrency,
   effectiveCategory,
+  txFlow,
+  loadFlowRules,
+  expenseMerchants,
+  investmentAccountIds,
   ymOf,
   median,
   type BankTx,
   type BankAccount,
 } from './bank-tx';
-import { categoryBaseline, baselineZ, balanceProjection, detectIncome, monthlyCashflow } from './finance-features';
+import {
+  categoryBaseline, baselineZ, balanceProjection, detectIncome, monthlyCashflow,
+  recurringPriceHikes, monthlyNetSpendBaseline,
+} from './finance-features';
 import { categoryLabel } from './tx-category';
 
 export type FinanceSeverity = 'flag' | 'attention'; // flag=值得尽快看, attention=可关注
@@ -121,18 +128,32 @@ function anomalyFindings(txs: BankTx[], ym: string, opts?: { domainNet?: number;
 
 // ── 财务⑭:费用体检 —— 本月银行费用(ATM/透支/外币/利息)合计(BillGuard:灰色费用年均 ~$350)──
 function feeAuditFindings(txs: BankTx[], ym: string): FinanceFinding[] {
-  const fees = txs.filter((t) => (t.date || '').slice(0, 7) === ym && t.amount > 0 && effectiveCategory(t) === 'BANK_FEES');
+  // bug2「检查正确性」:这条曾把 `FIDELITY 500 INDEX FUND - TAX WITHHELD` 算成「银行费用」。
+  // 两层根因:① Plaid 投资流水的 subtype `tax withheld` 在入库时被归到 BANK_FEES;
+  // ② 这里是全仓唯一不过 txFlow 的聚合 —— 投资账户的钱在 KPI 支出里根本不算支出
+  //    (txFlow 对 investmentAccountIds 返回 transfer),却在费用体检里算「费用」,
+  //    于是 $42.01 与月度支出永远对不上账,文案还说「多数可申请减免」(代扣税不可能减免)。
+  // 现在与其余聚合同口径:只收 txFlow 判定为真实支出的那些。
+  const invest = investmentAccountIds();
+  const rules = loadFlowRules();
+  const evidence = expenseMerchants(txs);
+  const fees = txs.filter((t) => (t.date || '').slice(0, 7) === ym
+    && t.amount > 0
+    && txFlow(t, rules, evidence, invest) === 'expense'
+    && effectiveCategory(t) === 'BANK_FEES');
   if (!fees.length) return [];
-  const total = fees.reduce((s, t) => s + Math.abs(t.amount), 0);
+  const total = fees.reduce((s, t) => s + t.amount, 0);
   const ccy = fees[0].currency || dominantCurrency(txs);
+  // 示例取金额最大那笔 —— 原来取 fees[0](原始顺序),换个同步顺序示例商户就变。
+  const top = fees.reduce((a, b) => (b.amount > a.amount ? b : a), fees[0]);
   return [{
     id: 'finance-fee-audit',
     kind: 'fee_audit',
     severity: 'attention',
     title: ['本月有银行费用产生', 'Bank fees this month'],
     detail: [
-      `${fees.length} 笔共 ${formatMoney(total, ccy)}(如 ${fees[0].name});多数费用可申请减免或调整习惯避开`,
-      `${fees.length} fee(s), ${formatMoney(total, ccy)} (e.g. ${fees[0].name}) — many are waivable`,
+      `${fees.length} 笔共 ${formatMoney(total, ccy)}(最大一笔 ${top.name});多数银行费用可申请减免或调整习惯避开`,
+      `${fees.length} fee(s), ${formatMoney(total, ccy)} (largest: ${top.name}) — many bank fees are waivable`,
     ],
   }];
 }
@@ -196,50 +217,48 @@ function savingsRateFindings(txs: BankTx[]): FinanceFinding[] {
   }];
 }
 
-// ── ② 订阅涨价:定期扣款里最近一笔明显高于此前基线(bank-tx 没有,这里新增)──
+// ── ② 订阅涨价 ──
+// bug2「检查正确性」:这里原本自己重算了一套涨幅判定(函数级双实现),漏了
+// finance-features.recurringPriceHikes 早就写对的两条保护 ——
+//   ① 排除 RENT_AND_UTILITIES(水电市政费金额天然浮动,不是涨价);
+//   ② 只收 mature 流。
+// 后果:Town Of Cary(市政水费)被报成 flag 红条、Duke Energy 报 attention,
+// 而同一屏的订阅行角标走的是 recurringPriceHikes(排除水电)—— 两处对同一笔各说各话。
+// 现在直接复用单一实现,这个函数只负责把 hike 组装成 finding。
 function subscriptionHikeFindings(txs: BankTx[]): FinanceFinding[] {
-  const out: FinanceFinding[] = [];
-  for (const r of detectRecurring(txs)) {
-    // 需有历史基线(至少 3 笔),且涨幅 ≥5% 且绝对涨 ≥ $1(挡掉四舍五入噪音)。
-    // 财务⑭:阈值从 10% 放宽到 5% —— 订阅价格爬升(BillGuard "cost creep")常是小步慢涨。
-    if (r.count < 3 || r.baselineAmount <= 0) continue;
-    const rise = r.latestAmount - r.baselineAmount;
-    if (r.latestAmount < r.baselineAmount * 1.05 || rise < 1) continue;
-    const pct = Math.round((rise / r.baselineAmount) * 100);
-    out.push({
-      id: `finance-hike-${r.key}`,
-      kind: 'subscription_hike',
-      severity: pct >= 25 ? 'flag' : 'attention',
-      title: [`${r.name} 定期扣款涨价了`, `${r.name} recurring charge went up`],
-      detail: [
-        `${r.name} 最近一笔 ${formatMoney(r.latestAmount, r.currency)},此前约 ${formatMoney(r.baselineAmount, r.currency)}(涨 ${pct}%)`,
-        `${r.name} latest ${formatMoney(r.latestAmount, r.currency)} vs ~${formatMoney(r.baselineAmount, r.currency)} before (+${pct}%)`,
-      ],
-    });
-  }
-  return out;
+  return recurringPriceHikes(detectRecurring(txs)).map((h) => ({
+    id: `finance-hike-${h.key}`,
+    kind: 'subscription_hike' as const,
+    severity: (h.deltaPct >= 25 ? 'flag' : 'attention') as FinanceSeverity,
+    title: [`${h.name} 定期扣款涨价了`, `${h.name} recurring charge went up`] as [string, string],
+    detail: [
+      `${h.name} 最近一笔 ${formatMoney(h.to, h.currency)},此前约 ${formatMoney(h.from, h.currency)}(涨 ${h.deltaPct}%)`,
+      `${h.name} latest ${formatMoney(h.to, h.currency)} vs ~${formatMoney(h.from, h.currency)} before (+${h.deltaPct}%)`,
+    ] as [string, string],
+  }));
 }
 
 // ── ③ 现金流跑道:存款账户余额 ÷ 近月均支出 = 还能撑几个月(bank-tx 没有,这里新增)──
 // 保守:只用存款(depository)账户的正余额;需 ≥2 个月支出历史;跑道 <1.5 月记 flag,<3 月 attention。
-function cashRunwayFindings(txs: BankTx[], accounts: BankAccount[]): FinanceFinding[] {
+function cashRunwayFindings(txs: BankTx[], accounts: BankAccount[], opts?: { domainNet?: number }): FinanceFinding[] {
   const ccy = dominantCurrency(txs);
+  // bug2:缺币种的账户此前被这里排除、却被应急金卡按 USD 计入(分子也不同源)。统一按主币种兜底。
   const depository = accounts.filter(
     (a) => (a.type || '').toLowerCase() === 'depository'
       && typeof a.balance === 'number' && a.balance > 0
-      && (a.currency || '').toUpperCase() === ccy,
+      && (a.currency || ccy).toUpperCase() === ccy,
   );
   if (!depository.length) return [];
   const balance = depository.reduce((s, a) => s + (a.balance || 0), 0);
 
-  // 近月均支出(最多取 3 个最近月的 gross;需 ≥2 个月)。
-  const months = availableMonths(txs).slice(0, 3);
-  const grosses = months.map((m) => summarizeMonth(txs, m).gross).filter((g) => g > 0);
-  if (grosses.length < 2) return [];
-  const avgMonthly = median(grosses);
-  if (avgMonthly < MIN_BASE) return [];
+  // bug2「检查正确性」:此前这里自己算「近 3 个月(含当前残月)的 gross 中位数」,
+  // 而「应急金」卡算的是「近 6 个完整月的 net 中位数」—— 同一份存款算出 1.3 和 1.5 两个月数,
+  // 而且 1.3 恰好跨过 <1.5 的 flag 门槛,凭空多出一条红色预警。
+  // 现在两处共用 monthlyNetSpendBaseline,并把域内支出一起并进分母(与总览 KPI 同口径)。
+  const monthlySpend = monthlyNetSpendBaseline(txs, new Date(), { domainMonthly: opts?.domainNet });
+  if (!monthlySpend || monthlySpend < MIN_BASE) return [];
 
-  const runwayMonths = balance / avgMonthly;
+  const runwayMonths = balance / monthlySpend;
   if (runwayMonths >= 3) return [];
   const m = Math.round(runwayMonths * 10) / 10;
   return [{
@@ -248,8 +267,8 @@ function cashRunwayFindings(txs: BankTx[], accounts: BankAccount[]): FinanceFind
     severity: runwayMonths < 1.5 ? 'flag' : 'attention',
     title: ['现金流跑道偏短', 'Cash runway is short'],
     detail: [
-      `存款 ${formatMoney(balance, ccy)},按近月均支出约能撑 ${m} 个月`,
-      `${formatMoney(balance, ccy)} in cash ≈ ${m} months at recent spend`,
+      `存款 ${formatMoney(balance, ccy)},按近几个完整月的净支出约能撑 ${m} 个月`,
+      `${formatMoney(balance, ccy)} in cash ≈ ${m} months at recent net spend`,
     ],
   }];
 }
@@ -287,7 +306,7 @@ export function financeFindings(
   const all = [
     ...anomalyFindings(txs, ym, opts),
     ...subscriptionHikeFindings(txs),
-    ...cashRunwayFindings(txs, accounts),
+    ...cashRunwayFindings(txs, accounts, opts),
     ...upcomingBillFindings(txs),
     ...feeAuditFindings(txs, ym),
     ...newRecurringFindings(txs),

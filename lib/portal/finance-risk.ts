@@ -4,10 +4,10 @@
  * 交易数据只能近似其客观面,合成总分会冒充精度)。纯函数、非投资建议。
  */
 import {
-  summarizeMonth, availableMonths, dominantCurrency, formatMoney, median, ymOf,
+  dominantCurrency, formatMoney, median, ymOf,
   type BankTx, type BankAccount,
 } from './bank-tx';
-import { detectIncome, subscriptionLoad, monthlyCashflow } from './finance-features';
+import { detectIncome, subscriptionLoad, monthlyCashflow, monthlyNetSpendBaseline } from './finance-features';
 
 export type FinanceRiskCategory = 'info' | 'low' | 'moderate' | 'high';
 
@@ -20,24 +20,13 @@ export interface FinanceScore {
   source: string;
 }
 
-const MIN_SPEND = 50; // 月净支出低于此额,比率无意义
-
-/** 近 6 个完整月的月净支出 median(≥2 个有效月才算)。 */
-function monthlyNetMedian(txs: BankTx[], now: Date): number | null {
-  const curYm = ymOf(now);
-  const nets = availableMonths(txs)
-    .filter((m) => m < curYm).slice(0, 6)
-    .map((m) => summarizeMonth(txs, m).net)
-    .filter((n) => n >= MIN_SPEND);
-  if (nets.length < 2) return null;
-  return median(nets);
-}
-
 export function computeFinanceScores(txs: BankTx[], accounts: BankAccount[] = [], now: Date = new Date()): FinanceScore[] {
   const out: FinanceScore[] = [];
   if (!txs.length) return out;
   const ccy = dominantCurrency(txs);
-  const netMedian = monthlyNetMedian(txs, now);
+  // 月净支出基线的唯一口径(finance-features.monthlyNetSpendBaseline)——
+  // 现金流跑道那条预警也调同一个函数,两处不再各算一套(bug2 同屏 1.5 vs 1.3)。
+  const netMedian = monthlyNetSpendBaseline(txs, now);
 
   // ── 应急金月数 = 存款 ÷ 月净支出 median(3–6 个月是通行共识)──
   const deposits = accounts
@@ -60,8 +49,16 @@ export function computeFinanceScores(txs: BankTx[], accounts: BankAccount[] = []
   }
 
   // ── 储蓄率 = (收入 − 净支出) / 收入(近 3 个完整月 median;需可靠收入流)──
+  // bug2「检查正确性」:展示的收入曾用 detectIncome 的月化值,而 pct 的分母是当月实际入账 ——
+  // 两个不同的「收入」并列在一句话里,用户照着文案自己算得到完全不同的百分比。
+  // 现在展示值改成**参与计算那几个月**的入账中位数,和分母同源。
   const income = detectIncome(txs);
-  if (income && netMedian) {
+  const monthlyIncomeMedian = (() => {
+    const curYm = ymOf(now);
+    const rows = monthlyCashflow(txs, 8).filter((mc) => mc.ym < curYm && mc.income > 0).slice(-3);
+    return rows.length >= 2 ? median(rows.map((mc) => mc.income)) : null;
+  })();
+  if (income && netMedian && monthlyIncomeMedian) {
     const curYm = ymOf(now);
     const rates = monthlyCashflow(txs, 8)
       .filter((mc) => mc.ym < curYm && mc.income > 0)
@@ -77,19 +74,24 @@ export function computeFinanceScores(txs: BankTx[], accounts: BankAccount[] = []
         value: `${pct}%`,
         category,
         detail: [
-          `近几个月收入约 ${formatMoney(income.monthlyIncome, ccy)}/月,结余约 ${pct}%;50/30/20 法则建议 20% 归储蓄`,
-          `~${formatMoney(income.monthlyIncome, ccy)}/mo income, saving ~${pct}%; the 50/30/20 rule suggests 20% to savings`,
+          `近几个月入账约 ${formatMoney(monthlyIncomeMedian, ccy)}/月,结余约 ${pct}%;50/30/20 法则建议 20% 归储蓄`,
+          `~${formatMoney(monthlyIncomeMedian, ccy)}/mo received, saving ~${pct}%; the 50/30/20 rule suggests 20% to savings`,
         ],
         source: '50/30/20 预算法则(Warren)',
       });
     }
   }
 
-  // ── 订阅负担率 = 定期账单月化 ÷ 月收入(>10% 值得盘一盘)──
-  if (income) {
-    const load = subscriptionLoad(txs);
-    if (load.count > 0 && income.monthlyIncome > 0) {
-      const ratio = load.monthly / income.monthlyIncome;
+  // ── 订阅负担率 = 订阅月化 ÷ 月入账(>10% 值得盘一盘)──
+  // bug2「检查正确性」两处修正:
+  // ① 分子曾把房租/房贷/水电/保险也算进「订阅」,却配「哪些还在用」的订阅审计文案 ——
+  //    口径名不副实(同文件的涨价判定早就把水电排除了)。现在只算可退订的那类。
+  // ② 分母曾用 detectIncome 月化(只认规整流,漏奖金/第二份收入 → 系统性低估收入 → 负担率虚高),
+  //    与储蓄率的分母不是一个东西。统一改成与储蓄率同源的月入账中位数。
+  if (monthlyIncomeMedian && monthlyIncomeMedian > 0) {
+    const load = subscriptionLoad(txs, undefined, { excludeCategories: ['RENT_AND_UTILITIES', 'LOAN_PAYMENTS'] });
+    if (load.count > 0) {
+      const ratio = load.monthly / monthlyIncomeMedian;
       const pct = Math.round(ratio * 100);
       const category: FinanceRiskCategory = ratio > 0.1 ? 'moderate' : ratio > 0.05 ? 'low' : 'info';
       out.push({
@@ -98,8 +100,8 @@ export function computeFinanceScores(txs: BankTx[], accounts: BankAccount[] = []
         value: `${pct}%`,
         category,
         detail: [
-          `${load.count} 项定期约 ${formatMoney(load.monthly, ccy)}/月,占收入 ${pct}%;超过 10% 值得盘一盘哪些还在用`,
-          `${load.count} recurring ≈ ${formatMoney(load.monthly, ccy)}/mo (${pct}% of income); above 10% is worth an audit`,
+          `${load.count} 项订阅约 ${formatMoney(load.monthly, ccy)}/月,占入账 ${pct}%;超过 10% 值得盘一盘哪些还在用(房租水电不计入)`,
+          `${load.count} subscriptions ≈ ${formatMoney(load.monthly, ccy)}/mo (${pct}% of income); above 10% is worth an audit (rent & utilities excluded)`,
         ],
         source: '订阅审计实践(Rocket Money 口径,策展)',
       });
