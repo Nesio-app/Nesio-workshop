@@ -103,8 +103,10 @@ curl -X POST https://treasurebox-nu.vercel.app/api/portal/ingest \
 3. **阶段 2（半天服务端）**：`/api/robot` 召回路由 + 中文 prompt，语音问「我的护照在哪」。
 4. **阶段 3（硬件化）**：装进 Pi + 麦阵 + 音箱，systemd 开机自启。**设计红线照搬 App**：
    每个异步动作必有可见失败态——断网/落库失败要用灯色或语音明说，绝不静默转回待机。
-5. **阶段 4（可选加分）**：屏幕表情、舵机转头、早晨主动念简报（接 `/api/portal/daily-brief`，
-   注意它挂着 `guardAiRoute` 付费门）。
+5. **阶段 4（可选加分）**：屏幕表情、舵机转头、早晨主动念日报。
+   > 2026-07-30 更新：原先这里写的是接 `/api/portal/daily-brief`——那条路由是语音简报时代
+   > 的遗物，全仓零调用方，已删除。现在的每日日报是 `lib/portal/daily-report.ts`，
+   > **纯规则、无网络、无 AI、无付费门**，机器人拿 markdown 直接念即可，反而更省事。
 
 ## 欠账 / 明确不做
 

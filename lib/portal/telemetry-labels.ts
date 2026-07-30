@@ -35,7 +35,6 @@ export const TELEMETRY_LABEL: Record<string, [string, string]> = {
   calendar_create_open: ['建个日程', 'Create event'],
   family_sharing_open: ['打开家庭共享', 'Family sharing'],
   brief_open: ['打开每日简报', 'Open daily brief'],
-  brief_play: ['听简报', 'Play brief'],
   routine_brief_open: ['打开例行简报', 'Routine brief'],
 
   workout_start: ['开始跟练', 'Start workout'],

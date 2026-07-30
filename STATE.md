@@ -624,9 +624,9 @@ sensitivity/retention 枚举化(中期)。
   重资产付费(整包手动备份/图片深检索)另论;云备份/恢复本身对登录用户免费。
 - **服务端权益强制:骨架已落、待接真源**(2026-07-14 记,安全审计 #1):
   `lib/portal/auth/server-entitlement.ts` 提供 `readServerTier` / `guardServerEntitlement`,
-  已接进 `guardAiRoute({ requirePaidCloudAi:true })`,七路付费云 AI 路由(meeting-notes /
-  avatarify / person-extract / inventory-extract / living-model / health-insight / daily-brief)
-  已挂。**默认 inert**(真源未接 → fail-open 放行,线上行为不变)。**接真源(部署侧)**:
+  已接进 `guardAiRoute({ requirePaidCloudAi:true })`,六路付费云 AI 路由(meeting-notes /
+  avatarify / person-extract / inventory-extract / living-model / health-insight)
+  已挂。(daily-brief 2026-07-30 随语音简报一并删除。)**默认 inert**(真源未接 → fail-open 放行,线上行为不变)。**接真源(部署侧)**:
   ① Supabase 建 `user_entitlements(user_id, plan)` + RLS(仅本人读 / service_role 写);
   ② StoreKit/支付回调服务端校验收据 → upsert plan;
   ③ 置环境变量 `NESIO_SERVER_ENTITLEMENT=1`、`NESIO_ENTITLEMENT_TABLE=user_entitlements`。

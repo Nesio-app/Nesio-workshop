@@ -145,7 +145,9 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Onboarding/激活漏斗(30 天,按设备去重) ──
-  const funnelSteps = ['app_open', 'brief_play', 'mood_open', 'capture_voice_open', 'chat_send'];
+  // 2026-07-30:brief_play(语音简报播放)从这里下架 —— 语音简报已删,这个事件全仓从没发过,
+  // 留在漏斗里的后果是 admin 永远把它算成「流失最重的一步(0%)」,把真正的瓶颈盖住。
+  const funnelSteps = ['app_open', 'mood_open', 'capture_voice_open', 'chat_send'];
   const devicesByEvent = new Map<string, Set<string>>();
   for (const r of telemetry.rows) {
     if (!devicesByEvent.has(r.name)) devicesByEvent.set(r.name, new Set());

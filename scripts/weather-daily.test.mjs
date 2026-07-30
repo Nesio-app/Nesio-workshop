@@ -55,9 +55,11 @@ const snap2 = await w2.fetchWeatherAt(1, 1, 'UTC', 'X');
 assert.ok(!snap2.forecastNote || !snap2.forecastNote.includes('伞'), '低降水概率不提示带伞');
 assert.equal(snap2.precipProb, 10);
 
-// daily-brief 简报用上区间 + 降水概率(源码级)
-const brief = fs.readFileSync(new URL('../app/api/portal/daily-brief/route.ts', import.meta.url), 'utf8');
-assert.ok(brief.includes('tempMinC') && brief.includes('tempMaxC') && brief.includes('~'), '简报报温度区间 X~Y');
-assert.ok(brief.includes('precipProb') && brief.includes('降水概率'), '简报并入降水概率');
+// 每日日报用上区间 + 降水概率(源码级)。
+// 2026-07-30:此前这两条钉的是 app/api/portal/daily-brief/route.ts —— 那条路由是语音简报
+// 时代的遗物,全仓零调用方,后来被删。契约钉在死代码上等于没钉:真正在用天气的是日报。
+const report = fs.readFileSync(new URL('../lib/portal/daily-report.ts', import.meta.url), 'utf8');
+assert.ok(report.includes('tempMinC') && report.includes('tempMaxC') && report.includes('~'), '日报报温度区间 X~Y');
+assert.ok(report.includes('precipProb') && report.includes('降水概率'), '日报并入降水概率');
 
 console.log('weather-daily: OK');
