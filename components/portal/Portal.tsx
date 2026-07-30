@@ -883,6 +883,14 @@ export default function Portal() {
       setInsightsOpen(true);
     };
     const trainingHandler = () => { setInsightsTab('fitness'); setInsightsNonce((n) => n + 1); setInsightsOpen(true); };
+    // Bug4 图25-30:全屏子页(美味等)右上角的「今天」—— 一步回今天,不是逐层往回退。
+    // 关掉洞察浮层再切面,否则浮层还盖着,点了像没反应。
+    const goTodayHandler = () => {
+      setInsightsOpen(false);
+      setCookingOpen(false);
+      setInventoryOpen(false);
+      setActiveSurface('today');
+    };
     const workoutHandler = (e: Event) => { track('workout_start', {}); setWorkoutKey((k) => k + 1); setWorkoutSession((e as CustomEvent).detail); };
     const proGateHandler = (e: Event) => {
       const feature = (e as CustomEvent).detail?.feature || 'pro';
@@ -918,6 +926,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-brief', briefHandler);
     window.addEventListener('nesio-open-insights', insightsHandler);
     window.addEventListener('nesio-open-training', trainingHandler);
+    window.addEventListener('nesio-go-today', goTodayHandler);
     window.addEventListener('nesio-start-workout', workoutHandler);
     return () => {
       window.removeEventListener('nesio-memory-search', memorySearchHandler);
@@ -935,6 +944,7 @@ export default function Portal() {
       window.removeEventListener('nesio-open-brief', briefHandler);
       window.removeEventListener('nesio-open-insights', insightsHandler);
       window.removeEventListener('nesio-open-training', trainingHandler);
+      window.removeEventListener('nesio-go-today', goTodayHandler);
       window.removeEventListener('nesio-start-workout', workoutHandler);
     };
   }, []);

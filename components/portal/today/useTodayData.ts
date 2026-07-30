@@ -254,7 +254,8 @@ export function useTodayData(canUsePrivateData: boolean) {
         }
         // ── 出卡:ledger 窗口重算 + 三门(同步免费)。文案就是判决文案,润色层已拆。──
         const live = loadLiveJudgedCards(now, 3);
-        const GROUP_ICON: Record<string, string> = { 日程: '🗓️', 财务: '💳', 健康: '🌿', 物品: '📦', 人: '🎂', 其他: '💡' };
+        // 走 icons.tsx 的具名键(不是 emoji)—— 渲染层 GuidanceIcon 查这张表出描边图标。
+        const GROUP_ICON: Record<string, string> = { 日程: 'calendar', 财务: 'card', 健康: 'health', 物品: 'box', 人: 'person', 其他: 'idea' };
         let newProactiveCards: ProactiveCardData[] = live
           .map((c) => {
             const target = resolveCardTarget(c.fingerprints);
@@ -264,7 +265,7 @@ export function useTodayData(canUsePrivateData: boolean) {
               body: c.body,
               confidence: 90,
               sourceTags: [],
-              icon: GROUP_ICON[c.group] ?? '💡',
+              icon: GROUP_ICON[c.group] ?? 'idea',
               priority: c.severity * 3,
               urgent: c.severity === 3,
               cardType: c.group,

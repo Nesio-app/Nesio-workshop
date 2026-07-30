@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
 import SegTabs from '../ui/SegTabs';
-import { IconBookOpen, IconCamera, IconCheckSquare, IconZap, IconUtensils } from '../icons';
+import { IconBookOpen, IconBox, IconCamera, IconCheckSquare, IconZap, IconUtensils } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -26,7 +26,11 @@ import { scaleAmountsInText, servingFactor } from '@/lib/cooking/scale-recipe';
 import { recipeNutritionPerServing, recipeMainNutrition, lookupNutrition, type PerServing, type FoodNutrition } from '@/lib/cooking/nutrition';
 import { getWishlist, addWish, type WishDish } from '@/lib/cooking/wishlist';
 import { addMeal, type MealSource, type MealItem } from '@/lib/cooking/meals';
-import { planWeek, type WeekPlan } from '@/lib/cooking/meal-plan-core';
+import { planWeek } from '@/lib/cooking/meal-plan-core';
+import {
+  MEAL_SLOTS, MEAL_SLOT_LABEL, MEAL_CALENDAR_EVENT, getDayPlan, setMealPlan,
+  upcomingDayKeys, plannedDishes, dayKey, type MealSlot,
+} from '@/lib/cooking/meal-calendar';
 import { saveGeneratedRecipe, findGeneratedRecipe } from '@/lib/cooking/generated-recipes';
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { localDayKey } from '@/lib/portal/local-day';
@@ -39,6 +43,8 @@ type View =
   | { kind: 'needs'; match: RecipeMatch<Recipe>; from: 'home' | 'wishlist' | 'recipe' }
   | { kind: 'logmeal' }
   | { kind: 'plan' }
+  // 图25/27:日历里的一格改成「点进详情页编辑」,不再在列表里就地打字。
+  | { kind: 'planEdit'; date: string; slot: MealSlot }
   | { kind: 'generate' }
   | { kind: 'tips' };
 
@@ -148,7 +154,7 @@ export default function CookingSheet({ open, onClose, initialView }: {
 
             {view.kind === 'home' && (
               <>
-                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} title={t('美味', 'Cooking')} />
+                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} t={t} />
                 <SubTabs active="home" onSelect={setTopView} t={t} />
                 <HomeBody
                   soon={soon} recipes={recipes} recipesErr={recipesErr} soonNames={soonNames} pantryNames={pantryNames}
@@ -165,21 +171,21 @@ export default function CookingSheet({ open, onClose, initialView }: {
             )}
             {view.kind === 'pantry' && (
               <>
-                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} title={t('库存', 'Pantry')} />
+                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} t={t} />
                 <SubTabs active="pantry" onSelect={setTopView} t={t} />
                 <PantryBody items={items} shopping={shopping} onCamera={openCamera} onRemove={remove} onError={setErr} onChanged={reload} t={t} />
               </>
             )}
             {view.kind === 'wishlist' && (
               <>
-                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} title={t('想做清单', 'Want to cook')} />
+                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} t={t} />
                 <SubTabs active="wishlist" onSelect={setTopView} t={t} />
                 <WishlistBody wishes={wishes} recipes={recipes} onCompute={(n) => computeNeeds(n, 'wishlist')} onOpenDish={openRecipeByName} onPlan={() => setView({ kind: 'plan' })} onError={setErr} onChanged={reload} onCamera={openCamera} t={t} />
               </>
             )}
             {view.kind === 'recipe' && (
               <>
-                <ScreenHead backLabel={t('美味', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={view.match.recipe.name} />
+                <ScreenHead backLabel={t('美味', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={view.match.recipe.name} t={t} />
                 <RecipeBody match={view.match} t={t} />
               </>
             )}
@@ -188,19 +194,20 @@ export default function CookingSheet({ open, onClose, initialView }: {
                 <ScreenHead
                   backLabel={view.from === 'wishlist' ? t('想做清单', 'Want to cook') : view.from === 'recipe' ? view.match.recipe.name : t('美味', 'Cooking')}
                   onBack={() => setView(view.from === 'wishlist' ? { kind: 'wishlist' } : view.from === 'recipe' ? { kind: 'recipe', match: view.match } : { kind: 'home' })}
-                  title={view.match.recipe.name} />
+                  t={t} />
+                {/* 图28:大标题删掉 —— 从菜谱页进来时返回链已经写着同一个菜名,标题是复读。 */}
                 <NeedsBody match={view.match} onError={setErr} onDone={() => setView({ kind: 'home' })} t={t} />
               </>
             )}
             {view.kind === 'logmeal' && (
               <>
-                <ScreenHead backLabel={t('美味', 'Cooking')} onBack={finishLogMeal} title={t('记一餐', 'Log a meal')} />
+                <ScreenHead backLabel={t('美味', 'Cooking')} onBack={finishLogMeal} title={t('记一餐', 'Log a meal')} t={t} />
                 <MealLogBody photoUrl={mealPhoto} onError={setErr} onDone={finishLogMeal} t={t} />
               </>
             )}
             {view.kind === 'generate' && (
               <>
-                <ScreenHead backLabel={t('美味', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={t('生成新菜谱', 'Generate a recipe')} />
+                <ScreenHead backLabel={t('美味', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={t('生成新菜谱', 'Generate a recipe')} t={t} />
                 <GenerateBody
                   pantryItems={items}
                   soonNames={soonNames}
@@ -216,13 +223,20 @@ export default function CookingSheet({ open, onClose, initialView }: {
             )}
             {view.kind === 'plan' && (
               <>
-                <ScreenHead backLabel={t('想做清单', 'Want to cook')} onBack={() => setView({ kind: 'wishlist' })} title={t('做饭计划', 'Meal plan')} />
-                <PlanBody matches={planMatches} recipes={recipes} soonNames={soonNames} pantryNames={pantryNames} onError={setErr} t={t} />
+                <ScreenHead backLabel={t('想做清单', 'Want to cook')} onBack={() => setView({ kind: 'wishlist' })} t={t} />
+                <PlanBody recipes={recipes} pantryNames={pantryNames} onError={setErr}
+                  onEdit={(date, slot) => setView({ kind: 'planEdit', date, slot })} t={t} />
+              </>
+            )}
+            {view.kind === 'planEdit' && (
+              <>
+                <ScreenHead backLabel={t('美食日历', 'Meal calendar')} onBack={() => setView({ kind: 'plan' })} t={t} />
+                <PlanEditBody date={view.date} slot={view.slot} recipes={recipes} matches={planMatches} t={t} />
               </>
             )}
             {view.kind === 'tips' && (
               <>
-                <ScreenHead backLabel={t('美味', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={t('新手技法', 'Techniques')} />
+                <ScreenHead backLabel={t('美味', 'Cooking')} onBack={() => setView({ kind: 'home' })} title={t('新手技法', 'Techniques')} t={t} />
                 <TipsBody t={t} />
               </>
             )}
@@ -311,10 +325,10 @@ function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec
         )
         : <CaptureRow manualLabel={`+ ${t('选个菜', 'Pick a dish')}`} onManual={() => setAdding(true)} onCamera={onCamera} t={t} />}
 
-      {/* 快过期 · 先用掉 —— 横向白卡 + 软色 pill +「别浪费」 */}
+      {/* 图30:「快过期 · 先用掉」+「别浪费」那行小标题删掉 —— 卡片上本来就写着还剩几天,
+          再加一句「别浪费」是催,不是信息。卡片本身留着(它是这一屏唯一有时效的东西)。 */}
       {soon.length > 0 && (
         <section>
-          <SectionHead label={t('快过期 · 先用掉', 'Use these first')} right={t('别浪费', 'Don’t waste it')} />
           <div style={{ display: 'flex', gap: 'var(--space-3)', overflowX: 'auto', paddingBottom: 'var(--space-1)', margin: '0 calc(-1 * var(--space-4))', padding: '0 var(--space-4) var(--space-1)', scrollSnapType: 'x proximity' }}>
             {soon.slice(0, 6).map((it) => {
               const tone = soonPillTone(it.daysLeft);
@@ -333,9 +347,8 @@ function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec
       <section>
         {recipesErr && <ErrorRow msg={t('菜谱没载出来。', 'Recipes didn’t load.')} onRetry={onLoadRec} t={t} />}
         {!recipesErr && recipes === null && <p style={hintLine}>{t('翻翻菜谱…', 'Looking through recipes…')}</p>}
-        {rows.length === 0 && !adding && (
-          <p style={{ ...hintLine, lineHeight: 1.6 }}>{t('自己选几道想做的 —— 搜库里的,或直接打菜名。', 'Pick dishes yourself — search the library or type a name.')}</p>
-        )}
+        {/* 图30:「自己选几道想做的 —— 搜库里的,或直接打菜名」删掉 ——
+            上面那颗「+ 选个菜」按钮已经说明了要干什么,这句是同一件事的第二遍。 */}
         {rows.length > 0 && (
           <div style={card}>
             {rows.map((rowItem, i) => (
@@ -360,25 +373,29 @@ function HomeBody({ soon, recipes, recipesErr, soonNames, pantryNames, onLoadRec
         )}
       </section>
 
-      {/* 三个入口同一套灰底样式(用户:各种颜色去掉,不一致)。 */}
-      <button type="button" onClick={onGenerate}
-        style={{ ...ghostBtn, width: '100%', padding: 'var(--space-3)', fontSize: 'var(--text-body)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
-        <IconZap size={16} />{t('生成新菜谱', 'Generate a recipe')}
-        {!canUsePaidCloudAi() && <span style={{ ...pill, background: 'var(--portal-accent-soft-md)', color: 'var(--portal-accent)', marginLeft: 'var(--space-1)' }}>Pro</span>}
-      </button>
-
-      {/* 记一餐:点一下开相机 → 拍完进记一餐页 */}
-      <button type="button" onClick={onLogMeal} style={{ ...ghostBtn, width: '100%', padding: 'var(--space-3)', fontSize: 'var(--text-body)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
-        <IconCamera size={16} />{t('记一餐', 'Log a meal')}
-      </button>
-
-      {/* 新手技法:HowToCook tips 技法文(焯水/去腥/食品安全…) */}
-      <button type="button" onClick={onTips} style={{ ...ghostBtn, width: '100%', padding: 'var(--space-3)', fontSize: 'var(--text-body)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
-        <IconBookOpen size={16} />{t('新手技法', 'Techniques')}
-      </button>
+      {/* 图30:三条通栏按钮(生成新菜谱 / 记一餐 / 新手技法)占了半屏,
+          但它们都是「偶尔用一次」的次要动作。压成一排小图标,文字进 aria-label 与 title。 */}
+      <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'flex-end' }}>
+        {([
+          [t('生成新菜谱', 'Generate a recipe'), <IconZap key="z" size={17} />, onGenerate, !canUsePaidCloudAi()],
+          [t('记一餐', 'Log a meal'), <IconCamera key="c" size={17} />, onLogMeal, false],
+          [t('新手技法', 'Techniques'), <IconBookOpen key="b" size={17} />, onTips, false],
+        ] as const).map(([label, icon, onClick, pro]) => (
+          <button key={label} type="button" onClick={onClick} aria-label={label} title={label}
+            style={{ ...ghostBtn, position: 'relative', flex: 'none', width: 44, height: 44, padding: 0, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
+            {icon}
+            {pro && <span style={{ position: 'absolute', top: -4, right: -4, ...pill, padding: '0 5px', fontSize: 'var(--text-xs)', background: 'var(--portal-accent-soft-md)', color: 'var(--portal-accent)' }}>Pro</span>}
+          </button>
+        ))}
+      </div>
     </>
   );
 }
+
+/** 图29:存放位置 tag —— 和分类同一套形态。值是存进 PantryItem.location 的规范名。 */
+const PANTRY_LOCATIONS: Array<[string, string]> = [
+  ['冰箱', 'Fridge'], ['冷冻', 'Freezer'], ['橱柜', 'Cupboard'], ['台面', 'Counter'], ['其他', 'Other'],
+];
 
 /** 器具筛选 chips:值对齐 importer 的 TOOL_PATTERNS 规范名(蒸锅/破壁机太常见或太小众,不进筛选)。 */
 const TOOL_CHIPS: Array<[string, string]> = [
@@ -490,6 +507,21 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
 }) {
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState('');
+  // 图26:长按排期。450ms 与底部导航长按同节奏;抬手/移开/右键菜单都要能取消,
+  // 否则手指滑一下就误触发排期层。
+  const [scheduling, setScheduling] = useState<string | null>(null);
+  const holdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // 长按已经触发过就把随后那一次 click 吃掉 —— 否则松手时排期层和菜谱页会一起打开。
+  const heldRef = useRef(false);
+  const cancelHold = useCallback(() => {
+    if (holdRef.current) { clearTimeout(holdRef.current); holdRef.current = null; }
+  }, []);
+  const startHold = useCallback((dish: string) => {
+    cancelHold();
+    heldRef.current = false;
+    holdRef.current = setTimeout(() => { heldRef.current = true; navigator.vibrate?.(12); setScheduling(dish); }, 450);
+  }, [cancelHold]);
+  useEffect(() => cancelHold, [cancelHold]);
   // 搜的时候模糊匹配已登记在库的菜谱,dropdown 给 ≤5 条。
   const suggestions = useMemo(() => {
     const q = name.trim();
@@ -531,14 +563,16 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
             )}
           </div>
         )
-        : <CaptureRow manualLabel={`+ ${t('搜个菜', 'Search a dish')}`} onManual={() => setAdding(true)} onCamera={onCamera} t={t} />}
+        : <CaptureRow manualLabel={`+ ${t('搜菜谱', 'Search recipes')}`} onManual={() => setAdding(true)} onCamera={onCamera} t={t} />}
 
+      {/* 图26:「排一周食谱」改叫「美食日历」—— 进去的那一页现在就是一份日历,
+          不再是一键排出来的一周。 */}
       <button type="button" onClick={onPlan} style={{ ...primaryBtn, width: '100%', padding: 'var(--space-3)', fontSize: 'var(--text-body)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
-        <IconUtensils size={16} />{t('排一周食谱', 'Plan the week')}
+        <IconUtensils size={16} />{t('美食日历', 'Meal calendar')}
       </button>
 
       {wishes.length === 0 && !adding
-        ? <p style={{ ...hintLine, lineHeight: 1.6 }}>{t('想做的菜先攒着 —— 搜库里的,或直接打菜名。点一道看步骤,或算「还缺什么」。', 'Save dishes you want — search or type. Tap for steps, or see what’s missing.')}</p>
+        ? <p style={{ ...hintLine, lineHeight: 1.6 }}>{t('想做的菜先攒着 —— 搜库里的,或直接打菜名。点一道看步骤,长按选哪天做。', 'Save dishes you want — search or type. Tap for steps, long-press to schedule.')}</p>
         : (
           /* 封面卡网格。这一屏是「挑今天做哪道」——照片帮得上,所以走两列大图卡;
              自选列表那屏是状态列表(材料齐 / 缺 3 样),行式更好扫,保持不动。
@@ -549,7 +583,12 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
               const rec = recipes?.find((x) => x.name === w.name);
               return (
                 <div key={w.name} style={{ ...card, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                  <button type="button" onClick={() => onOpenDish(w.name)}
+                  {/* 图26:长按一张菜卡 → 选哪天做。点开还是看步骤,长按才是排期 ——
+                      和记忆卡「点开/长按」的分工一致。 */}
+                  <button type="button" onClick={() => { if (heldRef.current) { heldRef.current = false; return; } onOpenDish(w.name); }}
+                    onPointerDown={() => startHold(w.name)} onPointerUp={cancelHold}
+                    onPointerLeave={cancelHold} onPointerCancel={cancelHold}
+                    onContextMenu={(e) => { e.preventDefault(); setScheduling(w.name); }}
                     style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left', fontFamily: 'var(--font-sans)' }}>
                     <RecipeCover image={rec?.image} />
                     <div style={{ padding: 'var(--space-3) var(--space-3) var(--space-2)' }}>
@@ -568,6 +607,36 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
             })}
           </div>
         )}
+
+      {/* 图26:长按后的排期层 —— 挑哪天、哪一顿,直接写进美食日历。 */}
+      {scheduling && (
+        <NesioSheet variant="bottom" card={false} elevated open onOpenChange={(o) => { if (!o) setScheduling(null); }}
+          ariaLabel={t('选哪天做', 'Pick a day')}>
+          <div style={{ padding: 'var(--space-4)', paddingBottom: 'calc(var(--space-4) + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+            <p style={{ margin: 0, fontSize: 'var(--text-body)', fontWeight: 600, color: 'var(--portal-ink)' }}>
+              {t(`哪天做「${scheduling}」?`, `When to cook “${scheduling}”?`)}
+            </p>
+            {upcomingDayKeys(7).map((date) => {
+              const d = new Date(`${date}T00:00:00`);
+              const isToday = date === dayKey(new Date());
+              return (
+                <div key={date} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                  <span style={{ flex: 'none', width: 72, fontSize: 'var(--text-xs)', color: isToday ? 'var(--portal-accent)' : 'var(--portal-muted)', fontWeight: isToday ? 700 : 400 }}>
+                    {isToday ? t('今天', 'Today') : `${d.getMonth() + 1}/${d.getDate()}`}
+                  </span>
+                  {MEAL_SLOTS.map((slot) => (
+                    <button key={slot} type="button" style={{ ...chip, flex: 1 }}
+                      onClick={() => { setMealPlan(date, slot, scheduling); setScheduling(null); }}>
+                      {t(MEAL_SLOT_LABEL[slot].zh, MEAL_SLOT_LABEL[slot].en)}
+                    </button>
+                  ))}
+                </div>
+              );
+            })}
+            <button type="button" style={ghostBtn} onClick={() => setScheduling(null)}>{t('稍后', 'Later')}</button>
+          </div>
+        </NesioSheet>
+      )}
     </>
   );
 }
@@ -826,44 +895,57 @@ function RecipeBody({ match, t }: { match: RecipeMatch<Recipe>; t: TT }) {
 function NeedsBody({ match, onError, onDone, t }: { match: RecipeMatch<Recipe>; onError: (m: string) => void; onDone: () => void; t: TT }) {
   const [msg, setMsg] = useState('');
   const [saved, setSaved] = useState(false);
+  // 图28:缺的东西不再是「一按全存进去」——每一样先自己点一下选中(pill 从「缺」变「要买」),
+  // 底部按钮只加勾过的。缺 8 样但这次只想买 2 样,以前没有办法表达。
+  const [picked, setPicked] = useState<string[]>([]);
   function save() {
-    try { addToShopping(match.missing); setSaved(true); setMsg(t(`存了 ${match.missing.length} 样进「记忆」`, `${match.missing.length} saved to memory`)); setTimeout(onDone, 900); }
+    if (picked.length === 0) return;
+    try { addToShopping(picked); setSaved(true); setMsg(t(`加了 ${picked.length} 样进购物清单`, `${picked.length} added to your list`)); setTimeout(onDone, 900); }
     catch { onError(t('没存上,再试一次。', 'Could not save — try again.')); }
   }
   const rows = [...match.have.map((n) => ({ n, have: true })), ...match.missing.map((n) => ({ n, have: false }))];
   return (
     <>
-      <div style={{ ...banner, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{match.recipe.source === 'howtocook'
-        ? t('家庭份量 · 每份用量,可直接照做', 'Home portions — cook as written')
-        : t('家庭份 · 已把餐厅用量缩放到家庭份', 'Scaled a restaurant portion down to a home serving')}</div>
+      {/* 图28:「家庭份量 · 每份用量」那条横幅删掉 —— 份量在菜谱页已经说过一次。 */}
 
       <section>
-        <SectionHead label={t('需要这些', 'You’ll need')} right={t('对照你的库存', 'vs your pantry')} />
+        {/* 图28:「需要这些 · 对照你的库存」小标题删掉 —— 右边的「有 / 缺」pill 自己就在做对照。 */}
         <div style={card}>
-          {rows.map((r, i) => (
-            <div key={r.n} style={{ ...row, borderBottom: i === rows.length - 1 && match.staples.length === 0 ? 'none' : divider }}>
-              <Dot />
-              <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', fontWeight: 600 }}>{r.n}</span>
-              {r.have
-                ? <span style={{ ...pill, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{t('有', 'Have')}</span>
-                : <span style={{ ...pill, background: 'var(--portal-accent-soft)', color: 'var(--portal-muted)' }}>{t('缺 · 要买', 'Buy')}</span>}
-            </div>
-          ))}
-          {match.staples.length > 0 && (
-            <div style={{ ...row, borderBottom: 'none' }}>
-              <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('常备(盐/油等,默认你有)', 'Staples (salt/oil, assumed on hand)')}: {match.staples.join(' · ')}</span>
-            </div>
-          )}
+          {rows.map((r, i) => {
+            const on = picked.includes(r.n);
+            return (
+              <div key={r.n} style={{ ...row, borderBottom: i === rows.length - 1 ? 'none' : divider }}>
+                <Dot />
+                <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', fontWeight: 600 }}>{r.n}</span>
+                {r.have
+                  ? <span style={{ ...pill, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{t('有', 'Have')}</span>
+                  : (
+                    <button type="button" aria-pressed={on}
+                      onClick={() => setPicked((cur) => (cur.includes(r.n) ? cur.filter((x) => x !== r.n) : [...cur, r.n]))}
+                      style={{
+                        ...pill, cursor: 'pointer', border: 'none', fontFamily: 'var(--font-sans)',
+                        background: on ? 'var(--portal-accent)' : 'var(--portal-accent-soft)',
+                        color: on ? 'var(--sheet-opaque, #fff)' : 'var(--portal-muted)',
+                      }}>
+                      {on ? t('要买', 'Buy') : t('缺', 'Missing')}
+                    </button>
+                  )}
+              </div>
+            );
+          })}
+          {/* 图28:「常备(盐/油等,默认你有)」那一行删掉 —— 它不是这次要处理的东西。 */}
         </div>
       </section>
 
       {match.missing.length > 0 ? (
         <>
-          <button type="button" onClick={save} disabled={saved} style={{ ...primaryBtn, width: '100%', padding: 'var(--space-4)', fontSize: 'var(--text-body)', opacity: saved ? 0.55 : 1 }}>
-            {t(`把缺的 ${match.missing.length} 样 · 存进「记忆」当购物清单`, `Save the ${match.missing.length} missing to your shopping list`)}
+          <button type="button" onClick={save} disabled={saved || picked.length === 0}
+            style={{ ...primaryBtn, width: '100%', padding: 'var(--space-4)', fontSize: 'var(--text-body)', opacity: saved || picked.length === 0 ? 0.55 : 1 }}>
+            {picked.length > 0
+              ? t(`加入购物清单 · ${picked.length} 样`, `Add ${picked.length} to shopping list`)
+              : t('加入购物清单', 'Add to shopping list')}
           </button>
           {msg && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-go)', textAlign: 'center' }}>{msg}</span>}
-          <p style={caption}>{t('到超市按清单勾一勾;买回自动进库存 —— 闭环。', 'Check items off at the store; what you buy flows back into the pantry — full loop.')}</p>
         </>
       ) : (
         <p style={{ ...hintLine, color: 'var(--status-go)' }}>{t('都齐了 · 直接开做。', 'All set — cook it now.')}</p>
@@ -1065,68 +1147,52 @@ function MealLogBody({ photoUrl, onError, onDone, t }: { photoUrl?: string; onEr
   );
 }
 
-// ── 做饭计划(周)──────────────────────────────────────────────────────────────
+// ── 美食日历(Bug4 图25 / 图27)──────────────────────────────────────────────
 //
-// 2026-07-28 重做(用户标注 图28「需要重新设计」)。旧版的问题:
-//   ① 周一到周日七行长得一模一样,今天该做什么得自己数;
-//   ② 右边七个 pill 全是「需采购」——所有行同一个状态 = 等于没说,更看不出差几样;
-//   ③ 一天想换掉/今天不做饭,只能手打菜名;
-//   ④ 底部三层(「本周缺 12 样」+ 一个大按钮 + 一行说明)讲的是同一件事。
-// 现在:今天排最前并高亮;状态分「可以做 / 差 N 样(列出缺的) / 外食」;每行两个轻动作
-//(换一道 / 外食);底部收成一条「差 N 样 · 加进购物清单」。
-const WEEK_DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-const WEEK_DAYS_EN = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+// 从「做饭计划」改过来。旧版是一份**算出来**的一周排菜:七行长得一样、右边七个 pill、
+// 每行就地打字改菜名 —— 而且改完不落盘,退出去就没了。用户的三条要求把它整个换了个方向:
+//   ① 一天应该有三顿饭(早/午/晚),不是一天一格;
+//   ② 这里**只显示已经有的安排** —— 没排的格子就是空的,不替你猜、不替你填;
+//   ③ 编辑是点进详情页,不在列表里就地改。
+// 「外食」那个状态也一并删掉:没安排 ≠ 出去吃,把空当成一个状态是在替用户下结论。
+const WEEK_DAYS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+const WEEK_DAYS_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const CAL_DAYS = 7;
 
-function PlanBody({ matches, recipes, soonNames, pantryNames, onError, t }: {
-  matches: RecipeMatch<Recipe>[]; recipes: Recipe[] | null; soonNames: Set<string>; pantryNames: Set<string>; onError: (m: string) => void; t: TT;
+function PlanBody({ recipes, pantryNames, onError, onEdit, t }: {
+  recipes: Recipe[] | null; pantryNames: Set<string>; onError: (m: string) => void;
+  onEdit: (date: string, slot: MealSlot) => void; t: TT;
 }) {
   const [msg, setMsg] = useState('');
   const [saved, setSaved] = useState(false);
+  const [tick, setTick] = useState(0);
   const dict = t('zh', 'en');
   const days = dict === 'zh' ? WEEK_DAYS : WEEK_DAYS_EN;
-  const plan: WeekPlan = useMemo(() => planWeek(matches, days, soonNames), [matches, soonNames, days]);
 
-  // 每天可自选/输入菜名;空 = 外食。用户改过以输入为准。
-  const [edits, setEdits] = useState<Record<string, string>>({});
   useEffect(() => {
-    setEdits((prev) => {
-      const next: Record<string, string> = { ...prev };
-      for (const d of plan.days) if (next[d.day] === undefined) next[d.day] = d.dishName ?? '';
-      return next;
-    });
-  }, [plan.days]);
+    const h = () => setTick((n) => n + 1);
+    window.addEventListener(MEAL_CALENDAR_EVENT, h);
+    return () => window.removeEventListener(MEAL_CALENDAR_EVENT, h);
+  }, []);
 
-  // 今天排最前:周一=1…周日=0 → 折成 0..6 的下标,再把数组转一圈。
-  const todayIdx = (new Date().getDay() + 6) % 7;
-  const ordered = useMemo(() => days.map((_, i) => days[(todayIdx + i) % days.length]), [days, todayIdx]);
+  const dates = useMemo(() => upcomingDayKeys(CAL_DAYS), []);
+  // tick 是刻意的依赖:日历是同步读快照,靠上面的事件通知重读。
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const cal = useMemo(() => dates.map((d) => ({ date: d, plan: getDayPlan(d) })), [dates, tick]);
 
-  /** 一道菜现在能不能做 —— 缺哪几样也一并算出来(要显示在行里)。 */
-  const dayStatus = useCallback((dishName: string): { kind: 'out' | 'ready' | 'short'; missing: string[] } => {
-    const nm = dishName.trim();
-    if (!nm) return { kind: 'out', missing: [] };
-    if (!recipes) return { kind: 'short', missing: [] };
-    const r = recipes.find((x) => x.name === nm) ?? recipes.find((x) => x.name.includes(nm) || nm.includes(x.name));
-    if (!r) return { kind: 'short', missing: [] };
-    const m = matchRecipe(r, pantryNames, normalizeIngredient);
-    return m.canCook ? { kind: 'ready', missing: [] } : { kind: 'short', missing: m.missing };
-  }, [recipes, pantryNames]);
-
+  /** 排上的菜合起来还差什么 —— 只按已安排的算,不含没排的格子。 */
   const missingAll = useMemo(() => {
+    if (!recipes) return [];
     const miss = new Set<string>();
-    for (const d of days) for (const x of dayStatus(edits[d] ?? '').missing) miss.add(x);
+    for (const name of plannedDishes(dates)) {
+      const r = recipes.find((x) => x.name === name) ?? recipes.find((x) => x.name.includes(name) || name.includes(x.name));
+      if (!r) continue;
+      const m = matchRecipe(r, pantryNames, normalizeIngredient);
+      if (!m.canCook) m.missing.forEach((x) => miss.add(x));
+    }
     return [...miss];
-  }, [edits, days, dayStatus]);
-
-  /** 换一道:在候选里往后挪一位(确定性,不随机 —— 连点两次不会又转回来)。 */
-  const pool = useMemo(() => matches.map((m) => m.recipe.name), [matches]);
-  const swap = (day: string) => {
-    if (!pool.length) return;
-    setEdits((prev) => {
-      const cur = (prev[day] ?? '').trim();
-      const at = pool.indexOf(cur);
-      return { ...prev, [day]: pool[(at + 1 + pool.length) % pool.length] };
-    });
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recipes, pantryNames, dates, tick]);
 
   function save() {
     if (!missingAll.length) return;
@@ -1138,57 +1204,48 @@ function PlanBody({ matches, recipes, soonNames, pantryNames, onError, t }: {
     } catch { onError(t('没存上,再试一次。', 'Could not save — try again.')); }
   }
 
-  const recipeNames = useMemo(() => (recipes ?? []).map((r) => r.name), [recipes]);
-
+  const todayKey = dayKey(new Date());
   return (
     <>
       <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
-        {ordered.map((day, i) => {
-          const dish = edits[day] ?? '';
-          const st = dayStatus(dish);
-          const isToday = i === 0;
+        {cal.map(({ date, plan }, i) => {
+          const d = new Date(`${date}T00:00:00`);
+          const isToday = date === todayKey;
           return (
-            <div key={day} style={{
+            <div key={date} style={{
               padding: 'var(--space-3)',
-              borderBottom: i === ordered.length - 1 ? 'none' : divider,
+              borderBottom: i === cal.length - 1 ? 'none' : divider,
               background: isToday ? 'var(--portal-accent-soft)' : 'transparent',
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                <span style={{ flex: 'none', width: 44, fontSize: 'var(--text-xs)', fontWeight: 700, color: isToday ? 'var(--portal-accent)' : 'var(--portal-muted)' }}>
-                  {isToday ? t('今天', 'Today') : day}
-                </span>
-                <input
-                  list="cooking-plan-dishes"
-                  style={{ ...inputStyle, flex: 1, minWidth: 0, padding: 'var(--space-1) var(--space-2)', border: 'none', background: 'transparent', fontWeight: isToday ? 600 : 400 }}
-                  placeholder={t('外食 · 或选一道', 'Eating out · or pick one')}
-                  value={dish}
-                  onChange={(e) => setEdits((prev) => ({ ...prev, [day]: e.target.value }))}
-                />
-                {st.kind === 'ready' && <span style={{ ...pill, background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{t('可以做', 'Ready')}</span>}
-                {st.kind === 'short' && <span style={{ ...pill, background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>{st.missing.length ? t(`差 ${st.missing.length} 样`, `${st.missing.length} short`) : t('差点料', 'Short')}</span>}
-                {st.kind === 'out' && <span style={{ ...pill, background: 'var(--portal-accent-soft-md)', color: 'var(--portal-muted)' }}>{t('外食', 'Out')}</span>}
+              <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: isToday ? 'var(--portal-accent)' : 'var(--portal-muted)', marginBottom: 'var(--space-2)' }}>
+                {isToday ? t('今天', 'Today') : `${days[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`}
               </div>
-              {/* 差什么就写出来,不用点进去猜 */}
-              {st.missing.length > 0 && (
-                <p style={{ margin: '4px 0 0 52px', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{st.missing.slice(0, 4).join('、')}{st.missing.length > 4 ? '…' : ''}</p>
-              )}
-              <div style={{ display: 'flex', gap: 'var(--space-3)', margin: '6px 0 0 52px' }}>
-                {pool.length > 0 && (
-                  <button type="button" onClick={() => swap(day)} style={linkBtn}>{t('换一道', 'Swap')}</button>
-                )}
-                {dish.trim() && (
-                  <button type="button" onClick={() => setEdits((prev) => ({ ...prev, [day]: '' }))} style={linkBtn}>{t('这天外食', 'Eating out')}</button>
-                )}
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                {MEAL_SLOTS.map((slot) => {
+                  const dish = plan[slot];
+                  return (
+                    <button key={slot} type="button" onClick={() => onEdit(date, slot)}
+                      aria-label={t(`${MEAL_SLOT_LABEL[slot].zh}餐 · ${dish || '还没排'}`, `${MEAL_SLOT_LABEL[slot].en} · ${dish || 'not planned'}`)}
+                      style={{
+                        flex: 1, minWidth: 0, textAlign: 'left', cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                        padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', border: divider,
+                        background: dish ? 'var(--glass-bg-solid)' : 'transparent',
+                      }}>
+                      <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t(MEAL_SLOT_LABEL[slot].zh, MEAL_SLOT_LABEL[slot].en)}</span>
+                      <span style={{
+                        display: 'block', fontSize: 'var(--text-sm)', marginTop: 2,
+                        color: dish ? 'var(--portal-ink)' : 'var(--portal-muted)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>{dish || '+'}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
           );
         })}
       </div>
-      <datalist id="cooking-plan-dishes">
-        {recipeNames.map((n) => <option key={n} value={n} />)}
-      </datalist>
 
-      {/* 底部收成一条:缺多少 + 一个动作,不再是「本周缺」+ 大按钮 + 说明三层 */}
       {missingAll.length > 0 && (
         <button type="button" onClick={save} disabled={saved}
           style={{ ...primaryBtn, width: '100%', padding: 'var(--space-3)', fontSize: 'var(--text-body)', opacity: saved ? 0.55 : 1 }}>
@@ -1196,6 +1253,50 @@ function PlanBody({ matches, recipes, soonNames, pantryNames, onError, t }: {
         </button>
       )}
       {msg && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-go)', textAlign: 'center' }}>{msg}</span>}
+    </>
+  );
+}
+
+/** 图27:日历一格的详情页 —— 排哪道菜、或把这一顿清掉。 */
+function PlanEditBody({ date, slot, recipes, matches, t }: {
+  date: string; slot: MealSlot; recipes: Recipe[] | null; matches: RecipeMatch<Recipe>[]; t: TT;
+}) {
+  const [q, setQ] = useState(() => getDayPlan(date)[slot] ?? '');
+  const suggestions = useMemo(() => {
+    const query = q.trim();
+    if (query) return (recipes ?? []).filter((r) => r.name.includes(query)).slice(0, 8);
+    // 没打字时给「手上材料最接近」的几道 —— 排菜时最想先看到的就是这几道。
+    return matches.slice(0, 8).map((m) => m.recipe);
+  }, [q, recipes, matches]);
+
+  const d = new Date(`${date}T00:00:00`);
+  return (
+    <>
+      <p style={{ ...hintLine, margin: 0 }}>
+        {t(`${d.getMonth() + 1} 月 ${d.getDate()} 日 · ${MEAL_SLOT_LABEL[slot].zh}餐`, `${d.getMonth() + 1}/${d.getDate()} · ${MEAL_SLOT_LABEL[slot].en}`)}
+      </p>
+      <div style={{ ...card, padding: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+        <input style={{ ...inputStyle, flex: 1, minWidth: 0 }} value={q} autoFocus
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') setMealPlan(date, slot, q); }} />
+        <button type="button" style={primaryBtn} onClick={() => setMealPlan(date, slot, q)}>{t('排上', 'Set')}</button>
+      </div>
+      {getDayPlan(date)[slot] && (
+        <button type="button" style={{ ...ghostBtn, width: '100%' }} onClick={() => { setMealPlan(date, slot, null); setQ(''); }}>
+          {t('这一顿不排了', 'Clear this meal')}
+        </button>
+      )}
+      {suggestions.length > 0 && (
+        <div style={card}>
+          {suggestions.map((r, i) => (
+            <button key={r.name} type="button" onClick={() => { setQ(r.name); setMealPlan(date, slot, r.name); }}
+              style={{ ...row, width: '100%', textAlign: 'left', background: 'transparent', border: 'none', borderBottom: i === suggestions.length - 1 ? 'none' : divider, cursor: 'pointer' }}>
+              <RecipeThumb name={r.name} image={r.image} size={32} />
+              <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
     </>
   );
 }
@@ -1221,21 +1322,32 @@ function AddForm({ onAdded, onCancel, onError, t }: { onAdded: () => void; onCan
 
   return (
     <div style={{ ...card, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-      {/* 每格都带标题:空框看不出是什么(用户标注「这里面的字需要」)。 */}
+      {/* 图29:每格的占位文字删掉 —— 上面已经有标题,框里再写一遍「如『牛奶』」是重复,
+          而且它看着像已经填了内容。「可空」更是把「不必填」说成了输入建议。 */}
       <label style={fieldLabel}>{t('食材', 'Food')}
-        <input style={inputStyle} placeholder={t('如「牛奶」「菠菜」', 'e.g. milk, spinach')} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+        <input style={inputStyle} value={name} onChange={(e) => setName(e.target.value)} autoFocus />
       </label>
+      {/* 图29「日期框飘出界面」:两格并排时 flex item 默认 min-width:auto,
+          date 输入自带的日历图标 + 固定内容宽把它撑过父容器 —— minWidth:0 才收得住。 */}
       <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-        <label style={{ ...fieldLabel, flex: 1 }}>{t('数量', 'Qty')}
-          <input style={inputStyle} inputMode="numeric" placeholder={t('可空', 'optional')} value={qty} onChange={(e) => setQty(e.target.value)} />
+        <label style={{ ...fieldLabel, flex: 1, minWidth: 0 }}>{t('数量', 'Qty')}
+          <input style={{ ...inputStyle, maxWidth: '100%' }} inputMode="numeric" value={qty} onChange={(e) => setQty(e.target.value)} />
         </label>
-        <label style={{ ...fieldLabel, flex: 1 }}>{t('有效期', 'Expiry')}
-          <input style={inputStyle} type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
+        <label style={{ ...fieldLabel, flex: 1, minWidth: 0 }}>{t('有效期', 'Expiry')}
+          <input style={{ ...inputStyle, maxWidth: '100%' }} type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
         </label>
       </div>
-      <label style={fieldLabel}>{t('放哪', 'Where')}
-        <input style={inputStyle} placeholder={t('如「冰箱」,可空', 'e.g. fridge, optional')} value={location} onChange={(e) => setLocation(e.target.value)} />
-      </label>
+      {/* 图29:「放哪」从自由输入改成和分类同一套 tag —— 存放位置本来就只有那几处,
+          打字既慢又会把「冰箱」「冰箱里」存成两个地方。再点一下取消选择。 */}
+      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('放哪', 'Where')}</span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
+        {PANTRY_LOCATIONS.map(([zh, en]) => (
+          <button key={zh} type="button" onClick={() => setLocation((v) => (v === zh ? '' : zh))}
+            style={{ ...chip, ...(location === zh ? chipOn : {}), display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}>
+            <IconBox size={12} />{t(zh, en)}
+          </button>
+        ))}
+      </div>
       <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('分类', 'Category')}</span>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
         {PANTRY_CATEGORIES.map((c) => (
@@ -1253,10 +1365,23 @@ function AddForm({ onAdded, onCancel, onError, t }: { onAdded: () => void; onCan
 // ── 结构件 & 小工具 ───────────────────────────────────────────────────────────
 type TT = (zh: string, en: string) => string;
 
-function ScreenHead({ backLabel, onBack, title, subtitle, subtitleRight }: { backLabel: string; onBack: () => void; title?: string; subtitle?: string; subtitleRight?: string }) {
+/**
+ * Bug4 图25-30:每一屏顶上都补一个「今天」—— 美味是从洞察宫格里点进来的全屏页,
+ * 想回今天原本要「‹ 洞察 → 今天」两步。同时那几屏的大标题按标注删掉(title 不传即可),
+ * 屏名由下面的分段 tab 说明,不必再用一行 h1 复述。
+ */
+function ScreenHead({ backLabel, onBack, title, subtitle, subtitleRight, t }: { backLabel: string; onBack: () => void; title?: string; subtitle?: string; subtitleRight?: string; t: TT }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-      <button type="button" onClick={onBack} style={backLink}>‹ {backLabel}</button>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+        <button type="button" onClick={onBack} style={backLink}>‹ {backLabel}</button>
+        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('nesio-go-today'))}
+          style={{
+            flex: 'none', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)',
+            color: 'var(--portal-accent)', background: 'var(--portal-accent-soft)', border: '1px solid var(--portal-line)',
+            borderRadius: 'var(--radius-pill)', padding: 'var(--space-1) var(--space-3)', cursor: 'pointer',
+          }}>{t('今天', 'Today')}</button>
+      </div>
       {title && <h1 style={{ margin: 0, fontSize: 'var(--text-h1)', fontWeight: 700, lineHeight: 1.15, color: 'var(--portal-ink)' }}>{title}</h1>}
       {subtitle && (
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
