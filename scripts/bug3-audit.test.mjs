@@ -164,7 +164,16 @@ const ITEMS = [
   ['67', 'p15 导入表单也能上传', () => /type="file"/.test(F.travelPlan)],
 
   // ── 世界 / 足迹(p28–p29)──
-  ['68', 'p28 地球换写实航拍风格', () => /ocean/.test(F.globe) && /geoCircle/.test(F.globe)],
+  // 地表色板是**内容色**(卫星照的海在夜间也是蓝的),按 CLAUDE.md 例外允许写死;
+  // 但球面上的 UI 叠加层必须走 token —— 这条分界线光写在文档里下一个人还是会搞混,钉住它。
+  ['68', 'p28 地球换写实航拍风格', () => {
+    if (!/ocean/.test(F.globe) || !/geoCircle/.test(F.globe)) return false;
+    // 到访高亮这类 UI 叠加必须从 computed style 读 token,不许写死
+    if (!/tok\('--status-go'/.test(F.globe)) return false;
+    // 反向:别把 --portal-* / --status-* 之外的 UI 色也写死进 canvas
+    const uiHex = (F.globe.match(/(fillStyle|strokeStyle|shadowColor)\s*=\s*'#[0-9a-fA-F]{6}'/g) || []);
+    return uiHex.length === 0;
+  }],
   ['69', 'p28 星空底在两个主题都有', () => !/data-portal-theme="day"\][^{]*\.nesio-globe-stage/.test(F.css)],
   ['70', 'p29 月份可左右翻', () => /monthBack/.test(F.timeline) && /monthlyPlaceComparison\([^)]*monthOffset\s*=\s*0/.test(F.placeStats) && /monthlyPlaceComparison\(trail, monthBack\)/.test(F.timeline)],
   ['71', 'p29 删「地点 = 去过的不同地方」说明', () => !C.timeline.includes('去过的不同地方')],
