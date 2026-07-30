@@ -105,6 +105,25 @@ const none = { byEmail: {}, bySender: {} };
     '「有附件」是**事实**不是判断 —— 给它做成可改的,等于承诺一个改不了的东西');
 }
 
+/* ── ⑤' 改错了要能改回去 ──────────────────────────────────────────
+   自查发现的缺口:clearMailTagFix / removeSenderRule 两个函数**写好了零调用方** ——
+   也就是说用户改错一个标签之后**回不到自动判定**,他只能再改成别的,
+   没法说「算了,还是听系统的」。这正是我在这一轮里批评过的那种病
+   (daily-brief 那条 180 行的死路由)。 */
+{
+  const panel = strip(read('components/portal/insights/SchedulePanel.tsx'));
+  assert.match(panel, /clearMailTagFix\(emailId\)/, '要能撤销这一封的修正');
+  assert.match(panel, /removeSenderRule\(sender\)/, '勾过的发件人规则要能删');
+
+  // **两条路分开给** —— 合成一个按钮会说谎:清掉这一封的修正之后,如果发件人规则还在,
+  // 标签照样被规则改着,而按钮上写着「恢复自动判定」。
+  assert.match(panel, /const hasMine = Boolean\(emailId && fixes\.byEmail\[emailId\]\)/,
+    '「这一封改过没」和「发件人规则有没有」是两个独立判断');
+  assert.match(panel, /const hasRule = Boolean\(sender && fixes\.bySender\[sender\]\)/);
+  assert.match(panel, /\{\(hasMine \|\| hasRule\) && \(/,
+    '**改过之后才给这两个按钮** —— 没改过时点它什么都不会变,那就是个假按钮');
+}
+
 /* ── ⑥ 存储类别 ──────────────────────────────────────────────────── */
 {
   assert.match(read('scripts/storage-key-registry.test.mjs'), /\["nesio-mail-tag-fix-v1", "durable"\]/,

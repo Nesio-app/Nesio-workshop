@@ -42,7 +42,9 @@ export interface DailyReportExtras {
   domainInsights: DailyReportDomainInsight[];
   fitnessSession?: string;
   meals: string[];
-  orders: DailyReportOrder[];
+  /* orders 不在这里 —— 它由调用方用 collectOrders(节点) 单独算,因为节点在它手上。
+     自查发现:这里原本挂着一个 `orders: []`,**从没被赋值过**,然后被调用方整个覆盖。
+     结果不错,但它是个说谎的字段:看着像「这里管订单」,其实一行都不管。 */
   /** 未来两周里确定会发生的事(已知日期,无推算) */
   ahead: DailyReportAhead[];
   /** 我自己说过想做、却一直没动的那几条(见 loose-threads) */
@@ -93,7 +95,7 @@ export function collectOrders(nodes: readonly Orderish[], limit = 4): DailyRepor
  * @param now 定稿时刻(当天 08:00)。判「今天」用它,不用真实当前时间。
  */
 export function collectDailyReportExtras(now: Date = new Date()): DailyReportExtras {
-  const out: DailyReportExtras = { reminders: [], domainInsights: [], meals: [], orders: [], ahead: [], threads: [] };
+  const out: DailyReportExtras = { reminders: [], domainInsights: [], meals: [], ahead: [], threads: [] };
   if (typeof window === 'undefined') return out;
   const todayKey = dayKeyOf(now);
 

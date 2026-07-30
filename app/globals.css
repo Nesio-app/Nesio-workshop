@@ -20697,3 +20697,5 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   color: var(--portal-muted);
 }
 .nesio-mailtag-rule-check { flex: none; color: var(--portal-accent); }
+/* 禁用的筛选/选择 chip —— 看得出点不了,而不是点了没反应 */
+.nesio-schedfilter-chip[disabled] { opacity: 0.45; cursor: default; }

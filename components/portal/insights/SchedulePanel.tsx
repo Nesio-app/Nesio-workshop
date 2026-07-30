@@ -31,6 +31,7 @@ import { mailStatusLine, mailBadges, toneVars } from '@/lib/portal/mail-badges';
 import { extractEmailLocal } from '@/lib/portal/email-extract-local';
 import {
   loadMailTagFix, resolveMailKind, mailTagFixReady, fixMailTag, senderKeyOf,
+  clearMailTagFix, removeSenderRule,
   MAIL_TAG_FIX_EVENT, MAIL_TAG_KINDS, type MailTagFixStore, type MailTagFix,
 } from '@/lib/portal/mail-tag-fix';
 import { searchTokens, matchesSearch } from '@/lib/portal/schedule-search';
@@ -642,6 +643,13 @@ function MailTagFixSheet({ row, dict, onClose }: { row: Row; dict: 'zh' | 'en'; 
     onClose();
   };
 
+  /* 「恢复自动」的两条路,分开给 —— 合成一个按钮会说谎:
+     清掉这一封的修正之后,如果发件人规则还在,标签照样被规则改着,
+     而按钮上写着「恢复自动判定」。 */
+  const fixes = loadMailTagFix();
+  const hasMine = Boolean(emailId && fixes.byEmail[emailId]);
+  const hasRule = Boolean(sender && fixes.bySender[sender]);
+
   return (
     <NesioSheet
       variant="bottom"
@@ -661,9 +669,20 @@ function MailTagFixSheet({ row, dict, onClose }: { row: Row; dict: 'zh' | 'en'; 
           aria-label={L(dict, '关闭', 'Close')}>✕</button>
       </div>
       <div className="nesio-settings-sheet-body">
+        {/* 没有 emailId 就**改不了**,而且要在选项**上面**说清楚。
+            自查发现的洞:此前这行提示挂在选项下面、选项照常能点,而 fixMailTag 对空 id
+            直接 return —— 用户点一下、面板关掉、标签没变,那行小字他根本没看到。
+            「按了没反应」的教科书案例,而且是我自己写的。 */}
+        {!emailId && (
+          <p role="alert" className="nesio-remind-err" style={{ marginBottom: 'var(--space-3)' }}>
+            {L(dict, '这条改不了 —— 它没有邮件 id,多半是同步早期留下的旧记录。下次同步后就能改了。',
+                  'Cannot change this one — it has no email id (an old record from an earlier sync).')}
+          </p>
+        )}
         <div className="nesio-remind-row">
           {([...MAIL_TAG_KINDS, 'none'] as MailTagFix[]).map((k) => (
-            <button key={k} type="button" className="nesio-schedfilter-chip" onClick={() => apply(k)}>
+            <button key={k} type="button" className="nesio-schedfilter-chip"
+              disabled={!emailId} onClick={() => apply(k)}>
               {label(k)}
             </button>
           ))}
@@ -693,12 +712,24 @@ function MailTagFixSheet({ row, dict, onClose }: { row: Row; dict: 'zh' | 'en'; 
           </button>
         )}
 
-        {!emailId && (
-          <p role="alert" className="nesio-remind-err" style={{ marginTop: 'var(--space-3)' }}>
-            {L(dict, '这条没有邮件 id,改不了 —— 它多半是同步早期留下的旧记录。',
-                  'No email id on this one — it is an old record from an earlier sync.')}
-          </p>
+        {/* 改过之后才给「恢复自动」—— 没改过时点它什么都不会变,那就是个假按钮。 */}
+        {(hasMine || hasRule) && (
+          <div className="nesio-remind-row" style={{ marginTop: 'var(--space-3)' }}>
+            {hasMine && (
+              <button type="button" className="nesio-schedfilter-chip"
+                onClick={() => { clearMailTagFix(emailId); onClose(); }}>
+                {L(dict, '恢复自动判定', 'Back to automatic')}
+              </button>
+            )}
+            {hasRule && (
+              <button type="button" className="nesio-schedfilter-chip"
+                onClick={() => { removeSenderRule(sender); onClose(); }}>
+                {L(dict, `删掉「${sender} 都这样」这条规则`, `Remove the rule for ${sender}`)}
+              </button>
+            )}
+          </div>
         )}
+
       </div>
     </NesioSheet>
   );
