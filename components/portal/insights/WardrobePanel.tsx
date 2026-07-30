@@ -775,8 +775,10 @@ export default function WardrobePanel() {
                 </div>
               </div>
 
+              {/* role=alert 与「搭配」那一处对齐 —— 同一个 tryonError 在两个屏渲染,
+                  少一个 role 就变成「一处读屏会播报、另一处不会」。 */}
               {tryonError && (
-                <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>{tryonError}</p>
+                <p role="alert" style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>{tryonError}</p>
               )}
 
               <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-3)', opacity: tryonBusy ? 0.6 : 1 }}
