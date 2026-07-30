@@ -14,7 +14,7 @@ import NesioMark from './NesioMark';
 // 批次 139:统一「打开详情」—— 聊天引用卡与记忆页/今天页共用同一个完整详情组件
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { getLifeGraph, isBulkImported, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
+import { getLifeGraph, isBulkImported, isPrivateExternalNode, linkNodes, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
 import { recallByRecognition } from '@/lib/portal/photo-recall';
 import { buildMemoryContext, fmtEventDate, extractCitations } from '@/lib/portal/memory-retrieval';
 import { createCalendarEvent } from '@/lib/portal/calendar-client';
@@ -873,9 +873,10 @@ Edit location/value anytime in Storage.`),
       itemIds.push(saved.id);
     }
     if (container) {
-      updateLifeNode(container.id, {
-        relations: itemIds.map((id) => ({ targetId: id, relation: 'plan_item' })),
-      });
+      // R1:走 linkNodes —— 条目在创建时已经写了 part_of_plan(那时容器还没有 id 可指),
+      // 这里补容器 → 条目那一半。linkNodes 自带去重,反向那条不会重复写。
+      // 原来是 updateLifeNode 整块替换 relations,容器上别的关系会被一起冲掉。
+      for (const id of itemIds) linkNodes(container.id, id, 'plan_item');
     }
     setMessages((prev) => { const next = prev.map((m) => m.id === msg.id ? { ...m, planSaved: true } : m); saveHistory(next); return next; });
     window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
@@ -957,11 +958,11 @@ Edit location/value anytime in Storage.`),
       relations: refRelations, rawInput: msg.text,
     });
     // 反向认亲:被引用的计划节点也指回这份清单
+    // R1:走 linkNodes —— 一次读写把两边写完、自带去重、反向关系自动推
+    // (has_checklist ↔ checklist_of)。原来只写了被引用那一侧,
+    // 从清单点进去看不到它属于哪个计划。
     for (const r of refRelations) {
-      const live = getLifeGraph().find((x) => x.id === r.targetId);
-      if (live && !live.relations.some((x) => x.targetId === savedNode.id)) {
-        updateLifeNode(live.id, { relations: [...live.relations, { targetId: savedNode.id, relation: 'has_checklist' }] });
-      }
+      linkNodes(r.targetId, savedNode.id, 'has_checklist');
     }
     setMessages((prev) => prev.map((m) => m.id === msg.id ? { ...m, savedToMemory: true } : m));
     window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
