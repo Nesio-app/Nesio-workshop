@@ -72,10 +72,16 @@ export default function HealthLensCards({
       .filter((p) => p?.name && !p.stoppedAt);
     setMeds(m);
 
-    // ③ 就诊:近的在前
+    // ③ 就诊:近的在前。bug3 p41:医生 / 保险 / 价格也显示出来 —— 不然填了看不见,等于没填。
     const v = healthSignals({ personKey, types: [HEALTH_VISIT] }).map((s) => {
       const p = s.payload as unknown as HealthVisitPayload;
-      return { id: s.id, date: s.occurredAt, title: s.title, note: p?.note };
+      const money = typeof p?.price === 'number' && Number.isFinite(p.price)
+        ? `${p.currency === 'USD' || !p.currency ? '$' : ''}${p.price}`
+        : '';
+      return {
+        id: s.id, date: s.occurredAt, title: s.title,
+        note: [p?.doctor, p?.insurance, money, p?.note].filter(Boolean).join(' · ') || undefined,
+      };
     });
     setVisits(v.slice(0, MAX_VISITS));
   }, [personKey]);
