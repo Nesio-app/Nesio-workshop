@@ -15,6 +15,7 @@ import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { ROADMAP_ITEMS } from '@/lib/portal/roadmap';
 import { EXPERIMENTS } from '@/lib/portal/experiments';
 import { envValue } from '@/lib/portal/env';
+import { telemetryLabel } from '@/lib/portal/telemetry-labels';
 
 export const dynamic = 'force-dynamic';
 
@@ -336,7 +337,10 @@ export async function GET(req: NextRequest) {
     if (!worst || rate < worst.rate) worst = { step: funnel[i].step, rate };
   }
   if (worst && worst.rate < 40) {
-    insights.push({ severity: 'gentle', title: `漏斗瓶颈:${worst.step}(${worst.rate}%)`, detail: `到「${worst.step}」这步只有 ${worst.rate}% 的设备走过来,是流失最重的一环。`, advice: '这一步的入口是不是太深/文案不清?先降低它的进入门槛再看一周数据。' });
+    // Bug4 图17/图19「事件说人话」:这句洞察是**服务端**拼的,里面直接嵌了原始事件名
+    // (真机上显示成「漏斗瓶颈:brief_play(0%)」)。同一张表在这里也过一遍。
+    const worstName = telemetryLabel(worst.step);
+    insights.push({ severity: 'gentle', title: `流失最重的一步:${worstName}(${worst.rate}%)`, detail: `走到「${worstName}」这步的设备只剩 ${worst.rate}%。`, advice: '这一步的入口是不是太深/文案不清?先降低它的进入门槛再看一周数据。' });
   }
 
   const fbTotal = feedback.useful + feedback.wrong + feedback.too_much;

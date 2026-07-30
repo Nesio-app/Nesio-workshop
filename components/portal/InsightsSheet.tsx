@@ -187,9 +187,13 @@ function MindPie({ items, onPick, dict }: { items: Array<[string, number]>; onPi
               <small className="nesio-mindpie2-go">{L(dict, '查看记忆 ›', 'View ›')}</small>
             </button>
           ) : (
+            // 图22 上还写着一句「也显示百分比」——指的就是**没点任何一片时**的中心。
+            // 原来静止状态只有一个总数,而这张图整个是在讲占比:不点也该先看见
+            // 「最大的那块占几成」。总次数退成脚注。
             <>
-              <b>{total}</b>
-              <small>{L(dict, '次', 'times')}</small>
+              <b>{Math.round((arcs[0]?.c ?? 0) / total * 100)}%</b>
+              <small className="nesio-mindpie2-ctr-name">{arcs[0]?.tag ?? ''}</small>
+              <small>{L(dict, `共 ${total} 次`, `${total} total`)}</small>
             </>
           )}
         </div>
