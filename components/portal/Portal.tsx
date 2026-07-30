@@ -1459,7 +1459,14 @@ export default function Portal() {
       )}
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
       {calendarCreateOpen && <CalendarCreateSheet open={calendarCreateOpen} onClose={() => setCalendarCreateOpen(false)} />}
-      {familyOpen && <FamilySharingSheet open={familyOpen} onClose={() => setFamilyOpen(false)} />}
+      {/* onToday:右上「今天」要连洞察一起关(bug3:左边回洞察、右边回今天) */}
+      {familyOpen && (
+        <FamilySharingSheet
+          open={familyOpen}
+          onClose={() => setFamilyOpen(false)}
+          onToday={() => { setFamilyOpen(false); setInsightsOpen(false); }}
+        />
+      )}
       {cookingOpen && <CookingSheet open={cookingOpen} onClose={() => setCookingOpen(false)} />}
       {workoutSession && (
         // 错误边界(修「打开跟练 app 卡死」):跟练播放器一旦被畸形数据(如别端同步回的坏 workout)

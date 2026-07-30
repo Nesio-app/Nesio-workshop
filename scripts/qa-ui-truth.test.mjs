@@ -138,13 +138,16 @@ const code = stripComments;
 // owed = earned − 已发放。家长一发工钱进度就倒退,发多了直接变负 ——
 // 用户看到的是「¥-20.00 / ¥100.00 · 还差 ¥120.00」。
 {
+  // bug3:这块已按标注从「家庭分享」搬进奖励模块(愿望集成到 rewards)。断言跟着搬,
+  // 病根不变 —— 进度分母必须是 earned(累计挣到的),不是 owed(还没发的工钱)。
+  const goal = code(read('components/portal/family/FamilyGoalCard.tsx'));
+  assert.ok(/\.earned/.test(goal), '攒钱进度没有取 earned(累计挣到的)');
+  assert.ok(/const reached = earned >= goal/.test(goal), '「攒够了」必须拿 earned 判 —— 用 owed 发过工钱之后永远达不到');
+  assert.ok(!/\bowed\b/.test(goal), '攒钱目标卡里不许出现 owed —— 它一发工钱就掉,进度会倒退甚至变负');
   const fam = code(read('components/portal/family/FamilySharingSheet.tsx'));
-  assert.ok(/saved:\s*number/.test(fam), '攒钱目标又改回按 owed 算了');
-  assert.ok(/saved=\{[\s\S]{0,120}?\.earned/.test(fam), '攒钱进度没有取 earned(累计挣到的)');
-  assert.ok(
-    !/const reached = owed >= goal/.test(fam),
-    '「攒够了」还在拿 owed 判 —— 发过工钱之后永远达不到',
-  );
+  assert.ok(!/GoalSection/.test(fam), '家庭板里不许再留一份攒钱目标 —— 两个愿望拆在两页就是原问题');
+  const store = code(read('components/portal/RewardsStore.tsx'));
+  assert.ok(/FamilyGoalCard/.test(store), '奖励模块必须挂上攒钱目标卡(愿望集成到 rewards)');
   const server = code(read('lib/family/family-server.ts'));
   assert.ok(/earned:\s*bal\.earned/.test(server), '服务端没把 earned 发给客户端,前端算不出真实攒钱进度');
 }
