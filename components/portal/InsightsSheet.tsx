@@ -28,7 +28,7 @@ import { usePortalLocale } from './use-portal-locale';
 import { InfoTip } from './InfoTip';
 import {
   IconRefresh, IconTrendingUp, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconDownload, IconAlertTriangle, IconBookmark, IconHanger,
-  IconBulb, IconTarget, IconPlay, IconHeartPulse, IconActivity, IconMapPin, IconCard, IconBox, IconUser, IconCar, IconMirror,
+  IconBulb, IconTarget, IconPlay, IconHeartPulse, IconActivity, IconMapPin, IconCard, IconBox, IconUser, IconHome, IconMirror,
   IconGear, IconPeople, IconUtensils,
 } from './icons';
 import TimelineTab from './insights/TimelineTab';
@@ -387,7 +387,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       case 'inventory': return <IconBox />;
       case 'wardrobe': return <IconHanger />;
       case 'relationships': return <IconUser />;
-      case 'tesla': return <IconCar />;
+      // #8:这一格从「车」改名成「资产」(房产 + 车两个子 tab)后,图标还是一辆小汽车 ——
+      // 名字和图标说的不是一件事,用户点进去才发现里面还有房产。房产是这格里更大的那一半。
+      case 'tesla': return <IconHome />;
       case 'living': return <IconMirror />;
       case 'admin': return <IconGear />;
       default: return <IconNote />;

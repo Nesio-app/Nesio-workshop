@@ -20719,3 +20719,11 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   font-weight: var(--weight-semibold);
   color: var(--portal-muted);
 }
+
+/* #25:恢复出来的草稿不是今天留下的时,在输入条下面说清楚是哪天的 ——
+   否则几周前语音听岔的半句看起来就像刚打的,而用户根本不记得打过。 */
+.nesio-tl-capture-stale {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+}

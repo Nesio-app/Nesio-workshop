@@ -10,6 +10,8 @@ import LocationPicker from './LocationPicker';
 import EmailComposeSheet from './EmailComposeSheet';
 import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare, IconFile} from './icons';
 import { isTopicTag } from '@/lib/portal/topic-tags';
+// #18:「地点」字段里塞的是会议链接 —— 一条 URL 不是一个地方
+import { splitEventLocation, shortUrlLabel } from '@/lib/portal/meeting-location';
 import { L } from '@/lib/portal/i18n';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName, stripMarkdownInline } from '@/lib/portal/node-display';
@@ -359,23 +361,33 @@ function EventSection({ node }: {
         </div>
       )}
       {location && (() => {
-        // Google 日历里,Zoom / Teams / Meet 这些会议软件是把**会议链接**写进 location 字段的
-        // (它们那边就这么设计)。原样挂在「地点」下面语义不对,而且一长串 URL 也没法看。
-        // 认出来就改叫「会议链接」,并做成能点的 —— 对用户比一个假地点有用得多。
-        const meetingUrl = /^https?:\/\//i.test(location.trim()) ? location.trim() : '';
-        const label = meetingUrl ? L(dict, '会议链接', 'Meeting link') : L(dict, '地点', 'Location');
-        const shown = meetingUrl
-          ? (() => { try { return new URL(meetingUrl).hostname.replace(/^www\./, ''); } catch { return meetingUrl; } })()
-          : location;
-        const href = meetingUrl || mapLink;
+        /* #18:Google 日历里 Zoom / Teams / Meet 是把**会议链接**写进 location 字段的
+           (它们那边就这么设计)。一条 URL 不是一个地方,原样挂在「地点」下面语义不对。
+           上一版只认「整段 location 就是一条 URL」,而现实里常见的是
+           `Zoom Meeting https://…`、`https://… (Room 3)` 这种混着写的 —— 全漏了。
+           现在把 URL 摘出来,剩下的文字才是地点:两样都在就分成两行,各说各的。 */
+        const { place, meetingUrl, knownMeeting } = splitEventLocation(location);
         return (
-          <div className="nesio-node-attr-row">
-            <span className="nesio-node-attr-key">{label}</span>
-            {href
-              ? <a href={href} target="_blank" rel="noopener noreferrer" className="nesio-node-attr-val nesio-node-attr-link">{shown}</a>
-              : <span className="nesio-node-attr-val">{shown}</span>
-            }
-          </div>
+          <>
+            {place && (
+              <div className="nesio-node-attr-row">
+                <span className="nesio-node-attr-key">{L(dict, '地点', 'Location')}</span>
+                {mapLink
+                  ? <a href={mapLink} target="_blank" rel="noopener noreferrer" className="nesio-node-attr-val nesio-node-attr-link">{place}</a>
+                  : <span className="nesio-node-attr-val">{place}</span>}
+              </div>
+            )}
+            {meetingUrl && (
+              <div className="nesio-node-attr-row">
+                <span className="nesio-node-attr-key">
+                  {knownMeeting ? L(dict, '会议链接', 'Meeting link') : L(dict, '链接', 'Link')}
+                </span>
+                <a href={safeExternalUrl(meetingUrl)} target="_blank" rel="noopener noreferrer" className="nesio-node-attr-val nesio-node-attr-link">
+                  {shortUrlLabel(meetingUrl)}
+                </a>
+              </div>
+            )}
+          </>
         );
       })()}
       {participants && <InfoRow label={L(dict, '参与者', 'People')} value={participants} />}

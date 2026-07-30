@@ -27,7 +27,7 @@ export default function MemoryLensSheet({ open, onOpenChange, node }: { open: bo
   const en = dict === 'en';
   const text = `${node.name}${node.attributes?.notes ? ' —— ' + node.attributes.notes : node.rawInput ? ' —— ' + node.rawInput : ''}`;
 
-  const { recommended, rest, locked } = useMemo(() => lensesForMemory(text), [text]);
+  const { recommended, rest, locked, withheldPersonal } = useMemo(() => lensesForMemory(text), [text]);
   const [applied, setApplied] = useState<MemoryLens | null>(null);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<LensResult | null>(null);
@@ -58,6 +58,7 @@ export default function MemoryLensSheet({ open, onOpenChange, node }: { open: bo
           ? `You logged “${echo.tag}” on ${day} too${echo.many ? ` — ${echo.count} times before this` : ''}`
           : `你 ${day} 也记过「${echo.tag}」${echo.many ? ` —— 在这之前一共 ${echo.count} 次` : ''}`,
         many: echo.many,
+        background: echo.background,
       };
     } catch { return null; }
   }, [node, en]);
@@ -105,6 +106,15 @@ export default function MemoryLensSheet({ open, onOpenChange, node }: { open: bo
             </>}
             <p className="ng-lbl">{L(dict, '全部镜头', 'All lenses')}</p>
             {rest.map((l) => <LensRow key={l.id} l={l} />)}
+            {/* #35:「前提·事实·逻辑·情绪」「认知扭曲识别」拆的是**人说的话**。
+                套在一条系统通知上,输出的「情绪」一栏只能生硬地编 ——
+                与其让用户挨个点开发现都很勉强,不如直接说清楚为什么没有它们。 */}
+            {withheldPersonal > 0 && (
+              <p className="ng-quiet" style={{ textAlign: 'left', marginTop: 8 }}>
+                {L(dict, '这条像是事务性记录 —— 拆「你的前提 / 情绪」那几个镜头先收起来了,它们是给你自己说的话准备的。',
+                  'This reads like a transactional record — the lenses that unpack your premises and feelings are tucked away; they are meant for things you said yourself.')}
+              </p>
+            )}
             {locked.map((l) => (
               <div key={l.id} className="ng-lens locked">
                 <Ico path={l.icon} cls="li" />
@@ -141,6 +151,9 @@ export default function MemoryLensSheet({ open, onOpenChange, node }: { open: bo
                     <span className="t">{L(dict, '念念还记得', 'Nessa remembers')}</span>
                     {relatedHint.text}
                     {relatedHint.many && ` —— ${L(dict, '也许是个值得留意的模式,不只是这一次。', 'maybe a pattern worth noticing, not just this once.')}`}
+                    {/* #36:天天出现的东西不是模式。lensEcho 判成背景常量时不许说「模式」,
+                        还得说清它为什么天天出现 —— 否则用户会以为自己在反复关注它。 */}
+                    {relatedHint.background && ` —— ${L(dict, '不过它几乎天天出现,更像是这类记录里固定带的名字,不是你最近在关注它。', 'It shows up nearly every day though — more a fixed name in this kind of record than something you have been focusing on.')}`}
                   </div>
                 )}
                 {saved ? (

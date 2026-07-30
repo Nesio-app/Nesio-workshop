@@ -39,6 +39,11 @@ export interface CaptureBarProps {
    */
   micError?: string;
   onDismissMicError?: () => void;
+  /**
+   * #25:恢复出来的草稿如果不是今天留下的,在这儿说清楚是哪天的 ——
+   * 否则几周前语音听岔的半句看起来就像用户刚打的,而他根本不记得打过。
+   */
+  staleNote?: string;
 }
 
 /** 输入框随字数长高(和成长页文本框同一套手感)。 */
@@ -147,6 +152,10 @@ export default function CaptureBar(capture: CaptureBarProps) {
           )}
         </div>
       </form>
+
+      {capture.staleNote && capture.value.trim() && (
+        <p className="nesio-tl-capture-stale">{capture.staleNote}</p>
+      )}
 
       {err && (
         <p className="nesio-tl-capture-err" role="alert">

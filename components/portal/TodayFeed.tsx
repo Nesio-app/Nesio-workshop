@@ -8,6 +8,7 @@ import NesioMark from './NesioMark';
 import RetrospectCard from './RetrospectCard';
 import { usePortalLocale } from './use-portal-locale';
 import { L } from '@/lib/portal/i18n';
+import { readJotDraft, writeJotDraft, draftAgeNote } from '@/lib/portal/jot-draft';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, deleteFocusNode, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem, getLiveMemoryNode, type LiveMemoryNode } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
 import { dismissJudgedCard, judgeState, clearJudgeError } from '@/lib/portal/guidance-judge-auto';
@@ -228,15 +229,22 @@ export default function TodayFeed({
   const quickInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   // 批次 163:记一笔草稿持久化 —— 没点记下就退出 App,下次进来这条还在。
+  // #25(2026-07-30):持久化本身是对的,错的是它**没有尽头** —— 存的只有一串文字,
+  // 没有「什么时候留下的」,于是几个月前语音听岔的半句今天打开还躺在框里,
+  // 看起来就像刚打的。判据收在 lib/portal/jot-draft:超过 14 天不再恢复,
+  // 不是今天留下的就在输入条下面说清楚是哪天的。
+  const [draftNote, setDraftNote] = useState<{ zh: string; en: string } | null>(null);
   useEffect(() => {
-    // 读入防线(QA:草稿里出现从未输入过的「关注chong」):超长/非字符串一律丢弃
-    try { const d = localStorage.getItem('nesio-jot-draft-v1'); if (d && typeof d === 'string' && d.length <= 2000) setQuickAdd(d); } catch { /* ignore */ }
+    const d = readJotDraft();
+    if (!d) return;
+    setQuickAdd(d.text);
+    setDraftNote(draftAgeNote(d));
   }, []);
   useEffect(() => {
     // 语音识别进行中的 interim 半句不落盘(QA 乱码草稿根因):识别引擎的中间猜测
     // 每帧都在变,落盘等于把听错的半句永久写死;等 onend 出最终稿再由本 effect 落。
     if (micState === 'recording') return;
-    try { if (quickAdd) localStorage.setItem('nesio-jot-draft-v1', quickAdd); else localStorage.removeItem('nesio-jot-draft-v1'); } catch { /* ignore */ }
+    writeJotDraft(quickAdd);
   }, [quickAdd, micState]);
   // 卸载时停掉识别器(QA:导航走开后识别器还活着,环境音继续往草稿里写)
   useEffect(() => () => { recogRef.current?.stop(); }, []);
@@ -554,12 +562,14 @@ export default function TodayFeed({
             新建日程按钮按标注删掉。输入条本体见 today/CaptureBar.tsx。 */}
         <CaptureBar
           value={quickAdd}
-          onChange={setQuickAdd}
+          onChange={(v) => { setQuickAdd(v); setDraftNote(null); }}
+          staleNote={draftNote ? L(uiLocale, draftNote.zh, draftNote.en) : ''}
           onSubmit={() => {
             const name = quickAdd.trim();
             if (!name) return;
             addCommitmentNode(name);
             setQuickAdd('');
+            setDraftNote(null);
             setQuickSaved(L(uiLocale, '已记下', 'Noted'));
             setTimeout(() => setQuickSaved(''), 2000);
           }}
