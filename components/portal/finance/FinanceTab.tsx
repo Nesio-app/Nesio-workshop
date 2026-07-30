@@ -25,6 +25,7 @@ import { computeFinanceScores } from '@/lib/portal/finance-risk';
 import { incomeBreakdown, detectIncome, portfolioSummary, recurringPriceHikes } from '@/lib/portal/finance-features';
 import { loadCombinedFinanceTx, loadCombinedFinanceAccounts } from '@/lib/portal/tesla-finance';
 import QuickAddSheet from './QuickAddSheet';
+import ReconcileSheet from './ReconcileSheet';
 import CardsPane from './CardsPane';
 import AcctLogo from './AcctLogo';
 import InvestPane from './InvestPane';
@@ -351,6 +352,7 @@ export default function FinanceTab() {
   // (CLAUDE.md 红线:失败必须看得见,不许伪装成空。)
   const [hydrateState, setHydrateState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [quickAdd, setQuickAdd] = useState<null | { seg: 'expense' | 'income' | 'asset'; assetId?: string }>(null); // P1:全局「+」(带资产上下文)
+  const [reconcileOpen, setReconcileOpen] = useState(false); // L3-b:上传 statement 对账(端上解析,不上传)
 
   useEffect(() => {
     const reload = () => {
@@ -952,6 +954,14 @@ export default function FinanceTab() {
       {/* ── 交易:规则审核 + 筛选 + 明细 ── */}
       {sub === 'tx' && (
         <>
+          {/* L3-b:上传对账单。放在交易页顶部 —— 这一页就是「我这个月都花了什么」,
+              对账是它的自然动作。解析全在本机(pdf.js),文件不上传;产出的是候选行,
+              勾了才进账本。 */}
+          <button type="button" className="nesio-fin-review-accept" style={{ marginBottom: '0.4rem' }}
+            onClick={() => setReconcileOpen(true)}>
+            {L(dict, '上传对账单核对(只在本机解析,不上传)', 'Check a statement (parsed on this device)')}
+          </button>
+          <ReconcileSheet open={reconcileOpen} onClose={() => setReconcileOpen(false)} onSaved={() => setRev((r) => r + 1)} />
           {review.length > 0 && (
             <>
               <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, `规则审核 · ${review.length} 笔待归类`, `Review · ${review.length} to categorize`)}</p>
