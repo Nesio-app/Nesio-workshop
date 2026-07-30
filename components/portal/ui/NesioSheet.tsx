@@ -72,6 +72,12 @@ export interface NesioSheetProps {
    * 不做成全局改层:全局抬会把上面那条「fullscreen 盖住触发它的 bottom」的规则弄坏。
    */
   elevated?: boolean;
+  /**
+   * 遮罩加毛玻璃(bug3:「挂一条 / 打包清单打开后面背景虚化」)。
+   * 只影响遮罩的视觉,不动层序 —— 背后内容仍在,只是虚掉,让注意力落在这张卡上。
+   * reduced-transparency 下自动退成纯遮罩(见 globals.css)。
+   */
+  backdropBlur?: boolean;
   children: ReactNode;
 }
 
@@ -236,6 +242,7 @@ export default function NesioSheet({
   modal = true,
   opaqueOverlay = false,
   elevated = false,
+  backdropBlur = false,
   children,
 }: NesioSheetProps) {
   // opaqueOverlay + 非全屏:面板必须抬到不透明遮罩(929)之上,否则被自己的遮罩盖死
@@ -243,12 +250,13 @@ export default function NesioSheet({
   const overOpaque = opaqueOverlay && variant !== 'fullscreen' ? ' nesio-sheet--over-opaque' : '';
   // elevated:从 fullscreen 面板内部再开的层(940/941)。两者互不冲突,一起挂。
   const panelClass = `nesio-sheet nesio-sheet--${variant}${card ? '' : ' nesio-sheet--bare'}${overOpaque}${elevated ? ' nesio-sheet--elevated' : ''}${className ? ` ${className}` : ''}`;
+  const blurClass = backdropBlur ? ' nesio-sheet-overlay--blur' : '';
 
   if (variant === 'bottom') {
     return (
       <Drawer.Root open={open} onOpenChange={onOpenChange} dismissible={dismissible} modal repositionInputs={false}>
         <Drawer.Portal>
-          <Drawer.Overlay className={`nesio-sheet-overlay${elevated ? ' nesio-sheet-overlay--elevated' : ''}`} />
+          <Drawer.Overlay className={`nesio-sheet-overlay${elevated ? ' nesio-sheet-overlay--elevated' : ''}${blurClass}`} />
           <VaulContent panelClass={panelClass} panelStyle={style} ariaLabel={ariaLabel} open={open}>
             {children}
           </VaulContent>
@@ -259,7 +267,7 @@ export default function NesioSheet({
 
   // fullscreen 的遮罩用不透明页面底当底衬 —— 全屏面板常是磨砂玻璃底(半透明),
   // 需要背后有不透明层,否则在夜间(--glass-bg-solid 近全透)会透出下层。
-  const overlayClass = `nesio-sheet-overlay${variant === 'fullscreen' || opaqueOverlay ? ' nesio-sheet-overlay--opaque' : ''}${elevated ? ' nesio-sheet-overlay--elevated' : ''}`;
+  const overlayClass = `nesio-sheet-overlay${variant === 'fullscreen' || opaqueOverlay ? ' nesio-sheet-overlay--opaque' : ''}${elevated ? ' nesio-sheet-overlay--elevated' : ''}${blurClass}`;
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange} modal={modal}>
       <Dialog.Portal>

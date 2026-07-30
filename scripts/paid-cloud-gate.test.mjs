@@ -19,12 +19,11 @@ const read = (p) => fs.readFileSync(new URL('../' + p, import.meta.url), 'utf8')
   assert.ok(/if \(canUsePaidCloudAi\(\)\) return true/.test(ent), '放行走 canUsePaidCloudAi');
 }
 
-// ── 用户触发的九路云 AI 入口:接 guardPaidCloudAi ──
+// ── 用户触发的云 AI 入口:接 guardPaidCloudAi ──
+// (bug3 起 HangNoteSheet 不在此列 —— 记一条改成纯手动输入,不再有云调用)
 const GATED = [
   ['components/portal/today/MeetingRecorderSheet.tsx', 'meeting_notes'],
   ['components/portal/NesioProfileCard.tsx', 'avatar_ai'],
-  ['components/portal/relationships/PersonExtractSheet.tsx', 'person_extract'],
-  ['components/portal/relationships/HangNoteSheet.tsx', 'person_extract'],
   ['components/portal/InventorySheet.tsx', 'inventory_extract'],
   ['components/portal/NesioChatSheet.tsx', 'inventory_extract'],
   ['components/portal/health/HealthDashboard.tsx', 'health_insight'],

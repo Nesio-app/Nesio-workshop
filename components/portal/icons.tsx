@@ -20,6 +20,8 @@ function make(paths: React.ReactNode) {
 // ── 连接器 ──
 export const IconCalendar = make(<><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></>);
 export const IconMail = make(<><rect x="2" y="4" width="20" height="16" rx="2" /><path d="m22 6-10 7L2 6" /></>);
+export const IconPhone = make(<><path d="M6.5 3h3l1.5 4-2 1.5a11 11 0 0 0 5.5 5.5L16 12l4 1.5v3a2 2 0 0 1-2.2 2A16 16 0 0 1 4 6.2 2 2 0 0 1 6 4z" /></>);
+export const IconNavigate = make(<><path d="M3 11 21 3l-8 18-2-7z" /></>);
 export const IconCloudSun = make(<><path d="M12 2v2M4.9 4.9l1.4 1.4M2 12h2" /><path d="M15.9 11.6a4 4 0 1 0-6.4 3.9" /><path d="M13 22H7a4 4 0 1 1 .6-7.9A5 5 0 0 1 17.5 16 3 3 0 0 1 17 22h-4z" /></>);
 export const IconNote = make(<><path d="M4 4h13l3 3v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1z" /><path d="M8 9h8M8 13h8M8 17h5" /></>);
 export const IconBook = make(<><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V2H6.5A2.5 2.5 0 0 0 4 4.5z" /><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5" /></>);

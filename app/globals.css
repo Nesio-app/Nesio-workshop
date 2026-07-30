@@ -13971,6 +13971,34 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-rel-av--3 { background: #9a9060; }
 .nesio-rel-av--4 { background: #7f96b3; }
 .nesio-rel-av--5 { background: #a9906a; }
+/* bug3:通讯录同步来的 Gmail 头像 —— 有真头像就别用字母块 */
+.nesio-rel-av--img { object-fit: cover; background: var(--portal-accent-soft); }
+
+/* bug3:记一条时挂的附件清单(唯一副本在本机 IndexedDB) */
+.nesio-hang-att-list { list-style: none; margin: var(--space-2) 0 0; padding: 0; display: grid; gap: var(--space-1); }
+.nesio-hang-att {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2); border-radius: var(--radius-sm);
+  background: var(--portal-accent-soft); font-size: var(--text-xs);
+}
+.nesio-hang-att-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--portal-ink); }
+.nesio-hang-att-size { flex-shrink: 0; color: var(--portal-muted); }
+
+/* bug3:详情页名字与「记录」按钮同一行 */
+.nesio-rel-detail-name-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+
+/* bug3:联系人表单里「输入框 + 一个动作」的行(写信 / 打电话 / 导航) */
+.nesio-ct-field-row { display: flex; align-items: center; gap: var(--space-2); }
+.nesio-ct-field-row > .nesio-ob-input { flex: 1; min-width: 0; }
+.nesio-ct-field-act {
+  flex-shrink: 0; width: 2.6rem; height: 2.6rem; border-radius: var(--radius-sm);
+  display: grid; place-items: center; text-decoration: none;
+  border: 1px solid var(--portal-accent-border); background: var(--portal-accent-soft);
+  color: var(--portal-accent);
+}
+.nesio-ct-field-act:active { background: var(--portal-accent-soft-md); }
+/* 没填内容时不给可点的假象 */
+.nesio-ct-field-act.is-off { border-color: var(--portal-line); background: transparent; color: var(--portal-muted); opacity: 0.45; }
 
 /* ─── 按人分类的数据(人缘㊄)─── */
 .nesio-rel-rec-head { display: flex; align-items: center; justify-content: space-between; }
@@ -18589,6 +18617,12 @@ html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 
    940/941 —— 高过 fullscreen 的 929/930,仍低于 image-viewer(950)与特殊模态(1010–1200)。
    2026-07-28 标注 图24:不加这一层,抽屉落在 901 被洞察面板整个盖住 = 点了没反应。 */
 .nesio-sheet-overlay--elevated { z-index: 940; }
+/* bug3「背景虚化」:遮罩加毛玻璃。层序不变,只是把背后内容虚掉,注意力落在这张卡上。
+   reduced-transparency 下面的媒体查询会把 backdrop-filter 关掉、退成纯遮罩。 */
+.nesio-sheet-overlay--blur {
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+}
 /* ⚠️ 面板这条必须比基类 .nesio-sheet 特异度高。
    2026-07-29 实测:原来写成单类 `.nesio-sheet--elevated`,而基类 `.nesio-sheet{z-index:901}`
    在它**后面** —— 同特异度后者胜,面板停在 901,遮罩却正确抬到了 940。
@@ -18765,6 +18799,7 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 /* ② reduced-transparency:遮罩实底,不透穿背景 */
 @media (prefers-reduced-transparency: reduce) {
   .nesio-sheet-overlay { background: rgba(16, 28, 54, 0.55); }
+  .nesio-sheet-overlay--blur { backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
 /* ③ contrast:实边框 */
 @media (prefers-contrast: more) {

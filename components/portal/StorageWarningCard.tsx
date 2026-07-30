@@ -13,6 +13,7 @@
  */
 
 import { useEffect, useState } from 'react';
+import { IconAlertTriangle, IconDatabase } from './icons';
 import { getStorageMetrics, formatStorageMetrics, formatBytes } from '@/lib/idb/storage-monitor';
 import { cleanupLRU, cleanupExpiredCache } from '@/lib/idb/cleanup';
 import type { StorageMetrics } from '@/lib/idb/storage-monitor';
@@ -169,7 +170,7 @@ export default function StorageWarningCard({
     <div className={`storage-warning-card storage-warning-${severity}`} role="alert">
       <div className="storage-warning-content">
         <div className="storage-warning-icon">
-          {isDanger ? '⚠️' : '💾'}
+          {isDanger ? <IconAlertTriangle size={20} /> : <IconDatabase size={20} />}
         </div>
         <div className="storage-warning-text">
           <h3 className="storage-warning-title">

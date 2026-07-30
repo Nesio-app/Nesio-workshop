@@ -70,16 +70,20 @@ const purged = sm.purgeLocalData(storageLike);
 assert.ok(purged.keys.includes('nesio-person-records-v1'), '删除数据清掉按人数据');
 
 // ── 详情页接线(源码级) ──
-// 批次:「挂一条」抽成独立确认卡弹窗 HangNoteSheet。详情页负责 读/删 + 打开挂一条;
-// 新增(addPersonRecord)+ 分类选择 + 敏感本机 迁到 HangNoteSheet。
+// 批次:「挂一条」抽成独立弹窗 HangNoteSheet。详情页负责 读/删 + 打开它;
+// 新增(addPersonRecord)+ 分类选择 迁到 HangNoteSheet。
+// bug3:入口按钮改名「记录」并挪到名字同一行;起手的「说一句 → 云端抽取」整页删掉,
+// 只留手动输入(一个输入框 + 加号传附件),所以这里不再断言云调用与敏感提示文案。
 const sheet = fs.readFileSync(new URL('../components/portal/relationships/RelationshipDetailSheet.tsx', import.meta.url), 'utf8');
 assert.ok(sheet.includes('deletePersonRecord') && sheet.includes('loadPersonRecords'), '详情页删/读记录');
-assert.ok(sheet.includes('挂一条') && sheet.includes('HangNoteSheet'), '详情页开「挂一条」弹窗');
+assert.ok(sheet.includes('HangNoteSheet') && sheet.includes('setHangOpen(true)'), '详情页开「记录」弹窗');
 assert.ok(sheet.includes('sensitive') && sheet.includes('不进 AI'), '敏感项「仅你可见 · 不进 AI」提示');
 
 const hang = fs.readFileSync(new URL('../components/portal/relationships/HangNoteSheet.tsx', import.meta.url), 'utf8');
 assert.ok(hang.includes('addPersonRecord') && hang.includes('RECORD_CATEGORIES'), '挂一条:新增记录 + 分类选择');
-assert.ok(hang.includes('sensitive') && hang.includes('不进 AI'), '挂一条:敏感项「仅你可见 · 不进 AI」');
-assert.ok(hang.includes('person-extract'), '挂一条:AI 提取走 person-extract');
+// bug3:只留手动输入 —— 不许再有云抽取路径悄悄回来
+assert.ok(!hang.includes('person-extract'), '记一条:零云调用(说一句抽取整页已删)');
+assert.ok(hang.includes('putLocalFile') && hang.includes('MAX_FILE_BYTES'), '记一条:加号传附件走本机文件库(有体积上限)');
+assert.ok(hang.includes('setErr') && hang.includes('role="alert"'), '记一条:附件存不进有可见失败态');
 
 console.log('person-records: OK');

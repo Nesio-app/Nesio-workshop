@@ -30,8 +30,7 @@ const code = stripComments;
     'components/portal/insights/SchedulePanel.tsx',
     'components/portal/insights/WardrobePanel.tsx',
     'components/portal/cooking/CookingSheet.tsx',
-    // 2026-07-29 复审补录:这两处也是各写一套(第 6、7 套),一并收编
-    'components/portal/health/BodyLedgerPanel.tsx',
+    // (BodyLedgerPanel 已按 bug2 标注删掉自己的三个子 tab,整页只剩「今日」—— 没有分段控件可用了)
   ];
   for (const f of CALLERS) {
     const c = code(read(f));
