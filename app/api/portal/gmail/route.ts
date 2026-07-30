@@ -12,7 +12,7 @@ import { writeCloudSignalsForCurrentUser } from '@/lib/platform/runtime/cloud-si
 import { normalizeGmailToSignal } from '@/lib/life-domain/normalizers';
 import { getIntegrationToken, saveIntegrationToken } from '@/lib/portal/integrations';
 import { buildEmailExtractionPrompt, parseJsonBlock } from '@/lib/extraction/extraction';
-import { extractEmailLocal } from '@/lib/portal/email-extract-local';
+import { extractEmailLocal, type EmailLocalFields } from '@/lib/portal/email-extract-local';
 import { cookies } from 'next/headers';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 import { envValue } from '@/lib/portal/env';
@@ -60,7 +60,14 @@ async function requireAuthenticatedGmailAccess(req: NextRequest): Promise<NextRe
 
 // 免费最大化·Gmail:part 可嵌套(multipart/alternative 里再套 multipart);labelIds
 // 是消息资源顶层字段(metadata/full 都带),含 Gmail 系统分类 CATEGORY_PROMOTIONS 等。
-type GmailPart = { mimeType?: string; body?: { data?: string }; parts?: GmailPart[] };
+type GmailPart = {
+  mimeType?: string;
+  /** 有名字的 part 才可能是附件(正文 part 的 filename 是空串) */
+  filename?: string;
+  headers?: Array<{ name: string; value: string }>;
+  body?: { data?: string; attachmentId?: string };
+  parts?: GmailPart[];
+};
 type GmailMessage = {
   id: string;
   snippet?: string;
@@ -160,6 +167,52 @@ function emailAddrOf(s: string): string {
  */
 function mailDirection(msg: GmailMessage): 'sent' | 'received' {
   return (msg.labelIds || []).includes('SENT') ? 'sent' : 'received';
+}
+
+/**
+ * 这封有没有**真附件**(2026-07-30 用户:「右下角显示…有附件」)。
+ *
+ * 判据是正向的:一个 part 同时有 filename 和 body.attachmentId 才算。
+ * 光看 filename 会把签名档里的内嵌 logo 也算成附件 —— 那种 part 带
+ * `Content-Disposition: inline`,几乎每封营销邮件都有,标出来等于全部都「有附件」。
+ * 所以显式排掉 inline。
+ *
+ * 只在 format=full 时拿得到(metadata 不返回 parts)—— 拿不到就是 false,
+ * 不显示标签,而不是瞎猜一个。
+ */
+function hasAttachment(msg: GmailMessage): boolean {
+  const walk = (p?: GmailPart): boolean => {
+    if (!p) return false;
+    const name = (p.filename || '').trim();
+    if (name && p.body?.attachmentId) {
+      const disp = p.headers?.find((h) => h.name.toLowerCase() === 'content-disposition')?.value || '';
+      if (!/inline/i.test(disp)) return true;
+    }
+    return (p.parts || []).some(walk);
+  };
+  return walk(msg.payload);
+}
+
+/**
+ * 本地深抽取 + 附件 → 节点属性(命中才给)。
+ * AI 路径和兜底路径**共用这一个**:上一次「方向」字段只在兜底里打,AI 正常出结果时
+ * 就丢了,发件箱因此空了很久。同一件事不写两遍。
+ */
+function localAttrs(m: GmailMessage, local: EmailLocalFields, category: string): Record<string, string | boolean> {
+  return {
+    ...(local.store ? { store: local.store } : {}),
+    ...(local.eta ? { eta: local.eta } : {}),
+    ...(local.amount ? { amount: local.amount } : {}),
+    ...(local.orderNo ? { orderNo: local.orderNo } : {}),
+    ...(local.trackingNo ? { trackingNo: local.trackingNo } : {}),
+    ...(local.orderStatus ? { orderStatus: local.orderStatus } : {}),
+    ...(local.moneyFlow ? { moneyFlow: local.moneyFlow } : {}),
+    // 类型标签:本地规则能给出具体类型就用它;给不出时才退到 Gmail 自己的
+    // CATEGORY_PERSONAL —— 「私人」是 Google 的判定,不是我们猜的。
+    // 两个都没有就**不写这个字段**,行上也就不出现标签(不做「其它」兜底)。
+    ...(local.kindHint ? { kindHint: local.kindHint } : category === 'personal' ? { kindHint: 'personal' } : {}),
+    ...(hasAttachment(m) ? { hasAttachment: true } : {}),
+  };
 }
 
 /** 按发件人邮箱汇 Gmail 系统分类(供 AI 提取的节点也能带上通知/重要/mailCategory,不再只在兜底打)。 */
@@ -312,6 +365,15 @@ async function extractNodes(messages: GmailMessage[], canUsePaidCloudAi: boolean
             // 按 sender 归并的 cls 分不出方向。
             ...(src ? { mailDirection: mailDirection(src), ...(mailDirection(src) === 'sent' ? { to: header(src, 'to') } : {}) } : {}),
             ...(cls ? { mailCategory: cls.category } : {}),
+            // 订单状态 / 资金方向 / 类型标签 / 有附件 —— 纯本地规则,免费付费都有。
+            // AI 抽取的 schema 里没有这几个字段,不叠上来的话付费用户反而比免费用户少东西。
+            ...(src
+              ? localAttrs(
+                  src,
+                  extractEmailLocal(header(src, 'subject'), header(src, 'from'), extractFullBody(src)),
+                  mailCategory(src),
+                )
+              : {}),
           },
         };
       })
@@ -503,12 +565,8 @@ export async function GET(req: NextRequest) {
           // snippet(正文首句预览,无邮件头),不再靠渲染层从「来自 X: …」rawInput 里现剥。
           ...(m.snippet ? { summary: m.snippet.slice(0, 120) } : {}),
           ...(body ? { article: body } : {}),
-          // 本地抽取的结构化线索(命中才给)
-          ...(local.store ? { store: local.store } : {}),
-          ...(local.eta ? { eta: local.eta } : {}),
-          ...(local.amount ? { amount: local.amount } : {}),
-          ...(local.orderNo ? { orderNo: local.orderNo } : {}),
-          ...(local.trackingNo ? { trackingNo: local.trackingNo } : {}),
+          // 本地抽取的结构化线索(命中才给)+ 状态/类型/附件
+          ...localAttrs(m, local, cat),
         },
         relations: [] as Array<{ targetId: string; relation: string }>,
       };

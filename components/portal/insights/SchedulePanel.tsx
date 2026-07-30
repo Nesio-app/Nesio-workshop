@@ -26,6 +26,7 @@ import {
   buildChips, matchesChip, listCustomFilters, addCustomFilter, removeCustomFilter,
   scheduleFiltersReady, SCHEDULE_FILTERS_EVENT, type CustomFilter,
 } from '@/lib/portal/schedule-filters';
+import { mailStatusLine, mailBadges, toneVars } from '@/lib/portal/mail-badges';
 
 // 2026-07-30 用户:「目前邮件是只有收件,没有发件箱」。
 // 拆成收件 / 发件两格 —— 不是加个筛选标签,因为两者该走**不同的规则**:
@@ -195,6 +196,13 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
     ? { side: 'star' as const, label: starred ? markOff : markOn, bg: 'var(--status-gentle-soft)', fg: 'var(--status-gentle)' }
     : { side: 'del' as const, label: L(dict, '删除', 'Delete'), bg: 'var(--status-risk-soft)', fg: 'var(--status-risk)' };
 
+  /* ── 状态一行 + 右下角标签(2026-07-30 用户要求)────────────────────────
+     字段都是 gmail 路由抽好存在节点上的;缺就什么都不画(见 lib/portal/mail-badges.ts)。
+     日历项没有这些字段,自然是空 —— 不用为它加分支。 */
+  const attrs = row.node.attributes || {};
+  const status = mailStatusLine(attrs, dict);
+  const badges = mailBadges(attrs, dict);
+
   return (
     <div style={{ position: 'relative', borderRadius: 'var(--radius-md)', overflow: 'hidden', touchAction: 'pan-y' }}>
       {dx !== 0 && (
@@ -228,6 +236,30 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
             <span style={{ fontSize: 'var(--text-xs)', padding: '0.05rem 0.45rem', borderRadius: 'var(--radius-pill)', background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{row.badge}</span>
           )}
         </div>
+
+        {/* 在途订单 / 银行流水走到哪一步了(+ 到货时间、金额)。 */}
+        {status && (
+          <div style={{
+            marginTop: '0.25rem', fontSize: 'var(--text-xs)',
+            fontWeight: 'var(--weight-medium)', color: toneVars(status.tone).fg,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>{status.text}</div>
+        )}
+
+        {/* 右下角:订单 / 账单 / 预约 / 私人 / 有附件。认不出来就一个都不画。 */}
+        {badges.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-1)', marginTop: '0.3rem' }}>
+            {badges.map((b) => {
+              const v = toneVars(b.tone);
+              return (
+                <span key={b.id} style={{
+                  fontSize: 'var(--text-xs)', padding: '0.05rem 0.45rem',
+                  borderRadius: 'var(--radius-pill)', background: v.bg, color: v.fg,
+                }}>{b.label}</span>
+              );
+            })}
+          </div>
+        )}
       </button>
     </div>
   );
@@ -423,13 +455,23 @@ export default function SchedulePanel() {
         const cat = typeof a.mailCategory === 'string' ? a.mailCategory : '';
         if (cat === 'promotions' || cat === 'social') return false;
         if (!cat && AD_RE.test(hay)) return false;       // ① 广告(仅无官方分类时靠正则猜)
-        if (BANK_TX_RE.test(hay)) return false;          // ① 银行流水提醒
+        // ① 银行流水提醒 —— 2026-07-30 用户把这条**反过来**要了:
+        //    「如果是银行的显示 payment、收款、扣款状态」。
+        //    但 2026-07-28 的「不显示银行交易信息」也不是随口说的:那时的抱怨是它刷屏、没内容。
+        //    两条都成立,所以判据改成正向的:**认得出资金方向的留下**(那正是他现在要看的
+        //    那种:收款/扣款/退款/待付),认不出的照旧毙掉(那才是纯噪音)。
+        //    老节点没有 moneyFlow 字段 → 维持原样隐藏,下次同步后才浮上来。
+        if (BANK_TX_RE.test(hay) && !a.moneyFlow) return false;
         if (MEETING_INVITE_RE.test(hay)) return false;   // ① 开会通知/邀请回执
         // Gmail 标了 IMPORTANT 的(节点带「重要」tag)直接留 —— Google 的重要性预测看的是
         // 你自己的收信行为,比白名单更贴个人。
         if ((n.tags || []).includes('重要')) return true;
         if (!ROBOT_FROM_RE.test(from)) return true;      // ② 活人发的,留
-        return KEEP_RE.test(hay);                        // ② 机器发的,只留订单/旅行/票务/学校
+        // ② 机器发的:只留订单/旅行/票务/学校,外加**抽到了明确状态**的那些 ——
+        //    银行的收款/扣款、商家的已发货/已送达。KEEP_RE 是关键词白名单,
+        //    覆盖不到「Payment posted」这类写法;有 moneyFlow/orderStatus 说明
+        //    发件人自己已经把状态写明了,那就是有内容,不是噪音。
+        return KEEP_RE.test(hay) || Boolean(a.moneyFlow) || Boolean(a.orderStatus);
       })
       .map((n) => {
         const a = n.attributes || {};
