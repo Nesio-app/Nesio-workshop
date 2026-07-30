@@ -29,6 +29,8 @@ import { openPdf, groupItemsIntoRows, type PdfLine } from '@/lib/portal/pdfjs-lo
 import { parseStatement, parseVerdict, selfCheckStatement, type StatementParseResult } from '@/lib/portal/statement-parse';
 import { reviewStatement, candidateToEntry, importedRowIds, type StatementReview } from '@/lib/portal/statement-reconcile';
 import { addExpense, loadDomainExpenses, defaultFinanceCurrency } from '@/lib/portal/finance-sources';
+import { addReconcileRecord, voucherAssetId, recordsForFile } from '@/lib/portal/reconcile-record';
+import { putLocalFile, MAX_FILE_BYTES, prettyBytes } from '@/lib/portal/local-file-store';
 import { loadCombinedFinanceTx } from '@/lib/portal/tesla-finance';
 import { formatMoney } from '@/lib/portal/bank-tx';
 
@@ -58,11 +60,17 @@ export default function ReconcileSheet({ open, onClose, onSaved }: {
   const [refusedFix, setRefusedFix] = useState(false);
   /** 最近一次选的文件缓存起来 —— 填完年份要能就地重解析,不用再选一次文件。 */
   const pagesRef = useRef<PdfLine[][] | null>(null);
+  /** 原文件本身:留着当凭证(会计意义上的原始单据)。 */
+  const fileRef2 = useRef<File | null>(null);
+  const [keepVoucher, setKeepVoucher] = useState(true);
+  /** 这份单子之前对过几次 —— 显示出来,不拦截。 */
+  const [priorRuns, setPriorRuns] = useState(0);
 
   const reset = () => {
     setPhase('idle'); setErr(''); setFileName(''); setFileKey('');
     setParsed(null); setReview(null); setRawById({}); setPicked(new Set());
-    setYear(''); setSavedCount(0); setRefusedFix(false); pagesRef.current = null;
+    setYear(''); setSavedCount(0); setRefusedFix(false); setPriorRuns(0);
+    setKeepVoucher(true); pagesRef.current = null; fileRef2.current = null;
   };
 
   /** 拿一批(可能已被人工修正过的)行重新算复核清单。解析不重跑 —— 修正的是解析结果本身。 */
@@ -115,6 +123,8 @@ export default function ReconcileSheet({ open, onClose, onSaved }: {
     setPhase('reading'); setErr(''); setFileName(f.name);
     const key = fileKeyOf(f);
     setFileKey(key);
+    fileRef2.current = f;
+    setPriorRuns(recordsForFile(key).length);
     try {
       const buf = await f.arrayBuffer();
       const doc = await openPdf(buf);
@@ -135,7 +145,7 @@ export default function ReconcileSheet({ open, onClose, onSaved }: {
     }
   }
 
-  function saveSelected() {
+  async function saveSelected() {
     if (!review) return;
     setErr('');
     const cur = defaultFinanceCurrency();
@@ -163,6 +173,41 @@ export default function ReconcileSheet({ open, onClose, onSaved }: {
     } catch {
       setErr(t('有一条没存上,已经存进去的那些还在。再点一次会跳过已存的。',
         'One row failed to save; the ones already saved are kept. Trying again skips them.'));
+      return;
+    }
+
+    // ── 凭证 + 对账记录 ──────────────────────────────────────────────────
+    // 放在入账**之后**、且失败不回滚:账已经记进去了,凭证没存上不该把账撤回来。
+    // 但也不许静默 —— 人以为「留痕了」而其实没有,比不留更糟。
+    let asset: string | undefined;
+    const f = fileRef2.current;
+    if (keepVoucher && f) {
+      if (f.size > MAX_FILE_BYTES) {
+        setErr(`${t('账已经记好了,但这份文件太大存不下凭证(上限', 'Rows are saved, but the file is too big to keep as a voucher (max')} ${prettyBytes(MAX_FILE_BYTES)})。`);
+      } else {
+        const id = voucherAssetId(fileKey);
+        const ok = await putLocalFile(id, f, { name: f.name, mimeType: f.type || 'application/pdf', size: f.size });
+        if (ok) asset = id;
+        else setErr(t('账已经记好了,但原件没存下来 —— 本机空间可能不够。',
+          'Rows are saved, but the original file could not be kept — this device may be out of space.'));
+      }
+    }
+    const rec = addReconcileRecord({
+      fileKey, fileName,
+      ...(parsed?.header.accountTail ? { accountTail: parsed.header.accountTail } : {}),
+      ...(parsed?.header.periodStart ? { periodStart: parsed.header.periodStart } : {}),
+      ...(parsed?.header.periodEnd ? { periodEnd: parsed.header.periodEnd } : {}),
+      ...(review.reconcile ? {
+        expected: review.reconcile.expected,
+        computed: review.reconcile.computed,
+        delta: review.reconcile.delta,
+      } : {}),
+      acceptedCount: n,
+      ...(asset ? { voucherAssetId: asset } : {}),
+    });
+    if (!rec) {
+      setErr(t('账已经记好了,但这次对账没留下记录 —— 本机存储写不进去。',
+        'Rows are saved, but this reconciliation was not recorded — local storage refused the write.'));
     }
   }
 
@@ -238,6 +283,11 @@ export default function ReconcileSheet({ open, onClose, onSaved }: {
 
         {phase === 'review' && parsed && review && (
           <>
+            {priorRuns > 0 && (
+              <p style={{ ...label, margin: 0, lineHeight: 1.6 }}>
+                {`${t('这份单子之前对过', 'You have reconciled this statement')} ${priorRuns} ${t('次 —— 已经记过的行下面会标出来,不会重复记。', 'time(s) — rows already added are marked below and will not be double-counted.')}`}
+              </p>
+            )}
             {/* 只差一个年份 —— 单独一档,别报成「不支持」 */}
             {verdict === 'need_year' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -387,9 +437,22 @@ export default function ReconcileSheet({ open, onClose, onSaved }: {
             {err && <p role="alert" style={{ fontSize: 'var(--text-sm)', color: 'var(--status-risk)', margin: 0, lineHeight: 1.6 }}>{err}</p>}
 
             {review.rows.length > 0 && (
-              <button type="button" style={{ ...primary, opacity: picked.size ? 1 : 0.5 }} disabled={!picked.size} onClick={saveSelected}>
-                {`${t('记入账本', 'Add to ledger')}(${picked.size})`}
-              </button>
+              <>
+                {/* 凭证:会计意义上的原始单据。存本机(和其他附件同一套),
+                    会进你自己的备份,不进任何服务器 —— 这句话要说出来,
+                    因为 statement 是最敏感的文件之一,人有权先知道再决定。 */}
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={keepVoucher} onChange={() => setKeepVoucher((v) => !v)} style={{ marginTop: 3 }} />
+                  <span style={{ ...label, margin: 0, lineHeight: 1.6 }}>
+                    {t('把原件留作凭证(存在这台设备上,会进你自己的备份,不上任何服务器)',
+                      'Keep the original as a voucher (stored on this device, included in your own backup, never uploaded)')}
+                  </span>
+                </label>
+                <button type="button" style={{ ...primary, opacity: picked.size ? 1 : 0.5 }} disabled={!picked.size}
+                  onClick={() => { void saveSelected(); }}>
+                  {`${t('记入账本', 'Add to ledger')}(${picked.size})`}
+                </button>
+              </>
             )}
             <button type="button" style={ghost} onClick={() => fileRef.current?.click()}>
               {t('换一份账单', 'Another statement')}
@@ -399,6 +462,10 @@ export default function ReconcileSheet({ open, onClose, onSaved }: {
 
         {phase === 'saved' && (
           <>
+            {/* ⚠️ 这里必须渲染 err:凭证/对账记录的失败发生在 setPhase('saved') **之后**,
+                只在 review 那一屏渲染的话,这些提示 set 了却永远看不到 ——
+                正是本仓反复出现的「写了没接上」。自查第二遍抓到的。 */}
+            {err && <p role="alert" style={{ fontSize: 'var(--text-sm)', color: 'var(--status-gentle)', margin: 0, lineHeight: 1.6 }}>{err}</p>}
             <p style={{ fontSize: 'var(--text-body)', color: 'var(--status-go)', margin: 0 }}>
               {`${t('记下了', 'Added')} ${savedCount} ${t('笔。同一份单子再传一次不会重复记。', 'rows. Re-uploading the same statement will not double-count.')}`}
             </p>

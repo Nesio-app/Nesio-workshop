@@ -215,6 +215,11 @@ const KNOWN_KEYS = new Map([
   ["nesio-reader-highlights-v1", "durable"],
   ["nesio-reader-progress-v1", "durable"],
   ["nesio-receipt-match-rejected-v1", "durable"],
+  // L4 退款配对:关系和「不是」都是你的判断,新设备上从零开始就等于白配了一遍
+  ["nesio-refund-link-v1", "durable"],
+  ["nesio-refund-rejected-v1", "durable"],
+  // L4 对账记录:审计线索,丢了就查不出「那个月是拿哪份单子对的」
+  ["nesio-reconcile-records-v1", "durable"],
   ["nesio-rel-contact-v1", "durable"],
   ["nesio-relationship-overrides-v1", "durable"],
   ["nesio-rewards-v1", "durable"],
