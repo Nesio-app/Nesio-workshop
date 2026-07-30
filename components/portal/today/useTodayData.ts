@@ -11,8 +11,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { loadProfileSettings, portalLocaleToDictionaryLocale, PROFILE_UPDATED_EVENT } from '@/lib/portal/profile';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
-import { buildDailyReport, type DailyReport } from '@/lib/portal/daily-report';
-import { autoPersistTodayReport } from '@/lib/portal/daily-report-persist';
+import { autoPersistTodayReport, reportAnchor } from '@/lib/portal/daily-report-persist';
+import { collectDailyReportExtras, outfitNoteFor, collectOrders } from '@/lib/portal/daily-report-sources';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext, type TodayReceipt } from '@/lib/platform/view-models/today-view-model';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
@@ -102,7 +102,6 @@ export function useTodayData(canUsePrivateData: boolean) {
   const [displayName, setDisplayName] = useState('');
   const [memoryCount, setMemoryCount] = useState(0);
   const [memoryNotes, setMemoryNotes] = useState<readonly string[]>([]);
-  const [todayReport, setTodayReport] = useState<DailyReport | null>(null);
   const [focusNodes, setFocusNodes] = useState<readonly FocusNode[]>([]);
   const [allNodes, setAllNodes] = useState<readonly FocusNode[]>([]);
   const [receipt, setReceipt] = useState<TodayReceipt>({ realTotal: 0, todayCount: 0, yesterdayCount: 0 });
@@ -171,7 +170,6 @@ export function useTodayData(canUsePrivateData: boolean) {
       if (stale()) return;
       setMemoryCount(updated.memoryCount);
       setMemoryNotes(updated.memoryNotes);
-      if (!canUsePrivateData && !stale()) setTodayReport(null); // 登出:清私据派生的日报
       setFocusNodes(updated.focusNodes);
       setAllNodes(updated.allNodes);
       setReceipt(updated.receipt);
@@ -198,21 +196,47 @@ export function useTodayData(canUsePrivateData: boolean) {
 
         const uiLocale = portalLocaleToDictionaryLocale(loadProfileSettings().locale);
 
-        // 每日 AI 图文日报(块3):私据门已在此 if(canUsePrivateData) 内 —— 取材日历/邮件/记忆。
-        // 开着才生成 + 每日幂等自动存记忆(autoPersistTodayReport 内部再判开关/空/当天已生成)。
+        /* ── 每日日报(2026-07-30 跨面改版)────────────────────────────────
+           私据门已在此 if(canUsePrivateData) 内 —— 取材日历/邮件/记忆/各域判定。
+
+           **定稿口径 = 当天 08:00**(用户拍板「早上 8 点、当天不再变」)。
+           PWA 没有可靠后台定时,所以做不到 8 点整跑一次;改成把 now 钉在 08:00 ——
+           buildDailyReport 是纯函数,同样输入必然同样输出,钉死 now 就是定稿。
+           10 点才打开也拿到「早上八点那份」,里面照样有 9 点那场会。
+           早于 8 点则不出今天这份(reportDue 为假)—— 天没亮时当天的天气/邮件本来
+           也没同步全,出一份半成品再在中午自己改口,正是用户抱怨的那件事。 */
         {
           const profile = loadProfileSettings();
+          const anchor = reportAnchor(now);
+          const todayEvents = calEvents.filter((e) => {
+            const t = new Date(e.start).getTime();
+            const d0 = new Date(anchor); d0.setHours(0, 0, 0, 0);
+            const d1 = new Date(anchor); d1.setHours(23, 59, 59, 999);
+            return Number.isFinite(t) && t >= d0.getTime() && t <= d1.getTime();
+          });
+          // 跨面取数:七个域走已有的单一判定源,另加提醒/健身/吃/在途订单。
+          const extras = collectDailyReportExtras(anchor);
           const reportInput = {
             displayName: profile.displayName,
-            now,
+            now: anchor,
             locale: uiLocale,
-            weather: weather ? { temperatureC: weather.temperatureC, condition: weather.condition, forecastNote: weather.forecastNote } : undefined,
+            weather: weather ? { temperatureC: weather.temperatureC, condition: weather.condition, forecastNote: weather.forecastNote, tempMinC: weather.tempMinC, tempMaxC: weather.tempMaxC, precipProb: weather.precipProb } : undefined,
             events: calEvents.map((e) => ({ title: e.title, start: e.start, end: e.end, location: e.location, calendarName: e.calendarName })),
             emailHighlights: latestEmailSignals.map((s) => s.cardTitle || s.subject).filter(Boolean).slice(0, 3),
             memoryNotes: updated.memoryNotes.slice(0, 3),
+            ...extras,
+            // 穿什么要今天的天气 + 今天的日历当输入,这两样这里手上就有,
+            // 不回存储再读一遍(会读到另一个快照)。
+            outfitNote: outfitNoteFor(weather ?? undefined, todayEvents, anchor),
+            // 用 updated.allNodes,不用 allNodes 那个 state —— 后者是**上一轮渲染**的值
+            // (本轮的 setAllNodes 就在几行之前,还没生效),会让日报比列表慢一天。
+            orders: collectOrders(updated.allNodes),
           };
-          const report = buildDailyReport(reportInput);
-          if (!stale()) setTodayReport(profile.dailyReportEnabled && !report.empty ? report : null);
+          /* 这一页只负责**定稿落库**,不再往 Today 画卡(2026-07-30 用户定案:
+             「今天不要入口,用弹出卡片,在洞察开入口」)。
+             展示唯一在洞察页的 DailyReportPanel,而它**只读冻结件、不 build** ——
+             这样「当天不再变」是硬的:没有任何一处会拿新数据现算一份出来。
+             autoPersistTodayReport 内部自己会用 08:00 锚点 build 并判 due/空/当天已生成。 */
           autoPersistTodayReport(reportInput, { enabled: profile.dailyReportEnabled, now });
           // AI 判决(实弹):结构化信号批量送判,落 ledger;取数惰性(30min 闸后才算)。
           // 付费门双层:客户端 canUsePaidCloudAi 前置拦下(免费档不出网),路由端
@@ -382,6 +406,8 @@ export function useTodayData(canUsePrivateData: boolean) {
       if (canUsePrivateData) setDisplayName(loadProfileSettings().displayName || '');
       refresh();
     };
+    // 「再试一次」按钮:clearJudgeError() 已把错误与闸的水位清掉,这里只负责再跑一遍。
+    window.addEventListener('nesio-today-refresh', refreshSoon);
     window.addEventListener('nesio-life-graph-updated', refreshSoon);
     window.addEventListener('nesio-connectors-refreshed', refreshSoon);
     window.addEventListener('nesio-weather-updated', refreshSoon);
@@ -394,6 +420,7 @@ export function useTodayData(canUsePrivateData: boolean) {
       if (emailPollInterval) clearInterval(emailPollInterval);
       gmailCleanup?.();
       if (refreshTimer != null) window.clearTimeout(refreshTimer);
+      window.removeEventListener('nesio-today-refresh', refreshSoon);
       window.removeEventListener('nesio-life-graph-updated', refreshSoon);
       window.removeEventListener('nesio-connectors-refreshed', refreshSoon);
       window.removeEventListener('nesio-weather-updated', refreshSoon);
@@ -405,7 +432,7 @@ export function useTodayData(canUsePrivateData: boolean) {
 
   return {
     displayName,
-    memoryCount, memoryNotes, todayReport,
+    memoryCount, memoryNotes,
     focusNodes, allNodes, receipt,
     dormantStore, setDormantStore,
     calendarEvents, proactiveContext,

@@ -7,6 +7,7 @@
  */
 
 import { arbitrateTodayPresence } from '@/lib/platform/today-arbiter';
+import { firstNodeDate, nodeExpiryDate } from '@/lib/platform/node-dates';
 import { useEffect, useState, type RefObject } from 'react';
 import { focusTimeHint, localDayKey, markFocusNodeDone, type FocusNode, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
@@ -69,23 +70,17 @@ function CollapsedTaskItem({
           {hint && <span className="nesio-collapsed-kicker">{hint}</span>}
           <span className="nesio-collapsed-title">{node.name}</span>
         </button>
-        {/* 反馈:这条对今天没用 —— 记一条反馈(系统据此学习少推这类)+ 今天不再出现。
-            轻量文字钮,不用红色不制造焦虑(warm-coach);颜色走 token。 */}
+        {/* 移除这条 —— 用户要求(2026-07-30):时间线每一条后面都要有个 ✕ 可以移走。
+            文字「没用」换成 ✕:两个字在窄行里挤标题,而且「没用」像在评价这件事本身,
+            ✕ 说的是「从今天挪走」。语义不变,仍然记一条反馈 + 跨天不再占今天。 */}
         {onNotUseful && !isDone && (
           <button
             type="button"
-            className="nesio-tl-feedback-btn"
+            className="nesio-tl-x"
             onClick={(e) => { e.stopPropagation(); onNotUseful(node.id); }}
-            aria-label={L(dict, '反馈:这条今天用不上', 'Feedback: not useful today')}
-            title={L(dict, '这条今天用不上', 'Not useful today')}
-            style={{
-              flexShrink: 0, border: 'none', background: 'transparent',
-              color: 'var(--portal-muted)', fontSize: 'var(--text-xs)',
-              padding: 'var(--space-1) var(--space-2)', cursor: 'pointer', opacity: 0.75,
-            }}
-          >
-            {L(dict, '没用', 'Skip')}
-          </button>
+            aria-label={L(dict, '从今天移走这条', 'Remove from today')}
+            title={L(dict, '从今天移走', 'Remove from today')}
+          >✕</button>
         )}
       </div>
       {expanded && (
@@ -191,9 +186,32 @@ export function TodayFocusSection({
   // 批次 51:event 型此前整类排除(日历事件走 CalendarCards 渠道)—— 但邮件/照片/
   // 日历生成的记忆多是 event 型,长按「加入今日焦点」钉进来的必须放行,
   // 否则只有文字 note(commitment 型)钉得进来(用户实测抓出)。
+  //
+  // 2026-07-30 真机实锤(截图:时间线里出现「摇椅盖毯」「灰色高领毛衣」,还都标着「明天」):
+  // 这个判据一直是**反向**的 —— 只排除「被划掉的 / 已完成的 / 没钉今天的 event」,
+  // 剩下**一切**节点都能占今天。于是拍一张毯子、一件毛衣,它们就成了「今天要紧的事」。
+  // 这和「GitHub 邮件里的『健身』被认成健康打卡」是同一族的错:没有正向判据,
+  // 就等于「凡是没被拦住的都算数」。
+  //
+  // 改成正向:一个节点要占今天的时间线,必须至少满足一条 ——
+  //   ① 用户**自己钉**到今天了(focusPinnedOn);
+  //   ② 它本来就是承诺/待办类型(commitment);
+  //   ③ 它带**真日期**(firstNodeDate:只认 start/date/dueDate… 这些明确的日期键,
+  //      不用 nearestNodeDate —— 那个会扫描全部属性值,任何 ad-hoc 键上的字符串
+  //      只要能被 Date 解析就冒充成日期,正是这两件衣物长出「明天」的原因);
+  //   ④ 它快到期(食材/药品这类,到期本身就是今天的事)。
+  // 物品、人、地点、偏好这些没有时间语义的,一律不进 —— 它们在记忆页和收纳里好好待着。
+  const todayKey = localDayKey();
+  const qualifiesForTimeline = (n: FocusNode): boolean => {
+    if (n.attributes.focusPinnedOn === todayKey) return true;   // ①
+    if (n.type === 'event') return false;                        // 日历事件走 CalendarCards
+    if (n.type === 'commitment') return true;                    // ②
+    if (firstNodeDate(n.attributes)) return true;                // ③
+    if (nodeExpiryDate(n.attributes)) return true;               // ④
+    return false;
+  };
   const rawTaskNodes = allNodes.filter((n) =>
-    !dismissed.has(n.id) && !doneIds.has(n.id)
-    && (n.type !== 'event' || n.attributes.focusPinnedOn === localDayKey()));
+    !dismissed.has(n.id) && !doneIds.has(n.id) && qualifiesForTimeline(n));
   const verdict = arbitrateTodayPresence({
     pinnedId: pinned?.id ?? null,
     dormantCandidateId: dormantCandidate?.node.id ?? null,
@@ -225,6 +243,18 @@ export function TodayFocusSection({
 
   // 「没用」反馈:记一条负反馈(reasoning-engine 反馈库 + 事件,供排序/DEC 学习少推这类),
   // 并当天从今天移除(持久化,次日不复活缠人)。不删节点 —— 记忆页仍在,只是不占今天。
+  /**
+   * 日历行的 ✕(2026-07-30 用户要求「每一条后面都有个 ✕」)。
+   *
+   * 刻意**不**走 handleNotUseful 的永久静音:日历是外部权威数据,今天这场会和
+   * 明天那场是两件事(重复日程每次是不同的 occurrence)。永久静音一个 id,
+   * 轻则明天照样出现(id 不同)、重则整个系列从此消失 —— 两种都不是「移走这条」。
+   * 所以这里只做当天移除(dismissed 是日键的,过零点自动复原)。
+   */
+  function handleRemoveCalToday(id: string) {
+    setDismissed((prev) => { const next = new Set(prev); next.add(id); persistDismissed(next); return next; });
+  }
+
   function handleNotUseful(id: string) {
     recordCardFeedback(id, 'wrong');
     // 接裁决层(Today 审计 2026-07-29):此前只当天移除 = 和主动卡修之前一样的死路。
@@ -237,7 +267,12 @@ export function TodayFocusSection({
   // 没置顶卡时露出最靠前的一条(至少一个、至多一个),其余折叠。
   const collapsedNodes: React.ReactNode[] = [
     ...rest.map((obj) => (
-      <CollapsedCalItem key={obj.id} obj={obj} onOpenRecorder={() => setCalRecorderEvent(obj.event)} />
+      <CollapsedCalItem
+        key={obj.id}
+        obj={obj}
+        onOpenRecorder={() => setCalRecorderEvent(obj.event)}
+        onRemove={handleRemoveCalToday}
+      />
     )),
     ...taskNodes.map((node) => (
       <CollapsedTaskItem

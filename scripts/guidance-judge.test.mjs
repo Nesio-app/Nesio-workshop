@@ -147,7 +147,23 @@ assert.match(today, /loadLiveJudgedCards\(now, 3\)/, 'Today 从 ledger 出卡(�
 assert.match(today, /judgeNeedsFallback\(now\)/, 'AI 不可用要有兜底判断');
 assert.match(today, /buildFallbackCards\(/, '兜底走结构化零分类');
 const feedSrc = fs.readFileSync(new URL('../components/portal/TodayFeed.tsx', import.meta.url), 'utf8');
-assert.match(feedSrc, /showFallbackNote/, '兜底降级必须可见(不许静默)');
+// 2026-07-30 真机实锤后重钉:原来这一条钉的是变量名 showFallbackNote —— 钉名字不钉行为,
+// 于是「有一句话」就算过,哪怕那句话说错了。承诺其实是两条,分开钉:
+//   ① 真失败时说得出**是哪一种**失败,并且给得出一颗能点的重试(仓库红线:
+//      异步动作必须有可见失败态 = 消息 + 重试,不许只留一句没有下文的话);
+//   ② 没什么可判 / 没到点 / 免费档(idle)**不许**谎报「不可用」——
+//      判据必须过 judgeState,而不是「lastOkAt 为空就报警」。
+assert.match(feedSrc, /judgeState\(\)/, '兜底提示必须按判决层真实状态说话(区分 idle 与 failed)');
+assert.match(feedSrc, /judge\.kind === 'failed'/, '只有真失败才亮不可用提示');
+assert.match(feedSrc, /judgeReason\(/, '失败要说清是哪一种失败,不能只说「不可用」');
+assert.match(feedSrc, /clearJudgeError\(\)/, '失败态必须给得出重试(红线:消息 + 重试)');
+const autoSrc = auto;
+assert.match(autoSrc, /export function judgeState/, 'judgeState 是 idle/failed 的唯一判据');
+assert.doesNotMatch(
+  autoSrc, /lastOkAt === null \|\| l\.stats\.lastError !== null/,
+  '「从没成功过」不等于「不可用」—— 免费档/没到点/没有新信号都会让 lastOkAt 为空,' +
+  '按它报警就是吓唬用户(2026-07-30 真机截图实锤)',
+);
 assert.match(feedSrc, /c\.urgent/, 'severity 3 豁免展示配额');
 
 console.log('guidance-judge: OK(指纹白名单 / 严格解析 / 窗口钳制 / severity 封顶 / 归并防幻觉 / 红线四要件 / admin 真实成本)');

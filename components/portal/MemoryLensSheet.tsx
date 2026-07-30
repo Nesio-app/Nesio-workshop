@@ -10,9 +10,10 @@
 import { useMemo, useState } from 'react';
 import NesioSheet from './ui/NesioSheet';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { isTopicTag } from '@/lib/portal/topic-tags';
 import { recordGrowthAnswer } from '@/lib/portal/growth-guide';
 import { DIMENSION_LABEL } from '@/lib/portal/growth-engine';
-import { MEMORY_LENSES, lensesForMemory, applyLens, type MemoryLens, type LensResult } from '@/lib/portal/lens';
+import { MEMORY_LENSES, lensesForMemory, applyLens, lensEcho, type MemoryLens, type LensResult } from '@/lib/portal/lens';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -33,14 +34,31 @@ export default function MemoryLensSheet({ open, onOpenChange, node }: { open: bo
   const [failed, setFailed] = useState(false);
   const [saved, setSaved] = useState(false);
 
-  // 念念还记得:另一条更早、共享标签的记忆 = 记忆优势(别的工具做不到)
+  // 念念还记得:另一条更早、**共享同一个主题标签**的记忆 = 记忆优势(别的工具做不到)。
+  //
+  // Bug4 图6「念念还记得的内容逻辑正确吗?」—— 原来不对,而且错法和「健身邮件被认成
+  // 健康打卡」是同一族:它对 tag **一视同仁**地取交集。可是记忆上挂的标签一大半根本
+  // 不是主题 —— 采集方式(手记 / Voice)、来源(邮件 / flomo / 日历)、内部维度
+  // (domain: / facet:)。任意两条邮件都共享「邮件」,于是这句「你 X/Y 也记过类似的一次」
+  // 对**几乎任何一条记忆**都会出现,而两条之间毫无关系。它不是在回忆,是在凑数。
+  //
+  // 改三处:
+  //  ① 只认主题标签 —— isTopicTag 是仓库里「什么算主题」的唯一判据(主题门也用它),
+  //     再挡掉 domain:/facet: 这类内部前缀;
+  //  ② 把**共享的那个标签**印出来。说不出凭什么像,这句话就没法被用户检验;
+  //  ③ 只有更早的同标签记忆 ≥2 条才敢说「模式」。n=1 就说模式是硬凑。
   const relatedHint = useMemo(() => {
     try {
-      const others = getLifeGraph().filter((x) => x.id !== node.id && (x.tags || []).some((t) => (node.tags || []).includes(t)) && new Date(x.createdAt) < new Date(node.createdAt));
-      const prev = others.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0];
-      if (!prev) return null;
-      const d = new Date(prev.createdAt);
-      return en ? `You logged something similar on ${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} too` : `你 ${d.getMonth() + 1}/${d.getDate()} 也记过类似的一次`;
+      const echo = lensEcho(node, getLifeGraph(), isTopicTag);
+      if (!echo) return null;
+      const d = new Date(echo.at);
+      const day = en ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : `${d.getMonth() + 1}/${d.getDate()}`;
+      return {
+        text: en
+          ? `You logged “${echo.tag}” on ${day} too${echo.many ? ` — ${echo.count} times before this` : ''}`
+          : `你 ${day} 也记过「${echo.tag}」${echo.many ? ` —— 在这之前一共 ${echo.count} 次` : ''}`,
+        many: echo.many,
+      };
     } catch { return null; }
   }, [node, en]);
 
@@ -117,7 +135,13 @@ export default function MemoryLensSheet({ open, onOpenChange, node }: { open: bo
                 ))}
                 {result.cta && <div className="ng-lrow"><span className="k">↳</span><span className="v">{result.cta}</span></div>}
                 {relatedHint && (
-                  <div className="ng-life"><span className="t">{L(dict, '念念还记得(这是别的工具做不到的)', 'Nessa remembers (other tools can’t)')}</span>{relatedHint} —— {L(dict, '也许是个值得留意的模式,不只是这一次。', 'maybe a pattern worth noticing, not just this once.')}</div>
+                  <div className="ng-life">
+                    {/* 图6:标题里那句「这是别的工具做不到的」删掉 —— 自夸不是内容。
+                        「模式」只在真有 ≥2 条更早的同标签记忆时才说,n=1 就把话说完即止。 */}
+                    <span className="t">{L(dict, '念念还记得', 'Nessa remembers')}</span>
+                    {relatedHint.text}
+                    {relatedHint.many && ` —— ${L(dict, '也许是个值得留意的模式,不只是这一次。', 'maybe a pattern worth noticing, not just this once.')}`}
+                  </div>
                 )}
                 {saved ? (
                   <div className="ng-done" style={{ marginTop: 13 }}>{L(dict, `已存 · 记入「${DIMENSION_LABEL[applied.dim].zh}」维度 · 这条记忆现在带着你的回看`, `Saved · logged to “${DIMENSION_LABEL[applied.dim].en}” · this memory now carries your reflection`)}</div>

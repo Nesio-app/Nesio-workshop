@@ -10,18 +10,34 @@ import { usePortalLocale } from './use-portal-locale';
 import { L } from '@/lib/portal/i18n';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, deleteFocusNode, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem, getLiveMemoryNode, type LiveMemoryNode } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
-import { dismissJudgedCard } from '@/lib/portal/guidance-judge-auto';
+import { dismissJudgedCard, judgeState, clearJudgeError } from '@/lib/portal/guidance-judge-auto';
+
+/**
+ * 判决失败的原因 → 人话。ledger 里存的是 `route 401` / `route 429` / `network` /
+ * 服务端回的 error 码。直接印这些字符串等于没说,但也**不能编** —— 认不出就
+ * 原样带出去,至少能 grep 到。
+ */
+function judgeReason(err: string, locale: string): string {
+  const e = err.toLowerCase();
+  if (e.includes('401') || e.includes('unauthorized') || e.includes('not_signed_in')) return L(locale, '需要先登录', 'sign-in needed');
+  if (e.includes('403') || e.includes('forbidden') || e.includes('paid')) return L(locale, '这台设备没开这项', 'not enabled here');
+  if (e.includes('429') || e.includes('rate')) return L(locale, '这会儿太频繁了', 'rate limited');
+  if (e.includes('network') || e.includes('fetch')) return L(locale, '网络没通', 'network down');
+  if (e.startsWith('route 5') || e.includes('500') || e.includes('502') || e.includes('503')) return L(locale, '服务端出错', 'server error');
+  if (e.includes('parse') || e.includes('bad_json')) return L(locale, '返回看不懂', 'bad response');
+  return err;
+}
 import { resolveCardTarget, openCardTarget } from '@/lib/portal/card-target';
+import ProactiveCardDetail from './today/ProactiveCardDetail';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
 import dynamic from 'next/dynamic';
 import { createPortal } from 'react-dom';
-import { dismissProactiveById, getProactiveCardBudget } from './today/proactive-types';
+import { dismissProactiveById, getProactiveCardBudget, type ProactiveCardData } from './today/proactive-types';
 import { archiveShownCard } from '@/lib/portal/card-archive';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
 import CaptureBar from './today/CaptureBar';
 import { RoutineDueCards } from './today/RoutineDueCards';
-import { DailyReportCard } from './today/DailyReportCard';
 import { ThawedReminder } from './today/ThawedReminder';
 import { ReengageNudgeCard } from './today/ReengageNudgeCard';
 import { TodayFocusSection } from './today/FocusSection';
@@ -46,7 +62,7 @@ export default function TodayFeed({
 }) {
   const {
     displayName,
-    memoryCount, memoryNotes, todayReport,
+    memoryCount, memoryNotes,
     focusNodes, allNodes, receipt,
     dormantStore, setDormantStore,
     calendarEvents, proactiveContext,
@@ -310,7 +326,15 @@ export default function TodayFeed({
     ...visibleProactive.filter((c) => c.urgent),
     ...visibleProactive.filter((c) => !c.urgent).slice(0, cardBudget),
   ];
-  const showFallbackNote = activeProactiveCards.some((c) => c.sourceTags.includes('fallback'));
+  // 兜底提示分两种(2026-07-30 真机实锤:「AI 判断暂不可用」在没什么可判时也会出现)。
+  // 只有**真失败过**才说不可用,并且必须说清是哪一种失败、给一颗能点的重试 ——
+  // 仓库红线:异步动作的失败态要可见、可重试,不许只留一句没有下文的话。
+  // 没什么可判 / 没到点 / 免费档 = idle,兜底卡照出,但一个字都不说。
+  const showingFallback = activeProactiveCards.some((c) => c.sourceTags.includes('fallback'));
+  const judge = showingFallback ? judgeState() : { kind: 'live' as const };
+  const judgeFailed = judge.kind === 'failed' ? judge.error : null;
+  const [retrying, setRetrying] = useState(false);
+  const [cardDetail, setCardDetail] = useState<ProactiveCardData | null>(null); // 卡详情(任何卡都点得开)
 
   // 卡片档案:真实上屏即入档(times 累计)。AI 判决卡在判决时已建条,这里 bump;
   // 兜底/遗留卡记 rules lane。档案是唯一监测面,出一次记一次。
@@ -443,8 +467,12 @@ export default function TodayFeed({
         {/* 季度 Wrapped 卡片 */}
         {!quietAll && showWrapped && <WrappedCard onDismiss={dismissWrapped} />}
 
-        {/* 每日图文日报(未来预测区首张;仅登录 + 开关开 + 有内容时,todayReport 已受私据门)*/}
-        {canUsePrivateData && <DailyReportCard report={todayReport} />}
+        {/* 每日日报**不在这里** —— 2026-07-30 用户定案:「今天不要入口,用弹出卡片,
+            在洞察开入口」。它是一份读物,不是一张待办卡:Today 这一列每张卡都在要求你
+            做点什么(拍一下、回一句、划掉),日报却是「坐下来看两分钟」,混在里面既不像
+            卡片也不像文章,还天天占着最上面那块地方。入口见洞察页 → 洞察 → 每日日报。
+            **定稿与落库仍然在这一页触发**(useTodayData 里的 autoPersistTodayReport)——
+            只是不再往这里画一张卡。 */}
 
         {/* 回访再触达:来过好几回但某功能没碰过 → 轻轻探一句(全局两天一条,可稍后/不再提醒)*/}
         {canUsePrivateData && !quietAll && (
@@ -454,10 +482,19 @@ export default function TodayFeed({
           />
         )}
 
-        {/* AI 判决不可用时的兜底提示(承诺④:降级必须可见,不许静默) */}
-        {showFallbackNote && (
+        {/* AI 判决**失败**时的兜底提示(承诺④:降级必须可见,不许静默)。
+            idle(没什么可判/没到点/免费档)不是失败,不在这里说话。 */}
+        {judgeFailed && (
           <p className="nesio-settings-option-hint" style={{ margin: '0 0 var(--space-2)' }}>
-            {L(uiLocale, 'AI 判断暂不可用,先看这些确定的。', 'AI judging unavailable — here are the certain ones.')}
+            {L(uiLocale, `AI 判断这次没成(${judgeReason(judgeFailed, uiLocale)}),先看这些确定的。`, `AI judging failed (${judgeReason(judgeFailed, uiLocale)}) — here are the certain ones.`)}
+            <button
+              type="button"
+              disabled={retrying}
+              onClick={() => { setRetrying(true); clearJudgeError(); window.dispatchEvent(new CustomEvent('nesio-today-refresh')); }}
+              style={{ marginLeft: 'var(--space-2)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--portal-accent)', fontWeight: 'var(--weight-semibold)', fontFamily: 'var(--font-sans)', fontSize: 'inherit' }}
+            >
+              {retrying ? L(uiLocale, '重试中…', 'Retrying…') : L(uiLocale, '再试一次', 'Try again')}
+            </button>
           </p>
         )}
 
@@ -466,11 +503,24 @@ export default function TodayFeed({
           <ProactiveGuidanceCard
             key={card.id}
             card={card}
-            onOpen={card.nodeId
-              ? () => { const live = getLiveMemoryNode(card.nodeId!); if (live) setGuideDetailNode(live); }
-              : card.fingerprints
-                ? () => { const t = resolveCardTarget(card.fingerprints!); if (t) openCardTarget(t); }
-                : undefined}
+            /*
+             * 2026-07-30 用户实锤:「有来源的,我点不进去看细节」。
+             * 这里原来的三分支里,第三支是 undefined —— 例行卡/月报提醒/金句/兜底卡
+             * 整张点不动,而它们恰恰是卡面上写着「依据 · N 条」的那种。
+             * 现在保底:前两支解析不出来,就开卡详情(它凭什么出现 + 依据 + 来源)。
+             * 注意 resolveCardTarget 可能返回 null —— 那一支以前也是「点了没反应」,一并兜住。
+             */
+            onOpen={() => {
+              if (card.nodeId) {
+                const live = getLiveMemoryNode(card.nodeId);
+                if (live) { setGuideDetailNode(live); return; }
+              }
+              if (card.fingerprints) {
+                const target = resolveCardTarget(card.fingerprints);
+                if (target) { openCardTarget(target); return; }
+              }
+              setCardDetail(card);
+            }}
             onDismiss={() => {
               // 判决卡:「知道了」= 当日日键静默(三门之一);兜底/遗留卡走旧 dismissed 存储。
               // 冷却(自适应 2-24h)已随规则管线拆除 —— 用户裁决(card-verdict)与日键是仅存的记忆。
@@ -561,6 +611,24 @@ export default function TodayFeed({
         <MemoryNodeDetailLazy node={guideDetailNode} onClose={() => setGuideDetailNode(null)} />,
         document.body,
       )}
+
+      {/* 任何引导卡都点得开的详情(2026-07-30:此前只有带 nodeId/可解析指纹的卡有入口)。
+          依据里带 signalId 的条目本身也能点进对应记忆 —— 那个指针数据里一直有,只是没接线。 */}
+      {cardDetail && (
+        <ProactiveCardDetail
+          card={cardDetail}
+          onClose={() => setCardDetail(null)}
+          onOpenSignal={(sid) => {
+            const live = getLiveMemoryNode(sid);
+            if (!live) return false;
+            setGuideDetailNode(live);
+            return true;
+          }}
+        />
+      )}
+      {/* 情绪趋势面板不在这里 —— 已迁健康分析页(MoodTrendCard 自己挂 sheet)。
+          原来靠 window 事件跨页开,而洞察是浮层:activeSurface 是「记忆」时今天页
+          没挂载,点了没反应。合并 main 时这一块按 main 的删除保留。 */}
     </div>
   );
 }

@@ -10,8 +10,8 @@ import { useState, type ComponentType } from 'react';
 import type { CalendarEvent } from '@/lib/portal/types';
 import { EVENT_TYPE_LABEL, parseEventDate, type AttentionObject, type EventType } from '@/lib/platform/attention-engine';
 import { safeExternalUrl } from './meeting-node';
-import { t } from '@/lib/portal/i18n';
-import type { PortalLocale } from '@/lib/portal/profile';
+import { t, L } from '@/lib/portal/i18n';
+import { portalLocaleToDictionaryLocale, type PortalLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { IconLink, IconMic, IconMapPin, IconFlag, IconHeartPulse, IconNote, IconClock, IconStar, IconCalendar } from '../icons';
 
@@ -120,7 +120,7 @@ export function PinnedAttentionCard({
 
 // ── Collapsed list item ───────────────────────────────────────────────────────
 
-export function CollapsedCalItem({ obj, onOpenRecorder }: { obj: AttentionObject; onOpenRecorder: () => void }) {
+export function CollapsedCalItem({ obj, onOpenRecorder, onRemove }: { obj: AttentionObject; onOpenRecorder: () => void; onRemove?: (id: string) => void }) {
   const locale = usePortalLocale();
   const [expanded, setExpanded] = useState(false);
   const TypeIcon = EVENT_TYPE_LINEAR_ICON[obj.eventType];
@@ -141,6 +141,18 @@ export function CollapsedCalItem({ obj, onOpenRecorder }: { obj: AttentionObject
           <span className="nesio-collapsed-title">{obj.title}</span>
         </span>
       </button>
+      {/* 用户要求(2026-07-30):时间线**每一条**后面都要有 ✕ 能移走 —— 日历行此前没有,
+          于是一场不想看的会只能一直挂在那。移走 = 只从今天的时间线拿掉,
+          日历本身不动(我们没有权利替用户删他日历上的事)。 */}
+      {onRemove && (
+        <button
+          type="button"
+          className="nesio-tl-x"
+          onClick={(e) => { e.stopPropagation(); onRemove(obj.id); }}
+          aria-label={L(portalLocaleToDictionaryLocale(locale), '从今天移走这条', 'Remove from today')}
+          title={L(portalLocaleToDictionaryLocale(locale), '从今天移走', 'Remove from today')}
+        >✕</button>
+      )}
       {expanded && (
         <div className="nesio-collapsed-detail">
           {obj.event.description && <p className="nesio-collapsed-desc">{obj.event.description.slice(0, 80)}{obj.event.description.length > 80 ? '…' : ''}</p>}

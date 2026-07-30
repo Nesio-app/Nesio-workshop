@@ -10,7 +10,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import NesioSheet from '../ui/NesioSheet';
 import SegTabs from '../ui/SegTabs';
-import { IconBookOpen, IconBox, IconCamera, IconCheckSquare, IconZap, IconUtensils } from '../icons';
+import { IconBookOpen, IconCamera, IconCheckSquare, IconZap, IconUtensils } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -1337,15 +1337,15 @@ function AddForm({ onAdded, onCancel, onError, t }: { onAdded: () => void; onCan
           <input style={{ ...inputStyle, maxWidth: '100%' }} type="date" value={expiry} onChange={(e) => setExpiry(e.target.value)} />
         </label>
       </div>
-      {/* 图29:「放哪」从自由输入改成和分类同一套 tag —— 存放位置本来就只有那几处,
-          打字既慢又会把「冰箱」「冰箱里」存成两个地方。再点一下取消选择。 */}
+      {/* 图29:「放哪」从自由输入改成**和分类一模一样**的 tag —— 存放位置本来就只有那几处,
+          打字既慢又会把「冰箱」「冰箱里」存成两个地方。
+          注意是「和分类一样」:分类那排是纯文字 pill,所以这排也不挂图标,
+          否则两排 tag 一排带图标一排不带,又是一处不一致。再点一下取消选择。 */}
       <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('放哪', 'Where')}</span>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)' }}>
         {PANTRY_LOCATIONS.map(([zh, en]) => (
           <button key={zh} type="button" onClick={() => setLocation((v) => (v === zh ? '' : zh))}
-            style={{ ...chip, ...(location === zh ? chipOn : {}), display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}>
-            <IconBox size={12} />{t(zh, en)}
-          </button>
+            style={{ ...chip, ...(location === zh ? chipOn : {}) }}>{t(zh, en)}</button>
         ))}
       </div>
       <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('分类', 'Category')}</span>

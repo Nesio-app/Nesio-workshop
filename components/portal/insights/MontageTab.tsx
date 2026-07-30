@@ -196,9 +196,11 @@ export default function MontageTab() {
   }
 
   const fmtDur = (s: number) => s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : `0:${String(s).padStart(2, '0')}`;
-  // Bug4 图21:角标只说这是什么片 —— 「送你的 / 免费 / Pro」全部删掉。
-  // 用户不需要在自己的片库里被反复提醒哪部是买来的。
-  const badgeText = (m: VideoMontage) => L(dict, KIND_LABEL[m.kind].zh, KIND_LABEL[m.kind].en);
+  // Bug4 图21 的红圈盖的是**整块角标**(「记忆片段 · 送你的」),不只是「送你的」三个字;
+  // 另一条「免费,pro 字样删去」管的是片库里的「一周故事 · 免费」「小剧场 · Pro」。
+  // 于是:首片(hero)不要角标 —— 它就在你眼前,不用再贴个标签说这是什么;
+  // 片库的小卡留片种(一周故事 / 小剧场),把计费字样去掉。
+  const badgeText = (m: VideoMontage) => (m.gift ? '' : L(dict, KIND_LABEL[m.kind].zh, KIND_LABEL[m.kind].en));
   const coverOf = (m: VideoMontage) => m.poster || (m.slides?.[0] ? thumbs[m.slides[0].assetId] : '') || '';
 
   const gift = items.find((m) => m.gift) ?? items[0];
@@ -211,7 +213,7 @@ export default function MontageTab() {
       onClick={() => openFilm(m)}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openFilm(m); } }}
       aria-label={L(dict, `播放 ${m.title}`, `Play ${m.title}`)}>
-      <span className="kind">{badgeText(m)}</span>
+      {badgeText(m) && <span className="kind">{badgeText(m)}</span>}
       <span className="dur">{fmtDur(m.durationSec)}</span>
       <span className="play"><PlayIcon /></span>
       <span className="sh" />

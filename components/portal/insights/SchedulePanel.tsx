@@ -15,14 +15,35 @@ import dynamic from 'next/dynamic';
 import { getLifeGraph, deleteLifeNode, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 
 const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
+const EmailComposeSheet = dynamic(() => import('../EmailComposeSheet'), { ssr: false });
 import { L } from '@/lib/portal/i18n';
 import SegTabs from '../ui/SegTabs';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { IconStar, IconFlag } from '../icons';
 import { loadPins, togglePin, PINS_UPDATED_EVENT } from '@/lib/portal/pins';
+import {
+  buildChips, matchesChip, listCustomFilters, addCustomFilter, removeCustomFilter,
+  scheduleFiltersReady, SCHEDULE_FILTERS_EVENT, type CustomFilter,
+} from '@/lib/portal/schedule-filters';
+import { mailStatusLine, mailBadges, toneVars } from '@/lib/portal/mail-badges';
+import { searchTokens, matchesSearch } from '@/lib/portal/schedule-search';
+import { suggestScheduleFromEmail } from '@/lib/portal/email-schedule-suggest';
+import {
+  loadSuggestState, markSuggest, mailSuggestReady, MAIL_SUGGEST_EVENT, type SuggestVerdict,
+} from '@/lib/portal/mail-suggest-state';
+import {
+  listReminders, addReminder, removeReminder, completeReminder, reopenReminder,
+  parseWallClock, scheduleRemindersReady, SCHEDULE_REMINDERS_EVENT,
+  REMINDER_KINDS, type Reminder, type ReminderKind,
+} from '@/lib/portal/schedule-reminders';
+import { ensureEmailFulltextIndex, emailFulltextReady, emailFulltextScore } from '@/lib/portal/email-fulltext-index';
 
-type SubTab = 'calendar' | 'email';
+// 2026-07-30 用户:「目前邮件是只有收件,没有发件箱」。
+// 拆成收件 / 发件两格 —— 不是加个筛选标签,因为两者该走**不同的规则**:
+// 收件那格有一整套「什么值得留」的取舍(广告/银行流水/会议回执毙掉、机器发的只留几类);
+// 发件不需要任何取舍 —— 你自己发出去的,按定义就都值得看见。
+type SubTab = 'calendar' | 'email' | 'sent';
 
 /** 左滑删除后留多久的反悔窗口。到点才真删。 */
 const UNDO_MS = 6000;
@@ -35,6 +56,25 @@ interface Row {
   badge?: string;     // 「有记录」/「会议记录」
   query: string;      // 兜底:详情打不开时按原话去记忆页搜
   node: LifeNode;     // 图29:点一下直接开这条记忆的详情
+  /**
+   * Google 自己给的标签(2026-07-30 用户要求「用谷歌的 filter 先筛选」):
+   * 日历项 = 事件来自哪个日历;邮件 = Gmail 系统分类 + 重要性预测。
+   * 这些不是我们猜的,所以最适合当默认筛选面。
+   */
+  googleLabels: string[];
+  /**
+   * 搜索用的正文面(2026-07-30 用户:「模糊搜索,包括全文和 title」)。
+   * 这里放的是**节点上带的**预览(summary / article / 原文片段);邮件的完整全文只存
+   * 本机 IndexedDB(隐私红线不上云),那部分靠 email-fulltext-index 另外查。
+   */
+  body: string;
+}
+
+/** 节点上能当正文用的那几个字段,拼一起(截断,免得几百条 × 1500 字每次输入都全量小写)。 */
+function bodyOf(n: LifeNode): string {
+  const a = n.attributes || {};
+  const pick = (v: unknown) => (typeof v === 'string' ? v : '');
+  return `${pick(a.summary)} ${pick(a.article)} ${pick(a.description)} ${n.rawInput || ''}`.slice(0, 2000);
 }
 
 const AD_RE = /退订|unsubscribe|优惠|促销|限时|折扣|秒杀|大促|% ?off|sale\b|coupon|deal[s]?\b/i;
@@ -115,10 +155,27 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
 }) {
   const [dx, setDx] = useState(0);
   const start = useRef<{ x: number; y: number; lock: 'none' | 'x' | 'y' } | null>(null);
+  /**
+   * 这一次手势是不是「不再是一次点击」了 —— 越过 slop、变成纵向滚动、或被系统接管。
+   *
+   * 2026-07-30 用户实锤:「日程里的上下滑动,很容易打开某个具体的条目」。两个洞叠在一起:
+   *   ① 纵向锁定时只做了 `start.current = null; setDx(0)`,没留下「这次是滚动」的记号。
+   *      松手时 onUp 看到 dx === 0,`Math.abs(0) < 6` 成立 → **当成点击,打开条目**。
+   *      也就是说:任何在条目上起手的上下滑,只要手指最后抬在这一条上,就会打开它。
+   *   ② onPointerCancel 直接复用了 onUp。cancel 的语义是「这个手势被接管/中止了」,
+   *      浏览器接管滚动时就发它 —— 同样 dx === 0 → 又是一次误开。
+   *
+   * 修法:把「滑动」和「点击」彻底分家 —— 指针事件只负责位移与左右滑动作,
+   * **打开交给真正的 click**(顺带把键盘 Enter/Space 也修好了:此前这是个
+   * 没有 onClick 的 <button>,键盘根本打不开),滑动过的那一次把随后的 click 吃掉。
+   */
+  const swiped = useRef(false);
   const THRESHOLD = 72;
+  const SLOP = 6;
 
   const onDown = (e: React.PointerEvent) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    swiped.current = false;
     start.current = { x: e.clientX, y: e.clientY, lock: 'none' };
   };
   const onMove = (e: React.PointerEvent) => {
@@ -127,7 +184,9 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
     const mx = e.clientX - st.x;
     const my = e.clientY - st.y;
     if (st.lock === 'none') {
-      if (Math.abs(mx) < 6 && Math.abs(my) < 6) return;
+      if (Math.abs(mx) < SLOP && Math.abs(my) < SLOP) return;
+      // 一旦越过 slop,这次手势就不再是「点」了 —— 无论它后来往哪个方向走。
+      swiped.current = true;
       st.lock = Math.abs(mx) > Math.abs(my) ? 'x' : 'y';
       if (st.lock === 'y') { start.current = null; setDx(0); return; }  // 纵向:让页面滚
     }
@@ -137,9 +196,19 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
     const moved = dx;
     start.current = null;
     setDx(0);
+    // 只判左右滑的两个动作;「打开」不在这里 —— 见下面的 onClickRow。
     if (moved <= -THRESHOLD) onDelete();
     else if (moved >= THRESHOLD) onStar();
-    else if (Math.abs(moved) < 6) onOpen();
+  };
+  const onCancel = () => {
+    // 被系统接管(滚动)或中止:什么都不执行,并且把随后可能来的 click 也吃掉。
+    start.current = null;
+    setDx(0);
+    swiped.current = true;
+  };
+  const onClickRow = () => {
+    if (swiped.current) { swiped.current = false; return; }  // 这一次是滑动,不是点击
+    onOpen();
   };
 
   // 日历条目用星、邮件条目用旗子 —— 背后是同一个收藏夹(pins),只是两种东西
@@ -150,6 +219,13 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
   const revealing = dx > 0
     ? { side: 'star' as const, label: starred ? markOff : markOn, bg: 'var(--status-gentle-soft)', fg: 'var(--status-gentle)' }
     : { side: 'del' as const, label: L(dict, '删除', 'Delete'), bg: 'var(--status-risk-soft)', fg: 'var(--status-risk)' };
+
+  /* ── 状态一行 + 右下角标签(2026-07-30 用户要求)────────────────────────
+     字段都是 gmail 路由抽好存在节点上的;缺就什么都不画(见 lib/portal/mail-badges.ts)。
+     日历项没有这些字段,自然是空 —— 不用为它加分支。 */
+  const attrs = row.node.attributes || {};
+  const status = mailStatusLine(attrs, dict);
+  const badges = mailBadges(attrs, dict);
 
   return (
     <div style={{ position: 'relative', borderRadius: 'var(--radius-md)', overflow: 'hidden', touchAction: 'pan-y' }}>
@@ -162,7 +238,8 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
         }}>{revealing.label}</div>
       )}
       <button type="button"
-        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onCancel}
+        onClick={onClickRow}
         style={{ position: 'relative', display: 'block', textAlign: 'left', width: '100%', cursor: 'pointer',
           border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)',
           background: 'var(--glass-bg-solid, var(--portal-bg))', padding: 'var(--space-3) var(--space-4)',
@@ -179,12 +256,295 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, onOpen, onStar, onDelet
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '0.2rem', alignItems: 'center', flexWrap: 'wrap' }}>
           {row.meta && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{row.meta}</span>}
+          {/* 和下面那排标签用同一套 padding —— 同一张卡里两种大小的胶囊会显得没对齐 */}
           {row.badge && (
-            <span style={{ fontSize: 'var(--text-xs)', padding: '0.05rem 0.45rem', borderRadius: 'var(--radius-pill)', background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{row.badge}</span>
+            <span style={{ fontSize: 'var(--text-xs)', padding: '0 var(--space-2)', borderRadius: 'var(--radius-pill)', background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>{row.badge}</span>
           )}
         </div>
+
+        {/* 在途订单 / 银行流水走到哪一步了(+ 到货时间、金额)。 */}
+        {status && (
+          <div style={{
+            marginTop: 'var(--space-1)', fontSize: 'var(--text-xs)',
+            fontWeight: 'var(--weight-medium)', color: toneVars(status.tone).fg,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}>{status.text}</div>
+        )}
+
+        {/* 右下角:订单 / 账单 / 预约 / 私人 / 有附件。认不出来就一个都不画。 */}
+        {badges.length > 0 && (
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 'var(--space-1)', marginTop: 'var(--space-1)' }}>
+            {badges.map((b) => {
+              const v = toneVars(b.tone);
+              return (
+                <span key={b.id} style={{
+                  fontSize: 'var(--text-xs)', padding: '0 var(--space-2)',
+                  borderRadius: 'var(--radius-pill)', background: v.bg, color: v.fg,
+                }}>{b.label}</span>
+              );
+            })}
+          </div>
+        )}
       </button>
     </div>
+  );
+}
+
+/**
+ * RemindersSection —— 我自己设的、有明确时间的提醒(2026-07-30 用户要求:
+ *「日程里面可以增加我明确设置时间的提醒项目么,比如家务活,比如账单 due 等」)。
+ *
+ * 为什么**不**塞进上面那份 Row 列表里,而是单独一段:
+ *   ① 它不是一条记忆。Row 上挂着 LifeNode,点开走 MemoryNodeDetail、左滑走
+ *      deleteLifeNode —— 提醒没有节点,硬塞进去就得造一个假节点,然后删除会去
+ *      删一个不存在的 id(失败),详情会打开一条不存在的记忆。
+ *   ② 它的动作不一样:提醒要的是「做好了」(重复的往后滚一期),不是「星标」。
+ *   ③ 最要紧的:上面那份列表有 CHORE_RE —— 还款/缴费/家务/课程一律挡在门外。
+ *      那条规则针对的是**从待办 App 同步进来的**循环任务(会把真约会淹掉);
+ *      而用户亲手敲的家务和账单,一个字都不该被关键词吃掉。分开放,规则就不会打架。
+ *
+ * 搜索照样管它 —— 用户搜「房租」时不会在意这条是提醒还是日历项。
+ */
+function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonly string[] }) {
+  const [items, setItems] = useState<Reminder[]>([]);
+  const [adding, setAdding] = useState(false);
+  const [title, setTitle] = useState('');
+  const [at, setAt] = useState('');
+  const [kind, setKind] = useState<ReminderKind>('other');
+  const [repeat, setRepeat] = useState<'once' | 'weekly' | 'monthly'>('once');
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    const read = () => setItems(listReminders());
+    void scheduleRemindersReady().then(read);
+    read();
+    window.addEventListener(SCHEDULE_REMINDERS_EVENT, read);
+    return () => window.removeEventListener(SCHEDULE_REMINDERS_EVENT, read);
+  }, []);
+
+  const kindLabel = (k: ReminderKind) => L(dict,
+    k === 'chore' ? '家务' : k === 'bill' ? '账单' : '其它',
+    k === 'chore' ? 'Chore' : k === 'bill' ? 'Bill' : 'Other');
+
+  const openForm = () => {
+    // 预填明天早上 9 点 —— 空着让人现敲年月日很烦,填「现在」又会立刻变成一条待处理的。
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    d.setHours(9, 0, 0, 0);
+    const p = (n: number) => String(n).padStart(2, '0');
+    setAt(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T09:00`);
+    setErr('');
+    setAdding(true);
+  };
+
+  const submit = () => {
+    const created = addReminder({
+      title, at, kind,
+      ...(repeat === 'weekly' ? { everyDays: 7 } : repeat === 'monthly' ? { everyMonths: 1 } : {}),
+    });
+    // 从**存储的真相**回读,不信 addReminder 的返回值:配额满时它照样能造出对象,
+    // 界面上多一条、刷新就没了。写没进去就说出来,不假装成功。
+    const after = listReminders();
+    setItems(after);
+    if (!created || !after.some((r) => r.id === created.id)) {
+      setErr(L(dict, '这条没能存下来,先记在别处吧 —— 稍后再试一次。',
+                    'Could not save this one — try again in a moment.'));
+      return;
+    }
+    setAdding(false); setTitle(''); setErr('');
+  };
+
+  const now = Date.now();
+  const shown = items.filter((r) => matchesSearch(
+    { title: r.title, meta: kindLabel(r.kind), body: r.note || '' }, tokens));
+
+  // 搜索中且这一段没有命中 → 整段收起来,免得空标题占着位置误导「提醒都没了」。
+  if (tokens.length > 0 && shown.length === 0) return null;
+
+  return (
+    <section className="nesio-remind">
+      <div className="nesio-remind-head">
+        <h4 className="nesio-remind-title">{L(dict, '我设的提醒', 'My reminders')}</h4>
+        <button type="button" className="nesio-remind-add" onClick={() => (adding ? setAdding(false) : openForm())}>
+          {adding ? L(dict, '稍后', 'Later') : L(dict, '加一条', 'Add')}
+        </button>
+      </div>
+
+      {adding && (
+        <div className="nesio-remind-form">
+          <input className="nesio-schedfilter-input" value={title} onChange={(e) => setTitle(e.target.value)}
+            placeholder={L(dict, '要做什么(如:交房租)', 'What is it (e.g. pay rent)')} />
+          <input className="nesio-schedfilter-input" type="datetime-local" value={at}
+            onChange={(e) => setAt(e.target.value)} aria-label={L(dict, '什么时候', 'When')} />
+          <div className="nesio-remind-row" role="group" aria-label={L(dict, '类型', 'Kind')}>
+            {REMINDER_KINDS.map((k) => (
+              <button key={k} type="button"
+                className={`nesio-schedfilter-chip${kind === k ? ' on' : ''}`}
+                onClick={() => setKind(k)}>{kindLabel(k)}</button>
+            ))}
+          </div>
+          <div className="nesio-remind-row" role="group" aria-label={L(dict, '重复', 'Repeat')}>
+            {([['once', '只此一次', 'Once'], ['weekly', '每周', 'Weekly'], ['monthly', '每月', 'Monthly']] as const).map(([v, zh, en]) => (
+              <button key={v} type="button"
+                className={`nesio-schedfilter-chip${repeat === v ? ' on' : ''}`}
+                onClick={() => setRepeat(v)}>{L(dict, zh, en)}</button>
+            ))}
+          </div>
+          <button type="button" className="nesio-schedfilter-btn pri"
+            disabled={!title.trim() || !parseWallClock(at)}
+            onClick={submit}>{L(dict, '记下来', 'Save')}</button>
+          {err && <p role="alert" className="nesio-remind-err">{err}</p>}
+        </div>
+      )}
+
+      {shown.length === 0 ? (
+        <p className="nesio-remind-empty">
+          {L(dict, '还没有 —— 家务、账单到期这些自己设的时间,记在这里就不会被日历里的筛选吃掉。',
+                'Nothing yet — chores and bill due dates you set yourself live here.')}
+        </p>
+      ) : (
+        <ul className="nesio-remind-list">
+          {shown.map((r) => {
+            const when = parseWallClock(r.at);
+            const overdue = !r.doneAt && when !== null && when.getTime() < now;
+            const whenText = when
+              ? (dict === 'en'
+                  ? when.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                  : `${when.getMonth() + 1}月${when.getDate()}日 ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`)
+              : r.at;
+            const repeatText = r.everyMonths ? L(dict, '每月', 'Monthly') : r.everyDays === 7 ? L(dict, '每周', 'Weekly') : '';
+            return (
+              <li key={r.id} className={`nesio-remind-item${r.doneAt ? ' done' : ''}`}>
+                <div className="nesio-remind-main">
+                  <span className="nesio-remind-name">{r.title}</span>
+                  <span className="nesio-remind-when">
+                    {whenText}
+                    {repeatText && ` · ${repeatText}`}
+                    {` · ${kindLabel(r.kind)}`}
+                    {/* warm-coach:不说「逾期」,不用红色。到点没做只是「还有一件事」。 */}
+                    {overdue && ` · ${L(dict, '还等着', 'still waiting')}`}
+                  </span>
+                </div>
+                <div className="nesio-remind-acts">
+                  {r.doneAt ? (
+                    <button type="button" className="nesio-remind-act" onClick={() => { reopenReminder(r.id); setItems(listReminders()); }}>
+                      {L(dict, '撤销', 'Undo')}
+                    </button>
+                  ) : (
+                    <button type="button" className="nesio-remind-act" onClick={() => { completeReminder(r.id); setItems(listReminders()); }}>
+                      {L(dict, '做好了', 'Done')}
+                    </button>
+                  )}
+                  <button type="button" className="nesio-remind-act" onClick={() => { removeReminder(r.id); setItems(listReminders()); }}
+                    aria-label={L(dict, `删掉「${r.title}」`, `Delete “${r.title}”`)}>✕</button>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+/**
+ * MailSuggestions —— 邮件里像是有约,问一句要不要进日程(2026-07-30 用户要求:
+ *「邮件里可以识别明确带有时间的安排,直接放入日程,或者弹出一个提示框,让我确认」)。
+ *
+ * 用户给了两条路,这里走**确认**那条。不是保守,是因为两条路的代价不对称:
+ * 自动写进去错了他不会知道,只会发现日程里多了不认识的东西,而且不知道该去哪儿改;
+ * 弹一次确认错了,代价是他按一下「不用了」。
+ *
+ * 判据在 lib/portal/email-schedule-suggest.ts 里,苛刻到近乎吝啬(必须同时有
+ * 明确日历日期 + 明确钟点 + 两者挨得很近)。宁可漏掉一封真有约的信 —— 用户还能
+ * 自己在上面那段加 —— 也不要弹一个莫名其妙的框:那种框弹三次,他就再也不看了。
+ *
+ * 处理过的记在 mail-suggest-state,同一封不问第二遍。
+ */
+function MailSuggestions({ dict, rows }: { dict: 'zh' | 'en'; rows: Row[] }) {
+  const [state, setState] = useState<Record<string, SuggestVerdict>>({});
+  const [open, setOpen] = useState(false);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    const read = () => setState(loadSuggestState());
+    void mailSuggestReady().then(read);
+    read();
+    window.addEventListener(MAIL_SUGGEST_EVENT, read);
+    return () => window.removeEventListener(MAIL_SUGGEST_EVENT, read);
+  }, []);
+
+  const cands = useMemo(() => {
+    const out: Array<{ row: Row; eid: string; at: string; snippet: string }> = [];
+    for (const r of rows) {
+      const eid = typeof r.node.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
+      if (!eid || state[eid]) continue;
+      const hit = suggestScheduleFromEmail(r.title, r.body, r.dateIso);
+      if (hit) out.push({ row: r, eid, at: hit.at, snippet: hit.snippet });
+      if (out.length >= 12) break;   // 一次最多问 12 封;再多就不是「问一句」了
+    }
+    return out;
+  }, [rows, state]);
+
+  if (!cands.length) return null;
+
+  const decide = (c: { row: Row; eid: string; at: string }, verdict: SuggestVerdict) => {
+    setErr('');
+    if (verdict === 'added') {
+      const created = addReminder({ title: c.row.title, at: c.at, kind: 'other', sourceEmailId: c.eid });
+      // 从存储回读 —— 写没进去就说出来,不能「按了没反应」也不能假装成功
+      if (!created || !listReminders().some((r) => r.id === created.id)) {
+        setErr(L(dict, '这条没能加进日程,稍后再试一次。', 'Could not add it — try again in a moment.'));
+        return;
+      }
+    }
+    markSuggest(c.eid, verdict);
+    setState(loadSuggestState());
+  };
+
+  const fmt = (at: string) => {
+    const d = parseWallClock(at);
+    if (!d) return at;
+    return dict === 'en'
+      ? d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+      : `${d.getMonth() + 1}月${d.getDate()}日 ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  };
+
+  return (
+    <section className="nesio-remind">
+      <div className="nesio-remind-head">
+        <h4 className="nesio-remind-title">
+          {L(dict, `这 ${cands.length} 封信里像是写了时间`, `${cands.length} email(s) look like they have a time`)}
+        </h4>
+        <button type="button" className="nesio-remind-add" onClick={() => setOpen((v) => !v)}>
+          {open ? L(dict, '收起', 'Hide') : L(dict, '看看', 'Review')}
+        </button>
+      </div>
+
+      {open && (
+        <ul className="nesio-remind-list">
+          {cands.map((c) => (
+            <li key={c.eid} className="nesio-remind-item">
+              <div className="nesio-remind-main">
+                <span className="nesio-remind-name">{c.row.title}</span>
+                {/* 把原文里认出来的那一小段摆出来 —— 让用户自己判断我认得对不对,
+                    而不是让他相信一个看不见依据的结论。 */}
+                <span className="nesio-remind-when">{fmt(c.at)} · 「{c.snippet}」</span>
+              </div>
+              <div className="nesio-remind-acts">
+                <button type="button" className="nesio-remind-act" onClick={() => decide(c, 'added')}>
+                  {L(dict, '加进来', 'Add')}
+                </button>
+                <button type="button" className="nesio-remind-act" onClick={() => decide(c, 'dismissed')}>
+                  {L(dict, '不用了', 'No')}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+      {err && <p role="alert" className="nesio-remind-err">{err}</p>}
+    </section>
   );
 }
 
@@ -201,6 +561,30 @@ export default function SchedulePanel() {
   // 待删(可撤销)。离开本页时立刻结算,见下面的 effect。
   const [pending, setPending] = useState<{ row: Row; timer: number } | null>(null);
   const [delErr, setDelErr] = useState('');
+  // 一排筛选标签(2026-07-30):自定义定义落盘,选中项不落盘。
+  const [customs, setCustoms] = useState<CustomFilter[]>([]);
+  const [activeChip, setActiveChip] = useState<string | null>(null);
+  const [addingFilter, setAddingFilter] = useState(false);
+  const [composeOpen, setComposeOpen] = useState(false);   // 发件箱里直接写一封
+  const [fName, setFName] = useState('');
+  const [fKeyword, setFKeyword] = useState('');
+  // 搜索框(2026-07-30)。不落盘 —— 和筛选同理,记住上次的搜索词会让人以为数据少了。
+  const [q, setQ] = useState('');
+  // 本机全文索引好了没。没好之前只能搜到标题/发件人/正文预览,得说出来。
+  const [ftReady, setFtReady] = useState(false);
+  useEffect(() => {
+    if (emailFulltextReady()) { setFtReady(true); return; }
+    let alive = true;
+    void ensureEmailFulltextIndex().then(() => { if (alive) setFtReady(emailFulltextReady()); });
+    return () => { alive = false; };
+  }, []);
+  useEffect(() => {
+    const read = () => setCustoms(listCustomFilters());
+    void scheduleFiltersReady().then(read);
+    read();
+    window.addEventListener(SCHEDULE_FILTERS_EVENT, read);
+    return () => window.removeEventListener(SCHEDULE_FILTERS_EVENT, read);
+  }, []);
 
   // 星标 = 全 app 那一个收藏夹(lib/portal/pins),不是这一页私有的标记。
   // 第一版把它写成节点上的「星标」标签,结果是:这里加的星在记忆页收藏夹里看不到、
@@ -307,6 +691,12 @@ export default function SchedulePanel() {
           badge: a.meetingRecordId ? L(dict, '有记录', 'notes') : undefined,
           query: n.name,
           node: n,
+          googleLabels: [
+            // 来自哪个日历 —— Google 日历里用户自己分的那些栏,天然就是他要的筛选面
+            ...(typeof a.calendarName === 'string' && a.calendarName ? [a.calendarName] : []),
+            ...(a.meetingRecordId ? [L(dict, '有记录', 'Has notes')] : []),
+          ],
+          body: bodyOf(n),
         });
       } else if ((n.tags || []).includes('meeting-notes') && !a.calendarNodeId) {
         // 未挂到日历的独立会议记录(Granola/录音)也留在日程里
@@ -318,6 +708,8 @@ export default function SchedulePanel() {
           badge: L(dict, '会议记录', 'meeting'),
           query: stripPrefix(n.name),
           node: n,
+          googleLabels: [L(dict, '会议记录', 'Meeting notes')],
+          body: bodyOf(n),
         });
       }
     }
@@ -338,9 +730,15 @@ export default function SchedulePanel() {
     return [...upcoming, ...past];
   }, [nodes, dict]);
 
+  /** 这条是不是我发出去的。老节点没有这个字段 → 当收件(和改之前的行为一致,不让旧数据凭空消失)。 */
+  const isSent = (n: LifeNode) => (n.attributes || {}).mailDirection === 'sent';
+
   const emailRows = useMemo<Row[]>(() => {
     return nodes
       .filter((n) => n.source === 'email')
+      // 已发送的挪去「发件」那格 —— 此前它们混在收件里认不出来:
+      // 自己发的邮件发件人就是自己,ROBOT_FROM_RE 认不出是机器,于是当「活人发的」留下了。
+      .filter((n) => !isSent(n))
       .filter((n) => {
         const a = n.attributes || {};
         const from = `${typeof a.from === 'string' ? a.from : ''} ${typeof a.sender === 'string' ? a.sender : ''}`;
@@ -352,16 +750,27 @@ export default function SchedulePanel() {
         const cat = typeof a.mailCategory === 'string' ? a.mailCategory : '';
         if (cat === 'promotions' || cat === 'social') return false;
         if (!cat && AD_RE.test(hay)) return false;       // ① 广告(仅无官方分类时靠正则猜)
-        if (BANK_TX_RE.test(hay)) return false;          // ① 银行流水提醒
+        // ① 银行流水提醒 —— 2026-07-30 用户把这条**反过来**要了:
+        //    「如果是银行的显示 payment、收款、扣款状态」。
+        //    但 2026-07-28 的「不显示银行交易信息」也不是随口说的:那时的抱怨是它刷屏、没内容。
+        //    两条都成立,所以判据改成正向的:**认得出资金方向的留下**(那正是他现在要看的
+        //    那种:收款/扣款/退款/待付),认不出的照旧毙掉(那才是纯噪音)。
+        //    老节点没有 moneyFlow 字段 → 维持原样隐藏,下次同步后才浮上来。
+        if (BANK_TX_RE.test(hay) && !a.moneyFlow) return false;
         if (MEETING_INVITE_RE.test(hay)) return false;   // ① 开会通知/邀请回执
         // Gmail 标了 IMPORTANT 的(节点带「重要」tag)直接留 —— Google 的重要性预测看的是
         // 你自己的收信行为,比白名单更贴个人。
         if ((n.tags || []).includes('重要')) return true;
         if (!ROBOT_FROM_RE.test(from)) return true;      // ② 活人发的,留
-        return KEEP_RE.test(hay);                        // ② 机器发的,只留订单/旅行/票务/学校
+        // ② 机器发的:只留订单/旅行/票务/学校,外加**抽到了明确状态**的那些 ——
+        //    银行的收款/扣款、商家的已发货/已送达。KEEP_RE 是关键词白名单,
+        //    覆盖不到「Payment posted」这类写法;有 moneyFlow/orderStatus 说明
+        //    发件人自己已经把状态写明了,那就是有内容,不是噪音。
+        return KEEP_RE.test(hay) || Boolean(a.moneyFlow) || Boolean(a.orderStatus);
       })
       .map((n) => {
         const a = n.attributes || {};
+        const cat = typeof a.mailCategory === 'string' ? a.mailCategory : '';
         return {
           id: n.id,
           title: n.name,
@@ -369,6 +778,15 @@ export default function SchedulePanel() {
           meta: typeof a.from === 'string' ? a.from : (typeof a.sender === 'string' ? a.sender : ''),
           query: n.name,
           node: n,
+          // Gmail 自己的判定:重要性预测 + 系统分类。promotions/social 在上面已被毙掉,
+          // 所以这里长不出那两个标签 —— 正合「只给筛得出东西的标签」。
+          googleLabels: [
+            ...((n.tags || []).includes('重要') ? [L(dict, '重要', 'Important')] : []),
+            ...(cat === 'updates' ? [L(dict, '通知', 'Updates')] : []),
+            ...(cat === 'forums' ? [L(dict, '论坛', 'Forums')] : []),
+            ...(cat === 'personal' ? [L(dict, '个人', 'Personal')] : []),
+          ],
+          body: bodyOf(n),
         } as Row;
       })
       // 展示层去重:同一封邮件(emailId)只留一条。同步侧已按 emailId upsert,
@@ -384,9 +802,83 @@ export default function SchedulePanel() {
         const my = new Date(y.dateIso).getTime() || 0;
         return my - mx;
       });
-  }, [nodes]);
+  }, [nodes, dict]);
 
-  const rows = (sub === 'calendar' ? calendarRows : emailRows).filter((r) => !gone.has(r.id));
+  /**
+   * 发件箱。规则刻意只有一条:是我发的就显示。
+   * 收件那格的一整套取舍(广告/银行/会议回执/机器发件人白名单)在这里**一条都不用** ——
+   * 你自己按了发送的东西,没有「值不值得看见」的问题。
+   */
+  const sentRows = useMemo<Row[]>(() => nodes
+    .filter((n) => n.source === 'email' && isSent(n))
+    .map((n) => {
+      const a = n.attributes || {};
+      const to = typeof a.to === 'string' ? a.to : '';
+      return {
+        id: n.id,
+        title: n.name,
+        dateIso: typeof a.date === 'string' ? a.date : n.createdAt,
+        // 收件看「谁发来的」,发件看「发给谁」—— 副行换一个方向。
+        meta: to ? L(dict, `发给 ${to}`, `To ${to}`) : L(dict, '我发出的', 'Sent by me'),
+        query: n.name,
+        node: n,
+        googleLabels: (n.tags || []).includes('重要') ? [L(dict, '重要', 'Important')] : [],
+        body: bodyOf(n),
+      } as Row;
+    })
+    // 同一封只留一条(与收件同样的兜底:历史上曾建过无 emailId 的副本)
+    .filter((r, i, arr) => {
+      const eid = typeof r.node.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
+      if (!eid) return true;
+      return arr.findIndex((o) => o.node.attributes?.emailId === eid) === i;
+    })
+    .sort((x, y) => (new Date(y.dateIso).getTime() || 0) - (new Date(x.dateIso).getTime() || 0)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  [nodes, dict]);
+
+  const allRows = (sub === 'calendar' ? calendarRows : sub === 'sent' ? sentRows : emailRows)
+    .filter((r) => !gone.has(r.id));
+
+  /* ── 搜索(2026-07-30 用户:「日历和邮件增加搜索,模糊搜索,包括全文和 title」)──
+     命中面三层:标题 / 副行 / 节点上的正文预览 —— 这三层是同步的,输入即筛。
+     第四层是**本机全文**:邮件正文只存本机 IndexedDB(隐私红线不上云),
+     由 email-fulltext-index 提供一个同步查询 + 后台水合。索引没好之前全文那层查不到,
+     这件事必须**显式告诉用户**(见下面的 ftHint)—— 不然他会以为「这封信不在里面」。 */
+  const tokens = useMemo(() => searchTokens(q), [q]);
+  const searched = useMemo(() => {
+    if (!tokens.length) return allRows;
+    return allRows.filter((r) => {
+      const eid = typeof r.node.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
+      const ftHas = eid ? (tk: string) => emailFulltextScore(eid, [tk], '') > 0 : undefined;
+      return matchesSearch(r, tokens, ftHas);
+    });
+    // allRows 每次渲染都是新数组;按内容摘要当依赖。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRows.map((r) => r.id).join(','), tokens.join(' '), ftReady]);
+
+  const baseRows = searched;
+
+  /* ── 一排筛选标签(2026-07-30 用户要求)────────────────────────────────
+     标签面 = Google 自己的分类(日历名 / Gmail 系统分类与重要性)+ 用户自建的关键词。
+     两个 tab 各算各的:日历名不该出现在邮件那一排。
+     标签是**在搜索结果之上**长出来的:数字必须等于点下去真能看到的条数,
+     否则「工作 12」点进去只有 3 条,比没有这个数字更糟。
+     选中项**不落盘** —— 记住上次的筛选会让人下次进来以为数据少了。 */
+  const chips = useMemo(
+    () => buildChips(baseRows, customs),
+    // baseRows 每次渲染都是新数组,用它当依赖会每帧重算;按内容摘要算。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [baseRows.map((r) => `${r.id}:${r.googleLabels.join('|')}`).join(','), customs],
+  );
+  // 切 tab 时清掉选中 —— 邮件那排的标签在日历里根本不存在,留着就是筛出 0 条。
+  useEffect(() => { setActiveChip(null); }, [sub]);
+  // 搜索把某个 Google 标签筛没了时也要松开它,否则没有任何标签高亮、
+  // 列表却是全量 —— 界面在说一件和事实不符的事。
+  useEffect(() => {
+    if (activeChip && !chips.some((c) => c.id === activeChip)) setActiveChip(null);
+  }, [chips, activeChip]);
+  const chosen = activeChip ? chips.find((c) => c.id === activeChip) ?? null : null;
+  const rows = chosen ? baseRows.filter((r) => matchesChip(r, chosen)) : baseRows;
 
   const fmtDay = (iso: string) => {
     const d = new Date(iso);
@@ -406,18 +898,127 @@ export default function SchedulePanel() {
       <SegTabs
         items={[
           { key: 'calendar' as SubTab, label: L(dict, '日历项', 'Calendar'), badge: calendarRows.length },
-          { key: 'email' as SubTab, label: L(dict, '邮件', 'Mail'), badge: emailRows.length },
+          { key: 'email' as SubTab, label: L(dict, '收件', 'Inbox'), badge: emailRows.length },
+          { key: 'sent' as SubTab, label: L(dict, '发件', 'Sent'), badge: sentRows.length },
         ]}
         active={sub}
         onSelect={setSub}
         ariaLabel={L(dict, '日程视图', 'Schedule view')}
       />
 
+      {/* ── 搜索(2026-07-30 用户要求「日历和邮件增加搜索,模糊搜索,包括全文和 title」)──
+          放在筛选标签**上面**:先搜后筛,标签的数字也跟着搜索结果走。 */}
+      <div className="nesio-schedsearch">
+        <input
+          className="nesio-schedsearch-input"
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={sub === 'calendar'
+            ? L(dict, '搜日程:标题、地点、日历名…', 'Search: title, place, calendar…')
+            : L(dict, '搜邮件:标题、发件人、正文…', 'Search: subject, sender, body…')}
+          aria-label={L(dict, '搜索', 'Search')}
+        />
+        {q && (
+          <button type="button" className="nesio-schedsearch-clear" onClick={() => setQ('')}
+            aria-label={L(dict, '清空搜索', 'Clear search')}>✕</button>
+        )}
+      </div>
+      {/* 全文那一层还没准备好时说清楚 —— 否则「搜不到」会被当成「这封信不在里面」。
+          这不是错误,所以用中性色,也不给重试按钮:它自己会好。 */}
+      {tokens.length > 0 && sub !== 'calendar' && !ftReady && (
+        <p className="nesio-schedsearch-hint">
+          {L(dict, '正文全文还在本机准备中,这会儿搜的是标题、发件人和摘要。',
+                'Full text is still loading on this device — searching title, sender and preview for now.')}
+        </p>
+      )}
+
+      {/* ── 一排筛选标签(2026-07-30 用户要求「用谷歌的 filter 先筛选,我也可以自定义」)──
+          左边是 Google 自己给的(日历名 / Gmail 系统分类与重要性),右边是用户自建的关键词。
+          Google 标签只在**当前数据里真有**的时候才出现;自定义标签哪怕这会儿命中 0 条
+          也留着 —— 那是用户亲手建的东西,悄悄藏起来他会以为丢了(数字会写 0)。 */}
+      {(chips.length > 0 || customs.length > 0 || baseRows.length > 0) && (
+        <div className="nesio-schedfilter">
+          <div className="nesio-schedfilter-row" role="group" aria-label={L(dict, '筛选', 'Filters')}>
+            <button
+              type="button"
+              className={`nesio-schedfilter-chip${activeChip === null ? ' on' : ''}`}
+              onClick={() => setActiveChip(null)}
+            >
+              {L(dict, '全部', 'All')} <span className="n">{baseRows.length}</span>
+            </button>
+            {chips.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={`nesio-schedfilter-chip${activeChip === c.id ? ' on' : ''}${c.kind === 'custom' ? ' mine' : ''}`}
+                onClick={() => setActiveChip(activeChip === c.id ? null : c.id)}
+                onContextMenu={c.kind === 'custom' ? (e) => { e.preventDefault(); removeCustomFilter(c.id); if (activeChip === c.id) setActiveChip(null); } : undefined}
+                title={c.kind === 'custom' ? L(dict, `自定义 · 含「${c.keyword}」(长按/右键删)`, `Custom · contains “${c.keyword}”`) : undefined}
+              >
+                {c.label} <span className="n">{c.count}</span>
+              </button>
+            ))}
+            <button type="button" className="nesio-schedfilter-add" onClick={() => setAddingFilter((v) => !v)}
+              aria-label={L(dict, '自定义一个筛选', 'Add a filter')}>+</button>
+          </div>
+
+          {addingFilter && (
+            <div className="nesio-schedfilter-form">
+              <input className="nesio-schedfilter-input" value={fName} onChange={(e) => setFName(e.target.value)}
+                placeholder={L(dict, '叫什么(如:孩子学校)', 'Name it')} />
+              <input className="nesio-schedfilter-input" value={fKeyword} onChange={(e) => setFKeyword(e.target.value)}
+                placeholder={L(dict, '含哪个词', 'Contains which word')} />
+              <div className="nesio-schedfilter-actions">
+                <button type="button" className="nesio-schedfilter-btn" onClick={() => { setAddingFilter(false); setFName(''); setFKeyword(''); }}>
+                  {L(dict, '稍后', 'Later')}
+                </button>
+                <button type="button" className="nesio-schedfilter-btn pri" disabled={!fName.trim() || !fKeyword.trim()}
+                  onClick={() => { addCustomFilter(fName, fKeyword); setAddingFilter(false); setFName(''); setFKeyword(''); }}>
+                  {L(dict, '加进来', 'Add')}
+                </button>
+              </div>
+              {/* 说清它到底怎么匹配 —— 用户能预测结果,才敢用。不做隐式语义匹配。 */}
+              <p className="nesio-schedfilter-hint">
+                {L(dict, '按词筛:标题或发件人/地点里含这个词就算。不区分大小写。',
+                      'Keyword filter: matches the title or the sender/location line. Case-insensitive.')}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* 发件箱的入口不只是「看已发送」—— 在这一格里写一封新的才是完整闭环。
+          写信面板(EmailComposeSheet)本来只挂在记忆详情和聊天里,从日程页够不着。 */}
+      {sub === 'sent' && (
+        <button type="button" className="nesio-schedfilter-btn pri" style={{ width: '100%', marginBottom: 'var(--space-2)' }}
+          onClick={() => setComposeOpen(true)}>
+          {L(dict, '写一封', 'Write one')}
+        </button>
+      )}
+
+      {/* 我自己设的提醒(家务 / 账单 due)。只在日历那格 —— 它是「日程」,不是邮件。 */}
+      {sub === 'calendar' && <RemindersSection dict={dict} tokens={tokens} />}
+
+      {/* 收件里像是有约的那几封,问一句要不要进日程。用**未经搜索/筛选**的全量
+          (emailRows)—— 这件事和「我这会儿在找什么」无关,不该被搜索框藏起来。 */}
+      {sub === 'email' && <MailSuggestions dict={dict} rows={emailRows} />}
+
       {rows.length === 0 ? (
         <p className="nesio-insights-empty">
-          {sub === 'calendar'
-            ? L(dict, '还没有日程 —— 到「设置 → 数据接入」连 Google 日历,或连 Granola 同步会议。', 'No schedule yet — connect Google Calendar or Granola in Data sources.')
-            : L(dict, '还没有邮件 —— 到「设置 → 数据接入」连 Gmail 同步(广告已自动过滤)。', 'No mail yet — connect Gmail in Data sources (ads auto-filtered).')}
+          {/* 筛出 0 条 ≠ 没有数据。不说清是筛没的,用户会以为东西丢了。
+              搜索和标签是两件事,分开说 —— 「搜不到」和「这个标签下没有」要给不同的出口。 */}
+          {tokens.length > 0
+            ? L(dict, `搜「${q.trim()}」没有找到 —— 换个词,或清空搜索看全部。`, `Nothing matches “${q.trim()}” — try another word, or clear the search.`)
+            : chosen
+            ? L(dict, `「${chosen.label}」下没有 —— 点上面的「全部」看回来。`, `Nothing under “${chosen.label}” — tap All to see everything.`)
+            : sub === 'calendar'
+              ? L(dict, '还没有日程 —— 到「设置 → 数据接入」连 Google 日历,或连 Granola 同步会议。', 'No schedule yet — connect Google Calendar or Granola in Data sources.')
+              : sub === 'sent'
+                // 发件箱是这次新加的 —— 老同步下来的邮件节点没有方向字段,得等下一次同步补上。
+                // 空着的时候把这件事说清楚,而不是让人以为「我明明发过邮件」。
+                ? L(dict, '这里还没有 —— 已发送是随 Gmail 同步一起进来的,下次同步后就有了(这之前同步的邮件没记方向,会在下次同步时补上)。', 'Nothing here yet — sent mail arrives with the next Gmail sync (mail synced before this update gets its direction filled in then).')
+                : L(dict, '还没有邮件 —— 到「设置 → 数据接入」连 Gmail 同步(广告已自动过滤)。', 'No mail yet — connect Gmail in Data sources (ads auto-filtered).')}
         </p>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
@@ -457,6 +1058,9 @@ export default function SchedulePanel() {
 
       {/* elevated:日程在洞察(fullscreen,z-930)里,详情是 bottom 卡 —— 不抬层会被整个盖住。 */}
       {openNode && <MemoryNodeDetail node={openNode} elevated onClose={() => setOpenNode(null)} />}
+      {/* 写一封:发出去后会随下一次 Gmail 同步回到上面的列表(Gmail 的 SENT 是唯一真源,
+          这里不另存一份本地副本 —— 两份账最后一定对不上)。 */}
+      {composeOpen && <EmailComposeSheet open onClose={() => setComposeOpen(false)} context={{}} />}
     </div>
   );
 }

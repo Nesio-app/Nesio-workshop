@@ -22,7 +22,6 @@ Auth legend:
 | POST /api/portal/inventory-extract | guard | 20/min |
 | POST /api/portal/person-extract | guard | 20/min |
 | POST /api/portal/tts | guard | 10/min |
-| POST /api/portal/daily-brief | guard | 15/min |
 | POST /api/portal/guidance-judge | guardAiRoute + requirePaidCloudAi | 6/min | AI 判决层(实弹,8 层规则管线已拆):结构化信号批量判卡;sev3 判决出卡即 Web Push;completeText 真实 token+cost_usd 上账,/admin 汇总 |
 | POST/DELETE /api/portal/push-subscribe | guard | 10/min | Web Push 订阅登记/退订(user_push_subscriptions,service-role 写,RLS 拒直连;发送端在 guidance-judge) |
 | POST /api/portal/living-model | guard | 10/min |

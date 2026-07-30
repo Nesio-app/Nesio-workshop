@@ -172,8 +172,11 @@ export default function GrowthTab({ onOpenNode }: { onOpenNode?: (nodeId: string
           {/* 2026-07-29 标注(Bug4 P9):「今天教练带你看一件事」与「已连续回看 N 天」两句划掉 ——
               过渡文案不承载信息,下面的卡片本身就是那一件事。 */}
 
-          {/* ── 心智成长环(弱化仪表盘感)── */}
-          <div className="ng-sec"><span className="l">{L(dict, '你走过的面向', 'Facets you have touched')}</span><span className="r">{L(dict, '不是积分,是痕迹', 'Traces, not points')}</span></div>
+          {/* ── 心智成长环(弱化仪表盘感)──
+              图9 的红叉盖住的是**四句**,不只是上面两句:「你走过的面向」和
+              「不是积分,是痕迹」这一行小标题也在里面。下面卡片第一行
+              「在 N 个面向上留下过痕迹 · 共 M 次回看」已经把这件事说完了,
+              这一行是它的前言。 */}
           <div className="ng-mind">
             <p className="ng-mind-top">
               {total === 0

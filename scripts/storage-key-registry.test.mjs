@@ -149,6 +149,13 @@ const KNOWN_KEYS = new Map([
   ["nesio-bank-acct-names-v1", "durable"],
   ["nesio-fin-tx-annotations-v1", "durable"],
   ["nesio-meal-calendar-v1", "durable"],
+  ["nesio-schedule-filters-v1", "durable"],
+  // 用户自己敲进去的提醒(家务/账单 due)。换台设备后从头开始**不正确** —— 那是他
+  // 亲手写下的东西,丢了就是丢了,所以 durable。
+  ["nesio-schedule-reminders-v1", "durable"],
+  // 邮件里认出的「安排」我处理过没有(加进日程了 / 不用了)。「不用了」是一个决定 ——
+  // 在手机上按掉的建议换到电脑上又冒出来,等于这个决定没被记住,所以 durable。
+  ["nesio-mail-suggest-v1", "durable"],
   ["nesio-migration-completed-v1", "cache"],
   ["nesio-migration-log-v1", "cache"],
   ["nesio-entity-aliases-v1", "durable"],

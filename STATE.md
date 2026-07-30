@@ -173,6 +173,13 @@ sensitivity/retention 枚举化(中期)。
   `lib/portal/asset-care.ts`,附件压过存本机 IDB;「做饭计划」重做成**美食日历**
   (一天三顿、只显示排过的、点进详情页编辑),新增 `lib/cooking/meal-calendar.ts`。
   ● **新 key**:`nesio-asset-care-v1`、`nesio-meal-calendar-v1`(均 durable,已登记)。
+  ● **自查复盘发现的漏项**(图6「念念还记得的内容逻辑正确吗?」我一开始只改了按钮名、
+  没回答那个问题):它对 tag **一视同仁**地取交集,而记忆上的标签一大半不是主题 ——
+  来源(邮件/flomo/日历)、采集方式(手记/Voice)、内部维度(domain:/facet:)。
+  任意两条邮件都共享「邮件」,于是「你 X/Y 也记过类似的一次」对**几乎任何一条记忆**
+  都会出现而两条毫无关系 —— 和「健身邮件被认成健康打卡」是同一族的错。
+  改:抽成纯函数 `lensEcho`(lib/portal/lens.ts),只认 `isTopicTag`、把共享的那个标签
+  印出来让用户能检验、≥2 条更早的才敢叫「模式」。契约 `test:lens-echo`。
   ● 顺带修 `test:ui-consistency` 回归:引导卡分组图标此前直接写 emoji,改走 icons.tsx 具名键。
 
 - **本机存储 key 全量普查(2026-07-29;161 个 key)**:根因是
@@ -617,9 +624,9 @@ sensitivity/retention 枚举化(中期)。
   重资产付费(整包手动备份/图片深检索)另论;云备份/恢复本身对登录用户免费。
 - **服务端权益强制:骨架已落、待接真源**(2026-07-14 记,安全审计 #1):
   `lib/portal/auth/server-entitlement.ts` 提供 `readServerTier` / `guardServerEntitlement`,
-  已接进 `guardAiRoute({ requirePaidCloudAi:true })`,七路付费云 AI 路由(meeting-notes /
-  avatarify / person-extract / inventory-extract / living-model / health-insight / daily-brief)
-  已挂。**默认 inert**(真源未接 → fail-open 放行,线上行为不变)。**接真源(部署侧)**:
+  已接进 `guardAiRoute({ requirePaidCloudAi:true })`,六路付费云 AI 路由(meeting-notes /
+  avatarify / person-extract / inventory-extract / living-model / health-insight)
+  已挂。(daily-brief 2026-07-30 随语音简报一并删除。)**默认 inert**(真源未接 → fail-open 放行,线上行为不变)。**接真源(部署侧)**:
   ① Supabase 建 `user_entitlements(user_id, plan)` + RLS(仅本人读 / service_role 写);
   ② StoreKit/支付回调服务端校验收据 → upsert plan;
   ③ 置环境变量 `NESIO_SERVER_ENTITLEMENT=1`、`NESIO_ENTITLEMENT_TABLE=user_entitlements`。

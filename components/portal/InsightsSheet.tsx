@@ -53,6 +53,8 @@ import { readFactJournal, ensureFactJournal } from '@/lib/platform/fact-journal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+const DailyReportPanel = dynamic(() => import('./insights/DailyReportPanel'), { ssr: false });
+
 export type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'fitness' | 'timeline' | 'schedule' | 'finance' | 'inventory' | 'wardrobe' | 'relationships' | 'tesla' | 'living' | 'admin';
 
 const DAY_MS = 86_400_000;
@@ -187,9 +189,13 @@ function MindPie({ items, onPick, dict }: { items: Array<[string, number]>; onPi
               <small className="nesio-mindpie2-go">{L(dict, '查看记忆 ›', 'View ›')}</small>
             </button>
           ) : (
+            // 图22 上还写着一句「也显示百分比」——指的就是**没点任何一片时**的中心。
+            // 原来静止状态只有一个总数,而这张图整个是在讲占比:不点也该先看见
+            // 「最大的那块占几成」。总次数退成脚注。
             <>
-              <b>{total}</b>
-              <small>{L(dict, '次', 'times')}</small>
+              <b>{Math.round((arcs[0]?.c ?? 0) / total * 100)}%</b>
+              <small className="nesio-mindpie2-ctr-name">{arcs[0]?.tag ?? ''}</small>
+              <small>{L(dict, `共 ${total} 次`, `${total} total`)}</small>
             </>
           )}
         </div>
@@ -638,6 +644,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {/* ── Tab 1: 免费四件套(v1 规格 §2.1)── */}
         {mainTab === 'reflection' && (
           <div className="nesio-reflection-tab">
+            {/* 每日日报的**唯一入口**(2026-07-30 用户定案:「今天不要入口,用弹出卡片,
+                在洞察开入口」)。今天那份置顶,往日在下,点开都弹同一个层。 */}
+            <DailyReportPanel />
             {/* 2026-07-28 UI 精修(标注 图11「走走看放到最上面」):这块原本排在线头之后,
                 现在提到反思页最顶 —— 一进来先撞见一条旧记录,再看统计。 */}
             {/* ③ 走走看:衬线引原话「去年今天,你写下 ——」+ 再翻一条(偶遇感) */}

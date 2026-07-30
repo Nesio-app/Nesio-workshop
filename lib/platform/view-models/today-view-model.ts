@@ -3,7 +3,7 @@ import { ingestLifeNode } from '../../life-domain/ingest-node';
 import type { Signal } from '../../life-domain/signal';
 import { getLifeGraph, getRecentNodes, updateLifeNode, isBulkImported, type LifeNode } from '../../portal/life-graph';
 import type { RecommendationCard } from '../../portal/reasoning-engine';
-import { nearestNodeDate, nodeExpiryDate } from '../node-dates';
+import { firstNodeDate, nearestNodeDate, nodeExpiryDate } from '../node-dates';
 import { LEXICON } from '../keyword-lexicon';
 import { scheduleHint } from '../../portal/time-labels';
 
@@ -192,11 +192,16 @@ export function focusTimeHint(node: FocusNode, locale: string = 'zh'): string {
     if (diffH >= 24 && diffH < 48) return en ? 'expires tomorrow' : '明天到期';
     if (diffH < 0) return en ? 'expired' : '已过期';
   }
-  const d = nearestNodeDate(node.attributes, now.getTime());
+  // 2026-07-30 真机实锤(时间线里两件衣物都标着「明天」):这里原来先用
+  // nearestNodeDate —— 它会**扫描全部属性值**,任何 ad-hoc 键上的字符串只要能被
+  // Date 解析就冒充成日期。物品/衣橱节点上那些分析出来的杂字段因此长出了假日期。
+  // 时标只认**明确的日期键**(firstNodeDate:start/date/dueDate/deadline…)。
+  const d = firstNodeDate(node.attributes);
   if (d) return scheduleHint(d, now, locale);
-  const text = [node.name, node.rawInput || ''].join(' ').toLowerCase();
-  if (text.includes('今天') || text.includes('今日')) return en ? 'today' : '今天';
-  if (text.includes('明天') || text.includes('明日')) return en ? 'tomorrow' : '明天';
+  // 原来这里还有一段「文本里出现『明天』就说明天」的子串猜测 —— 删掉。
+  // 那是这一面最后一条正则语义路径,和「健身邮件 → 健康打卡」同源:
+  //「明天要还的钱」和「明天见」在字面上没有区别,而它会把两者都标成明天。
+  // 猜不出时标就不给时标,不编。
   const ageHours = (now.getTime() - new Date(node.createdAt).getTime()) / 3_600_000;
   if (ageHours < 24) return en ? 'just noted' : '刚记录';
   return '';
