@@ -547,6 +547,24 @@ export function removeBankAccount(id: string): void {
   accountsStore.save(loadBankAccounts().filter((a) => a.id !== id));
 }
 
+// 账户自定义名称:本机覆盖层,不改 Plaid 原始 name(同步合并不会冲掉)。
+const ACCT_NAME_KEY = 'nesio-bank-acct-names-v1';
+export function loadAccountNames(): Record<string, string> {
+  if (typeof window === 'undefined') return {};
+  try { return JSON.parse(localStorage.getItem(ACCT_NAME_KEY) || '{}') as Record<string, string>; } catch { return {}; }
+}
+export function setAccountName(id: string, name: string): void {
+  if (typeof window === 'undefined') return;
+  const all = loadAccountNames();
+  const v = name.trim();
+  if (v) all[id] = v; else delete all[id];
+  try { localStorage.setItem(ACCT_NAME_KEY, JSON.stringify(all)); } catch { reportStorageDropped(); return; }
+  window.dispatchEvent(new CustomEvent('nesio-bank-updated'));
+}
+export function displayAccountName(a: Pick<BankAccount, 'id' | 'name'>, names?: Record<string, string>): string {
+  return (names || loadAccountNames())[a.id] || a.name;
+}
+
 export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boolean }): void {
   if (opts?.replace && accounts.length > 0) {
     accountsStore.save(accounts.filter((a) => a?.id));

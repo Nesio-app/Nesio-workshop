@@ -14,7 +14,6 @@ import { L, t } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { GuidanceIcon } from '../icons';
 
 /** 金句卡:作者(— 苏格拉底 / — Author)默认另起一行,轻一档色。 */
 function QuoteBody({ body }: { body: string }) {
