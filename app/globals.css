@@ -13974,6 +13974,15 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 /* bug3:通讯录同步来的 Gmail 头像 —— 有真头像就别用字母块 */
 .nesio-rel-av--img { object-fit: cover; background: var(--portal-accent-soft); }
 
+/* bug3:「N 月足迹」左右月份选择器 */
+.nesio-tl-month-nav { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.nesio-tl-month-arrow {
+  flex: 0 0 auto; min-width: 2rem; height: 2rem; border-radius: var(--radius-sm);
+  border: 1px solid var(--portal-line); background: transparent; color: var(--portal-accent);
+  font-family: var(--font-sans); font-size: var(--text-body); cursor: pointer;
+}
+.nesio-tl-month-arrow:disabled { opacity: 0.35; cursor: default; }
+
 /* bug3:机场/车站输入框的离线候选下拉(行程加航班) */
 .nesio-hub-menu {
   list-style: none; margin: var(--space-1) 0 0; padding: var(--space-1);
@@ -18093,10 +18102,17 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
   margin: 0.5rem 0 0.75rem;
   padding: 0.9rem 0.6rem 0.7rem;
   border-radius: 1.2rem;
+  /* bug3「背景是宇宙」:多撒几颗星 + 一层极淡的银河带,两个主题同用 */
   background:
-    radial-gradient(circle at 22% 16%, rgba(148, 189, 255, 0.14) 0 2px, transparent 3px),
-    radial-gradient(circle at 78% 30%, rgba(148, 189, 255, 0.12) 0 1.5px, transparent 2.5px),
-    radial-gradient(circle at 60% 82%, rgba(148, 189, 255, 0.1) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 22% 16%, rgba(214, 232, 255, 0.55) 0 1.4px, transparent 2.2px),
+    radial-gradient(circle at 78% 30%, rgba(214, 232, 255, 0.45) 0 1.2px, transparent 2px),
+    radial-gradient(circle at 60% 82%, rgba(214, 232, 255, 0.4) 0 1.2px, transparent 2px),
+    radial-gradient(circle at 12% 62%, rgba(214, 232, 255, 0.35) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 42% 8%, rgba(214, 232, 255, 0.4) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 88% 68%, rgba(214, 232, 255, 0.32) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 33% 92%, rgba(214, 232, 255, 0.28) 0 1px, transparent 1.8px),
+    radial-gradient(circle at 68% 52%, rgba(214, 232, 255, 0.24) 0 0.9px, transparent 1.6px),
+    linear-gradient(118deg, transparent 34%, rgba(150, 178, 235, 0.07) 50%, transparent 66%),
     radial-gradient(circle at 50% 28%, #101d3c 0%, #070d1f 62%, #04070f 100%);
   overflow: hidden;
 }
@@ -18326,16 +18342,9 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
 }
 
 /* ── 批次 75:白天主题的地球舞台(夜空只属于夜晚) ── */
-html[data-portal-theme='day'] .nesio-globe-stage,
-html[data-portal-theme='day'] .nesio-globe-fsov {
-  background: radial-gradient(circle at 50% 30%, #dbeafe 0%, #b6d3f2 60%, #93bbe8 100%);
-}
-html[data-portal-theme='day'] .nesio-globe-stats {
-  background: rgba(255, 255, 255, 0.65);
-  border-color: rgba(30, 64, 120, 0.15);
-  color: #1e3a5f;
-}
-html[data-portal-theme='day'] .nesio-globe-stage-hint { color: rgba(30, 58, 95, 0.55); }
+/* bug3:白天也要星空 —— 「背景是宇宙」。原来 day 主题把地球舞台盖成浅蓝天空,
+   球体飘在蓝底上完全没有太空感。两个主题统一用夜空底(见 .nesio-globe-stage)。 */
+/* 舞台是星空底,统计胶囊/提示字在两个主题下都用浅色(day 的深色文字在星空上读不清) */
 
 /* ── 批次 77:问卷卡(多题带选项一次提交) + 选中态 ── */
 .nesio-chat-quiz {
