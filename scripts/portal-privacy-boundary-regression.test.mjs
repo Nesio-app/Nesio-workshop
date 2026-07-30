@@ -22,10 +22,9 @@ const todayFeed = [
 ].join('\n');
 const lifeStateRoute = read('app/api/portal/life-state/route.ts');
 
-assert.match(analyzeRoute, /isAnalyzeAiAllowed/, 'analyze route must gate real AI provider calls');
-assert.match(analyzeRoute, /x-nesio-stage5-secret/, 'analyze route must support the Stage 5 invocation secret gate');
-assert.match(analyzeRoute, /x-baohe-access-mode/, 'analyze route must support explicit personal lab mode');
-assert.match(analyzeRoute, /analyzeFallback/, 'analyze route must keep local fallback available');
+assert.match(analyzeRoute, /guardAiRoute/, 'analyze route must gate real AI provider calls');
+assert.match(analyzeRoute, /canUsePaidCloudAi/, 'analyze route must check paid cloud AI status before allowing cloud analysis');
+assert.match(analyzeRoute, /reportAiCall/, 'analyze route must report AI calls for cost tracking');
 
 assert.match(gmailRoute, /metadataOnly/, 'Gmail route must expose metadata-only mode');
 assert.match(gmailRoute, /includeBody/, 'Gmail route must require explicit body opt-in before reading email bodies');

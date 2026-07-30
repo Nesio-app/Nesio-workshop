@@ -14,7 +14,6 @@ import { L, t } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { GuidanceIcon } from '../icons';
 
 /** 金句卡:作者(— 苏格拉底 / — Author)默认另起一行,轻一档色。 */
 function QuoteBody({ body }: { body: string }) {
@@ -164,20 +163,9 @@ export function ProactiveGuidanceCard({
         </span>
       )}
       <div className="nesio-proactive-card-inner">
-        {!isQuote && <span className="nesio-proactive-card-icon"><GuidanceIcon icon={card.icon} /></span>}
         <div className="nesio-proactive-card-text" onClick={() => { if (Math.abs(dx) < 6) onOpen?.(); }} style={onOpen ? { cursor: 'pointer' } : undefined}>
           <p className="nesio-proactive-card-title">{card.title}</p>
           {isQuote ? <QuoteBody body={card.body} /> : <p className="nesio-proactive-card-body">{card.body}</p>}
-          {card.reason && (
-            <p style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', margin: '0.2rem 0 0' }}>{card.reason}</p>
-          )}
-          {card.sourceTags.length > 0 && (
-            <div className="nesio-proactive-card-tags">
-              {card.sourceTags.map((tag) => (
-                <span key={tag} className="nesio-proactive-card-tag">{tag}</span>
-              ))}
-            </div>
-          )}
           {card.evidence && card.evidence.length > 0 && (
             <div style={{ marginTop: '0.3rem' }}>
               <button

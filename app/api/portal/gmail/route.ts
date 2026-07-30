@@ -17,6 +17,8 @@ import { cookies } from 'next/headers';
 import { completeText, aiProviderAvailable } from '@/lib/portal/ai-complete';
 import { envValue } from '@/lib/portal/env';
 import { hasVerifiedSessionCookie } from '@/lib/portal/api-auth';
+import { readServerTier } from '@/lib/portal/auth/server-entitlement';
+import { reportAiCall } from '@/lib/portal/ai-telemetry';
 
 export const dynamic = 'force-dynamic';
 // 全量同步 = 1 次列表 + 最多 100 封 full 拉取 + 一发大 prompt AI 提取,30s 顶得很紧;
@@ -223,11 +225,14 @@ async function fetchMessages(accessToken: string, max = 50, metadataOnly = true,
   return messages.filter((m): m is GmailMessage => m !== null);
 }
 
-async function extractNodes(messages: GmailMessage[]): Promise<object[]> {
+async function extractNodes(messages: GmailMessage[], canUsePaidCloudAi: boolean = false): Promise<object[]> {
   // 免费最大化·Gmail:广告(CATEGORY_PROMOTIONS)不喂 AI —— 占普通邮箱大头,
   // 这一刀直接省掉一大块 completeText 成本,且广告本就不该进记忆。
   const worth = messages.filter((m) => !isPromotion(m));
-  if (!aiProviderAvailable() || !worth.length) return [];
+  if (!worth.length) return [];
+
+  // 免费用户不走云抽取,直接返回空
+  if (!canUsePaidCloudAi || !aiProviderAvailable()) return [];
 
   const emailTexts = worth.map((m) => {
     const subject = header(m, 'subject');
@@ -238,48 +243,55 @@ async function extractNodes(messages: GmailMessage[]): Promise<object[]> {
   }).join('\n\n───\n\n');
 
   const prompt = buildEmailExtractionPrompt(emailTexts);
+  const startedAt = Date.now();
 
-  const raw = (await completeText({ prompt, maxTokens: 2048, route: 'gmail' })).text || '[]';
-  const parsed = parseJsonBlock<Array<Record<string, unknown>>>(raw) ?? [];
+  try {
+    const raw = (await completeText({ prompt, maxTokens: 2048, route: 'gmail' })).text || '[]';
+    reportAiCall('gmail', true, startedAt, { type: 'extract' });
+    const parsed = parseJsonBlock<Array<Record<string, unknown>>>(raw) ?? [];
 
-  // 免费最大化·Gmail:把 Gmail 系统分类叠加到 AI 提取的节点(此前只在兜底路径打,AI 正常出结果时丢了)。
-  // 按发件人邮箱归并 —— schema 要求节点 attributes 保留 source(发件人),据此可靠回填通知/重要/mailCategory。
-  const byEmail = mailClassBySender(worth);
-  // 邮件全链路 join key(P0 修复):AI 抽取的节点必须带 emailId,否则全文索引/语义检索/RAG/
-  // 「阅读原文」全部拿不到 key、静默失效。按「发件人唯一 → 主题精确」回关源邮件注入 m.id。
-  const bySender = new Map<string, GmailMessage[]>();
-  for (const m of worth) {
-    const addr = emailAddrOf(header(m, 'from'));
-    if (!addr) continue;
-    const arr = bySender.get(addr) || [];
-    arr.push(m);
-    bySender.set(addr, arr);
-  }
-  const findSourceId = (attrs: Record<string, unknown>, name: unknown): string | undefined => {
-    const addr = emailAddrOf(String(attrs.source ?? attrs.from ?? ''));
-    const cands = addr ? bySender.get(addr) : undefined;
-    if (!cands || !cands.length) return undefined;
-    if (cands.length === 1) return cands[0].id || undefined;
-    const subj = String(attrs.subject ?? name ?? '').trim();
-    if (subj) {
-      const hit = cands.find((m) => header(m, 'subject').trim() === subj);
-      if (hit) return hit.id || undefined;
+    // 免费最大化·Gmail:把 Gmail 系统分类叠加到 AI 提取的节点(此前只在兜底路径打,AI 正常出结果时丢了)。
+    // 按发件人邮箱归并 —— schema 要求节点 attributes 保留 source(发件人),据此可靠回填通知/重要/mailCategory。
+    const byEmail = mailClassBySender(worth);
+    // 邮件全链路 join key(P0 修复):AI 抽取的节点必须带 emailId,否则全文索引/语义检索/RAG/
+    // 「阅读原文」全部拿不到 key、静默失效。按「发件人唯一 → 主题精确」回关源邮件注入 m.id。
+    const bySender = new Map<string, GmailMessage[]>();
+    for (const m of worth) {
+      const addr = emailAddrOf(header(m, 'from'));
+      if (!addr) continue;
+      const arr = bySender.get(addr) || [];
+      arr.push(m);
+      bySender.set(addr, arr);
     }
-    return undefined;
-  };
-  return parsed.map((n) => {
-    const attrs = (n.attributes && typeof n.attributes === 'object') ? { ...(n.attributes as Record<string, unknown>) } : {};
-    const emailId = findSourceId(attrs, n.name);
-    const cls = byEmail.get(emailAddrOf(String(attrs.source ?? attrs.from ?? '')));
-    const tags = Array.isArray(n.tags) ? [...n.tags] : [];
-    if (cls?.category === 'updates' && !tags.includes('通知')) tags.push('通知');
-    if (cls?.important && !tags.includes('重要')) tags.push('重要');
-    return {
-      ...n,
-      tags,
-      attributes: { ...attrs, ...(emailId ? { emailId } : {}), ...(cls ? { mailCategory: cls.category } : {}) },
+    const findSourceId = (attrs: Record<string, unknown>, name: unknown): string | undefined => {
+      const addr = emailAddrOf(String(attrs.source ?? attrs.from ?? ''));
+      const cands = addr ? bySender.get(addr) : undefined;
+      if (!cands || !cands.length) return undefined;
+      if (cands.length === 1) return cands[0].id || undefined;
+      const subj = String(attrs.subject ?? name ?? '').trim();
+      if (subj) {
+        const hit = cands.find((m) => header(m, 'subject').trim() === subj);
+        if (hit) return hit.id || undefined;
+      }
+      return undefined;
     };
-  });
+    return parsed.map((n) => {
+      const attrs = (n.attributes && typeof n.attributes === 'object') ? { ...(n.attributes as Record<string, unknown>) } : {};
+      const emailId = findSourceId(attrs, n.name);
+      const cls = byEmail.get(emailAddrOf(String(attrs.source ?? attrs.from ?? '')));
+      const tags = Array.isArray(n.tags) ? [...n.tags] : [];
+      if (cls?.category === 'updates' && !tags.includes('通知')) tags.push('通知');
+      if (cls?.important && !tags.includes('重要')) tags.push('重要');
+      return {
+        ...n,
+        tags,
+        attributes: { ...attrs, ...(emailId ? { emailId } : {}), ...(cls ? { mailCategory: cls.category } : {}) },
+      };
+    });
+  } catch (err) {
+    reportAiCall('gmail', false, startedAt, { type: 'extract' });
+    return [];
+  }
 }
 
 function metadataPreview(messages: GmailMessage[]) {
@@ -411,6 +423,11 @@ export async function GET(req: NextRequest) {
     refreshToken: winner.refreshToken,
   }, req);
 
+  // 获取当前用户的付费状态(用于 AI 提取决策)
+  const accessToken = cookieStore.get('baohe_auth_access')?.value || null;
+  const userTier = await readServerTier(accessToken);
+  const canUsePaidCloudAi = userTier === 'pro';
+
   const shouldCreateSignals = includeBody && shouldAnalyze;
   // AI 提取失败(配额 429/超时)不许炸掉整次同步 —— 未捕获会让路由回非 JSON 的
   // 500,客户端只能报「网络错误」(间歇性:配额窗口偶尔放行)。捕获后走下面的
@@ -419,7 +436,7 @@ export async function GET(req: NextRequest) {
   let aiExtractionFailed = false;
   if (shouldCreateSignals) {
     try {
-      nodes = await extractNodes(messages);
+      nodes = await extractNodes(messages, canUsePaidCloudAi);
     } catch (err) {
       aiExtractionFailed = true;
       console.error('[gmail] AI extraction failed, using metadata fallback:', err instanceof Error ? err.message : err);

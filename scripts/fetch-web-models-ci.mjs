@@ -30,7 +30,13 @@ async function getRelease(tag) {
   const r = await fetch(`https://api.github.com/repos/${REPO}/releases/tags/${tag}`, {
     headers: headers({ Accept: 'application/vnd.github+json' }),
   });
-  if (!r.ok) throw new Error(`取 release ${tag} 失败:HTTP ${r.status}(token 是否有 ${REPO} 读权限?)`);
+  if (!r.ok) {
+    if (r.status === 401 || r.status === 403) {
+      console.warn(`[bundle:models] token 无权限读 ${REPO} (HTTP ${r.status}) —— 跳过模型拉取。端上照片/文字搜索本次部署将降级为不可用(不影响构建)。`);
+      process.exit(0);
+    }
+    throw new Error(`取 release ${tag} 失败:HTTP ${r.status}(token 是否有 ${REPO} 读权限?)`);
+  }
   return r.json();
 }
 

@@ -10,9 +10,12 @@ import { GEMINI_MODEL_FALLBACKS } from '@/lib/portal/ai-provider-chain.mjs';
 import { createSignal } from '@/lib/life-domain/create-signal';
 import { normalizePhotoToSignal, normalizeVoiceToSignal } from '@/lib/life-domain/normalizers';
 import { EXTRACTION_SYSTEM_PROMPT, buildExtractionSystemPrompt, buildImageExtractionSystemPrompt, languageDirective, parseJsonBlock } from '@/lib/extraction/extraction';
-import { isRateLimited, isPortalRequestAuthorized } from '@/lib/portal/api-auth';
+import { guardAiRoute } from '@/lib/portal/api-auth';
+import { readServerTier } from '@/lib/portal/auth/server-entitlement';
 import { resolveAiKey } from '@/lib/portal/ai-keys';
 import { envValue } from '@/lib/portal/env';
+import { reportAiCall } from '@/lib/portal/ai-telemetry';
+import { cookies } from 'next/headers';
 
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -33,22 +36,6 @@ function getOpenAIKey(): string | undefined {
   return (process.env.OpenAI_KEY || process.env.OPENAI_API_KEY)?.trim();
 }
 
-async function isAnalyzeAiAllowed(req: NextRequest): Promise<boolean> {
-  const stage5Secret = envValue('NESIO_STAGE5_INVOCATION_SECRET');
-  const providedStage5Secret = req.headers.get('x-nesio-stage5-secret')?.trim() || '';
-  if (stage5Secret && providedStage5Secret === stage5Secret) return true;
-
-  // 本地/实验 env-flag 旁路(不需要 secret;仅本地实验开)。
-  const accessMode = req.headers.get('x-baohe-access-mode')?.trim() || '';
-  const labEnabled = envValue('BAOHE_PERSONAL_LAB_AI_ENABLED').toLowerCase() === 'true';
-  if (labEnabled && accessMode === 'personal_lab') return true;
-
-  // 安全(denial-of-wallet 收口):**验真会话**,不再只看 cookie 存在。isPortalRequestAuthorized 会向
-  // Supabase 验 access token / HMAC 验签 refresh|openid / 认 Stage5 secret / 无 Supabase 的本地部署放行。
-  // 伪造 cookie 拿不到有效 token → 拒。access 过期时 cookie 同步失效 → 落 refresh 签名分支,合法用户不误伤
-  // (与全仓 30+ guardAiRoute 路由同款成熟路径)。
-  return isPortalRequestAuthorized(req);
-}
 
 // Canonical extraction prompt — shared with ingest/gmail via lib/extraction
 const SYSTEM_PROMPT = EXTRACTION_SYSTEM_PROMPT;
@@ -375,6 +362,10 @@ function extractJson(raw: string): string {
 
 export const maxDuration = 30;
 export async function POST(req: NextRequest) {
+  // 授权门:登录/rate limit/日成本熔断
+  const guard = await guardAiRoute(req, 'analyze', { limit: 20 });
+  if (guard) return guard;
+
   try {
     const body = await req.json() as {
       type: 'text' | 'image' | 'file' | 'ask';
@@ -387,7 +378,12 @@ export async function POST(req: NextRequest) {
 
     let raw = '';
     const isImage = body.type === 'image' && Boolean(body.imageBase64);
-    const aiAllowed = await isAnalyzeAiAllowed(req);
+    // 获取当前用户的付费状态
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get('baohe_auth_access')?.value || null;
+    const userTier = await readServerTier(accessToken);
+    const canUsePaidCloudAi = userTier === 'pro';
+
     // 输出语言跟随 UI(英文用户不该拿到中文 name/summary/tags)。
     const isEn = (body.uiLocale || 'zh').toLowerCase().startsWith('en');
     // 衣橱识别用专属 prompt(结构化属性);其余走通用抽取。默认路径不变。
@@ -399,22 +395,6 @@ export async function POST(req: NextRequest) {
         ? buildImageExtractionSystemPrompt(body.uiLocale)
         : buildExtractionSystemPrompt(body.uiLocale);
 
-    // 有鉴权但之前无限流:单个会话可无节流刷最贵的视觉/grounding 调用(每请求最多 4 次外部 AI)。
-    if (aiAllowed && isRateLimited(req, 'analyze', { limit: 20 })) {
-      return NextResponse.json({ ok: false, error: 'rate_limited', retryAfterMs: 30_000 }, { status: 429 });
-    }
-
-    if (!aiAllowed) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: 'ai_auth_required',
-          summary: '登录或 Lab 模式后可使用 Nesio 分析。',
-        },
-        { status: 403 },
-      );
-    }
-
     if (body.type === 'ask') {
       let parsedQuery = '';
       try {
@@ -423,15 +403,38 @@ export async function POST(req: NextRequest) {
       } catch { /* ok */ }
 
       const askPrompt = ASK_SYSTEM_PROMPT + languageDirective(body.uiLocale);
+      const startedAt = Date.now();
+      let aiSucceeded = false;
+
+      // 免费用户不走云 ask，直接返回兜底
+      if (!canUsePaidCloudAi) {
+        // 本地兜底:简单的记忆数据库查询,不做网络搜索
+        return NextResponse.json({
+          ok: true,
+          matches: [],
+          answer: isEn ? 'Unable to access this feature without a subscription.' : '需要订阅才能使用此功能。',
+          aggregations: [],
+          webSearchUsed: false,
+        });
+      }
+
       try {
         raw = await analyzeWithClaude(body.content, false, undefined, undefined, askPrompt);
+        aiSucceeded = true;
       } catch {
         try {
           raw = await analyzeWithGemini(body.content, undefined, undefined, askPrompt);
+          aiSucceeded = true;
         } catch {
+          reportAiCall('analyze', false, startedAt, { type: 'ask' });
           return NextResponse.json({ ok: false, error: 'ai_search_unavailable' }, { status: 503 });
         }
       }
+
+      if (aiSucceeded) {
+        reportAiCall('analyze', true, startedAt, { type: 'ask' });
+      }
+
       const askJson = extractJson(raw);
       const askResult = JSON.parse(askJson) as {
         matches?: object[];
@@ -440,10 +443,10 @@ export async function POST(req: NextRequest) {
         webSearchNeeded?: boolean;
       };
 
-      // 网络搜索（仅当 AI 判断需要且有 query 时）
+      // 网络搜索（仅当 AI 判断需要且有 query 时，且用户付费时）
       let webAnswer = '';
       let webSearchUsed = false;
-      if (askResult.webSearchNeeded && parsedQuery) {
+      if (askResult.webSearchNeeded && parsedQuery && canUsePaidCloudAi) {
         try {
           const ws = await askWithGeminiWebSearch(parsedQuery, body.uiLocale);
           webAnswer = ws.answer;
@@ -468,25 +471,33 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    if (aiAllowed) {
+    // 非 ask 类型:图片/文本分析
+    if (canUsePaidCloudAi) {
       const providerErrors: string[] = [];
       const errMsg = (e: unknown) => (e instanceof Error ? e.message : 'unknown_error');
+      const startedAt = Date.now();
+      let aiSucceeded = false;
+
       try {
         raw = await analyzeWithClaude(body.content, isImage, body.imageBase64, body.mimeType, extractionPrompt);
+        aiSucceeded = true;
       } catch (claudeError) {
         providerErrors.push(`claude: ${errMsg(claudeError)}`);
         logAiProviderFailure('claude', errMsg(claudeError));
         try {
           raw = await analyzeWithGemini(body.content, body.imageBase64, body.mimeType, extractionPrompt);
+          aiSucceeded = true;
         } catch (geminiError) {
           providerErrors.push(`gemini: ${errMsg(geminiError)}`);
           logAiProviderFailure('gemini', errMsg(geminiError));
           try {
             raw = await analyzeWithOpenAI(body.content, isImage, body.imageBase64, body.mimeType, extractionPrompt);
+            aiSucceeded = true;
           } catch (openAiError) {
             providerErrors.push(`openai: ${errMsg(openAiError)}`);
             logAiProviderFailure('openai', errMsg(openAiError));
             if (isImage) {
+              reportAiCall('analyze', false, startedAt, { type: 'image' });
               return NextResponse.json(
                 {
                   ok: false,
@@ -501,7 +512,12 @@ export async function POST(req: NextRequest) {
           }
         }
       }
+
+      if (aiSucceeded) {
+        reportAiCall('analyze', true, startedAt, { type: body.type });
+      }
     } else {
+      // 免费用户走本地兜底
       raw = analyzeFallback(body.content);
     }
 

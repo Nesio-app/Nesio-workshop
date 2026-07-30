@@ -1,11 +1,13 @@
 'use client';
 
 /**
- * BodyLedgerPanel — 健康页「身体账本」:今日账本 / 餐后模式 / 稳飙探索。
+ * BodyLedgerPanel — 健康页「身体账本」。
+ * bug2 批:三个子 tab 删除 —— 今日账本内容直接作为身体账本主体;
+ * 餐后血糖 / 稳飙 两块导出给「分析」页渲染;概览的黄卡(补餐提示)与绿卡(念念小结)迁到这里。
  * 美容护理在同页「护理」tab(BeautyCarePanel)。
  */
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { HealthMetrics } from '@/lib/portal/apple-health';
 import {
   buildDayLedger, ledgerPrompt, suggestDinnerForGap, rankFoodReactions,
@@ -13,11 +15,11 @@ import {
   type BodyGoalKind, type BodyLedgerSection, type DinnerSuggestion, type DayLedger,
 } from '@/lib/portal/body-ledger';
 import { getMeals } from '@/lib/cooking/meals';
+import { healthNarrative } from '@/lib/portal/health-narrative';
 import { L } from '@/lib/portal/i18n';
-import SegTabs from '../ui/SegTabs';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { IconUtensils, IconZap, IconChevronRight, IconCheckCircle } from '../icons';
+import { IconUtensils, IconChevronRight } from '../icons';
 
 function ProgressRow({
   label, value, goal, unit,
@@ -209,7 +211,7 @@ function TodayBody({
   );
 }
 
-function PostMealBody({ health, dict }: { health: HealthMetrics | null; dict: string }) {
+export function PostMealBody({ health, dict }: { health: HealthMetrics | null; dict: string }) {
   const g = health?.glucose;
   const lastMeal = useMemo(() => {
     const meals = getMeals();
@@ -250,7 +252,7 @@ function PostMealBody({ health, dict }: { health: HealthMetrics | null; dict: st
   );
 }
 
-function ReactionBody({ health, dict }: { health: HealthMetrics | null; dict: string }) {
+export function ReactionBody({ health, dict }: { health: HealthMetrics | null; dict: string }) {
   const rows = useMemo(
     () => rankFoodReactions(getMeals(), health?.daily, { minN: 2, limit: 10 }),
     [health],
@@ -301,15 +303,12 @@ function ReactionBody({ health, dict }: { health: HealthMetrics | null; dict: st
 
 export default function BodyLedgerPanel({
   health,
-  initialSection = 'today',
 }: {
   health: HealthMetrics | null;
+  /** bug2:子 tab 已删,保留签名兼容旧调用点。 */
   initialSection?: BodyLedgerSection;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  const [section, setSection] = useState<Exclude<BodyLedgerSection, 'care'>>(
-    initialSection === 'care' ? 'today' : initialSection,
-  );
   const [ledger, setLedger] = useState<DayLedger>(() => buildDayLedger(todayYmd(), { rings: health?.activityRings }));
   const [suggestions, setSuggestions] = useState<DinnerSuggestion[]>([]);
   const [suggestErr, setSuggestErr] = useState<string | null>(null);
@@ -351,88 +350,27 @@ export default function BodyLedgerPanel({
     window.dispatchEvent(new CustomEvent('nesio-open-cooking'));
   }
 
+  // bug2:概览的绿色念卡(体重/静息心率小结)迁到身体账本
+  const nenLines = health ? healthNarrative(health.metrics, dict).slice(0, 2) : [];
+
   return (
     <div className="nesio-body-ledger">
-      {/* 2026-07-29:原 .nesio-bl-tabs 是全站分段控件的第 6 套,收敛到 SegTabs。 */}
-      <SegTabs
-        items={([
-          ['today', '今日账本', 'Today'],
-          ['postmeal', '餐后血糖', 'Post-meal'],
-          ['reaction', '稳 / 飙', 'Steady / spike'],
-        ] as const).map(([id, zh, en]) => ({ key: id, label: L(dict, zh, en) }))}
-        active={section}
-        onSelect={setSection}
-        ariaLabel={L(dict, '身体账本', 'Body ledger')}
-      />
-
-      {section === 'today' && (
-        <TodayBody
-          ledger={ledger}
-          dict={dict}
-          suggestions={suggestions}
-          suggestErr={suggestErr}
-          onRetrySuggest={() => setSuggestTick((n) => n + 1)}
-          onCook={() => openCooking()}
-          onLogMeal={() => openCooking()}
-          onGoal={(g) => reloadLedger(g)}
-        />
+      {nenLines.length > 0 && (
+        <div className="nesio-health-nen">
+          <span className="nesio-health-nen-avatar" aria-hidden>{L(dict, '念', 'N')}</span>
+          <p className="nesio-health-nen-text">{nenLines.join(' ')}</p>
+        </div>
       )}
-      {section === 'postmeal' && <PostMealBody health={health} dict={dict} />}
-      {section === 'reaction' && <ReactionBody health={health} dict={dict} />}
+      <TodayBody
+        ledger={ledger}
+        dict={dict}
+        suggestions={suggestions}
+        suggestErr={suggestErr}
+        onRetrySuggest={() => setSuggestTick((n) => n + 1)}
+        onCook={() => openCooking()}
+        onLogMeal={() => openCooking()}
+        onGoal={(g) => reloadLedger(g)}
+      />
     </div>
-  );
-}
-
-/** 概览快捷进入(对齐稿:账本 / 餐后 / 反应)。 */
-export function BodyLedgerQuickLinks({
-  onOpen, dict,
-}: {
-  onOpen: (section: BodyLedgerSection) => void;
-  dict: string;
-}) {
-  const items: Array<{ id: BodyLedgerSection; zh: string; en: string; subZh: string; subEn: string; ico: ReactNode }> = [
-    {
-      id: 'today',
-      zh: '身体账本 · 一日时间线',
-      en: 'Body ledger · day',
-      subZh: '吃 / 练 / 血糖放在一起看',
-      subEn: 'Eating, training, glucose together',
-      ico: <IconZap size={18} />,
-    },
-    {
-      id: 'postmeal',
-      zh: '餐后血糖',
-      en: 'Post-meal glucose',
-      subZh: '一餐对应的反应曲线',
-      subEn: 'Response curve after a meal',
-      ico: <IconCheckCircle size={18} />,
-    },
-    {
-      id: 'reaction',
-      zh: '食物反应排序',
-      en: 'Food reaction ranking',
-      subZh: '哪些让你稳,哪些偏飙',
-      subEn: 'What steadies you vs spikes',
-      ico: <IconUtensils size={18} />,
-    },
-  ];
-  return (
-    <>
-      <p className="nesio-insights-section-label">{L(dict, '快捷进入', 'Quick open')}</p>
-      <ul className="nesio-bl-quick">
-        {items.map((it) => (
-          <li key={it.id}>
-            <button type="button" className="nesio-bl-quick-row" onClick={() => onOpen(it.id)}>
-              <span className="nesio-bl-quick-ico">{it.ico}</span>
-              <span className="nesio-bl-quick-main">
-                <b>{L(dict, it.zh, it.en)}</b>
-                <small>{L(dict, it.subZh, it.subEn)}</small>
-              </span>
-              <IconChevronRight size={16} />
-            </button>
-          </li>
-        ))}
-      </ul>
-    </>
   );
 }
