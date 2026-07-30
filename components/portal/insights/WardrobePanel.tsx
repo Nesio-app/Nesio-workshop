@@ -1,13 +1,12 @@
 'use client';
 
 /**
- * WardrobePanel — 洞察「衣橱」tab。三块:
- *   ① 今天穿这套:读天气+今日日程,用 suggestOutfit 规则版(免费/端上)给一套预览。
- *   ② 加衣服:拍照/选图存本机 + 快选类型/保暖/正式度。Pro 可「AI 识别」自动填属性(analyze
- *      clothing 模式);免费手填(拍照仍可存,永不报错)。
- *   ③ 我的衣橱:按类型分组浏览,缩略图 + 属性,支持「今天穿了」(记穿着,鼓励穿遍)/删除。
- *   ④ 搭配(2026-07-28,标注 图15):存下来的搭配 —— 列表 / 按月日历两种看法,
- *      点星 = 喜欢,点不喜欢 = 淘汰(记录留着但不再推这一组)。搭配以前是现算的,关掉就没了。
+ * WardrobePanel — 洞察「衣橱」tab。三个子 tab(bug3 起):
+ *   ① 今天:读天气+今日日程,用 suggestOutfit 规则版(免费/端上)给一套;上身试穿。
+ *   ② 搭配:存下来的搭配 —— 列表 / 按月日历两种看法。点一套打开详情:看上身图、
+ *      排哪天穿(排进日历)、喜欢/淘汰、穿过几次。长按列表行直接排日子。
+ *   ③ 衣帽间(bug3 新增):加衣服 + 筛选 + 按类型分组的单品网格 + 单品详情。
+ *      —— 原来这三块全塞在「今天」下面,一个页面滚三屏才到底。
  * 只读/写 life-graph(衣服=object garment 节点),随 nesio-life-graph-updated 刷新。
  */
 
@@ -19,7 +18,7 @@ import {
 import { loadWardrobePrefs, recordOutfitFeedback, buildStylistDislikes } from '@/lib/portal/wardrobe-prefs';
 import {
   loadOutfits, saveOutfit, patchOutfit, removeOutfit, groupByMonth, outfitsOn, retiredKeys, outfitKey,
-  WARDROBE_OUTFITS_UPDATED, type SavedOutfit,
+  wornCount, WARDROBE_OUTFITS_UPDATED, type SavedOutfit,
 } from '@/lib/portal/wardrobe-outfits';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
@@ -28,7 +27,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import type { CalendarEvent } from '@/lib/portal/types';
 import SegTabs from '../ui/SegTabs';
-import { IconStar, IconThumbUp, IconThumbDown, IconCamera, IconAlertTriangle, IconRain, IconRefresh, IconMirror, IconHanger, GarmentIcon } from '../icons';
+import { IconStar, IconThumbUp, IconThumbDown, IconCamera, IconAlertTriangle, IconRain, IconRefresh, GarmentIcon } from '../icons';
 
 const TYPE_LABEL: Record<GarmentType, [string, string]> = {
   top: ['上装', 'Top'], bottom: ['下装', 'Bottoms'], outer: ['外套', 'Outerwear'],
@@ -138,8 +137,12 @@ export default function WardrobePanel() {
   // B｜反馈学习:本地偏好(喜欢的颜色 / 拒绝的组合),回喂规则版 + 云造型师
   const [prefs, setPrefs] = useState<OutfitPrefs>({ colorLikes: {}, dislikedItemIds: [], dislikedPairs: [] });
   const [fbFlash, setFbFlash] = useState<string | null>(null);
-  // 图15:存下来的搭配
-  const [tab, setTab] = useState<'today' | 'saved'>('today');
+  // 图15:存下来的搭配。bug3:再加一个「衣帽间」——「全部类型」以下那一整块搬进去。
+  const [tab, setTab] = useState<'today' | 'saved' | 'closet'>('today');
+  // 「换一套」的环形游标(免费档也真的换,见 suggestOutfit 的 rotate)
+  const [rotate, setRotate] = useState(0);
+  // bug3:点一套打开详情(上身图 / 排哪天穿 / 穿过几次)
+  const [openOutfitId, setOpenOutfitId] = useState<string | null>(null);
   const [outfits, setOutfits] = useState<SavedOutfit[]>([]);
   const [savedView, setSavedView] = useState<'list' | 'calendar'>('list');
   const [outfitErr, setOutfitErr] = useState('');
@@ -149,6 +152,8 @@ export default function WardrobePanel() {
   const [tryonError, setTryonError] = useState<string | null>(null);
   const [tryonResult, setTryonResult] = useState<string | null>(null);
   const [bodyThumb, setBodyThumb] = useState<string | null>(null);
+  // 每条搭配的上身图(assetId → dataUrl),搭配详情与日历格子共用
+  const [outfitTryons, setOutfitTryons] = useState<Record<string, string>>({});
   const bodyFileRef = useRef<HTMLInputElement>(null);
   // 批量上传 + 点按编辑
   const [bulkBusy, setBulkBusy] = useState(false);
@@ -192,13 +197,16 @@ export default function WardrobePanel() {
     } catch { setTryonError(L(dict, '这张图读不了,换一张试试。', 'Could not read that image — try another.')); }
   };
 
-  // 试穿:全身照 + 这套单品照 → 云端合成上身效果
-  const runTryon = async (pieces: Garment[]) => {
-    if (!isPro) { guardPaidCloudAi('wardrobe-tryon'); return; }
-    if (!bodyThumb) { setTryonError(L(dict, '先上传一张全身照。', 'Add a full-body photo first.')); return; }
+  /**
+   * 试穿核心:全身照 + 这套单品照 → 云端合成上身效果。返回 dataUrl,失败置 tryonError 并返回 null。
+   * 「今天」的试穿卡与「搭配」详情共用这一份 —— 别写两遍付费门/错误态。
+   */
+  const runTryonCore = async (pieces: Garment[]): Promise<string | null> => {
+    if (!isPro) { guardPaidCloudAi('wardrobe-tryon'); return null; }
+    if (!bodyThumb) { setTryonError(L(dict, '先上传一张全身照。', 'Add a full-body photo first.')); return null; }
     const person = dataUrlToPart(bodyThumb);
-    if (!person) { setTryonError(L(dict, '全身照读不了,重新上传一张。', 'Body photo unreadable — re-upload.')); return; }
-    setTryonBusy(true); setTryonError(null); setTryonResult(null);
+    if (!person) { setTryonError(L(dict, '全身照读不了,重新上传一张。', 'Body photo unreadable — re-upload.')); return null; }
+    setTryonBusy(true); setTryonError(null);
     try {
       const { getLocalImage } = await import('@/lib/portal/local-image-store');
       const garments: Array<{ base64: string; mime: string }> = [];
@@ -208,20 +216,46 @@ export default function WardrobePanel() {
         const part = url ? dataUrlToPart(url) : null;
         if (part) garments.push(part);
       }
-      if (garments.length === 0) { setTryonError(L(dict, '这套里的单品还没有照片 —— 先给它们拍照/上传,才能试穿。', 'Outfit pieces have no photos yet — add photos to try on.')); setTryonBusy(false); return; }
+      if (garments.length === 0) { setTryonError(L(dict, '这套里的单品还没有照片 —— 先给它们拍照/上传,才能试穿。', 'Outfit pieces have no photos yet — add photos to try on.')); return null; }
       const res = await fetch('/api/portal/wardrobe-tryon', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
         body: JSON.stringify({ person, garments }),
       });
       const data = await res.json() as { ok?: boolean; dataUrl?: string; message?: string };
-      if (data?.ok && data.dataUrl) setTryonResult(data.dataUrl);
-      else setTryonError(data?.message || L(dict, '试穿没成功,过会儿再试。', 'Try-on failed — try again later.'));
+      if (data?.ok && data.dataUrl) return data.dataUrl;
+      setTryonError(data?.message || L(dict, '试穿没成功,过会儿再试。', 'Try-on failed — try again later.'));
+      return null;
     } catch {
       setTryonError(L(dict, '试穿没成功,过会儿再试。', 'Try-on failed — try again later.'));
+      return null;
     } finally {
       setTryonBusy(false);
     }
+  };
+
+  const runTryon = async (pieces: Garment[]) => {
+    setTryonResult(null);
+    const url = await runTryonCore(pieces);
+    if (url) setTryonResult(url);
+  };
+
+  /**
+   * bug3:搭配详情里试穿 —— 结果**存进这条搭配**(tryonAssetId),
+   * 于是日历那一格显示的就是上身图,而不是单品缩略图。
+   */
+  const runTryonForOutfit = async (o: SavedOutfit) => {
+    const pieces = o.pieceIds.map((id) => items.find((g) => g.id === id)).filter(Boolean) as Garment[];
+    if (pieces.length === 0) { setTryonError(L(dict, '这套里的衣服已经不在衣橱里了。', 'These pieces are no longer in your wardrobe.')); return; }
+    const url = await runTryonCore(pieces);
+    if (!url) return;
+    const assetId = `wardrobe-tryon-${o.id}`;
+    const { putLocalImage } = await import('@/lib/portal/local-image-store');
+    const ok = await putLocalImage(assetId, url);
+    // 存不下也别丢结果:内存里先显示,只是日历下次进来没有图 —— 并且明说。
+    setOutfitTryons((prev) => ({ ...prev, [assetId]: url }));
+    if (!ok) { setTryonError(L(dict, '上身图这次没能存下来(空间满了)—— 现在能看,重开就没了。', 'Could not store the try-on image (storage full) — visible now, gone after reload.')); return; }
+    commitOutfit(patchOutfit(o.id, { tryonAssetId: assetId }));
   };
 
   useEffect(() => {
@@ -230,6 +264,22 @@ export default function WardrobePanel() {
     window.addEventListener(WARDROBE_OUTFITS_UPDATED, load2);
     return () => window.removeEventListener(WARDROBE_OUTFITS_UPDATED, load2);
   }, []);
+
+  // 搭配的上身图:按需从本机图库读(与单品缩略图同法)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { getLocalImage } = await import('@/lib/portal/local-image-store');
+      for (const o of outfits) {
+        const id = o.tryonAssetId;
+        if (!id || outfitTryons[id]) continue;
+        const url = await getLocalImage(id);
+        if (url && !cancelled) setOutfitTryons((prev) => ({ ...prev, [id]: url }));
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [outfits]);
 
   /** 存/改搭配的统一出口:写不进本机存储要说出来,不假装成功。 */
   const commitOutfit = (ok: boolean, msg?: string) => {
@@ -290,7 +340,14 @@ export default function WardrobePanel() {
     const filtered = items.filter((i) => !avoid.has(i.id));
     return filtered.length >= 2 ? filtered : items;
   }, [items, prefs]);
-  const outfit = useMemo(() => suggestOutfit(outfitPool, weatherCtx, localIso(), prefs), [outfitPool, weatherCtx, prefs, restyleNonce]); // eslint-disable-line react-hooks/exhaustive-deps
+  // bug3「推荐逻辑还需要优化」:① rotate 让「换一套」真的换(以前确定性算法给同一个答案);
+  // ② 淘汰过的组合从候选里剔掉(以前只在展示层提示一句,算法照推)。
+  const outfit = useMemo(
+    () => suggestOutfit(outfitPool, weatherCtx, localIso(), prefs, { rotate, avoidKeys: [...retiredKeys(outfits)] }),
+    [outfitPool, weatherCtx, prefs, restyleNonce, rotate, outfits], // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  /** 「换一套」的唯一出口:游标 +1(Pro 顺带重跑云造型师)。 */
+  const restyle = () => { setRotate((n) => n + 1); setRestyleNonce((n) => n + 1); };
 
   // Pro 云造型师:随衣橱/场合变化 or「重新造型」重算。失败置 stylistError,展示时回落规则版。
   useEffect(() => {
@@ -523,6 +580,7 @@ export default function WardrobePanel() {
         items={[
           { key: 'today' as const, label: L(dict, '今天', 'Today') },
           { key: 'saved' as const, label: L(dict, '搭配', 'Outfits'), badge: outfits.length },
+          { key: 'closet' as const, label: L(dict, '衣帽间', 'Closet'), badge: items.length },
         ]}
         active={tab}
         onSelect={setTab}
@@ -536,6 +594,25 @@ export default function WardrobePanel() {
       {tab === 'saved' ? (
         <SavedOutfits
           outfits={outfits} garments={items} thumbs={thumbs} view={savedView} dict={dict}
+          tryons={outfitTryons} openId={openOutfitId} onOpen={setOpenOutfitId}
+          tryonBusy={tryonBusy} tryonError={tryonError} isPro={isPro}
+          onTryon={runTryonForOutfit}
+          onSchedule={(o, date) => {
+            // 排哪天穿:给目标日建一条「计划」记录(同日同套会 upsert,不会多出一条),
+            // 上身图跟着这一组带过去,于是日历那天直接显示上身图。
+            const ok = saveOutfit(o.pieceIds, date, {
+              planned: true, starred: o.starred, retired: o.retired,
+              ...(o.tryonAssetId ? { tryonAssetId: o.tryonAssetId } : {}),
+            });
+            commitOutfit(ok, L(dict, `排到 ${date} 了`, `Scheduled for ${date}`));
+            if (ok) { setSavedView('calendar'); setOpenOutfitId(null); }
+          }}
+          onWear={(o) => {
+            // 计划到了那天真穿了 → 去掉 planned,这一组的「穿过几次」+1
+            for (const id of o.pieceIds) markWorn(id, new Date().toISOString());
+            commitOutfit(patchOutfit(o.id, { planned: false }), L(dict, '记下穿过了', 'Marked as worn'));
+            load();
+          }}
           onView={setSavedView}
           onStar={(o) => {
             const on = !o.starred;
@@ -558,7 +635,7 @@ export default function WardrobePanel() {
           }}
           onRemove={(o) => { if (confirm(L(dict, '删掉这条搭配记录?', 'Delete this outfit record?'))) commitOutfit(removeOutfit(o.id)); }}
         />
-      ) : (
+      ) : tab === 'today' ? (
       <>
       {/* ① 今天穿这套(有 AI 造型用 AI 的,否则规则版) */}
       {(() => {
@@ -566,13 +643,13 @@ export default function WardrobePanel() {
         if (items.length < 2 || pieces.length === 0) return null;
         // 图15:被淘汰过的一组不再推 —— 命中就直说,给一个「换一套」的出口(不静默换,免得看着像随机)
         const isRetired = retired.has(outfitKey(pieces.map((p) => p.id)));
-        const reasonText = aiPieces ? stylist!.reason : (dict === 'en' ? outfit.reason[1] : outfit.reason[0]);
         return (
         <div style={{ ...card, background: 'var(--portal-accent-soft-md)' }}>
+          {/* bug3:「今天穿这套」这行字删掉(它就在衣橱的第一屏,不需要自我介绍);
+              AI 造型徽章留着 —— 那是「这套哪来的」的真信息。 */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-2)' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>
-              <IconHanger size={17} />{L(dict, '今天穿这套', 'Today’s outfit')}
-              {aiPieces && <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--portal-blue-deep)' }}><IconStar size={12} />{L(dict, 'AI 造型', 'AI styled')}</span>}
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--portal-blue-deep)' }}>
+              {aiPieces && <><IconStar size={12} />{L(dict, 'AI 造型', 'AI styled')}</>}
             </span>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, `${pieces.length} 件`, `${pieces.length} pieces`)}</span>
           </div>
@@ -596,7 +673,7 @@ export default function WardrobePanel() {
           {isRetired && (
             <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
               {L(dict, '这套你淘汰过 —— ', 'You retired this one — ')}
-              <button type="button" onClick={() => setRestyleNonce((n) => n + 1)} style={linkish('var(--portal-accent)')}>{L(dict, '换一套', 'restyle')}</button>
+              <button type="button" onClick={restyle} style={linkish('var(--portal-accent)')}>{L(dict, '换一套', 'restyle')}</button>
             </p>
           )}
           {outfit.needUmbrella && (
@@ -606,45 +683,40 @@ export default function WardrobePanel() {
           {!aiPieces && outfit.mismatch && (
             <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}><IconAlertTriangle size={13} />{dict === 'en' ? outfit.mismatch[1] : outfit.mismatch[0]}</p>
           )}
-          {/* B｜反馈:喜欢/不喜欢 → 越用越懂你(免费+Pro 都有) */}
+          {/* B｜反馈:喜欢/不喜欢 → 越用越懂你(免费+Pro 都有)。
+              bug3:删「这套怎么样?」那句问话、删「这套穿了」按钮(搭配详情里排日子/记穿过更完整),
+              「试穿」与「换一套」并排、同一种按钮样式。 */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
             {fbFlash ? (
               <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-go)' }}>✓ {fbFlash}</span>
             ) : (
               <>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '这套怎么样?', 'Like this?')}</span>
-                <button type="button" aria-label={L(dict, '喜欢', 'Like')} onClick={() => giveFeedback('like', pieces)}
+                {/* 「这套穿了」按标注删掉了 —— 它原先是搭配唯一的入库口。现在改由「喜欢」入库
+                    (starred),搭配 tab 才不会永远是空的;排日子/记穿过都在搭配详情里做。 */}
+                <button type="button" aria-label={L(dict, '喜欢:存进搭配,以后多推这类', 'Like — save to Outfits, more like this')}
+                  onClick={() => {
+                    giveFeedback('like', pieces);
+                    commitOutfit(saveOutfit(pieces.map((p) => p.id), todayIso, { starred: true }));
+                  }}
                   style={{ display: 'inline-flex', padding: '0.3rem 0.55rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer' }}><IconThumbUp size={15} /></button>
-                <button type="button" aria-label={L(dict, '不喜欢', 'Dislike')} onClick={() => giveFeedback('dislike', pieces)}
+                <button type="button" aria-label={L(dict, '不喜欢:以后避开这套', 'Dislike — avoid this')} onClick={() => giveFeedback('dislike', pieces)}
                   style={{ display: 'inline-flex', padding: '0.3rem 0.55rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer' }}><IconThumbDown size={15} /></button>
-                {/* 图15:这套穿了 → 存进「搭配」,以后能翻能按月看 */}
-                <button type="button" onClick={() => {
-                  for (const p of pieces) markWorn(p.id, new Date().toISOString());
-                  giveFeedback('worn', pieces);
-                  commitOutfit(saveOutfit(pieces.map((p) => p.id), todayIso), L(dict, '存进「搭配」了', 'Saved to Outfits'));
-                  load();
-                }}
-                  style={{ marginLeft: 'auto', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
-                  {L(dict, '这套穿了', 'Wore this')}
-                </button>
-                <button type="button" onClick={() => { setTryonOpen(true); setTryonResult(null); setTryonError(null); }}
-                  style={{ padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: 'var(--text-xs)' }}>
-                  {L(dict, '试穿', 'Try on')}
-                </button>
               </>
             )}
           </div>
-          {/* Pro:云造型状态 + 重新造型 */}
-          {isPro && (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-                {stylistBusy ? L(dict, '造型中…', 'Styling…') : stylistError ? L(dict, 'AI 造型暂不可用,先按规则搭配', 'AI styling unavailable — showing rule-based') : ''}
-              </span>
-              <button type="button" onClick={() => setRestyleNonce((n) => n + 1)} disabled={stylistBusy}
-                style={{ flexShrink: 0, padding: '0.3rem 0.7rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-xs)', cursor: stylistBusy ? 'default' : 'pointer', opacity: stylistBusy ? 0.6 : 1 }}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}><IconRefresh size={12} />{L(dict, '换一套', 'Restyle')}</span>
-              </button>
-            </div>
+          {/* 试穿 / 换一套:并排等宽、同款式 */}
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+            <button type="button" style={outfitActionBtn} onClick={() => { setTryonOpen(true); setTryonResult(null); setTryonError(null); }}>
+              {L(dict, '试穿', 'Try on')}
+            </button>
+            <button type="button" style={{ ...outfitActionBtn, opacity: stylistBusy ? 0.6 : 1 }} disabled={stylistBusy} onClick={restyle}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}><IconRefresh size={13} />{L(dict, '换一套', 'Restyle')}</span>
+            </button>
+          </div>
+          {isPro && (stylistBusy || stylistError) && (
+            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+              {stylistBusy ? L(dict, '造型中…', 'Styling…') : L(dict, 'AI 造型暂不可用,先按规则搭配', 'AI styling unavailable — showing rule-based')}
+            </p>
           )}
         </div>
         );
@@ -660,8 +732,8 @@ export default function WardrobePanel() {
       {tryonOpen && (
         <div style={{ ...card, marginTop: 'var(--space-3)', background: 'var(--glass-bg-solid, var(--portal-bg))' }}>
           <input ref={bodyFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onPickBody} />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}><IconMirror size={15} />{L(dict, '上身试穿', 'Virtual try-on')}</span>
+          {/* bug3:「目 上身试穿」这个图标和标题都删掉 —— 卡片里已经是全身照 + 试穿按钮,自明。 */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
             <button type="button" onClick={() => setTryonOpen(false)} aria-label={L(dict, '收起', 'Close')}
               style={{ background: 'none', border: 'none', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
           </div>
@@ -688,11 +760,14 @@ export default function WardrobePanel() {
                   ) : <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}><IconCamera size={18} />{L(dict, '全身照', 'Full body')}</span>}
                 </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
-                    {bodyThumb
-                      ? L(dict, '用这张全身照把这套穿上看看。可随时换一张。', 'Use this full-body photo to see the outfit on you. Swap anytime.')
-                      : L(dict, '上传一张全身照(正面、光线好),就能看这套穿在你身上的样子。', 'Add a full-body photo (front, good light) to see the outfit on you.')}
-                  </p>
+                  {/* bug3:已有全身照时那句「用这张全身照把这套穿上看看」删掉(照片就在旁边,不必解说)。
+                      还没上传时保留提示 —— 并且把隐私那句合并到这里:交出照片之前才是需要知情的时刻。 */}
+                  {!bodyThumb && (
+                    <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
+                      {L(dict, '上传一张全身照(正面、光线好),就能看这套穿在你身上的样子。照片只存在你手机本地,仅在点「试穿」时发出去用于生成,服务端不留存。',
+                        'Add a full-body photo (front, good light) to see the outfit on you. It stays on your device — sent only when you tap Try on, never stored on the server.')}
+                    </p>
+                  )}
                   {bodyThumb && (
                     <button type="button" onClick={() => bodyFileRef.current?.click()}
                       style={{ marginTop: '0.4rem', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>{L(dict, '换全身照', 'Change photo')}</button>
@@ -706,17 +781,18 @@ export default function WardrobePanel() {
 
               <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-3)', opacity: tryonBusy ? 0.6 : 1 }}
                 disabled={tryonBusy} onClick={() => runTryon(currentPieces)}>
-                {tryonBusy ? L(dict, '生成中…(约十几秒)', 'Generating… (~15s)') : !isPro ? L(dict, '试穿这套(Pro)', 'Try on (Pro)') : L(dict, '试穿这套', 'Try on')}
+                {tryonBusy ? L(dict, '生成中…(约十几秒)', 'Generating… (~15s)') : !isPro ? L(dict, '试穿(Pro)', 'Try on (Pro)') : L(dict, '试穿', 'Try on')}
               </button>
-              <p style={{ margin: 'var(--space-2) 0 0', fontSize: '0.62rem', color: 'var(--portal-muted)', lineHeight: 1.5 }}>
-                {L(dict, '全身照只存在你手机本地,仅在点「试穿」时用于生成,服务端不留存。', 'Your photo stays on your device — sent only when you tap Try on, never stored on the server.')}
-              </p>
             </>
           )}
         </div>
       )}
 
-      {/* ② 加衣服 / 批量上传 */}
+      </>
+      ) : (
+      /* ═══ 衣帽间(bug3 新增第三个 tab):加衣服 + 筛选 + 单品网格 + 单品详情 ═══ */
+      <>
+      {/* ② 加衣服 / 批量上传(bug3:「加衣服」按钮从「今天」挪到这里) */}
       <input ref={bulkRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={onPickBulk} />
       {!adding ? (
         <>
@@ -908,67 +984,183 @@ export default function WardrobePanel() {
 }
 
 /**
- * SavedOutfits — 存下来的搭配(2026-07-28,标注 图15)。
+ * SavedOutfits — 存下来的搭配(2026-07-28,标注 图15;bug3 大改)。
  * 两种看法:列表(新→旧)/ 按月日历(哪天穿了什么,一眼看出哪几天没记)。
- * 点星 = 喜欢;点不喜欢 = 淘汰(记录留着,但搭配不再推这一组)。
+ *
+ * bug3 按标注补齐的四件事:
+ *   · 点一套 → 打开详情:上身试穿图 + 排哪天穿(排完直接跳到日历)+ 穿过几次
+ *   · 列表行长按 → 直接排日子(不用先进详情)
+ *   · 列表行显示这一组「穿过 N 次」
+ *   · 喜欢 / 淘汰 点了到底发生什么,写在按钮旁边 —— 尤其「变灰 = 已淘汰,不再出现在推荐里」
  */
-function SavedOutfits({ outfits, garments, thumbs, view, dict, onView, onStar, onRetire, onRemove }: {
+function SavedOutfits({
+  outfits, garments, thumbs, view, dict, tryons, openId, tryonBusy, tryonError, isPro,
+  onView, onStar, onRetire, onRemove, onOpen, onTryon, onSchedule, onWear,
+}: {
   outfits: SavedOutfit[]; garments: Garment[]; thumbs: Record<string, string>;
   view: 'list' | 'calendar'; dict: string;
+  tryons: Record<string, string>; openId: string | null;
+  tryonBusy: boolean; tryonError: string | null; isPro: boolean;
   onView: (v: 'list' | 'calendar') => void;
   onStar: (o: SavedOutfit) => void; onRetire: (o: SavedOutfit) => void; onRemove: (o: SavedOutfit) => void;
+  onOpen: (id: string | null) => void;
+  onTryon: (o: SavedOutfit) => void;
+  onSchedule: (o: SavedOutfit, date: string) => void;
+  onWear: (o: SavedOutfit) => void;
 }) {
   const byId = useMemo(() => new Map(garments.map((g) => [g.id, g])), [garments]);
   const months = useMemo(() => groupByMonth(outfits), [outfits]);
   // 日历里点某一天 → 下面只列那天穿的;再点一次取消,回到整月。
   const [pickedDay, setPickedDay] = useState<string | null>(null);
+  // 长按要排日子的那一条(null = 没在排)
+  const [schedulingId, setSchedulingId] = useState<string | null>(null);
+  const holdRef = useRef<number | null>(null);
+
+  const opened = openId ? outfits.find((o) => o.id === openId) || null : null;
 
   if (outfits.length === 0) {
     return (
       <p className="nesio-insights-empty" style={{ marginTop: 0 }}>
-        {L(dict, '还没存过搭配 —— 在「今天」里点「这套穿了」,它就会留在这儿,以后能按月翻。', 'No outfits saved yet — tap “Wore this” on the Today tab and they’ll collect here.')}
+        {L(dict, '还没存过搭配 —— 在「今天」里点喜欢或试穿过一套,它就会留在这儿,以后能按月翻。', 'No outfits saved yet — like or try on an outfit on the Today tab and it will collect here.')}
       </p>
     );
   }
 
-  const Row = ({ o }: { o: SavedOutfit }) => {
-    const pieces = o.pieceIds.map((id) => byId.get(id)).filter(Boolean) as Garment[];
+  const piecesOf = (o: SavedOutfit) => o.pieceIds.map((id) => byId.get(id)).filter(Boolean) as Garment[];
+  const fmtDay = (d: string) => (dict === 'en' ? d.slice(5).replace('-', '/') : `${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日`);
+
+  /** 单品缩略图条(详情/列表共用)。 */
+  const PieceStrip = ({ o, size }: { o: SavedOutfit; size: number }) => {
+    const pieces = piecesOf(o);
     return (
-      <div style={{ ...card, opacity: o.retired ? 0.55 : 1 }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
+        {pieces.map((p) => (thumbs[p.id] ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img key={p.id} src={thumbs[p.id]} alt={p.name} title={p.name} width={size} height={size}
+            style={{ width: size, height: size, borderRadius: 'var(--radius-sm)', objectFit: 'cover', border: '1px solid var(--portal-line)' }} />
+        ) : (
+          <span key={p.id} style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.5rem' }}>{p.name}</span>
+        )))}
+        {pieces.length === 0 && (
+          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '这套里的衣服已经不在衣橱里了', 'These pieces are no longer in your wardrobe')}</span>
+        )}
+      </div>
+    );
+  };
+
+  /** 排日子的小行:一个 date input + 确认。列表长按和详情里共用。 */
+  const Scheduler = ({ o }: { o: SavedOutfit }) => {
+    const [d, setD] = useState(o.date);
+    return (
+      <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginTop: 'var(--space-2)' }}>
+        <input type="date" value={d} onChange={(e) => setD(e.target.value)}
+          aria-label={L(dict, '哪天穿', 'Wear on')}
+          style={{ flex: 1, minWidth: 0, padding: '0.4rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)' }} />
+        <button type="button" disabled={!d} style={outfitActionBtn}
+          onClick={() => { if (d) { onSchedule(o, d); setSchedulingId(null); } }}>
+          {L(dict, '排进日历', 'Add to calendar')}
+        </button>
+      </div>
+    );
+  };
+
+  /** 喜欢 / 淘汰 / 删记录 + 结果说明(bug3:点了到底发生什么,写出来)。 */
+  const Actions = ({ o }: { o: SavedOutfit }) => (
+    <>
+      <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
+        <button type="button" onClick={() => onStar(o)} style={linkish(o.starred ? 'var(--status-gentle)' : 'var(--portal-muted)')}>
+          <span style={{ color: o.starred ? 'var(--status-gentle)' : 'var(--portal-muted)', marginRight: 'var(--space-1)', display: 'inline-flex', verticalAlign: '-2px' }}>
+            <IconStar size={13} />
+          </span>
+          {o.starred ? L(dict, '喜欢', 'Loved') : L(dict, '喜欢', 'Love it')}
+        </button>
+        <button type="button" onClick={() => onRetire(o)} style={linkish(o.retired ? 'var(--portal-accent)' : 'var(--portal-muted)')}>
+          {o.retired ? L(dict, '放回来', 'Un-retire') : L(dict, '淘汰', 'Retire')}
+        </button>
+        <button type="button" onClick={() => onRemove(o)} style={{ ...linkish('var(--portal-muted)'), marginLeft: 'auto' }}>{L(dict, '删记录', 'Delete')}</button>
+      </div>
+      {/* 结果说明:点完各自的后果 —— 变灰是什么意思,这里明写 */}
+      <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
+        {o.retired
+          ? L(dict, '已淘汰:这一组变灰,以后不会再出现在「今天」的推荐里。放回来就恢复。', 'Retired: greyed out and never suggested again on Today. Un-retire to restore.')
+          : o.starred
+            ? L(dict, '已喜欢:这套的颜色/风格会在以后的推荐里加权。', 'Loved: its colors and style get weighted up in future suggestions.')
+            : L(dict, '喜欢 = 以后多推这类;淘汰 = 变灰、以后不再推这一组;删记录 = 连这条记录一起删掉。', 'Love = more like this; Retire = greyed out and never suggested again; Delete = removes this record.')}
+      </p>
+    </>
+  );
+
+  /** 详情:上身图 + 排哪天穿 + 穿过几次(bug3:点一套可以打开) */
+  const Detail = ({ o }: { o: SavedOutfit }) => {
+    const worn = wornCount(outfits, o.pieceIds);
+    const tryUrl = o.tryonAssetId ? tryons[o.tryonAssetId] : undefined;
+    return (
+      <div style={{ ...card, opacity: o.retired ? 0.7 : 1 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-2)' }}>
-          <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>
-            {dict === 'en'
-              ? o.date.slice(5).replace('-', '/')
-              : `${Number(o.date.slice(5, 7))}月${Number(o.date.slice(8, 10))}日`}
-          </span>
-          <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-            {o.retired ? L(dict, '已淘汰', 'Retired') : o.starred ? L(dict, '喜欢', 'Loved') : L(dict, `${pieces.length} 件`, `${pieces.length} pieces`)}
-          </span>
+          <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{fmtDay(o.date)}</span>
+          <button type="button" onClick={() => onOpen(null)}
+            style={{ background: 'none', border: 'none', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: 0 }}>{L(dict, '收起', 'Close')}</button>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
-          {pieces.map((p) => (thumbs[p.id] ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img key={p.id} src={thumbs[p.id]} alt={p.name} title={p.name} width={52} height={52}
-              style={{ width: 52, height: 52, borderRadius: 'var(--radius-sm)', objectFit: 'cover', border: '1px solid var(--portal-line)' }} />
-          ) : (
-            <span key={p.id} style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.5rem' }}>{p.name}</span>
-          )))}
-          {pieces.length === 0 && (
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '这套里的衣服已经不在衣橱里了', 'These pieces are no longer in your wardrobe')}</span>
+        <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+          {o.planned ? L(dict, '排在这天 · 还没穿', 'Scheduled · not worn yet') : L(dict, `穿过 ${worn} 次`, `worn ${worn}×`)}
+          {o.retired ? L(dict, ' · 已淘汰', ' · retired') : ''}
+        </p>
+
+        {/* 上身试穿效果图 */}
+        {tryUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={tryUrl} alt={L(dict, '试穿效果', 'Try-on result')}
+            style={{ width: '100%', marginTop: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)' }} />
+        ) : (
+          <PieceStrip o={o} size={64} />
+        )}
+        {tryonError && (
+          <p role="alert" style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>{tryonError}</p>
+        )}
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
+          <button type="button" style={{ ...outfitActionBtn, opacity: tryonBusy ? 0.6 : 1 }} disabled={tryonBusy} onClick={() => onTryon(o)}>
+            {tryonBusy ? L(dict, '生成中…', 'Generating…') : tryUrl ? L(dict, '重新试穿', 'Try again') : !isPro ? L(dict, '试穿(Pro)', 'Try on (Pro)') : L(dict, '试穿', 'Try on')}
+          </button>
+          {o.planned && (
+            <button type="button" style={outfitActionBtn} onClick={() => onWear(o)}>{L(dict, '穿了', 'Wore it')}</button>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
-          <button type="button" onClick={() => onStar(o)} style={linkish(o.starred ? 'var(--status-gentle)' : 'var(--portal-muted)')}>
-            <span style={{ color: o.starred ? 'var(--status-gentle)' : 'var(--portal-muted)', marginRight: 'var(--space-1)', display: 'inline-flex', verticalAlign: '-2px' }}>
-              <IconStar size={13} />
+
+        {/* 排哪天穿 → 排完自动切到日历 */}
+        <Scheduler o={o} />
+        <Actions o={o} />
+      </div>
+    );
+  };
+
+  const Row = ({ o }: { o: SavedOutfit }) => {
+    const worn = wornCount(outfits, o.pieceIds);
+    const startHold = () => {
+      holdRef.current = window.setTimeout(() => { setSchedulingId(o.id); holdRef.current = null; }, 550);
+    };
+    const cancelHold = () => { if (holdRef.current) { window.clearTimeout(holdRef.current); holdRef.current = null; } };
+    return (
+      <div style={{ ...card, opacity: o.retired ? 0.55 : 1 }}>
+        {/* 整行可点 → 详情;长按 → 直接排日子(bug3 两条标注都要) */}
+        <div role="button" tabIndex={0} style={{ cursor: 'pointer' }}
+          onClick={() => { if (!holdRef.current) onOpen(o.id); cancelHold(); }}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(o.id); } }}
+          onPointerDown={startHold} onPointerUp={cancelHold} onPointerLeave={cancelHold}
+          onContextMenu={(e) => { e.preventDefault(); setSchedulingId(o.id); }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-2)' }}>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{fmtDay(o.date)}</span>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+              {o.planned
+                ? L(dict, '排在这天', 'Scheduled')
+                : o.retired
+                  ? L(dict, '已淘汰 · 不再推荐', 'Retired · not suggested')
+                  : L(dict, `穿过 ${worn} 次`, `worn ${worn}×`)}
             </span>
-            {o.starred ? L(dict, '喜欢', 'Loved') : L(dict, '喜欢', 'Love it')}
-          </button>
-          <button type="button" onClick={() => onRetire(o)} style={linkish(o.retired ? 'var(--portal-accent)' : 'var(--portal-muted)')}>
-            {o.retired ? L(dict, '取消淘汰', 'Un-retire') : L(dict, '不喜欢 · 淘汰', 'Retire')}
-          </button>
-          <button type="button" onClick={() => onRemove(o)} style={{ ...linkish('var(--portal-muted)'), marginLeft: 'auto' }}>{L(dict, '删记录', 'Delete')}</button>
+          </div>
+          <PieceStrip o={o} size={52} />
         </div>
+        {schedulingId === o.id ? <Scheduler o={o} /> : <Actions o={o} />}
       </div>
     );
   };
@@ -986,8 +1178,11 @@ function SavedOutfits({ outfits, garments, thumbs, view, dict, onView, onStar, o
         ariaLabel={L(dict, '搭配看法', 'Outfit view')}
       />
 
-      {view === 'list' ? (
+      {opened ? <Detail o={opened} /> : view === 'list' ? (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+          <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+            {L(dict, '点一套看上身图和排日子,长按直接排哪天穿。', 'Tap an outfit for the try-on view and scheduling; long-press to schedule directly.')}
+          </p>
           {outfits.map((o) => <Row key={o.id} o={o} />)}
         </div>
       ) : (
@@ -1000,7 +1195,7 @@ function SavedOutfits({ outfits, garments, thumbs, view, dict, onView, onStar, o
               <p style={sectionLbl}>{dict === 'en' ? m.month : `${m.month.slice(0, 4)} 年 ${Number(m.month.slice(5))} 月`}
                 <span style={{ color: 'var(--portal-muted)', fontWeight: 'var(--weight-regular)' }}> {L(dict, `${days} 天`, `${days} days`)}</span>
               </p>
-              <MonthGrid month={m.month} items={m.items} thumbs={thumbs} dict={dict} selected={pickedDay} onPick={setPickedDay} />
+              <MonthGrid month={m.month} items={m.items} thumbs={thumbs} tryons={tryons} dict={dict} selected={pickedDay} onPick={setPickedDay} />
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
                 {(pickedDay && pickedDay.slice(0, 7) === m.month ? outfitsOn(m.items, pickedDay) : m.items).map((o) => <Row key={o.id} o={o} />)}
               </div>
@@ -1012,15 +1207,17 @@ function SavedOutfits({ outfits, garments, thumbs, view, dict, onView, onStar, o
   );
 }
 
-
 /**
  * 一个月的日历格子:有搭配的那天亮一个点,点它只看那天的。
  * 图15 要的是「按日历展示」—— 第一版只做了按月分组的列表(状态名还叫 calendar),
  * 为日历写的 outfitsOn 一直没人用。这里把它补成真的日历。
  * 周一起头,和健身页的七天点同一个约定。
  */
-function MonthGrid({ month, items, thumbs, dict, selected, onPick }: {
-  month: string; items: SavedOutfit[]; thumbs: Record<string, string>; dict: string;
+function MonthGrid({ month, items, thumbs, tryons, dict, selected, onPick }: {
+  month: string; items: SavedOutfit[]; thumbs: Record<string, string>;
+  /** 每条搭配的上身图(assetId → dataUrl)—— bug3:日历那天要展示上身图,不是单品图。 */
+  tryons: Record<string, string>;
+  dict: string;
   selected: string | null; onPick: (d: string | null) => void;
 }) {
   const [y, m] = month.split('-').map(Number);
@@ -1028,13 +1225,20 @@ function MonthGrid({ month, items, thumbs, dict, selected, onPick }: {
   const lead = (first.getDay() + 6) % 7;              // 周一=0
   const days = new Date(y, m, 0).getDate();
   const has = new Set(items.map((o) => o.date));
-  // 每天取一张预览图:那天最先存的那套里,第一件有图的单品。
-  // 日历的价值就在「一眼看见那天穿的什么样」,所以格子里放图不放字。
+  // 每天取一张预览图:先要那套的**上身图**(bug3:日历页展示上身图),
+  // 没试穿过才退回「第一件有图的单品」。日历的价值就在「一眼看见那天穿的什么样」。
   const preview = new Map<string, string>();
+  const bodyDays = new Set<string>(); // 这天已经用上身图占住了,别被单品图覆盖
   for (const o of items) {
-    if (preview.has(o.date)) continue;
-    const url = o.pieceIds.map((id) => thumbs[id]).find(Boolean);
-    if (url) preview.set(o.date, url);
+    const url = (o.tryonAssetId ? tryons[o.tryonAssetId] : undefined)
+      || o.pieceIds.map((id) => thumbs[id]).find(Boolean);
+    if (!url) continue;
+    // 上身图优先级更高:已有单品图占位时,遇到同一天的上身图要顶掉它
+    const isBody = Boolean(o.tryonAssetId && tryons[o.tryonAssetId]);
+    if (preview.has(o.date) && !isBody) continue;
+    if (preview.has(o.date) && isBody && bodyDays.has(o.date)) continue;
+    preview.set(o.date, url);
+    if (isBody) bodyDays.add(o.date);
   }
   const pad = (n: number) => String(n).padStart(2, '0');
   const week = dict === 'en' ? ['M', 'T', 'W', 'T', 'F', 'S', 'S'] : ['一', '二', '三', '四', '五', '六', '日'];
@@ -1098,6 +1302,13 @@ function MonthGrid({ month, items, thumbs, dict, selected, onPick }: {
     </div>
   );
 }
+
+/** bug3:「试穿 / 换一套」并排同款 —— 原来一个是描边灰、一个是蓝底,看着像两个层级。 */
+const outfitActionBtn: React.CSSProperties = {
+  flex: 1, padding: '0.45rem 0', borderRadius: 'var(--radius-pill)',
+  border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)',
+  color: 'var(--portal-blue-deep)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', cursor: 'pointer',
+};
 
 const linkish = (color: string): React.CSSProperties => ({
   background: 'none', border: 'none', padding: 0, cursor: 'pointer',
