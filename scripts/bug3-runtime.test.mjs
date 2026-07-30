@@ -293,6 +293,57 @@ check('⑥b 涨价检测仍只认 mature(否则 2 笔中位数造假涨价)', ()
   assert.ok(/status !== 'mature'/.test(fn.slice(0, 1500)), '涨价 gate 必须仍在 mature 上');
 });
 
+// ══ ⑦ mood-trend:情绪盘记一笔就能在趋势里看到(p43 的可达性,数据侧)══
+// 上一版 p43 只把入口挂在 Apple Health 的情绪卡上,而趋势读的是这份 —— 于是
+// 「用情绪盘记心情的人有数据却没入口」。数据侧这里真跑一遍,保证卡上的
+// hasData / 主情绪 / 今天那根柱子确实由情绪盘记录驱动。
+const node = (emotion, tags, energyLevel, daysAgo = 0) => ({
+  type: 'health_state', tags,
+  attributes: { emotion, ...(energyLevel ? { energyLevel } : {}) },
+  createdAt: new Date(Date.now() - daysAgo * 86400000).toISOString(),
+});
+const loadTrend = (nodes) => load('lib/portal/mood-trend.ts', {
+  '@/lib/portal/life-graph': { getLifeGraph: () => nodes },
+});
+
+check('⑦a 情绪盘记一笔 → 分布 + 今天那根柱子都有它', () => {
+  const t = loadTrend([node('calm', ['moment', 'feeling', 'calm'], 'high')]).readMoodTrend('week');
+  assert.strictEqual(t.topEmotion, 'calm', '主情绪应是刚记的那一个');
+  looseDeepEqual(t.dist.map((d) => [d.id, d.count]), [['calm', 1]]);
+  const today = t.days[t.days.length - 1];
+  assert.strictEqual(today.isToday, true);
+  assert.strictEqual(today.emotionId, 'calm', '今天那根柱子要染上今天的心情');
+  assert.strictEqual(today.energyPct, 88, '满电 → 88%');
+});
+
+check('⑦b 空图不炸,且卡会判成「还没有记录」', () => {
+  const t = loadTrend([]).readMoodTrend('week');
+  assert.strictEqual(t.dist.length, 0);
+  assert.ok(t.days.every((d) => d.emotionId === null && d.energyPct === 0),
+    '一根有色柱子都不该有 —— 否则空态判定(hasData)会假阳');
+});
+
+check('⑦c 不是情绪记录的 health_state 不算进来', () => {
+  const t = loadTrend([
+    node('calm', ['lab'], 'mid'),            // 化验之类:没有 feeling/moment 标
+    node('joy', ['moment', 'feeling'], 'mid'),
+  ]).readMoodTrend('week');
+  looseDeepEqual(t.dist.map((d) => d.id), ['joy'], '只认情绪盘写的那类节点');
+});
+
+check('⑦d 认不出的情绪 id 不计数也不上色(脏数据不外泄成 var(--emotion-xxx))', () => {
+  const t = loadTrend([node('rage', ['moment', 'feeling'], 'mid')]).readMoodTrend('week');
+  assert.strictEqual(t.dist.length, 0);
+  assert.strictEqual(t.days[t.days.length - 1].emotionId, null);
+});
+
+check('⑦e 月窗口能捞到上周的记录(本周空也别让人以为没数据)', () => {
+  const nodes = [node('sad', ['moment', 'feeling'], 'low', 12)];
+  assert.strictEqual(loadTrend(nodes).readMoodTrend('week').dist.length, 0, '12 天前不在本周窗口');
+  looseDeepEqual(loadTrend(nodes).readMoodTrend('month').dist.map((d) => d.id), ['sad'],
+    '月窗口要能捞到 —— 所以本周没数据时入口也得留着');
+});
+
 Promise.all(results.filter((r) => r[0] === 'PASS').map(() => null)).then(() => {
   // 等 ①g 的 async 收尾
   setTimeout(() => {
