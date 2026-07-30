@@ -45,7 +45,7 @@ const MemoryNodeDetailLazy = dynamic(() => import('./MemoryNodeDetail'), { ssr: 
 import InventoryStatsPanel from './insights/InventoryStatsPanel';
 import WardrobePanel from './insights/WardrobePanel';
 import AdminOpsPanel from './insights/AdminOpsPanel';
-import TeslaPanel from './TeslaPanel';
+import AssetsPanel from './AssetsPanel';
 import TabErrorBoundary from './TabErrorBoundary';
 import CardArchivePanel from './insights/CardArchivePanel';
 import { mineCrossDomain } from '@/lib/portal/cross-domain-correlations';
@@ -81,6 +81,13 @@ function RhythmHeatmap({ nodes, compact = false }: { nodes: LifeNode[]; compact?
   const max = Math.max(1, ...grid.flat());
   const dowLabels = dict === 'en' ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'] : ['日', '一', '二', '三', '四', '五', '六'];
   const cellColor = (c: number) => (c === 0 ? 'var(--portal-surface-2, rgba(127,127,127,0.08))' : `color-mix(in srgb, var(--portal-blue-deep) ${Math.round(22 + 68 * (c / max))}%, transparent)`);
+  // Bug4 图22:格子下面补月份 —— 之前 10 列没有任何时间标尺,看图的人不知道
+  // 左边是几月、右边是不是这周。每列取该周周日所在的月,月份变了才写字。
+  const monthFmt = new Intl.DateTimeFormat(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short' });
+  const monthCols = Array.from({ length: WEEKS }, (_, wi) => {
+    const d = new Date(gridStart.getTime() + wi * 7 * DAY_MS);
+    return { wi, m: d.getMonth(), label: monthFmt.format(d) };
+  }).map((c, i, all) => ({ ...c, show: i === 0 || all[i - 1].m !== c.m }));
   return (
     <div className={`nesio-rhythm-heat${compact ? ' nesio-rhythm-heat--compact' : ''}`} role="img" aria-label={L(dict, '记录节律热力图', 'Capture rhythm heatmap')}>
       {grid.map((row, dow) => (
@@ -92,6 +99,12 @@ function RhythmHeatmap({ nodes, compact = false }: { nodes: LifeNode[]; compact?
           ))}
         </div>
       ))}
+      <div className="nesio-rhythm-heat-row nesio-rhythm-heat-months" aria-hidden>
+        {!compact && <span className="nesio-rhythm-heat-dow" />}
+        {monthCols.map((c) => (
+          <span key={c.wi} className="nesio-rhythm-heat-cell nesio-rhythm-heat-month">{c.show ? c.label : ''}</span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -166,9 +179,11 @@ function MindPie({ items, onPick, dict }: { items: Array<[string, number]>; onPi
         })}
         <div className="nesio-mindpie2-ctr" aria-live="polite">
           {selArc ? (
+            // Bug4 图22:选中一片时中心只有绝对次数 —— 但这张图问的是「占比」,
+            // 次数得自己跟总数做除法。百分比放大字位,次数退成脚注。
             <button type="button" className="nesio-mindpie2-open" onClick={(e) => { e.stopPropagation(); onPick(selArc.tag); }}>
-              <b>{selArc.c}</b>
-              <small className="nesio-mindpie2-ctr-name">{selArc.tag}</small>
+              <b>{Math.round((selArc.c / total) * 100)}%</b>
+              <small className="nesio-mindpie2-ctr-name">{selArc.tag} · {selArc.c}</small>
               <small className="nesio-mindpie2-go">{L(dict, '查看记忆 ›', 'View ›')}</small>
             </button>
           ) : (
@@ -347,7 +362,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       : t === 'schedule' ? L(dict, '日程', 'Schedule')
       : t === 'inventory' ? L(dict, '物品', 'Items')
       : t === 'wardrobe' ? L(dict, '衣橱', 'Wardrobe')
-      : t === 'tesla' ? L(dict, '车', 'Car')
+      // Bug4 图23-24:「车」扩成「资产」—— 房产 tab + 车 tab。
+      // tab key 仍叫 tesla:深链和宫格顺序都按 key 存,改 key 会把老用户的自定义顺序打散。
+      : t === 'tesla' ? L(dict, '资产', 'Assets')
       : t === 'admin' ? L(dict, '运营', 'Ops')
       : L(dict, '镜子', 'Mirror');
   const tabIcon = (t: MainTab): ReactNode => {
@@ -397,7 +414,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       : t === 'growth' ? showGrowth
       : t === 'montage' ? showMontage
       : t === 'wardrobe' ? showWardrobe
-      : t === 'tesla' ? showTesla
+      // 资产页不再由 Tesla 开关决定生死 —— 没连车也要能记房产;
+      // 车 tab 里那块实时快照自己会说「还没连」。
+      : t === 'tesla' ? true
       : t === 'living' ? showLiving
       : true; // 'reflection'(洞察)= 核心,永远在
   useEffect(() => { if (!tabEnabled(mainTab)) setMainTab('reflection'); }, [showPlaces, showHealth, showFinance, showPeople, showInventory, showSchedule, showGrowth, showMontage, showWardrobe, showTesla, showLiving, mainTab]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -527,10 +546,17 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
     if (monthNodes.length >= 5 && peak.count > monthNodes.length / 3) {
       parts.push(L(dict, `多在${peak.label}`, `mostly ${peak.labelEn}`));
     }
-    if (src.voice + src.manual >= 5) {
-      if (src.voice > src.manual) parts.push(L(dict, '说的比打的多', 'more spoken than typed'));
-      else if (src.manual > src.voice) parts.push(L(dict, '打的比说的多', 'more typed than spoken'));
-    }
+    // Bug4 图22 核实这一句是不是硬编码:不是 —— 每一节都从真实节点算,凑不够样本就不说。
+    // 但原来只比「说 vs 打」,拍照记的那部分永远不进句子;一个主要靠拍的人
+    // 会看到「打的比说的多」,而他这个月大半是照片。三者一起比,取真正的最多。
+    const bySrc: Array<[number, string, string]> = [
+      [src.voice, '说的最多', 'mostly spoken'],
+      [src.manual, '打的最多', 'mostly typed'],
+      [src.photo, '拍的最多', 'mostly photos'],
+    ];
+    const [topN, topZh, topEn] = [...bySrc].sort((a, b) => b[0] - a[0])[0];
+    const secondN = [...bySrc].sort((a, b) => b[0] - a[0])[1][0];
+    if (src.voice + src.manual + src.photo >= 5 && topN > secondN) parts.push(L(dict, topZh, topEn));
     return { line: parts.join(' · '), count: monthNodes.length };
   }, [realNodes, dict]);
 
@@ -621,21 +647,24 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
               return (
                 <div className="nesio-insights-section">
                   <p className="nesio-insights-section-label">{L(dict, '走走看', 'Wander')}</p>
-                  <div className="nesio-wander-card" style={{ padding: '0.9rem', borderRadius: 'var(--radius-md, 16px)', background: 'var(--portal-bg)', border: '1px solid var(--portal-line)' }}>
-                    <p style={{ margin: 0, fontSize: '0.7rem', color: 'var(--portal-muted)' }}>
-                      {isYearAgo ? L(dict, '去年今天,你写下 ——', 'A year ago today, you wrote —') : L(dict, '翻到一条 ——', 'Turned up —')}
-                    </p>
-                    <button type="button" onClick={() => openInMemory(node.name)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 0, margin: '0.45rem 0', cursor: 'pointer' }}>
-                      <span style={{ fontFamily: 'var(--font-serif)', fontSize: '0.98rem', lineHeight: 1.6, color: 'var(--portal-ink)' }}>「{node.name.slice(0, 60)}」</span>
-                    </button>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>
+                  {/* Bug4 图22:日期提到第一行(它是这条记录的坐标,该先看到),
+                      「再翻一条」只留刷新图标(卡片里只有这一个动作,不需要文字解释),
+                      「翻到一条 ——」那句引语删掉 —— 它什么也没说明。
+                      「去年今天」保留,但缩成日期旁的一个标记。正文字号回 token。 */}
+                  <div className="nesio-wander-card" style={{ padding: 'var(--space-3)', borderRadius: 'var(--radius-md, 16px)', background: 'var(--portal-bg)', border: '1px solid var(--portal-line)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)' }}>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
                         {new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'short', day: 'numeric' })}
+                        {isYearAgo && <b style={{ marginLeft: 'var(--space-2)', color: 'var(--portal-accent)', fontWeight: 'var(--weight-semibold)' }}>{L(dict, '去年今天', 'A year ago')}</b>}
                       </span>
-                      <button type="button" onClick={() => setWanderSeed((s) => s + 1)} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.28rem', fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-accent)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-                        <IconRefresh size={13} />{L(dict, '再翻一条', 'Another')}
+                      <button type="button" onClick={() => setWanderSeed((s) => s + 1)} aria-label={L(dict, '再翻一条', 'Another')} title={L(dict, '再翻一条', 'Another')}
+                        style={{ display: 'inline-flex', alignItems: 'center', color: 'var(--portal-accent)', background: 'transparent', border: 'none', padding: 'var(--space-1)', cursor: 'pointer' }}>
+                        <IconRefresh size={15} />
                       </button>
                     </div>
+                    <button type="button" onClick={() => openInMemory(node.name)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 0, margin: 'var(--space-2) 0 0', cursor: 'pointer' }}>
+                      <span style={{ fontFamily: 'var(--font-serif)', fontSize: 'var(--text-body)', lineHeight: 1.6, color: 'var(--portal-ink)' }}>「{node.name.slice(0, 60)}」</span>
+                    </button>
                   </div>
                 </div>
               );
@@ -797,7 +826,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {mainTab === 'admin' && <TabErrorBoundary label="admin"><AdminOpsPanel /></TabErrorBoundary>}
 
         {/* ── Tab: 车 · Tesla(常驻入口,便于长期观察数据到没到、去了哪)── */}
-        {mainTab === 'tesla' && <div className="nesio-analytics-tab"><TeslaPanel /></div>}
+        {mainTab === 'tesla' && <div className="nesio-analytics-tab"><AssetsPanel /></div>}
 
         {/* ── Tab: 认知 = 多面镜月度信(Pro);旧 7 层模型 + 节点图移 Lab ── */}
         {mainTab === 'living' && (

@@ -4,7 +4,7 @@
  * TeslaPanel — Tesla 数据视图(纯内容,无外壳)。
  * 被两处复用,不留双实现:
  *   ① TeslaSheet(数据接入 → Tesla 行「数据」)—— 包一层 bottom sheet 外壳;
- *   ② 洞察「车」tab —— 常驻入口,便于长期观察数据到没到、去了哪。
+ *   ② 洞察「资产 → 车」tab(AssetsPanel)—— 常驻入口,便于长期观察数据到没到、去了哪。
  * 只读 GET /api/portal/tesla 的实时快照;顺手把新鲜快照喂给 refreshTesla,
  * 让停车点/充电站即时进足迹、充电花费进财务(externalId 去重,不重复计)。
  */
