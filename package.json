@@ -355,6 +355,7 @@
     "test:guidance-gates": "node scripts/guidance-gates.test.mjs",
     "test:card-archive": "node scripts/card-archive.test.mjs",
     "test:lens-echo": "node scripts/lens-echo.test.mjs",
+    "test:nav-above-overlay": "node scripts/nav-above-overlay.test.mjs",
     "test:schedule-panel-dedup": "node scripts/schedule-panel-dedup.test.mjs",
     "test:storage-heal": "node scripts/storage-heal.test.mjs",
     "test:storage-key-registry": "node scripts/storage-key-registry.test.mjs",

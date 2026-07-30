@@ -1335,15 +1335,26 @@ export default function Portal() {
           <PortalBottomNav
             activeSurface={activeSurface}
             locale={locale}
-            // Bug4 图12:洞察首页的右上「今天」按钮删了,回今天全靠这颗导航键 ——
-            // 它必须同时把洞察浮层关掉,否则点了看起来「没反应」(浮层还盖着)。
+            /*
+             * Bug4 图12:洞察宫格页把这条导航抬到了浮层之上(z=931),于是它**看得见也点得着** ——
+             * 但它打开的东西全在浮层**底下**:相机 / 说一句 = .nesio-camera-sheet、
+             * .nesio-voice-sheet(z=400),聊天 = .nesio-wechat-fullscreen(z=310),
+             * 而洞察这层是 929/930。点下去 state 确实变了、sheet 也确实挂上了,
+             * 只是被整个盖住 —— 表现就是三颗键全是死的(用户实锤:「没有真正接入功能」)。
+             *
+             * 修法与仓库既有做法一致(见 memorySearchHandler 的同款注释):**先关浮层再开** ——
+             * 拍一下 / 说一句 / 聊天本来就是主面上的动作,不是洞察里的动作。
+             * 不走「把这些 sheet 全抬到 930 以上」那条路:400/310 是相对一堆别的东西定的,
+             * 全局抬层会把 .nesio-sheet-overlay 那段层序契约弄坏。
+             */
             onToday={() => { setInsightsOpen(false); setActiveSurface('today'); }}
-            onCamera={(file) => { setCameraFile(file); setCaptureMode('camera'); }}
-            onAsk={handleAskFromCenterButton}
+            onCamera={(file) => { setInsightsOpen(false); setCameraFile(file); setCaptureMode('camera'); }}
+            onAsk={() => { setInsightsOpen(false); handleAskFromCenterButton(); }}
+            // 已经在洞察首页了,再点「洞察」不做任何事(和系统 tab bar 一致)。
             onInsights={() => { setInsightsTab(undefined); setInsightsOpen(true); }}
             insightsActive={insightsOpen}
             aboveOverlay={insightsOpen && insightsHub}
-            onChatOpen={() => setChatOpen(true)}
+            onChatOpen={() => { setInsightsOpen(false); setChatOpen(true); }}
           />
         )}
       </div>
