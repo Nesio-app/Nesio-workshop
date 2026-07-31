@@ -44,7 +44,7 @@ const SNAPSHOT_STALE_DAYS = 14;
 
 const card: React.CSSProperties = {
   background: 'var(--glass-bg-raised)', border: '1px solid var(--glass-border)',
-  borderRadius: 'var(--radius-lg)', padding: '1rem 1.1rem', boxShadow: 'var(--shadow-card)',
+  borderRadius: 'var(--radius-lg)', padding: 'var(--space-4) var(--space-4)', boxShadow: 'var(--shadow-card)',
 };
 const tnum: React.CSSProperties = { fontVariantNumeric: 'tabular-nums' };
 const mono = 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace';
@@ -75,9 +75,9 @@ export function GovernancePanel({ secret }: { secret: string }) {
 
   useEffect(() => { void load(secret); }, [load, secret]);
 
-  if (!data) return <section style={{ ...card, marginTop: '0.9rem' }}>{loading ? '加载治理地图…' : ''}</section>;
+  if (!data) return <section style={{ ...card, marginTop: 'var(--space-4)' }}>{loading ? '加载治理地图…' : ''}</section>;
   if (!data.ok) {
-    return <section style={{ ...card, marginTop: '0.9rem', borderColor: 'var(--status-risk)' }}>
+    return <section style={{ ...card, marginTop: 'var(--space-4)', borderColor: 'var(--status-risk)' }}>
       治理数据读取失败{data.error ? `(${data.error})` : ''}。
     </section>;
   }
@@ -105,8 +105,8 @@ export function GovernancePanel({ secret }: { secret: string }) {
   ];
 
   return (
-    <section style={{ marginTop: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.7rem' }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
+    <section style={{ marginTop: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
         <h2 style={{ fontSize: '1rem', margin: 0, color: 'var(--portal-ink)' }}>软件治理地图</h2>
         <span style={{ fontSize: '0.7rem', color: 'var(--portal-muted)' }}>
           {/* 之前不管状态是什么都染成红色(写死 STATUS_COLOR.drifted),ok 也显示成告警。 */}
@@ -117,7 +117,7 @@ export function GovernancePanel({ secret }: { secret: string }) {
       </div>
 
       {/* KPI */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.7rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--space-3)' }}>
         {kpis.map(([label, val, foot]) => (
           <div key={label} style={card}>
             <div style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{label}</div>

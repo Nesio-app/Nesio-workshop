@@ -110,7 +110,7 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
             {RECORD_CATEGORIES.map((cat) => (
               <button key={cat.key} type="button"
                 className={`nesio-rel-chip${category === cat.key ? ' nesio-rel-chip--on' : ''}`}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}
                 onClick={() => setCategory(cat.key)}>
                 <RecordCatIcon category={cat.key} size={13} /> {L(dict, cat.zh, cat.en)}
               </button>

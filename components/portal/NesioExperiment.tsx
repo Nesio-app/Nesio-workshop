@@ -400,7 +400,7 @@ export function CreateExperimentWizard({ onSave, onCancel }: WizardProps) {
           <input className="nesio-exp-input" autoFocus
             placeholder={L(dict, '例：早睡对晨间精力的影响', 'e.g. Early sleep vs. morning energy')}
             value={name} onChange={(e) => setName(e.target.value)} />
-          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>{L(dict, '你的假设（可选）', 'Your hypothesis (optional)')}</p>
+          <p className="nesio-exp-wizard-label" style={{ marginTop: 'var(--space-4)' }}>{L(dict, '你的假设（可选）', 'Your hypothesis (optional)')}</p>
           <input className="nesio-exp-input"
             placeholder={L(dict, '例：如果我在 11 点前入睡，第二天精力评分会更高', 'e.g. If I sleep before 11pm, next-day energy scores higher')}
             value={hypo} onChange={(e) => setHypo(e.target.value)} />
@@ -417,11 +417,11 @@ export function CreateExperimentWizard({ onSave, onCancel }: WizardProps) {
           <input className="nesio-exp-input" autoFocus
             placeholder={L(dict, '例：入睡时间、咖啡杯数、运动时长', 'e.g. bedtime, cups of coffee, workout minutes')}
             value={ivName} onChange={(e) => setIvName(e.target.value)} />
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
             <input className="nesio-exp-input" style={{ flex: 1 }} placeholder={L(dict, '单位（可选）', 'Unit (optional)')}
               value={ivUnit} onChange={(e) => setIvUnit(e.target.value)} />
           </div>
-          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>{L(dict, '记录方式', 'How to record')}</p>
+          <p className="nesio-exp-wizard-label" style={{ marginTop: 'var(--space-4)' }}>{L(dict, '记录方式', 'How to record')}</p>
           <div className="nesio-exp-type-opts">
             {VAR_TYPE_OPTS.map((o) => (
               <button key={o.value} type="button"
@@ -445,11 +445,11 @@ export function CreateExperimentWizard({ onSave, onCancel }: WizardProps) {
           <input className="nesio-exp-input" autoFocus
             placeholder={L(dict, '例：晨间精力、睡眠质量、专注时长', 'e.g. morning energy, sleep quality, focus time')}
             value={dvName} onChange={(e) => setDvName(e.target.value)} />
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
             <input className="nesio-exp-input" style={{ flex: 1 }} placeholder={L(dict, '单位（可选）', 'Unit (optional)')}
               value={dvUnit} onChange={(e) => setDvUnit(e.target.value)} />
           </div>
-          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>{L(dict, '记录方式', 'How to record')}</p>
+          <p className="nesio-exp-wizard-label" style={{ marginTop: 'var(--space-4)' }}>{L(dict, '记录方式', 'How to record')}</p>
           <div className="nesio-exp-type-opts">
             {VAR_TYPE_OPTS.filter((o) => o.value !== 'boolean').map((o) => (
               <button key={o.value} type="button"
@@ -460,7 +460,7 @@ export function CreateExperimentWizard({ onSave, onCancel }: WizardProps) {
               </button>
             ))}
           </div>
-          <p className="nesio-exp-wizard-label" style={{ marginTop: '0.9rem' }}>{L(dict, '实验持续天数', 'Experiment length (days)')}</p>
+          <p className="nesio-exp-wizard-label" style={{ marginTop: 'var(--space-4)' }}>{L(dict, '实验持续天数', 'Experiment length (days)')}</p>
           <div className="nesio-exp-days-opts">
             {TARGET_DAYS_OPTS.map((d) => (
               <button key={d} type="button"
@@ -489,7 +489,7 @@ function NumberStepper({ value, onChange, unit }: { value: string; onChange: (v:
   // 恒定步长 1:时刻/次数类数值居多,粗步长会打错(实测 23点−5=18)
   const step = 1;
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
       <button type="button" aria-label={L(dict, '减少', 'Decrease')}
         style={{ width: 'var(--tap-min)', height: 'var(--tap-min)', borderRadius: '50%', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: '1.15rem', cursor: 'pointer' }}
         onClick={() => onChange(String(Math.max(0, cur - step)))}>−</button>

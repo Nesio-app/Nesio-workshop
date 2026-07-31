@@ -1271,7 +1271,7 @@ Edit location/value anytime in Storage.`),
         <div className="nesio-wechat-brand">
           <span className="nesio-wechat-title">{L(dict, '念念', 'Nessa')}</span>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.15rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}>
           <button
             type="button"
             className="nesio-wechat-more-btn"
@@ -1294,7 +1294,7 @@ Edit location/value anytime in Storage.`),
           <div className="nesio-chat-history-card">
             <p className="nesio-chat-history-title">{L(dict, '历史对话', 'Past chats')}</p>
             {sessions.length === 0 && (
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: '0.5rem 0' }}>{L(dict, '还没有归档的对话。点「新对话」会把当前对话存到这里。', 'No archived chats yet. "New chat" stores the current one here.')}</p>
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: 'var(--space-2) 0' }}>{L(dict, '还没有归档的对话。点「新对话」会把当前对话存到这里。', 'No archived chats yet. "New chat" stores the current one here.')}</p>
             )}
             {sessions.map((s) => (
               <button

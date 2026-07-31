@@ -28,13 +28,37 @@ const ROOT = new URL('..', import.meta.url);
  */
 const BASELINE = {
   fontSize: 13,
-  spacing: 323,
+  spacing: 16,
   radius: 42,
   hex: 27,
-  rawButton: 213,
+  rawButton: 193,
 };
 
 /*
+ * 2026-07-31(三次):间距 571→16。**两件事一起发生,别把它们混着读。**
+ *
+ * ① **量具修好了**:原来的正则是 `\b(?:padding|margin|gap):`,要求属性名后面**紧跟冒号**
+ *    —— 于是 `paddingTop:` / `marginBottom:` / `rowGap:` 这些方向变体**从来没被数进来**。
+ *    旧读数 323 只是真实违规的一小半;同一时刻用修好的正则去量,是 571。
+ * ② **清理**:571 → 16,按 4px 网格就近吸附(规则见下)。
+ *
+ * 吸附规则(代码级、可重跑,和字号那次同一套):把声明按空白拆成分量逐个吸,
+ * 每个分量找最近的一档,**漂移超过 0.125rem(2px)就不吸**。2px 是这里的正确上限 ——
+ * 网格步长就是 4px,「吸到最近格点」的最大漂移按定义是半格。字号那次用 1px 是因为
+ * 字号档位密;间距只有 4px 一档,用 1px 会把 0.6/0.4/0.35/0.9(共 264 处,正好卡在
+ * 两个格点中间)永久留在场上,基线就再也下不去了。
+ *
+ * 两条附加规则,都是为了不改变**语义**而不只是数值:
+ *   · 一条声明里只要有一个分量吸不动,整条不改 —— 半吸会留下
+ *     `'var(--space-1) 0.6rem'` 这种混合串,既没减少写死值又更难读。
+ *   · **非零的间距不许吸成 0**。`0.1rem` 是 1.6px 的发丝缝,吸到 0 不是漂移,
+ *     是「这里本来有条缝」变成「没有缝」。
+ *
+ * 留下的 16 处,每一处都是上面规则挡住的,不是漏网:
+ *   发丝值 0.05/0.1/0.12rem(吸到 0 会让缝消失)· 负间距 -0.35rem(有意的拉回)
+ *   · 和 `2px`/`6px`/`auto`/`env()`/`calc()` 混在一个串里的(拼不出纯 token 串)
+ *   · `1.75rem`(离 --space-6 和 --space-8 各 4px,正中间,吸哪边都是人来定)。
+ *
  * 2026-07-31(二次):字号 164→13、圆角 66→42。**按值就近吸附到设计系统档位**,
  * 规则是代码级的、可重跑的,不靠看图:每个写死值找最近的一档,**漂移超过 0.06rem
  * (≈1px)就不吸**,原样留下。
@@ -66,17 +90,28 @@ const BASELINE = {
 /** 和 .eslintrc.json 同源的判据(那边管编辑器提示,这边管 CI)。 */
 const CHECKS = [
   { key: 'fontSize', re: /\bfontSize:\s*'[0-9.]+(rem|px|em)'/g, what: '写死的字号', fix: 'var(--text-xs/sm/body/h3/h2/h1/display)' },
-  { key: 'spacing', re: /\b(?:padding|margin|gap):\s*'[^']*[0-9.]+rem[^']*'/g, what: '写死的间距', fix: 'var(--space-1..16)(4px 网格)' },
+  // ⚠️ 方向变体必须一起数:原来只写 `padding|margin|gap:`,于是 `paddingTop`/`marginBottom`
+  // 这些**根本没被数进来**(它们后面不是冒号)—— 这次清理的 663 处里大半是方向变体,
+  // 也就是说旧读数 323 只是全部违规的一小半。量具补上了,基线按新读数重卡。
+  { key: 'spacing', re: /\b(?:padding|margin|gap|rowGap|columnGap)(?:Top|Bottom|Left|Right|Block|Inline|BlockStart|BlockEnd|InlineStart|InlineEnd)?:\s*'[^']*[0-9.]+rem[^']*'/g, what: '写死的间距', fix: 'var(--space-1..16)(4px 网格)' },
   { key: 'radius', re: /\bborderRadius:\s*(?:'[0-9.]+(?:rem|px|em)?'|[0-9]+)/g, what: '写死的圆角', fix: 'var(--radius-sm/md/xl/pill)' },
   // 先摘掉 var(--x, #fallback) 这种兜底(全站惯例,不算硬编码),剩下的才是真写死。
   /**
-   * 绕过 Button 原语的裸 <button>。**只卡住不再增长,不批量迁。**
+   * 绕过 Button 原语的裸 <button>。**一个文件一个文件地还,新代码别再加一个。**
    *
-   * 213 个裸按钮 vs 17 个用原语 —— 差距很大,但一刀切迁移会把版式改坏:
-   * 那些 inline style 大半是**布局**(flex:1 / width:100% / marginTop),不是外观。
-   * 真要迁得连着布局一起想,那是一屏一屏的活,不是机械替换。
+   * 2026-07-31:213 → 193。原语开了 `layoutStyle` 窄口(布局留在外面、外观进原语)
+   * 之后,第一个迁的是 WardrobePanel(20 → 4)。
    *
-   * 所以这条棘轮的作用是:存量慢慢还,**新代码别再加一个**。
+   * 迁移的验收标准不是「<button> 变成 <Button>」,是:
+   *   · 外观参数化成 variant/size/tone —— 板块自造的样式常量该删掉,不是搬进 className;
+   *   · 只有布局走 layoutStyle(类型白名单挡着,写外观是编译错误);
+   *   · 手搓的禁用态(`opacity: busy ? 0.6 : 1`)换成 `disabled` —— 原语 :disabled 已经有。
+   * WardrobePanel 里 outfitActionBtn / linkish / chip 三个自造样式常量因此全删了,
+   * 它们分别就是 soft / ghost / (primary|secondary)+sm。
+   *
+   * 剩下的 4 处**不是漏网**:照片投放区 ×2(虚线框,里面填满一张 img)、衣物网格瓦片、
+   * 日历日格 —— 都是「可点的图块」,不是按钮。塞进按钮原语反而是错的。
+   * 往后每个文件都会有这么几处,棘轮的地板不会是 0。
    */
   { key: 'rawButton', re: /<button[^>]*\sstyle=\{/gs, what: '绕过 Button 原语的裸按钮', fix: "components/portal/ui/Button.tsx 的 <Button variant=...>" },
   { key: 'hex', re: /#[0-9a-fA-F]{6}\b/g, what: '写死的色值', fix: 'var(--portal-*/--status-*/--viz-*)', strip: (s) => s.replace(/var\([^)]*,\s*#[0-9a-fA-F]{3,8}\)/g, '') },

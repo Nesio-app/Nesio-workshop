@@ -30,12 +30,12 @@ export default function LegalPage({ title, updated, intro, sections }: LegalPage
 
   return (
     <div style={{ minHeight: '100dvh', background: 'var(--portal-bg, #f6f8fc)', color: 'var(--portal-ink, #2c2c2c)' }}>
-      <div style={{ maxWidth: 720, margin: '0 auto', padding: '2rem 1.25rem 4rem', fontFamily: 'var(--font-sans)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: 'var(--space-8) var(--space-5) var(--space-16)', fontFamily: 'var(--font-sans)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-6)', gap: 'var(--space-4)' }}>
           <a href="/" style={{ color: 'var(--portal-accent, #588ce3)', textDecoration: 'none', fontSize: 'var(--text-body)' }}>
             {i === 0 ? '← 返回 Nesio' : '← Back to Nesio'}
           </a>
-          <div style={{ display: 'flex', gap: '0.25rem', fontSize: 'var(--text-sm)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-1)', fontSize: 'var(--text-sm)' }}>
             <button type="button" onClick={() => setLocale('zh')}
               style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: locale === 'zh' ? 700 : 400, color: locale === 'zh' ? 'var(--portal-accent, #588ce3)' : 'var(--portal-muted, #8a94a6)' }}>中文</button>
             <span style={{ color: 'var(--portal-line, #d7deea)' }}>·</span>
@@ -44,13 +44,13 @@ export default function LegalPage({ title, updated, intro, sections }: LegalPage
           </div>
         </div>
 
-        <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 700, margin: '0 0 0.35rem' }}>{title[i]}</h1>
-        <p style={{ color: 'var(--portal-muted, #8a94a6)', fontSize: 'var(--text-sm)', margin: '0 0 1.5rem' }}>{updated[i]}</p>
-        <p style={{ lineHeight: 1.7, margin: '0 0 2rem' }}>{intro[i]}</p>
+        <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 700, margin: '0 0 var(--space-1)' }}>{title[i]}</h1>
+        <p style={{ color: 'var(--portal-muted, #8a94a6)', fontSize: 'var(--text-sm)', margin: '0 0 var(--space-6)' }}>{updated[i]}</p>
+        <p style={{ lineHeight: 1.7, margin: '0 0 var(--space-8)' }}>{intro[i]}</p>
 
         {sections.map((s, idx) => (
           <section key={idx} style={{ marginBottom: '1.75rem' }}>
-            <h2 style={{ fontSize: 'var(--text-h3)', fontWeight: 700, margin: '0 0 0.6rem' }}>{s.h[i]}</h2>
+            <h2 style={{ fontSize: 'var(--text-h3)', fontWeight: 700, margin: '0 0 var(--space-2)' }}>{s.h[i]}</h2>
             {s.body.map((p, j) => {
               const text = p[i];
               const isBullet = text.startsWith('· ');

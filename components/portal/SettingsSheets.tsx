@@ -257,12 +257,12 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
         </span>
       </button>
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionAppearance')}<InfoTip text={t(locale, 'generalAutoHint')} /></p>
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>{t(locale, 'sectionAppearance')}<InfoTip text={t(locale, 'generalAutoHint')} /></p>
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         {themeOpts.map((opt) => (
           <button key={opt.id} type="button"
             className={`nesio-settings-option${theme === opt.id ? ' nesio-settings-option--active' : ''}`}
-            style={{ flex: 1, justifyContent: 'center', gap: '0.35rem' }}
+            style={{ flex: 1, justifyContent: 'center', gap: 'var(--space-1)' }}
             onClick={() => pickTheme(opt.id)}>
             {opt.icon}
             <span className="nesio-settings-option-label">{opt.label}</span>
@@ -270,11 +270,11 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
         ))}
       </div>
       {themeSaveIssue && (
-        <p style={{ marginTop: '0.4rem', fontSize: 'var(--text-xs)', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
+        <p style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
       )}
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '字体大小', 'Text size')}<InfoTip text={L(dict, '整体放大界面文字与间距;标准 = 跟随系统设置。', 'Scales the whole UI text & spacing; Standard = follow system.')} /></p>
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '字体大小', 'Text size')}<InfoTip text={L(dict, '整体放大界面文字与间距;标准 = 跟随系统设置。', 'Scales the whole UI text & spacing; Standard = follow system.')} /></p>
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         {([['sm', L(dict, '小', 'S'), '0.8rem'], ['md', L(dict, '标准', 'M'), '0.95rem'], ['lg', L(dict, '大', 'L'), '1.1rem'], ['xl', L(dict, '特大', 'XL'), '1.28rem']] as Array<[FontScale, string, string]>).map(([id, label, demo]) => (
           <button key={id} type="button"
             className={`nesio-settings-option${fontScale === id ? ' nesio-settings-option--active' : ''}`}
@@ -285,13 +285,13 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
         ))}
       </div>
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionLanguage')}<InfoTip text={t(locale, 'langSoonHint')} /></p>
+      <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>{t(locale, 'sectionLanguage')}<InfoTip text={t(locale, 'langSoonHint')} /></p>
       {/* 批次 5:下拉选择,只开放字典已完成的语言(真实有效红线:不给不生效的选项) */}
       <select
         value={locale}
         onChange={(e) => pickLang(e.target.value as PortalLocale)}
         aria-label={t(locale, 'sectionLanguage')}
-        style={{ width: '100%', minHeight: 'var(--tap-min)', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', padding: '0.55rem 0.75rem', outline: 'none', fontFamily: 'inherit' }}
+        style={{ width: '100%', minHeight: 'var(--tap-min)', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', padding: 'var(--space-2) var(--space-3)', outline: 'none', fontFamily: 'inherit' }}
       >
         <optgroup label={t(locale, 'langGroupReady')}>
           {PORTAL_LOCALE_OPTIONS.filter(([code]) => READY_LOCALES.has(code)).map(([code, label]) => (
@@ -367,11 +367,11 @@ export function AppearanceSheet({ open, onClose }: SheetProps) {
   return (
     <SheetWrap open={open} onClose={onClose} title={L(dict, '外观与语言', 'Appearance & language')}>
       <p className="nesio-settings-section-label">{t(locale, 'sectionAppearance')}<InfoTip text={t(locale, 'generalAutoHint')} /></p>
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         {themeOpts.map((opt) => (
           <button key={opt.id} type="button"
             className={`nesio-settings-option${theme === opt.id ? ' nesio-settings-option--active' : ''}`}
-            style={{ flex: 1, justifyContent: 'center', gap: '0.35rem' }}
+            style={{ flex: 1, justifyContent: 'center', gap: 'var(--space-1)' }}
             onClick={() => pickTheme(opt.id)}>
             {opt.icon}
             <span className="nesio-settings-option-label">{opt.label}</span>
@@ -379,10 +379,10 @@ export function AppearanceSheet({ open, onClose }: SheetProps) {
         ))}
       </div>
       {themeSaveIssue && (
-        <p style={{ marginTop: '0.4rem', fontSize: 'var(--text-xs)', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
+        <p style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
       )}
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>
+      <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>
         {L(dict, '配色', 'Palette')}
         <InfoTip text={L(dict, '点一张即时全站换装,再点「默认蓝」还原。', 'Tap a card to reskin instantly; tap Default blue to restore.')} />
       </p>
@@ -405,8 +405,8 @@ export function AppearanceSheet({ open, onClose }: SheetProps) {
         ))}
       </div>
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '字体大小', 'Text size')}<InfoTip text={L(dict, '整体放大界面文字与间距;标准 = 跟随系统设置。', 'Scales the whole UI text & spacing; Standard = follow system.')} /></p>
-      <div style={{ display: 'flex', gap: '0.5rem' }}>
+      <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '字体大小', 'Text size')}<InfoTip text={L(dict, '整体放大界面文字与间距;标准 = 跟随系统设置。', 'Scales the whole UI text & spacing; Standard = follow system.')} /></p>
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
         {([['sm', L(dict, '小', 'S'), '0.8rem'], ['md', L(dict, '标准', 'M'), '0.95rem'], ['lg', L(dict, '大', 'L'), '1.1rem'], ['xl', L(dict, '特大', 'XL'), '1.28rem']] as Array<[FontScale, string, string]>).map(([id, label, demo]) => (
           <button key={id} type="button"
             className={`nesio-settings-option${fontScale === id ? ' nesio-settings-option--active' : ''}`}
@@ -417,12 +417,12 @@ export function AppearanceSheet({ open, onClose }: SheetProps) {
         ))}
       </div>
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{t(locale, 'sectionLanguage')}<InfoTip text={t(locale, 'langSoonHint')} /></p>
+      <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>{t(locale, 'sectionLanguage')}<InfoTip text={t(locale, 'langSoonHint')} /></p>
       <select
         value={locale}
         onChange={(e) => pickLang(e.target.value as PortalLocale)}
         aria-label={t(locale, 'sectionLanguage')}
-        style={{ width: '100%', minHeight: 'var(--tap-min)', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', padding: '0.55rem 0.75rem', outline: 'none', fontFamily: 'inherit' }}
+        style={{ width: '100%', minHeight: 'var(--tap-min)', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', padding: 'var(--space-2) var(--space-3)', outline: 'none', fontFamily: 'inherit' }}
       >
         <optgroup label={t(locale, 'langGroupReady')}>
           {PORTAL_LOCALE_OPTIONS.filter(([code]) => READY_LOCALES.has(code)).map(([code, label]) => (
@@ -840,7 +840,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       <div style={{ display: 'flex', gap: 8, margin: '1.2rem 0 6px' }}>
         {([['drive', L(dict, 'Google 云', 'Google cloud')], ['nesio', L(dict, `Nesio 云${cloudEntitled ? '' : ' · Pro 免费'}`, `Nesio cloud${cloudEntitled ? '' : ' · free with Pro'}`)]] as const).map(([d, label]) => (
           <button key={d} type="button" onClick={() => pickBackupDest(d)}
-            style={{ flex: 1, padding: '0.4rem 0.5rem', borderRadius: 10, fontSize: 'var(--text-sm)', cursor: 'pointer',
+            style={{ flex: 1, padding: 'var(--space-2) var(--space-2)', borderRadius: 10, fontSize: 'var(--text-sm)', cursor: 'pointer',
               border: `1px solid ${backupDest === d ? 'var(--portal-accent-border)' : 'var(--portal-line)'}`,
               background: backupDest === d ? 'var(--portal-accent-soft-md)' : 'transparent',
               color: backupDest === d ? 'var(--portal-ink)' : 'var(--portal-muted)' }}>
@@ -963,14 +963,16 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={clearAllMemory}>
           {deleted ? L(dict, '✓ 已清除', '✓ Cleared') : L(dict, '清除所有 Memory', 'Clear all memories')}
         </Button>
-        <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" style={{ opacity: 0.85 }} onClick={clearAllLocalData}>
+        {/* 2026-07-31:去掉原来的 style={{ opacity: 0.85 }} —— 三颗都是 risk,凭什么中间这颗淡 15%?
+            说不出理由的差异就是「同一屏的按钮长得不像一家」的来源。要分轻重就用 variant。 */}
+        <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={clearAllLocalData}>
           {L(dict, '彻底删除本机全部数据', 'Delete all local data')}
         </Button>
         {/* App Store 5.1.1 强制:App 内账号删除(云端 + 本机 + 登出)。 */}
         <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={deleteAccountAndData}>
           {L(dict, '删除账号与云端数据', 'Delete account & cloud data')}
         </Button>
-        {deleteMsg && <p className="nesio-settings-option-hint" style={{ margin: '0.4rem 0 0', color: 'var(--status-risk)' }}>{deleteMsg}</p>}
+        {deleteMsg && <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-2) 0 0', color: 'var(--status-risk)' }}>{deleteMsg}</p>}
       </details>
 
       {/* bug3 p44:底部那段说明删掉 —— 这一页每个按钮都在做那件事,不需要再用一段话复述。 */}
@@ -1040,7 +1042,7 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
 
       {/* 提审构建:整个 Lab + 功能开关中心不可达(合规:隐藏可达功能 = 2.3.1 违规)。 */}
       {!isAppStoreBuild() && (<>
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.5rem' }}>{L(dict, '实验功能', 'Experimental')}</p>
+      <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-6)' }}>{L(dict, '实验功能', 'Experimental')}</p>
       <button type="button"
         className={`nesio-settings-option${labOn ? ' nesio-settings-option--active' : ''}`}
         onClick={toggleLab}>
@@ -1096,8 +1098,8 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
           它是**日常设置**(和明暗、字号、语言并列),不是实验功能 ——
           藏在 Lab 里既难找,又让「点一张即时全站换装」这句承诺看着像内测玩具。 */}
 
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.5rem' }}>{L(dict, '功能开关中心', 'Feature switches')}</p>
-      <p className="nesio-settings-option-hint" style={{ margin: '0 0 0.6rem' }}>
+      <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-6)' }}>{L(dict, '功能开关中心', 'Feature switches')}</p>
+      <p className="nesio-settings-option-hint" style={{ margin: '0 0 var(--space-2)' }}>
         {L(dict, '逐个控制功能可见性。优先级:这里的显式 开/关 最大;「默认」= 标了「随 Lab」的内测域跟随上面的 Lab 总闸,其余跟随公开版。核心(拍/说/分享/问一问/洞察/今日)始终在,不在此列。改动即时生效。',
           'Controls feature visibility. Precedence: explicit On/Off here wins; "Default" follows the Lab switch above for rows tagged "Lab", otherwise the public build. Core (snap / voice / share / ask / insights / today) is always on and not listed. Applies instantly.')}
       </p>
@@ -1106,7 +1108,7 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
         if (!rows.length) return null;
         return (
           <div key={kind}>
-            <p className="nesio-settings-option-hint" style={{ margin: '0.6rem 0 0.3rem', fontWeight: 600 }}>
+            <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-2) 0 var(--space-1)', fontWeight: 600 }}>
               {kind === 'module' ? L(dict, '工具模块', 'Tool modules') : L(dict, '子功能', 'Sub-features')}
             </p>
             {rows.map((m) => {
@@ -1116,7 +1118,7 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
                   type="button"
                   onClick={() => setModuleOverride(m.id, val)}
                   style={{
-                    flex: 1, padding: '0.3rem 0', fontSize: 'var(--text-xs)', borderRadius: 'var(--radius-sm)',
+                    flex: 1, padding: 'var(--space-1) 0', fontSize: 'var(--text-xs)', borderRadius: 'var(--radius-sm)',
                     border: '0.5px solid var(--portal-border)',
                     background: cur === val ? 'var(--portal-accent-soft)' : 'transparent',
                     color: cur === val ? 'var(--portal-accent, var(--portal-fg))' : 'var(--portal-muted)',
@@ -1126,16 +1128,16 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
               );
               const defOn = defaultResolvesTo(m.id, m.defaultOn); // labOn 变化触发重渲,这里即时反映
               return (
-                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.4rem' }}>
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', margin: '0 0 var(--space-2)' }}>
                   <span style={{ flex: 1, fontSize: 'var(--text-sm)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                     {dict === 'en' ? m.en : m.zh}
                     {followsLab(m.id) && (
-                      <span style={{ fontSize: '0.6rem', color: 'var(--portal-muted)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-pill)', padding: '0 0.35rem' }}>
+                      <span style={{ fontSize: '0.6rem', color: 'var(--portal-muted)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-pill)', padding: '0 var(--space-1)' }}>
                         {L(dict, '随 Lab', 'Lab')}
                       </span>
                     )}
                   </span>
-                  <div style={{ display: 'flex', gap: '0.25rem', width: '11rem' }}>
+                  <div style={{ display: 'flex', gap: 'var(--space-1)', width: '11rem' }}>
                     {seg(null, L(dict, `默认·${defOn ? '开' : '关'}`, `Default·${defOn ? 'on' : 'off'}`))}
                     {seg('on', L(dict, '开', 'On'))}
                     {seg('off', L(dict, '关', 'Off'))}
@@ -1260,8 +1262,8 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
       })()}
 
       {/* Pro 权益清单(会员权益介绍) */}
-      <p className="nesio-settings-section-label" style={{ marginTop: '1.1rem' }}>{L(dict, 'Pro 能做什么', 'What Pro unlocks')}</p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: 'var(--text-sm)', lineHeight: 1.6 }}>
+      <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-4)' }}>{L(dict, 'Pro 能做什么', 'What Pro unlocks')}</p>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', fontSize: 'var(--text-sm)', lineHeight: 1.6 }}>
         {[
           L(dict, 'AI 自动识别与整理(拍照 / 分享 / 文件)', 'AI recognition & organizing (photos / shares / files)'),
           L(dict, '问一问深度回答(对话式检索)', 'Deep conversational answers in Ask'),
@@ -1269,11 +1271,11 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
           L(dict, '邮件直接回复(AI 起草,你点发送)', 'Direct email replies (AI drafts, you send)'),
           L(dict, '冷冻仓(冲动购买冷静期)', 'Freeze Vault (cooling-off for impulse buys)'),
         ].map((b) => (
-          <div key={b} style={{ display: 'flex', gap: '0.5rem', alignItems: 'flex-start' }}>
+          <div key={b} style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'flex-start' }}>
             <span style={{ color: 'var(--status-go)', flexShrink: 0 }}>✓</span><span>{b}</span>
           </div>
         ))}
-        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: '0.35rem 0 0' }}>
+        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: 'var(--space-1) 0 0' }}>
           {L(dict, '记录、搜索、手动标签永久免费。', 'Capturing, search, and manual tags stay free forever.')}
         </p>
       </div>
@@ -1282,7 +1284,7 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
           和上面刚说的「订阅生效中」正好对撞(用户报的第三重矛盾)。 */}
       {!isPaidPro && (
         <>
-          <p className="nesio-settings-section-label" style={{ marginTop: '1.1rem' }}>{t(locale, 'subFuturePlans')}</p>
+          <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-4)' }}>{t(locale, 'subFuturePlans')}</p>
           {PLAN_PREVIEWS.map((plan) => (
             <div key={plan.id} className="nesio-sub-upgrade-row">
               <div className="nesio-sub-upgrade-info">
@@ -1301,26 +1303,26 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
       )}
 
       {isPaidPro ? (
-        <div style={{ marginTop: '1.2rem', padding: '0.9rem 1rem', borderRadius: 'var(--radius-sm)', textAlign: 'center', background: 'var(--portal-card, #fff)', border: '1px solid var(--status-gentle, #6cbf84)' }}>
+        <div style={{ marginTop: 'var(--space-5)', padding: 'var(--space-4) var(--space-4)', borderRadius: 'var(--radius-sm)', textAlign: 'center', background: 'var(--portal-card, #fff)', border: '1px solid var(--status-gentle, #6cbf84)' }}>
           <p style={{ fontWeight: 600, margin: 0, color: 'var(--status-gentle, #4a9d63)' }}>{L(dict, '✓ 你已是 Pro 会员', "✓ You're a Pro member")}</p>
-          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: '0.35rem 0 0' }}>{L(dict, '订阅生效中,感谢支持。可在支付渠道管理或取消。', 'Subscription active — thank you. Manage or cancel via your payment provider.')}</p>
+          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: 'var(--space-1) 0 0' }}>{L(dict, '订阅生效中,感谢支持。可在支付渠道管理或取消。', 'Subscription active — thank you. Manage or cancel via your payment provider.')}</p>
         </div>
       ) : (
-      <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1.2rem' }} onClick={handleUpgrade} disabled={upgradeBusy || notified}>
+      <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: 'var(--space-5)' }} onClick={handleUpgrade} disabled={upgradeBusy || notified}>
         {notified ? `✓ ${t(locale, 'subNotifyDone')}` : upgradeBusy ? L(dict, '正在跳转…', 'Redirecting…') : L(dict, '升级 Pro', 'Upgrade to Pro')}
       </button>
       )}
       {billingHint === 'signin' && (
-        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '0.5rem' }}>
+        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', textAlign: 'center', marginTop: 'var(--space-2)' }}>
           {L(dict, '登录后即可升级。', 'Sign in first to upgrade.')}
         </p>
       )}
       {billingError && (
-        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--status-risk, #d9534f)', textAlign: 'center', marginTop: '0.5rem', wordBreak: 'break-word' }}>
+        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--status-risk, #d9534f)', textAlign: 'center', marginTop: 'var(--space-2)', wordBreak: 'break-word' }}>
           {L(dict, '支付未能发起:', 'Checkout failed: ')}{billingError}
         </p>
       )}
-      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '0.8rem' }}>
+      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', textAlign: 'center', marginTop: 'var(--space-3)' }}>
         {L(dict, '付费随 App 版内购开放,价格以内购页为准。', 'Purchases open with the App Store version; in-app prices apply.')}
         <br />
         <a href="/terms" style={{ color: 'inherit' }}>{L(dict, '服务条款(含自动续费说明)', 'Terms (incl. auto-renewal)')}</a>
@@ -1388,7 +1390,7 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
   const tierLabel = getTier() === 'pro'
     ? (days > 0 ? L(dict, `试用中 · 剩 ${days} 天`, `Trial · ${days}d left`) : 'Pro')
     : L(dict, '免费版', 'Free');
-  const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.7rem 0', borderBottom: '1px solid var(--portal-line)', fontSize: 'var(--text-body)' };
+  const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-3) 0', borderBottom: '1px solid var(--portal-line)', fontSize: 'var(--text-body)' };
 
   return (
     <SheetWrap open={open} onClose={onClose} title={L(dict, '账户', 'Account')}>
@@ -1405,39 +1407,39 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
         onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); saveName(); (e.target as HTMLInputElement).blur(); } }}
         onBlur={saveName}
       />
-      <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '0.5rem' }} onClick={saveName}>
+      <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: 'var(--space-2)' }} onClick={saveName}>
         {savedTip ? L(dict, '✓ 已保存', '✓ Saved') : L(dict, '保存昵称', 'Save nickname')}
       </button>
       {savedTip && (
-        <p className="nesio-settings-option-hint" aria-live="polite" style={{ margin: '0.35rem 0 0', color: 'var(--status-go)' }}>
+        <p className="nesio-settings-option-hint" aria-live="polite" style={{ margin: 'var(--space-1) 0 0', color: 'var(--status-go)' }}>
           {L(dict, `念念以后叫你「${name.trim() || '我'}」`, `Nessa will call you "${name.trim() || 'you'}" from now on`)}
         </p>
       )}
-      <button type="button" className="nesio-settings-option" style={{ marginTop: '0.6rem' }} onClick={onPickAvatar}>
+      <button type="button" className="nesio-settings-option" style={{ marginTop: 'var(--space-2)' }} onClick={onPickAvatar}>
         <span className="nesio-settings-option-label">{L(dict, '更换头像', 'Change avatar')}</span>
         <span aria-hidden style={{ color: 'var(--portal-muted)' }}>›</span>
       </button>
 
       {!loggedIn ? (
         <>
-          <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '账户', 'Account')}</p>
+          <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '账户', 'Account')}</p>
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
             {L(dict, '还没登录。登录后可跨设备同步、连接邮箱/日历。', 'Not signed in. Sign in to sync across devices and connect email/calendar.')}
           </p>
-          <a href="/login" className="nesio-ob-primary-btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: '0.8rem' }}>
+          <a href="/login" className="nesio-ob-primary-btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: 'var(--space-3)' }}>
             {L(dict, '去登录', 'Sign in')}
           </a>
         </>
       ) : (
         <>
-          <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '账户', 'Account')}</p>
+          <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '账户', 'Account')}</p>
           <div style={rowStyle}><span style={{ color: 'var(--portal-muted)' }}>{L(dict, '邮箱', 'E-mail')}</span><span>{email || '—'}</span></div>
           <button type="button" onClick={onOpenMembership} style={{ ...rowStyle, width: '100%', background: 'none', border: 'none', borderBottom: '1px solid var(--portal-line)', color: 'inherit', cursor: 'pointer', textAlign: 'left' }}>
             <span style={{ color: 'var(--portal-muted)' }}>{L(dict, '套餐', 'Plan')}</span>
             <span>{tierLabel} ›</span>
           </button>
 
-          <p className="nesio-settings-section-label" style={{ marginTop: '1.2rem' }}>{L(dict, '购买', 'Purchases')}</p>
+          <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '购买', 'Purchases')}</p>
           {/* 随 App 版 StoreKit 开放;disabled={true} 满足 no-inert-buttons 契约的显式禁用标注 */}
           <button type="button" disabled={true} style={{ ...rowStyle, width: '100%', background: 'none', border: 'none', color: 'var(--portal-muted)', cursor: 'default', textAlign: 'left' }}>
             <span>{L(dict, '恢复购买', 'Restore purchase')}</span>
@@ -1445,7 +1447,7 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
           </button>
 
           {/* 图1b:改密码移到登录/忘记密码流程,账户页不再放。删除账号入口在「数据与隐私」。 */}
-          <p className="nesio-settings-section-label" style={{ marginTop: '1.2rem' }}>{L(dict, '会话', 'Session')}</p>
+          <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '会话', 'Session')}</p>
           <button type="button" onClick={signOut} style={{ ...rowStyle, width: '100%', background: 'none', border: 'none', borderBottom: 'none', color: 'var(--status-risk)', cursor: 'pointer', textAlign: 'left' }}>
             <span>{L(dict, '退出登录', 'Sign out')}</span>
           </button>

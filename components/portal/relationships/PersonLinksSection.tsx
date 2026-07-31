@@ -101,7 +101,7 @@ export default function PersonLinksSection({ personKey, email }: { personKey: st
   return (
     <>
       {/* ── 健康 ─────────────────────────────────────────────── */}
-      <div style={{ marginTop: '1rem' }}>
+      <div style={{ marginTop: 'var(--space-4)' }}>
         <div className="nesio-rel-rec-head">
           <p className="nesio-settings-section-label" style={{ margin: 0 }}>
             {t('健康', 'Health')}{health.length ? ` · ${health.length}` : ''}
@@ -134,14 +134,14 @@ export default function PersonLinksSection({ personKey, email }: { personKey: st
             )}
           </>
         ) : (
-          <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>
+          <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>
             {t('还没有 TA 的健康记录。上面「挂一条」可以记医疗/药物/健康。', 'No health records yet — use “Add” above to note medical/medication/health.')}
           </p>
         )}
       </div>
 
       {/* ── 家务活 ───────────────────────────────────────────── */}
-      <div style={{ marginTop: '1rem' }}>
+      <div style={{ marginTop: 'var(--space-4)' }}>
         <div className="nesio-rel-rec-head">
           <p className="nesio-settings-section-label" style={{ margin: 0 }}>
             {t('家务活', 'Chores')}
@@ -151,21 +151,21 @@ export default function PersonLinksSection({ personKey, email }: { personKey: st
         </div>
 
         {chore.s === 'loading' && (
-          <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{t('看看…', 'Checking…')}</p>
+          <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>{t('看看…', 'Checking…')}</p>
         )}
 
         {/* 红线:异步失败要看得见 + 能重试,不许悄悄变成「暂无」*/}
         {chore.s === 'error' && (
-          <div role="alert" style={{ marginTop: '0.3rem' }}>
+          <div role="alert" style={{ marginTop: 'var(--space-1)' }}>
             <p className="nesio-rel-detail-err" style={{ margin: 0 }}>{chore.msg}</p>
-            <button type="button" className="nesio-rel-log-btn" style={{ marginTop: '0.4rem' }} onClick={() => void loadChores()}>
+            <button type="button" className="nesio-rel-log-btn" style={{ marginTop: 'var(--space-2)' }} onClick={() => void loadChores()}>
               {t('再试一次', 'Try again')}
             </button>
           </div>
         )}
 
         {chore.s === 'none' && (
-          <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>
+          <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>
             {t('TA 还不在你的家庭组里。在记忆详情里「分派给家人」就能把活派给 TA。',
               'They’re not in your family group yet — use “Assign to family” on a memory to give them a task.')}
           </p>
@@ -189,7 +189,7 @@ export default function PersonLinksSection({ personKey, email }: { personKey: st
             ))}
           </div>
         ) : (
-          <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>
+          <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>
             {t('TA 手上现在没有活。', 'Nothing on their plate right now.')}
           </p>
         ))}

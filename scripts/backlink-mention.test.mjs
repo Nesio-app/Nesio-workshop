@@ -190,7 +190,18 @@ check('⑥a 提交时**结算**再连,不是选中就连', () => {
   const c = strip(read('components/portal/TodayFeed.tsx'));
   assert.ok(/settleMentions\(quickAdd, pendingMentions\)/.test(c),
     '没有结算 —— 插了又删的 mention 也会被连上');
-  assert.ok(/linkNodes\(created\.id, m\.id, 'user_linked'\)/.test(c), '没有真的连');
+  // 2026-07-31:连边的动作从 TodayFeed 挪进了 lib/portal/mention.ts ——
+  // `check:leak` 那条架构规则不许「今天」页静态 import life-graph
+  // (今天页只能消费 TodayViewModel)。所以这里钉的是**意图**不是位置:
+  // 今天页要真的发起连接,而关系名仍然是 user_linked。
+  assert.ok(/linkSettledMentions\(created\.id, settled\)/.test(c),
+    '结算完没有真的去连 —— 那 @提及就只是往文本里插了个名字');
+  const M = strip(read('lib/portal/mention.ts'));
+  assert.ok(/linkNodes\(sourceId, m\.id, 'user_linked'\)/.test(M),
+    'mention 的连边不再走 user_linked —— 关系名换了,MemoryNodeDetail 那边的标签就对不上了');
+  assert.ok(!/from '@\/lib\/portal\/life-graph'/.test(c),
+    '今天页又静态 import 了 life-graph —— `npm run build` 里的 check:leak 会红,'
+    + '而 tsc 和 test:security 都发现不了(这次就是这么红了 4 小时)');
 });
 
 check('⑥b 连不上要说出来,但不拦提交', () => {

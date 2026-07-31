@@ -260,6 +260,35 @@ check('⑥c 幂等键按 (类型, 月份) —— 每次开机重算不能多出�
   assert.strictEqual(n.attributes.externalId, 'digest:workout:2026-07');
 });
 
+check('⑥c2 内容没变**不写** —— 每开一次家庭板就把小结顶到「最近更新」是不行的', () => {
+  // 行为测试,不是 grep:`ingestLifeNode` 命中已有节点时是无条件 updateLifeNode,
+  // 而那一步会盖 updatedAt + 整图 saveAll + 两条云推送。这个函数被调的场合恰好都是
+  // **反复重算同一份内容**(开机一次 · 每开一次家庭板一次),所以不比一下就是纯浪费,
+  // 而且会把三条月度小结不断顶到记忆库「最近更新」的最前面。
+  let writes = 0;
+  const same = {
+    id: 'n1', createdAt: 'x',
+    attributes: { externalId: 'digest:chore:2026-07', count: 3, partial: true, items: '洗碗,倒垃圾' },
+  };
+  const M = runSource('lib/portal/monthly-digest.ts', {
+    window: {},
+    getLifeGraph: () => [same],
+    ingestLifeNode: (i) => { writes += 1; return { id: 'n1', createdAt: 'x', ...i }; },
+  });
+  const input = { kind: 'chore', month: '2026-07', count: 3, items: ['洗碗', '倒垃圾'], partial: true };
+
+  M.upsertMonthlyDigest(input);
+  assert.strictEqual(writes, 0, '内容一模一样却还是写了 —— 那每开一次家庭板就是 3 次整图重写 + 6 条云推送');
+
+  // 数字变了就必须写,否则这个优化会把真更新也吞掉
+  M.upsertMonthlyDigest({ ...input, count: 4 });
+  assert.strictEqual(writes, 1, '次数变了却没写 —— 跳过写入不能跳过真的变化');
+  M.upsertMonthlyDigest({ ...input, items: ['洗碗'] });
+  assert.strictEqual(writes, 2, '明细变了却没写');
+  M.upsertMonthlyDigest({ ...input, partial: false });
+  assert.strictEqual(writes, 3, '月份过完了(partial false)却没写 —— 正文里的「到目前为止」会一直挂着');
+});
+
 check('⑥d 明细写进**正文** —— 搜索是全文扫的,只放 attributes 搜不到', () => {
   const M = MD();
   const t = M.digestText({ kind: 'workout', month: '2026-07', count: 3, items: ['深蹲', '硬拉'], partial: true });

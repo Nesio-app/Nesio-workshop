@@ -7,7 +7,7 @@ export default function SettingsPageClient() {
     <div className="portal-root portal-root--home">
       <div className="portal-grain" aria-hidden />
       <div className="portal-shell portal-shell--single">
-        <div className="portal-main" style={{ overflowY: 'auto', height: '100dvh', paddingBottom: '2rem' }}>
+        <div className="portal-main" style={{ overflowY: 'auto', height: '100dvh', paddingBottom: 'var(--space-8)' }}>
           <NesioProfileCard />
         </div>
       </div>

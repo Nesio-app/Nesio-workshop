@@ -83,6 +83,25 @@ export function upsertMonthlyDigest(d: DigestInput): LifeNode | null {
   if (typeof window === 'undefined') return null;
   if (!d.month || !(d.count > 0)) return null;
   const meta = KIND_META[d.kind];
+  const extId = digestExternalId(d.kind, d.month);
+  const items = d.items.slice(0, 40).join(',');
+
+  // ⚠️ 内容没变就**不写**。
+  //
+  // `ingestLifeNode` 命中已有节点时是无条件 `updateLifeNode`,而那一步会:
+  // 盖 updatedAt → saveAll(整图重写)→ syncLifeGraphUpsertToCloud + syncLifeNodeSignalToCloud
+  // (两条云推送)。这个函数被调的场合恰好都是**反复重算同一份内容**:
+  // 开机折一次、每开一次家庭板又折一次 —— 写的都是同一个数。
+  //
+  // 代价不只是浪费。updatedAt 被顶到当下,意味着你每瞄一眼家庭板,
+  // 三条月度小结就冒到「最近更新」的最前面,把真正新的记忆挤下去。
+  const prev = (() => { try { return getLifeGraph(); } catch { return []; } })()
+    .find((n) => n.attributes?.externalId === extId);
+  if (prev
+    && prev.attributes?.count === d.count
+    && prev.attributes?.partial === d.partial
+    && prev.attributes?.items === items) return prev;
+
   try {
     return ingestLifeNode({
       type: 'note',
@@ -93,12 +112,12 @@ export function upsertMonthlyDigest(d: DigestInput): LifeNode | null {
       tags: [meta.tag, '月度小结'],
       rawInput: digestText(d),
       attributes: {
-        externalId: digestExternalId(d.kind, d.month),
+        externalId: extId,
         digestKind: d.kind,
         month: d.month,
         count: d.count,
         partial: d.partial,
-        items: d.items.slice(0, 40).join(','),
+        items,
         date: `${d.month}-01`,
         epistemic: 'observation',
         generator: 'system:monthly-digest',
@@ -160,7 +179,10 @@ export function foldEventsToDigests(
  *     从来没被写下过,不是这里能补的。
  *   · **家务** —— 账本在服务端(family-server),要登录 + 网络。这里不去拉 ——
  *     开机时打一个网络请求去算一条小结,离线就静默失败,那种「有时有有时没有」的
- *     节点比没有更糟。等家庭板加载完账本时由它调 `upsertMonthlyDigest`。
+ *     节点比没有更糟。**已由家庭板接上**(FamilySharingSheet 的 `load()`,
+ *     2026-07-31):账本到手的那一刻就地折,不额外发请求。
+ *     只折**我自己**的 —— 小结的幂等键是 (类型, 月份),没有人的维度,
+ *     顺手把看到的每个人都折进去会让这个数字随手一点就变。
  *   · **练习** —— 目前没有任何持久化的答题历史可折。要先有记录才谈得上小结。
  *
  * 这三条写在这里而不是藏在 commit 里,是因为「为什么我这个月练了什么还是搜不到」

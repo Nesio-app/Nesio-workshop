@@ -655,8 +655,8 @@ export default function TimelineTab() {
           {locateMsg && (
             <p
               style={{
-                margin: '0 0 0.75rem',
-                padding: '0.55rem 0.75rem',
+                margin: '0 0 var(--space-3)',
+                padding: 'var(--space-2) var(--space-3)',
                 borderRadius: 'var(--radius-sm)',
                 fontSize: 'var(--text-xs)',
                 lineHeight: 1.45,
@@ -788,7 +788,7 @@ export default function TimelineTab() {
 
           {highlights && (highlights.longestStay || highlights.busiestDay || highlights.farthestDay) && (
             <>
-              <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '纪录', 'Records')}</p>
+              <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '纪录', 'Records')}</p>
               <div className="nesio-tl-records">
                 {highlights.longestStay && (
                   <div className="nesio-tl-record"><span className="nesio-tl-record-name">{L(dict, '最长停留', 'Longest stay')}</span><span className="nesio-tl-record-val">{displayLabel(highlights.longestStay.label)} · {fmtDur(highlights.longestStay.min)}</span><span className="nesio-tl-record-date">{dayLabel(highlights.longestStay.dateKey)}</span></div>
@@ -805,7 +805,7 @@ export default function TimelineTab() {
 
           {highlights && highlights.monthly.length > 1 && (
             <>
-              <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '每月去过的地点', 'Places per month')}</p>
+              <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '每月去过的地点', 'Places per month')}</p>
               <div className="nesio-tl-months">
                 {highlights.monthly.map((m) => {
                   const max = Math.max(...highlights.monthly.map((x) => x.places), 1);
@@ -848,7 +848,7 @@ export default function TimelineTab() {
             />
 
             {placeShare.length === 0 ? (
-              <p className="nesio-insights-empty" style={{ marginTop: '1rem' }}>{L(dict, '这段时间还没有地点记录 —— 换个时段看看。', 'No places in this period — try another range.')}</p>
+              <p className="nesio-insights-empty" style={{ marginTop: 'var(--space-4)' }}>{L(dict, '这段时间还没有地点记录 —— 换个时段看看。', 'No places in this period — try another range.')}</p>
             ) : (
               <>
                 {/* 可交互甜甜圈:图例贴在饼里,点扇形高亮 + 中心出详情 */}

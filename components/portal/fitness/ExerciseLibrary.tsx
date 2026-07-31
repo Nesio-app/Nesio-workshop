@@ -249,7 +249,7 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
             <>
               {catStatus === 'loading' && <p className="nesio-freeze-empty">{L(dict, '正在把完整动作库载进来…', 'Loading the full library…')}</p>}
               {catStatus === 'error' && (
-                <div className="nesio-exfig--error" style={{ aspectRatio: 'auto', padding: '1rem' }}>
+                <div className="nesio-exfig--error" style={{ aspectRatio: 'auto', padding: 'var(--space-4)' }}>
                   <span className="nesio-exfig-msg">{L(dict, '完整动作库没载进来', 'Library did not load')}{catErr ? `（${catErr}）` : ''}</span>
                   <button type="button" className="nesio-exfig-retry" onClick={loadCat}>{L(dict, '重试', 'Retry')}</button>
                 </div>

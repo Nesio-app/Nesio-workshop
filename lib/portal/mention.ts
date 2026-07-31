@@ -23,6 +23,22 @@
  * 而这种错很难发现:它长得像是你自己连的。
  */
 
+/**
+ * ## 2026-07-31 图访问收进来了(修构建)
+ *
+ * 第一版把 `getLifeGraph()` 和 `linkNodes()` 直接写在 CaptureBar / TodayFeed 里,
+ * 撞了 `scripts/check-platform-leak.mjs` 的一条架构规则:
+ * **「今天」页只能消费 TodayViewModel,不许静态 import `@/lib/portal/life-graph`。**
+ * 那条检查跑在 `npm run build` 里(`check:leak`),不在 tsc 也不在 test:security ——
+ * 我当时只跑了 `npx next build`,把 build 脚本前面五步全跳过了,所以没看见。
+ *
+ * 同文件里已有 `await import('@/lib/portal/life-graph')` 的写法能躲过检查器,
+ * 但那是躲不是修。规则要的是「今天页不自己决定数据从哪来」,所以正解是把图访问
+ * 挪到这个领域模块里:UI 只说「给我候选」「把这些连上」,不知道背后是图还是别的。
+ */
+
+import { getLifeGraph } from './life-graph';
+
 export interface MentionCandidate {
   id: string;
   name: string;
@@ -129,4 +145,42 @@ export function settleMentions(text: string, pending: readonly PendingMention[])
     out.push(m);
   }
   return out;
+}
+
+/* ═══ 图访问:UI 层不碰图,只说「给我候选」「把这些连上」 ═══════════════════ */
+
+/**
+ * 从整图里找候选。UI 调这个,不自己 `getLifeGraph()`。
+ *
+ * 分开一层不只是为了过检查器:候选池将来可能不只是图(邮件全文、联系人…),
+ * 那时改这里就行,输入框不用动。
+ */
+export function mentionCandidatesFromGraph(
+  query: string, opts: { max?: number; excludeId?: string } = {},
+): MentionCandidate[] {
+  if (typeof window === 'undefined') return [];
+  try { return mentionCandidates(query, getLifeGraph(), opts); } catch { return []; }
+}
+
+/** 一次结算的结果:连上几条、总共该连几条。差额要让用户看见,不能静默。 */
+export interface MentionLinkResult { linked: number; total: number }
+
+/**
+ * 把结算后的 mention 真的连上。
+ *
+ * **连不上不抛**:这条记录本身是你要的东西,为了一条关联把它丢掉更糟。
+ * 但返回差额 —— 调用方必须把「有几条没连上」说出来。
+ */
+export async function linkSettledMentions(
+  sourceId: string, settled: readonly PendingMention[],
+): Promise<MentionLinkResult> {
+  if (!settled.length) return { linked: 0, total: 0 };
+  let linked = 0;
+  try {
+    const { linkNodes } = await import('./life-graph');
+    for (const m of settled) {
+      try { if (linkNodes(sourceId, m.id, 'user_linked').ok) linked += 1; } catch { /* 差额由调用方报出 */ }
+    }
+  } catch { /* 整个模块加载不出来:linked 停在 0,调用方照样会说 */ }
+  return { linked, total: settled.length };
 }

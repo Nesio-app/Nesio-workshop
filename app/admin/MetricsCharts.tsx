@@ -97,12 +97,12 @@ export function FunnelSteps({ data }: { data: Array<{ step: string; devices: num
         const rate = rates[i];
         const isBottleneck = worstRate !== null && rate === worstRate && rate < 40;
         return (
-          <div key={f.step} style={{ marginBottom: '0.65rem' }}>
+          <div key={f.step} style={{ marginBottom: 'var(--space-3)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: INK, marginBottom: 3 }}>
               <span>
                 {f.step}
                 {isBottleneck && (
-                  <span style={{ marginLeft: 6, fontSize: '0.62rem', color: 'var(--status-risk)', border: '1px solid var(--status-risk)', borderRadius: 'var(--radius-pill)', padding: '0 0.4rem' }}>瓶颈</span>
+                  <span style={{ marginLeft: 6, fontSize: '0.62rem', color: 'var(--status-risk)', border: '1px solid var(--status-risk)', borderRadius: 'var(--radius-pill)', padding: '0 var(--space-2)' }}>瓶颈</span>
                 )}
               </span>
               <span>
@@ -128,12 +128,12 @@ export function InsightCard({ severity, title, detail, advice }: { severity: 'go
   const soft = severity === 'risk' ? 'var(--status-risk-soft)' : severity === 'gentle' ? 'var(--status-gentle-soft)' : 'var(--status-go-soft)';
   const icon = severity === 'risk' ? '⚠' : severity === 'gentle' ? '◐' : '✓';
   return (
-    <div style={{ display: 'flex', gap: '0.7rem', padding: '0.75rem 0.9rem', borderRadius: 'var(--radius-md)', background: soft, borderLeft: `3px solid ${color}`, marginBottom: '0.5rem' }}>
+    <div style={{ display: 'flex', gap: 'var(--space-3)', padding: 'var(--space-3) var(--space-4)', borderRadius: 'var(--radius-md)', background: soft, borderLeft: `3px solid ${color}`, marginBottom: 'var(--space-2)' }}>
       <span style={{ color, fontSize: '1rem', lineHeight: 1.3 }} aria-hidden>{icon}</span>
       <div style={{ minWidth: 0 }}>
         <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 700, color: INK }}>{title}</p>
-        <p style={{ margin: '0.15rem 0 0', fontSize: '0.76rem', color: INK, opacity: 0.85 }}>{detail}</p>
-        <p style={{ margin: '0.25rem 0 0', fontSize: '0.76rem', color }}>建议:{advice}</p>
+        <p style={{ margin: 'var(--space-1) 0 0', fontSize: '0.76rem', color: INK, opacity: 0.85 }}>{detail}</p>
+        <p style={{ margin: 'var(--space-1) 0 0', fontSize: '0.76rem', color }}>建议:{advice}</p>
       </div>
     </div>
   );

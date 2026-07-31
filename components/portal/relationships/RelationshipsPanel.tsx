@@ -221,7 +221,7 @@ export default function RelationshipsPanel() {
       })}
 
       {/* 加人挪到最下边(bug3):列表是这一页的主体,加人是偶发动作,不该占顶部黄金位 */}
-      <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: '1rem' }} onClick={() => setAddOpen(true)}>
+      <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-4)' }} onClick={() => setAddOpen(true)}>
         {L(dict, '＋ 加人', '＋ Add someone')}
       </button>
 

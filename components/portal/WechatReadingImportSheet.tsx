@@ -71,10 +71,10 @@ export default function WechatReadingImportSheet({ open, onClose }: { open: bool
             onChange={(e) => setText(e.target.value)}
             placeholder={L(dict, '把微信读书导出的笔记粘到这里…\n\n《书名》 作者\n◆ 章节\n>> 划线原文\n想法：你的批注', 'Paste your WeChat Reading export here…')}
           />
-          <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: '0.6rem' }} onClick={doImport} disabled={!text.trim()}>
+          <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-2)' }} onClick={doImport} disabled={!text.trim()}>
             {L(dict, '解析并导入', 'Parse and import')}
           </button>
-          {result && <p className="nesio-settings-option-hint" style={{ marginTop: '0.5rem' }}>{result}</p>}
+          {result && <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-2)' }}>{result}</p>}
         </div>
       </div>
     </div>

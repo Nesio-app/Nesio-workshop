@@ -62,7 +62,7 @@ export default function RouteError({
         type="button"
         onClick={() => { try { window.location.reload(); } catch { reset(); } }}
         style={{
-          marginTop: 'var(--space-2)', padding: '0.5rem 1.5rem', borderRadius: 'var(--radius-pill)',
+          marginTop: 'var(--space-2)', padding: 'var(--space-2) var(--space-6)', borderRadius: 'var(--radius-pill)',
           border: 'none', background: 'var(--portal-accent)', color: 'var(--portal-on-accent, #fff)',
           fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: 'pointer',
         }}
@@ -86,7 +86,7 @@ export default function RouteError({
               const text = `${error.name || 'Error'}: ${error.message || ''}${error.digest ? ` · #${error.digest}` : ''}`;
               try { navigator.clipboard?.writeText(text); } catch { /* 剪贴板不可用就让用户手抄 */ }
             }}
-            style={{ fontSize: '0.72rem', padding: '0.3rem 0.9rem', borderRadius: 999, border: '1px solid var(--portal-line, #ccc)', background: 'transparent', cursor: 'pointer' }}
+            style={{ fontSize: '0.72rem', padding: 'var(--space-1) var(--space-4)', borderRadius: 999, border: '1px solid var(--portal-line, #ccc)', background: 'transparent', cursor: 'pointer' }}
           >
             复制错误信息
           </button>

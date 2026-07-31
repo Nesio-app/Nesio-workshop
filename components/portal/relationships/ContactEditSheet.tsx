@@ -125,7 +125,7 @@ export default function ContactEditSheet({ open, onClose, contactKey, nodeId, in
           placeholder={L(dict, '怎么称呼 TA', 'What you call them')} onChange={set('name')} />
 
         {/* bug3:关系改成选 tag —— 自由填写的结果是「同事/同事们/工作同事」三种写法算三种关系 */}
-        <p className="nesio-settings-section-label" style={{ marginTop: '0.7rem' }}>{L(dict, '关系', 'Relationship')}</p>
+        <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-3)' }}>{L(dict, '关系', 'Relationship')}</p>
         <div className="nesio-rel-chips" role="group" aria-label={L(dict, '关系', 'Relationship')}>
           {relTags.map((t) => {
             const on = (draft.relation || '') === t.zh;
@@ -139,7 +139,7 @@ export default function ContactEditSheet({ open, onClose, contactKey, nodeId, in
           })}
         </div>
 
-        <label className="nesio-settings-section-label" htmlFor="ct-email" style={{ marginTop: '0.7rem' }}>{L(dict, '邮箱', 'Email')}</label>
+        <label className="nesio-settings-section-label" htmlFor="ct-email" style={{ marginTop: 'var(--space-3)' }}>{L(dict, '邮箱', 'Email')}</label>
         <div className="nesio-ct-field-row">
           <input id="ct-email" className="nesio-ob-input" type="email" value={draft.email || ''} maxLength={80}
             placeholder={L(dict, '有的话填上 —— 邮件往来会自动认到 TA', 'If you have it — emails will match to them')} onChange={set('email')} />
@@ -147,7 +147,7 @@ export default function ContactEditSheet({ open, onClose, contactKey, nodeId, in
             label={L(dict, '给 TA 写信', 'Write to them')}><IconMail size={16} /></FieldAction>
         </div>
 
-        <label className="nesio-settings-section-label" htmlFor="ct-phone" style={{ marginTop: '0.7rem' }}>{L(dict, '电话', 'Phone')}</label>
+        <label className="nesio-settings-section-label" htmlFor="ct-phone" style={{ marginTop: 'var(--space-3)' }}>{L(dict, '电话', 'Phone')}</label>
         <div className="nesio-ct-field-row">
           <input id="ct-phone" className="nesio-ob-input" type="tel" value={draft.phone || ''} maxLength={32}
             onChange={set('phone')} />
@@ -155,7 +155,7 @@ export default function ContactEditSheet({ open, onClose, contactKey, nodeId, in
             label={L(dict, '打给 TA', 'Call them')}><IconPhone size={16} /></FieldAction>
         </div>
 
-        <label className="nesio-settings-section-label" htmlFor="ct-addr" style={{ marginTop: '0.7rem' }}>{L(dict, '地址', 'Address')}</label>
+        <label className="nesio-settings-section-label" htmlFor="ct-addr" style={{ marginTop: 'var(--space-3)' }}>{L(dict, '地址', 'Address')}</label>
         <div className="nesio-ct-field-row">
           <input id="ct-addr" className="nesio-ob-input" value={draft.address || ''} maxLength={120}
             onChange={set('address')} />
@@ -164,15 +164,15 @@ export default function ContactEditSheet({ open, onClose, contactKey, nodeId, in
             label={L(dict, '导航过去', 'Navigate there')}><IconNavigate size={16} /></FieldAction>
         </div>
 
-        <label className="nesio-settings-section-label" htmlFor="ct-bday" style={{ marginTop: '0.7rem' }}>{L(dict, '生日', 'Birthday')}</label>
+        <label className="nesio-settings-section-label" htmlFor="ct-bday" style={{ marginTop: 'var(--space-3)' }}>{L(dict, '生日', 'Birthday')}</label>
         <input id="ct-bday" className="nesio-ob-input" type="date" value={draft.birthday || ''} onChange={set('birthday')} />
 
-        <label className="nesio-settings-section-label" htmlFor="ct-note" style={{ marginTop: '0.7rem' }}>{L(dict, '备注', 'Note')}</label>
+        <label className="nesio-settings-section-label" htmlFor="ct-note" style={{ marginTop: 'var(--space-3)' }}>{L(dict, '备注', 'Note')}</label>
         <input id="ct-note" className="nesio-ob-input" value={draft.note || ''} maxLength={120} onChange={set('note')} />
 
-        {err && <p className="nesio-rel-detail-err" role="alert" style={{ marginTop: '0.7rem' }}>{err}</p>}
+        {err && <p className="nesio-rel-detail-err" role="alert" style={{ marginTop: 'var(--space-3)' }}>{err}</p>}
 
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
           <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }} onClick={onClose}>
             {L(dict, '取消', 'Cancel')}
           </button>

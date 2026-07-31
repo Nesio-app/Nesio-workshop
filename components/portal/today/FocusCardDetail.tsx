@@ -287,7 +287,7 @@ export function FocusCardDetail({
             {L(dict, '直达链接', 'Open link')}
           </a>
         )}
-        {error && <p className="nesio-momentum-error" style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)', margin: '0 0 0.5rem' }}>{error}</p>}
+        {error && <p className="nesio-momentum-error" style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)', margin: '0 0 var(--space-2)' }}>{error}</p>}
         <button type="button" className="nesio-momentum-ignite-btn" onClick={() => void firstBreakdown()}>
           {error ? L(dict, '重试', 'Retry') : L(dict, '拆成小步', 'Break it into steps')}
         </button>
@@ -322,7 +322,7 @@ export function FocusCardDetail({
         <div className="nesio-momentum-wave-badge">{L(dict, `第 ${waveIndex} 波`, `Wave ${waveIndex}`)}</div>
       )}
       {waveSource && (
-        <p className="nesio-settings-option-hint" style={{ margin: '0 0 0.4rem' }}>
+        <p className="nesio-settings-option-hint" style={{ margin: '0 0 var(--space-2)' }}>
           {waveSource === 'cache'
             ? L(dict, 'AI 暂时离线 · 复用了上次给你的拆解', 'AI offline · reused its last breakdown for you')
             : L(dict, 'AI 暂时离线 · 这是本地拆的,够你先动起来', 'AI offline · a local breakdown to get you moving')}
@@ -345,13 +345,13 @@ export function FocusCardDetail({
             </div>
           );
         })()}
-        <div style={{ display: 'flex', gap: '0.4rem', marginLeft: 'auto' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginLeft: 'auto' }}>
           <button type="button" onClick={() => { const live = getLiveMemoryNode(node.id); if (live) setMemNode(live); }}
-            style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', cursor: 'pointer' }}>
+            style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: 'var(--space-1) var(--space-2)', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', cursor: 'pointer' }}>
             {L(dict, '查看详情', 'Details')}
           </button>
           <button type="button" onClick={() => void aiRefineWave()} disabled={aiRefining}
-            style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: 'var(--text-overline)', color: 'var(--portal-accent)', cursor: 'pointer', opacity: aiRefining ? 0.6 : 1 }}>
+            style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: 'var(--space-1) var(--space-2)', fontSize: 'var(--text-overline)', color: 'var(--portal-accent)', cursor: 'pointer', opacity: aiRefining ? 0.6 : 1 }}>
             {aiRefining ? L(dict, '换一种拆法中…', 'Reworking…') : L(dict, '换一种拆法', 'Rework it')}
           </button>
         </div>
