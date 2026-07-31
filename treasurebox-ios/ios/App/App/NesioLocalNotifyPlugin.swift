@@ -51,7 +51,7 @@ public class NesioLocalNotifyPlugin: CAPPlugin, CAPBridgedPlugin {
 
     // ── 权限 ────────────────────────────────────────────────────────────────
 
-    @objc func checkPermissions(_ call: CAPPluginCall) {
+    @objc public override func checkPermissions(_ call: CAPPluginCall) {
         center.getNotificationSettings { settings in
             let display: String
             switch settings.authorizationStatus {
@@ -64,7 +64,7 @@ public class NesioLocalNotifyPlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    @objc func requestPermissions(_ call: CAPPluginCall) {
+    @objc public override func requestPermissions(_ call: CAPPluginCall) {
         center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
             // 用户点「不允许」不是错误,是一个答案。如实回 denied,
             // 让 JS 侧去说「想让它到点提醒你,要在设置里打开通知」。

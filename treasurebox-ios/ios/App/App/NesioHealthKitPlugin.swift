@@ -116,7 +116,7 @@ public class NesioHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
         return out
     }
 
-    @objc func checkPermissions(_ call: CAPPluginCall) {
+    @objc public override func checkPermissions(_ call: CAPPluginCall) {
         guard HKHealthStore.isHealthDataAvailable() else {
             call.resolve(["available": false, "read": "unavailable"]); return
         }
@@ -124,7 +124,7 @@ public class NesioHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve(["available": true, "read": "unknown"])
     }
 
-    @objc func requestPermissions(_ call: CAPPluginCall) {
+    @objc public override func requestPermissions(_ call: CAPPluginCall) {
         guard HKHealthStore.isHealthDataAvailable() else {
             call.resolve(["ok": false, "reason": "unavailable"]); return
         }

@@ -69,7 +69,7 @@ public class NesioSpeechPlugin: CAPPlugin, CAPBridgedPlugin {
         call.resolve(["available": true, "onDevice": true, "reason": ""])
     }
 
-    @objc func requestPermissions(_ call: CAPPluginCall) {
+    @objc public override func requestPermissions(_ call: CAPPluginCall) {
         SFSpeechRecognizer.requestAuthorization { status in
             guard status == .authorized else {
                 call.resolve(["speech": status == .denied ? "denied" : "prompt", "microphone": "prompt"])

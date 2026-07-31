@@ -110,11 +110,11 @@ public class NesioGeolocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         ]
     }
 
-    @objc func checkPermissions(_ call: CAPPluginCall) {
+    @objc public override func checkPermissions(_ call: CAPPluginCall) {
         call.resolve(permissionPayload())
     }
 
-    @objc func requestPermissions(_ call: CAPPluginCall) {
+    @objc public override func requestPermissions(_ call: CAPPluginCall) {
         let status = CLLocationManager.authorizationStatus()
         guard status == .notDetermined else {
             // 已经问过了。再调 requestWhenInUse 系统**不会**再弹,
