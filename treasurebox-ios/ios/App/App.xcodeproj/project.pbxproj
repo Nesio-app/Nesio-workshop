@@ -12,6 +12,11 @@
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		AE51000B0000000000000002 /* NesioVisionPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE51000A0000000000000001 /* NesioVisionPlugin.swift */; };
+		AE51001B0000000000000002 /* NesioGeolocationPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE51001A0000000000000001 /* NesioGeolocationPlugin.swift */; };
+		AE51002B0000000000000002 /* NesioLocalNotifyPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE51002A0000000000000001 /* NesioLocalNotifyPlugin.swift */; };
+		AE51003B0000000000000002 /* NesioHealthKitPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE51003A0000000000000001 /* NesioHealthKitPlugin.swift */; };
+		AE51004B0000000000000002 /* NesioSpeechPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE51004A0000000000000001 /* NesioSpeechPlugin.swift */; };
+		AE51005B0000000000000002 /* NesioSpotlightPlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE51005A0000000000000001 /* NesioSpotlightPlugin.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
@@ -24,6 +29,13 @@
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		AE51000A0000000000000001 /* NesioVisionPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NesioVisionPlugin.swift; sourceTree = "<group>"; };
+		AE51001A0000000000000001 /* NesioGeolocationPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NesioGeolocationPlugin.swift; sourceTree = "<group>"; };
+		AE51002A0000000000000001 /* NesioLocalNotifyPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NesioLocalNotifyPlugin.swift; sourceTree = "<group>"; };
+		AE51003A0000000000000001 /* NesioHealthKitPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NesioHealthKitPlugin.swift; sourceTree = "<group>"; };
+		AE51004A0000000000000001 /* NesioSpeechPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NesioSpeechPlugin.swift; sourceTree = "<group>"; };
+		AE51005A0000000000000001 /* NesioSpotlightPlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NesioSpotlightPlugin.swift; sourceTree = "<group>"; };
+		AE51006A0000000000000001 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		AE51007A0000000000000001 /* App-sideload.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = "App-sideload.entitlements"; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
@@ -67,6 +79,13 @@
 				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				AE51000A0000000000000001 /* NesioVisionPlugin.swift */,
+				AE51001A0000000000000001 /* NesioGeolocationPlugin.swift */,
+				AE51002A0000000000000001 /* NesioLocalNotifyPlugin.swift */,
+				AE51003A0000000000000001 /* NesioHealthKitPlugin.swift */,
+				AE51004A0000000000000001 /* NesioSpeechPlugin.swift */,
+				AE51005A0000000000000001 /* NesioSpotlightPlugin.swift */,
+				AE51006A0000000000000001 /* App.entitlements */,
+				AE51007A0000000000000001 /* App-sideload.entitlements */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -160,6 +179,11 @@
 			files = (
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				AE51000B0000000000000002 /* NesioVisionPlugin.swift in Sources */,
+				AE51001B0000000000000002 /* NesioGeolocationPlugin.swift in Sources */,
+				AE51002B0000000000000002 /* NesioLocalNotifyPlugin.swift in Sources */,
+				AE51003B0000000000000002 /* NesioHealthKitPlugin.swift in Sources */,
+				AE51004B0000000000000002 /* NesioSpeechPlugin.swift in Sources */,
+				AE51005B0000000000000002 /* NesioSpotlightPlugin.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -299,6 +323,7 @@
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "App/App-sideload.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
@@ -309,7 +334,7 @@
 				);
 				MARKETING_VERSION = 1.0;
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
-				PRODUCT_BUNDLE_IDENTIFIER = com.jiuxiao.treasurebox;
+				PRODUCT_BUNDLE_IDENTIFIER = app.nesio.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_VERSION = 5.0;
@@ -321,6 +346,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = "App/App-sideload.entitlements";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = App/Info.plist;
@@ -330,7 +356,7 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = com.jiuxiao.treasurebox;
+				PRODUCT_BUNDLE_IDENTIFIER = app.nesio.ios;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
 				SWIFT_VERSION = 5.0;

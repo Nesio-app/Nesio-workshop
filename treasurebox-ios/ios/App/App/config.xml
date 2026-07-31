@@ -1,0 +1,15 @@
+<?xml version='1.0' encoding='utf-8'?>
+<!--
+  Capacitor iOS 平台模板文件。**不是我们写的配置**,真正的配置在
+  根目录的 capacitor.config.ts(它经 `npx cap sync ios` 生成
+  ios/App/App/capacitor.config.json)。
+
+  留着它是因为 `project.pbxproj` 的 Resources 阶段引用了它 ——
+  缺文件的话 xcodebuild 会直接报 "Build input file cannot be found" 而中断。
+
+  它原本是 `npx cap add ios` 生成的,而我们**不跑那条命令**(跑了会重新生成整个
+  ios/,把六个自研插件连同 pbxproj 里的登记一起冲掉)。所以这个文件必须入库。
+-->
+<widget version="1.0.0" xmlns="http://www.w3.org/ns/widgets" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <access origin="*" />
+</widget>

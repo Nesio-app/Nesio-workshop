@@ -68,6 +68,10 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-reminder-notify-state-v1',
   // HealthKit 自动同步的日期簿记 —— 单设备本地状态,同步过去只会让新设备以为已经拉过。
   'nesio-healthkit-auto-sync-v1',
+  // 「让 iOS 系统搜索找得到我的记忆」开关(Core Spotlight,2026-07-31)。
+  // 索引在**这台设备**的系统搜索库里,换台手机上面什么都没有 ——
+  // 开关同步过去会造出「显示开着、实际没索引」的假状态。
+  'nesio-spotlight-enabled-v1',
   'nesio-calendar-local-v1',
   'nesio-last-location-v1',
   'nesio-telemetry-device-v1',

@@ -8,19 +8,108 @@ import { isNativePlatform } from './platform-capabilities';
 import type { HealthMetric, HealthMetrics } from './apple-health';
 import { saveHealthMetrics } from './health-store';
 
+/** 原生回来的一行,字段名照 Apple 导出的 `<Record …>`。 */
+interface HealthSampleRow {
+  type: string;
+  sourceName: string;
+  startDate: string;
+  endDate: string;
+  unit: string;
+  value: string;
+}
+
 type NesioHealthKitPlugin = {
   checkPermissions: () => Promise<{ available?: boolean; read?: string }>;
   requestPermissions: () => Promise<{ ok?: boolean; reason?: string; read?: string }>;
-  fetchMetrics: (opts?: { days?: number }) => Promise<{
+  /** 老壳(Nesioshellfix.ipa)的路子:原生自己算好 HealthMetric[]。 */
+  fetchMetrics?: (opts?: { days?: number }) => Promise<{
     ok?: boolean;
     reason?: string;
     metrics?: HealthMetric[];
     workouts?: number;
     importedAt?: string;
   }>;
+  /** 新壳(2026-07-31)的路子:原样倒出样本,规则留在 JS。见下面那段。 */
+  fetchSamples?: (opts?: { days?: number; perTypeCap?: number }) => Promise<{
+    ok?: boolean;
+    reason?: string;
+    rows?: HealthSampleRow[];
+    workouts?: number;
+    importedAt?: string;
+  }>;
 };
 
 const NesioHealthKit = registerPlugin<NesioHealthKitPlugin>('NesioHealthKit');
+
+/**
+ * ## 两代壳,两条路,同一个出口
+ *
+ * **老壳** `fetchMetrics` —— 原生侧自己把 33 条指标算好了送过来。
+ * 问题是那套规则(单位换算 / iPhone+Watch 去重 / 脏值丢弃 / 睡眠区间合并 /
+ * 按月序列 / 「最后一天残缺别当最新」)在原生里再实现一遍就会**和 JS 这份漂移**,
+ * 而且每调一次规则都要重出 IPA。
+ *
+ * **新壳** `fetchSamples` —— 只把样本原样倒出来,字段名和 Apple 自己的
+ * `export.xml` 一一对应。JS 这边拼回同样的文本,喂给**同一个**解析器
+ * (`parseHealthMetrics`,手动导入 XML 走的也是它)。
+ * 一份规则,两个入口,不会有两套逻辑各自漂移的那一天;
+ * 而且以后调规则推一次部署就生效。
+ *
+ * 优先走新的,没有再退老的。两条都没有 → 这版壳没带健康。
+ */
+function rowsToAppleXml(rows: readonly HealthSampleRow[]): string {
+  const esc = (s: string) => String(s ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const lines = rows.map((r) =>
+    `<Record type="${esc(r.type)}" sourceName="${esc(r.sourceName)}" unit="${esc(r.unit)}"`
+    + ` startDate="${esc(r.startDate)}" endDate="${esc(r.endDate)}" value="${esc(r.value)}"/>`);
+  return `<HealthData>\n${lines.join('\n')}\n</HealthData>`;
+}
+
+/**
+ * 拉一次并组装成 HealthMetrics。**不写存储、不弹权限** —— 纯取数,
+ * 由调用方决定要不要落盘。两代壳都走这里。
+ */
+async function pullMetrics(days: number): Promise<{ ok: boolean; reason?: string; metrics?: HealthMetrics }> {
+  // 新壳优先
+  if (typeof NesioHealthKit.fetchSamples === 'function') {
+    const res = await NesioHealthKit.fetchSamples({ days });
+    if (!res?.ok || !Array.isArray(res.rows)) {
+      return { ok: false, reason: res?.reason || 'fetch_failed' };
+    }
+    if (res.rows.length === 0) return { ok: false, reason: 'no_data' };
+    const { parseHealthMetrics } = await import('./providers/apple-health');
+    const parsed = parseHealthMetrics(rowsToAppleXml(res.rows));
+    return {
+      ok: true,
+      metrics: {
+        ...parsed,
+        // 锻炼次数原生数得更准(它能直接查 workoutType,不用从文本里数标签)。
+        workouts: typeof res.workouts === 'number' ? res.workouts : parsed.workouts,
+        importedAt: res.importedAt || new Date().toISOString(),
+      },
+    };
+  }
+
+  // 老壳兜底
+  if (typeof NesioHealthKit.fetchMetrics === 'function') {
+    const res = await NesioHealthKit.fetchMetrics({ days });
+    if (!res?.ok || !Array.isArray(res.metrics) || res.metrics.length === 0) {
+      return { ok: false, reason: res?.reason || 'no_data' };
+    }
+    return {
+      ok: true,
+      metrics: {
+        metrics: res.metrics,
+        workouts: typeof res.workouts === 'number' ? res.workouts : 0,
+        importedAt: res.importedAt || new Date().toISOString(),
+      },
+    };
+  }
+
+  return { ok: false, reason: 'plugin_missing' };
+}
 
 export function isHealthKitAvailable(): boolean {
   return isNativePlatform();
@@ -50,17 +139,10 @@ export async function syncHealthKitToStore(days = 30): Promise<{
   try {
     const allowed = await requestHealthKitAccess();
     if (!allowed) return { ok: false, reason: 'denied' };
-    const res = await NesioHealthKit.fetchMetrics({ days });
-    if (!res?.ok || !Array.isArray(res.metrics)) {
-      return { ok: false, reason: res?.reason || 'fetch_failed' };
-    }
-    const metrics: HealthMetrics = {
-      metrics: res.metrics,
-      workouts: typeof res.workouts === 'number' ? res.workouts : 0,
-      importedAt: res.importedAt || new Date().toISOString(),
-    };
-    saveHealthMetrics(metrics);
-    return { ok: true, metrics };
+    const res = await pullMetrics(days);
+    if (!res.ok || !res.metrics) return { ok: false, reason: res.reason || 'fetch_failed' };
+    saveHealthMetrics(res.metrics);
+    return { ok: true, metrics: res.metrics };
   } catch {
     return { ok: false, reason: 'sync_failed' };
   }
@@ -95,16 +177,12 @@ export async function syncHealthKitQuietly(days = 30): Promise<{ ok: boolean; re
     const today = new Date().toLocaleDateString('en-CA');
     if (last === today) return { ok: false, reason: 'already_today' };
 
-    const res = await NesioHealthKit.fetchMetrics({ days });
-    if (!res?.ok || !Array.isArray(res.metrics) || res.metrics.length === 0) {
+    const res = await pullMetrics(days);
+    if (!res.ok || !res.metrics) {
       // 没授权 / 没数据 —— 都不是错误,是「今天这条路没东西可拿」。不写簿记,下次还试。
-      return { ok: false, reason: res?.reason || 'no_data' };
+      return { ok: false, reason: res.reason || 'no_data' };
     }
-    saveHealthMetrics({
-      metrics: res.metrics,
-      workouts: typeof res.workouts === 'number' ? res.workouts : 0,
-      importedAt: res.importedAt || new Date().toISOString(),
-    });
+    saveHealthMetrics(res.metrics);
     try { localStorage.setItem(HEALTHKIT_AUTO_SYNC_KEY, today); } catch { /* 簿记写不上只是会多拉一次 */ }
     return { ok: true };
   } catch {

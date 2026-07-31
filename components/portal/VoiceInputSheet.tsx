@@ -423,8 +423,38 @@ export default function VoiceInputSheet({ open, intent = 'note', seedText = '', 
     else setIntentLabel('');
   }, [text]);
 
+  /**
+   * 先试原生端上听写(新壳带 `SpeechRecognition` 插件),不行再退 Web。
+   *
+   * iOS 的 WKWebView 里 Web SpeechRecognition **根本不存在** —— 这就是这个话筒
+   * 以前在真机上必然失败的原因。原生那条走 `SFSpeechRecognizer` +
+   * `requiresOnDeviceRecognition`,录音不出手机。
+   *
+   * 顺序不能反:先探原生,探不到再看 Web。反过来在 iOS Safari 上会把
+   * 本来能用的 Web 路径也绕过去(Safari 有 webkitSpeechRecognition,壳里没有)。
+   */
   function startListening() {
     setMicError('');
+    void (async () => {
+      const { speechAvailability, startOnDeviceSpeech } = await import('@/lib/native/speech');
+      const avail = await speechAvailability('zh-CN');
+      if (!avail.available) { startWebListening(); return; }
+      const stop = await startOnDeviceSpeech({
+        onPartial: (t) => setText(t),
+        onResult: (t) => setText(t),
+        onError: (_reason, message) => {
+          setListening(false);
+          setMicError(message);
+          setTimeout(() => inputRef.current?.focus(), 100);
+        },
+      }, 'zh-CN');
+      if (!stop) return;   // startOnDeviceSpeech 已经通过 onError 说明了原因
+      recRef.current = { stop: () => { void stop(); } };
+      setListening(true);
+    })();
+  }
+
+  function startWebListening() {
     const w = window as unknown as Record<string, unknown>;
     const Ctor = (w['SpeechRecognition'] || w['webkitSpeechRecognition']) as
       (new () => {

@@ -1,63 +1,157 @@
-# Codemagic 云端出包 —— Next.js/Capacitor(hosted webview)→ iOS → TestFlight。
-# 老 Mac 不用碰;这条流水线在 Codemagic 的 macOS 机器上跑,签名 + 出 .ipa + 传 TestFlight。
-# 见 docs/appstore/ios-packaging-plan.md 的「你要点的」清单(证书/集成/环境变量)。
+# Codemagic 云端出包 —— Capacitor(远程 WebView)→ iOS → .ipa。
 #
-# 一次性准备(在 Codemagic 控制台,不写在这):
-#  1) 连接这个 Git 仓库。
-#  2) Team integrations → App Store Connect:上传 App Store Connect API Key(.p8 + Key ID + Issuer ID)。
-#  3) 建一个环境变量组 `appstore_credentials`,并把上面的集成绑进来(自动签名用)。
-#  4) App Store Connect 里先建好 App 记录(拿到 bundle id = app.nesio.ios)。
+# ## 两条 workflow,按你怎么装来选
+#
+#   ios-sideload   ← **Sideloadly 走这条**。产出**未签名**的 .ipa,
+#                    Sideloadly 用你自己的 Apple ID 重签名再装。
+#                    好处:这条流水线**完全不需要开发者账号** ——
+#                    不用证书、不用 provisioning profile、不用 App Store Connect 集成。
+#
+#   ios-testflight   走 TestFlight 的正规路。需要付费开发者账号 + 证书,
+#                    带 HealthKit entitlement。
+#
+# ## 为什么未签名的包能用
+#
+# Sideloadly 拿到 .ipa 后自己做这些事:解包 → 用你的 Apple ID 申请一份
+# development 证书和 profile → 重签 → 装机。我们这边签的那一次它反正要覆盖掉,
+# 所以干脆不签 —— 省掉整套证书配置,也就没有「证书过期导致构建红」
+# 这类和代码无关的失败。
+#
+# ## 免费 Apple ID 的两条限制(和这个 App 相关的)
+#
+#   · **7 天到期**,到期重签一次(Sideloadly 里再点一次 Start,App 数据不丢)。
+#   · **拿不到 HealthKit entitlement** → 步数/睡眠/心率读不了。
+#     所以 sideload 档用的是空的 `App-sideload.entitlements`。
+#     其余全部照常:端上识别、端上语音、系统搜索、本地通知、后台足迹
+#     —— 这些一个 entitlement 都不需要。
+#
+# ## 壳只是个空 WebView
+#
+# `capacitor.config.ts` 里 `server.url` 指向线上。所以**纯 JS 的改动推一次
+# 部署就生效** —— 只有改了 Swift / Info.plist / 权限,才需要重新出包。
+
+definitions:
+  scripts:
+    - &prepare_project
+      name: 生成 iOS 工程(保留仓里的自研插件)
+      working_directory: treasurebox-ios
+      script: |
+        set -e
+        npm ci
+        # ⚠️ 不能用 `npx cap add ios` —— 那会**重新生成** ios/,
+        #    把仓里六个自研插件的 Swift 文件和 pbxproj 里的登记一起冲掉。
+        #    ios/ 是入库的,这里只 sync(拷 web 资源 + 按 capacitor.config.ts
+        #    刷新 ios/App/App/capacitor.config.json)。
+        test -f ios/App/App/NesioVisionPlugin.swift || (echo "ios/ 工程不完整,插件文件不见了" && exit 1)
+        mkdir -p www && [ -f www/index.html ] || echo '<!doctype html><title>Nesio</title>' > www/index.html
+        npx cap sync ios
+        # 自查:六个插件必须都在编译清单里。
+        # 漏一个的后果是 App 装上去照常跑,只有那个功能永远「这版没带」——
+        # 而构建全绿。这种失败必须在这里拦住。
+        for p in Vision Geolocation LocalNotify HealthKit Speech Spotlight; do
+          test -f "ios/App/App/Nesio${p}Plugin.swift" \
+            || (echo "❌ Nesio${p}Plugin.swift 不在仓里(.gitignore 那条 ios/ 吞过一次)" && exit 1)
+          grep -q "Nesio${p}Plugin.swift in Sources" ios/App/App.xcodeproj/project.pbxproj \
+            || (echo "❌ Nesio${p}Plugin 没进 Sources 编译清单" && exit 1)
+        done
+        echo "✅ 六个插件都在,且都在编译清单里"
+        # pbxproj 的 Resources 阶段引用的东西缺一个,xcodebuild 就是
+        # "Build input file cannot be found" 直接中断。config.xml 要入库,
+        # 另外两个由 cap sync 现生成 —— 这里确认它真的生成了。
+        for f in config.xml capacitor.config.json public; do
+          test -e "ios/App/App/$f" || (echo "❌ Resources 阶段引用的 $f 不存在" && exit 1)
+        done
+        echo "✅ Resources 阶段的三个引用都在"
 
 workflows:
+
+  # ────────────────────────────────────────────────────────────────────────
+  ios-sideload:
+    name: Nesio iOS → 未签名 .ipa(给 Sideloadly)
+    max_build_duration: 45
+    instance_type: mac_mini_m2
+    environment:
+      node: 20
+      xcode: latest
+      vars:
+        XCODE_SCHEME: "App"
+        XCODE_PROJECT: "ios/App/App.xcodeproj"
+        # 壳加载的线上地址。改成别的部署就指别的。
+        NESIO_SHELL_URL: "https://treasurebox-nu.vercel.app"
+    scripts:
+      - *prepare_project
+      - name: 递增 build number
+        working_directory: treasurebox-ios/ios/App
+        # 用分钟级时间戳。Sideloadly 装同 bundle id 的新包会覆盖安装,
+        # build number 递增能让「装上的到底是不是新的」一眼看得出来。
+        script: agvtool new-version -all "$(($(date +%s) / 60))" || true
+      - name: 构建(不签名)
+        working_directory: treasurebox-ios
+        script: |
+          set -e
+          xcodebuild archive \
+            -project "$XCODE_PROJECT" \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -archivePath "$CM_BUILD_DIR/Nesio.xcarchive" \
+            -destination 'generic/platform=iOS' \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGN_ENTITLEMENTS="App/App-sideload.entitlements"
+      - name: 打成 .ipa
+        script: |
+          set -e
+          # .ipa 就是一个 zip:根目录一个 Payload/,里面放 .app。
+          # 未签名的包走不了 `xcodebuild -exportArchive`(它要 profile),
+          # 所以手工打 —— 反正 Sideloadly 会重签。
+          cd "$CM_BUILD_DIR"
+          mkdir -p Payload
+          cp -R Nesio.xcarchive/Products/Applications/App.app Payload/
+          zip -qry Nesio-sideload.ipa Payload
+          rm -rf Payload
+          ls -lh Nesio-sideload.ipa
+    artifacts:
+      - $CM_BUILD_DIR/Nesio-sideload.ipa
+      - /tmp/xcodebuild_logs/*.log
+
+  # ────────────────────────────────────────────────────────────────────────
   ios-testflight:
-    name: Nesio iOS → TestFlight
+    name: Nesio iOS → TestFlight(需付费开发者账号)
     max_build_duration: 60
     instance_type: mac_mini_m2
     environment:
       node: 20
       xcode: latest
-      cocoapods: default
       groups:
         - appstore_credentials        # ⬜ 在 Codemagic 控制台建;含 App Store Connect 集成
       vars:
-        BUNDLE_ID: "app.nesio.ios"    # ⬜ 与 capacitor.config.ts appId 一致
-        XCODE_SCHEME: "App"           # Capacitor 生成的默认 scheme
+        BUNDLE_ID: "app.nesio.ios"
+        XCODE_SCHEME: "App"
         XCODE_PROJECT: "ios/App/App.xcodeproj"
+        NESIO_SHELL_URL: "https://treasurebox-nu.vercel.app"
     integrations:
       app_store_connect: nesio_asc_key   # ⬜ Codemagic 里 App Store Connect 集成的名字
     scripts:
-      - name: 安装依赖
-        script: npm ci
-      - name: 生成 iOS 原生工程(Capacitor)
-        # ios/ 不入库,每次在云里从 capacitor.config.ts 现生成。
-        script: |
-          npx cap add ios || true
-          npx cap sync ios
-      - name: 写入 Info.plist 用途说明 + 出口合规
-        # 用途串见 docs/appstore/submission-assets.md §6。位置/健康**不加**(v1 已构建期关)。
-        script: |
-          PLIST="ios/App/App/Info.plist"
-          /usr/libexec/PlistBuddy -c "Add :NSCameraUsageDescription string '用于「拍一拍」记录物品与场景。'" "$PLIST" || true
-          /usr/libexec/PlistBuddy -c "Add :NSMicrophoneUsageDescription string '用于「说一句」语音记录。'" "$PLIST" || true
-          /usr/libexec/PlistBuddy -c "Add :NSPhotoLibraryUsageDescription string '用于从相册选取照片记录。'" "$PLIST" || true
-          /usr/libexec/PlistBuddy -c "Add :ITSAppUsesNonExemptEncryption bool false" "$PLIST" || true
+      - *prepare_project
       - name: 设置签名(自动)
-        script: |
-          xcode-project use-profiles
+        working_directory: treasurebox-ios
+        script: xcode-project use-profiles
       - name: 递增 build number
-        script: |
-          cd ios/App
-          agvtool new-version -all "$(($(date +%s) / 60))" || true
-      - name: 构建 IPA
+        working_directory: treasurebox-ios/ios/App
+        script: agvtool new-version -all "$(($(date +%s) / 60))" || true
+      - name: 构建 IPA(带 HealthKit)
+        working_directory: treasurebox-ios
+        # 这一档用完整 entitlements —— 付费账号才签得下 HealthKit。
         script: |
           xcode-project build-ipa \
             --project "$XCODE_PROJECT" \
-            --scheme "$XCODE_SCHEME"
+            --scheme "$XCODE_SCHEME" \
+            -- CODE_SIGN_ENTITLEMENTS="App/App.entitlements"
     artifacts:
-      - build/ios/ipa/*.ipa
+      - treasurebox-ios/build/ios/ipa/*.ipa
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
         auth: integration
-        submit_to_testflight: true     # 出包后自动送 TestFlight,你 iPhone 17 装来测
-        # submit_to_app_store: false   # 正式提审时再开
+        submit_to_testflight: true

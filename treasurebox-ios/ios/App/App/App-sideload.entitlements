@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  侧载档:**故意是空的**。
+
+	  Sideloadly 用你自己的 Apple ID 重签名。免费个人 Team 只能签「什么特殊
+	  entitlement 都不要」的 App —— 带一个它给不了的,签名当场失败,
+	  报错还是那种看不懂的 provisioning profile 错误。
+
+	  空 entitlement 会丢掉的只有 **HealthKit**(步数/睡眠/心率)。
+	  其余全部照常:
+	    · Vision 端上识别        —— 不需要 entitlement
+	    · 端上语音转文字          —— 不需要
+	    · Core Spotlight 系统搜索 —— 不需要
+	    · 本地通知               —— 不需要
+	    · 后台足迹(significant change + visits)—— 不需要,只要 Info.plist 里的
+	      UIBackgroundModes:[location] 和三条位置说明
+
+	  健康插件在这种构建里会如实返回不可用(requestAuthorization 拿到系统错误),
+	  UI 该说「这个版本没带健康数据」,而不是转圈。
+
+	  想要健康:用付费开发者账号签(那时用 App.entitlements)。
+	-->
+</dict>
+</plist>

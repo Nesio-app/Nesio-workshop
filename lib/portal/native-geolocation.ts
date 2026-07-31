@@ -46,6 +46,8 @@ type NesioGeolocationPlugin = {
   }>;
   startTrailWatch: () => Promise<{ ok?: boolean; reason?: string; always?: boolean }>;
   stopTrailWatch: () => Promise<{ ok?: boolean }>;
+  /** ↓ 新壳才有(2026-07-31)。老壳上是 undefined,调用前先探。 */
+  drainTrailPoints?: () => Promise<{ points?: TrailPoint[] }>;
   addListener: (
     event: 'trailPoint',
     cb: (point: TrailPoint) => void,
@@ -188,6 +190,15 @@ async function ingestTrailPoint(lat: number, lon: number): Promise<void> {
 /**
  * 订阅原生足迹点 + 开 significant/visits 监听。
  * 幂等;Always 时后台也能推点(壳在后台被系统唤醒时)。
+ *
+ * ## 为什么除了监听还要 drain 一次
+ *
+ * 后台的点是在 App **被系统唤醒**时投递的 —— 那会儿 WebView 常常还没起来,
+ * `notifyListeners` 发出去没人接,点就丢了。而真正的后台足迹恰恰全是这种点:
+ * 「一直开着定位却一个点都没有」有一半是这么来的。
+ *
+ * 新壳两条都走:事件即时到,同时原生侧攒一份队列。这里回前台时取一次,
+ * 把后台攒下的补齐。老壳没有 `drainTrailPoints`,这一段自动跳过。
  */
 export async function ensurePlaceTrailWatch(): Promise<{ ok: boolean; reason?: string }> {
   if (typeof window === 'undefined' || !isNativePlatform()) {
@@ -202,9 +213,36 @@ export async function ensurePlaceTrailWatch(): Promise<{ ok: boolean; reason?: s
       });
     }
     const res = await NesioGeolocation.startTrailWatch();
-    return res?.ok ? { ok: true } : { ok: false, reason: res?.reason || 'start_failed' };
+    if (!res?.ok) return { ok: false, reason: res?.reason || 'start_failed' };
+    void drainQueuedTrailPoints();
+    return { ok: true };
   } catch {
     return { ok: false, reason: 'start_failed' };
+  }
+}
+
+/**
+ * 取走原生侧攒着的后台足迹点。**取完即清**(原生那边清),
+ * 所以这是「至多消费一次」—— 宁可偶尔丢一个点,也不要每次回前台
+ * 把同一批点重复灌进足迹。
+ *
+ * 老壳没有这个方法 → 返回 0,什么都不做。
+ */
+export async function drainQueuedTrailPoints(): Promise<number> {
+  if (typeof window === 'undefined' || !isNativePlatform()) return 0;
+  try {
+    if (typeof NesioGeolocation.drainTrailPoints !== 'function') return 0;
+    const res = await NesioGeolocation.drainTrailPoints();
+    const points = Array.isArray(res?.points) ? res.points : [];
+    let taken = 0;
+    for (const p of points) {
+      if (typeof p?.lat !== 'number' || typeof p?.lon !== 'number') continue;
+      await ingestTrailPoint(p.lat, p.lon);
+      taken += 1;
+    }
+    return taken;
+  } catch {
+    return 0;
   }
 }
 

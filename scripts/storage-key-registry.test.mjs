@@ -161,6 +161,10 @@ const KNOWN_KEYS = new Map([
   ["nesio-reminder-notify-state-v1", "cache"],
   // HealthKit 自动同步的「今天拉过了」簿记。cache:换设备重拉一次是对的。
   ["nesio-healthkit-auto-sync-v1", "cache"],
+  // 「让 iOS 系统搜索找得到我的记忆」这个开关(Core Spotlight)。默认关。
+  // cache:索引本来就是**这台设备**的系统搜索库里的东西,换台手机上面什么都没有,
+  // 开关跟着同步过去反而会造出一个「显示开着、实际没索引」的假状态。
+  ["nesio-spotlight-enabled-v1", "cache"],
   // 邮件里认出的「安排」我处理过没有(加进日程了 / 不用了)。「不用了」是一个决定 ——
   // 在手机上按掉的建议换到电脑上又冒出来,等于这个决定没被记住,所以 durable。
   ["nesio-mail-suggest-v1", "durable"],

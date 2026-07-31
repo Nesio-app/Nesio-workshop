@@ -14,12 +14,14 @@
  *    「每天早上 9 点」自然就跟着当地的 9 点走 —— 因为 `at` 存的是墙上时钟
  *    (见 schedule-reminders.ts 顶部那段),`new Date()` 按设备当前时区解释它。
  *
- * ② **没有 cancel。** 删掉一条提醒之后,已经排进系统的那条**取消不掉**。
- *    这里的应对是 `tombstoneScheduled()`:用同一个 id 重排到很远的将来 ——
- *    iOS 对相同 identifier 是**替换**而不是新增,所以那条就永远不会响了。
- *    这是个 workaround,不是正解:它依赖「同 id 替换」这个行为,
- *    而且在系统里留了一条永不触发的排程占着 64 条配额里的一格。
- *    **壳的下一版应该加 `cancel(id)` / `cancelAll()`**,那时把 tombstone 换掉。
+ * ② **cancel 分两代壳。**(2026-07-31 更新)
+ *    新壳有 `cancel(id)` / `cancelAll()` / `listPending()`,撤就是真的撤。
+ *    老壳(手机上那个 Nesioshellfix.ipa)没有,只能退回 workaround:
+ *    用同一个 id 重排到很远的将来 —— iOS 对相同 identifier 是**替换**而不是新增,
+ *    所以那条就永远不会响了。代价是系统里留下一条永不触发的排程,
+ *    占着 64 条配额里的一格。
+ *    `tombstoneScheduled()` 会**先探新壳的 cancel**,探不到才写墓碑。
+ *    调用方不用关心走的是哪条。
  *
  * ③ iOS 每个 App 最多 **64 条** pending 通知。超了以后新的排不进去(静默失败)。
  *    所以排程方只排一个近期窗口,见 reminder-notifications.ts。
@@ -37,6 +39,10 @@ type NesioLocalNotifyPlugin = {
     afterSec?: number;
     id?: number;
   }) => Promise<{ ok?: boolean; reason?: string; id?: number }>;
+  /** ↓ 新壳才有。老壳上这些是 undefined —— 每个调用点都要先探再用。 */
+  cancel?: (opts: { id: number }) => Promise<{ ok?: boolean }>;
+  cancelAll?: () => Promise<{ ok?: boolean }>;
+  listPending?: () => Promise<{ items?: Array<{ id: number; title: string; at: number | null }>; count?: number; limit?: number }>;
 };
 
 /** iOS 每个 App 的 pending 通知上限。超了新的静默排不进去。 */
@@ -97,22 +103,69 @@ export async function scheduleLocalAt(opts: {
 }
 
 /**
- * 「取消」一条已排的通知 —— **workaround**,因为壳这一版没有 cancel。
+ * 撤掉一条已排的通知。
  *
- * 做法是用同一个 id 重排到十年后:iOS 对相同 identifier 是替换,
- * 于是原来那条到点就不会响了。代价是系统里留了一条永不触发的排程,
- * 占着 64 条配额里的一格(所以排程方要留余量)。
+ * ## 两条路,先走真的那条
  *
- * 壳加了真正的 cancel 之后,这个函数换实现即可,调用方不用动。
+ * **新壳**(2026-07-31 起,带 `NesioLocalNotifyPlugin.cancel`)直接撤,干净利落。
+ *
+ * **老壳**没有 cancel,只能退回原来那个 workaround:用同一个 id 重排到十年后 ——
+ * iOS 对相同 identifier 是**替换**,于是原来那条到点就不会响了。
+ * 代价是系统里留下一条永不触发的排程,占着 64 条配额里的一格。
+ *
+ * 名字保留 `tombstoneScheduled` 是因为调用方不该关心走的是哪条 ——
+ * 它要的只是「这条别响了」。等确认没人还在用老壳,再把下面那半段删掉。
  */
 export async function tombstoneScheduled(key: string): Promise<{ ok: boolean; reason?: string }> {
+  if (!isNativePlatform()) return { ok: false, reason: 'web_unsupported' };
+  const id = notifyIdOf(key);
+  try {
+    if (typeof NesioLocalNotify.cancel === 'function') {
+      const r = await NesioLocalNotify.cancel({ id });
+      if (r?.ok) return { ok: true };
+      // 新壳的 cancel 说没成 —— 别掉头去写墓碑,那会掩盖一个真问题。
+      return { ok: false, reason: 'cancel_failed' };
+    }
+  } catch {
+    // 插件里没这个方法时 Capacitor 会抛。落到下面的 workaround。
+  }
   const TEN_YEARS_SEC = 10 * 365 * 24 * 3600;
   return scheduleLocalAlert({
     title: ' ',
     body: ' ',
     afterSec: TEN_YEARS_SEC,
-    id: notifyIdOf(key),
+    id,
   });
+}
+
+/**
+ * 系统里现在排着哪些 —— **真相在系统那边**。
+ *
+ * 有了它,`reminder-notifications` 那份 `nesio-reminder-notify-state-v1` 簿记
+ * 就不再是唯一依据:簿记会有记错的一天(写失败、换设备、手动清缓存),
+ * 系统不会。老壳上返回 null,调用方继续用簿记。
+ */
+export async function listPendingNotifications(): Promise<
+  null | { ids: number[]; count: number; limit: number }
+> {
+  if (!isNativePlatform()) return null;
+  try {
+    if (typeof NesioLocalNotify.listPending !== 'function') return null;
+    const r = await NesioLocalNotify.listPending();
+    const items = Array.isArray(r?.items) ? r.items : [];
+    return {
+      ids: items.map((it) => it.id).filter((n) => Number.isFinite(n)),
+      count: r?.count ?? items.length,
+      limit: r?.limit ?? IOS_PENDING_LIMIT,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** 这版壳带没带真的 cancel。UI 想解释「为什么删了还占一格」时用得上。 */
+export function hasNativeCancel(): boolean {
+  return typeof NesioLocalNotify.cancel === 'function';
 }
 
 /** 立刻弹出一条本地通知(调试/自用提醒)。需已授权。 */
