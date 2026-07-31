@@ -147,7 +147,12 @@ assert.match(voiceSheet, /setTimeout\(\(\) => inputRef\.current\?\.focus\(\),\s*
 assert.doesNotMatch(voiceSheet, /会议记录/, 'VoiceInputSheet must not re-grow a meeting recorder entry (removed per user decision 2026-07-04).');
 assert.match(voiceSheet, /nesio-ask-answer|我找到了这些可能相关的线索|还没找到相关线索/s, 'Ask mode should show the answer below the input after asking.');
 assert.match(portal, /ASK_GUIDE_KEY|setAskGuideOpen\(true\)|问宝盒/, 'Portal must show a first-use ask guide when the center N is long-pressed.');
-assert.match(portal, /openAskVoice|setVoiceIntent\('ask'\)[\s\S]*setCaptureMode\('voice'\)/, 'Portal must route center N long press to the voice ask surface after the guide.');
+// 2026-07-31 前提更新(用户:「点击问问符号,进入真的问问界面」)。
+// 中间键以前落在语音 sheet 的 ask 形态 —— 一次性问答,追问不了。现在**所有**问念念
+// 入口(中间键 / 引导页的开始 / 首页输入条的晶体)都进 NesioChatSheet(多轮、有历史)。
+// 同一个念念不该在两个地方长两个样。
+assert.match(portal, /const openAskChat = useCallback\(\(\) => \{[\s\S]{0,400}setChatOpen\(true\)/, 'Portal must route the ask entries to the real chat sheet after the guide.');
+assert.doesNotMatch(portal, /setVoiceIntent\('ask'\)/, 'No entry may route ask to the voice sheet any more — that surface cannot follow up.');
 assert.match(portal, /nesio-memory-received[\s\S]*收好了，以后可以找回来|MemoryReceipt/, 'Portal must show a calm receipt animation after the first user record.');
 assert.match(portal, /onboardingActive[\s\S]*!\s*onboardingActive[\s\S]*<TodayFeed/s, 'Portal must hide private Today surfaces while first-login onboarding is visible.');
 assert.match(onboarding, /nesio-onboarding-visibility-change/, 'Onboarding must notify Portal so the private background layer can be hidden.');

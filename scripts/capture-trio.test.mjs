@@ -284,6 +284,38 @@ assert.ok(
   /const onAskText = \(e: Event\) => \{[\s\S]{0,600}JSON\.stringify\(\{ text, send: detail\?\.send === true \}\)[\s\S]{0,200}setChatOpen\(true\)/.test(portal),
   'Portal 要把 text 和 send 一起接住并开对话页 —— 只接 text 的话「话已发出」就丢了',
 );
+
+/* ── ⑦b 所有「问念念」入口只有一个落点 ──────────────────────────────────
+ *
+ * 2026-07-31 用户第二次指同一件事:「我是说,点击问问符号,进入真的问问界面」。
+ * 上一轮只切了首页输入条那一条,底部中间键和引导页的「开始」还落在语音 sheet 的
+ * ask 形态 —— 于是同一个念念在两个地方长两个样,而那正是他一开始抱怨的东西。
+ * 这一组压的就是「只有一个落点」。
+ */
+{
+  // 三个入口全部收敛到 openAskChat / chatOpen。
+  assert.ok(
+    /const openAskChat = useCallback\(\(\) => \{[\s\S]{0,500}setChatOpen\(true\);/.test(portal),
+    '打开问念念只许有一个实现,并且它开的是真对话页',
+  );
+  assert.ok(
+    /const askHandler = \(e: Event\) => \{[\s\S]{0,700}setChatOpen\(true\);/.test(portal),
+    'nesio-open-ask 这个事件同样要落到对话页 —— 漏了它,别处派事件的入口就还在旧路上',
+  );
+  assert.ok(
+    /onStart=\{openAskChat\}/.test(portal),
+    '首次使用的引导页点「开始」也要进对话页,不能把新用户单独送去另一套界面',
+  );
+  // 反向:一个都不许再回到语音 sheet 的 ask 形态。
+  assert.ok(
+    !/setVoiceIntent\('ask'\)/.test(portal),
+    '不许再有任何入口把「问」路由到语音 sheet —— 那一屏是一次性问答,追问不了',
+  );
+  assert.ok(
+    !/intent=\{voiceIntent\}/.test(portal) && !/seedText=\{voiceSeed\}/.test(portal),
+    '语音 sheet 只剩「说一句」这一副面孔,intent/seedText 那两个入口参数要一起收掉',
+  );
+}
 assert.ok(
   /setInsightsOpen\(false\);\s*\/\/ 浮层不关会盖住聊天页/.test(portal),
   '开对话页前要先关洞察浮层 —— 仓里「表面死按钮」的老根因就是浮层盖住了新开的页',

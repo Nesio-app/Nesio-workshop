@@ -14,7 +14,8 @@ import NesioMark from './NesioMark';
 // 批次 139:统一「打开详情」—— 聊天引用卡与记忆页/今天页共用同一个完整详情组件
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { getLifeGraph, isBulkImported, isPrivateExternalNode, linkNodes, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
+import { getLifeGraph, isBulkImported, linkNodes, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
+import { retrieveForAsk } from '@/lib/portal/ask-retrieval';
 import { recallByRecognition } from '@/lib/portal/photo-recall';
 import { buildMemoryContext, fmtEventDate, extractCitations } from '@/lib/portal/memory-retrieval';
 import { createCalendarEvent } from '@/lib/portal/calendar-client';
@@ -731,8 +732,14 @@ Edit location/value anytime in Storage.`),
     // 行为完全不变、当前用户无回归。
     // 批次 148:端上模式(用户手动选)或免费层 → 本机记忆搜索,不打云。深问 + 有权益才走云。
     if (!deepMode || !canUsePaidCloudAi()) {
-      // 隐私红线:未登录/未知态不把邮件主题、日程标题(私密外部节点 name)显示到聊天气泡里。
-      const hits = searchLifeGraphFuzzy(text.trim(), 6).filter((n) => canUsePrivateData || !isPrivateExternalNode(n));
+      /*
+       * 2026-07-31:从纯字面模糊换成 retrieveForAsk(语义 + 已登录时的云端回溯 + 模糊 + 近期)。
+       *
+       * 起因是把所有「问念念」入口都切到这一页之后的核对:原来那一屏(语音 sheet 的
+       * ask 形态)取材比这里强一档,光切入口的话用户会换到一个**界面对了、答得更差**
+       * 的地方 —— 而这种损失不会当场发现。隐私红线由 retrieveForAsk 内部逐层过。
+       */
+      const hits = (await retrieveForAsk(text.trim(), { canUsePrivateData, limit: 6 }));
       const body = hits.length
         ? L(dict, `在你的记忆里找到 ${hits.length} 条:\n${hits.map((n) => `• ${n.name}`).join('\n')}`,
             `Found ${hits.length} in your memory:\n${hits.map((n) => `• ${n.name}`).join('\n')}`)
@@ -815,8 +822,10 @@ Edit location/value anytime in Storage.`),
     } catch (err) {
       clearTimeout(timeout);
       const isTimeout = err instanceof Error && err.name === 'AbortError';
-      // 兜底：从本地记忆模糊搜索(隐私红线:未登录/未知态不带出邮件主题、日程标题)
-      const localHits = searchLifeGraphFuzzy(text.trim(), 5).filter((n) => canUsePrivateData || !isPrivateExternalNode(n));
+      // 兜底：云答挂了就给本机能找到的线索。同样走 retrieveForAsk ——
+      // AI 不可用的这一刻恰恰最需要检索给力,这里退回纯字面模糊是把最差的留给最难的时候。
+      // (隐私红线由 retrieveForAsk 内部逐层过。)
+      const localHits = await retrieveForAsk(text.trim(), { canUsePrivateData, limit: 5 }).catch(() => [] as LifeNode[]);
       const fallbackText = localHits.length
         ? L(dict, `AI 暂时不可用，但我在记忆库里找到了这些相关线索：\n${localHits.map((n) => `• ${n.name}`).join('\n')}`, `AI is briefly unavailable, but I found these related clues in your memory:\n${localHits.map((n) => `• ${n.name}`).join('\n')}`)
         : isTimeout ? L(dict, '响应超时，请重试。', 'The response timed out — please try again.') : L(dict, 'AI 暂时不可用，记忆库里也没找到相关线索。', 'AI is briefly unavailable, and nothing related turned up in your memory.');
