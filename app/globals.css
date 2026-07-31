@@ -20759,3 +20759,30 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nesio-mention-item.is-active { background: var(--portal-accent-soft); color: var(--portal-accent);
   font-weight: var(--weight-semibold); }
+
+/* ── 拍发票自动填(ReceiptScanRow)────────────────────────────────────────────
+   补的是「上传发票 → 自动找账」这条的正方向。抽金额走端上 OCR,不打云。
+   dup 那块用 gentle 不用 risk:重复记账是「等一下」,不是安全风险 ——
+   CLAUDE.md 的红线是不用红色制造焦虑。 */
+.nesio-receipt-scan {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  align-items: flex-start;
+}
+.nesio-receipt-scan-note {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  line-height: 1.6;
+}
+.nesio-receipt-scan-dup {
+  width: 100%;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  background: var(--status-gentle-soft);
+  color: var(--portal-ink);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
