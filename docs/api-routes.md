@@ -66,7 +66,8 @@ Auth legend:
 | GET /api/portal/music/apple-token | guardAiRoute (10/min) — 服务端签 MusicKit developer token(ES256,.p8 私钥只在服务端)。没配密钥时 200 + `configured:false`,让界面照实说「还没配好」而不是渲染成网络故障 |
 | GET /api/portal/music/spotify | guardAiRoute (20/min) — 读该账号的 Spotify 状态。`streamable` **只在 product 确认为 premium 时**为 true(正向判据);刷新失败即清 cookie 并如实报 `authorized:false` |
 | DELETE /api/portal/music/spotify | guardAiRoute (10/min) — 断开(清 httpOnly cookie) |
-| GET /api/portal/music/netease/search | guardAiRoute (20/min) — 网易云**元数据**搜索转发(NETEASE_API_BASE)。刻意不做取播放地址:锁区锁的正是那一步 |
+| GET /api/portal/music/netease/search | guardAiRoute (20/min) — 网易云元数据搜索转发(NETEASE_API_BASE) |
+| GET /api/portal/music/netease/song-url | guardAiRoute (30/min) — 逐曲问播放地址(NETEASE_API_BASE → `/song/url`)。**三态分开**:拿到 `{ok:true,url}`;拿到了但 url 为空 → `{ok:true,url:'',reason:'restricted'}`(这一首版权受限,**不是故障**,界面据此说「换一首」而不是「重试」);上游/网络挂了 → 502。2026-07-31 新增,起因是上一版把网易整个判成「放不出声」——那是过度概括,能不能放是逐曲的 |
 | GET /api/auth/session | open (reports session state) |
 
 ## OAuth flows (pre-auth by design)

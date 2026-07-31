@@ -5,9 +5,12 @@
  *
  *  ① 跨播放模型换源必须提前说。本地/Apple 是 Nesio 自己出声,Spotify 是遥控 ——
  *     切过去车机屏幕上显示的 App 会变。这句话要在切之前说,不是切完让用户自己发现。
- *  ② 「能不能放」是正向判据。configured / authorized / streamable 三项齐了才算能放;
- *     metadata-only 的源(没有国内出口的网易)恒不能放。反着写的症状很具体:
- *     点播放,静默无声,而界面上一切正常。
+ *  ② 「能不能放」是正向判据。configured / authorized / streamable 三项齐了才算能放。
+ *     反着写的症状很具体:点播放,静默无声,而界面上一切正常。
+ *     2026-07-31 补:网易是**逐曲**的 —— 源级别接得上就算能放,哪一首取不到
+ *     要点下去问过 song-url 才知道。把它整个判成「放不出声」是过度概括(用户当场
+ *     指出「不是所有歌都锁着的」),那一版的代价是一整个源被白白关掉。
+ *     所以这里现在压的是**受限 ≠ 故障**:两者必须给两句不同的话、两个不同的动作。
  *  ③ Spotify 的 streamable 必须**确认是 Premium**。连上了 ≠ 能放。
  *  ④ 每一条失败路径都要被渲染出来。算出了原因却没写进 DOM,等于没算。
  *
@@ -74,18 +77,35 @@ for (const missing of ['configured', 'authorized', 'streamable']) {
   const r = { ...READY, [missing]: false };
   assert.equal(cat.canPlayNow('local', r), false, `缺 ${missing} 就不能算能放`);
 }
-// metadata-only:哪怕三项全给 true 也不能放 —— 它的限制在播放模型上,不在就绪状态上。
-assert.equal(cat.canPlayNow('netease', READY), false, '网易是 metadata-only,恒不可播');
+// 网易:接得上就算**源级别**能放。前一版把它写成恒不可播,等于把一整个源关掉 ——
+// 而事实是多数非独家曲子照样出得了声。
+assert.equal(cat.canPlayNow('netease', READY), true, '网易接得上就算源级别能放,不许一刀切成不可播');
+assert.equal(cat.sourceInfo('netease').perTrack, true, '但它必须标成逐曲的 —— 界面据此把话说成「多数能放」而不是「都能放」');
+assert.equal(cat.sourceInfo('netease').model, 'in-app', '网易的音频是普通 URL,由 Nesio 自己播');
+assert.equal(cat.canPlayNow('netease', { ...READY, configured: false }), false, '没配 API base 就是接不上,那才是源级别不能放');
 // 不能放时必须给得出一句话。
-assert.ok(cat.blockedReason('netease', READY), '不能放就必须说得出为什么');
+assert.ok(cat.blockedReason('netease', { ...READY, configured: false }), '不能放就必须说得出为什么');
+assert.equal(cat.blockedReason('netease', READY), '', '源级别能放时不许再说一句「放不出声」');
 assert.equal(cat.blockedReason('local', READY), '', '能放的时候不该有多余的话');
+// 逐曲的那句说明必须存在,而且说的是「点下去才知道」,不是「不能放」。
+{
+  const note = cat.perTrackNote('netease');
+  assert.ok(note, '逐曲源必须有一句自己的说明');
+  assert.ok(!/放不出声/.test(note), '逐曲 ≠ 放不出声 —— 这正是上一版判错的那句话');
+  assert.equal(cat.perTrackNote('local'), '', '本地不是逐曲源,不该有这句');
+}
 
 /* ── ③ 回退链只收真能放的 ───────────────────────────────────────────────── */
 
 {
-  const chain = cat.fallbackChain('netease', { netease: READY, local: READY, spotify: READY });
+  const chain = cat.fallbackChain('netease', { netease: { ...READY, configured: false }, local: READY, spotify: READY });
   assert.ok(!chain.includes('netease'), '放不出声的源绝不能进回退链');
   assert.equal(chain[0], 'local', '首选放不了就顺着目录顺序找下一个真能放的');
+}
+{
+  // 反过来同样要压:网易接上了它就是**真能放**的源,不许因为「以为它锁着」被挡在链外。
+  const chain = cat.fallbackChain('local', { netease: READY, local: { ...READY, streamable: false } });
+  assert.equal(chain.join(','), 'netease', '网易接上了就该进回退链 —— 把它排除掉等于凭空少一个能用的源');
 }
 {
   // 首选能放时它必须在最前 —— 回退链不是「随便挑一个」。
@@ -113,15 +133,74 @@ assert.equal(cat.blockedReason('local', READY), '', '能放的时候不该有多
   );
 }
 
-/* ── ⑤ 网易:不去取播放地址 ─────────────────────────────────────────────── */
+/* ── ⑤ 网易:受限 ≠ 故障 ───────────────────────────────────────────────── */
 
 {
-  const route = read('app/api/portal/music/netease/search/route.ts');
-  assert.ok(!/song\/url/.test(route), '这条路由刻意只做元数据;取播放地址那一步正是被锁的那步');
-  const catalog = read('lib/platform/music/source-catalog.ts');
+  const route = read('app/api/portal/music/netease/song-url/route.ts');
+  // 三态必须分开。合成一句「播放失败」的下场很具体:用户对着一首**永远**放不了的歌
+  // 一直点重试 —— 而重试是这条路上唯一无效的动作。
   assert.ok(
-    /id: 'netease',[\s\S]{0,400}?model: 'metadata-only'/.test(catalog),
-    '网易在目录里必须是 metadata-only —— 哪天真有了国内出口再改这一处',
+    /ok: true, configured: true, url: '', reason: 'restricted'/.test(route),
+    "取不到 url 要回 200 + reason:'restricted' —— 它不是故障,不许混进错误分支",
+  );
+  assert.ok(
+    /error: 'upstream_failed'[\s\S]{0,120}status: 502/.test(route),
+    '上游挂了才是 502 —— 只有这一类才谈得上重试',
+  );
+  assert.ok(
+    /guardAiRoute\(req, 'music-netease-song-url'/.test(route),
+    '这条路由要走 guardAiRoute —— 它替用户去打外部接口',
+  );
+
+  const rd = read('lib/platform/music/readiness.ts');
+  assert.ok(
+    /netease: \{ configured: neteaseOk, authorized: neteaseOk, streamable: neteaseOk \}/.test(rd),
+    '网易的 streamable 跟着「接没接上」走,不许写死成 false —— 写死一次就把整个源关掉了',
+  );
+
+  const panel = read('components/portal/music/MusicPanel.tsx');
+  // 上一版这里是一块 is-static 的死文本:搜到了、点不动。那正是错判的产物。
+  assert.ok(
+    /className="nesio-music-row"[\s\S]{0,200}onClick=\{\(\) => \{ void onPlayNetease\(h\); \}\}/.test(panel),
+    '网易搜索结果每一行必须可点 —— 搜得到点不动等于把能放的那部分也一起关掉了',
+  );
+  assert.ok(
+    /playRemote\(j\.url, \{ id: h\.id, title: h\.title, artist: h\.artist \}\)/.test(panel),
+    '拿到播放地址要真的放出来,而不是只把它存进 state',
+  );
+
+  // 受限那句里**不许**出现「重试」这个动作。
+  const restricted = panel.match(/kind: 'restricted',\s*\n\s*text: L\(dict,\s*\n\s*'([^']+)',\s*\n\s*'([^']+)'/);
+  assert.ok(restricted, '受限必须有自己的一句话(中英各一份)');
+  assert.ok(/换一首/.test(restricted[1]), '受限那句要给出真出口:换一首 / 换个源 / 导本地');
+  assert.ok(!/再试|重试|Try again/.test(restricted[1] + restricted[2]), '受限那一首重试一万次也是同一个答案,不许劝人重试');
+  assert.ok(!/[一-龥]/.test(restricted[2]), '英文版里不该混中文');
+
+  // 按钮也要分:故障给「再试一次」,受限给「换一首」。顺序被压死 —— 调换即红。
+  assert.ok(
+    /neteaseTrackMsg\.kind === 'failed' \? \([\s\S]{0,260}再试一次[\s\S]{0,200}\) : \([\s\S]{0,260}换一首/.test(panel),
+    '重试键只给故障;受限那一首给的出口是「换一首」—— 两者是不同的动作,不能共用一个按钮',
+  );
+
+  // 放起来之后必须有地方能暂停/停掉。悬浮球在音乐页是让位的,所以这一条播放条
+  // 是唯一的出口 —— 它不能跟着搜索结果走:再搜一次别的,歌还在响而暂停键没了。
+  assert.ok(
+    /\{nowRemote && player\.state\.currentId === nowRemote\.id && \([\s\S]{0,400}player\.toggle\(\)/.test(panel),
+    '网易播放条要认 nowRemote(独立记住正在放的那一首),不许从当前这批搜索结果里现找',
+  );
+  assert.ok(
+    /onClick=\{\(\) => \{ player\.stop\(\); setNowRemote\(null\); \}\}/.test(panel),
+    '停止要真停,并且把「正在放」这份记录一起清掉',
+  );
+
+  // 源级别那句说明也要换掉:不能再写「搜到了但放不出声」。
+  assert.ok(
+    !/搜到了,但这里放不出声/.test(panel),
+    '「搜到了但放不出声」这句已被事实推翻,不许留在界面上',
+  );
+  assert.ok(
+    /perTrackNote\('netease', dict\)/.test(panel),
+    '搜到结果之后要说的是逐曲那句(多数能放、点下去才知道)',
   );
 }
 
@@ -301,10 +380,13 @@ assert.equal(cat.blockedReason('local', READY), '', '能放的时候不该有多
 
 {
   // 上一轮 #24 修的就是「动态生成的文案只有中文」。这一轮四个源的每一句都要过。
-  const en = cat.blockedReason('netease', READY, 'en');
-  const zh = cat.blockedReason('netease', READY, 'zh');
+  const NO_CONF = { ...READY, configured: false };
+  const en = cat.blockedReason('netease', NO_CONF, 'en');
+  const zh = cat.blockedReason('netease', NO_CONF, 'zh');
   assert.ok(en && zh && en !== zh, '不能放的原因必须有英文版');
   assert.ok(!/[一-龥]/.test(en), '英文版里不该混中文');
+  const enNote = cat.perTrackNote('netease', 'en');
+  assert.ok(enNote && !/[一-龥]/.test(enNote), '逐曲那句说明必须有英文版');
   const enNotice = cat.switchNotice('local', 'spotify', 'en');
   assert.ok(enNotice && !/[一-龥]/.test(enNotice), '换源提示必须有英文版');
   const enNone = cat.noSourceLine({}, 'en');
@@ -409,4 +491,30 @@ assert.equal(cat.blockedReason('local', READY), '', '能放的时候不该有多
   assert.ok(!/通常是的关系/.test(b), '本地源不许套用远端那句带 requires 的模板');
 }
 
-console.log('music-source-switch: OK(换源提前说 / 正向可播 / 回退链只收真能放的 / Premium 才算能放 / 失败路径可见 / 到头会停 / 清除已收口 / 回调落在音乐页 / CSP 与 locale 不静默坑人)');
+/* ── ⑲ 本地导入:宁可误收,不许误拒 ─────────────────────────────────────── */
+
+{
+  // 实测:「本地音乐无法识别任何格式,无法上传」——一首都选不中、选中了也进不来。
+  // 根因是两处**白名单**:input 的 accept,和 isAudioFile 的扩展名表。
+  // iOS「文件」App 交出来的 File 常常 type 是空串,iCloud 同步下来的甚至没有扩展名,
+  // 白名单在那儿必然踩空。判据方向要反过来:只挡明显不是的。
+  const lib = loadTs('lib/platform/music/local-tracks.ts');
+  assert.equal(lib.isAudioFile({ name: 'song', type: '' }), true, '没扩展名、没 MIME 的也要收 —— iOS 常态,拒了就是一首都进不来');
+  assert.equal(lib.isAudioFile({ name: '未命名 2', type: '' }), true, '中文名 + 无扩展名同样要收');
+  assert.equal(lib.isAudioFile({ name: 'a.flac', type: '' }), true, '认得出的扩展名当然收');
+  assert.equal(lib.isAudioFile({ name: 'a.mp3', type: 'application/octet-stream' }), true, 'MIME 报成八位流也要收 —— 这是最常见的一种');
+  // 但明显不是音频的照旧挡掉:误收一张 200MB 的视频对谁都没好处。
+  assert.equal(lib.isAudioFile({ name: 'IMG_1.HEIC', type: 'image/heic' }), false, '图片不收');
+  assert.equal(lib.isAudioFile({ name: 'clip.mp4', type: 'video/mp4' }), false, '视频不收');
+  assert.equal(lib.isAudioFile({ name: 'note.pdf', type: 'application/pdf' }), false, '文档不收');
+
+  const panel = read('components/portal/music/MusicPanel.tsx');
+  // accept 会在 iOS 的文件选择器里把一大片本来能选的文件灰掉 —— 仓里已为这件事
+  // 栽过一次(CaptureBar 的 CAPTURE_ACCEPT='')。这条压的就是别再加回来。
+  const input = panel.match(/<input\s*\n\s*ref=\{fileRef\}[\s\S]{0,900}?\/>/);
+  assert.ok(input, '导入用的 file input 必须在');
+  assert.ok(!/accept=/.test(input[0]), 'file input 不许设 accept —— iOS 上它会把没有 MIME 的音频整片灰掉,表现就是「一首都选不中」');
+  assert.ok(/className="nesio-visually-hidden"/.test(input[0]), 'iOS 的 WKWebView 会忽略 display:none 的 input 的 click(),只能视觉隐藏');
+}
+
+console.log('music-source-switch: OK(换源提前说 / 正向可播 / 网易逐曲且受限≠故障 / 回退链只收真能放的 / Premium 才算能放 / 失败路径可见 / 到头会停 / 清除已收口 / 回调落在音乐页 / CSP 与 locale 不静默坑人 / 本地导入宁可误收不许误拒)');

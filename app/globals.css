@@ -20923,9 +20923,11 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 
 .nesio-music-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .nesio-music-list li {
-  display: flex; align-items: center; gap: var(--space-2);
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
   border-bottom: 1px solid var(--portal-line);
 }
+/* 某一首的结果(受限 / 取不到)整条另起一行 —— 挤在曲名右边会把标题压成一个字宽。 */
+.nesio-music-list li > .nesio-music-err { flex: 0 0 100%; margin-bottom: var(--space-2); }
 .nesio-music-list li.is-cur .nesio-music-title { color: var(--portal-accent); }
 .nesio-music-row {
   flex: 1; min-width: 0; min-height: 52px;
@@ -20933,7 +20935,9 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   padding: var(--space-2) 0; border: 0; background: transparent;
   text-align: left; cursor: pointer;
 }
-.nesio-music-row.is-static { cursor: default; }
+/* 正在取播放地址的那一刻,整列暂时点不动。给足视觉线索:半透明 + 等待光标,
+   否则「点了没反应」的感觉照旧 —— 只是这次真的在干活。 */
+.nesio-music-row:disabled { cursor: progress; opacity: .55; }
 .nesio-music-title {
   font-size: var(--text-body); color: var(--portal-ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;

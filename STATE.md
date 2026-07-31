@@ -176,13 +176,28 @@ sensitivity/retention 枚举化(中期)。
   ● `in-app`(本地文件 / Apple Music):声音走 **Nesio 自己的音频会话**,车机蓝牙上
     显示 Nesio,MediaSession 接了上一首/下一首;
   ● `remote`(Spotify):Nesio 只是遥控器,声音与车机界面都在 Spotify 那边,要 Premium;
-  ● `metadata-only`(网易):**没有国内出口**,锁的是「拿播放地址」那一步(搜索/歌单不锁),
-    所以它此刻恒不可播。有了国内出口后改 `MUSIC_SOURCES` 里 netease 的 model 一处即可,
-    但必须同时把 streamable 做成**真去取 url**的探测,不许「配了 base 就假定能放」。
+  ● `metadata-only`:**目前没有源属于这一类**。这个模型留着,因为它描述的状态真实存在。
+  ● 网易(2026-07-31 更正):上一版把它判成 `metadata-only`(恒不可播),理由是
+    「没有国内出口就拿不到播放地址」——**那是过度概括**,用户当场指出:「不是所有歌
+    都锁着的,为什么 github 的就可以」。他是对的。真实情况是**逐曲**的:非独家、非 VIP
+    的曲子照样返回可播 URL。所以它现在是普通的 `in-app` 源 + `perTrack: true`:
+    源级别只说「接得上、多数能放」,**哪一首行不行点下去问 `song-url` 才知道**。
+    那条路由把三态**分开**报:`{ok:true,url}` / `{ok:true,url:'',reason:'restricted'}` / 502。
+    界面据此给两个**不同的动作**:受限 → 「换一首」(不给重试键,重试永远不会成功);
+    故障 → 「再试一次」。合成一句「播放失败」的代价就是用户对着一堵墙一直撞。
+    教训归档:**一个源不能因为「有一部分不行」就被整个关掉** —— 那是把判据从
+    「拿到东西才算数」偷换成「有风险就一刀切」,后者的代价是一整个能用的源消失。
   跨模型换源**必须先说**(`switchNotice`),否则用户在车里会突然看到车机换了个 App。
   「能不能放」是**正向判据**(`canPlayNow`:configured ∧ authorized ∧ streamable ∧ 非 metadata-only);
+  逐曲源(`perTrack`)在这条判据之上多一层:源过了不代表某一首过得了,那一层在点击时才结算。
   回退链只收真能放的,一个都没有时有专门的空态(`noSourceLine`),并把能放的摆出来一键切。
-  ● **今天真能出声的只有本地歌曲**:不要账号、不要订阅、离线可听。
+  ● **不配任何东西就能出声的只有本地歌曲**:不要账号、不要订阅、离线可听。
+    配了 `NETEASE_API_BASE` 之后网易也能出声(多数曲子);Apple / Spotify 仍缺密钥。
+    本地导入 2026-07-31 翻过判据方向:原来是白名单(accept + 扩展名表),在 iOS 上
+    必然踩空 —— 「文件」App 交出来的 File 常常 `type` 空串、iCloud 同步的甚至没扩展名,
+    实测症状就是用户说的「无法识别任何格式,无法上传」。现在**只挡明显不是的**
+    (图片/视频/文档),能不能解码交给 audio 元素。猜错代价不对称:误收删掉就是了,
+    误拒则是用户根本不知道为什么、也没有别的路可走。
     Apple Music 的接线是完整的(服务端 ES256 签 developer token + MusicKit JS 授权),
     但**没有 `APPLE_MUSIC_*` 密钥就跑不通**,界面照实说「还没配好」。
     Spotify 的 OAuth / 状态 / 权益判定完整(`product === 'premium'` 才算能放),
@@ -194,7 +209,8 @@ sensitivity/retention 枚举化(中期)。
     Spotify 令牌只放 **httpOnly cookie**,不落 localStorage(音乐模块红线:凭证仅本机私有)。
   ● **新路由**(均已写进 docs/api-routes.md):`GET /api/portal/music/apple-token`、
     `GET|DELETE /api/portal/music/spotify`、`GET /api/portal/music/spotify/{connect,callback}`、
-    `GET /api/portal/music/netease/search`。除 OAuth 两条外全走 `guardAiRoute`。
+    `GET /api/portal/music/netease/search`、`GET /api/portal/music/netease/song-url`。
+    除 OAuth 两条外全走 `guardAiRoute`。
   ● **CSP 补了 MusicKit**(`js-cdn.music.apple.com` / `api.music.apple.com` / media-src apple)——
     不补的表现跟当年 Plaid 一模一样:脚本被静默拦掉,按钮点了没反应,页面上没有任何线索。
   ● **收口**:`purgeLocalTracks` 已接进 local-owner 的删除/登出两处 + SettingsSheets 的

@@ -31,8 +31,12 @@ export const LOCAL_TRACKS_KEY = 'nesio-music-local-tracks-v1';
  */
 export const MAX_TRACK_BYTES = 80 * 1024 * 1024;
 
-/** 认得出的音频类型。列白名单而不是「非视频即音频」—— 反向过滤会让 .mov 混进曲库。 */
-const AUDIO_EXT = /\.(mp3|m4a|aac|flac|wav|ogg|oga|opus|aiff?|wma|alac)$/i;
+/** 常见音频扩展名。认得出就直接收。 */
+const AUDIO_EXT = /\.(mp3|m4a|m4b|mp4a|aac|flac|wav|wave|ogg|oga|opus|aiff?|aif|wma|alac|ape|dsf|dff|mka|amr|caf|3gp)$/i;
+
+/** 一眼就知道**不是**音频的。只挡这几类,别的一律让它进来试。 */
+const NOT_AUDIO_TYPE = /^(image|video|text)\//i;
+const NOT_AUDIO_EXT = /\.(jpe?g|png|gif|heic|heif|webp|bmp|svg|mov|mp4|m4v|avi|mkv|webm|pdf|docx?|xlsx?|pptx?|zip|rar|7z|txt|md|csv|json)$/i;
 
 export interface LocalTrack {
   id: string;
@@ -47,11 +51,28 @@ export interface LocalTrack {
   addedAt: number;
 }
 
+/**
+ * 这个文件收不收进曲库。
+ *
+ * 2026-07-31 实测「本地音乐无法识别任何格式,无法上传」之后翻过来写:
+ * 原来是**白名单**(type 以 audio/ 开头,或扩展名在表里),别的一律拒。
+ * 在 iOS 上这一条几乎必然踩空 —— 「文件」App 交出来的 File 常常
+ * `type` 是空串,而 iCloud Drive 同步下来的文件名可能连扩展名都没有。
+ * 于是每一个都被判成「看着不像音频」,一首都进不来。
+ *
+ * 现在改成**只挡明显不是的**(图片/视频/文档),其余一律收下 ——
+ * 到底能不能解码,由 audio 元素说了算,不由我在这里猜。
+ * 猜错的代价不对称:误收一个放不出声的文件,用户删掉就是了;
+ * 误拒一首真的歌,他根本不知道为什么、也没有别的路可走。
+ */
 export function isAudioFile(file: { name?: string; type?: string }): boolean {
   const type = String(file?.type || '');
+  const name = String(file?.name || '');
   if (type.startsWith('audio/')) return true;
-  // Safari 从 iCloud 导入时 type 常常是空串,只能看扩展名。
-  return AUDIO_EXT.test(String(file?.name || ''));
+  if (AUDIO_EXT.test(name)) return true;
+  // 明确不是音频的挡掉;剩下的(type 空 + 扩展名不认识)让它进来试。
+  if (NOT_AUDIO_TYPE.test(type) || NOT_AUDIO_EXT.test(name)) return false;
+  return true;
 }
 
 /**

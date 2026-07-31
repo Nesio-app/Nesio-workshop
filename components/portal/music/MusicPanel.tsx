@@ -6,7 +6,9 @@
  * 这一屏要老实交代的一件事:**四个音源不是一回事**。
  *   · 本地歌曲 / Apple Music —— Nesio 自己出声,车机上显示 Nesio;
  *   · Spotify               —— Nesio 只是遥控器,声音和车机界面都在 Spotify 那边;
- *   · 网易云                —— 没有国内出口的当下,能搜到、放不出声。
+ *   · 网易云                —— 也是 Nesio 自己出声,但**逐曲**:多数歌能放,
+ *                              版权受限那部分取不到,点下去才知道(2026-07-31 更正,
+ *                              上一版把它整个判成「放不出声」是过度概括)。
  * 所以换源不是换个下拉框那么轻:跨过这条线,用户在车里看到的东西会当场变。
  * switchNotice() 那句话就是为此存在,而且必须在**切之前**说。
  *
@@ -20,7 +22,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import {
   MUSIC_SOURCES, blockedReason, canPlayNow, fallbackChain, noSourceLine,
-  sourceInfo, sourceName, switchNotice, type MusicSourceId,
+  perTrackNote, sourceInfo, sourceName, switchNotice, type MusicSourceId,
 } from '@/lib/platform/music/source-catalog';
 import {
   importLocalTrack, deleteLocalTrack, loadLocalTracks, libraryHeadline,
@@ -31,7 +33,7 @@ import { loadMusicPrefs, saveMusicPrefs, loadLastPlayed, saveLastPlayed, type Mu
 import { EMPTY_READINESS, fetchSpotifyStatus, localReadiness, probeReadiness, type ReadinessMap, type SpotifyStatus } from '@/lib/platform/music/readiness';
 import { authorizeApple, lastAppleError } from '@/lib/platform/music/apple-client';
 import { useSessionState } from '../use-session-state';
-import { setPanelOpen } from '@/lib/platform/music/player-engine';
+import { playRemote, setPanelOpen } from '@/lib/platform/music/player-engine';
 import { useLocalPlayer } from './use-local-player';
 import type { RepeatMode } from '@/lib/platform/music/queue';
 
@@ -68,6 +70,21 @@ export default function MusicPanel() {
   const [neteaseHits, setNeteaseHits] = useState<NeteaseHit[]>([]);
   const [neteaseMsg, setNeteaseMsg] = useState('');
   const [searching, setSearching] = useState(false);
+  /** 正在问播放地址的那一首。只允许一首在飞 —— 连点两行会让后回来的那首抢走播放。 */
+  const [neteaseTrying, setNeteaseTrying] = useState('');
+  /**
+   * 某一首的结果。`kind` 是关键:
+   *   'restricted' —— 这一首确实取不到,唯一有效的动作是**换一首**,给重试键是骗人;
+   *   'failed'     —— 上游/网络故障,重试是对的动作,所以给重试键。
+   * 两者合成一句「播放失败」的下场,是用户对着一首永远放不了的歌一直点重试。
+   */
+  const [neteaseTrackMsg, setNeteaseTrackMsg] = useState<{ id: string; kind: 'restricted' | 'failed'; text: string } | null>(null);
+  /**
+   * 正在放的那一首网易歌曲。**不能从 neteaseHits 里现找** ——
+   * 放起来之后再搜一次别的,hits 就换了一批,播放条会当场消失:
+   * 歌还在响,而暂停键没了(悬浮球在这一页是让位的),用户没有任何地方能关掉它。
+   */
+  const [nowRemote, setNowRemote] = useState<NeteaseHit | null>(null);
   const [spotifyInfo, setSpotifyInfo] = useState<SpotifyStatus | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   // 随机序列的种子。挂载时定一次 —— 每次渲染重掷会让「上一首」回到一首没听过的歌。
@@ -207,6 +224,46 @@ export default function MusicPanel() {
     }
   }, [neteaseQ, dict]);
 
+  /**
+   * 点一首网易的歌。**这一步才知道它能不能放** —— 源级别只能说「多数能放」。
+   *
+   * 三种结局必须说三种话:拿到地址就直接出声;受限那句里没有「重试」两个字
+   * (它永远不会成功);故障那句才给重试。混着说 = 让人对着一堵墙一直撞。
+   */
+  const onPlayNetease = useCallback(async (h: NeteaseHit) => {
+    setNeteaseTrying(h.id);
+    setNeteaseTrackMsg(null);
+    try {
+      const res = await fetch(`/api/portal/music/netease/song-url?id=${encodeURIComponent(h.id)}`, { cache: 'no-store' });
+      const j = await res.json().catch(() => ({})) as { ok?: boolean; configured?: boolean; url?: string; reason?: string };
+      if (j.configured === false) {
+        setNeteaseTrackMsg({ id: h.id, kind: 'failed', text: L(dict, '网易云还没接上 —— 需要一个能连到它的接口地址。', 'NetEase is not wired up yet.') });
+        return;
+      }
+      if (res.ok && j.ok && j.url) {
+        setNowRemote(h);
+        await playRemote(j.url, { id: h.id, title: h.title, artist: h.artist });
+        return;
+      }
+      if (res.ok && j.reason === 'restricted') {
+        // 不是故障:这一首有版权限制。给的出口是「换一首 / 换个源 / 导本地」,不是重试。
+        setNeteaseTrackMsg({
+          id: h.id,
+          kind: 'restricted',
+          text: L(dict,
+            '这一首有版权限制,取不到音频。换一首,或者在别的源找同一首、把文件导进本地歌曲。',
+            'This one is rights-restricted, so there is no audio to fetch. Try another track, or import the file into local music.'),
+        });
+        return;
+      }
+      setNeteaseTrackMsg({ id: h.id, kind: 'failed', text: L(dict, '这次没取到播放地址,过一会儿再试。', 'Could not fetch the stream this time — try again shortly.') });
+    } catch {
+      setNeteaseTrackMsg({ id: h.id, kind: 'failed', text: L(dict, '网络没通,这次没请求出去。', 'Network error — the request did not go through.') });
+    } finally {
+      setNeteaseTrying('');
+    }
+  }, [dict]);
+
   const current = tracks.find((t) => t.id === player.state.currentId) || null;
   const resumeTrack = !current && lastId ? tracks.find((t) => t.id === lastId) || null : null;
 
@@ -308,7 +365,11 @@ export default function MusicPanel() {
           <input
             ref={fileRef}
             type="file"
-            accept="audio/*"
+            /* **不设 accept**。仓里已经为这件事栽过一次(见 CaptureBar 的 CAPTURE_ACCEPT=''):
+               在 iOS 的「文件」选择器里,accept 会把一大片本来能选的文件灰掉 ——
+               iCloud Drive 同步下来的音频常常没有 MIME、甚至没有扩展名。
+               实测症状就是用户说的「无法识别任何格式,无法上传」:一首都选不中。
+               让他先选得到,收不收由 isAudioFile 判、能不能放由 audio 元素判。 */
             multiple
             className="nesio-visually-hidden"
             onChange={(e) => { void onFiles(e.target.files); }}
@@ -503,9 +564,19 @@ export default function MusicPanel() {
         </section>
       )}
 
-      {/* ── 网易云:能搜,放不出声 ───────────────────────────────── */}
+      {/* ── 网易云:能搜,多数能放,受限那部分点下去才知道 ─────────── */}
       {source === 'netease' && (
         <section className="nesio-music-sec">
+          {/* 没配 API base 时**这一段自己说** —— 顶上那句 blocked 对未配置的远端源
+              是让位的(见上面的条件),这里不说就是整屏一句解释都没有:
+              搜索键点下去只会得到一句「还没接上」,而那要等他先点一次。 */}
+          {probed && !signedOut && readiness.netease && !readiness.netease.configured && (
+            <p className="nesio-music-msg">
+              {L(dict,
+                '要用它得先在服务端配上 NETEASE_API_BASE(一个能连到网易云的接口地址)。配好之前这一格只能看。',
+                'This needs NETEASE_API_BASE on the server (an endpoint that can reach NetEase). Until then this tab is read-only.')}
+            </p>
+          )}
           <div className="nesio-music-search">
             <input
               value={neteaseQ}
@@ -518,22 +589,79 @@ export default function MusicPanel() {
             </button>
           </div>
           {neteaseMsg && <p className="nesio-music-msg">{neteaseMsg}</p>}
+          {player.state.error && (
+            <div className="nesio-music-err">
+              <span>{player.state.error}</span>
+              <button type="button" onClick={player.clearError}>{L(dict, '知道了', 'OK')}</button>
+            </div>
+          )}
           <ul className="nesio-music-list">
             {neteaseHits.map((h) => (
-              <li key={h.id}>
-                <div className="nesio-music-row is-static">
+              <li key={h.id} className={h.id === player.state.currentId ? 'is-cur' : ''}>
+                {/* 可点。上一版这里是 is-static 的一块死文本 —— 那是「不是所有歌都锁着」
+                    这条事实被我判反了的产物。现在点下去才去问,问到什么说什么。 */}
+                <button
+                  type="button"
+                  className="nesio-music-row"
+                  disabled={!!neteaseTrying}
+                  onClick={() => { void onPlayNetease(h); }}
+                >
                   <span className="nesio-music-title">{h.title}</span>
-                  <span className="nesio-music-sub">{[h.artist, h.album, prettyDuration(h.durationSec)].filter(Boolean).join(' · ')}</span>
-                </div>
+                  <span className="nesio-music-sub">
+                    {neteaseTrying === h.id
+                      ? L(dict, '正在取播放地址…', 'Fetching stream…')
+                      : [h.artist, h.album, prettyDuration(h.durationSec)].filter(Boolean).join(' · ')}
+                  </span>
+                </button>
+                {neteaseTrackMsg?.id === h.id && (
+                  <div className="nesio-music-err">
+                    <span>{neteaseTrackMsg.text}</span>
+                    {/* 只有**故障**才给重试。受限那一首重试一万次也是同一个答案,
+                        给它一个重试键就是把用户按在墙上。 */}
+                    {neteaseTrackMsg.kind === 'failed' ? (
+                      <button type="button" onClick={() => { void onPlayNetease(h); }}>{L(dict, '再试一次', 'Try again')}</button>
+                    ) : (
+                      <button type="button" onClick={() => setNeteaseTrackMsg(null)}>{L(dict, '换一首', 'Another track')}</button>
+                    )}
+                  </div>
+                )}
               </li>
             ))}
           </ul>
           {!!neteaseHits.length && (
-            <p className="nesio-music-blocked">
-              {L(dict,
-                '搜到了,但这里放不出声。想听的话,先在别的源找同一首,或者把文件导进本地歌曲。',
-                'Found — but playback is unavailable here. Try another source, or import the file locally.')}
-            </p>
+            <p className="nesio-music-model">{perTrackNote('netease', dict)}</p>
+          )}
+
+          {/* 正在放的是网易这一首时,给一条播放条 —— 否则点完出声了,页面上却
+              没有任何暂停/继续的地方(悬浮球在这一页是让位的)。
+              认的是 nowRemote 而不是当前这批搜索结果:再搜一次别的,这条不能跟着消失。 */}
+          {nowRemote && player.state.currentId === nowRemote.id && (
+            <div className="nesio-music-bar">
+              <div className="nesio-music-bar-meta">
+                <strong>{nowRemote.title}</strong>
+                <span>{nowRemote.artist}</span>
+              </div>
+              <div className="nesio-music-bar-acts">
+                <button type="button" onClick={() => { void player.toggle(); }}>
+                  {player.state.playing ? L(dict, '暂停', 'Pause') : L(dict, '播放', 'Play')}
+                </button>
+                <button type="button" onClick={() => { player.stop(); setNowRemote(null); }}>{L(dict, '停止', 'Stop')}</button>
+              </div>
+              <div className="nesio-music-bar-time">
+                {clockTime(player.state.positionSec)} / {prettyDuration(player.state.durationSec)}
+              </div>
+              {player.state.durationSec > 0 && (
+                <input
+                  className="nesio-music-seek"
+                  type="range"
+                  min={0}
+                  max={Math.floor(player.state.durationSec)}
+                  value={Math.floor(player.state.positionSec)}
+                  aria-label={L(dict, '拖动到某一处', 'Seek')}
+                  onChange={(e) => player.seek(Number(e.target.value))}
+                />
+              )}
+            </div>
           )}
         </section>
       )}
