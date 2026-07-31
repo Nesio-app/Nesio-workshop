@@ -26,13 +26,24 @@ export function relativePastLabel(then: Date | string | number, now: number = Da
   return en ? `${y} year${y > 1 ? 's' : ''} ago` : `${y} 年前`;
 }
 
-/** "已过期 / 今天 / 明天 / 后天 / N天后 / 约N周后" — calendar-day based. */
+/**
+ * "已过期 / 今天 / 明天 / 后天 / N天后 / 约N周后" — calendar-day based.
+ *
+ * 2026-07-30:纯日期串('YYYY-MM-DD')原来会被 `new Date()` 当成 **UTC 零点**解析 ——
+ * 在 UTC-5 那就是本地前一天 19:00,于是「今天到期」显示成「已过期」、
+ * 「明天」显示成「今天」。日期串必须按**本地自然日**解析,它本来就没有时刻。
+ * 带时刻的输入维持原判定(今天早上 9 点、现在下午 3 点 → 确实已过期)。
+ */
 export function relativeFutureLabel(target: Date | string | number, now: Date = new Date(), locale: string = 'zh'): string {
-  const d = typeof target === 'number' ? new Date(target) : new Date(target);
+  const dateOnly = typeof target === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(target);
+  const d = dateOnly
+    ? new Date(Number(target.slice(0, 4)), Number(target.slice(5, 7)) - 1, Number(target.slice(8, 10)))
+    : new Date(target as Date | number);
   const en = locale === 'en';
-  if (d.getTime() < now.getTime()) return en ? 'overdue' : '已过期';
+  if (!dateOnly && d.getTime() < now.getTime()) return en ? 'overdue' : '已过期';
   const dayStart = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
   const diffDays = Math.round((dayStart(d) - dayStart(now)) / DAY);
+  if (dateOnly && diffDays < 0) return en ? 'overdue' : '已过期';
   if (diffDays <= 0) return en ? 'today' : '今天';
   if (diffDays === 1) return en ? 'tomorrow' : '明天';
   if (diffDays === 2) return en ? 'in 2 days' : '后天';

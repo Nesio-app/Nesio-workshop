@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { isPortalRequestAuthorized, isRateLimited } from '@/lib/portal/api-auth';
 import { getIntegrationToken, saveIntegrationToken, setTokenCookiesOnResponse } from '@/lib/portal/integrations';
-import { collectTeslaData, refreshTeslaToken, registerPartnerAccount, teslaConfigured } from '@/lib/portal/tesla';
+import { collectTeslaData, collectTeslaEnergy, refreshTeslaToken, registerPartnerAccount, teslaConfigured } from '@/lib/portal/tesla';
 import { envValue } from '@/lib/portal/env';
 
 export const dynamic = 'force-dynamic';
@@ -78,7 +78,20 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: 'tesla_fetch_failed', status: snapshot.status });
   }
 
-  const response = NextResponse.json({ ok: true, drives: snapshot.drives, charges: snapshot.charges });
+  // 能源产品(太阳能 / Powerwall)—— 2026-07-30 用户点名要的那半边。
+  // **best-effort 且与车辆分开失败**:家里没有能源产品的人这里天然是空的,
+  // 授权里没勾 energy_device_data 的会拿到 403 —— 两种情况都不能把车辆数据拖没了。
+  let energy: { live: unknown[]; days: unknown[]; unavailable?: string } = { live: [], days: [] };
+  try {
+    const e = await collectTeslaEnergy(accessToken);
+    if (e.status === 200) energy = { live: e.live, days: e.days };
+    // 403 = 这枚 token 没有 energy_device_data(scope 是发 token 时定死的,
+    // 加了 scope 也要重新授权一次才生效)。如实告诉前端,别让它显示「没有能源产品」。
+    else if (e.status === 403) energy = { live: [], days: [], unavailable: 'scope' };
+    else if (e.status !== 200) energy = { live: [], days: [], unavailable: 'fetch' };
+  } catch { energy = { live: [], days: [], unavailable: 'fetch' }; }
+
+  const response = NextResponse.json({ ok: true, drives: snapshot.drives, charges: snapshot.charges, energy });
 
   // Persist rotated token (Supabase + cookies) so we don't refresh every call.
   if (rotated) {

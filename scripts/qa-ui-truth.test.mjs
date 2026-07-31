@@ -128,9 +128,17 @@ const code = stripComments;
   const card = settings.slice(subAt, subAt + 1400);
   assert.ok(/nesio-sub-status-title">[\s\S]{0,80}\{pro/.test(card),
     '会员页标题没有跟着 pro 走 —— 已付费的账号会同屏看到「你已是 Pro」和「试用结束自动回到免费版」');
+  // 2026-07-30(#22 复发):判据从 isPaidPro 收紧成 pro —— 页面三块内容原来由**两个**
+  // 判据管(状态卡看 pro,价格档和页尾看 isPaidPro),只要它们分歧(本机 tier=pro
+  // 而服务端没确认付费),三重矛盾就原样回来。现在整屏只有一个判据。
   assert.ok(
-    /\{!isPaidPro && \(/.test(settings),
+    /\{!pro && \(/.test(settings),
     '已是 Pro 还在摆一排「规划中」的价格档 —— 和「订阅生效中」对撞(原始报告第 9 条的第三重矛盾)',
+  );
+  const proBody = settings.slice(subAt);
+  assert.ok(
+    !/\{!?isPaidPro[\s?&]/.test(proBody),
+    'pro 算完之后不许再有任何一块直接看 isPaidPro —— 两个判据管三块内容就是矛盾的来源',
   );
 }
 

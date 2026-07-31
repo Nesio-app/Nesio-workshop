@@ -96,7 +96,9 @@ const code = stripComments;
   );
   assert.match(
     code(read('components/portal/TeslaPanel.tsx')),
-    /state === 'loading'\)\s*\{\s*return <LoadingCard/,
+    // 2026-07-30:这个分支加了 timeoutMs 兜底(#12「加载条一直不消失」),
+    // 从单行 return 变成带括号的多行 JSX —— 判据仍然是「这个分支返回的是 LoadingCard」。
+    /state === 'loading'\)\s*\{\s*return \(?\s*<LoadingCard/,
     '车页的 loading 分支又变回裸文字了',
   );
   assert.match(read('app/globals.css'), /\.nesio-skeleton-bar\s*\{/, '骨架条样式没了 —— LoadingCard 会渲染成空白');

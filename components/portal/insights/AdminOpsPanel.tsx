@@ -10,6 +10,8 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
+// #40:总评不许被平均数盖住最弱那一维
+import { smartnessVerdict, BAND_LABEL } from '@/lib/portal/smartness-verdict';
 import { telemetryLabel } from '@/lib/portal/telemetry-labels';
 import { fetchWithTimeout } from '@/lib/portal/fetch-timeout';
 import LoadingCard from '../ui/LoadingCard';
@@ -225,15 +227,22 @@ export default function AdminOpsPanel() {
               自己就是图例。 */}
           <span style={big}>{data.smartness?.score ?? '—'}</span>
           {typeof data.smartness?.score === 'number' && (() => {
-            const s = data.smartness.score;
-            const [zh, en, fg, bg] = s >= 70
-              ? ['良好', 'Good', 'var(--status-go)', 'var(--status-go-soft)']
-              : s >= 50
-                ? ['一般', 'Fair', 'var(--status-gentle)', 'var(--status-gentle-soft)']
-                : ['待打磨', 'Needs work', 'var(--status-calm)', 'var(--status-calm-soft)'];
+            // #40:一个 29 分的维度被四个正常的抬起来,总评还写「良好」——
+            // 这块面板是拿来发现问题的,不能把最该被发现的那一项抹平。
+            // 评语由总分和**最弱那一项**共同决定(判据见 lib/portal/smartness-verdict)。
+            const v = smartnessVerdict(data.smartness.score, data.smartness.dims || []);
+            const [zh, en] = BAND_LABEL[v.band];
+            const [fg, bg] = v.band === 'good'
+              ? ['var(--status-go)', 'var(--status-go-soft)']
+              : v.band === 'fair'
+                ? ['var(--status-gentle)', 'var(--status-gentle-soft)']
+                : ['var(--status-calm)', 'var(--status-calm-soft)'];
             return (
               <span style={{ marginLeft: 'var(--space-2)', padding: '0.1rem 0.45rem', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-overline)', fontWeight: 'var(--weight-medium)', color: fg, background: bg, verticalAlign: 'middle' }}>
                 {L(dict, zh, en)}
+                {v.cappedByWeakest && v.weakest && (
+                  <> · {L(dict, `${v.weakest.dim} ${v.weakest.score}`, `${v.weakest.dim} ${v.weakest.score}`)}</>
+                )}
               </span>
             );
           })()}
@@ -269,7 +278,8 @@ export default function AdminOpsPanel() {
       {showDims && (data.smartness?.dims?.length ?? 0) > 0 && (
         <div style={{ ...card, marginTop: 'var(--space-2)' }}>
           <p style={{ margin: '0 0 var(--space-1)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
-            {L(dict, '聪明度 = 五维平均(0–100)。样本不足的维度按 50 中性、标·。', 'Smartness = avg of 5 dims (0–100). Thin-sample dims default to 50 (·).')}
+            {L(dict, '聪明度 = 五维平均(0–100)。样本不足的维度按 50 中性、标·。评语看最弱的一维 —— 平均分会把塌下去的那条腿抬起来。',
+              'Smartness = avg of 5 dims (0–100). Thin-sample dims default to 50 (·). The verdict follows the weakest measured dim — averages hide a leg that collapsed.')}
           </p>
           <Radar dims={data.smartness!.dims!} />
         </div>

@@ -39,6 +39,14 @@ export interface ManualAsset {
   /** 锚点,新→旧排序。值 = anchors[0].value。 */
   anchors: AssetAnchor[];
   createdAt: string;
+  /**
+   * #10(2026-07-30 真机):「资产 → 车」里同时躺着「JingBell」(Tesla 实时数据)和
+   * 「Model Y」($0 的手动空壳)—— 同一个分类下两套互不关联的车辆数据入口。
+   * 它们本来就是同一辆车的两半:一半是接口来的现在什么样,一半是你自己记的
+   * 估值 / 保养 / 税费。绑上之后两半合成一张卡。
+   * 空 = 没绑(用户明说过「分开也不影响」,所以绑定是可选的,不绑照旧各显各的)。
+   */
+  teslaVehicleId?: string;
 }
 
 const assetsStore = createBlobStore<ManualAsset[]>({
@@ -94,6 +102,22 @@ export function addManualAsset(input: {
 }
 
 /** 记一条估值锚点(同日覆盖 —— 一天只留一条,改错可重记)。 */
+/**
+ * 把这件资产绑到某辆 Tesla 车(#10)。传空串 = 解绑。
+ * 只写这一个字段,不动估值/记录 —— 绑定是「这两半是同一辆车」的声明,不是数据迁移。
+ */
+export function bindAssetToTesla(assetId: string, vehicleId: string): boolean {
+  const all = listManualAssets();
+  const idx = all.findIndex((a) => a.id === assetId);
+  if (idx < 0) return false;
+  const v = vehicleId.trim();
+  // 一辆车只能绑一件资产 —— 否则两张卡都说「这是 JingBell」,又是同屏两个事实
+  if (v) for (let i = 0; i < all.length; i++) if (i !== idx && all[i].teslaVehicleId === v) all[i] = { ...all[i], teslaVehicleId: undefined };
+  all[idx] = { ...all[idx], ...(v ? { teslaVehicleId: v } : { teslaVehicleId: undefined }) };
+  assetsStore.save(all);
+  return true;
+}
+
 export function addAssetAnchor(assetId: string, anchor: AssetAnchor): boolean {
   const all = listManualAssets();
   const idx = all.findIndex((a) => a.id === assetId);

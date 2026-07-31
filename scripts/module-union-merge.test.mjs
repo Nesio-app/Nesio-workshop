@@ -148,6 +148,16 @@ check('③c 银行三个 key 都在并集表里', () => {
   assert.strictEqual(M.needsUnionMerge('treasurebox-theme'), false, '快照型数据不该走并集');
 });
 
+// ⚠️ 反向的一条同样重要:**life-graph 不许进并集表**。
+// 它有自己那套 union 合并(所以早就被排除在通用模块同步之外);
+// 再在这里并一次就是两套语义叠加,冲突解法还不一样。
+// (这条是从另一个分支的 finance-sync-union 测试里搬过来的 —— 那份测的是
+//  被合并时删掉的重复实现,但它这条断言我这边原来缺。)
+check('③c2 life-graph 不在并集表里 —— 它有自己的 union,别并两遍', () => {
+  assert.strictEqual(M.needsUnionMerge('nesio-life-graph-v1'), false);
+  assert.strictEqual(M.needsUnionMerge('nesio-fin-budget-v1'), false, '预算是快照型,并集会把删掉的项并回来');
+});
+
 check('③d 格式漂移(不是数组)→ 返回 null 让调用方退回 LWW,不猜格式硬合', () => {
   assert.strictEqual(M.mergeModuleJson(KEY, '{"a":1}', '[]'), null);
   assert.strictEqual(M.mergeModuleJson(KEY, '不是 json', '[]'), null);

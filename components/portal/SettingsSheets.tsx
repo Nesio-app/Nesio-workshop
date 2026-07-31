@@ -7,15 +7,15 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { pushSupported, isPushEnabled, enablePush, disablePush } from '@/lib/portal/push-notify';
-import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, profileIdentityUpdatedAt, saveProfileSettings, touchProfileIdentity, type PortalLocale } from '@/lib/portal/profile';
+import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, saveProfileSettings, touchProfileIdentity, type PortalLocale } from '@/lib/portal/profile';
 import { pushProfileToCloud, syncProfileWithCloud } from '@/lib/portal/cloud-profile-sync';
 import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
-import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { L, t } from '@/lib/portal/i18n';
 import { usePortalLocale } from './use-portal-locale';
 import { IconChevronRight, IconHalfMoon, IconLink, IconLock, IconMoon, IconShield, IconSun } from './icons';
 import { InfoTip } from './InfoTip';
+import { useSessionState } from './use-session-state';
 import NesioSheet from './ui/NesioSheet';
 import { captureLocationEnabled, setCaptureLocationEnabled } from '@/lib/portal/capture-location';
 import { getFontScale, applyFontScale, type FontScale } from '@/lib/portal/font-scale';
@@ -27,6 +27,8 @@ import { purgeLocalData } from '@/lib/portal/storage-manifest';
 import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
 import { purgeLocalFiles } from '@/lib/portal/local-file-store';
+import { purgeLocalTracks } from '@/lib/platform/music/local-tracks';
+import { stop as stopMusic } from '@/lib/platform/music/player-engine';
 import { getTelemetryDeviceId } from '@/lib/portal/telemetry';
 import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab, isLabModeOn, getPalette, setPalette, PALETTES, type PaletteId } from '@/lib/portal/module-overrides';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
@@ -496,30 +498,35 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const [driveMsg, setDriveMsg] = useState('');
   // 备份目的地选择器:'drive'=Google Drive(免费)/ 'nesio'=Nesio 云(兜底)。默认免费的 Drive。
   const [backupDest, setBackupDest] = useState<'drive' | 'nesio'>('drive');
-  // 批次 151(QA #8):云状态此前写死「0 · 未登录」,不读真实登录态。取真会话,如实显示。
-  const [signedIn, setSignedIn] = useState(false);
+  // #21:这里原来自己 fetch 一遍 /api/auth/session,初值写死 false —— 一路请求慢一点,
+  // 屏幕上就同时出现「已登录」和「未登录」。登录态只有一个答案,走 useSessionState。
+  // (顺带:signedIn 此前算出来根本没人用,是「写了没接上」。)
+  const session = useSessionState(open);
+  const signedIn = session.state === 'signed-in';
   useEffect(() => {
     try { const v = localStorage.getItem('nesio-backup-dest'); if (v === 'nesio' || v === 'drive') setBackupDest(v); } catch { /* ignore */ }
   }, []);
+  const [diagSyncMsg, setDiagSyncMsg] = useState('');
+  /**
+   * #23(2026-07-30):用户报「换肤只在设置页生效,首页还是粉的」。查下来四套色卡对
+   * `--portal-*` / `--status-*` 那整组 token **一个不漏都覆盖了**,找不到能解释那一屏的机制;
+   * 最可能的解释是那台设备还在跑**旧构建**(iOS PWA 后台驻留的页面从不重新加载)。
+   *
+   * 可这件事**用户没法自己确认** —— 界面上没有任何地方写着「你现在跑的是哪一版」。
+   * 版本比对逻辑早就有(Portal 里回前台自动刷),但它是静默的:
+   * 一个静默的自愈机制在「它到底有没有生效」这种问题上等于不存在。
+   * 所以这里补一行看得见的:这台设备的构建 vs 线上部署,不一样就给一颗强制刷新。
+   */
+  const localBuild = (process.env.NEXT_PUBLIC_BUILD_SHA || 'dev').slice(0, 7);
+  const [liveBuild, setLiveBuild] = useState('');
   useEffect(() => {
     if (!open) return;
-    fetch('/api/auth/session', { cache: 'no-store' })
+    fetch('/api/version', { cache: 'no-store' })
       .then((r) => r.json())
-      .then((d: { loggedIn?: boolean }) => setSignedIn(Boolean(d?.loggedIn)))
-      .catch(() => {});
+      .then((d: { v?: string }) => setLiveBuild(String(d?.v || '').slice(0, 7)))
+      .catch(() => setLiveBuild(''));
   }, [open]);
-  // 批次202:跨端同步诊断 —— 每端一眼看出 版本/登录/身份戳,定位「为何不同步」。
-  const buildSha = (process.env.NEXT_PUBLIC_BUILD_SHA || 'dev').slice(0, 7);
-  const [diagLocalAt, setDiagLocalAt] = useState('');
-  const [diagCloudAt, setDiagCloudAt] = useState('');
-  const [diagSyncMsg, setDiagSyncMsg] = useState('');
-  const loadDiag = useCallback(() => {
-    setDiagLocalAt(profileIdentityUpdatedAt());
-    createAppApiClient().fetchCloudProfileSettings()
-      .then((r) => setDiagCloudAt(r.ok && typeof r.settings?.identityUpdatedAt === 'string' ? r.settings.identityUpdatedAt : ''))
-      .catch(() => {});
-  }, []);
-  useEffect(() => { if (open) loadDiag(); }, [open, loadDiag]);
+  const buildStale = Boolean(liveBuild && liveBuild !== 'dev' && localBuild !== 'dev' && liveBuild !== localBuild);
   /**
    * 2026-07-29 QA #11:用户点了一次同步,总数从 2541 变成 2544,报的是「✓ 已同步」——
    * 于是那 3 条看着像**凭空多出来**的。其实它们是别的设备存下、这台机器还没有的记忆,
@@ -535,10 +542,8 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         ? L(dict, `✓ 已同步 · 从云端取回 ${n} 条这台设备还没有的记忆 · 下拉刷新看结果`,
           `✓ Synced · pulled ${n} ${n === 1 ? 'memory' : 'memories'} this device didn't have yet · pull to refresh`)
         : L(dict, '✓ 已同步 · 本机和云端本来就一致,没有新增', '✓ Synced · already up to date, nothing new'));
-      loadDiag();
     } catch { setDiagSyncMsg(L(dict, '同步没能完成,过一会儿再试', 'Sync didn’t go through — try again in a bit')); }
   }
-  const fmtAt = (iso: string) => (iso ? iso.slice(5, 16).replace('T', ' ') : '—');
   const pickBackupDest = (d: 'drive' | 'nesio') => {
     setBackupDest(d);
     try { localStorage.setItem('nesio-backup-dest', d); } catch { /* ignore */ }
@@ -783,6 +788,8 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       void purgeIdbBlobs();                                 // IDB blob(健康/临床/地点)一并清 —— 别漏
       void purgeLocalImages();                              // 隐私审计:记忆照片在独立 IDB(nesio-images),必须一并清,否则「删除」留图在本机
       void purgeLocalFiles();                               // 同上:附件在 nesio-files,漏了就把 pdf 留在设备上
+      stopMusic();                                          // 先停播:歌还在响、文件已删掉是最刺眼的一种「没删干净」
+      void purgeLocalTracks();                              // 本地曲库在 nesio-music,同一条:漏了歌还留在设备上
       void import('@/lib/portal/local-email-body').then(({ purgeEmailBodies }) => purgeEmailBodies()); // 邮件全文独立 IDB(nesio-email-bodies)一并清
     } catch { /* ignore */ }
     setNodeCount(0);
@@ -815,7 +822,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     // 云删成功 → 清本机 + 登出
     try {
       getLifeGraph().forEach((n) => deleteLifeNode(n.id));
-      purgeLocalData(localStorage); void purgeIdbBlobs(); void purgeLocalImages(); void purgeLocalFiles();
+      purgeLocalData(localStorage); void purgeIdbBlobs(); void purgeLocalImages(); void purgeLocalFiles(); stopMusic(); void purgeLocalTracks();
       await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     } catch { /* ignore */ }
     setDeleteMsg(L(dict, '✓ 账号与全部数据已删除,正在登出…', '✓ Account and all data deleted, signing out…'));
@@ -902,6 +909,21 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       {auditState === 'failed' && auditFail && (
         <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, color: 'var(--portal-muted)' }}>{auditFail}</p>
       )}
+
+      {/* #14 后半:用户点了一次同步,总数从 2541 变成 2544,只报了「✓ 已同步」——
+          那 3 条看着像**凭空多出来**的。其实它们是别的设备存下、这台机器还没有的记忆。
+          handleForceSync 早就把这句话算好了(importedNodeCount),但**这颗按钮和这行字
+          从来没有被渲染过** —— 又一处「写了没接上」。同一个数字,说清来路就是功能,
+          不说就是 bug。 */}
+      <div className="nesio-settings-audit-row">
+        <Button variant="soft" size="md" full className="nesio-settings-action-btn"
+          onClick={handleForceSync} disabled={diagSyncMsg === L(dict, '同步中…', 'Syncing…')}>
+          {L(dict, '立即同步', 'Sync now')}
+        </Button>
+      </div>
+      {diagSyncMsg && (
+        <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, lineHeight: 1.7, color: 'var(--portal-muted)' }}>{diagSyncMsg}</p>
+      )}
       {auditReport && (auditState === 'done' || auditState === 'repairing') && (() => {
         const verdict = consistencyVerdict(auditReport);
         const pending = new Set(auditReport.pendingDeletes);
@@ -909,11 +931,19 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         return (
           <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, lineHeight: 1.7,
             color: verdict === 'clean' ? 'var(--status-go)' : verdict === 'repairable' ? 'var(--status-gentle)' : 'var(--status-risk)' }}>
+            {/* #14:这里原来写「本机 2541 条」,而记忆库首页写「2534 条」,用户当场就发现了。
+                两个数各有各的对 —— 体检必须比对**全部节点**(天气快照那类环境信号也要上云),
+                记忆库报的是**用户会当成记忆的那些**。错的是共用一个「条」字。
+                所以先报记忆数(和记忆库对得上),再把「另有 N 条环境信号也在同步」说出来。 */}
             {verdict === 'clean'
-              ? L(dict, `✓ 本机 ${auditReport.localCount} 条,云端 ${auditReport.cloudCount} 条,一一对得上。`,
-                  `✓ ${auditReport.localCount} local, ${auditReport.cloudCount} in cloud — all matched.`)
-              : L(dict, `本机 ${auditReport.localCount} 条 · 云端 ${auditReport.cloudCount} 条`,
-                  `${auditReport.localCount} local · ${auditReport.cloudCount} in cloud`)}
+              ? L(dict, `✓ 记忆 ${auditReport.localMemoryCount} 条,云端 ${auditReport.cloudCount} 条,一一对得上。`,
+                  `✓ ${auditReport.localMemoryCount} memories, ${auditReport.cloudCount} in cloud — all matched.`)
+              : L(dict, `记忆 ${auditReport.localMemoryCount} 条 · 云端 ${auditReport.cloudCount} 条`,
+                  `${auditReport.localMemoryCount} memories · ${auditReport.cloudCount} in cloud`)}
+            {auditReport.localCount > auditReport.localMemoryCount && (
+              <><br />{L(dict, `· 另有 ${auditReport.localCount - auditReport.localMemoryCount} 条环境信号(天气快照那类)也在同步,不计入记忆。`,
+                `· ${auditReport.localCount - auditReport.localMemoryCount} environment signals (weather snapshots etc.) also sync; not counted as memories.`)}</>
+            )}
             {auditReport.missingInCloud.length > 0 && (
               <><br />{L(dict, `· ${auditReport.missingInCloud.length} 条还没上云 —— 点右边补传就好。`,
                 `· ${auditReport.missingInCloud.length} not yet in the cloud — tap Upload to fix.`)}</>
@@ -975,7 +1005,22 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         {deleteMsg && <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-2) 0 0', color: 'var(--status-risk)' }}>{deleteMsg}</p>}
       </details>
 
-      {/* bug3 p44:底部那段说明删掉 —— 这一页每个按钮都在做那件事,不需要再用一段话复述。 */}
+      {/* #23:这台设备到底在跑哪一版 —— 「界面没跟着变」十有八九是这里对不上。
+          原来这个比对是静默自愈的,而静默的自愈机制在「它有没有生效」这种问题上等于不存在。 */}
+      <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-5)', lineHeight: 1.7 }}>
+        {L(dict, `这台设备的版本 ${localBuild}`, `This device is on build ${localBuild}`)}
+        {liveBuild ? L(dict, ` · 线上 ${liveBuild}`, ` · live ${liveBuild}`) : ''}
+        {buildStale && (
+          <>
+            <br />
+            {L(dict, '和线上不一样 —— 界面没跟着更新多半是这个原因。', 'Different from live — that is usually why the UI looks out of date.')}
+            <button type="button" onClick={() => window.location.reload()}
+              style={{ marginLeft: 'var(--space-2)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: 'var(--portal-accent)', fontWeight: 'var(--weight-semibold)', fontFamily: 'var(--font-sans)', fontSize: 'inherit' }}>
+              {L(dict, '取新版', 'Get the new build')}
+            </button>
+          </>
+        )}
+      </p>
     </SheetWrap>
   );
 }
@@ -1227,17 +1272,17 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
     ).catch(() => {});
   }
 
+  // #22(2026-07-30 真机复发):同一屏「试用中 / 规划中 / 你已是 Pro 会员」三句话打架。
+  // 上一轮把状态卡接上了 pro,但**页面另外两处还在看 isPaidPro** ——
+  // 两个判据管三块内容,只要它们分歧(本机 tier=pro 而服务端没确认付费),
+  // 矛盾就会原样回来。会员状态在这一屏只能有一个判据,算一次,处处用它。
+  const trialDays = trialDaysLeft();
+  const pro = isPaidPro || (getTier() === 'pro' && trialDays <= 0);
+
   return (
     <SheetWrap open={open} onClose={onClose} title={L(dict, '会员与权益', 'Membership')}>
       {(() => {
-        const days = trialDaysLeft();
-        // 服务端确认的付费 Pro 永远优先 —— 否则试用期内的付费用户会看到
-        // 顶部「免费试用剩 N 天」+ 底部「你已是 Pro 会员」同页打架(QA ⑥)。
-        const pro = isPaidPro || (getTier() === 'pro' && days <= 0);
-        // ⚠️ pro 必须管住**整张卡**,不只是那枚徽章。
-        // 上一轮修 QA⑥ 时只把 badge 接上了 pro,标题和描述还在看 days > 0 ——
-        // 于是「试用期内已经付费」的账号同屏出现:徽章 PRO + 标题「前 21 天全功能免费…
-        // 试用结束自动回到免费版」+ 页尾「✓ 你已是 Pro 会员」,三句话互相打架。
+        const days = trialDays;
         return (
           <div className="nesio-sub-status-card">
             <div className="nesio-sub-status-badge nesio-sub-status-badge--free">
@@ -1282,7 +1327,7 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
 
       {/* 已经是付费会员就别再摆一排「规划中」的价格 —— 那看着像「还没开卖」,
           和上面刚说的「订阅生效中」正好对撞(用户报的第三重矛盾)。 */}
-      {!isPaidPro && (
+      {!pro && (
         <>
           <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-4)' }}>{t(locale, 'subFuturePlans')}</p>
           {PLAN_PREVIEWS.map((plan) => (
@@ -1302,7 +1347,7 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
         </>
       )}
 
-      {isPaidPro ? (
+      {pro ? (
         <div style={{ marginTop: 'var(--space-5)', padding: 'var(--space-4) var(--space-4)', borderRadius: 'var(--radius-sm)', textAlign: 'center', background: 'var(--portal-card, #fff)', border: '1px solid var(--status-gentle, #6cbf84)' }}>
           <p style={{ fontWeight: 600, margin: 0, color: 'var(--status-gentle, #4a9d63)' }}>{L(dict, '✓ 你已是 Pro 会员', "✓ You're a Pro member")}</p>
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: 'var(--space-1) 0 0' }}>{L(dict, '订阅生效中,感谢支持。可在支付渠道管理或取消。', 'Subscription active — thank you. Manage or cancel via your payment provider.')}</p>
@@ -1340,8 +1385,11 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
 export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: SheetProps & { onOpenMembership: () => void; onPickAvatar: () => void }) {
   const locale = usePortalLocale();
   const dict = portalLocaleToDictionaryLocale(locale);
-  const [email, setEmail] = useState('');
-  const [loggedIn, setLoggedIn] = useState(false);
+  // #21:登录态只有一个答案(见 lib/portal/session-state)。
+  // 「问不出来」保持 unknown,不倒退成「未登录」—— 那正是「已登录」和「未登录」同屏的由来。
+  const session = useSessionState(open);
+  const loggedIn = session.state === 'signed-in';
+  const email = session.email;
   const [name, setName] = useState('');
   const [savedTip, setSavedTip] = useState(false);
   const savedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1351,13 +1399,6 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
     const p = loadProfileSettings();
     setName(p.displayName && p.displayName !== '我' ? p.displayName : '');
     setSavedTip(false);
-    fetch('/api/auth/session', { cache: 'no-store' })
-      .then((r) => r.json())
-      .then((d: { loggedIn?: boolean; user?: { email?: string } }) => {
-        setLoggedIn(Boolean(d?.loggedIn));
-        setEmail(d?.user?.email || '');
-      })
-      .catch(() => {});
   }, [open]);
 
   useEffect(() => () => { if (savedTimer.current) clearTimeout(savedTimer.current); }, []);

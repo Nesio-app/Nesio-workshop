@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { smartnessVerdict, BAND_LABEL } from '@/lib/portal/smartness-verdict';
 import { Delta, FeedbackDonut, FunnelSteps, InsightCard, SmartnessRadar, TopEventsChart, TrendChart, type DailyPoint } from './MetricsCharts';
 import { telemetryLabel } from '@/lib/portal/telemetry-labels';
 import { UserAccess } from './UserAccess';
@@ -313,10 +314,29 @@ export default function AdminPage() {
           {/* ── 聪明度 + AI 成本 ── */}
           <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
             <div style={card}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-                <p style={{ ...label, margin: 0 }}>聪明度(30 天,带·的维度样本不足按 50 中性)</p>
-                <span style={{ ...big, fontSize: '1.4rem', color: (data.smartness?.score ?? 0) >= 70 ? 'var(--status-go)' : (data.smartness?.score ?? 0) >= 50 ? 'var(--status-gentle)' : 'var(--status-risk)' }}>{data.smartness?.score ?? '—'}</span>
-              </div>
+              {/* #40:总分是五维平均,一个 29 分的维度会被四个正常的抬起来。
+                  这块面板是拿来发现问题的 —— 评语和配色都跟**最弱那一维**走,
+                  并把它点名说出来(判据见 lib/portal/smartness-verdict)。 */}
+              {(() => {
+                const v = data.smartness ? smartnessVerdict(data.smartness.score, data.smartness.dims) : null;
+                const tone = !v ? 'var(--portal-muted)'
+                  : v.band === 'good' ? 'var(--status-go)'
+                  : v.band === 'fair' ? 'var(--status-gentle)' : 'var(--status-risk)';
+                return (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                      <p style={{ ...label, margin: 0 }}>聪明度(30 天,带·的维度样本不足按 50 中性)</p>
+                      <span style={{ ...big, fontSize: '1.4rem', color: tone }}>{data.smartness?.score ?? '—'}</span>
+                    </div>
+                    {v && (
+                      <p style={{ ...label, margin: '0.15rem 0 0', color: tone, letterSpacing: 0 }}>
+                        {BAND_LABEL[v.band][0]}
+                        {v.cappedByWeakest && v.weakest && ` —— 最弱一维「${v.weakest.dim}」只有 ${v.weakest.score},平均分把它抬起来了`}
+                      </p>
+                    )}
+                  </>
+                );
+              })()}
               {data.smartness && <SmartnessRadar dims={data.smartness.dims} />}
             </div>
             <div style={card}>

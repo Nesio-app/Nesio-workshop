@@ -17,13 +17,17 @@ const securityHeaders = [
       "default-src 'self'",
       // 批次 22:Plaid Link 从 cdn.plaid.com 加载脚本(此前被静默拦截 →
       // 「点击没反应」);Link 弹窗是它域名下的 iframe → frame-src。
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.plaid.com",
+      // 2026-07-30 音乐模块:Apple Music 的 MusicKit JS 从 Apple 自己的 CDN 加载。
+      // 不放行的表现跟当年 Plaid 一模一样 —— **静默被 CSP 拦掉、按钮点了没反应**,
+      // 而且控制台之外没有任何线索。同批放行它的 API 域(授权与播放都走那儿)。
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.plaid.com https://js-cdn.music.apple.com",
       "style-src 'self' 'unsafe-inline' fonts.googleapis.com",
       "font-src 'self' fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",
-      "media-src 'self' blob:",
+      // Apple Music 的音频流走 HLS,分片在 apple.com 各边缘域;本地歌曲走 blob:。
+      "media-src 'self' blob: https://*.apple.com https://*.mzstatic.com",
       // Plaid Link SDK 与其后端通信;开发/沙盒/生产三档域名都放行
-      "connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://api.bigdatacloud.net https://api.weather.gov https://cdn.plaid.com https://production.plaid.com https://sandbox.plaid.com https://development.plaid.com",
+      "connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://api.bigdatacloud.net https://api.weather.gov https://cdn.plaid.com https://production.plaid.com https://sandbox.plaid.com https://development.plaid.com https://api.music.apple.com https://*.music.apple.com",
       "frame-src 'self' https://cdn.plaid.com https://plaid.com",
       "worker-src 'self' blob:",
       "frame-ancestors 'none'",

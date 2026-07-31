@@ -4,9 +4,9 @@
  * 足迹「计划」tab — 即将出发列表 + 新建行程 / 粘贴订票确认导入。
  */
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  listPlannedTrips, createBlankTrip, importBookingIntoTrip,
+  listPlannedTrips, createBlankTrip, importBookingIntoTrip, groupTripsByTime,
   TRAVEL_TRIPS_UPDATED_EVENT, type Trip,
 } from '@/lib/portal/travel-trips';
 import { ensureTravelPoiLoaded } from '@/lib/portal/travel-poi';
@@ -87,6 +87,7 @@ function TripSuggestCards({ dict, onCreated }: { dict: string; onCreated: () => 
 export default function TravelPlanPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [trips, setTrips] = useState<Trip[]>([]);
+  const grouped = useMemo(() => groupTripsByTime(trips), [trips]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [mode, setMode] = useState<'idle' | 'create' | 'import'>('idle');
   const [dest, setDest] = useState('');
@@ -175,7 +176,7 @@ export default function TravelPlanPanel() {
   return (
     <div className="nesio-travel-plan">
       <div className="nesio-travel-plan-head">
-        <h3 className="nesio-travel-plan-title">{L(dict, '即将出发', 'Starting soon')}</h3>
+        <h3 className="nesio-travel-plan-title">{L(dict, '行程', 'Trips')}</h3>
         <span className="nesio-travel-plan-count">{L(dict, `${trips.length} 段`, `${trips.length} trip${trips.length === 1 ? '' : 's'}`)}</span>
       </div>
 
@@ -188,22 +189,39 @@ export default function TravelPlanPanel() {
         </div>
       )}
 
-      <ul className="nesio-travel-plan-list">
-        {trips.map((t) => (
-          <li key={t.id}>
-            <button type="button" className="nesio-travel-plan-card" onClick={() => setOpenId(t.id)}>
-              <span className="nesio-travel-plan-card-ico"><IconPlane size={18} /></span>
-              <span className="nesio-travel-plan-card-main">
-                <b>{t.title}</b>
-                <small>{t.startDate} → {t.endDate}{t.weatherHint ? ` · ${t.weatherHint}` : ''} · {t.nodes.length} {L(dict, '节点', 'nodes')}</small>
-              </span>
-              <IconChevronRight size={16} />
-            </button>
-            {/* bug3:卡片右侧那个 ✕ 删掉 —— 一次误触就没了整趟行程,而且没有确认。
-                要删行程去时间线里删(有确认)。 */}
-          </li>
-        ))}
-      </ul>
+      {/* 按**日期**分三组(2026-07-30 真机实锤:一趟 7/28 已经出发的行程被列在
+          「即将出发」下面)。根因是拿**状态**当日期用 —— 状态是人标的,不一定跟得上日历;
+          日期是硬事实。第三组「已经过去了」把「其实结束了只是没人标完成」说出来,
+          而不是继续假装它要出发。 */}
+      {([
+        ['upcoming', L(dict, '即将出发', 'Starting soon')],
+        ['ongoing', L(dict, '正在路上', 'On the road')],
+        ['overdue', L(dict, '已经过去了 —— 要标成完成吗', 'Already over — mark as done?')],
+      ] as const).map(([key, title]) => {
+        const list = grouped[key];
+        if (!list.length) return null;
+        return (
+          <div key={key}>
+            <p className="nesio-travel-plan-group">{title}</p>
+            <ul className="nesio-travel-plan-list">
+              {list.map((t) => (
+                <li key={t.id}>
+                  <button type="button" className="nesio-travel-plan-card" onClick={() => setOpenId(t.id)}>
+                    <span className="nesio-travel-plan-card-ico"><IconPlane size={18} /></span>
+                    <span className="nesio-travel-plan-card-main">
+                      <b>{t.title}</b>
+                      <small>{t.startDate} → {t.endDate}{t.weatherHint ? ` · ${t.weatherHint}` : ''} · {t.nodes.length} {L(dict, '节点', 'nodes')}</small>
+                    </span>
+                    <IconChevronRight size={16} />
+                  </button>
+                  {/* bug3:卡片右侧那个 ✕ 删掉 —— 一次误触就没了整趟行程,而且没有确认。
+                      要删行程去时间线里删(有确认)。 */}
+                </li>
+              ))}
+            </ul>
+          </div>
+        );
+      })}
 
       {mode === 'idle' && (
         <div className="nesio-travel-plan-cta-row">

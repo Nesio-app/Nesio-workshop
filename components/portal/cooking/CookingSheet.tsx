@@ -15,7 +15,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import {
-  listPantry, addPantry, removePantry, expiringPantry,
+  listPantry, addPantry, removePantry, updatePantry, expiringPantry,
   PANTRY_CATEGORIES, type PantryItem,
 } from '@/lib/cooking/pantry';
 import { normalizeIngredient, CUISINES } from '@/lib/cooking/food-catalog';
@@ -26,6 +26,7 @@ import { scaleAmountsInText, servingFactor } from '@/lib/cooking/scale-recipe';
 import { recipeNutritionPerServing, recipeMainNutrition, lookupNutrition, type PerServing, type FoodNutrition } from '@/lib/cooking/nutrition';
 import { getWishlist, addWish, type WishDish } from '@/lib/cooking/wishlist';
 import SpendClaimRow from '../finance/SpendClaimRow';
+import Button from '../ui/Button';
 import { addMeal, getMeals, type MealSource, type MealItem } from '@/lib/cooking/meals';
 import { planWeek } from '@/lib/cooking/meal-plan-core';
 import {
@@ -155,7 +156,7 @@ export default function CookingSheet({ open, onClose, initialView }: {
 
             {view.kind === 'home' && (
               <>
-                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} t={t} />
+                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} page={t('美味', 'Cooking')} t={t} />
                 <SubTabs active="home" onSelect={setTopView} t={t} />
                 <HomeBody
                   soon={soon} recipes={recipes} recipesErr={recipesErr} soonNames={soonNames} pantryNames={pantryNames}
@@ -172,14 +173,14 @@ export default function CookingSheet({ open, onClose, initialView }: {
             )}
             {view.kind === 'pantry' && (
               <>
-                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} t={t} />
+                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} page={t('美味', 'Cooking')} t={t} />
                 <SubTabs active="pantry" onSelect={setTopView} t={t} />
                 <PantryBody items={items} shopping={shopping} onCamera={openCamera} onRemove={remove} onError={setErr} onChanged={reload} t={t} />
               </>
             )}
             {view.kind === 'wishlist' && (
               <>
-                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} t={t} />
+                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} page={t('美味', 'Cooking')} t={t} />
                 <SubTabs active="wishlist" onSelect={setTopView} t={t} />
                 <WishlistBody wishes={wishes} recipes={recipes} onCompute={(n) => computeNeeds(n, 'wishlist')} onOpenDish={openRecipeByName} onPlan={() => setView({ kind: 'plan' })} onError={setErr} onChanged={reload} onCamera={openCamera} t={t} />
               </>
@@ -444,7 +445,7 @@ function PantryBody({ items, shopping, onCamera, onRemove, onError, onChanged, t
         <section>
           <SectionHead label={t('快过期', 'Expiring soon')} right={t(`${soon.length} 项`, `${soon.length}`)} />
           <div style={card}>
-            {soon.map((it, i) => <PantryRow key={it.id} it={it} last={i === soon.length - 1} soon onRemove={onRemove} t={t} />)}
+            {soon.map((it, i) => <PantryRow key={it.id} it={it} last={i === soon.length - 1} soon onRemove={onRemove} onChanged={onChanged} onError={onError} t={t} />)}
           </div>
         </section>
       )}
@@ -453,7 +454,7 @@ function PantryBody({ items, shopping, onCamera, onRemove, onError, onChanged, t
         <section>
           <SectionHead label={t('充足', 'Well stocked')} />
           <div style={card}>
-            {rest.map((it, i) => <PantryRow key={it.id} it={it} last={i === rest.length - 1} soon={false} onRemove={onRemove} t={t} />)}
+            {rest.map((it, i) => <PantryRow key={it.id} it={it} last={i === rest.length - 1} soon={false} onRemove={onRemove} onChanged={onChanged} onError={onError} t={t} />)}
           </div>
         </section>
       )}
@@ -486,17 +487,75 @@ function PantryBody({ items, shopping, onCamera, onRemove, onError, onChanged, t
   );
 }
 
-function PantryRow({ it, last, soon, onRemove, t }: { it: PantryItem; last: boolean; soon: boolean; onRemove: (id: string) => void; t: TT }) {
-  const meta = [it.addedAt ? buyLabel(it.addedAt, t) : it.category || '', it.location].filter(Boolean).join(' · ');
+/**
+ * #39(2026-07-30 真机):「黄瓜」这张卡点了没反应 —— 整行只有右边那个 ✕ 是可点的,
+ * 行本身是个 <div>。而它偏偏标着「过期」:效期多半是记进来时按默认保质期估的,
+ * 估错了,用户却**没有任何地方能改**。两件事其实是一件:
+ * 这一行没有「去处」,所以既点不动,也改不了。
+ *
+ * 现在点开就是编辑:数量 / 效期 / 放哪。收起时也把效期日期本身印出来 ——
+ * 只写一个「过期」而不说是哪天,用户根本没法判断它是不是记错了。
+ */
+function PantryRow({ it, last, soon, onRemove, onChanged, onError, t }: {
+  it: PantryItem; last: boolean; soon: boolean;
+  onRemove: (id: string) => void; onChanged: () => void; onError: (m: string) => void; t: TT;
+}) {
+  const [open, setOpen] = useState(false);
+  const [qty, setQty] = useState(it.quantity == null ? '' : String(it.quantity));
+  const [exp, setExp] = useState(it.expiry || '');
+  const [loc, setLoc] = useState(it.location || '');
+
+  const meta = [
+    it.addedAt ? buyLabel(it.addedAt, t) : it.category || '',
+    it.location,
+    it.expiry ? t(`效期 ${it.expiry}`, `use by ${it.expiry}`) : '',
+  ].filter(Boolean).join(' · ');
+
+  function save() {
+    const n = qty.trim() === '' ? null : Number(qty);
+    if (qty.trim() !== '' && !Number.isFinite(n as number)) { onError(t('数量填个数字就行。', 'Quantity needs to be a number.')); return; }
+    try {
+      if (!updatePantry(it.id, { quantity: n, expiry: exp.trim(), location: loc.trim() })) {
+        onError(t('没改成 —— 再试一次。', 'That didn’t save — try again.'));
+        return;
+      }
+      setOpen(false);
+      onChanged();
+    } catch {
+      onError(t('没改成 —— 再试一次。', 'That didn’t save — try again.'));
+    }
+  }
+
   return (
-    <div style={{ ...row, borderBottom: last ? 'none' : divider }}>
-      <Dot />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 'var(--text-body)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{qtyName(it)}</div>
-        {meta && <div style={{ ...subText, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta}</div>}
+    <div style={{ borderBottom: last ? 'none' : divider }}>
+      <div style={{ ...row, borderBottom: 'none' }}>
+        <Dot />
+        <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)}
+          style={{ flex: 1, minWidth: 0, minHeight: 44, textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, fontFamily: 'var(--font-sans)', color: 'var(--portal-ink)' }}>
+          <span style={{ display: 'block', fontSize: 'var(--text-body)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{qtyName(it)}</span>
+          {meta && <span style={{ ...subText, display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{meta}</span>}
+        </button>
+        {soon && <span style={{ ...pill, background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>{daysPill(it.daysLeft, t)}</span>}
+        <button type="button" onClick={() => void onRemove(it.id)} aria-label={t('删除', 'Remove')} style={xBtn}>✕</button>
       </div>
-      {soon && <span style={{ ...pill, background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>{daysPill(it.daysLeft, t)}</span>}
-      <button type="button" onClick={() => void onRemove(it.id)} aria-label={t('删除', 'Remove')} style={xBtn}>✕</button>
+      {open && (
+        <div style={{ padding: '0 var(--space-3) var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          <input value={qty} onChange={(e) => setQty(e.target.value)} inputMode="numeric"
+            placeholder={t('数量(空 = 不计数)', 'Quantity (blank = not counted)')} style={inputStyle} />
+          <input type="date" value={exp} onChange={(e) => setExp(e.target.value)} style={inputStyle} />
+          <input value={loc} onChange={(e) => setLoc(e.target.value)}
+            placeholder={t('放哪(冰箱 / 橱柜…)', 'Where (fridge / pantry…)')} style={inputStyle} />
+          <p style={{ ...subText, margin: 0 }}>
+            {t('效期留空 = 这东西没有效期,不再进「快过期」。', 'Leave the date blank if it has no expiry — it drops out of “expiring soon”.')}
+          </p>
+          <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+            <button type="button" onClick={() => { setOpen(false); setQty(it.quantity == null ? '' : String(it.quantity)); setExp(it.expiry || ''); setLoc(it.location || ''); }} style={{ ...ghostBtn, flex: 1 }}>{t('稍后', 'Later')}</button>
+            {/* 合并音乐分支时新加的一颗。primaryBtn 就是原语的 primary(accent 底 / 白字 / 胶囊),
+                flex:1 是布局 —— 正好是 layoutStyle 窄口的标准用法,不必再多一颗裸按钮。 */}
+            <Button variant="primary" layoutStyle={{ flex: 1 }} onClick={save}>{t('存下来', 'Save')}</Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1437,11 +1496,17 @@ type TT = (zh: string, en: string) => string;
  * 想回今天原本要「‹ 洞察 → 今天」两步。同时那几屏的大标题按标注删掉(title 不传即可),
  * 屏名由下面的分段 tab 说明,不必再用一行 h1 复述。
  */
-function ScreenHead({ backLabel, onBack, title, subtitle, subtitleRight, t }: { backLabel: string; onBack: () => void; title?: string; subtitle?: string; subtitleRight?: string; t: TT }) {
+function ScreenHead({ backLabel, onBack, page, title, subtitle, subtitleRight, t }: { backLabel: string; onBack: () => void; page?: string; title?: string; subtitle?: string; subtitleRight?: string; t: TT }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
         <button type="button" onClick={onBack} style={backLink}>‹ {backLabel}</button>
+        {/* #37(2026-07-30 真机):三个顶层屏的页头只剩一个「‹ 洞察」,不写自己叫什么。
+            左边说的是「点它去哪」,中间说的是「你现在在哪」—— 两件事不能互相顶替。
+            大标题 h1 之前按标注删过,所以这里只补一个小号页名,不把标题加回来。 */}
+        {page && (
+          <span style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{page}</span>
+        )}
         <button type="button" onClick={() => window.dispatchEvent(new CustomEvent('nesio-go-today'))}
           style={{
             flex: 'none', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)',

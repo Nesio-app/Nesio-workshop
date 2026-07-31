@@ -23,7 +23,9 @@ import RelationshipDetailSheet from './RelationshipDetailSheet';
 import FamilySummary from './FamilySummary';
 import ContactEditSheet from './ContactEditSheet';
 import { buildFamilyDigest } from '@/lib/portal/family-digest';
-import { ENTITY_ALIASES_EVENT } from '@/lib/portal/entity-resolution';
+import { ENTITY_ALIASES_EVENT, mergeEntity } from '@/lib/portal/entity-resolution';
+// #26:「Jing / Jing Duan / DUAN JING」是同一个人 —— 规范化对词序无能为力,得把候选挑出来
+import { suggestPersonMerges, loadDismissedMerges, dismissMerge, withoutDismissed } from '@/lib/portal/person-merge-suggest';
 
 const GROUPS: Closeness[] = ['core', 'close', 'acquaintance'];
 // 单层最多先渲染这么多行,其余「显示全部」再展开 —— 防「导入了几千个 Google 联系人 →
@@ -73,6 +75,10 @@ export default function RelationshipsPanel() {
   const [activeGroup, setActiveGroup] = useState<string | null>(null); // null=全部;桶 id 或原始分组名
   const [showMore, setShowMore] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+  // #26:说过「不是同一个人」的配对要**记住**。自查时发现最初只放在 state 里 ——
+  // 刷新一次就又问一遍,那正是用户这一轮报的「说过的话不算数」那一类毛病。
+  const [dismissedMerges, setDismissedMerges] = useState<string[]>([]);
+  useEffect(() => { setDismissedMerges(loadDismissedMerges()); }, []);
   const [expandedTiers, setExpandedTiers] = useState<Record<Closeness, boolean>>({ core: false, close: false, acquaintance: false });
 
   const rebuild = () => {
@@ -131,8 +137,46 @@ export default function RelationshipsPanel() {
   const dueList = shown.filter((c) => c.reachOut);
   const familyDigest = buildFamilyDigest(contacts);
 
+  /* #26(2026-07-30 真机):「Jing」「Jing Duan」「DUAN JING」是同一个人被拆成三条。
+     用户手动并了前两条,**第三条依然独立** —— 因为合并是一次一对手动指认,
+     而系统从来没告诉他「还有一条也像」。
+     规范化只到大小写/空白,对**词序反过来**无能为力(通讯录 姓+名 vs 邮件署名 名+姓)。
+     这里把候选挑出来摆在最上面。**不自动合并** —— 合并不可撤销,而「同名不同人」
+     在现实里很常见;系统替人做这个决定,错一次就把两个人的记录搅在一起,再也分不开。 */
+  const mergeHints = withoutDismissed(suggestPersonMerges(contacts.map((c) => c.name)), dismissedMerges);
+
   return (
     <div className="nesio-health-dash">
+      {mergeHints.length > 0 && (
+        <div className="nesio-rel-mergehint">
+          {mergeHints.slice(0, 3).map((h) => (
+            <div key={`${h.canonical}|${h.alias}`} className="nesio-rel-mergehint-row">
+              <span className="nesio-rel-mergehint-text">
+                {h.confidence === 'high'
+                  ? L(dict, `「${h.alias}」和「${h.canonical}」是同样几个字,只是顺序不同 —— 多半是同一个人。`,
+                    `“${h.alias}” and “${h.canonical}” are the same words in a different order — likely the same person.`)
+                  : L(dict, `「${h.alias}」可能就是「${h.canonical}」—— 也可能是另一个同名的人。`,
+                    `“${h.alias}” might be “${h.canonical}” — or a different person with that name.`)}
+              </span>
+              <span className="nesio-rel-mergehint-actions">
+                <button type="button" className="nesio-rel-mergehint-btn"
+                  onClick={() => { mergeEntity(h.alias, h.canonical); rebuild(); }}>
+                  {L(dict, '合并', 'Merge')}
+                </button>
+                <button type="button" className="nesio-rel-mergehint-btn ghost"
+                  onClick={() => setDismissedMerges(dismissMerge(h.canonical, h.alias))}>
+                  {L(dict, '不是', 'Not the same')}
+                </button>
+              </span>
+            </div>
+          ))}
+          <p className="nesio-rel-mergehint-foot">
+            {L(dict, '合并之后这两个名字的记录会归到一处,不可撤销 —— 拿不准就先放着。',
+              'Merging pools both names’ records into one and cannot be undone — leave it if you are unsure.')}
+          </p>
+        </div>
+      )}
+
       {(presentBuckets.length > 0 || moreGroups.length > 0) && (
         <div className="nesio-rel-chips" role="tablist" aria-label={L(dict, '联系人分组', 'Contact groups')}>
           <button type="button" role="tab" aria-selected={!activeGroup} className={`nesio-rel-chip${!activeGroup ? ' nesio-rel-chip--on' : ''}`} onClick={() => setActiveGroup(null)}>

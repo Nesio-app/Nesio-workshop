@@ -160,7 +160,17 @@ assert.match(profileCard, /className="nesio-profile-stat"[\s\S]*返回今天/, '
 assert.doesNotMatch(profileCard, /<MirrorProfileCard embedded \/>\s*<\/div>\s*\{\/\* Menu \*\//, 'Profile page should not show the organized-clues card inline before settings menu.');
 assert.match(profileCard, /api\/auth\/logout|退出登录/, 'Profile/settings surface must expose a logout action when signed in.');
 assert.match(profileCard, /clearProfileIdentity/, 'Profile logout must clear local identity so the old customer name is not shown after sign-out.');
-assert.match(profileCard, /loggedIn\?:\s*boolean|Boolean\(d\?\.loggedIn\)/, 'Profile card must use session.loggedIn, not ok, to avoid fake signed-in state.');
+// 2026-07-30(#21):这个判定搬到了唯一的登录态来源 lib/portal/session-state ——
+// 原来每个组件各 fetch 一遍 /api/auth/session、各自定义失败怎么办,初值还不一样,
+// 于是「已登录」和「未登录」会同屏出现。组件侧现在只订阅那一份。
+// 原意(必须看 loggedIn,不是看 ok)照旧守着,只是守在了它现在所在的地方。
+assert.match(profileCard, /useSessionState\(/, 'Profile card must read the single session source, not fetch its own.');
+assert.doesNotMatch(profileCard, /fetch\('\/api\/auth\/session'/, 'Profile card must not ask the session question a second time.');
+assert.match(
+  read('lib/portal/session-state.ts'),
+  /typeof d\.loggedIn !== 'boolean'/,
+  'Session source must use loggedIn, not ok, to avoid fake signed-in state.',
+);
 assert.match(loginPage, /注册|Create account|发送注册链接|sign-up/, 'Login page must expose a create-account path.');
 assert.match(loginPage, /nesio-login-logo-img/, 'Login page must use a non-inverted logo class so the logo is visible on the white card.');
 assert.match(authClient, /\/api\/auth\/callback/, 'Login/OAuth helper must redirect through the auth callback route so sessions are created.');

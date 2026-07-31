@@ -170,6 +170,77 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **音乐模块 · 四音源(2026-07-30,本轮新增)**:用户定的范围是「本地歌曲 + 网易 +
+  歌曲自由切换 + Spotify + Apple Music」。落地时把「自由切换」拆成它真实的样子 ——
+  **四个源不是一个播放器的四个开关,是两种播放模型**:
+  ● `in-app`(本地文件 / Apple Music):声音走 **Nesio 自己的音频会话**,车机蓝牙上
+    显示 Nesio,MediaSession 接了上一首/下一首;
+  ● `remote`(Spotify):Nesio 只是遥控器,声音与车机界面都在 Spotify 那边,要 Premium;
+  ● `metadata-only`(网易):**没有国内出口**,锁的是「拿播放地址」那一步(搜索/歌单不锁),
+    所以它此刻恒不可播。有了国内出口后改 `MUSIC_SOURCES` 里 netease 的 model 一处即可,
+    但必须同时把 streamable 做成**真去取 url**的探测,不许「配了 base 就假定能放」。
+  跨模型换源**必须先说**(`switchNotice`),否则用户在车里会突然看到车机换了个 App。
+  「能不能放」是**正向判据**(`canPlayNow`:configured ∧ authorized ∧ streamable ∧ 非 metadata-only);
+  回退链只收真能放的,一个都没有时有专门的空态(`noSourceLine`),并把能放的摆出来一键切。
+  ● **今天真能出声的只有本地歌曲**:不要账号、不要订阅、离线可听。
+    Apple Music 的接线是完整的(服务端 ES256 签 developer token + MusicKit JS 授权),
+    但**没有 `APPLE_MUSIC_*` 密钥就跑不通**,界面照实说「还没配好」。
+    Spotify 的 OAuth / 状态 / 权益判定完整(`product === 'premium'` 才算能放),
+    **但没接 Web Playback SDK 的播放** —— 用户没有 Premium,这条路径无法验证,
+    不写无法验证的成功路径;要接时在 spotify 那一段里补。
+  ● **新 key**:`nesio-music-local-tracks-v1`(cache)、`nesio-music-last-played-v1`(cache)、
+    `nesio-music-prefs-v1`(durable)。前两个判 cache 的理由:音频 Blob 在独立 IDB
+    (`nesio-music`)、**不进备份**,元数据同步过去只会得到一份点了放不出声的假曲库。
+    Spotify 令牌只放 **httpOnly cookie**,不落 localStorage(音乐模块红线:凭证仅本机私有)。
+  ● **新路由**(均已写进 docs/api-routes.md):`GET /api/portal/music/apple-token`、
+    `GET|DELETE /api/portal/music/spotify`、`GET /api/portal/music/spotify/{connect,callback}`、
+    `GET /api/portal/music/netease/search`。除 OAuth 两条外全走 `guardAiRoute`。
+  ● **CSP 补了 MusicKit**(`js-cdn.music.apple.com` / `api.music.apple.com` / media-src apple)——
+    不补的表现跟当年 Plaid 一模一样:脚本被静默拦掉,按钮点了没反应,页面上没有任何线索。
+  ● **收口**:`purgeLocalTracks` 已接进 local-owner 的删除/登出两处 + SettingsSheets 的
+    清空/删除账号两处。漏一处就是「用户以为删了、歌还在设备上」。
+  ● 契约 `test:music-source-switch`(16 组判断),三轮共 41 条注入回归全部被抓、0 漏网。
+
+- **首页输入条三合一 · 记一笔/找/问(2026-07-31)**:起因是一条**许诺了没做**的路 ——
+  用户在首页打「设一个明天下午 3 点医生提醒」,`intent-router` 认出了意图、屏幕上显示了
+  「设置提醒」四个字,然后那句话落成一条普通记录:明天下午三点什么都不会发生,而他以为设上了。
+  ● **不做自动意图分流**。猜错的代价不对称:把「问」猜成「记」只是多一条垃圾记录,
+    把「记」猜成「问」是**你要存的东西没存下来而你以为存了**。所以默认(回车/↑)永远是
+    记一笔、一个字没改;另外两条摆在输入框下面,**点了才走**。
+  ● 新 `lib/portal/when-parse.ts`(纯函数,now 注入):认「明天下午 3 点 / 今晚 8 点 /
+    下周二 15:00 / 8月1日 / 三点半 / tomorrow 3pm」等。三条自律写死在文件头:
+    **认不出返回 null 绝不硬凑**;**猜了什么必须说出来**(`hasExplicitTime=false` 时界面
+    写明「你没说几点,先按早上 9:00」);输出**墙上时钟**(与 schedule-reminders 同格式)。
+    12 小时歧义**不猜**(「3 点」就是 3 点),但解析结果原样显示、当场能改。
+  ● 「设成提醒」落到 `schedule-reminders`(日程页那份),不新开存储;回执**带撤销**
+    (自动识别总有认错的时候),并点明「在日程里」——不说的话回执一消失那条提醒就等于不存在。
+  ● 「找」派 `nesio-memory-search` 把词带到记忆页(那套是完整的:语义理解+筛选+详情),
+    **不在输入条下面再造一个小结果列表**;「问」派**专用事件 `nesio-open-ask`** 带上原文,
+    VoiceInputSheet 加 `seedText` 预填 —— 刻意不复用 `nesio-open-voice`:那个名字被
+    `test:today-settings-bug3` 明令禁止出现在 TodayFeed 里(用户标注过「点话筒不该跳说一说」),
+    那条保护是对的,不为省一个事件名去放宽它。
+  ● 契约 `test:capture-trio`(8 组判断),27 条注入回归全部被抓、0 漏网。
+
+- **悬浮播放球(2026-07-31,用户:「开始播放后可以变成一个圆形的悬浮按钮么」)**:
+  连带做了一次**结构改造** —— 播放器从 MusicPanel 里的一个 `<audio>` JSX 节点,
+  搬到 `lib/platform/music/player-engine.ts` 的**模块级单例**(audio 挂 document.body)。
+  原因很硬:React 元素随组件卸载被销毁,切走音乐页那一刻歌就断了,
+  而球的全部意义正是「人走了、歌还在放」。形制照 session-state:单一真源 + 订阅。
+  ● 交互:开始播放**默认展开**(曲名 + 播放/暂停 + 下一首 + 关闭),6 秒后自己收成
+    一个圆球(带进度环);收起态点球重新展开。**刻意不做「点球直接暂停」** ——
+    球贴在屏幕边上,滑动误触的代价是音乐莫名其妙停了而用户不知道碰到了什么。
+    **关闭不藏进长按**:找不到怎么关掉的用户会去清后台。
+  ● 关闭 = **真停**(pause + 断源 + revoke objectURL + 清 currentId,并清掉车机/锁屏
+    残留),不是把球藏起来 —— 藏起来而声音还在,用户会满屋子找是谁在唱歌。
+  ● 层级 z=935,夹在洞察浮层(929/930)与 elevated(940)之间;位置抬到底部导航之上
+    (安全区 + 4.6rem),不拿一个新功能挡掉四个旧入口。
+  ● MediaSession 收归引擎自管(跟着正在放的东西走,不跟着哪个组件还挂着)——
+    交给组件的话,人离开音乐页后车机上会一直停在上一首。
+  ● 音乐页开着时球让位(那一页底部已有完整播放条,同屏两套控制是矛盾)。
+  ● 顺手把 `seek` 接到界面(可拖进度条,时长未知时不给拖);删掉没人用的
+    `resetEngineForTest`;登出/清空/删账号四处在清曲库**之前**先停播。
+  ● 契约 `test:music-floating-player`(11 组判断),29 条注入回归全部被抓、0 漏网。
+
 - **Bug4 图文对照 30 页(2026-07-30,已做完)**:一份逐页标注的截图 PDF,页 N 的文字说的是
   页 N+1 的那张图。分四批落地(`5fdef9b3` / `28efa1c1` / `a4343477` / `24cc43fc` + 自查回补)。
   改动集中在**删多余文案**与**把说明改成能用的功能**两类,几处涉及数据正确性:

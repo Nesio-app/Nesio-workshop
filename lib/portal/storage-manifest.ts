@@ -48,6 +48,15 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-migration-completed-v1',
   'nesio-migration-log-v1',
   'nesio-email-signals-cache',
+  // 车的电量时间线(看车这一页的副产物)。换台设备从零开始完全正确 ——
+  // 它不是用户录进来的东西,没必要进备份、上云。
+  'nesio-tesla-battery-log-v1',
+  // 本地曲库的**元数据**与播放位置(2026-07-30 音乐模块)。都判 cache,理由是同一个:
+  // 音频本体在 IndexedDB、**不进备份**(几百 MB 的备份 JSON 没有意义),
+  // 把列表同步到另一台设备只会得到一份点了放不出声的假曲库 —— 比没有更糟。
+  // 判据原句:「换台设备从零开始是否正确?」—— 正确,因为文件本来就没过去。
+  'nesio-music-local-tracks-v1',
+  'nesio-music-last-played-v1',
   'nesio-guidance-lang-cache-v1',
   // 语音简报的遗留缓存(功能 2026-07-30 已删)。**故意留在这张表里**:老设备的
   // localStorage 里可能还躺着这个值,一旦从 CACHE_KEYS 拿掉,keyKind() 的默认值是

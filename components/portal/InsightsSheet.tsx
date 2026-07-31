@@ -28,10 +28,11 @@ import { usePortalLocale } from './use-portal-locale';
 import { InfoTip } from './InfoTip';
 import {
   IconRefresh, IconTrendingUp, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconDownload, IconAlertTriangle, IconBookmark, IconHanger,
-  IconBulb, IconTarget, IconPlay, IconHeartPulse, IconActivity, IconMapPin, IconCard, IconBox, IconUser, IconCar, IconMirror,
-  IconGear, IconPeople, IconUtensils,
+  IconBulb, IconTarget, IconPlay, IconHeartPulse, IconActivity, IconMapPin, IconCard, IconBox, IconUser, IconHome, IconMirror,
+  IconGear, IconPeople, IconUtensils, IconMusic,
 } from './icons';
 import TimelineTab from './insights/TimelineTab';
+import MusicPanel from './music/MusicPanel';
 import GrowthTab from './insights/GrowthTab';
 import MontageTab from './insights/MontageTab';
 import MirrorLetterTab from './insights/MirrorLetterTab';
@@ -56,7 +57,7 @@ import { readFactJournal, ensureFactJournal } from '@/lib/platform/fact-journal'
 
 const DailyReportPanel = dynamic(() => import('./insights/DailyReportPanel'), { ssr: false });
 
-export type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'fitness' | 'timeline' | 'schedule' | 'finance' | 'inventory' | 'wardrobe' | 'relationships' | 'tesla' | 'living' | 'admin';
+export type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'fitness' | 'timeline' | 'schedule' | 'finance' | 'inventory' | 'wardrobe' | 'relationships' | 'tesla' | 'living' | 'music' | 'admin';
 
 const DAY_MS = 86_400_000;
 
@@ -372,6 +373,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       // Bug4 图23-24:「车」扩成「资产」—— 房产 tab + 车 tab。
       // tab key 仍叫 tesla:深链和宫格顺序都按 key 存,改 key 会把老用户的自定义顺序打散。
       : t === 'tesla' ? L(dict, '资产', 'Assets')
+      : t === 'music' ? L(dict, '音乐', 'Music')
       : t === 'admin' ? L(dict, '运营', 'Ops')
       : L(dict, '镜子', 'Mirror');
   const tabIcon = (t: MainTab): ReactNode => {
@@ -387,7 +389,10 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       case 'inventory': return <IconBox />;
       case 'wardrobe': return <IconHanger />;
       case 'relationships': return <IconUser />;
-      case 'tesla': return <IconCar />;
+      // #8:这一格从「车」改名成「资产」(房产 + 车两个子 tab)后,图标还是一辆小汽车 ——
+      // 名字和图标说的不是一件事,用户点进去才发现里面还有房产。房产是这格里更大的那一半。
+      case 'tesla': return <IconHome />;
+      case 'music': return <IconMusic />;
       case 'living': return <IconMirror />;
       case 'admin': return <IconGear />;
       default: return <IconNote />;
@@ -407,6 +412,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   const showTesla = useFeatureEnabled('tesla');
   const showLiving = useFeatureEnabled('living');
   const showCooking = useFeatureEnabled('cooking');
+  const showMusic = useFeatureEnabled('music');
 
 
   const tabEnabled = (t: MainTab): boolean =>
@@ -425,8 +431,9 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       // 车 tab 里那块实时快照自己会说「还没连」。
       : t === 'tesla' ? true
       : t === 'living' ? showLiving
+      : t === 'music' ? showMusic
       : true; // 'reflection'(洞察)= 核心,永远在
-  useEffect(() => { if (!tabEnabled(mainTab)) setMainTab('reflection'); }, [showPlaces, showHealth, showFinance, showPeople, showInventory, showSchedule, showGrowth, showMontage, showWardrobe, showTesla, showLiving, mainTab]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { if (!tabEnabled(mainTab)) setMainTab('reflection'); }, [showPlaces, showHealth, showFinance, showPeople, showInventory, showSchedule, showGrowth, showMontage, showWardrobe, showTesla, showLiving, showMusic, mainTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [allNodes, setAllNodes] = useState<LifeNode[]>([]);
 
@@ -434,7 +441,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   // tab = 切到本 sheet 的某个 tab;event = 打开另一个全屏面板。
   const hubTiles = useMemo(() => {
     const list: Array<{ key: string; label: string; icon: React.ReactNode; tab?: MainTab; event?: string }> = [];
-    for (const t of ['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule', 'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'admin'] as MainTab[]) {
+    for (const t of ['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule', 'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'music', 'admin'] as MainTab[]) {
       if (!tabEnabled(t)) continue;
       list.push({ key: t, label: tabLabel(t), icon: tabIcon(t), tab: t });
     }
@@ -448,7 +455,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
     // 恰好相同 → 不重算(首帧那份错的留着)。所有开关都必须进依赖,格子表才是确定的。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dict, showCooking, showPlaces, showExperiment, showHealth, showFinance, showPeople,
-      showInventory, showSchedule, showGrowth, showMontage, showWardrobe, showTesla, showLiving]);
+      showInventory, showSchedule, showGrowth, showMontage, showWardrobe, showTesla, showLiving, showMusic]);
   const [labOn, setLabOn] = useState(false);
   const [wanderSeed, setWanderSeed] = useState(() => Math.floor(Math.random() * 100_000));
 
@@ -836,6 +843,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
 
         {/* ── Tab: 车 · Tesla(常驻入口,便于长期观察数据到没到、去了哪)── */}
         {mainTab === 'tesla' && <div className="nesio-analytics-tab"><AssetsPanel /></div>}
+        {mainTab === 'music' && <div className="nesio-analytics-tab"><MusicPanel /></div>}
 
         {/* ── Tab: 认知 = 多面镜月度信(Pro);旧 7 层模型 + 节点图移 Lab ── */}
         {mainTab === 'living' && (

@@ -22,6 +22,10 @@ import { loadClinical, type StoredClinical } from '@/lib/portal/clinical-store';
 import { readLaunchSurfaceContextFromBrowser } from '@/lib/portal/launch-surface.mjs';
 import { evaluateHealthFindings, type Severity } from '@/lib/portal/health-clinical';
 import { computeRiskScores, type RiskCategory } from '@/lib/portal/health-risk';
+// #28:「血糖正常」和「GMI 偏高」同屏 —— 两边都对,得有一句话说清它们量的不是同一件事
+import { glucoseReconcileNote } from '@/lib/portal/health-reconcile';
+// #20:模型回复里的 markdown 记号 —— 念念那边已经在用同一个函数,这里之前漏了
+import { markdownToPlain } from '@/lib/portal/chat-markdown';
 import { buildMonthlyHealthReport, persistHealthReportToMemory, autoPersistLastMonthHealthReport, healthMonths } from '@/lib/portal/health-report';
 import { healthReportRichHtml } from '@/lib/portal/health-report-visual';
 import SegTabs from '../ui/SegTabs';
@@ -35,6 +39,8 @@ import HealthLensCards from './HealthLensCards';
 import MoodTrendCard from './MoodTrendCard';
 import HealthRecordSheet from './HealthRecordSheet';
 import MetricDetailSheet from './MetricDetailSheet';
+// #27:「今日精选」里混进三周前的步数 —— 每张卡自己报日期,报不出今天就不许挂在「今日」下
+import { asOfNote, picksAreToday, dayKeyOf, type PickSpan } from '@/lib/portal/health-picks';
 import LabScanSheet from './LabScanSheet';
 
 const TREND_HEADLINE: Record<FitnessInsight['trend'], [string, string]> = {
@@ -283,7 +289,11 @@ function AiInsightPanel({ data, dict }: { data: HealthMetrics; dict: string }) {
     <div className="nesio-fit-panel" style={{ marginTop: 'var(--space-2)' }}>
       {status === 'done' ? (
         <>
-          {text.split('\n').filter(Boolean).map((line, i) => <p key={i} className="nesio-health-story-line">{line}</p>)}
+          {/* #20:模型很自然地用 markdown 列表回答,而这里是纯文本渲染 ——
+              星号原样糊在正文里。念念那边 2026-07-29 已经修过一次(markdownToPlain),
+              这一处漏了:同一个 bug 在两个模块各犯一遍,就是因为没走同一个函数。
+              仍然**不渲染 HTML** —— 这段文字里带着健康读数,当 HTML 渲染是开注入口子。 */}
+          {markdownToPlain(text).split('\n').filter(Boolean).map((line, i) => <p key={i} className="nesio-health-story-line">{line}</p>)}
           <button type="button" className="nesio-connector-connect" style={{ marginTop: 'var(--space-2)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)' }} onClick={() => void run()}>{L(dict, '重新生成', 'Regenerate')}</button>
         </>
       ) : status === 'error' ? (
@@ -392,6 +402,11 @@ function FindingsCard({ data, dict }: { data: HealthMetrics; dict: string }) {
 function RiskCard({ data, dict }: { data: HealthMetrics; dict: string }) {
   const scores = computeRiskScores({ metrics: data.metrics, glucose: data.glucose, profile: data.profile });
   if (!scores.length) return null;
+  /* #28:同屏「血糖达标率良好 / 血糖稳定 = 正常」和「GMI 5.9% · 偏高(糖尿病前期区间)」
+     看着互相打架。三条各自都对 —— TIR 说时间、CV 说起伏、GMI 说平均线,量的不是同一件事。
+     错的是没有任何一句话说明这一点。不删任何一条结论(删了才是骗人),只把关系讲清楚。 */
+  const findings = evaluateHealthFindings({ metrics: data.metrics, glucose: data.glucose });
+  const note = glucoseReconcileNote(findings, scores);
   const color: Record<RiskCategory, string> = { high: 'var(--status-risk)', moderate: 'var(--status-gentle)', low: 'var(--status-go)', info: 'var(--portal-muted)' };
   return (
     <div className="nesio-fit-panel" style={{ marginTop: 'var(--space-2)' }}>
@@ -405,6 +420,11 @@ function RiskCard({ data, dict }: { data: HealthMetrics; dict: string }) {
           </p>
         </div>
       ))}
+      {note && (
+        <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-2) 0 0', lineHeight: 1.6, color: 'var(--portal-ink)' }}>
+          {L(dict, note[0], note[1])}
+        </p>
+      )}
       <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>{L(dict, '对照已发表评分/常模,数据齐才计算;非诊断', 'Against published scores/norms; computed only when inputs are present; not a diagnosis')}</p>
     </div>
   );
@@ -467,35 +487,50 @@ function savePickPrefs(p: Record<string, boolean>): void {
 
 // 概览:今日精选(点任意卡进「分析」看深度;右上「编辑」自选哪些进精选)
 function TodayPicks({ data, dict, onOpen }: { data: HealthMetrics; dict: string; onOpen: () => void }) {
-  type Pick = { key: string; dot: string; label: string; value: string; unit?: string; sub: string };
+  // #27:asOf = 这个数**说的是哪天**。span='span' 的卡本来就是一段时间的汇总(TIR、情绪均值),
+  // 只报「截到哪天」;报不出日期的一律不算今天。
+  type Pick = { key: string; dot: string; label: string; value: string; unit?: string; sub: string; asOf: string | null; span?: PickSpan };
   const [prefs, setPrefs] = useState<Record<string, boolean>>(() => loadPickPrefs());
   const [editing, setEditing] = useState(false);
+  const today = dayKeyOf(new Date());
   const all: Pick[] = [];
   if (data.activityRings) {
     const a = data.activityRings;
     const rr: Array<[number, number]> = [[a.move, a.moveGoal], [a.exercise, a.exerciseGoal], [a.stand, a.standGoal]];
     const pct = Math.round(rr.map(([v, g]) => (g > 0 ? Math.min(100, (v / g) * 100) : 0)).reduce((s, x) => s + x, 0) / 3);
-    all.push({ key: 'rings', dot: 'var(--status-gentle)', label: L(dict, '活动三环', 'Activity'), value: `${pct}`, unit: '%', sub: pct >= 100 ? L(dict, '已合上', 'closed') : L(dict, '还差一点合上', 'almost closed') });
+    all.push({ key: 'rings', dot: 'var(--status-gentle)', label: L(dict, '活动三环', 'Activity'), value: `${pct}`, unit: '%', sub: pct >= 100 ? L(dict, '已合上', 'closed') : L(dict, '还差一点合上', 'almost closed'), asOf: a.date || null });
   }
   if (data.sleepStages) {
     const s = data.sleepStages;
-    all.push({ key: 'sleep', dot: 'var(--status-calm)', label: L(dict, '睡眠', 'Sleep'), value: s.total.toFixed(1), unit: 'h', sub: L(dict, `达标 · 深睡 ${s.deep.toFixed(1)}h`, `deep ${s.deep.toFixed(1)}h`) });
+    all.push({ key: 'sleep', dot: 'var(--status-calm)', label: L(dict, '睡眠', 'Sleep'), value: s.total.toFixed(1), unit: 'h', sub: L(dict, `达标 · 深睡 ${s.deep.toFixed(1)}h`, `deep ${s.deep.toFixed(1)}h`), asOf: s.night || null });
   }
   if (data.glucose) {
-    all.push({ key: 'glu', dot: 'var(--status-go)', label: L(dict, '血糖达标', 'Glucose'), value: `${data.glucose.tirPct}`, unit: '%', sub: L(dict, 'TIR 稳', 'TIR steady') });
+    const lastDay = data.glucose.daily?.length ? data.glucose.daily[data.glucose.daily.length - 1].date : null;
+    all.push({ key: 'glu', dot: 'var(--status-go)', label: L(dict, '血糖达标', 'Glucose'), value: `${data.glucose.tirPct}`, unit: '%', sub: L(dict, 'TIR 稳', 'TIR steady'), asOf: lastDay, span: 'span' });
   }
   if (data.mood) {
     const tl: [string, string] = data.mood.tone === 'pleasant' ? ['偏积极', 'Pleasant'] : data.mood.tone === 'unpleasant' ? ['偏低落', 'Low'] : ['中性', 'Neutral'];
     const v = data.mood.avgValence;
-    all.push({ key: 'mood', dot: 'var(--portal-cool-accent)', label: L(dict, '情绪', 'Mood'), value: L(dict, tl[0], tl[1]), sub: L(dict, `效价 ${v > 0 ? '+' : ''}${v}`, `valence ${v > 0 ? '+' : ''}${v}`) });
+    const lastDay = data.mood.daily?.length ? data.mood.daily[data.mood.daily.length - 1].date : null;
+    all.push({ key: 'mood', dot: 'var(--portal-cool-accent)', label: L(dict, '情绪', 'Mood'), value: L(dict, tl[0], tl[1]), sub: L(dict, `效价 ${v > 0 ? '+' : ''}${v}`, `valence ${v > 0 ? '+' : ''}${v}`), asOf: lastDay, span: 'span' });
   }
   // 「活动」组指标也可加入精选(步数)
   const steps = data.metrics.find((m) => m.key === 'steps' || m.group === 'activity');
   if (steps) {
-    all.push({ key: `metric-${steps.key}`, dot: 'var(--portal-blue-deep)', label: L(dict, steps.label[0], steps.label[1]), value: fmt(steps.latest, steps.decimals), unit: steps.unit, sub: steps.latestDate.slice(5).replace('-', '/') });
+    // 老代码这里把 latestDate 当副标小字印上就算交代了 —— 于是三周前的 554 步挂在「今日精选」下面。
+    // 现在副标先留空,统一由 asOfNote 决定说什么。
+    all.push({ key: `metric-${steps.key}`, dot: 'var(--portal-blue-deep)', label: L(dict, steps.label[0], steps.label[1]), value: fmt(steps.latest, steps.decimals), unit: steps.unit, sub: '', asOf: steps.latestDate || null });
   }
   if (!all.length) return null;
   const enabled = all.filter((p) => prefs[p.key] !== false);
+  const notes = enabled.map((p) => asOfNote(p.asOf, today, p.span));
+  const allToday = picksAreToday(notes);
+  const subOf = (p: Pick, i: number) => {
+    const n = notes[i];
+    const stale = L(dict, n.zh, n.en);
+    if (!stale) return p.sub;
+    return p.sub ? `${p.sub} · ${stale}` : stale;
+  };
   const toggle = (key: string) => {
     const next = { ...prefs, [key]: prefs[key] === false };
     setPrefs(next); savePickPrefs(next);
@@ -503,7 +538,8 @@ function TodayPicks({ data, dict, onOpen }: { data: HealthMetrics; dict: string;
   return (
     <>
       <p className="nesio-insights-section-label" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span>{L(dict, '今日精选', 'Today')}</span>
+        {/* #27:一条不是今天的,整句就退成「近期」—— 标题是对整组卡的承诺 */}
+        <span>{allToday ? L(dict, '今日精选', 'Today') : L(dict, '近期精选', 'Recent')}</span>
         <button type="button" onClick={() => setEditing((v) => !v)}
           style={{ border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-xs)', color: 'var(--portal-accent)', padding: 0 }}>
           {editing ? L(dict, '完成', 'Done') : L(dict, '编辑', 'Edit')}
@@ -524,7 +560,7 @@ function TodayPicks({ data, dict, onOpen }: { data: HealthMetrics; dict: string;
       )}
       {enabled.length > 0 && (
         <div className="nesio-health-picks">
-          {enabled.map((p) => (
+          {enabled.map((p, i) => (
             <button key={p.key} type="button" className="nesio-health-pick" onClick={onOpen}>
               <span className="nesio-health-pick-top">
                 <span className="nesio-health-pick-dot" style={{ background: p.dot }} aria-hidden />
@@ -532,7 +568,7 @@ function TodayPicks({ data, dict, onOpen }: { data: HealthMetrics; dict: string;
                 <span className="nesio-health-pick-chev" aria-hidden>›</span>
               </span>
               <span className="nesio-health-pick-val">{p.value}{p.unit && <small>{p.unit}</small>}</span>
-              <span className="nesio-health-pick-sub">{p.sub}</span>
+              <span className="nesio-health-pick-sub">{subOf(p, i)}</span>
             </button>
           ))}
         </div>

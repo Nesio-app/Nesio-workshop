@@ -63,6 +63,8 @@ export async function purgeAllLocalUserData(): Promise<void> {
     await purgeIdbBlobs();                                // IDB blob(健康/临床/地点)
     await purgeLocalImages();                             // 记忆照片独立 IDB(nesio-images)
     await (await import('./local-file-store')).purgeLocalFiles();  // 记忆附件独立 IDB(nesio-files)
+    (await import('../platform/music/player-engine')).stop();  // 同上:先停,再清
+    await (await import('../platform/music/local-tracks')).purgeLocalTracks(); // 本地曲库独立 IDB(nesio-music)
     await (await import('./local-email-body')).purgeEmailBodies(); // 邮件全文独立 IDB(nesio-email-bodies)
   } catch (err) { logDropped('local_owner.purge', err); }
 }
@@ -81,6 +83,9 @@ export async function purgeLocalUserDataForLogout(): Promise<void> {
     await purgeIdbBlobs();                                // 健康/临床/地点 IDB(本地 clear)
     await purgeLocalImages();                             // 记忆照片 IDB(本地 clear)
     await (await import('./local-file-store')).purgeLocalFiles();  // 记忆附件 IDB(本地 clear)
+    // 先停播再清曲库:歌还在响、文件已经删掉,是这台设备上最刺眼的一种「删了没删干净」。
+    (await import('../platform/music/player-engine')).stop();
+    await (await import('../platform/music/local-tracks')).purgeLocalTracks(); // 本地曲库 IDB(本地 clear)——漏了就把歌留在这台设备上
     await (await import('./local-email-body')).purgeEmailBodies(); // 邮件全文 IDB(本地 clear)
     try { localStorage.removeItem(OWNER_KEY); } catch { /* ignore */ } // 清主人记录:回到干净设备
   } catch (err) { logDropped('local_owner.logout_purge', err); }

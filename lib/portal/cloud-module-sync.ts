@@ -21,6 +21,8 @@ import { logDropped } from './storage-health';
 import { isDedicatedSyncKey, DEDICATED_SYNC_PREFIXES } from './sync-ownership';
 import { recordCloudRestore } from './cloud-restore-receipt';
 import { isBackupKey } from './storage-manifest';
+import { rehydrateIdbBlobs } from './idb-blob-store';
+// #29:银行流水/账户是「按 id 的集合」,云端那份只能并进来,不能整键替换
 import { yieldToMain } from './yield-main';
 import { needsUnionMerge, mergeModuleJson } from './module-merge';
 
@@ -234,6 +236,12 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
     }
 
     const localMissing = localVal === undefined;
+
+    // (两个 agent 在各自分支上独立修了同一个 bug。合并时保留上面那一版:
+    //  它多覆盖一个 nesio-fin-holdings-v1,而且有「两端逐字节收敛」的契约。
+    //  另一版那条按 id 并集的分支删掉了 —— 它排在上面那支的 continue 之后,
+    //  覆盖的 key 又是子集,所以**永远执行不到**;留着只会让人以为有两套并集语义。)
+
     const localUnchangedSinceSync = !localMissing && state[key]?.hash === contentHash(localVal);
     // 反遮盖闸(通用防丢):**绝不用明显更小/更空的云端值覆盖本机非空值**。真机踩过——积分/
     // 跟练等「每设备进度」被一台空浏览器的空状态盖掉。云端这份不到本机一半大 → 疑似空/被清,
@@ -256,6 +264,12 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
     };
     try {
       await restoreCombinedBackup(backup, 'replace');
+      // 2026-07-30 自查发现:restoreCombinedBackup 是**直接写 IDB** 的,绕过了各 blob store;
+      // 而 store 的水合是记忆化的,第一次之后再也不重读 —— 数据已经落库了,页面上还是旧那份,
+      // 要等下次冷启动才看得见。只有 newlyAdded>0 那条路会 reload,
+      // 「本机已有、这次并进来一些」这条路不会 —— 那正是并集修好之后最常走的路。
+      // 让对应的 store 重读一遍(hydrate 末尾会 emit,监听组件跟着刷新)。
+      await rehydrateIdbBlobs(appliedKeys);
       // 数据被悄悄改变而用户不知道,本身就是问题(QA:积分 0→150)。留一条一次性回执。
       recordCloudRestore(filledKeys);
     } catch (err) { logDropped('cloud.module_sync_apply', err); }

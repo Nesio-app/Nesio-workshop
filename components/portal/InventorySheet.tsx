@@ -34,7 +34,7 @@ import {
   updateInventoryItem,
   type InventoryItem,
 } from '@/lib/portal/inventory';
-import { listStorageItems, countPantryItems, countWardrobeItems } from '@/lib/portal/inventory-visibility';
+import { listStorageItems, countPantryItems, countWardrobeItems, storageHeadline } from '@/lib/portal/inventory-visibility';
 
 interface InventorySheetProps {
   open: boolean;
@@ -578,7 +578,8 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
             return <p style={{ padding: 'var(--space-8) 0', textAlign: 'center', color: 'var(--portal-muted)' }}>{L(dict, '还没有物品,统计会随记录自动出现。', 'No items yet — stats appear as you add.')}</p>;
           }
           const st = inventoryStats(items);
-          const totalItems = items.length;
+          const headline = storageHeadline(items);
+          const totalItems = headline.rows;
           const unplaced = items.filter((i) => !i.space).length;
           const placed = totalItems - unplaced;
           const placedPct = totalItems ? Math.round((placed / totalItems) * 100) : 0;
@@ -592,7 +593,15 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
             <div style={{ maxHeight: '64vh', overflowY: 'auto', paddingBottom: 'var(--space-4)' }}>
               {/* 概览:物品 / 估值 / 未归位(未归位>0 时用琥珀提示,不用红色制造焦虑) */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
-                <div style={card}><span style={kv}>{totalItems}</span><span style={kl}>{L(dict, '物品', 'Items')}</span></div>
+                {/* #15:门面上的数 = 你点进去会看到的行数。Σ 数量(一盒 5 支笔算 5)是附加信息,
+                    只在两者不同时补一句,不抢主位 —— 两个数共用一个「件」字,就是 22 vs 18 的由来。 */}
+                <div style={card}>
+                  <span style={kv}>{totalItems}</span>
+                  <span style={kl}>{L(dict, '物品', 'Items')}</span>
+                  {headline.pieces !== headline.rows && (
+                    <span style={kl}>{L(dict, `共 ${headline.pieces} 个`, `${headline.pieces} pieces`)}</span>
+                  )}
+                </div>
                 <div style={card}><span style={kv}>≈${Math.round(st.totalValue).toLocaleString('en-US')}</span><span style={kl}>{L(dict, '估值', 'Est. value')}</span></div>
                 <div style={{ ...card, ...(unplaced > 0 ? { background: 'var(--status-gentle-soft)', borderColor: 'transparent' } : {}) }}>
                   <span style={{ ...kv, ...(unplaced > 0 ? { color: 'var(--status-gentle)' } : {}) }}>{unplaced}</span>

@@ -8,6 +8,7 @@ import NesioMark from './NesioMark';
 import RetrospectCard from './RetrospectCard';
 import { usePortalLocale } from './use-portal-locale';
 import { L } from '@/lib/portal/i18n';
+import { readJotDraft, writeJotDraft, draftAgeNote } from '@/lib/portal/jot-draft';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, deleteFocusNode, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem, getLiveMemoryNode, type LiveMemoryNode } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
 import { settleMentions, linkSettledMentions, type PendingMention } from '@/lib/portal/mention';
@@ -18,15 +19,25 @@ import { dismissJudgedCard, judgeState, clearJudgeError } from '@/lib/portal/gui
  * 服务端回的 error 码。直接印这些字符串等于没说,但也**不能编** —— 认不出就
  * 原样带出去,至少能 grep 到。
  */
+/**
+ * #13(2026-07-30 真机):首页问候语底下出现过一整条系统级报错当正文。
+ *
+ * 最后那行原来是 `return err;` —— **认不出来的错误码就原样印到首页最上面**。
+ * 用户看到的是一句说给程序听的话,而它占着问候语正下方那块最显眼的地方。
+ *
+ * 判据改成正向的:只说**我们认识的那几个原因**;认不出来就说「这次没连上」,
+ * 原始错误留在 title 里(要查的人查得到,不用摊在脸上)。
+ * 降级仍然可见(承诺④:不许静默),只是不再用内部语言说话。
+ */
 function judgeReason(err: string, locale: string): string {
-  const e = err.toLowerCase();
-  if (e.includes('401') || e.includes('unauthorized') || e.includes('not_signed_in')) return L(locale, '需要先登录', 'sign-in needed');
+  const e = String(err || '').toLowerCase();
+  if (e.includes('401') || e.includes('unauthorized') || e.includes('not_signed_in')) return L(locale, '要先登录', 'sign-in needed');
   if (e.includes('403') || e.includes('forbidden') || e.includes('paid')) return L(locale, '这台设备没开这项', 'not enabled here');
-  if (e.includes('429') || e.includes('rate')) return L(locale, '这会儿太频繁了', 'rate limited');
-  if (e.includes('network') || e.includes('fetch')) return L(locale, '网络没通', 'network down');
-  if (e.startsWith('route 5') || e.includes('500') || e.includes('502') || e.includes('503')) return L(locale, '服务端出错', 'server error');
-  if (e.includes('parse') || e.includes('bad_json')) return L(locale, '返回看不懂', 'bad response');
-  return err;
+  if (e.includes('429') || e.includes('rate')) return L(locale, '刚问得有点勤', 'asked too often just now');
+  if (e.includes('network') || e.includes('fetch')) return L(locale, '网没连上', 'offline');
+  if (e.startsWith('route 5') || e.includes('500') || e.includes('502') || e.includes('503')) return L(locale, '那边在忙', 'busy on our side');
+  if (e.includes('parse') || e.includes('bad_json')) return L(locale, '这次没读懂', "couldn't read the reply");
+  return L(locale, '这次没连上', "didn't get through");
 }
 import { resolveCardTarget, openCardTarget } from '@/lib/portal/card-target';
 import ProactiveCardDetail from './today/ProactiveCardDetail';
@@ -51,6 +62,10 @@ const FamilyTodayStrip = dynamic(() => import('./today/FamilyTodayStrip'), { ssr
 import MemoryFlashBanner, { useMemoryFlash } from './MemoryFlashBanner';
 import WrappedCard, { useWrappedTrigger } from './WrappedCard';
 import { takeCloudRestoreReceipt, restoreReceiptText } from '@/lib/portal/cloud-restore-receipt';
+// 三合一(2026-07-31):首页那句话认出时间就能直接变成一条真提醒 ——
+// 在这之前它只落成一条普通记录,而屏幕上还写着「设置提醒」。
+import { addReminder, removeReminder } from '@/lib/portal/schedule-reminders';
+import { formatWhen } from '@/lib/portal/when-parse';
 
 // ---- Main TodayFeed component ----
 
@@ -82,6 +97,8 @@ export default function TodayFeed({
   const [restoreNote, setRestoreNote] = useState<string | null>(null);
   // 批次 31:焦点下方快捷输入(用户新指令)
   const [quickAdd, setQuickAdd] = useState('');
+  // 「设成提醒」之后那条带撤销的回执(2026-07-31 三合一)。
+  const [remindReceipt, setRemindReceipt] = useState<{ text: string; onUndo: () => void } | null>(null);
   /** 打 @ 选过的记忆。提交时按「名字还在不在文本里」结算(见 CaptureBar 的 onMention)。 */
   const [pendingMentions, setPendingMentions] = useState<PendingMention[]>([]);
   const uiLocale = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -221,15 +238,22 @@ export default function TodayFeed({
   const quickInputRef = useRef<HTMLTextAreaElement | null>(null);
 
   // 批次 163:记一笔草稿持久化 —— 没点记下就退出 App,下次进来这条还在。
+  // #25(2026-07-30):持久化本身是对的,错的是它**没有尽头** —— 存的只有一串文字,
+  // 没有「什么时候留下的」,于是几个月前语音听岔的半句今天打开还躺在框里,
+  // 看起来就像刚打的。判据收在 lib/portal/jot-draft:超过 14 天不再恢复,
+  // 不是今天留下的就在输入条下面说清楚是哪天的。
+  const [draftNote, setDraftNote] = useState<{ zh: string; en: string } | null>(null);
   useEffect(() => {
-    // 读入防线(QA:草稿里出现从未输入过的「关注chong」):超长/非字符串一律丢弃
-    try { const d = localStorage.getItem('nesio-jot-draft-v1'); if (d && typeof d === 'string' && d.length <= 2000) setQuickAdd(d); } catch { /* ignore */ }
+    const d = readJotDraft();
+    if (!d) return;
+    setQuickAdd(d.text);
+    setDraftNote(draftAgeNote(d));
   }, []);
   useEffect(() => {
     // 语音识别进行中的 interim 半句不落盘(QA 乱码草稿根因):识别引擎的中间猜测
     // 每帧都在变,落盘等于把听错的半句永久写死;等 onend 出最终稿再由本 effect 落。
     if (micState === 'recording') return;
-    try { if (quickAdd) localStorage.setItem('nesio-jot-draft-v1', quickAdd); else localStorage.removeItem('nesio-jot-draft-v1'); } catch { /* ignore */ }
+    writeJotDraft(quickAdd);
   }, [quickAdd, micState]);
   // 卸载时停掉识别器(QA:导航走开后识别器还活着,环境音继续往草稿里写)
   useEffect(() => () => { recogRef.current?.stop(); }, []);
@@ -488,8 +512,9 @@ export default function TodayFeed({
         {/* AI 判决**失败**时的兜底提示(承诺④:降级必须可见,不许静默)。
             idle(没什么可判/没到点/免费档)不是失败,不在这里说话。 */}
         {judgeFailed && (
-          <p className="nesio-settings-option-hint" style={{ margin: '0 0 var(--space-2)' }}>
-            {L(uiLocale, `AI 判断这次没成(${judgeReason(judgeFailed, uiLocale)}),先看这些确定的。`, `AI judging failed (${judgeReason(judgeFailed, uiLocale)}) — here are the certain ones.`)}
+          <p className="nesio-settings-option-hint" style={{ margin: '0 0 var(--space-2)' }} title={judgeFailed}>
+            {/* 原始错误码留在 title 里 —— 要查的人查得到,不用摊在问候语底下。 */}
+            {L(uiLocale, `${judgeReason(judgeFailed, uiLocale)},这次先按确定的排。`, `${judgeReason(judgeFailed, uiLocale)} — showing the certain ones for now.`)}
             <button
               type="button"
               disabled={retrying}
@@ -546,7 +571,8 @@ export default function TodayFeed({
             新建日程按钮按标注删掉。输入条本体见 today/CaptureBar.tsx。 */}
         <CaptureBar
           value={quickAdd}
-          onChange={setQuickAdd}
+          onChange={(v) => { setQuickAdd(v); setDraftNote(null); }}
+          staleNote={draftNote ? L(uiLocale, draftNote.zh, draftNote.en) : ''}
           onMention={(m) => setPendingMentions((prev) => [...prev, m])}
           onSubmit={async () => {
             const name = quickAdd.trim();
@@ -561,6 +587,7 @@ export default function TodayFeed({
             const { linked } = await linkSettledMentions(created.id, settled);
             setPendingMentions([]);
             setQuickAdd('');
+            setDraftNote(null);
             setQuickSaved(
               settled.length === 0
                 ? L(uiLocale, '已记下', 'Noted')
@@ -577,6 +604,40 @@ export default function TodayFeed({
           onFiles={captureFiles}
           micError={micErr}
           onDismissMicError={() => setMicErr('')}
+          /* ── 三合一的另外两条路(2026-07-31)。都是显式的:点了才走。 ──
+             搜索**不新做一套结果界面** —— 记忆页那套是完整的(语义理解 + 筛选 + 详情),
+             这里只把词带过去。问念念同理:把已经打好的一句带进 ask,别让人重打一遍。 */
+          onSearch={(q) => {
+            window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: q } }));
+          }}
+          onAsk={(q) => {
+            // 专用事件名:nesio-open-voice 被 test:today-settings-bug3 禁止出现在这个文件里
+            // (用户标注过「点话筒不该跳说一说」)。那条保护是对的,不为省事去放宽它。
+            window.dispatchEvent(new CustomEvent('nesio-open-ask', { detail: { text: q } }));
+          }}
+          onRemind={(at, title) => {
+            const r = addReminder({ title, at, kind: 'other' });
+            if (!r) {
+              // 红线:失败要有可见失败态。存不下就说,别让人以为设上了。
+              setQuickSaved(L(uiLocale, '这条没能设上,再试一次', 'Could not set that — try again'));
+              setTimeout(() => setQuickSaved(''), 3000);
+              return;
+            }
+            setQuickAdd('');
+            setDraftNote(null);
+            // 撤销留在回执里:自动认出来的时间总有认错的时候,而「已经建好了、
+            // 你自己去日程页找出来删」不是一个能接受的收场。
+            setRemindReceipt({
+              // 点明落在哪 —— 「我设的提醒」只在日程页里露面,不说的话用户设完就再也找不到它,
+              // 回执一消失这条提醒对他来说就等于不存在了。
+              text: L(uiLocale,
+                `已设在 ${formatWhen(at)} · 「${r.title}」· 在日程里`,
+                `Set for ${formatWhen(at)} · “${r.title}” · in Schedule`),
+              onUndo: () => { removeReminder(r.id); setRemindReceipt(null); },
+            });
+            setTimeout(() => setRemindReceipt((cur) => (cur && cur.text.includes(formatWhen(at)) ? null : cur)), 8000);
+          }}
+          remindReceipt={remindReceipt}
         />
         {/* 存进去了要说一声。这条回执之前**只被 set、从来没渲染** ——
             于是「+」传完文件、记一笔按了「记下」,界面上什么反应都没有。

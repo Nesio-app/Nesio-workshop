@@ -9,6 +9,20 @@ import type { MindDimension } from './growth-engine';
 const DISTRESS_RE = /累|沮丧|难过|焦虑|烦|压力|失望|委屈|不开心|心情不好|崩溃|想哭|扛不住|emo|嗡|坐了很久/i;
 const SELF_BLAME_RE = /没用|不行|不够|差劲|失败|搞砸|做不好|笨|都怪我|是我的错|我应该|没领导好|没以身作则/i;
 
+/**
+ * #35(2026-07-30 真机):把「前提·事实·逻辑·情绪」「认知扭曲识别」这类镜头
+ * 套在一条「PROD Install Zoom Bridge 会议通知」上,输出的「情绪」一栏只能生硬地写
+ * 「收到这个通知,可能意味着安装过程已经完成」—— 用户说得对:很勉强,没有实际价值。
+ *
+ * 这些镜头是给**人说的话**设计的。判据得是正向的:这段文字里要有**第一人称或情绪词**,
+ * 才谈得上拆「你的前提」「你的情绪」。一条系统通知里没有「你」,拆出来的只能是编的。
+ */
+const PERSONAL_RE = /我|咱|自己|觉得|感觉|担心|希望|想要|后悔|难受|生气|开心|\bI\b|\bmy\b|\bme\b|\bfeel|\bworr|\bhope/i;
+
+export function hasPersonalVoice(text: string): boolean {
+  return PERSONAL_RE.test(String(text || ''));
+}
+
 export interface MemoryLens {
   id: string;
   name: string; nameEn: string;
@@ -18,6 +32,8 @@ export interface MemoryLens {
   locked?: boolean;             // 领域扩展包(如投资)未安装
   /** 是否为这条记忆推荐(纯规则,零成本)。 */
   recommend?: (text: string) => boolean;
+  /** #35:这个镜头拆的是「人说的话」。文字里没有第一人称/情绪词时不提供它。 */
+  needsPersonal?: boolean;
   /** 分层拆解的键序(也进 prompt);AI 按这些键回填。 */
   layerKeys: string[];
   buildPrompt: (text: string) => string;
@@ -35,6 +51,7 @@ export const MEMORY_LENSES: MemoryLens[] = [
     desc: '把这句重话拆成四层,看它是不是真那么重', descEn: 'Split the heavy line into four layers',
     icon: '<path d="M4 5h16v10H10l-4 3v-3H4z"/><path d="M8 9h8M8 12h5"/>', dim: 'emotion',
     recommend: (t) => DISTRESS_RE.test(t) || SELF_BLAME_RE.test(t),
+    needsPersonal: true,
     layerKeys: ['事实', '前提', '逻辑', '情绪'],
     buildPrompt: (t) => layerPrompt(t, '前提·事实·逻辑·情绪(帮你吵)', ['事实', '前提', '逻辑', '情绪'], '一句你可以说出口的、平静的回法'),
   },
@@ -43,6 +60,7 @@ export const MEMORY_LENSES: MemoryLens[] = [
     desc: '这句自我评价里藏着哪个思维陷阱', descEn: 'Which thinking trap hides in this self-talk',
     icon: '<circle cx="12" cy="12" r="9"/><path d="M9 10a3 3 0 0 1 6 0c0 2-3 2-3 4M12 18h.01"/>', dim: 'blindspot',
     recommend: (t) => SELF_BLAME_RE.test(t),
+    needsPersonal: true,
     layerKeys: ['陷阱', '真相', '分开'],
     buildPrompt: (t) => layerPrompt(t, '认知扭曲识别(CBT)', ['陷阱', '真相', '分开'], '敌人是那个陷阱,不是你 —— 一句拿回主动权的话'),
   },
@@ -77,17 +95,27 @@ export const MEMORY_LENSES: MemoryLens[] = [
 
 export function lensById(id: string): MemoryLens | undefined { return MEMORY_LENSES.find((l) => l.id === id); }
 
-/** 为一条记忆排镜头:推荐的在前(命中 recommend),锁定的在最后。 */
-export function lensesForMemory(text: string): { recommended: MemoryLens[]; rest: MemoryLens[]; locked: MemoryLens[] } {
+/**
+ * 为一条记忆排镜头:推荐的在前(命中 recommend),锁定的在最后。
+ * #35:文字里没有第一人称/情绪词时,把「拆人说的话」那几个镜头**收起来**,
+ * 并把收起来的数量报出去 —— 界面据此说一句「这条是事务性记录」,
+ * 而不是让用户挨个点开发现输出都很勉强。
+ */
+export function lensesForMemory(text: string): {
+  recommended: MemoryLens[]; rest: MemoryLens[]; locked: MemoryLens[]; withheldPersonal: number;
+} {
+  const personal = hasPersonalVoice(text);
   const recommended: MemoryLens[] = [];
   const rest: MemoryLens[] = [];
   const locked: MemoryLens[] = [];
+  let withheldPersonal = 0;
   for (const l of MEMORY_LENSES) {
-    if (l.locked) locked.push(l);
-    else if (l.recommend?.(text)) recommended.push(l);
+    if (l.locked) { locked.push(l); continue; }
+    if (l.needsPersonal && !personal) { withheldPersonal += 1; continue; }
+    if (l.recommend?.(text)) recommended.push(l);
     else rest.push(l);
   }
-  return { recommended, rest, locked };
+  return { recommended, rest, locked, withheldPersonal };
 }
 
 /** 情绪重的记忆 → 主动提示(上方 warm 卡)。 */
@@ -141,7 +169,19 @@ export interface LensEcho {
   count: number;
   /** ≥2 条才敢叫「模式」。n=1 说模式是硬凑 */
   many: boolean;
+  /**
+   * #36:这个标签是**背景常量**吗 —— 几乎每天都出现的那种。
+   * 现场:「你 7/30 也提过『Fidelity』——在这之前一共 58 次——也许是个值得留意的模式」。
+   * 可 Fidelity 是每天日程同步通知里固定出现的 401k 托管方名字,它**本来就该天天出现**。
+   * 天天出现的东西描述的是「你每天都会收到这类通知」,不是「你最近在关注它」。
+   * 把它包装成「值得留意的模式」是伪洞察。
+   */
+  background: boolean;
 }
+
+/** 出现在这么大比例的日子里,且条数够多 → 当背景常量,不叫模式。 */
+export const BACKGROUND_DAY_COVERAGE = 0.6;
+export const BACKGROUND_MIN_COUNT = 10;
 
 export function lensEcho(
   node: { id: string; createdAt: string; tags?: string[] },
@@ -165,5 +205,20 @@ export function lensEcho(
   const sorted = [...earlier].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   const prev = sorted[0];
   const tag = (prev.tags || []).map(norm).find((t) => mine.includes(t)) || '';
-  return { tag, at: prev.createdAt, count: sorted.length, many: sorted.length >= 2 };
+
+  // 背景常量判定:这个标签占了多少比例的「有记录的日子」。
+  const dayKey = (iso: string) => String(iso).slice(0, 10);
+  const allDays = new Set(all.map((x) => dayKey(x.createdAt)).filter(Boolean));
+  const tagDays = new Set(sorted.map((x) => dayKey(x.createdAt)).filter(Boolean));
+  const coverage = allDays.size ? tagDays.size / allDays.size : 0;
+  const background = sorted.length >= BACKGROUND_MIN_COUNT && coverage >= BACKGROUND_DAY_COVERAGE;
+
+  return {
+    tag,
+    at: prev.createdAt,
+    count: sorted.length,
+    // 天天出现的不算模式 —— 它只是背景
+    many: sorted.length >= 2 && !background,
+    background,
+  };
 }

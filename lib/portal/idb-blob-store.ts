@@ -98,6 +98,26 @@ export async function purgeIdbBlobs(backend: BlobBackend = idbBackend): Promise<
 // 各 blob store createBlobStore 时把自己的 key 登记进来。restore/路由据此判断某 key 该落
 // IDB 还是 localStorage —— 备份是扁平的、分辨不出,登记表就是那把标尺。
 const registeredBlobKeys = new Set<string>();
+/** key → 「从 IDB 重读一遍」。云同步在外部写完 IDB 之后靠它让 store 跟上。 */
+const blobRefreshers = new Map<string, () => Promise<void>>();
+
+function registerBlobRefresh(key: string, fn: () => Promise<void>): void {
+  blobRefreshers.set(key, fn);
+}
+
+/**
+ * 让这些 key 对应的 store 重新从 IDB 读一遍(外部直接写过 IDB 之后必须调)。
+ * 不认识的 key 直接跳过 —— 它可能只是 localStorage 的,那边本来就没有缓存层。
+ */
+export async function rehydrateIdbBlobs(keys: readonly string[]): Promise<number> {
+  let n = 0;
+  for (const k of keys) {
+    const fn = blobRefreshers.get(k);
+    if (!fn) continue;
+    try { await fn(); n++; } catch { /* 单个失败不拖垮其余 */ }
+  }
+  return n;
+}
 
 /** 该 key 是否是 IDB blob(已登记)。 */
 export function isIdbBlobKey(key: string): boolean {
@@ -121,6 +141,8 @@ export interface BlobStore<T> {
   load(): T | null;
   save(value: T): void;
   ready(): Promise<void>;
+  /** 从 IDB 重读一遍(外部直接写过 IDB 之后必须调,见 rehydrateIdbBlobs)。 */
+  refresh(): Promise<void>;
 }
 
 export interface BlobStoreOptions<T> {
@@ -167,6 +189,22 @@ export function createBlobStore<T>(opts: BlobStoreOptions<T>): BlobStore<T> {
     return hydratePromise;
   }
 
+  /**
+   * 重新从 IDB 读一遍(2026-07-30 自查发现)。
+   *
+   * 为什么必须有:云同步落地走的是 restoreCombinedBackup → idbBackend.set(),
+   * **绕过了这个 store**。而 ready() 的 hydratePromise 是记忆化的,
+   * 第一次之后再也不会重读 —— 于是数据已经在 IDB 里了,页面上还是旧的那份,
+   * 要等下次冷启动才看得见。用户那边的表现就是「同一入口不同时间点几种状态」。
+   *
+   * hydrate() 末尾会 emit,监听组件据此重读。
+   */
+  function refresh(): Promise<void> {
+    hydratePromise = hydrate();
+    return hydratePromise;
+  }
+  registerBlobRefresh(opts.key, refresh);
+
   if (opts.autoHydrate !== false && hasWindow) void ready();
 
   return {
@@ -177,5 +215,6 @@ export function createBlobStore<T>(opts: BlobStoreOptions<T>): BlobStore<T> {
       backend.set(opts.key, JSON.stringify(value)).catch(() => opts.onWriteError?.());
     },
     ready,
+    refresh,
   };
 }

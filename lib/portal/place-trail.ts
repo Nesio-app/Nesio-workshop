@@ -502,11 +502,30 @@ export function buildPlaceTimeline(visits: PlaceVisit[], maxDays = 14): Timeline
     // 用户定案:中间没有出现别的地点,就是一直在这个地方,合成一段。
     const sameName = last && (last.label === v.label
       || last.label.split(',')[0].trim() === v.label.split(',')[0].trim());
+    // #31(2026-07-30 真机):同一时刻 15:38 的两条坐标 35.7982,-78.8431 和
+    // 35.7983,-78.8432 —— 相距约 10 米,被记成两次独立到访。
+    // 根因是「同名才合」:这两条都还没认出名字(占位符),而**没有名字的点,
+    // 名字就不是它的身份,坐标才是**。所以分两种口径:
+    //   · 两边都有名字且同名 → 500 米内算一段(两家同名店不会挨这么近);
+    //   · 有一边还没认出名字 → 只看距离,150 米内就是同一个地方。
+    // 两个**不同的真地名**永远不合 —— 那是真的去了两个地方。
+    const dist = last && last.lat != null && v.lat != null
+      ? haversineKm(last.lat, last.lon ?? 0, v.lat, v.lon ?? 0)
+      : null;
+    const eitherUnnamed = !!last && (isGenericPlaceLabel(last.label) || isGenericPlaceLabel(v.label));
     const nearSame = sameName
-      && (last.lat == null || v.lat == null || haversineKm(last.lat!, last.lon ?? 0, v.lat, v.lon ?? 0) < 0.5);
+      ? (dist == null || dist < 0.5)
+      : (eitherUnnamed && dist != null && dist < 0.15);
     if (last && sameDay && nearSame) {
       if (end > last.end) last.end = end;
-      if (v.label.length < last.label.length) last.label = v.label; // 短基名优先(后缀变体不霸屏)
+      // 2026-07-30 自查发现:上面放开了「无名点按坐标合并」之后,这一行就有了新后果 ——
+      // 「Unknown」只有 7 个字符,合并 `Starbucks Reserve`(17)时会**把真地名顶掉**。
+      // 短基名优先这条规则本来是给「同名的后缀变体」用的(「X, Cary, US」→「X」),
+      // 前提是两边都是真名字。所以先分一层:**认出来的名字永远赢占位符**。
+      const lastGeneric = isGenericPlaceLabel(last.label);
+      const vGeneric = isGenericPlaceLabel(v.label);
+      if (lastGeneric && !vGeneric) last.label = v.label;
+      else if (!lastGeneric && !vGeneric && v.label.length < last.label.length) last.label = v.label;
       if (last.lat == null && v.lat != null) { last.lat = v.lat; last.lon = v.lon; }
     } else {
       segs.push({ label: v.label, category: catFor(v.label), start: v.ts, end, durationMin: 0, source: v.source, lat: v.lat, lon: v.lon });

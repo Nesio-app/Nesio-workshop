@@ -17842,6 +17842,63 @@ html[data-palette="sage"]:not([data-portal-theme="night"]), html[data-palette="s
    FAB/活动态/链接在夜里也跟皮肤走。双属性选择器 (0,2,1) 压过夜间基座 (0,1,1)。 */
 
 /* ① 蓝灰·灰粉 · 夜 */
+/* ── #23:换肤要连**卡面和文字**一起换 ─────────────────────────────────────────
+   用户报「换肤只在设置页生效,首页、记忆库还是原来的色调」。第一次查我比错了地方
+   (只对了 `:root, .portal-root` 那 8 个 --viz-*),结论是「都覆盖了」—— 错的。
+   真正声明日间默认的是 `.portal-root`,112 个 token;四套色卡只改了其中 33 个。
+   漏掉的那批里有:
+
+     --glass-bg-solid  全站用了 102 次(几乎每张卡、每张 sheet 的底色)
+     --portal-card     27 次      --portal-text  14 次
+     --glass-bg / -pop / -raised / -border / -highlight、--modal-card-bg、--portal-surface…
+
+   也就是说:换肤只换了强调色和页面背景,**卡面还是白的、文字还是原来的灰**。
+   设置页大量用 accent 着色,所以看起来变了;首页/记忆库满屏是卡片,自然「没怎么变」。
+   用户看到的是真的。
+
+   这里把这批「表面色」接到各色卡已经调好的值上。用 color-mix 之前先写一个平值,
+   不支持的浏览器保留前者(渐进增强,不新增依赖)。
+
+   **有意不换的**(和情绪色/地表色同一类,是语义不是皮肤):
+     · --status-risk / -soft / -stop / -warn —— 红是「真实风险」的语义色(CLAUDE.md),
+       跟着皮肤走会让某些配色下的风险提示和强调色分不开;
+     · 一切非颜色 token(间距/圆角/字号/字重/动效/层级)。 */
+html[data-palette]:not([data-portal-theme="night"]),
+html[data-palette]:not([data-portal-theme="night"]) .portal-root {
+  --portal-text: var(--portal-ink);
+  --portal-text-secondary: var(--portal-muted);
+  --portal-fg: var(--portal-ink);
+  --portal-border: var(--portal-line);
+  --portal-hairline: var(--portal-line);
+
+  /* 卡面:各色卡自己的页面底色往白里提 —— 纯白在暖色/灰绿皮肤下会显得「贴不上去」 */
+  --portal-card: #ffffff;
+  --portal-card: color-mix(in srgb, var(--portal-bg) 30%, #ffffff);
+  --portal-surface: var(--portal-card);
+  --portal-surface-2: var(--portal-bg);
+  --portal-card-bg: var(--portal-card);
+  --share-card-surface: var(--portal-card);
+
+  --glass-bg-solid: #ffffff;
+  --glass-bg-solid: color-mix(in srgb, var(--portal-bg) 30%, #ffffff);
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg: color-mix(in srgb, var(--portal-bg) 26%, rgba(255, 255, 255, 0.86));
+  --glass-bg-raised: var(--glass-bg-solid);
+  --glass-bg-pop: var(--glass-bg-solid);
+  --glass-border: var(--portal-line);
+  --glass-highlight: var(--portal-accent-soft);
+
+  --modal-card-bg: var(--glass-bg-solid);
+  /* 遮罩也跟着皮肤走一点 —— 纯黑遮罩压在暖色皮肤上会显得脏 */
+  --modal-backdrop-bg: rgba(20, 20, 24, 0.32);
+  --modal-backdrop-bg: color-mix(in srgb, var(--portal-ink) 34%, transparent);
+  --border-subtle: var(--portal-line);
+  --accent-primary: var(--portal-accent);
+  --accent-primary-dim: var(--portal-accent-soft-md);
+  --portal-green: var(--status-go);
+  --portal-on-accent: #ffffff;
+}
+
 html[data-portal-theme="night"][data-palette="bluegray-rose"],
 html[data-portal-theme="night"][data-palette="bluegray-rose"] .portal-root {
   --portal-blue-deep:#d49a94; --portal-blue-mid:#c08d87; --portal-blue-light:#4a3634;
@@ -20193,11 +20250,15 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   padding: var(--space-3);
   margin-bottom: var(--space-3);
 }
+/* #9:整块头部都是可点区域(原来只有名字那一行是按钮,高约 24px ——
+   看起来是一整块卡,手指落在日期行上就「没有任何反应」)。min-height 给足 44px。 */
 .nesio-assets-head {
   display: flex;
-  align-items: baseline;
-  gap: var(--space-2);
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
   width: 100%;
+  min-height: 44px;
   background: none;
   border: none;
   padding: 0;
@@ -20205,12 +20266,20 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   font-family: var(--font-sans);
   text-align: left;
 }
-.nesio-assets-head .n { flex: 1; min-width: 0; font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nesio-assets-head .v { flex: none; font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--portal-accent); font-variant-numeric: tabular-nums; }
-.nesio-assets-head .c { flex: none; color: var(--portal-muted); }
-.nesio-assets-sub { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--portal-muted); line-height: 1.5; }
+.nesio-assets-head:active { opacity: 0.72; }
+.nesio-assets-head-top {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  width: 100%;
+}
+.nesio-assets-head-top .n { flex: 1; min-width: 0; font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--portal-ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nesio-assets-head-top .v { flex: none; font-size: var(--text-body); font-weight: var(--weight-semibold); color: var(--portal-accent); font-variant-numeric: tabular-nums; }
+.nesio-assets-head-top .c { flex: none; color: var(--portal-muted); }
+.nesio-assets-sub { display: block; margin: 0; font-size: var(--text-xs); color: var(--portal-muted); line-height: 1.5; }
 .nesio-assets-due {
-  margin: var(--space-2) 0 0;
+  display: block;
+  margin: var(--space-1) 0 0;
   font-size: var(--text-xs);
   color: var(--status-gentle);
   background: var(--status-gentle-soft);
@@ -20710,6 +20779,358 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-mailtag-rule-check { flex: none; color: var(--portal-accent); }
 /* 禁用的筛选/选择 chip —— 看得出点不了,而不是点了没反应 */
 .nesio-schedfilter-chip[disabled] { opacity: 0.45; cursor: default; }
+/* 行程分组小标题(即将出发 / 正在路上 / 已经过去了) */
+.nesio-travel-plan-group {
+  margin: var(--space-4) 0 var(--space-2);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-muted);
+}
+
+/* #25:恢复出来的草稿不是今天留下的时,在输入条下面说清楚是哪天的 ——
+   否则几周前语音听岔的半句看起来就像刚打的,而用户根本不记得打过。 */
+.nesio-tl-capture-stale {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+}
+
+/* #26:「Jing / Jing Duan / DUAN JING」这类疑似同一个人的候选。
+   摆在关系页最上面,但**不自动合并** —— 合并不可撤销,拍板的是人。 */
+.nesio-rel-mergehint {
+  border: 1px solid var(--portal-accent-border);
+  background: var(--portal-accent-soft);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  margin-bottom: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.nesio-rel-mergehint-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.nesio-rel-mergehint-text {
+  flex: 1;
+  min-width: 12rem;
+  font-size: var(--text-sm);
+  color: var(--portal-ink);
+  line-height: 1.6;
+}
+.nesio-rel-mergehint-actions { display: flex; gap: var(--space-2); flex: none; }
+.nesio-rel-mergehint-btn {
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-accent);
+  background: var(--glass-bg-solid);
+  border: 1px solid var(--portal-accent-border);
+  border-radius: var(--radius-pill);
+  padding: var(--space-1) var(--space-3);
+  min-height: 32px;
+  cursor: pointer;
+}
+.nesio-rel-mergehint-btn.ghost { color: var(--portal-muted); border-color: var(--portal-line); }
+.nesio-rel-mergehint-foot { margin: 0; font-size: var(--text-xs); color: var(--portal-muted); line-height: 1.6; }
+
+/* #10:车资产卡上的「这是哪辆车」—— 把接口来的那半和手动记的那半认到一起。 */
+.nesio-assets-bindrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+  flex-wrap: wrap;
+}
+.nesio-assets-bindlabel {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  flex: none;
+}
+.nesio-assets-bindrow .nesio-assets-input { flex: 1; min-width: 10rem; }
+
+/* ── 音乐(2026-07-30)──────────────────────────────────────────────────────
+   四个音源不是一回事:本地/Apple 由 Nesio 自己出声,Spotify 是遥控,网易只能搜。
+   所以「能不能放」在 chip 上有一个实心点作正向标记 —— 灰着的就是现在放不了,
+   旁边一定跟着一句为什么(.nesio-music-blocked),不留灰按钮不说话。
+   颜色一律走 token(设计规范红线):强调=--portal-accent,提示=--status-gentle,
+   可用=--status-go,风险色一次没用 —— 这里没有任何真实风险。 */
+.nesio-music { display: flex; flex-direction: column; gap: var(--space-4); }
+
+.nesio-music-sources { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.nesio-music-src {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: 40px; padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-pill);
+  background: transparent; color: var(--portal-muted);
+  font-size: var(--text-sm); font-weight: var(--weight-medium); cursor: pointer;
+}
+.nesio-music-src.is-on {
+  color: var(--portal-accent); border-color: var(--portal-accent-border);
+  background: var(--portal-accent-soft);
+}
+.nesio-music-src-dot {
+  width: 6px; height: 6px; border-radius: var(--radius-pill);
+  background: var(--portal-line); flex: none;
+}
+.nesio-music-src-dot.is-live { background: var(--status-go); }
+
+.nesio-music-notice {
+  border: 1px solid var(--portal-accent-border); border-radius: var(--radius-md);
+  background: var(--portal-accent-soft); padding: var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-3);
+}
+.nesio-music-notice p { margin: 0; font-size: var(--text-sm); color: var(--portal-ink); line-height: 1.7; }
+.nesio-music-notice-acts { display: flex; gap: var(--space-2); }
+.nesio-music-notice-acts button {
+  min-height: 40px; padding: 0 var(--space-4);
+  border-radius: var(--radius-sm); border: 1px solid var(--portal-accent-border);
+  background: var(--portal-accent); color: var(--portal-on-accent, #fff);
+  font-size: var(--text-sm); font-weight: var(--weight-medium); cursor: pointer;
+}
+.nesio-music-notice-acts button.ghost {
+  background: transparent; color: var(--portal-muted); border-color: var(--portal-line);
+}
+
+.nesio-music-blocked,
+.nesio-music-model,
+.nesio-music-msg,
+.nesio-music-empty {
+  margin: 0; font-size: var(--text-xs); line-height: 1.7; color: var(--portal-muted);
+}
+.nesio-music-blocked { color: var(--status-gentle); }
+
+.nesio-music-err {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-3); border-radius: var(--radius-sm);
+  background: var(--status-gentle-soft); color: var(--portal-ink);
+  font-size: var(--text-xs); line-height: 1.6;
+}
+.nesio-music-err button {
+  flex: none; min-height: 32px; padding: 0 var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: transparent; color: var(--portal-muted); font-size: var(--text-xs); cursor: pointer;
+}
+
+.nesio-music-sec { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.nesio-music-libhead {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  font-size: var(--text-sm); color: var(--portal-muted);
+}
+.nesio-music-libhead button,
+.nesio-music-connect,
+.nesio-music-resume {
+  min-height: 44px; padding: 0 var(--space-4);
+  border: 1px solid var(--portal-accent-border); border-radius: var(--radius-sm);
+  background: var(--portal-accent-soft); color: var(--portal-accent);
+  font-size: var(--text-sm); font-weight: var(--weight-medium);
+  cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+.nesio-music-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.nesio-music-list li {
+  display: flex; align-items: center; gap: var(--space-2);
+  border-bottom: 1px solid var(--portal-line);
+}
+.nesio-music-list li.is-cur .nesio-music-title { color: var(--portal-accent); }
+.nesio-music-row {
+  flex: 1; min-width: 0; min-height: 52px;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  padding: var(--space-2) 0; border: 0; background: transparent;
+  text-align: left; cursor: pointer;
+}
+.nesio-music-row.is-static { cursor: default; }
+.nesio-music-title {
+  font-size: var(--text-body); color: var(--portal-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nesio-music-sub { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-music-del {
+  flex: none; width: 32px; height: 32px;
+  border: 0; background: transparent; color: var(--portal-muted);
+  font-size: var(--text-body); cursor: pointer;
+}
+
+.nesio-music-bar {
+  position: sticky; bottom: 0;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3); border-radius: var(--radius-md);
+  border: 1px solid var(--portal-line); background: var(--glass-bg-solid);
+}
+.nesio-music-bar-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.nesio-music-bar-meta strong {
+  font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--portal-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nesio-music-bar-meta span { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-music-bar-acts { display: flex; gap: var(--space-2); flex: none; }
+.nesio-music-bar-acts button {
+  min-height: 40px; min-width: 40px; padding: 0 var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: transparent; color: var(--portal-ink);
+  font-size: var(--text-sm); cursor: pointer;
+}
+.nesio-music-bar-time { flex: none; font-size: var(--text-xs); color: var(--portal-muted); }
+
+.nesio-music-modes { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.nesio-music-modes button {
+  min-height: 36px; padding: 0 var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-pill);
+  background: transparent; color: var(--portal-muted);
+  font-size: var(--text-xs); cursor: pointer;
+}
+.nesio-music-modes button.is-on {
+  color: var(--portal-accent); border-color: var(--portal-accent-border);
+  background: var(--portal-accent-soft);
+}
+
+.nesio-music-search { display: flex; gap: var(--space-2); }
+.nesio-music-search input {
+  flex: 1; min-width: 0; min-height: 44px; padding: 0 var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: transparent; color: var(--portal-ink); font-size: var(--text-sm);
+}
+.nesio-music-search button {
+  flex: none; min-height: 44px; padding: 0 var(--space-4);
+  border: 1px solid var(--portal-accent-border); border-radius: var(--radius-sm);
+  background: var(--portal-accent-soft); color: var(--portal-accent);
+  font-size: var(--text-sm); cursor: pointer;
+}
+
+/* 回退出口:当前源放不了时,把真能放的摆出来一键切过去(不给下一步 = 把人留在死路上)。 */
+.nesio-music-fallback {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  font-size: var(--text-xs); color: var(--portal-muted);
+}
+.nesio-music-fallback button {
+  min-height: 32px; padding: 0 var(--space-3);
+  border: 1px solid var(--portal-accent-border); border-radius: var(--radius-pill);
+  background: var(--portal-accent-soft); color: var(--portal-accent);
+  font-size: var(--text-xs); cursor: pointer;
+}
+
+/* ── 悬浮播放球(2026-07-31)────────────────────────────────────────────────
+   位置:底部导航**之上**、右侧。z=935 夹在洞察浮层(929/930)与 elevated(940)之间
+   —— 高于浮层所以每一页都看得见,低于 elevated 所以从洞察里再开的抽屉不会被它压住。
+   颜色全走 token;关闭键用 muted 而不是 --status-risk:关掉音乐不是风险,别制造焦虑。 */
+.nesio-fp,
+.nesio-fp-ball {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 4.6rem);
+  z-index: 935;
+}
+
+/* 收起态:一个圆球 + 一圈进度环 */
+.nesio-fp-ball {
+  width: 56px; height: 56px;
+  display: grid; place-items: center;
+  border: 1px solid var(--portal-accent-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg-solid);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  cursor: pointer; padding: 0;
+}
+.nesio-fp-ring {
+  position: absolute; inset: -1px;
+  border-radius: var(--radius-pill);
+  /* 进度环:走过的部分用强调色,剩下的透明 —— 不用第二个元素画底环,
+     底环由球本身的 border 充当。 */
+  background: conic-gradient(var(--portal-accent) var(--fp-pct, 0%), transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent 24px, #000 25px);
+  mask: radial-gradient(circle, transparent 24px, #000 25px);
+  pointer-events: none;
+}
+.nesio-fp-glyph {
+  font-size: var(--text-sm);
+  color: var(--portal-accent);
+  line-height: 1;
+}
+
+/* 展开态:曲名 + 三个圆键 */
+.nesio-fp {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  align-items: flex-end;
+  max-width: min(20rem, calc(100vw - 2rem));
+}
+.nesio-fp-meta {
+  display: flex; flex-direction: column; align-items: flex-end;
+  max-width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg-solid);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+.nesio-fp-meta strong {
+  max-width: 100%;
+  font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--portal-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nesio-fp-meta span { font-size: var(--text-xs); color: var(--portal-muted); }
+
+.nesio-fp-acts { display: flex; gap: var(--space-2); }
+.nesio-fp-btn {
+  width: 48px; height: 48px;
+  display: grid; place-items: center;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg-solid);
+  color: var(--portal-ink);
+  font-size: var(--text-sm); line-height: 1;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  cursor: pointer; padding: 0;
+}
+.nesio-fp-btn.is-main {
+  border-color: var(--portal-accent-border);
+  background: var(--portal-accent);
+  color: var(--portal-on-accent, #fff);
+}
+.nesio-fp-btn.is-close { color: var(--portal-muted); }
+
+.nesio-fp-err {
+  margin: 0; max-width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--status-gentle-soft); color: var(--portal-ink);
+  font-size: var(--text-xs); line-height: 1.6;
+}
+
+/* 播放进度:时长读出来之后才出现(拖不动的滑块比没有更像坏了)。 */
+.nesio-music-seek {
+  flex: 1 0 100%; width: 100%; margin-top: var(--space-2);
+  accent-color: var(--portal-accent);
+}
+
+/* ── 首页输入条的三条动作(2026-07-31 三合一)────────────────────────────────
+   全部显式:点了才走,默认(回车/↑)永远是记一笔。不自动判意图 ——
+   把「记」猜成「问」的代价是「你要存的东西没存下来,而你以为存了」。 */
+.nesio-cap-actions {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.nesio-cap-action {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%; min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: transparent; color: var(--portal-muted);
+  font-size: var(--text-xs); line-height: 1.5; text-align: left; cursor: pointer;
+}
+/* 认出时间的那一条最相关,给它强调色;另外两条保持安静。 */
+.nesio-cap-action.is-when {
+  color: var(--portal-accent);
+  border-color: var(--portal-accent-border);
+  background: var(--portal-accent-soft);
+}
+.nesio-cap-action-main { font-weight: var(--weight-medium); }
+/* 「你没说几点,先按早上 9:00」—— 默认值必须自己说出来,不能装成用户定过。 */
+.nesio-cap-action-sub { color: var(--portal-muted); font-size: var(--text-xs); }
 
 /* ── 「这笔钱是哪一笔」认领行(衣橱 / 美味 / 发票共用) ───────────────────── */
 .nesio-claim-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }

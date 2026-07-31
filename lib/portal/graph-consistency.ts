@@ -22,10 +22,14 @@
 import { getLifeGraph, getLifeGraphCloudSyncRecords, backfillLocalLifeGraphToCloud } from './life-graph';
 import { createAppApiClient } from './app-api-client';
 import { logDropped } from './storage-health';
+import { visibleMemoryNodes } from './memory-visibility';
 
 export interface GraphConsistencyReport {
   checkedAt: string;
   localCount: number;
+  /** 其中**用户会当成「记忆」的**那些(visibleMemoryNodes 的口径)。
+   *  同步要比对全部节点(天气快照也得上云),但报数给人看时不能跟记忆库那个数打架。 */
+  localMemoryCount: number;
   cloudCount: number;
   /** 本地有、云端没有 —— 这批是真缺口,该补传 */
   missingInCloud: string[];
@@ -58,6 +62,11 @@ export async function auditGraphConsistency(): Promise<
 
   const local = getLifeGraph();
   const localIds = new Set(local.map((n) => n.id));
+  // 2026-07-30 bug #14:体检卡写「本机 2541 条」,记忆库首页写「2534 条」,
+  // 用户当场就发现了。两个数其实各有各的对:体检必须比对**全部节点**
+  // (天气快照那类环境信号也要上云),记忆库报的是**用户会当成记忆的那些**。
+  // 错的是它们共用一个「条」字。所以两个数都带出来,由 UI 分别说清楚。
+  const localMemoryCount = visibleMemoryNodes(local, true).length;
 
   let cloudIds: Set<string>;
   try {
@@ -87,6 +96,7 @@ export async function auditGraphConsistency(): Promise<
     report: {
       checkedAt: new Date().toISOString(),
       localCount: localIds.size,
+      localMemoryCount,
       cloudCount: cloudIds.size,
       missingInCloud: [...localIds].filter((id) => !cloudIds.has(id)),
       missingLocally: [...cloudIds].filter((id) => !localIds.has(id)),
