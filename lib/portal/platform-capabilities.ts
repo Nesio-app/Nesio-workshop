@@ -46,11 +46,34 @@ export function speechToText(): CapabilityImpl {
   return 'none';
 }
 
-/** 视觉/OCR。native: 原生 Vision;web: 浏览器内 ML(transformers.js/MediaPipe,WebGPU 优先)。 */
+/**
+ * 视觉/OCR。**只有 native 一条真路**,web 一律 'none'。
+ *
+ * ## 这里原来在撒谎
+ *
+ * 原实现是「有 WebGPU 就返回 'web'」,注释写着「浏览器内 ML
+ * (transformers.js/MediaPipe)」—— **那个实现不存在**。后果不是少个功能,是
+ * 任何有 WebGPU 的浏览器上,能力汇总都会报 `vision: 'web'`,而真去调
+ * `recognizeOnDevice()` 拿到的是 `not_native`。谁信了这个汇总去排功能可用性,
+ * 就会排出一条根本走不通的路。
+ *
+ * 同一个关切**不许有两个判据**。运行时的权威是 `lib/native/vision.ts`
+ * (`visionAvailability()` / `recognizeOnDevice()`),它设计上就没有 web 分支:
+ * 端上不可用 → 明说 + 引导手填,**绝不改走云**(化验单是病历,发票上是税号和金额)。
+ * 这个函数是那条判据的**同步快照**,只能比它保守,不能比它乐观。
+ *
+ * ## 为什么现在不做浏览器端 OCR
+ *
+ * 不是技术问题,是场景:浏览器不是拍照的地方。化验单、小票都是手机拍的,
+ * web 端是回看和整理的面。为一个不发生拍照的场景建 WASM OCR,
+ * 是把最贵的选项花在最少发生的事情上。
+ *
+ * 将来真要做,走 Rust→WASM,不要 Tesseract.js。**那时这段注释和下面的实现
+ * 必须一起改** —— 上一次就是注释先跑到实现前面去,才留下这个假的 'web'。
+ */
 export function vision(): CapabilityImpl {
   if (hasNativePlugin('Vision')) return 'native';
-  if (typeof window !== 'undefined' && hasWebGPU()) return 'web';
-  return 'none'; // 无 WebGPU 也可退 WASM,但性能差,交由调用方决定是否上
+  return 'none';
 }
 
 /** 端上免费 LLM(Apple Foundation Models,iOS 26+)。仅原生插件可得,纯 PWA 拿不到。 */
