@@ -9,7 +9,12 @@
  * 5. Triggers re-run of Reasoning Engine
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+// 说了时间就能当场设成提醒,并在记忆里留一条身影(用户:「首页输入框和问问设置的提醒
+// 是要进记忆的」)。与首页那条输入框共用同一套解析与同一处存储 —— 不做第二份。
+import { parseWhen, formatWhen } from '@/lib/portal/when-parse';
+import { addReminder, repeatLabel } from '@/lib/portal/schedule-reminders';
+import { createReminderShadow } from '@/lib/portal/reminder-shadow';
 import { createPortal } from 'react-dom';
 import { getRecentNodes, getLifeGraph, updateLifeNode, isPrivateExternalNode, searchLifeGraphFuzzy, type LifeNode } from '@/lib/portal/life-graph';
 import { signalToLifeNode } from '@/lib/life-domain';
@@ -379,6 +384,8 @@ export default function VoiceInputSheet({ open, intent = 'note', seedText = '', 
   const [sendState, setSendState] = useState<SendState>('idle');
   const [intentLabel, setIntentLabel] = useState('');
   const [micError, setMicError] = useState('');
+  /** 「设成提醒」之后那句回执。建不出来时也走它 —— 失败必须可见。 */
+  const [remindMsg, setRemindMsg] = useState('');
   const [savedCount, setSavedCount] = useState(0);
   const [askResults, setAskResults] = useState<AskResult[]>([]);
   const [askAnswer, setAskAnswer] = useState('');
@@ -437,6 +444,11 @@ export default function VoiceInputSheet({ open, intent = 'note', seedText = '', 
     // handleSend 读的是当下的 text/state,不进依赖 —— 进了会在每次输入时重跑。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isAskMode, seedText, text]);
+
+  // 说的话里有没有时间。认不出就是 null —— 那一条按钮根本不出现(不硬凑一个时刻)。
+  const voiceWhen = useMemo(() => (text.trim().length >= 2 ? parseWhen(text.trim()) : null), [text]);
+  // 换了一句话,上一条回执就该收起来 —— 留着会让人以为刚打的这句也设上了。
+  useEffect(() => { setRemindMsg(''); }, [text]);
 
   // Update intent label as user types/speaks
   useEffect(() => {
@@ -774,6 +786,44 @@ export default function VoiceInputSheet({ open, intent = 'note', seedText = '', 
           />,
           document.body,
         )}
+
+        {/* 说了时间就能**当场设成提醒**(2026-07-31 用户:「首页输入框和问问设置的提醒
+            是要进记忆的」)。和首页那条输入框同一副规矩:
+              · 显式 —— 点了才建,不猜(说一句是往记忆里写东西,自动建提醒等于替人做主);
+              · 认不出时间就不出现这一条;
+              · 默认钟点要自己说出来;
+              · 建出来的提醒同时在记忆里留一条身影 —— 这正是用户说的「要进记忆」。
+            ask 那一侧不给这个按钮:那边是问问题,不是安排事情。 */}
+        {!isAskMode && voiceWhen && sendState !== 'saved' && (
+          <button
+            type="button"
+            className="nesio-cap-action is-when"
+            onClick={() => {
+              const r = addReminder({ title: voiceWhen.title, at: voiceWhen.at, ...(voiceWhen.repeat || {}) });
+              if (!r) {
+                setRemindMsg(L(dict, '这条没能设上,再试一次。', 'Could not set that — try again.'));
+                return;
+              }
+              createReminderShadow(r);   // 「要进记忆」就是这一句
+              const rep = repeatLabel(r, dict);
+              setRemindMsg(L(dict,
+                `已设在 ${formatWhen(r.at)}${rep ? ` · ${rep}` : ''} · 日程和时间线里都有`,
+                `Set for ${formatWhen(r.at)}${rep ? ` · ${rep}` : ''} · in Schedule and your timeline`));
+            }}
+          >
+            <span className="nesio-cap-action-main">
+              {L(dict,
+                `设成提醒 · ${formatWhen(voiceWhen.at)}${voiceWhen.repeat ? ` · ${repeatLabel(voiceWhen.repeat, dict)}` : ''}`,
+                `Set a reminder · ${formatWhen(voiceWhen.at)}${voiceWhen.repeat ? ` · ${repeatLabel(voiceWhen.repeat, dict)}` : ''}`)}
+            </span>
+            {!voiceWhen.hasExplicitTime && (
+              <span className="nesio-cap-action-sub">
+                {L(dict, '你没说几点,先按早上 9:00 · 可以改', 'No time given — defaulting to 9:00 AM · editable')}
+              </span>
+            )}
+          </button>
+        )}
+        {!isAskMode && remindMsg && <p className="nesio-voice-intent-label">{remindMsg}</p>}
 
         {/* Intent label — 批次 184:聊天意图变成可点链接,跳「问一问」并带上这句话(不再是死标签) */}
         {!isAskMode && intentLabel && sendState !== 'confirm' && (

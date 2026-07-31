@@ -40,7 +40,9 @@ assert.match(gmail, /date: header\(src, 'date'\)/, '富化节点的时间以邮�
 // ── ③ 展示层去重 + 官方分类 ──
 const panel = read('../components/portal/insights/SchedulePanel.tsx');
 assert.match(panel, /const k = `\$\{r\.title\}\|\$\{ms\(r\)\}`/, '日历项按「标题|绝对时刻」去重(抹平跨日历的时区写法差异)');
-assert.match(panel, /o\.node\.attributes\?\.emailId === eid/, '邮件按 emailId 去重(兜住历史重复节点)');
+// 2026-07-31:Row.node 改成可选(提醒也进这份列表了,而提醒不是 life-graph 节点),
+// 所以这里跟着变成可选链。判断没变 —— 邮件仍按 emailId 去重。
+assert.match(panel, /o\.node\?\.attributes\?\.emailId === eid/, '邮件按 emailId 去重(兜住历史重复节点)');
 assert.match(panel, /a\.mailCategory/, '必须消费 Gmail 官方分类字段(mailCategory),不能只靠本地正则猜广告');
 assert.match(panel, /cat === 'promotions' \|\| cat === 'social'/, 'promotions/social 用 Google 的判定直接毙');
 assert.match(panel, /!cat && AD_RE\.test\(hay\)/, '本地广告正则降级为「没有官方分类时」的兜底');

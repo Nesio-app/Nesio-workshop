@@ -89,10 +89,18 @@ const NOW = new Date(2026, 6, 31, 22, 12); // 2026-07-31 周五
   // 界面上要真的有这个入口 —— 数据存下来了没人看得到,等于没做。
   const panel = code(read('components/portal/insights/SchedulePanel.tsx'));
   assert.ok(/setShowDone\(\(v\) => !v\)/.test(panel), '日程页要有「已完成」的切换入口');
-  assert.ok(/\{showDone && \(/.test(panel), '已完成那一段要真的渲染出来');
   assert.ok(
-    /doneRows\.length === 0 \?[\s\S]{0,300}还没有做完的/.test(panel),
+    /showDone && <CompletedReminders dict=\{dict\} tokens=\{tokens\} \/>/.test(panel),
+    '已完成那一段要真的渲染出来',
+  );
+  assert.ok(
+    /还没有做完的 —— 点一条提醒上的「做好了」/.test(panel),
     '一条都没有时要说清楚怎么才会有,而不是空着',
+  );
+  // 展开已完成时主列表要让位 —— 同屏两份提醒,分不清哪份是待办。
+  assert.ok(
+    /\{sub === 'calendar' && showDone \? null : rows\.length === 0 \?/.test(panel),
+    '看已完成时主列表要让位,不能两份同屏',
   );
 }
 
@@ -110,8 +118,83 @@ assert.equal(rem.repeatLabel({}), '', '只此一次的不该有重复标签');
   // 看着像只此一次。必须走统一的 repeatLabel。
   const panel = code(read('components/portal/insights/SchedulePanel.tsx'));
   assert.ok(
-    /const repeatText = repeatLabel\(r, dict\);/.test(panel),
+    /const rep = repeatLabel\(r, dict\);/.test(panel),
     '日程页的重复标签要走 repeatLabel,不许各写各的',
+  );
+}
+
+/* ── ③b 提醒和日历项同级排在一张列表里 ─────────────────────────────────── */
+
+{
+  const panel = code(read('components/portal/insights/SchedulePanel.tsx'));
+  // 用户原话:「提醒项目混入日程列表,和日历同级别」。
+  // **只看那个循环体本身**:在整份文件里搜片段会撞上别处长得一样的写法
+  // (`if (r.doneAt) continue;` 在查重那段也有一份),门槛改坏了照样绿。
+  const loop = panel.match(/for \(const r of reminders\) \{[\s\S]*?\n {4}\}/);
+  assert.ok(loop, '提醒要作为普通行推进 calendarRows —— 那个循环不见了');
+  const body = loop[0];
+  assert.ok(/out\.push\(\{[\s\S]{0,400}reminder: r,/.test(body), '循环里要真的把提醒推成一行');
+  assert.ok(
+    /^\s*if \(r\.doneAt\) continue;/m.test(body) && !/^\s*continue;/m.test(body),
+    '做完的不进待办列表(而且不能是「一律 continue」把整段架空)',
+  );
+  // Row.node 松绑是这件事的前提:提醒不是 life-graph 节点。
+  assert.ok(/node\?: LifeNode;/.test(panel), 'Row.node 要可选,提醒行没有节点');
+  assert.ok(
+    /onOpen=\{r\.node \? \(\) => setOpenNode\(r\.node!\) : undefined\}/.test(panel),
+    '提醒行没有记忆可开 —— 不画一个点了没反应的行',
+  );
+  // 删提醒行删的是提醒本身,不是某个节点 id。
+  assert.ok(
+    /if \(id\.startsWith\('rem:'\)\) \{[\s\S]{0,240}removeReminder\(rid\);[\s\S]{0,120}removeReminderShadow\(rid\);/.test(panel),
+    '删提醒行要删提醒(连同身影),按 life-graph 的 id 去删只会一无所获',
+  );
+  // 「做好了」是提醒在这份列表里唯一要紧的动作 —— 没有它,「已完成」永远是空的。
+  assert.ok(
+    /if \(r\.reminder\) \{[\s\S]{0,240}completeReminder\(r\.reminder\.id\);/.test(panel),
+    '提醒行右滑要落到 completeReminder,不是打星',
+  );
+  assert.ok(
+    /const isReminder = !!row\.reminder;/.test(panel)
+    && /const Mark = isReminder \? IconCheck :/.test(panel),
+    '提醒行的那个动作图标要是「勾」,不是星 —— 给提醒打星没有意义',
+  );
+  // 日程页不再有新建提醒的表单:那件事整个交给首页输入框。
+  assert.ok(!/RemindersSection/.test(panel), '日程页那套新建/管理提醒的 UI 该删了');
+  assert.ok(
+    !/type="datetime-local"/.test(panel),
+    '日程页不该再有手填时刻的新建表单 —— 用户定案:首页输入框应该可以完成',
+  );
+}
+
+/* ── ③c 语音那一侧也能设,而且一样进记忆 ───────────────────────────────── */
+
+{
+  const sheet = code(read('components/portal/VoiceInputSheet.tsx'));
+  // 用户原话:「首页输入框和问问设置的提醒是要进记忆的」。
+  assert.ok(
+    /addReminder\(\{ title: voiceWhen\.title, at: voiceWhen\.at, \.\.\.\(voiceWhen\.repeat \|\| \{\}\) \}\)/.test(sheet),
+    '说一句里认出时间也要能设成提醒',
+  );
+  assert.ok(
+    /createReminderShadow\(r\);/.test(sheet),
+    '这条提醒同样要进记忆 —— 这正是用户说的「要进记忆」',
+  );
+  assert.ok(
+    /\{!isAskMode && voiceWhen && sendState !== 'saved' && \(/.test(sheet),
+    'ask 那一侧不给这个按钮:那边是问问题,不是安排事情',
+  );
+  assert.ok(
+    /if \(!r\) \{[\s\S]{0,200}没能设上/.test(sheet),
+    '设不上要说 —— 红线:失败必须可见',
+  );
+  assert.ok(
+    /useEffect\(\(\) => \{ setRemindMsg\(''\); \}, \[text\]\);/.test(sheet),
+    '换了一句话要把上一条回执收起来,否则会让人以为新打的这句也设上了',
+  );
+  assert.ok(
+    /!voiceWhen\.hasExplicitTime && \([\s\S]{0,300}你没说几点/.test(sheet),
+    '默认钟点在这一侧也要自己说出来',
   );
 }
 
@@ -174,12 +257,28 @@ assert.equal(rem.repeatLabel({}), '', '只此一次的不该有重复标签');
   const feed = code(read('components/portal/TodayFeed.tsx'));
   const panel = code(read('components/portal/insights/SchedulePanel.tsx'));
   assert.ok(/createReminderShadow\(r\);/.test(feed), '首页设的提醒要建身影');
+  assert.ok(/createReminderShadow\(created\)/.test(panel), '邮件确认过来的提醒也要建身影');
+
+  // 最结实的那条:**凡是建提醒的地方,都得跟一条身影**。
+  // 逐个入口点名的写法挡不住「明天有人加了第四个入口、忘了建身影」——
+  // 那时候「设好的提醒进入时间线」就只对一部分提醒成立,而症状是随机的。
+  const callers = ['components/portal/TodayFeed.tsx',
+                   'components/portal/insights/SchedulePanel.tsx',
+                   'components/portal/VoiceInputSheet.tsx'];
+  let adds = 0;
+  let shadows = 0;
+  for (const f of callers) {
+    const src = code(read(f));
+    adds += (src.match(/addReminder\(\{/g) || []).length;
+    shadows += (src.match(/createReminderShadow\(/g) || []).length;
+  }
+  assert.ok(adds > 0, '至少得有一个建提醒的入口');
+  assert.equal(shadows, adds,
+    `建了 ${adds} 处提醒但只建了 ${shadows} 处身影 —— 每个入口都要跟一条,否则「进时间线」只对一部分成立`);
+  // 删除那一侧同理:removeReminder 出现的地方必须跟一条 removeReminderShadow。
+  // (日程页现在只有 commitDelete 一处删提醒 —— 「加一条」那套 UI 已经删了。)
   assert.ok(
-    (panel.match(/createReminderShadow\(created\)/g) || []).length >= 2,
-    '日程页「加一条」和邮件确认过来的两处都要建身影',
-  );
-  assert.ok(
-    /removeReminder\(r\.id\); removeReminderShadow\(r\.id\)/.test(panel),
+    /removeReminder\(rid\);\s*\n\s*removeReminderShadow\(rid\);/.test(panel),
     '日程页删提醒要一并收走身影',
   );
   assert.ok(
@@ -257,4 +356,4 @@ assert.equal(rem.repeatLabel({}), '', '只此一次的不该有重复标签');
   );
 }
 
-console.log('reminder-unify: OK(每周几搬过来了 / 做完留痕可查 / 重复说得出人话 / 频率认得出且不默认重复 / 提醒进时间线(两个入口都建) / 例行提醒已删净 / 频率看得见 / 问一步到位)');
+console.log('reminder-unify: OK(每周几搬过来了 / 做完留痕可查 / 重复说得出人话 / 频率认得出且不默认重复 / 提醒进时间线(每个入口都建) / 提醒与日历同级 / 语音也能设 / 例行提醒已删净 / 频率看得见 / 问一步到位)');
