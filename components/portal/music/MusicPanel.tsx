@@ -225,6 +225,11 @@ export default function MusicPanel() {
               onClick={() => requestSwitch(s.id)}
             >
               <span className="nesio-music-src-name">{L(dict, s.zh, s.en)}</span>
+              {/* 没配好的源直接标在 chip 上 —— 四个长得一模一样、点进去才发现三个用不了,
+                  那是让人一个一个去撞墙。本地歌曲不标:它不需要配任何东西。 */}
+              {probed && !signedOut && s.id !== 'local' && r && !r.configured && (
+                <span className="nesio-music-src-tag">{L(dict, '未配置', 'not set up')}</span>
+              )}
               <span className={`nesio-music-src-dot${ok ? ' is-live' : ''}`} aria-hidden />
             </button>
           );
@@ -258,7 +263,13 @@ export default function MusicPanel() {
       )}
 
       {/* 这个源现在的处境。能放就不说话。 */}
-      {probed && !playable && blocked && !(signedOut && source !== 'local') && <p className="nesio-music-blocked">{blocked}</p>}
+      {/* 顶上这句只在**这一段自己不说明**的时候出现。
+          Apple / Spotify / 网易 各自的段落都会把「差什么、去哪补」讲清楚,
+          再在顶上写一遍,屏幕上就是两句「还没配好」(实测截图正是如此)。 */}
+      {probed && !playable && blocked
+        && !(signedOut && source !== 'local')
+        && !(source !== 'local' && ready && !ready.configured)
+        && <p className="nesio-music-blocked">{blocked}</p>}
       {/* 回退链的真实出口:当前源放不了时,把**真能放**的那几个摆出来、一键切过去。
           光说「放不了」而不给下一步,就是把用户留在死路上。切过去仍然走 requestSwitch,
           跨播放模型的那句提示不会被绕过。 */}
@@ -425,12 +436,25 @@ export default function MusicPanel() {
               '连上之后,声音仍然从 Nesio 自己播,车机上显示的也还是 Nesio。',
               'Once connected, Nesio itself plays; your car still shows Nesio.')}
           </p>
-          <button type="button" className="nesio-music-connect" onClick={() => { void onConnectApple(); }}>
-            {readiness.apple?.authorized
-              ? L(dict, '已连接 Apple Music', 'Apple Music connected')
-              : L(dict, '连接 Apple Music', 'Connect Apple Music')}
-          </button>
-          {connectMsg && <p className="nesio-music-msg">{connectMsg}</p>}
+          {/* 服务端没配开发者密钥时**不给这颗按钮** —— 点了必然失败,
+              而失败那句话跟顶上那句是同一件事,屏幕上就会出现两遍「还没配好」
+              (实测截图里正是如此)。没得点的时候,给一句能照着做的话。 */}
+          {readiness.apple?.configured ? (
+            <>
+              <button type="button" className="nesio-music-connect" onClick={() => { void onConnectApple(); }}>
+                {readiness.apple?.authorized
+                  ? L(dict, '已连接 Apple Music', 'Apple Music connected')
+                  : L(dict, '连接 Apple Music', 'Connect Apple Music')}
+              </button>
+              {connectMsg && <p className="nesio-music-msg">{connectMsg}</p>}
+            </>
+          ) : (
+            <p className="nesio-music-msg">
+              {L(dict,
+                '要用它得先在服务端配上 Apple 的开发者密钥(APPLE_MUSIC_TEAM_ID / KEY_ID / PRIVATE_KEY)。配好之前这一格只能看。',
+                'This needs Apple developer keys on the server (APPLE_MUSIC_TEAM_ID / KEY_ID / PRIVATE_KEY). Until then this tab is read-only.')}
+            </p>
+          )}
         </section>
       )}
 
@@ -461,10 +485,20 @@ export default function MusicPanel() {
                 setReadiness(await probeReadiness());
               }}
             >{L(dict, '断开 Spotify', 'Disconnect Spotify')}</button>
-          ) : (
+          ) : readiness.spotify?.configured ? (
             <a className="nesio-music-connect" href="/api/portal/music/spotify/connect">
               {L(dict, '连接 Spotify', 'Connect Spotify')}
             </a>
+          ) : (
+            /* 服务端没配 client id/secret 时**绝不放这个链接出去**:
+               那条路由回的是 503 + 一段 JSON,浏览器会原样铺满整屏
+               —— 实测截图就是一屏黑底白字的 {"ok":false,"error":"provider_not_configured"…}。
+               内部错误码不该出现在用户眼前(红线:内部文案泄露)。 */
+            <p className="nesio-music-msg">
+              {L(dict,
+                '要用它得先在服务端配上 SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET。配好之前这一格只能看。',
+                'This needs SPOTIFY_CLIENT_ID / SPOTIFY_CLIENT_SECRET on the server. Until then this tab is read-only.')}
+            </p>
           )}
         </section>
       )}

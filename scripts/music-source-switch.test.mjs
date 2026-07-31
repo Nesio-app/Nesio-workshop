@@ -142,7 +142,7 @@ assert.equal(cat.blockedReason('local', READY), '', '能放的时候不该有多
     '连接 Apple Music 的结果必须显示 —— 成功和失败都要',
   );
   assert.ok(
-    /probed && !playable && blocked &&[^\n]*<p className="nesio-music-blocked">\{blocked\}<\/p>/.test(panel),
+    /probed && !playable && blocked[\s\S]{0,300}<p className="nesio-music-blocked">\{blocked\}<\/p>/.test(panel),
     '当前源不能放时,那句原因必须显示在屏幕上',
   );
   // 但未登录时要让位给真原因:三个远端源的探测都走 guard,401 会被翻译成
@@ -354,6 +354,59 @@ assert.equal(cat.blockedReason('local', READY), '', '能放的时候不该有多
     /spotifyInfo\.product === 'premium'[\s\S]{0,240}免费版,搜得到但放不了/.test(panel),
     '连上的是免费账号就直说「搜得到但放不了」—— 比一句泛泛的「放不了」有用得多',
   );
+}
+
+/* ── ⑰ 没配好的源不许留一个点了就出事的入口 ───────────────────────────── */
+
+{
+  const panel = read('components/portal/music/MusicPanel.tsx');
+  // 实测:Spotify 那颗「连接」是个 <a href="/api/portal/music/spotify/connect">。
+  // 服务端没配 client id/secret 时那条路由回 503 + 一段 JSON,浏览器把它原样
+  // 铺满整屏 —— 用户看到的是一屏黑底白字的 {"ok":false,"error":"provider_not_configured"…}。
+  // 内部错误码不该出现在用户眼前(红线:内部文案泄露)。
+  assert.ok(
+    /\) : readiness\.spotify\?\.configured \? \([\s\S]{0,200}href="\/api\/portal\/music\/spotify\/connect"/.test(panel),
+    '没配好 Spotify 时不许放出那个跳转链接 —— 那条路由会回一屏裸 JSON',
+  );
+  // 中英**各一句**都要在:只搜一次的话,改掉中文那句、英文那句照样让断言过
+  // (同一个环境变量名在两句里都出现)。
+  assert.ok(
+    /要用它得先在服务端配上 SPOTIFY_CLIENT_ID \/ SPOTIFY_CLIENT_SECRET/.test(panel)
+    && /This needs SPOTIFY_CLIENT_ID \/ SPOTIFY_CLIENT_SECRET on the server/.test(panel),
+    '没配好时要说清楚缺什么、去哪配(中英各一句),而不是让人点一下撞一屏 JSON',
+  );
+  // Apple 同理:没配密钥时那颗按钮点了必然失败,而失败那句跟顶上那句是同一件事。
+  assert.ok(
+    /\{readiness\.apple\?\.configured \? \(/.test(panel),
+    '没配好 Apple 的开发者密钥时不该给「连接」按钮 —— 点了必然失败',
+  );
+  // 同一件事不许在一屏里说两遍。
+  assert.ok(
+    /&& !\(source !== 'local' && ready && !ready\.configured\)/.test(panel),
+    '这一段自己会说明时,顶上那句就该让位 —— 否则屏幕上两句「还没配好」',
+  );
+  // 四个源长得一模一样、点进去才发现三个用不了 = 让人一个个去撞墙。
+  assert.ok(
+    /probed && !signedOut && s\.id !== 'local' && r && !r\.configured/.test(panel),
+    '没配好的源要在 chip 上标出来(但未登录时不标 —— 那时真原因是没登录)',
+  );
+}
+
+/* ── ⑱ 本地歌曲的话术不许套远端那一套 ─────────────────────────────────── */
+
+{
+  // 实测截图:当前源是 Apple Music,屏幕上却写着
+  // 「本地歌曲还差一步就能放了 —— 连上账号或换成本地歌曲都行」。
+  // 本地歌曲不需要账号,也不该建议「换成本地歌曲」——它说的就是本地歌曲。
+  const line = cat.noSourceLine({ local: { configured: true, authorized: true, streamable: false } });
+  assert.ok(/导几首/.test(line), '本地歌曲差的是导歌,不是连账号');
+  assert.ok(!/连上账号/.test(line) && !/换成本地歌曲/.test(line), '不许拿远端那套话去说本地歌曲');
+
+  // blockedReason 同理:本地源走通用话术时 requires 是空串,
+  // 句子会变成「连上了,但这首现在取不到 —— 通常是的关系」,读都读不通。
+  const b = cat.blockedReason('local', { configured: true, authorized: true, streamable: false });
+  assert.ok(/导几首/.test(b), '本地歌曲放不出声只有一个原因:曲库空着');
+  assert.ok(!/通常是的关系/.test(b), '本地源不许套用远端那句带 requires 的模板');
 }
 
 console.log('music-source-switch: OK(换源提前说 / 正向可播 / 回退链只收真能放的 / Premium 才算能放 / 失败路径可见 / 到头会停 / 清除已收口 / 回调落在音乐页 / CSP 与 locale 不静默坑人)');

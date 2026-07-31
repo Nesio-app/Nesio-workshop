@@ -133,7 +133,9 @@ const COPY = {
     fromRemote: (a: MusicSourceInfo, b: MusicSourceInfo) => `换回 ${b.zh} 之后,${a.zh} 会停,声音回到 Nesio 自己播、车机上显示 ${b.showsOnCar}。`,
     toMetaOnly: (b: MusicSourceInfo) => `${b.zh}现在只能查不能放,切过去不会有声音。`,
     toInApp: (b: MusicSourceInfo) => `换到 ${b.zh},声音回到 Nesio 自己播。`,
-    halfWay: (names: string) => `${names}还差一步就能放了 —— 连上账号或换成本地歌曲都行。`,
+    halfWay: (names: string) => `${names}还差一步:连上账号就能听。`,
+    // 本地歌曲差的不是账号,是**还没导歌** —— 拿「连上账号」去说它,是一句对不上的话。
+    localEmpty: '本地歌曲还是空的 —— 导几首进来就能听,不要账号也不要网络。',
     nothing: '现在还没有能出声的音源。先往本地歌曲里放几首,离线也听得到。',
   },
   en: {
@@ -146,7 +148,8 @@ const COPY = {
     fromRemote: (a: MusicSourceInfo, b: MusicSourceInfo) => `Switching back to ${b.en} stops ${a.en}; Nesio plays again and your car shows ${b.showsOnCar}.`,
     toMetaOnly: (b: MusicSourceInfo) => `${b.en} can only search right now, so switching there will not make any sound.`,
     toInApp: (b: MusicSourceInfo) => `Switching to ${b.en} — Nesio plays the audio again.`,
-    halfWay: (names: string) => `${names} are one step away — connect an account, or switch to local files.`,
+    halfWay: (names: string) => `${names} are one step away — just connect an account.`,
+    localEmpty: 'Local music is still empty — drop a few files in and you can listen, no account and no network needed.',
     nothing: 'No source can play yet. Drop a few files into local music — those work offline.',
   },
 } as const;
@@ -162,6 +165,10 @@ export function blockedReason(id: MusicSourceId, r: SourceReadiness, locale: Mus
   const s = sourceInfo(id);
   const c = t(locale);
   if (canPlayNow(id, r)) return '';
+  // 本地歌曲**单独说**:它不需要配置、不需要账号,唯一放不出声的原因是曲库空着。
+  // 走下面那条通用话术的话,requires 是空串,句子会变成「连上了,但这首现在取不到 ——
+  // 通常是的关系」:一句读不通的话。
+  if (id === 'local') return c.localEmpty;
   if (s.model === 'metadata-only') return c.metaOnly(s);
   if (!r.configured) return c.unconfigured(s);
   if (!r.authorized) return c.unauthorized(s);
@@ -218,9 +225,15 @@ export function noSourceLine(
   locale: MusicLocale = 'zh',
 ): string {
   const c = t(locale);
+  // 本地歌曲**单独说**。它 configured 恒真、authorized 恒真,不能放只可能是一个原因:
+  // 曲库空着。把它混进「还差一步 —— 连上账号」那句里,得到的是一句对不上的话
+  // (实测:当前源是 Apple Music,屏幕上却写着「本地歌曲还差一步…连上账号或换成本地歌曲」)。
+  const localReady = readiness.local ?? UNREADY;
+  if (localReady.configured && !localReady.streamable) return c.localEmpty;
+
   const half = MUSIC_SOURCES.filter((s) => {
     const r = readiness[s.id] ?? UNREADY;
-    return s.model !== 'metadata-only' && r.configured && !canPlayNow(s.id, r);
+    return s.id !== 'local' && s.model !== 'metadata-only' && r.configured && !canPlayNow(s.id, r);
   });
   if (half.length) return c.halfWay(half.map(c.name).join(locale === 'en' ? ', ' : '、'));
   return c.nothing;

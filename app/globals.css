@@ -21176,3 +21176,11 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   .is-done .nesio-receipt-mark { animation: none; }
   .nesio-receipt-spin { animation-duration: 2s; }
 }
+
+/* 音源 chip 上的「未配置」小标(2026-07-31 实测:四个源长得一模一样,
+   点进去才发现三个用不了 —— 那是让人一个个去撞墙)。 */
+.nesio-music-src-tag {
+  font-size: var(--text-xs);
+  color: var(--status-gentle);
+  padding: 0 var(--space-1);
+}
