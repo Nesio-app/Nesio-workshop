@@ -37,6 +37,14 @@ function friendlyAuthError(error: string | undefined, zh: boolean): string {
   if (error === 'supabase_otp_failed') {
     return zh ? '登录邮件没有发出，请稍后再试，或先本地使用。' : 'The sign-in email was not sent. Try again later or use Nesio locally.';
   }
+  if (error === 'not_invited') {
+    // 邀请制(2026-07-31)。这句要**说清楚是名单问题,不是他填错了** ——
+    // 说成「登录失败」的话,人会反复试密码、重发验证码,最后以为是自己账号坏了。
+    // 同时留出口:Nesio 不登录也能用本地功能,那不是安慰话,是真的。
+    return zh
+      ? '这个邮箱还不在名单上。Nesio 现在是邀请制 —— 跟主人说一声，把你加进来就行。不登录也能先本地用。'
+      : 'This email is not on the list yet. Nesio is invite-only right now — ask the owner to add you. You can still use it locally without signing in.';
+  }
   if (error === 'user_not_found') {
     return zh ? '没有找到这个邮箱，请切换到注册。' : 'No account was found for this email. Switch to create account.';
   }

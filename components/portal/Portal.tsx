@@ -304,6 +304,22 @@ export default function Portal() {
   const [reliefBusy, setReliefBusy] = useState(false);
   const [reliefMsg, setReliefMsg] = useState('');
   const [storageAlert, setStorageAlert] = useState<{ kind: 'full' | 'warning'; percent: number; largest?: Array<{ key: string; bytes: number }> } | null>(null);
+  /**
+   * 邀请制挡下的那一次(2026-07-31)。magic link / 第三方登录被挡时,callback 会带
+   * `?status=not_invited` 把人送回这里 —— 不说一句的话,他看到的是「点了邮件链接、
+   * 回来了、然后什么也没发生」,只会再点一次、再等一封信。
+   */
+  const [notInvited, setNotInvited] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('status') !== 'not_invited' && params.get('auth') !== 'auth_not_invited') return;
+    setNotInvited(true);
+    // 读完就把参数擦掉,免得刷新一次又弹一遍。
+    for (const k of ['status', 'auth', 'provider', 'safePublicStatus', 'secretsRedacted', 'authReady', 'profileBootstrapStatus', 'profileBootstrapBlocking']) params.delete(k);
+    const qs = params.toString();
+    window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+  }, []);
   const [captureMode, setCaptureMode] = useState<CaptureMode | null>(null);
 
   // 批次 7:iOS PWA 后台驻留页面从不重载,用户会停在几天前的旧 UI。
@@ -1328,6 +1344,31 @@ export default function Portal() {
     <>
       <div className="portal-root portal-root--home">
         <div className="portal-grain" aria-hidden />
+        {notInvited && (
+          <div
+            role="alert"
+            style={{
+              position: 'fixed', top: 8, left: 12, right: 12, zIndex: 300,
+              padding: 'var(--space-3) var(--space-4)', borderRadius: 'var(--radius-md)',
+              background: 'var(--status-gentle-soft)', color: 'var(--portal-ink)',
+              fontSize: 'var(--text-sm)', lineHeight: 1.6,
+              display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+            }}
+          >
+            <span style={{ flex: 1 }}>
+              {L(dict,
+                '这个邮箱还不在名单上。Nesio 现在是邀请制 —— 跟主人说一声就能加进来。不登录也能先本地用。',
+                'This email is not on the list yet. Nesio is invite-only right now — ask the owner to add you. You can still use it locally.')}
+            </span>
+            <button
+              type="button"
+              onClick={() => setNotInvited(false)}
+              style={{ flex: 'none', minHeight: 'var(--tap-min, 44px)', padding: '0 var(--space-3)', border: 'none', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: 'var(--text-sm)' }}
+            >
+              {L(dict, '知道了', 'OK')}
+            </button>
+          </div>
+        )}
         {storageAlert && (
           <div
             role="alert"
