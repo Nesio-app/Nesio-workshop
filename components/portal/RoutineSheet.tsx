@@ -111,7 +111,7 @@ export default function RoutineSheet({ open, onClose }: { open: boolean; onClose
           {/* 健身:挂一个训练计划,Today 到点出「开始练」 */}
           {category === 'fitness' && (
             <div className="nesio-routine-plan-pick">
-              <p className="nesio-settings-option-hint" style={{ margin: '0 0 0.35rem' }}>{L(dict, '挂一个训练计划(到点在首页出「开始练」)', 'Attach a training plan (Today shows "Start")')}</p>
+              <p className="nesio-settings-option-hint" style={{ margin: '0 0 var(--space-1)' }}>{L(dict, '挂一个训练计划(到点在首页出「开始练」)', 'Attach a training plan (Today shows "Start")')}</p>
               {PROTOCOL_LIBRARY.map((p) => (
                 <button
                   key={p.id}
@@ -161,12 +161,12 @@ export default function RoutineSheet({ open, onClose }: { open: boolean; onClose
               </button>
             ))}
           </div>
-          <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: '0.5rem' }} onClick={submit} disabled={!text.trim()}>
+          <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-2)' }} onClick={submit} disabled={!text.trim()}>
             {L(dict, '添加', 'Add')}
           </button>
 
           {/* 列表 */}
-          <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>
+          <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>
             {L(dict, `已有提醒(${routines.length})`, `Your routines (${routines.length})`)}
           </p>
           {routines.length === 0 && (

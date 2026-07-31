@@ -78,8 +78,8 @@ export function UserAccess({ secret }: { secret: string }) {
   return (
     <div style={{ overflowX: 'auto' }}>
       {users.map((u) => (
-        <div key={u.identityKey} style={{ padding: '0.7rem 0', borderBottom: '1px solid var(--portal-line)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', alignItems: 'center' }}>
+        <div key={u.identityKey} style={{ padding: 'var(--space-3) 0', borderBottom: '1px solid var(--portal-line)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-2)', alignItems: 'center' }}>
             <div style={{ minWidth: 0 }}>
               <p style={{ margin: 0, fontSize: '0.82rem', fontWeight: 600, color: 'var(--portal-ink)' }}>
                 {u.email || u.displayName || u.identityKey.slice(0, 18)}
@@ -89,12 +89,12 @@ export function UserAccess({ secret }: { secret: string }) {
                 {u.provider || '—'}{u.createdAt ? ` · ${u.createdAt.slice(0, 10)} 注册` : ''}
               </p>
             </div>
-            <div style={{ display: 'flex', gap: '0.35rem' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
               {ROLES.map((r) => (
                 <button key={r.value} type="button" title={r.hint}
                   onClick={() => void patch(u.identityKey, { accessRole: r.value })}
                   style={{
-                    padding: '0.28rem 0.7rem', borderRadius: 'var(--radius-pill)', fontSize: '0.72rem', cursor: 'pointer',
+                    padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-pill)', fontSize: '0.72rem', cursor: 'pointer',
                     border: `1px solid ${u.accessRole === r.value ? 'var(--portal-accent)' : 'var(--glass-border)'}`,
                     background: u.accessRole === r.value ? 'var(--portal-accent-soft-md)' : 'var(--glass-bg-solid)',
                     color: u.accessRole === r.value ? 'var(--portal-accent)' : 'var(--portal-muted)',
@@ -105,14 +105,14 @@ export function UserAccess({ secret }: { secret: string }) {
             </div>
           </div>
           {u.accessRole === 'tester' && (
-            <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-1)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
               {GATED_MODULES.map((m) => {
                 const on = u.featureFlags[m] === true;
                 return (
                   <button key={m} type="button"
                     onClick={() => void patch(u.identityKey, { featureFlags: { ...u.featureFlags, [m]: !on } })}
                     style={{
-                      padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-pill)', fontSize: '0.68rem', cursor: 'pointer',
+                      padding: 'var(--space-1) var(--space-2)', borderRadius: 'var(--radius-pill)', fontSize: '0.68rem', cursor: 'pointer',
                       border: `1px solid ${on ? 'var(--status-go)' : 'var(--glass-border)'}`,
                       background: on ? 'var(--status-go-soft)' : 'var(--glass-bg-solid)',
                       color: on ? 'var(--status-go)' : 'var(--portal-muted)',

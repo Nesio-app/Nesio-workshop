@@ -93,7 +93,7 @@ export default function RewardsStore() {
         )}
 
         {pending.length === 0 && !adding && (
-          <p className="nesio-freeze-empty" style={{ padding: '0.75rem 0' }}>
+          <p className="nesio-freeze-empty" style={{ padding: 'var(--space-3) 0' }}>
             {L(dict, '还没有愿望。到「清单」里对一个冷冻的东西点「不买了」,它就会来这里。', 'No wishes yet. In the List tab, tap "Skipped" on a frozen item and it lands here.')}
           </p>
         )}

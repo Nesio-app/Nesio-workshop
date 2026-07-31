@@ -41,7 +41,7 @@ const FORMAL_LABEL: Record<Formality, [string, string]> = { casual: ['休闲', '
 const card: React.CSSProperties = { borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', padding: 'var(--space-4)' };
 const sectionLbl: React.CSSProperties = { margin: 'var(--space-5) 0 var(--space-2)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' };
 const chip = (active: boolean): React.CSSProperties => ({
-  padding: '0.3rem 0.7rem', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-xs)', cursor: 'pointer',
+  padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-xs)', cursor: 'pointer',
   border: `1px solid ${active ? 'transparent' : 'var(--portal-line)'}`,
   background: active ? 'var(--portal-accent)' : 'transparent',
   color: active ? 'var(--portal-on-accent, #fff)' : 'var(--portal-ink)',
@@ -649,7 +649,7 @@ export default function WardrobePanel() {
           {/* bug3:「今天穿这套」这行字删掉(它就在衣橱的第一屏,不需要自我介绍);
               AI 造型徽章留着 —— 那是「这套哪来的」的真信息。 */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-2)' }}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--portal-blue-deep)' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--portal-blue-deep)' }}>
               {aiPieces && <><IconStar size={12} />{L(dict, 'AI 造型', 'AI styled')}</>}
             </span>
             <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, `${pieces.length} 件`, `${pieces.length} pieces`)}</span>
@@ -665,7 +665,7 @@ export default function WardrobePanel() {
               <img key={p.id} src={thumbs[p.id]} alt={p.name} title={p.name} width={56} height={56}
                 style={{ width: 56, height: 56, borderRadius: 'var(--radius-sm)', objectFit: 'cover', border: '1px solid var(--portal-line)' }} />
             ) : (
-              <span key={p.id} style={{ display: 'inline-flex', alignItems: 'center', padding: '0.25rem 0.5rem', borderRadius: 'var(--radius-sm)', background: 'var(--glass-bg-solid, var(--portal-bg))', border: '1px solid var(--portal-line)', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)' }}>
+              <span key={p.id} style={{ display: 'inline-flex', alignItems: 'center', padding: 'var(--space-1) var(--space-2)', borderRadius: 'var(--radius-sm)', background: 'var(--glass-bg-solid, var(--portal-bg))', border: '1px solid var(--portal-line)', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)' }}>
                 {p.name}
               </span>
             )))}
@@ -678,11 +678,11 @@ export default function WardrobePanel() {
             </p>
           )}
           {outfit.needUmbrella && (
-            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-calm)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}><IconRain size={13} />{L(dict, '今天可能下雨,记得带伞', 'Rain likely — take an umbrella')}</p>
+            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-calm)', display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}><IconRain size={13} />{L(dict, '今天可能下雨,记得带伞', 'Rain likely — take an umbrella')}</p>
           )}
           {/* 规则版的季节冲突提示(AI 造型时不显示,AI 自己会避开) */}
           {!aiPieces && outfit.mismatch && (
-            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}><IconAlertTriangle size={13} />{dict === 'en' ? outfit.mismatch[1] : outfit.mismatch[0]}</p>
+            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)', display: 'flex', alignItems: 'center', gap: 'var(--space-1)' }}><IconAlertTriangle size={13} />{dict === 'en' ? outfit.mismatch[1] : outfit.mismatch[0]}</p>
           )}
           {/* B｜反馈:喜欢/不喜欢 → 越用越懂你(免费+Pro 都有)。
               bug3:删「这套怎么样?」那句问话、删「这套穿了」按钮(搭配详情里排日子/记穿过更完整),
@@ -699,9 +699,9 @@ export default function WardrobePanel() {
                     giveFeedback('like', pieces);
                     commitOutfit(saveOutfit(pieces.map((p) => p.id), todayIso, { starred: true }));
                   }}
-                  style={{ display: 'inline-flex', padding: '0.3rem 0.55rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer' }}><IconThumbUp size={15} /></button>
+                  style={{ display: 'inline-flex', padding: 'var(--space-1) var(--space-2)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer' }}><IconThumbUp size={15} /></button>
                 <button type="button" aria-label={L(dict, '不喜欢:以后避开这套', 'Dislike — avoid this')} onClick={() => giveFeedback('dislike', pieces)}
-                  style={{ display: 'inline-flex', padding: '0.3rem 0.55rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer' }}><IconThumbDown size={15} /></button>
+                  style={{ display: 'inline-flex', padding: 'var(--space-1) var(--space-2)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer' }}><IconThumbDown size={15} /></button>
               </>
             )}
           </div>
@@ -711,7 +711,7 @@ export default function WardrobePanel() {
               {L(dict, '试穿', 'Try on')}
             </button>
             <button type="button" style={{ ...outfitActionBtn, opacity: stylistBusy ? 0.6 : 1 }} disabled={stylistBusy} onClick={restyle}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.3rem' }}><IconRefresh size={13} />{L(dict, '换一套', 'Restyle')}</span>
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-1)' }}><IconRefresh size={13} />{L(dict, '换一套', 'Restyle')}</span>
             </button>
           </div>
           {isPro && (stylistBusy || stylistError) && (
@@ -744,9 +744,9 @@ export default function WardrobePanel() {
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={tryonResult} alt={L(dict, '试穿效果', 'Try-on result')} style={{ width: '100%', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)' }} />
               <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-                <a href={tryonResult} download="nesio-tryon.png" style={{ flex: 1, textAlign: 'center', padding: '0.5rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', textDecoration: 'none' }}>{L(dict, '保存图片', 'Save image')}</a>
+                <a href={tryonResult} download="nesio-tryon.png" style={{ flex: 1, textAlign: 'center', padding: 'var(--space-2)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', textDecoration: 'none' }}>{L(dict, '保存图片', 'Save image')}</a>
                 <button type="button" onClick={() => runTryon(currentPieces)} disabled={tryonBusy}
-                  style={{ flex: 1, padding: '0.5rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', cursor: tryonBusy ? 'default' : 'pointer', opacity: tryonBusy ? 0.6 : 1 }}>{L(dict, '再试一次', 'Try again')}</button>
+                  style={{ flex: 1, padding: 'var(--space-2)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', cursor: tryonBusy ? 'default' : 'pointer', opacity: tryonBusy ? 0.6 : 1 }}>{L(dict, '再试一次', 'Try again')}</button>
               </div>
             </div>
           ) : (
@@ -758,7 +758,7 @@ export default function WardrobePanel() {
                   {bodyThumb ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={bodyThumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}><IconCamera size={18} />{L(dict, '全身照', 'Full body')}</span>}
+                  ) : <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-1)' }}><IconCamera size={18} />{L(dict, '全身照', 'Full body')}</span>}
                 </button>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   {/* bug3:已有全身照时那句「用这张全身照把这套穿上看看」删掉(照片就在旁边,不必解说)。
@@ -771,7 +771,7 @@ export default function WardrobePanel() {
                   )}
                   {bodyThumb && (
                     <button type="button" onClick={() => bodyFileRef.current?.click()}
-                      style={{ marginTop: '0.4rem', padding: '0.25rem 0.6rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>{L(dict, '换全身照', 'Change photo')}</button>
+                      style={{ marginTop: 'var(--space-2)', padding: 'var(--space-1) var(--space-2)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>{L(dict, '换全身照', 'Change photo')}</button>
                   )}
                 </div>
               </div>
@@ -779,7 +779,7 @@ export default function WardrobePanel() {
               {/* role=alert 与「搭配」那一处对齐 —— 同一个 tryonError 在两个屏渲染,
                   少一个 role 就变成「一处读屏会播报、另一处不会」。 */}
               {tryonError && (
-                <p role="alert" style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>{tryonError}</p>
+                <p role="alert" style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)' }}>{tryonError}</p>
               )}
 
               <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-3)', opacity: tryonBusy ? 0.6 : 1 }}
@@ -822,9 +822,9 @@ export default function WardrobePanel() {
           {!editingId && (
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
             <button type="button" onClick={() => cameraRef.current?.click()}
-              style={{ flex: 1, padding: '0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: 'pointer' }}>{L(dict, '拍照', 'Camera')}</button>
+              style={{ flex: 1, padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: 'pointer' }}>{L(dict, '拍照', 'Camera')}</button>
             <button type="button" onClick={() => uploadRef.current?.click()}
-              style={{ flex: 1, padding: '0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: 'pointer' }}>{L(dict, '上传照片', 'Upload photo')}</button>
+              style={{ flex: 1, padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', cursor: 'pointer' }}>{L(dict, '上传照片', 'Upload photo')}</button>
           </div>
           )}
           <div style={{ display: 'flex', gap: 'var(--space-3)', alignItems: 'flex-start' }}>
@@ -841,21 +841,21 @@ export default function WardrobePanel() {
             <div style={{ flex: 1, minWidth: 0 }}>
               <input value={draft.name} onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
                 placeholder={L(dict, '名字(可留空)', 'Name (optional)')}
-                style={{ width: '100%', padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }} />
+                style={{ width: '100%', padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }} />
               {draft.dataUrl && (
-                <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.4rem' }}>
+                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
                   <button type="button" onClick={recognize} disabled={aiBusy || beautyBusy}
-                    style={{ padding: '0.35rem 0.7rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-xs)', cursor: aiBusy ? 'default' : 'pointer', opacity: aiBusy ? 0.6 : 1 }}>
+                    style={{ padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-xs)', cursor: aiBusy ? 'default' : 'pointer', opacity: aiBusy ? 0.6 : 1 }}>
                     {aiBusy ? L(dict, '识别中…', 'Recognizing…') : L(dict, 'AI 识别属性(Pro)', 'AI attributes (Pro)')}
                   </button>
                   {/* 图16:把这张照片洗成白底干净的单品图 */}
                   <button type="button" onClick={beautify} disabled={aiBusy || beautyBusy}
-                    style={{ padding: '0.35rem 0.7rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-xs)', cursor: beautyBusy ? 'default' : 'pointer', opacity: beautyBusy ? 0.6 : 1 }}>
+                    style={{ padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-xs)', cursor: beautyBusy ? 'default' : 'pointer', opacity: beautyBusy ? 0.6 : 1 }}>
                     {beautyBusy ? L(dict, '美化中…(约十几秒)', 'Cleaning up… (~15s)') : L(dict, '洗成白底图(Pro)', 'White background (Pro)')}
                   </button>
                   {origPhoto && (
                     <button type="button" onClick={() => { setDraft((d) => ({ ...d, dataUrl: origPhoto })); setOrigPhoto(null); }}
-                      style={{ padding: '0.35rem 0.7rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>
+                      style={{ padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>
                       {L(dict, '还是用原图', 'Use original')}
                     </button>
                   )}
@@ -865,7 +865,7 @@ export default function WardrobePanel() {
           </div>
 
           {aiError && (
-            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>{aiError}</p>
+            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)' }}>{aiError}</p>
           )}
 
           <p style={{ ...sectionLbl, marginTop: 'var(--space-4)' }}>{L(dict, '类型', 'Type')}</p>
@@ -891,7 +891,7 @@ export default function WardrobePanel() {
 
           <input value={draft.colors} onChange={(e) => setDraft((d) => ({ ...d, colors: e.target.value }))}
             placeholder={L(dict, '颜色(逗号分隔,可留空)', 'Colors (comma-separated, optional)')}
-            style={{ width: '100%', marginTop: 'var(--space-4)', padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }} />
+            style={{ width: '100%', marginTop: 'var(--space-4)', padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }} />
 
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
             <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={save}>{editingId ? L(dict, '保存修改', 'Save changes') : L(dict, '存进衣橱', 'Save')}</button>
@@ -983,9 +983,9 @@ export default function WardrobePanel() {
                     <img src={thumbs[it.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   ) : <GarmentIcon type={it.garmentType} size={26} />}
                 </div>
-                <div style={{ padding: '0.4rem 0.5rem' }}>
+                <div style={{ padding: 'var(--space-2) var(--space-2)' }}>
                   <p style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</p>
-                  <p style={{ margin: '0.15rem 0 0', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>
+                  <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>
                     {L(dict, WARMTH_LABEL[it.warmth][0], WARMTH_LABEL[it.warmth][1])} · {L(dict, FORMAL_LABEL[it.formality][0], FORMAL_LABEL[it.formality][1])}
                   </p>
                 </div>
@@ -1056,7 +1056,7 @@ function SavedOutfits({
           <img key={p.id} src={thumbs[p.id]} alt={p.name} title={p.name} width={size} height={size}
             style={{ width: size, height: size, borderRadius: 'var(--radius-sm)', objectFit: 'cover', border: '1px solid var(--portal-line)' }} />
         ) : (
-          <span key={p.id} style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '0.25rem 0.5rem' }}>{p.name}</span>
+          <span key={p.id} style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: 'var(--space-1) var(--space-2)' }}>{p.name}</span>
         )))}
         {pieces.length === 0 && (
           <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '这套里的衣服已经不在衣橱里了', 'These pieces are no longer in your wardrobe')}</span>
@@ -1072,7 +1072,7 @@ function SavedOutfits({
       <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginTop: 'var(--space-2)' }}>
         <input type="date" value={d} onChange={(e) => setD(e.target.value)}
           aria-label={L(dict, '哪天穿', 'Wear on')}
-          style={{ flex: 1, minWidth: 0, padding: '0.4rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)' }} />
+          style={{ flex: 1, minWidth: 0, padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)' }} />
         <button type="button" disabled={!d} style={outfitActionBtn}
           onClick={() => { if (d) { onSchedule(o, d); setSchedulingId(null); } }}>
           {L(dict, '排进日历', 'Add to calendar')}
@@ -1132,7 +1132,7 @@ function SavedOutfits({
           <PieceStrip o={o} size={64} />
         )}
         {tryonError && (
-          <p role="alert" style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>{tryonError}</p>
+          <p role="alert" style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)' }}>{tryonError}</p>
         )}
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
           <button type="button" style={{ ...outfitActionBtn, opacity: tryonBusy ? 0.6 : 1 }} disabled={tryonBusy} onClick={() => onTryon(o)}>
@@ -1322,7 +1322,7 @@ function MonthGrid({ month, items, thumbs, tryons, dict, selected, onPick }: {
 
 /** bug3:「试穿 / 换一套」并排同款 —— 原来一个是描边灰、一个是蓝底,看着像两个层级。 */
 const outfitActionBtn: React.CSSProperties = {
-  flex: 1, padding: '0.45rem 0', borderRadius: 'var(--radius-pill)',
+  flex: 1, padding: 'var(--space-2) 0', borderRadius: 'var(--radius-pill)',
   border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)',
   color: 'var(--portal-blue-deep)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)', cursor: 'pointer',
 };

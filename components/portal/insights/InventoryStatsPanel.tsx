@@ -86,7 +86,7 @@ export default function InventoryStatsPanel() {
     return (
       <div className="nesio-analytics-tab">
         <p className="nesio-insights-empty">{L(dict, '还没有物品。到物品页记几件,统计会自动出现。', 'No items yet — add a few in Items and stats appear here.')}</p>
-        <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: '0.8rem' }} onClick={openInventory}>{L(dict, '打开物品管理', 'Open Items')}</button>
+        <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-3)' }} onClick={openInventory}>{L(dict, '打开物品管理', 'Open Items')}</button>
       </div>
     );
   }
@@ -99,7 +99,7 @@ export default function InventoryStatsPanel() {
 
   const card: React.CSSProperties = { borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', padding: 'var(--space-4)' };
   const kv: React.CSSProperties = { display: 'block', fontSize: 'var(--text-h2)', fontWeight: 'var(--weight-bold)', color: 'var(--portal-ink)', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' };
-  const kl: React.CSSProperties = { display: 'block', marginTop: '0.25rem', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' };
+  const kl: React.CSSProperties = { display: 'block', marginTop: 'var(--space-1)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' };
   const sectionLbl: React.CSSProperties = { margin: 'var(--space-5) 0 var(--space-2)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' };
 
   return (

@@ -182,7 +182,7 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
     }
   }
 
-  const label = { fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginBottom: '0.25rem', display: 'block' } as const;
+  const label = { fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginBottom: 'var(--space-1)', display: 'block' } as const;
 
   return (
     <NesioSheet
@@ -199,41 +199,41 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
         </div>
 
         {sent ? (
-          <div style={{ textAlign: 'center', padding: '2rem 1.25rem' }}>
+          <div style={{ textAlign: 'center', padding: 'var(--space-8) var(--space-5)' }}>
             <p style={{ color: 'var(--status-go)', fontSize: '2rem', margin: 0, lineHeight: 1 }}>✓</p>
-            <p style={{ color: 'var(--status-go)', fontSize: 'var(--text-h3)', fontWeight: 700, marginTop: '0.5rem' }}>{L(dict, '已发送', 'Sent')}</p>
+            <p style={{ color: 'var(--status-go)', fontSize: 'var(--text-h3)', fontWeight: 700, marginTop: 'var(--space-2)' }}>{L(dict, '已发送', 'Sent')}</p>
           </div>
         ) : (
-          <div style={{ overflowY: 'auto', padding: '0 0.25rem 0.5rem' }}>
+          <div style={{ overflowY: 'auto', padding: '0 var(--space-1) var(--space-2)' }}>
             {fromEmail && (
-              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: '0 0 0.5rem' }}>
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: '0 0 var(--space-2)' }}>
                 {L(dict, `发件人:${fromEmail}(数据接入里连接的 Gmail)`, `From: ${fromEmail} (the Gmail connected in Data sources)`)}
               </p>
             )}
             <label style={label}>{L(dict, '收件人', 'To')}</label>
-            <input className="nesio-ob-input" value={to} onChange={(e) => setTo(e.target.value)} placeholder="name@example.com" style={{ marginBottom: '0.6rem' }} />
+            <input className="nesio-ob-input" value={to} onChange={(e) => setTo(e.target.value)} placeholder="name@example.com" style={{ marginBottom: 'var(--space-2)' }} />
 
             <label style={label}>{L(dict, '主题', 'Subject')}</label>
-            <input className="nesio-ob-input" value={subject} onChange={(e) => setSubject(e.target.value)} style={{ marginBottom: '0.6rem' }} />
+            <input className="nesio-ob-input" value={subject} onChange={(e) => setSubject(e.target.value)} style={{ marginBottom: 'var(--space-2)' }} />
 
             {/* AI 起草区 */}
-            <div style={{ background: 'var(--portal-accent-soft)', borderRadius: 'var(--radius-sm)', padding: '0.7rem', marginBottom: '0.7rem' }}>
+            <div style={{ background: 'var(--portal-accent-soft)', borderRadius: 'var(--radius-sm)', padding: 'var(--space-3)', marginBottom: 'var(--space-3)' }}>
               <label style={label}>{L(dict, '想表达什么?(可选,交给 AI 起草)', 'What to say? (optional — let AI draft it)')}</label>
               <input
                 className="nesio-ob-input"
                 value={intent}
                 onChange={(e) => setIntent(e.target.value)}
                 placeholder={L(dict, '例:同意周四见面,把时间定在下午三点', 'e.g. Agree to meet Thursday, propose 3pm')}
-                style={{ marginBottom: '0.5rem' }}
+                style={{ marginBottom: 'var(--space-2)' }}
               />
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginBottom: '0.55rem' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-1)', marginBottom: 'var(--space-2)' }}>
                 {TONES.map((t) => (
                   <button
                     key={t.key}
                     type="button"
                     onClick={() => setTone(tone === t.key ? '' : t.key)}
                     style={{
-                      fontSize: 'var(--text-xs)', padding: '0.25rem 0.6rem', borderRadius: 999,
+                      fontSize: 'var(--text-xs)', padding: 'var(--space-1) var(--space-2)', borderRadius: 999,
                       border: `1px solid ${tone === t.key ? 'var(--portal-accent)' : 'var(--portal-line)'}`,
                       background: tone === t.key ? 'var(--portal-accent)' : 'transparent',
                       color: tone === t.key ? '#fff' : 'var(--portal-muted)',
@@ -270,20 +270,20 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
             />
 
             {draftSource && (
-              <p style={{ color: 'var(--text-tertiary, #9ca3af)', fontSize: 'var(--text-xs)', marginTop: '0.5rem', lineHeight: 1.5 }}>
+              <p style={{ color: 'var(--text-tertiary, #9ca3af)', fontSize: 'var(--text-xs)', marginTop: 'var(--space-2)', lineHeight: 1.5 }}>
                 {draftSource === 'cache'
                   ? L(dict, 'AI 暂时离线 · 复用了上次给你的初稿,改一改就能发', 'AI is offline · reused a past draft — tweak and send')
                   : L(dict, 'AI 暂时离线 · 这是本地起的骨架,把你的话补进去', 'AI is offline · a local skeleton — fill in your words')}
               </p>
             )}
 
-            {error && <p style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)', marginTop: '0.5rem' }}>{error}</p>}
+            {error && <p style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)', marginTop: 'var(--space-2)' }}>{error}</p>}
 
-            <div style={{ display: 'flex', gap: '0.6rem', marginTop: '0.8rem' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
               <button
                 type="button"
                 onClick={onClose}
-                style={{ flex: 1, padding: '0.7rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: 'var(--text-body)' }}
+                style={{ flex: 1, padding: 'var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: 'var(--text-body)' }}
               >
                 {L(dict, '取消', 'Cancel')}
               </button>
@@ -297,7 +297,7 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
                 {sending ? L(dict, '发送中…', 'Sending…') : L(dict, '发送', 'Send')}
               </button>
             </div>
-            <p style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
+            <p style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', marginTop: 'var(--space-2)', textAlign: 'center' }}>
               {L(dict, '以你的 Gmail 账号发送 · 每封都由你亲手点发送', 'Sent from your Gmail · you send every message yourself')}
             </p>
           </div>

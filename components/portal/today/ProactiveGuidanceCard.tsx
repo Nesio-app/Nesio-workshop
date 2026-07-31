@@ -25,7 +25,7 @@ function QuoteBody({ body }: { body: string }) {
     return (
       <p className="nesio-proactive-card-body">
         {body.slice(0, idx).trim()}
-        <span style={{ display: 'block', marginTop: '0.2rem', color: 'var(--portal-muted)' }}>{body.slice(idx).trim()}</span>
+        <span style={{ display: 'block', marginTop: 'var(--space-1)', color: 'var(--portal-muted)' }}>{body.slice(idx).trim()}</span>
       </p>
     );
   }
@@ -214,14 +214,14 @@ export function ProactiveGuidanceCard({
             </div>
           )}
           {(feedbackGiven || savedQuote || gestureAck) ? (
-            <p style={{ fontSize: 'var(--text-overline)', color: 'var(--status-go)', margin: '0.35rem 0 0' }}>
+            <p style={{ fontSize: 'var(--text-overline)', color: 'var(--status-go)', margin: 'var(--space-1) 0 0' }}>
               {savedQuote ? L(dict, '已存入 Memory', 'Saved to Memory')
                 : gestureAck === 'useful' ? L(dict, '✓ 有用,记住了 —— 会多来点这样的', '✓ Useful, noted — more like this')
                 : gestureAck === 'later' ? L(dict, '好,稍后再提醒你', 'OK — will remind you later')
                 : t(locale, 'guidanceFeedbackAck')}
             </p>
           ) : (
-            <div style={{ display: 'flex', gap: '0.7rem', marginTop: '0.35rem' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-1)' }}>
               {/* 批次 33:有用/不准/不再提醒 文字行撤除 —— 左滑没用 · 右滑稍后 · 双击有用 */}
               {isQuote && (
                 <>

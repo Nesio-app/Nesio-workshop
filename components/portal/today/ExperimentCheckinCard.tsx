@@ -94,7 +94,7 @@ export function ExperimentCheckinCard() {
       </div>
       {/* 批次 8:记录面板占满整卡宽,不再挤在图标右侧的窄栏里 */}
       {expanded && (
-        <div style={{ padding: '0 0.9rem 0.9rem' }}>
+        <div style={{ padding: '0 var(--space-4) var(--space-4)' }}>
           <LogPanel exp={exp!} onLog={handleLog} />
         </div>
       )}

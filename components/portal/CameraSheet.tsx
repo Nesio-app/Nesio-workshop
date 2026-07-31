@@ -1502,7 +1502,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
       )}
 
       {phase === 'saved' && (
-        <div className="nesio-camera-result-panel" style={{ textAlign: 'center', padding: '1.5rem 1.25rem' }}>
+        <div className="nesio-camera-result-panel" style={{ textAlign: 'center', padding: 'var(--space-6) var(--space-5)' }}>
           <p style={{ color: 'var(--status-go)', fontSize: 'var(--text-display)', margin: 0, lineHeight: 1 }}>✓</p>
           <p style={{ color: 'var(--portal-ink)', fontSize: 'var(--text-h3)', fontWeight: 'var(--weight-semibold)' as unknown as number, marginTop: 'var(--space-2)' }}>{L(dict, '已存入记忆', 'Saved to Memory')}</p>
           <p style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-sm)', marginTop: 'var(--space-1)' }}>{L(dict, '在「记忆」里查看', 'View it in Memory')}</p>

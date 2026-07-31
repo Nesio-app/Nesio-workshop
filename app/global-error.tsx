@@ -33,7 +33,7 @@ export default function GlobalError({
           type="button"
           onClick={reset}
           style={{
-            marginTop: 8, padding: '0.5rem 1.5rem', borderRadius: 999,
+            marginTop: 8, padding: 'var(--space-2) var(--space-6)', borderRadius: 999,
             border: 'none', background: 'var(--portal-accent, #c07f79)', color: 'var(--portal-on-accent, #fff)',
             fontSize: '0.9rem', fontWeight: 500, cursor: 'pointer',
           }}

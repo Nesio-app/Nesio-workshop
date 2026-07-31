@@ -103,12 +103,12 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
         <div className="nesio-settings-sheet-body">
           {/* 批次 32:两个折叠区(常见问题 / 未来功能),点标题展开 */}
           <button type="button" onClick={() => setFaqOpen((v) => !v)} aria-expanded={faqOpen}
-            style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: '0.55rem 0', cursor: 'pointer' }}>
+            style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: 'var(--space-2) 0', cursor: 'pointer' }}>
             <span className="nesio-settings-section-label" style={{ margin: 0 }}>{L(dict, '常见问题', 'FAQ')}</span>
             <span style={{ color: 'var(--portal-muted)' }}>{faqOpen ? '▴' : '▾'}</span>
           </button>
           {faqOpen && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', fontSize: 'var(--text-sm)', lineHeight: 1.6, marginBottom: '0.9rem' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', fontSize: 'var(--text-sm)', lineHeight: 1.6, marginBottom: 'var(--space-4)' }}>
             {[
               [L(dict, '不登录能用吗?', 'Does it work without an account?'), L(dict, '能。核心记录/搜索/回顾全部本地可用;登录只用于云同步和邮箱/日历连接。', 'Yes — capture, search, and review all work locally. Sign in only enables cloud sync and email/calendar.')],
               [L(dict, '我的数据在哪?', 'Where is my data?'), L(dict, '默认只在你的设备上;登录并开同步后才备份到云端。设置→数据 可随时导出或删除。', 'On your device by default; backed up only after you sign in and enable sync. Export or delete anytime in Settings → Data.')],
@@ -117,26 +117,26 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
             ].map(([q, a]) => (
               <div key={q}>
                 <p style={{ margin: 0, fontWeight: 600, color: 'var(--portal-ink)' }}>{q}</p>
-                <p style={{ margin: '0.15rem 0 0', color: 'var(--portal-muted)' }}>{a}</p>
+                <p style={{ margin: 'var(--space-1) 0 0', color: 'var(--portal-muted)' }}>{a}</p>
               </div>
             ))}
           </div>
           )}
 
           <button type="button" onClick={() => setVoteOpen((v) => !v)} aria-expanded={voteOpen}
-            style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: '0.55rem 0', cursor: 'pointer' }}>
+            style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 'none', padding: 'var(--space-2) 0', cursor: 'pointer' }}>
             <span className="nesio-settings-section-label" style={{ margin: 0 }}>{L(dict, '给未来功能投票', 'Vote on upcoming features')}</span>
             <span style={{ color: 'var(--portal-muted)' }}>{voteOpen ? '▴' : '▾'}</span>
           </button>
           {voteOpen && (<>
-          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: '0 0 0.8rem' }}>
+          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: '0 0 var(--space-3)' }}>
             {t(locale, 'roadmapHint')}
           </p>
           {ROADMAP_ITEMS.map((item) => {
             const v = votes.get(item.id);
             return (
-              <div key={item.id} style={{ padding: '0.7rem 0', borderTop: '1px solid var(--portal-line)' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
+              <div key={item.id} style={{ padding: 'var(--space-3) 0', borderTop: '1px solid var(--portal-line)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
                   <p style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--portal-ink)' }}>
                     {item.title[dict]}
                     <span style={{ marginLeft: 6, fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-pill)', padding: '0.05rem 0.4rem' }}>
@@ -147,7 +147,7 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
                     <span style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', whiteSpace: 'nowrap' }}>{t(locale, 'roadmapVotesTemplate', { avg: v.avg, count: v.count })}</span>
                   )}
                 </div>
-                <p style={{ margin: '0.2rem 0 0.45rem', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.5 }}>{item.description[dict]}</p>
+                <p style={{ margin: 'var(--space-1) 0 var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.5 }}>{item.description[dict]}</p>
                 <div style={{ display: 'flex', gap: 0, marginLeft: '-0.6rem' }} role="radiogroup" aria-label={`${item.title[dict]}`}>
                   {[1, 2, 3, 4, 5].map((s) => {
                     const active = (v?.mine ?? 0) >= s;
@@ -167,8 +167,8 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
           </>)}
           {voteOpen && (<>
           {/* 自由许愿输入(批次 4) */}
-          <div style={{ borderTop: '1px solid var(--portal-line)', marginTop: '0.9rem', paddingTop: '0.9rem' }}>
-            <p style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--portal-ink)', margin: '0 0 0.45rem' }}>{t(locale, 'wishLabel')}</p>
+          <div style={{ borderTop: '1px solid var(--portal-line)', marginTop: 'var(--space-4)', paddingTop: 'var(--space-4)' }}>
+            <p style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--portal-ink)', margin: '0 0 var(--space-2)' }}>{t(locale, 'wishLabel')}</p>
             {wishSent ? (
               <p style={{ fontSize: 'var(--text-xs)', color: 'var(--status-go)', margin: 0 }}>✓ {t(locale, 'wishDone')}</p>
             ) : (
@@ -179,12 +179,12 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
                   placeholder={t(locale, 'wishPlaceholder')}
                   maxLength={80}
                   rows={2}
-                  style={{ width: '100%', resize: 'none', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--portal-line)', background: 'rgba(88,140,227,0.04)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', padding: '0.55rem 0.7rem', outline: 'none', fontFamily: 'inherit' }}
+                  style={{ width: '100%', resize: 'none', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--portal-line)', background: 'rgba(88,140,227,0.04)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', padding: 'var(--space-2) var(--space-3)', outline: 'none', fontFamily: 'inherit' }}
                 />
                 <button
                   type="button"
                   className="nesio-ob-primary-btn"
-                  style={{ marginTop: '0.5rem', opacity: wish.trim() ? 1 : 0.5 }}
+                  style={{ marginTop: 'var(--space-2)', opacity: wish.trim() ? 1 : 0.5 }}
                   disabled={!wish.trim()}
                   onClick={submitWish}
                 >
@@ -195,7 +195,7 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
           </div>
 
           </>)}
-          {error && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--status-risk)', margin: '0.6rem 0 0' }}>{error}</p>}
+          {error && <p style={{ fontSize: 'var(--text-xs)', color: 'var(--status-risk)', margin: 'var(--space-2) 0 0' }}>{error}</p>}
         </div>
     </NesioSheet>
   );

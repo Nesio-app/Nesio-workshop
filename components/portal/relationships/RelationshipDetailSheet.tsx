@@ -244,13 +244,13 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
 
           {/* 图4:关系可改 —— 亲疏三档 + 关系词(推错时手动校正,只存本机) */}
           {c && (
-            <div className="nesio-fit-panel" style={{ marginTop: '0.5rem' }}>
+            <div className="nesio-fit-panel" style={{ marginTop: 'var(--space-2)' }}>
               <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '关系 · 可修改', 'Relationship · editable')}</p>
-              <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.5rem' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
                 {(['core', 'close', 'acquaintance'] as OverrideCloseness[]).map((cl) => (
                   <button key={cl} type="button" aria-pressed={c.closeness === cl}
                     onClick={() => setRelationshipOverride(p.key, { closeness: cl })}
-                    style={{ flex: 1, padding: '0.4rem 0', fontSize: 'var(--text-sm)', borderRadius: 'var(--radius-sm, 12px)', border: '1px solid var(--portal-line)', cursor: 'pointer',
+                    style={{ flex: 1, padding: 'var(--space-2) 0', fontSize: 'var(--text-sm)', borderRadius: 'var(--radius-sm, 12px)', border: '1px solid var(--portal-line)', cursor: 'pointer',
                       background: c.closeness === cl ? 'var(--portal-accent-soft-md)' : 'transparent',
                       color: c.closeness === cl ? 'var(--portal-ink)' : 'var(--portal-muted)', fontWeight: c.closeness === cl ? 700 : 500 }}>
                     {L(dict, CLOSENESS_META[cl].zh, CLOSENESS_META[cl].en)}
@@ -275,7 +275,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                 })}
               </div>
               {/* 数据审计 #4:实体解析 —— 同一个人被记成两个名字(如「妈妈」和「母亲」)时,合并成一个 */}
-              <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.6rem' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                 <input type="text" className="nesio-ob-input" style={{ flex: 1 }}
                   placeholder={L(dict, '其实是同一个人?输入 TA 的另一个名字合并', 'Same person? Type their other name to merge')}
                   value={mergeDraft} maxLength={40}
@@ -303,7 +303,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
           )}
 
           {/* 挂在 TA 身上(成绩/消费/位置/医疗/药物/健康)。加入口已挪到名字行(bug3) */}
-          <div style={{ marginTop: '1rem' }}>
+          <div style={{ marginTop: 'var(--space-4)' }}>
             <p className="nesio-settings-section-label" style={{ margin: 0 }}>{L(dict, '挂在 TA 身上', 'Attached to them')}</p>
 
             {records.length > 0 && (
@@ -336,7 +336,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
 
           {/* 时间线 */}
           {p.timeline.length > 0 && (
-            <div style={{ marginTop: '1rem' }}>
+            <div style={{ marginTop: 'var(--space-4)' }}>
               <p className="nesio-settings-section-label">{L(dict, '往来', 'Timeline')}</p>
               <div className="nesio-rel-timeline">
                 {p.timeline.map((t, i) => (
@@ -358,7 +358,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
               2026-07-29:移除按钮此前只在有 person 节点时才出现 —— 从邮件和 relations
               推出来的人(占大多数)根本没有移除入口。现在一律给,走 removeContact:
               有节点就真删,没节点标 hidden 让推导层跳过。否则「删了又回来」。 */}
-          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)', flexWrap: 'wrap' }}>
             <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }} onClick={() => setEditOpen(true)}>
               {L(dict, '编辑资料', 'Edit details')}
             </button>
@@ -376,12 +376,12 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                   setUploadErr(L(dict, '没能移除 —— 本机存储写不进,过会儿再试。', 'Could not remove — local storage write failed. Try again.'));
                 }
               }}
-              style={{ padding: '0.4rem 0.9rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
+              style={{ padding: 'var(--space-2) var(--space-4)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-sm)', cursor: 'pointer' }}>
               {L(dict, '从关系里移除', 'Remove')}
             </button>
           </div>
 
-          <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>
+          <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-4)', textAlign: 'center' }}>
             {L(dict, '仅你可见 · 从你的记忆、邮件、通讯录推出', 'Only you · from your notes, email and contacts')}
           </p>
         </div>

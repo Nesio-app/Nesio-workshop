@@ -28,13 +28,37 @@ const ROOT = new URL('..', import.meta.url);
  */
 const BASELINE = {
   fontSize: 13,
-  spacing: 323,
+  spacing: 16,
   radius: 42,
   hex: 27,
   rawButton: 213,
 };
 
 /*
+ * 2026-07-31(三次):间距 571→16。**两件事一起发生,别把它们混着读。**
+ *
+ * ① **量具修好了**:原来的正则是 `\b(?:padding|margin|gap):`,要求属性名后面**紧跟冒号**
+ *    —— 于是 `paddingTop:` / `marginBottom:` / `rowGap:` 这些方向变体**从来没被数进来**。
+ *    旧读数 323 只是真实违规的一小半;同一时刻用修好的正则去量,是 571。
+ * ② **清理**:571 → 16,按 4px 网格就近吸附(规则见下)。
+ *
+ * 吸附规则(代码级、可重跑,和字号那次同一套):把声明按空白拆成分量逐个吸,
+ * 每个分量找最近的一档,**漂移超过 0.125rem(2px)就不吸**。2px 是这里的正确上限 ——
+ * 网格步长就是 4px,「吸到最近格点」的最大漂移按定义是半格。字号那次用 1px 是因为
+ * 字号档位密;间距只有 4px 一档,用 1px 会把 0.6/0.4/0.35/0.9(共 264 处,正好卡在
+ * 两个格点中间)永久留在场上,基线就再也下不去了。
+ *
+ * 两条附加规则,都是为了不改变**语义**而不只是数值:
+ *   · 一条声明里只要有一个分量吸不动,整条不改 —— 半吸会留下
+ *     `'var(--space-1) 0.6rem'` 这种混合串,既没减少写死值又更难读。
+ *   · **非零的间距不许吸成 0**。`0.1rem` 是 1.6px 的发丝缝,吸到 0 不是漂移,
+ *     是「这里本来有条缝」变成「没有缝」。
+ *
+ * 留下的 16 处,每一处都是上面规则挡住的,不是漏网:
+ *   发丝值 0.05/0.1/0.12rem(吸到 0 会让缝消失)· 负间距 -0.35rem(有意的拉回)
+ *   · 和 `2px`/`6px`/`auto`/`env()`/`calc()` 混在一个串里的(拼不出纯 token 串)
+ *   · `1.75rem`(离 --space-6 和 --space-8 各 4px,正中间,吸哪边都是人来定)。
+ *
  * 2026-07-31(二次):字号 164→13、圆角 66→42。**按值就近吸附到设计系统档位**,
  * 规则是代码级的、可重跑的,不靠看图:每个写死值找最近的一档,**漂移超过 0.06rem
  * (≈1px)就不吸**,原样留下。
@@ -66,7 +90,10 @@ const BASELINE = {
 /** 和 .eslintrc.json 同源的判据(那边管编辑器提示,这边管 CI)。 */
 const CHECKS = [
   { key: 'fontSize', re: /\bfontSize:\s*'[0-9.]+(rem|px|em)'/g, what: '写死的字号', fix: 'var(--text-xs/sm/body/h3/h2/h1/display)' },
-  { key: 'spacing', re: /\b(?:padding|margin|gap):\s*'[^']*[0-9.]+rem[^']*'/g, what: '写死的间距', fix: 'var(--space-1..16)(4px 网格)' },
+  // ⚠️ 方向变体必须一起数:原来只写 `padding|margin|gap:`,于是 `paddingTop`/`marginBottom`
+  // 这些**根本没被数进来**(它们后面不是冒号)—— 这次清理的 663 处里大半是方向变体,
+  // 也就是说旧读数 323 只是全部违规的一小半。量具补上了,基线按新读数重卡。
+  { key: 'spacing', re: /\b(?:padding|margin|gap|rowGap|columnGap)(?:Top|Bottom|Left|Right|Block|Inline|BlockStart|BlockEnd|InlineStart|InlineEnd)?:\s*'[^']*[0-9.]+rem[^']*'/g, what: '写死的间距', fix: 'var(--space-1..16)(4px 网格)' },
   { key: 'radius', re: /\bborderRadius:\s*(?:'[0-9.]+(?:rem|px|em)?'|[0-9]+)/g, what: '写死的圆角', fix: 'var(--radius-sm/md/xl/pill)' },
   // 先摘掉 var(--x, #fallback) 这种兜底(全站惯例,不算硬编码),剩下的才是真写死。
   /**

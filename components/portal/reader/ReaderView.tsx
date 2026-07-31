@@ -243,7 +243,7 @@ export default function ReaderView({ book, rawText, meta, onClose }: {
               <button type="button" className={`nesio-rd-btn${toolsOpen ? ' is-active' : ''}`} onClick={() => setToolsOpen((v) => !v)} aria-expanded={toolsOpen} aria-label={L(dict, '阅读选项', 'Reading options')}>Aa</button>
               {toolsOpen && (
                 <div className="nesio-rd-tools-menu">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                     <button type="button" className="nesio-rd-btn" onClick={() => setFontStep((v) => Math.max(0, v - 1))} aria-label={L(dict, '缩小字号', 'Smaller')}>A−</button>
                     <button type="button" className="nesio-rd-btn" onClick={() => setFontStep((v) => Math.min(FONT_SCALES.length - 1, v + 1))} aria-label={L(dict, '放大字号', 'Bigger')}>A+</button>
                   </div>

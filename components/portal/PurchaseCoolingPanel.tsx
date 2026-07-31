@@ -171,7 +171,7 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
           {scanTitle && <span className="nesio-cooling-scan-title">{scanTitle}</span>}
         </div>
       )}
-      {scanNote && <p style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', margin: '0.2rem 0 0' }}>{scanNote}</p>}
+      {scanNote && <p style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', margin: 'var(--space-1) 0 0' }}>{scanNote}</p>}
 
       <div className="nesio-cooling-copy">
         {persuasion.map((line, i) => <p key={i}>{line}</p>)}

@@ -266,9 +266,9 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
     setView('list');
   };
 
-  const label: React.CSSProperties = { display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: '0.7rem 0 0.3rem' };
+  const label: React.CSSProperties = { display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: 'var(--space-3) 0 var(--space-1)' };
   const chip = (active: boolean): React.CSSProperties => ({
-    padding: '0.32rem 0.7rem', borderRadius: 999, fontSize: 'var(--text-sm)', whiteSpace: 'nowrap',
+    padding: 'var(--space-1) var(--space-3)', borderRadius: 999, fontSize: 'var(--text-sm)', whiteSpace: 'nowrap',
     border: `1px solid ${active ? 'var(--accent-primary, #5b8cff)' : 'var(--portal-line)'}`,
     background: active ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent',
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
@@ -329,9 +329,9 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder={L(dict, '搜物品 / 位置…', 'Search items / locations…')}
-              style={{ margin: '0.5rem 0' }}
+              style={{ margin: 'var(--space-2) 0' }}
             />
-            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: '0.2rem 0 0.5rem' }}>
+            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: 'var(--space-1) 0 var(--space-2)' }}>
               <button type="button" style={chip(groupFilter === ALL)} onClick={() => setGroupFilter(ALL)}>{L(dict, '全部', 'All')} {items.length}</button>
               {groups.map(([name, n]) => (
                 <button key={name} type="button" style={chip(groupFilter === name)} onClick={() => setGroupFilter(name)}>
@@ -357,7 +357,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
             </div>
 
             {visible.length === 0 ? (
-              <p className="nesio-freeze-empty" style={{ padding: '1.6rem 0', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+              <p className="nesio-freeze-empty" style={{ padding: 'var(--space-6) 0', textAlign: 'center', color: 'var(--text-tertiary)' }}>
                 {query
                   ? L(dict, '没找到。换个词试试?', 'Nothing found. Try another word?')
                   : L(dict, '还没有物品。点下面「记一件」,或用「拍一下」拍张照直接识别。', 'No items yet. Tap "Add one" below, or snap a photo to recognize.')}
@@ -377,7 +377,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                         onClick={() => { setDetailId(i.id); setView('detail'); }}
                         style={{
                           display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', width: '100%',
-                          padding: '0.6rem 0.7rem', borderRadius: 14,
+                          padding: 'var(--space-2) var(--space-3)', borderRadius: 14,
                           border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
                           background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)',
                         }}
@@ -422,7 +422,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                 {/* 批次 133·设计:常用标签(点开筛该标签)*/}
                 {st.topTags.length > 0 && (
                   <>
-                    <p style={{ margin: '0.9rem 0 0.4rem', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{L(dict, '常用标签', 'Top tags')}</p>
+                    <p style={{ margin: 'var(--space-4) 0 var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{L(dict, '常用标签', 'Top tags')}</p>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {st.topTags.slice(0, 6).map((t) => (
                         <button key={t.tag} type="button" style={chip(query === t.tag)} onClick={() => setQuery(query === t.tag ? '' : t.tag)}>
@@ -435,7 +435,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               </>
             )}
 
-            <div style={{ display: 'flex', gap: 8, marginTop: '0.7rem' }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 'var(--space-3)' }}>
               <button type="button" className="nesio-freeze-primary-btn" style={{ flex: 2 }} onClick={() => { resetForm(); setView('add'); }}>
                 ＋ {L(dict, '记一件', 'Add one')}
               </button>
@@ -490,7 +490,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                 }}
               />
             </div>
-            {importMsg && <p style={{ margin: '0.45rem 0 0', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', textAlign: 'center' }}>{importMsg}</p>}
+            {importMsg && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', textAlign: 'center' }}>{importMsg}</p>}
           </>
         )}
 
@@ -501,12 +501,12 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
             <button
               type="button"
               disabled={pasteBusy}
-              style={{ width: '100%', padding: '0.55rem', borderRadius: 10, border: '1px dashed var(--border-subtle, rgba(255,255,255,0.2))', background: 'transparent', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', opacity: pasteBusy ? 0.6 : 1 }}
+              style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 10, border: '1px dashed var(--border-subtle, rgba(255,255,255,0.2))', background: 'transparent', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', opacity: pasteBusy ? 0.6 : 1 }}
               onClick={pasteRecognize}
             >
               {pasteBusy ? L(dict, '识别中…', 'Recognizing…') : L(dict, '粘贴商品信息识别(商品标题/描述都行)', 'Paste product info to auto-fill')}
             </button>
-            {pasteMsg && <p style={{ margin: '0.4rem 0 0', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', textAlign: 'center' }}>{pasteMsg}</p>}
+            {pasteMsg && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', textAlign: 'center' }}>{pasteMsg}</p>}
             <label style={label}>{L(dict, '物品名', 'Item name')}</label>
             <input className="nesio-ob-input" value={fName} onChange={(e) => setFName(e.target.value)} placeholder={L(dict, '例:护照、备用钥匙、维生素 D3', 'e.g. passport, spare keys, vitamin D3')} />
             <label style={label}>{L(dict, '放哪了?(和拍一下识别同一套位置)', 'Where does it live? (same places as Snap)')}</label>
@@ -566,7 +566,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
             <input className="nesio-ob-input" value={fTags} onChange={(e) => setFTags(e.target.value)} placeholder={L(dict, '例:护肤, 粉色, 礼物', 'e.g. skincare, pink, gift')} />
             <label style={label}>{L(dict, '备注(可选)', 'Note (optional)')}</label>
             <input className="nesio-ob-input" value={fNote} onChange={(e) => setFNote(e.target.value)} placeholder={L(dict, '例:被压在护手霜下面', 'e.g. under the hand cream')} />
-            <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', marginTop: '1rem', opacity: fName.trim() ? 1 : 0.5 }} disabled={!fName.trim()} onClick={submitAdd}>
+            <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', marginTop: 'var(--space-4)', opacity: fName.trim() ? 1 : 0.5 }} disabled={!fName.trim()} onClick={submitAdd}>
               {L(dict, '存进收纳', 'Save to storage')}
             </button>
           </div>
@@ -585,7 +585,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
 
           const card: React.CSSProperties = { borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', padding: 'var(--space-4)' };
           const kv: React.CSSProperties = { display: 'block', fontSize: 'var(--text-h2)', fontWeight: 'var(--weight-bold)', color: 'var(--portal-ink)', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' };
-          const kl: React.CSSProperties = { display: 'block', marginTop: '0.25rem', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' };
+          const kl: React.CSSProperties = { display: 'block', marginTop: 'var(--space-1)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' };
           const sectionLbl: React.CSSProperties = { margin: 'var(--space-5) 0 var(--space-2)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' };
 
           return (
@@ -625,7 +625,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
           const sp = sellPile(items);
           return (
             <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
-              <div style={{ borderRadius: 14, padding: '1rem', textAlign: 'center', background: 'var(--glass-bg, rgba(255,255,255,0.05))', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))' }}>
+              <div style={{ borderRadius: 14, padding: 'var(--space-4)', textAlign: 'center', background: 'var(--glass-bg, rgba(255,255,255,0.05))', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))' }}>
                 <span style={{ display: 'block', fontSize: 'var(--text-h1)', fontWeight: 700 }}>${sp.totalValue.toLocaleString('en-US')}</span>
                 <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
                   {sp.items.length
@@ -634,15 +634,15 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                 </span>
               </div>
               {sp.items.length === 0 ? (
-                <p style={{ padding: '1.2rem 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 'var(--text-sm)' }}>
+                <p style={{ padding: 'var(--space-5) 0', textAlign: 'center', color: 'var(--text-tertiary)', fontSize: 'var(--text-sm)' }}>
                   {L(dict, '在物品详情里点「标记出售」,它就会进到这里,估值自动累计。', 'Tap "Mark for sale" on any item — it lands here and the total grows.')}
                 </p>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: '0.7rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 'var(--space-3)' }}>
                   {sp.items.map((i) => (
                     <div key={i.id} style={{ display: 'flex', gap: 6, alignItems: 'stretch' }}>
                       <button type="button" onClick={() => { setDetailId(i.id); setView('detail'); }}
-                        style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: '0.6rem 0.7rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)' }}>
+                        style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)' }}>
                         <span style={{ flex: 1, minWidth: 0 }}>
                           <span style={{ display: 'block', fontSize: 'var(--text-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.name}{i.quantity != null ? ` ×${i.quantity}` : ''}</span>
                           <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{i.location || L(dict, '未归位', 'Unplaced')}</span>
@@ -651,7 +651,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                       </button>
                       {/* 物品⑥:一键复制转卖文案(纯模板),贴去闲鱼/FB Marketplace */}
                       <button type="button" onClick={() => copyListing(i)}
-                        style={{ flexShrink: 0, padding: '0 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: copiedId === i.id ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: copiedId === i.id ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: 'var(--text-xs)', whiteSpace: 'nowrap' }}>
+                        style={{ flexShrink: 0, padding: '0 var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: copiedId === i.id ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: copiedId === i.id ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: 'var(--text-xs)', whiteSpace: 'nowrap' }}>
                         {copiedId === i.id ? `✓ ${L(dict, '已复制', 'Copied')}` : L(dict, '复制文案', 'Copy ad')}
                       </button>
                     </div>
@@ -676,7 +676,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               not_arrived: [L(dict, '未到货', 'Not arrived'), 'var(--portal-muted)', 'transparent'],
             };
             const [text, color, bg] = map[d.status];
-            return <span style={{ fontSize: 'var(--text-overline)', fontWeight: 600, color, background: bg, padding: '0.15rem 0.5rem', borderRadius: 'var(--radius-pill, 999px)', whiteSpace: 'nowrap' }}>{text}</span>;
+            return <span style={{ fontSize: 'var(--text-overline)', fontWeight: 600, color, background: bg, padding: 'var(--space-1) var(--space-2)', borderRadius: 'var(--radius-pill, 999px)', whiteSpace: 'nowrap' }}>{text}</span>;
           };
           return (
             <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
@@ -689,7 +689,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                   </span>
                 );
                 return (
-                  <div style={{ borderRadius: 14, padding: '0.9rem 1rem', background: 'var(--glass-bg, rgba(255,255,255,0.05))', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', display: 'flex', flexWrap: 'wrap', gap: '0.7rem 1.2rem' }}>
+                  <div style={{ borderRadius: 14, padding: 'var(--space-4) var(--space-4)', background: 'var(--glass-bg, rgba(255,255,255,0.05))', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', display: 'flex', flexWrap: 'wrap', gap: 'var(--space-3) var(--space-5)' }}>
                     {lbl(fmt(sum.grossSpent), L(dict, '花销(含税)', 'Spent'))}
                     {lbl(fmt(sum.rebateTotal), L(dict, '返钱', 'Rebate'))}
                     {lbl(fmt(sum.realizedProfit), L(dict, '收益(已售)', 'Profit'), sum.realizedProfit >= 0 ? 'var(--status-go)' : 'var(--status-risk)')}
@@ -704,7 +704,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 4 }}>
                 {flip.map((i) => (
                   <button key={i.id} type="button" onClick={() => { setDetailId(i.id); setView('detail'); }}
-                    style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: '0.6rem 0.7rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)' }}>
+                    style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)' }}>
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <span style={{ display: 'block', fontSize: 'var(--text-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.name}</span>
                       <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
@@ -782,7 +782,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
   const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const chip = (on: boolean, toggle: () => void, text: string) => (
     <button type="button" onClick={toggle} style={{
-      padding: '0.3rem 0.7rem', borderRadius: 'var(--radius-pill, 999px)', fontSize: 'var(--text-xs)',
+      padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-pill, 999px)', fontSize: 'var(--text-xs)',
       border: '1px solid var(--portal-accent-border)', cursor: 'pointer',
       background: on ? 'var(--status-go-soft)' : 'transparent',
       color: on ? 'var(--status-go)' : 'var(--portal-muted)', fontWeight: on ? 600 : 400,
@@ -822,7 +822,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
 
   return (
     <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
-      <p style={{ margin: '0.3rem 0', fontSize: 'var(--text-body)' }}>
+      <p style={{ margin: 'var(--space-1) 0', fontSize: 'var(--text-body)' }}>
         {item.name}
         {exp && (
           <span style={{ marginLeft: 8, fontSize: 'var(--text-xs)', color: exp === 'expired' ? 'var(--status-risk)' : 'var(--status-gentle)' }}>
@@ -861,7 +861,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
       <button
         type="button"
         onClick={() => setAmzOpen((v) => !v)}
-        style={{ width: '100%', marginTop: '1rem', padding: '0.5rem 0.7rem', borderRadius: 10, textAlign: 'left', fontWeight: 600,
+        style={{ width: '100%', marginTop: 'var(--space-4)', padding: 'var(--space-2) var(--space-3)', borderRadius: 10, textAlign: 'left', fontWeight: 600,
           border: '1px solid var(--portal-accent-border)', background: amzOpen ? 'var(--portal-accent-soft)' : 'transparent',
           color: 'var(--portal-accent)', fontSize: 'var(--text-sm)' }}
       >
@@ -925,7 +925,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
 
       <button
         type="button"
-        style={{ width: '100%', marginTop: '1rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--portal-line)', background: item.forSale ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}
+        style={{ width: '100%', marginTop: 'var(--space-4)', padding: 'var(--space-2)', borderRadius: 10, border: '1px solid var(--portal-line)', background: item.forSale ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}
         onClick={() => { updateInventoryItem(item.id, { forSale: !item.forSale }); onChanged(); }}
       >
         {item.forSale ? L(dict, '已在卖闲置堆 · 点击取消', 'In sell pile · tap to remove') : L(dict, '标记出售(进卖闲置堆)', 'Mark for sale')}
@@ -933,7 +933,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
       {/* 物品④:物品本身变容器(收纳箱等);解除只摘 flag,不动已放进去的物品 */}
       <button
         type="button"
-        style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--portal-line)', background: item.isContainer ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}
+        style={{ width: '100%', marginTop: 'var(--space-2)', padding: 'var(--space-2)', borderRadius: 10, border: '1px solid var(--portal-line)', background: item.isContainer ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}
         onClick={() => { updateInventoryItem(item.id, { isContainer: !item.isContainer }); onChanged(); }}
       >
         {item.isContainer
@@ -941,7 +941,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
           : L(dict, '变成容器(其他物品的位置就能写它)', 'Make it a bin (other items can live in it)')}
       </button>
       <button type="button" className="nesio-freeze-primary-btn"
-        style={{ width: '100%', marginTop: '0.6rem', background: saveMsg === 'ok' ? 'var(--status-go)' : undefined }}
+        style={{ width: '100%', marginTop: 'var(--space-2)', background: saveMsg === 'ok' ? 'var(--status-go)' : undefined }}
         onClick={save}>
         {saveMsg === 'ok' ? L(dict, '✓ 已保存', '✓ Saved') : L(dict, '保存', 'Save')}
       </button>
@@ -952,7 +952,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
       )}
       <button
         type="button"
-        style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}
+        style={{ width: '100%', marginTop: 'var(--space-2)', padding: 'var(--space-2)', borderRadius: 10, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}
         onClick={() => { if (window.confirm(L(dict, '删除这件物品?', 'Delete this item?'))) { removeInventoryItem(item.id); onDeleted(); } }}
       >
         {L(dict, '删除物品', 'Delete item')}

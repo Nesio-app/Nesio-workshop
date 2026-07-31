@@ -200,7 +200,7 @@ export default function LocationPicker({ value, onChange, className }: LocationP
       {/* Level 2 — room */}
       {selectedPlace && (selectedPlace.rooms.length > 0 || roomMode === 'custom') && (
         roomMode === 'custom' ? (
-          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-1)', alignItems: 'center' }}>
             <input
               className="nesio-loc-free-input"
               value={customRoom}
@@ -230,7 +230,7 @@ export default function LocationPicker({ value, onChange, className }: LocationP
       {/* Level 3 — sub-room */}
       {selectedRoom && (subRooms.length > 0 || subRoomMode === 'custom') && (
         subRoomMode === 'custom' ? (
-          <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-1)', alignItems: 'center' }}>
             <input
               className="nesio-loc-free-input"
               value={customSubRoom}
