@@ -83,6 +83,25 @@ export function upsertMonthlyDigest(d: DigestInput): LifeNode | null {
   if (typeof window === 'undefined') return null;
   if (!d.month || !(d.count > 0)) return null;
   const meta = KIND_META[d.kind];
+  const extId = digestExternalId(d.kind, d.month);
+  const items = d.items.slice(0, 40).join(',');
+
+  // ⚠️ 内容没变就**不写**。
+  //
+  // `ingestLifeNode` 命中已有节点时是无条件 `updateLifeNode`,而那一步会:
+  // 盖 updatedAt → saveAll(整图重写)→ syncLifeGraphUpsertToCloud + syncLifeNodeSignalToCloud
+  // (两条云推送)。这个函数被调的场合恰好都是**反复重算同一份内容**:
+  // 开机折一次、每开一次家庭板又折一次 —— 写的都是同一个数。
+  //
+  // 代价不只是浪费。updatedAt 被顶到当下,意味着你每瞄一眼家庭板,
+  // 三条月度小结就冒到「最近更新」的最前面,把真正新的记忆挤下去。
+  const prev = (() => { try { return getLifeGraph(); } catch { return []; } })()
+    .find((n) => n.attributes?.externalId === extId);
+  if (prev
+    && prev.attributes?.count === d.count
+    && prev.attributes?.partial === d.partial
+    && prev.attributes?.items === items) return prev;
+
   try {
     return ingestLifeNode({
       type: 'note',
@@ -93,12 +112,12 @@ export function upsertMonthlyDigest(d: DigestInput): LifeNode | null {
       tags: [meta.tag, '月度小结'],
       rawInput: digestText(d),
       attributes: {
-        externalId: digestExternalId(d.kind, d.month),
+        externalId: extId,
         digestKind: d.kind,
         month: d.month,
         count: d.count,
         partial: d.partial,
-        items: d.items.slice(0, 40).join(','),
+        items,
         date: `${d.month}-01`,
         epistemic: 'observation',
         generator: 'system:monthly-digest',

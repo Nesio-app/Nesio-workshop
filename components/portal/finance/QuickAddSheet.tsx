@@ -150,7 +150,7 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
           <p style={label}>{t('记什么', 'Type')}</p>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {([['expense', '支出', 'Expense'], ['income', '收入', 'Income'], ['asset', '固定资产', 'Asset']] as Array<[Seg, string, string]>).map(([id, zh, en]) => (
-              <button key={id} type="button" style={chip(seg === id)} onClick={() => { setSeg(id); setCat(''); setCostAssetId(''); setErr(''); }}>
+              <button key={id} type="button" style={chip(seg === id)} onClick={() => { setSeg(id); setCat(''); setCostAssetId(''); setErr(''); setDupTx(''); setDupAck(false); }}>
                 {L(dict, zh, en)}
               </button>
             ))}
