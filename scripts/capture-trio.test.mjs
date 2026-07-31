@@ -128,9 +128,22 @@ assert.ok(
 // 原来「找」和「问」是两整行文字,各自把输入内容原样再写一遍 ——
 // 加上输入框本身,同一句话在屏幕上出现**三次**。要找什么、要问什么,框里写着呢。
 assert.ok(
-  /<IconSearch size=\{18\} \/>/.test(bar) && /<IconSparkle size=\{18\} \/>/.test(bar),
+  /<IconSearch size=\{18\} \/>/.test(bar)
+  && /src=\{nesioBrandAssets\.crystal\}/.test(bar),
   '「找」和「问」应该只是两枚图标',
 );
+// 「系统一致」不是口号:放大镜要和记忆页搜索框里那枚**同一个画法**,
+// 「问念念」用品牌那颗晶体(首页角标、PWA 图标用的都是它),不自己画一个星星。
+{
+  const icons = read('components/portal/icons.tsx');
+  const memory = read('components/portal/MemoryTab.tsx');
+  const mine = icons.match(/export const IconSearch = make\(<><circle ([^/]*)\/><path d="([^"]*)"/);
+  assert.ok(mine, 'IconSearch 不见了');
+  assert.ok(
+    memory.includes(mine[2]),
+    `放大镜的画法要和记忆页那枚一致(现在是 ${mine[2]})—— 同一个动作画成两个样子,用户会以为是两件事`,
+  );
+}
 assert.ok(
   !/在我的记忆里找「\$\{typed[\s\S]{0,40}\}」`\}\s*\n\s*<\/button>/.test(bar),
   '不许再把输入内容当按钮正文显示',
@@ -152,6 +165,68 @@ assert.ok(
   /日程和时间线里都有[\s\S]{0,240}in Schedule and your timeline/.test(feed),
   '回执要点明这条提醒落在哪 —— 不说的话回执一消失,它对用户就等于不存在了',
 );
+
+/* ── ④c 收下了要看得见 ─────────────────────────────────────────────────── */
+
+// 用户实测:「点发送、选照片选文件完了,任何反馈都没有」。
+// 原来只有一行灰字,而且**只在最后一步**才出现 —— 中间那几秒(压缩/写盘/识别)
+// 屏幕上一片安静,人不知道到底在办没办。
+{
+  assert.ok(
+    /const \[quickSaved, setQuickSaved\] = useState<\{ tone: 'busy' \| 'done' \| 'note'; text: string \} \| null>/.test(feed),
+    '回执要带语气:办事中 / 办好了 / 办好了但有话说 —— 三种要长得不一样',
+  );
+  // 锚在**行首**:`void 0 && setQuickSaved(…)` 这种把语句架空的改法,
+  // 光搜片段照样匹配得到(代码存在 ≠ 会执行)。
+  assert.ok(
+    /^\s*setQuickSaved\(\{ tone: 'busy', text: L\(uiLocale, `正在收下/m.test(feed),
+    '开始收东西的那一刻就要给状态,不是等全办完才说一句',
+  );
+  assert.ok(
+    /quickSaved\.tone === 'busy' \? <span className="nesio-receipt-spin" \/> : quickSaved\.tone === 'done' \? '✓'/.test(feed),
+    '办事时转圈、办好了打勾 —— 光一行字看不出到底成没成',
+  );
+  const css = read('app/globals.css');
+  assert.ok(/\.is-done \.nesio-receipt-mark \{ animation: nesio-receipt-pop/.test(css), '「✓」落下要弹一下');
+  assert.ok(
+    /@media \(prefers-reduced-motion: reduce\)[\s\S]{0,400}nesio-receipt-mark \{ animation: none/.test(css),
+    '动效敏感的人不该被弹一下 —— 状态照给,动作去掉',
+  );
+  // 同名 keyframes 只许有一份:重定义会**覆盖**原来那条,而两处位移方向还相反。
+  assert.equal(
+    (css.match(/@keyframes nesio-receipt-in/g) || []).length, 1,
+    'nesio-receipt-in 不许重定义 —— 后一份会悄悄改掉原有回执的动画',
+  );
+}
+
+/* ── ④d 照片要真的过一遍识别,过不了也要说 ─────────────────────────────── */
+
+// 用户实测:「这里上传的照片应该要经过智能识别再存,但现在是直接存为附件,
+// 没有识别过程」。识别其实在跑,但**免费档是静默 return** —— 于是它到底有没有
+// 发生过、为什么没发生,用户完全无从知道。
+{
+  assert.ok(
+    /智能识别是 Pro 的能力/.test(feed),
+    '识别不可用时要说出来,不能静默跳过 —— 静默的结果就是「照片直接存成了附件」',
+  );
+  assert.ok(
+    /setQuickSaved\(\{ tone: 'busy', text: L\(uiLocale, '正在认这张图…'/.test(feed),
+    '识别过程要看得见',
+  );
+  assert.ok(
+    /已存入 · 这次没认出来/.test(feed) && /已存入 · 识别没连上/.test(feed),
+    '认不出来 / 连不上,两种都要说 —— 别让人以为识别悄悄成功了',
+  );
+  // 只认了第一张,就只有单张时才敢改名 —— 多张时把「3 张照片」改成第一张的内容是错的。
+  assert.ok(
+    /recognizeSavedImage\(imgs\[0\], node\.id, imgs\.length === 1\)/.test(feed),
+    '要告诉识别这是不是唯一一张',
+  );
+  assert.ok(
+    /\.\.\.\(only \? \{ name: first\.name \} : \{\}\)/.test(feed),
+    '多张照片时不许拿第一张的识别结果改整条的名字 —— 另外几张跟那个名字没关系',
+  );
+}
 
 /* ── ⑤ 三条路都显式,默认仍是记一笔 ─────────────────────────────────────── */
 

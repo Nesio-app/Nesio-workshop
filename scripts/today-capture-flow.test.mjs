@@ -50,7 +50,13 @@ const code = stripComments;
 // ── ② 存进去要有看得见的回执 ────────────────────────────────────────────────
 {
   const feed = code(read('components/portal/TodayFeed.tsx'));
-  assert.ok(/const \[quickSaved, setQuickSaved\] = useState<string>/.test(feed), '回执 state 不见了');
+  // 2026-07-31:回执从一个字符串升级成带**语气**的对象(busy / done / note)——
+  // 用户实测「点发送、选照片选文件完了,任何反馈都没有」:原来只有一行灰字,
+  // 而且只在最后一步才出现。判断没变(回执必须存在且被渲染),形状变了。
+  assert.ok(
+    /const \[quickSaved, setQuickSaved\] = useState<\{ tone: 'busy' \| 'done' \| 'note'; text: string \} \| null>/.test(feed),
+    '回执 state 不见了',
+  );
   // 关键:它必须**被渲染**。之前正是「set 了但没渲染」——
   // 传完文件界面毫无反应,而代码里看着像是有提示的。
   assert.ok(
@@ -65,6 +71,12 @@ const code = stripComments;
   assert.ok(at > 0, '「+」传图不再顺手识别了');
   const fn = feed.slice(at, feed.indexOf('\n  }, [uiLocale]);', at));
   assert.ok(/canUsePaidCloudAi\(\)/.test(fn), '后台识别没查权益 —— 免费账号会白跑一趟云');
+  // 但**查了之后不许静默走开**:用户实测「照片直接存成附件,没有识别过程」,
+  // 根因就是免费档那条 `return` 一个字都不说 —— 他无从知道识别压根没发生。
+  assert.ok(
+    /智能识别是 Pro/.test(fn),
+    '权益不够时要把这件事说出来,不能静默 return(那正是「没有识别过程」的根因)',
+  );
   assert.ok(/fileToUploadPayload/.test(fn), '识别前没缩图 —— 原图会 413');
   assert.ok(
     /catch \{/.test(fn),

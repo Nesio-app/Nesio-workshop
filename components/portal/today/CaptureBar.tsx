@@ -20,7 +20,8 @@
 import { useMemo, useRef, useState, type RefObject } from 'react';
 import { formatWhen, parseWhen, type RepeatGuess } from '@/lib/portal/when-parse';
 import { repeatLabel } from '@/lib/portal/schedule-reminders';
-import { IconMic, IconPlus, IconSearch, IconSparkle } from '../icons';
+import { IconMic, IconPlus, IconSearch } from '../icons';
+import { nesioBrandAssets } from '@/lib/portal/nesio-design-system-assets.mjs';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -238,7 +239,11 @@ export default function CaptureBar(capture: CaptureBarProps) {
                   aria-label={L(dict, `问念念「${typed.slice(0, 18)}」`, `Ask Nessa “${typed.slice(0, 18)}”`)}
                   title={L(dict, '问念念', 'Ask Nessa')}
                   onClick={() => capture.onAsk?.(typed)}
-                ><IconSparkle size={18} /></button>
+                >
+                  {/* 「问念念」用**品牌那颗晶体**,不自己画一个星星 ——
+                      首页左上角、PWA 图标用的都是它,同一个东西就该长同一个样。 */}
+                  <img src={nesioBrandAssets.crystal} alt="" width={18} height={18} aria-hidden />
+                </button>
               )}
             </div>
           )}

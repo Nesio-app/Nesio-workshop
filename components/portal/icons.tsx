@@ -85,10 +85,10 @@ export const IconCloud = make(<path d="M17.5 19a4.5 4.5 0 0 0 .4-9A7 7 0 0 0 4.3
 export const IconPlane = make(<path d="M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z" />);
 export const IconGift = make(<><rect x="3" y="8" width="18" height="4" /><path d="M12 8v13M5 12v9h14v-9" /><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5" /></>);
 export const IconBed = make(<><path d="M2 4v16M2 8h18a2 2 0 0 1 2 2v10" /><path d="M2 17h20M6 8v9" /><circle cx="7" cy="12" r="1.2" /></>);
-// 首页输入条的两个动作(2026-07-31):放大镜=在记忆里找,星火=问念念。
-// 用图标不用整行文字 —— 那两行会把你刚打的字**再重复两遍**(输入框一遍 + 两行各一遍)。
-export const IconSearch = make(<><circle cx="11" cy="11" r="7" /><path d="M20 20l-4.3-4.3" /></>);
-export const IconSparkle = make(<><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /><path d="M18.5 15.5l.7 1.8 1.8.7-1.8.7-.7 1.8-.7-1.8-1.8-.7 1.8-.7z" /></>);
+// 首页输入条的「在记忆里找」(2026-07-31)。
+// **和记忆页搜索框里那枚一模一样**(circle r=8 + M21 21l-4.35-4.35)——
+// 同一个动作在两处画成两个样子,用户会以为是两件事。
+export const IconSearch = make(<><circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" /></>);
 
 // 音乐(2026-07-30):音符 —— 与「剧场」的播放三角刻意分开,那格是影像不是声音。
 export const IconMusic = make(<><path d="M9 18V5l12-2v13" /><circle cx="6" cy="18" r="3" /><circle cx="18" cy="16" r="3" /></>);

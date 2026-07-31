@@ -107,7 +107,12 @@ export default function TodayFeed({
    * 所以传完什么反馈都没有,用户不知道到底存没存进去(这正是要补的「已存入」提示)。
    * 现在存成功先报一句,识别结果回来了再把它补进同一条回执里。
    */
-  const [quickSaved, setQuickSaved] = useState<string>('');
+  /**
+   * 「收下了没有」这条回执。带**语气**:busy=还在办、done=办好了、note=办好了但有话说。
+   * 用户实测反馈:「点发送、选照片选文件完了,任何反馈都没有」——
+   * 在这之前只有一行灰字,而且只在最后一步才出现。
+   */
+  const [quickSaved, setQuickSaved] = useState<{ tone: 'busy' | 'done' | 'note'; text: string } | null>(null);
 
   /**
    * 「+」上传 → 落成记忆(2026-07-28)。
@@ -128,31 +133,60 @@ export default function TodayFeed({
    *
    * 免费用户不发这一趟(云识图是付费档);先缩再发,不然原图直接 413(见 image-payload.ts)。
    */
-  const recognizeSavedImage = useCallback(async (file: File, nodeId: string) => {
+  const recognizeSavedImage = useCallback(async (file: File, nodeId: string, only: boolean) => {
     try {
       const { canUsePaidCloudAi } = await import('@/lib/portal/entitlement');
-      if (!canUsePaidCloudAi()) return;   // 后台动作:免费静默跳过,不弹升级
+      if (!canUsePaidCloudAi()) {
+        // 原来这里是**静默** return —— 于是用户看到的是「照片直接存成附件、
+        // 没有任何识别过程」,而他无从知道识别根本没发生过、更不知道为什么。
+        // 不弹升级框(那是打扰),但要把这件事说出来。
+        setQuickSaved({ tone: 'note', text: L(uiLocale, '已存入 · 智能识别是 Pro 的能力', 'Saved · smart recognition is a Pro feature') });
+        setTimeout(() => setQuickSaved(null), 4000);
+        return;
+      }
+      setQuickSaved({ tone: 'busy', text: L(uiLocale, '正在认这张图…', 'Looking at that photo…') });
       const { fileToUploadPayload } = await import('@/lib/portal/image-payload');
       const { base64, mimeType } = await fileToUploadPayload(file);
       const res = await fetch('/api/portal/analyze', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType, uiLocale }),
       });
-      if (!res.ok) return;
+      const miss = () => {
+        setQuickSaved({ tone: 'note', text: L(uiLocale, '已存入 · 这次没认出来', 'Saved · could not recognize it this time') });
+        setTimeout(() => setQuickSaved(null), 4000);
+      };
+      if (!res.ok) { miss(); return; }
       const data = await res.json() as { ok?: boolean; nodes?: Array<{ name?: string; tags?: string[] }> };
       const first = data.nodes?.[0];
-      if (!data.ok || !first?.name) return;
+      if (!data.ok || !first?.name) { miss(); return; }
       const { updateLifeNode } = await import('@/lib/portal/life-graph');
-      updateLifeNode(nodeId, { name: first.name, tags: ['照片', ...(first.tags || [])].slice(0, 6) });
+      // 只认了**第一张**,所以只有单张时才敢改名 —— 多张时把「3 张照片」改成第一张的
+      // 内容是明确的错:另外两张跟这个名字没关系。标签照打(它是补充,不是替换)。
+      updateLifeNode(nodeId, {
+        ...(only ? { name: first.name } : {}),
+        tags: ['照片', ...(first.tags || [])].slice(0, 6),
+      });
       window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-      setQuickSaved(L(uiLocale, `已存入 · 认出是「${first.name}」`, `Saved · recognized "${first.name}"`));
-      setTimeout(() => setQuickSaved(''), 4000);
-    } catch { /* 认不出来不打扰 —— 东西已经存好了,这只是锦上添花 */ }
+      setQuickSaved({
+        tone: 'done',
+        text: only
+          ? L(uiLocale, `已存入 · 认出是「${first.name}」`, `Saved · recognized "${first.name}"`)
+          : L(uiLocale, `已存入 · 第一张认出是「${first.name}」`, `Saved · first photo recognized as "${first.name}"`),
+      });
+      setTimeout(() => setQuickSaved(null), 4000);
+    } catch {
+      // 认不出来东西也已经存好了 —— 但**说一声**,别让人以为识别悄悄成功了。
+      setQuickSaved({ tone: 'note', text: L(uiLocale, '已存入 · 识别没连上', 'Saved · recognition unavailable') });
+      setTimeout(() => setQuickSaved(null), 4000);
+    }
   }, [uiLocale]);
 
   const captureFiles = useCallback(async (files: File[]) => {
     const list = files.slice(0, 30);
     if (!list.length) return;
+    // 收东西这一路可能要好几秒(压缩 + 写 IDB + 识别)。**全程给个状态** ——
+    // 在这之前只有「+」那颗小按钮转一下,人盯着屏幕以为什么都没发生。
+    setQuickSaved({ tone: 'busy', text: L(uiLocale, `正在收下 ${list.length} 项…`, `Saving ${list.length} item${list.length > 1 ? 's' : ''}…`) });
     // ⚠️ 走 ingestLifeNode,不是 addLifeNode —— 后者是底层写,业务层直调会绕过主事实表
     //    (scripts/write-gate-addLifeNode.test.mjs 明文禁止)。我第一版就是直调 addLifeNode,
     //    表现是「文件存进 IDB 了,记忆一条没有」,右上角计数纹丝不动。
@@ -187,7 +221,7 @@ export default function TodayFeed({
         // 2026-07-29「提高智能」:存进去只是第一步 —— 顺手认一下这是什么,
         // 把文件名(IMG_9740 这种)换成看得懂的名字,并打上识别到的标签。
         // 存已经成功了,识别是加分项:认不出来就保持原样,**绝不因此报错**。
-        void recognizeSavedImage(imgs[0], node.id);
+        void recognizeSavedImage(imgs[0], node.id, imgs.length === 1);
       }
     }
 
@@ -218,14 +252,16 @@ export default function TodayFeed({
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
     const saved = list.length - failed.length;
     if (saved > 0) {
-      setQuickSaved(L(uiLocale, `已存入 ${saved} 项`, `Saved ${saved} item${saved > 1 ? 's' : ''}`));
-      setTimeout(() => setQuickSaved(''), 4000);
+      setQuickSaved({ tone: 'done', text: L(uiLocale, `已存入 ${saved} 项`, `Saved ${saved} item${saved > 1 ? 's' : ''}`) });
+      setTimeout(() => setQuickSaved(null), 4000);
+    } else {
+      setQuickSaved(null);   // 一件都没存进去:让下面那条失败态说话,别留一个「正在收…」卡在那
     }
     // 存不下的必须说,哪怕同一批里别的存进去了 —— 不能因为「大部分成功」就把失败的吞掉。
     if (failed.length) {
       throw new Error(`${failed.slice(0, 3).join('、')} 没存进去(单个上限 ${prettyBytes(MAX_FILE_BYTES)})。`);
     }
-  }, []);
+  }, [uiLocale, recognizeSavedImage]);
   // 批次 33:话筒 = 原地录音转文字直接入记忆(不跳说一句 sheet)。
   // bug3 p42:原来「识别起不来」这几条分支会回落去开「说一句」sheet —— 而 iOS PWA 上
   // SpeechRecognition 本来就不存在,于是点话筒**每次**都是弹出那张 sheet,正是标注要去掉的。
@@ -577,8 +613,8 @@ export default function TodayFeed({
             addCommitmentNode(name);
             setQuickAdd('');
             setDraftNote(null);
-            setQuickSaved(L(uiLocale, '已记下', 'Noted'));
-            setTimeout(() => setQuickSaved(''), 2000);
+            setQuickSaved({ tone: 'done', text: L(uiLocale, '已记下', 'Noted') });
+            setTimeout(() => setQuickSaved(null), 2600);
           }}
           onMic={startQuickMic}
           recording={micState === 'recording'}
@@ -601,8 +637,8 @@ export default function TodayFeed({
             const r = addReminder({ title, at, kind: 'other', ...(repeat || {}) });
             if (!r) {
               // 红线:失败要有可见失败态。存不下就说,别让人以为设上了。
-              setQuickSaved(L(uiLocale, '这条没能设上,再试一次', 'Could not set that — try again'));
-              setTimeout(() => setQuickSaved(''), 3000);
+              setQuickSaved({ tone: 'note', text: L(uiLocale, '这条没能设上,再试一次', 'Could not set that — try again') });
+              setTimeout(() => setQuickSaved(null), 3000);
               return;
             }
             setQuickAdd('');
@@ -627,8 +663,15 @@ export default function TodayFeed({
         {/* 存进去了要说一声。这条回执之前**只被 set、从来没渲染** ——
             于是「+」传完文件、记一笔按了「记下」,界面上什么反应都没有。
             识别结果回来了会把同一条改写成「已存入 · 认出是「…」」。 */}
+        {/* 一枚会动的回执:办事的时候转圈,办好了「✓」弹一下。
+            只给一行灰字的话,人盯着屏幕不知道到底成没成。 */}
         {quickSaved && (
-          <p className="nesio-tl-capture-receipt" role="status">{quickSaved}</p>
+          <p className={`nesio-tl-capture-receipt is-${quickSaved.tone}`} role="status">
+            <span className="nesio-receipt-mark" aria-hidden>
+              {quickSaved.tone === 'busy' ? <span className="nesio-receipt-spin" /> : quickSaved.tone === 'done' ? '✓' : '·'}
+            </span>
+            {quickSaved.text}
+          </p>
         )}
 
         {/* 今日焦点 — 重要安排 / 重要日子 / 重要提醒 */}
