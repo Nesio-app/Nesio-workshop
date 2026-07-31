@@ -28,7 +28,12 @@ assert.equal(geminiContract.runtimeAiReadiness.providers.gemini.enabled, true);
 assert.equal(geminiContract.runtimeAiReadiness.providers.gemini.startEndpoint, '/api/portal/chat');
 // #8:契约必须报告真实回退链(与 ai-complete 同源)。批次 45 补 openai 第三层
 // (analyze 早有、chat/completeText 曾缺 —— 「图片识别能用、问一问不行」的根因)。
-assert.deepEqual([...geminiContract.runtimeAiReadiness.routing.completionChain], ['claude', 'gemini', 'openai']);
+// 2026-07-31 用户定案:「AI 调用用 Kimi 的 API,然后 google 托底」——
+// kimi 进链首、gemini 紧随其后就是那两级;claude/openai 留在后面,配了 key 才走。
+assert.deepEqual([...geminiContract.runtimeAiReadiness.routing.completionChain], ['kimi', 'gemini', 'claude', 'openai']);
+// 前两位是用户明确定的**主 + 托底**,顺序不许被后来的人调换。
+assert.equal(geminiContract.runtimeAiReadiness.routing.completionChain[0], 'kimi', 'Kimi 必须是首选');
+assert.equal(geminiContract.runtimeAiReadiness.routing.completionChain[1], 'gemini', 'Google 必须是托底的那一层');
 assert.equal(geminiContract.runtimeAiReadiness.routing.geminiModelFallbacks.length >= 2, true);
 assert.equal(geminiContract.runtimeAiReadiness.providers.gemini.secretsRedacted, true);
 assert.equal(geminiContract.runtimeAiReadiness.providers.chatgpt.enabled, false);

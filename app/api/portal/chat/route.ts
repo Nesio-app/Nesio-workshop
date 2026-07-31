@@ -124,6 +124,45 @@ const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 // 批次 44:改共读单一数据源(此前这里硬编码一份旧链,与 ai-complete 漂移)
 
 // ── OpenAI(批次 45:第三层兜底,与 analyze 路由同构)─────────────────────────
+/**
+ * Kimi(Moonshot)—— 2026-07-31 用户定为首选通道,Google 托底。
+ * OpenAI 兼容形状,所以和下面的 callOpenAI 是同一副骨架,只换 base 和 key。
+ * 模型 ID **必须显式配**(KIMI_MODEL):编一个默认值,错了的表现是每次 4xx,
+ * 而日志看着像 key 不对,能查很久。
+ */
+async function callKimi(
+  apiKey: string,
+  message: string,
+  history: ChatMessage[],
+  systemInstruction: string,
+): Promise<{ text: string; sources: Array<{ title: string; url: string }> }> {
+  const model = (envValue('KIMI_MODEL') || '').trim();
+  if (!model) throw new Error('kimi_model_unset');
+  const base = (envValue('KIMI_API_BASE') || 'https://api.moonshot.ai/v1').trim().replace(/\/+$/, '');
+  const res = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      max_tokens: 1024,
+      messages: [
+        { role: 'system', content: systemInstruction },
+        ...history.filter((m) => m.text?.trim()).map((m) => ({
+          role: m.role === 'model' ? 'assistant' as const : 'user' as const,
+          content: m.text,
+        })),
+        { role: 'user', content: message },
+      ],
+    }),
+  });
+  const data = await res.json() as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string };
+  };
+  if (!res.ok || data.error) throw new Error(`Kimi ${res.status}${data.error?.message ? `: ${data.error.message}` : ''}`);
+  return { text: (data.choices?.[0]?.message?.content || '').trim(), sources: [] };
+}
+
 async function callOpenAI(
   apiKey: string,
   message: string,
@@ -348,8 +387,9 @@ export async function POST(req: NextRequest) {
   // 同时接受两种命名方式
   const geminiKey = resolveAiKey('gemini');
   const openaiKey = resolveAiKey('openai');
+  const kimiKey = resolveAiKey('kimi');
 
-  if (!anthropicKey && !geminiKey && !openaiKey) {
+  if (!kimiKey && !anthropicKey && !geminiKey && !openaiKey) {
     // 批次 33:技术性报错绝不给用户看(「只能感到更聪明」)。真实原因进服务端日志,
     // 用户拿到的是人话 + 下方照常渲染的相关记忆(确定性检索兜底)。
     console.error('[chat] no_provider_key');
@@ -378,13 +418,16 @@ export async function POST(req: NextRequest) {
 
   const startedAt = Date.now();
   try {
-    const result = anthropicKey
-      ? await callClaude(anthropicKey, message, history, systemInstruction)
-      : geminiKey
-        ? await callGemini(geminiKey, message, history, systemInstruction)
-        : await callOpenAI(openaiKey!, message, history, systemInstruction);
+    // 顺序的真源是 ai-provider-chain.mjs:kimi → gemini(托底)→ claude → openai。
+    const result = kimiKey
+      ? await callKimi(kimiKey, message, history, systemInstruction)
+      : anthropicKey
+        ? await callClaude(anthropicKey, message, history, systemInstruction)
+        : geminiKey
+          ? await callGemini(geminiKey, message, history, systemInstruction)
+          : await callOpenAI(openaiKey!, message, history, systemInstruction);
 
-    reportAiCall('chat', true, startedAt, { provider: anthropicKey ? 'claude' : geminiKey ? 'gemini' : 'openai' });
+    reportAiCall('chat', true, startedAt, { provider: kimiKey ? 'kimi' : anthropicKey ? 'claude' : geminiKey ? 'gemini' : 'openai' });
     const fin = parseChatActions(result.text || '');
     return NextResponse.json({
       ok: true,
@@ -401,7 +444,8 @@ export async function POST(req: NextRequest) {
     // Claude 失败 → Gemini → OpenAI(批次 45:与 analyze 同构的三层链 ——
     // 此前 chat 缺第三层,造成「图片识别能用、问一问不行」的逻辑不一致)
     let sawQuota = false;
-    if (geminiKey && anthropicKey) {
+    // 「主不是 gemini」时才在这儿试它 —— 主就是 gemini 的话再打一次是白撞同一个配额池。
+    if (geminiKey && (kimiKey || anthropicKey)) {
       try {
         const result = await callGemini(geminiKey, message, history, systemInstruction);
         reportAiCall('chat', true, startedAt, { provider: 'gemini_fallback' });
