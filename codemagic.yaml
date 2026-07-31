@@ -62,6 +62,12 @@ definitions:
           test -e "ios/App/App/$f" || (echo "❌ Resources 阶段引用的 $f 不存在" && exit 1)
         done
         echo "✅ Resources 阶段的三个引用都在"
+        # 共享 scheme。Xcode 自动建的那份落在 xcuserdata/(被忽略),
+        # `xcodebuild -scheme` 只认 xcshareddata/ 下的这份 ——
+        # 缺了就是「界面里能 Run,一上命令行找不到 scheme」。
+        test -f "ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme" \
+          || (echo "❌ 共享 scheme 不在,xcodebuild -scheme App 会找不到" && exit 1)
+        echo "✅ 共享 scheme 在"
 
 workflows:
 
