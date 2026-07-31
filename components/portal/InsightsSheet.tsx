@@ -694,7 +694,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
               <div className="nesio-insights-section">
                 <div className="nesio-insights-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                   <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '几个没接上的线头', 'A few loose threads')}</p>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '> 30 天', '> 30 days')}</span>
+                  <span style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>{L(dict, '> 30 天', '> 30 days')}</span>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginTop: '0.55rem' }}>
                   {threads.slice(0, 3).map((t) => {
@@ -720,7 +720,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
             <div className="nesio-insights-section">
               <div className="nesio-insights-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                 <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '节律', 'Rhythm')}</p>
-                <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '本月', 'this month')}</span>
+                <span style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>{L(dict, '本月', 'this month')}</span>
               </div>
               <p className="nesio-rhythm-line" style={{ margin: '0.45rem 0 0' }}>{rhythm.line}</p>
             </div>
@@ -729,7 +729,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
             <div className="nesio-insights-section">
               <div className="nesio-insights-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                 <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '生命版图', 'Life map')}<InfoTip text={L(dict, '五个领域(关系/事业/成长/健康/自我)按记录的意义密度(置信度+关联数+标签,不是数量)切分领土宽度;下方标出近来占比涨得最多的一域。', 'Five domains (ties/work/growth/health/self) split by meaning density (confidence + connections + tags, not count); below flags the domain whose share grew the most lately.')} /></p>
-                <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '意义密度 · 非数量', 'Meaning density · not counts')}</span>
+                <span style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>{L(dict, '意义密度 · 非数量', 'Meaning density · not counts')}</span>
               </div>
               {mapEligible && territory.slices.length ? (
                 <>
@@ -765,7 +765,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
               <div className="nesio-insights-section">
                 <div className="nesio-insights-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                   <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '跨域关联', 'Cross-domain links')}<InfoTip text={L(dict, '在你每日对齐的记录(情绪/花费/步数/睡眠/外出/日程/天气)上算皮尔逊相关,只跑一小组有生活意义的固定假设对,样本≥14 天、|r|≥0.3 才显示。统计相关,非因果。', 'Pearson correlation on your day-aligned records (mood/spend/steps/sleep/outings/schedule/weather); only a small fixed set of meaningful hypotheses, shown when n≥14 and |r|≥0.3. Correlation, not causation.')} /></p>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '统计相关 · 非因果', 'Correlation · not causation')}</span>
+                  <span style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>{L(dict, '统计相关 · 非因果', 'Correlation · not causation')}</span>
                 </div>
                 <ul className="nesio-xdom-list">
                   {crossDomain.map((c) => (

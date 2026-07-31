@@ -1283,7 +1283,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
               aria-label={copy.searchAria}
             />
             {query && (
-              <button type="button" onClick={() => setQuery('')} style={{ color: 'var(--portal-muted)', fontSize: '0.85rem' }} aria-label={copy.clear}>✕</button>
+              <button type="button" onClick={() => setQuery('')} style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-sm)' }} aria-label={copy.clear}>✕</button>
             )}
           </div>
           )}

@@ -220,7 +220,7 @@ export default function TrainingPlan() {
         {L(dict, '说说手边有什么器械、想练哪块,给你配一套,直接开练。', 'Tell it your equipment and focus — get a set, start right away.')}
       </p>
       {lastHint && (
-        <span style={{ display: 'inline-block', fontSize: '0.68rem', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', borderRadius: 'var(--radius-pill)', padding: '0.15rem 0.55rem', marginTop: '0.4rem' }}>
+        <span style={{ display: 'inline-block', fontSize: 'var(--text-overline)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', borderRadius: 'var(--radius-pill)', padding: '0.15rem 0.55rem', marginTop: '0.4rem' }}>
           {lastHint}
         </span>
       )}

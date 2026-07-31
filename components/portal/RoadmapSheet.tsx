@@ -129,7 +129,7 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
             <span style={{ color: 'var(--portal-muted)' }}>{voteOpen ? '▴' : '▾'}</span>
           </button>
           {voteOpen && (<>
-          <p style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', margin: '0 0 0.8rem' }}>
+          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: '0 0 0.8rem' }}>
             {t(locale, 'roadmapHint')}
           </p>
           {ROADMAP_ITEMS.map((item) => {
@@ -137,7 +137,7 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
             return (
               <div key={item.id} style={{ padding: '0.7rem 0', borderTop: '1px solid var(--portal-line)' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem' }}>
-                  <p style={{ margin: 0, fontSize: '0.85rem', fontWeight: 600, color: 'var(--portal-ink)' }}>
+                  <p style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--portal-ink)' }}>
                     {item.title[dict]}
                     <span style={{ marginLeft: 6, fontSize: '0.62rem', color: 'var(--portal-muted)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-pill)', padding: '0.05rem 0.4rem' }}>
                       {statusLabel[item.status]}
@@ -159,7 +159,7 @@ export default function RoadmapSheet({ open, onClose }: { open: boolean; onClose
                       </button>
                     );
                   })}
-                  {savingId === item.id && <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', alignSelf: 'center' }}>{t(locale, 'roadmapSaving')}</span>}
+                  {savingId === item.id && <span style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', alignSelf: 'center' }}>{t(locale, 'roadmapSaving')}</span>}
                 </div>
               </div>
             );

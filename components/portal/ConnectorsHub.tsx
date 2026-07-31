@@ -1548,11 +1548,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                     <p className="nesio-connector-desc">{dict === 'en' ? (c.descriptionEn ?? c.description) : c.description}</p>
                     {isConn && !oauthSyncResult[c.id] && <p className="nesio-connector-sync">{isSync ? (importPct != null ? L(dict, `导入中 ${importPct}%`, `Importing ${importPct}%`) : L(dict, '同步中…', 'Syncing…')) : L(dict, '已连接', 'Connected')}{cnt ? L(dict, `  ·  ${cnt} 个节点`, `  ·  ${cnt} nodes`) : ''}</p>}
                     {oauthSyncResult[c.id] && (
-                      <p className="nesio-connector-sync" style={{ color: oauthSyncResult[c.id].ok ? 'var(--status-go)' : 'var(--status-risk)', fontSize: '0.68rem', lineHeight: 1.4 }}>
+                      <p className="nesio-connector-sync" style={{ color: oauthSyncResult[c.id].ok ? 'var(--status-go)' : 'var(--status-risk)', fontSize: 'var(--text-overline)', lineHeight: 1.4 }}>
                         {oauthSyncResult[c.id].msg}
                         {oauthSyncResult[c.id].detail && <><br /><span style={{ opacity: 0.8, whiteSpace: 'pre-line' }}>{oauthSyncResult[c.id].detail}</span></>}
                         {oauthSyncResult[c.id].needsReauth && (
-                          <><br /><button type="button" style={{ marginTop: '0.25rem', fontSize: '0.68rem', color: 'var(--portal-blue-deep)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }} onClick={() => handleConnect(c)}>{L(dict, '点击重新授权 →', 'Tap to reconnect →')}</button></>
+                          <><br /><button type="button" style={{ marginTop: '0.25rem', fontSize: 'var(--text-overline)', color: 'var(--portal-blue-deep)', background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }} onClick={() => handleConnect(c)}>{L(dict, '点击重新授权 →', 'Tap to reconnect →')}</button></>
                         )}
                       </p>
                     )}
@@ -1615,7 +1615,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                         >
                           {isSync ? '…' : L(dict, '用 Notion 授权(选择页面)→', 'Authorize with Notion (pick pages) →')}
                         </button>
-                        <p style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', margin: '0 0 0.6rem', lineHeight: 1.5 }}>
+                        <p style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', margin: '0 0 0.6rem', lineHeight: 1.5 }}>
                           {L(dict, '会跳到 Notion 同意页,像 flomo 那样勾选要同步的页面。若在 iOS 上被 Notion App 劫持打不开,改用下面的粘贴 token。', 'Opens the Notion consent page (pick pages, like flomo). If iOS hijacks it into the Notion app, use paste-token below instead.')}
                         </p>
                         <div style={{ borderTop: '1px solid var(--portal-hairline, rgba(127,127,127,0.18))', margin: '0 0 0.6rem' }} />
@@ -1640,8 +1640,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                 {/* Notion 数据源选择器 —— N-5:选表 → 同步走 N-3 结构折叠(书=一条记忆,划线折进去);附一键重来 */}
                 {c.id === 'notion' && notionDbList && (
                   <div className="nesio-connector-token-box">
-                    <p style={{ fontSize: '0.75rem', color: 'var(--portal-ink)', fontWeight: 600, marginBottom: '0.2rem' }}>{L(dict, '选择要同步的表', 'Pick tables to sync')}</p>
-                    <p style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', marginBottom: '0.5rem', lineHeight: 1.5 }}>{L(dict, '勾选后点上面「同步」:会按结构理解 —— 读书这类自动把划线折进书里(一本书=一条记忆),丢掉日历表和技术列。重复同步幂等,删了不会重复。', 'Check tables, then tap Sync above. We read the structure — e.g. highlights fold into their book (one book = one memory), calendar tables and ID columns dropped. Re-syncing is idempotent, no duplicates.')}</p>
+                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', fontWeight: 600, marginBottom: '0.2rem' }}>{L(dict, '选择要同步的表', 'Pick tables to sync')}</p>
+                    <p style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', marginBottom: '0.5rem', lineHeight: 1.5 }}>{L(dict, '勾选后点上面「同步」:会按结构理解 —— 读书这类自动把划线折进书里(一本书=一条记忆),丢掉日历表和技术列。重复同步幂等,删了不会重复。', 'Check tables, then tap Sync above. We read the structure — e.g. highlights fold into their book (one book = one memory), calendar tables and ID columns dropped. Re-syncing is idempotent, no duplicates.')}</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: 220, overflowY: 'auto' }}>
                       {notionDbList.map((db) => (
                         <label key={db.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--portal-ink)', cursor: 'pointer' }}>
@@ -1664,16 +1664,16 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                 {/* Shortcuts setup */}
                 {shortcutsFor === c.id && (
                   <div className="nesio-connector-token-box">
-                    <p style={{ fontSize: '0.75rem', color: 'var(--portal-ink)', fontWeight: 600, marginBottom: '0.4rem' }}>{L(dict, '通过 iOS 快捷指令接入', 'Connect via iOS Shortcuts')}</p>
+                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', fontWeight: 600, marginBottom: '0.4rem' }}>{L(dict, '通过 iOS 快捷指令接入', 'Connect via iOS Shortcuts')}</p>
                     <ol style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', lineHeight: 1.7, paddingLeft: '1.1rem', marginBottom: '0.6rem' }}>
                       <li>{L(dict, '打开「快捷指令」App，新建快捷指令', 'Open the Shortcuts app and create a new shortcut')}</li>
                       <li>{L(dict, '添加动作「获取 URL 内容」', 'Add the "Get Contents of URL" action')}</li>
                       <li>{L(dict, 'URL 填下方地址，方法选 ', 'Use the URL below, method ')}<strong>POST</strong></li>
-                      <li>{L(dict, '请求体 JSON：', 'Request body JSON: ')}<code style={{ fontSize: '0.68rem' }}>{L(dict, `{"source":"${c.ingestSource}","content":"数据内容"}`, `{"source":"${c.ingestSource}","content":"your data"}`)}</code></li>
+                      <li>{L(dict, '请求体 JSON：', 'Request body JSON: ')}<code style={{ fontSize: 'var(--text-overline)' }}>{L(dict, `{"source":"${c.ingestSource}","content":"数据内容"}`, `{"source":"${c.ingestSource}","content":"your data"}`)}</code></li>
                       <li>{L(dict, '可设为自动化，定时推送', 'Optionally automate it on a schedule')}</li>
                     </ol>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <code style={{ flex: 1, fontSize: '0.68rem', background: 'rgba(88,140,227,0.08)', padding: '0.4rem 0.6rem', borderRadius: '0.5rem', wordBreak: 'break-all', color: 'var(--portal-ink)' }}>{ingestUrl}</code>
+                      <code style={{ flex: 1, fontSize: 'var(--text-overline)', background: 'rgba(88,140,227,0.08)', padding: '0.4rem 0.6rem', borderRadius: '0.5rem', wordBreak: 'break-all', color: 'var(--portal-ink)' }}>{ingestUrl}</code>
                       <button type="button" className="nesio-connector-connect" onClick={copyIngestUrl} style={{ flexShrink: 0 }}>{L(dict, '复制', 'Copy')}</button>
                     </div>
                   </div>

@@ -163,7 +163,7 @@ export default function LoginPageClient() {
         {/* Logo */}
         <div className="nesio-login-logo-row">
           <NesioMark className="nesio-login-logo-img" />
-          <span className="nesio-ob-brand" style={{ fontSize: '1.3rem' }}>Nesio</span>
+          <span className="nesio-ob-brand" style={{ fontSize: 'var(--text-h2)' }}>Nesio</span>
         </div>
 
         {state === 'email_sent' ? (
@@ -290,7 +290,7 @@ export default function LoginPageClient() {
               {zh ? '暂不登录，本地使用' : 'Skip — use locally'}
             </a>
 
-            <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.75rem', color: 'var(--portal-muted, #8a94a6)' }}>
+            <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: 'var(--text-xs)', color: 'var(--portal-muted, #8a94a6)' }}>
               <a href="/terms" style={{ color: 'inherit' }}>{zh ? '服务条款' : 'Terms'}</a>
               <span style={{ margin: '0 0.4rem' }}>·</span>
               <a href="/privacy" style={{ color: 'inherit' }}>{zh ? '隐私政策' : 'Privacy Policy'}</a>
