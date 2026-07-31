@@ -23,6 +23,7 @@ import {
 import { isTxShadow } from '@/lib/portal/tx-node';
 import { rankRelatedNodes } from '@/lib/portal/related-nodes';
 import { visibleMemoryNodes, isWeatherNode } from '@/lib/portal/memory-visibility';
+import { useMemoryCount } from './use-memory-count';
 import { pinNodeToTodayFocus } from '@/lib/platform/view-models/today-commands';
 import { DOMAINS } from '@/lib/life-domain';
 import { isFeatureEnabled } from '@/lib/portal/module-overrides';
@@ -1242,6 +1243,9 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
 
   const isSearching = Boolean(query.trim());
   const hasNodes = nodes.length > 0;
+  // 给人看的条数走唯一口径(见 use-memory-count)。列表仍然用本地 nodes 渲染 ——
+  // 那是同一批数据,只是这里额外拿到「落定了没有」。
+  const memoryCount = useMemoryCount(canUsePrivateData);
 
   return (
     <>
@@ -1362,9 +1366,22 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     <span className="nesio-section-title">
                       {L(dict, '全部记忆', 'All memories')}
                       {/* 筛选中显示「命中 / 总数」——不再一直挂 2328(QA:筛到健康 7 条,头部还写全部) */}
-                      <span className="nesio-section-title-sub"> · {typeFilter
-                        ? L(dict, `${visibleNodes.length} / ${nodes.length} 条`, `${visibleNodes.length} / ${nodes.length}`)
-                        : L(dict, `${nodes.length} 条 · 可搜`, `${nodes.length} · search`)}</span>
+                      {/*
+                        * 事实库水合完之前**不摆这个数**。
+                        *
+                        * 水合前读到的是投影,水合后是「IDB 事实 ∪ 投影」—— 可能更多。
+                        * 也就是说开机头几秒里这个数字注定会变一次。
+                        * 先给一个待会儿会变的数,比先不给更伤信任:用户会以为自己看错了,
+                        * 或者以为 App 弄丢了东西(「不同渠道看到的记录数不一样」就是这么来的)。
+                        *
+                        * 计数走 useMemoryCount —— 和这里的列表同一个谓词(visibleMemoryNodes),
+                        * 也和设置页体检卡同一个口径。
+                        */}
+                      <span className="nesio-section-title-sub"> · {!memoryCount.settled
+                        ? L(dict, '正在读取…', 'Loading…')
+                        : typeFilter
+                          ? L(dict, `${visibleNodes.length} / ${memoryCount.count} 条`, `${visibleNodes.length} / ${memoryCount.count}`)
+                          : L(dict, `${memoryCount.count} 条 · 可搜`, `${memoryCount.count} · search`)}</span>
                     </span>
                     <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                       {typeFilter && (

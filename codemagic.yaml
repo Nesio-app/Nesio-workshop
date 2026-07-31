@@ -25,6 +25,26 @@
 #     其余全部照常:端上识别、端上语音、系统搜索、本地通知、后台足迹
 #     —— 这些一个 entitlement 都不需要。
 #
+# ## ⚠️ Xcode 必须 16+(2026-07-31 本地打包实测撞到)
+#
+# Capacitor 8.4.0 通过 `capacitor-swift-pm` 发的是**预编译 xcframework**,不是源码。
+# 它的 `.swiftinterface` 里有一百多处声明包在:
+#
+#     #if compiler(>=5.3) && $NonescapableTypes
+#
+# `$NonescapableTypes` 是 **Swift 6.0 才有**的编译器特性。用 Swift 5.9(Xcode 15.x)
+# 消费它,条件为假,那批声明对编译器**直接不存在** —— 被藏掉的正好包括
+# `CAPPluginCall.reject(...)`(整份接口里只有这一个)和所有单参数取值器
+# (`getString(key)` / `getInt(key)` / `getArray(key)`,只剩必须给默认值的双参数版)。
+#
+# 症状是一堆看起来毫不相干的错:`call.reject` 报 "has no member"、
+# `getString("locale")` 报 "missing argument for parameter #2"、
+# 闭包参数类型推断失败…… **全是同一个根因**,跟这六个插件写得对不对无关。
+# 任何 Capacitor 8 插件在 Xcode 15 上都编不过。
+#
+# 这里写 `xcode: latest` —— Codemagic 的 macOS 镜像给的是最新稳定版(16+),
+# 所以云端这条路不受影响。**本地要编的话 Xcode 必须先升到 16。**
+#
 # ## 壳只是个空 WebView
 #
 # `capacitor.config.ts` 里 `server.url` 指向线上。所以**纯 JS 的改动推一次
@@ -68,6 +88,11 @@ definitions:
         test -f "ios/App/App.xcodeproj/xcshareddata/xcschemes/App.xcscheme" \
           || (echo "❌ 共享 scheme 不在,xcodebuild -scheme App 会找不到" && exit 1)
         echo "✅ 共享 scheme 在"
+        # `npx cap sync ios` 会**重写 config.xml 并把里面的注释吃掉** ——
+        # 就是解释「这文件为什么必须入库、为什么不能跑 cap add」的那段。
+        # 注释没了不影响构建,但下一个人看到一个没来由的文件就会想删掉它,
+        # 于是这个坑再踩一遍。把它还原回入库的那一版。
+        git checkout -- ios/App/App/config.xml 2>/dev/null || true
 
 workflows:
 

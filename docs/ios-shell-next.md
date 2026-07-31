@@ -139,6 +139,27 @@ AppDelegate 里接住 `CSSearchableItemActionType` 转成 `nesio://memory/<id>`�
 
 ## 出包 → 装机
 
+### 0. ⚠️ Xcode 必须 16+
+
+Capacitor 8.4.0 发的是**预编译 xcframework**,它的 `.swiftinterface` 里一百多处声明
+包在 `#if compiler(>=5.3) && $NonescapableTypes` 里 —— 那是 **Swift 6.0 才有**的
+编译器特性。用 Xcode 15.x(Swift 5.9)消费它,那批声明对编译器**直接不存在**,
+被藏掉的正好包括 `CAPPluginCall.reject(...)` 和所有单参数取值器
+(`getString(key)` / `getInt(key)` / `getArray(key)`)。
+
+症状是一堆看起来毫不相干的错(`reject` has no member、
+`getString` missing argument for parameter #2、闭包类型推断失败……)——
+**全是同一个根因,跟插件写得对不对无关**。任何 Capacitor 8 插件在 Xcode 15 上都编不过。
+
+Codemagic 的 `xcode: latest` 给的是 16+,所以**走云端这条路不受影响**。
+本地要编才需要先升 Xcode。
+
+(2026-07-31 本地打包实测撞到并定位。当时 42 个编译错里 14 个是真错
+——四个插件的 `checkPermissions`/`requestPermissions` 写成了 `@objc func`,
+而 `CAPPlugin` 把它们声明为 `open func`,所以那是覆盖不是新方法,
+必须 `@objc public override func`。这 14 个已修并入库;
+剩下 28 个全是上面那道门里的 API。)
+
 ### 1. 在 Codemagic 跑 `ios-sideload`
 
 ```
