@@ -37,22 +37,33 @@ const DEFAULT_GEMINI: AiPrice = { input: 0.075, output: 0.3 };
 const DEFAULT_OPENAI: AiPrice = { input: 0.15, output: 0.6 };
 
 /**
- * Kimi(Moonshot)的价格 —— **我不知道,所以不编**(2026-07-31)。
+ * Kimi(Moonshot)的价格。2026-07-31 **查证后填上**。
  *
- * 上面那三家的数字是有据可查的公开价目。Kimi 3 是新的,我手上没有可靠来源;
- * 随手填一个「差不多」的数,后果是 /admin 的成本页从此长期给出一个看着精确、
- * 实则凭空捏造的金额 —— 那比没有数字更坏,因为没人会去怀疑它。
+ * 上一版这里是空的,注释写着「我不知道,所以不编」—— 那是对的,当时确实没有出处。
+ * 现在有了:K3 官方 $3 / 百万输入、$15 / 百万输出,缓存命中 $0.30(九折优惠的那一档)。
+ * 有出处的数字和编一个,是两回事。
  *
- * 所以走环境变量(KIMI_PRICE_INPUT / KIMI_PRICE_OUTPUT,单位:美元 / 百万 token)。
- * 没配 = 0,而 0 在这里的含义是**「还没告诉我价格」,不是「免费」**;
- * priceKnown() 把这个区别透出去,让显示层能说人话而不是印一个 $0.00。
+ * 仍然可用 KIMI_PRICE_INPUT / KIMI_PRICE_OUTPUT 覆盖 —— 官方调价时不必改代码,
+ * 而且走第三方中转(OpenRouter / Together 之类)时价格本来就不一样。
+ *
+ * ⚠️ 一个容易低估的地方:K3 默认开思考模式,**思考 token 按输出价计费**。
+ * 所以 ai-complete 里把 reasoning_effort 压到了 low —— 那一行是成本项,不是风格项。
  */
+const KIMI_LIST_PRICE: AiPrice = { input: 3, output: 15 };
+/** 缓存命中价。Claude 那套按 input×0.1 近似,K3 有明码($0.30),直接用。 */
+const KIMI_CACHE_READ = 0.3;
+
 function kimiPrice(env: Record<string, string | undefined> = process.env): AiPrice {
-  const num = (v: string | undefined) => {
-    const n = Number((v ?? '').trim());
-    return Number.isFinite(n) && n >= 0 ? n : 0;
+  const num = (v: string | undefined, fallback: number) => {
+    const t = (v ?? '').trim();
+    if (!t) return fallback;
+    const n = Number(t);
+    return Number.isFinite(n) && n >= 0 ? n : fallback;
   };
-  return { input: num(env.KIMI_PRICE_INPUT), output: num(env.KIMI_PRICE_OUTPUT) };
+  return {
+    input: num(env.KIMI_PRICE_INPUT, KIMI_LIST_PRICE.input),
+    output: num(env.KIMI_PRICE_OUTPUT, KIMI_LIST_PRICE.output),
+  };
 }
 
 export type AiCostProvider = 'kimi' | 'claude' | 'gemini' | 'openai';
@@ -72,8 +83,7 @@ export function priceFor(provider: AiCostProvider, model: string): AiPrice {
  * 后者是根本没算 —— 混成一个 $0.00,用户会以为这条通道不要钱。
  */
 export function priceKnown(provider: AiCostProvider, env: Record<string, string | undefined> = process.env): boolean {
-  if (provider !== 'kimi') return true;
-  const p = kimiPrice(env);
+  const p = provider === 'kimi' ? kimiPrice(env) : priceFor(provider, '');
   return p.input > 0 || p.output > 0;
 }
 
@@ -88,7 +98,7 @@ export function estimateCostUsd(provider: AiCostProvider, model: string, usage: 
   const cost =
     nz(usage.inputTokens) * p.input +
     nz(usage.outputTokens) * p.output +
-    nz(usage.cacheReadTokens) * p.input * 0.1 +
+    nz(usage.cacheReadTokens) * (provider === 'kimi' ? KIMI_CACHE_READ : p.input * 0.1) +
     nz(usage.cacheWriteTokens) * p.input * 1.25;
   return cost / M;
 }

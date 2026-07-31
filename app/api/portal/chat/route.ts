@@ -127,8 +127,10 @@ const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 /**
  * Kimi(Moonshot)—— 2026-07-31 用户定为首选通道,Google 托底。
  * OpenAI 兼容形状,所以和下面的 callOpenAI 是同一副骨架,只换 base 和 key。
- * 模型 ID **必须显式配**(KIMI_MODEL):编一个默认值,错了的表现是每次 4xx,
- * 而日志看着像 key 不对,能查很久。
+ * 模型 id `kimi-k3` / base https://api.moonshot.ai/v1 —— 2026-07-31 查证后填的默认值,
+ * 有出处,不是编的;两者仍可用 env 覆盖。
+ * reasoning_effort 压到 low:K3 默认 max,而思考 token 按输出计费($15/M),
+ * 拿最贵的档干「答一句话」这种轻活不划算。
  */
 async function callKimi(
   apiKey: string,
@@ -136,15 +138,16 @@ async function callKimi(
   history: ChatMessage[],
   systemInstruction: string,
 ): Promise<{ text: string; sources: Array<{ title: string; url: string }> }> {
-  const model = (envValue('KIMI_MODEL') || '').trim();
-  if (!model) throw new Error('kimi_model_unset');
+  const model = (envValue('KIMI_MODEL') || 'kimi-k3').trim();
   const base = (envValue('KIMI_API_BASE') || 'https://api.moonshot.ai/v1').trim().replace(/\/+$/, '');
+  const effort = (envValue('KIMI_REASONING_EFFORT') || 'low').trim();
   const res = await fetch(`${base}/chat/completions`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model,
       max_tokens: 1024,
+      ...(effort ? { reasoning_effort: effort } : {}),
       messages: [
         { role: 'system', content: systemInstruction },
         ...history.filter((m) => m.text?.trim()).map((m) => ({

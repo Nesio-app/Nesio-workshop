@@ -140,17 +140,21 @@ async function callGemini(apiKey: string, prompt: string, system: string, maxTok
  * 走 **OpenAI 兼容**的 /chat/completions —— Moonshot 的公开接口一直是这个形状,
  * 所以请求/响应结构和上面 callOpenAI 是同一副,只是换了 base 和 key。
  *
- * ── 两处刻意不猜 ────────────────────────────────────────────────────────────
- * ① **模型 ID 必须显式配**(KIMI_MODEL)。没配就抛,不给一个我编的默认值 ——
- *    编错的表现是每次调用都 4xx,而日志里看着像「key 不对」,能查很久。
- *    宁可开口说「还没告诉我用哪个模型」。
- * ② base URL 可配(KIMI_API_BASE)。Moonshot 有国内/国际两个入口,而这个 App
- *    部署在国外,默认走国际站;真要走国内出口,配一下就行,不必改代码。
+ * ── 默认值(2026-07-31 查证后填上)────────────────────────────────────────────
+ * 上一版这里写着「模型 ID 必须显式配,我不知道就不编」。查过官方文档之后有出处了:
+ * 模型 id 是 `kimi-k3`、base 是 https://api.moonshot.ai/v1(我原来那个默认值猜对了)。
+ * 于是给上默认值 —— 有出处的默认值和编一个是两回事。两者都仍可用 env 覆盖。
+ *
+ * ── reasoning_effort:这一项直接决定账单 ────────────────────────────────────
+ * K3 **默认开思考模式,且 reasoning_effort 默认 max**。思考 token 按输出计费
+ * ($15/M),而 Nesio 绝大多数调用是「把这句话提取成一条记忆」「改写一句问候」
+ * 这类短活 —— 让它按 max 想一遍,是拿最贵的档去干最轻的活。
+ * 所以这里默认压到 low,需要深想的调用方自己传(KIMI_REASONING_EFFORT 可全局覆盖)。
  */
 async function callKimi(apiKey: string, prompt: string, system: string, maxTokens: number, temperature?: number, image?: string, responseFormat?: 'json'): Promise<CallResult> {
-  const usedModel = (envValue('KIMI_MODEL') || '').trim();
-  if (!usedModel) throw new Error('kimi_model_unset');
+  const usedModel = (envValue('KIMI_MODEL') || 'kimi-k3').trim();
   const base = (envValue('KIMI_API_BASE') || 'https://api.moonshot.ai/v1').trim().replace(/\/+$/, '');
+  const effort = (envValue('KIMI_REASONING_EFFORT') || 'low').trim();
   const img = image ? parseDataUrl(image) : null;
   const userContent = img
     ? [
@@ -164,6 +168,7 @@ async function callKimi(apiKey: string, prompt: string, system: string, maxToken
     body: JSON.stringify({
       model: usedModel,
       max_tokens: maxTokens,
+      ...(effort ? { reasoning_effort: effort } : {}),
       ...(typeof temperature === 'number' ? { temperature } : {}),
       ...(responseFormat === 'json' ? { response_format: { type: 'json_object' } } : {}),
       messages: [

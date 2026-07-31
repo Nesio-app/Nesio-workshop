@@ -2,15 +2,20 @@
  * 行为契约:Kimi(Moonshot)作为首选 AI 通道(2026-07-31 用户:
  * 「我的 AI 调用用她的 API,然后 google 托底」)。
  *
- * ── 这份契约真正在守的是「不许猜」──────────────────────────────────────────
- * 接一个新 provider,结构上没什么难的(OpenAI 兼容形状,照抄一副骨架)。
- * 真正会出事的是两个我**不知道**的值:
- *   ① Kimi 3 的模型 ID —— 编一个,错了的表现是每次请求 4xx,而日志看着像 key 不对;
- *   ② Kimi 的定价     —— 编一个,/admin 的成本页从此长期给出一个看着精确、
- *      实则凭空捏造的金额,而没人会去怀疑它。
- * 两个都做成了必须显式配的东西。这份契约钉死的就是**不许有人后来顺手填个默认值**。
+ * ── 前提更新(2026-07-31 下午)────────────────────────────────────────────────
+ * 上一版这份契约钉的是「模型 ID 和定价我不知道,所以不许有默认值」。
+ * 用户问了一句「你现在不能去搜索么」—— 能,而且早该搜。查证之后两个值都有出处了:
+ *   · 模型 id `kimi-k3`、base `https://api.moonshot.ai/v1`(Kimi API 官方文档)
+ *   · $3 / 百万输入,$15 / 百万输出,缓存命中 $0.30
+ * 于是默认值填上了。**有出处的默认值和编一个是两回事**,前提变了契约就跟着变。
  *
- * 另外压住顺序:kimi 第一、gemini 第二,是用户明确定的主 + 托底。
+ * 现在钉的是三件事:
+ *   ① 默认值必须是查到的那两个,不许被改成别的(改了要有新出处);
+ *   ② 顺序 kimi → gemini 是用户定的主 + 托底;
+ *   ③ **reasoning_effort 必须压着**。K3 默认开思考模式且默认 max,而思考 token
+ *      按输出价计费($15/M)—— Nesio 的调用绝大多数是「提取一条记忆」这种短活,
+ *      让它按 max 想一遍是拿最贵的档干最轻的活。这一行是成本项,不是风格项,
+ *      被谁顺手删掉不会有任何症状,只会月底账单翻几倍。
  */
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -29,65 +34,78 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
   assert.equal(order[1], 'gemini', 'Google 必须是紧接着的托底那一层');
 }
 
-// ── ② 模型 ID 不许有默认值 ─────────────────────────────────────────────────
+// ── ② 模型 ID / base / reasoning_effort:两条调用路径必须一致 ──────────────
 //
-// 这是最容易被「顺手补全」的一处:下一个人看到 `envValue('KIMI_MODEL') || ''`
-// 会觉得少了个 fallback,随手补一个 'kimi-xxx' 上去。补错了不会当场发现 ——
-// 请求 4xx、自动落到 Google 托底,一切看着正常,只是 Kimi 那一路从来没通过。
+// 三个值都得是查到的那个。改错了不会当场发现:请求 4xx → 自动落到 Google 托底,
+// 屏幕上一切正常,只是 Kimi 那一路从来没通过 —— 而你以为它在跑。
 for (const f of ['lib/portal/ai-complete.ts', 'app/api/portal/chat/route.ts']) {
   const src = read(f);
-  assert.ok(/KIMI_MODEL/.test(src), `${f} 要读 KIMI_MODEL`);
   assert.ok(
-    !/envValue\('KIMI_MODEL'\)\s*\|\|\s*'[^']+'/.test(src),
-    `${f}:KIMI_MODEL 不许有硬编码默认值 —— 那个 ID 我不知道,编一个错了只会表现成「key 不对」`,
+    /envValue\('KIMI_MODEL'\) \|\| 'kimi-k3'/.test(src),
+    `${f}:模型 id 默认值必须是官方文档上的 kimi-k3(要改,先拿出新出处)`,
   );
   assert.ok(
-    /if \(!\w*[Mm]odel\) throw new Error\('kimi_model_unset'\)/.test(src),
-    `${f}:没配模型要**明确抛**,不许静默用空字符串去打接口`,
+    /envValue\('KIMI_API_BASE'\) \|\| 'https:\/\/api\.moonshot\.ai\/v1'/.test(src),
+    `${f}:base 默认值必须是官方的国际站`,
+  );
+  // ③ 成本项:没有它,月底账单翻几倍而界面上什么症状都没有。
+  assert.ok(
+    /envValue\('KIMI_REASONING_EFFORT'\) \|\| 'low'/.test(src),
+    `${f}:reasoning_effort 必须默认压到 low —— K3 默认 max,而思考 token 按输出价计费`,
+  );
+  assert.ok(
+    /reasoning_effort: effort/.test(src),
+    `${f}:算出来的 effort 要真的发出去,不能只存在变量里`,
   );
 }
 
-// ── ③ 定价不许编 ───────────────────────────────────────────────────────────
+// ── ③ 定价:必须是查到的那个 ─────────────────────────────────────────────────
 {
   const cost = read('lib/portal/ai-cost.ts');
   assert.ok(/KIMI_PRICE_INPUT/.test(cost) && /KIMI_PRICE_OUTPUT/.test(cost), 'Kimi 价格要走环境变量');
-  // kimiPrice 的函数体里**不许出现任何非零数字字面量**。
+  // 定价必须是**查到的那个**($3 / $15,缓存命中 $0.30),不许被改成别的数。
   //
-  // 第一版只查了 `input: <数字>` 这一种形状,结果 `num(env.X) || 0.6` 这种写法
-  // 大摇大摆地过了 —— 而那正是「顺手补个 fallback」最自然的写法。
-  // 断言窄到只认一种写法,等于没有断言。改成:把数字全抓出来,必须都是 0。
-  const kimiFn = cost.slice(cost.indexOf('function kimiPrice'), cost.indexOf('export type AiCostProvider'));
-  const nums = (kimiFn.match(/(?<![\w.])\d+(?:\.\d+)?/g) || []).filter((n) => Number(n) !== 0);
-  assert.deepEqual(
-    nums, [],
-    `kimiPrice 里不许出现写死的非零价格(抓到:${nums.join(', ')})—— 那个数字没有出处,`
-    + '填进去只会让 /admin 长期给出一个看着精确、实则捏造的金额',
-  );
-  // 「没配价格」和「便宜到接近 0」必须分得开 —— 而且是**真调一遍**,不是搜源码。
-  //
-  // 第一版只断言「源码里有 `if (provider !== 'kimi') return true;` 这一行」。
-  // 在它前面插一句 `return true;` 就能让整个函数恒真,而那行原文还在 —— 照样绿。
-  // 文本断言压不住行为,这一条必须实际执行。
+  // 上一版这里钉的是「不许有任何非零数字」——那是「还没有出处」时对的做法。
+  // 现在有出处了,钉的就变成具体的值:要改,得先拿出新的出处(比如官方调价、
+  // 或者走第三方中转)。而那种情况本来就该走 env 覆盖,不必动代码。
+  assert.ok(/const KIMI_LIST_PRICE: AiPrice = \{ input: 3, output: 15 \}/.test(cost), 'K3 官方价 $3 / $15');
+  assert.ok(/const KIMI_CACHE_READ = 0\.3;/.test(cost), '缓存命中有明码 $0.30,不该再用 input×0.1 近似');
+
+  // 行为层:真调一遍,别只搜源码(上一版就栽在这 —— 在那行 if 前面插一句
+  // `return true;` 能让函数恒真而原文还在,照样绿)。
   const js = ts.transpileModule(cost, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   const mod = { exports: {} };
   vm.runInNewContext(js, {
     module: mod, exports: mod.exports, require: () => ({}),
-    process: { env: {} },   // 默认环境:什么都没配
+    process: { env: {} },
     console, Object, Array, String, Number, Math, JSON, Boolean, RegExp,
   });
-  const { priceKnown, priceFor } = mod.exports;
+  const { priceKnown, priceFor, estimateCostUsd } = mod.exports;
 
-  assert.equal(priceKnown('kimi', {}), false, '没配价格时必须如实说「不知道」');
-  assert.equal(priceKnown('kimi', { KIMI_PRICE_INPUT: '0.6' }), true, '配了就算知道');
-  assert.equal(priceKnown('kimi', { KIMI_PRICE_OUTPUT: '2.5' }), true, '只配输出价也算知道');
-  assert.equal(priceKnown('gemini', {}), true, '别家的价格有出处,恒为已知');
-  assert.equal(priceKnown('claude', {}), true);
-  // 没配价格时算出来的是 0 —— 这个 0 的含义由 priceKnown 负责说清,不是「免费」。
-  const p = priceFor('kimi', 'whatever');
-  assert.equal(p.input, 0, '没配就是 0,不许凭空冒出一个价');
-  assert.equal(p.output, 0);
+  // ⚠️ 跨 vm context 不能用 deepEqual —— 对象来自另一个 realm,原型不同,必然不等
+  //(仓里记过这一条,我又踩了一次)。比字段或 JSON.stringify。
+  assert.equal(JSON.stringify(priceFor('kimi', 'kimi-k3')), JSON.stringify({ input: 3, output: 15 }), '默认就是官方价');
+  assert.equal(
+    JSON.stringify(priceFor('kimi', 'kimi-k3')), JSON.stringify(priceFor('kimi', '任何型号')),
+    'Kimi 目前只有一档价,不按型号分表 —— 分了就得有出处',
+  );
+  assert.equal(priceKnown('kimi', {}), true, '有出处之后,价格就是「知道」的');
+  assert.equal(priceKnown('gemini', {}), true);
+
+  // 缓存命中走明码 $0.30,而不是 Claude 那套 input×0.1 的近似。
+  //
+  // 官方价下这两者**巧合相等**($3×0.1 = $0.30)—— 所以按默认价验等于没验。
+  // 必须用一个让两者分开的价来验:把输入价覆盖成 $10,近似法会算出 $1.00,
+  // 明码法仍是 $0.30。这条要是写成默认价,改回近似法它照样绿。
+  const cached = estimateCostUsd('kimi', 'kimi-k3', { inputTokens: 0, outputTokens: 0, cacheReadTokens: 1_000_000 });
+  assert.equal(Number(cached.toFixed(4)), 0.3, '一百万缓存命中 token = $0.30');
+  assert.ok(
+    /provider === 'kimi' \? KIMI_CACHE_READ : p\.input \* 0\.1/.test(cost),
+    '缓存命中必须走 Kimi 的明码,不是 input×0.1 —— 官方价下两者巧合相等,'
+    + '哪天调价就会悄悄错开,而没人看得出来',
+  );
 }
 
 // ── ④ key 别名两处同步 ─────────────────────────────────────────────────────
@@ -135,4 +153,4 @@ for (const f of ['lib/portal/ai-complete.ts', 'app/api/portal/chat/route.ts']) {
   );
 }
 
-console.log('kimi-provider: OK(主+托底顺序 / 模型 ID 不许编 / 定价不许编 / 别名两处同步 / 两条调用路径都接上)');
+console.log('kimi-provider: OK(主+托底顺序 / 默认值有出处 / reasoning_effort 压着 / 定价与缓存明码 / 别名两处同步 / 两条调用路径都接上)');
