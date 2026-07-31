@@ -70,7 +70,7 @@ export default function InvestPane({ txs, holdings, accounts, nwSeries, currency
       })}
       {checkup && (
         <>
-          <p className="nesio-settings-section-label" style={{ marginTop: '0.6rem' }}>{L(dict, '组合体检 · 本地确定性计算', 'Portfolio checkup · local & deterministic')}</p>
+          <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-2)' }}>{L(dict, '组合体检 · 本地确定性计算', 'Portfolio checkup · local & deterministic')}</p>
           <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>
             {L(dict,
               `集中度:${checkup.topName} 占 ${checkup.topPct}% · 前三占 ${checkup.top3Pct}%。配置:${checkup.allocation.slice(0, 3).map((x) => `${x.type} ${x.pct}%`).join(' · ')}。今年买 ${checkup.buys} 次 · 卖 ${checkup.sells} 次。`,

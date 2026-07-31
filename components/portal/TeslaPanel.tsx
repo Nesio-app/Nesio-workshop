@@ -199,7 +199,7 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
     return (
       <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', padding: 'var(--space-4)' }}>
         <p className="nesio-settings-option-hint" style={{ margin: 0 }}>{errMsg}</p>
-        <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: '0.6rem' }} onClick={() => void load()}>
+        <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-2)' }} onClick={() => void load()}>
           {L(dict, '再试一次', 'Try again')}
         </button>
       </div>

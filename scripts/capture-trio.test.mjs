@@ -139,9 +139,27 @@ assert.ok(
 
 {
   // 回车 / ↑ 的行为一个字没改:仍然是记一笔。这是肌肉记忆,不能因为多了两条路就变。
+  //
+  // ⚠️ 2026-07-31 合并 @提及分支时改过一次:原来这条钉的是 onKeyDown 的**整段字面量**,
+  // 而 @提及要在候选框开着时把 Enter 让给「选中候选」(Slack/Notion/GitHub 都是这样)。
+  // 钉字面量的话,「加一个自动补全」和「这条契约」就变成二选一 —— 但它俩要保护的
+  // 根本不是同一件事:这条防的是**意图分流劫持回车**,不是防任何 Enter 分支。
+  // 所以改成钉意图:回车直达 capture.onSubmit(),中间不许插判意图的东西。
+  const keydown = (bar.match(/onKeyDown=\{\(e\) => \{[\s\S]*?\n\s*\}\}/) || [''])[0];
+  assert.ok(keydown, '输入框没有 onKeyDown 了');
   assert.ok(
-    /onKeyDown=\{\(e\) => \{ if \(e\.key === 'Enter' && !e\.shiftKey\) \{ e\.preventDefault\(\); capture\.onSubmit\(\); \} \}\}/.test(bar),
-    '回车仍然直接提交(记一笔),不经过任何意图分流',
+    /e\.key === 'Enter' && !e\.shiftKey/.test(keydown) && /capture\.onSubmit\(\)/.test(keydown),
+    '回车不再直接提交(记一笔)—— 这是肌肉记忆,不能因为多了两条路就变',
+  );
+  // 唯一允许的提前 return 是「自动补全开着」。别的条件都算劫持。
+  // ⚠️ 按**行**取,别用 /if \([^)]*\) return;/ —— `[^)]*` 跨不过
+  // `(e.key === 'Enter' || ...)` 里的嵌套括号,连合法那条都匹配不到,
+  // 于是 every() 对空数组恒真,整条断言空转(自查反证时正好踩到)。
+  const earlyReturns = keydown.split('\n').filter((l) => /\breturn;\s*$/.test(l));
+  assert.ok(
+    earlyReturns.every((r) => /mention/.test(r)),
+    `回车被别的条件提前拦下了:${earlyReturns.filter((r) => !/mention/.test(r)).join(' / ')}\n`
+    + '  → 只有「@候选框开着」可以借走回车。判意图那类一律不行:猜错「记」为「问」= 东西没存下来。',
   );
   // 自动判意图这条路**不许**在这里出现 —— 猜错「记」为「问」= 东西没存下来。
   assert.ok(

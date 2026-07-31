@@ -17,8 +17,10 @@
  *   · 其余(pdf/docx/xlsx/zip…)→ lib/portal/local-file-store 原样存 Blob。
  * 不按类型白名单收,按体积设限 —— 白名单永远会漏掉某个「常见类型」。
  */
-import { useMemo, useRef, useState, type RefObject } from 'react';
+import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
+import MentionPicker from '../MentionPicker';
 import { formatWhen, parseWhen } from '@/lib/portal/when-parse';
+import { activeMentionQuery, applyMention, mentionCandidatesFromGraph, type MentionCandidate, type PendingMention } from '@/lib/portal/mention';
 import { IconMic, IconPlus } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -33,6 +35,11 @@ export interface CaptureBarProps {
   inputRef: RefObject<HTMLTextAreaElement | null>;
   /** 上传落库。由 TodayFeed 提供(它才知道怎么建节点);没给就不显示「+」。 */
   onFiles?: (files: File[]) => Promise<void>;
+  /**
+   * 打 @ 选中了一条记忆。**只是记下待结算**,不是当场就连 ——
+   * 文本是纯的,你插了又删掉就不该连。真正结算在提交时(`settleMentions`)。
+   */
+  onMention?: (m: PendingMention) => void;
   /**
    * bug3 p42:话筒听不了时的可见失败态。原来这几种情况会去开「说一句」sheet ——
    * iOS PWA 上 SpeechRecognition 根本不存在,于是点话筒每次都跳那张 sheet(标注要去掉)。
@@ -85,6 +92,41 @@ export default function CaptureBar(capture: CaptureBarProps) {
   // 两个字以下不打扰:打第一个字就弹出三行动作,比没有更烦。
   const showActions = typed.length >= 2 && !!(capture.onSearch || capture.onAsk || capture.onRemind);
 
+  // ── @提及:打字的时候顺手连一条已有的记忆 ──────────────────────────────────
+  // 为什么值得做:Notion/Roam 的图之所以密,是因为**边写边连**。我们原来要进详情页
+  // 点关联再搜再挑,四步摩擦,所以自己建的边几乎没有。
+  const [mention, setMention] = useState<{ at: number; query: string } | null>(null);
+  const [cands, setCands] = useState<MentionCandidate[]>([]);
+
+  const syncMention = useCallback((text: string, caret: number) => {
+    const q = activeMentionQuery(text, caret);
+    setMention(q);
+    if (!q || !q.query.trim()) { setCands([]); return; }
+    // 全图线性扫 —— 只在真的打了 @ 且有查询词时才扫,而且 mentionCandidatesFromGraph 内部有
+    // 200 条命中上限。不做去抖是因为它比一次 setState 还快;真慢了再说。
+    try { setCands(mentionCandidatesFromGraph(q.query, { max: 6 })); }
+    catch { setCands([]); }
+  }, []);
+
+  const pickMention = useCallback((c: MentionCandidate) => {
+    if (!mention) return;
+    const el = capture.inputRef.current;
+    const text = capture.value;
+    const next = applyMention(text, mention, c);
+    capture.onChange(next.text);
+    capture.onMention?.({ id: c.id, name: c.name } as PendingMention);
+    setMention(null); setCands([]);
+    // 光标放到插入位之后 —— 不放的话会跳到末尾,接着打字就接错地方了
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      try { el.setSelectionRange(next.caret, next.caret); } catch { /* 老浏览器 */ }
+    });
+  }, [mention, capture]);
+
+  const mentionOpen = Boolean(mention && cands.length);
+  void useMemo(() => mentionOpen, [mentionOpen]);
+
   async function take(files: File[]) {
     if (!files.length || !capture.onFiles) return;
     setBusy(true); setErr('');
@@ -134,8 +176,24 @@ export default function CaptureBar(capture: CaptureBarProps) {
             className="nesio-tl-capture-input"
             rows={1}
             value={capture.value}
-            onChange={(e) => { capture.onChange(e.target.value); growJot(e.currentTarget); }}
-            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); capture.onSubmit(); } }}
+            onChange={(e) => {
+              capture.onChange(e.target.value);
+              growJot(e.currentTarget);
+              syncMention(e.target.value, e.target.selectionStart ?? e.target.value.length);
+            }}
+            // 光标移动(点、方向键)也要重算 —— 只在 onChange 算的话,
+            // 你把光标挪回一个已经打好的 @xxx 后面,候选不会出来。
+            onSelect={(e) => {
+              const el = e.currentTarget;
+              syncMention(el.value, el.selectionStart ?? el.value.length);
+            }}
+            onBlur={() => setMention(null)}
+            onKeyDown={(e) => {
+              // 候选开着的时候 Enter 归它(选中候选),不能变成「记下」。
+              // MentionPicker 在 capture 阶段就拦了,这里再挡一次防漏。
+              if (mention && (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Escape')) return;
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); capture.onSubmit(); }
+            }}
             onFocus={(e) => {
               // 聚焦后等键盘升起,把输入框滚到刚好可见(nearest,不留大空隙)。
               const el = e.currentTarget;
@@ -143,6 +201,10 @@ export default function CaptureBar(capture: CaptureBarProps) {
             }}
             placeholder=""
           />
+
+          {mentionOpen && mention && (
+            <MentionPicker items={cands} dict={dict} onPick={pickMention} onClose={() => { setMention(null); setCands([]); }} />
+          )}
 
           {/* 清空。草稿是持久化的(没点记下就退出,下次进来还在),而在这之前**没有任何删掉它的入口** ——
               用户碰到一条自己从没打过的草稿(语音把环境音听成了字),只能一个字一个字退,

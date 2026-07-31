@@ -21,7 +21,7 @@ interface Weekly { range: { from: string | null; to: string | null }; days: numb
 const SEV_COLOR: Record<Severity, string> = { go: '#2e9e6b', gentle: '#c98a1a', risk: '#d64545' };
 const card: React.CSSProperties = {
   background: 'var(--glass-bg-raised)', border: '1px solid var(--glass-border)',
-  borderRadius: 'var(--radius-lg)', padding: '1rem 1.1rem', boxShadow: 'var(--shadow-card)',
+  borderRadius: 'var(--radius-lg)', padding: 'var(--space-4) var(--space-4)', boxShadow: 'var(--shadow-card)',
 };
 
 export function AnalystCard({ secret }: { secret: string }) {
@@ -84,7 +84,7 @@ export function AnalystCard({ secret }: { secret: string }) {
     } catch { setSent('err'); }
   }, [headers]);
 
-  if (loading && !report) return <section style={{ ...card, marginBottom: '1rem' }}>分析师读取中…</section>;
+  if (loading && !report) return <section style={{ ...card, marginBottom: 'var(--space-4)' }}>分析师读取中…</section>;
   if (!report) return null;
 
   const c = SEV_COLOR[report.status];
@@ -100,28 +100,28 @@ export function AnalystCard({ secret }: { secret: string }) {
   );
 
   return (
-    <section style={{ ...card, marginBottom: '1rem', borderLeft: `3px solid ${c}` }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.4rem' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.55rem' }}>
+    <section style={{ ...card, marginBottom: 'var(--space-4)', borderLeft: `3px solid ${c}` }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)' }}>
           <span style={{ fontSize: '0.7rem', letterSpacing: '0.08em', color: 'var(--portal-muted)', textTransform: 'uppercase' }}>分析师日报</span>
           <span style={{ fontSize: '0.95rem', fontWeight: 700, color: c }}>{report.headline}</span>
         </div>
         <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{report.date}</span>
       </div>
 
-      <ul style={{ margin: '0.7rem 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+      <ul style={{ margin: 'var(--space-3) 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
         {report.keyPoints.map((p, i) => (
-          <li key={i} style={{ fontSize: '0.8rem', color: 'var(--portal-ink)', display: 'flex', gap: '0.5rem' }}>
+          <li key={i} style={{ fontSize: '0.8rem', color: 'var(--portal-ink)', display: 'flex', gap: 'var(--space-2)' }}>
             <span style={{ color: 'var(--portal-muted)' }}>·</span><span>{p}</span>
           </li>
         ))}
       </ul>
 
       {report.alerts.length > 0 && (
-        <div style={{ marginTop: '0.8rem', display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+        <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           {report.alerts.map((a) => (
             <div key={a.type} style={{
-              fontSize: '0.76rem', padding: '0.5rem 0.65rem', borderRadius: 9,
+              fontSize: '0.76rem', padding: 'var(--space-2) var(--space-3)', borderRadius: 9,
               background: `color-mix(in srgb, ${SEV_COLOR[a.severity]} 10%, transparent)`,
               borderLeft: `2px solid ${SEV_COLOR[a.severity]}`,
             }}>
@@ -142,13 +142,13 @@ export function AnalystCard({ secret }: { secret: string }) {
         </div>
       )}
 
-      <div style={{ marginTop: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+      <div style={{ marginTop: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
         <button type="button" onClick={() => void emailNow()} disabled={sent === 'sending'} style={{
-          fontSize: '0.72rem', padding: '0.35rem 0.7rem', borderRadius: 8, cursor: 'pointer',
+          fontSize: '0.72rem', padding: 'var(--space-1) var(--space-3)', borderRadius: 8, cursor: 'pointer',
           border: '1px solid var(--glass-border)', background: 'var(--glass-bg)', color: 'var(--portal-ink)',
         }}>发送到邮箱</button>
         <button type="button" onClick={() => void loadWeekly()} disabled={weeklyBusy} style={{
-          fontSize: '0.72rem', padding: '0.35rem 0.7rem', borderRadius: 8, cursor: 'pointer',
+          fontSize: '0.72rem', padding: 'var(--space-1) var(--space-3)', borderRadius: 8, cursor: 'pointer',
           border: '1px solid var(--glass-border)', background: 'var(--glass-bg)', color: 'var(--portal-ink)',
         }}>{weeklyBusy ? '聚合中…' : '本周总结'}</button>
         {sent && <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{sentMsg[sent]}</span>}
@@ -163,7 +163,7 @@ export function AnalystCard({ secret }: { secret: string }) {
       </div>
 
       {showLearn && learn && (
-        <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: '0.55rem' }}>
+        <div style={{ marginTop: 'var(--space-2)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--glass-border)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
           <div>
             <div style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', marginBottom: 4 }}>学到的水位(基线)</div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -197,8 +197,8 @@ export function AnalystCard({ secret }: { secret: string }) {
       )}
 
       {weekly && (
-        <div style={{ marginTop: '0.6rem', paddingTop: '0.6rem', borderTop: '1px solid var(--glass-border)' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.4rem', flexWrap: 'wrap' }}>
+        <div style={{ marginTop: 'var(--space-2)', paddingTop: 'var(--space-2)', borderTop: '1px solid var(--glass-border)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
             <span style={{ fontSize: '0.78rem', fontWeight: 650, color: 'var(--portal-ink)' }}>本周总结 · {weekly.headline}</span>
             <span style={{ fontSize: '0.64rem', color: 'var(--portal-muted)' }}>{weekly.range.from || '—'} → {weekly.range.to || '—'}({weekly.days} 天)</span>
           </div>

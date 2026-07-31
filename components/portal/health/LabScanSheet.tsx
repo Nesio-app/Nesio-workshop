@@ -175,19 +175,19 @@ export default function LabScanSheet({
               {t('拍一张,或直接选体检中心给的 PDF。全程在这台设备上完成,文件不会离开。',
                 'Take a photo, or pick the PDF your lab sent. Everything runs on this device — the file never leaves.')}
             </p>
-            <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: '0.8rem' }}
+            <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-3)' }}
               onClick={() => fileRef.current?.click()}>
               {t('拍照', 'Take a photo')}
             </button>
-            <button type="button" className="nesio-rel-log-btn" style={{ width: '100%', marginTop: '0.5rem' }}
+            <button type="button" className="nesio-rel-log-btn" style={{ width: '100%', marginTop: 'var(--space-2)' }}
               onClick={() => pdfRef.current?.click()}>
               {t('选文件 · PDF 或图片', 'Choose a file · PDF or image')}
             </button>
-            <p className="nesio-settings-option-hint" style={{ marginTop: '0.5rem' }}>
+            <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-2)' }}>
               {t('带文字的 PDF 是直接读文字的 —— 比拍照准,也不需要端上识别。',
                 'A text-based PDF is read directly — more accurate than a photo, and no on-device OCR needed.')}
             </p>
-            <button type="button" className="nesio-rel-log-btn" style={{ width: '100%', marginTop: '0.5rem' }} onClick={goManual}>
+            <button type="button" className="nesio-rel-log-btn" style={{ width: '100%', marginTop: 'var(--space-2)' }} onClick={goManual}>
               {t('手填也行', 'Type it in instead')}
             </button>
           </>
@@ -211,7 +211,7 @@ export default function LabScanSheet({
               </p>
             )}
             <p className="nesio-rel-detail-err" style={{ marginTop: phase.fromScan ? '0.4rem' : 0 }}>{unavailableMessage(phase.reason)}</p>
-            <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: '0.6rem' }} onClick={goManual}>
+            <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-2)' }} onClick={goManual}>
               {t('手填这张单子', 'Type this report in')}
             </button>
           </div>
@@ -220,7 +220,7 @@ export default function LabScanSheet({
         {phase.s === 'failed' && (
           <div role="alert">
             <p className="nesio-rel-detail-err" style={{ marginTop: 0 }}>{phase.message}</p>
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
               <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }} onClick={() => pdfRef.current?.click()}>
                 {t('换一个文件', 'Try another file')}
               </button>
@@ -237,7 +237,7 @@ export default function LabScanSheet({
               {t('认出字了,但没找到能入库的指标行 —— 可能是版式没对上。',
                 'Text was read, but no metric rows matched — the layout may be unusual.')}
             </p>
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.6rem' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
               <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }} onClick={() => pdfRef.current?.click()}>
                 {t('换一个文件', 'Try another file')}
               </button>
@@ -255,26 +255,26 @@ export default function LabScanSheet({
                 ? t(`识别到 ${phase.rows.length} 项 · ${abn} 项在参考区间外`, `${phase.rows.length} metrics · ${abn} outside the reference range`)
                 : t(`识别到 ${phase.rows.length} 项`, `${phase.rows.length} metrics`)}
             </p>
-            <p className="nesio-settings-option-hint" style={{ margin: '0.25rem 0 0' }}>
+            <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>
               {t('逐项核一眼再入库 —— 认错一个数字,后面的曲线就跟着错。', 'Check each row before saving — one wrong number skews every curve after it.')}
             </p>
 
-            <label className="nesio-settings-section-label" htmlFor="ls-who" style={{ marginTop: '0.7rem' }}>{t('这是谁的', 'Whose')}</label>
+            <label className="nesio-settings-section-label" htmlFor="ls-who" style={{ marginTop: 'var(--space-3)' }}>{t('这是谁的', 'Whose')}</label>
             <select id="ls-who" className="nesio-ob-input" value={who} onChange={(e) => setWho(e.target.value)}>
               <option value={SELF_PERSON_KEY}>{t('我', 'Me')}</option>
               {people.map((p) => <option key={p.key} value={p.key}>{p.name}</option>)}
             </select>
 
-            <label className="nesio-settings-section-label" htmlFor="ls-date" style={{ marginTop: '0.7rem' }}>{t('化验日期', 'Report date')}</label>
+            <label className="nesio-settings-section-label" htmlFor="ls-date" style={{ marginTop: 'var(--space-3)' }}>{t('化验日期', 'Report date')}</label>
             <input id="ls-date" className="nesio-ob-input" type="date" value={phase.date}
               onChange={(e) => setPhase((c) => (c.s === 'confirm' ? { ...c, date: e.target.value } : c))} />
 
-            <p className="nesio-settings-section-label" style={{ marginTop: '0.9rem' }}>{t('逐项确认', 'Row by row')}</p>
+            <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-4)' }}>{t('逐项确认', 'Row by row')}</p>
             {phase.rows.map((r, i) => {
               const off = r.flag === 'high' || r.flag === 'low';
               return (
-                <div key={i} className="nesio-health-card" style={{ gridColumn: '1 / -1', marginBottom: '0.5rem', opacity: r.keep ? 1 : 0.45 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <div key={i} className="nesio-health-card" style={{ gridColumn: '1 / -1', marginBottom: 'var(--space-2)', opacity: r.keep ? 1 : 0.45 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
                     <input type="checkbox" checked={r.keep} aria-label={t(`收下「${r.name}」`, `Keep ${r.name}`)}
                       onChange={(e) => patch(i, { keep: e.target.checked })} />
                     <input className="nesio-ob-input" style={{ flex: 1 }} value={r.name} maxLength={40}
@@ -282,13 +282,13 @@ export default function LabScanSheet({
                       onChange={(e) => patch(i, { name: e.target.value })} />
                     {/* 偏离参考区间:amber。日常偏高不是风险,不用红。 */}
                     {off && (
-                      <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', padding: '0.15rem 0.5rem',
+                      <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', padding: 'var(--space-1) var(--space-2)',
                         borderRadius: 'var(--radius-pill)', background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>
                         {r.flag === 'high' ? t('偏高', 'High') : t('偏低', 'Low')}
                       </span>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: '0.4rem', marginTop: '0.4rem' }}>
+                  <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                     <input className="nesio-ob-input" style={{ flex: 2 }} inputMode="decimal" value={String(r.value)}
                       aria-label={t('数值', 'Value')}
                       onChange={(e) => patch(i, { value: Number(e.target.value) })} />
@@ -306,7 +306,7 @@ export default function LabScanSheet({
                   </div>
                   {/* 把握不足的行原样把 OCR 那一行摆出来,让人对照着改,而不是猜我们解错了什么 */}
                   {r.confidence !== 'high' && (
-                    <span className="nesio-health-card-range" style={{ display: 'block', marginTop: '0.3rem' }}>
+                    <span className="nesio-health-card-range" style={{ display: 'block', marginTop: 'var(--space-1)' }}>
                       {t('原文:', 'Read as: ')}{r.raw}
                     </span>
                   )}
@@ -316,7 +316,7 @@ export default function LabScanSheet({
 
             {saveErr && <p className="nesio-rel-detail-err" role="alert">{saveErr}</p>}
 
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.8rem' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
               <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }} onClick={() => fileRef.current?.click()}>
                 {t('重拍', 'Retake')}
               </button>
@@ -344,7 +344,7 @@ export default function LabScanSheet({
             if (f) void run(f);
           }} />
 
-        <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>
+        <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-4)', textAlign: 'center' }}>
           {t('读取与识别都在本机完成 · 健康信息参考,不作诊断', 'Reading and recognition run on-device · for reference, not a diagnosis')}
         </p>
       </div>

@@ -290,7 +290,7 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, fixes, onOpen, onStar, 
           </span>
           <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{dateLabel}</span>
         </div>
-        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: '0.2rem', alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-1)', alignItems: 'center', flexWrap: 'wrap' }}>
           {row.meta && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{row.meta}</span>}
           {/* 和下面那排标签用同一套 padding —— 同一张卡里两种大小的胶囊会显得没对齐 */}
           {row.badge && (

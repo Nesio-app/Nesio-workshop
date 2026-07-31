@@ -11,6 +11,7 @@ import { L } from '@/lib/portal/i18n';
 import { readJotDraft, writeJotDraft, draftAgeNote } from '@/lib/portal/jot-draft';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, deleteFocusNode, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem, getLiveMemoryNode, type LiveMemoryNode } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
+import { settleMentions, linkSettledMentions, type PendingMention } from '@/lib/portal/mention';
 import { dismissJudgedCard, judgeState, clearJudgeError } from '@/lib/portal/guidance-judge-auto';
 
 /**
@@ -98,6 +99,8 @@ export default function TodayFeed({
   const [quickAdd, setQuickAdd] = useState('');
   // 「设成提醒」之后那条带撤销的回执(2026-07-31 三合一)。
   const [remindReceipt, setRemindReceipt] = useState<{ text: string; onUndo: () => void } | null>(null);
+  /** 打 @ 选过的记忆。提交时按「名字还在不在文本里」结算(见 CaptureBar 的 onMention)。 */
+  const [pendingMentions, setPendingMentions] = useState<PendingMention[]>([]);
   const uiLocale = portalLocaleToDictionaryLocale(usePortalLocale());
   /**
    * 「+」传完东西之后那条回执。
@@ -475,7 +478,7 @@ export default function TodayFeed({
 
         {/* 云端往本机填过数据时的一次性回执(QA:积分 0→150 像被人乱改)。读一次即清。 */}
         {restoreNote && (
-          <p style={{ margin: '0 0 0.6rem', fontSize: '0.72rem', lineHeight: 1.6, color: 'var(--portal-muted)' }}>
+          <p style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--text-xs)', lineHeight: 1.6, color: 'var(--portal-muted)' }}>
             {restoreNote}
           </p>
         )}
@@ -570,13 +573,29 @@ export default function TodayFeed({
           value={quickAdd}
           onChange={(v) => { setQuickAdd(v); setDraftNote(null); }}
           staleNote={draftNote ? L(uiLocale, draftNote.zh, draftNote.en) : ''}
-          onSubmit={() => {
+          onMention={(m) => setPendingMentions((prev) => [...prev, m])}
+          onSubmit={async () => {
             const name = quickAdd.trim();
             if (!name) return;
-            addCommitmentNode(name);
+            const created = addCommitmentNode(name);
+            // @提及**在这里结算**:只连名字还留在最终文本里的那些。
+            // 打了某个名字又把它删掉,就不该连 —— 文本是纯的,这是唯一诚实的判据。
+            // (注释里别举真人名当例子:隐私边界那条契约扫的是整个文件,不剥注释。)
+            // 连不上不拦提交:这条记录本身是你要的东西,为了一条关联把它丢掉更糟;
+            // 但也不静默 —— 连不上就在回执里说。
+            const settled = settleMentions(quickAdd, pendingMentions);
+            const { linked } = await linkSettledMentions(created.id, settled);
+            setPendingMentions([]);
             setQuickAdd('');
             setDraftNote(null);
-            setQuickSaved(L(uiLocale, '已记下', 'Noted'));
+            setQuickSaved(
+              settled.length === 0
+                ? L(uiLocale, '已记下', 'Noted')
+                : linked === settled.length
+                  ? L(uiLocale, `已记下 · 关联了 ${linked} 条`, `Noted · linked ${linked}`)
+                  // 一条都没连上/只连上一部分要说出来 —— 静默的话你会以为连上了
+                  : L(uiLocale, `已记下,但有 ${settled.length - linked} 条没能关联上`, `Noted, but ${settled.length - linked} link(s) failed`),
+            );
             setTimeout(() => setQuickSaved(''), 2000);
           }}
           onMic={startQuickMic}

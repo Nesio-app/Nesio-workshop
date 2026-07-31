@@ -135,20 +135,20 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
   if (phase.s === 'assigned') {
     return (
       <div className="nesio-nd-photo-add">
-        <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--portal-ink)', lineHeight: 1.6 }}>
+        <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--portal-ink)', lineHeight: 1.6 }}>
           <b>{t('已交给', 'Assigned to')} {phase.name}</b> · <span style={{ color: 'var(--portal-muted)' }}>{stateLabel(phase.state, t)}</span>
           {phase.count > 1 ? ` · ${t(`共 ${phase.count} 次`, `${phase.count}×`)}` : ''}
         </p>
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
           <button type="button" className="nesio-node-action-secondary nesio-nd-photo-btn" onClick={() => void begin()}>
             {t('改派给别人', 'Reassign')}
           </button>
           <button type="button" onClick={() => void cancelChore(phase.familyId)} disabled={cancelBusy}
-            style={{ border: 'none', background: 'transparent', color: 'var(--status-risk)', fontSize: '0.82rem', cursor: 'pointer', padding: '0.2rem 0.4rem' }}>
+            style={{ border: 'none', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-sm)', cursor: 'pointer', padding: 'var(--space-1) var(--space-2)' }}>
             {cancelBusy ? t('停下中…', 'Stopping…') : phase.count > 1 ? t('停掉这条循环家务', 'Stop this recurring chore') : t('取消这件家务', 'Cancel this chore')}
           </button>
         </div>
-        {cancelErr && <p className="nesio-nd-photo-err" role="alert" style={{ marginTop: '0.4rem' }}>{cancelErr}</p>}
+        {cancelErr && <p className="nesio-nd-photo-err" role="alert" style={{ marginTop: 'var(--space-2)' }}>{cancelErr}</p>}
       </div>
     );
   }
@@ -176,11 +176,11 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
   if (phase.s === 'done') {
     return (
       <div className="nesio-nd-photo-add">
-        <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--status-go)', lineHeight: 1.6 }}>
+        <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--status-go)', lineHeight: 1.6 }}>
           {t(`已交给 ${phase.name} 了。TA 会在自己的今天页看到;做完后你也会在今天页收到提醒。`,
             `Handed to ${phase.name}. They'll see it on their Today; you'll hear back on yours when it's done.`)}
         </p>
-        <button type="button" className="nesio-node-action-secondary nesio-nd-photo-btn" onClick={() => void begin()} style={{ marginTop: '0.5rem' }}>
+        <button type="button" className="nesio-node-action-secondary nesio-nd-photo-btn" onClick={() => void begin()} style={{ marginTop: 'var(--space-2)' }}>
           {t('改派给别人', 'Reassign')}
         </button>
       </div>
@@ -190,10 +190,10 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
   if (phase.s === 'nofamily') {
     return (
       <div className="nesio-nd-photo-add">
-        <p style={{ margin: 0, fontSize: '0.82rem', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
+        <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
           {t('还没有家庭。先在洞察里建一个家庭,就能把家务分派给家人。', 'No family yet. Create one in Insights, then you can assign chores.')}
         </p>
-        <button type="button" className="nesio-node-action-secondary nesio-nd-photo-btn" style={{ marginTop: '0.5rem' }}
+        <button type="button" className="nesio-node-action-secondary nesio-nd-photo-btn" style={{ marginTop: 'var(--space-2)' }}
           onClick={() => { try { window.dispatchEvent(new CustomEvent('nesio-open-family')); } catch { /* noop */ } }}>
           {t('去建家庭', 'Open family')}
         </button>
@@ -215,23 +215,23 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
   // phase.s === 'pick'
   const fam = phase.families.find((f) => f.familyId === phase.familyId);
   return (
-    <div className="nesio-nd-photo-add" style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-      <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--portal-muted)' }}>{t('分派给谁?', 'Assign to whom?')}</p>
+    <div className="nesio-nd-photo-add" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+      <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('分派给谁?', 'Assign to whom?')}</p>
       {phase.families.length > 1 && (
         <select
           value={phase.familyId}
           onChange={(e) => { setPhase({ s: 'loading' }); void loadMembers(phase.families, e.target.value); }}
-          style={{ padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontSize: '0.85rem' }}
+          style={{ padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }}
         >
           {phase.families.map((f) => <option key={f.familyId} value={f.familyId}>{f.name}</option>)}
         </select>
       )}
       {/* 周期:接 chores-core cadence —— 每天/每周会向前铺 14 天,不用天天重派。 */}
-      <div style={{ display: 'flex', gap: '0.3rem' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-1)' }}>
         {([['once', t('一次', 'Once')], ['daily', t('每天', 'Daily')], ['weekly', t('每周', 'Weekly')]] as const).map(([k, label]) => (
           <button key={k} type="button" onClick={() => setRepeat(k)}
             style={{
-              flex: 1, padding: '0.3rem 0.4rem', borderRadius: 'var(--radius-sm)', fontSize: '0.8rem', cursor: 'pointer',
+              flex: 1, padding: 'var(--space-1) var(--space-2)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--text-sm)', cursor: 'pointer',
               border: '1px solid var(--portal-line)', fontFamily: 'var(--font-sans)',
               background: repeat === k ? 'var(--portal-accent-soft-md)' : 'transparent',
               color: repeat === k ? 'var(--portal-accent)' : 'var(--portal-muted)',
@@ -243,31 +243,31 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
       </div>
 
       {/* 金额:接回零花钱账本。留空 = 纯待办(不计钱)。 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <span style={{ fontSize: '0.85rem', color: 'var(--portal-muted)' }}>$</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>$</span>
         <input
           inputMode="decimal" value={reward} onChange={(e) => setReward(e.target.value)}
           placeholder={t('给多少(可留空)', 'Reward (optional)')}
-          style={{ flex: 1, minWidth: 0, padding: '0.35rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontSize: '0.85rem' }}
+          style={{ flex: 1, minWidth: 0, padding: 'var(--space-1) var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }}
         />
-        <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', color: 'var(--portal-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+        <label style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
           <input type="checkbox" checked={needsApproval} onChange={(e) => setNeedsApproval(e.target.checked)} />
           {t('做完我看一眼', 'I review it')}
         </label>
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
         {phase.members.map((m) => (
-          <button key={m.id} type="button" className="nesio-node-action-secondary" style={{ padding: '0.35rem 0.8rem', fontSize: '0.85rem' }}
+          <button key={m.id} type="button" className="nesio-node-action-secondary" style={{ padding: 'var(--space-1) var(--space-3)', fontSize: 'var(--text-sm)' }}
             onClick={() => fam && void assign(fam.familyId, m)}>
             {m.name}
           </button>
         ))}
         {phase.members.length === 0 && (
-          <span style={{ fontSize: '0.8rem', color: 'var(--portal-muted)' }}>{t('这个家庭还没有其他成员。', 'No other members yet.')}</span>
+          <span style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>{t('这个家庭还没有其他成员。', 'No other members yet.')}</span>
         )}
       </div>
       <button type="button" onClick={() => setPhase({ s: 'idle' })}
-        style={{ alignSelf: 'flex-start', border: 'none', background: 'transparent', color: 'var(--portal-muted)', fontSize: '0.78rem', cursor: 'pointer', padding: '0.2rem 0' }}>
+        style={{ alignSelf: 'flex-start', border: 'none', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: 'var(--space-1) 0' }}>
         {t('收起', 'Close')}
       </button>
     </div>

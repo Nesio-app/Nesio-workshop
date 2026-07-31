@@ -266,7 +266,7 @@ function HubGrid({ tiles, dict, onOpen }: { tiles: HubTile[]; dict: string; onOp
       {editing && (
         // 左右 0.25rem 和 .nesio-insights-header 对齐 —— 洞察页整体是贴边布局,
         // 不留这一点「完成」两个字就正好压在屏幕右边缘上(实测 right=390=视口宽)。
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 0.25rem', marginBottom: 'var(--space-2)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 var(--space-1)', marginBottom: 'var(--space-2)' }}>
           <span style={{ flex: 1, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
             {L(dict, '按住拖动换位置', 'Hold and drag to reorder')}
           </span>
@@ -276,7 +276,7 @@ function HubGrid({ tiles, dict, onOpen }: { tiles: HubTile[]; dict: string; onOp
       )}
 
       {saveErr && (
-        <p role="alert" style={{ margin: '0 0 var(--space-2)', padding: '0 0.25rem', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)' }}>{saveErr}</p>
+        <p role="alert" style={{ margin: '0 0 var(--space-2)', padding: '0 var(--space-1)', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)' }}>{saveErr}</p>
       )}
 
       <div className={`nesio-insights-hub${editing ? ' nesio-insights-hub--editing' : ''}`}>
@@ -605,7 +605,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
           <button type="button" className="nesio-insights-close" onClick={onClose} aria-label={L(dict, '回到今天', 'Back to Today')}>{L(dict, '今天', 'Today')}</button>
         </div>
         <div className="nesio-insights-body">
-          <p className="nesio-insights-empty" style={{ marginTop: '2.5rem' }}>
+          <p className="nesio-insights-empty" style={{ marginTop: 'var(--space-10)' }}>
             {L(dict,
               '登录后,这里只对你显示你自己的洞察 —— 关系、健康、足迹、财务、多面镜都来自你的私人记录,只给本人看。',
               'Sign in to see your own insights here — relationships, health, places, finance and mirror all come from your private records, visible only to you.')}
@@ -701,19 +701,19 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
               <div className="nesio-insights-section">
                 <div className="nesio-insights-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                   <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '几个没接上的线头', 'A few loose threads')}</p>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '> 30 天', '> 30 days')}</span>
+                  <span style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>{L(dict, '> 30 天', '> 30 days')}</span>
                 </div>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.55rem', marginTop: '0.55rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
                   {threads.slice(0, 3).map((t) => {
                     const days = Math.floor((Date.now() - new Date(t.createdAt).getTime()) / DAY_MS);
                     return (
-                      <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.7rem' }}>
+                      <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-3)' }}>
                         <div style={{ minWidth: 0 }}>
-                          <p style={{ margin: 0, fontWeight: 600, color: 'var(--portal-ink)', fontSize: '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>「{stripMarkdownInline(t.name).slice(0, 22)}」</p>
-                          <p style={{ margin: '0.12rem 0 0', fontSize: '0.7rem', color: 'var(--portal-muted)' }}>{L(dict, `${days} 天前提过,没再碰`, `mentioned ${days}d ago, not since`)}</p>
+                          <p style={{ margin: 0, fontWeight: 600, color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>「{stripMarkdownInline(t.name).slice(0, 22)}」</p>
+                          <p style={{ margin: '0.12rem 0 0', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>{L(dict, `${days} 天前提过,没再碰`, `mentioned ${days}d ago, not since`)}</p>
                         </div>
                         <button type="button" onClick={() => openInMemory(t.name)}
-                          style={{ flex: 'none', fontSize: '0.74rem', fontWeight: 600, padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-sm, 12px)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', cursor: 'pointer' }}>
+                          style={{ flex: 'none', fontSize: 'var(--text-xs)', fontWeight: 600, padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-sm, 12px)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', cursor: 'pointer' }}>
                           {L(dict, '拾起', 'Pick up')}
                         </button>
                       </div>
@@ -727,16 +727,16 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
             <div className="nesio-insights-section">
               <div className="nesio-insights-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                 <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '节律', 'Rhythm')}</p>
-                <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '本月', 'this month')}</span>
+                <span style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>{L(dict, '本月', 'this month')}</span>
               </div>
-              <p className="nesio-rhythm-line" style={{ margin: '0.45rem 0 0' }}>{rhythm.line}</p>
+              <p className="nesio-rhythm-line" style={{ margin: 'var(--space-2) 0 0' }}>{rhythm.line}</p>
             </div>
 
             {/* 生命版图:唯一保留的图,移到底部(≥21 天才出现,不满门槛只说实话,不放示例) */}
             <div className="nesio-insights-section">
               <div className="nesio-insights-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                 <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '生命版图', 'Life map')}<InfoTip text={L(dict, '五个领域(关系/事业/成长/健康/自我)按记录的意义密度(置信度+关联数+标签,不是数量)切分领土宽度;下方标出近来占比涨得最多的一域。', 'Five domains (ties/work/growth/health/self) split by meaning density (confidence + connections + tags, not count); below flags the domain whose share grew the most lately.')} /></p>
-                <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '意义密度 · 非数量', 'Meaning density · not counts')}</span>
+                <span style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>{L(dict, '意义密度 · 非数量', 'Meaning density · not counts')}</span>
               </div>
               {mapEligible && territory.slices.length ? (
                 <>
@@ -772,7 +772,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
               <div className="nesio-insights-section">
                 <div className="nesio-insights-section-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
                   <p className="nesio-insights-section-label" style={{ margin: 0 }}>{L(dict, '跨域关联', 'Cross-domain links')}<InfoTip text={L(dict, '在你每日对齐的记录(情绪/花费/步数/睡眠/外出/日程/天气)上算皮尔逊相关,只跑一小组有生活意义的固定假设对,样本≥14 天、|r|≥0.3 才显示。统计相关,非因果。', 'Pearson correlation on your day-aligned records (mood/spend/steps/sleep/outings/schedule/weather); only a small fixed set of meaningful hypotheses, shown when n≥14 and |r|≥0.3. Correlation, not causation.')} /></p>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--portal-muted)' }}>{L(dict, '统计相关 · 非因果', 'Correlation · not causation')}</span>
+                  <span style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>{L(dict, '统计相关 · 非因果', 'Correlation · not causation')}</span>
                 </div>
                 <ul className="nesio-xdom-list">
                   {crossDomain.map((c) => (

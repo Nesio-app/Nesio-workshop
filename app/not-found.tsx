@@ -37,7 +37,7 @@ export default function NotFound() {
       <Link
         href="/"
         style={{
-          marginTop: 'var(--space-2)', padding: '0.5rem 1.5rem', borderRadius: 'var(--radius-pill)',
+          marginTop: 'var(--space-2)', padding: 'var(--space-2) var(--space-6)', borderRadius: 'var(--radius-pill)',
           background: 'var(--portal-accent)', color: 'var(--portal-on-accent, #fff)',
           fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-medium)', textDecoration: 'none',
         }}

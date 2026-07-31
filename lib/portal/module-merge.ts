@@ -1,104 +1,147 @@
 /**
- * module-merge —— 有些模块是「一堆按 id 的记录」,不是一张快照(2026-07-30,bug #29)。
+ * module-merge —— 通用模块同步里**并集语义**那几个 key 的合并规则。
  *
- * 用户报的现象:同一个账号,同一个财务入口,不同时间点打开会看到**三种互不相干的状态** ——
- * 一次是「收入 $10,672.93 / 支出 $4,273.21」,一次是「支出 $259.69」,还有一次是
- * 「还没有银行流水」。他自己的定性是对的:这是缓存 / 本机 / 云之间的同步问题。
+ * ## 病灶
  *
- * 查下来根因在通用模块同步(cloud-module-sync)的**冲突语义**上:
- * 它对每个 key 做「模块级 last-write-wins」—— 云端赢的时候,是**整键替换**。
- * 这对「一张快照」型的数据没问题(预算、报告设置),但银行流水/账户是**集合**:
+ * `cloud-module-sync` 对每个 key 做**模块级 last-write-wins**,云端赢的时候是**整键替换**。
+ * 快照型数据(设置、当前体重、主题)这样没问题 —— 那种数据的语义就是「最新的那份是对的」。
  *
- *   · 每台设备各自从 Plaid 增量拉,`mergeBankTxForSync` 按 id upsert —— 本机是并集语义;
- *   · 两台设备的 Plaid 窗口、绑定的 item、拉取进度都可能不同;
- *   · 于是 A 有 500 笔、B 有 300 笔,谁后写谁赢,整键盖掉对方 —— 数字就这么跳。
+ * 但银行流水/账户在本机是**并集语义**:按 id upsert、账户只增合并。两台设备的 Plaid
+ * 拉取窗口和游标进度不同 —— A 有 500 笔、B 有 300 笔。谁后写谁赢,**对方独有的那部分
+ * 直接没了**。而且没有任何界面会报错:你只会发现「上个月的交易怎么少了一截」。
  *
- * 这正是 life-graph 被排除在通用同步之外的同一个理由(那边的注释写着
- * 「避免双写 + replace 冲掉其 union 合并语义」)。银行流水是同一类东西,却漏在了里面。
+ * `life-graph` 早就因为同一个理由被排除在通用同步外(它有自己的 union 合并),
+ * 银行流水漏在了里面。
  *
- * 所以:**这些 key 的云端那份只能并进来,不能整键替换**。
+ * ## 三条规矩(缺一条就不收敛)
  *
- * 一个必须守住的细节:合并结果要**确定性**。两台设备拿到同一批记录必须产出
- * 逐字节相同的 JSON,否则内容哈希对不上,pull→push→pull 会无限互推。
- * 所以合并后一律按固定顺序重排,不保留任何一边的原始顺序。
+ *   ① **只并不替换** —— 两边的记录按 id 取并集。本机独有的、云端独有的,一条都不能少。
  *
- * 权衡说在明处:并集意味着「一台设备删掉的记录,只要另一台还留着,就会被并回来」。
- * 但现在的整键替换**同样**会把它带回来(云端那份就是另一台的全量),
- * 而且还会顺手删掉本机独有的那些。并集在这条轴上不更差,在丢数据这条轴上明显更好。
+ *   ② **结果确定性重排** —— 合并完必须按同一个全序重排、字段顺序也归一。
+ *      两台设备算出的 JSON 必须**逐字节相同**,否则内容哈希对不上:
+ *      A 觉得自己改过 → 推给云;B 拉下来觉得自己改过 → 推给云 …… **无限互推**,
+ *      流量和电量白烧,而且数据其实一模一样。
  *
- * 纯函数,不碰存储、不碰网络。
+ *   ③ **并完不写 state** —— 合并出来的是「本机原来没有的超集」,必须让它被当成
+ *      「本机改过」,下一轮 push 才会把超集推上去。写了 state 就等于告诉系统
+ *      「本机和云端一致」,超集永远上不去,另一台设备也就永远拿不到。
+ *
+ * ## 字段冲突怎么办
+ *
+ * 同一个 id 两边都有、但某个字段不一样(A 富化出了商户 logo,B 还没有)。
+ * 规则:**有值的赢空的;两边都有值且不同,取序列化后字典序小的那个**。
+ *
+ * 后半条看起来武断,但它是**对称**的 —— 两台设备算出同一个结果,所以一轮就收敛。
+ * 换成「本机赢」就不对称了:A 留自己的、B 留自己的,永远谈不拢,又回到无限互推。
+ * 对 BankTx 来说冲突字段本来就少(Plaid 是同一个权威源),代价可以接受。
  */
 
-/** 这些模块是「按 id 的集合」。值 = 用哪个字段当 id。 */
-export const ID_SET_MODULES: Record<string, string> = {
-  // 银行流水:每台设备各自增量拉、按 id upsert(见 bank-tx.mergeBankTxForSync)
+/** 需要并集合并的 key → 用哪个字段当身份。不在表里的 key 走原来的 LWW。 */
+export const MERGE_KEYS: Readonly<Record<string, string>> = {
+  // 银行流水:按 id upsert(与本机 mergeBankTxForSync 同一语义)
   'nesio-bank-tx-v1': 'id',
-  // 银行账户:本机写入就是「只增合并」(见 bank-tx.saveBankAccounts),整键替换直接毁掉这个语义
+  // 账户:只增合并 —— 一台设备连了 Chase、另一台连了 BoA,两个都该留着
   'nesio-bank-accounts-v1': 'id',
+  // 持仓:同上
+  'nesio-fin-holdings-v1': 'id',
 };
 
-/** 并集上限,与 mergeBankTxForSync 的 cap 对齐 —— 不让多设备并集无限长大。 */
-export const MERGE_CAP = 5000;
-
-export interface MergeResult {
-  json: string;
-  /** 云端带进来、本机原本没有的条数。 */
-  addedFromCloud: number;
-  /** 本机独有、云端没有的条数(它们原来会被整键替换直接抹掉)。 */
-  keptOnlyLocal: number;
+export function needsUnionMerge(key: string): boolean {
+  return Object.prototype.hasOwnProperty.call(MERGE_KEYS, key);
 }
 
-/** 排序键:有 date 的按 date 降序,再按 id 升序。**两台设备必须排出一模一样的顺序**。 */
-function sortKey(rec: Record<string, unknown>, idField: string): [string, string] {
-  const date = typeof rec.date === 'string' ? rec.date : '';
-  const id = String(rec[idField] ?? '');
-  return [date, id];
+type Row = Record<string, unknown>;
+
+/** 字段级合并:有值赢空值;都有值且不同 → 字典序小的赢(**对称**,两端算出同一个结果)。 */
+function mergeRow(a: Row, b: Row): Row {
+  const out: Row = {};
+  for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) {
+    const va = a[k]; const vb = b[k];
+    const aEmpty = va == null || va === '';
+    const bEmpty = vb == null || vb === '';
+    if (aEmpty && bEmpty) { out[k] = va ?? vb; continue; }
+    if (aEmpty) { out[k] = vb; continue; }
+    if (bEmpty) { out[k] = va; continue; }
+    const sa = JSON.stringify(va); const sb = JSON.stringify(vb);
+    out[k] = sa === sb ? va : (sa < sb ? va : vb);
+  }
+  return out;
+}
+
+/** 键排序后重建 —— JSON.stringify 按插入顺序输出,不归一的话两端字节不同。 */
+function canonicalRow(r: Row): Row {
+  const out: Row = {};
+  for (const k of Object.keys(r).sort()) out[k] = r[k];
+  return out;
 }
 
 /**
- * 把云端那份并进本机那份。
- *
- * @returns 解析不出数组(格式变了 / 不是这类数据)→ null,调用方回落到原来的判据。
+ * 全序比较:先按 date 降序(新的在前,和本机 mergeBankTxForSync 一致),
+ * 再按 id 升序兜底。**必须是全序** —— 只按 date 排的话同一天的多笔顺序不定,
+ * 两端字节就不同了。
  */
-export function mergeIdSets(localJson: string | undefined, cloudJson: string, idField: string): MergeResult | null {
-  let local: unknown;
-  let cloud: unknown;
-  try { local = localJson === undefined ? [] : JSON.parse(localJson); } catch { return null; }
-  try { cloud = JSON.parse(cloudJson); } catch { return null; }
-  if (!Array.isArray(local) || !Array.isArray(cloud)) return null;
-
-  const byId = new Map<string, Record<string, unknown>>();
-  const localIds = new Set<string>();
-  // 先放云端,再放本机 —— 同 id 时**本机赢**:这台设备刚从 Plaid 拉过,它那份更新。
-  for (const r of cloud as Record<string, unknown>[]) {
-    const id = r && typeof r === 'object' ? String(r[idField] ?? '') : '';
-    if (id) byId.set(id, r);
-  }
-  let addedFromCloud = byId.size;
-  for (const r of local as Record<string, unknown>[]) {
-    const id = r && typeof r === 'object' ? String(r[idField] ?? '') : '';
-    if (!id) continue;
-    localIds.add(id);
-    if (byId.has(id)) addedFromCloud -= 1;
-    byId.set(id, r);
-  }
-  const cloudIds = new Set((cloud as Record<string, unknown>[]).map((r) => (r && typeof r === 'object' ? String(r[idField] ?? '') : '')).filter(Boolean));
-  let keptOnlyLocal = 0;
-  for (const id of localIds) if (!cloudIds.has(id)) keptOnlyLocal += 1;
-
-  const merged = [...byId.values()]
-    .sort((a, b) => {
-      const [da, ia] = sortKey(a, idField);
-      const [db, ib] = sortKey(b, idField);
-      if (da !== db) return da < db ? 1 : -1;   // date 降序(空 date 排最后)
-      return ia < ib ? -1 : ia > ib ? 1 : 0;    // id 升序,保证确定性
-    })
-    .slice(0, MERGE_CAP);
-
-  return { json: JSON.stringify(merged), addedFromCloud, keptOnlyLocal };
+function compareRows(idField: string, a: Row, b: Row): number {
+  const da = typeof a.date === 'string' ? a.date : '';
+  const db = typeof b.date === 'string' ? b.date : '';
+  if (da !== db) return da < db ? 1 : -1;
+  const ia = String(a[idField] ?? ''); const ib = String(b[idField] ?? '');
+  return ia < ib ? -1 : ia > ib ? 1 : 0;
 }
 
-/** 这个 key 要不要走并集。 */
-export function idFieldFor(key: string): string | null {
-  return Object.prototype.hasOwnProperty.call(ID_SET_MODULES, key) ? ID_SET_MODULES[key] : null;
+export interface MergeOutcome {
+  /** 合并后的 JSON。**两端逐字节相同** —— 这是收敛的前提。 */
+  json: string;
+  /** 本机原来就是这个结果吗(是 → 什么都不用做,可以正常写 state)。 */
+  unchanged: boolean;
+  /** 本机独有、云端没有的条数(> 0 说明「整键替换」本来会吃掉它们)。 */
+  localOnly: number;
+  /** 云端独有、本机没有的条数。 */
+  cloudOnly: number;
+}
+
+/**
+ * 并集合并一个模块 key。
+ *
+ * @param localJson 本机的值(undefined = 本机没有这个 key)
+ * @param cloudJson 云端的值
+ * @param cap       上限,与本机 store 对齐(流水 5000)。截断在**排序之后**做,
+ *                  所以两端截的是同一批 —— 先截后排会让两端留下不同的子集。
+ *
+ * 解析不出数组就返回 null,调用方退回原来的 LWW —— 猜一个格式去合并比不合并更危险。
+ */
+export function mergeModuleJson(
+  key: string, localJson: string | undefined, cloudJson: string, cap = 5000,
+): MergeOutcome | null {
+  const idField = MERGE_KEYS[key];
+  if (!idField) return null;
+  let localArr: unknown; let cloudArr: unknown;
+  try { localArr = localJson === undefined ? [] : JSON.parse(localJson); } catch { return null; }
+  try { cloudArr = JSON.parse(cloudJson); } catch { return null; }
+  if (!Array.isArray(localArr) || !Array.isArray(cloudArr)) return null;
+
+  const byId = new Map<string, Row>();
+  let localOnly = 0;
+  for (const r of localArr as Row[]) {
+    if (!r || typeof r !== 'object') continue;
+    const id = String(r[idField] ?? '');
+    if (!id) continue;
+    byId.set(id, r);
+    localOnly += 1;
+  }
+  let cloudOnly = 0;
+  for (const r of cloudArr as Row[]) {
+    if (!r || typeof r !== 'object') continue;
+    const id = String(r[idField] ?? '');
+    if (!id) continue;
+    const prev = byId.get(id);
+    if (prev) { byId.set(id, mergeRow(prev, r)); localOnly -= 1; }
+    else { byId.set(id, r); cloudOnly += 1; }
+  }
+
+  const merged = [...byId.values()]
+    .sort((a, b) => compareRows(idField, a, b))
+    .slice(0, cap)          // 排完再截 —— 先截后排两端会留下不同的子集
+    .map(canonicalRow);
+  const json = JSON.stringify(merged);
+  return { json, unchanged: json === localJson, localOnly: Math.max(0, localOnly), cloudOnly };
 }

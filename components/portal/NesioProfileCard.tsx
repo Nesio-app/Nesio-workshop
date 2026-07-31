@@ -205,7 +205,7 @@ export default function NesioProfileCard() {
 
           {/* 批次 6:数字统计改「返回今天」——设置页最常见的下一步 */}
           <a href="/" className="nesio-profile-stat" aria-label={L(dict, '返回今天', 'Back to Today')}>
-            <span className="nesio-profile-stat-label" style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--portal-blue-deep)' }}>{L(dict, '返回今天', 'Back to Today')}</span>
+            <span className="nesio-profile-stat-label" style={{ fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--portal-blue-deep)' }}>{L(dict, '返回今天', 'Back to Today')}</span>
           </a>
         </div>
         {avatarError && <p className="nesio-profile-avatar-error">{avatarError}</p>}

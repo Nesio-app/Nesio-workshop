@@ -104,7 +104,7 @@ function CollapsibleText({ text, limit = 110 }: { text: string; limit?: number }
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        style={{ marginLeft: 6, fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-blue-deep)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+        style={{ marginLeft: 6, fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--portal-blue-deep)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
       >
         {expanded ? L(dict, '收起', 'Less') : L(dict, '详情', 'More')}
       </button>
@@ -283,7 +283,7 @@ function ObjectSection({ node, assetUrls }: {
       <InfoRow label={L(dict, '支付方式', 'Paid with')} value={paymentMethod} />
       <InfoRow label={L(dict, '备注', 'Note')} value={note} />
       {fileUrl && (
-        <div style={{ marginTop: '0.75rem' }}>
+        <div style={{ marginTop: 'var(--space-3)' }}>
           <a href={safeExternalUrl(fileUrl)} target="_blank" rel="noopener noreferrer" className="nesio-type-action-btn">
             <IconLink size={13} /> {L(dict, '打开链接', 'Open link')}
           </a>
@@ -320,7 +320,7 @@ function PlaceSection({ node }: {
         </div>
       )}
       {(lat && lon && !address) && (
-        <div style={{ marginTop: '0.5rem' }}>
+        <div style={{ marginTop: 'var(--space-2)' }}>
           <a href={mapUrl('', lat, lon, dict)} target="_blank" rel="noopener noreferrer" className="nesio-type-action-btn">
             {L(dict, '在地图中查看', 'View on map')}
           </a>
@@ -402,7 +402,7 @@ function EventSection({ node }: {
         </div>
       )}
       {url && (
-        <div style={{ marginTop: '0.75rem' }}>
+        <div style={{ marginTop: 'var(--space-3)' }}>
           <a href={safeExternalUrl(url)} target="_blank" rel="noopener noreferrer"
             className={`nesio-type-action-btn${isMeeting ? ' nesio-type-action-btn--meeting' : ''}`}>
             {isMeeting ? L(dict, '加入会议', 'Join meeting') : <><IconLink size={13} /> {L(dict, '直达链接', 'Open link')}</>}
@@ -569,7 +569,7 @@ function NoteSection({ node }: { node: LifeNode }) {
       <InfoRow label={L(dict, '分类', 'Type')} value={category} />
       <InfoRow label={L(dict, '记录时间', 'Noted on')} value={fmtDate(date, dict)} />
       {url && (
-        <div style={{ marginTop: '0.75rem' }}>
+        <div style={{ marginTop: 'var(--space-3)' }}>
           <a href={safeExternalUrl(url)} target="_blank" rel="noopener noreferrer" className="nesio-type-action-btn">
             <IconLink size={13} /> {L(dict, '打开原文', 'Open source')}
           </a>
@@ -620,17 +620,17 @@ class DetailErrorBoundary extends Component<{ onClose: () => void; dict: string;
     if (this.state.err) {
       return (
         <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" onClick={this.props.onClose}>
-          <div className="nesio-node-detail-sheet" style={{ padding: '1.4rem 1.2rem', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-            <p style={{ margin: '0 0 0.4rem', fontSize: '1rem', fontWeight: 600 }}>{L(this.props.dict, '这条记忆的详情没打开成功', "This memory's details didn't open")}</p>
-            <p style={{ margin: '0 0 0.9rem', fontSize: '0.8rem', color: 'var(--portal-muted)' }}>{L(this.props.dict, '数据没有丢。关闭后再试一次。若反复出现,把下面这行错误复制发回来就能定位。', 'Your data is safe. Close and try again. If it keeps happening, copy the error line below and send it to us so we can pinpoint it.')}</p>
+          <div className="nesio-node-detail-sheet" style={{ padding: 'var(--space-6) var(--space-5)', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
+            <p style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--text-body)', fontWeight: 600 }}>{L(this.props.dict, '这条记忆的详情没打开成功', "This memory's details didn't open")}</p>
+            <p style={{ margin: '0 0 var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>{L(this.props.dict, '数据没有丢。关闭后再试一次。若反复出现,把下面这行错误复制发回来就能定位。', 'Your data is safe. Close and try again. If it keeps happening, copy the error line below and send it to us so we can pinpoint it.')}</p>
             {this.state.msg && (
               <p style={{
-                fontSize: '0.72rem', color: 'var(--status-risk, #c0392b)', margin: '0 auto 0.8rem', maxWidth: 300,
-                padding: '8px 10px', borderRadius: 8, textAlign: 'left', wordBreak: 'break-all', userSelect: 'text',
+                fontSize: 'var(--text-xs)', color: 'var(--status-risk, #c0392b)', margin: '0 auto 0.8rem', maxWidth: 300,
+                padding: '8px 10px', borderRadius: 'var(--radius-xs)', textAlign: 'left', wordBreak: 'break-all', userSelect: 'text',
                 background: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.25)',
               }}>{this.state.msg.slice(0, 200)}</p>
             )}
-            <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', justifyContent: 'center' }}>
               {this.state.msg && (
                 <button type="button" className="nesio-connector-disconnect" onClick={() => { try { navigator.clipboard?.writeText(this.state.msg); } catch { /* 手抄 */ } }}>{L(this.props.dict, '复制错误', 'Copy error')}</button>
               )}
@@ -1003,7 +1003,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
         <div className="nesio-settings-sheet-header">
           {editing ? (
             <input
-              className="nesio-ob-input" style={{ fontSize: '1rem', marginBottom: 0, flex: 1 }}
+              className="nesio-ob-input" style={{ fontSize: 'var(--text-body)', marginBottom: 0, flex: 1 }}
               value={field('name')} onChange={(e) => setField('name', e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); }}
               autoFocus
@@ -1013,7 +1013,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
           )}
           {/* 可见关闭出口(QA:只能 Esc/下滑关,触屏用户不知道怎么退) */}
           <button type="button" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}
-            style={{ flexShrink: 0, marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--portal-muted)', fontSize: '1rem', padding: '0.2rem 0.35rem', lineHeight: 1 }}>
+            style={{ flexShrink: 0, marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--portal-muted)', fontSize: 'var(--text-body)', padding: 'var(--space-1) var(--space-1)', lineHeight: 1 }}>
             ✕
           </button>
         </div>
@@ -1151,14 +1151,34 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               related_plan: [<IconLink key="i" size={13} />, '相关计划', 'Related plan'],
               has_checklist: [<IconCheckSquare key="i" size={13} />, '对应清单', 'Checklist'],
               user_linked: [<IconLink key="i" size={13} />, '手动关联', 'Linked'],
+              // 2026-07-30 反链保底:下面这几个原来**不在表里**,后果是关联建了但详情页
+              // 一条都不显示 —— 上周刚做的「这笔钱关联了谁」在这里是隐形的。
+              checklist_of: [<IconCheckSquare key="i" size={13} />, '所属清单', 'Checklist of'],
+              involves_person: [<IconLink key="i" size={13} />, '相关的人', 'Person involved'],
+              paid_by_tx: [<IconLink key="i" size={13} />, '对应这笔钱', 'Paid by'],
             };
+            /**
+             * ⚠️ 关系名**不做白名单过滤**。
+             *
+             * 原来是 `Boolean(REL_LABEL[x.r.relation])` —— 表里没有的关系类型直接从
+             * 界面上消失。那意味着每加一种关系,都要有人记得回来改这张表,
+             * 忘了就是「关联明明建了,详情页什么都没有」,而且不报错。
+             * 上周新增的 involves_person / paid_by_tx 就正好踩中,checklist_of 更是
+             * 一直漏着(从清单那一侧看不到它属于谁)。
+             *
+             * 现在:认得的用它自己的标签,不认得的走通用标签**照样显示**。
+             * 宁可显示一个笼统的「关联」,也不要让一条真实存在的边凭空消失。
+             */
+            const relMeta = (rel: string): [ReactNode, string, string] =>
+              REL_LABEL[rel] ?? [<IconLink key="i" size={13} />, '关联', 'Linked'];
             const rels = [
               ...(n.relations || []).filter((r) => !removedRels.has(`${r.relation}:${r.targetId}`)),
               ...addedRels,
             ];
             const live = rels
               .map((r) => ({ r, node: g.find((x) => x.id === r.targetId) }))
-              .filter((x): x is { r: { targetId: string; relation: string }; node: LifeNode } => Boolean(x.node) && Boolean(REL_LABEL[x.r.relation]));
+              // 只要目标节点还在就显示 —— 关系名不认得不是隐藏它的理由
+              .filter((x): x is { r: { targetId: string; relation: string }; node: LifeNode } => Boolean(x.node));
             // 批次 94(用户实锤关联记忆闪退):onClick 里抛的错 React 错误边界
             // 抓不到(只抓 render),会冒到全局 → 批次 85 处理器可能触发重载 =
             // 看起来「闪退」。addRel/removeRel 全包 try/catch,任何异常只吞不炸。
@@ -1196,8 +1216,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                 {live.map(({ r, node: t }) => (
                   <div key={`${r.relation}-${r.targetId}`} className="nesio-node-link-row">
                     <button type="button" className="nesio-node-link-chip" onClick={() => onOpenNode?.(t)}>
-                      <span>{REL_LABEL[r.relation][0]}</span>
-                      <span className="nesio-node-link-kind">{L(dict, REL_LABEL[r.relation][1], REL_LABEL[r.relation][2])}</span>
+                      <span>{relMeta(r.relation)[0]}</span>
+                      <span className="nesio-node-link-kind">{L(dict, relMeta(r.relation)[1], relMeta(r.relation)[2])}</span>
                       <span className="nesio-node-link-name">{t.name.slice(0, 24)}</span>
                     </button>
                     <button type="button" className="nesio-node-link-x" aria-label={L(dict, '解除关联', 'Unlink')} onClick={() => removeRel(r)}>✕</button>
@@ -1225,7 +1245,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                   </div>
                 )}
                 {linkError && (
-                  <p style={{ fontSize: '0.7rem', color: 'var(--status-risk)', margin: '0.3rem 0 0', wordBreak: 'break-all' }}>{linkError}</p>
+                  <p style={{ fontSize: 'var(--text-overline)', color: 'var(--status-risk)', margin: 'var(--space-1) 0 0', wordBreak: 'break-all' }}>{linkError}</p>
                 )}
               </div>
             );
@@ -1269,9 +1289,9 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
 
           {/* Raw input —— 批次 74:长文默认折叠(清单类原文动辄上千字) */}
           {showRawInput && (
-            <div className="nesio-node-raw" style={{ marginTop: '0.75rem' }}>
+            <div className="nesio-node-raw" style={{ marginTop: 'var(--space-3)' }}>
               <p className="nesio-settings-section-label">{isEmailNode ? L(dict, '原始记录 · 邮件原文', 'Original · email') : L(dict, '原始记录', 'Original note')}</p>
-              <p style={{ fontSize: '0.88rem', color: 'var(--portal-muted)', fontStyle: 'italic' }}>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', fontStyle: 'italic' }}>
                 &ldquo;{(() => { const raw = stripMarkdownInline(n.rawInput || ''); return rawExpanded || raw.length <= 180 ? raw : `${raw.slice(0, 180)}…`; })()}&rdquo;
               </p>
               {(n.rawInput || '').length > 180 && (
@@ -1285,7 +1305,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
           {/* Remaining attributes not covered above */}
           {shownAttrs.length > 0 && (
             <>
-              <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>{L(dict, '其他属性', 'Other details')}</p>
+              <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-3)' }}>{L(dict, '其他属性', 'Other details')}</p>
               {shownAttrs.map(([k, v]) => (
                 <div key={k} className="nesio-node-attr-row">
                   <span className="nesio-node-attr-key">{(dict === 'en' ? ATTR_KEY_LABELS_EN : ATTR_KEY_LABELS)[k] ?? k}</span>
@@ -1316,7 +1336,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               .slice(0, 2);
             if (!doors.length) return null;
             return (
-              <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
                 {doors.map(({ t, count }) => (
                   <button
                     key={t}
@@ -1325,7 +1345,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                       onClose();
                       window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: t } }));
                     }}
-                    style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.12))', border: 'none', borderRadius: 999, padding: '0.35rem 0.8rem', fontSize: '0.78rem', color: 'var(--portal-accent, #588ce3)', cursor: 'pointer' }}
+                    style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.12))', border: 'none', borderRadius: 999, padding: 'var(--space-1) var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--portal-accent, #588ce3)', cursor: 'pointer' }}
                   >
                     {t} · {count} {L(dict, '条', '')} ›
                   </button>
@@ -1354,8 +1374,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             if (galleryAssets.length === 0) return null;
             return (
             <>
-              <p className="nesio-settings-section-label" style={{ marginTop: '0.75rem' }}>{L(dict, '附件', 'Attachments')}</p>
-              <div style={{ display: 'grid', gap: '0.6rem' }}>
+              <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-3)' }}>{L(dict, '附件', 'Attachments')}</p>
+              <div style={{ display: 'grid', gap: 'var(--space-2)' }}>
                 {galleryAssets.map((asset) => {
                   const key = asset.id || asset.storagePath || asset.label || 'asset';
                   const previewUrl = assetUrls[key];
@@ -1374,12 +1394,12 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                           // 从 assetUrls 摘掉这条,自动回落到下面的软文案分支(有可见失败态,不是破图)。
                           onError={() => setAssetUrls((cur) => { if (!(key in cur)) return cur; const next = { ...cur }; delete next[key]; return next; })} />
                       ) : (
-                        <p style={{ fontSize: '0.82rem', color: 'var(--portal-muted)', marginBottom: '0.35rem' }}>
+                        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', marginBottom: 'var(--space-1)' }}>
                           {asset.local ? L(dict, '图片加载中…', 'Loading image…') : asset.storagePath ? L(dict, '图片线索已保存，登录后可查看。', 'Image clue saved — sign in to view.') : L(dict, '附件线索已保存。', 'Attachment clue saved.')}
                         </p>
                       )}
                       {asset.analysisSummary && (
-                        <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', margin: 0 }}>
+                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: 0 }}>
                           {asset.analysisSummary}
                         </p>
                       )}
@@ -1391,7 +1411,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             );
           })()}
 
-          <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', marginTop: '1rem' }}>
+          <p style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', marginTop: 'var(--space-4)' }}>
             {L(dict, '记录于', 'Noted on')} {createdDate}
             {/* 批次 55/57/63:位置戳 —— 点地点可纠正(与足迹同一套地址库) */}
             {(() => {
@@ -1419,7 +1439,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
           {relatedNodes && relatedNodes.length > 0 && (
             <div className="nesio-related-section">
               <p className="nesio-settings-section-label">{L(dict, '相关记忆', 'Related memories')}</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 {relatedNodes.slice(0, 6).map((r) => {
                   // 批次 53:循环日历事件(每周 Sprint 计划)同名难辨 —— 行内带日期标签
                   const rs = typeof r.attributes?.start === 'string' ? r.attributes.start : '';
@@ -1432,11 +1452,11 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                       key={r.id}
                       type="button"
                       onClick={() => onOpenNode?.(r)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.5rem 0.7rem', borderRadius: '0.7rem', border: '1px solid var(--portal-line, rgba(127,127,127,0.18))', background: 'none', color: 'var(--portal-ink)', textAlign: 'left', cursor: 'pointer' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line, rgba(127,127,127,0.18))', background: 'none', color: 'var(--portal-ink)', textAlign: 'left', cursor: 'pointer' }}
                     >
                       <NodeTypeIcon type={r.type} size={13} />
-                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{r.name}</span>
-                      {dateTag && <span style={{ color: 'var(--portal-muted)', fontSize: '0.74rem', flex: 'none' }}>{dateTag}</span>}
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--text-sm)' }}>{r.name}</span>
+                      {dateTag && <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', flex: 'none' }}>{dateTag}</span>}
                       <span style={{ color: 'var(--portal-muted)' }}>›</span>
                     </button>
                   );
@@ -1459,13 +1479,13 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
           {!editing && (
             <div className="nesio-growth">
               {shouldNudge(`${n.name} ${(n.attributes?.notes as string) || n.rawInput || ''}`) && !nudgeDismissed && (
-                <div className="ng-hint" style={{ marginTop: '1.25rem' }}>
+                <div className="ng-hint" style={{ marginTop: 'var(--space-5)' }}>
                   <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
                   <p>{L(dict, '念念看到这条情绪有点重 —— 要不要陪你把它看清楚一点?(不是分析你,是把话看清)', 'This one feels heavy — want to look at it more clearly? (not analyzing you — just seeing the words)')}</p>
                   <button type="button" className="x" onClick={() => setNudgeDismissed(true)}>{L(dict, '轻轻划走', 'Dismiss')}</button>
                 </div>
               )}
-              <button type="button" className="ng-btn" style={{ width: '100%', marginTop: '0.75rem' }} onClick={() => setLensOpen(true)}>
+              <button type="button" className="ng-btn" style={{ width: '100%', marginTop: 'var(--space-3)' }} onClick={() => setLensOpen(true)}>
                 {L(dict, '用镜头看看 ✦', 'Look with a lens ✦')}
               </button>
             </div>
@@ -1473,24 +1493,28 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
           <MemoryLensSheet open={lensOpen} onOpenChange={setLensOpen} node={n} />
 
       {/* Actions */}
-          <div style={{ display: 'flex', gap: '0.6rem', marginTop: '1.25rem' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-5)' }}>
             {/* 这一排以前是三套不同的自造按钮拼出来的(ob-primary / today--ghost / settings-danger),
-                高度各不相同,只好再加一层 .nesio-nd-action-btn 把它们掰齐。现在统一走 Button 原语,
-                那一层只剩「同一行等宽等高」的几何职责。 */}
+                高度各不相同,只好再加一层 .nesio-nd-action-btn 把它们掰齐。
+
+                2026-07-31:那层「掰齐」的类名其实把 height/padding/border-radius/font-size/
+                font-weight 全盖了一遍 —— 写着 <Button variant="primary"> 却又自带一整套外观,
+                是**假迁移**。现在外观全交给 variant/size/tone(md 已带 --tap-min 最小高度,
+                替掉原来手写的 height:46px),这里只剩 flex:1 这一条真正的布局,走 layoutStyle。 */}
             {editing ? (
               <>
-                <Button variant="primary" className="nesio-nd-action-btn" onClick={saveEdit}>{L(dict, '保存', 'Save')}</Button>
-                <Button variant="secondary" className="nesio-nd-action-btn" onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</Button>
+                <Button variant="primary" layoutStyle={{ flex: 1 }} onClick={saveEdit}>{L(dict, '保存', 'Save')}</Button>
+                <Button variant="secondary" layoutStyle={{ flex: 1 }} onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</Button>
               </>
             ) : (
               <>
                 {/* 批次 33:阅读入口顶部有(替换✕),底部也放回来一份 —— 用户反馈顶部那颗找不到 */}
                 {readableText && (
-                  <Button variant="primary" className="nesio-nd-action-btn" onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</Button>
+                  <Button variant="primary" layoutStyle={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</Button>
                 )}
                 {/* 批次 37:回复按钮移到顶部「阅读」旁,底部不再重复 */}
-                <Button variant="secondary" className="nesio-nd-action-btn" onClick={startEdit}>{L(dict, '编辑', 'Edit')}</Button>
-                <Button variant="soft" tone="risk" className="nesio-nd-action-btn" onClick={handleDelete}>{L(dict, '删除', 'Delete')}</Button>
+                <Button variant="secondary" layoutStyle={{ flex: 1 }} onClick={startEdit}>{L(dict, '编辑', 'Edit')}</Button>
+                <Button variant="soft" tone="risk" layoutStyle={{ flex: 1 }} onClick={handleDelete}>{L(dict, '删除', 'Delete')}</Button>
               </>
             )}
           </div>

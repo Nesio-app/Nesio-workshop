@@ -216,11 +216,11 @@ export default function TrainingPlan() {
   const genCard = (
     <section className="nesio-fit-today" style={{ marginBottom: 'var(--space-3)' }}>
       <h3 className="nesio-fit-today-name">{L(dict, '今天练什么', 'What to train today')}</h3>
-      <p className="nesio-fit-hello" style={{ margin: '0.2rem 0 0' }}>
+      <p className="nesio-fit-hello" style={{ margin: 'var(--space-1) 0 0' }}>
         {L(dict, '说说手边有什么器械、想练哪块,给你配一套,直接开练。', 'Tell it your equipment and focus — get a set, start right away.')}
       </p>
       {lastHint && (
-        <span style={{ display: 'inline-block', fontSize: '0.68rem', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', borderRadius: 'var(--radius-pill)', padding: '0.15rem 0.55rem', marginTop: '0.4rem' }}>
+        <span style={{ display: 'inline-block', fontSize: 'var(--text-overline)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', borderRadius: 'var(--radius-pill)', padding: 'var(--space-1) var(--space-2)', marginTop: 'var(--space-2)' }}>
           {lastHint}
         </span>
       )}

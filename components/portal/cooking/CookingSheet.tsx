@@ -25,7 +25,9 @@ import { getShoppingList, addToShopping, toggleShoppingItem, removeShoppingItem,
 import { scaleAmountsInText, servingFactor } from '@/lib/cooking/scale-recipe';
 import { recipeNutritionPerServing, recipeMainNutrition, lookupNutrition, type PerServing, type FoodNutrition } from '@/lib/cooking/nutrition';
 import { getWishlist, addWish, type WishDish } from '@/lib/cooking/wishlist';
-import { addMeal, type MealSource, type MealItem } from '@/lib/cooking/meals';
+import SpendClaimRow from '../finance/SpendClaimRow';
+import Button from '../ui/Button';
+import { addMeal, getMeals, type MealSource, type MealItem } from '@/lib/cooking/meals';
 import { planWeek } from '@/lib/cooking/meal-plan-core';
 import {
   MEAL_SLOTS, MEAL_SLOT_LABEL, MEAL_CALENDAR_EVENT, getDayPlan, setMealPlan,
@@ -548,7 +550,9 @@ function PantryRow({ it, last, soon, onRemove, onChanged, onError, t }: {
           </p>
           <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
             <button type="button" onClick={() => { setOpen(false); setQty(it.quantity == null ? '' : String(it.quantity)); setExp(it.expiry || ''); setLoc(it.location || ''); }} style={{ ...ghostBtn, flex: 1 }}>{t('稍后', 'Later')}</button>
-            <button type="button" onClick={save} style={{ ...primaryBtn, flex: 1 }}>{t('存下来', 'Save')}</button>
+            {/* 合并音乐分支时新加的一颗。primaryBtn 就是原语的 primary(accent 底 / 白字 / 胶囊),
+                flex:1 是布局 —— 正好是 layoutStyle 窄口的标准用法,不必再多一颗裸按钮。 */}
+            <Button variant="primary" layoutStyle={{ flex: 1 }} onClick={save}>{t('存下来', 'Save')}</Button>
           </div>
         </div>
       )}
@@ -1090,6 +1094,7 @@ function MealLogBody({ photoUrl, onError, onDone, t }: { photoUrl?: string; onEr
   const [source, setSource] = useState<MealSource>('自己做');
   const [name, setName] = useState('');
   const [grams, setGrams] = useState('');
+  const [price, setPrice] = useState('');   // 餐厅/外卖花了多少 —— 用来认领银行流水,不记账
   const [nutri, setNutri] = useState<{ ek: number; p: number; f: number; c: number; matched: number } | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -1131,7 +1136,14 @@ function MealLogBody({ photoUrl, onError, onDone, t }: { photoUrl?: string; onEr
     if (!next.length) { onError(t('先加一样吃的(输入名字后点「加」,或填完直接「记入」)。', 'Add a food name first — tap Add, or fill the name and Log.')); return; }
     try {
       const today = localDayKey();
-      addMeal({ source, items: next, energyKCal: nutri?.ek ?? 0, protein: nutri?.p ?? 0, fat: nutri?.f ?? 0, cho: nutri?.c ?? 0, occurredAt: today });
+      const p = Number(price);
+      addMeal({
+        source, items: next, energyKCal: nutri?.ek ?? 0, protein: nutri?.p ?? 0, fat: nutri?.f ?? 0, cho: nutri?.c ?? 0,
+        occurredAt: today,
+        // 只在真填了正数时带上 —— 空字符串 Number() 是 0,存 0 会让「没记价格」
+        // 和「免费」长得一模一样(actualSpend 那条注释说的就是这个)。
+        ...(Number.isFinite(p) && p > 0 ? { price: p } : {}),
+      });
       setSaved(true); setTimeout(onDone, 800);
     } catch { onError(t('没记上,再试一次。', 'Could not save — try again.')); }
   }
@@ -1181,6 +1193,22 @@ function MealLogBody({ photoUrl, onError, onDone, t }: { photoUrl?: string; onEr
         })}
       </div>
 
+      {/* 花了多少 —— 只在「餐厅/外卖」时问:自己做的饭没有单笔价格。
+          ⚠️ 这个数**不记一笔账**。在外面吃是刷卡的,Plaid 已经有那条流水,
+          再记一笔就是双计(月支出凭空多一份,两条看起来都对)。
+          它的用途是让这一餐能去**认领**银行里的那笔钱 —— 认领之后
+          「这顿饭花了多少」才是一个能回答的问题。 */}
+      {(source === '餐厅' || source === '外卖') && (
+        <section>
+          <SectionHead label={t('花了多少', 'What it cost')} right={t('可留空', 'optional')} />
+          <div style={{ ...card, padding: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
+            <input style={{ ...inputStyle, flex: 1 }} inputMode="decimal"
+              placeholder={t('金额(用来对上银行那笔,不会重复记账)', 'Amount — used to match your bank, not double-logged')}
+              value={price} onChange={(e) => setPrice(e.target.value)} />
+          </div>
+        </section>
+      )}
+
       {/* 营养四列 */}
       <section>
         <SectionHead label={t('营养', 'Nutrition')} right={t('估算', 'est.')} />
@@ -1199,7 +1227,49 @@ function MealLogBody({ photoUrl, onError, onDone, t }: { photoUrl?: string; onEr
         {saved ? t('已记入 ✓', 'Logged ✓') : t('记入今日账本', 'Log to today')}
       </button>
       <p style={caption}>{t('记下这一餐,身体账本按吃的日子求和。餐厅/外卖不扣库存。', 'Logged to your body ledger by the day you ate. Dine-in/takeout don’t touch the pantry.')}</p>
+
+      {/* 最近记了价格的几餐 —— 在这里认领银行里的那笔钱。
+          不列没记价格的:那些配不了(claimCandidates 要求 price>0),摆出来就是一排
+          点了没反应的按钮。 */}
+      <RecentMealsToClaim t={t} />
     </>
+  );
+}
+
+/**
+ * RecentMealsToClaim — 「这顿饭花了多少」。
+ *
+ * 记了价格的几餐,每一餐一行「这笔钱是哪一笔」。认领的是**银行里已有的那笔流水**,
+ * 不是再记一笔账。认领之后金额以银行为准 —— 你填的是回忆,银行是事实。
+ */
+function RecentMealsToClaim({ t }: { t: TT }) {
+  const dict = t('zh', 'en');
+  const [tick, setTick] = useState(0);
+  const meals = useMemo(() => {
+    void tick;
+    try { return getMeals().filter((m) => (m.price ?? 0) > 0).slice(0, 5); } catch { return []; }
+  }, [tick]);
+  if (!meals.length) return null;
+  return (
+    <section>
+      <SectionHead label={t('这几顿花了多少', 'What these cost')} right={t('对上银行', 'match bank')} />
+      <div style={{ ...card, padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        {meals.map((m) => (
+          <div key={m.id}>
+            <p style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--portal-ink)' }}>
+              {m.items.map((i) => i.name).filter(Boolean).slice(0, 3).join(' · ') || t('一餐', 'A meal')}
+              <span style={{ color: 'var(--portal-muted)', fontWeight: 400 }}> · {m.occurredAt}</span>
+            </p>
+            <SpendClaimRow
+              itemNodeId={m.id}
+              item={{ id: m.id, name: m.items.map((i) => i.name).filter(Boolean)[0] || t('一餐', 'A meal'), price: m.price ?? 0, occurredAt: m.occurredAt }}
+              dict={dict}
+              onChanged={() => setTick((v) => v + 1)}
+            />
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

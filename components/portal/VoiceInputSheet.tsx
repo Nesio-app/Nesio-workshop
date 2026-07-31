@@ -683,12 +683,12 @@ export default function VoiceInputSheet({ open, intent = 'note', seedText = '', 
 
         {/* 批次216:麦克风权限前置说明 —— 先讲为什么再弹系统框,把「端上/不上传」卖点说出来 */}
         {micPrimer && (
-          <div style={{ margin: '0 0 0.6rem', padding: '0.9rem 1rem', borderRadius: 14, background: 'var(--portal-card, #fff)', border: '1px solid var(--portal-line, #d7deea)', textAlign: 'center' }}>
+          <div style={{ margin: '0 0 var(--space-2)', padding: 'var(--space-4) var(--space-4)', borderRadius: 14, background: 'var(--portal-card, #fff)', border: '1px solid var(--portal-line, #d7deea)', textAlign: 'center' }}>
             <div style={{ fontSize: '1.7rem', lineHeight: 1 }} aria-hidden>{permissionRationale('microphone').icon}</div>
-            <p style={{ fontWeight: 600, margin: '0.5rem 0 0.25rem' }}>{permissionRationale('microphone').title[dict === 'en' ? 1 : 0]}</p>
-            <p style={{ fontSize: '0.8rem', color: 'var(--portal-muted, #8a94a6)', lineHeight: 1.6, margin: 0 }}>{permissionRationale('microphone').body[dict === 'en' ? 1 : 0]}</p>
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.8rem' }}>
-              <button type="button" onClick={() => setMicPrimer(false)} style={{ flex: 1, padding: '0.55rem', borderRadius: 10, border: '1px solid var(--portal-line, #d7deea)', background: 'transparent', color: 'var(--portal-muted, #8a94a6)', cursor: 'pointer' }}>{L(dict, '以后再说', 'Not now')}</button>
+            <p style={{ fontWeight: 600, margin: 'var(--space-2) 0 var(--space-1)' }}>{permissionRationale('microphone').title[dict === 'en' ? 1 : 0]}</p>
+            <p style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted, #8a94a6)', lineHeight: 1.6, margin: 0 }}>{permissionRationale('microphone').body[dict === 'en' ? 1 : 0]}</p>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
+              <button type="button" onClick={() => setMicPrimer(false)} style={{ flex: 1, padding: 'var(--space-2)', borderRadius: 10, border: '1px solid var(--portal-line, #d7deea)', background: 'transparent', color: 'var(--portal-muted, #8a94a6)', cursor: 'pointer' }}>{L(dict, '以后再说', 'Not now')}</button>
               <button type="button" className="nesio-ob-primary-btn" onClick={allowMicAndStart} style={{ flex: 1, marginTop: 0 }}>{L(dict, '允许并开始', 'Allow & start')}</button>
             </div>
           </div>
@@ -782,12 +782,12 @@ export default function VoiceInputSheet({ open, intent = 'note', seedText = '', 
                 ))}
               </div>
               <span className="nesio-voice-status-label">{isAskMode ? L(dict, '正在听这一句…', 'Listening…') : L(dict, '正在记录…', 'Recording…')}</span>
-              <button type="button" style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', marginLeft: '0.5rem', padding: '0.2rem 0.5rem' }} onClick={stopListening}>
+              <button type="button" style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginLeft: 'var(--space-2)', padding: 'var(--space-1) var(--space-2)' }} onClick={stopListening}>
                 {L(dict, '停止', 'Stop')}
               </button>
             </>
           ) : micError ? (
-            <span style={{ fontSize: '0.73rem', color: 'var(--status-risk)', textAlign: 'center', lineHeight: 1.4 }}>{micError}</span>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-risk)', textAlign: 'center', lineHeight: 1.4 }}>{micError}</span>
           ) : null}
         </div>
         )}
@@ -914,7 +914,7 @@ export default function VoiceInputSheet({ open, intent = 'note', seedText = '', 
             )}
           </div>
         ) : sendState === 'analyzing' ? (
-          <div className="nesio-voice-send-btn" style={{ opacity: 0.6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+          <div className="nesio-voice-send-btn" style={{ opacity: 0.6, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
             <span className="nesio-camera-recognizing-dot" style={{ background: '#fff' }} />{isAskMode ? L(dict, '正在搜索记忆…', 'Searching memory…') : L(dict, '念念正在整理…', 'Nessa is sorting…')}
           </div>
         ) : text.trim() && sendState !== 'confirm' ? (

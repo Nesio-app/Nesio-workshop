@@ -77,9 +77,9 @@ function Donut({ parts }: { parts: Array<{ label: string; value: number; color: 
           return el;
         })}
       </svg>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
         {parts.map((p) => (
-          <div key={p.label} style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)' }}>
+          <div key={p.label} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)' }}>
             <span style={{ width: 9, height: 9, borderRadius: 2, background: p.color, flexShrink: 0 }} aria-hidden />
             <span>{p.label}</span>
             <span style={{ color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>{total > 0 ? Math.round((p.value / total) * 100) : 0}% · {p.value}</span>
@@ -170,9 +170,9 @@ export default function AdminOpsPanel() {
               <input type="password" value={secret} onChange={(e) => setSecret(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') void load(secret); }}
                 placeholder={L(dict, '管理密钥', 'Admin secret')}
-                style={{ flex: 1, padding: '0.55rem 0.7rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }} />
+                style={{ flex: 1, padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }} />
               <button type="button" onClick={() => void load(secret)} disabled={loading || !secret.trim()}
-                style={{ padding: '0.55rem 1rem', borderRadius: 'var(--radius-sm)', border: 'none', background: 'var(--portal-accent)', color: 'var(--portal-on-accent, #fff)', cursor: 'pointer', fontSize: 'var(--text-sm)' }}>
+                style={{ padding: 'var(--space-2) var(--space-4)', borderRadius: 'var(--radius-sm)', border: 'none', background: 'var(--portal-accent)', color: 'var(--portal-on-accent, #fff)', cursor: 'pointer', fontSize: 'var(--text-sm)' }}>
                 {loading ? L(dict, '验证中…', '…') : L(dict, '进入', 'Enter')}
               </button>
             </div>
@@ -182,7 +182,7 @@ export default function AdminOpsPanel() {
         ) : (
           <div style={{ ...card, borderColor: 'transparent', background: 'var(--status-gentle-soft)' }}>
             <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--status-gentle)' }}>{L(dict, `加载失败(${data.error}),稍后重试。`, `Load failed (${data.error}) — try again.`)}</p>
-            <button type="button" onClick={() => void load(secret)} style={{ marginTop: 'var(--space-2)', padding: '0.4rem 0.8rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>{L(dict, '重试', 'Retry')}</button>
+            <button type="button" onClick={() => void load(secret)} style={{ marginTop: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>{L(dict, '重试', 'Retry')}</button>
           </div>
         )}
       </div>
@@ -202,24 +202,24 @@ export default function AdminOpsPanel() {
         <span style={label}>{data.generatedAt ? L(dict, `更新 ${new Date(data.generatedAt).toLocaleTimeString('zh-CN')}`, `Updated ${new Date(data.generatedAt).toLocaleTimeString('en-US')}`) : ''}</span>
         <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
           <button type="button" onClick={() => void load(secret)} disabled={loading}
-            style={{ padding: '0.3rem 0.7rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>{loading ? '…' : L(dict, '刷新', 'Refresh')}</button>
-          <a href="/admin" style={{ padding: '0.3rem 0.7rem', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-xs)', textDecoration: 'none' }}>{L(dict, '完整面板 ↗', 'Full panel ↗')}</a>
+            style={{ padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontSize: 'var(--text-xs)', cursor: 'pointer' }}>{loading ? '…' : L(dict, '刷新', 'Refresh')}</button>
+          <a href="/admin" style={{ padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-pill)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-blue-deep)', fontSize: 'var(--text-xs)', textDecoration: 'none' }}>{L(dict, '完整面板 ↗', 'Full panel ↗')}</a>
         </div>
       </div>
 
       {srcBad && (
-        <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)' }}>
+        <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)' }}>
           {L(dict, '数据源部分不可用 —— 完整面板里看详情。', 'Some data sources unavailable — see full panel.')}
         </p>
       )}
 
       {/* KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
-        <div style={card}><span style={big}>{data.windows?.today.events ?? 0}</span><span style={{ ...label, display: 'block', marginTop: '0.2rem' }}>{L(dict, `今日事件 · ${data.windows?.today.devices ?? 0} 台`, `Events today · ${data.windows?.today.devices ?? 0} devices`)}</span></div>
-        <div style={card}><span style={big}>{data.windows?.week.events ?? 0}</span><span style={{ ...label, display: 'block', marginTop: '0.2rem' }}>{L(dict, '7 天事件', 'Events / 7d')}</span></div>
+        <div style={card}><span style={big}>{data.windows?.today.events ?? 0}</span><span style={{ ...label, display: 'block', marginTop: 'var(--space-1)' }}>{L(dict, `今日事件 · ${data.windows?.today.devices ?? 0} 台`, `Events today · ${data.windows?.today.devices ?? 0} devices`)}</span></div>
+        <div style={card}><span style={big}>{data.windows?.week.events ?? 0}</span><span style={{ ...label, display: 'block', marginTop: 'var(--space-1)' }}>{L(dict, '7 天事件', 'Events / 7d')}</span></div>
         <button type="button" onClick={() => setShowDevices((v) => !v)} style={{ ...card, textAlign: 'left', cursor: 'pointer' }}>
           <span style={big}>{data.windows?.month.devices ?? 0}</span>
-          <span style={{ ...label, display: 'block', marginTop: '0.2rem' }}>{L(dict, '30 天设备 · 点看明细', 'Devices / 30d · tap')}</span>
+          <span style={{ ...label, display: 'block', marginTop: 'var(--space-1)' }}>{L(dict, '30 天设备 · 点看明细', 'Devices / 30d · tap')}</span>
         </button>
         <button type="button" onClick={() => setShowDims((v) => !v)} style={{ ...card, textAlign: 'left', cursor: 'pointer' }}>
           {/* 2026-07-29:此前只有这一格把数字染成青绿/琥珀/红,旁边三格是黑的,又没有图例 ——
@@ -238,7 +238,7 @@ export default function AdminOpsPanel() {
                 ? ['var(--status-gentle)', 'var(--status-gentle-soft)']
                 : ['var(--status-calm)', 'var(--status-calm-soft)'];
             return (
-              <span style={{ marginLeft: '0.4rem', padding: '0.1rem 0.45rem', borderRadius: 'var(--radius-pill)', fontSize: '0.62rem', fontWeight: 'var(--weight-medium)', color: fg, background: bg, verticalAlign: 'middle' }}>
+              <span style={{ marginLeft: 'var(--space-2)', padding: '0.1rem 0.45rem', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-overline)', fontWeight: 'var(--weight-medium)', color: fg, background: bg, verticalAlign: 'middle' }}>
                 {L(dict, zh, en)}
                 {v.cappedByWeakest && v.weakest && (
                   <> · {L(dict, `${v.weakest.dim} ${v.weakest.score}`, `${v.weakest.dim} ${v.weakest.score}`)}</>
@@ -246,12 +246,12 @@ export default function AdminOpsPanel() {
               </span>
             );
           })()}
-          <span style={{ ...label, display: 'block', marginTop: '0.2rem' }}>{L(dict, '聪明度 · 点看五维', 'Smartness · tap')}</span>
+          <span style={{ ...label, display: 'block', marginTop: 'var(--space-1)' }}>{L(dict, '聪明度 · 点看五维', 'Smartness · tap')}</span>
         </button>
       </div>
 
       {data.sampleCapped && (
-        <p style={{ margin: 'var(--space-2) 0 0', fontSize: '0.62rem', color: 'var(--portal-muted)' }}>
+        <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>
           {L(dict, '事件数为精确值;下方分项(Top/画像/AI)基于最近采样,近似。', 'Event counts are exact; breakdowns below use a recent sample (approximate).')}
         </p>
       )}
@@ -265,7 +265,7 @@ export default function AdminOpsPanel() {
             <p style={sectionLbl}>{L(dict, `14 天趋势 · 共 ${sum} 事件`, `14-day trend · ${sum} events`)}</p>
             <div style={{ ...card, padding: 'var(--space-3)' }}>
               <Sparkline points={last.map((d) => d.events)} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '0.2rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 'var(--space-1)' }}>
                 <span style={{ fontSize: '0.6rem', color: 'var(--portal-muted)' }}>{last[0]?.date.slice(5)}</span>
                 <span style={{ fontSize: '0.6rem', color: 'var(--portal-muted)' }}>{last[last.length - 1]?.date.slice(5)}</span>
               </div>
@@ -294,7 +294,7 @@ export default function AdminOpsPanel() {
             const isServer = d.id.startsWith('server');
             const name = isServer ? L(dict, '服务端', 'Server') : (i === 0 ? L(dict, '本机', 'This device') : `${L(dict, '设备', 'Device')} ${d.id.replace(/^d-/, '').slice(0, 4)}`);
             return (
-              <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', padding: '0.25rem 0', borderTop: '1px solid var(--portal-line)', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)' }}>
+              <div key={d.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', padding: 'var(--space-1) 0', borderTop: '1px solid var(--portal-line)', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)' }}>
                 <span>{name}</span>
                 <span style={{ color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>{d.events} · {d.lastAt.slice(5, 10)}</span>
               </div>
@@ -326,7 +326,7 @@ export default function AdminOpsPanel() {
               <p style={{ ...label, margin: 'var(--space-3) 0 var(--space-2)' }}>{L(dict, '最常用', 'Most used')}</p>
               {b.topFeatures.slice(0, 6).map((f) => (
                 <div key={f.name} style={{ margin: '0 0 var(--space-2)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', marginBottom: '0.2rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', marginBottom: 'var(--space-1)' }}>
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{featLabel(f.name, en)}</span>
                     <span style={{ color: 'var(--portal-muted)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{f.count}</span>
                   </div>
@@ -355,7 +355,7 @@ export default function AdminOpsPanel() {
             {data.insights!.slice(0, 4).map((ins) => (
               <div key={ins.title} style={{ ...card, borderLeft: `3px solid ${SEV_COLOR[ins.severity] || 'var(--portal-line)'}` }}>
                 <p style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{ins.title}</p>
-                <p style={{ margin: '0.2rem 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>{ins.detail}{ins.advice ? ` · ${ins.advice}` : ''}</p>
+                <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>{ins.detail}{ins.advice ? ` · ${ins.advice}` : ''}</p>
               </div>
             ))}
           </div>
@@ -403,14 +403,14 @@ export default function AdminOpsPanel() {
               </p>
             );
           })()}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.7fr 0.9fr', fontSize: '0.62rem', color: 'var(--portal-muted)', paddingBottom: '0.3rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.7fr 0.9fr', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', paddingBottom: 'var(--space-1)' }}>
             <span>{L(dict, '路由', 'Route')}</span><span>{L(dict, '次数', 'Calls')}</span><span>{L(dict, '成功', 'OK')}</span><span>{L(dict, '花费', 'Cost')}</span>
           </div>
           {data.ai!.routes.slice(0, 8).map((r) => {
             const measured = r.measuredCalls ?? 0;
             const allMeasured = measured >= r.calls;
             return (
-              <div key={r.route} style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.7fr 0.9fr', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', padding: '0.25rem 0', borderTop: '1px solid var(--portal-line)', fontVariantNumeric: 'tabular-nums' }}>
+              <div key={r.route} style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.7fr 0.9fr', fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', padding: 'var(--space-1) 0', borderTop: '1px solid var(--portal-line)', fontVariantNumeric: 'tabular-nums' }}>
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.route}</span>
                 <span>{r.calls}</span>
                 <span style={{ color: r.okRate >= 95 ? 'var(--status-go)' : r.okRate >= 85 ? 'var(--status-gentle)' : 'var(--status-risk)' }}>{r.okRate}%</span>
@@ -430,7 +430,7 @@ export default function AdminOpsPanel() {
       ) : (
         <div style={{ ...card, borderColor: 'transparent', background: 'var(--status-risk-soft)' }}>
           {data.clientErrors!.slice(0, 5).map((e) => (
-            <div key={`${e.kind}:${e.message}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', padding: '0.25rem 0', fontSize: 'var(--text-xs)' }}>
+            <div key={`${e.kind}:${e.message}`} style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', padding: 'var(--space-1) 0', fontSize: 'var(--text-xs)' }}>
               <span style={{ color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}><span style={{ color: 'var(--status-risk)', marginRight: 4 }}>{e.kind}</span>{e.message}</span>
               <span style={{ color: 'var(--portal-muted)', whiteSpace: 'nowrap', flexShrink: 0 }}>×{e.count} · {e.devices}{L(dict, ' 台', '')}</span>
             </div>

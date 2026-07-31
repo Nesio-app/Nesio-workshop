@@ -158,7 +158,7 @@ export function DailyBriefSheet({ open, onClose, canUsePrivateData = false }: { 
                   ))}
                 </div>
               )}
-              <button type="button" className="nesio-lm-perspective-btn" style={{ marginTop: '0.9rem' }} onClick={() => void fetchBrief()}>
+              <button type="button" className="nesio-lm-perspective-btn" style={{ marginTop: 'var(--space-4)' }} onClick={() => void fetchBrief()}>
                 {L(dict, '换个说法', 'Say it differently')}
               </button>
             </>

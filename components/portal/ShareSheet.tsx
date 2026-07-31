@@ -333,7 +333,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
               onChange={(e) => setTextInput(e.target.value)}
               autoFocus
             />
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
               <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={handleTextSubmit} disabled={!textInput.trim()}>
                 {L(dict, '提取信息', 'Extract')}
               </button>
@@ -346,7 +346,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
 
         {/* Analyzing */}
         {analyzing && (
-          <div style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--portal-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+          <div style={{ textAlign: 'center', padding: 'var(--space-6) 0', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 'var(--space-2)' }}>
             <span className="nesio-camera-recognizing-dot" style={{ background: 'var(--portal-blue-deep)', display: 'inline-block', width: '0.5rem', height: '0.5rem', borderRadius: '50%' }} />
             {L(dict, '念念正在整理可确认的信息…', 'Nessa is pulling out the key details…')}
           </div>
@@ -405,12 +405,12 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
                   setAiPayload(null);
                   void analyze(p.type, p.content, p.imageBase64, p.mimeType, true);
                 }}
-                style={{ width: '100%', marginBottom: '0.5rem', background: 'none', border: '1px solid var(--portal-line, rgba(127,127,127,0.25))', borderRadius: 999, padding: '0.5rem', fontSize: '0.82rem', color: 'var(--portal-accent, #588ce3)', cursor: 'pointer' }}
+                style={{ width: '100%', marginBottom: 'var(--space-2)', background: 'none', border: '1px solid var(--portal-line, rgba(127,127,127,0.25))', borderRadius: 999, padding: 'var(--space-2)', fontSize: 'var(--text-sm)', color: 'var(--portal-accent, #588ce3)', cursor: 'pointer' }}
               >
                 {analyzing ? L(dict, 'AI 整理中…', 'AI organizing…') : L(dict, 'AI 整理(识别要点和分类)', 'AI organize (extract key points)')}
               </button>
             )}
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
               <button type="button" className="nesio-share-save-btn" onClick={saveToMemory} style={{ flex: 1 }}>
                 {saved ? L(dict, '✓ 已存入 Memory', '✓ Saved to Memory') : L(dict, '存入 Memory', 'Save to Memory')}
               </button>

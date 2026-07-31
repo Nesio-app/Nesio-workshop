@@ -13,6 +13,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { addManualEntry } from '@/lib/portal/finance-sources';
+import ReceiptScanRow from './ReceiptScanRow';
 import {
   listManualAssets, addManualAsset, addAssetAnchor, assetCurrentValue, recordNetWorthSnapshot,
   type ManualAssetKind,
@@ -66,6 +67,10 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
   const [anchorNote, setAnchorNote] = useState('');
   const [err, setErr] = useState('');
   const [saving, setSaving] = useState(false);
+  /** 扫发票时发现银行里已经有对得上的一笔 —— 再记就是双计。空串 = 没有。 */
+  const [dupTx, setDupTx] = useState('');
+  /** 已经看过重复提示、坚持要记。不做成 confirm() 弹窗:那是打断,这里是让你看着做决定。 */
+  const [dupAck, setDupAck] = useState(false);
   // 保存成功的一拍:对勾描线(借形 pqoqubbw/icons,纯 CSS)→ 短停后再关,不打断关闭动画
   const [saved, setSaved] = useState(false);
   const closeTimer = useRef<number | null>(null);
@@ -78,11 +83,13 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
   const [costAssetId, setCostAssetId] = useState('');
   const [costKind, setCostKind] = useState<'tax' | 'repair' | 'insurance' | 'other'>('other');
 
-  const reset = () => { setAmount(''); setCat(''); setNote(''); setChannelId(''); setNewChannel(''); setAssetId(''); setNewAssetName(''); setAnchorNote(''); setCostAssetId(''); setCostKind('other'); setErr(''); };
+  const reset = () => { setAmount(''); setCat(''); setNote(''); setChannelId(''); setNewChannel(''); setAssetId(''); setNewAssetName(''); setAnchorNote(''); setCostAssetId(''); setCostKind('other'); setErr(''); setDupTx(''); setDupAck(false); };
 
   function save() {
     const v = Number(amount);
     if (!Number.isFinite(v) || v <= 0) { setErr(t('金额要大于 0。', 'Amount must be above 0.')); return; }
+    // 银行里已经有这笔了。不硬拦 —— 你可能真的想另记一笔;但要你看一眼再点第二次。
+    if (dupTx && !dupAck) { setDupAck(true); return; }
     setSaving(true); setErr('');
     try {
       if (seg === 'asset') {
@@ -143,7 +150,7 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
           <p style={label}>{t('记什么', 'Type')}</p>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {([['expense', '支出', 'Expense'], ['income', '收入', 'Income'], ['asset', '固定资产', 'Asset']] as Array<[Seg, string, string]>).map(([id, zh, en]) => (
-              <button key={id} type="button" style={chip(seg === id)} onClick={() => { setSeg(id); setCat(''); setCostAssetId(''); setErr(''); }}>
+              <button key={id} type="button" style={chip(seg === id)} onClick={() => { setSeg(id); setCat(''); setCostAssetId(''); setErr(''); setDupTx(''); setDupAck(false); }}>
                 {L(dict, zh, en)}
               </button>
             ))}
@@ -154,6 +161,15 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
           <p style={label}>{seg === 'asset' ? t('估值金额', 'Value') : t('金额', 'Amount')}</p>
           <input style={{ ...input, fontSize: 'var(--text-h2)', fontWeight: 700 }} inputMode="decimal" placeholder="0"
             value={amount} onChange={(e) => setAmount(e.target.value)} autoFocus />
+          {/* 支出才给「拍发票」—— 收入/估值没有发票这回事。
+              端上认字,发票不出手机;抽到金额后会顺便查银行里是不是已经有这笔。 */}
+          {seg === 'expense' && (
+            <ReceiptScanRow dict={dict} onExtracted={(f, dup) => {
+              setAmount(String(f.amount));
+              if (!note.trim() && f.merchant) setNote(f.merchant);
+              setDupTx(dup ? `${dup.name || ''} · ${dup.date} · ${dup.amount.toFixed(2)}` : '');
+            }} />
+          )}
         </div>
 
         {seg !== 'asset' && (
@@ -244,6 +260,14 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
           </>
         )}
 
+        {dupTx && (
+          <p role="alert" style={{ fontSize: 'var(--text-sm)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', margin: 0 }}>
+            {t(`银行里已经有一笔对得上:${dupTx}。再记一笔这钱会被算两次。`,
+              `Your bank already has a matching charge: ${dupTx}. Recording it again would count this money twice.`)}
+            {dupAck && ' '}{dupAck && t('还是要记的话,再点一次「保存」。', 'Tap Save again if you still want to record it.')}
+          </p>
+        )}
+
         {err && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--status-risk)', margin: 0 }}>{err}</p>}
 
         <button type="button" onClick={save} disabled={saving || saved}
@@ -256,7 +280,7 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
               </svg>
               {t('记下了', 'Saved')}
             </>
-          ) : saving ? t('保存中…', 'Saving…') : t('保存', 'Save')}
+          ) : saving ? t('保存中…', 'Saving…') : (dupTx && dupAck) ? t('还是记一笔', 'Record anyway') : t('保存', 'Save')}
         </button>
         <button type="button" onClick={() => { reset(); onClose(); }}
           style={{ border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '10px', fontSize: 'var(--text-sm)', fontWeight: 600, fontFamily: 'var(--font-sans)', cursor: 'pointer', background: 'transparent', color: 'var(--portal-accent)' }}>

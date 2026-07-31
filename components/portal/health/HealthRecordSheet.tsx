@@ -144,22 +144,22 @@ export default function HealthRecordSheet({ open, onClose, onSaved }: { open: bo
           ))}
         </div>
 
-        <label className="nesio-settings-section-label" htmlFor="hr-who" style={{ marginTop: '0.7rem' }}>{t('这是谁的', 'Whose')}</label>
+        <label className="nesio-settings-section-label" htmlFor="hr-who" style={{ marginTop: 'var(--space-3)' }}>{t('这是谁的', 'Whose')}</label>
         <select id="hr-who" className="nesio-ob-input" value={who} onChange={(e) => setWho(e.target.value)}>
           <option value={SELF_PERSON_KEY}>{t('我', 'Me')}</option>
           {people.map((p) => <option key={p.key} value={p.key}>{p.name}</option>)}
         </select>
 
-        <label className="nesio-settings-section-label" htmlFor="hr-date" style={{ marginTop: '0.7rem' }}>
+        <label className="nesio-settings-section-label" htmlFor="hr-date" style={{ marginTop: 'var(--space-3)' }}>
           {kind === 'med' ? t('从哪天开始吃', 'Started on') : t('日期', 'Date')}
         </label>
         <input id="hr-date" className="nesio-ob-input" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
 
         {kind === 'lab' && (
           <>
-            <label className="nesio-settings-section-label" htmlFor="hr-name" style={{ marginTop: '0.7rem' }}>{t('指标名', 'Metric')}</label>
+            <label className="nesio-settings-section-label" htmlFor="hr-name" style={{ marginTop: 'var(--space-3)' }}>{t('指标名', 'Metric')}</label>
             <input id="hr-name" className="nesio-ob-input" value={name} maxLength={40} placeholder={t('如:空腹血糖、糖化血红蛋白', 'e.g. fasting glucose')} onChange={(e) => setName(e.target.value)} />
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.7rem' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
               <div style={{ flex: 2 }}>
                 <label className="nesio-settings-section-label" htmlFor="hr-val">{t('数值', 'Value')}</label>
                 <input id="hr-val" className="nesio-ob-input" inputMode="decimal" value={value} onChange={(e) => setValue(e.target.value)} />
@@ -169,7 +169,7 @@ export default function HealthRecordSheet({ open, onClose, onSaved }: { open: bo
                 <input id="hr-unit" className="nesio-ob-input" value={unit} maxLength={16} placeholder="mmol/L" onChange={(e) => setUnit(e.target.value)} />
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.7rem' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
               <div style={{ flex: 1 }}>
                 <label className="nesio-settings-section-label" htmlFor="hr-low">{t('参考下限', 'Ref low')}</label>
                 <input id="hr-low" className="nesio-ob-input" inputMode="decimal" value={low} onChange={(e) => setLow(e.target.value)} />
@@ -179,7 +179,7 @@ export default function HealthRecordSheet({ open, onClose, onSaved }: { open: bo
                 <input id="hr-high" className="nesio-ob-input" inputMode="decimal" value={high} onChange={(e) => setHigh(e.target.value)} />
               </div>
             </div>
-            <p className="nesio-settings-option-hint" style={{ margin: '0.35rem 0 0' }}>
+            <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>
               {t('参考区间填了才画得出绿带 —— 化验单上一般印在数值旁边。留空也能存,只是曲线没有参照。',
                 'The reference range draws the green band — usually printed next to the value. Optional, but the curve has no baseline without it.')}
             </p>
@@ -188,9 +188,9 @@ export default function HealthRecordSheet({ open, onClose, onSaved }: { open: bo
 
         {kind === 'med' && (
           <>
-            <label className="nesio-settings-section-label" htmlFor="hr-name" style={{ marginTop: '0.7rem' }}>{t('药名', 'Medication')}</label>
+            <label className="nesio-settings-section-label" htmlFor="hr-name" style={{ marginTop: 'var(--space-3)' }}>{t('药名', 'Medication')}</label>
             <input id="hr-name" className="nesio-ob-input" value={name} maxLength={40} onChange={(e) => setName(e.target.value)} />
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.7rem' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
               <div style={{ flex: 1 }}>
                 <label className="nesio-settings-section-label" htmlFor="hr-dose">{t('剂量', 'Dose')}</label>
                 <input id="hr-dose" className="nesio-ob-input" value={dose} maxLength={24} placeholder="0.5g" onChange={(e) => setDose(e.target.value)} />
@@ -205,13 +205,13 @@ export default function HealthRecordSheet({ open, onClose, onSaved }: { open: bo
 
         {kind === 'symptom' && (
           <>
-            <label className="nesio-settings-section-label" htmlFor="hr-name" style={{ marginTop: '0.7rem' }}>{t('哪里不舒服', 'What you felt')}</label>
+            <label className="nesio-settings-section-label" htmlFor="hr-name" style={{ marginTop: 'var(--space-3)' }}>{t('哪里不舒服', 'What you felt')}</label>
             <input id="hr-name" className="nesio-ob-input" value={name} maxLength={40} placeholder={t('如:头晕、胃胀', 'e.g. dizziness')} onChange={(e) => setName(e.target.value)} />
-            <label className="nesio-settings-section-label" style={{ marginTop: '0.7rem' }}>{t('程度', 'How much')}</label>
-            <div style={{ display: 'flex', gap: '0.4rem' }}>
+            <label className="nesio-settings-section-label" style={{ marginTop: 'var(--space-3)' }}>{t('程度', 'How much')}</label>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
               {([1, 2, 3] as const).map((s) => (
                 <button key={s} type="button" aria-pressed={severity === s} onClick={() => setSeverity(s)}
-                  style={{ flex: 1, padding: '0.4rem 0', fontSize: 'var(--text-sm)', borderRadius: 'var(--radius-sm, 12px)',
+                  style={{ flex: 1, padding: 'var(--space-2) 0', fontSize: 'var(--text-sm)', borderRadius: 'var(--radius-sm, 12px)',
                     border: '1px solid var(--portal-line)', cursor: 'pointer',
                     background: severity === s ? 'var(--portal-accent-soft-md)' : 'transparent',
                     color: severity === s ? 'var(--portal-ink)' : 'var(--portal-muted)' }}>
@@ -219,24 +219,24 @@ export default function HealthRecordSheet({ open, onClose, onSaved }: { open: bo
                 </button>
               ))}
             </div>
-            <label className="nesio-settings-section-label" htmlFor="hr-note" style={{ marginTop: '0.7rem' }}>{t('记一句', 'Note')}</label>
+            <label className="nesio-settings-section-label" htmlFor="hr-note" style={{ marginTop: 'var(--space-3)' }}>{t('记一句', 'Note')}</label>
             <input id="hr-note" className="nesio-ob-input" value={note} maxLength={120} onChange={(e) => setNote(e.target.value)} />
           </>
         )}
 
         {kind === 'visit' && (
           <>
-            <label className="nesio-settings-section-label" htmlFor="hr-place" style={{ marginTop: '0.7rem' }}>{t('医院 / 诊所', 'Place')}</label>
+            <label className="nesio-settings-section-label" htmlFor="hr-place" style={{ marginTop: 'var(--space-3)' }}>{t('医院 / 诊所', 'Place')}</label>
             <input id="hr-place" className="nesio-ob-input" value={place} maxLength={40} onChange={(e) => setPlace(e.target.value)} />
-            <label className="nesio-settings-section-label" htmlFor="hr-dept" style={{ marginTop: '0.7rem' }}>{t('科室', 'Department')}</label>
+            <label className="nesio-settings-section-label" htmlFor="hr-dept" style={{ marginTop: 'var(--space-3)' }}>{t('科室', 'Department')}</label>
             <input id="hr-dept" className="nesio-ob-input" value={dept} maxLength={24} onChange={(e) => setDept(e.target.value)} />
 
             {/* bug3 p41:医生名字 —— 可以直接打,也可以从 People 里挑(挑了就关联上) */}
-            <label className="nesio-settings-section-label" htmlFor="hr-doctor" style={{ marginTop: '0.7rem' }}>{t('医生', 'Doctor')}</label>
+            <label className="nesio-settings-section-label" htmlFor="hr-doctor" style={{ marginTop: 'var(--space-3)' }}>{t('医生', 'Doctor')}</label>
             <input id="hr-doctor" className="nesio-ob-input" value={doctor} maxLength={40}
               onChange={(e) => { setDoctor(e.target.value); setDoctorKey(''); }} />
             {people.length > 0 && (
-              <div className="nesio-rel-chips" style={{ marginTop: '0.4rem' }}>
+              <div className="nesio-rel-chips" style={{ marginTop: 'var(--space-2)' }}>
                 {people.slice(0, 8).map((p) => (
                   <button key={p.key} type="button"
                     className={`nesio-rel-chip${doctorKey === p.key ? ' nesio-rel-chip--on' : ''}`}
@@ -250,7 +250,7 @@ export default function HealthRecordSheet({ open, onClose, onSaved }: { open: bo
             )}
 
             {/* bug3 p41:保险 + 价格 —— 就诊多半连着一笔钱,记在这条上才对得起来 */}
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.7rem' }}>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
               <div style={{ flex: 2 }}>
                 <label className="nesio-settings-section-label" htmlFor="hr-ins">{t('保险', 'Insurance')}</label>
                 <input id="hr-ins" className="nesio-ob-input" value={insurance} maxLength={40} onChange={(e) => setInsurance(e.target.value)} />
@@ -261,21 +261,21 @@ export default function HealthRecordSheet({ open, onClose, onSaved }: { open: bo
               </div>
             </div>
 
-            <label className="nesio-settings-section-label" htmlFor="hr-note" style={{ marginTop: '0.7rem' }}>{t('记一句', 'Note')}</label>
+            <label className="nesio-settings-section-label" htmlFor="hr-note" style={{ marginTop: 'var(--space-3)' }}>{t('记一句', 'Note')}</label>
             <input id="hr-note" className="nesio-ob-input" value={note} maxLength={120} placeholder={t('医生说了什么、下次什么时候来', 'What the doctor said, next visit')} onChange={(e) => setNote(e.target.value)} />
           </>
         )}
 
-        {err && <p className="nesio-rel-detail-err" role="alert" style={{ marginTop: '0.7rem' }}>{err}</p>}
+        {err && <p className="nesio-rel-detail-err" role="alert" style={{ marginTop: 'var(--space-3)' }}>{err}</p>}
 
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-4)' }}>
           <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }} onClick={onClose}>{t('先不记', 'Not now')}</button>
           <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} disabled={busy} onClick={save}>
             {busy ? t('存着…', 'Saving…') : t('记下', 'Save')}
           </button>
         </div>
 
-        <p className="nesio-settings-option-hint" style={{ marginTop: '0.8rem', textAlign: 'center' }}>
+        <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-3)', textAlign: 'center' }}>
           {t('健康信息参考,不作诊断 · 仅本机', 'For reference, not a diagnosis · on this device')}
         </p>
       </div>
