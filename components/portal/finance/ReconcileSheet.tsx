@@ -307,10 +307,19 @@ export default function ReconcileSheet({ open, onClose, onSaved }: {
               </div>
             )}
 
-            {verdict === 'unusable' && (
+            {/* 「没有文字」和「不是对账单」必须说成两句话。
+                合成一句的代价实测过:一张有字的医疗账单被告知是扫描件,
+                同一屏下面还列着从它里面读出来的原文 —— 而他会照着这句话去折腾 OCR。 */}
+            {verdict === 'no_text' && (
               <p role="alert" style={{ fontSize: 'var(--text-sm)', color: 'var(--status-gentle)', margin: 0, lineHeight: 1.6 }}>
-                {t('这份 PDF 里没有可读的文字层 —— 多半是扫描件。可以先试试从银行导出 CSV。',
-                  'No readable text layer — likely a scan. Exporting a CSV from your bank works better for now.')}
+                {t('这份 PDF 里一个字都读不出来 —— 多半是扫描件。可以先试试从银行导出 CSV。',
+                  'Not a single character could be read — likely a scan. Exporting a CSV from your bank works better for now.')}
+              </p>
+            )}
+            {verdict === 'not_a_statement' && (
+              <p role="alert" style={{ fontSize: 'var(--text-sm)', color: 'var(--status-gentle)', margin: 0, lineHeight: 1.6 }}>
+                {t('文字读出来了,但没有一行像银行流水 —— 这份多半不是对账单(账单、发票、收据都长这样)。换一份银行或信用卡的对账单就行。',
+                  'The text came through, but no line looks like a bank transaction — this probably is not a statement (bills, invoices and receipts look like this). Try a bank or card statement instead.')}
               </p>
             )}
 

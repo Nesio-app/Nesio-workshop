@@ -59,7 +59,11 @@ assert.match(gmail, /mailCategory: cat/, '分类结果要落到节点 attributes
 // 数据其实一直在同步:messages.list 不带 labelIds 时返回除 SPAM/TRASH 外的全部邮件,
 // 已发送的早就进来了。缺的是**方向**这个字段 —— 节点上从没记过,于是自己发的邮件
 // 因为「发件人不像机器人」被当成活人来信,**混在收件里**。所以钉两头:
-assert.match(gmail, /labelIds \|\| \[\]\)\.includes\('SENT'\)/, '方向必须用 Gmail 自己的 SENT 标签判,不许拿发件人猜');
+// 方向必须来自 Gmail 自己的 labelIds,不许拿发件人猜(自己发的邮件发件人就是自己)。
+// **具体判据**(SENT ∧ ¬INBOX —— 自己发给自己的算收件)压在 scripts/gmail-labels.test.mjs,
+// 那边把这个函数抽出来直测。这里只钉住「用的是 labelIds 这条路」,同一件事不两处各压一半。
+assert.match(gmail, /const labels = msg\.labelIds \|\| \[\];/, '方向必须用 Gmail 自己的标签判,不许拿发件人猜');
+assert.match(gmail, /labels\.includes\('SENT'\)/, '判据要读 SENT 标签');
 assert.match(gmail, /mailDirection: mailDirection\(m\)/, '兜底路径要把方向写进节点');
 assert.match(gmail, /mailDirection: mailDirection\(src\)/, 'AI 富化路径也要写方向(按**这一封**判,不能按发件人汇总 —— 自己发的邮件发件人就是自己)');
 assert.match(panel, /\.filter\(\(n\) => !isSent\(n\)\)/, '收件那格必须把已发送排除掉,否则又混回去');

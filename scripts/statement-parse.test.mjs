@@ -260,14 +260,66 @@ check('⑦b 同一份文件解析两次结果完全一样(零 AI 的意义就在
   looseDeepEqual(JSON.parse(JSON.stringify(a)), JSON.parse(JSON.stringify(b)));
 });
 
-check('⑦c 没有文字层(扫描件)→ unusable,而不是「解析出 0 笔然后说通过」', () => {
-  const r = P.parseStatement([[line([[40, 'Some Bank']])]], { fallbackYear: 2026 });
-  assert.strictEqual(P.parseVerdict(r), 'unusable');
+/*
+ * ⑦c/⑦d —— 「没有文字」和「不是对账单」是两件事(2026-07-31 用户实测)。
+ *
+ * 上一版这两种都报 unusable,界面一律说「这份 PDF 里没有可读的文字层 —— 多半是扫描件」。
+ * 实测把它戳穿了:一张**有文字的医疗账单**被告知是扫描件,而同一屏下面还列着
+ * 从它里面读出来的原文(「第1页 第12行:7/30/2026 Exam/Consultation…」)。
+ *
+ * 这条老测试自己就是证据:它叫「没有文字层(扫描件)」,构造的数据却含 'Some Bank'
+ * 这几个字 —— 名不副实的用例把错判据固化了下来。两条分开压。
+ */
+check('⑦c 一个字都没有(真扫描件)→ no_text', () => {
+  // 真正的扫描件:整页就是一张图,pdfjs 抽不出任何文字行。
+  assert.strictEqual(P.parseVerdict(P.parseStatement([[]], { fallbackYear: 2026 })), 'no_text');
+  // 只有空白/换行也算没有 —— 不能因为「有一行全是空格」就说它有文字层。
+  // **绕开 line() 这个 helper**:它自己会 trim,用它构造的话这条压的是测试而不是生产代码。
+  // 真实的 PdfLine 来自 pdfjs-loader,text 里带原样空白是常态(空行、页边留白)。
+  const blank = P.parseStatement([[{ y: 0, cells: [{ x: 40, text: '   ' }], text: '   \n  ' }]], { fallbackYear: 2026 });
+  assert.strictEqual(blank.textChars, 0, '整行只有空白 = 没有文字层,不许算成「有字」');
+  assert.strictEqual(P.parseVerdict(blank), 'no_text');
 });
 
-check('⑦e 只差一个年份 → need_year,**不许报成 unusable**', () => {
+check('⑦d 有文字但没有一行像流水 → not_a_statement,**不许说成扫描件**', () => {
+  const r = P.parseStatement([[line([[40, 'Some Bank']])]], { fallbackYear: 2026 });
+  assert.ok(r.textChars > 0, '读出了字就得如实记下来');
+  assert.strictEqual(P.parseVerdict(r), 'not_a_statement');
+
+  // 真实形状:医疗账单。有日期、有金额,但不是银行流水格式 ——
+  // 它会进 skipped(读得出原文),那恰恰**证明有文字层**。
+  const medical = P.parseStatement([[
+    line([[40, 'Patient Statement']]),
+    line([[40, '7/30/2026 Exam/Consultation Well Patient 1.00 $101.95 $0.00 $101.95']]),
+  ]], { fallbackYear: 2026 });
+  assert.ok(medical.textChars > 0);
+  assert.notStrictEqual(
+    P.parseVerdict(medical), 'no_text',
+    '同一屏能列出从这份 PDF 读到的原文,就不许说它没有文字层 —— 那是同屏自相矛盾',
+  );
+});
+
+check('⑦d2 界面上这两种也得是两句话', () => {
+  // lib 层分开了、UI 层又合回一句,用户看到的还是那句错话。所以这里压到屏幕上。
+  const sheet = fs.readFileSync(new URL('../components/portal/finance/ReconcileSheet.tsx', import.meta.url), 'utf8');
+  assert.ok(/verdict === 'no_text' &&/.test(sheet), '「一个字都读不出来」要有自己的分支');
+  assert.ok(/verdict === 'not_a_statement' &&/.test(sheet), '「不是对账单」要有自己的分支');
+  // 而且必须**说不一样的话**:两个分支文案相同 = 等于没分。
+  const grab = (v) => {
+    const m = new RegExp(`verdict === '${v}' &&[\\s\\S]{0,400}?t\\('([^']+)'`).exec(sheet);
+    return m ? m[1] : '';
+  };
+  const a = grab('no_text');
+  const b = grab('not_a_statement');
+  assert.ok(a && b, '两句话都要在');
+  assert.notStrictEqual(a, b, '两个分支说同一句话,等于没分开');
+  assert.ok(!/扫描件/.test(b), '「不是对账单」那句里不许出现「扫描件」—— 那正是当初说错的那个词');
+  assert.ok(/扫描件/.test(a), '真读不出字的那句才该提扫描件');
+});
+
+check('⑦e 只差一个年份 → need_year,**不许报成 no_text / not_a_statement**', () => {
   // 交易行上只印「07/12」,页眉没印期间,调用方也没给年份 —— 补哪一年无从得知。
-  // 报成 unusable 的话人会以为自己的单子根本不被支持而放弃,实际上填个年份就好了。
+  // 报成不可用的话人会以为自己的单子根本不被支持而放弃,实际上填个年份就好了。
   const r = P.parseStatement([[line([[40, 'Some Bank']]), ...txLines]]);
   assert.strictEqual(r.needsYear, true);
   assert.strictEqual(P.parseVerdict(r), 'need_year');

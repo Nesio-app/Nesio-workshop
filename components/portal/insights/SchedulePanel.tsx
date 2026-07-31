@@ -24,7 +24,8 @@ import { usePortalLocale } from '../use-portal-locale';
 import { IconStar, IconFlag, IconCheck } from '../icons';
 import { loadPins, togglePin, PINS_UPDATED_EVENT } from '@/lib/portal/pins';
 import {
-  buildChips, matchesChip, listCustomFilters, addCustomFilter, removeCustomFilter,
+  buildChips, matchesChip, matchesCustom, listCustomFilters, addCustomFilter,
+  removeCustomFilter, updateCustomFilter,
   scheduleFiltersReady, SCHEDULE_FILTERS_EVENT, type CustomFilter,
 } from '@/lib/portal/schedule-filters';
 import { mailStatusLine, mailBadges, toneVars } from '@/lib/portal/mail-badges';
@@ -90,6 +91,17 @@ interface Row {
    * 本机 IndexedDB(隐私红线不上云),那部分靠 email-fulltext-index 另外查。
    */
   body: string;
+  /**
+   * 这一行屏幕上**还看得见的其它字**:状态行(「扣款 · $662.59」)+ 右下角徽章(「账单」)。
+   *
+   * 2026-07-31 用户实测:自定义筛选「扣款」命中 0,而列表里明明白白有一条写着
+   * 「扣款 · $662.59」。根因是那两个字是 mail-badges 从 moneyFlow **派生出来展示的**,
+   * 既不在标题里也不在发件人里 —— 屏幕上有的字,搜不到。
+   *
+   * 这里算一份给筛选用;MailRow 渲染时会再算一次。两处都算**不是两份真源** ——
+   * mailStatusLine / mailBadges 是纯函数,同样的 attrs 必然给同样的字。
+   */
+  extra: string;
 }
 
 /** 节点上能当正文用的那几个字段,拼一起(截断,免得几百条 × 1500 字每次输入都全量小写)。 */
@@ -700,6 +712,12 @@ export default function SchedulePanel() {
   const [composeOpen, setComposeOpen] = useState(false);   // 发件箱里直接写一封
   const [fName, setFName] = useState('');
   const [fKeyword, setFKeyword] = useState('');
+  /**
+   * 正在改哪一个自定义筛选(2026-07-31 用户:「如果确实不管用,我希望可以修改,现在不行」)。
+   * null = 新建。以前只有「长按/右键删」——手机上长按常被系统的文本选择抢走,
+   * 于是一个建错了的筛选事实上既改不了也删不掉。
+   */
+  const [editId, setEditId] = useState<string | null>(null);
   // 搜索框(2026-07-30)。不落盘 —— 和筛选同理,记住上次的搜索词会让人以为数据少了。
   const [q, setQ] = useState('');
   // 用户改过的标签(这一封 / 发件人规则)。见 lib/portal/mail-tag-fix.ts —— 只记他改的,不隐式泛化。
@@ -857,6 +875,8 @@ export default function SchedulePanel() {
           dateIso: start,
           meta: typeof a.location === 'string' && a.location ? a.location : (typeof a.calendarName === 'string' ? a.calendarName : ''),
           badge: a.meetingRecordId ? L(dict, '有记录', 'notes') : undefined,
+          // 屏幕上这一行还看得见的字。日历项没有状态行,只有那枚徽章。
+          extra: a.meetingRecordId ? L(dict, '有记录', 'notes') : '',
           query: n.name,
           node: n,
           googleLabels: [
@@ -874,6 +894,7 @@ export default function SchedulePanel() {
           dateIso: typeof a.recordedAt === 'string' ? a.recordedAt : n.createdAt,
           meta: (n.tags || []).includes('Granola') ? 'Granola' : L(dict, '录音', 'Recording'),
           badge: L(dict, '会议记录', 'meeting'),
+          extra: L(dict, '会议记录', 'meeting'),
           query: stripPrefix(n.name),
           node: n,
           googleLabels: [L(dict, '会议记录', 'Meeting notes')],
@@ -893,6 +914,7 @@ export default function SchedulePanel() {
         dateIso: r.at,
         meta: [kindLabelOf(r.kind, dict), rep].filter(Boolean).join(' · '),
         badge: L(dict, '提醒', 'reminder'),
+        extra: L(dict, '提醒', 'reminder'),
         query: r.title,
         reminder: r,
         googleLabels: [L(dict, '我设的提醒', 'My reminders')],
@@ -958,13 +980,23 @@ export default function SchedulePanel() {
       .map((n) => {
         const a = n.attributes || {};
         const cat = typeof a.mailCategory === 'string' ? a.mailCategory : '';
+        const from = typeof a.from === 'string' ? a.from : (typeof a.sender === 'string' ? a.sender : '');
+        const body = bodyOf(n);
+        // 和 MailRow 里同一套推导(同步没写好这几个字段时才现算),
+        // 这样标签上的计数和屏幕上真看得见的字是一回事。
+        const facets = (a.orderStatus || a.moneyFlow || a.kindHint)
+          ? a
+          : { ...a, ...extractEmailLocal(n.name, from, body) } as typeof a;
+        const st = mailStatusLine(facets, dict);
+        const bg = mailBadges(facets, dict);
         return {
           id: n.id,
           title: n.name,
           dateIso: typeof a.date === 'string' ? a.date : n.createdAt,
-          meta: typeof a.from === 'string' ? a.from : (typeof a.sender === 'string' ? a.sender : ''),
+          meta: from,
           query: n.name,
           node: n,
+          extra: [st?.text || '', ...bg.map((b) => b.label)].filter(Boolean).join(' '),
           // Gmail 自己的判定:重要性预测 + 系统分类。promotions/social 在上面已被毙掉,
           // 所以这里长不出那两个标签 —— 正合「只给筛得出东西的标签」。
           googleLabels: [
@@ -973,7 +1005,7 @@ export default function SchedulePanel() {
             ...(cat === 'forums' ? [L(dict, '论坛', 'Forums')] : []),
             ...(cat === 'personal' ? [L(dict, '个人', 'Personal')] : []),
           ],
-          body: bodyOf(n),
+          body,
         } as Row;
       })
       // 展示层去重:同一封邮件(emailId)只留一条。同步侧已按 emailId upsert,
@@ -1165,9 +1197,29 @@ export default function SchedulePanel() {
                 {c.label} <span className="n">{c.count}</span>
               </button>
             ))}
-            <button type="button" className="nesio-schedfilter-add" onClick={() => setAddingFilter((v) => !v)}
+            <button type="button" className="nesio-schedfilter-add"
+              onClick={() => { setEditId(null); setFName(''); setFKeyword(''); setAddingFilter((v) => !v); }}
               aria-label={L(dict, '自定义一个筛选', 'Add a filter')}>+</button>
           </div>
+
+          {/* 选中自己建的标签时,给一条「改一改」。
+              放在 chip **外面**而不是 chip 里挂个小铅笔:chip 是 button,
+              按钮不能嵌按钮 —— 硬塞的下场刚在时间线那个 ✕ 上见过(掉到下一行还点不动)。 */}
+          {chosen?.kind === 'custom' && !addingFilter && (
+            <button
+              type="button"
+              className="nesio-schedfilter-btn"
+              style={{ alignSelf: 'flex-start' }}
+              onClick={() => {
+                setEditId(chosen.id);
+                setFName(chosen.label);
+                setFKeyword(chosen.keyword);
+                setAddingFilter(true);
+              }}
+            >
+              {L(dict, `改一改「${chosen.label}」`, `Edit “${chosen.label}”`)}
+            </button>
+          )}
 
           {addingFilter && (
             <div className="nesio-schedfilter-form">
@@ -1175,13 +1227,36 @@ export default function SchedulePanel() {
                 placeholder={L(dict, '叫什么(如:孩子学校)', 'Name it')} />
               <input className="nesio-schedfilter-input" value={fKeyword} onChange={(e) => setFKeyword(e.target.value)}
                 placeholder={L(dict, '含哪个词', 'Contains which word')} />
+              {/* 改的时候先说清楚它现在能筛出几条 —— 用户是因为「命中 0」才来改的,
+                  改完立刻看得见有没有用,比让他关掉表单再数一遍强。 */}
+              {fKeyword.trim() && (
+                <p className="nesio-schedsearch-hint" style={{ margin: 0 }}>
+                  {L(dict,
+                    `含「${fKeyword.trim()}」的有 ${baseRows.filter((r) => matchesCustom(r, fKeyword)).length} 条`,
+                    `${baseRows.filter((r) => matchesCustom(r, fKeyword)).length} match “${fKeyword.trim()}”`)}
+                </p>
+              )}
               <div className="nesio-schedfilter-actions">
-                <button type="button" className="nesio-schedfilter-btn" onClick={() => { setAddingFilter(false); setFName(''); setFKeyword(''); }}>
+                {editId && (
+                  <button type="button" className="nesio-schedfilter-btn"
+                    onClick={() => {
+                      removeCustomFilter(editId);
+                      if (activeChip === editId) setActiveChip(null);
+                      setAddingFilter(false); setEditId(null); setFName(''); setFKeyword('');
+                    }}>
+                    {L(dict, '删掉', 'Delete')}
+                  </button>
+                )}
+                <button type="button" className="nesio-schedfilter-btn" onClick={() => { setAddingFilter(false); setEditId(null); setFName(''); setFKeyword(''); }}>
                   {L(dict, '稍后', 'Later')}
                 </button>
                 <button type="button" className="nesio-schedfilter-btn pri" disabled={!fName.trim() || !fKeyword.trim()}
-                  onClick={() => { addCustomFilter(fName, fKeyword); setAddingFilter(false); setFName(''); setFKeyword(''); }}>
-                  {L(dict, '加进来', 'Add')}
+                  onClick={() => {
+                    if (editId) updateCustomFilter(editId, { name: fName, keyword: fKeyword });
+                    else addCustomFilter(fName, fKeyword);
+                    setAddingFilter(false); setEditId(null); setFName(''); setFKeyword('');
+                  }}>
+                  {editId ? L(dict, '改好了', 'Save') : L(dict, '加进来', 'Add')}
                 </button>
               </div>
               {/* 说清它到底怎么匹配 —— 用户能预测结果,才敢用。不做隐式语义匹配。 */}
