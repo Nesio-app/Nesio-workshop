@@ -31,7 +31,7 @@ const BASELINE = {
   spacing: 16,
   radius: 42,
   hex: 27,
-  rawButton: 213,
+  rawButton: 193,
 };
 
 /*
@@ -97,13 +97,21 @@ const CHECKS = [
   { key: 'radius', re: /\bborderRadius:\s*(?:'[0-9.]+(?:rem|px|em)?'|[0-9]+)/g, what: '写死的圆角', fix: 'var(--radius-sm/md/xl/pill)' },
   // 先摘掉 var(--x, #fallback) 这种兜底(全站惯例,不算硬编码),剩下的才是真写死。
   /**
-   * 绕过 Button 原语的裸 <button>。**只卡住不再增长,不批量迁。**
+   * 绕过 Button 原语的裸 <button>。**一个文件一个文件地还,新代码别再加一个。**
    *
-   * 213 个裸按钮 vs 17 个用原语 —— 差距很大,但一刀切迁移会把版式改坏:
-   * 那些 inline style 大半是**布局**(flex:1 / width:100% / marginTop),不是外观。
-   * 真要迁得连着布局一起想,那是一屏一屏的活,不是机械替换。
+   * 2026-07-31:213 → 193。原语开了 `layoutStyle` 窄口(布局留在外面、外观进原语)
+   * 之后,第一个迁的是 WardrobePanel(20 → 4)。
    *
-   * 所以这条棘轮的作用是:存量慢慢还,**新代码别再加一个**。
+   * 迁移的验收标准不是「<button> 变成 <Button>」,是:
+   *   · 外观参数化成 variant/size/tone —— 板块自造的样式常量该删掉,不是搬进 className;
+   *   · 只有布局走 layoutStyle(类型白名单挡着,写外观是编译错误);
+   *   · 手搓的禁用态(`opacity: busy ? 0.6 : 1`)换成 `disabled` —— 原语 :disabled 已经有。
+   * WardrobePanel 里 outfitActionBtn / linkish / chip 三个自造样式常量因此全删了,
+   * 它们分别就是 soft / ghost / (primary|secondary)+sm。
+   *
+   * 剩下的 4 处**不是漏网**:照片投放区 ×2(虚线框,里面填满一张 img)、衣物网格瓦片、
+   * 日历日格 —— 都是「可点的图块」,不是按钮。塞进按钮原语反而是错的。
+   * 往后每个文件都会有这么几处,棘轮的地板不会是 0。
    */
   { key: 'rawButton', re: /<button[^>]*\sstyle=\{/gs, what: '绕过 Button 原语的裸按钮', fix: "components/portal/ui/Button.tsx 的 <Button variant=...>" },
   { key: 'hex', re: /#[0-9a-fA-F]{6}\b/g, what: '写死的色值', fix: 'var(--portal-*/--status-*/--viz-*)', strip: (s) => s.replace(/var\([^)]*,\s*#[0-9a-fA-F]{3,8}\)/g, '') },
