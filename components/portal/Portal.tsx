@@ -881,6 +881,12 @@ export default function Portal() {
     const cookingCameraHandler = (e: Event) => {
       const file = (e as CustomEvent).detail?.file as File | undefined;
       track('cooking_camera_open');
+      // ⚠️ 必须先关洞察:相机是 z-index 400,洞察浮层是 901。
+      // 做饭页是从洞察 hub 进来的,所以点「拍一拍进货」时洞察还开着 ——
+      // 相机确实打开了,但整个盖在洞察底下,用户看到的是「做饭页没了,什么也没出现」,
+      // 也就是「点完闪退」。下面那个 openCameraHandler 早就修过同一个坑(护理页死按钮),
+      // 这条漏了。加相机入口时**都要问一句**:这条路上洞察关了没有。
+      setInsightsOpen(false);
       setCookingOpen(false); setPantryIntake(true); setCameraFile(file ?? null); setCaptureMode('camera');
     };
     // 行程购物/预算「拍小票」—— 打开通用相机识别(不强制食材进货模式)

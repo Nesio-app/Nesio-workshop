@@ -286,7 +286,23 @@ export default function TodayFeed({
   // SpeechRecognition 本来就不存在,于是点话筒**每次**都是弹出那张 sheet,正是标注要去掉的。
   // 现在一律不再开 sheet:说清楚这台设备听不了,并把光标放进输入框让人直接打字。
   const [micState, setMicState] = useState<'idle' | 'recording'>('idle');
-  const [micErr, setMicErr] = useState('');
+  /**
+   * 这台设备有没有语音识别引擎。**决定话筒按钮摆不摆**(2026-07-31)。
+   *
+   * 之前的做法是照摆按钮,点了再挂一条「语音输入没起来 —— 再点一次,或者直接打字」。
+   * 可 iOS PWA 上 SpeechRecognition 根本不存在,所以那条提示**每次都出现**:
+   * 一个永远不可能成功的按钮,配一条永远要点掉的横幅。用户标注要去掉的就是它。
+   *
+   * 正解是从源头断 —— 听不了就别摆这个话筒。没有按钮就没有失败,
+   * 也就不需要提示。(不是把提示藏起来留着按钮,那才是「点了没反应」。)
+   *
+   * 只在挂载后探一次:SSR 时 window 不存在,直接判 false 会让有引擎的设备也没有话筒。
+   */
+  const [micAvailable, setMicAvailable] = useState(true);
+  useEffect(() => {
+    const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
+    setMicAvailable(Boolean(w.SpeechRecognition || w.webkitSpeechRecognition));
+  }, []);
   const recogRef = useRef<{ stop: () => void } | null>(null);
   const quickInputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -314,23 +330,23 @@ export default function TodayFeed({
   function startQuickMic() {
     // 批次 37 重做:边说边把文字写进输入框(interim 实时可见),说完文字留在框里
     // 由用户回车确认;识别起不来(iOS PWA 常见)给可见提示 + 落到打字,绝不装死、也不换页。
-    // 红线:每个 async 动作都要有显式失败态 —— 这里的失败态就是 micErr。
-    const cannotListen = (why: string) => {
+    // 红线是「每个 async 动作都要有显式失败态」。这里的失败态**不再是一条横幅** ——
+    // 横幅在这台设备上是每次必现的噪音(见 micAvailable 的说明)。
+    // 现在的可见反馈有两层,都比横幅结实:
+    //   ① 光标立刻跳进输入框 —— 屏幕真的动了,而且动到了你下一步要用的地方;
+    //   ② 引擎本来就没有(或起不来)→ **把话筒收起来**,不再摆一个点不动的按钮。
+    // 「没反应」的定义是屏幕什么都没变;这两条都不是。
+    const cannotListen = () => {
       setMicState('idle');
       recogRef.current = null;
-      setMicErr(why);
-      // 听不了就让人能立刻打字 —— 换页(开 sheet)只会把已经打的半句弄丢
       setTimeout(() => quickInputRef.current?.focus(), 0);
     };
-    const noEngine = () => cannotListen(L(uiLocale,
-      '这台设备的浏览器不支持语音输入 —— 直接打字也一样能记。',
-      "This browser can't do voice input — typing works just as well."));
+    const noEngine = () => { setMicAvailable(false); cannotListen(); };
     type SR = { new (): { lang: string; interimResults: boolean; continuous: boolean; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void } };
     const w = window as unknown as { SpeechRecognition?: SR; webkitSpeechRecognition?: SR };
     const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!Ctor) { noEngine(); return; }
     if (micState === 'recording') { recogRef.current?.stop(); return; }
-    setMicErr('');
     let recog: InstanceType<SR>;
     try { recog = new Ctor(); } catch { noEngine(); return; }
     recog.lang = uiLocale === 'en' ? 'en-US' : 'zh-CN';
@@ -346,13 +362,13 @@ export default function TodayFeed({
       setMicState('idle');
       recogRef.current = null;
       // 一个字都没听到(常见于权限没给/引擎没起来)—— 说出来,不换页
-      if (!got) cannotListen(L(uiLocale, '没听到声音 —— 检查一下麦克风权限,或者直接打字。', "Didn't catch anything — check mic permission, or just type."));
+      if (!got) cannotListen();
     };
-    recog.onerror = () => cannotListen(L(uiLocale, '语音输入没起来 —— 再点一次,或者直接打字。', 'Voice input failed — tap again, or just type.'));
+    recog.onerror = () => cannotListen();
     recogRef.current = recog;
     setMicState('recording');
     try { recog.start(); } catch {
-      cannotListen(L(uiLocale, '语音输入没起来 —— 再点一次,或者直接打字。', 'Voice input failed — tap again, or just type.'));
+      cannotListen();
     }
   }
   // 情绪趋势面板不再挂在这里:入口在健康分析页(MoodTrendCard 自己挂 sheet)。
@@ -655,8 +671,7 @@ export default function TodayFeed({
           recording={micState === 'recording'}
           inputRef={quickInputRef}
           onFiles={captureFiles}
-          micError={micErr}
-          onDismissMicError={() => setMicErr('')}
+          micAvailable={micAvailable}
           /* ── 三合一的另外两条路(2026-07-31)。都是显式的:点了才走。 ──
              搜索**不新做一套结果界面** —— 记忆页那套是完整的(语义理解 + 筛选 + 详情),
              这里只把词带过去。问念念同理:把已经打好的一句带进 ask,别让人重打一遍。 */

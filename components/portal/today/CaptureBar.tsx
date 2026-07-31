@@ -41,12 +41,18 @@ export interface CaptureBarProps {
    */
   onMention?: (m: PendingMention) => void;
   /**
-   * bug3 p42:话筒听不了时的可见失败态。原来这几种情况会去开「说一句」sheet ——
-   * iOS PWA 上 SpeechRecognition 根本不存在,于是点话筒每次都跳那张 sheet(标注要去掉)。
-   * 现在不换页,就在输入条下面说清楚,人可以直接打字。
+   * 这台设备到底能不能听(2026-07-31)。
+   *
+   * 演进过程值得留一下:最早点话筒会跳「说一句」sheet —— iOS PWA 上
+   * SpeechRecognition 根本不存在,于是**每次**都跳,还什么也听不到。
+   * 改成不跳页、在输入条下面挂一条「语音输入没起来 —— 再点一次,或者直接打字」。
+   * 但那条横幅同样是**每次都出现**:一个永远不可能成功的按钮,配一条永远要点掉的提示。
+   * 用户标注要去掉的就是它。
+   *
+   * 现在的做法是从源头断:**听不了就不摆这个话筒**。没有按钮就没有失败,
+   * 也就不需要那条提示 —— 而不是留着按钮、把提示藏起来(那才是「点了没反应」)。
    */
-  micError?: string;
-  onDismissMicError?: () => void;
+  micAvailable?: boolean;
   /**
    * #25:恢复出来的草稿如果不是今天留下的,在这儿说清楚是哪天的 ——
    * 否则几周前语音听岔的半句看起来就像用户刚打的,而他根本不记得打过。
@@ -223,7 +229,7 @@ export default function CaptureBar(capture: CaptureBarProps) {
           {/* 填了字 → 右边那枚圆钮从「话筒」变「记下」。同一个位置,不再多摆一个按钮。 */}
           {capture.value.trim() ? (
             <button type="submit" className="nesio-tl-capture-send" aria-label={L(dict, '记下', 'Jot')}>↑</button>
-          ) : (
+          ) : capture.micAvailable !== false ? (
             <button
               type="button"
               className="nesio-tl-capture-mic"
@@ -232,7 +238,7 @@ export default function CaptureBar(capture: CaptureBarProps) {
             >
               <IconMic size={15} />
             </button>
-          )}
+          ) : null}
         </div>
       </form>
 
@@ -295,16 +301,6 @@ export default function CaptureBar(capture: CaptureBarProps) {
         </p>
       )}
 
-      {capture.micError && (
-        <p className="nesio-tl-capture-err" role="alert">
-          {capture.micError}
-          {capture.onDismissMicError && (
-            <button type="button" className="nesio-tl-capture-retry" onClick={capture.onDismissMicError}>
-              {L(dict, '知道了', 'Got it')}
-            </button>
-          )}
-        </p>
-      )}
     </div>
   );
 }

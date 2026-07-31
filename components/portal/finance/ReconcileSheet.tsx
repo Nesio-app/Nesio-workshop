@@ -54,7 +54,18 @@ export default function ReconcileSheet({ open, onClose, onSaved }: {
   const [review, setReview] = useState<StatementReview | null>(null);
   const [rawById, setRawById] = useState<Record<string, string>>({});
   const [picked, setPicked] = useState<Set<string>>(new Set());
-  const [year, setYear] = useState('');
+  /**
+   * 缺账期时用哪一年重解析。**默认就填当年,不留空。**
+   *
+   * 之前初值是 `''`,而输入框的 placeholder 写着 "2026" —— 灰字看着就像已经填好了。
+   * 可下面那颗「用这一年重新解析」是 `disabled={!/^\d{4}$/.test(year)}`:
+   * 空字符串 → 按钮是禁用的 → 点下去**什么都不会发生**,而屏幕上没有一处说明为什么。
+   * 这就是「点了没反应」的全部真相:不是逻辑没跑,是按钮根本没被允许跑。
+   *
+   * 现在默认填当年 —— 对账单绝大多数是最近开的,填错了当场改一个数字的事;
+   * 而「看着填了、其实没填」是查都查不出来的。
+   */
+  const [year, setYear] = useState(() => String(new Date().getFullYear()));
   const [savedCount, setSavedCount] = useState(0);
   /** 点过「不对,我自己来」的诊断 —— 同一份单子里不再劝第二次。 */
   const [refusedFix, setRefusedFix] = useState(false);
@@ -69,7 +80,7 @@ export default function ReconcileSheet({ open, onClose, onSaved }: {
   const reset = () => {
     setPhase('idle'); setErr(''); setFileName(''); setFileKey('');
     setParsed(null); setReview(null); setRawById({}); setPicked(new Set());
-    setYear(''); setSavedCount(0); setRefusedFix(false); setPriorRuns(0);
+    setYear(String(new Date().getFullYear())); setSavedCount(0); setRefusedFix(false); setPriorRuns(0);
     setKeepVoucher(true); pagesRef.current = null; fileRef2.current = null;
   };
 
@@ -250,10 +261,10 @@ export default function ReconcileSheet({ open, onClose, onSaved }: {
           <p style={{ fontSize: 'var(--text-h3)', fontWeight: 700, margin: 0, color: 'var(--portal-ink)' }}>
             {t('对一份账单', 'Check a statement')}
           </p>
-          <p style={{ ...label, marginTop: 4, lineHeight: 1.6 }}>
-            {t('文件只在这台设备上解析,不上传。解析出来的都是候选,你确认了才进账本。',
-              'Parsed on this device only — nothing is uploaded. Everything below is a candidate until you confirm.')}
-          </p>
+          {/* 2026-07-31:「文件只在这台设备上解析,不上传……」这段删掉。
+              触发这张卡的那颗按钮上就写着「上传对账单核对(只在本机解析,不上传)」——
+              同一句话在一屏里说两遍;而「你确认了才进账本」下面整屏都是逐条勾选,
+              界面本身已经把它演出来了。 */}
         </div>
 
         <input ref={fileRef} type="file" accept="application/pdf,.pdf" className="nesio-visually-hidden"
@@ -291,16 +302,25 @@ export default function ReconcileSheet({ open, onClose, onSaved }: {
             {/* 只差一个年份 —— 单独一档,别报成「不支持」 */}
             {verdict === 'need_year' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-ink)', margin: 0, lineHeight: 1.6 }}>
-                  {t('这份单子上的交易只印了月和日,页眉里也没找到账期 —— 告诉我是哪一年就行。',
-                    'Transactions here show only month/day and the header has no period — just tell me the year.')}
-                </p>
+                {/* 2026-07-31:那段两行的解释删了。留一个短标签就够 ——
+                    「哪一年」三个字 + 一个填好的年份框,要做什么一眼就清楚。 */}
+                <p style={{ ...label, margin: 0 }}>{t('这份单子是哪一年的', 'Which year is this statement')}</p>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <input inputMode="numeric" placeholder="2026" value={year} onChange={(e) => setYear(e.target.value)}
                     style={{ width: 100, border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', fontSize: 'var(--text-body)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }} />
                   <button type="button" style={{ ...ghost, flex: 1 }}
                     disabled={!/^\d{4}$/.test(year)}
-                    onClick={() => { if (pagesRef.current) runParse(pagesRef.current, fileKey, Number(year)); }}>
+                    onClick={() => {
+                      // 红线:没有静默分支。pages 丢了(重进过面板 / reset 过)就说出来并给出口,
+                      // 不能和「点了没反应」长成一个样。
+                      if (!pagesRef.current) {
+                        setErr(t('这份单子的内容已经不在手边了 —— 再选一次文件就行。',
+                          'The parsed pages are no longer in memory — pick the file again.'));
+                        setPhase('idle');
+                        return;
+                      }
+                      runParse(pagesRef.current, fileKey, Number(year));
+                    }}>
                     {t('用这一年重新解析', 'Re-parse with this year')}
                   </button>
                 </div>

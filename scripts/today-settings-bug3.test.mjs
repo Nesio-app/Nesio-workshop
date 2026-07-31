@@ -21,12 +21,29 @@ const feedCode = strip(feed);
 assert.ok(!/nesio-open-voice/.test(feedCode),
   '话筒的任何分支都不许再派 nesio-open-voice —— 那就是标注说的「打开原来的说一说」');
 assert.ok(/const cannotListen = /.test(feed), '听不了要走统一的可见失败态(cannotListen)');
-assert.ok(/setMicErr\(/.test(feed) && /micError=\{micErr\}/.test(feed),
-  '失败原因要传到输入条上显示出来(红线:异步动作必须有可见失败态)');
+/*
+ * 2026-07-31:判据换了一次,**要防的事没换**。
+ *
+ * 原来这里要求「失败原因传到输入条上显示出来」(micErr → micError 横幅)。
+ * 可 iOS PWA 上 SpeechRecognition 根本不存在 —— 那条横幅于是**每次点都出现**,
+ * 变成「一个永远不可能成功的按钮 + 一条永远要点掉的提示」。用户标注要去掉的就是它。
+ *
+ * 正解不是把提示藏起来留着按钮(那就成了真正的「点了没反应」),
+ * 而是从源头断:**听不了就不摆这个话筒**。所以新判据钉两条:
+ *   · 探不到引擎时 setMicAvailable(false) —— 按钮会消失;
+ *   · CaptureBar 不许无条件渲染话筒,必须看 micAvailable。
+ * 可见失败态仍在(光标落进输入框 + 按钮收起),只是不再靠一条横幅。
+ */
+assert.ok(/setMicAvailable\(false\)/.test(feedCode),
+  '探不到语音引擎时要 setMicAvailable(false) —— 否则会留下一个永远点不动的话筒');
+assert.ok(!/setMicErr\(/.test(feedCode),
+  '话筒失败横幅又回来了 —— 这台设备上它是每次必现的噪音,标注明确要去掉');
 assert.ok(/quickInputRef\.current\?\.focus\(\)/.test(feed),
   '听不了要把光标落进输入框 —— 让人能直接打字,而不是换页');
 const bar = read('components/portal/today/CaptureBar.tsx');
-assert.ok(/capture\.micError/.test(bar) && /role="alert"/.test(bar), '输入条要渲染话筒失败提示,且是 role=alert');
+assert.ok(/capture\.micAvailable !== false/.test(bar),
+  'CaptureBar 无条件渲染了话筒 —— 听不了的设备上就是一颗点不动的按钮');
+assert.ok(!/capture\.micError/.test(bar), '话筒失败横幅又回到输入条上了');
 
 // ── ② 「稍后」那一拍的时间线圆点(圆圈 + 三个点)+ 与文字对齐 ──
 const focus = read('components/portal/today/FocusSection.tsx');
