@@ -353,6 +353,44 @@ export default function Portal() {
     // 月度小结:让「我这个月练了什么」搜得到。只折本机有流水的那些域,
     // 边界写在 monthly-digest.ts 文件尾。
     void import('@/lib/portal/monthly-digest').then((m) => m.refreshMonthlyDigestsOnBoot()).catch(() => {});
+    // 健康:壳里 NesioHealthKit 是真的(从 IPA 核过),但之前**只有连接中心那一个手动按钮**
+    // 在用它 —— 步数睡眠心率要靠你自己想起来去点一下同步。开机静默拉一次(一天一次)。
+    // 静默 = 不弹权限:授权是在连接中心点「同步」时给的,开机路上突然弹 HealthKit 授权页
+    // 和用户正在做的事对不上。没授权的话 fetch 只是拿不到东西,不会打扰。
+    void import('@/lib/portal/native-healthkit').then((m) => m.syncHealthKitQuietly()).catch(() => {});
+  }, []);
+
+  /**
+   * 提醒 → 系统通知(2026-07-31,壳里 NesioLocalNotify 已确认可用)。
+   *
+   * 在这之前,你设的「每月 15 号早上 9 点交房租」到点什么都不会发生 ——
+   * 得自己打开 App 才看得见。能力一直在,只是没接到业务上。
+   *
+   * 三个时机各有各的必要,少一个就有洞:
+   *   · **开机**   —— 上次排的可能已经响完了,或者跨了时区;
+   *   · **回前台** —— 同上,而且这是最高频的一次校准(壳只认相对秒数,必须现算);
+   *   · **提醒变了** —— 新建/改时间/删除/打勾,立刻反映到排程,不用等下次回前台。
+   *
+   * 一律**不弹权限**(askPermission 默认 false):没人按按钮的时候突然弹一个系统弹窗
+   * 是最招人烦的那种。权限在用户真的设了一条提醒时才问(SchedulePanel 那边)。
+   */
+  useEffect(() => {
+    let stop = false;
+    const sync = () => {
+      if (stop) return;
+      void import('@/lib/portal/reminder-notifications')
+        .then((m) => m.syncReminderNotifications())
+        .catch(() => { /* 排不上不影响 App —— 提醒本体在列表里,一条没丢 */ });
+    };
+    sync();
+    const onVisible = () => { if (document.visibilityState === 'visible') sync(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('nesio-schedule-reminders-updated', sync);
+    return () => {
+      stop = true;
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('nesio-schedule-reminders-updated', sync);
+    };
   }, []);
   // 批次 85:懒加载 chunk 跨部署失效的全局兜底(错误页之外的路径,
   // 比如事件回调里的 dynamic import 被拒)—— 同一把 5 分钟防循环锁。

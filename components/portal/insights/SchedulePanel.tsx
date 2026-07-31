@@ -405,6 +405,21 @@ function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonl
       return;
     }
     setAdding(false); setTitle(''); setErr('');
+
+    // 存下了才谈得上「到点提醒你」—— 这是**唯一**该弹系统通知权限的时机:
+    // 用户刚亲手设了一条有时间的提醒,弹窗和他正在做的事对得上。
+    // 开机/回前台那两次重排一律不弹(见 Portal 里那个 effect)。
+    void import('@/lib/portal/reminder-notifications')
+      .then((m) => m.syncReminderNotifications({ askPermission: true }))
+      .then((r) => {
+        // 不吓唬人:排不上只是「到点不会响」,提醒本身一条没丢,列表里就在那儿。
+        // 但也不装作排上了 —— 说清楚,并且说清楚去哪儿开。
+        if (!r.ok && r.reason === 'denied') {
+          setErr(L(dict, '记下了。系统通知没开,到点不会响 —— 想让它响,去「设置 › 通知」里打开。',
+                        'Saved. Notifications are off, so it won\'t ring — turn them on in Settings › Notifications.'));
+        }
+      })
+      .catch(() => {});
   };
 
   const now = Date.now();

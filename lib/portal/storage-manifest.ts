@@ -62,6 +62,12 @@ export const CACHE_KEYS = new Set<string>([
   // localStorage 里可能还躺着这个值,一旦从 CACHE_KEYS 拿掉,keyKind() 的默认值是
   // durable —— 它会立刻开始进备份、上云同步。留着 = 继续当缓存、继续被清掉。
   'nesio-daily-brief-v2',
+  // 提醒 → 系统通知的排程投影(2026-07-31)。判据原句:「换台设备从零开始是否正确?」
+  // —— 正确。iOS 的 pending 通知是**这台设备**的东西,旧手机排过什么和新手机毫无关系;
+  // 真相在 nesio-schedule-reminders-v1 里,新设备回前台自己会重排一遍。
+  'nesio-reminder-notify-state-v1',
+  // HealthKit 自动同步的日期簿记 —— 单设备本地状态,同步过去只会让新设备以为已经拉过。
+  'nesio-healthkit-auto-sync-v1',
   'nesio-calendar-local-v1',
   'nesio-last-location-v1',
   'nesio-telemetry-device-v1',

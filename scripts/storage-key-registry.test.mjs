@@ -156,6 +156,11 @@ const KNOWN_KEYS = new Map([
   // 用户自己敲进去的提醒(家务/账单 due)。换台设备后从头开始**不正确** —— 那是他
   // 亲手写下的东西,丢了就是丢了,所以 durable。
   ["nesio-schedule-reminders-v1", "durable"],
+  // 提醒 → 系统通知的排程投影。cache:换台设备从零开始是**对的** ——
+  // 排程是设备本地的东西,真相在 nesio-schedule-reminders-v1 里,这只是它的影子。
+  ["nesio-reminder-notify-state-v1", "cache"],
+  // HealthKit 自动同步的「今天拉过了」簿记。cache:换设备重拉一次是对的。
+  ["nesio-healthkit-auto-sync-v1", "cache"],
   // 邮件里认出的「安排」我处理过没有(加进日程了 / 不用了)。「不用了」是一个决定 ——
   // 在手机上按掉的建议换到电脑上又冒出来,等于这个决定没被记住,所以 durable。
   ["nesio-mail-suggest-v1", "durable"],
