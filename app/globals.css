@@ -9911,6 +9911,37 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--portal-accent) 26%, transparent);
 }
 
+/* 「正在听」——三根跳动的竖条(用户实测 2026-07-31 图5:录音时符号必须变)。
+   动的东西才代表「正在进行」;静态图标换个颜色说不清「现在」这件事。 */
+.nesio-mic-wave {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 15px;
+}
+.nesio-mic-wave i {
+  display: block;
+  width: 2.5px;
+  border-radius: 2px;
+  background: currentColor;
+  height: 5px;
+  animation: nesio-mic-wave 0.9s ease-in-out infinite;
+}
+.nesio-mic-wave i:nth-child(2) { animation-delay: 0.15s; }
+.nesio-mic-wave i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes nesio-mic-wave {
+  0%, 100% { height: 5px; }
+  50% { height: 14px; }
+}
+/* 关掉动效的人也得看得出在不在听 —— 静止时保持高低错落的形状,
+   跟那枚话筒明显不是同一个东西。「减少动效」不等于「不给状态」。 */
+@media (prefers-reduced-motion: reduce) {
+  .nesio-mic-wave i { animation: none; height: 13px; }
+  .nesio-mic-wave i:nth-child(1) { height: 7px; }
+  .nesio-mic-wave i:nth-child(3) { height: 9px; }
+}
+
 /* 批次 136·情绪趋势(柱高=能量 / 柱色=心情 + 念念一句 + 情绪分布 + 周/月/年) */
 .nesio-trend-card { max-height: 88vh; overflow-y: auto; }
 .nesio-trend-header { display: flex; align-items: center; gap: 0.4rem; margin-bottom: 0.9rem; }
@@ -11552,12 +11583,21 @@ html[data-portal-theme="night"] .nesio-wechat-mode-btn { color: #b9d0f0; }
   color: var(--portal-muted);
   font-size: 0.85rem;
   cursor: pointer;
-  padding: 0.2rem 0.3rem;
+  /* 触摸区拉到 44px(--tap-min)。0.2rem 的内边距在手机上是个约 20px 的靶子,
+     指腹按下去一半在外面 —— 那正是「按了没反应」最朴素的一种成因。
+     负 margin 抵掉视觉位移:靶子变大,✕ 看起来还在原处。 */
+  min-width: var(--tap-min, 44px);
+  min-height: var(--tap-min, 44px);
+  margin: -0.5rem -0.5rem 0 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0.6;
   border-radius: 6px;
   line-height: 1;
 }
-.nesio-proactive-card-text { padding-right: 1.4rem; }
+/* 让出 ✕ 那一块,标题不被压在按钮底下 */
+.nesio-proactive-card-text { padding-right: 2.2rem; }
 .nesio-proactive-card-dismiss:hover { opacity: 1; background: rgba(0,0,0,.05); }
 
 .nesio-proactive-card-actions {
@@ -13072,7 +13112,16 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
   font-size: 0.78rem;
   color: var(--portal-muted);
   margin: 0;
+  /* 长串无空格的文本(网址、路径、订单号)必须能在任意处断行 ——
+     不断的话它会一路顶出屏幕右边(用户实测 图4)。normal 的 word-break
+     只在空格处断,而这类字符串**一个空格都没有**。 */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
 }
+/* 标题同理:一条从外部同步进来的日程,标题里塞一串 ID 是常态。 */
+.nesio-collapsed-title,
+.nesio-collapsed-kicker { overflow-wrap: anywhere; }
 .nesio-collapsed-link,
 .nesio-collapsed-record-btn,
 .nesio-collapsed-focus-btn {

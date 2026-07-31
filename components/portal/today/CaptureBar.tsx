@@ -169,11 +169,28 @@ export default function CaptureBar(capture: CaptureBarProps) {
           ) : (
             <button
               type="button"
-              className="nesio-tl-capture-mic"
-              aria-label={capture.recording ? L(dict, '说完了,点击保存', 'Done — tap to save') : L(dict, '说一句', 'Say something')}
+              className={`nesio-tl-capture-mic${capture.recording ? ' is-listening' : ''}`}
+              aria-label={capture.recording ? L(dict, '正在听,点一下停下来', 'Listening — tap to stop') : L(dict, '说一句', 'Say something')}
+              aria-pressed={capture.recording}
               onClick={capture.onMic}
             >
-              <IconMic size={15} />
+              {/*
+               * 录音中换符号(2026-07-31,用户实测 图5:「开始录音的话,符号应该改变」)。
+               *
+               * 原来不管在不在听都是同一枚话筒 —— 屏幕上唯一的线索是顶部系统那颗
+               * 橙点(还得你正好看见)。于是「它到底在不在听」只能靠猜,
+               * 而猜错的代价是对着手机说完一整句,发现一个字都没进去。
+               *
+               * 听的时候给三根跳动的竖条(和一个「停」的语义):动的东西才代表在进行中,
+               * 静态图标换个颜色说不清「现在」这件事。
+               */}
+              {capture.recording ? (
+                <span className="nesio-mic-wave" aria-hidden>
+                  <i /><i /><i />
+                </span>
+              ) : (
+                <IconMic size={15} />
+              )}
             </button>
           )}
         </div>

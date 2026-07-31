@@ -629,9 +629,17 @@ export default function TodayFeed({
             window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: q } }));
           }}
           onAsk={(q) => {
-            // 专用事件名:nesio-open-voice 被 test:today-settings-bug3 禁止出现在这个文件里
-            // (用户标注过「点话筒不该跳说一说」)。那条保护是对的,不为省事去放宽它。
-            window.dispatchEvent(new CustomEvent('nesio-open-ask', { detail: { text: q } }));
+            /*
+             * 2026-07-31(用户实测 图3:「点击问念念,应该直接进入问一问而不是搜索对话」)。
+             *
+             * 原来派的是 nesio-open-ask → 那开的是**语音 sheet 的 ask 形态**:
+             * 一次性问答,回一段摘要 + 一列「来源线索」。那是检索,不是对话 ——
+             * 你没法接着追问一句,回来还得重新问一遍。用户管它叫「搜索对话」,准确。
+             *
+             * 真正的问一问是 NesioChatSheet(多轮、有历史)。它已经有一条现成的入口:
+             * nesio-ask-text(阅读器划词「问念念」走的就是这条),所以复用它,不新造事件。
+             */
+            window.dispatchEvent(new CustomEvent('nesio-ask-text', { detail: { text: q, send: true } }));
           }}
           onRemind={(at, title, repeat) => {
             const r = addReminder({ title, at, kind: 'other', ...(repeat || {}) });

@@ -458,10 +458,15 @@ export default function Portal() {
   // 阅读器划词「问念念」→ 开聊天并把选中文作为引用喂进输入框(仿 ask-image)
   useEffect(() => {
     const onAskText = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { text?: string };
+      const detail = (e as CustomEvent).detail as { text?: string; send?: boolean };
       const text = (detail?.text || '').trim();
       if (!text) return;
-      try { sessionStorage.setItem('nesio-pending-ask-text', text); } catch { /* ignore */ }
+      // send:true = 这句话本身就是问题(首页输入条点「问念念」),开页即发,不再让人按一次;
+      // 不带 send = 划词引用,预填等用户补问题。两种意图存在同一个信封里,由 sheet 分流。
+      try {
+        sessionStorage.setItem('nesio-pending-ask-text', JSON.stringify({ text, send: detail?.send === true }));
+      } catch { /* ignore */ }
+      setInsightsOpen(false);   // 浮层不关会盖住聊天页 —— 仓里「表面死按钮」的老根因
       setChatOpen(true);
     };
     window.addEventListener('nesio-ask-text', onAskText);

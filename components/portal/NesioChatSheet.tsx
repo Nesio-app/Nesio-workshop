@@ -659,19 +659,6 @@ export default function NesioChatSheet({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-  // 阅读器划词「问念念」→ 把引用预填进输入框(不自动发送,等用户补问题)
-  useEffect(() => {
-    if (!open) return;
-    let quote = '';
-    try {
-      quote = sessionStorage.getItem('nesio-pending-ask-text') || '';
-      if (quote) sessionStorage.removeItem('nesio-pending-ask-text');
-    } catch { /* ignore */ }
-    if (!quote) return;
-    const snippet = quote.length > 120 ? `${quote.slice(0, 120)}…` : quote;
-    setInput(L(dict, `关于「${snippet}」，`, `About “${snippet}”, `));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
   // Opportunistically refresh device location so 问一问 knows where the user is.
   useEffect(() => { if (open) void refreshLocation(); }, [open]);
   useEffect(() => {
@@ -839,6 +826,39 @@ Edit location/value anytime in Storage.`),
     setSending(false);
     sendingRef.current = false;
   }, [messages]);
+
+  /**
+   * 带进来的那句话(nesio-ask-text)。**两种来源,两种处理** ——
+   *
+   *   · 阅读器划词:那是一段**引用**,用户还没提问。预填成「关于「…」，」等他补,
+   *     直接发出去只会让念念对着一段原文干瞪眼。
+   *   · 首页输入条点「问念念」(2026-07-31 图3):那**整句就是问题**,用户已经打完了。
+   *     再让他在另一个框里按一次发送,就是他上一轮说的「不想跳转」——
+   *     换个地方重来一遍,不算一步到位。
+   *
+   * 放在 sendMessage 之后:effect 里要调它。挪位置比留在原地绕一层 ref 干净。
+   */
+  useEffect(() => {
+    if (!open) return;
+    let raw = '';
+    try {
+      raw = sessionStorage.getItem('nesio-pending-ask-text') || '';
+      if (raw) sessionStorage.removeItem('nesio-pending-ask-text');
+    } catch { /* ignore */ }
+    if (!raw) return;
+    let text = raw;
+    let autoSend = false;
+    try {
+      const parsed = JSON.parse(raw) as { text?: string; send?: boolean };
+      if (parsed && typeof parsed.text === 'string') { text = parsed.text; autoSend = parsed.send === true; }
+    } catch { /* 老格式是裸字符串,当引用处理 */ }
+    text = text.trim();
+    if (!text) return;
+    if (autoSend) { void sendMessage(text); return; }
+    const snippet = text.length > 120 ? `${text.slice(0, 120)}…` : text;
+    setInput(L(dict, `关于「${snippet}」，`, `About “${snippet}”, `));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // 批次 68:行程确认卡 → 真正落库(带日期的自动进今日聚焦/引导卡;航班等类型由词典自动识别)
   function savePlanItems(msg: UiMessage) {

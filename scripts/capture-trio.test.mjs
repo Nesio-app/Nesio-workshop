@@ -261,11 +261,18 @@ assert.ok(
   'CaptureBar 不该自己算搜索结果 —— 双实现迟早漂移',
 );
 
-/* ── ⑦ 问念念要把打好的那句带过去 ───────────────────────────────────────── */
+/* ── ⑦ 问念念 = 真进对话页,而且话已经发出去了 ───────────────────────────── */
 
+/*
+ * 2026-07-31 前提更新(用户实测 图3:「点击问念念,应该直接进入问一问而不是搜索对话」)。
+ *
+ * 上一版派 nesio-open-ask → 开的是**语音 sheet 的 ask 形态**:一次性问答,
+ * 回一段摘要 + 一列「来源线索」。那是检索,不是对话 —— 追问一句就得从头再问。
+ * 现在改走 nesio-ask-text → NesioChatSheet(多轮、有历史),复用阅读器划词那条现成入口。
+ */
 assert.ok(
-  /nesio-open-ask'[\s\S]{0,80}detail: \{ text: q \}/.test(feed),
-  '「问念念」要带上已经打好的文字',
+  /nesio-ask-text'[\s\S]{0,120}detail: \{ text: q, send: true \}/.test(feed),
+  '「问念念」要进真对话页,并且带上已经打好的那句 + send:true(打完了还要再按一次发送,就不叫一步到位)',
 );
 // 用**专用事件名**,不复用 nesio-open-voice —— 那个名字被 test:today-settings-bug3
 // 明令禁止出现在 TodayFeed 里(用户标注过:点话筒不该跳「说一说」)。
@@ -274,22 +281,34 @@ assert.ok(
   '不许在 TodayFeed 里派 nesio-open-voice —— 会撞上一条用户明确要求的保护',
 );
 assert.ok(
-  /const askHandler = \(e: Event\) => \{[\s\S]{0,300}setVoiceIntent\('ask'\);[\s\S]{0,200}setVoiceSeed\(typeof d\?\.text === 'string' \? d\.text : ''\)/.test(portal),
-  'Portal 要把事件里的文字接住 —— 接不住的话「带过去」就是空话',
+  /const onAskText = \(e: Event\) => \{[\s\S]{0,600}JSON\.stringify\(\{ text, send: detail\?\.send === true \}\)[\s\S]{0,200}setChatOpen\(true\)/.test(portal),
+  'Portal 要把 text 和 send 一起接住并开对话页 —— 只接 text 的话「话已发出」就丢了',
 );
 assert.ok(
-  /addEventListener\('nesio-open-ask', askHandler\)/.test(portal)
-  && /removeEventListener\('nesio-open-ask', askHandler\)/.test(portal),
-  '事件要登记也要注销 —— 只加不撤会在每次重挂时叠一层监听',
+  /setInsightsOpen\(false\);\s*\/\/ 浮层不关会盖住聊天页/.test(portal),
+  '开对话页前要先关洞察浮层 —— 仓里「表面死按钮」的老根因就是浮层盖住了新开的页',
 );
-assert.ok(
-  /if \(seedText\) setText\(seedText\);/.test(sheet),
-  '问一问那张 sheet 打开时要预填 —— 让人在另一个框里重打一遍是最没道理的一种「重来」',
-);
-assert.ok(
-  /setVoiceSeed\(''\)/.test(portal),
-  '关掉之后要把种子清掉,否则下次打开会带上上一次的话',
-);
+{
+  const chat = read('components/portal/NesioChatSheet.tsx');
+  // **这次改动最容易搞坏的地方**:阅读器划词带来的是一段引用(用户还没提问),
+  // 直接发出去等于把一段原文丢给念念让它干瞪眼。两种来源必须分流,不能一刀切成自动发。
+  assert.ok(
+    /if \(autoSend\) \{ void sendMessage\(text\); return; \}/.test(chat),
+    'send:true 要真的发出去,不是只填进输入框',
+  );
+  assert.ok(
+    /setInput\(L\(dict, `关于「\$\{snippet\}」，`/.test(chat),
+    '不带 send 的(阅读器划词)仍要预填成引用等用户补问题 —— 一刀切成自动发会把划词那条路弄坏',
+  );
+  assert.ok(
+    /JSON\.parse\(raw\)[\s\S]{0,240}catch \{ \/\* 老格式是裸字符串,当引用处理 \*\/ \}/.test(chat),
+    '解析要兜住老格式的裸字符串 —— 会话里可能还躺着改版前写进去的那一条',
+  );
+  assert.ok(
+    /sessionStorage\.removeItem\('nesio-pending-ask-text'\)/.test(chat),
+    '读完要清掉,否则下次打开对话页会把上一次那句再发一遍',
+  );
+}
 
 /* ── ⑧ 给人看的时刻写法 ─────────────────────────────────────────────────── */
 
