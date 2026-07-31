@@ -593,8 +593,10 @@ body {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: calc(0.65rem + env(safe-area-inset-top)) 1rem
+  padding: calc(0.65rem + env(safe-area-inset-top)) 0
     calc(1rem + env(safe-area-inset-bottom));
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
   display: flex;
   flex-direction: column;
 }
@@ -18967,7 +18969,11 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
   border-radius: 1.1rem 1.1rem 0 0;
   border-top: 1px solid var(--portal-line);
   max-height: 88lvh;
-  padding: 0.5rem 1rem calc(env(safe-area-inset-bottom, 0px) + var(--kb-inset, 0px) + 0.9rem);
+  padding: 0.5rem 0 calc(env(safe-area-inset-bottom, 0px) + var(--kb-inset, 0px) + 0.9rem);
+  /* 左右走 --page-gutter + safe-area(2026-07-31)。这一处覆盖**所有**走原语的弹出件 ——
+     此前是写死的 1rem:留边够,但横屏/刘海机上那一侧安全区比它宽,内容照样钻挖孔底下。 */
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
 }
 .nesio-sheet-grabber {
   width: 2.2rem;
@@ -19015,7 +19021,9 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
   transform: translate(-50%, -50%);
   border-radius: var(--radius-md, 16px);
   border: 1px solid var(--portal-line);
-  padding: 1.1rem 1.15rem calc(env(safe-area-inset-bottom, 0px) + 1.1rem);
+  padding: 1.1rem 0 calc(env(safe-area-inset-bottom, 0px) + 1.1rem);
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
   box-shadow: 0 24px 60px rgba(16, 28, 54, 0.22);
 }
 .nesio-sheet--center[data-state='open'] { animation: nesioSheetPop var(--dur, 0.3s) var(--ease-out); }

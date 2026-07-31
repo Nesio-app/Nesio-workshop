@@ -54,6 +54,13 @@ const PAGE_SHELLS = [
   ['.nesio-insights-header', '洞察标题栏 —— 要和它下面的内容对齐在同一条左边线上'],
   ['.nesio-today-scroll', '今天页'],
   ['.nesio-memory-scroll', '记忆页'],
+  ['.portal-main', '设置页'],
+  // 这两条是**弹出件的总闸**:所有走 NesioSheet 原语的 sheet/modal 都吃它们。
+  // 单个 sheet 自己带 card 的(bare)不在这儿,那种由它自己的 card 类负责 ——
+  // 查过一轮:.nesio-settings-sheet-card 1.25rem / .nesio-mood-card 1.1rem /
+  // .nesio-rd-overlay 0.9rem / .nesio-trip-sheet-card space-4,都有。
+  ['.nesio-sheet--bottom:not(.nesio-sheet--bare)', '底部弹出件(原语)'],
+  ['.nesio-sheet--center', '居中弹出件(原语)'],
 ];
 for (const [sel, why] of PAGE_SHELLS) {
   const b = block(sel);
@@ -105,4 +112,4 @@ for (const [sel, why] of PAGE_SHELLS) {
   );
 }
 
-console.log('page-gutter: OK(留边一处定义 / 四个页面壳都用上 / 带 safe-area 自适应 / 旧补丁没长回来)');
+console.log(`page-gutter: OK(留边一处定义 / ${PAGE_SHELLS.length} 个页面壳与弹出件总闸都用上 / 带 safe-area 自适应 / 旧补丁没长回来)`);
