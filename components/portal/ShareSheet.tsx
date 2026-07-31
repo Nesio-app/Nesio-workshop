@@ -405,7 +405,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
                   setAiPayload(null);
                   void analyze(p.type, p.content, p.imageBase64, p.mimeType, true);
                 }}
-                style={{ width: '100%', marginBottom: '0.5rem', background: 'none', border: '1px solid var(--portal-line, rgba(127,127,127,0.25))', borderRadius: 999, padding: '0.5rem', fontSize: '0.82rem', color: 'var(--portal-accent, #588ce3)', cursor: 'pointer' }}
+                style={{ width: '100%', marginBottom: '0.5rem', background: 'none', border: '1px solid var(--portal-line, rgba(127,127,127,0.25))', borderRadius: 999, padding: '0.5rem', fontSize: 'var(--text-sm)', color: 'var(--portal-accent, #588ce3)', cursor: 'pointer' }}
               >
                 {analyzing ? L(dict, 'AI 整理中…', 'AI organizing…') : L(dict, 'AI 整理(识别要点和分类)', 'AI organize (extract key points)')}
               </button>

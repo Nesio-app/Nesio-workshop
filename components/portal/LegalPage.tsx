@@ -32,7 +32,7 @@ export default function LegalPage({ title, updated, intro, sections }: LegalPage
     <div style={{ minHeight: '100dvh', background: 'var(--portal-bg, #f6f8fc)', color: 'var(--portal-ink, #2c2c2c)' }}>
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '2rem 1.25rem 4rem', fontFamily: 'var(--font-sans)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', gap: '1rem' }}>
-          <a href="/" style={{ color: 'var(--portal-accent, #588ce3)', textDecoration: 'none', fontSize: '0.9rem' }}>
+          <a href="/" style={{ color: 'var(--portal-accent, #588ce3)', textDecoration: 'none', fontSize: 'var(--text-body)' }}>
             {i === 0 ? '← 返回 Nesio' : '← Back to Nesio'}
           </a>
           <div style={{ display: 'flex', gap: '0.25rem', fontSize: 'var(--text-sm)' }}>
@@ -50,7 +50,7 @@ export default function LegalPage({ title, updated, intro, sections }: LegalPage
 
         {sections.map((s, idx) => (
           <section key={idx} style={{ marginBottom: '1.75rem' }}>
-            <h2 style={{ fontSize: '1.1rem', fontWeight: 700, margin: '0 0 0.6rem' }}>{s.h[i]}</h2>
+            <h2 style={{ fontSize: 'var(--text-h3)', fontWeight: 700, margin: '0 0 0.6rem' }}>{s.h[i]}</h2>
             {s.body.map((p, j) => {
               const text = p[i];
               const isBullet = text.startsWith('· ');

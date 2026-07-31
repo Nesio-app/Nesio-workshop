@@ -270,7 +270,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
         ))}
       </div>
       {themeSaveIssue && (
-        <p style={{ marginTop: '0.4rem', fontSize: '0.76rem', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
+        <p style={{ marginTop: '0.4rem', fontSize: 'var(--text-xs)', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
       )}
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '字体大小', 'Text size')}<InfoTip text={L(dict, '整体放大界面文字与间距;标准 = 跟随系统设置。', 'Scales the whole UI text & spacing; Standard = follow system.')} /></p>
@@ -291,7 +291,7 @@ export function GeneralSheet({ open, onClose }: SheetProps) {
         value={locale}
         onChange={(e) => pickLang(e.target.value as PortalLocale)}
         aria-label={t(locale, 'sectionLanguage')}
-        style={{ width: '100%', minHeight: 'var(--tap-min)', borderRadius: '0.75rem', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: '0.88rem', padding: '0.55rem 0.75rem', outline: 'none', fontFamily: 'inherit' }}
+        style={{ width: '100%', minHeight: 'var(--tap-min)', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', padding: '0.55rem 0.75rem', outline: 'none', fontFamily: 'inherit' }}
       >
         <optgroup label={t(locale, 'langGroupReady')}>
           {PORTAL_LOCALE_OPTIONS.filter(([code]) => READY_LOCALES.has(code)).map(([code, label]) => (
@@ -379,7 +379,7 @@ export function AppearanceSheet({ open, onClose }: SheetProps) {
         ))}
       </div>
       {themeSaveIssue && (
-        <p style={{ marginTop: '0.4rem', fontSize: '0.76rem', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
+        <p style={{ marginTop: '0.4rem', fontSize: 'var(--text-xs)', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
       )}
 
       <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>
@@ -422,7 +422,7 @@ export function AppearanceSheet({ open, onClose }: SheetProps) {
         value={locale}
         onChange={(e) => pickLang(e.target.value as PortalLocale)}
         aria-label={t(locale, 'sectionLanguage')}
-        style={{ width: '100%', minHeight: 'var(--tap-min)', borderRadius: '0.75rem', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: '0.88rem', padding: '0.55rem 0.75rem', outline: 'none', fontFamily: 'inherit' }}
+        style={{ width: '100%', minHeight: 'var(--tap-min)', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', padding: '0.55rem 0.75rem', outline: 'none', fontFamily: 'inherit' }}
       >
         <optgroup label={t(locale, 'langGroupReady')}>
           {PORTAL_LOCALE_OPTIONS.filter(([code]) => READY_LOCALES.has(code)).map(([code, label]) => (
@@ -840,7 +840,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       <div style={{ display: 'flex', gap: 8, margin: '1.2rem 0 6px' }}>
         {([['drive', L(dict, 'Google 云', 'Google cloud')], ['nesio', L(dict, `Nesio 云${cloudEntitled ? '' : ' · Pro 免费'}`, `Nesio cloud${cloudEntitled ? '' : ' · free with Pro'}`)]] as const).map(([d, label]) => (
           <button key={d} type="button" onClick={() => pickBackupDest(d)}
-            style={{ flex: 1, padding: '0.4rem 0.5rem', borderRadius: 10, fontSize: '0.8rem', cursor: 'pointer',
+            style={{ flex: 1, padding: '0.4rem 0.5rem', borderRadius: 10, fontSize: 'var(--text-sm)', cursor: 'pointer',
               border: `1px solid ${backupDest === d ? 'var(--portal-accent-border)' : 'var(--portal-line)'}`,
               background: backupDest === d ? 'var(--portal-accent-soft-md)' : 'transparent',
               color: backupDest === d ? 'var(--portal-ink)' : 'var(--portal-muted)' }}>
@@ -1089,7 +1089,7 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
             {L(dict, '用「问一问」同一套检索,把今天的安排/提醒写成一段话 + 相关记忆链接 —— 就是上线后每天早晨推给你的那张。', "Runs the same retrieval as Ask to sum up today into one paragraph with memory links — the card you'll get each morning once live.")}
           </span>
         </div>
-        <span className="nesio-settings-option-hint" aria-hidden style={{ fontSize: '1.1rem' }}>›</span>
+        <span className="nesio-settings-option-hint" aria-hidden style={{ fontSize: 'var(--text-h3)' }}>›</span>
       </button>
 
       {/* 2026-07-29:配色色卡搬到「外观与语言」。
@@ -1116,7 +1116,7 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
                   type="button"
                   onClick={() => setModuleOverride(m.id, val)}
                   style={{
-                    flex: 1, padding: '0.3rem 0', fontSize: '0.72rem', borderRadius: 'var(--radius-sm)',
+                    flex: 1, padding: '0.3rem 0', fontSize: 'var(--text-xs)', borderRadius: 'var(--radius-sm)',
                     border: '0.5px solid var(--portal-border)',
                     background: cur === val ? 'var(--portal-accent-soft)' : 'transparent',
                     color: cur === val ? 'var(--portal-accent, var(--portal-fg))' : 'var(--portal-muted)',
@@ -1127,7 +1127,7 @@ export function LabSheet({ open, onClose, onOpenPreview }: SheetProps & { onOpen
               const defOn = defaultResolvesTo(m.id, m.defaultOn); // labOn 变化触发重渲,这里即时反映
               return (
                 <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: '0 0 0.4rem' }}>
-                  <span style={{ flex: 1, fontSize: '0.82rem', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                  <span style={{ flex: 1, fontSize: 'var(--text-sm)', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
                     {dict === 'en' ? m.en : m.zh}
                     {followsLab(m.id) && (
                       <span style={{ fontSize: '0.6rem', color: 'var(--portal-muted)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-pill)', padding: '0 0.35rem' }}>
@@ -1301,7 +1301,7 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
       )}
 
       {isPaidPro ? (
-        <div style={{ marginTop: '1.2rem', padding: '0.9rem 1rem', borderRadius: 12, textAlign: 'center', background: 'var(--portal-card, #fff)', border: '1px solid var(--status-gentle, #6cbf84)' }}>
+        <div style={{ marginTop: '1.2rem', padding: '0.9rem 1rem', borderRadius: 'var(--radius-sm)', textAlign: 'center', background: 'var(--portal-card, #fff)', border: '1px solid var(--status-gentle, #6cbf84)' }}>
           <p style={{ fontWeight: 600, margin: 0, color: 'var(--status-gentle, #4a9d63)' }}>{L(dict, '✓ 你已是 Pro 会员', "✓ You're a Pro member")}</p>
           <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: '0.35rem 0 0' }}>{L(dict, '订阅生效中,感谢支持。可在支付渠道管理或取消。', 'Subscription active — thank you. Manage or cancel via your payment provider.')}</p>
         </div>
@@ -1316,11 +1316,11 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
         </p>
       )}
       {billingError && (
-        <p style={{ fontSize: '0.72rem', color: 'var(--status-risk, #d9534f)', textAlign: 'center', marginTop: '0.5rem', wordBreak: 'break-word' }}>
+        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--status-risk, #d9534f)', textAlign: 'center', marginTop: '0.5rem', wordBreak: 'break-word' }}>
           {L(dict, '支付未能发起:', 'Checkout failed: ')}{billingError}
         </p>
       )}
-      <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '0.8rem' }}>
+      <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '0.8rem' }}>
         {L(dict, '付费随 App 版内购开放,价格以内购页为准。', 'Purchases open with the App Store version; in-app prices apply.')}
         <br />
         <a href="/terms" style={{ color: 'inherit' }}>{L(dict, '服务条款(含自动续费说明)', 'Terms (incl. auto-renewal)')}</a>
@@ -1388,7 +1388,7 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
   const tierLabel = getTier() === 'pro'
     ? (days > 0 ? L(dict, `试用中 · 剩 ${days} 天`, `Trial · ${days}d left`) : 'Pro')
     : L(dict, '免费版', 'Free');
-  const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.7rem 0', borderBottom: '1px solid var(--portal-line)', fontSize: '0.9rem' };
+  const rowStyle: React.CSSProperties = { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.7rem 0', borderBottom: '1px solid var(--portal-line)', fontSize: 'var(--text-body)' };
 
   return (
     <SheetWrap open={open} onClose={onClose} title={L(dict, '账户', 'Account')}>
@@ -1421,7 +1421,7 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
       {!loggedIn ? (
         <>
           <p className="nesio-settings-section-label" style={{ marginTop: '1.25rem' }}>{L(dict, '账户', 'Account')}</p>
-          <p style={{ fontSize: '0.88rem', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
+          <p style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
             {L(dict, '还没登录。登录后可跨设备同步、连接邮箱/日历。', 'Not signed in. Sign in to sync across devices and connect email/calendar.')}
           </p>
           <a href="/login" className="nesio-ob-primary-btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: '0.8rem' }}>
@@ -1441,7 +1441,7 @@ export function AccountSheet({ open, onClose, onOpenMembership, onPickAvatar }: 
           {/* 随 App 版 StoreKit 开放;disabled={true} 满足 no-inert-buttons 契约的显式禁用标注 */}
           <button type="button" disabled={true} style={{ ...rowStyle, width: '100%', background: 'none', border: 'none', color: 'var(--portal-muted)', cursor: 'default', textAlign: 'left' }}>
             <span>{L(dict, '恢复购买', 'Restore purchase')}</span>
-            <span style={{ fontSize: '0.72rem' }}>{L(dict, '随 App 版开放', 'Coming with the App Store version')}</span>
+            <span style={{ fontSize: 'var(--text-xs)' }}>{L(dict, '随 App 版开放', 'Coming with the App Store version')}</span>
           </button>
 
           {/* 图1b:改密码移到登录/忘记密码流程,账户页不再放。删除账号入口在「数据与隐私」。 */}

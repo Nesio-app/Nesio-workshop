@@ -500,7 +500,7 @@ function NumberStepper({ value, onChange, unit }: { value: string; onChange: (v:
       ) : (
         <button type="button" onClick={() => setEditing(true)}
           style={{ minWidth: '5.5rem', minHeight: 'var(--tap-min)', border: 'none', background: 'none', cursor: 'text', fontSize: 'var(--text-h2)', fontWeight: 700, color: value === '' ? 'var(--portal-muted)' : 'var(--portal-ink)' }}>
-          {value === '' ? '0' : value}{unit ? <span style={{ fontSize: '0.7rem', fontWeight: 500, color: 'var(--portal-muted)', marginLeft: 3 }}>{unit}</span> : null}
+          {value === '' ? '0' : value}{unit ? <span style={{ fontSize: 'var(--text-overline)', fontWeight: 500, color: 'var(--portal-muted)', marginLeft: 3 }}>{unit}</span> : null}
         </button>
       )}
       <button type="button" aria-label={L(dict, '增加', 'Increase')}

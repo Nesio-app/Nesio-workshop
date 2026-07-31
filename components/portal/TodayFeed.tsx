@@ -455,7 +455,7 @@ export default function TodayFeed({
 
         {/* 云端往本机填过数据时的一次性回执(QA:积分 0→150 像被人乱改)。读一次即清。 */}
         {restoreNote && (
-          <p style={{ margin: '0 0 0.6rem', fontSize: '0.72rem', lineHeight: 1.6, color: 'var(--portal-muted)' }}>
+          <p style={{ margin: '0 0 0.6rem', fontSize: 'var(--text-xs)', lineHeight: 1.6, color: 'var(--portal-muted)' }}>
             {restoreNote}
           </p>
         )}

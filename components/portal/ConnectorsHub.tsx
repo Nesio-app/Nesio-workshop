@@ -1491,7 +1491,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         <p className="nesio-settings-sheet-desc">{L(dict, '连接外部信号源，让 Today Feed 出现真实数据驱动的建议。', 'Connect outside signals so Today runs on real data.')}</p>
 
         {toast && (
-          <div style={{ background: toast.ok ? 'var(--status-go-soft)' : 'var(--status-risk-soft)', border: `1px solid ${toast.ok ? 'var(--status-go)' : 'var(--status-risk)'}`, borderRadius: '0.75rem', padding: '0.65rem 0.85rem', marginBottom: '0.75rem', fontSize: '0.8rem', color: toast.ok ? 'var(--status-go)' : 'var(--status-risk)' }}>
+          <div style={{ background: toast.ok ? 'var(--status-go-soft)' : 'var(--status-risk-soft)', border: `1px solid ${toast.ok ? 'var(--status-go)' : 'var(--status-risk)'}`, borderRadius: 'var(--radius-sm)', padding: '0.65rem 0.85rem', marginBottom: '0.75rem', fontSize: 'var(--text-sm)', color: toast.ok ? 'var(--status-go)' : 'var(--status-risk)' }}>
             {toast.ok ? '✓ ' : ''}{toast.msg}
           </div>
         )}
@@ -1499,7 +1499,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         {/* 多银行连续连接:连好一家后就地问要不要再连一家(不用跳回设置页重新找入口)。 */}
         {plaidChain && (
           <div style={{ background: 'var(--portal-accent-soft)', border: '1px solid var(--portal-accent-border)', borderRadius: 'var(--radius-md)', padding: '0.7rem 0.85rem', marginBottom: '0.75rem' }}>
-            <p style={{ margin: '0 0 0.5rem', fontSize: '0.82rem', color: 'var(--portal-ink)' }}>
+            <p style={{ margin: '0 0 0.5rem', fontSize: 'var(--text-sm)', color: 'var(--portal-ink)' }}>
               {L(dict, `已连接 ${plaidChain.count} 家银行。还有别的银行要连吗?`, `${plaidChain.count} bank(s) linked. Add another?`)}
             </p>
             <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -1508,7 +1508,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                 {L(dict, '＋ 再连一家', '＋ Add another')}
               </button>
               <button type="button"
-                style={{ flex: 1, borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: '0.82rem' }}
+                style={{ flex: 1, borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)' }}
                 onClick={() => setPlaidChain(null)}>
                 {L(dict, '连好了', 'All done')}
               </button>
@@ -1559,7 +1559,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                   </div>
 
                   {c.comingSoon ? (
-                    <span style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', flexShrink: 0 }}>{L(dict, '敬请期待', 'Stay tuned')}</span>
+                    <span style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', flexShrink: 0 }}>{L(dict, '敬请期待', 'Stay tuned')}</span>
                   ) : c.method === 'shortcuts' ? (
                     <button type="button" className="nesio-connector-connect" onClick={() => setShortcutsFor(shortcutsFor === c.id ? null : c.id)} style={{ flexShrink: 0 }}>
                       {shortcutsFor === c.id ? L(dict, '收起', 'Collapse') : L(dict, '设置', 'Set up')}
@@ -1623,15 +1623,15 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                           href="https://www.notion.so/my-integrations"
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ display: 'inline-block', marginBottom: '0.5rem', fontSize: '0.74rem', fontWeight: 600, color: 'var(--portal-blue-deep)', textDecoration: 'underline' }}
+                          style={{ display: 'inline-block', marginBottom: '0.5rem', fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--portal-blue-deep)', textDecoration: 'underline' }}
                         >
                           {L(dict, '或粘贴 token:打开 notion.so/my-integrations →', 'Or paste a token: open notion.so/my-integrations →')}
                         </a>
                       </>
                     )}
-                    <p style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', marginBottom: '0.5rem', lineHeight: 1.5 }}>{dict === 'en' ? (c.tokenHintEn ?? c.tokenHint) : c.tokenHint}</p>
+                    <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginBottom: '0.5rem', lineHeight: 1.5 }}>{dict === 'en' ? (c.tokenHintEn ?? c.tokenHint) : c.tokenHint}</p>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
-                      <input className="nesio-ob-input" style={{ marginBottom: 0, flex: 1, fontSize: '0.8rem' }} type="password" placeholder={L(dict, '粘贴 Token…', 'Paste token…')} value={tokenValue} onChange={(e) => setTokenValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitToken(c); }} autoFocus />
+                      <input className="nesio-ob-input" style={{ marginBottom: 0, flex: 1, fontSize: 'var(--text-sm)' }} type="password" placeholder={L(dict, '粘贴 Token…', 'Paste token…')} value={tokenValue} onChange={(e) => setTokenValue(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitToken(c); }} autoFocus />
                       <button type="button" className="nesio-connector-connect" onClick={() => submitToken(c)} disabled={!tokenValue.trim()}>{L(dict, '连接', 'Connect')}</button>
                     </div>
                   </div>
@@ -1644,17 +1644,17 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                     <p style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', marginBottom: '0.5rem', lineHeight: 1.5 }}>{L(dict, '勾选后点上面「同步」:会按结构理解 —— 读书这类自动把划线折进书里(一本书=一条记忆),丢掉日历表和技术列。重复同步幂等,删了不会重复。', 'Check tables, then tap Sync above. We read the structure — e.g. highlights fold into their book (one book = one memory), calendar tables and ID columns dropped. Re-syncing is idempotent, no duplicates.')}</p>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', maxHeight: 220, overflowY: 'auto' }}>
                       {notionDbList.map((db) => (
-                        <label key={db.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8rem', color: 'var(--portal-ink)', cursor: 'pointer' }}>
+                        <label key={db.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: 'var(--text-sm)', color: 'var(--portal-ink)', cursor: 'pointer' }}>
                           <input type="checkbox" checked={notionDbSel.includes(db.id)} onChange={() => toggleNotionDb(db.id)} />
                           <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{db.title}</span>
                         </label>
                       ))}
                     </div>
-                    <p style={{ fontSize: '0.66rem', color: 'var(--portal-muted)', marginTop: '0.5rem' }}>{L(dict, `已选 ${notionDbSel.length} 个`, `${notionDbSel.length} selected`)}</p>
+                    <p style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', marginTop: '0.5rem' }}>{L(dict, `已选 ${notionDbSel.length} 个`, `${notionDbSel.length} selected`)}</p>
                     <button
                       type="button"
                       onClick={clearNotionMemories}
-                      style={{ marginTop: '0.6rem', width: '100%', padding: '0.5rem', fontSize: '0.76rem', fontWeight: 600, borderRadius: 'var(--radius-sm, 12px)', border: '1.5px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer' }}
+                      style={{ marginTop: '0.6rem', width: '100%', padding: '0.5rem', fontSize: 'var(--text-xs)', fontWeight: 600, borderRadius: 'var(--radius-sm, 12px)', border: '1.5px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer' }}
                     >
                       {L(dict, '清除已导入的 Notion 记忆(重来)', 'Clear imported Notion memories (start over)')}
                     </button>
@@ -1665,7 +1665,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                 {shortcutsFor === c.id && (
                   <div className="nesio-connector-token-box">
                     <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', fontWeight: 600, marginBottom: '0.4rem' }}>{L(dict, '通过 iOS 快捷指令接入', 'Connect via iOS Shortcuts')}</p>
-                    <ol style={{ fontSize: '0.72rem', color: 'var(--portal-muted)', lineHeight: 1.7, paddingLeft: '1.1rem', marginBottom: '0.6rem' }}>
+                    <ol style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.7, paddingLeft: '1.1rem', marginBottom: '0.6rem' }}>
                       <li>{L(dict, '打开「快捷指令」App，新建快捷指令', 'Open the Shortcuts app and create a new shortcut')}</li>
                       <li>{L(dict, '添加动作「获取 URL 内容」', 'Add the "Get Contents of URL" action')}</li>
                       <li>{L(dict, 'URL 填下方地址，方法选 ', 'Use the URL below, method ')}<strong>POST</strong></li>
@@ -1673,7 +1673,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                       <li>{L(dict, '可设为自动化，定时推送', 'Optionally automate it on a schedule')}</li>
                     </ol>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                      <code style={{ flex: 1, fontSize: 'var(--text-overline)', background: 'rgba(88,140,227,0.08)', padding: '0.4rem 0.6rem', borderRadius: '0.5rem', wordBreak: 'break-all', color: 'var(--portal-ink)' }}>{ingestUrl}</code>
+                      <code style={{ flex: 1, fontSize: 'var(--text-overline)', background: 'rgba(88,140,227,0.08)', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-xs)', wordBreak: 'break-all', color: 'var(--portal-ink)' }}>{ingestUrl}</code>
                       <button type="button" className="nesio-connector-connect" onClick={copyIngestUrl} style={{ flexShrink: 0 }}>{L(dict, '复制', 'Copy')}</button>
                     </div>
                   </div>
@@ -1686,22 +1686,22 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
               合起来还揭示一件事 —— 一个把「回溯>预测」写进公理的 App,导进来的数据
               大部分只有「最近」和「未来」。这是事实,不藏着。 */}
           <details style={{ marginTop: '0.9rem', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', padding: '0.15rem 0.75rem' }}>
-            <summary style={{ cursor: 'pointer', padding: '0.6rem 0', fontSize: '0.82rem', color: 'var(--portal-muted)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <summary style={{ cursor: 'pointer', padding: '0.6rem 0', fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ color: 'var(--portal-ink)', fontWeight: 600 }}>{L(dict, '各接入能拿到多久的数据', 'How far back each source reaches')}</span>
               <span aria-hidden>▾</span>
             </summary>
             <div style={{ paddingBottom: '0.6rem' }}>
               {IMPORT_WINDOWS.map((w) => (
                 <div key={w.source[0]} style={{ padding: '0.45rem 0', borderTop: '1px solid var(--portal-line)' }}>
-                  <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--portal-ink)' }}>
+                  <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-ink)' }}>
                     {L(dict, w.source[0], w.source[1])}
                     {!w.canBackfill && (
-                      <span style={{ marginLeft: 6, fontSize: '0.66rem', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', borderRadius: 999, padding: '0.05rem 0.4rem' }}>
+                      <span style={{ marginLeft: 6, fontSize: 'var(--text-overline)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', borderRadius: 999, padding: '0.05rem 0.4rem' }}>
                         {L(dict, '拿不到更早', 'no earlier data')}
                       </span>
                     )}
                   </p>
-                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.72rem', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
+                  <p style={{ margin: '0.15rem 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
                     {L(dict, w.window[0], w.window[1]).replace(/\*\*/g, '')}
                   </p>
                 </div>
@@ -1711,10 +1711,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
 
           {/* ── 开发中 · 折叠二级(以后慢慢开发的接入不占主列表) ── */}
           <details className="nesio-conn-dev-group" style={{ marginTop: '0.9rem', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)', padding: '0.15rem 0.75rem' }}>
-            <summary style={{ cursor: 'pointer', padding: '0.6rem 0', fontSize: '0.82rem', color: 'var(--portal-muted)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <summary style={{ cursor: 'pointer', padding: '0.6rem 0', fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span>
                 <span style={{ color: 'var(--portal-ink)', fontWeight: 600 }}>{L(dict, '开发中 · 抢先看', 'In development · preview')}</span>
-                <span style={{ marginLeft: 8, fontSize: '0.7rem' }}>{CONNECTORS.filter((c) => c.dev).length} {L(dict, '项在打磨', 'being polished')}</span>
+                <span style={{ marginLeft: 8, fontSize: 'var(--text-overline)' }}>{CONNECTORS.filter((c) => c.dev).length} {L(dict, '项在打磨', 'being polished')}</span>
               </span>
               <span aria-hidden>▾</span>
             </summary>
@@ -1722,7 +1722,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           </details>
 
           {/* 批次 35:三行说明收进一个小信息符号 */}
-          <div style={{ marginTop: '1rem', textAlign: 'center', fontSize: '0.74rem', color: 'var(--portal-muted)' }}>
+          <div style={{ marginTop: '1rem', textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
             {L(dict, '连接方式与数据去向', 'How sources connect & where data lives')}
             <InfoTip text={L(dict,
               '有 API 的(Google 日历+Gmail / Notion / Toggl / Flomo)直接连接;没有公开 API 的(提醒事项 / Keep / 微信读书)通过快捷指令推送。抽取出的记录存在你的设备;连接邮箱/日历/Notion/银行等账号时,授权与数据拉取会经过对应服务商的服务器。',
@@ -1737,7 +1737,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           <div style={{ position: 'relative', width: '100%', maxWidth: 560, maxHeight: '80vh', background: 'var(--glass-bg-solid, #fff)', borderRadius: '1rem 1rem 0 0', display: 'flex', flexDirection: 'column', paddingBottom: 'env(safe-area-inset-bottom)' }}>
             <div style={{ padding: '1rem 1.1rem 0.6rem' }}>
               <p style={{ margin: 0, fontWeight: 700, color: 'var(--portal-ink)' }}>{L(dict, '选择要提炼的会议', 'Pick meetings to distill')}</p>
-              <p style={{ margin: '.25rem 0 0', fontSize: '.76rem', color: 'var(--portal-muted)' }}>{L(dict, '只提炼你勾选的(每次最多 10 场)。灰色=已同步过。', 'Only the ones you check are distilled (max 10). Grey = already synced.')}</p>
+              <p style={{ margin: '.25rem 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '只提炼你勾选的(每次最多 10 场)。灰色=已同步过。', 'Only the ones you check are distilled (max 10). Grey = already synced.')}</p>
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: '0.25rem 1.1rem' }}>
               {granolaList.map((m) => {
@@ -1747,9 +1747,9 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                   <label key={m.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '.6rem', padding: '.55rem 0', borderBottom: '1px solid var(--portal-line)', cursor: 'pointer', opacity: done ? .55 : 1 }}>
                     <input type="checkbox" checked={checked} onChange={(e) => setGranolaSel((prev) => { const n = new Set(prev); if (e.target.checked) n.add(m.id); else n.delete(m.id); return n; })} style={{ marginTop: '.2rem', flexShrink: 0 }} />
                     <span style={{ flex: 1 }}>
-                      <span style={{ display: 'block', fontSize: '.86rem', color: 'var(--portal-ink)' }}>{m.title || L(dict, '(无标题)', '(untitled)')}</span>
+                      <span style={{ display: 'block', fontSize: 'var(--text-sm)', color: 'var(--portal-ink)' }}>{m.title || L(dict, '(无标题)', '(untitled)')}</span>
                       {(m.date || done) && (
-                        <span style={{ fontSize: '.72rem', color: 'var(--portal-muted)' }}>
+                        <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
                           {m.date ? new Date(m.date).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' }) : ''}{done ? L(dict, ' · 已同步', ' · synced') : ''}
                         </span>
                       )}
@@ -1757,7 +1757,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                   </label>
                 );
               })}
-              {!granolaList.length && <p style={{ fontSize: '.8rem', color: 'var(--portal-muted)', padding: '1rem 0' }}>{L(dict, '最近 30 天没有会议', 'No meetings in the last 30 days')}</p>}
+              {!granolaList.length && <p style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', padding: '1rem 0' }}>{L(dict, '最近 30 天没有会议', 'No meetings in the last 30 days')}</p>}
             </div>
             <div style={{ display: 'flex', gap: '.5rem', padding: '.7rem 1.1rem 1rem', borderTop: '1px solid var(--portal-line)' }}>
               <button type="button" className="nesio-connector-disconnect" onClick={() => setGranolaList(null)} style={{ flex: 1 }}>{L(dict, '取消', 'Cancel')}</button>

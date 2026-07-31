@@ -265,7 +265,7 @@ export default function LoginPageClient() {
               type="button"
               onClick={handleEmail}
               disabled={state === 'loading' || !email.trim()}
-              style={{ width: '100%', marginTop: '0.5rem', background: 'none', border: 'none', color: 'var(--portal-muted, #8a94a6)', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ width: '100%', marginTop: '0.5rem', background: 'none', border: 'none', color: 'var(--portal-muted, #8a94a6)', fontSize: 'var(--text-sm)', cursor: 'pointer', textDecoration: 'underline' }}
             >
               {zh ? (tab === 'register' ? '不设密码,用邮件链接注册' : '忘记密码?用邮件链接登录') : (tab === 'register' ? 'No password — sign up with an email link' : 'Forgot password? Sign in with an email link')}
             </button>

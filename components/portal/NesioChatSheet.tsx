@@ -1294,7 +1294,7 @@ Edit location/value anytime in Storage.`),
           <div className="nesio-chat-history-card">
             <p className="nesio-chat-history-title">{L(dict, '历史对话', 'Past chats')}</p>
             {sessions.length === 0 && (
-              <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', margin: '0.5rem 0' }}>{L(dict, '还没有归档的对话。点「新对话」会把当前对话存到这里。', 'No archived chats yet. "New chat" stores the current one here.')}</p>
+              <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: '0.5rem 0' }}>{L(dict, '还没有归档的对话。点「新对话」会把当前对话存到这里。', 'No archived chats yet. "New chat" stores the current one here.')}</p>
             )}
             {sessions.map((s) => (
               <button

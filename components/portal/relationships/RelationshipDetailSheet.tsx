@@ -250,7 +250,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                 {(['core', 'close', 'acquaintance'] as OverrideCloseness[]).map((cl) => (
                   <button key={cl} type="button" aria-pressed={c.closeness === cl}
                     onClick={() => setRelationshipOverride(p.key, { closeness: cl })}
-                    style={{ flex: 1, padding: '0.4rem 0', fontSize: '0.8rem', borderRadius: 'var(--radius-sm, 12px)', border: '1px solid var(--portal-line)', cursor: 'pointer',
+                    style={{ flex: 1, padding: '0.4rem 0', fontSize: 'var(--text-sm)', borderRadius: 'var(--radius-sm, 12px)', border: '1px solid var(--portal-line)', cursor: 'pointer',
                       background: c.closeness === cl ? 'var(--portal-accent-soft-md)' : 'transparent',
                       color: c.closeness === cl ? 'var(--portal-ink)' : 'var(--portal-muted)', fontWeight: c.closeness === cl ? 700 : 500 }}>
                     {L(dict, CLOSENESS_META[cl].zh, CLOSENESS_META[cl].en)}

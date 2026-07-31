@@ -130,7 +130,7 @@ function GlucoseCard({ g, dict }: { g: GlucoseAnalysis; dict: string }) {
         <div style={{ width: `${g.tirPct}%`, background: 'var(--status-go)' }} />
         {g.abovePct > 0 && <div style={{ width: `${g.abovePct}%`, background: 'var(--status-gentle)' }} />}
       </div>
-      <div style={{ display: 'flex', gap: '0.75rem', fontSize: '0.7rem', color: 'var(--portal-muted)', flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: '0.75rem', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', flexWrap: 'wrap' }}>
         <span><b style={{ color: 'var(--status-go)' }}>{g.tirPct}%</b> {L(dict, '达标', 'in range')}</span>
         {g.belowPct > 0 && <span><b style={{ color: 'var(--status-risk)' }}>{g.belowPct}%</b> {L(dict, '偏低', 'low')}</span>}
         {g.abovePct > 0 && <span><b style={{ color: 'var(--status-gentle)' }}>{g.abovePct}%</b> {L(dict, '偏高', 'high')}</span>}
@@ -170,7 +170,7 @@ function ActivityRingsCard({ a, dict }: { a: ActivityRings; dict: string }) {
           const pct = r.goal > 0 ? Math.min(100, Math.round((r.v / r.goal) * 100)) : 0;
           return (
             <div key={r.label[0]}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--portal-muted)', marginBottom: 2 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginBottom: 2 }}>
                 <span>{L(dict, r.label[0], r.label[1])}</span>
                 <span><b style={{ color: r.color }}>{r.v}</b>{r.goal > 0 ? ` / ${r.goal} ${r.unit}` : ` ${r.unit}`}{r.goal > 0 ? ` · ${pct}%` : ''}</span>
               </div>
@@ -201,7 +201,7 @@ function SleepStagesCard({ s, dict }: { s: SleepStages; dict: string }) {
       <div style={{ display: 'flex', height: 10, borderRadius: 5, overflow: 'hidden', margin: '0.5rem 0 0.4rem', background: 'var(--portal-line)' }}>
         {segs.filter((g) => g.v > 0).map((g) => <div key={g.label[0]} style={{ width: `${(g.v / denom) * 100}%`, background: g.color }} />)}
       </div>
-      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.7rem', color: 'var(--portal-muted)' }}>
+      <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>
         {segs.map((g) => (
           <span key={g.label[0]}><span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: g.color, marginRight: 4, verticalAlign: 'middle' }} />{L(dict, g.label[0], g.label[1])} {g.v.toFixed(1)}h</span>
         ))}
@@ -314,12 +314,12 @@ function ClinicalCard({ c, dict }: { c: StoredClinical; dict: string }) {
           <span className="nesio-health-card-label">{L(dict, `化验单 · ${c.labs.length} 项`, `Labs · ${c.labs.length}`)}</span>
           <div style={{ marginTop: '0.4rem', display: 'flex', flexDirection: 'column', gap: '0.3rem' }}>
             {c.labs.slice(0, 20).map((lab, i) => (
-              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', fontSize: '0.74rem' }}>
+              <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '0.5rem', fontSize: 'var(--text-xs)' }}>
                 <span style={{ color: 'var(--portal-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lab.name}</span>
                 <span style={{ flexShrink: 0 }}>
                   <b style={{ color: flagColor(lab.flag) }}>{lab.value}{lab.unit ? ` ${lab.unit}` : ''}</b>
-                  {(lab.low != null || lab.high != null) && <span style={{ color: 'var(--portal-muted)', fontSize: '0.66rem' }}> ({lab.low ?? ''}–{lab.high ?? ''})</span>}
-                  {lab.date && <span style={{ color: 'var(--portal-muted)', fontSize: '0.66rem', marginLeft: 4 }}>{lab.date.slice(2)}</span>}
+                  {(lab.low != null || lab.high != null) && <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-overline)' }}> ({lab.low ?? ''}–{lab.high ?? ''})</span>}
+                  {lab.date && <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-overline)', marginLeft: 4 }}>{lab.date.slice(2)}</span>}
                 </span>
               </div>
             ))}
@@ -329,8 +329,8 @@ function ClinicalCard({ c, dict }: { c: StoredClinical; dict: string }) {
       )}
       {(c.medications.length > 0 || c.conditions.length > 0) && (
         <div className="nesio-health-card" style={{ gridColumn: '1 / -1', marginTop: '0.5rem' }}>
-          {c.conditions.length > 0 && <p style={{ margin: '0 0 0.3rem', fontSize: '0.74rem' }}><span style={{ color: 'var(--portal-muted)' }}>{L(dict, '诊断:', 'Conditions: ')}</span>{c.conditions.slice(0, 12).join(' · ')}</p>}
-          {c.medications.length > 0 && <p style={{ margin: 0, fontSize: '0.74rem' }}><span style={{ color: 'var(--portal-muted)' }}>{L(dict, '用药:', 'Meds: ')}</span>{c.medications.slice(0, 12).join(' · ')}</p>}
+          {c.conditions.length > 0 && <p style={{ margin: '0 0 0.3rem', fontSize: 'var(--text-xs)' }}><span style={{ color: 'var(--portal-muted)' }}>{L(dict, '诊断:', 'Conditions: ')}</span>{c.conditions.slice(0, 12).join(' · ')}</p>}
+          {c.medications.length > 0 && <p style={{ margin: 0, fontSize: 'var(--text-xs)' }}><span style={{ color: 'var(--portal-muted)' }}>{L(dict, '用药:', 'Meds: ')}</span>{c.medications.slice(0, 12).join(' · ')}</p>}
         </div>
       )}
       <p className="nesio-settings-option-hint" style={{ marginTop: '0.4rem' }}>{L(dict, '来自 Apple 健康记录(export_cda)· 仅本机 · 仅 Lab 模式可见', 'From Apple Health Records (export_cda) · on-device · Lab only')}</p>
@@ -351,8 +351,8 @@ function FindingsCard({ data, dict }: { data: HealthMetrics; dict: string }) {
   // 行样式抽成常量:两个来源(指南判定 / 稳飙)必须长得一模一样 —— 标注要的就是「风格一致」,
   // 靠复制粘贴保证不了,下一次改一处就会走形。
   const rowStyle = { display: 'flex', gap: '0.5rem', alignItems: 'baseline', marginBottom: '0.35rem' } as const;
-  const dotStyle = { flexShrink: 0, minWidth: 44, fontSize: '0.62rem', fontWeight: 600 } as const;
-  const srcStyle = { display: 'block', fontSize: '0.62rem', color: 'var(--portal-muted)' } as const;
+  const dotStyle = { flexShrink: 0, minWidth: 44, fontSize: 'var(--text-overline)', fontWeight: 600 } as const;
+  const srcStyle = { display: 'block', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' } as const;
   return (
     <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
       <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '健康提示 · 依据指南', 'Health flags · guideline-based')}</p>
@@ -401,7 +401,7 @@ function RiskCard({ data, dict }: { data: HealthMetrics; dict: string }) {
           <p className="nesio-health-story-line" style={{ margin: 0 }}>
             <span style={{ color: color[s.category], fontWeight: 600 }}>● </span>
             <b>{L(dict, s.label[0], s.label[1])}</b> — <span style={{ color: color[s.category] }}>{s.value}</span>
-            <span style={{ display: 'block', fontSize: '0.62rem', color: 'var(--portal-muted)' }}>{L(dict, s.detail[0], s.detail[1])} · {L(dict, `依据:${s.source}`, `source: ${s.source}`)}</span>
+            <span style={{ display: 'block', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>{L(dict, s.detail[0], s.detail[1])} · {L(dict, `依据:${s.source}`, `source: ${s.source}`)}</span>
           </p>
         </div>
       ))}

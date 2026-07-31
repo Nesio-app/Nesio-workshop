@@ -214,7 +214,7 @@ export function ProactiveGuidanceCard({
             </div>
           )}
           {(feedbackGiven || savedQuote || gestureAck) ? (
-            <p style={{ fontSize: '0.66rem', color: 'var(--status-go)', margin: '0.35rem 0 0' }}>
+            <p style={{ fontSize: 'var(--text-overline)', color: 'var(--status-go)', margin: '0.35rem 0 0' }}>
               {savedQuote ? L(dict, '已存入 Memory', 'Saved to Memory')
                 : gestureAck === 'useful' ? L(dict, '✓ 有用,记住了 —— 会多来点这样的', '✓ Useful, noted — more like this')
                 : gestureAck === 'later' ? L(dict, '好,稍后再提醒你', 'OK — will remind you later')
@@ -228,14 +228,14 @@ export function ProactiveGuidanceCard({
                   <button
                     type="button"
                     onClick={handleSaveQuote}
-                    style={{ fontSize: '0.64rem', color: 'var(--portal-blue-deep)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
+                    style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-blue-deep)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
                   >
                     {L(dict, '存到记忆', 'Save to Memory')}
                   </button>
                   <button
                     type="button"
                     onClick={handleQuoteMute}
-                    style={{ fontSize: '0.64rem', color: 'var(--portal-muted)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
+                    style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textDecoration: 'underline', textUnderlineOffset: 2 }}
                   >
                     {t(locale, 'guidanceFeedbackTooMuch')}
                   </button>

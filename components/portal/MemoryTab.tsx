@@ -1251,13 +1251,13 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
             </p>
           )}
           {nodes.some(isDemoNode) && (
-            <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 12, padding: '0.55rem 0.9rem', margin: '0 0 0.6rem', fontSize: '0.72rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 'var(--radius-sm)', padding: '0.55rem 0.9rem', margin: '0 0 0.6rem', fontSize: 'var(--text-xs)', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>{L(dict, '这些是示例数据,让你看看 Nesio 记东西的样子。', 'Sample data to show how Nesio remembers. ')}<a href="/login" style={{ color: 'inherit', fontWeight: 600 }}>{L(dict, '登录', 'Sign in')}</a>{L(dict, '或直接开始记录,就会换成你自己的。', ' or just start noting — it becomes yours.')}</span>
             </div>
           )}
           {/* 登录后灌入的样例数据(可一键清)—— 与游客只读 demo 分家 */}
           {canUsePrivateData && hasSampleData(nodes) && (
-            <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 12, padding: '0.55rem 0.9rem', margin: '0 0 0.6rem', fontSize: '0.72rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 'var(--radius-sm)', padding: '0.55rem 0.9rem', margin: '0 0 0.6rem', fontSize: 'var(--text-xs)', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <span>{L(dict, '这些是样例,帮你先看看各功能的样子。', 'These are samples — a peek at what each feature looks like.')}</span>
               <button
                 type="button"
