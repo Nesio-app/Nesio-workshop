@@ -321,6 +321,10 @@ function CareSection({ assetId, records, people, dict }: {
   // 附件(合同/发票/维修单):压过再落 IndexedDB,这里只留 assetId。
   const [files, setFiles] = useState<string[]>([]);
   const [upErr, setUpErr] = useState('');
+  /** 端上从单据上读出来的那句(不是错误 —— 单据已经附上了)。 */
+  const [scanHint, setScanHint] = useState('');
+  /** 票面日期和「日期」框不一致时的那个值。非空才显示「改成这天」。 */
+  const [scanDate, setScanDate] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function pickFiles(list: FileList | null) {
@@ -338,6 +342,32 @@ function CareSection({ assetId, records, people, dict }: {
       }
     }
     if (added.length) setFiles((cur) => [...cur, ...added]);
+
+    // ── 在这台设备上把单据读一遍 ──────────────────────────────────────────
+    //
+    // 这个按钮写的是「附一张单据」—— 合同、发票、维修单。以前它**只存**:
+    // 单子挂上去了,可旁边那个「花了多少」还得自己照着抄一遍。
+    // 金额和日期就印在图上,认一下就有,没有让人重打的道理。
+    //
+    // 只填**空着的**框:用户已经打了数字就不动 —— 他看到的东西比这张图全。
+    // 发票上是税号和金额,这一步只在本机做,图不出手机。
+    const first = Array.from(list)[0];
+    if (first?.type.startsWith('image/')) {
+      const { understandImage } = await import('@/lib/portal/image-understand');
+      const seen = await understandImage(first);
+      if (seen.fields) {
+        const f = seen.fields;
+        if (!amount.trim()) setAmount(String(f.amount));
+        // 日期框开局就是今天(是个真值,不是空),所以**不自动盖** —— 只在票面日期
+        // 和框里不一样时给个按钮让人自己换。替人改日期改错了,后面对账全乱。
+        const offDate = f.date && f.date !== date ? f.date : '';
+        setScanDate(offDate);
+        setScanHint(L(dict, `单据上读到 ${f.amount}${f.date ? ` · ${f.date}` : ''} —— 金额填进去了,不对就改。`,
+          `Read ${f.amount}${f.date ? ` · ${f.date}` : ''} off the document — amount filled in; change it if it's wrong.`));
+      } else if (seen.visionMessage) {
+        setScanHint(seen.visionMessage);
+      }
+    }
   }
 
   function submit() {
@@ -403,6 +433,16 @@ function CareSection({ assetId, records, people, dict }: {
             {files.length ? L(dict, `已附 ${files.length} 张 · 再加一张`, `${files.length} attached · add more`) : L(dict, '+ 附一张单据', '+ Attach a document')}
           </button>
           {upErr && <p className="nesio-settings-option-hint" style={{ margin: 0, color: 'var(--status-risk)' }}>{upErr}</p>}
+          {scanHint && (
+            <p className="nesio-assets-scanhint">
+              {scanHint}
+              {scanDate && (
+                <button type="button" className="nesio-assets-link" onClick={() => { setDate(scanDate); setScanDate(''); }}>
+                  {L(dict, `日期改成 ${scanDate}`, `Use ${scanDate}`)}
+                </button>
+              )}
+            </p>
+          )}
           {kind !== 'tax' && (
             <input className="nesio-assets-input" value={every} onChange={(e) => setEvery(e.target.value)}
               inputMode="numeric" placeholder={L(dict, '多久做一次(月;空=一次性)', 'Every N months (blank = one-off)')} />

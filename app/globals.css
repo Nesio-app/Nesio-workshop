@@ -9270,6 +9270,19 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
   font-weight: var(--weight-regular);
 }
 
+/* 端上读出来的结果:一句「图没出过门」。用 status-go 而不是灰字 ——
+   这是个**好消息**(隐私没被牺牲),不是一条免责声明。 */
+.nesio-camera-local-note {
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--status-go);
+  background: var(--status-go-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-2);
+  font-weight: var(--weight-regular);
+}
+
 /* 识别动作行:自己一行,横向可滚(四个 chip 在窄屏上不再换行挤压说明文字) */
 .nesio-camera-result-actions {
   display: flex;
@@ -21206,4 +21219,45 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   color: var(--portal-ink);
   font-size: var(--text-xs);
   line-height: 1.6;
+}
+
+/* 财务·挂发票后端上读出来的那句(2026-07-31)。
+   对得上走 status-go,对不上走 status-gentle 而不是 status-risk ——
+   金额差多半是含税前后,不是出事了。红色留给真风险。 */
+.nesio-fin-scannote {
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--status-go);
+  background: var(--status-go-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0 0;
+}
+.nesio-fin-scannote.is-off {
+  color: var(--status-gentle);
+  background: var(--status-gentle-soft);
+}
+
+/* 记忆详情·加完照片后「上面的字也记下了」那一句。
+   它不是错误 —— 用 muted 不用 risk,别让人以为出了事。 */
+.nesio-nd-scan-hint {
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--portal-muted);
+  margin: var(--space-2) 0 0;
+}
+
+/* 资产·附单据后端上读出来的那句 + 「日期改成…」出口。 */
+.nesio-assets-scanhint {
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--status-go);
+  background: var(--status-go-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
 }

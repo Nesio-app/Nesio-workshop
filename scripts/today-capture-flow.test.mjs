@@ -64,7 +64,19 @@ const code = stripComments;
   const at = feed.indexOf('const recognizeSavedImage');
   assert.ok(at > 0, '「+」传图不再顺手识别了');
   const fn = feed.slice(at, feed.indexOf('\n  }, [uiLocale]);', at));
-  assert.ok(/canUsePaidCloudAi\(\)/.test(fn), '后台识别没查权益 —— 免费账号会白跑一趟云');
+  // 2026-07-31:这一条原来是 `canUsePaidCloudAi()` —— 「后台识别没查权益,免费账号会白跑一趟云」。
+  // 判据换了,**要防的事没换**:别为一张图白发一趟出去。
+  //
+  // 换的原因是那道权益门在 workshop 把识别整个关掉了(这个仓不分收费免费),
+  // 用户看到的就是「加号加的图一张都不认」。而且就算在产品仓,拿**钱**当分流依据也是错的:
+  // 小票上写的就是那些字,端上认一遍就有,付了钱也不该发出去。
+  //
+  // 新判据:先端上认字,端上给得出答案就**直接 return**,不往下走云那段。
+  assert.ok(/understandImage\(/.test(fn), '「+」传图不再先在端上认字 —— 每张图都会白发一趟云');
+  assert.ok(
+    /needsCloud[\s\S]*?return;/.test(fn),
+    '端上认出来了却还是往下走云 —— 那趟往返白花钱、白等,还把票据发出了门',
+  );
   assert.ok(/fileToUploadPayload/.test(fn), '识别前没缩图 —— 原图会 413');
   assert.ok(
     /catch \{/.test(fn),

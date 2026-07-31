@@ -128,12 +128,61 @@ export default function TodayFeed({
    * 再去问一下这是什么。所以识别失败不影响已经存好的那条记忆 ——
    * 认出来了就改个看得懂的名字,认不出来就保持文件名原样,不打扰。
    *
-   * 免费用户不发这一趟(云识图是付费档);先缩再发,不然原图直接 413(见 image-payload.ts)。
+   * ## 先在这台设备上认一遍字(2026-07-31)
+   *
+   * 这里原来第一句是 `if (!canUsePaidCloudAi()) return` —— 于是 workshop 里
+   * 「加号加的图一张都不认」,因为这个仓**不分收费免费**,那道门等于把识别整个关掉了。
+   * 门去掉了(产品仓 nesio 保留,搬过去时要加回来)。
+   *
+   * 但光去掉门只是「都去打云」。真正该改的是**顺序**:先端上认字 ——
+   * 免费、离线、图一个字节不出手机。小票/订单/化验单上写的**就是**那些字,
+   * 认出来了就直接用,不必发出去让大模型再读一遍。
+   * 只有「这是什么东西」(一件深蓝大衣、桌上那支笔)才非云不可 —— 衣服上没写着自己是什么。
+   *
+   * 认出来的原文一律进 rawInput:本地检索扫的就是那儿。
+   * 「图存下来了、上面印的单号日期店名一个字都搜不到」是这轮要修的老毛病。
+   *
+   * 一次传多张时:**每一张都在端上认**(不花钱、不出门,没有只认第一张的理由),
+   * 认出的字并起来进同一条记忆。云只发第一张 —— 那趟要钱,而且这几张本来就是一条记忆。
    */
-  const recognizeSavedImage = useCallback(async (file: File, nodeId: string) => {
+  const recognizeSavedImage = useCallback(async (files: File[], nodeId: string) => {
+    const file = files[0];
+    if (!file) return;
     try {
-      const { canUsePaidCloudAi } = await import('@/lib/portal/entitlement');
-      if (!canUsePaidCloudAi()) return;   // 后台动作:免费静默跳过,不弹升级
+      const { understandImage, tagsFromText } = await import('@/lib/portal/image-understand');
+      const { updateLifeNode: updateNode } = await import('@/lib/portal/life-graph');
+      const all = [];
+      for (const f of files) all.push(await understandImage(f));
+      // 字段以第一张认出来的为准(多张小票是另一回事,这里不猜);正文把每张的字都并进来。
+      const seen = { ...all[0], text: all.map((s) => s.text).filter(Boolean).join('\n\n') };
+
+      // 端上认出字了 —— 先把它落进去。这一步不管后面云跑不跑,都算数。
+      if (seen.text.trim()) {
+        updateNode(nodeId, {
+          rawInput: seen.text.slice(0, 5000),
+          tags: ['照片', ...tagsFromText(seen.text, 5)].slice(0, 6),
+        });
+        window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+      }
+
+      // 是单据、金额也真抽到了 → 这张图不用出门。名字用商家,金额日期入 attributes。
+      if (!seen.needsCloud && seen.fields) {
+        const f = seen.fields;
+        updateNode(nodeId, {
+          name: (f.merchant || '').trim() || L(uiLocale, '小票', 'Receipt'),
+          attributes: {
+            price: f.amount,
+            ...(f.date ? { receiptDate: f.date } : {}),
+            ...(f.merchant ? { store: f.merchant } : {}),
+            ocrSource: 'on-device',
+          },
+        });
+        window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+        setQuickSaved(L(uiLocale, `已存入 · 在这台设备上读出了金额 ${f.amount}`, `Saved · read ${f.amount} on this device`));
+        setTimeout(() => setQuickSaved(''), 4000);
+        return;
+      }
+
       const { fileToUploadPayload } = await import('@/lib/portal/image-payload');
       const { base64, mimeType } = await fileToUploadPayload(file);
       const res = await fetch('/api/portal/analyze', {
@@ -144,8 +193,12 @@ export default function TodayFeed({
       const data = await res.json() as { ok?: boolean; nodes?: Array<{ name?: string; tags?: string[] }> };
       const first = data.nodes?.[0];
       if (!data.ok || !first?.name) return;
-      const { updateLifeNode } = await import('@/lib/portal/life-graph');
-      updateLifeNode(nodeId, { name: first.name, tags: ['照片', ...(first.tags || [])].slice(0, 6) });
+      // 云给的标签**和**端上认出的字合并 —— 云答的是「这是什么」,端上答的是「上面写着什么」,
+      // 两边不是一回事。只留云的会把图上印的店名单号又弄丢。
+      updateNode(nodeId, {
+        name: first.name,
+        tags: Array.from(new Set(['照片', ...(first.tags || []), ...tagsFromText(seen.text, 3)])).slice(0, 6),
+      });
       window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
       setQuickSaved(L(uiLocale, `已存入 · 认出是「${first.name}」`, `Saved · recognized "${first.name}"`));
       setTimeout(() => setQuickSaved(''), 4000);
@@ -189,7 +242,7 @@ export default function TodayFeed({
         // 2026-07-29「提高智能」:存进去只是第一步 —— 顺手认一下这是什么,
         // 把文件名(IMG_9740 这种)换成看得懂的名字,并打上识别到的标签。
         // 存已经成功了,识别是加分项:认不出来就保持原样,**绝不因此报错**。
-        void recognizeSavedImage(imgs[0], node.id);
+        void recognizeSavedImage(imgs, node.id);
       }
     }
 

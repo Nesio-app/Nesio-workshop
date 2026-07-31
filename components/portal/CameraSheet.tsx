@@ -10,11 +10,11 @@ import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { matchNearestPlace, formatLocation, getNamedPlaces } from '@/lib/portal/named-places';
 import LocationPicker from './LocationPicker';
 import { IconCamera, IconImage, NodeTypeIcon } from './icons';
-import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { consolidateAmazonOrder } from '@/lib/portal/amazon-order';
 import { appendShoppingReceipt, consumeTravelReceiptTripId } from '@/lib/portal/travel-trips';
 import { addReceiptExpense, defaultFinanceCurrency } from '@/lib/portal/finance-sources';
 import Button from './ui/Button';
+import { understandImage, tagsFromText, type UnderstandResult } from '@/lib/portal/image-understand';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -109,9 +109,9 @@ function foodPrompt(en: boolean): string {
     : '这是一张食材/食品照片(冰箱、菜、购物袋等)。请为每一种可见的食材/食品单独生成一个 object 节点,节点名用食材的通用名(如「西红柿」「鸡蛋」「牛奶」「菠菜」,不要写「一盒鸡蛋」这类带量词的长名)。数量能数清就放进 attributes.quantity(数字);包装上印的保质期/到期日能看清就放进 attributes.expiry(YYYY-MM-DD)。不要生成地点或人物节点,不要生成汇总节点。';
 }
 async function analyzeImage(base64: string, prompt?: string, dict: string = 'zh'): Promise<AnalysisResult> {
-  // 成本护栏:免费层不打云视觉 —— 照片照样保存(待确认线索,可手动加名/标签),
-  // AI 深识别归 Pro。分层未启用(当前 PWA)恒放行,不变。
-  if (!canUsePaidCloudAi()) throw new AnalyzeImageError('free_tier_local');
+  // 2026-07-31:workshop **不分收费免费** —— 这里原来是付费门(免费层不打云视觉,
+  // 照片只当「待确认线索」存下来)。产品仓(nesio)保留那道门,workshop 是自己用的实验仓,
+  // 该识别的就识别,不为分层牺牲可用性。往 prod 搬时要把门加回去。
   const en = dict.toLowerCase().startsWith('en');
   const res = await fetch('/api/portal/analyze', {
     method: 'POST',
@@ -239,6 +239,50 @@ function buildPendingImageResult(dict: string = 'zh', reason: 'auth' | 'free_tie
   };
 }
 
+/**
+ * 端上认出的字 → 一条小票节点。**不打云。**
+ *
+ * 和云路径的差别得说清楚,别让人以为这是等价替换:
+ *   · 云会把小票**拆成每个条目一个节点**(「牛奶 $4.99」「面包 $3.20」…);
+ *   · 端上只认字,`extractReceiptFields` 抽的是**这张票的总额/日期/商家** ——
+ *     一条节点,不是一堆。条目拆分需要理解版式,那确实是云更擅长的事。
+ *
+ * 所以这里不假装拆得开:给一条准确的总额记录,再在结果页留一句
+ * 「想按条目拆开?让 AI 再看一遍」的出口(analyzeFullImage({ forceCloud: true }))。
+ * 对最常用的那个场景 —— 把这笔花销记进账 —— 总额+日期+商家本来就是全部所需,
+ * 而且是**从图上的字直接读出来的**,不是模型猜的。
+ */
+function buildLocalReceiptResult(seen: UnderstandResult, dict: string = 'zh'): AnalysisResult {
+  const f = seen.fields!;
+  const store = (f.merchant || '').trim();
+  const name = store || L(dict, '小票', 'Receipt');
+  // 金额是「靠合计关键词找到的」还是「取最大值猜的」——后者要让用户核对,不能装作一样准。
+  const summary = f.amountFrom === 'keyword'
+    ? L(dict, `在这台设备上认出来的 —— ${store ? store + ' · ' : ''}${f.amount}${f.date ? ' · ' + f.date : ''}。图没有发出去。`,
+        `Read on this device — ${store ? store + ' · ' : ''}${f.amount}${f.date ? ' · ' + f.date : ''}. The photo never left.`)
+    : L(dict, `认出来了,但没找到「合计」那一行,金额取的是票面最大的数 —— 麻烦核对一下。图没有发出去。`,
+        `Read it, but no "total" line was found — this is the largest number on the receipt. Worth a check. The photo never left.`);
+  return {
+    summary,
+    nodes: [{
+      type: 'object',
+      name,
+      attributes: {
+        price: f.amount,
+        ...(f.date ? { receiptDate: f.date } : {}),
+        ...(store ? { store } : {}),
+        // 认出来的原文留一份 —— 「只存图」的老毛病就是图上写的字一个都搜不到。
+        ocrSource: 'on-device',
+      },
+      relations: [],
+      tags: [L(dict, '小票', 'receipt'), ...tagsFromText(seen.text, 5)],
+      source: 'photo',
+      confidence: f.amountFrom === 'keyword' ? 0.95 : 0.7,
+      rawInput: seen.text.slice(0, 2000),
+    }],
+  };
+}
+
 function parseInlineTags(value: string): string[] {
   return Array.from(new Set(
     value
@@ -278,6 +322,14 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [editedNodes, setEditedNodes] = useState<EditedNode[]>([]);
   const [isReceipt, setIsReceipt] = useState(false);
+  /**
+   * 端上认出来的字。两个用处,缺一个都算白认:
+   *   ① 存进节点 rawInput —— 「图存下来了、上面写的字一个都搜不到」是这轮要修的老毛病;
+   *   ② 结果页显示「这是在这台设备上读的」,让人知道图有没有出过门。
+   */
+  const [ocrText, setOcrText] = useState('');
+  /** 这次结果是端上读出来的、**没打云**。结果页据此给「让 AI 再看一遍」的出口。 */
+  const [localOnly, setLocalOnly] = useState(false);
   const [permDenied, setPermDenied] = useState(false);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [error, setError] = useState('');
@@ -605,18 +657,41 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
   }
 
   // Analyze the full captured image (called from selection overlay or result phase)
-  async function analyzeFullImage() {
+  async function analyzeFullImage(opts?: { forceCloud?: boolean }) {
     if (!capturedBase64) return;
-    // AI 是显式按钮:分层启用后免费点它 → 升级引导;免费期(分层未启用)可用。
-    if (!canUsePaidCloudAi()) {
-      window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'photo_ai' } }));
-      return;
-    }
     setSelecting(false);
     setPhase('analyzing');
     setError('');
+    setLocalOnly(false);
     try {
       const en = dict.toLowerCase().startsWith('en');
+
+      // ── 端上先认字 ────────────────────────────────────────────────────────
+      //
+      // 顺序以前是反的:先把图发去云,等云读完再用关键词判「哦这是张小票」
+      // (下面的 `detectReceipt(res)`)。可那些关键词本来就印在图上 ——
+      // 端上认一遍就知道,根本不用先发出去。
+      //
+      // 认出来是小票/订单、而且金额真抽到了 → **就不打云了**:那些信息就是图上的字,
+      // 让大模型再读一遍是把确定性的事交给会猜的东西,还慢、还把票据发出门。
+      //
+      // `forceCloud` 是结果页那个「让 AI 再看一遍」按钮 —— 端上只给一条总额记录,
+      // 想按条目拆开还得云来。**是用户点的**,不是我们替他决定把票发出去。
+      const seen = opts?.forceCloud ? null : await understandImage(capturedBase64);
+      if (seen) {
+        setOcrText(seen.text);
+        // 进货模式要的是**逐个食材**,端上只认字给不出这个 —— 那条路照旧走云。
+        if (!intakeSubtype && !seen.needsCloud && seen.fields) {
+          const local = buildLocalReceiptResult(seen, dict);
+          setResult(local);
+          setEditedNodes(toEditedNodes(local.nodes, local.summary));
+          setIsReceipt(true);
+          setLocalOnly(true);
+          setPhase('result');
+          return;
+        }
+      }
+
       const res = await analyzeImage(capturedBase64, intakeSubtype ? foodPrompt(en) : undefined, dict);
       const nodes = toEditedNodes(res.nodes, res.summary);
       setResult(res);
@@ -653,10 +728,6 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
   // 打「亚马逊」标签)。合并逻辑在 lib/portal/amazon-order.ts(有单测),这里只做相机侧编排。
   async function analyzeOrder() {
     if (!capturedBase64) return;
-    if (!canUsePaidCloudAi()) {
-      window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'photo_ai' } }));
-      return;
-    }
     setSelecting(false);
     setPhase('analyzing');
     setError('');
@@ -740,8 +811,11 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
       // Non-image file: text analysis
       const text = await file.text().catch(() => file.name);
       setPhase('analyzing');
-      // 成本护栏:免费层文件不打云抽取 —— 确定性存档(文件名作标题 + 全文进 article,可读可搜)
-      if (!canUsePaidCloudAi()) {
+      // workshop 不分收费免费(2026-07-31)。这段原来是**付费门后的免费兜底**
+      // (免费用户走确定性存档)。门拆了之后它不该变成死代码 —— 它是真兜底:
+      // 云那条走不通(离线/出错)时,文件名作标题 + 全文进 article,照样可读可搜。
+      // 所以改成一个函数,由下面 catch 调它。往 prod 搬时在这之前把付费门加回来。
+      const archiveLocally = () => {
         const full = text.trim();
         const fileAttrs: Record<string, string> = full.length >= 200 ? { article: full } : { note: full };
         const fileResult = {
@@ -751,14 +825,13 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
             relations: [], tags: [L(dict, '文件', 'file')], confidence: 0.8, rawInput: full.slice(0, 200),
             source: 'manual' as const,
           }],
-          summary: L(dict, '文件已存档,可搜索可阅读。升级 Pro 可用 AI 提取要点。', 'File archived — searchable and readable. Upgrade to Pro for AI extraction.'),
+          summary: L(dict, '文件已存档,可搜索可阅读(这次没能提取要点)。', 'File archived — searchable and readable (couldn’t extract key points this time).'),
         };
         setResult(fileResult);
         setEditedNodes(toEditedNodes(fileResult.nodes, fileResult.summary));
         setIsReceipt(false);
         setPhase('result');
-        return;
-      }
+      };
       try {
         const res2 = await fetch('/api/portal/analyze', {
           method: 'POST',
@@ -772,7 +845,9 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
         setIsReceipt(detectReceipt(fileResult));
         setPhase('result');
       } catch {
-        setPhase('live');
+        // 云那条走不通(离线/出错):**别把文件丢了**。原来这里只是 setPhase('live'),
+        // 用户传了个文件、转了一圈、回到取景框,什么都没发生 —— 那和「按钮点了没反应」一样。
+        archiveLocally();
       }
     }
   }
@@ -863,7 +938,10 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
         tags: Array.from(new Set([...(n.tags || []), ...userTags])),
         confidence: n.confidence,
         relations: n.relations,
-        rawInput: n.rawInput,
+        // 端上认出来的字兜底进 rawInput —— 全文检索扫的就是这里。
+        // 「图存下来了、上面写的字一个都搜不到」是这轮要修的病:哪怕这张图最后走了云、
+        // 云只给了个名字,图上印的单号/日期/店名也该能被搜出来。
+        rawInput: n.rawInput || (ocrText ? ocrText.slice(0, 2000) : undefined),
         attributes: {
           ...n.attributes,
           ...captureCoords,
@@ -973,6 +1051,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
   function retake() {
     setSelecting(false);
     setResult(null); setEditedNodes([]); setIsReceipt(false);
+    setOcrText(''); setLocalOnly(false);
     setCapturedPreview(''); setCapturedBase64(''); setError(''); setExtraTags(''); setSourceFile(null);
     setNodeLocations({}); setNodePlaceMeta({}); setDetectedPlaceId('');
     setSimilarItems({});
@@ -1055,12 +1134,6 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
     e.preventDefault();
     const pts = selPointsRef.current;
     if (pts.length < 3 || !capturedPreview) { setSelecting(false); return; }
-    // 圈选 = AI 动作:分层启用后免费 → 升级引导(免费期可用)
-    if (!canUsePaidCloudAi()) {
-      window.dispatchEvent(new CustomEvent('nesio-pro-gate', { detail: { feature: 'photo_ai' } }));
-      selPointsRef.current = [];
-      return;
-    }
     const canvas = selectCanvasRef.current;
     if (!canvas) { setSelecting(false); return; }
 
@@ -1299,11 +1372,25 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
               和旁边的按钮糊在一起。字号/行高走 token,不再自己写死 0.78rem。 */}
           <p className="nesio-camera-result-summary">{result.summary}</p>
 
+          {/* 端上读的:告诉用户图**没出过门**,再给一条「想拆细」的出口。
+              这两句必须挨着 —— 只说「没发出去」像在解释为什么内容少,
+              只给按钮又等于默认把票据发出去是常态。 */}
+          {localOnly && (
+            <p className="nesio-camera-local-note">
+              {L(dict, '这是在这台设备上读出来的,图没有发出去。想按条目拆开的话——',
+                    'Read on this device; the photo never left. Want it split into line items?')}
+            </p>
+          )}
+
           {/* 识别动作行:AI 识别 / 圈选 / 订单 / 搜记忆 */}
           <div className="nesio-camera-result-actions">
             {capturedPreview && (
-              <button type="button" className="nesio-camera-select-btn" onClick={analyzeFullImage}>
-                {L(dict, 'AI 识别', 'Scan')}
+              <button
+                type="button"
+                className="nesio-camera-select-btn"
+                onClick={() => analyzeFullImage(localOnly ? { forceCloud: true } : undefined)}
+              >
+                {localOnly ? L(dict, '让 AI 再看一遍', 'Ask AI to look again') : L(dict, 'AI 识别', 'Scan')}
               </button>
             )}
             {capturedPreview && (
@@ -1495,7 +1582,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
           <div className="nesio-select-overlay-actions">
             {/* QA:AI 不再是唯一出路 —— 「直接存」零 AI 零等待;AI 识别是明示按钮 */}
             <button type="button" className="nesio-select-action-btn" onClick={saveWithoutAi}>{L(dict, '直接存', 'Save as-is')}</button>
-            <button type="button" className="nesio-select-action-btn" onClick={analyzeFullImage}>{L(dict, 'AI 识别全图', 'Scan full image')}</button>
+            <button type="button" className="nesio-select-action-btn" onClick={() => analyzeFullImage()}>{L(dict, 'AI 识别全图', 'Scan full image')}</button>
             <button type="button" className="nesio-select-action-btn" onClick={retake}>{L(dict, '↩ 重拍', '↩ Retake')}</button>
           </div>
         </div>

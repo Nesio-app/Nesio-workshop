@@ -698,6 +698,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [addingPhoto, setAddingPhoto] = useState(false);
   const [photoErr, setPhotoErr] = useState('');
+  /** 加完照片后端上认字的结果。不是错误态 —— 照片已经加好了,这只是「顺手还做了什么」。 */
+  const [scanHint, setScanHint] = useState('');
   const [addedThumbs, setAddedThumbs] = useState<string[]>([]);
   // 批次 57:有坐标没地名(反查当时没跑完/存量节点)→ 打开详情时自愈回填
   const [healedPlace, setHealedPlace] = useState('');
@@ -878,6 +880,19 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
       if (!ok) throw new Error('updateLifeNode returned false');
       if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
       setAddedThumbs((p) => [...p, ...thumbs]);
+
+      // 存好了再认字(2026-07-31)。以前到上一行就结束了 —— 图挂进这条记忆,
+      // 上面写的字一个都搜不到。认字在这台设备上做,图不出手机;
+      // 名字不动(keepName)——这条记忆已经有名字了,是用户的,不该被一张附图改掉。
+      const { attachImageUnderstanding } = await import('@/lib/portal/image-understand');
+      const seen = await attachImageUnderstanding(n.id, list, { keepName: true });
+      if (seen?.text.trim()) {
+        setPhotoErr('');
+        setScanHint(L(dict, '照片上的字也记下了 —— 现在搜得到。', 'Text in the photos was read too — it\'s searchable now.'));
+      } else if (seen?.visionMessage) {
+        // 「这台设备认不了字」不是错误,是这条路今天走不通。照片已经加好了。
+        setScanHint(seen.visionMessage);
+      }
     } catch {
       setPhotoErr(L(dict, '照片没加成功,请再试一次', 'Could not add the photos — try again'));
     } finally {
@@ -1121,6 +1136,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                   </button>
                 </p>
               )}
+              {!photoErr && scanHint && <p className="nesio-nd-scan-hint">{scanHint}</p>}
               {addedThumbs.length > 0 && (
                 <div className="nesio-nd-added-thumbs">
                   {addedThumbs.map((u, i) => (

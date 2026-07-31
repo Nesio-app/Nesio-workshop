@@ -2,9 +2,8 @@
  * Tier 0 本地处理器 —— 端上识别 / 本地搜索 / 离线兜底
  *
  * 免费用户的确定性基础版实现。这些都是客户端可以独立完成的任务：
- * - 图片识别：端上标签提取 + OCR（不需要云 LLM）
+ * - 图片识别：端上 OCR(Vision 插件真认字)+ 从认出的字里取标签
  * - 语音问答：本地语义搜索（不需要云对话）
- * - 嵌入重排：纯本地余弦相似度（不需要云 embedding）
  * - 邮件富化：元数据 + 正则（不需要云 LLM）
  *
  * 所有函数返回 { result, confidence, source: 'local' } 格式。
@@ -19,16 +18,23 @@ export interface LocalHandlerResult<T = any> {
 }
 
 /**
- * 端上图片识别 —— 标签提取 + 基础 OCR
+ * 端上图片识别 —— **真的在这台设备上认字**(2026-07-31 重写)。
  *
- * Tier 0 限制：
- * - 仅提取简单标签（色彩、物体检测）
- * - 基础 OCR（仅识别大字、高对比）
- * - 不涉及内容理解、人脸识别等复杂能力
+ * ## 之前这里是假的
  *
- * 实现依赖：
- * - HTML5 Canvas 图像处理
- * - 端上轻量 OCR 库（如 Tesseract.js）
+ * 原实现把图画进 canvas,统计平均 RGB 和亮度,产出 `red-toned` / `bright` /
+ * `desaturated` 这类标签;OCR 那一行写着「这里简化为空,实际应集成 Tesseract.js」,
+ * 于是 `text` 恒为 `''`。
+ *
+ * 后果比「没有识别」更糟:聊天那几处把这些标签当**节点名**显示 ——
+ * 用户看到的是「识别到:blue-toned、bright」,还会被当成记忆存下来。
+ * 一条走不通的路,伪装成走通了。
+ *
+ * ## 现在
+ *
+ * 走 `understandImage`(端上 Vision 插件,VNRecognizeTextRequest)——
+ * 真认字、免费、离线、图一个字节不出手机。认不了就如实说认不了,
+ * 不再拿色调糊弄。标签从**认出来的字**里取,不从像素平均值里编。
  */
 export async function recognizeImageLocally(
   imageData: string | Blob | File
@@ -36,100 +42,25 @@ export async function recognizeImageLocally(
   tags: string[];
   text: string;
   confidence: number;
+  /** 这台设备认不了字时的那句人话。有它就说明 text 一定是空的。 */
+  unavailable?: string;
 }>> {
-  try {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Canvas context not available');
-
-    // 加载图像
-    const img = new Image();
-    const blob = imageData instanceof Blob ? imageData : new Blob([imageData]);
-    const url = URL.createObjectURL(blob);
-
-    return new Promise((resolve, reject) => {
-      img.onload = async () => {
-        try {
-          canvas.width = img.width;
-          canvas.height = img.height;
-          ctx.drawImage(img, 0, 0);
-
-          // 简单的色彩/亮度统计（标签提取）
-          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          const data = imageData.data;
-          const tags = extractImageTags(data);
-
-          // 基础 OCR —— 这里简化为空，实际应集成 Tesseract.js
-          const text = '';
-
-          resolve({
-            result: {
-              tags,
-              text,
-              confidence: 0.5, // Tier 0 置信度较低
-            },
-            confidence: 0.5,
-            source: 'local',
-          });
-        } catch (e) {
-          reject(e);
-        } finally {
-          URL.revokeObjectURL(url);
-        }
-      };
-      img.onerror = () => {
-        URL.revokeObjectURL(url);
-        reject(new Error('Failed to load image'));
-      };
-      img.src = url;
-    });
-  } catch (error) {
-    throw new Error(
-      `端上图片识别失败: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
+  const { understandImage, tagsFromText } = await import('./image-understand');
+  const seen = await understandImage(imageData);
+  // 认出字了才谈得上置信度;认不出就是 0,别给一个「0.5」让上游以为半信半疑。
+  const confidence = seen.text.trim() ? (seen.fields ? 0.95 : 0.7) : 0;
+  return {
+    result: {
+      tags: tagsFromText(seen.text, 6),
+      text: seen.text,
+      confidence,
+      ...(seen.visionMessage ? { unavailable: seen.visionMessage } : {}),
+    },
+    confidence,
+    source: 'local',
+  };
 }
 
-/**
- * 简单的色彩/亮度标签提取
- */
-function extractImageTags(imageData: Uint8ClampedArray): string[] {
-  const tags: string[] = [];
-  let totalR = 0, totalG = 0, totalB = 0;
-  let totalBrightness = 0;
-  const pixelCount = imageData.length / 4;
-
-  for (let i = 0; i < imageData.length; i += 4) {
-    totalR += imageData[i];
-    totalG += imageData[i + 1];
-    totalB += imageData[i + 2];
-    const brightness = (imageData[i] + imageData[i + 1] + imageData[i + 2]) / 3;
-    totalBrightness += brightness;
-  }
-
-  const avgR = totalR / pixelCount;
-  const avgG = totalG / pixelCount;
-  const avgB = totalB / pixelCount;
-  const avgBrightness = totalBrightness / pixelCount;
-
-  // 色彩倾向
-  if (avgR > avgG && avgR > avgB) tags.push('red-toned');
-  if (avgG > avgR && avgG > avgB) tags.push('green-toned');
-  if (avgB > avgR && avgB > avgG) tags.push('blue-toned');
-
-  // 亮度
-  if (avgBrightness > 200) tags.push('bright');
-  if (avgBrightness < 100) tags.push('dark');
-
-  // 饱和度
-  const max = Math.max(avgR, avgG, avgB);
-  const min = Math.min(avgR, avgG, avgB);
-  const saturation = max === 0 ? 0 : (max - min) / max;
-  if (saturation > 0.7) tags.push('saturated');
-  if (saturation < 0.2) tags.push('desaturated');
-
-  return tags;
-}
 
 /**
  * 本地语义搜索 —— 基于关键词和 fuzzy 匹配
@@ -159,43 +90,17 @@ export async function searchMemoriesLocally(
   }
 }
 
-/**
- * 本地向量重排 —— 纯余弦相似度（不需要云 embedding）
+/*
+ * 【删掉了 rerankedResultsLocally】(2026-07-31)
  *
- * 实现依赖：
- * - 端上预训练的轻量 embedding 模型（如 ONNX 格式）
- * - IDB 向量缓存（vectors 库）
+ * 它的「相关度」是 `score: Math.random()` —— 排出来的顺序和查询无关,
+ * 纯随机。注释里写着「简化:实际应用端上 embedding 模型」,而那个模型不存在。
+ * 全仓零调用点,所以今天没人被它坑到;但它顶着 Tier 0 处理器的名字躺在这里,
+ * 下一个人接线时会以为它能用 —— 那时候的表现是「搜索结果每次都不一样」,
+ * 而代码看着挺对。没实现的东西不留占位。
  *
- * Tier 0 限制：
- * - 使用端上模型，精度较低
- * - 仅支持已缓存的向量
- * - 重排算法仅用余弦相似度
+ * 真要做端上重排,走 lib/portal/semantic-rerank.ts 那条(已有纯本地分支)。
  */
-export async function rerankedResultsLocally(
-  texts: string[],
-  queryEmbedding: number[]
-): Promise<LocalHandlerResult<Array<{ idx: number; score: number }>>> {
-  try {
-    // 简化实现：对每条文本计算余弦相似度
-    const results = texts.map((_, idx) => ({
-      idx,
-      score: Math.random(), // 简化：实际应用端上 embedding 模型
-    }));
-
-    // 按分数排序
-    results.sort((a, b) => b.score - a.score);
-
-    return {
-      result: results,
-      confidence: 0.4, // 本地重排置信度较低
-      source: 'local',
-    };
-  } catch (error) {
-    throw new Error(
-      `本地重排失败: ${error instanceof Error ? error.message : String(error)}`
-    );
-  }
-}
 
 /**
  * 本地邮件富化 —— 元数据提取 + 正则
