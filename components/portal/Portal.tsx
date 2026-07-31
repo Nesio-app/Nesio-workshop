@@ -141,6 +141,29 @@ type AuthSessionPayload = {
  *
  * 所以 force 不是可选的调优参数,是区分这两种语义的开关。
  */
+/**
+ * 七条云同步的任务表。**名字必须稳定** —— 离线队列里只存名字(函数序列化不了),
+ * 重跑时靠它找回该调哪个。改名 = 队列里那条变成认不出来的孤儿。
+ */
+const CLOUD_SYNC_TASKS = [
+  // 记忆图/学习态/profile 逐一 union/LWW 合并回灌(跨端一致)。
+  { name: 'memory', run: () => syncMemoryWithCloud() },
+  { name: 'learning', run: () => syncLearningWithCloud() },
+  { name: 'profile', run: () => syncProfileWithCloud() },
+  // 记录级模块同步(**唯一的通用云同步**):健康/足迹/财务/物品/关系… 每个 durable key 一行。
+  { name: 'modules', run: () => autoSyncModulesWithCloud() },
+  // 邮件全文/导入书籍/地点封面照:各自独立 IDB 的记录级同步,量级大不进模块同步。
+  { name: 'email-bodies', run: () => autoSyncEmailBodiesWithCloud() },
+  { name: 'reader-books', run: () => autoSyncReaderBooksWithCloud() },
+  { name: 'place-images', run: () => autoSyncPlaceImagesWithCloud() },
+  // 外部连接器(日历/邮件/flomo/银行/通讯录)拉新,30 分钟节流,内部保证。
+  { name: 'connectors', run: () => autoSyncConnectorsOnBoot() },
+];
+
+/** 名字 → 怎么跑。给 drainCloudSyncQueue 用(队列里只有名字)。 */
+const CLOUD_SYNC_REGISTRY: Record<string, () => Promise<unknown>> =
+  Object.fromEntries(CLOUD_SYNC_TASKS.map((t) => [t.name, t.run]));
+
 async function fetchAuthSessionPayload(force = false): Promise<AuthSessionPayload | null> {
   const info = await readSession(force ? { force: true } : {});
   return (info.payload as AuthSessionPayload | null) ?? null;
@@ -675,18 +698,15 @@ export default function Portal() {
       void (async () => {
         await fetchAuthSessionPayload(true);   // ← 要副作用(刷 cookie),不能吃缓存
         if (isCloudSyncSuspended()) return;
-        // 记忆图/学习态/profile 逐一 union/LWW 合并回灌(跨端一致)。
-        void syncMemoryWithCloud();
-        void syncLearningWithCloud();
-        void syncProfileWithCloud();
-        // 记录级模块同步(**唯一的通用云同步**):健康/足迹/财务/物品/关系… 每个 durable key 一行同步。
-        void autoSyncModulesWithCloud();
-        // 邮件全文/导入书籍/地点封面照:各自独立 IDB 的记录级同步,量级大不进模块同步。best-effort。
-        void autoSyncEmailBodiesWithCloud();
-        void autoSyncReaderBooksWithCloud();
-        void autoSyncPlaceImagesWithCloud();
-        // 外部连接器(日历/邮件/flomo/银行/通讯录)拉新,30 分钟节流,内部保证。
-        void autoSyncConnectorsOnBoot();
+        // 七条云同步统一走 runCloudSyncBatch:**哪条这次没跑成就记进离线队列**,
+        // 下次开机或 online 事件回来时自动重跑(带退避)。
+        // 之前这里是一排 void —— 断网/超时/5xx 一律无声无息,这一轮就这么丢了。
+        //
+        // ⚠️ 它接住的是**整条任务抛出来的**失败。那些函数内部的
+        // `void pushXxxToCloud()`(即发即忘)在里面就把错吃掉了,这一层看不见 ——
+        // 诚实的说法是「拉取失败会重试,推送失败暂时还不会」。见 cloud-sync-runner 文件头。
+        const { runCloudSyncBatch } = await import('@/lib/portal/cloud-sync-runner');
+        await runCloudSyncBatch(CLOUD_SYNC_TASKS);
       })();
     };
     const scheduleHeavySyncBatch = () => whenIdle(runHeavySyncBatch);
@@ -696,6 +716,18 @@ export default function Portal() {
     // 一次性自愈(2026-07-29):清历史邮件重复节点 + 已拆模块的孤儿 key。幂等,跑过即零开销。
     whenIdle(() => { void import('@/lib/portal/storage-heal').then((m) => m.runStorageHealOnce()).catch(() => {}); });
     scheduleHeavySyncBatch(); // 挂载/登录:也推到空闲,不阻塞首屏交互
+    // 网络回来时把队列里攒着的失败同步补掉 —— **这才是离线队列的意义所在**:
+    // 你在地铁里改的东西,出站那一刻自动补上,而不是等你下次想起来打开 App。
+    // 开机也补一次(上次可能是关 App 关掉的,没等到 online 事件)。
+    const drainQueued = () => {
+      whenIdle(() => {
+        void import('@/lib/portal/cloud-sync-runner')
+          .then((m) => m.drainCloudSyncQueue(CLOUD_SYNC_REGISTRY))
+          .catch(() => {});
+      });
+    };
+    drainQueued();
+    window.addEventListener('online', drainQueued);
     const unregisterLearningPush = registerLearningAutoPush();
     // 批次205:改名字/头像/语言/教练/日报/主题任一 → 防抖自动推上云,别端拉取即一致。
     const unregisterProfilePush = registerProfileAutoPush();
@@ -706,6 +738,7 @@ export default function Portal() {
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener(SYNC_RESUME_EVENT, onSyncResume);
+      window.removeEventListener('online', drainQueued);
       unregisterLearningPush();
       unregisterProfilePush();
     };
@@ -820,6 +853,10 @@ export default function Portal() {
     pruneDisposableSignals();
     // M3 读切换:回填 + 删除传导 + 水合事实缓存(见 signal-read-cache.ts)
     void hydrateSignalFactStore();
+    // IDB 那一整套(开库/健康检查/配额/定期清理/P1 缓存迁移/删源)。
+    // 它自己排到 requestIdleCallback,不挡首屏;失败只降级到 localStorage,不抛。
+    // 在这之前 lib/idb 的 16 个模块里有 14 个零调用方 —— 建好了从没接上。
+    void import('@/lib/idb/boot').then((m) => m.bootStorage()).catch(() => {});
     if (!canUsePrivateRuntime) {
       // 只有服务器明确说「未登录」才清私有节点;未知态(网络抖动/超时)
       // 绝不删数据——删了的节点在项目里的引用会一起消失,且重新同步后

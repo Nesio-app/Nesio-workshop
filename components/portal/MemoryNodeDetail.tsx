@@ -6,6 +6,7 @@ import { deleteLifeNode, getLifeGraph, linkNodes, searchLifeGraphFuzzy, unlinkNo
 import { displayStoredLocation } from '@/lib/portal/named-places';
 import type { LocationMeta } from './LocationPicker';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
+import { makeAssetErrorHandler } from '@/lib/portal/signed-asset-url';
 import LocationPicker from './LocationPicker';
 import EmailComposeSheet from './EmailComposeSheet';
 import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare, IconFile} from './icons';
@@ -1405,10 +1406,35 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                     <div key={key} className="nesio-type-asset-card">
                       {isImage && previewUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={previewUrl} alt={asset.label || n.name} draggable={false} className="nesio-type-asset-img" onClick={() => setViewImage({ url: previewUrl, name: asset.label || n.name })} style={{ cursor: 'zoom-in' }}
-                          // 云图签名 URL 加载失败(过期/取不到)时,别把浏览器默认破图「?」留在页面 ——
-                          // 从 assetUrls 摘掉这条,自动回落到下面的软文案分支(有可见失败态,不是破图)。
-                          onError={() => setAssetUrls((cur) => { if (!(key in cur)) return cur; const next = { ...cur }; delete next[key]; return next; })} />
+                        <img src={previewUrl} alt={asset.label || n.name} draggable={false} className="nesio-type-asset-img"
+                          onClick={() => setViewImage({ url: previewUrl, name: asset.label || n.name })} style={{ cursor: 'zoom-in' }}
+                          /*
+                           * 云图加载失败时:**先换一张签名 URL,换不到才退文案**。
+                           *
+                           * 原来这里只做后半截 —— 直接把这条从 assetUrls 摘掉,
+                           * 回落到「图片线索已保存,登录后可查看」。避免了破图方块,
+                           * 但把最常见的那种失败(签名 URL 到期)也一并当成了「你没登录」:
+                           * 用户明明登着,照片却消失了,还被告知去登录。
+                           * 这比破图更糟 —— 它给了一个**错的**解释。
+                           *
+                           * 头像那条(批次 11)一直有换签兜底,附件这条从来没有。
+                           * 现在共用 signed-asset-url 里那套(同 path 并发去重、只重试一次)。
+                           */
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            if (asset.storagePath && img.dataset.retried !== '1') {
+                              makeAssetErrorHandler(asset.storagePath, (url) => {
+                                setAssetUrls((cur) => {
+                                  if (url) return { ...cur, [key]: url };
+                                  // 换签失败 → 摘掉,回落到软文案(可见失败态,不是破图)
+                                  if (!(key in cur)) return cur;
+                                  const next = { ...cur }; delete next[key]; return next;
+                                });
+                              })(e);
+                              return;
+                            }
+                            setAssetUrls((cur) => { if (!(key in cur)) return cur; const next = { ...cur }; delete next[key]; return next; });
+                          }} />
                       ) : (
                         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', marginBottom: 'var(--space-1)' }}>
                           {asset.local ? L(dict, '图片加载中…', 'Loading image…') : asset.storagePath ? L(dict, '图片线索已保存，登录后可查看。', 'Image clue saved — sign in to view.') : L(dict, '附件线索已保存。', 'Attachment clue saved.')}
