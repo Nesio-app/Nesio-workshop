@@ -426,6 +426,8 @@ export default function Portal() {
     return () => window.removeEventListener('nesio-recognize-image', onRecog);
   }, []);
   const [voiceIntent, setVoiceIntent] = useState<'note' | 'ask'>('note');
+  // 带进「说一句/问念念」的初始文字(首页输入条转过来的那句)。用完即清。
+  const [voiceSeed, setVoiceSeed] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
   const [locale, setLocale] = useState<PortalLocale>('zh');
   const dict = portalLocaleToDictionaryLocale(locale);
@@ -843,6 +845,22 @@ export default function Portal() {
   // Allow TodayFeed empty state / other surfaces to open Tell Nesio or capture directly
   useEffect(() => {
     const voiceHandler = () => { track('capture_voice_open'); setCaptureMode('voice'); };
+    /**
+     * 2026-07-31 首页输入条三合一的「问念念」。
+     *
+     * **单独一个事件名**,不复用 nesio-open-voice —— 后者被 test:today-settings-bug3
+     * 明确禁止出现在 TodayFeed 里(用户标注过:点话筒不该跳「说一说」sheet)。
+     * 那条保护是对的,不该为了省一个事件名去放宽它;而且「问念念」和「打开说一句」
+     * 本来就是两件事,共用一个名字迟早再被人搞混。
+     * detail.text = 已经打好的那句话,带过去,别让人在另一个框里重打一遍。
+     */
+    const askHandler = (e: Event) => {
+      const d = (e as CustomEvent).detail as { text?: string } | undefined;
+      track('capture_voice_open');
+      setVoiceIntent('ask');
+      setVoiceSeed(typeof d?.text === 'string' ? d.text : '');
+      setCaptureMode('voice');
+    };
     const moodHandler = () => { track('mood_open'); setMoodOpen(true); };
     const freezeHandler = () => {
       // 冷冻仓:未上线 → 免费/Pro 都不上(走「会随 Pro 开放」引导);上线后 Pro 专属。唯一开门点。
@@ -920,6 +938,7 @@ export default function Portal() {
     window.addEventListener('nesio-memory-search', memorySearchHandler);
     window.addEventListener('nesio-pro-gate', proGateHandler);
     window.addEventListener('nesio-open-voice', voiceHandler);
+    window.addEventListener('nesio-open-ask', askHandler);
     window.addEventListener('nesio-open-mood', moodHandler);
     window.addEventListener('nesio-open-freeze', freezeHandler);
     window.addEventListener('nesio-open-inventory', inventoryHandler);
@@ -938,6 +957,7 @@ export default function Portal() {
       window.removeEventListener('nesio-memory-search', memorySearchHandler);
       window.removeEventListener('nesio-pro-gate', proGateHandler);
       window.removeEventListener('nesio-open-voice', voiceHandler);
+      window.removeEventListener('nesio-open-ask', askHandler);
       window.removeEventListener('nesio-open-mood', moodHandler);
       window.removeEventListener('nesio-open-freeze', freezeHandler);
       window.removeEventListener('nesio-open-inventory', inventoryHandler);
@@ -1381,8 +1401,9 @@ export default function Portal() {
       <VoiceInputSheet
         open={captureMode === 'voice'}
         intent={voiceIntent}
+        seedText={voiceSeed}
         canUsePrivateData={canViewPrivateData}
-        onClose={() => { setCaptureMode(null); setVoiceIntent('note'); }}
+        onClose={() => { setCaptureMode(null); setVoiceIntent('note'); setVoiceSeed(''); }}
       />
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
       <MoodSheet open={moodOpen} onClose={() => setMoodOpen(false)} />

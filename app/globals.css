@@ -21095,3 +21095,28 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   flex: 1 0 100%; width: 100%; margin-top: var(--space-2);
   accent-color: var(--portal-accent);
 }
+
+/* ── 首页输入条的三条动作(2026-07-31 三合一)────────────────────────────────
+   全部显式:点了才走,默认(回车/↑)永远是记一笔。不自动判意图 ——
+   把「记」猜成「问」的代价是「你要存的东西没存下来,而你以为存了」。 */
+.nesio-cap-actions {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.nesio-cap-action {
+  display: flex; flex-direction: column; gap: 2px;
+  width: 100%; min-height: 40px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: transparent; color: var(--portal-muted);
+  font-size: var(--text-xs); line-height: 1.5; text-align: left; cursor: pointer;
+}
+/* 认出时间的那一条最相关,给它强调色;另外两条保持安静。 */
+.nesio-cap-action.is-when {
+  color: var(--portal-accent);
+  border-color: var(--portal-accent-border);
+  background: var(--portal-accent-soft);
+}
+.nesio-cap-action-main { font-weight: var(--weight-medium); }
+/* 「你没说几点,先按早上 9:00」—— 默认值必须自己说出来,不能装成用户定过。 */
+.nesio-cap-action-sub { color: var(--portal-muted); font-size: var(--text-xs); }

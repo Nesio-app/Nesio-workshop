@@ -17,7 +17,8 @@
  *   · 其余(pdf/docx/xlsx/zip…)→ lib/portal/local-file-store 原样存 Blob。
  * 不按类型白名单收,按体积设限 —— 白名单永远会漏掉某个「常见类型」。
  */
-import { useRef, useState, type RefObject } from 'react';
+import { useMemo, useRef, useState, type RefObject } from 'react';
+import { formatWhen, parseWhen } from '@/lib/portal/when-parse';
 import { IconMic, IconPlus } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -44,6 +45,19 @@ export interface CaptureBarProps {
    * 否则几周前语音听岔的半句看起来就像用户刚打的,而他根本不记得打过。
    */
   staleNote?: string;
+  /**
+   * 三合一的另外两条路(2026-07-31)。**都是显式的**:用户点了才走。
+   *
+   * 为什么不自动判意图 —— intent-router 那套猜测的代价是不对称的:
+   * 把「问」猜成「记」只是多一条垃圾记录,把「记」猜成「问」是**你要存的东西没存下来**,
+   * 而你以为存了。所以默认永远是记一笔(回车/↑ 行为一个字没改),另外两条摆在下面。
+   */
+  onSearch?: (q: string) => void;
+  onAsk?: (q: string) => void;
+  /** 认出时间时的「设成提醒」。没认出来这一条不出现 —— 认不出就不提议。 */
+  onRemind?: (at: string, title: string) => void;
+  /** 刚设成提醒之后的那条回执(带撤销)。由上层给,这里只负责显示。 */
+  remindReceipt?: { text: string; onUndo: () => void } | null;
 }
 
 /** 输入框随字数长高(和成长页文本框同一套手感)。 */
@@ -63,6 +77,13 @@ export default function CaptureBar(capture: CaptureBarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+
+  const typed = capture.value.trim();
+  // 认出时间才提议「设成提醒」。认不出就**不出这一条** —— 宁可让人自己去日程页加,
+  // 也不给他一个设在他没说过的时刻上的提醒(那种他不会发现,直到错过那件事)。
+  const when = useMemo(() => (typed.length >= 2 ? parseWhen(typed) : null), [typed]);
+  // 两个字以下不打扰:打第一个字就弹出三行动作,比没有更烦。
+  const showActions = typed.length >= 2 && !!(capture.onSearch || capture.onAsk || capture.onRemind);
 
   async function take(files: File[]) {
     if (!files.length || !capture.onFiles) return;
@@ -155,6 +176,52 @@ export default function CaptureBar(capture: CaptureBarProps) {
 
       {capture.staleNote && capture.value.trim() && (
         <p className="nesio-tl-capture-stale">{capture.staleNote}</p>
+      )}
+
+      {/* 设成提醒之后的回执。**带撤销** —— 一个自动认出来的时间总有认错的时候,
+          而「已经建好了、你自己去日程页找出来删」不是一个能接受的收场。 */}
+      {capture.remindReceipt && (
+        <p className="nesio-tl-capture-receipt" role="status">
+          {capture.remindReceipt.text}
+          <button type="button" className="nesio-tl-capture-retry" onClick={capture.remindReceipt.onUndo}>
+            {L(dict, '撤销', 'Undo')}
+          </button>
+        </p>
+      )}
+
+      {/* ── 另外两条路(外加认出时间时的第三条)──────────────────────────
+          全部显式:点了才走。默认(回车/↑)永远是记一笔。 */}
+      {showActions && (
+        <div className="nesio-cap-actions">
+          {when && capture.onRemind && (
+            <button
+              type="button"
+              className="nesio-cap-action is-when"
+              onClick={() => capture.onRemind?.(when.at, when.title)}
+            >
+              <span className="nesio-cap-action-main">
+                {L(dict, `设成提醒 · ${formatWhen(when.at)}`, `Set a reminder · ${formatWhen(when.at)}`)}
+              </span>
+              {/* 时间是默认填的就**说出来**。只说了「明天」却装作用户定过九点,
+                  是这一整条路上最容易骗到人的地方。 */}
+              {!when.hasExplicitTime && (
+                <span className="nesio-cap-action-sub">
+                  {L(dict, '你没说几点,先按早上 9:00 · 可以改', 'No time given — defaulting to 9:00 AM · editable')}
+                </span>
+              )}
+            </button>
+          )}
+          {capture.onSearch && (
+            <button type="button" className="nesio-cap-action" onClick={() => capture.onSearch?.(typed)}>
+              {L(dict, `在我的记忆里找「${typed.slice(0, 18)}」`, `Search my memory for “${typed.slice(0, 18)}”`)}
+            </button>
+          )}
+          {capture.onAsk && (
+            <button type="button" className="nesio-cap-action" onClick={() => capture.onAsk?.(typed)}>
+              {L(dict, `问念念「${typed.slice(0, 18)}」`, `Ask Nessa “${typed.slice(0, 18)}”`)}
+            </button>
+          )}
+        </div>
       )}
 
       {err && (

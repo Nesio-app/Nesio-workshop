@@ -61,6 +61,10 @@ const FamilyTodayStrip = dynamic(() => import('./today/FamilyTodayStrip'), { ssr
 import MemoryFlashBanner, { useMemoryFlash } from './MemoryFlashBanner';
 import WrappedCard, { useWrappedTrigger } from './WrappedCard';
 import { takeCloudRestoreReceipt, restoreReceiptText } from '@/lib/portal/cloud-restore-receipt';
+// 三合一(2026-07-31):首页那句话认出时间就能直接变成一条真提醒 ——
+// 在这之前它只落成一条普通记录,而屏幕上还写着「设置提醒」。
+import { addReminder, removeReminder } from '@/lib/portal/schedule-reminders';
+import { formatWhen } from '@/lib/portal/when-parse';
 
 // ---- Main TodayFeed component ----
 
@@ -92,6 +96,8 @@ export default function TodayFeed({
   const [restoreNote, setRestoreNote] = useState<string | null>(null);
   // 批次 31:焦点下方快捷输入(用户新指令)
   const [quickAdd, setQuickAdd] = useState('');
+  // 「设成提醒」之后那条带撤销的回执(2026-07-31 三合一)。
+  const [remindReceipt, setRemindReceipt] = useState<{ text: string; onUndo: () => void } | null>(null);
   const uiLocale = portalLocaleToDictionaryLocale(usePortalLocale());
   /**
    * 「+」传完东西之后那条回执。
@@ -579,6 +585,40 @@ export default function TodayFeed({
           onFiles={captureFiles}
           micError={micErr}
           onDismissMicError={() => setMicErr('')}
+          /* ── 三合一的另外两条路(2026-07-31)。都是显式的:点了才走。 ──
+             搜索**不新做一套结果界面** —— 记忆页那套是完整的(语义理解 + 筛选 + 详情),
+             这里只把词带过去。问念念同理:把已经打好的一句带进 ask,别让人重打一遍。 */
+          onSearch={(q) => {
+            window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: q } }));
+          }}
+          onAsk={(q) => {
+            // 专用事件名:nesio-open-voice 被 test:today-settings-bug3 禁止出现在这个文件里
+            // (用户标注过「点话筒不该跳说一说」)。那条保护是对的,不为省事去放宽它。
+            window.dispatchEvent(new CustomEvent('nesio-open-ask', { detail: { text: q } }));
+          }}
+          onRemind={(at, title) => {
+            const r = addReminder({ title, at, kind: 'other' });
+            if (!r) {
+              // 红线:失败要有可见失败态。存不下就说,别让人以为设上了。
+              setQuickSaved(L(uiLocale, '这条没能设上,再试一次', 'Could not set that — try again'));
+              setTimeout(() => setQuickSaved(''), 3000);
+              return;
+            }
+            setQuickAdd('');
+            setDraftNote(null);
+            // 撤销留在回执里:自动认出来的时间总有认错的时候,而「已经建好了、
+            // 你自己去日程页找出来删」不是一个能接受的收场。
+            setRemindReceipt({
+              // 点明落在哪 —— 「我设的提醒」只在日程页里露面,不说的话用户设完就再也找不到它,
+              // 回执一消失这条提醒对他来说就等于不存在了。
+              text: L(uiLocale,
+                `已设在 ${formatWhen(at)} · 「${r.title}」· 在日程里`,
+                `Set for ${formatWhen(at)} · “${r.title}” · in Schedule`),
+              onUndo: () => { removeReminder(r.id); setRemindReceipt(null); },
+            });
+            setTimeout(() => setRemindReceipt((cur) => (cur && cur.text.includes(formatWhen(at)) ? null : cur)), 8000);
+          }}
+          remindReceipt={remindReceipt}
         />
         {/* 存进去了要说一声。这条回执之前**只被 set、从来没渲染** ——
             于是「+」传完文件、记一笔按了「记下」,界面上什么反应都没有。

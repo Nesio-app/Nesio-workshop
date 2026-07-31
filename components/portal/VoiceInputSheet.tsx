@@ -36,6 +36,11 @@ import { searchMemoriesLocally } from '@/lib/portal/local-tier0-handlers';
 interface VoiceInputSheetProps {
   open: boolean;
   intent?: 'note' | 'ask';
+  /**
+   * 打开时预填的文字。首页那条输入条把已经打好的一句带过来 ——
+   * 让人在另一个框里重打一遍是最没道理的一种「重来」。
+   */
+  seedText?: string;
   canUsePrivateData?: boolean;
   onClose: () => void;
 }
@@ -366,7 +371,7 @@ function DateTimePicker({ value, onChange, onClose }: {
   );
 }
 
-export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateData = false, onClose }: VoiceInputSheetProps) {
+export default function VoiceInputSheet({ open, intent = 'note', seedText = '', canUsePrivateData = false, onClose }: VoiceInputSheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [text, setText] = useState('');
   const [listening, setListening] = useState(false);
@@ -401,10 +406,15 @@ export default function VoiceInputSheet({ open, intent = 'note', canUsePrivateDa
       setDetail({}); setDetailOpen(false); setImageDataUrl(''); setSavedEvent(null); setShowDatePicker(false);
       recRef.current?.stop();
     } else {
+      // 首页输入条转过来的那句话,原样带进来 —— 不覆盖用户在这儿已经打的东西
+      // (seedText 只在打开的那一刻生效,之后他改成什么就是什么)。
+      if (seedText) setText(seedText);
       setTimeout(() => inputRef.current?.focus(), 120);
     }
     // 卸载时(录音中被父组件直接移除,没先置 open=false)也要释放麦克风。
     return () => { recRef.current?.stop(); recRef.current = null; };
+    // seedText 故意不进依赖:它是「打开那一刻」的初值,跟着它重跑会把用户改过的字冲掉。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isAskMode]);
 
   // Update intent label as user types/speaks
