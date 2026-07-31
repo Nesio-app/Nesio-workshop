@@ -93,12 +93,19 @@ export function resetMirrorProfile(): void {
   }
 }
 
+/**
+ * 走 session-state 单例(2026-07-31 归一)。原来这里自己 fetch 一趟,
+ * 和 Portal、PortalOnboarding 各打各的 —— 三趟请求在不同时刻回来、
+ * 各自 setState,开机头几秒登录态就会来回变。
+ *
+ * 顺带修好一处语义:原来 `catch → false`,把「问不出来」当成「没登录」。
+ * 单例是三态的,`unknown` 保持未知 —— 这里只在**服务器明确说登录了**时返回 true,
+ * 网络抖一下不会让镜像档案误以为用户登出了。
+ */
 async function hasCloudSession(): Promise<boolean> {
   try {
-    const res = await fetch('/api/auth/session', { cache: 'no-store' });
-    if (!res.ok) return false;
-    const data = await res.json() as { loggedIn?: boolean };
-    return data.loggedIn === true;
+    const { readSession } = await import('../session-state');
+    return (await readSession()).state === 'signed-in';
   } catch {
     return false;
   }

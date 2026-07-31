@@ -90,6 +90,7 @@ import { usePortalLocale } from './use-portal-locale';
 import { runConnectors } from '@/lib/platform/runtime/integration-runtime';
 import { pruneDisposableSignals } from '@/lib/life-domain';
 import { hydrateSignalFactStore } from '@/lib/life-domain/signal-read-cache';
+import { readSession } from '@/lib/portal/session-state';
 import { prunePrivateExternalNodes } from '@/lib/portal/life-graph';
 import { STORAGE_FULL_EVENT, STORAGE_WARNING_EVENT } from '@/lib/portal/storage-health';
 import { recordAppOpen } from '@/lib/portal/feature-usage';
@@ -114,9 +115,35 @@ type AuthSessionPayload = {
   profileBootstrapBlocking?: boolean;
 };
 
-async function fetchAuthSessionPayload(): Promise<AuthSessionPayload | null> {
-  const res = await fetch('/api/auth/session', { cache: 'no-store' });
-  return res.ok ? (res.json() as Promise<AuthSessionPayload>) : null;
+/**
+ * 读登录态。**走 session-state 那个单例,不再自己 fetch。**
+ *
+ * 原来这里是一句裸 `fetch('/api/auth/session')` —— 而 PortalOnboarding 和
+ * mirror-profile 各有一句一模一样的。三趟请求各自在不同时刻回来、各自 setState,
+ * 于是开机头几秒登录态会来回变(你报的那个)。
+ *
+ * bug #21 建 session-state 时统一过一轮,但这三处没并进去,因为它们要的是
+ * `hasRefreshToken` / `authReady` / `profileBootstrapBlocking`,而当时那个单例
+ * 只回 state + email 装不下。现在单例缓存整个 payload,这里取回来就行 ——
+ * **同一时刻只有一趟请求,所有人拿到同一个答案。**
+ */
+/**
+ * @param force `true` = 一定要真的打一次服务器,不吃缓存。
+ *
+ * ⚠️ 两个调用点要的**不是同一件事**,合并时差点合错:
+ *
+ *   · 重同步批次开头那句(`runHeavySyncBatch`)要的是**副作用** ——
+ *     「先单路刷新会话写回 cookie,再开并行云同步」,为的是避免 access 过期窗口里
+ *     多路 `grant_type=refresh_token` 互踢。它必须真的发出去。
+ *     吃了 30 秒缓存的话这句就成了空转,而那条保护**静默失效**,
+ *     症状要到并发同步互踢时才浮出来 —— 极难查。
+ *   · `refreshAuthSession` 要的是**当前状态**,吃缓存正合适(本来就是为了少打几趟)。
+ *
+ * 所以 force 不是可选的调优参数,是区分这两种语义的开关。
+ */
+async function fetchAuthSessionPayload(force = false): Promise<AuthSessionPayload | null> {
+  const info = await readSession(force ? { force: true } : {});
+  return (info.payload as AuthSessionPayload | null) ?? null;
 }
 
 function AskGuideSheet({
@@ -646,7 +673,7 @@ export default function Portal() {
       if (isCloudSyncSuspended()) { return; } // 跟练中:先不同步,退出时(resume)再补
       // 先单路刷新会话写回 cookie,再开并行云同步 —— 避免 access 过期窗口多路 grant_type=refresh_token 互踢。
       void (async () => {
-        await fetchAuthSessionPayload();
+        await fetchAuthSessionPayload(true);   // ← 要副作用(刷 cookie),不能吃缓存
         if (isCloudSyncSuspended()) return;
         // 记忆图/学习态/profile 逐一 union/LWW 合并回灌(跨端一致)。
         void syncMemoryWithCloud();
