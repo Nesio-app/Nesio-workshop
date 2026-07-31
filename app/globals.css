@@ -140,6 +140,16 @@
   --space-12: 3rem;
   --space-16: 4rem;
   --tap-min: 44px;
+  /**
+   * 页面留边(2026-07-31 用户:「所有的页面,把这种四边都紧挨着屏幕边的情况处理一下」)。
+   *
+   * 以前这个值散在各个顶层滚动容器里(今天页 / 记忆页各写了一份 1.1rem),
+   * 而**洞察那一整个壳漏了** —— 财务、衣橱、洞察、日程…全都装在它里面,
+   * 于是那些页的文字一路顶到屏幕边,「5 月」这种标签直接被裁掉半个字。
+   * 收成一个 token:留边这件事从此只有一处定义。
+   * 1rem 而不是原来的 1.1rem —— 回到 4px 网格(差 1.6px,看不出来)。
+   */
+  --page-gutter: var(--space-4);
   --ease-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-fast: 0.2s;
@@ -4910,7 +4920,11 @@ html[data-portal-theme="night"] .nesio-logo-night { display: inline-block !impor
   overflow-y: auto;
   /* 6.5rem:悬浮导航(底 0.5rem + 高约 3.2rem)+ 余量 —— QA 实测 390×844 下
      「还有 N 件小事」行被导航压了一截,5.5rem 不够。 */
-  padding: 0.5rem 1.1rem calc(6.5rem + env(safe-area-inset-bottom));
+  padding: 0.5rem 0 calc(6.5rem + env(safe-area-inset-bottom));
+  /* 左右走同一个 token(见 --page-gutter)。max(…, safe-area) 是「自适应屏幕」的另一半:
+     横屏/刘海机上那一侧安全区更宽,写死一个数就等于让内容钻到挖孔底下。 */
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain; /* iOS PWA:触底橡皮筋会拖动 fixed 层露出 html 兜底色(底部色带) */
 }
@@ -5226,7 +5240,9 @@ html[data-portal-theme="night"] .nesio-today-btn--ghost {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden; /* 竖向滚动容器绝不横滚:堵住「页面漂移/超出屏幕」 */
-  padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 1.1rem calc(5.5rem + env(safe-area-inset-bottom));
+  padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 0 calc(5.5rem + env(safe-area-inset-bottom));
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain; /* 同 today-scroll:掐断触底橡皮筋,不露 html 兜底色 */
 }
@@ -8723,8 +8739,14 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
   align-items: center;
   gap: 0.6rem;
   /* 全屏后顶到状态栏:留状态栏安全区,和记忆页一致。
-     2026-07-28 UI 精修:左右补 0.25rem —— 之前 0,「洞察」两个字贴边了。 */
-  padding: calc(0.6rem + env(safe-area-inset-top, 0px)) 0.25rem 0.9rem;
+     左右走 --page-gutter(2026-07-31)。此前是 0.25rem —— 那是 2026-07-28
+     发现「洞察」两个字贴边之后就地补的一小块,治的是症状:标题不贴了,
+     但下面整个 body 照旧贴着。现在留边由 --page-gutter 统一定义,
+     标题栏和它下面的内容对齐在同一条左边线上。 */
+  padding-top: calc(0.6rem + env(safe-area-inset-top, 0px));
+  padding-bottom: 0.9rem;
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
   flex-shrink: 0;
   border-bottom: 1px solid var(--portal-line);
   margin-bottom: 0.1rem;
@@ -8788,6 +8810,17 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
   padding-top: 0.75rem;
   /* 底安全区由内容自己吃 —— 全屏 sheet padding=0,不再靠 Vaul ::after 填色 */
   padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  /*
+   * 左右留边(2026-07-31 补)。这一条**以前根本不存在** —— 今天页、记忆页各自写了
+   * 1.1rem,而装着财务/衣橱/洞察/日程的这个壳一个字都没写。子面板普遍也不自己加
+   * (查过:analytics / finance / wardrobe / timeline / relationships 根上都没有),
+   * 于是那几屏的内容一路顶到屏幕边,「5 月」这类标签直接被裁掉半个字。
+   *
+   * max(gutter, safe-area) 而不是写死一个数:横屏或刘海机上,那一侧的安全区比
+   * 常规留边宽,写死就等于让内容钻到挖孔底下 —— 这才是「自适应屏幕」的那一半。
+   */
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
 }
 .nesio-insights-body::-webkit-scrollbar { display: none; }
 /* Bug4 图12:宫格首页没有标题栏了 —— 状态栏安全区改由 body 自己吃;
