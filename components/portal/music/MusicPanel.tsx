@@ -78,7 +78,7 @@ export default function MusicPanel() {
    *   'failed'     —— 上游/网络故障,重试是对的动作,所以给重试键。
    * 两者合成一句「播放失败」的下场,是用户对着一首永远放不了的歌一直点重试。
    */
-  const [neteaseTrackMsg, setNeteaseTrackMsg] = useState<{ id: string; kind: 'restricted' | 'failed'; text: string } | null>(null);
+  const [neteaseTrackMsg, setNeteaseTrackMsg] = useState<{ id: string; kind: 'restricted' | 'blocked' | 'failed'; text: string } | null>(null);
   /**
    * 正在放的那一首网易歌曲。**不能从 neteaseHits 里现找** ——
    * 放起来之后再搜一次别的,hits 就换了一批,播放条会当场消失:
@@ -205,10 +205,13 @@ export default function MusicPanel() {
     setNeteaseMsg('');
     try {
       const res = await fetch(`/api/portal/music/netease/search?q=${encodeURIComponent(q)}`, { cache: 'no-store' });
-      const j = await res.json() as { ok?: boolean; configured?: boolean; hits?: NeteaseHit[] };
-      if (!j.configured) {
+      const j = await res.json() as { ok?: boolean; configured?: boolean; hits?: NeteaseHit[]; reason?: string };
+      if (j.reason === 'blocked') {
+        // 被风控不是「没搜到」:换个词再搜一遍没用,这一句必须自己一支。
         setNeteaseHits([]);
-        setNeteaseMsg(L(dict, '网易云还没接上 —— 需要一个能连到它的接口地址。', 'NetEase is not wired up yet.'));
+        setNeteaseMsg(L(dict,
+          '网易这会儿不接受这台服务器的请求,换个词再搜也一样。先用别的源,或者过一阵再来。',
+          'NetEase is not accepting requests from this server right now — a different search will not help. Use another source, or come back later.'));
       } else if (!j.ok) {
         setNeteaseHits([]);
         setNeteaseMsg(L(dict, '这次没搜到,过一会儿再试。', 'Search failed. Try again shortly.'));
@@ -227,22 +230,32 @@ export default function MusicPanel() {
   /**
    * 点一首网易的歌。**这一步才知道它能不能放** —— 源级别只能说「多数能放」。
    *
-   * 三种结局必须说三种话:拿到地址就直接出声;受限那句里没有「重试」两个字
-   * (它永远不会成功);故障那句才给重试。混着说 = 让人对着一堵墙一直撞。
+   * 四种结局必须说四种话,因为**下一步动作各不相同**:
+   *   拿到地址 → 直接出声;
+   *   这一首受限 → 换一首(那句里没有「重试」两个字,它永远不会成功);
+   *   整台被风控 → 换歌也没用,得换出口 —— 说成「这首受限」会让人一首一首试到放弃;
+   *   故障 → 才给重试。
+   * 混着说 = 让人对着一堵墙一直撞。
    */
   const onPlayNetease = useCallback(async (h: NeteaseHit) => {
     setNeteaseTrying(h.id);
     setNeteaseTrackMsg(null);
     try {
       const res = await fetch(`/api/portal/music/netease/song-url?id=${encodeURIComponent(h.id)}`, { cache: 'no-store' });
-      const j = await res.json().catch(() => ({})) as { ok?: boolean; configured?: boolean; url?: string; reason?: string };
-      if (j.configured === false) {
-        setNeteaseTrackMsg({ id: h.id, kind: 'failed', text: L(dict, '网易云还没接上 —— 需要一个能连到它的接口地址。', 'NetEase is not wired up yet.') });
-        return;
-      }
+      const j = await res.json().catch(() => ({})) as { ok?: boolean; url?: string; reason?: string };
       if (res.ok && j.ok && j.url) {
         setNowRemote(h);
         await playRemote(j.url, { id: h.id, title: h.title, artist: h.artist });
+        return;
+      }
+      if (j.reason === 'blocked') {
+        setNeteaseTrackMsg({
+          id: h.id,
+          kind: 'blocked',
+          text: L(dict,
+            '网易这会儿不接受这台服务器的请求 —— 跟这一首没关系,换歌也一样。先用别的源,或者过一阵再来。',
+            'NetEase is not accepting requests from this server right now — this is not about this track, so switching tracks will not help. Use another source, or come back later.'),
+        });
         return;
       }
       if (res.ok && j.reason === 'restricted') {
@@ -567,14 +580,16 @@ export default function MusicPanel() {
       {/* ── 网易云:能搜,多数能放,受限那部分点下去才知道 ─────────── */}
       {source === 'netease' && (
         <section className="nesio-music-sec">
-          {/* 没配 API base 时**这一段自己说** —— 顶上那句 blocked 对未配置的远端源
-              是让位的(见上面的条件),这里不说就是整屏一句解释都没有:
-              搜索键点下去只会得到一句「还没接上」,而那要等他先点一次。 */}
+          {/* 这一段自己说 —— 顶上那句 blocked 对没就绪的远端源是让位的(见上面的条件),
+              这里不说就是整屏一句解释都没有。
+              2026-07-31 起网易**不需要配任何东西**(直连),所以这句话不再是「去配 XX」,
+              而是「暂时连不上」。逃生口(指一个自建实例)是部署者的事,写在 .env.example
+              和 STATE.md 里,不塞进用户界面 —— 环境变量名不该出现在这儿。 */}
           {probed && !signedOut && readiness.netease && !readiness.netease.configured && (
             <p className="nesio-music-msg">
               {L(dict,
-                '要用它得先在服务端配上 NETEASE_API_BASE(一个能连到网易云的接口地址)。配好之前这一格只能看。',
-                'This needs NETEASE_API_BASE on the server (an endpoint that can reach NetEase). Until then this tab is read-only.')}
+                '网易这会儿连不上 —— 不用你配什么,过一阵再来试试。想现在就听的话,本地歌曲照常能用。',
+                'NetEase is unreachable right now — nothing for you to set up, just try again later. Local files still work.')}
             </p>
           )}
           <div className="nesio-music-search">
@@ -616,12 +631,15 @@ export default function MusicPanel() {
                 {neteaseTrackMsg?.id === h.id && (
                   <div className="nesio-music-err">
                     <span>{neteaseTrackMsg.text}</span>
-                    {/* 只有**故障**才给重试。受限那一首重试一万次也是同一个答案,
-                        给它一个重试键就是把用户按在墙上。 */}
+                    {/* 三种结局三个动作。只有**故障**才给重试:受限那一首重试一万次
+                        也是同一个答案;被风控时连「换一首」都是错的建议(每一首都一样)。
+                        给错按钮 = 把用户按在墙上让他自己撞。 */}
                     {neteaseTrackMsg.kind === 'failed' ? (
                       <button type="button" onClick={() => { void onPlayNetease(h); }}>{L(dict, '再试一次', 'Try again')}</button>
-                    ) : (
+                    ) : neteaseTrackMsg.kind === 'restricted' ? (
                       <button type="button" onClick={() => setNeteaseTrackMsg(null)}>{L(dict, '换一首', 'Another track')}</button>
+                    ) : (
+                      <button type="button" onClick={() => setNeteaseTrackMsg(null)}>{L(dict, '知道了', 'OK')}</button>
                     )}
                   </div>
                 )}

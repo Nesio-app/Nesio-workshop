@@ -25,7 +25,9 @@ const securityHeaders = [
       "font-src 'self' fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",
       // Apple Music 的音频流走 HLS,分片在 apple.com 各边缘域;本地歌曲走 blob:。
-      "media-src 'self' blob: https://*.apple.com https://*.mzstatic.com",
+      // 网易的音频落在 126.net 的 CDN(m701/m801… 各节点)—— 不放行的表现同样是
+      // **点了没声音、控制台之外一行线索都没有**,正是 Plaid 当年那个坑。
+      "media-src 'self' blob: https://*.apple.com https://*.mzstatic.com https://*.music.126.net https://*.126.net",
       // Plaid Link SDK 与其后端通信;开发/沙盒/生产三档域名都放行
       "connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://api.bigdatacloud.net https://api.weather.gov https://cdn.plaid.com https://production.plaid.com https://sandbox.plaid.com https://development.plaid.com https://api.music.apple.com https://*.music.apple.com",
       "frame-src 'self' https://cdn.plaid.com https://plaid.com",
