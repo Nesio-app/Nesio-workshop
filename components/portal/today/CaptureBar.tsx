@@ -19,8 +19,7 @@
  */
 import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
 import MentionPicker from '../MentionPicker';
-import { activeMentionQuery, applyMention, mentionCandidates, type MentionCandidate, type PendingMention } from '@/lib/portal/mention';
-import { getLifeGraph } from '@/lib/portal/life-graph';
+import { activeMentionQuery, applyMention, mentionCandidatesFromGraph, type MentionCandidate, type PendingMention } from '@/lib/portal/mention';
 import { IconMic, IconPlus } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -77,9 +76,9 @@ export default function CaptureBar(capture: CaptureBarProps) {
     const q = activeMentionQuery(text, caret);
     setMention(q);
     if (!q || !q.query.trim()) { setCands([]); return; }
-    // 全图线性扫 —— 只在真的打了 @ 且有查询词时才扫,而且 mentionCandidates 内部有
+    // 全图线性扫 —— 只在真的打了 @ 且有查询词时才扫,而且 mentionCandidatesFromGraph 内部有
     // 200 条命中上限。不做去抖是因为它比一次 setState 还快;真慢了再说。
-    try { setCands(mentionCandidates(q.query, getLifeGraph(), { max: 6 })); }
+    try { setCands(mentionCandidatesFromGraph(q.query, { max: 6 })); }
     catch { setCands([]); }
   }, []);
 

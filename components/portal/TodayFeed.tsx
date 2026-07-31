@@ -10,8 +10,7 @@ import { usePortalLocale } from './use-portal-locale';
 import { L } from '@/lib/portal/i18n';
 import { buildTodayViewModel, focusTimeHint, markFocusNodeDone, deleteFocusNode, addCommitmentNode, addMeetingNotes, saveSubtasks, toggleSubtask, type FocusNode, type SubTask, type ProactiveContext, type ProactiveContextItem, getLiveMemoryNode, type LiveMemoryNode } from '@/lib/platform/view-models/today-view-model';
 import type { CalendarEvent } from '@/lib/portal/types';
-import { settleMentions, type PendingMention } from '@/lib/portal/mention';
-import { linkNodes } from '@/lib/portal/life-graph';
+import { settleMentions, linkSettledMentions, type PendingMention } from '@/lib/portal/mention';
 import { dismissJudgedCard, judgeState, clearJudgeError } from '@/lib/portal/guidance-judge-auto';
 
 /**
@@ -549,7 +548,7 @@ export default function TodayFeed({
           value={quickAdd}
           onChange={setQuickAdd}
           onMention={(m) => setPendingMentions((prev) => [...prev, m])}
-          onSubmit={() => {
+          onSubmit={async () => {
             const name = quickAdd.trim();
             if (!name) return;
             const created = addCommitmentNode(name);
@@ -559,10 +558,7 @@ export default function TodayFeed({
             // 连不上不拦提交:这条记录本身是你要的东西,为了一条关联把它丢掉更糟;
             // 但也不静默 —— 连不上就在回执里说。
             const settled = settleMentions(quickAdd, pendingMentions);
-            let linked = 0;
-            for (const m of settled) {
-              try { if (linkNodes(created.id, m.id, 'user_linked').ok) linked += 1; } catch { /* 见下面的回执 */ }
-            }
+            const { linked } = await linkSettledMentions(created.id, settled);
             setPendingMentions([]);
             setQuickAdd('');
             setQuickSaved(
