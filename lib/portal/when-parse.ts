@@ -30,6 +30,18 @@ export interface WhenGuess {
   matched: string;
   /** 去掉时间词之后剩下的正文,当提醒标题。剩空了就退回整句。 */
   title: string;
+  /**
+   * 重复方式(2026-07-31 从「例行提醒」并过来的能力)。**没说就是 undefined**,
+   * 不默认成「每天」—— 把一次性的事变成天天响,是最快让人关掉整个功能的做法。
+   */
+  repeat?: RepeatGuess;
+}
+
+/** 三者互斥,weekdays 优先。「每周一三五」不是等间隔,用 everyDays 表达不了。 */
+export interface RepeatGuess {
+  everyDays?: number;
+  everyMonths?: number;
+  weekdays?: number[];
 }
 
 /** 只说了日期没说时间时填这个钟点。填了就必须在界面上说 —— 见 hasExplicitTime。 */
@@ -79,6 +91,19 @@ function parseDate(text: string, now: Date): DateHit | null {
       const cand = new Date(year, mo - 1, day);
       if (cand < new Date(now.getFullYear(), now.getMonth(), now.getDate())) year += 1;
       return { date: new Date(year, mo - 1, day), matched: md[0] };
+    }
+  }
+
+  // 光一个「15 号」——「每月 15 号交房租」里没有月份,但它明确说的是某一天。
+  // 当月的那天过了就落到下个月,否则会造出一条一建就过期的提醒。
+  const dom = text.match(/(?:^|[^0-9:：])(\d{1,2})\s*[号號]/);
+  if (dom) {
+    const day = Number(dom[1]);
+    if (day >= 1 && day <= 31) {
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      let cand = new Date(now.getFullYear(), now.getMonth(), day);
+      if (cand < today) cand = new Date(now.getFullYear(), now.getMonth() + 1, day);
+      return { date: cand, matched: dom[0].replace(/^[^0-9]/, '') };
     }
   }
 
@@ -176,6 +201,45 @@ function applyMeridiem(hour: number, prefix?: string): number {
   return hour;
 }
 
+/* ── 频率 ────────────────────────────────────────────────────────────────── */
+
+interface RepeatHit { repeat: RepeatGuess; matched: string }
+
+/**
+ * 「每天 / 每周三 / 每周一三五 / 工作日 / 每月 / 每两天」。
+ *
+ * 认不出就返回 null,**绝不默认成每天** —— 把一次性的事变成天天响,
+ * 是最快让人把整个提醒功能关掉的做法。
+ */
+function parseRepeat(text: string): RepeatHit | null {
+  // 工作日
+  const wk = text.match(/(?:每个?)?工作日|weekdays?/i);
+  if (wk) return { repeat: { weekdays: [1, 2, 3, 4, 5] }, matched: wk[0] };
+
+  // 每周一三五 / 每周三 / 每星期二四
+  const wd = text.match(/每\s*(?:周|週|星期|礼拜)\s*([一二三四五六日天]+)/);
+  if (wd) {
+    const days = [...wd[1]].map((c) => (c === '天' ? 0 : WEEKDAY_CN.indexOf(c))).filter((d) => d >= 0);
+    if (days.length) return { repeat: { weekdays: [...new Set(days)].sort() }, matched: wd[0] };
+  }
+  // 「每周」不带星期几 —— 说不清是哪天,不猜(调用方拿到 undefined 就当一次性处理)。
+
+  // 每两天 / 每 3 天 / 每天 / daily
+  const dy = text.match(/每\s*([0-9]{1,2}|[两二三四五六七八九十]{1,2})?\s*(?:天|日)|daily/i);
+  if (dy) {
+    const n = dy[1] ? cnNumber(dy[1]) : 1;
+    if (Number.isFinite(n) && n >= 1) return { repeat: { everyDays: n }, matched: dy[0] };
+  }
+
+  // 每两个月 / 每月 / monthly
+  const mo = text.match(/每\s*([0-9]{1,2}|[两二三四五六七八九十]{1,2})?\s*个?\s*月|monthly/i);
+  if (mo) {
+    const n = mo[1] ? cnNumber(mo[1]) : 1;
+    if (Number.isFinite(n) && n >= 1) return { repeat: { everyMonths: n }, matched: mo[0] };
+  }
+  return null;
+}
+
 /* ── 标题清洗 ────────────────────────────────────────────────────────────── */
 
 /** 「设一个…提醒」这类外壳词。留着会让提醒标题变成「设一个医生提醒」。 */
@@ -203,9 +267,12 @@ export function parseWhen(text: string, now: Date = new Date()): WhenGuess | nul
   const raw = String(text || '').trim();
   if (!raw) return null;
 
+  const rep = parseRepeat(raw);
   const d = parseDate(raw, now);
   const t = parseTime(raw);
-  if (!d && !t) return null;   // 一样都认不出 —— 不硬凑
+  // 只说了「每天」而没有任何钟点线索,也算认出来了 —— 缺省钟点由 DEFAULT_HOUR 补,
+  // 界面会照实说「你没说几点」。三样都没有才是真的认不出。
+  if (!d && !t && !rep) return null;   // 一样都认不出 —— 不硬凑
 
   let date = d ? d.date : new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const hour = t ? t.hour : DEFAULT_HOUR;
@@ -216,12 +283,26 @@ export function parseWhen(text: string, now: Date = new Date()): WhenGuess | nul
   // (「今晚 8 点」在夜里 10 点说,那确实是过去了 —— 界面会把时刻显示出来,用户自己看得见)。
   // 只说了钟点、没说哪天,而今天这个钟点已经过去 → 说的是明天。
   // 不这样处理的话,晚上十点打「8 点提醒我」会拿到一条今早八点的、一创建就过期的提醒。
-  if (!d && t) {
+  // 没说哪天(不管说没说钟点),而算出来的时刻已经过去 → 说的是明天。
+  // 「每两天浇花」在夜里打进来也会落到今天早上九点 —— 一建就是过期的,得往后挪一天。
+  if (!d) {
     const todayAt = new Date(date.getFullYear(), date.getMonth(), date.getDate(), hour, minute);
     if (todayAt.getTime() <= now.getTime()) date = addDays(now, 1);
   }
 
-  const matchedParts = [d?.matched, t?.matched].filter(Boolean) as string[];
+  // 「每周三 8 点」:at 落在下一个周三,repeat 记住每周三 —— 两者都要,不是二选一。
+  // 只说了「每周三」没说日期时,parseDate 认不出(它只认「周三」不认「每周三」),
+  // 这里用 weekdays 把首次落点补上,否则会落在今天、当天就过期。
+  if (!d && rep?.repeat.weekdays?.length) {
+    const set = new Set(rep.repeat.weekdays);
+    for (let i = 0; i <= 7; i += 1) {
+      const cand = addDays(now, i);
+      const at = new Date(cand.getFullYear(), cand.getMonth(), cand.getDate(), hour, minute);
+      if (set.has(cand.getDay()) && at.getTime() > now.getTime()) { date = cand; break; }
+    }
+  }
+
+  const matchedParts = [rep?.matched, d?.matched, t?.matched].filter(Boolean) as string[];
   const title = cleanTitle(raw, matchedParts);
 
   return {
@@ -229,6 +310,7 @@ export function parseWhen(text: string, now: Date = new Date()): WhenGuess | nul
     hasExplicitTime: !!t,
     matched: matchedParts.join(' '),
     title: title || raw,
+    ...(rep ? { repeat: rep.repeat } : {}),
   };
 }
 

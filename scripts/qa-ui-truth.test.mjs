@@ -160,17 +160,11 @@ const code = stripComments;
   assert.ok(/earned:\s*bal\.earned/.test(server), '服务端没把 earned 发给客户端,前端算不出真实攒钱进度');
 }
 
-// ── ⑥ 到点的例行提醒要有「不再提醒」出口 ─────────────────────────────────────
-// CLAUDE.md 红线:每个提示都要有「跳过 / 稍后 / 不再提醒」。原来只有「完成 / 今天跳过」,
-// 两个都只管今天,不想要的提醒每天还会再来;而整张卡又不可点,没有别的出口。
-{
-  const cards = code(read('components/portal/today/RoutineDueCards.tsx'));
-  assert.ok(/deleteRoutine\(r\.id\)/.test(cards), '例行提醒卡没有「不再提醒」出口');
-  assert.equal(
-    (cards.match(/deleteRoutine\(r\.id\)/g) || []).length, 2,
-    'AI 简报卡和普通提醒卡两种都要有「不再提醒」—— 少一种就有一类提醒关不掉',
-  );
-}
+// ── ⑥ (已撤)例行提醒卡的「不再提醒」出口 ─────────────────────────────────────
+// 2026-07-31:例行提醒模块整个删掉了 —— 它的能力(每周几重复)并进了
+// schedule-reminders,提醒不再在今天页出卡,所以这条断言失去了对象。
+// **红线本身没变**:凡是会重复出现的提示,都必须给得出「不再提醒」。
+// 现在那个出口在日程页每条提醒的「✕」上,由 test:reminder-unify 那边盯着。
 
 // ── ⑦ 「读不出来」不许伪装成「没有数据」 ─────────────────────────────────────
 // 财务页原来是 hydrated: boolean,而 bankDataReady() 的 catch 里直接 setHydrated(true)——

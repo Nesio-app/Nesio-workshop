@@ -417,6 +417,27 @@ export default function VoiceInputSheet({ open, intent = 'note', seedText = '', 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, isAskMode]);
 
+  /**
+   * 从首页输入条转过来的问题:**直接开始回答**,不停在一个已经填好、还等着再点一次
+   * 发送的框上(用户原话「点击 ask,直接进入问问页面」)。
+   *
+   * 只在「问」这一侧自动跑 —— 「说一句」是往记忆里**写**东西,自动提交等于替人
+   * 按下保存键,那是另一回事。
+   * autoAskedRef 保证一次打开只自动发一次:文字被 setText 之后这个 effect 会再跑,
+   * 不挡的话会连着发两遍(白花一次 AI 的钱)。
+   */
+  const autoAskedRef = useRef('');
+  useEffect(() => {
+    if (!open || !isAskMode) { autoAskedRef.current = ''; return; }
+    const seed = seedText.trim();
+    if (!seed || autoAskedRef.current === seed) return;
+    if (text.trim() !== seed) return;   // 等 setText 落定再发
+    autoAskedRef.current = seed;
+    void handleSend();
+    // handleSend 读的是当下的 text/state,不进依赖 —— 进了会在每次输入时重跑。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, isAskMode, seedText, text]);
+
   // Update intent label as user types/speaks
   useEffect(() => {
     if (text.trim()) setIntentLabel(routeIntent(text).suggestedAction);

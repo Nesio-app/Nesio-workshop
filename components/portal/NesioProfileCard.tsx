@@ -23,7 +23,6 @@ import { useProfileAvatar } from './use-profile-avatar';
 import { AccountSheet, AppearanceSheet, PrivacySheet, SubscriptionSheet, LabSheet } from './SettingsSheets';
 import ConnectorsHub from './ConnectorsHub';
 import RoadmapSheet from './RoadmapSheet';
-import RoutineSheet from './RoutineSheet';
 import PreviewGuidesSheet from './PreviewGuidesSheet';
 import { getTier, trialDaysLeft, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { L } from '@/lib/portal/i18n';
@@ -32,10 +31,10 @@ import { invalidateSession } from '@/lib/portal/session-state';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
-import { IconClock, IconGift, IconSun, IconShield, IconHelpCircle, IconBulb } from './icons';
+import { IconGift, IconSun, IconShield, IconHelpCircle, IconBulb } from './icons';
 
 // 图3/4/5:档案页删除、账户收进头像区、菜单去分组标题与小灰字
-type ActiveSheet = 'account' | 'appearance' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'routine' | 'preview' | 'lab' | null;
+type ActiveSheet = 'account' | 'appearance' | 'privacy' | 'subscription' | 'connectors' | 'roadmap' | 'preview' | 'lab' | null;
 
 export default function NesioProfileCard() {
   const [displayName, setDisplayName] = useState('Jessy');
@@ -168,7 +167,6 @@ export default function NesioProfileCard() {
   // 用户要求:这几项与上面两张卡同形态 —— 合进同一套整行卡(图标块 + 名称 + 箭头)。
   const bottomItems: Array<{ key: ActiveSheet; icon: ReactNode; iconBg: string; label: string }> = [
     { key: 'subscription', icon: <IconGift />, iconBg: 'var(--chip-amber)', label: L(dict, '会员 · Pro', 'Membership · Pro') },
-    { key: 'routine', icon: <IconClock />, iconBg: 'var(--chip-mint)', label: L(dict, '例行提醒', 'Routines') },
     { key: 'roadmap', icon: <IconHelpCircle />, iconBg: 'var(--chip-periwinkle)', label: L(dict, '帮助与反馈', 'Help & feedback') },
     { key: 'lab', icon: <IconBulb />, iconBg: 'var(--chip-violet)', label: 'Lab' },
   ];
@@ -291,7 +289,6 @@ export default function NesioProfileCard() {
       <SubscriptionSheet open={activeSheet === 'subscription'} onClose={() => setActiveSheet(null)} />
       <ConnectorsHub open={activeSheet === 'connectors'} onClose={() => setActiveSheet(null)} />
       <RoadmapSheet open={activeSheet === 'roadmap'} onClose={() => setActiveSheet(null)} />
-      <RoutineSheet open={activeSheet === 'routine'} onClose={() => setActiveSheet(null)} />
       <LabSheet open={activeSheet === 'lab'} onClose={() => setActiveSheet(null)} onOpenPreview={() => setActiveSheet('preview')} />
       <PreviewGuidesSheet open={activeSheet === 'preview'} onClose={() => setActiveSheet(null)} />
     </>

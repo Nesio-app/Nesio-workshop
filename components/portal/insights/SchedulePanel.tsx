@@ -41,6 +41,12 @@ import {
 } from '@/lib/portal/mail-suggest-state';
 import {
   listReminders, addReminder, removeReminder, completeReminder, reopenReminder,
+  listCompleted, repeatLabel, type CompletedEntry,
+} from '@/lib/portal/schedule-reminders';
+// 提醒在时间线上的身影:两个建提醒的入口共用同一份 —— 只在一处建的话,
+// 「设好的提醒进入时间线」就只对首页那条输入生效,从这一页加的看不见。
+import { createReminderShadow, removeReminderShadow } from '@/lib/portal/reminder-shadow';
+import {
   parseWallClock, scheduleRemindersReady, SCHEDULE_REMINDERS_EVENT,
   REMINDER_KINDS, type Reminder, type ReminderKind,
 } from '@/lib/portal/schedule-reminders';
@@ -361,6 +367,8 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, fixes, onOpen, onStar, 
 function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonly string[] }) {
   const [items, setItems] = useState<Reminder[]>([]);
   const [adding, setAdding] = useState(false);
+  // 「已完成」是这一段的另一面,不是另一个页面 —— 切过去看一眼就能切回来。
+  const [showDone, setShowDone] = useState(false);
   const [title, setTitle] = useState('');
   const [at, setAt] = useState('');
   const [kind, setKind] = useState<ReminderKind>('other');
@@ -404,10 +412,14 @@ function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonl
                     'Could not save this one — try again in a moment.'));
       return;
     }
+    // 真的存进去了才建身影 —— 上面那段刚从存储回读确认过。
+    createReminderShadow(created);
     setAdding(false); setTitle(''); setErr('');
   };
 
   const now = Date.now();
+  const doneRows = showDone ? listCompleted().filter((c) => matchesSearch(
+    { title: c.title, meta: kindLabel(c.kind), body: '' }, tokens)) : [];
   const shown = items.filter((r) => matchesSearch(
     { title: r.title, meta: kindLabel(r.kind), body: r.note || '' }, tokens));
 
@@ -418,10 +430,50 @@ function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonl
     <section className="nesio-remind">
       <div className="nesio-remind-head">
         <h4 className="nesio-remind-title">{L(dict, '我设的提醒', 'My reminders')}</h4>
+        {/* 用户原话:「应该有已完成提醒查询地方」。在这之前**重复提醒做完不留任何痕迹**
+            (直接滚到下一次),所以「这个月到底交没交房租」根本没有数据能回答。
+            现在一次性的看 doneAt、重复的看 doneLog,两种在这里都查得到。 */}
+        <button type="button" className="nesio-remind-add" onClick={() => setShowDone((v) => !v)}>
+          {showDone ? L(dict, '回到待办', 'Back') : L(dict, `已完成${doneRows.length ? ` (${doneRows.length})` : ''}`, `Done${doneRows.length ? ` (${doneRows.length})` : ''}`)}
+        </button>
         <button type="button" className="nesio-remind-add" onClick={() => (adding ? setAdding(false) : openForm())}>
           {adding ? L(dict, '稍后', 'Later') : L(dict, '加一条', 'Add')}
         </button>
       </div>
+
+      {/* 已完成:只读的一段流水。这里不给「撤销」—— 重复提醒的那一次已经滚过去了,
+          撤销它意味着把时间倒回去,讲不清也做不对;要改就在待办那边改下一次。 */}
+      {showDone && (
+        doneRows.length === 0 ? (
+          <p className="nesio-remind-empty">
+            {L(dict, '还没有做完的 —— 点一条提醒上的「做好了」,它就会记在这里。',
+                  'Nothing finished yet — tap “Done” on a reminder and it lands here.')}
+          </p>
+        ) : (
+          <ul className="nesio-remind-list">
+            {doneRows.map((c) => {
+              const when = parseWallClock(c.at);
+              const whenText = when
+                ? (dict === 'en'
+                    ? when.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                    : `${when.getMonth() + 1}月${when.getDate()}日 ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`)
+                : c.at;
+              return (
+                <li key={c.id} className="nesio-remind-item done">
+                  <div className="nesio-remind-main">
+                    <span className="nesio-remind-name">{c.title}</span>
+                    <span className="nesio-remind-when">
+                      {whenText}
+                      {` · ${kindLabel(c.kind)}`}
+                      {c.recurring && ` · ${L(dict, '这一次', 'this one')}`}
+                    </span>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )
+      )}
 
       {adding && (
         <div className="nesio-remind-form">
@@ -450,7 +502,7 @@ function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonl
         </div>
       )}
 
-      {shown.length === 0 ? (
+      {showDone ? null : shown.length === 0 ? (
         <p className="nesio-remind-empty">
           {L(dict, '还没有 —— 家务、账单到期这些自己设的时间,记在这里就不会被日历里的筛选吃掉。',
                 'Nothing yet — chores and bill due dates you set yourself live here.')}
@@ -465,7 +517,9 @@ function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonl
                   ? when.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
                   : `${when.getMonth() + 1}月${when.getDate()}日 ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`)
               : r.at;
-            const repeatText = r.everyMonths ? L(dict, '每月', 'Monthly') : r.everyDays === 7 ? L(dict, '每周', 'Weekly') : '';
+            // 走统一的 repeatLabel:原来这行只认「每月」和 everyDays===7,
+            // 「每周一三五」这类(从例行提醒并过来的)会显示成空白 —— 看着像只此一次。
+            const repeatText = repeatLabel(r, dict);
             return (
               <li key={r.id} className={`nesio-remind-item${r.doneAt ? ' done' : ''}`}>
                 <div className="nesio-remind-main">
@@ -488,7 +542,7 @@ function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonl
                       {L(dict, '做好了', 'Done')}
                     </button>
                   )}
-                  <button type="button" className="nesio-remind-act" onClick={() => { removeReminder(r.id); setItems(listReminders()); }}
+                  <button type="button" className="nesio-remind-act" onClick={() => { removeReminder(r.id); removeReminderShadow(r.id); setItems(listReminders()); }}
                     aria-label={L(dict, `删掉「${r.title}」`, `Delete “${r.title}”`)}>✕</button>
                 </div>
               </li>
@@ -564,6 +618,7 @@ function MailSuggestions({ dict, rows, taken }: {
         setErr(L(dict, '这条没能加进日程,稍后再试一次。', 'Could not add it — try again in a moment.'));
         return;
       }
+      createReminderShadow(created);
     }
     markSuggest(c.eid, verdict);
     setState(loadSuggestState());

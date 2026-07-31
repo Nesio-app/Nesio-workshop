@@ -115,7 +115,7 @@ assert.ok(
 /* ── ④ 建出来的提醒撤得掉,失败也说得清 ─────────────────────────────────── */
 
 assert.ok(
-  /removeReminder\(r\.id\); setRemindReceipt\(null\);/.test(feed),
+  /onUndo: \(\) => \{[^}]*removeReminder\(r\.id\)[^}]*setRemindReceipt\(null\)/.test(feed),
   '回执上的「撤销」必须真的把那条提醒删掉,不能只是把回执藏起来',
 );
 assert.ok(
@@ -127,12 +127,12 @@ assert.ok(
   '存不下就要说 —— 红线:每个异步动作都要有可见失败态,不许静默回 idle',
 );
 assert.ok(
-  /addReminder\(\{ title, at, kind: 'other' \}\)/.test(feed),
+  /addReminder\(\{ title, at, kind: 'other'/.test(feed),
   '「设成提醒」要落到 schedule-reminders(日程页那份),不是又开一处新存储',
 );
 assert.ok(
-  /在日程里[\s\S]{0,200}in Schedule/.test(feed),
-  '回执要点明这条提醒落在哪 —— 「我设的提醒」只在日程页露面,不说的话回执一消失它就等于不存在了',
+  /日程和时间线里都有[\s\S]{0,240}in Schedule and your timeline/.test(feed),
+  '回执要点明这条提醒落在哪 —— 不说的话回执一消失,它对用户就等于不存在了',
 );
 
 /* ── ⑤ 三条路都显式,默认仍是记一笔 ─────────────────────────────────────── */

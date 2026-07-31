@@ -48,7 +48,6 @@ import { archiveShownCard } from '@/lib/portal/card-archive';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
 import CaptureBar from './today/CaptureBar';
-import { RoutineDueCards } from './today/RoutineDueCards';
 import { ThawedReminder } from './today/ThawedReminder';
 import { ReengageNudgeCard } from './today/ReengageNudgeCard';
 import { TodayFocusSection } from './today/FocusSection';
@@ -63,8 +62,10 @@ import WrappedCard, { useWrappedTrigger } from './WrappedCard';
 import { takeCloudRestoreReceipt, restoreReceiptText } from '@/lib/portal/cloud-restore-receipt';
 // 三合一(2026-07-31):首页那句话认出时间就能直接变成一条真提醒 ——
 // 在这之前它只落成一条普通记录,而屏幕上还写着「设置提醒」。
-import { addReminder, removeReminder } from '@/lib/portal/schedule-reminders';
+import { addReminder, removeReminder, repeatLabel } from '@/lib/portal/schedule-reminders';
 import { formatWhen } from '@/lib/portal/when-parse';
+// 提醒在时间线上的身影。两个建提醒的入口共用同一份 —— 各写一份迟早有一处忘了收。
+import { createReminderShadow, removeReminderShadow } from '@/lib/portal/reminder-shadow';
 
 // ---- Main TodayFeed component ----
 
@@ -596,8 +597,8 @@ export default function TodayFeed({
             // (用户标注过「点话筒不该跳说一说」)。那条保护是对的,不为省事去放宽它。
             window.dispatchEvent(new CustomEvent('nesio-open-ask', { detail: { text: q } }));
           }}
-          onRemind={(at, title) => {
-            const r = addReminder({ title, at, kind: 'other' });
+          onRemind={(at, title, repeat) => {
+            const r = addReminder({ title, at, kind: 'other', ...(repeat || {}) });
             if (!r) {
               // 红线:失败要有可见失败态。存不下就说,别让人以为设上了。
               setQuickSaved(L(uiLocale, '这条没能设上,再试一次', 'Could not set that — try again'));
@@ -606,15 +607,18 @@ export default function TodayFeed({
             }
             setQuickAdd('');
             setDraftNote(null);
-            // 撤销留在回执里:自动认出来的时间总有认错的时候,而「已经建好了、
-            // 你自己去日程页找出来删」不是一个能接受的收场。
+            // 用户原话「设好的提醒进入时间线」:提醒的真源在 schedule-reminders,
+            // 这里同时在记忆里留一条**身影**。撤销时两条一起收 ——
+            // 只删一边会留下一条指向不存在提醒的记忆。
+            createReminderShadow(r);
+            const rep = repeatLabel(r, uiLocale);
             setRemindReceipt({
               // 点明落在哪 —— 「我设的提醒」只在日程页里露面,不说的话用户设完就再也找不到它,
               // 回执一消失这条提醒对他来说就等于不存在了。
               text: L(uiLocale,
-                `已设在 ${formatWhen(at)} · 「${r.title}」· 在日程里`,
-                `Set for ${formatWhen(at)} · “${r.title}” · in Schedule`),
-              onUndo: () => { removeReminder(r.id); setRemindReceipt(null); },
+                `已设在 ${formatWhen(at)}${rep ? ` · ${rep}` : ''} · 「${r.title}」· 日程和时间线里都有`,
+                `Set for ${formatWhen(at)}${rep ? ` · ${rep}` : ''} · “${r.title}” · in Schedule and your timeline`),
+              onUndo: () => { removeReminder(r.id); removeReminderShadow(r.id); setRemindReceipt(null); },
             });
             setTimeout(() => setRemindReceipt((cur) => (cur && cur.text.includes(formatWhen(at)) ? null : cur)), 8000);
           }}
@@ -647,7 +651,6 @@ export default function TodayFeed({
             记一笔输入内联进时间线「记一笔·话筒」节点(唯一极简输入入口)。 */}
 
         {/* 实验打卡(批次 8:按用户要求放到最下面) */}
-        {!quietAll && <RoutineDueCards />}
         {!quietAll && <ExperimentCheckinCard />}
 
         {/* 批次 169:用户实锤去掉底部「想到什么…」提示行 */}

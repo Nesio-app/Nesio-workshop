@@ -18,7 +18,8 @@
  * 不按类型白名单收,按体积设限 —— 白名单永远会漏掉某个「常见类型」。
  */
 import { useMemo, useRef, useState, type RefObject } from 'react';
-import { formatWhen, parseWhen } from '@/lib/portal/when-parse';
+import { formatWhen, parseWhen, type RepeatGuess } from '@/lib/portal/when-parse';
+import { repeatLabel } from '@/lib/portal/schedule-reminders';
 import { IconMic, IconPlus } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -55,7 +56,7 @@ export interface CaptureBarProps {
   onSearch?: (q: string) => void;
   onAsk?: (q: string) => void;
   /** 认出时间时的「设成提醒」。没认出来这一条不出现 —— 认不出就不提议。 */
-  onRemind?: (at: string, title: string) => void;
+  onRemind?: (at: string, title: string, repeat?: RepeatGuess) => void;
   /** 刚设成提醒之后的那条回执(带撤销)。由上层给,这里只负责显示。 */
   remindReceipt?: { text: string; onUndo: () => void } | null;
 }
@@ -84,6 +85,9 @@ export default function CaptureBar(capture: CaptureBarProps) {
   const when = useMemo(() => (typed.length >= 2 ? parseWhen(typed) : null), [typed]);
   // 两个字以下不打扰:打第一个字就弹出三行动作,比没有更烦。
   const showActions = typed.length >= 2 && !!(capture.onSearch || capture.onAsk || capture.onRemind);
+  // 「每天 / 每周三」这类频率也要摆在按钮上 —— 用户看不见系统读成了什么,
+  // 就只能等到明天发现它天天响才知道。
+  const whenRepeat = when?.repeat ? repeatLabel(when.repeat, dict) : '';
 
   async function take(files: File[]) {
     if (!files.length || !capture.onFiles) return;
@@ -197,10 +201,12 @@ export default function CaptureBar(capture: CaptureBarProps) {
             <button
               type="button"
               className="nesio-cap-action is-when"
-              onClick={() => capture.onRemind?.(when.at, when.title)}
+              onClick={() => capture.onRemind?.(when.at, when.title, when.repeat)}
             >
               <span className="nesio-cap-action-main">
-                {L(dict, `设成提醒 · ${formatWhen(when.at)}`, `Set a reminder · ${formatWhen(when.at)}`)}
+                {L(dict,
+                  `设成提醒 · ${formatWhen(when.at)}${whenRepeat ? ` · ${whenRepeat}` : ''}`,
+                  `Set a reminder · ${formatWhen(when.at)}${whenRepeat ? ` · ${whenRepeat}` : ''}`)}
               </span>
               {/* 时间是默认填的就**说出来**。只说了「明天」却装作用户定过九点,
                   是这一整条路上最容易骗到人的地方。 */}
