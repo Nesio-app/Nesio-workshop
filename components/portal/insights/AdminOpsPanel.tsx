@@ -232,7 +232,7 @@ export default function AdminOpsPanel() {
                 ? ['一般', 'Fair', 'var(--status-gentle)', 'var(--status-gentle-soft)']
                 : ['待打磨', 'Needs work', 'var(--status-calm)', 'var(--status-calm-soft)'];
             return (
-              <span style={{ marginLeft: '0.4rem', padding: '0.1rem 0.45rem', borderRadius: 'var(--radius-pill)', fontSize: '0.62rem', fontWeight: 'var(--weight-medium)', color: fg, background: bg, verticalAlign: 'middle' }}>
+              <span style={{ marginLeft: '0.4rem', padding: '0.1rem 0.45rem', borderRadius: 'var(--radius-pill)', fontSize: 'var(--text-overline)', fontWeight: 'var(--weight-medium)', color: fg, background: bg, verticalAlign: 'middle' }}>
                 {L(dict, zh, en)}
               </span>
             );
@@ -242,7 +242,7 @@ export default function AdminOpsPanel() {
       </div>
 
       {data.sampleCapped && (
-        <p style={{ margin: 'var(--space-2) 0 0', fontSize: '0.62rem', color: 'var(--portal-muted)' }}>
+        <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>
           {L(dict, '事件数为精确值;下方分项(Top/画像/AI)基于最近采样,近似。', 'Event counts are exact; breakdowns below use a recent sample (approximate).')}
         </p>
       )}
@@ -393,7 +393,7 @@ export default function AdminOpsPanel() {
               </p>
             );
           })()}
-          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.7fr 0.9fr', fontSize: '0.62rem', color: 'var(--portal-muted)', paddingBottom: '0.3rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.7fr 0.9fr', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', paddingBottom: '0.3rem' }}>
             <span>{L(dict, '路由', 'Route')}</span><span>{L(dict, '次数', 'Calls')}</span><span>{L(dict, '成功', 'OK')}</span><span>{L(dict, '花费', 'Cost')}</span>
           </div>
           {data.ai!.routes.slice(0, 8).map((r) => {

@@ -657,8 +657,8 @@ export default function TimelineTab() {
               style={{
                 margin: '0 0 0.75rem',
                 padding: '0.55rem 0.75rem',
-                borderRadius: '0.75rem',
-                fontSize: '0.78rem',
+                borderRadius: 'var(--radius-sm)',
+                fontSize: 'var(--text-xs)',
                 lineHeight: 1.45,
                 background: locateMsg.ok ? 'var(--status-go-soft)' : 'var(--status-risk-soft)',
                 color: locateMsg.ok ? 'var(--status-go)' : 'var(--status-risk)',

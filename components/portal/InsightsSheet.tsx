@@ -702,11 +702,11 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
                     return (
                       <div key={t.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.7rem' }}>
                         <div style={{ minWidth: 0 }}>
-                          <p style={{ margin: 0, fontWeight: 600, color: 'var(--portal-ink)', fontSize: '0.84rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>「{stripMarkdownInline(t.name).slice(0, 22)}」</p>
-                          <p style={{ margin: '0.12rem 0 0', fontSize: '0.7rem', color: 'var(--portal-muted)' }}>{L(dict, `${days} 天前提过,没再碰`, `mentioned ${days}d ago, not since`)}</p>
+                          <p style={{ margin: 0, fontWeight: 600, color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>「{stripMarkdownInline(t.name).slice(0, 22)}」</p>
+                          <p style={{ margin: '0.12rem 0 0', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>{L(dict, `${days} 天前提过,没再碰`, `mentioned ${days}d ago, not since`)}</p>
                         </div>
                         <button type="button" onClick={() => openInMemory(t.name)}
-                          style={{ flex: 'none', fontSize: '0.74rem', fontWeight: 600, padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-sm, 12px)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', cursor: 'pointer' }}>
+                          style={{ flex: 'none', fontSize: 'var(--text-xs)', fontWeight: 600, padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-sm, 12px)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', cursor: 'pointer' }}>
                           {L(dict, '拾起', 'Pick up')}
                         </button>
                       </div>

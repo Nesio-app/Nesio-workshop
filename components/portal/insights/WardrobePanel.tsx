@@ -736,7 +736,7 @@ export default function WardrobePanel() {
           {/* bug3:「目 上身试穿」这个图标和标题都删掉 —— 卡片里已经是全身照 + 试穿按钮,自明。 */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
             <button type="button" onClick={() => setTryonOpen(false)} aria-label={L(dict, '收起', 'Close')}
-              style={{ background: 'none', border: 'none', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: '1rem' }}>✕</button>
+              style={{ background: 'none', border: 'none', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: 'var(--text-body)' }}>✕</button>
           </div>
 
           {tryonResult ? (
@@ -985,7 +985,7 @@ export default function WardrobePanel() {
                 </div>
                 <div style={{ padding: '0.4rem 0.5rem' }}>
                   <p style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</p>
-                  <p style={{ margin: '0.15rem 0 0', fontSize: '0.62rem', color: 'var(--portal-muted)' }}>
+                  <p style={{ margin: '0.15rem 0 0', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>
                     {L(dict, WARMTH_LABEL[it.warmth][0], WARMTH_LABEL[it.warmth][1])} · {L(dict, FORMAL_LABEL[it.formality][0], FORMAL_LABEL[it.formality][1])}
                   </p>
                 </div>

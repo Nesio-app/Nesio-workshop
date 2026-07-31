@@ -427,7 +427,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
               {([['write', L(dict, '写一篇', 'Write')], ['history', L(dict, '历史', 'History')]] as const).map(([id, label]) => (
                 <button key={id} type="button"
                   onClick={() => setJournalTab(id)}
-                  style={{ fontSize: '0.78rem', fontWeight: 600, padding: '0.3rem 0.8rem', borderRadius: 999, border: 'none', cursor: 'pointer', background: journalTab === id ? 'var(--portal-blue-deep)' : 'rgba(88,140,227,0.1)', color: journalTab === id ? '#fff' : 'var(--portal-blue-deep)' }}>
+                  style={{ fontSize: 'var(--text-xs)', fontWeight: 600, padding: '0.3rem 0.8rem', borderRadius: 999, border: 'none', cursor: 'pointer', background: journalTab === id ? 'var(--portal-blue-deep)' : 'rgba(88,140,227,0.1)', color: journalTab === id ? '#fff' : 'var(--portal-blue-deep)' }}>
                   {label}
                 </button>
               ))}
@@ -448,9 +448,9 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
               {/* 富文本-lite 工具条:加粗 / 列表 */}
               <div style={{ display: 'flex', gap: '0.4rem', marginBottom: '0.4rem' }}>
                 <button type="button" onClick={wrapBold} aria-label={L(dict, '加粗', 'Bold')}
-                  style={{ minWidth: 'var(--tap-min)', minHeight: '2.1rem', borderRadius: '0.5rem', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid)', fontWeight: 800, color: 'var(--portal-ink)', cursor: 'pointer' }}>B</button>
+                  style={{ minWidth: 'var(--tap-min)', minHeight: '2.1rem', borderRadius: 'var(--radius-xs)', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid)', fontWeight: 800, color: 'var(--portal-ink)', cursor: 'pointer' }}>B</button>
                 <button type="button" onClick={insertBullet} aria-label={L(dict, '列表', 'List')}
-                  style={{ minWidth: 'var(--tap-min)', minHeight: '2.1rem', borderRadius: '0.5rem', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', cursor: 'pointer' }}>•—</button>
+                  style={{ minWidth: 'var(--tap-min)', minHeight: '2.1rem', borderRadius: 'var(--radius-xs)', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', cursor: 'pointer' }}>•—</button>
               </div>
               <div
                 ref={journalRef}
@@ -477,14 +477,14 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
               />
               <div style={{ maxHeight: '46vh', overflowY: 'auto', paddingRight: 2 }}>
                 {filtered.length === 0 && (
-                  <p style={{ fontSize: '0.8rem', color: 'var(--portal-muted)', textAlign: 'center', padding: '1.2rem 0' }}>
+                  <p style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', textAlign: 'center', padding: '1.2rem 0' }}>
                     {q ? L(dict, `没有找到「${q}」`, `Nothing found for \"${q}\"`) : L(dict, '还没有日记。长按转盘中心,写下第一篇。', 'No journal yet. Long-press the wheel center to write the first one.')}
                   </p>
                 )}
                 {[...byDay.entries()].map(([day, list]) => (
                   <div key={day} style={{ marginBottom: '0.7rem' }}>
                     {/* 时间线:日期节点 + 竖线 */}
-                    <p style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.72rem', fontWeight: 700, color: 'var(--portal-blue-deep)', margin: '0 0 0.35rem' }}>
+                    <p style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--text-xs)', fontWeight: 700, color: 'var(--portal-blue-deep)', margin: '0 0 0.35rem' }}>
                       <IconBook size={13} /> {day}
                     </p>
                     <div style={{ borderLeft: '2px solid var(--portal-line)', marginLeft: 6, paddingLeft: 12, display: 'grid', gap: '0.5rem' }}>
@@ -494,16 +494,16 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
                         return (
                           <button key={e.id} type="button"
                             onClick={() => setExpandedEntry(isOpen ? '' : e.id)}
-                            style={{ textAlign: 'left', background: 'rgba(88,140,227,0.05)', border: '1px solid var(--portal-line)', borderRadius: '0.7rem', padding: '0.55rem 0.7rem', cursor: 'pointer' }}>
+                            style={{ textAlign: 'left', background: 'rgba(88,140,227,0.05)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '0.55rem 0.7rem', cursor: 'pointer' }}>
                             <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', margin: '0 0 0.25rem' }}>
                               {e.emotionColor && <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: e.emotionColor, display: 'inline-block' }} />}
                               {[e.emotionLabel || '', e.energyLevel ? `${L(dict, '能量', 'energy ')}${energyWord(e.energyLevel, dict)}` : '', timeOfDay(dict, e.date), e.date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })].filter(Boolean).join(' · ')}
                             </p>
                             {e.html && isOpen ? (
-                              <div className="nesio-journal-history-html" style={{ fontSize: '0.82rem', color: 'var(--portal-ink)', lineHeight: 1.6 }}
+                              <div className="nesio-journal-history-html" style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-ink)', lineHeight: 1.6 }}
                                 dangerouslySetInnerHTML={{ __html: sanitizeJournalHtml(e.html) }} />
                             ) : (
-                              <div style={{ fontSize: '0.82rem', color: 'var(--portal-ink)', lineHeight: 1.6 }}>{renderMdLite(preview)}</div>
+                              <div style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-ink)', lineHeight: 1.6 }}>{renderMdLite(preview)}</div>
                             )}
                           </button>
                         );

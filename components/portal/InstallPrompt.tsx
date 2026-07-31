@@ -95,16 +95,16 @@ export default function InstallPrompt({ locale = 'zh' }: { locale?: PortalLocale
       bottom: 'calc(var(--portal-bottom-nav-clearance, 84px) + env(safe-area-inset-bottom, 0px))',
       width: 'min(92vw, 420px)', zIndex: 60,
       background: 'var(--sheet-opaque, #fff)', color: 'var(--portal-ink, #2c2c2c)',
-      border: '1px solid var(--portal-line, #d7deea)', borderRadius: 16,
+      border: '1px solid var(--portal-line, #d7deea)', borderRadius: 'var(--radius-md)',
       boxShadow: '0 8px 30px rgba(15, 30, 60, 0.18)', padding: '0.9rem 1rem',
       display: 'flex', alignItems: 'center', gap: '0.75rem',
     }}>
       <NesioMark size={34} style={{ flexShrink: 0 }} />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ margin: 0, fontWeight: 600, fontSize: '0.92rem' }}>
+        <p style={{ margin: 0, fontWeight: 600, fontSize: 'var(--text-body)' }}>
           {zh ? '把 Nesio 装到主屏' : 'Add Nesio to your Home Screen'}
         </p>
-        <p style={{ margin: '0.15rem 0 0', fontSize: '0.8rem', color: 'var(--portal-muted, #8a94a6)' }}>
+        <p style={{ margin: '0.15rem 0 0', fontSize: 'var(--text-sm)', color: 'var(--portal-muted, #8a94a6)' }}>
           {mode === 'ios'
             ? (zh ? '点击底部「分享」→「添加到主屏幕」' : 'Tap Share → “Add to Home Screen”')
             : (zh ? '像 App 一样打开,离线也能用' : 'Opens like an app, works offline too')}
@@ -119,7 +119,7 @@ export default function InstallPrompt({ locale = 'zh' }: { locale?: PortalLocale
       )}
       <button type="button" onClick={close} aria-label={zh ? '关闭' : 'Dismiss'} style={{
         flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer',
-        color: 'var(--portal-muted, #8a94a6)', fontSize: '1.1rem', lineHeight: 1, padding: '0.2rem',
+        color: 'var(--portal-muted, #8a94a6)', fontSize: 'var(--text-h3)', lineHeight: 1, padding: '0.2rem',
       }}>✕</button>
     </div>
   );

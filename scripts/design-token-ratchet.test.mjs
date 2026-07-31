@@ -27,13 +27,22 @@ const ROOT = new URL('..', import.meta.url);
  * 清理完一批就把对应数字改成新的实际值 —— 那一刻棘轮就卡在更严的位置上了。
  */
 const BASELINE = {
-  fontSize: 164,
+  fontSize: 13,
   spacing: 323,
-  radius: 66,
+  radius: 42,
   hex: 27,
+  rawButton: 213,
 };
 
 /*
+ * 2026-07-31(二次):字号 164→13、圆角 66→42。**按值就近吸附到设计系统档位**,
+ * 规则是代码级的、可重跑的,不靠看图:每个写死值找最近的一档,**漂移超过 0.06rem
+ * (≈1px)就不吸**,原样留下。
+ *
+ * 留下来没吸的 13 处字号:0.6(×4) 1.15(×3) 1.4(×2) 1.7 2.0 —— 它们离最近档位
+ * 都超过 1px,吸过去是**真的改变视觉**,那需要你看着定,不是机械替换能决定的。
+ * 圆角同理留下 24 处(多为 2/4/5/10/11/14px 这类小值,和 8/12/16 档不对齐)。
+ *
  * 2026-07-31:字号 231→164 —— 把和现有 token **完全相等**的写死值(0.75/0.68/0.85/0.95…)
  * 换成 token,零视觉变化。剩下的 164 处是 0.72/0.7/0.78/0.82 这类**没有精确对应档**的,
  * 换过去会改变字号,得一屏一屏看着改,不能批量。
@@ -60,6 +69,16 @@ const CHECKS = [
   { key: 'spacing', re: /\b(?:padding|margin|gap):\s*'[^']*[0-9.]+rem[^']*'/g, what: '写死的间距', fix: 'var(--space-1..16)(4px 网格)' },
   { key: 'radius', re: /\bborderRadius:\s*(?:'[0-9.]+(?:rem|px|em)?'|[0-9]+)/g, what: '写死的圆角', fix: 'var(--radius-sm/md/xl/pill)' },
   // 先摘掉 var(--x, #fallback) 这种兜底(全站惯例,不算硬编码),剩下的才是真写死。
+  /**
+   * 绕过 Button 原语的裸 <button>。**只卡住不再增长,不批量迁。**
+   *
+   * 213 个裸按钮 vs 17 个用原语 —— 差距很大,但一刀切迁移会把版式改坏:
+   * 那些 inline style 大半是**布局**(flex:1 / width:100% / marginTop),不是外观。
+   * 真要迁得连着布局一起想,那是一屏一屏的活,不是机械替换。
+   *
+   * 所以这条棘轮的作用是:存量慢慢还,**新代码别再加一个**。
+   */
+  { key: 'rawButton', re: /<button[^>]*\sstyle=\{/gs, what: '绕过 Button 原语的裸按钮', fix: "components/portal/ui/Button.tsx 的 <Button variant=...>" },
   { key: 'hex', re: /#[0-9a-fA-F]{6}\b/g, what: '写死的色值', fix: 'var(--portal-*/--status-*/--viz-*)', strip: (s) => s.replace(/var\([^)]*,\s*#[0-9a-fA-F]{3,8}\)/g, '') },
 ];
 

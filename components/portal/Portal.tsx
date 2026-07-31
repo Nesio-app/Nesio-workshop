@@ -1276,7 +1276,7 @@ export default function Portal() {
             style={{
               position: 'fixed', top: 8, left: 12, right: 12, zIndex: 300,
               background: 'var(--status-risk-soft)', border: '1px solid var(--status-risk)',
-              borderRadius: 12, padding: '0.6rem 0.9rem', fontSize: '0.8rem',
+              borderRadius: 'var(--radius-sm)', padding: '0.6rem 0.9rem', fontSize: 'var(--text-sm)',
               color: 'var(--status-risk, #d33)', display: 'flex', alignItems: 'center', gap: 8,
             }}
           >
@@ -1288,7 +1288,7 @@ export default function Portal() {
               </span>
               {/* 批次 116:占用最多的几项(诊断「哪里占空间」),按皮肤中性色显示 */}
               {!reliefMsg && storageAlert.largest && storageAlert.largest.length > 0 && (
-                <span style={{ fontSize: '0.72rem', opacity: 0.88 }}>
+                <span style={{ fontSize: 'var(--text-xs)', opacity: 0.88 }}>
                   {L(dict, '占用最多：', 'Biggest: ')}
                   {storageAlert.largest.slice(0, 3).map((k) =>
                     `${storageKeyLabel(k.key, dict)} ${k.bytes >= 1048576 ? `${(k.bytes / 1048576).toFixed(1)}M` : `${Math.round(k.bytes / 1024)}K`}`
@@ -1310,7 +1310,7 @@ export default function Portal() {
                   setTimeout(() => { setStorageAlert(null); setReliefMsg(''); }, 3500);
                 } finally { setReliefBusy(false); }
               }}
-              style={{ flex: 'none', background: 'var(--status-risk)', color: '#fff', border: 'none', borderRadius: 999, padding: '0.3rem 0.7rem', fontSize: '0.74rem', fontWeight: 600, cursor: 'pointer', opacity: reliefBusy ? 0.6 : 1 }}
+              style={{ flex: 'none', background: 'var(--status-risk)', color: '#fff', border: 'none', borderRadius: 999, padding: '0.3rem 0.7rem', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer', opacity: reliefBusy ? 0.6 : 1 }}
             >{reliefBusy ? L(dict, '清理中…', 'Cleaning…') : L(dict, '一键腾空间', 'Free up space')}</button>
             <button
               type="button"
@@ -1322,7 +1322,7 @@ export default function Portal() {
                 try { sessionStorage.setItem('nesio-storage-alert-snooze-v1', until); } catch { /* ignore */ }
                 setStorageAlert(null);
               }}
-              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: '1rem', padding: 0 }}
+              style={{ background: 'none', border: 'none', color: 'inherit', cursor: 'pointer', fontSize: 'var(--text-body)', padding: 0 }}
               aria-label={L(dict, '关闭存储警告', 'Dismiss storage warning')}
             >✕</button>
           </div>
@@ -1387,13 +1387,13 @@ export default function Portal() {
             ? L(dict, '这台设备上有另一个账号的数据', 'This device holds another account’s data')
             : L(dict, '把本机已有的记录归入这个账号?', 'Keep the records already on this device?')}
         >
-          <div style={{ width: 'min(96vw, 440px)', background: 'var(--sheet-opaque, #fff)', color: 'var(--portal-ink, #2c2c2c)', borderRadius: 20, padding: '1.4rem 1.25rem', boxShadow: '0 12px 48px rgba(4,10,22,0.4)' }}>
-            <h3 style={{ margin: '0 0 0.5rem', fontSize: '1.1rem', fontWeight: 700 }}>
+          <div style={{ width: 'min(96vw, 440px)', background: 'var(--sheet-opaque, #fff)', color: 'var(--portal-ink, #2c2c2c)', borderRadius: 'var(--radius-lg)', padding: '1.4rem 1.25rem', boxShadow: '0 12px 48px rgba(4,10,22,0.4)' }}>
+            <h3 style={{ margin: '0 0 0.5rem', fontSize: 'var(--text-h3)', fontWeight: 700 }}>
               {ownerConflict.kind === 'other_account'
                 ? L(dict, '这台设备上有另一个账号的数据', 'This device holds another account’s data')
                 : L(dict, '把本机已有的记录归入这个账号?', 'Keep the records already on this device?')}
             </h3>
-            <p style={{ margin: '0 0 1.1rem', lineHeight: 1.6, color: 'var(--portal-muted, #8a94a6)', fontSize: '0.9rem' }}>
+            <p style={{ margin: '0 0 1.1rem', lineHeight: 1.6, color: 'var(--portal-muted, #8a94a6)', fontSize: 'var(--text-body)' }}>
               {ownerConflict.kind === 'other_account'
                 ? L(dict,
                     `本机现在是${ownerConflict.prevEmail ? `「${ownerConflict.prevEmail}」` : '上一个账号'}的空间。切换后,ta 的记忆会先归档在本机 ta 的名下(不删除、不外泄),换回 ta 的账号时原样回来;你会进入自己的空间。`,
@@ -1454,7 +1454,7 @@ export default function Portal() {
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            style={{ width: 'min(96vw, 460px)', margin: '0 0 max(1rem, env(safe-area-inset-bottom))', background: 'var(--sheet-opaque, #fff)', color: 'var(--portal-ink, #2c2c2c)', borderRadius: 20, padding: '1.4rem 1.25rem', boxShadow: '0 -8px 40px rgba(4,10,22,0.35)' }}
+            style={{ width: 'min(96vw, 460px)', margin: '0 0 max(1rem, env(safe-area-inset-bottom))', background: 'var(--sheet-opaque, #fff)', color: 'var(--portal-ink, #2c2c2c)', borderRadius: 'var(--radius-lg)', padding: '1.4rem 1.25rem', boxShadow: '0 -8px 40px rgba(4,10,22,0.35)' }}
           >
             <p style={{ margin: 0, fontSize: 'var(--text-xs)', letterSpacing: '0.08em', color: 'var(--portal-accent, #588ce3)', fontWeight: 700 }}>PRO</p>
             <h3 style={{ margin: '0.3rem 0 0.5rem', fontSize: '1.15rem', fontWeight: 700 }}>

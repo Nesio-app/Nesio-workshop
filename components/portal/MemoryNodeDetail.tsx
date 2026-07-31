@@ -102,7 +102,7 @@ function CollapsibleText({ text, limit = 110 }: { text: string; limit?: number }
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        style={{ marginLeft: 6, fontSize: '0.72rem', fontWeight: 600, color: 'var(--portal-blue-deep)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+        style={{ marginLeft: 6, fontSize: 'var(--text-xs)', fontWeight: 600, color: 'var(--portal-blue-deep)', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
       >
         {expanded ? L(dict, '收起', 'Less') : L(dict, '详情', 'More')}
       </button>
@@ -609,12 +609,12 @@ class DetailErrorBoundary extends Component<{ onClose: () => void; dict: string;
       return (
         <div className="nesio-node-detail-overlay" role="dialog" aria-modal="true" onClick={this.props.onClose}>
           <div className="nesio-node-detail-sheet" style={{ padding: '1.4rem 1.2rem', textAlign: 'center' }} onClick={(e) => e.stopPropagation()}>
-            <p style={{ margin: '0 0 0.4rem', fontSize: '1rem', fontWeight: 600 }}>{L(this.props.dict, '这条记忆的详情没打开成功', "This memory's details didn't open")}</p>
-            <p style={{ margin: '0 0 0.9rem', fontSize: '0.8rem', color: 'var(--portal-muted)' }}>{L(this.props.dict, '数据没有丢。关闭后再试一次。若反复出现,把下面这行错误复制发回来就能定位。', 'Your data is safe. Close and try again. If it keeps happening, copy the error line below and send it to us so we can pinpoint it.')}</p>
+            <p style={{ margin: '0 0 0.4rem', fontSize: 'var(--text-body)', fontWeight: 600 }}>{L(this.props.dict, '这条记忆的详情没打开成功', "This memory's details didn't open")}</p>
+            <p style={{ margin: '0 0 0.9rem', fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>{L(this.props.dict, '数据没有丢。关闭后再试一次。若反复出现,把下面这行错误复制发回来就能定位。', 'Your data is safe. Close and try again. If it keeps happening, copy the error line below and send it to us so we can pinpoint it.')}</p>
             {this.state.msg && (
               <p style={{
-                fontSize: '0.72rem', color: 'var(--status-risk, #c0392b)', margin: '0 auto 0.8rem', maxWidth: 300,
-                padding: '8px 10px', borderRadius: 8, textAlign: 'left', wordBreak: 'break-all', userSelect: 'text',
+                fontSize: 'var(--text-xs)', color: 'var(--status-risk, #c0392b)', margin: '0 auto 0.8rem', maxWidth: 300,
+                padding: '8px 10px', borderRadius: 'var(--radius-xs)', textAlign: 'left', wordBreak: 'break-all', userSelect: 'text',
                 background: 'rgba(192,57,43,0.08)', border: '1px solid rgba(192,57,43,0.25)',
               }}>{this.state.msg.slice(0, 200)}</p>
             )}
@@ -991,7 +991,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
         <div className="nesio-settings-sheet-header">
           {editing ? (
             <input
-              className="nesio-ob-input" style={{ fontSize: '1rem', marginBottom: 0, flex: 1 }}
+              className="nesio-ob-input" style={{ fontSize: 'var(--text-body)', marginBottom: 0, flex: 1 }}
               value={field('name')} onChange={(e) => setField('name', e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') saveEdit(); }}
               autoFocus
@@ -1001,7 +1001,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
           )}
           {/* 可见关闭出口(QA:只能 Esc/下滑关,触屏用户不知道怎么退) */}
           <button type="button" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}
-            style={{ flexShrink: 0, marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--portal-muted)', fontSize: '1rem', padding: '0.2rem 0.35rem', lineHeight: 1 }}>
+            style={{ flexShrink: 0, marginLeft: 'auto', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--portal-muted)', fontSize: 'var(--text-body)', padding: '0.2rem 0.35rem', lineHeight: 1 }}>
             ✕
           </button>
         </div>
@@ -1233,7 +1233,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                   </div>
                 )}
                 {linkError && (
-                  <p style={{ fontSize: '0.7rem', color: 'var(--status-risk)', margin: '0.3rem 0 0', wordBreak: 'break-all' }}>{linkError}</p>
+                  <p style={{ fontSize: 'var(--text-overline)', color: 'var(--status-risk)', margin: '0.3rem 0 0', wordBreak: 'break-all' }}>{linkError}</p>
                 )}
               </div>
             );
@@ -1279,7 +1279,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
           {showRawInput && (
             <div className="nesio-node-raw" style={{ marginTop: '0.75rem' }}>
               <p className="nesio-settings-section-label">{isEmailNode ? L(dict, '原始记录 · 邮件原文', 'Original · email') : L(dict, '原始记录', 'Original note')}</p>
-              <p style={{ fontSize: '0.88rem', color: 'var(--portal-muted)', fontStyle: 'italic' }}>
+              <p style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', fontStyle: 'italic' }}>
                 &ldquo;{(() => { const raw = stripMarkdownInline(n.rawInput || ''); return rawExpanded || raw.length <= 180 ? raw : `${raw.slice(0, 180)}…`; })()}&rdquo;
               </p>
               {(n.rawInput || '').length > 180 && (
@@ -1333,7 +1333,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                       onClose();
                       window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: t } }));
                     }}
-                    style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.12))', border: 'none', borderRadius: 999, padding: '0.35rem 0.8rem', fontSize: '0.78rem', color: 'var(--portal-accent, #588ce3)', cursor: 'pointer' }}
+                    style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.12))', border: 'none', borderRadius: 999, padding: '0.35rem 0.8rem', fontSize: 'var(--text-xs)', color: 'var(--portal-accent, #588ce3)', cursor: 'pointer' }}
                   >
                     {t} · {count} {L(dict, '条', '')} ›
                   </button>
@@ -1382,12 +1382,12 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                           // 从 assetUrls 摘掉这条,自动回落到下面的软文案分支(有可见失败态,不是破图)。
                           onError={() => setAssetUrls((cur) => { if (!(key in cur)) return cur; const next = { ...cur }; delete next[key]; return next; })} />
                       ) : (
-                        <p style={{ fontSize: '0.82rem', color: 'var(--portal-muted)', marginBottom: '0.35rem' }}>
+                        <p style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', marginBottom: '0.35rem' }}>
                           {asset.local ? L(dict, '图片加载中…', 'Loading image…') : asset.storagePath ? L(dict, '图片线索已保存，登录后可查看。', 'Image clue saved — sign in to view.') : L(dict, '附件线索已保存。', 'Attachment clue saved.')}
                         </p>
                       )}
                       {asset.analysisSummary && (
-                        <p style={{ fontSize: '0.78rem', color: 'var(--portal-muted)', margin: 0 }}>
+                        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: 0 }}>
                           {asset.analysisSummary}
                         </p>
                       )}
@@ -1399,7 +1399,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             );
           })()}
 
-          <p style={{ fontSize: '0.7rem', color: 'var(--portal-muted)', marginTop: '1rem' }}>
+          <p style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', marginTop: '1rem' }}>
             {L(dict, '记录于', 'Noted on')} {createdDate}
             {/* 批次 55/57/63:位置戳 —— 点地点可纠正(与足迹同一套地址库) */}
             {(() => {
@@ -1440,11 +1440,11 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                       key={r.id}
                       type="button"
                       onClick={() => onOpenNode?.(r)}
-                      style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.5rem 0.7rem', borderRadius: '0.7rem', border: '1px solid var(--portal-line, rgba(127,127,127,0.18))', background: 'none', color: 'var(--portal-ink)', textAlign: 'left', cursor: 'pointer' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.5rem 0.7rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line, rgba(127,127,127,0.18))', background: 'none', color: 'var(--portal-ink)', textAlign: 'left', cursor: 'pointer' }}
                     >
                       <NodeTypeIcon type={r.type} size={13} />
                       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--text-sm)' }}>{r.name}</span>
-                      {dateTag && <span style={{ color: 'var(--portal-muted)', fontSize: '0.74rem', flex: 'none' }}>{dateTag}</span>}
+                      {dateTag && <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', flex: 'none' }}>{dateTag}</span>}
                       <span style={{ color: 'var(--portal-muted)' }}>›</span>
                     </button>
                   );

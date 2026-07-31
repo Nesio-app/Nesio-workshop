@@ -287,7 +287,7 @@ export function FocusCardDetail({
             {L(dict, '直达链接', 'Open link')}
           </a>
         )}
-        {error && <p className="nesio-momentum-error" style={{ color: 'var(--status-risk)', fontSize: '0.8rem', margin: '0 0 0.5rem' }}>{error}</p>}
+        {error && <p className="nesio-momentum-error" style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)', margin: '0 0 0.5rem' }}>{error}</p>}
         <button type="button" className="nesio-momentum-ignite-btn" onClick={() => void firstBreakdown()}>
           {error ? L(dict, '重试', 'Retry') : L(dict, '拆成小步', 'Break it into steps')}
         </button>
@@ -374,7 +374,7 @@ export function FocusCardDetail({
                 {/* 批次 14:emoji 不进 UI(红线);动作名本身就够了 */}
                 <span className="nesio-momentum-name">{a.name}</span>
                 {!!a.durationMin && (
-                  <span style={{ flexShrink: 0, fontSize: '0.7rem', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                  <span style={{ flexShrink: 0, fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
                     {a.durationMin} min
                   </span>
                 )}
@@ -411,7 +411,7 @@ export function FocusCardDetail({
                       {/* 批次 14:同上,去 emoji */}
                       <span className="nesio-momentum-drill-name">{d.name}</span>
                       {!!d.durationMin && (
-                        <span style={{ flexShrink: 0, fontSize: '0.66rem', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                        <span style={{ flexShrink: 0, fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
                           {d.durationMin} min
                         </span>
                       )}
