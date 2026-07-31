@@ -43,7 +43,11 @@ const PLUGINS = [
     js: 'NesioGeolocation',
     bridge: 'lib/portal/native-geolocation.ts',
     inShell: true,
-    note: '壳类 NesioGeolocationPlugin;Info.plist 三条 Location 描述 + UIBackgroundModes:[location] 齐全。',
+    note: '壳类 NesioGeolocationPlugin;Info.plist 三条 Location 描述 + UIBackgroundModes:[location] 齐全。'
+      + '⚠️ **事件通道是断的**:壳有 startTrailWatch/stopTrailWatch/trailWatching、也确实起了 '
+      + 'startMonitoringSignificantLocationChanges + startMonitoringVisits,但二进制里 `trailPoint` 出现 0 次 —— '
+      + '而 JS 侧 addListener("trailPoint") 就等着它。所以 startTrailWatch 返回 ok(UI 显示「足迹监听已开」),'
+      + '点却一个都回不来。这就是「位置后台一直收集还不管用」。下一版壳要补 notifyListeners("trailPoint", …)。',
   },
   {
     js: 'NesioLocalNotify',
@@ -120,6 +124,31 @@ for (const p of PLUGINS.filter((x) => !x.inShell)) {
     + `  清单备注:${p.note}`,
   );
 }
+
+// ── ②c 事件通道:JS addListener 的事件名,必须在清单备注里被交代过 ──────────────
+//
+// 方法名对得上**不代表**通道通。NesioGeolocation 就是这么坏的:
+// startTrailWatch 有、返回 ok,但壳从不 notifyListeners("trailPoint"),
+// 于是 UI 一路显示「足迹监听已开」,而一个点都没进来过 —— 比整个插件缺失更难查,
+// 因为每一层看起来都成功了。
+//
+// 静态没法验证壳到底发不发某个事件(那要真机跑),所以这里只钉一件事:
+// **每个 addListener 的事件名都得在清单备注里出现过** —— 逼你拆壳核一次,
+// 而不是写完 addListener 就当它通了。
+const listened = new Map();
+for (const p of PLUGINS) {
+  const src = stripComments(read(p.bridge));
+  for (const m of src.matchAll(/addListener\(\s*['"]([A-Za-z0-9_]+)['"]/g)) listened.set(m[1], p);
+}
+const uncheckedEvents = [...listened.entries()]
+  .filter(([ev, p]) => !p.note.includes(ev))
+  .map(([ev, p]) => `${ev}(${p.bridge})`);
+assert.deepEqual(
+  uncheckedEvents, [],
+  `这些事件 JS 在监听,但清单备注里没交代壳发不发:${uncheckedEvents.join(', ')}\n`
+  + '  → 拆一次 IPA,用 `strings App | grep -cF "<事件名>"` 核实,把结论写进对应插件的 note。\n'
+  + '    方法名对得上不代表通道通 —— trailPoint 就是这么断了还一路显示「已开启」的。',
+);
 
 // ── ③ 清单里标的桥文件必须真在 ────────────────────────────────────────────
 const missingBridge = PLUGINS.filter((p) => !fs.existsSync(path.join(ROOT, p.bridge))).map((p) => p.bridge);
