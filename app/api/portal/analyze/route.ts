@@ -17,6 +17,21 @@ import { envValue } from '@/lib/portal/env';
 import { reportAiCall } from '@/lib/portal/ai-telemetry';
 import { cookies } from 'next/headers';
 
+/**
+ * 逐字转写。**不许理解、不许总结、不许输出 JSON。**
+ *
+ * 这个模式是给化验单用的:端上认不了字的时候,用户**逐次点头同意**之后才发出去
+ * (LabScanSheet 里那颗「发到云端认一次」)。云在这条路上的角色只有一个 —— 认字。
+ * 「这行是白细胞、偏高」那部分仍然由本机的 lib/health/lab-parse 做:
+ * 让会猜的东西去判临床数值,错了不会报错,只会安安静静变成一条假记录。
+ */
+const OCR_TRANSCRIBE_PROMPT = [
+  'Transcribe ALL text visible in this image, verbatim, preserving line breaks and reading order.',
+  'Do NOT summarize, translate, interpret, diagnose, or add commentary.',
+  'Do NOT output JSON or markdown fences. Output the raw text only.',
+  'If a character is unclear, transcribe your best reading — do not invent values.',
+].join(' ');
+
 const ANTHROPIC_API_URL = 'https://api.anthropic.com/v1/messages';
 const GEMINI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models';
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
@@ -373,7 +388,13 @@ export async function POST(req: NextRequest) {
       imageBase64?: string;
       mimeType?: string;
       uiLocale?: string;
-      mode?: 'clothing';
+      /**
+       * 'clothing' —— 衣橱专用结构化属性。
+       * 'ocr'      —— **只逐字转写,不做任何理解**。给化验单这类「图上写的就是答案」的东西用:
+       *               云在这里只是替一台认不了字的设备当 OCR 引擎,解析仍由本机的
+       *               确定性解析器做(lib/health/lab-parse)。返回 { ok, text },没有 nodes。
+       */
+      mode?: 'clothing' | 'ocr';
     };
 
     let raw = '';
@@ -389,11 +410,13 @@ export async function POST(req: NextRequest) {
     // 衣橱识别用专属 prompt(结构化属性);其余走通用抽取。默认路径不变。
     // 2026-07-28(标注 图8/图9):拍照走图片专用 prompt —— 通用抽取会把「桌上一支笔」判成
     // 「没有生命图谱条目」返回空 nodes,于是刚存过的东西再拍一次也认不出来。
-    const extractionPrompt = (isImage && body.mode === 'clothing')
-      ? buildClothingPrompt(body.uiLocale)
-      : isImage
-        ? buildImageExtractionSystemPrompt(body.uiLocale)
-        : buildExtractionSystemPrompt(body.uiLocale);
+    const extractionPrompt = (isImage && body.mode === 'ocr')
+      ? OCR_TRANSCRIBE_PROMPT
+      : (isImage && body.mode === 'clothing')
+        ? buildClothingPrompt(body.uiLocale)
+        : isImage
+          ? buildImageExtractionSystemPrompt(body.uiLocale)
+          : buildExtractionSystemPrompt(body.uiLocale);
 
     if (body.type === 'ask') {
       let parsedQuery = '';
@@ -469,6 +492,33 @@ export async function POST(req: NextRequest) {
         aggregations: askResult.aggregations || [],
         webSearchUsed,
       });
+    }
+
+    // ── mode: 'ocr' —— 只认字,提前返回 ────────────────────────────────────
+    //
+    // 不走下面那套 tier 分支:那条路在拿不到云的时候会落到 analyzeFallback(把**文本**
+    // 当输入),对一张图返回的是一坨没有意义的东西。认字这件事要么认出来,要么老实说没认出来。
+    // (workshop 不分收费免费;往产品仓搬时这条要挂 requirePaidCloudAi。)
+    if (isImage && body.mode === 'ocr') {
+      const startedAt = Date.now();
+      const errs: string[] = [];
+      const em = (e: unknown) => (e instanceof Error ? e.message : 'unknown_error');
+      for (const call of [
+        () => analyzeWithClaude(body.content, true, body.imageBase64, body.mimeType, extractionPrompt),
+        () => analyzeWithGemini(body.content, body.imageBase64, body.mimeType, extractionPrompt),
+        () => analyzeWithOpenAI(body.content, true, body.imageBase64, body.mimeType, extractionPrompt),
+      ]) {
+        try {
+          const text = await call();
+          if (text && text.trim()) {
+            reportAiCall('analyze', true, startedAt, { type: 'image' });
+            return NextResponse.json({ ok: true, text });
+          }
+          errs.push('empty_text');
+        } catch (e) { errs.push(em(e)); }
+      }
+      reportAiCall('analyze', false, startedAt, { type: 'image' });
+      return NextResponse.json({ ok: false, error: 'ocr_unavailable', providerErrors: errs }, { status: 503 });
     }
 
     // 非 ask 类型:图片/文本分析

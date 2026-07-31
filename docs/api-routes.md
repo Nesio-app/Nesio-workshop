@@ -40,7 +40,7 @@ Auth legend:
 | POST /api/health/chat | guard | 20/min |
 | POST /api/health/narrative | guard (allowCrossOrigin) | 15/min |
 | GET/POST /api/secretary/health, /api/secretary/chat | session / lab(route 内建) | — |
-| POST /api/portal/analyze | verified session (Supabase) / env-lab | — | isAnalyzeAiAllowed→isPortalRequestAuthorized(验真 access token,不再只看 cookie 存在);衣橱:mode='clothing' 用专属 prompt 抽结构化衣物属性(付费云;客户端 canUsePaidCloudAi 前置门,免费手填兜底) |
+| POST /api/portal/analyze | verified session (Supabase) / env-lab | — | isAnalyzeAiAllowed→isPortalRequestAuthorized(验真 access token,不再只看 cookie 存在);衣橱:mode='clothing' 用专属 prompt 抽结构化衣物属性(付费云;客户端 canUsePaidCloudAi 前置门,免费手填兜底)。**mode='ocr'**(2026-07-31):只逐字转写、返回 { ok, text },不做理解也不出 nodes —— 给化验单当端上认不了字时的兜底,由用户在 LabScanSheet 里**逐张点头**才发;判定仍留在本机 parseLabReport。往产品仓搬时这条要挂 requirePaidCloudAi。 |
 | POST /api/portal/wardrobe-stylist | guardAiRoute + requirePaidCloudAi | 20/min | 衣橱·Pro 云造型师:从现有单品挑一套协调搭配 + 理由 + 贴士;免费/失败回落规则版 suggestOutfit |
 | POST /api/portal/avatarify | guardAiRoute + requirePaidCloudAi | 10/min | 图像重绘,一个 style 参数两种用途:style='avatar'(默认)照片→app 主题色卡通头像;style='garment'(2026-07-28,标注 图16)衣服照片→白底干净单品图(prompt 里明令不许改颜色/图案/版型)。Gemini 图像模型优先、OpenAI gpt-image-1 兜底;无 key/失败诚实报错,客户端保留原图可一键换回 |
 | POST /api/portal/wardrobe-tryon | guardAiRoute + requirePaidCloudAi | 10/min | 衣橱·Pro 上身试穿:全身照 + 单品照 → Gemini 图像模型合成上身效果;隐私:照片不落库、仅请求时发送;reportAiCall 上账 |

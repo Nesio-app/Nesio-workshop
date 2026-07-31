@@ -56,7 +56,7 @@ const EXEMPT = new Map([
   ['components/portal/cooking/CookingSheet.tsx', { why: '进货/记一餐都转交 CameraSheet(intakeSubtype 模式)。', to: 'components/portal/CameraSheet.tsx' }],
 
   // ── 走更底层的桥,或本来就是端上入口 ──
-  ['components/portal/health/LabScanSheet.tsx', { why: '化验单 —— 直接走 recognizeOnDevice(比 understandImage 更底层),而且**故意不给云兜底**:化验单是病历,端上不可用时的正解是引导手填,不是换条路发出去。' }],
+  ['components/portal/health/LabScanSheet.tsx', { why: '化验单 —— 直接走 recognizeOnDevice(比 understandImage 更底层)。端上认不了时**默认仍不发**,只多一颗要逐次点头的「发到云端认一次」(见下面 ⑤)。' }],
   ['components/portal/finance/ReceiptScanRow.tsx', { why: '本来就是端上识别的入口(走 lib/native/vision)。' }],
 
   // ── 根本不取图 ──
@@ -175,6 +175,41 @@ assert.match(
   'image-understand 不再给出 needsCloud —— 调用方就没法知道「端上够不够」,\n'
   + '  只能一律打云,这一轮做的事就白做了。',
 );
+
+// ── ⑤ 化验单走云:只能是「问过才发」,而且不许记住 ──────────────────────────
+//
+// 2026-07-31 用户定案:允许云兜底,但**每一张都要重新问一次**。
+// 这条最容易在后面某次「优化体验」里被悄悄改掉 —— 加一个「以后不再问」的勾,
+// 交互上顺了,实际是把一次性授权变成了长期授权,而对象是病历。
+{
+  const LAB = 'components/portal/health/LabScanSheet.tsx';
+  const lab = stripComments(read(LAB));
+
+  // 默认不发:云那条必须经过 asking 这一步,不能从 blocked 直接 fetch
+  assert.match(lab, /s:\s*'asking'/, `${LAB} 少了「先问一次」那一步 —— 云兜底不能是点一下就发`);
+  assert.ok(
+    /setPhase\(\{\s*s:\s*'asking'/.test(lab),
+    `${LAB} 里没有进入 asking 的入口 —— 那颗「发到云端认一次」要么点不动,要么绕过了确认`,
+  );
+
+  // 不许记住选择:任何形式的持久化同意都是把一次性授权变成长期授权
+  assert.doesNotMatch(
+    lab, /localStorage|sessionStorage|不再提醒|dontAskAgain|rememberChoice/,
+    `${LAB} 开始持久化「发不发云」的选择了 —— 用户定的是**每一张都重新问**。\n`
+    + '  病历的一次性同意不该被一个勾选框变成长期同意。',
+  );
+
+  // 云那条只当 OCR:判定必须留在本机
+  assert.match(
+    lab, /mode:\s*'ocr'/,
+    `${LAB} 发云时没有指定 mode:'ocr' —— 那就不只是认字了,\n`
+    + '  等于把「哪项偏高」交给会猜的东西判。临床数值判错不会报错,只会静静变成一条假记录。',
+  );
+  assert.match(
+    lab, /parseLabReport|finishWithText/,
+    `${LAB} 不再用本机的确定性解析器 —— 云认完字之后的判定必须回到 parseLabReport`,
+  );
+}
 
 // 计数按**实际测到的**来,不拿 EXEMPT.size 去减 —— 名单里有些文件根本不在取文件口列表里
 // (它们是留给判据放宽后的),相减出来的数是假的。报错的数字自己先得是真的。

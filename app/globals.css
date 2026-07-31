@@ -9576,36 +9576,57 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
   touch-action: none;
   cursor: crosshair;
 }
+/* 圈选页顶部提示。
+   2026-07-31:原来是 `top: 1.5rem` —— 不避刘海,在有灵动岛/状态栏的机器上
+   直接压到时间和信号格底下。而且 `white-space: nowrap` 让这句中文在窄屏
+   横着捅出屏幕两边。两条都是「贴边」,一起修:上边距吃 safe-area,
+   宽度封顶后允许换行。 */
 .nesio-select-hint {
   position: absolute;
-  top: 1.5rem;
+  top: calc(var(--space-6) + env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
+  max-width: min(88vw, 30rem);
   background: rgba(0,0,0,0.55);
   backdrop-filter: blur(6px);
   color: #fff;
-  font-size: 0.82rem;
-  font-weight: 600;
-  padding: 0.45rem 1.1rem;
-  border-radius: 999px;
-  white-space: nowrap;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  line-height: 1.5;
+  text-align: center;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
   pointer-events: none;
 }
+/* 底部三颗按钮。
+   2026-07-31:原来靠 `left:50% + translateX(-50%)` 居中 —— 那种居中**没有边界**:
+   三颗按钮加起来比屏幕宽的时候,它只会均匀地朝两边溢出,于是最左最右两颗贴着屏幕边
+   (真机上正好压在圆角和手势条附近,既难点又难看)。
+   改成左右各占满再 padding 收边:这样 padding 才真正管得住,横向 safe-area 也能吃进去。 */
 .nesio-select-overlay-actions {
   position: absolute;
-  bottom: calc(2rem + env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
+  left: 0;
+  right: 0;
+  transform: none;
   display: flex;
-  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-left: calc(var(--space-4) + env(safe-area-inset-left));
+  padding-right: calc(var(--space-4) + env(safe-area-inset-right));
 }
 .nesio-select-action-btn {
   background: rgba(255,255,255,0.15);
   backdrop-filter: blur(6px);
   color: #fff;
-  font-size: 0.9rem;
-  font-weight: 600;
-  padding: 0.6rem 1.5rem;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  /* 左右内边距从 1.5rem 收到 --space-4(1rem):三颗按钮原来加起来就撑不下窄屏,
+     这是它们朝两边溢出的另一半原因。min-height 走 --tap-min,收窄的是宽不是可点面积。 */
+  padding: var(--space-3) var(--space-4);
+  min-height: var(--tap-min, 44px);
+  white-space: nowrap;
   border-radius: 999px;
   border: 1.5px solid rgba(255,255,255,0.25);
   cursor: pointer;
