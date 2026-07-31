@@ -963,7 +963,9 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={clearAllMemory}>
           {deleted ? L(dict, '✓ 已清除', '✓ Cleared') : L(dict, '清除所有 Memory', 'Clear all memories')}
         </Button>
-        <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" style={{ opacity: 0.85 }} onClick={clearAllLocalData}>
+        {/* 2026-07-31:去掉原来的 style={{ opacity: 0.85 }} —— 三颗都是 risk,凭什么中间这颗淡 15%?
+            说不出理由的差异就是「同一屏的按钮长得不像一家」的来源。要分轻重就用 variant。 */}
+        <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={clearAllLocalData}>
           {L(dict, '彻底删除本机全部数据', 'Delete all local data')}
         </Button>
         {/* App Store 5.1.1 强制:App 内账号删除(云端 + 本机 + 登出)。 */}

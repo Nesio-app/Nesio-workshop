@@ -7861,7 +7861,8 @@ html[data-portal-theme="night"] .nesio-settings-option-label { color: #e8eefa; }
    外观已经不在这儿了 —— 调用点换成 <Button variant="soft" size="md" full>(危险的加 tone="risk"),
    这两个类名只剩「和上一条隔多远」这一件事。这就是桥接的终点:
    先并值让视觉立刻统一,再换标签,换完旧类只留布局职责(或者干脆消失)。 */
-.nesio-settings-action-btn { margin-top: 0.85rem; }
+/* 只剩布局(挂在 <Button> 上的板块类名的正确形态:外观一律交给 variant/size/tone)。 */
+.nesio-settings-action-btn { margin-top: var(--space-3); }
 
 .nesio-settings-danger-btn { margin-top: var(--space-2); }
 
@@ -20072,6 +20073,11 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-ob-auth-btn:disabled { opacity: 0.45; cursor: default; }
 .nesio-btn:disabled:active { transform: none; }
 .nesio-btn-icon { display: inline-flex; align-items: center; flex-shrink: 0; }
+/* 内容排布档。补这两档是因为 213 个裸按钮里有 ~38 处在手写
+   justifyContent/textAlign/display/alignItems/gap —— 它们不是外观也不是外面的布局,
+   是「左文字右箭头」这种行式按钮,原语本来没有这个形态,只好各写各的。 */
+.nesio-btn--align-between { justify-content: space-between; text-align: left; }
+.nesio-btn--align-start { justify-content: flex-start; text-align: left; }
 
 /* 三档尺寸。同一档的主/次按钮尺寸**必须**一致 —— 挨着放才不会一高一矮
    (相机那对以前是 0.5rem/0.78rem 配 0.55rem/0.8rem,肉眼就能看出错位)。 */
@@ -20087,6 +20093,16 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-btn--lg,
 .nesio-ob-primary-btn,
 .nesio-ob-auth-btn { padding: var(--space-3) var(--space-5); font-size: var(--text-body); }
+/* 2026-07-31:md/lg 补最小触摸目标。
+   设计系统第 142 行就写着 --tap-min: 44px,站内别处(关闭键/圆钮/输入行)都在守它,
+   **唯独这个「全站唯一按钮原语」自己不守** —— md 按内容算下来只有 ~36px。
+   这正是迁移一直卡住的原因之一:板块按钮(如 .nesio-nd-action-btn 的 height:46px)
+   是各自补上这 10px 的,换成原语反而会缩水成点不中的目标,于是没人敢换。
+   补在原语上之后,迁移不再需要「顺手带一个 height」。
+   sm 不加:它是密集行里的内联 chip(标签/次要操作),强行 44px 会把列表撑散 ——
+   sm 本来就不该拿来做主行动,要做主行动就用 md。 */
+.nesio-btn--md,
+.nesio-btn--lg { min-height: var(--tap-min, 44px); }
 
 /* 四种变体。颜色一律从 --portal-accent / --status-risk 派生,换皮肤自动跟随。 */
 .nesio-btn--primary,
@@ -20138,22 +20154,14 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
    .nesio-today-btn--ghost / .nesio-settings-danger-btn 三套不同的自造按钮,高度各不相同,
    于是又加一层把它们**掰**齐(真机反馈「按钮大小形状不统一」)。三套现在都并到原语上了,
    这一层只剩几何职责。必须排在原语之后:它靠 source-order 压住基类的 padding/radius/font。 */
-.nesio-nd-action-btn {
-  flex: 1;
-  width: auto;
-  height: 46px;
-  min-height: 0;
-  box-sizing: border-box;
-  padding: 0 var(--space-4);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold, 600);
-  margin-top: 0;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-}
+/* 2026-07-31:削回只剩布局。
+   原来这里把 height / padding / border-radius / font-size / font-weight / display /
+   align-items / justify-content 全写了一遍 —— 而调用点写的是 <Button variant="primary">。
+   等于原语定了一套外观,这个类名又盖掉一套,那 5 处是**假迁移**:<Button> 只当
+   带额外步骤的 <button> 在用,「同一屏两个按钮长得不像一家」的病根一点没动。
+   外观现在全交给 variant/size/tone(size="md" 就是 46px 那一档),这里只留布局。
+   `flex: 1` 也不留 —— 它属于「这颗按钮在父容器里占多大」,走 layoutStyle。 */
+.nesio-nd-action-btn { width: auto; }
 
 /* ── 资产页(Bug4 图23-24:原「车」页 → 房产 tab + 车 tab)────────────────── */
 .nesio-assets-tabs {

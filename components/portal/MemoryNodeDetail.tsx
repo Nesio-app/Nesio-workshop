@@ -1483,22 +1483,26 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
       {/* Actions */}
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-5)' }}>
             {/* 这一排以前是三套不同的自造按钮拼出来的(ob-primary / today--ghost / settings-danger),
-                高度各不相同,只好再加一层 .nesio-nd-action-btn 把它们掰齐。现在统一走 Button 原语,
-                那一层只剩「同一行等宽等高」的几何职责。 */}
+                高度各不相同,只好再加一层 .nesio-nd-action-btn 把它们掰齐。
+
+                2026-07-31:那层「掰齐」的类名其实把 height/padding/border-radius/font-size/
+                font-weight 全盖了一遍 —— 写着 <Button variant="primary"> 却又自带一整套外观,
+                是**假迁移**。现在外观全交给 variant/size/tone(md 已带 --tap-min 最小高度,
+                替掉原来手写的 height:46px),这里只剩 flex:1 这一条真正的布局,走 layoutStyle。 */}
             {editing ? (
               <>
-                <Button variant="primary" className="nesio-nd-action-btn" onClick={saveEdit}>{L(dict, '保存', 'Save')}</Button>
-                <Button variant="secondary" className="nesio-nd-action-btn" onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</Button>
+                <Button variant="primary" layoutStyle={{ flex: 1 }} onClick={saveEdit}>{L(dict, '保存', 'Save')}</Button>
+                <Button variant="secondary" layoutStyle={{ flex: 1 }} onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</Button>
               </>
             ) : (
               <>
                 {/* 批次 33:阅读入口顶部有(替换✕),底部也放回来一份 —— 用户反馈顶部那颗找不到 */}
                 {readableText && (
-                  <Button variant="primary" className="nesio-nd-action-btn" onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</Button>
+                  <Button variant="primary" layoutStyle={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</Button>
                 )}
                 {/* 批次 37:回复按钮移到顶部「阅读」旁,底部不再重复 */}
-                <Button variant="secondary" className="nesio-nd-action-btn" onClick={startEdit}>{L(dict, '编辑', 'Edit')}</Button>
-                <Button variant="soft" tone="risk" className="nesio-nd-action-btn" onClick={handleDelete}>{L(dict, '删除', 'Delete')}</Button>
+                <Button variant="secondary" layoutStyle={{ flex: 1 }} onClick={startEdit}>{L(dict, '编辑', 'Edit')}</Button>
+                <Button variant="soft" tone="risk" layoutStyle={{ flex: 1 }} onClick={handleDelete}>{L(dict, '删除', 'Delete')}</Button>
               </>
             )}
           </div>
