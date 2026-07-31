@@ -76,13 +76,15 @@ public class NesioLocalNotifyPlugin: CAPPlugin, CAPBridgedPlugin {
 
     /// 老签名:几秒之后。JS 侧现有调用走的是这条,保持不动。
     @objc func schedule(_ call: CAPPluginCall) {
-        let afterSec = max(1, call.getInt("afterSec") ?? 1)
+        let afterSec = max(1, call.getInt("afterSec", 1))
         submit(call, seconds: TimeInterval(afterSec))
     }
 
     /// 新签名:绝对时刻(epoch 毫秒)。差值在原生侧算,少一处时钟不一致的机会。
     @objc func scheduleAt(_ call: CAPPluginCall) {
-        guard let epochMs = call.getDouble("epochMs") ?? call.getInt("epochMs").map(Double.init) else {
+        // 0 当哨兵:JS 侧传的是毫秒时间戳,永远 > 0,不会和「没传」撞上。
+        let epochMs = call.getDouble("epochMs", 0)
+        guard epochMs > 0 else {
             call.resolve(["ok": false, "reason": "missing_epoch"]); return
         }
         let seconds = epochMs / 1000.0 - Date().timeIntervalSince1970
@@ -94,12 +96,14 @@ public class NesioLocalNotifyPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     private func submit(_ call: CAPPluginCall, seconds: TimeInterval) {
-        guard let id = call.getInt("id") else {
+        // -1 当哨兵:JS 侧 notifyIdOf() 走 FNV-1a 取正再取模,永远 >= 0。
+        let id = call.getInt("id", -1)
+        guard id >= 0 else {
             call.resolve(["ok": false, "reason": "missing_id"]); return
         }
         let content = UNMutableNotificationContent()
-        content.title = call.getString("title") ?? ""
-        content.body = call.getString("body") ?? ""
+        content.title = call.getString("title", "")
+        content.body = call.getString("body", "")
         content.sound = .default
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: seconds, repeats: false)
@@ -119,7 +123,8 @@ public class NesioLocalNotifyPlugin: CAPPlugin, CAPBridgedPlugin {
     // ── 撤销 ────────────────────────────────────────────────────────────────
 
     @objc func cancel(_ call: CAPPluginCall) {
-        guard let id = call.getInt("id") else {
+        let id = call.getInt("id", -1)
+        guard id >= 0 else {
             call.resolve(["ok": false, "reason": "missing_id"]); return
         }
         center.removePendingNotificationRequests(withIdentifiers: [String(id)])

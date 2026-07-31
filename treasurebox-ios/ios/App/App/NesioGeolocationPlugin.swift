@@ -163,13 +163,13 @@ public class NesioGeolocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             return
         }
         // maximumAge:缓存够新就直接用,省一次 GPS 唤醒(室内首点要 8 秒以上)。
-        let maxAgeMs = call.getInt("maximumAge") ?? 0
+        let maxAgeMs = call.getInt("maximumAge", 0)
         if maxAgeMs > 0, let last = manager.location,
            Date().timeIntervalSince(last.timestamp) * 1000 <= Double(maxAgeMs) {
             call.resolve(fixPayload(last)); return
         }
 
-        if call.getBool("enableHighAccuracy") == true {
+        if call.getBool("enableHighAccuracy", false) {
             manager.desiredAccuracy = kCLLocationAccuracyBest
         }
         pendingFixes.append(call)
@@ -177,7 +177,7 @@ public class NesioGeolocationPlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             self.manager.requestLocation()
             // requestLocation 自己有超时,但那个超时**不保证**回调 ——
             // 没有这一层的话 JS 侧那个 Promise 会永远挂着(UI 转圈转到天荒地老)。
-            let ms = call.getInt("timeout") ?? 18_000
+            let ms = call.getInt("timeout", 18_000)
             self.fixTimer?.invalidate()
             self.fixTimer = Timer.scheduledTimer(withTimeInterval: Double(ms) / 1000.0, repeats: false) { [weak self] _ in
                 self?.flushFixes(["ok": false, "reason": "timeout"])

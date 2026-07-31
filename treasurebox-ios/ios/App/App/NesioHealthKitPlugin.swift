@@ -153,8 +153,8 @@ public class NesioHealthKitPlugin: CAPPlugin, CAPBridgedPlugin {
         guard HKHealthStore.isHealthDataAvailable() else {
             call.resolve(["ok": false, "reason": "unavailable"]); return
         }
-        let days = max(1, min(3650, call.getInt("days") ?? 30))
-        let perTypeCap = max(50, min(20_000, call.getInt("perTypeCap") ?? 3_000))
+        let days = max(1, min(3650, call.getInt("days", 30)))
+        let perTypeCap = max(50, min(20_000, call.getInt("perTypeCap", 3_000)))
         let end = Date()
         guard let start = Calendar.current.date(byAdding: .day, value: -days, to: end) else {
             call.resolve(["ok": false, "reason": "bad_range"]); return

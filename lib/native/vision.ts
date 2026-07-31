@@ -27,7 +27,26 @@ export type VisionResult =
 const TIMEOUT_MS = 20_000;
 
 interface VisionPlugin {
-  recognizeText(o: { imageBase64: string }): Promise<{ text: string; lines?: Array<{ text: string; confidence: number }> }>;
+  recognizeText(o: { imageBase64: string }): Promise<{
+    /**
+     * 原生侧成败标志。**必须看它** —— 见下。
+     *
+     * 2026-07-31:原生那边把六条失败路径从 `call.reject` 换成了
+     * `call.resolve({ok:false, reason, message})`。理由是 Capacitor 8 的
+     * 预编译 xcframework 把 `reject` 藏在 `$NonescapableTypes` 门后
+     * (Swift 6.0 才有的特性),Xcode 15 上根本调不到。
+     *
+     * ⚠️ 那次改动如果不同步改这里,后果是**失败被当成成功**:
+     * reject 会触发下面的 catch,resolve 不会 —— `text` 是 undefined,
+     * `String(undefined || '')` 得到空串,于是「识别失败」变成
+     * 「这张图上没有字」。两者对用户是完全不同的下一步。
+     */
+    ok?: boolean;
+    reason?: string;
+    message?: string;
+    text?: string;
+    lines?: Array<{ text: string; confidence: number }>;
+  }>;
   isAvailable(): Promise<{ available: boolean; reason?: string }>;
 }
 
@@ -99,6 +118,15 @@ export async function recognizeOnDevice(image: Blob | string): Promise<VisionRes
       p.recognizeText({ imageBase64 }),
       new Promise<never>((_, rej) => setTimeout(() => rej(new Error('timeout')), TIMEOUT_MS)),
     ]);
+    // 原生失败现在走 resolve 而不是 reject(见 VisionPlugin 的注释)——
+    // 不显式判这一句的话,失败会静默变成「这张图上没有字」。
+    if (race?.ok === false) {
+      const known: VisionUnavailableReason[] = ['ios_too_old'];
+      const reason = known.find((k) => k === race.reason);
+      return reason
+        ? { ok: false, reason, message: unavailableMessage(reason) }
+        : { ok: false, reason: 'failed', message: race.message || '这张没认出来。拍近一点、把整张单子放平再试试。' };
+    }
     const text = String(race?.text || '');
     return { ok: true, text, lines: race?.lines || [] };
   } catch (err) {

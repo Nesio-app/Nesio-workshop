@@ -55,7 +55,7 @@ public class NesioSpeechPlugin: CAPPlugin, CAPBridgedPlugin {
      * 「这台设备的端上识别不支持中文」和「你没给麦克风权限」要说不同的话。
      */
     @objc func isAvailable(_ call: CAPPluginCall) {
-        let locale = Locale(identifier: call.getString("locale") ?? "zh-CN")
+        let locale = Locale(identifier: call.getString("locale", "zh-CN"))
         guard let r = SFSpeechRecognizer(locale: locale) else {
             call.resolve(["available": false, "reason": "locale_unsupported"]); return
         }
@@ -99,7 +99,7 @@ public class NesioSpeechPlugin: CAPPlugin, CAPBridgedPlugin {
     @objc func start(_ call: CAPPluginCall) {
         guard !listening else { call.resolve(["ok": true, "already": true]); return }
 
-        let locale = Locale(identifier: call.getString("locale") ?? "zh-CN")
+        let locale = Locale(identifier: call.getString("locale", "zh-CN"))
         guard let r = SFSpeechRecognizer(locale: locale), r.isAvailable else {
             call.resolve(["ok": false, "reason": "recognizer_unavailable"]); return
         }

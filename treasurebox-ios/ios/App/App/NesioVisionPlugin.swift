@@ -16,6 +16,20 @@ import UIKit
  *
  * 语言:中文简体 + 英文。usesLanguageCorrection 关掉 —— 化验单上大量是
  * 「HbA1c」「10^9/L」这类词典里没有的串,开着纠错反而会把它们改成别的词。
+ *
+ * ## 为什么失败走 resolve 而不是 reject
+ *
+ * Capacitor 8 发的是**预编译 xcframework**,它的 `.swiftinterface` 把
+ * `CAPPluginCall.reject(...)` 包在 `#if compiler(>=5.3) && $NonescapableTypes` 里 ——
+ * 那是 Swift 6.0 才有的编译器特性。用 Xcode 15.x(Swift 5.9)编,
+ * 这个方法对编译器**根本不存在**,报 "has no member"。
+ *
+ * 所以这里统一改成 `resolve(["ok": false, "reason": …, "message": …])` ——
+ * **一条失败路径都没少**,每个 reason code 原样保留,只是走 resolve 出去。
+ * 另外五个插件本来就是这个风格,现在六个一致了。
+ *
+ * (顺带一个好处:JS 侧不用再靠 try/catch 分辨「这次没成」和「桥本身炸了」——
+ * 前者是 `ok:false` 的正常返回,后者才是异常。)
  */
 @objc(NesioVisionPlugin)
 public class NesioVisionPlugin: CAPPlugin, CAPBridgedPlugin {
@@ -44,21 +58,22 @@ public class NesioVisionPlugin: CAPPlugin, CAPBridgedPlugin {
      */
     @objc func recognizeText(_ call: CAPPluginCall) {
         guard #available(iOS 13.0, *) else {
-            call.reject("这台设备的系统太旧,用不了端上识别", "ios_too_old"); return
+            call.resolve(["ok": false, "reason": "ios_too_old", "message": "这台设备的系统太旧,用不了端上识别"]); return
         }
-        guard let b64 = call.getString("imageBase64"), !b64.isEmpty else {
-            call.reject("没收到图片", "no_image"); return
+        let b64 = call.getString("imageBase64", "")
+        guard !b64.isEmpty else {
+            call.resolve(["ok": false, "reason": "no_image", "message": "没收到图片"]); return
         }
         guard let data = Data(base64Encoded: b64, options: .ignoreUnknownCharacters) else {
-            call.reject("图片数据读不出来", "bad_base64"); return
+            call.resolve(["ok": false, "reason": "bad_base64", "message": "图片数据读不出来"]); return
         }
         guard let image = UIImage(data: data), let cg = image.cgImage else {
-            call.reject("这张图解不开", "decode_failed"); return
+            call.resolve(["ok": false, "reason": "decode_failed", "message": "这张图解不开"]); return
         }
 
         let request = VNRecognizeTextRequest { req, err in
             if let err = err {
-                call.reject("识别没成:\(err.localizedDescription)", "vision_failed"); return
+                call.resolve(["ok": false, "reason": "vision_failed", "message": "识别没成:\(err.localizedDescription)"]); return
             }
             let observations = (req.results as? [VNRecognizedTextObservation]) ?? []
 
@@ -99,6 +114,7 @@ public class NesioVisionPlugin: CAPPlugin, CAPBridgedPlugin {
             flush()
 
             call.resolve([
+                "ok": true,
                 "text": flushed.joined(separator: "\n"),
                 "lines": lines
             ])
@@ -113,7 +129,7 @@ public class NesioVisionPlugin: CAPPlugin, CAPBridgedPlugin {
         // 识别是 CPU 密集活,别占主线程(否则 webview 整个卡住)。
         DispatchQueue.global(qos: .userInitiated).async {
             do { try handler.perform([request]) }
-            catch { call.reject("识别没跑起来:\(error.localizedDescription)", "handler_failed") }
+            catch { call.resolve(["ok": false, "reason": "handler_failed", "message": "识别没跑起来:\(error.localizedDescription)"]) }
         }
     }
 

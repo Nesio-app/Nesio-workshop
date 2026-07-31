@@ -60,7 +60,10 @@ public class NesioSpotlightPlugin: CAPPlugin, CAPBridgedPlugin {
         guard CSSearchableIndex.isIndexingAvailable() else {
             call.resolve(["ok": false, "reason": "indexing_disabled"]); return
         }
-        guard let raw = call.getArray("items") as? [[String: Any]], !raw.isEmpty else {
+        // 直接读 options 而不是 getArray:getArray 的双参数版是泛型的,
+        // 而这里要的元素类型是 [String: Any],泛型推断在这上面很容易翻。
+        // options 是 CAPPluginCall 的基础属性,不在那道 #if 门里。
+        guard let raw = call.options["items"] as? [[String: Any]], !raw.isEmpty else {
             call.resolve(["ok": true, "indexed": 0]); return
         }
 
@@ -95,7 +98,7 @@ public class NesioSpotlightPlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func removeItems(_ call: CAPPluginCall) {
-        let ids = (call.getArray("ids") as? [String]) ?? []
+        let ids = (call.options["ids"] as? [String]) ?? []
         guard !ids.isEmpty else { call.resolve(["ok": true, "removed": 0]); return }
         CSSearchableIndex.default().deleteSearchableItems(withIdentifiers: ids) { err in
             if let err = err {
