@@ -877,7 +877,7 @@ export default function Portal() {
     // 那几个板块的深链(车页「→ 财务/足迹」等指路行)派了事件也落回默认页,看着像死链。
     const INSIGHTS_TABS: ReadonlySet<string> = new Set([
       'reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule',
-      'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'admin',
+      'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'music', 'admin',
     ]);
     const insightsHandler = (e: Event) => {
       const tab = (e as CustomEvent).detail?.tab;
@@ -1208,6 +1208,21 @@ export default function Portal() {
 
     return () => { mounted = false; };
   }, [canUsePrivateRuntime]);
+
+  // Spotify 授权回调跳回的是 `/?music=1&spotify=…` —— 不接这一下,用户从 Spotify
+  // 回来只会看到首页,以为什么都没发生。`spotify` 参数**故意留着**不清,
+  // 由音乐面板读出来显示成一句话(成功/被拒/要重连各不相同)。
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('music') === '1') {
+      setInsightsTab('music');
+      setInsightsNonce((n) => n + 1);
+      setInsightsOpen(true);
+      params.delete('music');
+      const qs = params.toString();
+      window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`);
+    }
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);

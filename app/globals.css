@@ -20840,3 +20840,165 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   flex: none;
 }
 .nesio-assets-bindrow .nesio-assets-input { flex: 1; min-width: 10rem; }
+
+/* ── 音乐(2026-07-30)──────────────────────────────────────────────────────
+   四个音源不是一回事:本地/Apple 由 Nesio 自己出声,Spotify 是遥控,网易只能搜。
+   所以「能不能放」在 chip 上有一个实心点作正向标记 —— 灰着的就是现在放不了,
+   旁边一定跟着一句为什么(.nesio-music-blocked),不留灰按钮不说话。
+   颜色一律走 token(设计规范红线):强调=--portal-accent,提示=--status-gentle,
+   可用=--status-go,风险色一次没用 —— 这里没有任何真实风险。 */
+.nesio-music { display: flex; flex-direction: column; gap: var(--space-4); }
+
+.nesio-music-sources { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.nesio-music-src {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  min-height: 40px; padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-pill);
+  background: transparent; color: var(--portal-muted);
+  font-size: var(--text-sm); font-weight: var(--weight-medium); cursor: pointer;
+}
+.nesio-music-src.is-on {
+  color: var(--portal-accent); border-color: var(--portal-accent-border);
+  background: var(--portal-accent-soft);
+}
+.nesio-music-src-dot {
+  width: 6px; height: 6px; border-radius: var(--radius-pill);
+  background: var(--portal-line); flex: none;
+}
+.nesio-music-src-dot.is-live { background: var(--status-go); }
+
+.nesio-music-notice {
+  border: 1px solid var(--portal-accent-border); border-radius: var(--radius-md);
+  background: var(--portal-accent-soft); padding: var(--space-3);
+  display: flex; flex-direction: column; gap: var(--space-3);
+}
+.nesio-music-notice p { margin: 0; font-size: var(--text-sm); color: var(--portal-ink); line-height: 1.7; }
+.nesio-music-notice-acts { display: flex; gap: var(--space-2); }
+.nesio-music-notice-acts button {
+  min-height: 40px; padding: 0 var(--space-4);
+  border-radius: var(--radius-sm); border: 1px solid var(--portal-accent-border);
+  background: var(--portal-accent); color: var(--portal-on-accent, #fff);
+  font-size: var(--text-sm); font-weight: var(--weight-medium); cursor: pointer;
+}
+.nesio-music-notice-acts button.ghost {
+  background: transparent; color: var(--portal-muted); border-color: var(--portal-line);
+}
+
+.nesio-music-blocked,
+.nesio-music-model,
+.nesio-music-msg,
+.nesio-music-empty {
+  margin: 0; font-size: var(--text-xs); line-height: 1.7; color: var(--portal-muted);
+}
+.nesio-music-blocked { color: var(--status-gentle); }
+
+.nesio-music-err {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  padding: var(--space-3); border-radius: var(--radius-sm);
+  background: var(--status-gentle-soft); color: var(--portal-ink);
+  font-size: var(--text-xs); line-height: 1.6;
+}
+.nesio-music-err button {
+  flex: none; min-height: 32px; padding: 0 var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: transparent; color: var(--portal-muted); font-size: var(--text-xs); cursor: pointer;
+}
+
+.nesio-music-sec { display: flex; flex-direction: column; gap: var(--space-3); }
+
+.nesio-music-libhead {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+  font-size: var(--text-sm); color: var(--portal-muted);
+}
+.nesio-music-libhead button,
+.nesio-music-connect,
+.nesio-music-resume {
+  min-height: 44px; padding: 0 var(--space-4);
+  border: 1px solid var(--portal-accent-border); border-radius: var(--radius-sm);
+  background: var(--portal-accent-soft); color: var(--portal-accent);
+  font-size: var(--text-sm); font-weight: var(--weight-medium);
+  cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+
+.nesio-music-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.nesio-music-list li {
+  display: flex; align-items: center; gap: var(--space-2);
+  border-bottom: 1px solid var(--portal-line);
+}
+.nesio-music-list li.is-cur .nesio-music-title { color: var(--portal-accent); }
+.nesio-music-row {
+  flex: 1; min-width: 0; min-height: 52px;
+  display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  padding: var(--space-2) 0; border: 0; background: transparent;
+  text-align: left; cursor: pointer;
+}
+.nesio-music-row.is-static { cursor: default; }
+.nesio-music-title {
+  font-size: var(--text-body); color: var(--portal-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nesio-music-sub { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-music-del {
+  flex: none; width: 32px; height: 32px;
+  border: 0; background: transparent; color: var(--portal-muted);
+  font-size: var(--text-body); cursor: pointer;
+}
+
+.nesio-music-bar {
+  position: sticky; bottom: 0;
+  display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3); border-radius: var(--radius-md);
+  border: 1px solid var(--portal-line); background: var(--glass-bg-solid);
+}
+.nesio-music-bar-meta { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.nesio-music-bar-meta strong {
+  font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--portal-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nesio-music-bar-meta span { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-music-bar-acts { display: flex; gap: var(--space-2); flex: none; }
+.nesio-music-bar-acts button {
+  min-height: 40px; min-width: 40px; padding: 0 var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: transparent; color: var(--portal-ink);
+  font-size: var(--text-sm); cursor: pointer;
+}
+.nesio-music-bar-time { flex: none; font-size: var(--text-xs); color: var(--portal-muted); }
+
+.nesio-music-modes { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.nesio-music-modes button {
+  min-height: 36px; padding: 0 var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-pill);
+  background: transparent; color: var(--portal-muted);
+  font-size: var(--text-xs); cursor: pointer;
+}
+.nesio-music-modes button.is-on {
+  color: var(--portal-accent); border-color: var(--portal-accent-border);
+  background: var(--portal-accent-soft);
+}
+
+.nesio-music-search { display: flex; gap: var(--space-2); }
+.nesio-music-search input {
+  flex: 1; min-width: 0; min-height: 44px; padding: 0 var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: transparent; color: var(--portal-ink); font-size: var(--text-sm);
+}
+.nesio-music-search button {
+  flex: none; min-height: 44px; padding: 0 var(--space-4);
+  border: 1px solid var(--portal-accent-border); border-radius: var(--radius-sm);
+  background: var(--portal-accent-soft); color: var(--portal-accent);
+  font-size: var(--text-sm); cursor: pointer;
+}
+
+/* 回退出口:当前源放不了时,把真能放的摆出来一键切过去(不给下一步 = 把人留在死路上)。 */
+.nesio-music-fallback {
+  display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+  font-size: var(--text-xs); color: var(--portal-muted);
+}
+.nesio-music-fallback button {
+  min-height: 32px; padding: 0 var(--space-3);
+  border: 1px solid var(--portal-accent-border); border-radius: var(--radius-pill);
+  background: var(--portal-accent-soft); color: var(--portal-accent);
+  font-size: var(--text-xs); cursor: pointer;
+}

@@ -63,6 +63,10 @@ Auth legend:
 | GET /api/portal/tasks | guardAiRoute (20/min) + Google OAuth token (tasks) — 读 Google Tasks 待办 |
 | GET /api/portal/people | guardAiRoute (20/min) + Google OAuth token (contacts.readonly) — 读通讯录→person 节点(人缘管理);runPeopleSync 消费 |
 | GET /api/portal/tesla | isPortalRequestAuthorized + rate limit (20/min) + Tesla OAuth token — 只读快照:车辆(drive/charge/vehicle_state)+ **能源产品**(2026-07-30 补:`/api/1/products` → `energy_sites/{id}/live_status` 与 `history?kind=energy&period=day`)。能源与车辆**分开失败**:没有能源产品或 token 缺 `energy_device_data` 时只让 energy 为空,不影响车辆数据 |
+| GET /api/portal/music/apple-token | guardAiRoute (10/min) — 服务端签 MusicKit developer token(ES256,.p8 私钥只在服务端)。没配密钥时 200 + `configured:false`,让界面照实说「还没配好」而不是渲染成网络故障 |
+| GET /api/portal/music/spotify | guardAiRoute (20/min) — 读该账号的 Spotify 状态。`streamable` **只在 product 确认为 premium 时**为 true(正向判据);刷新失败即清 cookie 并如实报 `authorized:false` |
+| DELETE /api/portal/music/spotify | guardAiRoute (10/min) — 断开(清 httpOnly cookie) |
+| GET /api/portal/music/netease/search | guardAiRoute (20/min) — 网易云**元数据**搜索转发(NETEASE_API_BASE)。刻意不做取播放地址:锁区锁的正是那一步 |
 | GET /api/auth/session | open (reports session state) |
 
 ## OAuth flows (pre-auth by design)
@@ -73,6 +77,8 @@ Auth legend:
 | GET /api/portal/gmail/callback | state cookie validation |
 | GET /api/portal/calendar/connect | redirects to Google consent |
 | GET /api/portal/calendar/oauth/callback | state cookie validation |
+| GET /api/portal/music/spotify/connect | redirects to Spotify consent(缺 env 时 503 + missingEnv) |
+| GET /api/portal/music/spotify/callback | state cookie validation;令牌只写 httpOnly cookie(不落 localStorage/不进备份/不上云),失败一律带原因跳回 `/?music=1&spotify=…` |
 
 ## Telemetry
 

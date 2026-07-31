@@ -170,6 +170,37 @@ sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
 
+- **音乐模块 · 四音源(2026-07-30,本轮新增)**:用户定的范围是「本地歌曲 + 网易 +
+  歌曲自由切换 + Spotify + Apple Music」。落地时把「自由切换」拆成它真实的样子 ——
+  **四个源不是一个播放器的四个开关,是两种播放模型**:
+  ● `in-app`(本地文件 / Apple Music):声音走 **Nesio 自己的音频会话**,车机蓝牙上
+    显示 Nesio,MediaSession 接了上一首/下一首;
+  ● `remote`(Spotify):Nesio 只是遥控器,声音与车机界面都在 Spotify 那边,要 Premium;
+  ● `metadata-only`(网易):**没有国内出口**,锁的是「拿播放地址」那一步(搜索/歌单不锁),
+    所以它此刻恒不可播。有了国内出口后改 `MUSIC_SOURCES` 里 netease 的 model 一处即可,
+    但必须同时把 streamable 做成**真去取 url**的探测,不许「配了 base 就假定能放」。
+  跨模型换源**必须先说**(`switchNotice`),否则用户在车里会突然看到车机换了个 App。
+  「能不能放」是**正向判据**(`canPlayNow`:configured ∧ authorized ∧ streamable ∧ 非 metadata-only);
+  回退链只收真能放的,一个都没有时有专门的空态(`noSourceLine`),并把能放的摆出来一键切。
+  ● **今天真能出声的只有本地歌曲**:不要账号、不要订阅、离线可听。
+    Apple Music 的接线是完整的(服务端 ES256 签 developer token + MusicKit JS 授权),
+    但**没有 `APPLE_MUSIC_*` 密钥就跑不通**,界面照实说「还没配好」。
+    Spotify 的 OAuth / 状态 / 权益判定完整(`product === 'premium'` 才算能放),
+    **但没接 Web Playback SDK 的播放** —— 用户没有 Premium,这条路径无法验证,
+    不写无法验证的成功路径;要接时在 spotify 那一段里补。
+  ● **新 key**:`nesio-music-local-tracks-v1`(cache)、`nesio-music-last-played-v1`(cache)、
+    `nesio-music-prefs-v1`(durable)。前两个判 cache 的理由:音频 Blob 在独立 IDB
+    (`nesio-music`)、**不进备份**,元数据同步过去只会得到一份点了放不出声的假曲库。
+    Spotify 令牌只放 **httpOnly cookie**,不落 localStorage(音乐模块红线:凭证仅本机私有)。
+  ● **新路由**(均已写进 docs/api-routes.md):`GET /api/portal/music/apple-token`、
+    `GET|DELETE /api/portal/music/spotify`、`GET /api/portal/music/spotify/{connect,callback}`、
+    `GET /api/portal/music/netease/search`。除 OAuth 两条外全走 `guardAiRoute`。
+  ● **CSP 补了 MusicKit**(`js-cdn.music.apple.com` / `api.music.apple.com` / media-src apple)——
+    不补的表现跟当年 Plaid 一模一样:脚本被静默拦掉,按钮点了没反应,页面上没有任何线索。
+  ● **收口**:`purgeLocalTracks` 已接进 local-owner 的删除/登出两处 + SettingsSheets 的
+    清空/删除账号两处。漏一处就是「用户以为删了、歌还在设备上」。
+  ● 契约 `test:music-source-switch`(16 组判断),三轮共 41 条注入回归全部被抓、0 漏网。
+
 - **Bug4 图文对照 30 页(2026-07-30,已做完)**:一份逐页标注的截图 PDF,页 N 的文字说的是
   页 N+1 的那张图。分四批落地(`5fdef9b3` / `28efa1c1` / `a4343477` / `24cc43fc` + 自查回补)。
   改动集中在**删多余文案**与**把说明改成能用的功能**两类,几处涉及数据正确性:
