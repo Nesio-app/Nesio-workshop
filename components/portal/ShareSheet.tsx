@@ -346,7 +346,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
 
         {/* Analyzing */}
         {analyzing && (
-          <div style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--portal-muted)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+          <div style={{ textAlign: 'center', padding: '1.5rem 0', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
             <span className="nesio-camera-recognizing-dot" style={{ background: 'var(--portal-blue-deep)', display: 'inline-block', width: '0.5rem', height: '0.5rem', borderRadius: '50%' }} />
             {L(dict, '念念正在整理可确认的信息…', 'Nessa is pulling out the key details…')}
           </div>

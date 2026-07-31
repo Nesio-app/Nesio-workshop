@@ -399,7 +399,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                             {i.name}{i.quantity != null ? ` ×${i.quantity}` : ''}
                           </span>
                           {/* 一级存放位置 */}
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: '0.75rem', color: i.location ? 'var(--text-secondary)' : 'var(--accent-primary, #c08f6f)' }}>
+                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--text-xs)', color: i.location ? 'var(--text-secondary)' : 'var(--accent-primary, #c08f6f)' }}>
                             <IconMapPin size={12} />
                             {(i.location && stripEmoji(i.location)) || i.location || L(dict, '未归位 · 点开设位置', 'Unplaced · tap to set')}
                           </span>
@@ -490,7 +490,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                 }}
               />
             </div>
-            {importMsg && <p style={{ margin: '0.45rem 0 0', fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'center' }}>{importMsg}</p>}
+            {importMsg && <p style={{ margin: '0.45rem 0 0', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', textAlign: 'center' }}>{importMsg}</p>}
           </>
         )}
 
@@ -506,7 +506,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
             >
               {pasteBusy ? L(dict, '识别中…', 'Recognizing…') : L(dict, '粘贴商品信息识别(商品标题/描述都行)', 'Paste product info to auto-fill')}
             </button>
-            {pasteMsg && <p style={{ margin: '0.4rem 0 0', fontSize: '0.75rem', color: 'var(--text-tertiary)', textAlign: 'center' }}>{pasteMsg}</p>}
+            {pasteMsg && <p style={{ margin: '0.4rem 0 0', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', textAlign: 'center' }}>{pasteMsg}</p>}
             <label style={label}>{L(dict, '物品名', 'Item name')}</label>
             <input className="nesio-ob-input" value={fName} onChange={(e) => setFName(e.target.value)} placeholder={L(dict, '例:护照、备用钥匙、维生素 D3', 'e.g. passport, spare keys, vitamin D3')} />
             <label style={label}>{L(dict, '放哪了?(和拍一下识别同一套位置)', 'Where does it live? (same places as Snap)')}</label>
@@ -626,7 +626,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
           return (
             <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
               <div style={{ borderRadius: 14, padding: '1rem', textAlign: 'center', background: 'var(--glass-bg, rgba(255,255,255,0.05))', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))' }}>
-                <span style={{ display: 'block', fontSize: '1.6rem', fontWeight: 700 }}>${sp.totalValue.toLocaleString('en-US')}</span>
+                <span style={{ display: 'block', fontSize: 'var(--text-h1)', fontWeight: 700 }}>${sp.totalValue.toLocaleString('en-US')}</span>
                 <span style={{ display: 'block', fontSize: '0.76rem', color: 'var(--text-tertiary)' }}>
                   {sp.items.length
                     ? L(dict, `这堆闲置约值这么多(${sp.items.length} 件)—— 挂出去就是零花钱`, `Your sell pile (${sp.items.length} items) — list them and it's pocket money`)
@@ -647,7 +647,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                           <span style={{ display: 'block', fontSize: '0.9rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{i.name}{i.quantity != null ? ` ×${i.quantity}` : ''}</span>
                           <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>{i.location || L(dict, '未归位', 'Unplaced')}</span>
                         </span>
-                        <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{i.price != null ? `$${(i.price * (i.quantity && i.quantity > 0 ? i.quantity : 1)).toLocaleString('en-US')}` : L(dict, '未估值', 'no est.')}</span>
+                        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>{i.price != null ? `$${(i.price * (i.quantity && i.quantity > 0 ? i.quantity : 1)).toLocaleString('en-US')}` : L(dict, '未估值', 'no est.')}</span>
                       </button>
                       {/* 物品⑥:一键复制转卖文案(纯模板),贴去闲鱼/FB Marketplace */}
                       <button type="button" onClick={() => copyListing(i)}
@@ -685,7 +685,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                 const lbl = (v: string, k: string, color?: string) => (
                   <span style={{ display: 'flex', flexDirection: 'column', minWidth: 64 }}>
                     <b style={{ fontSize: '1.05rem', color }}>{v}</b>
-                    <span style={{ color: 'var(--text-tertiary)', fontSize: '0.68rem' }}>{k}</span>
+                    <span style={{ color: 'var(--text-tertiary)', fontSize: 'var(--text-overline)' }}>{k}</span>
                   </span>
                 );
                 return (
@@ -713,7 +713,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                       </span>
                     </span>
                     <span style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-                      <span style={{ fontSize: '0.85rem', fontWeight: 600 }}>{i.outOfPocket != null ? fmt(i.outOfPocket) : (i.buyPrice != null ? fmt(i.buyPrice) : '—')}</span>
+                      <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>{i.outOfPocket != null ? fmt(i.outOfPocket) : (i.buyPrice != null ? fmt(i.buyPrice) : '—')}</span>
                       {badge(i)}
                     </span>
                   </button>
@@ -863,7 +863,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
         onClick={() => setAmzOpen((v) => !v)}
         style={{ width: '100%', marginTop: '1rem', padding: '0.5rem 0.7rem', borderRadius: 10, textAlign: 'left', fontWeight: 600,
           border: '1px solid var(--portal-accent-border)', background: amzOpen ? 'var(--portal-accent-soft)' : 'transparent',
-          color: 'var(--portal-accent)', fontSize: '0.85rem' }}
+          color: 'var(--portal-accent)', fontSize: 'var(--text-sm)' }}
       >
         {amzOpen ? '▾' : '▸'} {L(dict, '亚马逊转卖 · 订单/返现/利润', 'Amazon flip · order / rebate / profit')}
       </button>
@@ -917,7 +917,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
               {L(dict, '盈利', 'Profit')}: {profit != null ? money(profit) : '—'}
             </span>
           </div>
-          <p style={{ margin: '6px 2px 0', fontSize: '0.68rem', color: 'var(--portal-muted)' }}>
+          <p style={{ margin: '6px 2px 0', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>
             {L(dict, '自付额 = 买入价 − 返现(税不进成本);盈利 = 转卖价 − 自付额。保存后打「亚马逊」标签。', 'Out of pocket = buy − rebate (tax excluded); profit = resale − out of pocket. Saving tags it 亚马逊.')}
           </p>
         </div>
@@ -925,7 +925,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
 
       <button
         type="button"
-        style={{ width: '100%', marginTop: '1rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--portal-line)', background: item.forSale ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+        style={{ width: '100%', marginTop: '1rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--portal-line)', background: item.forSale ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}
         onClick={() => { updateInventoryItem(item.id, { forSale: !item.forSale }); onChanged(); }}
       >
         {item.forSale ? L(dict, '已在卖闲置堆 · 点击取消', 'In sell pile · tap to remove') : L(dict, '标记出售(进卖闲置堆)', 'Mark for sale')}
@@ -933,7 +933,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
       {/* 物品④:物品本身变容器(收纳箱等);解除只摘 flag,不动已放进去的物品 */}
       <button
         type="button"
-        style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--portal-line)', background: item.isContainer ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: '0.85rem' }}
+        style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--portal-line)', background: item.isContainer ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}
         onClick={() => { updateInventoryItem(item.id, { isContainer: !item.isContainer }); onChanged(); }}
       >
         {item.isContainer
@@ -952,7 +952,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
       )}
       <button
         type="button"
-        style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--status-risk)', fontSize: '0.85rem' }}
+        style={{ width: '100%', marginTop: '0.5rem', padding: '0.55rem', borderRadius: 10, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}
         onClick={() => { if (window.confirm(L(dict, '删除这件物品?', 'Delete this item?'))) { removeInventoryItem(item.id); onDeleted(); } }}
       >
         {L(dict, '删除物品', 'Delete item')}

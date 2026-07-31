@@ -31,7 +31,7 @@ export default class TabErrorBoundary extends Component<
           <p style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', margin: '0.4rem 0 0', lineHeight: 1.6 }}>
             别的页面不受影响。把下面这段截图发我,我就能定位:
           </p>
-          <pre style={{ margin: '0.5rem 0 0', padding: '0.6rem', fontSize: '0.68rem', lineHeight: 1.4, color: 'var(--status-risk)', background: 'var(--status-risk-soft)', borderRadius: 'var(--radius-sm, 12px)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '10rem', overflow: 'auto' }}>
+          <pre style={{ margin: '0.5rem 0 0', padding: '0.6rem', fontSize: 'var(--text-overline)', lineHeight: 1.4, color: 'var(--status-risk)', background: 'var(--status-risk-soft)', borderRadius: 'var(--radius-sm, 12px)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', maxHeight: '10rem', overflow: 'auto' }}>
             {msg}
           </pre>
           <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '0.6rem', width: '100%' }} onClick={() => this.setState({ error: null })}>

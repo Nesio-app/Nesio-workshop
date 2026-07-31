@@ -270,7 +270,7 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
             />
 
             {draftSource && (
-              <p style={{ color: 'var(--text-tertiary, #9ca3af)', fontSize: '0.75rem', marginTop: '0.5rem', lineHeight: 1.5 }}>
+              <p style={{ color: 'var(--text-tertiary, #9ca3af)', fontSize: 'var(--text-xs)', marginTop: '0.5rem', lineHeight: 1.5 }}>
                 {draftSource === 'cache'
                   ? L(dict, 'AI 暂时离线 · 复用了上次给你的初稿,改一改就能发', 'AI is offline · reused a past draft — tweak and send')
                   : L(dict, 'AI 暂时离线 · 这是本地起的骨架,把你的话补进去', 'AI is offline · a local skeleton — fill in your words')}
@@ -297,7 +297,7 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
                 {sending ? L(dict, '发送中…', 'Sending…') : L(dict, '发送', 'Send')}
               </button>
             </div>
-            <p style={{ fontSize: '0.68rem', color: 'var(--portal-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
+            <p style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', marginTop: '0.5rem', textAlign: 'center' }}>
               {L(dict, '以你的 Gmail 账号发送 · 每封都由你亲手点发送', 'Sent from your Gmail · you send every message yourself')}
             </p>
           </div>

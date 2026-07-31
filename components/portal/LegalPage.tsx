@@ -35,7 +35,7 @@ export default function LegalPage({ title, updated, intro, sections }: LegalPage
           <a href="/" style={{ color: 'var(--portal-accent, #588ce3)', textDecoration: 'none', fontSize: '0.9rem' }}>
             {i === 0 ? '← 返回 Nesio' : '← Back to Nesio'}
           </a>
-          <div style={{ display: 'flex', gap: '0.25rem', fontSize: '0.85rem' }}>
+          <div style={{ display: 'flex', gap: '0.25rem', fontSize: 'var(--text-sm)' }}>
             <button type="button" onClick={() => setLocale('zh')}
               style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: locale === 'zh' ? 700 : 400, color: locale === 'zh' ? 'var(--portal-accent, #588ce3)' : 'var(--portal-muted, #8a94a6)' }}>中文</button>
             <span style={{ color: 'var(--portal-line, #d7deea)' }}>·</span>
@@ -44,8 +44,8 @@ export default function LegalPage({ title, updated, intro, sections }: LegalPage
           </div>
         </div>
 
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 700, margin: '0 0 0.35rem' }}>{title[i]}</h1>
-        <p style={{ color: 'var(--portal-muted, #8a94a6)', fontSize: '0.85rem', margin: '0 0 1.5rem' }}>{updated[i]}</p>
+        <h1 style={{ fontSize: 'var(--text-h1)', fontWeight: 700, margin: '0 0 0.35rem' }}>{title[i]}</h1>
+        <p style={{ color: 'var(--portal-muted, #8a94a6)', fontSize: 'var(--text-sm)', margin: '0 0 1.5rem' }}>{updated[i]}</p>
         <p style={{ lineHeight: 1.7, margin: '0 0 2rem' }}>{intro[i]}</p>
 
         {sections.map((s, idx) => (

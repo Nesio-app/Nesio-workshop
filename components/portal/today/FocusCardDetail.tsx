@@ -347,11 +347,11 @@ export function FocusCardDetail({
         })()}
         <div style={{ display: 'flex', gap: '0.4rem', marginLeft: 'auto' }}>
           <button type="button" onClick={() => { const live = getLiveMemoryNode(node.id); if (live) setMemNode(live); }}
-            style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: '0.68rem', color: 'var(--portal-muted)', cursor: 'pointer' }}>
+            style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', cursor: 'pointer' }}>
             {L(dict, '查看详情', 'Details')}
           </button>
           <button type="button" onClick={() => void aiRefineWave()} disabled={aiRefining}
-            style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: '0.68rem', color: 'var(--portal-accent)', cursor: 'pointer', opacity: aiRefining ? 0.6 : 1 }}>
+            style={{ background: 'none', border: '1px solid var(--portal-line)', borderRadius: 999, padding: '0.2rem 0.6rem', fontSize: 'var(--text-overline)', color: 'var(--portal-accent)', cursor: 'pointer', opacity: aiRefining ? 0.6 : 1 }}>
             {aiRefining ? L(dict, '换一种拆法中…', 'Reworking…') : L(dict, '换一种拆法', 'Rework it')}
           </button>
         </div>

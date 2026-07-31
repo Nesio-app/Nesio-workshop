@@ -495,7 +495,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
                           <button key={e.id} type="button"
                             onClick={() => setExpandedEntry(isOpen ? '' : e.id)}
                             style={{ textAlign: 'left', background: 'rgba(88,140,227,0.05)', border: '1px solid var(--portal-line)', borderRadius: '0.7rem', padding: '0.55rem 0.7rem', cursor: 'pointer' }}>
-                            <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.68rem', color: 'var(--portal-muted)', margin: '0 0 0.25rem' }}>
+                            <p style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', margin: '0 0 0.25rem' }}>
                               {e.emotionColor && <span aria-hidden style={{ width: 8, height: 8, borderRadius: '50%', background: e.emotionColor, display: 'inline-block' }} />}
                               {[e.emotionLabel || '', e.energyLevel ? `${L(dict, '能量', 'energy ')}${energyWord(e.energyLevel, dict)}` : '', timeOfDay(dict, e.date), e.date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })].filter(Boolean).join(' · ')}
                             </p>

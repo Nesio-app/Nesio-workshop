@@ -221,7 +221,7 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
         <select
           value={phase.familyId}
           onChange={(e) => { setPhase({ s: 'loading' }); void loadMembers(phase.families, e.target.value); }}
-          style={{ padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontSize: '0.85rem' }}
+          style={{ padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }}
         >
           {phase.families.map((f) => <option key={f.familyId} value={f.familyId}>{f.name}</option>)}
         </select>
@@ -244,11 +244,11 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
 
       {/* 金额:接回零花钱账本。留空 = 纯待办(不计钱)。 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-        <span style={{ fontSize: '0.85rem', color: 'var(--portal-muted)' }}>$</span>
+        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>$</span>
         <input
           inputMode="decimal" value={reward} onChange={(e) => setReward(e.target.value)}
           placeholder={t('给多少(可留空)', 'Reward (optional)')}
-          style={{ flex: 1, minWidth: 0, padding: '0.35rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontSize: '0.85rem' }}
+          style={{ flex: 1, minWidth: 0, padding: '0.35rem 0.6rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }}
         />
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', fontSize: '0.78rem', color: 'var(--portal-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>
           <input type="checkbox" checked={needsApproval} onChange={(e) => setNeedsApproval(e.target.checked)} />
@@ -257,7 +257,7 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4rem' }}>
         {phase.members.map((m) => (
-          <button key={m.id} type="button" className="nesio-node-action-secondary" style={{ padding: '0.35rem 0.8rem', fontSize: '0.85rem' }}
+          <button key={m.id} type="button" className="nesio-node-action-secondary" style={{ padding: '0.35rem 0.8rem', fontSize: 'var(--text-sm)' }}
             onClick={() => fam && void assign(fam.familyId, m)}>
             {m.name}
           </button>

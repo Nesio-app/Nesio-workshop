@@ -1418,12 +1418,12 @@ export default function Portal() {
                       setLocalOwner(ownerConflict.userId, ownerConflict.email);
                       window.location.reload();
                     }}
-                    style={{ width: '100%', background: 'var(--portal-accent, #588ce3)', color: 'var(--portal-on-accent, #fff)', border: 'none', borderRadius: 999, padding: '0.7rem', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer', opacity: ownerBusy ? 0.6 : 1 }}>
+                    style={{ width: '100%', background: 'var(--portal-accent, #588ce3)', color: 'var(--portal-on-accent, #fff)', border: 'none', borderRadius: 999, padding: '0.7rem', fontSize: 'var(--text-body)', fontWeight: 600, cursor: 'pointer', opacity: ownerBusy ? 0.6 : 1 }}>
                     {ownerBusy ? L(dict, '正在切换空间…', 'Switching spaces…') : L(dict, '切换到我的空间', 'Switch to my space')}
                   </button>
                   <button type="button" disabled={ownerBusy}
                     onClick={async () => { setOwnerBusy(true); await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {}); window.location.reload(); }}
-                    style={{ width: '100%', background: 'none', color: 'var(--portal-muted, #8a94a6)', border: '1px solid var(--portal-line, #d7deea)', borderRadius: 999, padding: '0.7rem', fontSize: '0.95rem', cursor: 'pointer' }}>
+                    style={{ width: '100%', background: 'none', color: 'var(--portal-muted, #8a94a6)', border: '1px solid var(--portal-line, #d7deea)', borderRadius: 999, padding: '0.7rem', fontSize: 'var(--text-body)', cursor: 'pointer' }}>
                     {L(dict, '退出登录', 'Sign out')}
                   </button>
                 </>
@@ -1431,12 +1431,12 @@ export default function Portal() {
                 <>
                   <button type="button" disabled={ownerBusy}
                     onClick={() => { claimLocalDataForUser(ownerConflict.userId, ownerConflict.email); setOwnerConflict(null); }}
-                    style={{ width: '100%', background: 'var(--portal-accent, #588ce3)', color: 'var(--portal-on-accent, #fff)', border: 'none', borderRadius: 999, padding: '0.7rem', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer' }}>
+                    style={{ width: '100%', background: 'var(--portal-accent, #588ce3)', color: 'var(--portal-on-accent, #fff)', border: 'none', borderRadius: 999, padding: '0.7rem', fontSize: 'var(--text-body)', fontWeight: 600, cursor: 'pointer' }}>
                     {L(dict, '归入这个账号', 'Keep them under this account')}
                   </button>
                   <button type="button" disabled={ownerBusy}
                     onClick={async () => { setOwnerBusy(true); await purgeAllLocalUserData(); setLocalOwner(ownerConflict.userId, ownerConflict.email); window.location.reload(); }}
-                    style={{ width: '100%', background: 'none', color: 'var(--portal-muted, #8a94a6)', border: '1px solid var(--portal-line, #d7deea)', borderRadius: 999, padding: '0.7rem', fontSize: '0.95rem', cursor: 'pointer' }}>
+                    style={{ width: '100%', background: 'none', color: 'var(--portal-muted, #8a94a6)', border: '1px solid var(--portal-line, #d7deea)', borderRadius: 999, padding: '0.7rem', fontSize: 'var(--text-body)', cursor: 'pointer' }}>
                     {ownerBusy ? L(dict, '清除中…', 'Clearing…') : L(dict, '清除本机数据,从零开始', 'Clear local data & start fresh')}
                   </button>
                 </>
@@ -1456,7 +1456,7 @@ export default function Portal() {
             onClick={(e) => e.stopPropagation()}
             style={{ width: 'min(96vw, 460px)', margin: '0 0 max(1rem, env(safe-area-inset-bottom))', background: 'var(--sheet-opaque, #fff)', color: 'var(--portal-ink, #2c2c2c)', borderRadius: 20, padding: '1.4rem 1.25rem', boxShadow: '0 -8px 40px rgba(4,10,22,0.35)' }}
           >
-            <p style={{ margin: 0, fontSize: '0.75rem', letterSpacing: '0.08em', color: 'var(--portal-accent, #588ce3)', fontWeight: 700 }}>PRO</p>
+            <p style={{ margin: 0, fontSize: 'var(--text-xs)', letterSpacing: '0.08em', color: 'var(--portal-accent, #588ce3)', fontWeight: 700 }}>PRO</p>
             <h3 style={{ margin: '0.3rem 0 0.5rem', fontSize: '1.15rem', fontWeight: 700 }}>
               {proGate === 'freeze'
                 ? L(dict, '冷冻仓是 Pro 功能', 'Freeze Vault is a Pro feature')
@@ -1470,7 +1470,7 @@ export default function Portal() {
             <button
               type="button"
               onClick={() => setProGate(null)}
-              style={{ width: '100%', background: 'var(--portal-accent, #588ce3)', color: 'var(--portal-on-accent, #fff)', border: 'none', borderRadius: 999, padding: '0.7rem', fontSize: '0.95rem', fontWeight: 600, cursor: 'pointer' }}
+              style={{ width: '100%', background: 'var(--portal-accent, #588ce3)', color: 'var(--portal-on-accent, #fff)', border: 'none', borderRadius: 999, padding: '0.7rem', fontSize: 'var(--text-body)', fontWeight: 600, cursor: 'pointer' }}
             >
               {L(dict, '知道了', 'Got it')}
             </button>

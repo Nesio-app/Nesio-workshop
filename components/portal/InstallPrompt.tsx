@@ -113,7 +113,7 @@ export default function InstallPrompt({ locale = 'zh' }: { locale?: PortalLocale
       {mode === 'chrome' && (
         <button type="button" onClick={install} style={{
           flexShrink: 0, background: 'var(--portal-accent, #588ce3)', color: 'var(--portal-on-accent, #fff)',
-          border: 'none', borderRadius: 999, padding: '0.45rem 0.9rem', fontSize: '0.85rem',
+          border: 'none', borderRadius: 999, padding: '0.45rem 0.9rem', fontSize: 'var(--text-sm)',
           fontWeight: 600, cursor: 'pointer',
         }}>{zh ? '安装' : 'Install'}</button>
       )}

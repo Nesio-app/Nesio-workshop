@@ -1443,7 +1443,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                       style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', padding: '0.5rem 0.7rem', borderRadius: '0.7rem', border: '1px solid var(--portal-line, rgba(127,127,127,0.18))', background: 'none', color: 'var(--portal-ink)', textAlign: 'left', cursor: 'pointer' }}
                     >
                       <NodeTypeIcon type={r.type} size={13} />
-                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.85rem' }}>{r.name}</span>
+                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--text-sm)' }}>{r.name}</span>
                       {dateTag && <span style={{ color: 'var(--portal-muted)', fontSize: '0.74rem', flex: 'none' }}>{dateTag}</span>}
                       <span style={{ color: 'var(--portal-muted)' }}>›</span>
                     </button>

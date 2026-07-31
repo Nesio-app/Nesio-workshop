@@ -862,21 +862,21 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       </div>
       {/* 状态:仅当前所用目的地会填充 */}
       {cloudState === 'done' && (
-        <p style={{ fontSize: '0.75rem', marginTop: 4, color: 'var(--status-go)' }}>
+        <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, color: 'var(--status-go)' }}>
           {L(dict, '✓ 已备份到 Nesio 云', '✓ Backed up to Nesio cloud')}{cloudBackupAt ? ` · ${new Date(cloudBackupAt).toLocaleString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}` : ''}
         </p>
       )}
       {cloudState === 'error' && cloudError && (
-        <p style={{ fontSize: '0.75rem', marginTop: 4, color: cloudError === 'entitlement_required' ? 'var(--portal-muted)' : 'var(--status-risk)' }}>
+        <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, color: cloudError === 'entitlement_required' ? 'var(--portal-muted)' : 'var(--status-risk)' }}>
           {cloudErrorText(cloudError)}
         </p>
       )}
       {cloudRestoreState === 'error' && cloudRestoreError && (
-        <p style={{ fontSize: '0.75rem', marginTop: 4, color: cloudRestoreError === 'entitlement_required' || cloudRestoreError === 'no_backup' ? 'var(--portal-muted)' : 'var(--status-risk)' }}>
+        <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, color: cloudRestoreError === 'entitlement_required' || cloudRestoreError === 'no_backup' ? 'var(--portal-muted)' : 'var(--status-risk)' }}>
           {cloudRestoreErrorText(cloudRestoreError)}
         </p>
       )}
-      {driveMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: driveState === 'error' ? 'var(--status-risk)' : 'var(--status-go)' }}>{driveMsg}</p>}
+      {driveMsg && <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, color: driveState === 'error' ? 'var(--status-risk)' : 'var(--status-go)' }}>{driveMsg}</p>}
 
       {/* 同步体检(地基 F2)。此前这里只报「N 条记忆,全在本机」—— 那是**本地**条数,
           回答不了「云端也有吗」。同步机制齐备但没人能验:backfill 默认只补最新 200 条,
@@ -900,14 +900,14 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         )}
       </div>
       {auditState === 'failed' && auditFail && (
-        <p style={{ fontSize: '0.75rem', marginTop: 4, color: 'var(--portal-muted)' }}>{auditFail}</p>
+        <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, color: 'var(--portal-muted)' }}>{auditFail}</p>
       )}
       {auditReport && (auditState === 'done' || auditState === 'repairing') && (() => {
         const verdict = consistencyVerdict(auditReport);
         const pending = new Set(auditReport.pendingDeletes);
         const cloudOnly = auditReport.missingLocally.filter((id) => !pending.has(id));
         return (
-          <p style={{ fontSize: '0.75rem', marginTop: 4, lineHeight: 1.7,
+          <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, lineHeight: 1.7,
             color: verdict === 'clean' ? 'var(--status-go)' : verdict === 'repairable' ? 'var(--status-gentle)' : 'var(--status-risk)' }}>
             {verdict === 'clean'
               ? L(dict, `✓ 本机 ${auditReport.localCount} 条,云端 ${auditReport.cloudCount} 条,一一对得上。`,
@@ -947,8 +947,8 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         </Button>
       </div>
       <input ref={importRef} type="file" accept="application/json,.json" className="nesio-visually-hidden" onChange={handleImportFile} />
-      {restoreMsg && <p style={{ fontSize: '0.75rem', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
-      {exportWarn && <p style={{ fontSize: '0.75rem', marginTop: 4, lineHeight: 1.6, color: 'var(--status-gentle)' }}>{exportWarn}</p>}
+      {restoreMsg && <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
+      {exportWarn && <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, lineHeight: 1.6, color: 'var(--status-gentle)' }}>{exportWarn}</p>}
 
       {/* 2026-07-29:三个红按钮原来是平铺的,一屏三条红 —— CLAUDE.md 红线明写「不用红色制造焦虑」,
           而且这三件事一年也未必做一次,却天天占着视线。收进一个入口,点开才展开。
@@ -1261,7 +1261,7 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
 
       {/* Pro 权益清单(会员权益介绍) */}
       <p className="nesio-settings-section-label" style={{ marginTop: '1.1rem' }}>{L(dict, 'Pro 能做什么', 'What Pro unlocks')}</p>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: '0.85rem', lineHeight: 1.6 }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', fontSize: 'var(--text-sm)', lineHeight: 1.6 }}>
         {[
           L(dict, 'AI 自动识别与整理(拍照 / 分享 / 文件)', 'AI recognition & organizing (photos / shares / files)'),
           L(dict, '问一问深度回答(对话式检索)', 'Deep conversational answers in Ask'),
@@ -1273,7 +1273,7 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
             <span style={{ color: 'var(--status-go)', flexShrink: 0 }}>✓</span><span>{b}</span>
           </div>
         ))}
-        <p style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', margin: '0.35rem 0 0' }}>
+        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: '0.35rem 0 0' }}>
           {L(dict, '记录、搜索、手动标签永久免费。', 'Capturing, search, and manual tags stay free forever.')}
         </p>
       </div>
@@ -1303,7 +1303,7 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
       {isPaidPro ? (
         <div style={{ marginTop: '1.2rem', padding: '0.9rem 1rem', borderRadius: 12, textAlign: 'center', background: 'var(--portal-card, #fff)', border: '1px solid var(--status-gentle, #6cbf84)' }}>
           <p style={{ fontWeight: 600, margin: 0, color: 'var(--status-gentle, #4a9d63)' }}>{L(dict, '✓ 你已是 Pro 会员', "✓ You're a Pro member")}</p>
-          <p style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', margin: '0.35rem 0 0' }}>{L(dict, '订阅生效中,感谢支持。可在支付渠道管理或取消。', 'Subscription active — thank you. Manage or cancel via your payment provider.')}</p>
+          <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: '0.35rem 0 0' }}>{L(dict, '订阅生效中,感谢支持。可在支付渠道管理或取消。', 'Subscription active — thank you. Manage or cancel via your payment provider.')}</p>
         </div>
       ) : (
       <button type="button" className="nesio-ob-primary-btn" style={{ marginTop: '1.2rem' }} onClick={handleUpgrade} disabled={upgradeBusy || notified}>
@@ -1311,7 +1311,7 @@ export function SubscriptionSheet({ open, onClose }: SheetProps) {
       </button>
       )}
       {billingHint === 'signin' && (
-        <p style={{ fontSize: '0.75rem', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '0.5rem' }}>
+        <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', textAlign: 'center', marginTop: '0.5rem' }}>
           {L(dict, '登录后即可升级。', 'Sign in first to upgrade.')}
         </p>
       )}
