@@ -21002,3 +21002,96 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   background: var(--portal-accent-soft); color: var(--portal-accent);
   font-size: var(--text-xs); cursor: pointer;
 }
+
+/* ── 悬浮播放球(2026-07-31)────────────────────────────────────────────────
+   位置:底部导航**之上**、右侧。z=935 夹在洞察浮层(929/930)与 elevated(940)之间
+   —— 高于浮层所以每一页都看得见,低于 elevated 所以从洞察里再开的抽屉不会被它压住。
+   颜色全走 token;关闭键用 muted 而不是 --status-risk:关掉音乐不是风险,别制造焦虑。 */
+.nesio-fp,
+.nesio-fp-ball {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 4.6rem);
+  z-index: 935;
+}
+
+/* 收起态:一个圆球 + 一圈进度环 */
+.nesio-fp-ball {
+  width: 56px; height: 56px;
+  display: grid; place-items: center;
+  border: 1px solid var(--portal-accent-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg-solid);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
+  cursor: pointer; padding: 0;
+}
+.nesio-fp-ring {
+  position: absolute; inset: -1px;
+  border-radius: var(--radius-pill);
+  /* 进度环:走过的部分用强调色,剩下的透明 —— 不用第二个元素画底环,
+     底环由球本身的 border 充当。 */
+  background: conic-gradient(var(--portal-accent) var(--fp-pct, 0%), transparent 0);
+  -webkit-mask: radial-gradient(circle, transparent 24px, #000 25px);
+  mask: radial-gradient(circle, transparent 24px, #000 25px);
+  pointer-events: none;
+}
+.nesio-fp-glyph {
+  font-size: var(--text-sm);
+  color: var(--portal-accent);
+  line-height: 1;
+}
+
+/* 展开态:曲名 + 三个圆键 */
+.nesio-fp {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  align-items: flex-end;
+  max-width: min(20rem, calc(100vw - 2rem));
+}
+.nesio-fp-meta {
+  display: flex; flex-direction: column; align-items: flex-end;
+  max-width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg-solid);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+.nesio-fp-meta strong {
+  max-width: 100%;
+  font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--portal-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nesio-fp-meta span { font-size: var(--text-xs); color: var(--portal-muted); }
+
+.nesio-fp-acts { display: flex; gap: var(--space-2); }
+.nesio-fp-btn {
+  width: 48px; height: 48px;
+  display: grid; place-items: center;
+  border: 1px solid var(--portal-line);
+  border-radius: var(--radius-pill);
+  background: var(--glass-bg-solid);
+  color: var(--portal-ink);
+  font-size: var(--text-sm); line-height: 1;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+  cursor: pointer; padding: 0;
+}
+.nesio-fp-btn.is-main {
+  border-color: var(--portal-accent-border);
+  background: var(--portal-accent);
+  color: var(--portal-on-accent, #fff);
+}
+.nesio-fp-btn.is-close { color: var(--portal-muted); }
+
+.nesio-fp-err {
+  margin: 0; max-width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--status-gentle-soft); color: var(--portal-ink);
+  font-size: var(--text-xs); line-height: 1.6;
+}
+
+/* 播放进度:时长读出来之后才出现(拖不动的滑块比没有更像坏了)。 */
+.nesio-music-seek {
+  flex: 1 0 100%; width: 100%; margin-top: var(--space-2);
+  accent-color: var(--portal-accent);
+}

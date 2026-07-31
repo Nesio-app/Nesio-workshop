@@ -42,6 +42,8 @@ const NesioChatSheet = dynamic(() => import('./NesioChatSheet'), { ssr: false })
 const NotePanelEnhanced = dynamic(() => import('./NotePanelEnhanced'), { ssr: false });
 const ToolsTreasurePopup = dynamic(() => import('./ToolsTreasureSheet'), { ssr: false });
 const InventorySheet = dynamic(() => import('./InventorySheet'), { ssr: false });
+// 悬浮播放球:没在放的时候自己返回 null。ssr:false —— 它读的是浏览器里那个 audio 的状态。
+const FloatingPlayer = dynamic(() => import('./music/FloatingPlayer'), { ssr: false });
 const CalendarCreateSheet = dynamic(() => import('./CalendarCreateSheet'), { ssr: false });
 const FamilySharingSheet = dynamic(() => import('./family/FamilySharingSheet'), { ssr: false });
 const CookingSheet = dynamic(() => import('./cooking/CookingSheet'), { ssr: false });
@@ -1503,6 +1505,10 @@ export default function Portal() {
           <InsightsSheet onClose={() => setInsightsOpen(false)} canUsePrivateData={canViewPrivateData} initialTab={insightsTab} tabNonce={insightsNonce} onHubChange={setInsightsHub} />
         </NesioSheet>
       )}
+      {/* 悬浮播放球:挂在这一层,才能在**每一页**都看得见。
+          音频本体在 player-engine 的模块级 audio 上(不在音乐面板里),
+          所以切走那一页歌不会断 —— 这颗球就是那时候唯一的控制入口。 */}
+      <FloatingPlayer />
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
       {calendarCreateOpen && <CalendarCreateSheet open={calendarCreateOpen} onClose={() => setCalendarCreateOpen(false)} />}
       {/* onToday:右上「今天」要连洞察一起关(bug3:左边回洞察、右边回今天) */}

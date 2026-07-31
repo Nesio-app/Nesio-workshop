@@ -159,7 +159,7 @@ assert.equal(cat.blockedReason('local', READY), '', '能放的时候不该有多
     /probed && !chain\.length && <p className="nesio-music-blocked">\{noSourceLine\(readiness, dict\)\}/.test(panel),
     '一个源都放不了时的空态必须渲染 —— 这是「按了没反应」那一类 bug 的根',
   );
-  const player = read('components/portal/music/use-local-player.ts');
+  const player = read('lib/platform/music/player-engine.ts');
   // 浏览器挡下自动播放 ≠ 格式放不了:前者**再点一次就能出声**,后者只能换歌。
   // 两句合并成一句「放不出来」等于把唯一有效的动作藏了起来 —— 所以压的是那个出口。
   assert.ok(
@@ -278,9 +278,9 @@ assert.equal(cat.blockedReason('local', READY), '', '能放的时候不该有多
     /if \(t\.id === player\.state\.currentId\) player\.stop\(\);[\s\S]{0,120}deleteLocalTrack\(t\.id\)/.test(panel),
     '曲库里删掉的歌还在响,是同屏自相矛盾 —— 删之前要停',
   );
-  const hook = read('components/portal/music/use-local-player.ts');
+  const engine = read('lib/platform/music/player-engine.ts');
   assert.ok(
-    /stop: \(\) => \{[\s\S]{0,200}revoke\(\);/.test(hook),
+    /export function stop\(\): void \{[\s\S]{0,320}revoke\(\);/.test(engine),
     'stop 要把 objectURL 也放掉,不然一首无损几十 MB 一直占着',
   );
 }
@@ -312,7 +312,7 @@ assert.equal(cat.blockedReason('local', READY), '', '能放的时候不该有多
   assert.equal(cat.sourceName('local', 'en'), 'Local files', '源名要按语言给');
 
   // 播放器与导入的失败话术同样两份 —— 它们是用户最可能撞上的两处。
-  const hook = read('components/portal/music/use-local-player.ts');
+  const hook = read('lib/platform/music/player-engine.ts');
   assert.ok(/const COPY = \{[\s\S]{0,1200}\n  en: \{/.test(hook), '播放器的失败话术必须中英各一份');
   const tracks = read('lib/platform/music/local-tracks.ts');
   assert.ok(/const IMPORT_COPY = \{[\s\S]{0,1200}\n  en: \{/.test(tracks), '导入的失败话术必须中英各一份');
@@ -329,6 +329,20 @@ assert.equal(cat.blockedReason('local', READY), '', '能放的时候不该有多
   assert.ok(
     /\{clockTime\(player\.state\.positionSec\)\} \/ \{prettyDuration\(player\.state\.durationSec\)\}/.test(panel),
     '进度要用 clockTime(0 秒 = 0:00);--:-- 表示的是「不知道多长」,刚开始放不该显示成那样',
+  );
+}
+
+/* ── ⑮b 进度可拖,但拖得动才给 ──────────────────────────────────────────── */
+
+{
+  const panel = read('components/portal/music/MusicPanel.tsx');
+  assert.ok(
+    /player\.seek\(Number\(e\.target\.value\)\)/.test(panel),
+    'seek 必须接到界面上 —— 引擎透出来却没人调,等于没做',
+  );
+  assert.ok(
+    /player\.state\.durationSec > 0 && \([\s\S]{0,400}type="range"/.test(panel),
+    '时长还没读出来时不给拖:一个拖了不动的滑块比没有滑块更让人以为坏了',
   );
 }
 

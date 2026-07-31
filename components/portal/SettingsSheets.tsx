@@ -28,6 +28,7 @@ import { purgeIdbBlobs } from '@/lib/portal/idb-blob-store';
 import { purgeLocalImages } from '@/lib/portal/local-image-store';
 import { purgeLocalFiles } from '@/lib/portal/local-file-store';
 import { purgeLocalTracks } from '@/lib/platform/music/local-tracks';
+import { stop as stopMusic } from '@/lib/platform/music/player-engine';
 import { getTelemetryDeviceId } from '@/lib/portal/telemetry';
 import { FEATURE_CATALOG, loadModuleOverrides, setModuleOverride, MODULE_OVERRIDES_EVENT, defaultResolvesTo, followsLab, isLabModeOn, getPalette, setPalette, PALETTES, type PaletteId } from '@/lib/portal/module-overrides';
 import { isAppStoreBuild } from '@/lib/portal/app-build.mjs';
@@ -787,6 +788,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       void purgeIdbBlobs();                                 // IDB blob(健康/临床/地点)一并清 —— 别漏
       void purgeLocalImages();                              // 隐私审计:记忆照片在独立 IDB(nesio-images),必须一并清,否则「删除」留图在本机
       void purgeLocalFiles();                               // 同上:附件在 nesio-files,漏了就把 pdf 留在设备上
+      stopMusic();                                          // 先停播:歌还在响、文件已删掉是最刺眼的一种「没删干净」
       void purgeLocalTracks();                              // 本地曲库在 nesio-music,同一条:漏了歌还留在设备上
       void import('@/lib/portal/local-email-body').then(({ purgeEmailBodies }) => purgeEmailBodies()); // 邮件全文独立 IDB(nesio-email-bodies)一并清
     } catch { /* ignore */ }
@@ -820,7 +822,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     // 云删成功 → 清本机 + 登出
     try {
       getLifeGraph().forEach((n) => deleteLifeNode(n.id));
-      purgeLocalData(localStorage); void purgeIdbBlobs(); void purgeLocalImages(); void purgeLocalFiles(); void purgeLocalTracks();
+      purgeLocalData(localStorage); void purgeIdbBlobs(); void purgeLocalImages(); void purgeLocalFiles(); stopMusic(); void purgeLocalTracks();
       await fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
     } catch { /* ignore */ }
     setDeleteMsg(L(dict, '✓ 账号与全部数据已删除,正在登出…', '✓ Account and all data deleted, signing out…'));

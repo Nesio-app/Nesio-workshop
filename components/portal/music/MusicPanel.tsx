@@ -31,6 +31,7 @@ import { loadMusicPrefs, saveMusicPrefs, loadLastPlayed, saveLastPlayed, type Mu
 import { EMPTY_READINESS, fetchSpotifyStatus, localReadiness, probeReadiness, type ReadinessMap, type SpotifyStatus } from '@/lib/platform/music/readiness';
 import { authorizeApple, lastAppleError } from '@/lib/platform/music/apple-client';
 import { useSessionState } from '../use-session-state';
+import { setPanelOpen } from '@/lib/platform/music/player-engine';
 import { useLocalPlayer } from './use-local-player';
 import type { RepeatMode } from '@/lib/platform/music/queue';
 
@@ -76,6 +77,8 @@ export default function MusicPanel() {
   // 那一帧与客户端不一致(水合告警),而且首屏会闪一下。
   const [lastId, setLastId] = useState('');
   useEffect(() => { setTracks(loadLocalTracks()); setLastId(loadLastPlayed()); }, []);
+  // 告诉悬浮球「这一页开着,你先让位」—— 同一屏两套播放控制会让人怀疑它俩不是一回事。
+  useEffect(() => { setPanelOpen(true); return () => setPanelOpen(false); }, []);
   useEffect(() => {
     let alive = true;
     // 明确未登录时不去打那三个 guard 路由 —— 每次都是 401,除了给限流器添噪音没有别的作用。
@@ -378,6 +381,19 @@ export default function MusicPanel() {
               <div className="nesio-music-bar-time">
                 {clockTime(player.state.positionSec)} / {prettyDuration(player.state.durationSec)}
               </div>
+              {/* 可拖的进度 —— 时长还没读出来(durationSec=0)时不给拖:
+                  一个拖了不动的滑块比没有滑块更让人以为坏了。 */}
+              {player.state.durationSec > 0 && (
+                <input
+                  className="nesio-music-seek"
+                  type="range"
+                  min={0}
+                  max={Math.floor(player.state.durationSec)}
+                  value={Math.floor(player.state.positionSec)}
+                  aria-label={L(dict, '拖动到某一处', 'Seek')}
+                  onChange={(e) => player.seek(Number(e.target.value))}
+                />
+              )}
             </div>
           )}
 
@@ -488,8 +504,8 @@ export default function MusicPanel() {
         </section>
       )}
 
-      {/* in-app 播放器的音频元素。只有本地源用它。 */}
-      <audio ref={player.audioRef} preload="metadata" />
+      {/* 音频元素**不在这里** —— 它挂在 document.body 上、由 player-engine 独占。
+          放在组件里的话,切走这一页音乐就断了,悬浮球也就没有存在的意义了。 */}
     </div>
   );
 }
