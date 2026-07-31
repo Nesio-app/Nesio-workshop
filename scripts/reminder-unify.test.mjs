@@ -234,9 +234,12 @@ assert.equal(rem.repeatLabel({}), '', '只此一次的不该有重复标签');
 
 {
   const shadow = code(read('lib/portal/reminder-shadow.ts'));
+  // dueDate 必须是**完整墙上时钟**:node-dates 的键序里它排在 remindAt 前面,
+  // 只存纯日期的话 firstNodeDate 先命中它、钟点当场丢掉 ——
+  // 这条提醒在时间线上就变成「明天(某个时候)」,而用户明明说了三点。
   assert.ok(
-    /dueDate: r\.at\.slice\(0, 10\)[\s\S]{0,120}dueTime: r\.at\.slice\(11\)/.test(shadow),
-    '身影要带时刻 —— 不带 dueDate/dueTime 它排不进时间线',
+    /dueDate: r\.at,[\s\S]{0,160}dueTime: r\.at\.slice\(11\),[\s\S]{0,80}remindAt: r\.at,/.test(shadow),
+    '身影的 dueDate 要带钟点(完整墙上时钟),否则时间线只知道是哪天、不知道几点',
   );
   assert.ok(
     /\[SHADOW_ATTR\]: r\.id/.test(shadow),
@@ -339,7 +342,7 @@ assert.equal(rem.repeatLabel({}), '', '只此一次的不该有重复标签');
 {
   const sheet = code(read('components/portal/VoiceInputSheet.tsx'));
   assert.ok(
-    /autoAskedRef\.current = seed;\s*\n\s*void handleSend\(\);/.test(sheet),
+    /autoAskedRef\.current = seed;[\s\S]{0,240}void handleSend\(seed\);/.test(sheet),
     '从首页带过来的问题要直接开始回答,不停在一个填好了还等着再点一次发送的框上',
   );
   assert.ok(
@@ -350,9 +353,16 @@ assert.equal(rem.repeatLabel({}), '', '只此一次的不该有重复标签');
     /if \(!seed \|\| autoAskedRef\.current === seed\) return;/.test(sheet),
     '一次打开只自动发一次 —— 不挡的话会连发两遍,白花一次 AI 的钱',
   );
+  // 不等 text 这个 state 同步 —— **把话直接传进去**。等 setText 落定是一个多余的
+  // 时序依赖:React 批处理、渲染顺序、这张 sheet 又是 dynamic import 的,
+  // 任何一环慢半拍,用户看到的就是一个填好了却什么都没发生的框。
   assert.ok(
-    /if \(text\.trim\(\) !== seed\) return;/.test(sheet),
-    '要等文字真的填进去再发,否则发出去的是空的',
+    /void handleSend\(seed\);/.test(sheet),
+    '自动提问要把那句话直接传给 handleSend,不依赖 state 同步',
+  );
+  assert.ok(
+    /async function handleSend\(override\?: string\) \{\s*\n\s*const t = \(override \?\? text\)\.trim\(\);/.test(sheet),
+    'handleSend 要收得下这个 override,否则传了也没用',
   );
 }
 

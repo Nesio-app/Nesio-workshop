@@ -20,7 +20,7 @@
 import { useMemo, useRef, useState, type RefObject } from 'react';
 import { formatWhen, parseWhen, type RepeatGuess } from '@/lib/portal/when-parse';
 import { repeatLabel } from '@/lib/portal/schedule-reminders';
-import { IconMic, IconPlus } from '../icons';
+import { IconMic, IconPlus, IconSearch, IconSparkle } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -217,15 +217,30 @@ export default function CaptureBar(capture: CaptureBarProps) {
               )}
             </button>
           )}
-          {capture.onSearch && (
-            <button type="button" className="nesio-cap-action" onClick={() => capture.onSearch?.(typed)}>
-              {L(dict, `在我的记忆里找「${typed.slice(0, 18)}」`, `Search my memory for “${typed.slice(0, 18)}”`)}
-            </button>
-          )}
-          {capture.onAsk && (
-            <button type="button" className="nesio-cap-action" onClick={() => capture.onAsk?.(typed)}>
-              {L(dict, `问念念「${typed.slice(0, 18)}」`, `Ask Nessa “${typed.slice(0, 18)}”`)}
-            </button>
+          {/* 两枚图标就够 —— 原来是两整行,把你刚打的那句话**又重复了两遍**
+              (输入框一遍、两行各一遍)。要找什么、要问什么,输入框里写着呢。
+              文字留在 aria-label 上,读屏用户不受影响。 */}
+          {(capture.onSearch || capture.onAsk) && (
+            <div className="nesio-cap-icons">
+              {capture.onSearch && (
+                <button
+                  type="button"
+                  className="nesio-cap-icon"
+                  aria-label={L(dict, `在我的记忆里找「${typed.slice(0, 18)}」`, `Search my memory for “${typed.slice(0, 18)}”`)}
+                  title={L(dict, '在我的记忆里找', 'Search my memory')}
+                  onClick={() => capture.onSearch?.(typed)}
+                ><IconSearch size={18} /></button>
+              )}
+              {capture.onAsk && (
+                <button
+                  type="button"
+                  className="nesio-cap-icon"
+                  aria-label={L(dict, `问念念「${typed.slice(0, 18)}」`, `Ask Nessa “${typed.slice(0, 18)}”`)}
+                  title={L(dict, '问念念', 'Ask Nessa')}
+                  onClick={() => capture.onAsk?.(typed)}
+                ><IconSparkle size={18} /></button>
+              )}
+            </div>
           )}
         </div>
       )}

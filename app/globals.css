@@ -21120,3 +21120,14 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-cap-action-main { font-weight: var(--weight-medium); }
 /* 「你没说几点,先按早上 9:00」—— 默认值必须自己说出来,不能装成用户定过。 */
 .nesio-cap-action-sub { color: var(--portal-muted); font-size: var(--text-xs); }
+
+/* 首页输入条的两枚动作图标(2026-07-31)。原来是两整行文字,把刚打的那句话
+   又重复了两遍 —— 输入框里写着呢,这里只要「拿它去做什么」。 */
+.nesio-cap-icons { display: flex; gap: var(--space-2); }
+.nesio-cap-icon {
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  border: 1px solid var(--portal-line); border-radius: var(--radius-pill);
+  background: transparent; color: var(--portal-muted); cursor: pointer; padding: 0;
+}
+.nesio-cap-icon:active { background: var(--portal-accent-soft); color: var(--portal-accent); }

@@ -438,12 +438,13 @@ export default function VoiceInputSheet({ open, intent = 'note', seedText = '', 
     if (!open || !isAskMode) { autoAskedRef.current = ''; return; }
     const seed = seedText.trim();
     if (!seed || autoAskedRef.current === seed) return;
-    if (text.trim() !== seed) return;   // 等 setText 落定再发
     autoAskedRef.current = seed;
-    void handleSend();
-    // handleSend 读的是当下的 text/state,不进依赖 —— 进了会在每次输入时重跑。
+    // **把话直接传进去**,不等 text 这个 state 同步 —— 那是一个多余的时序依赖,
+    // 慢半拍就变成「框里填好了、什么也没发生」。
+    void handleSend(seed);
+    // handleSend 读的是当下的 state,不进依赖 —— 进了会在每次输入时重跑。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, isAskMode, seedText, text]);
+  }, [open, isAskMode, seedText]);
 
   // 说的话里有没有时间。认不出就是 null —— 那一条按钮根本不出现(不硬凑一个时刻)。
   const voiceWhen = useMemo(() => (text.trim().length >= 2 ? parseWhen(text.trim()) : null), [text]);
@@ -528,8 +529,14 @@ export default function VoiceInputSheet({ open, intent = 'note', seedText = '', 
     kick();
   }
 
-  async function handleSend() {
-    const t = text.trim();
+  /**
+   * @param override 直接用这段文字发,不读 state。
+   *   给「从首页带一句话过来、当场就问」用 —— 等 setText 落定再发是一个多余的时序依赖:
+   *   React 的批处理、渲染顺序、以及这张 sheet 是 dynamic import 的,任何一环慢半拍,
+   *   那一句就发不出去,而用户看到的是一个填好了却什么都没发生的框。
+   */
+  async function handleSend(override?: string) {
+    const t = (override ?? text).trim();
     if (!t) return;
 
     if (isAskMode) {
@@ -989,7 +996,7 @@ export default function VoiceInputSheet({ open, intent = 'note', seedText = '', 
             <span className="nesio-camera-recognizing-dot" style={{ background: '#fff' }} />{isAskMode ? L(dict, '正在搜索记忆…', 'Searching memory…') : L(dict, '念念正在整理…', 'Nessa is sorting…')}
           </div>
         ) : text.trim() && sendState !== 'confirm' ? (
-          <button type="button" className="nesio-voice-send-btn" onClick={handleSend}>
+          <button type="button" className="nesio-voice-send-btn" onClick={() => { void handleSend(); }}>
             {isAskMode ? L(dict, '问念念', 'Ask') : L(dict, '告诉念念', 'Tell Nessa')}
           </button>
         ) : null}

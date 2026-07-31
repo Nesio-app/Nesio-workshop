@@ -24,9 +24,18 @@ export const SHADOW_ATTR = 'reminderId';
 export function createReminderShadow(r: Reminder): string {
   try {
     const node = addCommitmentNode(r.title, {
-      // 带上时刻,时间线才排得进去(lib/platform/node-dates 认 dueDate/dueTime)。
-      dueDate: r.at.slice(0, 10),
+      /*
+       * dueDate 存的是**完整墙上时钟**(2026-08-01T15:00),不是纯日期。
+       *
+       * node-dates 的 NODE_DATE_KEYS 里 dueDate 排在 remindAt **前面**,
+       * firstNodeDate 会先命中它 —— 只存 `2026-08-01` 的话钟点当场丢掉,
+       * 这条提醒在时间线/今日焦点上变成「明天(某个时候)」,而用户明明说了三点。
+       * dueTime 单独再存一份给那些只读时分的地方;remindAt 是语义最准的那个键,
+       * 一并写上,免得下游按它找的时候扑空。
+       */
+      dueDate: r.at,
       dueTime: r.at.slice(11),
+      remindAt: r.at,
       [SHADOW_ATTR]: r.id,
       ...(repeatLabel(r) ? { recurring: repeatLabel(r) } : {}),
     });
