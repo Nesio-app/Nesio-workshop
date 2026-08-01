@@ -55,7 +55,7 @@ function buildSampleNodesZh(): IngestNodeInput[] {
       relations: [{ targetId: '妈妈', relation: '家人' }],
       tags: t(['关系']), rawInput: '晚上给妈妈打了电话,聊了快一个小时',
       attributes: { externalId: 'sample-call-mom', date: iso(-1, 20) } },
-    { type: 'note', name: '想给发小挑个生日礼物', source: 'manual', confidence: 1,
+    { type: 'collection', name: '想给发小挑个生日礼物', source: 'manual', confidence: 1,
       relations: [{ targetId: '发小', relation: '朋友' }],
       tags: t(['关系', '提醒']), rawInput: '发小生日快到了,她喜欢蓝色的东西',
       attributes: { externalId: 'sample-linda-gift' } },
@@ -73,19 +73,19 @@ function buildSampleNodesZh(): IngestNodeInput[] {
       attributes: { externalId: 'sample-cal-review', start: iso(1, 10), end: iso(1, 11), location: '会议室 B', participants: '产品组' } },
 
     // ── 提醒 / 承诺（今日焦点 · 该做的事）──
-    { type: 'commitment', name: '给妈妈回个电话', source: 'manual', confidence: 1,
+    { type: 'task', name: '给妈妈回个电话', source: 'manual', confidence: 1,
       relations: [{ targetId: '妈妈', relation: '家人' }], tags: t(['提醒']),
       rawInput: '答应妈妈这周末回个电话',
       attributes: { externalId: 'sample-todo-callmom', dueDate: iso(2, 19), owner: '我', priority: 'medium' } },
 
     // ── 地方笔记（批次 174:place 类型退役 —— 无真实数据源,真实地点走「足迹」与物品 location 属性）──
-    { type: 'note', name: '巷口咖啡馆', source: 'manual', confidence: 1,
+    { type: 'collection', name: '巷口咖啡馆', source: 'manual', confidence: 1,
       relations: [], tags: t(['地点']),
       rawInput: '巷口那家咖啡馆下午人少,写东西效率很高',
       attributes: { externalId: 'sample-cafe', category: 'cafe', note: '靠窗的位置最好', lat: 40.0308, lon: -105.2925, city: 'Boulder', country: '美国' } },
 
     // ── 心情（今天页第一拍 · 洞察情绪）──
-    { type: 'health_state', name: '此刻 · 平静', source: 'manual', confidence: 1,
+    { type: 'Mind', name: '此刻 · 平静', source: 'manual', confidence: 1,
       relations: [], tags: t(['moment', 'feeling', 'calm', 'energy-mid']),
       rawInput: '此刻 平静 · 精力中',
       attributes: { externalId: 'sample-mood-today', date: iso(0, 14, 20), emotion: 'calm', emotionLabel: '平静', emotionQuadrant: 'hv-la', energyValue: 55, energyLevel: 'mid' } },
@@ -115,19 +115,19 @@ function buildSampleNodesEn(): IngestNodeInput[] {
       attributes: { externalId: 'sample-en-call-mom', date: iso(-1, 20) } },
 
     // ── 导览①:洞察页(观察 + 分析,引导点进去)──
-    { type: 'note', name: 'See what Insights noticed this week', source: 'manual', confidence: 1,
+    { type: 'collection', name: 'See what Insights noticed this week', source: 'manual', confidence: 1,
       relations: [], tags: t(['guide']),
       rawInput: 'Nesio quietly watches your week and turns it into observations. Open Insights (bottom bar) to see your daily rhythm, what keeps coming to mind, and a few threads worth picking back up — tap the pie to explore.',
       attributes: { externalId: 'sample-en-guide-insights', date: iso(0, 8) } },
 
     // ── 导览②:点头像进设置 ──
-    { type: 'note', name: 'Tap your avatar to open Settings', source: 'manual', confidence: 1,
+    { type: 'collection', name: 'Tap your avatar to open Settings', source: 'manual', confidence: 1,
       relations: [], tags: t(['guide']),
       rawInput: 'Your avatar sits at the top-left. Tap it to reach your profile and Settings — appearance & language, data & privacy, membership, and Lab. That is also where you rename yourself and change your photo.',
       attributes: { externalId: 'sample-en-guide-avatar', date: iso(0, 8, 30) } },
 
     // ── 导览③:顶部提醒卡的手势(左滑/右滑/双击)──
-    { type: 'note', name: 'The reminder cards respond to gestures', source: 'manual', confidence: 1,
+    { type: 'collection', name: 'The reminder cards respond to gestures', source: 'manual', confidence: 1,
       relations: [], tags: t(['guide']),
       rawInput: 'On the reminder cards up top: swipe left if a nudge is not useful, swipe right to be reminded later, and double-tap when it is useful. No buttons to hunt for.',
       attributes: { externalId: 'sample-en-guide-gestures', date: iso(0, 9) } },
@@ -145,7 +145,7 @@ function buildSampleNodesEn(): IngestNodeInput[] {
       attributes: { externalId: 'sample-en-cal-review', start: iso(1, 10), end: iso(1, 11), location: 'Room B', participants: 'Product team' } },
 
     // ── 提醒 / 承诺（今日焦点 · 顶部提醒卡,可练手势）──
-    { type: 'commitment', name: 'Call Mom back this weekend', source: 'manual', confidence: 1,
+    { type: 'task', name: 'Call Mom back this weekend', source: 'manual', confidence: 1,
       relations: [{ targetId: 'Mom', relation: 'family' }], tags: t(['提醒']),
       rawInput: 'Promised to call Mom back this weekend.',
       attributes: { externalId: 'sample-en-todo-callmom', dueDate: iso(2, 19), owner: 'me', priority: 'medium' } },
@@ -157,21 +157,21 @@ function buildSampleNodesEn(): IngestNodeInput[] {
       attributes: { externalId: 'sample-en-cafe', category: 'cafe', note: 'The window seat is best', lat: 40.0308, lon: -105.2925, city: 'Boulder', country: 'United States' } },
 
     // ── 心情（今天页第一拍 · 洞察情绪）──
-    { type: 'health_state', name: 'Right now · Calm', source: 'manual', confidence: 1,
+    { type: 'Mind', name: 'Right now · Calm', source: 'manual', confidence: 1,
       relations: [], tags: t(['moment', 'feeling', 'calm', 'energy-mid']),
       rawInput: 'Right now: calm · steady energy',
       attributes: { externalId: 'sample-en-mood-today', date: iso(0, 14, 20), emotion: 'calm', emotionLabel: 'Calm', emotionQuadrant: 'hv-la', energyValue: 55, energyLevel: 'mid' } },
 
     // ── 反复在想（洞察·「你最近反复在想」的饼图,同标签≥3 攒出一瓣）──
-    { type: 'note', name: 'Morning pages before the day starts', source: 'manual', confidence: 1,
+    { type: 'collection', name: 'Morning pages before the day starts', source: 'manual', confidence: 1,
       relations: [], tags: t(['reflection']),
       rawInput: 'Three pages longhand before email. Head feels clearer after.',
       attributes: { externalId: 'sample-en-reflect-morning', date: iso(-2, 7) } },
-    { type: 'note', name: 'A long walk untangled a decision', source: 'manual', confidence: 1,
+    { type: 'collection', name: 'A long walk untangled a decision', source: 'manual', confidence: 1,
       relations: [], tags: t(['reflection']),
       rawInput: 'Walked the loop and the stuck decision suddenly made sense.',
       attributes: { externalId: 'sample-en-reflect-walk', date: iso(-4, 18) } },
-    { type: 'note', name: 'One deep-work block, phone away', source: 'manual', confidence: 1,
+    { type: 'collection', name: 'One deep-work block, phone away', source: 'manual', confidence: 1,
       relations: [], tags: t(['reflection']),
       rawInput: 'Ninety focused minutes beat the whole scattered afternoon before it.',
       attributes: { externalId: 'sample-en-reflect-focus', date: iso(-6, 15) } },

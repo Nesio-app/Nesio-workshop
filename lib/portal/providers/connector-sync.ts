@@ -142,7 +142,7 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
         // 否则「入库时挡住的」和「展示时滤掉的」会慢慢漂成两套。
         if (!plain.trim() || isTagOnlyText(plain)) continue;
         ingestLifeNode({
-          type: 'preference',
+          type: 'Mind',
           name: plain.slice(0, 40),
           attributes: { source: 'Flomo', created: m.created_at, flomoSlug: m.slug || '' },
           relations: [],

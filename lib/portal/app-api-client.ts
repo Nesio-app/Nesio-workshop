@@ -431,7 +431,7 @@ export type CloudAccountProfileResponse = {
 export type CloudMemoryNodeRecord = {
   id: string;
   schemaVersion?: 'LifeNode@v1' | string;
-  type: 'person' | 'object' | 'place' | 'event' | 'commitment' | 'health_state' | 'preference' | string;
+  type: 'person' | 'Thing' | 'place' | 'event' | 'task' | 'Mind' | 'collection' | string;
   name: string;
   attributes?: Record<string, string | number | boolean | null>;
   source: 'manual' | 'photo' | 'calendar' | 'email' | 'system' | 'voice' | string;

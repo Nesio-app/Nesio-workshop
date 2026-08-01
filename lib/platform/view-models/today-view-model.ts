@@ -65,7 +65,7 @@ const FOCUS_TIME_WORDS = [
 ];
 
 // All node types that are inherently action/attention items
-const FOCUS_TYPES = new Set(['commitment', 'event', 'health_state']);
+const FOCUS_TYPES = new Set(['task', 'event', 'Mind']);
 
 /** Extract nearest future or past-due date from a node's attributes */
 function extractNearestDate(node: LifeNode): Date | null {
@@ -142,7 +142,7 @@ function isFocusNode(node: LifeNode): boolean {
   if (isSyncedReferenceNode(node)) return false;
   // 批次 37:手动/语音亲手添加的待办,当天就进焦点 —— 用户主动放进来的事,
   // 今天就是它的日子(此前无日期待办被拒之门外,「刚记的去哪了」)。
-  if (node.type === 'commitment' && (node.source === 'manual' || node.source === 'voice')) {
+  if (node.type === 'task' && (node.source === 'manual' || node.source === 'voice')) {
     const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
     if (new Date(node.createdAt).getTime() >= dayStart.getTime()) {
       // 批次 73:带**明确过去日期**的不硬塞进今天(年份写错/补录旧事,
@@ -223,7 +223,7 @@ export interface ProactiveContext {
   healthItems: string[];
 }
 
-const HEALTH_TYPES = new Set(['health_state']);
+const HEALTH_TYPES = new Set(['Mind']);
 
 function buildProactiveContext(allNodes: LifeNode[]): ProactiveContext {
   const now = Date.now();

@@ -27,6 +27,23 @@
 
 import type { LifeNode } from './life-graph';
 
+// 2026-08-01 改名批:就地内联(不 import life-graph.ts 里那份同名函数)——
+// scripts/graph-shards.test.mjs 用 vm.runInNewContext 把这个文件单独当一个模块跑,
+// 所有 require() 一律被桩成 {}(见测试文件 load()),真的 import 会让这个函数
+// 在沙箱里变成 undefined,调用时抛错,又被下面 parseNodeArray 的 try/catch 吞掉,
+// 表现成一整批"读出来是 null"的假死。几份定义(life-graph.ts / signal.ts / 这里)
+// 必须保持一致,都只有 5 行 switch,drift 风险低,换不起沙箱兼容性。
+function normalizeLegacyNodeType(type: string): string {
+  switch (type) {
+    case 'object': return 'Thing';
+    case 'commitment': return 'task';
+    case 'health_state': return 'Mind';
+    case 'preference': return 'Mind';
+    case 'note': return 'collection';
+    default: return type;
+  }
+}
+
 export interface ShardBackend {
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<void>;
@@ -82,7 +99,11 @@ function parseNodeArray(raw: string | null): LifeNode[] | null {
   if (!raw) return null;
   try {
     const v = JSON.parse(raw) as unknown;
-    return Array.isArray(v) ? (v as LifeNode[]) : null;
+    if (!Array.isArray(v)) return null;
+    // 2026-08-01 改名批:分片是当前用户数据的主体所在,读出来时把改名前的老
+    // type 字符串(object/commitment/health_state/preference/note)映到新值 ——
+    // 这条路径不经过 normalizeNode 校验,不在这里接就等于原样把老值继续用下去。
+    return (v as LifeNode[]).map((n) => (n && typeof n === 'object' ? { ...n, type: normalizeLegacyNodeType(String(n.type)) as LifeNode['type'] } : n));
   } catch { return null; }
 }
 

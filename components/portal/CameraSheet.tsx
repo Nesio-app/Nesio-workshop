@@ -26,7 +26,7 @@ interface SimilarItem { node: LifeNode; score: number }
 
 function findSimilarObjects(name: string, tags: string[]): SimilarItem[] {
   const graph = getLifeGraph();
-  const candidates = graph.filter((n) => n.type === 'object');
+  const candidates = graph.filter((n) => n.type === 'Thing');
   const nameLower = name.toLowerCase().replace(/\s+/g, '');
   const results: SimilarItem[] = [];
 
@@ -199,7 +199,7 @@ function detectReceipt(result: AnalysisResult): boolean {
   // 批次 180:光「多物品」不算小票(一张鼠标+垫子+桌面的普通照片曾误判)。
   // 真小票的条目都带价格 —— 多物品必须**多数带 price**才当小票。
   const manyPriced = result.nodes.length >= 3
-    && result.nodes.filter((n) => n.type === 'object' && n.attributes?.price != null && n.attributes?.price !== '').length >= result.nodes.length - 1;
+    && result.nodes.filter((n) => n.type === 'Thing' && n.attributes?.price != null && n.attributes?.price !== '').length >= result.nodes.length - 1;
   return keywordHit || manyPriced;
 }
 
@@ -215,7 +215,7 @@ async function getCurrentLocation(): Promise<{ lat: number; lon: number } | null
 // ── Node type chips ──────────────────────────────────────────────────────────
 
 // 批次 174:'place' 退役 —— 不再让相机把东西归类成「位置」(无真实数据源;真实地点走足迹/物品 location)
-const ALL_TYPES = ['object', 'person', 'event', 'commitment', 'health_state', 'preference'] as const;
+const ALL_TYPES = ['Thing', 'person', 'event', 'task', 'Mind'] as const;
 
 function buildPendingImageResult(dict: string = 'zh', reason: 'auth' | 'free_tier' = 'auth', pantry = false): AnalysisResult {
   // 进货模式:名字留空(让用户直接打食材名,而不是「照片 · 时间」),文案也换成起名引导。
@@ -227,7 +227,7 @@ function buildPendingImageResult(dict: string = 'zh', reason: 'auth' | 'free_tie
         : L(dict, '照片已存好 —— 改个名字、加点标签更好找。', 'Photo saved — rename or tag it to find it later.'),
     nodes: [
       {
-        type: 'object',
+        type: 'Thing',
         name: pantry ? '' : L(dict, `照片 · ${new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, `Photo · ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`),
         attributes: {},
         relations: [],
@@ -265,7 +265,7 @@ function buildLocalReceiptResult(seen: UnderstandResult, dict: string = 'zh'): A
   return {
     summary,
     nodes: [{
-      type: 'object',
+      type: 'Thing',
       name,
       attributes: {
         price: f.amount,
@@ -561,7 +561,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
     setDetectedPlaceId(place.id);
     const defaults: Record<number, string> = {};
     nodes.forEach((n, i) => {
-      if (n.type === 'object') defaults[i] = `${place.emoji} ${place.name}`;
+      if (n.type === 'Thing') defaults[i] = `${place.emoji} ${place.name}`;
     });
     if (Object.keys(defaults).length > 0) setNodeLocations(defaults);
   }
@@ -572,7 +572,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
     const manual: AnalysisResult = {
       summary: L(dict, '照片已就绪,填个名字(标签可选)就能存。', 'Photo ready — give it a name (tags optional) and save.'),
       nodes: [{
-        type: 'object', name: L(dict, `照片 · ${new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, `Photo · ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`), attributes: {},
+        type: 'Thing', name: L(dict, `照片 · ${new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, `Photo · ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`), attributes: {},
         relations: [], tags: [], source: 'photo', confidence: 1,
       }],
     };
@@ -702,7 +702,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
       // Check for similar existing objects
       const similars: Record<number, SimilarItem[]> = {};
       nodes.forEach((n, i) => {
-        if (n.type === 'object') {
+        if (n.type === 'Thing') {
           const found = findSimilarObjects(n.name, n.tags ?? []);
           if (found.length > 0) similars[i] = found;
         }
@@ -736,7 +736,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
       const res = await analyzeImage(capturedBase64, orderPrompt(en), dict);
       const c = consolidateAmazonOrder(res.nodes, res.summary);
       const node: EditedNode = {
-        name: c.name, type: 'object', attributes: c.attributes, tags: c.tags,
+        name: c.name, type: 'Thing', attributes: c.attributes, tags: c.tags,
         source: 'photo', confidence: 0.9, relations: [], note: '', expiry: '', price: '', deleted: false,
       };
       const parts: string[] = [c.name];
@@ -820,7 +820,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
         const fileAttrs: Record<string, string> = full.length >= 200 ? { article: full } : { note: full };
         const fileResult = {
           nodes: [{
-            type: 'preference' as const, name: (file.name || full.slice(0, 40)).slice(0, 60),
+            type: 'Mind' as const, name: (file.name || full.slice(0, 40)).slice(0, 60),
             attributes: fileAttrs,
             relations: [], tags: [L(dict, '文件', 'file')], confidence: 0.8, rawInput: full.slice(0, 200),
             source: 'manual' as const,
@@ -862,7 +862,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
       const travelTripId = consumeTravelReceiptTripId();
       if (travelTripId) {
         const lines = nodesToSave
-          .filter((n) => n.type === 'object')
+          .filter((n) => n.type === 'Thing')
           .map((n) => ({
             name: n.name.trim() || L(dict, '未命名', 'Untitled'),
             price: n.price?.trim() ? Number(String(n.price).replace(/[^\d.]/g, '')) || undefined : undefined,
@@ -879,7 +879,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
       } else {
         // 非行程:多数条目带价 → 当作小票记入财务聚合口
         const lines = nodesToSave
-          .filter((n) => n.type === 'object')
+          .filter((n) => n.type === 'Thing')
           .map((n) => ({
             name: n.name.trim() || L(dict, '未命名', 'Untitled'),
             price: n.price?.trim() ? Number(String(n.price).replace(/[^\d.]/g, '')) || undefined : undefined,
@@ -955,7 +955,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
           ...(n.expiry?.trim() ? { expiry: n.expiry.trim() as string } : {}),
           ...(n.price?.trim() ? { price: n.price.trim() as string } : {}),
           // 进货模式:object 节点打后台子类(食材)→ 进「做饭·库存」而非物品页。属性,不渲染成标签。
-          ...(intakeSubtype && n.type === 'object' ? { subtype: intakeSubtype } : {}),
+          ...(intakeSubtype && n.type === 'Thing' ? { subtype: intakeSubtype } : {}),
           ...(userTags.length ? { userTags: userTags.join(', ') as string } : {}),
         },
       });
@@ -1470,7 +1470,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
                 {/* 批次 181:逐条「你好像已经有了」已并入顶部统一「相似记忆」段,这里不再重复 */}
 
                 {/* Location — shown for objects, hierarchical picker */}
-                {node.type === 'object' && (
+                {node.type === 'Thing' && (
                   <div className="nesio-camera-node-loc-row">
                     <span className="nesio-camera-node-expiry-label">{L(dict, '存放位置', 'Stored at')}</span>
                     <LocationPicker
@@ -1485,7 +1485,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
                 )}
 
                 {/* 批次 64:价格 —— 小票条目/物品可见可改 */}
-                {(node.type === 'object' || isReceipt) && (
+                {(node.type === 'Thing' || isReceipt) && (
                   <div className="nesio-camera-node-expiry-row">
                     <span className="nesio-camera-node-expiry-label">{L(dict, '价格', 'Price')}</span>
                     <input
@@ -1500,7 +1500,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
                 )}
 
                 {/* Expiry — shown for objects or receipt items */}
-                {(node.type === 'object' || isReceipt) && (
+                {(node.type === 'Thing' || isReceipt) && (
                   <div className="nesio-camera-node-expiry-row">
                     <span className="nesio-camera-node-expiry-label">{L(dict, '有效期', 'Expires')}</span>
                     <input
@@ -1520,7 +1520,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
             type="button"
             className="nesio-camera-add-item-btn"
             onClick={() => setEditedNodes((prev) => [...prev, {
-              name: '', type: 'object', attributes: {}, tags: [], source: 'photo',
+              name: '', type: 'Thing', attributes: {}, tags: [], source: 'photo',
               confidence: 1, relations: [], deleted: false,
             }])}
           >

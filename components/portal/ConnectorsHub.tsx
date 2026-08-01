@@ -307,7 +307,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         if (!seen.needsCloud && seen.fields) {
           const f = seen.fields;
           ingestLifeNode({
-            type: 'object',
+            type: 'Thing',
             name: (f.merchant || '').trim() || L(dict, '小票', 'Receipt'),
             source: 'photo',
             confidence: f.amountFrom === 'keyword' ? 0.95 : 0.7,

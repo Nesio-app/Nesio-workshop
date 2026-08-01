@@ -1,7 +1,7 @@
 /**
  * POST /api/portal/weread  (批次 161)
  * 微信读书自动同步 —— 用用户粘贴的 weread cookie 调其 web 接口(i.weread.qq.com)取
- * 「有笔记的书 + 划线 + 想法」,归一成划线记忆节点(type:'note', sourceApp:'wechat')返回浏览器 ingest。
+ * 「有笔记的书 + 划线 + 想法」,归一成划线记忆节点(type:'collection', sourceApp:'wechat')返回浏览器 ingest。
  *
  * 非官方接口:微信读书没有公开 API,靠 cookie。wr_skey 会过期(数小时),过期需重粘 cookie
  * —— 返回 invalid_token,syncToken 会提示重新输入。参考社区实现 mcp-server-weread / weread2notion。
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
       const body = highlights.map((h) => `• ${h}`).join('\n');
       nodes.push({
         name: title,
-        type: 'note',
+        type: 'collection',
         tags: ['微信读书', '读书划线', ...(author ? [author] : [])],
         attributes: {
           category: '读书划线',

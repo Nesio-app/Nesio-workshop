@@ -15,7 +15,7 @@ function todayLocal(): string {
 }
 
 export interface HealthNode {
-  type: 'health_state' | 'event';
+  type: 'Mind' | 'event';
   name: string;
   attributes: Record<string, string | number>;
   relations: never[];
@@ -217,7 +217,7 @@ export function parseAppleHealthText(xml: string): HealthParseResult {
   const nodes: HealthNode[] = [];
   if (summaryLines.length) {
     nodes.push({
-      type: 'health_state',
+      type: 'Mind',
       name: 'Apple Health · 健康概况',
       // 固定外部 id:重导入时更新同一张概况节点,而不是每次新增一条。
       attributes: { ...attrs, externalId: 'health:summary' },
@@ -878,7 +878,7 @@ class HealthAggregator {
     const nodes: HealthNode[] = [];
     if (summaryLines.length) {
       nodes.push({
-        type: 'health_state', name: 'Apple Health · 健康概况',
+        type: 'Mind', name: 'Apple Health · 健康概况',
         attributes: { ...attrs, externalId: 'health:summary' },
         relations: [], tags: ['健康', 'Apple Health'], confidence: 0.85,
         rawInput: summaryLines.join(' · '),

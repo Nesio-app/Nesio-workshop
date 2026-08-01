@@ -27,9 +27,12 @@ import { isLensEligible } from '@/lib/portal/lens-eligible';
 import Button from './ui/Button';
 import MemoryLensSheet from './MemoryLensSheet';
 import { shouldNudge } from '@/lib/portal/lens';
+// 2026-08-01 改名批:object→Thing / commitment→task / health_state+preference→Mind(合并,
+// 取 health_state 原色)/ note→collection。collection 之前一直没有专属色(遗留 bug),借这次改名
+// 把 preference 空出来的 chip-mint 补给它。
 const TYPE_BG_DETAIL: Record<string, string> = {
-  person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
-  event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
+  person: 'var(--chip-indigo)', Thing: 'var(--chip-blue)', place: 'var(--chip-green)',
+  event: 'var(--chip-amber)', task: 'var(--chip-violet)', Mind: 'var(--chip-pink)', collection: 'var(--chip-mint)',
 };
 
 interface MemoryNodeDetailProps {
@@ -46,12 +49,12 @@ interface MemoryNodeDetailProps {
 }
 
 const TYPE_LABELS_ZH: Record<string, string> = {
-  person: '人物', object: '物品', place: '地点', event: '事件',
-  commitment: '承诺', health_state: '健康状态', preference: '偏好', note: '笔记',
+  person: '人物', Thing: '物品', place: '地点', event: '事件',
+  task: '待办', Mind: '心念', collection: '笔记',
 };
 const TYPE_LABELS_EN: Record<string, string> = {
-  person: 'Person', object: 'Item', place: 'Place', event: 'Event',
-  commitment: 'Promise', health_state: 'Health', preference: 'Preference', note: 'Note',
+  person: 'Person', Thing: 'Item', place: 'Place', event: 'Event',
+  task: 'Task', Mind: 'Mind', collection: 'Note',
 };
 
 /** 用户点名的 8 个自定义可见标签(2026-08-01)——比 type 重要,命中就在头部领头,
@@ -534,32 +537,34 @@ function CommitmentSection({ node, onToggleDone }: {
   );
 }
 
-function HealthSection({ node }: { node: LifeNode }) {
-  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  const healthType = attr(node, 'healthType', 'category');
-  const date = attr(node, 'date', 'start', 'datetime');
-  const value = attr(node, 'value');
-  const unit = attr(node, 'unit');
-  const note = attr(node, 'note');
-  const typeLabel = (dict === 'en' ? HEALTH_TYPES_EN : HEALTH_TYPES)[healthType] || (healthType || L(dict, '健康', 'Health'));
-
-  return (
-    <div className="nesio-type-section">
-      <InfoRow label={L(dict, '类型', 'Type')} value={typeLabel} />
-      <InfoRow label={L(dict, '时间', 'Time')} value={fmtDateTime(date, dict)} />
-      {value && <InfoRow label={L(dict, '数值', 'Value')} value={unit ? `${value} ${unit}` : value} />}
-      <InfoRow label={L(dict, '备注', 'Note')} value={note} />
-    </div>
-  );
-}
-
-function PreferenceSection({ node, assetUrls }: {
+// 2026-08-01 改名批:Mind 合并了旧 health_state + preference —— 两个 Section 合一,
+// 内部按"有没有健康类字段(healthType/value/unit)"分支渲染,不新增字段,
+// 只是把原来两条互斥的 n.type 分支改成同一 type 下的属性判断。
+function MindSection({ node, assetUrls }: {
   node: LifeNode;
   assetUrls: Record<string, string>;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  const category = attr(node, 'category');
+  const healthType = attr(node, 'healthType');
+  const value = attr(node, 'value');
+  const unit = attr(node, 'unit');
+  const isHealthLike = Boolean(healthType || value);
   const note = attr(node, 'note');
+
+  if (isHealthLike) {
+    const date = attr(node, 'date', 'start', 'datetime');
+    const typeLabel = (dict === 'en' ? HEALTH_TYPES_EN : HEALTH_TYPES)[healthType] || (healthType || L(dict, '健康', 'Health'));
+    return (
+      <div className="nesio-type-section">
+        <InfoRow label={L(dict, '类型', 'Type')} value={typeLabel} />
+        <InfoRow label={L(dict, '时间', 'Time')} value={fmtDateTime(date, dict)} />
+        {value && <InfoRow label={L(dict, '数值', 'Value')} value={unit ? `${value} ${unit}` : value} />}
+        <InfoRow label={L(dict, '备注', 'Note')} value={note} />
+      </div>
+    );
+  }
+
+  const category = attr(node, 'category');
   const date = attr(node, 'date');
   const assets = node.assets || [];
   const firstImage = assets.find((a) => a.kind === 'image' || a.mimeType?.startsWith('image/'));
@@ -827,7 +832,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
       expiry: attr(n, 'expiry'),
       // 手记只认真正写过的 dueDate —— 不能带 'date' 这个后备键,那是"记录时间"
       // (何时随手记下的),把它当截止日期回填会在下次保存时把记录时间错写成截止日期。
-      dueDate: n.type === 'note' ? attr(n, 'dueDate') : attr(n, 'dueDate', 'deadline', 'due', 'date'),
+      dueDate: n.type === 'collection' ? attr(n, 'dueDate') : attr(n, 'dueDate', 'deadline', 'due', 'date'),
       priority: attr(n, 'priority'),
       owner: attr(n, 'owner'),
       recurring: attr(n, 'recurring'),
@@ -842,7 +847,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
   function saveEdit() {
     if (!fields.name.trim()) return;
     const extra: Record<string, string | null> = {};
-    if (n.type === 'object') {
+    if (n.type === 'Thing') {
       if (fields.location !== attr(n, 'location', 'room')) {
         extra.location = fields.location || null;
         // 批次192:位置一改就同步 placeId(选了命名地点就存,自由文本/清空则删)—— 避免残留旧 placeId 显示错名。
@@ -854,7 +859,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
       if (fields.purchaseDate !== attr(n, 'purchaseDate')) extra.purchaseDate = fields.purchaseDate || null;
       if (fields.expiry !== attr(n, 'expiry')) extra.expiry = fields.expiry || null;
     }
-    if (n.type === 'commitment') {
+    if (n.type === 'task') {
       if (fields.dueDate !== attr(n, 'dueDate', 'deadline')) extra.dueDate = fields.dueDate || null;
       if (fields.priority !== attr(n, 'priority')) extra.priority = fields.priority || null;
       if (fields.owner !== attr(n, 'owner')) extra.owner = fields.owner || null;
@@ -863,7 +868,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
     // 2026-08-01 用户点名:没有日期的待办被归成「手记」,以前手记编辑面板压根没有
     // 截止日期这个框,填了也存不进去 —— 日程页因此永远看不到它。手记只开放这一个字段
     // (优先级/负责人/循环那些是"任务"专属概念,套到随手记的一条笔记上不成立)。
-    if (n.type === 'note') {
+    if (n.type === 'collection') {
       if (fields.dueDate !== attr(n, 'dueDate')) extra.dueDate = fields.dueDate || null;
     }
     if (n.type === 'event') {
@@ -1106,7 +1111,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
         {/* Expanded edit form — type-specific fields */}
         {editing && (
           <div className="nesio-edit-form">
-            {n.type === 'object' && (<>
+            {n.type === 'Thing' && (<>
               <div className="nesio-edit-row">
                 <span>{L(dict, '存放位置', 'Stored at')}</span>
                 <LocationPicker value={field('location')} onChange={(v, meta) => { setField('location', v); setEditPlaceMeta(meta ?? null); }} />
@@ -1115,7 +1120,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               <label className="nesio-edit-row"><span>{L(dict, '购买日期', 'Bought on')}</span><input type="date" value={field('purchaseDate')} onChange={(e) => setField('purchaseDate', e.target.value)} /></label>
               <label className="nesio-edit-row"><span>{L(dict, '有效期', 'Expires')}</span><input type="date" value={field('expiry')} onChange={(e) => setField('expiry', e.target.value)} /></label>
             </>)}
-            {n.type === 'commitment' && (<>
+            {n.type === 'task' && (<>
               <label className="nesio-edit-row"><span>{L(dict, '截止日期', 'Due')}</span><input type="date" value={field('dueDate').slice(0, 10)} onChange={(e) => setField('dueDate', e.target.value)} /></label>
               <label className="nesio-edit-row">
                 <span>{L(dict, '优先级', 'Priority')}</span>
@@ -1133,7 +1138,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               <label className="nesio-edit-row"><span>{L(dict, '会议链接', 'Meeting link')}</span><input value={field('url')} onChange={(e) => setField('url', e.target.value)} placeholder="https://zoom.us/…" /></label>
               <label className="nesio-edit-row"><span>{L(dict, '地点', 'Location')}</span><input value={field('eventLocation')} onChange={(e) => setField('eventLocation', e.target.value)} placeholder={L(dict, '地点或地址', 'Place or address')} /></label>
             </>)}
-            {n.type === 'note' && (
+            {n.type === 'collection' && (
               // 2026-08-01:随手记下、没赶上带日期的一句话,事后想设个截止提醒也该有地方填 ——
               // 填了就会出现在「日程」里(见 SchedulePanel 的手记分支)。
               <label className="nesio-edit-row"><span>{L(dict, '截止日期(可选)', 'Due date (optional)')}</span><input type="date" value={field('dueDate').slice(0, 10)} onChange={(e) => setField('dueDate', e.target.value)} /></label>
@@ -1223,7 +1228,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
 
           {/* 闭环起点:日历/承诺类记忆可「分派给家人」(→ 对方今天页看到 → 做完你今天页收到回响)。
               2026-08-01 收进编辑态 —— 它是「对这条记忆做一次安排」,和删除/关联同类。 */}
-          {editing && (n.type === 'event' || n.type === 'commitment') && (
+          {editing && (n.type === 'event' || n.type === 'task') && (
             <AssignChoreLazy node={n} />
           )}
 
@@ -1233,7 +1238,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
           {n.type === 'person' && (
             <PersonSection node={n} relatedNodes={relatedNodes} onOpenNode={onOpenNode} />
           )}
-          {n.type === 'object' && (
+          {n.type === 'Thing' && (
             <ObjectSection node={n} assetUrls={assetUrls} />
           )}
           {n.type === 'place' && (
@@ -1242,16 +1247,13 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
           {n.type === 'event' && (
             <EventSection node={n} relatedNodes={relatedNodes} onOpenNode={onOpenNode} />
           )}
-          {n.type === 'commitment' && (
+          {n.type === 'task' && (
             <CommitmentSection node={n} onToggleDone={toggleDone} />
           )}
-          {n.type === 'health_state' && (
-            <HealthSection node={n} />
+          {n.type === 'Mind' && (
+            <MindSection node={n} assetUrls={assetUrls} />
           )}
-          {n.type === 'preference' && (
-            <PreferenceSection node={n} assetUrls={assetUrls} />
-          )}
-          {n.type === 'note' && (
+          {n.type === 'collection' && (
             <NoteSection node={n} />
           )}
 
@@ -1337,7 +1339,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               图片线索里跳过它,避免同一张图出现两次;只剩额外图时才显示本区。 */}
           {(() => {
             const allAssets = n.assets || [];
-            const heroShown = n.type === 'object' || n.type === 'preference';
+            const heroShown = n.type === 'Thing' || n.type === 'Mind';
             const heroKey = heroShown
               ? (() => { const f = allAssets.find((a) => a.kind === 'image' || a.mimeType?.startsWith('image/')); return f ? (f.id || f.storagePath || f.label || 'asset') : ''; })()
               : '';

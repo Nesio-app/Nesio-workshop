@@ -9,15 +9,40 @@ import { emailFulltextScore } from './email-fulltext-index';
 import { tokenizeCJK } from './cjk-tokenize';
 import { expandQueryTerms } from './query-synonyms';
 
+/**
+ * 2026-08-01 改名批(用户点名最高优先级架构项):
+ *   object → Thing / commitment → task / health_state + preference → Mind(合并)/ note → collection。
+ *   person / event 不变,place 仍是批次 174 的墓碑值,不参与本次改名。
+ *
+ * 老数据(localStorage/IndexedDB 分片/云快照/备份文件里躺着的旧 type 字符串)不会自己变,
+ * 所以每一条"生数据从外部进图"的路径都要过这道映射 —— 见调用点:
+ * normalizeNode()(云快照)、seedFromLocalStorage()、life-graph-shards.ts 的 parseNodeArray()
+ * (IndexedDB 分片,当前用户数据主体所在)。
+ *
+ * 就地定义、不 import 共享模块:好几个 scripts/*.test.mjs 用 vm.runInNewContext 把某个
+ * lib 文件单独当模块跑,require() 全被桩成 {}(见那些测试文件的 load())——跨文件 import
+ * 在那种沙箱里会变成 undefined,调用时炸,反而更难查。life-graph-shards.ts 和 signal.ts
+ * 各自也有一份同样的 5 行 switch,drift 风险低,换不起沙箱兼容性。
+ */
+export function normalizeLegacyNodeType(type: string): string {
+  switch (type) {
+    case 'object': return 'Thing';
+    case 'commitment': return 'task';
+    case 'health_state': return 'Mind';
+    case 'preference': return 'Mind';
+    case 'note': return 'collection';
+    default: return type;
+  }
+}
+
 export type LifeNodeType =
   | 'person'
-  | 'object'
+  | 'Thing'
   | 'place' // 批次 174 退役:不再生产/不再进类型选择器,仅作墓碑保留(老节点仍能渲染 PlaceSection)。勿重新加进 TYPE_ORDER/ALL_TYPES。
   | 'event'
-  | 'commitment'
-  | 'health_state'
-  | 'preference'
-  | 'note';
+  | 'task'
+  | 'Mind'
+  | 'collection';
 
 export type LifeNodeSource = 'manual' | 'photo' | 'calendar' | 'email' | 'system' | 'voice';
 
@@ -110,13 +135,12 @@ const CLOUD_MEMORY_ENDPOINT = '/api/cloud/memory';
 const CLOUD_SIGNALS_ENDPOINT = '/api/cloud/signals';
 const LIFE_NODE_TYPES = new Set<LifeNodeType>([
   'person',
-  'object',
+  'Thing',
   'place',
   'event',
-  'commitment',
-  'health_state',
-  'preference',
-  'note',
+  'task',
+  'Mind',
+  'collection',
 ]);
 const LIFE_NODE_SOURCES = new Set<LifeNodeSource>(['manual', 'photo', 'calendar', 'email', 'system', 'voice']);
 
@@ -135,23 +159,24 @@ function lifeNodeSourceToSignalSource(source: LifeNodeSource): string {
 }
 
 function lifeNodeTypeToSignalType(type: LifeNodeType): string {
-  if (type === 'health_state') return 'symptom';
+  // Mind 合并了旧 health_state(症状,symptom)与 preference(泛观察,observation)——
+  // 选 observation 兜底,Mind 现在覆盖的面比"症状"宽得多,不能再默认往健康方向偏。
   if (type === 'place') return 'location';
-  if (type === 'object' || type === 'person' || type === 'preference') return 'observation';
+  if (type === 'Thing' || type === 'person' || type === 'Mind') return 'observation';
   return type;
 }
 
 function inferLifeNodeSignalRetention(node: LifeNode): string {
   const tags = (node.tags || []).join(' ').toLowerCase();
   if (node.type === 'person' || tags.includes('family') || tags.includes('家庭')) return 'AlwaysAlive';
-  if (node.type === 'preference' || tags.includes('learning') || tags.includes('读书')) return 'LongLiving';
+  if (node.type === 'Mind' || tags.includes('learning') || tags.includes('读书')) return 'LongLiving';
   if (tags.includes('weather') || tags.includes('天气')) return 'Disposable';
   return 'Normal';
 }
 
 function inferLifeNodeSignalSensitivity(node: LifeNode): string {
   const tags = (node.tags || []).join(' ').toLowerCase();
-  if (node.type === 'health_state' || tags.includes('health') || tags.includes('健康')) return 'health';
+  if (node.type === 'Mind' || tags.includes('health') || tags.includes('健康')) return 'health';
   if (tags.includes('finance') || tags.includes('财务')) return 'financial';
   if (tags.includes('family') || tags.includes('家庭')) return 'family';
   if (node.source === 'calendar' || tags.includes('work') || tags.includes('工作') || tags.includes('会议')) return 'work';
@@ -724,7 +749,9 @@ function seedFromLocalStorage(): LifeNode[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     const v = raw ? JSON.parse(raw) : [];
-    return Array.isArray(v) ? v : [];
+    // 老设备的种子数据可能还带着改名前的 type 字符串,不过这道就直接进内存图了
+    // (这条路径不走 normalizeNode 的校验)。
+    return Array.isArray(v) ? v.map((n) => (n && typeof n === 'object' ? { ...n, type: normalizeLegacyNodeType(String(n.type)) } : n)) : [];
   } catch { return []; }
 }
 
@@ -926,7 +953,8 @@ function normalizeNode(value: unknown): LifeNode | null {
   if (!isRecord(value)) return null;
   const id = stringValue(value.id);
   const name = stringValue(value.name);
-  const type = stringValue(value.type);
+  const rawType = stringValue(value.type);
+  const type = rawType ? normalizeLegacyNodeType(rawType) : undefined;
   const source = stringValue(value.source);
   const createdAt = stringValue(value.createdAt);
   if (!id || !name || !type || !source || !createdAt) return null;
@@ -1592,7 +1620,7 @@ export function parseManualCapture(text: string): Omit<LifeNode, 'id' | 'created
   const location = locationMatch?.[1]?.trim() || '';
 
   const node: Omit<LifeNode, 'id' | 'createdAt'> = {
-    type: location ? 'object' : personName ? 'person' : 'object',
+    type: location ? 'Thing' : personName ? 'person' : 'Thing',
     name,
     attributes: {},
     source: 'voice',
@@ -1614,7 +1642,7 @@ export function parseManualCapture(text: string): Omit<LifeNode, 'id' | 'created
 
   // Commitment detection
   if (lower.includes('提醒') || lower.includes('别忘') || lower.includes('记得')) {
-    node.type = 'commitment';
+    node.type = 'task';
   }
 
   return node;

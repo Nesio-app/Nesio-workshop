@@ -12,7 +12,7 @@ import { getLiveMemoryNode, getLinkedChecklist, saveSubtasks, type LiveMemoryNod
 
 const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
 import { isMeetingNode, getMeetingTime, getMeetingUrl, safeExternalUrl } from './meeting-node';
-import { IconBox, IconCalendar, IconFlag, IconHeartPulse, IconMapPin, IconStar, IconUser, IconLink, IconMic } from '../icons';
+import { IconBox, IconCalendar, IconFlag, IconHeartPulse, IconMapPin, IconUser, IconLink, IconMic } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -23,13 +23,15 @@ import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 
 type Step = { name: string; emoji?: string; durationMin?: number };
 
+// 2026-08-01 改名批:object→Thing / commitment→task / health_state+preference→Mind(合并,
+// 取 health_state 原图标/标签,同 icons.tsx 的 NodeTypeIcon 一致取舍)。
 export const FOCUS_TYPE_LABEL: Record<string, string> = {
-  commitment: '任务', event: '日程', object: '物品', person: '联系人',
-  place: '地点', health_state: '健康', preference: '偏好',
+  task: '任务', event: '日程', Thing: '物品', person: '联系人',
+  place: '地点', Mind: '健康',
 };
 export const FOCUS_TYPE_ICON: Record<string, React.ReactNode> = {
-  commitment: <IconFlag size={15} />, event: <IconCalendar size={15} />, object: <IconBox size={15} />, person: <IconUser size={15} />,
-  place: <IconMapPin size={15} />, health_state: <IconHeartPulse size={15} />, preference: <IconStar size={15} />,
+  task: <IconFlag size={15} />, event: <IconCalendar size={15} />, Thing: <IconBox size={15} />, person: <IconUser size={15} />,
+  place: <IconMapPin size={15} />, Mind: <IconHeartPulse size={15} />,
 };
 
 // ── Momentum Engine ── 3-action wave, auto-unlock, recursive drill ──────────

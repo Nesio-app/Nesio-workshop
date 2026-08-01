@@ -119,13 +119,14 @@ export interface Signal {
 
 const NODE_TYPE_TO_SIGNAL: Record<LifeNodeType, SignalType> = {
   event: 'event',
-  commitment: 'commitment',
-  health_state: 'symptom',
-  object: 'observation',
+  task: 'commitment',
+  // Mind 合并了旧 health_state(症状)与 preference(泛观察)—— observation 更宽,
+  // 不能再默认往"症状"偏(见文件顶 §1 同类取舍)。
+  Mind: 'observation',
+  Thing: 'observation',
   person: 'observation',
   place: 'location',
-  preference: 'observation',
-  note: 'observation',
+  collection: 'observation',
 };
 
 const NODE_SOURCE_TO_SIGNAL: Record<LifeNodeSource, SignalSource> = {
@@ -139,7 +140,7 @@ const NODE_SOURCE_TO_SIGNAL: Record<LifeNodeSource, SignalSource> = {
 
 function inferSensitivity(node: LifeNode): SignalSensitivity {
   const tags = (node.tags || []).join(' ').toLowerCase();
-  if (node.type === 'health_state' || tags.includes('健康') || tags.includes('health')) return 'health';
+  if (node.type === 'Mind' || tags.includes('健康') || tags.includes('health')) return 'health';
   if (tags.includes('finance') || tags.includes('财务') || tags.includes('账单')) return 'financial';
   if (tags.includes('family') || tags.includes('家庭')) return 'family';
   if (tags.includes('work') || tags.includes('工作') || tags.includes('会议') || node.source === 'calendar') return 'work';
@@ -169,9 +170,9 @@ function inferRetention(node: LifeNode): RetentionPolicy {
   if (tags.includes('家庭') || tags.includes('family') || tags.includes('tesla') || node.type === 'person') {
     return 'AlwaysAlive';
   }
-  // Long-term knowledge / finance
+  // Long-term knowledge / finance(Mind 合并了旧 preference,沿用它的长留判据)
   if (tags.includes('finance') || tags.includes('财务') || tags.includes('读书') ||
-      tags.includes('learning') || tags.includes('notion') || node.type === 'preference') {
+      tags.includes('learning') || tags.includes('notion') || node.type === 'Mind') {
     return 'LongLiving';
   }
   // Transient: weather / one-off notices / quick voice scraps with no entities
@@ -267,8 +268,8 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
 
 const SIGNAL_TYPE_TO_NODE: Record<string, LifeNodeType> = {
   event: 'event',
-  commitment: 'commitment',
-  symptom: 'health_state',
+  commitment: 'task',
+  symptom: 'Mind',
   location: 'place',
 };
 
@@ -281,8 +282,22 @@ const SIGNAL_SOURCE_TO_NODE: Partial<Record<SignalSource, LifeNodeSource>> = {
   voice: 'voice',
 };
 
-const NODE_TYPES: ReadonlySet<string> = new Set(['event', 'commitment', 'health_state', 'object', 'person', 'place', 'preference', 'note']);
+const NODE_TYPES: ReadonlySet<string> = new Set(['event', 'task', 'Mind', 'Thing', 'person', 'place', 'collection']);
 const NODE_SOURCES: ReadonlySet<string> = new Set(['manual', 'photo', 'calendar', 'email', 'system', 'voice']);
+
+// 2026-08-01 改名批:就地内联,不 import(同 life-graph.ts 顶部注释的理由——
+// 几个 scripts/*.test.mjs 用 vm 沙箱把某个 lib 文件单独当模块跑,require() 桩成 {},
+// 跨文件 import 在那种环境里会变成 undefined)。
+function normalizeLegacyNodeType(type: string): string {
+  switch (type) {
+    case 'object': return 'Thing';
+    case 'commitment': return 'task';
+    case 'health_state': return 'Mind';
+    case 'preference': return 'Mind';
+    case 'note': return 'collection';
+    default: return type;
+  }
+}
 
 /**
  * Signal → LifeNode 投影(cutover 恢复路径)。优先用 payload.nodeType/
@@ -310,12 +325,16 @@ export function signalToLifeNode(signal: Signal): LifeNode {
   const derived = signal.derivedFrom || parseDerivedFromAttr(payload.derivedFrom);
   if (derived?.length) attributes.derivedFrom = JSON.stringify(derived);
 
+  // 老信号的 payload.nodeType 可能还是改名前的字符串(object/commitment/health_state/
+  // preference/note)—— 先过一道改名映射,不然 2026-08-01 前写的信号全部落回下面的
+  // signal.type 兜底,把保真字段的意义丢了。
+  const legacyNodeType = typeof nodeType === 'string' ? normalizeLegacyNodeType(nodeType) : nodeType;
   return {
     id: signal.evidence.externalId || signal.id,
-    type: (typeof nodeType === 'string' && NODE_TYPES.has(nodeType)
-      ? nodeType
-      // 批次 183:兜底 preference → note(见 create-signal.lifeNodeType 同批注)
-      : SIGNAL_TYPE_TO_NODE[signal.type] ?? 'note') as LifeNodeType,
+    type: (typeof legacyNodeType === 'string' && NODE_TYPES.has(legacyNodeType)
+      ? legacyNodeType
+      // 批次 183:兜底 preference → note,现改名 → collection(见 create-signal.lifeNodeType 同批注)
+      : SIGNAL_TYPE_TO_NODE[signal.type] ?? 'collection') as LifeNodeType,
     name: signal.title,
     attributes,
     source: (typeof nodeSource === 'string' && NODE_SOURCES.has(nodeSource)

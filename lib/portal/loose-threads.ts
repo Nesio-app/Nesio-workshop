@@ -30,7 +30,7 @@ export interface ThreadNode {
 }
 
 /** 实体类型 —— 它们不是「要做的事」,不存在接不接得上。 */
-const ENTITY_TYPES = new Set(['person', 'place', 'health_state']);
+const ENTITY_TYPES = new Set(['person', 'place', 'Mind']);
 
 export function isLooseThread(n: ThreadNode, now: number = Date.now()): boolean {
   if (!n || !n.createdAt) return false;

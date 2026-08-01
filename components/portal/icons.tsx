@@ -143,13 +143,13 @@ export function GarmentIcon({ type, size = 20 }: { type: string; size?: number }
 export function NodeTypeIcon({ type, size = 16 }: { type: string; size?: number }) {
   switch (type) {
     case 'person': return <IconUser size={size} />;
-    case 'object': return <IconBox size={size} />;
+    case 'Thing': return <IconBox size={size} />;
     case 'place': return <IconMapPin size={size} />;
     case 'event': return <IconCalendar size={size} />;
-    case 'commitment': return <IconFlag size={size} />;
-    case 'health_state': return <IconHeartPulse size={size} />;
-    case 'preference': return <IconStar size={size} />;
-    case 'note': return <IconNote size={size} />;
+    case 'task': return <IconFlag size={size} />;
+    // Mind 合并了旧 health_state(IconHeartPulse)与 preference(IconStar)—— 取前者。
+    case 'Mind': return <IconHeartPulse size={size} />;
+    case 'collection': return <IconNote size={size} />;
     default: return <IconNote size={size} />;
   }
 }

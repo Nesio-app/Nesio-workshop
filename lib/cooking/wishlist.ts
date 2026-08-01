@@ -9,7 +9,7 @@ const TAG = '想做清单';
 export interface WishDish { name: string; note?: string }   // note = 朋友推荐/拍一张/想给孩子做…
 
 function find(): LifeNode | null {
-  return getLifeGraph().find((n) => n.type === 'note' && (n.tags || []).includes(TAG)) || null;
+  return getLifeGraph().find((n) => n.type === 'collection' && (n.tags || []).includes(TAG)) || null;
 }
 function parse(n: LifeNode): WishDish[] {
   try { const a = JSON.parse(String(n.attributes?.dishes ?? '[]')); return Array.isArray(a) ? a : []; }
@@ -37,7 +37,7 @@ export function addWish(name: string, note?: string): WishDish[] {
   }
   const dishes: WishDish[] = [{ name: nm, ...(note ? { note } : {}) }];
   ingestLifeNode({
-    type: 'note', name: '想做清单',
+    type: 'collection', name: '想做清单',
     attributes: { dishes: JSON.stringify(dishes), epistemic: 'observation', generator: 'user' },
     source: 'manual', confidence: 1, relations: [], tags: [TAG],
   });

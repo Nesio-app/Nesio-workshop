@@ -80,7 +80,7 @@ function makeEngine({ nodes = [], txs = [] } = {}) {
 
 // 3d) 行动卡点(未完成承诺 5–30 天)
 {
-  const eng = makeEngine({ nodes: [{ id: 'c1', type: 'commitment', name: '把方案写完', createdAt: day(10), attributes: { notes: '想清楚再动手' }, tags: [] }] });
+  const eng = makeEngine({ nodes: [{ id: 'c1', type: 'task', name: '把方案写完', createdAt: day(10), attributes: { notes: '想清楚再动手' }, tags: [] }] });
   const seed = eng.collectSeeds(NOW, new Set(), 3).find((s) => s.lensId === 'action-stall');
   assert.ok(seed && seed.mode === 'nudge', '未完成承诺 → 行动卡点');
   assert.equal(seed.meta?.stall, 'overthink');
@@ -88,7 +88,7 @@ function makeEngine({ nodes = [], txs = [] } = {}) {
 
 // 3e) 伴读碰撞(久放高置信)
 {
-  const eng = makeEngine({ nodes: [{ id: 'd1', type: 'preference', name: '某本书的观点还记得', confidence: 0.9, createdAt: day(25), attributes: { notes: '真正重要的是把判断写下来再碰一次，而不是急着收藏更多摘要。' } }] });
+  const eng = makeEngine({ nodes: [{ id: 'd1', type: 'Mind', name: '某本书的观点还记得', confidence: 0.9, createdAt: day(25), attributes: { notes: '真正重要的是把判断写下来再碰一次，而不是急着收藏更多摘要。' } }] });
   const seed = eng.collectSeeds(NOW, new Set(), 3).find((s) => s.lensId === 'collision-read');
   assert.ok(seed && seed.mode === 'nudge', '久放高置信 → 伴读碰撞');
 }

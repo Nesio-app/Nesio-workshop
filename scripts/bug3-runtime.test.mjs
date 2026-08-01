@@ -329,7 +329,7 @@ check('⑥b 涨价检测仍只认 mature(否则 2 笔中位数造假涨价)', ()
 // 「用情绪盘记心情的人有数据却没入口」。数据侧这里真跑一遍,保证卡上的
 // hasData / 主情绪 / 今天那根柱子确实由情绪盘记录驱动。
 const node = (emotion, tags, energyLevel, daysAgo = 0) => ({
-  type: 'health_state', tags,
+  type: 'Mind', tags,
   attributes: { emotion, ...(energyLevel ? { energyLevel } : {}) },
   createdAt: new Date(Date.now() - daysAgo * 86400000).toISOString(),
 });

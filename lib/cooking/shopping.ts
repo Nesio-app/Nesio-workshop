@@ -22,7 +22,7 @@ function parseItems(node: LifeNode): ShoppingItem[] {
   } catch { return []; }
 }
 function findActive(): LifeNode | null {
-  return getLifeGraph().find((n) => n.type === 'note' && (n.tags || []).includes(TAG)) || null;
+  return getLifeGraph().find((n) => n.type === 'collection' && (n.tags || []).includes(TAG)) || null;
 }
 function writeItems(node: LifeNode, items: ShoppingItem[]): boolean {
   return updateLifeNode(node.id, { attributes: { ...node.attributes, items: JSON.stringify(items) } });
@@ -52,7 +52,7 @@ export function addToShopping(rawNames: string[]): ShoppingListView | null {
   if (!names.length) return null;
   const items = mergeShoppingItems([], names);
   const node = ingestLifeNode({
-    type: 'note', name: '购物清单',
+    type: 'collection', name: '购物清单',
     attributes: { items: JSON.stringify(items), epistemic: 'observation', generator: 'user' },
     source: 'manual', confidence: 1, relations: [], tags: [TAG],
   });

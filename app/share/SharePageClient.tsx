@@ -78,9 +78,9 @@ export default function SharePageClient() {
       }
     }
     ingestLifeNode({
-      // 批次 184:分享链接 = note(可读文章),不再是 object;纯文本也 note(不再 preference)
+      // 批次 184:分享链接 = collection(可读文章,原 note),不再是 Thing;纯文本也 collection(不再 Mind)
       name: (displayTitle || L(dict, '分享内容', 'Shared item')).slice(0, 60),
-      type: 'note',
+      type: 'collection',
       source: 'manual',
       confidence: 0.9,
       rawInput: article ? article.slice(0, 200) : (sharedText || sharedUrl),

@@ -21,7 +21,7 @@ export interface NotionPageRow {
 }
 
 export interface FoldedMemory {
-  type: 'preference' | 'event';
+  type: 'Mind' | 'event';
   name: string;
   source: 'manual';
   confidence: number;
@@ -73,7 +73,7 @@ export function foldSourcesToMemories(
       }
       if (dateVal) attrs.start = dateVal;
       parents.set(row.id, {
-        type: dateVal ? 'event' : 'preference',
+        type: dateVal ? 'event' : 'Mind',
         name: (name || src.title).slice(0, 80),
         source: 'manual',
         confidence: 0.85,

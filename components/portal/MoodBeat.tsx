@@ -31,7 +31,7 @@ function readLatestMoodToday(): Beat | null {
   try {
     const moods = getLifeGraph().filter((n) => {
       const tags = n.tags || [];
-      return n.type === 'health_state' && (tags.includes('feeling') || tags.includes('moment'));
+      return n.type === 'Mind' && (tags.includes('feeling') || tags.includes('moment'));
     });
     if (moods.length === 0) return null;
     moods.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());

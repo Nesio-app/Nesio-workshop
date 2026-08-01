@@ -267,7 +267,7 @@ export default function TodayFeed({
       if (assets.length) {
         const node = ingestLifeNode({
           name: assets.length === 1 ? imgs[0].name.replace(/\.[^.]+$/, '') : `${assets.length} 张照片`,
-          type: 'note', source: 'manual', tags: ['照片'], attributes: {}, relations: [], confidence: 1, assets,
+          type: 'collection', source: 'manual', tags: ['照片'], attributes: {}, relations: [], confidence: 1, assets,
         });
         // 2026-07-29「提高智能」:存进去只是第一步 —— 顺手认一下这是什么,
         // 把文件名(IMG_9740 这种)换成看得懂的名字,并打上识别到的标签。
@@ -280,7 +280,7 @@ export default function TodayFeed({
       const text = await f.text();
       ingestLifeNode({
         name: f.name.replace(/\.[^.]+$/, ''),
-        type: 'note', source: 'manual', tags: ['文件'], attributes: {}, relations: [], confidence: 1,
+        type: 'collection', source: 'manual', tags: ['文件'], attributes: {}, relations: [], confidence: 1,
         rawInput: text.slice(0, 20000),
       });
     }
@@ -294,7 +294,7 @@ export default function TodayFeed({
       if (!ok) { failed.push(f.name); continue; }
       ingestLifeNode({
         name: f.name.replace(/\.[^.]+$/, ''),
-        type: 'note', source: 'manual', tags: ['文件'], attributes: { fileName: f.name, fileSize: String(f.size) },
+        type: 'collection', source: 'manual', tags: ['文件'], attributes: { fileName: f.name, fileSize: String(f.size) },
         relations: [], confidence: 1,
         assets: [{ id, kind: 'file' as const, local: true, mimeType, label: f.name, createdAt: new Date().toISOString() }],
       });

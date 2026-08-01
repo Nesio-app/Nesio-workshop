@@ -218,7 +218,7 @@ export function TodayFocusSection({
   const qualifiesForTimeline = (n: FocusNode): boolean => {
     if (n.attributes.focusPinnedOn === todayKey) return true;   // ①
     if (n.type === 'event') return false;                        // 日历事件走 CalendarCards
-    if (n.type === 'commitment') return true;                    // ②
+    if (n.type === 'task') return true;                          // ②
     if (firstNodeDate(n.attributes)) return true;                // ③
     if (nodeExpiryDate(n.attributes)) return true;               // ④
     return false;

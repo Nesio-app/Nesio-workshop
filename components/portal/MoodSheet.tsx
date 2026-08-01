@@ -249,7 +249,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
       ingestLifeNode({
         // 批次 12:节点名按保存时的界面语言生成(英文界面下不再冒出中文标题)
         name: `Journal · ${dateStr}${em ? ` · ${L(dict, em.label, em.labelEn)}` : ''}`,
-        type: 'health_state',
+        type: 'Mind',
         tags: ['moment', 'journal', ...(em ? ['feeling', em.id, em.quadrant] : []), `energy-${lvl}`],
         attributes: {
           isJournal: true, journalText: plain || journal.trim(),
@@ -264,7 +264,7 @@ export default function MoodSheet({ open, onClose }: MoodSheetProps) {
       ingestLifeNode({
         // 批次 12:同上,「此刻 · 感激」在英文界面下生成 "This moment · Grateful"
         name: L(dict, `此刻 · ${em.label}`, `This moment · ${em.labelEn}`),
-        type: 'health_state',
+        type: 'Mind',
         tags: ['moment', 'feeling', em.id, em.quadrant, `energy-${lvl}`],
         attributes: {
           emotion: em.id, emotionLabel: em.label, emotionEmoji: em.emoji,

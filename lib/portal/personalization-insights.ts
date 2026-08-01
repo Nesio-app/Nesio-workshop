@@ -125,8 +125,8 @@ const MOOD_DOT = { gentle: 'var(--status-gentle)', calm: 'var(--status-calm)' } 
 function computeDataDepth(g: Array<{ type: string }>): BaoheDataDepthItem[] {
   const c = (t: string) => g.filter((x) => x.type === t).length;
   const pct = (n: number, cap: number) => Math.min(100, Math.round((n / cap) * 100));
-  const objectN = c('object'), personN = c('person'), taskN = c('commitment');
-  const habitN = c('health_habit') + c('preference');
+  const objectN = c('Thing'), personN = c('person'), taskN = c('task');
+  const habitN = c('health_habit') + c('Mind');
   // health/bank 已迁 IDB → 用 store 的 has-data(不再直读已迁走的 localStorage key)。
   const spend = hasBankTxData(), health = hasHealthData();
   return [

@@ -104,7 +104,7 @@ export function upsertMonthlyDigest(d: DigestInput): LifeNode | null {
 
   try {
     return ingestLifeNode({
-      type: 'note',
+      type: 'collection',
       name: `${d.month} · ${meta.zh}`,
       source: 'system',
       confidence: 1,

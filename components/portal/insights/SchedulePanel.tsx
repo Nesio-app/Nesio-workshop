@@ -911,12 +911,12 @@ export default function SchedulePanel() {
         });
       } else if (
         !a.reminderId && a.done !== true &&
-        (n.type === 'commitment' || (n.type === 'note' && typeof a.dueDate === 'string' && a.dueDate))
+        (n.type === 'task' || (n.type === 'collection' && typeof a.dueDate === 'string' && a.dueDate))
       ) {
         /*
          * 2026-08-01(用户:「没有截止日期的、逾期未完成的,都分成手记,进不了日程,
          * 即使后来编辑增加时间也进不了」)。根因两层:①手记类型的编辑面板本来就没有
-         * 「截止日期」这个输入框(见 MemoryNodeDetail 的 n.type === 'commitment' 门),
+         * 「截止日期」这个输入框(见 MemoryNodeDetail 的 n.type === 'task' 门),
          * 现在已经放开给手记也能填;②这张列表以前只认 calendar / meeting-notes / 提醒
          * 三种来源,任务类节点(commitment,或补填了 dueDate 的手记)一条都进不来。
          * 提醒 shadow(带 reminderId)已经走上面那条 reminders 循环,这里要排掉避免重复。

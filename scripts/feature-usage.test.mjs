@@ -50,7 +50,7 @@ assert.ok(n && n.key === 'mood', '空库:洞察需攒够被跳过,落到心情')
 assert.ok(n.openEvent === 'nesio-open-mood', '心情走 nesio-open-mood 事件');
 
 // ── 图谱推断:有心情节点 → 心情算用过,跳到物品 ──
-const moodNode = { type: 'health_state', tags: ['feeling'], createdAt: '2026-01-01' };
+const moodNode = { type: 'Mind', tags: ['feeling'], createdAt: '2026-01-01' };
 n = fu.pickReengagementNudge({ nodes: [moodNode], now, zh: true });
 assert.ok(n && n.key === 'inventory', '有心情节点 → 心情跳过 → 物品');
 

@@ -91,7 +91,7 @@ export function ProactiveGuidanceCard({
   function handleSaveQuote() {
     ingestLifeNode({
       name: card.body.slice(0, 60),
-      type: 'preference',
+      type: 'Mind',
       source: 'manual',
       confidence: 1,
       rawInput: card.body,
