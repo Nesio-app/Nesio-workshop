@@ -24,6 +24,9 @@ function loadTs(path, requireImpl) {
 }
 
 const epi = loadTs('../lib/life-domain/signal-epistemic.ts', () => ({}));
+// 2026-08-01 Domains 三合一:inferSensitivity 新增调用 classifyDomainFromText,空桩会让
+// createSignal 假抛错,接真实现(纯函数,无副作用依赖)。
+const contextExtractor = loadTs('../lib/life-domain/context-extractor.ts', () => ({}));
 
 assert.equal(epi.inferEpistemic({ type: 'feedback.retrieval' }), 'feedback');
 assert.equal(epi.inferEpistemic({ type: 'growth.reflection' }), 'user_asserted');
@@ -60,6 +63,7 @@ const create = loadTs('../lib/life-domain/create-signal.ts', (p) => {
   if (p.includes('signal-store-idb')) return { appendSignalIdb: async () => true };
   if (p.includes('storage-health')) return { logDropped: () => {} };
   if (p.includes('signal-epistemic')) return epi;
+  if (p.includes('context-extractor')) return contextExtractor;
   if (p.includes('./signal') || p.endsWith('/signal')) {
     return loadTs('../lib/life-domain/signal.ts', (p2) => {
       if (p2.includes('life-graph')) return { getLifeGraph: () => [], deleteLifeNode: () => {} };

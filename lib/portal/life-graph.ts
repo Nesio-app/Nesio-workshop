@@ -4,6 +4,7 @@
  * This is the foundation for Reasoning Engine and Today Feed.
  */
 import { mergeConflictingNodes } from './life-node-merge';
+import { classifyDomainFromText } from '../life-domain/context-extractor';
 import { emailFulltextScore } from './email-fulltext-index';
 import { tokenizeCJK } from './cjk-tokenize';
 import { expandQueryTerms } from './query-synonyms';
@@ -154,6 +155,9 @@ function inferLifeNodeSignalSensitivity(node: LifeNode): string {
   if (tags.includes('finance') || tags.includes('财务')) return 'financial';
   if (tags.includes('family') || tags.includes('家庭')) return 'family';
   if (node.source === 'calendar' || tags.includes('work') || tags.includes('工作') || tags.includes('会议')) return 'work';
+  // 2026-08-01 Domains 三合一:同 create-signal.ts 的 inferSensitivity,关键词兜底只加严 health。
+  const text = [node.name, node.rawInput, node.tags?.join(' ')].filter(Boolean).join(' ');
+  if (text && classifyDomainFromText(text) === 'health') return 'health';
   return 'normal';
 }
 

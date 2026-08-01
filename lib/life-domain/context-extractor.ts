@@ -17,12 +17,16 @@ import type { SignalContext } from './context';
 
 // ── Domain classification (keyword → front domain) ──────────────────────────
 
+// 2026-08-01 用户点名扩容(Domains 三合一:sensitivity 退场,FrontDomain 接手 + 机器判定关键词扩充)——
+// 用户手写了一版新关键词草案,这里对齐进原有 5 桶(不新开桶,FrontDomain 只有这 5 个)。
+// 「成长/反思/镜子内容」没有字面并进 health(那是身体信号的桶,反思更贴 growth 已有的「复盘」),
+// 「reader 高亮划线」不是靠关键词猜的——见 node-context.ts 的非文本判据(有专属数据标记)。
 const DOMAIN_KEYWORDS: Array<{ domain: FrontDomain; words: RegExp }> = [
-  { domain: 'assets', words: /(放在|存在|收纳|盒子|抽屉|储物|物品|买|购|账单|订阅|续费|预算|花了|剩.{0,3}瓶|快递|发票)/ },
+  { domain: 'assets', words: /(放在|存在|收纳|盒子|抽屉|储物|物品|买|购|账单|订阅|续费|预算|花了|剩.{0,3}瓶|快递|发票|收入|支出|退款|投资|价格|费用|订单|税金|资产)/ },
   { domain: 'health', words: /(睡|运动|健身|训练|跑步|血糖|药|医院|体检|身体|饮食|卡路里|心率)/ },
   { domain: 'energy', words: /(焦虑|情绪|冥想|低能量|恢复|疲惫|压力|心理|独处|放空|grounding)/ },
-  { domain: 'growth', words: /(会议|任务|项目|工作|学习|阅读|论文|刷题|笔记|复盘|deadline|截止)/ },
-  { domain: 'life', words: /(生日|礼物|旅行|朋友|妈妈|爸爸|家人|聚餐|约会|纪念日)/ },
+  { domain: 'growth', words: /(会议|任务|项目|工作|学习|阅读|论文|刷题|笔记|复盘|反思|知识|学业|deadline|截止)/ },
+  { domain: 'life', words: /(生日|礼物|旅行|朋友|妈妈|爸爸|家人|聚餐|约会|纪念日|音乐|衣服|美食|穿搭|家务|愿望|足迹|饭店|剧场)/ },
 ];
 
 // 批次 146:分类不准的根 —— 旧逻辑「首个命中赢 + 零命中一律默认 life + 置信度硬编码 0.7」,
@@ -32,6 +36,17 @@ function countHits(text: string, re: RegExp): number {
   const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
   return (text.match(g) || []).length;
 }
+/** 零命中返回 null(不装懂猜 life)——给 node-context.ts 的「关键词兜底,猜不出才退到粗粒度 type 映射」用。
+ *  跟 classifyDomain 用同一张关键词表,不重复维护;classifyDomain 自己的零命中行为(→ life 低置信,
+ *  给 isNodeUncertain 标「待确认」)是 extractContext()/语音捕获路径依赖的既有行为,不动它。 */
+export function classifyDomainFromText(text: string): FrontDomain | null {
+  const scored = DOMAIN_KEYWORDS
+    .map((k) => ({ domain: k.domain, hits: countHits(text, k.words) }))
+    .filter((s) => s.hits > 0)
+    .sort((a, b) => b.hits - a.hits);
+  return scored.length ? scored[0].domain : null;
+}
+
 function classifyDomain(text: string): { domain: FrontDomain; secondary: FrontDomain[]; confidence: number } {
   const scored = DOMAIN_KEYWORDS
     .map((k) => ({ domain: k.domain, hits: countHits(text, k.words) }))

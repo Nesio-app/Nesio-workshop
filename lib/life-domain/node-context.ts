@@ -13,6 +13,7 @@
 import type { LifeNode } from '../portal/life-graph';
 import { DOMAINS, type FrontDomain } from './domain-taxonomy';
 import type { SignalContext } from './context';
+import { classifyDomainFromText } from './context-extractor';
 
 export function readNodeContext(node: LifeNode): SignalContext | null {
   const raw = node.attributes?.context;
@@ -36,9 +37,19 @@ const TYPE_DOMAIN: Record<string, FrontDomain> = {
   preference: 'life',
 };
 
+/**
+ * 2026-08-01 用户点名:大多数节点根本没走 extractContext(只有语音捕获这一条路调用它,
+ * 见 VoiceInputSheet.tsx)—— 照片/邮件/连接器同步/银行流水等全部落进下面粗粒度的
+ * TYPE_DOMAIN(所有 object 一律 assets、所有 event 一律 growth,不看内容)。这里在
+ * type 兜底**之前**插一道关键词判据,复用同一张表(与 extractContext 同源,不重复维护),
+ * 让已经存在的大多数节点也能被内容判出更准的 domain,而不是只靠类型硬猜。
+ */
 export function nodeDomain(node: LifeNode): FrontDomain | null {
   const ctx = readNodeContext(node);
   if (ctx?.domain && ctx.domain in DOMAINS) return ctx.domain;
+  const text = [node.name, node.rawInput, (node.tags || []).join(' ')].filter(Boolean).join(' ');
+  const byKeyword = text ? classifyDomainFromText(text) : null;
+  if (byKeyword) return byKeyword;
   return TYPE_DOMAIN[node.type] ?? null;
 }
 

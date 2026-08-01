@@ -19,6 +19,7 @@ import {
   stampEpistemic,
   type SignalEpistemic,
 } from './signal-epistemic';
+import { classifyDomainFromText } from './context-extractor';
 
 export const SIGNAL_SCHEMA_VERSION = 'Signal@v1';
 export type SignalWriteMode = 'local_first' | 'cloud_mirror_attempted' | 'cloud_mirror_pending';
@@ -113,6 +114,13 @@ function inferSensitivity(input: CreateSignalInput): SignalSensitivity {
   if (input.source === 'health') return 'health';
   if (String(input.type).startsWith('finance.')) return 'financial';
   if (input.source === 'calendar' || input.source === 'gmail' || input.source === 'task') return 'work';
+  // 2026-08-01 Domains 三合一:source/type 都没标健康时,再用关键词判一遍(与 FrontDomain
+  // 用同一张表,见 context-extractor.ts)。只做加严 —— 只会把更多内容并入 health(更保守,
+  // 永远不会把已经判成 health 的内容判走),不动 isDeviceOnlySignal 的闸门写法本身(仍是字面
+  // sensitivity === 'health',受 scripts/health-privacy-boundary.test.mjs 钉死,那道闸门要不要
+  // 跟着 FrontDomain.gated 扩到 energy 域是没决定的开放问题,这里不擅自扩)。
+  const text = [input.title, input.raw].filter(Boolean).join(' ');
+  if (text && classifyDomainFromText(text) === 'health') return 'health';
   return 'normal';
 }
 
