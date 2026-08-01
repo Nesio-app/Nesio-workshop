@@ -5603,7 +5603,10 @@ html[data-portal-theme="night"] .nesio-type-chip {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  align-self: flex-start;
+  /* 2026-08-01:去掉 align-self:flex-start(原来只占内容宽)——有自定义标签时
+     type 角标要能贴到卡片右边,这一行得撑满卡宽,type-corner 靠 margin-left:auto 推右。
+     没标签时行为不变(左对齐图标+名,右边没有东西可推)。 */
+  width: 100%;
   max-width: 100%;
 }
 .nesio-memory-card-cat-label {
@@ -5613,6 +5616,9 @@ html[data-portal-theme="night"] .nesio-type-chip {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* 2026-08-01:与 type-corner 同行时得能让出空间给它,不然角标被挤出卡外。 */
+  min-width: 0;
+  flex-shrink: 1;
 }
 .nesio-memory-card-lead {
   width: 1.7rem;
@@ -5636,6 +5642,20 @@ html[data-portal-theme="night"] .nesio-type-chip {
   white-space: nowrap;
 }
 .nesio-memory-card-source svg { opacity: 0.85; }
+
+/* type 角标(2026-08-01,只在有自定义标签领头时出现)——推到 nesio-memory-card-cat 这一行右边。 */
+.nesio-memory-card-type-corner {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--portal-muted);
+  opacity: 0.62;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .nesio-memory-card-pending {
   font-size: 0.64rem;
   font-weight: 700;
@@ -8418,12 +8438,16 @@ html[data-portal-theme="night"] .nesio-node-attr-val { color: #e8eefa; }
   margin: 0 -0.1rem;
   background: var(--type-strip-bg, var(--chip-fog));
 }
-/* 来源徽章(2026-08-01 用户点名,图一红圈)——推到这一行最右边,类型图标/文字仍在左边。 */
+/* type 角标(2026-08-01,图一红圈位置;只在自定义标签领头时出现)——推到这一行最右边。 */
 .nesio-type-header-source {
   margin-left: auto;
   display: inline-flex;
   align-items: center;
+  gap: 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 600;
   opacity: 0.7;
+  white-space: nowrap;
 }
 /* 夜间:pastel 调暗成同色系轻染,不再是一条白带(浅字 #c7d4f5 在其上可读)。 */
 html[data-portal-theme="night"] .nesio-type-header-strip {

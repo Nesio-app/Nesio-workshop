@@ -9,7 +9,7 @@ import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { makeAssetErrorHandler } from '@/lib/portal/signed-asset-url';
 import LocationPicker from './LocationPicker';
 import EmailComposeSheet from './EmailComposeSheet';
-import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare, IconFile} from './icons';
+import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare, IconFile, IconBookmark } from './icons';
 import { isTopicTag } from '@/lib/portal/topic-tags';
 // #18:「地点」字段里塞的是会议链接 —— 一条 URL 不是一个地方
 import { splitEventLocation, shortUrlLabel } from '@/lib/portal/meeting-location';
@@ -52,6 +52,10 @@ const TYPE_LABELS_EN: Record<string, string> = {
   person: 'Person', object: 'Item', place: 'Place', event: 'Event',
   commitment: 'Promise', health_state: 'Health', preference: 'Preference', note: 'Note',
 };
+
+/** 用户点名的 8 个自定义可见标签(2026-08-01)——比 type 重要,命中就在头部领头,
+ *  同名单见 MemoryTab.tsx(两处各自维护一份小常量,跟 sourceMeta 那套重复模式一致)。 */
+const CUSTOM_TAGS = ['财务', '物品', '衣橱', '美食', '健康', '人物', '心情', '阅读'];
 
 const PERSON_CATEGORIES: Record<string, string> = {
   family: '家人', colleague: '同事', friend: '朋友', acquaintance: '认识', other: '其他',
@@ -1029,11 +1033,28 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
         {/* 类型色条:tint 走 CSS 变量,夜间由 CSS 混暗 —— 直接 inline background 会让
             浅色 pastel 在夜间糊成一条白带(QA 截图「弹出框上侧白边」)。 */}
         <div className="nesio-type-header-strip" style={{ ['--type-strip-bg' as string]: typeBg }}>
-          <span className="nesio-type-header-icon"><NodeTypeIcon type={n.type} size={15} /></span>
-          <span className="nesio-type-header-label">{(dict === 'en' ? TYPE_LABELS_EN : TYPE_LABELS_ZH)[n.type] || n.type}</span>
-          {/* 2026-08-01 用户点名(图一红圈):来源徽章放到这一行右上角 —— 下面
-              nesio-node-source-row 那行文字保留(时间/详情),这里只给一眼可辨的图标。 */}
-          <span className="nesio-type-header-source" aria-hidden>{SRC.icon}</span>
+          {/* 2026-08-01 用户更正:自定义标签比 type 重要——命中就标签领头(左),
+              type 退到这一行右上角小字;没有自定义标签就维持原样(type 领头,无角标)。 */}
+          {(() => {
+            const customTag = (n.tags || []).find((t) => CUSTOM_TAGS.includes(t));
+            if (customTag) {
+              return (
+                <>
+                  <span className="nesio-type-header-icon"><IconBookmark size={15} /></span>
+                  <span className="nesio-type-header-label">{customTag}</span>
+                  <span className="nesio-type-header-source" aria-hidden>
+                    <NodeTypeIcon type={n.type} size={12} /> {(dict === 'en' ? TYPE_LABELS_EN : TYPE_LABELS_ZH)[n.type] || n.type}
+                  </span>
+                </>
+              );
+            }
+            return (
+              <>
+                <span className="nesio-type-header-icon"><NodeTypeIcon type={n.type} size={15} /></span>
+                <span className="nesio-type-header-label">{(dict === 'en' ? TYPE_LABELS_EN : TYPE_LABELS_ZH)[n.type] || n.type}</span>
+              </>
+            );
+          })()}
         </div>
 
         <div className="nesio-settings-sheet-header">

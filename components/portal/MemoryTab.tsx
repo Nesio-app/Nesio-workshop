@@ -216,6 +216,11 @@ function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: L
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
+const TYPE_BG: Record<string, string> = {
+  person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
+  event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
+  note: 'var(--chip-lemon)', // 批次 143
+};
 const TYPE_LABEL_ZH: Record<string, string> = {
   person: '人物', object: '物品', place: '地点',
   event: '事件', commitment: '承诺', health_state: '健康', preference: '偏好', note: '笔记',
@@ -461,6 +466,11 @@ function smartCardTitle(name: string): string {
   return `${clause.length > 24 ? clause.slice(0, 24) : clause}…`;
 }
 
+function getPersonInitials(name: string) {
+  const bgs = ['var(--avatar-indigo)', 'var(--avatar-blue)', 'var(--avatar-mint)', 'var(--avatar-pink)', 'var(--avatar-amber)', 'var(--avatar-violet)'];
+  return { initials: name.slice(0, 1), bg: bgs[name.charCodeAt(0) % bgs.length] };
+}
+
 // isWeatherNode / visibleMemoryNodes 已收到 lib/portal/memory-visibility.ts ——
 // 设置页的「N 条记忆」也要用同一份判据,否则两处各报一个数(QA #10)。
 
@@ -610,7 +620,12 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
   const srcMeta = sourceMeta(node, dict);
   const catLabel = categoryLabelForCard(node, dict);
   const isMood = node.type === 'health_state' && (node.tags || []).some((t) => t === 'feeling' || t === 'moment');
+  const isPerson = node.type === 'person';
+  const { initials, bg: avatarBg } = isPerson ? getPersonInitials(node.name) : { initials: '', bg: '' };
   const uncertain = isNodeUncertain(node);
+  // 2026-08-01 用户点名:自定义标签比 type 更重要——命中就领头,type 退到这一行右上角小徽章;
+  // 没有自定义标签的卡(目前是多数)维持原样,type 照旧领头,不额外画一个多余的角标。
+  const customTag = (node.tags || []).find((t) => CUSTOM_TAGS.includes(t));
 
   return (
     <button
@@ -641,25 +656,35 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
       onContextMenu={(e) => { e.preventDefault(); shareNode(); }}
       aria-label={`${node.name}${L(dict, ',左滑删除,长按分享', ' — swipe left to delete, long-press to share')}`}
     >
-      {/* 2026-08-01 用户点名:来源(哪里来的)换到领头位置,类型(是什么)退到底部小字 ——
-          之前是「分类图标+分类名」领头、来源徽章左下角,这里整体对调。
-          人物不再用头像领头(小字位置放不下可读的头像),统一走来源图标+来源名。 */}
+      {/* 2026-08-01 用户点名:自定义标签比 type 重要——标签领头(左上),type 退到这一行
+          右上角小徽章;没标签的卡维持原样(分类图标+分类名领头,人物用头像)。 */}
       <span className="nesio-memory-card-cat">
-        <span className="nesio-memory-card-lead nesio-memory-card-icon" style={{ background: 'var(--portal-accent-soft)' }}>
-          {srcMeta.icon}
-        </span>
-        <span className="nesio-memory-card-cat-label">{srcMeta.label}</span>
+        {customTag ? (
+          <span className="nesio-memory-card-lead nesio-memory-card-icon" style={{ background: 'var(--portal-accent-soft)' }}>
+            <IconBookmark size={14} />
+          </span>
+        ) : isPerson ? (
+          <span className="nesio-memory-card-lead nesio-memory-card-avatar" style={{ background: avatarBg }}>{initials}</span>
+        ) : (
+          <span className="nesio-memory-card-lead nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || 'var(--portal-accent-soft)' }}>
+            {isMood ? <IconActivity size={14} /> : <NodeTypeIcon type={node.type} size={14} />}
+          </span>
+        )}
+        <span className="nesio-memory-card-cat-label">{customTag || catLabel}</span>
+        {customTag && (
+          <span className="nesio-memory-card-type-corner">
+            {isMood ? <IconActivity size={11} /> : <NodeTypeIcon type={node.type} size={11} />}
+            {catLabel}
+          </span>
+        )}
       </span>
       <span className="nesio-memory-card-title" title={node.name}>{smartCardTitle(displayNodeName(node.name, dict))}</span>
       {extra && <span className="nesio-memory-card-extra">{extra}</span>}
       {badge && <span className="nesio-memory-card-status-badge" style={{ background: badgeColor }}>{badge}</span>}
       {!extra && !badge && <span className="nesio-memory-card-sub">{cleanMemoryPreview(node, dict)}</span>}
-      {/* 类型徽章(图标 + 名,退到左下,与来源对调位置)· 待确认 · 时间 */}
+      {/* 来源徽章(图标 + 名,回到左下,恢复原位)· 待确认 · 时间 */}
       <span className="nesio-memory-card-meta-row">
-        <span className="nesio-memory-card-source">
-          {isMood ? <IconActivity size={11} /> : <NodeTypeIcon type={node.type} size={11} />}
-          {catLabel}
-        </span>
+        <span className="nesio-memory-card-source">{srcMeta.icon}{srcMeta.label}</span>
         {uncertain && <span className="nesio-memory-card-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
         {(() => {
           // 标签三层 §3.3:列表卡带相对时间(今天/昨天/N 天前),数据的"新鲜度"一眼可辨
