@@ -479,8 +479,25 @@ sensitivity/retention 枚举化(中期)。
     `scripts/periodic-report-anchor.test.mjs` 钉死锚点日期/到点判定/窗口方向,
     挂进 `test:contracts`(非 `test:security`——这不是安全契约)。`PlansPanel`/
     `RetrospectPanel` 的文案("周一 8:00 出"等)同步改成新锚点时间。
+  ● **计划内容加优先级 + 时间冲突(#184,不做"关联"/"blocker"——没有真实数据源)**:
+    调研先行(见调研结论):reminders 没有优先级字段,life-graph 的 relations
+    里也没有依赖/阻塞语义,全仓搜不到相关词汇——用户拍板"先做能做的两项,
+    blocker/关联明确说明未实现",不编造数据模型。
+    · **优先级**:复用 `lib/platform/attention-engine.ts` 已有的确定性打分先例
+      (关键词规则推事件类型 → 类型定重要度,`No AI`)给"已经排定的"重新排序
+      (`TYPE_IMPORTANCE` 补 `export`);段标题改成"已经排定的(按重要度)"。
+    · **冲突**:`useTodayData.ts` 传给 `buildPlan` 的本来就是完整
+      `CalendarEvent[]`(带 `end`/`allDay`),`buildPlan` 的参数类型之前把这些
+      字段砍掉了——补回来,两个非全天事件的 `[start,end)` 区间重叠就是真冲突,
+      没写 `end` 的事件按零时长处理,不替它编时长。新段 `id: 'conflicts'`
+      (`DailyReportSectionId` 加这个值,`DailyReportSheet.tsx` 的
+      `SECTION_ICON` 同步补 `IconAlertTriangle`)。
+    新增 `scripts/periodic-report-plan.test.mjs`——真编译
+    `keyword-lexicon.ts`+`attention-engine.ts`(而非 stub 空对象)锁住"按重要度
+    排序不是按日期"+"冲突检测只抓真重叠、不误伤全天/不重叠事件"两条行为。
   契约验证:`tsc --noEmit` 0 错;`test:security` 全绿;新增的
-  `periodic-report-anchor` 单测绿;`daily-report`/`daily-report-persist` 复测绿
+  `periodic-report-anchor`/`periodic-report-plan` 单测绿;
+  `daily-report`/`daily-report-persist`/`daily-report-crossface` 复测绿
   (确认没被 `useTodayData.ts` 里紧邻的改动带歪)。
 
 - **VoiceInputSheet 的 `intent='ask'` 那一支已不可达,但还没删(2026-07-31)**。

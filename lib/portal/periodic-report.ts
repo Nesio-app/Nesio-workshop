@@ -29,6 +29,8 @@ import { listCompleted, listReminders } from './schedule-reminders';
 import { looseThreads } from './loose-threads';
 import type { DailyReport, DailyReportSection } from './daily-report';
 import { listDailyReports } from './daily-report-persist';
+import { inferEventType, TYPE_IMPORTANCE, EVENT_TYPE_LABEL } from '@/lib/platform/attention-engine';
+import type { CalendarEvent } from './types';
 
 export type PeriodKind = 'week' | 'month';
 export type PeriodDirection = 'retrospect' | 'plan';
@@ -205,16 +207,31 @@ export function buildRetrospect(
   return { date: periodKey, title, greeting: '', headline, sections, markdown, empty };
 }
 
+/** 一天里的钟点,如 "14:30"(本地时间)。 */
+function fmtClock(d: Date): string {
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
 /**
  * 计划:窗口内已确定的日历项 + 到期提醒 + 还没接上的线头。
  *
  * 和日报「往前看」段同一条红线——只放**已知**会落在这个窗口的事,不推测、不猜
  * 「你可能想做什么」。「线头」是唯一例外(见 loose-threads.ts 的注释:那是用户
  * 自己说过想做、却一直没动的事,不是 Nesio 替他决定的目标)。
+ *
+ * 2026-08-01 加优先级排序 + 时间冲突检测(用户拍板范围:「关联」「blocker」分析
+ * 没有真实数据源——reminders 没有优先级字段,life-graph 的 relations 里也没有
+ * 依赖/阻塞语义,全仓搜不到相关词汇——所以不做,不编造数据,只做能做的两项):
+ *   · **优先级**:复用 `lib/platform/attention-engine.ts` 已有的确定性打分先例
+ *     (关键词规则推事件类型 → 类型定重要度,No AI)给"已经排定的"重新排序,
+ *     不再单纯按时间先后。
+ *   · **冲突**:日历事件本来就带 end/allDay(useTodayData 传进来的就是完整
+ *     `CalendarEvent[]`),两个非全天事件的时间区间重叠是真冲突,不是猜的——
+ *     没写 end 的事件按零时长处理,不替它编一个时长。
  */
 export function buildPlan(
   kind: PeriodKind,
-  events: ReadonlyArray<{ title?: string; start?: string }>,
+  events: ReadonlyArray<{ title?: string; start?: string; end?: string; allDay?: boolean; description?: string }>,
   threadNodes: ReadonlyArray<{ type?: string; name?: string; createdAt?: string; lastConfirmedAt?: string; attributes?: Record<string, unknown> }>,
   now: Date,
   locale: 'zh' | 'en' = 'zh',
@@ -223,26 +240,64 @@ export function buildPlan(
   const periodKey = periodKeyOf(kind, start);
 
   const upcomingEvents = events
-    .filter((e): e is { title: string; start: string } => !!e.title && !!e.start)
-    .map((e) => ({ title: e.title, d: new Date(e.start) }))
+    .filter((e): e is { title: string; start: string; end?: string; allDay?: boolean; description?: string } => !!e.title && !!e.start)
+    .map((e) => ({
+      title: e.title,
+      d: new Date(e.start),
+      dEnd: e.end ? new Date(e.end) : new Date(e.start),
+      allDay: !!e.allDay,
+      eventType: inferEventType({ id: '', title: e.title, start: e.start, description: e.description } as CalendarEvent),
+    }))
     .filter((e) => !Number.isNaN(e.d.getTime()) && e.d.getTime() >= start.getTime() && e.d.getTime() < end.getTime())
     .sort((a, b) => a.d.getTime() - b.d.getTime());
 
-  const reminders = listReminders().filter((r) => {
-    if (r.doneAt) return false;
-    const d = new Date(r.at);
-    return !Number.isNaN(d.getTime()) && d.getTime() >= start.getTime() && d.getTime() < end.getTime();
-  });
+  const reminders = listReminders()
+    .filter((r) => {
+      if (r.doneAt) return false;
+      const d = new Date(r.at);
+      return !Number.isNaN(d.getTime()) && d.getTime() >= start.getTime() && d.getTime() < end.getTime();
+    })
+    .map((r) => ({
+      title: r.title,
+      d: new Date(r.at),
+      eventType: inferEventType({ id: '', title: r.title, start: r.at, description: r.note } as CalendarEvent),
+    }));
 
   const threads = looseThreads(threadNodes, now.getTime()).slice(0, 5);
 
+  // 时间冲突:非全天事件按 start 排序后两两比对相邻区间——已排序,一旦下一个
+  // 事件的 start 已经过了当前事件的 end 就不可能再重叠,提前退出内层循环。
+  const conflicts: Array<{ a: string; b: string; aTime: string; bTime: string }> = [];
+  const timed = [...upcomingEvents].filter((e) => !e.allDay).sort((a, b) => a.d.getTime() - b.d.getTime());
+  for (let i = 0; i < timed.length; i++) {
+    for (let j = i + 1; j < timed.length; j++) {
+      if (timed[j].d.getTime() >= timed[i].dEnd.getTime()) break;
+      conflicts.push({ a: timed[i].title, b: timed[j].title, aTime: fmtClock(timed[i].d), bTime: fmtClock(timed[j].d) });
+    }
+  }
+
+  // 优先级:事件 + 提醒按类型重要度排序(同重要度按日期先后),不再单纯按时间。
+  const byPriority = [
+    ...upcomingEvents.map((e) => ({ title: e.title, d: e.d, importance: TYPE_IMPORTANCE[e.eventType], label: EVENT_TYPE_LABEL[e.eventType] })),
+    ...reminders.map((r) => ({ title: r.title, d: r.d, importance: TYPE_IMPORTANCE[r.eventType], label: EVENT_TYPE_LABEL[r.eventType] })),
+  ].sort((a, b) => b.importance - a.importance || a.d.getTime() - b.d.getTime());
+
   const sections: DailyReportSection[] = [];
-  if (upcomingEvents.length || reminders.length) {
-    const lines = [
-      ...reminders.map((r) => `${dateKey(new Date(r.at)).slice(5)} · ${r.title}`),
-      ...upcomingEvents.map((e) => `${dateKey(e.d).slice(5)} · ${e.title}`),
-    ];
-    sections.push({ id: 'calendar', title: locale === 'en' ? 'Already on the calendar' : '已经排定的', lines: lines.slice(0, 10) });
+  if (conflicts.length) {
+    sections.push({
+      id: 'conflicts',
+      title: locale === 'en' ? 'Time conflicts' : '⚠️ 时间冲突',
+      lines: conflicts.slice(0, 8).map((c) => (locale === 'en'
+        ? `${c.aTime} ${c.a} overlaps ${c.bTime} ${c.b}`
+        : `${c.aTime} ${c.a} 与 ${c.bTime} ${c.b} 时间重叠`)),
+    });
+  }
+  if (byPriority.length) {
+    sections.push({
+      id: 'calendar',
+      title: locale === 'en' ? 'Already on the calendar (by priority)' : '已经排定的(按重要度)',
+      lines: byPriority.slice(0, 10).map((it) => `${dateKey(it.d).slice(5)} · ${it.title}(${it.label})`),
+    });
   }
   if (threads.length) {
     sections.push({
@@ -259,7 +314,9 @@ export function buildPlan(
     : (locale === 'en' ? `Next month · ${rangeLabel}` : `下月计划 · ${rangeLabel}`);
   const headline = empty
     ? (locale === 'en' ? 'Nothing set yet for this stretch.' : '这一期还没有排定的事。')
-    : (locale === 'en' ? `${upcomingEvents.length + reminders.length} thing(s) already on the calendar` : `已经有 ${upcomingEvents.length + reminders.length} 件事排定`);
+    : conflicts.length
+      ? (locale === 'en' ? `${byPriority.length} thing(s) set, ${conflicts.length} time conflict(s) to glance at` : `已经有 ${byPriority.length} 件事排定,其中 ${conflicts.length} 处时间重叠可以看一眼`)
+      : (locale === 'en' ? `${byPriority.length} thing(s) already on the calendar` : `已经有 ${byPriority.length} 件事排定`);
   const markdown = sections.map((s) => `## ${s.title}\n${s.lines.map((l) => `- ${l}`).join('\n')}`).join('\n\n');
 
   return { date: periodKey, title, greeting: '', headline, sections, markdown, empty };

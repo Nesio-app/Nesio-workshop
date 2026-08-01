@@ -20,7 +20,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
 import {
-  IconNote, IconCloudSun, IconCalendar, IconMail, IconBook, IconCheckSquare, IconTrendingUp, IconClock,
+  IconNote, IconCloudSun, IconCalendar, IconMail, IconBook, IconCheckSquare, IconTrendingUp, IconClock, IconAlertTriangle,
 } from './icons';
 
 // 段落图标。Record<DailyReportSectionId, …> 是穷举类型 —— 日报/周报/月报加新段时
@@ -36,6 +36,7 @@ const SECTION_ICON: Record<DailyReport['sections'][number]['id'], React.Componen
   completed: IconCheckSquare,  // 回顾:这一期做完的
   tally: IconTrendingUp,       // 回顾:各域被提到几次
   threads: IconBook,           // 计划:还没接上的线头
+  conflicts: IconAlertTriangle, // 计划:日历时间冲突
 };
 
 export default function DailyReportSheet({

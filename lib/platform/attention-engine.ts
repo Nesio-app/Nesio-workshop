@@ -27,7 +27,7 @@ export type EventType =
   | 'other';    // everything else
 
 // Base importance by type (0–100)
-const TYPE_IMPORTANCE: Record<EventType, number> = {
+export const TYPE_IMPORTANCE: Record<EventType, number> = {
   flight:   95,
   medical:  92,
   exam:     92,
