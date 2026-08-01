@@ -34,7 +34,6 @@ const F = {
   wardrobe: read('components/portal/insights/WardrobePanel.tsx'),
   wardrobeLib: read('lib/portal/wardrobe.ts'),
   outfits: read('lib/portal/wardrobe-outfits.ts'),
-  familyGoal: read('components/portal/family/FamilyGoalCard.tsx'),
   rewards: read('components/portal/RewardsStore.tsx'),
   familySharing: read('components/portal/family/FamilySharingSheet.tsx'),
   travelPlan: read('components/portal/travel/TravelPlanPanel.tsx'),
@@ -131,8 +130,20 @@ const ITEMS = [
   ['37', 'p10 淘汰真的不再推(avoidKeys)', () => /avoidKeys/.test(F.wardrobeLib) && /avoidKeys/.test(F.wardrobe)],
 
   // ── 家庭 / 愿望(p13–p14)──
-  ['38', 'p13 攒钱目标卡进奖励模块', () => exists('components/portal/family/FamilyGoalCard.tsx') && /<FamilyGoalCard/.test(F.rewards)],
-  ['39', 'p13 进度分母用 earned 不用 owed', () => /earned >= goal/.test(F.familyGoal) && !/owed/.test(C.familyGoal)],
+  // 38/39 走过两代。**要保的东西一次没变**:攒钱目标和愿望不许拆在两个页面、
+  // 给用户看的进度不许用 owed(发一次工钱就倒退,给多了变负)。
+  //   · bug3 当时的落法:把家庭板那块 FamilyGoalCard 搬进奖励模块;
+  //   · 2026-08-01 用户「乐高并入愿望清单」+「家务也挣积分」:那块卡整个撤了,
+  //     钱这套 UI 一起撤 —— 现在只有积分,而积分只加不减,负数没有意义。
+  //     已设过的目标搬成一条积分愿望(migrate-goal-to-wish)。
+  // 细则压在 scripts/family-points-only.test.mjs(那边真跑)。
+  ['38', 'p13 攒钱目标和愿望在同一处(现已并进愿望清单)',
+    () => !exists('components/portal/family/FamilyGoalCard.tsx')
+      && /migrateFamilyGoalToWish\(\)/.test(F.rewards)
+      && !/<FamilyGoalCard/.test(F.rewards)],
+  ['39', 'p13 给用户看的进度不用 owed',
+    () => /points\(e\.earned, dict\)/.test(F.familySharing)
+      && !/Math\.abs\(ledger\.balance\.owed\)/.test(C.familySharing)],
   ['40', 'p14 删标题 + 页头对齐(‹ 洞察 + 今天)', () => /backLabel/.test(F.familySharing) && /onToday/.test(F.familySharing) && !/function GoalSection/.test(F.familySharing)],
 
   // ── 行程(p15–p27)──

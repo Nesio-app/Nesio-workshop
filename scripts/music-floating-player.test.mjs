@@ -81,7 +81,19 @@ assert.ok(
   assert.ok(/void toggle\(\); \}/.test(ball), '要有播放/暂停');
   assert.ok(/step\('next', false\)/.test(ball), "要有下一首,且是手动语义(auto=false)——单曲循环下也得真换歌");
   // 三个键各自的 aria-label:球上只有符号,没有文字,读屏用户全靠它。
-  for (const [label, hint] of [['playLabel', '播放/暂停'], ["'下一首'", '下一首'], ["'关闭播放'", '关闭']]) {
+  // 2026-08-01:「收起」和「停止播放」拆成两颗键 —— 用户实测「点一下,悬浮球缩回去
+  // 那个按钮不管用」,查下来**那个按钮根本不存在**:展开态只有三个键,而 × 是 stop。
+  // 他点了以为收起坏了,其实是音乐被他关掉了。× 的文案也跟着改成「停止播放」,
+  // 免得再被当成「收起」。
+  // ⚠️ 曲名条也带同一个 aria-label(整块可点 = 收起),所以判据要钉在 **.nesio-fp-btn**
+  //    这一颗上 —— 第一版没钉,注入把 ⌄ 键整个删掉之后曲名条那份照样匹配、照样绿。
+  assert.ok(/className="nesio-fp-btn"\s*\n\s*aria-label=\{L\(dict, '收起', 'Collapse'\)\}/.test(ball),
+    '展开态要有一颗**收起**键(不是只有曲名条可点)—— ' +
+    '「我想让它别挡着」和「我不想听了」不该是同一颗键');
+  // 曲名条那份也留着(手指落在哪都行),两条路并存
+  assert.ok(/className="nesio-fp-meta"[\s\S]{0,220}setExpanded\(false\)/.test(ball),
+    '曲名条也该整块可点收起 —— 不用瞄准那颗小键');
+  for (const [label, hint] of [['playLabel', '播放/暂停'], ["'下一首'", '下一首'], ["'停止播放'", '停止播放']]) {
     assert.ok(new RegExp(`aria-label=\\{${label.startsWith("'") ? `L\\(dict, ${label}` : label}`).test(ball),
       `${hint} 这一键要有 aria-label`);
   }
@@ -101,6 +113,34 @@ assert.ok(
   !/onLongPress|onTouchStart[\s\S]{0,80}stop/.test(ball),
   '关闭不能只有长按这一条路 —— 藏起来的出口等于没有出口',
 );
+/* ── ⑥a 长按 = 挪位置,不是别的(2026-08-01 用户点名)───────────────────── */
+// 判据钉在「阈值那个 setTimeout 里面才 setDragging(true)」这一整块上 ——
+// 只查两个字符串各自存在的话,把 dragging 换成常量 true 照样绿(注入抓出来的)。
+assert.ok(/setTimeout\(\(\) => \{[\s\S]{0,300}setDragging\(true\)[\s\S]{0,200}\}, LONG_PRESS_MS\)/.test(ball),
+  '进拖动态必须**等到长按阈值**才发生 —— 直接拖会把页面滚动吃掉,而滚动比挪球高频得多');
+assert.ok(/const \[dragging, setDragging\] = useState\(false\)/.test(ball),
+  'dragging 必须是真的 state —— 写死成常量的话「拖完那一下不许触发点击」这层保护就空了');
+assert.ok(/!pressRef\.current\.moved/.test(ball),
+  '按下之后手指移开过就不算长按 —— 那是在滚页面,不是在挪球');
+// 拖完那一下不许顺手触发点击 —— 手指抬起来的地方通常不是他想点的东西
+for (const guard of [/if \(!dragging\) setExpanded\(true\)/, /if \(!dragging\) setExpanded\(false\)/]) {
+  assert.ok(guard.test(ball), '拖动结束时不许顺带把展开/收起也触发了');
+}
+// 位置要记住,而且要夹在视口里 —— 换了屏幕方向之后落到屏幕外就再也点不到了
+assert.ok(/localStorage\.setItem\(FP_POS_KEY/.test(ball), '拖到哪要记住');
+assert.ok(/function clampPos/.test(ball) && /Math\.min\(Math\.max\(0, p\.x\)/.test(ball),
+  '存着的坐标要夹回视口 —— 换个屏幕尺寸就可能落到屏幕外,那球再也点不到');
+
+/* ── ⑥b 三秒不碰变半透明,但**不消失** ─────────────────────────────────── */
+assert.ok(/DIM_MS/.test(ball) && /setDim\(true\)/.test(ball), '要有「多久不碰就淡下去」');
+assert.ok(/setDim\(false\)/.test(ball), '碰一下要能恢复 —— 淡着还点不亮就成了半个死按钮');
+{
+  const css = fs.readFileSync(new URL('../app/globals.css', import.meta.url), 'utf8');
+  const dim = css.slice(css.indexOf('.nesio-fp.is-dim'), css.indexOf('.nesio-fp.is-dim') + 200);
+  assert.ok(/opacity:\s*0?\.\d+/.test(dim), '淡化要用 opacity');
+  assert.ok(!/display:\s*none|visibility:\s*hidden/.test(dim),
+    '淡下去**不许变成消失** —— 消失了「怎么关掉这首歌」就又没有答案了');
+}
 
 /* ── ⑥b 音乐页开着时球要让位 ────────────────────────────────────────────── */
 
@@ -143,7 +183,9 @@ assert.ok(
 {
   // 只看**这一条规则**里的值 —— 在整份 css 里搜关键字,别处一个长得像的写法就能
   // 让断言蒙混过关(断言太宽 = 断言不存在)。
-  const rule = css.match(/\.nesio-fp,\s*\n\.nesio-fp-ball \{[^}]*\}/);
+  // 2026-08-01:定位从按钮本身挪到了**外层** wrap —— 长按拖动要改 left/top,
+  // 而球自己还要 position:relative 给进度环做定位上下文。
+  const rule = css.match(/\.nesio-fp,\s*\n\.nesio-fp-ball-wrap \{[^}]*\}/);
   assert.ok(rule, '悬浮球的定位规则不见了');
   const block = rule[0];
   const m = block.match(/z-index:\s*(\d+)/);
