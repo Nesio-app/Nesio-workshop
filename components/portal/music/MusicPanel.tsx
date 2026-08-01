@@ -26,7 +26,7 @@ import {
 } from '@/lib/platform/music/source-catalog';
 import {
   importLocalTrack, deleteLocalTrack, loadLocalTracks, libraryHeadline,
-  prettyDuration, renameLocalTrack, parseTrackName, type LocalTrack,
+  prettyDuration, renameLocalTrack, parseTrackName, LOCAL_TRACKS_CHANGED, type LocalTrack,
 } from '@/lib/platform/music/local-tracks';
 import { prettyBytes } from '@/lib/portal/local-file-store';
 import { loadMusicPrefs, saveMusicPrefs, loadLastPlayed, saveLastPlayed, type MusicPrefs } from '@/lib/platform/music/prefs';
@@ -94,6 +94,13 @@ export default function MusicPanel() {
   // 那一帧与客户端不一致(水合告警),而且首屏会闪一下。
   const [lastId, setLastId] = useState('');
   useEffect(() => { setTracks(loadLocalTracks()); setLastId(loadLastPlayed()); }, []);
+  // 时长是播起来之后才知道的,由引擎写回 localStorage。不听这个事件的话,
+  // 列表上那一栏会永远停在「--:--」—— 数据早就有了,只是这份快照不知道。
+  useEffect(() => {
+    const onChanged = () => setTracks(loadLocalTracks());
+    window.addEventListener(LOCAL_TRACKS_CHANGED, onChanged);
+    return () => window.removeEventListener(LOCAL_TRACKS_CHANGED, onChanged);
+  }, []);
   // 告诉悬浮球「这一页开着,你先让位」—— 同一屏两套播放控制会让人怀疑它俩不是一回事。
   useEffect(() => { setPanelOpen(true); return () => setPanelOpen(false); }, []);
   useEffect(() => {

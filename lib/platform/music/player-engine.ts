@@ -164,7 +164,9 @@ export async function playId(id: string): Promise<void> {
   if (!track) { emit({ error: c.gone, loading: false, playing: false }); return; }
   emit({ currentId: id, loading: true, error: '' });
 
-  const blob = await getTrackBlob(id);
+  // 把记着的 MIME 一起带过去 —— 读回来的 blob 没有 type 的话(iOS 上是常态)
+  // 靠它重新包一层,否则 Safari 拿到一个空 MIME 的 blob URL 就是不出声。
+  const blob = await getTrackBlob(id, track.mimeType);
   if (!blob) { emit({ loading: false, playing: false, error: c.fileMissing(track.title) }); return; }
 
   const a = audio();
