@@ -20,6 +20,7 @@ import {
   setMemberRole, removeMember,
   type FamilySummary, type FamilyMemberView, type BoardView, type LedgerView, type ChoreInstanceView,
 } from '@/lib/family/family-client';
+import { awardChorePoints } from './award-chore-points';
 
 type View = { kind: 'board' } | { kind: 'ledger'; person: FamilyMemberView };
 type Dict = 'zh' | 'en';
@@ -272,6 +273,9 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, dict, t
     const r = await choreAction(familyId, instanceId, action);
     setBusyId('');
     if (!r.ok) { setErr(r.error); return; }
+    // 家务挣积分(2026-08-01 用户:「家务也挣积分」)。判据和幂等都在
+    // earnChorePoints 里 —— 两个调用点(这儿 + 今天页的家务条)各写一份必然漂移。
+    void awardChorePoints(familyId, instanceId, dict === 'en' ? 'en' : 'zh');
     void load();
   }
 

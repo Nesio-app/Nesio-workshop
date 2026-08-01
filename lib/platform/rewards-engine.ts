@@ -10,12 +10,18 @@
  *   - storage-ios「大后方」积分系统(igDecline +price PTS / redeemReward / breath +20)
  *   - adhd-flow-ios 褒奖兑换(reward shop:pts 成本 + redeemed + streak combo)
  *
- * 纯本地(localStorage `nesio-rewards-v1`),不调 AI、不上传。
+ * 存 localStorage `nesio-rewards-v1`,不调 AI。
+ *
+ * ⚠️ 别信下面这句的旧版本:它原来写着「不上传」——**那是过时的**。
+ * 这个 key 是 durable、非 dedicated,早就走通用 cloud-module-sync 上云了
+ * (见 scripts/sync-ownership.test.mjs:「普通 durable 数据 → 默认走通用同步」)。
+ * 2026-08-01 用户以为愿望清单还在本机,正是被这句注释误导的。
+ * 通用同步是「加功能零同步代码」的默认路 —— 新模块什么都不写就已经在同步了。
  */
 
 import { reportStorageDropped } from '@/lib/portal/storage-health';
 
-export type PointsSource = 'freeze_decline' | 'fitness' | 'project' | 'breath' | 'healing' | 'manual' | 'redeem';
+export type PointsSource = 'freeze_decline' | 'fitness' | 'project' | 'breath' | 'healing' | 'manual' | 'redeem' | 'chore';
 
 export interface PointsEntry {
   id: string;
@@ -23,6 +29,12 @@ export interface PointsEntry {
   delta: number;    // + 赚 / - 花
   label: string;    // 已本地化的一句说明(存时就定好语言)
   source: PointsSource;
+  /**
+   * 这一笔是**哪一件事**挣的(2026-08-01,家务接进积分)。
+   * 用来去重:同一条家务反复刷新/两个页面各点一次,不能给两次分。
+   * 只有需要幂等的来源才填 —— 训练打卡那类每次都是新的一次,不需要。
+   */
+  sourceId?: string;
 }
 
 export interface RewardItem {
@@ -106,13 +118,68 @@ function newId(prefix: string): string {
   return `${prefix}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
-/** 记一笔积分变动(delta 正为赚、负为花)。 */
-export function earnPoints(delta: number, source: PointsSource, label: string): RewardsState {
+/**
+ * 记一笔积分变动(delta 正为赚、负为花)。
+ *
+ * `sourceId` 给的话就**幂等**:同一个 (source, sourceId) 已经记过就原样返回,
+ * 不再加第二次。家务这条路上必须有它 —— 同一件家务在今天页和家庭板上
+ * 各有一个「完成」按钮,而刷新之后 board 还会把它带回来。
+ * 没有 sourceId 的来源(训练打卡、呼吸练习)每次都是新的一次,照旧累加。
+ */
+export function earnPoints(delta: number, source: PointsSource, label: string, sourceId?: string): RewardsState {
   const s = loadRewards();
+  if (sourceId && s.ledger.some((e) => e.source === source && e.sourceId === sourceId)) {
+    return s;   // 这一件已经给过分了
+  }
   s.points = Math.max(0, s.points + delta);
-  s.ledger.unshift({ id: newId('pe'), ts: new Date().toISOString(), delta, label, source });
+  s.ledger.unshift({
+    id: newId('pe'), ts: new Date().toISOString(), delta, label, source,
+    ...(sourceId ? { sourceId } : {}),
+  });
   s.ledger = s.ledger.slice(0, LEDGER_CAP);
   return save(s);
+}
+
+/**
+ * 一件家务挣多少积分(2026-08-01 用户:「这两个合并,家务也挣积分」)。
+ *
+ * 家务本身带的是**金额**(ChoreInstance.value,家庭板按钱记账)。
+ * 1 元 = 1 积分 —— 和愿望的定价口径一致(WISH_COST_RATIO 那句「1 积分 ≈ 1 元」),
+ * 所以「做够这些家务就能换那个东西」在心里是直接对得上的。
+ *
+ * 金额是 0 的家务(不带钱、纯分工的那种)仍然给一份底分 ——
+ * 做完一件事却什么都没发生,下次就不会有人点那个「完成」了。
+ */
+export const POINTS_PER_UNPAID_CHORE = 5;
+
+export function chorePointValue(value: number): number {
+  const v = Number(value);
+  if (!Number.isFinite(v) || v <= 0) return POINTS_PER_UNPAID_CHORE;
+  return Math.max(1, Math.round(v));
+}
+
+/**
+ * 家务完成 → 记积分。**幂等**(同一条 instance 只给一次)。
+ *
+ * 什么时候算「挣到」:
+ *   · 要审核的 → 批准之后(state 'approved'/'paid')。做完还没批就给分,
+ *     等于绕开了审核这件事本身;
+ *   · 不要审核的 → 点完成就给(state 'done' 起)。
+ * 判据放在这儿一处 —— 两个调用点(今天页的家务条、家庭板)各写一份必然漂移。
+ */
+export function earnChorePoints(
+  chore: { id: string; title?: string; value: number; state: string; needsApproval?: boolean },
+  locale: 'zh' | 'en' = 'zh',
+): RewardsState | null {
+  const st = String(chore.state || '');
+  const settled = chore.needsApproval
+    ? (st === 'approved' || st === 'paid')
+    : (st === 'done' || st === 'approved' || st === 'paid');
+  if (!settled) return null;
+  const pts = chorePointValue(chore.value);
+  const name = (chore.title || '').trim() || (locale === 'en' ? 'a chore' : '一件家务');
+  const label = locale === 'en' ? `Chore done: ${name}` : `家务完成:${name}`;
+  return earnPoints(pts, 'chore', label, chore.id);
 }
 
 /** 忍住没买的东西 → 落进奖品仓库当愿望(成本 = 原价)。返回新愿望;重复 url 不重复加。 */

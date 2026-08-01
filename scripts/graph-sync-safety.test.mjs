@@ -110,7 +110,16 @@ check('① 离线删除后拉云:被删的那条不复活', () => {
   const ids = graph.getLifeGraph().map((n) => n.id);
   assert.ok(!ids.includes(gone.id), '已删的节点被云快照复活了 —— 这正是要修的丢数据路径');
   assert.ok(ids.includes(keep.id), '没删的节点不该被误伤');
-  assert.strictEqual(merged.importedNodeCount, 1, '报数要诚实:挡下的那条不算已导入');
+  /*
+   * 报数要诚实。2026-08-01 计数语义分成了三个(用户:「点了同步,总显示 1000,
+   * 不知道数字,数据是否准确」——原来那一个数报的是云端总条数,
+   * 而界面上写的是「这台设备还没有的」)。这里两个数一起钉,比原来只钉一个更严:
+   *   · cloudNodeCount:云端给了 2 条,被删除意图挡下 1 条 → 1。**挡下的不算**,
+   *     这条保护和改之前是同一件事;
+   *   · importedNodeCount:keep 本地本来就有 → 0 条是「新取回的」。
+   */
+  assert.strictEqual(merged.cloudNodeCount, 1, '报数要诚实:被删除意图挡下的那条不计入');
+  assert.strictEqual(merged.importedNodeCount, 0, 'keep 本地已有,不算「取回了这台设备还没有的」');
 });
 
 // ── ② 没有挂起 delete 时,同步照常工作(别把同步整个挡死)────────────────
