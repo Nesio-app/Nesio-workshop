@@ -26,6 +26,10 @@ let inFlight = false;
 export interface CloudMemorySyncResult {
   ok: boolean;
   importedNodeCount: number;
+  /** 本地已有、被云端那份更新过的条数。 */
+  updatedNodeCount?: number;
+  /** 云端这次一共给了多少条 —— 和「取回了几条新的」不是一回事。 */
+  cloudNodeCount?: number;
 }
 
 /**
@@ -48,7 +52,12 @@ export async function syncMemoryWithCloud(opts: { force?: boolean } = {}): Promi
     // 顺带把本地新记忆推上云 + 重试挂起项,让「拉」的同时也「推」,两端逐步收敛。
     void retryLifeGraphCloudSync();
     void backfillLocalLifeGraphToCloud({ limit: 200 });
-    return { ok: true, importedNodeCount: merged.importedNodeCount };
+    return {
+      ok: true,
+      importedNodeCount: merged.importedNodeCount,
+      updatedNodeCount: merged.updatedNodeCount,
+      cloudNodeCount: merged.cloudNodeCount,
+    };
   } catch (err) {
     logDropped('cloud.memory_sync', err); // 可观测:整条记忆同步失败别哑吞(196-205 静默丢的教训)
     return { ok: false, importedNodeCount: 0 };

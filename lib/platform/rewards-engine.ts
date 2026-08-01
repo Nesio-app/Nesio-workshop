@@ -10,7 +10,13 @@
  *   - storage-ios「大后方」积分系统(igDecline +price PTS / redeemReward / breath +20)
  *   - adhd-flow-ios 褒奖兑换(reward shop:pts 成本 + redeemed + streak combo)
  *
- * 纯本地(localStorage `nesio-rewards-v1`),不调 AI、不上传。
+ * 存 localStorage `nesio-rewards-v1`,不调 AI。
+ *
+ * ⚠️ 别信下面这句的旧版本:它原来写着「不上传」——**那是过时的**。
+ * 这个 key 是 durable、非 dedicated,早就走通用 cloud-module-sync 上云了
+ * (见 scripts/sync-ownership.test.mjs:「普通 durable 数据 → 默认走通用同步」)。
+ * 2026-08-01 用户以为愿望清单还在本机,正是被这句注释误导的。
+ * 通用同步是「加功能零同步代码」的默认路 —— 新模块什么都不写就已经在同步了。
  */
 
 import { reportStorageDropped } from '@/lib/portal/storage-health';

@@ -966,10 +966,17 @@ function mergeLifeNodeAssets(existing: LifeNodeAsset[] = [], incoming: LifeNodeA
 }
 
 export function mergeCloudMemorySnapshot(snapshot: { nodes?: unknown[]; assets?: unknown[] }): {
+  /** 这台设备**原本没有**的那些。界面上「取回 N 条」问的就是这个数。 */
   importedNodeCount: number;
+  /** 本地已有、云端那份更新 → 被合并覆盖过的。 */
+  updatedNodeCount: number;
+  /** 云端这次一共给了多少条(扣掉被删除意图挡下的)。和上面两个不是一回事。 */
+  cloudNodeCount: number;
   importedAssetCount: number;
 } {
-  if (typeof window === 'undefined') return { importedNodeCount: 0, importedAssetCount: 0 };
+  if (typeof window === 'undefined') {
+    return { importedNodeCount: 0, updatedNodeCount: 0, cloudNodeCount: 0, importedAssetCount: 0 };
+  }
 
   const incomingNodes = Array.isArray(snapshot.nodes)
     ? snapshot.nodes.map(normalizeNode).filter((node): node is LifeNode => Boolean(node))
@@ -1012,9 +1019,24 @@ export function mergeCloudMemorySnapshot(snapshot: { nodes?: unknown[]; assets?:
   // 陈旧云快照会盖掉本地更新的编辑 → 丢数据。改为按 attributes.updatedAt(数据审计#3 的
   // 编辑时刻,退化 createdAt)取新者的标量字段,较旧一侧独有字段仍保留;资产两侧永远并集。
   let skippedDeletedCount = 0;
+  /*
+   * 「新到的」和「本来就有的」要分开数(2026-08-01,用户:「点了同步,总显示 1000,
+   * 不知道数字,数据是否准确」)。
+   *
+   * 这里原来一个数都没分:importedNodeCount = incomingNodes.length - skippedDeletedCount,
+   * 也就是**云端快照里的全部条数** —— 而设置页那行字写的是「从云端取回 N 条
+   * 这台设备还没有的记忆」。两件事。于是每次点同步都看到同一个大数,
+   * 因为它根本不是增量,它是「云端一共给了多少」。
+   *
+   * 数字本身没错(云端确实给了那么多),错的是它在回答另一个问题。
+   */
+  let newNodeCount = 0;
+  let updatedNodeCount = 0;
   for (const incomingNode of incomingNodes) {
     if (pendingDeleteIds.has(incomingNode.id)) { skippedDeletedCount += 1; continue; } // 见上:删除意图优先
     const localNode = nodesById.get(incomingNode.id);
+    if (!localNode) newNodeCount += 1;
+    else if (JSON.stringify(localNode) !== JSON.stringify(incomingNode)) updatedNodeCount += 1;
     const mergedAssets = mergeLifeNodeAssets(
       mergeLifeNodeAssets(localNode?.assets, incomingNode.assets),
       incomingAssetsByNodeId.get(incomingNode.id),
@@ -1034,11 +1056,18 @@ export function mergeCloudMemorySnapshot(snapshot: { nodes?: unknown[]; assets?:
   saveAll(mergedNodes);
   // 报数要诚实:被删除意图挡下的那些没有合进来,不能算「已导入」
   //(否则「已恢复 N 条」会比实际多,用户对不上数)。
-  const importedNodeCount = incomingNodes.length - skippedDeletedCount;
+  // importedNodeCount **只数这台设备原本没有的** —— 界面上那句话问的就是这个。
+  // 云端一共给了多少(cloudNodeCount)另算,它回答的是别的问题。
+  const importedNodeCount = newNodeCount;
   window.dispatchEvent(new CustomEvent('nesio-life-graph-cloud-hydrated', {
-    detail: { importedNodeCount, importedAssetCount: incomingAssets.length },
+    detail: { importedNodeCount, updatedNodeCount, importedAssetCount: incomingAssets.length },
   }));
-  return { importedNodeCount, importedAssetCount: incomingAssets.length };
+  return {
+    importedNodeCount,
+    updatedNodeCount,
+    cloudNodeCount: incomingNodes.length - skippedDeletedCount,
+    importedAssetCount: incomingAssets.length,
+  };
 }
 
 export async function backfillLocalLifeGraphToCloud({ limit = 200, ids }: { limit?: number; ids?: string[] } = {}): Promise<{
