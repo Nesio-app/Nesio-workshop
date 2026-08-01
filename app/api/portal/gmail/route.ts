@@ -19,6 +19,7 @@ import { envValue } from '@/lib/portal/env';
 import { hasVerifiedSessionCookie } from '@/lib/portal/api-auth';
 import { readServerTier } from '@/lib/portal/auth/server-entitlement';
 import { reportAiCall } from '@/lib/portal/ai-telemetry';
+import { mailDirectionOf, emailAddrOf as emailAddrOfShared } from '@/lib/portal/mail-direction';
 
 export const dynamic = 'force-dynamic';
 // 全量同步 = 1 次列表 + 最多 100 封 full 拉取 + 一发大 prompt AI 提取,30s 顶得很紧;
@@ -151,35 +152,18 @@ function header(msg: GmailMessage, name: string): string {
   return msg.payload?.headers?.find((h) => h.name.toLowerCase() === name.toLowerCase())?.value || '';
 }
 
-/** 从 From 头(「名字 <a@b.com>」或裸地址)抠出邮箱地址(小写),作分类归并的稳定键。 */
-function emailAddrOf(s: string): string {
-  const m = /<([^>]+)>/.exec(s) || /([^\s<>@]+@[^\s<>@]+)/.exec(s);
-  return (m ? m[1] : '').trim().toLowerCase();
-}
+/** 从 From 头抠出邮箱地址(小写),作分类归并的稳定键。实现在 mail-direction —— 那边也要用,不写两份。 */
+const emailAddrOf = emailAddrOfShared;
 
-/**
- * 这封是我发的还是收到的(2026-07-30 用户:「目前邮件是只有收件,没有发件箱」)。
- *
- * 其实**一直在同步** —— messages.list 不带 labelIds 时返回除 SPAM/TRASH 外的全部邮件,
- * 已发送的那些早就进来了。缺的不是数据,是**方向**这个字段:节点上从没记过,
- * 于是日程页只能拿发件人猜,而自己发的邮件发件人就是自己 —— 混在收件里认不出来。
- * SENT 是 Gmail 自己打的标签,直接用,不猜。
- */
 function mailDirection(msg: GmailMessage): 'sent' | 'received' {
-  const labels = msg.labelIds || [];
-  /*
-   * 2026-07-31 更正(用户实测:「这个被放进发件箱是错误的」——一封「Your Day Ahead」
-   * 每日简报,发给 hanbing6228@gmail.com,也就是他自己)。
-   *
-   * 上一版只看 SENT。但**自己发给自己**的邮件,Gmail 会同时打 SENT 和 INBOX ——
-   * 每日简报、从别处转存给自己的资料、各种 self-note 都属这一类。
-   * 于是它们全被归进「发件」,而用户对它们的认知是「我要读的东西」,不是「我写的东西」。
-   *
-   * 真正「我写给别人的」只有 SENT、没有 INBOX(Gmail 不会把你发出去的信放进你的收件箱)。
-   * 所以判据是 SENT ∧ ¬INBOX —— 这一条精确地就是那个集合。
-   * labelIds 是 per-message 的,线程里你的那条回复不带 INBOX,不会被误判。
-   */
-  return labels.includes('SENT') && !labels.includes('INBOX') ? 'sent' : 'received';
+  // 判据本体在 lib/portal/mail-direction —— 读取侧(SchedulePanel)要用同一份。
+  // 两处各写一份的下场这条已经演过一遍:同步侧改对了、读取侧照旧,用户看到的还是原样。
+  return mailDirectionOf({
+    labels: msg.labelIds || [],
+    from: header(msg, 'from'),
+    to: header(msg, 'to'),
+    cc: header(msg, 'cc'),
+  });
 }
 
 /**
@@ -293,7 +277,9 @@ async function fetchMessages(accessToken: string, max = 50, metadataOnly = true,
   const messages = await Promise.all(
     ids.slice(0, max).map(async ({ id }) => {
       const res = await fetch(
-        `${GMAIL_API}/users/me/messages/${id}?format=${metadataOnly ? 'metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date' : 'full'}`,
+        // To/Cc 也要请求:mailDirection 靠「收件人里除了我还有没有别人」判自寄信,
+        // 拿不到收件人就只能退回旧判据(而旧判据漏掉归档过的自寄信)。
+        `${GMAIL_API}/users/me/messages/${id}?format=${metadataOnly ? 'metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Cc&metadataHeaders=Date' : 'full'}`,
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       if (!res.ok) return null;

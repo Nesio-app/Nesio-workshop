@@ -150,6 +150,14 @@
    * 1rem 而不是原来的 1.1rem —— 回到 4px 网格(差 1.6px,看不出来)。
    */
   --page-gutter: var(--space-4);
+  /*
+   * 弹出层(底部抽屉/详情卡)的左右留边。**比 --page-gutter 宽一档**,这不是随手加的:
+   * 页面上的字外面还裹着一层卡片(卡自己有内边距),所以 16px 的版心看着是够的;
+   * 而弹出层是通栏的,内容直接贴着那 16px —— 视觉上就窄了一截。
+   * 2026-08-01 用户:「记忆详情页这样的弹出页面的排版还是很靠边」。
+   * 和 --page-gutter 一样:非颜色 token,不跟着换肤(见 skin-and-locale 的 NON_COLOR)。
+   */
+  --sheet-gutter: var(--space-6);
   --ease-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-fast: 0.2s;
@@ -5866,7 +5874,11 @@ html[data-portal-theme="night"] .nesio-tell-fan-icon {
   background: var(--glass-bg-pop);
   border-top-left-radius: 1.5rem;
   border-top-right-radius: 1.5rem;
-  padding: 0 1.25rem calc(2.5rem + env(safe-area-inset-bottom));
+  /* 2026-08-01(用户:「记忆详情页这样的弹出页面的排版还是很靠边」):
+     原来是写死的 1.25rem,而且横向没吃 safe-area(横屏/刘海屏那一侧会被切)。
+     统一走 --sheet-gutter —— 弹出层是通栏的,内容外面没有卡片那一层,
+     所以比页面版心宽一档。 */
+  padding: 0 max(var(--sheet-gutter), env(safe-area-inset-right, 0px)) calc(2.5rem + env(safe-area-inset-bottom)) max(var(--sheet-gutter), env(safe-area-inset-left, 0px));
   box-shadow: 0 -8px 40px rgba(0,0,0,0.15);
   animation: sheetSlideUp 0.28s var(--ease-out);
 }
@@ -20509,7 +20521,7 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 
 /* ── 引导卡详情(2026-07-30:任何卡都点得开「它凭什么出现」)────────────────── */
 .nesio-cardetail {
-  padding: var(--space-4) var(--space-4) calc(var(--space-6) + env(safe-area-inset-bottom, 0px));
+  padding: var(--space-4) max(var(--sheet-gutter), env(safe-area-inset-right, 0px)) calc(var(--space-6) + env(safe-area-inset-bottom, 0px)) max(var(--sheet-gutter), env(safe-area-inset-left, 0px));
   display: flex;
   flex-direction: column;
   gap: var(--space-2);

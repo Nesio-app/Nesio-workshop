@@ -72,8 +72,15 @@ assert.ok(/cls\??\.important[\s\S]{0,60}'重要'/.test(src), 'AI 节点:importan
 assert.ok(/mailCategory: cls\.category/.test(src), 'AI 节点写 mailCategory 属性');
 
 // 纯函数:emailAddrOf + mailClassBySender
+// emailAddrOf 2026-08-01 搬到 lib/portal/mail-direction(方向判据也要用它,不写两份)——
+// 它自己的行为压在 scripts/mail-direction.test.mjs。这里把那一份注进沙盒,
+// 好让 mailClassBySender 能跑起来。
+const mdSrc = fs.readFileSync(new URL('../lib/portal/mail-direction.ts', import.meta.url), 'utf8');
+const mdJs = ts.transpileModule(mdSrc, { compilerOptions: { module: ts.ModuleKind.ES2022, target: ts.ScriptTarget.ES2022 } }).outputText;
+const addrFn = mdJs.match(/function emailAddrOf\b[\s\S]*?\n\}/m);
+assert.ok(addrFn, 'mail-direction 里应当有 emailAddrOf —— 判据搬家了,这里跟着取');
 vm.runInContext(
-  [grab('header'), grab('emailAddrOf'), grab('mailClassBySender'),
+  [addrFn[0], grab('header'), grab('mailClassBySender'),
     'globalThis.__y = { emailAddrOf, mailClassBySender };'].join('\n'),
   sandbox,
 );
@@ -96,30 +103,20 @@ assert.equal(emailAddrOf('no email here'), '', '无地址返回空');
   assert.equal(ann.important, false, '普通发件人 → 非 important');
 }
 
-// ── 发件 / 收件:自己发给自己的算收件 ──────────────────────────────────────
+// ── 发件 / 收件 ────────────────────────────────────────────────────────────
 //
-// 用户实测(2026-07-31):一封「Your Day Ahead」每日简报、收件人是他自己,
-// 被归进了「发件」。上一版只看 SENT —— 而**自己发给自己**的邮件 Gmail 会同时打
-// SENT 和 INBOX(每日简报、转存给自己的资料、self-note 都属这一类)。
-// 用户对它们的认知是「我要读的」,不是「我写的」。
-//
-// 真正「我写给别人的」只有 SENT、没有 INBOX(Gmail 不把你发出去的信放进你的收件箱),
-// 所以判据是 SENT ∧ ¬INBOX —— 精确地就是那个集合。
+// 判据本体 2026-08-01 搬到 lib/portal/mail-direction —— 读取侧(SchedulePanel)
+// 要用同一份来纠正同步时写死的历史方向。行为(含「归档过的自寄信」这个把判据
+// 打回两次的 case)压在 scripts/mail-direction.test.mjs,那边真跑。
+// 这里只钉住这个路由确实把该给的都喂了进去,不重复压同一件事。
 {
-  assert.ok(
-    /labels\.includes\('SENT'\) && !labels\.includes\('INBOX'\)/.test(src),
-    '发件判据必须是 SENT ∧ ¬INBOX —— 只看 SENT 会把「自己发给自己」的信归进发件箱',
-  );
-  // 把这个函数抽出来直测,别只压源码形状。
-  const m = /function mailDirection\(msg: GmailMessage\): 'sent' \| 'received' \{[\s\S]*?\n\}/.exec(src);
-  assert.ok(m, 'mailDirection 不见了');
-  const js = m[0].replace(/: GmailMessage/, '').replace(/: 'sent' \| 'received'/, '');
-  const fn = vm.runInNewContext(`(${js.replace(/^function mailDirection/, 'function')})`, {});
-  assert.equal(fn({ labelIds: ['SENT'] }), 'sent', '只有 SENT = 我写给别人的');
-  assert.equal(fn({ labelIds: ['SENT', 'INBOX'] }), 'received', '自己发给自己(SENT+INBOX)= 我要读的,算收件');
-  assert.equal(fn({ labelIds: ['INBOX'] }), 'received');
-  assert.equal(fn({ labelIds: [] }), 'received', '什么标签都没有时不许猜成发件');
-  assert.equal(fn({}), 'received', 'labelIds 缺失不许抛');
+  assert.ok(/mailDirectionOf\(\{/.test(src), '方向要走共享判据,不许在路由里再写一份');
+  for (const field of ['labels: msg.labelIds', "from: header(msg, 'from')", "to: header(msg, 'to')", "cc: header(msg, 'cc')"]) {
+    assert.ok(src.includes(field), `方向判据缺了输入:${field} —— 少喂一个,判据就退回「不知道收件人」那条兜底路径`);
+  }
+  // metadata 模式下必须请求 To/Cc,否则上面那两个 header() 永远是空串
+  assert.ok(/metadataHeaders=To/.test(src) && /metadataHeaders=Cc/.test(src),
+    'metadata 模式要请求 To/Cc —— 不请求的话判据拿不到收件人,自寄信照样滑进发件箱');
 }
 
-console.log('gmail-labels: OK(含发件判据:自己发给自己算收件)');
+console.log('gmail-labels: OK(标签归一 / 正文回退 / 发件人分类 / 方向判据输入齐全)');
