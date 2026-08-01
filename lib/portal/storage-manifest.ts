@@ -82,6 +82,9 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-cloud-backup-last-v1',           // cloud-backup 上次推送标记
   'nesio-backup-first-sync-done-v1',      // legacy 首次同步标志
   // 单设备草稿/测试位 —— 云同步会让它们「删了又复活」(QA:草稿乱码清不掉、测试 Pro 位跨设备扩散)
+  // 「今天看没看过简报」的日键。cache —— 这是这台机器上的 UI 状态,
+  // 不是用户数据;换台设备第一次打开时重新提示一遍,正是对的行为。
+  'nesio-daily-brief-seen-v1',
   'nesio-jot-draft-v1',                   // 速记草稿:本机暂存,别跨设备回灌
   'nesio-pro-entitlement-v1',             // Lab 测试 Pro 覆盖位:绝不该同步到真设备
   // AI 判决层(2026-07-29 硬拆后新增)。三个都是**按设备**的簿记,不是用户数据:
