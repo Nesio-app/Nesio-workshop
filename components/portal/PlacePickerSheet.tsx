@@ -114,9 +114,9 @@ export default function PlacePickerSheet({ raw, lat, lon, onClose, onRenamed }: 
             <option key={k} value={k}>{L(dict, meta.zh, meta.en)}</option>
           ))}
         </select>
-        <p className="nesio-memmap-list-title" style={{ marginTop: '0.7rem' }}>{L(dict, '附近的地方', 'Places nearby')}{loading ? ' …' : ''}</p>
+        <p className="nesio-memmap-list-title" style={{ marginTop: 'var(--space-3)' }}>{L(dict, '附近的地方', 'Places nearby')}{loading ? ' …' : ''}</p>
         {!loading && diagHint(diag) && (
-          <p className="nesio-settings-option-hint" style={{ color: diag.startsWith('err_') || diag === 'off' ? 'var(--status-gentle)' : 'var(--portal-muted)', margin: '0 0 0.3rem' }}>
+          <p className="nesio-settings-option-hint" style={{ color: diag.startsWith('err_') || diag === 'off' ? 'var(--status-gentle)' : 'var(--portal-muted)', margin: '0 0 var(--space-1)' }}>
             {diagHint(diag)}
           </p>
         )}

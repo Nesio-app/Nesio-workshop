@@ -74,7 +74,7 @@ export default function MetricDetailSheet({
           <p className="nesio-insights-empty">{t('这个指标还没有记录。', 'No readings for this metric yet.')}</p>
         ) : (
           <>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem' }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 'var(--space-2)' }}>
               <span style={{ fontSize: 'var(--text-h2, 1.5rem)', fontWeight: 'var(--weight-bold, 700)', color: off ? 'var(--status-gentle)' : 'var(--portal-ink)' }}>
                 {last.value}
               </span>
@@ -84,22 +84,22 @@ export default function MetricDetailSheet({
               )}
             </div>
 
-            <div style={{ marginTop: '0.6rem' }}>
+            <div style={{ marginTop: 'var(--space-2)' }}>
               <LabCurve points={points} unit={unit} meds={meds} height={150} />
             </div>
 
-            <p className="nesio-settings-option-hint" style={{ margin: '0.4rem 0 0' }}>
+            <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-2) 0 0' }}>
               {meds.length > 0
                 ? t('绿色带是参考区间;竖虚线是开始吃药的日子。', 'Green band = reference range; dashed lines = when a medication started.')
                 : t('绿色带是参考区间。记下在用药的起始日,这里就会画出竖虚线。', 'Green band = reference range. Log a medication start date to see it marked here.')}
             </p>
 
-            <p className="nesio-rel-rec-sub" style={{ display: 'block', marginTop: '0.3rem' }}>
+            <p className="nesio-rel-rec-sub" style={{ display: 'block', marginTop: 'var(--space-1)' }}>
               {t(`${points.length} 次记录 · ${points[0].date} 起`, `${points.length} readings · since ${points[0].date}`)}
             </p>
 
             {/* 全部读数,新的在前 */}
-            <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{t('每次读数', 'Readings')}</p>
+            <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-4)' }}>{t('每次读数', 'Readings')}</p>
             <div className="nesio-rel-rec-list">
               {[...points].reverse().map((p, i) => (
                 <div key={i} className="nesio-rel-rec-row">
@@ -115,7 +115,7 @@ export default function MetricDetailSheet({
 
             {alongside.length > 0 && (
               <>
-                <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{t('同期发生', 'Around the same time')}</p>
+                <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-4)' }}>{t('同期发生', 'Around the same time')}</p>
                 <div className="nesio-rel-timeline">
                   {alongside.map((e) => (
                     <div key={e.id} className="nesio-rel-tl-row">
@@ -124,7 +124,7 @@ export default function MetricDetailSheet({
                     </div>
                   ))}
                 </div>
-                <p className="nesio-settings-option-hint" style={{ margin: '0.35rem 0 0' }}>
+                <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>
                   {t('只按时间对齐,不代表互为因果。', 'Aligned by time only — not a causal claim.')}
                 </p>
               </>
@@ -132,7 +132,7 @@ export default function MetricDetailSheet({
           </>
         )}
 
-        <p className="nesio-settings-option-hint" style={{ marginTop: '1rem', textAlign: 'center' }}>
+        <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-4)', textAlign: 'center' }}>
           {t('健康信息参考,不作诊断 · 仅本机', 'For reference, not a diagnosis · on this device')}
         </p>
       </div>

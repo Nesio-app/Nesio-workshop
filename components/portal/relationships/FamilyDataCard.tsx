@@ -50,26 +50,26 @@ export default function FamilyDataCard({ kind }: { kind: 'health' | 'spend' }) {
     : L(dict, '家人消费', 'Family spending');
 
   return (
-    <div className="nesio-fit-panel" style={{ marginTop: '0.6rem' }}>
+    <div className="nesio-fit-panel" style={{ marginTop: 'var(--space-2)' }}>
       <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{title}</p>
       <div className="nesio-fam-members">
         {members.map((m) => (
           <button key={m.key} type="button" className="nesio-fam-chip" onClick={() => setOpenKey(m.key)}>
             <span className="nesio-fam-chip-name">{m.name}</span>
             <span className="nesio-fam-chip-cats">
-              {cats.map((c) => (m.counts[c] ? <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}><RecordCatIcon category={c} size={12} />{m.counts[c]}</span> : null))}
+              {cats.map((c) => (m.counts[c] ? <span key={c} style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}><RecordCatIcon category={c} size={12} />{m.counts[c]}</span> : null))}
             </span>
           </button>
         ))}
       </div>
       {recent.length > 0 && (
-        <div className="nesio-rel-timeline" style={{ marginTop: '0.5rem' }}>
+        <div className="nesio-rel-timeline" style={{ marginTop: 'var(--space-2)' }}>
           {recent.map((item) => {
             const d = item.record.date || item.record.createdAt;
             return (
               <button key={item.record.id} type="button" className="nesio-fam-tl-row" onClick={() => setOpenKey(item.personKey)}>
                 <span className="nesio-rel-tl-date">{new Date(d).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' })}</span>
-                <span className="nesio-rel-tl-text" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                <span className="nesio-rel-tl-text" style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}>
                   <RecordCatIcon category={item.record.category} size={13} /> <b>{item.personName}</b> · {item.record.title}{typeof item.record.amount === 'number' ? ` · ${item.record.amount}` : ''}
                 </span>
               </button>
@@ -77,7 +77,7 @@ export default function FamilyDataCard({ kind }: { kind: 'health' | 'spend' }) {
           })}
         </div>
       )}
-      <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>
+      <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>
         {L(dict, '点进去看 / 加(拍一张也行)· 仅你可见', 'Tap to view or add (photo works too) · only you')}
       </p>
       {openKey && <RelationshipDetailSheet contactKey={openKey} onClose={() => setOpenKey(null)} />}

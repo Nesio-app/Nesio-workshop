@@ -32,7 +32,7 @@ export default function FamilySummary({ digest, onOpen }: Props) {
             <span className="nesio-fam-chip-name">{m.name}</span>
             <span className="nesio-fam-chip-cats">
               {Object.entries(m.counts).map(([cat, n]) => (
-                <span key={cat} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.15rem' }}><RecordCatIcon category={cat as PersonRecordCategory} size={12} />{n}</span>
+                <span key={cat} style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}><RecordCatIcon category={cat as PersonRecordCategory} size={12} />{n}</span>
               ))}
             </span>
           </button>
@@ -40,7 +40,7 @@ export default function FamilySummary({ digest, onOpen }: Props) {
       </div>
 
       {digest.recent.length > 0 && (
-        <div className="nesio-rel-timeline" style={{ marginTop: '0.6rem' }}>
+        <div className="nesio-rel-timeline" style={{ marginTop: 'var(--space-2)' }}>
           {digest.recent.map((item) => {
             const d = item.record.date || item.record.createdAt;
             return (
@@ -48,7 +48,7 @@ export default function FamilySummary({ digest, onOpen }: Props) {
                 <span className="nesio-rel-tl-date">
                   {new Date(d).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' })}
                 </span>
-                <span className="nesio-rel-tl-text" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                <span className="nesio-rel-tl-text" style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)' }}>
                   <RecordCatIcon category={item.record.category} size={13} /> <b>{item.personName}</b> · {item.record.title}
                   {typeof item.record.amount === 'number' ? ` · ${item.record.amount}` : ''}
                 </span>

@@ -21,6 +21,7 @@ import {
   type LifeNode,
 } from '@/lib/portal/life-graph';
 import { isTxShadow } from '@/lib/portal/tx-node';
+import { rankRelatedNodes } from '@/lib/portal/related-nodes';
 import { visibleMemoryNodes, isWeatherNode } from '@/lib/portal/memory-visibility';
 import { pinNodeToTodayFocus } from '@/lib/platform/view-models/today-commands';
 import { DOMAINS } from '@/lib/life-domain';
@@ -131,7 +132,7 @@ function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: L
   }
 
   if (objectNodes.length === 0) {
-    return <p className="nesio-insights-empty" style={{ marginTop: '1rem' }}>{L(dict, '暂无物品记录。拍照时选择存放位置，就能在这里看到。', 'No items yet. Pick a storage spot when you snap a photo and it shows up here.')}</p>;
+    return <p className="nesio-insights-empty" style={{ marginTop: 'var(--space-4)' }}>{L(dict, '暂无物品记录。拍照时选择存放位置，就能在这里看到。', 'No items yet. Pick a storage spot when you snap a photo and it shows up here.')}</p>;
   }
 
   const allCount = objectNodes.length;
@@ -305,30 +306,20 @@ function extractKeywords(text: string): string[] {
  *  批量导入的节点只有显式关系才算相关;一个真实信号都没有 → 不显示,不硬凑。 */
 const RELATED_SYSTEM_TAGS = new Set(['联系人', '手动记录', '月报', 'Voice', '手写']);
 
+/**
+ * 找相关记忆。排序逻辑抽到 `lib/portal/related-nodes.ts` —— 那里能真跑测试。
+ *
+ * **显式关联全部排在最前,不截断**;后面才用标签/关键词猜的补到上限。
+ * 合起来之后**不要再截断** —— 那等于把显式关联又挤掉了(反证时踩到过)。
+ */
 function findRelatedNodes(target: LifeNode, allNodes: LifeNode[]): LifeNode[] {
-  const targetWords = extractKeywords(`${target.name} ${target.rawInput || ''}`);
-  const targetTags = new Set((target.tags || []).filter((t) => !RELATED_SYSTEM_TAGS.has(t)));
-  return allNodes
-    .filter((n) => n.id !== target.id && !isWeatherNode(n))
-    .map((node) => {
-      let score = 0;
-      const explicit = Boolean(
-        target.relations?.some((r) => r.targetId === node.id) ||
-        node.relations?.some((r) => r.targetId === target.id),
-      );
-      if (explicit) score += 10;
-      score += (node.tags || []).filter((t) => targetTags.has(t)).length * 3;
-      const nodeWords = extractKeywords(`${node.name} ${node.rawInput || ''}`);
-      score += targetWords.filter((w) => nodeWords.includes(w)).length * 2;
-      if (!explicit && isBulkImported(node)) score = 0;
-      return { node, score };
-    })
-    .filter((s) => s.score >= 2)
-    // 批次 53:同分(循环日历的每一次 Sprint 计划分数一样)按日期升序,读起来是时间线
-    .sort((a, b) => b.score - a.score
-      || String(a.node.attributes?.start ?? a.node.createdAt).localeCompare(String(b.node.attributes?.start ?? b.node.createdAt)))
-    .slice(0, 5)
-    .map((s) => s.node);
+  const { explicit, guessed } = rankRelatedNodes(target, allNodes, {
+    extractKeywords,
+    isExcluded: (n) => isWeatherNode(n as LifeNode),
+    isBulkImported: (n) => isBulkImported(n as LifeNode),
+    systemTags: RELATED_SYSTEM_TAGS,
+  });
+  return [...explicit, ...guessed] as LifeNode[];
 }
 
 function findOnThisDayNodes(nodes: LifeNode[]): LifeNode[] {
@@ -775,7 +766,7 @@ function FavoritesSheet({ pinnedNodes, onClose, onOpenNode, onLongPressNode }: {
           // 标签筛完为空还留一句 —— 那不是教程,是「你筛了但没有」的必要反馈。
           tag ? <p className="nesio-project-detail-empty">{L(dict, '这个标签下还没有收藏', 'Nothing under this tag yet')}</p> : null
         ) : (
-          <div className="nesio-memory-grid" style={{ padding: '0 1rem 1rem' }}>
+          <div className="nesio-memory-grid" style={{ padding: '0 var(--space-4) var(--space-4)' }}>
             {shown.map((n) => (
               <MemoryCard key={n.id} node={n} onOpen={() => onOpenNode(n)} onDeleted={() => {}} onLongPress={onLongPressNode ? () => onLongPressNode(n) : undefined} />
             ))}
@@ -823,7 +814,7 @@ function ProjectsSheet({ projects, allNodes, onClose, onOpenProject, onCreate, o
           <span className="nesio-proj-stat"><b>{archivedCount}</b> {L(dict, '归档', 'Archived')}</span>
         </div>
         {sorted.length > 0 ? (
-          <div className="nesio-memory-grid nesio-fav-expanded" style={{ padding: '0 1rem 0.5rem' }}>
+          <div className="nesio-memory-grid nesio-fav-expanded" style={{ padding: '0 var(--space-4) var(--space-2)' }}>
             {sorted.map((p) => (
               <ProjectCard key={p.id} project={p} allNodes={allNodes} onClick={() => onOpenProject(p)} onSetStatus={(s) => onSetStatus(p.id, s)} />
             ))}
@@ -831,7 +822,7 @@ function ProjectsSheet({ projects, allNodes, onClose, onOpenProject, onCreate, o
         ) : (
           <p className="nesio-project-detail-empty">{L(dict, '还没有项目,创建一个把相关记录聚在一起', 'No projects yet — create one to group related notes')}</p>
         )}
-        <button type="button" className="nesio-mem-jar-create" style={{ margin: '0 1rem 1rem' }} onClick={onCreate}>
+        <button type="button" className="nesio-mem-jar-create" style={{ margin: '0 var(--space-4) var(--space-4)' }} onClick={onCreate}>
           {L(dict, '新建项目', 'New project')}
         </button>
     </NesioSheet>
@@ -880,13 +871,13 @@ function ProjectDetailSheet({
         {nodes.length === 0 ? (
           <p className="nesio-project-detail-empty">{L(dict, '还没有记录。在记忆卡片里长按可以加入项目。', 'Nothing here yet. Long-press a memory card to add it.')}</p>
         ) : (
-          <div className="nesio-memory-grid" style={{ padding: '0 1rem 1rem' }}>
+          <div className="nesio-memory-grid" style={{ padding: '0 var(--space-4) var(--space-4)' }}>
             {nodes.map((n) => (
               <MemoryCard key={n.id} node={n} onOpen={() => onOpenNode(n)} onDeleted={() => {}} onLongPress={onLongPressNode ? () => onLongPressNode(n) : undefined} />
             ))}
           </div>
         )}
-        <div style={{ padding: '0 1rem 1.5rem' }}>
+        <div style={{ padding: '0 var(--space-4) var(--space-6)' }}>
           <button
             type="button"
             className="nesio-project-delete-btn"
@@ -936,7 +927,7 @@ function CreateProjectSheet({
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter' && name.trim()) { onCreate(name.trim(), emoji, status); onClose(); } }}
         />
-        <div className="nesio-proj-card-status" style={{ margin: '0.6rem 0 0.2rem' }}>
+        <div className="nesio-proj-card-status" style={{ margin: 'var(--space-2) 0 var(--space-1)' }}>
           {([['active', '进行中', 'Active'], ['planned', '计划中', 'Planned']] as Array<[ProjectStatus, string, string]>).map(([k, zh, en]) => (
             <button key={k} type="button" className={`nesio-proj-card-statbtn${status === k ? ' nesio-proj-card-statbtn--on' : ''}`} onClick={() => setStatus(k)}>
               {L(dict, zh, en)}
@@ -1257,20 +1248,20 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
       <div className="nesio-memory-root">
         <div className="nesio-memory-scroll" onTouchStart={onPullStart} onTouchEnd={onPullEnd}>
           {pullSync !== 'idle' && (
-            <p className="nesio-settings-option-hint" style={{ textAlign: 'center', margin: '0 0 0.5rem' }}>
+            <p className="nesio-settings-option-hint" style={{ textAlign: 'center', margin: '0 0 var(--space-2)' }}>
               {pullSync === 'syncing'
                 ? L(dict, '正在同步日历 / 邮件 / Flomo / 银行…', 'Syncing calendar / mail / flomo / bank…')
                 : pullSummary}
             </p>
           )}
           {nodes.some(isDemoNode) && (
-            <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 12, padding: '0.55rem 0.9rem', margin: '0 0 0.6rem', fontSize: '0.72rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}>
+            <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 'var(--radius-sm)', padding: 'var(--space-2) var(--space-4)', margin: '0 0 var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', gap: 6 }}>
               <span>{L(dict, '这些是示例数据,让你看看 Nesio 记东西的样子。', 'Sample data to show how Nesio remembers. ')}<a href="/login" style={{ color: 'inherit', fontWeight: 600 }}>{L(dict, '登录', 'Sign in')}</a>{L(dict, '或直接开始记录,就会换成你自己的。', ' or just start noting — it becomes yours.')}</span>
             </div>
           )}
           {/* 登录后灌入的样例数据(可一键清)—— 与游客只读 demo 分家 */}
           {canUsePrivateData && hasSampleData(nodes) && (
-            <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 12, padding: '0.55rem 0.9rem', margin: '0 0 0.6rem', fontSize: '0.72rem', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ background: 'var(--portal-accent-soft, rgba(88,140,227,0.1))', borderRadius: 'var(--radius-sm)', padding: 'var(--space-2) var(--space-4)', margin: '0 0 var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--portal-blue-deep)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
               <span>{L(dict, '这些是样例,帮你先看看各功能的样子。', 'These are samples — a peek at what each feature looks like.')}</span>
               <button
                 type="button"
@@ -1296,7 +1287,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
               aria-label={copy.searchAria}
             />
             {query && (
-              <button type="button" onClick={() => setQuery('')} style={{ color: 'var(--portal-muted)', fontSize: '0.85rem' }} aria-label={copy.clear}>✕</button>
+              <button type="button" onClick={() => setQuery('')} style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-sm)' }} aria-label={copy.clear}>✕</button>
             )}
           </div>
           )}
@@ -1366,7 +1357,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
               {/* Recent memories */}
               {hasNodes && (
                 <>
-                  <div className="nesio-section-header" style={{ marginTop: '0.25rem' }}>
+                  <div className="nesio-section-header" style={{ marginTop: 'var(--space-1)' }}>
                     {/* 批次 112:对齐 mockup —— 「全部记忆 · N 条 · 可搜」 */}
     <span className="nesio-section-title">
                       {L(dict, '全部记忆', 'All memories')}
@@ -1375,7 +1366,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                         ? L(dict, `${visibleNodes.length} / ${nodes.length} 条`, `${visibleNodes.length} / ${nodes.length}`)
                         : L(dict, `${nodes.length} 条 · 可搜`, `${nodes.length} · search`)}</span>
                     </span>
-                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
+                    <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                       {typeFilter && (
                         <button type="button" className="nesio-section-action" onClick={() => setTypeFilter(null)}>
                           {L(dict, '清除筛选', 'Clear filter')}

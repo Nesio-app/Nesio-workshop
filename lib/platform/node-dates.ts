@@ -9,9 +9,34 @@
  */
 
 /** Known date attribute keys, in priority order. */
+/**
+ * 节点上表示时间的键。**按真实在用的来**,不是想象。
+ *
+ * 2026-07-31 修正:原名单里 `due` / `deadline` / `datetime` / `scheduledAt` / `remindAt`
+ * 这五个**在全仓 attributes 里一次都没出现过** —— 当时不确定有哪些名字,就把能想到的都列上了。
+ * 而真在用的 `occurredAt`(2 处)和 `takenAt`(2 处)**反而不在名单里**,只能靠下面
+ * 「扫所有字符串字段猜日期」那层兜住。
+ *
+ * ## 标准名是 `occurredAt`
+ *
+ * 「这件事发生的时候」这一个概念,现在有四个名字:`date` / `occurredAt` / `takenAt`
+ * / `start`(当它不表示区间时)。**新代码一律用 `occurredAt`** —— 语义最准,
+ * `date` 太泛(什么的日期?),`takenAt` 只说得通拍照。
+ *
+ * 存量不动:老数据里的 `date` / `takenAt` 由这份名单继续认。但不许再长第五个名字,
+ * 由 scripts/node-date-keys.test.mjs 守着。
+ */
 export const NODE_DATE_KEYS = [
-  'start', 'end', 'date', 'dueDate', 'due', 'deadline', 'datetime', 'scheduledAt', 'remindAt',
+  // 「事情发生的时候」—— 同一个概念的历史名字,新代码只用 occurredAt
+  'occurredAt', 'date', 'takenAt',
+  // 区间两端(和上面是不同概念,不是重复)
+  'start', 'end',
+  // 截止(不同概念)
+  'dueDate',
 ] as const;
+
+/** 新代码写「事情发生的时候」时该用的键。 */
+export const CANONICAL_OCCURRED_KEY = 'occurredAt';
 
 type AttrBag = Record<string, unknown>;
 

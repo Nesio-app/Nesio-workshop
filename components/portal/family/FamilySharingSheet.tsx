@@ -559,7 +559,29 @@ function LedgerScreen({ familyId, person, me, onChanged, onLeft, dict, t }: {
     const r = await getLedger(familyId, personId);
     if (!r.ok) { setErr(r.error); return; }
     setLedger(r.data.ledger);
-  }, [familyId, personId]);
+
+    // ── 家务月度小结 ────────────────────────────────────────────────────────
+    // monthly-digest 的开机那一趟**故意**不拉这个:账本在服务端,开机时打一个网络
+    // 请求去算一条小结,离线就静默失败 —— 那种「有时有有时没有」的节点比没有更糟。
+    // 所以约定是「等家庭板加载完账本时由它来调」,这里就是那个时刻:数据已经在手上,
+    // 不额外发一次请求,失败了也只是这一次没折。
+    //
+    // 只折**我自己**的账本:小结节点的幂等键是 (类型, 月份),没有人的维度。
+    // 顺手把看到的每个人都折进去的话,「这个月家务干了多少」会变成
+    // 「我最后点开的那个人干了多少」—— 一个看起来对、其实随手一点就变的数字。
+    if (personId !== me.id) return;
+    try {
+      const m = await import('@/lib/portal/monthly-digest');
+      const events = r.data.ledger.approved
+        .map((c) => ({ date: c.approvedAt?.slice(0, 10) ?? c.dueDate, label: choreTitle(c, t) }))
+        .filter((e) => Boolean(e.date));
+      // 只重算最近 3 个月 —— 更早的不会再变(账本是只增的)
+      for (const d of m.foldEventsToDigests('chore', events, new Date()).slice(0, 3)) {
+        m.upsertMonthlyDigest(d);
+      }
+    } catch { /* 折不出来不影响看账本 */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [familyId, personId, me.id]);
 
   useEffect(() => { void load(); }, [load]);
 

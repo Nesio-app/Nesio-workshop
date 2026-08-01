@@ -171,15 +171,15 @@ export default function LoginPageClient() {
         {/* Logo */}
         <div className="nesio-login-logo-row">
           <NesioMark className="nesio-login-logo-img" />
-          <span className="nesio-ob-brand" style={{ fontSize: '1.3rem' }}>Nesio</span>
+          <span className="nesio-ob-brand" style={{ fontSize: 'var(--text-h2)' }}>Nesio</span>
         </div>
 
         {state === 'email_sent' ? (
           <div className="nesio-login-sent">
-            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: '0.75rem', color: 'var(--portal-accent)' }} aria-hidden><IconMail size={38} /></div>
+            <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-3)', color: 'var(--portal-accent)' }} aria-hidden><IconMail size={38} /></div>
             <h2 className="nesio-ob-step-title">{zh ? '查一下邮件' : 'Check your email'}</h2>
             <p className="nesio-ob-step-sub">{zh ? `登录链接已发到 ${email}，点击链接完成登录。` : `A sign-in link was sent to ${email}.`}</p>
-            <a href="/" className="nesio-ob-primary-btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: '1rem' }}>
+            <a href="/" className="nesio-ob-primary-btn" style={{ display: 'block', textAlign: 'center', textDecoration: 'none', marginTop: 'var(--space-4)' }}>
               {zh ? '返回首页' : 'Back to home'}
             </a>
           </div>
@@ -196,16 +196,16 @@ export default function LoginPageClient() {
             </div>
 
             {reason === 'not_registered' && (
-              <p className="nesio-ob-step-sub" style={{ textAlign: 'center', marginBottom: '0.75rem', color: 'var(--status-gentle, #c9923f)' }}>
+              <p className="nesio-ob-step-sub" style={{ textAlign: 'center', marginBottom: 'var(--space-3)', color: 'var(--status-gentle, #c9923f)' }}>
                 {zh ? '这个 Google 账号还没注册过 Nesio。在下面用它「创建账号」即可。' : "This Google account isn't registered with Nesio yet. Use it to create an account below."}
               </p>
             )}
             {reason === 'connect_requires_account' && (
-              <p className="nesio-ob-step-sub" style={{ textAlign: 'center', marginBottom: '0.75rem', color: 'var(--portal-accent, #588ce3)' }}>
+              <p className="nesio-ob-step-sub" style={{ textAlign: 'center', marginBottom: 'var(--space-3)', color: 'var(--portal-accent, #588ce3)' }}>
                 {zh ? '连接邮箱 / 日历 / 银行等私有数据源,需要先登录账号。' : 'Connecting private sources (email, calendar, banks) requires an account.'}
               </p>
             )}
-            <p className="nesio-ob-step-sub" style={{ textAlign: 'center', marginBottom: '1.25rem' }}>
+            <p className="nesio-ob-step-sub" style={{ textAlign: 'center', marginBottom: 'var(--space-5)' }}>
               {tab === 'login'
                 ? (zh ? '登录后，Memory 与 Today Feed 跨设备同步。' : 'Sign in to sync your Memory and Today across devices.')
                 : (zh ? '新用户创建账号。首次 Google 授权或邮件确认后，Nesio 会建立你的账户。' : 'Create a new account. Google or email confirmation creates your Nesio account.')}
@@ -273,7 +273,7 @@ export default function LoginPageClient() {
               type="button"
               onClick={handleEmail}
               disabled={state === 'loading' || !email.trim()}
-              style={{ width: '100%', marginTop: '0.5rem', background: 'none', border: 'none', color: 'var(--portal-muted, #8a94a6)', fontSize: '0.8rem', cursor: 'pointer', textDecoration: 'underline' }}
+              style={{ width: '100%', marginTop: 'var(--space-2)', background: 'none', border: 'none', color: 'var(--portal-muted, #8a94a6)', fontSize: 'var(--text-sm)', cursor: 'pointer', textDecoration: 'underline' }}
             >
               {zh ? (tab === 'register' ? '不设密码,用邮件链接注册' : '忘记密码?用邮件链接登录') : (tab === 'register' ? 'No password — sign up with an email link' : 'Forgot password? Sign in with an email link')}
             </button>
@@ -289,20 +289,20 @@ export default function LoginPageClient() {
             )}
 
             {/* Language */}
-            <div className="nesio-ob-lang-row" style={{ marginTop: '1.25rem' }}>
+            <div className="nesio-ob-lang-row" style={{ marginTop: 'var(--space-5)' }}>
               <button type="button" className={`nesio-ob-lang-btn${zh ? ' nesio-ob-lang-btn--active' : ''}`} onClick={() => { setLocale('zh'); saveProfileSettings({ locale: 'zh' }); }}>简体中文</button>
               <button type="button" className={`nesio-ob-lang-btn${!zh ? ' nesio-ob-lang-btn--active' : ''}`} onClick={() => { setLocale('en'); saveProfileSettings({ locale: 'en' }); }}>English</button>
             </div>
 
-            <a href="/" className="nesio-ob-skip-btn" style={{ display: 'block', textAlign: 'center', marginTop: '0.5rem', textDecoration: 'none' }}>
+            <a href="/" className="nesio-ob-skip-btn" style={{ display: 'block', textAlign: 'center', marginTop: 'var(--space-2)', textDecoration: 'none' }}>
               {zh ? '暂不登录，本地使用' : 'Skip — use locally'}
             </a>
 
-            <p style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.75rem', color: 'var(--portal-muted, #8a94a6)' }}>
+            <p style={{ textAlign: 'center', marginTop: 'var(--space-4)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted, #8a94a6)' }}>
               <a href="/terms" style={{ color: 'inherit' }}>{zh ? '服务条款' : 'Terms'}</a>
-              <span style={{ margin: '0 0.4rem' }}>·</span>
+              <span style={{ margin: '0 var(--space-2)' }}>·</span>
               <a href="/privacy" style={{ color: 'inherit' }}>{zh ? '隐私政策' : 'Privacy Policy'}</a>
-              <span style={{ margin: '0 0.4rem' }}>·</span>
+              <span style={{ margin: '0 var(--space-2)' }}>·</span>
               <a href="/support" style={{ color: 'inherit' }}>{zh ? '支持' : 'Support'}</a>
             </p>
           </>

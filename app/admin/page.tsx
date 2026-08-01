@@ -81,12 +81,12 @@ const PRODUCT_EVENT_LABEL: Record<string, string> = {
 
 const card: React.CSSProperties = {
   background: 'var(--glass-bg-raised)', border: '1px solid var(--glass-border)',
-  borderRadius: 'var(--radius-lg)', padding: '1rem 1.1rem', boxShadow: 'var(--shadow-card)',
+  borderRadius: 'var(--radius-lg)', padding: 'var(--space-4) var(--space-4)', boxShadow: 'var(--shadow-card)',
 };
 const label: React.CSSProperties = { fontSize: '0.7rem', color: 'var(--portal-muted)', letterSpacing: '0.08em' };
 const big: React.CSSProperties = { fontSize: '1.7rem', fontWeight: 700, color: 'var(--portal-ink)' };
 const chip = (active: boolean): React.CSSProperties => ({
-  padding: '0.3rem 0.75rem', borderRadius: 'var(--radius-pill)', fontSize: '0.75rem', cursor: 'pointer',
+  padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-pill)', fontSize: '0.75rem', cursor: 'pointer',
   whiteSpace: 'nowrap',
   border: `1px solid ${active ? 'var(--portal-accent)' : 'var(--glass-border)'}`,
   background: active ? 'var(--portal-accent-soft-md)' : 'var(--glass-bg-solid)',
@@ -172,15 +172,15 @@ export default function AdminPage() {
   const rangeDevices = Math.max(0, ...daily.map((d) => d.devices));
 
   return (
-    <main style={{ maxWidth: 880, margin: '0 auto', padding: '1.2rem 1rem 4rem', fontFamily: 'var(--font-sans)' }}>
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.6rem', marginBottom: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+    <main style={{ maxWidth: 880, margin: '0 auto', padding: 'var(--space-5) var(--space-4) var(--space-16)', fontFamily: 'var(--font-sans)' }}>
+      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-2)', marginBottom: 'var(--space-4)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
           {/* Bug4 图13:这一页原本是条单行道 —— 进来之后既没有返回,也没法退出登录,
               只能靠浏览器后退或手动改地址栏。左边给「回 App」,右边给「退出」。 */}
           <a href="/" style={{ ...chip(false), textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}>‹ 回 App</a>
           <h1 style={{ fontSize: 'var(--text-h2)', color: 'var(--portal-ink)', margin: 0 }}>Nesio 数据面板</h1>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
           {RANGES.map((r) => (
             <button key={r} type="button" style={chip(range === r)} onClick={() => setRange(r)}>{r} 天</button>
           ))}
@@ -213,23 +213,23 @@ export default function AdminPage() {
 
       {/* ── 密钥 / 失败态 ── */}
       {data && !data.ok && (
-        <section style={{ ...card, marginBottom: '1rem' }}>
+        <section style={{ ...card, marginBottom: 'var(--space-4)' }}>
           {data.error === 'admin_secret_required' || data.error === 'forbidden' ? (
             <>
-              <p style={{ margin: '0 0 0.6rem', color: 'var(--portal-ink)' }}>输入管理密钥(NESIO_ADMIN_SECRET),只保存在本机浏览器。</p>
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <p style={{ margin: '0 0 var(--space-2)', color: 'var(--portal-ink)' }}>输入管理密钥(NESIO_ADMIN_SECRET),只保存在本机浏览器。</p>
+              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                 <input
                   type="password" value={secret} onChange={(e) => setSecret(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') void load(secret); }}
                   placeholder="管理密钥"
-                  style={{ flex: 1, padding: '0.55rem 0.8rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)' }}
+                  style={{ flex: 1, padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--glass-border)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)' }}
                 />
                 <button type="button" onClick={() => void load(secret)} disabled={loading || !secret.trim()}
-                  style={{ padding: '0.55rem 1rem', borderRadius: 'var(--radius-sm)', border: 'none', background: 'var(--portal-accent)', color: '#fff', cursor: 'pointer' }}>
+                  style={{ padding: 'var(--space-2) var(--space-4)', borderRadius: 'var(--radius-sm)', border: 'none', background: 'var(--portal-accent)', color: '#fff', cursor: 'pointer' }}>
                   {loading ? '验证中…' : '进入'}
                 </button>
               </div>
-              {saved && <p style={{ ...label, marginTop: '0.5rem' }}>已存的密钥未通过,可能已在服务端更换。</p>}
+              {saved && <p style={{ ...label, marginTop: 'var(--space-2)' }}>已存的密钥未通过,可能已在服务端更换。</p>}
             </>
           ) : data.error === 'admin_not_configured' ? (
             <p style={{ margin: 0, color: 'var(--status-gentle)' }}>面板未激活:{data.hint}</p>
@@ -245,7 +245,7 @@ export default function AdminPage() {
         <>
           {/* ── 数据源健康 ── */}
           {(!data.sources?.telemetryEvents.ok || !data.sources?.productEvents.ok) && (
-            <section style={{ ...card, marginBottom: '1rem', borderColor: 'var(--status-gentle)' }}>
+            <section style={{ ...card, marginBottom: 'var(--space-4)', borderColor: 'var(--status-gentle)' }}>
               {!data.sources?.telemetryEvents.ok && (
                 <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--status-gentle)' }}>
                   telemetry_events 数据源不可用({data.sources?.telemetryEvents.error})
@@ -253,7 +253,7 @@ export default function AdminPage() {
                 </p>
               )}
               {!data.sources?.productEvents.ok && (
-                <p style={{ margin: '0.3rem 0 0', fontSize: '0.8rem', color: 'var(--status-gentle)' }}>
+                <p style={{ margin: 'var(--space-1) 0 0', fontSize: '0.8rem', color: 'var(--status-gentle)' }}>
                   product_events 数据源不可用({data.sources?.productEvents.error})
                   {data.sources?.productEvents.error === 'table_missing' && ' — 需在 Supabase SQL Editor 建表(schema bundle 的 Product events 段)'}
                 </p>
@@ -265,13 +265,13 @@ export default function AdminPage() {
           <AnalystCard secret={typeof window !== 'undefined' ? localStorage.getItem(SECRET_KEY) || '' : ''} />
 
           {/* ── 洞察与建议(规则引擎替你先看一遍) ── */}
-          <section style={{ marginBottom: '0.9rem' }}>
-            <p style={{ ...label, margin: '0 0 0.5rem' }}>洞察与建议</p>
+          <section style={{ marginBottom: 'var(--space-4)' }}>
+            <p style={{ ...label, margin: '0 0 var(--space-2)' }}>洞察与建议</p>
             {data.insights?.map((ins) => <InsightCard key={ins.title} {...ins} />)}
           </section>
 
           {/* ── KPI 行 ── */}
-          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.7rem', marginBottom: '0.9rem' }}>
+          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
             {([
               ['今日事件', data.windows?.today.events, `${data.windows?.today.devices ?? 0} 台设备`, data.deltas?.todayVsYesterday],
               ['7 天事件', data.windows?.week.events, '对比前 7 天', data.deltas?.weekVsPrevWeek],
@@ -279,16 +279,16 @@ export default function AdminPage() {
               ['30 天设备', data.windows?.month.devices, `${data.windows?.month.events ?? 0} 事件`, null],
             ] as const).map(([name, value, sub, delta]) => (
               <div key={name} style={card}>
-                <p style={{ ...label, margin: '0 0 0.3rem' }}>{name}</p>
+                <p style={{ ...label, margin: '0 0 var(--space-1)' }}>{name}</p>
                 <p style={{ ...big, margin: 0 }}>{value ?? 0}<Delta value={delta} /></p>
-                <p style={{ ...label, margin: '0.2rem 0 0' }}>{sub}</p>
+                <p style={{ ...label, margin: 'var(--space-1) 0 0' }}>{sub}</p>
               </div>
             ))}
           </section>
 
           {/* ── 趋势 ── */}
-          <section style={{ ...card, marginBottom: '0.9rem' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+          <section style={{ ...card, marginBottom: 'var(--space-4)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
               {/* Bug4 图17:图例原来是「事件/设备/上一周期」三个内部词,看图的人得先翻译一遍。 */}
               <p style={{ ...label, margin: 0 }}>最近 {range} 天 — 蓝色面积 = 用了多少次 · 绿线 = 多少台设备在用 · 灰虚线 = 上一个 {range} 天</p>
               <span style={label}>{data.generatedAt ? `更新 ${new Date(data.generatedAt).toLocaleTimeString('zh-CN')}` : ''}</span>
@@ -297,22 +297,22 @@ export default function AdminPage() {
           </section>
 
           {/* ── Top 事件 + 漏斗 ── */}
-          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.7rem', marginBottom: '0.9rem' }}>
+          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
             <div style={card}>
-              <p style={{ ...label, margin: '0 0 0.6rem' }}>用得最多的动作(7 天)</p>
+              <p style={{ ...label, margin: '0 0 var(--space-2)' }}>用得最多的动作(7 天)</p>
               {(data.topEvents7d?.length ?? 0) === 0
                 ? <p style={{ ...label }}>暂无数据 — 遥测刚接通,等它累积。</p>
                 : <TopEventsChart data={data.topEvents7d!.map((e) => ({ ...e, name: telemetryLabel(e.name) }))} />}
             </div>
             <div style={card}>
-              <p style={{ ...label, margin: '0 0 0.6rem' }}>一路走到哪一步(30 天,按设备算 · 百分比是「上一步里还剩多少人」)</p>
+              <p style={{ ...label, margin: '0 0 var(--space-2)' }}>一路走到哪一步(30 天,按设备算 · 百分比是「上一步里还剩多少人」)</p>
               {/* Bug4 图17「事件说人话」:漏斗的每一级也是原始事件名,一并过表。 */}
               <FunnelSteps data={(data.funnel30d || []).map((f) => ({ ...f, step: telemetryLabel(f.step) }))} />
             </div>
           </section>
 
           {/* ── 聪明度 + AI 成本 ── */}
-          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.7rem', marginBottom: '0.9rem' }}>
+          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
             <div style={card}>
               {/* #40:总分是五维平均,一个 29 分的维度会被四个正常的抬起来。
                   这块面板是拿来发现问题的 —— 评语和配色都跟**最弱那一维**走,
@@ -340,13 +340,13 @@ export default function AdminPage() {
               {data.smartness && <SmartnessRadar dims={data.smartness.dims} />}
             </div>
             <div style={card}>
-              <p style={{ ...label, margin: '0 0 0.2rem' }}>
+              <p style={{ ...label, margin: '0 0 var(--space-1)' }}>
                 AI 调用与成本(30 天)
                 {data.ai && <span style={{ marginLeft: 8, color: 'var(--portal-ink)' }}>共 {data.ai.totals.calls} 次 · ≈ ${data.ai.totals.estCostUsd}</span>}
               </p>
               {/* Bug4 图18:「量级估算」是一句免责声明,不是信息 —— 直接说清有几成是真价。 */}
               {data.ai && data.ai.totals.calls > 0 && (
-                <p style={{ ...label, margin: '0 0 0.4rem', letterSpacing: 0 }}>
+                <p style={{ ...label, margin: '0 0 var(--space-2)', letterSpacing: 0 }}>
                   其中 {Math.round(((data.ai.totals.measuredCalls ?? 0) / data.ai.totals.calls) * 100)}% 的调用带回了真实 token 价(${data.ai.totals.measuredCostUsd ?? 0}),
                   其余按每路由拍平单价估;带 ≈ 的行含估算成分。延迟只算真报了耗时的调用。
                 </p>
@@ -356,13 +356,13 @@ export default function AdminPage() {
                 : (
                   <div style={{ overflowX: 'auto' }}>
                     <div style={{ minWidth: 420 }}>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.7fr 0.7fr 0.8fr 0.7fr', fontSize: '0.68rem', color: 'var(--portal-muted)', padding: '0 0 0.3rem' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.7fr 0.7fr 0.8fr 0.7fr', fontSize: '0.68rem', color: 'var(--portal-muted)', padding: '0 0 var(--space-1)' }}>
                       <span>路由</span><span>次数</span><span>成功</span><span>延迟</span><span>花费</span>
                     </div>
                     {data.ai!.routes.map((r) => {
                       const allMeasured = (r.measuredCalls ?? 0) >= r.calls;
                       return (
-                      <div key={r.route} style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.7fr 0.7fr 0.8fr 0.7fr', fontSize: '0.76rem', color: 'var(--portal-ink)', padding: '0.22rem 0', borderTop: '1px solid var(--portal-line)' }}>
+                      <div key={r.route} style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.7fr 0.7fr 0.8fr 0.7fr', fontSize: '0.76rem', color: 'var(--portal-ink)', padding: 'var(--space-1) 0', borderTop: '1px solid var(--portal-line)' }}>
                         <span>{r.route}</span>
                         <span>{r.calls}</span>
                         <span style={{ color: r.okRate >= 95 ? 'var(--status-go)' : r.okRate >= 85 ? 'var(--status-gentle)' : 'var(--status-risk)' }}>{r.okRate}%</span>
@@ -378,16 +378,16 @@ export default function AdminPage() {
           </section>
 
           {/* ── 功能许愿(Roadmap 评分)+ 实验 ── */}
-          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.7rem', marginBottom: '0.9rem' }}>
+          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--space-3)', marginBottom: 'var(--space-4)' }}>
             <div style={card}>
               {/* Bug4 图16:榜单是死是活看不出来 —— 补一句数据从哪来、★ 和「待投票」各是什么意思。 */}
-              <p style={{ ...label, margin: '0 0 0.2rem' }}>功能许愿榜</p>
-              <p style={{ ...label, margin: '0 0 0.6rem', letterSpacing: 0 }}>
+              <p style={{ ...label, margin: '0 0 var(--space-1)' }}>功能许愿榜</p>
+              <p style={{ ...label, margin: '0 0 var(--space-2)', letterSpacing: 0 }}>
                 候选功能写在 lib/portal/roadmap.ts 里(改代码才增删);★ 分和票数是真实用户票,
                 来自「设置 → 投票给未来功能」,一人一功能一票、可改。写「待投票」= 这条还一票没有。
               </p>
               {data.roadmapVotes?.map((v) => (
-                <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0.3rem 0', borderTop: '1px solid var(--portal-line)', fontSize: '0.78rem', color: 'var(--portal-ink)' }}>
+                <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 'var(--space-1) 0', borderTop: '1px solid var(--portal-line)', fontSize: '0.78rem', color: 'var(--portal-ink)' }}>
                   <span>
                     {v.title}
                     <span style={{ ...label, marginLeft: 6 }}>{v.status === 'building' ? '在做' : v.status === 'planned' ? '已排期' : '探索中'}</span>
@@ -398,9 +398,9 @@ export default function AdminPage() {
             </div>
             <div style={card}>
               {/* Bug4 图15:原来只写了「注册表在哪个文件」,看的人不知道这块在说什么。 */}
-              <p style={{ ...label, margin: '0 0 0.2rem' }}>A/B 实验</p>
+              <p style={{ ...label, margin: '0 0 var(--space-1)' }}>A/B 实验</p>
               {/* Bug4 图15 上写的是「怎么用」——不是「是什么」。所以这里写的是**步骤**。 */}
-              <p style={{ ...label, margin: '0 0 0.6rem', letterSpacing: 0 }}>
+              <p style={{ ...label, margin: '0 0 var(--space-2)', letterSpacing: 0 }}>
                 同一个功能做两版、按设备随机分,用来判断哪一版更好。怎么用:
                 ① 在 <code>lib/portal/experiments.ts</code> 里加一条(id / 名字 / 变体名 / enabled),登记即生效;
                 ② 代码里用 <code>getVariant(&apos;实验id&apos;)</code> 取这台设备分到哪一版,按它渲染,
@@ -411,12 +411,12 @@ export default function AdminPage() {
               </p>
               {(data.experiments?.length ?? 0) === 0 && <p style={label}>暂无注册实验</p>}
               {data.experiments?.map((e) => (
-                <div key={e.id} style={{ padding: '0.3rem 0', borderTop: '1px solid var(--portal-line)' }}>
+                <div key={e.id} style={{ padding: 'var(--space-1) 0', borderTop: '1px solid var(--portal-line)' }}>
                   <p style={{ margin: 0, fontSize: '0.78rem', color: 'var(--portal-ink)' }}>
                     {e.name}
                     <span style={{ ...label, marginLeft: 6, color: e.enabled ? 'var(--status-go)' : 'var(--portal-muted)' }}>{e.enabled ? '运行中' : '未启用'}</span>
                   </p>
-                  <p style={{ ...label, margin: '0.15rem 0 0' }}>
+                  <p style={{ ...label, margin: 'var(--space-1) 0 0' }}>
                     {e.variants.map((v) => `${v.variant}: ${v.devices} 设备`).join(' · ')}
                   </p>
                 </div>
@@ -425,9 +425,9 @@ export default function AdminPage() {
           </section>
 
           {/* ── 客户端错误(错误自己来找你) ── */}
-          <section style={{ ...card, marginBottom: '0.9rem', ...(data.clientErrors?.length ? { borderColor: 'var(--status-risk)' } : {}) }}>
-            <p style={{ ...label, margin: '0 0 0.2rem' }}>用户那边报的错(30 天)</p>
-            <p style={{ ...label, margin: '0 0 0.5rem', letterSpacing: 0 }}>
+          <section style={{ ...card, marginBottom: 'var(--space-4)', ...(data.clientErrors?.length ? { borderColor: 'var(--status-risk)' } : {}) }}>
+            <p style={{ ...label, margin: '0 0 var(--space-1)' }}>用户那边报的错(30 天)</p>
+            <p style={{ ...label, margin: '0 0 var(--space-2)', letterSpacing: 0 }}>
               用户浏览器崩了会自动送一条过来(只送报错文字和文件名,不带任何个人数据)。点一行看全文。
             </p>
             {(data.clientErrors?.length ?? 0) === 0
@@ -436,12 +436,12 @@ export default function AdminPage() {
                 const sig = `${e.kind}:${e.message}`;
                 const open = errOpen === sig;
                 return (
-                  <div key={sig} style={{ padding: '0.35rem 0', borderTop: '1px solid var(--portal-line)', fontSize: '0.76rem' }}>
+                  <div key={sig} style={{ padding: 'var(--space-1) 0', borderTop: '1px solid var(--portal-line)', fontSize: '0.76rem' }}>
                     {/* Bug4 图15:一行截断的报错等于没有报错 —— 点开给全文 + 出错文件 + 第一次出现。 */}
                     <button
                       type="button"
                       onClick={() => setErrOpen(open ? null : sig)}
-                      style={{ display: 'flex', justifyContent: 'space-between', gap: '0.6rem', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit' }}
+                      style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', width: '100%', textAlign: 'left', background: 'none', border: 'none', padding: 0, cursor: 'pointer', font: 'inherit' }}
                     >
                       <span style={{ color: 'var(--portal-ink)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         <span style={{ color: 'var(--status-risk)', marginRight: 6 }}>{e.kind}</span>{e.message}
@@ -449,10 +449,10 @@ export default function AdminPage() {
                       <span style={{ color: 'var(--portal-muted)', whiteSpace: 'nowrap' }}>×{e.count} · {e.devices} 台 · {e.lastAt.slice(5, 16).replace('T', ' ')}</span>
                     </button>
                     {open && (
-                      <div style={{ marginTop: '0.4rem', padding: '0.5rem 0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--portal-accent-soft)' }}>
+                      <div style={{ marginTop: 'var(--space-2)', padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)', background: 'var(--portal-accent-soft)' }}>
                         <p style={{ margin: 0, color: 'var(--portal-ink)', wordBreak: 'break-word', whiteSpace: 'pre-wrap' }}>{e.message}</p>
-                        {e.source && <p style={{ ...label, margin: '0.35rem 0 0', letterSpacing: 0, wordBreak: 'break-all' }}>出错文件:{e.source}</p>}
-                        <p style={{ ...label, margin: '0.2rem 0 0', letterSpacing: 0 }}>
+                        {e.source && <p style={{ ...label, margin: 'var(--space-1) 0 0', letterSpacing: 0, wordBreak: 'break-all' }}>出错文件:{e.source}</p>}
+                        <p style={{ ...label, margin: 'var(--space-1) 0 0', letterSpacing: 0 }}>
                           第一次 {e.firstAt ? e.firstAt.slice(0, 16).replace('T', ' ') : '—'} · 最近一次 {e.lastAt.slice(0, 16).replace('T', ' ')} · 影响 {e.devices} 台设备
                         </p>
                         {/* Bug4 图15「点开后要说怎么修」:光有报错文字还是要人自己去猜从哪下手。
@@ -460,7 +460,7 @@ export default function AdminPage() {
                         {(() => {
                           const fix = fixHint(e.kind, e.message);
                           return (
-                            <p style={{ margin: '0.45rem 0 0', fontSize: '0.76rem', color: 'var(--portal-ink)', lineHeight: 1.6 }}>
+                            <p style={{ margin: 'var(--space-2) 0 0', fontSize: '0.76rem', color: 'var(--portal-ink)', lineHeight: 1.6 }}>
                               <b style={{ color: 'var(--portal-accent)' }}>怎么修</b> · {fix}
                             </p>
                           );
@@ -473,9 +473,9 @@ export default function AdminPage() {
           </section>
 
           {/* ── 反馈 + 产品事件 ── */}
-          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '0.7rem' }}>
+          <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 'var(--space-3)' }}>
             <div style={card}>
-              <p style={{ ...label, margin: '0 0 0.6rem' }}>今日卡反馈(30 天)— DEC 推荐质量</p>
+              <p style={{ ...label, margin: '0 0 var(--space-2)' }}>今日卡反馈(30 天)— DEC 推荐质量</p>
               <FeedbackDonut
                 useful={data.cardFeedback30d?.useful ?? 0}
                 wrong={data.cardFeedback30d?.wrong ?? 0}
@@ -483,10 +483,10 @@ export default function AdminPage() {
               />
             </div>
             <div style={card}>
-              <p style={{ ...label, margin: '0 0 0.6rem' }}>用户主动做的事(30 天,已登录用户)</p>
+              <p style={{ ...label, margin: '0 0 var(--space-2)' }}>用户主动做的事(30 天,已登录用户)</p>
               {(data.productEvents30d?.length ?? 0) === 0 && <p style={label}>暂无数据</p>}
               {data.productEvents30d?.map((e) => (
-                <div key={e.type} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--portal-ink)', marginBottom: '0.35rem' }}>
+                <div key={e.type} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: 'var(--portal-ink)', marginBottom: 'var(--space-1)' }}>
                   {/* Bug4 图14:原来直接印内部事件名(today.card.feedback…),看板的人得先认代码。 */}
                   <span title={e.type}>{PRODUCT_EVENT_LABEL[e.type] || e.type}</span><span>{e.count}</span>
                 </div>
@@ -494,17 +494,17 @@ export default function AdminPage() {
             </div>
           </section>
           {/* ── 用户权限管理 ── */}
-          <section style={{ ...card, marginTop: '0.9rem' }}>
-            <p style={{ ...label, margin: '0 0 0.2rem' }}>用户权限管理</p>
-            <p style={{ ...label, margin: '0 0 0.7rem' }}>
+          <section style={{ ...card, marginTop: 'var(--space-4)' }}>
+            <p style={{ ...label, margin: '0 0 var(--space-1)' }}>用户权限管理</p>
+            <p style={{ ...label, margin: '0 0 var(--space-3)' }}>
               角色:普通=公开功能;测试员=+下方勾选模块;Lab=全部实验功能与 secretary。改动即存,用户下次打开 App 生效。
             </p>
             <UserAccess secret={typeof window !== 'undefined' ? localStorage.getItem(SECRET_KEY) || '' : ''} />
           </section>
           {/* ── 软件治理地图 ── */}
-          <section style={{ marginTop: '0.9rem' }}>
-            <p style={{ ...label, margin: '0 0 0.2rem' }}>软件治理</p>
-            <p style={{ ...label, margin: '0 0 0.4rem' }}>
+          <section style={{ marginTop: 'var(--space-4)' }}>
+            <p style={{ ...label, margin: '0 0 var(--space-1)' }}>软件治理</p>
+            <p style={{ ...label, margin: '0 0 var(--space-2)' }}>
               契约/就绪层的运行状态:哪些真在跑、哪些算了没人看、哪个已漂移。数据来自 governance-map + 构建期快照。
             </p>
             <GovernancePanel secret={typeof window !== 'undefined' ? localStorage.getItem(SECRET_KEY) || '' : ''} />

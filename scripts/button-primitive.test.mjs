@@ -152,10 +152,12 @@ const CSS = read('app/globals.css');
       !/<button[^>]*className="nesio-(ob-primary|today|settings-danger)-btn[^"]*nesio-nd-action-btn/.test(nd),
       '记忆详情底部那一排又拆回三套自造按钮了 —— 那正是「按钮大小形状不统一」的原始现场',
     );
+    // 载体从 className="nesio-nd-action-btn" 换成 layoutStyle={{ flex: 1 }}:
+    // 那个类名原来把外观也盖了一遍(假迁移),现在只剩「这一行等宽」这一条布局职责。
     for (const v of ['variant="primary"', 'variant="secondary"', 'variant="soft" tone="risk"']) {
       assert.ok(
-        new RegExp(`<Button ${v.replace(/"/g, '"')} className="nesio-nd-action-btn"`).test(nd),
-        `记忆详情底部那排少了 <Button ${v}> —— 阅读/编辑/删除三档语气要分得开`,
+        new RegExp(`<Button ${v} layoutStyle=\\{\\{ flex: 1 \\}\\}`).test(nd),
+        `记忆详情底部那排少了 <Button ${v} layoutStyle={{ flex: 1 }}> —— 阅读/编辑/删除三档语气要分得开`,
       );
     }
   }
@@ -284,16 +286,63 @@ const CSS = read('app/globals.css');
     '.nesio-ob-primary-btn 的投影又写死品牌蓝了',
   );
 
-  // ── 等高层必须排在原语之后 ────────────────────────────────────────────────
-  // .nesio-nd-action-btn 是把记忆详情底部那一排「掰」等高的一层,靠 source-order 生效。
-  // 它原来在原语之前 —— 桥接把那一排的三个基类挪到更后面,它就压不住了(删除键会比
-  // 旁边的阅读键矮一截、圆角也不一样)。
-  const rowAt = CSS.search(/\n\.nesio-nd-action-btn \{/);
-  assert.ok(rowAt > 0, '.nesio-nd-action-btn 不见了');
-  assert.ok(
-    rowAt > PRIM_AT,
-    '.nesio-nd-action-btn 跑到 Button 原语前面去了 —— 它压不住基类的 padding/radius/font,'
-    + '记忆详情底部那一排会重新一高一矮',
+  // ── 挂在 <Button> 上的板块类名:只准放布局 ────────────────────────────────
+  //
+  // 这里原来是一条**反过来**的断言:要求 .nesio-nd-action-btn 排在原语之后,
+  // 好「压住」原语的 padding/radius/font。那等于把假迁移写进契约保护起来 ——
+  // 调用点写着 <Button variant="primary">,类名里却又把 height/padding/border-radius/
+  // font-size/font-weight 盖了一遍,原语等于没用上,「同一屏两个按钮长得不像一家」照旧。
+  //
+  // 现在的规矩:板块类名可以留(动画钩子/测试选择器要用),但**只准放布局**。
+  // 外观一律 variant/size/tone。
+  const APPEARANCE = /\b(background|background-color|color|border|border-color|border-radius|font-size|font-weight|font-family|padding|box-shadow|opacity)\s*:/;
+  for (const cls of ['nesio-nd-action-btn', 'nesio-settings-action-btn', 'nesio-settings-danger-btn']) {
+    const at = CSS.search(new RegExp(`\\n\\.${cls}[ ,{]`));
+    if (at < 0) continue;   // 类名被删掉是更好的结局,不算违规
+    const body = CSS.slice(CSS.indexOf('{', at) + 1, CSS.indexOf('}', at));
+    const bad = body.split(';').map((s) => s.trim()).filter((s) => APPEARANCE.test(s));
+    assert.deepEqual(
+      bad, [],
+      `.${cls} 挂在 <Button> 上,却自己写了外观:${bad.join(' / ')}\n`
+      + '  → 那就是假迁移:原语定一套、类名盖一套,等于把 <Button> 当带额外步骤的 <button> 用。\n'
+      + '    外观走 variant/size/tone;这里只留布局(margin/flex/width…)。',
+    );
+  }
+
+  // ── md/lg 必须够得着最小触摸目标 ──────────────────────────────────────────
+  // 设计系统声明了 --tap-min: 44px,站内别处都在守。原语自己不守时 md 只有 ~36px,
+  // 于是每个板块各自补一个 height:46px —— 这正是迁移一直不敢动的原因之一:
+  // 换成原语反而缩水成点不中的目标。
+  assert.match(
+    CSS, /\.nesio-btn--md,?\s*\n?\.nesio-btn--lg\s*\{[^}]*min-height:\s*var\(--tap-min/,
+    'Button 原语的 md/lg 没有 min-height: var(--tap-min) —— 按内容算只有 ~36px,'
+    + '低于设计系统第 142 行自己声明的 44px。板块只好各自补 height,迁移就永远做不干净。',
+  );
+}
+
+// ── 出口只有一个,而且是窄的 ──────────────────────────────────────────────────
+//
+// layoutStyle 如果类型是 CSSProperties,那 213 个裸按钮里那 ~249 处外观
+// (color/background/border/fontSize/borderRadius…)会原样从新口子漏过去,
+// 迁移就只是把 <button> 改名叫 <Button>。所以:宽口封掉、窄口是白名单。
+{
+  assert.match(
+    SRC, /Omit<ButtonHTMLAttributes<HTMLButtonElement>,\s*'children'\s*\|\s*'style'>/,
+    'ButtonProps 又把 style 放进来了 —— 有了它,layoutStyle 白名单形同虚设:'
+    + '外观直接从 style 塞进去就行。宽口必须封死,只留 layoutStyle。',
+  );
+
+  const wl = SRC.slice(SRC.indexOf('ButtonLayoutStyle = Pick<CSSProperties'));
+  const wlBody = wl.slice(0, wl.indexOf('>;'));
+  assert.ok(wlBody.length > 100, 'ButtonLayoutStyle 白名单没找到 —— 窄口不见了');
+  const LEAKED = ['background', 'backgroundColor', 'color', 'border', 'borderRadius',
+    'fontSize', 'fontWeight', 'fontFamily', 'boxShadow', 'opacity', 'padding'];
+  const leaks = LEAKED.filter((k) => new RegExp(`'${k}'`).test(wlBody));
+  assert.deepEqual(
+    leaks, [],
+    `ButtonLayoutStyle 白名单里混进了外观属性:${leaks.join(', ')}\n`
+    + '  → 加字段前先问:它决定的是按钮**长什么样**,还是按钮**在哪**?\n'
+    + '    长什么样的一律不加 —— 那正是这个白名单要挡住的。',
   );
 }
 

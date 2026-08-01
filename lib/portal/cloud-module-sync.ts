@@ -23,8 +23,8 @@ import { recordCloudRestore } from './cloud-restore-receipt';
 import { isBackupKey } from './storage-manifest';
 import { rehydrateIdbBlobs } from './idb-blob-store';
 // #29:银行流水/账户是「按 id 的集合」,云端那份只能并进来,不能整键替换
-import { idFieldFor, mergeIdSets } from './module-merge';
 import { yieldToMain } from './yield-main';
+import { needsUnionMerge, mergeModuleJson } from './module-merge';
 
 // 归属:记忆图/头像身份/学习态/邮件全文 各有专属引擎(见 sync-ownership.ts),通用模块同步一律让路,
 // 避免两套合并语义抢同一份数据(换端横跳的根因)。判断统一走 isDedicatedSyncKey,不再各写一份。
@@ -34,6 +34,9 @@ const SYNC_STATE_KEY = 'nesio-module-sync-state-v1';
 const MAX_MODULE_PACKED_BYTES = 4 * 1024 * 1024;
 const MIN_INTERVAL_MS = 20_000;
 const POST_BATCH = 20;
+
+/** 并集分支里判「本机原来没有这个 key」——单独抽出来,免得和下面的 LWW 变量抢名字。 */
+const localMissingOf = (v: string | undefined): boolean => v === undefined;
 
 let lastSyncAt = 0;
 let inFlight = false;
@@ -209,28 +212,35 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
     const stamp = row.updatedAt || new Date().toISOString();
     const localVal = localEntries[key];
     if (localVal === json) { state[key] = { hash: contentHash(json), syncedAt: stamp }; continue; } // 已一致
-    const localMissing = localVal === undefined;
-
-    // ── #29(2026-07-30):有些模块是「一堆按 id 的记录」,不是一张快照 ──────────
-    // 银行流水/账户在本机就是并集语义(按 id upsert、账户只增合并),而这里的
-    // last-write-wins 云端赢时是**整键替换** —— 两台设备的 Plaid 窗口/进度不同,
-    // 谁后写谁赢,对方独有的那些就没了。用户看到的「同一入口三种互不相干的状态」
-    // 就是这么来的。这类 key 只能**并进来**。
-    // (life-graph 早就因为同一个理由被排除在外,银行流水是同一类东西,漏在了里面。)
-    const idField = idFieldFor(key);
-    if (idField) {
-      const m = mergeIdSets(localVal, json, idField);
+    // ── 并集语义的 key 先在这里拦下(银行流水/账户/持仓)────────────────────
+    // 它们在本机是「按 id upsert」,不是快照。走下面的模块级 LWW = **整键替换**:
+    // A 有 500 笔、B 有 300 笔,谁后写谁赢,对方独有的直接没了,而且没有任何界面会报错。
+    // life-graph 早就因为同一个理由被排除在通用同步外,银行流水漏在了里面。
+    if (needsUnionMerge(key)) {
+      const m = mergeModuleJson(key, localVal, json);
       if (m) {
-        if (m.json !== localVal) {
+        // 只并不替换:本机独有 + 云端独有,一条都不少
+        if (!m.unchanged) {
           applyEntries[key] = m.json;
-          if (localMissing) { newlyAdded++; filledKeys.push(key); }
+          if (localMissingOf(localVal)) { newlyAdded++; filledKeys.push(key); }
         }
-        // **故意不写 state**:并集通常是本机和云端的超集,得让接下来的 push 把它带上去。
-        // 写了 state 就等于说「已经和云端一致」,那些本机独有的记录再也传不出去。
+        // ⚠️ **不写 state** —— 合并出来的是超集,必须让它被当成「本机改过」,
+        // 下一轮 push 才会把超集推上去。写了 state 就是告诉系统「两边一致」,
+        // 超集永远上不去,另一台设备永远拿不到。
+        // (真正一致的情况上面 `localVal === json` 那一支已经处理并写过 state 了,
+        //  所以这里无条件跳过是安全的,不会永远推下去。)
         continue;
       }
-      // 解析不出数组(格式变了)→ 落回下面原来的判据,不硬来
+      // 解析不出数组(格式漂移)→ 落回下面的 LWW。会丢数据,所以留一条可见记录。
+      logDropped('cloud.module_merge_parse', new Error(`union-merge parse failed: ${key}`));
     }
+
+    const localMissing = localVal === undefined;
+
+    // (两个 agent 在各自分支上独立修了同一个 bug。合并时保留上面那一版:
+    //  它多覆盖一个 nesio-fin-holdings-v1,而且有「两端逐字节收敛」的契约。
+    //  另一版那条按 id 并集的分支删掉了 —— 它排在上面那支的 continue 之后,
+    //  覆盖的 key 又是子集,所以**永远执行不到**;留着只会让人以为有两套并集语义。)
 
     const localUnchangedSinceSync = !localMissing && state[key]?.hash === contentHash(localVal);
     // 反遮盖闸(通用防丢):**绝不用明显更小/更空的云端值覆盖本机非空值**。真机踩过——积分/

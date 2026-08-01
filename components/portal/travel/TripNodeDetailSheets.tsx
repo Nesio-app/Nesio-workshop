@@ -157,7 +157,7 @@ export function ShoppingDetail({
       </p>
       <div className="nesio-trip-card nesio-trip-card--list">
         {shopping.lines.length === 0 && (
-          <p className="nesio-trip-footnote" style={{ padding: '0.8rem' }}>{L(dict, '还没有条目 —— 拍小票识别后会加进来。', 'No lines yet — snap a receipt to add them.')}</p>
+          <p className="nesio-trip-footnote" style={{ padding: 'var(--space-3)' }}>{L(dict, '还没有条目 —— 拍小票识别后会加进来。', 'No lines yet — snap a receipt to add them.')}</p>
         )}
         {shopping.lines.map((line, i) => (
           <div key={i} className="nesio-trip-shop-row">
@@ -268,7 +268,7 @@ export function PackingDetail({
             {L(dict, `「${openNeed}」的候选`, `Candidates for “${openNeed}”`)}
           </p>
           {candidates(openNeed).length === 0 ? (
-            <p className="nesio-trip-footnote" style={{ padding: '0.8rem' }}>
+            <p className="nesio-trip-footnote" style={{ padding: 'var(--space-3)' }}>
               {L(dict, '物品库里找不到相近的 —— 存入记忆后,以后拍到就能对上。', 'Nothing similar in your inventory — save it and future photos will match.')}
             </p>
           ) : candidates(openNeed).map((c) => (
@@ -366,7 +366,7 @@ export function BudgetDetail({
               <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginTop: 'var(--space-2)' }}>
                 <input type="number" inputMode="decimal" value={draft} onChange={(e) => setDraft(e.target.value)}
                   aria-label={L(dict, `${c.label}预算`, `${c.label} budget`)}
-                  style={{ flex: 1, minWidth: 0, padding: '0.4rem 0.5rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)' }} />
+                  style={{ flex: 1, minWidth: 0, padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)' }} />
                 <button type="button" className="nesio-trip-primary" style={{ flex: '0 0 auto' }}
                   onClick={() => { setCategoryBudget(tripId, c.id, Number(draft) || 0); setEditCat(null); onChanged(); }}>
                   {L(dict, '存', 'Save')}

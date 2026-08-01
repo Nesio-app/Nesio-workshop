@@ -25,6 +25,10 @@ function load(rel, extraRequire = {}) {
       reportStorageDropped: () => {}, logDropped: () => {}, deleteLocalFile: async () => {},
       createBlobStore: () => ({ load: () => [], save: () => {} }),
       normalizeCategory: (c) => c, categoryLabel: (c) => c,
+      // tx-graph-bridge:批注现在是**两写**(覆盖层 + 图)。这里 stub 掉图那一侧,
+      // 本文件只验覆盖层的行为;图那一侧由 spend-claim.test.mjs 真跑。
+      linkTxToPerson: () => ({ graphOk: true }), unlinkTxFromPerson: () => ({ graphOk: true }),
+      attachAssetToTx: () => ({ graphOk: true }), detachAssetFromTx: () => ({ graphOk: true }),
     },
   });
   return mod.exports;
@@ -58,7 +62,9 @@ assert.strictEqual(ann.hasTxAnnotation({ people: [] }), false, '空数组不算�
 assert.strictEqual(ann.hasTxAnnotation({ people: ['linda'] }), true);
 assert.strictEqual(ann.hasTxAnnotation({ attachments: [{ assetId: 'a', name: 'n', mimeType: 'image/png', size: 1 }] }), true);
 // 无 window(SSR / 存不进)时写操作返回 false —— 调用方据此出可见错误,不许假成功
-assert.strictEqual(ann.setTxPeople('tx1', ['linda']), false, '没有 window 时写入必须返回 false,不许假成功');
+// 返回值是 { ok, graphOk }:ok = 财务页存下了吗,graphOk = 别处看得到吗。
+// 没有 window 时覆盖层写不进 → ok 必须是 false,不许假成功。
+assert.strictEqual(ann.setTxPeople('tx1', ['linda']).ok, false, '没有 window 时写入必须返回 ok:false,不许假成功');
 
 const annSrc = fs.readFileSync(new URL('../lib/portal/tx-annotations.ts', import.meta.url), 'utf8');
 assert.ok(/reportStorageDropped\(\)/.test(annSrc), '写失败必须 reportStorageDropped(红线:不许吞掉存储失败)');
@@ -69,7 +75,11 @@ assert.ok(code.includes("'修改'"), '每一笔流水要有「修改」入口');
 assert.ok(code.includes("'关联人'"), '「修改」里要能手动关联人');
 assert.ok(code.includes("'传附件'"), '「修改」里要能传附件');
 assert.ok(/putLocalFile\(assetId, f, meta\)/.test(tab), '附件本体进 local-file-store(IndexedDB),不塞 localStorage');
-assert.ok(/if \(!stored \|\| !addTxAttachment/.test(tab), '本体或元信息任一没写进,都要报错,不许挂指向空气的附件');
+assert.ok(/if \(!stored \|\| !added\?\.ok\)/.test(tab), '本体或元信息任一没写进,都要报错,不许挂指向空气的附件');
+// 关联只落在财务页 = 这一层要修的毛病本身。它必须被说出来,不许静默。
+assert.ok(/!r\.graphOk/.test(code) && /no_person_node/.test(code),
+  '关联写进了财务页但没连上图时,UI 必须说清楚(「TA 还不是联系人,所以 TA 的页面看不到这笔钱」)—— 静默 = 用户以为关联上了,其实别处还是看不到');
+assert.ok(/!added\.graphOk/.test(code), '附件存下了但没挂进记忆节点,也要说 —— 否则这张发票只有财务页看得到');
 assert.ok(/role="alert"/.test(tab), '「修改」里的失败必须有可见错误(红线)');
 assert.ok(/buildRelationships\(getLifeGraph\(\)/.test(tab), '关联人的候选要和关系页同一套联系人');
 

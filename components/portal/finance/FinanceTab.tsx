@@ -41,9 +41,11 @@ import { buildMonthlyReport, persistReportToMemory, autoPersistLastMonthReport }
 import { reportRichHtml } from '@/lib/portal/finance-report-visual';
 import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES } from '@/lib/portal/tx-category';
 import { loadAllPersonRecords } from '@/lib/portal/person-records';
+import { splitEvenly } from '@/lib/portal/ledger-allocation';
 import {
   loadTxAnnotations, txAnnotationOf, hasTxAnnotation, toggleTxPerson, setTxNote,
   addTxAttachment, removeTxAttachment, TX_ANNOTATIONS_EVENT, type TxAnnotation,
+  setTxSplits, clearTxSplits, setTxAmortize, clearTxAmortize,
 } from '@/lib/portal/tx-annotations';
 import { putLocalFile, prettyBytes, MAX_FILE_BYTES } from '@/lib/portal/local-file-store';
 import { getLifeGraph } from '@/lib/portal/life-graph';
@@ -163,7 +165,7 @@ function SpendChartPager({ merchants, incomes, currency, dict, chart, onChart }:
   return (
     <div
       className="nesio-fin-chartpager"
-      style={{ marginTop: '1.25rem' }}
+      style={{ marginTop: 'var(--space-5)' }}
       onTouchStart={(e) => { const t = e.touches[0]; if (t) startRef.current = { x: t.clientX, y: t.clientY }; }}
       onTouchEnd={(e) => {
         const s = startRef.current; startRef.current = null;
@@ -223,8 +225,124 @@ function SpendChartPager({ merchants, incomes, currency, dict, chart, onChart }:
  * 关联人/附件/备注存 tx-annotations 覆盖层(按 tx.id),下一次 Plaid 同步不会冲掉;
  * 附件本体进 local-file-store(IndexedDB)。写失败一律出可见错误,不假成功。
  */
-function TxEditPanel({ txId, flow, dict, onFlow, contacts }: {
+/**
+ * TxSplitEditor — 一笔支出分摊到多个分类/人;年费按月摊。
+ *
+ * 两条规矩写在 UI 上而不只在数据层:
+ *   · **差一分都不存**。`validateAllocation` 返回 delta,这里直接显示「还剩 $x 要摊」——
+ *     只说「合计不对」的话你不知道还差多少。
+ *   · **分摊不改原额**。它是视图:总额聚合永远读原额,只有按分类/按人汇总才走分摊。
+ *     两边都算就是同一笔钱按两套口径各算一次。
+ */
+function TxSplitEditor({ txId, total, dict, contacts, onChanged }: {
+  txId: string; total: number; dict: string;
+  contacts: Array<{ key: string; name: string }>;
+  onChanged: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [rows, setRows] = useState<Array<{ target: string; amount: string }>>([]);
+  const [err, setErr] = useState<string | null>(null);
+  const [saved, setSaved] = useState(false);
+  const [months, setMonths] = useState('');
+
+  const existing = txAnnotationOf(txId).splits || [];
+  const amort = txAnnotationOf(txId).amortize;
+
+  const start = () => {
+    setRows(existing.length
+      ? existing.map((s) => ({ target: s.target, amount: String(s.amount) }))
+      : splitEvenly(total, 2).map((s) => ({ target: '', amount: String(s.amount) })));
+    setOpen(true); setErr(null); setSaved(false);
+  };
+
+  const save = () => {
+    setSaved(false);
+    const parsed = rows
+      .map((r) => ({ target: r.target.trim(), amount: Number(r.amount) }))
+      .filter((r) => r.target || r.amount);
+    const r = setTxSplits(txId, total, parsed);
+    if (r.ok) { setErr(null); setSaved(true); setOpen(false); onChanged(); return; }
+    setErr(
+      r.reason === 'sum_mismatch'
+        ? (r.delta > 0
+            ? L(dict, `还剩 ${r.delta.toFixed(2)} 没分完。`, `${r.delta.toFixed(2)} still to allocate.`)
+            : L(dict, `分多了 ${Math.abs(r.delta).toFixed(2)}。`, `Over-allocated by ${Math.abs(r.delta).toFixed(2)}.`))
+        : r.reason === 'duplicate_target' ? L(dict, '同一个去处出现了两次 —— 合起来写一行更清楚。', 'Same target twice — merge them into one row.')
+        : r.reason === 'nonpositive' ? L(dict, '每一份都要大于 0。', 'Every share must be greater than 0.')
+        : r.reason === 'empty' ? L(dict, '先填一行。', 'Add a row first.')
+        : L(dict, '没存进去,可能空间满了。', "Couldn't save — storage may be full."),
+    );
+  };
+
+  return (
+    <div className="nesio-fin-txedit-row" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+      <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+        <button type="button" className={`nesio-fin-flowopt${existing.length ? ' is-active' : ''}`} onClick={() => (open ? setOpen(false) : start())}>
+          {existing.length
+            ? L(dict, `已分摊 ${existing.length} 份`, `Split ${existing.length} ways`)
+            : L(dict, '分摊', 'Split')}
+        </button>
+        {existing.length > 0 && (
+          <button type="button" className="nesio-fin-flowopt" onClick={() => { clearTxSplits(txId); onChanged(); setOpen(false); }}>
+            {L(dict, '撤销分摊', 'Undo split')}
+          </button>
+        )}
+        {/* 按月摊:年费/保险。同样不生成新交易,原额不动。 */}
+        <input className="nesio-fin-split-months" inputMode="numeric" placeholder={L(dict, '按月摊(月数)', 'Amortize (months)')}
+          value={months} onChange={(e) => setMonths(e.target.value)}
+          onBlur={() => {
+            const m = Number(months);
+            if (!months.trim()) return;
+            if (!Number.isFinite(m) || m < 1) { setErr(L(dict, '月数要是大于 0 的整数。', 'Months must be a positive number.')); return; }
+            const now = new Date();
+            const ok = setTxAmortize(txId, `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`, Math.round(m));
+            if (!ok) setErr(L(dict, '没存进去,可能空间满了。', "Couldn't save — storage may be full."));
+            else { setErr(null); onChanged(); }
+          }} />
+        {amort && (
+          <button type="button" className="nesio-fin-flowopt is-active" onClick={() => { clearTxAmortize(txId); onChanged(); }}>
+            {L(dict, `每月摊 ${amort.months} 期 ✕`, `${amort.months}-month amortize ✕`)}
+          </button>
+        )}
+      </div>
+
+      {open && (
+        <div className="nesio-fin-split-rows">
+          {rows.map((r, i) => (
+            <div key={i} className="nesio-fin-split-row">
+              <input className="nesio-fin-split-target" placeholder={L(dict, '分类 / 人', 'Category / person')}
+                list="nesio-split-targets" value={r.target}
+                onChange={(e) => setRows((v) => v.map((x, j) => (j === i ? { ...x, target: e.target.value } : x)))} />
+              <input className="nesio-fin-split-amt" inputMode="decimal" placeholder="0.00" value={r.amount}
+                onChange={(e) => setRows((v) => v.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
+              <button type="button" className="nesio-fin-flowopt" aria-label={L(dict, '删这一行', 'Remove row')}
+                onClick={() => setRows((v) => v.filter((_, j) => j !== i))}>✕</button>
+            </div>
+          ))}
+          <datalist id="nesio-split-targets">
+            {contacts.slice(0, 24).map((c) => <option key={c.key} value={c.name} />)}
+          </datalist>
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+            <button type="button" className="nesio-fin-flowopt" onClick={() => setRows((v) => [...v, { target: '', amount: '' }])}>
+              {L(dict, '加一份', 'Add share')}
+            </button>
+            <button type="button" className="nesio-fin-flowopt" onClick={() => setRows(splitEvenly(total, Math.max(2, rows.length)).map((s, i) => ({ target: rows[i]?.target || '', amount: String(s.amount) })))}>
+              {L(dict, '平均分', 'Split evenly')}
+            </button>
+            <button type="button" className="nesio-fin-flowopt is-active" onClick={save}>{L(dict, '存', 'Save')}</button>
+          </div>
+        </div>
+      )}
+      {err && <p className="nesio-claim-err" role="alert">{err}</p>}
+      {saved && <p className="nesio-fin-score-hint">{L(dict, '分摊已存 —— 按分类汇总时会用它。', 'Split saved — category totals will use it.')}</p>}
+    </div>
+  );
+}
+
+function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts }: {
   txId: string;
+  /** 这一笔的原额(绝对值)。分摊要拿它卡合计 —— 差一分都不存。 */
+  txAmount: number;
   flow: TxFlow;
   dict: string;
   onFlow: (f: TxFlow) => void;
@@ -244,7 +362,24 @@ function TxEditPanel({ txId, flow, dict, onFlow, contacts }: {
     || (/[a-z]/i.test(key) ? key.replace(/\b\w/g, (m) => m.toUpperCase()) : key);
 
   const togglePerson = (key: string) => {
-    setErr(toggleTxPerson(txId, key) ? null : failed);
+    const r = toggleTxPerson(txId, key);
+    // 两个失败是两回事,不能都说「失败了」:
+    //   · ok=false   —— 财务页这行都没存下(空间满了之类)
+    //   · graphOk=false —— 财务页存下了,但**那个人的页面看不到这笔钱**,记忆库也搜不到。
+    //     这正是加这条桥要修的毛病,所以它绝不能自己静默。
+    if (!r.ok) setErr(failed);
+    else if (!r.graphOk) {
+      setErr(
+        r.reason === 'no_person_node'
+          ? L(dict, `已记在这笔交易上。不过「${nameOf(key)}」还不是通讯录里的联系人,所以 TA 的关系页暂时看不到这笔钱 —— 去关系页把 TA 加进来就会自动接上。`,
+               `Saved on this transaction. “${nameOf(key)}” isn't a contact yet, so it won't show on their page — add them in People and it'll connect.`)
+          : r.reason === 'no_tx_node'
+            ? L(dict, '已记在这笔交易上。这笔流水还没同步进记忆,所以暂时只有财务页看得到 —— 下次同步后会自动补上。',
+                 "Saved here. This transaction hasn't synced into memory yet, so only Finance shows it for now — the next sync will connect it.")
+            : L(dict, '已记在这笔交易上,但没能连到记忆里 —— 别处暂时看不到。',
+                 "Saved here, but couldn't connect it to memory — other pages won't show it yet."),
+      );
+    } else setErr(null);
     setAnn(txAnnotationOf(txId));
   };
 
@@ -263,9 +398,15 @@ function TxEditPanel({ txId, flow, dict, onFlow, contacts }: {
       const meta = { name: f.name, mimeType: f.type || 'application/octet-stream', size: f.size };
       const stored = await putLocalFile(assetId, f, meta);
       // 红线:本体没存进就不要在列表里挂一个指向空气的附件。
-      if (!stored || !addTxAttachment(txId, { assetId, ...meta })) {
+      const added = stored ? addTxAttachment(txId, { assetId, ...meta }) : null;
+      if (!stored || !added?.ok) {
         setErr(L(dict, `「${f.name}」没能存进本机 —— 可能空间满了,清点空间再试。`, `Couldn't store “${f.name}” — device storage may be full.`));
         continue;
+      }
+      // 存下了但没挂到记忆节点上:财务页看得到,记忆详情/问一问取不到。说清楚。
+      if (!added.graphOk) {
+        setErr(L(dict, `「${f.name}」已存好,但还没连进记忆 —— 下次同步后记忆详情里也能看到。`,
+          `“${f.name}” is saved, but not linked into memory yet — the next sync will connect it.`));
       }
     }
     setAnn(txAnnotationOf(txId));
@@ -310,6 +451,11 @@ function TxEditPanel({ txId, flow, dict, onFlow, contacts }: {
           <p className="nesio-fin-score-hint">{L(dict, '还没有可选的人 —— 先去关系页加一个。', 'No people yet — add one on the People page first.')}</p>
         )
       )}
+
+      {/* 分摊:把这一笔拆到多个分类/人。**合计必须等于原额**,差一分都不存 ——
+          「大致分了一下」的分摊比不分更糟:按分类汇总会少一块钱,而你看不出少在哪。
+          分摊不改原额,它是一个视图;总额聚合永远读原额。 */}
+      <TxSplitEditor txId={txId} total={txAmount} dict={dict} contacts={contacts} onChanged={() => setAnn(txAnnotationOf(txId))} />
 
       {atts.length > 0 && (
         <ul className="nesio-hang-att-list">
@@ -504,7 +650,7 @@ export default function FinanceTab() {
           <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>
             {L(dict, '本机流水这次没读出来(浏览器存储没打开成功),数据还在,不是丢了。', "Couldn't open local transaction storage this time — your data is still there.")}
           </p>
-          <button type="button" className="nesio-fin-review-accept" style={{ marginTop: '0.5rem' }}
+          <button type="button" className="nesio-fin-review-accept" style={{ marginTop: 'var(--space-2)' }}
             onClick={() => { setHydrateState('loading'); bankDataReady().then(() => { setHydrateState('ready'); setRev((r) => r + 1); }).catch(() => setHydrateState('error')); }}>
             {L(dict, '重试', 'Retry')}
           </button>
@@ -523,18 +669,18 @@ export default function FinanceTab() {
         )}
         <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」;现金账也可以直接手动记。', 'No bank transactions yet. Connect via Settings → Data sources → Plaid, or just add cash entries by hand.')}</p>
         {/* UI 审计 P0-1:此前「+」只在主分支渲染,没连银行的用户永远点不到 —— 死锁解除 */}
-        <button type="button" className="nesio-fin-review-accept" style={{ marginTop: '0.5rem' }}
+        <button type="button" className="nesio-fin-review-accept" style={{ marginTop: 'var(--space-2)' }}
           onClick={() => setQuickAdd({ seg: 'expense' })}>{L(dict, '＋ 记一笔(现金 / 红包 / 资产)', '＋ Add entry (cash / income / asset)')}</button>
         <QuickAddSheet open={quickAdd != null} initialSeg={quickAdd?.seg} initialAssetId={quickAdd?.assetId}
           onClose={() => setQuickAdd(null)} onSaved={() => setRev((r) => r + 1)} />
         {domainSpend.count > 0 && (
-          <div style={{ marginTop: '0.75rem' }}>
+          <div style={{ marginTop: 'var(--space-3)' }}>
             <p className="nesio-settings-section-label">{L(dict, '本月小票 / 旅行', 'Receipts / travel this month')}</p>
             <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>
               {L(dict, `${domainSpend.count} 笔 · 合计约 ${domainSpend.total.toFixed(0)}(未并入银行 KPI)`, `${domainSpend.count} · ~${domainSpend.total.toFixed(0)} (not in bank KPIs)`)}
             </p>
             {domainRows.slice(0, 6).map((e) => (
-              <div key={e.id} className="nesio-fin-person-row" style={{ marginTop: '0.35rem' }}>
+              <div key={e.id} className="nesio-fin-person-row" style={{ marginTop: 'var(--space-1)' }}>
                 <span className="nesio-fin-person-name">{e.merchant || e.note || e.source}</span>
                 <span className="nesio-fin-person-amt">{e.currency}{e.amount}</span>
               </div>
@@ -745,7 +891,7 @@ export default function FinanceTab() {
                   `${domainSpend.count} this month · ~${domainSpend.total.toFixed(0)}${summary.domainCount ? ` · ${summary.domainCount} same-currency folded into KPIs` : ''}${summary.otherCurrencyCount ? ` · ${summary.otherCurrencyCount} other-currency aside` : ''}`,
                 )}
               </p>
-              <div className="nesio-fin-personspend" style={{ marginBottom: '0.8rem' }}>
+              <div className="nesio-fin-personspend" style={{ marginBottom: 'var(--space-3)' }}>
                 {domainRows.slice(0, 5).map((e) => {
                   // P1 小票对账:金额±1% + 日期±3天 + 商户词,给一条候选;「不是」进否决记忆。
                   const takenTxIds = new Set(loadDomainExpenses().map((x) => x.linkedBankTxId).filter((v): v is string => Boolean(v)));
@@ -760,7 +906,7 @@ export default function FinanceTab() {
                         <span className="nesio-fin-person-amt" style={e.kind === 'income' ? { color: 'var(--status-go)' } : undefined}>{e.kind === 'income' ? '+' : ''}{e.currency}{e.amount}</span>
                       </div>
                       {cand && (
-                        <div className="nesio-fin-person-row" style={{ paddingLeft: '0.6rem' }}>
+                        <div className="nesio-fin-person-row" style={{ paddingLeft: 'var(--space-2)' }}>
                           <span className="nesio-fin-person-name" style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>
                             {L(dict, `银行流水可能是同一笔:${cand.name.slice(0, 18)} · ${cand.date.slice(5)}`, `Likely same in bank feed: ${cand.name.slice(0, 18)} · ${cand.date.slice(5)}`)}
                           </span>
@@ -777,7 +923,7 @@ export default function FinanceTab() {
                     </div>
                   );
                 })}
-                <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: '0.2rem' }}>{L(dict, '关联后小票变成那笔银行流水的明细,不再双计。', 'Linked receipts become detail of the bank txn — no double counting.')}</p>
+                <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: 'var(--space-1)' }}>{L(dict, '关联后小票变成那笔银行流水的明细,不再双计。', 'Linked receipts become detail of the bank txn — no double counting.')}</p>
               </div>
             </>
           )}
@@ -874,7 +1020,7 @@ export default function FinanceTab() {
           {/* 批次 39:原「支出」tab 内容(分类聚合 + 商户 Top)并入总览 —— 它本就是聚合分析 */}
           {/* 财务⑮:财务体检 —— L3 分项评分,每项带通行标准出处;红只给真实风险 */}
           {scores.length > 0 && (
-            <details className="nesio-fin-fold" style={{ marginTop: '1.25rem' }}>
+            <details className="nesio-fin-fold" style={{ marginTop: 'var(--space-5)' }}>
               <summary className="nesio-settings-section-label" style={{ cursor: 'pointer', listStyle: 'none' }}>{L(dict, '财务体检', 'Financial checkup')} ›</summary>
               <div className="nesio-fin-scores">
                 {scores.map((s) => (
@@ -891,7 +1037,7 @@ export default function FinanceTab() {
           )}
 
           {/* 财务㉓:月报 —— 报告级 Markdown,可下载 / 存入记忆(问一问可检索) */}
-          <div className="nesio-fin-budget-add" style={{ marginTop: '1.25rem' }}>
+          <div className="nesio-fin-budget-add" style={{ marginTop: 'var(--space-5)' }}>
             <button type="button" className="nesio-fin-flowopt" onClick={() => {
               try {
                 // 财务㉜:下载=彩色图文 HTML(自包含,双击即看,浏览器里还能打印成 PDF)
@@ -929,7 +1075,7 @@ export default function FinanceTab() {
 
           {/* bug2:已学规则 —— 从交易页移到总览最下面,折叠 */}
           {(Object.keys(learnedRules.merchant).length > 0 || Object.keys(learnedRules.flow).length > 0) && (
-            <details className="nesio-fin-fold" style={{ marginTop: '1.25rem' }}>
+            <details className="nesio-fin-fold" style={{ marginTop: 'var(--space-5)' }}>
               <summary className="nesio-settings-section-label" style={{ cursor: 'pointer', listStyle: 'none' }}>{L(dict, `已学规则 · ${Object.keys(learnedRules.merchant).length + Object.keys(learnedRules.flow).length} 条`, `Learned rules · ${Object.keys(learnedRules.merchant).length + Object.keys(learnedRules.flow).length}`)} ›</summary>
               <div className="nesio-fin-rules">
                 {Object.entries(learnedRules.merchant).map(([name, cat]) => (
@@ -958,7 +1104,7 @@ export default function FinanceTab() {
           {/* L3-b:上传对账单。放在交易页顶部 —— 这一页就是「我这个月都花了什么」,
               对账是它的自然动作。解析全在本机(pdf.js),文件不上传;产出的是候选行,
               勾了才进账本。 */}
-          <button type="button" className="nesio-fin-review-accept" style={{ marginBottom: '0.4rem' }}
+          <button type="button" className="nesio-fin-review-accept" style={{ marginBottom: 'var(--space-2)' }}
             onClick={() => setReconcileOpen(true)}>
             {L(dict, '上传对账单核对(只在本机解析,不上传)', 'Check a statement (parsed on this device)')}
           </button>
@@ -971,7 +1117,7 @@ export default function FinanceTab() {
               <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, `规则审核 · ${review.length} 笔待归类`, `Review · ${review.length} to categorize`)}</p>
               {/* P3 纠错闭环:批量「全部按建议」(原来一次只出 1 笔,12 笔要点 12 次) */}
               {review.length > 1 && (
-                <button type="button" className="nesio-fin-review-accept" style={{ marginBottom: '0.4rem' }}
+                <button type="button" className="nesio-fin-review-accept" style={{ marginBottom: 'var(--space-2)' }}
                   onClick={() => { for (const t of review) setMerchantRuleFor(t, suggestCategory(t.name).category); setRev((r) => r + 1); }}>
                   {L(dict, `全部按建议归类(${review.length} 笔,每笔都可再改)`, `Accept all suggestions (${review.length}, each editable later)`)}
                 </button>
@@ -1060,7 +1206,7 @@ export default function FinanceTab() {
                     </div>
                   </div>
                   {flowEditId === t.id && (
-                    <TxEditPanel txId={t.id} flow={f} dict={dict} contacts={pickContacts}
+                    <TxEditPanel txId={t.id} txAmount={Math.abs(t.amount)} flow={f} dict={dict} contacts={pickContacts}
                       onFlow={(opt) => applyFlow(t, opt)} />
                   )}
                 </div>
@@ -1079,7 +1225,7 @@ export default function FinanceTab() {
             </button>
           )}
           {adjIds.size > 0 && (
-            <p className="nesio-settings-option-hint" style={{ marginTop: '0.35rem' }}>
+            <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-1)' }}>
               {L(dict, `已折叠 ${adjIds.size / 2} 组银行内部调整(同日同额一正一负,净额为零)`, `${adjIds.size / 2} internal bank adjustment pair(s) collapsed (same-day offsetting, net zero)`)}
             </p>
           )}
@@ -1274,7 +1420,7 @@ export default function FinanceTab() {
               </div>
             )}
             {isCurrentMonth && (
-              <div className="nesio-fin-kpis" style={{ marginTop: '0.6rem', marginBottom: 0, gridTemplateColumns: 'repeat(2, 1fr)' }}>
+              <div className="nesio-fin-kpis" style={{ marginTop: 'var(--space-2)', marginBottom: 0, gridTemplateColumns: 'repeat(2, 1fr)' }}>
                 <div className="nesio-fin-kpi">
                   <span className="nesio-fin-kpi-l">{L(dict, '本月账单待付', 'Bills left to pay')}</span>
                   <span className="nesio-fin-kpi-v">{formatMoney(monthBills.total)}</span>
@@ -1287,7 +1433,7 @@ export default function FinanceTab() {
                 </div>
               </div>
             )}
-            <p className="nesio-settings-section-label" style={{ marginTop: '1rem' }}>{L(dict, '分类预算', 'Category budgets')}</p>
+            <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-4)' }}>{L(dict, '分类预算', 'Category budgets')}</p>
             <div className="nesio-fin-cats">
               {perCategory.map((c) => (
                 <div key={c.category} className="nesio-fin-cat">
@@ -1304,7 +1450,7 @@ export default function FinanceTab() {
               ))}
             </div>
             {bp.otherSpent > 0 && (
-              <div className="nesio-fin-cat" style={{ marginTop: '0.9rem' }}>
+              <div className="nesio-fin-cat" style={{ marginTop: 'var(--space-4)' }}>
                 <div className="nesio-fin-cat-top">
                   <span className="nesio-fin-cat-name">{L(dict, '其他(未设预算)', 'Everything else')}</span>
                   <span className="nesio-fin-cat-amt">{formatMoney(bp.otherSpent)}</span>

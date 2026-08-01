@@ -119,16 +119,16 @@ export default function HealthLensCards({
     <>
       {/* ① 指标趋势 */}
       {metrics.length > 0 && (
-        <div style={{ marginTop: '0.8rem' }}>
+        <div style={{ marginTop: 'var(--space-3)' }}>
           <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{t('指标趋势', 'Trends')}</p>
           {metrics.map((m) => {
             const last = m.points[m.points.length - 1];
             const off = last.flag === 'high' || last.flag === 'low';
             return (
-              <div key={m.name} className="nesio-health-card" style={{ gridColumn: '1 / -1', marginBottom: '0.5rem' }}>
+              <div key={m.name} className="nesio-health-card" style={{ gridColumn: '1 / -1', marginBottom: 'var(--space-2)' }}>
                 <button type="button" onClick={() => onOpenMetric?.(m.name)}
                   style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 0, padding: 0, cursor: onOpenMetric ? 'pointer' : 'default' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '0.5rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 'var(--space-2)' }}>
                     <span className="nesio-health-card-label">{m.name}</span>
                     <span style={{ fontWeight: 'var(--weight-semibold, 600)', color: off ? 'var(--status-gentle)' : 'var(--portal-ink)' }}>
                       {last.value}{m.unit ? ` ${m.unit}` : ''}
@@ -136,7 +136,7 @@ export default function HealthLensCards({
                   </div>
                   {m.points.length >= 2
                     ? <LabCurve points={m.points} unit={m.unit} meds={medMarks} height={72} />
-                    : <p className="nesio-settings-option-hint" style={{ margin: '0.3rem 0 0' }}>{t('只有一次记录 —— 再记一次就能看出走向。', 'Only one reading — log another to see a trend.')}</p>}
+                    : <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>{t('只有一次记录 —— 再记一次就能看出走向。', 'Only one reading — log another to see a trend.')}</p>}
                   <span className="nesio-health-card-range">
                     {[
                       fmtDay(last.date, dict),
@@ -153,7 +153,7 @@ export default function HealthLensCards({
 
       {/* ② 在用药物 */}
       {meds.length > 0 && (
-        <div style={{ marginTop: '0.8rem' }}>
+        <div style={{ marginTop: 'var(--space-3)' }}>
           <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>
             {t(`在用药物 · 今天 ${done}/${meds.length}`, `Medications · ${done}/${meds.length} today`)}
           </p>
@@ -171,7 +171,7 @@ export default function HealthLensCards({
                   </div>
                   <button type="button" onClick={() => toggleMed(m.name)}
                     aria-pressed={taken}
-                    style={{ flexShrink: 0, padding: '0.3rem 0.7rem', borderRadius: 'var(--radius-pill)', cursor: 'pointer',
+                    style={{ flexShrink: 0, padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-pill)', cursor: 'pointer',
                       fontSize: 'var(--text-xs)',
                       border: `1px solid ${taken ? 'transparent' : 'var(--portal-line)'}`,
                       background: taken ? 'var(--status-go-soft)' : 'transparent',
@@ -183,13 +183,13 @@ export default function HealthLensCards({
             })}
           </div>
           {/* 红线:打卡写失败必须看得见,不许打个勾然后数据没了 */}
-          {logErr && <p className="nesio-rel-detail-err" role="alert" style={{ marginTop: '0.4rem' }}>{logErr}</p>}
+          {logErr && <p className="nesio-rel-detail-err" role="alert" style={{ marginTop: 'var(--space-2)' }}>{logErr}</p>}
         </div>
       )}
 
       {/* ③ 就诊时间线 */}
       {visits.length > 0 && (
-        <div style={{ marginTop: '0.8rem' }}>
+        <div style={{ marginTop: 'var(--space-3)' }}>
           <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{t('就诊', 'Visits')}</p>
           <div className="nesio-rel-timeline">
             {visits.map((v) => (

@@ -61,7 +61,7 @@ export default function MoodTrendSheet({ open, onClose }: { open: boolean; onClo
         </div>
 
         {!hasData ? (
-          <p className="nesio-settings-option-hint" style={{ textAlign: 'center', padding: '2.5rem 0' }}>
+          <p className="nesio-settings-option-hint" style={{ textAlign: 'center', padding: 'var(--space-10) 0' }}>
             {L(dict, `${periodWord}还没有心情记录 —— 回今天页,滑一下情绪盘记一笔。`, `No mood logged ${periodWord} yet — log one on Today.`)}
           </p>
         ) : (

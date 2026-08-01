@@ -223,6 +223,9 @@ const KNOWN_KEYS = new Map([
   // L4 退款配对:关系和「不是」都是你的判断,新设备上从零开始就等于白配了一遍
   ["nesio-refund-link-v1", "durable"],
   ["nesio-refund-rejected-v1", "durable"],
+  // 行程建议的「不再提醒」。durable:换台设备重新弹一遍你已经拒过的建议
+  // 就是骚扰 —— 否决是你表达过的意思,该跟着你走。
+  ["nesio-trip-suggest-dismissed-v1", "durable"],
   // L4 对账记录:审计线索,丢了就查不出「那个月是拿哪份单子对的」
   ["nesio-reconcile-records-v1", "durable"],
   ["nesio-rel-contact-v1", "durable"],
@@ -242,6 +245,7 @@ const KNOWN_KEYS = new Map([
   ["nesio-wardrobe-prefs-v1", "durable"],
   ["nesio-weather-last-geo-v1", "durable"],
   ["nesio-workout-equip-v1", "durable"],
+  // 训练流水。durable:换台设备「我上周练了什么」不该从零开始 —— 那是你干过的事,不是缓存。
   ["nesio-workout-history-v1", "durable"],
   ["nesio-workout-last-v1", "durable"],
   ["nesio-workout-rest-sec-v1", "durable"],

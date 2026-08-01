@@ -344,7 +344,7 @@ function TodayObsCard({ o, dict, en, basis, pick, onPick, onSave, onSkip, onGoHe
               <div className="ng-reveal" style={{ whiteSpace: 'pre-wrap' }}>{guide.reflection}</div>
               {gq && (
                 <div style={{ marginTop: 'var(--space-3)' }}>
-                  <p className="ng-ask" style={{ fontSize: '0.96rem' }}>{gq.question}</p>
+                  <p className="ng-ask" style={{ fontSize: 'var(--text-body)' }}>{gq.question}</p>
                   {gq.options.map((opt, i) => {
                     const revealed = gpick != null;
                     const cls = !revealed ? 'ng-opt' : i === gq.correctIndex ? 'ng-opt right' : i === gpick ? 'ng-opt wrong' : 'ng-opt';
