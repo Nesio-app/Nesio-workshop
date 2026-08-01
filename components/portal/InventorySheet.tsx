@@ -451,7 +451,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
                 ref={fileRef}
                 type="file"
                 accept=".csv,text/csv"
-                style={{ display: 'none' }}
+                className="nesio-visually-hidden"
                 onChange={async (e) => {
                   const f = e.target.files?.[0];
                   e.target.value = '';

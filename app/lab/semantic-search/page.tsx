@@ -224,7 +224,7 @@ export default function SemanticSearchLab() {
             <button onClick={onIndexBaohe} disabled={!!busy} style={btn}>索引宝盒照片</button>
             <label style={btn}>
               选本地图片…
-              <input type="file" accept="image/*" multiple hidden onChange={(e) => onIndexFiles(e.target.files)} />
+              <input type="file" accept="image/*" multiple className="nesio-visually-hidden" onChange={(e) => onIndexFiles(e.target.files)} />
             </label>
             <button onClick={async () => { await clearIndex(); setIndexCount(0); setHits([]); say('已清空索引'); }} style={btn}>清空索引</button>
             <span style={{ fontSize: 13, color: 'var(--portal-muted)' }}>{busy || `已索引 ${indexCount} 张`}</span>

@@ -100,7 +100,7 @@ export default function ReceiptScanRow({ dict, onExtracted }: {
 
   return (
     <div className="nesio-receipt-scan">
-      <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
+      <input ref={fileRef} type="file" accept="image/*" className="nesio-visually-hidden"
         onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void run(f); }} />
 
       <Button variant="soft" size="sm" disabled={phase.s === 'reading'}

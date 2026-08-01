@@ -153,6 +153,14 @@
   **不是「推完就算完」**:推分支 → 开 PR → 合并,一轮里全做完。
   合之前必须先把 main 合进分支并把冲突解干净:带着冲突开 PR 等于把活推回给用户。
   验证四件套照旧:tsc + `test:security` + `test:contracts` + `next build`。
+- **`<input type="file">` 不许 display:none**(2026-08-01,已栽三次)。iOS 的 WKWebView
+  对**不参与布局**的 file input 会忽略程序化 `click()` —— 桌面 Chrome 照开,所以本地
+  怎么测都是好的,装到手机上就是「点了完全没反应、也不报错」,用户看到的就是「没实现」。
+  用 `nesio-visually-hidden`(留 1×1 盒子),更不许 `document.createElement('input')` 后
+  直接 click(那个元素连 DOM 都没进)。守卫:`scripts/file-picker-ios.test.mjs`。
+  同一条契约还钉住:**通用**文件入口不设 accept 白名单(白名单永远漏掉 PDF/docx/xlsx,
+  在 iOS 选择器里直接是灰的);**读不懂 ≠ 收不下**,解析不了正文的文件也要先 putLocalFile
+  + ingestLifeNode 存下来,不许回一句「暂不支持」。
 - **`test:contracts` 目前跑不到头,而且这件事本身是个洞**:
   `test:vision-plugin-wiring` 读 `treasurebox-ios/ios/App/App/NesioVisionPlugin.swift`,
   该文件只存在于**没合进 main** 的 `claude/new-session-r1kcgy` 分支,且被 .gitignore 的
