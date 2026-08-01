@@ -245,9 +245,10 @@ export function useTodayData(canUsePrivateData: boolean) {
              这样「当天不再变」是硬的:没有任何一处会拿新数据现算一份出来。
              autoPersistTodayReport 内部自己会用 08:00 锚点 build 并判 due/空/当天已生成。 */
           autoPersistTodayReport(reportInput, { enabled: profile.dailyReportEnabled, now });
-          /* 周报/月报的回顾 + 计划(2026-08-01 用户拍板扩展):同一个「回前台检查一次」
-             的口径,同一个 dailyReportEnabled 开关——没让用户多开一道设置。
-             周一 8 点 / 每月 1 日 8 点才到点,到点了这一期没生成过才真的写。 */
+          /* 周报/月报的回顾 + 计划(2026-08-01 用户拍板扩展,同日改期):同一个
+             「回前台检查一次」的口径,同一个 dailyReportEnabled 开关——没让用户
+             多开一道设置。锚点是周日下午 4 点 / 每月最后一天下午 4 点(期末,不
+             是期初)才到点,到点了这一期没生成过才真的写。 */
           for (const kind of (['week', 'month'] as const)) {
             autoPersistPeriodicReport({
               kind, direction: 'retrospect',
