@@ -154,9 +154,12 @@ const CSS = read('app/globals.css');
     );
     // 载体从 className="nesio-nd-action-btn" 换成 layoutStyle={{ flex: 1 }}:
     // 那个类名原来把外观也盖了一遍(假迁移),现在只剩「这一行等宽」这一条布局职责。
-    for (const v of ['variant="primary"', 'variant="secondary"', 'variant="soft" tone="risk"']) {
+    // 2026-08-01:这一排统一加了 size="sm"(用户「样子一样,缩小」),
+    // 所以 variant 和 layoutStyle 之间会隔着它 —— 正则放宽到「中间可以有别的属性」,
+    // 压的仍然是「三档语气都在、布局走 layoutStyle」这两件事。
+    for (const v of ['variant="primary"', 'variant="secondary"', 'variant="soft" size="sm" tone="risk"']) {
       assert.ok(
-        new RegExp(`<Button ${v} layoutStyle=\\{\\{ flex: 1 \\}\\}`).test(nd),
+        new RegExp(`<Button ${v}[^>]*layoutStyle=\\{\\{ flex: 1 \\}\\}`).test(nd),
         `记忆详情底部那排少了 <Button ${v} layoutStyle={{ flex: 1 }}> —— 阅读/编辑/删除三档语气要分得开`,
       );
     }
