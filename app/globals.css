@@ -21635,3 +21635,223 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   align-items: center;
   gap: var(--space-2);
 }
+
+/* ════════════════════════════════════════════════════════════════════════════
+   音乐:歌单子 tab / 全屏播放器 / 加到歌单
+   (2026-08-01,用户:「播放全屏,歌词。都没有」「应该有歌单 子tab 才对」)
+   颜色一律走 token —— 这一屏是深色底,但深色也由 token 组出来,不写死色值。
+   ════════════════════════════════════════════════════════════════════════════ */
+
+.nesio-music-tabs {
+  display: flex; gap: var(--space-2);
+  border-bottom: 1px solid var(--portal-line);
+  padding-bottom: var(--space-2);
+}
+.nesio-music-tab {
+  min-height: 40px; padding: 0 var(--space-4);
+  border: none; background: transparent; cursor: pointer;
+  font-size: var(--text-sm); font-weight: var(--weight-medium); color: var(--portal-muted);
+  border-radius: var(--radius-sm);
+}
+.nesio-music-tab.is-on {
+  color: var(--portal-accent); background: var(--portal-accent-soft);
+}
+
+/* 每一行的「＋加歌单」。和右边的「×移出」同一尺寸,不抢视觉。 */
+.nesio-music-add {
+  flex: none; min-width: 40px; min-height: 40px;
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: transparent; color: var(--portal-muted);
+  font-size: var(--text-body); cursor: pointer;
+}
+.nesio-music-add:hover { color: var(--portal-accent); border-color: var(--portal-accent-border); }
+
+.nesio-music-expand {
+  font-size: var(--text-body); line-height: 1;
+}
+
+/* ── 歌单列表 ─────────────────────────────────────────────────────────────── */
+.nesio-pl-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.nesio-pl-card {
+  width: 100%; display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3); border: 1px solid var(--portal-line); border-radius: var(--radius-md);
+  background: transparent; cursor: pointer; text-align: left;
+}
+.nesio-pl-card-art {
+  flex: none; width: 52px; height: 52px; border-radius: var(--radius-sm);
+  display: grid; place-items: center; font-size: var(--text-h3);
+  background: var(--portal-accent-soft); color: var(--portal-accent);
+}
+.nesio-pl-card-meta { display: flex; flex-direction: column; min-width: 0; }
+.nesio-pl-card-meta strong {
+  font-size: var(--text-body); font-weight: var(--weight-medium); color: var(--portal-ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.nesio-pl-card-meta span { font-size: var(--text-xs); color: var(--portal-muted); }
+
+.nesio-pl-detail-head { display: flex; }
+.nesio-pl-back {
+  min-height: 40px; padding: 0 var(--space-2); border: none; background: transparent;
+  color: var(--portal-accent); font-size: var(--text-sm); cursor: pointer;
+}
+.nesio-pl-hero { display: flex; align-items: center; gap: var(--space-4); }
+.nesio-pl-hero-art {
+  flex: none; width: 88px; height: 88px; border-radius: var(--radius-md);
+  display: grid; place-items: center; font-size: var(--text-h1);
+  background: var(--portal-accent-soft); color: var(--portal-accent);
+}
+.nesio-pl-hero-meta { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.nesio-pl-hero-meta strong { font-size: var(--text-h3); color: var(--portal-ink); }
+.nesio-pl-hero-meta span { font-size: var(--text-sm); color: var(--portal-muted); }
+.nesio-pl-acts { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+.nesio-pl-play-all {
+  min-height: 44px; padding: 0 var(--space-5); border-radius: var(--radius-pill);
+  border: 1px solid var(--portal-accent-border); background: var(--portal-accent-soft);
+  color: var(--portal-accent); font-size: var(--text-sm); font-weight: var(--weight-medium); cursor: pointer;
+}
+.nesio-pl-play-all:disabled { opacity: .5; cursor: default; }
+.nesio-pl-del {
+  min-height: 44px; padding: 0 var(--space-4); border-radius: var(--radius-pill);
+  border: 1px solid var(--portal-line); background: transparent;
+  color: var(--portal-muted); font-size: var(--text-sm); cursor: pointer;
+}
+
+/* ── 全屏播放器 ───────────────────────────────────────────────────────────── */
+.nesio-fsp {
+  /* 定位/遮罩/焦点由 NesioSheet(variant=fullscreen)接管 —— 这里只管里面的排布。
+     自己写 position:fixed + role=dialog 是「撒谎的模态」:没有焦点陷阱、
+     Esc 关不掉、背景还能滚(见 scripts/sheet-primitive-allowlist)。 */
+  display: flex; flex-direction: column; gap: var(--space-4);
+  height: 100%;
+  background: var(--portal-bg);
+  /* 弹出层留边走 --sheet-gutter(比页面窄一档的那个),外面没有卡片那一层 */
+  padding: calc(var(--space-4) + env(safe-area-inset-top, 0px))
+           max(var(--sheet-gutter), env(safe-area-inset-right, 0px))
+           calc(var(--space-6) + env(safe-area-inset-bottom, 0px))
+           max(var(--sheet-gutter), env(safe-area-inset-left, 0px));
+  overflow: hidden;
+}
+.nesio-fsp-top { display: flex; align-items: center; justify-content: space-between; }
+.nesio-fsp-top-label { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-fsp-icon {
+  min-width: 44px; min-height: 44px; border: none; background: transparent;
+  color: var(--portal-ink); font-size: var(--text-h3); cursor: pointer;
+}
+.nesio-fsp-icon.is-empty { visibility: hidden; }
+
+.nesio-fsp-art {
+  flex: none; align-self: center;
+  width: min(56vw, 220px); aspect-ratio: 1; border-radius: var(--radius-xl);
+  display: grid; place-items: center;
+  background: linear-gradient(150deg, var(--portal-accent-soft-md), var(--portal-accent-soft));
+  border: 1px solid var(--portal-accent-border);
+}
+.nesio-fsp-art-note { font-size: 3rem; color: var(--portal-accent); }
+
+.nesio-fsp-meta { text-align: center; display: flex; flex-direction: column; gap: var(--space-1); }
+.nesio-fsp-meta strong { font-size: var(--text-h3); color: var(--portal-ink); }
+.nesio-fsp-meta span { font-size: var(--text-sm); color: var(--portal-muted); }
+
+.nesio-fsp-lyrics {
+  flex: 1; min-height: 0; overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-4) 0; text-align: center;
+  -webkit-overflow-scrolling: touch;
+}
+.nesio-fsp-lyric {
+  display: flex; flex-direction: column; gap: 2px;
+  border: none; background: transparent; cursor: pointer;
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--text-sm); color: var(--portal-muted);
+  transition: color .2s, font-size .2s;
+}
+.nesio-fsp-lyric.is-on {
+  color: var(--portal-accent); font-size: var(--text-body); font-weight: var(--weight-medium);
+}
+.nesio-fsp-lyric em { font-style: normal; font-size: var(--text-xs); opacity: .75; }
+.nesio-fsp-lyric-note { font-size: var(--text-sm); color: var(--portal-muted); }
+.nesio-fsp-lyric-note.is-src { font-size: var(--text-xs); opacity: .7; margin-top: var(--space-4); }
+.nesio-fsp-lyric-err { display: flex; flex-direction: column; align-items: center; gap: var(--space-2); }
+.nesio-fsp-lyric-err p { font-size: var(--text-sm); color: var(--portal-muted); }
+.nesio-fsp-lyric-err button {
+  min-height: 40px; padding: 0 var(--space-4); border-radius: var(--radius-sm);
+  border: 1px solid var(--portal-accent-border); background: var(--portal-accent-soft);
+  color: var(--portal-accent); font-size: var(--text-sm); cursor: pointer;
+}
+
+.nesio-fsp-seek { display: flex; flex-direction: column; gap: var(--space-1); }
+.nesio-fsp-seek input { width: 100%; accent-color: var(--portal-accent); }
+.nesio-fsp-seek-time {
+  display: flex; justify-content: space-between;
+  font-size: var(--text-xs); color: var(--portal-muted);
+}
+
+.nesio-fsp-ctrl { display: flex; align-items: center; justify-content: center; gap: var(--space-4); }
+.nesio-fsp-play {
+  width: 64px; height: 64px; border-radius: var(--radius-pill);
+  border: 1px solid var(--portal-accent-border); background: var(--portal-accent-soft);
+  color: var(--portal-accent); font-size: var(--text-h3); cursor: pointer;
+}
+.nesio-fsp-step {
+  min-width: 48px; min-height: 48px; border: none; background: transparent;
+  color: var(--portal-ink); font-size: var(--text-h3); cursor: pointer;
+}
+.nesio-fsp-mini {
+  min-width: 44px; min-height: 44px; border: none; background: transparent;
+  color: var(--portal-muted); font-size: var(--text-body); cursor: pointer;
+}
+.nesio-fsp-mini.is-on { color: var(--portal-accent); }
+.nesio-fsp-err {
+  font-size: var(--text-sm); color: var(--status-risk); text-align: center;
+}
+.nesio-fsp-foot { display: flex; justify-content: center; gap: var(--space-2); flex-wrap: wrap; }
+.nesio-fsp-foot-btn {
+  min-height: 40px; padding: 0 var(--space-3); border-radius: var(--radius-pill);
+  border: 1px solid var(--portal-line); background: transparent;
+  color: var(--portal-muted); font-size: var(--text-xs); cursor: pointer;
+}
+.nesio-fsp-foot-btn.is-on {
+  color: var(--portal-accent); border-color: var(--portal-accent-border); background: var(--portal-accent-soft);
+}
+
+/* ── 加到歌单 ─────────────────────────────────────────────────────────────── */
+.nesio-atp {
+  /* 同上:壳交给 NesioSheet(variant=bottom),这里只管里面。 */
+  max-height: 72vh; overflow-y: auto;
+  display: flex; flex-direction: column; gap: var(--space-3);
+  background: var(--glass-bg-solid);
+  padding: var(--space-5) max(var(--sheet-gutter), env(safe-area-inset-right, 0px))
+           calc(var(--space-6) + env(safe-area-inset-bottom, 0px))
+           max(var(--sheet-gutter), env(safe-area-inset-left, 0px));
+}
+.nesio-atp-head { display: flex; align-items: center; justify-content: space-between; }
+.nesio-atp-head strong { font-size: var(--text-body); color: var(--portal-ink); }
+.nesio-atp-head button {
+  min-width: 44px; min-height: 44px; border: none; background: transparent;
+  color: var(--portal-muted); font-size: var(--text-body); cursor: pointer;
+}
+.nesio-atp-track { font-size: var(--text-sm); color: var(--portal-muted); }
+.nesio-atp-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.nesio-atp-row {
+  width: 100%; display: flex; flex-direction: column; gap: 2px; text-align: left;
+  min-height: 52px; padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: transparent; cursor: pointer;
+}
+.nesio-atp-name { font-size: var(--text-sm); color: var(--portal-ink); }
+.nesio-atp-sub { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-atp-msg { font-size: var(--text-xs); color: var(--status-go); padding: var(--space-1) var(--space-3); }
+.nesio-atp-msg.is-bad { color: var(--status-risk); }
+.nesio-atp-new { display: flex; gap: var(--space-2); }
+.nesio-atp-new input {
+  flex: 1; min-width: 0; min-height: 44px; padding: 0 var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: transparent; color: var(--portal-ink); font-size: var(--text-sm);
+}
+.nesio-atp-new button {
+  flex: none; min-height: 44px; padding: 0 var(--space-4);
+  border: 1px solid var(--portal-accent-border); border-radius: var(--radius-sm);
+  background: var(--portal-accent-soft); color: var(--portal-accent);
+  font-size: var(--text-sm); cursor: pointer;
+}
+.nesio-atp-new button:disabled { opacity: .5; cursor: default; }

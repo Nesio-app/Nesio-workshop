@@ -15,6 +15,7 @@
 
 import { getTrackBlob, setTrackDuration, type LocalTrack } from './local-tracks';
 import { nextIndex, playOrder, prevIndex, type RepeatMode } from './queue';
+import { findPlayable, type ProbeOutcome } from './auto-advance';
 import type { MusicLocale } from './source-catalog';
 
 /** 引擎自己会说的几句话。系统说的话翻译,曲名(用户数据)不翻。 */
@@ -68,6 +69,23 @@ let opts: PlayerOptions = { repeat: 'off', shuffle: false, seed: 1, locale: 'zh'
  * 与本地曲库互斥 —— 谁最后放,currentId 就指向谁。
  */
 let remote: { id: string; title: string; artist: string } | null = null;
+
+/**
+ * 远端那条队列(2026-08-01,用户:「哪都没有,自动播放下一个」)。
+ *
+ * 在这之前 step() 放远端曲目时**直接停住**,注释写着「远端目前没有队列概念,
+ * 所以就停在这儿,不假装能续」。那句在当时是诚实的,但结果就是用户说的
+ * 「我要一个个点」—— 一首放完什么都不发生。
+ *
+ * 补上队列之后,远端的「下一首」和本地是同一件事,只是多一步:
+ * 下一首可能取不到音频(受限),那就再往下找 —— 交给 findPlayable,
+ * 它知道什么时候该继续、什么时候该停(风控见一次就停)。
+ */
+let entryQueue: readonly QueueEntry[] = [];
+let resolveRemote: ((id: string) => Promise<ProbeOutcome>) | null = null;
+/** 自动往下找的过程中用户点了别的 —— 用这个序号作废掉上一趟。 */
+let remoteRun = 0;
+let onRemoteStop: ((r: { stop: string; skipped: number }) => void) | null = null;
 let el: HTMLAudioElement | null = null;
 let objectUrl = '';
 const listeners = new Set<(s: PlayerState) => void>();
@@ -123,6 +141,58 @@ export function setOptions(next: PlayerOptions): void {
 }
 
 /**
+ * 队列里的一条。**本地和远端用同一个形状** —— 一个歌单里两种源混着是常态
+ * (自己导的几首 + 网易搜到的几首),队列要是分成两条,「下一首」就会在
+ * 两种源的交界处莫名其妙地停住。
+ */
+export interface QueueEntry {
+  ref: string;
+  source: 'local' | 'netease';
+  id: string;
+  title: string;
+  artist: string;
+  durationSec: number;
+}
+
+/**
+ * 把一批曲目交给引擎当队列,并告诉它**怎么问一首远端的歌能不能放**。
+ *
+ * resolver 由界面注入而不是引擎自己 fetch:哪个源、走哪条路由是界面的事,
+ * 而「往下找到哪儿为止」才是引擎的事。分开之后这两件都能单独测。
+ *
+ * onStop 是**停下来那一刻要说的话**的出口。没有它的话,自动往下找的三种
+ * 停法(风控/断网/都放不了)会静默地什么都不发生 —— 那正是「按了没反应」的根。
+ */
+export function setEntryQueue(
+  list: readonly QueueEntry[],
+  resolver: (id: string) => Promise<ProbeOutcome>,
+  onStop?: (r: { stop: string; skipped: number }) => void,
+): void {
+  entryQueue = list;
+  resolveRemote = resolver;
+  onRemoteStop = onStop || null;
+}
+
+export function currentQueue(): readonly QueueEntry[] {
+  return entryQueue;
+}
+
+/** 放队列里的某一条。本地走 blob,远端先问地址 —— 调用方不用管是哪种。 */
+export async function playEntry(e: QueueEntry): Promise<void> {
+  cancelAutoAdvance();          // 用户明确点了这一首:作废掉正在跑的自动往下找
+  if (e.source === 'local') { await playId(e.id); return; }
+  const resolver = resolveRemote;
+  if (!resolver) { emit({ error: copy().notReady, loading: false, playing: false }); return; }
+  emit({ currentId: e.id, loading: true, error: '' });
+  const run = ++remoteRun;
+  const r = await findPlayable([0], 0, async () => resolver(e.id), { isCancelled: () => run !== remoteRun });
+  if (run !== remoteRun) return;
+  if (r.index >= 0 && r.url) { await playRemote(r.url, { id: e.id, title: e.title, artist: e.artist }); return; }
+  emit({ playing: false, loading: false });
+  onRemoteStop?.({ stop: r.stop, skipped: r.skipped });
+}
+
+/**
  * 音乐面板是不是正开着。
  *
  * 开着的时候悬浮球要让位:那一页底部已经有一条完整的播放条,
@@ -139,6 +209,40 @@ export function setPanelOpen(v: boolean): void {
 
 export function isPanelOpen(): boolean {
   return panelOpen;
+}
+
+/**
+ * 那个 audio 元素本身。**只给需要碰浏览器原生播放能力的地方用**
+ * (目前只有 AirPlay 的投放选择器 —— 它是 audio 元素上的一个方法,
+ * 没有别的调用途径)。控制播放请走上面那些函数,别在外面直接改 src/currentTime:
+ * 那样状态就有两个真源了。
+ */
+export function audioElement(): HTMLAudioElement | null {
+  return typeof document === 'undefined' ? null : audio();
+}
+
+/**
+ * 这台设备能不能投到 AirPlay。
+ *
+ * 只有 Safari(iOS/macOS)有这个 API,而且**必须由用户手势触发** ——
+ * 所以这里只回答「要不要显示那个按钮」,点了之后由系统自己出选择器。
+ *
+ * 蓝牙不在这里:蓝牙是**系统层**的连接,连上之后网页的声音本来就跟着过去了,
+ * 网页既没有 API 也不需要有 —— 给它做一个按钮只会是一个点了什么都不发生的键。
+ * Google Cast 同理:要 SDK,而 iOS Safari 根本不支持。
+ */
+export function canAirPlay(): boolean {
+  if (typeof window === 'undefined') return false;
+  const w = window as unknown as { WebKitPlaybackTargetAvailabilityEvent?: unknown };
+  const a = audio() as unknown as { webkitShowPlaybackTargetPicker?: unknown } | null;
+  return Boolean(w.WebKitPlaybackTargetAvailabilityEvent && a && typeof a.webkitShowPlaybackTargetPicker === 'function');
+}
+
+/** 弹出系统的投放选择器(AirPlay / 支持 AirPlay 的音箱)。必须在用户手势里调。 */
+export function showAirPlayPicker(): boolean {
+  const a = audio() as unknown as { webkitShowPlaybackTargetPicker?: () => void } | null;
+  if (!a || typeof a.webkitShowPlaybackTargetPicker !== 'function') return false;
+  try { a.webkitShowPlaybackTargetPicker(); return true; } catch { return false; }
 }
 
 export function currentState(): PlayerState {
@@ -232,8 +336,9 @@ export async function toggle(): Promise<void> {
 
 export function step(dir: 'next' | 'prev', auto: boolean): void {
   // 正在放远端的那一首时,本地队列里根本没有它 —— 按本地顺序「下一首」会跳到
-  // 一首毫不相干的歌。远端目前没有队列概念,所以就停在这儿,不假装能续。
-  if (remote && remote.id === state.currentId) { emit({ playing: false }); audio()?.pause(); return; }
+  // 一首毫不相干的歌。走远端自己那条队列。
+  if (entryQueue.some((e) => e.id === state.currentId)) { void stepEntry(dir, auto); return; }
+  if (remote && remote.id === state.currentId) { void stepEntry(dir, auto); return; }
   if (!tracks.length) return;
   const order = playOrder(tracks.length, opts.shuffle, opts.seed);
   const cur = Math.max(0, tracks.findIndex((t) => t.id === state.currentId));
@@ -246,6 +351,54 @@ export function step(dir: 'next' | 'prev', auto: boolean): void {
   }
   const t = tracks[idx];
   if (t) void playId(t.id);
+}
+
+/**
+ * 远端的上一首/下一首。和本地的差别只有一处:下一首**可能取不到音频**,
+ * 那就继续往下找 —— 但风控时立刻停(见 auto-advance 里那段说明)。
+ */
+async function stepEntry(dir: 'next' | 'prev', auto: boolean): Promise<void> {
+  const resolver = resolveRemote;
+  if (!entryQueue.length || !resolver) {
+    // 没有队列可续:停住,别假装能续。
+    audio()?.pause();
+    emit({ playing: false });
+    return;
+  }
+  const order = playOrder(entryQueue.length, opts.shuffle, opts.seed);
+  const cur = Math.max(0, entryQueue.findIndex((t) => t.id === state.currentId));
+  const idx = dir === 'next' ? nextIndex(cur, order, opts.repeat, auto) : prevIndex(cur, order);
+  if (idx == null) { audio()?.pause(); emit({ playing: false }); return; }
+
+  const startPos = Math.max(0, order.indexOf(idx));
+  const run = ++remoteRun;
+  emit({ loading: true, error: '' });
+  const r = await findPlayable(order, startPos, async (i) => {
+    const t = entryQueue[i];
+    if (!t) return { kind: 'failed' };
+    // 本地曲目不用问任何人 —— 文件就在这台机器上。给一个占位 url 让 findPlayable
+    // 认为「这一首行」,真正的播放走下面的 playEntry(它会分派到 blob 那条路)。
+    if (t.source === 'local') return { kind: 'ok', url: 'local' };
+    return resolver(t.id);
+  }, { isCancelled: () => run !== remoteRun });
+
+  if (run !== remoteRun) return;          // 这一趟已经被用户点别的作废了
+  if (r.index >= 0 && r.url) {
+    const t = entryQueue[r.index];
+    if (t.source === 'local') await playId(t.id);
+    else await playRemote(r.url, { id: t.id, title: t.title, artist: t.artist });
+    // 跳过了几首也要说 —— 默默换歌用户会以为自己点错了
+    if (r.skipped > 0) onRemoteStop?.({ stop: 'played', skipped: r.skipped });
+    return;
+  }
+  audio()?.pause();
+  emit({ playing: false, loading: false });
+  onRemoteStop?.({ stop: r.stop, skipped: r.skipped });
+}
+
+/** 用户手动点了别的 —— 作废掉正在跑的那一趟自动往下找。 */
+export function cancelAutoAdvance(): void {
+  remoteRun += 1;
 }
 
 export function seek(sec: number): void {

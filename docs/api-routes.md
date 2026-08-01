@@ -68,6 +68,7 @@ Auth legend:
 | DELETE /api/portal/music/spotify | guardAiRoute (10/min) — 断开(清 httpOnly cookie) |
 | GET /api/portal/music/netease/search | guardAiRoute (20/min) — 网易云搜索。**默认直连**(weapi,协议在 `lib/platform/music/netease-protocol`),配了 `NETEASE_API_BASE` 才转发给自建实例。风控回 `{ok:false,reason:'blocked'}` 而非 502 —— 换个词再搜没用,这不是故障 |
 | GET /api/portal/music/netease/song-url | guardAiRoute (30/min) — 逐曲问播放地址,默认直连(weapi → 回退 `song/media/outer/url`,两条都拿不到才算受限)。**四态分开,四个不同的下一步**:`{ok:true,url}`;`{ok:true,url:'',reason:'restricted'}`(这一首受限 → 换一首,**不给重试**);`{ok:false,reason:'blocked'}`(整台被风控 → 换歌没用);502(真故障 → 重试)。拿到的地址一律改写成 https,否则 https 页面上的混合内容会被浏览器静默拦掉。2026-07-31 新增 |
+| GET /api/portal/music/netease/lyric | guardAiRoute (40/min) — 一首歌的歌词(LRC + 翻译),默认直连 weapi,配了 `NETEASE_API_BASE` 才转发。**服务的不只是网易的歌**:本地导入的 mp3 自己没带词时,拿曲名搜一首同名的再来这里取词(用户:「本地没歌词的,都用网易歌词」)。「没有词」`{ok:true,lrc:''}` 与「取不到」502/blocked 分开 —— 纯音乐不该挂一个点不好的重试。2026-08-01 新增 |
 | GET /api/auth/session | open (reports session state) |
 
 ## OAuth flows (pre-auth by design)

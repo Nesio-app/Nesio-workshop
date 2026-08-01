@@ -233,3 +233,36 @@ export async function songUrlDirect(id: string): Promise<UpstreamOutcome<string>
   if (sawFailure) return { kind: 'failed' };
   return { kind: 'restricted' };
 }
+
+/* ── 取歌词 ──────────────────────────────────────────────────────────────── */
+
+export interface NeteaseLyric {
+  /** LRC 原文(带时间戳)。空串 = 这一首没有歌词(纯音乐/没人做过)。 */
+  lrc: string;
+  /** 翻译版 LRC。中文用户听外文歌时是主要看的那一份。没有就空串。 */
+  translated: string;
+}
+
+/**
+ * 一首歌的歌词。
+ *
+ * 「没有歌词」和「取不到歌词」是两件事,分开报:
+ *   · 纯音乐 / 没人做过词 → `{ kind:'ok', value:{ lrc:'' } }`,界面说「这一首没有歌词」,
+ *     不该给重试按钮 —— 重试一万次也还是没有。
+ *   · 被风控 / 网络挂     → blocked / failed,界面才给重试。
+ * 合成一句「歌词加载失败」的代价,就是纯音乐上永远挂着一个点不好的重试。
+ */
+export async function lyricDirect(id: string): Promise<UpstreamOutcome<NeteaseLyric>> {
+  try {
+    const j = await postWeapi('https://music.163.com/weapi/song/lyric', {
+      id, lv: -1, kv: -1, tv: -1, csrf_token: '',
+    });
+    if (!j) return { kind: 'failed' };
+    if (isRiskControl(j['code'])) return { kind: 'blocked' };
+    const lrc = String((j['lrc'] as { lyric?: string } | undefined)?.lyric || '');
+    const translated = String((j['tlyric'] as { lyric?: string } | undefined)?.lyric || '');
+    return { kind: 'ok', value: { lrc, translated } };
+  } catch {
+    return { kind: 'failed' };
+  }
+}
