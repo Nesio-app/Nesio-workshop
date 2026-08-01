@@ -279,19 +279,30 @@ const code = stripComments;
 // 这四条的共同点:**功能都「做了」,但用户按不到或看不出来**。
 // 这类回退最阴——代码里那一行明明在,契约要压的是它在屏幕上的处境。
 {
-  // (a) 主动卡不能只有手势。批次 33 撤掉了 ✕ 只留左右滑,之后手势被实测打回三次
-  //     (「向右滑动还是失败」→「向左拉还是拉不动」)。手势失灵时,卡就永远关不掉。
+  /*
+   * (a) 主动卡的出口。
+   *
+   * 这一条改过两次,两次都是用户定的:
+   *   · 2026-07-31 他实测「向左拉还是拉不动」,而我定不出左滑为什么不跟手,
+   *     于是补了一枚 ✕ —— 那时这里断言的是「必须有一个不依赖手势的出口」;
+   *   · 2026-08-01 他说「卡片的取消是左右滑,不需要右上角 x」,✕ 撤掉。
+   *
+   * 所以现在压的是**手势那条路还在**,而不是「有几个出口」。
+   * ⚠️ 这条契约的局限要说清楚:它只能保证手势的代码在,
+   * **保证不了它在真机上跟手** —— 而恰恰是那件事被实测打回过三次。
+   * 手势要是又失灵,这条契约会照常绿。到那时该去修手势(或按用户当时的意思
+   * 重新给一个出口),而不是以为「契约绿着就没事」。
+   */
   const gcard = code(read('components/portal/today/ProactiveGuidanceCard.tsx'));
-  assert.ok(
-    /className="nesio-proactive-card-dismiss"[\s\S]{0,400}handleSnooze\(\)/.test(gcard),
-    '主动卡必须有一个不依赖手势的出口(✕)—— 手势可以更快,但不能是唯一的那条路',
-  );
+  assert.ok(/onPointerDown/.test(gcard) && /onPointerUp/.test(gcard),
+    '主动卡的手势出口没了 —— ✕ 已按用户要求撤掉,手势是现在**唯一**的关闭方式,不能再少');
+  assert.ok(/ddx < -64/.test(gcard) && /ddx > 64/.test(gcard),
+    '左右两个方向都要有阈值判定 —— 只剩一个方向等于半条出口');
+  assert.ok(/handleSnooze\(\)/.test(gcard), '右滑要落到 handleSnooze(稍后再说)');
+  // ✕ 确实撤了(不是两套并存 —— 用户要的是「只用滑」)
+  assert.ok(!/className="nesio-proactive-card-dismiss"/.test(gcard),
+    '用户 2026-08-01 明确不要右上角 ✕ 了,它不该长回来');
   const css = read('app/globals.css');
-  const dismissBlk = css.slice(css.indexOf('.nesio-proactive-card-dismiss {'));
-  assert.ok(
-    /min-height: var\(--tap-min/.test(dismissBlk.slice(0, 600)),
-    '✕ 的触摸区要到 --tap-min —— 20px 的靶子在手机上按一半在外面,那就是另一种「点了没反应」',
-  );
 
   // (b) 时间线上的 ✕ 必须在**行内**。日历那条原来把 ✕ 放在 <li> 底下(因为行是个
   //     <button>,✕ 不能嵌进去),块级流一走,✕ 就掉到条目下面一行、贴最左,
@@ -319,4 +330,4 @@ const code = stripComments;
   );
 }
 
-console.log('qa-ui-truth: OK(file input 可点 · 头像手势 · 深链自增号 · 一件事一个数 · 攒钱进度 · 提醒可关 · 出口不只手势 · ✕ 在行内 · 录音看得出来)');
+console.log('qa-ui-truth: OK(file input 可点 · 头像手势 · 深链自增号 · 一件事一个数 · 攒钱进度 · 提醒可关 · 手势出口还在 · ✕ 在行内 · 录音看得出来)');

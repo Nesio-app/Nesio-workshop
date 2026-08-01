@@ -47,6 +47,7 @@ import {
 // 提醒在时间线上的身影:两个建提醒的入口共用同一份 —— 只在一处建的话,
 // 「设好的提醒进入时间线」就只对首页那条输入生效,从这一页加的看不见。
 import { createReminderShadow, removeReminderShadow } from '@/lib/portal/reminder-shadow';
+import { mailDirectionOf } from '@/lib/portal/mail-direction';
 import {
   parseWallClock, scheduleRemindersReady, SCHEDULE_REMINDERS_EVENT,
   type Reminder, type ReminderKind,
@@ -184,7 +185,7 @@ function stripPrefix(name: string): string {
  * 只认横向手势:纵向位移更大时立刻放手,免得把页面滚动吃掉。
  */
 function SwipeRow({ row, kind, dict, starred, dateLabel, fixes, onOpen, onStar, onDelete, onFixTag }: {
-  row: Row; kind: SubTab; dict: 'zh' | 'en'; starred: boolean; dateLabel: string;
+  row: Row; kind: SubTab; dict: 'zh' | 'en'; starred: boolean; dateLabel: { day: string; time: string };
   /** 用户改过的标签(这一封 / 发件人规则)。见 lib/portal/mail-tag-fix.ts。 */
   fixes: MailTagFixStore;
   /** 可缺省:提醒行没有记忆节点可开 —— 缺省时整行不再是「可点开」的。 */
@@ -327,7 +328,14 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, fixes, onOpen, onStar, 
               </span>
             )}{row.title}
           </span>
-          <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{dateLabel}</span>
+          {/* 2026-08-01(用户:「时间显示到日子下面,一行太挤了」):日期一行、钟点一行,
+              右对齐。挤在一行的话标题会被压得只剩两三个字。 */}
+          <span style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', lineHeight: 1.25 }}>
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{dateLabel.day}</span>
+            {dateLabel.time && (
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{dateLabel.time}</span>
+            )}
+          </span>
         </div>
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-1)', alignItems: 'center', flexWrap: 'wrap' }}>
           {row.meta && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '70%' }}>{row.meta}</span>}
@@ -905,6 +913,21 @@ export default function SchedulePanel() {
     // 提醒进同一张列表。**做完的不进** —— 它们在「已完成」那一面,混进待办里
     // 会让人以为还没做。CHORE_RE 那道过滤只管日历项(挡的是待办 App 同步进来的
     // 循环任务),提醒是用户亲手设的,一个字都不许被关键词吃掉。
+    /*
+     * 2026-08-01(用户:「提醒点一下,目前进不到记忆详情」)。
+     *
+     * 提醒行原来一律 `node: undefined` —— 注释写的是「提醒不是 life-graph 节点」。
+     * 那句话只对了一半:提醒**本体**确实住在 schedule-reminders,但它在记忆里
+     * 一直有一条身影(reminder-shadow,标着 reminderId)。也就是说详情是有的,
+     * 只是这张列表没去找。找一下就能点开。
+     *
+     * 先按 reminderId 建索引再查,不在循环里线性扫 —— 提醒和节点都可能上千条。
+     */
+    const shadowByReminder = new Map<string, LifeNode>();
+    for (const n of nodes) {
+      const rid = (n.attributes || {}).reminderId;
+      if (typeof rid === 'string' && rid) shadowByReminder.set(rid, n);
+    }
     for (const r of reminders) {
       if (r.doneAt) continue;
       const rep = repeatLabel(r, dict);
@@ -917,6 +940,9 @@ export default function SchedulePanel() {
         extra: L(dict, '提醒', 'reminder'),
         query: r.title,
         reminder: r,
+        // 有身影就能开详情;老提醒(这个功能之前设的)没有身影,那一条仍然不可点 ——
+        // 画一个点了什么也不会发生的入口比没有更糟。
+        ...(shadowByReminder.get(r.id) ? { node: shadowByReminder.get(r.id) } : {}),
         googleLabels: [L(dict, '我设的提醒', 'My reminders')],
         body: r.note || '',
       });
@@ -939,8 +965,26 @@ export default function SchedulePanel() {
     return [...upcoming, ...past];
   }, [nodes, reminders, dict]);
 
-  /** 这条是不是我发出去的。老节点没有这个字段 → 当收件(和改之前的行为一致,不让旧数据凭空消失)。 */
-  const isSent = (n: LifeNode) => (n.attributes || {}).mailDirection === 'sent';
+  /**
+   * 这条是不是我发出去的。
+   *
+   * 2026-08-01(用户第三次指同两封「Your Day Ahead」,而且说了「同步后还是没变化」):
+   * 光读 mailDirection 是不够的 —— 那个字段是**同步当时**按当时的判据写死的,
+   * 而 Gmail 同步是增量的(after:),老邮件根本不会被重新拉一遍。
+   * 也就是说:同步侧的判据改对了,这两封仍旧躺在发件箱里,永远。
+   *
+   * 所以读取侧要能自己纠正。节点上存着 from 和 to,判据(收件人里除了我还有没有别人)
+   * 用这两个就能跑 —— 判据本体和同步侧共用 lib/portal/mail-direction,不写两份。
+   */
+  const isSent = (n: LifeNode) => {
+    const a = n.attributes || {};
+    return mailDirectionOf({
+      from: typeof a.from === 'string' ? a.from : '',
+      to: typeof a.to === 'string' ? a.to : '',
+      cc: typeof a.cc === 'string' ? a.cc : '',
+      storedDirection: typeof a.mailDirection === 'string' ? a.mailDirection : '',
+    }) === 'sent';
+  };
 
   const emailRows = useMemo<Row[]>(() => {
     return nodes
@@ -1128,15 +1172,14 @@ export default function SchedulePanel() {
    * 后者会把用户真的设在午夜的那条也吞掉。只有日期的串(YYYY-MM-DD,
    * 比如按 recordedAt/date 落进来的那两类)没有 T,自然就只显示日期。
    */
-  const fmtDay = (iso: string) => {
+  const fmtDay = (iso: string): { day: string; time: string } => {
     const d = new Date(iso);
-    if (Number.isNaN(d.getTime())) return '';
+    if (Number.isNaN(d.getTime())) return { day: '', time: '' };
     const day = dict === 'en'
       ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       : `${d.getMonth() + 1}月${d.getDate()}日`;
-    if (!/T\d{2}:\d{2}/.test(String(iso))) return day;
-    const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-    return `${day} ${hm}`;
+    if (!/T\d{2}:\d{2}/.test(String(iso))) return { day, time: '' };
+    return { day, time: `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` };
   };
 
 

@@ -32,31 +32,19 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
  * (源码判据在这里压不住:在那行前面插一句 `return raw;`,正则照样匹配得到。
  *  第一版就是这么写的,注入回归当场抓出来。)
  */
-function fakeIndexedDB(seed = new Map()) {
-  const store = seed;
-  const tx = () => ({
-    objectStore: () => ({
-      put(v, k) { store.set(k, v); queueMicrotask(() => this._tx.oncomplete?.()); return { _tx: this._tx }; },
+function fakeDb(store = new Map()) {
+  const mkTx = () => {
+    const tx = {};
+    const os = {
+      put(v, k) { store.set(k, v); queueMicrotask(() => tx.oncomplete?.()); return {}; },
       get(k) { const r = { result: store.get(k) ?? undefined }; queueMicrotask(() => r.onsuccess?.()); return r; },
-      delete(k) { store.delete(k); queueMicrotask(() => this._tx.oncomplete?.()); return {}; },
-      clear() { store.clear(); queueMicrotask(() => this._tx.oncomplete?.()); return {}; },
-    }),
-  });
-  return {
-    _store: store,
-    open() {
-      const req = {};
-      queueMicrotask(() => {
-        req.result = {
-          objectStoreNames: { contains: () => true },
-          createObjectStore: () => {},
-          transaction() { const t = tx(); const os = t.objectStore(); os._tx = t; t.objectStore = () => os; return t; },
-        };
-        req.onsuccess?.();
-      });
-      return req;
-    },
+      delete(k) { store.delete(k); queueMicrotask(() => tx.oncomplete?.()); return {}; },
+      clear() { store.clear(); queueMicrotask(() => tx.oncomplete?.()); return {}; },
+    };
+    tx.objectStore = () => os;
+    return tx;
   };
+  return { _store: store, transaction: mkTx };
 }
 
 function loadTs(rel, extra = {}) {
@@ -66,7 +54,15 @@ function loadTs(rel, extra = {}) {
   const mod = { exports: {} };
   vm.runInNewContext(js, {
     module: mod, exports: mod.exports, console,
-    require: () => ({ logDropped: () => {}, reportStorageDropped: () => {} }),
+    require: (spec) => {
+      // 2026-08-01 合并 main:开库这一段被抽到 lib/idb/open-simple-db。
+      // stub 掉它,返回下面那个最小替身 —— 判据压的是 getTrackBlob 的行为,
+      // 不是 IndexedDB 自己怎么开。
+      if (String(spec).includes('open-simple-db')) {
+        return { openSimpleDb: async () => (extra.__db || null) };
+      }
+      return { logDropped: () => {}, reportStorageDropped: () => {} };
+    },
     Date, Math, Number, Array, Object, String, Set, Map, JSON, isNaN, RegExp, Boolean, Blob,
     Promise, queueMicrotask, Number_isFinite: Number.isFinite,
     ...extra,
@@ -146,7 +142,7 @@ const LT = loadTs('lib/platform/music/local-tracks.ts');
   //    正则照样匹配得到、照样绿。所以喂真 blob 进去,看拿回来的是什么。
   const seed = new Map();
   const withDb = loadTs('lib/platform/music/local-tracks.ts', {
-    indexedDB: fakeIndexedDB(seed),
+    __db: fakeDb(seed),
     window: { addEventListener() {}, removeEventListener() {}, dispatchEvent() {} },
     localStorage: (() => { const m = new Map(); return { getItem: (k) => m.get(k) ?? null, setItem: (k, v) => m.set(k, v), removeItem: (k) => m.delete(k) }; })(),
     CustomEvent: class { constructor(t) { this.type = t; } },
