@@ -52,7 +52,7 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const t = (zh: string, en: string) => L(dict, zh, en);
   const [phase, setPhase] = useState<Phase>({ s: 'checking' });
-  const [reward, setReward] = useState('');            // 这件家务值多少钱(接回零花钱账本;留空=0,只当待办)
+  const [reward, setReward] = useState('');            // 这件家务值多少**分**(留空=0,做完仍给底分)
   const [needsApproval, setNeedsApproval] = useState(true); // 要不要家长看一眼再计入
   const [repeat, setRepeat] = useState<'once' | 'daily' | 'weekly'>('once'); // 周期:一次/每天/每周(接 chores-core cadence)
   const [cancelBusy, setCancelBusy] = useState(false);
@@ -242,12 +242,14 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
         ))}
       </div>
 
-      {/* 金额:接回零花钱账本。留空 = 纯待办(不计钱)。 */}
+      {/* 积分:做完加到 TA 的积分池(2026-08-01,原来这里是「$ 给多少」——
+          钱那套已经整个换成积分了)。留空 = 不特别标价,做完照样给一份底分
+          (chorePointValue 里的 POINTS_PER_UNPAID_CHORE)。 */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>$</span>
+        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>{t('分', 'pts')}</span>
         <input
-          inputMode="decimal" value={reward} onChange={(e) => setReward(e.target.value)}
-          placeholder={t('给多少(可留空)', 'Reward (optional)')}
+          inputMode="numeric" value={reward} onChange={(e) => setReward(e.target.value.replace(/[^0-9]/g, ''))}
+          placeholder={t('值多少分(可留空)', 'Points (optional)')}
           style={{ flex: 1, minWidth: 0, padding: 'var(--space-1) var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)' }}
         />
         <label style={{ display: 'inline-flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', cursor: 'pointer', whiteSpace: 'nowrap' }}>

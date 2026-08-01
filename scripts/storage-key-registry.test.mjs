@@ -93,6 +93,8 @@ const KNOWN_KEYS = new Map([
   ["nesio-last-location-v1", "cache"],
   // 「今天看没看过简报」。cache —— 换台设备从零开始是对的：
   // 它是这台机器上的 UI 状态，不是用户数据。
+  // 悬浮播放球被拖到了哪。cache —— 这台机器上的 UI 状态,换设备回默认角是对的。
+  ["nesio-fp-pos-v1", "cache"],
   ["nesio-daily-brief-seen-v1", "cache"],
   // 每日日报卡片「今天先不看」——同上，UI 状态，cache。
   ["nesio-daily-report-card-dismiss-v1", "cache"],

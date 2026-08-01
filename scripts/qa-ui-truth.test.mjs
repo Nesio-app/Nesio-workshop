@@ -151,18 +151,28 @@ const code = stripComments;
 // owed = earned − 已发放。家长一发工钱进度就倒退,发多了直接变负 ——
 // 用户看到的是「¥-20.00 / ¥100.00 · 还差 ¥120.00」。
 {
-  // bug3:这块已按标注从「家庭分享」搬进奖励模块(愿望集成到 rewards)。断言跟着搬,
-  // 病根不变 —— 进度分母必须是 earned(累计挣到的),不是 owed(还没发的工钱)。
-  const goal = code(read('components/portal/family/FamilyGoalCard.tsx'));
-  assert.ok(/\.earned/.test(goal), '攒钱进度没有取 earned(累计挣到的)');
-  assert.ok(/const reached = earned >= goal/.test(goal), '「攒够了」必须拿 earned 判 —— 用 owed 发过工钱之后永远达不到');
-  assert.ok(!/\bowed\b/.test(goal), '攒钱目标卡里不许出现 owed —— 它一发工钱就掉,进度会倒退甚至变负');
+  /*
+   * 这条改过三次,**病根一次没变**:给用户看的进度不许用 owed(还没发的工钱)——
+   * 家长一发工钱就倒退,发多了直接变负(「¥-20.00 / ¥100.00」那一幕)。
+   *   · bug3:从「家庭分享」搬进奖励模块(FamilyGoalCard);
+   *   · 2026-08-01「乐高并入愿望清单」+「家务也挣积分」:那张卡片整个撤了,
+   *     钱这套 UI 也一起撤 —— 现在只有积分,而积分**只加不减**,
+   *     负数在这套里根本没有意义。已设过的目标搬成一条积分愿望。
+   * 所以现在压的是「owed 不许再出现在给用户看的地方」。
+   */
   const fam = code(read('components/portal/family/FamilySharingSheet.tsx'));
   assert.ok(!/GoalSection/.test(fam), '家庭板里不许再留一份攒钱目标 —— 两个愿望拆在两页就是原问题');
+  assert.ok(/points\(e\.earned, dict\)/.test(fam),
+    '「大家」那一列要报 earned —— 原来报的是 owed,发一次工钱就掉一截');
+  assert.ok(/points\(Math\.max\(0, ledger\.balance\.earned\), dict\)/.test(fam),
+    '账本头要报 earned 且夹在 0 以上 —— 用户实测那张「已多给 TA ¥20.00」就是 owed 翻负');
+  assert.ok(!/已多给|overpaid|还欠 TA|You still owe/.test(fam),
+    '「还欠 / 已多给」整套借贷话术要撤 —— 积分只加不减,不存在欠不欠');
   const store = code(read('components/portal/RewardsStore.tsx'));
-  assert.ok(/FamilyGoalCard/.test(store), '奖励模块必须挂上攒钱目标卡(愿望集成到 rewards)');
+  assert.ok(!/FamilyGoalCard/.test(store),
+    '独立的攒钱目标卡已并进愿望清单(用户 2026-08-01 点名)—— 一页两种加法、两种进度条是原问题');
   const server = code(read('lib/family/family-server.ts'));
-  assert.ok(/earned:\s*bal\.earned/.test(server), '服务端没把 earned 发给客户端,前端算不出真实攒钱进度');
+  assert.ok(/earned:\s*bal\.earned/.test(server), '服务端要把 earned 发给客户端,否则前端只剩 owed 可用');
 }
 
 // ── ⑥ (已撤)例行提醒卡的「不再提醒」出口 ─────────────────────────────────────

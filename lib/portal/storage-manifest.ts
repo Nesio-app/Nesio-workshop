@@ -94,6 +94,8 @@ export const CACHE_KEYS = new Set<string>([
   // 单设备草稿/测试位 —— 云同步会让它们「删了又复活」(QA:草稿乱码清不掉、测试 Pro 位跨设备扩散)
   // 「今天看没看过简报」的日键。cache —— 这是这台机器上的 UI 状态,
   // 不是用户数据;换台设备第一次打开时重新提示一遍,正是对的行为。
+  // 悬浮播放球被拖到了哪。cache:换台设备回到默认角正是对的行为。
+  'nesio-fp-pos-v1',
   'nesio-daily-brief-seen-v1',
   // 每日日报卡片「今天先不看」的日键——同上一条,同一类 UI 状态。
   'nesio-daily-report-card-dismiss-v1',
