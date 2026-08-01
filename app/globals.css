@@ -21289,16 +21289,34 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
    位置:底部导航**之上**、右侧。z=935 夹在洞察浮层(929/930)与 elevated(940)之间
    —— 高于浮层所以每一页都看得见,低于 elevated 所以从洞察里再开的抽屉不会被它压住。
    颜色全走 token;关闭键用 muted 而不是 --status-risk:关掉音乐不是风险,别制造焦虑。 */
+/* 定位挂在**外层**(2026-08-01 加了长按拖动:拖动要改 left/top,而按钮自己
+   还要保持 position:relative 给进度环做定位上下文)。 */
 .nesio-fp,
-.nesio-fp-ball {
+.nesio-fp-ball-wrap {
   position: fixed;
   right: var(--space-4);
   bottom: calc(env(safe-area-inset-bottom, 0px) + 4.6rem);
   z-index: 935;
+  touch-action: none;   /* 拖它的时候别让页面跟着滚 */
+  transition: opacity 0.28s var(--ease-out);
 }
+/* 3 秒不碰就淡下去(用户点名)。**不消失** —— 消失了「怎么关掉这首歌」
+   就又没有答案了。碰一下就恢复。 */
+.nesio-fp.is-dim,
+.nesio-fp-ball-wrap.is-dim { opacity: 0.42; }
+/* 拖动中:抬起来一点,让人看得出「它现在跟着我的手」 */
+.nesio-fp.is-dragging,
+.nesio-fp-ball-wrap.is-dragging {
+  opacity: 1;
+  transform: scale(1.06);
+  transition: transform 0.12s var(--ease-out);
+}
+.nesio-fp.is-dragging .nesio-fp-btn,
+.nesio-fp-ball-wrap.is-dragging .nesio-fp-ball { pointer-events: none; }
 
 /* 收起态:一个圆球 + 一圈进度环 */
 .nesio-fp-ball {
+  position: relative;   /* 进度环 inset:-1px 靠它定位 */
   width: 56px; height: 56px;
   display: grid; place-items: center;
   border: 1px solid var(--portal-accent-border);
@@ -21307,6 +21325,18 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.16);
   cursor: pointer; padding: 0;
 }
+/* 曲名条整块可点 = 收起(2026-08-01)。它从 <div> 变成了 <button>,
+   要去掉浏览器给按钮的默认外观,否则会在胶囊里长出一个方框。 */
+.nesio-fp-meta {
+  border: none;
+  background: none;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
 .nesio-fp-ring {
   position: absolute; inset: -1px;
   border-radius: var(--radius-pill);
