@@ -111,7 +111,7 @@ function buildLocationTree(objectNodes: LifeNode[]): { tree: LocationTree[]; unl
 
 function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: LifeNode) => void }) {
   const dict = useDict();
-  const objectNodes = nodes.filter((n) => n.type === 'object');
+  const objectNodes = nodes.filter((n) => n.type === 'Thing');
   const [expandedPlaces, setExpandedPlaces] = useState<Set<string>>(new Set());
   const [expandedRooms, setExpandedRooms] = useState<Set<string>>(new Set());
 
@@ -216,24 +216,26 @@ function ObjectMap({ nodes, onOpenNode }: { nodes: LifeNode[]; onOpenNode: (n: L
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
+// 2026-08-01 改名批:object→Thing / commitment→task / health_state+preference→Mind(合并,
+// 取 health_state 原色/中文标签)/ note→collection。
 const TYPE_BG: Record<string, string> = {
-  person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
-  event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
-  note: 'var(--chip-lemon)', // 批次 143
+  person: 'var(--chip-indigo)', Thing: 'var(--chip-blue)', place: 'var(--chip-green)',
+  event: 'var(--chip-amber)', task: 'var(--chip-violet)', Mind: 'var(--chip-pink)',
+  collection: 'var(--chip-lemon)', // 批次 143
 };
 const TYPE_LABEL_ZH: Record<string, string> = {
-  person: '人物', object: '物品', place: '地点',
-  event: '事件', commitment: '承诺', health_state: '健康', preference: '偏好', note: '笔记',
+  person: '人物', Thing: '物品', place: '地点',
+  event: '事件', task: '待办', Mind: '心念', collection: '笔记',
 };
 const TYPE_LABEL_EN: Record<string, string> = {
-  person: 'People', object: 'Items', place: 'Places',
-  event: 'Events', commitment: 'Promises', health_state: 'Health', preference: 'Preferences', note: 'Notes',
+  person: 'People', Thing: 'Items', place: 'Places',
+  event: 'Events', task: 'Tasks', Mind: 'Mind', collection: 'Notes',
 };
 function typeLabel(t: string, dict: DictLocale): string {
   return (dict === 'en' ? TYPE_LABEL_EN : TYPE_LABEL_ZH)[t] ?? t;
 }
 // 批次 174:'place' 从类型筛选芯片移除(退役 —— 无真实数据源)。老 place 节点仍在「全部」里渲染,清除样例即消失。
-const TYPE_ORDER = ['person', 'object', 'event', 'commitment', 'health_state', 'preference', 'note'];
+const TYPE_ORDER = ['person', 'Thing', 'event', 'task', 'Mind', 'collection'];
 
 
 const COPY = {
@@ -384,18 +386,18 @@ function getNodeTypeMeta(node: LifeNode, dict: DictLocale = 'zh') {
   const str = (v: unknown) => (typeof v === 'string' && v ? v : '');
   switch (node.type) {
     case 'person': return { extra: str(a.relation) || str(a.role) || str(a.company) };
-    case 'health_state': {
+    case 'Mind': {
       const dateStr = str(a.date) || str(a.recordedAt);
       const dateLabel = dateStr ? new Date(dateStr).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' }) : '';
       const status = str(a.status);
       const badgeColor = status.includes('恢复') ? 'var(--status-go)' : status.includes('注意') ? 'var(--status-gentle)' : 'var(--portal-cool-accent)';
       return { extra: dateLabel, badge: status || undefined, badgeColor: status ? badgeColor : undefined };
     }
-    case 'commitment': {
+    case 'task': {
       const dueStr = str(a.dueDate) || str(a.due) || str(a.date);
       return { extra: dueStr ? L(dict, `截止 ${new Date(dueStr).toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })}`, `Due ${new Date(dueStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`) : '' };
     }
-    case 'object': {
+    case 'Thing': {
       const loc = str(a.location) || str(a.where) || str(a.place) || str(a.storage);
       return { extra: loc };
     }
@@ -440,7 +442,7 @@ function sourceMeta(node: LifeNode, dict: DictLocale): { label: string; icon: Re
 
 /** 卡片分类名(设计:分类图标 + 分类名领头)。心情记录 → 情绪(不是「健康」)。 */
 function categoryLabelForCard(node: LifeNode, dict: DictLocale): string {
-  if (node.type === 'health_state') {
+  if (node.type === 'Mind') {
     const tags = node.tags || [];
     if (tags.includes('feeling') || tags.includes('moment')) return L(dict, '情绪', 'Mood');
   }
@@ -546,7 +548,7 @@ function LongPressSheet({
   const addToInventory = () => {
     const live = getLifeGraph().find((x) => x.id === node.id);
     const tags = live?.tags || [];
-    updateLifeNode(node.id, { type: 'object', tags: tags.includes('收纳') ? tags : [...tags, '收纳'] });
+    updateLifeNode(node.id, { type: 'Thing', tags: tags.includes('收纳') ? tags : [...tags, '收纳'] });
     onClose();
   };
   // 批次 171(用户实锤·对标微信长按):竖排文字按钮 → 图标横排 + 下方小字。
@@ -619,7 +621,7 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
   const { extra, badge, badgeColor } = getNodeTypeMeta(node, dict);
   const srcMeta = sourceMeta(node, dict);
   const catLabel = categoryLabelForCard(node, dict);
-  const isMood = node.type === 'health_state' && (node.tags || []).some((t) => t === 'feeling' || t === 'moment');
+  const isMood = node.type === 'Mind' && (node.tags || []).some((t) => t === 'feeling' || t === 'moment');
   const isPerson = node.type === 'person';
   const { initials, bg: avatarBg } = isPerson ? getPersonInitials(node.name) : { initials: '', bg: '' };
   const uncertain = isNodeUncertain(node);
@@ -893,7 +895,7 @@ function ProjectDetailSheet({
         <div className="nesio-project-detail-stats">
           <span>{nodes.length} {L(dict, '条记录', 'entries')}</span>
           <span>·</span>
-          <span>{nodes.filter((n) => n.type === 'commitment').length} {L(dict, '个承诺', 'promises')}</span>
+          <span>{nodes.filter((n) => n.type === 'task').length} {L(dict, '个承诺', 'promises')}</span>
         </div>
         {nodes.length === 0 ? (
           <p className="nesio-project-detail-empty">{L(dict, '还没有记录。在记忆卡片里长按可以加入项目。', 'Nothing here yet. Long-press a memory card to add it.')}</p>
@@ -975,14 +977,16 @@ function CreateProjectSheet({
 
 // ── Memory Relation Graph builders ───────────────────────────────────────────
 
+// 2026-08-01 改名批同时补一个老 bug:这张表以前没有 note 的颜色(TYPE_ORDER 里却有
+// note 这一档,点没颜色),顺手把改名后的 collection 补上。
 const MEM_NODE_COLOR: Record<string, string> = {
-  person:       'var(--portal-accent)',
-  object:       'var(--status-calm)',
-  place:        'var(--status-go)',
-  event:        'var(--status-gentle)',
-  commitment:   'var(--portal-cool-accent)',
-  health_state: 'var(--status-risk)',
-  preference:   'var(--portal-muted)',
+  person:     'var(--portal-accent)',
+  Thing:      'var(--status-calm)',
+  place:      'var(--status-go)',
+  event:      'var(--status-gentle)',
+  task:       'var(--portal-cool-accent)',
+  Mind:       'var(--status-risk)',
+  collection: 'var(--chip-lemon)',
 };
 
 function buildMemGraphNodes(nodes: LifeNode[]): GNode[] {

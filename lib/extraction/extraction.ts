@@ -34,30 +34,30 @@ Confidence rubric: 0.9+ = explicitly stated fact; 0.7 = clearly inferred;
 
 export const CLASSIFICATION_RULES_BLOCK = `CRITICAL CLASSIFICATION RULES:
 1. "明天X生日" / "X的生日是Y" → create TWO nodes:
-   a) commitment: name="X 生日", attributes={dueDate: <ISO date>, reminder: true}, tags=["生日","提醒"]
+   a) task: name="X 生日", attributes={dueDate: <ISO date>, reminder: true}, tags=["生日","提醒"]
    b) person: name="X" (if not already known)
-   NOT a preference or object.
+   NOT a Mind or Thing.
 
-2. "X说要/答应/需要/要记得Y" → commitment node, name=the task Y, attributes={owner: X}
+2. "X说要/答应/需要/要记得Y" → task node, name=the task Y, attributes={owner: X}
 
-3. "记住/X在Y" → object node, name=X, attributes={location: Y}
+3. "记住/X在Y" → Thing node, name=X, attributes={location: Y}
 
 4. Any meeting/appointment with time → event node with start ISO date
 
-5. Health mentions (药/运动/体检/睡眠/饮食) → health_state node
+5. Health mentions (药/运动/体检/睡眠/饮食) → Mind node (attributes.healthType set)
 
-6. Pure opinions/likes/preferences → preference node
+6. Pure opinions/likes/preferences → Mind node (attributes.category set, no healthType)
 
-7. Receipts/shopping: create object nodes for each purchased ITEM only. Do NOT create a place node for the store.
+7. Receipts/shopping: create Thing nodes for each purchased ITEM only. Do NOT create a place node for the store.
 
-8. 证件照片/扫描件(护照/签证/驾照/身份证/居留卡)→ object 节点，subtype=passport|visa|license|id，
+8. 证件照片/扫描件(护照/签证/驾照/身份证/居留卡)→ Thing 节点，subtype=passport|visa|license|id，
    attributes.expiry=证件到期日(ISO)。绝不要当 person 或 place。name 用「XX 护照/签证」这类，别含证件号。
 
-9. 保修卡 / 含保修期的收据 / 电子产品说明书 → 对应 object 节点，subtype=warranty，
+9. 保修卡 / 含保修期的收据 / 电子产品说明书 → 对应 Thing 节点，subtype=warranty，
    attributes.purchaseDate=购买日(ISO)、expiry=保修截止日(购买日+保修期，能算就填 ISO)。
 
 10. 兜底捕捉(永不丢 · 开放世界 Layer ①):以上规则都无法明确归类的输入,**绝不要跳过或丢弃**——
-    仍产出一个 note 节点:name=对原文的一句话中性概括，rawInput=原文原样保留，
+    仍产出一个 collection 节点:name=对原文的一句话中性概括，rawInput=原文原样保留，
     tags=**慷慨**的检索关键词(把能想到的同义词/主题词/相关物都放进去，retrieval-only、不展示给用户)，
     confidence ≤0.5(标明这是低置信捕捉)。
     原则:分不出类 = 先低置信存下来(不打扰用户,但进主表、等以后翻得出/被激活),
@@ -109,7 +109,7 @@ export const IMAGE_RECOGNITION_DIRECTIVE = `
 
 IMAGE MODE — MANDATORY:
 - A photo ALWAYS yields at least one node. Never return an empty "nodes" array for a readable photo.
-- Name the main visible subject as an "object" node (e.g. a pen, a mug, a book, a plant, a receipt).
+- Name the main visible subject as a "Thing" node (e.g. a pen, a mug, a book, a plant, a receipt).
   Use the plainest everyday word a person would use to look it up later, not a marketing description.
 - Add 1-4 more nodes for other clearly visible items worth remembering. Skip walls, floors, hands, shadows.
 - In "tags", be generous with retrieval synonyms for each item (material, colour, brand, category,
@@ -126,9 +126,9 @@ export function buildImageExtractionSystemPrompt(locale?: string): string {
 // ── Source-hinted variant (the ingest route: shortcuts / reminders / exports) ─
 
 export const SOURCE_HINTS: Record<string, string> = {
-  reminder: '这是来自 Apple 提醒事项的待办。提取为 commitment 节点，标注截止日期。',
-  keep: '这是来自 Keep 的运动健康数据。提取为 health_state 节点（运动类型、时长、卡路里）。',
-  wechat_reading: '这是来自微信读书的阅读数据。提取为 preference 节点（书名、作者、进度、笔记）。',
+  reminder: '这是来自 Apple 提醒事项的待办。提取为 task 节点，标注截止日期。',
+  keep: '这是来自 Keep 的运动健康数据。提取为 Mind 节点（运动类型、时长、卡路里）。',
+  wechat_reading: '这是来自微信读书的阅读数据。提取为 Mind 节点（书名、作者、进度、笔记）。',
   toggl: '这是来自 Toggl 的时间记录。提取为 event 节点（项目、任务、时长）。',
   shortcuts: '这是来自 iOS 快捷指令的数据。根据内容判断类型。',
   generic: '根据内容判断最合适的节点类型。',
@@ -163,7 +163,7 @@ export function buildEmailExtractionPrompt(emailTexts: string): string {
 - 会议 / 约会 / 日程邀请（含时间的 meeting、invite、日程、预约）→ 一个 event 节点，name=会议主题，attributes.date=ISO 时间。
   绝不要把会议的组织者 / 发件人单独提成 person 节点 —— 那是「谁发的」，不是一条值得记的人物记忆。
 - 只有当邮件本身是在「介绍 / 认识一个新的人」（简历、引荐、新同事介绍）时，才提 person 节点。
-- 承诺 / 要做的事 → commitment；单纯的重要日期 → event。
+- 承诺 / 要做的事 → task；单纯的重要日期 → event。
 - 机票 / 行程确认（航班、值机、e-ticket、boarding、行程单）→ 一个 event 节点，subtype=flight，
   name=「城市→城市 航班号」。attributes 必须抽：start=起飞时间（ISO，带时区偏移，别用收件时间）、
   flightNo=航班号、from/to=始发/到达机场或城市、pnr=订座编号（有才填）。抽不到起飞时间就别标 flight。

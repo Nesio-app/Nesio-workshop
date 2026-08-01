@@ -32,7 +32,7 @@ const vm = code(read('lib/platform/view-models/today-view-model.ts'));
   );
   // 正向判据的四条要件都在
   assert.match(focus, /focusPinnedOn === todayKey/, '① 用户自己钉到今天的必须放行');
-  assert.match(focus, /n\.type === 'commitment'/, '② 承诺/待办类型够格');
+  assert.match(focus, /n\.type === 'task'/, '② 承诺/待办类型够格');
   assert.match(focus, /firstNodeDate\(n\.attributes\)/, '③ 带**明确日期键**的够格');
   assert.match(focus, /nodeExpiryDate\(n\.attributes\)/, '④ 快到期的够格(到期本身就是今天的事)');
 

@@ -22,14 +22,15 @@ const DOMAINS = [
 type DomainId = typeof DOMAINS[number]['id'];
 
 const TYPE_TO_DOMAIN: Record<LifeNodeType, DomainId> = {
-  person:       'relations',
-  event:        'self',
-  commitment:   'work',
-  health_state: 'health',
-  preference:   'self',
-  place:        'growth',
-  object:       'self',
-  note:         'growth',
+  person:     'relations',
+  event:      'self',
+  task:       'work',
+  // Mind 合并了旧 health_state('health')与 preference('self')—— 选 self,
+  // 健康类内容主要靠专门的健康信号/镜头分类,不指着这张泛域图区分。
+  Mind:       'self',
+  place:      'growth',
+  Thing:      'self',
+  collection: 'growth',
 };
 
 const TAG_KEYWORDS: Record<DomainId, string[]> = {

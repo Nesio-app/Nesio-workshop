@@ -32,7 +32,7 @@ export default function WechatReadingImportSheet({ open, onClose }: { open: bool
     for (const n of notes) {
       ingestLifeNode({
         name: n.highlight.slice(0, 40),
-        type: 'preference',
+        type: 'Mind',
         source: 'manual',
         confidence: 0.9,
         rawInput: n.highlight,

@@ -4758,6 +4758,27 @@ body:has(.nesio-mood-overlay) .nesio-bottom-nav::before {
 }
 .nesio-tl-x:active { opacity: 1; }
 
+/* 2026-08-01·行尾对勾(与 nesio-tl-x 成对):不吃右边距(留给 x 吃),
+   颜色用 status-go 与左侧圆圈勾一致,一眼认得出是"完成"。 */
+.nesio-tl-check {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--tap-min, 44px);
+  min-height: var(--tap-min, 44px);
+  margin: calc(-1 * var(--space-2)) 0;
+  border: none;
+  background: transparent;
+  color: var(--status-go);
+  font-size: var(--text-sm);
+  line-height: 1;
+  opacity: 0.6;
+  cursor: pointer;
+  font-family: var(--font-sans);
+}
+.nesio-tl-check:active { opacity: 1; }
+
 html[data-portal-theme="night"] .nesio-bottom-nav {
   background: rgba(20, 32, 58, 0.88);
   border-color: rgba(88,140,227,0.18);
@@ -12770,11 +12791,12 @@ html[data-portal-theme="night"] .nesio-otd-card-name { color: #d0d8f0; }
 }
 
 /* 批次 130·克制清单(设计「去掉亮蓝大按钮和层层套框」):步骤=干净白卡,子步骤在卡内细线缩进 */
+/* 2026-08-01 用户点名"背景框位置不对":item 和内部 row 各自都有 padding,叠加后
+   卡片四边留白不对称(底部比顶部多出一截)。padding 全部交给 row 管,item 只管边框/圆角。 */
 .nesio-momentum-item {
   border-radius: 12px;
   background: var(--glass-bg-solid, #fff);
   border: 1px solid var(--portal-line);
-  padding: 0.15rem 0.35rem 0.35rem;
   transition: opacity 0.2s;
 }
 html[data-portal-theme="night"] .nesio-momentum-item { background: rgba(255,255,255,0.05); border-color: rgba(255,255,255,0.09); }

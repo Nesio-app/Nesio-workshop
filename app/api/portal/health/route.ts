@@ -84,17 +84,17 @@ function parseHealthFallback(text: string): object[] {
   const lower = text.toLowerCase();
 
   if (lower.includes('stepcount') || lower.includes('步数')) {
-    nodes.push({ type: 'health_state', name: '步数记录', attributes: { metric: '步数', source: 'Apple Health' }, relations: [], tags: ['Apple Health'], confidence: 0.8, rawInput: text.slice(0, 100) });
+    nodes.push({ type: 'Mind', name: '步数记录', attributes: { metric: '步数', source: 'Apple Health' }, relations: [], tags: ['Apple Health'], confidence: 0.8, rawInput: text.slice(0, 100) });
   }
   if (lower.includes('sleepanalysis') || lower.includes('睡眠')) {
-    nodes.push({ type: 'health_state', name: '睡眠记录', attributes: { metric: '睡眠', source: 'Apple Health' }, relations: [], tags: ['Apple Health', '睡眠'], confidence: 0.8, rawInput: text.slice(0, 100) });
+    nodes.push({ type: 'Mind', name: '睡眠记录', attributes: { metric: '睡眠', source: 'Apple Health' }, relations: [], tags: ['Apple Health', '睡眠'], confidence: 0.8, rawInput: text.slice(0, 100) });
   }
   if (lower.includes('heartrate') || lower.includes('心率')) {
-    nodes.push({ type: 'health_state', name: '心率记录', attributes: { metric: '心率', unit: 'bpm', source: 'Apple Health' }, relations: [], tags: ['Apple Health', '心率'], confidence: 0.8, rawInput: text.slice(0, 100) });
+    nodes.push({ type: 'Mind', name: '心率记录', attributes: { metric: '心率', unit: 'bpm', source: 'Apple Health' }, relations: [], tags: ['Apple Health', '心率'], confidence: 0.8, rawInput: text.slice(0, 100) });
   }
 
   if (!nodes.length) {
-    nodes.push({ type: 'health_state', name: '健康数据导入', attributes: { source: 'Apple Health' }, relations: [], tags: ['Apple Health'], confidence: 0.6, rawInput: text.slice(0, 80) });
+    nodes.push({ type: 'Mind', name: '健康数据导入', attributes: { source: 'Apple Health' }, relations: [], tags: ['Apple Health'], confidence: 0.6, rawInput: text.slice(0, 80) });
   }
   return nodes;
 }

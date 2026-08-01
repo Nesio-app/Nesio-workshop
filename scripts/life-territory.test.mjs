@@ -22,8 +22,8 @@ const ago = (days) => new Date(NOW - days * DAY).toISOString();
 // 域判定:关键词优先于类型
 {
   assert.equal(detectTerritoryDomain({ name: '和朋友吃饭', type: 'event' }), 'relations', '关键词判关系');
-  assert.equal(detectTerritoryDomain({ name: '学习吉他', type: 'object' }), 'growth', '关键词判成长');
-  assert.equal(detectTerritoryDomain({ name: '随手记', type: 'commitment' }), 'work', '回落类型→事业');
+  assert.equal(detectTerritoryDomain({ name: '学习吉他', type: 'Thing' }), 'growth', '关键词判成长');
+  assert.equal(detectTerritoryDomain({ name: '随手记', type: 'task' }), 'work', '回落类型→事业');
 }
 
 // 占比合计=100、降序、零占比剔除
@@ -31,8 +31,8 @@ const ago = (days) => new Date(NOW - days * DAY).toISOString();
   const nodes = [
     { name: '妈妈', type: 'person', createdAt: ago(3), confidence: 0.9, relations: [1, 2, 3] },
     { name: '家人聚会', type: 'event', tags: ['家人'], createdAt: ago(10), confidence: 0.8 },
-    { name: '项目上线', type: 'commitment', createdAt: ago(5), confidence: 0.7, tags: ['工作'] },
-    { name: '学吉他', type: 'object', createdAt: ago(8), confidence: 0.6 },
+    { name: '项目上线', type: 'task', createdAt: ago(5), confidence: 0.7, tags: ['工作'] },
+    { name: '学吉他', type: 'Thing', createdAt: ago(8), confidence: 0.6 },
   ];
   const { slices } = computeTerritory(nodes, NOW);
   const sum = slices.reduce((s, x) => s + x.pct, 0);
@@ -46,13 +46,13 @@ const ago = (days) => new Date(NOW - days * DAY).toISOString();
 {
   const nodes = [
     // 前窗(60–120 天前):全是事业
-    { name: '项目A', type: 'commitment', createdAt: ago(90), confidence: 0.9 },
-    { name: '项目B', type: 'commitment', createdAt: ago(80), confidence: 0.9 },
-    { name: '项目C', type: 'commitment', createdAt: ago(70), confidence: 0.9 },
+    { name: '项目A', type: 'task', createdAt: ago(90), confidence: 0.9 },
+    { name: '项目B', type: 'task', createdAt: ago(80), confidence: 0.9 },
+    { name: '项目C', type: 'task', createdAt: ago(70), confidence: 0.9 },
     // 近窗(<60 天):全是成长
-    { name: '学吉他', type: 'object', tags: ['学习'], createdAt: ago(20), confidence: 0.9 },
-    { name: '读书', type: 'object', tags: ['书'], createdAt: ago(10), confidence: 0.9 },
-    { name: '学做饭', type: 'object', tags: ['技能'], createdAt: ago(5), confidence: 0.9 },
+    { name: '学吉他', type: 'Thing', tags: ['学习'], createdAt: ago(20), confidence: 0.9 },
+    { name: '读书', type: 'Thing', tags: ['书'], createdAt: ago(10), confidence: 0.9 },
+    { name: '学做饭', type: 'Thing', tags: ['技能'], createdAt: ago(5), confidence: 0.9 },
   ];
   const { shift } = computeTerritory(nodes, NOW);
   assert.ok(shift && shift.id === 'growth', '最大迁移=成长');

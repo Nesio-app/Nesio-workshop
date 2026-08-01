@@ -198,7 +198,7 @@ export function sortAmazonFlip(items: InventoryItem[]): InventoryItem[] {
 /** 全部物品(object 节点),新→旧。容器物品的 containedCount 在此跨物品计算。 */
 export function listInventoryItems(): InventoryItem[] {
   const items = getLifeGraph()
-    .filter((n) => n.type === 'object')
+    .filter((n) => n.type === 'Thing')
     .map(toInventoryItem);
   // 物品④:location 任一非空间段命中容器物品名 → 算「装在里面」
   const counts = new Map<string, number>();
@@ -272,7 +272,7 @@ export function addInventoryItem(input: NewInventoryItem): LifeNode {
   const itemTags = (input.tags || []).map((t) => t.trim()).filter(Boolean);
   const withAmazon = input.isAmazon ? ['亚马逊', ...itemTags.filter((t) => t !== '亚马逊')] : itemTags;
   return ingestLifeNode({
-    type: 'object',
+    type: 'Thing',
     name: input.name.trim(),
     attributes: { ...attributes, epistemic: 'observation', generator: 'user' },
     source: 'manual',

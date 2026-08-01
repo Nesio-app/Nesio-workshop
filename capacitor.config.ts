@@ -9,7 +9,13 @@ import type { CapacitorConfig } from '@capacitor/cli';
  */
 const config: CapacitorConfig = {
   appId: 'app.nesio.ios',
-  appName: 'Nesio',
+  // 2026-08-01 用户实锤:系统「通知」列表里显示 Nesio,系统「App」列表里显示宝盒 ——
+  // 两处名字不一致,像是两个不同的 App。根因:这份根级配置写的是英文名,而
+  // treasurebox-ios/capacitor.config.ts(真正编出那份 IPA 的工程)写的是「宝盒」,
+  // 且它的三份 precheck 脚本都断言 CFBundleDisplayName === '宝盒'。这里跟着改成
+  // 一致的中文名,但**光改这个文件不会让手机上已装的 App 改名**——CFBundleDisplayName
+  // 是编译进 Info.plist 的,要下次重新出包(cap sync + 签名)才会生效。
+  appName: '宝盒',
 
   // hosted 模式下 webDir 只作离线兜底(server.url 不可达时显示)。
   webDir: 'ios-shell',

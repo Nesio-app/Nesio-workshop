@@ -90,13 +90,14 @@ function lifeNodeSource(source: SignalSource): LifeNodeSource {
 function lifeNodeType(input: CreateSignalInput): LifeNodeType {
   if (input.source === 'calendar' || input.type === 'event') return 'event';
   // 批次 31 QA:裸 'task'(说一句 growth 域)此前漏网落到 preference —— 「洗衣服」被拍成⭐偏好
-  if (input.source === 'task' || input.type === 'commitment' || input.type === 'task' || String(input.type).startsWith('task.')) return 'commitment';
-  if (input.source === 'health' || String(input.type).startsWith('health.')) return 'health_state';
+  // (input.source === 'task' 这个 'task' 是 Signal 来源字符串,和下面返回的 LifeNodeType 'task' 同名但不同命名空间,别搞混)
+  if (input.source === 'task' || input.type === 'commitment' || input.type === 'task' || String(input.type).startsWith('task.')) return 'task';
+  if (input.source === 'health' || String(input.type).startsWith('health.')) return 'Mind';
   if (String(input.type).includes('location')) return 'place';
-  if (input.source === 'photo' || String(input.type).includes('object')) return 'object';
-  // 批次 183(用户实锤「记忆类别很混乱」):兜底从 preference 改 note。
-  // preference 应留给"真偏好"(喜欢/口味),没匹配上的随手记(粘贴URL/一句话)是 note,不是偏好。
-  return 'note';
+  if (input.source === 'photo' || String(input.type).includes('object')) return 'Thing';
+  // 批次 183(用户实锤「记忆类别很混乱」):兜底从 preference 改 note,2026-08-01 改名批 note → collection。
+  // Mind(原 preference)应留给"真偏好"(喜欢/口味),没匹配上的随手记(粘贴URL/一句话)是 collection,不是偏好。
+  return 'collection';
 }
 
 function primitivePayload(payload: Record<string, unknown> = {}): LifeNode['attributes'] {

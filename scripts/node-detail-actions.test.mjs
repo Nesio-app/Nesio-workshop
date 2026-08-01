@@ -29,29 +29,29 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
   const { isLensEligible } = mod.exports;
 
   // 用户点名的五类都要有
-  assert.equal(isLensEligible({ source: 'manual', type: 'note' }), true, '手记');
-  assert.equal(isLensEligible({ source: 'voice', type: 'note' }), true, '说一句记下来的也是手记');
+  assert.equal(isLensEligible({ source: 'manual', type: 'collection' }), true, '手记');
+  assert.equal(isLensEligible({ source: 'voice', type: 'collection' }), true, '说一句记下来的也是手记');
   // 手记那一支要**单独**成立:去掉它之后,一条 type 不是 note 的手记就没有镜头了。
-  // (第一版所有手记用例都同时带 type:'note',于是删掉 source 分支照样绿 —— 注入抓出来的。)
-  assert.equal(isLensEligible({ source: 'manual', type: 'commitment' }), true,
+  // (第一版所有手记用例都同时带 type:'collection',于是删掉 source 分支照样绿 —— 注入抓出来的。)
+  assert.equal(isLensEligible({ source: 'manual', type: 'task' }), true,
     '首页输入条记下的一笔是 commitment,它也是自己写的字');
   // 但手动登记的**物品/地点/人**不算 —— 那些的详情页是一张表,不是一段话
-  assert.equal(isLensEligible({ source: 'manual', type: 'object' }), false,
+  assert.equal(isLensEligible({ source: 'manual', type: 'Thing' }), false,
     '手动登记的一件物品仍然是物品,镜头对着它没有话可看');
   assert.equal(isLensEligible({ source: 'manual', type: 'place' }), false);
   assert.equal(isLensEligible({ source: 'manual', type: 'person' }), false);
-  assert.equal(isLensEligible({ type: 'note', source: 'import' }), true, 'note 类型');
-  assert.equal(isLensEligible({ type: 'object', source: 'import', tags: ['flomo'] }), true, 'flomo');
-  assert.equal(isLensEligible({ type: 'object', source: 'import', tags: ['微信读书'] }), true, '阅读笔记');
-  assert.equal(isLensEligible({ type: 'object', source: 'import', tags: ['阅读'] }), true, '阅读');
-  assert.equal(isLensEligible({ type: 'object', source: 'import', tags: ['心情'] }), true, '心情');
-  assert.equal(isLensEligible({ type: 'object', source: 'import', tags: ['mood'] }), true, '心情(英文 tag)');
-  assert.equal(isLensEligible({ type: 'object', source: 'import', tags: ['MOOD'] }), true, 'tag 大小写不该影响判定');
+  assert.equal(isLensEligible({ type: 'collection', source: 'import' }), true, 'note 类型');
+  assert.equal(isLensEligible({ type: 'Thing', source: 'import', tags: ['flomo'] }), true, 'flomo');
+  assert.equal(isLensEligible({ type: 'Thing', source: 'import', tags: ['微信读书'] }), true, '阅读笔记');
+  assert.equal(isLensEligible({ type: 'Thing', source: 'import', tags: ['阅读'] }), true, '阅读');
+  assert.equal(isLensEligible({ type: 'Thing', source: 'import', tags: ['心情'] }), true, '心情');
+  assert.equal(isLensEligible({ type: 'Thing', source: 'import', tags: ['mood'] }), true, '心情(英文 tag)');
+  assert.equal(isLensEligible({ type: 'Thing', source: 'import', tags: ['MOOD'] }), true, 'tag 大小写不该影响判定');
 
   // 底下没有话可看的,不该出现镜头 —— 那是一条点了之后发现无话可说的路
   assert.equal(isLensEligible({ type: 'event', source: 'calendar' }), false, '日历事件底下没有话可看');
-  assert.equal(isLensEligible({ type: 'object', source: 'email', tags: ['邮件'] }), false, '一封对账单不需要镜头');
-  assert.equal(isLensEligible({ type: 'object', source: 'import', tags: ['衣橱'] }), false, '衣柜里的物品');
+  assert.equal(isLensEligible({ type: 'Thing', source: 'email', tags: ['邮件'] }), false, '一封对账单不需要镜头');
+  assert.equal(isLensEligible({ type: 'Thing', source: 'import', tags: ['衣橱'] }), false, '衣柜里的物品');
   assert.equal(isLensEligible({ type: 'place', source: 'location' }), false, '位置');
   assert.equal(isLensEligible(null), false, '空节点不许抛');
   assert.equal(isLensEligible(undefined), false);
@@ -100,7 +100,7 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
   assert.match(src, /'＋ 添加附件', '＋ Add files'/,
     '「添加照片」要改叫「添加附件」—— 它本来就能收任意文件,叫「照片」是自己把自己讲窄了');
   // 分派给家人
-  assert.match(src, /\{editing && \(n\.type === 'event' \|\| n\.type === 'commitment'\)/,
+  assert.match(src, /\{editing && \(n\.type === 'event' \|\| n\.type === 'task'\)/,
     '分派给家人要收进编辑态');
   // 加关联(只读的「相关记忆」列表仍留在详情页 —— 那是要看的信息)
   assert.match(src, /\{editing && !linkPicking && \(/, '「＋关联」按钮要收进编辑态');

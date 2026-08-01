@@ -101,7 +101,7 @@ function writeMeetingExtraction(
   // ① 会议记录节点:留转写原文,并把总结/推断项/人名收进 attributes(详情页可读)。
   const record = ingestLifeNode({
     name: `${en ? 'Meeting notes' : '会议记录'} · ${meetingName}`,
-    type: 'commitment',
+    type: 'task',
     tags: [en ? 'Meeting notes' : '会议记录', 'meeting-notes', ...extraTags],
     attributes: {
       meetingNodeId,
@@ -141,7 +141,7 @@ function writeMeetingExtraction(
     const deadline = typeof t.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.deadline) ? t.deadline : null;
     ingestLifeNode({
       name: text,
-      type: 'commitment',
+      type: 'task',
       tags: [en ? 'Meeting to-do' : '会议待办', 'meeting-todo', ...extraTags],
       attributes: {
         fromMeeting: meetingName,
@@ -229,7 +229,7 @@ export function pinNodeToTodayFocus(nodeId: string): boolean {
  *   提醒本身的真源仍是 schedule-reminders,这里只是它在记忆里的一条身影。
  */
 export function addCommitmentNode(name: string, attrs: Record<string, string> = {}): FocusNode {
-  const node = ingestLifeNode({ name, type: 'commitment', source: 'manual', confidence: 1, tags: [], attributes: attrs, relations: [] });
+  const node = ingestLifeNode({ name, type: 'task', source: 'manual', confidence: 1, tags: [], attributes: attrs, relations: [] });
   // 操作类动作不冒充 useful(2026-07-27);真正的卡反馈仍走 emitFeedback。
   // 不再补发 broadcast:ingestLifeNode → saveAll 已派发 nesio-life-graph-updated,
   // 这里再发一次 = 整条 Today 重算管线跑两遍(QA 速记提交冻结的一半成本)。

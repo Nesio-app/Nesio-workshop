@@ -22,9 +22,10 @@ import { IconHome, IconUtensils, IconCard, IconActivity, IconBriefcase, IconPlan
 import { displayNodeName } from '@/lib/portal/node-display';
 
 // 到访记忆列表:类型 → 图标底色(与记忆详情类型条同一套 chip 语义色)
+// 2026-08-01 改名批:health_state+preference 合并成 Mind,取 health_state 原色(chip-pink)。
 const VM_TYPE_BG: Record<string, string> = {
-  person: 'var(--chip-indigo)', object: 'var(--chip-blue)', place: 'var(--chip-green)',
-  event: 'var(--chip-amber)', commitment: 'var(--chip-violet)', health_state: 'var(--chip-pink)', preference: 'var(--chip-mint)',
+  person: 'var(--chip-indigo)', Thing: 'var(--chip-blue)', place: 'var(--chip-green)',
+  event: 'var(--chip-amber)', task: 'var(--chip-violet)', Mind: 'var(--chip-pink)',
 };
 import dynamic from 'next/dynamic';
 import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';

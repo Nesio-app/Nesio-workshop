@@ -208,7 +208,7 @@ export async function POST(req: NextRequest) {
   // 就不该是兜底。现在只有这一条路:一页一条、可读、幂等。
   const finalNodes = contentPages.map((p) => ({
     // 批次 143:外部笔记落 note 类型(不再挤进 preference 大杂烩)
-    type: 'note',
+    type: 'collection',
     name: (p.title || 'Notion').slice(0, 60),
     attributes: { source: 'Notion', sourceApp: 'notion', notionPageId: p.id, ...(p.url ? { url: p.url } : {}), ...(p.text ? { article: p.text } : {}) },
     relations: [],

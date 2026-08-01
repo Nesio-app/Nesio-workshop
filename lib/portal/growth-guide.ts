@@ -58,7 +58,7 @@ function answeredKeys(): Set<string> {
 
 function commitmentReviewCard(now: number): GrowthCard | null {
   const nodes = getLifeGraph().filter((n) => {
-    if (n.type !== 'commitment') return false;
+    if (n.type !== 'task') return false;
     if (n.attributes?.done) return false;
     if (n.tags?.includes('meeting-notes')) return false; // 会议记录本体不是待办
     const age = now - new Date(n.createdAt).getTime();
@@ -122,7 +122,7 @@ function spendShiftCard(now: number): GrowthCard | null {
 function dustyMemoryCard(now: number, dayKey: string): GrowthCard | null {
   const nodes = getLifeGraph().filter((n) => {
     if ((n.confidence ?? 0) < 0.8) return false;
-    if (n.type === 'commitment' || n.type === 'event') return false;
+    if (n.type === 'task' || n.type === 'event') return false;
     const age = now - new Date(n.createdAt).getTime();
     return age >= 21 * DAY_MS;
   });

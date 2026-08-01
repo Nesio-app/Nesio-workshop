@@ -38,16 +38,16 @@ const ago = (days) => new Date(NOW - days * 86_400_000).toISOString();
 
 /* ── ① 够久没碰的待办 = 线头 ─────────────────────────────────────── */
 {
-  assert.equal(isLooseThread({ type: 'commitment', createdAt: ago(40) }, NOW), true);
+  assert.equal(isLooseThread({ type: 'task', createdAt: ago(40) }, NOW), true);
   assert.equal(isLooseThread({ type: 'event', createdAt: ago(THREAD_STALE_DAYS + 1) }, NOW), true,
     `刚过 ${THREAD_STALE_DAYS} 天就算`);
-  assert.equal(isLooseThread({ type: 'commitment', createdAt: ago(THREAD_STALE_DAYS - 1) }, NOW), false,
+  assert.equal(isLooseThread({ type: 'task', createdAt: ago(THREAD_STALE_DAYS - 1) }, NOW), false,
     '还没到阈值的不算 —— 上周刚记的事被说成「没接上」会让人莫名其妙');
 }
 
 /* ── ② 实体不是待办 ─────────────────────────────────────────────── */
 {
-  for (const t of ['person', 'place', 'health_state']) {
+  for (const t of ['person', 'place', 'Mind']) {
     assert.equal(isLooseThread({ type: t, createdAt: ago(400) }, NOW), false,
       `${t} 是**实体**不是待办 —— 一个人、一个地方不存在「没接上」。` +
       '把认识很久的人列成「你落下的事」是很冒犯的');
@@ -56,31 +56,31 @@ const ago = (days) => new Date(NOW - days * 86_400_000).toISOString();
 
 /* ── ③ 做完的 / 后来又碰过的,都不算落下 ──────────────────────────── */
 {
-  assert.equal(isLooseThread({ type: 'commitment', createdAt: ago(40), attributes: { done: true } }, NOW), false,
+  assert.equal(isLooseThread({ type: 'task', createdAt: ago(40), attributes: { done: true } }, NOW), false,
     '做完了');
   assert.equal(
-    isLooseThread({ type: 'commitment', createdAt: ago(40), lastConfirmedAt: ago(2) }, NOW), false,
+    isLooseThread({ type: 'task', createdAt: ago(40), lastConfirmedAt: ago(2) }, NOW), false,
     '后来又回来看过/改过 → 不是落下的。只看 createdAt 的话,一件你天天在推进的长期事项' +
     '会因为「建得早」被说成没接上',
   );
   assert.equal(
-    isLooseThread({ type: 'commitment', createdAt: ago(40), lastConfirmedAt: ago(40) }, NOW), true,
+    isLooseThread({ type: 'task', createdAt: ago(40), lastConfirmedAt: ago(40) }, NOW), true,
     'lastConfirmedAt 等于 createdAt = 建完就没再动过,那还是线头',
   );
 }
 
 /* ── ④ 脏数据不许崩,也不许凭空算成线头 ─────────────────────────── */
 {
-  assert.equal(isLooseThread({ type: 'commitment' }, NOW), false, '没有 createdAt → 不下判断');
-  assert.equal(isLooseThread({ type: 'commitment', createdAt: '不是日期' }, NOW), false, '解析不出来 → 不下判断');
+  assert.equal(isLooseThread({ type: 'task' }, NOW), false, '没有 createdAt → 不下判断');
+  assert.equal(isLooseThread({ type: 'task', createdAt: '不是日期' }, NOW), false, '解析不出来 → 不下判断');
   assert.equal(isLooseThread(null, NOW), false, 'null 不崩');
 }
 
 /* ── ⑤ 最老的排最前 ─────────────────────────────────────────────── */
 {
   const out = looseThreads([
-    { type: 'commitment', createdAt: ago(35), name: '较近' },
-    { type: 'commitment', createdAt: ago(200), name: '最老' },
+    { type: 'task', createdAt: ago(35), name: '较近' },
+    { type: 'task', createdAt: ago(200), name: '最老' },
     { type: 'person', createdAt: ago(300), name: '人(不算)' },
   ], NOW);
   assert.equal(out.map((n) => n.name).join(','), '最老,较近',

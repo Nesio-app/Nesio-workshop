@@ -108,7 +108,7 @@ export function removeNodeFromProject(projectId: string, nodeId: string): void {
 
 export function getProjectInsights(project: Project, allNodes: LifeNode[]): ProjectInsights {
   const nodes = allNodes.filter((n) => project.nodeIds.includes(n.id));
-  const commitmentCount = nodes.filter((n) => n.type === 'commitment').length;
+  const commitmentCount = nodes.filter((n) => n.type === 'task').length;
 
   const tagFreq = nodes
     .flatMap((n) => n.tags ?? [])

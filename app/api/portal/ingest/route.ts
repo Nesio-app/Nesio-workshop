@@ -53,7 +53,7 @@ async function extractNodes(source: string, content: string): Promise<{ nodes: o
     // Rule-based fallback
     return {
       nodes: [{
-        type: source === 'reminder' ? 'commitment' : source === 'keep' ? 'health_state' : source === 'wechat_reading' ? 'preference' : 'object',
+        type: source === 'reminder' ? 'task' : source === 'keep' ? 'Mind' : source === 'wechat_reading' ? 'Mind' : 'Thing',
         name: content.slice(0, 40),
         attributes: { source, raw: content.slice(0, 200) },
         relations: [],
@@ -74,7 +74,7 @@ async function extractNodes(source: string, content: string): Promise<{ nodes: o
     return { nodes: parsed.nodes || [], summary: parsed.summary || '已记录' };
   } catch {
     return {
-      nodes: [{ type: 'object', name: content.slice(0, 40), attributes: { source }, relations: [], tags: [source], confidence: 0.6, rawInput: content.slice(0, 200) }],
+      nodes: [{ type: 'Thing', name: content.slice(0, 40), attributes: { source }, relations: [], tags: [source], confidence: 0.6, rawInput: content.slice(0, 200) }],
       summary: '已记录',
     };
   }

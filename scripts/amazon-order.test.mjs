@@ -23,11 +23,11 @@ const split = [
   { type: 'note', name: '预估税费 $8.63', attributes: {} },
   { type: 'note', name: '税前总计 $118.99', attributes: {} },
   { type: 'note', name: '订单号 112-4313914-7678611', attributes: {} },
-  { type: 'object', name: 'ALPHA CAMP 20 Inch', attributes: {} },
+  { type: 'Thing', name: 'ALPHA CAMP 20 Inch', attributes: {} },
 ];
 const c = consolidateAmazonOrder(split, 'Sold by: Makun\nOrder placed July 23, 2026');
 assert.equal(c.name, 'ALPHA CAMP 20 Inch', '产品名取 object 节点');
-assert.equal(c.type, 'object');
+assert.equal(c.type, 'Thing');
 assert.deepEqual([...c.tags], ['亚马逊'], '打亚马逊标签');
 assert.equal(c.attributes.orderNo, '112-4313914-7678611', '订单号');
 assert.equal(c.attributes.buyPrice, 118.99, '买入价 = 税前总计');
@@ -37,7 +37,7 @@ assert.equal(c.attributes.orderedAt, '2026-07-23', '下单日 July 23, 2026');
 
 // ── 税前缺失 → 用总计 − 税反推 ──
 const noSub = [
-  { type: 'object', name: '钛双面案板', attributes: {} },
+  { type: 'Thing', name: '钛双面案板', attributes: {} },
   { type: 'note', name: '总计 $40.00', attributes: {} },
   { type: 'note', name: '税费 $2.40', attributes: {} },
 ];
@@ -46,7 +46,7 @@ assert.equal(c2.attributes.buyPrice, 37.6, '反推税前 = 40 − 2.4');
 assert.equal(c2.attributes.tax, 2.4);
 
 // ── 模型已经只返一条(带结构化 attributes)也照收 ──
-const clean = [{ type: 'object', name: 'Storage Stool', attributes: { orderNo: '112-0000000-0000000', buyPrice: 38.6, seller: 'Makun' } }];
+const clean = [{ type: 'Thing', name: 'Storage Stool', attributes: { orderNo: '112-0000000-0000000', buyPrice: 38.6, seller: 'Makun' } }];
 const c3 = consolidateAmazonOrder(clean);
 assert.equal(c3.name, 'Storage Stool');
 assert.equal(c3.attributes.buyPrice, 38.6);

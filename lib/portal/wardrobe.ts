@@ -93,7 +93,7 @@ export function listWardrobe(): Garment[] {
   let nodes: LifeNode[];
   try { nodes = getLifeGraph(); } catch { return []; }
   return nodes
-    .filter((n) => n.type === 'object' && n.attributes?.garment === true)
+    .filter((n) => n.type === 'Thing' && n.attributes?.garment === true)
     .map(toGarment);
 }
 
@@ -141,7 +141,7 @@ export function addGarment(input: NewGarment): LifeNode {
     ? [{ id: input.assetId, kind: 'image' as const, local: true, mimeType: input.mimeType || 'image/jpeg' }]
     : undefined;
   return ingestLifeNode({
-    type: 'object',
+    type: 'Thing',
     name: input.name.trim() || '未命名衣物',
     attributes: { ...attributes, epistemic: 'observation', generator: input.assetId ? 'user:photo' : 'user' },
     source: input.assetId ? 'photo' : 'manual',

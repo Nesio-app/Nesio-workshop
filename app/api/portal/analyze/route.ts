@@ -299,7 +299,7 @@ function analyzeFallback(content: string): string {
   const objectMatch = content.match(/(?:记住|记得)?\s*(.+?)(?:在|放在|存在|位于)\s*(.+?)(?:里|中|$)/);
   if (objectMatch) {
     nodes.push({
-      type: 'object',
+      type: 'Thing',
       name: objectMatch[1].trim(),
       attributes: { location: objectMatch[2].trim() },
       relations: [],
@@ -326,7 +326,7 @@ function analyzeFallback(content: string): string {
   // Commitment
   if (lower.includes('提醒') || lower.includes('别忘') || lower.includes('记得')) {
     nodes.push({
-      type: 'commitment',
+      type: 'task',
       name: content.slice(0, 25),
       attributes: { detail: content },
       relations: [],
@@ -339,7 +339,7 @@ function analyzeFallback(content: string): string {
   // Health
   if (lower.includes('感冒') || lower.includes('发烧') || lower.includes('嗓子') || lower.includes('头疼') || lower.includes('不舒服')) {
     nodes.push({
-      type: 'health_state',
+      type: 'Mind',
       name: content.slice(0, 20),
       attributes: { status: 'recovering', detail: content },
       relations: [],
@@ -351,7 +351,7 @@ function analyzeFallback(content: string): string {
 
   if (nodes.length === 0) {
     nodes.push({
-      type: 'object',
+      type: 'Thing',
       name: content.slice(0, 30),
       attributes: { note: content },
       relations: [],

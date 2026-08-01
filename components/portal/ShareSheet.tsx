@@ -56,7 +56,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
       people: [],
       nodes: [
         {
-          type: 'object',
+          type: 'Thing',
           name: L(dict, `照片 · ${new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`, `Photo · ${new Date().toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}`),
           attributes: {
             note: L(dict, '改个名字、加点标签更好找;想认内容点「AI 整理」。', 'Rename or tag it to find it later; tap "AI organize" to recognize content.'),
@@ -90,7 +90,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
         people: [],
         nodes: [{
           // 批次 143:抓来的文章 = note 类(不再进 preference)
-          type: 'note',
+          type: 'collection',
           name: title.slice(0, 60),
           attributes: {
             url,
@@ -156,7 +156,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
               intent: 'MEMORY_CAPTURE',
               people: [],
               nodes: [{
-                type: 'object',
+                type: 'Thing',
                 name: (f?.merchant || '').trim() || seen.text.split(/\r?\n/)[0]?.slice(0, 40) || L(dict, '照片', 'Photo'),
                 // ShareSheet 的 ParsedResult.attributes 是 Record<string, string> ——
                 // 金额转字符串,和这条路上别的字段一个类型。
@@ -187,7 +187,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
         intent: 'MEMORY_CAPTURE',
         people: [],
         nodes: [{
-          type: 'preference', name: full.slice(0, 40) || L(dict, '分享内容', 'Shared content'),
+          type: 'Mind', name: full.slice(0, 40) || L(dict, '分享内容', 'Shared content'),
           attributes: full.length >= 200 ? { article: full } : { note: full },
           relations: [], tags: ['文章'], confidence: 0.8, rawInput: full.slice(0, 200),
         }],
@@ -214,7 +214,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
         const full = content.trim();
         if (full.length >= 200) {
           if (nodes.length === 0) {
-            nodes.push({ type: 'preference', name: full.slice(0, 40), attributes: { article: full }, relations: [], tags: ['文章'], confidence: 0.8, rawInput: full.slice(0, 200) });
+            nodes.push({ type: 'Mind', name: full.slice(0, 40), attributes: { article: full }, relations: [], tags: ['文章'], confidence: 0.8, rawInput: full.slice(0, 200) });
           } else {
             nodes[0] = { ...nodes[0], attributes: { ...nodes[0].attributes, article: full }, tags: Array.from(new Set([...(nodes[0].tags || []), '文章'])) };
           }
@@ -409,7 +409,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
             <p className="nesio-share-recent-label">{L(dict, '刚刚分享进来', 'Just shared')}</p>
             <div className="nesio-share-parsed-card">
               <span className="nesio-share-parsed-icon">
-                <NodeTypeIcon type={{ MEMORY_CAPTURE: 'object', EVENT_LOG: 'event', COMMITMENT: 'commitment', HEALTH_LOG: 'health_state', REMINDER: 'commitment' }[parsed.intent] || 'event'} size={18} />
+                <NodeTypeIcon type={{ MEMORY_CAPTURE: 'Thing', EVENT_LOG: 'event', COMMITMENT: 'task', HEALTH_LOG: 'Mind', REMINDER: 'task' }[parsed.intent] || 'event'} size={18} />
               </span>
               <div className="nesio-share-parsed-body">
                 <p className="nesio-share-parsed-title">{parsed.title}</p>

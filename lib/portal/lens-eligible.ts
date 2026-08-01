@@ -30,11 +30,15 @@ export interface LensCandidate {
  * 有结构的类型:它们的详情页是一张表(在哪、多少钱、谁、什么时候),
  * 不是一段话。手动登记的一件物品仍然是物品 —— 镜头对着它没有话可看。
  */
-const STRUCTURED = new Set(['object', 'place', 'person', 'event', 'health_state']);
+// 2026-08-01 改名批:Mind 合并了旧 health_state(结构化,原在这张表里,没镜头)与
+// preference(是一段话,原不在这张表里,靠下面的 manual/voice 分支拿到镜头)——
+// 两边行为相反,不能简单地把 Mind 塞进/踢出这张表。折中偏向"多给一个镜头"
+// 而不是"少给"(丢镜头=丢功能,多一个用不上的按钮成本更低),Mind 不进这张表。
+const STRUCTURED = new Set(['Thing', 'place', 'person', 'event']);
 
 export function isLensEligible(node: LensCandidate | null | undefined): boolean {
   if (!node) return false;
-  if (node.type === 'note') return true;
+  if (node.type === 'collection') return true;
 
   // 心情/笔记类来源:靠 tag 认(mood 在这个仓里不是独立 type)。
   // 这一支不看 type —— 一条打了「心情」的记录,不管它被归成什么,底下都是话。

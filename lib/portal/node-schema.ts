@@ -18,7 +18,7 @@ export interface AttributeSpec {
 }
 
 export const NODE_ATTRIBUTE_SCHEMA: Record<LifeNodeType, AttributeSpec[]> = {
-  commitment: [
+  task: [
     { key: 'dueDate', hint: 'ISO' },
     { key: 'priority', hint: 'high/medium/low' },
     { key: 'owner', hint: '' },
@@ -45,7 +45,7 @@ export const NODE_ATTRIBUTE_SCHEMA: Record<LifeNodeType, AttributeSpec[]> = {
     { key: 'birthday', hint: 'ISO' },
     { key: 'note', hint: '' },
   ],
-  object: [
+  Thing: [
     { key: 'location', hint: '' },
     { key: 'purchaseDate', hint: '' },
     { key: 'price', hint: '' },
@@ -60,19 +60,19 @@ export const NODE_ATTRIBUTE_SCHEMA: Record<LifeNodeType, AttributeSpec[]> = {
     { key: 'category', hint: 'work/home/shopping/school/restaurant' },
     { key: 'note', hint: '' },
   ],
-  health_state: [
+  // 2026-08-01 改名批:Mind 合并了旧 health_state + preference —— 属性表取两边并集
+  // (healthType/date/value/unit 来自 health_state,category/note 来自 preference)。
+  Mind: [
     { key: 'healthType', hint: 'medication/appointment/fitness/sleep/diet' },
     { key: 'date', hint: 'ISO' },
     { key: 'value', hint: '' },
     { key: 'unit', hint: '' },
-  ],
-  preference: [
     { key: 'category', hint: '' },
     { key: 'note', hint: '' },
   ],
-  // 批次 143:note = 外部笔记软件/收藏(Notion / Flomo / 微信收藏…)的正文型记忆。
-  // 正文走 rawInput/article,关键信息只留最小几项;preference 不再当笔记垃圾桶。
-  note: [
+  // 批次 143:collection(原 note)= 外部笔记软件/收藏(Notion / Flomo / 微信收藏…)的正文型记忆。
+  // 正文走 rawInput/article,关键信息只留最小几项;Mind 不再当笔记垃圾桶。
+  collection: [
     { key: 'category', hint: '' },
     { key: 'sourceApp', hint: 'notion/flomo/wechat/web' },
     { key: 'date', hint: 'ISO' },

@@ -105,7 +105,7 @@ assert.equal(metrics.profile.sex, 'male', 'D1:性别');
 assert.equal(metrics.profile.bloodType, 'O+', 'D1:血型 O+(Positive→+)');
 assert.ok(metrics.profile.age >= 30 && metrics.profile.age <= 100, `D1:年龄由生日推算,实得 ${metrics.profile?.age}`);
 
-const summary = nodes.find((n) => n.type === 'health_state');
+const summary = nodes.find((n) => n.type === 'Mind');
 assert.ok(summary && /步/.test(summary.rawInput) && /体重/.test(summary.rawInput), '概况节点全文件包含步数+体重');
 assert.equal(summary.attributes.externalId, 'health:summary', '概况节点固定 externalId(幂等)');
 assert.equal(nodes.filter((n) => n.type === 'event').length, 1, '锻炼事件节点');
