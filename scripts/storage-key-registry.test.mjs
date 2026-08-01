@@ -91,6 +91,9 @@ const KNOWN_KEYS = new Map([
   ["nesio-judge-dismissed-v1", "cache"],
   ["nesio-last-backup-at", "cache"],
   ["nesio-last-location-v1", "cache"],
+  // 「今天看没看过简报」。cache —— 换台设备从零开始是对的：
+  // 它是这台机器上的 UI 状态，不是用户数据。
+  ["nesio-daily-brief-seen-v1", "cache"],
   ["nesio-life-graph-cloud-sync-outbox-v1", "cache"],
   ["nesio-life-graph-cloud-sync-v1", "cache"],
   ["nesio-music-last-played-v1", "cache"],

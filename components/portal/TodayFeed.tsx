@@ -50,6 +50,7 @@ import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
 import CaptureBar from './today/CaptureBar';
 import { ThawedReminder } from './today/ThawedReminder';
+import { DailyBriefRow } from './today/DailyBriefRow';
 import { ReengageNudgeCard } from './today/ReengageNudgeCard';
 import { TodayFocusSection } from './today/FocusSection';
 import { useTodayData } from './today/useTodayData';
@@ -675,6 +676,10 @@ export default function TodayFeed({
             onMarkDone={(nodeId) => markFocusNodeDone(nodeId)}
           />
         ))}
+
+        {/* 每日简报入口(2026-08-01,用户:「每日文字简报在哪里,没有见到」)——
+            此前它只在设置里有一个 demo 入口,从没上过首页。点开的是同一张 sheet。 */}
+        <DailyBriefRow />
 
         {/* 冷冻到期提醒(批次 7:冷冻仓入口迁到拍一下,决定回路留在首屏) */}
         <ThawedReminder />

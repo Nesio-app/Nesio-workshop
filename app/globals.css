@@ -9825,6 +9825,58 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
 /* 批次 128·环形能量表:情绪词后缀,弧长=能量高低,色随情绪(--mood-c) */
 .nesio-tl-node--mood .nesio-mood-ring { display: inline-block; vertical-align: -2px; margin-left: 6px; color: var(--mood-c, var(--portal-muted)); }
 /* 批次 128·记一笔·话筒常驻末节点(虚线草稿位):点话筒=说一句,点文字=打字 */
+/* ── 每日简报入口(2026-08-01,用户「每日文字简报在哪里,没有见到」)──────────
+   一行,不是一张卡。看过之后不消失、只是安静下来 —— 消失的话他明天又要找一遍。 */
+.nesio-brief-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-3);
+  border: 1px solid var(--portal-accent-border);
+  border-radius: var(--radius-md);
+  background: var(--portal-accent-soft);
+  text-align: left;
+  cursor: pointer;
+}
+.nesio-brief-row:active { transform: scale(0.995); }
+/* 今天读过了:退成一条安静的行,不再是当天第一眼要看的东西 */
+.nesio-brief-row.is-seen {
+  background: transparent;
+  border-color: var(--portal-line);
+}
+.nesio-brief-row-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-pill);
+  background: var(--portal-accent-soft-md);
+  color: var(--portal-accent);
+}
+.nesio-brief-row.is-seen .nesio-brief-row-icon {
+  background: var(--portal-line);
+  color: var(--portal-muted);
+}
+.nesio-brief-row-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.nesio-brief-row-title {
+  font-size: var(--text-body);
+  font-weight: var(--weight-semibold);
+  color: var(--portal-ink);
+}
+.nesio-brief-row.is-seen .nesio-brief-row-title { font-weight: var(--weight-medium); color: var(--portal-muted); }
+.nesio-brief-row-sub {
+  font-size: var(--text-xs);
+  color: var(--portal-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.nesio-brief-row-chev { flex-shrink: 0; color: var(--portal-muted); font-size: var(--text-h3); }
+
 .nesio-tl-capture {
   display: flex;
   flex-direction: column;
