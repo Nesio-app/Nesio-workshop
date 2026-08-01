@@ -9,8 +9,8 @@
  *   · remote      —— 声音从**别的 App** 出来,Nesio 只是遥控器。Spotify 属这类
  *                    (iOS 是 App Remote,web 是 Connect):必须装着 Spotify、且是 Premium,
  *                    车机上显示的是 **Spotify 不是 Nesio**。
- *   · metadata-only —— 查得到、放不出声。网易在**没有国内出口**时就是这一类:
- *                    搜索/歌单/封面都不锁区,锁的是「拿播放地址」那一步。
+ *   · metadata-only —— 查得到、放不出声。**目前没有源属于这一类**;这个模型留着,
+ *                    因为它描述的是一种真实存在的状态(见下面网易那条的历史)。
  *
  * 从 in-app 切到 remote,用户看到的东西会当场变(车机屏幕换一个 App、音量走另一条通道)。
  * 这**必须提前说**,不能切完了让他自己发现 —— switchNotice() 就是那句话。
@@ -39,6 +39,12 @@ export interface MusicSourceInfo {
    *  给用户看的句子里,只留中文的话英文界面会当场混进中文。 */
   requires: string;
   requiresEn: string;
+  /**
+   * 能不能放是**逐曲**的:源本身通着,但某一首可能取不到。
+   * 网易是这一类(版权受限的那部分拿不到播放地址,其余照样能放)。
+   * 界面据此把话说准:源级别只能说「可能」,哪一首不行要等点下去才知道。
+   */
+  perTrack?: boolean;
 }
 
 export const MUSIC_SOURCES: readonly MusicSourceInfo[] = Object.freeze([
@@ -74,11 +80,22 @@ export const MUSIC_SOURCES: readonly MusicSourceInfo[] = Object.freeze([
     id: 'netease',
     zh: '网易云音乐',
     en: 'NetEase',
-    // 没有国内出口 IP 就拿不到播放地址 —— 这是它此刻的真实能力,不是「暂时故障」。
-    model: 'metadata-only',
-    showsOnCar: '—',
-    requires: '国内网络出口',
-    requiresEn: 'a mainland-China network route',
+    /*
+     * 2026-07-31 更正。我上一版把它写成 metadata-only,理由是「没有国内出口就拿不到
+     * 播放地址」—— **那是过度概括**,用户当场指出来:「不是所有歌都锁着的,
+     * 为什么 github 的就可以」。他是对的。
+     *
+     * 真实情况是**逐曲**的:非独家、非 VIP 的曲子在国外出口上照样能拿到可播 URL,
+     * 被挡住的是版权受限/独家/付费那部分。所以它就是一个普通的 in-app 源
+     * (音频是普通 URL,Nesio 自己播),只不过**每一首都要先问过才知道**。
+     * 这一点正好落回本文件的核心判据:能不能放,要拿到东西才算数 ——
+     * 源级别说「可能」,具体哪一首放不了,点的时候才知道、也在那时候说。
+     */
+    model: 'in-app',
+    showsOnCar: 'Nesio',
+    perTrack: true,
+    requires: '有的曲子有版权限制',
+    requiresEn: 'some tracks are rights-restricted',
   },
 ]);
 
@@ -126,6 +143,7 @@ const COPY = {
   zh: {
     name: (s: MusicSourceInfo) => s.zh,
     metaOnly: (s: MusicSourceInfo) => `${s.zh}这里能搜到歌、看得到歌单,但放不出声 —— 差一个${s.requires}。先用别的源听。`,
+    perTrackNote: (s: MusicSourceInfo) => `${s.zh}多数歌能直接放;${s.requires}的那部分取不到,点下去才知道 —— 遇到了就换一首或换个源。`,
     unconfigured: (s: MusicSourceInfo) => `${s.zh}还没配好,这一步得在设置里补上。`,
     unauthorized: (s: MusicSourceInfo) => `${s.zh}还没连上你的账号,连一下就能听。`,
     notStreamable: (s: MusicSourceInfo) => `${s.zh}连上了,但这首现在取不到 —— 通常是${s.requires}的关系。换个源试试。`,
@@ -133,12 +151,15 @@ const COPY = {
     fromRemote: (a: MusicSourceInfo, b: MusicSourceInfo) => `换回 ${b.zh} 之后,${a.zh} 会停,声音回到 Nesio 自己播、车机上显示 ${b.showsOnCar}。`,
     toMetaOnly: (b: MusicSourceInfo) => `${b.zh}现在只能查不能放,切过去不会有声音。`,
     toInApp: (b: MusicSourceInfo) => `换到 ${b.zh},声音回到 Nesio 自己播。`,
-    halfWay: (names: string) => `${names}还差一步就能放了 —— 连上账号或换成本地歌曲都行。`,
+    halfWay: (names: string) => `${names}还差一步:连上账号就能听。`,
+    // 本地歌曲差的不是账号,是**还没导歌** —— 拿「连上账号」去说它,是一句对不上的话。
+    localEmpty: '本地歌曲还是空的 —— 导几首进来就能听,不要账号也不要网络。',
     nothing: '现在还没有能出声的音源。先往本地歌曲里放几首,离线也听得到。',
   },
   en: {
     name: (s: MusicSourceInfo) => s.en,
     metaOnly: (s: MusicSourceInfo) => `${s.en} can search and browse here, but it cannot play — that needs ${s.requiresEn}. Use another source for now.`,
+    perTrackNote: (s: MusicSourceInfo) => `Most ${s.en} tracks play fine; ${s.requiresEn} and you will find out when you tap it — try another track or another source.`,
     unconfigured: (s: MusicSourceInfo) => `${s.en} is not set up yet — that step happens in settings.`,
     unauthorized: (s: MusicSourceInfo) => `${s.en} is not linked to your account yet. Connect it and you are set.`,
     notStreamable: (s: MusicSourceInfo) => `${s.en} is connected, but this one will not stream right now — usually about ${s.requiresEn}. Try another source.`,
@@ -146,7 +167,8 @@ const COPY = {
     fromRemote: (a: MusicSourceInfo, b: MusicSourceInfo) => `Switching back to ${b.en} stops ${a.en}; Nesio plays again and your car shows ${b.showsOnCar}.`,
     toMetaOnly: (b: MusicSourceInfo) => `${b.en} can only search right now, so switching there will not make any sound.`,
     toInApp: (b: MusicSourceInfo) => `Switching to ${b.en} — Nesio plays the audio again.`,
-    halfWay: (names: string) => `${names} are one step away — connect an account, or switch to local files.`,
+    halfWay: (names: string) => `${names} are one step away — just connect an account.`,
+    localEmpty: 'Local music is still empty — drop a few files in and you can listen, no account and no network needed.',
     nothing: 'No source can play yet. Drop a few files into local music — those work offline.',
   },
 } as const;
@@ -162,6 +184,10 @@ export function blockedReason(id: MusicSourceId, r: SourceReadiness, locale: Mus
   const s = sourceInfo(id);
   const c = t(locale);
   if (canPlayNow(id, r)) return '';
+  // 本地歌曲**单独说**:它不需要配置、不需要账号,唯一放不出声的原因是曲库空着。
+  // 走下面那条通用话术的话,requires 是空串,句子会变成「连上了,但这首现在取不到 ——
+  // 通常是的关系」:一句读不通的话。
+  if (id === 'local') return c.localEmpty;
   if (s.model === 'metadata-only') return c.metaOnly(s);
   if (!r.configured) return c.unconfigured(s);
   if (!r.authorized) return c.unauthorized(s);
@@ -218,12 +244,24 @@ export function noSourceLine(
   locale: MusicLocale = 'zh',
 ): string {
   const c = t(locale);
+  // 本地歌曲**单独说**。它 configured 恒真、authorized 恒真,不能放只可能是一个原因:
+  // 曲库空着。把它混进「还差一步 —— 连上账号」那句里,得到的是一句对不上的话
+  // (实测:当前源是 Apple Music,屏幕上却写着「本地歌曲还差一步…连上账号或换成本地歌曲」)。
+  const localReady = readiness.local ?? UNREADY;
+  if (localReady.configured && !localReady.streamable) return c.localEmpty;
+
   const half = MUSIC_SOURCES.filter((s) => {
     const r = readiness[s.id] ?? UNREADY;
-    return s.model !== 'metadata-only' && r.configured && !canPlayNow(s.id, r);
+    return s.id !== 'local' && s.model !== 'metadata-only' && r.configured && !canPlayNow(s.id, r);
   });
   if (half.length) return c.halfWay(half.map(c.name).join(locale === 'en' ? ', ' : '、'));
   return c.nothing;
+}
+
+/** 逐曲源的那句说明。不是「不能放」,是「点下去才知道这一首行不行」。 */
+export function perTrackNote(id: MusicSourceId, locale: MusicLocale = 'zh'): string {
+  const s = sourceInfo(id);
+  return s.perTrack ? t(locale).perTrackNote(s) : '';
 }
 
 /** 源名(按语言)。界面到处要用,别让每个调用点自己写 `locale === 'en' ? s.en : s.zh`。 */

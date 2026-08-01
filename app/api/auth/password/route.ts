@@ -14,8 +14,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { isRateLimited } from '@/lib/portal/api-auth';
 import { AUTH_SIG_COOKIE, signSessionValue } from '@/lib/portal/auth/session-sig';
+import { isInvited, gateReason } from '@/lib/portal/auth/invite-allowlist';
 
 interface SupabaseSession { access_token?: string; refresh_token?: string; expires_in?: number }
+
+/**
+ * 邀请制的门(2026-07-31)。**贴着每一处发 cookie 的地方**放,不放在路由开头 ——
+ * 开头那种「先判一次然后一路往下」的写法,新增一条分支就会绕过去,
+ * 而绕过去之后没有任何症状:登录照常成功。
+ * 密码这条路两个出口(注册 / 登录)各一道。
+ */
+function inviteBlocked(email: string): NextResponse | null {
+  if (isInvited(email)) return null;
+  console.warn('[auth] invite_gate_blocked', gateReason(email));
+  return NextResponse.json({ ok: false, error: 'not_invited' }, { status: 403 });
+}
 
 function setAuthCookies(response: NextResponse, session: SupabaseSession) {
   const secure = process.env.NODE_ENV === 'production';
@@ -85,6 +98,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: false, error }, { status: 400 });
     }
     // Supabase 开了邮箱确认 → 无会话返回:让用户去邮箱点确认
+    const blocked = inviteBlocked(email);
+    if (blocked) return blocked;
     if (!data.access_token) return NextResponse.json({ ok: true, needsEmailConfirm: true });
     const response = NextResponse.json({ ok: true });
     setAuthCookies(response, data);
@@ -101,6 +116,8 @@ export async function POST(req: NextRequest) {
     if (!res.ok || !data.access_token) {
       return NextResponse.json({ ok: false, error: 'invalid_credentials' }, { status: 401 });
     }
+    const blocked = inviteBlocked(email);
+    if (blocked) return blocked;
     const response = NextResponse.json({ ok: true });
     setAuthCookies(response, data);
     return response;

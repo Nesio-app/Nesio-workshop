@@ -91,4 +91,59 @@ const row = (title, meta, labels) => ({ title, meta, googleLabels: labels });
   assert.ok(!matchesChip(r, { kind: 'google', id: '家', label: '家', count: 1 }), 'Google 标签必须整体相等,不能子串命中');
 }
 
-console.log('schedule-filters: OK(无空标签 / 自建标签不藏 / 字面可预测 / 标签精确比)');
+// ── ⑤ 看得见就搜得到 ────────────────────────────────────────────────────
+//
+// 用户实测(2026-07-31):自建的「扣款」标签命中 0,而列表里明明白白有一条写着
+// 「扣款 · $662.59」。根因是那两个字是 mail-badges 从 moneyFlow **派生出来展示的**,
+// 既不在标题里也不在发件人里 —— 屏幕上有的字,搜不到。
+//
+// 这是最伤信任的一种:用户照着屏幕上的字建筛选,系统说没有。
+{
+  const withExtra = (title, meta, extra) => ({ title, meta, extra, googleLabels: [] });
+  assert.ok(
+    matchesCustom(withExtra('Your AutoPay Reminder', 'American Express', '扣款 · $662.59 账单'), '扣款'),
+    '状态行上的字必须搜得到 —— 用户是照着屏幕上的字建的筛选',
+  );
+  assert.ok(matchesCustom(withExtra('x', 'y', '有附件'), '附件'), '徽章上的字同理');
+  assert.ok(!matchesCustom(withExtra('x', 'y', ''), '扣款'), 'extra 为空时不许瞎命中');
+  assert.ok(!matchesCustom(withExtra('x', 'y'), '扣款'), 'extra 缺失(日历行)不许抛');
+
+  // **正文预览刻意不进匹配面**:它在屏幕上是折起来的。拿它匹配会筛出一堆
+  // 用户看不出为什么会命中的行 —— 那比漏筛更难排查。判据是「看得见」,不是「字段全塞」。
+  const withBody = { title: 'x', meta: 'y', extra: '', body: '这里写着扣款两个字', googleLabels: [] };
+  assert.ok(!matchesCustom(withBody, '扣款'), '折起来的正文不参与筛选 —— 命中了用户也看不出为什么');
+
+  // buildChips 的计数走的是同一个函数,所以数字和点进去看到的条数必然一致。
+  const rows = [withExtra('a', 'b', '扣款 · $10'), withExtra('c', 'd', '已付款')];
+  const chips = buildChips(rows, [{ id: 'f1', name: '扣款', keyword: '扣款', createdAt: '' }]);
+  const mine = chips.find((c) => c.id === 'f1');
+  assert.equal(mine.count, 1, '标签上的数字必须等于点下去真能看到的条数');
+  assert.equal(rows.filter((r) => matchesChip(r, mine)).length, mine.count, '计数和筛选必须是同一套判断');
+}
+
+// ── ⑥ 建错了要改得掉 ────────────────────────────────────────────────────
+//
+// 用户:「如果确实不管用,我希望可以修改,现在不行」。以前只有长按/右键删,
+// 而手机上长按常被系统的文本选择抢走 —— 一个建错的筛选事实上既改不了也删不掉。
+{
+  const panel = fs.readFileSync(new URL('../components/portal/insights/SchedulePanel.tsx', import.meta.url), 'utf8');
+  assert.ok(
+    /updateCustomFilter\(editId, \{ name: fName, keyword: fKeyword \}\)/.test(panel),
+    '改完要真的存下去',
+  );
+  assert.ok(
+    /chosen\?\.kind === 'custom' && !addingFilter &&[\s\S]{0,600}setEditId\(chosen\.id\)/.test(panel),
+    '选中自建标签时要给得出「改一改」的入口 —— 藏在长按里等于没有',
+  );
+  assert.ok(
+    /\{editId && \([\s\S]{0,400}removeCustomFilter\(editId\)/.test(panel),
+    '编辑态里要能删 —— 长按在手机上会被系统的文本选择抢走',
+  );
+  // 改的时候当场显示命中数:用户就是因为「命中 0」才来改的,改完立刻看得见有没有用。
+  assert.ok(
+    /fKeyword\.trim\(\) && \([\s\S]{0,500}matchesCustom\(r, fKeyword\)\)\.length/.test(panel),
+    '编辑时要当场显示这个词能筛出几条',
+  );
+}
+
+console.log('schedule-filters: OK(无空标签 / 自建标签不藏 / 字面可预测 / 标签精确比 / 看得见就搜得到 / 建错了改得掉)');

@@ -160,17 +160,11 @@ const code = stripComments;
   assert.ok(/earned:\s*bal\.earned/.test(server), '服务端没把 earned 发给客户端,前端算不出真实攒钱进度');
 }
 
-// ── ⑥ 到点的例行提醒要有「不再提醒」出口 ─────────────────────────────────────
-// CLAUDE.md 红线:每个提示都要有「跳过 / 稍后 / 不再提醒」。原来只有「完成 / 今天跳过」,
-// 两个都只管今天,不想要的提醒每天还会再来;而整张卡又不可点,没有别的出口。
-{
-  const cards = code(read('components/portal/today/RoutineDueCards.tsx'));
-  assert.ok(/deleteRoutine\(r\.id\)/.test(cards), '例行提醒卡没有「不再提醒」出口');
-  assert.equal(
-    (cards.match(/deleteRoutine\(r\.id\)/g) || []).length, 2,
-    'AI 简报卡和普通提醒卡两种都要有「不再提醒」—— 少一种就有一类提醒关不掉',
-  );
-}
+// ── ⑥ (已撤)例行提醒卡的「不再提醒」出口 ─────────────────────────────────────
+// 2026-07-31:例行提醒模块整个删掉了 —— 它的能力(每周几重复)并进了
+// schedule-reminders,提醒不再在今天页出卡,所以这条断言失去了对象。
+// **红线本身没变**:凡是会重复出现的提示,都必须给得出「不再提醒」。
+// 现在那个出口在日程页每条提醒的「✕」上,由 test:reminder-unify 那边盯着。
 
 // ── ⑦ 「读不出来」不许伪装成「没有数据」 ─────────────────────────────────────
 // 财务页原来是 hydrated: boolean,而 bankDataReady() 的 catch 里直接 setHydrated(true)——
@@ -280,4 +274,49 @@ const code = stripComments;
   }
 }
 
-console.log('qa-ui-truth: OK(file input 可点 · 头像手势 · 深链自增号 · 一件事一个数 · 攒钱进度 · 提醒可关)');
+// ── ⑦ 2026-07-31 实测四条:能不能按、按了看不看得出来 ─────────────────────
+//
+// 这四条的共同点:**功能都「做了」,但用户按不到或看不出来**。
+// 这类回退最阴——代码里那一行明明在,契约要压的是它在屏幕上的处境。
+{
+  // (a) 主动卡不能只有手势。批次 33 撤掉了 ✕ 只留左右滑,之后手势被实测打回三次
+  //     (「向右滑动还是失败」→「向左拉还是拉不动」)。手势失灵时,卡就永远关不掉。
+  const gcard = code(read('components/portal/today/ProactiveGuidanceCard.tsx'));
+  assert.ok(
+    /className="nesio-proactive-card-dismiss"[\s\S]{0,400}handleSnooze\(\)/.test(gcard),
+    '主动卡必须有一个不依赖手势的出口(✕)—— 手势可以更快,但不能是唯一的那条路',
+  );
+  const css = read('app/globals.css');
+  const dismissBlk = css.slice(css.indexOf('.nesio-proactive-card-dismiss {'));
+  assert.ok(
+    /min-height: var\(--tap-min/.test(dismissBlk.slice(0, 600)),
+    '✕ 的触摸区要到 --tap-min —— 20px 的靶子在手机上按一半在外面,那就是另一种「点了没反应」',
+  );
+
+  // (b) 时间线上的 ✕ 必须在**行内**。日历那条原来把 ✕ 放在 <li> 底下(因为行是个
+  //     <button>,✕ 不能嵌进去),块级流一走,✕ 就掉到条目下面一行、贴最左,
+  //     看着像浮在两条中间的孤零零一个叉,还点不动(用户实测 图2)。
+  const cal = code(read('components/portal/today/CalendarCards.tsx'));
+  assert.ok(
+    !/<button type="button" className="nesio-collapsed-row"/.test(cal),
+    '日历行不能整行是一个 <button> —— 那样 ✕ 只能塞到行外面(按钮不能嵌套按钮)',
+  );
+  assert.ok(
+    /<div className="nesio-collapsed-row">[\s\S]{0,900}className="nesio-tl-x"[\s\S]{0,400}<\/div>/.test(cal),
+    '✕ 必须和标题按钮平级、同在 .nesio-collapsed-row 里 —— 它的位置是「这一条的末尾」',
+  );
+
+  // (c) 录音时符号必须变。原来在听和不在听是同一枚话筒,屏幕上唯一线索是系统那颗橙点 ——
+  //     猜错的代价是对着手机说完一整句,发现一个字都没进去(用户实测 图5)。
+  const bar = code(read('components/portal/today/CaptureBar.tsx'));
+  assert.ok(
+    /capture\.recording \? \([\s\S]{0,200}nesio-mic-wave[\s\S]{0,200}\) : \([\s\S]{0,120}<IconMic/.test(bar),
+    '录音中要换掉话筒图标 —— 状态只写在 aria-label 上,眼睛是看不见的',
+  );
+  assert.ok(
+    /@media \(prefers-reduced-motion: reduce\) \{\s*\n\s*\.nesio-mic-wave i \{ animation: none; height: 13px; \}/.test(css),
+    '关掉动效的人也得看得出在不在听 —— 「减少动效」不等于「不给状态」',
+  );
+}
+
+console.log('qa-ui-truth: OK(file input 可点 · 头像手势 · 深链自增号 · 一件事一个数 · 攒钱进度 · 提醒可关 · 出口不只手势 · ✕ 在行内 · 录音看得出来)');

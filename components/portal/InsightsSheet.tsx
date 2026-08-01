@@ -264,9 +264,10 @@ function HubGrid({ tiles, dict, onOpen }: { tiles: HubTile[]; dict: string; onOp
   return (
     <>
       {editing && (
-        // 左右 0.25rem 和 .nesio-insights-header 对齐 —— 洞察页整体是贴边布局,
-        // 不留这一点「完成」两个字就正好压在屏幕右边缘上(实测 right=390=视口宽)。
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: '0 var(--space-1)', marginBottom: 'var(--space-2)' }}>
+        // 2026-07-31:这里原来补了 `padding: 0 0.25rem`,理由写的是这一页本来就没有留边。
+        // 那不是设计,是 .nesio-insights-body 漏了左右 padding —— 已在 --page-gutter
+        // 那儿从根上修掉。再留这一小块就是双重缩进。
+        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
           <span style={{ flex: 1, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
             {L(dict, '按住拖动换位置', 'Hold and drag to reorder')}
           </span>
@@ -276,7 +277,7 @@ function HubGrid({ tiles, dict, onOpen }: { tiles: HubTile[]; dict: string; onOp
       )}
 
       {saveErr && (
-        <p role="alert" style={{ margin: '0 0 var(--space-2)', padding: '0 var(--space-1)', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)' }}>{saveErr}</p>
+        <p role="alert" style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)' }}>{saveErr}</p>
       )}
 
       <div className={`nesio-insights-hub${editing ? ' nesio-insights-hub--editing' : ''}`}>

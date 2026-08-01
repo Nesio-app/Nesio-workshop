@@ -61,7 +61,9 @@ function loadTs(rel) {
   //   ① 非颜色(间距/圆角/字号/字重/动效/层级/容器)—— 皮肤不改尺寸;
   //   ② 语义红 —— 红是「真实风险」的语义色(CLAUDE.md),跟着皮肤走会让风险提示
   //      在某些配色下和强调色分不开。和情绪色/地表色同一类:被描绘的含义,不是 UI 皮肤。
-  const NON_COLOR = /^--(space|radius|text|weight|leading|tracking|dur|ease|shadow|glass-blur|modal-backdrop-blur|modal-backdrop-saturate|modal-card-blur|modal-card-saturate|tap-min|container|portal-bottom-nav-clearance|font)/;
+  // `--page-gutter` 是「页面左右留边」的长度(2026-08-01,用户「四边都紧挨着屏幕边」),
+  // 和 --space-* / --tap-min 同类:皮肤换的是颜色,不是版心宽度。
+  const NON_COLOR = /^--(space|radius|text|weight|leading|tracking|dur|ease|shadow|glass-blur|modal-backdrop-blur|modal-backdrop-saturate|modal-card-blur|modal-card-saturate|tap-min|container|page-gutter|portal-bottom-nav-clearance|font)/;
   const SEMANTIC_RED = new Set(['--status-risk', '--status-risk-soft', '--status-stop', '--status-warn']);
   const skinnable = [...base].filter((t) => !NON_COLOR.test(t) && !SEMANTIC_RED.has(t));
 

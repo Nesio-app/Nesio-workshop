@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { bootstrapCloudAccountProfile, buildCloudAccountProfileBootstrapMeta } from '@/lib/portal/cloud-account-profile';
+import { isInvited, gateReason, emailFromAccessToken } from '@/lib/portal/auth/invite-allowlist';
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
 import { AUTH_SIG_COOKIE, WECHAT_SIG_COOKIE, signSessionValue } from '@/lib/portal/auth/session-sig';
@@ -30,6 +31,23 @@ function safeRedirectUrl(req: NextRequest, params: Record<string, string>) {
     if (value) target.searchParams.set(key, value);
   }
   return target;
+}
+
+/**
+ * 邀请制的门(2026-07-31)。
+ *
+ * 这条路(magic link / OTP / 第三方)拿不到明文邮箱 —— 它在 access_token 的 claim 里。
+ * 解不出来就当「不知道你是谁」,门开着时一律不放行(见 invite-allowlist 的 fail-closed):
+ * 否则只要让邮箱读取失败就能绕过整道门。
+ *
+ * 放在**每一处发 cookie 的地方旁边**,不放路由开头 —— 开头判一次然后一路往下的写法,
+ * 新增一条分支就绕过去了,而绕过去之后没有任何症状:登录照常成功。
+ */
+function inviteAllows(session: { access_token?: string }): boolean {
+  const email = emailFromAccessToken(session.access_token || '');
+  const ok = isInvited(email);
+  if (!ok) console.warn('[auth] invite_gate_blocked', gateReason(email));
+  return ok;
 }
 
 function setAuthCookies(response: NextResponse, session: SupabaseTokenResponse) {
@@ -302,19 +320,23 @@ export async function GET(req: NextRequest) {
     if (session?.access_token) after(() => bootstrapCloudAccountProfile(session?.access_token).catch(() => { /* best-effort */ }));
     const profileBootstrap = null;
     const profileBootstrapMeta = buildCloudAccountProfileBootstrapMeta(profileBootstrap);
+    // 被邀请制挡下时**不许再说 session_established** —— 那会把用户送回首页、
+    // 界面显示登录成功,而 cookie 一个都没发:他会一路点下去,每个动作都 401。
+    // 说错状态比不说更糟,所以这里让 allowed 参与措辞。
+    const allowed = !!session?.access_token && inviteAllows(session);
     const target = safeRedirectUrl(req, {
       safePublicStatus: 'true',
       secretsRedacted: 'true',
-      auth: session?.access_token ? 'auth_callback_received' : 'auth_callback_failed',
+      auth: !session?.access_token ? 'auth_callback_failed' : allowed ? 'auth_callback_received' : 'auth_not_invited',
       provider,
-      status: session?.access_token ? 'session_established' : 'session_exchange_failed',
-      profileBootstrapStatus: session?.access_token ? profileBootstrapMeta.profileBootstrapStatus : 'profile_bootstrap_not_started',
-      profileBootstrapBlocking: session?.access_token ? String(profileBootstrapMeta.profileBootstrapBlocking) : 'false',
-      authReady: session?.access_token ? String(profileBootstrapMeta.authReady) : 'false',
+      status: !session?.access_token ? 'session_exchange_failed' : allowed ? 'session_established' : 'not_invited',
+      profileBootstrapStatus: allowed ? profileBootstrapMeta.profileBootstrapStatus : 'profile_bootstrap_not_started',
+      profileBootstrapBlocking: allowed ? String(profileBootstrapMeta.profileBootstrapBlocking) : 'false',
+      authReady: allowed ? String(profileBootstrapMeta.authReady) : 'false',
     });
     const response = NextResponse.redirect(target);
-    if (session?.access_token) {
-      setAuthCookies(response, session);
+    if (allowed) {
+      setAuthCookies(response, session!);
     }
     return response;
   }
@@ -324,19 +346,20 @@ export async function GET(req: NextRequest) {
     if (session?.access_token) after(() => bootstrapCloudAccountProfile(session?.access_token).catch(() => { /* best-effort */ }));
     const profileBootstrap = null;
     const profileBootstrapMeta = buildCloudAccountProfileBootstrapMeta(profileBootstrap);
+    const allowed = !!session?.access_token && inviteAllows(session);
     const target = safeRedirectUrl(req, {
       safePublicStatus: 'true',
       secretsRedacted: 'true',
-      auth: session?.access_token ? 'auth_callback_received' : 'auth_callback_failed',
+      auth: !session?.access_token ? 'auth_callback_failed' : allowed ? 'auth_callback_received' : 'auth_not_invited',
       provider,
-      status: session?.access_token ? 'session_established' : 'otp_verify_failed',
-      profileBootstrapStatus: session?.access_token ? profileBootstrapMeta.profileBootstrapStatus : 'profile_bootstrap_not_started',
-      profileBootstrapBlocking: session?.access_token ? String(profileBootstrapMeta.profileBootstrapBlocking) : 'false',
-      authReady: session?.access_token ? String(profileBootstrapMeta.authReady) : 'false',
+      status: !session?.access_token ? 'otp_verify_failed' : allowed ? 'session_established' : 'not_invited',
+      profileBootstrapStatus: allowed ? profileBootstrapMeta.profileBootstrapStatus : 'profile_bootstrap_not_started',
+      profileBootstrapBlocking: allowed ? String(profileBootstrapMeta.profileBootstrapBlocking) : 'false',
+      authReady: allowed ? String(profileBootstrapMeta.authReady) : 'false',
     });
     const response = NextResponse.redirect(target);
-    if (session?.access_token) {
-      setAuthCookies(response, session);
+    if (allowed) {
+      setAuthCookies(response, session!);
     }
     return response;
   }

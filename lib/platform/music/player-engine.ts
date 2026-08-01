@@ -63,6 +63,11 @@ const INITIAL: PlayerState = Object.freeze({
 let state: PlayerState = INITIAL;
 let tracks: readonly LocalTrack[] = [];
 let opts: PlayerOptions = { repeat: 'off', shuffle: false, seed: 1, locale: 'zh' };
+/**
+ * 正在放的**远端**曲目(网易那类:音频是一个普通 URL,不在本地曲库里)。
+ * 与本地曲库互斥 —— 谁最后放,currentId 就指向谁。
+ */
+let remote: { id: string; title: string; artist: string } | null = null;
 let el: HTMLAudioElement | null = null;
 let objectUrl = '';
 const listeners = new Set<(s: PlayerState) => void>();
@@ -140,8 +145,10 @@ export function currentState(): PlayerState {
   return state;
 }
 
-export function currentTrack(): LocalTrack | null {
-  return tracks.find((t) => t.id === state.currentId) || null;
+export function currentTrack(): { id: string; title: string; artist: string } | null {
+  if (remote && remote.id === state.currentId) return remote;
+  const t = tracks.find((x) => x.id === state.currentId);
+  return t ? { id: t.id, title: t.title, artist: t.artist } : null;
 }
 
 export function subscribe(fn: (s: PlayerState) => void): () => void {
@@ -162,6 +169,7 @@ export async function playId(id: string): Promise<void> {
 
   const a = audio();
   if (!a) { emit({ loading: false, error: c.notReady }); return; }
+  remote = null;                  // 换回本地曲目:远端那条身份作废,不然 currentTrack 认错人
   revoke();
   objectUrl = URL.createObjectURL(blob);
   a.src = objectUrl;
@@ -173,6 +181,33 @@ export async function playId(id: string): Promise<void> {
     // 合成一句「放不出来」等于把唯一有效的动作藏起来。
     const name = (e as Error)?.name || '';
     emit({ playing: false, loading: false, error: name === 'NotAllowedError' ? c.blocked : c.badFormat(track.title) });
+  }
+}
+
+/**
+ * 放一个**远端**地址(网易那类)。
+ *
+ * 和 playId 的差别只在音频从哪来:那边是本地 blob,这边是一个 URL。
+ * 别的都一样 —— 同一个 audio 元素、同一份状态、同一套失败话术,
+ * 所以悬浮球、车机显示、暂停键全都照旧管用,不需要第二套。
+ *
+ * 「这一首取不到」不在这里判:那是调用方问过 song-url 之后的事,
+ * 而且它要说的是「换一首」而不是「重试」——两种话不该在同一处拼。
+ */
+export async function playRemote(url: string, meta: { id: string; title: string; artist?: string }): Promise<void> {
+  const c = copy();
+  const a = audio();
+  if (!a) { emit({ loading: false, error: c.notReady }); return; }
+  remote = { id: meta.id, title: meta.title, artist: meta.artist || '' };
+  emit({ currentId: meta.id, loading: true, error: '' });
+  revoke();                       // 上一首要是本地的,把它的 objectURL 放掉
+  a.src = url;
+  try {
+    await a.play();
+    emit({ playing: true, loading: false, error: '' });
+  } catch (e) {
+    const name = (e as Error)?.name || '';
+    emit({ playing: false, loading: false, error: name === 'NotAllowedError' ? c.blocked : c.badFormat(meta.title) });
   }
 }
 
@@ -194,6 +229,9 @@ export async function toggle(): Promise<void> {
 }
 
 export function step(dir: 'next' | 'prev', auto: boolean): void {
+  // 正在放远端的那一首时,本地队列里根本没有它 —— 按本地顺序「下一首」会跳到
+  // 一首毫不相干的歌。远端目前没有队列概念,所以就停在这儿,不假装能续。
+  if (remote && remote.id === state.currentId) { emit({ playing: false }); audio()?.pause(); return; }
   if (!tracks.length) return;
   const order = playOrder(tracks.length, opts.shuffle, opts.seed);
   const cur = Math.max(0, tracks.findIndex((t) => t.id === state.currentId));
@@ -228,6 +266,7 @@ export function stop(): void {
   const a = audio();
   if (a) { a.pause(); a.removeAttribute('src'); a.load(); }
   revoke();
+  remote = null;
   emit({ currentId: '', playing: false, positionSec: 0, durationSec: 0, loading: false });
   // 车机/锁屏上的残留也要清:关掉了,那边还显示着曲名和一个暂停键,
   // 用户会以为没关干净、回头去翻后台。

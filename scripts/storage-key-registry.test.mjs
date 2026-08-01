@@ -231,7 +231,6 @@ const KNOWN_KEYS = new Map([
   ["nesio-rel-contact-v1", "durable"],
   ["nesio-relationship-overrides-v1", "durable"],
   ["nesio-rewards-v1", "durable"],
-  ["nesio-routines-v1", "durable"],
   ["nesio-snoozed-overdue", "durable"],
   ["nesio-theme-lowsat-v1", "durable"],
   ["nesio-theme-palette-v1", "durable"],

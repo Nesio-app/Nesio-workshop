@@ -10,6 +10,23 @@ const securityHeaders = [
   // CSP 的 frame-ancestors 已防点击劫持(更细粒度),这里放开 iframe 承载。
   { key: 'X-Content-Type-Options', value: 'nosniff' },
   { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  /*
+   * 不进搜索引擎(2026-07-31 用户:「谷歌可以搜到……可以搜不到么」)。
+   *
+   * 这个仓此前**一个 robots 设置都没有** —— 既没有 robots.txt、metadata 里也没有
+   * robots 字段。等于默认敞开,Google 想收录什么就收录什么,于是网址真的被搜到了。
+   *
+   * ── 为什么是 noindex 而不是 robots.txt 的 Disallow ──────────────────────────
+   * 这里有个反直觉的地方,搞反了会**适得其反**:
+   * `Disallow: /` 禁的是**爬取**,不是**收录**。已经在索引里的那些条目,爬虫从此
+   * 进不来,也就永远看不到「请把我撤下」这个指令 —— 结果是那条搜索结果**留在
+   * 那里不走**(只是没了摘要,变成一行光秃秃的网址)。
+   * 要让它消失,必须**让爬虫进得来、并且在响应头上告诉它 noindex**。
+   * 所以 robots.txt 是放行的(见 app/robots.ts),真正干活的是这一行。
+   *
+   * noarchive 顺带掐掉网页快照 —— 不然即使从搜索结果里撤了,快照还能被翻出来。
+   */
+  { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive, nosnippet' },
   { key: 'Permissions-Policy', value: 'camera=(self), microphone=(self), geolocation=(self)' },
   {
     key: 'Content-Security-Policy',
@@ -25,7 +42,9 @@ const securityHeaders = [
       "font-src 'self' fonts.gstatic.com data:",
       "img-src 'self' data: blob: https:",
       // Apple Music 的音频流走 HLS,分片在 apple.com 各边缘域;本地歌曲走 blob:。
-      "media-src 'self' blob: https://*.apple.com https://*.mzstatic.com",
+      // 网易的音频落在 126.net 的 CDN(m701/m801… 各节点)—— 不放行的表现同样是
+      // **点了没声音、控制台之外一行线索都没有**,正是 Plaid 当年那个坑。
+      "media-src 'self' blob: https://*.apple.com https://*.mzstatic.com https://*.music.126.net https://*.126.net",
       // Plaid Link SDK 与其后端通信;开发/沙盒/生产三档域名都放行
       "connect-src 'self' https://api.open-meteo.com https://geocoding-api.open-meteo.com https://api.bigdatacloud.net https://api.weather.gov https://cdn.plaid.com https://production.plaid.com https://sandbox.plaid.com https://development.plaid.com https://api.music.apple.com https://*.music.apple.com",
       "frame-src 'self' https://cdn.plaid.com https://plaid.com",

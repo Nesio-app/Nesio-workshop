@@ -12,6 +12,10 @@
 
 // 与 lib/portal/contracts/ai-provider-router-contract.mjs 的 alternateGroups 同步(改一处两处都要改)。
 export const AI_KEY_ALIASES = {
+  // Kimi(Moonshot)。2026-07-31 用户定为**首选**通道,Google 托底。
+  // 两个别名:官方文档历来用 MOONSHOT_API_KEY,而人嘴上说的是 Kimi —— 两个都认,
+  // 免得又出现「key 配了但那一路读窄了、静默走兜底」(health-insight 中过一次)。
+  kimi: ['KIMI_API_KEY', 'MOONSHOT_API_KEY'],
   anthropic: ['ANTHROPIC_API_KEY', 'CLAUDE_API_KEY'],
   gemini: ['GEMINI_API_KEY', 'GOOGLE_GENERATIVE_AI_API_KEY', 'GOOGLE_AI_API_KEY', 'GOOGLE_API_KEY'],
   openai: ['OPENAI_API_KEY', 'OpenAI_KEY'],
@@ -21,6 +25,7 @@ export const AI_KEY_ALIASES = {
 export type AiProvider = keyof typeof AI_KEY_ALIASES;
 
 export interface ResolvedAiKeys {
+  kimi: string;
   anthropic: string;
   gemini: string;
   openai: string;
@@ -41,6 +46,7 @@ function firstNonEmpty(names: readonly string[], env: EnvLike): string {
 /** 解析全部 provider 的 key(env 可注入,默认读 process.env)。 */
 export function resolveAiKeys(env: EnvLike = process.env): ResolvedAiKeys {
   return {
+    kimi: firstNonEmpty(AI_KEY_ALIASES.kimi, env),
     anthropic: firstNonEmpty(AI_KEY_ALIASES.anthropic, env),
     gemini: firstNonEmpty(AI_KEY_ALIASES.gemini, env),
     openai: firstNonEmpty(AI_KEY_ALIASES.openai, env),

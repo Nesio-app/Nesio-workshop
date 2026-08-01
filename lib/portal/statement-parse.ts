@@ -250,6 +250,18 @@ export interface StatementParseResult {
    * 人会以为自己的单子不被支持,直接放弃。
    */
   needsYear: boolean;
+  /**
+   * 这份 PDF 里提取到的可见字符总数。
+   *
+   * 存在的理由是一句**说错了的话**(2026-07-31 用户实测):解析不出交易时,
+   * 界面一口咬定「这份 PDF 里没有可读的文字层 —— 多半是扫描件」,
+   * 而同一屏下面还列着一行**从那份 PDF 的文字里读出来的**原文
+   * (「第1页 第12行:7/30/2026 Exam/Consultation…」)。同屏自相矛盾。
+   *
+   * 真相是那份 PDF 有文字层,只是它压根不是银行对账单(那是一张医疗账单)。
+   * 「没解析出交易」和「没有文字」是两件事,处置也不同:一个换文件,一个走 OCR/导 CSV。
+   */
+  textChars: number;
 }
 
 export interface SelfCheck {
@@ -368,6 +380,9 @@ export function parseStatement(
     header, rows, skipped,
     selfCheck: selfCheckStatement(header, rows),
     needsYear: year <= 0,
+    // 提取到多少可见字符。0 = 这份 PDF 真的没有文字层(扫描件);
+    // >0 而 rows 为空 = 有字,只是没有一行像银行流水 —— 两者的下一步完全不同。
+    textChars: allLines.reduce((n, l) => n + l.text.trim().length, 0),
   };
 }
 
@@ -501,13 +516,20 @@ export function selfCheckStatement(header: StatementHeader, rows: readonly Candi
  *
  * `ready`     三条自校验没有一条 fail(unknown 允许 —— 有些单子就是没印期初余额)
  * `review`    有 fail —— 先让人看差在哪,**不许一键全部接受**
- * `need_year` 只差一个年份。**不要报成 unusable** —— 那会让人以为自己的单子
+ * `need_year` 只差一个年份。**不要报成 no_text** —— 那会让人以为自己的单子
  *             根本不被支持而放弃,实际上填一个年份就好了
- * `unusable`  一条都没解析出来(多半是扫描件,没有文字层)
+ * `no_text`   一个字都没提取到 —— 这才是扫描件,得走 OCR 或从银行导 CSV
+ * `not_a_statement` 有文字、也读得出行,但没有一行像银行流水 ——
+ *             多半是拿错了文件(医疗账单、发票、收据都长这样)。换一份就好,
+ *             跟 OCR 一点关系都没有。
+ *
+ * 后两者以前合成一个 `unusable`,界面一律说「没有可读的文字层,多半是扫描件」——
+ * 于是用户传了一张有字的医疗账单,被告知它是扫描件,同一屏下面还列着从它里面
+ * 读出来的原文。说错原因比不说更糟:他会去折腾 OCR,而正确动作是换个文件。
  */
-export function parseVerdict(r: StatementParseResult): 'ready' | 'review' | 'need_year' | 'unusable' {
+export function parseVerdict(r: StatementParseResult): 'ready' | 'review' | 'need_year' | 'no_text' | 'not_a_statement' {
   if (r.needsYear) return 'need_year';
-  if (!r.rows.length) return 'unusable';
+  if (!r.rows.length) return r.textChars > 0 ? 'not_a_statement' : 'no_text';
   const c = r.selfCheck;
   return (c.balance === 'fail' || c.period === 'fail' || c.count === 'fail') ? 'review' : 'ready';
 }

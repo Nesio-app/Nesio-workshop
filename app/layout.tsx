@@ -5,6 +5,22 @@ import './globals.css';
 export const metadata: Metadata = {
   title: 'Nesio · Personal Life Kit',
   description: 'Nesio is a mobile-first personal life kit for local-first tools, AI friends, and daily context.',
+  /*
+   * 不进搜索引擎(2026-07-31)。这是三处口径中的第三处 ——
+   * next.config.js 的 X-Robots-Tag 响应头是主力(对所有响应生效,包括
+   * 爬虫抓到的任何一个路径),这里的 <meta> 是纵深:有些爬虫只读 HTML 不读头。
+   * app/robots.ts 则**刻意放行爬取**,好让爬虫进来读到这两处的 noindex ——
+   * 理由见那个文件,搞反了会让旧条目永远撤不掉。
+   *
+   * googleBot 单独再写一遍:Google 对自家 bot 认 googlebot 这一支,
+   * 只写通用的 robots 在少数情况下会被它按更宽的默认值处理。
+   */
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    googleBot: { index: false, follow: false, noimageindex: true },
+  },
   manifest: '/manifest.json',
   icons: {
     icon: [

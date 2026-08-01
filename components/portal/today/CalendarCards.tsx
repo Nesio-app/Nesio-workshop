@@ -118,6 +118,25 @@ export function PinnedAttentionCard({
   );
 }
 
+/**
+ * 这条 description 值不值得占一行(2026-07-31,用户实测 图4:
+ * 「第二个显示的一串网址内容没有意义」)。
+ *
+ * 从待办类应用(滴答清单等)同步过来的日历项,description 常常**整条就是一个深链** ——
+ * 一串 `https://dida365.com/webapp#p/inbox/tasks/68f…` 铺在那儿:
+ * 读不出任何信息、还把行撑破。而同一块里旁边就有一颗「链接」按钮 —— 那才是它该有的样子。
+ *
+ * 判据是「去掉链接之后还剩不剩下人话」,不是「以 http 开头就砍」:
+ * 「地址 https://… 记得带表」这种是有内容的,砍掉就把用户真写的字弄丢了。
+ */
+export function meaningfulDesc(raw: string | undefined | null): string {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  const rest = s.replace(/https?:\/\/\S+/gi, '').replace(/[\s·|,、。;:\-—_]+/g, '');
+  // 剩下不到两个字 = 这条正文的全部内容就是那个链接。
+  return rest.length >= 2 ? s : '';
+}
+
 // ── Collapsed list item ───────────────────────────────────────────────────────
 
 export function CollapsedCalItem({ obj, onOpenRecorder, onRemove }: { obj: AttentionObject; onOpenRecorder: () => void; onRemove?: (id: string) => void }) {
@@ -131,31 +150,48 @@ export function CollapsedCalItem({ obj, onOpenRecorder, onRemove }: { obj: Atten
   return (
     <li className="nesio-collapsed-item">
       {/* 批次 111:日历项也做成时间线节点 —— 空心圆点在轨上 + 时标 kicker + 标题(去掉旧的图标+右侧 meta) */}
-      <button type="button" className="nesio-collapsed-row" onClick={() => setExpanded((v) => !v)}>
+      {/*
+       * 2026-07-31(用户实测 图2「x 位置应该在对应条目后,并且现在不管用」):
+       * 这一行原来**整行是一个 button 元素**,而 ✕ 又不能嵌在按钮里(嵌套按钮),
+       * (⚠️ 这句话刻意不写那个尖括号标签的字面写法:portal-no-inert-buttons 那条契约
+       *  用正则扫源码、**不剥注释**,注释里出现它会被当成真标签,一路匹配到后面的
+       *  自闭合斜杠,然后报一个根本不存在的「惰性按钮」。我写第一版时正是这么误报的。)
+       * 于是它被放到了 <li> 底下 —— <li> 是块级流,✕ 就掉到了条目**下面一行、贴最左**,
+       * 看起来像浮在两条中间的一个孤零零的叉。点不动则是因为它跟上面那个
+       * width:100% 的行按钮在同一条流里互相压着。
+       *
+       * 改成和 CollapsedTaskItem 同一副骨架:外层 div 作行容器,里面
+       * 「点标题展开」是一个 button、✕ 是它的**兄弟** —— 两个按钮平级,不再嵌套,
+       * ✕ 也就回到了它该在的位置:这一条的末尾。
+       */}
+      <div className="nesio-collapsed-row">
         {/* 批次 129·定时·钟:有具体时间的日历项圆内嵌钟;全天事件用素圆 */}
         <span className={`nesio-collapsed-dot${obj.event.allDay ? '' : ' nesio-collapsed-dot--clock'}`} aria-hidden>
           {!obj.event.allDay && <IconClock size={13} />}
         </span>
-        <span className="nesio-collapsed-task-body">
+        <button type="button" className="nesio-collapsed-task-body" onClick={() => setExpanded((v) => !v)}>
           <span className="nesio-collapsed-kicker">{[dayTag, timeStr, countdown].filter(Boolean).join(' · ')}</span>
           <span className="nesio-collapsed-title">{obj.title}</span>
-        </span>
-      </button>
-      {/* 用户要求(2026-07-30):时间线**每一条**后面都要有 ✕ 能移走 —— 日历行此前没有,
-          于是一场不想看的会只能一直挂在那。移走 = 只从今天的时间线拿掉,
-          日历本身不动(我们没有权利替用户删他日历上的事)。 */}
-      {onRemove && (
-        <button
-          type="button"
-          className="nesio-tl-x"
-          onClick={(e) => { e.stopPropagation(); onRemove(obj.id); }}
-          aria-label={L(portalLocaleToDictionaryLocale(locale), '从今天移走这条', 'Remove from today')}
-          title={L(portalLocaleToDictionaryLocale(locale), '从今天移走', 'Remove from today')}
-        >✕</button>
-      )}
+        </button>
+        {/* 用户要求(2026-07-30):时间线**每一条**后面都要有 ✕ 能移走 —— 日历行此前没有,
+            于是一场不想看的会只能一直挂在那。移走 = 只从今天的时间线拿掉,
+            日历本身不动(我们没有权利替用户删他日历上的事)。 */}
+        {onRemove && (
+          <button
+            type="button"
+            className="nesio-tl-x"
+            onClick={(e) => { e.stopPropagation(); onRemove(obj.id); }}
+            aria-label={L(portalLocaleToDictionaryLocale(locale), '从今天移走这条', 'Remove from today')}
+            title={L(portalLocaleToDictionaryLocale(locale), '从今天移走', 'Remove from today')}
+          >✕</button>
+        )}
+      </div>
       {expanded && (
         <div className="nesio-collapsed-detail">
-          {obj.event.description && <p className="nesio-collapsed-desc">{obj.event.description.slice(0, 80)}{obj.event.description.length > 80 ? '…' : ''}</p>}
+          {(() => {
+            const desc = meaningfulDesc(obj.event.description);
+            return desc ? <p className="nesio-collapsed-desc">{desc.slice(0, 80)}{desc.length > 80 ? '…' : ''}</p> : null;
+          })()}
           {obj.event.location && <p className="nesio-collapsed-loc"><IconMapPin size={12} /> {obj.event.location}</p>}
           {/* 批次 48:两个小按钮并排(此前链接是通栏胶囊、记录另起一行) */}
           <div className="nesio-collapsed-actions">

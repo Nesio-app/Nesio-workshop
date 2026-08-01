@@ -14,7 +14,8 @@ import NesioMark from './NesioMark';
 // 批次 139:统一「打开详情」—— 聊天引用卡与记忆页/今天页共用同一个完整详情组件
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { getLifeGraph, isBulkImported, isPrivateExternalNode, linkNodes, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
+import { getLifeGraph, isBulkImported, linkNodes, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
+import { retrieveForAsk } from '@/lib/portal/ask-retrieval';
 import { recallByRecognition } from '@/lib/portal/photo-recall';
 import { buildMemoryContext, fmtEventDate, extractCitations } from '@/lib/portal/memory-retrieval';
 import { createCalendarEvent } from '@/lib/portal/calendar-client';
@@ -659,19 +660,6 @@ export default function NesioChatSheet({
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
-  // 阅读器划词「问念念」→ 把引用预填进输入框(不自动发送,等用户补问题)
-  useEffect(() => {
-    if (!open) return;
-    let quote = '';
-    try {
-      quote = sessionStorage.getItem('nesio-pending-ask-text') || '';
-      if (quote) sessionStorage.removeItem('nesio-pending-ask-text');
-    } catch { /* ignore */ }
-    if (!quote) return;
-    const snippet = quote.length > 120 ? `${quote.slice(0, 120)}…` : quote;
-    setInput(L(dict, `关于「${snippet}」，`, `About “${snippet}”, `));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
   // Opportunistically refresh device location so 问一问 knows where the user is.
   useEffect(() => { if (open) void refreshLocation(); }, [open]);
   useEffect(() => {
@@ -744,8 +732,14 @@ Edit location/value anytime in Storage.`),
     // 行为完全不变、当前用户无回归。
     // 批次 148:端上模式(用户手动选)或免费层 → 本机记忆搜索,不打云。深问 + 有权益才走云。
     if (!deepMode || !canUsePaidCloudAi()) {
-      // 隐私红线:未登录/未知态不把邮件主题、日程标题(私密外部节点 name)显示到聊天气泡里。
-      const hits = searchLifeGraphFuzzy(text.trim(), 6).filter((n) => canUsePrivateData || !isPrivateExternalNode(n));
+      /*
+       * 2026-07-31:从纯字面模糊换成 retrieveForAsk(语义 + 已登录时的云端回溯 + 模糊 + 近期)。
+       *
+       * 起因是把所有「问念念」入口都切到这一页之后的核对:原来那一屏(语音 sheet 的
+       * ask 形态)取材比这里强一档,光切入口的话用户会换到一个**界面对了、答得更差**
+       * 的地方 —— 而这种损失不会当场发现。隐私红线由 retrieveForAsk 内部逐层过。
+       */
+      const hits = (await retrieveForAsk(text.trim(), { canUsePrivateData, limit: 6 }));
       const body = hits.length
         ? L(dict, `在你的记忆里找到 ${hits.length} 条:\n${hits.map((n) => `• ${n.name}`).join('\n')}`,
             `Found ${hits.length} in your memory:\n${hits.map((n) => `• ${n.name}`).join('\n')}`)
@@ -828,8 +822,10 @@ Edit location/value anytime in Storage.`),
     } catch (err) {
       clearTimeout(timeout);
       const isTimeout = err instanceof Error && err.name === 'AbortError';
-      // 兜底：从本地记忆模糊搜索(隐私红线:未登录/未知态不带出邮件主题、日程标题)
-      const localHits = searchLifeGraphFuzzy(text.trim(), 5).filter((n) => canUsePrivateData || !isPrivateExternalNode(n));
+      // 兜底：云答挂了就给本机能找到的线索。同样走 retrieveForAsk ——
+      // AI 不可用的这一刻恰恰最需要检索给力,这里退回纯字面模糊是把最差的留给最难的时候。
+      // (隐私红线由 retrieveForAsk 内部逐层过。)
+      const localHits = await retrieveForAsk(text.trim(), { canUsePrivateData, limit: 5 }).catch(() => [] as LifeNode[]);
       const fallbackText = localHits.length
         ? L(dict, `AI 暂时不可用，但我在记忆库里找到了这些相关线索：\n${localHits.map((n) => `• ${n.name}`).join('\n')}`, `AI is briefly unavailable, but I found these related clues in your memory:\n${localHits.map((n) => `• ${n.name}`).join('\n')}`)
         : isTimeout ? L(dict, '响应超时，请重试。', 'The response timed out — please try again.') : L(dict, 'AI 暂时不可用，记忆库里也没找到相关线索。', 'AI is briefly unavailable, and nothing related turned up in your memory.');
@@ -839,6 +835,39 @@ Edit location/value anytime in Storage.`),
     setSending(false);
     sendingRef.current = false;
   }, [messages]);
+
+  /**
+   * 带进来的那句话(nesio-ask-text)。**两种来源,两种处理** ——
+   *
+   *   · 阅读器划词:那是一段**引用**,用户还没提问。预填成「关于「…」，」等他补,
+   *     直接发出去只会让念念对着一段原文干瞪眼。
+   *   · 首页输入条点「问念念」(2026-07-31 图3):那**整句就是问题**,用户已经打完了。
+   *     再让他在另一个框里按一次发送,就是他上一轮说的「不想跳转」——
+   *     换个地方重来一遍,不算一步到位。
+   *
+   * 放在 sendMessage 之后:effect 里要调它。挪位置比留在原地绕一层 ref 干净。
+   */
+  useEffect(() => {
+    if (!open) return;
+    let raw = '';
+    try {
+      raw = sessionStorage.getItem('nesio-pending-ask-text') || '';
+      if (raw) sessionStorage.removeItem('nesio-pending-ask-text');
+    } catch { /* ignore */ }
+    if (!raw) return;
+    let text = raw;
+    let autoSend = false;
+    try {
+      const parsed = JSON.parse(raw) as { text?: string; send?: boolean };
+      if (parsed && typeof parsed.text === 'string') { text = parsed.text; autoSend = parsed.send === true; }
+    } catch { /* 老格式是裸字符串,当引用处理 */ }
+    text = text.trim();
+    if (!text) return;
+    if (autoSend) { void sendMessage(text); return; }
+    const snippet = text.length > 120 ? `${text.slice(0, 120)}…` : text;
+    setInput(L(dict, `关于「${snippet}」，`, `About “${snippet}”, `));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // 批次 68:行程确认卡 → 真正落库(带日期的自动进今日聚焦/引导卡;航班等类型由词典自动识别)
   function savePlanItems(msg: UiMessage) {
