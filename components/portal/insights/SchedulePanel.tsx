@@ -1118,12 +1118,25 @@ export default function SchedulePanel() {
   const chosen = activeChip ? chips.find((c) => c.id === activeChip) ?? null : null;
   const rows = chosen ? baseRows.filter((r) => matchesChip(r, chosen)) : baseRows;
 
+  /*
+   * 2026-08-01(用户:「日程里预览除了显示日期还应该显示时间如果有的话」):
+   * 这里原来只输出月日 —— 于是一条设在 14:00 的提醒在列表上写着「8月1日」,
+   * 你得点进去才知道是几点。而这一列**本来就有钟点**:进得了这张表的日历项
+   * 全是有具体时刻的(全天的在上面就 `continue` 掉了),提醒的 at 是完整墙上时钟。
+   *
+   * 判据是「原串里到底有没有时分」,不是「解析出来的小时是不是 0」——
+   * 后者会把用户真的设在午夜的那条也吞掉。只有日期的串(YYYY-MM-DD,
+   * 比如按 recordedAt/date 落进来的那两类)没有 T,自然就只显示日期。
+   */
   const fmtDay = (iso: string) => {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
-    return dict === 'en'
+    const day = dict === 'en'
       ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       : `${d.getMonth() + 1}月${d.getDate()}日`;
+    if (!/T\d{2}:\d{2}/.test(String(iso))) return day;
+    const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return `${day} ${hm}`;
   };
 
 

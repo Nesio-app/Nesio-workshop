@@ -16,6 +16,7 @@ const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: fals
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { getLifeGraph, isBulkImported, linkNodes, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
 import { retrieveForAsk } from '@/lib/portal/ask-retrieval';
+import { listReminders, parseWallClock, repeatLabel, type Reminder } from '@/lib/portal/schedule-reminders';
 import { recallByRecognition } from '@/lib/portal/photo-recall';
 import { buildMemoryContext, fmtEventDate, extractCitations } from '@/lib/portal/memory-retrieval';
 import { createCalendarEvent } from '@/lib/portal/calendar-client';
@@ -155,9 +156,27 @@ const INVENTORY_ADD_RE = /(记|加|收|添|买了).{0,8}(物品|东西|收纳|�
 const INVENTORY_QUESTION_RE = /[??]|哪里|在哪|哪儿|找一?下|找找|去哪/;
 
 
+/**
+ * 「今天有什么安排」这类问题的上下文。
+ *
+ * 2026-08-01(用户实测:问「下午有什么安排」,答案里列了四条 Zoom 会议,
+ * 唯独漏掉他自己设在 14:00 的「去看牙医」):
+ * 这个函数原来**只读 Google 日历**。而用户自己设的提醒住在 schedule-reminders 里,
+ * 从来没进过这段上下文 —— 于是 AI 手上压根没有那条,答得再好也答不出来。
+ *
+ * 从用户那边看,「日历上的会」和「我自己设的提醒」都是「今天的安排」,
+ * 没有理由只有一半能被问到。两边都喂,但**分开标注**:
+ * 一条是别人排给我的、一条是我自己给自己定的,AI 说的时候能说清楚是哪种。
+ *
+ * (记忆里其实有提醒的身影节点(reminder-shadow),但那条路走的是语义/字面检索 ——
+ *  「下午有什么安排」和「去看牙医」字面上一个字都不重合,搜不出来。
+ *  时间型问题要的是按时间窗取,不是按相似度取。)
+ */
 function buildCalendarContext(query: string): string {
   const events: CalendarEvent[] = getCachedCalendarEvents();
-  if (events.length === 0) return '';
+  let reminders: Reminder[] = [];
+  try { reminders = listReminders(); } catch { reminders = []; }
+  if (events.length === 0 && reminders.length === 0) return '';
 
   const temporal = parseTemporalQuery(query);
 
@@ -177,8 +196,13 @@ function buildCalendarContext(query: string): string {
     const d = ev.start ? fmtEventDate(ev.start) : '';
     return `• ${ev.title || '未命名'}${d ? ` (${d})` : ''}`;
   };
+  const fmtRem = (r: Reminder) => {
+    const rep = repeatLabel(r);
+    return `• ${r.title} (${fmtEventDate(r.at)}${rep ? ` · ${rep}` : ''})`;
+  };
 
-  const parts: string[] = [`【Google日历】共 ${events.length} 条`];
+  const parts: string[] = [];
+  if (events.length) parts.push(`【Google日历】共 ${events.length} 条`);
 
   if (dateEvents.length > 0) {
     parts.push(`\n【${temporal.label}的日历事件】（精确匹配，优先参考）`);
@@ -193,6 +217,26 @@ function buildCalendarContext(query: string): string {
   if (upcoming.length > 0) {
     parts.push('\n【近期日程】');
     parts.push(...upcoming.map(fmtEv));
+  }
+
+  // ── 我自己设的提醒。和日历事件同一套时间处理,只是分开标注来源。 ──
+  if (reminders.length) {
+    const inSpan: Reminder[] = [];
+    const rest: Reminder[] = [];
+    for (const r of reminders) {
+      const d = parseWallClock(r.at);
+      if (!d) continue;
+      if (temporal.hasDate && isInSpan(d, temporal)) inSpan.push(r);
+      else if (d.getTime() >= now - 86_400_000) rest.push(r);
+    }
+    if (inSpan.length) {
+      parts.push(`\n【${temporal.label}我设的提醒】（精确匹配，和上面的日历事件同等重要）`);
+      parts.push(...inSpan.map(fmtRem));
+    }
+    if (rest.length) {
+      parts.push('\n【我设的其它提醒】');
+      parts.push(...rest.slice(0, 30).map(fmtRem));
+    }
   }
 
   return parts.join('\n');
