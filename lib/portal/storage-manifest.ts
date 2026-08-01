@@ -61,6 +61,10 @@ export const CACHE_KEYS = new Set<string>([
   // 语音简报的遗留缓存(功能 2026-07-30 已删)。**故意留在这张表里**:老设备的
   // localStorage 里可能还躺着这个值,一旦从 CACHE_KEYS 拿掉,keyKind() 的默认值是
   // durable —— 它会立刻开始进备份、上云同步。留着 = 继续当缓存、继续被清掉。
+  // 「例行提醒」的遗留数据(功能 2026-07-31 已删,能力并进 schedule-reminders)。
+  // **故意留在这张表里**,同 daily-brief-v2:老设备的 localStorage 里可能还躺着它,
+  // 一旦不在册,keyKind() 的默认值是 durable —— 它会立刻开始进备份、上云同步。
+  'nesio-routines-v1',
   'nesio-daily-brief-v2',
   // 提醒 → 系统通知的排程投影(2026-07-31)。判据原句:「换台设备从零开始是否正确?」
   // —— 正确。iOS 的 pending 通知是**这台设备**的东西,旧手机排过什么和新手机毫无关系;

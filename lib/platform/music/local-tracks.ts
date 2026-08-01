@@ -32,8 +32,12 @@ export const LOCAL_TRACKS_KEY = 'nesio-music-local-tracks-v1';
  */
 export const MAX_TRACK_BYTES = 80 * 1024 * 1024;
 
-/** 认得出的音频类型。列白名单而不是「非视频即音频」—— 反向过滤会让 .mov 混进曲库。 */
-const AUDIO_EXT = /\.(mp3|m4a|aac|flac|wav|ogg|oga|opus|aiff?|wma|alac)$/i;
+/** 常见音频扩展名。认得出就直接收。 */
+const AUDIO_EXT = /\.(mp3|m4a|m4b|mp4a|aac|flac|wav|wave|ogg|oga|opus|aiff?|aif|wma|alac|ape|dsf|dff|mka|amr|caf|3gp)$/i;
+
+/** 一眼就知道**不是**音频的。只挡这几类,别的一律让它进来试。 */
+const NOT_AUDIO_TYPE = /^(image|video|text)\//i;
+const NOT_AUDIO_EXT = /\.(jpe?g|png|gif|heic|heif|webp|bmp|svg|mov|mp4|m4v|avi|mkv|webm|pdf|docx?|xlsx?|pptx?|zip|rar|7z|txt|md|csv|json)$/i;
 
 export interface LocalTrack {
   id: string;
@@ -48,11 +52,49 @@ export interface LocalTrack {
   addedAt: number;
 }
 
+/**
+ * 这个文件收不收进曲库。
+ *
+ * 2026-07-31 实测「本地音乐无法识别任何格式,无法上传」之后翻过来写:
+ * 原来是**白名单**(type 以 audio/ 开头,或扩展名在表里),别的一律拒。
+ * 在 iOS 上这一条几乎必然踩空 —— 「文件」App 交出来的 File 常常
+ * `type` 是空串,而 iCloud Drive 同步下来的文件名可能连扩展名都没有。
+ * 于是每一个都被判成「看着不像音频」,一首都进不来。
+ *
+ * 现在改成**只挡明显不是的**(图片/视频/文档),其余一律收下 ——
+ * 到底能不能解码,由 audio 元素说了算,不由我在这里猜。
+ * 猜错的代价不对称:误收一个放不出声的文件,用户删掉就是了;
+ * 误拒一首真的歌,他根本不知道为什么、也没有别的路可走。
+ */
 export function isAudioFile(file: { name?: string; type?: string }): boolean {
   const type = String(file?.type || '');
+  const name = String(file?.name || '');
   if (type.startsWith('audio/')) return true;
-  // Safari 从 iCloud 导入时 type 常常是空串,只能看扩展名。
-  return AUDIO_EXT.test(String(file?.name || ''));
+  if (AUDIO_EXT.test(name)) return true;
+  // 明确不是音频的挡掉;剩下的(type 空 + 扩展名不认识)让它进来试。
+  if (NOT_AUDIO_TYPE.test(type) || NOT_AUDIO_EXT.test(name)) return false;
+  return true;
+}
+
+/**
+ * 从扩展名兜一个 MIME。
+ *
+ * 为什么非要有:Safari **不嗅探内容**,一个 `type` 为空的 blob URL 喂给 audio
+ * 元素就是放不出声(Chrome 会自己认出来,所以桌面上一切正常)。而 iOS 的
+ * 「文件」App / iCloud Drive 交出来的 File,`type` 空着是常态。
+ * 认不出来的落到 audio/mpeg —— 用户导进来的绝大多数是 mp3,而猜错的代价
+ * 只是这一首放不了(和现在一样),猜对的收益是绝大多数都能放。
+ */
+export function mimeFromName(fileName: string): string {
+  const ext = String(fileName || '').match(/\.([a-z0-9]+)$/i)?.[1]?.toLowerCase() || '';
+  const map: Record<string, string> = {
+    mp3: 'audio/mpeg', m4a: 'audio/mp4', m4b: 'audio/mp4', mp4a: 'audio/mp4', alac: 'audio/mp4',
+    aac: 'audio/aac', flac: 'audio/flac', wav: 'audio/wav', wave: 'audio/wav',
+    ogg: 'audio/ogg', oga: 'audio/ogg', opus: 'audio/ogg',
+    aiff: 'audio/aiff', aif: 'audio/aiff', caf: 'audio/x-caf',
+    wma: 'audio/x-ms-wma', amr: 'audio/amr', mka: 'audio/x-matroska',
+  };
+  return map[ext] || 'audio/mpeg';
 }
 
 /**
@@ -115,6 +157,7 @@ const IMPORT_COPY = {
     notAudio: (n: string) => `「${n}」看着不像音频文件,先跳过了。`,
     tooBig: (n: string, mb: number) => `「${n}」超过 ${mb}MB,这一首先留在原处吧。`,
     noStore: '这台设备的本机存储用不了,歌暂时存不下来。',
+    readFailed: (n: string) => `「${n}」读不出来 —— 如果是从 iCloud 里选的,先在「文件」里把它下载到本机再试一次。`,
     writeFailed: (n: string) => `「${n}」没存下来 —— 多半是设备空间满了。`,
     metaFailed: (n: string) => `「${n}」的曲目信息没记下来,这一首没能加进去。`,
   },
@@ -122,6 +165,7 @@ const IMPORT_COPY = {
     notAudio: (n: string) => `“${n}” does not look like an audio file, so it was skipped.`,
     tooBig: (n: string, mb: number) => `“${n}” is over ${mb}MB — leaving that one where it is.`,
     noStore: 'This device will not let us store files, so the track could not be saved.',
+    readFailed: (n: string) => `“${n}” could not be read — if you picked it from iCloud, download it to this device in Files first, then try again.`,
     writeFailed: (n: string) => `“${n}” did not save — most likely the device is out of space.`,
     metaFailed: (n: string) => `“${n}” could not be recorded in the library, so it was not added.`,
   },
@@ -144,18 +188,39 @@ export async function importLocalTrack(file: File, locale: MusicLocale = 'zh'): 
 
   const { title, artist } = parseTrackName(file.name);
   const id = `lt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  // 扩展名兜底的 MIME。**必须记下来**,而且不能只信 file.type ——
+  // iOS 的「文件」App 交出来的 File 常常 type 是空串,而空 MIME 的 blob URL
+  // 在 Safari 上是放不出声的(它不像 Chrome 那样去嗅内容)。见 blobFor()。
+  const mimeType = file.type || mimeFromName(file.name);
   const track: LocalTrack = {
     id, title, artist,
     durationSec: 0,
     sizeBytes: file.size,
-    mimeType: file.type || 'audio/mpeg',
+    mimeType,
     fileName: file.name,
     addedAt: Date.now(),
   };
 
+  /*
+   * ⚠️ 存的是**字节副本**,不是那个 File 对象本身。
+   *
+   * File 是一个指向磁盘上某个临时文件的句柄。WebKit 往 IndexedDB 里写 File
+   * 时保存的也只是这个引用 —— 等 iOS 回收掉那份临时文件(切走 app、系统清理),
+   * 读回来的东西就是空的或者直接读失败。桌面 Chrome 会老老实实拷一份,
+   * 所以这条在本地永远测不出来:导入看着成功、列表里也有,过一会儿点了没声。
+   * arrayBuffer() 是一次真读取,拿到的是我们自己的字节。
+   */
+  let bytes: ArrayBuffer;
+  try {
+    bytes = await file.arrayBuffer();
+  } catch (e) {
+    logDropped('music.track.read', e);
+    return { ok: false, error: c.readFailed(file.name) };
+  }
+
   const stored = await new Promise<boolean>((resolve) => {
     const tx = db.transaction(STORE, 'readwrite');
-    tx.objectStore(STORE).put(file, id);
+    tx.objectStore(STORE).put(new Blob([bytes], { type: mimeType }), id);
     tx.oncomplete = () => resolve(true);
     tx.onerror = () => {
       logDropped('music.track.put', tx.error);
@@ -173,16 +238,29 @@ export async function importLocalTrack(file: File, locale: MusicLocale = 'zh'): 
   return { ok: true, track };
 }
 
-/** 拿音频本体。返回 null = 文件不在了(用户清过浏览器数据),调用方要把这事说出来。 */
-export async function getTrackBlob(id: string): Promise<Blob | null> {
+/**
+ * 拿音频本体。返回 null = 文件不在了(用户清过浏览器数据),调用方要把这事说出来。
+ *
+ * `mimeType` 是曲目元数据里记着的那个。传进来的话,读回来的 blob 要是没 type
+ * (早先版本存的是 File 引用,或者当初 file.type 本来就是空的)就按它重新包一层 ——
+ * **空 MIME 的 blob URL 在 Safari 上放不出声**,而 Chrome 会自己嗅出来。
+ * 这就是「导进来了、列表里有、点了没反应」在 iPhone 上的样子。
+ */
+export async function getTrackBlob(id: string, mimeType?: string): Promise<Blob | null> {
   const db = await openDB();
   if (!db) return null;
-  return new Promise((resolve) => {
+  const raw = await new Promise<Blob | null>((resolve) => {
     const tx = db.transaction(STORE, 'readonly');
     const req = tx.objectStore(STORE).get(id);
     req.onsuccess = () => resolve((req.result as Blob) ?? null);
     req.onerror = () => resolve(null);
   });
+  if (!raw) return null;
+  // 0 字节 = 那份 File 引用已经失效了(有没有 type 都一样废)。当成「文件不在了」,
+  // 让调用方说人话 —— 把空 blob 喂给 audio 元素换来的是「这个格式放不了」,那是误诊。
+  if (raw.size === 0) return null;
+  if (raw.type) return raw;
+  return new Blob([raw], { type: mimeType || mimeFromName(loadLocalTracks().find((t) => t.id === id)?.fileName || '') });
 }
 
 export async function deleteLocalTrack(id: string, opts: { metaOnly?: boolean } = {}): Promise<void> {
@@ -200,14 +278,24 @@ export async function deleteLocalTrack(id: string, opts: { metaOnly?: boolean } 
   saveLocalTracks(loadLocalTracks().filter((t) => t.id !== id));
 }
 
+/**
+ * 曲库在别处被改动了(目前只有「时长补回来」这一种)。
+ * 面板的 React state 是导入那一刻的快照,不订阅这个事件的话,
+ * 列表上的时长会永远停在 `--:--` —— 引擎明明已经把秒数写回 localStorage 了。
+ */
+export const LOCAL_TRACKS_CHANGED = 'nesio-music-tracks-changed';
+
 /** 时长要等 audio 元素读出来才知道,读到了补回去 —— 只补这一个字段,别整条覆盖。 */
 export function setTrackDuration(id: string, durationSec: number): void {
   if (!Number.isFinite(durationSec) || durationSec <= 0) return;
   const list = loadLocalTracks();
   const i = list.findIndex((t) => t.id === id);
+  // 值没变就直接回 —— 这个函数挂在 loadedmetadata 上,不做幂等会反复写 + 反复派事件。
   if (i < 0 || list[i].durationSec === Math.round(durationSec)) return;
   list[i] = { ...list[i], durationSec: Math.round(durationSec) };
-  saveLocalTracks(list);
+  if (saveLocalTracks(list) && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(LOCAL_TRACKS_CHANGED));
+  }
 }
 
 export function renameLocalTrack(id: string, title: string, artist: string): void {

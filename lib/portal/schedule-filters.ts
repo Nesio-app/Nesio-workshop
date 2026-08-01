@@ -59,6 +59,29 @@ export function addCustomFilter(name: string, keyword: string): CustomFilter | n
   return f;
 }
 
+/**
+ * 改一个已有的筛选(2026-07-31 用户:「如果确实不管用,我希望可以修改,现在不行」)。
+ *
+ * 以前只能删了重建 —— 而删除是长按/右键触发的,手机上长按还常常被系统的文本选择抢走。
+ * 于是一个建错了的筛选事实上是**改不掉也删不掉**的。
+ *
+ * 名字和关键词都可选:只想改关键词就别动名字。
+ * 传空串视为「没改这一项」——真要清空一个筛选的关键词是没有意义的(那它谁也匹配不到),
+ * 与其存一个废筛选,不如当作没改。
+ */
+export function updateCustomFilter(id: string, patch: { name?: string; keyword?: string }): CustomFilter | null {
+  const all = listCustomFilters();
+  const i = all.findIndex((f) => f.id === id);
+  if (i < 0) return null;
+  const cur = all[i] as CustomFilter;
+  const name = (patch.name ?? '').trim() || cur.name;
+  const keyword = (patch.keyword ?? '').trim() || cur.keyword;
+  const next: CustomFilter = { ...cur, name, keyword };
+  all[i] = next;
+  store.save(all);
+  return next;
+}
+
 export function removeCustomFilter(id: string): void {
   store.save(listCustomFilters().filter((f) => f.id !== id));
 }
@@ -70,6 +93,20 @@ export interface FilterableRow {
   title: string;
   /** 副行:发件人 / 地点 / 日历名 */
   meta: string;
+  /**
+   * 这一行**屏幕上还看得见的其它字**:状态行(「扣款 · $662.59」「已付款」)、
+   * 右下角徽章(「账单」「私人」「有附件」)。
+   *
+   * 2026-07-31 补(用户实测:自定义筛选「扣款」命中 0,而列表里明明有一条写着
+   * 「扣款 · $662.59」)。根因是这些字是**派生出来展示的**(mail-badges 从
+   * moneyFlow / orderStatus 算),既不在标题里也不在发件人里 ——
+   * 于是屏幕上有的字,搜不到。
+   *
+   * 判据是**看得见就搜得到**,不是「把所有字段都塞进来」:
+   * 正文预览(body)刻意不进 —— 它在屏幕上是折起来的,拿它匹配会筛出一堆
+   * 用户看不出为什么会命中的行,那比漏筛更难排查。
+   */
+  extra?: string;
   /** Google 给的标签(日历名 / mailCategory / 重要),原样带过来 */
   googleLabels: readonly string[];
 }
@@ -82,7 +119,8 @@ export type FilterChip =
 export function matchesCustom(row: FilterableRow, keyword: string): boolean {
   const k = keyword.trim().toLowerCase();
   if (!k) return false;
-  return `${row.title} ${row.meta}`.toLowerCase().includes(k);
+  // 标题 + 副行 + 屏幕上看得见的其它字。三者就是这一行的**可见面**。
+  return `${row.title} ${row.meta} ${row.extra || ''}`.toLowerCase().includes(k);
 }
 
 export function matchesChip(row: FilterableRow, chip: FilterChip): boolean {

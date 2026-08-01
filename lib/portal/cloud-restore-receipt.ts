@@ -22,7 +22,6 @@ const NOTABLE: Record<string, [string, string]> = {
   'nesio-place-trail-v1': ['地点足迹', 'Place trail'],
   'nesio-health-v1': ['健康指标', 'Health metrics'],
   'nesio-wardrobe-v1': ['衣橱', 'Wardrobe'],
-  'nesio-routines-v1': ['例行提醒', 'Routines'],
 };
 
 export interface RestoreReceipt {

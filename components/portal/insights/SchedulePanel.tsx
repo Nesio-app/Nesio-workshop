@@ -21,10 +21,11 @@ import SegTabs from '../ui/SegTabs';
 import NesioSheet from '../ui/NesioSheet';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { IconStar, IconFlag } from '../icons';
+import { IconStar, IconFlag, IconCheck } from '../icons';
 import { loadPins, togglePin, PINS_UPDATED_EVENT } from '@/lib/portal/pins';
 import {
-  buildChips, matchesChip, listCustomFilters, addCustomFilter, removeCustomFilter,
+  buildChips, matchesChip, matchesCustom, listCustomFilters, addCustomFilter,
+  removeCustomFilter, updateCustomFilter,
   scheduleFiltersReady, SCHEDULE_FILTERS_EVENT, type CustomFilter,
 } from '@/lib/portal/schedule-filters';
 import { mailStatusLine, mailBadges, toneVars } from '@/lib/portal/mail-badges';
@@ -40,9 +41,15 @@ import {
   loadSuggestState, markSuggest, mailSuggestReady, MAIL_SUGGEST_EVENT, type SuggestVerdict,
 } from '@/lib/portal/mail-suggest-state';
 import {
-  listReminders, addReminder, removeReminder, completeReminder, reopenReminder,
+  listReminders, addReminder, removeReminder, completeReminder,
+  listCompleted, repeatLabel, type CompletedEntry,
+} from '@/lib/portal/schedule-reminders';
+// 提醒在时间线上的身影:两个建提醒的入口共用同一份 —— 只在一处建的话,
+// 「设好的提醒进入时间线」就只对首页那条输入生效,从这一页加的看不见。
+import { createReminderShadow, removeReminderShadow } from '@/lib/portal/reminder-shadow';
+import {
   parseWallClock, scheduleRemindersReady, SCHEDULE_REMINDERS_EVENT,
-  REMINDER_KINDS, type Reminder, type ReminderKind,
+  type Reminder, type ReminderKind,
 } from '@/lib/portal/schedule-reminders';
 import { ensureEmailFulltextIndex, emailFulltextReady, emailFulltextScore } from '@/lib/portal/email-fulltext-index';
 
@@ -62,7 +69,16 @@ interface Row {
   meta: string;       // 副行(地点/来源/收件人等)
   badge?: string;     // 「有记录」/「会议记录」
   query: string;      // 兜底:详情打不开时按原话去记忆页搜
-  node: LifeNode;     // 图29:点一下直接开这条记忆的详情
+  /**
+   * 图29:点一下直接开这条记忆的详情。
+   *
+   * 2026-07-31 改成**可选** —— 提醒也进这张列表了(用户:「提醒项目混入日程列表,
+   * 和日历同级别」),而提醒不是 life-graph 节点。凡是用到它的地方都得先判空:
+   * 提醒行没有节点可开,也没有邮件属性可读。
+   */
+  node?: LifeNode;
+  /** 这一行是一条提醒时,它本身。与 node 二选一 —— 两个都空的行不该存在。 */
+  reminder?: Reminder;
   /**
    * Google 自己给的标签(2026-07-30 用户要求「用谷歌的 filter 先筛选」):
    * 日历项 = 事件来自哪个日历;邮件 = Gmail 系统分类 + 重要性预测。
@@ -75,6 +91,17 @@ interface Row {
    * 本机 IndexedDB(隐私红线不上云),那部分靠 email-fulltext-index 另外查。
    */
   body: string;
+  /**
+   * 这一行屏幕上**还看得见的其它字**:状态行(「扣款 · $662.59」)+ 右下角徽章(「账单」)。
+   *
+   * 2026-07-31 用户实测:自定义筛选「扣款」命中 0,而列表里明明白白有一条写着
+   * 「扣款 · $662.59」。根因是那两个字是 mail-badges 从 moneyFlow **派生出来展示的**,
+   * 既不在标题里也不在发件人里 —— 屏幕上有的字,搜不到。
+   *
+   * 这里算一份给筛选用;MailRow 渲染时会再算一次。两处都算**不是两份真源** ——
+   * mailStatusLine / mailBadges 是纯函数,同样的 attrs 必然给同样的字。
+   */
+  extra: string;
 }
 
 /** 节点上能当正文用的那几个字段,拼一起(截断,免得几百条 × 1500 字每次输入都全量小写)。 */
@@ -160,7 +187,8 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, fixes, onOpen, onStar, 
   row: Row; kind: SubTab; dict: 'zh' | 'en'; starred: boolean; dateLabel: string;
   /** 用户改过的标签(这一封 / 发件人规则)。见 lib/portal/mail-tag-fix.ts。 */
   fixes: MailTagFixStore;
-  onOpen: () => void; onStar: () => void; onDelete: () => void;
+  /** 可缺省:提醒行没有记忆节点可开 —— 缺省时整行不再是「可点开」的。 */
+  onOpen?: () => void; onStar: () => void; onDelete: () => void;
   /** 点了类型标签 → 打开修正选择器。日历项没有这回事,所以可缺省。 */
   onFixTag?: () => void;
 }) {
@@ -219,16 +247,27 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, fixes, onOpen, onStar, 
   };
   const onClickRow = () => {
     if (swiped.current) { swiped.current = false; return; }  // 这一次是滑动,不是点击
-    onOpen();
+    // 没有可开的东西就什么都不做 —— 不留一个点了没反应的行(提醒行就是这种)。
+    onOpen?.();
   };
 
   // 日历条目用星、邮件条目用旗子 —— 背后是同一个收藏夹(pins),只是两种东西
   // 混在一个列表里时,图标得能一眼分开(和邮件客户端「标记」的习惯一致)。
-  const Mark = kind === 'email' ? IconFlag : IconStar;
-  const markOn = kind === 'email' ? L(dict, '标记', 'Flag') : L(dict, '星标', 'Star');
-  const markOff = kind === 'email' ? L(dict, '取消标记', 'Unflag') : L(dict, '取消星标', 'Unstar');
+  // 提醒行右滑是**做好了**,不是星标 —— 给一条提醒打星没有意义,而「做好了」是它
+  // 唯一要紧的动作(重复的往后滚一期、一次性的进「已完成」)。没有这个入口,
+  // 「已完成」那一面就永远是空的:整条链断在这里。
+  const isReminder = !!row.reminder;
+  const Mark = isReminder ? IconCheck : kind === 'email' ? IconFlag : IconStar;
+  const markOn = isReminder
+    ? L(dict, '做好了', 'Done')
+    : kind === 'email' ? L(dict, '标记', 'Flag') : L(dict, '星标', 'Star');
+  const markOff = isReminder
+    ? L(dict, '做好了', 'Done')
+    : kind === 'email' ? L(dict, '取消标记', 'Unflag') : L(dict, '取消星标', 'Unstar');
   const revealing = dx > 0
-    ? { side: 'star' as const, label: starred ? markOff : markOn, bg: 'var(--status-gentle-soft)', fg: 'var(--status-gentle)' }
+    ? { side: 'star' as const, label: starred && !isReminder ? markOff : markOn,
+        bg: isReminder ? 'var(--status-go-soft)' : 'var(--status-gentle-soft)',
+        fg: isReminder ? 'var(--status-go)' : 'var(--status-gentle)' }
     : { side: 'del' as const, label: L(dict, '删除', 'Delete'), bg: 'var(--status-risk-soft)', fg: 'var(--status-risk)' };
 
   /* ── 状态一行 + 右下角标签(2026-07-30 用户要求)────────────────────────
@@ -242,7 +281,7 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, fixes, onOpen, onStar, 
      立即生效、不等同步、连同步窗口之外的老邮件也有。
      hasAttachment 抽不出来(要 Gmail 的 payload)—— 那个只能等同步,没有就不画,不猜。 */
   const attrs = useMemo(() => {
-    const a = row.node.attributes || {};
+    const a = row.node?.attributes || {};
     if (kind === 'calendar') return a;                    // 日历项没有这些字段,不白跑正则
     if (a.orderStatus || a.moneyFlow || a.kindHint) return a;  // 同步时已经写好了
     const local = extractEmailLocal(
@@ -251,7 +290,7 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, fixes, onOpen, onStar, 
       row.body,
     );
     return { ...a, ...local } as typeof a;
-  }, [row.node.attributes, row.title, row.body, kind]);
+  }, [row.node?.attributes, row.title, row.body, kind]);
   const status = mailStatusLine(attrs, dict);
   /* 类型标签的最终值:**这一封的修正 > 发件人规则 > 自动判定**(硬优先级)。
      用户亲手改过的那一封,不管规则怎么写、自动判定多有把握,都以他改的为准 ——
@@ -343,177 +382,77 @@ function SwipeRow({ row, kind, dict, starred, dateLabel, fixes, onOpen, onStar, 
   );
 }
 
-/**
- * RemindersSection —— 我自己设的、有明确时间的提醒(2026-07-30 用户要求:
- *「日程里面可以增加我明确设置时间的提醒项目么,比如家务活,比如账单 due 等」)。
- *
- * 为什么**不**塞进上面那份 Row 列表里,而是单独一段:
- *   ① 它不是一条记忆。Row 上挂着 LifeNode,点开走 MemoryNodeDetail、左滑走
- *      deleteLifeNode —— 提醒没有节点,硬塞进去就得造一个假节点,然后删除会去
- *      删一个不存在的 id(失败),详情会打开一条不存在的记忆。
- *   ② 它的动作不一样:提醒要的是「做好了」(重复的往后滚一期),不是「星标」。
- *   ③ 最要紧的:上面那份列表有 CHORE_RE —— 还款/缴费/家务/课程一律挡在门外。
- *      那条规则针对的是**从待办 App 同步进来的**循环任务(会把真约会淹掉);
- *      而用户亲手敲的家务和账单,一个字都不该被关键词吃掉。分开放,规则就不会打架。
- *
- * 搜索照样管它 —— 用户搜「房租」时不会在意这条是提醒还是日历项。
- */
-function RemindersSection({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonly string[] }) {
-  const [items, setItems] = useState<Reminder[]>([]);
-  const [adding, setAdding] = useState(false);
-  const [title, setTitle] = useState('');
-  const [at, setAt] = useState('');
-  const [kind, setKind] = useState<ReminderKind>('other');
-  const [repeat, setRepeat] = useState<'once' | 'weekly' | 'monthly'>('once');
-  const [err, setErr] = useState('');
+/** 提醒类型的人话。模块级 —— 主列表和「已完成」两处都要用,各写一份必然漂移。 */
+function kindLabelOf(k: ReminderKind, dict: 'zh' | 'en'): string {
+  return L(dict,
+    k === 'chore' ? '家务' : k === 'bill' ? '账单' : k === 'event' ? '日程' : '其它',
+    k === 'chore' ? 'Chore' : k === 'bill' ? 'Bill' : k === 'event' ? 'Event' : 'Other');
+}
 
+/**
+ * CompletedReminders —— 做完的提醒,只读的一段流水(2026-07-31)。
+ *
+ * 用户原话:「应该有已完成提醒查询地方」。在这之前**重复提醒做完不留任何痕迹**
+ * (直接滚到下一次),所以「这个月到底交没交房租」根本没有数据能回答。
+ * 一次性的看 doneAt、重复的看 doneLog,两种都收在 listCompleted() 里。
+ *
+ * 这里**不给撤销**:重复提醒的那一次已经滚过去了,撤销它意味着把时间倒回去,
+ * 讲不清也做不对。要改就在待办那边改下一次。
+ *
+ * 待办的提醒**不在这个组件里** —— 它们和日历项同级排在主列表中
+ * (用户:「提醒项目混入日程列表,和日历同级别」)。新建也不在这里:
+ * 那件事整个交给首页那条输入框(「首页输入框应该可以完成」)。
+ */
+function CompletedReminders({ dict, tokens }: { dict: 'zh' | 'en'; tokens: readonly string[] }) {
+  const [items, setItems] = useState<CompletedEntry[]>([]);
   useEffect(() => {
-    const read = () => setItems(listReminders());
+    const read = () => setItems(listCompleted());
     void scheduleRemindersReady().then(read);
     read();
     window.addEventListener(SCHEDULE_REMINDERS_EVENT, read);
     return () => window.removeEventListener(SCHEDULE_REMINDERS_EVENT, read);
   }, []);
 
-  const kindLabel = (k: ReminderKind) => L(dict,
-    k === 'chore' ? '家务' : k === 'bill' ? '账单' : k === 'event' ? '日程' : '其它',
-    k === 'chore' ? 'Chore' : k === 'bill' ? 'Bill' : k === 'event' ? 'Event' : 'Other');
+  const shown = items.filter((c) => matchesSearch(
+    { title: c.title, meta: kindLabelOf(c.kind, dict), body: '' }, tokens));
 
-  const openForm = () => {
-    // 预填明天早上 9 点 —— 空着让人现敲年月日很烦,填「现在」又会立刻变成一条待处理的。
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    d.setHours(9, 0, 0, 0);
-    const p = (n: number) => String(n).padStart(2, '0');
-    setAt(`${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T09:00`);
-    setErr('');
-    setAdding(true);
-  };
-
-  const submit = () => {
-    const created = addReminder({
-      title, at, kind,
-      ...(repeat === 'weekly' ? { everyDays: 7 } : repeat === 'monthly' ? { everyMonths: 1 } : {}),
-    });
-    // 从**存储的真相**回读,不信 addReminder 的返回值:配额满时它照样能造出对象,
-    // 界面上多一条、刷新就没了。写没进去就说出来,不假装成功。
-    const after = listReminders();
-    setItems(after);
-    if (!created || !after.some((r) => r.id === created.id)) {
-      setErr(L(dict, '这条没能存下来,先记在别处吧 —— 稍后再试一次。',
-                    'Could not save this one — try again in a moment.'));
-      return;
-    }
-    setAdding(false); setTitle(''); setErr('');
-
-    // 存下了才谈得上「到点提醒你」—— 这是**唯一**该弹系统通知权限的时机:
-    // 用户刚亲手设了一条有时间的提醒,弹窗和他正在做的事对得上。
-    // 开机/回前台那两次重排一律不弹(见 Portal 里那个 effect)。
-    void import('@/lib/portal/reminder-notifications')
-      .then((m) => m.syncReminderNotifications({ askPermission: true }))
-      .then((r) => {
-        // 不吓唬人:排不上只是「到点不会响」,提醒本身一条没丢,列表里就在那儿。
-        // 但也不装作排上了 —— 说清楚,并且说清楚去哪儿开。
-        if (!r.ok && r.reason === 'denied') {
-          setErr(L(dict, '记下了。系统通知没开,到点不会响 —— 想让它响,去「设置 › 通知」里打开。',
-                        'Saved. Notifications are off, so it won\'t ring — turn them on in Settings › Notifications.'));
-        }
-      })
-      .catch(() => {});
-  };
-
-  const now = Date.now();
-  const shown = items.filter((r) => matchesSearch(
-    { title: r.title, meta: kindLabel(r.kind), body: r.note || '' }, tokens));
-
-  // 搜索中且这一段没有命中 → 整段收起来,免得空标题占着位置误导「提醒都没了」。
-  if (tokens.length > 0 && shown.length === 0) return null;
+  if (shown.length === 0) {
+    return (
+      <p className="nesio-remind-empty">
+        {tokens.length > 0
+          ? L(dict, '做完的里面没有匹配的。', 'Nothing finished matches that.')
+          : L(dict, '还没有做完的 —— 点一条提醒上的「做好了」,它就会记在这里。',
+                    'Nothing finished yet — tap “Done” on a reminder and it lands here.')}
+      </p>
+    );
+  }
 
   return (
-    <section className="nesio-remind">
-      <div className="nesio-remind-head">
-        <h4 className="nesio-remind-title">{L(dict, '我设的提醒', 'My reminders')}</h4>
-        <button type="button" className="nesio-remind-add" onClick={() => (adding ? setAdding(false) : openForm())}>
-          {adding ? L(dict, '稍后', 'Later') : L(dict, '加一条', 'Add')}
-        </button>
-      </div>
-
-      {adding && (
-        <div className="nesio-remind-form">
-          <input className="nesio-schedfilter-input" value={title} onChange={(e) => setTitle(e.target.value)}
-            placeholder={L(dict, '要做什么(如:交房租)', 'What is it (e.g. pay rent)')} />
-          <input className="nesio-schedfilter-input" type="datetime-local" value={at}
-            onChange={(e) => setAt(e.target.value)} aria-label={L(dict, '什么时候', 'When')} />
-          <div className="nesio-remind-row" role="group" aria-label={L(dict, '类型', 'Kind')}>
-            {REMINDER_KINDS.map((k) => (
-              <button key={k} type="button"
-                className={`nesio-schedfilter-chip${kind === k ? ' on' : ''}`}
-                onClick={() => setKind(k)}>{kindLabel(k)}</button>
-            ))}
-          </div>
-          <div className="nesio-remind-row" role="group" aria-label={L(dict, '重复', 'Repeat')}>
-            {([['once', '只此一次', 'Once'], ['weekly', '每周', 'Weekly'], ['monthly', '每月', 'Monthly']] as const).map(([v, zh, en]) => (
-              <button key={v} type="button"
-                className={`nesio-schedfilter-chip${repeat === v ? ' on' : ''}`}
-                onClick={() => setRepeat(v)}>{L(dict, zh, en)}</button>
-            ))}
-          </div>
-          <button type="button" className="nesio-schedfilter-btn pri"
-            disabled={!title.trim() || !parseWallClock(at)}
-            onClick={submit}>{L(dict, '记下来', 'Save')}</button>
-          {err && <p role="alert" className="nesio-remind-err">{err}</p>}
-        </div>
-      )}
-
-      {shown.length === 0 ? (
-        <p className="nesio-remind-empty">
-          {L(dict, '还没有 —— 家务、账单到期这些自己设的时间,记在这里就不会被日历里的筛选吃掉。',
-                'Nothing yet — chores and bill due dates you set yourself live here.')}
-        </p>
-      ) : (
-        <ul className="nesio-remind-list">
-          {shown.map((r) => {
-            const when = parseWallClock(r.at);
-            const overdue = !r.doneAt && when !== null && when.getTime() < now;
-            const whenText = when
-              ? (dict === 'en'
-                  ? when.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
-                  : `${when.getMonth() + 1}月${when.getDate()}日 ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`)
-              : r.at;
-            const repeatText = r.everyMonths ? L(dict, '每月', 'Monthly') : r.everyDays === 7 ? L(dict, '每周', 'Weekly') : '';
-            return (
-              <li key={r.id} className={`nesio-remind-item${r.doneAt ? ' done' : ''}`}>
-                <div className="nesio-remind-main">
-                  <span className="nesio-remind-name">{r.title}</span>
-                  <span className="nesio-remind-when">
-                    {whenText}
-                    {repeatText && ` · ${repeatText}`}
-                    {` · ${kindLabel(r.kind)}`}
-                    {/* warm-coach:不说「逾期」,不用红色。到点没做只是「还有一件事」。 */}
-                    {overdue && ` · ${L(dict, '还等着', 'still waiting')}`}
-                  </span>
-                </div>
-                <div className="nesio-remind-acts">
-                  {r.doneAt ? (
-                    <button type="button" className="nesio-remind-act" onClick={() => { reopenReminder(r.id); setItems(listReminders()); }}>
-                      {L(dict, '撤销', 'Undo')}
-                    </button>
-                  ) : (
-                    <button type="button" className="nesio-remind-act" onClick={() => { completeReminder(r.id); setItems(listReminders()); }}>
-                      {L(dict, '做好了', 'Done')}
-                    </button>
-                  )}
-                  <button type="button" className="nesio-remind-act" onClick={() => { removeReminder(r.id); setItems(listReminders()); }}
-                    aria-label={L(dict, `删掉「${r.title}」`, `Delete “${r.title}”`)}>✕</button>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </section>
+    <ul className="nesio-remind-list">
+      {shown.map((c) => {
+        const when = parseWallClock(c.at);
+        const whenText = when
+          ? (dict === 'en'
+              ? when.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+              : `${when.getMonth() + 1}月${when.getDate()}日 ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}`)
+          : c.at;
+        return (
+          <li key={c.id} className="nesio-remind-item done">
+            <div className="nesio-remind-main">
+              <span className="nesio-remind-name">{c.title}</span>
+              <span className="nesio-remind-when">
+                {whenText}
+                {` · ${kindLabelOf(c.kind, dict)}`}
+                {c.recurring && ` · ${L(dict, '这一次', 'this one')}`}
+              </span>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
   );
 }
+
 
 /**
  * MailSuggestions —— 邮件里像是有约,问一句要不要进日程(2026-07-30 用户要求:
@@ -550,7 +489,7 @@ function MailSuggestions({ dict, rows, taken }: {
   const cands = useMemo(() => {
     const out: Array<{ row: Row; eid: string; at: string; snippet: string }> = [];
     for (const r of rows) {
-      const eid = typeof r.node.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
+      const eid = typeof r.node?.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
       if (!eid || state[eid]) continue;
       const hit = suggestScheduleFromEmail(r.title, r.body, r.dateIso);
       if (!hit) continue;
@@ -579,6 +518,7 @@ function MailSuggestions({ dict, rows, taken }: {
         setErr(L(dict, '这条没能加进日程,稍后再试一次。', 'Could not add it — try again in a moment.'));
         return;
       }
+      createReminderShadow(created);
     }
     markSuggest(c.eid, verdict);
     setState(loadSuggestState());
@@ -644,7 +584,7 @@ function MailSuggestions({ dict, rows, taken }: {
  */
 function MailTagFixSheet({ row, dict, onClose }: { row: Row; dict: 'zh' | 'en'; onClose: () => void }) {
   const [alsoSender, setAlsoSender] = useState(false);
-  const a = row.node.attributes || {};
+  const a = row.node?.attributes || {};
   const emailId = typeof a.emailId === 'string' ? a.emailId : '';
   const from = typeof a.from === 'string' ? a.from : '';
   const sender = senderKeyOf(from);
@@ -754,6 +694,8 @@ function MailTagFixSheet({ row, dict, onClose }: { row: Row; dict: 'zh' | 'en'; 
 export default function SchedulePanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [sub, setSub] = useState<SubTab>('calendar');
+  // 「已完成」是日程这一面的另一半,不是另一个页面 —— 切过去看一眼就能切回来。
+  const [showDone, setShowDone] = useState(false);
   const [nodes, setNodes] = useState<LifeNode[]>([]);
   // 图29「点击应该直接进入对应记忆,而不是记忆页」:就地开这条记忆的详情。
   const [openNode, setOpenNode] = useState<LifeNode | null>(null);
@@ -770,6 +712,12 @@ export default function SchedulePanel() {
   const [composeOpen, setComposeOpen] = useState(false);   // 发件箱里直接写一封
   const [fName, setFName] = useState('');
   const [fKeyword, setFKeyword] = useState('');
+  /**
+   * 正在改哪一个自定义筛选(2026-07-31 用户:「如果确实不管用,我希望可以修改,现在不行」)。
+   * null = 新建。以前只有「长按/右键删」——手机上长按常被系统的文本选择抢走,
+   * 于是一个建错了的筛选事实上既改不了也删不掉。
+   */
+  const [editId, setEditId] = useState<string | null>(null);
   // 搜索框(2026-07-30)。不落盘 —— 和筛选同理,记住上次的搜索词会让人以为数据少了。
   const [q, setQ] = useState('');
   // 用户改过的标签(这一封 / 发件人规则)。见 lib/portal/mail-tag-fix.ts —— 只记他改的,不隐式泛化。
@@ -810,6 +758,13 @@ export default function SchedulePanel() {
   }, []);
 
   const toggleStar = (r: Row) => {
+    // 提醒行的这个动作是**做好了**,不是星标。重复的往后滚一期并留一条完成记录,
+    // 一次性的打勾进「已完成」—— 这是提醒在这份列表里唯一要紧的动作。
+    if (r.reminder) {
+      completeReminder(r.reminder.id);
+      setReminders(listReminders());
+      return;
+    }
     togglePin(r.id);
     // 从**存储的真相**回读,而不是拿 togglePin 的返回值。它算的是「本该变成什么」,
     // 配额满写不进去时照样返回 true —— 星会亮,刷新就没了(全局横幅虽然会亮,
@@ -829,6 +784,14 @@ export default function SchedulePanel() {
    * 删除写失败(返回 false)就把行放回来并显式报错,不假装成功。
    */
   const commitDelete = (id: string) => {
+    // 提醒行删的是**提醒**(连同它在时间线上的身影),不是某个记忆节点 ——
+    // 按 life-graph 的 id 去删只会一无所获,而那一行已经从界面上消失了。
+    if (id.startsWith('rem:')) {
+      const rid = id.slice(4);
+      removeReminder(rid);
+      removeReminderShadow(rid);
+      return;
+    }
     if (!deleteLifeNode(id)) {
       setGone((prev) => { const next = new Set(prev); next.delete(id); return next; });
       setDelErr(L(dict, '这条没能删掉,已经放回来了。', 'Could not delete — it is back in the list.'));
@@ -869,6 +832,17 @@ export default function SchedulePanel() {
     setPending(null);
   };
 
+  // 提醒和日历项**同级**排在一张列表里(用户:「提醒项目混入日程列表,和日历同级别」)。
+  // 它们不是 life-graph 节点,所以单独订阅一份 —— 但排序、搜索、筛选走的是同一条路。
+  const [reminders, setReminders] = useState<Reminder[]>([]);
+  useEffect(() => {
+    const read = () => setReminders(listReminders());
+    void scheduleRemindersReady().then(read);
+    read();
+    window.addEventListener(SCHEDULE_REMINDERS_EVENT, read);
+    return () => window.removeEventListener(SCHEDULE_REMINDERS_EVENT, read);
+  }, []);
+
   useEffect(() => {
     const load = () => { try { setNodes(getLifeGraph()); } catch { setNodes([]); } };
     load();
@@ -901,6 +875,8 @@ export default function SchedulePanel() {
           dateIso: start,
           meta: typeof a.location === 'string' && a.location ? a.location : (typeof a.calendarName === 'string' ? a.calendarName : ''),
           badge: a.meetingRecordId ? L(dict, '有记录', 'notes') : undefined,
+          // 屏幕上这一行还看得见的字。日历项没有状态行,只有那枚徽章。
+          extra: a.meetingRecordId ? L(dict, '有记录', 'notes') : '',
           query: n.name,
           node: n,
           googleLabels: [
@@ -918,6 +894,7 @@ export default function SchedulePanel() {
           dateIso: typeof a.recordedAt === 'string' ? a.recordedAt : n.createdAt,
           meta: (n.tags || []).includes('Granola') ? 'Granola' : L(dict, '录音', 'Recording'),
           badge: L(dict, '会议记录', 'meeting'),
+          extra: L(dict, '会议记录', 'meeting'),
           query: stripPrefix(n.name),
           node: n,
           googleLabels: [L(dict, '会议记录', 'Meeting notes')],
@@ -925,6 +902,26 @@ export default function SchedulePanel() {
         });
       }
     }
+    // 提醒进同一张列表。**做完的不进** —— 它们在「已完成」那一面,混进待办里
+    // 会让人以为还没做。CHORE_RE 那道过滤只管日历项(挡的是待办 App 同步进来的
+    // 循环任务),提醒是用户亲手设的,一个字都不许被关键词吃掉。
+    for (const r of reminders) {
+      if (r.doneAt) continue;
+      const rep = repeatLabel(r, dict);
+      out.push({
+        id: `rem:${r.id}`,
+        title: r.title,
+        dateIso: r.at,
+        meta: [kindLabelOf(r.kind, dict), rep].filter(Boolean).join(' · '),
+        badge: L(dict, '提醒', 'reminder'),
+        extra: L(dict, '提醒', 'reminder'),
+        query: r.title,
+        reminder: r,
+        googleLabels: [L(dict, '我设的提醒', 'My reminders')],
+        body: r.note || '',
+      });
+    }
+
     const t0 = todayStart.getTime();
     const ms = (r: Row) => { const v = new Date(r.dateIso).getTime(); return Number.isNaN(v) ? 0 : v; };
     // 展示层去重(真机 2026-07-29:同一场会两条)。同步侧按 calendarId / `标题|start 原文` 去重,
@@ -940,7 +937,7 @@ export default function SchedulePanel() {
     const upcoming = deduped.filter((r) => ms(r) >= t0).sort((x, y) => ms(x) - ms(y));   // 近 → 远
     const past = deduped.filter((r) => ms(r) < t0).sort((x, y) => ms(y) - ms(x));        // 刚过去的先
     return [...upcoming, ...past];
-  }, [nodes, dict]);
+  }, [nodes, reminders, dict]);
 
   /** 这条是不是我发出去的。老节点没有这个字段 → 当收件(和改之前的行为一致,不让旧数据凭空消失)。 */
   const isSent = (n: LifeNode) => (n.attributes || {}).mailDirection === 'sent';
@@ -983,13 +980,23 @@ export default function SchedulePanel() {
       .map((n) => {
         const a = n.attributes || {};
         const cat = typeof a.mailCategory === 'string' ? a.mailCategory : '';
+        const from = typeof a.from === 'string' ? a.from : (typeof a.sender === 'string' ? a.sender : '');
+        const body = bodyOf(n);
+        // 和 MailRow 里同一套推导(同步没写好这几个字段时才现算),
+        // 这样标签上的计数和屏幕上真看得见的字是一回事。
+        const facets = (a.orderStatus || a.moneyFlow || a.kindHint)
+          ? a
+          : { ...a, ...extractEmailLocal(n.name, from, body) } as typeof a;
+        const st = mailStatusLine(facets, dict);
+        const bg = mailBadges(facets, dict);
         return {
           id: n.id,
           title: n.name,
           dateIso: typeof a.date === 'string' ? a.date : n.createdAt,
-          meta: typeof a.from === 'string' ? a.from : (typeof a.sender === 'string' ? a.sender : ''),
+          meta: from,
           query: n.name,
           node: n,
+          extra: [st?.text || '', ...bg.map((b) => b.label)].filter(Boolean).join(' '),
           // Gmail 自己的判定:重要性预测 + 系统分类。promotions/social 在上面已被毙掉,
           // 所以这里长不出那两个标签 —— 正合「只给筛得出东西的标签」。
           googleLabels: [
@@ -998,15 +1005,15 @@ export default function SchedulePanel() {
             ...(cat === 'forums' ? [L(dict, '论坛', 'Forums')] : []),
             ...(cat === 'personal' ? [L(dict, '个人', 'Personal')] : []),
           ],
-          body: bodyOf(n),
+          body,
         } as Row;
       })
       // 展示层去重:同一封邮件(emailId)只留一条。同步侧已按 emailId upsert,
       // 这里兜住历史遗留的重复节点(富化认不出源邮件时曾建过无 emailId 的副本)。
       .filter((r, i, arr) => {
-        const eid = typeof r.node.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
+        const eid = typeof r.node?.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
         if (!eid) return true;
-        return arr.findIndex((o) => o.node.attributes?.emailId === eid) === i;
+        return arr.findIndex((o) => o.node?.attributes?.emailId === eid) === i;
       })
       // 邮件时间以邮件头为准;字符串比大小对 RFC2822 头(「Tue, 29 Jul…」)是错的,按时刻排。
       .sort((x, y) => {
@@ -1040,9 +1047,9 @@ export default function SchedulePanel() {
     })
     // 同一封只留一条(与收件同样的兜底:历史上曾建过无 emailId 的副本)
     .filter((r, i, arr) => {
-      const eid = typeof r.node.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
+      const eid = typeof r.node?.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
       if (!eid) return true;
-      return arr.findIndex((o) => o.node.attributes?.emailId === eid) === i;
+      return arr.findIndex((o) => o.node?.attributes?.emailId === eid) === i;
     })
     .sort((x, y) => (new Date(y.dateIso).getTime() || 0) - (new Date(x.dateIso).getTime() || 0)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1060,7 +1067,7 @@ export default function SchedulePanel() {
   const searched = useMemo(() => {
     if (!tokens.length) return allRows;
     return allRows.filter((r) => {
-      const eid = typeof r.node.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
+      const eid = typeof r.node?.attributes?.emailId === 'string' ? r.node.attributes.emailId : '';
       const ftHas = eid ? (tk: string) => emailFulltextScore(eid, [tk], '') > 0 : undefined;
       return matchesSearch(r, tokens, ftHas);
     });
@@ -1190,9 +1197,29 @@ export default function SchedulePanel() {
                 {c.label} <span className="n">{c.count}</span>
               </button>
             ))}
-            <button type="button" className="nesio-schedfilter-add" onClick={() => setAddingFilter((v) => !v)}
+            <button type="button" className="nesio-schedfilter-add"
+              onClick={() => { setEditId(null); setFName(''); setFKeyword(''); setAddingFilter((v) => !v); }}
               aria-label={L(dict, '自定义一个筛选', 'Add a filter')}>+</button>
           </div>
+
+          {/* 选中自己建的标签时,给一条「改一改」。
+              放在 chip **外面**而不是 chip 里挂个小铅笔:chip 是 button,
+              按钮不能嵌按钮 —— 硬塞的下场刚在时间线那个 ✕ 上见过(掉到下一行还点不动)。 */}
+          {chosen?.kind === 'custom' && !addingFilter && (
+            <button
+              type="button"
+              className="nesio-schedfilter-btn"
+              style={{ alignSelf: 'flex-start' }}
+              onClick={() => {
+                setEditId(chosen.id);
+                setFName(chosen.label);
+                setFKeyword(chosen.keyword);
+                setAddingFilter(true);
+              }}
+            >
+              {L(dict, `改一改「${chosen.label}」`, `Edit “${chosen.label}”`)}
+            </button>
+          )}
 
           {addingFilter && (
             <div className="nesio-schedfilter-form">
@@ -1200,13 +1227,36 @@ export default function SchedulePanel() {
                 placeholder={L(dict, '叫什么(如:孩子学校)', 'Name it')} />
               <input className="nesio-schedfilter-input" value={fKeyword} onChange={(e) => setFKeyword(e.target.value)}
                 placeholder={L(dict, '含哪个词', 'Contains which word')} />
+              {/* 改的时候先说清楚它现在能筛出几条 —— 用户是因为「命中 0」才来改的,
+                  改完立刻看得见有没有用,比让他关掉表单再数一遍强。 */}
+              {fKeyword.trim() && (
+                <p className="nesio-schedsearch-hint" style={{ margin: 0 }}>
+                  {L(dict,
+                    `含「${fKeyword.trim()}」的有 ${baseRows.filter((r) => matchesCustom(r, fKeyword)).length} 条`,
+                    `${baseRows.filter((r) => matchesCustom(r, fKeyword)).length} match “${fKeyword.trim()}”`)}
+                </p>
+              )}
               <div className="nesio-schedfilter-actions">
-                <button type="button" className="nesio-schedfilter-btn" onClick={() => { setAddingFilter(false); setFName(''); setFKeyword(''); }}>
+                {editId && (
+                  <button type="button" className="nesio-schedfilter-btn"
+                    onClick={() => {
+                      removeCustomFilter(editId);
+                      if (activeChip === editId) setActiveChip(null);
+                      setAddingFilter(false); setEditId(null); setFName(''); setFKeyword('');
+                    }}>
+                    {L(dict, '删掉', 'Delete')}
+                  </button>
+                )}
+                <button type="button" className="nesio-schedfilter-btn" onClick={() => { setAddingFilter(false); setEditId(null); setFName(''); setFKeyword(''); }}>
                   {L(dict, '稍后', 'Later')}
                 </button>
                 <button type="button" className="nesio-schedfilter-btn pri" disabled={!fName.trim() || !fKeyword.trim()}
-                  onClick={() => { addCustomFilter(fName, fKeyword); setAddingFilter(false); setFName(''); setFKeyword(''); }}>
-                  {L(dict, '加进来', 'Add')}
+                  onClick={() => {
+                    if (editId) updateCustomFilter(editId, { name: fName, keyword: fKeyword });
+                    else addCustomFilter(fName, fKeyword);
+                    setAddingFilter(false); setEditId(null); setFName(''); setFKeyword('');
+                  }}>
+                  {editId ? L(dict, '改好了', 'Save') : L(dict, '加进来', 'Add')}
                 </button>
               </div>
               {/* 说清它到底怎么匹配 —— 用户能预测结果,才敢用。不做隐式语义匹配。 */}
@@ -1228,14 +1278,22 @@ export default function SchedulePanel() {
         </button>
       )}
 
-      {/* 我自己设的提醒(家务 / 账单 due)。只在日历那格 —— 它是「日程」,不是邮件。 */}
-      {sub === 'calendar' && <RemindersSection dict={dict} tokens={tokens} />}
+      {/* 提醒的**待办**已经和日历项同级混在下面那份列表里了;这里只留一个
+          「已完成」的入口 —— 它是另一面,不是另一个页面。新建整个交给首页输入框。 */}
+      {sub === 'calendar' && (
+        <div className="nesio-remind-head">
+          <button type="button" className="nesio-remind-add" onClick={() => setShowDone((v) => !v)}>
+            {showDone ? L(dict, '← 回到日程', '← Back to schedule') : L(dict, '看已完成的提醒', 'Finished reminders')}
+          </button>
+        </div>
+      )}
+      {sub === 'calendar' && showDone && <CompletedReminders dict={dict} tokens={tokens} />}
 
       {/* 收件里像是有约的那几封,问一句要不要进日程。用**未经搜索/筛选**的全量
           (emailRows)—— 这件事和「我这会儿在找什么」无关,不该被搜索框藏起来。 */}
       {sub === 'email' && <MailSuggestions dict={dict} rows={emailRows} taken={takenSlots} />}
 
-      {rows.length === 0 ? (
+      {sub === 'calendar' && showDone ? null : rows.length === 0 ? (
         <p className="nesio-insights-empty">
           {/* 筛出 0 条 ≠ 没有数据。不说清是筛没的,用户会以为东西丢了。
               搜索和标签是两件事,分开说 —— 「搜不到」和「这个标签下没有」要给不同的出口。 */}
@@ -1256,7 +1314,10 @@ export default function SchedulePanel() {
           {rows.slice(0, 60).map((r) => (
             <SwipeRow key={r.id} row={r} kind={sub} dict={dict} starred={starred.has(r.id)} dateLabel={fmtDay(r.dateIso)}
               fixes={tagFixes}
-              onOpen={() => setOpenNode(r.node)} onStar={() => toggleStar(r)} onDelete={() => removeRow(r)}
+              /* 提醒行没有记忆节点可开 —— 传 undefined,SwipeRow 那边就不画「打开」这条路,
+                 而不是画一个点了什么也不会发生的按钮。 */
+              onOpen={r.node ? () => setOpenNode(r.node!) : undefined}
+              onStar={() => toggleStar(r)} onDelete={() => removeRow(r)}
               onFixTag={sub === 'calendar' ? undefined : () => setFixing(r)} />
           ))}
         </div>

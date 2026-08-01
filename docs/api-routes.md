@@ -66,7 +66,8 @@ Auth legend:
 | GET /api/portal/music/apple-token | guardAiRoute (10/min) — 服务端签 MusicKit developer token(ES256,.p8 私钥只在服务端)。没配密钥时 200 + `configured:false`,让界面照实说「还没配好」而不是渲染成网络故障 |
 | GET /api/portal/music/spotify | guardAiRoute (20/min) — 读该账号的 Spotify 状态。`streamable` **只在 product 确认为 premium 时**为 true(正向判据);刷新失败即清 cookie 并如实报 `authorized:false` |
 | DELETE /api/portal/music/spotify | guardAiRoute (10/min) — 断开(清 httpOnly cookie) |
-| GET /api/portal/music/netease/search | guardAiRoute (20/min) — 网易云**元数据**搜索转发(NETEASE_API_BASE)。刻意不做取播放地址:锁区锁的正是那一步 |
+| GET /api/portal/music/netease/search | guardAiRoute (20/min) — 网易云搜索。**默认直连**(weapi,协议在 `lib/platform/music/netease-protocol`),配了 `NETEASE_API_BASE` 才转发给自建实例。风控回 `{ok:false,reason:'blocked'}` 而非 502 —— 换个词再搜没用,这不是故障 |
+| GET /api/portal/music/netease/song-url | guardAiRoute (30/min) — 逐曲问播放地址,默认直连(weapi → 回退 `song/media/outer/url`,两条都拿不到才算受限)。**四态分开,四个不同的下一步**:`{ok:true,url}`;`{ok:true,url:'',reason:'restricted'}`(这一首受限 → 换一首,**不给重试**);`{ok:false,reason:'blocked'}`(整台被风控 → 换歌没用);502(真故障 → 重试)。拿到的地址一律改写成 https,否则 https 页面上的混合内容会被浏览器静默拦掉。2026-07-31 新增 |
 | GET /api/auth/session | open (reports session state) |
 
 ## OAuth flows (pre-auth by design)

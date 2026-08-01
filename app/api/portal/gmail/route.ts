@@ -166,7 +166,20 @@ function emailAddrOf(s: string): string {
  * SENT 是 Gmail 自己打的标签,直接用,不猜。
  */
 function mailDirection(msg: GmailMessage): 'sent' | 'received' {
-  return (msg.labelIds || []).includes('SENT') ? 'sent' : 'received';
+  const labels = msg.labelIds || [];
+  /*
+   * 2026-07-31 更正(用户实测:「这个被放进发件箱是错误的」——一封「Your Day Ahead」
+   * 每日简报,发给 hanbing6228@gmail.com,也就是他自己)。
+   *
+   * 上一版只看 SENT。但**自己发给自己**的邮件,Gmail 会同时打 SENT 和 INBOX ——
+   * 每日简报、从别处转存给自己的资料、各种 self-note 都属这一类。
+   * 于是它们全被归进「发件」,而用户对它们的认知是「我要读的东西」,不是「我写的东西」。
+   *
+   * 真正「我写给别人的」只有 SENT、没有 INBOX(Gmail 不会把你发出去的信放进你的收件箱)。
+   * 所以判据是 SENT ∧ ¬INBOX —— 这一条精确地就是那个集合。
+   * labelIds 是 per-message 的,线程里你的那条回复不带 INBOX,不会被误判。
+   */
+  return labels.includes('SENT') && !labels.includes('INBOX') ? 'sent' : 'received';
 }
 
 /**

@@ -87,8 +87,14 @@ export async function probeReadiness(): Promise<ReadinessMap> {
       authorized: spotify.authorized,
       streamable: spotify.streamable,
     },
-    // 网易:configured 只影响「能不能搜」;能不能放由 model 决定(恒否)。
-    netease: { configured: neteaseOk, authorized: neteaseOk, streamable: false },
+    /*
+     * 网易:2026-07-31 更正。上一版写死 streamable:false,理由是「没有国内出口
+     * 就拿不到播放地址」—— 用户当场指出那是过度概括:「不是所有歌都锁着的」。
+     * 事实是**逐曲**的,所以源级别只能说「接得上」(配了 API base 就有一半的歌能放),
+     * 具体哪一首取不到,点下去问过 song-url 才知道 —— 那时候再说,而且说的是
+     * 「换一首」不是「这个源不能用」。
+     */
+    netease: { configured: neteaseOk, authorized: neteaseOk, streamable: neteaseOk },
   };
 }
 

@@ -353,6 +353,28 @@ export default function Portal() {
   const [reliefBusy, setReliefBusy] = useState(false);
   const [reliefMsg, setReliefMsg] = useState('');
   const [storageAlert, setStorageAlert] = useState<{ kind: 'full' | 'warning'; percent: number; largest?: Array<{ key: string; bytes: number }> } | null>(null);
+  /**
+   * 邀请制挡下的那一次(2026-07-31)。magic link / 第三方登录被挡时,callback 会带
+   * `?status=not_invited` 把人送回这里 —— 不说一句的话,他看到的是「点了邮件链接、
+   * 回来了、然后什么也没发生」,只会再点一次、再等一封信。
+   */
+  const [notInvited, setNotInvited] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('status') !== 'not_invited' && params.get('auth') !== 'auth_not_invited') return;
+    setNotInvited(true);
+    // 读完就把参数擦掉,免得刷新一次又弹一遍。
+    // 只擦触发这条提示的那两个。**刻意不列 profileBootstrap\* 那几个**:
+    // test:auth-product-profile-bootstrap 禁止 Portal 里出现那个词 —— 它守的是
+    // 「不许拿 profile bootstrap 去挡已登录用户」。我这儿只是清 URL 参数、
+    // 跟门控毫无关系,但契约是文本匹配,抓不出这个区别。
+    // 与其为了一个清参数的便利去放宽那条保护(放宽了就可能漏掉真的门控用法),
+    // 不如少清两个无害的参数 —— 它们本来也不影响什么。
+    for (const k of ['status', 'auth']) params.delete(k);
+    const qs = params.toString();
+    window.history.replaceState({}, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`);
+  }, []);
   const [captureMode, setCaptureMode] = useState<CaptureMode | null>(null);
 
   // 批次 7:iOS PWA 后台驻留页面从不重载,用户会停在几天前的旧 UI。
@@ -515,9 +537,14 @@ export default function Portal() {
     window.addEventListener('nesio-recognize-image', onRecog);
     return () => window.removeEventListener('nesio-recognize-image', onRecog);
   }, []);
-  const [voiceIntent, setVoiceIntent] = useState<'note' | 'ask'>('note');
-  // 带进「说一句/问念念」的初始文字(首页输入条转过来的那句)。用完即清。
-  const [voiceSeed, setVoiceSeed] = useState('');
+  /*
+   * voiceIntent / voiceSeed 已删(2026-07-31)。
+   *
+   * 语音 sheet 曾经有两副面孔:intent='note' 记一笔、intent='ask' 问念念。
+   * 现在**所有**问念念入口都进真对话页(见 openAskChat),ask 那一支再没有人走 ——
+   * 留着一个不可达的 state 就是留一条会被人重新接上的旧路。
+   * 这张 sheet 从此只做一件事:说一句、记下来。
+   */
   const [noteOpen, setNoteOpen] = useState(false);
   const [locale, setLocale] = useState<PortalLocale>('zh');
   const dict = portalLocaleToDictionaryLocale(locale);
@@ -548,10 +575,15 @@ export default function Portal() {
   // 阅读器划词「问念念」→ 开聊天并把选中文作为引用喂进输入框(仿 ask-image)
   useEffect(() => {
     const onAskText = (e: Event) => {
-      const detail = (e as CustomEvent).detail as { text?: string };
+      const detail = (e as CustomEvent).detail as { text?: string; send?: boolean };
       const text = (detail?.text || '').trim();
       if (!text) return;
-      try { sessionStorage.setItem('nesio-pending-ask-text', text); } catch { /* ignore */ }
+      // send:true = 这句话本身就是问题(首页输入条点「问念念」),开页即发,不再让人按一次;
+      // 不带 send = 划词引用,预填等用户补问题。两种意图存在同一个信封里,由 sheet 分流。
+      try {
+        sessionStorage.setItem('nesio-pending-ask-text', JSON.stringify({ text, send: detail?.send === true }));
+      } catch { /* ignore */ }
+      setInsightsOpen(false);   // 浮层不关会盖住聊天页 —— 仓里「表面死按钮」的老根因
       setChatOpen(true);
     };
     window.addEventListener('nesio-ask-text', onAskText);
@@ -965,20 +997,27 @@ export default function Portal() {
   useEffect(() => {
     const voiceHandler = () => { track('capture_voice_open'); setCaptureMode('voice'); };
     /**
-     * 2026-07-31 首页输入条三合一的「问念念」。
+     * 「问念念」—— 一律进**真对话页**(2026-07-31 用户:「点击问问符号,进入真的问问界面」)。
      *
-     * **单独一个事件名**,不复用 nesio-open-voice —— 后者被 test:today-settings-bug3
-     * 明确禁止出现在 TodayFeed 里(用户标注过:点话筒不该跳「说一说」sheet)。
-     * 那条保护是对的,不该为了省一个事件名去放宽它;而且「问念念」和「打开说一句」
-     * 本来就是两件事,共用一个名字迟早再被人搞混。
-     * detail.text = 已经打好的那句话,带过去,别让人在另一个框里重打一遍。
+     * 这个事件以前开的是语音 sheet 的 ask 形态:一次性问答,回一段摘要 + 一列「来源线索」,
+     * 追问一句就得从头再问。用户管它叫「搜索对话」,准确。
+     *
+     * 这一版把**所有**问念念入口收到一处:底部中间那颗大按钮、引导页的「开始」、
+     * 首页输入条的晶体,全都开 NesioChatSheet。上一轮只切了输入条那一条,
+     * 结果同一个念念在两个地方长两个样 —— 那本身就是要修的东西。
+     * detail.text = 已经打好的那句话;send = 它本身就是问题,开页即发。
      */
     const askHandler = (e: Event) => {
-      const d = (e as CustomEvent).detail as { text?: string } | undefined;
+      const d = (e as CustomEvent).detail as { text?: string; send?: boolean } | undefined;
       track('capture_voice_open');
-      setVoiceIntent('ask');
-      setVoiceSeed(typeof d?.text === 'string' ? d.text : '');
-      setCaptureMode('voice');
+      const text = typeof d?.text === 'string' ? d.text.trim() : '';
+      if (text) {
+        try {
+          sessionStorage.setItem('nesio-pending-ask-text', JSON.stringify({ text, send: d?.send !== false }));
+        } catch { /* ignore */ }
+      }
+      setInsightsOpen(false);
+      setChatOpen(true);
     };
     const moodHandler = () => { track('mood_open'); setMoodOpen(true); };
     const freezeHandler = () => {
@@ -1410,14 +1449,21 @@ export default function Portal() {
     [launchSurfaceContext],
   );
 
-  const openAskVoice = useCallback(() => {
+  /**
+   * 打开问念念。**只有这一个实现** —— 底部中间键、引导页的「开始」、
+   * 首页输入条的晶体,走的都是它(2026-07-31 用户:「点击问问符号,进入真的问问界面」)。
+   *
+   * 以前它开的是语音 sheet 的 ask 形态。那一屏是一次性问答:回一段摘要 + 一列
+   * 「来源线索」,追问不了 —— 而念念的对话页(多轮、有历史、能翻回去)一直都在,
+   * 只是这个入口没通到那儿。同一个念念在两个地方长两个样,是这次要收掉的东西。
+   */
+  const openAskChat = useCallback(() => {
     try {
       localStorage.setItem(ASK_GUIDE_KEY, '1');
     } catch { /* ignore unavailable storage */ }
     setAskGuideOpen(false);
-    setActiveSurface('today');
-    setVoiceIntent('ask');
-    setCaptureMode('voice');
+    setInsightsOpen(false);   // 浮层不关会盖住对话页 —— 仓里「表面死按钮」的老根因
+    setChatOpen(true);
   }, []);
 
   const handleAskFromCenterButton = useCallback(() => {
@@ -1429,13 +1475,38 @@ export default function Portal() {
       setAskGuideOpen(true);
       return;
     }
-    openAskVoice();
-  }, [openAskVoice]);
+    openAskChat();
+  }, [openAskChat]);
 
   return (
     <>
       <div className="portal-root portal-root--home">
         <div className="portal-grain" aria-hidden />
+        {notInvited && (
+          <div
+            role="alert"
+            style={{
+              position: 'fixed', top: 8, left: 12, right: 12, zIndex: 300,
+              padding: 'var(--space-3) var(--space-4)', borderRadius: 'var(--radius-md)',
+              background: 'var(--status-gentle-soft)', color: 'var(--portal-ink)',
+              fontSize: 'var(--text-sm)', lineHeight: 1.6,
+              display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
+            }}
+          >
+            <span style={{ flex: 1 }}>
+              {L(dict,
+                '这个邮箱还不在名单上。Nesio 现在是邀请制 —— 跟主人说一声就能加进来。不登录也能先本地用。',
+                'This email is not on the list yet. Nesio is invite-only right now — ask the owner to add you. You can still use it locally.')}
+            </span>
+            <button
+              type="button"
+              onClick={() => setNotInvited(false)}
+              style={{ flex: 'none', minHeight: 'var(--tap-min, 44px)', padding: '0 var(--space-3)', border: 'none', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer', fontSize: 'var(--text-sm)' }}
+            >
+              {L(dict, '知道了', 'OK')}
+            </button>
+          </div>
+        )}
         {storageAlert && (
           <div
             role="alert"
@@ -1532,10 +1603,8 @@ export default function Portal() {
       <CameraSheet open={captureMode === 'camera'} initialFile={cameraFile} intakeSubtype={pantryIntake ? '食材' : undefined} onClose={() => { const wasPantry = pantryIntake; setCaptureMode(null); setCameraFile(null); setPantryIntake(false); if (wasPantry) setTimeout(() => setCookingOpen(true), 80); }} />
       <VoiceInputSheet
         open={captureMode === 'voice'}
-        intent={voiceIntent}
-        seedText={voiceSeed}
         canUsePrivateData={canViewPrivateData}
-        onClose={() => { setCaptureMode(null); setVoiceIntent('note'); setVoiceSeed(''); }}
+        onClose={() => setCaptureMode(null)}
       />
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
       <MoodSheet open={moodOpen} onClose={() => setMoodOpen(false)} />
@@ -1680,7 +1749,7 @@ export default function Portal() {
         </TabErrorBoundary>
       )}
       {briefOpen && <DailyBriefSheet open={briefOpen} onClose={() => setBriefOpen(false)} canUsePrivateData={canViewPrivateData} />}
-      <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskVoice} />
+      <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskChat} />
 
       <NesioChatSheet open={chatOpen} onClose={() => setChatOpen(false)} canUsePrivateData={canViewPrivateData} />
       <NotePanelEnhanced open={noteOpen} onOpenChange={setNoteOpen} />

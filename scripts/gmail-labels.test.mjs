@@ -96,4 +96,30 @@ assert.equal(emailAddrOf('no email here'), '', '无地址返回空');
   assert.equal(ann.important, false, '普通发件人 → 非 important');
 }
 
-console.log('gmail-labels: OK');
+// ── 发件 / 收件:自己发给自己的算收件 ──────────────────────────────────────
+//
+// 用户实测(2026-07-31):一封「Your Day Ahead」每日简报、收件人是他自己,
+// 被归进了「发件」。上一版只看 SENT —— 而**自己发给自己**的邮件 Gmail 会同时打
+// SENT 和 INBOX(每日简报、转存给自己的资料、self-note 都属这一类)。
+// 用户对它们的认知是「我要读的」,不是「我写的」。
+//
+// 真正「我写给别人的」只有 SENT、没有 INBOX(Gmail 不把你发出去的信放进你的收件箱),
+// 所以判据是 SENT ∧ ¬INBOX —— 精确地就是那个集合。
+{
+  assert.ok(
+    /labels\.includes\('SENT'\) && !labels\.includes\('INBOX'\)/.test(src),
+    '发件判据必须是 SENT ∧ ¬INBOX —— 只看 SENT 会把「自己发给自己」的信归进发件箱',
+  );
+  // 把这个函数抽出来直测,别只压源码形状。
+  const m = /function mailDirection\(msg: GmailMessage\): 'sent' \| 'received' \{[\s\S]*?\n\}/.exec(src);
+  assert.ok(m, 'mailDirection 不见了');
+  const js = m[0].replace(/: GmailMessage/, '').replace(/: 'sent' \| 'received'/, '');
+  const fn = vm.runInNewContext(`(${js.replace(/^function mailDirection/, 'function')})`, {});
+  assert.equal(fn({ labelIds: ['SENT'] }), 'sent', '只有 SENT = 我写给别人的');
+  assert.equal(fn({ labelIds: ['SENT', 'INBOX'] }), 'received', '自己发给自己(SENT+INBOX)= 我要读的,算收件');
+  assert.equal(fn({ labelIds: ['INBOX'] }), 'received');
+  assert.equal(fn({ labelIds: [] }), 'received', '什么标签都没有时不许猜成发件');
+  assert.equal(fn({}), 'received', 'labelIds 缺失不许抛');
+}
+
+console.log('gmail-labels: OK(含发件判据:自己发给自己算收件)');

@@ -8,7 +8,7 @@
 import { GEMINI_MODEL_FALLBACKS } from './ai-provider-chain.mjs';
 import { resolveAiKey } from '@/lib/portal/ai-keys';
 import { envValue } from '@/lib/portal/env';
-import { estimateCostUsd, type AiUsage } from '@/lib/portal/ai-cost';
+import { estimateCostUsd, type AiUsage, type AiCostProvider } from '@/lib/portal/ai-cost';
 import { reportAiCall } from '@/lib/portal/ai-telemetry';
 
 const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -17,7 +17,7 @@ const GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta/models';
 export function aiProviderAvailable(): boolean {
   // 统一别名解析:此前只认 GEMINI_API_KEY/GOOGLE_GENERATIVE_AI_API_KEY,漏了
   // GOOGLE_AI_API_KEY / GOOGLE_API_KEY —— 共享客户端也曾中招同一个窄读 bug。
-  return Boolean(resolveAiKey('anthropic') || resolveAiKey('gemini') || resolveAiKey('openai'));
+  return Boolean(resolveAiKey('kimi') || resolveAiKey('anthropic') || resolveAiKey('gemini') || resolveAiKey('openai'));
 }
 
 /** 解析 data URL(data:image/jpeg;base64,...)→ { mimeType, base64 };非法返回 null。 */
@@ -134,6 +134,62 @@ async function callGemini(apiKey: string, prompt: string, system: string, maxTok
   throw new Error(lastError);
 }
 
+/**
+ * Kimi(Moonshot)。2026-07-31 用户定为首选通道。
+ *
+ * 走 **OpenAI 兼容**的 /chat/completions —— Moonshot 的公开接口一直是这个形状,
+ * 所以请求/响应结构和上面 callOpenAI 是同一副,只是换了 base 和 key。
+ *
+ * ── 默认值(2026-07-31 查证后填上)────────────────────────────────────────────
+ * 上一版这里写着「模型 ID 必须显式配,我不知道就不编」。查过官方文档之后有出处了:
+ * 模型 id 是 `kimi-k3`、base 是 https://api.moonshot.ai/v1(我原来那个默认值猜对了)。
+ * 于是给上默认值 —— 有出处的默认值和编一个是两回事。两者都仍可用 env 覆盖。
+ *
+ * ── reasoning_effort:这一项直接决定账单 ────────────────────────────────────
+ * K3 **默认开思考模式,且 reasoning_effort 默认 max**。思考 token 按输出计费
+ * ($15/M),而 Nesio 绝大多数调用是「把这句话提取成一条记忆」「改写一句问候」
+ * 这类短活 —— 让它按 max 想一遍,是拿最贵的档去干最轻的活。
+ * 所以这里默认压到 low,需要深想的调用方自己传(KIMI_REASONING_EFFORT 可全局覆盖)。
+ */
+async function callKimi(apiKey: string, prompt: string, system: string, maxTokens: number, temperature?: number, image?: string, responseFormat?: 'json'): Promise<CallResult> {
+  const usedModel = (envValue('KIMI_MODEL') || 'kimi-k3').trim();
+  const base = (envValue('KIMI_API_BASE') || 'https://api.moonshot.ai/v1').trim().replace(/\/+$/, '');
+  const effort = (envValue('KIMI_REASONING_EFFORT') || 'low').trim();
+  const img = image ? parseDataUrl(image) : null;
+  const userContent = img
+    ? [
+        { type: 'text', text: prompt },
+        { type: 'image_url', image_url: { url: image } },
+      ]
+    : prompt;
+  const res = await fetch(`${base}/chat/completions`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: usedModel,
+      max_tokens: maxTokens,
+      ...(effort ? { reasoning_effort: effort } : {}),
+      ...(typeof temperature === 'number' ? { temperature } : {}),
+      ...(responseFormat === 'json' ? { response_format: { type: 'json_object' } } : {}),
+      messages: [
+        ...(system ? [{ role: 'system', content: system }] : []),
+        { role: 'user', content: userContent },
+      ],
+    }),
+  });
+  const data = await res.json() as {
+    choices?: Array<{ message?: { content?: string } }>;
+    error?: { message?: string; type?: string };
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+  };
+  if (!res.ok || data.error) throw new Error(`Kimi ${res.status}${data.error?.message ? `: ${data.error.message}` : ''}`);
+  return {
+    text: (data.choices?.[0]?.message?.content || '').trim(),
+    model: usedModel,
+    usage: { inputTokens: data.usage?.prompt_tokens || 0, outputTokens: data.usage?.completion_tokens || 0 },
+  };
+}
+
 async function callOpenAI(apiKey: string, prompt: string, system: string, maxTokens: number, temperature?: number, image?: string, responseFormat?: 'json'): Promise<CallResult> {
   const img = image ? parseDataUrl(image) : null;
   const userContent = img
@@ -171,7 +227,7 @@ async function callOpenAI(apiKey: string, prompt: string, system: string, maxTok
 }
 
 /** 把一次 completeText 调用的真实 token + 估算成本落进现有 ai_route 遥测(server-only,best-effort)。 */
-function logAiCost(route: string, provider: 'claude' | 'gemini' | 'openai', startedAt: number, r: CallResult): void {
+function logAiCost(route: string, provider: AiCostProvider, startedAt: number, r: CallResult): void {
   const extra: Record<string, string | number | boolean> = {
     provider,
     model: r.model,
@@ -196,12 +252,26 @@ function logAiCost(route: string, provider: 'claude' | 'gemini' | 'openai', star
 export async function completeText(
   { prompt, system = '', maxTokens = 1024, model, temperature, image, responseFormat, route = 'complete' }:
   { prompt: string; system?: string; maxTokens?: number; model?: string; temperature?: number; image?: string; responseFormat?: 'json'; route?: string },
-): Promise<{ text: string; provider: 'claude' | 'gemini' | 'openai'; usage?: AiUsage; model?: string }> {
+): Promise<{ text: string; provider: AiCostProvider; usage?: AiUsage; model?: string }> {
+  const kimiKey = resolveAiKey('kimi');
   const anthropicKey = resolveAiKey('anthropic');
   const geminiKey = resolveAiKey('gemini');
   const openaiKey = resolveAiKey('openai');
   const startedAt = Date.now();
 
+  // Kimi 打头(2026-07-31 用户定案),Gemini 托底 —— 顺序的真源在 ai-provider-chain.mjs。
+  if (kimiKey) {
+    try {
+      const r = await callKimi(kimiKey, prompt, system, maxTokens, temperature, image, responseFormat);
+      if (r.text) {
+        logAiCost(route, 'kimi', startedAt, r);
+        return { text: r.text, provider: 'kimi', usage: r.usage, model: r.model };
+      }
+    } catch (err) {
+      // 后面一个都没配就把真错抛出去 —— 静默兜底成空答案是这个仓修过好几次的病。
+      if (!geminiKey && !anthropicKey && !openaiKey) throw err;
+    }
+  }
   if (anthropicKey) {
     try {
       const r = await callClaude(anthropicKey, prompt, system, maxTokens, model, temperature, image);

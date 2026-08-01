@@ -368,7 +368,7 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
           </div>
         )}
 
-        <input ref={fileRef} type="file" accept="image/*,.pdf,.txt,.eml,.docx,.md" style={{ display: 'none' }} onChange={handleFileChange} />
+        <input ref={fileRef} type="file" accept="image/*,.pdf,.txt,.eml,.docx,.md" className="nesio-visually-hidden" onChange={handleFileChange} />
 
         {/* Text paste mode */}
         {textMode && !parsed && (

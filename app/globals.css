@@ -140,6 +140,16 @@
   --space-12: 3rem;
   --space-16: 4rem;
   --tap-min: 44px;
+  /**
+   * 页面留边(2026-07-31 用户:「所有的页面,把这种四边都紧挨着屏幕边的情况处理一下」)。
+   *
+   * 以前这个值散在各个顶层滚动容器里(今天页 / 记忆页各写了一份 1.1rem),
+   * 而**洞察那一整个壳漏了** —— 财务、衣橱、洞察、日程…全都装在它里面,
+   * 于是那些页的文字一路顶到屏幕边,「5 月」这种标签直接被裁掉半个字。
+   * 收成一个 token:留边这件事从此只有一处定义。
+   * 1rem 而不是原来的 1.1rem —— 回到 4px 网格(差 1.6px,看不出来)。
+   */
+  --page-gutter: var(--space-4);
   --ease-soft: cubic-bezier(0.22, 0.61, 0.36, 1);
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --dur-fast: 0.2s;
@@ -583,8 +593,10 @@ body {
   overflow-y: auto;
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
-  padding: calc(0.65rem + env(safe-area-inset-top)) 1rem
+  padding: calc(0.65rem + env(safe-area-inset-top)) 0
     calc(1rem + env(safe-area-inset-bottom));
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
   display: flex;
   flex-direction: column;
 }
@@ -4910,7 +4922,11 @@ html[data-portal-theme="night"] .nesio-logo-night { display: inline-block !impor
   overflow-y: auto;
   /* 6.5rem:悬浮导航(底 0.5rem + 高约 3.2rem)+ 余量 —— QA 实测 390×844 下
      「还有 N 件小事」行被导航压了一截,5.5rem 不够。 */
-  padding: 0.5rem 1.1rem calc(6.5rem + env(safe-area-inset-bottom));
+  padding: 0.5rem 0 calc(6.5rem + env(safe-area-inset-bottom));
+  /* 左右走同一个 token(见 --page-gutter)。max(…, safe-area) 是「自适应屏幕」的另一半:
+     横屏/刘海机上那一侧安全区更宽,写死一个数就等于让内容钻到挖孔底下。 */
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain; /* iOS PWA:触底橡皮筋会拖动 fixed 层露出 html 兜底色(底部色带) */
 }
@@ -5226,7 +5242,9 @@ html[data-portal-theme="night"] .nesio-today-btn--ghost {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden; /* 竖向滚动容器绝不横滚:堵住「页面漂移/超出屏幕」 */
-  padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 1.1rem calc(5.5rem + env(safe-area-inset-bottom));
+  padding: calc(0.5rem + env(safe-area-inset-top, 0px)) 0 calc(5.5rem + env(safe-area-inset-bottom));
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain; /* 同 today-scroll:掐断触底橡皮筋,不露 html 兜底色 */
 }
@@ -8755,8 +8773,14 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
   align-items: center;
   gap: 0.6rem;
   /* 全屏后顶到状态栏:留状态栏安全区,和记忆页一致。
-     2026-07-28 UI 精修:左右补 0.25rem —— 之前 0,「洞察」两个字贴边了。 */
-  padding: calc(0.6rem + env(safe-area-inset-top, 0px)) 0.25rem 0.9rem;
+     左右走 --page-gutter(2026-07-31)。此前是 0.25rem —— 那是 2026-07-28
+     发现「洞察」两个字贴边之后就地补的一小块,治的是症状:标题不贴了,
+     但下面整个 body 照旧贴着。现在留边由 --page-gutter 统一定义,
+     标题栏和它下面的内容对齐在同一条左边线上。 */
+  padding-top: calc(0.6rem + env(safe-area-inset-top, 0px));
+  padding-bottom: 0.9rem;
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
   flex-shrink: 0;
   border-bottom: 1px solid var(--portal-line);
   margin-bottom: 0.1rem;
@@ -8820,6 +8844,17 @@ html[data-portal-theme="night"] .nesio-connector-name { color: #e8eefa; }
   padding-top: 0.75rem;
   /* 底安全区由内容自己吃 —— 全屏 sheet padding=0,不再靠 Vaul ::after 填色 */
   padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+  /*
+   * 左右留边(2026-07-31 补)。这一条**以前根本不存在** —— 今天页、记忆页各自写了
+   * 1.1rem,而装着财务/衣橱/洞察/日程的这个壳一个字都没写。子面板普遍也不自己加
+   * (查过:analytics / finance / wardrobe / timeline / relationships 根上都没有),
+   * 于是那几屏的内容一路顶到屏幕边,「5 月」这类标签直接被裁掉半个字。
+   *
+   * max(gutter, safe-area) 而不是写死一个数:横屏或刘海机上,那一侧的安全区比
+   * 常规留边宽,写死就等于让内容钻到挖孔底下 —— 这才是「自适应屏幕」的那一半。
+   */
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
 }
 .nesio-insights-body::-webkit-scrollbar { display: none; }
 /* Bug4 图12:宫格首页没有标题栏了 —— 状态栏安全区改由 body 自己吃;
@@ -9978,6 +10013,37 @@ html[data-portal-theme="night"] .nesio-tl-dot--mood {
 /* 录音中:话筒本来就是实心了,所以改用外圈光晕表达「正在说」。 */
 .nesio-tl-capture--rec .nesio-tl-capture-mic {
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--portal-accent) 26%, transparent);
+}
+
+/* 「正在听」——三根跳动的竖条(用户实测 2026-07-31 图5:录音时符号必须变)。
+   动的东西才代表「正在进行」;静态图标换个颜色说不清「现在」这件事。 */
+.nesio-mic-wave {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  height: 15px;
+}
+.nesio-mic-wave i {
+  display: block;
+  width: 2.5px;
+  border-radius: 2px;
+  background: currentColor;
+  height: 5px;
+  animation: nesio-mic-wave 0.9s ease-in-out infinite;
+}
+.nesio-mic-wave i:nth-child(2) { animation-delay: 0.15s; }
+.nesio-mic-wave i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes nesio-mic-wave {
+  0%, 100% { height: 5px; }
+  50% { height: 14px; }
+}
+/* 关掉动效的人也得看得出在不在听 —— 静止时保持高低错落的形状,
+   跟那枚话筒明显不是同一个东西。「减少动效」不等于「不给状态」。 */
+@media (prefers-reduced-motion: reduce) {
+  .nesio-mic-wave i { animation: none; height: 13px; }
+  .nesio-mic-wave i:nth-child(1) { height: 7px; }
+  .nesio-mic-wave i:nth-child(3) { height: 9px; }
 }
 
 /* 批次 136·情绪趋势(柱高=能量 / 柱色=心情 + 念念一句 + 情绪分布 + 周/月/年) */
@@ -11655,12 +11721,21 @@ html[data-portal-theme="night"] .nesio-wechat-mode-btn { color: #b9d0f0; }
   color: var(--portal-muted);
   font-size: 0.85rem;
   cursor: pointer;
-  padding: 0.2rem 0.3rem;
+  /* 触摸区拉到 44px(--tap-min)。0.2rem 的内边距在手机上是个约 20px 的靶子,
+     指腹按下去一半在外面 —— 那正是「按了没反应」最朴素的一种成因。
+     负 margin 抵掉视觉位移:靶子变大,✕ 看起来还在原处。 */
+  min-width: var(--tap-min, 44px);
+  min-height: var(--tap-min, 44px);
+  margin: -0.5rem -0.5rem 0 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   opacity: 0.6;
   border-radius: 6px;
   line-height: 1;
 }
-.nesio-proactive-card-text { padding-right: 1.4rem; }
+/* 让出 ✕ 那一块,标题不被压在按钮底下 */
+.nesio-proactive-card-text { padding-right: 2.2rem; }
 .nesio-proactive-card-dismiss:hover { opacity: 1; background: rgba(0,0,0,.05); }
 
 .nesio-proactive-card-actions {
@@ -13107,21 +13182,6 @@ html[data-portal-theme="night"] .nesio-momentum-item { background: rgba(255,255,
   cursor: pointer;
   min-width: 0;
 }
-/* 2026-08-01:日历项没有独立的勾选圈按钮,圆点+文字合在一个按钮里触发展开(与
-   FocusSection 的 check+task-body 两个按钮不同结构)——这个类负责让圆点和文字
-   横向并排(而不是被 .nesio-collapsed-task-body 的 column 布局挤成竖排),
-   同时作为 flex:1 的行内子项,好让旁边的 ✕ 按钮有地方待。 */
-.nesio-collapsed-cal-body {
-  flex: 1;
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  background: none;
-  border: none;
-  text-align: left;
-  cursor: pointer;
-  min-width: 0;
-}
 /* 时标作 kicker(现在/今晚 20:15/明早…),标题上方,accent 色 */
 .nesio-collapsed-kicker {
   font-size: 0.72rem;
@@ -13190,7 +13250,16 @@ html[data-portal-theme="night"] .nesio-today-root button.nesio-collapsed-check {
   font-size: 0.78rem;
   color: var(--portal-muted);
   margin: 0;
+  /* 长串无空格的文本(网址、路径、订单号)必须能在任意处断行 ——
+     不断的话它会一路顶出屏幕右边(用户实测 图4)。normal 的 word-break
+     只在空格处断,而这类字符串**一个空格都没有**。 */
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  min-width: 0;
 }
+/* 标题同理:一条从外部同步进来的日程,标题里塞一串 ID 是常态。 */
+.nesio-collapsed-title,
+.nesio-collapsed-kicker { overflow-wrap: anywhere; }
 .nesio-collapsed-link,
 .nesio-collapsed-record-btn,
 .nesio-collapsed-focus-btn {
@@ -19017,7 +19086,11 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
   border-radius: 1.1rem 1.1rem 0 0;
   border-top: 1px solid var(--portal-line);
   max-height: 88lvh;
-  padding: 0.5rem 1rem calc(env(safe-area-inset-bottom, 0px) + var(--kb-inset, 0px) + 0.9rem);
+  padding: 0.5rem 0 calc(env(safe-area-inset-bottom, 0px) + var(--kb-inset, 0px) + 0.9rem);
+  /* 左右走 --page-gutter + safe-area(2026-07-31)。这一处覆盖**所有**走原语的弹出件 ——
+     此前是写死的 1rem:留边够,但横屏/刘海机上那一侧安全区比它宽,内容照样钻挖孔底下。 */
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
 }
 .nesio-sheet-grabber {
   width: 2.2rem;
@@ -19065,7 +19138,9 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
   transform: translate(-50%, -50%);
   border-radius: var(--radius-md, 16px);
   border: 1px solid var(--portal-line);
-  padding: 1.1rem 1.15rem calc(env(safe-area-inset-bottom, 0px) + 1.1rem);
+  padding: 1.1rem 0 calc(env(safe-area-inset-bottom, 0px) + 1.1rem);
+  padding-left: max(var(--page-gutter), env(safe-area-inset-left, 0px));
+  padding-right: max(var(--page-gutter), env(safe-area-inset-right, 0px));
   box-shadow: 0 24px 60px rgba(16, 28, 54, 0.22);
 }
 .nesio-sheet--center[data-state='open'] { animation: nesioSheetPop var(--dur, 0.3s) var(--ease-out); }
@@ -21062,9 +21137,11 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 
 .nesio-music-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .nesio-music-list li {
-  display: flex; align-items: center; gap: var(--space-2);
+  display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-2);
   border-bottom: 1px solid var(--portal-line);
 }
+/* 某一首的结果(受限 / 取不到)整条另起一行 —— 挤在曲名右边会把标题压成一个字宽。 */
+.nesio-music-list li > .nesio-music-err { flex: 0 0 100%; margin-bottom: var(--space-2); }
 .nesio-music-list li.is-cur .nesio-music-title { color: var(--portal-accent); }
 .nesio-music-row {
   flex: 1; min-width: 0; min-height: 52px;
@@ -21072,7 +21149,9 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   padding: var(--space-2) 0; border: 0; background: transparent;
   text-align: left; cursor: pointer;
 }
-.nesio-music-row.is-static { cursor: default; }
+/* 正在取播放地址的那一刻,整列暂时点不动。给足视觉线索:半透明 + 等待光标,
+   否则「点了没反应」的感觉照旧 —— 只是这次真的在干活。 */
+.nesio-music-row:disabled { cursor: progress; opacity: .55; }
 .nesio-music-title {
   font-size: var(--text-body); color: var(--portal-ink);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
@@ -21259,6 +21338,70 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 .nesio-cap-action-main { font-weight: var(--weight-medium); }
 /* 「你没说几点,先按早上 9:00」—— 默认值必须自己说出来,不能装成用户定过。 */
 .nesio-cap-action-sub { color: var(--portal-muted); font-size: var(--text-xs); }
+
+/* 首页输入条的两枚动作图标(2026-07-31)。原来是两整行文字,把刚打的那句话
+   又重复了两遍 —— 输入框里写着呢,这里只要「拿它去做什么」。 */
+.nesio-cap-icons { display: flex; gap: var(--space-2); }
+.nesio-cap-icon {
+  width: 40px; height: 40px;
+  display: grid; place-items: center;
+  border: 1px solid var(--portal-line); border-radius: var(--radius-pill);
+  background: transparent; color: var(--portal-muted); cursor: pointer; padding: 0;
+}
+.nesio-cap-icon:active { background: var(--portal-accent-soft); color: var(--portal-accent); }
+
+/* ── 收下了没有:一枚会动的回执(2026-07-31)────────────────────────────────
+   用户实测:「点发送、选照片选文件完了,任何反馈都没有」。原来只有一行灰字,
+   而且只在最后一步才出现 —— 中间那几秒(压缩/写盘/识别)屏幕上一片安静。
+   现在办事时转圈、办好了「✓」弹一下、有话说时是一个安静的点。 */
+.nesio-tl-capture-receipt.is-busy,
+.nesio-tl-capture-receipt.is-done,
+.nesio-tl-capture-receipt.is-note {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  /* 淡入交给 .nesio-tl-capture-receipt 上原有的那条 —— 这里再写一遍会**覆盖**它,
+     而两处的位移方向还相反(那条是 -2px、这条是 +4px)。同名 keyframes 也别重定义。 */
+}
+.nesio-tl-capture-receipt.is-done { background: var(--status-go-soft); color: var(--status-go); }
+.nesio-tl-capture-receipt.is-busy { background: var(--portal-accent-soft); color: var(--portal-accent); }
+.nesio-tl-capture-receipt.is-note { background: var(--status-gentle-soft); color: var(--status-gentle); }
+
+.nesio-receipt-mark {
+  display: grid; place-items: center; width: 16px; height: 16px; flex: none;
+  font-size: var(--text-xs); font-weight: var(--weight-bold); line-height: 1;
+}
+/* 「✓」落下时弹一下 —— 这一下就是「办好了」那个瞬间,没有它人不确定发生过什么。 */
+.is-done .nesio-receipt-mark { animation: nesio-receipt-pop .32s var(--ease-out, ease-out); }
+
+.nesio-receipt-spin {
+  width: 12px; height: 12px; border-radius: 50%;
+  border: 2px solid var(--portal-accent-border);
+  border-top-color: var(--portal-accent);
+  animation: nesio-receipt-turn .7s linear infinite;
+}
+
+@keyframes nesio-receipt-pop {
+  0%   { transform: scale(.4); opacity: 0; }
+  60%  { transform: scale(1.25); opacity: 1; }
+  100% { transform: scale(1); }
+}
+@keyframes nesio-receipt-turn { to { transform: rotate(360deg); } }
+
+/* 动效敏感的人不该被弹一下 —— 状态照给,动作去掉。 */
+@media (prefers-reduced-motion: reduce) {
+  .nesio-tl-capture-receipt { animation: none; }
+  .is-done .nesio-receipt-mark { animation: none; }
+  .nesio-receipt-spin { animation-duration: 2s; }
+}
+
+/* 音源 chip 上的「未配置」小标(2026-07-31 实测:四个源长得一模一样,
+   点进去才发现三个用不了 —— 那是让人一个个去撞墙)。 */
+.nesio-music-src-tag {
+  font-size: var(--text-xs);
+  color: var(--status-gentle);
+  padding: 0 var(--space-1);
+}
 
 /* ── 「这笔钱是哪一笔」认领行(衣橱 / 美味 / 发票共用) ───────────────────── */
 .nesio-claim-row { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }

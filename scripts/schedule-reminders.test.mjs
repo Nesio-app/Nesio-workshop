@@ -43,9 +43,15 @@ const { nextOccurrence, parseWallClock, formatWallClock } =
 {
   const panel = strip(read('components/portal/insights/SchedulePanel.tsx'));
 
-  assert.match(panel, /RemindersSection/,
-    '用户自己设的提醒要有自己的一段 —— 不是塞进那份 Row 列表里' +
-    '(Row 上挂着 LifeNode:硬塞就得造假节点,删除会去删一个不存在的 id)');
+  /* 2026-07-31 前提反转:用户定案「提醒项目混入日程列表,和日历同级别」,
+     提醒**就是**要进那份 Row 列表。
+     原来这条断言担心的是「Row 上挂着 LifeNode,硬塞就得造假节点」——
+     那个坏结果没有发生:node 改成了可选,提醒行有自己的删除路径(removeReminder)
+     和自己的完成动作,点开那条路在没有节点时直接不画。
+     这些新的保护由 test:reminder-unify 逐条盯着;这里只留下面那条更要紧的:
+     **CHORE_RE 不许碰到提醒**。 */
+  assert.match(panel, /for \(const r of reminders\) \{/,
+    '提醒要和日历项同级排进那份 Row 列表(用户定案),不再另起一段');
 
   // CHORE_RE 只准用在日历项那条路上。提醒那一段落进它的射程 = 用户设的「交房租」
   // 被自己的过滤器静默删掉。
@@ -55,14 +61,23 @@ const { nextOccurrence, parseWallClock, formatWallClock } =
     '一旦它碰到用户手写的提醒,「交房租」「倒垃圾」会被静默吃掉 —— ' +
     '而这两个正是用户点名要加进来的例子');
 
-  const section = panel.slice(panel.indexOf('function RemindersSection'));
-  const body = section.slice(0, section.indexOf('\n}\n'));
-  assert.doesNotMatch(body, /CHORE_RE/, '提醒那一段里不许出现 CHORE_RE');
-  assert.match(body, /matchesSearch\(/,
-    '搜索要管到提醒 —— 用户搜「房租」时不会在意这条是提醒还是日历项');
-  // 写入失败要说出来(全仓红线:不许静默吞掉存储失败)
-  assert.match(body, /listReminders\(\)/, '存完要从存储回读,不信返回值');
-  assert.match(body, /role="alert"/, '存不下来必须有看得见的失败态,不能默默回到空表单');
+  // 提醒推成行的那个循环里,一个 CHORE_RE 都不许有 —— 它一旦碰到用户手写的提醒,
+  // 「交房租」「倒垃圾」会被自己的过滤器静默吃掉,而那两个正是用户点名要的例子。
+  const loop = panel.match(/for \(const r of reminders\) \{[\s\S]*?\n {4}\}/);
+  assert.ok(loop, '提醒进列表的那个循环不见了');
+  assert.doesNotMatch(loop[0], /CHORE_RE/, '提醒推进列表的那段里不许出现 CHORE_RE');
+
+  // 搜索要管到提醒 —— 用户搜「房租」时不会在意这条是提醒还是日历项。
+  // 提醒现在是普通 Row,主列表那道 matchesSearch 自然覆盖它;前提是标题/副行/正文
+  // 都填上了,否则搜索面是空的、永远搜不到。
+  assert.match(loop[0], /title: r\.title,/, '提醒行要填标题,否则搜不到');
+  assert.match(loop[0], /body: r\.note \|\| '',/, '提醒的备注也要进搜索面');
+  assert.match(panel, /return matchesSearch\(r, tokens, ftHas\);/,
+    '主列表要照常过搜索 —— 提醒是普通行,它跟着一起被搜到');
+
+  // 「已完成」那一段也要能搜 —— 找一件做过的事,和找一件没做的事一样常见。
+  const done = panel.slice(panel.indexOf('function CompletedReminders'));
+  assert.match(done.slice(0, 2000), /matchesSearch\(/, '已完成那一段也要接搜索');
 }
 
 /* ── ② 墙上时钟:存的是本地钟面,不是 UTC ────────────────────────── */

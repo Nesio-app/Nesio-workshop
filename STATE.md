@@ -5,7 +5,9 @@
 > 最后更新:2026-08-01(五图反馈批:CSV 导入丢数据 bug 修复 + 今天页时间线三处 +
 > 记忆详情页整合;Signal/LifeNode schema 改名批:SignalSource 增删/修误分类 +
 > epistemic·generator 收紧必填;retentionPolicy/自定义 tag/LifeNodeType
-> 改名批因契约冲突或规格丢失明确搁置,见「已知欠账」首条)
+> 改名批因契约冲突或规格丢失明确搁置,见「已知欠账」首条;并发会话合并:与另一
+> 并行会话(claude/home-desktop-robot-setup-wb6rg7,PR #292-294)在 main 上的
+> 26 个提交做了真实内容合并,6 个冲突文件逐行核对,详见「已知欠账」新条目)
 
 ## 当前纪元:两代产品交接中
 
@@ -149,6 +151,36 @@
   tsc + test:security + test:contracts + build,再连同自己的改动一起进 PR。
   已知会冲突的一处:`database/schema/supabase-backend-v1-bundle.sql` 头部的生成时间戳,
   取较新的那份即可。
+- **每一轮改动都要开 PR、然后合进 main**(用户 2026-08-01 定的规矩:「你把所有的都开 PR
+  然后合并吧,以后每次都这样」)。此前的做法是只推分支、等用户自己去合,结果是
+  分支上堆了十几个提交、prod 上一个都看不到 —— 用户在 Vercel 部署列表里发现的。
+  **不是「推完就算完」**:推分支 → 开 PR → 合并,一轮里全做完。
+  合之前必须先把 main 合进分支并把冲突解干净:带着冲突开 PR 等于把活推回给用户。
+  验证四件套照旧:tsc + `test:security` + `test:contracts` + `next build`。
+- **`<input type="file">` 不许 display:none**(2026-08-01,已栽三次)。iOS 的 WKWebView
+  对**不参与布局**的 file input 会忽略程序化 `click()` —— 桌面 Chrome 照开,所以本地
+  怎么测都是好的,装到手机上就是「点了完全没反应、也不报错」,用户看到的就是「没实现」。
+  用 `nesio-visually-hidden`(留 1×1 盒子),更不许 `document.createElement('input')` 后
+  直接 click(那个元素连 DOM 都没进)。守卫:`scripts/file-picker-ios.test.mjs`。
+  同一条契约还钉住:**通用**文件入口不设 accept 白名单(白名单永远漏掉 PDF/docx/xlsx,
+  在 iOS 选择器里直接是灰的);**读不懂 ≠ 收不下**,解析不了正文的文件也要先 putLocalFile
+  + ingestLifeNode 存下来,不许回一句「暂不支持」。
+- **Blob 存 IDB 只能存字节副本,不能存 File 句柄**(2026-08-01,用户「我选的 mp3,
+  也无法播放」)。File 是指向磁盘临时文件的引用,WebKit 往 IndexedDB 里写 File 存的
+  也只是这个引用 —— iOS 回收掉那份临时文件之后读回来就是 0 字节。Chrome 会老实拷一份,
+  所以桌面永远测不出来:导入看着成功、列表里也有,过一会儿点了没声。
+  先 `await file.arrayBuffer()` 再 `put(new Blob([bytes], { type }))`。
+- **喂给 `<audio>`/`<img>` 的 blob URL 必须带 MIME**。Safari **不嗅探内容**,
+  `type` 为空的 blob 就是不出声/不显示(Chrome 自己认得出来)。而 iOS 的「文件」App /
+  iCloud Drive 交出来的 File,`type` 空着是常态 —— 所以要从扩展名兜一个存下来,
+  读回来时如果还是空的再兜一次(老数据)。守卫:`scripts/music-local-ios.test.mjs`。
+- **`test:contracts` 目前跑不到头,而且这件事本身是个洞**:
+  `test:vision-plugin-wiring` 读 `treasurebox-ios/ios/App/App/NesioVisionPlugin.swift`,
+  该文件只存在于**没合进 main** 的 `claude/new-session-r1kcgy` 分支,且被 .gitignore 的
+  `ios/` 规则挡着 —— 在 pristine origin/main 上一样红。因为它排在链条中间,
+  **排在它后面的契约在 main 上从来没跑过**;CI 门是 `test:security` 所以一直没暴露。
+  在它修好之前,验收 `test:contracts` 要逐条跑(把 package.json 里那串 `npm run` 拆开
+  一条条执行并收集退出码),不能只看那一条串行命令的结果。
 
 ## v1 产品规格执行状态(2026-07-10)
 
@@ -274,19 +306,92 @@ sensitivity/retention 枚举化(中期)。
   `travel-trips-contract`/`design-token-ratchet`/`qa:launch`/`release:serial`/
   4 个 `test:e2e*`)经 `git stash` 回退逐个确认与本批无关。
 
+- **并发会话合并(2026-08-01)**:用户要求「把之前的改动都 pr deploy」时发现,
+  生产实际加载的 `treasurebox-nu.vercel.app`(原生壳 Capacitor `server.url` 远程
+  WebView 指向此处,纯 JS 改动推到 `main` 免重签重装)已经落后 —— 另一个并行运行
+  的 Claude Code 会话(`claude/home-desktop-robot-setup-wb6rg7`)当天已把 PR
+  #292-294(26 个提交)合进 `main`,而本会话 24 个提交(Domains 三合一 + 五图反馈批)
+  从未合并。开 PR #295,`git merge origin/main` 在 6 个文件产生真实内容冲突,逐个
+  核对合并(非二选一):
+  ● `TodayFeed.tsx` 的 `recognizeSavedImage`——两边各自独立重写了同一个函数:
+    这边(HEAD)加了"先端上 OCR 识字、单据字段抽全了就不出门"(省钱/离线),
+    那边(main)加了 `canUsePaidCloudAi()` 门 + 每条路径都要有可见失败态(这边此前
+    是裸 `catch {}`,违反 CLAUDE.md"每个异步动作必须有可见失败态")。两边都是对的、
+    都不能丢——合成:端上先行 → 端上答不出才查权益 → 查完权益无论哪个分支都要说话。
+  ● `SchedulePanel.tsx`——那边把手动填表单的"加一条提醒"整个删了(改用首页输入框
+    统一建提醒),换成只读的"已完成提醒"视图(`CompletedReminders`,新功能)。取了
+    那边的结构,但那张旧表单里"存下了就弹系统通知权限"这条逻辑跟着表单一起消失了
+    ——首页输入框那条建提醒的路(`TodayFeed.tsx` 的 `onRemind`)本来就没接这个权限
+    请求,合并后会变成"提醒能设上,但从没人被问过要不要开系统通知,到点不响"。
+    已经补上(`onRemind` 里接 `syncReminderNotifications({ askPermission: true })`,
+    拒绝时给可见的"去设置里开"提示)——**这大概率就是用户报的"设置了提醒,没管用"
+    的根因**,值得下一轮追问确认是否已解决。
+  ● `CalendarCards.tsx`(采用那边更干净的 `CollapsedCalItem` 结构,删掉这边多出的
+    CSS 类)、`package.json`(两边新测试脚本取并集)、`scripts/today-capture-flow.test.mjs`
+    / `scripts/capture-trio.test.mjs`(断言改成同时验两边的判据,而不是二选一)。
+  契约验证:`tsc --noEmit` 0 错(除已知的 `phase1-migration.test.ts`);`test:security`
+  全绿;`today-capture-flow`/`capture-trio`/`schedule-reminders`/`schedule-panel-dedup`/
+  `card-verdict`/`guidance-judge` 定向复核全绿。`design-token-ratchet` 失败
+  (195 vs 基线 193)**确认是合并前 HEAD 自己就有的既存差距**(`LabScanSheet.tsx`
+  裸按钮 13 vs 主干 10,早于本次合并——用 `git worktree` 分别量过 HEAD/main 两边
+  的原始计数确认),非本次合并引入,未在本轮顺手修(超出"合并部署"范围,记账于此)。
+
+- **VoiceInputSheet 的 `intent='ask'` 那一支已不可达,但还没删(2026-07-31)**。
+  用户两次指同一件事(「点击问问符号,进入真的问问界面」),这一轮把**所有**问念念入口
+  (底部中间键 / 首次引导页的「开始」/ 首页输入条的晶体)统一切到 `NesioChatSheet`;
+  Portal 里的 `voiceIntent` / `voiceSeed` 已删,类型上再没人能传 `'ask'` 进去。
+  那张 sheet 从此只做「说一句」。
+  **没顺手删掉 ask 支的理由**:它内部有一套自己的取材(语义 + 云端 RAG 回溯),
+  而对话页当时只有本地字面模糊 —— 直接删等于**悄悄弄丢一档检索质量**,
+  而那种损失没有症状,几周后才会表现成「念念变笨了」。
+  所以先把取材抽成 `lib/portal/ask-retrieval.ts` 两边共用、并让对话页真的用上
+  (`open-world-rag` 契约钉死了这一条),ask 支那 18 处分支 + `askResults` /
+  `askAnswer` / `askAggregations` / `webSearchUsed` / `askError` 这几个 state
+  留待单独一轮清理 —— 那是纯删除,该在没有别的改动混进来的时候做。
+
 - **音乐模块 · 四音源(2026-07-30,本轮新增)**:用户定的范围是「本地歌曲 + 网易 +
   歌曲自由切换 + Spotify + Apple Music」。落地时把「自由切换」拆成它真实的样子 ——
   **四个源不是一个播放器的四个开关,是两种播放模型**:
   ● `in-app`(本地文件 / Apple Music):声音走 **Nesio 自己的音频会话**,车机蓝牙上
     显示 Nesio,MediaSession 接了上一首/下一首;
   ● `remote`(Spotify):Nesio 只是遥控器,声音与车机界面都在 Spotify 那边,要 Premium;
-  ● `metadata-only`(网易):**没有国内出口**,锁的是「拿播放地址」那一步(搜索/歌单不锁),
-    所以它此刻恒不可播。有了国内出口后改 `MUSIC_SOURCES` 里 netease 的 model 一处即可,
-    但必须同时把 streamable 做成**真去取 url**的探测,不许「配了 base 就假定能放」。
+  ● `metadata-only`:**目前没有源属于这一类**。这个模型留着,因为它描述的状态真实存在。
+  ● 网易(2026-07-31 更正):上一版把它判成 `metadata-only`(恒不可播),理由是
+    「没有国内出口就拿不到播放地址」——**那是过度概括**,用户当场指出:「不是所有歌
+    都锁着的,为什么 github 的就可以」。他是对的。真实情况是**逐曲**的:非独家、非 VIP
+    的曲子照样返回可播 URL。所以它现在是普通的 `in-app` 源 + `perTrack: true`:
+    源级别只说「接得上、多数能放」,**哪一首行不行点下去问 `song-url` 才知道**。
+    那条路由把三态**分开**报:`{ok:true,url}` / `{ok:true,url:'',reason:'restricted'}` / 502。
+    界面据此给两个**不同的动作**:受限 → 「换一首」(不给重试键,重试永远不会成功);
+    故障 → 「再试一次」。合成一句「播放失败」的代价就是用户对着一堵墙一直撞。
+    教训归档:**一个源不能因为「有一部分不行」就被整个关掉** —— 那是把判据从
+    「拿到东西才算数」偷换成「有风险就一刀切」,后者的代价是一整个能用的源消失。
+  ● 网易**改直连**(同日,用户:「意味着我电脑要一直开着?」——不用)。原来
+    `NETEASE_API_BASE` 指向一个要常驻的第三方服务(NeteaseCloudMusicApi);
+    Nesio 统共只用它两个接口,为此养一整个服务不划算。协议搬进
+    `lib/platform/music/netease-protocol.ts`(weapi 加密:AES-128-CBC 两层 +
+    RSA no-padding;RSA 用模数/指数自己做模幂,**不走 PEM** —— 凭记忆拼的 PEM
+    被 OpenSSL 当场 `asn1 too long` 拒收,自己算反而少一层会拼错的东西)。
+    `NETEASE_API_BASE` 降级为**可选逃生口**:直连是逆向协议,坏了指一个自建实例还能用。
+    取地址两条路都试(weapi → `song/media/outer/url`),**两条都拿不到才敢说受限**。
+    拿到的地址一律 http→https:混合内容会被浏览器**静默**拦掉,表现是「点了没声音、
+    一行报错都没有」;同理 CSP 的 media-src 补了 `*.126.net`(Plaid 那个坑的同款)。
+    **未实测**:这个开发环境连不上 music.163.com(出网策略 403),所以密文对不对
+    只有真机知道。契约压的是能压的:四态分派、回退真走到、混合内容改写、
+    模幂与 OpenSSL 逐位对照(200 次 + 一个专门找出来的「裸输出不足 256 位」样本)、
+    公钥常量指纹、协议层不许被客户端 import。**压不了的**也写在测试注释里:
+    模数改一位不会红 —— 测试用的 n 就是从生产读的,两边一起改仍自洽。
   跨模型换源**必须先说**(`switchNotice`),否则用户在车里会突然看到车机换了个 App。
   「能不能放」是**正向判据**(`canPlayNow`:configured ∧ authorized ∧ streamable ∧ 非 metadata-only);
+  逐曲源(`perTrack`)在这条判据之上多一层:源过了不代表某一首过得了,那一层在点击时才结算。
   回退链只收真能放的,一个都没有时有专门的空态(`noSourceLine`),并把能放的摆出来一键切。
-  ● **今天真能出声的只有本地歌曲**:不要账号、不要订阅、离线可听。
+  ● **不配任何东西就能出声的只有本地歌曲**:不要账号、不要订阅、离线可听。
+    配了 `NETEASE_API_BASE` 之后网易也能出声(多数曲子);Apple / Spotify 仍缺密钥。
+    本地导入 2026-07-31 翻过判据方向:原来是白名单(accept + 扩展名表),在 iOS 上
+    必然踩空 —— 「文件」App 交出来的 File 常常 `type` 空串、iCloud 同步的甚至没扩展名,
+    实测症状就是用户说的「无法识别任何格式,无法上传」。现在**只挡明显不是的**
+    (图片/视频/文档),能不能解码交给 audio 元素。猜错代价不对称:误收删掉就是了,
+    误拒则是用户根本不知道为什么、也没有别的路可走。
     Apple Music 的接线是完整的(服务端 ES256 签 developer token + MusicKit JS 授权),
     但**没有 `APPLE_MUSIC_*` 密钥就跑不通**,界面照实说「还没配好」。
     Spotify 的 OAuth / 状态 / 权益判定完整(`product === 'premium'` 才算能放),
@@ -298,12 +403,64 @@ sensitivity/retention 枚举化(中期)。
     Spotify 令牌只放 **httpOnly cookie**,不落 localStorage(音乐模块红线:凭证仅本机私有)。
   ● **新路由**(均已写进 docs/api-routes.md):`GET /api/portal/music/apple-token`、
     `GET|DELETE /api/portal/music/spotify`、`GET /api/portal/music/spotify/{connect,callback}`、
-    `GET /api/portal/music/netease/search`。除 OAuth 两条外全走 `guardAiRoute`。
+    `GET /api/portal/music/netease/search`、`GET /api/portal/music/netease/song-url`。
+    除 OAuth 两条外全走 `guardAiRoute`。
   ● **CSP 补了 MusicKit**(`js-cdn.music.apple.com` / `api.music.apple.com` / media-src apple)——
     不补的表现跟当年 Plaid 一模一样:脚本被静默拦掉,按钮点了没反应,页面上没有任何线索。
   ● **收口**:`purgeLocalTracks` 已接进 local-owner 的删除/登出两处 + SettingsSheets 的
     清空/删除账号两处。漏一处就是「用户以为删了、歌还在设备上」。
   ● 契约 `test:music-source-switch`(16 组判断),三轮共 41 条注入回归全部被抓、0 漏网。
+
+- **日程页重排 · 提醒与日历同级(2026-07-31 续)**:用户定案「在日程里的提醒功能也可以
+  删了,首页输入框应该可以完成,问一问也可以」+「提醒项目混入日程列表,和日历同级别」。
+  ● `Row.node` 从必填改成**可选**,新增 `reminder?: Reminder` —— 这是「混进去」的前提。
+    上一版契约禁止这么做,理由是「硬塞就得造假节点、删除会去删一个不存在的 id」;
+    那个坏结果没有发生:提醒行有自己的删除路径(`rem:` 前缀 → removeReminder + 收身影)、
+    自己的完成动作,点开那条路在 node 缺省时**不画按钮**而不是画一个点了没反应的。
+    `test:schedule-reminders` 那条断言随之更新(前提反转写进注释)。
+  ● 提醒行右滑 = **做好了**(不是打星 —— 给提醒打星没有意义),图标换成勾。
+    没有这个入口,「已完成」那一面永远是空的:整条链断在这里。
+  ● 删掉日程页那套新建/管理提醒的 UI(表单 + 待办列表),只留一个只读的
+    `CompletedReminders`。**CHORE_RE 绝不能碰到提醒**那条老保护保留并收紧到
+    「提醒推进列表的那个循环体里一个都不许有」。
+  ● 语音/说一句那侧补上同样的「设成提醒」按钮 —— 用户:「首页输入框和问问设置的提醒
+    是要进记忆的」。ask 侧**不给**这个按钮:那边是问问题,不是安排事情。
+  ● 契约里加了一条最结实的:**凡是 addReminder 的地方都要跟一条 createReminderShadow**
+    (按调用计数比对)。逐个入口点名的写法挡不住「明天有人加了第四个入口忘了建身影」——
+    那时「设好的提醒进时间线」只对一部分提醒成立,而症状是随机的。
+  ● 自查里三条**断言太宽**被注入抓出来:在整份文件里搜 `if (r.doneAt) continue;`
+    (查重那段也有一份)、搜 `IconCheck`(改成 `false ? IconCheck` 照样匹配)、
+    以及一条三元两边写成一样的废断言。全部收紧到「只看那段代码本身」。
+
+- **提醒收成一处 · 例行提醒模块删除(2026-07-31)**:用户定案「输入框可以设置提醒,
+  智能提醒,我可以语言设置时间,频率然后进入记忆。就不需要例行提醒和日程里的提醒项目了」。
+  ● 合并的**前提**是留下的那份先长出被删那份的能力,否则搬过去就是丢功能。
+    `schedule-reminders` 因此补了 **weekdays**(每周一三五 —— 等间隔的 everyDays 表达不了)
+    与 **doneLog**(重复提醒做完是往后滚,在这之前**不留任何痕迹**,所以「这个月到底交没交
+    房租」根本没有数据能回答 —— 用户原话「应该有已完成提醒查询地方」)。
+    日程页加「已完成」切换;`repeatLabel` 统一重复措辞(原来那行只认「每月」和
+    everyDays===7,「每周一三五」显示成空白、看着像只此一次)。
+  ● `when-parse` 认频率:每天 / 每周三 / 每周一三五 / 工作日 / 每月N号 / 每两天。
+    **没说频率就不是重复的** —— 把一次性的事默认成天天响,是最快让人关掉整个功能的做法。
+    首次落点绝不允许一建就过期。
+  ● **提醒进时间线**(用户原话):新增 `lib/portal/reminder-shadow.ts` —— 提醒的真源仍是
+    schedule-reminders,记忆里放一条带 dueDate/dueTime 的**身影**,靠 `reminderId` 认亲。
+    收在一个文件里是因为它有**三个**调用点(首页输入条、日程页加一条、邮件确认),
+    各写一份必然有一处忘了建、或删提醒时忘了收身影。身影**不存**完成状态/下一次时刻 ——
+    存了两处立刻开始漂移。
+  ● 删掉 `lib/portal/routines.ts` / `RoutineSheet` / `RoutineDueCards` 与个人页入口。
+    用户确认那台设备上的例行提醒是测试数据,**不做迁移**。`nesio-routines-v1` 留在
+    CACHE_KEYS(同 daily-brief-v2 的先例):老设备上还躺着这个值,不在册就默认 durable,
+    会开始进备份、上云。
+  ● **连带代价(已如实记下)**:「每日 AI 简报」原本挂在例行提醒上到点出卡,那张卡随模块
+    一起没了;简报功能本身仍在(设置里有独立入口派 `nesio-open-brief`),失去的是
+    「到点提醒你看」。要恢复自动触发得单独给它一个开关。
+  ● 「问」改成**一步到位**:从首页带过去的问题直接开始回答,不停在一个填好了还等着
+    再点一次发送的框上;只在 ask 侧自动跑(「说一句」是往记忆里写,自动提交等于替人
+    按保存键),且一次打开只发一次(不挡会连发两遍、白花一次 AI 的钱)。
+  ● 契约 `test:reminder-unify`(9 组判断),22 条注入回归全部被抓、0 漏网。
+  ● **还没做**:提醒混进日程主列表、与日历项同级(现在仍是「我设的提醒」独立一段)。
+    那需要给 Row 松绑 `node: LifeNode` 这个必填,是一次单独的重排。
 
 - **首页输入条三合一 · 记一笔/找/问(2026-07-31)**:起因是一条**许诺了没做**的路 ——
   用户在首页打「设一个明天下午 3 点医生提醒」,`intent-router` 认出了意图、屏幕上显示了

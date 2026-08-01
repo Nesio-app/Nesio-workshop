@@ -14,7 +14,8 @@ import NesioMark from './NesioMark';
 // 批次 139:统一「打开详情」—— 聊天引用卡与记忆页/今天页共用同一个完整详情组件
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { getLifeGraph, isBulkImported, isPrivateExternalNode, linkNodes, searchLifeGraphFuzzy, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
+import { getLifeGraph, isBulkImported, linkNodes, type LifeNode, updateLifeNode } from '@/lib/portal/life-graph';
+import { retrieveForAsk } from '@/lib/portal/ask-retrieval';
 import { recallByRecognition } from '@/lib/portal/photo-recall';
 import { buildMemoryContext, fmtEventDate, extractCitations } from '@/lib/portal/memory-retrieval';
 import { createCalendarEvent } from '@/lib/portal/calendar-client';
@@ -608,6 +609,7 @@ export default function NesioChatSheet({
   const listRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const filePickerRef = useRef<HTMLInputElement>(null);
+  const imagePickerRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<{ stop(): void } | null>(null);
   // 输入框随字数自增高:重置到 auto 再取 scrollHeight,封顶 ~5 行(120px)后内部滚动。
   useEffect(() => {
@@ -659,19 +661,6 @@ export default function NesioChatSheet({
     }).catch((err) => {
       setMessages((prev) => [...prev, { id: `a-${Date.now()}`, role: 'model', text: describeUploadFailure(err, dict !== 'en') }]);
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
-  // 阅读器划词「问念念」→ 把引用预填进输入框(不自动发送,等用户补问题)
-  useEffect(() => {
-    if (!open) return;
-    let quote = '';
-    try {
-      quote = sessionStorage.getItem('nesio-pending-ask-text') || '';
-      if (quote) sessionStorage.removeItem('nesio-pending-ask-text');
-    } catch { /* ignore */ }
-    if (!quote) return;
-    const snippet = quote.length > 120 ? `${quote.slice(0, 120)}…` : quote;
-    setInput(L(dict, `关于「${snippet}」，`, `About “${snippet}”, `));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
   // Opportunistically refresh device location so 问一问 knows where the user is.
@@ -746,8 +735,14 @@ Edit location/value anytime in Storage.`),
     // 行为完全不变、当前用户无回归。
     // 批次 148:端上模式(用户手动选)或免费层 → 本机记忆搜索,不打云。深问 + 有权益才走云。
     if (!deepMode || !canUsePaidCloudAi()) {
-      // 隐私红线:未登录/未知态不把邮件主题、日程标题(私密外部节点 name)显示到聊天气泡里。
-      const hits = searchLifeGraphFuzzy(text.trim(), 6).filter((n) => canUsePrivateData || !isPrivateExternalNode(n));
+      /*
+       * 2026-07-31:从纯字面模糊换成 retrieveForAsk(语义 + 已登录时的云端回溯 + 模糊 + 近期)。
+       *
+       * 起因是把所有「问念念」入口都切到这一页之后的核对:原来那一屏(语音 sheet 的
+       * ask 形态)取材比这里强一档,光切入口的话用户会换到一个**界面对了、答得更差**
+       * 的地方 —— 而这种损失不会当场发现。隐私红线由 retrieveForAsk 内部逐层过。
+       */
+      const hits = (await retrieveForAsk(text.trim(), { canUsePrivateData, limit: 6 }));
       const body = hits.length
         ? L(dict, `在你的记忆里找到 ${hits.length} 条:\n${hits.map((n) => `• ${n.name}`).join('\n')}`,
             `Found ${hits.length} in your memory:\n${hits.map((n) => `• ${n.name}`).join('\n')}`)
@@ -830,8 +825,10 @@ Edit location/value anytime in Storage.`),
     } catch (err) {
       clearTimeout(timeout);
       const isTimeout = err instanceof Error && err.name === 'AbortError';
-      // 兜底：从本地记忆模糊搜索(隐私红线:未登录/未知态不带出邮件主题、日程标题)
-      const localHits = searchLifeGraphFuzzy(text.trim(), 5).filter((n) => canUsePrivateData || !isPrivateExternalNode(n));
+      // 兜底：云答挂了就给本机能找到的线索。同样走 retrieveForAsk ——
+      // AI 不可用的这一刻恰恰最需要检索给力,这里退回纯字面模糊是把最差的留给最难的时候。
+      // (隐私红线由 retrieveForAsk 内部逐层过。)
+      const localHits = await retrieveForAsk(text.trim(), { canUsePrivateData, limit: 5 }).catch(() => [] as LifeNode[]);
       const fallbackText = localHits.length
         ? L(dict, `AI 暂时不可用，但我在记忆库里找到了这些相关线索：\n${localHits.map((n) => `• ${n.name}`).join('\n')}`, `AI is briefly unavailable, but I found these related clues in your memory:\n${localHits.map((n) => `• ${n.name}`).join('\n')}`)
         : isTimeout ? L(dict, '响应超时，请重试。', 'The response timed out — please try again.') : L(dict, 'AI 暂时不可用，记忆库里也没找到相关线索。', 'AI is briefly unavailable, and nothing related turned up in your memory.');
@@ -841,6 +838,39 @@ Edit location/value anytime in Storage.`),
     setSending(false);
     sendingRef.current = false;
   }, [messages]);
+
+  /**
+   * 带进来的那句话(nesio-ask-text)。**两种来源,两种处理** ——
+   *
+   *   · 阅读器划词:那是一段**引用**,用户还没提问。预填成「关于「…」，」等他补,
+   *     直接发出去只会让念念对着一段原文干瞪眼。
+   *   · 首页输入条点「问念念」(2026-07-31 图3):那**整句就是问题**,用户已经打完了。
+   *     再让他在另一个框里按一次发送,就是他上一轮说的「不想跳转」——
+   *     换个地方重来一遍,不算一步到位。
+   *
+   * 放在 sendMessage 之后:effect 里要调它。挪位置比留在原地绕一层 ref 干净。
+   */
+  useEffect(() => {
+    if (!open) return;
+    let raw = '';
+    try {
+      raw = sessionStorage.getItem('nesio-pending-ask-text') || '';
+      if (raw) sessionStorage.removeItem('nesio-pending-ask-text');
+    } catch { /* ignore */ }
+    if (!raw) return;
+    let text = raw;
+    let autoSend = false;
+    try {
+      const parsed = JSON.parse(raw) as { text?: string; send?: boolean };
+      if (parsed && typeof parsed.text === 'string') { text = parsed.text; autoSend = parsed.send === true; }
+    } catch { /* 老格式是裸字符串,当引用处理 */ }
+    text = text.trim();
+    if (!text) return;
+    if (autoSend) { void sendMessage(text); return; }
+    const snippet = text.length > 120 ? `${text.slice(0, 120)}…` : text;
+    setInput(L(dict, `关于「${snippet}」，`, `About “${snippet}”, `));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   // 批次 68:行程确认卡 → 真正落库(带日期的自动进今日聚焦/引导卡;航班等类型由词典自动识别)
   function savePlanItems(msg: UiMessage) {
@@ -989,12 +1019,18 @@ Edit location/value anytime in Storage.`),
    * 得在两个地方分别修。提出来放这儿,两处共用同一套缩图和同一套失败文案。
    */
   function pickAndRecognizeImage() {
-    const inp = document.createElement('input');
-    inp.type = 'file';
-    inp.accept = 'image/*';
-    inp.onchange = async (e) => {
-      const f = (e.target as HTMLInputElement).files?.[0];
-      if (!f) return;
+    imagePickerRef.current?.click();
+  }
+
+  /**
+   * 选中一张图之后干的事。原来这段挂在一个 `document.createElement('input')` 上 ——
+   * 那个 input **从来没插进 DOM**,而 iOS 的 WKWebView 对不参与布局的 file input
+   * 会忽略程序化 click():桌面 Chrome 照开,装到手机上就是「点『相册』完全没反应,
+   * 也不报错」。仓里为这件事栽过一次(见 today/CaptureBar.tsx 里那条注释),
+   * 这里当时漏掉了。现在改用页面里真实存在的 input(visually-hidden 保留布局盒子)。
+   */
+  async function recognizeImageFile(f: File) {
+    {
       const uid = nextMsgId('u');
       setMessages((prev) => [...prev, { id: uid, role: 'user', text: L(dict, '[图片] 识别图片', '[Image] Recognize image') }]);
       try {
@@ -1052,8 +1088,7 @@ Edit location/value anytime in Storage.`),
       } catch (err) {
         setMessages((prev) => [...prev, { id: nextMsgId('a'), role: 'model', text: describeUploadFailure(err, dict !== 'en') }]);
       }
-    };
-    inp.click();
+    }
   }
 
   async function handleFileUpload(file: File) {
@@ -1110,12 +1145,46 @@ Edit location/value anytime in Storage.`),
       return;
     }
 
+    // PDF / docx / xlsx / zip…:读不出正文,但**不等于收不下**。
+    //
+    // 这条分支原来直接回一句「暂不支持」就结束了 —— 而首页输入条的「+」早就能把
+    // 任意文件原样存进本机(local-file-store)。同一个 app 里两套能力,人在问一问这边
+    // 传个 PDF 得到的是「没实现」。收下和读懂是两件事:先收下,读不懂就说读不懂。
     if (!isText) {
-      const notice: UiMessage = {
-        id: `m-${Date.now()}`, role: 'model',
-        text: L(dict, `暂时只支持文本（CSV/TXT/JSON 等）和图片文件。"${file.name}" 是 .${ext || '未知'} 格式，暂不支持。`, `For now, only text files (CSV/TXT/JSON, etc.) and images are supported. "${file.name}" is .${ext || 'unknown'} — not supported yet.`),
-      };
-      setMessages((prev) => [...prev, notice]);
+      try {
+        const { MAX_FILE_BYTES, prettyBytes, putLocalFile } = await import('@/lib/portal/local-file-store');
+        if (file.size > MAX_FILE_BYTES) {
+          setMessages((prev) => [...prev, { id: `m-${nextMsgId('a')}`, role: 'model',
+            text: L(dict, `「${file.name}」${prettyBytes(file.size)},超过单个文件上限 ${prettyBytes(MAX_FILE_BYTES)},没能存下。`,
+              `“${file.name}” is ${prettyBytes(file.size)}, over the ${prettyBytes(MAX_FILE_BYTES)} per-file limit — not saved.`) }]);
+          return;
+        }
+        const { ingestLifeNode } = await import('@/lib/life-domain/ingest-node');
+        const assetId = `localfile-chat-${nextMsgId('f')}`;
+        const mimeType = file.type || 'application/octet-stream';
+        const ok = await putLocalFile(assetId, file, { name: file.name, mimeType, size: file.size });
+        if (!ok) throw new Error('put_failed');
+        // ⚠️ 走 ingestLifeNode,不是 addLifeNode —— 后者是底层写,业务层直调会绕过主事实表
+        //    (scripts/write-gate-addLifeNode.test.mjs 明文禁止)。
+        ingestLifeNode({
+          name: file.name.replace(/\.[^.]+$/, ''),
+          type: 'note', source: 'manual', tags: ['文件'],
+          attributes: { fileName: file.name, fileSize: String(file.size) },
+          relations: [], confidence: 1,
+          assets: [{ id: assetId, kind: 'file' as const, local: true, mimeType, label: file.name, createdAt: new Date().toISOString() }],
+        });
+        if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+        setMessages((prev) => [...prev, { id: `m-${nextMsgId('a')}`, role: 'model',
+          // 说清楚落在哪、以及我这次**读没读到里面的字** —— 只说「已存入」的话,
+          // 下一句你问「这份合同写了什么」会得到一个凭空的答案。
+          text: L(dict,
+            `已收下 **${file.name}**,存在这台设备上,记忆里能找到它。\n\n.${ext || '这个格式'} 的正文我这次没读出来,所以还没法回答里面的内容 —— 想让我读的话,把文字复制过来,或者存成 txt / md 再传一次。`,
+            `Saved **${file.name}** on this device — you'll find it in your memory.\n\nI couldn't read the text inside a .${ext || 'file like this'} yet, so I can't answer about its contents — paste the text here, or re-upload it as .txt / .md.`) }]);
+      } catch {
+        // 红线:每个 async 动作都要有可见失败态,不许静默回 idle。
+        setMessages((prev) => [...prev, { id: `e-${nextMsgId('a')}`, role: 'model',
+          text: L(dict, `「${file.name}」没能存下来,再试一次。`, `Couldn't save “${file.name}” — please try again.`) }]);
+      }
       return;
     }
 
@@ -1640,7 +1709,10 @@ Edit location/value anytime in Storage.`),
           </button>
           {/* 2026-07-28 标注 图9:「+」面板里的「语音输入」划掉 —— 输入栏右边那个麦克风
               就是同一个功能(setVoiceMode(true)),同一屏摆两个入口是重复不是方便。 */}
-          <button type="button" className="nesio-wechat-plus-item" onClick={() => filePickerRef.current?.click()}>
+          {/* 另外三个都当场收面板,只有这个不收 —— 于是 iOS 上选择器起不来时,
+              面板杵在原地,看起来就是「点了没反应」。收面板和选文件是两回事,
+              前者必须立刻发生。 */}
+          <button type="button" className="nesio-wechat-plus-item" onClick={() => { setShowPlus(false); filePickerRef.current?.click(); }}>
             <span className="nesio-wechat-plus-icon"><IconFile /></span>
             <span>{L(dict, '文件', 'File')}</span>
           </button>
@@ -1651,16 +1723,37 @@ Edit location/value anytime in Storage.`),
         </div>
       )}
 
-      {/* Hidden file picker for document/CSV upload */}
+      {/*
+       * 「+ → 文件」和「+ → 相册」用的两个 picker。
+       *
+       * ⚠️ 两条纪律,都是仓里栽过的:
+       *  ① 不能用 display:none。iOS 的 WKWebView 对**不参与布局**的 file input
+       *    会忽略程序化 click() —— 桌面 Chrome 照开,所以本地测不出来,装到手机上
+       *    就是「点了完全没反应,也不报错」。visually-hidden 保留布局盒子。
+       *  ② 「文件」那个不设 accept。白名单永远会漏掉某个常见类型(这里原来漏掉了
+       *    PDF / docx / xlsx —— 在 iOS 的文件选择器里它们直接是灰的,连选都选不中,
+       *    而这正是「本地上传没实现」的样子)。约束改在体积上,见 local-file-store。
+       *  ③ 先快照成数组再清 value:input.value = '' 会把 FileList 一起清空。
+       */}
       <input
         ref={filePickerRef}
         type="file"
-        accept=".csv,.tsv,.txt,.md,.json,.xml,.yaml,.yml,.log,image/*"
-        style={{ display: 'none' }}
+        className="nesio-visually-hidden"
         onChange={(e) => {
-          const file = e.target.files?.[0];
+          const file = e.currentTarget.files?.[0];
+          e.currentTarget.value = '';
           if (file) void handleFileUpload(file);
-          e.target.value = '';
+        }}
+      />
+      <input
+        ref={imagePickerRef}
+        type="file"
+        accept="image/*"
+        className="nesio-visually-hidden"
+        onChange={(e) => {
+          const file = e.currentTarget.files?.[0];
+          e.currentTarget.value = '';
+          if (file) void recognizeImageFile(file);
         }}
       />
 

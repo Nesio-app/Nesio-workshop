@@ -49,7 +49,6 @@ import { archiveShownCard } from '@/lib/portal/card-archive';
 import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
 import CaptureBar from './today/CaptureBar';
-import { RoutineDueCards } from './today/RoutineDueCards';
 import { ThawedReminder } from './today/ThawedReminder';
 import { ReengageNudgeCard } from './today/ReengageNudgeCard';
 import { TodayFocusSection } from './today/FocusSection';
@@ -65,8 +64,10 @@ import WrappedCard, { useWrappedTrigger } from './WrappedCard';
 import { takeCloudRestoreReceipt, restoreReceiptText } from '@/lib/portal/cloud-restore-receipt';
 // 三合一(2026-07-31):首页那句话认出时间就能直接变成一条真提醒 ——
 // 在这之前它只落成一条普通记录,而屏幕上还写着「设置提醒」。
-import { addReminder, removeReminder } from '@/lib/portal/schedule-reminders';
+import { addReminder, removeReminder, repeatLabel } from '@/lib/portal/schedule-reminders';
 import { formatWhen } from '@/lib/portal/when-parse';
+// 提醒在时间线上的身影。两个建提醒的入口共用同一份 —— 各写一份迟早有一处忘了收。
+import { createReminderShadow, removeReminderShadow } from '@/lib/portal/reminder-shadow';
 
 // ---- Main TodayFeed component ----
 
@@ -110,7 +111,12 @@ export default function TodayFeed({
    * 所以传完什么反馈都没有,用户不知道到底存没存进去(这正是要补的「已存入」提示)。
    * 现在存成功先报一句,识别结果回来了再把它补进同一条回执里。
    */
-  const [quickSaved, setQuickSaved] = useState<string>('');
+  /**
+   * 「收下了没有」这条回执。带**语气**:busy=还在办、done=办好了、note=办好了但有话说。
+   * 用户实测反馈:「点发送、选照片选文件完了,任何反馈都没有」——
+   * 在这之前只有一行灰字,而且只在最后一步才出现。
+   */
+  const [quickSaved, setQuickSaved] = useState<{ tone: 'busy' | 'done' | 'note'; text: string } | null>(null);
 
   /**
    * 「+」上传 → 落成记忆(2026-07-28)。
@@ -149,6 +155,7 @@ export default function TodayFeed({
   const recognizeSavedImage = useCallback(async (files: File[], nodeId: string) => {
     const file = files[0];
     if (!file) return;
+    const only = files.length === 1;
     try {
       const { understandImage, tagsFromText } = await import('@/lib/portal/image-understand');
       const { updateLifeNode: updateNode } = await import('@/lib/portal/life-graph');
@@ -167,10 +174,11 @@ export default function TodayFeed({
       }
 
       // 是单据、金额也真抽到了 → 这张图不用出门。名字用商家,金额日期入 attributes。
+      // 多张时只有第一张的商家名靠谱,别的照片跟着改名是错的(见下方云路径同款 only 判断)。
       if (!seen.needsCloud && seen.fields) {
         const f = seen.fields;
         updateNode(nodeId, {
-          name: (f.merchant || '').trim() || L(uiLocale, '小票', 'Receipt'),
+          ...(only ? { name: (f.merchant || '').trim() || L(uiLocale, '小票', 'Receipt') } : {}),
           attributes: {
             price: f.amount,
             ...(f.date ? { receiptDate: f.date } : {}),
@@ -179,36 +187,63 @@ export default function TodayFeed({
           },
         });
         window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-        setQuickSaved(L(uiLocale, `已存入 · 在这台设备上读出了金额 ${f.amount}`, `Saved · read ${f.amount} on this device`));
-        setTimeout(() => setQuickSaved(''), 4000);
+        setQuickSaved({ tone: 'done', text: L(uiLocale, `已存入 · 在这台设备上读出了金额 ${f.amount}`, `Saved · read ${f.amount} on this device`) });
+        setTimeout(() => setQuickSaved(null), 4000);
         return;
       }
 
+      // 端上没能确定性地读出单据字段 → 剩下的只能靠云看图猜「这是什么」,
+      // 而云识图是付费能力(免费机直接静默 return 会让人以为识别根本没跑过)。
+      const { canUsePaidCloudAi } = await import('@/lib/portal/entitlement');
+      if (!canUsePaidCloudAi()) {
+        setQuickSaved({ tone: 'note', text: L(uiLocale, '已存入 · 智能识别是 Pro 的能力', 'Saved · smart recognition is a Pro feature') });
+        setTimeout(() => setQuickSaved(null), 4000);
+        return;
+      }
+      setQuickSaved({ tone: 'busy', text: L(uiLocale, '正在认这张图…', 'Looking at that photo…') });
       const { fileToUploadPayload } = await import('@/lib/portal/image-payload');
       const { base64, mimeType } = await fileToUploadPayload(file);
       const res = await fetch('/api/portal/analyze', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ type: 'image', imageBase64: base64, mimeType, uiLocale }),
       });
-      if (!res.ok) return;
+      const miss = () => {
+        setQuickSaved({ tone: 'note', text: L(uiLocale, '已存入 · 这次没认出来', 'Saved · could not recognize it this time') });
+        setTimeout(() => setQuickSaved(null), 4000);
+      };
+      if (!res.ok) { miss(); return; }
       const data = await res.json() as { ok?: boolean; nodes?: Array<{ name?: string; tags?: string[] }> };
       const first = data.nodes?.[0];
-      if (!data.ok || !first?.name) return;
+      if (!data.ok || !first?.name) { miss(); return; }
       // 云给的标签**和**端上认出的字合并 —— 云答的是「这是什么」,端上答的是「上面写着什么」,
       // 两边不是一回事。只留云的会把图上印的店名单号又弄丢。
+      // 只认了**第一张**,所以只有单张时才敢改名 —— 多张时把「3 张照片」改成第一张的
+      // 内容是明确的错:另外两张跟这个名字没关系。标签照打(它是补充,不是替换)。
       updateNode(nodeId, {
-        name: first.name,
+        ...(only ? { name: first.name } : {}),
         tags: Array.from(new Set(['照片', ...(first.tags || []), ...tagsFromText(seen.text, 3)])).slice(0, 6),
       });
       window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-      setQuickSaved(L(uiLocale, `已存入 · 认出是「${first.name}」`, `Saved · recognized "${first.name}"`));
-      setTimeout(() => setQuickSaved(''), 4000);
-    } catch { /* 认不出来不打扰 —— 东西已经存好了,这只是锦上添花 */ }
+      setQuickSaved({
+        tone: 'done',
+        text: only
+          ? L(uiLocale, `已存入 · 认出是「${first.name}」`, `Saved · recognized "${first.name}"`)
+          : L(uiLocale, `已存入 · 第一张认出是「${first.name}」`, `Saved · first photo recognized as "${first.name}"`),
+      });
+      setTimeout(() => setQuickSaved(null), 4000);
+    } catch {
+      // 认不出来东西也已经存好了 —— 但**说一声**,别让人以为识别悄悄成功了。
+      setQuickSaved({ tone: 'note', text: L(uiLocale, '已存入 · 识别没连上', 'Saved · recognition unavailable') });
+      setTimeout(() => setQuickSaved(null), 4000);
+    }
   }, [uiLocale]);
 
   const captureFiles = useCallback(async (files: File[]) => {
     const list = files.slice(0, 30);
     if (!list.length) return;
+    // 收东西这一路可能要好几秒(压缩 + 写 IDB + 识别)。**全程给个状态** ——
+    // 在这之前只有「+」那颗小按钮转一下,人盯着屏幕以为什么都没发生。
+    setQuickSaved({ tone: 'busy', text: L(uiLocale, `正在收下 ${list.length} 项…`, `Saving ${list.length} item${list.length > 1 ? 's' : ''}…`) });
     // ⚠️ 走 ingestLifeNode,不是 addLifeNode —— 后者是底层写,业务层直调会绕过主事实表
     //    (scripts/write-gate-addLifeNode.test.mjs 明文禁止)。我第一版就是直调 addLifeNode,
     //    表现是「文件存进 IDB 了,记忆一条没有」,右上角计数纹丝不动。
@@ -274,14 +309,16 @@ export default function TodayFeed({
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
     const saved = list.length - failed.length;
     if (saved > 0) {
-      setQuickSaved(L(uiLocale, `已存入 ${saved} 项`, `Saved ${saved} item${saved > 1 ? 's' : ''}`));
-      setTimeout(() => setQuickSaved(''), 4000);
+      setQuickSaved({ tone: 'done', text: L(uiLocale, `已存入 ${saved} 项`, `Saved ${saved} item${saved > 1 ? 's' : ''}`) });
+      setTimeout(() => setQuickSaved(null), 4000);
+    } else {
+      setQuickSaved(null);   // 一件都没存进去:让下面那条失败态说话,别留一个「正在收…」卡在那
     }
     // 存不下的必须说,哪怕同一批里别的存进去了 —— 不能因为「大部分成功」就把失败的吞掉。
     if (failed.length) {
       throw new Error(`${failed.slice(0, 3).join('、')} 没存进去(单个上限 ${prettyBytes(MAX_FILE_BYTES)})。`);
     }
-  }, []);
+  }, [uiLocale, recognizeSavedImage]);
   // 批次 33:话筒 = 原地录音转文字直接入记忆(不跳说一句 sheet)。
   // bug3 p42:原来「识别起不来」这几条分支会回落去开「说一句」sheet —— 而 iOS PWA 上
   // SpeechRecognition 本来就不存在,于是点话筒**每次**都是弹出那张 sheet,正是标注要去掉的。
@@ -663,15 +700,23 @@ export default function TodayFeed({
             setPendingMentions([]);
             setQuickAdd('');
             setDraftNote(null);
-            setQuickSaved(
-              settled.length === 0
+            /*
+             * 合并 main(2026-08-01):main 加了「关联了 N 条」的回执,而我这边把
+             * quickSaved 从字符串升级成了 { tone, text } —— 两边都要:
+             * 功能取 main 的(没连上的要说出来),形状取这边的(tone 决定回执的样子)。
+             * 只取一边的后果:要么丢掉「有几条没连上」这个提示(用户会以为都连上了),
+             * 要么把字符串塞进一个吃对象的 state(类型当场炸)。
+             */
+            setQuickSaved({
+              tone: settled.length === 0 || linked === settled.length ? 'done' : 'note',
+              text: settled.length === 0
                 ? L(uiLocale, '已记下', 'Noted')
                 : linked === settled.length
                   ? L(uiLocale, `已记下 · 关联了 ${linked} 条`, `Noted · linked ${linked}`)
                   // 一条都没连上/只连上一部分要说出来 —— 静默的话你会以为连上了
                   : L(uiLocale, `已记下,但有 ${settled.length - linked} 条没能关联上`, `Noted, but ${settled.length - linked} link(s) failed`),
-            );
-            setTimeout(() => setQuickSaved(''), 2000);
+            });
+            setTimeout(() => setQuickSaved(null), 2600);
           }}
           onMic={startQuickMic}
           recording={micState === 'recording'}
@@ -685,39 +730,77 @@ export default function TodayFeed({
             window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: q } }));
           }}
           onAsk={(q) => {
-            // 专用事件名:nesio-open-voice 被 test:today-settings-bug3 禁止出现在这个文件里
-            // (用户标注过「点话筒不该跳说一说」)。那条保护是对的,不为省事去放宽它。
-            window.dispatchEvent(new CustomEvent('nesio-open-ask', { detail: { text: q } }));
+            /*
+             * 2026-07-31(用户实测 图3:「点击问念念,应该直接进入问一问而不是搜索对话」)。
+             *
+             * 原来派的是 nesio-open-ask → 那开的是**语音 sheet 的 ask 形态**:
+             * 一次性问答,回一段摘要 + 一列「来源线索」。那是检索,不是对话 ——
+             * 你没法接着追问一句,回来还得重新问一遍。用户管它叫「搜索对话」,准确。
+             *
+             * 真正的问一问是 NesioChatSheet(多轮、有历史)。它已经有一条现成的入口:
+             * nesio-ask-text(阅读器划词「问念念」走的就是这条),所以复用它,不新造事件。
+             */
+            window.dispatchEvent(new CustomEvent('nesio-ask-text', { detail: { text: q, send: true } }));
           }}
-          onRemind={(at, title) => {
-            const r = addReminder({ title, at, kind: 'other' });
+          onRemind={(at, title, repeat) => {
+            const r = addReminder({ title, at, kind: 'other', ...(repeat || {}) });
             if (!r) {
               // 红线:失败要有可见失败态。存不下就说,别让人以为设上了。
-              setQuickSaved(L(uiLocale, '这条没能设上,再试一次', 'Could not set that — try again'));
-              setTimeout(() => setQuickSaved(''), 3000);
+              setQuickSaved({ tone: 'note', text: L(uiLocale, '这条没能设上,再试一次', 'Could not set that — try again') });
+              setTimeout(() => setQuickSaved(null), 3000);
               return;
             }
             setQuickAdd('');
             setDraftNote(null);
-            // 撤销留在回执里:自动认出来的时间总有认错的时候,而「已经建好了、
-            // 你自己去日程页找出来删」不是一个能接受的收场。
+            // 用户原话「设好的提醒进入时间线」:提醒的真源在 schedule-reminders,
+            // 这里同时在记忆里留一条**身影**。撤销时两条一起收 ——
+            // 只删一边会留下一条指向不存在提醒的记忆。
+            createReminderShadow(r);
+            const rep = repeatLabel(r, uiLocale);
             setRemindReceipt({
               // 点明落在哪 —— 「我设的提醒」只在日程页里露面,不说的话用户设完就再也找不到它,
               // 回执一消失这条提醒对他来说就等于不存在了。
               text: L(uiLocale,
-                `已设在 ${formatWhen(at)} · 「${r.title}」· 在日程里`,
-                `Set for ${formatWhen(at)} · “${r.title}” · in Schedule`),
-              onUndo: () => { removeReminder(r.id); setRemindReceipt(null); },
+                `已设在 ${formatWhen(at)}${rep ? ` · ${rep}` : ''} · 「${r.title}」· 日程和时间线里都有`,
+                `Set for ${formatWhen(at)}${rep ? ` · ${rep}` : ''} · “${r.title}” · in Schedule and your timeline`),
+              onUndo: () => { removeReminder(r.id); removeReminderShadow(r.id); setRemindReceipt(null); },
             });
             setTimeout(() => setRemindReceipt((cur) => (cur && cur.text.includes(formatWhen(at)) ? null : cur)), 8000);
+
+            // 存下了才谈得上「到点提醒你」—— 这是**唯一**该弹系统通知权限的时机:
+            // 用户刚亲手设了一条有时间的提醒,弹窗和他正在做的事对得上。
+            // 2026-08-01 合并核对:这条原来长在日程页那张手动填表单的 submit() 里;
+            // 建提醒的路统一收到这条首页输入框之后,那张表单被合并删掉了,弹权限的
+            // 时机也跟着消失 —— 提醒能设上,却从没人被问过要不要开系统通知,
+            // 到点自然不响(用户反馈「设置了提醒,没管用」的根因之一)。
+            void import('@/lib/portal/reminder-notifications')
+              .then((m) => m.syncReminderNotifications({ askPermission: true }))
+              .then((res) => {
+                if (!res.ok && res.reason === 'denied') {
+                  setQuickSaved({
+                    tone: 'note',
+                    text: L(uiLocale, '记下了。系统通知没开,到点不会响 —— 想让它响,去「设置 › 通知」里打开。',
+                      'Saved. Notifications are off, so it won\'t ring — turn them on in Settings › Notifications.'),
+                  });
+                  setTimeout(() => setQuickSaved(null), 6000);
+                }
+              })
+              .catch(() => {});
           }}
           remindReceipt={remindReceipt}
         />
         {/* 存进去了要说一声。这条回执之前**只被 set、从来没渲染** ——
             于是「+」传完文件、记一笔按了「记下」,界面上什么反应都没有。
             识别结果回来了会把同一条改写成「已存入 · 认出是「…」」。 */}
+        {/* 一枚会动的回执:办事的时候转圈,办好了「✓」弹一下。
+            只给一行灰字的话,人盯着屏幕不知道到底成没成。 */}
         {quickSaved && (
-          <p className="nesio-tl-capture-receipt" role="status">{quickSaved}</p>
+          <p className={`nesio-tl-capture-receipt is-${quickSaved.tone}`} role="status">
+            <span className="nesio-receipt-mark" aria-hidden>
+              {quickSaved.tone === 'busy' ? <span className="nesio-receipt-spin" /> : quickSaved.tone === 'done' ? '✓' : '·'}
+            </span>
+            {quickSaved.text}
+          </p>
         )}
 
         {/* 今日焦点 — 重要安排 / 重要日子 / 重要提醒 */}
@@ -740,7 +823,6 @@ export default function TodayFeed({
             记一笔输入内联进时间线「记一笔·话筒」节点(唯一极简输入入口)。 */}
 
         {/* 实验打卡(批次 8:按用户要求放到最下面) */}
-        {!quietAll && <RoutineDueCards />}
         {!quietAll && <ExperimentCheckinCard />}
 
         {/* 批次 169:用户实锤去掉底部「想到什么…」提示行 */}

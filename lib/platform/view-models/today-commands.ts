@@ -222,8 +222,14 @@ export function pinNodeToTodayFocus(nodeId: string): boolean {
   return true;
 }
 
-export function addCommitmentNode(name: string): FocusNode {
-  const node = ingestLifeNode({ name, type: 'commitment', source: 'manual', confidence: 1, tags: [], attributes: {}, relations: [] });
+/**
+ * @param attrs 额外属性。2026-07-31 加:首页设的提醒也要在**时间线**上留一条
+ *   (用户原话「设好的提醒进入时间线」)—— 带上 dueDate/dueTime 它才排得进去,
+ *   带上 reminderId 才能在撤销时把这条影子一起收走。
+ *   提醒本身的真源仍是 schedule-reminders,这里只是它在记忆里的一条身影。
+ */
+export function addCommitmentNode(name: string, attrs: Record<string, string> = {}): FocusNode {
+  const node = ingestLifeNode({ name, type: 'commitment', source: 'manual', confidence: 1, tags: [], attributes: attrs, relations: [] });
   // 操作类动作不冒充 useful(2026-07-27);真正的卡反馈仍走 emitFeedback。
   // 不再补发 broadcast:ingestLifeNode → saveAll 已派发 nesio-life-graph-updated,
   // 这里再发一次 = 整条 Today 重算管线跑两遍(QA 速记提交冻结的一半成本)。

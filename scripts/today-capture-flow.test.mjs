@@ -50,7 +50,13 @@ const code = stripComments;
 // ── ② 存进去要有看得见的回执 ────────────────────────────────────────────────
 {
   const feed = code(read('components/portal/TodayFeed.tsx'));
-  assert.ok(/const \[quickSaved, setQuickSaved\] = useState<string>/.test(feed), '回执 state 不见了');
+  // 2026-07-31:回执从一个字符串升级成带**语气**的对象(busy / done / note)——
+  // 用户实测「点发送、选照片选文件完了,任何反馈都没有」:原来只有一行灰字,
+  // 而且只在最后一步才出现。判断没变(回执必须存在且被渲染),形状变了。
+  assert.ok(
+    /const \[quickSaved, setQuickSaved\] = useState<\{ tone: 'busy' \| 'done' \| 'note'; text: string \} \| null>/.test(feed),
+    '回执 state 不见了',
+  );
   // 关键:它必须**被渲染**。之前正是「set 了但没渲染」——
   // 传完文件界面毫无反应,而代码里看着像是有提示的。
   assert.ok(
@@ -64,18 +70,21 @@ const code = stripComments;
   const at = feed.indexOf('const recognizeSavedImage');
   assert.ok(at > 0, '「+」传图不再顺手识别了');
   const fn = feed.slice(at, feed.indexOf('\n  }, [uiLocale]);', at));
-  // 2026-07-31:这一条原来是 `canUsePaidCloudAi()` —— 「后台识别没查权益,免费账号会白跑一趟云」。
-  // 判据换了,**要防的事没换**:别为一张图白发一趟出去。
+  // 2026-08-01 合并(两边独立改了同一个函数):先端上认字(免费/离线/省钱),
+  // 端上认不出单据字段才谈得上云,而云是付费能力 —— 两条判据都要防,不是二选一。
   //
-  // 换的原因是那道权益门在 workshop 把识别整个关掉了(这个仓不分收费免费),
-  // 用户看到的就是「加号加的图一张都不认」。而且就算在产品仓,拿**钱**当分流依据也是错的:
-  // 小票上写的就是那些字,端上认一遍就有,付了钱也不该发出去。
-  //
-  // 新判据:先端上认字,端上给得出答案就**直接 return**,不往下走云那段。
+  // 端上先行的原因:小票上写的就是那些字,端上认一遍就有,不该为一张图白发一趟云。
   assert.ok(/understandImage\(/.test(fn), '「+」传图不再先在端上认字 —— 每张图都会白发一趟云');
   assert.ok(
     /needsCloud[\s\S]*?return;/.test(fn),
     '端上认出来了却还是往下走云 —— 那趟往返白花钱、白等,还把票据发出了门',
+  );
+  assert.ok(/canUsePaidCloudAi\(\)/.test(fn), '后台识别没查权益 —— 免费账号会白跑一趟云');
+  // 但**查了之后不许静默走开**:用户实测「照片直接存成附件,没有识别过程」,
+  // 根因就是免费档那条 `return` 一个字都不说 —— 他无从知道识别压根没发生。
+  assert.ok(
+    /智能识别是 Pro/.test(fn),
+    '权益不够时要把这件事说出来,不能静默 return(那正是「没有识别过程」的根因)',
   );
   assert.ok(/fileToUploadPayload/.test(fn), '识别前没缩图 —— 原图会 413');
   assert.ok(
@@ -140,4 +149,46 @@ const code = stripComments;
   );
 }
 
-console.log('today-capture-flow: OK(直达相机 · 回执看得见 · 删掉的没长回来 · 趋势层级够 · 设置已整合)');
+// ── ⑨ 日历条目的正文:整条就是一个链接时别占一行 ─────────────────────────
+//
+// 用户实测(2026-07-31 图4):「第二个显示的一串网址内容没有意义」。
+// 从待办类应用同步来的日历项,description 常常整条就是一个回原应用的深链
+// (https://dida365.com/webapp#p/inbox/tasks/68f…):读不出信息、还把行撑破,
+// 而同一块里旁边就有一颗「链接」按钮 —— 那才是它该有的样子。
+{
+  const ts = await import('typescript');
+  const vm = await import('node:vm');
+  const js = ts.default.transpileModule(read('components/portal/today/CalendarCards.tsx'), {
+    compilerOptions: { module: ts.default.ModuleKind.CommonJS, target: ts.default.ScriptTarget.ES2022, jsx: ts.default.JsxEmit.React },
+  }).outputText;
+  const mod = { exports: {} };
+  vm.default.runInNewContext(js, {
+    module: mod, exports: mod.exports, require: () => new Proxy({}, { get: () => () => null }),
+    console, Object, Array, String, Number, Math, JSON, Set, Map, Boolean, RegExp,
+  });
+  const { meaningfulDesc } = mod.exports;
+
+  assert.equal(meaningfulDesc('https://dida365.com/webapp#p/inbox/tasks/68f0a1'), '', '整条就是一个深链 → 不显示');
+  assert.equal(meaningfulDesc('  https://example.com/x?y=1  '), '', '前后空白不影响判断');
+  assert.equal(meaningfulDesc(''), '', '空的就是空的');
+  assert.equal(meaningfulDesc(undefined), '', 'undefined 不许抛');
+  // **判据是「去掉链接后还剩不剩人话」,不是「以 http 开头就砍」**——
+  // 砍错的代价是把用户真写的字弄丢,那比多显示一行网址严重得多。
+  assert.equal(
+    meaningfulDesc('地址 https://maps.example.com/abc 记得带表'),
+    '地址 https://maps.example.com/abc 记得带表',
+    '链接**旁边**有内容的必须原样留下 —— 这是用户自己写的字',
+  );
+  // 链接**在开头**、后面才是正文 —— 日历描述里极常见(会议链接 + 一句说明)。
+  // 这一条专门用来区分两种判据:偷懒写成 /^https?:/ 就会把「记得带表」一起砍掉,
+  // 而上面那条(链接在中间)是抓不住这个错的。
+  assert.equal(
+    meaningfulDesc('https://maps.example.com/abc 记得带表'),
+    'https://maps.example.com/abc 记得带表',
+    '判据是「去掉链接后还剩不剩人话」,不是「以 http 开头就砍」—— 砍错就把用户写的字弄丢了',
+  );
+  assert.equal(meaningfulDesc('带上泳衣'), '带上泳衣', '压根没链接的当然留');
+  assert.equal(meaningfulDesc('https://a.com https://b.com'), '', '整条全是链接,几条都一样没意义');
+}
+
+console.log('today-capture-flow: OK(直达相机 · 回执看得见 · 删掉的没长回来 · 趋势层级够 · 设置已整合 · 裸链接不占行)');

@@ -19,9 +19,11 @@
  */
 import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
 import MentionPicker from '../MentionPicker';
-import { formatWhen, parseWhen } from '@/lib/portal/when-parse';
+import { formatWhen, parseWhen, type RepeatGuess } from '@/lib/portal/when-parse';
+import { repeatLabel } from '@/lib/portal/schedule-reminders';
 import { activeMentionQuery, applyMention, mentionCandidatesFromGraph, type MentionCandidate, type PendingMention } from '@/lib/portal/mention';
-import { IconMic, IconPlus } from '../icons';
+import { IconMic, IconPlus, IconSearch } from '../icons';
+import { nesioBrandAssets } from '@/lib/portal/nesio-design-system-assets.mjs';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -68,7 +70,7 @@ export interface CaptureBarProps {
   onSearch?: (q: string) => void;
   onAsk?: (q: string) => void;
   /** 认出时间时的「设成提醒」。没认出来这一条不出现 —— 认不出就不提议。 */
-  onRemind?: (at: string, title: string) => void;
+  onRemind?: (at: string, title: string, repeat?: RepeatGuess) => void;
   /** 刚设成提醒之后的那条回执(带撤销)。由上层给,这里只负责显示。 */
   remindReceipt?: { text: string; onUndo: () => void } | null;
 }
@@ -97,6 +99,9 @@ export default function CaptureBar(capture: CaptureBarProps) {
   const when = useMemo(() => (typed.length >= 2 ? parseWhen(typed) : null), [typed]);
   // 两个字以下不打扰:打第一个字就弹出三行动作,比没有更烦。
   const showActions = typed.length >= 2 && !!(capture.onSearch || capture.onAsk || capture.onRemind);
+  // 「每天 / 每周三」这类频率也要摆在按钮上 —— 用户看不见系统读成了什么,
+  // 就只能等到明天发现它天天响才知道。
+  const whenRepeat = when?.repeat ? repeatLabel(when.repeat, dict) : '';
 
   // ── @提及:打字的时候顺手连一条已有的记忆 ──────────────────────────────────
   // 为什么值得做:Notion/Roam 的图之所以密,是因为**边写边连**。我们原来要进详情页
@@ -232,11 +237,28 @@ export default function CaptureBar(capture: CaptureBarProps) {
           ) : capture.micAvailable !== false ? (
             <button
               type="button"
-              className="nesio-tl-capture-mic"
-              aria-label={capture.recording ? L(dict, '说完了,点击保存', 'Done — tap to save') : L(dict, '说一句', 'Say something')}
+              className={`nesio-tl-capture-mic${capture.recording ? ' is-listening' : ''}`}
+              aria-label={capture.recording ? L(dict, '正在听,点一下停下来', 'Listening — tap to stop') : L(dict, '说一句', 'Say something')}
+              aria-pressed={capture.recording}
               onClick={capture.onMic}
             >
-              <IconMic size={15} />
+              {/*
+               * 录音中换符号(2026-07-31,用户实测 图5:「开始录音的话,符号应该改变」)。
+               *
+               * 原来不管在不在听都是同一枚话筒 —— 屏幕上唯一的线索是顶部系统那颗
+               * 橙点(还得你正好看见)。于是「它到底在不在听」只能靠猜,
+               * 而猜错的代价是对着手机说完一整句,发现一个字都没进去。
+               *
+               * 听的时候给三根跳动的竖条(和一个「停」的语义):动的东西才代表在进行中,
+               * 静态图标换个颜色说不清「现在」这件事。
+               */}
+              {capture.recording ? (
+                <span className="nesio-mic-wave" aria-hidden>
+                  <i /><i /><i />
+                </span>
+              ) : (
+                <IconMic size={15} />
+              )}
             </button>
           ) : null}
         </div>
@@ -265,10 +287,12 @@ export default function CaptureBar(capture: CaptureBarProps) {
             <button
               type="button"
               className="nesio-cap-action is-when"
-              onClick={() => capture.onRemind?.(when.at, when.title)}
+              onClick={() => capture.onRemind?.(when.at, when.title, when.repeat)}
             >
               <span className="nesio-cap-action-main">
-                {L(dict, `设成提醒 · ${formatWhen(when.at)}`, `Set a reminder · ${formatWhen(when.at)}`)}
+                {L(dict,
+                  `设成提醒 · ${formatWhen(when.at)}${whenRepeat ? ` · ${whenRepeat}` : ''}`,
+                  `Set a reminder · ${formatWhen(when.at)}${whenRepeat ? ` · ${whenRepeat}` : ''}`)}
               </span>
               {/* 时间是默认填的就**说出来**。只说了「明天」却装作用户定过九点,
                   是这一整条路上最容易骗到人的地方。 */}
@@ -279,15 +303,34 @@ export default function CaptureBar(capture: CaptureBarProps) {
               )}
             </button>
           )}
-          {capture.onSearch && (
-            <button type="button" className="nesio-cap-action" onClick={() => capture.onSearch?.(typed)}>
-              {L(dict, `在我的记忆里找「${typed.slice(0, 18)}」`, `Search my memory for “${typed.slice(0, 18)}”`)}
-            </button>
-          )}
-          {capture.onAsk && (
-            <button type="button" className="nesio-cap-action" onClick={() => capture.onAsk?.(typed)}>
-              {L(dict, `问念念「${typed.slice(0, 18)}」`, `Ask Nessa “${typed.slice(0, 18)}”`)}
-            </button>
+          {/* 两枚图标就够 —— 原来是两整行,把你刚打的那句话**又重复了两遍**
+              (输入框一遍、两行各一遍)。要找什么、要问什么,输入框里写着呢。
+              文字留在 aria-label 上,读屏用户不受影响。 */}
+          {(capture.onSearch || capture.onAsk) && (
+            <div className="nesio-cap-icons">
+              {capture.onSearch && (
+                <button
+                  type="button"
+                  className="nesio-cap-icon"
+                  aria-label={L(dict, `在我的记忆里找「${typed.slice(0, 18)}」`, `Search my memory for “${typed.slice(0, 18)}”`)}
+                  title={L(dict, '在我的记忆里找', 'Search my memory')}
+                  onClick={() => capture.onSearch?.(typed)}
+                ><IconSearch size={18} /></button>
+              )}
+              {capture.onAsk && (
+                <button
+                  type="button"
+                  className="nesio-cap-icon"
+                  aria-label={L(dict, `问念念「${typed.slice(0, 18)}」`, `Ask Nessa “${typed.slice(0, 18)}”`)}
+                  title={L(dict, '问念念', 'Ask Nessa')}
+                  onClick={() => capture.onAsk?.(typed)}
+                >
+                  {/* 「问念念」用**品牌那颗晶体**,不自己画一个星星 ——
+                      首页左上角、PWA 图标用的都是它,同一个东西就该长同一个样。 */}
+                  <img src={nesioBrandAssets.crystal} alt="" width={18} height={18} aria-hidden />
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
