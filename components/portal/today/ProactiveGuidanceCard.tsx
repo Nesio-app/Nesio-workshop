@@ -5,7 +5,7 @@
  * 含 TODAY-002 证据展开与 TODAY-004 反馈行。从 TodayFeed 拆出。
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { recordCardFeedback } from '@/lib/portal/reasoning-engine';
 import { recordSignalFeedback } from '@/lib/life-domain/signal-feedback';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
@@ -53,6 +53,12 @@ export function ProactiveGuidanceCard({
   const [gestureAck, setGestureAck] = useState<'useful' | 'later' | null>(null);
   const startRef = useRef<{ x: number; y: number } | null>(null);
   const lastTapRef = useRef(0);
+  // 单击开卡要等一小段时间再动手,确认这不是双击的第一下——否则单击已经把卡
+  // 导航走了,endSwipe 那边靠 lastTapRef 做的双击判定永远等不到第二下落地
+  // (2026-08-01 用户实测:双击=有用的手势已经失效,只剩单击开卡在生效,根因
+  // 就是这里跟 endSwipe 抢跑)。
+  const openTapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (openTapTimerRef.current) clearTimeout(openTapTimerRef.current); }, []);
 
   // 批次 166:抽成坐标级逻辑,Pointer + Touch 双绑 —— iOS PWA 的 Pointer Events 对水平
   // 手势不稳(用户实锤「向右滑动还是失败」),补 Touch 事件兜底。
@@ -80,6 +86,8 @@ export function ProactiveGuidanceCard({
       const now = Date.now();
       if (now - lastTapRef.current < 320) {
         lastTapRef.current = 0;
+        // 这是双击的第二下——撤掉第一下(单击)排的开卡定时器,别在判完「有用」之后又把卡打开。
+        if (openTapTimerRef.current) { clearTimeout(openTapTimerRef.current); openTapTimerRef.current = null; }
         setGestureAck('useful');
         handleFeedback('useful');
         return;
@@ -191,7 +199,18 @@ export function ProactiveGuidanceCard({
         </span>
       )}
       <div className="nesio-proactive-card-inner">
-        <div className="nesio-proactive-card-text" onClick={() => { if (Math.abs(dx) < 6) onOpen?.(); }} style={onOpen ? { cursor: 'pointer' } : undefined}>
+        <div
+          className="nesio-proactive-card-text"
+          onClick={() => {
+            if (Math.abs(dx) >= 6 || !onOpen) return;
+            // 单击开卡先缓一下(320ms,同 endSwipe 判双击的窗口)——如果这一下其实是
+            // 双击的第一下,下面的 pointerup 会在窗口内识别出第二下并撤掉这个定时器,
+            // 不然单击已经把卡导航走了,双击永远等不到第二下(见上面 openTapTimerRef 的注释)。
+            if (openTapTimerRef.current) clearTimeout(openTapTimerRef.current);
+            openTapTimerRef.current = setTimeout(() => { openTapTimerRef.current = null; onOpen(); }, 320);
+          }}
+          style={onOpen ? { cursor: 'pointer' } : undefined}
+        >
           <p className="nesio-proactive-card-title">{card.title}</p>
           {isQuote ? <QuoteBody body={card.body} /> : <p className="nesio-proactive-card-body">{card.body}</p>}
           {/* bug3 p46/47:「依据 ▸ N 条」展开块整块删掉(来源行在 bug2 已删)——
