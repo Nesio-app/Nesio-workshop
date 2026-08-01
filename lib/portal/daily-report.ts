@@ -124,7 +124,11 @@ export interface DailyReportInput {
 }
 
 /**
- * 段落 id。加新段时同步 components/portal/today/DailyReportCard.tsx 的 SECTION_ICON。
+ * 段落 id。加新段时同步 components/portal/DailyReportSheet.tsx 的 SECTION_ICON。
+ *
+ * 后三个(completed/tally/threads)是 2026-08-01 加的,给周报/月报用
+ * (见 lib/portal/periodic-report.ts)—— 复用同一个 Sheet 组件渲染,
+ * 不为「本质上也是一份报告」的东西另起一套壳。
  */
 export type DailyReportSectionId =
   | 'action'    // 要你动:到点的提醒 / flag 级判定 / 到货
@@ -133,7 +137,10 @@ export type DailyReportSectionId =
   | 'domain'    // 新进展(有昨天可比时是差分)/ 这几面(第一天时是快照)
   | 'ahead'     // 往前看:未来两周确定会发生的事(默认折叠)
   | 'email'     // 邮件:只给一行汇总 + 出口,不复述内容
-  | 'memory';   // 念念还记得
+  | 'memory'    // 念念还记得
+  | 'completed' // 回顾:这一期做完的(提醒/家务)
+  | 'tally'     // 回顾:各域被提到几次(非叙事,纯计数)
+  | 'threads';  // 计划:还没接上的线头
 
 export interface DailyReportSection {
   id: DailyReportSectionId;

@@ -5629,7 +5629,10 @@ html[data-portal-theme="night"] .nesio-type-chip {
   display: flex;
   align-items: center;
   gap: 0.4rem;
-  align-self: flex-start;
+  /* 2026-08-01:去掉 align-self:flex-start(原来只占内容宽)——有自定义标签时
+     type 角标要能贴到卡片右边,这一行得撑满卡宽,type-corner 靠 margin-left:auto 推右。
+     没标签时行为不变(左对齐图标+名,右边没有东西可推)。 */
+  width: 100%;
   max-width: 100%;
 }
 .nesio-memory-card-cat-label {
@@ -5639,6 +5642,9 @@ html[data-portal-theme="night"] .nesio-type-chip {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  /* 2026-08-01:与 type-corner 同行时得能让出空间给它,不然角标被挤出卡外。 */
+  min-width: 0;
+  flex-shrink: 1;
 }
 .nesio-memory-card-lead {
   width: 1.7rem;
@@ -5662,6 +5668,20 @@ html[data-portal-theme="night"] .nesio-type-chip {
   white-space: nowrap;
 }
 .nesio-memory-card-source svg { opacity: 0.85; }
+
+/* type 角标(2026-08-01,只在有自定义标签领头时出现)——推到 nesio-memory-card-cat 这一行右边。 */
+.nesio-memory-card-type-corner {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--portal-muted);
+  opacity: 0.62;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
 .nesio-memory-card-pending {
   font-size: 0.64rem;
   font-weight: 700;
@@ -8448,6 +8468,17 @@ html[data-portal-theme="night"] .nesio-node-attr-val { color: #e8eefa; }
   margin: 0 -0.1rem;
   background: var(--type-strip-bg, var(--chip-fog));
 }
+/* type 角标(2026-08-01,图一红圈位置;只在自定义标签领头时出现)——推到这一行最右边。 */
+.nesio-type-header-source {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  opacity: 0.7;
+  white-space: nowrap;
+}
 /* 夜间:pastel 调暗成同色系轻染,不再是一条白带(浅字 #c7d4f5 在其上可读)。 */
 html[data-portal-theme="night"] .nesio-type-header-strip {
   background: color-mix(in srgb, var(--type-strip-bg, var(--chip-fog)) 20%, transparent);
@@ -9317,6 +9348,19 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
   font-weight: var(--weight-regular);
 }
 
+/* 端上读出来的结果:一句「图没出过门」。用 status-go 而不是灰字 ——
+   这是个**好消息**(隐私没被牺牲),不是一条免责声明。 */
+.nesio-camera-local-note {
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--status-go);
+  background: var(--status-go-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0 0 var(--space-2);
+  font-weight: var(--weight-regular);
+}
+
 /* 识别动作行:自己一行,横向可滚(四个 chip 在窄屏上不再换行挤压说明文字) */
 .nesio-camera-result-actions {
   display: flex;
@@ -9610,36 +9654,57 @@ html[data-portal-theme="night"] .nesio-mirror-title { color: #e8eefa; }
   touch-action: none;
   cursor: crosshair;
 }
+/* 圈选页顶部提示。
+   2026-07-31:原来是 `top: 1.5rem` —— 不避刘海,在有灵动岛/状态栏的机器上
+   直接压到时间和信号格底下。而且 `white-space: nowrap` 让这句中文在窄屏
+   横着捅出屏幕两边。两条都是「贴边」,一起修:上边距吃 safe-area,
+   宽度封顶后允许换行。 */
 .nesio-select-hint {
   position: absolute;
-  top: 1.5rem;
+  top: calc(var(--space-6) + env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
+  max-width: min(88vw, 30rem);
   background: rgba(0,0,0,0.55);
   backdrop-filter: blur(6px);
   color: #fff;
-  font-size: 0.82rem;
-  font-weight: 600;
-  padding: 0.45rem 1.1rem;
-  border-radius: 999px;
-  white-space: nowrap;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  line-height: 1.5;
+  text-align: center;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
   pointer-events: none;
 }
+/* 底部三颗按钮。
+   2026-07-31:原来靠 `left:50% + translateX(-50%)` 居中 —— 那种居中**没有边界**:
+   三颗按钮加起来比屏幕宽的时候,它只会均匀地朝两边溢出,于是最左最右两颗贴着屏幕边
+   (真机上正好压在圆角和手势条附近,既难点又难看)。
+   改成左右各占满再 padding 收边:这样 padding 才真正管得住,横向 safe-area 也能吃进去。 */
 .nesio-select-overlay-actions {
   position: absolute;
-  bottom: calc(2rem + env(safe-area-inset-bottom));
-  left: 50%;
-  transform: translateX(-50%);
+  bottom: calc(var(--space-6) + env(safe-area-inset-bottom));
+  left: 0;
+  right: 0;
+  transform: none;
   display: flex;
-  gap: 0.75rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding-left: calc(var(--space-4) + env(safe-area-inset-left));
+  padding-right: calc(var(--space-4) + env(safe-area-inset-right));
 }
 .nesio-select-action-btn {
   background: rgba(255,255,255,0.15);
   backdrop-filter: blur(6px);
   color: #fff;
-  font-size: 0.9rem;
-  font-weight: 600;
-  padding: 0.6rem 1.5rem;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  /* 左右内边距从 1.5rem 收到 --space-4(1rem):三颗按钮原来加起来就撑不下窄屏,
+     这是它们朝两边溢出的另一半原因。min-height 走 --tap-min,收窄的是宽不是可点面积。 */
+  padding: var(--space-3) var(--space-4);
+  min-height: var(--tap-min, 44px);
+  white-space: nowrap;
   border-radius: 999px;
   border: 1.5px solid rgba(255,255,255,0.25);
   cursor: pointer;
@@ -10659,6 +10724,40 @@ html[data-portal-theme="night"] .nesio-connector-token-box {
 }
 .nesio-today-points:active { transform: scale(0.96); }
 .nesio-today-points:focus-visible { outline: 2px solid var(--portal-accent); outline-offset: 2px; }
+
+/* 天气符号(顶栏,2026-08-01) —— 跟积分徽章同一套 pill 语言,信息展示不是按钮 */
+.nesio-today-weather {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  height: 1.9rem;
+  font-family: inherit;
+  font-size: 0.78rem;
+  line-height: 1;
+  font-weight: var(--weight-medium, 500);
+  font-variant-numeric: tabular-nums;
+  color: var(--portal-muted);
+  background: var(--portal-bg);
+  border: 1px solid var(--portal-line);
+  border-radius: 999px;
+  padding: 0 0.55rem;
+}
+html[data-portal-theme="night"] .nesio-today-weather {
+  background: var(--portal-blue-light, #2c4a78);
+  color: #dce8fa;
+  border: 1px solid var(--portal-line);
+}
+
+/* 极端天气预警条 —— 真实安全风险,CLAUDE.md 允许用 status-risk(不是制造焦虑) */
+.nesio-today-weather-alert {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--status-risk);
+  background: var(--status-risk-soft);
+  border-radius: var(--radius-sm);
+}
 
 
 html[data-portal-theme="night"] .nesio-today-avatar {
@@ -18660,6 +18759,20 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
   cursor: pointer;
   text-align: left;
 }
+/* 2026-08-01:「相关记忆」标题行内的关联触发器 —— 不再单独占一整行 */
+.nesio-node-link-add-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: none;
+  background: none;
+  padding: 0.15rem 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--portal-blue-deep);
+  cursor: pointer;
+  flex: none;
+}
 .nesio-node-link-picker { display: flex; flex-direction: column; gap: 0.35rem; }
 .nesio-node-link-cand {
   display: flex; align-items: center; gap: 0.4rem;
@@ -21428,4 +21541,45 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   color: var(--portal-ink);
   font-size: var(--text-xs);
   line-height: 1.6;
+}
+
+/* 财务·挂发票后端上读出来的那句(2026-07-31)。
+   对得上走 status-go,对不上走 status-gentle 而不是 status-risk ——
+   金额差多半是含税前后,不是出事了。红色留给真风险。 */
+.nesio-fin-scannote {
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--status-go);
+  background: var(--status-go-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: var(--space-2) 0 0;
+}
+.nesio-fin-scannote.is-off {
+  color: var(--status-gentle);
+  background: var(--status-gentle-soft);
+}
+
+/* 记忆详情·加完照片后「上面的字也记下了」那一句。
+   它不是错误 —— 用 muted 不用 risk,别让人以为出了事。 */
+.nesio-nd-scan-hint {
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--portal-muted);
+  margin: var(--space-2) 0 0;
+}
+
+/* 资产·附单据后端上读出来的那句 + 「日期改成…」出口。 */
+.nesio-assets-scanhint {
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  color: var(--status-go);
+  background: var(--status-go-soft);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
 }

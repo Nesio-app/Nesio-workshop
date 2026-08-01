@@ -23,6 +23,7 @@ import {
 import { isTxShadow } from '@/lib/portal/tx-node';
 import { rankRelatedNodes } from '@/lib/portal/related-nodes';
 import { visibleMemoryNodes, isWeatherNode } from '@/lib/portal/memory-visibility';
+import { useMemoryCount } from './use-memory-count';
 import { pinNodeToTodayFocus } from '@/lib/platform/view-models/today-commands';
 import { DOMAINS } from '@/lib/life-domain';
 import { isFeatureEnabled } from '@/lib/portal/module-overrides';
@@ -404,6 +405,20 @@ function getNodeTypeMeta(node: LifeNode, dict: DictLocale = 'zh') {
 
 /** 来源徽章 · 6 种(批次 122·设计「来源徽章·6 种·左下角固定」):图标 + 名。
  *  设计里手记(自己记的)也标「手记」,不再隐藏。位置类记忆标「位置」。 */
+/** sourceMeta 的分组键版本(同一套判据,给筛选行去重计数用,不重复维护两份分支)。 */
+function sourceKeyOf(node: LifeNode): string {
+  const tags = node.tags || [];
+  if (tags.includes('notion')) return 'notion';
+  if (tags.includes('keep')) return 'keep';
+  if (tags.includes('flomo')) return 'flomo';
+  if (tags.includes('微信读书') || tags.includes('wechat') || tags.includes('微信')) return 'wechat';
+  if (node.type === 'place') return 'place';
+  return node.source;
+}
+
+/** 用户点名的 8 个自定义可见标签(2026-08-01)——记忆页第三排筛选,命中才出现该 chip。 */
+const CUSTOM_TAGS = ['财务', '物品', '衣橱', '美食', '健康', '人物', '心情', '阅读'];
+
 function sourceMeta(node: LifeNode, dict: DictLocale): { label: string; icon: ReactNode } {
   const tags = node.tags || [];
   const sz = 11;
@@ -602,12 +617,15 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
   }
 
   const { extra, badge, badgeColor } = getNodeTypeMeta(node, dict);
-  const isPerson = node.type === 'person';
-  const { initials, bg: avatarBg } = isPerson ? getPersonInitials(node.name) : { initials: '', bg: '' };
   const srcMeta = sourceMeta(node, dict);
   const catLabel = categoryLabelForCard(node, dict);
   const isMood = node.type === 'health_state' && (node.tags || []).some((t) => t === 'feeling' || t === 'moment');
+  const isPerson = node.type === 'person';
+  const { initials, bg: avatarBg } = isPerson ? getPersonInitials(node.name) : { initials: '', bg: '' };
   const uncertain = isNodeUncertain(node);
+  // 2026-08-01 用户点名:自定义标签比 type 更重要——命中就领头,type 退到这一行右上角小徽章;
+  // 没有自定义标签的卡(目前是多数)维持原样,type 照旧领头,不额外画一个多余的角标。
+  const customTag = (node.tags || []).find((t) => CUSTOM_TAGS.includes(t));
 
   return (
     <button
@@ -638,24 +656,33 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
       onContextMenu={(e) => { e.preventDefault(); shareNode(); }}
       aria-label={`${node.name}${L(dict, ',左滑删除,长按分享', ' — swipe left to delete, long-press to share')}`}
     >
-      {/* 批次 121→122·设计统一卡片模板:分类图标(辅助色)+ 分类名领头 —— 标明「这是什么」,
-          分类为主。人物用头像。每卡恰好 1 个 type 图标(批次 13 双图标已废)。 */}
+      {/* 2026-08-01 用户点名:自定义标签比 type 重要——标签领头(左上),type 退到这一行
+          右上角小徽章;没标签的卡维持原样(分类图标+分类名领头,人物用头像)。 */}
       <span className="nesio-memory-card-cat">
-        {isPerson ? (
+        {customTag ? (
+          <span className="nesio-memory-card-lead nesio-memory-card-icon" style={{ background: 'var(--portal-accent-soft)' }}>
+            <IconBookmark size={14} />
+          </span>
+        ) : isPerson ? (
           <span className="nesio-memory-card-lead nesio-memory-card-avatar" style={{ background: avatarBg }}>{initials}</span>
         ) : (
           <span className="nesio-memory-card-lead nesio-memory-card-icon" style={{ background: TYPE_BG[node.type] || 'var(--portal-accent-soft)' }}>
-            {/* CARD SPEC:情绪有独立图标(波形),不再借健康的心跳图标 */}
             {isMood ? <IconActivity size={14} /> : <NodeTypeIcon type={node.type} size={14} />}
           </span>
         )}
-        <span className="nesio-memory-card-cat-label">{catLabel}</span>
+        <span className="nesio-memory-card-cat-label">{customTag || catLabel}</span>
+        {customTag && (
+          <span className="nesio-memory-card-type-corner">
+            {isMood ? <IconActivity size={11} /> : <NodeTypeIcon type={node.type} size={11} />}
+            {catLabel}
+          </span>
+        )}
       </span>
       <span className="nesio-memory-card-title" title={node.name}>{smartCardTitle(displayNodeName(node.name, dict))}</span>
       {extra && <span className="nesio-memory-card-extra">{extra}</span>}
       {badge && <span className="nesio-memory-card-status-badge" style={{ background: badgeColor }}>{badge}</span>}
       {!extra && !badge && <span className="nesio-memory-card-sub">{cleanMemoryPreview(node, dict)}</span>}
-      {/* 来源徽章(图标 + 名,6 种,左下固定)· 待确认 · 时间(来源为辅) */}
+      {/* 来源徽章(图标 + 名,回到左下,恢复原位)· 待确认 · 时间 */}
       <span className="nesio-memory-card-meta-row">
         <span className="nesio-memory-card-source">{srcMeta.icon}{srcMeta.label}</span>
         {uncertain && <span className="nesio-memory-card-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
@@ -992,6 +1019,9 @@ function buildMemGraphEdges(nodes: LifeNode[]): GEdge[] {
 export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
+  // 2026-08-01 用户点名:类型筛选行下面再加 2 排——来源、自定义标签,三档筛选可叠加。
+  const [sourceFilter, setSourceFilter] = useState<string | null>(null);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
   const [showTx, setShowTx] = useState(false); // 交易默认收起(见 visibleNodes 那段注释)
   const [showObjectMap, setShowObjectMap] = useState(false);
   const [showRelationGraph, setShowRelationGraph] = useState(false);
@@ -1188,6 +1218,15 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     return n.type === filter;
   };
 
+  // 三档筛选可叠加(类型 + 来源 + 自定义标签),互不排斥。
+  const matchesAllFilters = (n: LifeNode): boolean => {
+    if (typeFilter && !matchesFilter(n, typeFilter)) return false;
+    if (sourceFilter && sourceKeyOf(n) !== sourceFilter) return false;
+    if (tagFilter && !(n.tags || []).includes(tagFilter)) return false;
+    return true;
+  };
+  const hasActiveFilter = Boolean(typeFilter || sourceFilter || tagFilter);
+
   // 交易:照常进图、照常可搜、照常能被关联,但**默认列表里收进一个可展开的分组**。
   // 理由:交易是靠搜索和 dashboard 用的(用户 2026-07-30 定的),逐条铺开会把手记、
   // 照片、心情这些真的会翻的东西挤没。搜索和按类型筛选时**不折叠** ——
@@ -1197,13 +1236,13 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   // Filtered nodes for browse mode
   const visibleNodes = useMemo(() => {
     let result = nodes;
-    if (typeFilter) result = result.filter((n) => matchesFilter(n, typeFilter));
+    if (hasActiveFilter) result = result.filter(matchesAllFilters);
     else if (!showTx) result = result.filter((n) => !isTxShadow(n));
     return result;
-  }, [nodes, typeFilter, showTx]);
+  }, [nodes, typeFilter, sourceFilter, tagFilter, showTx]);
 
   const results = query.trim()
-    ? visibleMemoryNodes(smartNodes, canUsePrivateData).filter((n) => !typeFilter || matchesFilter(n, typeFilter))
+    ? visibleMemoryNodes(smartNodes, canUsePrivateData).filter((n) => !hasActiveFilter || matchesAllFilters(n))
     : visibleNodes;
 
   // 永远有渲染上限(QA 冻结修):搜索/「显示全部」曾一次挂 2000+ 张卡冻死主线程。
@@ -1219,6 +1258,27 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     'facet:plan': nodes.filter((n) => n.attributes?.planContainer || n.attributes?.planImported).length,
     'facet:list': nodes.filter((n) => n.attributes?.checklist).length,
   }), [nodes]);
+
+  // 第二排:来源筛选(sourceKeyOf 分组,复用 sourceMeta 拿图标/文案,不重复维护判据)。
+  const sourceGroups = useMemo(() => {
+    const map = new Map<string, { icon: ReactNode; label: string; count: number }>();
+    for (const n of nodes) {
+      const key = sourceKeyOf(n);
+      const existing = map.get(key);
+      if (existing) existing.count += 1;
+      else { const meta = sourceMeta(n, dict); map.set(key, { icon: meta.icon, label: meta.label, count: 1 }); }
+    }
+    return map;
+  }, [nodes, dict]);
+
+  // 第三排:自定义标签筛选(用户点名的 8 个;没命中的不出现该 chip)。
+  const tagCounts = useMemo(() => {
+    const acc: Record<string, number> = {};
+    for (const n of nodes) for (const t of (n.tags || [])) {
+      if (CUSTOM_TAGS.includes(t)) acc[t] = (acc[t] ?? 0) + 1;
+    }
+    return acc;
+  }, [nodes]);
 
 
   const onThisDayNodes = useMemo(() => findOnThisDayNodes(nodes), [nodes]);
@@ -1242,6 +1302,9 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
 
   const isSearching = Boolean(query.trim());
   const hasNodes = nodes.length > 0;
+  // 给人看的条数走唯一口径(见 use-memory-count)。列表仍然用本地 nodes 渲染 ——
+  // 那是同一批数据,只是这里额外拿到「落定了没有」。
+  const memoryCount = useMemoryCount(canUsePrivateData);
 
   return (
     <>
@@ -1362,13 +1425,26 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     <span className="nesio-section-title">
                       {L(dict, '全部记忆', 'All memories')}
                       {/* 筛选中显示「命中 / 总数」——不再一直挂 2328(QA:筛到健康 7 条,头部还写全部) */}
-                      <span className="nesio-section-title-sub"> · {typeFilter
-                        ? L(dict, `${visibleNodes.length} / ${nodes.length} 条`, `${visibleNodes.length} / ${nodes.length}`)
-                        : L(dict, `${nodes.length} 条 · 可搜`, `${nodes.length} · search`)}</span>
+                      {/*
+                        * 事实库水合完之前**不摆这个数**。
+                        *
+                        * 水合前读到的是投影,水合后是「IDB 事实 ∪ 投影」—— 可能更多。
+                        * 也就是说开机头几秒里这个数字注定会变一次。
+                        * 先给一个待会儿会变的数,比先不给更伤信任:用户会以为自己看错了,
+                        * 或者以为 App 弄丢了东西(「不同渠道看到的记录数不一样」就是这么来的)。
+                        *
+                        * 计数走 useMemoryCount —— 和这里的列表同一个谓词(visibleMemoryNodes),
+                        * 也和设置页体检卡同一个口径。
+                        */}
+                      <span className="nesio-section-title-sub"> · {!memoryCount.settled
+                        ? L(dict, '正在读取…', 'Loading…')
+                        : hasActiveFilter
+                          ? L(dict, `${visibleNodes.length} / ${memoryCount.count} 条`, `${visibleNodes.length} / ${memoryCount.count}`)
+                          : L(dict, `${memoryCount.count} 条 · 可搜`, `${memoryCount.count} · search`)}</span>
                     </span>
                     <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                      {typeFilter && (
-                        <button type="button" className="nesio-section-action" onClick={() => setTypeFilter(null)}>
+                      {hasActiveFilter && (
+                        <button type="button" className="nesio-section-action" onClick={() => { setTypeFilter(null); setSourceFilter(null); setTagFilter(null); }}>
                           {L(dict, '清除筛选', 'Clear filter')}
                         </button>
                       )}
@@ -1410,6 +1486,55 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                       </button>
                     )}
                   </div>
+
+                  {/* 2026-08-01 用户点名:第二排——按来源筛选(哪个连接器/怎么记的)。 */}
+                  {sourceGroups.size > 0 && (
+                    <div className="nesio-memory-type-filter" role="group" aria-label={L(dict, '按来源筛选', 'Filter by source')}>
+                      <button
+                        type="button"
+                        className={`nesio-type-chip${!sourceFilter ? ' is-active' : ''}`}
+                        onClick={() => setSourceFilter(null)}
+                      >
+                        {L(dict, '全部来源', 'All sources')}
+                      </button>
+                      {Array.from(sourceGroups.entries()).map(([key, g]) => (
+                        <button
+                          key={key}
+                          type="button"
+                          className={`nesio-type-chip${sourceFilter === key ? ' is-active' : ''}`}
+                          onClick={() => setSourceFilter((prev) => (prev === key ? null : key))}
+                        >
+                          {g.icon} {g.label}
+                          <span className="nesio-type-chip-count">{g.count}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* 2026-08-01 用户点名:第三排——自定义标签(财务/物品/衣橱/美食/健康/人物/心情/阅读)。
+                      命中才出现该 chip,不铺一排全是 0 的死标签。 */}
+                  {CUSTOM_TAGS.some((t) => tagCounts[t]) && (
+                    <div className="nesio-memory-type-filter" role="group" aria-label={L(dict, '按自定义标签筛选', 'Filter by custom tag')}>
+                      <button
+                        type="button"
+                        className={`nesio-type-chip${!tagFilter ? ' is-active' : ''}`}
+                        onClick={() => setTagFilter(null)}
+                      >
+                        {L(dict, '全部标签', 'All tags')}
+                      </button>
+                      {CUSTOM_TAGS.filter((t) => tagCounts[t]).map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          className={`nesio-type-chip${tagFilter === t ? ' is-active' : ''}`}
+                          onClick={() => setTagFilter((prev) => (prev === t ? null : t))}
+                        >
+                          {t}
+                          <span className="nesio-type-chip-count">{tagCounts[t]}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
 
                   {/* 批次 183/186(用户实锤):地图、关联图视图均删除 —— 记忆页只保留列表。 */}
                 </>
@@ -1480,7 +1605,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
           {/* 交易分组:默认收起。它们照常在图里、照常可搜可关联 ——
               只是不在默认列表里逐条铺开(用户 2026-07-30 定的)。
               搜索时不显示这一条:那时候列表里本来就该有交易。 */}
-          {!showObjectMap && !isSearching && !typeFilter && txCount > 0 && (
+          {!showObjectMap && !isSearching && !hasActiveFilter && txCount > 0 && (
             <button
               type="button"
               className="nesio-fin-flowopt"

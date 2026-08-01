@@ -23,25 +23,31 @@ import {
   IconNote, IconCloudSun, IconCalendar, IconMail, IconBook, IconCheckSquare, IconTrendingUp, IconClock,
 } from './icons';
 
-// 段落图标。Record<DailyReportSectionId, …> 是穷举类型 —— 日报加新段时这里漏一个
-// tsc 直接红,不会静默渲染成空图标。
+// 段落图标。Record<DailyReportSectionId, …> 是穷举类型 —— 日报/周报/月报加新段时
+// 这里漏一个 tsc 直接红,不会静默渲染成空图标。
 const SECTION_ICON: Record<DailyReport['sections'][number]['id'], React.ComponentType<{ size?: number }>> = {
   action: IconCheckSquare,     // 先处理这几件
-  calendar: IconCalendar,      // 今日日程
+  calendar: IconCalendar,      // 今日日程 / 计划里的日程
   today: IconCloudSun,         // 今天(天气/穿/吃/练)
   domain: IconTrendingUp,      // 新进展 / 这几面
   ahead: IconClock,            // 往前看(未来两周)
   email: IconMail,
   memory: IconBook,
+  completed: IconCheckSquare,  // 回顾:这一期做完的
+  tally: IconTrendingUp,       // 回顾:各域被提到几次
+  threads: IconBook,           // 计划:还没接上的线头
 };
 
 export default function DailyReportSheet({
   report, elevated = false, onClose,
+  // 日报「早上 8:00 定稿 · 这一天不再变」——周报/月报口径不同,由调用方传自己的说法。
+  footNote,
 }: {
   report: DailyReport;
   /** 从洞察(fullscreen,z-930)里打开时必须抬层,否则会被整个盖住。 */
   elevated?: boolean;
   onClose: () => void;
+  footNote?: string;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
 
@@ -84,7 +90,7 @@ export default function DailyReportSheet({
           );
         })}
         <p className="nesio-drsheet-foot">
-          {L(dict, '早上 8:00 定稿 · 这一天不再变', 'Fixed at 8:00 · unchanged for the rest of the day')}
+          {footNote ?? L(dict, '早上 8:00 定稿 · 这一天不再变', 'Fixed at 8:00 · unchanged for the rest of the day')}
         </p>
       </div>
     </NesioSheet>

@@ -42,6 +42,9 @@ export default function WechatReadingImportSheet({ open, onClose }: { open: bool
           ...(n.author ? { author: n.author } : {}),
           ...(n.chapter ? { chapter: n.chapter } : {}),
           ...(n.thought ? { thought: n.thought } : {}),
+          // source:'manual' 落 Signal 层会被压成泛泛的 Entry —— 微信读书划线有专属
+          // SignalSource('wechat_reading'),标出来才认得出是读书笔记不是随手记。
+          signalSource: 'wechat_reading',
         },
         relations: [],
       });

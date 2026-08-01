@@ -21,7 +21,7 @@ import { loadLastLocation, refreshLocation } from '@/lib/portal/location-store';
 import { captureLocationEnabled, getFreshCaptureFix, prefetchCaptureLocation } from '@/lib/portal/capture-location';
 import { lifeNodeToSignal } from './signal';
 import { signalWriteMode, writeCloudSignal } from './create-signal';
-import { isSignalEpistemic, stampEpistemic } from './signal-epistemic';
+import { isSignalEpistemic, stampEpistemic, type SignalEpistemic } from './signal-epistemic';
 
 export type IngestNodeInput = Omit<LifeNode, 'id' | 'createdAt'>;
 
@@ -97,17 +97,23 @@ function externalKey(attrs: IngestNodeInput['attributes'] | undefined): string |
 
 export function ingestLifeNode(input: IngestNodeInput): LifeNode {
   input = stampCaptureLocation(input);
-  // 可信度盖章:旁路迁入后门也必须带 epistemic(可清数据后不再靠读时猜测)。
+  // 可信度盖章:旁路迁入后门也必须带 epistemic+generator(两者均已收紧为 Signal 必填字段,
+  // 2026-08-01)。原来只在 epistemic 缺失时才补,generator 单独缺失(epistemic 有效但
+  // generator 没传)会被漏过 —— 两个字段分别判、分别兜,不共用一个门。
   const attrs = { ...(input.attributes || {}) };
-  if (!isSignalEpistemic(attrs.epistemic)) {
+  const hasEpistemic = isSignalEpistemic(attrs.epistemic);
+  const hasGenerator = typeof attrs.generator === 'string' && attrs.generator.length > 0;
+  if (!hasEpistemic || !hasGenerator) {
     const stamp = stampEpistemic({
+      epistemic: hasEpistemic ? (attrs.epistemic as SignalEpistemic) : undefined,
+      generator: hasGenerator ? (attrs.generator as string) : undefined,
       source: input.source,
       type: typeof attrs.signalType === 'string' ? attrs.signalType : input.type,
       confidence: input.confidence,
       payload: attrs as Record<string, unknown>,
     });
     attrs.epistemic = stamp.epistemic;
-    if (stamp.generator) attrs.generator = stamp.generator;
+    attrs.generator = stamp.generator || String(input.source);
   }
   input = { ...input, attributes: attrs };
   // ⑦ 去重下沉到唯一写入口:带外部 id 的输入(Gmail/Notion 重复同步)幂等 —— 命中就原地更新,

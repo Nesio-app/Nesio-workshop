@@ -9,5 +9,14 @@ xcuserdata
 capacitor-cordova-ios-plugins
 
 # Generated Config files
+# capacitor.config.json 确实是生成的 —— `npx cap sync ios` 每次按根目录的
+# capacitor.config.ts 重写它,入库只会带来冲突。保持忽略。
 App/App/capacitor.config.json
-App/App/config.xml
+#
+# config.xml 不一样,**它必须入库**。
+# 这条忽略规则的前提是「跑 `npx cap add ios` 会生成它」—— 而我们**不跑那条命令**:
+# 跑了会重新生成整个 ios/,把六个自研插件的 Swift 和 pbxproj 里的登记一起冲掉。
+# 于是它永远不会被生成,而 pbxproj 的 Resources 阶段引用着它 ——
+# 缺文件 xcodebuild 直接报 "Build input file cannot be found" 而中断。
+# (2026-07-31:补插件时踩到,codemagic 的 prepare 步骤里加了一道检查。)
+!App/App/config.xml

@@ -6,9 +6,10 @@ import { deleteLifeNode, getLifeGraph, linkNodes, searchLifeGraphFuzzy, unlinkNo
 import { displayStoredLocation } from '@/lib/portal/named-places';
 import type { LocationMeta } from './LocationPicker';
 import { createAppApiClient } from '@/lib/portal/app-api-client';
+import { makeAssetErrorHandler } from '@/lib/portal/signed-asset-url';
 import LocationPicker from './LocationPicker';
 import EmailComposeSheet from './EmailComposeSheet';
-import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare, IconFile} from './icons';
+import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare, IconFile, IconBookmark } from './icons';
 import { isTopicTag } from '@/lib/portal/topic-tags';
 // #18:「地点」字段里塞的是会议链接 —— 一条 URL 不是一个地方
 import { splitEventLocation, shortUrlLabel } from '@/lib/portal/meeting-location';
@@ -52,6 +53,10 @@ const TYPE_LABELS_EN: Record<string, string> = {
   commitment: 'Promise', health_state: 'Health', preference: 'Preference', note: 'Note',
 };
 
+/** 用户点名的 8 个自定义可见标签(2026-08-01)——比 type 重要,命中就在头部领头,
+ *  同名单见 MemoryTab.tsx(两处各自维护一份小常量,跟 sourceMeta 那套重复模式一致)。 */
+const CUSTOM_TAGS = ['财务', '物品', '衣橱', '美食', '健康', '人物', '心情', '阅读'];
+
 const PERSON_CATEGORIES: Record<string, string> = {
   family: '家人', colleague: '同事', friend: '朋友', acquaintance: '认识', other: '其他',
 };
@@ -80,17 +85,26 @@ const PRIORITY_LABELS: Record<string, { label: string; labelEn: string; color: s
   low: { label: '普通', labelEn: 'Normal', color: 'var(--portal-muted)' },
 };
 
-/** 已知属性键 → 中文标签(天气信号等系统属性不再裸奔英文键名) */
+/** 已知属性键 → 中文标签(天气信号等系统属性不再裸奔英文键名)
+ *  2026-08-01 扩容:银行流水影子节点(tx-node.ts)、会议记录抽取(today-commands.ts)
+ *  落的这些键此前不在名单里 —— 不隐藏(不是纯技术字段,是流水/会议真值),
+ *  但没标签就裸奔成 txAmount/merchantId 这类英文键名,一并补齐。 */
 const ATTR_KEY_LABELS: Record<string, string> = {
   temperatureC: '温度', condition: '天气', forecastNote: '预报',
   placeName: '地点', humidity: '湿度', windKph: '风速',
   // 邮件本地深抽取(Phase 2)的结构化线索
   amount: '金额', orderNo: '订单号', trackingNo: '快递单号',
+  // 银行流水影子节点(tx-node.ts)
+  txAmount: '金额', txCurrency: '币种', txCategory: '分类', merchantId: '商户', accountId: '账户',
+  // 会议记录抽取(today-commands.ts writeMeetingExtraction)
+  summary: '摘要', people: '涉及人物',
 };
 const ATTR_KEY_LABELS_EN: Record<string, string> = {
   temperatureC: 'Temperature', condition: 'Weather', forecastNote: 'Forecast',
   placeName: 'Place', humidity: 'Humidity', windKph: 'Wind',
   amount: 'Amount', orderNo: 'Order #', trackingNo: 'Tracking #',
+  txAmount: 'Amount', txCurrency: 'Currency', txCategory: 'Category', merchantId: 'Merchant', accountId: 'Account',
+  summary: 'Summary', people: 'People',
 };
 
 /** 长文本(如日历事件的会议记录)默认只显示摘要,点「详情」展开 */
@@ -194,7 +208,10 @@ const HIDDEN_ATTRIBUTE_KEYS = new Set([
   'capturedLat', 'capturedLon', 'capturedPlace',
   // Signal infrastructure — never user-visible
   'signalId', 'signalSource', 'signalType', 'signalVersion',
-  'occuredAt', 'occurredAt', 'capturedAt', 'retentionPolicy', 'sensitivity',
+  // 2026-08-01 用户点名:updatedAt 裸露成 "updatedAt 2026-08-01T16:12:12.951Z"(原始 UTC
+  // ISO 串,没经过 fmtDateTime 本地化,看着像时区错了)——本该跟 occurredAt/capturedAt
+  // 一样是内部记账字段,当年加那两个的时候漏了这个,补上同样隐藏(不是给用户看的字段)。
+  'occuredAt', 'occurredAt', 'capturedAt', 'updatedAt', 'retentionPolicy', 'sensitivity',
   'sourceNodeId', 'schemaVersion',
   // 认知谱系内部字段(QA:详情页露出「epistemic: observation」「generator: manual」)
   'epistemic', 'generator', 'provenance', 'confidence',
@@ -211,6 +228,13 @@ const HIDDEN_ATTRIBUTE_KEYS = new Set([
   'energyValue', 'energyLevel', 'recordedAt', 'hourOfDay',
   'isWorkHours', 'isEvening', 'isMorning', 'isJournal', 'journalText',
   'article', 'image',
+  // 2026-08-01:银行流水影子节点(tx-node.ts)/会议记录抽取(today-commands.ts)/
+  // 多面镜存信(mirror-letter-persist.ts)的纯技术字段 —— 不是用户会想看的值,
+  // 真内容已经在各自的专属展示位(流水金额见下方 ATTR_KEY_LABELS,会议正文见
+  // CollapsibleText rawInput,信正文同理),这些只是内部关联/去重用的键。
+  'txShadow', 'txId', 'kind', 'mirrorId', 'meetingNodeId', 'meetingRecordId',
+  'calendarNodeId', 'calendarName', 'granolaMeetingId', 'fromMeeting', 'focusPinnedOn',
+  'inferredJson', 'notes', 'recordedAt', 'derivedFrom',
 ]);
 
 function InfoRow({ label, value, link }: { label: string; value: string; link?: string }) {
@@ -675,6 +699,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
     return () => clearTimeout(h);
   }, [linkQuery, linkPicking, node?.id]);
   const [rawExpanded, setRawExpanded] = useState(false); // 批次 74:原始记录折叠
+  const [otherAttrsExpanded, setOtherAttrsExpanded] = useState(false); // 2026-08-01:其他属性默认折叠,别让生 key 抢眼
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [editing, setEditing] = useState(false);
   // 批次192:编辑存放位置时,从 LocationPicker 捕获稳定 placeId/room/subRoom(存入时写节点/清空)。
@@ -698,6 +723,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
   const photoInputRef = useRef<HTMLInputElement>(null);
   const [addingPhoto, setAddingPhoto] = useState(false);
   const [photoErr, setPhotoErr] = useState('');
+  /** 加完照片后端上认字的结果。不是错误态 —— 照片已经加好了,这只是「顺手还做了什么」。 */
+  const [scanHint, setScanHint] = useState('');
   const [addedThumbs, setAddedThumbs] = useState<string[]>([]);
   // 批次 57:有坐标没地名(反查当时没跑完/存量节点)→ 打开详情时自愈回填
   const [healedPlace, setHealedPlace] = useState('');
@@ -878,6 +905,19 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
       if (!ok) throw new Error('updateLifeNode returned false');
       if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
       setAddedThumbs((p) => [...p, ...thumbs]);
+
+      // 存好了再认字(2026-07-31)。以前到上一行就结束了 —— 图挂进这条记忆,
+      // 上面写的字一个都搜不到。认字在这台设备上做,图不出手机;
+      // 名字不动(keepName)——这条记忆已经有名字了,是用户的,不该被一张附图改掉。
+      const { attachImageUnderstanding } = await import('@/lib/portal/image-understand');
+      const seen = await attachImageUnderstanding(n.id, list, { keepName: true });
+      if (seen?.text.trim()) {
+        setPhotoErr('');
+        setScanHint(L(dict, '照片上的字也记下了 —— 现在搜得到。', 'Text in the photos was read too — it\'s searchable now.'));
+      } else if (seen?.visionMessage) {
+        // 「这台设备认不了字」不是错误,是这条路今天走不通。照片已经加好了。
+        setScanHint(seen.visionMessage);
+      }
     } catch {
       setPhotoErr(L(dict, '照片没加成功,请再试一次', 'Could not add the photos — try again'));
     } finally {
@@ -924,7 +964,10 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
     if (tags.includes('keep')) return { icon: <IconNote size={sz} />, label: 'Keep', provider: '' };
     if (n.type === 'place') return { icon: <IconMapPin size={sz} />, label: L(dict, '位置', 'Place'), provider: '' };
     switch (n.source) {
-      case 'email': return { icon: <IconMail size={sz} />, label: L(dict, '邮件', 'Email'), provider: 'Gmail' };
+      // 2026-08-01 用户点名:「来自 邮件 · Gmail · 8.1 10:56」——provider 和后面的时间戳
+      // 挤在一行里反而重复(时间已经单独有一行「时间」字段),连接器名对用户没有增量信息,
+      // 「来自 邮件」就够了。
+      case 'email': return { icon: <IconMail size={sz} />, label: L(dict, '邮件', 'Email'), provider: '' };
       case 'calendar': return { icon: <IconCalendar size={sz} />, label: L(dict, '日历', 'Calendar'), provider: L(dict, 'Google 日历', 'Google Calendar') };
       case 'photo': return { icon: <IconCamera size={sz} />, label: L(dict, '拍照', 'Photo'), provider: '' };
       case 'voice': return { icon: <IconMic size={sz} />, label: L(dict, '语音', 'Voice'), provider: '' };
@@ -996,8 +1039,28 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
         {/* 类型色条:tint 走 CSS 变量,夜间由 CSS 混暗 —— 直接 inline background 会让
             浅色 pastel 在夜间糊成一条白带(QA 截图「弹出框上侧白边」)。 */}
         <div className="nesio-type-header-strip" style={{ ['--type-strip-bg' as string]: typeBg }}>
-          <span className="nesio-type-header-icon"><NodeTypeIcon type={n.type} size={15} /></span>
-          <span className="nesio-type-header-label">{(dict === 'en' ? TYPE_LABELS_EN : TYPE_LABELS_ZH)[n.type] || n.type}</span>
+          {/* 2026-08-01 用户更正:自定义标签比 type 重要——命中就标签领头(左),
+              type 退到这一行右上角小字;没有自定义标签就维持原样(type 领头,无角标)。 */}
+          {(() => {
+            const customTag = (n.tags || []).find((t) => CUSTOM_TAGS.includes(t));
+            if (customTag) {
+              return (
+                <>
+                  <span className="nesio-type-header-icon"><IconBookmark size={15} /></span>
+                  <span className="nesio-type-header-label">{customTag}</span>
+                  <span className="nesio-type-header-source" aria-hidden>
+                    <NodeTypeIcon type={n.type} size={12} /> {(dict === 'en' ? TYPE_LABELS_EN : TYPE_LABELS_ZH)[n.type] || n.type}
+                  </span>
+                </>
+              );
+            }
+            return (
+              <>
+                <span className="nesio-type-header-icon"><NodeTypeIcon type={n.type} size={15} /></span>
+                <span className="nesio-type-header-label">{(dict === 'en' ? TYPE_LABELS_EN : TYPE_LABELS_ZH)[n.type] || n.type}</span>
+              </>
+            );
+          })()}
         </div>
 
         <div className="nesio-settings-sheet-header">
@@ -1073,7 +1136,9 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             <span className="nesio-node-source-text">
               {L(dict, '来自 ', 'From ')}
               <b className="nesio-node-source-name">{SRC.label}{SRC.provider ? ` · ${SRC.provider}` : ''}</b>
-              {srcTime ? ` · ${srcTime}` : ''}
+              {/* 2026-08-01 用户点名时间显示重复:event 类型下面 EventSection 已经有专属的
+                  「时间」整行(带起止),这里再补一遍同一个日期只是噪音,其它类型仍保留。 */}
+              {srcTime && n.type !== 'event' ? ` · ${srcTime}` : ''}
             </span>
             {srcUncertain && <span className="nesio-node-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
           </div>
@@ -1121,6 +1186,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                   </button>
                 </p>
               )}
+              {!photoErr && scanHint && <p className="nesio-nd-scan-hint">{scanHint}</p>}
               {addedThumbs.length > 0 && (
                 <div className="nesio-nd-added-thumbs">
                   {addedThumbs.map((u, i) => (
@@ -1137,131 +1203,9 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             <AssignChoreLazy node={n} />
           )}
 
-          {/* 批次 70:关联链 —— 行程↔邮件自动挂钩、计划容器↔条目,点开跳转;
-              批次 73:手动增删关联(删除自动连线 = 反馈信号,本地留痕) */}
-          {(() => {
-            try {
-            const g = getLifeGraph();
-            // 批次 77(用户点名图标问题):emoji → 设计系统线性图标
-            const REL_LABEL: Record<string, [ReactNode, string, string]> = {
-              confirmed_by_email: [<IconMail key="i" size={13} />, '确认邮件', 'Confirmation email'],
-              confirms_plan: [<IconCalendar key="i" size={13} />, '对应行程', 'Linked plan'],
-              part_of_plan: [<IconFlag key="i" size={13} />, '所属计划', 'Part of plan'],
-              plan_item: [<IconCalendar key="i" size={13} />, '计划条目', 'Plan item'],
-              related_plan: [<IconLink key="i" size={13} />, '相关计划', 'Related plan'],
-              has_checklist: [<IconCheckSquare key="i" size={13} />, '对应清单', 'Checklist'],
-              user_linked: [<IconLink key="i" size={13} />, '手动关联', 'Linked'],
-              // 2026-07-30 反链保底:下面这几个原来**不在表里**,后果是关联建了但详情页
-              // 一条都不显示 —— 上周刚做的「这笔钱关联了谁」在这里是隐形的。
-              checklist_of: [<IconCheckSquare key="i" size={13} />, '所属清单', 'Checklist of'],
-              involves_person: [<IconLink key="i" size={13} />, '相关的人', 'Person involved'],
-              paid_by_tx: [<IconLink key="i" size={13} />, '对应这笔钱', 'Paid by'],
-            };
-            /**
-             * ⚠️ 关系名**不做白名单过滤**。
-             *
-             * 原来是 `Boolean(REL_LABEL[x.r.relation])` —— 表里没有的关系类型直接从
-             * 界面上消失。那意味着每加一种关系,都要有人记得回来改这张表,
-             * 忘了就是「关联明明建了,详情页什么都没有」,而且不报错。
-             * 上周新增的 involves_person / paid_by_tx 就正好踩中,checklist_of 更是
-             * 一直漏着(从清单那一侧看不到它属于谁)。
-             *
-             * 现在:认得的用它自己的标签,不认得的走通用标签**照样显示**。
-             * 宁可显示一个笼统的「关联」,也不要让一条真实存在的边凭空消失。
-             */
-            const relMeta = (rel: string): [ReactNode, string, string] =>
-              REL_LABEL[rel] ?? [<IconLink key="i" size={13} />, '关联', 'Linked'];
-            const rels = [
-              ...(n.relations || []).filter((r) => !removedRels.has(`${r.relation}:${r.targetId}`)),
-              ...addedRels,
-            ];
-            const live = rels
-              .map((r) => ({ r, node: g.find((x) => x.id === r.targetId) }))
-              // 只要目标节点还在就显示 —— 关系名不认得不是隐藏它的理由
-              .filter((x): x is { r: { targetId: string; relation: string }; node: LifeNode } => Boolean(x.node));
-            // 批次 94(用户实锤关联记忆闪退):onClick 里抛的错 React 错误边界
-            // 抓不到(只抓 render),会冒到全局 → 批次 85 处理器可能触发重载 =
-            // 看起来「闪退」。addRel/removeRel 全包 try/catch,任何异常只吞不炸。
-            const removeRel = (r: { targetId: string; relation: string }) => {
-              try {
-                setRemovedRels((prev) => new Set(prev).add(`${r.relation}:${r.targetId}`));
-                // R1:走 unlinkNodes —— 一次读写把两边解完。
-                // 原来反向那次是 `filter(x => x.targetId !== n.id)`,把**所有**指回来的关系
-                // 都删了:两个节点之间有两种关系时(比如 user_linked + has_checklist),
-                // 解掉一种会把另一种一起带走,而这边还留着。
-                unlinkNodes(n.id, r.targetId, r.relation);
-                logLinkFeedback({ action: 'removed', relation: r.relation, from: n.id, to: r.targetId });
-              } catch (err) { console.error('[link] remove_failed', err); setLinkError(`解除出错:${err instanceof Error ? err.message : String(err)}`.slice(0, 120)); }
-            };
-            const addRel = (t: LifeNode) => {
-              try {
-                if (t.id === n.id || rels.some((x) => x.targetId === t.id)) { setLinkPicking(false); setLinkQuery(''); return; }
-                const liveN = g.find((x) => x.id === n.id);
-                // R1:一次读写把两边写完 —— 原来是两次 updateLifeNode,
-                // 第二次失败就留下半条关联(这边看得到、那边看不到),没有界面会报错。
-                linkNodes(n.id, t.id, 'user_linked');
-                setAddedRels((prev) => [...prev, { targetId: t.id, relation: 'user_linked' }]);
-                logLinkFeedback({ action: 'added', relation: 'user_linked', from: n.id, to: t.id });
-              } catch (err) {
-                console.error('[link] add_failed', err);
-                setLinkError(`关联出错:${err instanceof Error ? err.message : String(err)}`.slice(0, 120));
-              } finally {
-                setLinkQuery('');
-              }
-            };
-            // 批次 172:用去抖异步算好的候选(不在渲染里同步搜全图 —— 闪退根因)
-            const candidates = linkCandidates;
-            return (
-              <div className="nesio-node-links">
-                {live.map(({ r, node: t }) => (
-                  <div key={`${r.relation}-${r.targetId}`} className="nesio-node-link-row">
-                    <button type="button" className="nesio-node-link-chip" onClick={() => onOpenNode?.(t)}>
-                      <span>{relMeta(r.relation)[0]}</span>
-                      <span className="nesio-node-link-kind">{L(dict, relMeta(r.relation)[1], relMeta(r.relation)[2])}</span>
-                      <span className="nesio-node-link-name">{t.name.slice(0, 24)}</span>
-                    </button>
-                    <button type="button" className="nesio-node-link-x" aria-label={L(dict, '解除关联', 'Unlink')} onClick={() => removeRel(r)}>✕</button>
-                  </div>
-                ))}
-                {!linkPicking ? (
-                  <button type="button" className="nesio-node-link-add" onClick={() => setLinkPicking(true)}>
-                    ＋ {L(dict, '关联一条记忆', 'Link a memory')}
-                  </button>
-                ) : (
-                  <div className="nesio-node-link-picker">
-                    <input
-                      className="nesio-tl-rename-input"
-                      value={linkQuery}
-                      onChange={(e) => setLinkQuery(e.target.value)}
-                      placeholder={L(dict, '搜记忆名字…', 'Search memories…')}
-                      autoFocus
-                    />
-                    {candidates.map((c) => (
-                      <button key={c.id} type="button" className="nesio-node-link-cand" onClick={() => addRel(c)}>
-                        <NodeTypeIcon type={c.type} size={12} /> {c.name.slice(0, 28)}
-                      </button>
-                    ))}
-                    <button type="button" className="nesio-node-link-add" onClick={() => { setLinkPicking(false); setLinkQuery(''); }}>{L(dict, '收起', 'Close')}</button>
-                  </div>
-                )}
-                {linkError && (
-                  <p style={{ fontSize: 'var(--text-overline)', color: 'var(--status-risk)', margin: 'var(--space-1) 0 0', wordBreak: 'break-all' }}>{linkError}</p>
-                )}
-              </div>
-            );
-            } catch {
-              // 批次 83(用户实锤「添加关联闪退卡死」):关联块自身出错只藏本块,
-              // 不放大成整卡崩溃;等真机栈定点修根因。
-              return null;
-            }
-          })()}
-
-          {/* 批次 125·设计:关键信息段标(结构化类型的核心属性区领头) */}
-          {(['object', 'event', 'commitment', 'person', 'place', 'health_state', 'preference', 'note'] as string[]).includes(n.type) && (
-            <p className="nesio-settings-section-label nesio-node-keyinfo-label">{L(dict, '关键信息', 'Key info')}</p>
-          )}
-
-          {/* Type-specific section */}
+          {/* Type-specific section —— 「关键信息」段标已砍(详情页精简 2026-08-01):
+              下面永远只跟着一个类型 Section,Section 自己的字段都带 label 了,
+              这行纯装饰的空标题不提供信息,只占地方。 */}
           {n.type === 'person' && (
             <PersonSection node={n} relatedNodes={relatedNodes} onOpenNode={onOpenNode} />
           )}
@@ -1302,11 +1246,22 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             </div>
           )}
 
-          {/* Remaining attributes not covered above */}
+          {/* Remaining attributes not covered above — 默认折叠:这里剩下的多是没建专属展示位的
+              长尾字段,展开前只给一个可点的标题,不把生 key 糊用户脸上。 */}
           {shownAttrs.length > 0 && (
-            <>
-              <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-3)' }}>{L(dict, '其他属性', 'Other details')}</p>
-              {shownAttrs.map(([k, v]) => (
+            <div style={{ marginTop: 'var(--space-3)' }}>
+              <button
+                type="button"
+                onClick={() => setOtherAttrsExpanded((v) => !v)}
+                className="nesio-settings-section-label"
+                style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+              >
+                {L(dict, '其他属性', 'Other details')}
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', fontWeight: 400 }}>
+                  {otherAttrsExpanded ? L(dict, '收起', 'Hide') : L(dict, `展开 ${shownAttrs.length} 项`, `Show ${shownAttrs.length}`)}
+                </span>
+              </button>
+              {otherAttrsExpanded && shownAttrs.map(([k, v]) => (
                 <div key={k} className="nesio-node-attr-row">
                   <span className="nesio-node-attr-key">{(dict === 'en' ? ATTR_KEY_LABELS_EN : ATTR_KEY_LABELS)[k] ?? k}</span>
                   <span className="nesio-node-attr-val" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
@@ -1315,7 +1270,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                   </span>
                 </div>
               ))}
-            </>
+            </div>
           )}
 
           {/* 标签三层重构:L2 语义标签(AI 冗余打的检索词,如 餐具/玻璃/水杯)不再上屏 ——
@@ -1389,10 +1344,35 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                     <div key={key} className="nesio-type-asset-card">
                       {isImage && previewUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={previewUrl} alt={asset.label || n.name} draggable={false} className="nesio-type-asset-img" onClick={() => setViewImage({ url: previewUrl, name: asset.label || n.name })} style={{ cursor: 'zoom-in' }}
-                          // 云图签名 URL 加载失败(过期/取不到)时,别把浏览器默认破图「?」留在页面 ——
-                          // 从 assetUrls 摘掉这条,自动回落到下面的软文案分支(有可见失败态,不是破图)。
-                          onError={() => setAssetUrls((cur) => { if (!(key in cur)) return cur; const next = { ...cur }; delete next[key]; return next; })} />
+                        <img src={previewUrl} alt={asset.label || n.name} draggable={false} className="nesio-type-asset-img"
+                          onClick={() => setViewImage({ url: previewUrl, name: asset.label || n.name })} style={{ cursor: 'zoom-in' }}
+                          /*
+                           * 云图加载失败时:**先换一张签名 URL,换不到才退文案**。
+                           *
+                           * 原来这里只做后半截 —— 直接把这条从 assetUrls 摘掉,
+                           * 回落到「图片线索已保存,登录后可查看」。避免了破图方块,
+                           * 但把最常见的那种失败(签名 URL 到期)也一并当成了「你没登录」:
+                           * 用户明明登着,照片却消失了,还被告知去登录。
+                           * 这比破图更糟 —— 它给了一个**错的**解释。
+                           *
+                           * 头像那条(批次 11)一直有换签兜底,附件这条从来没有。
+                           * 现在共用 signed-asset-url 里那套(同 path 并发去重、只重试一次)。
+                           */
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            if (asset.storagePath && img.dataset.retried !== '1') {
+                              makeAssetErrorHandler(asset.storagePath, (url) => {
+                                setAssetUrls((cur) => {
+                                  if (url) return { ...cur, [key]: url };
+                                  // 换签失败 → 摘掉,回落到软文案(可见失败态,不是破图)
+                                  if (!(key in cur)) return cur;
+                                  const next = { ...cur }; delete next[key]; return next;
+                                });
+                              })(e);
+                              return;
+                            }
+                            setAssetUrls((cur) => { if (!(key in cur)) return cur; const next = { ...cur }; delete next[key]; return next; });
+                          }} />
                       ) : (
                         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', marginBottom: 'var(--space-1)' }}>
                           {asset.local ? L(dict, '图片加载中…', 'Loading image…') : asset.storagePath ? L(dict, '图片线索已保存，登录后可查看。', 'Image clue saved — sign in to view.') : L(dict, '附件线索已保存。', 'Attachment clue saved.')}
@@ -1433,37 +1413,166 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             })()}
           </p>
 
-          {/* 标签三层重构:详情页的关联图撤下 —— 它把「同天创建/弱相似」画成箭头,
-              视觉上像因果实际是噪声(QA:「全是乱连接」)。换成诚实的「相关记忆」列表;
-              全景图谱仍在记忆页的「关联图」入口。 */}
-          {relatedNodes && relatedNodes.length > 0 && (
-            <div className="nesio-related-section">
-              <p className="nesio-settings-section-label">{L(dict, '相关记忆', 'Related memories')}</p>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                {relatedNodes.slice(0, 6).map((r) => {
-                  // 批次 53:循环日历事件(每周 Sprint 计划)同名难辨 —— 行内带日期标签
-                  const rs = typeof r.attributes?.start === 'string' ? r.attributes.start : '';
-                  const rd = rs ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(rs) ? `${rs}T00:00` : rs) : null;
-                  const dateTag = rd && !Number.isNaN(rd.getTime())
-                    ? L(dict, `${rd.getMonth() + 1}月${rd.getDate()}日`, `${rd.getMonth() + 1}/${rd.getDate()}`)
-                    : '';
-                  return (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => onOpenNode?.(r)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line, rgba(127,127,127,0.18))', background: 'none', color: 'var(--portal-ink)', textAlign: 'left', cursor: 'pointer' }}
-                    >
-                      <NodeTypeIcon type={r.type} size={13} />
-                      <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--text-sm)' }}>{r.name}</span>
-                      {dateTag && <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', flex: 'none' }}>{dateTag}</span>}
-                      <span style={{ color: 'var(--portal-muted)' }}>›</span>
+          {/* 详情页精简(2026-08-01):关联块(手动增删)+ 相关记忆(自动算的只读列表)
+              原来分两处出现 —— 顶上一个、底下一个,同一件"这条和什么有关"的事说两遍。
+              合并到这一处,手动关联(可加/可解)放前面,自动相关记忆(只读浏览)跟在后面。
+              标签三层重构那次的初衷仍在:关联图撤下的原因是「同天创建/弱相似」画成箭头
+              视觉上像因果实际是噪声,全景图谱仍在记忆页的「关联图」入口。 */}
+          {(() => {
+            let linksBlock: ReactNode = null;
+            try {
+              const g = getLifeGraph();
+              // 批次 77(用户点名图标问题):emoji → 设计系统线性图标
+              const REL_LABEL: Record<string, [ReactNode, string, string]> = {
+                confirmed_by_email: [<IconMail key="i" size={13} />, '确认邮件', 'Confirmation email'],
+                confirms_plan: [<IconCalendar key="i" size={13} />, '对应行程', 'Linked plan'],
+                part_of_plan: [<IconFlag key="i" size={13} />, '所属计划', 'Part of plan'],
+                plan_item: [<IconCalendar key="i" size={13} />, '计划条目', 'Plan item'],
+                related_plan: [<IconLink key="i" size={13} />, '相关计划', 'Related plan'],
+                has_checklist: [<IconCheckSquare key="i" size={13} />, '对应清单', 'Checklist'],
+                user_linked: [<IconLink key="i" size={13} />, '手动关联', 'Linked'],
+                // 2026-07-30 反链保底:下面这几个原来**不在表里**,后果是关联建了但详情页
+                // 一条都不显示 —— 上周刚做的「这笔钱关联了谁」在这里是隐形的。
+                checklist_of: [<IconCheckSquare key="i" size={13} />, '所属清单', 'Checklist of'],
+                involves_person: [<IconLink key="i" size={13} />, '相关的人', 'Person involved'],
+                paid_by_tx: [<IconLink key="i" size={13} />, '对应这笔钱', 'Paid by'],
+              };
+              /**
+               * ⚠️ 关系名**不做白名单过滤**。
+               *
+               * 原来是 `Boolean(REL_LABEL[x.r.relation])` —— 表里没有的关系类型直接从
+               * 界面上消失。那意味着每加一种关系,都要有人记得回来改这张表,
+               * 忘了就是「关联明明建了,详情页什么都没有」,而且不报错。
+               * 上周新增的 involves_person / paid_by_tx 就正好踩中,checklist_of 更是
+               * 一直漏着(从清单那一侧看不到它属于谁)。
+               *
+               * 现在:认得的用它自己的标签,不认得的走通用标签**照样显示**。
+               * 宁可显示一个笼统的「关联」,也不要让一条真实存在的边凭空消失。
+               */
+              const relMeta = (rel: string): [ReactNode, string, string] =>
+                REL_LABEL[rel] ?? [<IconLink key="i" size={13} />, '关联', 'Linked'];
+              const rels = [
+                ...(n.relations || []).filter((r) => !removedRels.has(`${r.relation}:${r.targetId}`)),
+                ...addedRels,
+              ];
+              const live = rels
+                .map((r) => ({ r, node: g.find((x) => x.id === r.targetId) }))
+                // 只要目标节点还在就显示 —— 关系名不认得不是隐藏它的理由
+                .filter((x): x is { r: { targetId: string; relation: string }; node: LifeNode } => Boolean(x.node));
+              // 批次 94(用户实锤关联记忆闪退):onClick 里抛的错 React 错误边界
+              // 抓不到(只抓 render),会冒到全局 → 批次 85 处理器可能触发重载 =
+              // 看起来「闪退」。addRel/removeRel 全包 try/catch,任何异常只吞不炸。
+              const removeRel = (r: { targetId: string; relation: string }) => {
+                try {
+                  setRemovedRels((prev) => new Set(prev).add(`${r.relation}:${r.targetId}`));
+                  // R1:走 unlinkNodes —— 一次读写把两边解完。
+                  // 原来反向那次是 `filter(x => x.targetId !== n.id)`,把**所有**指回来的关系
+                  // 都删了:两个节点之间有两种关系时(比如 user_linked + has_checklist),
+                  // 解掉一种会把另一种一起带走,而这边还留着。
+                  unlinkNodes(n.id, r.targetId, r.relation);
+                  logLinkFeedback({ action: 'removed', relation: r.relation, from: n.id, to: r.targetId });
+                } catch (err) { console.error('[link] remove_failed', err); setLinkError(`解除出错:${err instanceof Error ? err.message : String(err)}`.slice(0, 120)); }
+              };
+              const addRel = (t: LifeNode) => {
+                try {
+                  if (t.id === n.id || rels.some((x) => x.targetId === t.id)) { setLinkPicking(false); setLinkQuery(''); return; }
+                  const liveN = g.find((x) => x.id === n.id);
+                  // R1:一次读写把两边写完 —— 原来是两次 updateLifeNode,
+                  // 第二次失败就留下半条关联(这边看得到、那边看不到),没有界面会报错。
+                  linkNodes(n.id, t.id, 'user_linked');
+                  setAddedRels((prev) => [...prev, { targetId: t.id, relation: 'user_linked' }]);
+                  logLinkFeedback({ action: 'added', relation: 'user_linked', from: n.id, to: t.id });
+                } catch (err) {
+                  console.error('[link] add_failed', err);
+                  setLinkError(`关联出错:${err instanceof Error ? err.message : String(err)}`.slice(0, 120));
+                } finally {
+                  setLinkQuery('');
+                }
+              };
+              // 批次 172:用去抖异步算好的候选(不在渲染里同步搜全图 —— 闪退根因)
+              const candidates = linkCandidates;
+              linksBlock = (
+                <div className="nesio-node-links">
+                  {live.map(({ r, node: t }) => (
+                    <div key={`${r.relation}-${r.targetId}`} className="nesio-node-link-row">
+                      <button type="button" className="nesio-node-link-chip" onClick={() => onOpenNode?.(t)}>
+                        <span>{relMeta(r.relation)[0]}</span>
+                        <span className="nesio-node-link-kind">{L(dict, relMeta(r.relation)[1], relMeta(r.relation)[2])}</span>
+                        <span className="nesio-node-link-name">{t.name.slice(0, 24)}</span>
+                      </button>
+                      <button type="button" className="nesio-node-link-x" aria-label={L(dict, '解除关联', 'Unlink')} onClick={() => removeRel(r)}>✕</button>
+                    </div>
+                  ))}
+                  {linkPicking && (
+                    <div className="nesio-node-link-picker">
+                      <input
+                        className="nesio-tl-rename-input"
+                        value={linkQuery}
+                        onChange={(e) => setLinkQuery(e.target.value)}
+                        placeholder={L(dict, '搜记忆名字…', 'Search memories…')}
+                        autoFocus
+                      />
+                      {candidates.map((c) => (
+                        <button key={c.id} type="button" className="nesio-node-link-cand" onClick={() => addRel(c)}>
+                          <NodeTypeIcon type={c.type} size={12} /> {c.name.slice(0, 28)}
+                        </button>
+                      ))}
+                      <button type="button" className="nesio-node-link-add" onClick={() => { setLinkPicking(false); setLinkQuery(''); }}>{L(dict, '收起', 'Close')}</button>
+                    </div>
+                  )}
+                  {linkError && (
+                    <p style={{ fontSize: 'var(--text-overline)', color: 'var(--status-risk)', margin: 'var(--space-1) 0 0', wordBreak: 'break-all' }}>{linkError}</p>
+                  )}
+                </div>
+              );
+            } catch {
+              // 批次 83(用户实锤「添加关联闪退卡死」):关联块自身出错只藏本块,
+              // 不放大成整卡崩溃;等真机栈定点修根因。
+              linksBlock = null;
+            }
+            const hasRelated = Boolean(relatedNodes && relatedNodes.length > 0);
+            if (!linksBlock && !hasRelated) return null;
+            return (
+              <div className="nesio-related-section">
+                {/* 2026-08-01 用户点名整合:「＋关联一条记忆」从独立一行的虚线按钮挪到标题
+                    行内,不再多占一整行竖直空间。 */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+                  <p className="nesio-settings-section-label" style={{ margin: 0 }}>{L(dict, '相关记忆', 'Related memories')}</p>
+                  {!linkPicking && (
+                    <button type="button" className="nesio-node-link-add-inline" onClick={() => setLinkPicking(true)}>
+                      <IconLink size={12} /> {L(dict, '关联', 'Link')}
                     </button>
-                  );
-                })}
+                  )}
+                </div>
+                {linksBlock}
+                {hasRelated && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: linksBlock ? 'var(--space-2)' : 0 }}>
+                    {relatedNodes!.slice(0, 6).map((r) => {
+                      // 批次 53:循环日历事件(每周 Sprint 计划)同名难辨 —— 行内带日期标签
+                      const rs = typeof r.attributes?.start === 'string' ? r.attributes.start : '';
+                      const rd = rs ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(rs) ? `${rs}T00:00` : rs) : null;
+                      const dateTag = rd && !Number.isNaN(rd.getTime())
+                        ? L(dict, `${rd.getMonth() + 1}月${rd.getDate()}日`, `${rd.getMonth() + 1}/${rd.getDate()}`)
+                        : '';
+                      return (
+                        <button
+                          key={r.id}
+                          type="button"
+                          onClick={() => onOpenNode?.(r)}
+                          style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line, rgba(127,127,127,0.18))', background: 'none', color: 'var(--portal-ink)', textAlign: 'left', cursor: 'pointer' }}
+                        >
+                          <NodeTypeIcon type={r.type} size={13} />
+                          <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: 'var(--text-sm)' }}>{r.name}</span>
+                          {dateTag && <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', flex: 'none' }}>{dateTag}</span>}
+                          <span style={{ color: 'var(--portal-muted)' }}>›</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {placePickOpen && (
         <PlacePickerLazy
@@ -1475,25 +1584,22 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
         />
       )}
 
-      {/* 镜头看记忆:情绪重的主动提示 + 用镜头看看(长在记忆上的动作) */}
-          {!editing && (
+      {/* 镜头看记忆:情绪重的主动提示单独留着(不是按钮,是判断出来的时候才出现的一句话);
+          「用镜头看看」本身不再单独占一整行 —— 2026-08-01 用户点名底部按钮太占地方,
+          并进下面的 Actions 一排,别再多起一段。 */}
+          {!editing && shouldNudge(`${n.name} ${(n.attributes?.notes as string) || n.rawInput || ''}`) && !nudgeDismissed && (
             <div className="nesio-growth">
-              {shouldNudge(`${n.name} ${(n.attributes?.notes as string) || n.rawInput || ''}`) && !nudgeDismissed && (
-                <div className="ng-hint" style={{ marginTop: 'var(--space-5)' }}>
-                  <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
-                  <p>{L(dict, '念念看到这条情绪有点重 —— 要不要陪你把它看清楚一点?(不是分析你,是把话看清)', 'This one feels heavy — want to look at it more clearly? (not analyzing you — just seeing the words)')}</p>
-                  <button type="button" className="x" onClick={() => setNudgeDismissed(true)}>{L(dict, '轻轻划走', 'Dismiss')}</button>
-                </div>
-              )}
-              <button type="button" className="ng-btn" style={{ width: '100%', marginTop: 'var(--space-3)' }} onClick={() => setLensOpen(true)}>
-                {L(dict, '用镜头看看 ✦', 'Look with a lens ✦')}
-              </button>
+              <div className="ng-hint" style={{ marginTop: 'var(--space-5)' }}>
+                <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+                <p>{L(dict, '念念看到这条情绪有点重 —— 要不要陪你把它看清楚一点?(不是分析你,是把话看清)', 'This one feels heavy — want to look at it more clearly? (not analyzing you — just seeing the words)')}</p>
+                <button type="button" className="x" onClick={() => setNudgeDismissed(true)}>{L(dict, '轻轻划走', 'Dismiss')}</button>
+              </div>
             </div>
           )}
           <MemoryLensSheet open={lensOpen} onOpenChange={setLensOpen} node={n} />
 
-      {/* Actions */}
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-5)' }}>
+      {/* Actions —— 2026-08-01:「用镜头看看」并入这一排,不再单独一整行占地方 */}
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-5)', flexWrap: 'wrap' }}>
             {/* 这一排以前是三套不同的自造按钮拼出来的(ob-primary / today--ghost / settings-danger),
                 高度各不相同,只好再加一层 .nesio-nd-action-btn 把它们掰齐。
 
@@ -1508,6 +1614,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               </>
             ) : (
               <>
+                <Button variant="soft" layoutStyle={{ flex: 1 }} onClick={() => setLensOpen(true)}>{L(dict, '用镜头看看 ✦', 'Lens ✦')}</Button>
                 {/* 批次 33:阅读入口顶部有(替换✕),底部也放回来一份 —— 用户反馈顶部那颗找不到 */}
                 {readableText && (
                   <Button variant="primary" layoutStyle={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</Button>

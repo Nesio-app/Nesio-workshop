@@ -66,6 +66,16 @@ export const CACHE_KEYS = new Set<string>([
   // 一旦不在册,keyKind() 的默认值是 durable —— 它会立刻开始进备份、上云同步。
   'nesio-routines-v1',
   'nesio-daily-brief-v2',
+  // 提醒 → 系统通知的排程投影(2026-07-31)。判据原句:「换台设备从零开始是否正确?」
+  // —— 正确。iOS 的 pending 通知是**这台设备**的东西,旧手机排过什么和新手机毫无关系;
+  // 真相在 nesio-schedule-reminders-v1 里,新设备回前台自己会重排一遍。
+  'nesio-reminder-notify-state-v1',
+  // HealthKit 自动同步的日期簿记 —— 单设备本地状态,同步过去只会让新设备以为已经拉过。
+  'nesio-healthkit-auto-sync-v1',
+  // 「让 iOS 系统搜索找得到我的记忆」开关(Core Spotlight,2026-07-31)。
+  // 索引在**这台设备**的系统搜索库里,换台手机上面什么都没有 ——
+  // 开关同步过去会造出「显示开着、实际没索引」的假状态。
+  'nesio-spotlight-enabled-v1',
   'nesio-calendar-local-v1',
   'nesio-last-location-v1',
   'nesio-telemetry-device-v1',
@@ -85,6 +95,8 @@ export const CACHE_KEYS = new Set<string>([
   // 「今天看没看过简报」的日键。cache —— 这是这台机器上的 UI 状态,
   // 不是用户数据;换台设备第一次打开时重新提示一遍,正是对的行为。
   'nesio-daily-brief-seen-v1',
+  // 每日日报卡片「今天先不看」的日键——同上一条,同一类 UI 状态。
+  'nesio-daily-report-card-dismiss-v1',
   'nesio-jot-draft-v1',                   // 速记草稿:本机暂存,别跨设备回灌
   'nesio-pro-entitlement-v1',             // Lab 测试 Pro 覆盖位:绝不该同步到真设备
   // AI 判决层(2026-07-29 硬拆后新增)。三个都是**按设备**的簿记,不是用户数据:

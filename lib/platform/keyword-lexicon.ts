@@ -13,7 +13,10 @@
 
 export const LEXICON = {
   flight: /flight|航班|机票|登机|起飞|出发|乘机|飞往|飞\s*\w|itinerary|e-ticket|电子客票|booking.?confirm/i,
-  medical: /doctor|医生|医院|诊所|手术|检查|复诊|复查|挂号|预约.*医|dental|牙科|体检|看诊|取药|配药|打针|疫苗|产检/i,
+  // 2026-08-01 用户实锤误分类:裸的「检查」是个太通用的动词("检查学校账单"也命中)——
+  // 收窄成「检查」+身体相关名词的搭配,不再单独一个词就命中;体检/复查/复诊已经覆盖
+  // 常见医疗场景,不靠这个宽泛词兜底。
+  medical: /doctor|医生|医院|诊所|手术|检查(身体|牙齿|眼睛|皮肤)|复诊|复查|挂号|预约.*医|dental|牙科|体检|看诊|取药|配药|打针|疫苗|产检/i,
   exam: /exam|考试|考核|测试|quiz|托福|雅思|gre|gmat/i,
   deadline: /due|deadline|截止|到期|缴费|付款|租金|房租|还款|逾期|最后一天|last.?day|expires|过期/i,
   birthday: /birthday|生日|寿|满月/i,

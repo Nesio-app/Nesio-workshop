@@ -2,12 +2,12 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CAPACITOR_DEBUG</key>
+	<key>CAPACITOR_DEBUG</key>
 	<string>$(CAPACITOR_DEBUG)</string>
 	<key>CFBundleDevelopmentRegion</key>
-	<string>en</string>
+	<string>zh_CN</string>
 	<key>CFBundleDisplayName</key>
-        <string>宝盒</string>
+	<string>宝盒</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -22,6 +22,22 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
+
+	<!-- Spotlight 搜索结果点进来走这个 scheme(AppDelegate 把 CSSearchableItem
+	     的 id 拼成 nesio://memory/<id>)。没有这段的话那条 URL 打不开,
+	     搜到了也跳不过去。 -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>app.nesio.ios</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>nesio</string>
+			</array>
+		</dict>
+	</array>
+
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>
@@ -30,7 +46,7 @@
 	<string>Main</string>
 	<key>UIRequiredDeviceCapabilities</key>
 	<array>
-		<string>armv7</string>
+		<string>arm64</string>
 	</array>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
@@ -45,5 +61,53 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+
+	<!-- ── 后台模式 ────────────────────────────────────────────────────────
+	     location:足迹靠 significant-change + visits,这两者**会唤醒 App**,
+	     所以这一条是必须的。注意它和 `allowsBackgroundLocationUpdates` 是两回事 ——
+	     后者是给连续定位(startUpdatingLocation)用的,我们没用,也不该用:
+	     那会一直吃电、状态栏一直挂蓝条,而足迹只需要 500m 粒度。 -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
+
+	<!-- ── 权限说明串 ──────────────────────────────────────────────────────
+	     每一条都是**缺了就闪退**,不是报错 —— iOS 对缺 usage description
+	     一律直接杀进程,而且崩在用户第一次点那个按钮的瞬间。
+	     写法上照 App Store 审核的要求:说清楚「拿来做什么」,不写空话。 -->
+
+	<key>NSCameraUsageDescription</key>
+	<string>用于「拍一拍」记录物品、票据与场景。照片默认只存在这台设备上。</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>用于从相册选取照片加进你的记忆。</string>
+	<key>NSPhotoLibraryAddUsageDescription</key>
+	<string>用于把你在应用内保存的图片存回相册。</string>
+
+	<key>NSMicrophoneUsageDescription</key>
+	<string>用于「说一句」语音记录与会议录音。</string>
+	<!-- 端上语音转文字。SFSpeechRecognizer 用的是这一条,和麦克风是两个权限,
+	     两个都要 —— 只给麦克风的话一调用识别就崩。 -->
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>用于把你说的话转成文字。识别在这台设备上完成,录音不会离开手机。</string>
+
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>用于给记忆标注地点,以及在地图上看你去过哪里。</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>选择「始终」后,应用可以在后台记录你到过的地方,自动补全足迹 —— 不用每次都手动打卡。位置只存在这台设备上。</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>选择「始终」后,应用可以在后台记录你到过的地方,自动补全足迹。位置只存在这台设备上。</string>
+
+	<!-- HealthKit。⚠️ 这两条只在带 HealthKit entitlement 的构建里有意义;
+	     免费 Apple ID 签名(Sideloadly 个人账号)拿不到那个 entitlement,
+	     那种构建里健康插件会如实返回不可用。见 codemagic.yaml 的两个 workflow。 -->
+	<key>NSHealthShareUsageDescription</key>
+	<string>读取步数、睡眠、心率等健康数据,汇进你的身体账本。数据只留在这台设备上,不上传。</string>
+	<key>NSHealthUpdateUsageDescription</key>
+	<string>本应用不向健康写入数据。</string>
+
+	<!-- 出口合规:没有自研加密算法,只用系统 HTTPS。填了这条上传时就不用每次回答问卷。 -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 </dict>
 </plist>

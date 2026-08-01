@@ -94,6 +94,8 @@ const KNOWN_KEYS = new Map([
   // 「今天看没看过简报」。cache —— 换台设备从零开始是对的：
   // 它是这台机器上的 UI 状态，不是用户数据。
   ["nesio-daily-brief-seen-v1", "cache"],
+  // 每日日报卡片「今天先不看」——同上，UI 状态，cache。
+  ["nesio-daily-report-card-dismiss-v1", "cache"],
   ["nesio-life-graph-cloud-sync-outbox-v1", "cache"],
   ["nesio-life-graph-cloud-sync-v1", "cache"],
   ["nesio-music-last-played-v1", "cache"],
@@ -149,6 +151,11 @@ const KNOWN_KEYS = new Map([
   ["nesio-cross-region-consent-v1", "durable"],
   ["nesio-cross-region-delivery-cooldown-v1", "durable"],
   ["nesio-daily-report-auto-v1", "durable"],
+  // 周报/月报的「这一期问过了没」——和上面日报同一套口径,同归 durable。
+  ["nesio-periodic-report-week-retrospect-auto-v1", "durable"],
+  ["nesio-periodic-report-week-plan-auto-v1", "durable"],
+  ["nesio-periodic-report-month-retrospect-auto-v1", "durable"],
+  ["nesio-periodic-report-month-plan-auto-v1", "durable"],
   ["nesio-dormant-store", "durable"],
   ["nesio-energy-baseline-v1", "durable"],
   ["nesio-asset-care-v1", "durable"],
@@ -159,6 +166,15 @@ const KNOWN_KEYS = new Map([
   // 用户自己敲进去的提醒(家务/账单 due)。换台设备后从头开始**不正确** —— 那是他
   // 亲手写下的东西,丢了就是丢了,所以 durable。
   ["nesio-schedule-reminders-v1", "durable"],
+  // 提醒 → 系统通知的排程投影。cache:换台设备从零开始是**对的** ——
+  // 排程是设备本地的东西,真相在 nesio-schedule-reminders-v1 里,这只是它的影子。
+  ["nesio-reminder-notify-state-v1", "cache"],
+  // HealthKit 自动同步的「今天拉过了」簿记。cache:换设备重拉一次是对的。
+  ["nesio-healthkit-auto-sync-v1", "cache"],
+  // 「让 iOS 系统搜索找得到我的记忆」这个开关(Core Spotlight)。默认关。
+  // cache:索引本来就是**这台设备**的系统搜索库里的东西,换台手机上面什么都没有,
+  // 开关跟着同步过去反而会造出一个「显示开着、实际没索引」的假状态。
+  ["nesio-spotlight-enabled-v1", "cache"],
   // 邮件里认出的「安排」我处理过没有(加进日程了 / 不用了)。「不用了」是一个决定 ——
   // 在手机上按掉的建议换到电脑上又冒出来,等于这个决定没被记住,所以 durable。
   ["nesio-mail-suggest-v1", "durable"],

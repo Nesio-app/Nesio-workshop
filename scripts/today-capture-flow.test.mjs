@@ -70,6 +70,15 @@ const code = stripComments;
   const at = feed.indexOf('const recognizeSavedImage');
   assert.ok(at > 0, '「+」传图不再顺手识别了');
   const fn = feed.slice(at, feed.indexOf('\n  }, [uiLocale]);', at));
+  // 2026-08-01 合并(两边独立改了同一个函数):先端上认字(免费/离线/省钱),
+  // 端上认不出单据字段才谈得上云,而云是付费能力 —— 两条判据都要防,不是二选一。
+  //
+  // 端上先行的原因:小票上写的就是那些字,端上认一遍就有,不该为一张图白发一趟云。
+  assert.ok(/understandImage\(/.test(fn), '「+」传图不再先在端上认字 —— 每张图都会白发一趟云');
+  assert.ok(
+    /needsCloud[\s\S]*?return;/.test(fn),
+    '端上认出来了却还是往下走云 —— 那趟往返白花钱、白等,还把票据发出了门',
+  );
   assert.ok(/canUsePaidCloudAi\(\)/.test(fn), '后台识别没查权益 —— 免费账号会白跑一趟云');
   // 但**查了之后不许静默走开**:用户实测「照片直接存成附件,没有识别过程」,
   // 根因就是免费档那条 `return` 一个字都不说 —— 他无从知道识别压根没发生。

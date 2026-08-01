@@ -1,4 +1,4 @@
-export { runConnectors } from '../../portal/connectors';
+export { runConnectors, refreshWeather } from '../../portal/connectors';
 export {
   fetchWeatherAt,
   readGeo,

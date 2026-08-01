@@ -13,8 +13,19 @@
  *   · 成员选择(我 / 家人)。
  *   · 逐项可改:名字/值/单位/参考区间全都能就地编辑,解错了当场改,不用回头重录。
  *
- * 端上识别不可用时**不偷偷走云** —— 化验单是病历,不因为端上没有就换条路发出去。
- * 直接说清楚为什么,并把人引到手填。
+ * ## 端上认不了字的时候(2026-07-31 用户定案)
+ *
+ * 老规矩是「不给云兜底」—— 化验单是病历,不因为端上没有就换条路发出去。
+ * 这条**没有被推翻**,被推翻的只是「一条路都不给」:那台设备上你只能一个字一个字手填。
+ *
+ * 新规矩是「**问过才发**」:
+ *   · 默认仍然不发。屏幕先说清楚这台设备认不了字,并给「手填这张单子」。
+ *   · 旁边多一颗「发到云端认一次」。按钮上和按下去之后**都写明这是病历**,
+ *     并且**每一张都要重新点一次** —— 没有「以后不再问」,没有记住选择。
+ *     一张化验单发不发出去,是一次一决定的事,不是一个设置项。
+ *   · 云在这条路上只当 OCR(`mode: 'ocr'`,逐字转写)。「这行是白细胞、偏高」
+ *     仍然由本机的 parseLabReport 判 —— 让会猜的东西去判临床数值,
+ *     错了不会报错,只会安安静静变成一条假记录。
  */
 
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -35,6 +46,11 @@ type Phase =
   | { s: 'reading'; step: 'pdf' | 'ocr' }
   // fromScan:扫描件 PDF 走到这里时,该说的不是「拍清楚点」而是「这份是图片型 PDF」
   | { s: 'blocked'; reason: VisionUnavailableReason; fromScan?: boolean }
+  // 用户点了「发到云端认一次」→ 先把话说明白,再点一次才真发。**不记住选择。**
+  // 带着 reason/fromScan 一起走:点「算了」要能原样退回上一屏,
+  // 而不是退回一个编出来的原因(那会让「为什么认不了」这句话变成假的)。
+  | { s: 'asking'; reason: VisionUnavailableReason; fromScan?: boolean }
+  | { s: 'sending' }
   | { s: 'failed'; message: string }                    // 识别没成 —— 可重试
   | { s: 'empty'; text: string }                        // 认出字了但一条指标都解不出来
   | { s: 'confirm'; rows: Row[]; date: string };
@@ -56,6 +72,13 @@ export default function LabScanSheet({
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const pdfRef = useRef<HTMLInputElement>(null);
+  /**
+   * 端上认不了的那些图,留在这儿等用户决定发不发。
+   * 只在内存里 —— 不落盘、不进 IndexedDB:一张没被同意发出去的化验单,
+   * 不该因为「我们先存着」而在设备上多留一份。关掉面板(reset)就没了。
+   */
+  // 两条来路给的形状不一样:图片是 File,扫描件 PDF 渲出来的是 dataURL 字符串。
+  const pendingImagesRef = useRef<Array<Blob | string>>([]);
 
   const people = useMemo(() => {
     if (!open) return [];
@@ -93,6 +116,7 @@ export default function LabScanSheet({
       // 扫描件:每页渲染成图,逐张过端上识别
       const avail = await visionAvailability();
       if (!avail.available) {
+        pendingImagesRef.current = read.images;   // 用户点头之后才发得出去
         setPhase({ s: 'blocked', reason: avail.reason || 'plugin_missing', fromScan: true });
         return;
       }
@@ -110,7 +134,11 @@ export default function LabScanSheet({
     // ── 图片 ───────────────────────────────────────────────────────────────
     setPhase({ s: 'reading', step: 'ocr' });
     const avail = await visionAvailability();
-    if (!avail.available) { setPhase({ s: 'blocked', reason: avail.reason || 'plugin_missing' }); return; }
+    if (!avail.available) {
+      pendingImagesRef.current = [file];
+      setPhase({ s: 'blocked', reason: avail.reason || 'plugin_missing' });
+      return;
+    }
 
     const r = await recognizeOnDevice(file);
     if (!r.ok) { setPhase({ s: 'failed', message: r.message }); return; }
@@ -118,7 +146,63 @@ export default function LabScanSheet({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [finishWithText, dict]);
 
-  const reset = () => { setPhase({ s: 'pick' }); setSaveErr(null); };
+  const reset = () => {
+    setPhase({ s: 'pick' });
+    setSaveErr(null);
+    pendingImagesRef.current = [];   // 没被同意发出去的化验单不留在内存里
+  };
+
+  /**
+   * 用户**这一次**同意把这张化验单发到云端认字。
+   *
+   * 三条约束写在这儿,改的时候一起看:
+   *   ① 只有从 `asking` 这一步点进来 —— 也就是屏幕上刚说过一遍「这是病历」;
+   *   ② 云只认字(`mode: 'ocr'`),判定仍走本机 parseLabReport;
+   *   ③ 用完就把图从内存里清掉,**不记住这次选择** —— 下一张要重新问。
+   */
+  const sendToCloud = useCallback(async () => {
+    const imgs = pendingImagesRef.current;
+    if (!imgs.length) {
+      setPhase({ s: 'failed', message: t('这张图已经不在手边了 —— 再选一次就行。', 'That image is no longer held — pick it again.') });
+      return;
+    }
+    setPhase({ s: 'sending' });
+    const toBase64 = (b: Blob | string) => (typeof b === 'string'
+      ? Promise.resolve(b.includes(',') ? b.split(',')[1] : b)
+      : new Promise<string>((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(String(r.result).split(',')[1] || '');
+        r.onerror = () => rej(new Error('read_failed'));
+        r.readAsDataURL(b);
+      }));
+    try {
+      const texts: string[] = [];
+      for (const img of imgs) {
+        const base64 = await toBase64(img);
+        const res = await fetch('/api/portal/analyze', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
+          body: JSON.stringify({
+            type: 'image', mode: 'ocr', content: '', imageBase64: base64,
+            mimeType: typeof img === 'string' ? 'image/png' : (img.type || 'image/jpeg'),
+          }),
+        });
+        const data = await res.json() as { ok?: boolean; text?: string };
+        if (!res.ok || !data.ok || !data.text) {
+          // 红线:失败要说出来,不许静默回到「认不了」那一屏假装什么都没发生。
+          setPhase({ s: 'failed', message: t('云端这次也没认出来 —— 可以换一张更清楚的,或者手填。',
+            "The cloud couldn't read it either — try a clearer photo, or type it in.") });
+          return;
+        }
+        texts.push(data.text);
+      }
+      pendingImagesRef.current = [];   // 发完就清:不留副本
+      finishWithText(texts.join('\n'));
+    } catch {
+      setPhase({ s: 'failed', message: t('没连上 —— 网络回来再试,或者手填。', 'Could not connect — try again later, or type it in.') });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [finishWithText, dict]);
 
   const patch = (i: number, p: Partial<Row>) => setPhase((cur) => {
     if (cur.s !== 'confirm') return cur;
@@ -210,11 +294,50 @@ export default function LabScanSheet({
                   'This PDF is a scan (each page is an image) with no text to read — it needs OCR.')}
               </p>
             )}
-            <p className="nesio-rel-detail-err" style={{ marginTop: phase.fromScan ? '0.4rem' : 0 }}>{unavailableMessage(phase.reason)}</p>
+            <p className="nesio-rel-detail-err" style={{ marginTop: phase.fromScan ? 'var(--space-1)' : 0 }}>{unavailableMessage(phase.reason)}</p>
+            {/* 主按钮仍然是手填 —— 默认不发。云那条是次要出口,而且要再点一次。 */}
             <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-2)' }} onClick={goManual}>
               {t('手填这张单子', 'Type this report in')}
             </button>
+            {pendingImagesRef.current.length > 0 && (
+              <button type="button" className="nesio-rel-log-btn" style={{ width: '100%', marginTop: 'var(--space-2)' }}
+                onClick={() => setPhase({ s: 'asking', reason: phase.reason, fromScan: phase.fromScan })}>
+                {t('或者:发到云端认一次', 'Or: send to the cloud to read it once')}
+              </button>
+            )}
           </div>
+        )}
+
+        {/* 真发之前把话说明白。**每一张都要走这一步** —— 没有「以后不再问」。 */}
+        {phase.s === 'asking' && (
+          <div>
+            <p style={{ fontSize: 'var(--text-body)', color: 'var(--portal-ink)', margin: 0, lineHeight: 1.7, fontWeight: 'var(--weight-semibold)' as unknown as number }}>
+              {t('这张化验单会发到云端认字。', 'This lab report will be sent to the cloud to be read.')}
+            </p>
+            <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-2)', lineHeight: 1.7 }}>
+              {t('化验单是病历 —— 上面有你的姓名、日期和各项数值。这一次发出去,只用来认字;'
+                + '认出来之后判「哪项偏高」仍然在这台设备上做,数值不会交给云去解读。'
+                + '每一张都会重新问一次,不会记住这次的选择。',
+                'A lab report is a medical record — it carries your name, dates and values. '
+                + 'This one send is only to transcribe the text; deciding what is out of range still happens on this device. '
+                + 'You will be asked again for every report — this choice is not remembered.')}
+            </p>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
+              <button type="button" className="nesio-rel-log-btn" style={{ flex: 1 }}
+                onClick={() => setPhase({ s: 'blocked', reason: phase.reason, fromScan: phase.fromScan })}>
+                {t('算了', 'No')}
+              </button>
+              <button type="button" className="nesio-ob-primary-btn" style={{ flex: 1 }} onClick={() => void sendToCloud()}>
+                {t('发出去认这一张', 'Send this one')}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {phase.s === 'sending' && (
+          <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>
+            {t('发出去认字中…', 'Sending to be read…')}
+          </p>
         )}
 
         {phase.s === 'failed' && (

@@ -5,7 +5,8 @@
 ## 原则
 
 1. **事实唯一入口**:`createSignal` / `ingestLifeNode`(禁止业务旁路 `addLifeNode`)
-2. **epistemic 必盖章**:写入时 stamp;检索只答地面事实
+2. **epistemic 必盖章**:写入时 stamp;检索只答地面事实(2026-08-01:`epistemic`/`generator`
+   在 `Signal` 类型上收紧为必填,不再是可选字段;旧数据读路径见 `ensureEpistemicStamp()`)
 3. **反馈不双写**:无 `nesio-signal-feedback-v1` / 无 `nesio-feedback-log-v1` / 无 `nesio-card-feedback-v1`;总线事件落 `feedback.reaction` Signal,DEC 压制读 `readFeedbackLog` 投影
 4. **学习投影可留**:Preference / Baseline / cooling / dormant —— 不是第二真相源
 5. **已退役伪智能**:`guidance-ranker` 在线学习接线、cross-region bandit 更新、living-model Lab、demo personalization stage、Recency 原语

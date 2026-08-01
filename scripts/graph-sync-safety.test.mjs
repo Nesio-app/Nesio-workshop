@@ -61,8 +61,11 @@ function loadGraph() {
     // life-node-merge 必须用**真的**(④ 钉的就是它的 LWW 行为);其余是检索/落盘辅助,
     // 与合并判定无关,给足够的空实现即可。vm 里 require 返回 {} 会让
     // `mergeConflictingNodes is not a function`,那是harness 假失败,不是产品 bug。
+    // context-extractor 同理要用真的:inferLifeNodeSignalSensitivity(2026-08-01 Domains
+    // 三合一新增)在 addLifeNode 路径上调用 classifyDomainFromText,空桩会让本测试假失败。
     require: (id) => {
       if (id.endsWith('life-node-merge')) return loadDep('lib/portal/life-node-merge.ts');
+      if (id.endsWith('context-extractor')) return loadDep('lib/life-domain/context-extractor.ts');
       return {
         emailFulltextScore: () => 0,
         tokenizeCJK: (s2) => String(s2).split(/\s+/).filter(Boolean),

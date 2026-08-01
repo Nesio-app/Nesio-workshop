@@ -2,8 +2,14 @@
 
 > Loop-engineering 原则:状态必须活在对话之外。任何 AI 会话或新协作者
 > **先读这个文件**,再动手。改动仓库重大状态时,同步更新这里。
-> 最后更新:2026-07-27(激进审计落地:Kill 伪智能/反馈双轨/认知双轨 + 成长教练收口 +
-> Finance/Health 可视化与品味旁注;见「已知欠账」首条与 signal-epistemic.md)
+> 最后更新:2026-08-01(五图反馈批:CSV 导入丢数据 bug 修复 + 今天页时间线三处 +
+> 记忆详情页整合;Signal/LifeNode schema 改名批:SignalSource 增删/修误分类 +
+> epistemic·generator 收紧必填;retentionPolicy/自定义 tag/LifeNodeType
+> 改名批因契约冲突或规格丢失明确搁置,见「已知欠账」首条;并发会话合并:与另一
+> 并行会话(claude/home-desktop-robot-setup-wb6rg7,PR #292-294)在 main 上的
+> 26 个提交做了真实内容合并,6 个冲突文件逐行核对,详见「已知欠账」新条目;
+> 洞察改「目标」+ 新增「回顾/计划」两个 tab + 每日日报改回今天页卡片 + 新增
+> 周报/月报回顾与计划引擎,见下方「洞察三 tab 化 + 周期报告」条目)
 
 ## 当前纪元:两代产品交接中
 
@@ -199,6 +205,191 @@
 sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
+
+- **Signal/LifeNode schema 改名批(2026-08-01,本轮)**:
+  ● **已落地**:`SignalSource` 删 `hardware_pulse`(死值),`manual`→`Entry`(跟
+    `LifeNodeSource.manual` 撞名分层),新增 `Bank`(银行流水影子节点 tx-node.ts)、
+    `meeting_notes`(会议记录 today-commands.ts);修正此前"有枚举值但从没被写入过"的
+    误分类(notion/toggl/health/wechat_reading/reminder/keep 现在都在 ingest 路径盖
+    `attributes.signalSource`/覆盖 `source`,不再被压平成泛泛的 manual/system/task/health)。
+    `Signal.epistemic`/`Signal.generator` 收紧为**必填**(原 `?:`),`lifeNodeToSignal()`/
+    云端 `sanitizeSignal()`/`signal-search.ts` 云行读取统一走 `stampEpistemic()` 兜底,
+    IDB 旧记录读路径加 `ensureEpistemicStamp()` 兜底(见 signal-epistemic.ts)。
+    `evidence`/`confidence` **刻意保留未删**(见下)。MemoryNodeDetail.tsx「其他属性」
+    默认折叠 + 补齐 tx-shadow/会议记录抽取的属性标签。
+  ● **明确未做(有理由,别误当遗漏)**:
+    ① `retentionPolicy` 删除/天气改直连 —— `scripts/runtime-data-plane-contract.test.mjs`
+       与 `scripts/signal-dec-platform-rules.test.mjs` 两条契约测试**钉死**天气必须走
+       `createSignal(normalizeWeatherToSignal(...))`,且天气已有 Disposable 24h 自动
+       裁剪 + 记忆列表展示层过滤(memory-visibility.ts `isWeatherNode`)—— 用户抱怨的
+       "天气占地方"表面症状已经被两层机制接住,贸然砍掉持久化会正面撞两条契约,
+       需要用户明确"连契约一起改"才能动。
+    ② `sensitivity` → `Domains` 改名重设计 —— **2026-08-01 已拿到用户明确决策并开始
+       落地,见下方新条目**;不再是待澄清项。
+    ③ 8 个自定义可见 tag(财务/物品/衣橱/美食/健康/人物/心情/阅读)UI 接线 —— 不确定
+       该接进哪个界面:最近一批("bug2 批·物品页")刚**删掉**物品页的"常用标签"快选
+       UI 当噪音处理,现在再加一版新标签选择器方向不明,存在跟那个决定正面冲突的风险。
+    ④ `LifeNodeType` 改名批(object→Thing / commitment→task / health_state→health /
+       preference→Mind / note→collection;person/event 不变,place 维持批次174的墓碑
+       退役状态不碰)—— 目标值都明确,但 `object` 一项就有 130+ 处字面量比较/构造点,
+       且 life-graph.ts 的图谱读入口不止一条(localStorage 种子 / IDB 分片 / 云拉取…),
+       安全的改法要求在**所有**读入口做旧值→新值归一化,否则任一入口漏做,老用户已存
+       的该类型记忆会在该入口静默"消失"(过滤器再也匹配不上旧字符串)。规模和风险都
+       够格单独立一个批次专门做,不该挤进这轮捎带手改完。
+  契约验证:`tsc --noEmit` 0 错(除 pre-existing 的 `lib/idb/__tests__/phase1-migration.test.ts`
+  缺测试框架类型声明);`test:security` 全绿;`test:contracts`(319 条)除 3 条**验证为
+  改动前就失败**的预置项(`cloud-module-data-runtime`/`v14-sovereignty-ui-regression`/
+  `cloud-auto-sync`,均与本批无关)外全绿。
+
+- **Domains 三合一(2026-08-01,进行中)**:用户明确决策 —— `SignalSensitivity`(退场)+
+  `FrontDomain`(`lib/life-domain/domain-taxonomy.ts`,此前只有语音捕获/搜索查询两条路径
+  会走到)+ 分类逻辑层,三合一;8 个自定义可见 tag(财务/物品/衣橱/美食/健康/人物/心情/
+  阅读)**明确不参与**——那是用户自己看的人工习惯,不算智能部分。
+  ● **第一轮(commit ba6a031)**:关键词判据接入既有 5 域(life/growth/assets/health/
+    energy),`node-context.ts` 的 `nodeDomain()` 加了关键词兜底(此前只有语音/搜索两条
+    路径走关键词分类,现在照片/邮件/连接器同步等大多数节点也能被内容判出 domain)。
+  ● **第二轮修正(commit 0763c95,当前状态)**:用户反馈"原来的分类命名不准确"—— `growth`
+    硬塞了"工作"+"学习"两件不相关的事,`assets` 硬塞了"钱"+"物品收纳"两件不相关的事。
+    **`FrontDomain` 从 5 桶改成 7 桶(breaking rename,growth/assets 两个值已删除)**:
+    `life`(生活,收纳/物品并入这里)、`work`(工作,新拆出)、`finance`(财务,原 assets
+    收窄到只管钱)、`health`/`energy`(不变)、`learn`(成长,原 growth 收窄到只管学习/
+    阅读/复盘反思)、`relationship`(关系,从 life 拆出人物向内容)。跟着改的消费方:
+    `context-extractor.ts` 的 `DOMAIN_KEYWORDS`/`classifyDomainFromText()`/`inferIntent()`,
+    `node-context.ts` 的 `TYPE_DOMAIN` 兜底表(person→relationship 比原来塞 life 准,
+    event/commitment→work 比原来笼统的 growth 准),`create-signal.ts`/`life-graph.ts` 的
+    sensitivity 关键词兜底(从只加严 health 扩到 finance/work 也一起加严),
+    `VoiceInputSheet.tsx` 的 `signalTypeForDomain()`。**没动**`isDeviceOnlySignal()`
+    本身的判据写法(仍是字面 `sensitivity === 'health'`,受
+    `scripts/health-privacy-boundary.test.mjs` 钉死);**没动**
+    `lib/portal/domain-capability-taxonomy-v1.mjs`(模块治理/审计层的独立 5 桶命名,给
+    "哪个老模块该收进哪个域"做历史记录用,是完全独立的系统,跟这次改的记忆内容分类
+    无关,不需要跟着改;`scripts/domain-capability-taxonomy-contract.test.mjs` 钉的正是
+    那个独立系统,本批未触碰,仍全绿)。
+  ● **未做、留给用户明确决定的开放问题**(高风险/不擅自决定):`isDeviceOnlySignal`
+    要不要跟着 `FrontDomain.gated` 从「只挡 health」扩到「health + energy 一起挡」——
+    `DOMAINS.energy.gated = true`,PRD 里已经把 energy(情绪/心理/冥想)当敏感域设计,
+    但当前隐私闸门只认 `sensitivity === 'health'`。扩大是更保守的方向,但会让此前能
+    同步的 energy 类内容变成设备专属,是要用户点头的行为变化。
+    (原先关于 `life-state.ts` `evalWork`/`evalFinance` 严格判据的开放问题,随 7 桶拆分
+    已经自然解决——`work`/`finance` 现在是干净的独立域,不再跟 growth/assets 混杂。)
+  ● 顺带修了 3 条契约测试(`graph-sync-safety`/`life-graph-fact-sink`/`signal-epistemic`)
+    的 vm 沙箱 harness——新增的 `context-extractor` 依赖在假 `require` 桩下返回空对象,
+    导致 `classifyDomainFromText is not a function` 假失败(不是产品 bug),已接上真实现。
+  契约验证(两轮都做过):`tsc --noEmit` 0 错;`test:security` 全绿;`test:contracts`
+  全量扫过,确认额外触发的失败(`cloud-module-data-runtime`/`v14-sovereignty-ui-regression`/
+  `auth-implicit-session-import`/`cloud-auto-sync`/`body-ledger-contract`/
+  `travel-trips-contract`/`design-token-ratchet`/`qa:launch`/`release:serial`/4 个
+  `test:e2e*` 因沙箱无 Chrome 二进制)经 `git stash` 回退到改动前逐个确认全部是本批
+  之前就存在,与本批无关。
+
+- **五图反馈批(2026-08-01)**:用户给了 5 张带手绘圈的真机截图,逐条修完。
+  ● **最高优先级 · 数据丢失 bug(`lib/portal/life-graph.ts`)**:CSV 导入的物品下次开
+    App 就没了。根因:`graphHydrated` 在水合**发起**那一刻就置 `true`(只为防重入),
+    `saveAll` 却拿它当"水合已完成"的判据,在真正读完 IDB + union 旧数据之前就把
+    "种子 + 本次新增几条"的半张图交给 `writeGraphShards`,分片索引被覆盖 ——
+    没提到的历史年份分片物理数据还在但读不出来,且完全静默(不报错、不告警)。
+    修法:拆出 `graphHydrationSettled`,只在水合真正跑完那一刻才置 true,`saveAll`
+    改认这个新标记而不是 `graphHydrated`。
+  ● 今天页:`keyword-lexicon.ts` 的 `medical` 正则里裸的"检查"太宽泛,把"检查学校
+    账单"误判成"医疗预约"(收窄成"检查"+身体部位搭配);`CalendarCards.tsx` 日历行
+    ✕ 按钮布局错位(外层不支持 flex 子项并列)+ `FocusSection.tsx` 的 `rest` 过滤
+    漏了 `!dismissed.has()`(点了不管用,两个 bug 一起修);`TodayFeed.tsx` 引导卡跳
+    记忆详情没传 `elevated`,z-index 比来源卡矮一层导致"重影";积分从顶栏 chip 的
+    浮层商城升级成 `InsightsSheet.tsx` 下的独立 `rewards` tab(复用现成
+    `RewardsStore` 组件,删掉不再用的 `RewardsStoreSheet.tsx`)。
+  ● 记忆详情页(`MemoryNodeDetail.tsx`):`updatedAt` 补进隐藏字段名单(此前裸露成
+    原始 UTC ISO 串,看着像时区错了);邮件来源行不再多写"Gmail";event 类型详情页
+    不再重复显示同一个时间;"用镜头看看"并入阅读/编辑/删除同一排;
+    "＋关联一条记忆"挪到"相关记忆"标题行内。
+  契约验证:`tsc --noEmit` 0 错;`test:security` 全绿;`test:contracts` 全量扫过,
+  额外触发的失败(`auth-session-sticky-refresh`,连同已知的
+  `cloud-module-data-runtime`/`v14-sovereignty-ui-regression`/
+  `auth-implicit-session-import`/`cloud-auto-sync`/`body-ledger-contract`/
+  `travel-trips-contract`/`design-token-ratchet`/`qa:launch`/`release:serial`/
+  4 个 `test:e2e*`)经 `git stash` 回退逐个确认与本批无关。
+
+- **并发会话合并(2026-08-01)**:用户要求「把之前的改动都 pr deploy」时发现,
+  生产实际加载的 `treasurebox-nu.vercel.app`(原生壳 Capacitor `server.url` 远程
+  WebView 指向此处,纯 JS 改动推到 `main` 免重签重装)已经落后 —— 另一个并行运行
+  的 Claude Code 会话(`claude/home-desktop-robot-setup-wb6rg7`)当天已把 PR
+  #292-294(26 个提交)合进 `main`,而本会话 24 个提交(Domains 三合一 + 五图反馈批)
+  从未合并。开 PR #295,`git merge origin/main` 在 6 个文件产生真实内容冲突,逐个
+  核对合并(非二选一):
+  ● `TodayFeed.tsx` 的 `recognizeSavedImage`——两边各自独立重写了同一个函数:
+    这边(HEAD)加了"先端上 OCR 识字、单据字段抽全了就不出门"(省钱/离线),
+    那边(main)加了 `canUsePaidCloudAi()` 门 + 每条路径都要有可见失败态(这边此前
+    是裸 `catch {}`,违反 CLAUDE.md"每个异步动作必须有可见失败态")。两边都是对的、
+    都不能丢——合成:端上先行 → 端上答不出才查权益 → 查完权益无论哪个分支都要说话。
+  ● `SchedulePanel.tsx`——那边把手动填表单的"加一条提醒"整个删了(改用首页输入框
+    统一建提醒),换成只读的"已完成提醒"视图(`CompletedReminders`,新功能)。取了
+    那边的结构,但那张旧表单里"存下了就弹系统通知权限"这条逻辑跟着表单一起消失了
+    ——首页输入框那条建提醒的路(`TodayFeed.tsx` 的 `onRemind`)本来就没接这个权限
+    请求,合并后会变成"提醒能设上,但从没人被问过要不要开系统通知,到点不响"。
+    已经补上(`onRemind` 里接 `syncReminderNotifications({ askPermission: true })`,
+    拒绝时给可见的"去设置里开"提示)。**后续追问已排除**:用户反馈"提醒设置好系统
+    没有弹出任何授权提醒",但确认 iOS「设置 → 通知 → 宝盒」当时已经是"允许通知"
+    打开的状态——`ensureLocalNotificationPermission()` 见已授权就直接返回 true,
+    不会再弹系统弹窗,这是**正确行为**,不是回归。真正待验证的是提醒**到点是否真响**
+    (`syncReminderNotifications` 的排程链路本身),不是权限请求这一步——留给下一次
+    真机测试确认。
+  ● `CalendarCards.tsx`(采用那边更干净的 `CollapsedCalItem` 结构,删掉这边多出的
+    CSS 类)、`package.json`(两边新测试脚本取并集)、`scripts/today-capture-flow.test.mjs`
+    / `scripts/capture-trio.test.mjs`(断言改成同时验两边的判据,而不是二选一)。
+  契约验证:`tsc --noEmit` 0 错(除已知的 `phase1-migration.test.ts`);`test:security`
+  全绿;`today-capture-flow`/`capture-trio`/`schedule-reminders`/`schedule-panel-dedup`/
+  `card-verdict`/`guidance-judge` 定向复核全绿。`design-token-ratchet` 失败
+  (195 vs 基线 193)**确认是合并前 HEAD 自己就有的既存差距**(`LabScanSheet.tsx`
+  裸按钮 13 vs 主干 10,早于本次合并——用 `git worktree` 分别量过 HEAD/main 两边
+  的原始计数确认),非本次合并引入,未在本轮顺手修(超出"合并部署"范围,记账于此)。
+
+- **洞察三 tab 化 + 周报/月报引擎(2026-08-01)**:用户拍板扩展"每日简报"到周期性
+  回顾/计划,并顺带纠正了两处我先前答错的事实(见下)。
+  ● **纠正**:①`SignalSource` 只删了 `hardware_pulse` 一个死值,`notion`/`toggl`/
+    `reminder`/`keep`/`wechat_reading` 仍在——它们是 ConnectorsHub 里真实连接器的
+    signalSource(Notion/Toggl/Keep 健康/微信读书导入),不是死代码,我之前笼统说
+    "都删了"是错的。②`LifeNodeType` 改名批(person/event/Place/Thing/Mind/task/
+    collection)**确实没做**——`lib/portal/life-graph.ts` 里仍是旧值
+    (object/commitment/health_state/preference/note),STATE.md 早前已把它列为
+    "规模够格单独立一个批次,不该捎带手改"的明确搁置项;用户说"我也说改了的",
+    这里如实告知现状(没做),不是又一次误判。
+  ● **奖励**:积分 chip 从今天页顶栏彻底删除(`points` state + 按钮一并清,只在
+    `InsightsSheet` 的 rewards tab 里露面,不再有今天页入口)。
+  ● **洞察改名 + 新增两个 tab**:`MainTab` 加 `'retrospect'`(回顾)`'plans'`(计划);
+    `'reflection'` 的 tab 标签"洞察"→"目标"(内容不变,仍是模式分析/生命版图那一套)。
+    每日日报从 `'reflection'` tab 里搬进新的 `RetrospectPanel`(回顾),旁边加周报/
+    月报历史列表;`PlansPanel`(计划)展示下周/下月计划,只看当期不列历史。
+  ● **周报/月报引擎**(新文件 `lib/portal/periodic-report.ts`):复用日报已有的地基,
+    不重新取数——**回顾**把窗口内已落库的每日日报摞起来做汇总(标题列表 + 从
+    每日日报存的 insights JSON 里数各域被提到几次,纯计数不叙事)+ 这一期做完的
+    提醒;**计划**是窗口内已确定的日历项/到期提醒 + 线头(loose-threads),同日报
+    "往前看"段一样的红线:只放已知的,不推测。锚点周一 08:00(周)/ 每月 1 日
+    08:00(月),和 Vercel 现有的 `vercel.json` cron(`7 8 * * 1` 跑 weekly analyst)
+    同一天。回顾看的是**上一期**(锚点到了才看刚结束的那期),计划看的是**这一期**
+    (锚点到了看今天起到期末)——periodKey 天然不同,互不冲突。持久化模式照抄
+    `daily-report-persist.ts`:落成 `kind: 'periodic-report'` 的记忆节点,
+    `externalId` 幂等,`localStorage` 记"这一期问过了没"防重复生成(4 个静态 key,
+    没用模板字符串拼——那样会绕过 `storage-key-registry` 的字面量扫描,新登记的
+    4 个 + 1 个卡片 dismiss key 全部过契约)。生成时机接进 `useTodayData.ts` 里
+    `autoPersistTodayReport` 紧挨着的那处,同一个 `dailyReportEnabled` 开关,
+    没让用户多开一道设置。
+    渲染复用 `DailyReportSheet`(新增 3 个 section id:`completed`/`tally`/
+    `threads`,不为"本质上也是一份报告"的东西另起壳),`footNote` 改成可传参
+    (日报"这一天不再变" vs 周期报告"这一期不再变")。
+  ● **每日日报卡片重新上今天页**(推翻 2026-07-30"今天不要入口"的旧定案,
+    `daily-report-crossface.test.mjs` 的对应断言已从"不许有卡片"改成"必须有卡片
+    且只读冻结件"):新文件 `components/portal/today/DailyReportCard.tsx`,到点
+    (08:00)有内容才出现,"今天先不看"只压到明天(非永久,永久开关在设置里)。
+  ● **明确 v1 简化,未细化**(用户原话"初步设想,细节还需要增加"):周报/月报的
+    "回顾"内容目前只是标题罗列 + 域计数,没有叙事化摘要;"计划"只列已排定的事,
+    没有主动建议;"全平台打通"经核实简报取数本来就已经接了 7 个域 + 提醒/衣橱/
+    做饭/库存/健身/线头(不是只有日历邮件),内容单薄更可能是"正向准入"的过滤
+    门槛偏严(只放"今天真要你动"的),不是取数窄——这条待用户下一轮确认具体是
+    哪一路觉得单薄,再决定是放宽过滤还是真的加新取数源。
+  契约验证:`tsc --noEmit` 0 错;`test:security` 全绿;`daily-report`/
+  `daily-report-persist`/`daily-report-crossface`(断言已更新)/`storage-key-registry`
+  全绿;`design-token-ratchet` 195(基线 193)确认是本条之前就有的既存差距,本条
+  未新增裸按钮。手动核算 `isoWeekKey`/`periodAnchor`/`periodDue`/`buildRetrospect`/
+  `buildPlan` 的日期边界逻辑(周一 8 点前后、跨周边界)。
 
 - **VoiceInputSheet 的 `intent='ask'` 那一支已不可达,但还没删(2026-07-31)**。
   用户两次指同一件事(「点击问问符号,进入真的问问界面」),这一轮把**所有**问念念入口

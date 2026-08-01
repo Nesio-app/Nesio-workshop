@@ -149,7 +149,6 @@ export function CollapsedCalItem({ obj, onOpenRecorder, onRemove }: { obj: Atten
 
   return (
     <li className="nesio-collapsed-item">
-      {/* 批次 111:日历项也做成时间线节点 —— 空心圆点在轨上 + 时标 kicker + 标题(去掉旧的图标+右侧 meta) */}
       {/*
        * 2026-07-31(用户实测 图2「x 位置应该在对应条目后,并且现在不管用」):
        * 这一行原来**整行是一个 button 元素**,而 ✕ 又不能嵌在按钮里(嵌套按钮),

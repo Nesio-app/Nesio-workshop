@@ -354,6 +354,8 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts }: {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const pickRef = useRef<HTMLInputElement>(null);
+  /** 端上从发票上读出来的话。「这张票上写的是多少」和这笔钱对不对得上,是挂发票的**全部意义**。 */
+  const [scanNote, setScanNote] = useState<{ text: string; mismatch: boolean } | null>(null);
   const failed = L(dict, '这一下没存进本机 —— 可能空间满了,清点空间再试。', 'Not saved on this device — storage may be full.');
 
   const people = ann.people || [];
@@ -407,6 +409,34 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts }: {
       if (!added.graphOk) {
         setErr(L(dict, `「${f.name}」已存好,但还没连进记忆 —— 下次同步后记忆详情里也能看到。`,
           `“${f.name}” is saved, but not linked into memory yet — the next sync will connect it.`));
+      }
+
+      // ── 在这台设备上认一遍字 ────────────────────────────────────────────
+      //
+      // 「传附件」以前**只是存**:发票挂上去了,上面写的金额日期商家一个字都没进系统,
+      // 搜也搜不到、对也对不上。可挂发票的意义**就是**那些字。
+      //
+      // 发票上是税号和金额 —— 这一步只在本机做,图一个字节不出手机。
+      // (产品仓 nesio 里云识图在付费门后面;这里是 workshop,不分收费免费。)
+      if (f.type.startsWith('image/') && added.nodeId) {
+        const { attachImageUnderstanding } = await import('@/lib/portal/image-understand');
+        const seen = await attachImageUnderstanding(added.nodeId, [f], { keepName: true });
+        if (seen?.fields) {
+          const amt = seen.fields.amount;
+          // 差一分以内当一致 —— 浮点和四舍五入不该报成「对不上」。
+          const mismatch = Math.abs(amt - Math.abs(txAmount)) > 0.01;
+          setScanNote({
+            text: mismatch
+              ? L(dict, `票上是 ${amt}${seen.fields.date ? ` · ${seen.fields.date}` : ''},和这笔的 ${Math.abs(txAmount)} 对不上 —— 可能是含税前后,也可能挂错了单。`,
+                     `Receipt says ${amt}${seen.fields.date ? ` · ${seen.fields.date}` : ''} — doesn't match this ${Math.abs(txAmount)}. Could be pre/post tax, or the wrong receipt.`)
+              : L(dict, `票上是 ${amt}${seen.fields.date ? ` · ${seen.fields.date}` : ''},和这笔对得上。`,
+                     `Receipt says ${amt}${seen.fields.date ? ` · ${seen.fields.date}` : ''} — matches this one.`),
+            mismatch,
+          });
+        } else if (seen?.visionMessage) {
+          // 「这台设备认不了字」和「这张图没认出字」是两件事,别混成一句。
+          setScanNote({ text: seen.visionMessage, mismatch: false });
+        }
       }
     }
     setAnn(txAnnotationOf(txId));
@@ -474,6 +504,11 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts }: {
         placeholder={L(dict, '备注', 'Note')}
         onChange={(e) => setNote(e.target.value)}
         onBlur={() => { if (note !== (ann.note || '')) { setErr(setTxNote(txId, note) ? null : failed); setAnn(txAnnotationOf(txId)); } }} />
+
+      {/* 对不上不用红色 —— 那多半是含税前后差,不是出事了。用琥珀提一句就够。 */}
+      {scanNote && (
+        <p className={`nesio-fin-scannote${scanNote.mismatch ? ' is-off' : ''}`}>{scanNote.text}</p>
+      )}
 
       {err && <p className="nesio-rel-detail-err" role="alert">{err}</p>}
     </div>

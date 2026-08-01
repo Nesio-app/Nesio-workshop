@@ -112,6 +112,9 @@ function writeMeetingExtraction(
       ...(inferred.length ? { inferredJson: JSON.stringify(inferred) } : {}),
       ...(people.length ? { people: people.join(en ? ', ' : '、') } : {}),
       ...(calNode ? { calendarNodeId: calNode.id, calendarName: calNode.name } : {}),
+      // source: 'voice' 落 LifeNodeSource 会跟随手一句语音记的东西混在一起 ——
+      // 会议记录有专属 SignalSource('meeting_notes'),标出来才认得出是转写不是随口一句。
+      signalSource: 'meeting_notes',
     },
     rawInput: notes,
     confidence: 1,

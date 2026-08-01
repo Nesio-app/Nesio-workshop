@@ -218,8 +218,14 @@ assert.ok(
     '认不出来 / 连不上,两种都要说 —— 别让人以为识别悄悄成功了',
   );
   // 只认了第一张,就只有单张时才敢改名 —— 多张时把「3 张照片」改成第一张的内容是错的。
+  // 2026-08-01 合并:识别函数改成收整个 files 数组(端上要给每一张都过一遍 OCR),
+  // 是不是「唯一一张」改成函数内部用 files.length === 1 自己算,不再靠调用方传第三个参数。
   assert.ok(
-    /recognizeSavedImage\(imgs\[0\], node\.id, imgs\.length === 1\)/.test(feed),
+    /recognizeSavedImage\(imgs, node\.id\)/.test(feed),
+    '「+」传图识别不再收整份文件数组 —— 多张时端上就没法每张都认一遍',
+  );
+  assert.ok(
+    /const only = files\.length === 1;/.test(feed),
     '要告诉识别这是不是唯一一张',
   );
   assert.ok(

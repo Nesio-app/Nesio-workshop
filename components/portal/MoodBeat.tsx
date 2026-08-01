@@ -88,8 +88,11 @@ export default function MoodBeat() {
       >
         <span className="nesio-tl-dot nesio-tl-dot--mood nesio-tl-dot--mood-invite" aria-hidden><MoodRipple /></span>
         <span className="nesio-tl-time">{L(dict, '现在', 'Now')}</span>
+        {/* 2026-07-31:副标题「滑一下记 5 秒 · 今天还没记」删掉。
+            「今天还没记」是每天必现的一句 —— 它把「还没做」摆到首页上,
+            正是文案红线里要避的那种催促;而「滑一下记 5 秒」是操作说明,
+            点进去就知道,不必在首页上先教一遍。标题那句已经是邀请了。 */}
         <span className="nesio-tl-title">{L(dict, '此刻,你感觉——', 'This moment, you feel —')}</span>
-        <span className="nesio-tl-sub">{L(dict, '滑一下记 5 秒 · 今天还没记', '5 seconds to log · not yet today')}</span>
       </button>
     );
   }

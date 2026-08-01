@@ -1,6 +1,6 @@
 import { getSignals, type Signal } from './signal';
 import { retrievalScoreAdjust, isDownranked } from './retrieval-feedback';
-import { isGroundFact, isSignalEpistemic, parseDerivedFromAttr } from './signal-epistemic';
+import { isGroundFact, isSignalEpistemic, parseDerivedFromAttr, stampEpistemic } from './signal-epistemic';
 
 /** 检索反馈的目标稳定键:与云端行 evidence.externalId 对齐,回退 signal.id。 */
 function retrievalKey(signal: Signal): string {
@@ -104,8 +104,17 @@ export function cloudSignalRowToSignal(row: CloudSignalRow): Signal | null {
     ...(embeddingText ? { embedding_text: embeddingText } : {}),
   };
   const evidence = row.evidence || { source: row.source, raw: embeddingText };
-  const epistemic = isSignalEpistemic(payload.epistemic) ? payload.epistemic : undefined;
-  const generator = typeof payload.generator === 'string' ? payload.generator : undefined;
+  const confidence = typeof row.confidence === 'number' ? row.confidence : 0.7;
+  // epistemic/generator 必填(2026-08-01)——云端行是老 schema 存的,可能压根没这两列,
+  // 跟本机读路径(ensureEpistemicStamp)一样用 stampEpistemic 兜底,不留 undefined。
+  const stamp = stampEpistemic({
+    epistemic: isSignalEpistemic(payload.epistemic) ? payload.epistemic : undefined,
+    generator: typeof payload.generator === 'string' ? payload.generator : undefined,
+    type: row.type,
+    source: row.source,
+    confidence,
+    payload,
+  });
   const derivedFrom = parseDerivedFromAttr(payload.derivedFrom);
   return {
     id: row.signal_id,
@@ -117,13 +126,13 @@ export function cloudSignalRowToSignal(row: CloudSignalRow): Signal | null {
     payload,
     content: payload,
     entities: Array.isArray(row.entities) ? row.entities : [],
-    confidence: typeof row.confidence === 'number' ? row.confidence : 0.7,
+    confidence,
     sensitivity: row.sensitivity || 'normal',
     retentionPolicy: row.retention_policy || 'Normal',
     evidence,
     tags: [],
-    epistemic,
-    generator,
+    epistemic: stamp.epistemic,
+    generator: stamp.generator || String(row.source),
     derivedFrom,
   };
 }

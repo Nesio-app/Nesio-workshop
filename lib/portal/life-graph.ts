@@ -4,6 +4,7 @@
  * This is the foundation for Reasoning Engine and Today Feed.
  */
 import { mergeConflictingNodes } from './life-node-merge';
+import { classifyDomainFromText } from '../life-domain/context-extractor';
 import { emailFulltextScore } from './email-fulltext-index';
 import { tokenizeCJK } from './cjk-tokenize';
 import { expandQueryTerms } from './query-synonyms';
@@ -154,6 +155,14 @@ function inferLifeNodeSignalSensitivity(node: LifeNode): string {
   if (tags.includes('finance') || tags.includes('财务')) return 'financial';
   if (tags.includes('family') || tags.includes('家庭')) return 'family';
   if (node.source === 'calendar' || tags.includes('work') || tags.includes('工作') || tags.includes('会议')) return 'work';
+  // 2026-08-01 Domains 三合一:同 create-signal.ts 的 inferSensitivity,关键词兜底只加严。
+  const text = [node.name, node.rawInput, node.tags?.join(' ')].filter(Boolean).join(' ');
+  if (text) {
+    const domain = classifyDomainFromText(text);
+    if (domain === 'health') return 'health';
+    if (domain === 'finance') return 'financial';
+    if (domain === 'work') return 'work';
+  }
   return 'normal';
 }
 
@@ -702,6 +711,14 @@ export async function retryLifeGraphCloudSync(): Promise<{
 let memCache: LifeNode[] | null = null;
 let memDirty = false;
 let graphHydrated = false;
+// 2026-08-01 用户实锤「CSV 导入的数据下次开 App 就没了」——根因:上面的 graphHydrated
+// 在水合**发起的那一刻**就置 true(只为防重入),saveAll 却拿它当「水合已完成」的判据,
+// 在水合真正跑完(读 IDB + union 旧数据)之前就把只有「种子 + 本次新增几条」的半张图
+// 直接喂给 persistGraphToIdb → writeGraphShards,分片索引被这半张图整个覆盖 —— 索引
+// 不再指向没被这次 nodes 提到的历史年份分片,物理数据还在但读不出来了,且完全静默。
+// 拆成两个标记:graphHydrated 仍是「水合是否已发起」的重入锁;这个新标记只在水合的
+// 异步读取 + union 真正跑完那一刻才置 true,saveAll 改认这个。
+let graphHydrationSettled = false;
 
 function seedFromLocalStorage(): LifeNode[] {
   try {
@@ -812,6 +829,7 @@ function hydrateGraphOnce(): void {
       // 跑一遍不花钱。放在这里而不是给个按钮 —— 那些关系界面上根本渲染不出来,
       // 用户不知道它存在,也就永远不会去点那个按钮。
       try { repairDanglingRelations(); } catch { /* 修不动就保持原样,不挡启动 */ }
+      graphHydrationSettled = true; // 只有真读完 + union 完才算数,saveAll 靠这个判断能不能直接落盘
       window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
     } catch {
       // 水合失败:保持 localStorage 播种,不删 localStorage,放开重入让下次再试
@@ -833,14 +851,18 @@ function saveAll(nodes: LifeNode[]): void {
   if (typeof window === 'undefined') return;
   compactCloudSyncOutboxOnce();
   memCache = nodes;
-  const wasHydrated = graphHydrated;
+  // 2026-08-01 修复:必须用「水合真跑完」而不是「水合已发起」来判断能不能直接落盘 ——
+  // 见上面 graphHydrationSettled 声明处的注释。未 settle 时 hydrateGraphOnce() 若已
+  // 在飞行中会因重入锁直接返回,但没关系:memDirty 已置 true、memCache 已是最新,
+  // 水合自己的完成回调会读到这两者,union 旧 IDB 数据后再回写,不会漏了这次的改动。
+  const wasSettled = graphHydrationSettled;
   memDirty = true;
   window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
   import('./storage-health').then(({ checkStorageWarning }) => checkStorageWarning());
-  if (wasHydrated) {
+  if (wasSettled) {
     persistGraphToIdb(nodes);
   } else {
-    hydrateGraphOnce(); // 未水合:reconcile(union 旧 IDB)后由水合回写,防覆盖旧数据
+    hydrateGraphOnce(); // 未水合完成:reconcile(union 旧 IDB)后由水合回写,防覆盖旧数据
   }
 }
 

@@ -32,7 +32,13 @@ function load(rel, requireImpl = () => ({})) {
   return ctx.module.exports;
 }
 
-const mocks = (p) => (p === './storage-health' ? { checkStorageWarning: () => {}, reportStorageDropped: () => {} } : ({}));
+const mocks = (p) => {
+  if (p === './storage-health') return { checkStorageWarning: () => {}, reportStorageDropped: () => {} };
+  // 2026-08-01 Domains 三合一:inferLifeNodeSignalSensitivity 新增调用 classifyDomainFromText,
+  // 空桩会让 addLifeNode 里的 sensitivity 判定假抛错,这里跟 life-node-merge 一样接真实现。
+  if (p.endsWith('context-extractor')) return load('../lib/life-domain/context-extractor.ts');
+  return {};
+};
 const lg = load('../lib/portal/life-graph.ts', mocks);
 
 // 注册间谍 sink

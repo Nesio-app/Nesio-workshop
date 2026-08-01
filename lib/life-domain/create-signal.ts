@@ -19,6 +19,7 @@ import {
   stampEpistemic,
   type SignalEpistemic,
 } from './signal-epistemic';
+import { classifyDomainFromText } from './context-extractor';
 
 export const SIGNAL_SCHEMA_VERSION = 'Signal@v1';
 export type SignalWriteMode = 'local_first' | 'cloud_mirror_attempted' | 'cloud_mirror_pending';
@@ -82,7 +83,7 @@ function lifeNodeSource(source: SignalSource): LifeNodeSource {
   if (source === 'calendar') return 'calendar';
   if (source === 'gmail') return 'email';
   if (source === 'voice') return 'voice';
-  if (source === 'manual') return 'manual';
+  if (source === 'Entry') return 'manual';
   return 'system';
 }
 
@@ -113,12 +114,24 @@ function inferSensitivity(input: CreateSignalInput): SignalSensitivity {
   if (input.source === 'health') return 'health';
   if (String(input.type).startsWith('finance.')) return 'financial';
   if (input.source === 'calendar' || input.source === 'gmail' || input.source === 'task') return 'work';
+  // 2026-08-01 Domains 三合一:source/type 都没标出来时,再用关键词判一遍(与 FrontDomain
+  // 用同一张表,见 context-extractor.ts)。只做加严 —— 只会把更多内容并入这三档,永远不会把
+  // 已经判定的内容判走;不动 isDeviceOnlySignal 的闸门写法本身(仍是字面 sensitivity ===
+  // 'health',受 scripts/health-privacy-boundary.test.mjs 钉死,那道闸门要不要跟着
+  // FrontDomain.gated 扩到 energy 域是没决定的开放问题,这里不擅自扩)。
+  const text = [input.title, input.raw].filter(Boolean).join(' ');
+  if (text) {
+    const domain = classifyDomainFromText(text);
+    if (domain === 'health') return 'health';
+    if (domain === 'finance') return 'financial';
+    if (domain === 'work') return 'work';
+  }
   return 'normal';
 }
 
 function inferRetention(input: CreateSignalInput): RetentionPolicy {
   if (input.retentionPolicy) return input.retentionPolicy;
-  if (input.source === 'weather' || input.source === 'hardware_pulse') return 'Disposable';
+  if (input.source === 'weather') return 'Disposable';
   if (input.source === 'health' || input.source === 'gmail') return 'LongLiving';
   return 'Normal';
 }

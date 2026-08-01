@@ -38,6 +38,10 @@ export function persistMirrorLetterToMemory(
       topic: letter.topic || 'all',
       epistemic: 'derived',
       generator: 'ai:mirror',
+      // LifeNodeSource(6 值)没有 ai_observation,只能落 'system' —— 但 Signal 层的
+      // source(18 值)读的是这个字段优先(signal.ts:207),不填就被 NODE_SOURCE_TO_SIGNAL
+      // 压平成 device。这封信是 AI 对用户的观察,ai_observation 才是它的真实来源。
+      signalSource: 'ai_observation',
     },
   });
   return 'saved';

@@ -17,12 +17,22 @@ import type { SignalContext } from './context';
 
 // ── Domain classification (keyword → front domain) ──────────────────────────
 
+// 2026-08-01 用户点名二轮修正:「原来的分类命名不准确」—— growth 硬塞了「工作」+「学习」两件
+//不相关的事,assets 硬塞了「钱」+「物品收纳」两件不相关的事,分类结果自然模糊。拆成 7 桶,
+// 关键词表按用户手写草案逐行对齐(不再合并进旧的 5 桶):work(工作单独)、finance(财务只管钱,
+// 物品收纳挪去 life)、health(身体客观指标)、energy(情绪/心理主观状态)、life(生活杂项 + 物品)、
+// learn(学习/阅读/复盘反思/镜子内容)、relationship(人物向内容单独拆出,不再併入 life)。
+// 「旅行」在 life 和 relationship 里都出现(草案原文如此)——同框共现时靠命中数打分自然消歧
+// (「和妈妈旅行」→ relationship 2 命中 > life 1 命中)。
+// 「reader 高亮划线」不是靠关键词猜的——见 node-context.ts 的非文本判据(有专属数据标记)。
 const DOMAIN_KEYWORDS: Array<{ domain: FrontDomain; words: RegExp }> = [
-  { domain: 'assets', words: /(放在|存在|收纳|盒子|抽屉|储物|物品|买|购|账单|订阅|续费|预算|花了|剩.{0,3}瓶|快递|发票)/ },
+  { domain: 'work', words: /(会议|任务|项目|工作|deadline|截止|汇报|加班|开会)/ },
+  { domain: 'finance', words: /(收入|支出|退款|投资|价格|费用|订单|账单|订阅|续费|快递|发票|资产|税金|花了|预算|买|购)/ },
   { domain: 'health', words: /(睡|运动|健身|训练|跑步|血糖|药|医院|体检|身体|饮食|卡路里|心率)/ },
+  { domain: 'life', words: /(放在|存在|收纳|盒子|抽屉|储物|物品|剩.{0,3}瓶|旅行|音乐|衣服|美食|穿搭|家务|愿望|足迹|饭店|剧场)/ },
   { domain: 'energy', words: /(焦虑|情绪|冥想|低能量|恢复|疲惫|压力|心理|独处|放空|grounding)/ },
-  { domain: 'growth', words: /(会议|任务|项目|工作|学习|阅读|论文|刷题|笔记|复盘|deadline|截止)/ },
-  { domain: 'life', words: /(生日|礼物|旅行|朋友|妈妈|爸爸|家人|聚餐|约会|纪念日)/ },
+  { domain: 'learn', words: /(学习|阅读|论文|刷题|笔记|复盘|反思|知识|学业|镜子)/ },
+  { domain: 'relationship', words: /(生日|礼物|旅行|朋友|妈妈|爸爸|家人|聚餐|约会|纪念日)/ },
 ];
 
 // 批次 146:分类不准的根 —— 旧逻辑「首个命中赢 + 零命中一律默认 life + 置信度硬编码 0.7」,
@@ -32,6 +42,17 @@ function countHits(text: string, re: RegExp): number {
   const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
   return (text.match(g) || []).length;
 }
+/** 零命中返回 null(不装懂猜 life)——给 node-context.ts 的「关键词兜底,猜不出才退到粗粒度 type 映射」用。
+ *  跟 classifyDomain 用同一张关键词表,不重复维护;classifyDomain 自己的零命中行为(→ life 低置信,
+ *  给 isNodeUncertain 标「待确认」)是 extractContext()/语音捕获路径依赖的既有行为,不动它。 */
+export function classifyDomainFromText(text: string): FrontDomain | null {
+  const scored = DOMAIN_KEYWORDS
+    .map((k) => ({ domain: k.domain, hits: countHits(text, k.words) }))
+    .filter((s) => s.hits > 0)
+    .sort((a, b) => b.hits - a.hits);
+  return scored.length ? scored[0].domain : null;
+}
+
 function classifyDomain(text: string): { domain: FrontDomain; secondary: FrontDomain[]; confidence: number } {
   const scored = DOMAIN_KEYWORDS
     .map((k) => ({ domain: k.domain, hits: countHits(text, k.words) }))
@@ -85,7 +106,8 @@ function inferIntent(text: string, domain: FrontDomain): string {
   if (/(提醒|别忘|记得|到期|续费|过期)/.test(text)) return 'remind';
   if (/(安排|计划|几点|明天|下周|约)/.test(text)) return 'schedule';
   if (/(感觉|状态|情绪|今天很)/.test(text)) return 'reflect';
-  return domain === 'assets' ? 'find_later' : 'log';
+  // 「找东西」意图跟着「收纳/物品」概念走——那部分现在归 life,不再是 finance(finance 收窄到钱)。
+  return domain === 'life' ? 'find_later' : 'log';
 }
 
 // ── Main ────────────────────────────────────────────────────────────────────

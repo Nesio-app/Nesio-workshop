@@ -135,11 +135,18 @@ function clearAuthCallbackParams() {
   if (changed) window.history.replaceState(null, document.title, `${url.pathname}${url.search}${url.hash}`);
 }
 
+/**
+ * 走 session-state 单例(2026-07-31 归一)。原来这里自己 fetch 一趟,
+ * 和 Portal、mirror-profile 各打各的 —— 三趟请求各自在不同时刻回来、
+ * 各自 setState,开机头几秒登录态就会来回变(用户报的「设置的登录状态也在变」)。
+ *
+ * 引导页要的是 `user.name` / `displayName` 这些字段,所以取整个 payload;
+ * 单例现在把它原样缓存着,不用再自己发请求。
+ */
 async function readAuthSession(): Promise<AuthSessionResult | null> {
   try {
-    const res = await fetch('/api/auth/session', { cache: 'no-store' });
-    if (!res.ok) return null;
-    return await res.json() as AuthSessionResult;
+    const { readSession } = await import('@/lib/portal/session-state');
+    return ((await readSession()).payload as AuthSessionResult | null) ?? null;
   } catch {
     return null;
   }

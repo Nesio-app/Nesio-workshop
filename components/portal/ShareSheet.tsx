@@ -131,7 +131,55 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
     // 「AI 整理」按钮显式触发(force=true)才打云。
     if (!force) {
       setAiPayload({ type, content, imageBase64, mimeType });
-      if (type === 'image') { setParsed(buildPendingImageParsed()); return true; }
+      if (type === 'image') {
+        // ── 端上认一遍字再说「没识别」──────────────────────────────────────
+        //
+        // 「任何档位都不自动打 AI」这条不动 —— 它管的是**打不打云**。
+        // 而端上认字不打云:免费、离线、图一个字节不出手机,
+        // 所以它可以是默认路径,不需要用户再点一下「AI 整理」。
+        //
+        // 分享进来的十有八九是截图 —— 订单、小票、对话、票根。
+        // 那些信息就是图上的字,以前却一律落成「照片 · 7月31日」,
+        // 上面写的一个字都搜不到。
+        if (imageBase64) {
+          const { understandImage, tagsFromText } = await import('@/lib/portal/image-understand');
+          const seen = await understandImage(imageBase64);
+          if (seen.text.trim()) {
+            const f = seen.fields;
+            setParsed({
+              title: (f?.merchant || '').trim() || seen.text.split(/\r?\n/)[0]?.slice(0, 40) || L(dict, '照片已存好', 'Photo saved'),
+              summary: f
+                ? L(dict, `在这台设备上读出来的:${f.amount}${f.date ? ` · ${f.date}` : ''}。图没有发出去。`,
+                       `Read on this device: ${f.amount}${f.date ? ` · ${f.date}` : ''}. The photo never left.`)
+                : L(dict, '图上的字在这台设备上读下来了 —— 现在搜得到。图没有发出去。',
+                       'The text in this image was read on this device — it\'s searchable now. The photo never left.'),
+              intent: 'MEMORY_CAPTURE',
+              people: [],
+              nodes: [{
+                type: 'object',
+                name: (f?.merchant || '').trim() || seen.text.split(/\r?\n/)[0]?.slice(0, 40) || L(dict, '照片', 'Photo'),
+                // ShareSheet 的 ParsedResult.attributes 是 Record<string, string> ——
+                // 金额转字符串,和这条路上别的字段一个类型。
+                attributes: f
+                  ? {
+                    price: String(f.amount),
+                    ...(f.date ? { receiptDate: f.date } : {}),
+                    ...(f.merchant ? { store: f.merchant } : {}),
+                    ocrSource: 'on-device',
+                  }
+                  : { ocrSource: 'on-device' },
+                relations: [],
+                tags: ['图片', ...tagsFromText(seen.text, 5)],
+                confidence: f ? (f.amountFrom === 'keyword' ? 0.95 : 0.7) : 0.6,
+                rawInput: seen.text.slice(0, 2000),
+              }],
+            });
+            return true;
+          }
+        }
+        setParsed(buildPendingImageParsed());
+        return true;
+      }
       const full = content.trim();
       setParsed({
         title: full.slice(0, 40) || L(dict, '分享内容', 'Shared content'),
