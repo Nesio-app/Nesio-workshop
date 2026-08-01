@@ -727,7 +727,7 @@ export default function WardrobePanel() {
       {/* C｜上身试穿(展开在搭配卡下方) */}
       {tryonOpen && (
         <div style={{ ...card, marginTop: 'var(--space-3)', background: 'var(--glass-bg-solid, var(--portal-bg))' }}>
-          <input ref={bodyFileRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onPickBody} />
+          <input ref={bodyFileRef} type="file" accept="image/*" className="nesio-visually-hidden" onChange={onPickBody} />
           {/* bug3:「目 上身试穿」这个图标和标题都删掉 —— 卡片里已经是全身照 + 试穿按钮,自明。 */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
             <Button variant="ghost" size="sm" onClick={() => setTryonOpen(false)} aria-label={L(dict, '收起', 'Close')}>✕</Button>
@@ -788,7 +788,7 @@ export default function WardrobePanel() {
       /* ═══ 衣帽间(bug3 新增第三个 tab):加衣服 + 筛选 + 单品网格 + 单品详情 ═══ */
       <>
       {/* ② 加衣服 / 批量上传(bug3:「加衣服」按钮从「今天」挪到这里) */}
-      <input ref={bulkRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={onPickBulk} />
+      <input ref={bulkRef} type="file" accept="image/*" multiple className="nesio-visually-hidden" onChange={onPickBulk} />
       {!adding ? (
         <>
           {/* 图13「一个按钮,点一下可以上传可以拍照」:原来「+ 加一件」和「批量上传」并排,
@@ -808,8 +808,8 @@ export default function WardrobePanel() {
         <div style={{ ...card, marginTop: 'var(--space-4)', background: 'var(--glass-bg-solid, var(--portal-bg))' }}>
           {editingId && <p style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{L(dict, '编辑衣物 · 改属性(照片不动)', 'Edit · attributes only')}</p>}
           {/* 拍照走相机;上传走相册(无 capture) —— 两个入口共用 onPickFile */}
-          <input ref={cameraRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onPickFile} />
-          <input ref={uploadRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={onPickFile} />
+          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden" onChange={onPickFile} />
+          <input ref={uploadRef} type="file" accept="image/*" className="nesio-visually-hidden" onChange={onPickFile} />
           {/* 两个大号取图入口:一眼可见,并排等宽(编辑时隐藏 —— 只改属性) */}
           {!editingId && (
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>

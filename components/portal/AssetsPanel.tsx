@@ -397,7 +397,7 @@ function CareSection({ assetId, records, people, dict }: {
           <input className="nesio-assets-input" value={contact} onChange={(e) => setContact(e.target.value)}
             placeholder={L(dict, '联系方式(电话 / 微信 / 邮箱,可空)', 'Contact (phone / email, optional)')} />
           {/* 附件:合同、发票、维修单拍一张存着 —— 压过再落本机 IndexedDB,不上传。 */}
-          <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }}
+          <input ref={fileRef} type="file" accept="image/*" multiple className="nesio-visually-hidden"
             onChange={(e) => { void pickFiles(e.target.files); e.target.value = ''; }} />
           <button type="button" className="nesio-assets-link" onClick={() => fileRef.current?.click()}>
             {files.length ? L(dict, `已附 ${files.length} 张 · 再加一张`, `${files.length} attached · add more`) : L(dict, '+ 附一张单据', '+ Attach a document')}

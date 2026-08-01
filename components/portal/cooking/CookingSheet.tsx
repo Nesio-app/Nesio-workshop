@@ -147,8 +147,8 @@ export default function CookingSheet({ open, onClose, initialView }: {
 
   return (
     <NesioSheet variant="fullscreen" open={open} onOpenChange={(o) => { if (!o) onClose(); }} ariaLabel={t('做饭 · 库存', 'Cooking · Pantry')} className="cooking-skin">
-      <input ref={camInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onCamFile} />
-      <input ref={mealCamRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={onMealCamFile} />
+      <input ref={camInputRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden" onChange={onCamFile} />
+      <input ref={mealCamRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden" onChange={onMealCamFile} />
       <div style={{ minHeight: '100%', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }}>
         <div>
           <div style={{ padding: 'var(--space-5) var(--space-4) var(--space-8)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>

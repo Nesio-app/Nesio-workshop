@@ -1177,9 +1177,9 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
       <canvas ref={canvasRef} style={{ display: 'none' }} />
       {/* Native camera — opens the iOS system camera directly (reliable, no
           persistent stream/indicator). Triggered by a user tap. */}
-      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFileChange} />
+      <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden" onChange={handleFileChange} />
       {/* Gallery / file picker — no capture, so it picks from library/files. */}
-      <input ref={fileRef} type="file" accept="image/*,.pdf,.txt,.eml" style={{ display: 'none' }} onChange={handleFileChange} />
+      <input ref={fileRef} type="file" accept="image/*,.pdf,.txt,.eml" className="nesio-visually-hidden" onChange={handleFileChange} />
 
       {/* Header */}
       <div className="nesio-camera-header">
