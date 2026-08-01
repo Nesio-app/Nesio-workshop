@@ -161,6 +161,15 @@
   同一条契约还钉住:**通用**文件入口不设 accept 白名单(白名单永远漏掉 PDF/docx/xlsx,
   在 iOS 选择器里直接是灰的);**读不懂 ≠ 收不下**,解析不了正文的文件也要先 putLocalFile
   + ingestLifeNode 存下来,不许回一句「暂不支持」。
+- **Blob 存 IDB 只能存字节副本,不能存 File 句柄**(2026-08-01,用户「我选的 mp3,
+  也无法播放」)。File 是指向磁盘临时文件的引用,WebKit 往 IndexedDB 里写 File 存的
+  也只是这个引用 —— iOS 回收掉那份临时文件之后读回来就是 0 字节。Chrome 会老实拷一份,
+  所以桌面永远测不出来:导入看着成功、列表里也有,过一会儿点了没声。
+  先 `await file.arrayBuffer()` 再 `put(new Blob([bytes], { type }))`。
+- **喂给 `<audio>`/`<img>` 的 blob URL 必须带 MIME**。Safari **不嗅探内容**,
+  `type` 为空的 blob 就是不出声/不显示(Chrome 自己认得出来)。而 iOS 的「文件」App /
+  iCloud Drive 交出来的 File,`type` 空着是常态 —— 所以要从扩展名兜一个存下来,
+  读回来时如果还是空的再兜一次(老数据)。守卫:`scripts/music-local-ios.test.mjs`。
 - **`test:contracts` 目前跑不到头,而且这件事本身是个洞**:
   `test:vision-plugin-wiring` 读 `treasurebox-ios/ios/App/App/NesioVisionPlugin.swift`,
   该文件只存在于**没合进 main** 的 `claude/new-session-r1kcgy` 分支,且被 .gitignore 的
