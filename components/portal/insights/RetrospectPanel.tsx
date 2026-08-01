@@ -22,7 +22,7 @@ const DailyReportSheet = dynamic(() => import('../DailyReportSheet'), { ssr: fal
 
 const MAX_LIST = 8;
 
-function PeriodList({
+export function PeriodList({
   label, items, onOpen,
 }: {
   label: string;
