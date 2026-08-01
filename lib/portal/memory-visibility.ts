@@ -40,10 +40,27 @@ export function isTagOnlyImport(n: LifeNode): boolean {
 }
 
 /**
+ * 内部记账,不是用户的记忆(2026-08-01 用户实锤截图:「反馈:today/card_type/财务」
+ * 「2026-07 · 训练」这类节点混进了记忆列表,显示成一堆生 key)。三类都验过零功能
+ * 消费者读 visibleMemoryNodes/getLifeGraph 的展示路径 —— 各自的真实读口是
+ * readFeedbackLog()(读 getSignals)、finance-aggregate/tesla-finance/domain-insights
+ * (读 getLifeGraph 全量),藏起来不影响它们:
+ *   · 反馈信号 —— feedback-log/retrieval-feedback/signal-feedback 统一盖
+ *     `epistemic:'feedback'`,本来就是「元评价,不当记忆证据」。
+ *   · 系统月报/摘要(健身训练次数等) —— monthly-digest 统一盖 `digestKind`。
+ *   · 特斯拉行车/充电 —— normalizeTeslaDriveToSignal/ChargeToSignal 统一带
+ *     `vehicleId`(source 落地后是 'system',和月报/财务报告同源,不能拿 source 分)。
+ */
+export function isInternalBookkeepingNode(n: LifeNode): boolean {
+  const attrs = n.attributes as Record<string, unknown> | undefined;
+  return attrs?.epistemic === 'feedback' || Boolean(attrs?.digestKind) || Boolean(attrs?.vehicleId);
+}
+
+/**
  * 用户**看得见**的记忆。
  * @param canUse 能否使用私密数据(未登录/未确认账户时,私密外部节点一律不出现)。
  */
 export function visibleMemoryNodes(nodes: readonly LifeNode[], canUse: boolean): LifeNode[] {
-  const base = nodes.filter((n) => !isWeatherNode(n) && !isTagOnlyImport(n));
+  const base = nodes.filter((n) => !isWeatherNode(n) && !isTagOnlyImport(n) && !isInternalBookkeepingNode(n));
   return canUse ? base : base.filter((n) => !isPrivateExternalNode(n));
 }
