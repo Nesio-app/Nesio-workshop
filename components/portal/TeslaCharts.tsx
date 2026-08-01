@@ -180,19 +180,52 @@ export function BatteryTimeline({ log, dict }: { log: TeslaLogPoint[]; dict: str
       .sort((a, b) => Date.parse(a.at) - Date.parse(b.at)),
     [log],
   );
-  if (pts.length < 2) return null;
-
   const W = 320, H = 90, PAD = 6;
-  const t0 = Date.parse(pts[0].at);
-  const t1 = Date.parse(pts[pts.length - 1].at);
+  const t0 = pts.length ? Date.parse(pts[0].at) : 0;
+  const t1 = pts.length ? Date.parse(pts[pts.length - 1].at) : 0;
   const span = Math.max(1, t1 - t0);
+
+  /**
+   * 画得出一条**有意义**的线吗?(2026-08-01,用户实测截图:这里是一条
+   * 笔直的水平线,两端标签都是 8/1。)
+   *
+   * 原判据只有「至少两个点」。两个点当然连得成线 —— 但连出来的那条线在说
+   * 「这段时间电量没变」,而真相是**只采到了两个点**。这是这一屏里最像数据
+   * 的一处装饰:它不报错、不空白,只是安静地讲一件没发生过的事。
+   *
+   * 所以再加两道:跨度太短(不足两小时)的不画,只有两个点的不画。
+   * 画不出来时**说清楚为什么** —— 「还在攒」和「电量没变」是两回事。
+   */
+  const enoughPoints = pts.length >= 3;
+  const enoughSpan = span >= 2 * 60 * 60 * 1000;
+  if (!enoughPoints || !enoughSpan) {
+    if (!pts.length) return null;
+    return (
+      <>
+        <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-4)' }}>
+          {L(dict, '电量', 'Battery')}
+        </p>
+        <p className="nesio-settings-option-hint">
+          {L(dict,
+            `还画不出趋势 —— 目前只攒到 ${pts.length} 个读数。车的接口只回「此刻」,所以这条线是靠你每次打开这一页时的采样攒出来的,多看几次就有了。`,
+            `Not enough to plot a trend yet — ${pts.length} reading${pts.length === 1 ? '' : 's'} so far. The vehicle API only returns “now”, so this line is built from samples taken each time you open this page.`)}
+        </p>
+      </>
+    );
+  }
   const x = (p: TeslaLogPoint) => PAD + ((Date.parse(p.at) - t0) / span) * (W - PAD * 2);
   const y = (p: TeslaLogPoint) => PAD + (1 - (p.batteryPct as number) / 100) * (H - PAD * 2);
   const d = pts.map((p, i) => `${i ? 'L' : 'M'}${x(p).toFixed(1)},${y(p).toFixed(1)}`).join(' ');
 
   const days = Math.max(1, Math.round(span / 86_400_000));
+  // 跨度不到一天时两端都会是同一个日期(截图上正是「8/1 … 8/1」)——
+  // 那两个标签等于什么都没说。不足一天就显示时刻。
+  const withinADay = span < 86_400_000;
   const fmt = (iso: string) => {
     const dt = new Date(iso);
+    if (withinADay) {
+      return dt.toLocaleTimeString(dict === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit' });
+    }
     return dict === 'en'
       ? dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
       : `${dt.getMonth() + 1}/${dt.getDate()}`;
@@ -201,7 +234,9 @@ export function BatteryTimeline({ log, dict }: { log: TeslaLogPoint[]; dict: str
   return (
     <>
       <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-4)' }}>
-        {L(dict, `电量 · 近 ${days} 天`, `Battery · last ${days} days`)}
+        {withinADay
+          ? L(dict, '电量 · 今天', 'Battery · today')
+          : L(dict, `电量 · 近 ${days} 天`, `Battery · last ${days} days`)}
       </p>
       <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img"
         aria-label={L(dict, '电量随时间变化', 'Battery level over time')}>
