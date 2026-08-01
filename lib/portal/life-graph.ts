@@ -155,9 +155,14 @@ function inferLifeNodeSignalSensitivity(node: LifeNode): string {
   if (tags.includes('finance') || tags.includes('财务')) return 'financial';
   if (tags.includes('family') || tags.includes('家庭')) return 'family';
   if (node.source === 'calendar' || tags.includes('work') || tags.includes('工作') || tags.includes('会议')) return 'work';
-  // 2026-08-01 Domains 三合一:同 create-signal.ts 的 inferSensitivity,关键词兜底只加严 health。
+  // 2026-08-01 Domains 三合一:同 create-signal.ts 的 inferSensitivity,关键词兜底只加严。
   const text = [node.name, node.rawInput, node.tags?.join(' ')].filter(Boolean).join(' ');
-  if (text && classifyDomainFromText(text) === 'health') return 'health';
+  if (text) {
+    const domain = classifyDomainFromText(text);
+    if (domain === 'health') return 'health';
+    if (domain === 'finance') return 'financial';
+    if (domain === 'work') return 'work';
+  }
   return 'normal';
 }
 

@@ -27,12 +27,15 @@ export function readNodeContext(node: LifeNode): SignalContext | null {
 }
 
 /** Type-based salvage when a node carries no explicit context.domain. */
+// 2026-08-01 Domains 二轮修正跟着 FrontDomain 改名走:object 归 life(物品/收纳并入 life,
+// 不再是已改名/收窄的 finance);person 改归 relationship(比塞进 life 更准);
+// event/commitment 归 work(原先都归笼统的 growth)。
 const TYPE_DOMAIN: Record<string, FrontDomain> = {
-  object: 'assets',
+  object: 'life',
   place: 'life',
-  person: 'life',
-  event: 'growth',
-  commitment: 'growth',
+  person: 'relationship',
+  event: 'work',
+  commitment: 'work',
   health_state: 'health',
   preference: 'life',
 };

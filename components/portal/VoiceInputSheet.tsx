@@ -114,11 +114,16 @@ interface PendingDraft {
   priority?: string;
 }
 
+// 2026-08-01 Domains 二轮修正:assets 改名收窄成 finance(只管钱),原本"物品/收纳"归属的
+// object 判据挪去 life(growth→work 同理,task 现在挂 work)。finance 也可能是"买了个东西"
+// 这种带 place/object 线索的记录,保留同样的 object.location 分支。
 function signalTypeForDomain(domain: FrontDomain | null, hasPlaceOrObject: boolean): string {
-  if (domain === 'assets') return hasPlaceOrObject ? 'object.location' : 'object';
   if (domain === 'health') return 'health.state';
-  if (domain === 'growth') return 'task';
+  if (domain === 'work') return 'task';
   if (domain === 'energy') return 'energy.state';
+  if (domain === 'life' || domain === 'finance') {
+    return hasPlaceOrObject ? 'object.location' : 'object';
+  }
   return 'observation';
 }
 
