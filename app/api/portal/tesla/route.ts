@@ -91,7 +91,7 @@ export async function GET(req: NextRequest) {
     else if (e.status !== 200) energy = { live: [], days: [], unavailable: 'fetch' };
   } catch { energy = { live: [], days: [], unavailable: 'fetch' }; }
 
-  const response = NextResponse.json({ ok: true, drives: snapshot.drives, charges: snapshot.charges, energy });
+  const response = NextResponse.json({ ok: true, drives: snapshot.drives, charges: snapshot.charges, health: snapshot.health, energy });
 
   // Persist rotated token (Supabase + cookies) so we don't refresh every call.
   if (rotated) {

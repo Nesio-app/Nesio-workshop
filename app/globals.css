@@ -21855,3 +21855,47 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   font-size: var(--text-sm); cursor: pointer;
 }
 .nesio-atp-new button:disabled { opacity: .5; cursor: default; }
+
+/* 财务空态(2026-08-01,用户实测:投资页一片白,底下只有一句免责声明)。
+   空态要说清**为什么空**和**下一步做什么** —— 「暂无数据」四个字是让用户自己去猜。 */
+.nesio-fin-empty {
+  display: flex; flex-direction: column; gap: var(--space-2);
+  padding: var(--space-4); margin-top: var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-md);
+  background: var(--portal-accent-soft);
+}
+.nesio-fin-empty-title {
+  font-size: var(--text-body); font-weight: var(--weight-medium); color: var(--portal-ink); margin: 0;
+}
+.nesio-fin-empty-body {
+  font-size: var(--text-sm); color: var(--portal-muted); margin: 0; line-height: 1.55;
+}
+
+/* 车的「此刻」(2026-08-01,用户:「如果能做成图 3 和 4 就好」)。
+   图 3/4 是 Tesla 官方的车队看板;一辆车没有「分布」,所以这里是转译不是照搬:
+   车队的状态分布环 → 一个带色点的明确状态;车队的告警柱状图 → 这一辆的车况格。 */
+.nesio-tesla-status {
+  display: inline-flex; align-items: center; gap: var(--space-2);
+  flex: none; padding: 2px var(--space-3); border-radius: var(--radius-pill);
+  font-size: var(--text-xs); font-weight: var(--weight-medium);
+}
+.nesio-tesla-dot { width: 7px; height: 7px; border-radius: var(--radius-pill); background: currentColor; }
+.nesio-tesla-status.is-go { color: var(--status-go); background: var(--status-go-soft); }
+.nesio-tesla-status.is-calm { color: var(--status-calm); background: var(--status-calm-soft); }
+/* 「联系不上」用温和色而不是风险色 —— 车在深度休眠不是故障,不该拿红色制造焦虑。 */
+.nesio-tesla-status.is-gentle { color: var(--status-gentle); background: var(--status-gentle-soft); }
+
+.nesio-tesla-health {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: var(--space-2); margin-top: var(--space-3);
+}
+.nesio-tesla-health-cell {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+}
+.nesio-tesla-health-cell.is-gentle {
+  border-color: var(--status-gentle); background: var(--status-gentle-soft);
+}
+.nesio-tesla-health-label { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-tesla-health-value { font-size: var(--text-sm); color: var(--portal-ink); }
