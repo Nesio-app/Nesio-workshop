@@ -9,6 +9,7 @@
 
 import type { Signal } from './signal';
 import { openSimpleDb } from '@/lib/idb/open-simple-db';
+import { ensureEpistemicStamp } from './signal-epistemic';
 
 const DB_NAME = 'nesio-signals';
 const STORE = 'signals';
@@ -42,20 +43,21 @@ export async function getRecentSignalsIdb(limit = 100): Promise<Signal[]> {
     const req = idx.openCursor(null, 'prev');
     req.onsuccess = () => {
       const cursor = req.result;
-      if (cursor && out.length < limit) { out.push(cursor.value as Signal); cursor.continue(); }
+      if (cursor && out.length < limit) { out.push(ensureEpistemicStamp(cursor.value as Signal)); cursor.continue(); }
       else resolve(out);
     };
     req.onerror = () => resolve(out);
   });
 }
 
-/** 全量读取(水合用)。事实库为 localStorage 量级(≤5MB 投影镜像),一次读入可接受。 */
+/** 全量读取(水合用)。事实库为 localStorage 量级(≤5MB 投影镜像),一次读入可接受。
+ *  兜底 epistemic/generator(2026-08-01 收紧为必填前写入的旧记录可能缺这两列)。 */
 export async function getAllSignalsIdb(): Promise<Signal[]> {
   const db = await openDb();
   if (!db) return [];
   return new Promise((resolve) => {
     const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
-    req.onsuccess = () => resolve((req.result as Signal[]) || []);
+    req.onsuccess = () => resolve(((req.result as Signal[]) || []).map(ensureEpistemicStamp));
     req.onerror = () => resolve([]);
   });
 }

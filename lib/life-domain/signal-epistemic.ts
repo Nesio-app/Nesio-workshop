@@ -117,6 +117,27 @@ export function hasWeakEvidenceChain(stamp: EpistemicStamp): boolean {
   return needsEvidenceChain(stamp.epistemic) && !(stamp.derivedFrom && stamp.derivedFrom.length > 0);
 }
 
+/**
+ * 读时兜底:确保一条已落库 Signal 的 epistemic/generator 非空(2026-08-01,
+ * epistemic+generator 收紧为必填字段后补 —— IDB 里可能躺着更早写入、
+ * 缺这两个字段的旧记录,类型收紧不会追溯改写它们,读路径必须自己兜住)。
+ * 已有合法值原样保留,只补缺的一半。
+ */
+export function ensureEpistemicStamp<T extends Pick<Signal, 'type' | 'source' | 'confidence' | 'epistemic' | 'generator' | 'payload'>>(signal: T): T {
+  const hasEpistemic = isSignalEpistemic(signal.epistemic);
+  const hasGenerator = typeof signal.generator === 'string' && signal.generator.length > 0;
+  if (hasEpistemic && hasGenerator) return signal;
+  const stamp = stampEpistemic({
+    epistemic: hasEpistemic ? signal.epistemic : undefined,
+    generator: hasGenerator ? signal.generator : undefined,
+    type: signal.type,
+    source: signal.source,
+    confidence: signal.confidence,
+    payload: signal.payload,
+  });
+  return { ...signal, epistemic: stamp.epistemic, generator: stamp.generator || String(signal.source) };
+}
+
 /** 从已落库 Signal / 节点属性读回(含旧数据推断)。 */
 export function resolveEpistemic(signal: Pick<Signal, 'type' | 'source' | 'confidence' | 'payload'> & {
   epistemic?: SignalEpistemic;

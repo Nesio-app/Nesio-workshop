@@ -31,14 +31,14 @@ assert.equal(epi.inferEpistemic({ kind: 'mirror-letter' }), 'derived');
 assert.equal(epi.inferEpistemic({ kind: 'daily-report' }), 'system_summary');
 assert.equal(epi.inferEpistemic({ source: 'photo', confidence: 0.7 }), 'extraction');
 assert.equal(epi.inferEpistemic({ source: 'gmail', type: 'email' }), 'observation');
-assert.equal(epi.isGroundFact({ type: 'note', source: 'manual', confidence: 1 }), true);
-assert.equal(epi.isGroundFact({ type: 'feedback.today_card', source: 'manual', confidence: 1 }), false);
+assert.equal(epi.isGroundFact({ type: 'note', source: 'Entry', confidence: 1 }), true);
+assert.equal(epi.isGroundFact({ type: 'feedback.today_card', source: 'Entry', confidence: 1 }), false);
 assert.equal(epi.isGroundFact({ type: 'event', source: 'device', confidence: 1, payload: { kind: 'mirror-letter', epistemic: 'derived' } }), false);
-assert.equal(epi.isGroundFact({ type: 'growth.reflection', source: 'manual', confidence: 1 }), true, '用户回看是地面断言');
+assert.equal(epi.isGroundFact({ type: 'growth.reflection', source: 'Entry', confidence: 1 }), true, '用户回看是地面断言');
 
 const stamp = epi.stampEpistemic({
   type: 'growth.reflection',
-  source: 'manual',
+  source: 'Entry',
   derivedFrom: ['c1'],
   generator: 'user',
 });
@@ -74,7 +74,7 @@ const create = loadTs('../lib/life-domain/create-signal.ts', (p) => {
 });
 
 const growth = create.createSignal({
-  source: 'manual',
+  source: 'Entry',
   type: 'growth.reflection',
   title: '成长回看',
   payload: { answer: '还想做' },
@@ -94,7 +94,7 @@ assert.match(search, /isGroundFact\(signal\)/, '检索走地面事实滤层');
 
 const growthSrc = fs.readFileSync(new URL('../lib/portal/growth-guide.ts', import.meta.url), 'utf8');
 assert.match(growthSrc, /epistemic:\s*'user_asserted'/, '成长回答标 user_asserted');
-assert.match(growthSrc, /source:\s*'manual'/, '成长回答不再滥用 ai_observation');
+assert.match(growthSrc, /source:\s*'Entry'/, '成长回答不再滥用 ai_observation');
 
 const mirror = fs.readFileSync(new URL('../lib/portal/mirror-letter-persist.ts', import.meta.url), 'utf8');
 assert.match(mirror, /epistemic:\s*'derived'/, '镜像信标 derived');

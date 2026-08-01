@@ -82,7 +82,7 @@ function lifeNodeSource(source: SignalSource): LifeNodeSource {
   if (source === 'calendar') return 'calendar';
   if (source === 'gmail') return 'email';
   if (source === 'voice') return 'voice';
-  if (source === 'manual') return 'manual';
+  if (source === 'Entry') return 'manual';
   return 'system';
 }
 
@@ -118,7 +118,7 @@ function inferSensitivity(input: CreateSignalInput): SignalSensitivity {
 
 function inferRetention(input: CreateSignalInput): RetentionPolicy {
   if (input.retentionPolicy) return input.retentionPolicy;
-  if (input.source === 'weather' || input.source === 'hardware_pulse') return 'Disposable';
+  if (input.source === 'weather') return 'Disposable';
   if (input.source === 'health' || input.source === 'gmail') return 'LongLiving';
   return 'Normal';
 }

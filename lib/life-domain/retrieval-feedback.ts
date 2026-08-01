@@ -55,7 +55,7 @@ function adjustments(): Map<string, RetrievalVerdict> {
 export function markRetrievalFeedback(targetId: string, verdict: RetrievalVerdict): void {
   if (!targetId) return;
   createSignal({
-    source: 'manual',
+    source: 'Entry',
     type: RETRIEVAL_FEEDBACK_TYPE,
     title: `检索反馈:${verdict === 'not_this' ? '不是这个' : '有用'}`,
     payload: { targetId, verdict },

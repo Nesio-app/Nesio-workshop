@@ -81,17 +81,26 @@ const PRIORITY_LABELS: Record<string, { label: string; labelEn: string; color: s
   low: { label: '普通', labelEn: 'Normal', color: 'var(--portal-muted)' },
 };
 
-/** 已知属性键 → 中文标签(天气信号等系统属性不再裸奔英文键名) */
+/** 已知属性键 → 中文标签(天气信号等系统属性不再裸奔英文键名)
+ *  2026-08-01 扩容:银行流水影子节点(tx-node.ts)、会议记录抽取(today-commands.ts)
+ *  落的这些键此前不在名单里 —— 不隐藏(不是纯技术字段,是流水/会议真值),
+ *  但没标签就裸奔成 txAmount/merchantId 这类英文键名,一并补齐。 */
 const ATTR_KEY_LABELS: Record<string, string> = {
   temperatureC: '温度', condition: '天气', forecastNote: '预报',
   placeName: '地点', humidity: '湿度', windKph: '风速',
   // 邮件本地深抽取(Phase 2)的结构化线索
   amount: '金额', orderNo: '订单号', trackingNo: '快递单号',
+  // 银行流水影子节点(tx-node.ts)
+  txAmount: '金额', txCurrency: '币种', txCategory: '分类', merchantId: '商户', accountId: '账户',
+  // 会议记录抽取(today-commands.ts writeMeetingExtraction)
+  summary: '摘要', people: '涉及人物',
 };
 const ATTR_KEY_LABELS_EN: Record<string, string> = {
   temperatureC: 'Temperature', condition: 'Weather', forecastNote: 'Forecast',
   placeName: 'Place', humidity: 'Humidity', windKph: 'Wind',
   amount: 'Amount', orderNo: 'Order #', trackingNo: 'Tracking #',
+  txAmount: 'Amount', txCurrency: 'Currency', txCategory: 'Category', merchantId: 'Merchant', accountId: 'Account',
+  summary: 'Summary', people: 'People',
 };
 
 /** 长文本(如日历事件的会议记录)默认只显示摘要,点「详情」展开 */
@@ -212,6 +221,13 @@ const HIDDEN_ATTRIBUTE_KEYS = new Set([
   'energyValue', 'energyLevel', 'recordedAt', 'hourOfDay',
   'isWorkHours', 'isEvening', 'isMorning', 'isJournal', 'journalText',
   'article', 'image',
+  // 2026-08-01:银行流水影子节点(tx-node.ts)/会议记录抽取(today-commands.ts)/
+  // 多面镜存信(mirror-letter-persist.ts)的纯技术字段 —— 不是用户会想看的值,
+  // 真内容已经在各自的专属展示位(流水金额见下方 ATTR_KEY_LABELS,会议正文见
+  // CollapsibleText rawInput,信正文同理),这些只是内部关联/去重用的键。
+  'txShadow', 'txId', 'kind', 'mirrorId', 'meetingNodeId', 'meetingRecordId',
+  'calendarNodeId', 'calendarName', 'granolaMeetingId', 'fromMeeting', 'focusPinnedOn',
+  'inferredJson', 'notes', 'recordedAt', 'derivedFrom',
 ]);
 
 function InfoRow({ label, value, link }: { label: string; value: string; link?: string }) {
@@ -676,6 +692,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
     return () => clearTimeout(h);
   }, [linkQuery, linkPicking, node?.id]);
   const [rawExpanded, setRawExpanded] = useState(false); // 批次 74:原始记录折叠
+  const [otherAttrsExpanded, setOtherAttrsExpanded] = useState(false); // 2026-08-01:其他属性默认折叠,别让生 key 抢眼
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [editing, setEditing] = useState(false);
   // 批次192:编辑存放位置时,从 LocationPicker 捕获稳定 placeId/room/subRoom(存入时写节点/清空)。
@@ -1197,11 +1214,22 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             </div>
           )}
 
-          {/* Remaining attributes not covered above */}
+          {/* Remaining attributes not covered above — 默认折叠:这里剩下的多是没建专属展示位的
+              长尾字段,展开前只给一个可点的标题,不把生 key 糊用户脸上。 */}
           {shownAttrs.length > 0 && (
-            <>
-              <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-3)' }}>{L(dict, '其他属性', 'Other details')}</p>
-              {shownAttrs.map(([k, v]) => (
+            <div style={{ marginTop: 'var(--space-3)' }}>
+              <button
+                type="button"
+                onClick={() => setOtherAttrsExpanded((v) => !v)}
+                className="nesio-settings-section-label"
+                style={{ display: 'flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+              >
+                {L(dict, '其他属性', 'Other details')}
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', fontWeight: 400 }}>
+                  {otherAttrsExpanded ? L(dict, '收起', 'Hide') : L(dict, `展开 ${shownAttrs.length} 项`, `Show ${shownAttrs.length}`)}
+                </span>
+              </button>
+              {otherAttrsExpanded && shownAttrs.map(([k, v]) => (
                 <div key={k} className="nesio-node-attr-row">
                   <span className="nesio-node-attr-key">{(dict === 'en' ? ATTR_KEY_LABELS_EN : ATTR_KEY_LABELS)[k] ?? k}</span>
                   <span className="nesio-node-attr-val" style={{ display: 'inline-flex', alignItems: 'center', gap: 5 }}>
@@ -1210,7 +1238,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                   </span>
                 </div>
               ))}
-            </>
+            </div>
           )}
 
           {/* 标签三层重构:L2 语义标签(AI 冗余打的检索词,如 餐具/玻璃/水杯)不再上屏 ——

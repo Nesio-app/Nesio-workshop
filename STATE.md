@@ -2,8 +2,9 @@
 
 > Loop-engineering 原则:状态必须活在对话之外。任何 AI 会话或新协作者
 > **先读这个文件**,再动手。改动仓库重大状态时,同步更新这里。
-> 最后更新:2026-07-27(激进审计落地:Kill 伪智能/反馈双轨/认知双轨 + 成长教练收口 +
-> Finance/Health 可视化与品味旁注;见「已知欠账」首条与 signal-epistemic.md)
+> 最后更新:2026-08-01(Signal/LifeNode schema 改名批:SignalSource 增删/修误分类 +
+> epistemic·generator 收紧必填;retentionPolicy/Domains 改名/自定义 tag/LifeNodeType
+> 改名批因契约冲突或规格丢失明确搁置,见「已知欠账」首条)
 
 ## 当前纪元:两代产品交接中
 
@@ -169,6 +170,44 @@
 sensitivity/retention 枚举化(中期)。
 
 ## 已知欠账(按优先级)
+
+- **Signal/LifeNode schema 改名批(2026-08-01,本轮)**:
+  ● **已落地**:`SignalSource` 删 `hardware_pulse`(死值),`manual`→`Entry`(跟
+    `LifeNodeSource.manual` 撞名分层),新增 `Bank`(银行流水影子节点 tx-node.ts)、
+    `meeting_notes`(会议记录 today-commands.ts);修正此前"有枚举值但从没被写入过"的
+    误分类(notion/toggl/health/wechat_reading/reminder/keep 现在都在 ingest 路径盖
+    `attributes.signalSource`/覆盖 `source`,不再被压平成泛泛的 manual/system/task/health)。
+    `Signal.epistemic`/`Signal.generator` 收紧为**必填**(原 `?:`),`lifeNodeToSignal()`/
+    云端 `sanitizeSignal()`/`signal-search.ts` 云行读取统一走 `stampEpistemic()` 兜底,
+    IDB 旧记录读路径加 `ensureEpistemicStamp()` 兜底(见 signal-epistemic.ts)。
+    `evidence`/`confidence` **刻意保留未删**(见下)。MemoryNodeDetail.tsx「其他属性」
+    默认折叠 + 补齐 tx-shadow/会议记录抽取的属性标签。
+  ● **明确未做(有理由,别误当遗漏)**:
+    ① `retentionPolicy` 删除/天气改直连 —— `scripts/runtime-data-plane-contract.test.mjs`
+       与 `scripts/signal-dec-platform-rules.test.mjs` 两条契约测试**钉死**天气必须走
+       `createSignal(normalizeWeatherToSignal(...))`,且天气已有 Disposable 24h 自动
+       裁剪 + 记忆列表展示层过滤(memory-visibility.ts `isWeatherNode`)—— 用户抱怨的
+       "天气占地方"表面症状已经被两层机制接住,贸然砍掉持久化会正面撞两条契约,
+       需要用户明确"连契约一起改"才能动。
+    ② `sensitivity` → `Domains` 改名重设计 —— 只留下"改名 + 系统标签驱动隐藏/自定义
+       标签可见"的哲学描述,原表格的具体枚举值在压缩摘要里丢失,而 `sensitivity` 是
+       `isDeviceOnlySignal()`(健康数据永不上云的产品红线,被 health-signals.test.mjs
+       钉死)的判据来源 —— 蒙一版新枚举有真实概率悄悄改坏这条隐私闸门,必须拿到原表
+       原文或重新确认后再动。
+    ③ 8 个自定义可见 tag(财务/物品/衣橱/美食/健康/人物/心情/阅读)UI 接线 —— 不确定
+       该接进哪个界面:最近一批("bug2 批·物品页")刚**删掉**物品页的"常用标签"快选
+       UI 当噪音处理,现在再加一版新标签选择器方向不明,存在跟那个决定正面冲突的风险。
+    ④ `LifeNodeType` 改名批(object→Thing / commitment→task / health_state→health /
+       preference→Mind / note→collection;person/event 不变,place 维持批次174的墓碑
+       退役状态不碰)—— 目标值都明确,但 `object` 一项就有 130+ 处字面量比较/构造点,
+       且 life-graph.ts 的图谱读入口不止一条(localStorage 种子 / IDB 分片 / 云拉取…),
+       安全的改法要求在**所有**读入口做旧值→新值归一化,否则任一入口漏做,老用户已存
+       的该类型记忆会在该入口静默"消失"(过滤器再也匹配不上旧字符串)。规模和风险都
+       够格单独立一个批次专门做,不该挤进这轮捎带手改完。
+  契约验证:`tsc --noEmit` 0 错(除 pre-existing 的 `lib/idb/__tests__/phase1-migration.test.ts`
+  缺测试框架类型声明);`test:security` 全绿;`test:contracts`(319 条)除 3 条**验证为
+  改动前就失败**的预置项(`cloud-module-data-runtime`/`v14-sovereignty-ui-regression`/
+  `cloud-auto-sync`,均与本批无关)外全绿。
 
 - **音乐模块 · 四音源(2026-07-30,本轮新增)**:用户定的范围是「本地歌曲 + 网易 +
   歌曲自由切换 + Spotify + Apple Music」。落地时把「自由切换」拆成它真实的样子 ——

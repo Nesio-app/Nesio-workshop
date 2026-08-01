@@ -93,7 +93,7 @@ export function ensureFeedbackSignalBridge(): void {
     if (event.surface === 'today' && event.dimension === 'card') return;
     try {
       createSignal({
-        source: 'manual',
+        source: 'Entry',
         type: 'feedback.reaction',
         title: `反馈:${event.surface}/${event.dimension}/${event.key}`,
         payload: { ...event },

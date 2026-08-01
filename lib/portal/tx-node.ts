@@ -79,6 +79,9 @@ export function txToNodeInput(tx: BankTx): Omit<LifeNode, 'id' | 'createdAt'> {
       txShadow: true,
       epistemic: 'observation',
       generator: 'system:tx-shadow',
+      // source: 'system' 落 LifeNodeSource 只能压平成泛泛的 device —— 银行流水有专属
+      // SignalSource('Bank'),不标就跟其它系统生成的东西混在一起,分不清是不是流水。
+      signalSource: 'Bank',
     },
   };
 }

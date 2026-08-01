@@ -162,7 +162,7 @@ export function recordGrowthAnswer(card: GrowthCard, answer: string): void {
   const text = (answer || '').trim();
   if (!text) return;
   createSignal({
-    source: 'manual',
+    source: 'Entry',
     type: GROWTH_REFLECTION_TYPE,
     title: `成长回看:${card.question.slice(0, 40)}`,
     payload: { kind: card.kind, refId: card.refId, question: card.question, context: card.context, answer: text, dimension: card.dimension },

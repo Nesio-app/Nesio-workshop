@@ -74,7 +74,7 @@ export function recordSignalFeedback(card: RecommendationCard, feedback: Recomme
     createdAt: new Date().toISOString(),
   };
   const feedbackSignal = createSignal({
-    source: 'manual',
+    source: 'Entry',
     type: TODAY_CARD_FEEDBACK_TYPE,
     title: `反馈：${card.title}`,
     payload: {

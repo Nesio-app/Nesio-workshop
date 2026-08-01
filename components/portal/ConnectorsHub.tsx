@@ -257,8 +257,15 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setTimeout(() => setToast(null), 3500);
   }
 
-  function saveNodes(nodes: Array<Omit<NodeInput, 'source'>>, source: LifeNode['source']) {
-    nodes.forEach((n) => ingestLifeNode({ ...n, source } as NodeInput));
+  // signalSource:落库的 LifeNodeSource 只有 6 档,notion/toggl/health 等连接器同落
+  // 'manual'/'system' 会被压平成 Entry/device,分不清具体是哪个连接器 —— 这里同时
+  // 盖上 Signal 层专属来源(attrs.signalSource),lifeNodeToSignal() 优先读它。
+  function saveNodes(nodes: Array<Omit<NodeInput, 'source'>>, source: LifeNode['source'], signalSource?: string) {
+    nodes.forEach((n) => ingestLifeNode({
+      ...n,
+      source,
+      attributes: signalSource ? { ...n.attributes, signalSource } : n.attributes,
+    } as NodeInput));
     window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
   }
 
@@ -685,7 +692,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         return;
       }
       const n = data.nodes || [];
-      saveNodes(n, c.id === 'toggl' ? 'system' : 'manual');
+      saveNodes(n, c.id === 'toggl' ? 'system' : 'manual', c.id === 'toggl' ? 'toggl' : 'notion');
       saveConnectorState(c.id, true);
       setConnected((p) => ({ ...p, [c.id]: true }));
       setCounts((p) => ({ ...p, [c.id]: n.length }));
@@ -1441,7 +1448,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         showToast(L(dict, '未识别到健康数据(确认选的是 export.xml/zip,不是 export_cda)', 'No health data (make sure it is export.xml/zip, not export_cda)'), false);
         setSyncing(null); return;
       }
-      if (nodes.length) saveNodes(nodes as Array<Omit<NodeInput, 'source'>>, 'system');
+      if (nodes.length) saveNodes(nodes as Array<Omit<NodeInput, 'source'>>, 'system', 'health');
       saveConnectorState('health', true);
       setConnected((p) => ({ ...p, health: true }));
       setCounts((p) => ({ ...p, health: metrics.metrics.length || nodes.length }));
