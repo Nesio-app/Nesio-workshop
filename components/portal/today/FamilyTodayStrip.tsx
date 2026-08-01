@@ -14,6 +14,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { listFamilies, getBoard, choreAction, type BoardView, type ChoreInstanceView } from '@/lib/family/family-client';
+import { awardChorePoints } from '../family/award-chore-points';
 import { readPortalCache, writePortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 
 // 货币符号跟随语言:中文 ¥、英文 $(金额纯展示,Nesio 永不碰钱)。
@@ -91,6 +92,8 @@ export default function FamilyTodayStrip() {
     const r = await choreAction(familyId, instanceId, action);
     setBusyId('');
     if (!r.ok) { setActionErr(t('那一下没成,再试一次。', 'That didn’t go through — try again.')); return; }
+    // 家务挣积分。和家庭板走同一个函数(判据 + 幂等都在那儿)。
+    void awardChorePoints(familyId, instanceId, dict === 'en' ? 'en' : 'zh');
     void fetchNow();
   }, [fetchNow, t]);
 
