@@ -147,6 +147,19 @@
   tsc + test:security + test:contracts + build,再连同自己的改动一起进 PR。
   已知会冲突的一处:`database/schema/supabase-backend-v1-bundle.sql` 头部的生成时间戳,
   取较新的那份即可。
+- **每一轮改动都要开 PR、然后合进 main**(用户 2026-08-01 定的规矩:「你把所有的都开 PR
+  然后合并吧,以后每次都这样」)。此前的做法是只推分支、等用户自己去合,结果是
+  分支上堆了十几个提交、prod 上一个都看不到 —— 用户在 Vercel 部署列表里发现的。
+  **不是「推完就算完」**:推分支 → 开 PR → 合并,一轮里全做完。
+  合之前必须先把 main 合进分支并把冲突解干净:带着冲突开 PR 等于把活推回给用户。
+  验证四件套照旧:tsc + `test:security` + `test:contracts` + `next build`。
+- **`test:contracts` 目前跑不到头,而且这件事本身是个洞**:
+  `test:vision-plugin-wiring` 读 `treasurebox-ios/ios/App/App/NesioVisionPlugin.swift`,
+  该文件只存在于**没合进 main** 的 `claude/new-session-r1kcgy` 分支,且被 .gitignore 的
+  `ios/` 规则挡着 —— 在 pristine origin/main 上一样红。因为它排在链条中间,
+  **排在它后面的契约在 main 上从来没跑过**;CI 门是 `test:security` 所以一直没暴露。
+  在它修好之前,验收 `test:contracts` 要逐条跑(把 package.json 里那串 `npm run` 拆开
+  一条条执行并收集退出码),不能只看那一条串行命令的结果。
 
 ## v1 产品规格执行状态(2026-07-10)
 
