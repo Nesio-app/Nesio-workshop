@@ -22,7 +22,7 @@ const DailyReportSheet = dynamic(() => import('../DailyReportSheet'), { ssr: fal
 
 const MAX_LIST = 8;
 
-function PeriodList({
+export function PeriodList({
   label, items, onOpen,
 }: {
   label: string;
@@ -83,7 +83,7 @@ export default function RetrospectPanel() {
           report={open}
           elevated
           onClose={() => setOpen(null)}
-          footNote={L(dict, '周一 / 每月 1 日 8:00 定稿 · 这一期不再变', 'Fixed Monday / the 1st at 8:00 · unchanged for this period')}
+          footNote={L(dict, '周日 / 月末最后一天下午 4 点定稿 · 这一期不再变', 'Fixed Sunday / the last day of the month at 4pm · unchanged for this period')}
         />
       )}
     </div>

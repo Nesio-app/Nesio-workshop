@@ -11,7 +11,10 @@
 > 并行会话(claude/home-desktop-robot-setup-wb6rg7,PR #292-294)在 main 上的
 > 26 个提交做了真实内容合并,6 个冲突文件逐行核对,详见「已知欠账」新条目;
 > 洞察改「目标」+ 新增「回顾/计划」两个 tab + 每日日报改回今天页卡片 + 新增
-> 周报/月报回顾与计划引擎,见下方「洞察三 tab 化 + 周期报告」条目)
+> 周报/月报回顾与计划引擎,见下方「洞察三 tab 化 + 周期报告」条目;同日续batch:
+> 目标页收拢成单入口三子 tab(纠正上条的三平级面板误判)、简报卡去图标不常驻、
+> 修 ProactiveGuidanceCard 双击有用手势被单击抢跑、周期报告锚点从期初早上改
+> 期末下午,见下方「目标页三 tab 收拢 + 简报卡收尾 + 周期报告改期」条目)
 
 ## 当前纪元:两代产品交接中
 
@@ -450,6 +453,35 @@ sensitivity/retention 枚举化(中期)。
   全绿;`design-token-ratchet` 195(基线 193)确认是本条之前就有的既存差距,本条
   未新增裸按钮。手动核算 `isoWeekKey`/`periodAnchor`/`periodDue`/`buildRetrospect`/
   `buildPlan` 的日期边界逻辑(周一 8 点前后、跨周边界)。
+
+- **目标页三 tab 收拢 + 简报卡收尾 + 周期报告改期(2026-08-01,同日续batch)**:
+  ● **目标页收拢成单入口**:上面那条批次误把回顾/计划各开成一个独立 hub tile
+    (三个平级洞察面板),用户纠正为"一个叫目标的入口打开后内含节律/回顾/计划
+    三个子 tab"——`InsightsSheet.tsx` 的 `MainTab` 去掉 `'retrospect'`/`'plans'`,
+    新增内部 `GoalsSubTab`,reflection tab 顶部加 `SegTabs` 切三个子 tab。
+    `PlansPanel` 原来只看当前一期("已经过去的计划没什么好翻的"的旧设计判断被
+    推翻),改成同 `RetrospectPanel` 一样用 `listPeriodicReports` 翻往期(导出
+    `RetrospectPanel` 的 `PeriodList` 复用)——当前期置顶,往期折成列表。
+  ● **`DailyReportCard` 去图标 + 不常驻**:去掉左侧 `IconNote`;之前"看全文"后
+    卡片仍留在今天页(只有"今天先不看"才收),现在看完全文关闭详情页也算
+    "今天见过了",一并收起——不再有"看过但还杵在 feed 里"的第三态。
+  ● **顺手修的手势 bug**:`ProactiveGuidanceCard` 双击=有用的手势已失效,根因是
+    单击开卡的 `onClick`(直接 `onOpen()`)和双击判定(`endSwipe` 里的
+    `lastTapRef`)互不知情——单击第一下已经把卡导航走了,双击第二下永远等不到。
+    改成单击先排 320ms 定时器(和双击判定窗口对齐),真等到确认不是双击才开卡;
+    双击命中时反过来撤掉这个定时器。
+  ● **周期报告锚点改期(用户拍板:"下午 4 点吧。周报每周日,月报每月最后一天")**:
+    `lib/portal/periodic-report.ts` 的 `periodAnchor` 从"期初早上"(周一 8 点 /
+    每月 1 日 8 点)改成"期末下午"(周日 16 点 / 每月最后一天 16 点)。**窗口方向
+    跟着整体后移一期**:回顾看的从"上一期"变成"这一期(刚过完/正在收尾的)",
+    计划看的从"这一期"变成"下一期"——`windowOf` 重写,不再靠 `periodAnchor`
+    的年月推算窗口,直接用 `now` 所在的这一期做基准(plan 方向 +1 期)。新增
+    `scripts/periodic-report-anchor.test.mjs` 钉死锚点日期/到点判定/窗口方向,
+    挂进 `test:contracts`(非 `test:security`——这不是安全契约)。`PlansPanel`/
+    `RetrospectPanel` 的文案("周一 8:00 出"等)同步改成新锚点时间。
+  契约验证:`tsc --noEmit` 0 错;`test:security` 全绿;新增的
+  `periodic-report-anchor` 单测绿;`daily-report`/`daily-report-persist` 复测绿
+  (确认没被 `useTodayData.ts` 里紧邻的改动带歪)。
 
 - **VoiceInputSheet 的 `intent='ask'` 那一支已不可达,但还没删(2026-07-31)**。
   用户两次指同一件事(「点击问问符号,进入真的问问界面」),这一轮把**所有**问念念入口
