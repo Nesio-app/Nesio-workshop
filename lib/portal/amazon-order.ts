@@ -16,7 +16,7 @@ export interface RawNode {
 
 export interface ConsolidatedOrder {
   name: string;
-  type: 'object';
+  type: 'Thing';
   tags: string[];
   attributes: Record<string, string | number>;
 }
@@ -74,7 +74,7 @@ function lines(nodes: RawNode[], summary: string): string[] {
 
 /** 挑产品名:优先 object 节点;否则挑不像「金额/税/总计/订单号/日期」的最长名。 */
 function pickProductName(nodes: RawNode[]): string {
-  const obj = nodes.find((n) => n.type === 'object' && n.name && n.name.trim());
+  const obj = nodes.find((n) => n.type === 'Thing' && n.name && n.name.trim());
   if (obj?.name) return obj.name.trim();
   const cand = nodes
     .map((n) => (n.name || '').trim())
@@ -138,7 +138,7 @@ export function consolidateAmazonOrder(nodes: RawNode[], summary = ''): Consolid
 
   return {
     name: pickProductName(nodes) || (attrs.orderNo ? `订单 ${attrs.orderNo}` : '亚马逊订单'),
-    type: 'object',
+    type: 'Thing',
     tags: ['亚马逊'],
     attributes: attrs,
   };

@@ -30,14 +30,15 @@ export function readNodeContext(node: LifeNode): SignalContext | null {
 // 2026-08-01 Domains 二轮修正跟着 FrontDomain 改名走:object 归 life(物品/收纳并入 life,
 // 不再是已改名/收窄的 finance);person 改归 relationship(比塞进 life 更准);
 // event/commitment 归 work(原先都归笼统的 growth)。
+// Mind 合并了旧 health_state('health')与 preference('life')—— 取 life,同
+// life-territory.ts/LifeMap.tsx 的取舍(那两处也把合并后的 Mind 归到"自我/life"一侧)。
 const TYPE_DOMAIN: Record<string, FrontDomain> = {
-  object: 'life',
+  Thing: 'life',
   place: 'life',
   person: 'relationship',
   event: 'work',
-  commitment: 'work',
-  health_state: 'health',
-  preference: 'life',
+  task: 'work',
+  Mind: 'life',
 };
 
 /**

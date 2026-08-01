@@ -138,7 +138,7 @@ export const LENSES: Lens[] = [
     id: 'action-stall', name: '行动卡点', nameEn: 'Action stall', mode: 'nudge', dimension: 'control',
     match: ({ nodes, now }) => {
       const n = nodes.find((x) => {
-        if (x.type !== 'commitment' || x.attributes?.done) return false;
+        if (x.type !== 'task' || x.attributes?.done) return false;
         if (x.tags?.includes('meeting-notes')) return false;
         const age = now - new Date(x.createdAt).getTime();
         if (age < 5 * DAY || age > 30 * DAY) return false;
@@ -202,7 +202,7 @@ export const LENSES: Lens[] = [
     match: ({ nodes, now }) => {
       const n = nodes.find((x) => {
         if ((x.confidence ?? 0) < 0.8) return false;
-        if (x.type === 'commitment' || x.type === 'event') return false;
+        if (x.type === 'task' || x.type === 'event') return false;
         const age = now - new Date(x.createdAt).getTime();
         if (age < 14 * DAY) return false;
         const notes = String(x.attributes?.notes || x.rawInput || '');

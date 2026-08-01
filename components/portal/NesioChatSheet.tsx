@@ -936,7 +936,7 @@ Edit location/value anytime in Storage.`),
       const airport = it.place ? resolveAirport(it.place) : null;
       const saved = ingestLifeNode({
         name: it.name,
-        type: it.kind === 'todo' ? 'commitment' : 'event',
+        type: it.kind === 'todo' ? 'task' : 'event',
         source: 'manual',
         confidence: 0.9,
         tags: ['行程'],
@@ -1027,7 +1027,7 @@ Edit location/value anytime in Storage.`),
       name: isChecklist
         ? (titleLine || L(dict, `清单 · ${items.length} 项`, `Checklist · ${items.length} items`))
         : msg.text.slice(0, 60),
-      type: isChecklist ? 'commitment' : 'event',
+      type: isChecklist ? 'task' : 'event',
       source: 'manual', confidence: 0.9,
       tags: isChecklist ? ['宝盒对话', '清单'] : ['宝盒对话'],
       attributes: {
@@ -1212,7 +1212,7 @@ Edit location/value anytime in Storage.`),
         //    (scripts/write-gate-addLifeNode.test.mjs 明文禁止)。
         ingestLifeNode({
           name: file.name.replace(/\.[^.]+$/, ''),
-          type: 'note', source: 'manual', tags: ['文件'],
+          type: 'collection', source: 'manual', tags: ['文件'],
           attributes: { fileName: file.name, fileSize: String(file.size) },
           relations: [], confidence: 1,
           assets: [{ id: assetId, kind: 'file' as const, local: true, mimeType, label: file.name, createdAt: new Date().toISOString() }],

@@ -31,10 +31,11 @@ export interface PersonProfile {
   ego: { nodes: GNode[]; edges: GEdge[] };
 }
 
+// 2026-08-01 改名批:health_state+preference 合并成 Mind,取 health_state 原色(status-risk)。
 const NODE_COLOR: Record<string, string> = {
-  person: 'var(--portal-accent)', object: 'var(--status-calm)', place: 'var(--status-go)',
-  event: 'var(--status-gentle)', commitment: 'var(--portal-cool-accent)',
-  health_state: 'var(--status-risk)', preference: 'var(--portal-muted)',
+  person: 'var(--portal-accent)', Thing: 'var(--status-calm)', place: 'var(--status-go)',
+  event: 'var(--status-gentle)', task: 'var(--portal-cool-accent)',
+  Mind: 'var(--status-risk)',
 };
 const FAMILY_TAG = /家人|家庭|family/i;
 

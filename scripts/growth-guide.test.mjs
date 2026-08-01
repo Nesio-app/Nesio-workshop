@@ -41,15 +41,15 @@ function makeWorld({ nodes = [], txs = [] } = {}) {
   return { gg, signals, protocols };
 }
 
-const COMMIT_OLD = { id: 'c1', type: 'commitment', name: '给妈妈打电话聊搬家', createdAt: day(8), confidence: 1, attributes: {}, tags: [] };
+const COMMIT_OLD = { id: 'c1', type: 'task', name: '给妈妈打电话聊搬家', createdAt: day(8), confidence: 1, attributes: {}, tags: [] };
 
 // 1) commitment_review 规则边界
 {
   const { gg } = makeWorld({ nodes: [
     COMMIT_OLD,
-    { id: 'c2', type: 'commitment', name: '太新', createdAt: day(2), confidence: 1, attributes: {}, tags: [] },
-    { id: 'c3', type: 'commitment', name: '已完成', createdAt: day(9), confidence: 1, attributes: { done: true }, tags: [] },
-    { id: 'c4', type: 'commitment', name: '会议记录 · X', createdAt: day(9), confidence: 1, attributes: {}, tags: ['meeting-notes'] },
+    { id: 'c2', type: 'task', name: '太新', createdAt: day(2), confidence: 1, attributes: {}, tags: [] },
+    { id: 'c3', type: 'task', name: '已完成', createdAt: day(9), confidence: 1, attributes: { done: true }, tags: [] },
+    { id: 'c4', type: 'task', name: '会议记录 · X', createdAt: day(9), confidence: 1, attributes: {}, tags: ['meeting-notes'] },
   ] });
   const cards = gg.todayGrowthCards(3, NOW);
   assert.equal(cards.filter((c) => c.kind === 'commitment_review').length, 1);
@@ -77,10 +77,10 @@ const COMMIT_OLD = { id: 'c1', type: 'commitment', name: '给妈妈打电话聊�
 // 3) dusty_memory 日幂等 + 21 天线
 {
   const nodes = [
-    { id: 'm1', type: 'preference', name: '旧念头A', createdAt: day(30), confidence: 0.9, attributes: {}, tags: [] },
-    { id: 'm2', type: 'preference', name: '旧念头B', createdAt: day(40), confidence: 0.9, attributes: {}, tags: [] },
-    { id: 'm3', type: 'preference', name: '太新', createdAt: day(3), confidence: 0.9, attributes: {}, tags: [] },
-    { id: 'm4', type: 'preference', name: '低置信', createdAt: day(40), confidence: 0.5, attributes: {}, tags: [] },
+    { id: 'm1', type: 'Mind', name: '旧念头A', createdAt: day(30), confidence: 0.9, attributes: {}, tags: [] },
+    { id: 'm2', type: 'Mind', name: '旧念头B', createdAt: day(40), confidence: 0.9, attributes: {}, tags: [] },
+    { id: 'm3', type: 'Mind', name: '太新', createdAt: day(3), confidence: 0.9, attributes: {}, tags: [] },
+    { id: 'm4', type: 'Mind', name: '低置信', createdAt: day(40), confidence: 0.5, attributes: {}, tags: [] },
   ];
   const { gg } = makeWorld({ nodes });
   const a = gg.todayGrowthCards(3, NOW).find((c) => c.kind === 'dusty_memory');

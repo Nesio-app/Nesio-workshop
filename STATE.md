@@ -2,10 +2,12 @@
 
 > Loop-engineering 原则:状态必须活在对话之外。任何 AI 会话或新协作者
 > **先读这个文件**,再动手。改动仓库重大状态时,同步更新这里。
-> 最后更新:2026-08-01(五图反馈批:CSV 导入丢数据 bug 修复 + 今天页时间线三处 +
+> 最后更新:2026-08-01(**LifeNodeType 改名批已落地**:object→Thing / commitment→task /
+> health_state+preference→Mind(合并)/ note→collection,person/event 不变、place 仍
+> 是批次174墓碑值;真机反馈小修一批:任务拆分卡精简/时间线✓✕拆分/日程页手记补
+> 截止日期入口;五图反馈批:CSV 导入丢数据 bug 修复 + 今天页时间线三处 +
 > 记忆详情页整合;Signal/LifeNode schema 改名批:SignalSource 增删/修误分类 +
-> epistemic·generator 收紧必填;retentionPolicy/自定义 tag/LifeNodeType
-> 改名批因契约冲突或规格丢失明确搁置,见「已知欠账」首条;并发会话合并:与另一
+> epistemic·generator 收紧必填;并发会话合并:与另一
 > 并行会话(claude/home-desktop-robot-setup-wb6rg7,PR #292-294)在 main 上的
 > 26 个提交做了真实内容合并,6 个冲突文件逐行核对,详见「已知欠账」新条目;
 > 洞察改「目标」+ 新增「回顾/计划」两个 tab + 每日日报改回今天页卡片 + 新增
@@ -229,17 +231,75 @@ sensitivity/retention 枚举化(中期)。
     ③ 8 个自定义可见 tag(财务/物品/衣橱/美食/健康/人物/心情/阅读)UI 接线 —— 不确定
        该接进哪个界面:最近一批("bug2 批·物品页")刚**删掉**物品页的"常用标签"快选
        UI 当噪音处理,现在再加一版新标签选择器方向不明,存在跟那个决定正面冲突的风险。
-    ④ `LifeNodeType` 改名批(object→Thing / commitment→task / health_state→health /
-       preference→Mind / note→collection;person/event 不变,place 维持批次174的墓碑
-       退役状态不碰)—— 目标值都明确,但 `object` 一项就有 130+ 处字面量比较/构造点,
-       且 life-graph.ts 的图谱读入口不止一条(localStorage 种子 / IDB 分片 / 云拉取…),
-       安全的改法要求在**所有**读入口做旧值→新值归一化,否则任一入口漏做,老用户已存
-       的该类型记忆会在该入口静默"消失"(过滤器再也匹配不上旧字符串)。规模和风险都
-       够格单独立一个批次专门做,不该挤进这轮捎带手改完。
+    ④ `LifeNodeType` 改名批 —— **2026-08-01 已完成,见下方新条目**,不再是欠账。
   契约验证:`tsc --noEmit` 0 错(除 pre-existing 的 `lib/idb/__tests__/phase1-migration.test.ts`
   缺测试框架类型声明);`test:security` 全绿;`test:contracts`(319 条)除 3 条**验证为
   改动前就失败**的预置项(`cloud-module-data-runtime`/`v14-sovereignty-ui-regression`/
   `cloud-auto-sync`,均与本批无关)外全绿。
+
+- **`LifeNodeType` 改名批(2026-08-01,已完成)**:用户点名最高优先级架构项("先改
+  LifeNodeType"),值映射:`object→Thing` / `commitment→task` / `health_state`+
+  `preference` **合并成** `Mind` / `note→collection`;`person`/`event` 不变,
+  `place` 仍是批次174的墓碑退役值不碰。
+  ● **规模复核**:先跑一个只读 Explore agent 摸清爆炸半径 —— STATE.md 早前记的
+    "`object` 130+ 处字面量" 是未验证的估算,实测约 75 处生产代码(`typeof x ===
+    'object'` 噪音占了原始 grep 命中的 92%);`commitment`/`health_state` 噪音接近零,
+    `preference`/`note` 各有一套同名但无关的子系统(个性化偏好学习 preference-store.ts、
+    通用"备注"属性键 `note`、UI 语气枚举 `'busy'|'done'|'note'`)必须避开。
+  ● **迁移策略**:`normalizeLegacyNodeType()` 就地内联在三处入图口径(`life-graph.ts`
+    的 `normalizeNode`/`seedFromLocalStorage`,`life-graph-shards.ts` 的
+    `parseNodeArray`——IndexedDB 分片是当前用户数据主体所在,`signal.ts` 的
+    `signalToLifeNode`),老字符串一律映射成新值再校验/使用。**没有做成共享模块**——
+    好几个 `scripts/*.test.mjs` 用 `vm.runInNewContext` 把单个 lib 文件当模块单独跑、
+    `require()` 全桩成 `{}`,跨文件 import 在那种沙箱里变成 `undefined`,调用时炸、
+    又被 try/catch 吞掉,表现成一整批"读出来是 null"的假死(`graph-shards`/
+    `graph-sync-safety` 两条契约测试踩过这个坑,已改回三份内联的同一份 5 行 switch)。
+  ● **Mind 合并的取舍**(`health_state`+`preference`→一个值,原本两套互斥的展示/
+    判据必须二选一或重新分支):`MemoryNodeDetail.tsx` 的 `HealthSection`/
+    `PreferenceSection` 合并成 `MindSection`,内部按"有没有 `healthType`/`value`
+    字段"分支渲染,不是简单二选一。图标/颜色类映射(`icons.tsx`/`MemoryTab.tsx`/
+    `RelationGraph.tsx`/`TimelineTab.tsx`/`relationship-profile.ts`/
+    `MemoryNodeDetail.tsx` 的两套 TYPE_BG)统一取 `health_state` 原色/图标。
+    生命域归类类(`LifeMap.tsx`/`life-territory.ts`/`node-context.ts` 的
+    `TYPE_TO_DOMAIN`)统一取 `preference` 原域("自我/life"侧)。`lens-eligible.ts`
+    的 `STRUCTURED` 集合和 `loose-threads.ts` 的 `ENTITY_TYPES` 集合两边行为相反
+    (health_state 在集合里、preference 不在),各自按"宁可多给一个用不上的按钮,
+    不要少给一个真需要的功能"的方向单独判断,不是照抄同一个决定。
+  ● **顺手修的老 bug**(报告点名、改名批里一起处理不算 scope creep):
+    ① `app/api/cloud/memory/route.ts` 的 `allowedMemoryTypes` 服务端白名单漏了
+    `note`(现 `collection`)—— 手记类节点(无日期随手记的默认落点)因此在云
+    upsert/pull 两端都被静默丢弃,现已补上;② `MemoryTab.tsx`/`MemoryNodeDetail.tsx`
+    的第二套颜色映射漏了 note 的颜色档,顺手补上 `collection`。
+  ● **手记(collection)加了截止日期编辑入口**(见下方"真机反馈小修一批"),
+    是这批改名的直接连带 —— 没有 due date 的手记以前压根没有编辑框能填。
+  ● **AI 抽取 prompt 同步改名**(`lib/extraction/extraction.ts` 的
+    `CLASSIFICATION_RULES_BLOCK`/`SOURCE_HINTS`/`IMAGE_RECOGNITION_DIRECTIVE`)——
+    这段文本直接喂给云端抽取模型,不改的话模型会继续吐旧字符串,靠
+    `normalizeLegacyNodeType` 兜底虽然功能上不受影响,但让模型说新词更干净。
+  ● **免费 AI 上限已跟用户对齐**(为后续"简报叙事化"批铺路,非本批范围):用户
+    明确选择"免费用户无限量调云,不做预算熔断"这个例外(workshop 环境不限成本/
+    隐私),下一批做简报叙事化时按此实现,不再走"免费=确定性/零成本"红线的默认路径。
+  契约验证:`tsc --noEmit` 0 错(除 pre-existing 的 `phase1-migration.test.ts`);
+  `test:security` 全绿;`scripts/*.test.mjs` 全量 383 个跑了一遍,10 个失败经
+  `git stash` 回退到改动前逐个确认**全部 pre-existing、与本批无关**(与 STATE.md
+  已记录的已知失败名单一致:`cloud-module-data-runtime`/`v14-sovereignty-ui-regression`/
+  `auth-implicit-session-import`/`cloud-auto-sync`/`body-ledger-contract`/
+  `travel-trips-contract`/`design-token-ratchet`/`auth-session-sticky-refresh`/
+  `tesla-finance`),另 20 个由本批改名直接触发的测试失败(旧类型字面量当 fixture/
+  源码正则断言)已全部随源码改名同步更新并转绿。
+
+- **真机反馈小修一批(2026-08-01)**:LifeNodeType 改名批之前的零散小修,一起验证部署。
+  ● 任务拆分卡(`FocusCardDetail.tsx`):去掉每步的估算时间显示,"太难"按钮只留
+    "↓"符号(省空间,一行东西太多);修 `.nesio-momentum-item`/`.nesio-momentum-row`
+    双重 padding 叠加导致的背景卡留白不对称(padding 全部交给 row 管)。
+  ● 时间线(`FocusSection.tsx`):行尾 ✕ 拆成两个符号 —— ✓(完成)/✕(移走),
+    此前只有 ✕,用户没认出左侧圆圈也是完成按钮。
+  ● 日程页(`SchedulePanel.tsx`):新增待办分支(commitment 类节点,或带 dueDate
+    的手记),配"无截止日期"/"逾期未完成"两个筛选标签(复用既有 `googleLabels`
+    筛选机制,不新建筛选系统);提醒行同样补上逾期标签。手记类节点补上"截止日期"
+    编辑入口(`MemoryNodeDetail.tsx`,此前只有 commitment 类型能填,没日期的手记
+    编辑加了时间也存不进日程 —— 编辑面板压根没这个框)。
+  契约验证同上(与 LifeNodeType 改名批一起跑的 tsc/test:security/全量测试)。
 
 - **Domains 三合一(2026-08-01,进行中)**:用户明确决策 —— `SignalSensitivity`(退场)+
   `FrontDomain`(`lib/life-domain/domain-taxonomy.ts`,此前只有语音捕获/搜索查询两条路径

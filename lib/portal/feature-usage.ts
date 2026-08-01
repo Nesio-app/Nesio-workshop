@@ -204,7 +204,7 @@ export function featureCatalog(zh: boolean): FeatureDef[] {
       body: L('今天页顶上点一下心情球,几秒钟。攒几次,洞察就能帮你看出情绪的节奏。', 'Tap the mood orb atop Today — a few seconds. A few logs and Insights reveals your rhythm.'),
       ctaLabel: L('记心情', 'Log mood'),
       openEvent: 'nesio-open-mood',
-      infer: (nodes) => nodes.some((n) => n.type === 'health_state' && (n.tags ?? []).some((t) => FEELING_TAGS.has(t))),
+      infer: (nodes) => nodes.some((n) => n.type === 'Mind' && (n.tags ?? []).some((t) => FEELING_TAGS.has(t))),
     },
     {
       key: 'inventory',
@@ -212,9 +212,9 @@ export function featureCatalog(zh: boolean): FeatureDef[] {
       body: L('拍一下或说一句,念念记住它放哪了 —— 要用时一搜就有,不用再翻箱倒柜。', 'Snap or say it — Nesio remembers where it went, so a search brings it back.'),
       ctaLabel: L('整理物品', 'Organize items'),
       openEvent: 'nesio-open-inventory',
-      infer: (nodes) => nodes.some((n) => n.type === 'object'),
+      infer: (nodes) => nodes.some((n) => n.type === 'Thing'),
       // 物品节点越多,越可能受益于收纳
-      readiness: (nodes) => nodes.filter((n) => n.type === 'object').length * 3,
+      readiness: (nodes) => nodes.filter((n) => n.type === 'Thing').length * 3,
     },
     {
       key: 'capture',

@@ -16,7 +16,7 @@ export interface NotionRow {
 }
 
 export interface MappedNode {
-  type: 'event' | 'preference';
+  type: 'event' | 'Mind';
   name: string;
   attributes: Record<string, string>;
   relations: Array<{ targetId: string; relation: string }>;
@@ -117,7 +117,7 @@ export function notionRowToNode(row: NotionRow, dbTitle: string): MappedNode {
 
   return {
     // 有日期字段的行当作事件(能进时间线),否则当作偏好/记录
-    type: dateVal ? 'event' : 'preference',
+    type: dateVal ? 'event' : 'Mind',
     name: (name || 'Untitled').slice(0, 80),
     attributes,
     relations: [],

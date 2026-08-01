@@ -42,9 +42,9 @@ assert.equal(new Set(ids).size, ids.length, 'externalId 无重复');
 // 八域覆盖
 const types = new Set(nodes.map((n) => n.type));
 assert.ok(types.has('person'), '有人物');
-assert.ok(types.has('commitment'), '有提醒/承诺');
-assert.ok(types.has('note'), '有笔记'); // 批次 174:place 退役,原「巷口咖啡馆」位置改为 note
-assert.ok(types.has('health_state'), '有心情');
+assert.ok(types.has('task'), '有提醒/承诺');
+assert.ok(types.has('collection'), '有笔记'); // 批次 174:place 退役,原「巷口咖啡馆」位置改为 note(现 collection)
+assert.ok(types.has('Mind'), '有心情');
 assert.ok(nodes.some((n) => n.source === 'email'), '有邮件来源');
 assert.ok(nodes.some((n) => n.source === 'calendar'), '有日历来源');
 
@@ -53,7 +53,7 @@ const cafe = nodes.find((n) => n.attributes.externalId === 'sample-cafe');
 assert.ok(typeof cafe.attributes.lat === 'number' && typeof cafe.attributes.lon === 'number', '位置带经纬度');
 
 // 心情带情绪语义(今天页第一拍/洞察情绪)
-const mood = nodes.find((n) => n.type === 'health_state');
+const mood = nodes.find((n) => n.type === 'Mind');
 assert.ok(mood.attributes.emotion && mood.attributes.emotionLabel, '心情带情绪标签');
 assert.ok((mood.tags || []).includes('feeling'), '心情带 feeling tag');
 
@@ -80,12 +80,12 @@ for (const n of en) {
 const enIds = en.map((n) => n.attributes.externalId);
 assert.equal(new Set(enIds).size, enIds.length, '英文 externalId 无重复');
 const enTypes = new Set(en.map((n) => n.type));
-for (const ty of ['person', 'commitment', 'place', 'health_state']) assert.ok(enTypes.has(ty), `英文有 ${ty}`);
+for (const ty of ['person', 'task', 'place', 'Mind']) assert.ok(enTypes.has(ty), `英文有 ${ty}`);
 assert.ok(en.some((n) => n.source === 'email'), '英文有邮件来源');
 assert.ok(en.some((n) => n.source === 'calendar'), '英文有日历来源');
 const enPlace = en.find((n) => n.type === 'place');
 assert.ok(typeof enPlace.attributes.lat === 'number' && typeof enPlace.attributes.lon === 'number', '英文位置带经纬度');
-const enMood = en.find((n) => n.type === 'health_state');
+const enMood = en.find((n) => n.type === 'Mind');
 assert.ok(enMood.attributes.emotion && enMood.attributes.emotionLabel, '英文心情带情绪标签');
 assert.ok((enMood.tags || []).includes('feeling'), '英文心情带 feeling tag');
 // 关系 targetId 落在英文样例人物内

@@ -32,7 +32,7 @@ function energyPct(lvl: string): number { return lvl === 'high' ? 88 : lvl === '
 export function readMoodTrend(period: MoodPeriod): MoodTrendData {
   const graph = getLifeGraph().filter((n) => {
     const t = n.tags || [];
-    return n.type === 'health_state' && (t.includes('feeling') || t.includes('moment'));
+    return n.type === 'Mind' && (t.includes('feeling') || t.includes('moment'));
   });
   const now = new Date();
   const spanDays = period === 'week' ? 7 : period === 'month' ? 30 : 365;

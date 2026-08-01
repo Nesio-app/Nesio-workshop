@@ -27,7 +27,7 @@ function daysAhead(n: number, hour = 10): string {
 export const DEMO_SEED_NODES: LifeNode[] = [
   {
     id: 'demo-keys',
-    type: 'object',
+    type: 'Thing',
     name: '备用钥匙',
     source: 'manual',
     confidence: 1,
@@ -39,7 +39,7 @@ export const DEMO_SEED_NODES: LifeNode[] = [
   },
   {
     id: 'demo-gift',
-    type: 'commitment',
+    type: 'task',
     name: '给发小准备生日礼物',
     source: 'manual',
     confidence: 1,
@@ -75,7 +75,7 @@ export const DEMO_SEED_NODES: LifeNode[] = [
   },
   {
     id: 'demo-med',
-    type: 'health_state',
+    type: 'Mind',
     name: '维生素 D 还剩半瓶',
     source: 'manual',
     confidence: 1,
@@ -87,7 +87,7 @@ export const DEMO_SEED_NODES: LifeNode[] = [
   },
   {
     id: 'demo-cafe',
-    type: 'note', // 批次 174:place 类型退役
+    type: 'collection', // 批次 174:place 类型退役
     name: '巷口咖啡馆',
     source: 'manual',
     confidence: 1,

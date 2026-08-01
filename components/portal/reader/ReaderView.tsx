@@ -128,7 +128,7 @@ export default function ReaderView({ book, rawText, meta, onClose }: {
     const text = selText.trim();
     if (!text) return;
     ingestLifeNode({
-      name: text.slice(0, 60), type: 'preference', source: 'manual', confidence: 1, rawInput: text,
+      name: text.slice(0, 60), type: 'Mind', source: 'manual', confidence: 1, rawInput: text,
       tags: ['笔记', '摘录', book.title.slice(0, 24)], attributes: { origin: '阅读摘录', fromArticle: book.title }, relations: [],
     });
     clearSel(); flash(L(dict, '已收进记忆', 'Saved to Memory'));
@@ -159,7 +159,7 @@ export default function ReaderView({ book, rawText, meta, onClose }: {
     if (!text) return;
     ingestLifeNode({
       name: book.title.slice(0, 60) || L(dict, '一篇阅读', 'A read'),
-      type: 'preference', source: 'manual', confidence: 1, rawInput: text,
+      type: 'Mind', source: 'manual', confidence: 1, rawInput: text,
       tags: ['笔记', '阅读', book.title.slice(0, 24)],
       attributes: { origin: '阅读收藏', externalId: `read-${docId}` }, relations: [],
     });

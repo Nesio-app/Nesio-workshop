@@ -6,7 +6,7 @@ import { encryptField, decryptField } from '@/lib/portal/cloud/field-encryption'
 type CloudMemoryNode = {
   id: string;
   schemaVersion: 'LifeNode@v1';
-  type: 'person' | 'object' | 'place' | 'event' | 'commitment' | 'health_state' | 'preference';
+  type: 'person' | 'Thing' | 'place' | 'event' | 'task' | 'Mind' | 'collection';
   name: string;
   attributes: Record<string, string | number | boolean | null>;
   source: 'manual' | 'photo' | 'calendar' | 'email' | 'system' | 'voice';
@@ -50,14 +50,17 @@ const allowedMemoryNodeKeys = [
   'rawInput',
 ] as const;
 
+// 2026-08-01 改名批同时补上一个老 bug:这张表以前漏了 'note'(现 'collection')——
+// 手记类节点因此在云 upsert/pull 两端都被静默丢弃(它是没日期随手记的默认落点,
+// 漏了不是小概率)。改名顺带把 collection 加进来,不是新增范围。
 const allowedMemoryTypes = new Set<CloudMemoryNode['type']>([
   'person',
-  'object',
+  'Thing',
   'place',
   'event',
-  'commitment',
-  'health_state',
-  'preference',
+  'task',
+  'Mind',
+  'collection',
 ]);
 
 const allowedMemorySources = new Set<CloudMemoryNode['source']>([

@@ -14,7 +14,7 @@ const ext = read('../lib/extraction/extraction.ts');
 assert.match(ext, /兜底捕捉|Layer\s*①/, '分类规则含兜底捕捉(Layer ①)');
 assert.match(ext, /永不丢|绝不要跳过|不要跳过/, '明确「永不丢/不跳过」');
 assert.match(ext, /confidence\s*[≤<]?=?\s*0?\.5/, '兜底捕捉 confidence ≤0.5');
-assert.match(ext, /note 节点|note节点/, '兜底走 note 节点(通用捕捉)');
+assert.match(ext, /collection 节点|collection节点/, '兜底走 collection 节点(通用捕捉,原 note,2026-08-01 改名)');
 
 // ② 召回不按 confidence 阈值排除低置信(只影响排序)
 const search = read('../lib/life-domain/signal-search.ts');

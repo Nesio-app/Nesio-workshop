@@ -47,7 +47,7 @@ function parse(n: LifeNode): Meal | null {
 export function addMeal(m: Omit<Meal, 'id'>): string {
   const title = m.items.map((i) => i.name).filter(Boolean).slice(0, 3).join(' · ') || '一餐';
   const node = ingestLifeNode({
-    type: 'note', name: title, source: 'manual', confidence: 1, relations: [], tags: [TAG],
+    type: 'collection', name: title, source: 'manual', confidence: 1, relations: [], tags: [TAG],
     attributes: {
       items: JSON.stringify(m.items), source: m.source,
       energyKCal: String(m.energyKCal), protein: String(m.protein), fat: String(m.fat), cho: String(m.cho),
@@ -65,7 +65,7 @@ export function addMeal(m: Omit<Meal, 'id'>): string {
 /** 读全部一餐(新到旧),给身体账本/时间轴求和。 */
 export function getMeals(): Meal[] {
   return getLifeGraph()
-    .filter((n) => n.type === 'note' && (n.tags || []).includes(TAG))
+    .filter((n) => n.type === 'collection' && (n.tags || []).includes(TAG))
     .map(parse)
     .filter((m): m is Meal => m != null)
     .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));

@@ -28,14 +28,14 @@ export const TERRITORY_DOMAINS: TerritoryDomain[] = [
 ];
 
 const TYPE_TO_DOMAIN: Record<LifeNodeType, TerritoryDomainId> = {
-  person:       'relations',
-  event:        'self',
-  commitment:   'work',
-  health_state: 'health',
-  preference:   'self',
-  place:        'growth',
-  object:       'self',
-  note:         'growth',
+  person:     'relations',
+  event:      'self',
+  task:       'work',
+  // Mind 合并了旧 health_state('health')与 preference('self')—— 选 self,同 LifeMap.tsx。
+  Mind:       'self',
+  place:      'growth',
+  Thing:      'self',
+  collection: 'growth',
 };
 
 const TAG_KEYWORDS: Record<TerritoryDomainId, string[]> = {

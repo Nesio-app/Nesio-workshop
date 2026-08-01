@@ -39,14 +39,14 @@ function splitLabel(label: string): [string, string] {
  * 原来是 7 个写死的 hex —— 换皮肤时整个界面都变了,只有这张关系图纹丝不动。
  * 现在跟着皮肤压饱和,而 7 个色相位仍然分散(相邻节点还是分得开)。
  */
+// 2026-08-01 改名批:health_state+preference 合并成 Mind,取 health_state 原色(viz-2)。
 const TYPE_FILL: Record<string, string> = {
   person: 'var(--viz-5)',
-  object: 'var(--viz-1)',
+  Thing: 'var(--viz-1)',
   place: 'var(--viz-3)',
   event: 'var(--viz-4)',
-  commitment: 'var(--viz-6)',
-  health_state: 'var(--viz-2)',
-  preference: 'var(--viz-7)',
+  task: 'var(--viz-6)',
+  Mind: 'var(--viz-2)',
 };
 const DEFAULT_FILL = 'var(--viz-8)';
 

@@ -48,7 +48,7 @@ export function recordMoment(emotionId: EmotionId, opts?: { en?: boolean; though
   const note = opts?.thought?.trim();
   ingestLifeNode({
     name: opts?.en ? `This moment · ${em.labelEn}` : `此刻 · ${em.label}`,
-    type: 'health_state',
+    type: 'Mind',
     tags: ['moment', 'feeling', em.id, em.quadrant, ...(opts?.tags ?? [])],
     attributes: {
       emotion: em.id, emotionLabel: em.label, emotionEmoji: em.emoji, emotionQuadrant: em.quadrant,
