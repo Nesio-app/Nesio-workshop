@@ -7,7 +7,9 @@
 > epistemic·generator 收紧必填;retentionPolicy/自定义 tag/LifeNodeType
 > 改名批因契约冲突或规格丢失明确搁置,见「已知欠账」首条;并发会话合并:与另一
 > 并行会话(claude/home-desktop-robot-setup-wb6rg7,PR #292-294)在 main 上的
-> 26 个提交做了真实内容合并,6 个冲突文件逐行核对,详见「已知欠账」新条目)
+> 26 个提交做了真实内容合并,6 个冲突文件逐行核对,详见「已知欠账」新条目;
+> 洞察改「目标」+ 新增「回顾/计划」两个 tab + 每日日报改回今天页卡片 + 新增
+> 周报/月报回顾与计划引擎,见下方「洞察三 tab 化 + 周期报告」条目)
 
 ## 当前纪元:两代产品交接中
 
@@ -324,8 +326,12 @@ sensitivity/retention 枚举化(中期)。
     ——首页输入框那条建提醒的路(`TodayFeed.tsx` 的 `onRemind`)本来就没接这个权限
     请求,合并后会变成"提醒能设上,但从没人被问过要不要开系统通知,到点不响"。
     已经补上(`onRemind` 里接 `syncReminderNotifications({ askPermission: true })`,
-    拒绝时给可见的"去设置里开"提示)——**这大概率就是用户报的"设置了提醒,没管用"
-    的根因**,值得下一轮追问确认是否已解决。
+    拒绝时给可见的"去设置里开"提示)。**后续追问已排除**:用户反馈"提醒设置好系统
+    没有弹出任何授权提醒",但确认 iOS「设置 → 通知 → 宝盒」当时已经是"允许通知"
+    打开的状态——`ensureLocalNotificationPermission()` 见已授权就直接返回 true,
+    不会再弹系统弹窗,这是**正确行为**,不是回归。真正待验证的是提醒**到点是否真响**
+    (`syncReminderNotifications` 的排程链路本身),不是权限请求这一步——留给下一次
+    真机测试确认。
   ● `CalendarCards.tsx`(采用那边更干净的 `CollapsedCalItem` 结构,删掉这边多出的
     CSS 类)、`package.json`(两边新测试脚本取并集)、`scripts/today-capture-flow.test.mjs`
     / `scripts/capture-trio.test.mjs`(断言改成同时验两边的判据,而不是二选一)。
@@ -335,6 +341,55 @@ sensitivity/retention 枚举化(中期)。
   (195 vs 基线 193)**确认是合并前 HEAD 自己就有的既存差距**(`LabScanSheet.tsx`
   裸按钮 13 vs 主干 10,早于本次合并——用 `git worktree` 分别量过 HEAD/main 两边
   的原始计数确认),非本次合并引入,未在本轮顺手修(超出"合并部署"范围,记账于此)。
+
+- **洞察三 tab 化 + 周报/月报引擎(2026-08-01)**:用户拍板扩展"每日简报"到周期性
+  回顾/计划,并顺带纠正了两处我先前答错的事实(见下)。
+  ● **纠正**:①`SignalSource` 只删了 `hardware_pulse` 一个死值,`notion`/`toggl`/
+    `reminder`/`keep`/`wechat_reading` 仍在——它们是 ConnectorsHub 里真实连接器的
+    signalSource(Notion/Toggl/Keep 健康/微信读书导入),不是死代码,我之前笼统说
+    "都删了"是错的。②`LifeNodeType` 改名批(person/event/Place/Thing/Mind/task/
+    collection)**确实没做**——`lib/portal/life-graph.ts` 里仍是旧值
+    (object/commitment/health_state/preference/note),STATE.md 早前已把它列为
+    "规模够格单独立一个批次,不该捎带手改"的明确搁置项;用户说"我也说改了的",
+    这里如实告知现状(没做),不是又一次误判。
+  ● **奖励**:积分 chip 从今天页顶栏彻底删除(`points` state + 按钮一并清,只在
+    `InsightsSheet` 的 rewards tab 里露面,不再有今天页入口)。
+  ● **洞察改名 + 新增两个 tab**:`MainTab` 加 `'retrospect'`(回顾)`'plans'`(计划);
+    `'reflection'` 的 tab 标签"洞察"→"目标"(内容不变,仍是模式分析/生命版图那一套)。
+    每日日报从 `'reflection'` tab 里搬进新的 `RetrospectPanel`(回顾),旁边加周报/
+    月报历史列表;`PlansPanel`(计划)展示下周/下月计划,只看当期不列历史。
+  ● **周报/月报引擎**(新文件 `lib/portal/periodic-report.ts`):复用日报已有的地基,
+    不重新取数——**回顾**把窗口内已落库的每日日报摞起来做汇总(标题列表 + 从
+    每日日报存的 insights JSON 里数各域被提到几次,纯计数不叙事)+ 这一期做完的
+    提醒;**计划**是窗口内已确定的日历项/到期提醒 + 线头(loose-threads),同日报
+    "往前看"段一样的红线:只放已知的,不推测。锚点周一 08:00(周)/ 每月 1 日
+    08:00(月),和 Vercel 现有的 `vercel.json` cron(`7 8 * * 1` 跑 weekly analyst)
+    同一天。回顾看的是**上一期**(锚点到了才看刚结束的那期),计划看的是**这一期**
+    (锚点到了看今天起到期末)——periodKey 天然不同,互不冲突。持久化模式照抄
+    `daily-report-persist.ts`:落成 `kind: 'periodic-report'` 的记忆节点,
+    `externalId` 幂等,`localStorage` 记"这一期问过了没"防重复生成(4 个静态 key,
+    没用模板字符串拼——那样会绕过 `storage-key-registry` 的字面量扫描,新登记的
+    4 个 + 1 个卡片 dismiss key 全部过契约)。生成时机接进 `useTodayData.ts` 里
+    `autoPersistTodayReport` 紧挨着的那处,同一个 `dailyReportEnabled` 开关,
+    没让用户多开一道设置。
+    渲染复用 `DailyReportSheet`(新增 3 个 section id:`completed`/`tally`/
+    `threads`,不为"本质上也是一份报告"的东西另起壳),`footNote` 改成可传参
+    (日报"这一天不再变" vs 周期报告"这一期不再变")。
+  ● **每日日报卡片重新上今天页**(推翻 2026-07-30"今天不要入口"的旧定案,
+    `daily-report-crossface.test.mjs` 的对应断言已从"不许有卡片"改成"必须有卡片
+    且只读冻结件"):新文件 `components/portal/today/DailyReportCard.tsx`,到点
+    (08:00)有内容才出现,"今天先不看"只压到明天(非永久,永久开关在设置里)。
+  ● **明确 v1 简化,未细化**(用户原话"初步设想,细节还需要增加"):周报/月报的
+    "回顾"内容目前只是标题罗列 + 域计数,没有叙事化摘要;"计划"只列已排定的事,
+    没有主动建议;"全平台打通"经核实简报取数本来就已经接了 7 个域 + 提醒/衣橱/
+    做饭/库存/健身/线头(不是只有日历邮件),内容单薄更可能是"正向准入"的过滤
+    门槛偏严(只放"今天真要你动"的),不是取数窄——这条待用户下一轮确认具体是
+    哪一路觉得单薄,再决定是放宽过滤还是真的加新取数源。
+  契约验证:`tsc --noEmit` 0 错;`test:security` 全绿;`daily-report`/
+  `daily-report-persist`/`daily-report-crossface`(断言已更新)/`storage-key-registry`
+  全绿;`design-token-ratchet` 195(基线 193)确认是本条之前就有的既存差距,本条
+  未新增裸按钮。手动核算 `isoWeekKey`/`periodAnchor`/`periodDue`/`buildRetrospect`/
+  `buildPlan` 的日期边界逻辑(周一 8 点前后、跨周边界)。
 
 - **VoiceInputSheet 的 `intent='ask'` 那一支已不可达,但还没删(2026-07-31)**。
   用户两次指同一件事(「点击问问符号,进入真的问问界面」),这一轮把**所有**问念念入口

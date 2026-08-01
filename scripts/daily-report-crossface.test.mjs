@@ -15,6 +15,10 @@
  *      empty 的判定不能靠 sections.length —— 日程段永远会渲染(哪怕只写「今天没安排」),
  *      那样就永远不空,自动预生成会天天往记忆里存一条空日报。
  *   ⑤ **默认开**,但**亲手关过的人保持关**(判据必须是 !== '0',不是 === '1')。
+ *
+ * 2026-08-01 追加:入口从「洞察页弹出层」改回「今天页卡片」(用户拍板推翻了
+ * 2026-07-30 那条「今天不要入口」的旧决定,原话「形式为每天上午 8 点做成卡片
+ * 推到今天」)——⑥ 那条断言已经从"不许有卡片"改成"必须有卡片,且只读冻结件"。
  */
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -285,9 +289,16 @@ const EIGHT = new Date(2026, 6, 30, 8, 0);
   assert.match(panel, /disabled=\{!r\.report\}/,
     '没有冻结件的往日不许做成能点的按钮 —— 点开一个空壳比不给这个入口更糟');
 
+  // 2026-08-01 用户改拍板:「形式为每天上午 8 点做成卡片推到今天」——推翻上面
+  // 2026-07-30 那条「今天不要入口」的旧决定。这里改成正向断言:卡片必须在,
+  // 而且必须只读冻结件(不许现算)。
   const today = strip(read('components/portal/TodayFeed.tsx'));
-  assert.doesNotMatch(today, /DailyReportCard/,
-    'Today 不再有日报卡(用户定案:「今天不要入口,用弹出卡片,在洞察开入口」)');
+  assert.match(today, /DailyReportCard/,
+    'Today 页要有每日日报卡片(用户 2026-08-01 拍板:「每天上午 8 点做成卡片推到今天」)');
+  const card = strip(read('components/portal/today/DailyReportCard.tsx'));
+  assert.match(card, /readTodayReport\(/, '卡片只读冻结件');
+  assert.doesNotMatch(card, /buildDailyReport/,
+    '卡片不许 build —— 同上面 DailyReportPanel 那条理由:现算的兜底是个后门');
 }
 
 /* ── ⑦ 好久没关注的面 + 没接上的线头(2026-07-30 用户点名要的两项)────── */
