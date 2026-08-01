@@ -13,7 +13,7 @@ import {
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
-import FamilyGoalCard from './family/FamilyGoalCard';
+import { migrateFamilyGoalToWish } from './family/migrate-goal-to-wish';
 
 export default function RewardsStore() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -24,6 +24,18 @@ export default function RewardsStore() {
   const [flash, setFlash] = useState('');
 
   const refresh = () => setState(loadRewards());
+  // 老的家庭攒钱目标搬成一条积分愿望。幂等(同名已在就只清服务端那份)。
+  const [migrated, setMigrated] = useState('');
+  useEffect(() => {
+    let alive = true;
+    void migrateFamilyGoalToWish().then((label) => {
+      if (!alive || !label) return;
+      setMigrated(label);
+      refresh();
+    });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     refresh();
@@ -71,9 +83,15 @@ export default function RewardsStore() {
         {L(dict, '忍住没买的东西存这儿当愿望。做成事赚积分,攒够就奖励自己。', 'Things you resisted buying wait here as wishes. Earn points by getting things done, then reward yourself.')}
       </p>
 
-      {/* bug3:攒钱目标(愿望)从「家庭分享」板搬到这里 —— 两个愿望不该拆在两个页面。
-          没入伙的人看不到这一块。 */}
-      <FamilyGoalCard />
+      {/* 2026-08-01:独立的「攒钱目标」卡片(乐高那块)撤了 —— 它按**钱**走,
+          而家务已经改成挣积分,那块连数据源都没有了。已设过的目标搬成一条积分愿望
+          (migrate-goal-to-wish),从此愿望清单是唯一一处。 */}
+      {migrated && (
+        <p className="nesio-freeze-hint" style={{ color: 'var(--status-go)' }}>
+          {L(dict, `「${migrated}」已经搬到下面的愿望清单里了 —— 现在用积分攒。`,
+            `“${migrated}” moved into your wishlist below — it runs on points now.`)}
+        </p>
+      )}
 
       {/* 待兑换 */}
       <div className="nesio-freeze-section">

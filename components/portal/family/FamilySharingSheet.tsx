@@ -16,7 +16,7 @@ import { relativeFutureLabel } from '@/lib/portal/time-labels';
 import { portalLocaleToDictionaryLocale, loadProfileSettings } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import {
-  listFamilies, createFamily, joinFamily, getBoard, getLedger, choreAction, recordPayout, reversePayout, syncMyFamilyProfile,
+  listFamilies, createFamily, joinFamily, getBoard, getLedger, choreAction, syncMyFamilyProfile,
   setMemberRole, removeMember,
   type FamilySummary, type FamilyMemberView, type BoardView, type LedgerView, type ChoreInstanceView,
 } from '@/lib/family/family-client';
@@ -25,8 +25,18 @@ import { awardChorePoints } from './award-chore-points';
 type View = { kind: 'board' } | { kind: 'ledger'; person: FamilyMemberView };
 type Dict = 'zh' | 'en';
 
-// 货币符号跟随语言:中文 ¥、英文 $。金额纯展示(Nesio 永不碰钱),不做汇率换算。
-const money = (n: number, dict: Dict) => `${dict === 'en' ? '$' : '¥'}${n.toFixed(2)}`;
+/**
+ * 家务的「多少」怎么显示(2026-08-01 用户:「家务挣积分,把钱相关的 UI 逻辑都换。
+ * 不需要给现金。不存在负数」)。
+ *
+ * 原来是 money():`¥20.00`。整套钱的语义跟着来了 —— 欠多少、给了多少现金、
+ * 给多了就出「已多给 TA ¥20.00」这种负数。用户点名不要这一套。
+ * 现在只有积分:家务做完加分,分攒着换愿望清单里的东西,**没有减法**。
+ *
+ * 换算 1 元 = 1 积分(chorePointValue 那边同一口径)—— 服务端字段名还叫 value/earned,
+ * 那是后端的事;界面上从此只说「分」。
+ */
+const points = (n: number, dict: Dict) => (dict === 'en' ? `${Math.round(n)} pts` : `${Math.round(n)} 分`);
 
 export default function FamilySharingSheet({ open, onClose, onToday }: {
   open: boolean;
@@ -313,7 +323,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, dict, t
             <div key={c.id} style={{ ...rowStyle, borderBottom: i === board.myChoresToday.length - 1 ? 'none' : rowStyle.borderBottom }}>
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{choreTitle(c, t)}</div>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{c.state === 'done' ? t('已提交,等审核', 'Submitted — waiting for review') : t('干完点「完成」', 'Tap Done when finished')} · {money(c.value, dict)}</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{c.state === 'done' ? t('已提交,等审核', 'Submitted — waiting for review') : t('干完点「完成」', 'Tap Done when finished')} · {points(c.value, dict)}</div>
               </div>
               {c.state === 'todo' && (
                 <button type="button" onClick={() => act(c.id, 'done')} disabled={busyId === c.id + 'done'} style={primaryBtn}>{t('完成', 'Done')}</button>
@@ -330,7 +340,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, dict, t
           <div style={cardStyle}>
             {board.toReview.map((c, i) => (
               <div key={c.id} style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch', gap: 'var(--space-2)', borderBottom: i === board.toReview.length - 1 ? 'none' : rowStyle.borderBottom }}>
-                <div style={{ fontSize: 'var(--text-body)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}><MemberAvatar name={displayName(c.assigneeId)} avatar={avatarOf(c.assigneeId)} size={22} /><span>{displayName(c.assigneeId)} · {choreTitle(c, t)} <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>{money(c.value, dict)}</span></span></div>
+                <div style={{ fontSize: 'var(--text-body)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}><MemberAvatar name={displayName(c.assigneeId)} avatar={avatarOf(c.assigneeId)} size={22} /><span>{displayName(c.assigneeId)} · {choreTitle(c, t)} <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>{points(c.value, dict)}</span></span></div>
                 {c.proofPhotoRef && <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-1)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}><IconCamera size={12} />{t('附了张存证照 —— 只存在你们家庭里。', 'A photo was added — stays in your family vault.')}</div>}
                 <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                   <button type="button" onClick={() => act(c.id, 'approve')} disabled={busyId === c.id + 'approve'} style={{ ...goBtn, flex: 1 }}>{t('看着不错', 'Looks good')}</button>
@@ -416,9 +426,11 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, dict, t
               <MemberAvatar name={displayName(e.member.id)} avatar={avatarOf(e.member.id)} size={32} />
               <div style={{ flex: 1 }}>
                 <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{displayName(e.member.id)}</div>
-                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('攒了', 'saved up')}</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('攒了', 'earned')}</div>
               </div>
-              <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)' as unknown as number, fontVariantNumeric: 'tabular-nums' }}>{money(e.owed, dict)}</span>
+              {/* earned 而不是 owed:owed 是「还没发的工钱」,发一次就掉一截、给多了变负数
+                  (用户实测那张「已多给 TA ¥20.00」)。积分只加不减,用累计挣到的。 */}
+              <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)' as unknown as number, fontVariantNumeric: 'tabular-nums' }}>{points(e.earned, dict)}</span>
               <span style={{ color: 'var(--portal-muted)' }}>›</span>
             </button>
           ))}
@@ -502,7 +514,7 @@ function StatsSection({ approved, dict, t }: { approved: ChoreInstanceView[]; di
         {[{ label: t('本周', 'This week'), n: weekCount, e: weekEarned }, { label: t('本月', 'This month'), n: monthCount, e: monthEarned }].map((s) => (
           <div key={s.label} style={{ ...cardStyle, flex: 1, padding: 'var(--space-3)' }}>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{s.label}</div>
-            <div style={{ fontSize: 'var(--text-h2)', fontWeight: 'var(--weight-bold)' as unknown as number, lineHeight: 1.1, color: 'var(--portal-ink)', fontVariantNumeric: 'tabular-nums' }}>{money(s.e, dict)}</div>
+            <div style={{ fontSize: 'var(--text-h2)', fontWeight: 'var(--weight-bold)' as unknown as number, lineHeight: 1.1, color: 'var(--portal-ink)', fontVariantNumeric: 'tabular-nums' }}>{points(s.e, dict)}</div>
             <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t(`完成 ${s.n} 件`, `${s.n} done`)}</div>
           </div>
         ))}
@@ -516,7 +528,7 @@ function StatsSection({ approved, dict, t }: { approved: ChoreInstanceView[]; di
             const isNow = i === bars.length - 1;
             const h = Math.round((b.earned / maxBar) * 100);
             return (
-              <div key={b.week} title={`${b.week} · ${money(b.earned, dict)}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%' }}>
+              <div key={b.week} title={`${b.week} · ${points(b.earned, dict)}`} style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%' }}>
                 <div style={{ height: `${Math.max(b.earned > 0 ? 6 : 2, h)}%`, background: isNow ? 'var(--portal-blue-deep)' : 'var(--portal-accent-soft-md)', borderRadius: 'var(--radius-sm)', transition: 'height .2s' }} />
               </div>
             );
@@ -533,7 +545,7 @@ function StatsSection({ approved, dict, t }: { approved: ChoreInstanceView[]; di
           <div key={row.title} style={{ ...rowStyle, borderBottom: i === top.length - 1 ? 'none' : rowStyle.borderBottom }}>
             <div style={{ flex: 1, minWidth: 0, fontSize: 'var(--text-body)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{row.title}</div>
             <span style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', whiteSpace: 'nowrap' }}>×{row.count}</span>
-            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' as unknown as number, color: 'var(--status-go)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{money(row.sum, dict)}</span>
+            <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)' as unknown as number, color: 'var(--status-go)', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{points(row.sum, dict)}</span>
           </div>
         ))}
       </div>
@@ -547,16 +559,8 @@ function LedgerScreen({ familyId, person, me, onChanged, onLeft, dict, t }: {
   onChanged: () => void; onLeft: () => void; dict: Dict; t: (a: string, b: string) => string;
 }) {
   const personId = person.id;
-  const canRecordPayout = me.canRecordPayout;
   const [ledger, setLedger] = useState<LedgerView | null>(null);
   const [err, setErr] = useState('');
-  const [payAmt, setPayAmt] = useState('');
-  const [payBusy, setPayBusy] = useState(false);
-  const [payErr, setPayErr] = useState('');
-  const [showPay, setShowPay] = useState(false);
-  const [confirmReverse, setConfirmReverse] = useState('');   // 待确认冲正的 payoutId
-  const [revBusy, setRevBusy] = useState('');
-  const [revErr, setRevErr] = useState('');
 
   const load = useCallback(async () => {
     setErr('');
@@ -589,40 +593,36 @@ function LedgerScreen({ familyId, person, me, onChanged, onLeft, dict, t }: {
 
   useEffect(() => { void load(); }, [load]);
 
-  async function pay() {
-    const amt = Number(payAmt);
-    if (!(amt > 0)) { setPayErr(t('填一个大于 0 的金额。', 'Enter an amount greater than 0.')); return; }
-    setPayBusy(true); setPayErr('');
-    const r = await recordPayout(familyId, personId, amt);
-    setPayBusy(false);
-    if (!r.ok) { setPayErr(t('没记上,再试一次。', 'Could not record — try again.')); return; }
-    setPayAmt(''); setShowPay(false); void load();
-  }
-
-  async function reverse(payoutId: string) {
-    setRevBusy(payoutId); setRevErr('');
-    const r = await reversePayout(familyId, payoutId);
-    setRevBusy('');
-    if (!r.ok) { setRevErr(t('没撤成,再试一次。', 'Could not undo — try again.')); return; }
-    setConfirmReverse(''); void load();
-  }
+  // pay() / reverse() 撤掉(2026-08-01 用户:「不需要给现金」)。
+  // family-client 里的 recordPayout / reversePayout 没删 —— 那是服务端能力,
+  // 别人的家庭可能还有旧数据;这里不再给入口。
 
   if (err && !ledger) return <ErrorRow msg={t('没连上,稍后再试。', 'Could not load — try again.')} onRetry={load} t={t} />;
   if (!ledger) return <LoadingCard label={t('正在读账本…', 'Loading the ledger…')} lines={3} />;
 
-  const history: Array<{ id: string; title: string; date: string; delta: number; payoutId?: string }> = [
+  /*
+   * 历史只剩「家务加分」这一种(2026-08-01)。发薪那一路整条撤掉 ——
+   * 用户点名「不需要给现金」,而一条 −¥20 的记录正是负数的来源。
+   * 服务端的 payout API 没删(别人的家庭可能还在用旧数据),只是这里不再给入口、
+   * 也不再把它算进任何一个数。
+   */
+  const history: Array<{ id: string; title: string; date: string; delta: number }> = [
     ...ledger.approved.map((c) => ({ id: c.id, title: choreTitle(c, t), date: c.approvedAt?.slice(0, 10) ?? c.dueDate, delta: c.value })),
-    ...ledger.payouts.map((p) => ({ id: `p_${p.id}`, title: t('你给了现金 · 从攒的里扣', 'You gave cash · deducted'), date: p.date, delta: -p.amount, payoutId: p.id })),
   ].sort((a, b) => (a.date < b.date ? 1 : -1));
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
       <div style={{ ...cardStyle, padding: 'var(--space-4)' }}>
-        {/* owed<0 = 你给的现金比 TA 挣的还多(多给了),别显示成「欠 -$20」那种迷惑负数。 */}
-        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>{ledger.balance.owed >= 0 ? t('还欠 TA', 'You still owe') : t('已多给 TA', 'You’ve overpaid')}</div>
-        <div style={{ fontSize: 'var(--text-display)', fontWeight: 'var(--weight-bold)' as unknown as number, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{money(Math.abs(ledger.balance.owed), dict)}</div>
+        {/*
+         * 2026-08-01(用户:「不需要给现金。不存在负数」):
+         * 这儿原来显示的是 owed —— 「还欠 TA」/给多了就翻成「已多给 TA ¥20.00」。
+         * 那是一套借贷账,而积分只加不减,**负数在这套里没有意义**。
+         * 现在报 earned(累计挣到的),它按定义就非负。
+         */}
+        <div style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-muted)' }}>{t('一共攒了', 'Earned so far')}</div>
+        <div style={{ fontSize: 'var(--text-display)', fontWeight: 'var(--weight-bold)' as unknown as number, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{points(Math.max(0, ledger.balance.earned), dict)}</div>
         <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginTop: 'var(--space-1)' }}>
-          {t('审核过的家务往上加 · 你给的现金往下扣', 'Approved chores add up · cash you give deducts')}
+          {t('审核过的家务往上加 · 攒够了到「奖励」里换东西', 'Approved chores add up · spend them in Rewards')}
         </div>
       </div>
 
@@ -632,61 +632,33 @@ function LedgerScreen({ familyId, person, me, onChanged, onLeft, dict, t }: {
         <p style={sectLabel}>{t('历史', 'History')}</p>
         <div style={cardStyle}>
           {history.length === 0 && <p style={{ ...rowStyle, borderBottom: 'none', color: 'var(--portal-muted)', fontSize: 'var(--text-sm)' }}>{t('还没有记录。', 'Nothing yet.')}</p>}
-          {history.map((h, i) => {
-            const canUndo = canRecordPayout && !!h.payoutId;   // 只有发薪行、且能记付款的人可撤
-            const confirming = confirmReverse === h.payoutId;
-            return (
-              <div key={h.id} style={{ ...rowStyle, flexWrap: 'wrap', borderBottom: i === history.length - 1 ? 'none' : rowStyle.borderBottom }}>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 'var(--text-body)' }}>{h.title}</div>
-                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{h.date}</div>
-                </div>
-                <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)' as unknown as number, color: h.delta >= 0 ? 'var(--status-go)' : 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                  {h.delta >= 0 ? '+' : '−'}{money(Math.abs(h.delta), dict)}
-                </span>
-                {canUndo && !confirming && (
-                  <button type="button" onClick={() => { setConfirmReverse(h.payoutId!); setRevErr(''); }}
-                    style={{ border: 'none', background: 'transparent', color: 'var(--portal-accent)', fontSize: 'var(--text-xs)', cursor: 'pointer', padding: 'var(--space-1)', whiteSpace: 'nowrap' }}>
-                    {t('记错了?撤这笔', 'Undo')}
-                  </button>
-                )}
-                {canUndo && confirming && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', width: '100%', marginTop: 'var(--space-2)' }}>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t('撤掉这笔发薪?TA 攒的会加回去。', 'Undo this payout? It goes back to their savings.')}</span>
-                    {revErr && <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-xs)' }}>{revErr}</span>}
-                    <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                      <button type="button" onClick={() => void reverse(h.payoutId!)} disabled={revBusy === h.payoutId}
-                        style={{ ...ghostBtn, color: 'var(--status-risk)' }}>{revBusy === h.payoutId ? t('撤销中…', 'Undoing…') : t('撤掉', 'Undo it')}</button>
-                      <button type="button" onClick={() => { setConfirmReverse(''); setRevErr(''); }} style={ghostBtn}>{t('先不', 'Not now')}</button>
-                    </div>
-                  </div>
-                )}
+          {/* 只剩「家务加分」这一种记录 —— 发薪那一路(以及它的撤销)整条撤掉,
+              用户点名「不需要给现金」。积分只加不减,所以这里没有负号那一支。 */}
+          {history.map((h, i) => (
+            <div key={h.id} style={{ ...rowStyle, borderBottom: i === history.length - 1 ? 'none' : rowStyle.borderBottom }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 'var(--text-body)' }}>{h.title}</div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{h.date}</div>
               </div>
-            );
-          })}
+              <span style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)' as unknown as number, color: 'var(--status-go)', fontVariantNumeric: 'tabular-nums' }}>
+                +{points(h.delta, dict)}
+              </span>
+            </div>
+          ))}
         </div>
       </section>
 
-      {canRecordPayout && (
-        showPay ? (
-          <div style={{ ...cardStyle, padding: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            <input style={inputStyle} inputMode="decimal" placeholder={t('给了多少现金?', 'How much cash did you give?')} value={payAmt} onChange={(e) => setPayAmt(e.target.value)} />
-            {payErr && <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}>{payErr}</span>}
-            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-              <button type="button" onClick={pay} disabled={payBusy} style={primaryBtn}>{payBusy ? t('记账中…', 'Recording…') : t('记下这笔', 'Record it')}</button>
-              <button type="button" onClick={() => { setShowPay(false); setPayErr(''); }} style={ghostBtn}>{t('取消', 'Cancel')}</button>
-            </div>
-          </div>
-        ) : (
-          <button type="button" onClick={() => setShowPay(true)} style={{ ...primaryBtn, alignSelf: 'stretch' }}>{t('给了现金 → 记一笔', 'Pay out cash → record it')}</button>
-        )
-      )}
+      {/* 「给了现金 → 记一笔」整块撤掉(2026-08-01 用户:「不需要给现金」)。
+          服务端的 payout API 没删 —— 别人的家庭可能还有旧数据,
+          但这里不再给入口,也不再把它算进任何一个数。 */}
 
       <MemberAdmin familyId={familyId} person={person} me={me} onChanged={onChanged} onLeft={onLeft} t={t} />
 
       <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6, margin: 0 }}>
-        {t('Nesio 永不碰钱。现金你来给,我们只把账记清 —— 审核过的家务往上加,你给的现金往下扣。没有银行、没有卡、没有要打电话取消的订阅。',
-          'Nesio never moves money. You give the cash; we just keep the count straight — approved chores add up, cash you give deducts.')}
+        {/* 2026-08-01:这一段原来在解释「Nesio 永不碰钱、现金你来给」——
+            那是钱那套的说明。现在家务只挣积分,钱整个不在这个模块里了。 */}
+        {t('家务做完就攒分,攒够了到「奖励」里换自己想要的东西。分只加不减 —— 这里不碰钱,也没有欠不欠的事。',
+          'Chores earn points; spend them in Rewards on whatever you want. Points only add up — no money here, and nothing to owe.')}
       </p>
     </div>
   );
