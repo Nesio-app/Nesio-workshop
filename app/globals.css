@@ -13107,6 +13107,21 @@ html[data-portal-theme="night"] .nesio-momentum-item { background: rgba(255,255,
   cursor: pointer;
   min-width: 0;
 }
+/* 2026-08-01:日历项没有独立的勾选圈按钮,圆点+文字合在一个按钮里触发展开(与
+   FocusSection 的 check+task-body 两个按钮不同结构)——这个类负责让圆点和文字
+   横向并排(而不是被 .nesio-collapsed-task-body 的 column 布局挤成竖排),
+   同时作为 flex:1 的行内子项,好让旁边的 ✕ 按钮有地方待。 */
+.nesio-collapsed-cal-body {
+  flex: 1;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+  min-width: 0;
+}
 /* 时标作 kicker(现在/今晚 20:15/明早…),标题上方,accent 色 */
 .nesio-collapsed-kicker {
   font-size: 0.72rem;
@@ -18610,6 +18625,20 @@ html[data-portal-theme="night"] .nesio-memmap-canvas { background: #16243c; }
   color: var(--portal-muted);
   cursor: pointer;
   text-align: left;
+}
+/* 2026-08-01:「相关记忆」标题行内的关联触发器 —— 不再单独占一整行 */
+.nesio-node-link-add-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  border: none;
+  background: none;
+  padding: 0.15rem 0.3rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--portal-blue-deep);
+  cursor: pointer;
+  flex: none;
 }
 .nesio-node-link-picker { display: flex; flex-direction: column; gap: 0.35rem; }
 .nesio-node-link-cand {

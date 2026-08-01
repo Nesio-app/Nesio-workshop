@@ -130,29 +130,35 @@ export function CollapsedCalItem({ obj, onOpenRecorder, onRemove }: { obj: Atten
 
   return (
     <li className="nesio-collapsed-item">
-      {/* 批次 111:日历项也做成时间线节点 —— 空心圆点在轨上 + 时标 kicker + 标题(去掉旧的图标+右侧 meta) */}
-      <button type="button" className="nesio-collapsed-row" onClick={() => setExpanded((v) => !v)}>
-        {/* 批次 129·定时·钟:有具体时间的日历项圆内嵌钟;全天事件用素圆 */}
-        <span className={`nesio-collapsed-dot${obj.event.allDay ? '' : ' nesio-collapsed-dot--clock'}`} aria-hidden>
-          {!obj.event.allDay && <IconClock size={13} />}
-        </span>
-        <span className="nesio-collapsed-task-body">
-          <span className="nesio-collapsed-kicker">{[dayTag, timeStr, countdown].filter(Boolean).join(' · ')}</span>
-          <span className="nesio-collapsed-title">{obj.title}</span>
-        </span>
-      </button>
-      {/* 用户要求(2026-07-30):时间线**每一条**后面都要有 ✕ 能移走 —— 日历行此前没有,
-          于是一场不想看的会只能一直挂在那。移走 = 只从今天的时间线拿掉,
-          日历本身不动(我们没有权利替用户删他日历上的事)。 */}
-      {onRemove && (
-        <button
-          type="button"
-          className="nesio-tl-x"
-          onClick={(e) => { e.stopPropagation(); onRemove(obj.id); }}
-          aria-label={L(portalLocaleToDictionaryLocale(locale), '从今天移走这条', 'Remove from today')}
-          title={L(portalLocaleToDictionaryLocale(locale), '从今天移走', 'Remove from today')}
-        >✕</button>
-      )}
+      {/* 批次 111:日历项也做成时间线节点 —— 空心圆点在轨上 + 时标 kicker + 标题(去掉旧的图标+右侧 meta)
+          2026-08-01 修位置错:外层原来是 <button> 包住圆点+标题,✕ 挂在它外面的 <li> 下,
+          没有 flex 容器兜着,挤到下一行去了。仿 FocusSection.tsx 的 CollapsedTaskItem:
+          外层改 <div className="nesio-collapsed-row">,圆点+标题挪进内层按钮,✕ 跟内层按钮
+          做同级 flex 子项,才会贴在标题右侧。 */}
+      <div className="nesio-collapsed-row">
+        <button type="button" className="nesio-collapsed-cal-body" onClick={() => setExpanded((v) => !v)}>
+          {/* 批次 129·定时·钟:有具体时间的日历项圆内嵌钟;全天事件用素圆 */}
+          <span className={`nesio-collapsed-dot${obj.event.allDay ? '' : ' nesio-collapsed-dot--clock'}`} aria-hidden>
+            {!obj.event.allDay && <IconClock size={13} />}
+          </span>
+          <span className="nesio-collapsed-task-body" style={{ cursor: 'inherit' }}>
+            <span className="nesio-collapsed-kicker">{[dayTag, timeStr, countdown].filter(Boolean).join(' · ')}</span>
+            <span className="nesio-collapsed-title">{obj.title}</span>
+          </span>
+        </button>
+        {/* 用户要求(2026-07-30):时间线**每一条**后面都要有 ✕ 能移走 —— 日历行此前没有,
+            于是一场不想看的会只能一直挂在那。移走 = 只从今天的时间线拿掉,
+            日历本身不动(我们没有权利替用户删他日历上的事)。 */}
+        {onRemove && (
+          <button
+            type="button"
+            className="nesio-tl-x"
+            onClick={(e) => { e.stopPropagation(); onRemove(obj.id); }}
+            aria-label={L(portalLocaleToDictionaryLocale(locale), '从今天移走这条', 'Remove from today')}
+            title={L(portalLocaleToDictionaryLocale(locale), '从今天移走', 'Remove from today')}
+          >✕</button>
+        )}
+      </div>
       {expanded && (
         <div className="nesio-collapsed-detail">
           {obj.event.description && <p className="nesio-collapsed-desc">{obj.event.description.slice(0, 80)}{obj.event.description.length > 80 ? '…' : ''}</p>}

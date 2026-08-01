@@ -208,7 +208,10 @@ const HIDDEN_ATTRIBUTE_KEYS = new Set([
   'capturedLat', 'capturedLon', 'capturedPlace',
   // Signal infrastructure — never user-visible
   'signalId', 'signalSource', 'signalType', 'signalVersion',
-  'occuredAt', 'occurredAt', 'capturedAt', 'retentionPolicy', 'sensitivity',
+  // 2026-08-01 用户点名:updatedAt 裸露成 "updatedAt 2026-08-01T16:12:12.951Z"(原始 UTC
+  // ISO 串,没经过 fmtDateTime 本地化,看着像时区错了)——本该跟 occurredAt/capturedAt
+  // 一样是内部记账字段,当年加那两个的时候漏了这个,补上同样隐藏(不是给用户看的字段)。
+  'occuredAt', 'occurredAt', 'capturedAt', 'updatedAt', 'retentionPolicy', 'sensitivity',
   'sourceNodeId', 'schemaVersion',
   // 认知谱系内部字段(QA:详情页露出「epistemic: observation」「generator: manual」)
   'epistemic', 'generator', 'provenance', 'confidence',
@@ -961,7 +964,10 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
     if (tags.includes('keep')) return { icon: <IconNote size={sz} />, label: 'Keep', provider: '' };
     if (n.type === 'place') return { icon: <IconMapPin size={sz} />, label: L(dict, '位置', 'Place'), provider: '' };
     switch (n.source) {
-      case 'email': return { icon: <IconMail size={sz} />, label: L(dict, '邮件', 'Email'), provider: 'Gmail' };
+      // 2026-08-01 用户点名:「来自 邮件 · Gmail · 8.1 10:56」——provider 和后面的时间戳
+      // 挤在一行里反而重复(时间已经单独有一行「时间」字段),连接器名对用户没有增量信息,
+      // 「来自 邮件」就够了。
+      case 'email': return { icon: <IconMail size={sz} />, label: L(dict, '邮件', 'Email'), provider: '' };
       case 'calendar': return { icon: <IconCalendar size={sz} />, label: L(dict, '日历', 'Calendar'), provider: L(dict, 'Google 日历', 'Google Calendar') };
       case 'photo': return { icon: <IconCamera size={sz} />, label: L(dict, '拍照', 'Photo'), provider: '' };
       case 'voice': return { icon: <IconMic size={sz} />, label: L(dict, '语音', 'Voice'), provider: '' };
@@ -1130,7 +1136,9 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             <span className="nesio-node-source-text">
               {L(dict, '来自 ', 'From ')}
               <b className="nesio-node-source-name">{SRC.label}{SRC.provider ? ` · ${SRC.provider}` : ''}</b>
-              {srcTime ? ` · ${srcTime}` : ''}
+              {/* 2026-08-01 用户点名时间显示重复:event 类型下面 EventSection 已经有专属的
+                  「时间」整行(带起止),这里再补一遍同一个日期只是噪音,其它类型仍保留。 */}
+              {srcTime && n.type !== 'event' ? ` · ${srcTime}` : ''}
             </span>
             {srcUncertain && <span className="nesio-node-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
           </div>
@@ -1495,11 +1503,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                       <button type="button" className="nesio-node-link-x" aria-label={L(dict, '解除关联', 'Unlink')} onClick={() => removeRel(r)}>✕</button>
                     </div>
                   ))}
-                  {!linkPicking ? (
-                    <button type="button" className="nesio-node-link-add" onClick={() => setLinkPicking(true)}>
-                      ＋ {L(dict, '关联一条记忆', 'Link a memory')}
-                    </button>
-                  ) : (
+                  {linkPicking && (
                     <div className="nesio-node-link-picker">
                       <input
                         className="nesio-tl-rename-input"
@@ -1530,7 +1534,16 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             if (!linksBlock && !hasRelated) return null;
             return (
               <div className="nesio-related-section">
-                <p className="nesio-settings-section-label">{L(dict, '相关记忆', 'Related memories')}</p>
+                {/* 2026-08-01 用户点名整合:「＋关联一条记忆」从独立一行的虚线按钮挪到标题
+                    行内,不再多占一整行竖直空间。 */}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
+                  <p className="nesio-settings-section-label" style={{ margin: 0 }}>{L(dict, '相关记忆', 'Related memories')}</p>
+                  {!linkPicking && (
+                    <button type="button" className="nesio-node-link-add-inline" onClick={() => setLinkPicking(true)}>
+                      <IconLink size={12} /> {L(dict, '关联', 'Link')}
+                    </button>
+                  )}
+                </div>
                 {linksBlock}
                 {hasRelated && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: linksBlock ? 'var(--space-2)' : 0 }}>
@@ -1571,25 +1584,22 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
         />
       )}
 
-      {/* 镜头看记忆:情绪重的主动提示 + 用镜头看看(长在记忆上的动作) */}
-          {!editing && (
+      {/* 镜头看记忆:情绪重的主动提示单独留着(不是按钮,是判断出来的时候才出现的一句话);
+          「用镜头看看」本身不再单独占一整行 —— 2026-08-01 用户点名底部按钮太占地方,
+          并进下面的 Actions 一排,别再多起一段。 */}
+          {!editing && shouldNudge(`${n.name} ${(n.attributes?.notes as string) || n.rawInput || ''}`) && !nudgeDismissed && (
             <div className="nesio-growth">
-              {shouldNudge(`${n.name} ${(n.attributes?.notes as string) || n.rawInput || ''}`) && !nudgeDismissed && (
-                <div className="ng-hint" style={{ marginTop: 'var(--space-5)' }}>
-                  <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
-                  <p>{L(dict, '念念看到这条情绪有点重 —— 要不要陪你把它看清楚一点?(不是分析你,是把话看清)', 'This one feels heavy — want to look at it more clearly? (not analyzing you — just seeing the words)')}</p>
-                  <button type="button" className="x" onClick={() => setNudgeDismissed(true)}>{L(dict, '轻轻划走', 'Dismiss')}</button>
-                </div>
-              )}
-              <button type="button" className="ng-btn" style={{ width: '100%', marginTop: 'var(--space-3)' }} onClick={() => setLensOpen(true)}>
-                {L(dict, '用镜头看看 ✦', 'Look with a lens ✦')}
-              </button>
+              <div className="ng-hint" style={{ marginTop: 'var(--space-5)' }}>
+                <svg viewBox="0 0 24 24" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></svg>
+                <p>{L(dict, '念念看到这条情绪有点重 —— 要不要陪你把它看清楚一点?(不是分析你,是把话看清)', 'This one feels heavy — want to look at it more clearly? (not analyzing you — just seeing the words)')}</p>
+                <button type="button" className="x" onClick={() => setNudgeDismissed(true)}>{L(dict, '轻轻划走', 'Dismiss')}</button>
+              </div>
             </div>
           )}
           <MemoryLensSheet open={lensOpen} onOpenChange={setLensOpen} node={n} />
 
-      {/* Actions */}
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-5)' }}>
+      {/* Actions —— 2026-08-01:「用镜头看看」并入这一排,不再单独一整行占地方 */}
+          <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-5)', flexWrap: 'wrap' }}>
             {/* 这一排以前是三套不同的自造按钮拼出来的(ob-primary / today--ghost / settings-danger),
                 高度各不相同,只好再加一层 .nesio-nd-action-btn 把它们掰齐。
 
@@ -1604,6 +1614,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               </>
             ) : (
               <>
+                <Button variant="soft" layoutStyle={{ flex: 1 }} onClick={() => setLensOpen(true)}>{L(dict, '用镜头看看 ✦', 'Lens ✦')}</Button>
                 {/* 批次 33:阅读入口顶部有(替换✕),底部也放回来一份 —— 用户反馈顶部那颗找不到 */}
                 {readableText && (
                   <Button variant="primary" layoutStyle={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</Button>

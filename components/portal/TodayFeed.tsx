@@ -761,8 +761,11 @@ export default function TodayFeed({
       />
 
       {/* 批次 83:引导卡 → 记忆详情(portal 到 body,避 transform 祖先) */}
+      {/* 2026-08-11 用户实锤「点卡片弹出看不清的重影」:从 ProactiveCardDetail(硬编码
+          elevated,z-940)点「依据」跳出来的这个详情没传 elevated,落在普通层 z-900 ——
+          比来源卡矮一层,被上层遮罩/毛玻璃糊住,看着像重影。见 NesioSheet 的 elevated 注释。 */}
       {guideDetailNode && typeof document !== 'undefined' && createPortal(
-        <MemoryNodeDetailLazy node={guideDetailNode} onClose={() => setGuideDetailNode(null)} />,
+        <MemoryNodeDetailLazy node={guideDetailNode} onClose={() => setGuideDetailNode(null)} elevated />,
         document.body,
       )}
 

@@ -47,7 +47,6 @@ const FloatingPlayer = dynamic(() => import('./music/FloatingPlayer'), { ssr: fa
 const CalendarCreateSheet = dynamic(() => import('./CalendarCreateSheet'), { ssr: false });
 const FamilySharingSheet = dynamic(() => import('./family/FamilySharingSheet'), { ssr: false });
 const CookingSheet = dynamic(() => import('./cooking/CookingSheet'), { ssr: false });
-const RewardsStoreSheet = dynamic(() => import('./RewardsStoreSheet'), { ssr: false });
 const DailyBriefSheet = dynamic(() => import('./DailyBriefSheet').then((m) => m.DailyBriefSheet), { ssr: false });
 // 洞察 = 全屏浮层(非 surface):提到 Portal 层,底部导航从任意页都能开。1143 行,开时才加载。
 const InsightsSheet = dynamic(() => import('./InsightsSheet'), { ssr: false });
@@ -583,7 +582,6 @@ export default function Portal() {
   const [familyOpen, setFamilyOpen] = useState(false);
   const [cookingOpen, setCookingOpen] = useState(false);
   const [pantryIntake, setPantryIntake] = useState(false);   // 做饭页「拍一拍进货」:复用相机、拍的当食材落库
-  const [rewardsOpen, setRewardsOpen] = useState(false);
   const [workoutSession, setWorkoutSession] = useState<import('./fitness/WorkoutPlayer').PlayerSession | null>(null);
   // 每次「开始跟练」自增,用作 WorkoutPlayer 的 key → 换一个训练(如跑步→力量)必定全新挂载,
   // 绝不复用上一个训练的内部态(idx/phase/repCount)。修「打开力量没反应 / 退出力量却冒出跑步」的换练串台。
@@ -1015,7 +1013,14 @@ export default function Portal() {
       setInsightsOpen(false);
       setPantryIntake(false); setCameraFile(file ?? null); setCaptureMode('camera');
     };
-    const rewardsHandler = () => { track('rewards_open'); setRewardsOpen(true); };
+    // 2026-08-01 用户点名:积分从今天页顶栏 chip 打开的浮层商城,升级成洞察下的独立页 ——
+    // 不再单独维护一个 RewardsStoreSheet 浮层,统一走 Insights 的 tab 打开路径。
+    const rewardsHandler = () => {
+      track('rewards_open');
+      setInsightsTab('rewards');
+      setInsightsNonce((n) => n + 1);
+      setInsightsOpen(true);
+    };
     const briefHandler = () => { track('brief_open', {}); setBriefOpen(true); };
     // 洞察浮层:底部导航 / 卡片 / 「开始练」都派事件打开;detail.tab 指定进哪个 tab(如 fitness)
     // 2026-07-28(标注 图21):原来只认 tab==='fitness',别的一律落回默认页 ——
@@ -1024,7 +1029,7 @@ export default function Portal() {
     // 那几个板块的深链(车页「→ 财务/足迹」等指路行)派了事件也落回默认页,看着像死链。
     const INSIGHTS_TABS: ReadonlySet<string> = new Set([
       'reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule',
-      'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'music', 'admin',
+      'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'music', 'rewards', 'admin',
     ]);
     const insightsHandler = (e: Event) => {
       const tab = (e as CustomEvent).detail?.tab;
@@ -1535,7 +1540,6 @@ export default function Portal() {
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
       <MoodSheet open={moodOpen} onClose={() => setMoodOpen(false)} />
       <FreezeVaultSheet open={freezeOpen} onClose={() => setFreezeOpen(false)} initialTab="add" />
-      <RewardsStoreSheet open={rewardsOpen} onClose={() => setRewardsOpen(false)} />
       {ownerConflict && (
         <NesioSheet
           variant="center"
