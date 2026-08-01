@@ -95,6 +95,8 @@ export const CACHE_KEYS = new Set<string>([
   // 「今天看没看过简报」的日键。cache —— 这是这台机器上的 UI 状态,
   // 不是用户数据;换台设备第一次打开时重新提示一遍,正是对的行为。
   'nesio-daily-brief-seen-v1',
+  // 每日日报卡片「今天先不看」的日键——同上一条,同一类 UI 状态。
+  'nesio-daily-report-card-dismiss-v1',
   'nesio-jot-draft-v1',                   // 速记草稿:本机暂存,别跨设备回灌
   'nesio-pro-entitlement-v1',             // Lab 测试 Pro 覆盖位:绝不该同步到真设备
   // AI 判决层(2026-07-29 硬拆后新增)。三个都是**按设备**的簿记,不是用户数据:

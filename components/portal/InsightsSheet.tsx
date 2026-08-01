@@ -29,7 +29,7 @@ import { InfoTip } from './InfoTip';
 import {
   IconRefresh, IconTrendingUp, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconDownload, IconAlertTriangle, IconBookmark, IconHanger,
   IconBulb, IconTarget, IconPlay, IconHeartPulse, IconActivity, IconMapPin, IconCard, IconBox, IconUser, IconHome, IconMirror,
-  IconGear, IconPeople, IconUtensils, IconMusic, IconGift,
+  IconGear, IconPeople, IconUtensils, IconMusic, IconGift, IconHistory, IconFlag,
 } from './icons';
 import TimelineTab from './insights/TimelineTab';
 import MusicPanel from './music/MusicPanel';
@@ -56,9 +56,12 @@ import { readFactJournal, ensureFactJournal } from '@/lib/platform/fact-journal'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-const DailyReportPanel = dynamic(() => import('./insights/DailyReportPanel'), { ssr: false });
+// 2026-08-01:每日日报挪进「回顾」tab(见下方 RetrospectPanel),不再直接挂在
+// reflection(目标)tab 里——目标是模式分析,回顾是报告历史,两件事分开摆。
+const RetrospectPanel = dynamic(() => import('./insights/RetrospectPanel'), { ssr: false });
+const PlansPanel = dynamic(() => import('./insights/PlansPanel'), { ssr: false });
 
-export type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'fitness' | 'timeline' | 'schedule' | 'finance' | 'inventory' | 'wardrobe' | 'relationships' | 'tesla' | 'living' | 'music' | 'rewards' | 'admin';
+export type MainTab = 'reflection' | 'retrospect' | 'plans' | 'growth' | 'montage' | 'health' | 'fitness' | 'timeline' | 'schedule' | 'finance' | 'inventory' | 'wardrobe' | 'relationships' | 'tesla' | 'living' | 'music' | 'rewards' | 'admin';
 
 const DAY_MS = 86_400_000;
 
@@ -361,7 +364,11 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   useEffect(() => { onHubChange?.(showHub); }, [showHub, onHubChange]);
   useEffect(() => () => { onHubChange?.(false); }, [onHubChange]);
   const tabLabel = (t: MainTab): string =>
-    t === 'reflection' ? L(dict, '洞察', 'Insights')
+    // 2026-08-01 用户拍板:「洞察」改名「目标」,回顾(报告历史)/计划(往前看)
+    // 从这个 tab 里拆成两个独立新 tab(见下)。
+    t === 'reflection' ? L(dict, '目标', 'Goals')
+      : t === 'retrospect' ? L(dict, '回顾', 'Retrospect')
+      : t === 'plans' ? L(dict, '计划', 'Plans')
       : t === 'growth' ? L(dict, '成长', 'Growth')
       : t === 'montage' ? L(dict, '剧场', 'Films')
       : t === 'health' ? L(dict, '健康', 'Health')
@@ -384,6 +391,8 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   const tabIcon = (t: MainTab): ReactNode => {
     switch (t) {
       case 'reflection': return <IconBulb />;
+      case 'retrospect': return <IconHistory />;
+      case 'plans': return <IconFlag />;
       case 'growth': return <IconTarget />;
       case 'montage': return <IconPlay />;
       case 'health': return <IconHeartPulse />;
@@ -441,7 +450,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       // 积分是全 App 通用的攒分机制(冷冻仓忍住/健身打卡/深度疗愈都会加),
       // 没有单独开关可关掉,跟 tesla 一样恒在。
       : t === 'rewards' ? true
-      : true; // 'reflection'(洞察)= 核心,永远在
+      : true; // 'reflection'(目标)/'retrospect'(回顾)/'plans'(计划)= 核心,永远在
   useEffect(() => { if (!tabEnabled(mainTab)) setMainTab('reflection'); }, [showPlaces, showHealth, showFinance, showPeople, showInventory, showSchedule, showGrowth, showMontage, showWardrobe, showTesla, showLiving, showMusic, mainTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [allNodes, setAllNodes] = useState<LifeNode[]>([]);
@@ -450,7 +459,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   // tab = 切到本 sheet 的某个 tab;event = 打开另一个全屏面板。
   const hubTiles = useMemo(() => {
     const list: Array<{ key: string; label: string; icon: React.ReactNode; tab?: MainTab; event?: string }> = [];
-    for (const t of ['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule', 'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'music', 'rewards', 'admin'] as MainTab[]) {
+    for (const t of ['reflection', 'retrospect', 'plans', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule', 'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'music', 'rewards', 'admin'] as MainTab[]) {
       if (!tabEnabled(t)) continue;
       list.push({ key: t, label: tabLabel(t), icon: tabIcon(t), tab: t });
     }
@@ -660,9 +669,6 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
         {/* ── Tab 1: 免费四件套(v1 规格 §2.1)── */}
         {mainTab === 'reflection' && (
           <div className="nesio-reflection-tab">
-            {/* 每日日报的**唯一入口**(2026-07-30 用户定案:「今天不要入口,用弹出卡片,
-                在洞察开入口」)。今天那份置顶,往日在下,点开都弹同一个层。 */}
-            <DailyReportPanel />
             {/* 2026-07-28 UI 精修(标注 图11「走走看放到最上面」):这块原本排在线头之后,
                 现在提到反思页最顶 —— 一进来先撞见一条旧记录,再看统计。 */}
             {/* ③ 走走看:衬线引原话「去年今天,你写下 ——」+ 再翻一条(偶遇感) */}
@@ -806,6 +812,12 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
                 留着(以后想挂回来直接 import),但现在它没有入口。别以为设置里还能看到。 */}
           </div>
         )}
+
+        {/* ── Tab: 回顾(2026-08-01)—— 每日日报 + 周报 + 月报,只读历史 ── */}
+        {mainTab === 'retrospect' && <RetrospectPanel />}
+
+        {/* ── Tab: 计划(2026-08-01)—— 下周 / 下月,只看这一期 ── */}
+        {mainTab === 'plans' && <PlansPanel />}
 
         {/* ── Tab: Timeline ── */}
         {mainTab === 'timeline' && showPlaces && (

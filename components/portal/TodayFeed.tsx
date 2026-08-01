@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { useProfileAvatar } from './use-profile-avatar';
-import { getPoints } from '@/lib/platform/rewards-engine';
 import NesioMark from './NesioMark';
 import RetrospectCard from './RetrospectCard';
 import { usePortalLocale } from './use-portal-locale';
@@ -52,6 +51,7 @@ import CaptureBar from './today/CaptureBar';
 import { ThawedReminder } from './today/ThawedReminder';
 import { DailyBriefRow } from './today/DailyBriefRow';
 import { ReengageNudgeCard } from './today/ReengageNudgeCard';
+import { DailyReportCard } from './today/DailyReportCard';
 import { TodayFocusSection } from './today/FocusSection';
 import { useTodayData } from './today/useTodayData';
 import { FocusModeSheet } from './today/FocusModeSheet';
@@ -88,13 +88,6 @@ export default function TodayFeed({
     proactiveCards, setProactiveCards,
     dismissedCardIds, setDismissedCardIds,
   } = useTodayData(canUsePrivateData);
-  const [points, setPoints] = useState(0); // App 级积分(奖品商城),顶栏徽章
-  useEffect(() => {
-    const sync = () => { try { setPoints(getPoints()); } catch { /* SSR / 无存储 */ } };
-    sync();
-    window.addEventListener('nesio-rewards-updated', sync);
-    return () => window.removeEventListener('nesio-rewards-updated', sync);
-  }, []);
   const [guideDetailNode, setGuideDetailNode] = useState<LiveMemoryNode | null>(null); // 批次 83:引导卡点开详情
   // 云端往本机填过数据时的一次性回执(QA:积分 0→150 像被人乱改)。读一次即清。
   const [restoreNote, setRestoreNote] = useState<string | null>(null);
@@ -564,11 +557,8 @@ export default function TodayFeed({
         <div className="nesio-today-header-tools">
           {/* 天气符号(2026-08-01 用户点名):按小时更新见 Portal.tsx,这里只画。 */}
           <WeatherChip />
-          {/* App 级积分徽章 → 奖品商城(积分来自忍住没买 / 跟练 / 深度疗愈);点开经 Portal 的 nesio-open-rewards 门 */}
-          <button type="button" className="nesio-today-points" onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-rewards'))}
-            aria-label={L(uiLocale, `${points} 积分 · 打开奖品商城`, `${points} points · open rewards`)}>
-            {points}
-          </button>
+          {/* 2026-08-01 用户:积分/奖品商城完全从今天页移除,只在洞察里露面
+              (InsightsSheet 的 rewards tab)——今天页顶栏不再有这个入口。 */}
           {/* 批次 39:听简报暂时收进「设置 → 路线图」(还在打磨);记录心情移到中央「+」扇形菜单 */}
           <a href="/settings" className="nesio-today-avatar" aria-label={L(uiLocale, '我的设置', 'My settings')}>
             {avatarUrl ? (
@@ -607,12 +597,11 @@ export default function TodayFeed({
         {/* 季度 Wrapped 卡片 */}
         {!quietAll && showWrapped && <WrappedCard onDismiss={dismissWrapped} />}
 
-        {/* 每日日报**不在这里** —— 2026-07-30 用户定案:「今天不要入口,用弹出卡片,
-            在洞察开入口」。它是一份读物,不是一张待办卡:Today 这一列每张卡都在要求你
-            做点什么(拍一下、回一句、划掉),日报却是「坐下来看两分钟」,混在里面既不像
-            卡片也不像文章,还天天占着最上面那块地方。入口见洞察页 → 洞察 → 每日日报。
-            **定稿与落库仍然在这一页触发**(useTodayData 里的 autoPersistTodayReport)——
-            只是不再往这里画一张卡。 */}
+        {/* 每日日报卡片(2026-08-01 用户拍板,推翻 2026-07-30 的旧定案):
+            到点(08:00)且有内容才出现,今天点了「先不看」就压到明天。
+            **定稿与落库仍然只在 useTodayData 一处触发**(autoPersistTodayReport)——
+            这里只读冻结件,不重算,「当天不再变」照旧成立。 */}
+        {canUsePrivateData && <DailyReportCard nodes={allNodes} />}
 
         {/* 回访再触达:来过好几回但某功能没碰过 → 轻轻探一句(全局两天一条,可稍后/不再提醒)*/}
         {canUsePrivateData && !quietAll && (

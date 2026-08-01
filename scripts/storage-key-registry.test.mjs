@@ -94,6 +94,8 @@ const KNOWN_KEYS = new Map([
   // 「今天看没看过简报」。cache —— 换台设备从零开始是对的：
   // 它是这台机器上的 UI 状态，不是用户数据。
   ["nesio-daily-brief-seen-v1", "cache"],
+  // 每日日报卡片「今天先不看」——同上，UI 状态，cache。
+  ["nesio-daily-report-card-dismiss-v1", "cache"],
   ["nesio-life-graph-cloud-sync-outbox-v1", "cache"],
   ["nesio-life-graph-cloud-sync-v1", "cache"],
   ["nesio-music-last-played-v1", "cache"],
@@ -149,6 +151,11 @@ const KNOWN_KEYS = new Map([
   ["nesio-cross-region-consent-v1", "durable"],
   ["nesio-cross-region-delivery-cooldown-v1", "durable"],
   ["nesio-daily-report-auto-v1", "durable"],
+  // 周报/月报的「这一期问过了没」——和上面日报同一套口径,同归 durable。
+  ["nesio-periodic-report-week-retrospect-auto-v1", "durable"],
+  ["nesio-periodic-report-week-plan-auto-v1", "durable"],
+  ["nesio-periodic-report-month-retrospect-auto-v1", "durable"],
+  ["nesio-periodic-report-month-plan-auto-v1", "durable"],
   ["nesio-dormant-store", "durable"],
   ["nesio-energy-baseline-v1", "durable"],
   ["nesio-asset-care-v1", "durable"],

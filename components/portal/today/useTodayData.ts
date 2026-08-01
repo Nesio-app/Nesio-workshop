@@ -12,6 +12,7 @@ import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { loadProfileSettings, portalLocaleToDictionaryLocale, PROFILE_UPDATED_EVENT } from '@/lib/portal/profile';
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { autoPersistTodayReport, reportAnchor, readYesterdayInsights } from '@/lib/portal/daily-report-persist';
+import { buildRetrospect, buildPlan, autoPersistPeriodicReport } from '@/lib/portal/periodic-report';
 import { collectDailyReportExtras, outfitNoteFor, collectOrders, aheadEvents } from '@/lib/portal/daily-report-sources';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext, type TodayReceipt } from '@/lib/platform/view-models/today-view-model';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
@@ -244,6 +245,21 @@ export function useTodayData(canUsePrivateData: boolean) {
              这样「当天不再变」是硬的:没有任何一处会拿新数据现算一份出来。
              autoPersistTodayReport 内部自己会用 08:00 锚点 build 并判 due/空/当天已生成。 */
           autoPersistTodayReport(reportInput, { enabled: profile.dailyReportEnabled, now });
+          /* 周报/月报的回顾 + 计划(2026-08-01 用户拍板扩展):同一个「回前台检查一次」
+             的口径,同一个 dailyReportEnabled 开关——没让用户多开一道设置。
+             周一 8 点 / 每月 1 日 8 点才到点,到点了这一期没生成过才真的写。 */
+          for (const kind of (['week', 'month'] as const)) {
+            autoPersistPeriodicReport({
+              kind, direction: 'retrospect',
+              report: buildRetrospect(kind, updated.allNodes, now, uiLocale),
+              enabled: profile.dailyReportEnabled, now,
+            });
+            autoPersistPeriodicReport({
+              kind, direction: 'plan',
+              report: buildPlan(kind, calEvents, updated.allNodes, now, uiLocale),
+              enabled: profile.dailyReportEnabled, now,
+            });
+          }
           // AI 判决(实弹):结构化信号批量送判,落 ledger;取数惰性(30min 闸后才算)。
           // 付费门双层:客户端 canUsePaidCloudAi 前置拦下(免费档不出网),路由端
           // guardAiRoute + requirePaidCloudAi 强制。llm-sweep 已被吸收拆除。
