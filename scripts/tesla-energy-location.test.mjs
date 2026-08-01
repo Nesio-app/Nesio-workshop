@@ -51,7 +51,9 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
   assert.match(route, /unavailable: 'scope'/,
     '403 = 这枚 token 没有 energy_device_data。要如实告诉前端 —— ' +
     '直接显示「没有能源产品」会把「没授权」说成「你家没有」,那是两回事');
-  assert.match(route, /drives: snapshot\.drives, charges: snapshot\.charges, energy/,
+  // 2026-08-01:中间多了 health(胎压/待装更新/门锁,给车况格用)。
+  // 判据要压的是「车辆数据照旧返回」,不是这三个字段挨在一起。
+  assert.match(route, /drives: snapshot\.drives, charges: snapshot\.charges,[\s\S]{0,80}energy/,
     '车辆数据照旧返回');
 
   const panel = read('components/portal/TeslaPanel.tsx');

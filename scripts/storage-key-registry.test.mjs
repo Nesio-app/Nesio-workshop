@@ -217,6 +217,7 @@ const KNOWN_KEYS = new Map([
   ["nesio-mirror-letters-v1", "durable"],
   ["nesio-mirror-profile-v1", "durable"],
   ["nesio-module-overrides-v1", "durable"],
+  ["nesio-music-playlists-v1", "durable"],
   ["nesio-music-prefs-v1", "durable"],
   ["nesio-named-places", "durable"],
   ["nesio-notion-db-v1", "durable"],

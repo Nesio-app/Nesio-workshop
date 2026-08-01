@@ -21,6 +21,11 @@ import { chargeEnergyLine, hasAnyChargeRecord } from '@/lib/portal/tesla-charge-
 // 如果可以,做成图 2,和 4 这样的可视化,在车的页面。」
 import { TeslaLocationMap, EnergyFlowRow, EnergyDaysChart, BatteryTimeline, type EnergyLive, type EnergyDay } from './TeslaCharts';
 import { recordTeslaReadings, readTeslaLog, type TeslaLogPoint } from '@/lib/portal/tesla-history';
+// 2026-08-01 用户:「如果能做成图 3 和 4 就好」(Tesla 官方那两张 Fleet API 看板)。
+// 那是车队看板;一辆车没有「分布」,所以是转译不是照搬 —— 判据都在 tesla-now 里。
+import {
+  vehicleStatus, statusLabel, statusTone, dataAgeLine, chargeNowLine, rangeLine, healthItems,
+} from '@/lib/portal/tesla-now';
 
 interface TeslaDrive {
   vehicleId: string;
@@ -31,6 +36,8 @@ interface TeslaDrive {
   odometerMi?: number | null;
   latitude?: number | null;
   longitude?: number | null;
+  /** 车上那份读数的时刻(毫秒)。和 `at`(我们问它的时刻)不是一回事。 */
+  dataAgeMs?: number | null;
 }
 
 interface TeslaCharge {
@@ -42,6 +49,22 @@ interface TeslaCharge {
   costUsd?: number | null;
   energyAddedKwh?: number | null;
   location?: string;
+  chargerPowerKw?: number | null;
+  rangeMi?: number | null;
+  minutesToFull?: number | null;
+  chargeLimitPct?: number | null;
+}
+
+interface TeslaHealthRow {
+  vehicleId: string;
+  tirePsi?: { fl: number | null; fr: number | null; rl: number | null; rr: number | null };
+  tireSoftWarning?: boolean;
+  softwareUpdate?: string;
+  carVersion?: string;
+  locked?: boolean | null;
+  sentryMode?: boolean | null;
+  insideTempC?: number | null;
+  outsideTempC?: number | null;
 }
 
 interface TeslaEnergyPayload {
@@ -65,6 +88,13 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
   const [drives, setDrives] = useState<TeslaDrive[]>([]);
   const [charges, setCharges] = useState<TeslaCharge[]>([]);
   const [energy, setEnergy] = useState<TeslaEnergyPayload>({});
+  const [health, setHealth] = useState<TeslaHealthRow[]>([]);
+  /**
+   * 车停在哪儿的**地名**(图 3 卡片上那行「345 Almaden Dr, San Jose」)。
+   * 一对经纬度对人是没有意义的 —— 地图上那个点告诉你「在这儿」,
+   * 但说不出「在公司」还是「在家」。反解一次,按坐标缓存。
+   */
+  const [placeByVehicle, setPlaceByVehicle] = useState<Record<string, string>>({});
   const [log, setLog] = useState<TeslaLogPoint[]>([]);
 
   // 2026-07-29(用户标注「车页卡死在『正在向车问好…』」的真因):这条 fetch 原本没有超时。
@@ -86,7 +116,7 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
     setState('loading');
     try {
       const res = await fetchWithTimeout('/api/portal/tesla', { cache: 'no-store' }, 15_000);
-      const data = await res.json() as { ok?: boolean; error?: string; drives?: TeslaDrive[]; charges?: TeslaCharge[]; energy?: TeslaEnergyPayload };
+      const data = await res.json() as { ok?: boolean; error?: string; drives?: TeslaDrive[]; charges?: TeslaCharge[]; health?: TeslaHealthRow[]; energy?: TeslaEnergyPayload };
       if (!mine()) return;   // 已经有更新的一趟在飞,旧结果一律丢弃
       if (!data.ok) {
         setErrMsg(data.error === 'not_connected' || data.error === 'token_expired'
@@ -100,6 +130,7 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
       setDrives(data.drives || []);
       setCharges(data.charges || []);
       setEnergy(data.energy || {});
+      setHealth(data.health || []);
       setState('ready');
       // #10:把车报上去。用 name 而不是 id 展示 —— 用户认得的是「JingBell」,不是一串数字。
       if (onVehicles) {
@@ -134,6 +165,48 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
 
   useEffect(() => { void load(); }, [load]);
 
+  /**
+   * 把车所在的坐标反解成一个人能读的地名。
+   *
+   * 只在坐标**真的变了**的时候问一次:反解是一次网络请求,而这一页会因为
+   * 语言切换/重新聚焦重渲染好几次 —— 跟着渲染问的话,车停在原地不动
+   * 也会一直在发请求。
+   *
+   * 失败就**什么都不显示**,不显示「未知位置」——地图上那个点已经在说
+   * 「在这儿」了,底下再加一行「未知位置」只是把一次失败摆到台面上。
+   */
+  const geoKeyRef = useRef('');
+  useEffect(() => {
+    const withCoords = drives.filter((d) => d.latitude != null && d.longitude != null);
+    if (!withCoords.length) return;
+    const key = withCoords.map((d) => `${d.vehicleId}:${d.latitude!.toFixed(4)},${d.longitude!.toFixed(4)}`).join('|');
+    if (key === geoKeyRef.current) return;
+    geoKeyRef.current = key;
+    let alive = true;
+    void (async () => {
+      const next: Record<string, string> = {};
+      for (const d of withCoords) {
+        try {
+          // 这条路由是 POST(GET 那支是给「附近候选」用的),返回 { name, city, country }
+          const res = await fetchWithTimeout('/api/portal/geocode', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ lat: d.latitude, lon: d.longitude }),
+            cache: 'no-store',
+          }, 8_000);
+          const j = await res.json().catch(() => null) as { ok?: boolean; name?: string; city?: string } | null;
+          if (!j?.ok) continue;
+          const label = [String(j.name || '').trim(), String(j.city || '').trim()].filter(Boolean).join(' · ');
+          if (label) next[d.vehicleId] = label;
+        } catch { /* 解不出来就不显示这一行 */ }
+      }
+      if (alive && Object.keys(next).length) setPlaceByVehicle((prev) => ({ ...prev, ...next }));
+    })();
+    return () => { alive = false; };
+  }, [drives]);
+
+  const healthByVehicle = new Map(health.map((h) => [h.vehicleId, h]));
+
   // 实时行(有电量)按车归组;历史行(有站点/花费、无电量)按时间倒序。
   const liveByVehicle = new Map<string, { drive?: TeslaDrive; charge?: TeslaCharge }>();
   for (const d of drives) {
@@ -167,11 +240,6 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
       : s === 'Stopped' ? L(dict, '已暂停', 'Paused')
       : s === 'Disconnected' ? L(dict, '未插枪', 'Unplugged')
       : s || L(dict, '未知', 'Unknown');
-
-  const shiftLabel = (s?: string) =>
-    s === 'D' || s === 'R' ? L(dict, '行驶中', 'Driving')
-      : s === 'N' ? L(dict, '空档', 'Neutral')
-      : L(dict, '停放中', 'Parked');
 
   const fmtDay = (iso: string) => {
     const d = new Date(iso);
@@ -217,15 +285,44 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
       {[...liveByVehicle.entries()].map(([vid, v]) => {
         const battery = v.charge?.batteryLevel ?? null;
         const name = v.drive?.displayName || v.charge?.displayName || `Tesla ${vid.slice(-4)}`;
+        // 图 3 那张卡的三样:一个明确的状态、这份读数多旧、车停在哪个地名。
+        const status = vehicleStatus({
+          shiftState: v.drive?.shiftState,
+          chargingState: v.charge?.chargingState,
+          dataAgeMs: v.drive?.dataAgeMs ?? null,
+        });
+        const zh = dict !== 'en';
+        const age = dataAgeLine(v.drive?.dataAgeMs ?? null, zh);
+        const place = placeByVehicle[vid] || '';
+        const charging = chargeNowLine({
+          chargingState: v.charge?.chargingState,
+          chargerPowerKw: v.charge?.chargerPowerKw ?? null,
+          minutesToFull: v.charge?.minutesToFull ?? null,
+          chargeLimitPct: v.charge?.chargeLimitPct ?? null,
+          batteryLevel: battery,
+        }, zh);
+        const range = rangeLine(v.charge?.rangeMi ?? null, zh);
+        const hItems = healthItems(healthByVehicle.get(vid), zh);
         return (
           <div key={vid} style={{
             border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)',
             padding: 'var(--space-4)', marginBottom: 'var(--space-3)',
           }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-              <p style={{ fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{name}</p>
-              <span className="nesio-settings-option-hint">{shiftLabel(v.drive?.shiftState)}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <p style={{ fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)', margin: 0 }}>{name}</p>
+              {/* 图 3 的图例(在开 / 停放 / 离线)在单车上收成一个带色点的状态。
+                  「联系不上」用温和色而不是风险色 —— 车在睡觉不是故障。 */}
+              <span className={`nesio-tesla-status is-${statusTone(status)}`}>
+                <span className="nesio-tesla-dot" aria-hidden />
+                {statusLabel(status, dict !== 'en')}
+              </span>
             </div>
+            {/* 这一行是这张卡上最要紧的一句:**这份读数多旧**。
+                Tesla 回的是车上最后一次上报的值,深度休眠时能是几小时前的 ——
+                不说出来,一个昨晚的电量就会被当成此刻,而用户会照着它决定要不要出门。 */}
+            <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>
+              {age}{place ? ` · ${place}` : ''}
+            </p>
             {/* #10:这辆车已经和下面某件手动记的车认成同一辆了 —— 说一句,
                 免得「JingBell」和「Model Y」看起来还是两台互不相干的车。 */}
             {(boundIds || []).includes(vid) && (
@@ -251,6 +348,13 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
                     background: battery <= 20 ? 'var(--status-gentle)' : 'var(--status-go)',
                   }} />
                 </div>
+                {/* 「还能开多远」是百分比回答不了的 —— 充电上限不是 100% 时尤其如此。
+                    正在充的时候再加一句「还要多久到 80%」。 */}
+                {(range || charging) && (
+                  <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-2) 0 0' }}>
+                    {[range, charging].filter(Boolean).join(' · ')}
+                  </p>
+                )}
               </div>
             )}
             <div style={{ display: 'flex', gap: 'var(--space-4)', marginTop: 'var(--space-3)', fontSize: 'var(--text-sm)', color: 'var(--portal-muted)', flexWrap: 'wrap' }}>
@@ -260,6 +364,21 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
                 <span>{L(dict, '位置已记入足迹', 'Location saved to Places')}</span>
               )}
             </div>
+
+            {/* 图 4 的「Vehicle Health」在单车上的对应物。原图是 79 辆车的告警分布 ——
+                一辆车没有分布,硬做成环形图只会是一个 100% 单色的装饰。
+                真正拿得到、也真有人关心的是这几样。**取不到的项一个都不显示**:
+                一行「胎压 —」不是信息,它只是把「我们没拿到」伪装成一条数据。 */}
+            {hItems.length > 0 && (
+              <div className="nesio-tesla-health">
+                {hItems.map((it) => (
+                  <div key={it.key} className={`nesio-tesla-health-cell is-${it.tone}`}>
+                    <span className="nesio-tesla-health-label">{it.label}</span>
+                    <span className="nesio-tesla-health-value">{it.value}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         );
       })}

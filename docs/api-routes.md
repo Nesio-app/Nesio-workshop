@@ -62,12 +62,13 @@ Auth legend:
 | GET /api/portal/drive | guardAiRoute (20/min) + Google OAuth token (drive.appdata) — 拉回云备份 |
 | GET /api/portal/tasks | guardAiRoute (20/min) + Google OAuth token (tasks) — 读 Google Tasks 待办 |
 | GET /api/portal/people | guardAiRoute (20/min) + Google OAuth token (contacts.readonly) — 读通讯录→person 节点(人缘管理);runPeopleSync 消费 |
-| GET /api/portal/tesla | isPortalRequestAuthorized + rate limit (20/min) + Tesla OAuth token — 只读快照:车辆(drive/charge/vehicle_state)+ **能源产品**(2026-07-30 补:`/api/1/products` → `energy_sites/{id}/live_status` 与 `history?kind=energy&period=day`)。能源与车辆**分开失败**:没有能源产品或 token 缺 `energy_device_data` 时只让 energy 为空,不影响车辆数据 |
+| GET /api/portal/tesla | isPortalRequestAuthorized + rate limit (20/min) + Tesla OAuth token — 只读快照:车辆(drive/charge/vehicle_state)+ **能源产品**(2026-07-30 补:`/api/1/products` → `energy_sites/{id}/live_status` 与 `history?kind=energy&period=day`)。能源与车辆**分开失败**:没有能源产品或 token 缺 `energy_device_data` 时只让 energy 为空,不影响车辆数据。2026-08-01 补 `health`(胎压/待装更新/门锁/哨兵/车内外温度,来自 `vehicle_state;climate_state`)与充电功率/续航/充满还要多久/充电上限,以及 `drive_state.timestamp`(**车上那份读数的时刻**,与我们问它的时刻分开 —— 深度休眠时能差几小时) |
 | GET /api/portal/music/apple-token | guardAiRoute (10/min) — 服务端签 MusicKit developer token(ES256,.p8 私钥只在服务端)。没配密钥时 200 + `configured:false`,让界面照实说「还没配好」而不是渲染成网络故障 |
 | GET /api/portal/music/spotify | guardAiRoute (20/min) — 读该账号的 Spotify 状态。`streamable` **只在 product 确认为 premium 时**为 true(正向判据);刷新失败即清 cookie 并如实报 `authorized:false` |
 | DELETE /api/portal/music/spotify | guardAiRoute (10/min) — 断开(清 httpOnly cookie) |
 | GET /api/portal/music/netease/search | guardAiRoute (20/min) — 网易云搜索。**默认直连**(weapi,协议在 `lib/platform/music/netease-protocol`),配了 `NETEASE_API_BASE` 才转发给自建实例。风控回 `{ok:false,reason:'blocked'}` 而非 502 —— 换个词再搜没用,这不是故障 |
 | GET /api/portal/music/netease/song-url | guardAiRoute (30/min) — 逐曲问播放地址,默认直连(weapi → 回退 `song/media/outer/url`,两条都拿不到才算受限)。**四态分开,四个不同的下一步**:`{ok:true,url}`;`{ok:true,url:'',reason:'restricted'}`(这一首受限 → 换一首,**不给重试**);`{ok:false,reason:'blocked'}`(整台被风控 → 换歌没用);502(真故障 → 重试)。拿到的地址一律改写成 https,否则 https 页面上的混合内容会被浏览器静默拦掉。2026-07-31 新增 |
+| GET /api/portal/music/netease/lyric | guardAiRoute (40/min) — 一首歌的歌词(LRC + 翻译),默认直连 weapi,配了 `NETEASE_API_BASE` 才转发。**服务的不只是网易的歌**:本地导入的 mp3 自己没带词时,拿曲名搜一首同名的再来这里取词(用户:「本地没歌词的,都用网易歌词」)。「没有词」`{ok:true,lrc:''}` 与「取不到」502/blocked 分开 —— 纯音乐不该挂一个点不好的重试。2026-08-01 新增 |
 | GET /api/auth/session | open (reports session state) |
 
 ## OAuth flows (pre-auth by design)

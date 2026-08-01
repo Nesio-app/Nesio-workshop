@@ -186,6 +186,12 @@ export interface TeslaDrive {
   shiftState?: string;
   speedMph?: number | null;
   odometerMi?: number | null;
+  /**
+   * 车上那份数据的时间戳(毫秒)。**和 `at` 不是一回事**:`at` 是我们问它的时刻,
+   * 这个是车最后一次上报的时刻。车深度休眠时两者能差几个小时 ——
+   * 不分开的话界面会把一份几小时前的读数说成「刚刚」。
+   */
+  dataAgeMs?: number | null;
   // drive_state 本来就返回经纬度;之前丢了,足迹时间线拿不到位置。只读快照 = 同步时的
   // 采样点(非连续轨迹),但配上充电站点已足够把「今天车去过哪」画进足迹。
   latitude?: number | null;
@@ -201,6 +207,39 @@ export interface TeslaCharge {
   costUsd?: number | null;
   energyAddedKwh?: number | null;
   location?: string;
+  /** kW,正在充多少。0/null = 没在充。 */
+  chargerPowerKw?: number | null;
+  /** 估算续航(英里)。电量百分比回答不了「还能开多远」。 */
+  rangeMi?: number | null;
+  /** 充满还要多少分钟。0 = 不在充或已满。 */
+  minutesToFull?: number | null;
+  /** 充电上限(%)。80% 上限时「44%」的含义和 100% 上限时不一样。 */
+  chargeLimitPct?: number | null;
+}
+
+/**
+ * 车况:图 4 那张「Vehicle Health」在单车上的对应物。
+ *
+ * 原图是**车队**看板(79 辆车的告警分布),一辆车没有「分布」——
+ * 硬套会做出一个 100% 单色的环形图,那是装饰不是信息。
+ * 单车上真正拿得到、也真正有人关心的是这几样:胎压、有没有待装的软件更新、
+ * 锁没锁、哨兵模式开着没有。
+ */
+export interface TeslaHealth {
+  vehicleId: string;
+  at: string;
+  /** psi。四个轮胎,取不到就 null。 */
+  tirePsi?: { fl: number | null; fr: number | null; rl: number | null; rr: number | null };
+  /** 有任何一个轮胎报了低压警告。 */
+  tireSoftWarning?: boolean;
+  /** 待装的软件更新版本;空 = 没有。 */
+  softwareUpdate?: string;
+  /** 当前车机版本。 */
+  carVersion?: string;
+  locked?: boolean | null;
+  sentryMode?: boolean | null;
+  insideTempC?: number | null;
+  outsideTempC?: number | null;
 }
 
 /** 能源产品(太阳能 / Powerwall)的**此刻**:功率流向 + 电池电量。 */
@@ -252,18 +291,19 @@ type VehicleRow = { id?: string | number; id_s?: string; display_name?: string; 
  * charging history (with billed cost). Returns status 401 so the caller can
  * refresh the token and retry.
  */
-export async function collectTeslaData(accessToken: string): Promise<{ status: number; drives: TeslaDrive[]; charges: TeslaCharge[]; vehiclesStatus?: number }> {
+export async function collectTeslaData(accessToken: string): Promise<{ status: number; drives: TeslaDrive[]; charges: TeslaCharge[]; health: TeslaHealth[]; vehiclesStatus?: number }> {
   const vehiclesRes = await teslaGet('/api/1/vehicles', accessToken);
-  if (vehiclesRes.status === 401) return { status: 401, drives: [], charges: [] };
+  if (vehiclesRes.status === 401) return { status: 401, drives: [], charges: [], health: [] };
   // 412 = 合作方域名未注册(Fleet API 前置条件)。以前被静默当成「没有车」,
   // UI 只能显示空态 —— 把状态带出去,路由侧可就地补注册并重试。
   if (vehiclesRes.status !== 200) {
-    return { status: 200, drives: [], charges: [], vehiclesStatus: vehiclesRes.status };
+    return { status: 200, drives: [], charges: [], health: [], vehiclesStatus: vehiclesRes.status };
   }
   const vehicles = ((vehiclesRes.data as { response?: VehicleRow[] })?.response) || [];
 
   const drives: TeslaDrive[] = [];
   const charges: TeslaCharge[] = [];
+  const health: TeslaHealth[] = [];
 
   for (const v of vehicles) {
     const vehicleId = String(v.id_s || v.id || '');
@@ -272,12 +312,14 @@ export async function collectTeslaData(accessToken: string): Promise<{ status: n
 
     // Live drive + charge state. Uses vehicle_device_data scope. vehicle_state 带上
     // 是为了拿 odometer(在 vehicle_state 里,不在 drive_state)——不然里程永远是 null。
-    const vd = await teslaGet(`/api/1/vehicles/${vehicleId}/vehicle_data?endpoints=${encodeURIComponent('drive_state;charge_state;vehicle_state')}`, accessToken);
-    if (vd.status === 401) return { status: 401, drives, charges };
-    const resp = (vd.data as { response?: { drive_state?: Record<string, unknown>; charge_state?: Record<string, unknown>; vehicle_state?: Record<string, unknown> } })?.response;
+    // climate_state 是 2026-08-01 加的:车内/车外温度。同一次请求里带上,不多一趟往返。
+    const vd = await teslaGet(`/api/1/vehicles/${vehicleId}/vehicle_data?endpoints=${encodeURIComponent('drive_state;charge_state;vehicle_state;climate_state')}`, accessToken);
+    if (vd.status === 401) return { status: 401, drives, charges, health };
+    const resp = (vd.data as { response?: { drive_state?: Record<string, unknown>; charge_state?: Record<string, unknown>; vehicle_state?: Record<string, unknown>; climate_state?: Record<string, unknown> } })?.response;
     const ds = resp?.drive_state;
     const cs = resp?.charge_state;
     const vs = resp?.vehicle_state;
+    const cl = resp?.climate_state;
     const at = new Date().toISOString();
 
     if (ds) {
@@ -290,6 +332,9 @@ export async function collectTeslaData(accessToken: string): Promise<{ status: n
         odometerMi: (vs?.odometer as number | null) ?? null,
         latitude: (ds.latitude as number | null) ?? null,
         longitude: (ds.longitude as number | null) ?? null,
+        // drive_state.timestamp 是**车上**那份读数的时刻(毫秒)。深度休眠时它可能是
+        // 几小时前的 —— 界面必须能说出「这是 3 小时前的读数」,而不是把它当成此刻。
+        dataAgeMs: typeof ds.timestamp === 'number' ? (ds.timestamp as number) : null,
       });
     }
     if (cs) {
@@ -301,6 +346,36 @@ export async function collectTeslaData(accessToken: string): Promise<{ status: n
         chargingState: (cs.charging_state as string) || undefined,
         energyAddedKwh: (cs.charge_energy_added as number | null) ?? null,
         costUsd: null,
+        chargerPowerKw: (cs.charger_power as number | null) ?? null,
+        // est_battery_range 是按最近开法估的,比 battery_range(理论值)更贴实际;
+        // 取不到才退回理论值。
+        rangeMi: (cs.est_battery_range as number | null) ?? (cs.battery_range as number | null) ?? null,
+        minutesToFull: (cs.minutes_to_full_charge as number | null) ?? null,
+        chargeLimitPct: (cs.charge_limit_soc as number | null) ?? null,
+      });
+    }
+    if (vs || cl) {
+      const su = (vs?.software_update as Record<string, unknown> | undefined) || {};
+      const psi = (v: unknown) => (typeof v === 'number' && v > 0 ? Math.round(v * 14.5038 * 10) / 10 : null);  // bar → psi
+      health.push({
+        vehicleId,
+        at,
+        tirePsi: {
+          fl: psi(vs?.tpms_pressure_fl), fr: psi(vs?.tpms_pressure_fr),
+          rl: psi(vs?.tpms_pressure_rl), rr: psi(vs?.tpms_pressure_rr),
+        },
+        tireSoftWarning: Boolean(
+          vs?.tpms_soft_warning_fl || vs?.tpms_soft_warning_fr
+          || vs?.tpms_soft_warning_rl || vs?.tpms_soft_warning_rr,
+        ),
+        // status 为 'available'/'downloading'/'installing' 时才算「有待装的更新」;
+        // 空字符串是常态(没有更新),不该显示成一条告警。
+        softwareUpdate: su.status && su.status !== '' ? String(su.version || su.status) : '',
+        carVersion: vs?.car_version ? String(vs.car_version).split(' ')[0] : '',
+        locked: (vs?.locked as boolean | null) ?? null,
+        sentryMode: (vs?.sentry_mode as boolean | null) ?? null,
+        insideTempC: (cl?.inside_temp as number | null) ?? null,
+        outsideTempC: (cl?.outside_temp as number | null) ?? null,
       });
     }
   }
@@ -309,7 +384,7 @@ export async function collectTeslaData(accessToken: string): Promise<{ status: n
   // session rows under response.data; field names have shifted over versions,
   // so keep this tolerant and adjust against live output.
   const hist = await teslaGet('/api/1/dx/charging/history', accessToken);
-  if (hist.status === 401) return { status: 401, drives, charges };
+  if (hist.status === 401) return { status: 401, drives, charges, health };
   const sessions = ((hist.data as { response?: { data?: unknown[] } })?.response?.data) || [];
   for (const raw of sessions as Array<Record<string, unknown>>) {
     const fees = (raw.fees as Array<Record<string, unknown>>) || [];
@@ -324,7 +399,7 @@ export async function collectTeslaData(accessToken: string): Promise<{ status: n
     });
   }
 
-  return { status: 200, drives, charges };
+  return { status: 200, drives, charges, health };
 }
 
 /**
