@@ -3,7 +3,9 @@
 /**
  * DailyReportCard —— 每日日报在今天页的**卡片**入口(2026-08-01 用户拍板,
  * 推翻 2026-07-30 的旧定案「今天不要入口,用弹出卡片,在洞察开入口」——
- * 用户这次明确要「形式为每天上午 8 点做成卡片推到今天」)。
+ * 用户这次明确要「形式为每天上午 8 点做成卡片推到今天」;同日追加:去掉左侧
+ * 图标,且不要「常驻」——看过全文之后这张卡也该收起,不该在「今天先不看」
+ * 之外还有个「已经看过了但还杵在 feed 里」的第三态)。
  *
  * 只读:定稿与落库仍然只有 useTodayData 一处(08:00 锚点 + 冻结件,daily-report-persist)。
  * 这里给什么就画什么。到点之前(还没定稿)不占地方——不给一张空卡片。
@@ -19,7 +21,6 @@ import type { DailyReport } from '@/lib/portal/daily-report';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { IconNote } from '../icons';
 
 const DailyReportSheet = dynamic(() => import('../DailyReportSheet'), { ssr: false });
 
@@ -48,10 +49,7 @@ export function DailyReportCard({ nodes }: { nodes: ReadonlyArray<ReportNode> })
   return (
     <>
       <div className="nesio-reengage-card" role="note">
-        <div className="nesio-reengage-head">
-          <span className="nesio-reengage-icon" aria-hidden><IconNote size={16} /></span>
-          <p className="nesio-reengage-title">{report.title}</p>
-        </div>
+        <p className="nesio-reengage-title" style={{ marginBottom: '0.35rem' }}>{report.title}</p>
         <p className="nesio-reengage-body">{report.headline}</p>
         <div className="nesio-reengage-actions">
           <button type="button" className="nesio-reengage-cta" onClick={() => setOpen(true)}>
@@ -62,7 +60,8 @@ export function DailyReportCard({ nodes }: { nodes: ReadonlyArray<ReportNode> })
           </button>
         </div>
       </div>
-      {open && <DailyReportSheet report={report} onClose={() => setOpen(false)} />}
+      {/* 看完全文也算「今天见过了」——收起来,别在 feed 里常驻。 */}
+      {open && <DailyReportSheet report={report} onClose={() => { setOpen(false); dismiss(); }} />}
     </>
   );
 }
