@@ -23,6 +23,7 @@ const AssignChoreLazy = dynamicImport(() => import('./family/AssignChoreButton')
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
+import { isLensEligible } from '@/lib/portal/lens-eligible';
 import Button from './ui/Button';
 import MemoryLensSheet from './MemoryLensSheet';
 import { shouldNudge } from '@/lib/portal/lens';
@@ -1143,24 +1144,21 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             {srcUncertain && <span className="nesio-node-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
           </div>
 
-          {/* 批次 125·设计:阅读原文/回复 显眼按钮排(阅读原文=实心强调,回复=描边) */}
-          {!editing && (readableText || isEmailNode) && (
-            <div className="nesio-node-action-row">
-              {readableText && (
-                <button type="button" className="nesio-node-action-primary" onClick={() => setReaderOpen(true)}>
-                  {L(dict, '阅读原文', 'Read original')}
-                </button>
-              )}
-              {isEmailNode && (
-                <button type="button" className="nesio-node-action-secondary" onClick={() => setComposeOpen(true)}>
-                  {L(dict, '回复', 'Reply')}
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* 用户需求:在记忆详情里补传本地照片进这条记忆(本机存,不上传) */}
-          {!editing && (
+          {/*
+           * 2026-08-01 按钮大整理(用户原话:「详情页就阅读和编辑 2 个按钮」,
+           * 「删除、分派家人、关联记忆都放进点击编辑后的页面」)。
+           *
+           * 在这之前这一屏上散着七八个按钮:顶上「阅读原文 / 回复」一排、
+           * 紧接着「＋ 添加照片」一排、再一个「分派给家人」、底下还有
+           * 「用镜头看看 / 阅读 / 编辑 / 删除」——「阅读」甚至上下各一份。
+           * 现在只有底部一排,改这条记忆的那几件事全都收进编辑态。
+           *
+           * 「添加附件」跟着改名并去掉 accept:原来只收 image/*,而附件本来
+           * 就不该只有照片(local-file-store 早就能原样收任意文件)。
+           * 白名单在 iOS 的文件选择器里会把 PDF/docx 直接灰掉 —— 这个坑
+           * 仓里栽过两次,见 scripts/file-picker-ios.test.mjs。
+           */}
+          {editing && (
             <div className="nesio-nd-photo-add">
               <button
                 type="button"
@@ -1168,12 +1166,11 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                 onClick={() => photoInputRef.current?.click()}
                 disabled={addingPhoto}
               >
-                {addingPhoto ? L(dict, '添加中…', 'Adding…') : L(dict, '＋ 添加照片', '＋ Add photos')}
+                {addingPhoto ? L(dict, '添加中…', 'Adding…') : L(dict, '＋ 添加附件', '＋ Add files')}
               </button>
               <input
                 ref={photoInputRef}
                 type="file"
-                accept="image/*"
                 multiple
                 className="nesio-visually-hidden"
                 onChange={(e) => { const f = e.currentTarget.files; e.currentTarget.value = ''; void addPhotos(f); }}
@@ -1198,8 +1195,9 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             </div>
           )}
 
-          {/* 闭环起点:日历/承诺类记忆可「分派给家人」(→ 对方今天页看到 → 做完你今天页收到回响)。 */}
-          {!editing && (n.type === 'event' || n.type === 'commitment') && (
+          {/* 闭环起点:日历/承诺类记忆可「分派给家人」(→ 对方今天页看到 → 做完你今天页收到回响)。
+              2026-08-01 收进编辑态 —— 它是「对这条记忆做一次安排」,和删除/关联同类。 */}
+          {editing && (n.type === 'event' || n.type === 'commitment') && (
             <AssignChoreLazy node={n} />
           )}
 
@@ -1538,7 +1536,10 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                     行内,不再多占一整行竖直空间。 */}
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 'var(--space-2)' }}>
                   <p className="nesio-settings-section-label" style={{ margin: 0 }}>{L(dict, '相关记忆', 'Related memories')}</p>
-                  {!linkPicking && (
+                  {/* 2026-08-01(用户:「关联记忆…放进点击编辑后的页面」):
+                      **加**关联是改这条记忆,收进编辑态;而下面那份列表是只读的,
+                      留在详情页 —— 「这条和什么有关」是要看的信息,不是要改的东西。 */}
+                  {editing && !linkPicking && (
                     <button type="button" className="nesio-node-link-add-inline" onClick={() => setLinkPicking(true)}>
                       <IconLink size={12} /> {L(dict, '关联', 'Link')}
                     </button>
@@ -1609,19 +1610,34 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
                 替掉原来手写的 height:46px),这里只剩 flex:1 这一条真正的布局,走 layoutStyle。 */}
             {editing ? (
               <>
-                <Button variant="primary" layoutStyle={{ flex: 1 }} onClick={saveEdit}>{L(dict, '保存', 'Save')}</Button>
-                <Button variant="secondary" layoutStyle={{ flex: 1 }} onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</Button>
+                <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} onClick={saveEdit}>{L(dict, '保存', 'Save')}</Button>
+                <Button variant="secondary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</Button>
+                {/* 删除收进编辑态(2026-08-01 用户点名)。放在保存/取消后面、而且是最后一个 ——
+                    误触的代价在这一排里只有它是不可逆的。 */}
+                <Button variant="soft" size="sm" tone="risk" layoutStyle={{ flex: 1 }} onClick={handleDelete}>{L(dict, '删除', 'Delete')}</Button>
               </>
             ) : (
               <>
-                <Button variant="soft" layoutStyle={{ flex: 1 }} onClick={() => setLensOpen(true)}>{L(dict, '用镜头看看 ✦', 'Lens ✦')}</Button>
-                {/* 批次 33:阅读入口顶部有(替换✕),底部也放回来一份 —— 用户反馈顶部那颗找不到 */}
+                {/* 阅读 —— 顶上那份「阅读原文」已撤,这里是唯一一处。 */}
                 {readableText && (
-                  <Button variant="primary" layoutStyle={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</Button>
+                  <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</Button>
                 )}
-                {/* 批次 37:回复按钮移到顶部「阅读」旁,底部不再重复 */}
-                <Button variant="secondary" layoutStyle={{ flex: 1 }} onClick={startEdit}>{L(dict, '编辑', 'Edit')}</Button>
-                <Button variant="soft" tone="risk" layoutStyle={{ flex: 1 }} onClick={handleDelete}>{L(dict, '删除', 'Delete')}</Button>
+                {/*
+                 * 回复。用户列的「详情页就阅读和编辑 2 个按钮」里没点到它,
+                 * 但它也没被点名要挪进编辑页 —— 而回复一封邮件和编辑这条记忆
+                 * 完全是两件事,塞进编辑态会很别扭。它只在邮件节点上出现,
+                 * 所以留在这一排:非邮件的记忆看到的仍然只有阅读 + 编辑。
+                 * (要是这条也该撤,说一声就撤。)
+                 */}
+                {isEmailNode && (
+                  <Button variant="secondary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => setComposeOpen(true)}>{L(dict, '回复', 'Reply')}</Button>
+                )}
+                {/* 「镜头」两个字(用户点名),而且只给写下来的字看 —— 判据在 lens-eligible。
+                    一封对账单、一个日历事件底下没有话可看,给它镜头就是一条无话可说的路。 */}
+                {isLensEligible(n) && (
+                  <Button variant="soft" size="sm" layoutStyle={{ flex: 1 }} onClick={() => setLensOpen(true)}>{L(dict, '镜头', 'Lens')}</Button>
+                )}
+                <Button variant="secondary" size="sm" layoutStyle={{ flex: 1 }} onClick={startEdit}>{L(dict, '编辑', 'Edit')}</Button>
               </>
             )}
           </div>
