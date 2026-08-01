@@ -189,11 +189,8 @@ sensitivity/retention 枚举化(中期)。
        裁剪 + 记忆列表展示层过滤(memory-visibility.ts `isWeatherNode`)—— 用户抱怨的
        "天气占地方"表面症状已经被两层机制接住,贸然砍掉持久化会正面撞两条契约,
        需要用户明确"连契约一起改"才能动。
-    ② `sensitivity` → `Domains` 改名重设计 —— 只留下"改名 + 系统标签驱动隐藏/自定义
-       标签可见"的哲学描述,原表格的具体枚举值在压缩摘要里丢失,而 `sensitivity` 是
-       `isDeviceOnlySignal()`(健康数据永不上云的产品红线,被 health-signals.test.mjs
-       钉死)的判据来源 —— 蒙一版新枚举有真实概率悄悄改坏这条隐私闸门,必须拿到原表
-       原文或重新确认后再动。
+    ② `sensitivity` → `Domains` 改名重设计 —— **2026-08-01 已拿到用户明确决策并开始
+       落地,见下方新条目**;不再是待澄清项。
     ③ 8 个自定义可见 tag(财务/物品/衣橱/美食/健康/人物/心情/阅读)UI 接线 —— 不确定
        该接进哪个界面:最近一批("bug2 批·物品页")刚**删掉**物品页的"常用标签"快选
        UI 当噪音处理,现在再加一版新标签选择器方向不明,存在跟那个决定正面冲突的风险。
@@ -208,6 +205,41 @@ sensitivity/retention 枚举化(中期)。
   缺测试框架类型声明);`test:security` 全绿;`test:contracts`(319 条)除 3 条**验证为
   改动前就失败**的预置项(`cloud-module-data-runtime`/`v14-sovereignty-ui-regression`/
   `cloud-auto-sync`,均与本批无关)外全绿。
+
+- **Domains 三合一(2026-08-01,进行中)**:用户明确决策 —— `SignalSensitivity`(退场)+
+  `FrontDomain`(`lib/life-domain/domain-taxonomy.ts` 既有 5 域 life/growth/assets/health/
+  energy,此前只有语音捕获/搜索查询两条路径会走到)+ 分类逻辑层,三合一;8 个自定义可见
+  tag(财务/物品/衣橱/美食/健康/人物/心情/阅读)**明确不参与**——那是用户自己看的人工
+  习惯,不算智能部分。用户手写了一版关键词分类草案要求据此扩容。
+  ● **已做(commit ba6a031)**:`context-extractor.ts` 的 `DOMAIN_KEYWORDS` 按草案扩容
+    (归并进既有 5 桶,没新开桶);新增 `classifyDomainFromText()`(零命中返回 null,
+    不影响 `extractContext()` 依赖的既有零命中→life 低置信行为);`node-context.ts` 的
+    `nodeDomain()` 在粗粒度 type 兜底前插入这道关键词判据,让照片/邮件/连接器同步等
+    此前从不过 `extractContext()` 的大多数节点也能被内容判出准确 domain(消费方
+    `domain-stats.ts`/`smart-search.ts` 自动受益,未改这两个文件)。`create-signal.ts`
+    的 `inferSensitivity()` 与 `life-graph.ts` 的 `inferLifeNodeSignalSensitivity()`
+    各加一条关键词兜底,只做**加严**(更多内容判成 `health`,绝不会把已判成 health 的
+    判走)—— **没有**改 `isDeviceOnlySignal()` 本身的判据写法(仍是字面 `sensitivity
+    === 'health'`,受 `scripts/health-privacy-boundary.test.mjs` 钉死;真正钉 `sensitivity:
+    'health'` 字面文本的是 `scripts/health-signals.test.mjs`,两个文件容易搞混,已用调研
+    agent 核实过)。
+  ● **未做、留给用户明确决定的两个开放问题**(高风险/影响面广,不擅自决定):
+    ① `isDeviceOnlySignal` 要不要跟着 `FrontDomain.gated` 从「只挡 health」扩到「health +
+       energy 一起挡」——`DOMAINS.energy.gated = true`,PRD 里已经把 energy(情绪/心理/冥想)
+       当敏感域设计,但当前隐私闸门只认 `sensitivity === 'health'`。扩大是"更保守"方向,
+       但会让此前能同步的 energy 类内容变成设备专属,是要用户点头的行为变化。
+    ② `life-state.ts` 的 `evalWork`/`evalFinance` 严格判据(`sensitivity === 'work'` /
+       `'financial'`,无 fallback,喂给 Today/多面镜/未来引导)要不要接到合并后的 Domain——
+       `FrontDomain.growth` 同时覆盖"工作"和"学习",`FrontDomain.assets` 同时覆盖"财务"和
+       "物品收纳",跟 `work`/`financial` 不是干净的一对一映射,贸然接可能让学习类内容被
+       算进"工作负荷"、物品类内容被算进"财务记录",影响 Life State 的推理准确度。
+  ● 顺带修了 3 条契约测试(`graph-sync-safety`/`life-graph-fact-sink`/`signal-epistemic`)
+    的 vm 沙箱 harness——新增的 `context-extractor` 依赖在假 `require` 桩下返回空对象,
+    导致 `classifyDomainFromText is not a function` 假失败(不是产品 bug),已接上真实现。
+  契约验证:`tsc --noEmit` 0 错;`test:security` 全绿;`test:contracts` 全量扫过,
+  确认另外触发的 5 个失败(`cloud-auto-sync`/`body-ledger-contract`/`travel-trips-contract`/
+  `qa:launch`/`release:serial`,还有 4 个 `test:e2e*` 因沙箱无 Chrome 二进制)在改动前
+  (`git stash` 到 fd95620)就已失败,与本批无关。
 
 - **音乐模块 · 四音源(2026-07-30,本轮新增)**:用户定的范围是「本地歌曲 + 网易 +
   歌曲自由切换 + Spotify + Apple Music」。落地时把「自由切换」拆成它真实的样子 ——
