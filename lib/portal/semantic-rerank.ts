@@ -17,6 +17,7 @@ import { isPrivateExternalNode, type LifeNode } from './life-graph';
 import { canUsePaidCloudAi } from './entitlement';
 import { getEmailBody } from './local-email-body';
 import { embedTexts, TEXT_EMBED_MODEL } from './semantic-search/text-embed';
+import { openSimpleDb } from '@/lib/idb/open-simple-db';
 
 const LEGACY_LS_KEY = 'nesio-node-embeddings-v1';
 const DB_NAME = 'nesio-vectors';
@@ -48,18 +49,13 @@ function nodeEmbeddingText(n: LifeNode, emailBody?: string): string {
 
 // ── IndexedDB micro-helper (no dependency) ────────────────────────────────────
 
-function openDb(): Promise<IDBDatabase | null> {
-  return new Promise((resolve) => {
-    if (typeof indexedDB === 'undefined') { resolve(null); return; }
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => { req.result.createObjectStore(STORE); };
-    req.onsuccess = () => {
-      // One-time cleanup of the legacy localStorage cache
-      try { localStorage.removeItem(LEGACY_LS_KEY); } catch { /* ignore */ }
-      resolve(req.result);
-    };
-    req.onerror = () => resolve(null);
-  });
+async function openDb(): Promise<IDBDatabase | null> {
+  const db = await openSimpleDb(DB_NAME, 1, [{ name: STORE }]);
+  if (db) {
+    // One-time cleanup of the legacy localStorage cache
+    try { localStorage.removeItem(LEGACY_LS_KEY); } catch { /* ignore */ }
+  }
+  return db;
 }
 
 function idbGetMany(db: IDBDatabase, ids: string[]): Promise<Map<string, CacheEntry>> {

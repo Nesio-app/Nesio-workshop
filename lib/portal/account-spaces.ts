@@ -13,17 +13,13 @@
 
 import { buildCombinedBackup, restoreCombinedBackup } from './cloud-backup';
 import { logDropped } from './storage-health';
+import { openSimpleDbStrict } from '@/lib/idb/open-simple-db';
 
 const DB_NAME = 'nesio-account-spaces';
 const STORE = 'spaces';
 
 function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => { req.result.createObjectStore(STORE); };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+  return openSimpleDbStrict(DB_NAME, 1, [{ name: STORE }]);
 }
 
 async function idbGet(key: string): Promise<string | null> {

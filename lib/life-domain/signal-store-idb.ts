@@ -8,22 +8,15 @@
  */
 
 import type { Signal } from './signal';
+import { openSimpleDb } from '@/lib/idb/open-simple-db';
 
 const DB_NAME = 'nesio-signals';
 const STORE = 'signals';
 
 function openDb(): Promise<IDBDatabase | null> {
-  return new Promise((resolve) => {
-    if (typeof indexedDB === 'undefined') { resolve(null); return; }
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const store = req.result.createObjectStore(STORE, { keyPath: 'id' });
-      store.createIndex('occurredAt', 'occurredAt');
-      store.createIndex('source', 'source');
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => resolve(null);
-  });
+  return openSimpleDb(DB_NAME, 1, [
+    { name: STORE, keyPath: 'id', indexes: [{ name: 'occurredAt', keyPath: 'occurredAt' }, { name: 'source', keyPath: 'source' }] },
+  ]);
 }
 
 /** 追加一条 Signal(幂等:同 id 覆盖)。失败静默——事实库是增强不是依赖。 */

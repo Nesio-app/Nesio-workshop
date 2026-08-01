@@ -10,6 +10,8 @@
  * 后端可注入(便于单测);导出/删除收口(full-backup / purgeLocalData)也覆盖这些 IDB blob。
  */
 
+import { openSimpleDbStrict } from '@/lib/idb/open-simple-db';
+
 export interface BlobBackend {
   get(key: string): Promise<string | null>;
   set(key: string, value: string): Promise<void>;
@@ -21,14 +23,7 @@ const DB_NAME = 'nesio-blobs';
 const STORE = 'blobs';
 
 function openDb(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      if (!req.result.objectStoreNames.contains(STORE)) req.result.createObjectStore(STORE);
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
+  return openSimpleDbStrict(DB_NAME, 1, [{ name: STORE }]);
 }
 
 /** 真 IndexedDB 后端;SSR/无 IDB 时安全降级。 */

@@ -7,21 +7,13 @@
  */
 
 import { logDropped, reportStorageDropped } from '@/lib/portal/storage-health';
+import { openSimpleDb } from '@/lib/idb/open-simple-db';
 
 const DB_NAME = 'nesio-images';
 const STORE = 'images';
 
 function openDB(): Promise<IDBDatabase | null> {
-  return new Promise((resolve) => {
-    if (typeof indexedDB === 'undefined') { resolve(null); return; }
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => resolve(null);
-  });
+  return openSimpleDb(DB_NAME, 1, [{ name: STORE }]);
 }
 
 /** 压缩到最长边 maxDim 的 JPEG dataURL(存储与上传都用它)。 */
