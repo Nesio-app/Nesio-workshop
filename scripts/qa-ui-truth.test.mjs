@@ -108,9 +108,14 @@ const code = stripComments;
       /importedNodeCount/.test(fn),
       '「立即同步」又只报一句「已同步」了 —— 记忆总数当场变大却不说来路,用户看到的就是「凭空多了 3 条」',
     );
+    // 2026-08-01:文案组装抽到 lib/portal/sync-result-copy(埋在组件 async 里的
+    // 字符串拼接压不住 —— `void mem.updatedNodeCount;` 就能骗过正则)。
+    // 「什么都没变要有一支」现在由 scripts/sync-count-honest 真跑着压,那边更狠;
+    // 这里只钉住调用点确实走了那个函数、而且三个数都传了进去。
     assert.ok(
-      /n > 0[\s\S]{0,400}\?[\s\S]{0,400}:/.test(fn),
-      '同步没有「什么都没变」那一支 —— 一条没取回也说「取回 0 条」同样让人犯嘀咕',
+      /describeSyncResult\(\{[\s\S]{0,240}total: mem\.cloudNodeCount/.test(fn),
+      '同步那句话没走 describeSyncResult(或者没把云端总数传进去)—— ' +
+      '用户问的「数据是否准确」要的就是一个能和记忆库对得上的总数',
     );
   }
 

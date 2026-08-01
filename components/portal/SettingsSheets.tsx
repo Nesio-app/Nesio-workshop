@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { pushSupported, isPushEnabled, enablePush, disablePush } from '@/lib/portal/push-notify';
 import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, saveProfileSettings, touchProfileIdentity, type PortalLocale } from '@/lib/portal/profile';
+import { describeSyncResult } from '@/lib/portal/sync-result-copy';
 import { pushProfileToCloud, syncProfileWithCloud } from '@/lib/portal/cloud-profile-sync';
 import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
@@ -537,11 +538,13 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     setDiagSyncMsg(L(dict, '同步中…', 'Syncing…'));
     try {
       const [mem] = await Promise.all([syncMemoryWithCloud({ force: true }), syncProfileWithCloud()]);
-      const n = mem.importedNodeCount;
-      setDiagSyncMsg(n > 0
-        ? L(dict, `✓ 已同步 · 从云端取回 ${n} 条这台设备还没有的记忆 · 下拉刷新看结果`,
-          `✓ Synced · pulled ${n} ${n === 1 ? 'memory' : 'memories'} this device didn't have yet · pull to refresh`)
-        : L(dict, '✓ 已同步 · 本机和云端本来就一致,没有新增', '✓ Synced · already up to date, nothing new'));
+      // 文案组装抽到 lib/portal/sync-result-copy —— 埋在这儿的话契约只能拿正则去源码里
+      // 找「提到了这个字段没有」,而 `void mem.updatedNodeCount;` 一样能骗过它(注入回归抓出来的)。
+      setDiagSyncMsg(describeSyncResult({
+        fresh: mem.importedNodeCount,
+        updated: mem.updatedNodeCount ?? 0,
+        total: mem.cloudNodeCount ?? 0,
+      }, dict !== 'en'));
     } catch { setDiagSyncMsg(L(dict, '同步没能完成,过一会儿再试', 'Sync didn’t go through — try again in a bit')); }
   }
   const pickBackupDest = (d: 'drive' | 'nesio') => {
