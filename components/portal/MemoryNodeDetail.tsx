@@ -588,11 +588,24 @@ function NoteSection({ node }: { node: LifeNode }) {
   const category = attr(node, 'category');
   const date = attr(node, 'date');
   const url = attr(node, 'url');
+  // 2026-08-01:手记补填的截止日期(见编辑面板),同 CommitmentSection 一样标一下过期。
+  const dueDate = attr(node, 'dueDate');
+  const dueParsed = dueDate ? parseLocalDate(dueDate) : null;
+  const isOverdue = dueParsed !== null && dueParsed.getTime() - Date.now() < 0 && !node.attributes.done;
   return (
     <div className="nesio-type-section">
       <InfoRow label={L(dict, '来源应用', 'From app')} value={sourceApp} />
       <InfoRow label={L(dict, '分类', 'Type')} value={category} />
       <InfoRow label={L(dict, '记录时间', 'Noted on')} value={fmtDate(date, dict)} />
+      {dueDate && (
+        <div className={`nesio-node-attr-row${isOverdue ? ' nesio-attr-overdue' : ''}`}>
+          <span className="nesio-node-attr-key">{L(dict, '截止日期', 'Due')}</span>
+          <span className="nesio-node-attr-val">
+            {fmtDateTime(dueDate, dict)}
+            {isOverdue && <span className="nesio-overdue-tag"> {L(dict, '已过期', 'overdue')}</span>}
+          </span>
+        </div>
+      )}
       {url && (
         <div style={{ marginTop: 'var(--space-3)' }}>
           <a href={safeExternalUrl(url)} target="_blank" rel="noopener noreferrer" className="nesio-type-action-btn">
@@ -812,7 +825,9 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
       price: attr(n, 'price'),
       purchaseDate: attr(n, 'purchaseDate'),
       expiry: attr(n, 'expiry'),
-      dueDate: attr(n, 'dueDate', 'deadline', 'due', 'date'),
+      // 手记只认真正写过的 dueDate —— 不能带 'date' 这个后备键,那是"记录时间"
+      // (何时随手记下的),把它当截止日期回填会在下次保存时把记录时间错写成截止日期。
+      dueDate: n.type === 'note' ? attr(n, 'dueDate') : attr(n, 'dueDate', 'deadline', 'due', 'date'),
       priority: attr(n, 'priority'),
       owner: attr(n, 'owner'),
       recurring: attr(n, 'recurring'),
@@ -844,6 +859,12 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
       if (fields.priority !== attr(n, 'priority')) extra.priority = fields.priority || null;
       if (fields.owner !== attr(n, 'owner')) extra.owner = fields.owner || null;
       if (fields.recurring !== attr(n, 'recurring')) extra.recurring = fields.recurring || null;
+    }
+    // 2026-08-01 用户点名:没有日期的待办被归成「手记」,以前手记编辑面板压根没有
+    // 截止日期这个框,填了也存不进去 —— 日程页因此永远看不到它。手记只开放这一个字段
+    // (优先级/负责人/循环那些是"任务"专属概念,套到随手记的一条笔记上不成立)。
+    if (n.type === 'note') {
+      if (fields.dueDate !== attr(n, 'dueDate')) extra.dueDate = fields.dueDate || null;
     }
     if (n.type === 'event') {
       if (fields.url !== attr(n, 'url', 'htmlLink')) extra.url = fields.url || null;
@@ -1112,6 +1133,11 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               <label className="nesio-edit-row"><span>{L(dict, '会议链接', 'Meeting link')}</span><input value={field('url')} onChange={(e) => setField('url', e.target.value)} placeholder="https://zoom.us/…" /></label>
               <label className="nesio-edit-row"><span>{L(dict, '地点', 'Location')}</span><input value={field('eventLocation')} onChange={(e) => setField('eventLocation', e.target.value)} placeholder={L(dict, '地点或地址', 'Place or address')} /></label>
             </>)}
+            {n.type === 'note' && (
+              // 2026-08-01:随手记下、没赶上带日期的一句话,事后想设个截止提醒也该有地方填 ——
+              // 填了就会出现在「日程」里(见 SchedulePanel 的手记分支)。
+              <label className="nesio-edit-row"><span>{L(dict, '截止日期(可选)', 'Due date (optional)')}</span><input type="date" value={field('dueDate').slice(0, 10)} onChange={(e) => setField('dueDate', e.target.value)} /></label>
+            )}
             {n.type === 'person' && (<>
               <label className="nesio-edit-row">
                 <span>{L(dict, '关系', 'Relationship')}</span>

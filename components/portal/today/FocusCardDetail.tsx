@@ -373,18 +373,16 @@ export function FocusCardDetail({
                 />
                 {/* 批次 14:emoji 不进 UI(红线);动作名本身就够了 */}
                 <span className="nesio-momentum-name">{a.name}</span>
-                {!!a.durationMin && (
-                  <span style={{ flexShrink: 0, fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                    {a.durationMin} min
-                  </span>
-                )}
+                {/* 2026-08-01 用户点名:估算时间去掉,「太难」两个字去掉只留符号,省空间 —— 一行要放的东西太多了。 */}
                 {!a.done && !drills && !isDrilling && (
                   <button
                     type="button"
                     className="nesio-momentum-hard-btn"
                     onClick={() => handleDrill(a)}
+                    aria-label={L(dict, '太难,再拆细一点', 'Too hard — break it down further')}
+                    title={L(dict, '太难,再拆细一点', 'Too hard — break it down further')}
                   >
-                    {L(dict, '太难 ↓', 'Too hard ↓')}
+                    ↓
                   </button>
                 )}
                 {isDrilling && <span className="nesio-momentum-drilling">⋯</span>}
@@ -410,11 +408,6 @@ export function FocusCardDetail({
                       />
                       {/* 批次 14:同上,去 emoji */}
                       <span className="nesio-momentum-drill-name">{d.name}</span>
-                      {!!d.durationMin && (
-                        <span style={{ flexShrink: 0, fontSize: 'var(--text-overline)', color: 'var(--portal-muted)', fontVariantNumeric: 'tabular-nums' }}>
-                          {d.durationMin} min
-                        </span>
-                      )}
                     </li>
                   ))}
                 </ul>

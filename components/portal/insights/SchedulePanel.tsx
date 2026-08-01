@@ -53,6 +53,7 @@ import {
   type Reminder, type ReminderKind,
 } from '@/lib/portal/schedule-reminders';
 import { ensureEmailFulltextIndex, emailFulltextReady, emailFulltextScore } from '@/lib/portal/email-fulltext-index';
+import { firstNodeDate } from '@/lib/platform/node-dates';
 
 // 2026-07-30 用户:「目前邮件是只有收件,没有发件箱」。
 // 拆成收件 / 发件两格 —— 不是加个筛选标签,因为两者该走**不同的规则**:
@@ -908,6 +909,36 @@ export default function SchedulePanel() {
           googleLabels: [L(dict, '会议记录', 'Meeting notes')],
           body: bodyOf(n),
         });
+      } else if (
+        !a.reminderId && a.done !== true &&
+        (n.type === 'commitment' || (n.type === 'note' && typeof a.dueDate === 'string' && a.dueDate))
+      ) {
+        /*
+         * 2026-08-01(用户:「没有截止日期的、逾期未完成的,都分成手记,进不了日程,
+         * 即使后来编辑增加时间也进不了」)。根因两层:①手记类型的编辑面板本来就没有
+         * 「截止日期」这个输入框(见 MemoryNodeDetail 的 n.type === 'commitment' 门),
+         * 现在已经放开给手记也能填;②这张列表以前只认 calendar / meeting-notes / 提醒
+         * 三种来源,任务类节点(commitment,或补填了 dueDate 的手记)一条都进不来。
+         * 提醒 shadow(带 reminderId)已经走上面那条 reminders 循环,这里要排掉避免重复。
+         */
+        const due = firstNodeDate(a);
+        const hasDate = !!due;
+        out.push({
+          id: n.id,
+          title: n.name,
+          dateIso: hasDate ? due.toISOString() : n.createdAt,
+          meta: '',
+          badge: hasDate ? undefined : L(dict, '无截止日期', 'No due date'),
+          extra: hasDate ? '' : L(dict, '无截止日期', 'No due date'),
+          query: n.name,
+          node: n,
+          googleLabels: [
+            L(dict, '待办', 'Task'),
+            ...(hasDate ? [] : [L(dict, '无截止日期', 'No due date')]),
+            ...(hasDate && due.getTime() < todayStart.getTime() ? [L(dict, '逾期未完成', 'Overdue')] : []),
+          ],
+          body: bodyOf(n),
+        });
       }
     }
     // 提醒进同一张列表。**做完的不进** —— 它们在「已完成」那一面,混进待办里
@@ -931,6 +962,8 @@ export default function SchedulePanel() {
     for (const r of reminders) {
       if (r.doneAt) continue;
       const rep = repeatLabel(r, dict);
+      const remMs = new Date(r.at).getTime();
+      const remOverdue = !Number.isNaN(remMs) && remMs < todayStart.getTime();
       out.push({
         id: `rem:${r.id}`,
         title: r.title,
@@ -943,7 +976,10 @@ export default function SchedulePanel() {
         // 有身影就能开详情;老提醒(这个功能之前设的)没有身影,那一条仍然不可点 ——
         // 画一个点了什么也不会发生的入口比没有更糟。
         ...(shadowByReminder.get(r.id) ? { node: shadowByReminder.get(r.id) } : {}),
-        googleLabels: [L(dict, '我设的提醒', 'My reminders')],
+        googleLabels: [
+          L(dict, '我设的提醒', 'My reminders'),
+          ...(remOverdue ? [L(dict, '逾期未完成', 'Overdue')] : []),
+        ],
         body: r.note || '',
       });
     }

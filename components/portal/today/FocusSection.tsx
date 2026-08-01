@@ -70,9 +70,18 @@ function CollapsedTaskItem({
           {hint && <span className="nesio-collapsed-kicker">{hint}</span>}
           <span className="nesio-collapsed-title">{node.name}</span>
         </button>
-        {/* 移除这条 —— 用户要求(2026-07-30):时间线每一条后面都要有个 ✕ 可以移走。
-            文字「没用」换成 ✕:两个字在窄行里挤标题,而且「没用」像在评价这件事本身,
-            ✕ 说的是「从今天挪走」。语义不变,仍然记一条反馈 + 跨天不再占今天。 */}
+        {/* 2026-08-01 用户点名:行尾只有一个 ✕,看不出还能"完成"——拆成两个小符号,
+            对勾=完成(同左侧圆圈勾,这里再放一个是因为用户视觉上没认出左侧那个是按钮)
+            ✕=移走(不影响完成状态,只是今天不看了)。 */}
+        {!isDone && (
+          <button
+            type="button"
+            className="nesio-tl-check"
+            onClick={(e) => { e.stopPropagation(); onDone(node); }}
+            aria-label={t(locale, 'todayDoneAria')}
+            title={t(locale, 'todayDoneAria')}
+          >✓</button>
+        )}
         {onNotUseful && !isDone && (
           <button
             type="button"
