@@ -2,8 +2,9 @@
 
 > Loop-engineering 原则:状态必须活在对话之外。任何 AI 会话或新协作者
 > **先读这个文件**,再动手。改动仓库重大状态时,同步更新这里。
-> 最后更新:2026-08-01(Signal/LifeNode schema 改名批:SignalSource 增删/修误分类 +
-> epistemic·generator 收紧必填;retentionPolicy/Domains 改名/自定义 tag/LifeNodeType
+> 最后更新:2026-08-01(五图反馈批:CSV 导入丢数据 bug 修复 + 今天页时间线三处 +
+> 记忆详情页整合;Signal/LifeNode schema 改名批:SignalSource 增删/修误分类 +
+> epistemic·generator 收紧必填;retentionPolicy/自定义 tag/LifeNodeType
 > 改名批因契约冲突或规格丢失明确搁置,见「已知欠账」首条)
 
 ## 当前纪元:两代产品交接中
@@ -246,6 +247,32 @@ sensitivity/retention 枚举化(中期)。
   `travel-trips-contract`/`design-token-ratchet`/`qa:launch`/`release:serial`/4 个
   `test:e2e*` 因沙箱无 Chrome 二进制)经 `git stash` 回退到改动前逐个确认全部是本批
   之前就存在,与本批无关。
+
+- **五图反馈批(2026-08-01)**:用户给了 5 张带手绘圈的真机截图,逐条修完。
+  ● **最高优先级 · 数据丢失 bug(`lib/portal/life-graph.ts`)**:CSV 导入的物品下次开
+    App 就没了。根因:`graphHydrated` 在水合**发起**那一刻就置 `true`(只为防重入),
+    `saveAll` 却拿它当"水合已完成"的判据,在真正读完 IDB + union 旧数据之前就把
+    "种子 + 本次新增几条"的半张图交给 `writeGraphShards`,分片索引被覆盖 ——
+    没提到的历史年份分片物理数据还在但读不出来,且完全静默(不报错、不告警)。
+    修法:拆出 `graphHydrationSettled`,只在水合真正跑完那一刻才置 true,`saveAll`
+    改认这个新标记而不是 `graphHydrated`。
+  ● 今天页:`keyword-lexicon.ts` 的 `medical` 正则里裸的"检查"太宽泛,把"检查学校
+    账单"误判成"医疗预约"(收窄成"检查"+身体部位搭配);`CalendarCards.tsx` 日历行
+    ✕ 按钮布局错位(外层不支持 flex 子项并列)+ `FocusSection.tsx` 的 `rest` 过滤
+    漏了 `!dismissed.has()`(点了不管用,两个 bug 一起修);`TodayFeed.tsx` 引导卡跳
+    记忆详情没传 `elevated`,z-index 比来源卡矮一层导致"重影";积分从顶栏 chip 的
+    浮层商城升级成 `InsightsSheet.tsx` 下的独立 `rewards` tab(复用现成
+    `RewardsStore` 组件,删掉不再用的 `RewardsStoreSheet.tsx`)。
+  ● 记忆详情页(`MemoryNodeDetail.tsx`):`updatedAt` 补进隐藏字段名单(此前裸露成
+    原始 UTC ISO 串,看着像时区错了);邮件来源行不再多写"Gmail";event 类型详情页
+    不再重复显示同一个时间;"用镜头看看"并入阅读/编辑/删除同一排;
+    "＋关联一条记忆"挪到"相关记忆"标题行内。
+  契约验证:`tsc --noEmit` 0 错;`test:security` 全绿;`test:contracts` 全量扫过,
+  额外触发的失败(`auth-session-sticky-refresh`,连同已知的
+  `cloud-module-data-runtime`/`v14-sovereignty-ui-regression`/
+  `auth-implicit-session-import`/`cloud-auto-sync`/`body-ledger-contract`/
+  `travel-trips-contract`/`design-token-ratchet`/`qa:launch`/`release:serial`/
+  4 个 `test:e2e*`)经 `git stash` 回退逐个确认与本批无关。
 
 - **音乐模块 · 四音源(2026-07-30,本轮新增)**:用户定的范围是「本地歌曲 + 网易 +
   歌曲自由切换 + Spotify + Apple Music」。落地时把「自由切换」拆成它真实的样子 ——
