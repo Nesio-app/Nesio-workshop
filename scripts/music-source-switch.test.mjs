@@ -183,12 +183,17 @@ assert.equal(cat.blockedReason('local', READY), '', '能放的时候不该有多
   // 放起来之后必须有地方能暂停/停掉。悬浮球在音乐页是让位的,所以这一条播放条
   // 是唯一的出口 —— 它不能跟着搜索结果走:再搜一次别的,歌还在响而暂停键没了。
   assert.ok(
-    /\{nowRemote && player\.state\.currentId === nowRemote\.id && \([\s\S]{0,400}player\.toggle\(\)/.test(panel),
+    // 2026-08-01 窗口从 400 放宽到 900:这条播放条上多了「展开全屏」和「下一首」
+    // (远端补上队列之后「下一首」才有意义),暂停键被推到了更后面。
+    // 判据要压的是「认 nowRemote 而不是现从搜索结果里找」,不是按钮的排列顺序。
+    /\{nowRemote && player\.state\.currentId === nowRemote\.id && \([\s\S]{0,900}player\.toggle\(\)/.test(panel),
     '网易播放条要认 nowRemote(独立记住正在放的那一首),不许从当前这批搜索结果里现找',
   );
   assert.ok(
-    /onClick=\{\(\) => \{ player\.stop\(\); setNowRemote\(null\); \}\}/.test(panel),
-    '停止要真停,并且把「正在放」这份记录一起清掉',
+    // cancelAutoAdvance 是 2026-08-01 补的:停止时还要把**正在后台跑的那趟
+    // 「自动往下找」**一起作废 —— 不然用户按了停止,几秒后自动续播又把下一首放起来了。
+    /onClick=\{\(\) => \{ cancelAutoAdvance\(\); player\.stop\(\); setNowRemote\(null\); \}\}/.test(panel),
+    '停止要真停(连同正在跑的自动往下找),并且把「正在放」这份记录一起清掉',
   );
 
   // 源级别那句说明也要换掉:不能再写「搜到了但放不出声」。

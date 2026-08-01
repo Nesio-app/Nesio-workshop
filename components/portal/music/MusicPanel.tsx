@@ -33,7 +33,13 @@ import { loadMusicPrefs, saveMusicPrefs, loadLastPlayed, saveLastPlayed, type Mu
 import { EMPTY_READINESS, fetchSpotifyStatus, localReadiness, probeReadiness, type ReadinessMap, type SpotifyStatus } from '@/lib/platform/music/readiness';
 import { authorizeApple, lastAppleError } from '@/lib/platform/music/apple-client';
 import { useSessionState } from '../use-session-state';
-import { playRemote, setPanelOpen } from '@/lib/platform/music/player-engine';
+import { playRemote, setPanelOpen, setEntryQueue, cancelAutoAdvance, type QueueEntry } from '@/lib/platform/music/player-engine';
+import type { ProbeOutcome } from '@/lib/platform/music/auto-advance';
+import { autoAdvanceMessage } from '@/lib/platform/music/auto-advance';
+import { trackRef, type PlaylistEntry } from '@/lib/platform/music/playlists';
+import FullScreenPlayer, { type NowPlaying } from './FullScreenPlayer';
+import AddToPlaylistSheet from './AddToPlaylistSheet';
+import PlaylistsTab from './PlaylistsTab';
 import { useLocalPlayer } from './use-local-player';
 import type { RepeatMode } from '@/lib/platform/music/queue';
 
@@ -93,6 +99,14 @@ export default function MusicPanel() {
   // 「上次听到哪」只在客户端读:渲染期直接读 localStorage 会让服务端渲染出的
   // 那一帧与客户端不一致(水合告警),而且首屏会闪一下。
   const [lastId, setLastId] = useState('');
+  /** 曲库 / 歌单 两个子 tab(用户:「在音乐板面应该有歌单 子tab 才对」)。 */
+  const [tab, setTab] = useState<'library' | 'playlists'>('library');
+  /** 全屏播放器开着没有。**默认关** —— 点一首歌不该抢走整屏。 */
+  const [fullscreen, setFullscreen] = useState(false);
+  /** 「加到歌单」弹层要加的那一首。 */
+  const [adding, setAdding] = useState<Omit<PlaylistEntry, 'addedAt'> | null>(null);
+  /** 自动往下找停下来时说的那句话(风控/断网/都放不了)。不许静默。 */
+  const [queueMsg, setQueueMsg] = useState('');
   useEffect(() => { setTracks(loadLocalTracks()); setLastId(loadLastPlayed()); }, []);
   // 时长是播起来之后才知道的,由引擎写回 localStorage。不听这个事件的话,
   // 列表上那一栏会永远停在「--:--」—— 数据早就有了,只是这份快照不知道。
@@ -235,6 +249,51 @@ export default function MusicPanel() {
   }, [neteaseQ, dict]);
 
   /**
+   * 问一首网易的歌现在能不能放。**只回答,不播** ——
+   * 这样同一个判断既能给用户手点用,也能给引擎自动往下找用,不写两份。
+   */
+  const probeRemote = useCallback(async (id: string): Promise<ProbeOutcome> => {
+    try {
+      const res = await fetch(`/api/portal/music/netease/song-url?id=${encodeURIComponent(id)}`, { cache: 'no-store' });
+      const j = await res.json().catch(() => ({})) as { ok?: boolean; url?: string; reason?: string };
+      if (res.ok && j.ok && j.url) return { kind: 'ok', url: j.url };
+      if (j.reason === 'blocked') return { kind: 'blocked' };
+      if (res.ok && j.reason === 'restricted') return { kind: 'restricted' };
+      return { kind: 'failed' };
+    } catch {
+      return { kind: 'failed' };
+    }
+  }, []);
+
+  /**
+   * 自动往下找停在哪儿了。**必须说出来** —— 一首放完什么都不发生,
+   * 用户只会觉得「播放器又坏了」,而这四种停法各有各的下一步。
+   */
+  const onQueueStop = useCallback((r: { stop: string; skipped: number }) => {
+    setQueueMsg(autoAdvanceMessage(
+      { index: r.stop === 'played' ? 0 : -1, url: '', skipped: r.skipped, stop: r.stop as never },
+      dict === 'en' ? 'en' : 'zh',
+    ));
+  }, [dict]);
+
+  /**
+   * 搜索结果就是一条队列。**这是「自动播放下一个」的接线**:
+   * 在这之前一首放完就停住了(引擎里写着「远端没有队列概念」),
+   * 于是用户说的「我要一个个点」。
+   */
+  useEffect(() => {
+    if (!neteaseHits.length) return;
+    setEntryQueue(
+      neteaseHits.map((h) => ({
+        ref: trackRef('netease', h.id), source: 'netease' as const, id: h.id,
+        title: h.title, artist: h.artist, durationSec: h.durationSec,
+      })) satisfies QueueEntry[],
+      probeRemote,
+      onQueueStop,
+    );
+  }, [neteaseHits, probeRemote, onQueueStop]);
+
+  /**
    * 点一首网易的歌。**这一步才知道它能不能放** —— 源级别只能说「多数能放」。
    *
    * 四种结局必须说四种话,因为**下一步动作各不相同**:
@@ -245,6 +304,8 @@ export default function MusicPanel() {
    * 混着说 = 让人对着一堵墙一直撞。
    */
   const onPlayNetease = useCallback(async (h: NeteaseHit) => {
+    cancelAutoAdvance();      // 用户明确点了这一首:作废掉正在跑的自动往下找
+    setQueueMsg('');
     setNeteaseTrying(h.id);
     setNeteaseTrackMsg(null);
     try {
@@ -284,8 +345,31 @@ export default function MusicPanel() {
     }
   }, [dict]);
 
+  /**
+   * 自动往下找换了一首之后,把「正在放的远端曲目」跟上。
+   *
+   * 不跟的话,播放条和全屏播放器会停在**上一首**的名字上,而声音已经是下一首了 ——
+   * 这一屏上两个说法打架,用户只会得出「这播放器是乱的」。
+   */
+  useEffect(() => {
+    const id = player.state.currentId;
+    if (!id || nowRemote?.id === id) return;
+    const hit = neteaseHits.find((h) => h.id === id);
+    if (hit) setNowRemote(hit);
+  }, [player.state.currentId, neteaseHits, nowRemote?.id]);
+
   const current = tracks.find((t) => t.id === player.state.currentId) || null;
   const resumeTrack = !current && lastId ? tracks.find((t) => t.id === lastId) || null : null;
+
+  /**
+   * 正在放的那一首,统一成一个形状 —— 本地和远端在全屏播放器里没有区别,
+   * 它要的只是「叫什么、谁唱的、多长、去哪儿要歌词」。
+   */
+  const now: NowPlaying | null = current
+    ? { source: 'local', id: current.id, title: current.title, artist: current.artist, durationSec: current.durationSec }
+    : (nowRemote && nowRemote.id === player.state.currentId)
+      ? { source: 'netease', id: nowRemote.id, title: nowRemote.title, artist: nowRemote.artist, durationSec: nowRemote.durationSec }
+      : null;
 
   return (
     <div className="nesio-music">
@@ -314,6 +398,32 @@ export default function MusicPanel() {
       </div>
 
       {/* 换源前的那句话。跨播放模型才出现 —— 同模型之间不打扰。 */}
+      {/* 曲库 / 歌单 两个子 tab。歌单**跨源** —— 一个歌单里本地和网易的歌混着是常态,
+          所以它不跟着上面那排音源走。 */}
+      <div className="nesio-music-tabs" role="tablist">
+        <button
+          type="button" role="tab" aria-selected={tab === 'library'}
+          className={`nesio-music-tab${tab === 'library' ? ' is-on' : ''}`}
+          onClick={() => setTab('library')}
+        >{L(dict, '曲库', 'Library')}</button>
+        <button
+          type="button" role="tab" aria-selected={tab === 'playlists'}
+          className={`nesio-music-tab${tab === 'playlists' ? ' is-on' : ''}`}
+          onClick={() => setTab('playlists')}
+        >{L(dict, '歌单', 'Playlists')}</button>
+      </div>
+
+      {tab === 'playlists' && (
+        <PlaylistsTab probeRemote={probeRemote} onQueueStop={onQueueStop} currentId={player.state.currentId} />
+      )}
+
+      {queueMsg && (
+        <div className="nesio-music-err">
+          <span>{queueMsg}</span>
+          <button type="button" onClick={() => setQueueMsg('')}>{L(dict, '知道了', 'OK')}</button>
+        </div>
+      )}
+
       {pendingSwitch && (
         <div className="nesio-music-notice">
           <p>{pendingSwitch.notice}</p>
@@ -370,7 +480,7 @@ export default function MusicPanel() {
       )}
 
       {/* ── 本地歌曲 ─────────────────────────────────────────────── */}
-      {source === 'local' && (
+      {tab === 'library' && source === 'local' && (
         <section className="nesio-music-sec">
           <div className="nesio-music-libhead">
             <span>{head.count
@@ -426,6 +536,16 @@ export default function MusicPanel() {
                     {[t.artist, prettyDuration(t.durationSec)].filter(Boolean).join(' · ')}
                   </span>
                 </button>
+                {/* 「加歌单」(用户:「每一个可以的歌曲要有按钮可以加歌单」)。
+                    本地曲目也能进歌单 —— 歌单是跨源的。 */}
+                <button
+                  type="button"
+                  className="nesio-music-add"
+                  aria-label={L(dict, `把「${t.title}」加到歌单`, `Add “${t.title}” to a playlist`)}
+                  onClick={() => setAdding({
+                    ref: trackRef('local', t.id), title: t.title, artist: t.artist, durationSec: t.durationSec,
+                  })}
+                >＋</button>
                 <button
                   type="button"
                   className="nesio-music-del"
@@ -448,6 +568,14 @@ export default function MusicPanel() {
                 <span>{current?.artist || ''}</span>
               </div>
               <div className="nesio-music-bar-acts">
+                {/* 展开成全屏(大封面 + 歌词)。这条窄播放条在列表页是对的 ——
+                    边看列表边控制;要看歌词的人从这里进去。 */}
+                <button
+                  type="button"
+                  className="nesio-music-expand"
+                  onClick={() => setFullscreen(true)}
+                  aria-label={L(dict, '全屏播放', 'Full screen player')}
+                >⌃</button>
                 <button type="button" onClick={player.prev} aria-label={L(dict, '上一首', 'Previous')}>‹‹</button>
                 <button type="button" onClick={() => { void player.toggle(); }}>
                   {player.state.playing ? L(dict, '暂停', 'Pause') : L(dict, '播放', 'Play')}
@@ -510,7 +638,7 @@ export default function MusicPanel() {
       )}
 
       {/* ── Apple Music ─────────────────────────────────────────── */}
-      {source === 'apple' && (
+      {tab === 'library' && source === 'apple' && (
         <section className="nesio-music-sec">
           <p className="nesio-music-model">
             {L(dict,
@@ -540,7 +668,7 @@ export default function MusicPanel() {
       )}
 
       {/* ── Spotify ─────────────────────────────────────────────── */}
-      {source === 'spotify' && (
+      {tab === 'library' && source === 'spotify' && (
         <section className="nesio-music-sec">
           <p className="nesio-music-model">
             {L(dict,
@@ -585,7 +713,7 @@ export default function MusicPanel() {
       )}
 
       {/* ── 网易云:能搜,多数能放,受限那部分点下去才知道 ─────────── */}
-      {source === 'netease' && (
+      {tab === 'library' && source === 'netease' && (
         <section className="nesio-music-sec">
           {/* 这一段自己说 —— 顶上那句 blocked 对没就绪的远端源是让位的(见上面的条件),
               这里不说就是整屏一句解释都没有。
@@ -635,6 +763,14 @@ export default function MusicPanel() {
                       : [h.artist, h.album, prettyDuration(h.durationSec)].filter(Boolean).join(' · ')}
                   </span>
                 </button>
+                <button
+                  type="button"
+                  className="nesio-music-add"
+                  aria-label={L(dict, `把「${h.title}」加到歌单`, `Add “${h.title}” to a playlist`)}
+                  onClick={() => setAdding({
+                    ref: trackRef('netease', h.id), title: h.title, artist: h.artist, durationSec: h.durationSec,
+                  })}
+                >＋</button>
                 {neteaseTrackMsg?.id === h.id && (
                   <div className="nesio-music-err">
                     <span>{neteaseTrackMsg.text}</span>
@@ -667,10 +803,20 @@ export default function MusicPanel() {
                 <span>{nowRemote.artist}</span>
               </div>
               <div className="nesio-music-bar-acts">
+                <button
+                  type="button"
+                  className="nesio-music-expand"
+                  onClick={() => setFullscreen(true)}
+                  aria-label={L(dict, '全屏播放', 'Full screen player')}
+                >⌃</button>
+                <button type="button" onClick={player.prev} aria-label={L(dict, '上一首', 'Previous')}>‹‹</button>
                 <button type="button" onClick={() => { void player.toggle(); }}>
                   {player.state.playing ? L(dict, '暂停', 'Pause') : L(dict, '播放', 'Play')}
                 </button>
-                <button type="button" onClick={() => { player.stop(); setNowRemote(null); }}>{L(dict, '停止', 'Stop')}</button>
+                {/* 「下一首」在这里是**新的**:在这之前远端一首放完就停住,
+                    这个键也没有意义。现在它走的是搜索结果那条队列。 */}
+                <button type="button" onClick={player.next} aria-label={L(dict, '下一首', 'Next')}>››</button>
+                <button type="button" onClick={() => { cancelAutoAdvance(); player.stop(); setNowRemote(null); }}>{L(dict, '停止', 'Stop')}</button>
               </div>
               <div className="nesio-music-bar-time">
                 {clockTime(player.state.positionSec)} / {prettyDuration(player.state.durationSec)}
@@ -690,6 +836,25 @@ export default function MusicPanel() {
           )}
         </section>
       )}
+
+      {/* 全屏播放器(用户:「播放全屏,歌词。都没有」)。**默认不开** ——
+          点一首歌不该抢走整屏;要看歌词的人自己点开。 */}
+      {fullscreen && now && (
+        <FullScreenPlayer
+          now={now}
+          state={player.state}
+          repeat={prefs.repeat}
+          shuffle={prefs.shuffle}
+          onRepeat={(v) => setPref({ repeat: v })}
+          onShuffle={(v) => setPref({ shuffle: v })}
+          onClose={() => setFullscreen(false)}
+          onAddToPlaylist={(n) => setAdding({
+            ref: trackRef(n.source, n.id), title: n.title, artist: n.artist, durationSec: n.durationSec,
+          })}
+        />
+      )}
+
+      {adding && <AddToPlaylistSheet entry={adding} onClose={() => setAdding(null)} />}
 
       {/* 音频元素**不在这里** —— 它挂在 document.body 上、由 player-engine 独占。
           放在组件里的话,切走这一页音乐就断了,悬浮球也就没有存在的意义了。 */}
