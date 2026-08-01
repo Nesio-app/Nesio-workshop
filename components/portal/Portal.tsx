@@ -87,7 +87,7 @@ import {
 import { loadProfileSettings, portalLocaleToDictionaryLocale, PROFILE_UPDATED_EVENT, type PortalLocale } from '@/lib/portal/profile';
 import { L } from '@/lib/portal/i18n';
 import { usePortalLocale } from './use-portal-locale';
-import { runConnectors } from '@/lib/platform/runtime/integration-runtime';
+import { runConnectors, refreshWeather } from '@/lib/platform/runtime/integration-runtime';
 import { pruneDisposableSignals } from '@/lib/life-domain';
 import { hydrateSignalFactStore } from '@/lib/life-domain/signal-read-cache';
 import { readSession } from '@/lib/portal/session-state';
@@ -872,6 +872,22 @@ export default function Portal() {
     }
     runConnectors().catch(() => undefined);
   }, [authReady, canUsePrivateRuntime, authDefinitelyAnonymous]);
+
+  // 天气按小时更新(2026-08-01 用户点名):runConnectors 只在挂载时拉一次,天气缓存
+  // TTL 5 分钟(prefetch-cache.ts)但从没人隔一小时再喊它——一天里天气就再也不会变了。
+  // 定时 + 回前台各触发一次 refreshWeather();缓存过期(>5min)才会真的重新请求接口,
+  // 短时间内来回切前后台不会重复打 API。
+  useEffect(() => {
+    if (!authReady || !canUsePrivateRuntime) return;
+    const tick = () => { void refreshWeather(); };
+    const timer = setInterval(tick, 60 * 60_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') tick(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [authReady, canUsePrivateRuntime]);
 
   useEffect(() => {
     const syncLocale = () => setLocale(loadProfileSettings().locale);

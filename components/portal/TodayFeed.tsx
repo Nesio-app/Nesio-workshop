@@ -56,6 +56,7 @@ import { TodayFocusSection } from './today/FocusSection';
 import { useTodayData } from './today/useTodayData';
 import { FocusModeSheet } from './today/FocusModeSheet';
 import { MeetingRecorderSheet } from './today/MeetingRecorderSheet';
+import { WeatherChip, WeatherAlertBanner } from './today/WeatherChip';
 
 const MemoryNodeDetailLazy = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 const FamilyTodayStrip = dynamic(() => import('./today/FamilyTodayStrip'), { ssr: false });
@@ -523,6 +524,8 @@ export default function TodayFeed({
           <NesioMark className="nesio-today-brand-icon" />
         </button>
         <div className="nesio-today-header-tools">
+          {/* 天气符号(2026-08-01 用户点名):按小时更新见 Portal.tsx,这里只画。 */}
+          <WeatherChip />
           {/* App 级积分徽章 → 奖品商城(积分来自忍住没买 / 跟练 / 深度疗愈);点开经 Portal 的 nesio-open-rewards 门 */}
           <button type="button" className="nesio-today-points" onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-rewards'))}
             aria-label={L(uiLocale, `${points} 积分 · 打开奖品商城`, `${points} points · open rewards`)}>
@@ -544,6 +547,9 @@ export default function TodayFeed({
             级联落到 Hiragino Mincho/系统衬线,渲出来偏粗且带繁体字形,和下面时间线两种字。
             改回设计系统正文 sans(--font-sans,Noto Sans SC 简体优先)+ 常规字重。 */}
         <p className="nesio-today-receipt">{receiptLine}</p>
+
+        {/* 极端天气预警(NWS 实时预警);没有就不占地方 */}
+        <WeatherAlertBanner />
 
         {/* 云端往本机填过数据时的一次性回执(QA:积分 0→150 像被人乱改)。读一次即清。 */}
         {restoreNote && (

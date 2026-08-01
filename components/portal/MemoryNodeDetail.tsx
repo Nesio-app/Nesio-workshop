@@ -1031,6 +1031,9 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
         <div className="nesio-type-header-strip" style={{ ['--type-strip-bg' as string]: typeBg }}>
           <span className="nesio-type-header-icon"><NodeTypeIcon type={n.type} size={15} /></span>
           <span className="nesio-type-header-label">{(dict === 'en' ? TYPE_LABELS_EN : TYPE_LABELS_ZH)[n.type] || n.type}</span>
+          {/* 2026-08-01 用户点名(图一红圈):来源徽章放到这一行右上角 —— 下面
+              nesio-node-source-row 那行文字保留(时间/详情),这里只给一眼可辨的图标。 */}
+          <span className="nesio-type-header-source" aria-hidden>{SRC.icon}</span>
         </div>
 
         <div className="nesio-settings-sheet-header">

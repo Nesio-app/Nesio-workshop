@@ -8418,6 +8418,13 @@ html[data-portal-theme="night"] .nesio-node-attr-val { color: #e8eefa; }
   margin: 0 -0.1rem;
   background: var(--type-strip-bg, var(--chip-fog));
 }
+/* 来源徽章(2026-08-01 用户点名,图一红圈)——推到这一行最右边,类型图标/文字仍在左边。 */
+.nesio-type-header-source {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  opacity: 0.7;
+}
 /* 夜间:pastel 调暗成同色系轻染,不再是一条白带(浅字 #c7d4f5 在其上可读)。 */
 html[data-portal-theme="night"] .nesio-type-header-strip {
   background: color-mix(in srgb, var(--type-strip-bg, var(--chip-fog)) 20%, transparent);
@@ -10563,6 +10570,40 @@ html[data-portal-theme="night"] .nesio-connector-token-box {
 }
 .nesio-today-points:active { transform: scale(0.96); }
 .nesio-today-points:focus-visible { outline: 2px solid var(--portal-accent); outline-offset: 2px; }
+
+/* 天气符号(顶栏,2026-08-01) —— 跟积分徽章同一套 pill 语言,信息展示不是按钮 */
+.nesio-today-weather {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  height: 1.9rem;
+  font-family: inherit;
+  font-size: 0.78rem;
+  line-height: 1;
+  font-weight: var(--weight-medium, 500);
+  font-variant-numeric: tabular-nums;
+  color: var(--portal-muted);
+  background: var(--portal-bg);
+  border: 1px solid var(--portal-line);
+  border-radius: 999px;
+  padding: 0 0.55rem;
+}
+html[data-portal-theme="night"] .nesio-today-weather {
+  background: var(--portal-blue-light, #2c4a78);
+  color: #dce8fa;
+  border: 1px solid var(--portal-line);
+}
+
+/* 极端天气预警条 —— 真实安全风险,CLAUDE.md 允许用 status-risk(不是制造焦虑) */
+.nesio-today-weather-alert {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--status-risk);
+  background: var(--status-risk-soft);
+  border-radius: var(--radius-sm);
+}
 
 
 html[data-portal-theme="night"] .nesio-today-avatar {

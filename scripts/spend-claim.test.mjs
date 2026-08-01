@@ -183,8 +183,8 @@ check('②g 记忆库默认列表把交易收进可展开分组,但**搜索时�
   assert.ok(/isTxShadow/.test(m), '记忆库没识别交易节点');
   assert.ok(/!showTx\) result = result\.filter\(\(n\) => !isTxShadow\(n\)\)/.test(m),
     '默认列表没把交易收起来 —— 几千条会把手记/照片/心情挤没');
-  assert.ok(/!isSearching && !typeFilter && txCount > 0/.test(m),
-    '搜索或按类型筛选时还显示折叠条 —— 那时候你就是在找它,不该再折');
+  assert.ok(/!isSearching && !hasActiveFilter && txCount > 0/.test(m),
+    '搜索或按筛选(类型/来源/自定义标签)时还显示折叠条 —— 那时候你就是在找它,不该再折');
   // 折叠只影响**浏览**列表;搜索走的是 results 的另一条分支,不许被过滤
   const at = m.indexOf('const results = query.trim()');
   const line = m.slice(at, m.indexOf(';', at + 30));
