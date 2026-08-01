@@ -86,7 +86,7 @@ export default function PlansPanel() {
             <PlanRow
               kind="week" report={weekPlan} dict={dict} onOpen={setOpen}
               pendingLabel={L(dict, '这周还没转一圈生成 —— 回今天页看看就会出来。', "Hasn't generated yet — open Today once and it will.")}
-              dueLabel={L(dict, '周一 8:00 出 —— 到点后这一周不再变。', 'Ready Monday 8:00 — then it stays put for the week.')}
+              dueLabel={L(dict, '周日下午 4 点出 —— 到点后这一周不再变。', 'Ready Sunday 4pm — then it stays put for the week.')}
             />
           </li>
         </ul>
@@ -98,7 +98,7 @@ export default function PlansPanel() {
             <PlanRow
               kind="month" report={monthPlan} dict={dict} onOpen={setOpen}
               pendingLabel={L(dict, '这个月还没转一圈生成 —— 回今天页看看就会出来。', "Hasn't generated yet — open Today once and it will.")}
-              dueLabel={L(dict, '每月 1 日 8:00 出 —— 到点后这个月不再变。', 'Ready the 1st at 8:00 — then it stays put for the month.')}
+              dueLabel={L(dict, '月末最后一天下午 4 点出 —— 到点后这个月不再变。', 'Ready 4pm on the last day of the month — then it stays put for the month.')}
             />
           </li>
         </ul>

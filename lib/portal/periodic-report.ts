@@ -10,13 +10,14 @@
  *     (loose-threads)。不猜、不编——只列**已经确定**会落在这个窗口的事,
  *     和日报「往前看」段同一条红线。
  *
- * 生成时机同日报:每次回前台检查一次,过了这一期的锚点(周一 8 点 / 每月 1 日
- * 8 点)且这一期还没生成过 → 生成并冻结落库,同一期内不再变。
+ * 生成时机同日报:每次回前台检查一次,过了这一期的锚点(2026-08-01 用户拍板
+ * 改期:周日 16 点 / 每月最后一天 16 点——期末下午,不再是期初早上)且这一期
+ * 还没生成过 → 生成并冻结落库,同一期内不再变。
  *
  * 「回顾」和「计划」虽然锚点相同,但**窗口方向相反**:
- *   · 周一 8 点到的是「上一周(刚结束的周一到周日)」的回顾,和「这一周(今天到
+ *   · 周日 16 点到的是「这一周(周一到今天)」的回顾,和「下一周(下周一到
  *     周日)」的计划——两份内容不一样,periodKey 也不一样。
- *   · 月度同理:月初到的是上个月的回顾 + 这个月的计划。
+ *   · 月度同理:月末到的是这个月的回顾 + 下个月的计划。
  *
  * 存储:落成记忆节点(kind: 'periodic-report'),period ('week'|'month') +
  * direction('retrospect'|'plan') + periodKey 幂等,和日报同一套写法
@@ -61,14 +62,28 @@ function mondayOf(d: Date): Date {
   return r;
 }
 
-/** 锚点:本周一 08:00(周)/ 本月 1 日 08:00(月)。到点才生成,和日报同一口径。 */
+/** 这一周的周日 00:00(本地)——周报锚点日。 */
+function sundayOf(d: Date): Date {
+  const r = mondayOf(d);
+  r.setDate(r.getDate() + 6);
+  return r;
+}
+
+/** 这一月的最后一天 00:00(本地)——月报锚点日。 */
+function lastDayOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth() + 1, 0);
+}
+
+/**
+ * 锚点:本周日 16:00(周)/ 本月最后一天 16:00(月)——2026-08-01 用户拍板改期
+ * (原先是周一 8 点 / 每月 1 日 8 点,即**下一期开始时**才回头生成上一期;
+ * 现在改成**这一期快结束时**(最后一天下午)就地生成,回顾看的是刚过完的
+ * 这一期,不用等到下一期才追认)。和日报一样,每次回前台检查一次,过了锚点
+ * 且这一期还没生成过 → 生成并冻结落库,同一期内不再变。
+ */
 export function periodAnchor(kind: PeriodKind, now: Date): Date {
-  if (kind === 'week') {
-    const a = mondayOf(now);
-    a.setHours(8, 0, 0, 0);
-    return a;
-  }
-  const a = new Date(now.getFullYear(), now.getMonth(), 1, 8, 0, 0, 0);
+  const a = kind === 'week' ? sundayOf(now) : lastDayOfMonth(now);
+  a.setHours(16, 0, 0, 0);
   return a;
 }
 
@@ -76,27 +91,26 @@ export function periodDue(kind: PeriodKind, now: Date): boolean {
   return now.getTime() >= periodAnchor(kind, now).getTime();
 }
 
-/** [起, 止) 窗口。回顾看**上一期**,计划看**这一期**。 */
+/**
+ * [起, 止) 窗口。锚点落在期末,所以回顾看的是**这一期(刚过完/正在收尾的)**,
+ * 计划看的是**下一期**——和旧的「锚点在期初,回顾看上一期」正好错开一期,
+ * 但两个方向的窗口本身没变(依然是完整的一周/一月)。
+ */
 function windowOf(kind: PeriodKind, direction: PeriodDirection, now: Date): { start: Date; end: Date } {
-  const anchor = periodAnchor(kind, now);
   if (kind === 'week') {
-    const start = new Date(anchor); start.setHours(0, 0, 0, 0);
-    if (direction === 'retrospect') start.setDate(start.getDate() - 7);
+    const start = mondayOf(now);
+    if (direction === 'plan') start.setDate(start.getDate() + 7);
     const end = new Date(start); end.setDate(end.getDate() + 7);
     return { start, end };
   }
-  const y = anchor.getFullYear(), m = anchor.getMonth();
-  if (direction === 'retrospect') {
-    const start = new Date(y, m - 1, 1);
-    const end = new Date(y, m, 1);
-    return { start, end };
-  }
+  const y = now.getFullYear();
+  const m = now.getMonth() + (direction === 'plan' ? 1 : 0);
   const start = new Date(y, m, 1);
   const end = new Date(y, m + 1, 1);
   return { start, end };
 }
 
-/** 这一份该落哪个 periodKey——回顾用窗口起点(上一期),计划用窗口起点(这一期)。两者天然一致。 */
+/** 这一份该落哪个 periodKey——回顾用窗口起点(这一期),计划用窗口起点(下一期)。两者天然一致。 */
 function externalIdOf(kind: PeriodKind, direction: PeriodDirection, now: Date): string {
   const { start } = windowOf(kind, direction, now);
   return `periodic-report-${kind}-${direction}-${periodKeyOf(kind, start)}`;
