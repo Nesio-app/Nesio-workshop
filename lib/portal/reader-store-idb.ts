@@ -8,21 +8,13 @@
 
 import type { ReaderBook } from './adhd-reader';
 import { logDropped, reportStorageDropped } from './storage-health';
+import { openSimpleDb } from '@/lib/idb/open-simple-db';
 
 const DB_NAME = 'nesio-reader';
 const STORE = 'books';
 
 function openDB(): Promise<IDBDatabase | null> {
-  return new Promise((resolve) => {
-    if (typeof indexedDB === 'undefined') { resolve(null); return; }
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE, { keyPath: 'id' });
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => resolve(null);
-  });
+  return openSimpleDb(DB_NAME, 1, [{ name: STORE, keyPath: 'id' }]);
 }
 
 export async function saveReaderBook(book: ReaderBook): Promise<void> {

@@ -56,6 +56,7 @@ import { TodayFocusSection } from './today/FocusSection';
 import { useTodayData } from './today/useTodayData';
 import { FocusModeSheet } from './today/FocusModeSheet';
 import { MeetingRecorderSheet } from './today/MeetingRecorderSheet';
+import { WeatherChip, WeatherAlertBanner } from './today/WeatherChip';
 
 const MemoryNodeDetailLazy = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 const FamilyTodayStrip = dynamic(() => import('./today/FamilyTodayStrip'), { ssr: false });
@@ -135,15 +136,67 @@ export default function TodayFeed({
    * 再去问一下这是什么。所以识别失败不影响已经存好的那条记忆 ——
    * 认出来了就改个看得懂的名字,认不出来就保持文件名原样,不打扰。
    *
-   * 免费用户不发这一趟(云识图是付费档);先缩再发,不然原图直接 413(见 image-payload.ts)。
+   * ## 先在这台设备上认一遍字(2026-07-31)
+   *
+   * 这里原来第一句是 `if (!canUsePaidCloudAi()) return` —— 于是 workshop 里
+   * 「加号加的图一张都不认」,因为这个仓**不分收费免费**,那道门等于把识别整个关掉了。
+   * 门去掉了(产品仓 nesio 保留,搬过去时要加回来)。
+   *
+   * 但光去掉门只是「都去打云」。真正该改的是**顺序**:先端上认字 ——
+   * 免费、离线、图一个字节不出手机。小票/订单/化验单上写的**就是**那些字,
+   * 认出来了就直接用,不必发出去让大模型再读一遍。
+   * 只有「这是什么东西」(一件深蓝大衣、桌上那支笔)才非云不可 —— 衣服上没写着自己是什么。
+   *
+   * 认出来的原文一律进 rawInput:本地检索扫的就是那儿。
+   * 「图存下来了、上面印的单号日期店名一个字都搜不到」是这轮要修的老毛病。
+   *
+   * 一次传多张时:**每一张都在端上认**(不花钱、不出门,没有只认第一张的理由),
+   * 认出的字并起来进同一条记忆。云只发第一张 —— 那趟要钱,而且这几张本来就是一条记忆。
    */
-  const recognizeSavedImage = useCallback(async (file: File, nodeId: string, only: boolean) => {
+  const recognizeSavedImage = useCallback(async (files: File[], nodeId: string) => {
+    const file = files[0];
+    if (!file) return;
+    const only = files.length === 1;
     try {
+      const { understandImage, tagsFromText } = await import('@/lib/portal/image-understand');
+      const { updateLifeNode: updateNode } = await import('@/lib/portal/life-graph');
+      const all = [];
+      for (const f of files) all.push(await understandImage(f));
+      // 字段以第一张认出来的为准(多张小票是另一回事,这里不猜);正文把每张的字都并进来。
+      const seen = { ...all[0], text: all.map((s) => s.text).filter(Boolean).join('\n\n') };
+
+      // 端上认出字了 —— 先把它落进去。这一步不管后面云跑不跑,都算数。
+      if (seen.text.trim()) {
+        updateNode(nodeId, {
+          rawInput: seen.text.slice(0, 5000),
+          tags: ['照片', ...tagsFromText(seen.text, 5)].slice(0, 6),
+        });
+        window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+      }
+
+      // 是单据、金额也真抽到了 → 这张图不用出门。名字用商家,金额日期入 attributes。
+      // 多张时只有第一张的商家名靠谱,别的照片跟着改名是错的(见下方云路径同款 only 判断)。
+      if (!seen.needsCloud && seen.fields) {
+        const f = seen.fields;
+        updateNode(nodeId, {
+          ...(only ? { name: (f.merchant || '').trim() || L(uiLocale, '小票', 'Receipt') } : {}),
+          attributes: {
+            price: f.amount,
+            ...(f.date ? { receiptDate: f.date } : {}),
+            ...(f.merchant ? { store: f.merchant } : {}),
+            ocrSource: 'on-device',
+          },
+        });
+        window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+        setQuickSaved({ tone: 'done', text: L(uiLocale, `已存入 · 在这台设备上读出了金额 ${f.amount}`, `Saved · read ${f.amount} on this device`) });
+        setTimeout(() => setQuickSaved(null), 4000);
+        return;
+      }
+
+      // 端上没能确定性地读出单据字段 → 剩下的只能靠云看图猜「这是什么」,
+      // 而云识图是付费能力(免费机直接静默 return 会让人以为识别根本没跑过)。
       const { canUsePaidCloudAi } = await import('@/lib/portal/entitlement');
       if (!canUsePaidCloudAi()) {
-        // 原来这里是**静默** return —— 于是用户看到的是「照片直接存成附件、
-        // 没有任何识别过程」,而他无从知道识别根本没发生过、更不知道为什么。
-        // 不弹升级框(那是打扰),但要把这件事说出来。
         setQuickSaved({ tone: 'note', text: L(uiLocale, '已存入 · 智能识别是 Pro 的能力', 'Saved · smart recognition is a Pro feature') });
         setTimeout(() => setQuickSaved(null), 4000);
         return;
@@ -163,12 +216,13 @@ export default function TodayFeed({
       const data = await res.json() as { ok?: boolean; nodes?: Array<{ name?: string; tags?: string[] }> };
       const first = data.nodes?.[0];
       if (!data.ok || !first?.name) { miss(); return; }
-      const { updateLifeNode } = await import('@/lib/portal/life-graph');
+      // 云给的标签**和**端上认出的字合并 —— 云答的是「这是什么」,端上答的是「上面写着什么」,
+      // 两边不是一回事。只留云的会把图上印的店名单号又弄丢。
       // 只认了**第一张**,所以只有单张时才敢改名 —— 多张时把「3 张照片」改成第一张的
       // 内容是明确的错:另外两张跟这个名字没关系。标签照打(它是补充,不是替换)。
-      updateLifeNode(nodeId, {
+      updateNode(nodeId, {
         ...(only ? { name: first.name } : {}),
-        tags: ['照片', ...(first.tags || [])].slice(0, 6),
+        tags: Array.from(new Set(['照片', ...(first.tags || []), ...tagsFromText(seen.text, 3)])).slice(0, 6),
       });
       window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
       setQuickSaved({
@@ -225,7 +279,7 @@ export default function TodayFeed({
         // 2026-07-29「提高智能」:存进去只是第一步 —— 顺手认一下这是什么,
         // 把文件名(IMG_9740 这种)换成看得懂的名字,并打上识别到的标签。
         // 存已经成功了,识别是加分项:认不出来就保持原样,**绝不因此报错**。
-        void recognizeSavedImage(imgs[0], node.id, imgs.length === 1);
+        void recognizeSavedImage(imgs, node.id);
       }
     }
 
@@ -271,7 +325,23 @@ export default function TodayFeed({
   // SpeechRecognition 本来就不存在,于是点话筒**每次**都是弹出那张 sheet,正是标注要去掉的。
   // 现在一律不再开 sheet:说清楚这台设备听不了,并把光标放进输入框让人直接打字。
   const [micState, setMicState] = useState<'idle' | 'recording'>('idle');
-  const [micErr, setMicErr] = useState('');
+  /**
+   * 这台设备有没有语音识别引擎。**决定话筒按钮摆不摆**(2026-07-31)。
+   *
+   * 之前的做法是照摆按钮,点了再挂一条「语音输入没起来 —— 再点一次,或者直接打字」。
+   * 可 iOS PWA 上 SpeechRecognition 根本不存在,所以那条提示**每次都出现**:
+   * 一个永远不可能成功的按钮,配一条永远要点掉的横幅。用户标注要去掉的就是它。
+   *
+   * 正解是从源头断 —— 听不了就别摆这个话筒。没有按钮就没有失败,
+   * 也就不需要提示。(不是把提示藏起来留着按钮,那才是「点了没反应」。)
+   *
+   * 只在挂载后探一次:SSR 时 window 不存在,直接判 false 会让有引擎的设备也没有话筒。
+   */
+  const [micAvailable, setMicAvailable] = useState(true);
+  useEffect(() => {
+    const w = window as unknown as { SpeechRecognition?: unknown; webkitSpeechRecognition?: unknown };
+    setMicAvailable(Boolean(w.SpeechRecognition || w.webkitSpeechRecognition));
+  }, []);
   const recogRef = useRef<{ stop: () => void } | null>(null);
   const quickInputRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -299,23 +369,23 @@ export default function TodayFeed({
   function startQuickMic() {
     // 批次 37 重做:边说边把文字写进输入框(interim 实时可见),说完文字留在框里
     // 由用户回车确认;识别起不来(iOS PWA 常见)给可见提示 + 落到打字,绝不装死、也不换页。
-    // 红线:每个 async 动作都要有显式失败态 —— 这里的失败态就是 micErr。
-    const cannotListen = (why: string) => {
+    // 红线是「每个 async 动作都要有显式失败态」。这里的失败态**不再是一条横幅** ——
+    // 横幅在这台设备上是每次必现的噪音(见 micAvailable 的说明)。
+    // 现在的可见反馈有两层,都比横幅结实:
+    //   ① 光标立刻跳进输入框 —— 屏幕真的动了,而且动到了你下一步要用的地方;
+    //   ② 引擎本来就没有(或起不来)→ **把话筒收起来**,不再摆一个点不动的按钮。
+    // 「没反应」的定义是屏幕什么都没变;这两条都不是。
+    const cannotListen = () => {
       setMicState('idle');
       recogRef.current = null;
-      setMicErr(why);
-      // 听不了就让人能立刻打字 —— 换页(开 sheet)只会把已经打的半句弄丢
       setTimeout(() => quickInputRef.current?.focus(), 0);
     };
-    const noEngine = () => cannotListen(L(uiLocale,
-      '这台设备的浏览器不支持语音输入 —— 直接打字也一样能记。',
-      "This browser can't do voice input — typing works just as well."));
+    const noEngine = () => { setMicAvailable(false); cannotListen(); };
     type SR = { new (): { lang: string; interimResults: boolean; continuous: boolean; onresult: ((e: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null; onerror: (() => void) | null; start: () => void; stop: () => void } };
     const w = window as unknown as { SpeechRecognition?: SR; webkitSpeechRecognition?: SR };
     const Ctor = w.SpeechRecognition || w.webkitSpeechRecognition;
     if (!Ctor) { noEngine(); return; }
     if (micState === 'recording') { recogRef.current?.stop(); return; }
-    setMicErr('');
     let recog: InstanceType<SR>;
     try { recog = new Ctor(); } catch { noEngine(); return; }
     recog.lang = uiLocale === 'en' ? 'en-US' : 'zh-CN';
@@ -331,13 +401,13 @@ export default function TodayFeed({
       setMicState('idle');
       recogRef.current = null;
       // 一个字都没听到(常见于权限没给/引擎没起来)—— 说出来,不换页
-      if (!got) cannotListen(L(uiLocale, '没听到声音 —— 检查一下麦克风权限,或者直接打字。', "Didn't catch anything — check mic permission, or just type."));
+      if (!got) cannotListen();
     };
-    recog.onerror = () => cannotListen(L(uiLocale, '语音输入没起来 —— 再点一次,或者直接打字。', 'Voice input failed — tap again, or just type.'));
+    recog.onerror = () => cannotListen();
     recogRef.current = recog;
     setMicState('recording');
     try { recog.start(); } catch {
-      cannotListen(L(uiLocale, '语音输入没起来 —— 再点一次,或者直接打字。', 'Voice input failed — tap again, or just type.'));
+      cannotListen();
     }
   }
   // 情绪趋势面板不再挂在这里:入口在健康分析页(MoodTrendCard 自己挂 sheet)。
@@ -492,6 +562,8 @@ export default function TodayFeed({
           <NesioMark className="nesio-today-brand-icon" />
         </button>
         <div className="nesio-today-header-tools">
+          {/* 天气符号(2026-08-01 用户点名):按小时更新见 Portal.tsx,这里只画。 */}
+          <WeatherChip />
           {/* App 级积分徽章 → 奖品商城(积分来自忍住没买 / 跟练 / 深度疗愈);点开经 Portal 的 nesio-open-rewards 门 */}
           <button type="button" className="nesio-today-points" onClick={() => window.dispatchEvent(new CustomEvent('nesio-open-rewards'))}
             aria-label={L(uiLocale, `${points} 积分 · 打开奖品商城`, `${points} points · open rewards`)}>
@@ -513,6 +585,9 @@ export default function TodayFeed({
             级联落到 Hiragino Mincho/系统衬线,渲出来偏粗且带繁体字形,和下面时间线两种字。
             改回设计系统正文 sans(--font-sans,Noto Sans SC 简体优先)+ 常规字重。 */}
         <p className="nesio-today-receipt">{receiptLine}</p>
+
+        {/* 极端天气预警(NWS 实时预警);没有就不占地方 */}
+        <WeatherAlertBanner />
 
         {/* 云端往本机填过数据时的一次性回执(QA:积分 0→150 像被人乱改)。读一次即清。 */}
         {restoreNote && (
@@ -652,8 +727,7 @@ export default function TodayFeed({
           recording={micState === 'recording'}
           inputRef={quickInputRef}
           onFiles={captureFiles}
-          micError={micErr}
-          onDismissMicError={() => setMicErr('')}
+          micAvailable={micAvailable}
           /* ── 三合一的另外两条路(2026-07-31)。都是显式的:点了才走。 ──
              搜索**不新做一套结果界面** —— 记忆页那套是完整的(语义理解 + 筛选 + 详情),
              这里只把词带过去。问念念同理:把已经打好的一句带进 ask,别让人重打一遍。 */
@@ -697,6 +771,26 @@ export default function TodayFeed({
               onUndo: () => { removeReminder(r.id); removeReminderShadow(r.id); setRemindReceipt(null); },
             });
             setTimeout(() => setRemindReceipt((cur) => (cur && cur.text.includes(formatWhen(at)) ? null : cur)), 8000);
+
+            // 存下了才谈得上「到点提醒你」—— 这是**唯一**该弹系统通知权限的时机:
+            // 用户刚亲手设了一条有时间的提醒,弹窗和他正在做的事对得上。
+            // 2026-08-01 合并核对:这条原来长在日程页那张手动填表单的 submit() 里;
+            // 建提醒的路统一收到这条首页输入框之后,那张表单被合并删掉了,弹权限的
+            // 时机也跟着消失 —— 提醒能设上,却从没人被问过要不要开系统通知,
+            // 到点自然不响(用户反馈「设置了提醒,没管用」的根因之一)。
+            void import('@/lib/portal/reminder-notifications')
+              .then((m) => m.syncReminderNotifications({ askPermission: true }))
+              .then((res) => {
+                if (!res.ok && res.reason === 'denied') {
+                  setQuickSaved({
+                    tone: 'note',
+                    text: L(uiLocale, '记下了。系统通知没开,到点不会响 —— 想让它响,去「设置 › 通知」里打开。',
+                      'Saved. Notifications are off, so it won\'t ring — turn them on in Settings › Notifications.'),
+                  });
+                  setTimeout(() => setQuickSaved(null), 6000);
+                }
+              })
+              .catch(() => {});
           }}
           remindReceipt={remindReceipt}
         />
@@ -754,8 +848,11 @@ export default function TodayFeed({
       />
 
       {/* 批次 83:引导卡 → 记忆详情(portal 到 body,避 transform 祖先) */}
+      {/* 2026-08-11 用户实锤「点卡片弹出看不清的重影」:从 ProactiveCardDetail(硬编码
+          elevated,z-940)点「依据」跳出来的这个详情没传 elevated,落在普通层 z-900 ——
+          比来源卡矮一层,被上层遮罩/毛玻璃糊住,看着像重影。见 NesioSheet 的 elevated 注释。 */}
       {guideDetailNode && typeof document !== 'undefined' && createPortal(
-        <MemoryNodeDetailLazy node={guideDetailNode} onClose={() => setGuideDetailNode(null)} />,
+        <MemoryNodeDetailLazy node={guideDetailNode} onClose={() => setGuideDetailNode(null)} elevated />,
         document.body,
       )}
 

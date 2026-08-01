@@ -40,6 +40,10 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
   const [busy, setBusy] = useState(false);
   const [saved, setSaved] = useState(false);
   const pickRef = useRef<HTMLInputElement>(null);
+  /** 端上从附件上认出来的原文 —— 存的时候进 detail,这条记录才搜得到。 */
+  const [scanText, setScanText] = useState('');
+  /** 给用户看的那一句(不是错误 —— 附件已经加好了)。 */
+  const [scanHint, setScanHint] = useState('');
 
   const meta = RECORD_CATEGORY_MAP[category];
 
@@ -65,6 +69,27 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
       added.push({ assetId, name: f.name, mimeType: f.type || 'application/octet-stream', size: f.size });
     }
     if (added.length) setFiles((prev) => [...prev, ...added]);
+
+    // ── 在这台设备上认一遍字 ────────────────────────────────────────────────
+    //
+    // 这个加号以前**只存**:一起吃饭的账单挂上去了,金额还得自己再打一遍,
+    // 上面写的店名日期也搜不到。字就印在图上,认一下就有。
+    //
+    // 认出来的原文进 detail(那是这条记录被搜到的地方),金额只在
+    // 「金额」框还空着时才填 —— 用户打了数就不动他的。
+    const firstImg = picked.find((f) => f.type.startsWith('image/'));
+    if (firstImg) {
+      const { understandImage } = await import('@/lib/portal/image-understand');
+      const seen = await understandImage(firstImg);
+      if (seen.text.trim()) setScanText(seen.text.slice(0, 2000));
+      if (seen.fields) {
+        if (meta.money && !amount.trim()) setAmount(String(seen.fields.amount));
+        setScanHint(L(dict, `票上读到 ${seen.fields.amount}${seen.fields.date ? ` · ${seen.fields.date}` : ''}。`,
+          `Read ${seen.fields.amount}${seen.fields.date ? ` · ${seen.fields.date}` : ''} off the receipt.`));
+      } else if (seen.visionMessage) {
+        setScanHint(seen.visionMessage);
+      }
+    }
     setBusy(false);
   };
 
@@ -75,6 +100,8 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
       personKey, category, title,
       ...(meta.money && amount && !Number.isNaN(Number(amount)) ? { amount: Number(amount) } : {}),
       ...(files.length ? { attachments: files } : {}),
+      // 附件上认出来的字进 detail —— 「图挂上去了但上面写的一个字都搜不到」就是这么修的。
+      ...(scanText ? { detail: scanText } : {}),
     });
     setSaved(true);
     window.setTimeout(onClose, 900);
@@ -152,6 +179,7 @@ export default function HangNoteSheet({ personKey, personName, subtitle, avatarI
             </ul>
           )}
 
+          {scanHint && <p className="nesio-nd-scan-hint">{scanHint}</p>}
           {err && <p className="nesio-rel-detail-err" role="alert">{err}</p>}
 
           <button type="button" className="nesio-ob-primary-btn nesio-hang-primary" disabled={busy || !text.trim()} onClick={save}>

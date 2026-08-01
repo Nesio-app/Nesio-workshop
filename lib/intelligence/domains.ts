@@ -267,7 +267,8 @@ const energyCalendarDomain: DomainEngine = {
 
     return one({
       id: 'dec-energy-calendar-allocation',
-      domain: 'work',
+      domain: 'health', // 卡片内容是健康×日历,原写 'work' 是跟引擎注册名各说各话——只改这一个字段,
+                        // 引擎仍叫 'energy-calendar'(dec-stage3-sandbox 测试钉着这个稳定 id,不能动)
       domainLabel: '精力分配',
       confidence,
       urgency: denseCalendar ? 5 : 4,

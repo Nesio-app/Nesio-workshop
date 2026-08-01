@@ -66,6 +66,16 @@ export const CACHE_KEYS = new Set<string>([
   // 一旦不在册,keyKind() 的默认值是 durable —— 它会立刻开始进备份、上云同步。
   'nesio-routines-v1',
   'nesio-daily-brief-v2',
+  // 提醒 → 系统通知的排程投影(2026-07-31)。判据原句:「换台设备从零开始是否正确?」
+  // —— 正确。iOS 的 pending 通知是**这台设备**的东西,旧手机排过什么和新手机毫无关系;
+  // 真相在 nesio-schedule-reminders-v1 里,新设备回前台自己会重排一遍。
+  'nesio-reminder-notify-state-v1',
+  // HealthKit 自动同步的日期簿记 —— 单设备本地状态,同步过去只会让新设备以为已经拉过。
+  'nesio-healthkit-auto-sync-v1',
+  // 「让 iOS 系统搜索找得到我的记忆」开关(Core Spotlight,2026-07-31)。
+  // 索引在**这台设备**的系统搜索库里,换台手机上面什么都没有 ——
+  // 开关同步过去会造出「显示开着、实际没索引」的假状态。
+  'nesio-spotlight-enabled-v1',
   'nesio-calendar-local-v1',
   'nesio-last-location-v1',
   'nesio-telemetry-device-v1',

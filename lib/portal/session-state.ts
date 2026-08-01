@@ -26,9 +26,34 @@ export type SessionState = 'signed-in' | 'signed-out' | 'unknown';
 export interface SessionInfo {
   state: SessionState;
   email: string;
+  /**
+   * 服务器那一份原样带回来的其余字段。
+   *
+   * 加这个是因为归一没归干净(2026-07-31 复查发现):Portal 自己留了一个
+   * `fetchAuthSessionPayload()`,PortalOnboarding 和 mirror-profile 各留一个 ——
+   * 三处仍在直接打 `/api/auth/session`。理由也算正当:它们要的是
+   * `hasRefreshToken` / `authReady` / `profileBootstrapBlocking` 这些字段,
+   * 而这里只回 state + email,装不下。
+   *
+   * 于是「唯一答案」只统一了一半:三处各发各的请求、各自在不同时刻 setState,
+   * 屏幕上照样能出现互相矛盾的登录态 —— 只是比 bug #21 那次少了几处。
+   *
+   * 修法是把整个 payload 缓存下来,谁要什么字段自己取,但**只有一趟请求**。
+   */
+  payload: SessionPayload | null;
 }
 
-let current: SessionInfo = { state: 'unknown', email: '' };
+/** `/api/auth/session` 的响应形状。字段随服务端加,这里只做已知字段的类型。 */
+export interface SessionPayload {
+  loggedIn?: boolean;
+  user?: { email?: string };
+  hasRefreshToken?: boolean;
+  status?: string;
+  authReady?: boolean;
+  profileBootstrapBlocking?: boolean;
+}
+
+let current: SessionInfo = { state: 'unknown', email: '', payload: null };
 let inFlight: Promise<SessionInfo> | null = null;
 let fetchedAt = 0;
 
@@ -74,11 +99,12 @@ export async function readSession(opts: { force?: boolean; now?: number } = {}):
     try {
       const res = await fetch('/api/auth/session', { cache: 'no-store' });
       if (!res.ok) return current;                       // 非 200 = 问不出来,不是没登录
-      const d = await res.json() as { loggedIn?: boolean; user?: { email?: string } } | null;
+      const d = await res.json() as SessionPayload | null;
       if (!d || typeof d.loggedIn !== 'boolean') return current;   // 答非所问,同样不下结论
       const next: SessionInfo = {
         state: d.loggedIn ? 'signed-in' : 'signed-out',
         email: d.user?.email || '',
+        payload: d,
       };
       fetchedAt = now;
       publish(next);

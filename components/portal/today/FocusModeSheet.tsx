@@ -25,7 +25,7 @@ function recordFocusSession(node: FocusNode, elapsedMin: number, completed: bool
   if (elapsedMin < 1) return; // 秒开秒关不算一次专注
   track('focus_session', { minutes: elapsedMin, completed });
   createSignal({
-    source: 'manual',
+    source: 'Entry',
     type: 'focus.session',
     title: `专注 ${elapsedMin} 分钟 · ${node.name.slice(0, 24)}`,
     payload: { minutes: elapsedMin, completed, nodeId: node.id, nodeName: node.name.slice(0, 60) },

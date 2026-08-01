@@ -47,7 +47,6 @@ const FloatingPlayer = dynamic(() => import('./music/FloatingPlayer'), { ssr: fa
 const CalendarCreateSheet = dynamic(() => import('./CalendarCreateSheet'), { ssr: false });
 const FamilySharingSheet = dynamic(() => import('./family/FamilySharingSheet'), { ssr: false });
 const CookingSheet = dynamic(() => import('./cooking/CookingSheet'), { ssr: false });
-const RewardsStoreSheet = dynamic(() => import('./RewardsStoreSheet'), { ssr: false });
 const DailyBriefSheet = dynamic(() => import('./DailyBriefSheet').then((m) => m.DailyBriefSheet), { ssr: false });
 // 洞察 = 全屏浮层(非 surface):提到 Portal 层,底部导航从任意页都能开。1143 行,开时才加载。
 const InsightsSheet = dynamic(() => import('./InsightsSheet'), { ssr: false });
@@ -87,9 +86,10 @@ import {
 import { loadProfileSettings, portalLocaleToDictionaryLocale, PROFILE_UPDATED_EVENT, type PortalLocale } from '@/lib/portal/profile';
 import { L } from '@/lib/portal/i18n';
 import { usePortalLocale } from './use-portal-locale';
-import { runConnectors } from '@/lib/platform/runtime/integration-runtime';
+import { runConnectors, refreshWeather } from '@/lib/platform/runtime/integration-runtime';
 import { pruneDisposableSignals } from '@/lib/life-domain';
 import { hydrateSignalFactStore } from '@/lib/life-domain/signal-read-cache';
+import { readSession } from '@/lib/portal/session-state';
 import { prunePrivateExternalNodes } from '@/lib/portal/life-graph';
 import { STORAGE_FULL_EVENT, STORAGE_WARNING_EVENT } from '@/lib/portal/storage-health';
 import { recordAppOpen } from '@/lib/portal/feature-usage';
@@ -114,9 +114,58 @@ type AuthSessionPayload = {
   profileBootstrapBlocking?: boolean;
 };
 
-async function fetchAuthSessionPayload(): Promise<AuthSessionPayload | null> {
-  const res = await fetch('/api/auth/session', { cache: 'no-store' });
-  return res.ok ? (res.json() as Promise<AuthSessionPayload>) : null;
+/**
+ * 读登录态。**走 session-state 那个单例,不再自己 fetch。**
+ *
+ * 原来这里是一句裸 `fetch('/api/auth/session')` —— 而 PortalOnboarding 和
+ * mirror-profile 各有一句一模一样的。三趟请求各自在不同时刻回来、各自 setState,
+ * 于是开机头几秒登录态会来回变(你报的那个)。
+ *
+ * bug #21 建 session-state 时统一过一轮,但这三处没并进去,因为它们要的是
+ * `hasRefreshToken` / `authReady` / `profileBootstrapBlocking`,而当时那个单例
+ * 只回 state + email 装不下。现在单例缓存整个 payload,这里取回来就行 ——
+ * **同一时刻只有一趟请求,所有人拿到同一个答案。**
+ */
+/**
+ * @param force `true` = 一定要真的打一次服务器,不吃缓存。
+ *
+ * ⚠️ 两个调用点要的**不是同一件事**,合并时差点合错:
+ *
+ *   · 重同步批次开头那句(`runHeavySyncBatch`)要的是**副作用** ——
+ *     「先单路刷新会话写回 cookie,再开并行云同步」,为的是避免 access 过期窗口里
+ *     多路 `grant_type=refresh_token` 互踢。它必须真的发出去。
+ *     吃了 30 秒缓存的话这句就成了空转,而那条保护**静默失效**,
+ *     症状要到并发同步互踢时才浮出来 —— 极难查。
+ *   · `refreshAuthSession` 要的是**当前状态**,吃缓存正合适(本来就是为了少打几趟)。
+ *
+ * 所以 force 不是可选的调优参数,是区分这两种语义的开关。
+ */
+/**
+ * 七条云同步的任务表。**名字必须稳定** —— 离线队列里只存名字(函数序列化不了),
+ * 重跑时靠它找回该调哪个。改名 = 队列里那条变成认不出来的孤儿。
+ */
+const CLOUD_SYNC_TASKS = [
+  // 记忆图/学习态/profile 逐一 union/LWW 合并回灌(跨端一致)。
+  { name: 'memory', run: () => syncMemoryWithCloud() },
+  { name: 'learning', run: () => syncLearningWithCloud() },
+  { name: 'profile', run: () => syncProfileWithCloud() },
+  // 记录级模块同步(**唯一的通用云同步**):健康/足迹/财务/物品/关系… 每个 durable key 一行。
+  { name: 'modules', run: () => autoSyncModulesWithCloud() },
+  // 邮件全文/导入书籍/地点封面照:各自独立 IDB 的记录级同步,量级大不进模块同步。
+  { name: 'email-bodies', run: () => autoSyncEmailBodiesWithCloud() },
+  { name: 'reader-books', run: () => autoSyncReaderBooksWithCloud() },
+  { name: 'place-images', run: () => autoSyncPlaceImagesWithCloud() },
+  // 外部连接器(日历/邮件/flomo/银行/通讯录)拉新,30 分钟节流,内部保证。
+  { name: 'connectors', run: () => autoSyncConnectorsOnBoot() },
+];
+
+/** 名字 → 怎么跑。给 drainCloudSyncQueue 用(队列里只有名字)。 */
+const CLOUD_SYNC_REGISTRY: Record<string, () => Promise<unknown>> =
+  Object.fromEntries(CLOUD_SYNC_TASKS.map((t) => [t.name, t.run]));
+
+async function fetchAuthSessionPayload(force = false): Promise<AuthSessionPayload | null> {
+  const info = await readSession(force ? { force: true } : {});
+  return (info.payload as AuthSessionPayload | null) ?? null;
 }
 
 function AskGuideSheet({
@@ -375,6 +424,44 @@ export default function Portal() {
     // 月度小结:让「我这个月练了什么」搜得到。只折本机有流水的那些域,
     // 边界写在 monthly-digest.ts 文件尾。
     void import('@/lib/portal/monthly-digest').then((m) => m.refreshMonthlyDigestsOnBoot()).catch(() => {});
+    // 健康:壳里 NesioHealthKit 是真的(从 IPA 核过),但之前**只有连接中心那一个手动按钮**
+    // 在用它 —— 步数睡眠心率要靠你自己想起来去点一下同步。开机静默拉一次(一天一次)。
+    // 静默 = 不弹权限:授权是在连接中心点「同步」时给的,开机路上突然弹 HealthKit 授权页
+    // 和用户正在做的事对不上。没授权的话 fetch 只是拿不到东西,不会打扰。
+    void import('@/lib/portal/native-healthkit').then((m) => m.syncHealthKitQuietly()).catch(() => {});
+  }, []);
+
+  /**
+   * 提醒 → 系统通知(2026-07-31,壳里 NesioLocalNotify 已确认可用)。
+   *
+   * 在这之前,你设的「每月 15 号早上 9 点交房租」到点什么都不会发生 ——
+   * 得自己打开 App 才看得见。能力一直在,只是没接到业务上。
+   *
+   * 三个时机各有各的必要,少一个就有洞:
+   *   · **开机**   —— 上次排的可能已经响完了,或者跨了时区;
+   *   · **回前台** —— 同上,而且这是最高频的一次校准(壳只认相对秒数,必须现算);
+   *   · **提醒变了** —— 新建/改时间/删除/打勾,立刻反映到排程,不用等下次回前台。
+   *
+   * 一律**不弹权限**(askPermission 默认 false):没人按按钮的时候突然弹一个系统弹窗
+   * 是最招人烦的那种。权限在用户真的设了一条提醒时才问(SchedulePanel 那边)。
+   */
+  useEffect(() => {
+    let stop = false;
+    const sync = () => {
+      if (stop) return;
+      void import('@/lib/portal/reminder-notifications')
+        .then((m) => m.syncReminderNotifications())
+        .catch(() => { /* 排不上不影响 App —— 提醒本体在列表里,一条没丢 */ });
+    };
+    sync();
+    const onVisible = () => { if (document.visibilityState === 'visible') sync(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('nesio-schedule-reminders-updated', sync);
+    return () => {
+      stop = true;
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('nesio-schedule-reminders-updated', sync);
+    };
   }, []);
   // 批次 85:懒加载 chunk 跨部署失效的全局兜底(错误页之外的路径,
   // 比如事件回调里的 dynamic import 被拒)—— 同一把 5 分钟防循环锁。
@@ -527,7 +614,6 @@ export default function Portal() {
   const [familyOpen, setFamilyOpen] = useState(false);
   const [cookingOpen, setCookingOpen] = useState(false);
   const [pantryIntake, setPantryIntake] = useState(false);   // 做饭页「拍一拍进货」:复用相机、拍的当食材落库
-  const [rewardsOpen, setRewardsOpen] = useState(false);
   const [workoutSession, setWorkoutSession] = useState<import('./fitness/WorkoutPlayer').PlayerSession | null>(null);
   // 每次「开始跟练」自增,用作 WorkoutPlayer 的 key → 换一个训练(如跑步→力量)必定全新挂载,
   // 绝不复用上一个训练的内部态(idx/phase/repCount)。修「打开力量没反应 / 退出力量却冒出跑步」的换练串台。
@@ -640,20 +726,17 @@ export default function Portal() {
       if (isCloudSyncSuspended()) { return; } // 跟练中:先不同步,退出时(resume)再补
       // 先单路刷新会话写回 cookie,再开并行云同步 —— 避免 access 过期窗口多路 grant_type=refresh_token 互踢。
       void (async () => {
-        await fetchAuthSessionPayload();
+        await fetchAuthSessionPayload(true);   // ← 要副作用(刷 cookie),不能吃缓存
         if (isCloudSyncSuspended()) return;
-        // 记忆图/学习态/profile 逐一 union/LWW 合并回灌(跨端一致)。
-        void syncMemoryWithCloud();
-        void syncLearningWithCloud();
-        void syncProfileWithCloud();
-        // 记录级模块同步(**唯一的通用云同步**):健康/足迹/财务/物品/关系… 每个 durable key 一行同步。
-        void autoSyncModulesWithCloud();
-        // 邮件全文/导入书籍/地点封面照:各自独立 IDB 的记录级同步,量级大不进模块同步。best-effort。
-        void autoSyncEmailBodiesWithCloud();
-        void autoSyncReaderBooksWithCloud();
-        void autoSyncPlaceImagesWithCloud();
-        // 外部连接器(日历/邮件/flomo/银行/通讯录)拉新,30 分钟节流,内部保证。
-        void autoSyncConnectorsOnBoot();
+        // 七条云同步统一走 runCloudSyncBatch:**哪条这次没跑成就记进离线队列**,
+        // 下次开机或 online 事件回来时自动重跑(带退避)。
+        // 之前这里是一排 void —— 断网/超时/5xx 一律无声无息,这一轮就这么丢了。
+        //
+        // ⚠️ 它接住的是**整条任务抛出来的**失败。那些函数内部的
+        // `void pushXxxToCloud()`(即发即忘)在里面就把错吃掉了,这一层看不见 ——
+        // 诚实的说法是「拉取失败会重试,推送失败暂时还不会」。见 cloud-sync-runner 文件头。
+        const { runCloudSyncBatch } = await import('@/lib/portal/cloud-sync-runner');
+        await runCloudSyncBatch(CLOUD_SYNC_TASKS);
       })();
     };
     const scheduleHeavySyncBatch = () => whenIdle(runHeavySyncBatch);
@@ -663,6 +746,18 @@ export default function Portal() {
     // 一次性自愈(2026-07-29):清历史邮件重复节点 + 已拆模块的孤儿 key。幂等,跑过即零开销。
     whenIdle(() => { void import('@/lib/portal/storage-heal').then((m) => m.runStorageHealOnce()).catch(() => {}); });
     scheduleHeavySyncBatch(); // 挂载/登录:也推到空闲,不阻塞首屏交互
+    // 网络回来时把队列里攒着的失败同步补掉 —— **这才是离线队列的意义所在**:
+    // 你在地铁里改的东西,出站那一刻自动补上,而不是等你下次想起来打开 App。
+    // 开机也补一次(上次可能是关 App 关掉的,没等到 online 事件)。
+    const drainQueued = () => {
+      whenIdle(() => {
+        void import('@/lib/portal/cloud-sync-runner')
+          .then((m) => m.drainCloudSyncQueue(CLOUD_SYNC_REGISTRY))
+          .catch(() => {});
+      });
+    };
+    drainQueued();
+    window.addEventListener('online', drainQueued);
     const unregisterLearningPush = registerLearningAutoPush();
     // 批次205:改名字/头像/语言/教练/日报/主题任一 → 防抖自动推上云,别端拉取即一致。
     const unregisterProfilePush = registerProfileAutoPush();
@@ -673,6 +768,7 @@ export default function Portal() {
     return () => {
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener(SYNC_RESUME_EVENT, onSyncResume);
+      window.removeEventListener('online', drainQueued);
       unregisterLearningPush();
       unregisterProfilePush();
     };
@@ -787,6 +883,10 @@ export default function Portal() {
     pruneDisposableSignals();
     // M3 读切换:回填 + 删除传导 + 水合事实缓存(见 signal-read-cache.ts)
     void hydrateSignalFactStore();
+    // IDB 那一整套(开库/健康检查/配额/定期清理/P1 缓存迁移/删源)。
+    // 它自己排到 requestIdleCallback,不挡首屏;失败只降级到 localStorage,不抛。
+    // 在这之前 lib/idb 的 16 个模块里有 14 个零调用方 —— 建好了从没接上。
+    void import('@/lib/idb/boot').then((m) => m.bootStorage()).catch(() => {});
     if (!canUsePrivateRuntime) {
       // 只有服务器明确说「未登录」才清私有节点;未知态(网络抖动/超时)
       // 绝不删数据——删了的节点在项目里的引用会一起消失,且重新同步后
@@ -802,6 +902,22 @@ export default function Portal() {
     }
     runConnectors().catch(() => undefined);
   }, [authReady, canUsePrivateRuntime, authDefinitelyAnonymous]);
+
+  // 天气按小时更新(2026-08-01 用户点名):runConnectors 只在挂载时拉一次,天气缓存
+  // TTL 5 分钟(prefetch-cache.ts)但从没人隔一小时再喊它——一天里天气就再也不会变了。
+  // 定时 + 回前台各触发一次 refreshWeather();缓存过期(>5min)才会真的重新请求接口,
+  // 短时间内来回切前后台不会重复打 API。
+  useEffect(() => {
+    if (!authReady || !canUsePrivateRuntime) return;
+    const tick = () => { void refreshWeather(); };
+    const timer = setInterval(tick, 60 * 60_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') tick(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [authReady, canUsePrivateRuntime]);
 
   useEffect(() => {
     const syncLocale = () => setLocale(loadProfileSettings().locale);
@@ -920,6 +1036,12 @@ export default function Portal() {
     const cookingCameraHandler = (e: Event) => {
       const file = (e as CustomEvent).detail?.file as File | undefined;
       track('cooking_camera_open');
+      // ⚠️ 必须先关洞察:相机是 z-index 400,洞察浮层是 901。
+      // 做饭页是从洞察 hub 进来的,所以点「拍一拍进货」时洞察还开着 ——
+      // 相机确实打开了,但整个盖在洞察底下,用户看到的是「做饭页没了,什么也没出现」,
+      // 也就是「点完闪退」。下面那个 openCameraHandler 早就修过同一个坑(护理页死按钮),
+      // 这条漏了。加相机入口时**都要问一句**:这条路上洞察关了没有。
+      setInsightsOpen(false);
       setCookingOpen(false); setPantryIntake(true); setCameraFile(file ?? null); setCaptureMode('camera');
     };
     // 行程购物/预算「拍小票」—— 打开通用相机识别(不强制食材进货模式)
@@ -930,7 +1052,14 @@ export default function Portal() {
       setInsightsOpen(false);
       setPantryIntake(false); setCameraFile(file ?? null); setCaptureMode('camera');
     };
-    const rewardsHandler = () => { track('rewards_open'); setRewardsOpen(true); };
+    // 2026-08-01 用户点名:积分从今天页顶栏 chip 打开的浮层商城,升级成洞察下的独立页 ——
+    // 不再单独维护一个 RewardsStoreSheet 浮层,统一走 Insights 的 tab 打开路径。
+    const rewardsHandler = () => {
+      track('rewards_open');
+      setInsightsTab('rewards');
+      setInsightsNonce((n) => n + 1);
+      setInsightsOpen(true);
+    };
     const briefHandler = () => { track('brief_open', {}); setBriefOpen(true); };
     // 洞察浮层:底部导航 / 卡片 / 「开始练」都派事件打开;detail.tab 指定进哪个 tab(如 fitness)
     // 2026-07-28(标注 图21):原来只认 tab==='fitness',别的一律落回默认页 ——
@@ -939,7 +1068,7 @@ export default function Portal() {
     // 那几个板块的深链(车页「→ 财务/足迹」等指路行)派了事件也落回默认页,看着像死链。
     const INSIGHTS_TABS: ReadonlySet<string> = new Set([
       'reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule',
-      'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'music', 'admin',
+      'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'music', 'rewards', 'admin',
     ]);
     const insightsHandler = (e: Event) => {
       const tab = (e as CustomEvent).detail?.tab;
@@ -1480,7 +1609,6 @@ export default function Portal() {
       <ShareSheet open={captureMode === 'share'} onClose={() => setCaptureMode(null)} />
       <MoodSheet open={moodOpen} onClose={() => setMoodOpen(false)} />
       <FreezeVaultSheet open={freezeOpen} onClose={() => setFreezeOpen(false)} initialTab="add" />
-      <RewardsStoreSheet open={rewardsOpen} onClose={() => setRewardsOpen(false)} />
       {ownerConflict && (
         <NesioSheet
           variant="center"

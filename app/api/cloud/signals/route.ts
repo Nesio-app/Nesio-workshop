@@ -5,6 +5,7 @@ import { embedSignalText, signalEmbeddingModel, signalVectorSearchEnabled } from
 import { encryptSignalRowColumns, decryptSignalRowColumns } from '@/lib/portal/cloud/field-encryption';
 import { sortRowsForQuery } from '@/lib/portal/cloud/signal-search';
 import type { Signal, SignalSensitivity, SignalSource, RetentionPolicy } from '@/lib/life-domain/signal';
+import { isSignalEpistemic, stampEpistemic } from '@/lib/life-domain/signal-epistemic';
 
 const SIGNAL_SCHEMA_VERSION = 'Signal@v1';
 const ALLOWED_SOURCES = new Set<SignalSource>([
@@ -15,8 +16,7 @@ const ALLOWED_SOURCES = new Set<SignalSource>([
   'health',
   'task',
   'weather',
-  'hardware_pulse',
-  'manual',
+  'Entry',
   'ai_observation',
   'flomo',
   'notion',
@@ -25,6 +25,8 @@ const ALLOWED_SOURCES = new Set<SignalSource>([
   'keep',
   'wechat_reading',
   'device',
+  'Bank',
+  'meeting_notes',
 ]);
 const ALLOWED_RETENTION = new Set<RetentionPolicy>(['AlwaysAlive', 'LongLiving', 'Normal', 'Disposable']);
 const ALLOWED_SENSITIVITY = new Set<SignalSensitivity>(['normal', 'private', 'health', 'financial', 'family', 'work']);
@@ -116,6 +118,18 @@ function sanitizeSignal(input: unknown): Signal | null {
   if (!id || !source || !type || !title || !ALLOWED_SOURCES.has(source)) return null;
   const retentionPolicy = sanitizeString(raw.retentionPolicy || raw.retention_policy, 80) as RetentionPolicy | undefined;
   const sensitivity = sanitizeString(raw.sensitivity, 80) as SignalSensitivity | undefined;
+  const confidence = clampConfidence(raw.confidence);
+  // epistemic/generator 收紧为必填(2026-08-01)——客户端镜像上来的旧信号可能没带,
+  // 服务端这道口子不能照抄成 undefined,得跟本机读路径一样兜底(stampEpistemic)。
+  const epistemicRaw = sanitizeString(raw.epistemic, 40);
+  const generatorRaw = sanitizeString(raw.generator, 120);
+  const stamp = stampEpistemic({
+    epistemic: isSignalEpistemic(epistemicRaw) ? epistemicRaw : undefined,
+    generator: generatorRaw,
+    type,
+    source,
+    confidence,
+  });
   return {
     id,
     source,
@@ -126,7 +140,7 @@ function sanitizeSignal(input: unknown): Signal | null {
     payload: sanitizeJsonObject(raw.payload),
     content: sanitizeJsonObject(raw.payload),
     entities: sanitizeJsonArray(raw.entities) as Signal['entities'],
-    confidence: clampConfidence(raw.confidence),
+    confidence,
     sensitivity: sensitivity && ALLOWED_SENSITIVITY.has(sensitivity) ? sensitivity : 'normal',
     retentionPolicy: retentionPolicy && ALLOWED_RETENTION.has(retentionPolicy) ? retentionPolicy : 'Normal',
     evidence: sanitizeJsonObject(raw.evidence) as unknown as Signal['evidence'],
@@ -134,6 +148,8 @@ function sanitizeSignal(input: unknown): Signal | null {
       const value = sanitizeString(tag, 80);
       return value ? [value.replace(/^#/, '')] : [];
     }),
+    epistemic: stamp.epistemic,
+    generator: stamp.generator || String(source),
   };
 }
 

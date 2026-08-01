@@ -59,6 +59,12 @@ export interface BridgeResult {
   graphOk: boolean;
   /** 没写成的原因,给 UI 出具体提示用(别只说「失败了」)。 */
   reason?: 'no_tx_node' | 'no_person_node' | 'link_failed';
+  /**
+   * 这笔钱在图上的节点 id。给「挂完附件还要往同一条节点里补东西」的调用方用
+   * (端上认出来的发票原文要落进这条节点的 rawInput,否则票上的字一个都搜不到)。
+   * 没找到节点时不存在 —— 和 graphOk:false 同时发生。
+   */
+  nodeId?: string;
 }
 
 /**
@@ -99,9 +105,9 @@ export function attachAssetToTx(txId: string, asset: LifeNodeAsset): BridgeResul
   const txNode = findTxNode(txId);
   if (!txNode) return { graphOk: false, reason: 'no_tx_node' };
   const existing = txNode.assets || [];
-  if (existing.some((a) => a.id === asset.id)) return { graphOk: true };
+  if (existing.some((a) => a.id === asset.id)) return { graphOk: true, nodeId: txNode.id };
   const ok = updateLifeNode(txNode.id, { assets: [...existing, asset] });
-  return ok ? { graphOk: true } : { graphOk: false, reason: 'link_failed' };
+  return ok ? { graphOk: true, nodeId: txNode.id } : { graphOk: false, reason: 'link_failed', nodeId: txNode.id };
 }
 
 /** 从流水节点摘掉附件元信息。本体的删除由调用方走 `removeTxAttachment`(它删 IndexedDB)。 */

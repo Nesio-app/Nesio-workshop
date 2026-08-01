@@ -426,10 +426,26 @@ export default function WardrobePanel() {
     }
   };
 
-  // Pro:AI 识别照片 → 预填属性。免费走升级引导。永不盲信 —— 用户可改后再存。
+  /**
+   * AI 识别照片 → 预填属性。永不盲信 —— 用户可改后再存。
+   *
+   * ## 这里**故意不加端上前置**(2026-07-31)
+   *
+   * 这一轮把全站取图入口都改成「先端上认字,认出来就不打云」。衣橱是**唯一的例外**,
+   * 而且是有意的:端上那条路(VNRecognizeTextRequest)只会**认字**。
+   * 而这里要答的是「这是件什么衣服 —— 什么类目、什么颜色、什么材质」,
+   * 衣服上没写着自己是深蓝羊毛大衣。端上一个字也答不了。
+   *
+   * 硬加一道端上前置的后果是:每张衣服照片先白等一次 OCR(真机上几百毫秒到一两秒),
+   * 拿到空字符串,然后照样打云。纯亏。
+   *
+   * 判据写在 lib/portal/image-understand.ts 的规矩 ③:
+   * **图上的字够用就不打云;要看懂图才打云。** 衣橱属于后者。
+   * 别因为「别处都加了」就把这里也加上 —— 那是照抄形式,不是照抄理由。
+   */
   const recognize = async () => {
     if (!draft.dataUrl) return;
-    if (!canUsePaidCloudAi()) { guardPaidCloudAi('wardrobe-ai'); return; }
+    // 2026-07-31 workshop 不分收费免费(产品仓保留这道门)。
     setAiBusy(true); setAiError(null);
     try {
       const base64 = draft.dataUrl.split(',')[1] || '';
@@ -469,7 +485,7 @@ export default function WardrobePanel() {
    */
   const beautify = async () => {
     if (!draft.dataUrl) return;
-    if (!canUsePaidCloudAi()) { guardPaidCloudAi('wardrobe-ai'); return; }
+    // 2026-07-31 workshop 不分收费免费(产品仓保留这道门)。
     setBeautyBusy(true); setAiError(null);
     try {
       const base64 = draft.dataUrl.split(',')[1] || '';

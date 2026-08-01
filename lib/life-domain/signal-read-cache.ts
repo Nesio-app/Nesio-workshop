@@ -28,6 +28,55 @@ import { bulkPutSignalsIdb, deleteSignalIdb, getAllSignalsIdb } from './signal-s
 let byId: Map<string, Signal> | null = null;
 let listening = false;
 let idbTimer: ReturnType<typeof setTimeout> | null = null;
+let hydrated = false;
+
+/**
+ * 水合完成事件。**这是「开机头十秒数字跳来跳回」的修法。**
+ *
+ * ## 之前发生了什么
+ *
+ * `getSignals()` 的第一行是:
+ *
+ * ```ts
+ * const cached = getCachedSignals();
+ * let signals = cached ?? getLifeGraph().map(lifeNodeToSignal);
+ * ```
+ *
+ * 水合**之前** cached 是 null → 读到的是投影(N 条)。
+ * 水合**之后** cached 是「IDB 事实 ∪ 投影」→ 可能是 N+k 条
+ * (事实库是独立的,可以保留投影之外的信号 —— 见文件头)。
+ *
+ * 也就是说同一个函数在两个时刻返回**两个不同的集合**,这本身是设计使然、没问题。
+ * 出问题的是:**水合完成时什么都不广播**。
+ *
+ * 于是没有任何组件在那一刻重算 —— 它们各自保持着水合前算出的旧数字,
+ * 直到被某个**不相干的**重渲染碰到,才悄悄换成新数字。
+ * 一个卡片因为你滑了一下重渲染了,数字变了;另一个没被碰到,还是旧的。
+ * 用户看到的就是「数字跳来跳回」和「不同地方数不一样」。
+ *
+ * 修法两条,缺一不可:
+ *
+ *   ① 水合完成**广播一次** —— 所有读点在**同一时刻**一起收敛到新数字,
+ *      而不是各自在随机时刻漂移过去。
+ *   ② 暴露 `isFactStoreHydrated()` —— 显示条数的地方在水合前显示骨架,
+ *      而不是先给一个待会儿会变的数。
+ *
+ * 只做①的话数字仍然会当着用户的面跳一次(只是整齐地跳);
+ * 只做②的话各处仍然会在不同时刻醒来。
+ */
+export const SIGNAL_FACT_STORE_HYDRATED_EVENT = 'nesio-signal-fact-store-hydrated';
+
+/**
+ * 事实库水合完了没有。
+ *
+ * **注意语义**:`false` 不代表「没数据」,代表「现在读到的是投影,
+ * 待会儿可能变多」。显示条数的地方应该据此显示骨架,
+ * 而不是先摆一个会变的数字出来 —— 那比转圈更伤信任:
+ * 用户会以为自己刚才看错了,或者以为 App 弄丢了东西。
+ */
+export function isFactStoreHydrated(): boolean {
+  return hydrated;
+}
 
 /** 同步读取水合后的事实缓存;未水合返回 null(调用方回退投影)。 */
 export function getCachedSignals(): Signal[] | null {
@@ -74,11 +123,33 @@ export async function hydrateSignalFactStore(): Promise<{ total: number } | null
     byId = new Map(idbAll.map((s) => [s.id, s]));
     const graphSignals = overlayProjection();
     await bulkPutSignalsIdb(graphSignals);
+    markHydrated();
     return { total: byId.size };
   } catch {
     byId = null; // 事实缓存是增强不是依赖:失败读路径走投影
+    // 失败也要标 —— 否则「还在读取」的骨架会一直转下去。
+    // 读到的是投影(而不是投影 ∪ 事实),但它是**稳定**的:不会再变了。
+    // 对用户来说「这就是最终答案」比「永远在加载」诚实得多。
+    markHydrated();
     return null;
   }
+}
+
+/**
+ * 标记水合完成并广播一次。
+ *
+ * 广播的是 `nesio-life-graph-updated` **加**一个专用事件,两个都要:
+ *   · `nesio-life-graph-updated` —— 现存的 135 个读点已经在听它了,
+ *     借它让所有人**在同一时刻**一起收敛(而不是各自随机醒来)。
+ *   · 专用事件 —— 给「显示骨架直到落定」的那些地方用。
+ *     它们不关心图变了,只关心「还会不会再变」。
+ */
+function markHydrated(): void {
+  if (hydrated) return;
+  hydrated = true;
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(SIGNAL_FACT_STORE_HYDRATED_EVENT));
+  window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
 }
 
 /**

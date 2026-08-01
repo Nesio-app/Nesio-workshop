@@ -8,22 +8,16 @@
  */
 
 import type { Signal } from './signal';
+import { openSimpleDb } from '@/lib/idb/open-simple-db';
+import { ensureEpistemicStamp } from './signal-epistemic';
 
 const DB_NAME = 'nesio-signals';
 const STORE = 'signals';
 
 function openDb(): Promise<IDBDatabase | null> {
-  return new Promise((resolve) => {
-    if (typeof indexedDB === 'undefined') { resolve(null); return; }
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const store = req.result.createObjectStore(STORE, { keyPath: 'id' });
-      store.createIndex('occurredAt', 'occurredAt');
-      store.createIndex('source', 'source');
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => resolve(null);
-  });
+  return openSimpleDb(DB_NAME, 1, [
+    { name: STORE, keyPath: 'id', indexes: [{ name: 'occurredAt', keyPath: 'occurredAt' }, { name: 'source', keyPath: 'source' }] },
+  ]);
 }
 
 /** 追加一条 Signal(幂等:同 id 覆盖)。失败静默——事实库是增强不是依赖。 */
@@ -49,20 +43,21 @@ export async function getRecentSignalsIdb(limit = 100): Promise<Signal[]> {
     const req = idx.openCursor(null, 'prev');
     req.onsuccess = () => {
       const cursor = req.result;
-      if (cursor && out.length < limit) { out.push(cursor.value as Signal); cursor.continue(); }
+      if (cursor && out.length < limit) { out.push(ensureEpistemicStamp(cursor.value as Signal)); cursor.continue(); }
       else resolve(out);
     };
     req.onerror = () => resolve(out);
   });
 }
 
-/** 全量读取(水合用)。事实库为 localStorage 量级(≤5MB 投影镜像),一次读入可接受。 */
+/** 全量读取(水合用)。事实库为 localStorage 量级(≤5MB 投影镜像),一次读入可接受。
+ *  兜底 epistemic/generator(2026-08-01 收紧为必填前写入的旧记录可能缺这两列)。 */
 export async function getAllSignalsIdb(): Promise<Signal[]> {
   const db = await openDb();
   if (!db) return [];
   return new Promise((resolve) => {
     const req = db.transaction(STORE, 'readonly').objectStore(STORE).getAll();
-    req.onsuccess = () => resolve((req.result as Signal[]) || []);
+    req.onsuccess = () => resolve(((req.result as Signal[]) || []).map(ensureEpistemicStamp));
     req.onerror = () => resolve([]);
   });
 }

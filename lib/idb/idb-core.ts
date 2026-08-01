@@ -112,18 +112,18 @@ export async function initializeDB(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
+      const upgradeTx = (event.target as IDBOpenDBRequest).transaction;
       console.log(`[IDB] Upgrading database to v${DB_VERSION}`);
 
       for (const storeDef of STORES) {
-        // 创建或获取存储表
-        let store: IDBObjectStore;
-        if (db.objectStoreNames.contains(storeDef.name)) {
-          // 表已存在，但不能在 versionchange 事务中访问
-          // 我们稍后会添加缺失的索引
-        } else {
-          store = db.createObjectStore(storeDef.name, { keyPath: storeDef.keyPath });
-          // 立即添加索引
-          for (const index of storeDef.indexes) {
+        // 已存在的表:versionchange 事务里能拿到句柄(request.transaction.objectStore),
+        // 只是不能再 createObjectStore —— 之前那句"不能访问"是错的,导致新增索引
+        // 从没真正补上过。用已存在的句柄把缺的索引补齐(indexNames 判重,不重复建)。
+        const store = db.objectStoreNames.contains(storeDef.name)
+          ? upgradeTx!.objectStore(storeDef.name)
+          : db.createObjectStore(storeDef.name, { keyPath: storeDef.keyPath });
+        for (const index of storeDef.indexes) {
+          if (!store.indexNames.contains(index.name)) {
             store.createIndex(index.name, index.keyPath, { unique: index.unique ?? false });
           }
         }

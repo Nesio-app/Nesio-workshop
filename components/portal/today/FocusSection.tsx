@@ -175,7 +175,11 @@ export function TodayFocusSection({
   const now = new Date();
   const scored = scoreCalendarEvents(calendarEvents, now);
   const pinned = selectPinned(scored);
-  const rest = scored.filter((o) => o.id !== pinned?.id);
+  // 2026-08-01 用户实锤「日历行的 ✕ 点了不管用」:这里此前只排除置顶项,漏了排除
+  // dismissed —— handleRemoveCalToday 确实把 id 写进了 dismissed(且持久化成功),
+  // 但下面渲染用的 rest 压根没读这个集合,下一帧照样把它画回来。任务节点那边(214 行)
+  // 早就正确接了 !dismissed.has(...),日历事件这条分支当年漏接了。
+  const rest = scored.filter((o) => o.id !== pinned?.id && !dismissed.has(o.id));
 
   // ── Dormant: one review card per day(先选,交给统一仲裁器排重)──
   const [dormantDismissed, setDormantDismissed] = useState<Set<string>>(new Set());

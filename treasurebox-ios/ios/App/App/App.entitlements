@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!--
+	  HealthKit 是这里**唯一**需要 entitlement 的能力。
+
+	  Vision / 语音识别 / Core Spotlight / 本地通知 / 后台定位 —— 一个都不需要
+	  entitlement,只要 Info.plist 里的用途说明。这一点对侧载很关键:
+	  免费 Apple ID(个人 Team)拿不到任何特殊 entitlement,但上面那些照样能用。
+
+	  ⚠️ 用免费账号签名时**要用 App-sideload.entitlements**(那份是空的)。
+	  带着 HealthKit 去签会直接失败:
+	      "Provisioning profile doesn't include the com.apple.developer.healthkit entitlement"
+	  见 codemagic.yaml 的两个 workflow。
+	-->
+	<key>com.apple.developer.healthkit</key>
+	<true/>
+	<key>com.apple.developer.healthkit.access</key>
+	<array/>
+</dict>
+</plist>

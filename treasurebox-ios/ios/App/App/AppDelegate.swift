@@ -1,5 +1,6 @@
 import UIKit
 import Capacitor
+import CoreSpotlight
 
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -40,6 +41,17 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([any UIUserActivityRestoring]?) -> Void) -> Bool {
+        // 从 iOS 系统搜索(桌面下拉 / 锁屏搜索)点进来的那一条。
+        //
+        // Spotlight 不是用 URL 把 App 拉起来的,它给的是一个 NSUserActivity,
+        // 真正的 id 藏在 userInfo 里。**这一段没有的话,搜索结果点了只会打开首页** ——
+        // 搜到了却跳不过去,比搜不到更让人恼火。
+        if userActivity.activityType == CSSearchableItemActionType,
+           let id = userActivity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+           let url = URL(string: "nesio://memory/\(id)") {
+            return ApplicationDelegateProxy.shared.application(application, open: url, options: [:])
+        }
+
         // Called when the app was launched with an activity, including Universal Links.
         // Feel free to add additional processing here, but if you want the App API to support
         // tracking app url opens, make sure to keep this call

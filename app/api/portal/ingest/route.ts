@@ -81,11 +81,15 @@ async function extractNodes(source: string, content: string): Promise<{ nodes: o
 }
 
 function normalizeIngestToSignal(source: string, content: string) {
+  // normalizeTaskToSignal/normalizeHealthToSignal 内部把 source 写死成泛泛的
+  // 'task'/'health' —— 这里再按 type(task.*/health.* 前缀,与 source 无关地推断
+  // LifeNodeType,见 create-signal.lifeNodeType)覆盖回真实来源,Apple 提醒事项/
+  // Keep 运动数据才认得出是哪个连接器,不会跟其它 task/health 信号混在一起。
   if (source === 'reminder') {
-    return normalizeTaskToSignal({ title: content.slice(0, 80) || '提醒事项', status: 'open' });
+    return { ...normalizeTaskToSignal({ title: content.slice(0, 80) || '提醒事项', status: 'open' }), source: 'reminder' as const };
   }
   if (source === 'keep') {
-    return normalizeHealthToSignal({ title: content.slice(0, 80) || '健康记录', status: content });
+    return { ...normalizeHealthToSignal({ title: content.slice(0, 80) || '健康记录', status: content }), source: 'keep' as const };
   }
   return normalizeVoiceToSignal({ text: content, tags: [source] });
 }

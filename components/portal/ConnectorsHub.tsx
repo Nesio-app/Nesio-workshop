@@ -23,7 +23,7 @@ import { isPro, canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { IMPORT_WINDOWS } from '@/lib/portal/backup-inventory';
 import { isLabModeOn } from '@/lib/portal/module-overrides';
 import { logDropped } from '@/lib/portal/storage-health';
-import { executeBackgroundCloudOnly } from '@/lib/portal/client-flow-control';
+import { understandImage, tagsFromText } from '@/lib/portal/image-understand';
 
 interface ConnectorsHubProps { open: boolean; onClose: () => void; }
 
@@ -257,8 +257,15 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setTimeout(() => setToast(null), 3500);
   }
 
-  function saveNodes(nodes: Array<Omit<NodeInput, 'source'>>, source: LifeNode['source']) {
-    nodes.forEach((n) => ingestLifeNode({ ...n, source } as NodeInput));
+  // signalSource:落库的 LifeNodeSource 只有 6 档,notion/toggl/health 等连接器同落
+  // 'manual'/'system' 会被压平成 Entry/device,分不清具体是哪个连接器 —— 这里同时
+  // 盖上 Signal 层专属来源(attrs.signalSource),lifeNodeToSignal() 优先读它。
+  function saveNodes(nodes: Array<Omit<NodeInput, 'source'>>, source: LifeNode['source'], signalSource?: string) {
+    nodes.forEach((n) => ingestLifeNode({
+      ...n,
+      source,
+      attributes: signalSource ? { ...n.attributes, signalSource } : n.attributes,
+    } as NodeInput));
     window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
   }
 
@@ -287,6 +294,39 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         const { readExifCapture } = await import('@/lib/portal/exif-gps');
         const cap = await readExifCapture(list[i]);
         const base64 = await fileToJpegBase64(list[i]);
+
+        // ── 先在这台设备上认一遍字 ──────────────────────────────────────
+        //
+        // 相册批量导入是**最该先端上认**的地方:一次 30 张,以前 30 张全发去云。
+        // 而相册里成堆的正是小票、订单截图、单据 —— 那些信息就是图上印的字,
+        // 端上认得出来就不必发出去,一分钱不花、图一个字节不出手机。
+        //
+        // 认出是单据、金额也抽到了 → 这张就地成节点,跳过云。
+        // 其余的(风景、人、物)照旧走云 —— 那要「看懂」,端上答不了。
+        const seen = await understandImage(list[i]);
+        if (!seen.needsCloud && seen.fields) {
+          const f = seen.fields;
+          ingestLifeNode({
+            type: 'object',
+            name: (f.merchant || '').trim() || L(dict, '小票', 'Receipt'),
+            source: 'photo',
+            confidence: f.amountFrom === 'keyword' ? 0.95 : 0.7,
+            relations: [],
+            tags: [L(dict, '小票', 'receipt'), '批量导入', ...tagsFromText(seen.text, 4)],
+            rawInput: seen.text.slice(0, 2000),
+            attributes: {
+              price: f.amount,
+              ...(f.date ? { receiptDate: f.date } : {}),
+              ...(f.merchant ? { store: f.merchant } : {}),
+              ocrSource: 'on-device',
+              ...(cap.lat != null && cap.lon != null ? { capturedLat: cap.lat, capturedLon: cap.lon } : {}),
+              ...(cap.takenAt ? { takenAt: cap.takenAt } : {}),
+            },
+          } as NodeInput);
+          saved += 1;
+          continue;
+        }
+
         const res = await fetch('/api/portal/analyze', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
@@ -652,7 +692,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         return;
       }
       const n = data.nodes || [];
-      saveNodes(n, c.id === 'toggl' ? 'system' : 'manual');
+      saveNodes(n, c.id === 'toggl' ? 'system' : 'manual', c.id === 'toggl' ? 'toggl' : 'notion');
       saveConnectorState(c.id, true);
       setConnected((p) => ({ ...p, [c.id]: true }));
       setCounts((p) => ({ ...p, [c.id]: n.length }));
@@ -1408,7 +1448,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         showToast(L(dict, '未识别到健康数据(确认选的是 export.xml/zip,不是 export_cda)', 'No health data (make sure it is export.xml/zip, not export_cda)'), false);
         setSyncing(null); return;
       }
-      if (nodes.length) saveNodes(nodes as Array<Omit<NodeInput, 'source'>>, 'system');
+      if (nodes.length) saveNodes(nodes as Array<Omit<NodeInput, 'source'>>, 'system', 'health');
       saveConnectorState('health', true);
       setConnected((p) => ({ ...p, health: true }));
       setCounts((p) => ({ ...p, health: metrics.metrics.length || nodes.length }));

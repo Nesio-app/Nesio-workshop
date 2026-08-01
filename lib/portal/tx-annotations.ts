@@ -95,7 +95,13 @@ function write(txId: string, patch: TxAnnotation): boolean {
 }
 
 /** 两写的结果:`ok` 是覆盖层(财务页看得到吗),`graphOk` 是图(别处看得到吗)。 */
-export interface TxWriteResult { ok: boolean; graphOk: boolean; reason?: BridgeResult['reason'] }
+export interface TxWriteResult {
+  ok: boolean;
+  graphOk: boolean;
+  reason?: BridgeResult['reason'];
+  /** 这笔钱在图上的节点 id(挂附件时才有)—— 端上认出的发票原文要补进这条节点。 */
+  nodeId?: string;
+}
 
 export function setTxPeople(txId: string, people: string[]): TxWriteResult {
   const uniq = [...new Set(people.map((p) => p.trim().toLowerCase()).filter(Boolean))];
@@ -179,7 +185,7 @@ export function addTxAttachment(txId: string, att: TxAttachment): TxWriteResult 
     ...(att.name ? { label: att.name } : {}),
     createdAt: new Date().toISOString(),
   });
-  return { ok, graphOk: g.graphOk, reason: g.reason };
+  return { ok, graphOk: g.graphOk, reason: g.reason, nodeId: g.nodeId };
 }
 
 /** 删附件:元信息和 IndexedDB 里的本体一起删(否则本体成孤儿,永远占着配额)。 */

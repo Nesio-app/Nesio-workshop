@@ -13,6 +13,7 @@
 import type { LifeNode } from '../portal/life-graph';
 import { DOMAINS, type FrontDomain } from './domain-taxonomy';
 import type { SignalContext } from './context';
+import { classifyDomainFromText } from './context-extractor';
 
 export function readNodeContext(node: LifeNode): SignalContext | null {
   const raw = node.attributes?.context;
@@ -26,19 +27,32 @@ export function readNodeContext(node: LifeNode): SignalContext | null {
 }
 
 /** Type-based salvage when a node carries no explicit context.domain. */
+// 2026-08-01 Domains 二轮修正跟着 FrontDomain 改名走:object 归 life(物品/收纳并入 life,
+// 不再是已改名/收窄的 finance);person 改归 relationship(比塞进 life 更准);
+// event/commitment 归 work(原先都归笼统的 growth)。
 const TYPE_DOMAIN: Record<string, FrontDomain> = {
-  object: 'assets',
+  object: 'life',
   place: 'life',
-  person: 'life',
-  event: 'growth',
-  commitment: 'growth',
+  person: 'relationship',
+  event: 'work',
+  commitment: 'work',
   health_state: 'health',
   preference: 'life',
 };
 
+/**
+ * 2026-08-01 用户点名:大多数节点根本没走 extractContext(只有语音捕获这一条路调用它,
+ * 见 VoiceInputSheet.tsx)—— 照片/邮件/连接器同步/银行流水等全部落进下面粗粒度的
+ * TYPE_DOMAIN(所有 object 一律 assets、所有 event 一律 growth,不看内容)。这里在
+ * type 兜底**之前**插一道关键词判据,复用同一张表(与 extractContext 同源,不重复维护),
+ * 让已经存在的大多数节点也能被内容判出更准的 domain,而不是只靠类型硬猜。
+ */
 export function nodeDomain(node: LifeNode): FrontDomain | null {
   const ctx = readNodeContext(node);
   if (ctx?.domain && ctx.domain in DOMAINS) return ctx.domain;
+  const text = [node.name, node.rawInput, (node.tags || []).join(' ')].filter(Boolean).join(' ');
+  const byKeyword = text ? classifyDomainFromText(text) : null;
+  if (byKeyword) return byKeyword;
   return TYPE_DOMAIN[node.type] ?? null;
 }
 

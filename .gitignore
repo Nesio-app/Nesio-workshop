@@ -66,8 +66,17 @@ next-env.d.ts
 /health-web/config.js
 .gstack/
 
-# Capacitor 生成的原生工程(云 CI 每次现生成,不入库)
+# Capacitor 生成的原生工程,默认不入库(云 CI 现生成)。
 ios/
+# 但 treasurebox-ios 那份**不是生成的** —— 它带着六个自研插件的 Swift 源码,
+# 是出壳的唯一依据,必须入库。
+#
+# 这条负规则是 2026-07-31 补的,补之前的状况很坏:目录里几个老文件是历史上
+# force-add 进来的(所以 git status 看得见它们的改动),而**新加的文件一律被静默忽略**。
+# 我那次新写了五个插件、改好 pbxproj、测试全绿,`git status` 上却一个新文件都没有 ——
+# 提交推上去,CI 拉下来编译,出的包里五个插件一个都没有,而且整条流水线全绿。
+# 这种失败没有任何一层会报错。
+!/treasurebox-ios/ios/
 public/ort/
 public/_demo/
 

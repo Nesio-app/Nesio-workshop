@@ -44,7 +44,7 @@ assert.equal(store.length, 1, 'markRetrievalFeedback 写入一条 Signal');
 assert.equal(store[0].type, 'feedback.retrieval', 'type=feedback.retrieval(一等公民事实)');
 assert.equal(store[0].payload.targetId, 't1', 'payload.targetId 记录目标');
 assert.equal(store[0].payload.verdict, 'not_this', 'payload.verdict 记录裁决');
-assert.equal(store[0].source, 'manual', 'source=manual(用户反馈,非 ai_observation)');
+assert.equal(store[0].source, 'Entry', 'source=Entry(用户反馈,非 ai_observation)');
 assert.equal(store[0].epistemic, 'feedback', 'epistemic=feedback');
 assert.equal(rf.isDownranked('t1'), true, 'not_this → 降权(剔除)');
 assert.equal(rf.retrievalScoreAdjust('t1'), -100, 'not_this → 强负(盖过相关性,等同剔除)');

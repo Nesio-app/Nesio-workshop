@@ -16,9 +16,9 @@ import { getLifeGraph, deleteLifeNode, type LifeNode, type LifeNodeType, type Li
 import { getCachedSignals } from './signal-read-cache';
 import type { SignalContext } from './context';
 import {
-  inferEpistemic,
   isSignalEpistemic,
   parseDerivedFromAttr,
+  stampEpistemic,
   type SignalEpistemic,
 } from './signal-epistemic';
 
@@ -39,8 +39,7 @@ export type SignalSource =
   | 'health'
   | 'task'
   | 'weather'
-  | 'hardware_pulse'
-  | 'manual'
+  | 'Entry' // 批次 2026-08-01 改名(原 'manual')——跟 LifeNodeSource 的 'manual' 撞名太久,读者分不清哪层
   | 'ai_observation'
   | 'flomo'
   | 'notion'
@@ -49,7 +48,9 @@ export type SignalSource =
   | 'keep'
   | 'wechat_reading'
   | 'tesla'
-  | 'device';
+  | 'device'
+  | 'Bank' // 银行流水影子节点(tx-node.ts)——之前落地无标记,压平成了泛泛的 device
+  | 'meeting_notes'; // 会议记录(麦克风/Granola)——之前落地无标记,压平成了泛泛的 voice
 
 export type SignalType = string;
 
@@ -101,13 +102,15 @@ export interface Signal {
    *  intent). Suggestion until the user confirms (Domain-Capability PRD §7). */
   context?: SignalContext;
   /**
-   * 认识论层级(可信度分层)。缺省时由 resolveEpistemic() 按 type/source 推断。
-   * observation/user_asserted/extraction = 地面事实;derived/system_summary = 蒸馏;
-   * feedback = 元评价(永不作答问证据)。
+   * 认识论层级(可信度分层)。写入门 stampEpistemic() 统一盖章,收紧为必填
+   * (2026-08-01)—— observation/user_asserted/extraction = 地面事实;
+   * derived/system_summary = 蒸馏;feedback = 元评价(永不作答问证据)。
+   * 旧数据(落库时没有这个字段)读路径见 ensureEpistemicStamp()。
    */
-  epistemic?: SignalEpistemic;
-  /** 谁写出这条:user / connector:gmail / ai:mirror / rule:growth … */
-  generator?: string;
+  epistemic: SignalEpistemic;
+  /** 谁写出这条:user / connector:gmail / ai:mirror / rule:growth …
+   *  同上收紧为必填,由 stampEpistemic() 兜底推断,不会是空串。 */
+  generator: string;
   /** 派生主张所依据的 Signal/Node id 链(claude-obsidian 式引用)。 */
   derivedFrom?: string[];
 }
@@ -126,7 +129,7 @@ const NODE_TYPE_TO_SIGNAL: Record<LifeNodeType, SignalType> = {
 };
 
 const NODE_SOURCE_TO_SIGNAL: Record<LifeNodeSource, SignalSource> = {
-  manual: 'manual',
+  manual: 'Entry',
   photo: 'photo',
   calendar: 'calendar',
   email: 'gmail',
@@ -206,7 +209,7 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
   }
   const source = typeof node.attributes['signalSource'] === 'string'
     ? node.attributes['signalSource'] as SignalSource
-    : NODE_SOURCE_TO_SIGNAL[node.source] ?? 'manual';
+    : NODE_SOURCE_TO_SIGNAL[node.source] ?? 'Entry';
   const occurredAt =
     (typeof node.attributes['start'] === 'string' && node.attributes['start']) ||
     (typeof node.attributes['date'] === 'string' && node.attributes['date']) ||
@@ -219,15 +222,22 @@ export function lifeNodeToSignal(node: LifeNode): Signal {
 
   const epistemicAttr = node.attributes['epistemic'];
   const kind = typeof node.attributes['kind'] === 'string' ? node.attributes['kind'] : undefined;
-  const epistemic = isSignalEpistemic(epistemicAttr)
-    ? epistemicAttr
-    : inferEpistemic({ type: signalType, source, confidence: node.confidence, kind });
-  const generator = typeof node.attributes['generator'] === 'string'
-    ? node.attributes['generator']
-    : undefined;
+  const generatorAttr = typeof node.attributes['generator'] === 'string' ? node.attributes['generator'] : undefined;
+  // epistemic/generator 收紧为必填(2026-08-01)——旧写入门只保证 epistemic 有推断兜底,
+  // generator 缺失时以前直接落 undefined。统一走 stampEpistemic 两个都兜住,不再各管一半。
+  const stamp = stampEpistemic({
+    epistemic: isSignalEpistemic(epistemicAttr) ? epistemicAttr : undefined,
+    generator: generatorAttr,
+    type: signalType,
+    source,
+    confidence: node.confidence,
+    payload: { kind },
+  });
+  const epistemic = stamp.epistemic;
+  const generator = stamp.generator || String(source);
   const derivedFrom = parseDerivedFromAttr(node.attributes['derivedFrom']);
   payload.epistemic = epistemic;
-  if (generator) payload.generator = generator;
+  payload.generator = generator;
   if (derivedFrom?.length) payload.derivedFrom = derivedFrom;
 
   return {
@@ -263,7 +273,7 @@ const SIGNAL_TYPE_TO_NODE: Record<string, LifeNodeType> = {
 };
 
 const SIGNAL_SOURCE_TO_NODE: Partial<Record<SignalSource, LifeNodeSource>> = {
-  manual: 'manual',
+  Entry: 'manual',
   photo: 'photo',
   calendar: 'calendar',
   gmail: 'email',

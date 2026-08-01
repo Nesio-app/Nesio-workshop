@@ -3,6 +3,8 @@
  * 模型第一次由用户拖入(见 Lab 页说明),之后离线可用——不依赖任何托管。
  */
 
+import { openSimpleDb } from '@/lib/idb/open-simple-db';
+
 const DB_NAME = 'nesio-ml';
 const MODELS = 'models';
 const INDEX = 'clip-index';
@@ -16,17 +18,7 @@ export interface IndexEntry {
 }
 
 function openDB(): Promise<IDBDatabase | null> {
-  return new Promise((resolve) => {
-    if (typeof indexedDB === 'undefined') { resolve(null); return; }
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(MODELS)) db.createObjectStore(MODELS);
-      if (!db.objectStoreNames.contains(INDEX)) db.createObjectStore(INDEX, { keyPath: 'id' });
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => resolve(null);
-  });
+  return openSimpleDb(DB_NAME, 1, [{ name: MODELS }, { name: INDEX, keyPath: 'id' }]);
 }
 
 function tx<T>(store: string, mode: IDBTransactionMode, op: (s: IDBObjectStore) => IDBRequest): Promise<T | null> {

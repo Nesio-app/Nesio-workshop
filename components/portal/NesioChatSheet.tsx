@@ -494,7 +494,9 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
               name: tag,
               type: 'tag',
             })),
-            summary: localResult.result.text || L(dict, '（本地识别）', 'Local recognition'),
+            // 认出字了就用原文;认不了就用桥给的那句人话(「这台设备认不了字」),
+            // 别再回一句「（本地识别）」——那句什么也没说。
+            summary: localResult.result.text || localResult.result.unavailable || '',
           };
         },
         // Cloud: 云端 AI 识别（付费用户走这路）
@@ -517,7 +519,7 @@ function CameraView({ onResult, onClose, autoOpen = false }: {
         const names = data.nodes.map((n) => n.name).join(L(dict, '、', ', '));
         // 显示识别来源（本地/云端）
         const sourceHint = result.source === 'local'
-          ? L(dict, '（本地识别）', '(local)')
+          ? L(dict, '(在这台设备上读的,图没有发出去)', ' (read on this device — the photo never left)')
           : '';
         onResult(
           (names || data.summary || L(dict, '（未识别到）', 'Nothing recognized')) + sourceHint,
@@ -686,8 +688,8 @@ export default function NesioChatSheet({
     const userMsg: UiMessage = { id: `u-${Date.now()}`, role: 'user', text: L(dict, `［图片］${pending.name || '这张图'}`, `[Image] ${pending.name || 'this photo'}`) };
     setMessages((prev) => { const next = [...prev, userMsg]; return next; });
     // 记忆详情里的图是本机图库原图,同样可能越过请求体上限 —— 先过一遍缩图判据。
-    // Phase 2: 后台识图改为检查付费权限（免费用户跳过）
-    if (!canUsePaidCloudAi()) return; // 免费用户不触发云识别
+    // 2026-07-31 workshop 不分收费免费:原来免费用户到这里直接 return,
+    // 于是记忆详情里的图发进聊天后什么都不发生。产品仓保留那道门,workshop 拆掉。
 
     void dataUrlToUploadPayload(dataUrl).then(({ base64, mimeType }) => fetch('/api/portal/analyze', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1091,7 +1093,9 @@ Edit location/value anytime in Storage.`),
             return {
               ok: true,
               nodes: localResult.result.tags.map(tag => ({ name: tag, type: 'tag' })),
-              summary: localResult.result.text || L(dict, '（本地识别）', 'Local recognition'),
+              // 认出字了就用原文;认不了就用桥给的那句人话(「这台设备认不了字」),
+              // 别再回一句「（本地识别）」——那句什么也没说。
+              summary: localResult.result.text || localResult.result.unavailable || '',
               source: 'local',
             };
           },
@@ -1110,7 +1114,7 @@ Edit location/value anytime in Storage.`),
         if (data.ok && data.nodes?.length) {
           const names = data.nodes.map((n) => n.name).join(L(dict, '、', ', '));
           const nodes = recallByRecognition(data.nodes, data.summary);
-          const sourceHint = result.source === 'local' ? L(dict, '（本地识别）', ' (local)') : '';
+          const sourceHint = result.source === 'local' ? L(dict, '(在这台设备上读的,图没有发出去)', ' (read on this device — the photo never left)') : '';
           aiText = nodes.length > 0
             ? L(dict, `识别到：${names}${sourceHint}\n\n找到 ${nodes.length} 条相关记录：\n${nodes.map((n) => `• ${n.name}`).join('\n')}`,
               `Recognized: ${names}${sourceHint}\n\nFound ${nodes.length} related record(s):\n${nodes.map((n) => `• ${n.name}`).join('\n')}`)
@@ -1154,7 +1158,9 @@ Edit location/value anytime in Storage.`),
             return {
               ok: true,
               nodes: localResult.result.tags.map(tag => ({ name: tag, type: 'tag' })),
-              summary: localResult.result.text || L(dict, '（本地识别）', 'Local recognition'),
+              // 认出字了就用原文;认不了就用桥给的那句人话(「这台设备认不了字」),
+              // 别再回一句「（本地识别）」——那句什么也没说。
+              summary: localResult.result.text || localResult.result.unavailable || '',
               source: 'local',
             };
           },
@@ -1170,7 +1176,7 @@ Edit location/value anytime in Storage.`),
 
         const data = result.data;
         const names = data.nodes?.map((n) => n.name).join(L(dict, '、', ', ')) || '';
-        const sourceHint = result.source === 'local' ? L(dict, '（本地识别）', ' (local)') : '';
+        const sourceHint = result.source === 'local' ? L(dict, '(在这台设备上读的,图没有发出去)', ' (read on this device — the photo never left)') : '';
         const text = names
           ? L(dict, `识别到：${names}${sourceHint}\n\n可以继续问我关于这张图片的问题。`, `Recognized: ${names}${sourceHint}\n\nAsk me anything about this image.`)
           : data.summary || L(dict, '这张图没看清,换个角度再拍一张试试。', 'Could not read this photo — try another angle.');

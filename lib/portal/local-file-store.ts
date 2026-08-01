@@ -19,6 +19,7 @@
  */
 
 import { logDropped, reportStorageDropped } from '@/lib/portal/storage-health';
+import { openSimpleDb } from '@/lib/idb/open-simple-db';
 
 const DB_NAME = 'nesio-files';
 const STORE = 'files';
@@ -36,16 +37,7 @@ interface StoredFile extends LocalFileMeta {
 }
 
 function openDB(): Promise<IDBDatabase | null> {
-  return new Promise((resolve) => {
-    if (typeof indexedDB === 'undefined') { resolve(null); return; }
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => resolve(null);
-  });
+  return openSimpleDb(DB_NAME, 1, [{ name: STORE }]);
 }
 
 /** 人话体积:给 UI 和错误提示共用,免得两处各写一份四舍五入。 */
