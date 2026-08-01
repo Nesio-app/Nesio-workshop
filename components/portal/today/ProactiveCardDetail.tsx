@@ -34,7 +34,11 @@ export default function ProactiveCardDetail({ card, onClose, onOpenSignal }: {
       variant="bottom"
       open
       elevated
-      card={false}
+      // 2026-08-01(用户:「点击卡片显示内容是透明」):这里原来是 card={false},
+      // 走 .nesio-sheet--bare —— 那个类**不给 background**,于是整张详情是透明的,
+      // 字直接压在底下的时间线上。bare 是给「浮在内容上的裸控件」用的,
+      // 而这是一整屏要读的字,该有实底。
+      card
       onOpenChange={(o) => { if (!o) onClose(); }}
       ariaLabel={card.title}
     >

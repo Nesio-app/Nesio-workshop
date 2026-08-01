@@ -101,30 +101,48 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
   assert.ok(end > 0, '找不到 fmtDay —— 比错块就会假绿');
   const src = body.slice(0, end + 5);
 
-  const js = ts.transpileModule(`const dict = 'zh'; ${src} module.exports = { fmtDay };`, {
+  const js = ts.transpileModule(`const dict: 'zh' = 'zh'; ${src} module.exports = { fmtDay };`, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   const mod = { exports: {} };
   vm.runInNewContext(js, { module: mod, exports: mod.exports, Date, Number, String, RegExp, console });
   const { fmtDay } = mod.exports;
 
-  // 有钟点的:日期 + 时间都要在
+  // 日期和钟点是**分开两个字段**返回的(2026-08-01 用户:「时间显示到日子下面,
+  // 一行太挤了」)—— 拼成一个字符串的话调用方没法把它排成两行。
   const withTime = fmtDay('2026-08-01T14:00');
-  assert.match(withTime, /8月1日/, `有钟点的也得带日期,拿到 ${JSON.stringify(withTime)}`);
-  assert.match(withTime, /14:00/,
-    `设在 14:00 的提醒在列表上只写日期(拿到 ${JSON.stringify(withTime)}) —— ` +
+  assert.equal(typeof withTime, 'object', 'fmtDay 要返回 {day,time},拼成一行会把标题挤没');
+  assert.match(withTime.day, /8月1日/, `日期这一行不对,拿到 ${JSON.stringify(withTime)}`);
+  assert.equal(withTime.time, '14:00',
+    `设在 14:00 的提醒在列表上没有钟点(拿到 ${JSON.stringify(withTime)}) —— ` +
     '得点进去才知道几点,而这一列本来就有钟点');
+  assert.doesNotMatch(withTime.day, /\d{2}:\d{2}/, '钟点不许混在日期那一行里');
   // 午夜是真的午夜,不许因为「看起来像全天」被吞掉
-  assert.match(fmtDay('2026-08-01T00:00'), /00:00/,
+  assert.equal(fmtDay('2026-08-01T00:00').time, '00:00',
     '判据必须钉在「原串有没有时分」上,不是「小时是不是 0」—— ' +
     '后者会把用户真的设在午夜的那条也吞掉');
   // 只有日期的:不许凭空造一个 0:00 出来
   const dayOnly = fmtDay('2026-08-01');
-  assert.match(dayOnly, /8月1日/);
-  assert.doesNotMatch(dayOnly, /\d{2}:\d{2}/,
+  assert.match(dayOnly.day, /8月1日/);
+  assert.equal(dayOnly.time, '',
     `只有日期的串不许凭空补一个钟点(拿到 ${JSON.stringify(dayOnly)})`);
   // 垃圾输入不炸
-  assert.equal(fmtDay('not-a-date'), '');
+  assert.equal(JSON.stringify(fmtDay('not-a-date')), JSON.stringify({ day: '', time: '' }));
+}
+
+/* ══ ③b 提醒行要能点开记忆详情 ═══════════════════════════════════════════ */
+{
+  const panel = stripComments(read('components/portal/insights/SchedulePanel.tsx'));
+  // 提醒的身影一直在记忆里(标着 reminderId),这张列表原来根本没去找 → 整行不可点
+  assert.match(panel, /shadowByReminder/,
+    '提醒行要按 reminderId 找回它在记忆里的身影 —— 找不到的话整行点不开,' +
+    '而详情其实一直是有的(用户:「提醒点一下,目前进不到记忆详情」)');
+  assert.match(panel, /shadowByReminder\.set\(rid, n\)/, '要先建索引,不许在循环里线性扫上千条');
+  assert.match(panel, /shadowByReminder\.get\(r\.id\) \? \{ node: shadowByReminder\.get\(r\.id\) \} : \{\}/,
+    '有身影才挂 node —— 老提醒没有身影,给它一个点了什么也不会发生的入口比没有更糟');
+  // 调用点还是按 node 决定可不可点(改了构造却没改这句 = 白改)
+  assert.match(panel, /onOpen=\{r\.node \? \(\) => setOpenNode\(r\.node!\) : undefined\}/,
+    '整行可点与否仍由 r.node 决定');
 }
 
 /* ══ ④ 每日简报要有首页入口(不是只藏在设置里)═══════════════════════════ */
