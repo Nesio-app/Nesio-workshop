@@ -16,6 +16,7 @@ import { loadProfileSettings } from '@/lib/portal/profile';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { DailyReportOffNotice } from './DailyReportOffNotice';
 
 const DailyReportPanel = dynamic(() => import('./DailyReportPanel'), { ssr: false });
 const DailyReportSheet = dynamic(() => import('../DailyReportSheet'), { ssr: false });
@@ -71,7 +72,7 @@ export default function RetrospectPanel() {
   const monthly = useMemo(() => listPeriodicReports(nodes, 'month', 'retrospect'), [nodes]);
 
   const enabled = loadProfileSettings().dailyReportEnabled;
-  if (!enabled) return null;
+  if (!enabled) return <DailyReportOffNotice />;
 
   return (
     <div className="nesio-reflection-tab">

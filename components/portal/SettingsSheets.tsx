@@ -79,242 +79,6 @@ function applyTheme(choice: ThemeChoice) {
   document.documentElement.setAttribute('data-portal-theme', resolved);
 }
 
-/**
- * GeneralSheet(通用)— 语气 / 提醒程度 / 外观 / 语言 / 触感。
- * 一切改动即点即生效(设计红线:不再有"看起来能点但没反应"的控件):
- *   - 语气 → chat 系统提示词(buildSystemPersonality)
- *   - 提醒程度 → Today 主动卡数量(PROACTIVE_LEVEL_KEY,useTodayFeed 消费)
- *   - 外观/语言 → 立即应用;语言 12 种,zh/en 之外先回落英文界面
- */
-export function GeneralSheet({ open, onClose }: SheetProps) {
-  const locale = usePortalLocale();
-  const dict = portalLocaleToDictionaryLocale(locale);
-  const [tone, setTone] = useState<ToneStyle>('warm');
-  const [interrupt, setInterrupt] = useState<InterruptLevel>('proactive');
-  const [hapticsOn, setHapticsOn] = useState(true);
-  const [dailyReportOn, setDailyReportOn] = useState(false);
-  const [theme, setTheme] = useState<ThemeChoice>('auto');
-  const [themeSaveIssue, setThemeSaveIssue] = useState('');
-  const [fontScale, setFontScale] = useState<FontScale>('md');
-  const [captureLocOn, setCaptureLocOn] = useState(false);
-
-  useEffect(() => {
-    if (!open) return;
-    const p = loadProfileSettings();
-    setTone((p.coachStyle as ToneStyle) || 'warm');
-    setDailyReportOn(p.dailyReportEnabled);
-    try {
-      const lvl = localStorage.getItem(PROACTIVE_LEVEL_KEY);
-      setInterrupt(lvl === 'minimal' || lvl === 'silent' ? lvl : getMirrorProfile().interruptionStyle);
-      setHapticsOn(localStorage.getItem(HAPTIC_FEEDBACK_KEY) !== '0');
-      const th = localStorage.getItem(THEME_KEY);
-      setTheme(th === 'day' || th === 'night' ? th : 'auto');
-      setFontScale(getFontScale());
-      setCaptureLocOn(captureLocationEnabled());
-    } catch { /* ignore */ }
-  }, [open]);
-
-  function pickTone(next: ToneStyle) {
-    setTone(next);
-    saveProfileSettings({ coachStyle: next as 'warm' | 'minimal' | 'professional' });
-  }
-  function pickInterrupt(next: InterruptLevel) {
-    setInterrupt(next);
-    try { localStorage.setItem(PROACTIVE_LEVEL_KEY, next); } catch { /* ignore */ }
-    window.dispatchEvent(new CustomEvent('nesio-proactive-level-changed'));
-  }
-  function pickTheme(next: ThemeChoice) {
-    setTheme(next);
-    applyTheme(next);
-    touchProfileIdentity(); // 批次205:主题跨端 —— 打新 profile 时间戳 + 广播,触发自动回推
-
-    // 批次 51:存储满时 setItem 静默失败 → 当前页面看着切成功,下次加载 boot
-    // 脚本读不到选择又跳回「随系统」(用户实测:主页还是黑、设置回跳)。
-    // 失败先自动腾空间重试;仍不行就说真话,不装保存成功。
-    try {
-      localStorage.setItem(THEME_KEY, next);
-      setThemeSaveIssue('');
-    } catch {
-      void (async () => {
-        try {
-          const { runStorageRelief } = await import('@/lib/portal/storage-relief');
-          await runStorageRelief();
-          localStorage.setItem(THEME_KEY, next);
-          setThemeSaveIssue('');
-        } catch {
-          setThemeSaveIssue(L(dict, '本机空间满了,这个选择没能保存 —— 先回今天页点「一键腾空间」。', 'Local storage is full — this choice could not be saved. Tap "Free up space" on the Today page first.'));
-        }
-      })();
-    }
-  }
-  function pickLang(next: PortalLocale) {
-    saveProfileSettings({ locale: next }); // PROFILE_UPDATED_EVENT → 全站即时切换
-  }
-  // 每日 AI 图文日报开关(即点即生效;存 profile,saveProfileSettings 已接 storage-health)。
-  function toggleDailyReport() {
-    setDailyReportOn((v) => {
-      saveProfileSettings({ dailyReportEnabled: !v });
-      return !v;
-    });
-  }
-  function toggleHaptics() {
-    setHapticsOn((v) => {
-      try { localStorage.setItem(HAPTIC_FEEDBACK_KEY, v ? '0' : '1'); } catch { /* ignore */ }
-      return !v;
-    });
-  }
-  // Step 6 推送开关(用户拍板:权限只在这里要,不自动弹)。失败态可见(hint 换文案)。
-  const [pushOn, setPushOn] = useState(false);
-  const [pushMsg, setPushMsg] = useState('');
-  useEffect(() => { setPushOn(isPushEnabled()); }, []);
-  async function togglePush() {
-    if (pushOn) {
-      await disablePush();
-      setPushOn(false); setPushMsg('');
-      return;
-    }
-    setPushMsg(L(dict, '正在开启…', 'Enabling…'));
-    const r = await enablePush();
-    if (r.ok) { setPushOn(true); setPushMsg(''); }
-    else {
-      setPushMsg(r.reason === 'denied'
-        ? L(dict, '浏览器没给通知权限,可在系统设置里打开后重试', 'Notification permission denied — enable it in system settings and retry')
-        : L(dict, '没开成,稍后再试', 'Could not enable — try again later'));
-    }
-  }
-
-  const [prefsOpen, setPrefsOpen] = useState(false);
-  const toneOpts: Array<{ id: ToneStyle; label: string; hint: string }> = [
-    { id: 'warm', label: t(locale, 'toneWarm'), hint: t(locale, 'toneWarmHint') },
-    { id: 'direct', label: t(locale, 'toneDirect'), hint: t(locale, 'toneDirectHint') },
-    { id: 'minimal', label: t(locale, 'toneMinimalist'), hint: t(locale, 'toneMinimalistHint') },
-  ];
-  const levelOpts: Array<{ id: InterruptLevel; label: string; hint: string }> = [
-    { id: 'proactive', label: t(locale, 'levelProactive'), hint: t(locale, 'levelProactiveHint') },
-    { id: 'minimal', label: t(locale, 'levelLight'), hint: t(locale, 'levelLightHint') },
-    { id: 'silent', label: t(locale, 'levelSilent'), hint: t(locale, 'levelSilentHint') },
-  ];
-  const themeOpts: Array<{ id: ThemeChoice; label: string; icon: React.ReactNode }> = [
-    { id: 'day', label: t(locale, 'themeDay'), icon: <IconSun size={16} /> },
-    { id: 'auto', label: t(locale, 'themeAuto'), icon: <IconHalfMoon size={16} /> },
-    { id: 'night', label: t(locale, 'themeNight'), icon: <IconMoon size={16} /> },
-  ];
-
-  return (
-    <SheetWrap open={open} onClose={onClose} title={t(locale, 'generalTitle')} tip={t(locale, 'generalDesc')}>
-
-      {/* 批次 134·设计「通用·精简」:去掉「语气 + 主动提醒程度」和偏好折叠;开关组直接铺开。 */}
-      <p className="nesio-settings-section-label">{L(dict, '开关', 'Switches')}</p>
-      <button type="button"
-        className={`nesio-settings-option${dailyReportOn ? ' nesio-settings-option--active' : ''}`}
-        onClick={toggleDailyReport}>
-        <div>
-          <span className="nesio-settings-option-label">{L(dict, '每日 AI 图文日报', 'Daily AI report')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, '每天存进记忆 · 首页回顾里给你', 'Saved to Memory daily · shown in Today')}</span>
-        </div>
-        <span className={`nesio-settings-space-check${dailyReportOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
-          {dailyReportOn ? '✓' : '○'}
-        </span>
-      </button>
-      <button type="button"
-        className={`nesio-settings-option${hapticsOn ? ' nesio-settings-option--active' : ''}`}
-        onClick={toggleHaptics}>
-        <div>
-          <span className="nesio-settings-option-label">{L(dict, '触感反馈', 'Haptics')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, '记录成功/找到/长按录音时轻震', 'Gentle buzz when you save, find something, or hold to record')}</span>
-        </div>
-        <span className={`nesio-settings-space-check${hapticsOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
-          {hapticsOn ? '✓' : '○'}
-        </span>
-      </button>
-      {/* Step 6:重要提醒推送(sev3 才推 —— 登机口/就诊/还款截止级;开关在这要权限,不自动弹) */}
-      {pushSupported() && (
-        <button type="button"
-          className={`nesio-settings-option${pushOn ? ' nesio-settings-option--active' : ''}`}
-          onClick={() => { void togglePush(); }}>
-          <div>
-            <span className="nesio-settings-option-label">{L(dict, '重要提醒推送', 'Critical reminders push')}</span>
-            <span className="nesio-settings-option-hint">
-              {pushMsg || L(dict, '只推真正要紧的(登机/就诊/还款截止),一天最多几条', 'Only truly urgent ones (boarding, appointments, due bills)')}
-            </span>
-          </div>
-          <span className={`nesio-settings-space-check${pushOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
-            {pushOn ? '✓' : '○'}
-          </span>
-        </button>
-      )}
-      {/* 批次 56:记忆自动定位 —— 开启即请求手机定位权限(权限时刻在这里,不在记录途中) */}
-      <button type="button"
-        className={`nesio-settings-option${captureLocOn ? ' nesio-settings-option--active' : ''}`}
-        onClick={() => {
-          const next = !captureLocOn;
-          setCaptureLocOn(next);
-          setCaptureLocationEnabled(next);
-        }}>
-        <div>
-          <span className="nesio-settings-option-label">{L(dict, '记忆自动定位', 'Auto-locate memories')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, '亲手记的带上位置 · 只存本机', 'Your own notes get a location · kept on this device only')}</span>
-        </div>
-        <span className={`nesio-settings-space-check${captureLocOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
-          {captureLocOn ? '✓' : '○'}
-        </span>
-      </button>
-
-      <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>{t(locale, 'sectionAppearance')}<InfoTip text={t(locale, 'generalAutoHint')} /></p>
-      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-        {themeOpts.map((opt) => (
-          <button key={opt.id} type="button"
-            className={`nesio-settings-option${theme === opt.id ? ' nesio-settings-option--active' : ''}`}
-            style={{ flex: 1, justifyContent: 'center', gap: 'var(--space-1)' }}
-            onClick={() => pickTheme(opt.id)}>
-            {opt.icon}
-            <span className="nesio-settings-option-label">{opt.label}</span>
-          </button>
-        ))}
-      </div>
-      {themeSaveIssue && (
-        <p style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--status-risk, #c0564f)' }}>{themeSaveIssue}</p>
-      )}
-
-      <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>{L(dict, '字体大小', 'Text size')}<InfoTip text={L(dict, '整体放大界面文字与间距;标准 = 跟随系统设置。', 'Scales the whole UI text & spacing; Standard = follow system.')} /></p>
-      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-        {([['sm', L(dict, '小', 'S'), '0.8rem'], ['md', L(dict, '标准', 'M'), '0.95rem'], ['lg', L(dict, '大', 'L'), '1.1rem'], ['xl', L(dict, '特大', 'XL'), '1.28rem']] as Array<[FontScale, string, string]>).map(([id, label, demo]) => (
-          <button key={id} type="button"
-            className={`nesio-settings-option${fontScale === id ? ' nesio-settings-option--active' : ''}`}
-            style={{ flex: 1, justifyContent: 'center' }}
-            onClick={() => { setFontScale(id); applyFontScale(id); }}>
-            <span className="nesio-settings-option-label" style={{ fontSize: demo, lineHeight: 1 }}>{label}</span>
-          </button>
-        ))}
-      </div>
-
-      <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-5)' }}>{t(locale, 'sectionLanguage')}<InfoTip text={t(locale, 'langSoonHint')} /></p>
-      {/* 批次 5:下拉选择,只开放字典已完成的语言(真实有效红线:不给不生效的选项) */}
-      <select
-        value={locale}
-        onChange={(e) => pickLang(e.target.value as PortalLocale)}
-        aria-label={t(locale, 'sectionLanguage')}
-        style={{ width: '100%', minHeight: 'var(--tap-min)', borderRadius: 'var(--radius-sm)', border: '1.5px solid var(--portal-line)', background: 'var(--glass-bg-solid)', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', padding: 'var(--space-2) var(--space-3)', outline: 'none', fontFamily: 'inherit' }}
-      >
-        <optgroup label={t(locale, 'langGroupReady')}>
-          {PORTAL_LOCALE_OPTIONS.filter(([code]) => READY_LOCALES.has(code)).map(([code, label]) => (
-            <option key={code} value={code}>{label}</option>
-          ))}
-        </optgroup>
-        <optgroup label={t(locale, 'langGroupSoon')}>
-          {PORTAL_LOCALE_OPTIONS.filter(([code]) => !READY_LOCALES.has(code)).map(([code, label]) => (
-            <option key={code} value={code} disabled>{label}</option>
-          ))}
-        </optgroup>
-      </select>
-
-    </SheetWrap>
-  );
-}
-
-// 兼容旧引用(契约/历史调用点):ToneSheet 即 GeneralSheet
-export const ToneSheet = GeneralSheet;
-
 // ── 档案(批次 138·设计「档案与账户分开」):昵称 + 头像,从账户拆出 ──
 // 图3:ProfileSheet(档案页)已删除 —— 昵称与更换头像并入 AccountSheet(账户)。
 
@@ -551,6 +315,57 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     setBackupDest(d);
     try { localStorage.setItem('nesio-backup-dest', d); } catch { /* ignore */ }
   };
+
+  /**
+   * 这四个开关(日报/触感/推送/自动定位)本来在 GeneralSheet(即 ToneSheet)里,
+   * 批次138 把「通用」拆成「外观与语言」时,主题/字号/语言迁去了 AppearanceSheet,
+   * 但这四个开关没跟着迁走——GeneralSheet 从此没有任何入口能打开(NesioProfileCard
+   * 只挂了 AccountSheet/AppearanceSheet/PrivacySheet/SubscriptionSheet/LabSheet),
+   * 这四个开关等于人间蒸发:用户没法关也没法开(真机反馈:「日报没有开关」,查下来
+   * 就是这个——不是 UI 忘了画,是压根没地方点)。搬进这里(数据与隐私,离「连接
+   * 数据源」「记忆自动定位」本来就近),GeneralSheet 整个删掉(见下方注释)。
+   */
+  const [dailyReportOn, setDailyReportOn] = useState(false);
+  const [hapticsOn, setHapticsOn] = useState(true);
+  const [captureLocOn, setCaptureLocOn] = useState(false);
+  const [pushOn, setPushOn] = useState(false);
+  const [pushMsg, setPushMsg] = useState('');
+  useEffect(() => {
+    if (!open) return;
+    setDailyReportOn(loadProfileSettings().dailyReportEnabled);
+    try {
+      setHapticsOn(localStorage.getItem(HAPTIC_FEEDBACK_KEY) !== '0');
+      setCaptureLocOn(captureLocationEnabled());
+    } catch { /* ignore */ }
+    setPushOn(isPushEnabled());
+  }, [open]);
+  function toggleDailyReport() {
+    setDailyReportOn((v) => {
+      saveProfileSettings({ dailyReportEnabled: !v });
+      return !v;
+    });
+  }
+  function toggleHaptics() {
+    setHapticsOn((v) => {
+      try { localStorage.setItem(HAPTIC_FEEDBACK_KEY, v ? '0' : '1'); } catch { /* ignore */ }
+      return !v;
+    });
+  }
+  async function togglePush() {
+    if (pushOn) {
+      await disablePush();
+      setPushOn(false); setPushMsg('');
+      return;
+    }
+    setPushMsg(L(dict, '正在开启…', 'Enabling…'));
+    const r = await enablePush();
+    if (r.ok) { setPushOn(true); setPushMsg(''); }
+    else {
+      setPushMsg(r.reason === 'denied'
+        ? L(dict, '浏览器没给通知权限,可在系统设置里打开后重试', 'Notification permission denied — enable it in system settings and retry')
+        : L(dict, '没开成,稍后再试', 'Could not enable — try again later'));
+    }
+  }
 
   async function handleDriveBackup() {
     setDriveState('busy'); setDriveMsg('');
@@ -834,6 +649,61 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
 
   return (
     <SheetWrap open={open} onClose={onClose} title={L(dict, '数据与隐私', 'Data & privacy')}>
+
+      {/* 从 GeneralSheet 搬来的四个开关(见上方 pickBackupDest 后的长注释)。 */}
+      <p className="nesio-settings-section-label">{L(dict, '开关', 'Switches')}</p>
+      <button type="button"
+        className={`nesio-settings-option${dailyReportOn ? ' nesio-settings-option--active' : ''}`}
+        onClick={toggleDailyReport}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '每日 AI 图文日报', 'Daily AI report')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '每天存进记忆 · 首页回顾里给你', 'Saved to Memory daily · shown in Today')}</span>
+        </div>
+        <span className={`nesio-settings-space-check${dailyReportOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+          {dailyReportOn ? '✓' : '○'}
+        </span>
+      </button>
+      <button type="button"
+        className={`nesio-settings-option${hapticsOn ? ' nesio-settings-option--active' : ''}`}
+        onClick={toggleHaptics}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '触感反馈', 'Haptics')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '记录成功/找到/长按录音时轻震', 'Gentle buzz when you save, find something, or hold to record')}</span>
+        </div>
+        <span className={`nesio-settings-space-check${hapticsOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+          {hapticsOn ? '✓' : '○'}
+        </span>
+      </button>
+      {pushSupported() && (
+        <button type="button"
+          className={`nesio-settings-option${pushOn ? ' nesio-settings-option--active' : ''}`}
+          onClick={() => { void togglePush(); }}>
+          <div>
+            <span className="nesio-settings-option-label">{L(dict, '重要提醒推送', 'Critical reminders push')}</span>
+            <span className="nesio-settings-option-hint">
+              {pushMsg || L(dict, '只推真正要紧的(登机/就诊/还款截止),一天最多几条', 'Only truly urgent ones (boarding, appointments, due bills)')}
+            </span>
+          </div>
+          <span className={`nesio-settings-space-check${pushOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+            {pushOn ? '✓' : '○'}
+          </span>
+        </button>
+      )}
+      <button type="button"
+        className={`nesio-settings-option${captureLocOn ? ' nesio-settings-option--active' : ''}`}
+        onClick={() => {
+          const next = !captureLocOn;
+          setCaptureLocOn(next);
+          setCaptureLocationEnabled(next);
+        }}>
+        <div>
+          <span className="nesio-settings-option-label">{L(dict, '记忆自动定位', 'Auto-locate memories')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '亲手记的带上位置 · 只存本机', 'Your own notes get a location · kept on this device only')}</span>
+        </div>
+        <span className={`nesio-settings-space-check${captureLocOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+          {captureLocOn ? '✓' : '○'}
+        </span>
+      </button>
 
       {/* bug2:「你的数据在哪里」整块删除(数据主权面板 + 同步诊断) */}
 

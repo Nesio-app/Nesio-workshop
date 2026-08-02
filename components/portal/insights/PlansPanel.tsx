@@ -23,6 +23,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { PeriodList } from './RetrospectPanel';
+import { DailyReportOffNotice } from './DailyReportOffNotice';
 
 const DailyReportSheet = dynamic(() => import('../DailyReportSheet'), { ssr: false });
 
@@ -75,7 +76,7 @@ export default function PlansPanel() {
   );
 
   const enabled = loadProfileSettings().dailyReportEnabled;
-  if (!enabled) return null;
+  if (!enabled) return <DailyReportOffNotice />;
 
   return (
     <div className="nesio-reflection-tab">
