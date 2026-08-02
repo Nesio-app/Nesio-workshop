@@ -25,6 +25,7 @@ import { loadProfileSettings } from '@/lib/portal/profile';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { DailyReportOffNotice } from './DailyReportOffNotice';
 
 const DailyReportSheet = dynamic(() => import('../DailyReportSheet'), { ssr: false });
 
@@ -50,8 +51,8 @@ export default function DailyReportPanel() {
   );
 
   const enabled = loadProfileSettings().dailyReportEnabled;
-  // 关掉了就整段不出现 —— 那是用户自己关的,不该再在洞察页立着一块空地。
-  if (!enabled) return null;
+  // 关掉了就显式说明,不是留一块没解释的空地(见 DailyReportOffNotice 的长注释)。
+  if (!enabled) return <DailyReportOffNotice />;
 
   const fmt = (date: string) => {
     // date 是 YYYY-MM-DD(本地日键)。用 T12:00 解析,免得跨时区被推到前一天。
