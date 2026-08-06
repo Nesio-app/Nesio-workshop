@@ -1,5 +1,6 @@
 import { reportStorageDropped } from '@/lib/portal/storage-health';
 import { haversineMeters } from '@/lib/portal/geo';
+import { createBlobStore } from '@/lib/portal/idb-blob-store';
 
 export interface NamedPlace {
   id: string;
@@ -12,7 +13,11 @@ export interface NamedPlace {
   subRooms: Record<string, string[]>;
 }
 
-const STORAGE_KEY = 'nesio-named-places';
+const placesStore = createBlobStore<NamedPlace[]>({
+  key: 'nesio-named-places',
+  updateEvent: 'nesio-named-places-updated',
+  validate: (v) => Array.isArray(v),
+});
 
 const DEFAULT_HOME: NamedPlace = {
   id: 'home',
@@ -33,22 +38,27 @@ const DEFAULT_HOME: NamedPlace = {
 
 export function getNamedPlaces(): NamedPlace[] {
   if (typeof window === 'undefined') return [DEFAULT_HOME];
+  const cached = placesStore.load();
+  if (cached && cached.length) return cached;
+  // 老用户:IDB 空但 localStorage 可能还有(createBlobStore 水合时会自动搬,
+  // 但这里兜底防 race)
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [DEFAULT_HOME];
-    const parsed = JSON.parse(raw) as NamedPlace[];
-    return parsed.length ? parsed : [DEFAULT_HOME];
-  } catch {
-    return [DEFAULT_HOME];
-  }
+    const raw = localStorage.getItem('nesio-named-places');
+    if (raw) {
+      const parsed = JSON.parse(raw) as NamedPlace[];
+      if (parsed.length) {
+        placesStore.save(parsed);
+        try { localStorage.removeItem('nesio-named-places'); } catch { /* ignore */ }
+        return parsed;
+      }
+    }
+  } catch { /* ignore */ }
+  return [DEFAULT_HOME];
 }
 
 export function saveNamedPlaces(places: NamedPlace[]): void {
   if (typeof window === 'undefined') return;
-  // 用户命名的地点(家/常去)是原创数据;此前裸 setItem 配额满会抛,上层某处一 catch 就变静默丢。
-  // 包住并派发可见事件(红线),不让「保存地点」悄无声息失败。
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(places)); }
-  catch { reportStorageDropped(); }
+  placesStore.save(places);
 }
 
 export function upsertNamedPlace(place: NamedPlace): void {
