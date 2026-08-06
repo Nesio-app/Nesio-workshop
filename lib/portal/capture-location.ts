@@ -9,13 +9,16 @@
  *  - 开关默认关;开启动作本身就是权限时刻(立即预热一次,系统弹授权框);
  *  - 捕获路径不等 GPS:捕获面打开时预热(prefetch),盖章只读 ≤5 分钟的缓存;
  *  - 地名异步回填:坐标先落节点,反查到城市名后 updateLifeNode 补 capturedPlace。
+ *
+ * 批次 P2-geo:FIX_CACHE_KEY 从 localStorage 迁到 IDB blob-store,
+ * 减少 5MB 配额压力与频繁 JSON parse 的内存抖动。
  */
 
 import { reverseGeocode } from './weather';
 import { getDevicePosition } from './native-geolocation';
+import { createBlobStore } from './idb-blob-store';
 
 const FLAG_KEY = 'nesio-capture-loc-v1';           // durable:用户选择,进备份
-const FIX_CACHE_KEY = 'nesio-capture-fix-cache-v1'; // cache:可再生,不进备份
 const FIX_MAX_AGE = 5 * 60_000;
 const PREFETCH_THROTTLE = 60_000;
 
@@ -26,6 +29,12 @@ export interface CaptureFix {
   ts: number;
   label?: string;
 }
+
+const fixStore = createBlobStore<CaptureFix>({
+  key: 'nesio-capture-fix-cache-v1',
+  updateEvent: 'nesio-capture-fix-updated',
+  validate: (v) => v != null && typeof (v as CaptureFix).lat === 'number',
+});
 
 export function captureLocationEnabled(): boolean {
   if (typeof window === 'undefined') return false;
@@ -42,16 +51,14 @@ let memFix: CaptureFix | null = null;
 
 function readFixCache(): CaptureFix | null {
   if (memFix) return memFix;
-  try {
-    const raw = JSON.parse(localStorage.getItem(FIX_CACHE_KEY) || 'null') as CaptureFix | null;
-    if (raw && typeof raw.lat === 'number') memFix = raw;
-  } catch { /* ignore */ }
+  const cached = fixStore.load();
+  if (cached && typeof cached.lat === 'number') memFix = cached;
   return memFix;
 }
 
 function writeFixCache(fix: CaptureFix): void {
   memFix = fix;
-  try { localStorage.setItem(FIX_CACHE_KEY, JSON.stringify(fix)); } catch { /* ignore */ }
+  fixStore.save(fix);
 }
 
 /** 盖章用:≤maxAge 的最近定位;没有就 null(宁缺毋错)。 */
