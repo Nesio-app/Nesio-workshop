@@ -1,149 +1,120 @@
-/**
- * Place Trail — 地点流水(批次 21)。
- *
- * b 主线:天气连接器每次拿到定位就顺手记一笔,自然积累成自己的
- * 地点足迹(隐私完全本机);a 补历史:Google 地图时间轴导出的 JSON
- * 可整段导入并入同一条流水。洞察 → 分析 → 「地点足迹」消费。
- */
+import { reportStorageDropped } from '@/lib/portal/storage-health';
+import { haversineMeters } from '@/lib/portal/geo';
+import { createBlobStore } from '@/lib/portal/idb-blob-store';
 
-import { reportStorageDropped } from './storage-health';
-import { createBlobStore } from './idb-blob-store';
-import { wallDateKey, wallHour, clampEndToWallDay } from './place-time.mjs';
-import { canonicalCountryKey } from './country-normalize';
-import { haversineKm, isGenericPlaceLabel, placeKey as geoPlaceKey } from './geo';
-
-export { haversineKm } from './geo';
-
-export interface PlaceVisit {
-  /** ISO 时间(到访开始) */
-  ts: string;
-  /** 结束时间(导入的历史段才有) */
-  end?: string;
-  label: string;
-  lat?: number;
-  lon?: number;
-  source: 'live' | 'import';
+export interface NamedPlace {
+  id: string;
+  name: string;
+  emoji: string;
+  lat: number;
+  lon: number;
+  radiusMeters: number;
+  rooms: string[];
+  subRooms: Record<string, string[]>;
 }
 
-const KEY = 'nesio-place-trail-v1';
-// 批次 57 迁 IndexedDB 后不再受 localStorage 配额约束;800 会把整段
-// Google 时间轴历史静默砍掉(只剩最近 800 条),是「导入了却看不到历史」的根因。
-const CAP = 20000;
-export const PLACE_TRAIL_UPDATED_EVENT = 'nesio-place-trail-updated';
-
-// 批次 57:地点轨迹(自动采集、会无限长)挪 IndexedDB —— 腾 localStorage 配额;
-// 别名/分类/地理编码(小)仍留 localStorage。读取同步(缓存),写落 IDB。
-const store = createBlobStore<PlaceVisit[]>({
-  key: KEY, updateEvent: PLACE_TRAIL_UPDATED_EVENT,
-  validate: (v) => Array.isArray(v), onWriteError: reportStorageDropped,
+const placesStore = createBlobStore<NamedPlace[]>({
+  key: 'nesio-named-places',
+  updateEvent: 'nesio-named-places-updated',
+  validate: (v) => Array.isArray(v),
 });
 
-// 批次 75(用户三次实锤 家/Ethans Glen Court 分家):历史数据自愈 ——
-// 用户命名的地点(改名目标/手动分类为 home 的)坐标 150m 内的**街道后缀**
-// 原名(Court/St/Ave/Rd…,geocode 街名不是用户起的)一次性归并过去。
-// 只认"街名 → 人名"方向,绝不把两家真 POI 硬并。
-const HEAL_FLAG = 'nesio-place-heal-v1';
-const STREET_SUFFIX_RE = /\b(court|ct|street|st|avenue|ave|road|rd|drive|dr|lane|ln|way|blvd|boulevard|circle|cir|place|pl|trail|trl|terrace|ter|parkway|pkwy)\b\.?,?/i;
-export function healSplitPlacesOnce(): void {
-  if (typeof window === 'undefined') return;
-  try { if (localStorage.getItem(HEAL_FLAG)) return; localStorage.setItem(HEAL_FLAG, '1'); } catch { return; }
-  const trail = loadPlaceTrail();
-  const renames = loadPlaceRenames();
-  const cats = loadPlaceCategories();
-  // 用户命名集合:改名目标 + 手动标为 home 的标签
-  const named = new Set<string>([...Object.values(renames), ...Object.keys(cats).filter((k) => cats[k] === 'home')]);
-  if (!named.size) return;
-  const coordOf = new Map<string, { lat: number; lon: number }>();
-  for (const v of trail) {
-    if (v.lat != null && v.lon != null && !coordOf.has(v.label)) coordOf.set(v.label, { lat: v.lat, lon: v.lon });
-  }
-  let merges = 0;
-  for (const [label, c] of coordOf) {
-    if (merges >= 20) break;
-    if (named.has(label) || !STREET_SUFFIX_RE.test(label)) continue;
-    for (const target of named) {
-      const tc = coordOf.get(target);
-      if (!tc) continue;
-      if (haversineKm(c.lat, c.lon, tc.lat, tc.lon) <= 0.15) {
-        renamePlaceLabel(label, target);
-        merges += 1;
-        break;
+const DEFAULT_HOME: NamedPlace = {
+  id: 'home',
+  name: '家',
+  emoji: '🏠',
+  lat: 0,
+  lon: 0,
+  radiusMeters: 150,
+  rooms: ['客厅', '卧室', '书房', '厨房', '卫生间', '阳台', '门口', '储物间'],
+  subRooms: {
+    客厅: ['电视柜', '沙发旁', '茶几', '书架', '边柜'],
+    卧室: ['床头柜', '衣柜', '梳妆台', '床底'],
+    书房: ['书桌', '书架', '文件柜', '抽屉'],
+    厨房: ['橱柜', '冰箱', '台面', '抽屉'],
+    储物间: ['上层', '中层', '下层', '角落'],
+  },
+};
+
+export function getNamedPlaces(): NamedPlace[] {
+  if (typeof window === 'undefined') return [DEFAULT_HOME];
+  const cached = placesStore.load();
+  if (cached && cached.length) return cached;
+  // 老用户:IDB 空但 localStorage 可能还有(createBlobStore 水合时会自动搬,
+  // 但这里兜底防 race)
+  try {
+    const raw = localStorage.getItem('nesio-named-places');
+    if (raw) {
+      const parsed = JSON.parse(raw) as NamedPlace[];
+      if (parsed.length) {
+        placesStore.save(parsed);
+        try { localStorage.removeItem('nesio-named-places'); } catch { /* ignore */ }
+        return parsed;
       }
     }
+  } catch { /* ignore */ }
+  return [DEFAULT_HOME];
+}
+
+export function saveNamedPlaces(places: NamedPlace[]): void {
+  if (typeof window === 'undefined') return;
+  placesStore.save(places);
+}
+
+export function upsertNamedPlace(place: NamedPlace): void {
+  const places = getNamedPlaces();
+  const idx = places.findIndex((p) => p.id === place.id);
+  if (idx >= 0) places[idx] = place;
+  else places.push(place);
+  saveNamedPlaces(places);
+}
+
+export function deleteNamedPlace(id: string): void {
+  saveNamedPlaces(getNamedPlaces().filter((p) => p.id !== id));
+}
+
+export function matchNearestPlace(lat: number, lon: number): NamedPlace | null {
+  const places = getNamedPlaces().filter((p) => p.lat !== 0 || p.lon !== 0);
+  let best: NamedPlace | null = null;
+  let bestDist = Infinity;
+  for (const p of places) {
+    const d = haversineMeters(lat, lon, p.lat, p.lon);
+    if (d < p.radiusMeters && d < bestDist) {
+      bestDist = d;
+      best = p;
+    }
   }
+  return best;
 }
 
-let coordAliasNormalized = false;
-/** 批次 62:存量归一 —— 批次 60 只给坐标条目做了显示别名,raw 仍是坐标,
- *  聚合/时间线按 raw 分家(用户实测两行同名不合并)。开机把「坐标 raw + 有别名」
- *  的条目就地改写成别名真名并清掉别名,连续同名停留自此天然合并。 */
-function normalizeCoordAliasesOnce(): void {
-  if (coordAliasNormalized || typeof window === 'undefined') return;
-  coordAliasNormalized = true;
-  try {
-    const aliases = loadPlaceAliases();
-    const coordKeys = Object.keys(aliases).filter((k) => /^-?\d+\.\d+,-?\d+\.\d+$/.test(k));
-    for (const k of coordKeys) renamePlaceLabel(k, aliases[k]);
-  } catch { /* 归一失败不拦读取 */ }
-}
-
-export function loadPlaceTrail(): PlaceVisit[] {
-  normalizeCoordAliasesOnce();
-  try { healSplitPlacesOnce(); } catch { /* 愈合失败不拦读取 */ }
-  const raw = store.load();
-  return Array.isArray(raw) ? raw : [];
-}
-
-function save(trail: PlaceVisit[]): void {
-  // 按时间倒序,封顶
-  const sorted = [...trail].sort((a, b) => b.ts.localeCompare(a.ts)).slice(0, CAP);
-  store.save(sorted);
-}
-
-/** 实时记录:同一地点 2 小时内不重复记(定位轮询会反复命中同一地方)。 */
-export function recordLiveVisit(rawLabel: string, lat?: number, lon?: number): void {
-  const label = canonicalPlaceLabel(rawLabel);
-  if (!label) return;
-  const trail = loadPlaceTrail();
-  const now = Date.now();
-  const recentSame = trail.find(
-    (v) => v.label === label && now - new Date(v.ts).getTime() < 2 * 3_600_000,
-  );
-  if (recentSame) return;
-  // 带本地时区偏移的 ISO(QA 计数错位):纯 Z 时间戳会按浏览器时区分日,与带偏移的
-  // 历史事件(Tesla 等)分日口径不一致 → 深夜的点在不同视图落到不同的「天」。
-  const d = new Date();
-  const off = -d.getTimezoneOffset();
-  const sign = off >= 0 ? '+' : '-';
-  const pad = (x: number) => String(Math.trunc(Math.abs(x))).padStart(2, '0');
-  const tsLocal = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}${sign}${pad(off / 60)}:${pad(off % 60)}`;
-  save([{ ts: tsLocal, label, lat, lon, source: 'live' }, ...trail]);
+export function formatLocation(placeId: string, room: string, subRoom: string): string {
+  const places = getNamedPlaces();
+  const place = places.find((p) => p.id === placeId);
+  if (!place) return [placeId, room, subRoom].filter(Boolean).join(' · ');
+  // 设计:存放位置显示一律线性无 emoji(🏠 等图形字符不进 UI 文本)。只保留地点名,
+  // 图标交给渲染层。存储是结构化 placeId/room/subRoom,这里纯展示,去 emoji 不影响匹配。
+  const parts = [place.name];
+  if (room) parts.push(room);
+  if (subRoom) parts.push(subRoom);
+  return parts.join(' · ');
 }
 
 /**
- * 记录一次「发生在特定时间」的到访 —— 连接器给的历史事件(如 Tesla 充电会话)。
- * 与 recordLiveVisit 的区别:ts 用事件真实时间,不是「现在」。按 label|ts 去重,
- * 反复同步同一会话不会重复堆。source 记 'live'(不触发 import 那天让位粗粒度打点的逻辑)。
+ * 批次192(存放位置闭环):把物品存的位置解析成**当前**显示串。
+ * 有稳定 placeId → 用当前命名地点重建(命名地点改名后自动传导到所有物品);
+ * 没有 placeId(自由文本/老数据)→ 回退存的 location 字符串。
  */
-export function recordVisitAt(rawLabel: string, tsISO: string, lat?: number, lon?: number): void {
-  const label = canonicalPlaceLabel(rawLabel);
-  if (!label || !tsISO) return;
-  const ts = new Date(tsISO).toISOString();
-  if (Number.isNaN(new Date(ts).getTime())) return;
-  const trail = loadPlaceTrail();
-  if (trail.some((v) => v.label === label && v.ts === ts)) return;
-  save([{ ts, label, lat, lon, source: 'live' }, ...trail]);
+export function displayStoredLocation(attrs: Record<string, unknown> | null | undefined): string {
+  const pid = typeof attrs?.placeId === 'string' ? attrs.placeId : '';
+  if (pid && getNamedPlaces().some((p) => p.id === pid)) {
+    return formatLocation(
+      pid,
+      typeof attrs?.placeRoom === 'string' ? attrs.placeRoom : '',
+      typeof attrs?.placeSubRoom === 'string' ? attrs.placeSubRoom : '',
+    );
+  }
+  return typeof attrs?.location === 'string' ? attrs.location : '';
 }
-
-/** 批量并入导入的历史段(按 ts+label 去重)。返回新增条数。 */
-export function mergeImportedVisits(visits: PlaceVisit[]): number {
-  const trail = loadPlaceTrail();
-  const seen = new Set(trail.map((v) => `${v.ts}|${v.label}`));
-  const fresh = visits.filter((v) => v.label && v.ts && !seen.has(`${v.ts}|${v.label}`));
-  if (fresh.length) save([...fresh, ...trail]);
-  return fresh.length;
-}
-
 // ── Google 地图时间轴导出解析 ────────────────────────────────────────────────
 // 支持两种格式:
 //  A. 新版手机端导出(2024+):{ semanticSegments: [{ startTime, endTime,
@@ -237,51 +208,56 @@ export function categoryOf(label: string): PlaceCategory {
 }
 
 export const PLACE_CATEGORY_META: Record<PlaceCategory, { zh: string; en: string; sym: string }> = {
-  grocery: { zh: '超市', en: 'Grocery', sym: '🛒' },
-  cafe: { zh: '咖啡', en: 'Café', sym: '☕' },
-  park: { zh: '公园', en: 'Park', sym: '🌳' },
-  education: { zh: '学校', en: 'School', sym: '🎓' },
-  shopping: { zh: '购物', en: 'Shopping', sym: '🛍' },
-  food: { zh: '餐饮', en: 'Food & drink', sym: '🍽' },
-  fitness: { zh: '运动', en: 'Sports', sym: '🏃' },
-  culture: { zh: '文化', en: 'Culture', sym: '🏛' },
-  entertainment: { zh: '娱乐', en: 'Entertainment', sym: '🎡' },
-  health: { zh: '医疗', en: 'Health', sym: '🏥' },
-  lodging: { zh: '住宿', en: 'Lodging', sym: '🏨' },
-  transit: { zh: '交通', en: 'Transit', sym: '✈' },
-  work: { zh: '工作', en: 'Work', sym: '💼' },
-  home: { zh: '家', en: 'Home', sym: '🏠' },
-  place: { zh: '其他地点', en: 'Other places', sym: '📍' },
-  unknown: { zh: '未命名', en: 'Unnamed', sym: '📍' },
+  grocery: { zh: '超市', en: 'Grocery', sym: '' },
+  cafe: { zh: '咖啡', en: 'Café', sym: '' },
+  park: { zh: '公园', en: 'Park', sym: '' },
+  education: { zh: '学校', en: 'School', sym: '' },
+  shopping: { zh: '购物', en: 'Shopping', sym: '' },
+  food: { zh: '餐饮', en: 'Food & drink', sym: '' },
+  fitness: { zh: '运动', en: 'Sports', sym: '' },
+  culture: { zh: '文化', en: 'Culture', sym: '' },
+  entertainment: { zh: '娱乐', en: 'Entertainment', sym: '' },
+  health: { zh: '医疗', en: 'Health', sym: '' },
+  lodging: { zh: '住宿', en: 'Lodging', sym: '' },
+  transit: { zh: '交通', en: 'Transit', sym: '' },
+  work: { zh: '工作', en: 'Work', sym: '' },
+  home: { zh: '家', en: 'Home', sym: '' },
+  place: { zh: '其他地点', en: 'Other places', sym: '' },
+  unknown: { zh: '未命名', en: 'Unnamed', sym: '' },
 };
 
 export interface CategoryGroup { category: PlaceCategory; count: number; visits: number; places: PlaceCluster[] }
 
 // 批次 40:反向地理编码结果 —— label → { name, city, country }。供 World tab(国家/城市)。
-const PLACE_GEO_KEY = 'nesio-place-geo-v1';
 export interface PlaceGeo { name?: string; city?: string; country?: string; resolved?: boolean; kind?: PlaceCategory }
 export function loadPlaceGeo(): Record<string, PlaceGeo> {
   if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem(PLACE_GEO_KEY) || '{}') as Record<string, PlaceGeo>; } catch { return {}; }
+  if (_geoCache) return _geoCache;
+  _geoCache = geoStore.load() || {};
+  return _geoCache;
 }
 export function setPlaceGeo(rawLabel: string, geo: PlaceGeo): void {
   if (typeof window === 'undefined') return;
-  const all = loadPlaceGeo();
-  all[rawLabel] = { ...all[rawLabel], ...geo };
-  try { localStorage.setItem(PLACE_GEO_KEY, JSON.stringify(all)); window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT)); } catch { /* ignore */ }
+  const all = { ...loadPlaceGeo(), [rawLabel]: { ...(loadPlaceGeo()[rawLabel] || {}), ...geo } };
+  geoStore.save(all);
+  _geoCache = all;
+  try { window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT)); } catch { /* ignore */ }
 }
 
 // 批次 40:手动类别覆盖 —— 自动识别不了(未命名)时,用户自己挑类别,记住。
-const PLACE_CAT_KEY = 'nesio-place-cat-v1';
 export function loadPlaceCategories(): Record<string, PlaceCategory> {
   if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem(PLACE_CAT_KEY) || '{}') as Record<string, PlaceCategory>; } catch { return {}; }
+  if (_catsCache) return _catsCache;
+  _catsCache = catStore.load() || {};
+  return _catsCache;
 }
 export function setPlaceCategory(raw: string, cat: PlaceCategory | ''): void {
   if (typeof window === 'undefined') return;
-  const all = loadPlaceCategories();
+  const all = { ...loadPlaceCategories() };
   if (cat) all[raw] = cat; else delete all[raw];
-  try { localStorage.setItem(PLACE_CAT_KEY, JSON.stringify(all)); window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT)); } catch { reportStorageDropped(); }
+  catStore.save(all);
+  _catsCache = all;
+  try { window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT)); } catch { reportStorageDropped(); }
 }
 
 /** 地点类别:手动指定 > geocode 拿到的地点本来的类(沃尔玛=超市)> 名字推断(未命名 → unknown)。 */
@@ -345,11 +321,11 @@ export function worldByCountry(visits: PlaceVisit[]): CountryGroup[] {
 }
 
 // ── 批次 30:地点别名(手动纠正 Unknown/机器名 → 记住,以后都用对的名字)──────
-const PLACE_ALIAS_KEY = 'nesio-place-alias-v1';
-
 export function loadPlaceAliases(): Record<string, string> {
   if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem(PLACE_ALIAS_KEY) || '{}') as Record<string, string>; } catch { return {}; }
+  if (_aliasesCache) return _aliasesCache;
+  _aliasesCache = aliasStore.load() || {};
+  return _aliasesCache;
 }
 
 /** 原始名 → 显示名(用户纠正过就用纠正后的)。 */
@@ -361,21 +337,23 @@ export function displayLabel(raw: string): string {
 // ── 批次 69:改名的持久记忆 —— 此前 renamePlaceLabel 只改历史本体,改完之后
 // **新**打点带着原始 geocode 名回来又分了家(用户实锤:家 与 Ethans Glen Court
 // 两行并存)。这里把 old→new 永久记住,recordLiveVisit/recordVisitAt 写入前先归一。
-const PLACE_RENAME_KEY = 'nesio-place-renames-v1';
 function loadPlaceRenames(): Record<string, string> {
   if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem(PLACE_RENAME_KEY) || '{}') as Record<string, string>; } catch { return {}; }
+  if (_renamesCache) return _renamesCache;
+  _renamesCache = renameStore.load() || {};
+  return _renamesCache;
 }
 function rememberRename(oldLabel: string, newLabel: string): void {
   try {
-    const map = loadPlaceRenames();
+    const map = { ...loadPlaceRenames() };
     map[oldLabel] = newLabel;
     // geocode 标签常见「名字, 城市, 国家」变体 —— 基名也记一份,后缀变体一并认亲
     const base = oldLabel.split(',')[0].trim();
     if (base && base !== oldLabel) map[base] = newLabel;
     // 链式改名(A→B 后 B→C):旧映射指向 oldLabel 的全部改指 newLabel
     for (const k of Object.keys(map)) if (map[k] === oldLabel) map[k] = newLabel;
-    localStorage.setItem(PLACE_RENAME_KEY, JSON.stringify(map));
+    renameStore.save(map);
+    _renamesCache = map;
   } catch { reportStorageDropped(); }
 }
 /** 写入前归一:改过名的地址(含「, 城市, 国家」后缀变体)一律用真名落库。 */
@@ -414,7 +392,8 @@ export function renamePlaceLabel(oldLabel: string, newLabel: string): void {
       const merged = { ...geo[oldLabel], ...(geo[newLabel] || {}), name: newLabel };
       const all = { ...geo, [newLabel]: merged };
       delete all[oldLabel];
-      localStorage.setItem(PLACE_GEO_KEY, JSON.stringify(all));
+      geoStore.save(all);
+      _geoCache = all;
     }
     const cats = loadPlaceCategories();
     if (cats[oldLabel] && !cats[newLabel]) setPlaceCategory(newLabel, cats[oldLabel]);
@@ -431,11 +410,12 @@ export function renamePlaceLabel(oldLabel: string, newLabel: string): void {
 
 export function setPlaceAlias(raw: string, name: string): void {
   if (typeof window === 'undefined') return;
-  const map = loadPlaceAliases();
+  const map = { ...loadPlaceAliases() };
   const trimmed = name.trim();
   if (trimmed && trimmed !== raw) map[raw] = trimmed; else delete map[raw];
-  try { localStorage.setItem(PLACE_ALIAS_KEY, JSON.stringify(map)); } catch { reportStorageDropped(); }
-  window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT));
+  aliasStore.save(map);
+  _aliasesCache = map;
+  try { window.dispatchEvent(new CustomEvent(PLACE_TRAIL_UPDATED_EVENT)); } catch { /* ignore */ }
 }
 
 export interface TimelineSegment {
@@ -632,14 +612,13 @@ export function clusterPlaces(visits: PlaceVisit[], topN = 8): PlaceCluster[] {
 }
 
 /* ---------- 批次 33:反向地理编码开关(默认关)---------- */
-const GEOCODE_FLAG_KEY = 'nesio-place-geocode-enabled';
 export function loadGeocodeEnabled(): boolean {
   if (typeof window === 'undefined') return false;
-  try { return localStorage.getItem(GEOCODE_FLAG_KEY) === '1'; } catch { return false; }
+  return geocodeFlagStore.load() === '1';
 }
 export function setGeocodeEnabled(on: boolean): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem(GEOCODE_FLAG_KEY, on ? '1' : '0'); } catch { /* ignore */ }
+  geocodeFlagStore.save(on ? '1' : '0');
 }
 
 /** 环游:去过的「外面」地点(排除家/未知),按最近去过排序 —— 给旅行/城市卡用。 */
@@ -693,7 +672,6 @@ function humanizeSemanticType(label: string): string {
 // 地名要自己反查(用户实测:导入后满屏未知地点)。按 ~110m 坐标格去重 —— 同一
 // 地点的反复到访只查一次;结果缓存本机,跨次导入/打开不重查;每轮限量,防一次
 // 导入几百个格子把免费反查服务打爆(查不完的下轮继续,常去的先有名字)。
-const REVGEO_CACHE_KEY = 'nesio-revgeo-cache-v1';
 const COORD_LABEL_RE = /^-?\d+(\.\d+)?,\s*-?\d+(\.\d+)?$/;
 
 function needsRealName(v: PlaceVisit): boolean {
@@ -707,8 +685,7 @@ export async function backfillGenericPlaceLabels(maxLookups = 40): Promise<numbe
   const needs = trail.filter(needsRealName);
   if (!needs.length) return 0;
 
-  let cache: Record<string, { label: string; city?: string; country?: string; kind?: string }> = {};
-  try { cache = JSON.parse(localStorage.getItem(REVGEO_CACHE_KEY) || '{}') as typeof cache; } catch { cache = {}; }
+  let cache = revgeoStore.load() || {};
 
   const cellOf = (v: PlaceVisit) => `${(v.lat as number).toFixed(3)},${(v.lon as number).toFixed(3)}`;
   const byCell = new Map<string, number>();
@@ -759,7 +736,7 @@ export async function backfillGenericPlaceLabels(maxLookups = 40): Promise<numbe
     }
     resolved.set(key, hit);
   }
-  try { localStorage.setItem(REVGEO_CACHE_KEY, JSON.stringify(cache)); } catch { reportStorageDropped(); }
+  revgeoStore.save(cache);
   if (!resolved.size) return 0;
 
   let touched = 0;
