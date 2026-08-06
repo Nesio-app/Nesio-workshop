@@ -2,12 +2,14 @@
  * Location store — last known device location, reverse-geocoded to a city label.
  * Client-side only. Refreshed opportunistically (chat open, weather fetch);
  * consumers read the cached value synchronously.
+ *
+ * 批次 P2-geo:从 localStorage 迁到 IDB blob-store,减少 5MB 配额压力。
  */
 
 import { readGeo, reverseGeocode } from './weather';
 import { relativePastLabel } from './time-labels';
+import { createBlobStore } from './idb-blob-store';
 
-const KEY = 'nesio-last-location-v1';
 // Re-geocode at most every 10 minutes — city-level context doesn't move faster.
 const REFRESH_INTERVAL = 10 * 60 * 1000;
 
@@ -19,12 +21,15 @@ export interface StoredLocation {
   ts: number;
 }
 
+const locStore = createBlobStore<StoredLocation>({
+  key: 'nesio-last-location-v1',
+  updateEvent: 'nesio-last-location-updated',
+  validate: (v) => v != null && typeof (v as StoredLocation).label === 'string',
+});
+
 export function loadLastLocation(): StoredLocation | null {
   if (typeof window === 'undefined') return null;
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || 'null') as StoredLocation | null;
-    return raw?.label ? raw : null;
-  } catch { return null; }
+  return locStore.load();
 }
 
 /**
@@ -42,7 +47,7 @@ export async function refreshLocation(): Promise<StoredLocation | null> {
     const geo = await reverseGeocode(lat, lon);
     if (!geo.label) return cached;
     const next: StoredLocation = { label: geo.label, city: geo.city, lat, lon, ts: Date.now() };
-    try { localStorage.setItem(KEY, JSON.stringify(next)); } catch { /* ignore */ }
+    locStore.save(next);
     return next;
   } catch {
     return cached;
