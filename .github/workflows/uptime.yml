@@ -23,7 +23,8 @@ jobs:
             local code
             code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 15 "$url" || echo "000")
             echo "$label → $code (expect $expect)"
-            if [ "$code" != "$expect" ]; then FAILS="$FAILS\n- $label: got $code, expected $expect ($url)"; fi
+            # expect 可以是「403|404」这样的多选一(用于「门关着就行」类断言)
+            if ! echo "$expect" | tr '|' '\n' | grep -qx "$code"; then FAILS="$FAILS\n- $label: got $code, expected $expect ($url)"; fi
           }
           check "首页" "https://www.nesio.app" "200"
           check "登录页" "https://www.nesio.app/login" "200"
@@ -31,8 +32,9 @@ jobs:
           check "PWA manifest" "https://www.nesio.app/manifest.json" "200"
           check "Service Worker" "https://www.nesio.app/sw.js" "200"
           check "健康端点" "https://www.nesio.app/api/portal/health" "200"
-          # 安全门必须保持关闭(松了同样是事故)
-          check "secretary 公众隔离" "https://www.nesio.app/secretary" "403"
+          # 安全门必须保持关闭(松了同样是事故)。/secretary 路由已整体移除:
+          # 404 = 门也是关的;只有 200 这类「公众能进」才算事故。
+          check "secretary 公众隔离" "https://www.nesio.app/secretary" "403|404"
           if [ -n "$FAILS" ]; then
             echo "failed=true" >> "$GITHUB_OUTPUT"
             {
