@@ -74,6 +74,17 @@ function newAssetId(): string {
   try { return `wardrobe-${crypto.randomUUID()}`; } catch { return `wardrobe-${Date.now()}-${Math.round(Math.random() * 1e9)}`; }
 }
 
+/**
+ * 存完图立即推云 / 打开面板立即拉云(force 绕开 30s 节流)。
+ * 不加这个的话,推送要等下一次「切后台再切回」的同步批次 —— 用户在两台设备间来回看,
+ * 体感就是「怎么都不同步」。best-effort:未登录/离线静默,批次的离线队列仍是兜底。
+ */
+function kickWardrobeImageSync(): void {
+  void import('@/lib/portal/cloud-wardrobe-image-sync')
+    .then((m) => m.autoSyncWardrobeImagesWithCloud({ force: true }))
+    .catch(() => { /* ignore */ });
+}
+
 // analyze(clothing) 返回节点 → 衣物属性 patch(供单件识别 + 批量共用);无有效字段返回 null。
 function attrsFromAnalyze(n: { name?: unknown; attributes?: Record<string, unknown> } | undefined): Partial<{ name: string; garmentType: GarmentType; warmth: Warmth; formality: Formality; colors: string[] }> | null {
   if (!n) return null;
@@ -182,6 +193,7 @@ export default function WardrobePanel() {
     };
     window.addEventListener('nesio-life-graph-updated', load);
     window.addEventListener('nesio-wardrobe-images-updated', onImagesSynced);
+    kickWardrobeImageSync(); // 打开衣帽间就把别端的照片拉下来,不等下一次前台切换
     return () => {
       window.removeEventListener('nesio-life-graph-updated', load);
       window.removeEventListener('nesio-wardrobe-images-updated', onImagesSynced);
@@ -212,6 +224,7 @@ export default function WardrobePanel() {
       if (!ok) { setTryonError(L(dict, '全身照存不下了(存储空间满),清点空间再试。', 'Could not save the photo (storage full).')); return; }
       try { localStorage.setItem(BODY_FLAG, '1'); } catch { /* ignore */ }
       setBodyThumb(dataUrl);
+      kickWardrobeImageSync();
     } catch { setTryonError(L(dict, '这张图读不了,换一张试试。', 'Could not read that image — try another.')); }
   };
 
@@ -274,6 +287,7 @@ export default function WardrobePanel() {
     setOutfitTryons((prev) => ({ ...prev, [assetId]: url }));
     if (!ok) { setTryonError(L(dict, '上身图这次没能存下来(空间满了)—— 现在能看,重开就没了。', 'Could not store the try-on image (storage full) — visible now, gone after reload.')); return; }
     commitOutfit(patchOutfit(o.id, { tryonAssetId: assetId }));
+    kickWardrobeImageSync();
   };
 
   useEffect(() => {
@@ -549,6 +563,7 @@ export default function WardrobePanel() {
       } catch { assetId = null; /* 存图失败也让衣服进衣橱,只是没缩略图 */ }
     }
     addGarment({ name, garmentType: draft.garmentType, warmth: draft.warmth, formality: draft.formality, colors, assetId, mimeType: draft.mimeType });
+    if (assetId) kickWardrobeImageSync();
     setDraft(EMPTY_DRAFT); setAdding(false); setAiError(null); setOrigPhoto(null);
     load();
   };
@@ -588,6 +603,7 @@ export default function WardrobePanel() {
       setBulkMsg(L(dict, `处理中 ${i + 1}/${files.length}`, `Processing ${i + 1}/${files.length}`));
     }
     load();
+    if (added > 0) kickWardrobeImageSync();
     setBulkBusy(false);
     const tail = pro ? (aiStopped ? L(dict, '（部分已 AI 识别,其余可点每件补）', ' (some AI-tagged; tap to finish)') : L(dict, '（已 AI 识别）', ' (AI-tagged)')) : L(dict, '（点每件可补属性）', ' — tap each to edit');
     setBulkMsg(L(dict, `加了 ${added} 件${tail}`, `Added ${added}${tail}`));
