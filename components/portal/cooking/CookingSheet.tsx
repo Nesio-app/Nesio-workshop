@@ -1170,7 +1170,7 @@ function MealLogBody({ photoUrl, photoFile, onError, onDone, t }: { photoUrl?: s
     setName(''); setGrams('');
   }
   function removeItem(i: number) { setItems((v) => v.filter((_, idx) => idx !== i)); }
-  function save() {
+  async function save() {
     // 输入框有字但忘点「加」→ 自动并入,避免「先加一样吃的」+ 无效 Retry。
     let next = items;
     const pending = name.trim();
@@ -1184,13 +1184,22 @@ function MealLogBody({ photoUrl, photoFile, onError, onDone, t }: { photoUrl?: s
     try {
       const today = localDayKey();
       const p = Number(price);
-      addMeal({
+      const mealId = addMeal({
         source, items: next, energyKCal: nutri?.ek ?? 0, protein: nutri?.p ?? 0, fat: nutri?.f ?? 0, cho: nutri?.c ?? 0,
         occurredAt: today,
         // 只在真填了正数时带上 —— 空字符串 Number() 是 0,存 0 会让「没记价格」
         // 和「免费」长得一模一样(actualSpend 那条注释说的就是这个)。
         ...(Number.isFinite(p) && p > 0 ? { price: p } : {}),
       });
+      // 照片此前只用来识别、从不落库 → 换端永远只有文字。与记忆照片同路:本机 + 云 Storage。
+      if (photoUrl) {
+        const { persistCapturedPhoto } = await import('@/lib/portal/capture-pipeline');
+        const { updateLifeNode } = await import('@/lib/portal/life-graph');
+        const label = next.map((i) => i.name).filter(Boolean).slice(0, 3).join(' · ') || '一餐';
+        const persisted = await persistCapturedPhoto({ dataUrl: photoUrl, purpose: 'meal', label });
+        if (persisted) updateLifeNode(mealId, { assets: persisted.assets });
+        else onError(t('这一餐记下了,但照片没存上(空间可能满了)。', 'Meal saved, but the photo could not be stored (storage may be full).'));
+      }
       setSaved(true); setTimeout(onDone, 800);
     } catch { onError(t('没记上,再试一次。', 'Could not save — try again.')); }
   }
@@ -1288,7 +1297,7 @@ function MealLogBody({ photoUrl, photoFile, onError, onDone, t }: { photoUrl?: s
           : t('估算 · 基于《中国食物成分表》· 加克数更准。', 'Estimate · China Food Composition Table · add grams for accuracy.')}</p>
       </section>
 
-      <button type="button" onClick={save} disabled={saved} style={{ ...primaryBtn, width: '100%', padding: 'var(--space-4)', fontSize: 'var(--text-body)', opacity: saved ? 0.55 : 1 }}>
+      <button type="button" onClick={() => void save()} disabled={saved} style={{ ...primaryBtn, width: '100%', padding: 'var(--space-4)', fontSize: 'var(--text-body)', opacity: saved ? 0.55 : 1 }}>
         {saved ? t('已记入 ✓', 'Logged ✓') : t('记入今日账本', 'Log to today')}
       </button>
       <p style={caption}>{t('记下这一餐,身体账本按吃的日子求和。餐厅/外卖不扣库存。', 'Logged to your body ledger by the day you ate. Dine-in/takeout don’t touch the pantry.')}</p>

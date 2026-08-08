@@ -39,7 +39,9 @@ export interface Garment {
   material: string;
   seasons: string[];      // ['春','秋'];空 = 全季
   hasPhoto: boolean;
-  assetId: string | null; // 首张图 assetId(缩略图用 getLocalImage 读)
+  assetId: string | null; // 首张图 assetId(缩略图优先 getLocalImage)
+  /** 云 Storage 路径(换端无本机图时用签名 URL 读)。来自 assets[].storagePath。 */
+  storagePath: string | null;
   lastWornAt: string | null;
   wearCount: number;
   /** 买这件花了多少。null = 没记。见 NewGarment.price 那条注释:它不自动记账,是用来认领银行流水的。 */
@@ -66,7 +68,10 @@ function coerceFormality(v: unknown): Formality {
 
 export function toGarment(node: LifeNode): Garment {
   const a = node.attributes || {};
-  const img = node.assets?.find((as) => as.kind === 'image');
+  // 本机 asset 优先取 id;云孪生(有 storagePath)单独取出 —— 换端只靠后者。
+  const localImg = node.assets?.find((as) => as.kind === 'image' && as.local);
+  const cloudImg = node.assets?.find((as) => as.kind === 'image' && as.storagePath);
+  const img = localImg || cloudImg || node.assets?.find((as) => as.kind === 'image');
   return {
     node,
     id: node.id,
@@ -77,8 +82,9 @@ export function toGarment(node: LifeNode): Garment {
     colors: splitList(a.colors),
     material: typeof a.material === 'string' ? a.material : '',
     seasons: splitList(a.seasons),
-    hasPhoto: Boolean(img),
-    assetId: img?.id ?? null,
+    hasPhoto: Boolean(img || cloudImg),
+    assetId: localImg?.id ?? (img && !img.storagePath ? img.id : null) ?? null,
+    storagePath: cloudImg?.storagePath ?? img?.storagePath ?? null,
     lastWornAt: typeof a.lastWornAt === 'string' ? a.lastWornAt : null,
     wearCount: Number(a.wearCount) || 0,
     // 写进去要读得回来 —— 只写不读的字段等于没写
@@ -106,6 +112,8 @@ export interface NewGarment {
   material?: string;
   seasons?: string[];
   assetId?: string | null;   // 已存进本机图库(putLocalImage)的照片 id
+  /** 云 Storage 路径(与记忆照片同构);有则挂云孪生 asset,换端可见。 */
+  storagePath?: string | null;
   mimeType?: string;
   /**
    * 买这件花了多少(正数)。**不自动记一笔支出** —— 刷卡买的话 Plaid 已经有那条流水,
@@ -137,18 +145,29 @@ export function addGarment(input: NewGarment): LifeNode {
     if (input.currency) attributes.currency = input.currency;
     if (input.purchasedAt) attributes.purchasedAt = input.purchasedAt;
   }
-  const assets = input.assetId
-    ? [{ id: input.assetId, kind: 'image' as const, local: true, mimeType: input.mimeType || 'image/jpeg' }]
-    : undefined;
+  const assets: NonNullable<LifeNode['assets']> = [];
+  if (input.assetId) {
+    assets.push({ id: input.assetId, kind: 'image', local: true, mimeType: input.mimeType || 'image/jpeg' });
+  }
+  if (input.storagePath) {
+    assets.push({
+      id: `cloud-${input.assetId || Date.now()}`,
+      kind: 'image',
+      storagePath: input.storagePath,
+      mimeType: input.mimeType || 'image/jpeg',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  }
   return ingestLifeNode({
     type: 'Thing',
     name: input.name.trim() || '未命名衣物',
-    attributes: { ...attributes, epistemic: 'observation', generator: input.assetId ? 'user:photo' : 'user' },
-    source: input.assetId ? 'photo' : 'manual',
+    attributes: { ...attributes, epistemic: 'observation', generator: (input.assetId || input.storagePath) ? 'user:photo' : 'user' },
+    source: (input.assetId || input.storagePath) ? 'photo' : 'manual',
     confidence: 1,
     relations: [],
     tags: ['收纳', WARDROBE_CATEGORY],
-    ...(assets ? { assets } : {}),
+    ...(assets.length ? { assets } : {}),
   });
 }
 

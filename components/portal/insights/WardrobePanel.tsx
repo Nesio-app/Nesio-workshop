@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { openModeCamera, takePendingCapture, prepareCapturedPhoto, storeWardrobeImage, kickWardrobeImageSync } from '@/lib/portal/capture-pipeline';
+import { openModeCamera, takePendingCapture, prepareCapturedPhoto, storeWardrobeImage, storeWardrobeImageFull, resolveAssetDisplayUrl, kickWardrobeImageSync } from '@/lib/portal/capture-pipeline';
 import {
   listWardrobe, addGarment, removeGarment, markWorn, suggestOutfit, inferFormalNeed,
   GARMENT_TYPES, updateGarment, type Garment, type GarmentType, type Warmth, type Formality, type OutfitPrefs,
@@ -212,12 +212,21 @@ export default function WardrobePanel() {
     if (!person) { setTryonError(L(dict, '全身照读不了,重新上传一张。', 'Body photo unreadable — re-upload.')); return null; }
     setTryonBusy(true); setTryonError(null);
     try {
-      const { getLocalImage } = await import('@/lib/portal/local-image-store');
       const garments: Array<{ base64: string; mime: string }> = [];
       for (const p of pieces) {
-        if (!p.assetId) continue;
-        const url = await getLocalImage(p.assetId);
-        const part = url ? dataUrlToPart(url) : null;
+        if (!p.assetId && !p.storagePath) continue;
+        const url = await resolveAssetDisplayUrl({ assetId: p.assetId, storagePath: p.storagePath });
+        // 试穿 API 要 base64;签名 URL 先拉成 dataURL。
+        let dataUrl = url;
+        if (url && !url.startsWith('data:')) {
+          try {
+            const res = await fetch(url);
+            const blob = await res.blob();
+            const { compressToDataUrl } = await import('@/lib/portal/local-image-store');
+            dataUrl = await compressToDataUrl(blob) || '';
+          } catch { dataUrl = ''; }
+        }
+        const part = dataUrl ? dataUrlToPart(dataUrl) : null;
         if (part) garments.push(part);
       }
       if (garments.length === 0) { setTryonError(L(dict, '这套里的单品还没有照片 —— 先给它们拍照/上传,才能试穿。', 'Outfit pieces have no photos yet — add photos to try on.')); return null; }
@@ -302,14 +311,13 @@ export default function WardrobePanel() {
     if (kind === 'dislike') setRestyleNonce((n) => n + 1); // 换一套,避开刚拒绝的
   };
 
-  // 缩略图:按需从本机图库读(和收纳页同法)
+  // 缩略图:本机 IDB 优先,没有就按 storagePath 换签名 URL(换端必经此路,与记忆照片同构)。
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const { getLocalImage } = await import('@/lib/portal/local-image-store');
       for (const it of items) {
-        if (!it.assetId || thumbs[it.id]) continue;
-        const url = await getLocalImage(it.assetId);
+        if ((!it.assetId && !it.storagePath) || thumbs[it.id]) continue;
+        const url = await resolveAssetDisplayUrl({ assetId: it.assetId, storagePath: it.storagePath });
         if (url && !cancelled) setThumbs((prev) => ({ ...prev, [it.id]: url }));
       }
     })();
@@ -523,13 +531,17 @@ export default function WardrobePanel() {
       return;
     }
     let assetId: string | null = null;
+    let storagePath: string | null = null;
     if (draft.dataUrl) {
       try {
         assetId = newAssetId();
-        await storeWardrobeImage(assetId, draft.dataUrl);
+        // 本机 + 云 Storage(与记忆照片同路);storagePath 挂到节点上,换端才能看见图。
+        const persisted = await storeWardrobeImageFull(assetId, draft.dataUrl, name);
+        if (!persisted) assetId = null;
+        else storagePath = persisted.storagePath ?? null;
       } catch { assetId = null; /* 存图失败也让衣服进衣橱,只是没缩略图 */ }
     }
-    addGarment({ name, garmentType: draft.garmentType, warmth: draft.warmth, formality: draft.formality, colors, assetId, mimeType: draft.mimeType });
+    addGarment({ name, garmentType: draft.garmentType, warmth: draft.warmth, formality: draft.formality, colors, assetId, storagePath, mimeType: draft.mimeType });
     setDraft(EMPTY_DRAFT); setAdding(false); setAiError(null); setOrigPhoto(null);
     load();
   };
@@ -550,8 +562,9 @@ export default function WardrobePanel() {
         if (!photo) throw new Error('unreadable'); // → catch:跳过读不了的图,进度照走
         const { dataUrl } = photo;
         const assetId = newAssetId();
-        await storeWardrobeImage(assetId, dataUrl); // 内部去抖推云:批量 20 张只触发一次同步
-        const node = addGarment({ name: '', garmentType: 'top', warmth: 2, formality: 'casual', assetId, mimeType: 'image/jpeg' });
+        const persisted = await storeWardrobeImageFull(assetId, dataUrl);
+        if (!persisted) throw new Error('store_failed');
+        const node = addGarment({ name: '', garmentType: 'top', warmth: 2, formality: 'casual', assetId, storagePath: persisted.storagePath ?? null, mimeType: 'image/jpeg' });
         if (pro && !aiStopped) {
           try {
             const base64 = dataUrl.split(',')[1] || '';
