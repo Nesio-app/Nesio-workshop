@@ -43,7 +43,11 @@ export function digestExternalId(kind: DigestKind, month: string): string {
 
 /** 'YYYY-MM' */
 export function monthKeyOf(d: Date | string): string {
-  const dt = typeof d === 'string' ? new Date(d) : d;
+  // 纯日期串(YYYY-MM-DD)会被 Date 按 **UTC 午夜**解析 —— 美东这类西半球时区,
+  // 本地月份会退回上个月(7月1日的训练折进 2026-06)。补 T00:00 按本地解析。
+  const dt = typeof d === 'string'
+    ? new Date(/^\d{4}-\d{2}-\d{2}$/.test(d) ? `${d}T00:00` : d)
+    : d;
   if (Number.isNaN(dt.getTime())) return '';
   return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
 }

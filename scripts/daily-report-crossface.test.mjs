@@ -283,8 +283,9 @@ const EIGHT = new Date(2026, 6, 30, 8, 0);
   const panel = strip(read('components/portal/insights/DailyReportPanel.tsx'));
   assert.match(panel, /reportDue\(new Date\(\)\)/,
     '还没到 08:00 时要说清它几点来,不能空着一块地方');
-  // 关掉日报的人,洞察页也不该立着一块空地
-  assert.match(panel, /if \(!enabled\) return null/, '关掉了就整段不出现');
+  // 关掉日报的人,洞察页也不该立着一块空地 —— 换成显式说明(DailyReportOffNotice),
+  // 而不是 return null 留一块没解释的空地(面板侧已改,断言跟上)。
+  assert.match(panel, /if \(!enabled\) return <DailyReportOffNotice/, '关掉了就换成显式说明,不渲染正文');
   // 老节点没有冻结件 → 点开是空壳。要么禁用要么说明,不做「点了没反应」的假按钮。
   assert.match(panel, /disabled=\{!r\.report\}/,
     '没有冻结件的往日不许做成能点的按钮 —— 点开一个空壳比不给这个入口更糟');

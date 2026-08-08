@@ -19,7 +19,7 @@ assert.match(mirror, /data\.reason === 'api_error'[\s\S]{0,120}setError\('ai-err
 assert.doesNotMatch(mirror, /setError\('ai'\)/, '旧的合并态 ai 已清除');
 
 // ── 文案分清 ──
-assert.match(mirror, /error === 'no-key'[\s\S]{0,200}配|AI key/, 'no-key 文案讲接 AI/配 key');
+assert.match(mirror, /error === 'no-key'[\s\S]{0,200}(接上 AI|配|AI key)/, 'no-key 文案讲接 AI/配 key');
 assert.match(mirror, /这次没写出来/, 'ai-error 文案讲「这次没写出来」');
 
 // ── 可点重试/重写 ──

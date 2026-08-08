@@ -1209,7 +1209,9 @@ export default function SchedulePanel() {
    * 比如按 recordedAt/date 落进来的那两类)没有 T,自然就只显示日期。
    */
   const fmtDay = (iso: string): { day: string; time: string } => {
-    const d = new Date(iso);
+    // 纯日期串(YYYY-MM-DD)按规范会被 Date 解析成 **UTC 午夜** —— 在美东这类西半球时区,
+    // 本地化输出会退回前一天(8月1日显示成7月31日)。补个 T00:00 让它按本地解析。
+    const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(String(iso)) ? `${iso}T00:00` : iso);
     if (Number.isNaN(d.getTime())) return { day: '', time: '' };
     const day = dict === 'en'
       ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
