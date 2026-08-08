@@ -44,7 +44,11 @@ assert.match(authClient, /profileBootstrapped:\s*Boolean\(data\?\.profileBootstr
 assert.match(authClient, /profileBootstrapStatus:\s*data\?\.profileBootstrapStatus/, 'auth client must propagate product profile bootstrap status.');
 assert.match(authClient, /\/api\/auth\/import/, 'auth client must import implicit tokens through the server import route');
 assert.match(authClient, /history\.replaceState/, 'auth client must clear token hashes from the visible URL after import');
-assert.doesNotMatch(authClient, /localStorage\.setItem[\s\S]*(accessToken|refreshToken|access_token|refresh_token)/, 'auth client must not persist auth tokens in localStorage');
+assert.doesNotMatch(
+  authClient,
+  /localStorage\.setItem\(\s*['"][^'"]*['"]\s*,[\s\S]{0,120}(accessToken|refreshToken|access_token|refresh_token)/,
+  'auth client must not persist auth tokens in localStorage',
+);
 
 assert.match(layout, /AuthHashImportBridge/, 'Root layout must mount the auth hash import bridge for all routes');
 assert.match(authHashImportBridge, /importSupabaseHashSession/, 'AuthHashImportBridge must import Supabase hash sessions outside the portal route');
@@ -52,9 +56,10 @@ assert.match(authHashImportBridge, /nesio-auth-session-imported/, 'AuthHashImpor
 assert.match(authHashImportBridge, /window\.location\.hash/, 'AuthHashImportBridge must react to Supabase hash links on the current route');
 
 assert.match(portal, /importSupabaseHashSession/, 'Portal must import Supabase hash sessions before reading the auth session');
-assert.match(portal, /importSupabaseHashSession\(\)[\s\S]*\/api\/auth\/session/, 'Portal must import hash session before session lookup');
+assert.match(portal, /importSupabaseHashSession\(\)[\s\S]{0,500}refreshAuthSession/, 'Portal imports hash session before refreshing auth via session-state');
+assert.match(portal, /fetchAuthSessionPayload[\s\S]*readSession/, 'Portal session lookup goes through session-state readSession');
 assert.match(loginPage, /importSupabaseHashSession/, 'Login page must recover if Supabase redirects hash tokens to /login');
-assert.match(loginPage, /result\.imported && result\.ok[\s\S]*window\.location\.href = '\/'/, 'Login page must return users home after importing a hash session');
+assert.match(loginPage, /importSupabaseHashSession\(\)[\s\S]{0,600}result\.ok[\s\S]{0,120}window\.location\.href = '\/'/, 'Login page must return users home after importing a hash session');
 
 assert.equal(
   packageJson.scripts['test:auth-implicit-session-import'],

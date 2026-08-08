@@ -28,7 +28,8 @@ assert.ok(!/hasCloudEntitlement/.test(sync), 'P3:自动同步不锁付费墙(不
 // ── Portal 顶层触发 ──
 const portal = read('../components/portal/Portal.tsx');
 assert.match(portal, /import \{ syncMemoryWithCloud \} from '@\/lib\/portal\/cloud-memory-sync'/, 'Portal 引入共享同步');
-const portalHasTrigger = /canSyncPrivateData\)\s*return;[\s\S]*?syncMemoryWithCloud\(\)/.test(portal)
+assert.match(portal, /runCloudSyncBatch\(CLOUD_SYNC_TASKS\)/, 'Portal 经批次 runner 触发云同步');
+const portalHasTrigger = /canSyncPrivateData\)\s*return;[\s\S]*?runCloudSyncBatch\(CLOUD_SYNC_TASKS\)/.test(portal)
   && /visibilitychange/.test(portal);
 assert.ok(portalHasTrigger, 'Portal 登录后触发同步且监听 visibilitychange 回前台再拉');
 

@@ -25,7 +25,7 @@ assert.match(dash, /身体账本|Body ledger/, '身体账本 tab');
 assert.match(dash, /护理|Care/, '护理 tab');
 
 const panel = read('components/portal/health/BodyLedgerPanel.tsx');
-assert.match(panel, /BodyLedgerQuickLinks/, '概览快捷进入');
+assert.match(panel, /BodyLedgerAnalysisCards/, '分析页小结卡(原概览快捷链已并入)');
 assert.match(panel, /suggestDinnerForGap|去做/, '补餐去做');
 
 const css = read('app/globals.css');

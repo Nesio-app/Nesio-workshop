@@ -87,7 +87,8 @@ assert.match(portal, /import \{ autoSyncModulesWithCloud \} from '@\/lib\/portal
 // 数据泄露收口(P0):同步门必须在「本机数据归属」核对通过后才开 —— ownerConflict 非空时一律不同步,
 // 否则换人登录时上一账号数据会按当前登录人身份上传。
 assert.match(portal, /canSyncPrivateData\s*=\s*canUsePrivateRuntime\s*&&\s*ownerConflict === null/, 'Portal 同步门 = 登录 && 归属已核对(防跨账号泄露)');
-assert.match(portal, /canSyncPrivateData\)\s*return;[\s\S]*?autoSyncModulesWithCloud\(\)/, 'Portal 归属核对通过后才触发模块同步');
+assert.match(portal, /autoSyncModulesWithCloud/, 'Portal 同步批次含模块同步');
+assert.match(portal, /canSyncPrivateData\)\s*return;[\s\S]*?runCloudSyncBatch\(CLOUD_SYNC_TASKS\)/, 'Portal 归属核对通过后才触发同步批次(含模块同步)');
 // 重同步批次改经 whenIdle 调度 + isCloudSyncSuspended 闸门(修「同步抢主线程 = 跟练卡死」),
 // mount 与回前台都路由到 scheduleHeavySyncBatch,不再在交互帧同步直呼各引擎。
 assert.match(portal, /if\s*\(\s*isCloudSyncSuspended\(\)\s*\)\s*\{?\s*return/, 'Portal 重同步批次受暂停闸门早退');

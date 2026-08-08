@@ -96,13 +96,13 @@ export default function MeetingsPanel({ onOpenMemory }: { onOpenMemory: (query: 
               <span style={{ flexShrink: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{fmtDay(r.dateIso)}</span>
             </div>
             <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 'var(--text-xs)', padding: '0.1rem 0.5rem', borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)', color: 'var(--portal-muted)' }}>{r.source}</span>
+              <span style={{ fontSize: 'var(--text-xs)', padding: '2px var(--space-2)', borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)', color: 'var(--portal-muted)' }}>{r.source}</span>
               {r.linkedName ? (
-                <span style={{ fontSize: 'var(--text-xs)', padding: '0.1rem 0.5rem', borderRadius: 'var(--radius-pill)', background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>
+                <span style={{ fontSize: 'var(--text-xs)', padding: '2px var(--space-2)', borderRadius: 'var(--radius-pill)', background: 'var(--status-go-soft)', color: 'var(--status-go)' }}>
                   {L(dict, `已挂日程 · ${r.linkedName}`, `Linked · ${r.linkedName}`)}
                 </span>
               ) : (
-                <span style={{ fontSize: 'var(--text-xs)', padding: '0.1rem 0.5rem', borderRadius: 'var(--radius-pill)', background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>
+                <span style={{ fontSize: 'var(--text-xs)', padding: '2px var(--space-2)', borderRadius: 'var(--radius-pill)', background: 'var(--status-gentle-soft)', color: 'var(--status-gentle)' }}>
                   {L(dict, '未挂到日程', 'Not linked')}
                 </span>
               )}

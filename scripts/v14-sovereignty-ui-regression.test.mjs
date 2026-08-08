@@ -240,7 +240,8 @@ assert.match(authStartRoute, /www\.nesio\.app\/api\/auth\/callback/, 'Server aut
 // cookies (UI looked signed out). Callbacks now stay on the caller's host.
 assert.match(authStartRoute, /Keep production callbacks on the caller's current host/, 'Auth redirect must document the keep-caller-host rule.');
 assert.doesNotMatch(authStartRoute, /hostname = ['"]www\.nesio\.app['"]/, 'Auth redirect must not force-rewrite the callback hostname.');
-assert.match(onboarding, /\/api\/auth\/session/, 'Onboarding must read the auth session after OAuth or magic-link callbacks.');
+assert.match(onboarding, /readAuthSession|readSession|session-state/, 'Onboarding must read auth via the single session source after OAuth or magic-link callbacks.');
+assert.doesNotMatch(onboarding, /fetch\('\/api\/auth\/session'/, 'Onboarding must not fetch /api/auth/session on its own.');
 assert.match(onboarding, /nesio-auth-session-imported|nesio-auth-session-ready/, 'Onboarding must react to session import events.');
 assert.match(onboarding, /auth_callback_received|session_established|session_imported/, 'Onboarding must treat callback success URLs as authenticated bootstrap candidates.');
 
