@@ -30,7 +30,7 @@ import { autoSyncPlaceImagesWithCloud } from '@/lib/portal/cloud-place-image-syn
 import { autoSyncWardrobeImagesWithCloud } from '@/lib/portal/cloud-wardrobe-image-sync';
 import { autoSyncLocalFilesWithCloud } from '@/lib/portal/cloud-file-sync';
 import { autoSyncConnectorsOnBoot } from '@/lib/portal/connector-sync';
-import { OPEN_MODE_CAMERA_EVENT, setPendingCapture, type ModeCameraMode } from '@/lib/portal/capture-pipeline';
+import { OPEN_MODE_CAMERA_EVENT, setPendingCapture, backfillMissingPhotoUploads, type ModeCameraMode } from '@/lib/portal/capture-pipeline';
 
 // Heavy sheets load on first open, not at boot — together they were ~3.5k
 // lines of first-paint JS for UI the user may never touch in a session.
@@ -160,6 +160,8 @@ const CLOUD_SYNC_TASKS = [
   { name: 'place-images', run: () => autoSyncPlaceImagesWithCloud() },
   { name: 'wardrobe-images', run: () => autoSyncWardrobeImagesWithCloud() },
   { name: 'local-files', run: () => autoSyncLocalFilesWithCloud() },
+  // 旧衣物/一餐:本机有图但从未写入 memory_assets → 补传(与主相机同路)。
+  { name: 'photo-backfill', run: () => backfillMissingPhotoUploads({ limit: 12 }).then(() => {}) },
   // 外部连接器(日历/邮件/flomo/银行/通讯录)拉新,30 分钟节流,内部保证。
   { name: 'connectors', run: () => autoSyncConnectorsOnBoot() },
 ];

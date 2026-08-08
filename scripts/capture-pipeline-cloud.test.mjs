@@ -1,8 +1,10 @@
 /**
- * 拍摄管线云同步契约:记一餐/衣帽间照片必须走「本机 + uploadCloudAsset」
- * (与记忆照片同构),不能只塞 IDB 指望 module-data 补缺。
+ * 拍摄管线云同步契约:记一餐/衣帽间必须走主相机同构三步,
+ * 且通用 upsert 不能再把 assets 剥成空数组。
  *
- * 病灶:文字(life-graph)立刻跨端,照片本体从不挂 storagePath → 换端永远没图。
+ * 病灶:主相机能同步、其它入口不能 —— 因为只有主相机调了
+ * saveCloudMemorySnapshot({ assets }),而 syncLifeGraphUpsertToCloud 一直发 assets:[].
+ * 服务端 sanitizeMemoryNode 会剥掉 node.assets,图只进 memory_assets 表。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -12,24 +14,39 @@ const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 const read = (rel) => fs.readFileSync(path.join(ROOT, rel), 'utf8');
 
 const pipeline = read('lib/portal/capture-pipeline.ts');
+const lifeGraph = read('lib/portal/life-graph.ts');
 const wardrobe = read('components/portal/insights/WardrobePanel.tsx');
 const cooking = read('components/portal/cooking/CookingSheet.tsx');
 const wardrobeLib = read('lib/portal/wardrobe.ts');
 
-assert.match(pipeline, /uploadCloudAsset/, 'capture-pipeline 必须上传云 Storage');
-assert.match(pipeline, /persistCapturedPhoto/, '统一落库入口 persistCapturedPhoto');
-assert.match(pipeline, /resolveAssetDisplayUrl/, '换端读图走 resolveAssetDisplayUrl(本机→签名 URL)');
-assert.match(pipeline, /storagePath/, '云上传成功要带回 storagePath');
+// ── 通用 upsert 必须带 assets(根因修复) ──
+assert.match(
+  lifeGraph,
+  /syncLifeGraphUpsertToCloud[\s\S]{0,800}assets:\s*assets|body:\s*JSON\.stringify\(\{\s*nodes:\s*\[node\],\s*assets\s*\}\)/,
+  'syncLifeGraphUpsertToCloud 必须把 node.assets(带 nodeId)推上云,不能再 assets:[]',
+);
+// 只查函数体里的 JSON.stringify 载荷,别误伤注释里提到的「以前 assets:[]」。
+const upsertStart = lifeGraph.indexOf('async function syncLifeGraphUpsertToCloud');
+assert.ok(upsertStart >= 0, '找不到 syncLifeGraphUpsertToCloud');
+const upsertBody = lifeGraph.slice(upsertStart, lifeGraph.indexOf('\nasync function', upsertStart + 1));
+assert.match(upsertBody, /assets\s*=\s*\(node\.assets/, 'upsert 从 node.assets 取出资产');
+assert.match(upsertBody, /JSON\.stringify\(\{\s*nodes:\s*\[node\],\s*assets\s*\}\)/, 'upsert POST 体带 assets');
+assert.doesNotMatch(upsertBody, /JSON\.stringify\(\{\s*nodes:\s*\[node\],\s*assets:\s*\[\s*\]\s*\}\)/, '禁止再写死 assets:[]');
 
-assert.match(wardrobe, /storeWardrobeImageFull/, '衣帽间保存走 storeWardrobeImageFull(带 storagePath)');
-assert.match(wardrobe, /resolveAssetDisplayUrl/, '衣帽间缩略图换端能读云图');
-assert.match(wardrobe, /storagePath:\s*persisted\.storagePath|storagePath,\s*mimeType/, 'addGarment 要带上 storagePath');
+// ── 管线三步同构主相机 ──
+assert.match(pipeline, /purpose:\s*['"]memory['"]/, '云上传 purpose 必须是 memory(与主相机一致)');
+assert.match(pipeline, /saveCloudMemorySnapshot/, '必须写 memory_assets(saveCloudMemorySnapshot)');
+assert.match(pipeline, /attachPhotoToMemoryNode/, '挂节点入口 attachPhotoToMemoryNode');
+assert.match(pipeline, /pushNodeAssetsToCloud/, '创建时已带图 → pushNodeAssetsToCloud');
+assert.match(pipeline, /backfillMissingPhotoUploads/, '旧图补传 backfillMissingPhotoUploads');
+assert.match(pipeline, /resolveAssetDisplayUrl/, '换端读图 resolveAssetDisplayUrl');
 
-assert.match(wardrobeLib, /storagePath/, 'Garment 投影暴露 storagePath');
-assert.match(wardrobeLib, /input\.storagePath/, 'addGarment 接受并挂云孪生 asset');
+assert.match(wardrobe, /pushNodeAssetsToCloud/, '衣帽间保存后推 memory_assets');
+assert.match(wardrobe, /storeWardrobeImageFull/, '衣帽间走 storeWardrobeImageFull');
+assert.match(wardrobe, /resolveAssetDisplayUrl/, '衣帽间缩略图能读云图');
+assert.match(wardrobeLib, /input\.storagePath/, 'addGarment 挂云孪生 asset');
 
-assert.match(cooking, /persistCapturedPhoto/, '记一餐保存必须落照片');
-assert.match(cooking, /purpose:\s*'meal'/, '记一餐照片 purpose=meal');
-assert.match(cooking, /updateLifeNode\(mealId,\s*\{\s*assets:/, '照片 asset 挂到这一餐节点');
+assert.match(cooking, /attachPhotoToMemoryNode/, '记一餐保存必须 attachPhotoToMemoryNode');
+assert.match(cooking, /kind:\s*'meal'/, '记一餐 kind=meal');
 
-console.log('capture-pipeline-cloud: OK(本机+云 Storage · 记一餐/衣帽间同记忆路径)');
+console.log('capture-pipeline-cloud: OK(upsert 带 assets · 主相机三步同构 · 旧图补传)');

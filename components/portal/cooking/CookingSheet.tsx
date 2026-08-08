@@ -1191,14 +1191,13 @@ function MealLogBody({ photoUrl, photoFile, onError, onDone, t }: { photoUrl?: s
         // 和「免费」长得一模一样(actualSpend 那条注释说的就是这个)。
         ...(Number.isFinite(p) && p > 0 ? { price: p } : {}),
       });
-      // 照片此前只用来识别、从不落库 → 换端永远只有文字。与记忆照片同路:本机 + 云 Storage。
+      // 照片此前只用来识别、从不落库 → 换端永远只有文字。
+      // 与主相机同构:本机 + uploadCloudAsset(purpose=memory) + saveCloudMemorySnapshot(assets)。
       if (photoUrl) {
-        const { persistCapturedPhoto } = await import('@/lib/portal/capture-pipeline');
-        const { updateLifeNode } = await import('@/lib/portal/life-graph');
+        const { attachPhotoToMemoryNode } = await import('@/lib/portal/capture-pipeline');
         const label = next.map((i) => i.name).filter(Boolean).slice(0, 3).join(' · ') || '一餐';
-        const persisted = await persistCapturedPhoto({ dataUrl: photoUrl, purpose: 'meal', label });
-        if (persisted) updateLifeNode(mealId, { assets: persisted.assets });
-        else onError(t('这一餐记下了,但照片没存上(空间可能满了)。', 'Meal saved, but the photo could not be stored (storage may be full).'));
+        const persisted = await attachPhotoToMemoryNode({ nodeId: mealId, dataUrl: photoUrl, kind: 'meal', label });
+        if (!persisted) onError(t('这一餐记下了,但照片没存上(空间可能满了)。', 'Meal saved, but the photo could not be stored (storage may be full).'));
       }
       setSaved(true); setTimeout(onDone, 800);
     } catch { onError(t('没记上,再试一次。', 'Could not save — try again.')); }

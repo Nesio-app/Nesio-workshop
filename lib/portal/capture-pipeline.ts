@@ -7,16 +7,15 @@
  * (取景框/相册/压缩全复用)→ 拍完压缩成 dataURL 放进这里的「交接匣」→ Portal 重开
  * 来源 sheet → 来源 sheet 挂载时取走照片,继续自己的后处理(记一餐认菜品/衣帽间认衣物)。
  *
- * 为什么是交接匣不是回调/事件:来源 sheet 在拍摄期间是**卸载**的(z 序所迫),
- * 回调没有挂着的接收方;交接匣 + 重开 + 挂载时取,时序上永远成立。
- *
- * 落库/上云:**与记忆照片同一条路** —— putLocalImage(本机) + uploadCloudAsset(云 Storage
- * 得 storagePath)。节点挂两条 asset(local + storagePath),跨端靠记忆图同步带上指针,
- * 别端用签名 URL 读图。此前衣帽间只塞 IDB、记一餐连图都不存 → 「文字同步了、图永远没有」。
- * module-data 的 wardrobe-image 同步仍作 IDB 补缺兜底(全身照/试穿图没有节点时)。
+ * 落库/上云:**必须与主相机 CameraSheet 同构**,三步缺一不可:
+ *   ① putLocalImage(本机)
+ *   ② uploadCloudAsset(purpose:'memory' → Supabase Storage 得 storagePath)
+ *   ③ saveCloudMemorySnapshot({ nodes, assets:[{... , nodeId}] }) 写入 memory_assets
+ * 服务端 sanitizeMemoryNode 会剥掉 node.assets;只 updateLifeNode / 只塞 IDB
+ * → 换端永远只有文字。主相机能同步、别的入口不能 = 以前漏了 ③。
  */
 import { compressToDataUrl, getLocalImage, putLocalImage } from './local-image-store';
-import type { LifeNodeAsset } from './life-graph';
+import type { LifeNode, LifeNodeAsset } from './life-graph';
 
 export type ModeCameraMode = 'meal' | 'wardrobe';
 export interface CapturedPhoto { file: File; dataUrl: string }
@@ -70,21 +69,24 @@ export interface PersistedCapture {
   dataUrl: string;
   mimeType: string;
   storagePath?: string;
-  /** 挂到 life-graph 节点上的 asset 列表(本机 + 可选云孪生,同 CameraSheet 记忆路径)。 */
   assets: LifeNodeAsset[];
 }
 
 /**
- * 本机存 + 云 Storage 上传(与记忆照片同构)。
- * 本机失败 → 返回 null(调用方给可见错误);云上传失败 → 仍返回本机结果(离线可用,下次靠 module-sync / 重试)。
+ * 本机存 + 云 Storage 上传(与主相机同构,purpose 固定 memory —— 那是唯一验证过能跨端的桶路径)。
+ * 本机失败 → null;云失败 → 仍返回本机结果(离线可用)。
+ * **注意**:这一步还没把 asset 写进 memory_assets —— 必须再调 attachPhotoToMemoryNode /
+ * pushNodeAssetsToCloud,否则换端看不见。
  */
 export async function persistCapturedPhoto(opts: {
   dataUrl: string;
-  purpose: 'wardrobe' | 'meal' | 'memory' | 'attachment';
+  /** 仅用于本地 assetId 前缀;云上传一律 purpose=memory(与主相机一致)。 */
+  kind?: 'wardrobe' | 'meal' | 'memory' | 'attachment';
   assetId?: string;
   label?: string;
 }): Promise<PersistedCapture | null> {
-  const assetId = opts.assetId || newAssetId(opts.purpose === 'meal' ? 'meal' : opts.purpose === 'wardrobe' ? 'wardrobe' : 'asset');
+  const kind = opts.kind || 'memory';
+  const assetId = opts.assetId || newAssetId(kind === 'meal' ? 'meal' : kind === 'wardrobe' ? 'wardrobe' : 'asset');
   const mimeType = 'image/jpeg';
   const ok = await putLocalImage(assetId, opts.dataUrl);
   if (!ok) return null;
@@ -104,7 +106,8 @@ export async function persistCapturedPhoto(opts: {
     const file = dataUrlToFile(opts.dataUrl, `${assetId}.jpg`);
     if (file) {
       const { createAppApiClient } = await import('./app-api-client');
-      const upload = await createAppApiClient().uploadCloudAsset({ file, purpose: opts.purpose });
+      // purpose 必须是 memory —— 主相机唯一验证过的跨端路径;契约也锁这个。
+      const upload = await createAppApiClient().uploadCloudAsset({ file, purpose: 'memory' });
       if (upload.ok && upload.storagePath) {
         storagePath = upload.storagePath;
         assets.push({
@@ -120,27 +123,93 @@ export async function persistCapturedPhoto(opts: {
     }
   } catch { /* 云上传 best-effort;本机副本已在 */ }
 
-  if (opts.purpose === 'wardrobe') kickWardrobeImageSync();
+  if (kind === 'wardrobe') kickWardrobeImageSync();
   return { assetId, dataUrl: opts.dataUrl, mimeType, storagePath, assets };
 }
 
 /**
- * 衣帽间照片落地(兼容旧调用):本机 + 云 Storage + IDB 补缺同步。
- * 有 storagePath 时调用方应把它写进节点 assets,换端才能靠签名 URL 看见。
+ * 把照片挂到记忆节点并**立刻**推 memory_assets(主相机收尾三步里的 ③)。
+ * 这是换端能看见的关键一步 —— 漏了就只剩本机图。
+ */
+export async function attachPhotoToMemoryNode(opts: {
+  nodeId: string;
+  dataUrl: string;
+  kind?: 'wardrobe' | 'meal' | 'memory';
+  assetId?: string;
+  label?: string;
+}): Promise<PersistedCapture | null> {
+  const persisted = await persistCapturedPhoto({
+    dataUrl: opts.dataUrl,
+    kind: opts.kind,
+    assetId: opts.assetId,
+    label: opts.label,
+  });
+  if (!persisted) return null;
+
+  const { getLifeGraph, updateLifeNode } = await import('./life-graph');
+  const live = getLifeGraph().find((n) => n.id === opts.nodeId);
+  if (!live) return persisted;
+
+  const mergedAssets = [...(live.assets || [])];
+  for (const a of persisted.assets) {
+    if (!mergedAssets.some((x) => x.id === a.id || (a.storagePath && x.storagePath === a.storagePath))) {
+      mergedAssets.push(a);
+    }
+  }
+  updateLifeNode(opts.nodeId, { assets: mergedAssets });
+
+  // 显式推 memory_assets(与 CameraSheet.saveCloudMemorySnapshot 同构)。
+  // syncLifeGraphUpsertToCloud 现在也会带 assets,这里再推一次:上传刚完成时
+  // updateLifeNode 的异步 upsert 可能还在飞,且 cloud asset 必须带 nodeId。
+  const cloudOnes = persisted.assets
+    .filter((a) => a.storagePath)
+    .map((a) => ({ ...a, nodeId: opts.nodeId }));
+  if (cloudOnes.length) {
+    try {
+      const { createAppApiClient } = await import('./app-api-client');
+      const node = getLifeGraph().find((n) => n.id === opts.nodeId);
+      if (node) {
+        await createAppApiClient().saveCloudMemorySnapshot({
+          nodes: [node as LifeNode],
+          assets: cloudOnes,
+        });
+      }
+    } catch { /* best-effort;通用 upsert 仍是兜底 */ }
+  }
+  return persisted;
+}
+
+/** 节点已有 assets(含 storagePath)时,立刻推 memory_assets —— 给 addGarment 创建时已带图用。 */
+export async function pushNodeAssetsToCloud(nodeId: string): Promise<void> {
+  try {
+    const { getLifeGraph } = await import('./life-graph');
+    const node = getLifeGraph().find((n) => n.id === nodeId);
+    if (!node) return;
+    const cloudOnes = (node.assets || [])
+      .filter((a) => a.storagePath)
+      .map((a) => ({ ...a, nodeId }));
+    if (!cloudOnes.length) return;
+    const { createAppApiClient } = await import('./app-api-client');
+    await createAppApiClient().saveCloudMemorySnapshot({ nodes: [node], assets: cloudOnes });
+  } catch { /* ignore */ }
+}
+
+/**
+ * 衣帽间照片落地(兼容旧调用):本机 + 云 Storage。
+ * 有节点时请改用 attachPhotoToMemoryNode / storeWardrobeImageFull + pushNodeAssetsToCloud。
  */
 export async function storeWardrobeImage(assetId: string, dataUrl: string): Promise<boolean> {
-  const r = await persistCapturedPhoto({ dataUrl, purpose: 'wardrobe', assetId });
+  const r = await persistCapturedPhoto({ dataUrl, kind: 'wardrobe', assetId });
   return Boolean(r);
 }
 
-/** 同 storeWardrobeImage,但把 storagePath / assets 交还给调用方挂到节点上。 */
 export async function storeWardrobeImageFull(assetId: string, dataUrl: string, label?: string): Promise<PersistedCapture | null> {
-  return persistCapturedPhoto({ dataUrl, purpose: 'wardrobe', assetId, label });
+  return persistCapturedPhoto({ dataUrl, kind: 'wardrobe', assetId, label });
 }
 
 /**
  * 读图:本机 IDB 优先,没有就按 storagePath 换签名 URL(换端必经此路)。
- * 签名 URL 成功时顺手写回本机,下次离线也能看。
+ * 签名 URL 成功时 fetch 成 dataURL 缓存进本机。
  */
 export async function resolveAssetDisplayUrl(opts: {
   assetId?: string | null;
@@ -157,7 +226,6 @@ export async function resolveAssetDisplayUrl(opts: {
     const { createAppApiClient } = await import('./app-api-client');
     const result = await createAppApiClient().fetchCloudAssetReadUrl({ storagePath: opts.storagePath });
     if (!result.ok || !result.signedUrl) return null;
-    // 换端首次拉到 → fetch 成 dataURL 缓存进本机(signedUrl 会过期,不能直接塞 IDB)。
     void (async () => {
       if (!opts.assetId) return;
       try {
@@ -172,11 +240,38 @@ export async function resolveAssetDisplayUrl(opts: {
   } catch { return null; }
 }
 
-let kickTimer: number | null = null;
 /**
- * 存完立即推 / 打开衣帽间立即拉(force 绕开 30s 节流)。IDB 补缺通道的触发器;
- * 主路径已是 uploadCloudAsset,这条兜底全身照/试穿图和未拿到 storagePath 的旧图。
+ * 补传:本机有图、节点上还没有 storagePath 的衣物/一餐 —— 上传并推 memory_assets。
+ * 打开衣帽间/同步批次时跑;幂等(已有 storagePath 的跳过)。
  */
+export async function backfillMissingPhotoUploads(opts?: { limit?: number }): Promise<{ uploaded: number }> {
+  if (typeof window === 'undefined') return { uploaded: 0 };
+  const limit = opts?.limit ?? 8;
+  const { getLifeGraph } = await import('./life-graph');
+  let uploaded = 0;
+  for (const node of getLifeGraph()) {
+    if (uploaded >= limit) break;
+    const isGarment = node.type === 'Thing' && node.attributes?.garment === true;
+    const isMeal = node.type === 'collection' && (node.tags || []).includes('一餐');
+    if (!isGarment && !isMeal) continue;
+    if ((node.assets || []).some((a) => a.storagePath)) continue;
+    const local = (node.assets || []).find((a) => a.local && a.id);
+    if (!local?.id) continue;
+    const dataUrl = await getLocalImage(local.id);
+    if (!dataUrl || !dataUrl.startsWith('data:')) continue;
+    const r = await attachPhotoToMemoryNode({
+      nodeId: node.id,
+      dataUrl,
+      kind: isMeal ? 'meal' : 'wardrobe',
+      assetId: local.id,
+      label: node.name,
+    });
+    if (r?.storagePath) uploaded += 1;
+  }
+  return { uploaded };
+}
+
+let kickTimer: number | null = null;
 export function kickWardrobeImageSync(): void {
   if (typeof window === 'undefined') return;
   if (kickTimer != null) window.clearTimeout(kickTimer);
@@ -185,5 +280,7 @@ export function kickWardrobeImageSync(): void {
     void import('./cloud-wardrobe-image-sync')
       .then((m) => m.autoSyncWardrobeImagesWithCloud({ force: true }))
       .catch(() => { /* ignore */ });
+    // 顺手补传「有本机图、无 storagePath」的旧衣物/一餐。
+    void backfillMissingPhotoUploads().catch(() => {});
   }, 800);
 }

@@ -622,11 +622,16 @@ async function syncLifeGraphUpsertToCloud(node: LifeNode): Promise<void> {
   queueCloudSyncOutboxItem(node, 'upsert');
   markCloudSyncPending(node.id, 'upsert');
   updateCloudSyncOutboxAttempt(node.id, 'upsert');
+  // ⚠️ 必须带上 assets(含 nodeId)。服务端 sanitizeMemoryNode **会剥掉** node.assets,
+  // 图的 storagePath 只进 memory_assets 表;传 assets:[] = 换端永远只有文字没有图。
+  // 主相机能同步是因为它另调了 saveCloudMemorySnapshot({ assets })—— 这条通用 upsert
+  // 以前一直漏,衣帽间/记一餐/任何非主相机入口挂的图都上不去。
+  const assets = (node.assets || []).map((asset) => ({ ...asset, nodeId: node.id }));
   const result = await cloudFetchWithSmartError(CLOUD_MEMORY_ENDPOINT, {
     method: 'POST',
     credentials: 'include',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ nodes: [node], assets: [] }),
+    body: JSON.stringify({ nodes: [node], assets }),
   });
   if (result.ok) {
     markCloudSyncSynced(node.id, 'upsert');

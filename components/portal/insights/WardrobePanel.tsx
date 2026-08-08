@@ -11,7 +11,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { openModeCamera, takePendingCapture, prepareCapturedPhoto, storeWardrobeImage, storeWardrobeImageFull, resolveAssetDisplayUrl, kickWardrobeImageSync } from '@/lib/portal/capture-pipeline';
+import { openModeCamera, takePendingCapture, prepareCapturedPhoto, storeWardrobeImage, storeWardrobeImageFull, resolveAssetDisplayUrl, kickWardrobeImageSync, pushNodeAssetsToCloud } from '@/lib/portal/capture-pipeline';
 import {
   listWardrobe, addGarment, removeGarment, markWorn, suggestOutfit, inferFormalNeed,
   GARMENT_TYPES, updateGarment, type Garment, type GarmentType, type Warmth, type Formality, type OutfitPrefs,
@@ -535,13 +535,15 @@ export default function WardrobePanel() {
     if (draft.dataUrl) {
       try {
         assetId = newAssetId();
-        // 本机 + 云 Storage(与记忆照片同路);storagePath 挂到节点上,换端才能看见图。
+        // 本机 + 云 Storage(与主相机同路,purpose=memory);storagePath 挂到节点上。
         const persisted = await storeWardrobeImageFull(assetId, draft.dataUrl, name);
         if (!persisted) assetId = null;
         else storagePath = persisted.storagePath ?? null;
       } catch { assetId = null; /* 存图失败也让衣服进衣橱,只是没缩略图 */ }
     }
-    addGarment({ name, garmentType: draft.garmentType, warmth: draft.warmth, formality: draft.formality, colors, assetId, storagePath, mimeType: draft.mimeType });
+    const node = addGarment({ name, garmentType: draft.garmentType, warmth: draft.warmth, formality: draft.formality, colors, assetId, storagePath, mimeType: draft.mimeType });
+    // 主相机收尾关键步:显式推 memory_assets(带 nodeId)。漏了换端永远没图。
+    if (storagePath) void pushNodeAssetsToCloud(node.id);
     setDraft(EMPTY_DRAFT); setAdding(false); setAiError(null); setOrigPhoto(null);
     load();
   };
@@ -565,6 +567,7 @@ export default function WardrobePanel() {
         const persisted = await storeWardrobeImageFull(assetId, dataUrl);
         if (!persisted) throw new Error('store_failed');
         const node = addGarment({ name: '', garmentType: 'top', warmth: 2, formality: 'casual', assetId, storagePath: persisted.storagePath ?? null, mimeType: 'image/jpeg' });
+        if (persisted.storagePath) void pushNodeAssetsToCloud(node.id);
         if (pro && !aiStopped) {
           try {
             const base64 = dataUrl.split(',')[1] || '';
