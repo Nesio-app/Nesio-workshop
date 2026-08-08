@@ -68,6 +68,8 @@ export default function CookingSheet({ open, onClose, initialView }: {
   const camInputRef = useRef<HTMLInputElement>(null);
   const mealCamRef = useRef<HTMLInputElement>(null);
   const [mealPhoto, setMealPhoto] = useState('');
+  // 原始文件留给 AI 识别用(objectURL 只能显示,识别要重新压缩出 base64)。
+  const [mealPhotoFile, setMealPhotoFile] = useState<File | null>(null);
 
   const reload = useCallback(() => {
     try { setItems(listPantry()); } catch { setErr(t('读不出库存,刷新看看。', 'Could not read the pantry — refresh.')); }
@@ -107,6 +109,7 @@ export default function CookingSheet({ open, onClose, initialView }: {
       if (prev) try { URL.revokeObjectURL(prev); } catch { /* ignore */ }
       try { return URL.createObjectURL(f); } catch { return ''; }
     });
+    setMealPhotoFile(f);
     setErr('');
     setView({ kind: 'logmeal' });
   }, []);
@@ -115,6 +118,7 @@ export default function CookingSheet({ open, onClose, initialView }: {
       if (prev) try { URL.revokeObjectURL(prev); } catch { /* ignore */ }
       return '';
     });
+    setMealPhotoFile(null);
     setView({ kind: 'home' });
   }, []);
 
@@ -205,7 +209,7 @@ export default function CookingSheet({ open, onClose, initialView }: {
             {view.kind === 'logmeal' && (
               <>
                 <ScreenHead backLabel={t('美味', 'Cooking')} onBack={finishLogMeal} title={t('记一餐', 'Log a meal')} t={t} />
-                <MealLogBody photoUrl={mealPhoto} onError={setErr} onDone={finishLogMeal} t={t} />
+                <MealLogBody photoUrl={mealPhoto} photoFile={mealPhotoFile} onError={setErr} onDone={finishLogMeal} t={t} />
               </>
             )}
             {view.kind === 'generate' && (
@@ -1089,7 +1093,14 @@ function TipContent({ content }: { content: string }) {
 
 // ── 记一餐(进食事件)──────────────────────────────────────────────────────────
 const MEAL_SOURCES: MealSource[] = ['自己做', '餐厅', '外卖', '其他'];
-function MealLogBody({ photoUrl, onError, onDone, t }: { photoUrl?: string; onError: (m: string) => void; onDone: () => void; t: TT }) {
+/** 记一餐识别指令:认菜品(不是食材),名字用通用名,估克数进 attributes.grams。 */
+function mealPhotoPrompt(en: boolean): string {
+  return en
+    ? 'This is a photo of a meal about to be eaten. For EACH distinct dish/food on the plate(s), create ONE object node named with the dish\'s common name (e.g. "fried rice", "grilled chicken leg", "tomato & egg stir-fry"). If you can estimate this serving\'s weight, put it in attributes.grams (a number, grams). Do NOT list raw ingredients separately, do NOT create place/person nodes, and do NOT create a summary node.'
+    : '这是一张正要吃的餐食照片。请为照片里每一道菜/食物单独生成一个 object 节点,节点名用菜品的通用名(如「蛋炒饭」「烤鸡腿」「番茄炒蛋」);能估出这一份的克数就放进 attributes.grams(数字,克)。不要把一道菜拆成生食材,不要生成地点或人物节点,不要生成汇总节点。';
+}
+function MealLogBody({ photoUrl, photoFile, onError, onDone, t }: { photoUrl?: string; photoFile?: File | null; onError: (m: string) => void; onDone: () => void; t: TT }) {
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [items, setItems] = useState<MealItem[]>([]);
   const [source, setSource] = useState<MealSource>('自己做');
   const [name, setName] = useState('');
@@ -1097,6 +1108,48 @@ function MealLogBody({ photoUrl, onError, onDone, t }: { photoUrl?: string; onEr
   const [price, setPrice] = useState('');   // 餐厅/外卖花了多少 —— 用来认领银行流水,不记账
   const [nutri, setNutri] = useState<{ ek: number; p: number; f: number; c: number; matched: number } | null>(null);
   const [saved, setSaved] = useState(false);
+  // 拍照识别三态:loading / error(带重试) / done。异步动作必须有可见失败态。
+  const [recog, setRecog] = useState<'idle' | 'loading' | 'done' | 'error'>('idle');
+
+  const recognizePhoto = useCallback(async () => {
+    if (!photoFile) return;
+    setRecog('loading');
+    try {
+      const { compressToDataUrl } = await import('@/lib/portal/local-image-store');
+      const dataUrl = await compressToDataUrl(photoFile);
+      if (!dataUrl) throw new Error('compress_failed');
+      const en = dict.toLowerCase().startsWith('en');
+      const res = await fetch('/api/portal/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
+        body: JSON.stringify({
+          type: 'image',
+          content: mealPhotoPrompt(en),
+          imageBase64: dataUrl.split(',')[1],
+          mimeType: 'image/jpeg',
+          uiLocale: dict,
+        }),
+      });
+      const data = await res.json() as { ok?: boolean; nodes?: Array<{ name?: string; attributes?: Record<string, unknown> }> };
+      if (!data.ok || !data.nodes?.length) throw new Error('no_result');
+      const found: MealItem[] = [];
+      for (const n of data.nodes) {
+        const nm = String(n.name || '').trim();
+        if (!nm || nm.length > 40) continue;
+        const g = Number(n.attributes?.grams);
+        found.push({ name: nm, ...(Number.isFinite(g) && g > 0 ? { grams: Math.round(g) } : {}) });
+      }
+      if (!found.length) throw new Error('no_result');
+      setItems((prev) => {
+        const have = new Set(prev.map((i) => i.name));
+        return [...prev, ...found.filter((i) => !have.has(i.name))];
+      });
+      setRecog('done');
+    } catch {
+      setRecog('error');
+    }
+  }, [photoFile, dict]);
+  useEffect(() => { if (photoFile) void recognizePhoto(); }, [photoFile, recognizePhoto]);
 
   // 营养 = Σ(每100g × 克/100),查本地成分表;没克数的项按 100g 估。全标估算。
   useEffect(() => {
@@ -1155,6 +1208,24 @@ function MealLogBody({ photoUrl, onError, onDone, t }: { photoUrl?: string; onEr
         <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={photoUrl} alt="" style={{ width: '100%', maxHeight: '30vh', objectFit: 'cover', display: 'block' }} draggable={false} />
+          {recog === 'loading' && (
+            <p style={{ margin: 0, padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }} role="status">
+              {t('正在认这餐吃了什么…', 'Recognizing what this meal is…')}
+            </p>
+          )}
+          {recog === 'error' && (
+            <p style={{ margin: 0, padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--status-risk)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }} role="alert">
+              {t('没认出来 —— 可以手动加,或', 'Could not recognize — add manually, or')}
+              <button type="button" onClick={() => void recognizePhoto()} style={{ border: 'none', background: 'none', padding: 0, color: 'var(--portal-accent)', fontSize: 'var(--text-xs)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                {t('再试一次', 'retry')}
+              </button>
+            </p>
+          )}
+          {recog === 'done' && (
+            <p style={{ margin: 0, padding: 'var(--space-2) var(--space-3)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }} role="status">
+              {t('已按照片预填,不对可以删掉或改克数。', 'Prefilled from the photo — remove or edit anything that looks off.')}
+            </p>
+          )}
         </div>
       )}
 
