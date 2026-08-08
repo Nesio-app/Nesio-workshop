@@ -33,7 +33,7 @@ export async function reconcileMyChorePoints(
     const lr = await getLedger(familyId, myId);
     if (!lr.ok) return;
     for (const c of lr.data.ledger.approved) {
-      earnChorePoints({ ...c, assigneeId: myId }, locale);
+      earnChorePoints(c, locale);
     }
   } catch { /* 记分失败不拦页面 */ }
 }
