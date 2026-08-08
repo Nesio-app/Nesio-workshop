@@ -131,6 +131,8 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-xlib-draft-v1',                                                   // 动作库草稿(同 jot-draft:本机暂存)
   'nesio-heal-earned', 'nesio-wrapped-last',                               // 日键计分 / 上次展示
   'nesio-a2hs-dismissed-until', 'nesio-ask-guide-seen-v1', 'nesio-retro-dismissed-v1', // UI 一次性标记
+  // 明确匿名清库后的 sessionStorage 闸(防隐私模式/重复 reload)。本会话簿记,换设备从零正确。
+  'nesio-signed-out-purged',
 ]);
 // 注意:**不要**在这里放裸 `geo` —— 它会误伤足迹主数据键 `nesio-place-geo-v1`
 // (`-geo-` 被判成缓存 → 从云备份里被剔除 → 换浏览器足迹永远同步不过去,已踩过)。

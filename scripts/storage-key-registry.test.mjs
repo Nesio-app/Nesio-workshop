@@ -119,6 +119,7 @@ const KNOWN_KEYS = new Map([
   ["nesio-retro-dismissed-v1", "cache"],
   ["nesio-revgeo-cache-v1", "durable"],
   ["nesio-server-entitlement-v1", "cache"],
+  ["nesio-signed-out-purged", "cache"], // sessionStorage 匿名清库闸,换设备从零正确
   ["nesio-storage-alert-snooze-v1", "cache"],
   ["nesio-storage-warned-at", "cache"],
   ["nesio-telemetry-device-v1", "cache"],
