@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { openModeCamera, takePendingCapture, prepareCapturedPhoto, storeWardrobeImage, kickWardrobeImageSync } from '@/lib/portal/capture-pipeline';
 import {
   listWardrobe, addGarment, removeGarment, markWorn, suggestOutfit, inferFormalNeed,
   GARMENT_TYPES, updateGarment, type Garment, type GarmentType, type Warmth, type Formality, type OutfitPrefs,
@@ -42,47 +43,11 @@ const FORMAL_LABEL: Record<Formality, [string, string]> = { casual: ['休闲', '
 const card: React.CSSProperties = { borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', padding: 'var(--space-4)' };
 const sectionLbl: React.CSSProperties = { margin: 'var(--space-5) 0 var(--space-2)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' };
 
-/** 缩到 ≤1280px 的 jpeg dataURL,别把整张原图塞进 IndexedDB。 */
-function compressImage(file: File): Promise<{ dataUrl: string; mimeType: string }> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('read_failed'));
-    reader.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error('decode_failed'));
-      img.onload = () => {
-        const max = 1280;
-        let { width, height } = img;
-        if (width > max || height > max) {
-          const r = Math.min(max / width, max / height);
-          width = Math.round(width * r); height = Math.round(height * r);
-        }
-        const canvas = document.createElement('canvas');
-        canvas.width = width; canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) { resolve({ dataUrl: String(reader.result), mimeType: file.type || 'image/jpeg' }); return; }
-        ctx.drawImage(img, 0, 0, width, height);
-        resolve({ dataUrl: canvas.toDataURL('image/jpeg', 0.82), mimeType: 'image/jpeg' });
-      };
-      img.src = String(reader.result);
-    };
-    reader.readAsDataURL(file);
-  });
-}
+// 压缩统一走 capture-pipeline.prepareCapturedPhoto(1400px/0.82,全站同参)——
+// 此前这里有一份自己的 1280px 压缩实现,「同一件事有两套做法」是 image-payload 病根,不再留。
 
 function newAssetId(): string {
   try { return `wardrobe-${crypto.randomUUID()}`; } catch { return `wardrobe-${Date.now()}-${Math.round(Math.random() * 1e9)}`; }
-}
-
-/**
- * 存完图立即推云 / 打开面板立即拉云(force 绕开 30s 节流)。
- * 不加这个的话,推送要等下一次「切后台再切回」的同步批次 —— 用户在两台设备间来回看,
- * 体感就是「怎么都不同步」。best-effort:未登录/离线静默,批次的离线队列仍是兜底。
- */
-function kickWardrobeImageSync(): void {
-  void import('@/lib/portal/cloud-wardrobe-image-sync')
-    .then((m) => m.autoSyncWardrobeImagesWithCloud({ force: true }))
-    .catch(() => { /* ignore */ });
 }
 
 // analyze(clothing) 返回节点 → 衣物属性 patch(供单件识别 + 批量共用);无有效字段返回 null。
@@ -134,8 +99,7 @@ export default function WardrobePanel() {
   const [beautyBusy, setBeautyBusy] = useState(false);   // 图16:白底美化中
   const [origPhoto, setOrigPhoto] = useState<string | null>(null); // 美化前的原图,可一键换回
   const [aiError, setAiError] = useState<string | null>(null);
-  const cameraRef = useRef<HTMLInputElement>(null); // 拍照(capture=environment)
-  const uploadRef = useRef<HTMLInputElement>(null); // 上传本地图片(相册,无 capture)
+  const uploadRef = useRef<HTMLInputElement>(null); // 上传本地图片(相册,无 capture);拍照走主相机 mode=wardrobe
   // A｜Pro 云造型师:AI 从现有单品挑一套 + 理由 + 贴士。免费/失败回落规则版 outfit。
   const [stylist, setStylist] = useState<{ pieceIds: string[]; reason: string; tips: string[] } | null>(null);
   const [stylistBusy, setStylistBusy] = useState(false);
@@ -194,6 +158,16 @@ export default function WardrobePanel() {
     window.addEventListener('nesio-life-graph-updated', load);
     window.addEventListener('nesio-wardrobe-images-updated', onImagesSynced);
     kickWardrobeImageSync(); // 打开衣帽间就把别端的照片拉下来,不等下一次前台切换
+    // 模式相机交接:主相机拍完衣物照 → Portal 重开衣帽间 → 这里取走照片直进「加衣物」表单。
+    const captured = takePendingCapture('wardrobe');
+    if (captured) {
+      setTab('closet');
+      setEditingId(null);
+      setDraft({ ...EMPTY_DRAFT, dataUrl: captured.dataUrl, mimeType: 'image/jpeg' });
+      setOrigPhoto(null);
+      setAiError(null);
+      setAdding(true);
+    }
     return () => {
       window.removeEventListener('nesio-life-graph-updated', load);
       window.removeEventListener('nesio-wardrobe-images-updated', onImagesSynced);
@@ -218,13 +192,12 @@ export default function WardrobePanel() {
     if (!file) return;
     setTryonError(null);
     try {
-      const { dataUrl } = await compressImage(file);
-      const { putLocalImage } = await import('@/lib/portal/local-image-store');
-      const ok = await putLocalImage(BODY_ASSET_ID, dataUrl);
+      const photo = await prepareCapturedPhoto(file);
+      if (!photo) { setTryonError(L(dict, '这张图读不了,换一张试试。', 'Could not read that image — try another.')); return; }
+      const ok = await storeWardrobeImage(BODY_ASSET_ID, photo.dataUrl);
       if (!ok) { setTryonError(L(dict, '全身照存不下了(存储空间满),清点空间再试。', 'Could not save the photo (storage full).')); return; }
       try { localStorage.setItem(BODY_FLAG, '1'); } catch { /* ignore */ }
-      setBodyThumb(dataUrl);
-      kickWardrobeImageSync();
+      setBodyThumb(photo.dataUrl);
     } catch { setTryonError(L(dict, '这张图读不了,换一张试试。', 'Could not read that image — try another.')); }
   };
 
@@ -281,13 +254,11 @@ export default function WardrobePanel() {
     const url = await runTryonCore(pieces);
     if (!url) return;
     const assetId = `wardrobe-tryon-${o.id}`;
-    const { putLocalImage } = await import('@/lib/portal/local-image-store');
-    const ok = await putLocalImage(assetId, url);
+    const ok = await storeWardrobeImage(assetId, url);
     // 存不下也别丢结果:内存里先显示,只是日历下次进来没有图 —— 并且明说。
     setOutfitTryons((prev) => ({ ...prev, [assetId]: url }));
     if (!ok) { setTryonError(L(dict, '上身图这次没能存下来(空间满了)—— 现在能看,重开就没了。', 'Could not store the try-on image (storage full) — visible now, gone after reload.')); return; }
     commitOutfit(patchOutfit(o.id, { tryonAssetId: assetId }));
-    kickWardrobeImageSync();
   };
 
   useEffect(() => {
@@ -454,12 +425,9 @@ export default function WardrobePanel() {
     e.target.value = '';
     if (!file) return;
     setAiError(null);
-    try {
-      const { dataUrl, mimeType } = await compressImage(file);
-      setDraft((d) => ({ ...d, dataUrl, mimeType }));
-    } catch {
-      setAiError(L(dict, '这张图读不了,换一张试试。', 'Could not read that image — try another.'));
-    }
+    const photo = await prepareCapturedPhoto(file);
+    if (photo) setDraft((d) => ({ ...d, dataUrl: photo.dataUrl, mimeType: 'image/jpeg' }));
+    else setAiError(L(dict, '这张图读不了,换一张试试。', 'Could not read that image — try another.'));
   };
 
   /**
@@ -557,13 +525,11 @@ export default function WardrobePanel() {
     let assetId: string | null = null;
     if (draft.dataUrl) {
       try {
-        const { putLocalImage } = await import('@/lib/portal/local-image-store');
         assetId = newAssetId();
-        await putLocalImage(assetId, draft.dataUrl);
+        await storeWardrobeImage(assetId, draft.dataUrl);
       } catch { assetId = null; /* 存图失败也让衣服进衣橱,只是没缩略图 */ }
     }
     addGarment({ name, garmentType: draft.garmentType, warmth: draft.warmth, formality: draft.formality, colors, assetId, mimeType: draft.mimeType });
-    if (assetId) kickWardrobeImageSync();
     setDraft(EMPTY_DRAFT); setAdding(false); setAiError(null); setOrigPhoto(null);
     load();
   };
@@ -575,23 +541,24 @@ export default function WardrobePanel() {
     if (files.length === 0) return;
     setBulkBusy(true);
     setBulkMsg(L(dict, `处理中 0/${files.length}`, `Processing 0/${files.length}`));
-    const { putLocalImage } = await import('@/lib/portal/local-image-store');
     const pro = canUsePaidCloudAi();
     let aiStopped = false; // 撞到限流就停 AI、继续存图
     let added = 0;
     for (let i = 0; i < files.length; i++) {
       try {
-        const { dataUrl, mimeType } = await compressImage(files[i]);
+        const photo = await prepareCapturedPhoto(files[i]);
+        if (!photo) throw new Error('unreadable'); // → catch:跳过读不了的图,进度照走
+        const { dataUrl } = photo;
         const assetId = newAssetId();
-        await putLocalImage(assetId, dataUrl);
-        const node = addGarment({ name: '', garmentType: 'top', warmth: 2, formality: 'casual', assetId, mimeType });
+        await storeWardrobeImage(assetId, dataUrl); // 内部去抖推云:批量 20 张只触发一次同步
+        const node = addGarment({ name: '', garmentType: 'top', warmth: 2, formality: 'casual', assetId, mimeType: 'image/jpeg' });
         if (pro && !aiStopped) {
           try {
             const base64 = dataUrl.split(',')[1] || '';
             const res = await fetch('/api/portal/analyze', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', 'x-baohe-access-mode': 'personal_lab' },
-              body: JSON.stringify({ type: 'image', mode: 'clothing', content: L(dict, '识别这件衣服', 'Identify this clothing item'), imageBase64: base64, mimeType, uiLocale: dict }),
+              body: JSON.stringify({ type: 'image', mode: 'clothing', content: L(dict, '识别这件衣服', 'Identify this clothing item'), imageBase64: base64, mimeType: 'image/jpeg', uiLocale: dict }),
             });
             const data = await res.json() as { ok?: boolean; nodes?: Array<{ name?: string; attributes?: Record<string, unknown> }>; error?: string };
             if (res.status === 429 || data.error === 'rate_limited') aiStopped = true; // 剩下的先存,不再识别
@@ -603,7 +570,6 @@ export default function WardrobePanel() {
       setBulkMsg(L(dict, `处理中 ${i + 1}/${files.length}`, `Processing ${i + 1}/${files.length}`));
     }
     load();
-    if (added > 0) kickWardrobeImageSync();
     setBulkBusy(false);
     const tail = pro ? (aiStopped ? L(dict, '（部分已 AI 识别,其余可点每件补）', ' (some AI-tagged; tap to finish)') : L(dict, '（已 AI 识别）', ' (AI-tagged)')) : L(dict, '（点每件可补属性）', ' — tap each to edit');
     setBulkMsg(L(dict, `加了 ${added} 件${tail}`, `Added ${added}${tail}`));
@@ -910,13 +876,12 @@ export default function WardrobePanel() {
       ) : (
         <div style={{ ...card, marginTop: 'var(--space-4)', background: 'var(--glass-bg-solid, var(--portal-bg))' }}>
           {editingId && <p style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{L(dict, '编辑衣物 · 改属性(照片不动)', 'Edit · attributes only')}</p>}
-          {/* 拍照走相机;上传走相册(无 capture) —— 两个入口共用 onPickFile */}
-          <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden" onChange={onPickFile} />
+          {/* 拍照走主相机(mode=wardrobe,「一个相机、多种模式」);上传走相册(无 capture,onPickFile)。 */}
           <input ref={uploadRef} type="file" accept="image/*" className="nesio-visually-hidden" onChange={onPickFile} />
           {/* 两个大号取图入口:一眼可见,并排等宽(编辑时隐藏 —— 只改属性) */}
           {!editingId && (
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-            <Button variant="soft" pill={false} layoutStyle={{ flex: 1 }} onClick={() => cameraRef.current?.click()}>{L(dict, '拍照', 'Camera')}</Button>
+            <Button variant="soft" pill={false} layoutStyle={{ flex: 1 }} onClick={() => openModeCamera('wardrobe')}>{L(dict, '拍照', 'Camera')}</Button>
             <Button variant="soft" pill={false} layoutStyle={{ flex: 1 }} onClick={() => uploadRef.current?.click()}>{L(dict, '上传照片', 'Upload photo')}</Button>
           </div>
           )}

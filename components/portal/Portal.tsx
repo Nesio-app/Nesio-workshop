@@ -30,6 +30,7 @@ import { autoSyncPlaceImagesWithCloud } from '@/lib/portal/cloud-place-image-syn
 import { autoSyncWardrobeImagesWithCloud } from '@/lib/portal/cloud-wardrobe-image-sync';
 import { autoSyncLocalFilesWithCloud } from '@/lib/portal/cloud-file-sync';
 import { autoSyncConnectorsOnBoot } from '@/lib/portal/connector-sync';
+import { OPEN_MODE_CAMERA_EVENT, setPendingCapture, type ModeCameraMode } from '@/lib/portal/capture-pipeline';
 
 // Heavy sheets load on first open, not at boot — together they were ~3.5k
 // lines of first-paint JS for UI the user may never touch in a session.
@@ -618,6 +619,8 @@ export default function Portal() {
   const [familyOpen, setFamilyOpen] = useState(false);
   const [cookingOpen, setCookingOpen] = useState(false);
   const [pantryIntake, setPantryIntake] = useState(false);   // 做饭页「拍一拍进货」:复用相机、拍的当食材落库
+  // 「一个相机、多种模式」:记一餐/衣帽间带模式调起主相机;拍完经 capture-pipeline 交接匣回到来源 sheet。
+  const [modeCamera, setModeCamera] = useState<ModeCameraMode | null>(null);
   const [workoutSession, setWorkoutSession] = useState<import('./fitness/WorkoutPlayer').PlayerSession | null>(null);
   // 每次「开始跟练」自增,用作 WorkoutPlayer 的 key → 换一个训练(如跑步→力量)必定全新挂载,
   // 绝不复用上一个训练的内部态(idx/phase/repCount)。修「打开力量没反应 / 退出力量却冒出跑步」的换练串台。
@@ -1048,6 +1051,19 @@ export default function Portal() {
       setInsightsOpen(false);
       setCookingOpen(false); setPantryIntake(true); setCameraFile(file ?? null); setCaptureMode('camera');
     };
+    // 「一个相机、多种模式」:记一餐/衣帽间派事件调起主相机。同进货:先关洞察/做饭
+    // (相机 z=400 在全屏 sheet 901 之下),拍完由 onModeCaptured 重开来源 sheet。
+    const modeCameraHandler = (e: Event) => {
+      const m = (e as CustomEvent).detail?.mode as ModeCameraMode | undefined;
+      if (m !== 'meal' && m !== 'wardrobe') return;
+      track('mode_camera_open');
+      setInsightsOpen(false);
+      setCookingOpen(false);
+      setPantryIntake(false);
+      setModeCamera(m);
+      setCameraFile(null);
+      setCaptureMode('camera');
+    };
     // 行程购物/预算「拍小票」—— 打开通用相机识别(不强制食材进货模式)
     const openCameraHandler = (e: Event) => {
       const file = (e as CustomEvent).detail?.file as File | undefined;
@@ -1121,6 +1137,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-family', familyHandler);
     window.addEventListener('nesio-open-cooking', cookingHandler);
     window.addEventListener('nesio-open-cooking-camera', cookingCameraHandler);
+    window.addEventListener(OPEN_MODE_CAMERA_EVENT, modeCameraHandler);
     window.addEventListener('nesio-open-camera', openCameraHandler);
     window.addEventListener('nesio-open-rewards', rewardsHandler);
     window.addEventListener('nesio-open-brief', briefHandler);
@@ -1140,6 +1157,7 @@ export default function Portal() {
       window.removeEventListener('nesio-open-family', familyHandler);
       window.removeEventListener('nesio-open-cooking', cookingHandler);
       window.removeEventListener('nesio-open-cooking-camera', cookingCameraHandler);
+      window.removeEventListener(OPEN_MODE_CAMERA_EVENT, modeCameraHandler);
       window.removeEventListener('nesio-open-camera', openCameraHandler);
       window.removeEventListener('nesio-open-rewards', rewardsHandler);
       window.removeEventListener('nesio-open-brief', briefHandler);
@@ -1604,7 +1622,32 @@ export default function Portal() {
       </div>
 
       {/* Capture sheets — rendered at root level, independent of TellNesioSheet state */}
-      <CameraSheet open={captureMode === 'camera'} initialFile={cameraFile} intakeSubtype={pantryIntake ? '食材' : undefined} onClose={() => { const wasPantry = pantryIntake; setCaptureMode(null); setCameraFile(null); setPantryIntake(false); if (wasPantry) setTimeout(() => setCookingOpen(true), 80); }} />
+      <CameraSheet
+        open={captureMode === 'camera'}
+        initialFile={cameraFile}
+        intakeSubtype={pantryIntake ? '食材' : undefined}
+        mode={modeCamera ?? undefined}
+        onModeCaptured={(photo) => {
+          const m = modeCamera;
+          if (!m) return;
+          // 拍完:照片进交接匣 → 关相机 → 重开来源 sheet(挂载时取走照片继续)。80ms 同进货的节拍。
+          setPendingCapture(m, photo);
+          setModeCamera(null); setCaptureMode(null); setCameraFile(null);
+          setTimeout(() => {
+            if (m === 'meal') setCookingOpen(true);
+            else { setInsightsTab('wardrobe'); setInsightsNonce((n) => n + 1); setInsightsOpen(true); }
+          }, 80);
+        }}
+        onClose={() => {
+          const wasPantry = pantryIntake;
+          const m = modeCamera;
+          setCaptureMode(null); setCameraFile(null); setPantryIntake(false); setModeCamera(null);
+          if (wasPantry) setTimeout(() => setCookingOpen(true), 80);
+          // 模式相机取消:也回到来源 sheet,别把用户丢在首页。
+          else if (m === 'meal') setTimeout(() => setCookingOpen(true), 80);
+          else if (m === 'wardrobe') setTimeout(() => { setInsightsTab('wardrobe'); setInsightsNonce((n) => n + 1); setInsightsOpen(true); }, 80);
+        }}
+      />
       <VoiceInputSheet
         open={captureMode === 'voice'}
         canUsePrivateData={canViewPrivateData}

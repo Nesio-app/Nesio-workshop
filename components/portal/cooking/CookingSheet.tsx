@@ -8,6 +8,7 @@
  * 主线全免费·确定性;云生成是 Pro 点缀。每个异步动作有显式失败态;全用设计 token、无 emoji、线性图标。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { openModeCamera, takePendingCapture } from '@/lib/portal/capture-pipeline';
 import NesioSheet from '../ui/NesioSheet';
 import SegTabs from '../ui/SegTabs';
 import { IconBookOpen, IconCamera, IconCheckSquare, IconZap, IconUtensils } from '../icons';
@@ -66,9 +67,8 @@ export default function CookingSheet({ open, onClose, initialView }: {
   const [shopping, setShopping] = useState<ShoppingItem[]>([]);
   const [wishes, setWishes] = useState<WishDish[]>([]);
   const camInputRef = useRef<HTMLInputElement>(null);
-  const mealCamRef = useRef<HTMLInputElement>(null);
-  const [mealPhoto, setMealPhoto] = useState('');
-  // 原始文件留给 AI 识别用(objectURL 只能显示,识别要重新压缩出 base64)。
+  const [mealPhoto, setMealPhoto] = useState(''); // 压缩后的 dataURL(显示用,capture-pipeline 给的)
+  // 原始文件留给 AI 识别用(识别要重新压缩出 base64)。
   const [mealPhotoFile, setMealPhotoFile] = useState<File | null>(null);
 
   const reload = useCallback(() => {
@@ -100,24 +100,19 @@ export default function CookingSheet({ open, onClose, initialView }: {
     const f = e.target.files?.[0]; e.target.value = '';
     if (f) window.dispatchEvent(new CustomEvent('nesio-open-cooking-camera', { detail: { file: f } }));
   }, []);
-  /** 记一餐:点一下先开相机,拍好带图进记一餐页(页内不再放相机)。 */
-  const startLogMeal = useCallback(() => { mealCamRef.current?.click(); }, []);
-  const onMealCamFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; e.target.value = '';
-    if (!f) return;
-    setMealPhoto((prev) => {
-      if (prev) try { URL.revokeObjectURL(prev); } catch { /* ignore */ }
-      try { return URL.createObjectURL(f); } catch { return ''; }
-    });
-    setMealPhotoFile(f);
+  /** 记一餐:带模式调起主相机(「一个相机、多种模式」)—— 拍好经交接匣回到这里进记一餐页。 */
+  const startLogMeal = useCallback(() => { openModeCamera('meal'); }, []);
+  // 模式相机交接:Portal 拍完重开做饭页,这里挂载时取走照片直进「记一餐」。
+  useEffect(() => {
+    const p = takePendingCapture('meal');
+    if (!p) return;
+    setMealPhoto(p.dataUrl);
+    setMealPhotoFile(p.file);
     setErr('');
     setView({ kind: 'logmeal' });
   }, []);
   const finishLogMeal = useCallback(() => {
-    setMealPhoto((prev) => {
-      if (prev) try { URL.revokeObjectURL(prev); } catch { /* ignore */ }
-      return '';
-    });
+    setMealPhoto('');
     setMealPhotoFile(null);
     setView({ kind: 'home' });
   }, []);
@@ -153,7 +148,6 @@ export default function CookingSheet({ open, onClose, initialView }: {
   return (
     <NesioSheet variant="fullscreen" open={open} onOpenChange={(o) => { if (!o) onClose(); }} ariaLabel={t('做饭 · 库存', 'Cooking · Pantry')} className="cooking-skin">
       <input ref={camInputRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden" onChange={onCamFile} />
-      <input ref={mealCamRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden" onChange={onMealCamFile} />
       <div style={{ minHeight: '100%', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }}>
         <div>
           <div style={{ padding: 'var(--space-5) var(--space-4) var(--space-8)', display: 'flex', flexDirection: 'column', gap: 'var(--space-5)' }}>

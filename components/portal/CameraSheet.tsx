@@ -19,6 +19,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import { localDayKey } from '@/lib/portal/local-day';
+import { prepareCapturedPhoto, type CapturedPhoto, type ModeCameraMode } from '@/lib/portal/capture-pipeline';
 
 // ── Similarity check (拍照发现已有) ────────────────────────────────────────
 
@@ -59,6 +60,12 @@ interface CameraSheetProps {
   initialFile?: File | null;
   /** 进货模式:非空时,拍到的 object 节点打上该后台子类(如「食材」→ 进「做饭·库存」)。复用整条相机管线。 */
   intakeSubtype?: string;
+  /**
+   * 模式相机(「一个相机、多种模式」):记一餐/衣帽间带模式调起主相机 ——
+   * 取景框/相册/压缩全复用,拍完把照片交回入口(onModeCaptured),不走记忆识别流。
+   */
+  mode?: ModeCameraMode;
+  onModeCaptured?: (photo: CapturedPhoto) => void;
 }
 
 interface AnalyzedNode extends Omit<LifeNode, 'id' | 'createdAt'> {}
@@ -319,7 +326,7 @@ function dataUrlToFile(dataUrl: string, fileName: string): File | null {
   return new File([bytes], fileName, { type: mimeType || 'image/jpeg' });
 }
 
-export default function CameraSheet({ open, onClose, initialFile, intakeSubtype }: CameraSheetProps) {
+export default function CameraSheet({ open, onClose, initialFile, intakeSubtype, mode, onModeCaptured }: CameraSheetProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -551,6 +558,16 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
     ctx.drawImage(video, 0, 0);
+
+    // 模式相机(记一餐/衣帽间):拍到帧就交回入口,不进记忆识别流。
+    if (mode && onModeCaptured) {
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+      const file = dataUrlToFile(dataUrl, `nesio-camera-${Date.now()}.jpg`);
+      if (!file) { setError(L(dict, '这一帧没拍成,再试一次。', 'That frame did not capture — try again.')); setPhase('live'); return; }
+      stopCamera();
+      onModeCaptured({ file, dataUrl });
+      return;
+    }
 
     // Show preview thumbnail
     const preview = canvas.toDataURL('image/jpeg', 0.5);
@@ -785,6 +802,17 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
   }
 
   async function processFile(file: File) {
+    // 模式相机(记一餐/衣帽间):压缩完直接交回入口,不走 EXIF/QR/记忆识别。
+    if (mode && onModeCaptured) {
+      if (!file.type.startsWith('image/')) {
+        setError(L(dict, '这个模式只收照片。', 'This mode only takes photos.'));
+        return;
+      }
+      const photo = await prepareCapturedPhoto(file);
+      if (!photo) { setError(L(dict, '这张图读不了,换一张试试。', 'Could not read that image — try another.')); return; }
+      onModeCaptured(photo);
+      return;
+    }
     setSourceFile(file);
     setExifCap(null);
     setQrCodes([]); setMemSearch(null);
@@ -1264,8 +1292,8 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
       {/* Native camera — opens the iOS system camera directly (reliable, no
           persistent stream/indicator). Triggered by a user tap. */}
       <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden" onChange={handleFileChange} />
-      {/* Gallery / file picker — no capture, so it picks from library/files. */}
-      <input ref={fileRef} type="file" accept="image/*,.pdf,.txt,.eml" className="nesio-visually-hidden" onChange={handleFileChange} />
+      {/* Gallery / file picker — no capture, so it picks from library/files. 模式相机只收图。 */}
+      <input ref={fileRef} type="file" accept={mode ? 'image/*' : 'image/*,.pdf,.txt,.eml'} className="nesio-visually-hidden" onChange={handleFileChange} />
 
       {/* Header */}
       <div className="nesio-camera-header">
@@ -1275,7 +1303,9 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
           </svg>
         </button>
         <h2 className="nesio-camera-title">
-          {L(dict, { idle: '拍一下', live: '拍一下', captured: '处理中', analyzing: '识别中', result: '识别结果', saved: '已保存', 'no-camera': '上传图片' }[phase as 'idle' | 'live' | 'captured' | 'analyzing' | 'result' | 'saved' | 'no-camera'], { idle: 'Snap', live: 'Snap', captured: 'Processing', analyzing: 'Recognizing', result: 'Results', saved: 'Saved', 'no-camera': 'Upload image' }[phase as 'idle' | 'live' | 'captured' | 'analyzing' | 'result' | 'saved' | 'no-camera'])}
+          {mode
+            ? L(dict, mode === 'meal' ? '记一餐' : '拍衣物', mode === 'meal' ? 'Log a meal' : 'Wardrobe photo')
+            : L(dict, { idle: '拍一下', live: '拍一下', captured: '处理中', analyzing: '识别中', result: '识别结果', saved: '已保存', 'no-camera': '上传图片' }[phase as 'idle' | 'live' | 'captured' | 'analyzing' | 'result' | 'saved' | 'no-camera'], { idle: 'Snap', live: 'Snap', captured: 'Processing', analyzing: 'Recognizing', result: 'Results', saved: 'Saved', 'no-camera': 'Upload image' }[phase as 'idle' | 'live' | 'captured' | 'analyzing' | 'result' | 'saved' | 'no-camera'])}
         </h2>
         <div style={{ width: 40 }} />
       </div>
@@ -1300,9 +1330,13 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype 
           <div className="nesio-camera-chooser">
             <span className="nesio-camera-chooser-icon" aria-hidden><IconCamera size={30} /></span>
             <p className="nesio-camera-chooser-text">
-              {phase === 'idle'
-                ? L(dict, '拍一张，Nesio 帮你识别并存入 Memory', 'Take a photo — Nesio recognizes it and saves it to Memory')
-                : L(dict, '取景框没起来 —— 用系统相机照样拍,或从相册选择。', "The viewfinder didn't start — use the system camera or pick from Photos.")}
+              {phase !== 'idle'
+                ? L(dict, '取景框没起来 —— 用系统相机照样拍,或从相册选择。', "The viewfinder didn't start — use the system camera or pick from Photos.")
+                : mode === 'meal'
+                  ? L(dict, '拍下这一餐,Nesio 帮你认出吃了什么', 'Snap this meal — Nesio recognizes what you ate')
+                  : mode === 'wardrobe'
+                    ? L(dict, '拍下衣物,加进你的衣帽间', 'Snap a garment to add it to your wardrobe')
+                    : L(dict, '拍一张，Nesio 帮你识别并存入 Memory', 'Take a photo — Nesio recognizes it and saves it to Memory')}
             </p>
             <div className="nesio-camera-chooser-actions">
               {/* 批次 33:no-camera 也给「拍照」(原生 capture input 永远可用,iOS 系统相机直开) */}
