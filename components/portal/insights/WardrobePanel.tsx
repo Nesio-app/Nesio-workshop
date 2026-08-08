@@ -165,8 +165,27 @@ export default function WardrobePanel() {
   useEffect(() => {
     load();
     try { setPrefs(loadWardrobePrefs()); } catch { /* 无存储 */ }
+    // 云端拉回照片(cloud-wardrobe-image-sync)后重读:清缩略图缓存 + 重设 items(新数组引用触发按需重读)。
+    const onImagesSynced = () => {
+      setThumbs({});
+      setOutfitTryons({});
+      load();
+      try { setOutfits(loadOutfits()); } catch { /* ignore */ }
+      void (async () => {
+        try {
+          if (localStorage.getItem(BODY_FLAG) !== '1') return;
+          const { getLocalImage } = await import('@/lib/portal/local-image-store');
+          const url = await getLocalImage(BODY_ASSET_ID);
+          if (url) setBodyThumb(url);
+        } catch { /* ignore */ }
+      })();
+    };
     window.addEventListener('nesio-life-graph-updated', load);
-    return () => window.removeEventListener('nesio-life-graph-updated', load);
+    window.addEventListener('nesio-wardrobe-images-updated', onImagesSynced);
+    return () => {
+      window.removeEventListener('nesio-life-graph-updated', load);
+      window.removeEventListener('nesio-wardrobe-images-updated', onImagesSynced);
+    };
   }, []);
 
   // 全身照(试穿用):有就读缩略图

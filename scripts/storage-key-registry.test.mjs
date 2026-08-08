@@ -81,6 +81,8 @@ const KNOWN_KEYS = new Map([
   ["nesio-drive-backup-at", "cache"],
   ["nesio-email-signals-cache", "cache"],
   ["nesio-email-sync-state-v1", "cache"],
+  // per-record 云同步状态(每 id 上次同步内容哈希)。cache —— 新设备从零开始重新对账是对的。
+  ["nesio-file-sync-state-v1", "cache"],
   ["nesio-family-strip-fetch-at-v1", "cache"],
   ["nesio-first-memory-receipt-shown-v1", "cache"],
   ["nesio-focus-dismissed-v1", "cache"],
@@ -125,6 +127,7 @@ const KNOWN_KEYS = new Map([
   ["nesio-today-cards-v1", "cache"],
   ["nesio-today-dismissed-v1", "cache"],
   ["nesio-version-reload", "cache"],
+  ["nesio-wardrobe-image-sync-state-v1", "cache"],
   ["nesio-wrapped-last", "cache"],
   ["nesio-xlib-draft-v1", "cache"],
   ["treasurebox-personalization-insight-shown-day", "cache"],

@@ -27,6 +27,8 @@ import { isCloudSyncSuspended, whenIdle, SYNC_RESUME_EVENT } from '@/lib/portal/
 import { autoSyncEmailBodiesWithCloud } from '@/lib/portal/cloud-email-sync';
 import { autoSyncReaderBooksWithCloud } from '@/lib/portal/cloud-reader-sync';
 import { autoSyncPlaceImagesWithCloud } from '@/lib/portal/cloud-place-image-sync';
+import { autoSyncWardrobeImagesWithCloud } from '@/lib/portal/cloud-wardrobe-image-sync';
+import { autoSyncLocalFilesWithCloud } from '@/lib/portal/cloud-file-sync';
 import { autoSyncConnectorsOnBoot } from '@/lib/portal/connector-sync';
 
 // Heavy sheets load on first open, not at boot — together they were ~3.5k
@@ -141,7 +143,7 @@ type AuthSessionPayload = {
  * 所以 force 不是可选的调优参数,是区分这两种语义的开关。
  */
 /**
- * 七条云同步的任务表。**名字必须稳定** —— 离线队列里只存名字(函数序列化不了),
+ * 云同步任务表。**名字必须稳定** —— 离线队列里只存名字(函数序列化不了),
  * 重跑时靠它找回该调哪个。改名 = 队列里那条变成认不出来的孤儿。
  */
 const CLOUD_SYNC_TASKS = [
@@ -151,10 +153,12 @@ const CLOUD_SYNC_TASKS = [
   { name: 'profile', run: () => syncProfileWithCloud() },
   // 记录级模块同步(**唯一的通用云同步**):健康/足迹/财务/物品/关系… 每个 durable key 一行。
   { name: 'modules', run: () => autoSyncModulesWithCloud() },
-  // 邮件全文/导入书籍/地点封面照:各自独立 IDB 的记录级同步,量级大不进模块同步。
+  // 邮件全文/导入书籍/地点封面照/衣帽间照片/文件附件:各自独立 IDB 的记录级同步,量级大不进模块同步。
   { name: 'email-bodies', run: () => autoSyncEmailBodiesWithCloud() },
   { name: 'reader-books', run: () => autoSyncReaderBooksWithCloud() },
   { name: 'place-images', run: () => autoSyncPlaceImagesWithCloud() },
+  { name: 'wardrobe-images', run: () => autoSyncWardrobeImagesWithCloud() },
+  { name: 'local-files', run: () => autoSyncLocalFilesWithCloud() },
   // 外部连接器(日历/邮件/flomo/银行/通讯录)拉新,30 分钟节流,内部保证。
   { name: 'connectors', run: () => autoSyncConnectorsOnBoot() },
 ];
@@ -728,7 +732,7 @@ export default function Portal() {
       void (async () => {
         await fetchAuthSessionPayload(true);   // ← 要副作用(刷 cookie),不能吃缓存
         if (isCloudSyncSuspended()) return;
-        // 七条云同步统一走 runCloudSyncBatch:**哪条这次没跑成就记进离线队列**,
+        // 全部云同步统一走 runCloudSyncBatch:**哪条这次没跑成就记进离线队列**,
         // 下次开机或 online 事件回来时自动重跑(带退避)。
         // 之前这里是一排 void —— 断网/超时/5xx 一律无声无息,这一轮就这么丢了。
         //

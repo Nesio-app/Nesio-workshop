@@ -40,15 +40,21 @@ export const DEDICATED_SYNC_KEYS = new Set<string>([
 export const READER_BOOK_MODULE_PREFIX = 'reader-book:';
 /** 地点封面照逐张行前缀(cloud-place-image-sync)—— nesio-images 里的 placephoto-* 覆盖图,per-record 上云。 */
 export const PLACE_IMAGE_MODULE_PREFIX = 'place-image:';
+/** 衣帽间照片逐张行前缀(cloud-wardrobe-image-sync)—— nesio-images 里的 wardrobe-* / 全身照,per-record 上云。 */
+export const WARDROBE_IMAGE_MODULE_PREFIX = 'wardrobe-image:';
+/** 文件附件逐份行前缀(cloud-file-sync)—— nesio-files 的 pdf/凭证/聊天文件,per-record 上云。 */
+export const LOCAL_FILE_MODULE_PREFIX = 'local-file:';
 
 /**
  * 由专属引擎负责的 key 前缀(通用 module-sync 让路)。加新的 per-record 专属引擎 = 在此加它的前缀,
  * 通用同步会据此**服务端**排除(不下载)+ 客户端跳过,自动合规。
  */
 export const DEDICATED_SYNC_PREFIXES: readonly string[] = [
-  EMAIL_BODY_MODULE_PREFIX,   // 邮件全文逐封行(cloud-email-sync)
-  READER_BOOK_MODULE_PREFIX,  // 导入书籍逐本行(cloud-reader-sync)
-  PLACE_IMAGE_MODULE_PREFIX,  // 地点封面照逐张行(cloud-place-image-sync,走通用 record-sync 工厂)
+  EMAIL_BODY_MODULE_PREFIX,     // 邮件全文逐封行(cloud-email-sync)
+  READER_BOOK_MODULE_PREFIX,    // 导入书籍逐本行(cloud-reader-sync)
+  PLACE_IMAGE_MODULE_PREFIX,    // 地点封面照逐张行(cloud-place-image-sync,走通用 record-sync 工厂)
+  WARDROBE_IMAGE_MODULE_PREFIX, // 衣帽间照片逐张行(cloud-wardrobe-image-sync,同工厂)
+  LOCAL_FILE_MODULE_PREFIX,     // 文件附件逐份行(cloud-file-sync,同工厂)
 ];
 
 /** 该 key 是否由某个专属引擎负责同步 → 通用 module-sync 应跳过它。 */

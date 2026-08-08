@@ -119,6 +119,7 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-connectors-autosync-at-v1',                                       // 自动同步节流水位
   'nesio-bank-synced-at', 'nesio-drive-backup-at', 'nesio-last-backup-at', // 各同步的"上次时间"
   'nesio-place-image-sync-state-v1', 'nesio-reader-sync-state-v1',         // 同步簿记(同 email-sync-state)
+  'nesio-wardrobe-image-sync-state-v1', 'nesio-file-sync-state-v1',        // 同步簿记(衣帽间照片/文件附件)
   'nesio-life-graph-cloud-sync-v1', 'nesio-life-graph-cloud-sync-outbox-v1', // 云同步水位与待发队列
   'nesio-family-strip-fetch-at-v1',                                        // 取数节流
   'nesio-plaid-enrich-v1',                                                 // 一次性全量回填标记
