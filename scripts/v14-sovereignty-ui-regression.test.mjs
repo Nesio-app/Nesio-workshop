@@ -121,8 +121,8 @@ assert.doesNotMatch(memoryTab, /你的生活，连成一张图|Life Graph|识别
 assert.doesNotMatch(memoryTab, /登录后查看你的 Memory|去登录|接入 Gmail/, 'Memory empty state should not force login or early Gmail connection.');
 // 批次 15:搜索占位精简后,本地优先意图由 hero 文案承载(由你放进来,由你随时找回)
 assert.match(memoryTab, /这里会放你以后想找回的东西|由你放进来，由你随时找回|回头找得到|放进来第一件|登录同步/, 'Memory empty state should prioritize local-first value before login sync.');
-assert.match(memoryTab, /isPrivateExternalNode|visibleMemoryNodes/, 'Memory should show local records while filtering private external calendar/email nodes when signed out.');
-assert.doesNotMatch(memoryTab, /setNodes\(\[\]\);\s*return undefined;/, 'Signed-out Memory must not hide local voice/photo/manual records.');
+assert.match(memoryTab, /visibleMemoryNodes|DEMO_SEED_NODES/, 'Signed-out Memory uses visibility gate + demo seed (no residual real-user leak).');
+assert.match(memoryTab, /DEMO_SEED_NODES/, 'Signed-out empty Memory falls back to demo seed only.');
 assert.doesNotMatch(memoryTab, /aria-label="语音问宝盒"|nesio-memory-search-voice/, 'Memory search should stay focused on typed retrieval; voice ask belongs to the center N long press.');
 assert.match(memoryTab, /showAll|visibleItems|slice\(0,\s*6\)|更多线索/s, 'Memory should show at most six cards first and fold the rest behind a more button.');
 assert.match(memoryTab, /deleteLifeNode|左滑删除|长按分享|navigator\.share|clipboard/, 'Memory cards should support left-swipe delete and long-press share.');

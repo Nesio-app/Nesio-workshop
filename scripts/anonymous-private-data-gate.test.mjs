@@ -72,8 +72,13 @@ assert.match(
 );
 assert.match(
   portal,
-  /canViewPrivateData\s*=\s*authSessionLoggedIn\s*!==\s*false/,
-  'Portal UI private view must stay sticky while auth is unknown (avoid demo/empty flicker).',
+  /canViewPrivateData\s*=\s*authSessionLoggedIn\s*===\s*true/,
+  'Portal UI private view must be fail-closed (unknown/signed-out must not expose real local data).',
+);
+assert.match(
+  portal,
+  /purgeLocalUserDataForLogout/,
+  'Confirmed signed-out with residual local data must purge like logout (shared-device leak closure).',
 );
 assert.doesNotMatch(
   portal,
@@ -83,7 +88,7 @@ assert.doesNotMatch(
 assert.match(
   portal,
   /<TodayFeed[\s\S]*canUsePrivateData=\{canViewPrivateData\}/,
-  'TodayFeed must use the sticky UI private-data gate (not flip to demo while session is unknown).',
+  'TodayFeed must use the fail-closed UI private-data gate.',
 );
 assert.match(
   portal,
@@ -93,7 +98,7 @@ assert.match(
 assert.match(
   portal,
   /<MemoryTab[\s\S]*canUsePrivateData=\{canViewPrivateData\}/,
-  'MemoryTab must use the sticky UI private-data gate (not flip to demo while session is unknown).',
+  'MemoryTab must use the fail-closed UI private-data gate.',
 );
 assert.match(
   portal,
@@ -130,17 +135,17 @@ assertBefore(
   memoryTab,
   'visibleMemoryNodes',
   'const results',
-  'MemoryTab must filter private external calendar/email nodes before rendering signed-out Memory results.',
+  'MemoryTab must run the visibility gate before rendering Memory results.',
 );
 assert.match(
   memoryTab,
-  /isPrivateExternalNode/,
-  'MemoryTab must use the Life Graph private external-node classifier instead of hiding all local records.',
+  /DEMO_SEED_NODES/,
+  'Signed-out Memory must fall back to demo seed, not real residual local records.',
 );
-assert.doesNotMatch(
-  memoryTab,
-  /if \(!canUsePrivateData\) \{\s*setNodes\(\[\]\);/,
-  'Signed-out Memory should keep local voice/photo/manual records visible while filtering external private nodes.',
+assert.match(
+  read('lib/portal/memory-visibility.ts'),
+  /if\s*\(\s*!canUse\s*\)\s*return\s*\[\s*\]/,
+  'visibleMemoryNodes must return [] when private gate is closed (no hand-written residual leak).',
 );
 
 assert.match(

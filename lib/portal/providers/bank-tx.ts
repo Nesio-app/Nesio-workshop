@@ -514,6 +514,12 @@ function isSameUnderlyingAccount(incoming: BankAccount, stored: BankAccount): bo
 /* ---------- 财务㉗:投资持仓(点时快照,同步时整体替换) ---------- */
 
 export interface Holding {
+  /**
+   * 并集同步身份。稳定生成:`accountId|ticker|name`(或 Plaid security_id)。
+   * 历史数据可能缺这个字段 —— saveHoldings / module-merge.rowIdentity 会补。
+   * 缺了又进并集合并 → 两边全被 skip → 持仓被写成 [](投资页「退出就没了」的根因)。
+   */
+  id?: string;
   accountId: string;
   name: string;
   ticker?: string;
@@ -522,6 +528,15 @@ export interface Holding {
   value: number;    // 市值(机构口径)
   costBasis?: number;
   currency: string;
+}
+
+/** 持仓稳定身份(与 module-merge.rowIdentity 同口径)。 */
+export function holdingId(h: Pick<Holding, 'id' | 'accountId' | 'name' | 'ticker'>): string {
+  if (h.id) return h.id;
+  const acct = (h.accountId || '').trim();
+  const ticker = (h.ticker || '').trim();
+  const name = (h.name || '').trim();
+  return acct && (ticker || name) ? `${acct}|${ticker}|${name}` : '';
 }
 
 export const BANK_HOLDINGS_KEY = 'nesio-fin-holdings-v1';
@@ -533,13 +548,34 @@ const holdingsStore = createBlobStore<Holding[]>({
 
 export function loadHoldings(): Holding[] {
   const raw = holdingsStore.load();
-  return Array.isArray(raw) ? raw : [];
+  if (!Array.isArray(raw)) return [];
+  // 自愈:历史持仓没 id → 补上并写回,避免下次 module-sync 并集再把它们 skip 成空。
+  let dirty = false;
+  const out = raw.map((h) => {
+    if (!h || typeof h !== 'object') return h;
+    if (h.id) return h;
+    const id = holdingId(h);
+    if (!id) return h;
+    dirty = true;
+    return { ...h, id };
+  });
+  if (dirty && out.length) {
+    try { holdingsStore.save(out); } catch { /* 读路径尽力而为 */ }
+  }
+  return out;
 }
 
-/** 持仓是点时快照 → 整体替换(空列表不写,防同步半途清空)。 */
+/** 持仓是点时快照 → 整体替换(空列表不写,防同步半途清空)。落库前盖稳定 id。 */
 export function saveHoldings(holdings: Holding[]): void {
   if (!holdings.length) return;
-  holdingsStore.save(holdings.filter((h) => h && h.accountId));
+  const stamped = holdings
+    .filter((h) => h && h.accountId)
+    .map((h) => {
+      const id = holdingId(h);
+      return id ? { ...h, id } : h;
+    });
+  if (!stamped.length) return;
+  holdingsStore.save(stamped);
 }
 
 /** 财务⑯:手动移除账户(重复/失效副本兜底)。若该账户仍在连接中,下次同步会重新拉回。 */

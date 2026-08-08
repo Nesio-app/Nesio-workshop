@@ -45,9 +45,31 @@ export function setLocalOwner(userId: string, email: string): void {
   } catch (err) { logDropped('local_owner.set', err); }
 }
 
-/** 本机有没有值得保护的用户数据(记忆节点是判断代表;photos/health 都挂在它之下产生)。 */
+/**
+ * 本机有没有值得保护的用户数据。
+ * 记忆图是主判据;财务/健康/持仓等 durable blob 即使图已空也算「有」——
+ * 否则会话过期后只剩持仓时,匿名清库会漏掉(共享设备仍能在 DevTools 看到)。
+ */
 export function hasMeaningfulLocalData(): boolean {
-  try { return getLifeGraph().length > 0; } catch { return false; }
+  try {
+    if (getLifeGraph().length > 0) return true;
+  } catch { /* ignore */ }
+  if (typeof window === 'undefined') return false;
+  const residualKeys = [
+    'nesio-fin-holdings-v1',
+    'nesio-bank-tx-v1',
+    'nesio-bank-accounts-v1',
+    'nesio-health-v1',
+    'nesio-place-geo-v1',
+    'nesio-mirror-profile-v1',
+  ];
+  try {
+    for (const k of residualKeys) {
+      const v = localStorage.getItem(k);
+      if (v && v !== '[]' && v !== '{}' && v !== 'null') return true;
+    }
+  } catch { /* ignore */ }
+  return false;
 }
 
 /**

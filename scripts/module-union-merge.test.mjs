@@ -164,6 +164,36 @@ check('③d 格式漂移(不是数组)→ 返回 null 让调用方退回 LWW,不
   assert.strictEqual(M.mergeModuleJson('treasurebox-theme', '[]', '[]'), null, '不在表里的 key 不该被合并');
 });
 
+// ── ④ 持仓无 id 不许并成空(投资页「退出就没了」)────────────────────────────
+const HOLD = 'nesio-fin-holdings-v1';
+const holding = (over = {}) => ({
+  accountId: 'acct1', name: 'Vanguard Total', ticker: 'VTI', quantity: 10, value: 2000, currency: 'USD', ...over,
+});
+
+check('④a 真实持仓形状(无 id)并集不得变 []', () => {
+  const a = [holding(), holding({ name: 'Cash', ticker: '', accountId: 'acct1' })];
+  // cash 用 name 兜底身份
+  const a2 = [holding(), { accountId: 'acct1', name: 'Cash', quantity: 100, value: 100, currency: 'USD' }];
+  const m = M.mergeModuleJson(HOLD, JSON.stringify(a2), JSON.stringify([holding({ ticker: 'VXUS', name: 'Intl' })]));
+  assert.ok(m, '持仓无 id 时 merge 直接 null 了 —— 应合成身份');
+  const out = JSON.parse(m.json);
+  assert.ok(out.length >= 2, `无 id 持仓被 skip 成 ${out.length} 条(本应 ≥2)—— 这就是投资数据消失的根因`);
+  assert.ok(out.every((r) => r.id), '合并后应盖上稳定 id,方便下次收敛');
+});
+
+check('④b 空云端不许清空本机持仓(无 id 历史数据)', () => {
+  const a = [holding()];
+  const m = M.mergeModuleJson(HOLD, JSON.stringify(a), '[]');
+  assert.ok(m);
+  assert.strictEqual(JSON.parse(m.json).length, 1, '空云把无 id 持仓清空了');
+});
+
+check('④c 两边都无可用身份 → 返回 null(宁走 LWW,不返回 [])', () => {
+  // 缺 accountId/name 合成不出身份
+  const m = M.mergeModuleJson(HOLD, JSON.stringify([{ quantity: 1 }]), JSON.stringify([{ quantity: 2 }]));
+  assert.strictEqual(m, null, '合成不出身份时必须 null,绝不能 apply []');
+});
+
 const bad = results.filter((r) => r[0] === 'FAIL');
 if (bad.length) {
   console.error(`module-union-merge 有 ${bad.length} 条不过:`);

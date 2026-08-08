@@ -93,7 +93,6 @@ import { runConnectors, refreshWeather } from '@/lib/platform/runtime/integratio
 import { pruneDisposableSignals } from '@/lib/life-domain';
 import { hydrateSignalFactStore } from '@/lib/life-domain/signal-read-cache';
 import { readSession } from '@/lib/portal/session-state';
-import { prunePrivateExternalNodes } from '@/lib/portal/life-graph';
 import { STORAGE_FULL_EVENT, STORAGE_WARNING_EVENT } from '@/lib/portal/storage-health';
 import { recordAppOpen } from '@/lib/portal/feature-usage';
 import { track, installErrorTracking } from '@/lib/portal/telemetry';
@@ -557,10 +556,10 @@ export default function Portal() {
   const dict = portalLocaleToDictionaryLocale(locale);
   const [authReady, setAuthReady] = useState(false);
   // 批次 14 数据完整性:会话接口网络失败/非 200 时不能当「未登录」——
-  // 此前任何一次瞬时失败都会触发 prunePrivateExternalNodes 硬删日历/邮件
-  // 节点(项目里引用的也跟着消失),下次重新同步 createdAt 全新 → 列表大洗牌。
+  // 瞬时失败绝不能清库(否则重同步后列表大洗牌)。
   // 三态:true=确定登录 / false=服务器明确说未登录 / null=未知(启动中/网络问题/session_unverified)。
-  // 未知态既不跑连接器也不删数据;UI 读本机私据时也不要塞演示数据/空登录页。
+  // 未知态:不跑连接器、不清库;UI 私据门 fail-closed(不露真实数据,可短暂 demo)。
+  // 明确匿名且本机仍有残留:与登出同款 purge(共享设备泄露收口)。
   const [authDefinitelyAnonymous, setAuthDefinitelyAnonymous] = useState(false);
   const [authSessionLoggedIn, setAuthSessionLoggedIn] = useState<boolean | null>(null);
   const [onboardingActive, setOnboardingActive] = useState(false);
@@ -678,9 +677,10 @@ export default function Portal() {
   );
   // 云同步/连接器:必须「确定已登录」(null/false 都不跑,防未鉴权上传)。
   const canUsePrivateRuntime = authSessionLoggedIn === true;
-  // UI 读本机私据:未知(null)时保持上次可见性——不当匿名,避免演示种子/空态来回跳。
-  // 只有服务器明确 signed_out 才收成匿名门。
-  const canViewPrivateData = authSessionLoggedIn !== false;
+  // UI 读本机私据:**fail-closed** —— 只有确定已登录才露真实数据。
+  // 旧契约 `!== false` 让未知(null)也读本机图/财务/健康 → 共享设备/会话过期未登出
+  // 时等于数据泄露。未知态宁可短暂 demo/空,也不能把上一账号的生活摊开。
+  const canViewPrivateData = authSessionLoggedIn === true;
   // 数据泄露收口(P0):在「本机数据归属」核对通过前,**任何**私有云同步都不许跑 —— 否则 A 没登出、
   // B 同机登录时,弹窗还没弹,A 的记忆/健康/财务已按 B 的身份上传落库(进了 B 的账号)。ownerConflict
   // 非空(other_account / anonymous_data)= 归属未定 → 一律不同步,直到用户在弹窗里选定归属。
@@ -837,6 +837,10 @@ export default function Portal() {
         const loggedIn = Boolean(data.loggedIn);
         const sessionReady = loggedIn && data.authReady !== false && data.profileBootstrapBlocking !== true;
         setAuthSessionLoggedIn(loggedIn);
+        if (loggedIn) {
+          // 允许下次「明确匿名」再走残留清库(本会话登出→再进游客时仍能收口)。
+          try { sessionStorage.removeItem('nesio-signed-out-purged'); } catch { /* ignore */ }
+        }
         // P0 隐私:核对本机数据归属。换账号登录时,上一个人的记忆绝不能默默留给下一个人。
         if (loggedIn && data.user?.id) {
           const verdict = reconcileLocalOwner(data.user.id, data.user.email || '');
@@ -897,12 +901,30 @@ export default function Portal() {
     // 在这之前 lib/idb 的 16 个模块里有 14 个零调用方 —— 建好了从没接上。
     void import('@/lib/idb/boot').then((m) => m.bootStorage()).catch(() => {});
     if (!canUsePrivateRuntime) {
-      // 只有服务器明确说「未登录」才清私有节点;未知态(网络抖动/超时)
-      // 绝不删数据——删了的节点在项目里的引用会一起消失,且重新同步后
-      // createdAt 全变导致列表重排(批次 14 用户报的三个数据问题同根)。
+      // 服务器明确 signed_out:本机若还留着用户数据 = 共享设备泄露面。
+      // 旧逻辑只 prune 邮件/日历外部节点,手记/健康/财务/持仓仍躺在 localStorage
+      // 且 Memory 旧门会继续渲染 —— 现改为与登出同款纯本地清库(不传导云删除)。
+      // 未知态(网络抖动)绝不走这里(authDefinitelyAnonymous 仍为 false)。
       if (authDefinitelyAnonymous) {
-        const removed = prunePrivateExternalNodes();
-        if (removed > 0) track('private_prune', { removed });
+        void (async () => {
+          try {
+            const { hasMeaningfulLocalData, purgeLocalUserDataForLogout, getLocalOwner } = await import('@/lib/portal/local-owner');
+            // 有主人记录或仍有残留私据才清;空游客反复 purge/reload 没意义。
+            const hadResidual = Boolean(getLocalOwner()) || hasMeaningfulLocalData();
+            if (!hadResidual) return;
+            await purgeLocalUserDataForLogout();
+            track('private_purge_signed_out', { reason: 'anonymous_residual' });
+            // 清完让各 store 重读空态;否则内存里还挂着上一拍的图。
+            if (typeof window.location?.reload === 'function') {
+              const FLAG = 'nesio-signed-out-purged';
+              try {
+                if (sessionStorage.getItem(FLAG) === '1') return;
+                sessionStorage.setItem(FLAG, '1');
+                if (sessionStorage.getItem(FLAG) === '1') window.location.reload();
+              } catch { /* 隐私模式写不进就不 reload,UI 门已挡住展示 */ }
+            }
+          } catch { /* best-effort;UI 门仍 fail-closed */ }
+        })();
       }
       try {
         sessionStorage.removeItem(PORTAL_CACHE_KEYS.calendar);

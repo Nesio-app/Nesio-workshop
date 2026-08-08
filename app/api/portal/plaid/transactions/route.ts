@@ -163,7 +163,7 @@ export async function GET(req: NextRequest) {
   const added: PlaidTx[] = [];
   const invAdded: PlaidInvTx[] = []; // 财务⑯:投资账户流水(独立产品拉取)
   // 财务㉗:持仓快照(holdings + securities join;失败不阻断,客户端仅在非空时替换)
-  const holdingsOut: Array<{ accountId: string; name: string; ticker?: string; type?: string; quantity: number; value: number; costBasis?: number; currency: string }> = [];
+  const holdingsOut: Array<{ id: string; accountId: string; name: string; ticker?: string; type?: string; quantity: number; value: number; costBasis?: number; currency: string }> = [];
   // 免费最大化·Plaid:投资拉取诊断 —— 此前 investments 的两个 catch 全空吞错,
   // 「有投资账户但没数据」既不显示也不进日志,连根因都看不到(违反可见失败态)。
   // 记账:发现几个投资账户 + Plaid 回的 error_code,透出给前端 + 落日志。
@@ -270,10 +270,18 @@ export async function GET(req: NextRequest) {
             const secById = new Map((h.securities ?? []).map((sec) => [sec.security_id, sec]));
             for (const hd of h.holdings) {
               const sec = secById.get(hd.security_id);
+              const name = sec?.name || sec?.ticker_symbol || 'Security';
+              const ticker = sec?.ticker_symbol || undefined;
+              // 稳定 id:优先 Plaid security_id(同账户同标的唯一);否则 account|ticker|name。
+              // 客户端 module-sync 并集按 id —— 没 id 会被 skip 成 [] 清空投资页。
+              const id = hd.security_id
+                ? `${hd.account_id}|${hd.security_id}`
+                : `${hd.account_id}|${ticker || ''}|${name}`;
               holdingsOut.push({
+                id,
                 accountId: hd.account_id,
-                name: sec?.name || sec?.ticker_symbol || 'Security',
-                ticker: sec?.ticker_symbol || undefined,
+                name,
+                ticker,
                 type: sec?.type || undefined,
                 quantity: hd.quantity ?? 0,
                 value: hd.institution_value ?? 0,

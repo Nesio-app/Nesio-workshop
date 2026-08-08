@@ -8,6 +8,7 @@ import {
 import { normalizeSupabaseRuntimeUrl } from '@/lib/portal/production-runtime';
 import { envValue } from '@/lib/portal/env';
 import { AUTH_SIG_COOKIE, WECHAT_SIG_COOKIE, signSessionValue, verifiedWechatOpenid } from '@/lib/portal/auth/session-sig';
+import { singleflightRefresh } from '@/lib/portal/auth/refresh-singleflight';
 
 type SupabaseUserResponse = {
   id?: string;
@@ -81,18 +82,13 @@ async function fetchSupabaseUser(accessToken: string): Promise<SupabaseUserRespo
   return response.json() as Promise<SupabaseUserResponse>;
 }
 
-const sessionRefreshInflight = new Map<string, Promise<SupabaseTokenResponse | null>>();
-
 async function refreshSupabaseSession(refreshToken: string): Promise<SupabaseTokenResponse | null> {
   const supabaseUrl = normalizeSupabaseRuntimeUrl(envValue('SUPABASE_URL'));
   const supabaseAnonKey = envValue('SUPABASE_ANON_KEY');
   if (!supabaseUrl || !supabaseAnonKey || !refreshToken) return null;
 
-  // 同进程单飞:Supabase refresh token 旋转时并行 refresh 会互踢。
-  const existing = sessionRefreshInflight.get(refreshToken);
-  if (existing) return existing;
-
-  const inflight = (async (): Promise<SupabaseTokenResponse | null> => {
+  // 同进程单飞(与 cloud-server-runtime 共用 Map):并行 refresh 会把旋转后的 token 互踢。
+  return singleflightRefresh(refreshToken, async () => {
     const response = await fetch(`${supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
       method: 'POST',
       headers: {
@@ -107,12 +103,7 @@ async function refreshSupabaseSession(refreshToken: string): Promise<SupabaseTok
 
     if (!response.ok) return null;
     return response.json() as Promise<SupabaseTokenResponse>;
-  })().finally(() => {
-    sessionRefreshInflight.delete(refreshToken);
   });
-
-  sessionRefreshInflight.set(refreshToken, inflight);
-  return inflight;
 }
 
 function signedInResponse(

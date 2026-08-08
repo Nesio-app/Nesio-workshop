@@ -10,7 +10,7 @@
  *
  * 判据收到这里一份,谁要报数就调它。
  */
-import { isPrivateExternalNode, type LifeNode } from './life-graph';
+import type { LifeNode } from './life-graph';
 import { isTagOnlyText } from './topic-tags';
 
 /** 天气快照是环境信号,进 Memory 只会制造噪音(用户反馈「存在意义不明」)。 */
@@ -58,9 +58,12 @@ export function isInternalBookkeepingNode(n: LifeNode): boolean {
 
 /**
  * 用户**看得见**的记忆。
- * @param canUse 能否使用私密数据(未登录/未确认账户时,私密外部节点一律不出现)。
+ * @param canUse 能否使用私密数据。
+ *   · true  → 过滤天气/空壳导入/内部记账后返回
+ *   · false → **一律空**(未登录/未知态)。旧行为只藏邮件/日历、仍露手记/照片,
+ *             在共享设备或会话过期未登出时就是数据泄露;演示种子由 MemoryTab 另行注入。
  */
 export function visibleMemoryNodes(nodes: readonly LifeNode[], canUse: boolean): LifeNode[] {
-  const base = nodes.filter((n) => !isWeatherNode(n) && !isTagOnlyImport(n) && !isInternalBookkeepingNode(n));
-  return canUse ? base : base.filter((n) => !isPrivateExternalNode(n));
+  if (!canUse) return [];
+  return nodes.filter((n) => !isWeatherNode(n) && !isTagOnlyImport(n) && !isInternalBookkeepingNode(n));
 }

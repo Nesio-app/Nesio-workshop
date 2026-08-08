@@ -87,18 +87,21 @@ async function fetchSignedInUser(config: ReturnType<typeof getCloudConfig>, acce
 
 async function refreshSupabaseSession(config: ReturnType<typeof getCloudConfig>, refreshToken: string): Promise<SupabaseTokenResponse | null> {
   if (!refreshToken) return null;
-  const response = await fetch(`${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
-    method: 'POST',
-    headers: {
-      apikey: config.anonKey,
-      Authorization: `Bearer ${config.anonKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ refresh_token: refreshToken }),
-    cache: 'no-store',
+  const { singleflightRefresh } = await import('@/lib/portal/auth/refresh-singleflight');
+  return singleflightRefresh(refreshToken, async () => {
+    const response = await fetch(`${config.supabaseUrl}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: {
+        apikey: config.anonKey,
+        Authorization: `Bearer ${config.anonKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+      cache: 'no-store',
+    });
+    if (!response.ok) return null;
+    return response.json() as Promise<SupabaseTokenResponse>;
   });
-  if (!response.ok) return null;
-  return response.json() as Promise<SupabaseTokenResponse>;
 }
 
 function setRefreshedAuthCookies(response: NextResponse, session?: SupabaseTokenResponse | null) {

@@ -42,15 +42,33 @@ export const MERGE_KEYS: Readonly<Record<string, string>> = {
   'nesio-bank-tx-v1': 'id',
   // 账户:只增合并 —— 一台设备连了 Chase、另一台连了 BoA,两个都该留着
   'nesio-bank-accounts-v1': 'id',
-  // 持仓:同上
+  // 持仓:按 id(accountId|ticker|name)。⚠️ 历史数据可能没写 id 字段 ——
+  // rowIdentity 会合成;若仍拿不到身份,绝不能 silently skip 成 [](那会清空投资页)。
   'nesio-fin-holdings-v1': 'id',
 };
+
+type Row = Record<string, unknown>;
 
 export function needsUnionMerge(key: string): boolean {
   return Object.prototype.hasOwnProperty.call(MERGE_KEYS, key);
 }
 
-type Row = Record<string, unknown>;
+/**
+ * 取一行的并集身份。持仓历史上没有 id(Plaid 落库只写 accountId/name/ticker),
+ * 若只认 row.id,两边全被 skip → merge 出 `[]` → 云同步 replace 本机 →
+ * 再 push 把云也盖空。这就是「退出/回前台后投资持仓消失」。
+ */
+export function rowIdentity(key: string, row: Row, idField: string): string {
+  const direct = String(row[idField] ?? '');
+  if (direct) return direct;
+  if (key === 'nesio-fin-holdings-v1') {
+    const acct = String(row.accountId ?? '').trim();
+    const ticker = String(row.ticker ?? '').trim();
+    const name = String(row.name ?? '').trim();
+    if (acct && (ticker || name)) return `${acct}|${ticker}|${name}`;
+  }
+  return '';
+}
 
 /** 字段级合并:有值赢空值;都有值且不同 → 字典序小的赢(**对称**,两端算出同一个结果)。 */
 function mergeRow(a: Row, b: Row): Row {
@@ -123,25 +141,32 @@ export function mergeModuleJson(
   let localOnly = 0;
   for (const r of localArr as Row[]) {
     if (!r || typeof r !== 'object') continue;
-    const id = String(r[idField] ?? '');
+    const id = rowIdentity(key, r, idField);
     if (!id) continue;
-    byId.set(id, r);
+    // 把合成身份写回行,后续 push / 再合都稳定(持仓历史无 id 的自愈)。
+    byId.set(id, r[idField] ? r : { ...r, [idField]: id });
     localOnly += 1;
   }
   let cloudOnly = 0;
   for (const r of cloudArr as Row[]) {
     if (!r || typeof r !== 'object') continue;
-    const id = String(r[idField] ?? '');
+    const id = rowIdentity(key, r, idField);
     if (!id) continue;
+    const stamped = r[idField] ? r : { ...r, [idField]: id };
     const prev = byId.get(id);
-    if (prev) { byId.set(id, mergeRow(prev, r)); localOnly -= 1; }
-    else { byId.set(id, r); cloudOnly += 1; }
+    if (prev) { byId.set(id, mergeRow(prev, stamped)); localOnly -= 1; }
+    else { byId.set(id, stamped); cloudOnly += 1; }
   }
 
   const merged = [...byId.values()]
     .sort((a, b) => compareRows(idField, a, b))
     .slice(0, cap)          // 排完再截 —— 先截后排两端会留下不同的子集
     .map(canonicalRow);
+
+  // 保险丝:输入非空却合成不出任何身份 → 绝不能返回 [] 让调用方 replace 清空本机。
+  // 退回 null → 走 LWW,cloudWouldShrink 还能挡住「空云盖本地」。
+  if (merged.length === 0 && (localArr.length > 0 || cloudArr.length > 0)) return null;
+
   const json = JSON.stringify(merged);
   return { json, unchanged: json === localJson, localOnly: Math.max(0, localOnly), cloudOnly };
 }

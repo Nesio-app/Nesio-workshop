@@ -132,6 +132,14 @@ export async function pushModulesToCloud(
   for (const [key, value] of Object.entries(entries)) {
     const h = contentHash(value);
     if (state[key]?.hash === h) continue; // 未变
+    // 并集类模块(流水/账户/持仓):绝不把「空数组」推上云。
+    // 历史持仓无 id 时 merge 会误产出 [] → replace 本机 → 再 push 把云也盖空。
+    // 本机真的清空应靠用户显式操作 + 专属路径,不是通用模块同步。
+    if (needsUnionMerge(key) && (value === '[]' || value === '')) {
+      logDropped('cloud.module_refuse_empty_push', new Error(key));
+      skipped.push(key);
+      continue;
+    }
     // 大 blob(健康/财务/足迹)同步 gzip 在主线程 —— 每压一条让出一拍,避免整段循环冻住 UI。
     if (packed++ > 0) await yieldToMain();
     const gz = await packValue(value);

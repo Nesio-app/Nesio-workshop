@@ -95,7 +95,7 @@ assert.match(portal, /const sessionReady\s*=\s*loggedIn\s*&&\s*data\.authReady\s
 assert.match(portal, /markNesioOnboardingDoneForAuth\(\)/s, 'Portal must persist onboarding completion when a signed-in session is ready.');
 assert.match(portal, /window\.dispatchEvent\(new CustomEvent\(NESIO_ONBOARDING_COMPLETE_EVENT/s, 'Portal must notify onboarding when a signed-in session is ready.');
 assert.match(portal, /canUsePrivateRuntime\s*=\s*authSessionLoggedIn\s*===\s*true/s, 'Portal private runtime/sync must require a definitive signed-in session (not unknown).');
-assert.match(portal, /canViewPrivateData\s*=\s*authSessionLoggedIn\s*!==\s*false/s, 'Portal UI private view must stay sticky while session is unknown (avoid demo/empty flicker).');
+assert.match(portal, /canViewPrivateData\s*=\s*authSessionLoggedIn\s*===\s*true/s, 'Portal UI private view must be fail-closed (unknown must not expose real data).');
 assert.match(portal, /status\s*===\s*['"]session_unverified['"]/s, 'Portal must treat session_unverified as unknown, not signed-out.');
 assert.match(portal, /hasRefreshToken/s, 'Portal must sticky-keep session when refresh cookie remains after a failed refresh.');
 assert.match(portal, /fetchAuthSessionPayload\(\)/s, 'Portal sync batch must warm session before parallel cloud calls.');

@@ -801,11 +801,22 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
     for (const asset of assets) {
       const key = asset.id || asset.storagePath || '';
       if (!key) continue;
-      // 批次 23:本机图优先从 IndexedDB 读(未登录/离线也能看)
+      // 批次 23:本机图优先从 IndexedDB 读(未登录/离线也能看)。
+      // 换端时 asset.local=true 但 IDB 空 —— 以前 continue 掉、又不读云孪生 →
+      // 记忆详情英雄图空白(衣帽间用 resolveAssetDisplayUrl 能看见,总库看不见)。
       if (asset.local) {
         void import('@/lib/portal/local-image-store').then(({ getLocalImage }) =>
-          getLocalImage(asset.id).then((dataUrl) => {
-            if (!cancelled && dataUrl) setAssetUrls((cur) => ({ ...cur, [key]: dataUrl }));
+          getLocalImage(asset.id).then(async (dataUrl) => {
+            if (cancelled) return;
+            if (dataUrl) { setAssetUrls((cur) => ({ ...cur, [key]: dataUrl })); return; }
+            const cloudPath = asset.storagePath
+              || assets.find((a) => a.storagePath && (a.kind === 'image' || a.mimeType?.startsWith('image/')))?.storagePath;
+            if (!cloudPath) return;
+            try {
+              const result = await client.fetchCloudAssetReadUrl({ storagePath: cloudPath });
+              if (cancelled || !result.ok || !result.signedUrl) return;
+              setAssetUrls((cur) => ({ ...cur, [key]: result.signedUrl || '' }));
+            } catch { /* ignore */ }
           }),
         ).catch(() => {});
         continue;
@@ -1360,13 +1371,13 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             const heroKey = heroShown
               ? (() => { const f = allAssets.find((a) => a.kind === 'image' || a.mimeType?.startsWith('image/')); return f ? (f.id || f.storagePath || f.label || 'asset') : ''; })()
               : '';
-            // 顶部已用**本地图**作 hero 时,跳过它的云端孪生副本(同一张照片的云备份,id/storagePath
-            // 不同故 key 去重漏掉它)——那条云图正是详情页那张破图「?」的来源。只留额外的本地图/文件线索。
-            const heroIsLocalImage = heroShown && allAssets.some((a) => (a.kind === 'image' || a.mimeType?.startsWith('image/')) && a.local);
+            // 顶部英雄图已经**真正加载出 URL**时,才跳过云端孪生(避免同图两份)。
+            // 以前只看 asset.local 标记 —— 换端标记在、图不在,英雄空白,云孪生还被滤掉。
+            const heroLoaded = Boolean(heroKey && assetUrls[heroKey]);
             const galleryAssets = allAssets.filter((a) => {
               if ((a.id || a.storagePath || a.label || 'asset') === heroKey) return false;
               const isImg = a.kind === 'image' || a.mimeType?.startsWith('image/');
-              if (heroIsLocalImage && isImg && !a.local && a.storagePath) return false;
+              if (heroLoaded && isImg && !a.local && a.storagePath) return false;
               return true;
             });
             if (galleryAssets.length === 0) return null;
