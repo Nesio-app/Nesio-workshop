@@ -312,7 +312,7 @@ export function tripBudgetSummary(trip: Trip): {
   };
 }
 
-/** 按 dayKey 分组,保持节点顺序。 */
+/** 按 dayKey 分组,保持节点顺序;组内按 at 时间排序。 */
 export function groupNodesByDay(nodes: TripNode[]): Array<{ dayKey: string; dayLabel: string; nodes: TripNode[] }> {
   const order: string[] = [];
   const map = new Map<string, { dayLabel: string; nodes: TripNode[] }>();
@@ -325,7 +325,69 @@ export function groupNodesByDay(nodes: TripNode[]): Array<{ dayKey: string; dayL
     }
     map.get(key)!.nodes.push(n);
   }
-  return order.map((k) => ({ dayKey: k, dayLabel: map.get(k)!.dayLabel, nodes: map.get(k)!.nodes }));
+  return order.map((k) => {
+    const g = map.get(k)!;
+    g.nodes.sort((a, b) => {
+      const ta = a.at ? new Date(a.at).getTime() : Number.MAX_SAFE_INTEGER;
+      const tb = b.at ? new Date(b.at).getTime() : Number.MAX_SAFE_INTEGER;
+      if (ta !== tb) return ta - tb;
+      return 0;
+    });
+    return { dayKey: k, dayLabel: g.dayLabel, nodes: g.nodes };
+  });
+}
+
+/** 时间线左侧文案:优先 ISO at → 本地化具体时间,否则 timeLabel。 */
+export function formatTripNodeTime(n: TripNode, dict: string): string {
+  if (n.at) {
+    const d = new Date(n.at);
+    if (!Number.isNaN(d.getTime())) {
+      return d.toLocaleString(dict === 'en' ? 'en-US' : 'zh-CN', {
+        month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
+        hour12: dict === 'en',
+      });
+    }
+  }
+  const t = (n.timeLabel || '').trim();
+  return t || '·';
+}
+
+/** 从订票确认文本片段解析日期/时间 → at + timeLabel。 */
+function parseBookingDateTime(chunk: string): { at?: string; timeLabel: string } {
+  const dateIso = chunk.match(/\b(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})\b/);
+  const dateUs = chunk.match(/\b(\d{1,2})[-/.](\d{1,2})[-/.](20\d{2})\b/);
+  const time12 = chunk.match(/\b(\d{1,2}):(\d{2})\s*(AM|PM|am|pm)\b/);
+  const time24 = chunk.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+
+  let y = 0; let mo = 0; let d = 0;
+  if (dateIso) {
+    y = Number(dateIso[1]); mo = Number(dateIso[2]); d = Number(dateIso[3]);
+  } else if (dateUs) {
+    mo = Number(dateUs[1]); d = Number(dateUs[2]); y = Number(dateUs[3]);
+  }
+  let hh = 12; let mm = 0;
+  if (time12) {
+    hh = Number(time12[1]) % 12;
+    if (/pm/i.test(time12[3])) hh += 12;
+    mm = Number(time12[2]);
+  } else if (time24) {
+    hh = Number(time24[1]); mm = Number(time24[2]);
+  }
+
+  if (y && mo && d) {
+    const iso = `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}T${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}:00`;
+    const label = time12 || time24
+      ? `${mo}/${d} ${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`
+      : `${mo}/${d}`;
+    return { at: iso, timeLabel: label };
+  }
+  if (time12 || time24) {
+    const label = time12
+      ? `${time12[1]}:${time12[2]} ${time12[3].toUpperCase()}`
+      : `${time24![1]}:${time24![2]}`;
+    return { timeLabel: label };
+  }
+  return { timeLabel: '' };
 }
 
 /** 新建空行程壳。 */
@@ -584,17 +646,19 @@ export function parseBookingConfirmation(text: string): TripNode[] {
     const flightNo = `${m[1]}${m[2]}`;
     if (seenFlights.has(flightNo)) continue;
     seenFlights.add(flightNo);
-    const window = raw.slice(Math.max(0, m.index - 80), m.index + 120);
+    const window = raw.slice(Math.max(0, m.index - 120), m.index + 160);
     const route = window.match(routeRe);
     const seat = window.match(seatRe)?.[1] || raw.match(seatRe)?.[1];
     const confirmation = window.match(confRe)?.[1] || raw.match(confRe)?.[1];
     const fromCode = route?.[1];
     const toCode = route?.[2];
+    const when = parseBookingDateTime(window);
     nodes.push({
       id: uid('n'),
       kind: 'flight',
       state: 'booked',
-      timeLabel: '',
+      timeLabel: when.timeLabel,
+      ...(when.at ? { at: when.at } : {}),
       dayKey: 'd1',
       dayLabel: '行程日',
       title: fromCode && toCode ? `${fromCode} → ${toCode}` : `航班 ${flightNo}`,
@@ -618,11 +682,13 @@ export function parseBookingConfirmation(text: string): TripNode[] {
   const hotelName = raw.match(hotelRe)?.[1]?.trim();
   if (hotelName) {
     const price = Number((raw.match(priceRe)?.[1] || '').replace(/,/g, '')) || undefined;
+    const when = parseBookingDateTime(raw.slice(Math.max(0, (raw.match(hotelRe)?.index ?? 0) - 80), (raw.match(hotelRe)?.index ?? 0) + 120));
     nodes.push({
       id: uid('n'),
       kind: 'hotel',
       state: 'booked',
-      timeLabel: '',
+      timeLabel: when.timeLabel,
+      ...(when.at ? { at: when.at } : {}),
       dayKey: 'd1',
       dayLabel: '行程日',
       title: `入住 · ${hotelName}`,

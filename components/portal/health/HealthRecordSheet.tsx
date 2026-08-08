@@ -32,7 +32,7 @@ const KINDS: Array<{ k: Kind; zh: string; en: string }> = [
 
 const today = () => new Date().toLocaleDateString('en-CA');
 
-export default function HealthRecordSheet({ open, onClose, onSaved }: { open: boolean; onClose: () => void; onSaved?: () => void }) {
+export default function HealthRecordSheet({ open, onClose, onSaved, initialKind = 'lab' }: { open: boolean; onClose: () => void; onSaved?: () => void; initialKind?: Kind }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const t = (zh: string, en: string) => L(dict, zh, en);
 
@@ -65,11 +65,12 @@ export default function HealthRecordSheet({ open, onClose, onSaved }: { open: bo
 
   useEffect(() => {
     if (!open) return;
+    setKind(initialKind);
     setErr(null); setDate(today());
     setName(''); setValue(''); setUnit(''); setLow(''); setHigh('');
     setDose(''); setFreq(''); setSeverity(1); setPlace(''); setDept(''); setNote('');
     setDoctor(''); setDoctorKey(''); setInsurance(''); setPrice('');
-  }, [open]);
+  }, [open, initialKind]);
 
   // 成员:本人 + 有名字的联系人(家人排前面 —— 健康数据多半是给家里人记的)
   const people = useMemo(() => {

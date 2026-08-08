@@ -17,6 +17,7 @@ const placesStore = createBlobStore<NamedPlace[]>({
   key: 'nesio-named-places',
   updateEvent: 'nesio-named-places-updated',
   validate: (v) => Array.isArray(v),
+  onWriteError: reportStorageDropped,
 });
 
 const DEFAULT_HOME: NamedPlace = {

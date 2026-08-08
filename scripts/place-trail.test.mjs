@@ -37,8 +37,17 @@ const placeTime = await import('../lib/portal/place-time.mjs');
 const geo = loadModule('../lib/portal/geo.ts');
 const countryNorm = loadModule('../lib/portal/country-normalize.ts');
 const storageHealth = { reportStorageDropped() {} };
+const idbStores = Object.create(null);
 const idb = {
-  createBlobStore: () => ({ load: () => [], save() {} }),
+  createBlobStore: (opts) => ({
+    load: () => {
+      if (opts.key === 'nesio-place-trail-v1') return [];
+      return idbStores[opts.key] ?? {};
+    },
+    save(v) { idbStores[opts.key] = v; },
+    ready: () => Promise.resolve(),
+    refresh: () => Promise.resolve(),
+  }),
 };
 
 const trail = loadModule('../lib/portal/place-trail.ts', (p) => {
@@ -94,3 +103,10 @@ assert.ok(!labels.includes('Old City Ping') || placeTime.wallDateKey(oldLiveIso)
 }
 
 console.log('place-trail timeline filter tests passed');
+
+// 地址元数据走 IDB blob(durable),不再写 localStorage
+trail.setPlaceGeo('Test Cafe', { name: 'Test Cafe', city: 'Raleigh', country: 'United States' });
+assert.equal(idbStores['nesio-place-geo-v1']?.['Test Cafe']?.city, 'Raleigh', 'place-geo 落 IDB');
+assert.ok(trail.loadPlaceGeo()['Test Cafe']?.city === 'Raleigh', 'loadPlaceGeo 读 IDB 缓存');
+
+console.log('place-trail geo IDB tests passed');

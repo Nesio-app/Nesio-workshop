@@ -3,22 +3,40 @@
 /**
  * 家务完成 → 记积分(2026-08-01,用户:「这两个合并,家务也挣积分」)。
  *
- * 在这之前奖励页是两套经济并排:上面「乐高」按**钱**攒(进度来自家务挣的钱,
- * 存家庭服务端),下面愿望清单按**积分**攒(存本机)。同一页两种单位、两条进度条。
- * 现在只有积分这一种:家务做完也进同一个池子,「做够这些家务就能换那个东西」
- * 在心里是直接对得上的。
- *
- * 这个文件只做一件事:拿到刚动过的那条家务的**最新状态**,交给 earnChorePoints。
- * 为什么要重新读一遍 board 而不是直接用点击时手上那条 —— 「完成」之后的状态
- * 是服务端定的(要不要审核、批没批),客户端手上那份是动作**之前**的。
- * 拿旧的去判,要审核的那些会在还没批的时候就把分发了。
- *
- * 幂等在 earnChorePoints 里(按 instance id 去重)—— 这里可以放心重复调:
- * 今天页和家庭板各有一个「完成」按钮,刷新之后 board 还会把它带回来。
+ * 判据在 earnChorePoints(幂等 + 要审核的批准后才给)。
+ * 家长批准孩子的家务时,分记在孩子设备上的积分池 —— 所以除了动作当下
+ * 尝试记分,打开家庭板时还会从账本 reconcile 一遍(幂等,不会重复给)。
  */
 
-import { getBoard } from '@/lib/family/family-client';
+import { getBoard, getLedger } from '@/lib/family/family-client';
 import { earnChorePoints } from '@/lib/platform/rewards-engine';
+
+function awardIfMine(
+  chore: { id: string; title?: string; value: number; state: string; needsApproval?: boolean; assigneeId?: string } | undefined,
+  myId: string,
+  locale: 'zh' | 'en',
+): void {
+  if (!chore || chore.assigneeId !== myId) return;
+  earnChorePoints(chore, locale);
+}
+
+/** 打开家庭板/今天页时:把账本里已批准、但本机还没记过的家务积分补齐。 */
+export async function reconcileMyChorePoints(
+  familyId: string,
+  locale: 'zh' | 'en' = 'zh',
+): Promise<void> {
+  if (!familyId) return;
+  try {
+    const b = await getBoard(familyId);
+    if (!b.ok) return;
+    const myId = b.data.board.me.id;
+    const lr = await getLedger(familyId, myId);
+    if (!lr.ok) return;
+    for (const c of lr.data.ledger.approved) {
+      earnChorePoints({ ...c, assigneeId: myId }, locale);
+    }
+  } catch { /* 记分失败不拦页面 */ }
+}
 
 export async function awardChorePoints(
   familyId: string,
@@ -28,16 +46,12 @@ export async function awardChorePoints(
   if (!familyId || !instanceId) return;
   try {
     const b = await getBoard(familyId);
-    if (!b.ok) return;   // 读不到就不给分。下次动这条家务时会再判一遍(幂等,不会重复给)
+    if (!b.ok) return;
     const board = b.data.board;
     const all = [...board.myChoresToday, ...board.toReview, ...board.assigned];
     const chore = all.find((c) => c.id === instanceId);
-    if (!chore) return;
-    // 只给**自己**做的那些记分 —— 家长批准别人的家务不该往自己的积分池里加。
-    if (chore.assigneeId !== board.me.id) return;
-    earnChorePoints(chore, locale);
-  } catch {
-    // 记分失败不该把「家务完成」这件事一起打翻 —— 家务是主,积分是影。
-    // 下次动这条家务时会再判一遍。
-  }
+    awardIfMine(chore, board.me.id, locale);
+    // 家长批准后孩子不在场 —— 孩子下次打开板子时 reconcile 会补上
+    void reconcileMyChorePoints(familyId, locale);
+  } catch { /* 记分失败不拦家务完成 */ }
 }

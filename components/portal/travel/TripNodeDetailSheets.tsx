@@ -10,7 +10,7 @@ import {
   setFlightCheckInReminder, hasFlightCheckInReminder, armTravelReceiptCapture,
   generatePackingList, recomputeBudgetNode, updateNode, setCategoryBudget, removeTripNode,
   type TripNode, type FlightPayload, type HotelPayload,
-  type ShoppingPayload, type PackingPayload, type BudgetPayload, type PoiPayload, type TodoPayload,
+  type ShoppingPayload, type ShoppingLine, type PackingPayload, type BudgetPayload, type PoiPayload, type TodoPayload,
 } from '@/lib/portal/travel-trips';
 import { poiTypeLabel } from '@/lib/portal/travel-poi';
 import { listInventoryItems } from '@/lib/portal/inventory';
@@ -34,12 +34,14 @@ function Row({ label, value }: { label: string; value?: string | number | null }
 }
 
 export function FlightDetail({
-  tripId, nodeId, flight, dict,
+  tripId, nodeId, flight, dict, onChanged,
 }: {
-  tripId: string; nodeId: string; flight: FlightPayload; dict: string;
+  tripId: string; nodeId: string; flight: FlightPayload; dict: string; onChanged?: () => void;
 }) {
   const [reminded, setReminded] = useState(() => hasFlightCheckInReminder(tripId, nodeId));
   const [msg, setMsg] = useState<string | null>(null);
+  const [edit, setEdit] = useState(false);
+  const [draft, setDraft] = useState(flight);
 
   function setReminder() {
     const ok = setFlightCheckInReminder(tripId, nodeId);
@@ -49,6 +51,16 @@ export function FlightDetail({
     }
     setReminded(true);
     setMsg(L(dict, '已记下值机提醒(起飞前会在本机提示)', 'Check-in reminder saved on this device'));
+  }
+
+  function saveFlight() {
+    const title = `${draft.fromCode || draft.from} → ${draft.toCode || draft.to}`;
+    updateNode(tripId, nodeId, {
+      title,
+      payload: { kind: 'flight', flight: draft },
+    });
+    setEdit(false);
+    onChanged?.();
   }
 
   return (
@@ -62,13 +74,37 @@ export function FlightDetail({
         {flight.statusText && <span className="nesio-trip-status-pill">{flight.statusText}</span>}
       </div>
       <div className="nesio-trip-card">
-        <Row label={L(dict, '航班号', 'Flight')} value={flight.flightNo} />
-        <Row label={L(dict, '航司', 'Airline')} value={flight.airline} />
-        <Row label={L(dict, '航站楼', 'Terminal')} value={flight.terminal} />
-        <Row label={L(dict, '座位', 'Seat')} value={flight.seat} />
-        <Row label={L(dict, '舱位', 'Cabin')} value={flight.cabin} />
-        <Row label={L(dict, '确认号', 'Confirmation')} value={flight.confirmation} />
-        <Row label={L(dict, '登机口', 'Gate')} value={flight.gate} />
+        {edit ? (
+          <>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '出发', 'From')}</span>
+              <input className="nesio-trip-kv-v" value={draft.from} onChange={(e) => setDraft({ ...draft, from: e.target.value })} aria-label={L(dict, '出发', 'From')} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '到达', 'To')}</span>
+              <input className="nesio-trip-kv-v" value={draft.to} onChange={(e) => setDraft({ ...draft, to: e.target.value })} aria-label={L(dict, '到达', 'To')} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '航班号', 'Flight')}</span>
+              <input className="nesio-trip-kv-v" value={draft.flightNo || ''} onChange={(e) => setDraft({ ...draft, flightNo: e.target.value })} aria-label={L(dict, '航班号', 'Flight')} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '航司', 'Airline')}</span>
+              <input className="nesio-trip-kv-v" value={draft.airline || ''} onChange={(e) => setDraft({ ...draft, airline: e.target.value })} aria-label={L(dict, '航司', 'Airline')} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '座位', 'Seat')}</span>
+              <input className="nesio-trip-kv-v" value={draft.seat || ''} onChange={(e) => setDraft({ ...draft, seat: e.target.value })} aria-label={L(dict, '座位', 'Seat')} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '确认号', 'Confirmation')}</span>
+              <input className="nesio-trip-kv-v" value={draft.confirmation || ''} onChange={(e) => setDraft({ ...draft, confirmation: e.target.value })} aria-label={L(dict, '确认号', 'Confirmation')} /></label>
+            <div className="nesio-trip-actions">
+              <button type="button" className="nesio-trip-action" onClick={() => { setEdit(false); setDraft(flight); }}>{L(dict, '取消', 'Cancel')}</button>
+              <button type="button" className="nesio-trip-primary" onClick={saveFlight}>{L(dict, '保存', 'Save')}</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <Row label={L(dict, '航班号', 'Flight')} value={flight.flightNo} />
+            <Row label={L(dict, '航司', 'Airline')} value={flight.airline} />
+            <Row label={L(dict, '航站楼', 'Terminal')} value={flight.terminal} />
+            <Row label={L(dict, '座位', 'Seat')} value={flight.seat} />
+            <Row label={L(dict, '舱位', 'Cabin')} value={flight.cabin} />
+            <Row label={L(dict, '确认号', 'Confirmation')} value={flight.confirmation} />
+            <Row label={L(dict, '登机口', 'Gate')} value={flight.gate} />
+            <button type="button" className="nesio-trip-action" onClick={() => setEdit(true)}>{L(dict, '编辑', 'Edit')}</button>
+          </>
+        )}
       </div>
       <button type="button" className="nesio-trip-primary" onClick={setReminder} disabled={reminded}>
         {reminded
@@ -80,8 +116,25 @@ export function FlightDetail({
   );
 }
 
-export function HotelDetail({ hotel, dict }: { hotel: HotelPayload; dict: string }) {
+export function HotelDetail({
+  tripId, nodeId, hotel, dict, onChanged,
+}: {
+  tripId: string; nodeId: string; hotel: HotelPayload; dict: string; onChanged?: () => void;
+}) {
   const total = (hotel.pricePerNight || 0) * (hotel.nights || 1);
+  const [edit, setEdit] = useState(false);
+  const [draft, setDraft] = useState(hotel);
+
+  function saveHotel() {
+    updateNode(tripId, nodeId, {
+      title: `入住 · ${draft.name.trim()}`,
+      subtitle: draft.pricePerNight != null ? `${draft.currency || '¥'}${draft.pricePerNight}` : undefined,
+      payload: { kind: 'hotel', hotel: draft },
+    });
+    setEdit(false);
+    onChanged?.();
+  }
+
   const mapsUrl = hotel.lat != null && hotel.lon != null
     ? `https://maps.apple.com/?ll=${hotel.lat},${hotel.lon}&q=${encodeURIComponent(hotel.name)}`
     : hotel.address
@@ -114,17 +167,43 @@ export function HotelDetail({ hotel, dict }: { hotel: HotelPayload; dict: string
         </a>
       )}
       <div className="nesio-trip-card">
-        <Row label={L(dict, '酒店', 'Hotel')} value={hotel.name} />
-        <Row label={L(dict, '地址', 'Address')} value={hotel.address} />
-        <Row
-          label={L(dict, '价格', 'Price')}
-          value={hotel.pricePerNight != null
-            ? `${hotel.currency || '¥'}${hotel.pricePerNight}/${L(dict, '晚', 'night')}${hotel.nights ? ` · ${hotel.nights} ${L(dict, '晚', 'nights')} = ${hotel.currency || '¥'}${total}` : ''}`
-            : null}
-        />
-        <Row label={L(dict, '入住', 'Check-in')} value={hotel.checkIn} />
-        <Row label={L(dict, '退房', 'Check-out')} value={hotel.checkOut} />
-        <Row label={L(dict, '确认号', 'Confirmation')} value={hotel.confirmation} />
+        {edit ? (
+          <>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '酒店', 'Hotel')}</span>
+              <input className="nesio-trip-kv-v" value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} aria-label={L(dict, '酒店', 'Hotel')} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '地址', 'Address')}</span>
+              <input className="nesio-trip-kv-v" value={draft.address || ''} onChange={(e) => setDraft({ ...draft, address: e.target.value })} aria-label={L(dict, '地址', 'Address')} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '每晚', 'Per night')}</span>
+              <input className="nesio-trip-kv-v" inputMode="decimal" value={draft.pricePerNight ?? ''} onChange={(e) => setDraft({ ...draft, pricePerNight: Number(e.target.value) || undefined })} aria-label={L(dict, '每晚', 'Per night')} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '晚数', 'Nights')}</span>
+              <input className="nesio-trip-kv-v" inputMode="numeric" value={draft.nights ?? 1} onChange={(e) => setDraft({ ...draft, nights: Number(e.target.value) || 1 })} aria-label={L(dict, '晚数', 'Nights')} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '入住', 'Check-in')}</span>
+              <input className="nesio-trip-kv-v" value={draft.checkIn || ''} onChange={(e) => setDraft({ ...draft, checkIn: e.target.value })} aria-label={L(dict, '入住', 'Check-in')} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '退房', 'Check-out')}</span>
+              <input className="nesio-trip-kv-v" value={draft.checkOut || ''} onChange={(e) => setDraft({ ...draft, checkOut: e.target.value })} aria-label={L(dict, '退房', 'Check-out')} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '确认号', 'Confirmation')}</span>
+              <input className="nesio-trip-kv-v" value={draft.confirmation || ''} onChange={(e) => setDraft({ ...draft, confirmation: e.target.value })} aria-label={L(dict, '确认号', 'Confirmation')} /></label>
+            <div className="nesio-trip-actions">
+              <button type="button" className="nesio-trip-action" onClick={() => { setEdit(false); setDraft(hotel); }}>{L(dict, '取消', 'Cancel')}</button>
+              <button type="button" className="nesio-trip-primary" onClick={saveHotel}>{L(dict, '保存', 'Save')}</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <Row label={L(dict, '酒店', 'Hotel')} value={hotel.name} />
+            <Row label={L(dict, '地址', 'Address')} value={hotel.address} />
+            <Row
+              label={L(dict, '价格', 'Price')}
+              value={hotel.pricePerNight != null
+                ? `${hotel.currency || '¥'}${hotel.pricePerNight}/${L(dict, '晚', 'night')}${hotel.nights ? ` · ${hotel.nights} ${L(dict, '晚', 'nights')} = ${hotel.currency || '¥'}${total}` : ''}`
+                : null}
+            />
+            <Row label={L(dict, '入住', 'Check-in')} value={hotel.checkIn} />
+            <Row label={L(dict, '退房', 'Check-out')} value={hotel.checkOut} />
+            <Row label={L(dict, '确认号', 'Confirmation')} value={hotel.confirmation} />
+            <button type="button" className="nesio-trip-action" onClick={() => setEdit(true)}>{L(dict, '编辑', 'Edit')}</button>
+          </>
+        )}
       </div>
       <div className="nesio-trip-actions">
         {mapsUrl && (
@@ -143,37 +222,103 @@ export function HotelDetail({ hotel, dict }: { hotel: HotelPayload; dict: string
 }
 
 export function ShoppingDetail({
-  tripId, shopping, dict,
+  tripId, nodeId, shopping, dict, onChanged,
 }: {
-  tripId: string; shopping: ShoppingPayload; dict: string;
+  tripId: string; nodeId: string; shopping: ShoppingPayload; dict: string; onChanged?: () => void;
 }) {
+  const [edit, setEdit] = useState(false);
+  const [draft, setDraft] = useState(shopping);
+
+  function saveShopping() {
+    const total = draft.lines.reduce((s, l) => s + (l.price || 0), 0);
+    updateNode(tripId, nodeId, {
+      title: draft.title || L(dict, '购物', 'Shopping'),
+      subtitle: total > 0 ? `${draft.currency || '¥'}${total}` : `${draft.lines.length} 样`,
+      payload: {
+        kind: 'shopping',
+        shopping: { ...draft, total: total || undefined },
+      },
+    });
+    recomputeBudgetNode(tripId);
+    setEdit(false);
+    onChanged?.();
+  }
+
+  function updateLine(i: number, patch: Partial<ShoppingLine>) {
+    setDraft((d) => ({ ...d, lines: d.lines.map((ln, j) => (j === i ? { ...ln, ...patch } : ln)) }));
+  }
+
+  function addLine() {
+    setDraft((d) => ({ ...d, lines: [...d.lines, { name: L(dict, '新条目', 'New item') }] }));
+  }
+
+  function removeLine(i: number) {
+    setDraft((d) => ({ ...d, lines: d.lines.filter((_, j) => j !== i) }));
+  }
+
+  const view = edit ? draft : shopping;
+  const total = view.lines.reduce((s, l) => s + (l.price || 0), 0);
+
   return (
     <div className="nesio-trip-detail">
       <p className="nesio-trip-detail-lede">
         {L(dict, '买了什么', 'What I bought')}
-        {shopping.date || shopping.total != null
-          ? ` · ${[shopping.date, shopping.total != null ? `${shopping.currency || '¥'}${shopping.total}` : ''].filter(Boolean).join(' · ')}`
+        {view.date || total > 0
+          ? ` · ${[view.date, total > 0 ? `${view.currency || '¥'}${total}` : ''].filter(Boolean).join(' · ')}`
           : ''}
       </p>
+      {edit && (
+        <label className="nesio-trip-kv" style={{ marginBottom: 'var(--space-2)' }}>
+          <span className="nesio-trip-kv-k">{L(dict, '日期', 'Date')}</span>
+          <input className="nesio-trip-kv-v" type="date" value={draft.date || ''} onChange={(e) => setDraft({ ...draft, date: e.target.value })} />
+        </label>
+      )}
       <div className="nesio-trip-card nesio-trip-card--list">
-        {shopping.lines.length === 0 && (
+        {view.lines.length === 0 && (
           <p className="nesio-trip-footnote" style={{ padding: 'var(--space-3)' }}>{L(dict, '还没有条目 —— 拍小票识别后会加进来。', 'No lines yet — snap a receipt to add them.')}</p>
         )}
-        {shopping.lines.map((line, i) => (
+        {view.lines.map((line, i) => (
           <div key={i} className="nesio-trip-shop-row">
             <span className="nesio-trip-shop-ico"><IconBox size={16} /></span>
             <div className="nesio-trip-shop-main">
-              <b>{line.name}</b>
-              {line.note && <small>{line.note}</small>}
+              {edit ? (
+                <>
+                  <input className="nesio-trip-kv-v" value={line.name} onChange={(e) => updateLine(i, { name: e.target.value })} aria-label={L(dict, '品名', 'Item')} />
+                  <input className="nesio-trip-kv-v" value={line.note || ''} placeholder={L(dict, '备注', 'Note')} onChange={(e) => updateLine(i, { note: e.target.value })} aria-label={L(dict, '备注', 'Note')} />
+                </>
+              ) : (
+                <>
+                  <b>{line.name}</b>
+                  {line.note && <small>{line.note}</small>}
+                </>
+              )}
             </div>
-            <span className="nesio-trip-shop-price">{line.price != null ? `${shopping.currency || '¥'}${line.price}` : ''}</span>
+            {edit ? (
+              <input className="nesio-trip-kv-v" style={{ width: 72 }} inputMode="decimal" value={line.price ?? ''} onChange={(e) => updateLine(i, { price: Number(e.target.value) || undefined })} aria-label={L(dict, '价格', 'Price')} />
+            ) : (
+              <span className="nesio-trip-shop-price">{line.price != null ? `${shopping.currency || '¥'}${line.price}` : ''}</span>
+            )}
+            {edit && (
+              <button type="button" className="nesio-trip-action" aria-label={L(dict, '删除', 'Remove')} onClick={() => removeLine(i)}>×</button>
+            )}
           </div>
         ))}
       </div>
-      <SnapButton className="nesio-trip-primary" beforeOpen={() => armTravelReceiptCapture(tripId)}
-        ariaLabel={L(dict, '拍小票 · 记入本行程', 'Snap receipt · add to trip')}>
-        <IconCamera size={16} /> {L(dict, '拍小票 · 记入本行程', 'Snap receipt · add to trip')}
-      </SnapButton>
+      {edit ? (
+        <div className="nesio-trip-actions">
+          <button type="button" className="nesio-trip-action" onClick={addLine}>{L(dict, '加一行', 'Add line')}</button>
+          <button type="button" className="nesio-trip-action" onClick={() => { setEdit(false); setDraft(shopping); }}>{L(dict, '取消', 'Cancel')}</button>
+          <button type="button" className="nesio-trip-primary" onClick={saveShopping}>{L(dict, '保存', 'Save')}</button>
+        </div>
+      ) : (
+        <>
+          <button type="button" className="nesio-trip-action" onClick={() => setEdit(true)}>{L(dict, '编辑', 'Edit')}</button>
+          <SnapButton className="nesio-trip-primary" beforeOpen={() => armTravelReceiptCapture(tripId)}
+            ariaLabel={L(dict, '拍小票 · 记入本行程', 'Snap receipt · add to trip')}>
+            <IconCamera size={16} /> {L(dict, '拍小票 · 记入本行程', 'Snap receipt · add to trip')}
+          </SnapButton>
+        </>
+      )}
     </div>
   );
 }
@@ -186,7 +331,20 @@ export function PackingDetail({
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [openNeed, setOpenNeed] = useState<string | null>(null);
+  const [editIdx, setEditIdx] = useState<number | null>(null);
+  const [editName, setEditName] = useState('');
+  const [newItem, setNewItem] = useState('');
   const needs = packing.items.filter((i) => i.status === 'need');
+
+  function persistItems(items: typeof packing.items) {
+    const needN = items.filter((i) => i.status === 'need').length;
+    updateNode(tripId, nodeId, {
+      subtitle: needN > 0 ? `${items.length} 样 · ${needN} 样需买` : `${items.length} 样 · 齐了`,
+      state: needN > 0 ? 'todo' : 'booked',
+      payload: { kind: 'packing', packing: { ...packing, items } },
+    });
+    onChanged();
+  }
 
   /** 物品库里名字相近的候选(纯本地字符串包含,零云)。 */
   function candidates(name: string): Array<{ id: string; name: string; location: string }> {
@@ -207,14 +365,27 @@ export function PackingDetail({
     const items = packing.items.map((it) => (it.name === needName
       ? { ...it, status: 'have' as const, name: invName, ...(place ? { place } : {}) }
       : it));
-    const needN = items.filter((i) => i.status === 'need').length;
-    updateNode(tripId, nodeId, {
-      subtitle: needN > 0 ? `${items.length} 样 · ${needN} 样需买` : `${items.length} 样 · 齐了`,
-      state: needN > 0 ? 'todo' : 'booked',
-      payload: { kind: 'packing', packing: { ...packing, items } },
-    });
+    persistItems(items);
     setOpenNeed(null);
-    onChanged();
+  }
+
+  function saveEditItem() {
+    if (editIdx == null || !editName.trim()) return;
+    const items = packing.items.map((it, i) => (i === editIdx ? { ...it, name: editName.trim() } : it));
+    persistItems(items);
+    setEditIdx(null);
+    setEditName('');
+  }
+
+  function removeItem(idx: number) {
+    persistItems(packing.items.filter((_, i) => i !== idx));
+  }
+
+  function addItem() {
+    const name = newItem.trim();
+    if (!name) return;
+    persistItems([...packing.items, { name, status: 'need' as const }]);
+    setNewItem('');
   }
 
   function pushNeeds() {
@@ -245,10 +416,25 @@ export function PackingDetail({
         {packing.items.map((it, i) => (
           <div key={i} className="nesio-trip-pack-row">
             <div className="nesio-trip-shop-main">
-              <b>{it.name}{it.reason ? `(${it.reason})` : ''}</b>
+              {editIdx === i ? (
+                <input
+                  className="nesio-trip-kv-v"
+                  value={editName}
+                  autoFocus
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') saveEditItem(); if (e.key === 'Escape') setEditIdx(null); }}
+                  aria-label={L(dict, '物品名', 'Item name')}
+                />
+              ) : (
+                <button type="button" className="nesio-trip-link" style={{ textAlign: 'left', padding: 0 }} onClick={() => { setEditIdx(i); setEditName(it.name); }}>
+                  <b>{it.name}{it.reason ? `(${it.reason})` : ''}</b>
+                </button>
+              )}
               {it.status === 'have' && it.place && <small>{it.place}</small>}
             </div>
-            {it.status === 'need' ? (
+            {editIdx === i ? (
+              <button type="button" className="nesio-trip-tag is-have" onClick={saveEditItem}>{L(dict, '保存', 'Save')}</button>
+            ) : it.status === 'need' ? (
               /* bug3:「需买」可点 —— 点开在最下面给候选清单(同名物品/相近物品) */
               <button type="button" className="nesio-trip-tag is-need" aria-expanded={openNeed === it.name}
                 onClick={() => setOpenNeed(openNeed === it.name ? null : it.name)}>
@@ -257,8 +443,23 @@ export function PackingDetail({
             ) : (
               <span className="nesio-trip-tag is-have">{it.place ? it.place : L(dict, '已有', 'Have')}</span>
             )}
+            {editIdx !== i && (
+              <button type="button" className="nesio-trip-link" aria-label={L(dict, '删除', 'Remove')} onClick={() => removeItem(i)}>✕</button>
+            )}
           </div>
         ))}
+      </div>
+      <div className="nesio-trip-actions" style={{ marginTop: 'var(--space-2)' }}>
+        <input
+          value={newItem}
+          onChange={(e) => setNewItem(e.target.value)}
+          placeholder=""
+          aria-label={L(dict, '新物品', 'New item')}
+          className="nesio-trip-kv-v"
+          style={{ flex: 1 }}
+          onKeyDown={(e) => { if (e.key === 'Enter') addItem(); }}
+        />
+        <button type="button" className="nesio-trip-action" onClick={addItem}>{L(dict, '添加', 'Add')}</button>
       </div>
 
       {/* 点「需买」→ 候选清单落在最下面(物品库里名字相近的,可能就是它) */}
@@ -465,9 +666,9 @@ export function TripNodeDetailBody({
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const p = node.payload;
-  if (p.kind === 'flight') return <FlightDetail tripId={tripId} nodeId={node.id} flight={p.flight} dict={dict} />;
-  if (p.kind === 'hotel') return <HotelDetail hotel={p.hotel} dict={dict} />;
-  if (p.kind === 'shopping') return <ShoppingDetail tripId={tripId} shopping={p.shopping} dict={dict} />;
+  if (p.kind === 'flight') return <FlightDetail tripId={tripId} nodeId={node.id} flight={p.flight} dict={dict} onChanged={onChanged} />;
+  if (p.kind === 'hotel') return <HotelDetail tripId={tripId} nodeId={node.id} hotel={p.hotel} dict={dict} onChanged={onChanged} />;
+  if (p.kind === 'shopping') return <ShoppingDetail tripId={tripId} nodeId={node.id} shopping={p.shopping} dict={dict} onChanged={onChanged} />;
   if (p.kind === 'packing') {
     return <PackingDetail tripId={tripId} nodeId={node.id} packing={p.packing} dict={dict} onChanged={onChanged} />;
   }

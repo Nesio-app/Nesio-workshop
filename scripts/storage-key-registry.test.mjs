@@ -115,7 +115,7 @@ const KNOWN_KEYS = new Map([
   ["nesio-push-enabled-v1", "cache"],
   ["nesio-reader-sync-state-v1", "cache"],
   ["nesio-retro-dismissed-v1", "cache"],
-  ["nesio-revgeo-cache-v1", "cache"],
+  ["nesio-revgeo-cache-v1", "durable"],
   ["nesio-server-entitlement-v1", "cache"],
   ["nesio-storage-alert-snooze-v1", "cache"],
   ["nesio-storage-warned-at", "cache"],

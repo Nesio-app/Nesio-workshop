@@ -27,6 +27,7 @@ import { recipeNutritionPerServing, recipeMainNutrition, lookupNutrition, type P
 import { getWishlist, addWish, type WishDish } from '@/lib/cooking/wishlist';
 import SpendClaimRow from '../finance/SpendClaimRow';
 import Button from '../ui/Button';
+import LocationPicker from '../LocationPicker';
 import { addMeal, getMeals, type MealSource, type MealItem } from '@/lib/cooking/meals';
 import { planWeek } from '@/lib/cooking/meal-plan-core';
 import {
@@ -543,8 +544,7 @@ function PantryRow({ it, last, soon, onRemove, onChanged, onError, t }: {
           <input value={qty} onChange={(e) => setQty(e.target.value)} inputMode="numeric"
             placeholder={t('数量(空 = 不计数)', 'Quantity (blank = not counted)')} style={inputStyle} />
           <input type="date" value={exp} onChange={(e) => setExp(e.target.value)} style={inputStyle} />
-          <input value={loc} onChange={(e) => setLoc(e.target.value)}
-            placeholder={t('放哪(冰箱 / 橱柜…)', 'Where (fridge / pantry…)')} style={inputStyle} />
+          <LocationPicker value={loc} onChange={(v) => setLoc(v)} />
           <p style={{ ...subText, margin: 0 }}>
             {t('效期留空 = 这东西没有效期,不再进「快过期」。', 'Leave the date blank if it has no expiry — it drops out of “expiring soon”.')}
           </p>

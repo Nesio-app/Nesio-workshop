@@ -47,7 +47,7 @@ assert.equal(keyKind('nesio-place-geo-v1'), 'durable', '足迹主数据 = durabl
 assert.equal(isBackupKey('nesio-place-geo-v1'), true, '足迹必须进备份(否则换机丢足迹)');
 assert.equal(keyKind('nesio-place-cat-v1'), 'durable', '足迹分类 = durable');
 // 但真正的地理缓存仍要判成 cache(不进备份)
-assert.equal(keyKind('nesio-revgeo-cache-v1'), 'cache', '反向地理编码缓存 = cache');
+assert.equal(keyKind('nesio-revgeo-cache-v1'), 'durable', '反查地名 = durable(IDB 地址事实,虽键名带 cache)');
 assert.equal(keyKind('nesio-place-geocode-enabled'), 'cache', 'geocode 开关/缓存 = cache');
 assert.equal(keyKind('analyst_feedback'), 'durable', '学习态 = durable(进备份)');
 assert.equal(keyKind('nesio-mirror-profile-v1'), 'durable', 'mirror-profile 不该被误判成 auth');

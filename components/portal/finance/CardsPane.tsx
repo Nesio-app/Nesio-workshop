@@ -11,8 +11,10 @@ import { useState } from 'react';
 import {
   accountMonth, accountTypeLabel, formatMoney, removeBankAccount,
   loadAccountNames, setAccountName, displayAccountName,
+  txFlow, TX_FLOW_LABELS, effectiveCategory,
   type BankTx, type BankAccount, type Holding,
 } from '@/lib/portal/bank-tx';
+import { categoryLabel, categoryDetailLabel } from '@/lib/portal/tx-category';
 import {
   assetCurrentValue, assetDepreciation, assetHoldingCosts, channelBalance, removeManualAsset, recordNetWorthSnapshot,
   type ManualAsset,
@@ -168,13 +170,34 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
               <div>
                 <p style={{ margin: '0 0 4px', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '本月明细', 'This month')}</p>
                 <div className="nesio-fin-txlist" style={{ maxHeight: '38vh', overflowY: 'auto' }}>
-                  {detailTxs.map((t) => (
-                    <div key={t.id} className="nesio-fin-txrow">
-                      <span className="nesio-fin-txdate">{(t.date || '').slice(5).replace('-', '/')}</span>
-                      <span className="nesio-fin-txname" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
-                      <span className={`nesio-fin-txamt${t.amount < 0 ? ' is-refund' : ''}`}>{t.amount >= 0 ? `-${formatMoney(t.amount, t.currency)}` : `+${formatMoney(-t.amount, t.currency)}`}</span>
+                  {detailTxs.map((t) => {
+                    const f = txFlow(t);
+                    const primary = categoryLabel(effectiveCategory(t), dict) || L(dict, '待归类', 'Uncategorized');
+                    const detail = categoryDetailLabel(t.categoryDetail || '', dict);
+                    return (
+                    <div key={t.id} className="nesio-fin-txrow" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 2 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span className="nesio-fin-txdate">{(t.date || '').slice(5).replace('-', '/')}</span>
+                        <span className={`nesio-fin-txflow nesio-fin-txflow--${f}`}>
+                          <span className="nesio-fin-txflow-l">{L(dict, TX_FLOW_LABELS[f][0], TX_FLOW_LABELS[f][1])}</span>
+                          {f === 'expense' && detail && detail !== primary && (
+                            <span className="nesio-fin-txcat"> · {primary} · {detail}</span>
+                          )}
+                          {f === 'expense' && (!detail || detail === primary) && (
+                            <span className="nesio-fin-txcat"> · {primary}</span>
+                          )}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span className="nesio-fin-txname" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name}</span>
+                        <span className={`nesio-fin-txamt${t.amount < 0 ? ' is-refund' : ''}`}>{t.amount >= 0 ? `-${formatMoney(t.amount, t.currency)}` : `+${formatMoney(-t.amount, t.currency)}`}</span>
+                      </div>
+                      {t.city && (
+                        <span className="nesio-fin-txfoot" style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{t.city}</span>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             )}

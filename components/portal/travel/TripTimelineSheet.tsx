@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   getTrip, deleteTrip, addTripNode, generatePackingList, importBookingIntoTrip,
-  recomputeBudgetNode, groupNodesByDay, TRAVEL_TRIPS_UPDATED_EVENT,
+  recomputeBudgetNode, groupNodesByDay, formatTripNodeTime, TRAVEL_TRIPS_UPDATED_EVENT,
   type Trip, type TripNode,
 } from '@/lib/portal/travel-trips';
 import { ensureTravelHubsLoaded, searchTravelHubs, hubLabel, type TravelHub } from '@/lib/portal/travel-hubs';
@@ -130,16 +130,23 @@ export default function TripTimelineSheet({
     reload();
   }
 
-  /** 上传订票确认文件(.txt/.eml)→ 读成文本填进框。读不了要说出来,不许静默。 */
+  /** 上传订票确认 → 读文本 → 自动识别(不只填框)。 */
   async function onPickBooking(file: File | undefined) {
-    if (!file) return;
+    if (!file || !trip) return;
     setErr(null);
     try {
       const text = await file.text();
       if (!text.trim()) { setErr(L(dict, '这个文件是空的。', 'That file is empty.')); return; }
-      setPaste(text.slice(0, 20000));
+      const n = importBookingIntoTrip(trip.id, text.slice(0, 20000));
+      if (n <= 0) {
+        setPaste(text.slice(0, 20000));
+        setErr(L(dict, '没自动识别出航班/酒店 —— 正文已填入,可改后再点「识别」。', 'No flight/hotel parsed — text pasted; edit and tap Parse.'));
+        return;
+      }
+      setAdding(null); setPaste(''); setErr(null);
+      reload();
     } catch {
-      setErr(L(dict, '这个文件读不了 —— 换个 .txt / .eml,或直接粘贴正文。', "Couldn't read that file — try a .txt/.eml, or paste the text.")); 
+      setErr(L(dict, '这个文件读不了 —— 换 .txt / .eml / .html,或直接粘贴正文。', "Couldn't read that file — try .txt/.eml/.html, or paste the text."));
     }
   }
 
@@ -263,7 +270,7 @@ export default function TripTimelineSheet({
                       {/* bug3:「粘贴确认功能失效,下面按钮为上传和识别」——
                           「上传」= 选一个 .txt/.eml 确认文件读进文本框(没有剪贴板也能用,
                           这正是原来「点了没反应」的场合);「识别」= 拆成节点。 */}
-                      <input ref={bookingFileRef} type="file" accept=".txt,.eml,.md,text/plain,message/rfc822"
+                      <input ref={bookingFileRef} type="file" accept=".txt,.eml,.md,.html,.pdf,text/plain,message/rfc822,text/html,application/pdf"
                         className="nesio-visually-hidden"
                         onChange={(e) => { void onPickBooking(e.target.files?.[0]); e.currentTarget.value = ''; }} />
                       <div className="nesio-travel-plan-form-actions">
@@ -287,7 +294,7 @@ export default function TripTimelineSheet({
                       {g.nodes.map((n) => (
                         <li key={n.id}>
                           <button type="button" className="nesio-trip-node" onClick={() => setDetailNode(n)}>
-                            <span className="nesio-trip-node-time">{n.timeLabel || '·'}</span>
+                            <span className="nesio-trip-node-time">{formatTripNodeTime(n, dict)}</span>
                             <span className={`nesio-trip-node-dot${n.state === 'todo' ? ' is-todo' : ' is-booked'}`} aria-hidden>
                               <NodeKindIcon kind={n.kind} size={14} />
                             </span>

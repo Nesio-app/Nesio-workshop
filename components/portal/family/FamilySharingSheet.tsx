@@ -20,7 +20,7 @@ import {
   setMemberRole, removeMember,
   type FamilySummary, type FamilyMemberView, type BoardView, type LedgerView, type ChoreInstanceView,
 } from '@/lib/family/family-client';
-import { awardChorePoints } from './award-chore-points';
+import { awardChorePoints, reconcileMyChorePoints } from './award-chore-points';
 
 type View = { kind: 'board' } | { kind: 'ledger'; person: FamilyMemberView };
 type Dict = 'zh' | 'en';
@@ -276,7 +276,7 @@ function BoardScreen({ familyId, families, onSwitchFamily, onOpenLedger, dict, t
     setBoard(r.data.board);
   }, [familyId]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(); void reconcileMyChorePoints(familyId, dict === 'en' ? 'en' : 'zh'); }, [load, familyId, dict]);
 
   async function act(instanceId: string, action: 'done' | 'approve' | 'send_back') {
     setBusyId(instanceId + action); setErr('');

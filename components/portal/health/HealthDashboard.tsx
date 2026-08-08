@@ -35,6 +35,7 @@ import BodyLedgerPanel, { PostMealBody, BodyLedgerAnalysisCards } from './BodyLe
 import { rankFoodReactions, mgDlToDisplay } from '@/lib/portal/body-ledger';
 import { getMeals } from '@/lib/cooking/meals';
 import BeautyCarePanel from './BeautyCarePanel';
+import MedicationPanel from './MedicationPanel';
 import HealthLensCards from './HealthLensCards';
 import MoodTrendCard from './MoodTrendCard';
 import HealthRecordSheet from './HealthRecordSheet';
@@ -455,7 +456,7 @@ function MetricCard({ m, dict }: { m: HealthMetric; dict: string }) {
 }
 
 // ── 概览 / 分析 / 身体账本 / 护理 ──
-type HealthView = 'overview' | 'analysis' | 'ledger' | 'care';
+type HealthView = 'overview' | 'analysis' | 'ledger' | 'care' | 'meds';
 
 // 2026-07-29:改用全站唯一的分段控件 SegTabs(原 .nesio-health-subtabs 是五套之一)。
 function HealthSubTabs({ view, onChange, dict }: { view: HealthView; onChange: (v: HealthView) => void; dict: string }) {
@@ -463,6 +464,7 @@ function HealthSubTabs({ view, onChange, dict }: { view: HealthView; onChange: (
     ['overview', '概览', 'Overview'],
     ['analysis', '分析', 'Analysis'],
     ['ledger', '身体账本', 'Body ledger'],
+    ['meds', '用药', 'Medications'],
     ['care', '护理', 'Care'],
   ];
   return (
@@ -678,6 +680,7 @@ export default function HealthDashboard() {
       <div className="nesio-health-dash">
         <HealthSubTabs view={view} onChange={setView} dict={dict} />
         {view === 'ledger' && <BodyLedgerPanel health={data} onRecord={() => setRecordOpen(true)} onScan={() => setScanOpen(true)} />}
+        {view === 'meds' && <MedicationPanel />}
         {view === 'care' && <BeautyCarePanel />}
         {(view === 'overview' || view === 'analysis') && (
           <>
@@ -713,6 +716,7 @@ export default function HealthDashboard() {
       <HealthSubTabs view={view} onChange={setView} dict={dict} />
 
       {view === 'ledger' && <BodyLedgerPanel health={data} onRecord={() => setRecordOpen(true)} onScan={() => setScanOpen(true)} />}
+      {view === 'meds' && <MedicationPanel />}
       {view === 'care' && <BeautyCarePanel />}
 
       {view === 'overview' ? (

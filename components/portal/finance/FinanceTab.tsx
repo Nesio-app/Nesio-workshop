@@ -1232,6 +1232,9 @@ export default function FinanceTab() {
                           {displayAccountName(a, acctNames)}{a.mask ? ` ····${a.mask}` : ''}
                         </span>
                       )}
+                      {t.city && (
+                        <span className="nesio-fin-txacct" style={{ marginLeft: 'auto', color: 'var(--portal-muted)' }}>{t.city}</span>
+                      )}
                       {/* bug3:每一笔都能改 —— 流向 / 关联人 / 附件 / 备注 */}
                       <button type="button" className="nesio-fin-txedit-btn"
                         aria-expanded={flowEditId === t.id}

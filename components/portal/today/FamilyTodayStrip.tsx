@@ -14,7 +14,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { listFamilies, getBoard, choreAction, type BoardView, type ChoreInstanceView } from '@/lib/family/family-client';
-import { awardChorePoints } from '../family/award-chore-points';
+import { awardChorePoints, reconcileMyChorePoints } from '../family/award-chore-points';
 import { readPortalCache, writePortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 
 // 家务的「多少」= 积分(2026-08-01 用户:「家务挣积分,把钱相关的 UI 逻辑都换」)。
@@ -60,6 +60,7 @@ export default function FamilyTodayStrip() {
       }
       setBoards(next);
       writePortalCache(PORTAL_CACHE_KEYS.family, next);
+      for (const fam of next) void reconcileMyChorePoints(fam.familyId, dict === 'en' ? 'en' : 'zh');
       try { localStorage.setItem(FETCH_AT_KEY, String(Date.now())); } catch { /* noop */ }
     } finally {
       inFlight.current = false;

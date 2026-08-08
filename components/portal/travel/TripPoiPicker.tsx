@@ -146,7 +146,11 @@ export default function TripPoiPicker({
         })}
       </ul>
       {ready && list.length === 0 && (
-        <p className="nesio-trip-empty">{L(dict, '这附近没匹配到 —— 换个关键词试试。', 'No matches nearby — try another keyword.')}</p>
+        <p className="nesio-trip-empty">
+          {!city && !query.trim()
+            ? L(dict, '离线库目前覆盖日本主要城市 —— 在搜索框输入「东京」「京都」等,或手动添加其它目的地景点。', 'Offline pack covers major cities in Japan — search “Tokyo”, “Kyoto”, etc., or add other places manually.')
+            : L(dict, '没匹配到 —— 换个关键词,或确认目的地在离线库覆盖范围内。', 'No matches — try another keyword or check offline coverage.')}
+        </p>
       )}
 
       <div className="nesio-travel-plan-form-actions">

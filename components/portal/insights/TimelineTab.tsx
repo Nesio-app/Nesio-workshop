@@ -46,6 +46,7 @@ import { computePlacesShareStats, type PlacesShareStats } from '@/lib/portal/pla
 import { matchPlacePhotoAsset, placePhotoOverrideId, setPlacePhotoOverride, PLACE_PHOTOS_EVENT, type GeoImageNode, type PlaceDescriptor } from '@/lib/portal/place-photos';
 import { countryDisplayName, canonicalCountryKey } from '@/lib/portal/country-normalize';
 import TravelPlanPanel from '../travel/TravelPlanPanel';
+import { listCompletedTrips, TRAVEL_TRIPS_UPDATED_EVENT } from '@/lib/portal/travel-trips';
 
 type Sub = 'timeline' | 'analytics' | 'travel' | 'world' | 'plan';
 
@@ -245,6 +246,7 @@ export default function TimelineTab() {
   const [shareStats, setShareStats] = useState<PlacesShareStats | null>(null); // 足迹成就卡分享
   const [locateBusy, setLocateBusy] = useState(false);
   const [locateMsg, setLocateMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [doneTrips, setDoneTrips] = useState(() => listCompletedTrips());
 
   useEffect(() => {
     const read = () => setTrail(loadPlaceTrail());
@@ -256,6 +258,13 @@ export default function TimelineTab() {
       .then((m) => m.backfillGenericPlaceLabels(20))
       .catch(() => {});
     return () => window.removeEventListener(PLACE_TRAIL_UPDATED_EVENT, read);
+  }, []);
+
+  useEffect(() => {
+    const reload = () => setDoneTrips(listCompletedTrips());
+    reload();
+    window.addEventListener(TRAVEL_TRIPS_UPDATED_EVENT, reload);
+    return () => window.removeEventListener(TRAVEL_TRIPS_UPDATED_EVENT, reload);
   }, []);
 
   const days = useMemo(() => timelineDays(trail), [trail]);
@@ -941,6 +950,22 @@ export default function TimelineTab() {
       )}
       {/* bug3:「完成的行程」整块按标注删掉 —— 行程走完就是足迹本身,
           不需要在世界页再摆一排 chip(「完成 · 进世界」那颗按钮也一起删了)。 */}
+
+      {sub === 'world' && doneTrips.length > 0 && (
+        <div className="nesio-travel-done">
+          <p className="nesio-settings-section-label">{L(dict, '完成的行程', 'Completed trips')}</p>
+          <ul className="nesio-travel-done-list">
+            {doneTrips.slice(0, 12).map((t) => (
+              <li key={t.id}>
+                <span className="nesio-travel-done-chip">
+                  {t.title}
+                  {t.destination ? ` · ${t.destination}` : ''}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* ── 世界(设计稿④):先国家卡,点 › 进城市明信片 ── */}
       {sub === 'world' && world.length === 0 && (

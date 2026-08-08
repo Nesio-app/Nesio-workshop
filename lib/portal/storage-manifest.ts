@@ -133,14 +133,18 @@ export const CACHE_KEYS = new Set<string>([
 ]);
 // 注意:**不要**在这里放裸 `geo` —— 它会误伤足迹主数据键 `nesio-place-geo-v1`
 // (`-geo-` 被判成缓存 → 从云备份里被剔除 → 换浏览器足迹永远同步不过去,已踩过)。
-// 反向地理编码缓存靠 `cache`(nesio-revgeo-cache-v1)、地理编码开关靠 `geocode` 各自命中,
+// 反向地理编码坐标格 → 真实地名,持久化 IDB(durable),非 localStorage 缓存 tier。
 // 都不需要裸 `geo`。
 const CACHE_RE = /(^|[-_])(cache|last-sync|last-location|warned-at|shown|geocode)([-_]|$)/i;
+
+/** 键名带 cache 但内容是地址事实(反查地名),应 durable + IDB —— 不能走 cache tier。 */
+const DURABLE_OVERRIDES = new Set(['nesio-revgeo-cache-v1']);
 
 export type StorageKind = 'auth' | 'cache' | 'durable';
 
 export function keyKind(key: string): StorageKind {
   if (AUTH_KEYS.has(key) || AUTH_RE.test(key)) return 'auth';
+  if (DURABLE_OVERRIDES.has(key)) return 'durable';
   if (CACHE_KEYS.has(key) || CACHE_RE.test(key)) return 'cache';
   return 'durable';
 }

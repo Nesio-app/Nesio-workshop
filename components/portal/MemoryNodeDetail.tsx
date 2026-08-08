@@ -646,6 +646,7 @@ interface EditFields {
   category: string; birthday: string;
   // shared
   note: string;
+  detail: string;
 }
 
 // ── Graph helpers ─────────────────────────────────────────────────────────────
@@ -726,7 +727,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
   const [fields, setFields] = useState<EditFields>({
     name: '', location: '', price: '', purchaseDate: '', expiry: '',
     dueDate: '', priority: '', owner: '', recurring: '',
-    url: '', eventLocation: '', category: '', birthday: '', note: '',
+    url: '', eventLocation: '', category: '', birthday: '', note: '', detail: '',
   });
   const [deleted, setDeleted] = useState(false);
   const [assetUrls, setAssetUrls] = useState<Record<string, string>>({});
@@ -841,6 +842,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
       category: attr(n, 'category'),
       birthday: attr(n, 'birthday'),
       note: attr(n, 'note'),
+      detail: n.rawInput || attr(n, 'detail', 'body', 'description'),
     });
     setEditing(true);
   }
@@ -865,7 +867,6 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
       if (fields.owner !== attr(n, 'owner')) extra.owner = fields.owner || null;
       if (fields.recurring !== attr(n, 'recurring')) extra.recurring = fields.recurring || null;
     }
-    // 2026-08-01 用户点名:没有日期的待办被归成「手记」,以前手记编辑面板压根没有
     // 截止日期这个框,填了也存不进去 —— 日程页因此永远看不到它。手记只开放这一个字段
     // (优先级/负责人/循环那些是"任务"专属概念,套到随手记的一条笔记上不成立)。
     if (n.type === 'collection') {
@@ -885,7 +886,13 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
       if (v === null) delete newAttrs[k];
       else newAttrs[k] = v;
     }
-    updateLifeNode(n.id, { name: fields.name.trim(), attributes: newAttrs });
+    const detailChanged = n.type === 'task'
+      && fields.detail.trim() !== (n.rawInput || attr(n, 'detail', 'body', 'description') || '').trim();
+    updateLifeNode(n.id, {
+      name: fields.name.trim(),
+      attributes: newAttrs,
+      ...(detailChanged ? { rawInput: fields.detail.trim() } : {}),
+    });
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
     setEditing(false);
     onClose();
@@ -1121,6 +1128,16 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               <label className="nesio-edit-row"><span>{L(dict, '有效期', 'Expires')}</span><input type="date" value={field('expiry')} onChange={(e) => setField('expiry', e.target.value)} /></label>
             </>)}
             {n.type === 'task' && (<>
+              <label className="nesio-edit-row nesio-edit-row--stack">
+                <span>{L(dict, '详情', 'Details')}</span>
+                <textarea
+                  className="nesio-ob-input"
+                  rows={4}
+                  value={field('detail')}
+                  onChange={(e) => setField('detail', e.target.value)}
+                  placeholder={L(dict, '待办说明、步骤、链接…', 'What to do, steps, links…')}
+                />
+              </label>
               <label className="nesio-edit-row"><span>{L(dict, '截止日期', 'Due')}</span><input type="date" value={field('dueDate').slice(0, 10)} onChange={(e) => setField('dueDate', e.target.value)} /></label>
               <label className="nesio-edit-row">
                 <span>{L(dict, '优先级', 'Priority')}</span>

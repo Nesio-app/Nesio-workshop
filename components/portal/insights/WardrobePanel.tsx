@@ -156,6 +156,9 @@ export default function WardrobePanel() {
   const [bulkMsg, setBulkMsg] = useState<string | null>(null);
   const bulkRef = useRef<HTMLInputElement>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [fittingQueue, setFittingQueue] = useState<string[]>([]);
+  const [pickMode, setPickMode] = useState(false);
+  const [pickedIds, setPickedIds] = useState<string[]>([]);
   const isPro = canUsePaidCloudAi();
 
   const load = () => { try { setItems(listWardrobe()); } catch { setItems([]); } };
@@ -713,6 +716,15 @@ export default function WardrobePanel() {
                   iconLeft={<IconThumbUp size={15} />} />
                 <Button variant="secondary" size="sm" aria-label={L(dict, '不喜欢:以后避开这套', 'Dislike — avoid this')} onClick={() => giveFeedback('dislike', pieces)}
                   iconLeft={<IconThumbDown size={15} />} />
+                <Button variant="ghost" size="sm" aria-label={L(dict, '不再推荐这套', "Dismiss — don't suggest again")}
+                  onClick={() => {
+                    giveFeedback('dislike', pieces);
+                    setRestyleNonce((n) => n + 1);
+                    setFbFlash(L(dict, '不再推荐这套', "Won't suggest again"));
+                    window.setTimeout(() => setFbFlash(null), 2200);
+                  }}>
+                  {L(dict, '不再推荐', 'Dismiss')}
+                </Button>
               </>
             )}
           </div>
@@ -818,6 +830,46 @@ export default function WardrobePanel() {
           </div>
           {bulkMsg && (
             <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: bulkBusy ? 'var(--portal-muted)' : 'var(--status-go)', textAlign: 'center' }}>{bulkBusy ? '' : '✓ '}{bulkMsg}</p>
+          )}
+          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-3)' }}>
+            <Button variant={pickMode ? 'primary' : 'secondary'} size="sm"
+              onClick={() => { setPickMode((v) => !v); setPickedIds([]); }}>
+              {pickMode ? L(dict, '取消自选', 'Cancel pick') : L(dict, '自选搭配', 'Build outfit')}
+            </Button>
+            {pickMode && pickedIds.length >= 2 && (
+              <Button variant="primary" size="sm" onClick={() => {
+                commitOutfit(saveOutfit(pickedIds, todayIso));
+                setPickMode(false); setPickedIds([]); setTab('saved');
+              }}>
+                {L(dict, `存为搭配(${pickedIds.length}件)`, `Save outfit (${pickedIds.length})`)}
+              </Button>
+            )}
+          </div>
+          {fittingQueue.length > 0 && (
+            <div style={{ ...card, marginTop: 'var(--space-3)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                <span style={{ fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>{L(dict, '试衣间', 'Fitting room')}</span>
+                <Button variant="ghost" size="sm" onClick={() => setFittingQueue([])}>{L(dict, '清空', 'Clear')}</Button>
+              </div>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
+                {fittingQueue.map((id) => {
+                  const g = items.find((x) => x.id === id);
+                  if (!g) return null;
+                  return (
+                    <button key={id} type="button" onClick={() => { setTryonOpen(true); setTryonResult(null); setTryonError(null); void runTryon([g]); }}
+                      style={{ border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: 'var(--space-1)', background: 'var(--portal-accent-soft)', cursor: 'pointer' }}>
+                      {thumbs[id] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={thumbs[id]} alt={g.name} width={48} height={48} style={{ width: 48, height: 48, objectFit: 'cover', borderRadius: 'var(--radius-sm)' }} />
+                      ) : g.name}
+                    </button>
+                  );
+                })}
+              </div>
+              <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                {L(dict, '点一件单独试穿;在单品详情里可「加入试衣间」。', 'Tap one to try it on; use Add to fitting room on item detail.')}
+              </p>
+            </div>
           )}
         </>
       ) : (
@@ -963,6 +1015,9 @@ export default function WardrobePanel() {
             <Button variant="primary" layoutStyle={{ flex: 1 }}
               onClick={() => { markWorn(detail.id, new Date().toISOString()); giveFeedback('worn', [detail]); load(); }}>{L(dict, '今天穿了', 'Worn today')}</Button>
             <Button variant="secondary" onClick={() => { startEdit(detail); setDetailId(null); }}>{L(dict, '编辑', 'Edit')}</Button>
+            <Button variant="secondary" onClick={() => {
+              setFittingQueue((q) => (q.includes(detail.id) ? q : [...q, detail.id]));
+            }}>{L(dict, '加入试衣间', 'Add to fitting room')}</Button>
             <Button variant="secondary" tone="risk" onClick={() => { if (confirm(L(dict, `从衣橱移除「${detail.name}」?`, `Remove “${detail.name}” from wardrobe?`))) { removeGarment(detail.id); setDetailId(null); load(); } }}>{L(dict, '移除', 'Remove')}</Button>
           </div>
         </div>
@@ -973,9 +1028,17 @@ export default function WardrobePanel() {
           <p style={sectionLbl}>{L(dict, TYPE_LABEL[g.type][0], TYPE_LABEL[g.type][1])} <span style={{ color: 'var(--portal-muted)', fontWeight: 'var(--weight-regular)' }}>{g.list.length}</span></p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 'var(--space-2)' }}>
             {g.list.map((it) => (
-              <button key={it.id} type="button" onClick={() => setDetailId(it.id)}
+              <button key={it.id} type="button"
+                onClick={() => {
+                  if (pickMode) {
+                    setPickedIds((ids) => (ids.includes(it.id) ? ids.filter((x) => x !== it.id) : [...ids, it.id]));
+                    return;
+                  }
+                  setDetailId(it.id);
+                }}
                 aria-label={it.name}
-                style={{ padding: 0, textAlign: 'left', cursor: 'pointer', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid, var(--portal-bg))', overflow: 'hidden' }}>
+                aria-pressed={pickMode ? pickedIds.includes(it.id) : undefined}
+                style={{ padding: 0, textAlign: 'left', cursor: 'pointer', borderRadius: 'var(--radius-md)', border: `1px solid ${pickMode && pickedIds.includes(it.id) ? 'var(--portal-accent)' : 'var(--portal-line)'}`, background: pickMode && pickedIds.includes(it.id) ? 'var(--portal-accent-soft-md)' : 'var(--glass-bg-solid, var(--portal-bg))', overflow: 'hidden' }}>
                 <div style={{ aspectRatio: '1', background: 'var(--portal-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--portal-muted)', fontSize: '1.4rem' }}>
                   {thumbs[it.id] ? (
                     // eslint-disable-next-line @next/next/no-img-element

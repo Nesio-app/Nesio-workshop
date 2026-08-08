@@ -154,19 +154,32 @@ interface EditedNode {
 
 // 批次 64:识别退化的确定性兜底 —— 兜底模型(gpt-4o-mini)时代,能用规则接住的绝不指望模型。
 const NON_ITEM_RE = /^(销售税|消费税|税费?|小计|合计|总计|找零|小费|sales?\s*tax|tax|subtotal|total|change( due)?|tips?|balance)$/i;
-const EXPIRY_KEY_RE = /(有效期|保质期|销售日期|赏味|best\s*by|sell\s*by|use\s*by|exp(?:iry|ires|\.)?)/i;
+const EXPIRY_KEY_RE = /(有效期|保质期|赏味|best\s*by|sell\s*by|use\s*by|exp(?:iry|ires|\.)?|到期)/i;
+/** 生产日期/上市日期 —— 不能当有效期(Bug:牛奶未来效期却显示过期,常把生产日期误读)。 */
+const PRODUCTION_KEY_RE = /(生产日期|生产日|制造日期|packed\s*on|mfg|manufactured|销售日期)/i;
 const DATE_RE = /(\d{4})\s*[年\/\-.]\s*(\d{1,2})\s*[月\/\-.]\s*(\d{1,2})|(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/;
+
+function parseDateParts(y: number, mo: number, d: number): string {
+  if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return '';
+  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+}
 
 /** 文本里紧挨"有效期类关键词"的日期 → YYYY-MM-DD;没有则 ''。 */
 function extractExpiryFromText(text: string): string {
-  if (!text || !EXPIRY_KEY_RE.test(text)) return '';
-  const m = DATE_RE.exec(text);
+  if (!text || PRODUCTION_KEY_RE.test(text)) return '';
+  const keyIdx = text.search(EXPIRY_KEY_RE);
+  if (keyIdx < 0) return '';
+  const window = text.slice(keyIdx, keyIdx + 48);
+  const m = DATE_RE.exec(window);
   if (!m) return '';
   let y: number; let mo: number; let d: number;
   if (m[1]) { y = Number(m[1]); mo = Number(m[2]); d = Number(m[3]); }
-  else { mo = Number(m[4]); d = Number(m[5]); y = Number(m[6]); if (y < 100) y += 2000; }
-  if (!y || mo < 1 || mo > 12 || d < 1 || d > 31) return '';
-  return `${y}-${String(mo).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  else {
+    mo = Number(m[4]); d = Number(m[5]); y = Number(m[6]); if (y < 100) y += 2000;
+    // 美式 MM/DD:第一位 >12 则 swap
+    if (mo > 12 && d <= 12) { const t = mo; mo = d; d = t; }
+  }
+  return parseDateParts(y, mo, d);
 }
 
 function toEditedNodes(nodes: AnalyzedNode[], summary = ''): EditedNode[] {

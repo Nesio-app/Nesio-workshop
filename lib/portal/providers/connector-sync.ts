@@ -126,8 +126,19 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
     const data = await res.json() as { ok?: boolean; memos?: Array<{ content: string; created_at: string; tags: string[]; slug?: string }>; error?: string };
     if (!data.ok) return { ok: false, fresh: 0, error: data.error || 'not_configured' };
     const { getLifeGraph } = await import('@/lib/portal/life-graph');
-    const existingSlugs = new Set(getLifeGraph().map((n) => n.attributes?.flomoSlug as string).filter(Boolean));
-    const fresh = (data.memos || []).filter((m) => !existingSlugs.has(m.slug || ''));
+    const graph = getLifeGraph();
+    const existingSlugs = new Set(graph.map((n) => n.attributes?.flomoSlug as string).filter(Boolean));
+    const existingBodies = new Set(
+      graph
+        .filter((n) => n.attributes?.source === 'Flomo' || (n.tags || []).includes('Flomo'))
+        .map((n) => (n.rawInput || n.name || '').trim().slice(0, 200))
+        .filter(Boolean),
+    );
+    const fresh = (data.memos || []).filter((m) => {
+      if (existingSlugs.has(m.slug || '')) return false;
+      const plain = stripMarkdownInline(m.content.replace(/<[^>]+>/g, ' ')).trim().slice(0, 200);
+      return plain && !existingBodies.has(plain);
+    });
     const batch = fresh.slice(0, FLOMO_INGEST_CAP); // memos 已按新→旧;先灌最新一批
     let imported = 0;
     for (let i = 0; i < batch.length; i += FLOMO_INGEST_CHUNK) {
@@ -142,7 +153,7 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
         // 否则「入库时挡住的」和「展示时滤掉的」会慢慢漂成两套。
         if (!plain.trim() || isTagOnlyText(plain)) continue;
         ingestLifeNode({
-          type: 'Mind',
+          type: 'collection',
           name: plain.slice(0, 40),
           attributes: { source: 'Flomo', created: m.created_at, flomoSlug: m.slug || '' },
           relations: [],

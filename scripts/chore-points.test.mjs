@@ -112,12 +112,11 @@ function loadEngine() {
 {
   const award = stripComments(read('components/portal/family/award-chore-points.ts'));
   assert.match(award, /earnChorePoints\(chore, locale\)/, '记分要走共享判据');
-  // 必须重新读 board:点击时手上那条是**动作之前**的状态
   assert.match(award, /await getBoard\(familyId\)/,
-    '要重新读一遍 board —— 客户端手上那条是动作之前的状态,拿它去判,' +
-    '要审核的那些会在还没批的时候就把分发了');
-  assert.match(award, /chore\.assigneeId !== board\.me\.id/,
-    '只给自己做的记分 —— 家长批准别人的家务不该往自己的积分池里加');
+    '要重新读一遍 board —— 客户端手上那条是动作之前的状态');
+  assert.match(award, /reconcileMyChorePoints/,
+    '打开家庭板时要从账本补齐已批准家务的积分(孩子设备不在场时)');
+  assert.match(award, /chore\.assigneeId !== myId/, '只给执行人记分');
   assert.match(award, /catch \{/, '记分失败不许把「家务完成」一起打翻');
 
   for (const f of ['components/portal/family/FamilySharingSheet.tsx', 'components/portal/today/FamilyTodayStrip.tsx']) {
