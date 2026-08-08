@@ -84,15 +84,16 @@ export default function TripPoiPicker({
       </div>
       <p className="nesio-trip-footnote">
         {city
-          ? L(dict, `按「${destination || city}」附近推荐 · 随 App 打包,无网可用`, `Near “${destination || city}” · bundled offline`)
-          : L(dict, '目的地未识别城市时仍可搜全日本库 · 随 App 打包,无网可用', 'Search the Japan pack · bundled offline')}
+          ? L(dict, `「${destination || city}」附近 · 离线`, `Near “${destination || city}” · offline`)
+          : L(dict, '离线景点库', 'Offline sights')}
       </p>
       <label>
         <span>{L(dict, '搜索', 'Search')}</span>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={L(dict, '景点名 / museum…', 'Name / museum…')}
+          placeholder=""
+          aria-label={L(dict, '搜索', 'Search')}
         />
       </label>
       <div className="nesio-trip-poi-types">

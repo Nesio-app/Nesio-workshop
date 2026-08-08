@@ -190,7 +190,7 @@ function AskGuideSheet({
         <div className="nesio-sheet-handle" aria-hidden />
         <p className="nesio-ask-guide-kicker">{L(dict, '长按中间按钮', 'Long-press the center button')}</p>
         <h2>{L(dict, '问念念', 'Ask Nessa')}</h2>
-        <p>{L(dict, '念念替你记得 —— 找东西、找线索，也可以问下一步。比如：钥匙在哪里？生日快到了该买什么礼物？', "Nessa remembers for you — find things, find clues, or ask what's next. Like: where are my keys? What gift before the birthday?")}</p>
+        <p>{L(dict, '念念替你记得 —— 找东西、找线索，也可以问下一步。', "Nessa remembers for you — find things, find clues, or ask what's next.")}</p>
         <div className="nesio-ask-guide-examples" aria-label={L(dict, '问念念示例', 'Ask Nessa examples')}>
           <span>{L(dict, '钥匙在哪里', 'Where are my keys')}</span>
           <span>{L(dict, 'Linda 生日买什么', "What to buy for Linda's birthday")}</span>

@@ -182,7 +182,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
             </button>
           </div>
         </div>
-        <p className="nesio-freeze-hint">{L(dict, '冲动想买？先冻 24 小时，冷静一下再决定', 'Impulse buy? Freeze it 24 hours and decide with a cool head')}</p>
+        <p className="nesio-freeze-hint">{L(dict, '想买?先冻 24 小时', 'Want it? Freeze 24 hours first')}</p>
 
         {flash && <div className="nesio-rewards-flash">{flash}</div>}
 
@@ -208,7 +208,8 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
               className="nesio-freeze-url-input"
               value={urlInput}
               onChange={(e) => setUrlInput(e.target.value)}
-              placeholder={L(dict, '粘贴购物链接（淘宝/京东/Amazon…）', 'Paste a shopping link (Amazon, Taobao…)')}
+              placeholder=""
+              aria-label={L(dict, '购物链接', 'Shopping link')}
               onBlur={(e) => { if (e.target.value.trim()) void parseUrl(e.target.value.trim()); }}
             />
             <div className="nesio-freeze-add-btns">
@@ -238,7 +239,8 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
                     className="nesio-freeze-name-input"
                     value={parsed.title}
                     onChange={(e) => setParsed((prev) => prev ? { ...prev, title: e.target.value } : null)}
-                    placeholder={L(dict, '商品名称', 'Item name')}
+                    placeholder=""
+                    aria-label={L(dict, '商品名称', 'Item name')}
                   />
                   {parsed.price && <p className="nesio-freeze-price">{parsed.price}</p>}
                   {parsed.store && <p className="nesio-freeze-store">{parsed.store}</p>}
@@ -278,7 +280,7 @@ export default function FreezeVaultSheet({ open, onClose, initialUrl, initialTab
         {tab === 'list' && (
           <div className="nesio-freeze-list">
             {active.length === 0 && thawed.length === 0 && resolved.length === 0 && (
-              <p className="nesio-freeze-empty">{L(dict, '冷冻仓是空的。粘贴购物链接或手动输入商品名称来冻住。', 'The vault is empty. Paste a shopping link or type an item name to freeze it.')}</p>
+              <p className="nesio-freeze-empty">{L(dict, '冷冻仓是空的', 'The vault is empty')}</p>
             )}
 
             {thawed.length > 0 && (

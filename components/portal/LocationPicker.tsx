@@ -164,7 +164,8 @@ export default function LocationPicker({ value, onChange, className }: LocationP
         <input
           className="nesio-loc-free-input"
           value={freeText}
-          placeholder={L(dict, '输入位置…', 'Enter a place…')}
+          placeholder=""
+          aria-label={L(dict, '位置', 'Place')}
           onChange={(e) => { setFreeText(e.target.value); onChange(e.target.value); }}
         />
         {/* 批次192:自由文本 → 存为可复用命名地点(下次直接选,改名自动传导到所有物品) */}
@@ -204,8 +205,9 @@ export default function LocationPicker({ value, onChange, className }: LocationP
             <input
               className="nesio-loc-free-input"
               value={customRoom}
-              placeholder={L(dict, '输入区域名称…', 'Enter an area…')}
+              placeholder=""
               onChange={(e) => handleCustomRoomChange(e.target.value)}
+              aria-label={L(dict, '区域名称', 'Area name')}
               autoFocus
             />
             <button type="button" className="nesio-loc-switch-btn" onClick={() => { setRoomMode('select'); setCustomRoom(''); setSelectedRoom(''); }}>
@@ -234,8 +236,9 @@ export default function LocationPicker({ value, onChange, className }: LocationP
             <input
               className="nesio-loc-free-input"
               value={customSubRoom}
-              placeholder={L(dict, '输入具体位置…', 'Enter a spot…')}
+              placeholder=""
               onChange={(e) => handleCustomSubRoomChange(e.target.value)}
+              aria-label={L(dict, '具体位置', 'Spot')}
               autoFocus
             />
             <button type="button" className="nesio-loc-switch-btn" onClick={() => { setSubRoomMode('select'); setCustomSubRoom(''); setSelectedSubRoom(''); }}>

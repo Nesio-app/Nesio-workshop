@@ -776,7 +776,8 @@ export default function VoiceInputSheet({ open, intent = 'note', seedText = '', 
           <input
             ref={inputRef}
             className="nesio-voice-input"
-            placeholder={isAskMode ? L(dict, '打字问念念,或点麦克风说…', 'Type your question, or tap the mic…') : L(dict, '说一句,或直接打字…', 'Say it, or just type…')}
+            placeholder=""
+            aria-label={isAskMode ? L(dict, '问念念', 'Ask Nessa') : L(dict, '记一句', 'Jot a note')}
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}

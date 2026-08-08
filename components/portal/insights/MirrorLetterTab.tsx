@@ -265,26 +265,25 @@ export default function MirrorLetterTab() {
   }
 
   const errorText = error === 'auth'
-    ? L(dict, '登录后,念念每月给你写一封信。', 'Sign in and Nessa will write you a letter each month.')
+    ? L(dict, '登录后才能写信', 'Sign in to write a letter')
     : error === 'no-key'
-      ? L(dict, '还没接上 AI(部署里配一个 AI key 即可),信写不出来。', 'AI is not connected yet (set an AI key in your deployment).')
+      ? L(dict, '还没接上 AI', 'AI is not connected yet')
       : error === 'quota'
-        ? L(dict, 'AI 免费额度暂时用完了(服务端需配 ANTHROPIC_API_KEY 或给 Gemini 开付费)——不是你的问题。', 'The free AI quota is used up for now (server needs ANTHROPIC_API_KEY or paid Gemini) — not your fault.')
+        ? L(dict, 'AI 额度暂时用完了', 'AI quota used up for now')
       : error === 'thin'
-        ? L(dict, '这个月能读到的还不多 —— 记满 10 条,信才有的可写。', 'Not much to read this month yet — the letter needs at least 10 notes.')
+        ? L(dict, '这个月笔记还不够 · 需满 10 条', 'Need at least 10 notes this month')
         : error === 'network'
-          ? L(dict, '网络异常,这封信没送到,点重试。', 'Network issue — the letter did not arrive. Tap retry.')
+          ? L(dict, '网络异常,点重试', 'Network issue — tap retry')
           : error === 'save'
-            ? L(dict, '这封信没能存进记忆,再点一次试试。', 'Could not save it to memory — tap again to retry.')
+            ? L(dict, '没存进记忆,再试一次', 'Could not save — try again')
           : error === 'ai-error'
-            ? L(dict, '这次没写出来(AI 忙或稍有波动),点重试。', 'Could not write it this time (AI busy) — tap retry.')
+            ? L(dict, '这次没写出来,点重试', 'Could not write — tap retry')
             : '';
 
   const mirrorOptions = useMemo(
     () => MIRRORS.map((m) => ({
       id: m.id,
       label: L(dict, m.name, m.nameEn),
-      hint: L(dict, m.desc, m.descEn),
       locked: !m.freePreview && !isPro(),
     })),
     [dict],
@@ -344,11 +343,11 @@ export default function MirrorLetterTab() {
                 <div key={p.id} className="nesio-mirror-para">
                   <p className="nesio-mirror-para-text">{p.text}</p>
                   {p.evidence.length > 0 && (
-                    <div className="nesio-mirror-evidence">
+                    <ul className="nesio-mirror-evidence">
                       {p.evidence.map((e, i) => (
-                        <span key={i} className="nesio-mirror-evidence-chip">{e}</span>
+                        <li key={i} className="nesio-mirror-evidence-row">{e}</li>
                       ))}
-                    </div>
+                    </ul>
                   )}
                   <div className="nesio-mirror-verdict">
                     <button
@@ -392,7 +391,7 @@ export default function MirrorLetterTab() {
               {errorText && <p className="nesio-mirror-error">{errorText}</p>}
               <button type="button" className="nesio-mirror-action nesio-mirror-action--primary" onClick={() => void generate()} disabled={nodeCount < 10 && !error}>
                 {nodeCount < 10 && !error
-                  ? L(dict, `已亲手记 ${nodeCount} / 10 条,记满后开写(通讯录等批量导入不算)`, `${nodeCount} / 10 hand-written notes — starts at 10 (bulk imports like contacts don't count)`)
+                  ? L(dict, `已记 ${nodeCount} / 10`, `${nodeCount} / 10 notes`)
                   : L(dict, '写这封信', 'Write the letter')}
               </button>
             </>
@@ -401,7 +400,7 @@ export default function MirrorLetterTab() {
       )}
 
       {/* 页脚诚实声明 */}
-      <p className="nesio-mirror-note">{L(dict, '只回看,不预测 · 任意时段都能生成', 'Looks back, never predicts · generate for any period')}</p>
+      <p className="nesio-mirror-note">{L(dict, '只回看,不预测', 'Looks back, never predicts')}</p>
 
       {/* 往期存档抽屉。portal 到 body:此 Tab 可能渲染在 Vaul(transform)卡片内,
           position:fixed 会被 transform 祖先困住;portal 出去 + 容器 z-948(压过洞察卡 901)
@@ -415,7 +414,7 @@ export default function MirrorLetterTab() {
               <button type="button" className="nesio-mirror-drawer-close" onClick={() => setArchiveOpen(false)} aria-label={L(dict, '关闭', 'Close')}>×</button>
             </div>
             {archive.length === 0 ? (
-              <p className="nesio-mirror-drawer-empty">{L(dict, '还没有存下的信 —— 写一封,它就会出现在这里。', 'No letters yet — write one and it lands here.')}</p>
+              <p className="nesio-mirror-drawer-empty">{L(dict, '还没有存下的信', 'No letters yet')}</p>
             ) : (
               <div className="nesio-mirror-drawer-list">
                 {archive.map((l) => {

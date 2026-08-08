@@ -79,7 +79,7 @@ export default function LensTab() {
                 {/* 标注(Bug4 P5「日期前不要圆点」):圆点不承载信息,情绪重已由边框色表达 */}
                 {fmtDay(n.createdAt)}
                 {heavy && ` · ${L(dict, '情绪重', 'heavy')}`}
-                <span className="go">{L(dict, '用镜头看看 ›', 'Look ›')}</span>
+                <span className="go">{L(dict, '用镜头看看', 'Look')}</span>
               </div>
               <p className="ng-mem-text">{nodeText(n)}</p>
               {(n.tags || []).length > 0 && (

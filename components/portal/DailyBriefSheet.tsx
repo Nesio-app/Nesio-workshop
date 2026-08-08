@@ -146,10 +146,10 @@ export function DailyBriefSheet({ open, onClose, canUsePrivateData = false }: { 
           {loading && <p className="nesio-mirror-writing">{L(dict, '念念正在整理今天…', 'Nessa is putting today together…')}</p>}
           {!loading && script && (
             <>
-              <p className="nesio-daily-brief-text nesio-serif-voice">{script}</p>
+              <p className="nesio-daily-brief-text">{script}</p>
               {liveRefs.length > 0 && (
                 <div className="nesio-brief-refs">
-                  <span className="nesio-brief-refs-label">{L(dict, '相关记忆 · 点开看看', 'From your memory · tap to open')}</span>
+                  <span className="nesio-brief-refs-label">{L(dict, '相关记忆', 'Related memories')}</span>
                   {liveRefs.map((n) => (
                     <button key={n.id} type="button" className="nesio-brief-ref-chip" onClick={() => setDetailNode(n)}>
                       <NodeTypeIcon type={n.type} size={12} />

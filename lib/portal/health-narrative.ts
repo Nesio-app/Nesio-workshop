@@ -51,20 +51,19 @@ export function narrateMetric(m: HealthMetric, dict: string): string | null {
   const p = analyzeSeries(m.series || []);
   if (!p) return null;
   const label = dict === 'en' ? m.label[1] : m.label[0];
-  const first = m.series[0];
   const last = m.series[m.series.length - 1];
   const dirWord = dict === 'en' ? DIR_WORD[p.dir][1] : DIR_WORD[p.dir][0];
-  const months = m.series.length;
   const goodBad = p.dir !== 'flat'
     ? (LOWER_BETTER.has(m.key) ? (p.dir === 'down' ? '(好)' : '') : (p.dir === 'up' ? '(好)' : ''))
     : '';
   const goodBadEn = p.dir !== 'flat'
     ? (LOWER_BETTER.has(m.key) ? (p.dir === 'down' ? ' (good)' : '') : (p.dir === 'up' ? ' (good)' : ''))
     : '';
+  // 短数据点:标签 + 方向词 + 当前值(数字 semibold 由 CSS 承接)
   if (dict === 'en') {
-    return `${label}: ${dirWord}${goodBadEn} over ${months} months (${first.v}→${last.v}${m.unit ? ' ' + m.unit : ''}).`;
+    return `${label} ${dirWord}${goodBadEn} · ${last.v}${m.unit ? m.unit : ''}`;
   }
-  return `${label}:近 ${months} 个月${dirWord}${goodBad}(${first.v}→${last.v}${m.unit || ''})。`;
+  return `${label} ${dirWord}${goodBad} · ${last.v}${m.unit || ''}`;
 }
 
 /** 挑最值得说的几条指标,生成叙事段落。 */

@@ -13,6 +13,7 @@ import { listStorageItems } from '@/lib/portal/inventory-visibility';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { InfoTip } from '../InfoTip';
 
 /**
  * bug2:物品分类由横条列表改成饼图(纯 SVG,无依赖)。类别色走设计系统 --viz-1..8,
@@ -97,7 +98,7 @@ export default function InventoryStatsPanel() {
   const placedPct = totalItems ? Math.round((placed / totalItems) * 100) : 0;
   const maxCat = Math.max(1, ...st.byCategory.map((c) => c.count));
 
-  const card: React.CSSProperties = { borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', padding: 'var(--space-4)' };
+  const card: React.CSSProperties = { borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-card, #fff)', padding: 'var(--space-4)' };
   const kv: React.CSSProperties = { display: 'block', fontSize: 'var(--text-h2)', fontWeight: 'var(--weight-bold)', color: 'var(--portal-ink)', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' };
   const kl: React.CSSProperties = { display: 'block', marginTop: 'var(--space-1)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' };
   const sectionLbl: React.CSSProperties = { margin: 'var(--space-5) 0 var(--space-2)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' };
@@ -108,7 +109,7 @@ export default function InventoryStatsPanel() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)' }}>
         <div style={card}><span style={kv}>{totalItems}</span><span style={kl}>{L(dict, '物品', 'Items')}</span></div>
         <div style={card}><span style={kv}>≈${Math.round(st.totalValue).toLocaleString('en-US')}</span><span style={kl}>{L(dict, '估值', 'Est. value')}</span></div>
-        <div style={{ ...card, ...(unplaced > 0 ? { background: 'var(--status-gentle-soft)', borderColor: 'transparent' } : {}) }}>
+        <div style={{ ...card, ...(unplaced > 0 ? { borderColor: 'var(--status-gentle)' } : {}) }}>
           <span style={{ ...kv, ...(unplaced > 0 ? { color: 'var(--status-gentle)' } : {}) }}>{unplaced}</span>
           <span style={kl}>{L(dict, '未归位', 'Unplaced')}</span>
         </div>
@@ -116,15 +117,15 @@ export default function InventoryStatsPanel() {
 
       {/* 归位进度 */}
       <p style={{ ...sectionLbl, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
-        <span>{L(dict, '归位进度', 'Placement')}</span>
-        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-bold)', color: 'var(--status-go)', fontVariantNumeric: 'tabular-nums' }}>{placedPct}%</span>
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          {L(dict, '归位进度', 'Placement')}
+          <InfoTip text={L(dict, `已归位 ${placed} · 未归位 ${unplaced} · ${st.spaces} 个空间 · ${st.containers} 个容器`, `${placed} placed · ${unplaced} unplaced · ${st.spaces} spaces · ${st.containers} bins`)} />
+        </span>
+        <span style={{ fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--status-go)', fontVariantNumeric: 'tabular-nums' }}>{placedPct}%</span>
       </p>
-      <div style={{ height: 10, borderRadius: 'var(--radius-pill)', background: 'var(--status-gentle-soft)', overflow: 'hidden' }}>
+      <div style={{ height: 10, borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)', overflow: 'hidden' }}>
         <div style={{ height: '100%', width: `${placedPct}%`, background: 'var(--status-go)', borderRadius: 'var(--radius-pill)' }} />
       </div>
-      <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-        {L(dict, `已归位 ${placed} · 未归位 ${unplaced} · ${st.spaces} 个空间 · ${st.containers} 个容器`, `${placed} placed · ${unplaced} unplaced · ${st.spaces} spaces · ${st.containers} bins`)}
-      </p>
 
       {/* bug2:分类横条图 → 饼图,「按分类」黑体小标题删掉(饼图自带图例) */}
       {st.byCategory.length > 0 && <CategoryPie rows={st.byCategory} onOpen={openInventory} dict={dict} />}

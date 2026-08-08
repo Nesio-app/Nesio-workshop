@@ -253,7 +253,8 @@ export function MeetingRecorderSheet({ open, meetingNode, onClose }: {
               {!recording && (
                 <textarea
                   className="nesio-recorder-notes-input"
-                  placeholder={L(dict, '或直接输入会议笔记…', 'Or type meeting notes directly…')}
+                  placeholder=""
+                  aria-label={L(dict, '会议笔记', 'Meeting notes')}
                   value={transcript}
                   onChange={(e) => setTranscript(e.target.value)}
                   rows={3}

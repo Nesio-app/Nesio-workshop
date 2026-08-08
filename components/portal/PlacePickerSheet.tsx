@@ -98,7 +98,8 @@ export default function PlacePickerSheet({ raw, lat, lon, onClose, onRenamed }: 
             className="nesio-tl-rename-input"
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={L(dict, '手动命名,比如「家」「公司」', 'Name it — Home, Office…')}
+            placeholder=""
+            aria-label={L(dict, '地点名称', 'Place name')}
           />
           <button type="submit" className="nesio-fin-review-accept" disabled={!text.trim()}>{L(dict, '保存', 'Save')}</button>
         </form>
@@ -109,7 +110,7 @@ export default function PlacePickerSheet({ raw, lat, lon, onClose, onRenamed }: 
           onChange={(e) => setKindPick(e.target.value as PlaceCategory | '')}
           aria-label={L(dict, '选择分类', 'Category')}
         >
-          <option value="">{L(dict, '选择分类(可选)', 'Category (optional)')}</option>
+          <option value="">{L(dict, '分类', 'Category')}</option>
           {(Object.entries(PLACE_CATEGORY_META) as Array<[PlaceCategory, { zh: string; en: string }]>).map(([k, meta]) => (
             <option key={k} value={k}>{L(dict, meta.zh, meta.en)}</option>
           ))}

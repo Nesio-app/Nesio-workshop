@@ -1461,7 +1461,7 @@ Edit location/value anytime in Storage.`),
             {/* 批次 99:助理拟人化 —— 空态由念念自我介绍(设计规范 命名 NAME LOCKED)。
                 导航仍叫「问一问」(动作名),念念是她本人。 */}
             <p className="nesio-wechat-empty-sub">
-              {L(dict, '替你记得的那一个。不预测,只在对的时候,把你存过的轻轻翻给你。', 'The one who remembers for you — no predictions, just your own moments handed back at the right time.')}
+              {L(dict, '替你记得的那一个。', 'The one who remembers for you.')}
             </p>
             <div className="nesio-wechat-suggestions">
               {[L(dict, '我的护照放在哪里', 'Where did I put my passport?'), L(dict, '今天该吃什么', 'What should I eat today?'), L(dict, '帮我总结这周做了什么', 'Summarize my week')].map((s) => (
@@ -1563,7 +1563,7 @@ Edit location/value anytime in Storage.`),
                   if (!live.length) return null;
                   return (
                     <div className="nesio-wechat-refs">
-                      <span className="nesio-wechat-refs-label">{L(dict, '相关记忆 · 点开可回看/回复', 'Related memories · tap to view/reply')}</span>
+                      <span className="nesio-wechat-refs-label">{L(dict, '相关记忆', 'Related memories')}</span>
                       {live.map(({ ref, node }) => (
                         <div key={ref.id} className="nesio-wechat-ref-row">
                           <button type="button" className="nesio-wechat-ref-chip" onClick={() => setDetailNode(node!)}>
@@ -1854,7 +1854,8 @@ Edit location/value anytime in Storage.`),
               ref={inputRef}
               className="nesio-wechat-input"
               rows={1}
-              placeholder={L(dict, '问一问…', 'Ask…')}
+              placeholder=""
+              aria-label={L(dict, '问一问', 'Ask')}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void sendMessage(input); } }}

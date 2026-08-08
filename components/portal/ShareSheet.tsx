@@ -376,7 +376,8 @@ export default function ShareSheet({ open, onClose }: ShareSheetProps) {
             <textarea
               className="nesio-ob-input"
               style={{ resize: 'vertical', minHeight: '5rem', borderRadius: '0.85rem', width: '100%', fontFamily: 'inherit' }}
-              placeholder={L(dict, '粘贴邮件正文、链接、笔记内容…', 'Paste email text, links, notes…')}
+              placeholder=""
+              aria-label={L(dict, '粘贴内容', 'Paste content')}
               value={textInput}
               onChange={(e) => setTextInput(e.target.value)}
               autoFocus

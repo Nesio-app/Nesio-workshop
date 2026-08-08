@@ -206,11 +206,11 @@ function NameStep({ onNext, locale }: { onNext: (name: string) => void; locale: 
     <div className="nesio-ob-step">
       <div className="nesio-ob-step-icon" aria-hidden><IconSmile size={30} /></div>
       <h2 className="nesio-ob-step-title">{t(locale, 'onboardingNameLabel')}</h2>
-      <p className="nesio-ob-step-sub">{t(locale, 'onboardingNameNote')}</p>
       <input
         ref={inputRef}
         className="nesio-ob-input"
-        placeholder={t(locale, 'onboardingNameCopy')}
+        placeholder=""
+        aria-label={t(locale, 'onboardingNameLabel')}
         value={name}
         maxLength={24}
         onChange={(e) => setName(e.target.value)}
@@ -352,12 +352,12 @@ export function FirstUseTips({ onDone, locale }: { onDone: () => void; locale: P
   // 聚光式 coach-mark:每步定位到对应 UI(data-tour),高亮 + 气泡指过去;中键步可真实点/长按。
   const steps: TourStep[] = [
     { Icon: IconTarget, title: t(locale, 'onboardingTipTodayTitle'), body: t(locale, 'onboardingTipTodayBody'), target: 'today', place: 'above' },
-    { Icon: IconSmile, title: L(dict, '今天第一拍:心情', "Today's first beat: mood"), body: L(dict, '这里点一下心情,记下此刻的情绪和精力 —— 后面洞察会把它连成规律。', 'Tap here to log how you feel and your energy — Insights weaves it into patterns later.'), target: 'mood', place: 'auto' },
-    { Icon: IconMic, title: L(dict, '存一条试试', 'Save one — try it'), body: L(dict, '点中间按钮:说一句、拍一下、或收一条链接,先存成草稿。存一条试试。', 'Tap the center button — say a line, snap a photo, or drop in a link. It saves as a draft. Try saving one.'), target: 'center', place: 'above', round: true, tap: true },
+    { Icon: IconSmile, title: L(dict, '今天第一拍:心情', "Today's first beat: mood"), body: L(dict, '点这里记下此刻的情绪和精力。', 'Tap here to log how you feel and your energy.'), target: 'mood', place: 'auto' },
+    { Icon: IconMic, title: L(dict, '存一条试试', 'Save one — try it'), body: L(dict, '点中间按钮:说一句、拍一下、或收一条链接,先存成草稿。', 'Tap the center button — say a line, snap a photo, or drop in a link. It saves as a draft.'), target: 'center', place: 'above', round: true, tap: true },
     { Icon: IconZap, title: L(dict, '任务太大?拆一下', 'Too big? Break it down'), body: L(dict, '今天要紧的事上点「拆一下」—— 把一件大事拆成 3 个立刻能动手的小步。', 'On a focus item, tap "Break down" — a big task becomes 3 steps you can start right now.'), target: 'breakdown', place: 'below' },
-    { Icon: IconStar, title: t(locale, 'onboardingTipMemoryTitle'), body: L(dict, '点左上角这个晶体进「记忆」—— 你记过的一切都在这。长按任意卡片:标为核心记忆,或加进某个项目。', 'Tap this crystal top-left for Memory — everything you noted lives here. Long-press any card: mark it Core, or add it to a Project.'), target: 'memory', place: 'below' },
-    { Icon: IconBulb, title: L(dict, '洞察:把点连成线', 'Insights: connect the dots'), body: L(dict, '点底部「洞察」—— 心情、关系、足迹、花销会被连成规律,轻轻提醒。', 'Tap "Insights" in the bottom bar — mood, people, places and spending linked into gentle patterns.'), target: 'insights', place: 'above' },
-    { Icon: IconMic, title: L(dict, '长按中间按钮有惊喜', 'Long-press the center for a surprise'), body: L(dict, '长按中间按钮松手,调出「问一问」—— 直接问念念「护照放哪」「上次买的药」,记过的都能找回。试试长按。', 'Long-press & release the center button to open Ask — ask Nessa "Where’s my passport?" or "that medicine I bought"; anything noted comes back. Give it a long-press.'), target: 'center', place: 'above', round: true, tap: true, longpress: true },
+    { Icon: IconStar, title: t(locale, 'onboardingTipMemoryTitle'), body: L(dict, '点左上角晶体进「记忆」—— 你记过的一切都在这。长按卡片可标为核心,或加进项目。', 'Tap the crystal top-left for Memory — everything you noted lives here. Long-press a card to mark Core or add to a Project.'), target: 'memory', place: 'below' },
+    { Icon: IconBulb, title: L(dict, '洞察:把点连成线', 'Insights: connect the dots'), body: L(dict, '点底部「洞察」—— 心情、关系、足迹、花销会被连成规律。', 'Tap "Insights" in the bottom bar — mood, people, places and spending linked into patterns.'), target: 'insights', place: 'above' },
+    { Icon: IconMic, title: L(dict, '长按中间按钮有惊喜', 'Long-press the center for a surprise'), body: L(dict, '长按中间按钮松手,调出「问一问」—— 直接问念念「护照放哪」「上次买的药」。', 'Long-press & release the center button to open Ask — ask Nessa "Where’s my passport?" or "that medicine I bought".'), target: 'center', place: 'above', round: true, tap: true, longpress: true },
   ];
   const cur = steps[step];
   const StepIcon = cur.Icon;

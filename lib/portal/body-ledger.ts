@@ -182,29 +182,23 @@ export function buildDayLedger(
   };
 }
 
-/** 缺口提示文案(warm-coach,非诊断)。 */
+/** 缺口提示文案(warm-coach,非诊断)——短数据点,不写长句。 */
 export function ledgerPrompt(ledger: DayLedger, zh: boolean): string | null {
   if (ledger.meals.length === 0 && ledger.proteinGap <= 0) {
-    return zh
-      ? '今天还没记一餐 —— 吃完在「美味」里记一下,账本就会亮起来。'
-      : 'No meals logged today — log one in Cooking and the ledger lights up.';
+    return zh ? '今日还没记餐' : 'No meals logged yet';
   }
   if (ledger.proteinGap >= 20) {
     return zh
-      ? `蛋白还差约 ${ledger.proteinGap}g · 热量预算还剩 ${Math.max(0, ledger.energyLeft)} kcal —— 可从冰箱补一餐。`
-      : `About ${ledger.proteinGap}g protein short · ${Math.max(0, ledger.energyLeft)} kcal left — refill from the fridge.`;
+      ? `蛋白 −${ledger.proteinGap}g · 热量余 ${Math.max(0, ledger.energyLeft)} kcal`
+      : `Protein −${ledger.proteinGap}g · ${Math.max(0, ledger.energyLeft)} kcal left`;
   }
   if (ledger.energyLeft < -200) {
-    return zh
-      ? '今天热量已经超预算一点 —— 先喝杯水,下一餐轻轻收一点就好。'
-      : 'A bit over the calorie budget — a glass of water, then ease the next meal.';
+    return zh ? '热量略超预算' : 'A bit over calorie budget';
   }
   if (ledger.proteinGap > 0) {
-    return zh
-      ? `蛋白还差 ${ledger.proteinGap}g,轻轻补一口就好。`
-      : `${ledger.proteinGap}g protein still open — a light top-up is enough.`;
+    return zh ? `蛋白 −${ledger.proteinGap}g` : `Protein −${ledger.proteinGap}g`;
   }
-  return zh ? '今天的账大致平了 —— 身体会记得。' : 'Today’s ledger is roughly balanced.';
+  return null; // 平账不占屏
 }
 
 /**

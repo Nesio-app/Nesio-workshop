@@ -129,7 +129,8 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
           className="nesio-cooling-input"
           type="number"
           inputMode="decimal"
-          placeholder="$"
+          placeholder=""
+          aria-label={L(dict, '价格', 'Price')}
           value={price}
           onChange={(e) => setPrice(e.target.value)}
         />
@@ -140,7 +141,8 @@ export function PurchaseCoolingPanel({ productName, similarCount, similarExample
               className="nesio-cooling-input"
               type="number"
               inputMode="decimal"
-              placeholder={L(dict, '$/小时', '$/hr')}
+              placeholder=""
+              aria-label={L(dict, '时薪', 'Hourly pay')}
               value={wage}
               onChange={(e) => saveWage(e.target.value)}
               onBlur={() => { if (wage) setEditingWage(false); }}

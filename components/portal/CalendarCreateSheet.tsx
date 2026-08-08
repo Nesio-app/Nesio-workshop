@@ -75,7 +75,7 @@ export default function CalendarCreateSheet({ open, onClose }: { open: boolean; 
   return (
     <NesioSheet open={open} onOpenChange={(o) => { if (!o) close(); }} ariaLabel={t('新建日程', 'New event')} variant="bottom">
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)', padding: 'var(--space-2) 0' }}>
-        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 'var(--text-h3)', color: 'var(--portal-ink)', fontWeight: 'var(--weight-semibold)' as unknown as number }}>
+        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 'var(--text-h3)', color: 'var(--portal-ink)', fontWeight: 'var(--weight-semibold)' as unknown as number }}>
           {t('新建日程', 'New event')}
         </div>
 
@@ -122,9 +122,10 @@ export default function CalendarCreateSheet({ open, onClose }: { open: boolean; 
 
             {mode === 'nl' ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                <label style={label}>{t('用一句话说,念念帮你排', 'Describe it in one line')}</label>
+                <label style={label}>{t('一句话', 'One line')}</label>
                 <textarea value={text} onChange={(e) => setText(e.target.value)} rows={3}
-                  placeholder={t('例:周五下午3点约牙医', 'e.g. dentist this Friday 3pm')}
+                  placeholder=""
+                  aria-label={t('一句话', 'One line')}
                   style={{ ...input, resize: 'none' }} />
               </div>
             ) : (
@@ -132,7 +133,7 @@ export default function CalendarCreateSheet({ open, onClose }: { open: boolean; 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                   <label style={label}>{t('标题', 'Title')}</label>
                   <input value={summary} onChange={(e) => setSummary(e.target.value)}
-                    placeholder={t('要做什么', 'What')} style={input} />
+                    placeholder="" aria-label={t('标题', 'Title')} style={input} />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
                   <label style={label}>{t('日期', 'Date')}</label>
@@ -149,8 +150,8 @@ export default function CalendarCreateSheet({ open, onClose }: { open: boolean; 
                   </div>
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
-                  <label style={label}>{t('地点(可选)', 'Location (optional)')}</label>
-                  <input value={location} onChange={(e) => setLocation(e.target.value)} style={input} />
+                  <label style={label}>{t('地点', 'Location')}</label>
+                  <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="" aria-label={t('地点', 'Location')} style={input} />
                 </div>
               </div>
             )}

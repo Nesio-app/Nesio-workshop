@@ -69,7 +69,7 @@ export default function MeetingsPanel({ onOpenMemory }: { onOpenMemory: (query: 
   if (rows.length === 0) {
     return (
       <p className="nesio-insights-empty">
-        {L(dict, '还没有会议记录 —— 到「设置 → 数据接入 → Granola」同步,或用今天页的会议录音。', 'No meeting notes yet — sync Granola in Settings → Data sources, or record a meeting from Today.')}
+        {L(dict, '还没有会议记录', 'No meeting notes yet')}
       </p>
     );
   }

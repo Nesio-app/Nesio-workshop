@@ -174,7 +174,7 @@ export async function getDevicePosition(options?: {
 
 let trailBridgeStarted = false;
 
-async function ingestTrailPoint(lat: number, lon: number): Promise<void> {
+async function ingestTrailPoint(lat: number, lon: number, opts?: { manual?: boolean }): Promise<void> {
   let label = `${lat.toFixed(4)},${lon.toFixed(4)}`;
   try {
     const { reverseGeocode } = await import('./providers/weather');
@@ -183,7 +183,7 @@ async function ingestTrailPoint(lat: number, lon: number): Promise<void> {
   } catch { /* 坐标名兜底 */ }
   try {
     const { recordLiveVisit } = await import('./place-trail');
-    recordLiveVisit(label, lat, lon);
+    recordLiveVisit(label, lat, lon, opts);
   } catch { /* ignore */ }
 }
 
@@ -246,7 +246,11 @@ export async function drainQueuedTrailPoints(): Promise<number> {
   }
 }
 
-/** 连接器成功拿到点后立刻记一条足迹(不等后台事件)。 */
-export async function recordVisitFromCoords(lat: number, lon: number): Promise<void> {
-  await ingestTrailPoint(lat, lon);
+/** 连接器成功拿到点后立刻记一条足迹(不等后台事件)。manual=用户点「标记当前位置」。 */
+export async function recordVisitFromCoords(
+  lat: number,
+  lon: number,
+  opts?: { manual?: boolean },
+): Promise<void> {
+  await ingestTrailPoint(lat, lon, opts);
 }

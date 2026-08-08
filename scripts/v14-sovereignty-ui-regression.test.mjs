@@ -191,7 +191,7 @@ assert.doesNotMatch(shareSheet, /navigator\.share|从系统分享导入|handleAp
 assert.match(domains, /确认，放到门口/, 'Domain actions should read as user confirmation, not AI obedience.');
 
 assert.doesNotMatch(settingsSheets, /像朋友一样|Moment|Today Feed 的卡片会按此过滤|按能力层计费|Remember|Understand|Steer|Operate|Future Steering|Mirror Profile|全自动 Life Graph|API 接入/, 'Settings sheets should use user-sovereignty copy instead of internal product or SaaS terms.');
-assert.match(settingsSheets, /只整理你放进来的内容|哪些内容不会被使用|主动提醒|保持安静|选中的生活空间，会优先出现在 Today|先记住|帮你理解|主动提醒|家庭与自动化/, 'Settings sheets should expose trust, quiet mode, spaces, and user-value subscription copy.');
+assert.match(settingsSheets, /只整理你放进来的内容|哪些内容不会被使用|主动提醒|保持安静|选中的生活空间|先记住|帮你理解|家庭与自动化|InfoTip/, 'Settings sheets should expose trust, quiet mode, spaces, and user-value subscription copy (details may live in InfoTip).');
 assert.match(lifeGraph, /nesio-memory-received/, 'Life Graph should emit a user-record receipt event for calm feedback.');
 // 批次 1(2026-07-04)把设置文案迁入 i18n 字典,断言连同字典一起检查。
 const settingsI18n = read('lib/portal/i18n.ts');

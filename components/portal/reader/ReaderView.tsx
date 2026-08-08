@@ -263,7 +263,7 @@ export default function ReaderView({ book, rawText, meta, onClose }: {
 
       {searchOpen && isFull && (
         <div className="nesio-rd-search">
-          <input className="nesio-rd-search-input" value={query} autoFocus placeholder={L(dict, '在本篇里搜…', 'Search…')} onChange={(e) => setQuery(e.target.value)} />
+          <input className="nesio-rd-search-input" value={query} autoFocus placeholder="" aria-label={L(dict, '在本篇里搜', 'Search in article')} onChange={(e) => setQuery(e.target.value)} />
           {matches.length > 0 && <span className="nesio-rd-search-cnt">{matches.length}</span>}
         </div>
       )}
@@ -313,7 +313,7 @@ export default function ReaderView({ book, rawText, meta, onClose }: {
           )}
           {isFull && meta?.related && meta.related.length > 0 && (
             <div className="nesio-rd-related">
-              <p className="nesio-rd-related-h">{L(dict, `相关记忆 · ${meta.related.length}`, `Related · ${meta.related.length}`)}</p>
+              <p className="nesio-rd-related-h">{L(dict, '相关记忆', 'Related')}</p>
               {meta.related.slice(0, 3).map((r, i) => (
                 <p key={i} className="nesio-rd-related-item"><span className="nesio-rd-related-dot" aria-hidden />{r.text}</p>
               ))}

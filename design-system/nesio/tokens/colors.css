@@ -21,8 +21,8 @@
   /* ── Surface & ink (day) ── */
   --portal-bg:    #f4f8fd;        /* app base behind glass        */
   --portal-ink:   #1e2a3a;        /* primary text                 */
-  --portal-muted: #5a6d82;        /* secondary text / labels      */
-  --portal-line:  rgba(88, 140, 227, 0.14); /* hairline borders   */
+  --portal-muted: #4a5d72;        /* secondary text / labels      */
+  --portal-line:  rgba(60, 90, 130, 0.28); /* hairline borders   */
 
   /* ── Zone tones (three cabins) ──
      cool = 秩序与跃迁 · warm = 觉察与锚定 · neutral = 体现与投射 */
@@ -62,8 +62,8 @@ html[data-portal-theme="night"] .portal-root,
 
   --portal-bg:    #0e1626;
   --portal-ink:   #e7eefb;
-  --portal-muted: rgba(200, 217, 245, 0.6);
-  --portal-line:  rgba(127, 176, 245, 0.16);
+  --portal-muted: rgba(200, 217, 245, 0.78);
+  --portal-line:  rgba(127, 176, 245, 0.28);
 
   --portal-cool:           #16243c;
   --portal-cool-accent:    #7fb0ee;

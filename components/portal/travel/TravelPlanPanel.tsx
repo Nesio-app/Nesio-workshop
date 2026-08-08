@@ -15,6 +15,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { IconPlane, IconChevronRight } from '../icons';
+import { InfoTip } from '../InfoTip';
 import TripTimelineSheet from './TripTimelineSheet';
 
 function todayYmd(): string {
@@ -185,7 +186,7 @@ export default function TravelPlanPanel() {
       {trips.length === 0 && mode === 'idle' && (
         <div className="nesio-travel-plan-empty">
           <IconPlane size={28} />
-          <p>{L(dict, '还没有行程 —— 新建一趟,或粘贴订票确认自动拆时间线。', 'No trips yet — create one, or paste a booking confirmation to unpack the timeline.')}</p>
+          <p>{L(dict, '还没有行程', 'No trips yet')}</p>
         </div>
       )}
 
@@ -238,7 +239,7 @@ export default function TravelPlanPanel() {
         <div className="nesio-travel-plan-form">
           <label>
             <span>{L(dict, '目的地', 'Destination')}</span>
-            <input value={dest} onChange={(e) => setDest(e.target.value)} placeholder={L(dict, '东京', 'Tokyo')} />
+            <input value={dest} onChange={(e) => setDest(e.target.value)} placeholder="" aria-label={L(dict, '目的地', 'Destination')} />
           </label>
           <label>
             <span>{L(dict, '出发日', 'Start')}</span>
@@ -258,20 +259,24 @@ export default function TravelPlanPanel() {
       {mode === 'import' && (
         <div className="nesio-travel-plan-form">
           <label>
-            <span>{L(dict, '目的地(可空,会试着从正文猜)', 'Destination (optional)')}</span>
-            <input value={dest} onChange={(e) => setDest(e.target.value)} placeholder={L(dict, '东京', 'Tokyo')} />
+            <span>{L(dict, '目的地', 'Destination')}</span>
+            <input value={dest} onChange={(e) => setDest(e.target.value)} placeholder="" aria-label={L(dict, '目的地', 'Destination')} />
           </label>
           <label>
             <span>{L(dict, '出发日', 'Start')}</span>
             <input type="date" value={start} onChange={(e) => setStart(e.target.value)} />
           </label>
           <label>
-            <span>{L(dict, '订票确认全文', 'Booking text')}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+              {L(dict, '订票确认', 'Booking text')}
+              <InfoTip text={L(dict, '粘贴航空公司或酒店确认邮件;可含航班号、航线、酒店名。目的地可空,会试着从正文猜。', 'Paste airline/hotel confirmation; flight no., route, hotel name ok. Destination optional — we try to guess from the text.')} />
+            </span>
             <textarea
               rows={6}
               value={importText}
               onChange={(e) => setImportText(e.target.value)}
-              placeholder={L(dict, '粘贴航空公司/酒店确认邮件… 含航班号如 NH976、PVG→HND、酒店名', 'Paste airline/hotel confirmation… flight no. like NH976, PVG→HND, hotel name')}
+              placeholder=""
+              aria-label={L(dict, '订票确认', 'Booking text')}
             />
           </label>
           {importErr && (

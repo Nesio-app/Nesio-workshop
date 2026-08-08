@@ -75,6 +75,18 @@ function clusterAtZoom(items: GeoNode[], z: number): Cluster[] {
   return out;
 }
 
+function memoryLabel(node: LifeNode, dict: 'zh' | 'en'): string {
+  const name = (node.name || '').trim();
+  if (name) return name;
+  const place = typeof node.attributes?.capturedPlace === 'string' ? node.attributes.capturedPlace.trim() : '';
+  if (place) return place;
+  const type = node.type || 'memory';
+  const date = node.createdAt
+    ? new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' })
+    : '';
+  return [type, date].filter(Boolean).join(' · ') || L(dict, '一条记忆', 'A memory');
+}
+
 export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -87,6 +99,7 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
   const pinchStart = useRef<{ dist: number; midX: number; midY: number } | null>(null);
   const [pinch, setPinch] = useState<{ scale: number; midX: number; midY: number } | null>(null);
   const [picked, setPicked] = useState<Cluster | null>(null);
+  const userPicked = useRef(false);
 
   const all = useMemo(() => (open ? geoNodes() : []), [open]);
 
@@ -105,6 +118,21 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
     return all.filter((g) => new Date(g.node.createdAt).getTime() < cutoff);
   }, [all, days, activeIdx]);
 
+  const clusters = useMemo(
+    () => (view ? clusterAtZoom(visible, view.z) : []),
+    [view, visible],
+  );
+
+  // 仅一个簇时自动选中;多簇时默认展示可见记忆摘要(不必先点气泡)。
+  useEffect(() => {
+    if (!open || !view) return;
+    if (clusters.length === 1) {
+      setPicked(clusters[0]);
+      return;
+    }
+    if (!userPicked.current) setPicked(null);
+  }, [open, view, clusters]);
+
   // 初始视野:装下全部点(单点给街区级)
   useEffect(() => {
     if (!open || view || all.length === 0) return;
@@ -122,7 +150,13 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
   }, [open, view, all, size]);
 
   useEffect(() => {
-    if (!open) { setView(null); setPicked(null); setDragPx(null); return; }
+    if (!open) {
+      setView(null);
+      setPicked(null);
+      setDragPx(null);
+      userPicked.current = false;
+      return;
+    }
     const el = wrapRef.current;
     if (!el) return;
     const update = () => setSize({ w: el.clientWidth || 360, h: el.clientHeight || 480 });
@@ -133,7 +167,6 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
 
   if (!open) return null;
 
-  const clusters = view ? clusterAtZoom(visible, view.z) : [];
   const cx = view ? xWorld(view.lon, view.z) : 0;
   const cy = view ? yWorld(view.lat, view.z) : 0;
   const left = cx - size.w / 2 - (dragPx?.dx ?? 0);
@@ -150,9 +183,15 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
   }
 
   const zoomTo = (dz: number) => {
+    userPicked.current = false;
     setPicked(null);
     setView((v) => (v ? { ...v, z: Math.max(MIN_Z, Math.min(MAX_Z, v.z + dz)) } : v));
   };
+
+  const listItems: GeoNode[] = picked
+    ? picked.items
+    : visible.slice().sort((a, b) => b.node.createdAt.localeCompare(a.node.createdAt));
+  const showList = visible.length > 0;
 
   const canvasXY = (e: React.PointerEvent) => {
     const r = wrapRef.current?.getBoundingClientRect();
@@ -198,6 +237,7 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
           const latMid = latOfY(top + ps.midY, view.z);
           const cLon = lonOfX(xWorld(lonMid, z2) - ps.midX + size.w / 2, z2);
           const cLat = latOfY(yWorld(latMid, z2) - ps.midY + size.h / 2, z2);
+          userPicked.current = false;
           setPicked(null);
           setView({ lat: cLat, lon: cLon, z: z2 });
         }
@@ -254,13 +294,19 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
           // 热力色:记得越多越暖(hue 210 冷蓝 → 18 橙红)
           const maxN = Math.max(1, ...clusters.map((x) => x.items.length));
           const heat = 210 - Math.round(192 * Math.sqrt(c.items.length / maxN));
+          const isOn = picked != null && Math.abs(picked.lat - c.lat) < 1e-6 && Math.abs(picked.lon - c.lon) < 1e-6
+            && picked.items.length === c.items.length;
           return (
             <button
               key={i}
               type="button"
-              className="nesio-memmap-bubble"
+              className={`nesio-memmap-bubble${isOn ? ' is-on' : ''}`}
               style={{ left: px - r, top: py - r, width: r * 2, height: r * 2, background: `hsl(${heat} 76% 50%)` }}
-              onClick={(e) => { e.stopPropagation(); setPicked(c); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                userPicked.current = true;
+                setPicked(c);
+              }}
               aria-label={L(dict, `这里记了 ${c.items.length} 条`, `${c.items.length} memories here`)}
             >{c.items.length}</button>
           );
@@ -279,7 +325,11 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
             min={0}
             max={days.length - 1}
             value={activeIdx}
-            onChange={(e) => { setDayIdxRaw(Number(e.target.value)); setPicked(null); }}
+            onChange={(e) => {
+              userPicked.current = false;
+              setDayIdxRaw(Number(e.target.value));
+              setPicked(null);
+            }}
             aria-label={L(dict, '时间', 'Time')}
           />}
           <span className="nesio-memmap-timebar-label">
@@ -294,20 +344,22 @@ export default function MemoryMapSheet({ open, onClose }: { open: boolean; onClo
           </span>
         </div>
       )}
-      {picked && (
+      {showList && (
         <div className="nesio-memmap-list">
           <p className="nesio-memmap-list-title">
-            {(() => {
-              const named = picked.items.find((g) => typeof g.node.attributes.capturedPlace === 'string' && g.node.attributes.capturedPlace);
-              const place = named ? String(named.node.attributes.capturedPlace) : `${picked.lat.toFixed(3)}, ${picked.lon.toFixed(3)}`;
-              return L(dict, `${place} · ${picked.items.length} 条记忆`, `${place} · ${picked.items.length} memories`);
-            })()}
+            {picked
+              ? (() => {
+                const named = picked.items.find((g) => typeof g.node.attributes.capturedPlace === 'string' && g.node.attributes.capturedPlace);
+                const place = named ? String(named.node.attributes.capturedPlace) : `${picked.lat.toFixed(3)}, ${picked.lon.toFixed(3)}`;
+                return L(dict, `${place} · ${picked.items.length} 条记忆`, `${place} · ${picked.items.length} memories`);
+              })()
+              : L(dict, `当前可见 · ${listItems.length} 条记忆`, `Visible · ${listItems.length} memories`)}
           </p>
           <div className="nesio-memmap-list-scroll">
-            {picked.items.slice(0, 20).map(({ node }) => (
+            {listItems.slice(0, 20).map(({ node }) => (
               <div key={node.id} className="nesio-memmap-item">
                 <NodeTypeIcon type={node.type} size={13} />
-                <span className="nesio-memmap-item-name">{node.name}</span>
+                <span className="nesio-memmap-item-name">{memoryLabel(node, dict)}</span>
                 <span className="nesio-memmap-item-time">
                   {new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' })}
                 </span>
