@@ -2,7 +2,7 @@
 
 /**
  * DictionarySheet — 欧路风格查词。
- * 搜框 + 词头/音标/词性释义/例句 + 生词本;本地词库优先,可选 AI 兜底。
+ * 搜框 + 列表点进详情(释义/例句/助记);本地词库优先,可选 AI 兜底。
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -16,6 +16,7 @@ import {
   lookupWordAsync, toggleWordbook, isInWordbook, entriesForWordbookAsync,
   loadAiEnabled, saveAiEnabled, fetchAiLookup, lexiconSizeLabel, type DictHit,
 } from '@/lib/portal/dictionary/lookup';
+import DictDetailView from './DictDetailView';
 
 export default function DictionarySheet({
   open, onClose, initialQuery = '',
@@ -36,6 +37,7 @@ export default function DictionarySheet({
   const [packLoading, setPackLoading] = useState(false);
   const [lexCount, setLexCount] = useState(0);
   const [book, setBook] = useState<DictEntry[]>([]);
+  const [selected, setSelected] = useState<{ entry: DictEntry; fromAi?: boolean } | null>(null);
   const aiSeq = useRef(0);
   const lookSeq = useRef(0);
 
@@ -46,6 +48,7 @@ export default function DictionarySheet({
     setErr('');
     setAiErr('');
     setAiEntry(null);
+    setSelected(null);
     setAiOn(loadAiEnabled());
     setPackLoading(true);
     void ensureEcdictMeta()
@@ -91,15 +94,17 @@ export default function DictionarySheet({
   }, [dict, t]);
 
   useEffect(() => {
-    if (!open || tab !== 'search' || !aiOn || !q.trim() || hits.length > 0) {
-      setAiEntry(null);
-      setAiErr('');
-      setAiLoading(false);
+    if (!open || tab !== 'search' || !aiOn || !q.trim() || hits.length > 0 || selected) {
+      if (!aiOn || hits.length > 0) {
+        setAiEntry(null);
+        setAiErr('');
+        setAiLoading(false);
+      }
       return;
     }
     const timer = window.setTimeout(() => { void runAiLookup(q); }, 400);
     return () => { window.clearTimeout(timer); };
-  }, [open, tab, aiOn, q, hits.length, runAiLookup]);
+  }, [open, tab, aiOn, q, hits.length, runAiLookup, selected]);
 
   const onToggleAi = () => {
     const next = !aiOn;
@@ -117,7 +122,8 @@ export default function DictionarySheet({
     }
   };
 
-  const onToggle = (word: string) => {
+  const onToggle = (word: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     const r = toggleWordbook(word);
     if (!r.ok) {
       setErr(t('生词本没存上 —— 本机空间可能满了。', 'Could not save wordbook — storage may be full.'));
@@ -127,12 +133,24 @@ export default function DictionarySheet({
     setBookRev((n) => n + 1);
   };
 
-  const renderEntry = (hit: DictHit | { entry: DictEntry; rank?: string; fromAi?: boolean }, i: number) => {
+  const renderCard = (hit: DictHit | { entry: DictEntry; rank?: string; fromAi?: boolean }, i: number) => {
     const e = hit.entry;
     const inBook = isInWordbook(e.word);
     const fromAi = 'fromAi' in hit && hit.fromAi;
     return (
-      <article key={`${e.word}-${i}`} className="nesio-dict-entry">
+      <article
+        key={`${e.word}-${i}`}
+        className="nesio-dict-entry nesio-dict-entry-card"
+        role="button"
+        tabIndex={0}
+        onClick={() => setSelected({ entry: e, fromAi: Boolean(fromAi) })}
+        onKeyDown={(ev) => {
+          if (ev.key === 'Enter' || ev.key === ' ') {
+            ev.preventDefault();
+            setSelected({ entry: e, fromAi: Boolean(fromAi) });
+          }
+        }}
+      >
         <header className="nesio-dict-entry-head">
           <div>
             <h3 className="nesio-dict-headword">{e.headword}</h3>
@@ -141,29 +159,19 @@ export default function DictionarySheet({
           </div>
           <button type="button" className={`nesio-dict-star${inBook ? ' is-on' : ''}`}
             aria-label={inBook ? t('移出生词本', 'Remove from wordbook') : t('加入生词本', 'Add to wordbook')}
-            onClick={() => onToggle(e.word)}>
+            onClick={(ev) => onToggle(e.word, ev)}>
             {inBook ? '★' : '☆'}
           </button>
         </header>
         <ul className="nesio-dict-senses">
-          {e.senses.map((s, j) => (
+          {e.senses.slice(0, 2).map((s, j) => (
             <li key={j}>
               {s.pos && <span className="nesio-dict-pos">{s.pos}</span>}
               <span className="nesio-dict-def">{s.zh}</span>
-              {s.en && <span className="nesio-dict-def-en">{s.en}</span>}
             </li>
           ))}
         </ul>
-        {e.examples && e.examples.length > 0 && (
-          <div className="nesio-dict-examples">
-            {e.examples.map((ex, j) => (
-              <p key={j} className="nesio-dict-ex">
-                <span className="nesio-dict-ex-en">{ex.en}</span>
-                <span className="nesio-dict-ex-zh">{ex.zh}</span>
-              </p>
-            ))}
-          </div>
-        )}
+        <p className="nesio-dict-card-hint">{t('点开看例句与助记', 'Tap for examples & study notes')}</p>
       </article>
     );
   };
@@ -174,76 +182,89 @@ export default function DictionarySheet({
     <NesioSheet variant="bottom" elevated open={open} onOpenChange={(o) => { if (!o) onClose(); }}
       ariaLabel={t('词典', 'Dictionary')}>
       <div className="nesio-dict-sheet">
-        <div className="nesio-dict-tabs">
-          <button type="button" className={tab === 'search' ? 'is-on' : ''} onClick={() => setTab('search')}>
-            {t('查词', 'Lookup')}
-          </button>
-          <button type="button" className={tab === 'book' ? 'is-on' : ''} onClick={() => setTab('book')}>
-            {t(`生词本 · ${book.length}`, `Wordbook · ${book.length}`)}
-          </button>
-          <button type="button" className="nesio-dict-close" onClick={onClose} aria-label={t('关闭', 'Close')}>✕</button>
-        </div>
-
-        {tab === 'search' && (
+        {selected ? (
+          <DictDetailView
+            entry={selected.entry}
+            fromAi={selected.fromAi}
+            locale={dict}
+            t={t}
+            onBack={() => setSelected(null)}
+            onBookChange={() => setBookRev((n) => n + 1)}
+          />
+        ) : (
           <>
-            <input
-              className="nesio-dict-search"
-              value={q}
-              autoFocus
-              placeholder={t('输入英文或中文…', 'English or Chinese…')}
-              onChange={(e) => setQ(e.target.value)}
-            />
-            <div className="nesio-dict-toolbar">
-              <p className="nesio-dict-meta">
-                {packLoading
-                  ? t('正在加载欧路兼容词库…', 'Loading Eudic-compatible lexicon…')
-                  : t(
-                    `离线词库 · ECDICT ${(lexCount || ecdictPackCount()).toLocaleString('en-US')} 词`,
-                    `Offline · ECDICT ${(lexCount || ecdictPackCount()).toLocaleString('en-US')} words`,
-                  )}
-                {aiOn ? t(' · AI 已开', ' · AI on') : t(' · 不联网', ' · offline')}
-              </p>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={aiOn}
-                className={`nesio-dict-ai-toggle${aiOn ? ' is-on' : ''}`}
-                onClick={onToggleAi}
-              >
-                {t('AI 查词', 'AI lookup')}
+            <div className="nesio-dict-tabs">
+              <button type="button" className={tab === 'search' ? 'is-on' : ''} onClick={() => setTab('search')}>
+                {t('查词', 'Lookup')}
               </button>
+              <button type="button" className={tab === 'book' ? 'is-on' : ''} onClick={() => setTab('book')}>
+                {t(`生词本 · ${book.length}`, `Wordbook · ${book.length}`)}
+              </button>
+              <button type="button" className="nesio-dict-close" onClick={onClose} aria-label={t('关闭', 'Close')}>✕</button>
             </div>
-            {!q.trim() && (
-              <p className="nesio-dict-hint">{t('试试 hello、今天、dictionary', 'Try hello, 今天, or dictionary')}</p>
-            )}
-            {showLocalMiss && !aiOn && (
-              <p className="nesio-dict-empty" role="status">{t('词库里没有这个词。', 'Not in the offline lexicon.')}</p>
-            )}
-            {showLocalMiss && aiOn && !aiLoading && !aiEntry && !aiErr && (
-              <p className="nesio-dict-hint" role="status">{t('本地没有,正在准备 AI 查词…', 'Not local — preparing AI lookup…')}</p>
-            )}
-            {aiLoading && (
-              <p className="nesio-dict-hint" role="status">{t('AI 查词中…', 'Looking up with AI…')}</p>
-            )}
-            {aiErr && (
-              <div className="nesio-dict-ai-err" role="alert">
-                <p>{aiErr}</p>
-                <button type="button" className="nesio-dict-retry" onClick={() => { void runAiLookup(q); }}>
-                  {t('重试', 'Retry')}
-                </button>
-              </div>
-            )}
-            <div className="nesio-dict-list">
-              {hits.map((h, i) => renderEntry(h, i))}
-              {aiEntry && renderEntry({ entry: aiEntry, fromAi: true }, 999)}
-            </div>
-          </>
-        )}
 
-        {tab === 'book' && (
-          book.length === 0
-            ? <p className="nesio-dict-empty">{t('生词本还是空的 —— 查到词点星星收藏。', 'Wordbook is empty — star a word to save it.')}</p>
-            : <div className="nesio-dict-list">{book.map((e, i) => renderEntry({ entry: e }, i))}</div>
+            {tab === 'search' && (
+              <>
+                <input
+                  className="nesio-dict-search"
+                  value={q}
+                  autoFocus
+                  placeholder={t('输入英文或中文…', 'English or Chinese…')}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+                <div className="nesio-dict-toolbar">
+                  <p className="nesio-dict-meta">
+                    {packLoading
+                      ? t('正在加载欧路兼容词库…', 'Loading Eudic-compatible lexicon…')
+                      : t(
+                        `离线词库 · ECDICT ${(lexCount || ecdictPackCount()).toLocaleString('en-US')} 词`,
+                        `Offline · ECDICT ${(lexCount || ecdictPackCount()).toLocaleString('en-US')} words`,
+                      )}
+                    {aiOn ? t(' · AI 已开', ' · AI on') : t(' · 不联网', ' · offline')}
+                  </p>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={aiOn}
+                    className={`nesio-dict-ai-toggle${aiOn ? ' is-on' : ''}`}
+                    onClick={onToggleAi}
+                  >
+                    {t('AI 查词', 'AI lookup')}
+                  </button>
+                </div>
+                {!q.trim() && (
+                  <p className="nesio-dict-hint">{t('试试 hello、今天、dictionary', 'Try hello, 今天, or dictionary')}</p>
+                )}
+                {showLocalMiss && !aiOn && (
+                  <p className="nesio-dict-empty" role="status">{t('词库里没有这个词。', 'Not in the offline lexicon.')}</p>
+                )}
+                {showLocalMiss && aiOn && !aiLoading && !aiEntry && !aiErr && (
+                  <p className="nesio-dict-hint" role="status">{t('本地没有,正在准备 AI 查词…', 'Not local — preparing AI lookup…')}</p>
+                )}
+                {aiLoading && (
+                  <p className="nesio-dict-hint" role="status">{t('AI 查词中…', 'Looking up with AI…')}</p>
+                )}
+                {aiErr && (
+                  <div className="nesio-dict-ai-err" role="alert">
+                    <p>{aiErr}</p>
+                    <button type="button" className="nesio-dict-retry" onClick={() => { void runAiLookup(q); }}>
+                      {t('重试', 'Retry')}
+                    </button>
+                  </div>
+                )}
+                <div className="nesio-dict-list">
+                  {hits.map((h, i) => renderCard(h, i))}
+                  {aiEntry && renderCard({ entry: aiEntry, fromAi: true }, 999)}
+                </div>
+              </>
+            )}
+
+            {tab === 'book' && (
+              book.length === 0
+                ? <p className="nesio-dict-empty">{t('生词本还是空的 —— 查到词点星星收藏。', 'Wordbook is empty — star a word to save it.')}</p>
+                : <div className="nesio-dict-list">{book.map((e, i) => renderCard({ entry: e }, i))}</div>
+            )}
+          </>
         )}
 
         {err && <p className="nesio-dict-err" role="alert">{err}</p>}

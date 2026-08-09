@@ -107,13 +107,72 @@ export async function fetchAiLookup(query: string, locale?: string): Promise<Dic
   const res = await fetch('/api/portal/dictionary-lookup', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: query.trim().slice(0, 80), locale }),
+    body: JSON.stringify({ query: query.trim().slice(0, 80), locale, mode: 'lookup' }),
   });
   const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string; entry?: DictEntry };
   if (!res.ok || !data.ok || !data.entry) {
     throw new Error(data.error || `lookup_failed_${res.status}`);
   }
   return data.entry;
+}
+
+/** 详情页 AI 补全:例句 + 助记/词根/搭配(可与本地释义合并)。 */
+export async function fetchAiEnrich(query: string, locale?: string): Promise<DictEntry> {
+  const res = await fetch('/api/portal/dictionary-lookup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: query.trim().slice(0, 80), locale, mode: 'enrich' }),
+  });
+  const data = await res.json().catch(() => ({})) as { ok?: boolean; error?: string; entry?: DictEntry };
+  if (!res.ok || !data.ok || !data.entry) {
+    throw new Error(data.error || `enrich_failed_${res.status}`);
+  }
+  return data.entry;
+}
+
+/** 详情补全缓存(换设备可从零 —— cache)。 */
+const ENRICH_KEY = 'nesio-dict-enrich-cache-v1';
+const ENRICH_MAX = 80;
+
+type EnrichMap = Record<string, DictEntry>;
+
+function readEnrichMap(): EnrichMap {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = JSON.parse(localStorage.getItem(ENRICH_KEY) || '{}') as EnrichMap;
+    return raw && typeof raw === 'object' ? raw : {};
+  } catch { return {}; }
+}
+
+export function loadEnrichCache(word: string): DictEntry | null {
+  const w = norm(word);
+  if (!w) return null;
+  return readEnrichMap()[w] || null;
+}
+
+export function saveEnrichCache(entry: DictEntry): { ok: boolean } {
+  if (typeof window === 'undefined') return { ok: false };
+  const w = norm(entry.word);
+  if (!w) return { ok: false };
+  try {
+    const map = readEnrichMap();
+    map[w] = {
+      word: entry.word,
+      headword: entry.headword,
+      phonetic: entry.phonetic,
+      senses: entry.senses.slice(0, 6),
+      examples: entry.examples?.slice(0, 4),
+      mnemonic: entry.mnemonic,
+      roots: entry.roots,
+      collocations: entry.collocations?.slice(0, 8),
+    };
+    const keys = Object.keys(map);
+    if (keys.length > ENRICH_MAX) {
+      for (const k of keys.slice(0, keys.length - ENRICH_MAX)) delete map[k];
+    }
+    localStorage.setItem(ENRICH_KEY, JSON.stringify(map));
+    return { ok: true };
+  } catch { return { ok: false }; }
 }
 
 /** 生词本(本机)。 */

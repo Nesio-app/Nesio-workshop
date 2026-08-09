@@ -21,6 +21,12 @@ export interface DictEntry {
   examples?: Array<{ en: string; zh: string }>;
   /** 反向检索用的中文关键词 */
   zhKeys?: string[];
+  /** 助记(多为 AI 补全;本地包无此字段) */
+  mnemonic?: string;
+  /** 词根/词缀拆解 */
+  roots?: string;
+  /** 常见搭配 */
+  collocations?: string[];
 }
 
 /** 精选常用词 —— 体积可控的离线底库(可后续扩包)。 */

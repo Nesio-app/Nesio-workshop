@@ -89,6 +89,9 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-module-sync-since-v1',           // cloud-module-sync 增量拉取水位(仅本机,不上云)
   'nesio-module-sync-last-at',            // cloud-module-sync 节流(localStorage 主读,跨 WKWebView 杀进程)
   'nesio-dict-ai-enabled-v1',             // 词典 AI 查词开关:按设备偏好,换端从默认(关)开始
+  'nesio-dict-enrich-cache-v1',           // 词典详情 AI 补全缓存:可丢,换端从零补即可
+  'nesio-wardrobe-body-v1',               // 试穿全身照是否存在的 flag(图在 IDB)
+  'nesio-wardrobe-body-ids-v1',           // 多张全身照 asset id 列表(图在 IDB)
   'nesio-rel-nudge-dismissed-v1',         // 关系页绿提示关闭日键:本机 UI 状态
   'nesio-email-sync-state-v1',            // cloud-email-sync 每封上次同步哈希
   'nesio-backup-synced-entrycount-v1',    // cloud-backup 高水位

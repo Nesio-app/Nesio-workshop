@@ -29,7 +29,7 @@ import { getWishlist, addWish, type WishDish } from '@/lib/cooking/wishlist';
 import SpendClaimRow from '../finance/SpendClaimRow';
 import Button from '../ui/Button';
 import LocationPicker from '../LocationPicker';
-import { addMeal, getMeals, type MealSource, type MealItem } from '@/lib/cooking/meals';
+import { addMeal, getMeals, type Meal, type MealSource, type MealItem } from '@/lib/cooking/meals';
 import { planWeek } from '@/lib/cooking/meal-plan-core';
 import {
   MEAL_SLOTS, MEAL_SLOT_LABEL, MEAL_CALENDAR_EVENT, getDayPlan, setMealPlan,
@@ -38,11 +38,17 @@ import {
 import { saveGeneratedRecipe, findGeneratedRecipe } from '@/lib/cooking/generated-recipes';
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { localDayKey } from '@/lib/portal/local-day';
+import { loadHealthMetrics } from '@/lib/portal/health-store';
+import { rankFoodReactions, mgDlToDisplay } from '@/lib/portal/body-ledger';
+import type { DailyFact } from '@/lib/portal/apple-health';
+
+type TopTab = 'home' | 'pantry' | 'wishlist' | 'meals';
 
 type View =
   | { kind: 'home' }
   | { kind: 'pantry' }
   | { kind: 'wishlist' }
+  | { kind: 'meals' }
   | { kind: 'recipe'; match: RecipeMatch<Recipe> }
   | { kind: 'needs'; match: RecipeMatch<Recipe>; from: 'home' | 'wishlist' | 'recipe' }
   | { kind: 'logmeal' }
@@ -54,7 +60,7 @@ type View =
 
 export default function CookingSheet({ open, onClose, initialView }: {
   open: boolean; onClose: () => void;
-  initialView?: 'home' | 'pantry' | 'wishlist';
+  initialView?: TopTab;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const t = useCallback((zh: string, en: string) => L(dict, zh, en), [dict]);
@@ -94,7 +100,7 @@ export default function CookingSheet({ open, onClose, initialView }: {
     [recipes, pantryNames],
   );
 
-  const setTopView = useCallback((k: 'home' | 'pantry' | 'wishlist') => { setErr(''); setView({ kind: k }); }, []);
+  const setTopView = useCallback((k: TopTab) => { setErr(''); setView({ kind: k }); }, []);
   const openCamera = useCallback(() => camInputRef.current?.click(), []);
   const onCamFile = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0]; e.target.value = '';
@@ -114,7 +120,7 @@ export default function CookingSheet({ open, onClose, initialView }: {
   const finishLogMeal = useCallback(() => {
     setMealPhoto('');
     setMealPhotoFile(null);
-    setView({ kind: 'home' });
+    setView({ kind: 'meals' });
   }, []);
 
   const computeNeeds = useCallback((dishName: string, from: 'wishlist' | 'home' | 'recipe') => {
@@ -182,6 +188,13 @@ export default function CookingSheet({ open, onClose, initialView }: {
                 <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} page={t('美味', 'Cooking')} t={t} />
                 <SubTabs active="wishlist" onSelect={setTopView} t={t} />
                 <WishlistBody wishes={wishes} recipes={recipes} onCompute={(n) => computeNeeds(n, 'wishlist')} onOpenDish={openRecipeByName} onPlan={() => setView({ kind: 'plan' })} onError={setErr} onChanged={reload} onCamera={openCamera} t={t} />
+              </>
+            )}
+            {view.kind === 'meals' && (
+              <>
+                <ScreenHead backLabel={t('洞察', 'Insights')} onBack={onClose} page={t('美味', 'Cooking')} t={t} />
+                <SubTabs active="meals" onSelect={setTopView} t={t} />
+                <MealsBody onLogMeal={startLogMeal} t={t} />
               </>
             )}
             {view.kind === 'recipe' && (
@@ -1617,20 +1630,138 @@ function SectionHead({ label, right, rightGo }: { label: string; right?: string;
     </div>
   );
 }
-/** 做饭内部子 tab:做饭 / 库存 / 想做清单(在洞察下,做饭的子导航)。 */
+/** 做饭内部子 tab:做饭 / 库存 / 想做清单 / 餐(在洞察下,做饭的子导航)。 */
 // 2026-07-29:这套内联 tab 是全站五套之一,收敛到 SegTabs。
-function SubTabs({ active, onSelect, t }: { active: 'home' | 'pantry' | 'wishlist'; onSelect: (k: 'home' | 'pantry' | 'wishlist') => void; t: TT }) {
+function SubTabs({ active, onSelect, t }: { active: TopTab; onSelect: (k: TopTab) => void; t: TT }) {
   return (
     <SegTabs
       items={[
         { key: 'home' as const, label: t('做饭', 'Cook') },
         { key: 'pantry' as const, label: t('库存', 'Pantry') },
         { key: 'wishlist' as const, label: t('想做清单', 'Wishlist') },
+        { key: 'meals' as const, label: t('餐', 'Meals') },
       ]}
       active={active}
       onSelect={onSelect}
       ariaLabel={t('美味视图', 'Cooking view')}
     />
+  );
+}
+
+/**
+ * MealsBody — 已记一餐列表 + 同日血糖振幅 + 食物反应探索。
+ * 记餐入口仍走主相机 mode=meal;营养估算已在记入时落库。
+ */
+function MealsBody({ onLogMeal, t }: { onLogMeal: () => void; t: TT }) {
+  const [meals, setMeals] = useState<Meal[]>([]);
+  const [daily, setDaily] = useState<DailyFact[] | undefined>();
+  const [gluUnit, setGluUnit] = useState<'mg/dL' | 'mmol/L'>('mg/dL');
+  const [tick, setTick] = useState(0);
+
+  useEffect(() => {
+    try { setMeals(getMeals()); } catch { setMeals([]); }
+    try {
+      const hm = loadHealthMetrics();
+      setDaily(hm?.daily);
+      if (hm?.glucose?.unit === 'mmol/L') setGluUnit('mmol/L');
+    } catch {
+      setDaily(undefined);
+    }
+  }, [tick]);
+
+  useEffect(() => {
+    const bump = () => setTick((n) => n + 1);
+    window.addEventListener('nesio-life-graph-updated', bump);
+    window.addEventListener('nesio-health-updated', bump);
+    return () => {
+      window.removeEventListener('nesio-life-graph-updated', bump);
+      window.removeEventListener('nesio-health-updated', bump);
+    };
+  }, []);
+
+  const reactions = useMemo(() => rankFoodReactions(meals, daily, { minN: 2, limit: 6 }), [meals, daily]);
+  const byDate = useMemo(() => new Map((daily || []).map((d) => [d.date, d])), [daily]);
+
+  const fmtDay = (d: string) => {
+    const zh = t('zh', 'en') === 'zh';
+    return zh ? `${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日` : d.slice(5).replace('-', '/');
+  };
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+        <button type="button" onClick={onLogMeal} style={{ ...primaryBtn, flex: 1 }}>
+          {t('拍照记一餐', 'Photo log a meal')}
+        </button>
+      </div>
+      <p style={caption}>
+        {t('记下的餐会进身体账本;有 Apple 健康血糖时,同日振幅会显示在下面。', 'Logged meals feed the body ledger; same-day glucose swing shows below when Health data is present.')}
+      </p>
+
+      {reactions.length > 0 && (
+        <section>
+          <SectionHead label={t('餐后血糖探索', 'Post-meal glucose tips')} right={t('样本≥2', 'n≥2')} />
+          <div style={card}>
+            {reactions.map((r, i) => {
+              const rise = mgDlToDisplay(r.avgRise, gluUnit);
+              const label = r.tone === 'spike'
+                ? t(`偏高 · 振幅约 ${rise}`, `Higher · ~${rise}`)
+                : t(`较稳 · 振幅约 ${rise}`, `Steadier · ~${rise}`);
+              return (
+                <div key={r.name} style={{ ...row, borderBottom: i === reactions.length - 1 ? 'none' : divider }}>
+                  <Dot />
+                  <span style={{ flex: 1, fontSize: 'var(--text-sm)', fontWeight: 600 }}>{r.name}</span>
+                  <span style={{
+                    fontSize: 'var(--text-xs)', fontWeight: 600,
+                    color: r.tone === 'spike' ? 'var(--status-gentle)' : 'var(--status-go)',
+                  }}>
+                    {label}{` · n=${r.n}`}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <p style={caption}>{t('探索向提示,不是医疗建议。', 'Exploratory only — not medical advice.')}</p>
+        </section>
+      )}
+
+      <section>
+        <SectionHead label={t('最近一餐', 'Recent meals')} right={meals.length ? `${meals.length}` : undefined} />
+        {meals.length === 0 ? (
+          <p className="nesio-insights-empty" style={{ margin: 0 }}>
+            {t('还没记过餐 —— 点上面拍照记一餐。', 'No meals yet — tap above to photo-log one.')}
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+            {meals.slice(0, 40).map((m) => {
+              const fact = byDate.get(m.occurredAt);
+              const title = m.items.map((it) => it.name).filter(Boolean).slice(0, 3).join(' · ') || t('一餐', 'Meal');
+              const glu = fact && fact.glucoseAvg != null
+                ? t(
+                  `血糖均 ${mgDlToDisplay(fact.glucoseAvg, gluUnit)}${fact.glucoseMax != null ? ` · 高 ${mgDlToDisplay(fact.glucoseMax, gluUnit)}` : ''}`,
+                  `Glu avg ${mgDlToDisplay(fact.glucoseAvg, gluUnit)}${fact.glucoseMax != null ? ` · max ${mgDlToDisplay(fact.glucoseMax, gluUnit)}` : ''}`,
+                )
+                : null;
+              return (
+                <div key={m.id} style={card}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', alignItems: 'baseline' }}>
+                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--portal-ink)' }}>{title}</span>
+                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{fmtDay(m.occurredAt)}</span>
+                  </div>
+                  <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                    {t(m.source, m.source === '自己做' ? 'Home' : m.source === '餐厅' ? 'Dine-in' : m.source === '外卖' ? 'Takeout' : 'Other')}
+                    {` · ${Math.round(m.energyKCal)} kcal · P${Math.round(m.protein)} C${Math.round(m.cho)} F${Math.round(m.fat)}`}
+                  </p>
+                  {glu && (
+                    <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-calm)' }}>{glu}</p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+    </>
   );
 }
 
