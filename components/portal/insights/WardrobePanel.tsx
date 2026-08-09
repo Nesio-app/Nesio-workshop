@@ -1247,7 +1247,7 @@ export default function WardrobePanel() {
       )}
 
       {zoomUrl && (
-        <div className="nesio-tryon-lightbox" role="dialog" aria-modal="true" aria-label={L(dict, '试穿全屏', 'Try-on fullscreen')}
+        <div className="nesio-tryon-lightbox" aria-label={L(dict, '试穿全屏', 'Try-on fullscreen')}
           onClick={() => setZoomUrl(null)}>
           <button type="button" className="nesio-tryon-lightbox-close" aria-label={L(dict, '关闭', 'Close')}
             onClick={() => setZoomUrl(null)}>✕</button>
