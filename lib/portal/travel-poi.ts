@@ -20,6 +20,10 @@ export interface TravelPoi {
   summary?: string;
   /** 英文短简介(可选) */
   summaryEn?: string;
+  ticketPrice?: string;
+  hours?: string;
+  tips?: string;
+  imageUrl?: string;
 }
 
 interface PoiFile {
@@ -198,7 +202,7 @@ export function suggestPoisForDestination(destination: string, opts?: {
   const pool: TravelPoi[] =
     city === 'tokyo' && tokyoCache?.length
       ? tokyoCache
-      : (allPoisCache || japanCache || []);
+      : (allPoisCache || worldCache || japanCache || tokyoCache || []);
 
   let scored = pool.map((p) => {
     let score = 0;
@@ -206,12 +210,15 @@ export function suggestPoisForDestination(destination: string, opts?: {
       const c = CITY_CENTERS[city];
       const d = haversineKm(c.lat, c.lon, p.lat, p.lon);
       score = d <= c.radiusKm ? c.radiusKm - d : 1000 + d;
+    } else if (nameQuery) {
+      // 无目的地时按名字/global 搜索 —— 别默认 500 把全世界都筛掉
+      score = 200;
     } else {
       score = 500;
     }
     if (type !== 'all' && p.type !== type) score += 5000;
     if (nameQuery) {
-      const hay = `${p.name} ${p.type || ''} ${p.country || ''}`.toLowerCase();
+      const hay = `${p.name} ${p.type || ''} ${p.country || ''} ${p.summary || ''} ${p.summaryEn || ''}`.toLowerCase();
       if (!hay.includes(nameQuery)) score += 8000;
       else score -= 50;
     }

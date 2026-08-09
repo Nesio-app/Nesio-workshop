@@ -33,7 +33,7 @@ const SYNC_STATE_KEY = 'nesio-module-sync-state-v1';
 /** 单模块压缩块上限(与路由 MAX_DATA_BYTES 对齐,< Vercel 4.5MB 请求体上限)。 */
 const MAX_MODULE_PACKED_BYTES = 4 * 1024 * 1024;
 const MIN_INTERVAL_MS = 20_000;
-/** 跨 reload 也生效的节流(sessionStorage);避免每次冷启动都打全量 pull。 */
+/** 跨 reload / WKWebView 杀进程也生效的节流(localStorage 主读,sessionStorage 双写兼容旧值)。 */
 const SYNC_COOLDOWN_KEY = 'nesio-module-sync-last-at';
 const POST_BATCH = 20;
 
@@ -46,13 +46,18 @@ let inFlight = false;
 function readPersistedSyncAt(): number {
   if (typeof window === 'undefined') return 0;
   try {
-    const n = Number(sessionStorage.getItem(SYNC_COOLDOWN_KEY) || '0');
+    const raw = localStorage.getItem(SYNC_COOLDOWN_KEY)
+      ?? sessionStorage.getItem(SYNC_COOLDOWN_KEY)
+      ?? '0';
+    const n = Number(raw);
     return Number.isFinite(n) ? n : 0;
   } catch { return 0; }
 }
 function writePersistedSyncAt(ts: number): void {
   if (typeof window === 'undefined') return;
-  try { sessionStorage.setItem(SYNC_COOLDOWN_KEY, String(ts)); } catch { /* quota / private */ }
+  const s = String(ts);
+  try { localStorage.setItem(SYNC_COOLDOWN_KEY, s); } catch { /* quota / private */ }
+  try { sessionStorage.setItem(SYNC_COOLDOWN_KEY, s); } catch { /* quota / private */ }
 }
 
 // ── base64 / gzip 收口(fflate,全浏览器兼容)─────────────────────────────────

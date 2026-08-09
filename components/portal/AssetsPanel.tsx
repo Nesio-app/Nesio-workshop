@@ -6,8 +6,8 @@
  * 两个 tab:房产 / 车。共用同一套底座,不做两份实现:
  *   · 估值 = finance-assets 的手动资产 + 估值锚点(用户拍板方案 1:手动录入,零外部依赖 ——
  *     不接 Zillow 之类第三方,估值是「你自己认的那个数 + 你写的依据」,可回溯可改)。
- *   · 花钱的记录(税费/维修/保养)走 finance-sources.addManualEntry(assetId + assetCostKind),
- *     所以它们**同时**出现在财务板块里,不是资产页自己的私账;assetHoldingCosts 再把它们归集回来。
+ *   · 花钱的记录(税费/维修/保养)走 finance-sources.addManualEntry(assetId + assetCostKind,
+ *     includeInFinance:false) —— 只归在资产持有成本里,不进财务总览 KPI;assetHoldingCosts 归集回来。
  *   · 不花钱的那一半(谁做的、多久一次、下次什么时候)在 asset-care 里 —— 财务放不下这些。
  *
  * 车 tab 在这套之上多一块实时快照(TeslaPanel:状态/里程/充电/能耗),那块是接口来的,只读。
@@ -382,6 +382,7 @@ function CareSection({ assetId, records, people, dict }: {
         note: title.trim(),
         assetId,
         assetCostKind: kind === 'maintenance' ? 'other' : kind,
+        includeInFinance: false,
       })
       : null;
     const person = people.find((p) => p.key === provider);

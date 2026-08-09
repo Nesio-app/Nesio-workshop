@@ -9,6 +9,8 @@
 import { createBlobStore } from './idb-blob-store';
 import { reportStorageDropped } from './storage-health';
 import { listInventoryItems } from './inventory';
+import { loadTxAnnotations } from './tx-annotations';
+import { loadBankTx } from './bank-tx';
 import { addToShopping } from '@/lib/cooking/shopping';
 import { addReceiptExpense } from './finance-sources';
 import { ledgerProgressPct, ledgerRemaining } from './period-ledger';
@@ -28,6 +30,11 @@ export interface FlightPayload {
   confirmation?: string;
   statusText?: string; // 准点 / 延误…
   gate?: string;
+  /** 票价(计入预算 actual) */
+  price?: number;
+  currency?: string;
+  departureAt?: string;
+  arrivalAt?: string;
 }
 
 export interface HotelPayload {
@@ -92,6 +99,10 @@ export interface PoiPayload {
   wikidata?: string;
   summary?: string;
   summaryEn?: string;
+  ticketPrice?: string;
+  hours?: string;
+  tips?: string;
+  imageUrl?: string;
 }
 
 export type TripNodePayload =
@@ -135,6 +146,8 @@ export interface Trip {
    * recomputeBudgetNode 必须尊重它 —— 否则一按「按节点重算」就把用户改的数抹掉。
    */
   budgetByCategory?: Record<string, number>;
+  /** 用户自定义预算分类(id → 显示名);默认 flight/stay/shop 之外的可增删。 */
+  customBudgetCategories?: Array<{ id: string; label: string }>;
   currency?: string;
   nodes: TripNode[];
   createdAt: string;
@@ -638,6 +651,65 @@ export function generatePackingList(tripId: string): Trip | null {
 /** 订票正文里偶发超大数字串(订单号/金额粘连)——拒绝进预算。 */
 const MAX_REASONABLE_PRICE = 1_000_000;
 
+const DEFAULT_BUDGET_CATS = [
+  { id: 'flight', label: '机票' },
+  { id: 'stay', label: '住宿' },
+  { id: 'shop', label: '购物' },
+] as const;
+
+function sumTripAnnotatedBankTx(tripId: string): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const anns = loadTxAnnotations();
+    let sum = 0;
+    for (const tx of loadBankTx()) {
+      const ann = anns[tx.id];
+      if (ann?.tripId !== tripId) continue;
+      const amt = Math.abs(Number(tx.amount) || 0);
+      if (amt > 0 && amt <= MAX_REASONABLE_PRICE) sum += amt;
+    }
+    return Math.round(sum * 100) / 100;
+  } catch {
+    return 0;
+  }
+}
+
+/** 从上传文件提取订票确认文本(PDF 文字层 / 纯文本);扫描件 PDF 与图片需用户粘贴 OCR 结果。 */
+export async function extractTextFromBookingFile(
+  file: File,
+): Promise<{ ok: true; text: string } | { ok: false; reason: 'empty' | 'binary' | 'pdf_scanned' | 'pdf_failed' | 'image' | 'read_failed' }> {
+  const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  const isImage = file.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|heic)$/i.test(file.name);
+
+  if (isImage) return { ok: false, reason: 'image' };
+
+  if (isPdf) {
+    try {
+      const { readLabPdf, looksLikeTextLayer } = await import('@/lib/health/lab-pdf');
+      const r = await readLabPdf(file);
+      if (r.kind === 'text' && looksLikeTextLayer(r.lines, r.pages)) {
+        const text = r.lines.join('\n').trim();
+        if (!text) return { ok: false, reason: 'empty' };
+        return { ok: true, text: text.slice(0, 20000) };
+      }
+      return { ok: false, reason: 'pdf_scanned' };
+    } catch {
+      return { ok: false, reason: 'pdf_failed' };
+    }
+  }
+
+  try {
+    const text = await file.text();
+    if (!text.trim()) return { ok: false, reason: 'empty' };
+    if (/[\u0000]/.test(text.slice(0, 200)) || (text.match(/[^\x09\x0a\x0d\x20-\x7E\u0080-\uFFFF]/g) || []).length > text.length * 0.3) {
+      return { ok: false, reason: 'binary' };
+    }
+    return { ok: true, text: text.slice(0, 20000) };
+  } catch {
+    return { ok: false, reason: 'read_failed' };
+  }
+}
+
 function parseMoneyNear(text: string): number | undefined {
   const m = text.match(/(?:¥|￥|CNY|RMB|USD|\$)\s*([\d,]+(?:\.\d+)?)/i);
   if (!m) return undefined;
@@ -669,6 +741,7 @@ export function parseBookingConfirmation(text: string): TripNode[] {
     const fromCode = route?.[1];
     const toCode = route?.[2];
     const when = parseBookingDateTime(window);
+    const price = parseMoneyNear(window);
     nodes.push({
       id: uid('n'),
       kind: 'flight',
@@ -678,7 +751,7 @@ export function parseBookingConfirmation(text: string): TripNode[] {
       dayKey: 'd1',
       dayLabel: '行程日',
       title: fromCode && toCode ? `${fromCode} → ${toCode}` : `航班 ${flightNo}`,
-      subtitle: [flightNo, seat ? `座位 ${seat}` : '', confirmation ? `确认 ${confirmation}` : ''].filter(Boolean).join(' · '),
+      subtitle: [flightNo, seat ? `座位 ${seat}` : '', confirmation ? `确认 ${confirmation}` : '', price != null ? `$${price}` : ''].filter(Boolean).join(' · '),
       payload: {
         kind: 'flight',
         flight: {
@@ -690,6 +763,8 @@ export function parseBookingConfirmation(text: string): TripNode[] {
           seat,
           confirmation,
           statusText: '已订',
+          ...(price != null ? { price, currency: '$' } : {}),
+          ...(when.at ? { departureAt: when.at } : {}),
         },
       },
     });
@@ -776,13 +851,14 @@ export function appendShoppingReceipt(
   return getTrip(tripId) || next;
 }
 
-/** 按航班/酒店/购物重算预算节点。 */
+/** 按航班/酒店/购物/刷卡批注重算预算节点。 */
 export function recomputeBudgetNode(tripId: string): Trip | null {
   const t = getTrip(tripId);
   if (!t) return null;
   let flight = 0;
   let stay = 0;
   let shop = 0;
+  const customActual: Record<string, number> = {};
   for (const n of t.nodes) {
     if (n.payload.kind === 'hotel') {
       const h = n.payload.hotel;
@@ -794,15 +870,14 @@ export function recomputeBudgetNode(tripId: string): Trip | null {
       if (tot > 0 && tot <= MAX_REASONABLE_PRICE) shop += tot;
     }
     if (n.payload.kind === 'flight') {
-      // 无票价字段时不硬估;有确认即计 0,留给用户改预算
+      const p = n.payload.flight.price || 0;
+      if (p > 0 && p <= MAX_REASONABLE_PRICE) flight += p;
     }
   }
-  const actualTotal = flight + stay + shop;
+  const bank = sumTripAnnotatedBankTx(tripId);
+  const actualTotal = flight + stay + shop + bank;
   const over = t.budgetByCategory || {};
   const hasOverride = Object.keys(over).length > 0;
-  // 用户改过分类预算 → 总预算 = 各分类之和(改了分类总额还是老数字最容易被当成 bug);
-  // 没改过 → 优先实际节点合计;仅当手填总额合理时才沿用。
-  // 曾用「永远 sticky trip.budgetTotal」→ 订票误解析出巨额后删节点,页面变成 ¥0 / ¥305 亿。
   let sticky = Number(t.budgetTotal) || 0;
   if (sticky > MAX_REASONABLE_PRICE) sticky = 0;
   if (sticky > 0 && actualTotal === 0 && !hasOverride) sticky = 0;
@@ -818,11 +893,23 @@ export function recomputeBudgetNode(tripId: string): Trip | null {
     }
     return share[id] || 0;
   };
-  const categories = [
+  const categories: BudgetCategory[] = [
     { id: 'flight', label: '机票', actual: flight, budget: catBudget('flight') },
     { id: 'stay', label: '住宿', actual: stay, budget: catBudget('stay') },
     { id: 'shop', label: '购物', actual: shop, budget: catBudget('shop') },
   ];
+  if (bank > 0) {
+    categories.push({ id: 'bank', label: '刷卡', actual: bank, budget: catBudget('bank') });
+  }
+  for (const c of t.customBudgetCategories || []) {
+    if (categories.some((x) => x.id === c.id)) continue;
+    categories.push({
+      id: c.id,
+      label: c.label,
+      actual: customActual[c.id] || 0,
+      budget: catBudget(c.id),
+    });
+  }
   const budgetTotal = hasOverride
     ? categories.reduce((a, c) => a + c.budget, 0)
     : (autoTotal || actualTotal || 0);
@@ -878,6 +965,31 @@ export function clearTripBudget(tripId: string): Trip | null {
   return recomputeBudgetNode(tripId);
 }
 
+/** 新增自定义预算分类(可删;预算额走 budgetByCategory)。 */
+export function addCustomBudgetCategory(tripId: string, label: string): Trip | null {
+  const t = getTrip(tripId);
+  if (!t) return null;
+  const trimmed = label.trim();
+  if (!trimmed) return null;
+  const id = uid('bcat');
+  const existing = t.customBudgetCategories || [];
+  if (existing.some((c) => c.label === trimmed)) return recomputeBudgetNode(tripId);
+  upsertTrip({ ...t, customBudgetCategories: [...existing, { id, label: trimmed }] });
+  return recomputeBudgetNode(tripId);
+}
+
+/** 删除自定义预算分类(连同 budgetByCategory 里的覆盖)。 */
+export function removeCustomBudgetCategory(tripId: string, categoryId: string): Trip | null {
+  const t = getTrip(tripId);
+  if (!t) return null;
+  if (DEFAULT_BUDGET_CATS.some((c) => c.id === categoryId) || categoryId === 'bank') return t;
+  const nextCustom = (t.customBudgetCategories || []).filter((c) => c.id !== categoryId);
+  const nextOver = { ...(t.budgetByCategory || {}) };
+  delete nextOver[categoryId];
+  upsertTrip({ ...t, customBudgetCategories: nextCustom, budgetByCategory: nextOver });
+  return recomputeBudgetNode(tripId);
+}
+
 const CHECKIN_KEY = 'nesio-travel-checkin-reminders-v1';
 
 /** 本地记下值机提醒(起飞前 24h);UI 可读列表。 */
@@ -908,21 +1020,49 @@ export function hasFlightCheckInReminder(tripId: string, nodeId: string): boolea
   }
 }
 
-/** 小票识别结果挂到哪趟行程(CameraSheet 保存后消费)。 */
+/** 小票识别结果挂到哪趟行程(CameraSheet 保存成功后才消费)。 */
 export const TRAVEL_RECEIPT_TRIP_KEY = 'nesio-travel-receipt-trip-v1';
 
 export function armTravelReceiptCapture(tripId: string): void {
   try { sessionStorage.setItem(TRAVEL_RECEIPT_TRIP_KEY, tripId); } catch { /* */ }
 }
 
+/** 读行程挂钩,不消费 —— 保存失败 / OCR 无可用行时要留着让用户重试。 */
+export function peekTravelReceiptTripId(): string | null {
+  try { return sessionStorage.getItem(TRAVEL_RECEIPT_TRIP_KEY); } catch { return null; }
+}
+
 export function consumeTravelReceiptTripId(): string | null {
   try {
     const id = sessionStorage.getItem(TRAVEL_RECEIPT_TRIP_KEY);
-    sessionStorage.removeItem(TRAVEL_RECEIPT_TRIP_KEY);
+    if (id) sessionStorage.removeItem(TRAVEL_RECEIPT_TRIP_KEY);
     return id;
   } catch {
     return null;
   }
+}
+
+export function clearTravelReceiptTripId(): void {
+  try { sessionStorage.removeItem(TRAVEL_RECEIPT_TRIP_KEY); } catch { /* */ }
+}
+
+/** 相机/OCR 条目 → 行程购物行;滤掉空名且无价的噪声行。 */
+export function buildUsableReceiptLines(
+  things: Array<{ name: string; price?: string; attributes?: Record<string, string | number | boolean | null> }>,
+  untitledLabel = '未命名',
+): ShoppingLine[] {
+  return things
+    .map((n) => {
+      const name = (n.name || '').trim();
+      const priceRaw = n.price?.trim() ? Number(String(n.price).replace(/[^\d.]/g, '')) : undefined;
+      const price = priceRaw != null && Number.isFinite(priceRaw) && priceRaw > 0 ? priceRaw : undefined;
+      const note = n.attributes?.store ? String(n.attributes.store) : undefined;
+      return { name, price, note, intoInventory: true as const };
+    })
+    .filter((l) => {
+      const hasName = l.name.length > 0 && l.name !== untitledLabel && l.name !== 'Untitled';
+      return hasName || (l.price || 0) > 0;
+    });
 }
 
 /** 把离线景点加入行程时间线(描边待办=还没去)。 */
@@ -932,6 +1072,7 @@ export function addPoisToTrip(
     name: string; lat: number; lon: number;
     country?: string; type?: string; wikidata?: string;
     summary?: string; summaryEn?: string;
+    ticketPrice?: string; hours?: string; tips?: string; imageUrl?: string;
   }>,
 ): number {
   const t = getTrip(tripId);
@@ -964,6 +1105,10 @@ export function addPoisToTrip(
           wikidata: p.wikidata,
           summary: p.summary,
           summaryEn: p.summaryEn,
+          ticketPrice: p.ticketPrice,
+          hours: p.hours,
+          tips: p.tips,
+          imageUrl: p.imageUrl,
         },
       },
     });

@@ -31,6 +31,9 @@ export interface WeatherSnapshot {
   tempMinC?: number;     // 今日最低温
   precipProb?: number;   // 今日降水概率 %(带伞判断)
   uvMax?: number;        // 今日 UV 峰值
+  /** 写入缓存时的坐标 —— refreshWeather 用来判断要不要因位置变化重拉 */
+  lat?: number;
+  lon?: number;
 }
 
 const FETCH_TIMEOUT_MS = 8_000;
@@ -237,6 +240,8 @@ export async function fetchWeatherAt(
     tempMinC,
     precipProb,
     uvMax,
+    lat,
+    lon,
   };
 }
 

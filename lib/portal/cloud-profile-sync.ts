@@ -56,7 +56,8 @@ function dataUrlToFile(dataUrl: string, name: string): File | null {
 function applyCloudProfile(cloud: CloudProfileSettings, cloudAt: string): boolean {
   const patch: Record<string, unknown> = {};
   if (typeof cloud.displayName === 'string' && cloud.displayName.trim()) patch.displayName = cloud.displayName;
-  if (typeof cloud.avatarStoragePath === 'string') {
+  // 只有云端**真有** storagePath 才采纳并清旧签名 URL;云里没头像时保留本地 data: 永久头像。
+  if (typeof cloud.avatarStoragePath === 'string' && cloud.avatarStoragePath.trim()) {
     patch.avatarStoragePath = cloud.avatarStoragePath;
     patch.avatarUrl = ''; // 清旧签名 URL → useProfileAvatar 用新 storagePath 重新换签渲染
   }

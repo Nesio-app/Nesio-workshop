@@ -26,7 +26,7 @@
 import { reportStorageDropped } from './storage-health';
 import { deleteLocalFile } from './local-file-store';
 import { validateAllocation } from './ledger-allocation';
-import { linkTxToPerson, unlinkTxFromPerson, attachAssetToTx, detachAssetFromTx, type BridgeResult } from './tx-graph-bridge';
+import { linkTxToPerson, unlinkTxFromPerson, attachAssetToTx, detachAssetFromTx, linkTxToMemoryNode, unlinkTxFromMemoryNode, linkTxToTrip, unlinkTxFromTrip, linkTxToManualAsset, unlinkTxFromManualAsset, linkTxToProject, unlinkTxFromProject, type BridgeResult } from './tx-graph-bridge';
 
 export interface TxAttachment {
   assetId: string;
@@ -61,8 +61,12 @@ export interface TxAnnotation {
   categoryDetail?: string;
   /** 关联的旅行(trip.id)。 */
   tripId?: string;
-  /** 记忆自定义标签 / 项目分类。 */
+  /** @deprecated 用 memoryNodeId —— 自定义标签不能反查到记忆详情。 */
   memoryTag?: string;
+  /** 关联的记忆 LifeNode.id。 */
+  memoryNodeId?: string;
+  /** 关联的项目(Project.id)。 */
+  projectId?: string;
   /** 关联的手动财产(finance-assets ManualAsset.id)。 */
   assetId?: string;
 }
@@ -91,6 +95,7 @@ export function hasTxAnnotation(a: TxAnnotation | undefined): boolean {
     || (a.splits && a.splits.length) || a.amortize
     || (a.category && a.category.trim()) || (a.categoryDetail && a.categoryDetail.trim())
     || (a.tripId && a.tripId.trim()) || (a.memoryTag && a.memoryTag.trim())
+    || (a.memoryNodeId && a.memoryNodeId.trim()) || (a.projectId && a.projectId.trim())
     || (a.assetId && a.assetId.trim()),
   );
 }
@@ -218,36 +223,92 @@ export function setTxCategoryDetail(txId: string, categoryDetail: string): boole
 }
 
 /** 关联旅行;空字符串 = 清除。 */
-export function setTxTrip(txId: string, tripId: string): boolean {
+export function setTxTrip(txId: string, tripId: string): TxWriteResult {
   const id = (tripId || '').trim();
-  return write(txId, { tripId: id || undefined });
+  const ok = write(txId, { tripId: id || undefined });
+  let graphOk = true; let reason: BridgeResult['reason'];
+  if (id) {
+    const r = linkTxToTrip(txId, id);
+    if (!r.graphOk) { graphOk = false; reason = r.reason; }
+  } else {
+    const r = unlinkTxFromTrip(txId);
+    if (!r.graphOk) { graphOk = false; reason = r.reason; }
+  }
+  return { ok, graphOk, reason };
 }
 
-/** 关联记忆自定义标签;空字符串 = 清除。 */
+/** @deprecated 用 setTxMemoryNode —— 保留读旧数据。 */
 export function setTxMemoryTag(txId: string, memoryTag: string): boolean {
   const tag = (memoryTag || '').trim();
   return write(txId, { memoryTag: tag || undefined });
 }
 
-/** 关联手动财产;空字符串 = 清除。 */
-export function setTxAsset(txId: string, assetId: string): boolean {
-  const id = (assetId || '').trim();
-  return write(txId, { assetId: id || undefined });
+/** 关联记忆节点;空字符串 = 清除。 */
+export function setTxMemoryNode(txId: string, memoryNodeId: string): TxWriteResult {
+  const id = (memoryNodeId || '').trim();
+  const before = txAnnotationOf(txId).memoryNodeId || '';
+  const ok = write(txId, { memoryNodeId: id || undefined });
+  let graphOk = true; let reason: BridgeResult['reason'];
+  if (before && before !== id) {
+    const r = unlinkTxFromMemoryNode(txId, before);
+    if (!r.graphOk) { graphOk = false; reason = r.reason; }
+  }
+  if (id) {
+    const r = linkTxToMemoryNode(txId, id);
+    if (!r.graphOk) { graphOk = false; reason = reason ?? r.reason; }
+  }
+  return { ok, graphOk, reason };
 }
 
-/** 批量写入 trip / memoryTag / assetId(空值 = 清除对应字段)。 */
+/** 关联手动财产;空字符串 = 清除。 */
+export function setTxAsset(txId: string, assetId: string): TxWriteResult {
+  const id = (assetId || '').trim();
+  const ok = write(txId, { assetId: id || undefined });
+  let graphOk = true; let reason: BridgeResult['reason'];
+  if (id) {
+    const r = linkTxToManualAsset(txId, id);
+    if (!r.graphOk) { graphOk = false; reason = r.reason; }
+  } else {
+    const r = unlinkTxFromManualAsset(txId);
+    if (!r.graphOk) { graphOk = false; reason = r.reason; }
+  }
+  return { ok, graphOk, reason };
+}
+
+/** 关联项目;空字符串 = 清除。 */
+export function setTxProject(txId: string, projectId: string): TxWriteResult {
+  const id = (projectId || '').trim();
+  const before = txAnnotationOf(txId).projectId || '';
+  const ok = write(txId, { projectId: id || undefined });
+  let graphOk = true; let reason: BridgeResult['reason'];
+  if (before && before !== id) {
+    const r = unlinkTxFromProject(txId, before);
+    if (!r.graphOk) { graphOk = false; reason = r.reason; }
+  }
+  if (id) {
+    const r = linkTxToProject(txId, id);
+    if (!r.graphOk) { graphOk = false; reason = reason ?? r.reason; }
+  }
+  return { ok, graphOk, reason };
+}
+
+/** 批量写入 trip / memoryNodeId / projectId / assetId(空值 = 清除对应字段)。 */
 export function patchTxAnnotation(
   txId: string,
-  patch: Partial<Pick<TxAnnotation, 'tripId' | 'memoryTag' | 'assetId'>>,
+  patch: Partial<Pick<TxAnnotation, 'tripId' | 'memoryNodeId' | 'projectId' | 'assetId'>>,
 ): boolean {
   const next: Partial<TxAnnotation> = {};
   if (patch.tripId !== undefined) {
     const id = (patch.tripId || '').trim();
     next.tripId = id || undefined;
   }
-  if (patch.memoryTag !== undefined) {
-    const tag = (patch.memoryTag || '').trim();
-    next.memoryTag = tag || undefined;
+  if (patch.memoryNodeId !== undefined) {
+    const id = (patch.memoryNodeId || '').trim();
+    next.memoryNodeId = id || undefined;
+  }
+  if (patch.projectId !== undefined) {
+    const id = (patch.projectId || '').trim();
+    next.projectId = id || undefined;
   }
   if (patch.assetId !== undefined) {
     const id = (patch.assetId || '').trim();

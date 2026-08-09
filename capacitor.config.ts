@@ -21,11 +21,13 @@ const config: CapacitorConfig = {
   webDir: 'ios-shell',
 
   server: {
-    // 自用现网。提审时改成 APPSTORE_BUILD=1 的合规部署域名。
-    url: 'https://treasurebox-nu.vercel.app',
+    // 与 PWA canonical 同域,减少 IPA/PWA 双 origin 数据分叉。
+    url: process.env.NESIO_SHELL_URL || 'https://www.nesio.app',
     cleartext: false,
     // OAuth / 外链回跳(Google、Apple、Plaid 等)允许离开主域再回来。
     allowNavigation: [
+      'www.nesio.app',
+      'nesio.app',
       'treasurebox-nu.vercel.app',
       '*.vercel.app',
       'accounts.google.com',

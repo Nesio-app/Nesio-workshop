@@ -9,7 +9,7 @@ import { createAppApiClient } from '@/lib/portal/app-api-client';
 import { makeAssetErrorHandler } from '@/lib/portal/signed-asset-url';
 import LocationPicker from './LocationPicker';
 import EmailComposeSheet from './EmailComposeSheet';
-import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare, IconFile, IconBookmark } from './icons';
+import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare, IconFile, IconBookmark, IconPlus } from './icons';
 import { isTopicTag } from '@/lib/portal/topic-tags';
 import {
   addCustomMemoryTag,
@@ -714,6 +714,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
   const [otherAttrsExpanded, setOtherAttrsExpanded] = useState(false); // 2026-08-01:其他属性默认折叠,别让生 key 抢眼
   const [customTagsList, setCustomTagsList] = useState<string[]>(() => loadCustomMemoryTags());
   const [newTagInput, setNewTagInput] = useState('');
+  const [tagAddOpen, setTagAddOpen] = useState(false);
   const [nodeTags, setNodeTags] = useState<string[]>(() => node?.tags ?? []);
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   // 批次 172(关联记忆闪退根治):搜索移出渲染热路径 —— 去抖异步跑,不再每次按键同步搜全图
@@ -1114,29 +1115,79 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
         {/* 类型色条:tint 走 CSS 变量,夜间由 CSS 混暗 —— 直接 inline background 会让
             浅色 pastel 在夜间糊成一条白带(QA 截图「弹出框上侧白边」)。 */}
         <div className="nesio-type-header-strip" style={{ ['--type-strip-bg' as string]: typeBg }}>
-          {/* 2026-08-01 用户更正:自定义标签比 type 重要——命中就标签领头(左),
-              type 退到这一行右上角小字;没有自定义标签就维持原样(type 领头,无角标)。 */}
           {(() => {
             const customTag = nodeTags.find((t) => isCustomMemoryTag(t));
-            if (customTag) {
-              return (
-                <>
-                  <span className="nesio-type-header-icon"><IconBookmark size={15} /></span>
-                  <span className="nesio-type-header-label">{customTag}</span>
-                  <span className="nesio-type-header-source" aria-hidden>
-                    <NodeTypeIcon type={n.type} size={12} /> {(dict === 'en' ? TYPE_LABELS_EN : TYPE_LABELS_ZH)[n.type] || n.type}
-                  </span>
-                </>
-              );
-            }
+            const typeCorner = (
+              <span className="nesio-type-header-source" aria-hidden>
+                <NodeTypeIcon type={n.type} size={12} /> {(dict === 'en' ? TYPE_LABELS_EN : TYPE_LABELS_ZH)[n.type] || n.type}
+              </span>
+            );
             return (
               <>
-                <span className="nesio-type-header-icon"><NodeTypeIcon type={n.type} size={15} /></span>
-                <span className="nesio-type-header-label">{(dict === 'en' ? TYPE_LABELS_EN : TYPE_LABELS_ZH)[n.type] || n.type}</span>
+                {customTag ? (
+                  <>
+                    <span className="nesio-type-header-icon"><IconBookmark size={15} /></span>
+                    <span className="nesio-type-header-label">{customTag}</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="nesio-type-header-icon"><NodeTypeIcon type={n.type} size={15} /></span>
+                    <span className="nesio-type-header-label">{(dict === 'en' ? TYPE_LABELS_EN : TYPE_LABELS_ZH)[n.type] || n.type}</span>
+                  </>
+                )}
+                <div className="nesio-type-header-tag-tools">
+                  {customTag && typeCorner}
+                  <select
+                    className="nesio-type-header-tag-select"
+                    value=""
+                    aria-label={L(dict, '选择自定义标签', 'Pick a custom tag')}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (v) toggleCustomTag(v);
+                      e.target.value = '';
+                    }}
+                  >
+                    <option value="">{L(dict, '标签', 'Tag')}</option>
+                    {customTagsList.map((tag) => (
+                      <option key={tag} value={tag}>
+                        {nodeTags.includes(tag) ? `✓ ${tag}` : tag}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    className="nesio-type-header-tag-plus"
+                    aria-label={L(dict, '新建标签', 'New tag')}
+                    aria-expanded={tagAddOpen}
+                    onClick={() => setTagAddOpen((v) => !v)}
+                  >
+                    <IconPlus size={14} />
+                  </button>
+                </div>
               </>
             );
           })()}
         </div>
+        {tagAddOpen && (
+          <div className="nesio-type-header-tag-add">
+            <input
+              className="nesio-ob-input"
+              value={newTagInput}
+              onChange={(e) => setNewTagInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') { commitNewCustomTag(); setTagAddOpen(false); } }}
+              placeholder={L(dict, '新建标签', 'New tag')}
+              aria-label={L(dict, '新建标签', 'New tag')}
+            />
+            <button
+              type="button"
+              className="nesio-node-action-secondary"
+              onClick={() => { commitNewCustomTag(); setTagAddOpen(false); }}
+              disabled={!newTagInput.trim()}
+            >
+              {L(dict, '添加', 'Add')}
+            </button>
+          </div>
+        )}
 
         <div className="nesio-settings-sheet-header">
           {editing ? (
@@ -1231,44 +1282,6 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               {srcTime && n.type !== 'event' ? ` · ${srcTime}` : ''}
             </span>
             {srcUncertain && <span className="nesio-node-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
-          </div>
-
-          {/* 自定义标签:注册表 chip 切换;新建标签写入注册表并打上 */}
-          <div style={{ marginTop: 'var(--space-3)' }}>
-            <p className="nesio-settings-section-label" style={{ marginBottom: 'var(--space-2)' }}>
-              {L(dict, '自定义标签', 'Custom tags')}
-            </p>
-            <div className="nesio-memory-type-filter" role="group" aria-label={L(dict, '切换自定义标签', 'Toggle custom tags')}>
-              {customTagsList.map((tag) => (
-                <button
-                  key={tag}
-                  type="button"
-                  className={`nesio-type-chip${nodeTags.includes(tag) ? ' is-active' : ''}`}
-                  onClick={() => toggleCustomTag(tag)}
-                >
-                  {tag}
-                </button>
-              ))}
-            </div>
-            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', alignItems: 'center' }}>
-              <input
-                className="nesio-ob-input"
-                style={{ flex: 1, marginBottom: 0 }}
-                value={newTagInput}
-                onChange={(e) => setNewTagInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') commitNewCustomTag(); }}
-                placeholder={L(dict, '新建标签', 'New tag')}
-                aria-label={L(dict, '新建标签', 'New tag')}
-              />
-              <button
-                type="button"
-                className="nesio-node-action-secondary"
-                onClick={commitNewCustomTag}
-                disabled={!newTagInput.trim()}
-              >
-                {L(dict, '添加', 'Add')}
-              </button>
-            </div>
           </div>
 
           {/*

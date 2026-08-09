@@ -134,10 +134,14 @@ export default function TripPoiPicker({
           return (
             <li key={`${p.name}-${p.lat}`}>
               <button type="button" className={`nesio-trip-poi-row${on ? ' is-on' : ''}`} onClick={() => toggle(p.name)}>
-                <span className="nesio-trip-poi-ico"><IconMapPin size={16} /></span>
+                {p.imageUrl ? (
+                  <img src={p.imageUrl} alt="" aria-hidden style={{ width: 40, height: 40, borderRadius: 10, objectFit: 'cover', flexShrink: 0 }} />
+                ) : (
+                  <span className="nesio-trip-poi-ico"><IconMapPin size={16} /></span>
+                )}
                 <span className="nesio-trip-poi-main">
                   <b>{p.name}</b>
-                  <small>{poiTypeLabel(p.type, zh)}{p.country ? ` · ${p.country}` : ''}</small>
+                  <small>{poiTypeLabel(p.type, zh)}{p.country ? ` · ${p.country}` : ''}{p.ticketPrice ? ` · ${p.ticketPrice}` : ''}</small>
                   {(zh ? p.summary : (p.summaryEn || p.summary)) && (
                     <span className="nesio-trip-poi-summary">
                       {zh ? p.summary : (p.summaryEn || p.summary)}

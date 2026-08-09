@@ -106,6 +106,7 @@ export function addManualEntry(input: {
   amount: number; kind: 'expense' | 'income';
   date?: string; category?: string; note?: string; channelId?: string; currency?: string;
   assetId?: string; assetCostKind?: 'tax' | 'repair' | 'insurance' | 'other';
+  includeInFinance?: boolean;
 }): Expense | null {
   if (!(input.amount > 0)) return null;
   return addExpense({
@@ -118,7 +119,7 @@ export function addManualEntry(input: {
     ...(input.note ? { note: input.note } : {}),
     ...(input.channelId ? { channelId: input.channelId } : {}),
     ...(input.assetId ? { assetId: input.assetId, assetCostKind: input.assetCostKind || 'other' } : {}),
-    includeInFinance: true,
+    includeInFinance: input.includeInFinance !== false,
   });
 }
 

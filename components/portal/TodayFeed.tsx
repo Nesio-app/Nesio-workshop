@@ -256,37 +256,43 @@ export default function TodayFeed({
     if (imgs.length) {
       const { compressToDataUrl } = await import('@/lib/portal/local-image-store');
       const { attachPhotoToMemoryNode } = await import('@/lib/portal/capture-pipeline');
-      // 先建节点,再按主相机三步挂图(本机 + Storage + memory_assets)。
-      // source=photo → 物品/记忆侧归「照片」来源,不是手记;有配文则同条存入。
-      const node = ingestLifeNode({
-        name: captionTrim
-          || (imgs.length === 1 ? imgs[0].name.replace(/\.[^.]+$/, '') : `${imgs.length} 张照片`),
-        type: 'collection',
-        source: 'photo',
-        tags: ['照片'],
-        attributes: {},
-        relations: [],
-        confidence: 1,
-        assets: [],
-        ...(captionTrim ? { rawInput: captionTrim } : {}),
-      });
-      let attached = 0;
-      for (let i = 0; i < imgs.length; i++) {
-        if (imgs[i].size > MAX_FILE_BYTES) continue;
-        const dataUrl = await compressToDataUrl(imgs[i], 1400, 0.82);
-        if (!dataUrl) { failed.push(imgs[i].name); continue; }
-        const ok = await attachPhotoToMemoryNode({
-          nodeId: node.id,
-          dataUrl,
-          kind: 'memory',
-          label: imgs[i].name,
-        });
-        if (!ok) { failed.push(imgs[i].name); continue; }
-        attached += 1;
+      const { deleteLifeNode } = await import('@/lib/portal/life-graph');
+      const validImgs = imgs.filter((f) => f.size <= MAX_FILE_BYTES);
+      const prepared: Array<{ file: File; dataUrl: string }> = [];
+      for (const f of validImgs) {
+        const dataUrl = await compressToDataUrl(f, 1400, 0.82);
+        if (!dataUrl) { failed.push(f.name); continue; }
+        prepared.push({ file: f, dataUrl });
       }
-      if (attached > 0) {
-        // 存已经成功了,识别是加分项:认不出来就保持原样,**绝不因此报错**。
-        void recognizeSavedImage(imgs.filter((f) => f.size <= MAX_FILE_BYTES), node.id);
+      if (prepared.length) {
+        const node = ingestLifeNode({
+          name: captionTrim
+            || (prepared.length === 1 ? prepared[0].file.name.replace(/\.[^.]+$/, '') : `${prepared.length} 张照片`),
+          type: 'collection',
+          source: 'photo',
+          tags: ['照片'],
+          attributes: {},
+          relations: [],
+          confidence: 1,
+          assets: [],
+          ...(captionTrim ? { rawInput: captionTrim } : {}),
+        });
+        let attached = 0;
+        for (const { file, dataUrl } of prepared) {
+          const ok = await attachPhotoToMemoryNode({
+            nodeId: node.id,
+            dataUrl,
+            kind: 'memory',
+            label: file.name,
+          });
+          if (!ok) { failed.push(file.name); continue; }
+          attached += 1;
+        }
+        if (attached === 0) {
+          deleteLifeNode(node.id);
+        } else {
+          void recognizeSavedImage(prepared.map((p) => p.file), node.id);
+        }
       }
     }
 
@@ -805,6 +811,9 @@ export default function TodayFeed({
               .catch(() => {});
           }}
           remindReceipt={remindReceipt}
+          onDictionary={(q) => {
+            window.dispatchEvent(new CustomEvent('nesio-open-dictionary', { detail: { query: q || '' } }));
+          }}
         />
         {/* 存进去了要说一声。这条回执之前**只被 set、从来没渲染** ——
             于是「+」传完文件、记一笔按了「记下」,界面上什么反应都没有。

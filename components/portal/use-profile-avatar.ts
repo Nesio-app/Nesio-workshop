@@ -47,6 +47,8 @@ export function useProfileAvatar(enabled: boolean = true): {
 
     const onUpdate = () => {
       const p = loadProfileSettings();
+      // 本地 data: 头像是永久的 —— 云同步没 storagePath 时不应被清成空。
+      if (p.avatarUrl?.startsWith('data:')) { setAvatarUrl(p.avatarUrl); return; }
       if (p.avatarUrl) { setAvatarUrl(p.avatarUrl); return; }
       // 批次200:跨端拉到别端头像时 applyCloudProfile 会清本地 avatarUrl、只留新 avatarStoragePath。
       // 此时不能停在空头像 —— 必须用新 storagePath 换签重渲染,否则别端的头像换不过来(显示成首字母)。
@@ -58,12 +60,14 @@ export function useProfileAvatar(enabled: boolean = true): {
   }, [enabled, fetchFreshUrl]);
 
   const refreshAvatar = useCallback(() => {
+    const profile = loadProfileSettings();
+    // data: 永不过期 —— onError 误触时不应清掉本地永久头像。
+    if (profile.avatarUrl?.startsWith('data:')) return;
     // 先把坏掉的 URL 摘掉再去换新的:签名 URL 过期时,<img> 会先渲染成浏览器的
     // 「破图」图标(真机看到的那个蓝色问号方块),等换签回来才恢复。
     // 立刻置空 → 退回首字母占位,过程中不出现破图。
     setAvatarUrl('');
-    const path = loadProfileSettings().avatarStoragePath;
-    if (path) fetchFreshUrl(path);
+    if (profile.avatarStoragePath) fetchFreshUrl(profile.avatarStoragePath);
   }, [fetchFreshUrl]);
 
   return { avatarUrl, refreshAvatar };

@@ -35,6 +35,7 @@ import {
   type InventoryItem,
 } from '@/lib/portal/inventory';
 import { listStorageItems, countPantryItems, countWardrobeItems, storageHeadline } from '@/lib/portal/inventory-visibility';
+import SpendClaimRow from './finance/SpendClaimRow';
 
 interface InventorySheetProps {
   open: boolean;
@@ -118,6 +119,7 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
   const [pantryCount, setPantryCount] = useState(0);
   const [wardrobeCount, setWardrobeCount] = useState(0);
   const [groupFilter, setGroupFilter] = useState<string>(ALL);
+  const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'list' | 'add' | 'detail' | 'stats' | 'sell' | 'flip'>('list');
   /** page 变体三栏:总览 / 容器 / 列表(sheet 仍走原 list 流) */
@@ -152,6 +154,7 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
       setView('list');
       setQuery('');
       setGroupFilter(ALL);
+      setCategoryFilter(null);
     }
   }, [open, isPage]);
 
@@ -169,6 +172,10 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
     let list = items;
     if (groupFilter === UNPLACED) list = list.filter((i) => !i.space);
     else if (groupFilter !== ALL) list = list.filter((i) => i.space === groupFilter);
+    if (categoryFilter) {
+      list = list.filter((i) => (i.category || '').trim() === categoryFilter
+        || (categoryFilter === '文件' && /^(文件|Files)$/i.test(i.category || '')));
+    }
     const q = query.trim().toLowerCase();
     if (q) {
       list = list.filter((i) =>
@@ -182,7 +189,7 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
         i.orderNo.toLowerCase().includes(q));
     }
     return list;
-  }, [items, groupFilter, query]);
+  }, [items, groupFilter, categoryFilter, query]);
 
   const unplacedCount = useMemo(() => items.filter((i) => !i.space).length, [items]);
   const st = useMemo(() => inventoryStats(items), [items]);
@@ -338,7 +345,7 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
                 <button
                   type="button"
                   className="nesio-inv-stat nesio-inv-pantry-link"
-                  onClick={() => { setQuery('文件'); setGroupFilter(ALL); }}
+                  onClick={() => { setCategoryFilter('文件'); setQuery(''); setGroupFilter(ALL); }}
                 >
                   {L(dict, `${filesCount} 件文件`, `${filesCount} files`)}
                 </button>
@@ -386,7 +393,7 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
                 </button>
               )}
               <button type="button" className="nesio-inv-stat nesio-inv-pantry-link"
-                onClick={() => { setQuery(filesCount ? '文件' : ''); setGroupFilter(ALL); setPageTab('items'); }}>
+                onClick={() => { setCategoryFilter('文件'); setQuery(''); setGroupFilter(ALL); setPageTab('items'); }}>
                 {L(dict, `${filesCount} 件文件`, `${filesCount} files`)}
               </button>
             </div>
@@ -450,7 +457,12 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
               style={{ margin: 'var(--space-2) 0' }}
             />
             <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: 'var(--space-1) 0 var(--space-2)' }}>
-              <button type="button" style={chip(groupFilter === ALL)} onClick={() => setGroupFilter(ALL)}>{L(dict, '全部', 'All')} {items.length}</button>
+              <button type="button" style={chip(groupFilter === ALL && !categoryFilter)} onClick={() => { setGroupFilter(ALL); setCategoryFilter(null); }}>{L(dict, '全部', 'All')} {items.length}</button>
+              {categoryFilter && (
+                <button type="button" style={chip(true)} onClick={() => setCategoryFilter(null)}>
+                  {categoryFilter} ×
+                </button>
+              )}
               {groups.map(([name, n]) => (
                 <button key={name} type="button" style={chip(groupFilter === name)} onClick={() => setGroupFilter(name)}>
                   {stripEmoji(name) || name} {n}
@@ -926,20 +938,26 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
   onDeleted: () => void;
   onSaved: () => void;
 }) {
+  const attachRef = useRef<HTMLInputElement>(null);
   const [saveMsg, setSaveMsg] = useState<'idle' | 'ok' | 'err'>('idle');
+  const [attachErr, setAttachErr] = useState('');
+  const [attachBusy, setAttachBusy] = useState(false);
   const [location, setLocation] = useState(item.location);
   const [qty, setQty] = useState(item.quantity != null ? String(item.quantity) : '');
   const [expiry, setExpiry] = useState(item.expiry ?? '');
   const [note, setNote] = useState(item.note);
-  const [category, setCategory] = useState(item.category); // 物品①
+  const [category, setCategory] = useState(item.category);
+  const [catCustom, setCatCustom] = useState(() => {
+    const isPreset = CATEGORY_PRESETS.some(([zh]) => zh === item.category);
+    return !!item.category && !isPreset;
+  });
   const [tags, setTags] = useState(item.tags.join(', '));
-  const [price, setPrice] = useState(item.price != null ? String(item.price) : '');
-  // ── 亚马逊转卖(flip)字段 ──
+  const initialPrice = item.buyPrice != null ? String(item.buyPrice) : (item.price != null ? String(item.price) : '');
+  const [price, setPrice] = useState(initialPrice);
   const [amzOpen, setAmzOpen] = useState(item.isAmazon);
   const [orderNo, setOrderNo] = useState(item.orderNo);
   const [seller, setSeller] = useState(item.seller);
   const [keywords, setKeywords] = useState(item.keywords);
-  const [buyPrice, setBuyPrice] = useState(item.buyPrice != null ? String(item.buyPrice) : '');
   const [tax, setTax] = useState(item.tax != null ? String(item.tax) : '');
   const [orderedAt, setOrderedAt] = useState(item.orderedAt ?? '');
   const [arrivedAt, setArrivedAt] = useState(item.arrivedAt ?? '');
@@ -949,18 +967,20 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
   const [reviewDone, setReviewDone] = useState(item.reviewDone);
   const [reviewExempt, setReviewExempt] = useState(item.reviewExempt);
   const [sold, setSold] = useState(item.sold);
+  const [assetTick, setAssetTick] = useState(0);
   const exp = expiryStatus(item);
 
   const nOrNull = (s: string) => (s ? parseFloat(s) : (null as unknown as number | undefined));
-  // 自付额 = 买入价 + 税 − 返现;盈利 = 转卖价 − 自付额(实时,与 inventory.ts 派生一致)。
-  const bpNum = parseFloat(buyPrice);
-  // 自付额 = 买入价 − 返现(税不进成本,与 inventory.ts 一致)。
-  const oop = Number.isFinite(bpNum)
-    ? Math.round((bpNum - (parseFloat(rebate) || 0)) * 100) / 100
+  const priceNum = parseFloat(price);
+  const oop = Number.isFinite(priceNum)
+    ? Math.round((priceNum - (parseFloat(rebate) || 0)) * 100) / 100
     : null;
   const rspNum = parseFloat(resalePrice);
   const profit = Number.isFinite(rspNum) && oop != null ? Math.round((rspNum - oop) * 100) / 100 : null;
   const money = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const claimPrice = Number.isFinite(priceNum) && priceNum > 0 ? priceNum : 0;
+  const claimDate = orderedAt || arrivedAt || new Date().toISOString().slice(0, 10);
+
   const chip = (on: boolean, toggle: () => void, text: string) => (
     <button type="button" onClick={toggle} style={{
       padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-pill, 999px)', fontSize: 'var(--text-xs)',
@@ -970,9 +990,14 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
     }}>{on ? '✓ ' : ''}{text}</button>
   );
 
+  const assets = useMemo(() => {
+    void assetTick;
+    return item.node.assets || [];
+  }, [item.node.assets, assetTick]);
+
   const save = () => {
-    // 设计红线:保存必须有可见成败态(此前点保存无任何反应 = 用户实测「保存不管用」)。
     let ok = false;
+    const priceVal = nOrNull(price);
     try {
       ok = updateInventoryItem(item.id, {
         location,
@@ -981,10 +1006,11 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
         note,
         category,
         tags: tags.split(/[,,、]/).map((t) => t.trim()).filter(Boolean),
-        price: price ? parseFloat(price) : null as unknown as number | undefined,
+        price: priceVal,
+        buyPrice: amzOpen ? priceVal : undefined,
         isAmazon: amzOpen,
         orderNo, seller, keywords,
-        buyPrice: nOrNull(buyPrice), tax: nOrNull(tax), orderedAt, arrivedAt,
+        tax: nOrNull(tax), orderedAt, arrivedAt,
         rebate: nOrNull(rebate), resalePrice: nOrNull(resalePrice),
         rebateReceived, reviewDone, reviewExempt, sold,
       });
@@ -994,10 +1020,51 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
     if (ok) {
       onChanged();
       setSaveMsg('ok');
-      // 让「✓ 已保存」闪一下,再回列表(能看到更新后的物品,是最直接的成功反馈)。
       setTimeout(() => onSaved(), 550);
     } else {
       setSaveMsg('err');
+    }
+  };
+
+  const onAttachFiles = async (files: FileList | null) => {
+    if (!files?.length) return;
+    setAttachErr('');
+    setAttachBusy(true);
+    try {
+      const { compressToDataUrl } = await import('@/lib/portal/local-image-store');
+      const { attachPhotoToMemoryNode } = await import('@/lib/portal/capture-pipeline');
+      const { putLocalFile, MAX_FILE_BYTES, prettyBytes } = await import('@/lib/portal/local-file-store');
+      const { updateLifeNode, getLifeGraph } = await import('@/lib/portal/life-graph');
+      let okCount = 0;
+      const failed: string[] = [];
+      for (const f of Array.from(files).slice(0, 8)) {
+        if (f.size > MAX_FILE_BYTES) { failed.push(`${f.name}(${prettyBytes(f.size)})`); continue; }
+        if (f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif)$/i.test(f.name)) {
+          const dataUrl = await compressToDataUrl(f, 1400, 0.82);
+          if (!dataUrl) { failed.push(f.name); continue; }
+          const r = await attachPhotoToMemoryNode({ nodeId: item.id, dataUrl, kind: 'memory', label: f.name });
+          if (r) okCount += 1; else failed.push(f.name);
+        } else {
+          const id = `localfile-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+          const mimeType = f.type || 'application/octet-stream';
+          const stored = await putLocalFile(id, f, { name: f.name, mimeType, size: f.size });
+          if (!stored) { failed.push(f.name); continue; }
+          const live = getLifeGraph().find((n) => n.id === item.id);
+          const merged = [...(live?.assets || []), {
+            id, kind: 'file' as const, local: true, mimeType, label: f.name, createdAt: new Date().toISOString(),
+          }];
+          updateLifeNode(item.id, { assets: merged });
+          okCount += 1;
+        }
+      }
+      if (okCount) { setAssetTick((v) => v + 1); onChanged(); }
+      if (failed.length) {
+        setAttachErr(L(dict, `有 ${failed.length} 个没存上: ${failed.slice(0, 2).join(', ')}`, `${failed.length} couldn’t save: ${failed.slice(0, 2).join(', ')}`));
+      }
+    } catch {
+      setAttachErr(L(dict, '附件没存进去 —— 再试一次', "Couldn't save attachment — try again"));
+    } finally {
+      setAttachBusy(false);
     }
   };
 
@@ -1026,10 +1093,41 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
       <div style={{ display: 'flex', gap: 10 }}>
         <div style={{ flex: 1.2 }}>
           <label style={label}>{L(dict, '分类', 'Category')}</label>
-          <input className="nesio-ob-input" value={category} onChange={(e) => setCategory(e.target.value)} />
+          {(() => {
+            const isPreset = CATEGORY_PRESETS.some(([zh]) => zh === category);
+            const showCustom = catCustom || (!!category && !isPreset);
+            return (
+              <>
+                <select
+                  className="nesio-ob-input"
+                  value={showCustom ? CAT_CUSTOM : category}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === CAT_CUSTOM) { setCatCustom(true); setCategory(''); }
+                    else { setCatCustom(false); setCategory(v); }
+                  }}
+                >
+                  <option value="">{L(dict, '未分类', 'None')}</option>
+                  {CATEGORY_PRESETS.map(([zh, en]) => (
+                    <option key={zh} value={zh}>{L(dict, zh, en)}</option>
+                  ))}
+                  <option value={CAT_CUSTOM}>{L(dict, '自定义…', 'Custom…')}</option>
+                </select>
+                {showCustom && (
+                  <input
+                    className="nesio-ob-input"
+                    style={{ marginTop: 6 }}
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                    placeholder={L(dict, '自定义分类', 'Custom category')}
+                  />
+                )}
+              </>
+            );
+          })()}
         </div>
         <div style={{ flex: 1 }}>
-          <label style={label}>{L(dict, '估值 $', 'Value $')}</label>
+          <label style={label}>{L(dict, '价格 $', 'Price $')}</label>
           <input className="nesio-ob-input" inputMode="decimal" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9.]/g, ''))} />
         </div>
       </div>
@@ -1037,6 +1135,35 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
       <input className="nesio-ob-input" value={tags} onChange={(e) => setTags(e.target.value)} />
       <label style={label}>{L(dict, '备注', 'Note')}</label>
       <input className="nesio-ob-input" value={note} onChange={(e) => setNote(e.target.value)} />
+
+      <label style={label}>{L(dict, '照片 / 文件', 'Photos / files')}</label>
+      <input ref={attachRef} type="file" accept="image/*,.pdf,.doc,.docx,.txt,.csv" multiple className="nesio-visually-hidden"
+        onChange={(e) => { void onAttachFiles(e.target.files); e.currentTarget.value = ''; }} />
+      <button type="button" disabled={attachBusy} className="nesio-ob-input" style={{ textAlign: 'center', cursor: 'pointer' }}
+        onClick={() => attachRef.current?.click()}>
+        {attachBusy ? L(dict, '正在存…', 'Saving…') : L(dict, '添加照片或文件', 'Add photo or file')}
+      </button>
+      {attachErr && <p role="alert" style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-risk)' }}>{attachErr}</p>}
+      {assets.length > 0 && (
+        <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {assets.map((a) => (
+            <li key={a.id} style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+              {a.label || a.id}{a.kind === 'image' ? ` · ${L(dict, '图片', 'Image')}` : ` · ${L(dict, '文件', 'File')}`}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {claimPrice > 0 && (
+        <div style={{ marginTop: 'var(--space-3)' }}>
+          <SpendClaimRow
+            itemNodeId={item.id}
+            item={{ id: item.id, name: item.name, price: claimPrice, occurredAt: claimDate, merchant: seller || undefined }}
+            dict={dict}
+            onChanged={onChanged}
+          />
+        </div>
+      )}
 
       {/* ── 亚马逊转卖(flip)追踪:订单/返现/留评/转卖/利润 —— 对应用户 Notion 表 ── */}
       <button
@@ -1066,19 +1193,15 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <div style={{ flex: 1 }}>
-              <label style={label}>{L(dict, '买入价 $', 'Buy $')}</label>
-              <input className="nesio-ob-input" inputMode="decimal" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value.replace(/[^0-9.]/g, ''))} />
-            </div>
-            <div style={{ flex: 1 }}>
               <label style={label}>{L(dict, '税 $', 'Tax $')}</label>
               <input className="nesio-ob-input" inputMode="decimal" value={tax} onChange={(e) => setTax(e.target.value.replace(/[^0-9.]/g, ''))} />
             </div>
-          </div>
-          <div style={{ display: 'flex', gap: 10 }}>
             <div style={{ flex: 1 }}>
               <label style={label}>{L(dict, '返现 $', 'Rebate $')}</label>
               <input className="nesio-ob-input" inputMode="decimal" value={rebate} onChange={(e) => setRebate(e.target.value.replace(/[^0-9.]/g, ''))} />
             </div>
+          </div>
+          <div style={{ display: 'flex', gap: 10 }}>
             <div style={{ flex: 1 }}>
               <label style={label}>{L(dict, '转卖价 $', 'Resale $')}</label>
               <input className="nesio-ob-input" inputMode="decimal" value={resalePrice} onChange={(e) => setResalePrice(e.target.value.replace(/[^0-9.]/g, ''))} />
@@ -1099,7 +1222,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
             </span>
           </div>
           <p style={{ margin: '6px 2px 0', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>
-            {L(dict, '自付额 = 买入价 − 返现(税不进成本);盈利 = 转卖价 − 自付额。保存后打「亚马逊」标签。', 'Out of pocket = buy − rebate (tax excluded); profit = resale − out of pocket. Saving tags it 亚马逊.')}
+            {L(dict, '价格在上方;自付额 = 价格 − 返现(税不进成本);盈利 = 转卖价 − 自付额。', 'Price is above; out of pocket = price − rebate (tax excluded); profit = resale − out of pocket.')}
           </p>
         </div>
       )}

@@ -17,6 +17,36 @@ assert.match(store, /generatePackingList/, '生成打包清单');
 assert.match(store, /appendShoppingReceipt/, '小票入行程');
 assert.match(store, /setFlightCheckInReminder/, '值机提醒');
 assert.match(store, /armTravelReceiptCapture/, '拍小票挂行程');
+assert.match(store, /peekTravelReceiptTripId/, '读行程挂钩不消费');
+assert.match(store, /buildUsableReceiptLines/, '滤可用小票行');
+
+// buildUsableReceiptLines:空名无价不算可用行
+{
+  const ts = await import('typescript');
+  const vm = await import('node:vm');
+  const js = ts.default.transpileModule(read('lib/portal/travel-trips.ts'), {
+    compilerOptions: { module: ts.default.ModuleKind.CommonJS, target: ts.default.ScriptTarget.ES2022 },
+  }).outputText;
+  const mod = { exports: {} };
+  vm.default.runInNewContext(js, {
+    module: mod, exports: mod.exports,
+    require: (id) => {
+      if (id === './idb-blob-store') return { createBlobStore: () => ({}) };
+      if (id === './storage-health') return { reportStorageDropped: () => {} };
+      if (id === './inventory') return { listInventoryItems: () => [] };
+      if (id === '@/lib/cooking/shopping') return { addToShopping: () => {} };
+      if (id === './finance-sources') return { addReceiptExpense: () => {} };
+      if (id === './period-ledger') return { ledgerProgressPct: () => 0, ledgerRemaining: () => 0 };
+      return {};
+    },
+    console, Object, Array, String, Number, Math, JSON, Set, Map, Boolean, RegExp, Date,
+  });
+  const { buildUsableReceiptLines } = mod.exports;
+  assert.deepEqual(buildUsableReceiptLines([{ name: '  ', price: '' }]), []);
+  assert.equal(buildUsableReceiptLines([{ name: '未命名' }]).length, 0);
+  assert.equal(buildUsableReceiptLines([{ name: '牛奶', price: '4.99' }]).length, 1);
+  assert.equal(buildUsableReceiptLines([{ name: '', price: '12' }]).length, 1);
+}
 assert.match(store, /addPoisToTrip|kind: 'poi'/, '离线景点可写入行程');
 
 const poi = read('lib/portal/travel-poi.ts');
@@ -65,7 +95,11 @@ assert.match(detail, /openstreetmap|nesio-trip-map/, '酒店真地图');
 assert.match(detail, /PoiDetail|kind === 'poi'/, '景点详情');
 
 const camera = read('components/portal/CameraSheet.tsx');
-assert.match(camera, /consumeTravelReceiptTripId|appendShoppingReceipt/, '相机保存写入行程购物');
+assert.match(camera, /peekTravelReceiptTripId|buildUsableReceiptLines/, '相机先 peek 再判可用行');
+assert.match(camera, /consumeTravelReceiptTripId/, '成功后才 consume 行程挂钩');
+assert.match(camera, /appendShoppingReceipt/, '相机保存写入行程购物');
+assert.match(camera, /attachPhotoToMemoryNode/, '主相机挂图走 capture-pipeline');
+assert.match(camera, /photo_idb_failed/, '本机存图失败可见');
 
 const portal = read('components/portal/Portal.tsx');
 assert.match(portal, /nesio-open-camera/, 'Portal 监听拍小票');

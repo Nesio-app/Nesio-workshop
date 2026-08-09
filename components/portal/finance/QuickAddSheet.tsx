@@ -128,7 +128,7 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
         const row = addManualEntry({
           amount: v, kind: seg, ...(currency ? { currency } : {}),
           ...(cat ? { category: cat } : {}), ...(note.trim() ? { note: note.trim() } : {}), ...(ch ? { channelId: ch } : {}),
-          ...(seg === 'expense' && costAssetId ? { assetId: costAssetId, assetCostKind: costKind } : {}),
+          ...(seg === 'expense' && costAssetId ? { assetId: costAssetId, assetCostKind: costKind, includeInFinance: false } : {}),
         });
         if (!row) throw new Error('entry_failed');
       }

@@ -30,9 +30,13 @@
 import { getLifeGraph, linkNodes, unlinkNodes, updateLifeNode, type LifeNode, type LifeNodeAsset } from './life-graph';
 import { findTxNode } from './tx-node';
 import { resolveEntityKey, loadEntityAliases } from './entity-resolution';
+import { getTrip } from './travel-trips';
+import { addNodeToProject, removeNodeFromProject, getProjects } from './project';
 
 /** 「这笔钱和这个人有关」。跟认领(paid_by_tx)是两回事:认领是「这件东西花的就是这笔」。 */
 export const TX_PERSON_RELATION = 'involves_person';
+/** 这笔钱和某条记忆有关(双向,记忆详情/问一问可反查流水)。 */
+export const TX_MEMORY_RELATION = 'involves_memory';
 
 /**
  * 按 key 找 person 节点。
@@ -58,7 +62,7 @@ export interface BridgeResult {
   /** 图上写成功了吗。false = 关联只落在财务页,别的地方看不到。 */
   graphOk: boolean;
   /** 没写成的原因,给 UI 出具体提示用(别只说「失败了」)。 */
-  reason?: 'no_tx_node' | 'no_person_node' | 'link_failed';
+  reason?: 'no_tx_node' | 'no_person_node' | 'no_memory_node' | 'no_project' | 'no_trip' | 'link_failed';
   /**
    * 这笔钱在图上的节点 id。给「挂完附件还要往同一条节点里补东西」的调用方用
    * (端上认出来的发票原文要落进这条节点的 rawInput,否则票上的字一个都搜不到)。
@@ -136,4 +140,122 @@ export function txNodesOfPerson(personNodeId: string, graph?: readonly LifeNode[
   if (!person) return [];
   const ids = new Set((person.relations || []).filter((r) => r.relation === TX_PERSON_RELATION).map((r) => r.targetId));
   return g.filter((n) => ids.has(n.id));
+}
+
+/** 记忆 ↔ 这笔钱,写到图上。 */
+export function linkTxToMemoryNode(txId: string, memoryNodeId: string): BridgeResult {
+  const graph = (() => { try { return getLifeGraph(); } catch { return []; } })();
+  const txNode = findTxNode(txId, graph);
+  if (!txNode) return { graphOk: false, reason: 'no_tx_node' };
+  const memory = graph.find((n) => n.id === memoryNodeId);
+  if (!memory) return { graphOk: false, reason: 'no_memory_node' };
+  const r = linkNodes(txNode.id, memory.id, TX_MEMORY_RELATION);
+  return r.ok ? { graphOk: true, nodeId: txNode.id } : { graphOk: false, reason: 'link_failed', nodeId: txNode.id };
+}
+
+export function unlinkTxFromMemoryNode(txId: string, memoryNodeId: string): BridgeResult {
+  const graph = (() => { try { return getLifeGraph(); } catch { return []; } })();
+  const txNode = findTxNode(txId, graph);
+  if (!txNode) return { graphOk: true };
+  const memory = graph.find((n) => n.id === memoryNodeId);
+  if (!memory) return { graphOk: true };
+  unlinkNodes(txNode.id, memory.id, TX_MEMORY_RELATION);
+  return { graphOk: true };
+}
+
+/** 旅行不在图里 —— 把 tripId 写在流水节点 attributes 上,旅行页可反查 txId。 */
+export function linkTxToTrip(txId: string, tripId: string): BridgeResult {
+  const txNode = findTxNode(txId);
+  if (!txNode) return { graphOk: false, reason: 'no_tx_node' };
+  if (!getTrip(tripId)) return { graphOk: false, reason: 'no_trip', nodeId: txNode.id };
+  const ok = updateLifeNode(txNode.id, {
+    attributes: { ...txNode.attributes, linkedTripId: tripId },
+  });
+  return ok ? { graphOk: true, nodeId: txNode.id } : { graphOk: false, reason: 'link_failed', nodeId: txNode.id };
+}
+
+export function unlinkTxFromTrip(txId: string): BridgeResult {
+  const txNode = findTxNode(txId);
+  if (!txNode) return { graphOk: true };
+  const attrs = { ...txNode.attributes };
+  delete attrs.linkedTripId;
+  const ok = updateLifeNode(txNode.id, { attributes: attrs });
+  return ok ? { graphOk: true, nodeId: txNode.id } : { graphOk: false, reason: 'link_failed', nodeId: txNode.id };
+}
+
+/** 手动财产不在图里 —— 把 finance-assets id 写在流水节点 attributes 上。 */
+export function linkTxToManualAsset(txId: string, assetId: string): BridgeResult {
+  const txNode = findTxNode(txId);
+  if (!txNode) return { graphOk: false, reason: 'no_tx_node' };
+  const ok = updateLifeNode(txNode.id, {
+    attributes: { ...txNode.attributes, linkedManualAssetId: assetId },
+  });
+  return ok ? { graphOk: true, nodeId: txNode.id } : { graphOk: false, reason: 'link_failed', nodeId: txNode.id };
+}
+
+export function unlinkTxFromManualAsset(txId: string): BridgeResult {
+  const txNode = findTxNode(txId);
+  if (!txNode) return { graphOk: true };
+  const attrs = { ...txNode.attributes };
+  delete attrs.linkedManualAssetId;
+  const ok = updateLifeNode(txNode.id, { attributes: attrs });
+  return ok ? { graphOk: true, nodeId: txNode.id } : { graphOk: false, reason: 'link_failed', nodeId: txNode.id };
+}
+
+/** 项目聚合:把流水节点 id 加进 Project.nodeIds(记忆项目页可反查)。 */
+export function linkTxToProject(txId: string, projectId: string): BridgeResult {
+  const txNode = findTxNode(txId);
+  if (!txNode) return { graphOk: false, reason: 'no_tx_node' };
+  if (!getProjects().some((p) => p.id === projectId)) return { graphOk: false, reason: 'no_project', nodeId: txNode.id };
+  addNodeToProject(projectId, txNode.id);
+  return { graphOk: true, nodeId: txNode.id };
+}
+
+export function unlinkTxFromProject(txId: string, projectId: string): BridgeResult {
+  const txNode = findTxNode(txId);
+  if (!txNode) return { graphOk: true };
+  removeNodeFromProject(projectId, txNode.id);
+  return { graphOk: true, nodeId: txNode.id };
+}
+
+/** 这条记忆关联了哪些流水节点。 */
+export function txNodesOfMemory(memoryNodeId: string, graph?: readonly LifeNode[]): LifeNode[] {
+  const g = graph ?? (() => { try { return getLifeGraph(); } catch { return []; } })();
+  const memory = g.find((n) => n.id === memoryNodeId);
+  if (!memory) return [];
+  const ids = new Set((memory.relations || []).filter((r) => r.relation === TX_MEMORY_RELATION).map((r) => r.targetId));
+  return g.filter((n) => ids.has(n.id));
+}
+
+/** 这趟旅行关联了哪些银行流水 id(从流水节点 attributes 读)。 */
+export function txIdsOfTrip(tripId: string, graph?: readonly LifeNode[]): string[] {
+  const g = graph ?? (() => { try { return getLifeGraph(); } catch { return []; } })();
+  const out: string[] = [];
+  for (const n of g) {
+    if (n.attributes?.linkedTripId !== tripId) continue;
+    const txId = typeof n.attributes?.txId === 'string' ? n.attributes.txId : '';
+    if (txId) out.push(txId);
+  }
+  return out;
+}
+
+/** 这件手动财产关联了哪些银行流水 id。 */
+export function txIdsOfManualAsset(assetId: string, graph?: readonly LifeNode[]): string[] {
+  const g = graph ?? (() => { try { return getLifeGraph(); } catch { return []; } })();
+  const out: string[] = [];
+  for (const n of g) {
+    if (n.attributes?.linkedManualAssetId !== assetId) continue;
+    const txId = typeof n.attributes?.txId === 'string' ? n.attributes.txId : '';
+    if (txId) out.push(txId);
+  }
+  return out;
+}
+
+/** 这个项目聚合了哪些流水节点。 */
+export function txNodesOfProject(projectId: string, graph?: readonly LifeNode[]): LifeNode[] {
+  const project = getProjects().find((p) => p.id === projectId);
+  if (!project) return [];
+  const g = graph ?? (() => { try { return getLifeGraph(); } catch { return []; } })();
+  const ids = new Set(project.nodeIds);
+  return g.filter((n) => ids.has(n.id) && n.attributes?.txShadow);
 }

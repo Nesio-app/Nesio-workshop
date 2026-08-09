@@ -55,8 +55,24 @@ const BACKOFF_BASE_MS = 60_000;
 
 const QUEUE_CATEGORY = 'cloud-sync-task';
 
+/** 任务名 → 波次(越小越先跑)。未列出的落在波次 2(与模块后、连接器前的资产同步同级)。 */
+const TASK_WAVE: Record<string, number> = {
+  memory: 0,
+  learning: 0,
+  profile: 0,
+  modules: 1,
+  connectors: 3,
+};
+
+function waveOf(name: string): number {
+  return TASK_WAVE[name] ?? 2;
+}
+
 /**
  * 跑一批同步任务。**失败的记进离线队列,不抛。**
+ *
+ * 波次串行(波内也串行):记忆/profile → 模块 → 资产类 → 连接器。
+ * 避免并行 gzip/IDB 把主线程打满,也减少模块与记忆图并发写同一存储的竞态。
  *
  * 返回哪些成功、哪些进了队列 —— 调用方可以据此告诉用户
  * 「有 2 项还没同步上,联网后会自动补」,而不是假装全好了。
@@ -67,15 +83,24 @@ export async function runCloudSyncBatch(
   const ok: string[] = [];
   const queued: string[] = [];
 
-  await Promise.all(tasks.map(async (t) => {
-    try {
-      await t.run();
-      ok.push(t.name);
-    } catch (err) {
-      queued.push(t.name);
-      await enqueueFailedTask(t.name, err);
+  const waves = new Map<number, CloudSyncTask[]>();
+  for (const t of tasks) {
+    const w = waveOf(t.name);
+    if (!waves.has(w)) waves.set(w, []);
+    waves.get(w)!.push(t);
+  }
+
+  for (const w of [...waves.keys()].sort((a, b) => a - b)) {
+    for (const t of waves.get(w)!) {
+      try {
+        await t.run();
+        ok.push(t.name);
+      } catch (err) {
+        queued.push(t.name);
+        await enqueueFailedTask(t.name, err);
+      }
     }
-  }));
+  }
 
   return { ok, queued };
 }

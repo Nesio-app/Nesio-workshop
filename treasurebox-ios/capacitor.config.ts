@@ -14,8 +14,17 @@ import type { CapacitorConfig } from '@capacitor/cli';
  *    要是每改一行 JS 都得重出包,这条路根本走不下去。
  *
  *    `NESIO_SHELL_URL` 环境变量可以覆盖(本地调试时指到自己机器上)。
+ *
+ * ③ **allowNavigation**(2026-08-09):缺了这一段时 Google/Apple OAuth 会踢进
+ *    系统 Safari,cookie 回不到 WKWebView —— 表现成「登录跳浏览器、不回 App」。
+ *    与根 capacitor.config.ts 对齐。
+ *
+ * ④ **canonical 域名**:优先 www.nesio.app(与 PWA 同 origin),减少双端数据分叉;
+ *    未配置时仍回落 treasurebox-nu.vercel.app。
  */
-const REMOTE = process.env.NESIO_SHELL_URL || 'https://treasurebox-nu.vercel.app';
+const REMOTE = process.env.NESIO_SHELL_URL
+  || process.env.NEXT_PUBLIC_APP_ORIGIN
+  || 'https://www.nesio.app';
 
 const config: CapacitorConfig = {
   appId: 'app.nesio.ios',
@@ -25,6 +34,16 @@ const config: CapacitorConfig = {
     url: REMOTE,
     // 线上一律 https。允许明文只会给中间人开门,而这个 App 传的是记忆和邮件。
     cleartext: false,
+    // OAuth / 外链回跳(Google、Apple、Plaid 等)允许离开主域再回来。
+    allowNavigation: [
+      'www.nesio.app',
+      'nesio.app',
+      'treasurebox-nu.vercel.app',
+      '*.vercel.app',
+      'accounts.google.com',
+      'appleid.apple.com',
+      '*.supabase.co',
+    ],
   },
   ios: {
     // never: WebView 铺满物理屏,安全区由 CSS env(safe-area-inset-*) 处理。

@@ -8,6 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   getTrip, deleteTrip, addTripNode, generatePackingList, importBookingIntoTrip,
   recomputeBudgetNode, groupNodesByDay, formatTripNodeTime, TRAVEL_TRIPS_UPDATED_EVENT,
+  extractTextFromBookingFile,
   type Trip, type TripNode,
 } from '@/lib/portal/travel-trips';
 import { ensureTravelHubsLoaded, searchTravelHubs, hubLabel, type TravelHub } from '@/lib/portal/travel-hubs';
@@ -41,6 +42,7 @@ export default function TripTimelineSheet({
   const [fTo, setFTo] = useState('');
   const [fTime, setFTime] = useState('');
   const [fDate, setFDate] = useState('');
+  const [fPrice, setFPrice] = useState('');
   const bookingFileRef = useRef<HTMLInputElement>(null);
   const [hName, setHName] = useState('');
   const [hAddr, setHAddr] = useState('');
@@ -85,12 +87,16 @@ export default function TripTimelineSheet({
     if (!trip) return;
     const flightNo = fNo.trim().toUpperCase();
     if (!flightNo) { setErr(L(dict, '填航班号', 'Flight number needed')); return; }
+    const priceRaw = Number(fPrice);
+    const price = Number.isFinite(priceRaw) && priceRaw > 0 && priceRaw <= 1_000_000 ? priceRaw : undefined;
+    const atIso = fDate.trim() && fTime.trim() ? `${fDate.trim()}T${fTime.trim()}:00` : undefined;
     addTripNode(trip.id, {
       kind: 'flight', state: 'booked',
       timeLabel: [fDate.trim(), fTime.trim()].filter(Boolean).join(' '),
+      ...(atIso ? { at: atIso } : {}),
       dayKey: 'd1', dayLabel: L(dict, '行程日', 'Trip day'),
       title: (fFrom && fTo) ? `${fFrom.trim()} → ${fTo.trim()}` : `航班 ${flightNo}`,
-      subtitle: flightNo,
+      subtitle: [flightNo, price != null ? `$${price}` : ''].filter(Boolean).join(' · '),
       payload: {
         kind: 'flight',
         flight: {
@@ -98,11 +104,13 @@ export default function TripTimelineSheet({
           fromCode: fFrom.trim().length === 3 ? fFrom.trim().toUpperCase() : undefined,
           toCode: fTo.trim().length === 3 ? fTo.trim().toUpperCase() : undefined,
           flightNo, statusText: L(dict, '已订', 'Booked'),
+          ...(price != null ? { price, currency: '$' } : {}),
+          ...(atIso ? { departureAt: atIso } : {}),
         },
       },
     });
     recomputeBudgetNode(trip.id);
-    setAdding(null); setFNo(''); setFFrom(''); setFTo(''); setFTime(''); setFDate(''); setErr(null);
+    setAdding(null); setFNo(''); setFFrom(''); setFTo(''); setFTime(''); setFDate(''); setFPrice(''); setErr(null);
     reload();
   }
 
@@ -150,34 +158,32 @@ export default function TripTimelineSheet({
     reload();
   }
 
-  /** 上传订票确认 → 读文本 → 自动识别(不只填框)。PDF 二进制不能当文本读。 */
+  /** 上传订票确认 → 读文本 → 自动识别(PDF 文字层 / 纯文本;扫描件与图片提示粘贴)。 */
   async function onPickBooking(file: File | undefined) {
     if (!file || !trip) return;
     setErr(null);
-    const isPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
-    if (isPdf) {
-      setErr(L(dict, 'PDF 还不支持直接识别 —— 请复制正文粘贴,或上传 .txt / .eml / .html。', 'PDF isn’t supported yet — paste the text, or upload .txt/.eml/.html.'));
+    const extracted = await extractTextFromBookingFile(file);
+    if (!extracted.ok) {
+      const msg: Record<typeof extracted.reason, [string, string]> = {
+        empty: ['这个文件是空的。', 'That file is empty.'],
+        binary: ['这个文件不像可读文本 —— 换 .txt / .eml / .html,或直接粘贴。', 'That file doesn’t look like text — try .txt/.eml/.html, or paste.'],
+        pdf_scanned: ['这份 PDF 是扫描件,读不出文字 —— 请复制正文粘贴,或换 .txt / .eml。', 'This PDF is a scan — paste the text, or use .txt/.eml.'],
+        pdf_failed: ['PDF 打不开 —— 请复制正文粘贴。', 'Couldn’t open the PDF — paste the text instead.'],
+        image: ['图片暂不能直接识别 —— 请复制邮件/确认单文字粘贴,或上传 PDF(有文字层)。', 'Images can’t be parsed yet — paste the confirmation text, or upload a text-based PDF.'],
+        read_failed: ['这个文件读不了 —— 换 .txt / .eml / .html,或直接粘贴正文。', "Couldn't read that file — try .txt/.eml/.html, or paste the text."],
+      };
+      const [zh, en] = msg[extracted.reason];
+      setErr(L(dict, zh, en));
       return;
     }
-    try {
-      const text = await file.text();
-      if (!text.trim()) { setErr(L(dict, '这个文件是空的。', 'That file is empty.')); return; }
-      // 拒绝明显二进制垃圾(NUL 等)
-      if (/[\u0000]/.test(text.slice(0, 200)) || (text.match(/[^\x09\x0a\x0d\x20-\x7E\u0080-\uFFFF]/g) || []).length > text.length * 0.3) {
-        setErr(L(dict, '这个文件不像可读文本 —— 换 .txt / .eml / .html,或直接粘贴。', 'That file doesn’t look like text — try .txt/.eml/.html, or paste.'));
-        return;
-      }
-      const n = importBookingIntoTrip(trip.id, text.slice(0, 20000));
-      if (n <= 0) {
-        setPaste(text.slice(0, 20000));
-        setErr(L(dict, '没自动识别出航班/酒店 —— 正文已填入,可改后再点「识别」。', 'No flight/hotel parsed — text pasted; edit and tap Parse.'));
-        return;
-      }
-      setAdding(null); setPaste(''); setErr(null);
-      reload();
-    } catch {
-      setErr(L(dict, '这个文件读不了 —— 换 .txt / .eml / .html,或直接粘贴正文。', "Couldn't read that file — try .txt/.eml/.html, or paste the text."));
+    const n = importBookingIntoTrip(trip.id, extracted.text);
+    if (n <= 0) {
+      setPaste(extracted.text);
+      setErr(L(dict, '没自动识别出航班/酒店 —— 正文已填入,可改后再点「识别」。', 'No flight/hotel parsed — text pasted; edit and tap Parse.'));
+      return;
     }
+    setAdding(null); setPaste(''); setErr(null);
+    reload();
   }
 
   function addImport() {
@@ -281,6 +287,7 @@ export default function TripTimelineSheet({
                       })()}
                       <label><span>{L(dict, '日期', 'Date')}</span><input type="date" value={fDate} onChange={(e) => setFDate(e.target.value)} /></label>
                       <label><span>{L(dict, '时间', 'Time')}</span><input type="time" value={fTime} onChange={(e) => setFTime(e.target.value)} /></label>
+                      <label><span>{L(dict, '票价', 'Price')}</span><input type="number" inputMode="decimal" value={fPrice} onChange={(e) => setFPrice(e.target.value)} placeholder="$" /></label>
                       <div className="nesio-travel-plan-form-actions">
                         <button type="button" className="nesio-trip-action" onClick={() => setAdding(null)}>{L(dict, '取消', 'Cancel')}</button>
                         <button type="button" className="nesio-trip-primary" onClick={addFlight}>{L(dict, '加入', 'Add')}</button>
@@ -320,12 +327,12 @@ export default function TripTimelineSheet({
                   )}
                   {adding === 'import' && (
                     <>
-                      <p className="nesio-trip-footnote">{L(dict, '粘贴航空公司/酒店确认邮件正文;暂不支持 PDF 二进制。', 'Paste airline/hotel confirmation text; PDF binary isn’t supported yet.')}</p>
+                      <p className="nesio-trip-footnote">{L(dict, '粘贴确认邮件,或上传 .txt / .eml / .html / PDF(有文字层);扫描件 PDF 请粘贴文字。', 'Paste confirmation text, or upload .txt/.eml/.html/text PDF; for scans, paste the text.')}</p>
                       <label>
                         <span>{L(dict, '订票确认', 'Booking text')}</span>
                         <textarea rows={4} value={paste} onChange={(e) => setPaste(e.target.value)} />
                       </label>
-                      <input ref={bookingFileRef} type="file" accept=".txt,.eml,.md,.html,text/plain,message/rfc822,text/html"
+                      <input ref={bookingFileRef} type="file" accept=".txt,.eml,.md,.html,.pdf,text/plain,message/rfc822,text/html,application/pdf,image/*"
                         className="nesio-visually-hidden"
                         onChange={(e) => { void onPickBooking(e.target.files?.[0]); e.currentTarget.value = ''; }} />
                       <div className="nesio-travel-plan-form-actions">

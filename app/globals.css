@@ -8506,6 +8506,50 @@ html[data-portal-theme="night"] .nesio-type-header-strip {
 }
 .nesio-type-header-icon { font-size: 1.1rem; }
 .nesio-type-header-label { font-size: 0.72rem; font-weight: 700; color: #374151; letter-spacing: 0.03em; }
+.nesio-type-header-tag-tools {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+.nesio-type-header-tag-select {
+  max-width: 7.5rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  padding: 0.15rem 0.35rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--portal-ink) 12%, transparent);
+  background: color-mix(in srgb, var(--portal-bg) 70%, transparent);
+  color: inherit;
+}
+.nesio-type-header-tag-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: none;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--portal-bg) 65%, transparent);
+  color: inherit;
+  cursor: pointer;
+}
+.nesio-type-header-tag-add {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  padding: 0.35rem 1.1rem 0.55rem;
+  margin: 0 -0.1rem;
+  background: color-mix(in srgb, var(--type-strip-bg, var(--chip-fog)) 55%, transparent);
+}
+.nesio-type-header-tag-add .nesio-ob-input {
+  flex: 1;
+  margin-bottom: 0;
+  font-size: 0.78rem;
+}
+.nesio-type-header-tag-tools .nesio-type-header-source {
+  margin-left: 0;
+}
 
 .nesio-type-section { margin-bottom: 0.25rem; }
 

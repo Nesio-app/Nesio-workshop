@@ -3,7 +3,7 @@
  * Called on TodayFeed mount. Results read by Reasoning Engine.
  */
 
-import { fetchWeatherAt, reverseGeocode } from './weather';
+import { fetchWeatherAt, reverseGeocode, type WeatherSnapshot } from './weather';
 import { PORTAL_CACHE_KEYS, writePortalCache, readPortalCache } from '../prefetch-cache';
 import { getLifeGraph } from '../life-graph';
 import type { CalendarEvent } from '../types';
@@ -13,15 +13,20 @@ import { recordLiveVisit, recordVisitAt } from '../place-trail';
 
 // ── Weather ──────────────────────────────────────────────────────────────────
 
+/** 两坐标相距超过 ~8km 视为换地方了,要重拉天气。 */
+function weatherLocationStale(cached: WeatherSnapshot | null, lat: number, lon: number): boolean {
+  if (!cached?.lat || !cached?.lon) return true;
+  const dlat = (cached.lat - lat) * 111_000;
+  const dlon = (cached.lon - lon) * 111_000 * Math.cos((lat * Math.PI) / 180);
+  return Math.hypot(dlat, dlon) > 8_000;
+}
+
 export async function refreshWeather(): Promise<void> {
   if (typeof window === 'undefined') return;
-  // 批次 24:天气缓存只挡「重复拉天气」,不再挡地点足迹——此前 cached 存在
-  // 就整个早退,recordLiveVisit 永远没机会跑(用户报「足迹一直空」)。
-  const cached = readPortalCache<unknown>(PORTAL_CACHE_KEYS.weather);
 
   try {
     const { getDevicePosition } = await import('../native-geolocation');
-    const pos = await getDevicePosition({ timeoutMs: 8_000, maximumAgeMs: 300_000, enableHighAccuracy: false });
+    const pos = await getDevicePosition({ timeoutMs: 8_000, maximumAgeMs: 60_000, enableHighAccuracy: true });
     if (!pos) return;
     const { lat, lon } = pos;
     let placeName = '';
@@ -31,11 +36,11 @@ export async function refreshWeather(): Promise<void> {
     } catch { /* ignore */ }
 
     // 地点足迹:每次拿到定位都记(2h 同地去重),不受天气缓存影响
-    // 反查失败也用坐标名兜底 —— 否则 Always 开了足迹仍空。
     recordLiveVisit(placeName || `${lat.toFixed(4)},${lon.toFixed(4)}`, lat, lon);
 
-    // 天气:有缓存就不重复拉
-    if (!cached) {
+    // 天气:缓存过期(>5min)或位置明显变化时才重拉 —— 仍用当前 GPS,不吃旧坐标。
+    const cached = readPortalCache<WeatherSnapshot>(PORTAL_CACHE_KEYS.weather);
+    if (!cached || weatherLocationStale(cached, lat, lon)) {
       const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'auto';
       const snapshot = await fetchWeatherAt(lat, lon, timezone, placeName);
       writePortalCache(PORTAL_CACHE_KEYS.weather, snapshot);

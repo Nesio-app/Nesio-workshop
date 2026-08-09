@@ -15,6 +15,7 @@
  * → 换端永远只有文字。主相机能同步、别的入口不能 = 以前漏了 ③。
  */
 import { compressToDataUrl, getLocalImage, putLocalImage } from './local-image-store';
+import { logDropped } from './storage-health';
 import type { LifeNode, LifeNodeAsset } from './life-graph';
 
 export type ModeCameraMode = 'meal' | 'wardrobe';
@@ -89,7 +90,10 @@ export async function persistCapturedPhoto(opts: {
   const assetId = opts.assetId || newAssetId(kind === 'meal' ? 'meal' : kind === 'wardrobe' ? 'wardrobe' : 'asset');
   const mimeType = 'image/jpeg';
   const ok = await putLocalImage(assetId, opts.dataUrl);
-  if (!ok) return null;
+  if (!ok) {
+    logDropped('capture_pipeline.put_local_image', { kind, assetId });
+    return null;
+  }
 
   const localAsset: LifeNodeAsset = {
     id: assetId,

@@ -5,13 +5,12 @@ import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { createPortal } from 'react-dom';
 import dynamicImport from 'next/dynamic';
 const MemoryNodeDetailLazy = dynamicImport(() => import('./MemoryNodeDetail'), { ssr: false });
-import { getLifeGraph, updateLifeNode, type LifeNode, type LifeNodeAsset } from '@/lib/portal/life-graph';
-import { createAppApiClient } from '@/lib/portal/app-api-client';
+import { getLifeGraph, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
 import { matchNearestPlace, formatLocation, getNamedPlaces } from '@/lib/portal/named-places';
 import LocationPicker from './LocationPicker';
 import { IconCamera, IconImage, NodeTypeIcon } from './icons';
 import { consolidateAmazonOrder } from '@/lib/portal/amazon-order';
-import { appendShoppingReceipt, consumeTravelReceiptTripId } from '@/lib/portal/travel-trips';
+import { appendShoppingReceipt, buildUsableReceiptLines, consumeTravelReceiptTripId, clearTravelReceiptTripId, peekTravelReceiptTripId } from '@/lib/portal/travel-trips';
 import { addReceiptExpense, defaultFinanceCurrency } from '@/lib/portal/finance-sources';
 import Button from './ui/Button';
 import { understandImage, tagsFromText, type UnderstandResult } from '@/lib/portal/image-understand';
@@ -897,26 +896,35 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype,
     const nodesToSave = editedNodes.filter((n) => !n.deleted);
     if (!nodesToSave.length || saving) return;
     setSaving(true); // 立刻反馈:按钮变「保存中…」+ 禁用,避免用户以为没点上
+    setError('');
     try {
       await doSave(nodesToSave);
-      // 行程预算/购物「拍小票」:把识别条目并入当前行程购物节点
-      const travelTripId = consumeTravelReceiptTripId();
-      if (travelTripId) {
-        const lines = nodesToSave
-          .filter((n) => n.type === 'Thing')
-          .map((n) => ({
-            name: n.name.trim() || L(dict, '未命名', 'Untitled'),
-            price: n.price?.trim() ? Number(String(n.price).replace(/[^\d.]/g, '')) || undefined : undefined,
-            note: n.attributes?.store ? String(n.attributes.store) : undefined,
-            intoInventory: true,
-          }));
-        if (lines.length) {
-          appendShoppingReceipt(travelTripId, lines, {
-            title: L(dict, '购物 · 小票', 'Shopping · receipt'),
-            date: localDayKey(),
-            currency: defaultFinanceCurrency(),
-          });
+      const armedTripId = peekTravelReceiptTripId();
+      if (armedTripId) {
+        const lines = buildUsableReceiptLines(
+          nodesToSave.filter((n) => n.type === 'Thing'),
+          L(dict, '未命名', 'Untitled'),
+        );
+        if (!lines.length) {
+          setSaving(false);
+          setError(L(dict,
+            '没认出可用的小票条目 —— 用「AI 识别」或手动加条目后再存；行程入口还开着，可重试。',
+            'No usable receipt lines — try Scan or add items manually; the trip link is still armed, you can retry.'));
+          return;
         }
+        const trip = appendShoppingReceipt(armedTripId, lines, {
+          title: L(dict, '购物 · 小票', 'Shopping · receipt'),
+          date: localDayKey(),
+          currency: defaultFinanceCurrency(),
+        });
+        if (!trip) {
+          clearTravelReceiptTripId();
+          setSaving(false);
+          setError(L(dict, '小票没能记入行程 —— 行程可能已删除，请回到预算页重试。',
+            'Could not add receipt to trip — it may have been removed; reopen from Budget and try again.'));
+          return;
+        }
+        consumeTravelReceiptTripId();
       } else {
         // 非行程:多数条目带价 → 当作小票记入财务聚合口
         const lines = nodesToSave
@@ -943,9 +951,16 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype,
       }
       setPhase('saved');
       setTimeout(() => { onClose(); setPhase('idle'); setResult(null); setExtraTags(''); setSourceFile(null); setNodeLocations({}); setNodePlaceMeta({}); setDetectedPlaceId(''); setSaving(false); }, 1200);
-    } catch {
+    } catch (err: unknown) {
       setSaving(false);
-      setError(L(dict, '存入失败，请重试', 'Save failed — please try again'));
+      const code = err instanceof Error ? err.message : '';
+      if (code === 'photo_idb_failed') {
+        setError(L(dict, '照片没存进本机 —— 请点「存入记忆」重试。', 'Photo could not be saved locally — tap Save to Memory again.'));
+      } else if (code === 'photo_missing') {
+        setError(L(dict, '找不到照片数据 —— 请重拍或从相册重选。', 'Photo data missing — retake or pick from Photos.'));
+      } else {
+        setError(L(dict, '存入失败，请重试', 'Save failed — please try again'));
+      }
     }
   }
 
@@ -1008,30 +1023,28 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype,
       for (const sn of savedNodes) updateLifeNode(sn.id, { createdAt: takenAt });
     }
 
-    // 批次 23:先把照片压缩存本机 IndexedDB,挂一条本地 asset——
-    // 未登录/离线也能在节点详情看图、问一问也能拿到图。云端上传照旧(并行)。
+    // 批次 23 + A3:照片压缩存本机 IndexedDB 并挂 node.assets —— 失败必须抛出让 UI 可见。
+    // 与 capture-pipeline 同构(本机 + Storage + memory_assets),换端才能看见图。
     if (savedNodes.length > 0) {
-      try {
-        const { compressToDataUrl, putLocalImage } = await import('@/lib/portal/local-image-store');
-        const dataUrl = sourceFile
-          ? await compressToDataUrl(sourceFile)
-          : (capturedBase64 ? `data:image/jpeg;base64,${capturedBase64}` : '');
-        if (dataUrl) {
-          const localAssetId = `img-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
-          await putLocalImage(localAssetId, dataUrl);
-          // 批次 87(用户批准「以图搜图」):存图顺手算 dHash 指纹入索引
-          void import('@/lib/portal/image-hash')
-            .then(async ({ computeDHash, saveImageHash }) => {
-              const h = await computeDHash(dataUrl);
-              if (h) saveImageHash(savedNodes[0].id, h);
-            })
-            .catch(() => {});
-          const existing = savedNodes[0].assets || [];
-          updateLifeNode(savedNodes[0].id, {
-            assets: [...existing, { id: localAssetId, kind: 'image', mimeType: 'image/jpeg', local: true, createdAt: new Date().toISOString() }],
-          });
-        }
-      } catch { /* 图片存本机是增强,失败不影响文字记忆 */ }
+      const dataUrl = sourceFile
+        ? await (await import('@/lib/portal/local-image-store')).compressToDataUrl(sourceFile)
+        : (capturedBase64 ? `data:image/jpeg;base64,${capturedBase64}` : '');
+      if (!dataUrl) throw new Error('photo_missing');
+      const { attachPhotoToMemoryNode } = await import('@/lib/portal/capture-pipeline');
+      const persisted = await attachPhotoToMemoryNode({
+        nodeId: savedNodes[0].id,
+        dataUrl,
+        kind: 'memory',
+        label: result?.summary || savedNodes[0].name,
+      });
+      if (!persisted) throw new Error('photo_idb_failed');
+      // 批次 87(用户批准「以图搜图」):存图顺手算 dHash 指纹入索引
+      void import('@/lib/portal/image-hash')
+        .then(async ({ computeDHash, saveImageHash }) => {
+          const h = await computeDHash(dataUrl);
+          if (h) saveImageHash(savedNodes[0].id, h);
+        })
+        .catch(() => {});
     }
 
     // 批次 63:照片带 EXIF 坐标 → 按**拍摄时间**记进足迹(扩充时间线),
@@ -1054,39 +1067,7 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype,
         .catch(() => {});
     }
 
-    // 云上传/快照 best-effort,不阻塞「保存中…」收尾(弱网曾导致永远转圈)。
-    if (sourceFile && savedNodes.length > 0) {
-      const nodesSnapshot = savedNodes;
-      const tagsSnapshot = userTags;
-      const summary = result?.summary;
-      const file = sourceFile;
-      void (async () => {
-        let cloudAssets: Array<LifeNodeAsset & { nodeId?: string }> = [];
-        try {
-          const client = createAppApiClient();
-          const upload = await client.uploadCloudAsset({ file, purpose: 'memory' });
-          if (upload.ok && upload.storagePath) {
-            const assetRecord: LifeNodeAsset = {
-              id: `asset-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
-              kind: file.type.startsWith('image/') ? 'image' : 'file',
-              storagePath: upload.storagePath,
-              mimeType: upload.mimeType,
-              label: summary || nodesSnapshot[0].name,
-              analysisSummary: summary,
-              tags: Array.from(new Set([...(nodesSnapshot[0].tags || []), ...tagsSnapshot])),
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            };
-            cloudAssets = [{ ...assetRecord, nodeId: nodesSnapshot[0].id }];
-            const liveForAssets = getLifeGraph().find((x) => x.id === nodesSnapshot[0].id);
-            updateLifeNode(nodesSnapshot[0].id, { assets: [...(liveForAssets?.assets || []), assetRecord] });
-          }
-          await client.saveCloudMemorySnapshot({ nodes: nodesSnapshot, assets: cloudAssets });
-        } catch {
-          // Cloud sync is best-effort; local Memory remains available.
-        }
-      })();
-    }
+    // 云同步已由 attachPhotoToMemoryNode 处理(purpose=memory + memory_assets)。
   }
 
   function retake() {

@@ -40,19 +40,20 @@ import { loadBudget, saveBudget, hasBudget, suggestBudget, budgetProgress, type 
 import { buildMonthlyReport, persistReportToMemory, autoPersistLastMonthReport } from '@/lib/portal/finance-report';
 import { reportRichHtml } from '@/lib/portal/finance-report-visual';
 import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES, detailsForPrimary } from '@/lib/portal/tx-category';
-import { loadAllPersonRecords } from '@/lib/portal/person-records';
 import { splitEvenly } from '@/lib/portal/ledger-allocation';
 import {
   loadTxAnnotations, txAnnotationOf, hasTxAnnotation, setTxPeople, setTxNote,
-  addTxAttachment, removeTxAttachment, TX_ANNOTATIONS_EVENT, type TxAnnotation,
+  addTxAttachment, removeTxAttachment, TX_ANNOTATIONS_EVENT, type TxAnnotation, type TxWriteResult,
   setTxSplits, clearTxSplits, setTxAmortize, clearTxAmortize, setTxCategory,
-  setTxTrip, setTxMemoryTag, setTxAsset,
+  setTxTrip, setTxMemoryNode, setTxAsset, setTxProject,
 } from '@/lib/portal/tx-annotations';
 import { putLocalFile, prettyBytes, MAX_FILE_BYTES } from '@/lib/portal/local-file-store';
-import { getLifeGraph } from '@/lib/portal/life-graph';
+import { getLifeGraph, searchLifeGraphFuzzy } from '@/lib/portal/life-graph';
 import { buildRelationships } from '@/lib/portal/relationships';
 import { loadTrips, type Trip } from '@/lib/portal/travel-trips';
-import { loadCustomMemoryTags } from '@/lib/portal/memory-custom-tags';
+import { getProjects, type Project } from '@/lib/portal/project';
+import { visibleMemoryNodes } from '@/lib/portal/memory-visibility';
+import { memoryEventAt } from '@/lib/portal/memory-event-at';
 import { IconLock, IconSnowflake } from '../icons';
 import { isFreezeLaunched } from '@/lib/portal/entitlement';
 import { L } from '@/lib/portal/i18n';
@@ -252,7 +253,7 @@ function TxSplitEditor({ txId, total, dict, contacts, onChanged }: {
   );
 }
 
-function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, trips, memoryTags, financeAssets, tx, onCategoryChanged }: {
+function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, trips, memoryNodes, projects, financeAssets, tx, onCategoryChanged }: {
   txId: string;
   /** 这一笔的原额(绝对值)。分摊要拿它卡合计 —— 差一分都不存。 */
   txAmount: number;
@@ -261,7 +262,8 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, trips, memo
   onFlow: (f: TxFlow) => void;
   contacts: Array<{ key: string; name: string }>;
   trips: Trip[];
-  memoryTags: string[];
+  memoryNodes: Array<{ id: string; name: string }>;
+  projects: Project[];
   financeAssets: ManualAsset[];
   tx: BankTx;
   onCategoryChanged?: () => void;
@@ -270,6 +272,7 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, trips, memo
   const [note, setNote] = useState(() => txAnnotationOf(txId).note || '');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [memQ, setMemQ] = useState('');
   const pickRef = useRef<HTMLInputElement>(null);
   /** 端上从发票上读出来的话。「这张票上写的是多少」和这笔钱对不对得上,是挂发票的**全部意义**。 */
   const [scanNote, setScanNote] = useState<{ text: string; mismatch: boolean } | null>(null);
@@ -317,10 +320,52 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, trips, memo
     setAnn(txAnnotationOf(txId));
   };
 
-  const saveLinkField = (setter: (id: string, v: string) => boolean, value: string) => {
-    const ok = setter(txId, value);
-    setErr(ok ? null : failed);
-    if (ok) setAnn(txAnnotationOf(txId));
+  const saveLinkWrite = (r: TxWriteResult, emptyGraphHint?: string) => {
+    if (!r.ok) setErr(failed);
+    else if (!r.graphOk) {
+      setErr(emptyGraphHint || L(dict, '已记在这笔交易上,但没能连到记忆里 —— 别处暂时看不到。',
+        "Saved here, but couldn't connect it to memory — other pages won't show it yet."));
+    } else setErr(null);
+    setAnn(txAnnotationOf(txId));
+  };
+
+  const saveLinkField = (setter: (id: string, v: string) => TxWriteResult, value: string, emptyGraphHint?: string) => {
+    saveLinkWrite(setter(txId, value), emptyGraphHint);
+  };
+
+  const memoryLabel = (id: string) => memoryNodes.find((m) => m.id === id)?.name || id;
+  const filteredMemories = (() => {
+    const q = memQ.trim();
+    if (!q) return memoryNodes.slice(0, 40);
+    const seen = new Set<string>();
+    const out: Array<{ id: string; name: string }> = [];
+    for (const n of searchLifeGraphFuzzy(q, 30)) {
+      if (n.attributes?.txShadow) continue;
+      if (seen.has(n.id)) continue;
+      seen.add(n.id);
+      out.push({ id: n.id, name: n.name || n.rawInput?.slice(0, 40) || n.id });
+    }
+    for (const m of memoryNodes) {
+      if (seen.has(m.id)) continue;
+      if (!m.name.toLowerCase().includes(q.toLowerCase()) && !m.id.includes(q)) continue;
+      seen.add(m.id);
+      out.push(m);
+    }
+    return out.slice(0, 40);
+  })();
+
+  const saveMemoryLink = (memoryNodeId: string) => {
+    const id = memoryNodeId.trim();
+    const r = setTxMemoryNode(txId, id);
+    saveLinkWrite(
+      r,
+      id && r.reason === 'no_memory_node'
+        ? L(dict, '已记在这笔交易上。不过这条记忆找不到了 —— 可能已被删除。', 'Saved here, but that memory was not found — it may have been deleted.')
+        : id && r.reason === 'no_tx_node'
+          ? L(dict, '已记在这笔交易上。这笔流水还没同步进记忆,所以暂时只有财务页看得到 —— 下次同步后会自动补上。',
+               "Saved here. This transaction hasn't synced into memory yet, so only Finance shows it for now — the next sync will connect it.")
+          : undefined,
+    );
   };
 
   const onPick = async (list: FileList | null) => {
@@ -470,12 +515,30 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, trips, memo
           ))}
         </select>
 
-        <p className="nesio-fin-score-hint" style={{ margin: 0 }}>{L(dict, '关联记忆标签', 'Link a memory tag')}</p>
-        <select className="nesio-fin-select" value={ann.memoryTag || ''} aria-label={L(dict, '关联记忆标签', 'Link a memory tag')}
-          onChange={(e) => saveLinkField(setTxMemoryTag, e.target.value)}>
+        <p className="nesio-fin-score-hint" style={{ margin: 0 }}>{L(dict, '关联记忆', 'Link a memory')}</p>
+        <input className="nesio-fin-input" value={memQ} aria-label={L(dict, '搜索记忆', 'Search memories')}
+          placeholder={L(dict, '搜索记忆…', 'Search memories…')}
+          onChange={(e) => setMemQ(e.target.value)} />
+        <select className="nesio-fin-select" value={ann.memoryNodeId || ''} aria-label={L(dict, '关联记忆', 'Link a memory')}
+          onChange={(e) => saveMemoryLink(e.target.value)}>
           <option value="">{L(dict, '不关联', 'None')}</option>
-          {memoryTags.map((tag) => (
-            <option key={tag} value={tag}>{tag}</option>
+          {ann.memoryNodeId && !filteredMemories.some((m) => m.id === ann.memoryNodeId) && (
+            <option value={ann.memoryNodeId}>{memoryLabel(ann.memoryNodeId)}</option>
+          )}
+          {filteredMemories.map((m) => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+        </select>
+        {!memoryNodes.length && !memQ.trim() && (
+          <p className="nesio-fin-score-hint">{L(dict, '还没有可选的记忆 —— 先去记忆库记一条。', 'No memories yet — add one in Memory first.')}</p>
+        )}
+
+        <p className="nesio-fin-score-hint" style={{ margin: 0 }}>{L(dict, '关联项目', 'Link a project')}</p>
+        <select className="nesio-fin-select" value={ann.projectId || ''} aria-label={L(dict, '关联项目', 'Link a project')}
+          onChange={(e) => saveLinkField(setTxProject, e.target.value)}>
+          <option value="">{L(dict, '不关联', 'None')}</option>
+          {projects.map((p) => (
+            <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>
           ))}
         </select>
 
@@ -667,7 +730,16 @@ export default function FinanceTab() {
     [rev, annRev],
   );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const txEditMemoryTags = useMemo(() => loadCustomMemoryTags(), [rev, annRev]);
+  const txEditMemoryNodes = useMemo(
+    () => visibleMemoryNodes(getLifeGraph(), true)
+      .filter((n) => !n.attributes?.txShadow)
+      .sort((a, b) => memoryEventAt(b).getTime() - memoryEventAt(a).getTime())
+      .slice(0, 80)
+      .map((n) => ({ id: n.id, name: n.name || n.rawInput?.slice(0, 40) || n.id })),
+    [rev, annRev],
+  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const txEditProjects = useMemo(() => getProjects(), [rev, annRev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const txEditFinanceAssets = useMemo(() => listManualAssets(), [rev, annRev]);
   // 财务㉗:投资组合(持仓聚合;⚠️ 同样必须在空态早退之前)
@@ -755,7 +827,7 @@ export default function FinanceTab() {
   const netDelta = prevSummary.net >= 50 ? Math.round(((summary.net - prevSummary.net) / prevSummary.net) * 100) : null;
   const idx = months.indexOf(ym);
 
-  // 设计:总览顶部补 —— 本月支出(毛)+ 环比、念念一句话小结、消费×人(真数据)
+  // 设计:总览顶部补 —— 本月支出(毛)+ 环比、念念一句话小结
   const grossSpend = cats.reduce((s, c) => s + c.total, 0) + (summary.domainNet || 0);
   // P0:当前月环比基准 = 上月同进度(prevSummary 已按 throughDay 截断,分类同口径)
   const prevGross = categoryBreakdown(txs, prevYm(ym), isCurMonth ? { throughDay: todayDay } : undefined).reduce((s, c) => s + c.total, 0) + (prevSummary.domainNet || 0);
@@ -774,14 +846,6 @@ export default function FinanceTab() {
     }
     if (upcoming.items.length > 0) parts.push(L(dict, `还有 ${upcoming.items.length} 笔账单这周要付。`, `${upcoming.items.length} bill(s) due this week.`));
     return parts.join('');
-  })();
-  // 消费×人:person-records 里 spending 类(本月),按人聚合
-  const personSpend = (() => {
-    const recs = loadAllPersonRecords().filter((r) => r.category === 'spending' && typeof r.amount === 'number' && (r.date || r.createdAt).slice(0, 7) === ym);
-    const byKey = new Map<string, { total: number; titles: string[] }>();
-    for (const r of recs) { const e = byKey.get(r.personKey) || { total: 0, titles: [] }; e.total += r.amount as number; if (r.title) e.titles.push(r.title); byKey.set(r.personKey, e); }
-    const pretty = (k: string) => /[a-z]/i.test(k) ? k.replace(/\b\w/g, (m) => m.toUpperCase()) : k;
-    return [...byKey.entries()].map(([k, v]) => ({ key: k, name: pretty(k), total: v.total, title: v.titles.length === 1 ? v.titles[0] : '' })).sort((a, b) => b.total - a.total).slice(0, 5);
   })();
   // 设计:5 个子页 —— 总览 / 支出 / 交易 / 投资 / 卡片。预算并入支出,定期并入交易(订阅 tab 与交易页重复,已删)。
   // bug3:「支出」tab 改名「分类」—— 这一页的主体就是按分类的环形图,不是又一份支出总额
@@ -983,22 +1047,6 @@ export default function FinanceTab() {
                 })}
                 <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: 'var(--space-1)' }}>{L(dict, '关联后小票变成那笔银行流水的明细,不再双计。', 'Linked receipts become detail of the bank txn — no double counting.')}</p>
               </div>
-            </>
-          )}
-          {/* 消费 × 人:来自「关系 → 挂一条」记的消费(真数据,只存本机)*/}
-          {personSpend.length > 0 && (
-            <>
-              <p className="nesio-settings-section-label">{L(dict, '消费 × 人', 'Spending × people')}</p>
-              <div className="nesio-fin-personspend">
-                {personSpend.map((p) => (
-                  <div key={p.key} className="nesio-fin-person-row">
-                    <span className="nesio-fin-person-av" aria-hidden>{Array.from(p.name.trim())[0] || '·'}</span>
-                    <span className="nesio-fin-person-name">{p.name}{p.title ? ` · ${p.title}` : ''}</span>
-                    <span className="nesio-fin-person-amt">{formatMoney(p.total, summary.currency)}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>{L(dict, '来自你在「关系 → 挂一条」记的消费,仅你可见。', 'From spending you logged under People → attach; visible only to you.')}</p>
             </>
           )}
 
@@ -1234,7 +1282,7 @@ export default function FinanceTab() {
                   </div>
                   {flowEditId === t.id && (
                     <TxEditPanel txId={t.id} txAmount={Math.abs(t.amount)} flow={f} dict={dict} contacts={pickContacts}
-                      trips={txEditTrips} memoryTags={txEditMemoryTags} financeAssets={txEditFinanceAssets}
+                      trips={txEditTrips} memoryNodes={txEditMemoryNodes} projects={txEditProjects} financeAssets={txEditFinanceAssets}
                       tx={t} onFlow={(opt) => applyFlow(t, opt)} onCategoryChanged={() => setRev((r) => r + 1)} />
                   )}
                 </div>

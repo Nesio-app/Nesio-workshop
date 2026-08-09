@@ -9,7 +9,7 @@ import {
   pushPackingNeedsToShopping,
   setFlightCheckInReminder, hasFlightCheckInReminder, armTravelReceiptCapture,
   generatePackingList, recomputeBudgetNode, updateNode, setCategoryBudget, setTripBudgetTotal,
-  clearTripBudget, removeTripNode,
+  clearTripBudget, removeTripNode, addCustomBudgetCategory, removeCustomBudgetCategory,
   type TripNode, type FlightPayload, type HotelPayload,
   type ShoppingPayload, type ShoppingLine, type PackingPayload, type BudgetPayload, type PoiPayload, type TodoPayload,
 } from '@/lib/portal/travel-trips';
@@ -79,8 +79,14 @@ export function FlightDetail({
     const title = `${draft.fromCode || draft.from} → ${draft.toCode || draft.to}`;
     updateNode(tripId, nodeId, {
       title,
+      ...(draft.departureAt ? { at: draft.departureAt, timeLabel: draft.departureAt.slice(11, 16) || '' } : {}),
+      subtitle: [
+        draft.flightNo,
+        draft.price != null ? `$${draft.price}` : '',
+      ].filter(Boolean).join(' · ') || undefined,
       payload: { kind: 'flight', flight: draft },
     });
+    recomputeBudgetNode(tripId);
     setEdit(false);
     onChanged?.();
   }
@@ -112,6 +118,12 @@ export function FlightDetail({
               <input className="nesio-trip-kv-v" value={draft.seat || ''} onChange={(e) => setDraft({ ...draft, seat: e.target.value })} aria-label={L(dict, '座位', 'Seat')} /></label>
             <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '确认号', 'Confirmation')}</span>
               <input className="nesio-trip-kv-v" value={draft.confirmation || ''} onChange={(e) => setDraft({ ...draft, confirmation: e.target.value })} aria-label={L(dict, '确认号', 'Confirmation')} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '票价', 'Price')}</span>
+              <input className="nesio-trip-kv-v" inputMode="decimal" value={draft.price ?? ''} onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) || undefined, currency: '$' })} aria-label={L(dict, '票价', 'Price')} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '起飞', 'Departure')}</span>
+              <input className="nesio-trip-kv-v" type="datetime-local" value={draft.departureAt?.slice(0, 16) || ''} onChange={(e) => setDraft({ ...draft, departureAt: e.target.value ? `${e.target.value}:00` : undefined })} aria-label={L(dict, '起飞', 'Departure')} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '到达时间', 'Arrival time')}</span>
+              <input className="nesio-trip-kv-v" type="datetime-local" value={draft.arrivalAt?.slice(0, 16) || ''} onChange={(e) => setDraft({ ...draft, arrivalAt: e.target.value ? `${e.target.value}:00` : undefined })} aria-label={L(dict, '到达时间', 'Arrival time')} /></label>
             <div className="nesio-trip-actions">
               <button type="button" className="nesio-trip-action" onClick={() => { setEdit(false); setDraft(flight); }}>{L(dict, '取消', 'Cancel')}</button>
               <button type="button" className="nesio-trip-primary" onClick={saveFlight}>{L(dict, '保存', 'Save')}</button>
@@ -125,7 +137,9 @@ export function FlightDetail({
             <Row label={L(dict, '座位', 'Seat')} value={flight.seat} />
             <Row label={L(dict, '舱位', 'Cabin')} value={flight.cabin} />
             <Row label={L(dict, '确认号', 'Confirmation')} value={flight.confirmation} />
-            <Row label={L(dict, '登机口', 'Gate')} value={flight.gate} />
+            <Row label={L(dict, '票价', 'Price')} value={flight.price != null ? `$${flight.price}` : null} />
+            <Row label={L(dict, '起飞', 'Departure')} value={flight.departureAt?.replace('T', ' ').slice(0, 16)} />
+            <Row label={L(dict, '到达', 'Arrival')} value={flight.arrivalAt?.replace('T', ' ').slice(0, 16)} />
             <button type="button" className="nesio-trip-action" onClick={() => setEdit(true)}>{L(dict, '编辑', 'Edit')}</button>
           </>
         )}
@@ -548,8 +562,10 @@ export function BudgetDetail({
   const [totalDraft, setTotalDraft] = useState(String(budget.budgetTotal || ''));
   const [editCat, setEditCat] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
+  const [newCatLabel, setNewCatLabel] = useState('');
   const pct = budget.budgetTotal > 0 ? Math.min(100, Math.round((budget.actualTotal / budget.budgetTotal) * 100)) : 0;
   const remain = budget.budgetTotal - budget.actualTotal;
+  const isCustomCat = (id: string) => !['flight', 'stay', 'shop', 'bank'].includes(id);
 
   return (
     <div className="nesio-trip-detail">
@@ -629,15 +645,34 @@ export function BudgetDetail({
                 </button>
               </div>
             ) : (
-              <div className={`nesio-trip-cat-note${over ? ' is-over' : ''}`}>
-                {over
-                  ? L(dict, `超 ${currency}${delta.toLocaleString()}`, `Over ${currency}${delta.toLocaleString()}`)
-                  : L(dict, `剩 ${currency}${delta.toLocaleString()} · 点上改`, `${currency}${delta.toLocaleString()} left · tap to edit`)}
+              <div className={`nesio-trip-cat-note${over ? ' is-over' : ''}`} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <span>
+                  {over
+                    ? L(dict, `超 ${currency}${delta.toLocaleString()}`, `Over ${currency}${delta.toLocaleString()}`)
+                    : L(dict, `剩 ${currency}${delta.toLocaleString()} · 点上改`, `${currency}${delta.toLocaleString()} left · tap to edit`)}
+                </span>
+                {isCustomCat(c.id) && (
+                  <button type="button" className="nesio-trip-link" style={{ color: 'var(--status-risk)', flexShrink: 0 }}
+                    onClick={() => { if (confirm(L(dict, `删掉分类「${c.label}」?`, `Delete category “${c.label}”?`))) { removeCustomBudgetCategory(tripId, c.id); onChanged(); } }}>
+                    {L(dict, '删', 'Del')}
+                  </button>
+                )}
               </div>
             )}
           </div>
         );
       })}
+
+      <div className="nesio-trip-card" style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center' }}>
+        <input type="text" value={newCatLabel} onChange={(e) => setNewCatLabel(e.target.value)}
+          placeholder={L(dict, '新分类名', 'New category')}
+          aria-label={L(dict, '新分类名', 'New category')}
+          className="nesio-trip-budget-edit-input" style={{ flex: 1, minWidth: '8rem' }} />
+        <button type="button" className="nesio-trip-primary nesio-trip-primary--inline" disabled={!newCatLabel.trim()}
+          onClick={() => { addCustomBudgetCategory(tripId, newCatLabel); setNewCatLabel(''); onChanged(); }}>
+          {L(dict, '加分类', 'Add category')}
+        </button>
+      </div>
 
       <div className="nesio-trip-actions" style={{ flexWrap: 'wrap' }}>
         <button type="button" className="nesio-trip-action" onClick={() => { recomputeBudgetNode(tripId); onChanged(); }}>
@@ -663,11 +698,21 @@ export function PoiDetail({
   tripId: string; nodeId: string; poi: PoiPayload; visited: boolean; dict: string; onChanged: () => void;
 }) {
   const zh = dict !== 'en';
+  const [edit, setEdit] = useState(false);
+  const [draft, setDraft] = useState(poi);
   const mapsUrl = `https://maps.apple.com/?ll=${poi.lat},${poi.lon}&q=${encodeURIComponent(poi.name)}`;
   const osmEmbed = `https://www.openstreetmap.org/export/embed.html?bbox=${poi.lon - 0.012}%2C${poi.lat - 0.01}%2C${poi.lon + 0.012}%2C${poi.lat + 0.01}&layer=mapnik&marker=${poi.lat}%2C${poi.lon}`;
   const wikiUrl = poi.wikidata
     ? `https://www.wikidata.org/wiki/${encodeURIComponent(poi.wikidata)}`
     : null;
+
+  function savePoi() {
+    updateNode(tripId, nodeId, {
+      payload: { kind: 'poi', poi: draft },
+    });
+    setEdit(false);
+    onChanged();
+  }
 
   function markVisited() {
     updateNode(tripId, nodeId, {
@@ -679,6 +724,9 @@ export function PoiDetail({
 
   return (
     <div className="nesio-trip-detail">
+      {poi.imageUrl ? (
+        <img src={poi.imageUrl} alt={poi.name} loading="lazy" style={{ width: '100%', maxHeight: 180, objectFit: 'cover', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-2)' }} />
+      ) : null}
       <iframe className="nesio-trip-map" title={poi.name} src={osmEmbed} loading="lazy" />
       <div className="nesio-trip-detail-hero">
         <IconMapPin size={28} />
@@ -696,10 +744,31 @@ export function PoiDetail({
         </p>
       )}
       <div className="nesio-trip-card">
-        <Row label={L(dict, '类型', 'Type')} value={poiTypeLabel(poi.type, zh)} />
-        <Row label={L(dict, '国家', 'Country')} value={poi.country} />
-        <Row label="Lat / Lon" value={`${poi.lat.toFixed(5)}, ${poi.lon.toFixed(5)}`} />
-        <Row label="Wikidata" value={poi.wikidata} />
+        {edit ? (
+          <>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '门票', 'Ticket')}</span>
+              <input className="nesio-trip-kv-v" value={draft.ticketPrice || ''} onChange={(e) => setDraft({ ...draft, ticketPrice: e.target.value })} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '开放时间', 'Hours')}</span>
+              <input className="nesio-trip-kv-v" value={draft.hours || ''} onChange={(e) => setDraft({ ...draft, hours: e.target.value })} /></label>
+            <label className="nesio-trip-kv"><span className="nesio-trip-kv-k">{L(dict, '小贴士', 'Tips')}</span>
+              <input className="nesio-trip-kv-v" value={draft.tips || ''} onChange={(e) => setDraft({ ...draft, tips: e.target.value })} /></label>
+            <div className="nesio-trip-actions">
+              <button type="button" className="nesio-trip-action" onClick={() => { setEdit(false); setDraft(poi); }}>{L(dict, '取消', 'Cancel')}</button>
+              <button type="button" className="nesio-trip-primary" onClick={savePoi}>{L(dict, '保存', 'Save')}</button>
+            </div>
+          </>
+        ) : (
+          <>
+            <Row label={L(dict, '类型', 'Type')} value={poiTypeLabel(poi.type, zh)} />
+            <Row label={L(dict, '国家', 'Country')} value={poi.country} />
+            <Row label={L(dict, '门票', 'Ticket')} value={poi.ticketPrice} />
+            <Row label={L(dict, '开放时间', 'Hours')} value={poi.hours} />
+            <Row label={L(dict, '小贴士', 'Tips')} value={poi.tips} />
+            <Row label="Lat / Lon" value={`${poi.lat.toFixed(5)}, ${poi.lon.toFixed(5)}`} />
+            <Row label="Wikidata" value={poi.wikidata} />
+            <button type="button" className="nesio-trip-action" onClick={() => setEdit(true)}>{L(dict, '编辑', 'Edit')}</button>
+          </>
+        )}
       </div>
       <p className="nesio-trip-footnote">
         {L(dict, '坐标来自随包离线库,无网也能加入行程;打开地图/百科需要网络。', 'Coords come from the offline pack; maps/wiki need network.')}

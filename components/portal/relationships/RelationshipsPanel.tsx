@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 import {
-  buildRelationships, lastContactLabel,
+  buildRelationships,
   CLOSENESS_META, type Contact, type Closeness,
 } from '@/lib/portal/relationships';
 import { getLocalOwner } from '@/lib/portal/local-owner';
@@ -55,13 +55,14 @@ function initialOf(name: string): string {
   return t ? Array.from(t)[0].toUpperCase() : '·';
 }
 
-/** 左侧头像:通讯录同步来的 Gmail 头像优先,没有才退回莫兰迪字母块(图片 404 也退回)。 */
+/** 左侧头像:自定义上传优先,其次通讯录 Gmail 头像,没有才退回莫兰迪字母块。 */
 function ContactAvatar({ c }: { c: Contact }) {
   const [broken, setBroken] = useState(false);
-  if (c.photo && !broken) {
+  const src = c.avatar || c.photo;
+  if (src && !broken) {
     return (
       // eslint-disable-next-line @next/next/no-img-element -- Google 头像是外域任意 URL,不走 next/image 优化
-      <img className="nesio-rel-av nesio-rel-av--img" src={c.photo} alt="" loading="lazy" decoding="async"
+      <img className="nesio-rel-av nesio-rel-av--img" src={src} alt="" loading="lazy" decoding="async"
         referrerPolicy="no-referrer" onError={() => setBroken(true)} />
     );
   }
@@ -267,7 +268,7 @@ export default function RelationshipsPanel() {
                   <span className="nesio-rel-row-body">
                     <span className="nesio-rel-name">{c.name}</span>
                     <span className="nesio-rel-sub">
-                      {c.relation ? `${c.relation} · ` : ''}{dict === 'en' ? `mentioned ${c.mentions}×` : `提到 ${c.mentions} 次`} · {L(dict, `上次${lastContactLabel(c, dict)}`, `last ${lastContactLabel(c, 'en')}`)}
+                      {c.relation || L(dict, '未设关系', 'No relation set')}
                     </span>
                   </span>
                 </div>

@@ -1002,10 +1002,9 @@ function buildMemGraphEdges(nodes: LifeNode[]): GEdge[] {
 
 export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: boolean }) {
   const [query, setQuery] = useState('');
-  const [typeFilter, setTypeFilter] = useState<string | null>(null);
-  // 2026-08-01 用户点名:类型筛选行下面再加 2 排——来源、自定义标签,三档筛选可叠加。
-  const [sourceFilter, setSourceFilter] = useState<string | null>(null);
-  const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [typeFilters, setTypeFilters] = useState<Set<string>>(new Set());
+  const [sourceFilters, setSourceFilters] = useState<Set<string>>(new Set());
+  const [tagFilters, setTagFilters] = useState<Set<string>>(new Set());
   const [customTagsList, setCustomTagsList] = useState<string[]>(() =>
     typeof window !== 'undefined' ? loadCustomMemoryTags() : [],
   );
@@ -1205,14 +1204,57 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     return n.type === filter;
   };
 
-  // 三档筛选可叠加(类型 + 来源 + 自定义标签),互不排斥。
-  const matchesAllFilters = (n: LifeNode): boolean => {
-    if (typeFilter && !matchesFilter(n, typeFilter)) return false;
-    if (sourceFilter && sourceKeyOf(n) !== sourceFilter) return false;
-    if (tagFilter && !(n.tags || []).includes(tagFilter)) return false;
+  // 三档筛选可叠加(类型 + 来源 + 自定义标签),每档可多选;跨档 AND,标签档内 AND。
+  const matchesTypeFilters = (n: LifeNode): boolean => {
+    if (typeFilters.size === 0) return true;
+    for (const f of typeFilters) if (matchesFilter(n, f)) return true;
+    return false;
+  };
+  const matchesSourceFilters = (n: LifeNode): boolean => {
+    if (sourceFilters.size === 0) return true;
+    return sourceFilters.has(sourceKeyOf(n));
+  };
+  const matchesTagFilters = (n: LifeNode): boolean => {
+    if (tagFilters.size === 0) return true;
+    const tags = n.tags || [];
+    for (const t of tagFilters) if (!tags.includes(t)) return false;
     return true;
   };
-  const hasActiveFilter = Boolean(typeFilter || sourceFilter || tagFilter);
+  const matchesAllFilters = (n: LifeNode): boolean =>
+    matchesTypeFilters(n) && matchesSourceFilters(n) && matchesTagFilters(n);
+
+  const hasActiveFilter = typeFilters.size > 0 || sourceFilters.size > 0 || tagFilters.size > 0;
+
+  function toggleSetFilter(value: string, set: (fn: (prev: Set<string>) => Set<string>) => void) {
+    set((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) next.delete(value);
+      else next.add(value);
+      return next;
+    });
+  }
+
+  // 分面计数:某一档 chip 的数字 = 在「其它档已选条件」下的命中数(交集)。
+  const nodesForTypeCounts = useMemo(() => {
+    let result = nodes;
+    if (sourceFilters.size > 0) result = result.filter(matchesSourceFilters);
+    if (tagFilters.size > 0) result = result.filter(matchesTagFilters);
+    return result;
+  }, [nodes, sourceFilters, tagFilters]);
+
+  const nodesForSourceCounts = useMemo(() => {
+    let result = nodes;
+    if (typeFilters.size > 0) result = result.filter(matchesTypeFilters);
+    if (tagFilters.size > 0) result = result.filter(matchesTagFilters);
+    return result;
+  }, [nodes, typeFilters, tagFilters]);
+
+  const nodesForTagCounts = useMemo(() => {
+    let result = nodes;
+    if (typeFilters.size > 0) result = result.filter(matchesTypeFilters);
+    if (sourceFilters.size > 0) result = result.filter(matchesSourceFilters);
+    return result;
+  }, [nodes, typeFilters, sourceFilters]);
 
   // 交易:照常进图、照常可搜、照常能被关联,但**默认列表里收进一个可展开的分组**。
   // 理由:交易是靠搜索和 dashboard 用的(用户 2026-07-30 定的),逐条铺开会把手记、
@@ -1226,7 +1268,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     if (hasActiveFilter) result = result.filter(matchesAllFilters);
     else if (!showTx) result = result.filter((n) => !isTxShadow(n));
     return result;
-  }, [nodes, typeFilter, sourceFilter, tagFilter, showTx]);
+  }, [nodes, typeFilters, sourceFilters, tagFilters, showTx, hasActiveFilter]);
 
   const results = query.trim()
     ? visibleMemoryNodes(smartNodes, canUsePrivateData).filter((n) => !hasActiveFilter || matchesAllFilters(n))
@@ -1237,36 +1279,34 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const visibleItems = results.slice(0, query ? Math.max(displayLimit, 30) : displayLimit);
 
   // 全量 reduce/filter 从每渲染重算改为随 nodes 记忆(QA 性能修)
-  const typeCounts = useMemo(() => nodes.reduce<Record<string, number>>((acc, n) => {
+  const typeCounts = useMemo(() => nodesForTypeCounts.reduce<Record<string, number>>((acc, n) => {
     acc[n.type] = (acc[n.type] ?? 0) + 1;
     return acc;
-  }, {}), [nodes]);
+  }, {}), [nodesForTypeCounts]);
   const facetCounts = useMemo(() => ({
-    'facet:plan': nodes.filter((n) => n.attributes?.planContainer || n.attributes?.planImported).length,
-    'facet:list': nodes.filter((n) => n.attributes?.checklist).length,
-  }), [nodes]);
+    'facet:plan': nodesForTypeCounts.filter((n) => n.attributes?.planContainer || n.attributes?.planImported).length,
+    'facet:list': nodesForTypeCounts.filter((n) => n.attributes?.checklist).length,
+  }), [nodesForTypeCounts]);
 
-  // 第二排:来源筛选(sourceKeyOf 分组,复用 sourceMeta 拿图标/文案,不重复维护判据)。
   const sourceGroups = useMemo(() => {
     const map = new Map<string, { icon: ReactNode; label: string; count: number }>();
-    for (const n of nodes) {
+    for (const n of nodesForSourceCounts) {
       const key = sourceKeyOf(n);
       const existing = map.get(key);
       if (existing) existing.count += 1;
       else { const meta = sourceMeta(n, dict); map.set(key, { icon: meta.icon, label: meta.label, count: 1 }); }
     }
     return map;
-  }, [nodes, dict]);
+  }, [nodesForSourceCounts, dict]);
 
-  // 第三排:自定义标签筛选(注册表内全部展示,含 0 条)。
   const tagCounts = useMemo(() => {
     const acc: Record<string, number> = {};
     for (const t of customTagsList) acc[t] = 0;
-    for (const n of nodes) for (const t of (n.tags || [])) {
+    for (const n of nodesForTagCounts) for (const t of (n.tags || [])) {
       if (isCustomMemoryTag(t)) acc[t] = (acc[t] ?? 0) + 1;
     }
     return acc;
-  }, [nodes, customTagsList]);
+  }, [nodesForTagCounts, customTagsList]);
 
 
   const onThisDayNodes = useMemo(() => findOnThisDayNodes(nodes), [nodes]);
@@ -1425,7 +1465,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                     </span>
                     <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
                       {hasActiveFilter && (
-                        <button type="button" className="nesio-section-action" onClick={() => { setTypeFilter(null); setSourceFilter(null); setTagFilter(null); }}>
+                        <button type="button" className="nesio-section-action" onClick={() => { setTypeFilters(new Set()); setSourceFilters(new Set()); setTagFilters(new Set()); }}>
                           {L(dict, '清除筛选', 'Clear filter')}
                         </button>
                       )}
@@ -1438,29 +1478,28 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                   <div className="nesio-memory-type-filter" role="group" aria-label={L(dict, '按类型筛选', 'Filter by type')}>
                     <button
                       type="button"
-                      className={`nesio-type-chip${!typeFilter ? ' is-active' : ''}`}
-                      onClick={() => setTypeFilter(null)}
+                      className={`nesio-type-chip${typeFilters.size === 0 ? ' is-active' : ''}`}
+                      onClick={() => setTypeFilters(new Set())}
                     >
                       {copy.allTypes}
-                      <span className="nesio-type-chip-count">{nodes.length}</span>
+                      <span className="nesio-type-chip-count">{nodesForTypeCounts.length}</span>
                     </button>
-                    {TYPE_ORDER.filter((t) => typeCounts[t]).map((t) => (
+                    {TYPE_ORDER.filter((t) => typeCounts[t] || typeFilters.has(t)).map((t) => (
                       <button
                         key={t}
                         type="button"
-                        className={`nesio-type-chip${typeFilter === t ? ' is-active' : ''}`}
-                        onClick={() => setTypeFilter((prev) => (prev === t ? null : t))}
+                        className={`nesio-type-chip${typeFilters.has(t) ? ' is-active' : ''}`}
+                        onClick={() => toggleSetFilter(t, setTypeFilters)}
                       >
                         <NodeTypeIcon type={t} size={12} /> {typeLabel(t, dict)}
-                        <span className="nesio-type-chip-count">{typeCounts[t]}</span>
+                        <span className="nesio-type-chip-count">{typeCounts[t] ?? 0}</span>
                       </button>
                     ))}
-                    {/* 批次 182(用户实锤):「计划」筛选取消,与「项目」合并(项目球即入口) */}
-                    {facetCounts['facet:list'] > 0 && (
+                    {(facetCounts['facet:list'] > 0 || typeFilters.has('facet:list')) && (
                       <button
                         type="button"
-                        className={`nesio-type-chip${typeFilter === 'facet:list' ? ' is-active' : ''}`}
-                        onClick={() => setTypeFilter((prev) => (prev === 'facet:list' ? null : 'facet:list'))}
+                        className={`nesio-type-chip${typeFilters.has('facet:list') ? ' is-active' : ''}`}
+                        onClick={() => toggleSetFilter('facet:list', setTypeFilters)}
                       >
                         <IconCheckSquare size={12} /> {L(dict, '清单', 'Lists')}
                         <span className="nesio-type-chip-count">{facetCounts['facet:list']}</span>
@@ -1473,8 +1512,8 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                     <div className="nesio-memory-type-filter" role="group" aria-label={L(dict, '按来源筛选', 'Filter by source')}>
                       <button
                         type="button"
-                        className={`nesio-type-chip${!sourceFilter ? ' is-active' : ''}`}
-                        onClick={() => setSourceFilter(null)}
+                        className={`nesio-type-chip${sourceFilters.size === 0 ? ' is-active' : ''}`}
+                        onClick={() => setSourceFilters(new Set())}
                       >
                         {L(dict, '全部来源', 'All sources')}
                       </button>
@@ -1482,8 +1521,8 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                         <button
                           key={key}
                           type="button"
-                          className={`nesio-type-chip${sourceFilter === key ? ' is-active' : ''}`}
-                          onClick={() => setSourceFilter((prev) => (prev === key ? null : key))}
+                          className={`nesio-type-chip${sourceFilters.has(key) ? ' is-active' : ''}`}
+                          onClick={() => toggleSetFilter(key, setSourceFilters)}
                         >
                           {g.icon} {g.label}
                           <span className="nesio-type-chip-count">{g.count}</span>
@@ -1497,8 +1536,8 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                     <div className="nesio-memory-type-filter" role="group" aria-label={L(dict, '按自定义标签筛选', 'Filter by custom tag')}>
                       <button
                         type="button"
-                        className={`nesio-type-chip${!tagFilter ? ' is-active' : ''}`}
-                        onClick={() => setTagFilter(null)}
+                        className={`nesio-type-chip${tagFilters.size === 0 ? ' is-active' : ''}`}
+                        onClick={() => setTagFilters(new Set())}
                       >
                         {L(dict, '全部标签', 'All tags')}
                       </button>
@@ -1506,8 +1545,8 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                         <button
                           key={t}
                           type="button"
-                          className={`nesio-type-chip${tagFilter === t ? ' is-active' : ''}`}
-                          onClick={() => setTagFilter((prev) => (prev === t ? null : t))}
+                          className={`nesio-type-chip${tagFilters.has(t) ? ' is-active' : ''}`}
+                          onClick={() => toggleSetFilter(t, setTagFilters)}
                         >
                           {t}
                           <span className="nesio-type-chip-count">{tagCounts[t] ?? 0}</span>

@@ -30,6 +30,8 @@ export interface Contact {
   groups: string[];              // Google 联系人分组(家人/同事/自建组),关系 tab 按此筛选
   /** Gmail/通讯录头像 URL(person 节点 attributes.photo,Google People API 拉的非默认头像)。 */
   photo: string | null;
+  /** 用户自定义头像(data URI),优先于 photo。 */
+  avatar: string | null;
 }
 
 const CADENCE: Record<Closeness, number> = { core: 14, close: 30, acquaintance: 90 };
@@ -209,7 +211,8 @@ export function buildRelationships(
 ): Contact[] {
   const acc = new Map<string, Acc>();
   const groupsByKey = new Map<string, Set<string>>();  // key → Google 分组名(排除内部标记)
-  const photoByKey = new Map<string, string>();        // key → Gmail 头像 URL(左侧显示真头像,不是字母块)
+  const photoByKey = new Map<string, string>();        // key → Gmail 头像 URL
+  const avatarByKey = new Map<string, string>();       // key → 自定义头像(data URI)
   const selfIds = selfIdentityKeys(self);
   // 数据审计 #4:实体解析 —— 别名表一趟只加载一次;身份键走 resolveEntityKey,让「妈妈/母亲」
   // 「Linda/linda@x.com」这类同一实体的不同写法收敛成一个联系人(无别名配置时=旧的规范化行为)。
@@ -249,8 +252,10 @@ export function buildRelationships(
   }
 
   for (const n of nodes) {
-    const nodeDate = n.lastConfirmedAt || (typeof n.attributes?.date === 'string' ? n.attributes.date : null) || n.createdAt;
-    const nodeIso = toIso(nodeDate);
+    const mentionDate = n.type === 'person'
+      ? null
+      : (n.lastConfirmedAt || (typeof n.attributes?.date === 'string' ? n.attributes.date : null) || n.createdAt);
+    const nodeIso = toIso(mentionDate);
 
     // email 节点:from = 对方。但邮件发件人大量是公司/机构 —— 只在「已是通讯录里的人」或
     // 「来自个人邮箱服务商」时才当联系人;公司域(fidelity.com/amazon.com…)的陌生发件人不新建。
@@ -263,16 +268,20 @@ export function buildRelationships(
       }
     }
 
-    // person 节点本身
+    // person 节点:只登记身份/头像/分组,**不用**同步导入日期当「上次联系」。
     if (n.type === 'person' && n.name) {
-      bump(n.name, n.name, nodeIso, null);
-      // 头像:通讯录同步存在 attributes.photo。名字与邮箱两个 key 都记,联系人由哪条线索
-      // 汇聚出来都能取到头像。
+      bump(n.name, n.name, null, null);
       const ph = typeof n.attributes?.photo === 'string' ? n.attributes.photo.trim() : '';
+      const av = typeof n.attributes?.avatar === 'string' ? n.attributes.avatar.trim() : '';
       if (ph) {
         photoByKey.set(resolveEntityKey(n.name, aliases), ph);
         const pe = typeof n.attributes?.email === 'string' ? n.attributes.email : '';
         if (pe) photoByKey.set(resolveEntityKey(pe, aliases), ph);
+      }
+      if (av) {
+        avatarByKey.set(resolveEntityKey(n.name, aliases), av);
+        const pe = typeof n.attributes?.email === 'string' ? n.attributes.email : '';
+        if (pe) avatarByKey.set(resolveEntityKey(pe, aliases), av);
       }
       // 分组标签(排除内部「联系人」标记)→ 供关系 tab 按组筛选;名字与邮箱两个 key 都记
       const gs = (n.tags || []).filter((t) => t && t !== '联系人');
@@ -282,6 +291,7 @@ export function buildRelationships(
         const em = typeof n.attributes?.email === 'string' ? n.attributes.email : '';
         if (em) addGroups(resolveEntityKey(em, aliases));
       }
+      continue;
     }
 
     // relations:targetId 可能是人名,也可能是节点 id(linkNodes 后)。
@@ -326,7 +336,7 @@ export function buildRelationships(
     out.push({
       key: a.key, name: a.name, relation, closeness,
       mentions: a.mentions, lastContactAt: last, daysSince, cadenceDays, reachOut, overdueRatio,
-      groups, photo: photoByKey.get(a.key) || null,
+      groups, photo: photoByKey.get(a.key) || null, avatar: avatarByKey.get(a.key) || null,
     });
   }
 

@@ -155,7 +155,13 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
         ingestLifeNode({
           type: 'collection',
           name: plain.slice(0, 40),
-          attributes: { source: 'Flomo', created: m.created_at, flomoSlug: m.slug || '' },
+          attributes: {
+            source: 'Flomo',
+            created: m.created_at,
+            flomoSlug: m.slug || '',
+            // ingestLifeNode externalKey 认 externalId —— slug 稳定,重同步原地更新不堆重复
+            ...(m.slug ? { externalId: `flomo:${m.slug}` } : {}),
+          },
           relations: [],
           tags: ['Flomo', ...(m.tags || [])],
           confidence: 0.9,

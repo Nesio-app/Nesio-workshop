@@ -92,6 +92,8 @@ export const CAPTURE_ACCEPT = '';
 
 export default function CaptureBar(capture: CaptureBarProps) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const albumRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -199,6 +201,22 @@ export default function CaptureBar(capture: CaptureBarProps) {
                 {busy ? <span className="nesio-tl-capture-spin" aria-hidden /> : <IconPlus size={16} />}
               </button>
               <input
+                ref={cameraRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="nesio-visually-hidden"
+                onChange={(e) => { const picked = Array.from(e.currentTarget.files || []); e.currentTarget.value = ''; stageFiles(picked); }}
+              />
+              <input
+                ref={albumRef}
+                type="file"
+                accept="image/*"
+                multiple
+                className="nesio-visually-hidden"
+                onChange={(e) => { const picked = Array.from(e.currentTarget.files || []); e.currentTarget.value = ''; stageFiles(picked); }}
+              />
+              <input
                 ref={fileRef}
                 type="file"
                 {...(CAPTURE_ACCEPT ? { accept: CAPTURE_ACCEPT } : {})}
@@ -299,8 +317,16 @@ export default function CaptureBar(capture: CaptureBarProps) {
       {plusOpen && capture.onFiles && (
         <div className="nesio-cap-plus-menu" role="menu">
           <button type="button" role="menuitem" className="nesio-cap-plus-item"
+            onClick={() => { setPlusOpen(false); cameraRef.current?.click(); }}>
+            {L(dict, '拍照', 'Camera')}
+          </button>
+          <button type="button" role="menuitem" className="nesio-cap-plus-item"
+            onClick={() => { setPlusOpen(false); albumRef.current?.click(); }}>
+            {L(dict, '相册', 'Album')}
+          </button>
+          <button type="button" role="menuitem" className="nesio-cap-plus-item"
             onClick={() => { setPlusOpen(false); fileRef.current?.click(); }}>
-            {L(dict, '照片 / 文件', 'Photo / file')}
+            {L(dict, '文件', 'File')}
           </button>
         </div>
       )}

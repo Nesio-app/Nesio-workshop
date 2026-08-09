@@ -7,7 +7,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   listPlannedTrips, createBlankTrip, importBookingIntoTrip, groupTripsByTime,
-  TRAVEL_TRIPS_UPDATED_EVENT, type Trip,
+  TRAVEL_TRIPS_UPDATED_EVENT, extractTextFromBookingFile, type Trip,
 } from '@/lib/portal/travel-trips';
 import { ensureTravelPoiLoaded } from '@/lib/portal/travel-poi';
 import { suggestTripsFromEmails, acceptTripSuggestion, dismissTripSuggestion, type TripSuggestion } from '@/lib/portal/trip-suggest';
@@ -131,13 +131,21 @@ export default function TravelPlanPanel() {
   async function onPickBooking(file: File | undefined) {
     if (!file) return;
     setImportErr(null);
-    try {
-      const text = await file.text();
-      if (!text.trim()) { setImportErr(L(dict, '这个文件是空的。', 'That file is empty.')); return; }
-      setImportText(text.slice(0, 20000));
-    } catch {
-      setImportErr(L(dict, '这个文件读不了 —— 换个 .txt / .eml,或直接粘贴正文。', "Couldn't read that file — try a .txt/.eml, or paste the text."));
+    const extracted = await extractTextFromBookingFile(file);
+    if (!extracted.ok) {
+      const msg: Record<typeof extracted.reason, [string, string]> = {
+        empty: ['这个文件是空的。', 'That file is empty.'],
+        binary: ['这个文件读不了 —— 换个 .txt / .eml,或直接粘贴正文。', "Couldn't read that file — try a .txt/.eml, or paste the text."],
+        pdf_scanned: ['这份 PDF 是扫描件 —— 请复制正文粘贴。', 'This PDF is a scan — paste the text instead.'],
+        pdf_failed: ['PDF 打不开 —— 请复制正文粘贴。', 'Couldn’t open the PDF — paste the text instead.'],
+        image: ['图片暂不能直接识别 —— 请粘贴确认单文字。', 'Images can’t be parsed yet — paste the confirmation text.'],
+        read_failed: ['这个文件读不了 —— 换个 .txt / .eml,或直接粘贴正文。', "Couldn't read that file — try a .txt/.eml, or paste the text."],
+      };
+      const [zh, en] = msg[extracted.reason];
+      setImportErr(L(dict, zh, en));
+      return;
     }
+    setImportText(extracted.text);
   }
 
   function doImport() {
@@ -288,7 +296,7 @@ export default function TravelPlanPanel() {
           {importMsg && <p className="nesio-trip-msg" role="status">{importMsg}</p>}
           {/* bug3:「粘贴预定按钮不管用」—— 没有剪贴板权限/内容时,原来这条路是死的。
               补一个「上传」把 .txt/.eml 读进文本框,再点「识别」。 */}
-          <input ref={bookingFileRef} type="file" accept=".txt,.eml,.md,text/plain,message/rfc822"
+          <input ref={bookingFileRef} type="file" accept=".txt,.eml,.md,.html,.pdf,text/plain,message/rfc822,application/pdf,image/*"
             className="nesio-visually-hidden"
             onChange={(e) => { void onPickBooking(e.target.files?.[0]); e.currentTarget.value = ''; }} />
           <div className="nesio-travel-plan-form-actions">
