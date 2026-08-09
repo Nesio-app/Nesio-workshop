@@ -162,10 +162,10 @@ export async function ensureTravelPoiLoaded(): Promise<{ japan: number; tokyo: n
   try {
     await loadPromise;
     return {
-      japan: japanCache?.length || 0,
-      tokyo: tokyoCache?.length || 0,
-      world: worldCache?.length || 0,
-      total: allPoisCache?.length || 0,
+      japan: japanCache ? japanCache.length : 0,
+      tokyo: tokyoCache ? tokyoCache.length : 0,
+      world: worldCache ? worldCache.length : 0,
+      total: allPoisCache ? allPoisCache.length : 0,
     };
   } catch (err) {
     return { japan: 0, tokyo: 0, world: 0, total: 0, error: err instanceof Error ? err.message : 'poi_load_failed' };

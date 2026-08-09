@@ -710,9 +710,15 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
   const [linkCandidates, setLinkCandidates] = useState<LifeNode[]>([]);
   const [lensOpen, setLensOpen] = useState(false);        // 镜头看记忆(底部弹层)
   const [nudgeDismissed, setNudgeDismissed] = useState(false); // 情绪重记忆的主动提示已划走
+  const [rawExpanded, setRawExpanded] = useState(false); // 批次 74:原始记录折叠
+  const [otherAttrsExpanded, setOtherAttrsExpanded] = useState(false); // 2026-08-01:其他属性默认折叠,别让生 key 抢眼
+  const [customTagsList, setCustomTagsList] = useState<string[]>(() => loadCustomMemoryTags());
+  const [newTagInput, setNewTagInput] = useState('');
+  const [nodeTags, setNodeTags] = useState<string[]>(() => node?.tags ?? []);
+  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   // 批次 172(关联记忆闪退根治):搜索移出渲染热路径 —— 去抖异步跑,不再每次按键同步搜全图
   // (516 节点 + 中文 2-gram 同步搜会卡死主线程 → iOS 看门狗杀 webview = 用户实锤「一打字就闪退」)。
-  useEffect(() => { setNodeTags(node.tags ?? []); }, [node.id, node.tags]);
+  useEffect(() => { setNodeTags(node?.tags ?? []); }, [node?.id, node?.tags]);
   useEffect(() => {
     const syncTags = () => setCustomTagsList(loadCustomMemoryTags());
     window.addEventListener(MEMORY_CUSTOM_TAGS_EVENT, syncTags);
@@ -727,12 +733,6 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
     }, 220);
     return () => clearTimeout(h);
   }, [linkQuery, linkPicking, node?.id]);
-  const [rawExpanded, setRawExpanded] = useState(false); // 批次 74:原始记录折叠
-  const [otherAttrsExpanded, setOtherAttrsExpanded] = useState(false); // 2026-08-01:其他属性默认折叠,别让生 key 抢眼
-  const [customTagsList, setCustomTagsList] = useState<string[]>(() => loadCustomMemoryTags());
-  const [newTagInput, setNewTagInput] = useState('');
-  const [nodeTags, setNodeTags] = useState<string[]>(() => node.tags ?? []);
-  const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [editing, setEditing] = useState(false);
   // 批次192:编辑存放位置时,从 LocationPicker 捕获稳定 placeId/room/subRoom(存入时写节点/清空)。
   const [editPlaceMeta, setEditPlaceMeta] = useState<LocationMeta | null>(null);
