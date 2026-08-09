@@ -39,8 +39,14 @@ import { saveGeneratedRecipe, findGeneratedRecipe } from '@/lib/cooking/generate
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { localDayKey } from '@/lib/portal/local-day';
 import { loadHealthMetrics } from '@/lib/portal/health-store';
-import { rankFoodReactions, mgDlToDisplay } from '@/lib/portal/body-ledger';
-import type { DailyFact } from '@/lib/portal/apple-health';
+import {
+  rankFoodReactions, mgDlToDisplay, buildDayLedger, ledgerPrompt, goalLabel,
+  setBodyGoalKind, type BodyGoalKind,
+} from '@/lib/portal/body-ledger';
+import type { DailyFact, HealthMetrics } from '@/lib/portal/apple-health';
+import { getLifeGraph } from '@/lib/portal/life-graph';
+import { resolveAssetDisplayUrl } from '@/lib/portal/capture-pipeline';
+import { PostMealBody } from '../health/BodyLedgerPanel';
 
 type TopTab = 'home' | 'pantry' | 'wishlist' | 'meals';
 
@@ -1649,25 +1655,52 @@ function SubTabs({ active, onSelect, t }: { active: TopTab; onSelect: (k: TopTab
 }
 
 /**
- * MealsBody — 已记一餐列表 + 同日血糖振幅 + 食物反应探索。
- * 记餐入口仍走主相机 mode=meal;营养估算已在记入时落库。
+ * MealsBody — 拍照记餐列表 + 今日营养评估 + 餐后血糖趋势 + 食物反应探索。
  */
 function MealsBody({ onLogMeal, t }: { onLogMeal: () => void; t: TT }) {
+  const dict = t('zh', 'en');
+  const zh = dict === 'zh';
   const [meals, setMeals] = useState<Meal[]>([]);
+  const [health, setHealth] = useState<HealthMetrics | null>(null);
   const [daily, setDaily] = useState<DailyFact[] | undefined>();
   const [gluUnit, setGluUnit] = useState<'mg/dL' | 'mmol/L'>('mg/dL');
+  const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [tick, setTick] = useState(0);
+  const [goalRev, setGoalRev] = useState(0);
 
   useEffect(() => {
     try { setMeals(getMeals()); } catch { setMeals([]); }
     try {
       const hm = loadHealthMetrics();
+      setHealth(hm);
       setDaily(hm?.daily);
       if (hm?.glucose?.unit === 'mmol/L') setGluUnit('mmol/L');
     } catch {
+      setHealth(null);
       setDaily(undefined);
     }
   }, [tick]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const graph = getLifeGraph();
+      const byId = new Map(graph.map((n) => [n.id, n]));
+      const next: Record<string, string> = {};
+      await Promise.all(meals.slice(0, 40).map(async (m) => {
+        const node = byId.get(m.id);
+        const asset = node?.assets?.find((a) => a.kind === 'image') || node?.assets?.[0];
+        if (!asset) return;
+        const url = await resolveAssetDisplayUrl({
+          assetId: asset.id || null,
+          storagePath: asset.storagePath || null,
+        });
+        if (url) next[m.id] = url;
+      }));
+      if (!cancelled) setThumbs(next);
+    })();
+    return () => { cancelled = true; };
+  }, [meals, tick]);
 
   useEffect(() => {
     const bump = () => setTick((n) => n + 1);
@@ -1679,13 +1712,19 @@ function MealsBody({ onLogMeal, t }: { onLogMeal: () => void; t: TT }) {
     };
   }, []);
 
+  const ledger = useMemo(
+    () => buildDayLedger(undefined, { rings: health?.activityRings, meals }),
+    [health, meals, goalRev],
+  );
+  const prompt = useMemo(() => ledgerPrompt(ledger, zh), [ledger, zh]);
   const reactions = useMemo(() => rankFoodReactions(meals, daily, { minN: 2, limit: 6 }), [meals, daily]);
   const byDate = useMemo(() => new Map((daily || []).map((d) => [d.date, d])), [daily]);
 
-  const fmtDay = (d: string) => {
-    const zh = t('zh', 'en') === 'zh';
-    return zh ? `${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日` : d.slice(5).replace('-', '/');
-  };
+  const fmtDay = (d: string) => (
+    zh ? `${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日` : d.slice(5).replace('-', '/')
+  );
+
+  const pct = (v: number, g: number) => (g > 0 ? Math.min(100, Math.round((v / g) * 100)) : 0);
 
   return (
     <>
@@ -1694,9 +1733,60 @@ function MealsBody({ onLogMeal, t }: { onLogMeal: () => void; t: TT }) {
           {t('拍照记一餐', 'Photo log a meal')}
         </button>
       </div>
-      <p style={caption}>
-        {t('记下的餐会进身体账本;有 Apple 健康血糖时,同日振幅会显示在下面。', 'Logged meals feed the body ledger; same-day glucose swing shows below when Health data is present.')}
-      </p>
+
+      <section>
+        <SectionHead label={t('今日营养', 'Today nutrition')} right={goalLabel(ledger.goals.goal, zh)} />
+        <div style={{ ...card, padding: 'var(--space-3)' }}>
+          <div style={{ display: 'flex', gap: 'var(--space-1)', marginBottom: 'var(--space-3)' }}>
+            {(['muscle', 'maintain', 'cut'] as BodyGoalKind[]).map((g) => {
+              const on = ledger.goals.goal === g;
+              return (
+                <button key={g} type="button" onClick={() => { setBodyGoalKind(g); setGoalRev((n) => n + 1); }}
+                  style={{
+                    flex: 1, border: 'none', borderRadius: 'var(--radius-pill)', padding: 'var(--space-2) 0',
+                    fontSize: 'var(--text-xs)', fontWeight: on ? 700 : 600, fontFamily: 'var(--font-sans)', cursor: 'pointer',
+                    background: on ? 'var(--portal-accent)' : 'var(--portal-accent-soft)', color: on ? '#fff' : 'var(--portal-muted)',
+                  }}>
+                  {goalLabel(g, zh)}
+                </button>
+              );
+            })}
+          </div>
+          {([
+            [t('蛋白', 'Protein'), ledger.protein, ledger.goals.proteinG, 'g'],
+            [t('热量', 'Calories'), ledger.energyKCal, ledger.goals.energyKCal, ' kcal'],
+            [t('碳水', 'Carbs'), ledger.carbs, ledger.goals.carbsG, 'g'],
+          ] as const).map(([label, v, g, unit]) => (
+            <div key={label} style={{ marginBottom: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginBottom: 4 }}>
+                <span>{label}</span>
+                <span>{Math.round(v)} / {g}{unit}</span>
+              </div>
+              <div style={{ height: 6, borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)', overflow: 'hidden' }}>
+                <div style={{
+                  width: `${pct(v, g)}%`, height: '100%', borderRadius: 'var(--radius-pill)',
+                  background: pct(v, g) > 100 ? 'var(--status-gentle)' : 'var(--portal-accent)',
+                }} />
+              </div>
+            </div>
+          ))}
+          {prompt && (
+            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-sm)', color: 'var(--portal-ink)', fontWeight: 600 }}>{prompt}</p>
+          )}
+          {!prompt && ledger.meals.length > 0 && (
+            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-go)' }}>
+              {t('今天营养大致在目标附近。', 'Today’s intake looks near your goal.')}
+            </p>
+          )}
+        </div>
+      </section>
+
+      <section>
+        <SectionHead label={t('餐后血糖趋势', 'Post-meal glucose trend')} />
+        <div style={{ ...card, padding: 'var(--space-3)' }}>
+          <PostMealBody health={health} dict={dict} />
+        </div>
+      </section>
 
       {reactions.length > 0 && (
         <section>
@@ -1742,19 +1832,26 @@ function MealsBody({ onLogMeal, t }: { onLogMeal: () => void; t: TT }) {
                   `Glu avg ${mgDlToDisplay(fact.glucoseAvg, gluUnit)}${fact.glucoseMax != null ? ` · max ${mgDlToDisplay(fact.glucoseMax, gluUnit)}` : ''}`,
                 )
                 : null;
+              const thumb = thumbs[m.id];
               return (
                 <div key={m.id} style={card}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', alignItems: 'baseline' }}>
-                    <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--portal-ink)' }}>{title}</span>
-                    <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{fmtDay(m.occurredAt)}</span>
-                  </div>
-                  <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-                    {t(m.source, m.source === '自己做' ? 'Home' : m.source === '餐厅' ? 'Dine-in' : m.source === '外卖' ? 'Takeout' : 'Other')}
-                    {` · ${Math.round(m.energyKCal)} kcal · P${Math.round(m.protein)} C${Math.round(m.cho)} F${Math.round(m.fat)}`}
-                  </p>
-                  {glu && (
-                    <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-calm)' }}>{glu}</p>
+                  {thumb && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={thumb} alt="" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block' }} />
                   )}
+                  <div style={{ padding: 'var(--space-3)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 'var(--space-2)', alignItems: 'baseline' }}>
+                      <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700, color: 'var(--portal-ink)' }}>{title}</span>
+                      <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{fmtDay(m.occurredAt)}</span>
+                    </div>
+                    <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                      {t(m.source, m.source === '自己做' ? 'Home' : m.source === '餐厅' ? 'Dine-in' : m.source === '外卖' ? 'Takeout' : 'Other')}
+                      {` · ${Math.round(m.energyKCal)} kcal · P${Math.round(m.protein)} C${Math.round(m.cho)} F${Math.round(m.fat)}`}
+                    </p>
+                    {glu && (
+                      <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-calm)' }}>{glu}</p>
+                    )}
+                  </div>
                 </div>
               );
             })}

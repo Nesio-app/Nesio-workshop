@@ -867,11 +867,42 @@ export default function WardrobePanel() {
         </p>
       )}
 
+      {/* 今天页主屏:多张全身照(不依赖先点试穿) */}
+      <div style={{ ...card, marginTop: 'var(--space-3)', background: 'var(--glass-bg-solid, var(--portal-bg))' }}>
+        <input ref={bodyFileRef} type="file" accept="image/*" className="nesio-visually-hidden" onChange={onPickBody} />
+        <p style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>
+          {L(dict, '全身照', 'Full-body photos')}
+        </p>
+        <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center', marginTop: 'var(--space-2)' }}>
+          {bodyIds.map((id) => (
+            <button key={id} type="button" onClick={() => selectBody(id)}
+              aria-pressed={activeBodyId === id}
+              style={{
+                flexShrink: 0, width: 56, height: 72, borderRadius: 'var(--radius-md)', padding: 0, overflow: 'hidden', cursor: 'pointer',
+                border: activeBodyId === id ? '2px solid var(--portal-accent)' : '1px dashed var(--portal-accent-border)',
+                background: 'var(--portal-accent-soft)',
+              }}>
+              {bodyThumbs[id] ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={bodyThumbs[id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : null}
+            </button>
+          ))}
+          <button type="button" onClick={() => bodyFileRef.current?.click()}
+            style={{ flexShrink: 0, width: 56, height: 72, borderRadius: 'var(--radius-md)', border: '1px dashed var(--portal-accent-border)', background: 'var(--portal-accent-soft)', cursor: 'pointer', overflow: 'hidden', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', padding: 0 }}>
+            <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-1)' }}><IconCamera size={18} />{bodyIds.length ? L(dict, '再加', 'Add') : L(dict, '添加', 'Add')}</span>
+          </button>
+        </div>
+        <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.55 }}>
+          {!bodyThumb
+            ? L(dict, '上传全身照(正面、光线好)后可试穿。照片只存本机,点「试穿」时才发出。', 'Add a full-body photo for try-on. Kept on device; sent only when you try on.')
+            : L(dict, '点选一张用于试穿;可留几张备选。', 'Select one for try-on; you can keep a few.')}
+        </p>
+      </div>
+
       {/* C｜上身试穿(展开在搭配卡下方) */}
       {tryonOpen && (
         <div style={{ ...card, marginTop: 'var(--space-3)', background: 'var(--glass-bg-solid, var(--portal-bg))' }}>
-          <input ref={bodyFileRef} type="file" accept="image/*" className="nesio-visually-hidden" onChange={onPickBody} />
-          {/* bug3:「目 上身试穿」这个图标和标题都删掉 —— 卡片里已经是全身照 + 试穿按钮,自明。 */}
           <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }}>
             <Button variant="ghost" size="sm" onClick={() => setTryonOpen(false)} aria-label={L(dict, '收起', 'Close')}>✕</Button>
           </div>
@@ -892,49 +923,14 @@ export default function WardrobePanel() {
             </div>
           ) : (
             <>
-              {/* 全身照(可多张) */}
-              <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center', marginTop: 'var(--space-3)' }}>
-                {bodyIds.map((id) => (
-                  <button key={id} type="button" onClick={() => selectBody(id)}
-                    aria-pressed={activeBodyId === id}
-                    style={{
-                      flexShrink: 0, width: 56, height: 72, borderRadius: 'var(--radius-md)', padding: 0, overflow: 'hidden', cursor: 'pointer',
-                      border: activeBodyId === id ? '2px solid var(--portal-accent)' : '1px dashed var(--portal-accent-border)',
-                      background: 'var(--portal-accent-soft)',
-                    }}>
-                    {bodyThumbs[id] ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={bodyThumbs[id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : null}
-                  </button>
-                ))}
-                <button type="button" onClick={() => bodyFileRef.current?.click()}
-                  style={{ flexShrink: 0, width: 56, height: 72, borderRadius: 'var(--radius-md)', border: '1px dashed var(--portal-accent-border)', background: 'var(--portal-accent-soft)', cursor: 'pointer', overflow: 'hidden', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', padding: 0 }}>
-                  <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-1)' }}><IconCamera size={18} />{bodyIds.length ? L(dict, '再加', 'Add') : L(dict, '全身照', 'Full body')}</span>
-                </button>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  {/* bug3:已有全身照时那句「用这张全身照把这套穿上看看」删掉(照片就在旁边,不必解说)。
-                      还没上传时保留提示 —— 并且把隐私那句合并到这里:交出照片之前才是需要知情的时刻。 */}
-                  {!bodyThumb && (
-                    <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
-                      {L(dict, '上传一张全身照(正面、光线好),就能看这套穿在你身上的样子。照片只存在你手机本地,仅在点「试穿」时发出去用于生成,服务端不留存。',
-                        'Add a full-body photo (front, good light) to see the outfit on you. It stays on your device — sent only when you tap Try on, never stored on the server.')}
-                    </p>
-                  )}
-                  {bodyThumb && (
-                    <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-                      {L(dict, '点选一张全身照用于试穿;可再加几张备选。', 'Select a full-body photo for try-on; you can keep a few.')}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* role=alert 与「搭配」那一处对齐 —— 同一个 tryonError 在两个屏渲染,
-                  少一个 role 就变成「一处读屏会播报、另一处不会」。 */}
+              <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                {bodyThumb
+                  ? L(dict, '将用上方选中的全身照生成上身效果。', 'Uses the full-body photo selected above.')
+                  : L(dict, '先在上方加一张全身照。', 'Add a full-body photo above first.')}
+              </p>
               {tryonError && (
                 <p role="alert" style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)' }}>{tryonError}</p>
               )}
-
               <Button variant="primary" size="lg" full layoutStyle={{ marginTop: 'var(--space-3)' }}
                 disabled={tryonBusy} onClick={() => runTryon(currentPieces)}>
                 {tryonBusy ? L(dict, '生成中…(约十几秒)', 'Generating… (~15s)') : !isPro ? L(dict, '试穿(Pro)', 'Try on (Pro)') : L(dict, '试穿', 'Try on')}
@@ -1444,6 +1440,7 @@ function SavedOutfits({
 
   const Row = ({ o }: { o: SavedOutfit }) => {
     const worn = wornCount(outfits, o.pieceIds);
+    const tryUrl = o.tryonAssetId ? tryons[o.tryonAssetId] : undefined;
     const startHold = () => {
       holdRef.current = window.setTimeout(() => { setSchedulingId(o.id); holdRef.current = null; }, 550);
     };
@@ -1467,7 +1464,15 @@ function SavedOutfits({
                   : L(dict, `穿过 ${worn} 次`, `worn ${worn}×`)}
             </span>
           </div>
-          <PieceStrip o={o} size={52} />
+          {tryUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={tryUrl} alt="" style={{
+              width: '100%', maxHeight: 140, objectFit: 'cover', marginTop: 'var(--space-2)',
+              borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)',
+            }} />
+          ) : (
+            <PieceStrip o={o} size={52} />
+          )}
         </div>
         {schedulingId === o.id ? <Scheduler o={o} /> : <Actions o={o} />}
       </div>

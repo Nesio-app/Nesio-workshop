@@ -2,13 +2,13 @@
 
 /**
  * DictDetailView — 欧路式词条详情:释义 / 例句 / 助记·词根·搭配。
- * 离线释义始终可见;例句可本地或 AI;助记等懒加载 AI 并缓存。
+ * 离线释义始终可见;例句/助记在 AI 开关打开时懒加载补全并缓存。
  */
 
 import { useCallback, useEffect, useState } from 'react';
 import type { DictEntry } from '@/lib/portal/dictionary/offline-lexicon';
 import {
-  fetchAiEnrich, isInWordbook, loadEnrichCache, saveEnrichCache, toggleWordbook,
+  fetchAiEnrich, isInWordbook, loadAiEnabled, loadEnrichCache, saveEnrichCache, toggleWordbook,
 } from '@/lib/portal/dictionary/lookup';
 
 type DetailTab = 'senses' | 'examples' | 'study';
@@ -28,6 +28,7 @@ export default function DictDetailView({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [inBook, setInBook] = useState(() => isInWordbook(entry.word));
+  const [aiOn, setAiOn] = useState(() => loadAiEnabled());
 
   useEffect(() => {
     const cached = loadEnrichCache(entry.word);
@@ -35,6 +36,7 @@ export default function DictDetailView({
     setTab('senses');
     setErr('');
     setInBook(isInWordbook(entry.word));
+    setAiOn(loadAiEnabled());
   }, [entry]);
 
   const merged: DictEntry = {
@@ -78,10 +80,10 @@ export default function DictDetailView({
   }, [entry, locale, t]);
 
   useEffect(() => {
-    if (!needEnrich || busy) return;
+    if (!aiOn || !needEnrich || busy) return;
     if (loadEnrichCache(entry.word)) return;
     void runEnrich();
-  }, [needEnrich, busy, entry.word, runEnrich]);
+  }, [aiOn, needEnrich, busy, entry.word, runEnrich]);
 
   const onStar = () => {
     const r = toggleWordbook(entry.word);
@@ -92,6 +94,10 @@ export default function DictDetailView({
     setInBook(r.inBook);
     onBookChange?.();
   };
+
+  const emptyHint = !aiOn
+    ? t('开「AI 查词」可补例句与助记。', 'Turn on AI lookup to fill examples and study notes.')
+    : null;
 
   return (
     <div className="nesio-dict-detail">
@@ -150,7 +156,15 @@ export default function DictDetailView({
               <span className="nesio-dict-ex-zh">{ex.zh}</span>
             </p>
           )) : !busy && (
-            <p className="nesio-dict-empty">{t('还没有例句。', 'No examples yet.')}</p>
+            <>
+              <p className="nesio-dict-empty">{emptyHint || t('还没有例句。', 'No examples yet.')}</p>
+              {!aiOn && (
+                <button type="button" className="nesio-dict-retry" style={{ marginTop: 8 }}
+                  onClick={() => { void runEnrich(); }}>
+                  {t('仍用 AI 补一次', 'Enrich once with AI')}
+                </button>
+              )}
+            </>
           )}
         </div>
       )}
@@ -181,7 +195,15 @@ export default function DictDetailView({
             </section>
           )}
           {!busy && !merged.mnemonic && !merged.roots && !(merged.collocations?.length) && (
-            <p className="nesio-dict-empty">{t('还没有助记内容。', 'No study notes yet.')}</p>
+            <>
+              <p className="nesio-dict-empty">{emptyHint || t('还没有助记内容。', 'No study notes yet.')}</p>
+              {!aiOn && (
+                <button type="button" className="nesio-dict-retry" style={{ marginTop: 8 }}
+                  onClick={() => { void runEnrich(); }}>
+                  {t('仍用 AI 补一次', 'Enrich once with AI')}
+                </button>
+              )}
+            </>
           )}
         </div>
       )}
