@@ -25,6 +25,7 @@ import {
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import Button from '@/components/portal/ui/Button';
+import NesioSheet from '@/components/portal/ui/NesioSheet';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -1321,61 +1322,53 @@ export default function WardrobePanel() {
       </>
       )}
 
-      {unwornOpen && (
-        <div role="dialog" aria-modal="true" aria-label={L(dict, '好久没穿', 'Unworn')}
-          style={{
-            position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(0,0,0,0.45)',
-            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-          }}
-          onClick={() => setUnwornOpen(false)}>
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              width: '100%', maxWidth: 480, maxHeight: '72vh', overflowY: 'auto',
-              background: 'var(--sheet-opaque, var(--portal-bg))', borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0',
-              padding: 'var(--space-4)', border: '1px solid var(--portal-line)',
-            }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
-              <p style={{ margin: 0, fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>
-                {L(dict, '好久没穿', 'Unworn / idle')}
-              </p>
-              <Button variant="ghost" size="sm" onClick={() => setUnwornOpen(false)} aria-label={L(dict, '关闭', 'Close')}>✕</Button>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-              {items.filter((g) => {
-                if (g.wearCount === 0) return true;
-                if (!g.lastWornAt) return true;
-                return (Date.now() - Date.parse(g.lastWornAt)) / 86_400_000 >= UNWORN_DAYS;
-              }).map((g) => (
-                <button key={g.id} type="button"
-                  onClick={() => { setUnwornOpen(false); setDetailId(g.id); setTab('closet'); }}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 'var(--space-3)', textAlign: 'left',
-                    padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)',
-                    background: 'var(--portal-accent-soft)', color: 'var(--portal-ink)', cursor: 'pointer',
-                  }}>
-                  <span style={{ width: 48, height: 48, borderRadius: 'var(--radius-sm)', overflow: 'hidden', flexShrink: 0, background: 'var(--portal-bg)', display: 'grid', placeItems: 'center' }}>
-                    {thumbs[g.id] ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={thumbs[g.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    ) : <GarmentIcon type={g.garmentType} size={22} />}
-                  </span>
-                  <span style={{ flex: 1, minWidth: 0 }}>
-                    <span style={{ display: 'block', fontWeight: 'var(--weight-medium)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</span>
-                    <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-                      {g.wearCount === 0
-                        ? L(dict, '还没穿过', 'Never worn')
-                        : g.lastWornAt
-                          ? L(dict, `上次 ${g.lastWornAt.slice(5, 10)}`, `last ${g.lastWornAt.slice(5, 10)}`)
-                          : L(dict, '很久没记', 'Long idle')}
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
+      <NesioSheet
+        variant="bottom"
+        elevated
+        open={unwornOpen}
+        onOpenChange={setUnwornOpen}
+        ariaLabel={L(dict, '好久没穿', 'Unworn')}
+        style={{ maxHeight: '72vh' }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+          <p style={{ margin: 0, fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>
+            {L(dict, '好久没穿', 'Unworn / idle')}
+          </p>
+          <Button variant="ghost" size="sm" onClick={() => setUnwornOpen(false)} aria-label={L(dict, '关闭', 'Close')}>✕</Button>
         </div>
-      )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', maxHeight: '60vh', overflowY: 'auto' }}>
+          {items.filter((g) => {
+            if (g.wearCount === 0) return true;
+            if (!g.lastWornAt) return true;
+            return (Date.now() - Date.parse(g.lastWornAt)) / 86_400_000 >= UNWORN_DAYS;
+          }).map((g) => (
+            <button key={g.id} type="button"
+              onClick={() => { setUnwornOpen(false); setDetailId(g.id); setTab('closet'); }}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 'var(--space-3)', textAlign: 'left',
+                padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)',
+                background: 'var(--portal-accent-soft)', color: 'var(--portal-ink)', cursor: 'pointer',
+              }}>
+              <span style={{ width: 48, height: 48, borderRadius: 'var(--radius-sm)', overflow: 'hidden', flexShrink: 0, background: 'var(--portal-bg)', display: 'grid', placeItems: 'center' }}>
+                {thumbs[g.id] ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={thumbs[g.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : <GarmentIcon type={g.garmentType} size={22} />}
+              </span>
+              <span style={{ flex: 1, minWidth: 0 }}>
+                <span style={{ display: 'block', fontWeight: 'var(--weight-medium)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</span>
+                <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                  {g.wearCount === 0
+                    ? L(dict, '还没穿过', 'Never worn')
+                    : g.lastWornAt
+                      ? L(dict, `上次 ${g.lastWornAt.slice(5, 10)}`, `last ${g.lastWornAt.slice(5, 10)}`)
+                      : L(dict, '很久没记', 'Long idle')}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      </NesioSheet>
 
       {zoomUrl && typeof document !== 'undefined' && createPortal(
         <div className="nesio-tryon-lightbox" aria-label={L(dict, '试穿全屏', 'Try-on fullscreen')}

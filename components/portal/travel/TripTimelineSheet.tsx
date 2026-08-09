@@ -300,7 +300,7 @@ export default function TripTimelineSheet({
                 </button>
               </div>
               {addPickerOpen && (
-                <div className="nesio-trip-add-picker" role="dialog" aria-label={L(dict, '添加行程项', 'Add a plan')}>
+                <div className="nesio-trip-add-picker" aria-label={L(dict, '添加行程项', 'Add a plan')}>
                   <header className="nesio-trip-add-picker-head">
                     <button type="button" className="nesio-trip-link" onClick={() => setAddPickerOpen(false)}>{L(dict, '取消', 'Cancel')}</button>
                     <b>{L(dict, '添加行程项', 'Add a Plan')}</b>
