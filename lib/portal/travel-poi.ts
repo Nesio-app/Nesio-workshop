@@ -135,14 +135,13 @@ async function fetchPoiFile(path: string): Promise<TravelPoi[]> {
 
 /** 预热离线库(打开计划/时间线时调用)。失败不抛——无降级为空列表。 */
 export async function ensureTravelPoiLoaded(): Promise<{ japan: number; tokyo: number; world: number; total: number; error?: string }> {
-  if (allPoisCache) {
-    return {
-      japan: japanCache?.length || 0,
-      tokyo: tokyoCache?.length || 0,
-      world: worldCache?.length || 0,
-      total: allPoisCache.length,
-    };
-  }
+  const snapshot = () => ({
+    japan: japanCache?.length ?? 0,
+    tokyo: tokyoCache?.length ?? 0,
+    world: worldCache?.length ?? 0,
+    total: allPoisCache?.length ?? 0,
+  });
+  if (allPoisCache) return snapshot();
   if (!loadPromise) {
     loadPromise = (async () => {
       const [japan, tokyo, world] = await Promise.all([
@@ -161,12 +160,7 @@ export async function ensureTravelPoiLoaded(): Promise<{ japan: number; tokyo: n
   }
   try {
     await loadPromise;
-    return {
-      japan: japanCache ? japanCache.length : 0,
-      tokyo: tokyoCache ? tokyoCache.length : 0,
-      world: worldCache ? worldCache.length : 0,
-      total: allPoisCache ? allPoisCache.length : 0,
-    };
+    return snapshot();
   } catch (err) {
     return { japan: 0, tokyo: 0, world: 0, total: 0, error: err instanceof Error ? err.message : 'poi_load_failed' };
   }
