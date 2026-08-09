@@ -105,6 +105,7 @@ const KNOWN_KEYS = new Map([
   ["nesio-music-last-played-v1", "cache"],
   ["nesio-music-local-tracks-v1", "cache"],
   ["nesio-module-sync-since-v1", "cache"],
+  ["nesio-module-sync-last-at", "cache"],
   ["nesio-module-sync-state-v1", "cache"],
   ["nesio-node-embeddings-v1", "cache"],
   ["nesio-pending-ask-image", "cache"],
@@ -169,6 +170,8 @@ const KNOWN_KEYS = new Map([
   ["nesio-fin-tx-annotations-v1", "durable"],
   // 离线字典生词本 —— 用户亲手收藏的词,换设备应从云备份带回来。
   ["nesio-dict-wordbook-v1", "durable"],
+  // AI 查词开关 —— 设备本地偏好,换台默认关即可。
+  ["nesio-dict-ai-enabled-v1", "cache"],
   ["nesio-meal-calendar-v1", "durable"],
   ["nesio-schedule-filters-v1", "durable"],
   // 用户自己敲进去的提醒(家务/账单 due)。换台设备后从头开始**不正确** —— 那是他
@@ -256,8 +259,10 @@ const KNOWN_KEYS = new Map([
   ["nesio-trip-suggest-dismissed-v1", "durable"],
   // L4 对账记录:审计线索,丢了就查不出「那个月是拿哪份单子对的」
   ["nesio-reconcile-records-v1", "durable"],
+  ["nesio-memory-custom-tags-v1", "durable"],
   ["nesio-rel-contact-v1", "durable"],
   ["nesio-relationship-overrides-v1", "durable"],
+  ["nesio-rel-nudge-dismissed-v1", "cache"],
   ["nesio-rewards-v1", "durable"],
   ["nesio-snoozed-overdue", "durable"],
   ["nesio-theme-lowsat-v1", "durable"],

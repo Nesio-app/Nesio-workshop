@@ -90,6 +90,8 @@ export interface PoiPayload {
   country?: string;
   type?: string;
   wikidata?: string;
+  summary?: string;
+  summaryEn?: string;
 }
 
 export type TripNodePayload =
@@ -289,7 +291,7 @@ export function tripBudgetSummary(trip: Trip): {
   const budgetNode = trip.nodes.find((n) => n.payload.kind === 'budget');
   let actual = 0;
   let budget = 0;
-  let currency = trip.currency || '¥';
+  let currency = trip.currency || '$';
   if (budgetNode && budgetNode.payload.kind === 'budget') {
     actual = budgetNode.payload.budget.actualTotal;
     budget = budgetNode.payload.budget.budgetTotal;
@@ -405,7 +407,7 @@ export function createBlankTrip(input: {
     startDate: input.startDate,
     endDate: input.endDate,
     days,
-    currency: '¥',
+    currency: '$',
     budgetTotal: 0,
     nodes: [],
     createdAt: nowIso(),
@@ -825,12 +827,13 @@ export function recomputeBudgetNode(tripId: string): Trip | null {
     ? categories.reduce((a, c) => a + c.budget, 0)
     : (autoTotal || actualTotal || 0);
   const budgetPayload: BudgetPayload = {
-    currency: t.currency || '¥',
+    currency: t.currency || '$',
     actualTotal,
     budgetTotal,
     categories,
   };
   const existing = t.nodes.find((n) => n.kind === 'budget');
+  const cur = budgetPayload.currency || '$';
   const budgetNode: TripNode = {
     id: existing?.id || uid('n'),
     kind: 'budget',
@@ -839,7 +842,7 @@ export function recomputeBudgetNode(tripId: string): Trip | null {
     dayKey: '_budget',
     dayLabel: '行程预算',
     title: '行程预算',
-    subtitle: `实际 ¥${actualTotal.toLocaleString()} / 预算 ${(budgetPayload.budgetTotal).toLocaleString()}`,
+    subtitle: `实际 ${cur}${actualTotal.toLocaleString()} / 预算 ${budgetPayload.budgetTotal.toLocaleString()}`,
     payload: { kind: 'budget', budget: budgetPayload },
   };
   const others = t.nodes.filter((n) => n.kind !== 'budget');
@@ -925,7 +928,11 @@ export function consumeTravelReceiptTripId(): string | null {
 /** 把离线景点加入行程时间线(描边待办=还没去)。 */
 export function addPoisToTrip(
   tripId: string,
-  pois: Array<{ name: string; lat: number; lon: number; country?: string; type?: string; wikidata?: string }>,
+  pois: Array<{
+    name: string; lat: number; lon: number;
+    country?: string; type?: string; wikidata?: string;
+    summary?: string; summaryEn?: string;
+  }>,
 ): number {
   const t = getTrip(tripId);
   if (!t || !pois.length) return 0;
@@ -955,6 +962,8 @@ export function addPoisToTrip(
           country: p.country,
           type: p.type,
           wikidata: p.wikidata,
+          summary: p.summary,
+          summaryEn: p.summaryEn,
         },
       },
     });

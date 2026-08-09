@@ -36,18 +36,20 @@ export async function ensureTravelRoutesLoaded(): Promise<{ count: number; error
 
 export function isTravelRoutesReady(): boolean { return Boolean(cache); }
 
-/** 已知出发码 → 常见到达候选。 */
+/** 已知出发码 → 常见到达候选(支持 2–3 字 IATA 前缀)。 */
 export function suggestRouteDestinations(fromCode: string, limit = 8): TravelRoute[] {
   const from = fromCode.trim().toUpperCase();
   if (!from || from.length < 2) return [];
-  return routes().filter((r) => r.from === from).slice(0, limit);
+  if (from.length === 3) return routes().filter((r) => r.from === from).slice(0, limit);
+  return routes().filter((r) => r.from.startsWith(from)).slice(0, limit);
 }
 
-/** 已知到达码 → 常见出发候选。 */
+/** 已知到达码 → 常见出发候选(支持 2–3 字 IATA 前缀)。 */
 export function suggestRouteOrigins(toCode: string, limit = 8): TravelRoute[] {
   const to = toCode.trim().toUpperCase();
   if (!to || to.length < 2) return [];
-  return routes().filter((r) => r.to === to).slice(0, limit);
+  if (to.length === 3) return routes().filter((r) => r.to === to).slice(0, limit);
+  return routes().filter((r) => r.to.startsWith(to)).slice(0, limit);
 }
 
 export function findRoute(fromCode: string, toCode: string): TravelRoute | null {

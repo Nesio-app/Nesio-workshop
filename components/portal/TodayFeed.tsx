@@ -231,7 +231,7 @@ export default function TodayFeed({
     }
   }, [uiLocale]);
 
-  const captureFiles = useCallback(async (files: File[]) => {
+  const captureFiles = useCallback(async (files: File[], caption?: string) => {
     const list = files.slice(0, 30);
     if (!list.length) return;
     // 收东西这一路可能要好几秒(压缩 + 写 IDB + 识别)。**全程给个状态** ——
@@ -251,15 +251,24 @@ export default function TodayFeed({
     const bins = list.filter((f) => !isImage(f) && !isTextish(f));
     const tooBig = [...bins, ...imgs].filter((f) => f.size > MAX_FILE_BYTES);
     const failed: string[] = tooBig.map((f) => `${f.name}(${prettyBytes(f.size)})`);
+    const captionTrim = (caption || '').trim();
 
     if (imgs.length) {
       const { compressToDataUrl } = await import('@/lib/portal/local-image-store');
       const { attachPhotoToMemoryNode } = await import('@/lib/portal/capture-pipeline');
       // 先建节点,再按主相机三步挂图(本机 + Storage + memory_assets)。
-      // 旧路径只 putLocalImage → 换端永远看不到图,识别也像「没发生」。
+      // source=photo → 物品/记忆侧归「照片」来源,不是手记;有配文则同条存入。
       const node = ingestLifeNode({
-        name: imgs.length === 1 ? imgs[0].name.replace(/\.[^.]+$/, '') : `${imgs.length} 张照片`,
-        type: 'collection', source: 'manual', tags: ['照片'], attributes: {}, relations: [], confidence: 1, assets: [],
+        name: captionTrim
+          || (imgs.length === 1 ? imgs[0].name.replace(/\.[^.]+$/, '') : `${imgs.length} 张照片`),
+        type: 'collection',
+        source: 'photo',
+        tags: ['照片'],
+        attributes: {},
+        relations: [],
+        confidence: 1,
+        assets: [],
+        ...(captionTrim ? { rawInput: captionTrim } : {}),
       });
       let attached = 0;
       for (let i = 0; i < imgs.length; i++) {
@@ -732,13 +741,8 @@ export default function TodayFeed({
           micAvailable={micAvailable}
           /* ── 三合一的另外两条路(2026-07-31)。都是显式的:点了才走。 ──
              搜索**不新做一套结果界面** —— 记忆页那套是完整的(语义理解 + 筛选 + 详情),
-             这里只把词带过去。问念念同理:把已经打好的一句带进 ask,别让人重打一遍。 */
-          onDictionary={(q) => {
-            window.dispatchEvent(new CustomEvent('nesio-open-dictionary', { detail: { query: q || '' } }));
-          }}
-          onBrief={() => {
-            window.dispatchEvent(new CustomEvent('nesio-open-brief'));
-          }}
+             这里只把词带过去。问念念同理:把已经打好的一句带进 ask,别让人重打一遍。
+             查词典/简报已从加号菜单撤走。 */
           onSearch={(q) => {
             window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: q } }));
           }}

@@ -1,17 +1,19 @@
 'use client';
 
 /**
- * DictionaryPanel — 洞察「词典」板块。欧路风格离线查词的整页版(与首页 + 菜单同一套词库)。
+ * DictionaryPanel — 洞察「词典」板块。欧路风格离线查词的整页版(ECDICT 大词库)。
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
-import { LEXICON_SIZE } from '@/lib/portal/dictionary/offline-lexicon';
+import { ensureEcdictMeta, ecdictPackCount } from '@/lib/portal/dictionary/ecdict-pack';
 import {
-  lookupWord, toggleWordbook, isInWordbook, entriesForWordbook,
+  lookupWordAsync, toggleWordbook, isInWordbook, entriesForWordbookAsync,
+  lexiconSizeLabel, type DictHit,
 } from '@/lib/portal/dictionary/lookup';
+import type { DictEntry } from '@/lib/portal/dictionary/offline-lexicon';
 
 export default function DictionaryPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -20,9 +22,34 @@ export default function DictionaryPanel() {
   const [tab, setTab] = useState<'search' | 'book'>('search');
   const [bookRev, setBookRev] = useState(0);
   const [err, setErr] = useState('');
+  const [hits, setHits] = useState<DictHit[]>([]);
+  const [book, setBook] = useState<DictEntry[]>([]);
+  const [lexCount, setLexCount] = useState(0);
+  const lookSeq = useRef(0);
 
-  const hits = useMemo(() => (q.trim() ? lookupWord(q) : []), [q]);
-  const book = useMemo(() => entriesForWordbook(), [bookRev]);
+  useEffect(() => {
+    void ensureEcdictMeta()
+      .then((m) => setLexCount(m.count))
+      .catch(() => setLexCount(lexiconSizeLabel()));
+  }, []);
+
+  useEffect(() => {
+    if (!q.trim()) { setHits([]); return; }
+    const seq = ++lookSeq.current;
+    const timer = window.setTimeout(() => {
+      void lookupWordAsync(q).then((r) => {
+        if (seq === lookSeq.current) setHits(r);
+      });
+    }, 120);
+    return () => { window.clearTimeout(timer); };
+  }, [q]);
+
+  useEffect(() => {
+    if (tab !== 'book') return;
+    void entriesForWordbookAsync().then(setBook);
+  }, [tab, bookRev]);
+
+  const count = lexCount || ecdictPackCount();
 
   return (
     <div className="nesio-analytics-tab nesio-dict-panel">
@@ -40,7 +67,10 @@ export default function DictionaryPanel() {
           <input className="nesio-dict-search" value={q} placeholder={t('输入英文或中文…', 'English or Chinese…')}
             onChange={(e) => setQ(e.target.value)} />
           <p className="nesio-dict-meta">
-            {t(`离线词库 · ${LEXICON_SIZE} 词 · 不联网不花钱`, `Offline · ${LEXICON_SIZE} words · no network`)}
+            {t(
+              `离线词库 · ECDICT ${count.toLocaleString('en-US')} 词 · 欧路兼容开源库`,
+              `Offline · ECDICT ${count.toLocaleString('en-US')} · Eudic-compatible open lexicon`,
+            )}
           </p>
           {q.trim() && hits.length === 0 && (
             <p className="nesio-dict-empty">{t('词库里没有这个词。', 'Not in the offline lexicon.')}</p>

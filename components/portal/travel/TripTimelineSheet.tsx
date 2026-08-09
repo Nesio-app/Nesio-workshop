@@ -12,7 +12,7 @@ import {
 } from '@/lib/portal/travel-trips';
 import { ensureTravelHubsLoaded, searchTravelHubs, hubLabel, type TravelHub } from '@/lib/portal/travel-hubs';
 import { ensureTravelHotelsLoaded, searchTravelHotels, hotelLabel, type TravelHotel } from '@/lib/portal/travel-hotels';
-import { ensureTravelRoutesLoaded, suggestRouteDestinations, findRoute } from '@/lib/portal/travel-routes';
+import { ensureTravelRoutesLoaded, suggestRouteDestinations, suggestRouteOrigins, findRoute } from '@/lib/portal/travel-routes';
 import { ensureTravelPoiLoaded } from '@/lib/portal/travel-poi';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -49,6 +49,7 @@ export default function TripTimelineSheet({
   const [hLon, setHLon] = useState<number | undefined>(undefined);
   const [todoTitle, setTodoTitle] = useState('');
   const [paste, setPaste] = useState('');
+  const [routesErr, setRoutesErr] = useState<string | null>(null);
 
   function reload() {
     if (!tripId) { setTrip(null); return; }
@@ -61,7 +62,10 @@ export default function TripTimelineSheet({
     // 离线包预热:机场/酒店/航线/景点 —— 无网也能搜候选
     void ensureTravelHubsLoaded();
     void ensureTravelHotelsLoaded();
-    void ensureTravelRoutesLoaded();
+    void ensureTravelRoutesLoaded().then((r) => {
+      if (r.error) setRoutesErr(L(dict, '离线航线库没加载上,再试一次。', 'Offline route pack failed to load — try again.'));
+      else setRoutesErr(null);
+    });
     void ensureTravelPoiLoaded();
     const onUp = () => reload();
     window.addEventListener(TRAVEL_TRIPS_UPDATED_EVENT, onUp);
@@ -113,7 +117,7 @@ export default function TripTimelineSheet({
       timeLabel: '',
       dayKey: 'd1', dayLabel: L(dict, '行程日', 'Trip day'),
       title: `入住 · ${name}`,
-      subtitle: price != null ? `¥${price}` : undefined,
+      subtitle: price != null ? `$${price}` : undefined,
       payload: {
         kind: 'hotel',
         hotel: {
@@ -121,7 +125,7 @@ export default function TripTimelineSheet({
           address: hAddr.trim() || undefined,
           pricePerNight: price,
           nights: 1,
-          currency: '¥',
+          currency: '$',
           ...(hLat != null && hLon != null ? { lat: hLat, lon: hLon } : {}),
         },
       },
@@ -249,11 +253,23 @@ export default function TripTimelineSheet({
                 <div className={`nesio-travel-plan-form${adding === 'import' ? ' nesio-travel-plan-form--import' : ''}`}>
                   {adding === 'flight' && (
                     <>
-                      <p className="nesio-trip-footnote">{L(dict, '机场码来自离线枢纽库;常见航线也会提示到达候选。', 'Airport codes from the offline hub pack; common routes suggest destinations.')}</p>
+                      <p className="nesio-trip-footnote">{L(dict, '机场码来自离线枢纽库;常见航线也会提示出发/到达候选。', 'Airport codes from the offline hub pack; common routes suggest origins and destinations.')}</p>
+                      {routesErr && (
+                        <p className="nesio-trip-msg" role="alert" style={{ color: 'var(--status-risk)' }}>
+                          {routesErr}
+                          <button type="button" className="nesio-trip-link" onClick={() => {
+                            void ensureTravelRoutesLoaded().then((r) => {
+                              if (r.error) setRoutesErr(L(dict, '离线航线库没加载上,再试一次。', 'Offline route pack failed to load — try again.'));
+                              else setRoutesErr(null);
+                            });
+                          }}>{L(dict, '重试', 'Retry')}</button>
+                        </p>
+                      )}
                       <label><span>{L(dict, '航班号', 'Flight')}</span><input value={fNo} onChange={(e) => setFNo(e.target.value)} placeholder="NH976" /></label>
-                      <HubField label={L(dict, '出发', 'From')} value={fFrom} onChange={setFFrom} zh={dict !== 'en'} />
+                      <HubField label={L(dict, '出发', 'From')} value={fFrom} onChange={setFFrom} zh={dict !== 'en'}
+                        routeHints={suggestRouteOrigins(fTo, 8).map((r) => r.from)} />
                       <HubField label={L(dict, '到达', 'To')} value={fTo} onChange={setFTo} zh={dict !== 'en'}
-                        routeHints={suggestRouteDestinations(fFrom, 6).map((r) => r.to)} />
+                        routeHints={suggestRouteDestinations(fFrom, 8).map((r) => r.to)} />
                       {(() => {
                         const rt = findRoute(fFrom, fTo);
                         if (!rt?.airlines?.length) return null;
@@ -420,14 +436,15 @@ export default function TripTimelineSheet({
  */
 function HubField({ label, value, onChange, zh, routeHints }: {
   label: string; value: string; onChange: (v: string) => void; zh: boolean;
-  /** 离线航线包给出的到达三字码候选 */
+  /** 离线航线包给出的三字码候选(出发或到达) */
   routeHints?: string[];
 }) {
   const [focus, setFocus] = useState(false);
   const hits: TravelHub[] = focus ? searchTravelHubs(value, 6) : [];
   const exact = hits.length === 1 && hits[0].code.toLowerCase() === value.trim().toLowerCase();
-  const hintCodes = focus && !value.trim() && routeHints?.length
-    ? routeHints.filter((c) => c && c.length === 3)
+  const v = value.trim().toUpperCase();
+  const hintCodes = focus && routeHints?.length
+    ? [...new Set(routeHints.filter((c) => c && c.length === 3 && (!v || c.toUpperCase().startsWith(v))))].slice(0, 8)
     : [];
   return (
     <label style={{ position: 'relative' }}>

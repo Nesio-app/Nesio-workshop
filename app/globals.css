@@ -14488,11 +14488,17 @@ button.nesio-rel-due-info { background: none; border: none; padding: 0; font: in
 /* 挂在 TA 身上:敏感记录的「本机」徽章 */
 .nesio-rel-rec-local { display: inline-flex; align-items: center; gap: 0.18rem; flex: none; font-size: 0.62rem; font-weight: 800; color: var(--status-go); background: var(--status-go-soft); border-radius: 0.4rem; padding: 0.12rem 0.4rem; }
 /* 念念提醒卡(列表顶部,给最该联系的人一句暖话)*/
-.nesio-rel-nudge { display: flex; gap: 0.6rem; align-items: flex-start; background: var(--status-go-soft); border: 1px solid color-mix(in srgb, var(--status-go) 22%, transparent); border-radius: var(--radius-md, 14px); padding: 0.75rem 0.85rem; margin: 0.5rem 0 0.2rem; }
+.nesio-rel-nudge { display: flex; gap: 0.6rem; align-items: flex-start; background: var(--status-go-soft); border: 1px solid color-mix(in srgb, var(--status-go) 22%, transparent); border-radius: var(--radius-md, 14px); padding: 0.75rem 0.85rem; margin: 0.5rem 0 0.2rem; position: relative; }
 .nesio-rel-nudge-ic { flex: none; width: 1.7rem; height: 1.7rem; border-radius: 50%; display: grid; place-items: center; color: var(--status-go); background: color-mix(in srgb, var(--status-go) 16%, transparent); }
-.nesio-rel-nudge-body { flex: 1; min-width: 0; }
+.nesio-rel-nudge-body { flex: 1; min-width: 0; padding-right: 1.2rem; }
 .nesio-rel-nudge-text { margin: 0; font-size: 0.85rem; line-height: 1.5; color: var(--portal-ink); }
 .nesio-rel-nudge-btn { margin-top: 0.4rem; background: none; border: 0; padding: 0; font-size: 0.78rem; font-weight: 700; color: var(--status-go); cursor: pointer; }
+.nesio-rel-nudge-x {
+  position: absolute; top: 0.35rem; right: 0.45rem;
+  border: 0; background: transparent; color: var(--portal-muted);
+  font-size: 1.1rem; line-height: 1; cursor: pointer; padding: 0.2rem 0.35rem;
+  border-radius: var(--radius-sm);
+}
 .nesio-rel-touch-btn--due { background: var(--portal-accent-soft); color: var(--portal-accent); }
 
 /* ── 挂一条(设计稿:挂在 TA 身上 · 起手 + 确认卡)── */
@@ -20169,6 +20175,41 @@ a.nesio-trip-action { color: var(--portal-ink); }
 .nesio-trip-cat-note { font-size: var(--text-xs); color: var(--status-go); }
 .nesio-trip-cat-note.is-over { color: var(--status-risk); }
 
+.nesio-trip-budget-edit {
+  display: flex; gap: var(--space-2); align-items: center; margin-top: var(--space-2);
+  flex-wrap: wrap;
+}
+.nesio-trip-budget-edit-input {
+  flex: 1 1 10rem; min-width: 8rem; min-height: 2.75rem;
+  padding: var(--space-3) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--portal-line);
+  background: var(--portal-bg);
+  color: var(--portal-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-body);
+}
+.nesio-trip-primary--inline {
+  width: auto !important;
+  flex: 0 0 auto;
+  min-width: 3.5rem;
+  padding: 0.45rem 0.85rem;
+}
+.nesio-cap-pending {
+  display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+  padding: 0 var(--space-2) var(--space-2);
+}
+.nesio-cap-pending-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 0.25rem 0.5rem; border-radius: var(--radius-pill);
+  background: var(--portal-accent-soft); color: var(--portal-ink);
+  font-size: var(--text-xs); font-family: var(--font-sans);
+}
+.nesio-cap-pending-x {
+  border: 0; background: transparent; color: var(--portal-muted);
+  cursor: pointer; padding: 0 2px; font-size: 0.95rem; line-height: 1;
+}
+.nesio-cap-pending-hint { font-size: var(--text-xs); color: var(--portal-muted); }
 .nesio-trip-poi-picker { max-height: min(72lvh, 640px); overflow: auto; }
 .nesio-trip-poi-head {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
@@ -20209,6 +20250,19 @@ a.nesio-trip-action { color: var(--portal-ink); }
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
 .nesio-trip-poi-main small { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-trip-poi-summary {
+  font-size: var(--text-xs); color: var(--portal-muted); line-height: 1.35;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.nesio-trip-poi-detail-summary {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--portal-accent-soft);
+  border: 1px solid var(--portal-accent-border);
+  font-size: var(--text-sm); line-height: 1.5; color: var(--portal-ink);
+}
 
 html[data-portal-theme="night"] .nesio-foot-mode.is-active {
   background: color-mix(in srgb, var(--portal-card) 92%, var(--portal-accent-soft));
@@ -21928,6 +21982,28 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   background: var(--portal-bg); color: var(--portal-ink);
 }
 .nesio-dict-meta, .nesio-dict-hint, .nesio-dict-empty { margin: 0; font-size: var(--text-xs); color: var(--portal-muted); line-height: 1.5; }
+.nesio-dict-toolbar { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; }
+.nesio-dict-ai-toggle {
+  border: 1px solid var(--portal-line); border-radius: var(--radius-pill);
+  padding: 5px 12px; font-size: var(--text-xs); font-family: var(--font-sans);
+  background: transparent; color: var(--portal-muted); cursor: pointer; flex-shrink: 0;
+}
+.nesio-dict-ai-toggle.is-on {
+  background: var(--portal-accent-soft-md); color: var(--portal-accent);
+  border-color: var(--portal-accent-border); font-weight: 600;
+}
+.nesio-dict-ai-badge { margin: 2px 0 0; font-size: var(--text-xs); color: var(--portal-accent); }
+.nesio-dict-ai-err {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm);
+  background: var(--status-risk-soft); border: 1px solid var(--status-risk);
+}
+.nesio-dict-ai-err p { margin: 0; font-size: var(--text-sm); color: var(--portal-ink); flex: 1; }
+.nesio-dict-retry {
+  border: 1px solid var(--portal-accent-border); border-radius: var(--radius-pill);
+  padding: 4px 12px; font-size: var(--text-xs); font-weight: 600;
+  background: var(--portal-accent-soft); color: var(--portal-accent); cursor: pointer; flex-shrink: 0;
+}
 .nesio-dict-list { display: flex; flex-direction: column; gap: var(--space-3); max-height: 55vh; overflow-y: auto; }
 .nesio-dict-entry {
   border: 1px solid var(--portal-line); border-radius: var(--radius-md);

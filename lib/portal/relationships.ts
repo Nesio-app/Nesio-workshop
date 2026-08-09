@@ -57,7 +57,9 @@ export const RELATION_TAGS: Array<{ zh: string; en: string }> = [
 const CORE_RE = /家人|亲人|配偶|伴侣|老婆|老公|妻|夫|父|母|爸|妈|儿|女|兄|弟|姐|妹|family|spouse|partner|wife|husband|mother|father|mom|dad|son|daughter|brother|sister|parent/i;
 const CLOSE_RE = /朋友|挚友|好友|闺蜜|哥们|死党|friend|bestie|buddy/i;
 // 结构性/非人关系:这些 relation 的 targetId 不是人(品牌架构/文档/物品归属),不进联系人。
-const NON_PERSON_REL = /架构|品牌|文档|包含|定义|属于|归属|拥有|收纳|容器|owned_by|contains|part_of|belongs|includes|defines|architecture|brand|document|category|object/i;
+const NON_PERSON_REL = /架构|品牌|文档|包含|定义|属于|归属|拥有|收纳|容器|involves_person|owned_by|contains|part_of|belongs|includes|defines|architecture|brand|document|category|object/i;
+/** life-graph 节点 id 误当人名(如 node-178495…)—— 绝不能进联系人列表。 */
+const NODE_ID_RE = /^node-\d+/i;
 
 // 非人类「联系人」:邮件发件人里大量是机器人/机构/通知/账单/银行卡,不是你认识的人 ——
 // 关系管理只保留真人(用户实测:vercel[bot]、Platinum Card from American Express、Chase® Ink® 漏进列表)。
@@ -216,8 +218,8 @@ export function buildRelationships(
     const name = rawName.trim();
     const key = resolveEntityKey(rawKey, aliases);
     if (!key || key.length < 2) return;
-    // 过滤明显不是人的 key(纯数字/系统标记)
-    if (/^\d+$/.test(key)) return;
+    // 过滤明显不是人的 key(纯数字/系统标记/节点 id)
+    if (/^\d+$/.test(key) || NODE_ID_RE.test(key) || NODE_ID_RE.test(name)) return;
     // 账户本人不是联系人:自己的邮箱(含 +别名/点号归一)或名字命中即剔除 —— 修「自己的
     // hanbing6228+cc 被当成联系人」。
     if (selfIds.emails.has(normalizeEmail(key)) || selfIds.names.has(key) || selfIds.names.has(name.trim().toLowerCase())) return;
@@ -282,13 +284,18 @@ export function buildRelationships(
       }
     }
 
-    // relations:targetId 常是人名,relation 是关系词。但结构性关系(品牌架构/文档/
-    // 包含/定义/物品归属)的 targetId 不是人 —— 跳过,否则 demo 种子(Nesio 系统/
-    // TreasureBox/Nesio 指南)会漏成假联系人。
+    // relations:targetId 可能是人名,也可能是节点 id(linkNodes 后)。
+    // 结构性关系 / involves_person → 跳过;有节点则只认 type===person。
     for (const r of n.relations || []) {
       if (!r.targetId) continue;
       const rel = r.relation || '';
       if (NON_PERSON_REL.test(rel)) continue;
+      if (NODE_ID_RE.test(r.targetId)) {
+        const target = nodes.find((x) => x.id === r.targetId);
+        if (!target || target.type !== 'person' || !target.name) continue;
+        bump(target.name, target.name, nodeIso, rel ? rel : null);
+        continue;
+      }
       bump(r.targetId, r.targetId, nodeIso, rel ? rel : null);
     }
   }
@@ -296,9 +303,13 @@ export function buildRelationships(
   const overrides = loadRelationshipOverrides(); // 图4:用户手动改过的亲疏/关系词覆盖推断
   const out: Contact[] = [];
   for (const a of acc.values()) {
-    // 用户手动移除过的人:推导层跳过。推出来的联系人删不掉(下次重算又冒出来),
-    // 只能在这里认这条覆盖 —— 否则「移除」按钮点了等于没点。
+    // 用户手动移除过的人:推导层跳过。名字/邮箱任一 key 被 hidden 都算(防同步后换 key 复活)。
     if (overrides[a.key]?.hidden) continue;
+    if (Object.entries(overrides).some(([k, ov]) => {
+      if (!ov?.hidden) return false;
+      if (k === a.key) return true;
+      try { return resolveEntityKey(k, aliases) === a.key; } catch { return false; }
+    })) continue;
     const logged = contactLog[a.key] || null;
     const groups = Array.from(groupsByKey.get(a.key) || []);
     // 一次性会议与会人降噪:只当过一次 participant、无分组、无联系记录 → 不列入(路人不是关系)。
@@ -319,11 +330,12 @@ export function buildRelationships(
     });
   }
 
-  // 排序:该联系的排前(超期越多越前),其余按提及频率
+  // 排序:常联系(提及多)在最上;同频再比最近联系
   out.sort((x, y) => {
-    if (x.reachOut !== y.reachOut) return x.reachOut ? -1 : 1;
-    if (x.reachOut && y.reachOut) return y.overdueRatio - x.overdueRatio;
-    return y.mentions - x.mentions;
+    if (y.mentions !== x.mentions) return y.mentions - x.mentions;
+    const xt = x.lastContactAt ? Date.parse(x.lastContactAt) : 0;
+    const yt = y.lastContactAt ? Date.parse(y.lastContactAt) : 0;
+    return yt - xt;
   });
   return out;
 }

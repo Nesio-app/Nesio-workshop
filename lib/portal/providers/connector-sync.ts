@@ -371,11 +371,15 @@ export async function runPeopleSync(): Promise<PeopleSyncResult> {
       if (n.name) byName.set(n.name.toLowerCase(), rec);
     }
 
+    // 用户手动移除过的人:同步也不复活
+    const { hiddenContactKeys } = await import('@/lib/portal/relationship-overrides');
+    const hidden = hiddenContactKeys();
     let imported = 0; let updated = 0;
     for (const c of contacts) {
       const name = (c.name || '').trim();
       const email = (c.emails?.[0] || '').toLowerCase();
       if (!name && !email) continue;
+      if ((email && hidden.has(email)) || (name && (hidden.has(name.toLowerCase()) || hidden.has(name)))) continue;
       const attrs: Record<string, string | number | boolean | null> = { contactSource: 'google' };
       if (email) attrs.email = email;
       if (c.photo) attrs.photo = c.photo;

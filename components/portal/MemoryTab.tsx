@@ -23,6 +23,12 @@ import {
 import { isTxShadow } from '@/lib/portal/tx-node';
 import { rankRelatedNodes } from '@/lib/portal/related-nodes';
 import { visibleMemoryNodes, isWeatherNode } from '@/lib/portal/memory-visibility';
+import { memoryEventAt } from '@/lib/portal/memory-event-at';
+import {
+  isCustomMemoryTag,
+  loadCustomMemoryTags,
+  MEMORY_CUSTOM_TAGS_EVENT,
+} from '@/lib/portal/memory-custom-tags';
 import { useMemoryCount } from './use-memory-count';
 import { pinNodeToTodayFocus } from '@/lib/platform/view-models/today-commands';
 import { DOMAINS } from '@/lib/life-domain';
@@ -327,7 +333,7 @@ function findRelatedNodes(target: LifeNode, allNodes: LifeNode[]): LifeNode[] {
 function findOnThisDayNodes(nodes: LifeNode[]): LifeNode[] {
   const today = new Date();
   return nodes.filter((n) => {
-    const d = new Date(n.createdAt);
+    const d = memoryEventAt(n);
     return d.getMonth() === today.getMonth() && d.getDate() === today.getDate() && d.getFullYear() < today.getFullYear();
   });
 }
@@ -340,7 +346,7 @@ function isIntimateNode(node: LifeNode): boolean {
 
 function cleanMemoryPreview(node: LifeNode, dict: DictLocale = 'zh'): string {
   if (isIntimateNode(node)) {
-    const d = new Date(node.createdAt).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' });
+    const d = memoryEventAt(node).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'numeric', day: 'numeric' });
     return L(dict, `一段 ${d} 的心情记录 · 点开查看`, `A mood entry from ${d} · tap to view`);
   }
   // CARD SPEC:入库时若已产出归一化摘要(attributes.summary),第二行优先用它 ——
@@ -417,8 +423,7 @@ function sourceKeyOf(node: LifeNode): string {
   return node.source;
 }
 
-/** 用户点名的 8 个自定义可见标签(2026-08-01)——记忆页第三排筛选,命中才出现该 chip。 */
-const CUSTOM_TAGS = ['财务', '物品', '衣橱', '美食', '健康', '人物', '心情', '阅读'];
+/** 用户自定义可见标签 —— 注册表见 lib/portal/memory-custom-tags.ts。 */
 
 function sourceMeta(node: LifeNode, dict: DictLocale): { label: string; icon: ReactNode } {
   const tags = node.tags || [];
@@ -494,7 +499,7 @@ function OnThisDayStrip({ nodes, onOpen }: { nodes: LifeNode[]; onOpen: (n: Life
       <div className="nesio-otd-scroll">
         {nodes.map((n) => (
           <button key={n.id} type="button" className="nesio-otd-card" onClick={() => onOpen(n)}>
-            <span className="nesio-otd-card-year">{new Date(n.createdAt).getFullYear()} 年</span>
+            <span className="nesio-otd-card-year">{memoryEventAt(n).getFullYear()} 年</span>
             <span className="nesio-otd-card-name">{n.name}</span>
           </button>
         ))}
@@ -602,7 +607,7 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
   const uncertain = isNodeUncertain(node);
   // 2026-08-01 用户点名:自定义标签比 type 更重要——命中就领头,type 退到这一行右上角小徽章;
   // 没有自定义标签的卡(目前是多数)维持原样,type 照旧领头,不额外画一个多余的角标。
-  const customTag = (node.tags || []).find((t) => CUSTOM_TAGS.includes(t));
+  const customTag = (node.tags || []).find((t) => isCustomMemoryTag(t));
 
   return (
     <button
@@ -665,7 +670,7 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
         {uncertain && <span className="nesio-memory-card-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
         {(() => {
           // 标签三层 §3.3:列表卡带相对时间(今天/昨天/N 天前),数据的"新鲜度"一眼可辨
-          const t = new Date(node.createdAt);
+          const t = memoryEventAt(node);
           const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
           const label = t >= dayStart
             ? L(dict, '今天', 'Today')
@@ -1001,6 +1006,9 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   // 2026-08-01 用户点名:类型筛选行下面再加 2 排——来源、自定义标签,三档筛选可叠加。
   const [sourceFilter, setSourceFilter] = useState<string | null>(null);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  const [customTagsList, setCustomTagsList] = useState<string[]>(() =>
+    typeof window !== 'undefined' ? loadCustomMemoryTags() : [],
+  );
   const [showTx, setShowTx] = useState(false); // 交易默认收起(见 visibleNodes 那段注释)
   const [showObjectMap, setShowObjectMap] = useState(false);
   const [showRelationGraph, setShowRelationGraph] = useState(false);
@@ -1091,7 +1099,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const readNodes = useCallback(
     () => {
       const visible = visibleMemoryNodes(
-        getLifeGraph().sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        getLifeGraph().sort((a, b) => memoryEventAt(b).getTime() - memoryEventAt(a).getTime()),
         canUsePrivateData,
       );
       // 演示模式:未登录且没有任何本地记录 → 展示只读种子数据,
@@ -1131,12 +1139,14 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
       setLocale(p.locale);
     };
     const onProjectsUpdate = () => setProjects(getProjects());
+    const onCustomTagsUpdate = () => setCustomTagsList(loadCustomMemoryTags());
     const retrySync = () => { if (canUsePrivateData) void retryLifeGraphCloudSync(); };
 
     window.addEventListener('nesio-life-graph-updated', onUpdate);
     window.addEventListener('nesio-life-graph-cloud-sync-updated', onSyncUpdate);
     window.addEventListener(PROFILE_UPDATED_EVENT, onProfileUpdate);
     window.addEventListener('nesio-projects-updated', onProjectsUpdate);
+    window.addEventListener(MEMORY_CUSTOM_TAGS_EVENT, onCustomTagsUpdate);
     window.addEventListener('online', retrySync);
     return () => {
       cancelled = true;
@@ -1144,6 +1154,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
       window.removeEventListener('nesio-life-graph-cloud-sync-updated', onSyncUpdate);
       window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdate);
       window.removeEventListener('nesio-projects-updated', onProjectsUpdate);
+      window.removeEventListener(MEMORY_CUSTOM_TAGS_EVENT, onCustomTagsUpdate);
       window.removeEventListener('online', retrySync);
     };
   }, [canUsePrivateData, readNodes]);
@@ -1247,14 +1258,15 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     return map;
   }, [nodes, dict]);
 
-  // 第三排:自定义标签筛选(用户点名的 8 个;没命中的不出现该 chip)。
+  // 第三排:自定义标签筛选(注册表内全部展示,含 0 条)。
   const tagCounts = useMemo(() => {
     const acc: Record<string, number> = {};
+    for (const t of customTagsList) acc[t] = 0;
     for (const n of nodes) for (const t of (n.tags || [])) {
-      if (CUSTOM_TAGS.includes(t)) acc[t] = (acc[t] ?? 0) + 1;
+      if (isCustomMemoryTag(t)) acc[t] = (acc[t] ?? 0) + 1;
     }
     return acc;
-  }, [nodes]);
+  }, [nodes, customTagsList]);
 
 
   const onThisDayNodes = useMemo(() => findOnThisDayNodes(nodes), [nodes]);
@@ -1480,9 +1492,8 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                     </div>
                   )}
 
-                  {/* 2026-08-01 用户点名:第三排——自定义标签(财务/物品/衣橱/美食/健康/人物/心情/阅读)。
-                      命中才出现该 chip,不铺一排全是 0 的死标签。 */}
-                  {CUSTOM_TAGS.some((t) => tagCounts[t]) && (
+                  {/* 第三排——自定义标签(注册表内全部展示,含 0 条)。 */}
+                  {customTagsList.length > 0 && (
                     <div className="nesio-memory-type-filter" role="group" aria-label={L(dict, '按自定义标签筛选', 'Filter by custom tag')}>
                       <button
                         type="button"
@@ -1491,7 +1502,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                       >
                         {L(dict, '全部标签', 'All tags')}
                       </button>
-                      {CUSTOM_TAGS.filter((t) => tagCounts[t]).map((t) => (
+                      {customTagsList.map((t) => (
                         <button
                           key={t}
                           type="button"
@@ -1499,7 +1510,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                           onClick={() => setTagFilter((prev) => (prev === t ? null : t))}
                         >
                           {t}
-                          <span className="nesio-type-chip-count">{tagCounts[t]}</span>
+                          <span className="nesio-type-chip-count">{tagCounts[t] ?? 0}</span>
                         </button>
                       ))}
                     </div>

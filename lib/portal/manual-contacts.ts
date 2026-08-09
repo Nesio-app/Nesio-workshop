@@ -149,10 +149,24 @@ export function renameContact(oldKey: string, nodeId: string | null, next: Manua
  * 两种都**不动**提到 TA 的那些记忆本身。
  */
 export function removeContact(key: string, nodeId: string | null): boolean {
+  // 先取身份键再删节点,否则邮箱/名字丢了,同步后会换 key 复活。
+  const before = nodeId
+    ? getLifeGraph().find((x) => x.id === nodeId)
+    : getLifeGraph().find((x) => x.type === 'person' && (
+      x.name === key
+      || x.name?.trim().toLowerCase() === key.trim().toLowerCase()
+      || String(x.attributes?.email || '').toLowerCase() === key.trim().toLowerCase()
+    ));
   let ok = true;
   if (nodeId) ok = deleteLifeNode(nodeId);
-  // 节点删了也要标 hidden:邮件发件人/relations 里还提着这个名字,不标下次照样推出来。
-  if (ok) setContactHidden(key, true);
+  if (ok) {
+    setContactHidden(key, true);
+    const k2 = key.trim().toLowerCase();
+    if (k2 && k2 !== key) setContactHidden(k2, true);
+    if (before?.name) setContactHidden(before.name.trim().toLowerCase(), true);
+    const em = typeof before?.attributes?.email === 'string' ? before.attributes.email.toLowerCase() : '';
+    if (em) setContactHidden(em, true);
+  }
   if (ok) notify();
   return ok;
 }

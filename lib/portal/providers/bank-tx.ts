@@ -548,6 +548,33 @@ export function holdingId(h: Pick<Holding, 'id' | 'accountId' | 'name' | 'ticker
   return acct && (ticker || name) ? `${acct}|${ticker}|${name}` : '';
 }
 
+/** 重复持仓取更完整的一条:市值更高优先,其次有 costBasis 的优先。 */
+function pickBetterHolding(a: Holding, b: Holding): Holding {
+  if (a.value !== b.value) return a.value > b.value ? a : b;
+  const aCost = typeof a.costBasis === 'number' && a.costBasis > 0;
+  const bCost = typeof b.costBasis === 'number' && b.costBasis > 0;
+  if (aCost && !bCost) return a;
+  if (bCost && !aCost) return b;
+  if (aCost && bCost && a.costBasis !== b.costBasis) {
+    return (a.costBasis as number) > (b.costBasis as number) ? a : b;
+  }
+  return a;
+}
+
+/** 按 holdingId 去重 —— 同步/并集合并可能留下同标的的多条快照。 */
+export function dedupeHoldings(holdings: readonly Holding[]): Holding[] {
+  const byId = new Map<string, Holding>();
+  for (const raw of holdings) {
+    if (!raw || !raw.accountId) continue;
+    const id = holdingId(raw);
+    if (!id) continue;
+    const h = { ...raw, id };
+    const prev = byId.get(id);
+    byId.set(id, prev ? pickBetterHolding(h, prev) : h);
+  }
+  return [...byId.values()];
+}
+
 export const BANK_HOLDINGS_KEY = 'nesio-fin-holdings-v1';
 
 const holdingsStore = createBlobStore<Holding[]>({
@@ -558,31 +585,35 @@ const holdingsStore = createBlobStore<Holding[]>({
 export function loadHoldings(): Holding[] {
   const raw = holdingsStore.load();
   if (!Array.isArray(raw)) return [];
-  // 自愈:历史持仓没 id → 补上并写回,避免下次 module-sync 并集再把它们 skip 成空。
+  // 自愈:历史持仓没 id → 补上;重复 id → 去重。写回避免下次 module-sync 并集再把它们 skip 成空。
   let dirty = false;
-  const out = raw.map((h) => {
+  const stamped = raw.map((h) => {
     if (!h || typeof h !== 'object') return h;
     if (h.id) return h;
     const id = holdingId(h);
     if (!id) return h;
     dirty = true;
     return { ...h, id };
-  });
+  }).filter((h): h is Holding => Boolean(h && h.accountId));
+  const out = dedupeHoldings(stamped);
+  if (out.length !== stamped.length) dirty = true;
   if (dirty && out.length) {
     try { holdingsStore.save(out); } catch { /* 读路径尽力而为 */ }
   }
   return out;
 }
 
-/** 持仓是点时快照 → 整体替换(空列表不写,防同步半途清空)。落库前盖稳定 id。 */
+/** 持仓是点时快照 → 整体替换(空列表不写,防同步半途清空)。落库前盖稳定 id 并去重。 */
 export function saveHoldings(holdings: Holding[]): void {
   if (!holdings.length) return;
-  const stamped = holdings
-    .filter((h) => h && h.accountId)
-    .map((h) => {
-      const id = holdingId(h);
-      return id ? { ...h, id } : h;
-    });
+  const stamped = dedupeHoldings(
+    holdings
+      .filter((h) => h && h.accountId)
+      .map((h) => {
+        const id = holdingId(h);
+        return id ? { ...h, id } : h;
+      }),
+  );
   if (!stamped.length) return;
   holdingsStore.save(stamped);
 }
@@ -606,6 +637,7 @@ export function addManualBankAccount(input: {
   type?: 'depository' | 'credit' | 'loan' | 'investment' | 'other';
   mask?: string;
   currency?: string;
+  balance?: number;
 }): BankAccount | null {
   const name = (input.name || '').trim();
   if (!name) return null;
@@ -617,6 +649,7 @@ export function addManualBankAccount(input: {
     type: input.type || 'depository',
     subtype: 'manual',
     currency,
+    balance: Number.isFinite(input.balance as number) ? Number(input.balance) : 0,
     ...(input.mask ? { mask: String(input.mask).replace(/\D/g, '').slice(-4) } : {}),
     institution: '手动',
   };

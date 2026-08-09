@@ -8,7 +8,9 @@
    "lon": 139.518122,
    "country": "Japan",
    "wikidata": "Q806326",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Bandit：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Bandit: a notable attraction in Japan."
   },
   {
    "name": "Big O",
@@ -16,7 +18,9 @@
    "lon": 139.7539151,
    "country": "Japan",
    "wikidata": "Q794709",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Big O：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Big O: a notable attraction in Japan."
   },
   {
    "name": "Cosmo Clock 21",
@@ -24,7 +28,9 @@
    "lon": 139.637,
    "country": "Japan",
    "wikidata": "Q843426",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Cosmo Clock 21：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Cosmo Clock 21: a notable attraction in Japan."
   },
   {
    "name": "Daiba 1-chōme Shōtengai",
@@ -32,7 +38,9 @@
    "lon": 139.7762176,
    "country": "Japan",
    "wikidata": "Q11411934",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Daiba 1-chōme Shōtengai：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Daiba 1-chōme Shōtengai: a notable attraction in Japan."
   },
   {
    "name": "Daikanransha",
@@ -40,7 +48,9 @@
    "lon": 139.7822902,
    "country": "Japan",
    "wikidata": "Q751175",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "调色板城大摩天轮，东京台场海湾120米观景轮。",
+   "summaryEn": "120 m Ferris wheel on Odaiba with bay views."
   },
   {
    "name": "Diamond and Flower Ferris Wheel",
@@ -48,7 +58,9 @@
    "lon": 139.8572257,
    "country": "Japan",
    "wikidata": "Q901219",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Diamond and Flower Ferris Wheel：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Diamond and Flower Ferris Wheel: a notable attraction in Japan."
   },
   {
    "name": "Diving Coaster: Vanish",
@@ -56,7 +68,9 @@
    "lon": 139.637159,
    "country": "Japan",
    "wikidata": "Q1230670",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Diving Coaster: Vanish：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Diving Coaster: Vanish: a notable attraction in Japan."
   },
   {
    "name": "Legoland Discovery Center Tokyo",
@@ -64,7 +78,9 @@
    "lon": 139.775669,
    "country": "Japan",
    "wikidata": "Q30934236",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Legoland Discovery Center Tokyo：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Legoland Discovery Center Tokyo: a notable attraction in Japan."
   },
   {
    "name": "Momonga Standing and Loop Coaster",
@@ -72,7 +88,9 @@
    "lon": 139.519331,
    "country": "Japan",
    "wikidata": "Q108822228",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Momonga Standing and Loop Coaster：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Momonga Standing and Loop Coaster: a notable attraction in Japan."
   },
   {
    "name": "Nemo & Friends SeaRider",
@@ -80,7 +98,9 @@
    "lon": 139.8825,
    "country": "Japan",
    "wikidata": "Q29897109",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Nemo & Friends SeaRider：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Nemo & Friends SeaRider: a notable attraction in Japan."
   },
   {
    "name": "Panic Coaster – Back Daaan",
@@ -88,7 +108,9 @@
    "lon": 139.754,
    "country": "Japan",
    "wikidata": "Q65241484",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Panic Coaster – Back Daaan：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Panic Coaster – Back Daaan: a notable attraction in Japan."
   },
   {
    "name": "Q11546374",
@@ -96,7 +118,9 @@
    "lon": 139.646417,
    "country": "Japan",
    "wikidata": "Q11546374",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Q11546374：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Q11546374: a notable attraction in Japan."
   },
   {
    "name": "Raging Spirits",
@@ -104,7 +128,9 @@
    "lon": 139.880738,
    "country": "Japan",
    "wikidata": "Q267353",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Raging Spirits：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Raging Spirits: a notable attraction in Japan."
   },
   {
    "name": "SHIBUYA SKY",
@@ -112,7 +138,9 @@
    "lon": 139.702264,
    "country": "Japan",
    "wikidata": "Q116281743",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "涩谷 Scramble Square 屋顶360°露天展望，俯瞰世界最忙路口。",
+   "summaryEn": "Open-air 360° deck above Shibuya Crossing."
   },
   {
    "name": "Shin-Yokohama Raumen Museum",
@@ -120,7 +148,9 @@
    "lon": 139.614537,
    "country": "Japan",
    "wikidata": "Q864499",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Shin-Yokohama Raumen Museum：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Shin-Yokohama Raumen Museum: a notable attraction in Japan."
   },
   {
    "name": "Shitamachi Museum",
@@ -128,7 +158,9 @@
    "lon": 139.7726,
    "country": "Japan",
    "wikidata": "Q3915464",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Shitamachi Museum：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Shitamachi Museum: a notable attraction in Japan."
   },
   {
    "name": "Sindbad's Storybook Voyage",
@@ -136,7 +168,9 @@
    "lon": 139.881,
    "country": "Japan",
    "wikidata": "Q3484881",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Sindbad's Storybook Voyage：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Sindbad's Storybook Voyage: a notable attraction in Japan."
   },
   {
    "name": "Space Mountain",
@@ -144,7 +178,9 @@
    "lon": 139.877753,
    "country": "Japan",
    "wikidata": "Q7572428",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Space Mountain：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Space Mountain: a notable attraction in Japan."
   },
   {
    "name": "Takanawa Fire Station Nihon-enoki Branch Office",
@@ -152,7 +188,9 @@
    "lon": 139.733194444,
    "country": "Japan",
    "wikidata": "Q11672881",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Takanawa Fire Station Nihon-enoki Branch Office：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Takanawa Fire Station Nihon-enoki Branch Office: a notable attraction in Japan."
   },
   {
    "name": "Thunder Dolphin",
@@ -160,7 +198,9 @@
    "lon": 139.753277,
    "country": "Japan",
    "wikidata": "Q845812",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Thunder Dolphin：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Thunder Dolphin: a notable attraction in Japan."
   },
   {
    "name": "Tokyo City View",
@@ -168,7 +208,9 @@
    "lon": 139.7290554,
    "country": "Japan",
    "wikidata": "Q126417093",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Tokyo City View：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Tokyo City View: a notable attraction in Japan."
   },
   {
    "name": "Tokyo Ramen Kokugikan Mai",
@@ -176,7 +218,9 @@
    "lon": 139.773731765,
    "country": "Japan",
    "wikidata": "Q11347767",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Tokyo Ramen Kokugikan Mai：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Tokyo Ramen Kokugikan Mai: a notable attraction in Japan."
   },
   {
    "name": "Tokyo Skytree Tembo Deck",
@@ -184,7 +228,9 @@
    "lon": 139.810694,
    "country": "Japan",
    "wikidata": "Q117066302",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "东京晴空塔350米展望台，隅田川与东京塔全景。",
+   "summaryEn": "350 m Skytree deck with sweeping views of Tokyo."
   },
   {
    "name": "Tokyo Skytree Tembo Galleria",
@@ -192,7 +238,9 @@
    "lon": 139.8107946,
    "country": "Japan",
    "wikidata": "Q117066320",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "晴空塔450米玻璃回廊，日本最高公开观景台。",
+   "summaryEn": "450 m glass-walled gallery, highest public viewing in Japan."
   },
   {
    "name": "Twist Coaster Robin",
@@ -200,7 +248,9 @@
    "lon": 139.519394,
    "country": "Japan",
    "wikidata": "Q18355292",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Twist Coaster Robin：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Twist Coaster Robin: a notable attraction in Japan."
   },
   {
    "name": "White Canyon",
@@ -208,7 +258,9 @@
    "lon": 139.521355,
    "country": "Japan",
    "wikidata": "Q14754866",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "White Canyon：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "White Canyon: a notable attraction in Japan."
   },
   {
    "name": "Yokohama Skywalk",
@@ -216,7 +268,9 @@
    "lon": 139.67627778,
    "country": "Japan",
    "wikidata": "Q11542858",
-   "type": "attraction"
+   "type": "attraction",
+   "summary": "Yokohama Skywalk：位于日本的景点，可加入行程离线导航。",
+   "summaryEn": "Yokohama Skywalk: a notable attraction in Japan."
   },
   {
    "name": "21 21 DESIGN SIGHT",
@@ -224,7 +278,9 @@
    "lon": 139.73027,
    "country": "Japan",
    "wikidata": "Q863044",
-   "type": "museum"
+   "type": "museum",
+   "summary": "21 21 DESIGN SIGHT：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "21 21 DESIGN SIGHT: a notable museum in Japan."
   },
   {
    "name": "Adachi City Museum",
@@ -232,7 +288,9 @@
    "lon": 139.84143,
    "country": "Japan",
    "wikidata": "Q11636983",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Adachi City Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Adachi City Museum: a notable museum in Japan."
   },
   {
    "name": "Adachi Park of Living Things",
@@ -240,7 +298,9 @@
    "lon": 139.807222,
    "country": "Japan",
    "wikidata": "Q11636941",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Adachi Park of Living Things：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Adachi Park of Living Things: a notable museum in Japan."
   },
   {
    "name": "Aqua Park Shinagawa",
@@ -248,7 +308,9 @@
    "lon": 139.73527778,
    "country": "Japan",
    "wikidata": "Q3055859",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Aqua Park Shinagawa：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Aqua Park Shinagawa: a notable museum in Japan."
   },
   {
    "name": "Arakawa Furusato Museum",
@@ -256,7 +318,9 @@
    "lon": 139.795418,
    "country": "Japan",
    "wikidata": "Q104698248",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Arakawa Furusato Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Arakawa Furusato Museum: a notable museum in Japan."
   },
   {
    "name": "Art Aquarium Museum",
@@ -264,7 +328,9 @@
    "lon": 139.7657375,
    "country": "Japan",
    "wikidata": "Q116921556",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Art Aquarium Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Art Aquarium Museum: a notable museum in Japan."
   },
   {
    "name": "Broadcast Library",
@@ -272,7 +338,9 @@
    "lon": 139.642889,
    "country": "Japan",
    "wikidata": "Q11499008",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Broadcast Library：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Broadcast Library: a notable museum in Japan."
   },
   {
    "name": "Bunkamura",
@@ -280,7 +348,9 @@
    "lon": 139.695,
    "country": "Japan",
    "wikidata": "Q583055",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Bunkamura：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Bunkamura: a notable museum in Japan."
   },
   {
    "name": "Bunkyo Museum",
@@ -288,7 +358,9 @@
    "lon": 139.7566,
    "country": "Japan",
    "wikidata": "Q11499743",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Bunkyo Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Bunkyo Museum: a notable museum in Japan."
   },
   {
    "name": "Chōfu Local History Museum",
@@ -296,7 +368,9 @@
    "lon": 139.536191,
    "country": "Japan",
    "wikidata": "Q104698232",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Chōfu Local History Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Chōfu Local History Museum: a notable museum in Japan."
   },
   {
    "name": "Edogawa Ward Natural Zoo",
@@ -304,7 +378,9 @@
    "lon": 139.8584,
    "country": "Japan",
    "wikidata": "Q11551063",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Edogawa Ward Natural Zoo：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Edogawa Ward Natural Zoo: a notable museum in Japan."
   },
   {
    "name": "Folk Museum of Higashimurayama",
@@ -312,7 +388,9 @@
    "lon": 139.46627,
    "country": "Japan",
    "wikidata": "Q104698227",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Folk Museum of Higashimurayama：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Folk Museum of Higashimurayama: a notable museum in Japan."
   },
   {
    "name": "Folk Museum of Ōta City",
@@ -320,7 +398,9 @@
    "lon": 139.710621,
    "country": "Japan",
    "wikidata": "Q104708388",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Folk Museum of Ōta City：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Folk Museum of Ōta City: a notable museum in Japan."
   },
   {
    "name": "Fujimino Municipal Ōi Local Museum",
@@ -328,7 +408,9 @@
    "lon": 139.504777777,
    "country": "Japan",
    "wikidata": "Q11277080",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Fujimino Municipal Ōi Local Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Fujimino Municipal Ōi Local Museum: a notable museum in Japan."
   },
   {
    "name": "Fukagawa Edo Museum",
@@ -336,7 +418,9 @@
    "lon": 139.8007,
    "country": "Japan",
    "wikidata": "Q3090685",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Fukagawa Edo Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Fukagawa Edo Museum: a notable museum in Japan."
   },
   {
    "name": "Ichikawa Zoological & Botanical Garden",
@@ -344,7 +428,9 @@
    "lon": 139.965219,
    "country": "Japan",
    "wikidata": "Q11480258",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Ichikawa Zoological & Botanical Garden：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Ichikawa Zoological & Botanical Garden: a notable museum in Japan."
   },
   {
    "name": "Ichiyo Memorial Museum",
@@ -352,7 +438,9 @@
    "lon": 139.792806,
    "country": "Japan",
    "wikidata": "Q11353179",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Ichiyo Memorial Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Ichiyo Memorial Museum: a notable museum in Japan."
   },
   {
    "name": "Inagi City Local Archives Reference Room",
@@ -360,7 +448,9 @@
    "lon": 139.492305555,
    "country": "Japan",
    "wikidata": "Q85882958",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Inagi City Local Archives Reference Room：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Inagi City Local Archives Reference Room: a notable museum in Japan."
   },
   {
    "name": "Inokashira Park Zoo",
@@ -368,7 +458,9 @@
    "lon": 139.57275,
    "country": "Japan",
    "wikidata": "Q10860225",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Inokashira Park Zoo：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Inokashira Park Zoo: a notable museum in Japan."
   },
   {
    "name": "Itabashi Historical Museum",
@@ -376,7 +468,9 @@
    "lon": 139.643257,
    "country": "Japan",
    "wikidata": "Q104696866",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Itabashi Historical Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Itabashi Historical Museum: a notable museum in Japan."
   },
   {
    "name": "Japan Coast Guard Museum Yokohama",
@@ -384,7 +478,9 @@
    "lon": 139.64430556,
    "country": "Japan",
    "wikidata": "Q6156562",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Japan Coast Guard Museum Yokohama：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Japan Coast Guard Museum Yokohama: a notable museum in Japan."
   },
   {
    "name": "John Lennon Museum",
@@ -392,7 +488,9 @@
    "lon": 139.63083333,
    "country": "Japan",
    "wikidata": "Q1058730",
-   "type": "museum"
+   "type": "museum",
+   "summary": "John Lennon Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "John Lennon Museum: a notable museum in Japan."
   },
   {
    "name": "Kanagawa Museum of Modern Literature",
@@ -400,7 +498,9 @@
    "lon": 139.656083333,
    "country": "Japan",
    "wikidata": "Q11589405",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Kanagawa Museum of Modern Literature：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Kanagawa Museum of Modern Literature: a notable museum in Japan."
   },
   {
    "name": "Kanagawa Prefectural Archaeological Artifacts Center",
@@ -408,7 +508,9 @@
    "lon": 139.62766667,
    "country": "Japan",
    "wikidata": "Q30928683",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Kanagawa Prefectural Archaeological Artifacts Center：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Kanagawa Prefectural Archaeological Artifacts Center: a notable museum in Japan."
   },
   {
    "name": "Katsushika City Museum",
@@ -416,7 +518,9 @@
    "lon": 139.843447,
    "country": "Japan",
    "wikidata": "Q11621071",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Katsushika City Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Katsushika City Museum: a notable museum in Japan."
   },
   {
    "name": "Katsushika Shibamata Tora-san Museum",
@@ -424,7 +528,9 @@
    "lon": 139.88052778,
    "country": "Japan",
    "wikidata": "Q21018928",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Katsushika Shibamata Tora-san Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Katsushika Shibamata Tora-san Museum: a notable museum in Japan."
   },
   {
    "name": "Kawasui Kawasaki Aquarium",
@@ -432,7 +538,9 @@
    "lon": 139.696305555,
    "country": "Japan",
    "wikidata": "Q97169050",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Kawasui Kawasaki Aquarium：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Kawasui Kawasaki Aquarium: a notable museum in Japan."
   },
   {
    "name": "Kiki's Museum of Literature",
@@ -440,7 +548,9 @@
    "lon": 139.88225,
    "country": "Japan",
    "wikidata": "Q123309852",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Kiki's Museum of Literature：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Kiki's Museum of Literature: a notable museum in Japan."
   },
   {
    "name": "Kunitachi Local Museum",
@@ -448,7 +558,9 @@
    "lon": 139.432612,
    "country": "Japan",
    "wikidata": "Q133257623",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Kunitachi Local Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Kunitachi Local Museum: a notable museum in Japan."
   },
   {
    "name": "Kyōdo-no-Mori",
@@ -456,7 +568,9 @@
    "lon": 139.47361111,
    "country": "Japan",
    "wikidata": "Q3788904",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Kyōdo-no-Mori：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Kyōdo-no-Mori: a notable museum in Japan."
   },
   {
    "name": "Kōnuma Folk Museum",
@@ -464,7 +578,9 @@
    "lon": 139.62825,
    "country": "Japan",
    "wikidata": "Q11675671",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Kōnuma Folk Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Kōnuma Folk Museum: a notable museum in Japan."
   },
   {
    "name": "Machida City Museum of Literature, Kotoba Land",
@@ -472,7 +588,9 @@
    "lon": 139.45136111,
    "country": "Japan",
    "wikidata": "Q11578292",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Machida City Museum of Literature, Kotoba Land：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Machida City Museum of Literature, Kotoba Land: a notable museum in Japan."
   },
   {
    "name": "Machida Squirrel Garden",
@@ -480,7 +598,9 @@
    "lon": 139.449722,
    "country": "Japan",
    "wikidata": "Q11578268",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Machida Squirrel Garden：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Machida Squirrel Garden: a notable museum in Japan."
   },
   {
    "name": "Mega Web",
@@ -488,7 +608,9 @@
    "lon": 139.782528,
    "country": "Japan",
    "wikidata": "Q10854652",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Mega Web：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Mega Web: a notable museum in Japan."
   },
   {
    "name": "Minato City Local History Museum",
@@ -496,7 +618,9 @@
    "lon": 139.726889,
    "country": "Japan",
    "wikidata": "Q115212362",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Minato City Local History Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Minato City Local History Museum: a notable museum in Japan."
   },
   {
    "name": "Museum of Logistics",
@@ -504,7 +628,9 @@
    "lon": 139.732234,
    "country": "Japan",
    "wikidata": "Q21654524",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Museum of Logistics：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Museum of Logistics: a notable museum in Japan."
   },
   {
    "name": "Museum of Maritime Science",
@@ -512,7 +638,9 @@
    "lon": 139.77277778,
    "country": "Japan",
    "wikidata": "Q1048709",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Museum of Maritime Science：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Museum of Maritime Science: a notable museum in Japan."
   },
   {
    "name": "Museum of Modern Japanese Literature",
@@ -520,7 +648,9 @@
    "lon": 139.680929,
    "country": "Japan",
    "wikidata": "Q1954709",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Museum of Modern Japanese Literature：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Museum of Modern Japanese Literature: a notable museum in Japan."
   },
   {
    "name": "Museum of Toshima City",
@@ -528,7 +658,9 @@
    "lon": 139.706728,
    "country": "Japan",
    "wikidata": "Q104698258",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Museum of Toshima City：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Museum of Toshima City: a notable museum in Japan."
   },
   {
    "name": "NHK Museum of Broadcasting",
@@ -536,7 +668,9 @@
    "lon": 139.748278,
    "country": "Japan",
    "wikidata": "Q11235312",
-   "type": "museum"
+   "type": "museum",
+   "summary": "NHK Museum of Broadcasting：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "NHK Museum of Broadcasting: a notable museum in Japan."
   },
   {
    "name": "NYK Maritime Museum",
@@ -544,7 +678,9 @@
    "lon": 139.63944444,
    "country": "Japan",
    "wikidata": "Q6956071",
-   "type": "museum"
+   "type": "museum",
+   "summary": "NYK Maritime Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "NYK Maritime Museum: a notable museum in Japan."
   },
   {
    "name": "Nakagawa Funabansho Museum",
@@ -552,7 +688,9 @@
    "lon": 139.84627778,
    "country": "Japan",
    "wikidata": "Q11364944",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Nakagawa Funabansho Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Nakagawa Funabansho Museum: a notable museum in Japan."
   },
   {
    "name": "National Film Archive of Japan",
@@ -560,7 +698,9 @@
    "lon": 139.770611111,
    "country": "Japan",
    "wikidata": "Q51371009",
-   "type": "museum"
+   "type": "museum",
+   "summary": "National Film Archive of Japan：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "National Film Archive of Japan: a notable museum in Japan."
   },
   {
    "name": "Nerima Shakujiikoen Furusato Museum",
@@ -568,7 +708,9 @@
    "lon": 139.599444,
    "country": "Japan",
    "wikidata": "Q11608060",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Nerima Shakujiikoen Furusato Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Nerima Shakujiikoen Furusato Museum: a notable museum in Japan."
   },
   {
    "name": "Nissan Engine Museum",
@@ -576,7 +718,9 @@
    "lon": 139.66219444,
    "country": "Japan",
    "wikidata": "Q7040952",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Nissan Engine Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Nissan Engine Museum: a notable museum in Japan."
   },
   {
    "name": "Nissan Heritage Collection",
@@ -584,7 +728,9 @@
    "lon": 139.425034,
    "country": "Japan",
    "wikidata": "Q39048210",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Nissan Heritage Collection：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Nissan Heritage Collection: a notable museum in Japan."
   },
   {
    "name": "Nogeyama Zoo",
@@ -592,7 +738,9 @@
    "lon": 139.622873,
    "country": "Japan",
    "wikidata": "Q861318",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Nogeyama Zoo：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Nogeyama Zoo: a notable museum in Japan."
   },
   {
    "name": "Osaragi Jiro Memorial Museum",
@@ -600,7 +748,9 @@
    "lon": 139.65525,
    "country": "Japan",
    "wikidata": "Q11432376",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Osaragi Jiro Memorial Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Osaragi Jiro Memorial Museum: a notable museum in Japan."
   },
   {
    "name": "Police Museum",
@@ -608,7 +758,9 @@
    "lon": 139.769542,
    "country": "Japan",
    "wikidata": "Q11632332",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Police Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Police Museum: a notable museum in Japan."
   },
   {
    "name": "Safety Promotion Center",
@@ -616,7 +768,9 @@
    "lon": 139.753634,
    "country": "Japan",
    "wikidata": "Q3891462",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Safety Promotion Center：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Safety Promotion Center: a notable museum in Japan."
   },
   {
    "name": "Seikei Gakuen Archives / Museum",
@@ -624,7 +778,9 @@
    "lon": 139.573251,
    "country": "Japan",
    "wikidata": "Q104698221",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Seikei Gakuen Archives / Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Seikei Gakuen Archives / Museum: a notable museum in Japan."
   },
   {
    "name": "Setagaya City Local Museum",
@@ -632,7 +788,9 @@
    "lon": 139.647245,
    "country": "Japan",
    "wikidata": "Q104708389",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Setagaya City Local Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Setagaya City Local Museum: a notable museum in Japan."
   },
   {
    "name": "Setagaya Literary Museum",
@@ -640,7 +798,9 @@
    "lon": 139.609,
    "country": "Japan",
    "wikidata": "Q11362100",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Setagaya Literary Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Setagaya Literary Museum: a notable museum in Japan."
   },
   {
    "name": "Shibuya Folk and Literary Shirane Memorial Museum",
@@ -648,7 +808,9 @@
    "lon": 139.71255,
    "country": "Japan",
    "wikidata": "Q21019078",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Shibuya Folk and Literary Shirane Memorial Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Shibuya Folk and Literary Shirane Memorial Museum: a notable museum in Japan."
   },
   {
    "name": "Sodegaura City Local Museum",
@@ -656,7 +818,9 @@
    "lon": 139.994697,
    "country": "Japan",
    "wikidata": "Q104696854",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Sodegaura City Local Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Sodegaura City Local Museum: a notable museum in Japan."
   },
   {
    "name": "Suginami Historical Museum",
@@ -664,7 +828,9 @@
    "lon": 139.645447,
    "country": "Japan",
    "wikidata": "Q20045092",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Suginami Historical Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Suginami Historical Museum: a notable museum in Japan."
   },
   {
    "name": "Sumida Heritage Museum",
@@ -672,7 +838,9 @@
    "lon": 139.805882,
    "country": "Japan",
    "wikidata": "Q104698259",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Sumida Heritage Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Sumida Heritage Museum: a notable museum in Japan."
   },
   {
    "name": "Tabata Memorial Museum of Writers and Artists",
@@ -680,7 +848,9 @@
    "lon": 139.759278,
    "country": "Japan",
    "wikidata": "Q11577225",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Tabata Memorial Museum of Writers and Artists：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Tabata Memorial Museum of Writers and Artists: a notable museum in Japan."
   },
   {
    "name": "Tama Zoological Park",
@@ -688,7 +858,9 @@
    "lon": 139.402,
    "country": "Japan",
    "wikidata": "Q1413736",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Tama Zoological Park：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Tama Zoological Park: a notable museum in Japan."
   },
   {
    "name": "The History Museum of J-Koreans",
@@ -696,7 +868,9 @@
    "lon": 139.73703,
    "country": "Japan",
    "wikidata": "Q122929555",
-   "type": "museum"
+   "type": "museum",
+   "summary": "The History Museum of J-Koreans：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "The History Museum of J-Koreans: a notable museum in Japan."
   },
   {
    "name": "Toda City Museum",
@@ -704,7 +878,9 @@
    "lon": 139.663096,
    "country": "Japan",
    "wikidata": "Q11496511",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Toda City Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Toda City Museum: a notable museum in Japan."
   },
   {
    "name": "Tokorozawa Aviation Museum",
@@ -712,7 +888,9 @@
    "lon": 139.472,
    "country": "Japan",
    "wikidata": "Q1041232",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Tokorozawa Aviation Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Tokorozawa Aviation Museum: a notable museum in Japan."
   },
   {
    "name": "Tokyo Metropolitan Archaeological Center",
@@ -720,7 +898,9 @@
    "lon": 139.427722,
    "country": "Japan",
    "wikidata": "Q11525278",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Tokyo Metropolitan Archaeological Center：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Tokyo Metropolitan Archaeological Center: a notable museum in Japan."
   },
   {
    "name": "Tokyo Sea Life Park",
@@ -728,7 +908,9 @@
    "lon": 139.862166666,
    "country": "Japan",
    "wikidata": "Q4925165",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Tokyo Sea Life Park：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Tokyo Sea Life Park: a notable museum in Japan."
   },
   {
    "name": "Train and Bus Museum",
@@ -736,7 +918,9 @@
    "lon": 139.592386,
    "country": "Japan",
    "wikidata": "Q11660619",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Train and Bus Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Train and Bus Museum: a notable museum in Japan."
   },
   {
    "name": "Transportation Museum",
@@ -744,7 +928,9 @@
    "lon": 139.770083,
    "country": "Japan",
    "wikidata": "Q10882995",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Transportation Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Transportation Museum: a notable museum in Japan."
   },
   {
    "name": "Ueno Zoo",
@@ -752,7 +938,9 @@
    "lon": 139.771388888,
    "country": "Japan",
    "wikidata": "Q162722",
-   "type": "museum"
+   "type": "museum",
+   "summary": "东京上野动物园，日本最古动物园，大熊猫与不忍池旁。",
+   "summaryEn": "Japan's oldest zoo in Ueno Park, famed for giant pandas."
   },
   {
    "name": "Urayasu City Folk Museum",
@@ -760,7 +948,9 @@
    "lon": 139.901083333,
    "country": "Japan",
    "wikidata": "Q11558212",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Urayasu City Folk Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Urayasu City Folk Museum: a notable museum in Japan."
   },
   {
    "name": "Waseda International House of Literature",
@@ -768,7 +958,9 @@
    "lon": 139.719888888,
    "country": "Japan",
    "wikidata": "Q85880820",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Waseda International House of Literature：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Waseda International House of Literature: a notable museum in Japan."
   },
   {
    "name": "Western River Railroad",
@@ -776,7 +968,9 @@
    "lon": 139.882425,
    "country": "Japan",
    "wikidata": "Q3567503",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Western River Railroad：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Western River Railroad: a notable museum in Japan."
   },
   {
    "name": "Yokohama Anpanman Children's Museum",
@@ -784,7 +978,9 @@
    "lon": 139.628722222,
    "country": "Japan",
    "wikidata": "Q2496472",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Yokohama Anpanman Children's Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Yokohama Anpanman Children's Museum: a notable museum in Japan."
   },
   {
    "name": "Yokohama Archives of History",
@@ -792,7 +988,9 @@
    "lon": 139.644,
    "country": "Japan",
    "wikidata": "Q942479",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Yokohama Archives of History：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Yokohama Archives of History: a notable museum in Japan."
   },
   {
    "name": "Yokohama City Hasseiden Local Museum",
@@ -800,7 +998,9 @@
    "lon": 139.66497222,
    "country": "Japan",
    "wikidata": "Q30929285",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Yokohama City Hasseiden Local Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Yokohama City Hasseiden Local Museum: a notable museum in Japan."
   },
   {
    "name": "Yokohama Curry Museum",
@@ -808,7 +1008,9 @@
    "lon": 139.634,
    "country": "Japan",
    "wikidata": "Q1057482",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Yokohama Curry Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Yokohama Curry Museum: a notable museum in Japan."
   },
   {
    "name": "Yokohama Customs Museum",
@@ -816,7 +1018,9 @@
    "lon": 139.642,
    "country": "Japan",
    "wikidata": "Q8054623",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Yokohama Customs Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Yokohama Customs Museum: a notable museum in Japan."
   },
   {
    "name": "Yokohama Doll Museum",
@@ -824,7 +1028,9 @@
    "lon": 139.65211111,
    "country": "Japan",
    "wikidata": "Q11262871",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Yokohama Doll Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Yokohama Doll Museum: a notable museum in Japan."
   },
   {
    "name": "Yokohama Marine Science Museum",
@@ -832,7 +1038,9 @@
    "lon": 139.650833333,
    "country": "Japan",
    "wikidata": "Q98381287",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Yokohama Marine Science Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Yokohama Marine Science Museum: a notable museum in Japan."
   },
   {
    "name": "Yokohama Omoshiro Aquarium",
@@ -840,7 +1048,9 @@
    "lon": 139.644583,
    "country": "Japan",
    "wikidata": "Q17230652",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Yokohama Omoshiro Aquarium：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Yokohama Omoshiro Aquarium: a notable museum in Japan."
   },
   {
    "name": "Yokohama Port Museum",
@@ -848,7 +1058,9 @@
    "lon": 139.633,
    "country": "Japan",
    "wikidata": "Q11542838",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Yokohama Port Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Yokohama Port Museum: a notable museum in Japan."
   },
   {
    "name": "Yokohama Tram Museum",
@@ -856,7 +1068,9 @@
    "lon": 139.62456944,
    "country": "Japan",
    "wikidata": "Q11543182",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Yokohama Tram Museum：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Yokohama Tram Museum: a notable museum in Japan."
   },
   {
    "name": "Yoshimura Akira Commemorative Museum of Modern Literature",
@@ -864,7 +1078,9 @@
    "lon": 139.784194444,
    "country": "Japan",
    "wikidata": "Q38277897",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Yoshimura Akira Commemorative Museum of Modern Literature：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Yoshimura Akira Commemorative Museum of Modern Literature: a notable museum in Japan."
   },
   {
    "name": "Yumemigasaki Zoological Park",
@@ -872,7 +1088,9 @@
    "lon": 139.665194,
    "country": "Japan",
    "wikidata": "Q11431697",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Yumemigasaki Zoological Park：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Yumemigasaki Zoological Park: a notable museum in Japan."
   },
   {
    "name": "Zoorasia",
@@ -880,7 +1098,9 @@
    "lon": 139.52375,
    "country": "Japan",
    "wikidata": "Q3576063",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Zoorasia：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Zoorasia: a notable museum in Japan."
   },
   {
    "name": "Ōsaki Park",
@@ -888,7 +1108,9 @@
    "lon": 139.71427778,
    "country": "Japan",
    "wikidata": "Q11435011",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Ōsaki Park：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Ōsaki Park: a notable museum in Japan."
   },
   {
    "name": "Ōyama-kaidō Furusato-kan",
@@ -896,7 +1118,9 @@
    "lon": 139.61271944,
    "country": "Japan",
    "wikidata": "Q20043481",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Ōyama-kaidō Furusato-kan：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Ōyama-kaidō Furusato-kan: a notable museum in Japan."
   },
   {
    "name": "Ōyama-kaidō Furusato-kan",
@@ -904,7 +1128,9 @@
    "lon": 139.612718,
    "country": "Japan",
    "wikidata": "Q20043481",
-   "type": "museum"
+   "type": "museum",
+   "summary": "Ōyama-kaidō Furusato-kan：位于日本的博物馆，可加入行程离线导航。",
+   "summaryEn": "Ōyama-kaidō Furusato-kan: a notable museum in Japan."
   }
  ]
 }

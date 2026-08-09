@@ -10,11 +10,8 @@
  * 左边一枚「+」(上传图片/文件)、中间输入、右边实心话筒。
  * 之前是「话筒在框外左边 + 一个独立输入框」两个物件,参考图是一个整体。
  *
- * 「+」菜单:
- *   · 照片/文件 → TodayFeed.captureFiles(本机 + 云 Storage/memory_assets + 端上识别);
- *   · 查词典 → 离线欧路风格词库;
- *   · 今日简报 → 彩色图文简报 sheet。
- * 不按类型白名单收文件,按体积设限。
+ * 「+」菜单只留「照片/文件」—— 选后挂待发,点 ↑ 才入库(可与文字同条)。
+ * 查词典 / 简报从加号撤走(洞察/其它入口仍可用)。
  */
 import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
 import MentionPicker from '../MentionPicker';
@@ -34,8 +31,11 @@ export interface CaptureBarProps {
   onMic: () => void;
   recording: boolean;
   inputRef: RefObject<HTMLTextAreaElement | null>;
-  /** 上传落库。由 TodayFeed 提供(它才知道怎么建节点);没给就不显示「+」。 */
-  onFiles?: (files: File[]) => Promise<void>;
+  /**
+   * 上传落库。由 TodayFeed 提供。
+   * 选文件后先挂在输入条旁,点 ↑ 发送才入库;caption 为当时输入框文字(可与多图同存一条)。
+   */
+  onFiles?: (files: File[], caption?: string) => Promise<void>;
   /**
    * 打 @ 选中了一条记忆。**只是记下待结算**,不是当场就连 ——
    * 文本是纯的,你插了又删掉就不该连。真正结算在提交时(`settleMentions`)。
@@ -96,6 +96,8 @@ export default function CaptureBar(capture: CaptureBarProps) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [plusOpen, setPlusOpen] = useState(false);
+  /** 已选未发的附件 —— 点 ↑ 才进记忆,可与文字同条。 */
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
 
   const typed = capture.value.trim();
   // 认出时间才提议「设成提醒」。认不出就**不出这一条** —— 宁可让人自己去日程页加,
@@ -142,24 +144,49 @@ export default function CaptureBar(capture: CaptureBarProps) {
   const mentionOpen = Boolean(mention && cands.length);
   void useMemo(() => mentionOpen, [mentionOpen]);
 
-  async function take(files: File[]) {
-    if (!files.length || !capture.onFiles) return;
-    setBusy(true); setErr('');
-    try {
-      await capture.onFiles(files);
-    } catch (e) {
-      // 红线:每个 async 动作都要有显式失败态,不许静默回 idle。
-      setErr(e instanceof Error && e.message ? e.message : L(dict, '没存进去,再试一次。', 'Could not save — try again.'));
-    } finally {
-      setBusy(false);
-    }
+  function stageFiles(files: File[]) {
+    if (!files.length) return;
+    setErr('');
+    setPendingFiles((prev) => [...prev, ...files].slice(0, 30));
   }
 
+  async function submitAll() {
+    const caption = capture.value.trim();
+    if (pendingFiles.length && capture.onFiles) {
+      setBusy(true); setErr('');
+      try {
+        await capture.onFiles(pendingFiles, caption || undefined);
+        setPendingFiles([]);
+        if (caption) capture.onChange('');
+      } catch (e) {
+        setErr(e instanceof Error && e.message ? e.message : L(dict, '没存进去,再试一次。', 'Could not save — try again.'));
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    capture.onSubmit();
+  }
+
+  const canSend = Boolean(capture.value.trim() || pendingFiles.length);
+
   return (
-    <div className={`nesio-tl-capture nesio-tl-capture--top${capture.recording ? ' nesio-tl-capture--rec' : ''}${capture.value.trim() ? ' nesio-tl-capture--filled' : ''}`}>
-      <form className="nesio-tl-capture-form" onSubmit={(e) => { e.preventDefault(); capture.onSubmit(); }}>
+    <div className={`nesio-tl-capture nesio-tl-capture--top${capture.recording ? ' nesio-tl-capture--rec' : ''}${canSend ? ' nesio-tl-capture--filled' : ''}`}>
+      {pendingFiles.length > 0 && (
+        <div className="nesio-cap-pending" aria-label={L(dict, '待发送附件', 'Pending attachments')}>
+          {pendingFiles.map((f, i) => (
+            <span key={`${f.name}-${i}`} className="nesio-cap-pending-chip">
+              {f.type.startsWith('image/') ? L(dict, '图', 'Img') : L(dict, '文件', 'File')} · {f.name.slice(0, 18)}{f.name.length > 18 ? '…' : ''}
+              <button type="button" className="nesio-cap-pending-x" aria-label={L(dict, '去掉', 'Remove')}
+                onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}>×</button>
+            </span>
+          ))}
+          <span className="nesio-cap-pending-hint">{L(dict, '点 ↑ 一起记下', 'Tap ↑ to save')}</span>
+        </div>
+      )}
+      <form className="nesio-tl-capture-form" onSubmit={(e) => { e.preventDefault(); void submitAll(); }}>
         <div className="nesio-tl-capture-pill">
-          {(capture.onFiles || capture.onDictionary || capture.onBrief) && (
+          {capture.onFiles && (
             <>
               <button
                 type="button"
@@ -182,7 +209,7 @@ export default function CaptureBar(capture: CaptureBarProps) {
                 className="nesio-visually-hidden"
                 // ⚠️ 先快照成数组再清 value:input.value = '' 会把 FileList 一起清空,
                 //    先清后读拿到的是空表,表现是「点了没反应、也不报错」。踩过。
-                onChange={(e) => { const picked = Array.from(e.currentTarget.files || []); e.currentTarget.value = ''; void take(picked); }}
+                onChange={(e) => { const picked = Array.from(e.currentTarget.files || []); e.currentTarget.value = ''; stageFiles(picked); }}
               />
             </>
           )}
@@ -208,7 +235,7 @@ export default function CaptureBar(capture: CaptureBarProps) {
               // 候选开着的时候 Enter 归它(选中候选),不能变成「记下」。
               // MentionPicker 在 capture 阶段就拦了,这里再挡一次防漏。
               if (mention && (e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown' || e.key === 'Escape')) return;
-              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); capture.onSubmit(); }
+              if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void submitAll(); }
             }}
             onFocus={(e) => {
               // 聚焦后等键盘升起,把输入框滚到刚好可见(nearest,不留大空隙)。
@@ -236,9 +263,9 @@ export default function CaptureBar(capture: CaptureBarProps) {
             </button>
           )}
 
-          {/* 填了字 → 右边那枚圆钮从「话筒」变「记下」。同一个位置,不再多摆一个按钮。 */}
-          {capture.value.trim() ? (
-            <button type="submit" className="nesio-tl-capture-send" aria-label={L(dict, '记下', 'Jot')}>↑</button>
+          {/* 有字或有待发附件 → ↑;否则话筒。 */}
+          {canSend ? (
+            <button type="submit" className="nesio-tl-capture-send" aria-label={L(dict, '记下', 'Jot')} disabled={busy}>↑</button>
           ) : capture.micAvailable !== false ? (
             <button
               type="button"
@@ -269,26 +296,12 @@ export default function CaptureBar(capture: CaptureBarProps) {
         </div>
       </form>
 
-      {plusOpen && (
+      {plusOpen && capture.onFiles && (
         <div className="nesio-cap-plus-menu" role="menu">
-          {capture.onFiles && (
-            <button type="button" role="menuitem" className="nesio-cap-plus-item"
-              onClick={() => { setPlusOpen(false); fileRef.current?.click(); }}>
-              {L(dict, '照片 / 文件', 'Photo / file')}
-            </button>
-          )}
-          {capture.onDictionary && (
-            <button type="button" role="menuitem" className="nesio-cap-plus-item"
-              onClick={() => { setPlusOpen(false); capture.onDictionary?.(typed || undefined); }}>
-              {L(dict, '查词典', 'Dictionary')}
-            </button>
-          )}
-          {capture.onBrief && (
-            <button type="button" role="menuitem" className="nesio-cap-plus-item"
-              onClick={() => { setPlusOpen(false); capture.onBrief?.(); }}>
-              {L(dict, '今日简报', "Today's brief")}
-            </button>
-          )}
+          <button type="button" role="menuitem" className="nesio-cap-plus-item"
+            onClick={() => { setPlusOpen(false); fileRef.current?.click(); }}>
+            {L(dict, '照片 / 文件', 'Photo / file')}
+          </button>
         </div>
       )}
 

@@ -541,7 +541,8 @@ export function BudgetDetail({
 }: {
   tripId: string; budget: BudgetPayload; dict: string; onChanged: () => void;
 }) {
-  const currency = budget.currency || '¥';
+  // 用户实锤预算统一美元符号(历史行程若仍写 ¥,展示层也走 $)
+  const currency = '$';
   // bug3:「无法点无法编辑」—— 顶栏改总额 + 点类别改该类预算
   const [editTotal, setEditTotal] = useState(false);
   const [totalDraft, setTotalDraft] = useState(String(budget.budgetTotal || ''));
@@ -615,15 +616,15 @@ export function BudgetDetail({
               <div className="nesio-trip-budget-bar-fill" style={{ width: `${fill}%` }} />
             </div>
             {editing ? (
-              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', marginTop: 'var(--space-2)' }}>
+              <div className="nesio-trip-budget-edit">
                 <input type="number" inputMode="decimal" value={draft} onChange={(e) => setDraft(e.target.value)}
                   aria-label={L(dict, `${c.label}预算`, `${c.label} budget`)}
-                  style={{ flex: 1, minWidth: 0, padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)' }} />
-                <button type="button" className="nesio-trip-primary" style={{ flex: '0 0 auto' }}
+                  className="nesio-trip-budget-edit-input" />
+                <button type="button" className="nesio-trip-primary nesio-trip-primary--inline"
                   onClick={() => { setCategoryBudget(tripId, c.id, Number(draft) || 0); setEditCat(null); onChanged(); }}>
                   {L(dict, '存', 'Save')}
                 </button>
-                <button type="button" className="nesio-trip-action" style={{ flex: '0 0 auto' }} onClick={() => setEditCat(null)}>
+                <button type="button" className="nesio-trip-action" onClick={() => setEditCat(null)}>
                   {L(dict, '取消', 'Cancel')}
                 </button>
               </div>
@@ -689,6 +690,11 @@ export function PoiDetail({
         </div>
         {visited && <span className="nesio-trip-status-pill">{L(dict, '已去过', 'Visited')}</span>}
       </div>
+      {(zh ? poi.summary : (poi.summaryEn || poi.summary)) && (
+        <p className="nesio-trip-poi-detail-summary">
+          {zh ? poi.summary : (poi.summaryEn || poi.summary)}
+        </p>
+      )}
       <div className="nesio-trip-card">
         <Row label={L(dict, '类型', 'Type')} value={poiTypeLabel(poi.type, zh)} />
         <Row label={L(dict, '国家', 'Country')} value={poi.country} />

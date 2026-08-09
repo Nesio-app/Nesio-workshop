@@ -87,6 +87,9 @@ export const CACHE_KEYS = new Set<string>([
   // 且新设备被别端水位污染 → 冷启动该刷新却不刷新)。归 cache:不进备份/模块同步。
   'nesio-module-sync-state-v1',           // cloud-module-sync 每 key 上次同步哈希
   'nesio-module-sync-since-v1',           // cloud-module-sync 增量拉取水位(仅本机,不上云)
+  'nesio-module-sync-last-at',            // cloud-module-sync session 节流(sessionStorage)
+  'nesio-dict-ai-enabled-v1',             // 词典 AI 查词开关:按设备偏好,换端从默认(关)开始
+  'nesio-rel-nudge-dismissed-v1',         // 关系页绿提示关闭日键:本机 UI 状态
   'nesio-email-sync-state-v1',            // cloud-email-sync 每封上次同步哈希
   'nesio-backup-synced-entrycount-v1',    // cloud-backup 高水位
   'nesio-cloud-backup-last-v1',           // cloud-backup 上次推送标记

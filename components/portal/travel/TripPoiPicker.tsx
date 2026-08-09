@@ -114,7 +114,7 @@ export default function TripPoiPicker({
         ))}
       </div>
 
-      {!ready && !err && <p className="nesio-trip-footnote">{L(dict, '正在读离线库…', 'Loading offline pack…')}</p>}
+      {!ready && !err && <p className="nesio-trip-footnote">{L(dict, '正在读全球离线景点库…', 'Loading worldwide offline pack…')}</p>}
       {err && (
         <p className="nesio-trip-msg" role="alert" style={{ color: 'var(--status-risk)' }}>
           {err}
@@ -138,6 +138,11 @@ export default function TripPoiPicker({
                 <span className="nesio-trip-poi-main">
                   <b>{p.name}</b>
                   <small>{poiTypeLabel(p.type, zh)}{p.country ? ` · ${p.country}` : ''}</small>
+                  {(zh ? p.summary : (p.summaryEn || p.summary)) && (
+                    <span className="nesio-trip-poi-summary">
+                      {zh ? p.summary : (p.summaryEn || p.summary)}
+                    </span>
+                  )}
                 </span>
                 {on && <IconCheckCircle size={16} />}
               </button>
@@ -148,7 +153,7 @@ export default function TripPoiPicker({
       {ready && list.length === 0 && (
         <p className="nesio-trip-empty">
           {!city && !query.trim()
-            ? L(dict, '离线库目前覆盖日本主要城市 —— 在搜索框输入「东京」「京都」等,或手动添加其它目的地景点。', 'Offline pack covers major cities in Japan — search “Tokyo”, “Kyoto”, etc., or add other places manually.')
+            ? L(dict, '离线库覆盖全球主要城市 —— 在搜索框输入「巴黎」「纽约」「东京」等,或手动添加其它目的地景点。', 'Offline pack covers major cities worldwide — search “Paris”, “New York”, “Tokyo”, etc., or add other places manually.')
             : L(dict, '没匹配到 —— 换个关键词,或确认目的地在离线库覆盖范围内。', 'No matches — try another keyword or check offline coverage.')}
         </p>
       )}

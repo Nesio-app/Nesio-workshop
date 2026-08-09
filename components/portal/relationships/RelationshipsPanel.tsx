@@ -80,6 +80,11 @@ export default function RelationshipsPanel() {
   const [dismissedMerges, setDismissedMerges] = useState<string[]>([]);
   useEffect(() => { setDismissedMerges(loadDismissedMerges()); }, []);
   const [expandedTiers, setExpandedTiers] = useState<Record<Closeness, boolean>>({ core: false, close: false, acquaintance: false });
+  const NUDGE_DISMISS_KEY = 'nesio-rel-nudge-dismissed-v1';
+  const [nudgeDismissed, setNudgeDismissed] = useState<Record<string, number>>(() => {
+    if (typeof window === 'undefined') return {};
+    try { return JSON.parse(localStorage.getItem(NUDGE_DISMISS_KEY) || '{}') as Record<string, number>; } catch { return {}; }
+  });
 
   const rebuild = () => {
     const owner = getLocalOwner();
@@ -134,8 +139,20 @@ export default function RelationshipsPanel() {
     : activeBucket
       ? contacts.filter((c) => activeBucket.re.test(hayOf(c)))
       : contacts.filter((c) => c.groups.includes(activeGroup));
-  const dueList = shown.filter((c) => c.reachOut);
+  // 绿提示只对核心/亲近;一般熟人刷屏不合理。可关闭(当天内不再出同一人)。
+  const dayMs = 86400000;
+  const dueList = shown.filter((c) =>
+    c.reachOut
+    && (c.closeness === 'core' || c.closeness === 'close')
+    && !(nudgeDismissed[c.key] && Date.now() - nudgeDismissed[c.key] < dayMs),
+  );
   const familyDigest = buildFamilyDigest(contacts);
+
+  function dismissNudge(key: string) {
+    const next = { ...nudgeDismissed, [key]: Date.now() };
+    setNudgeDismissed(next);
+    try { localStorage.setItem(NUDGE_DISMISS_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+  }
 
   /* #26(2026-07-30 真机):「Jing」「Jing Duan」「DUAN JING」是同一个人被拆成三条。
      用户手动并了前两条,**第三条依然独立** —— 因为合并是一次一对手动指认,
@@ -201,21 +218,23 @@ export default function RelationshipsPanel() {
         </div>
       )}
 
-      {/* 念念提醒:给最该联系的人一句暖话(设计稿)—— 帮你起个头 = 开聊天预填草稿 */}
+      {/* 念念提醒:只对核心/亲近;可关闭 */}
       {dueList.length > 0 && (
         <div className="nesio-rel-nudge">
           <span className="nesio-rel-nudge-ic" aria-hidden><IconHelpCircle size={16} /></span>
           <div className="nesio-rel-nudge-body">
             <p className="nesio-rel-nudge-text">
               {L(dict,
-                `你有 ${lastContactLabel(dueList[0], dict)}没跟 ${dueList[0].name} 聊了。要不要今晚发条消息?`,
-                `It's been ${lastContactLabel(dueList[0], 'en')} since you talked to ${dueList[0].name}. Message them tonight?`)}
+                `已经 ${dueList[0].daysSince ?? 0} 天没跟 ${dueList[0].name} 聊了。要不要今晚发条消息?`,
+                `It's been ${dueList[0].daysSince ?? 0} days since you talked to ${dueList[0].name}. Message them tonight?`)}
             </p>
             <button type="button" className="nesio-rel-nudge-btn"
               onClick={() => window.dispatchEvent(new CustomEvent('nesio-ask-text', { detail: { text: L(dict, `帮我给 ${dueList[0].name} 写一条问候消息`, `Help me write a message to ${dueList[0].name}`) } }))}>
               {L(dict, '帮你起个头 ›', 'Draft it for me ›')}
             </button>
           </div>
+          <button type="button" className="nesio-rel-nudge-x" aria-label={L(dict, '关闭', 'Dismiss')}
+            onClick={() => dismissNudge(dueList[0].key)}>×</button>
         </div>
       )}
 

@@ -22,8 +22,22 @@ assert.match(store, /addPoisToTrip|kind: 'poi'/, '离线景点可写入行程');
 const poi = read('lib/portal/travel-poi.ts');
 assert.match(poi, /\/data\/travel-poi\//, 'POI 走 public 静态包');
 assert.match(poi, /suggestPoisForDestination/, '按目的地推荐');
+assert.match(poi, /world-attractions\.json/, '全球景点包');
+assert.match(poi, /allPoisCache/, '合并 allPois 缓存');
 assert.ok(fs.existsSync(path.join(root, 'public/data/travel-poi/japan-attractions.json')), '日本景点包存在');
 assert.ok(fs.existsSync(path.join(root, 'public/data/travel-poi/tokyo-attractions.json')), '东京景点包存在');
+assert.ok(fs.existsSync(path.join(root, 'public/data/travel-poi/world-attractions.json')), '全球景点包存在');
+
+const worldPoi = JSON.parse(read('public/data/travel-poi/world-attractions.json'));
+assert.ok(worldPoi.items.length >= 200, '全球景点 items 至少 200');
+for (const item of worldPoi.items) {
+  assert.ok(typeof item.summary === 'string' && item.summary.length > 0, `world POI "${item.name}" must have summary`);
+}
+
+const routes = read('public/data/travel-routes/routes.json');
+const routesJson = JSON.parse(routes);
+assert.ok(routesJson.count >= 200, '航线包至少 200 条');
+assert.ok(routesJson.items.length >= 200, '航线 items 至少 200');
 
 const tab = read('components/portal/insights/TimelineTab.tsx');
 assert.doesNotMatch(tab, /FootMode|足迹\(去过\)|nesio-foot-modes/, '不再用顶层去过/计划双栏');
@@ -41,6 +55,8 @@ assert.match(timeline, /is-todo|is-booked/, '实心/描边节点态');
 assert.match(timeline, /addTripNode|generatePackingList/, '时间线可加节点/打包');
 assert.match(timeline, /完成 · 进世界|Done · to World/, '完成进世界');
 assert.match(timeline, /TripPoiPicker|\+ 离线景点/, '时间线可加离线景点');
+assert.match(timeline, /suggestRouteOrigins/, '出发场也有航线候选');
+assert.match(timeline, /routesErr/, '航线包加载失败可见');
 
 const detail = read('components/portal/travel/TripNodeDetailSheets.tsx');
 assert.match(detail, /setFlightCheckInReminder/, '航班提醒真功能');

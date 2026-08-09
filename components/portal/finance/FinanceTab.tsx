@@ -31,7 +31,7 @@ import CardsPane from './CardsPane';
 import AcctLogo from './AcctLogo';
 import InvestPane from './InvestPane';
 import NesioSheet from '../ui/NesioSheet';
-import { listManualAssets, manualNetWorth, loadNetWorthSeries, finAssetsReady, FIN_ASSETS_EVENT } from '@/lib/portal/finance-assets';
+import { listManualAssets, manualNetWorth, loadNetWorthSeries, finAssetsReady, FIN_ASSETS_EVENT, type ManualAsset } from '@/lib/portal/finance-assets';
 import { receiptMatchCandidates, rejectPair, loadRejectedPairs } from '@/lib/portal/receipt-match';
 import { linkExpenseToBankTx, loadDomainExpenses } from '@/lib/portal/finance-sources';
 import { domainExpenseTotal, listExpenses, EXPENSES_EVENT, type Expense } from '@/lib/portal/finance-sources';
@@ -43,13 +43,16 @@ import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES, detailsF
 import { loadAllPersonRecords } from '@/lib/portal/person-records';
 import { splitEvenly } from '@/lib/portal/ledger-allocation';
 import {
-  loadTxAnnotations, txAnnotationOf, hasTxAnnotation, toggleTxPerson, setTxNote,
+  loadTxAnnotations, txAnnotationOf, hasTxAnnotation, setTxPeople, setTxNote,
   addTxAttachment, removeTxAttachment, TX_ANNOTATIONS_EVENT, type TxAnnotation,
   setTxSplits, clearTxSplits, setTxAmortize, clearTxAmortize, setTxCategory,
+  setTxTrip, setTxMemoryTag, setTxAsset,
 } from '@/lib/portal/tx-annotations';
 import { putLocalFile, prettyBytes, MAX_FILE_BYTES } from '@/lib/portal/local-file-store';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 import { buildRelationships } from '@/lib/portal/relationships';
+import { loadTrips, type Trip } from '@/lib/portal/travel-trips';
+import { loadCustomMemoryTags } from '@/lib/portal/memory-custom-tags';
 import { IconLock, IconSnowflake } from '../icons';
 import { isFreezeLaunched } from '@/lib/portal/entitlement';
 import { L } from '@/lib/portal/i18n';
@@ -57,6 +60,13 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
 type Sub = 'overview' | 'spending' | 'tx' | 'invest' | 'cards'; // 订阅 tab 已删(定期账单在交易页);预算在支出页渲染
+
+/** 财务批注「关联人」候选:核心 / 亲近 / 家人关系,不含一般熟人。 */
+function isFinancePickContact(c: { closeness: string; relation: string | null }): boolean {
+  if (c.closeness === 'core' || c.closeness === 'close') return true;
+  const r = c.relation || '';
+  return /家人|亲人|配偶|伴侣|父|母|爸|妈|儿|女|兄|弟|姐|妹|family|spouse|partner|parent|child|sibling/i.test(r);
+}
 
 function monthLabel(ym: string, dict: string): string {
   const [y, m] = ym.split('-');
@@ -242,7 +252,7 @@ function TxSplitEditor({ txId, total, dict, contacts, onChanged }: {
   );
 }
 
-function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, tx, onCategoryChanged }: {
+function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, trips, memoryTags, financeAssets, tx, onCategoryChanged }: {
   txId: string;
   /** 这一笔的原额(绝对值)。分摊要拿它卡合计 —— 差一分都不存。 */
   txAmount: number;
@@ -250,12 +260,14 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, tx, onCateg
   dict: string;
   onFlow: (f: TxFlow) => void;
   contacts: Array<{ key: string; name: string }>;
+  trips: Trip[];
+  memoryTags: string[];
+  financeAssets: ManualAsset[];
   tx: BankTx;
   onCategoryChanged?: () => void;
 }) {
   const [ann, setAnn] = useState<TxAnnotation>(() => txAnnotationOf(txId));
   const [note, setNote] = useState(() => txAnnotationOf(txId).note || '');
-  const [peopleOpen, setPeopleOpen] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const pickRef = useRef<HTMLInputElement>(null);
@@ -281,22 +293,20 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, tx, onCateg
   };
 
   const people = ann.people || [];
+  const linkedPerson = people[0] || '';
   const atts = ann.attachments || [];
   const nameOf = (key: string) => contacts.find((c) => c.key === key)?.name
     || (/[a-z]/i.test(key) ? key.replace(/\b\w/g, (m) => m.toUpperCase()) : key);
 
-  const togglePerson = (key: string) => {
-    const r = toggleTxPerson(txId, key);
-    // 两个失败是两回事,不能都说「失败了」:
-    //   · ok=false   —— 财务页这行都没存下(空间满了之类)
-    //   · graphOk=false —— 财务页存下了,但**那个人的页面看不到这笔钱**,记忆库也搜不到。
-    //     这正是加这条桥要修的毛病,所以它绝不能自己静默。
+  const savePersonLink = (key: string) => {
+    const k = key.trim().toLowerCase();
+    const r = setTxPeople(txId, k ? [k] : []);
     if (!r.ok) setErr(failed);
-    else if (!r.graphOk) {
+    else if (!r.graphOk && k) {
       setErr(
         r.reason === 'no_person_node'
-          ? L(dict, `已记在这笔交易上。不过「${nameOf(key)}」还不是通讯录里的联系人,所以 TA 的关系页暂时看不到这笔钱 —— 去关系页把 TA 加进来就会自动接上。`,
-               `Saved on this transaction. “${nameOf(key)}” isn't a contact yet, so it won't show on their page — add them in People and it'll connect.`)
+          ? L(dict, `已记在这笔交易上。不过「${nameOf(k)}」还不是通讯录里的联系人,所以 TA 的关系页暂时看不到这笔钱 —— 去关系页把 TA 加进来就会自动接上。`,
+               `Saved on this transaction. “${nameOf(k)}” isn't a contact yet, so it won't show on their page — add them in People and it'll connect.`)
           : r.reason === 'no_tx_node'
             ? L(dict, '已记在这笔交易上。这笔流水还没同步进记忆,所以暂时只有财务页看得到 —— 下次同步后会自动补上。',
                  "Saved here. This transaction hasn't synced into memory yet, so only Finance shows it for now — the next sync will connect it.")
@@ -305,6 +315,12 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, tx, onCateg
       );
     } else setErr(null);
     setAnn(txAnnotationOf(txId));
+  };
+
+  const saveLinkField = (setter: (id: string, v: string) => boolean, value: string) => {
+    const ok = setter(txId, value);
+    setErr(ok ? null : failed);
+    if (ok) setAnn(txAnnotationOf(txId));
   };
 
   const onPick = async (list: FileList | null) => {
@@ -431,34 +447,55 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, tx, onCateg
         )}
       </div>
 
-      {/* 关联人:点开选,选中的在上面成 chip,再点取消 */}
+      {/* 关联人 / 旅行 / 记忆标签 / 财产 —— 下拉单选,可清空 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <p className="nesio-fin-score-hint" style={{ margin: 0 }}>{L(dict, '关联人', 'Link a person')}</p>
+        <select className="nesio-fin-select" value={linkedPerson} aria-label={L(dict, '关联人', 'Link a person')}
+          onChange={(e) => savePersonLink(e.target.value)}>
+          <option value="">{L(dict, '不关联', 'None')}</option>
+          {contacts.map((c) => (
+            <option key={c.key} value={c.key}>{c.name}</option>
+          ))}
+        </select>
+        {!contacts.length && (
+          <p className="nesio-fin-score-hint">{L(dict, '还没有可选的人 —— 先去关系页加一个核心/家人联系人。', 'No eligible people yet — add a core/family contact on the People page first.')}</p>
+        )}
+
+        <p className="nesio-fin-score-hint" style={{ margin: 0 }}>{L(dict, '关联旅行', 'Link a trip')}</p>
+        <select className="nesio-fin-select" value={ann.tripId || ''} aria-label={L(dict, '关联旅行', 'Link a trip')}
+          onChange={(e) => saveLinkField(setTxTrip, e.target.value)}>
+          <option value="">{L(dict, '不关联', 'None')}</option>
+          {trips.map((t) => (
+            <option key={t.id} value={t.id}>{t.title || t.destination}</option>
+          ))}
+        </select>
+
+        <p className="nesio-fin-score-hint" style={{ margin: 0 }}>{L(dict, '关联记忆标签', 'Link a memory tag')}</p>
+        <select className="nesio-fin-select" value={ann.memoryTag || ''} aria-label={L(dict, '关联记忆标签', 'Link a memory tag')}
+          onChange={(e) => saveLinkField(setTxMemoryTag, e.target.value)}>
+          <option value="">{L(dict, '不关联', 'None')}</option>
+          {memoryTags.map((tag) => (
+            <option key={tag} value={tag}>{tag}</option>
+          ))}
+        </select>
+
+        <p className="nesio-fin-score-hint" style={{ margin: 0 }}>{L(dict, '关联财产', 'Link an asset')}</p>
+        <select className="nesio-fin-select" value={ann.assetId || ''} aria-label={L(dict, '关联财产', 'Link an asset')}
+          onChange={(e) => saveLinkField(setTxAsset, e.target.value)}>
+          <option value="">{L(dict, '不关联', 'None')}</option>
+          {financeAssets.map((a) => (
+            <option key={a.id} value={a.id}>{a.name}</option>
+          ))}
+        </select>
+      </div>
+
       <div className="nesio-fin-txedit-row">
-        {people.map((k) => (
-          <button key={k} type="button" className="nesio-fin-flowopt is-active" onClick={() => togglePerson(k)}
-            aria-label={L(dict, `取消关联 ${nameOf(k)}`, `Unlink ${nameOf(k)}`)}>{nameOf(k)} ✕</button>
-        ))}
-        <button type="button" className="nesio-fin-flowopt" onClick={() => setPeopleOpen((v) => !v)}>
-          {L(dict, '关联人', 'Link a person')}
-        </button>
         <button type="button" className="nesio-fin-flowopt" disabled={busy} onClick={() => pickRef.current?.click()}>
           {busy ? L(dict, '存着…', 'Saving…') : L(dict, '传附件', 'Attach')}
         </button>
       </div>
       <input ref={pickRef} type="file" multiple accept="image/*,application/pdf" className="nesio-visually-hidden"
         onChange={(e) => { void onPick(e.target.files); e.currentTarget.value = ''; }} />
-
-      {peopleOpen && (
-        contacts.length > 0 ? (
-          <div className="nesio-fin-txedit-row">
-            {contacts.slice(0, 24).map((c) => (
-              <button key={c.key} type="button" className={`nesio-fin-flowopt${people.includes(c.key) ? ' is-active' : ''}`}
-                onClick={() => togglePerson(c.key)}>{c.name}</button>
-            ))}
-          </div>
-        ) : (
-          <p className="nesio-fin-score-hint">{L(dict, '还没有可选的人 —— 先去关系页加一个。', 'No people yet — add one on the People page first.')}</p>
-        )
-      )}
 
       {/* 分摊:把这一笔拆到多个分类/人。**合计必须等于原额**,差一分都不存 ——
           「大致分了一下」的分摊比不分更糟:按分类汇总会少一块钱,而你看不出少在哪。
@@ -619,9 +656,20 @@ export default function FinanceTab() {
   // bug3「手动关联人」的候选:与关系页同一套联系人(只取 key + 显示名)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const pickContacts = useMemo(
-    () => buildRelationships(getLifeGraph(), Date.now()).map((c) => ({ key: c.key, name: c.name })),
+    () => buildRelationships(getLifeGraph(), Date.now())
+      .filter(isFinancePickContact)
+      .map((c) => ({ key: c.key, name: c.name })),
     [rev, sub],
   );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const txEditTrips = useMemo(
+    () => [...loadTrips()].sort((a, b) => b.startDate.localeCompare(a.startDate)),
+    [rev, annRev],
+  );
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const txEditMemoryTags = useMemo(() => loadCustomMemoryTags(), [rev, annRev]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const txEditFinanceAssets = useMemo(() => listManualAssets(), [rev, annRev]);
   // 财务㉗:投资组合(持仓聚合;⚠️ 同样必须在空态早退之前)
   const [budgetNote, setBudgetNote] = useState('');
   const [showAddBudget, setShowAddBudget] = useState(false); // bug2:「手动添加」按钮展开分类选择
@@ -1186,6 +1234,7 @@ export default function FinanceTab() {
                   </div>
                   {flowEditId === t.id && (
                     <TxEditPanel txId={t.id} txAmount={Math.abs(t.amount)} flow={f} dict={dict} contacts={pickContacts}
+                      trips={txEditTrips} memoryTags={txEditMemoryTags} financeAssets={txEditFinanceAssets}
                       tx={t} onFlow={(opt) => applyFlow(t, opt)} onCategoryChanged={() => setRev((r) => r + 1)} />
                   )}
                 </div>

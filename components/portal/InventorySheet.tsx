@@ -53,7 +53,7 @@ const UNPLACED = '__unplaced__';
 const CATEGORY_PRESETS: Array<[string, string]> = [
   ['日用品', 'Household'], ['护肤', 'Skincare'], ['电子', 'Electronics'], ['服饰', 'Apparel'],
   ['食品', 'Food'], ['文具', 'Stationery'], ['工具', 'Tools'], ['药品', 'Meds'],
-  ['母婴', 'Baby'], ['收藏', 'Collectible'],
+  ['母婴', 'Baby'], ['收藏', 'Collectible'], ['文件', 'Files'],
 ];
 const CAT_CUSTOM = '__custom__';
 // 批次 170:去 emoji —— 位置/分组名里残留的 🏠 等图形字符全清掉(设计:一律线性,无 emoji)
@@ -120,6 +120,8 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
   const [groupFilter, setGroupFilter] = useState<string>(ALL);
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'list' | 'add' | 'detail' | 'stats' | 'sell' | 'flip'>('list');
+  /** page 变体三栏:总览 / 容器 / 列表(sheet 仍走原 list 流) */
+  const [pageTab, setPageTab] = useState<'overview' | 'containers' | 'items'>('overview');
   const [detailId, setDetailId] = useState<string | null>(null);
   const [importMsg, setImportMsg] = useState(''); // 物品②:导入结果可见展示(不静默)
   const fileRef = useRef<HTMLInputElement>(null);
@@ -184,6 +186,24 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
 
   const unplacedCount = useMemo(() => items.filter((i) => !i.space).length, [items]);
   const st = useMemo(() => inventoryStats(items), [items]);
+  const filesCount = useMemo(
+    () => items.filter((i) => /^(文件|Files)$/i.test(i.category || '')).length,
+    [items],
+  );
+  const amazonCount = useMemo(() => items.filter((i) => i.isAmazon).length, [items]);
+  /** 容器页:按「空间 › 容器」聚合 */
+  const containerRows = useMemo(() => {
+    const map = new Map<string, { label: string; count: number; space: string }>();
+    for (const i of items) {
+      if (!i.space) continue;
+      const label = i.container ? `${stripEmoji(i.space) || i.space} › ${stripEmoji(i.container) || i.container}` : (stripEmoji(i.space) || i.space);
+      const key = `${i.space}|${i.container || ''}`;
+      const prev = map.get(key);
+      if (prev) prev.count += 1;
+      else map.set(key, { label, count: 1, space: i.space });
+    }
+    return [...map.values()].sort((a, b) => b.count - a.count);
+  }, [items]);
 
   // 批次 170:物品左侧占位符 —— 该物品记忆有图就显示真图(取本机 IndexedDB 图,离线也能看)
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
@@ -292,7 +312,8 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
               原来是「件数 / 估值 / 未归位」+ 一句食材去处,四个 chip 讲的是四件事,
               而用户要的是三类东西各有多少、且各自点得进去。物品数**排除食材与衣服**,
               否则三个数字加起来比总数大,又是一笔对不上的账。 */}
-          {view === 'list' && items.length > 0 ? (
+          {/* page 变体用顶栏三 tab,不再挤一排「物品/衣橱/食材」chip */}
+          {!isPage && view === 'list' && items.length > 0 ? (
             <div className="nesio-inv-stats">
               <span className="nesio-inv-stat">{st.count} {L(dict, '件物品', 'items')}</span>
               {wardrobeCount > 0 && (
@@ -313,6 +334,15 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
                   {L(dict, `${pantryCount} 件食材`, `${pantryCount} ingredients`)}
                 </button>
               )}
+              {filesCount > 0 && (
+                <button
+                  type="button"
+                  className="nesio-inv-stat nesio-inv-pantry-link"
+                  onClick={() => { setQuery('文件'); setGroupFilter(ALL); }}
+                >
+                  {L(dict, `${filesCount} 件文件`, `${filesCount} files`)}
+                </button>
+              )}
             </div>
           ) : <span />}
           {!isPage || view !== 'list' ? (
@@ -322,7 +352,94 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
           ) : <span />}
         </div>
 
-        {view === 'list' && (
+        {/* page · 总览:KPI + 分类入口 + 亚马逊 */}
+        {isPage && view === 'list' && pageTab === 'overview' && (
+          <div className="nesio-inv-overview" style={{ maxHeight: 'min(70vh, 640px)', overflowY: 'auto', paddingBottom: 'var(--space-4)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+              <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)' }}>
+                <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{st.count}</span>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '物品', 'Items')}</span>
+              </div>
+              <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)' }}>
+                <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>${Math.round(st.totalValue).toLocaleString('en-US')}</span>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '估值', 'Est. value')}</span>
+              </div>
+              <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)', ...(unplacedCount > 0 ? { borderColor: 'var(--status-gentle)' } : {}) }}>
+                <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums', ...(unplacedCount > 0 ? { color: 'var(--status-gentle)' } : {}) }}>{unplacedCount}</span>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '未归位', 'Unplaced')}</span>
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 'var(--space-3)' }}>
+              <button type="button" className="nesio-inv-stat" onClick={() => setPageTab('items')}>
+                {st.count} {L(dict, '件物品', 'items')}
+              </button>
+              {wardrobeCount > 0 && (
+                <button type="button" className="nesio-inv-stat nesio-inv-pantry-link"
+                  onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab: 'wardrobe' } })); }}>
+                  {L(dict, `${wardrobeCount} 件衣橱`, `${wardrobeCount} in wardrobe`)}
+                </button>
+              )}
+              {pantryCount > 0 && (
+                <button type="button" className="nesio-inv-stat nesio-inv-pantry-link"
+                  onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-cooking')); }}>
+                  {L(dict, `${pantryCount} 件食材`, `${pantryCount} ingredients`)}
+                </button>
+              )}
+              <button type="button" className="nesio-inv-stat nesio-inv-pantry-link"
+                onClick={() => { setQuery(filesCount ? '文件' : ''); setGroupFilter(ALL); setPageTab('items'); }}>
+                {L(dict, `${filesCount} 件文件`, `${filesCount} files`)}
+              </button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%' }}
+                onClick={() => { setView('flip'); }}>
+                {L(dict, `亚马逊物品${amazonCount ? ` · ${amazonCount}` : ''}`, `Amazon items${amazonCount ? ` · ${amazonCount}` : ''}`)}
+              </button>
+              <button type="button" style={{ ...chip(false), padding: 'var(--space-3)', textAlign: 'center' }} onClick={() => setView('stats')}>
+                {L(dict, '更多统计 · 分类占比', 'More stats · by category')}
+              </button>
+              <button type="button" style={{ ...chip(false), padding: 'var(--space-3)', textAlign: 'center' }} onClick={() => setView('sell')}>
+                {L(dict, '卖闲置', 'Sell pile')}
+              </button>
+              <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', marginTop: 'var(--space-2)' }}
+                onClick={() => { resetForm(); setView('add'); }}>
+                ＋ {L(dict, '记一件', 'Add one')}
+              </button>
+            </div>
+            {st.byCategory.length > 0 && <InventoryCategoryPie rows={st.byCategory} dict={dict} />}
+          </div>
+        )}
+
+        {/* page · 容器 */}
+        {isPage && view === 'list' && pageTab === 'containers' && (
+          <div style={{ maxHeight: 'min(70vh, 640px)', overflowY: 'auto' }}>
+            {unplacedCount > 0 && (
+              <button type="button" onClick={() => { setGroupFilter(UNPLACED); setPageTab('items'); }}
+                style={{ width: '100%', textAlign: 'left', marginBottom: 8, padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--status-gentle)', background: 'var(--status-gentle-soft)', color: 'var(--portal-ink)' }}>
+                <span style={{ fontWeight: 600 }}>{L(dict, '未归位', 'Unplaced')}</span>
+                <span style={{ float: 'right', fontVariantNumeric: 'tabular-nums' }}>{unplacedCount}</span>
+              </button>
+            )}
+            {containerRows.length === 0 ? (
+              <p className="nesio-freeze-empty" style={{ padding: 'var(--space-6) 0', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+                {L(dict, '还没有归位到容器的物品。到列表里点开一件设位置即可。', 'Nothing in a container yet — open an item in the list and set a place.')}
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {containerRows.map((row) => (
+                  <button key={row.label} type="button"
+                    onClick={() => { setGroupFilter(row.space); setQuery(row.label.includes('›') ? row.label.split('›').pop()?.trim() || '' : ''); setPageTab('items'); }}
+                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', color: 'var(--portal-ink)' }}>
+                    <span style={{ fontWeight: 600 }}>{row.label}</span>
+                    <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--portal-muted)' }}>{row.count}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {view === 'list' && (!isPage || pageTab === 'items') && (
           <>
             {/* 批次 173:用户实锤删掉「东西放哪了…」小字行 */}
             <input
@@ -344,16 +461,20 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
                   {L(dict, '未归位', 'Unplaced')} {unplacedCount}
                 </button>
               )}
-              <button type="button" style={chip(false)} onClick={() => setView('stats')}>
-                {L(dict, '统计', 'Stats')}
-              </button>
-              <button type="button" style={chip(false)} onClick={() => setView('sell')}>
-                {L(dict, '卖闲置', 'Sell pile')}
-              </button>
-              {items.some((i) => i.isAmazon) && (
-                <button type="button" style={chip(false)} onClick={() => setView('flip')}>
-                  {L(dict, '亚马逊转卖', 'Amazon flip')}
-                </button>
+              {!isPage && (
+                <>
+                  <button type="button" style={chip(false)} onClick={() => setView('stats')}>
+                    {L(dict, '统计', 'Stats')}
+                  </button>
+                  <button type="button" style={chip(false)} onClick={() => setView('sell')}>
+                    {L(dict, '卖闲置', 'Sell pile')}
+                  </button>
+                  {items.some((i) => i.isAmazon) && (
+                    <button type="button" style={chip(false)} onClick={() => setView('flip')}>
+                      {L(dict, '亚马逊转卖', 'Amazon flip')}
+                    </button>
+                  )}
+                </>
               )}
             </div>
 
@@ -603,7 +724,7 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
                     <span style={kl}>{L(dict, `共 ${headline.pieces} 个`, `${headline.pieces} pieces`)}</span>
                   )}
                 </div>
-                <div style={card}><span style={kv}>≈${Math.round(st.totalValue).toLocaleString('en-US')}</span><span style={kl}>{L(dict, '估值', 'Est. value')}</span></div>
+                <div style={card}><span style={kv}>${Math.round(st.totalValue).toLocaleString('en-US')}</span><span style={kl}>{L(dict, '估值', 'Est. value')}</span></div>
                 <div style={{ ...card, ...(unplaced > 0 ? { background: 'var(--status-gentle-soft)', borderColor: 'transparent' } : {}) }}>
                   <span style={{ ...kv, ...(unplaced > 0 ? { color: 'var(--status-gentle)' } : {}) }}>{unplaced}</span>
                   <span style={kl}>{L(dict, '未归位', 'Unplaced')}</span>
@@ -747,22 +868,34 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
   );
 
   if (isPage) {
+    const pageTabs: Array<{ id: typeof pageTab; zh: string; en: string }> = [
+      { id: 'overview', zh: '总览', en: 'Overview' },
+      { id: 'containers', zh: '容器', en: 'Bins' },
+      { id: 'items', zh: '列表', en: 'List' },
+    ];
     return (
       <div className="nesio-inv-page nesio-analytics-tab">
-        {view === 'list' && items.length > 0 && (
-          <div className="nesio-inv-page-hero" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-            <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)' }}>
-              <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{st.count}</span>
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '物品', 'Items')}</span>
-            </div>
-            <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)' }}>
-              <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>≈${Math.round(st.totalValue).toLocaleString('en-US')}</span>
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '估值', 'Est. value')}</span>
-            </div>
-            <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)', ...(unplacedCount > 0 ? { borderColor: 'var(--status-gentle)' } : {}) }}>
-              <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums', ...(unplacedCount > 0 ? { color: 'var(--status-gentle)' } : {}) }}>{unplacedCount}</span>
-              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '未归位', 'Unplaced')}</span>
-            </div>
+        {(view === 'list' || view === 'stats' || view === 'sell' || view === 'flip') && (
+          <div className="nesio-inv-page-tabs" role="tablist" aria-label={L(dict, '物品分区', 'Inventory sections')}
+            style={{ display: 'flex', gap: 6, marginBottom: 'var(--space-3)' }}>
+            {pageTabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                role="tab"
+                aria-selected={pageTab === t.id && view === 'list'}
+                className={pageTab === t.id && view === 'list' ? 'is-on' : undefined}
+                onClick={() => { setPageTab(t.id); setView('list'); setDetailId(null); }}
+                style={{
+                  flex: 1, padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-pill)',
+                  border: `1px solid ${pageTab === t.id && view === 'list' ? 'var(--portal-accent-border)' : 'var(--portal-line)'}`,
+                  background: pageTab === t.id && view === 'list' ? 'var(--portal-accent-soft)' : 'transparent',
+                  color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', fontWeight: 600,
+                }}
+              >
+                {L(dict, t.zh, t.en)}
+              </button>
+            ))}
           </div>
         )}
         {body}

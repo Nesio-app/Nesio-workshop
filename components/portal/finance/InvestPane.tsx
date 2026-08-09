@@ -6,7 +6,7 @@
  * 不显示份数。只陈述事实,不给建议。
  */
 
-import { formatMoney, investmentAccountIds, displayAccountName, loadAccountNames, type BankTx, type BankAccount, type Holding } from '@/lib/portal/bank-tx';
+import { formatMoney, investmentAccountIds, displayAccountName, loadAccountNames, holdingId, type BankTx, type BankAccount, type Holding } from '@/lib/portal/bank-tx';
 import { investIncomeYTD, portfolioCheckup } from '@/lib/portal/finance-features';
 import { investDailyChange, type NetWorthSnapshot } from '@/lib/portal/finance-assets';
 import { L } from '@/lib/portal/i18n';
@@ -90,10 +90,11 @@ export default function InvestPane({ txs, holdings, accounts, nwSeries, currency
           <div key={g.accountId} style={{ marginTop: 'var(--space-3)' }}>
             {/* bug3:账户名用正文黑体 —— nesio-fin-group-h 是小型大写 + 字距,英文账户名读起来像标签 */}
             <p className="nesio-fin-group-h nesio-fin-group-h--plain">{label} · {formatMoney(g.total, currency)}</p>
-            {g.list.map((h, i) => {
+            {g.list.map((h) => {
               const gain = typeof h.costBasis === 'number' && h.costBasis > 0 ? Math.round(((h.value - h.costBasis) / h.costBasis) * 100) : null;
+              const rowKey = h.id || holdingId(h);
               return (
-                <div key={`${h.accountId}-${h.ticker || h.name}-${i}`} className="nesio-fin-acctrow">
+                <div key={rowKey} className="nesio-fin-acctrow">
                   <div className="nesio-fin-acctrow-body">
                     {/* bug3:不显示基金的文字名称(「Fidelity Concord…」占满一行还被截断),
                         只留 ticker;没有 ticker 的才退回名字。持仓字重按系统正文,不加粗。 */}

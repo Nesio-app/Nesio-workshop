@@ -11,6 +11,13 @@ import LocationPicker from './LocationPicker';
 import EmailComposeSheet from './EmailComposeSheet';
 import { IconClock, IconLink, NodeTypeIcon, WeatherIcon, IconMail, IconCalendar, IconCamera, IconMic, IconNote, IconMapPin, IconFlag, IconCheckSquare, IconFile, IconBookmark } from './icons';
 import { isTopicTag } from '@/lib/portal/topic-tags';
+import {
+  addCustomMemoryTag,
+  isCustomMemoryTag,
+  loadCustomMemoryTags,
+  MEMORY_CUSTOM_TAGS_EVENT,
+} from '@/lib/portal/memory-custom-tags';
+import { memoryEventAt } from '@/lib/portal/memory-event-at';
 // #18:「地点」字段里塞的是会议链接 —— 一条 URL 不是一个地方
 import { splitEventLocation, shortUrlLabel } from '@/lib/portal/meeting-location';
 import { L } from '@/lib/portal/i18n';
@@ -56,10 +63,6 @@ const TYPE_LABELS_EN: Record<string, string> = {
   person: 'Person', Thing: 'Item', place: 'Place', event: 'Event',
   task: 'Task', Mind: 'Mind', collection: 'Note',
 };
-
-/** 用户点名的 8 个自定义可见标签(2026-08-01)——比 type 重要,命中就在头部领头,
- *  同名单见 MemoryTab.tsx(两处各自维护一份小常量,跟 sourceMeta 那套重复模式一致)。 */
-const CUSTOM_TAGS = ['财务', '物品', '衣橱', '美食', '健康', '人物', '心情', '阅读'];
 
 const PERSON_CATEGORIES: Record<string, string> = {
   family: '家人', colleague: '同事', friend: '朋友', acquaintance: '认识', other: '其他',
@@ -709,6 +712,12 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
   const [nudgeDismissed, setNudgeDismissed] = useState(false); // 情绪重记忆的主动提示已划走
   // 批次 172(关联记忆闪退根治):搜索移出渲染热路径 —— 去抖异步跑,不再每次按键同步搜全图
   // (516 节点 + 中文 2-gram 同步搜会卡死主线程 → iOS 看门狗杀 webview = 用户实锤「一打字就闪退」)。
+  useEffect(() => { setNodeTags(node.tags ?? []); }, [node.id, node.tags]);
+  useEffect(() => {
+    const syncTags = () => setCustomTagsList(loadCustomMemoryTags());
+    window.addEventListener(MEMORY_CUSTOM_TAGS_EVENT, syncTags);
+    return () => window.removeEventListener(MEMORY_CUSTOM_TAGS_EVENT, syncTags);
+  }, []);
   useEffect(() => {
     if (!linkPicking || linkQuery.trim().length < 1) { setLinkCandidates([]); return; }
     const q = linkQuery.trim();
@@ -720,6 +729,9 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
   }, [linkQuery, linkPicking, node?.id]);
   const [rawExpanded, setRawExpanded] = useState(false); // 批次 74:原始记录折叠
   const [otherAttrsExpanded, setOtherAttrsExpanded] = useState(false); // 2026-08-01:其他属性默认折叠,别让生 key 抢眼
+  const [customTagsList, setCustomTagsList] = useState<string[]>(() => loadCustomMemoryTags());
+  const [newTagInput, setNewTagInput] = useState('');
+  const [nodeTags, setNodeTags] = useState<string[]>(() => node.tags ?? []);
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [editing, setEditing] = useState(false);
   // 批次192:编辑存放位置时,从 LocationPicker 捕获稳定 placeId/room/subRoom(存入时写节点/清空)。
@@ -834,6 +846,25 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
 
   if (!node || deleted) return null;
   const n = node;
+
+  function toggleCustomTag(tag: string) {
+    const next = nodeTags.includes(tag)
+      ? nodeTags.filter((t) => t !== tag)
+      : [...nodeTags, tag];
+    setNodeTags(next);
+    updateLifeNode(n.id, { tags: next });
+  }
+
+  function commitNewCustomTag() {
+    const trimmed = newTagInput.trim();
+    if (!trimmed) return;
+    addCustomMemoryTag(trimmed);
+    setCustomTagsList(loadCustomMemoryTags());
+    const next = nodeTags.includes(trimmed) ? nodeTags : [...nodeTags, trimmed];
+    setNodeTags(next);
+    updateLifeNode(n.id, { tags: next });
+    setNewTagInput('');
+  }
 
   function startEdit() {
     setFields({
@@ -972,7 +1003,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
 
   // 标签三层 §3.3:「记录于 2026年7月9日」→ 相对时间(今天 12:34 / 昨天 / N 天前)
   const createdDate = (() => {
-    const created = new Date(n.createdAt);
+    const created = memoryEventAt(n);
     const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
     const time = created.toLocaleTimeString(dict === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
     if (created >= dayStart) return L(dict, `今天 ${time}`, `today ${time}`);
@@ -1020,9 +1051,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
       default: return { icon: <IconNote size={sz} />, label: L(dict, '手记', 'Note'), provider: '' };
     }
   })();
-  const srcTimeRaw = (typeof readableAttrs.date === 'string' && readableAttrs.date) ? readableAttrs.date : n.createdAt;
   const srcTime = (() => {
-    const d = new Date(srcTimeRaw);
+    const d = memoryEventAt(n);
     if (isNaN(d.getTime())) return '';
     return `${d.getMonth() + 1}·${d.getDate()} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
   })();
@@ -1087,7 +1117,7 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
           {/* 2026-08-01 用户更正:自定义标签比 type 重要——命中就标签领头(左),
               type 退到这一行右上角小字;没有自定义标签就维持原样(type 领头,无角标)。 */}
           {(() => {
-            const customTag = (n.tags || []).find((t) => CUSTOM_TAGS.includes(t));
+            const customTag = nodeTags.find((t) => isCustomMemoryTag(t));
             if (customTag) {
               return (
                 <>
@@ -1201,6 +1231,44 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               {srcTime && n.type !== 'event' ? ` · ${srcTime}` : ''}
             </span>
             {srcUncertain && <span className="nesio-node-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
+          </div>
+
+          {/* 自定义标签:注册表 chip 切换;新建标签写入注册表并打上 */}
+          <div style={{ marginTop: 'var(--space-3)' }}>
+            <p className="nesio-settings-section-label" style={{ marginBottom: 'var(--space-2)' }}>
+              {L(dict, '自定义标签', 'Custom tags')}
+            </p>
+            <div className="nesio-memory-type-filter" role="group" aria-label={L(dict, '切换自定义标签', 'Toggle custom tags')}>
+              {customTagsList.map((tag) => (
+                <button
+                  key={tag}
+                  type="button"
+                  className={`nesio-type-chip${nodeTags.includes(tag) ? ' is-active' : ''}`}
+                  onClick={() => toggleCustomTag(tag)}
+                >
+                  {tag}
+                </button>
+              ))}
+            </div>
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', alignItems: 'center' }}>
+              <input
+                className="nesio-ob-input"
+                style={{ flex: 1, marginBottom: 0 }}
+                value={newTagInput}
+                onChange={(e) => setNewTagInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') commitNewCustomTag(); }}
+                placeholder={L(dict, '新建标签', 'New tag')}
+                aria-label={L(dict, '新建标签', 'New tag')}
+              />
+              <button
+                type="button"
+                className="nesio-node-action-secondary"
+                onClick={commitNewCustomTag}
+                disabled={!newTagInput.trim()}
+              >
+                {L(dict, '添加', 'Add')}
+              </button>
+            </div>
           </div>
 
           {/*

@@ -33,6 +33,8 @@ const SYNC_STATE_KEY = 'nesio-module-sync-state-v1';
 /** 单模块压缩块上限(与路由 MAX_DATA_BYTES 对齐,< Vercel 4.5MB 请求体上限)。 */
 const MAX_MODULE_PACKED_BYTES = 4 * 1024 * 1024;
 const MIN_INTERVAL_MS = 20_000;
+/** 跨 reload 也生效的节流(sessionStorage);避免每次冷启动都打全量 pull。 */
+const SYNC_COOLDOWN_KEY = 'nesio-module-sync-last-at';
 const POST_BATCH = 20;
 
 /** 并集分支里判「本机原来没有这个 key」——单独抽出来,免得和下面的 LWW 变量抢名字。 */
@@ -40,6 +42,18 @@ const localMissingOf = (v: string | undefined): boolean => v === undefined;
 
 let lastSyncAt = 0;
 let inFlight = false;
+
+function readPersistedSyncAt(): number {
+  if (typeof window === 'undefined') return 0;
+  try {
+    const n = Number(sessionStorage.getItem(SYNC_COOLDOWN_KEY) || '0');
+    return Number.isFinite(n) ? n : 0;
+  } catch { return 0; }
+}
+function writePersistedSyncAt(ts: number): void {
+  if (typeof window === 'undefined') return;
+  try { sessionStorage.setItem(SYNC_COOLDOWN_KEY, String(ts)); } catch { /* quota / private */ }
+}
 
 // ── base64 / gzip 收口(fflate,全浏览器兼容)─────────────────────────────────
 function bytesToB64(bytes: Uint8Array): string {
@@ -239,8 +253,9 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
         //  所以这里无条件跳过是安全的,不会永远推下去。)
         continue;
       }
-      // 解析不出数组(格式漂移)→ 落回下面的 LWW。会丢数据,所以留一条可见记录。
+      // 解析不出数组(格式漂移)→ **禁止**落回 LWW 整键替换,否则会把本机/云端并集冲掉。
       logDropped('cloud.module_merge_parse', new Error(`union-merge parse failed: ${key}`));
+      continue;
     }
 
     const localMissing = localVal === undefined;
@@ -301,9 +316,11 @@ export async function pullModulesFromCloud(): Promise<{ applied: number; newlyAd
 export async function autoSyncModulesWithCloud(opts: { force?: boolean } = {}): Promise<void> {
   if (typeof window === 'undefined') return;
   const now = Date.now();
-  if (!opts.force && (inFlight || now - lastSyncAt < MIN_INTERVAL_MS)) return;
+  const cooledAt = Math.max(lastSyncAt, readPersistedSyncAt());
+  if (!opts.force && (inFlight || now - cooledAt < MIN_INTERVAL_MS)) return;
   inFlight = true;
   lastSyncAt = now;
+  writePersistedSyncAt(now);
   try {
     const { newlyAdded, applied, localEntries } = await pullModulesFromCloud();
     // 水合刷新每个页面加载最多一次(sessionStorage 闸)—— 防「某 key 永远判缺失」时 reload 无限刷屏

@@ -42,6 +42,8 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
   const [addMask, setAddMask] = useState('');
   const [addErr, setAddErr] = useState('');
   const [addBusy, setAddBusy] = useState(false);
+  const [addBal, setAddBal] = useState('');
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({ deposit: true, invest: true, liability: true });
   const names = loadAccountNames();
   const isLiabAcct = (a: BankAccount) => ['credit', 'loan'].includes((a.type || '').toLowerCase());
   const isInvestAcct = (a: BankAccount) => ['investment', 'brokerage'].includes((a.type || '').toLowerCase());
@@ -50,6 +52,16 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
   const liabAccts = accounts.filter(isLiabAcct);
   // 投资账户无 balance 时用该账户持仓市值兜底
   const investBal = (a: BankAccount) => (a.balance != null ? a.balance : holdings.filter((h) => h.accountId === a.id).reduce((s, h) => s + h.value, 0));
+  /** 手工户未写 balance 时,用流水推余额(支出为正 → 余额 = −Σamount)。 */
+  const displayBal = (a: BankAccount, group: 'deposit' | 'invest' | 'liability'): number | null => {
+    if (group === 'invest') return investBal(a);
+    if (a.balance != null) return a.balance;
+    if (isManualBankAccount(a) || a.id.startsWith('manual-') || a.subtype === 'manual') {
+      const mine = txs.filter((t) => t.accountId === a.id);
+      return -mine.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    }
+    return null;
+  };
 
   // 一行账户:logo + 自定义名 + 类型/本月消费(负债:额度利用)+ 余额;点行进详情(bug2:去 ✕)
   const acctRow = (a: BankAccount, group: 'deposit' | 'invest' | 'liability') => {
@@ -57,10 +69,13 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
     const tl = accountTypeLabel(a);
     const isCredit = (a.type || '').toLowerCase() === 'credit';
     const util = isCredit && a.balance != null && (a.limit ?? 0) > 0 ? `${Math.round((Math.max(0, a.balance) / (a.limit as number)) * 100)}%` : '';
+    const manualHint = (isManualBankAccount(a) || a.subtype === 'manual')
+      ? L(dict, '手工账户', 'Manual')
+      : '';
     const sub = group === 'liability'
       ? [L(dict, tl[0], tl[1]), util ? L(dict, `已用 ${util}`, `${util} used`) : ''].filter(Boolean).join(' · ')
-      : [L(dict, tl[0], tl[1]), m.count > 0 ? L(dict, `本月 -${formatMoney(m.spend, a.currency)}`, `this mo -${formatMoney(m.spend, a.currency)}`) : ''].filter(Boolean).join(' · ');
-    const rawBal = group === 'invest' ? investBal(a) : a.balance;
+      : [manualHint || L(dict, tl[0], tl[1]), m.count > 0 ? L(dict, `本月 -${formatMoney(m.spend, a.currency)}`, `this mo -${formatMoney(m.spend, a.currency)}`) : ''].filter(Boolean).join(' · ');
+    const rawBal = displayBal(a, group);
     const bal = rawBal != null ? (group === 'liability' ? `-${formatMoney(rawBal, a.currency)}` : formatMoney(rawBal, a.currency)) : '';
     return (
       <button key={a.id} type="button" className="nesio-fin-acctrow"
@@ -71,9 +86,25 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
           <span className="nesio-fin-acctrow-name">{displayAccountName(a, names)}{a.mask ? ` ····${a.mask}` : ''}</span>
           {sub && <span className="nesio-fin-acctrow-sub">{sub}</span>}
         </div>
-        <span className={`nesio-fin-acctrow-bal${group === 'liability' ? ' is-neg' : ''}`}>{bal}</span>
+        <span className={`nesio-fin-acctrow-bal${group === 'liability' ? ' is-neg' : ''}`}>{bal || '—'}</span>
         <span aria-hidden style={{ color: 'var(--portal-muted)', marginLeft: 4 }}>›</span>
       </button>
+    );
+  };
+
+  const groupBlock = (id: 'deposit' | 'invest' | 'liability', titleZh: string, titleEn: string, list: BankAccount[]) => {
+    if (!list.length) return null;
+    const open = openGroups[id] !== false;
+    return (
+      <>
+        <button type="button" className="nesio-fin-group-h" style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 0, padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit' }}
+          aria-expanded={open}
+          onClick={() => setOpenGroups((g) => ({ ...g, [id]: !open }))}>
+          <span>{L(dict, titleZh, titleEn)} · {list.length}</span>
+          <span aria-hidden style={{ color: 'var(--portal-muted)' }}>{open ? '▾' : '▸'}</span>
+        </button>
+        {open && <div className="nesio-fin-acctgroup">{list.map((a) => acctRow(a, id))}</div>}
+      </>
     );
   };
 
@@ -86,9 +117,16 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
     setAddErr('');
     setAddBusy(true);
     try {
-      const a = addManualBankAccount({ name: addName, type: addType, ...(addMask.trim() ? { mask: addMask } : {}) });
+      const balN = addBal.trim() === '' ? undefined : Number(addBal);
+      if (balN != null && !Number.isFinite(balN)) { setAddErr(L(dict, '余额请填数字。', 'Balance must be a number.')); return; }
+      const a = addManualBankAccount({
+        name: addName,
+        type: addType,
+        ...(addMask.trim() ? { mask: addMask } : {}),
+        ...(balN != null ? { balance: balN } : { balance: 0 }),
+      });
       if (!a) { setAddErr(L(dict, '给账户起个名字。', 'Name the account first.')); return; }
-      setAddName(''); setAddMask(''); setAddOpen(false); onChanged();
+      setAddName(''); setAddMask(''); setAddBal(''); setAddOpen(false); onChanged();
     } finally { setAddBusy(false); }
   };
 
@@ -117,6 +155,10 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
               placeholder={L(dict, '尾号(可空)', 'Last 4 (optional)')}
               inputMode="numeric" maxLength={4}
               style={{ border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', fontSize: 'var(--text-sm)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }} />
+            <input value={addBal} onChange={(e) => setAddBal(e.target.value)}
+              placeholder={L(dict, '当前余额(可空,默认 0)', 'Balance (optional, default 0)')}
+              inputMode="decimal"
+              style={{ border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', fontSize: 'var(--text-sm)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }} />
             {addErr && <p role="alert" style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--status-risk)' }}>{addErr}</p>}
             <button type="button" className="nesio-fin-review-accept" disabled={addBusy} onClick={submitManual}>
               {addBusy ? L(dict, '保存中…', 'Saving…') : L(dict, '保存账户', 'Save account')}
@@ -129,21 +171,9 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
         <p className="nesio-insights-option-hint nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没有银行账户。可先手工添加,或到「设置 → 数据接入」点银行「同步」。', 'No bank accounts yet. Add one manually above, or sync the bank connector (Settings → Data sources).')}</p>
       ) : (
         <>
-          {depositAccts.length > 0 && (<>
-            <p className="nesio-fin-group-h">{L(dict, '存款', 'Cash')}</p>
-            <div className="nesio-fin-acctgroup">{depositAccts.map((a) => acctRow(a, 'deposit'))}</div>
-          </>)}
-
-          {/* bug2:投资账户(fidelity 等)也属于资产,进资产卡列表;明细在「投资」页 */}
-          {investAccts.length > 0 && (<>
-            <p className="nesio-fin-group-h">{L(dict, '投资', 'Investing')}</p>
-            <div className="nesio-fin-acctgroup">{investAccts.map((a) => acctRow(a, 'invest'))}</div>
-          </>)}
-
-          {liabAccts.length > 0 && (<>
-            <p className="nesio-fin-group-h">{L(dict, '负债', 'Liabilities')}</p>
-            <div className="nesio-fin-acctgroup">{liabAccts.map((a) => acctRow(a, 'liability'))}</div>
-          </>)}
+          {groupBlock('deposit', '存款', 'Cash', depositAccts)}
+          {groupBlock('invest', '投资', 'Investing', investAccts)}
+          {groupBlock('liability', '负债', 'Liabilities', liabAccts)}
         </>
       )}
 

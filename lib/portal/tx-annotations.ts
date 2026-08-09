@@ -59,6 +59,12 @@ export interface TxAnnotation {
   category?: string;
   /** 子分类 / 自定义细分(PFC detailed 或自由文本)。 */
   categoryDetail?: string;
+  /** 关联的旅行(trip.id)。 */
+  tripId?: string;
+  /** 记忆自定义标签 / 项目分类。 */
+  memoryTag?: string;
+  /** 关联的手动财产(finance-assets ManualAsset.id)。 */
+  assetId?: string;
 }
 
 const KEY = 'nesio-fin-tx-annotations-v1';
@@ -83,7 +89,9 @@ export function hasTxAnnotation(a: TxAnnotation | undefined): boolean {
   return Boolean(
     (a.people && a.people.length) || (a.attachments && a.attachments.length) || (a.note && a.note.trim())
     || (a.splits && a.splits.length) || a.amortize
-    || (a.category && a.category.trim()) || (a.categoryDetail && a.categoryDetail.trim()),
+    || (a.category && a.category.trim()) || (a.categoryDetail && a.categoryDetail.trim())
+    || (a.tripId && a.tripId.trim()) || (a.memoryTag && a.memoryTag.trim())
+    || (a.assetId && a.assetId.trim()),
   );
 }
 
@@ -207,6 +215,45 @@ export function setTxCategory(
 export function setTxCategoryDetail(txId: string, categoryDetail: string): boolean {
   const d = (categoryDetail || '').trim();
   return write(txId, { categoryDetail: d || undefined });
+}
+
+/** 关联旅行;空字符串 = 清除。 */
+export function setTxTrip(txId: string, tripId: string): boolean {
+  const id = (tripId || '').trim();
+  return write(txId, { tripId: id || undefined });
+}
+
+/** 关联记忆自定义标签;空字符串 = 清除。 */
+export function setTxMemoryTag(txId: string, memoryTag: string): boolean {
+  const tag = (memoryTag || '').trim();
+  return write(txId, { memoryTag: tag || undefined });
+}
+
+/** 关联手动财产;空字符串 = 清除。 */
+export function setTxAsset(txId: string, assetId: string): boolean {
+  const id = (assetId || '').trim();
+  return write(txId, { assetId: id || undefined });
+}
+
+/** 批量写入 trip / memoryTag / assetId(空值 = 清除对应字段)。 */
+export function patchTxAnnotation(
+  txId: string,
+  patch: Partial<Pick<TxAnnotation, 'tripId' | 'memoryTag' | 'assetId'>>,
+): boolean {
+  const next: Partial<TxAnnotation> = {};
+  if (patch.tripId !== undefined) {
+    const id = (patch.tripId || '').trim();
+    next.tripId = id || undefined;
+  }
+  if (patch.memoryTag !== undefined) {
+    const tag = (patch.memoryTag || '').trim();
+    next.memoryTag = tag || undefined;
+  }
+  if (patch.assetId !== undefined) {
+    const id = (patch.assetId || '').trim();
+    next.assetId = id || undefined;
+  }
+  return write(txId, next);
 }
 
 export function addTxAttachment(txId: string, att: TxAttachment): TxWriteResult {
