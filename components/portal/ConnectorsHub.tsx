@@ -1629,6 +1629,14 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
                       )}
                       <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)}>{L(dict, '断开', 'Disconnect')}</button>
                     </div>
+                  ) : isConn && (c.method === 'geo' || c.id === 'health') ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)', flexShrink: 0 }}>
+                      {/* 与 OAuth/token 同源:已连接也要能再同步,避免只剩「断开」导致老数据一直挂着 */}
+                      <button type="button" className="nesio-connector-connect" onClick={() => handleConnect(c)} disabled={isSync}>
+                        {isSync ? <span className="nesio-sync-spin" aria-hidden /> : L(dict, '同步', 'Sync')}
+                      </button>
+                      <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)}>{L(dict, '断开', 'Disconnect')}</button>
+                    </div>
                   ) : isConn ? (
                     <button type="button" className="nesio-connector-disconnect" onClick={() => disconnect(c.id)} style={{ flexShrink: 0 }}>{L(dict, '断开', 'Disconnect')}</button>
                   ) : (

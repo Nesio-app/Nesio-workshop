@@ -10,7 +10,7 @@ import {
   healthSignals, SELF_PERSON_KEY, HEALTH_MED,
   type HealthMedPayload,
 } from '@/lib/health/health-signals';
-import { isMedTaken, setMedTaken, takenCount, MED_LOG_EVENT } from '@/lib/health/med-log';
+import { isMedTaken, setMedTaken, takenCount, loadMedLog, medKey, MED_LOG_EVENT } from '@/lib/health/med-log';
 import { buildRelationships } from '@/lib/portal/relationships';
 import { getLifeGraph } from '@/lib/portal/life-graph';
 import { L } from '@/lib/portal/i18n';
@@ -34,6 +34,12 @@ export default function MedicationPanel() {
   const [tick, setTick] = useState(0);
   const [logErr, setLogErr] = useState<string | null>(null);
   const [recordOpen, setRecordOpen] = useState(false);
+  const [calMonth, setCalMonth] = useState(() => {
+    const d = new Date();
+    return { y: d.getFullYear(), m: d.getMonth() };
+  });
+
+  const medLog = useMemo(() => loadMedLog(), [tick, personKey]);
 
   const people = useMemo(() => {
     try {
@@ -68,6 +74,26 @@ export default function MedicationPanel() {
   const done = takenCount(meds.map((m) => m.name));
   const whoLabel = people.find((p) => p.key === personKey)?.name || t('我', 'Me');
 
+  const monthLabel = calMonth.y === new Date().getFullYear() && calMonth.m === new Date().getMonth()
+    ? t('本月', 'This month')
+    : new Date(calMonth.y, calMonth.m, 1).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { year: 'numeric', month: 'long' });
+  const daysInMonth = new Date(calMonth.y, calMonth.m + 1, 0).getDate();
+  const firstDow = new Date(calMonth.y, calMonth.m, 1).getDay();
+  const calCells: Array<{ day: number; ymd: string; taken: number } | null> = [];
+  for (let i = 0; i < firstDow; i++) calCells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) {
+    const ymd = `${calMonth.y}-${String(calMonth.m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    const names = medLog[ymd] || [];
+    calCells.push({ day: d, ymd, taken: meds.length ? names.filter((n) => meds.some((m) => medKey(m.name) === n)).length : names.length });
+  }
+
+  function shiftCalMonth(delta: number) {
+    setCalMonth(({ y, m }) => {
+      const d = new Date(y, m + delta, 1);
+      return { y: d.getFullYear(), m: d.getMonth() };
+    });
+  }
+
   return (
     <div className="nesio-health-dash" style={{ paddingTop: 'var(--space-2)' }}>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
@@ -83,6 +109,36 @@ export default function MedicationPanel() {
         </label>
         <Button variant="primary" size="sm" onClick={() => setRecordOpen(true)}>{t('记一种药', 'Log medication')}</Button>
       </div>
+
+      {(meds.length > 0 || history.length > 0) && (
+        <section style={{ marginBottom: 'var(--space-4)' }}>
+          <div className="nesio-fin-monthbar" style={{ marginBottom: 'var(--space-2)' }}>
+            <button type="button" className="nesio-fin-monthnav" onClick={() => shiftCalMonth(-1)} aria-label={t('上一月', 'Previous month')}>‹</button>
+            <span className="nesio-fin-month">{monthLabel}</span>
+            <button type="button" className="nesio-fin-monthnav" onClick={() => shiftCalMonth(1)} aria-label={t('下一月', 'Next month')}>›</button>
+          </div>
+          <div className="nesio-ward-cal-grid" role="grid" aria-label={t('用药打卡日历', 'Medication calendar')}>
+            {['日', '一', '二', '三', '四', '五', '六'].map((w, i) => (
+              <span key={w} className="nesio-ward-cal-dow" style={{ fontSize: 'var(--text-xs)' }}>{dict === 'en' ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'][i] : w}</span>
+            ))}
+            {calCells.map((c, i) => (
+              c ? (
+                <span
+                  key={c.ymd}
+                  className={`nesio-ward-cal-day${c.taken > 0 ? ' has-outfit' : ''}`}
+                  title={c.taken > 0 ? t(`${c.day}日 · 已服 ${c.taken} 种`, `Day ${c.day} · ${c.taken} taken`) : undefined}
+                  style={{ fontSize: 'var(--text-xs)' }}
+                >
+                  {c.day}
+                  {c.taken > 0 && meds.length > 0 && c.taken >= meds.length && (
+                    <i style={{ background: 'var(--status-go)' }} aria-hidden />
+                  )}
+                </span>
+              ) : <span key={`e-${i}`} className="nesio-ward-cal-day is-empty" aria-hidden />
+            ))}
+          </div>
+        </section>
+      )}
 
       {meds.length === 0 && history.length === 0 ? (
         <p className="nesio-insights-empty">

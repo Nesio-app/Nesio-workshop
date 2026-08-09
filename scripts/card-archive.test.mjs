@@ -1,5 +1,5 @@
 /**
- * 行为契约:卡片档案 —— AI 判决层的唯一监测面(设计定稿 2026-07-29,Step 1)。
+ * 行为契约:卡片档案 —— AI 判决层的唯一监测面(设计定稿 2026-07-29,Drop 1)。
  *
  * 没有档案就不该开 AI:误报看「说了的」改判率,漏报看「没说的」+「该提醒我」。
  * 钉死:同卡去重累计 / 90 天+条数上限 / 改判可覆盖 / 统计喂口味 / 警示阈值 /
@@ -10,27 +10,36 @@ import vm from 'node:vm';
 import ts from 'typescript';
 import assert from 'node:assert/strict';
 
+let dropped = 0;
+const mem = new Map();
+
 function loadTs(rel, extra = {}) {
   const src = fs.readFileSync(new URL(rel, import.meta.url), 'utf8');
   const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const mod = { exports: {} };
   vm.runInNewContext(js, {
     module: mod, exports: mod.exports, console,
-    require: (p) => (String(p).includes('storage-health') ? { reportStorageDropped: () => { dropped += 1; } } : {}),
+    require: (p) => {
+      if (String(p).includes('storage-health')) return { reportStorageDropped: () => { dropped += 1; } };
+      if (String(p).includes('idb-blob-store')) {
+        return {
+          createBlobStore: ({ key }) => ({
+            load: () => (mem.has(key) ? mem.get(key) : null),
+            save: (v) => { mem.set(key, v); },
+            ready: async () => {},
+            refresh: async () => {},
+            isReady: () => true,
+          }),
+        };
+      }
+      return {};
+    },
     Date, Math, Number, Array, Object, String, Set, Map, JSON, isNaN, ...extra,
   });
   return mod.exports;
 }
 
-let dropped = 0;
-const store = new Map();
-const A = loadTs('../lib/portal/card-archive.ts', {
-  localStorage: {
-    getItem: (k) => (store.has(k) ? store.get(k) : null),
-    setItem: (k, v) => store.set(k, v),
-    removeItem: (k) => store.delete(k),
-  },
-});
+const A = loadTs('../lib/portal/card-archive.ts');
 
 const T0 = new Date('2026-07-29T10:00:00Z');
 const plus = (days) => new Date(T0.getTime() + days * 86_400_000);
@@ -74,7 +83,7 @@ assert.ok(stats.badRatio > 0.15 && stats.alarm, '改判率 >15% 且样本 ≥5 �
 assert.equal(stats.wantedCount, 1);
 
 // ── 90 天上限:老条目被裁 ──
-store.clear();
+mem.clear();
 A.archiveShownCard(mkShown('old'), T0);
 A.archiveShownCard(mkShown('new'), plus(95)); // 95 天后再写入,触发裁剪
 arc = A.readArchive();
@@ -82,14 +91,15 @@ assert.equal(arc.shown.length, 1, '90 天前的条目裁掉');
 assert.equal(arc.shown[0].id, 'new');
 
 // ── 条数上限 ──
-store.clear();
+mem.clear();
 const cap = A.ARCHIVE_MAX_DECLINED;
 A.archiveDeclined(Array.from({ length: cap + 30 }, (_, i) => ({ id: `d${i}`, lane: 'ai', title: 't', reason: 'r' })), T0);
 assert.equal(A.readArchive().declined.length, cap, `declined 封顶 ${cap}`);
 
 // ── 写失败不许静默吞(红线) ──
 const src = fs.readFileSync(new URL('../lib/portal/card-archive.ts', import.meta.url), 'utf8');
-assert.match(src, /reportStorageDropped\(\)/, '存储写失败必须走 storage-health 可见事件');
+assert.match(src, /reportStorageDropped/, '存储写失败必须走 storage-health 可见事件');
+assert.match(src, /createBlobStore/, '档案走 idb-blob-store(腾 localStorage 配额)');
 
 // ── 接线 ──
 const feed = fs.readFileSync(new URL('../components/portal/TodayFeed.tsx', import.meta.url), 'utf8');
@@ -107,6 +117,7 @@ assert.match(panel, /resolveCardTarget\(/, '跳转必须走 resolver(目标不�
 // ①「该提醒我」两半闭环 —— 记事实(喂 prompt)+ 摘出已判集合(重判)
 const auto2 = fs.readFileSync(new URL('../lib/portal/guidance-judge-auto.ts', import.meta.url), 'utf8');
 assert.match(auto2, /wantedTitles: wantedDeclinedTitles\(\)/, '「该提醒我」的标题要进判决口味段');
+assert.match(auto2, /createBlobStore/, '判决 ledger 走 idb-blob-store');
 assert.match(panel, /requeueFingerprint\(e\.id\)/, '「该提醒我」要触发该指纹重判');
 // ② 今天页手势与档案是同一本账
 const cardCmp = fs.readFileSync(new URL('../components/portal/today/ProactiveGuidanceCard.tsx', import.meta.url), 'utf8');
@@ -115,4 +126,4 @@ assert.match(cardCmp, /recordArchiveVerdict\(card\.factKey/, '手势表态(有�
 const target = fs.readFileSync(new URL('../lib/portal/card-target.ts', import.meta.url), 'utf8');
 assert.ok(!/target\s*[:=][^\n]*card\.(action|payload)/.test(target), 'resolver 不读 AI 输出的任何 target 字段');
 
-console.log('card-archive: OK(去重累计 / 改判可覆盖 / 双清单 / 口味统计+警示 / 上限 / 写失败可见 / 双轨接线)');
+console.log('card-archive: OK(去重累计 / 改判可覆盖 / 双清单 / 口味统计+警示 / 上限 / 写失败可见 / 双轨接线 / IDB)');

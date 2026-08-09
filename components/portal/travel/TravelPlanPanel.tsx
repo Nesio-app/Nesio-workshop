@@ -216,10 +216,26 @@ export default function TravelPlanPanel() {
               {list.map((t) => (
                 <li key={t.id}>
                   <button type="button" className="nesio-travel-plan-card" onClick={() => setOpenId(t.id)}>
-                    <span className="nesio-travel-plan-card-ico"><IconPlane size={18} /></span>
+                    <span className="nesio-travel-plan-card-ico"><IconPlane size={22} /></span>
                     <span className="nesio-travel-plan-card-main">
-                      <b>{t.title}</b>
-                      <small>{t.startDate} → {t.endDate}{t.weatherHint ? ` · ${t.weatherHint}` : ''} · {t.nodes.length} {L(dict, '节点', 'nodes')}</small>
+                      <b>{t.title || t.destination}</b>
+                      <small>
+                        {(() => {
+                          const start = new Date(`${t.startDate}T12:00:00`);
+                          const end = new Date(`${t.endDate}T12:00:00`);
+                          const fmt = (d: Date) => d.toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { weekday: 'short', month: 'short', day: 'numeric' });
+                          const days = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+                          const today = new Date(); today.setHours(12, 0, 0, 0);
+                          const until = Math.ceil((start.getTime() - today.getTime()) / 86400000);
+                          const countdown = until > 0
+                            ? L(dict, `还有 ${until} 天出发`, `Starts in ${until} day${until === 1 ? '' : 's'}`)
+                            : until === 0
+                              ? L(dict, '今天出发', 'Starts today')
+                              : L(dict, '行程中 / 已过', 'Ongoing / past');
+                          return `${fmt(start)} – ${fmt(end)} (${days} ${L(dict, '天', 'days')}) · ${countdown}`;
+                        })()}
+                        {t.weatherHint ? ` · ${t.weatherHint}` : ''}
+                      </small>
                     </span>
                     <IconChevronRight size={16} />
                   </button>
@@ -296,7 +312,7 @@ export default function TravelPlanPanel() {
           {importMsg && <p className="nesio-trip-msg" role="status">{importMsg}</p>}
           {/* bug3:「粘贴预定按钮不管用」—— 没有剪贴板权限/内容时,原来这条路是死的。
               补一个「上传」把 .txt/.eml 读进文本框,再点「识别」。 */}
-          <input ref={bookingFileRef} type="file" accept=".txt,.eml,.md,.html,.pdf,text/plain,message/rfc822,application/pdf,image/*"
+          <input ref={bookingFileRef} type="file" accept=".txt,.eml,.md,.html,.pdf,text/plain,message/rfc822,application/pdf,image/jpeg,image/png,image/webp,image/gif,image/heic"
             className="nesio-visually-hidden"
             onChange={(e) => { void onPickBooking(e.target.files?.[0]); e.currentTarget.value = ''; }} />
           <div className="nesio-travel-plan-form-actions">

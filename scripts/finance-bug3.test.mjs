@@ -93,11 +93,12 @@ assert.ok(/该分类 · 商户 Top|In this category · Top merchants/.test(tab),
 assert.ok(/明细 · \$\{catTxs\.length\}|Details · \$\{catTxs\.length\}/.test(tab), '点分类后要有每笔明细列表');
 assert.ok(/setSpendFocus/.test(tab) && /onSlice=/.test(tab), '分类饼图要可点');
 assert.ok(/setAllocPick/.test(tab), '组合结构环形图要能点开看这一类的持仓');
-// 四张卡 + 念念/＋记在卡片下面
+// 四张卡 + 念念在卡片下面;手记银行流水入口已撤(资产更新走 CardsPane.onQuickAddAsset)
 const kpiAt = tab.indexOf("'收入', 'Income'");
 const nessaAt = tab.indexOf('nesio-fin-nessa');
-const addAt = tab.indexOf("'＋ 记一笔'");
-assert.ok(kpiAt > 0 && nessaAt > kpiAt && addAt > kpiAt, '念念那句话和「＋记一笔」都要在四张卡下面');
+assert.ok(kpiAt > 0 && nessaAt > kpiAt, '念念那句话要在四张卡下面');
+assert.ok(!tab.includes("'＋ 记一笔'"), '总览不再手记银行流水');
+assert.ok(/onQuickAddAsset/.test(tab), '资产更新仍走 CardsPane');
 for (const card of ["'收入', 'Income'", "'支出', 'Spending'", "'总资产', 'Total assets'", "'投资', 'Investing'"]) {
   assert.ok(tab.includes(card), `总览必须有这张卡:${card}`);
 }

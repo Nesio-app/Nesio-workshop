@@ -221,7 +221,8 @@ const ITEMS = [
   ['92', 'p34 分类页单饼 + 点选出商户/明细', () => !/function SpendChartPager/.test(F.finTab) && /该分类 · 商户 Top|In this category · Top merchants/.test(F.finTab) && /setSpendFocus/.test(F.finTab)],
   ['93', 'p35 组合结构去图例 + 点开看详情', () => /setAllocPick/.test(F.finTab)],
   ['94', 'p35 念卡放到卡片下面', () => F.finTab.indexOf('nesio-fin-nessa') > F.finTab.indexOf("'收入', 'Income'")],
-  ['95', 'p35「+记」改按钮放卡片下面', () => !/\['add',/.test(C.finTab) && F.finTab.indexOf("'＋ 记一笔'") > F.finTab.indexOf("'收入', 'Income'")],
+  // 产品改口(2026-08):总览不再手记银行流水;资产更新走 CardsPane.onQuickAddAsset。
+  ['95', 'p35「+记」改按钮放卡片下面', () => !/\['add',/.test(C.finTab) && !F.finTab.includes("'＋ 记一笔'") && /onQuickAddAsset/.test(F.finTab)],
   ['96', 'p35 四张卡:收入/支出/总资产/投资(盈亏进投资卡)', () => ["'收入', 'Income'", "'支出', 'Spending'", "'总资产', 'Total assets'", "'投资', 'Investing'"].every((k) => F.finTab.includes(k)) && /portfolio\.gain/.test(F.finTab)],
 
   // ── 健康(p36–p41)──

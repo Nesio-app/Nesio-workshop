@@ -39,7 +39,10 @@ function loadRoute() {
       : p === '@/lib/portal/api-auth' ? { guardAiRoute: async () => null }
       : p === '../link-token/route' ? { plaidBase: () => 'https://sandbox.plaid.com' }
       : p === '@/lib/portal/env' ? { envValue: () => 'k' }
-      : p === '@/lib/portal/integrations' ? { writePlaidTokensForCurrentUser: async () => true }
+      : p === '@/lib/portal/integrations' ? {
+        writePlaidTokensForCurrentUser: async () => true,
+        readPlaidTokensForCurrentUser: async () => null,
+      }
       : ({}),
   });
   return mod.exports;
@@ -126,7 +129,12 @@ function makeTxWorld(world, opts = {}) {
     require: (p) => p === 'next/server' ? { NextRequest: class {}, NextResponse: { json: (b, init) => ({ __json: b, __status: init?.status ?? 200, cookies: { set: (n, v) => { cookies[n] = v; } } }) } }
       : p === '@/lib/portal/api-auth' ? { guardAiRoute: async () => null }
       : p === '../link-token/route' ? { plaidBase: () => 'https://sandbox.plaid.com' }
-      : p === '@/lib/portal/env' ? { envValue: () => 'k' } : ({}),
+      : p === '@/lib/portal/env' ? { envValue: () => 'k' }
+      : p === '@/lib/portal/integrations' ? {
+        readPlaidTokensForCurrentUser: async () => null,
+        replacePlaidTokensForCurrentUser: async () => true,
+        writePlaidTokensForCurrentUser: async () => true,
+      } : ({}),
   });
   return { route: mod.exports, cookies, removedItems };
 }
@@ -235,7 +243,7 @@ const syncTx = (id, acc) => ({ added: [{ transaction_id: id, account_id: acc, da
   const res = await w.route.GET(reqWithTokens(['at-fid']));
   const hs = [...res.__json.holdings].map((h) => ({ ...h }));
   assert.equal(hs.length, 2, '持仓全量进响应');
-  assert.deepEqual(hs[0], { accountId: 'acc-ira', name: 'Apple Inc', ticker: 'AAPL', type: 'equity', quantity: 10, value: 3000, costBasis: 2400, currency: 'USD' }, 'securities join 出名称/代码/类型');
+  assert.deepEqual(hs[0], { id: 'acc-ira|sec-1', accountId: 'acc-ira', name: 'Apple Inc', ticker: 'AAPL', type: 'equity', quantity: 10, value: 3000, costBasis: 2400, currency: 'USD' }, 'securities join 出名称/代码/类型');
   assert.equal(hs[1].name, 'Security', 'security 缺失 → 兜底名,不丢持仓');
   assert.equal(hs[1].costBasis, undefined, '缺成本透传 undefined(下游不硬算盈亏)');
 }

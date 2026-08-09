@@ -13962,6 +13962,23 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 .nesio-bl-empty-actions {
   display: flex; justify-content: center; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3);
 }
+.nesio-health-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+  min-height: 32px; padding: 0.3rem 0.75rem;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--portal-line);
+  background: var(--portal-card, #fff);
+  color: var(--portal-ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  cursor: pointer;
+}
+.nesio-health-btn--primary {
+  background: var(--portal-blue-deep);
+  border-color: var(--portal-blue-deep);
+  color: #fff;
+}
 
 /* 四 tab 时字号略收 */
 
@@ -14324,6 +14341,14 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 
 /* 关系·列表(整理后):分层标题 + 列表行 + 莫兰迪字母块头像 */
 .nesio-rel-tier-h { display: flex; align-items: center; gap: 0.45rem; font-size: 0.72rem; font-weight: 700; color: var(--portal-muted); margin: 1.1rem 0.15rem 0.5rem; }
+.nesio-rel-tier-fold { margin-bottom: var(--space-2); border: 1px solid var(--portal-line); border-radius: var(--radius-md); background: var(--portal-accent-soft); overflow: hidden; }
+.nesio-rel-tier-fold > summary.nesio-rel-tier-h--btn { list-style: none; cursor: pointer; margin: 0; padding: var(--space-2) var(--space-3); font-size: var(--text-sm); font-weight: var(--weight-semibold); color: var(--portal-ink); background: var(--portal-accent-soft-md); border-bottom: 1px solid var(--portal-line); }
+.nesio-rel-tier-fold > summary.nesio-rel-tier-h--btn::-webkit-details-marker { display: none; }
+.nesio-rel-tier-fold > summary.nesio-rel-tier-h--btn::after { content: '›'; margin-left: auto; color: var(--portal-muted); transform: rotate(90deg); transition: transform 0.15s ease; }
+.nesio-rel-tier-fold:not([open]) > summary.nesio-rel-tier-h--btn::after { transform: rotate(0deg); }
+.nesio-rel-tier-fold .nesio-rel-list { padding: var(--space-1) var(--space-2) var(--space-2); background: var(--portal-bg); }
+.nesio-rel-tier-fold .nesio-rel-row { background: var(--portal-bg); border: 1px solid var(--portal-line); border-radius: var(--radius-sm); margin-top: var(--space-1); }
+.nesio-health-iconbtn { width: 2.25rem; height: 2.25rem; padding: 0; display: inline-flex; align-items: center; justify-content: center; min-width: 0; }
 .nesio-rel-tier-dot { width: 0.5rem; height: 0.5rem; border-radius: 50%; flex-shrink: 0; }
 .nesio-rel-tier-dot--core { background: var(--portal-blue-deep); }
 .nesio-rel-tier-dot--close { background: var(--status-go); }
@@ -14466,6 +14491,21 @@ html[data-portal-theme="night"] .nesio-fin-acctgroup { background: rgba(255,255,
 
 /* ─── 按人分类的数据(人缘㊄)─── */
 .nesio-rel-rec-head { display: flex; align-items: center; justify-content: space-between; }
+.nesio-rel-cat-head {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  background: var(--portal-accent-soft); color: var(--portal-ink);
+  padding: var(--space-2) var(--space-3); cursor: pointer;
+  font-family: var(--font-sans); text-align: left;
+}
+.nesio-rel-cat-title {
+  font-size: var(--text-sm); font-weight: var(--weight-semibold);
+}
+.nesio-rel-rec-list--nested {
+  margin-top: var(--space-2);
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--portal-line);
+}
 .nesio-rel-rec-add { font-size: 0.78rem; font-weight: 600; color: var(--portal-blue-deep); background: none; border: none; cursor: pointer; padding: 0.2rem 0; }
 .nesio-rel-rec-form { display: flex; flex-direction: column; gap: 0.45rem; background: var(--glass-bg-solid); border: 1px solid var(--portal-line); border-radius: 0.75rem; padding: 0.7rem; margin: 0.5rem 0; }
 .nesio-rel-rec-input { font: inherit; font-size: 0.85rem; padding: 0.5rem 0.6rem; border: 1px solid var(--portal-line); border-radius: 0.55rem; background: var(--sheet-opaque, #fff); color: var(--portal-ink); width: 100%; }
@@ -19943,10 +19983,11 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .nesio-travel-plan-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
 .nesio-travel-plan-title {
   margin: 0;
-  font-family: var(--font-serif);
-  font-size: var(--text-h3);
-  font-weight: var(--weight-semibold);
+  font-family: var(--font-sans);
+  font-size: var(--text-h2);
+  font-weight: var(--weight-bold);
   color: var(--portal-ink);
+  letter-spacing: -0.02em;
 }
 .nesio-travel-plan-count { font-size: var(--text-xs); color: var(--portal-muted); }
 .nesio-travel-plan-empty {
@@ -19968,16 +20009,17 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
   padding: var(--space-3) var(--space-3);
   cursor: pointer; color: var(--portal-ink);
   font-family: var(--font-sans);
+  box-shadow: 0 1px 0 rgba(30, 42, 58, 0.04);
 }
 .nesio-travel-plan-card:active { background: var(--portal-accent-soft); }
 .nesio-travel-plan-card-ico {
-  width: 36px; height: 36px; border-radius: 50%;
+  width: 56px; height: 56px; border-radius: var(--radius-sm);
   display: grid; place-items: center;
-  background: var(--status-calm-soft); color: var(--status-calm); flex-shrink: 0;
+  background: var(--portal-accent-soft); color: var(--portal-blue-deep); flex-shrink: 0;
 }
 .nesio-travel-plan-card-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.nesio-travel-plan-card-main b { font-size: var(--text-body); font-weight: var(--weight-semibold); }
-.nesio-travel-plan-card-main small { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-travel-plan-card-main b { font-size: var(--text-body); font-weight: var(--weight-bold); }
+.nesio-travel-plan-card-main small { font-size: var(--text-xs); color: var(--portal-muted); line-height: 1.4; }
 .nesio-travel-plan-del {
   border: 0; background: transparent; color: var(--portal-muted);
   font-size: 1.2rem; padding: 0 var(--space-2); cursor: pointer; border-radius: var(--radius-sm);
@@ -20009,6 +20051,64 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 }
 .nesio-trip-addbar {
   display: flex; flex-wrap: wrap; gap: var(--space-2);
+}
+.nesio-trip-addbar--fab {
+  justify-content: flex-end;
+  padding: var(--space-2) 0 0;
+  position: sticky;
+  bottom: var(--space-3);
+  z-index: 2;
+  pointer-events: none;
+}
+.nesio-trip-addbar--fab > * { pointer-events: auto; }
+.nesio-trip-fab {
+  width: 52px; height: 52px; border-radius: var(--radius-pill);
+  border: none; background: var(--portal-blue-deep); color: #fff;
+  font-size: 1.75rem; line-height: 1; font-weight: var(--weight-medium);
+  box-shadow: 0 6px 18px rgba(30, 42, 58, 0.18);
+  cursor: pointer;
+}
+.nesio-trip-add-picker {
+  margin: var(--space-2) 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--portal-card, #fff);
+  border: 1px solid var(--portal-line);
+  display: flex; flex-direction: column; gap: var(--space-2);
+  max-height: min(60vh, 420px); overflow: auto;
+}
+.nesio-trip-add-picker-head {
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center;
+  margin-bottom: var(--space-1);
+}
+.nesio-trip-add-picker-head b {
+  text-align: center; font-size: var(--text-sm); font-weight: var(--weight-semibold);
+}
+.nesio-trip-add-picker-label {
+  margin: var(--space-2) 0 0; font-size: var(--text-xs); color: var(--portal-muted);
+  font-weight: var(--weight-semibold);
+}
+.nesio-trip-add-picker-group {
+  list-style: none; margin: 0; padding: 0;
+  border-radius: var(--radius-sm);
+  background: var(--portal-bg);
+  border: 1px solid var(--portal-line);
+  overflow: hidden;
+}
+.nesio-trip-add-picker-item {
+  width: 100%; display: flex; align-items: center; gap: var(--space-3);
+  padding: var(--space-3);
+  border: none; border-bottom: 1px solid var(--portal-line);
+  background: transparent; color: var(--portal-ink);
+  font-size: var(--text-sm); text-align: left; cursor: pointer;
+  font-family: var(--font-sans);
+}
+.nesio-trip-add-picker-group li:last-child .nesio-trip-add-picker-item { border-bottom: none; }
+.nesio-trip-add-picker-ico {
+  width: 32px; height: 32px; border-radius: var(--radius-pill);
+  display: grid; place-items: center;
+  background: var(--portal-accent-soft); color: var(--portal-blue-deep);
+  flex-shrink: 0;
 }
 .nesio-trip-addbar--secondary { margin-top: calc(-1 * var(--space-1)); }
 .nesio-trip-action--ghost {
@@ -22097,7 +22197,20 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: var(--space-3); padding: var(--space-4);
 }
-.nesio-tryon-lightbox img { max-width: 100%; max-height: 78vh; object-fit: contain; border-radius: var(--radius-md); }
+.nesio-tryon-lightbox-stage {
+  width: min(100%, 520px); max-height: 72vh; overflow: auto;
+  -webkit-overflow-scrolling: touch; touch-action: pan-x pan-y pinch-zoom;
+  border-radius: var(--radius-md);
+}
+.nesio-tryon-lightbox-stage.is-zoomed { max-height: 78vh; }
+.nesio-tryon-lightbox img {
+  display: block; width: 100%; max-height: 72vh; object-fit: contain;
+  border-radius: var(--radius-md); cursor: zoom-in; transition: transform 0.15s ease;
+  transform-origin: center center;
+}
+.nesio-tryon-lightbox img.is-zoomed {
+  width: 200%; max-width: none; max-height: none; cursor: zoom-out;
+}
 .nesio-tryon-lightbox-close {
   position: absolute; top: var(--space-4); right: var(--space-4); border: none; background: transparent;
   color: #fff; font-size: var(--text-h2); cursor: pointer; line-height: 1;

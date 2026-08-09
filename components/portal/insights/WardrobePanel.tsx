@@ -11,6 +11,7 @@
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { openModeCamera, takePendingCapture, prepareCapturedPhoto, storeWardrobeImage, storeWardrobeImageFull, resolveAssetDisplayUrl, kickWardrobeImageSync, pushNodeAssetsToCloud } from '@/lib/portal/capture-pipeline';
 import {
   listWardrobe, addGarment, removeGarment, markWorn, suggestOutfit, inferFormalNeed,
@@ -30,7 +31,10 @@ import { usePortalLocale } from '../use-portal-locale';
 import type { CalendarEvent } from '@/lib/portal/types';
 import SegTabs from '../ui/SegTabs';
 import SpendClaimRow from '../finance/SpendClaimRow';
+import { isNativePlatform } from '@/lib/portal/platform-capabilities';
 import { IconStar, IconThumbUp, IconThumbDown, IconCamera, IconAlertTriangle, IconRain, IconRefresh, GarmentIcon } from '../icons';
+
+const UNWORN_DAYS = 60; // 「好久没穿」门槛(天)
 
 const TYPE_LABEL: Record<GarmentType, [string, string]> = {
   top: ['上装', 'Top'], bottom: ['下装', 'Bottoms'], outer: ['外套', 'Outerwear'],
@@ -114,20 +118,48 @@ function saveBodyIds(ids: string[]): void {
   } catch { /* ignore */ }
 }
 
-/** 试穿图保存:优先系统分享(可进相册),否则下载。 */
-async function saveTryonToDevice(dataUrl: string): Promise<'shared' | 'downloaded' | 'failed'> {
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const t = window.setTimeout(() => reject(new Error('timeout')), ms);
+    p.then(
+      (v) => { window.clearTimeout(t); resolve(v); },
+      (e) => { window.clearTimeout(t); reject(e); },
+    );
+  });
+}
+
+function dataUrlToBlob(dataUrl: string): Blob | null {
+  const m = /^data:(image\/[a-z+]+);base64,(.*)$/i.exec(dataUrl);
+  if (!m) return null;
   try {
-    const blob = await (await fetch(dataUrl)).blob();
-    const file = new File([blob], 'nesio-tryon.png', { type: blob.type || 'image/png' });
-    const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-    if (typeof nav.share === 'function' && nav.canShare?.({ files: [file] })) {
-      await nav.share({ files: [file], title: 'Nesio try-on' });
-      return 'shared';
+    const bin = atob(m[2]);
+    const arr = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return new Blob([arr], { type: m[1] });
+  } catch { return null; }
+}
+
+/** 试穿图保存:Web 可走系统分享(带超时);iOS Capacitor 上 share 易挂起 → 直接下载。不用 fetch(dataUrl) 防卡主线程。 */
+async function saveTryonToDevice(dataUrl: string): Promise<'shared' | 'downloaded' | 'failed'> {
+  const blob = dataUrlToBlob(dataUrl);
+  if (!blob) return 'failed';
+  const file = new File([blob], 'nesio-tryon.png', { type: blob.type || 'image/png' });
+  try {
+    if (!isNativePlatform()) {
+      const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+      if (typeof nav.share === 'function' && nav.canShare?.({ files: [file] })) {
+        try {
+          await withTimeout(nav.share({ files: [file], title: 'Nesio try-on' }), 8_000);
+          return 'shared';
+        } catch { /* timeout / 取消 → 下载 */ }
+      }
     }
   } catch { /* fall through */ }
+  let objUrl: string | null = null;
   try {
+    objUrl = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = dataUrl;
+    a.href = objUrl;
     a.download = 'nesio-tryon.png';
     a.rel = 'noopener';
     document.body.appendChild(a);
@@ -136,6 +168,8 @@ async function saveTryonToDevice(dataUrl: string): Promise<'shared' | 'downloade
     return 'downloaded';
   } catch {
     return 'failed';
+  } finally {
+    if (objUrl) window.setTimeout(() => URL.revokeObjectURL(objUrl!), 8000);
   }
 }
 
@@ -182,7 +216,11 @@ export default function WardrobePanel() {
   const [bodyThumbs, setBodyThumbs] = useState<Record<string, string>>({});
   const [activeBodyId, setActiveBodyId] = useState(BODY_ASSET_ID);
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
+  const [zoomScaled, setZoomScaled] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
+  const [saveBusy, setSaveBusy] = useState(false);
+  const [unwornOpen, setUnwornOpen] = useState(false);
+  const [collapsedTypes, setCollapsedTypes] = useState<Set<GarmentType>>(() => new Set());
   // 每条搭配的上身图(assetId → dataUrl),搭配详情与日历格子共用
   const [outfitTryons, setOutfitTryons] = useState<Record<string, string>>({});
   const bodyFileRef = useRef<HTMLInputElement>(null);
@@ -286,16 +324,21 @@ export default function WardrobePanel() {
     } catch { setTryonError(L(dict, '这张图读不了,换一张试试。', 'Could not read that image — try another.')); }
   };
 
-  const onSaveTryon = async (url: string) => {
+  const onSaveTryon = (url: string) => {
     setSaveMsg(null);
-    const r = await saveTryonToDevice(url);
-    if (r === 'failed') {
-      setTryonError(L(dict, '没能保存图片 —— 换浏览器或截屏试试。', 'Could not save the image — try another browser or a screenshot.'));
-      return;
-    }
-    setSaveMsg(r === 'shared'
-      ? L(dict, '已打开系统分享 —— 可选「存储图像」。', 'Opened share sheet — choose Save Image.')
-      : L(dict, '已开始下载。', 'Download started.'));
+    setSaveBusy(true);
+    window.setTimeout(() => {
+      void saveTryonToDevice(url).then((r) => {
+        setSaveBusy(false);
+        if (r === 'failed') {
+          setSaveMsg(L(dict, '保存没成功 —— 换浏览器或截屏试试。', 'Save failed — try another browser or a screenshot.'));
+          return;
+        }
+        setSaveMsg(r === 'shared'
+          ? L(dict, '已打开系统分享 —— 可选「存储图像」。', 'Opened share sheet — choose Save Image.')
+          : L(dict, '已保存到相册/下载。', 'Saved to photos / download started.'));
+      });
+    }, 0);
   };
 
   /**
@@ -843,13 +886,12 @@ export default function WardrobePanel() {
               </>
             )}
           </div>
-          {/* 试穿 / 换一套:并排等宽、同款式 */}
+          {/* 试穿 / 换一套:并排等宽、小号统一 */}
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-            <Button variant="soft" layoutStyle={{ flex: 1 }} onClick={() => { setTryonOpen(true); setTryonResult(null); setTryonError(null); }}>
+            <Button variant="soft" size="sm" layoutStyle={{ flex: 1 }} onClick={() => { setTryonOpen(true); setTryonResult(null); setTryonError(null); }}>
               {L(dict, '试穿', 'Try on')}
             </Button>
-            {/* opacity: busy ? 0.6 : 1 是在手搓禁用态 —— 原语的 :disabled 已经是 0.45,交给它 */}
-            <Button variant="soft" layoutStyle={{ flex: 1 }} disabled={stylistBusy} onClick={restyle}
+            <Button variant="soft" size="sm" layoutStyle={{ flex: 1 }} disabled={stylistBusy} onClick={restyle}
               iconLeft={<IconRefresh size={13} />}>{L(dict, '换一套', 'Restyle')}</Button>
           </div>
           {isPro && (stylistBusy || stylistError) && (
@@ -870,9 +912,14 @@ export default function WardrobePanel() {
       {/* 今天页主屏:多张全身照(不依赖先点试穿) */}
       <div style={{ ...card, marginTop: 'var(--space-3)', background: 'var(--glass-bg-solid, var(--portal-bg))' }}>
         <input ref={bodyFileRef} type="file" accept="image/*" className="nesio-visually-hidden" onChange={onPickBody} />
-        <p style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>
-          {L(dict, '全身照', 'Full-body photos')}
-        </p>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <p style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>
+            {L(dict, '全身照', 'Full-body photos')}
+          </p>
+          {!bodyThumb && (
+            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '本机保存', 'On device')}</span>
+          )}
+        </div>
         <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', alignItems: 'center', marginTop: 'var(--space-2)' }}>
           {bodyIds.map((id) => (
             <button key={id} type="button" onClick={() => selectBody(id)}
@@ -889,15 +936,11 @@ export default function WardrobePanel() {
             </button>
           ))}
           <button type="button" onClick={() => bodyFileRef.current?.click()}
+            aria-label={bodyIds.length ? L(dict, '再加全身照', 'Add another photo') : L(dict, '添加全身照', 'Add photo')}
             style={{ flexShrink: 0, width: 56, height: 72, borderRadius: 'var(--radius-md)', border: '1px dashed var(--portal-accent-border)', background: 'var(--portal-accent-soft)', cursor: 'pointer', overflow: 'hidden', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)', padding: 0 }}>
-            <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--space-1)' }}><IconCamera size={18} />{bodyIds.length ? L(dict, '再加', 'Add') : L(dict, '添加', 'Add')}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' }}><IconCamera size={18} /></span>
           </button>
         </div>
-        <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.55 }}>
-          {!bodyThumb
-            ? L(dict, '上传全身照(正面、光线好)后可试穿。照片只存本机,点「试穿」时才发出。', 'Add a full-body photo for try-on. Kept on device; sent only when you try on.')
-            : L(dict, '点选一张用于试穿;可留几张备选。', 'Select one for try-on; you can keep a few.')}
-        </p>
       </div>
 
       {/* C｜上身试穿(展开在搭配卡下方) */}
@@ -908,32 +951,26 @@ export default function WardrobePanel() {
           </div>
 
           {tryonResult ? (
-            <div style={{ marginTop: 'var(--space-3)' }}>
-              <button type="button" onClick={() => setZoomUrl(tryonResult)}
+            <div style={{ marginTop: 'var(--space-2)' }}>
+              <button type="button" onClick={() => { setZoomScaled(false); setZoomUrl(tryonResult); }}
                 style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'transparent', cursor: 'zoom-in' }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={tryonResult} alt={L(dict, '试穿效果', 'Try-on result')} style={{ width: '100%', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)' }} />
               </button>
-              <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '点图可全屏', 'Tap image for fullscreen')}</p>
               <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-                <Button variant="soft" layoutStyle={{ flex: 1 }} onClick={() => { void onSaveTryon(tryonResult); }}>{L(dict, '保存到相册', 'Save to photos')}</Button>
-                <Button variant="soft" layoutStyle={{ flex: 1 }} onClick={() => runTryon(currentPieces)} disabled={tryonBusy}>{L(dict, '再试一次', 'Try again')}</Button>
+                <Button variant="soft" size="sm" layoutStyle={{ flex: 1 }} onClick={() => { void onSaveTryon(tryonResult); }}>{L(dict, '保存', 'Save')}</Button>
+                <Button variant="soft" size="sm" layoutStyle={{ flex: 1 }} onClick={() => runTryon(currentPieces)} disabled={tryonBusy}>{L(dict, '再试', 'Retry')}</Button>
               </div>
               {saveMsg && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-go)' }} role="status">{saveMsg}</p>}
             </div>
           ) : (
             <>
-              <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-                {bodyThumb
-                  ? L(dict, '将用上方选中的全身照生成上身效果。', 'Uses the full-body photo selected above.')
-                  : L(dict, '先在上方加一张全身照。', 'Add a full-body photo above first.')}
-              </p>
               {tryonError && (
                 <p role="alert" style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)' }}>{tryonError}</p>
               )}
-              <Button variant="primary" size="lg" full layoutStyle={{ marginTop: 'var(--space-3)' }}
-                disabled={tryonBusy} onClick={() => runTryon(currentPieces)}>
-                {tryonBusy ? L(dict, '生成中…(约十几秒)', 'Generating… (~15s)') : !isPro ? L(dict, '试穿(Pro)', 'Try on (Pro)') : L(dict, '试穿', 'Try on')}
+              <Button variant="primary" size="sm" full layoutStyle={{ marginTop: 'var(--space-2)' }}
+                disabled={tryonBusy || !bodyThumb} onClick={() => runTryon(currentPieces)}>
+                {tryonBusy ? L(dict, '生成中…', 'Generating…') : !bodyThumb ? L(dict, '先加全身照', 'Add photo first') : !isPro ? L(dict, '试穿(Pro)', 'Try on (Pro)') : L(dict, '试穿', 'Try on')}
               </Button>
             </>
           )}
@@ -996,7 +1033,7 @@ export default function WardrobePanel() {
                 })}
               </div>
               <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-                <Button variant="soft" layoutStyle={{ flex: 1 }} disabled={tryonBusy || fittingQueue.length < 1}
+                <Button variant="soft" size="sm" layoutStyle={{ flex: 1 }} disabled={tryonBusy || fittingQueue.length < 1}
                   onClick={() => {
                     const pieces = fittingQueue.map((id) => items.find((x) => x.id === id)).filter(Boolean) as Garment[];
                     if (!pieces.length) return;
@@ -1009,16 +1046,13 @@ export default function WardrobePanel() {
                   {tryonBusy ? L(dict, '生成中…', 'Generating…') : !isPro ? L(dict, '试穿整套(Pro)', 'Try on set (Pro)') : L(dict, '试穿整套', 'Try on set')}
                 </Button>
                 {fittingQueue.length >= 2 && (
-                  <Button variant="secondary" layoutStyle={{ flex: 1 }} onClick={() => {
+                  <Button variant="secondary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => {
                     commitOutfit(saveOutfit(fittingQueue, todayIso, { starred: true }));
                     setFittingQueue([]);
                     setTab('saved');
-                  }}>{L(dict, '喜欢 · 存搭配', 'Love · save outfit')}</Button>
+                  }}>{L(dict, '存搭配', 'Save outfit')}</Button>
                 )}
               </div>
-              <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-                {L(dict, '点一件单独试穿;「试穿整套」用同一套 AI 试穿。', 'Tap one piece alone; Try on set uses the same AI try-on.')}
-              </p>
             </div>
           )}
         </>
@@ -1113,15 +1147,19 @@ export default function WardrobePanel() {
       {items.length > 0 && (
         <div style={{ marginTop: 'var(--space-4)' }}>
           {(() => {
-            const never = items.filter((g) => g.wearCount === 0).length;
-            const heavy = items.filter((g) => g.wearCount >= 8).length;
-            if (!never && !heavy) return null;
+            const nowMs = Date.now();
+            const rotateList = items.filter((g) => {
+              if (g.wearCount === 0) return true;
+              if (!g.lastWornAt) return true;
+              const days = (nowMs - Date.parse(g.lastWornAt)) / 86_400_000;
+              return days >= UNWORN_DAYS;
+            });
+            if (rotateList.length === 0) return null;
             return (
-              <p style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.55 }}>
-                {never > 0 ? L(dict, `${never} 件还没穿过 —— 可以筛一下轮换。`, `${never} never worn — try rotating them in.`) : ''}
-                {never > 0 && heavy > 0 ? ' · ' : ''}
-                {heavy > 0 ? L(dict, `${heavy} 件穿得很多 —— 给别的一点出场机会。`, `${heavy} worn a lot — give others a turn.`) : ''}
-              </p>
+              <Button variant="secondary" size="sm" layoutStyle={{ marginBottom: 'var(--space-2)', width: '100%' }}
+                onClick={() => setUnwornOpen(true)}>
+                {L(dict, `${rotateList.length} 件好久没穿 · 看看`, `${rotateList.length} unworn / idle · view`)}
+              </Button>
             );
           })()}
           <label style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginBottom: 4 }}>{L(dict, '类型', 'Type')}</label>
@@ -1135,13 +1173,31 @@ export default function WardrobePanel() {
               <option key={t} value={t}>{L(dict, TYPE_LABEL[t][0], TYPE_LABEL[t][1])}</option>
             ))}
           </select>
-          <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap', marginTop: 'var(--space-2)' }}>
-            {([1, 2, 3] as Warmth[]).map((w) => (
-              <Button key={w} variant={fWarmth === w ? 'primary' : 'secondary'} size="sm" onClick={() => setFWarmth(fWarmth === w ? 'all' : w)}>{L(dict, WARMTH_LABEL[w][0], WARMTH_LABEL[w][1])}</Button>
-            ))}
-            {(['casual', 'smart', 'formal'] as Formality[]).map((f) => (
-              <Button key={f} variant={fFormal === f ? 'primary' : 'secondary'} size="sm" onClick={() => setFFormal(fFormal === f ? 'all' : f)}>{L(dict, FORMAL_LABEL[f][0], FORMAL_LABEL[f][1])}</Button>
-            ))}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+            <select
+              value={fWarmth === 'all' ? 'all' : String(fWarmth)}
+              onChange={(e) => setFWarmth(e.target.value === 'all' ? 'all' : Number(e.target.value) as Warmth)}
+              aria-label={L(dict, '厚薄', 'Warmth')}
+              style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid, var(--portal-bg))', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-sans)' }}
+            >
+              <option value="all">{L(dict, '全部厚薄', 'All warmth')}</option>
+              {([1, 2, 3] as Warmth[]).map((w) => (
+                <option key={w} value={w}>{L(dict, WARMTH_LABEL[w][0], WARMTH_LABEL[w][1])}</option>
+              ))}
+            </select>
+            <select
+              value={fFormal}
+              onChange={(e) => setFFormal(e.target.value === 'all' ? 'all' : e.target.value as Formality)}
+              aria-label={L(dict, '正式度', 'Formality')}
+              style={{ width: '100%', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'var(--glass-bg-solid, var(--portal-bg))', color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', fontFamily: 'var(--font-sans)' }}
+            >
+              <option value="all">{L(dict, '全部正式度', 'All formality')}</option>
+              {(['casual', 'smart', 'formal'] as Formality[]).map((f) => (
+                <option key={f} value={f}>{L(dict, FORMAL_LABEL[f][0], FORMAL_LABEL[f][1])}</option>
+              ))}
+            </select>
+          </div>
+          <div style={{ marginTop: 'var(--space-2)' }}>
             <Button variant={fUnworn ? 'primary' : 'secondary'} size="sm" onClick={() => setFUnworn((v) => !v)}>{L(dict, '还没穿过', 'Never worn')}</Button>
           </div>
           {filterOn && (
@@ -1205,60 +1261,152 @@ export default function WardrobePanel() {
         </div>
       )}
 
-      {grouped.map((g) => (
-        <div key={g.type}>
-          <p style={sectionLbl}>{L(dict, TYPE_LABEL[g.type][0], TYPE_LABEL[g.type][1])} <span style={{ color: 'var(--portal-muted)', fontWeight: 'var(--weight-regular)' }}>{g.list.length}</span></p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 'var(--space-2)' }}>
-            {g.list.map((it) => (
-              <button key={it.id} type="button"
-                onClick={() => {
-                  if (pickMode) {
-                    setPickedIds((ids) => (ids.includes(it.id) ? ids.filter((x) => x !== it.id) : [...ids, it.id]));
-                    return;
-                  }
-                  setDetailId(it.id);
-                }}
-                aria-label={it.name}
-                aria-pressed={pickMode ? pickedIds.includes(it.id) : undefined}
-                style={{ padding: 0, textAlign: 'left', cursor: 'pointer', borderRadius: 'var(--radius-md)', border: `1px solid ${pickMode && pickedIds.includes(it.id) ? 'var(--portal-accent)' : 'var(--portal-line)'}`, background: pickMode && pickedIds.includes(it.id) ? 'var(--portal-accent-soft-md)' : 'var(--glass-bg-solid, var(--portal-bg))', overflow: 'hidden' }}>
-                <div style={{ aspectRatio: '1', background: 'var(--portal-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--portal-muted)', fontSize: '1.4rem' }}>
-                  {thumbs[it.id] ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={thumbs[it.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : <GarmentIcon type={it.garmentType} size={26} />}
-                </div>
-                <div style={{ padding: 'var(--space-2) var(--space-2)' }}>
-                  <p style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</p>
-                  <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>
-                    {L(dict, WARMTH_LABEL[it.warmth][0], WARMTH_LABEL[it.warmth][1])} · {L(dict, FORMAL_LABEL[it.formality][0], FORMAL_LABEL[it.formality][1])}
-                    {it.wearCount > 0 ? ` · ${it.wearCount}×` : ''}
-                  </p>
-                </div>
-              </button>
-            ))}
+      {grouped.map((g) => {
+        const collapsed = collapsedTypes.has(g.type);
+        return (
+          <div key={g.type}>
+            <button type="button"
+              onClick={() => setCollapsedTypes((prev) => {
+                const next = new Set(prev);
+                if (next.has(g.type)) next.delete(g.type);
+                else next.add(g.type);
+                return next;
+              })}
+              aria-expanded={!collapsed}
+              style={{
+                ...sectionLbl, display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                width: '100%', border: 'none', background: 'transparent', cursor: 'pointer', padding: 0, textAlign: 'left',
+                fontFamily: 'var(--font-sans)',
+              }}>
+              <span>
+                {L(dict, TYPE_LABEL[g.type][0], TYPE_LABEL[g.type][1])}{' '}
+                <span style={{ color: 'var(--portal-muted)', fontWeight: 'var(--weight-regular)' }}>{g.list.length}</span>
+              </span>
+              <span aria-hidden style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-sm)' }}>{collapsed ? '›' : '▾'}</span>
+            </button>
+            {!collapsed && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(96px, 1fr))', gap: 'var(--space-2)' }}>
+                {g.list.map((it) => (
+                  <button key={it.id} type="button"
+                    onClick={() => {
+                      if (pickMode) {
+                        setPickedIds((ids) => (ids.includes(it.id) ? ids.filter((x) => x !== it.id) : [...ids, it.id]));
+                        return;
+                      }
+                      setDetailId(it.id);
+                    }}
+                    aria-label={it.name}
+                    aria-pressed={pickMode ? pickedIds.includes(it.id) : undefined}
+                    style={{ padding: 0, textAlign: 'left', cursor: 'pointer', borderRadius: 'var(--radius-md)', border: `1px solid ${pickMode && pickedIds.includes(it.id) ? 'var(--portal-accent)' : 'var(--portal-line)'}`, background: pickMode && pickedIds.includes(it.id) ? 'var(--portal-accent-soft-md)' : 'var(--glass-bg-solid, var(--portal-bg))', overflow: 'hidden' }}>
+                    <div style={{ aspectRatio: '1', background: 'var(--portal-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--portal-muted)', fontSize: '1.4rem' }}>
+                      {thumbs[it.id] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={thumbs[it.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : <GarmentIcon type={it.garmentType} size={26} />}
+                    </div>
+                    <div style={{ padding: 'var(--space-2) var(--space-2)' }}>
+                      <p style={{ margin: 0, fontSize: 'var(--text-xs)', fontWeight: 'var(--weight-medium)', color: 'var(--portal-ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{it.name}</p>
+                      <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>
+                        {L(dict, WARMTH_LABEL[it.warmth][0], WARMTH_LABEL[it.warmth][1])} · {L(dict, FORMAL_LABEL[it.formality][0], FORMAL_LABEL[it.formality][1])}
+                        {it.wearCount > 0 ? ` · ${it.wearCount}×` : ''}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-        </div>
-      ))}
+        );
+      })}
       </>
       )}
 
-      {zoomUrl && (
+      {unwornOpen && (
+        <div role="dialog" aria-modal="true" aria-label={L(dict, '好久没穿', 'Unworn')}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 70, background: 'rgba(0,0,0,0.45)',
+            display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
+          }}
+          onClick={() => setUnwornOpen(false)}>
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: '100%', maxWidth: 480, maxHeight: '72vh', overflowY: 'auto',
+              background: 'var(--sheet-opaque, var(--portal-bg))', borderRadius: 'var(--radius-xl) var(--radius-xl) 0 0',
+              padding: 'var(--space-4)', border: '1px solid var(--portal-line)',
+            }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--space-3)' }}>
+              <p style={{ margin: 0, fontSize: 'var(--text-body)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>
+                {L(dict, '好久没穿', 'Unworn / idle')}
+              </p>
+              <Button variant="ghost" size="sm" onClick={() => setUnwornOpen(false)} aria-label={L(dict, '关闭', 'Close')}>✕</Button>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+              {items.filter((g) => {
+                if (g.wearCount === 0) return true;
+                if (!g.lastWornAt) return true;
+                return (Date.now() - Date.parse(g.lastWornAt)) / 86_400_000 >= UNWORN_DAYS;
+              }).map((g) => (
+                <button key={g.id} type="button"
+                  onClick={() => { setUnwornOpen(false); setDetailId(g.id); setTab('closet'); }}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 'var(--space-3)', textAlign: 'left',
+                    padding: 'var(--space-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)',
+                    background: 'var(--portal-accent-soft)', color: 'var(--portal-ink)', cursor: 'pointer',
+                  }}>
+                  <span style={{ width: 48, height: 48, borderRadius: 'var(--radius-sm)', overflow: 'hidden', flexShrink: 0, background: 'var(--portal-bg)', display: 'grid', placeItems: 'center' }}>
+                    {thumbs[g.id] ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={thumbs[g.id]} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : <GarmentIcon type={g.garmentType} size={22} />}
+                  </span>
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontWeight: 'var(--weight-medium)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{g.name}</span>
+                    <span style={{ display: 'block', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                      {g.wearCount === 0
+                        ? L(dict, '还没穿过', 'Never worn')
+                        : g.lastWornAt
+                          ? L(dict, `上次 ${g.lastWornAt.slice(5, 10)}`, `last ${g.lastWornAt.slice(5, 10)}`)
+                          : L(dict, '很久没记', 'Long idle')}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {zoomUrl && typeof document !== 'undefined' && createPortal(
         <div className="nesio-tryon-lightbox" aria-label={L(dict, '试穿全屏', 'Try-on fullscreen')}
-          onClick={() => setZoomUrl(null)}>
+          onClick={() => { setZoomUrl(null); setZoomScaled(false); }}>
           <button type="button" className="nesio-tryon-lightbox-close" aria-label={L(dict, '关闭', 'Close')}
-            onClick={() => setZoomUrl(null)}>✕</button>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={zoomUrl} alt="" onClick={(e) => e.stopPropagation()} />
+            onClick={() => { setZoomUrl(null); setZoomScaled(false); }}>✕</button>
+          <div className={`nesio-tryon-lightbox-stage${zoomScaled ? ' is-zoomed' : ''}`}
+            onClick={(e) => e.stopPropagation()}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={zoomUrl}
+              alt=""
+              className={zoomScaled ? 'is-zoomed' : undefined}
+              onClick={() => setZoomScaled((z) => !z)}
+            />
+          </div>
           <div className="nesio-tryon-lightbox-actions" onClick={(e) => e.stopPropagation()}>
-            <Button variant="soft" layoutStyle={{ flex: 1 }} onClick={() => { void onSaveTryon(zoomUrl); }}>
-              {L(dict, '保存到相册', 'Save to photos')}
+            <Button variant="soft" size="sm" layoutStyle={{ flex: 1 }} disabled={saveBusy} onClick={() => onSaveTryon(zoomUrl)}>
+              {saveBusy ? L(dict, '保存中…', 'Saving…') : L(dict, '保存', 'Save')}
             </Button>
-            <Button variant="secondary" layoutStyle={{ flex: 1 }} onClick={() => setZoomUrl(null)}>
+            <Button variant="secondary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => { setZoomUrl(null); setZoomScaled(false); }}>
               {L(dict, '关闭', 'Close')}
             </Button>
           </div>
-          {saveMsg && <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: '#fff' }} role="status">{saveMsg}</p>}
-        </div>
+          {saveMsg && (
+            <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: saveMsg.includes(L(dict, '没成功', 'failed')) || saveMsg.includes('failed') ? 'var(--status-gentle)' : 'var(--status-go)' }} role="status">
+              {saveMsg}
+            </p>
+          )}
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -1297,12 +1445,16 @@ function SavedOutfits({
     for (const g of groupByMonth(outfits)) m.set(g.month, g.items);
     return m;
   }, [outfits]);
-  // 无限月历:默认近几个月,点「更早/更新」扩展
-  const [monthKeys, setMonthKeys] = useState<string[]>(() => (
-    [-2, -1, 0, 1].map((off) => monthKeyFromOffset(off))
-  ));
+  // 财务同款左右翻月(单月视图)
+  const [calMonth, setCalMonth] = useState(() => monthKeyFromOffset(0));
   // 日历里点某一天 → 下面只列那天穿的;再点一次取消,回到整月。
   const [pickedDay, setPickedDay] = useState<string | null>(null);
+  const shiftCalMonth = (delta: number) => {
+    const [y, m] = calMonth.split('-').map(Number);
+    const d = new Date(y, m - 1 + delta, 1);
+    setCalMonth(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    setPickedDay(null);
+  };
   // 长按要排日子的那一条(null = 没在排)
   const [schedulingId, setSchedulingId] = useState<string | null>(null);
   const holdRef = useRef<number | null>(null);
@@ -1501,34 +1653,30 @@ function SavedOutfits({
         </div>
       ) : (
         <>
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-2)' }}>
-            <Button variant="secondary" size="sm" onClick={() => {
-              const [y, m] = monthKeys[0].split('-').map(Number);
-              const prev = `${m === 1 ? y - 1 : y}-${String(m === 1 ? 12 : m - 1).padStart(2, '0')}`;
-              setMonthKeys((keys) => (keys.includes(prev) ? keys : [prev, ...keys]));
-            }}>{L(dict, '更早', 'Earlier')}</Button>
-            <Button variant="secondary" size="sm" onClick={() => {
-              const last = monthKeys[monthKeys.length - 1];
-              const [y, m] = last.split('-').map(Number);
-              const next = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, '0')}`;
-              setMonthKeys((keys) => (keys.includes(next) ? keys : [...keys, next]));
-            }}>{L(dict, '更新', 'Later')}</Button>
+          <div className="nesio-fin-monthbar" style={{ marginBottom: 'var(--space-2)' }}>
+            <button type="button" className="nesio-fin-monthnav" onClick={() => shiftCalMonth(-1)}
+              aria-label={L(dict, '上一月', 'Previous month')}>‹</button>
+            <span className="nesio-fin-month">
+              {dict === 'en' ? calMonth : `${calMonth.slice(0, 4)} 年 ${Number(calMonth.slice(5))} 月`}
+              <span style={{ color: 'var(--portal-muted)', fontWeight: 'var(--weight-regular)' as never }}>
+                {' '}{L(dict, `${new Set((byMonth.get(calMonth) || []).map((o) => o.date)).size} 天`, `${new Set((byMonth.get(calMonth) || []).map((o) => o.date)).size} days`)}
+              </span>
+            </span>
+            <button type="button" className="nesio-fin-monthnav" onClick={() => shiftCalMonth(1)}
+              aria-label={L(dict, '下一月', 'Next month')}>›</button>
           </div>
-          {monthKeys.map((month) => {
+          {(() => {
+            const month = calMonth;
             const items = byMonth.get(month) || [];
-            const days = new Set(items.map((o) => o.date)).size;
             return (
-              <div key={month} style={{ marginBottom: 'var(--space-5)' }}>
-                <p style={sectionLbl}>{dict === 'en' ? month : `${month.slice(0, 4)} 年 ${Number(month.slice(5))} 月`}
-                  <span style={{ color: 'var(--portal-muted)', fontWeight: 'var(--weight-regular)' }}> {L(dict, `${days} 天`, `${days} days`)}</span>
-                </p>
+              <div>
                 <MonthGrid month={month} items={items} thumbs={thumbs} tryons={tryons} dict={dict} selected={pickedDay} onPick={setPickedDay} />
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginTop: 'var(--space-3)' }}>
                   {(pickedDay && pickedDay.slice(0, 7) === month ? outfitsOn(items, pickedDay) : items).map((o) => <Row key={o.id} o={o} />)}
                 </div>
               </div>
             );
-          })}
+          })()}
         </>
       )}
     </>

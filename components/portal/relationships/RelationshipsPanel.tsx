@@ -245,15 +245,14 @@ export default function RelationshipsPanel() {
       {GROUPS.map((g) => {
         const items = shown.filter((c) => c.closeness === g);
         if (!items.length) return null;
-        // 大列表先只铺 TIER_CAP 行(其余点「显示全部」再渲染)—— 关键:不把几千行一次性挂上去。
         const expanded = expandedTiers[g];
         const visible = expanded ? items : items.slice(0, TIER_CAP);
         return (
-          <div key={g}>
-            <p className="nesio-rel-tier-h">
+          <details key={g} className="nesio-rel-tier-fold" open>
+            <summary className="nesio-rel-tier-h nesio-rel-tier-h--btn">
               <span className={`nesio-rel-tier-dot nesio-rel-tier-dot--${g}`} aria-hidden />
               {L(dict, CLOSENESS_META[g].zh, CLOSENESS_META[g].en)} · {items.length}
-            </p>
+            </summary>
             <div className="nesio-rel-list">
               {visible.map((c) => (
                 <div
@@ -280,7 +279,7 @@ export default function RelationshipsPanel() {
                 {L(dict, `显示全部 ${items.length} 位`, `Show all ${items.length}`)}
               </button>
             )}
-          </div>
+          </details>
         );
       })}
 

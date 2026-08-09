@@ -57,7 +57,8 @@ export function findTxNode(txId: string, graph?: readonly LifeNode[]): LifeNode 
 /** 一笔流水 → 节点输入。纯函数,可单测。 */
 export function txToNodeInput(tx: BankTx): Omit<LifeNode, 'id' | 'createdAt'> {
   return {
-    type: 'event',
+    // Thing 与其它物品/关联一致;勿用 event(关系图会落成琥珀褐,像「手工收入」那类误色)。
+    type: 'Thing',
     name: tx.name || '一笔交易',
     source: 'system',
     confidence: 1,

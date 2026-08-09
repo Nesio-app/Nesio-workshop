@@ -45,12 +45,12 @@ import {
   loadTxAnnotations, txAnnotationOf, hasTxAnnotation, setTxPeople, setTxNote,
   addTxAttachment, removeTxAttachment, TX_ANNOTATIONS_EVENT, type TxAnnotation, type TxWriteResult,
   setTxSplits, clearTxSplits, setTxAmortize, clearTxAmortize, setTxCategory,
-  setTxTrip, setTxMemoryNode, setTxAsset, setTxProject,
+  setTxTrip, setTxTripNode, setTxMemoryNode, setTxAsset, setTxProject,
 } from '@/lib/portal/tx-annotations';
 import { putLocalFile, prettyBytes, MAX_FILE_BYTES } from '@/lib/portal/local-file-store';
 import { getLifeGraph, searchLifeGraphFuzzy } from '@/lib/portal/life-graph';
 import { buildRelationships } from '@/lib/portal/relationships';
-import { loadTrips, type Trip } from '@/lib/portal/travel-trips';
+import { loadTrips, recomputeBudgetNode, type Trip } from '@/lib/portal/travel-trips';
 import { getProjects, type Project } from '@/lib/portal/project';
 import { visibleMemoryNodes } from '@/lib/portal/memory-visibility';
 import { memoryEventAt } from '@/lib/portal/memory-event-at';
@@ -508,12 +508,56 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, trips, memo
 
         <p className="nesio-fin-score-hint" style={{ margin: 0 }}>{L(dict, '关联旅行', 'Link a trip')}</p>
         <select className="nesio-fin-select" value={ann.tripId || ''} aria-label={L(dict, '关联旅行', 'Link a trip')}
-          onChange={(e) => saveLinkField(setTxTrip, e.target.value)}>
+          onChange={(e) => {
+            const v = e.target.value;
+            saveLinkField(setTxTrip, v);
+            if (v) recomputeBudgetNode(v);
+            else if (ann.tripId) recomputeBudgetNode(ann.tripId);
+          }}>
           <option value="">{L(dict, '不关联', 'None')}</option>
           {trips.map((t) => (
             <option key={t.id} value={t.id}>{t.title || t.destination}</option>
           ))}
         </select>
+        {ann.tripId && (() => {
+          const trip = trips.find((t) => t.id === ann.tripId);
+          if (!trip) return null;
+          const cats = [
+            { id: 'flight', label: L(dict, '机票', 'Flight') },
+            { id: 'stay', label: L(dict, '住宿', 'Lodging') },
+            { id: 'shop', label: L(dict, '购物', 'Shopping') },
+            ...(trip.customBudgetCategories || []).map((c) => ({ id: c.id, label: c.label })),
+          ];
+          const spendNodes = trip.nodes.filter((n) => n.kind === 'flight' || n.kind === 'hotel' || n.kind === 'shopping');
+          return (
+            <>
+              <p className="nesio-fin-score-hint" style={{ margin: 0 }}>{L(dict, '行程花费类', 'Trip spend type')}</p>
+              <select
+                className="nesio-fin-select"
+                value={ann.tripNodeId || ''}
+                aria-label={L(dict, '行程花费类', 'Trip spend type')}
+                onChange={(e) => {
+                  const ok = setTxTripNode(txId, e.target.value);
+                  setErr(ok ? null : failed);
+                  setAnn(txAnnotationOf(txId));
+                  if (ok && ann.tripId) recomputeBudgetNode(ann.tripId);
+                }}
+              >
+                <option value="">{L(dict, '未细分(记入刷卡)', 'Unspecified (card spend)')}</option>
+                {cats.map((c) => (
+                  <option key={c.id} value={c.id}>{c.label}</option>
+                ))}
+                {spendNodes.length > 0 && (
+                  <optgroup label={L(dict, '具体行程项', 'Specific items')}>
+                    {spendNodes.map((n) => (
+                      <option key={n.id} value={n.id}>{n.title || n.kind}</option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </>
+          );
+        })()}
 
         <p className="nesio-fin-score-hint" style={{ margin: 0 }}>{L(dict, '关联记忆', 'Link a memory')}</p>
         <input className="nesio-fin-input" value={memQ} aria-label={L(dict, '搜索记忆', 'Search memories')}
@@ -797,12 +841,7 @@ export default function FinanceTab() {
               : L(dict, `上次同步没成功(${st.error || 'unknown'}),稍后再试或到「设置 → 数据接入」看看。`, `Last sync failed (${st.error || 'unknown'}) — retry later or check Settings → Data sources.`)}
           </p>
         )}
-        <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」;现金账也可以直接手动记。', 'No bank transactions yet. Connect via Settings → Data sources → Plaid, or just add cash entries by hand.')}</p>
-        {/* UI 审计 P0-1:此前「+」只在主分支渲染,没连银行的用户永远点不到 —— 死锁解除 */}
-        <button type="button" className="nesio-fin-review-accept" style={{ marginTop: 'var(--space-2)' }}
-          onClick={() => setQuickAdd({ seg: 'expense' })}>{L(dict, '＋ 记一笔(现金 / 红包 / 资产)', '＋ Add entry (cash / income / asset)')}</button>
-        <QuickAddSheet open={quickAdd != null} initialSeg={quickAdd?.seg} initialAssetId={quickAdd?.assetId}
-          onClose={() => setQuickAdd(null)} onSaved={() => setRev((r) => r + 1)} />
+        <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Connect via Settings → Data sources → Plaid and sync.')}</p>
         {domainSpend.count > 0 && (
           <div style={{ marginTop: 'var(--space-3)' }}>
             <p className="nesio-settings-section-label">{L(dict, '本月小票 / 旅行', 'Receipts / travel this month')}</p>
@@ -967,11 +1006,6 @@ export default function FinanceTab() {
               <span>{nessaSummary}</span>
             </div>
           )}
-          <button type="button" className="nesio-fin-flowopt" style={{ color: 'var(--portal-accent)', fontWeight: 'var(--weight-semibold)' as never }}
-            onClick={() => setQuickAdd({ seg: 'expense' })}>
-            {L(dict, '＋ 记一笔', '＋ Add an entry')}
-          </button>
-
           {/* 组合结构:去图例,改交互环形图(点一块看这一类的持仓) */}
           {(() => {
             const portfolio = portfolioSummary(holdings);

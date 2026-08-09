@@ -280,16 +280,45 @@ export async function readPlaidTokensForCurrentUser(): Promise<string[] | null> 
 
 /**
  * 把 Plaid 令牌数组写进云端(加密整体)。读-改-写,读失败绝不空覆写(防清掉别的 provider)。
- * 返回是否成功(失败时调用方仍有 cookie 兜底)。
+ * 默认**附加式**(union):绝不让短列表整表盖掉云端旧 token(新连一家 + cookie 空 = 事故根因)。
+ * 主动剪枝/断开请用 `replacePlaidTokensForCurrentUser`。
  */
 export async function writePlaidTokensForCurrentUser(tokens: string[]): Promise<boolean> {
+  return persistPlaidTokensForCurrentUser(tokens, { mode: 'union' });
+}
+
+/**
+ * 用给定列表**整表替换**云端 Plaid token(剪枝死 token / 重复授权后必须走这里,
+ * 否则下一轮 sync 又会从云端把死 token 并回 cookie → 清空游标死循环)。
+ */
+export async function replacePlaidTokensForCurrentUser(tokens: string[]): Promise<boolean> {
+  return persistPlaidTokensForCurrentUser(tokens, { mode: 'replace' });
+}
+
+async function persistPlaidTokensForCurrentUser(
+  tokens: string[],
+  opts: { mode: 'union' | 'replace' },
+): Promise<boolean> {
   const userId = await getRefreshedUserId();
   const serviceKey = envValue('SUPABASE_SERVICE_ROLE_KEY');
   if (!userId || !serviceKey) return false;
-  const unique = Array.from(new Set(tokens.filter((t) => typeof t === 'string' && t.length > 0)));
-  if (!unique.length) return false;
+  const incoming = Array.from(new Set(tokens.filter((t) => typeof t === 'string' && t.length > 0)));
+  if (!incoming.length) return false;
   const existing = await readIntegrations(userId, serviceKey);
   if (existing === null) { console.error('plaid_cloud_save_aborted_read_failed'); return false; }
+  let unique = incoming;
+  if (opts.mode === 'union') {
+    try {
+      const enc = existing.plaid?.tokensEnc;
+      if (enc) {
+        const prev = JSON.parse(decryptField<string>(enc)) as unknown;
+        if (Array.isArray(prev)) {
+          const cloud = prev.filter((t): t is string => typeof t === 'string' && t.length > 0);
+          if (cloud.length) unique = Array.from(new Set([...cloud, ...incoming]));
+        }
+      }
+    } catch { /* 解密失败则按 incoming 写,别阻断新连接 */ }
+  }
   const entry: PlaidCloudEntry = {
     tokensEnc: String(encryptField(JSON.stringify(unique))),
     connectedAt: existing.plaid?.connectedAt || new Date().toISOString(),

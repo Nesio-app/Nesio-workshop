@@ -16,7 +16,7 @@ import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
 import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { relativePastLabel } from '@/lib/portal/time-labels';
-import { IconMapPin, IconClock, IconCamera, IconNote, IconBox } from './icons';
+import { IconMapPin, IconClock, IconCamera, IconNote, IconBox, IconPlus, IconUpload, IconHanger, IconUtensils, IconFile } from './icons';
 import LocationPicker from './LocationPicker';
 import { importInventoryCsv } from '@/lib/portal/inventory-import';
 import { useRef } from 'react';
@@ -26,6 +26,7 @@ import {
   buildListingText,
   expiryStatus,
   inventoryStats,
+  LOC_SEP,
   parseAmazonFlipCsv,
   removeInventoryItem,
   reviewDueInfo,
@@ -198,19 +199,60 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
     [items],
   );
   const amazonCount = useMemo(() => items.filter((i) => i.isAmazon).length, [items]);
-  /** 容器页:按「空间 › 容器」聚合 */
-  const containerRows = useMemo(() => {
-    const map = new Map<string, { label: string; count: number; space: string }>();
+  /** 容器页:房间 › 容器 › 嵌套(location 里 LOC_SEP 分段) */
+  type PlaceNode = { name: string; count: number; space: string; path: string; queryHint: string; children: PlaceNode[] };
+  const containerTree = useMemo(() => {
+    type Mutable = { name: string; count: number; space: string; path: string; queryHint: string; children: Map<string, Mutable> };
+    const roots = new Map<string, Mutable>();
     for (const i of items) {
       if (!i.space) continue;
-      const label = i.container ? `${stripEmoji(i.space) || i.space} › ${stripEmoji(i.container) || i.container}` : (stripEmoji(i.space) || i.space);
-      const key = `${i.space}|${i.container || ''}`;
-      const prev = map.get(key);
-      if (prev) prev.count += 1;
-      else map.set(key, { label, count: 1, space: i.space });
+      const spaceKey = i.space;
+      let room = roots.get(spaceKey);
+      if (!room) {
+        room = {
+          name: stripEmoji(i.space) || i.space,
+          count: 0,
+          space: i.space,
+          path: i.space,
+          queryHint: '',
+          children: new Map(),
+        };
+        roots.set(spaceKey, room);
+      }
+      room.count += 1;
+      if (!i.container) continue;
+      const parts = i.container.split(LOC_SEP).map((s) => s.trim()).filter(Boolean);
+      let cur = room;
+      const acc: string[] = [];
+      for (const part of parts) {
+        acc.push(part);
+        let child = cur.children.get(part);
+        if (!child) {
+          child = {
+            name: stripEmoji(part) || part,
+            count: 0,
+            space: i.space,
+            path: `${i.space}|${acc.join(LOC_SEP)}`,
+            queryHint: part,
+            children: new Map(),
+          };
+          cur.children.set(part, child);
+        }
+        child.count += 1;
+        cur = child;
+      }
     }
-    return [...map.values()].sort((a, b) => b.count - a.count);
+    const freeze = (n: Mutable): PlaceNode => ({
+      name: n.name,
+      count: n.count,
+      space: n.space,
+      path: n.path,
+      queryHint: n.queryHint,
+      children: [...n.children.values()].map(freeze).sort((a, b) => b.count - a.count),
+    });
+    return [...roots.values()].map(freeze).sort((a, b) => b.count - a.count);
   }, [items]);
+  const [treeOpen, setTreeOpen] = useState<Set<string>>(() => new Set());
 
   // 批次 170:物品左侧占位符 —— 该物品记忆有图就显示真图(取本机 IndexedDB 图,离线也能看)
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
@@ -310,9 +352,44 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
   });
 
+  const onImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    try {
+      const text = await f.text();
+      const firstLine = text.split('\n')[0] || '';
+      const isAmazon = /美金价格|自付额|Review Status|PayStatus/.test(firstLine);
+      if (isAmazon) {
+        const parsed = parseAmazonFlipCsv(text);
+        const seen = new Set(items.filter((i) => i.isAmazon).map((i) => `${i.name}|${i.arrivedAt || ''}`));
+        let imported = 0; let dup = 0;
+        for (const it of parsed) {
+          const key = `${it.name}|${it.arrivedAt || ''}`;
+          if (seen.has(key)) { dup++; continue; }
+          seen.add(key);
+          addInventoryItem(it);
+          imported++;
+        }
+        refresh();
+        setImportMsg(imported > 0
+          ? L(dict, `导入 ${imported} 件亚马逊转卖${dup ? ` · 跳过 ${dup} 件重复` : ''}`, `Imported ${imported} Amazon flips${dup ? ` · ${dup} duplicates skipped` : ''}`)
+          : L(dict, `没有新增(${dup} 件已在库)`, `Nothing new (${dup} already tracked)`));
+        return;
+      }
+      const r = importInventoryCsv(text);
+      refresh();
+      const parts = [L(dict, `导入 ${r.imported} 件`, `Imported ${r.imported}`)];
+      if (r.skipped) parts.push(L(dict, `跳过 ${r.skipped} 行(缺名称)`, `${r.skipped} skipped (no name)`));
+      if (r.errors.length && r.imported === 0) parts.push(r.errors[0]);
+      setImportMsg(parts.join(' · '));
+    } catch { setImportMsg(L(dict, '导入失败:文件读取出错', 'Import failed: could not read file')); }
+  };
+
   // page 变体:洞察内嵌时不需要 sheet(洞察自己是 fullscreen);sheet 变体仍 elevated 盖住洞察。
   const body = (
     <>
+        <input ref={fileRef} type="file" accept=".csv,text/csv" className="nesio-visually-hidden" onChange={onImportCsv} />
         {/* 批次 170:去「收纳」标题;统计挪中间上方,方块容器徽章 */}
         <div className="nesio-freeze-header nesio-inv-header">
           {/* 2026-07-29 标注(Bug4 P10):三个统计位改成「物品 / 衣橱 / 食材」三个口径 ——
@@ -359,134 +436,213 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
           ) : <span />}
         </div>
 
-        {/* page · 总览:KPI + 分类入口 + 亚马逊 */}
+        {/* page · 总览:KPI + 入口(去重文案/统一按钮) */}
         {isPage && view === 'list' && pageTab === 'overview' && (
           <div className="nesio-inv-overview" style={{ maxHeight: 'min(70vh, 640px)', overflowY: 'auto', paddingBottom: 'var(--space-4)' }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-              <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)' }}>
-                <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{st.count}</span>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '物品', 'Items')}</span>
-              </div>
-              <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)' }}>
-                <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>${Math.round(st.totalValue).toLocaleString('en-US')}</span>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '估值', 'Est. value')}</span>
-              </div>
-              <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)', ...(unplacedCount > 0 ? { borderColor: 'var(--status-gentle)' } : {}) }}>
-                <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums', ...(unplacedCount > 0 ? { color: 'var(--status-gentle)' } : {}) }}>{unplacedCount}</span>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '未归位', 'Unplaced')}</span>
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 'var(--space-3)' }}>
-              <button type="button" className="nesio-inv-stat" onClick={() => setPageTab('items')}>
-                {st.count} {L(dict, '件物品', 'items')}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 'var(--space-2)' }}>
+              <button type="button" aria-label={L(dict, '记一件', 'Add one')}
+                onClick={() => { resetForm(); setView('add'); }}
+                style={{ width: 36, height: 36, borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-ink)', display: 'grid', placeItems: 'center' }}>
+                <IconPlus size={18} />
               </button>
+              <button type="button" aria-label={L(dict, '导入 CSV', 'Import CSV')}
+                onClick={() => fileRef.current?.click()}
+                style={{ width: 36, height: 36, borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', display: 'grid', placeItems: 'center' }}>
+                <IconUpload size={18} />
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+              <button type="button" onClick={() => setPageTab('items')}
+                style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)', background: 'var(--portal-accent-soft)', color: 'var(--portal-ink)', textAlign: 'center' }}>
+                <IconBox size={18} />
+                <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums', marginTop: 4 }}>{st.count}</span>
+              </button>
+              <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)', textAlign: 'center' }}>
+                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>$</span>
+                <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{Math.round(st.totalValue).toLocaleString('en-US')}</span>
+              </div>
+              <button type="button" onClick={() => { setGroupFilter(UNPLACED); setPageTab('items'); }}
+                style={{ borderRadius: 'var(--radius-md)', border: `1px solid ${unplacedCount > 0 ? 'var(--status-gentle)' : 'var(--portal-line)'}`, padding: 'var(--space-3)', background: unplacedCount > 0 ? 'var(--status-gentle-soft)' : 'transparent', color: 'var(--portal-ink)', textAlign: 'center' }}>
+                <IconMapPin size={18} />
+                <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums', marginTop: 4, ...(unplacedCount > 0 ? { color: 'var(--status-gentle)' } : {}) }}>{unplacedCount}</span>
+              </button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 'var(--space-3)' }}>
               {wardrobeCount > 0 && (
-                <button type="button" className="nesio-inv-stat nesio-inv-pantry-link"
-                  onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab: 'wardrobe' } })); }}>
-                  {L(dict, `${wardrobeCount} 件衣橱`, `${wardrobeCount} in wardrobe`)}
+                <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab: 'wardrobe' } })); }}
+                  style={{ ...chip(false), padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <IconHanger size={16} /><span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{wardrobeCount}</span>
                 </button>
               )}
               {pantryCount > 0 && (
-                <button type="button" className="nesio-inv-stat nesio-inv-pantry-link"
-                  onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-cooking')); }}>
-                  {L(dict, `${pantryCount} 件食材`, `${pantryCount} ingredients`)}
+                <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-cooking')); }}
+                  style={{ ...chip(false), padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <IconUtensils size={16} /><span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{pantryCount}</span>
                 </button>
               )}
-              <button type="button" className="nesio-inv-stat nesio-inv-pantry-link"
-                onClick={() => { setCategoryFilter('文件'); setQuery(''); setGroupFilter(ALL); setPageTab('items'); }}>
-                {L(dict, `${filesCount} 件文件`, `${filesCount} files`)}
-              </button>
+              {filesCount > 0 && (
+                <button type="button" onClick={() => { setCategoryFilter('文件'); setQuery(''); setGroupFilter(ALL); setPageTab('items'); }}
+                  style={{ ...chip(false), padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                  <IconFile size={16} /><span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{filesCount}</span>
+                </button>
+              )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%' }}
                 onClick={() => { setView('flip'); }}>
-                {L(dict, `亚马逊物品${amazonCount ? ` · ${amazonCount}` : ''}`, `Amazon items${amazonCount ? ` · ${amazonCount}` : ''}`)}
+                {L(dict, `亚马逊${amazonCount ? ` · ${amazonCount}` : ''}`, `Amazon${amazonCount ? ` · ${amazonCount}` : ''}`)}
               </button>
-              <button type="button" style={{ ...chip(false), padding: 'var(--space-3)', textAlign: 'center' }} onClick={() => setView('stats')}>
-                {L(dict, '更多统计 · 分类占比', 'More stats · by category')}
+              <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', background: 'transparent', color: 'var(--portal-ink)', border: '1px solid var(--portal-line)' }} onClick={() => setView('stats')}>
+                {L(dict, '统计', 'Stats')}
               </button>
-              <button type="button" style={{ ...chip(false), padding: 'var(--space-3)', textAlign: 'center' }} onClick={() => setView('sell')}>
+              <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', background: 'transparent', color: 'var(--portal-ink)', border: '1px solid var(--portal-line)' }} onClick={() => setView('sell')}>
                 {L(dict, '卖闲置', 'Sell pile')}
               </button>
-              <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', marginTop: 'var(--space-2)' }}
-                onClick={() => { resetForm(); setView('add'); }}>
-                ＋ {L(dict, '记一件', 'Add one')}
-              </button>
             </div>
+            {importMsg && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', textAlign: 'center' }}>{importMsg}</p>}
             {st.byCategory.length > 0 && <InventoryCategoryPie rows={st.byCategory} dict={dict} />}
           </div>
         )}
 
-        {/* page · 容器 */}
-        {isPage && view === 'list' && pageTab === 'containers' && (
-          <div style={{ maxHeight: 'min(70vh, 640px)', overflowY: 'auto' }}>
-            {unplacedCount > 0 && (
-              <button type="button" onClick={() => { setGroupFilter(UNPLACED); setPageTab('items'); }}
-                style={{ width: '100%', textAlign: 'left', marginBottom: 8, padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--status-gentle)', background: 'var(--status-gentle-soft)', color: 'var(--portal-ink)' }}>
-                <span style={{ fontWeight: 600 }}>{L(dict, '未归位', 'Unplaced')}</span>
-                <span style={{ float: 'right', fontVariantNumeric: 'tabular-nums' }}>{unplacedCount}</span>
-              </button>
-            )}
-            {containerRows.length === 0 ? (
-              <p className="nesio-freeze-empty" style={{ padding: 'var(--space-6) 0', textAlign: 'center', color: 'var(--text-tertiary)' }}>
-                {L(dict, '还没有归位到容器的物品。到列表里点开一件设位置即可。', 'Nothing in a container yet — open an item in the list and set a place.')}
-              </p>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {containerRows.map((row) => (
-                  <button key={row.label} type="button"
-                    onClick={() => { setGroupFilter(row.space); setQuery(row.label.includes('›') ? row.label.split('›').pop()?.trim() || '' : ''); setPageTab('items'); }}
-                    style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', color: 'var(--portal-ink)' }}>
-                    <span style={{ fontWeight: 600 }}>{row.label}</span>
-                    <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--portal-muted)' }}>{row.count}</span>
+        {/* page · 容器:房间 › 容器 › 嵌套树 */}
+        {isPage && view === 'list' && pageTab === 'containers' && (() => {
+          const renderNode = (node: PlaceNode, depth: number) => {
+            const hasKids = node.children.length > 0;
+            const open = treeOpen.has(node.path);
+            return (
+              <div key={node.path}>
+                <div style={{ display: 'flex', alignItems: 'stretch', marginLeft: depth * 12, gap: 4 }}>
+                  {hasKids ? (
+                    <button type="button" aria-expanded={open} aria-label={open ? L(dict, '收起', 'Collapse') : L(dict, '展开', 'Expand')}
+                      onClick={() => setTreeOpen((prev) => {
+                        const next = new Set(prev);
+                        if (next.has(node.path)) next.delete(node.path);
+                        else next.add(node.path);
+                        return next;
+                      })}
+                      style={{ width: 28, border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer' }}>
+                      {open ? '▾' : '›'}
+                    </button>
+                  ) : <span style={{ width: 28 }} />}
+                  <button type="button"
+                    onClick={() => {
+                      setGroupFilter(node.space);
+                      setQuery(node.queryHint);
+                      setPageTab('items');
+                    }}
+                    style={{
+                      flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left',
+                      padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)',
+                      border: '1px solid var(--portal-line)', background: depth === 0 ? 'var(--portal-accent-soft)' : 'transparent',
+                      color: 'var(--portal-ink)',
+                    }}>
+                    <span style={{ fontWeight: depth === 0 ? 600 : 500 }}>{node.name}</span>
+                    <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--portal-muted)' }}>{node.count}</span>
                   </button>
-                ))}
+                </div>
+                {hasKids && open && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+                    {node.children.map((c) => renderNode(c, depth + 1))}
+                  </div>
+                )}
               </div>
-            )}
-          </div>
-        )}
+            );
+          };
+          return (
+            <div style={{ maxHeight: 'min(70vh, 640px)', overflowY: 'auto' }}>
+              {unplacedCount > 0 && (
+                <button type="button" onClick={() => { setGroupFilter(UNPLACED); setPageTab('items'); }}
+                  style={{ width: '100%', textAlign: 'left', marginBottom: 8, padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--status-gentle)', background: 'var(--status-gentle-soft)', color: 'var(--portal-ink)' }}>
+                  <span style={{ fontWeight: 600 }}>{L(dict, '未归位', 'Unplaced')}</span>
+                  <span style={{ float: 'right', fontVariantNumeric: 'tabular-nums' }}>{unplacedCount}</span>
+                </button>
+              )}
+              {containerTree.length === 0 ? (
+                <p className="nesio-freeze-empty" style={{ padding: 'var(--space-6) 0', textAlign: 'center', color: 'var(--text-tertiary)' }}>
+                  {L(dict, '还没有归位到容器的物品。到列表里点开一件设位置即可。', 'Nothing in a container yet — open an item in the list and set a place.')}
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {containerTree.map((n) => renderNode(n, 0))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {view === 'list' && (!isPage || pageTab === 'items') && (
           <>
-            {/* 批次 173:用户实锤删掉「东西放哪了…」小字行 */}
-            <input
-              className="nesio-ob-input"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder={L(dict, '搜物品 / 位置…', 'Search items / locations…')}
-              style={{ margin: 'var(--space-2) 0' }}
-            />
-            <div style={{ display: 'flex', gap: 6, overflowX: 'auto', padding: 'var(--space-1) 0 var(--space-2)' }}>
-              <button type="button" style={chip(groupFilter === ALL && !categoryFilter)} onClick={() => { setGroupFilter(ALL); setCategoryFilter(null); }}>{L(dict, '全部', 'All')} {items.length}</button>
-              {categoryFilter && (
-                <button type="button" style={chip(true)} onClick={() => setCategoryFilter(null)}>
-                  {categoryFilter} ×
-                </button>
-              )}
-              {groups.map(([name, n]) => (
-                <button key={name} type="button" style={chip(groupFilter === name)} onClick={() => setGroupFilter(name)}>
-                  {stripEmoji(name) || name} {n}
-                </button>
-              ))}
-              {unplacedCount > 0 && (
-                <button type="button" style={chip(groupFilter === UNPLACED)} onClick={() => setGroupFilter(UNPLACED)}>
-                  {L(dict, '未归位', 'Unplaced')} {unplacedCount}
-                </button>
-              )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6, margin: 'var(--space-2) 0' }}>
+              <input
+                className="nesio-ob-input"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={L(dict, '搜物品 / 位置…', 'Search items / locations…')}
+                style={{ flex: 1, margin: 0 }}
+              />
+              <button type="button" aria-label={L(dict, '记一件', 'Add one')}
+                onClick={() => { resetForm(); setView('add'); }}
+                style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-ink)', display: 'grid', placeItems: 'center' }}>
+                <IconPlus size={18} />
+              </button>
+              <button type="button" aria-label={L(dict, '导入 CSV', 'Import CSV')}
+                onClick={() => fileRef.current?.click()}
+                style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', display: 'grid', placeItems: 'center' }}>
+                <IconUpload size={18} />
+              </button>
+            </div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: 'var(--space-1) 0 var(--space-2)' }}>
+              <select
+                className="nesio-ob-input"
+                value={groupFilter}
+                onChange={(e) => setGroupFilter(e.target.value)}
+                aria-label={L(dict, '位置', 'Place')}
+                style={{ flex: 1, minWidth: 120, margin: 0 }}
+              >
+                <option value={ALL}>{L(dict, '全部位置', 'All places')} ({items.length})</option>
+                {groups.map(([name, n]) => (
+                  <option key={name} value={name}>{stripEmoji(name) || name} ({n})</option>
+                ))}
+                {unplacedCount > 0 && (
+                  <option value={UNPLACED}>{L(dict, '未归位', 'Unplaced')} ({unplacedCount})</option>
+                )}
+              </select>
+              <select
+                className="nesio-ob-input"
+                value={categoryFilter || ''}
+                onChange={(e) => setCategoryFilter(e.target.value || null)}
+                aria-label={L(dict, '分类', 'Category')}
+                style={{ flex: 1, minWidth: 120, margin: 0 }}
+              >
+                <option value="">{L(dict, '全部分类', 'All categories')}</option>
+                {CATEGORY_PRESETS.map(([zh, en]) => (
+                  <option key={zh} value={zh}>{L(dict, zh, en)}</option>
+                ))}
+                {categoryFilter && !CATEGORY_PRESETS.some(([zh]) => zh === categoryFilter) && (
+                  <option value={categoryFilter}>{categoryFilter}</option>
+                )}
+              </select>
               {!isPage && (
-                <>
-                  <button type="button" style={chip(false)} onClick={() => setView('stats')}>
-                    {L(dict, '统计', 'Stats')}
-                  </button>
-                  <button type="button" style={chip(false)} onClick={() => setView('sell')}>
-                    {L(dict, '卖闲置', 'Sell pile')}
-                  </button>
+                <select
+                  className="nesio-ob-input"
+                  value=""
+                  aria-label={L(dict, '更多', 'More')}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    e.target.value = '';
+                    if (v === 'stats') setView('stats');
+                    else if (v === 'sell') setView('sell');
+                    else if (v === 'flip') setView('flip');
+                  }}
+                  style={{ width: 'auto', margin: 0 }}
+                >
+                  <option value="">{L(dict, '更多…', 'More…')}</option>
+                  <option value="stats">{L(dict, '统计', 'Stats')}</option>
+                  <option value="sell">{L(dict, '卖闲置', 'Sell pile')}</option>
                   {items.some((i) => i.isAmazon) && (
-                    <button type="button" style={chip(false)} onClick={() => setView('flip')}>
-                      {L(dict, '亚马逊转卖', 'Amazon flip')}
-                    </button>
+                    <option value="flip">{L(dict, '亚马逊转卖', 'Amazon flip')}</option>
                   )}
-                </>
+                </select>
               )}
             </div>
 
@@ -494,136 +650,60 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
               <p className="nesio-freeze-empty" style={{ padding: 'var(--space-6) 0', textAlign: 'center', color: 'var(--text-tertiary)' }}>
                 {query
                   ? L(dict, '没找到。换个词试试?', 'Nothing found. Try another word?')
-                  : L(dict, '还没有物品。点下面「记一件」,或用「拍一下」拍张照直接识别。', 'No items yet. Tap "Add one" below, or snap a photo to recognize.')}
+                  : L(dict, '还没有物品。点右上角 ＋ 记一件,或用「拍一下」识别。', 'No items yet. Tap ＋ to add one, or snap a photo to recognize.')}
               </p>
             ) : (
-              <>
-                {/* 2026-07-29 标注(Bug4 P10):「物品 · 最近更新在前」删掉 —— 排序规则不必占一行字。 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: isPage ? 'min(70vh, 640px)' : '44vh', overflowY: 'auto', paddingBottom: 4 }}>
-                  {visible.map((i) => {
-                    const exp = expiryStatus(i);
-                    const src = i.node.source === 'photo' ? L(dict, '拍照', 'Photo') : i.node.source === 'email' ? L(dict, '邮件', 'Email') : L(dict, '手记', 'Note');
-                    const updated = relativePastLabel(i.node.createdAt, Date.now(), dict);
-                    return (
-                      <button
-                        key={i.id}
-                        type="button"
-                        onClick={() => { setDetailId(i.id); setView('detail'); }}
-                        style={{
-                          display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', width: '100%',
-                          padding: 'var(--space-2) var(--space-3)', borderRadius: 14,
-                          border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
-                          background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)',
-                        }}
-                      >
-                        {/* 预览图:有图显真图(批次170);无图 → 浅灰底 + 居中收纳图标(批次173) */}
-                        {thumbs[i.id] ? (
-                          <img src={thumbs[i.id]} alt={i.name} aria-hidden draggable={false} style={{
-                            flexShrink: 0, width: 46, height: 46, borderRadius: 11, objectFit: 'cover',
-                          }} />
-                        ) : (
-                          <span aria-hidden style={{
-                            flexShrink: 0, width: 46, height: 46, borderRadius: 11,
-                            background: 'var(--portal-line, rgba(0,0,0,0.06))',
-                            display: 'grid', placeItems: 'center', color: 'var(--portal-muted)',
-                          }}><IconBox size={22} /></span>
-                        )}
-                        <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                          <span style={{ fontSize: 'var(--text-body)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {i.name}{i.quantity != null ? ` ×${i.quantity}` : ''}
-                          </span>
-                          {/* 一级存放位置 */}
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--text-xs)', color: i.location ? 'var(--text-secondary)' : 'var(--accent-primary, #c08f6f)' }}>
-                            <IconMapPin size={12} />
-                            {(i.location && stripEmoji(i.location)) || i.location || L(dict, '未归位 · 点开设位置', 'Unplaced · tap to set')}
-                          </span>
-                          {/* 最后更新多久前 · 来源 */}
-                          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
-                            <IconClock size={12} />
-                            {L(dict, `${updated}更新`, `updated ${updated}`)} · {src}
-                          </span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: isPage ? 'min(70vh, 640px)' : '44vh', overflowY: 'auto', paddingBottom: 4 }}>
+                {visible.map((i) => {
+                  const exp = expiryStatus(i);
+                  const src = i.node.source === 'photo' ? L(dict, '拍照', 'Photo') : i.node.source === 'email' ? L(dict, '邮件', 'Email') : L(dict, '手记', 'Note');
+                  const updated = relativePastLabel(i.node.createdAt, Date.now(), dict);
+                  return (
+                    <button
+                      key={i.id}
+                      type="button"
+                      onClick={() => { setDetailId(i.id); setView('detail'); }}
+                      style={{
+                        display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', width: '100%',
+                        padding: 'var(--space-2) var(--space-3)', borderRadius: 14,
+                        border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
+                        background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)',
+                      }}
+                    >
+                      {thumbs[i.id] ? (
+                        <img src={thumbs[i.id]} alt={i.name} aria-hidden draggable={false} style={{
+                          flexShrink: 0, width: 46, height: 46, borderRadius: 11, objectFit: 'cover',
+                        }} />
+                      ) : (
+                        <span aria-hidden style={{
+                          flexShrink: 0, width: 46, height: 46, borderRadius: 11,
+                          background: 'var(--portal-line, rgba(0,0,0,0.06))',
+                          display: 'grid', placeItems: 'center', color: 'var(--portal-muted)',
+                        }}><IconBox size={22} /></span>
+                      )}
+                      <span style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        <span style={{ fontSize: 'var(--text-body)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {i.name}{i.quantity != null ? ` ×${i.quantity}` : ''}
                         </span>
-                        {exp && (
-                          <span style={{ flexShrink: 0, fontSize: 'var(--text-overline)', color: exp === 'expired' ? 'var(--status-risk)' : 'var(--status-gentle)' }}>
-                            {exp === 'expired' ? L(dict, '已过期', 'Expired') : L(dict, '临期', 'Expiring')}
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* 批次 133·设计:常用标签(点开筛该标签)*/}
-                {st.topTags.length > 0 && (
-                  <>
-                    <p style={{ margin: 'var(--space-4) 0 var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>{L(dict, '常用标签', 'Top tags')}</p>
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                      {st.topTags.slice(0, 6).map((t) => (
-                        <button key={t.tag} type="button" style={chip(query === t.tag)} onClick={() => setQuery(query === t.tag ? '' : t.tag)}>
-                          {t.tag} <span style={{ color: 'var(--text-tertiary)' }}>{t.count}</span>
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--text-xs)', color: i.location ? 'var(--text-secondary)' : 'var(--status-gentle)' }}>
+                          <IconMapPin size={12} />
+                          {(i.location && stripEmoji(i.location)) || i.location || L(dict, '未归位 · 点开设位置', 'Unplaced · tap to set')}
+                        </span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)' }}>
+                          <IconClock size={12} />
+                          {L(dict, `${updated}更新`, `updated ${updated}`)} · {src}
+                        </span>
+                      </span>
+                      {exp && (
+                        <span style={{ flexShrink: 0, fontSize: 'var(--text-overline)', color: exp === 'expired' ? 'var(--status-risk)' : 'var(--status-gentle)' }}>
+                          {exp === 'expired' ? L(dict, '已过期', 'Expired') : L(dict, '临期', 'Expiring')}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
             )}
-
-            <div style={{ display: 'flex', gap: 8, marginTop: 'var(--space-3)' }}>
-              <button type="button" className="nesio-freeze-primary-btn" style={{ flex: 2 }} onClick={() => { resetForm(); setView('add'); }}>
-                ＋ {L(dict, '记一件', 'Add one')}
-              </button>
-              {/* 物品②:CSV 批量导入(仅名称必填;同文件导两次会重复) */}
-              <button
-                type="button"
-                style={{ flex: 1, borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}
-                onClick={() => fileRef.current?.click()}
-              >
-                {L(dict, '导入 CSV', 'Import CSV')}
-              </button>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".csv,text/csv"
-                className="nesio-visually-hidden"
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = '';
-                  if (!f) return;
-                  try {
-                    const text = await f.text();
-                    const firstLine = text.split('\n')[0] || '';
-                    // 自动识别亚马逊转卖表(Notion「Amazon Free Tracker」导出):列名一命中就走转卖解析,
-                    // 否则走通用物品导入。用户不必选类型,直接传文件即可。
-                    const isAmazon = /美金价格|自付额|Review Status|PayStatus/.test(firstLine);
-                    if (isAmazon) {
-                      const parsed = parseAmazonFlipCsv(text);
-                      // 去重:同名 + 同到货日已在库就跳过(同文件导两次不叠加)。
-                      const seen = new Set(items.filter((i) => i.isAmazon).map((i) => `${i.name}|${i.arrivedAt || ''}`));
-                      let imported = 0; let dup = 0;
-                      for (const it of parsed) {
-                        const key = `${it.name}|${it.arrivedAt || ''}`;
-                        if (seen.has(key)) { dup++; continue; }
-                        seen.add(key);
-                        addInventoryItem(it);
-                        imported++;
-                      }
-                      refresh();
-                      setImportMsg(imported > 0
-                        ? L(dict, `导入 ${imported} 件亚马逊转卖${dup ? ` · 跳过 ${dup} 件重复` : ''}`, `Imported ${imported} Amazon flips${dup ? ` · ${dup} duplicates skipped` : ''}`)
-                        : L(dict, `没有新增(${dup} 件已在库)`, `Nothing new (${dup} already tracked)`));
-                      return;
-                    }
-                    const r = importInventoryCsv(text);
-                    refresh();
-                    const parts = [L(dict, `导入 ${r.imported} 件`, `Imported ${r.imported}`)];
-                    if (r.skipped) parts.push(L(dict, `跳过 ${r.skipped} 行(缺名称)`, `${r.skipped} skipped (no name)`));
-                    if (r.errors.length && r.imported === 0) parts.push(r.errors[0]);
-                    setImportMsg(parts.join(' · '));
-                  } catch { setImportMsg(L(dict, '导入失败:文件读取出错', 'Import failed: could not read file')); }
-                }}
-              />
-            </div>
             {importMsg && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', textAlign: 'center' }}>{importMsg}</p>}
           </>
         )}
@@ -697,7 +777,7 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
               </div>
             </div>
             <label style={label}>{L(dict, '标签(逗号分隔,可选)', 'Tags (comma separated, optional)')}</label>
-            <input className="nesio-ob-input" value={fTags} onChange={(e) => setFTags(e.target.value)} placeholder={L(dict, '例:护肤, 粉色, 礼物', 'e.g. skincare, pink, gift')} />
+            <input className="nesio-ob-input" value={fTags} onChange={(e) => setFTags(e.target.value)} placeholder="" />
             <label style={label}>{L(dict, '备注(可选)', 'Note (optional)')}</label>
             <input className="nesio-ob-input" value={fNote} onChange={(e) => setFNote(e.target.value)} placeholder={L(dict, '例:被压在护手霜下面', 'e.g. under the hand cream')} />
             <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', marginTop: 'var(--space-4)', opacity: fName.trim() ? 1 : 0.5 }} disabled={!fName.trim()} onClick={submitAdd}>

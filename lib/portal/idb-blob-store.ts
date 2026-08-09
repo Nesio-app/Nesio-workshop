@@ -138,6 +138,8 @@ export interface BlobStore<T> {
   ready(): Promise<void>;
   /** 从 IDB 重读一遍(外部直接写过 IDB 之后必须调,见 rehydrateIdbBlobs)。 */
   refresh(): Promise<void>;
+  /** 首次水合是否已完成(写路径可据此同步读-改-写,避免空缓存盖档)。 */
+  isReady(): boolean;
 }
 
 export interface BlobStoreOptions<T> {
@@ -160,6 +162,14 @@ export function createBlobStore<T>(opts: BlobStoreOptions<T>): BlobStore<T> {
     if (hasWindow) window.dispatchEvent(new CustomEvent(opts.updateEvent));
   }
 
+  /**
+   * 水合完成前的「最新意向写」。hydrate 末尾再看一次:
+   * 若期间有 save,以意向写为准落盘,绝不让「基于空缓存算出的旧空账」在调用方
+   * 未 await ready 时盖掉 IDB 里的完整档案(card-archive / judge-ledger 冷启动事故)。
+   */
+  let pendingWrite: T | null = null;
+  let hydrated = false;
+
   async function hydrate(): Promise<void> {
     try {
       let raw = await backend.get(opts.key);
@@ -171,11 +181,22 @@ export function createBlobStore<T>(opts: BlobStoreOptions<T>): BlobStore<T> {
           try { localStorage.removeItem(opts.key); } catch { /* ignore */ }
         }
       }
+      let disk: T | null = null;
       if (raw != null) {
-        const v = JSON.parse(raw) as unknown;
-        if (!opts.validate || opts.validate(v)) cache = v as T;
+        try {
+          const v = JSON.parse(raw) as unknown;
+          if (!opts.validate || opts.validate(v)) disk = v as T;
+        } catch { /* ignore bad json */ }
+      }
+      if (pendingWrite != null) {
+        cache = pendingWrite;
+        pendingWrite = null;
+        await backend.set(opts.key, JSON.stringify(cache)).catch(() => opts.onWriteError?.());
+      } else if (disk != null) {
+        cache = disk;
       }
     } catch { /* 水合失败:缓存保持 null */ }
+    hydrated = true;
     emit();
   }
 
@@ -195,6 +216,7 @@ export function createBlobStore<T>(opts: BlobStoreOptions<T>): BlobStore<T> {
    * hydrate() 末尾会 emit,监听组件据此重读。
    */
   function refresh(): Promise<void> {
+    hydrated = false;
     hydratePromise = hydrate();
     return hydratePromise;
   }
@@ -207,9 +229,23 @@ export function createBlobStore<T>(opts: BlobStoreOptions<T>): BlobStore<T> {
     save(value: T) {
       cache = value;
       emit();
+      if (!hydrated) {
+        // 尚未水合:只记意向,等 ready 后由 hydrate 或下方 then 落盘。
+        pendingWrite = value;
+        void ready().then(() => {
+          if (pendingWrite != null) {
+            cache = pendingWrite;
+            pendingWrite = null;
+            backend.set(opts.key, JSON.stringify(cache)).catch(() => opts.onWriteError?.());
+          }
+        });
+        return;
+      }
+      pendingWrite = null;
       backend.set(opts.key, JSON.stringify(value)).catch(() => opts.onWriteError?.());
     },
     ready,
     refresh,
+    isReady: () => hydrated,
   };
 }

@@ -51,6 +51,8 @@ export default function PersonLinksSection({ personKey, email }: { personKey: st
   const [health, setHealth] = useState<PersonHealthItem[]>([]);
   const [chore, setChore] = useState<ChorePhase>({ s: 'loading' });
   const [showAllHealth, setShowAllHealth] = useState(false);
+  const [openHealth, setOpenHealth] = useState(true);
+  const [openChore, setOpenChore] = useState(true);
 
   useEffect(() => {
     const rebuild = () => setHealth(personHealthItems(personKey));
@@ -101,20 +103,20 @@ export default function PersonLinksSection({ personKey, email }: { personKey: st
   return (
     <>
       {/* ── 健康 ─────────────────────────────────────────────── */}
-      <div style={{ marginTop: 'var(--space-4)' }}>
-        <div className="nesio-rel-rec-head">
-          <p className="nesio-settings-section-label" style={{ margin: 0 }}>
-            {t('健康', 'Health')}{health.length ? ` · ${health.length}` : ''}
-          </p>
+      <div className="nesio-rel-cat" style={{ marginTop: 'var(--space-4)' }}>
+        <button type="button" className="nesio-rel-cat-head" onClick={() => setOpenHealth((v) => !v)} aria-expanded={openHealth}>
+          <span className="nesio-rel-cat-title">
+            {openHealth ? '▾' : '▸'} {t('健康', 'Health')}{health.length ? ` · ${health.length}` : ''}
+          </span>
           {health.length > 0 && (
             <span className="nesio-rel-rec-local" title={t('仅你可见', 'Only you')}>
               <IconLock size={11} />{t('仅本机', 'On device')}
             </span>
           )}
-        </div>
-        {health.length > 0 ? (
+        </button>
+        {openHealth && (health.length > 0 ? (
           <>
-            <div className="nesio-rel-rec-list">
+            <div className="nesio-rel-rec-list nesio-rel-rec-list--nested">
               {healthShown.map((h) => (
                 <div key={h.id} className="nesio-rel-rec-row">
                   <div className="nesio-rel-rec-main">
@@ -137,19 +139,21 @@ export default function PersonLinksSection({ personKey, email }: { personKey: st
           <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>
             {t('还没有 TA 的健康记录。上面「挂一条」可以记医疗/药物/健康。', 'No health records yet — use “Add” above to note medical/medication/health.')}
           </p>
-        )}
+        ))}
       </div>
 
       {/* ── 家务活 ───────────────────────────────────────────── */}
-      <div style={{ marginTop: 'var(--space-4)' }}>
-        <div className="nesio-rel-rec-head">
-          <p className="nesio-settings-section-label" style={{ margin: 0 }}>
-            {t('家务活', 'Chores')}
+      <div className="nesio-rel-cat" style={{ marginTop: 'var(--space-4)' }}>
+        <button type="button" className="nesio-rel-cat-head" onClick={() => setOpenChore((v) => !v)} aria-expanded={openChore}>
+          <span className="nesio-rel-cat-title">
+            {openChore ? '▾' : '▸'} {t('家务活', 'Chores')}
             {chore.s === 'ok' && chore.chores.length ? ` · ${chore.chores.length}` : ''}
-          </p>
+          </span>
           {chore.s === 'ok' && <span className="nesio-rel-rec-sub">{chore.familyName}</span>}
-        </div>
+        </button>
 
+        {openChore && (
+          <>
         {chore.s === 'loading' && (
           <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>{t('看看…', 'Checking…')}</p>
         )}
@@ -172,7 +176,7 @@ export default function PersonLinksSection({ personKey, email }: { personKey: st
         )}
 
         {chore.s === 'ok' && (chore.chores.length > 0 ? (
-          <div className="nesio-rel-rec-list">
+          <div className="nesio-rel-rec-list nesio-rel-rec-list--nested">
             {chore.chores.slice(0, MAX_ROWS).map((c) => (
               <div key={c.id} className="nesio-rel-rec-row">
                 <div className="nesio-rel-rec-main">
@@ -193,6 +197,8 @@ export default function PersonLinksSection({ personKey, email }: { personKey: st
             {t('TA 手上现在没有活。', 'Nothing on their plate right now.')}
           </p>
         ))}
+          </>
+        )}
       </div>
     </>
   );

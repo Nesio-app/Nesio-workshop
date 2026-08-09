@@ -719,11 +719,33 @@ export function displayAccountName(a: Pick<BankAccount, 'id' | 'name'>, names?: 
 export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boolean }): void {
   if (opts?.replace && accounts.length > 0) {
     // Plaid 权威替换时保留手工账户,否则下次同步会抹掉「手动添加」入口下的户。
+    // 再加保险丝:若本次快照比本地 Plaid 户明显更少,且本地户仍有流水 —— 改并集,
+    // 避免「令牌被盖短 → authoritative 只带新银行 → 旧账户从表里消失」。
     const prev = accountsStore.load();
-    const manuals = (Array.isArray(prev) ? prev : []).filter((a) => a?.id && isManualBankAccount(a));
+    const prevList = Array.isArray(prev) ? prev.filter((a) => a?.id) : [];
+    const manuals = prevList.filter((a) => isManualBankAccount(a));
+    const prevPlaid = prevList.filter((a) => !isManualBankAccount(a));
     const byId = new Map<string, BankAccount>();
     for (const a of accounts) if (a?.id) byId.set(a.id, a);
     for (const m of manuals) if (!byId.has(m.id)) byId.set(m.id, m);
+    // 保险丝要保守:只在「整家机构从快照消失、但本地仍有该机构流水」时加回。
+    // 同机构换 item / 无机构元数据的权威去重,绝不能被加回(否则 bank-orphan 契约与重复账户退场失效)。
+    if (prevPlaid.length > accounts.length) {
+      const rawTx = loadBankTxRaw();
+      const txAccountIds = new Set(rawTx.map((t) => t.accountId).filter(Boolean));
+      for (const a of prevPlaid) {
+        if (byId.has(a.id)) continue;
+        if (!txAccountIds.has(a.id)) continue;
+        if (accounts.some((n) => isSameUnderlyingAccount(n, a))) continue;
+        const inst = (a.institution || '').trim();
+        if (!inst) continue;
+        const instStillPresent = accounts.some(
+          (n) => (n.institution || '').trim() === inst,
+        );
+        if (instStillPresent) continue;
+        byId.set(a.id, a);
+      }
+    }
     accountsStore.save([...byId.values()]);
     return;
   }

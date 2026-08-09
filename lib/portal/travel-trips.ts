@@ -658,20 +658,54 @@ const DEFAULT_BUDGET_CATS = [
 ] as const;
 
 function sumTripAnnotatedBankTx(tripId: string): number {
-  if (typeof window === 'undefined') return 0;
+  const { uncategorized, byCat } = tripAnnotatedBankByCategory(tripId);
+  const rest = Object.values(byCat).reduce((a, b) => a + b, 0);
+  return Math.round((uncategorized + rest) * 100) / 100;
+}
+
+/**
+ * 按二级选择(行程花费类 / 具体节点)拆刷卡金额。
+ * tripNodeId 可为预算类 id(flight/stay/shop/自定义)或 TripNode.id。
+ * 未选二级的仍归「刷卡」,选了耳机等自定义类则进该类 actual —— 不再整块塞进刷卡。
+ */
+export function tripAnnotatedBankByCategory(tripId: string): {
+  byCat: Record<string, number>;
+  uncategorized: number;
+} {
+  const byCat: Record<string, number> = {};
+  let uncategorized = 0;
+  if (typeof window === 'undefined') return { byCat, uncategorized };
   try {
+    const t = getTrip(tripId);
     const anns = loadTxAnnotations();
-    let sum = 0;
+    const nodeKindToCat = (kind: string): string | null => {
+      if (kind === 'flight') return 'flight';
+      if (kind === 'hotel') return 'stay';
+      if (kind === 'shopping') return 'shop';
+      return null;
+    };
+    const resolveCat = (tripNodeId: string | undefined): string | null => {
+      const id = (tripNodeId || '').trim();
+      if (!id || !t) return null;
+      if (id === 'flight' || id === 'stay' || id === 'shop' || id === 'bank') return id;
+      if ((t.customBudgetCategories || []).some((c) => c.id === id)) return id;
+      const node = t.nodes.find((n) => n.id === id);
+      if (node) return nodeKindToCat(node.kind) || nodeKindToCat(node.payload.kind) || null;
+      return null;
+    };
     for (const tx of loadBankTx()) {
       const ann = anns[tx.id];
       if (ann?.tripId !== tripId) continue;
       const amt = Math.abs(Number(tx.amount) || 0);
-      if (amt > 0 && amt <= MAX_REASONABLE_PRICE) sum += amt;
+      if (!(amt > 0 && amt <= MAX_REASONABLE_PRICE)) continue;
+      const cat = resolveCat(ann.tripNodeId);
+      if (cat && cat !== 'bank') byCat[cat] = (byCat[cat] || 0) + amt;
+      else uncategorized += amt;
     }
-    return Math.round(sum * 100) / 100;
-  } catch {
-    return 0;
-  }
+    for (const k of Object.keys(byCat)) byCat[k] = Math.round(byCat[k] * 100) / 100;
+    uncategorized = Math.round(uncategorized * 100) / 100;
+  } catch { /* ignore */ }
+  return { byCat, uncategorized };
 }
 
 /** 从上传文件提取订票确认文本(PDF 文字层 / 纯文本);扫描件 PDF 与图片需用户粘贴 OCR 结果。 */
@@ -858,7 +892,6 @@ export function recomputeBudgetNode(tripId: string): Trip | null {
   let flight = 0;
   let stay = 0;
   let shop = 0;
-  const customActual: Record<string, number> = {};
   for (const n of t.nodes) {
     if (n.payload.kind === 'hotel') {
       const h = n.payload.hotel;
@@ -874,8 +907,35 @@ export function recomputeBudgetNode(tripId: string): Trip | null {
       if (p > 0 && p <= MAX_REASONABLE_PRICE) flight += p;
     }
   }
-  const bank = sumTripAnnotatedBankTx(tripId);
-  const actualTotal = flight + stay + shop + bank;
+  const { byCat: bankByCat, uncategorized: bankUncat } = tripAnnotatedBankByCategory(tripId);
+  // 刷卡归入类目时:若用户挂的是具体节点 id,节点价已在上面计入 —— 不再把同类 bank 加一遍。
+  // 仅当 tripNodeId 是预算类 id(flight/stay/shop/自定义)时,才把银行金额加进该类 actual。
+  const nodeLinkedCats = new Set<string>();
+  try {
+    const anns = loadTxAnnotations();
+    for (const tx of loadBankTx()) {
+      const ann = anns[tx.id];
+      if (ann?.tripId !== tripId || !ann.tripNodeId) continue;
+      const nid = ann.tripNodeId.trim();
+      if (t.nodes.some((n) => n.id === nid)) {
+        const n = t.nodes.find((x) => x.id === nid)!;
+        if (n.kind === 'flight' || n.payload.kind === 'flight') nodeLinkedCats.add('flight');
+        if (n.kind === 'hotel' || n.payload.kind === 'hotel') nodeLinkedCats.add('stay');
+        if (n.kind === 'shopping' || n.payload.kind === 'shopping') nodeLinkedCats.add('shop');
+      }
+    }
+  } catch { /* ignore */ }
+  if (!nodeLinkedCats.has('flight')) flight += bankByCat.flight || 0;
+  if (!nodeLinkedCats.has('stay')) stay += bankByCat.stay || 0;
+  if (!nodeLinkedCats.has('shop')) shop += bankByCat.shop || 0;
+  const bank = bankUncat;
+  const customActual: Record<string, number> = {};
+  for (const [cid, amt] of Object.entries(bankByCat)) {
+    if (cid === 'flight' || cid === 'stay' || cid === 'shop' || cid === 'bank') continue;
+    customActual[cid] = (customActual[cid] || 0) + amt;
+  }
+  const customSum = Object.values(customActual).reduce((a, b) => a + b, 0);
+  const actualTotal = flight + stay + shop + bank + customSum;
   const over = t.budgetByCategory || {};
   const hasOverride = Object.keys(over).length > 0;
   let sticky = Number(t.budgetTotal) || 0;

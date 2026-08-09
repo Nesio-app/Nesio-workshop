@@ -29,6 +29,8 @@ import './providers/bank-tx';
 import './ai-cache';
 import './providers/calendar-local-store';
 import './chat-store';
+import './card-archive';
+import './guidance-judge-auto';
 import { collectLocalImages, restoreLocalImages } from './local-image-store';
 import { collectLocalFiles, restoreLocalFiles } from './local-file-store';
 

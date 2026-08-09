@@ -61,6 +61,8 @@ export interface TxAnnotation {
   categoryDetail?: string;
   /** 关联的旅行(trip.id)。 */
   tripId?: string;
+  /** 旅行内具体节点(机票/酒店/购物等 TripNode.id);依赖 tripId。 */
+  tripNodeId?: string;
   /** @deprecated 用 memoryNodeId —— 自定义标签不能反查到记忆详情。 */
   memoryTag?: string;
   /** 关联的记忆 LifeNode.id。 */
@@ -94,7 +96,8 @@ export function hasTxAnnotation(a: TxAnnotation | undefined): boolean {
     (a.people && a.people.length) || (a.attachments && a.attachments.length) || (a.note && a.note.trim())
     || (a.splits && a.splits.length) || a.amortize
     || (a.category && a.category.trim()) || (a.categoryDetail && a.categoryDetail.trim())
-    || (a.tripId && a.tripId.trim()) || (a.memoryTag && a.memoryTag.trim())
+    || (a.tripId && a.tripId.trim()) || (a.tripNodeId && a.tripNodeId.trim())
+    || (a.memoryTag && a.memoryTag.trim())
     || (a.memoryNodeId && a.memoryNodeId.trim()) || (a.projectId && a.projectId.trim())
     || (a.assetId && a.assetId.trim()),
   );
@@ -222,10 +225,15 @@ export function setTxCategoryDetail(txId: string, categoryDetail: string): boole
   return write(txId, { categoryDetail: d || undefined });
 }
 
-/** 关联旅行;空字符串 = 清除。 */
+/** 关联旅行;换行程或清空时一律清 tripNodeId(避免 A 的机票类落到 B)。 */
 export function setTxTrip(txId: string, tripId: string): TxWriteResult {
   const id = (tripId || '').trim();
-  const ok = write(txId, { tripId: id || undefined });
+  const prev = txAnnotationOf(txId).tripId || '';
+  const tripChanged = prev !== id;
+  const ok = write(txId, {
+    tripId: id || undefined,
+    ...(tripChanged || !id ? { tripNodeId: undefined } : {}),
+  });
   let graphOk = true; let reason: BridgeResult['reason'];
   if (id) {
     const r = linkTxToTrip(txId, id);
@@ -235,6 +243,12 @@ export function setTxTrip(txId: string, tripId: string): TxWriteResult {
     if (!r.graphOk) { graphOk = false; reason = r.reason; }
   }
   return { ok, graphOk, reason };
+}
+
+/** 关联旅行内具体花费节点(机票/酒店等);空 = 只挂行程不挂节点。 */
+export function setTxTripNode(txId: string, tripNodeId: string): boolean {
+  const id = (tripNodeId || '').trim();
+  return write(txId, { tripNodeId: id || undefined });
 }
 
 /** @deprecated 用 setTxMemoryNode —— 保留读旧数据。 */

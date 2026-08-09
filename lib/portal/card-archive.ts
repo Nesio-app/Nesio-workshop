@@ -1,5 +1,5 @@
 /**
- * 卡片档案 —— AI 判决层的唯一监测面(设计定稿 2026-07-29,Step 1)。
+ * 卡片档案 —— AI 判决层的唯一监测面(设计定稿 2026-07-29,Drop 1)。
  *
  * 两个清单,缺一不可:
  *   · 「说了的」(shown):每张出过的卡 + whyNow + evidence + 当时过了哪些门 + 你的改判。
@@ -12,10 +12,13 @@
  *
  * 上限:90 天 + shown≤400 / declined≤200 条。写失败走 storage-health(红线:不许静默吞)。
  * 跨端:整键属临时态,**不进 module-sync 整键 replace 通道**(改判 union 语义是挂账,先本机)。
+ * 存储:迁 IndexedDB(与 health-store 同模式)—— 档案会堆到数百条,别占 localStorage 5MB 配额。
  */
+import { createBlobStore } from './idb-blob-store';
 import { reportStorageDropped } from './storage-health';
 
-const KEY = 'nesio-card-archive-v1';
+export const ARCHIVE_KEY = 'nesio-card-archive-v1';
+const KEY = ARCHIVE_KEY;
 
 export const ARCHIVE_MAX_DAYS = 90;
 export const ARCHIVE_MAX_SHOWN = 400;
@@ -61,31 +64,45 @@ interface ArchiveState {
   declined: ArchiveDeclinedEntry[];
 }
 
+const EMPTY: ArchiveState = { shown: [], declined: [] };
+
+const store = createBlobStore<ArchiveState>({
+  key: KEY,
+  updateEvent: 'nesio-card-archive-updated',
+  validate: (v) => {
+    const a = v as Partial<ArchiveState> | null;
+    return !!a && Array.isArray(a.shown) && Array.isArray(a.declined);
+  },
+  onWriteError: reportStorageDropped,
+});
+
 function load(): ArchiveState {
-  if (typeof localStorage === 'undefined') return { shown: [], declined: [] };
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || 'null') as Partial<ArchiveState> | null;
-    return {
-      shown: Array.isArray(raw?.shown) ? raw!.shown! : [],
-      declined: Array.isArray(raw?.declined) ? raw!.declined! : [],
-    };
-  } catch {
-    return { shown: [], declined: [] };
-  }
+  const raw = store.load();
+  if (!raw) return { shown: [], declined: [] };
+  return {
+    shown: Array.isArray(raw.shown) ? raw.shown : [],
+    declined: Array.isArray(raw.declined) ? raw.declined : [],
+  };
 }
 
 function save(st: ArchiveState, now: Date): void {
-  if (typeof localStorage === 'undefined') return;
   const cutoff = new Date(now.getTime() - ARCHIVE_MAX_DAYS * 86_400_000).toISOString();
   const trimmed: ArchiveState = {
     shown: st.shown.filter((e) => e.lastAt >= cutoff).slice(-ARCHIVE_MAX_SHOWN),
     declined: st.declined.filter((e) => e.at >= cutoff).slice(-ARCHIVE_MAX_DECLINED),
   };
-  try {
-    localStorage.setItem(KEY, JSON.stringify(trimmed));
-  } catch {
-    reportStorageDropped(); // 红线:存储写失败必须可见,不许静默吞
-  }
+  store.save(trimmed);
+}
+
+/** 写路径一律等 IDB 水合完再读-改-写,避免冷启动空缓存盖掉档案。 */
+function mutateArchive(fn: (st: ArchiveState) => void, now: Date): void {
+  const run = () => {
+    const st = load();
+    fn(st);
+    save(st, now);
+  };
+  if (store.isReady()) run();
+  else void store.ready().then(run);
 }
 
 /** 记一张出过的卡。同 id 再出 = 累加 times、刷新 lastAt(不重复建条)。 */
@@ -94,17 +111,17 @@ export function archiveShownCard(
   now: Date = new Date(),
 ): void {
   if (!entry.id) return;
-  const st = load();
-  const at = now.toISOString();
-  const hit = st.shown.find((e) => e.id === entry.id);
-  if (hit) {
-    hit.lastAt = at;
-    hit.times += 1;
-    hit.gates = entry.gates; // 门的结果随最近一次
-  } else {
-    st.shown.push({ ...entry, firstAt: at, lastAt: at, times: 1 });
-  }
-  save(st, now);
+  mutateArchive((st) => {
+    const at = now.toISOString();
+    const hit = st.shown.find((e) => e.id === entry.id);
+    if (hit) {
+      hit.lastAt = at;
+      hit.times += 1;
+      hit.gates = entry.gates; // 门的结果随最近一次
+    } else {
+      st.shown.push({ ...entry, firstAt: at, lastAt: at, times: 1 });
+    }
+  }, now);
 }
 
 /** 记一批「没说的」判决(影子期主要入口)。同 id 幂等。 */
@@ -113,33 +130,33 @@ export function archiveDeclined(
   now: Date = new Date(),
 ): void {
   if (entries.length === 0) return;
-  const st = load();
-  const at = now.toISOString();
-  const known = new Set(st.declined.map((e) => e.id));
-  for (const e of entries) {
-    if (!e.id || known.has(e.id)) continue;
-    known.add(e.id);
-    st.declined.push({ ...e, at });
-  }
-  save(st, now);
+  mutateArchive((st) => {
+    const at = now.toISOString();
+    const known = new Set(st.declined.map((e) => e.id));
+    for (const e of entries) {
+      if (!e.id || known.has(e.id)) continue;
+      known.add(e.id);
+      st.declined.push({ ...e, at });
+    }
+  }, now);
 }
 
 /** 用户改判(说了的)。改判要能覆盖(点错了可以再点)。 */
 export function recordArchiveVerdict(id: string, v: ArchiveVerdict, now: Date = new Date()): void {
-  const st = load();
-  const hit = st.shown.find((e) => e.id === id);
-  if (!hit) return;
-  hit.verdict = { v, at: now.toISOString() };
-  save(st, now);
+  mutateArchive((st) => {
+    const hit = st.shown.find((e) => e.id === id);
+    if (!hit) return;
+    hit.verdict = { v, at: now.toISOString() };
+  }, now);
 }
 
 /** 「这条该提醒我」(没说的)。回灌为下一轮判决的口味事实。 */
 export function markDeclinedWanted(id: string, now: Date = new Date()): void {
-  const st = load();
-  const hit = st.declined.find((e) => e.id === id);
-  if (!hit) return;
-  hit.wanted = true;
-  save(st, now);
+  mutateArchive((st) => {
+    const hit = st.declined.find((e) => e.id === id);
+    if (!hit) return;
+    hit.wanted = true;
+  }, now);
 }
 
 export function readArchive(): ArchiveState {
@@ -196,6 +213,8 @@ export function wantedDeclinedTitles(limit = 8): string[] {
 
 /** 隐私清除。 */
 export function resetCardArchive(): void {
-  if (typeof localStorage === 'undefined') return;
-  try { localStorage.removeItem(KEY); } catch { /* 删除失败无害 */ }
+  store.save({ ...EMPTY });
+  if (typeof localStorage !== 'undefined') {
+    try { localStorage.removeItem(KEY); } catch { /* 删除失败无害 */ }
+  }
 }

@@ -73,6 +73,7 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   const [busy, setBusy] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [records, setRecords] = useState<PersonRecord[]>([]);
+  const [openRecCats, setOpenRecCats] = useState<Record<string, boolean>>({});
   const [hangOpen, setHangOpen] = useState(false); // 「挂一条」独立确认卡弹窗
   const [editOpen, setEditOpen] = useState(false); // 编辑资料(名字/邮箱/电话/生日/备注)
   const [relDraft, setRelDraft] = useState(''); // 图4:关系词编辑草稿
@@ -306,32 +307,60 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
           <div style={{ marginTop: 'var(--space-4)' }}>
             <p className="nesio-settings-section-label" style={{ margin: 0 }}>{L(dict, '挂在 TA 身上', 'Attached to them')}</p>
 
-            {records.length > 0 && (
-              <div className="nesio-rel-rec-list">
-                {records.map((r) => {
-                  const meta = RECORD_CATEGORY_MAP[r.category];
-                  return (
-                    <div key={r.id} className="nesio-rel-rec-row">
-                      <span className="nesio-rel-rec-ic" title={L(dict, meta.zh, meta.en)}><RecordCatIcon category={r.category} size={16} /></span>
-                      <div className="nesio-rel-rec-main">
-                        <span className="nesio-rel-rec-title">{r.title}{typeof r.amount === 'number' ? ` · ${r.amount}` : ''}</span>
-                        <span className="nesio-rel-rec-sub">
-                          {L(dict, meta.zh, meta.en)}
-                          {r.date ? ` · ${new Date(r.date).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' })}` : ''}
-                          {r.detail ? ` · ${r.detail}` : ''}
-                          {meta.sensitive ? L(dict, ' · 仅你可见', ' · only you') : ''}
-                          {r.attachments?.length ? L(dict, ` · ${r.attachments.length} 个附件`, ` · ${r.attachments.length} file(s)`) : ''}
-                        </span>
+            {records.length > 0 && (() => {
+              const byCat = new Map<string, PersonRecord[]>();
+              for (const r of records) {
+                const list = byCat.get(r.category) || [];
+                list.push(r);
+                byCat.set(r.category, list);
+              }
+              return (
+                <div className="nesio-rel-rec-cats">
+                  {[...byCat.entries()].map(([cat, list]) => {
+                    const meta = RECORD_CATEGORY_MAP[cat as PersonRecord['category']]
+                      ?? { zh: cat, en: cat, sensitive: false as const };
+                    const open = openRecCats[cat] !== false;
+                    return (
+                      <div key={cat} className="nesio-rel-cat" style={{ marginTop: 'var(--space-2)' }}>
+                        <button
+                          type="button"
+                          className="nesio-rel-cat-head"
+                          aria-expanded={open}
+                          onClick={() => setOpenRecCats((prev) => ({ ...prev, [cat]: !open }))}
+                        >
+                          <span className="nesio-rel-cat-title">
+                            {open ? '▾' : '▸'} <RecordCatIcon category={list[0].category} size={14} />{' '}
+                            {L(dict, meta.zh, meta.en)} · {list.length}
+                          </span>
+                          {meta.sensitive && (
+                            <span className="nesio-rel-rec-local" title={L(dict, '仅你可见 · 不进 AI', 'Only you · never sent to AI')}>
+                              <IconLock size={11} />{L(dict, '仅本机', 'On device')}
+                            </span>
+                          )}
+                        </button>
+                        {open && (
+                          <div className="nesio-rel-rec-list nesio-rel-rec-list--nested">
+                            {list.map((r) => (
+                              <div key={r.id} className="nesio-rel-rec-row">
+                                <div className="nesio-rel-rec-main">
+                                  <span className="nesio-rel-rec-title">{r.title}{typeof r.amount === 'number' ? ` · ${r.amount}` : ''}</span>
+                                  <span className="nesio-rel-rec-sub">
+                                    {r.date ? new Date(r.date).toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'short', day: 'numeric' }) : ''}
+                                    {r.detail ? ` · ${r.detail}` : ''}
+                                    {r.attachments?.length ? L(dict, ` · ${r.attachments.length} 个附件`, ` · ${r.attachments.length} file(s)`) : ''}
+                                  </span>
+                                </div>
+                                <button type="button" className="nesio-rel-rec-del" onClick={() => removeRecord(r.id)} aria-label={L(dict, '删除', 'Delete')}>✕</button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      {meta.sensitive && (
-                        <span className="nesio-rel-rec-local" title={L(dict, '仅你可见 · 不进 AI', 'Only you · never sent to AI')}><IconLock size={11} />{L(dict, '私密', 'Private')}</span>
-                      )}
-                      <button type="button" className="nesio-rel-rec-del" onClick={() => removeRecord(r.id)} aria-label={L(dict, '删除', 'Delete')}>✕</button>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </div>
 
           {/* 时间线 */}

@@ -488,7 +488,7 @@ function savePickPrefs(p: Record<string, boolean>): void {
 }
 
 // 概览:今日精选(点任意卡进「分析」看深度;右上「编辑」自选哪些进精选)
-function TodayPicks({ data, dict, onOpen }: { data: HealthMetrics; dict: string; onOpen: () => void }) {
+function TodayPicks({ data, dict, onOpenPick }: { data: HealthMetrics; dict: string; onOpenPick: (key: string) => void }) {
   // #27:asOf = 这个数**说的是哪天**。span='span' 的卡本来就是一段时间的汇总(TIR、情绪均值),
   // 只报「截到哪天」;报不出日期的一律不算今天。
   type Pick = { key: string; dot: string; label: string; value: string; unit?: string; sub: string; asOf: string | null; span?: PickSpan };
@@ -563,7 +563,7 @@ function TodayPicks({ data, dict, onOpen }: { data: HealthMetrics; dict: string;
       {enabled.length > 0 && (
         <div className="nesio-health-picks">
           {enabled.map((p, i) => (
-            <button key={p.key} type="button" className="nesio-health-pick" onClick={onOpen}>
+            <button key={p.key} type="button" className="nesio-health-pick" onClick={() => onOpenPick(p.key)}>
               <span className="nesio-health-pick-top">
                 <span className="nesio-health-pick-dot" style={{ background: p.dot }} aria-hidden />
                 {p.label}
@@ -640,6 +640,7 @@ export default function HealthDashboard() {
   const [recordOpen, setRecordOpen] = useState(false);      // 健康镜头:记一条(化验/用药/症状/就诊)
   const [scanOpen, setScanOpen] = useState(false);          // 健康镜头 B 屏:拍化验单(端上识别)
   const [openMetric, setOpenMetric] = useState<string | null>(null); // 健康镜头 C 屏:指标详情
+  const [analysisFocus, setAnalysisFocus] = useState<string | null>(null);
   const [reportMsg, setReportMsg] = useState(''); // 健康月报动作反馈(可见状态,不静默)
   // 月初自动补生成上月健康月报并存记忆(每设备每月一次,幂等)。
   // ⚠️ hooks 必须全部在下面的空态早退之前(hook 数量随渲染变化会让 React 整页抛错)。
@@ -667,6 +668,43 @@ export default function HealthDashboard() {
     }
     return () => window.removeEventListener('nesio-health-updated', onUpdate);
   }, []);
+
+  function openAnalysisPick(key: string) {
+    if (key.startsWith('metric-')) {
+      const mk = key.replace('metric-', '');
+      setOpenMetric(mk);
+    }
+    setAnalysisFocus(key);
+    setView('analysis');
+  }
+
+  useEffect(() => {
+    if (view !== 'analysis' || !analysisFocus) return;
+    const id = (() => {
+      if (analysisFocus === 'rings' || analysisFocus === 'sleep') return 'health-focus-deep';
+      if (analysisFocus === 'glu') return 'health-focus-postmeal';
+      if (analysisFocus === 'mood') return 'health-focus-mood';
+      if (analysisFocus.startsWith('metric-')) {
+        const mk = analysisFocus.replace('metric-', '');
+        const m = data?.metrics.find((x) => x.key === mk);
+        if (m) return `health-focus-group-${m.group}`;
+        return null;
+      }
+      return null;
+    })();
+    if (id) {
+      requestAnimationFrame(() => {
+        const el = document.getElementById(id);
+        if (el instanceof HTMLDetailsElement) {
+          el.open = true;
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
+    }
+    setAnalysisFocus(null);
+  }, [view, analysisFocus, data]);
 
   // 训练负荷不依赖 Apple Health(修「没导 XML 就永远看不到训练面板」):
   // 次数取 计划打卡 与 完成历史(自定义/生成的跟练也算)的较大者 —— 两边有重叠,取 max 不重计。
@@ -725,7 +763,7 @@ export default function HealthDashboard() {
           {/* 健康镜头(2026-07-29):化验/用药/就诊三卡 —— 读 Signal 主事实表。
               bug3 p41:上面那行入口(标签 + 拍化验单 + ＋记一条)删掉,入口只留在身体账本。 */}
           <HealthLensCards onOpenMetric={setOpenMetric} />
-          <TodayPicks data={data} dict={dict} onOpen={() => setView('analysis')} />
+          <TodayPicks data={data} dict={dict} onOpenPick={openAnalysisPick} />
           <TopFinding data={data} dict={dict} onOpen={() => setView('analysis')} />
           <TopRelationship data={data} dict={dict} />
           <button type="button" className="nesio-health-goanalysis" onClick={() => setView('analysis')}>
@@ -740,11 +778,13 @@ export default function HealthDashboard() {
 
           {/* bug3 p43「心情趋势显示在健康分析页」:摆在第一屏、不进「专项」折叠、
               不挂 data.mood 门 —— 折叠 + Apple Health 门就是上一版「我没见到」的原因。 */}
-          <MoodTrendCard dict={dict} />
+          <div id="health-focus-mood">
+            <MoodTrendCard dict={dict} />
+          </div>
 
           {/* 专项(折叠) */}
           {(insight.signals.length > 0 || data.activityRings || data.sleepStages || data.mood || data.glucose) && (
-            <details className="nesio-fin-fold" style={{ marginTop: 'var(--space-2)' }}>
+            <details id="health-focus-deep" className="nesio-fin-fold" style={{ marginTop: 'var(--space-2)' }}>
               <summary className="nesio-settings-section-label" style={{ cursor: 'pointer', listStyle: 'none', marginTop: 0 }}>{L(dict, '专项', 'Deep dive')} ›</summary>
               {insight.signals.length > 0 && <FitnessPanel insight={insight} dict={dict} />}
               {(data.activityRings || data.sleepStages || data.mood) && (
@@ -764,7 +804,7 @@ export default function HealthDashboard() {
 
           {/* bug2:身体账本的「餐后血糖」迁入分析页。
               bug3 p40:「稳 / 飙」这个折叠删掉 —— 内容并进了下面的「健康提示」。 */}
-          <details className="nesio-fin-fold" style={{ marginTop: 'var(--space-2)' }}>
+          <details id="health-focus-postmeal" className="nesio-fin-fold" style={{ marginTop: 'var(--space-2)' }}>
             <summary className="nesio-settings-section-label" style={{ cursor: 'pointer', listStyle: 'none', marginTop: 0 }}>{L(dict, '餐后血糖', 'Post-meal glucose')} ›</summary>
             <PostMealBody health={data} dict={dict} />
           </details>
@@ -796,7 +836,7 @@ export default function HealthDashboard() {
             const items = data.metrics.filter((m) => m.group === g.key);
             if (!items.length) return null;
             return (
-              <details key={g.key} className="nesio-fin-fold" style={{ marginTop: 'var(--space-2)' }}>
+              <details key={g.key} id={`health-focus-group-${g.key}`} className="nesio-fin-fold" style={{ marginTop: 'var(--space-2)' }}>
                 <summary className="nesio-settings-section-label" style={{ cursor: 'pointer', listStyle: 'none', marginTop: 0 }}>{L(dict, g.zh, g.en)} ›</summary>
                 <div className="nesio-health-grid">
                   {items.map((m) => <MetricCard key={m.key} m={m} dict={dict} />)}

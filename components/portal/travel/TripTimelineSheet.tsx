@@ -23,7 +23,7 @@ import { IconChevronRight, IconCard } from '../icons';
 import { NodeKindIcon, TripNodeDetailBody, nodeDetailTitle } from './TripNodeDetailSheets';
 import TripPoiPicker from './TripPoiPicker';
 
-type AddKind = 'flight' | 'hotel' | 'todo' | 'import' | 'poi' | null;
+type AddKind = 'flight' | 'hotel' | 'todo' | 'import' | 'poi' | 'shopping' | 'transit' | null;
 
 export default function TripTimelineSheet({
   tripId, open, onClose,
@@ -34,6 +34,7 @@ export default function TripTimelineSheet({
   const [trip, setTrip] = useState<Trip | null>(null);
   const [detailNode, setDetailNode] = useState<TripNode | null>(null);
   const [adding, setAdding] = useState<AddKind>(null);
+  const [addPickerOpen, setAddPickerOpen] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
   // add forms
@@ -50,6 +51,9 @@ export default function TripTimelineSheet({
   const [hLat, setHLat] = useState<number | undefined>(undefined);
   const [hLon, setHLon] = useState<number | undefined>(undefined);
   const [todoTitle, setTodoTitle] = useState('');
+  const [shopTitle, setShopTitle] = useState('');
+  const [shopTotal, setShopTotal] = useState('');
+  const [transitLabel, setTransitLabel] = useState('');
   const [paste, setPaste] = useState('');
   const [routesErr, setRoutesErr] = useState<string | null>(null);
 
@@ -75,8 +79,18 @@ export default function TripTimelineSheet({
   }, [open, tripId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!open) { setDetailNode(null); setAdding(null); setErr(null); }
+    if (!open) { setDetailNode(null); setAdding(null); setAddPickerOpen(false); setErr(null); }
   }, [open]);
+
+  function pickAdd(kind: Exclude<AddKind, null> | 'packing') {
+    setAddPickerOpen(false);
+    setErr(null);
+    if (kind === 'packing') {
+      onPack();
+      return;
+    }
+    setAdding(kind);
+  }
 
   if (!tripId) return null;
 
@@ -155,6 +169,39 @@ export default function TripTimelineSheet({
       payload: { kind: 'todo', todo: { title } },
     });
     setAdding(null); setTodoTitle(''); setErr(null);
+    reload();
+  }
+
+  function addShopping() {
+    if (!trip) return;
+    const title = shopTitle.trim() || L(dict, '购物', 'Shopping');
+    const tot = Number(shopTotal);
+    const total = Number.isFinite(tot) && tot > 0 ? tot : 0;
+    addTripNode(trip.id, {
+      kind: 'shopping', state: 'booked',
+      timeLabel: '',
+      dayKey: '_shop', dayLabel: L(dict, '购物', 'Shopping'),
+      title,
+      subtitle: total > 0 ? `$${total}` : '',
+      payload: { kind: 'shopping', shopping: { total, lines: total > 0 ? [{ name: title, price: total }] : [] } },
+    });
+    recomputeBudgetNode(trip.id);
+    setAdding(null); setShopTitle(''); setShopTotal(''); setErr(null);
+    reload();
+  }
+
+  function addTransit() {
+    if (!trip) return;
+    const label = transitLabel.trim();
+    if (!label) { setErr(L(dict, '填交通说明', 'Transit label needed')); return; }
+    addTripNode(trip.id, {
+      kind: 'transit', state: 'todo',
+      timeLabel: '',
+      dayKey: 'd1', dayLabel: L(dict, '行程日', 'Trip day'),
+      title: label,
+      payload: { kind: 'transit', transit: { label } },
+    });
+    setAdding(null); setTransitLabel(''); setErr(null);
     reload();
   }
 
@@ -242,18 +289,69 @@ export default function TripTimelineSheet({
 
           {trip && (
             <>
-              <div className="nesio-trip-addbar">
-                <button type="button" className="nesio-trip-action" onClick={() => { setAdding('flight'); setErr(null); }}>{L(dict, '+ 航班', '+ Flight')}</button>
-                <button type="button" className="nesio-trip-action" onClick={() => { setAdding('hotel'); setErr(null); }}>{L(dict, '+ 酒店', '+ Hotel')}</button>
-                <button type="button" className="nesio-trip-action" onClick={() => { setAdding('todo'); setErr(null); }}>{L(dict, '+ 待办', '+ To-do')}</button>
-                <button type="button" className="nesio-trip-action" onClick={() => { setAdding('poi'); setErr(null); }}>{L(dict, '+ 离线景点', '+ Offline sights')}</button>
-                <button type="button" className="nesio-trip-action" onClick={onPack}>{L(dict, '生成打包', 'Packing list')}</button>
-              </div>
-              <div className="nesio-trip-addbar nesio-trip-addbar--secondary">
-                <button type="button" className="nesio-trip-action nesio-trip-action--ghost" onClick={() => { setAdding('import'); setErr(null); }}>
-                  {L(dict, '粘贴订票确认', 'Paste booking confirmation')}
+              <div className="nesio-trip-addbar nesio-trip-addbar--fab">
+                <button
+                  type="button"
+                  className="nesio-trip-fab"
+                  aria-label={L(dict, '添加行程项', 'Add to plan')}
+                  onClick={() => { setAddPickerOpen(true); setErr(null); }}
+                >
+                  +
                 </button>
               </div>
+              {addPickerOpen && (
+                <div className="nesio-trip-add-picker" role="dialog" aria-label={L(dict, '添加行程项', 'Add a plan')}>
+                  <header className="nesio-trip-add-picker-head">
+                    <button type="button" className="nesio-trip-link" onClick={() => setAddPickerOpen(false)}>{L(dict, '取消', 'Cancel')}</button>
+                    <b>{L(dict, '添加行程项', 'Add a Plan')}</b>
+                    <span className="nesio-trip-sheet-spacer" aria-hidden />
+                  </header>
+                  <ul className="nesio-trip-add-picker-group">
+                    {([
+                      ['flight', L(dict, '航班', 'Flight')],
+                      ['hotel', L(dict, '住宿', 'Lodging')],
+                      ['transit', L(dict, '交通', 'Transit')],
+                    ] as const).map(([k, lab]) => (
+                      <li key={k}>
+                        <button type="button" className="nesio-trip-add-picker-item" onClick={() => pickAdd(k)}>
+                          <span className="nesio-trip-add-picker-ico"><NodeKindIcon kind={k} /></span>
+                          <span>{lab}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="nesio-trip-add-picker-label">{L(dict, '常用', 'Most popular')}</p>
+                  <ul className="nesio-trip-add-picker-group">
+                    {([
+                      ['poi', L(dict, '景点 / 活动', 'Sight / Activity')],
+                      ['todo', L(dict, '待办 / 会面', 'To-do / Meeting')],
+                      ['shopping', L(dict, '购物', 'Shopping')],
+                    ] as const).map(([k, lab]) => (
+                      <li key={k}>
+                        <button type="button" className="nesio-trip-add-picker-item" onClick={() => pickAdd(k)}>
+                          <span className="nesio-trip-add-picker-ico"><NodeKindIcon kind={k === 'poi' ? 'poi' : k === 'shopping' ? 'shopping' : 'todo'} /></span>
+                          <span>{lab}</span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="nesio-trip-add-picker-label">{L(dict, '更多', 'More')}</p>
+                  <ul className="nesio-trip-add-picker-group">
+                    <li>
+                      <button type="button" className="nesio-trip-add-picker-item" onClick={() => pickAdd('packing')}>
+                        <span className="nesio-trip-add-picker-ico"><NodeKindIcon kind="packing" /></span>
+                        <span>{L(dict, '生成打包清单', 'Packing list')}</span>
+                      </button>
+                    </li>
+                    <li>
+                      <button type="button" className="nesio-trip-add-picker-item" onClick={() => pickAdd('import')}>
+                        <span className="nesio-trip-add-picker-ico"><NodeKindIcon kind="flight" /></span>
+                        <span>{L(dict, '粘贴订票确认', 'Paste booking')}</span>
+                      </button>
+                    </li>
+                  </ul>
+                </div>
+              )}
 
               {adding && adding !== 'poi' && (
                 <div className={`nesio-travel-plan-form${adding === 'import' ? ' nesio-travel-plan-form--import' : ''}`}>
@@ -325,6 +423,25 @@ export default function TripTimelineSheet({
                       </div>
                     </>
                   )}
+                  {adding === 'shopping' && (
+                    <>
+                      <label><span>{L(dict, '购物项', 'Item')}</span><input value={shopTitle} onChange={(e) => setShopTitle(e.target.value)} /></label>
+                      <label><span>{L(dict, '金额', 'Amount')}</span><input type="number" inputMode="decimal" value={shopTotal} onChange={(e) => setShopTotal(e.target.value)} /></label>
+                      <div className="nesio-travel-plan-form-actions">
+                        <button type="button" className="nesio-trip-action" onClick={() => setAdding(null)}>{L(dict, '取消', 'Cancel')}</button>
+                        <button type="button" className="nesio-trip-primary" onClick={addShopping}>{L(dict, '加入', 'Add')}</button>
+                      </div>
+                    </>
+                  )}
+                  {adding === 'transit' && (
+                    <>
+                      <label><span>{L(dict, '交通', 'Transit')}</span><input value={transitLabel} onChange={(e) => setTransitLabel(e.target.value)} placeholder={L(dict, '如:租车 / 火车', 'e.g. rental / train')} /></label>
+                      <div className="nesio-travel-plan-form-actions">
+                        <button type="button" className="nesio-trip-action" onClick={() => setAdding(null)}>{L(dict, '取消', 'Cancel')}</button>
+                        <button type="button" className="nesio-trip-primary" onClick={addTransit}>{L(dict, '加入', 'Add')}</button>
+                      </div>
+                    </>
+                  )}
                   {adding === 'import' && (
                     <>
                       <p className="nesio-trip-footnote">{L(dict, '粘贴确认邮件,或上传 .txt / .eml / .html / PDF(有文字层);扫描件 PDF 请粘贴文字。', 'Paste confirmation text, or upload .txt/.eml/.html/text PDF; for scans, paste the text.')}</p>
@@ -332,7 +449,8 @@ export default function TripTimelineSheet({
                         <span>{L(dict, '订票确认', 'Booking text')}</span>
                         <textarea rows={4} value={paste} onChange={(e) => setPaste(e.target.value)} />
                       </label>
-                      <input ref={bookingFileRef} type="file" accept=".txt,.eml,.md,.html,.pdf,text/plain,message/rfc822,text/html,application/pdf,image/*"
+                      {/* accept 列具体图片 MIME,避免通配符触发源码审计的块注释剥离。 */}
+                      <input ref={bookingFileRef} type="file" accept=".txt,.eml,.md,.html,.pdf,text/plain,message/rfc822,text/html,application/pdf,image/jpeg,image/png,image/webp,image/gif,image/heic"
                         className="nesio-visually-hidden"
                         onChange={(e) => { void onPickBooking(e.target.files?.[0]); e.currentTarget.value = ''; }} />
                       <div className="nesio-travel-plan-form-actions">

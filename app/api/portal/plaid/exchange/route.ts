@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { plaidBase } from '../link-token/route';
 import { envValue } from '@/lib/portal/env';
-import { writePlaidTokensForCurrentUser } from '@/lib/portal/integrations';
+import { readPlaidTokensForCurrentUser, writePlaidTokensForCurrentUser } from '@/lib/portal/integrations';
 
 export const dynamic = 'force-dynamic';
 
@@ -83,20 +83,26 @@ export async function POST(req: NextRequest) {
 
   const response = NextResponse.json({ ok: true, items: accessTokens.length });
   const secure = process.env.NODE_ENV === 'production';
-  // 批次 40:支持连接多家银行 —— access_token 追加进数组 cookie,不再覆盖
-  // (之前单 cookie 覆盖 → 只剩最后一家,用户「10 个账户只显示 2 个」)。
+  // 多家银行:cookie ∪ 云端 ∪ 本次新换 —— 绝不能只读 cookie 再整表写云。
+  // cookie 空/丢(Safari/IPA/清站)时若只拿新 token 去 write,会把云端旧银行全盖掉,
+  // 随后 authoritative sync 再整表替换账户 → UI 只剩新银行,旧流水还在 IDB 里像「记忆」。
   let tokens: string[] = [];
   try { tokens = JSON.parse(req.cookies.get('nesio_plaid_tokens')?.value || '[]'); } catch { tokens = []; }
   if (!Array.isArray(tokens)) tokens = [];
+  const cloud = await readPlaidTokensForCurrentUser().catch(() => null);
+  if (Array.isArray(cloud)) {
+    for (const t of cloud) if (typeof t === 'string' && t && !tokens.includes(t)) tokens.push(t);
+  }
   for (const at of accessTokens) if (!tokens.includes(at)) tokens.push(at);
-  response.cookies.set('nesio_plaid_tokens', JSON.stringify(tokens.slice(-20)), {
+  const capped = tokens.slice(-20);
+  response.cookies.set('nesio_plaid_tokens', JSON.stringify(capped), {
     httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 180,
   });
   // 兼容:latest 也写单 cookie
   response.cookies.set('nesio_plaid_access', accessTokens[accessTokens.length - 1], {
     httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 180,
   });
-  // 跨浏览器:把全量令牌数组(加密)写一份到云端;失败不阻塞(cookie 已够本浏览器用)。
-  await writePlaidTokensForCurrentUser(tokens).catch(() => { /* cookie 兜底 */ });
+  // 跨浏览器:写合并后的全量(加密);失败不阻塞(cookie 已够本浏览器用)。
+  await writePlaidTokensForCurrentUser(capped).catch(() => { /* cookie 兜底 */ });
   return response;
 }

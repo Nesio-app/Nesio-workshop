@@ -970,16 +970,17 @@ const MEM_NODE_COLOR: Record<string, string> = {
 };
 
 function buildMemGraphNodes(nodes: LifeNode[]): GNode[] {
+  const graphType = (n: LifeNode) => (n.attributes?.txShadow ? 'Thing' : n.type);
   const connected = nodes.filter(n => (n.relations?.length ?? 0) > 0 || nodes.some(o => o.relations?.some(r => r.targetId === n.id)));
   if (connected.length === 0) return nodes.slice(0, 15).map(n => ({
-    id: n.id, label: n.name, type: n.type, weight: n.confidence,
-    color: MEM_NODE_COLOR[n.type] ?? 'var(--portal-accent)',
+    id: n.id, label: n.name, type: graphType(n), weight: n.confidence,
+    color: MEM_NODE_COLOR[graphType(n)] ?? 'var(--portal-accent)',
   }));
   const maxRel = Math.max(1, ...connected.map(n => n.relations?.length ?? 0));
   return connected.slice(0, 30).map(n => ({
-    id: n.id, label: n.name, type: n.type,
+    id: n.id, label: n.name, type: graphType(n),
     weight: 0.3 + ((n.relations?.length ?? 0) / maxRel) * 0.7,
-    color: MEM_NODE_COLOR[n.type] ?? 'var(--portal-accent)',
+    color: MEM_NODE_COLOR[graphType(n)] ?? 'var(--portal-accent)',
   }));
 }
 

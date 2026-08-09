@@ -32,13 +32,14 @@ import {
 import { applyGuidanceGates, type GateCard } from '@/lib/platform/guidance-engine/guidance-gates';
 import { archiveDeclined, archiveShownCard, archiveStats, wantedDeclinedTitles } from './card-archive';
 import { isCardSuppressed } from './card-verdict';
-import { logDropped } from './storage-health';
+import { createBlobStore } from './idb-blob-store';
+import { logDropped, reportStorageDropped } from './storage-health';
 import type { CalendarEvent } from './types';
 import type { EmailSignal } from '@/lib/platform/email-signals';
 import type { DomainInsight } from './domain-insights';
 import type { InventoryItem } from './inventory';
 
-const LEDGER_KEY = 'nesio-guidance-judge-ledger-v1';
+export const LEDGER_KEY = 'nesio-guidance-judge-ledger-v1';
 /** 同一批判决之间的最小间隔:打开 app 即判,但别在一次会话里反复打。 */
 const MIN_RUN_INTERVAL_MS = 30 * 60_000;
 
@@ -68,32 +69,35 @@ interface Ledger {
 const EMPTY_STATS: JudgeStats = { batches: 0, judgedSignals: 0, cardsMade: 0, declinedCount: 0, lastOkAt: null, lastError: null };
 const EMPTY: Ledger = { judged: [], cards: [], lastRunAt: null, stats: EMPTY_STATS };
 
+const ledgerStore = createBlobStore<Ledger>({
+  key: LEDGER_KEY,
+  updateEvent: 'nesio-guidance-judge-ledger-updated',
+  validate: (v) => {
+    const p = v as Partial<Ledger> | null;
+    return !!p && Array.isArray(p.judged) && Array.isArray(p.cards);
+  },
+  onWriteError: reportStorageDropped,
+});
+
 function readLedger(): Ledger {
-  if (typeof window === 'undefined') return { ...EMPTY };
-  try {
-    const raw = localStorage.getItem(LEDGER_KEY);
-    if (!raw) return { ...EMPTY, stats: { ...EMPTY_STATS } };
-    const p = JSON.parse(raw) as Partial<Ledger>;
-    return {
-      judged: Array.isArray(p.judged) ? p.judged : [],
-      cards: Array.isArray(p.cards) ? p.cards : [],
-      lastRunAt: typeof p.lastRunAt === 'string' ? p.lastRunAt : null,
-      stats: { ...EMPTY_STATS, ...(p.stats && typeof p.stats === 'object' ? p.stats : {}) },
-    };
-  } catch {
-    return { ...EMPTY, stats: { ...EMPTY_STATS } };
-  }
+  if (typeof window === 'undefined') return { ...EMPTY, stats: { ...EMPTY_STATS } };
+  const p = ledgerStore.load();
+  if (!p) return { ...EMPTY, stats: { ...EMPTY_STATS } };
+  return {
+    judged: Array.isArray(p.judged) ? p.judged : [],
+    cards: Array.isArray(p.cards) ? p.cards : [],
+    lastRunAt: typeof p.lastRunAt === 'string' ? p.lastRunAt : null,
+    stats: { ...EMPTY_STATS, ...(p.stats && typeof p.stats === 'object' ? p.stats : {}) },
+  };
 }
 
 function writeLedger(l: Ledger): void {
-  try {
-    // judged 集合只增不减会无限膨胀:窗口早已过去的卡的指纹仍要留着防重判,
-    // 但上限 2000,超了裁最老的(最坏情况 = 极老信号被重判一次,可接受)。
-    const trimmed: Ledger = { ...l, judged: l.judged.slice(-2000), cards: l.cards.slice(-300) };
-    localStorage.setItem(LEDGER_KEY, JSON.stringify(trimmed));
-  } catch (err) {
-    logDropped('guidance-judge.ledger', err);
-  }
+  // judged 集合只增不减会无限膨胀:窗口早已过去的卡的指纹仍要留着防重判,
+  // 但上限 2000,超了裁最老的(最坏情况 = 极老信号被重判一次,可接受)。
+  const trimmed: Ledger = { ...l, judged: l.judged.slice(-2000), cards: l.cards.slice(-300) };
+  const persist = () => ledgerStore.save(trimmed);
+  if (ledgerStore.isReady()) persist();
+  else void ledgerStore.ready().then(persist);
 }
 
 function localDayISO(d: Date): string {
@@ -319,6 +323,7 @@ export async function maybeRunJudgeBatch(
   opts: { now?: Date; uiLocale?: string; force?: boolean } = {},
 ): Promise<ShadowRunResult> {
   if (typeof window === 'undefined') return { status: 'skipped', note: 'ssr' };
+  await ledgerStore.ready();
   const now = opts.now ?? new Date();
   const ledger = readLedger();
   if (!opts.force && ledger.lastRunAt && now.getTime() - Date.parse(ledger.lastRunAt) < MIN_RUN_INTERVAL_MS) {
@@ -585,5 +590,6 @@ export function requeueFingerprint(fp: string): void {
 /** 隐私清除。 */
 export function resetJudgeLedger(): void {
   if (typeof window === 'undefined') return;
+  ledgerStore.save({ ...EMPTY, stats: { ...EMPTY_STATS } });
   try { localStorage.removeItem(LEDGER_KEY); } catch { /* 无害 */ }
 }

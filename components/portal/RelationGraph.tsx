@@ -44,7 +44,8 @@ const TYPE_FILL: Record<string, string> = {
   person: 'var(--viz-5)',
   Thing: 'var(--viz-1)',
   place: 'var(--viz-3)',
-  event: 'var(--viz-4)',
+  // 与 Thing 同相位 —— 流水影子曾用 event,琥珀相位在关系图里像「错色褐色」。
+  event: 'var(--viz-1)',
   task: 'var(--viz-6)',
   Mind: 'var(--viz-2)',
 };

@@ -10,7 +10,7 @@
  * 同时给每个账户附机构名/logo/主色(/item/get + /institutions/get_by_id),供 UI 展示。
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { readPlaidTokensForCurrentUser } from '@/lib/portal/integrations';
+import { readPlaidTokensForCurrentUser, replacePlaidTokensForCurrentUser } from '@/lib/portal/integrations';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 import { plaidBase } from '../link-token/route';
 import { envValue } from '@/lib/portal/env';
@@ -137,12 +137,21 @@ export async function GET(req: NextRequest) {
     const single = req.cookies.get('nesio_plaid_access')?.value || '';
     tokens = single ? [single] : [];
   }
-  // 跨浏览器:本浏览器 cookie 没有令牌(换了个浏览器/清了缓存)→ 从云端取回登录账号的令牌。
-  // 云端拿到后游标从空开始(全量刷新一次,不丢数据,只是首次略重),不依赖本机 cookie 游标。
+  // 跨浏览器 / cookie 半残:始终与云端并集。仅 cookie 空时才整表用云端;
+  // cookie 已有几家但缺云端旧家时也要补上(新连一家盖短 cookie 的恢复路径)。
   let tokensFromCloud = false;
-  if (!tokens.length) {
-    const cloud = await readPlaidTokensForCurrentUser();
-    if (cloud && cloud.length) { tokens = cloud; tokensFromCloud = true; }
+  const cloud = await readPlaidTokensForCurrentUser().catch(() => null);
+  if (Array.isArray(cloud) && cloud.length) {
+    if (!tokens.length) {
+      tokens = cloud;
+      tokensFromCloud = true;
+    } else {
+      let grew = false;
+      for (const t of cloud) {
+        if (typeof t === 'string' && t && !tokens.includes(t)) { tokens.push(t); grew = true; }
+      }
+      if (grew) tokensFromCloud = true; // 游标与新补 token 不对齐 → 下面会清空游标重拉
+    }
   }
   if (!tokens.length) {
     return NextResponse.json({ ok: false, error: 'not_connected' }, { status: 401 });
@@ -504,10 +513,16 @@ export async function GET(req: NextRequest) {
       httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 90,
     });
     if (stale.size) {
-      // 摘除重复 item 的 token(与游标同步瘦身,数组保持同序)
+      // 摘除重复/死 item 的 token(与游标同步瘦身,数组保持同序)。
+      // 必须同步 replace 云端 —— 否则下一轮 cookie∪云端又把死 token 灌回来,游标被清空死循环。
       response.cookies.set('nesio_plaid_tokens', JSON.stringify(keptTokens), {
         httpOnly: true, sameSite: 'lax', secure, path: '/', maxAge: 60 * 60 * 24 * 180,
       });
+      if (keptTokens.length) {
+        void replacePlaidTokensForCurrentUser(keptTokens).catch((err) => {
+          console.warn('plaid_cloud_prune_failed', err instanceof Error ? err.message : err);
+        });
+      }
     }
     return response;
   } catch {

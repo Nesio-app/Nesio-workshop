@@ -39,12 +39,14 @@ function ProgressRow({
 }
 
 function HourlyGlucoseChart({
-  hourly, unit, dict,
+  hourly, unit, dict, meals,
 }: {
   hourly: Array<{ hour: number; avg: number }>;
   unit: string;
   dict: string;
+  meals?: Array<{ hour: number; label: string }>;
 }) {
+  const [tip, setTip] = useState<{ hour: number; avg: number; xPct: number; idx: number; meal?: string } | null>(null);
   if (!hourly.length) {
     return (
       <p className="nesio-trip-footnote">
@@ -62,32 +64,76 @@ function HourlyGlucoseChart({
   const y = (v: number) => H - ((v - lo) / range) * H;
   const pts = hourly.map((h, i) => `${x(i).toFixed(1)},${y(h.avg).toFixed(1)}`);
   const area = `0,${H} ${pts.join(' ')} ${W},${H}`;
-  const mealHours = [8, 12, 18];
+  const mealMarks = meals?.length
+    ? meals
+    : [8, 12, 18].map((h) => ({ hour: h, label: '' }));
+  const pickAt = (clientX: number, rect: DOMRect) => {
+    const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const idx = Math.min(hourly.length - 1, Math.max(0, Math.round(pct * (hourly.length - 1))));
+    const h = hourly[idx];
+    if (!h) return;
+    const meal = mealMarks.find((m) => m.hour === h.hour)?.label;
+    setTip({ hour: h.hour, avg: h.avg, xPct: pct * 100, idx, ...(meal ? { meal } : {}) });
+  };
   return (
     <div className="nesio-bl-chart">
-      <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="88" preserveAspectRatio="none">
-        <polygon points={area} fill="var(--portal-accent-soft)" opacity="0.9" />
-        <polyline points={pts.join(' ')} fill="none" stroke="var(--portal-blue-deep)" strokeWidth="1.8" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
-        {mealHours.map((mh) => {
-          const idx = hourly.findIndex((h) => h.hour === mh);
-          if (idx < 0) return null;
-          return (
+      <div
+        style={{ position: 'relative', touchAction: 'none' }}
+        onPointerDown={(e) => pickAt(e.clientX, e.currentTarget.getBoundingClientRect())}
+        onPointerMove={(e) => {
+          if (e.pointerType === 'mouse' || e.buttons > 0) pickAt(e.clientX, e.currentTarget.getBoundingClientRect());
+        }}
+        onPointerLeave={() => setTip(null)}
+      >
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="88" preserveAspectRatio="none" aria-hidden>
+          <polygon points={area} fill="var(--portal-accent-soft)" opacity="0.9" />
+          <polyline points={pts.join(' ')} fill="none" stroke="var(--portal-blue-deep)" strokeWidth="1.8" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          {mealMarks.map((mh) => {
+            const idx = hourly.findIndex((h) => h.hour === mh.hour);
+            if (idx < 0) return null;
+            return (
+              <circle
+                key={`meal-${mh.hour}-${mh.label}`}
+                cx={x(idx)}
+                cy={y(hourly[idx].avg)}
+                r="2.4"
+                fill="var(--status-gentle)"
+              />
+            );
+          })}
+          {tip && (
             <circle
-              key={mh}
-              cx={x(idx)}
-              cy={y(hourly[idx].avg)}
-              r="2.4"
-              fill="var(--status-gentle)"
+              cx={x(tip.idx)}
+              cy={y(tip.avg)}
+              r="3.2"
+              fill="var(--portal-blue-deep)"
+              stroke="var(--portal-bg)"
+              strokeWidth="1"
             />
-          );
-        })}
-      </svg>
+          )}
+        </svg>
+        {tip && (
+          <div
+            role="status"
+            style={{
+              position: 'absolute', top: 4, left: `clamp(0%, calc(${tip.xPct}% - 40px), calc(100% - 80px))`,
+              minWidth: 72, padding: '4px 8px', borderRadius: 'var(--radius-sm)',
+              background: 'var(--sheet-opaque, var(--portal-bg))', border: '1px solid var(--portal-line)',
+              fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', pointerEvents: 'none',
+              fontVariantNumeric: 'tabular-nums', boxShadow: 'var(--shadow-sm, none)',
+            }}
+          >
+            <div>{String(tip.hour).padStart(2, '0')}:00 · {tip.avg.toFixed(1)} {unit}</div>
+            {tip.meal ? <div style={{ color: 'var(--status-gentle)' }}>{tip.meal}</div> : null}
+          </div>
+        )}
+      </div>
       <div className="nesio-bl-chart-axis">
         <span>8:00</span><span>12:00</span><span>16:00</span><span>20:00</span><span>24:00</span>
       </div>
       <div className="nesio-bl-legend">
         <span><i style={{ background: 'var(--portal-blue-deep)' }} />{L(dict, '血糖(日均)', 'Glucose (avg)')}</span>
-        <span><i style={{ background: 'var(--status-gentle)' }} />{L(dict, '常见用餐点', 'Usual meal hours')}</span>
+        <span><i style={{ background: 'var(--status-gentle)' }} />{meals?.length ? L(dict, '用餐记录', 'Logged meals') : L(dict, '常见用餐点', 'Usual meal hours')}</span>
         <span className="nesio-bl-unit">{unit}</span>
       </div>
     </div>
@@ -227,6 +273,17 @@ export function PostMealBody({ health, dict }: { health: HealthMetrics | null; d
     const meals = getMeals();
     return meals[0] || null;
   }, []);
+  const mealOverlays = useMemo(() => {
+    const meals = getMeals().slice(0, 12);
+    const out: Array<{ hour: number; label: string }> = [];
+    for (const m of meals) {
+      const d = new Date(m.occurredAt);
+      if (Number.isNaN(d.getTime())) continue;
+      const label = m.items.map((i) => i.name).filter(Boolean).slice(0, 2).join(' · ') || L(dict, '一餐', 'meal');
+      out.push({ hour: d.getHours(), label });
+    }
+    return out;
+  }, [dict]);
 
   return (
     <div className="nesio-bl-section">
@@ -246,7 +303,7 @@ export function PostMealBody({ health, dict }: { health: HealthMetrics | null; d
             <div><small>{L(dict, '90 天最高', '90d high')}</small><b>{g.max}</b><span>{g.unit}</span></div>
             <div><small>TIR</small><b>{g.tirPct}%</b><span /></div>
           </div>
-          <HourlyGlucoseChart hourly={g.hourly} unit={g.unit} dict={dict} />
+          <HourlyGlucoseChart hourly={g.hourly} unit={g.unit} dict={dict} meals={mealOverlays} />
           <div className="nesio-bl-prompt nesio-bl-prompt--calm">
             {L(dict,
               '这是全天各小时的平均曲线,橙色点是常见用餐时段 —— 仍在学习你的身体,先当模式看,别急着下结论。',

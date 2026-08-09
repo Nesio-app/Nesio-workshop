@@ -34,10 +34,18 @@ export interface PersonProfile {
 // 2026-08-01 改名批:health_state+preference 合并成 Mind,取 health_state 原色(status-risk)。
 const NODE_COLOR: Record<string, string> = {
   person: 'var(--portal-accent)', Thing: 'var(--status-calm)', place: 'var(--status-go)',
-  event: 'var(--status-gentle)', task: 'var(--portal-cool-accent)',
+  // event 与 Thing 同色 —— 旧流水影子曾标成 event+琥珀,关系图里像「手工收入」误成褐色。
+  event: 'var(--status-calm)', task: 'var(--portal-cool-accent)',
   Mind: 'var(--status-risk)',
 };
 const FAMILY_TAG = /家人|家庭|family/i;
+
+function graphNodeType(n: LifeNode): string {
+  if (n.attributes?.txShadow) return 'Thing';
+  if (n.attributes?.signalSource === 'Bank') return 'Thing';
+  if (n.type === 'event' && (n.tags || []).some((t) => /财务|交易|finance|tx/i.test(t))) return 'Thing';
+  return n.type;
+}
 
 /** 一个节点是否就是「这个人」的 person 节点(名字或邮箱归一命中)。 */
 function isPersonNode(n: LifeNode, key: string): boolean {
@@ -117,14 +125,14 @@ export function buildPersonProfile(
   for (const r of personNode?.relations || []) {
     if (!r.targetId) continue;
     const t = nodes.find((n) => n.id === r.targetId) || nodes.find((n) => n.name?.trim().toLowerCase() === r.targetId.trim().toLowerCase());
-    pushNeighbor(t?.id || `rel:${r.targetId}`, t?.name || r.targetId, t?.type || 'person', r.relation);
+    pushNeighbor(t?.id || `rel:${r.targetId}`, t?.name || r.targetId, t ? graphNodeType(t) : 'person', r.relation);
   }
   // 别的节点通过 relation 指向这个人 → 也是邻居(取对方节点)
   for (const n of nodes) {
     if (n.id === personNode?.id) continue;
     for (const r of n.relations || []) {
       const tgt = (r.targetId || '').trim().toLowerCase();
-      if (tgt === k || tgt === matchName) { pushNeighbor(n.id, n.name || '相关', n.type, r.relation); break; }
+      if (tgt === k || tgt === matchName) { pushNeighbor(n.id, n.name || '相关', graphNodeType(n), r.relation); break; }
     }
   }
 

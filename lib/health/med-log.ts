@@ -82,3 +82,8 @@ export function takenCount(names: string[], day = todayYmd()): number {
   const done = new Set(load()[day] || []);
   return names.filter((n) => done.has(medKey(n))).length;
 }
+
+/** 读取完整打卡日志(用药日历用)。 */
+export function loadMedLog(): MedLog {
+  return load();
+}
