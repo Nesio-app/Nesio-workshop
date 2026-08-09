@@ -9,8 +9,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import FamilyDataCard from '../relationships/FamilyDataCard';
 import {
-  availableMonths, categoryBreakdown, topMerchants,
-  needsReview, suggestCategory, setMerchantRule, effectiveCategory,
+  availableMonths, categoryBreakdown,
+  needsReview, suggestCategory, setMerchantRule, effectiveCategory, effectiveCategoryDetail,
   formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
   detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
   loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummaryWithHoldings, expenseMerchants,
@@ -22,7 +22,7 @@ import {
 // 另有一套 alerts 判定(函数级双实现),两个输出面据同一份流水各说各话,已删并由契约钉死不回潮。
 import { financeFindings } from '@/lib/portal/finance-insight';
 import { computeFinanceScores } from '@/lib/portal/finance-risk';
-import { incomeBreakdown, detectIncome, portfolioSummary, recurringPriceHikes } from '@/lib/portal/finance-features';
+import { detectIncome, portfolioSummary, recurringPriceHikes } from '@/lib/portal/finance-features';
 import { loadCombinedFinanceTx, loadCombinedFinanceAccounts } from '@/lib/portal/tesla-finance';
 import QuickAddSheet from './QuickAddSheet';
 import ReconcileSheet from './ReconcileSheet';
@@ -39,13 +39,13 @@ import { financeMonthAggregate } from '@/lib/portal/finance-aggregate';
 import { loadBudget, saveBudget, hasBudget, suggestBudget, budgetProgress, type BudgetConfig } from '@/lib/portal/finance-budget';
 import { buildMonthlyReport, persistReportToMemory, autoPersistLastMonthReport } from '@/lib/portal/finance-report';
 import { reportRichHtml } from '@/lib/portal/finance-report-visual';
-import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES } from '@/lib/portal/tx-category';
+import { categoryLabel, categoryDetailLabel, COMMON_EXPENSE_CATEGORIES, detailsForPrimary } from '@/lib/portal/tx-category';
 import { loadAllPersonRecords } from '@/lib/portal/person-records';
 import { splitEvenly } from '@/lib/portal/ledger-allocation';
 import {
   loadTxAnnotations, txAnnotationOf, hasTxAnnotation, toggleTxPerson, setTxNote,
   addTxAttachment, removeTxAttachment, TX_ANNOTATIONS_EVENT, type TxAnnotation,
-  setTxSplits, clearTxSplits, setTxAmortize, clearTxAmortize,
+  setTxSplits, clearTxSplits, setTxAmortize, clearTxAmortize, setTxCategory,
 } from '@/lib/portal/tx-annotations';
 import { putLocalFile, prettyBytes, MAX_FILE_BYTES } from '@/lib/portal/local-file-store';
 import { getLifeGraph } from '@/lib/portal/life-graph';
@@ -122,105 +122,8 @@ function MLogo({ src }: { src: string }) {
 }
 
 /**
- * bug3「商户和收入都用交互饼图,用左右滑动切换展示」——
- * 两页可左右滑动的大号环形图:商户 Top / 收入来源。原来是两个 `<details>` 折叠列表,
- * 得点开才看得见占比;现在默认就是图,点扇区看这一项的金额/笔数。
- * 只有一页有数据时不显示切换器(不给一个划过去是空的方向)。
- */
-function SpendChartPager({ merchants, incomes, currency, dict, chart, onChart }: {
-  merchants: Array<{ name: string; total: number; count: number; logo?: string | null }>;
-  incomes: Array<{ key: string; label: string; total: number }>;
-  currency: string;
-  dict: string;
-  chart: 'merchant' | 'income';
-  onChart: (c: 'merchant' | 'income') => void;
-}) {
-  const [focus, setFocus] = useState<string | null>(null);
-  const startRef = useRef<{ x: number; y: number } | null>(null);
-
-  const pages = useMemo(() => {
-    const out: Array<{ id: 'merchant' | 'income'; title: string }> = [];
-    if (merchants.length > 0) out.push({ id: 'merchant', title: L(dict, '商户 Top', 'Top merchants') });
-    if (incomes.length > 0) out.push({ id: 'income', title: L(dict, '收入来源', 'Income sources') });
-    return out;
-  }, [merchants.length, incomes.length, dict]);
-
-  if (pages.length === 0) return null;
-  // 当前页所在数据没了(比如切了月份)就退到第一页,不要停在空图上。
-  const cur = pages.find((p) => p.id === chart) || pages[0];
-  const rows = cur.id === 'merchant'
-    ? merchants.map((m) => ({ key: m.name, label: m.name, total: m.total, sub: L(dict, `${m.count} 笔`, `${m.count}×`), logo: m.logo || null }))
-    : incomes.map((s) => ({ key: s.key, label: s.label, total: s.total, sub: '', logo: null as string | null }));
-  const sum = rows.reduce((s, r) => s + r.total, 0) || 1;
-  const slices = rows.map((r) => ({ category: r.key, pct: Math.round((r.total / sum) * 1000) / 10 }));
-  const active = focus ? rows.find((r) => r.key === focus) || null : null;
-  const flip = (dir: 1 | -1) => {
-    if (pages.length < 2) return;
-    const i = pages.findIndex((p) => p.id === cur.id);
-    const next = pages[(i + dir + pages.length) % pages.length];
-    setFocus(null);
-    onChart(next.id);
-  };
-
-  return (
-    <div
-      className="nesio-fin-chartpager"
-      style={{ marginTop: 'var(--space-5)' }}
-      onTouchStart={(e) => { const t = e.touches[0]; if (t) startRef.current = { x: t.clientX, y: t.clientY }; }}
-      onTouchEnd={(e) => {
-        const s = startRef.current; startRef.current = null;
-        const t = e.changedTouches[0];
-        if (!s || !t) return;
-        const dx = t.clientX - s.x;
-        // 竖向滑动(翻页面)不该被当成换图
-        if (Math.abs(dx) < 48 || Math.abs(t.clientY - s.y) > Math.abs(dx)) return;
-        flip(dx < 0 ? 1 : -1);
-      }}
-    >
-      <div className="nesio-fin-chartpager-head">
-        {pages.length > 1 && (
-          <button type="button" className="nesio-fin-chartpager-arrow" aria-label={L(dict, '上一张图', 'Previous chart')} onClick={() => flip(-1)}>‹</button>
-        )}
-        <span className="nesio-settings-section-label" style={{ margin: 0 }}>{cur.title}</span>
-        {pages.length > 1 && (
-          <button type="button" className="nesio-fin-chartpager-arrow" aria-label={L(dict, '下一张图', 'Next chart')} onClick={() => flip(1)}>›</button>
-        )}
-      </div>
-      <FinanceDonut big slices={slices}
-        centerTop={active ? active.label : cur.title}
-        centerVal={active ? formatMoney(active.total, currency) : formatMoney(sum, currency)}
-        onSlice={(c) => setFocus((v) => (v === c ? null : c))} activeCategory={focus} />
-      {active ? (
-        <div className="nesio-fin-merchant" style={{ marginTop: 'var(--space-2)' }}>
-          <span className="nesio-fin-merchant-name" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-            {active.logo && <MLogo src={active.logo} />}{active.label}
-          </span>
-          <span className="nesio-fin-merchant-right">
-            <span className="nesio-fin-merchant-amt" style={cur.id === 'income' ? { color: 'var(--status-go)' } : undefined}>
-              {cur.id === 'income' ? '+' : ''}{formatMoney(active.total, currency)}
-            </span>
-            {active.sub && <span className="nesio-fin-merchant-cnt">{active.sub}</span>}
-          </span>
-        </div>
-      ) : (
-        <p className="nesio-fin-score-hint" style={{ textAlign: 'center', marginTop: 'var(--space-1)' }}>
-          {pages.length > 1
-            ? L(dict, '点一块看明细,左右滑动换一张图', 'Tap a slice for detail — swipe to switch charts')
-            : L(dict, '点一块看明细', 'Tap a slice for detail')}
-        </p>
-      )}
-      {pages.length > 1 && (
-        <div className="nesio-fin-chartpager-dots" aria-hidden>
-          {pages.map((p) => <span key={p.id} className={`nesio-fin-chartpager-dot${p.id === cur.id ? ' is-on' : ''}`} />)}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
  * bug3「交易里的每一笔流水增加修改选择,我可以手动关联人,传附件等」——
- * 展开在流水行下面的编辑区:①改流向(原来只有这一项)②关联人 ③附件 ④备注。
+ * 展开在流水行下面的编辑区:①改流向 ②分类/子分类 ③关联人 ④附件 ⑤备注。
  *
  * 关联人/附件/备注存 tx-annotations 覆盖层(按 tx.id),下一次 Plaid 同步不会冲掉;
  * 附件本体进 local-file-store(IndexedDB)。写失败一律出可见错误,不假成功。
@@ -339,7 +242,7 @@ function TxSplitEditor({ txId, total, dict, contacts, onChanged }: {
   );
 }
 
-function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts }: {
+function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, tx, onCategoryChanged }: {
   txId: string;
   /** 这一笔的原额(绝对值)。分摊要拿它卡合计 —— 差一分都不存。 */
   txAmount: number;
@@ -347,6 +250,8 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts }: {
   dict: string;
   onFlow: (f: TxFlow) => void;
   contacts: Array<{ key: string; name: string }>;
+  tx: BankTx;
+  onCategoryChanged?: () => void;
 }) {
   const [ann, setAnn] = useState<TxAnnotation>(() => txAnnotationOf(txId));
   const [note, setNote] = useState(() => txAnnotationOf(txId).note || '');
@@ -356,7 +261,24 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts }: {
   const pickRef = useRef<HTMLInputElement>(null);
   /** 端上从发票上读出来的话。「这张票上写的是多少」和这笔钱对不对得上,是挂发票的**全部意义**。 */
   const [scanNote, setScanNote] = useState<{ text: string; mismatch: boolean } | null>(null);
+  const curCat = effectiveCategory(tx);
+  const curDetail = effectiveCategoryDetail(tx);
+  const [catDraft, setCatDraft] = useState(curCat);
+  const [detailDraft, setDetailDraft] = useState(curDetail);
+  const [customCat, setCustomCat] = useState('');
+  const [customDetail, setCustomDetail] = useState('');
   const failed = L(dict, '这一下没存进本机 —— 可能空间满了,清点空间再试。', 'Not saved on this device — storage may be full.');
+
+  const saveCategory = (nextCat: string, nextDetail: string) => {
+    const ok = setTxCategory(txId, nextCat, nextDetail);
+    setErr(ok ? null : failed);
+    if (ok) {
+      setAnn(txAnnotationOf(txId));
+      setCatDraft(nextCat);
+      setDetailDraft(nextDetail);
+      onCategoryChanged?.();
+    }
+  };
 
   const people = ann.people || [];
   const atts = ann.attachments || [];
@@ -443,6 +365,10 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts }: {
     setBusy(false);
   };
 
+  const detailOpts = detailsForPrimary(catDraft || curCat);
+  const knownCats = COMMON_EXPENSE_CATEGORIES as readonly string[];
+  const isKnownCat = (c: string) => knownCats.includes(c) || c === 'INCOME';
+
   return (
     <div className="nesio-fin-txedit">
       <div className="nesio-fin-flowpick">
@@ -451,6 +377,58 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts }: {
             {L(dict, TX_FLOW_LABELS[opt][0], TX_FLOW_LABELS[opt][1])}
           </button>
         ))}
+      </div>
+
+      {/* 分类 / 子分类 / 自定义 —— 覆盖层,同步冲不掉 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <p className="nesio-fin-score-hint" style={{ margin: 0 }}>{L(dict, '分类(只改这一笔)', 'Category (this transaction only)')}</p>
+        <select className="nesio-fin-select" value={isKnownCat(catDraft) ? catDraft : '__custom__'}
+          aria-label={L(dict, '分类', 'Category')}
+          onChange={(e) => {
+            const v = e.target.value;
+            if (v === '__custom__') { setCustomCat(catDraft && !isKnownCat(catDraft) ? catDraft : ''); return; }
+            saveCategory(v, detailDraft.startsWith(`${v}_`) ? detailDraft : '');
+          }}>
+          {COMMON_EXPENSE_CATEGORIES.map((c) => (
+            <option key={c} value={c}>{categoryLabel(c, dict)}</option>
+          ))}
+          <option value="INCOME">{categoryLabel('INCOME', dict)}</option>
+          <option value="__custom__">{L(dict, '自定义…', 'Custom…')}</option>
+        </select>
+        {!isKnownCat(catDraft) && (
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input className="nesio-fin-input" value={customCat} placeholder={L(dict, '自定义分类名', 'Custom category')}
+              onChange={(e) => setCustomCat(e.target.value)}
+              onBlur={() => { const v = customCat.trim(); if (v && v !== catDraft) saveCategory(v, detailDraft); }} />
+          </div>
+        )}
+        <p className="nesio-fin-score-hint" style={{ margin: 0 }}>{L(dict, '子分类(可自定义)', 'Subcategory (custom OK)')}</p>
+        {detailOpts.length > 0 && (
+          <select className="nesio-fin-select" value={detailOpts.some((d) => d.id === detailDraft) ? detailDraft : ''}
+            aria-label={L(dict, '子分类', 'Subcategory')}
+            onChange={(e) => {
+              const v = e.target.value;
+              if (!v) { setCustomDetail(detailDraft); return; }
+              saveCategory(catDraft || curCat, v);
+            }}>
+            <option value="">{L(dict, '选择或下方自定义', 'Pick or type below')}</option>
+            {detailOpts.map((d) => (
+              <option key={d.id} value={d.id}>{dict === 'en' ? d.labelEn : d.labelZh}</option>
+            ))}
+          </select>
+        )}
+        <input className="nesio-fin-input" value={detailOpts.some((d) => d.id === detailDraft) ? customDetail : (detailDraft || customDetail)}
+          placeholder={L(dict, '自定义子分类(例:物业费)', 'Custom subcategory (e.g. HOA)')}
+          onChange={(e) => setCustomDetail(e.target.value)}
+          onBlur={() => {
+            const v = customDetail.trim();
+            if (v !== detailDraft) saveCategory(catDraft || curCat, v);
+          }} />
+        {(ann.category || ann.categoryDetail) && (
+          <button type="button" className="nesio-fin-flowopt" onClick={() => saveCategory('', '')}>
+            {L(dict, '恢复银行原分类', 'Reset to bank category')}
+          </button>
+        )}
       </div>
 
       {/* 关联人:点开选,选中的在上面成 chip,再点取消 */}
@@ -586,8 +564,6 @@ export default function FinanceTab() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const cats = useMemo(() => categoryBreakdown(txs, ym), [txs, ym, rev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const merchants = useMemo(() => topMerchants(txs, ym, 6), [txs, ym, rev]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const findings = useMemo(
     () => financeFindings(txs, accounts, ym, { domainNet: summary.domainNet, prevDomainNet: prevSummary.domainNet }),
     [txs, accounts, ym, rev, summary.domainNet, prevSummary.domainNet],
@@ -650,8 +626,7 @@ export default function FinanceTab() {
   const [budgetNote, setBudgetNote] = useState('');
   const [showAddBudget, setShowAddBudget] = useState(false); // bug2:「手动添加」按钮展开分类选择
   const [allocPick, setAllocPick] = useState<string | null>(null); // bug3:组合结构环形图点开看这一类持仓
-  const [spendChart, setSpendChart] = useState<'merchant' | 'income'>('merchant'); // bug3:商户/收入来源左右滑动切换
-  const [spendFocus, setSpendFocus] = useState<string | null>(null); // bug2:环形图点选分类 → 细节
+  const [spendFocus, setSpendFocus] = useState<string | null>(null); // bug2:环形图点选分类 → 走势/分析/明细
   const [txLimit, setTxLimit] = useState(10); // bug2:交易默认只显示 10 条
   const [recurDetail, setRecurDetail] = useState<string | null>(null); // bug2:订阅条目详情(key)
   const [reportMsg, setReportMsg] = useState(''); // 财务㉓:月报动作反馈(可见状态,不静默)
@@ -1144,42 +1119,9 @@ export default function FinanceTab() {
             {L(dict, '上传对账单核对(只在本机解析,不上传)', 'Check a statement (parsed on this device)')}
           </button>
           <ReconcileSheet open={reconcileOpen} onClose={() => setReconcileOpen(false)} onSaved={() => setRev((r) => r + 1)} />
-          {/* L4:退款配对。放在交易页 —— 退款本身就是一条交易,配的也是同一页里的另一条。
-              建议 + 确认,不自动生效:配错会让两笔真实的钱互相抵消,而且看不出来。 */}
-          <RefundPairs txs={txs} currency={summary.currency || undefined} onChanged={() => setRev((r) => r + 1)} />
-          {review.length > 0 && (
-            <>
-              <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, `规则审核 · ${review.length} 笔待归类`, `Review · ${review.length} to categorize`)}</p>
-              {/* P3 纠错闭环:批量「全部按建议」(原来一次只出 1 笔,12 笔要点 12 次) */}
-              {review.length > 1 && (
-                <button type="button" className="nesio-fin-review-accept" style={{ marginBottom: 'var(--space-2)' }}
-                  onClick={() => { for (const t of review) setMerchantRuleFor(t, suggestCategory(t.name).category); setRev((r) => r + 1); }}>
-                  {L(dict, `全部按建议归类(${review.length} 笔,每笔都可再改)`, `Accept all suggestions (${review.length}, each editable later)`)}
-                </button>
-              )}
-              {review.slice(0, 3).map((t) => {
-                const sug = suggestCategory(t.name);
-                return (
-                  <div key={t.id} className="nesio-fin-review">
-                    <p className="nesio-fin-review-title">{t.name} · {formatMoney(t.amount, summary.currency)}</p>
-                    {/* 规则命中的置信度是写死的常数(0.72/0.4),与证据量无关,不该以百分比精度冒充"可信度";改定性措辞。 */}
-                    <p className="nesio-fin-review-sug">{L(dict, `建议分类:${categoryLabel(sug.category, 'zh')}${sug.confidence >= 0.6 ? '(关键词匹配)' : '(默认猜测)'}`, `Suggested: ${categoryLabel(sug.category, 'en')}${sug.confidence >= 0.6 ? ' (keyword match)' : ' (default guess)'}`)}</p>
-                    <div className="nesio-fin-review-btns">
-                      <button type="button" className="nesio-fin-review-accept" onClick={() => resolveReview(t, sug.category)}>{L(dict, '接受', 'Accept')}</button>
-                      {COMMON_EXPENSE_CATEGORIES.filter((c) => c !== sug.category).slice(0, 2).map((c) => (
-                        <button key={c} type="button" className="nesio-fin-review-alt" onClick={() => resolveReview(t, c)}>{categoryLabel(c, dict)}</button>
-                      ))}
-                      {/* P3:原「排除」实为归类 OTHER(仍计入支出),文案骗人 —— 改真语义:不计收支(转账流) */}
-                      <button type="button" className="nesio-fin-review-skip" onClick={() => { setFlowRuleFor(t, 'transfer'); setRev((r) => r + 1); }}>{L(dict, '不计收支', 'Not spend')}</button>
-                    </div>
-                  </div>
-                );
-              })}
-            </>
-          )}
 
-          {/* 批次 40:筛选改成下拉菜单(账户 + 分类) */}
-          <div className="nesio-fin-filterbar" style={{ marginTop: review.length ? '1rem' : 0 }}>
+          {/* 批次 40:筛选改成下拉菜单(账户 + 分类) —— 人工审核/退款配对沉到列表下方 */}
+          <div className="nesio-fin-filterbar" style={{ marginTop: 0 }}>
             {accounts.length > 1 && (
               <select className="nesio-fin-select" value={acctFilter} onChange={(e) => setAcctFilter(e.target.value)} aria-label={L(dict, '按账户筛选', 'Filter by account')}>
                 <option value="all">{L(dict, '所有账户', 'All accounts')}</option>
@@ -1211,12 +1153,11 @@ export default function FinanceTab() {
                         {f === 'expense' && (() => {
                           // 财务⑨:primary 友好名后接 detailed 细分类(咖啡/加油…);*_OTHER_* 无增量不显示
                           const primary = categoryLabel(effectiveCategory(t), dict) || L(dict, '待归类', 'Uncategorized');
-                          const detail = categoryDetailLabel(t.categoryDetail || '', dict);
+                          const detail = categoryDetailLabel(effectiveCategoryDetail(t), dict);
                           return <span className="nesio-fin-txcat"> · {primary}{detail && detail !== primary ? ` · ${detail}` : ''}</span>;
                         })()}
                         {f === 'income' && (() => {
-                          // 财务⑯:收入也显示细分(工资/利息收入/分红/退税)
-                          const detail = categoryDetailLabel(t.categoryDetail || '', dict);
+                          const detail = categoryDetailLabel(effectiveCategoryDetail(t), dict);
                           return detail ? <span className="nesio-fin-txcat"> · {detail}</span> : null;
                         })()}
                       </button>
@@ -1235,7 +1176,7 @@ export default function FinanceTab() {
                       {t.city && (
                         <span className="nesio-fin-txacct" style={{ marginLeft: 'auto', color: 'var(--portal-muted)' }}>{t.city}</span>
                       )}
-                      {/* bug3:每一笔都能改 —— 流向 / 关联人 / 附件 / 备注 */}
+                      {/* bug3:每一笔都能改 —— 流向 / 分类 / 关联人 / 附件 / 备注 */}
                       <button type="button" className="nesio-fin-txedit-btn"
                         aria-expanded={flowEditId === t.id}
                         onClick={() => setFlowEditId((id) => (id === t.id ? null : t.id))}>
@@ -1245,7 +1186,7 @@ export default function FinanceTab() {
                   </div>
                   {flowEditId === t.id && (
                     <TxEditPanel txId={t.id} txAmount={Math.abs(t.amount)} flow={f} dict={dict} contacts={pickContacts}
-                      onFlow={(opt) => applyFlow(t, opt)} />
+                      tx={t} onFlow={(opt) => applyFlow(t, opt)} onCategoryChanged={() => setRev((r) => r + 1)} />
                   )}
                 </div>
               );
@@ -1267,6 +1208,38 @@ export default function FinanceTab() {
               {L(dict, `已折叠 ${adjIds.size / 2} 组银行内部调整(同日同额一正一负,净额为零)`, `${adjIds.size / 2} internal bank adjustment pair(s) collapsed (same-day offsetting, net zero)`)}
             </p>
           )}
+
+          {/* 人工识别沉底:先看流水,再处理待归类 / 退款配对(提示要说清差在哪) */}
+          {review.length > 0 && (
+            <>
+              <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-4)' }}>{L(dict, `规则审核 · ${review.length} 笔待归类`, `Review · ${review.length} to categorize`)}</p>
+              {review.length > 1 && (
+                <button type="button" className="nesio-fin-review-accept" style={{ marginBottom: 'var(--space-2)' }}
+                  onClick={() => { for (const t of review) setMerchantRuleFor(t, suggestCategory(t.name).category); setRev((r) => r + 1); }}>
+                  {L(dict, `全部按建议归类(${review.length} 笔,每笔都可再改)`, `Accept all suggestions (${review.length}, each editable later)`)}
+                </button>
+              )}
+              {review.slice(0, 3).map((t) => {
+                const sug = suggestCategory(t.name);
+                return (
+                  <div key={t.id} className="nesio-fin-review">
+                    <p className="nesio-fin-review-title">{t.name} · {formatMoney(t.amount, summary.currency)}</p>
+                    <p className="nesio-fin-review-sug">{L(dict, `建议分类:${categoryLabel(sug.category, 'zh')}${sug.confidence >= 0.6 ? '(关键词匹配)' : '(默认猜测)'}`, `Suggested: ${categoryLabel(sug.category, 'en')}${sug.confidence >= 0.6 ? ' (keyword match)' : ' (default guess)'}`)}</p>
+                    <div className="nesio-fin-review-btns">
+                      <button type="button" className="nesio-fin-review-accept" onClick={() => resolveReview(t, sug.category)}>{L(dict, '接受', 'Accept')}</button>
+                      {COMMON_EXPENSE_CATEGORIES.filter((c) => c !== sug.category).slice(0, 2).map((c) => (
+                        <button key={c} type="button" className="nesio-fin-review-alt" onClick={() => resolveReview(t, c)}>{categoryLabel(c, dict)}</button>
+                      ))}
+                      <button type="button" className="nesio-fin-review-skip" onClick={() => { setFlowRuleFor(t, 'transfer'); setRev((r) => r + 1); }}>{L(dict, '不计收支', 'Not spend')}</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </>
+          )}
+          <div style={{ marginTop: 'var(--space-4)' }}>
+            <RefundPairs txs={txs} currency={summary.currency || undefined} onChanged={() => setRev((r) => r + 1)} />
+          </div>
 
         </>
       )}
@@ -1345,23 +1318,44 @@ export default function FinanceTab() {
         );
       })()}
 
-      {/* ── 支出主体:交互环形图(点分类看细节)+ 商户 Top 折叠 + 收入来源折叠 ── */}
+      {/* ── 支出主体:单一环形图;点分类 → 走势 + 商户分析 + 每笔明细 ── */}
       {sub === 'spending' && (
         <>
           {cats.length > 0 ? (
             <>
-              {/* bug2:环形图去右侧图例,百分比进环中间;点扇区出该分类细节(月度折线 + 涨跌) */}
               {(() => {
                 const active = cats.find((c) => c.category === spendFocus) || null;
+                const flowRules = loadFlowRules();
+                const catTxs = active
+                  ? txs.filter((t) => (t.date || '').slice(0, 7) === ym && txFlow(t, flowRules) === 'expense' && effectiveCategory(t) === active.category)
+                    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || Math.abs(b.amount) - Math.abs(a.amount))
+                  : [];
+                const merchantAgg = (() => {
+                  const m = new Map<string, { name: string; total: number; count: number; logo?: string }>();
+                  for (const t of catTxs) {
+                    const key = (t.merchantId || t.name || '?').trim();
+                    const cur = m.get(key) || { name: t.name || L(dict, '未知', 'Unknown'), total: 0, count: 0, logo: t.merchantLogo };
+                    cur.total += Math.abs(t.amount);
+                    cur.count += 1;
+                    if (t.merchantLogo) cur.logo = t.merchantLogo;
+                    m.set(key, cur);
+                  }
+                  return [...m.values()].sort((a, b) => b.total - a.total).slice(0, 5);
+                })();
+                const avg = catTxs.length ? active!.total / catTxs.length : 0;
                 return (
                   <div style={{ marginTop: 'var(--space-3)' }}>
                     <FinanceDonut big slices={cats}
                       centerTop={active ? categoryLabel(active.category, dict) : L(dict, '本月支出', 'This month')}
                       centerVal={active ? `${active.pct}%` : formatMoney(cats.reduce((s, c) => s + c.total, 0), summary.currency)}
-                      onSlice={(c) => setSpendFocus((v) => (v === c ? null : c))} activeCategory={spendFocus} />
-                    {!active && <p className="nesio-fin-score-hint" style={{ textAlign: 'center', marginTop: 'var(--space-1)' }}>{L(dict, '点一块分类,看它的月度走势', 'Tap a slice to see its monthly trend')}</p>}
+                      onSlice={(c) => { if (c === 'OTHER_REST') return; setSpendFocus((v) => (v === c ? null : c)); }}
+                      activeCategory={spendFocus} />
+                    {!active && (
+                      <p className="nesio-fin-score-hint" style={{ textAlign: 'center', marginTop: 'var(--space-1)' }}>
+                        {L(dict, '点一块分类,看走势、商户和每笔明细', 'Tap a slice for trend, merchants, and each charge')}
+                      </p>
+                    )}
                     {active && (() => {
-                      // 该分类近 6 个月走势(折线)+ 环比涨跌
                       const seq = availableMonths(txs).slice(0, 6).reverse().map((m) => ({
                         ym: m, total: categoryBreakdown(txs, m).find((x) => x.category === active.category)?.total || 0,
                       }));
@@ -1385,6 +1379,61 @@ export default function FinanceTab() {
                           <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 2px' }}>
                             {seq.map((p) => <span key={p.ym} style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{p.ym.slice(5)}</span>)}
                           </div>
+
+                          {/* 分析:笔数 / 均笔 / 占月支出 + 商户 Top(并进同一块,不再另开饼图) */}
+                          <div className="nesio-fin-kpis" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginTop: 'var(--space-3)', marginBottom: 0 }}>
+                            <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '笔数', 'Count')}</span><span className="nesio-fin-kpi-v">{catTxs.length}</span></div>
+                            <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '均笔', 'Avg')}</span><span className="nesio-fin-kpi-v">{formatMoney(avg, summary.currency)}</span></div>
+                            <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '占本月', 'Share')}</span><span className="nesio-fin-kpi-v">{active.pct}%</span></div>
+                          </div>
+                          {merchantAgg.length > 0 && (
+                            <div style={{ marginTop: 'var(--space-3)' }}>
+                              <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '该分类 · 商户 Top', 'In this category · Top merchants')}</p>
+                              {merchantAgg.map((m) => (
+                                <div key={m.name} className="nesio-fin-cat-top" style={{ marginBottom: 4 }}>
+                                  <span className="nesio-fin-cat-name" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                    {m.logo && <MLogo src={m.logo} />}{m.name}
+                                    <span style={{ color: 'var(--portal-muted)', fontWeight: 400 }}> · {L(dict, `${m.count} 笔`, `${m.count}×`)}</span>
+                                  </span>
+                                  <span className="nesio-fin-cat-amt">{formatMoney(m.total, summary.currency)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          <div style={{ marginTop: 'var(--space-3)' }}>
+                            <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, `明细 · ${catTxs.length} 笔`, `Details · ${catTxs.length}`)}</p>
+                            {catTxs.length === 0 ? (
+                              <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '这个分类本月没有流水。', 'No charges in this category this month.')}</p>
+                            ) : (
+                              <div className="nesio-fin-txlist">
+                                {catTxs.map((t) => {
+                                  const a = t.accountId ? acctById.get(t.accountId) : undefined;
+                                  const detail = categoryDetailLabel(effectiveCategoryDetail(t), dict);
+                                  return (
+                                    <div key={t.id} className="nesio-fin-txrow" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 2 }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <span className="nesio-fin-txdate">{(t.date || '').slice(5).replace('-', '/')}</span>
+                                        {detail && <span className="nesio-fin-txcat" style={{ color: 'var(--portal-muted)' }}>{detail}</span>}
+                                      </div>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                        <span className="nesio-fin-txname" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {t.merchantLogo && <MLogo src={t.merchantLogo} />}{t.name || L(dict, '未知商户', 'Unknown')}
+                                        </span>
+                                        <span className="nesio-fin-txamt">-{formatMoney(Math.abs(t.amount), summary.currency)}</span>
+                                      </div>
+                                      {a && (
+                                        <span className="nesio-fin-txacct">
+                                          <AcctLogo a={a} size={13} />
+                                          {displayAccountName(a, acctNames)}{a.mask ? ` ····${a.mask}` : ''}
+                                        </span>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       );
                     })()}
@@ -1395,14 +1444,6 @@ export default function FinanceTab() {
           ) : (
             <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '这个月还没有可统计的支出。', 'No spending to break down this month yet.')}</p>
           )}
-
-          {/* bug3:商户 Top / 收入来源 —— 原来是两个折叠列表,现在都是交互饼图,左右滑动切换 */}
-          <SpendChartPager
-            merchants={merchants}
-            incomes={(summary.income > 0 ? [...incomeBreakdown(txs, ym)] : [])
-              .sort((a, b) => b.total - a.total)
-              .map((s) => ({ key: s.detail, label: categoryDetailLabel(s.detail, dict) || L(dict, '其他收入', 'Other income'), total: s.total }))}
-            currency={summary.currency} dict={dict} chart={spendChart} onChart={setSpendChart} />
         </>
       )}
 

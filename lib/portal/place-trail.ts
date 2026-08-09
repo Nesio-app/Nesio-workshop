@@ -1,5 +1,5 @@
 import { reportStorageDropped } from '@/lib/portal/storage-health';
-import { haversineKm, isGenericPlaceLabel, placeKey as geoPlaceKey } from '@/lib/portal/geo';
+import { haversineKm, haversineMeters, isGenericPlaceLabel, placeKey as geoPlaceKey } from '@/lib/portal/geo';
 import { createBlobStore } from '@/lib/portal/idb-blob-store';
 import { wallDateKey, wallHour, clampEndToWallDay } from '@/lib/portal/place-time.mjs';
 import { canonicalCountryKey } from '@/lib/portal/country-normalize';
@@ -742,7 +742,14 @@ function humanizeSemanticType(label: string): string {
 // 地点的反复到访只查一次;结果缓存本机,跨次导入/打开不重查;每轮限量,防一次
 // 导入几百个格子把免费反查服务打爆(查不完的下轮继续,常去的先有名字)。
 const REVGEO_CACHE_KEY = 'nesio-revgeo-cache-v1';
-type RevGeoCell = { label: string; city?: string; country?: string; kind?: string };
+/** 缓存命中须在锚点这么近(米)内;toFixed(3) 格约 110m,旧缓存常把隔壁店贴到整格。 */
+const REVGEO_CACHE_MAX_M = 50;
+const REVGEO_CACHE_MAX_AGE_MS = 30 * 24 * 3_600_000;
+type RevGeoCell = {
+  label: string; city?: string; country?: string; kind?: string;
+  /** 反查时的锚点坐标 —— 无则旧缓存,仅按格心粗校验 */
+  lat?: number; lon?: number; distM?: number; ts?: number;
+};
 const revgeoStore = createBlobStore<Record<string, RevGeoCell>>({
   key: REVGEO_CACHE_KEY,
   updateEvent: PLACE_TRAIL_UPDATED_EVENT,
@@ -756,6 +763,55 @@ function needsRealName(v: PlaceVisit): boolean {
     (isGenericPlace(v.label) || COORD_LABEL_RE.test((v.label || '').trim()));
 }
 
+function cellKeyOf(lat: number, lon: number): string {
+  return `${lat.toFixed(3)},${lon.toFixed(3)}`;
+}
+
+function revgeoCacheUsable(hit: RevGeoCell, lat: number, lon: number): boolean {
+  if (!hit?.label) return false;
+  if (hit.ts != null && Date.now() - hit.ts > REVGEO_CACHE_MAX_AGE_MS) return false;
+  // 旧缓存无锚点坐标 → 一律作废重查(曾把隔壁店名粘满 ~110m 格)。
+  if (hit.lat == null || hit.lon == null) return false;
+  return haversineMeters(hit.lat, hit.lon, lat, lon) <= REVGEO_CACHE_MAX_M;
+}
+
+/**
+ * 忘掉错贴的店名(足迹「不是这里」)。
+ * 清 revgeo 格缓存 + 改名映射,并把轨迹里同名条目打回「未知地点」以便重新反查。
+ */
+export function forgetStickyPlaceLabel(label: string): number {
+  if (typeof window === 'undefined' || !label.trim()) return 0;
+  const base = label.split(',')[0].trim();
+  const match = (s: string) => {
+    const t = (s || '').trim();
+    return t === label || t === base || t.split(',')[0].trim() === base;
+  };
+
+  const cache = loadJsonBlob(revgeoStore) as Record<string, RevGeoCell>;
+  let cacheTouched = false;
+  for (const k of Object.keys(cache)) {
+    if (match(cache[k]?.label || '')) { delete cache[k]; cacheTouched = true; }
+  }
+  if (cacheTouched) saveJsonBlob(revgeoStore, cache);
+
+  const renames = loadPlaceRenames();
+  let renameTouched = false;
+  for (const k of Object.keys(renames)) {
+    if (match(k) || match(renames[k])) { delete renames[k]; renameTouched = true; }
+  }
+  if (renameTouched) saveJsonBlob(renameStore, renames);
+
+  const trail = loadPlaceTrail();
+  let n = 0;
+  const next = trail.map((v) => {
+    if (!match(v.label)) return v;
+    n++;
+    return { ...v, label: '未知地点' };
+  });
+  if (n) save(next);
+  return n;
+}
+
 export async function backfillGenericPlaceLabels(maxLookups = 40): Promise<number> {
   if (typeof window === 'undefined') return 0;
   const trail = loadPlaceTrail();
@@ -764,7 +820,7 @@ export async function backfillGenericPlaceLabels(maxLookups = 40): Promise<numbe
 
   let cache: Record<string, RevGeoCell> = loadJsonBlob(revgeoStore);
 
-  const cellOf = (v: PlaceVisit) => `${(v.lat as number).toFixed(3)},${(v.lon as number).toFixed(3)}`;
+  const cellOf = (v: PlaceVisit) => cellKeyOf(v.lat as number, v.lon as number);
   const byCell = new Map<string, number>();
   for (const v of needs) byCell.set(cellOf(v), (byCell.get(cellOf(v)) || 0) + 1);
   // 到访多的格子先查 —— 常去的地方先有名字
@@ -774,7 +830,7 @@ export async function backfillGenericPlaceLabels(maxLookups = 40): Promise<numbe
   // 有 Foursquare key 时服务端 geocode 出「店名 + 类别」(POI 级,认店最准),
   // 优先走它;被限流(429)后本轮不再打服务端,余下格子回落免费链(街道级)。
   let serverBlocked = false;
-  const lookupOnce = async (lat: number, lon: number): Promise<{ label: string; city?: string; country?: string; kind?: string } | null> => {
+  const lookupOnce = async (lat: number, lon: number): Promise<RevGeoCell | null> => {
     if (!serverBlocked) {
       try {
         const res = await fetch('/api/portal/geocode', {
@@ -783,29 +839,33 @@ export async function backfillGenericPlaceLabels(maxLookups = 40): Promise<numbe
           body: JSON.stringify({ lat, lon }),
         });
         if (res.status === 429) { serverBlocked = true; } else {
-          const d = await res.json() as { ok?: boolean; name?: string; city?: string; country?: string; kind?: string };
+          const d = await res.json() as { ok?: boolean; name?: string; city?: string; country?: string; kind?: string; distanceM?: number };
           if (d.ok && d.name) {
             const label = [d.name, d.city && d.city !== d.name ? d.city : '', d.country].filter(Boolean).join(', ');
-            return { label, city: d.city, country: d.country, kind: d.kind };
+            return { label, city: d.city, country: d.country, kind: d.kind, lat, lon, distM: d.distanceM, ts: Date.now() };
           }
         }
       } catch { /* 服务端不可达 → 回落免费链 */ }
     }
     try {
       const g = await reverseGeocodeRobust(lat, lon);
-      if (g.label) return { label: g.label, city: g.city, country: g.country };
+      if (g.label) return { label: g.label, city: g.city, country: g.country, lat, lon, ts: Date.now() };
     } catch { /* 免费链也没查到 */ }
     return null;
   };
 
   let lookups = 0;
-  const resolved = new Map<string, { label: string; city?: string; country?: string; kind?: string }>();
+  const resolved = new Map<string, RevGeoCell>();
   for (const key of cells) {
-    let hit = cache[key];
+    const [lat, lon] = key.split(',').map(Number);
+    let hit: RevGeoCell | undefined = cache[key];
+    if (hit && !revgeoCacheUsable(hit, lat, lon)) {
+      delete cache[key];
+      hit = undefined;
+    }
     if (!hit) {
       if (lookups >= maxLookups) continue;
       lookups++;
-      const [lat, lon] = key.split(',').map(Number);
       const g = await lookupOnce(lat, lon);
       if (!g) continue; // 本轮查不到:跳过,下轮再试(不缓存失败)
       hit = g;
@@ -821,6 +881,8 @@ export async function backfillGenericPlaceLabels(maxLookups = 40): Promise<numbe
     if (!needsRealName(v)) return v;
     const hit = resolved.get(cellOf(v));
     if (!hit) return v;
+    // 逐条再验距离:同格内另一侧可能仍超阈值
+    if (v.lat != null && v.lon != null && !revgeoCacheUsable(hit, v.lat, v.lon)) return v;
     touched++;
     const name = canonicalPlaceLabel(hit.label) || hit.label;
     return { ...v, label: name };

@@ -49,7 +49,6 @@ import { ProactiveGuidanceCard } from './today/ProactiveGuidanceCard';
 import { ExperimentCheckinCard } from './today/ExperimentCheckinCard';
 import CaptureBar from './today/CaptureBar';
 import { ThawedReminder } from './today/ThawedReminder';
-import { DailyBriefRow } from './today/DailyBriefRow';
 import { ReengageNudgeCard } from './today/ReengageNudgeCard';
 import { DailyReportCard } from './today/DailyReportCard';
 import { TodayFocusSection } from './today/FocusSection';
@@ -254,25 +253,31 @@ export default function TodayFeed({
     const failed: string[] = tooBig.map((f) => `${f.name}(${prettyBytes(f.size)})`);
 
     if (imgs.length) {
-      const { compressToDataUrl, putLocalImage } = await import('@/lib/portal/local-image-store');
-      const assets = [];
+      const { compressToDataUrl } = await import('@/lib/portal/local-image-store');
+      const { attachPhotoToMemoryNode } = await import('@/lib/portal/capture-pipeline');
+      // 先建节点,再按主相机三步挂图(本机 + Storage + memory_assets)。
+      // 旧路径只 putLocalImage → 换端永远看不到图,识别也像「没发生」。
+      const node = ingestLifeNode({
+        name: imgs.length === 1 ? imgs[0].name.replace(/\.[^.]+$/, '') : `${imgs.length} 张照片`,
+        type: 'collection', source: 'manual', tags: ['照片'], attributes: {}, relations: [], confidence: 1, assets: [],
+      });
+      let attached = 0;
       for (let i = 0; i < imgs.length; i++) {
         if (imgs[i].size > MAX_FILE_BYTES) continue;
         const dataUrl = await compressToDataUrl(imgs[i], 1400, 0.82);
-        const id = `local-today-${Date.now()}-${i}`;
-        const ok = await putLocalImage(id, dataUrl);
-        if (!ok) { failed.push(imgs[i].name); continue; }
-        assets.push({ id, kind: 'image' as const, local: true, mimeType: 'image/jpeg', label: imgs[i].name, createdAt: new Date().toISOString() });
-      }
-      if (assets.length) {
-        const node = ingestLifeNode({
-          name: assets.length === 1 ? imgs[0].name.replace(/\.[^.]+$/, '') : `${assets.length} 张照片`,
-          type: 'collection', source: 'manual', tags: ['照片'], attributes: {}, relations: [], confidence: 1, assets,
+        if (!dataUrl) { failed.push(imgs[i].name); continue; }
+        const ok = await attachPhotoToMemoryNode({
+          nodeId: node.id,
+          dataUrl,
+          kind: 'memory',
+          label: imgs[i].name,
         });
-        // 2026-07-29「提高智能」:存进去只是第一步 —— 顺手认一下这是什么,
-        // 把文件名(IMG_9740 这种)换成看得懂的名字,并打上识别到的标签。
+        if (!ok) { failed.push(imgs[i].name); continue; }
+        attached += 1;
+      }
+      if (attached > 0) {
         // 存已经成功了,识别是加分项:认不出来就保持原样,**绝不因此报错**。
-        void recognizeSavedImage(imgs, node.id);
+        void recognizeSavedImage(imgs.filter((f) => f.size <= MAX_FILE_BYTES), node.id);
       }
     }
 
@@ -285,6 +290,7 @@ export default function TodayFeed({
       });
     }
 
+    let filesSaved = 0;
     for (let i = 0; i < bins.length; i++) {
       const f = bins[i];
       if (f.size > MAX_FILE_BYTES) continue;
@@ -298,6 +304,14 @@ export default function TodayFeed({
         relations: [], confidence: 1,
         assets: [{ id, kind: 'file' as const, local: true, mimeType, label: f.name, createdAt: new Date().toISOString() }],
       });
+      filesSaved += 1;
+    }
+    // 文件走 cloud-file-sync(localfile-*);以前只等 Portal 防抖 autoSync,人立刻换端会以为「没同步」。
+    if (filesSaved > 0) {
+      try {
+        const { pushLocalFilesToCloud } = await import('@/lib/portal/cloud-file-sync');
+        void pushLocalFilesToCloud();
+      } catch { /* best-effort */ }
     }
 
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
@@ -666,9 +680,8 @@ export default function TodayFeed({
           />
         ))}
 
-        {/* 每日简报入口(2026-08-01,用户:「每日文字简报在哪里,没有见到」)——
-            此前它只在设置里有一个 demo 入口,从没上过首页。点开的是同一张 sheet。 */}
-        <DailyBriefRow />
+        {/* 每日简报常驻卡已下架 —— 入口改到输入条「+」菜单 / 洞察「字典」旁的简报;
+            内容升级为彩色图文版(DailyBriefSheet)。 */}
 
         {/* 冷冻到期提醒(批次 7:冷冻仓入口迁到拍一下,决定回路留在首屏) */}
         <ThawedReminder />
@@ -720,6 +733,12 @@ export default function TodayFeed({
           /* ── 三合一的另外两条路(2026-07-31)。都是显式的:点了才走。 ──
              搜索**不新做一套结果界面** —— 记忆页那套是完整的(语义理解 + 筛选 + 详情),
              这里只把词带过去。问念念同理:把已经打好的一句带进 ask,别让人重打一遍。 */
+          onDictionary={(q) => {
+            window.dispatchEvent(new CustomEvent('nesio-open-dictionary', { detail: { query: q || '' } }));
+          }}
+          onBrief={() => {
+            window.dispatchEvent(new CustomEvent('nesio-open-brief'));
+          }}
           onSearch={(q) => {
             window.dispatchEvent(new CustomEvent('nesio-memory-search', { detail: { query: q } }));
           }}

@@ -314,7 +314,9 @@ check('④d 超额退款要提前说,不靠净额钳到 0 兜底', () => {
 
 check('④e 够硬 / 不够硬要显示出来', () => {
   assert.ok(/refundSuggestionIsStrong\(/.test(PAIRS_CODE), '所有建议长一个样 —— 人无从判断该不该信');
-  assert.ok(/对得上但不完全确定/.test(PAIRS), '不够硬的建议没有提醒');
+  // 弱建议必须说清差在哪(部分退 / 相隔天数),不许只剩「不完全确定」空话
+  assert.ok(/部分退|Partial amount/.test(PAIRS), '部分退款没有具体提示');
+  assert.ok(/!best\.exact/.test(PAIRS_CODE), '弱提示要按 exact/dayGap 分支,不能所有弱建议同一句');
 });
 
 check('④f 算的部分不在组件里重写', () => {

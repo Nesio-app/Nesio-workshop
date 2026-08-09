@@ -194,3 +194,13 @@ export function categoryDetailLabel(detail: string, dict: string = 'zh'): string
   // 收入来源列表把 detail 直接当标题展示,自由文本在中文界面下要有中文名
   return localizeFreeTextIncome(d, dict);
 }
+
+/** 某 primary 下可选的 PFC detailed(改子分类用)。 */
+export function detailsForPrimary(primary: string): Array<{ id: string; labelZh: string; labelEn: string }> {
+  const p = normalizeCategory(primary);
+  if (!p || !PFC_META[p]) return [];
+  const prefix = `${p}_`;
+  return Object.entries(DETAIL_META)
+    .filter(([k]) => k.startsWith(prefix) && !/_OTHER_/.test(k))
+    .map(([id, [labelZh, labelEn]]) => ({ id, labelZh, labelEn }));
+}

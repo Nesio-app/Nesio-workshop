@@ -1,12 +1,10 @@
 'use client';
 
 /**
- * DailyBriefSheet — 今日文字简报(批次 30 起;批次 176 重构)。
+ * DailyBriefSheet — 今日简报(彩色图文版)。
  *
- * 用户定案:简报的内容必须和「问一问」同一套算法 —— 不单独攒数据,只是排版漂亮。
- * 于是:buildMemoryContext(今天的安排/提醒)→ 同一个 /api/portal/chat 生成一段话
- *       → extractCitations 抽出「相关记忆」挂成可点链接(点开即回看那条记忆)。
- * 属 AI 例程(ai_routine),Pro 整功能(试用期内可用)。
+ * 内容仍与「问一问」同一套算法(buildMemoryContext + /api/portal/chat),
+ * 展示升级为彩色卡片:问候 hero、分段正文、相关记忆色块 —— 不再是一整段灰字。
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -23,12 +21,24 @@ import NesioSheet from './ui/NesioSheet';
 
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 
-// 简报走的就是问一问:同一句「今天有什么」检索,同一个对话端点生成。
 const BRIEF_QUERY = { zh: '今天有哪些安排、提醒和要注意的事', en: "what's on for me today" };
 const BRIEF_MSG = {
-  zh: '给我今天的简报:把我今天的安排、提醒和值得注意的事,用温暖、简洁的一段话说给我听。没有安排就如实说今天很空,别编。',
-  en: 'Give me my brief for today: sum up my schedule, reminders and anything worth noting in one warm, concise paragraph. If nothing is scheduled, say the day is clear — do not invent.',
+  zh: '给我今天的简报:把我今天的安排、提醒和值得注意的事,用温暖、简洁的一段话说给我听。没有安排就如实说今天很空,别编。可用 1–3 个短段落,段落之间空一行。',
+  en: 'Give me my brief for today: sum up my schedule, reminders and anything worth noting in a few warm short paragraphs (blank line between). If nothing is scheduled, say the day is clear — do not invent.',
 };
+
+const CARD_TONES = [
+  'var(--status-calm-soft)',
+  'var(--status-go-soft)',
+  'var(--status-gentle-soft)',
+  'var(--portal-accent-soft)',
+] as const;
+const CARD_INKS = [
+  'var(--status-calm)',
+  'var(--status-go)',
+  'var(--status-gentle)',
+  'var(--portal-accent)',
+] as const;
 
 function greetingFor(hour: number, dict: 'zh' | 'en', name: string): string {
   const g = hour < 5 ? L(dict, '凌晨好', 'Good morning')
@@ -38,6 +48,10 @@ function greetingFor(hour: number, dict: 'zh' | 'en', name: string): string {
   return name ? (dict === 'en' ? `${g}, ${name}` : `${g},${name}`) : g;
 }
 
+function splitParagraphs(script: string): string[] {
+  return script.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+}
+
 export function DailyBriefSheet({ open, onClose, canUsePrivateData = false }: { open: boolean; onClose: () => void; canUsePrivateData?: boolean }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [script, setScript] = useState('');
@@ -45,24 +59,16 @@ export function DailyBriefSheet({ open, onClose, canUsePrivateData = false }: { 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<'auth' | 'network' | null>(null);
   const [detailNode, setDetailNode] = useState<LifeNode | null>(null);
-  // 生成代:连点「换个说法/重试」会并发多个 /api/portal/chat,慢的旧响应后到会盖掉新简报。
-  // 每次生成 bump 此代,收尾按代校验,只认最后一次(last-response-wins)。
   const briefSeqRef = useRef(0);
 
   const fetchBrief = useCallback(async () => {
     const myGen = ++briefSeqRef.current;
     setLoading(true);
     setError(null);
-    // 批次194 补齐九路(§5.3):简报=付费云例程。入口已被 canUse('ai_routine') 挡(设置/例程卡);
-    // 这里再兜一层 —— 分层启用后免费直达也不打云(静默停,不重复弹升级窗)。
     if (!canUsePaidCloudAi()) { setLoading(false); return; }
     try {
       const profile = loadProfileSettings();
-      // ① 同一套检索算法(与问一问共用 buildMemoryContext)
-      // 隐私红线:未登录/未知态不把邮件正文/日历经 RAG 上下文送 /chat(见 buildMemoryContext includePrivate)。
       const { context: memoryContext, refCandidates } = await buildMemoryContext(dict === 'en' ? BRIEF_QUERY.en : BRIEF_QUERY.zh, '', canUsePrivateData);
-      // 批次190:把**真·跨域相关**(真实皮尔逊 r)喂进简报上下文 —— 让简报引真数字,
-      // 不再让模型在聚合块上瞎编「外卖多 40%」。统计相关非因果,原样引用不改动。
       let briefContext = memoryContext;
       try {
         const { mineCrossDomain } = await import('@/lib/portal/cross-domain-correlations');
@@ -76,7 +82,6 @@ export function DailyBriefSheet({ open, onClose, canUsePrivateData = false }: { 
             : '跨域统计(基于用户真实记录;统计相关非因果;可原样引用 r 值,严禁编造数字):'}\n${lines}`;
         }
       } catch { /* 无 journal 数据不影响简报 */ }
-      // ② 同一个对话端点生成一段话(只是提示词让它写成简报)
       const res = await fetch('/api/portal/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -89,13 +94,11 @@ export function DailyBriefSheet({ open, onClose, canUsePrivateData = false }: { 
           environmentContext: formatEnvironmentContext(),
         }),
       });
-      // 连点期间又发起了新一次生成 → 这次已过期,丢弃(不 setScript/setError 到新结果上)。
       if (briefSeqRef.current !== myGen) return;
       if (res.status === 401) { setError('auth'); return; }
       const data = await res.json() as { ok?: boolean; response?: string };
       if (briefSeqRef.current !== myGen) return;
       if (data.ok && data.response) {
-        // ③ 同一套引用解析:把模型自报的【依据】剥掉,cited 节点挂成「相关记忆」链接
         const { text, ids } = extractCitations(data.response.trim());
         setScript(text.replace(/\*\*/g, ''));
         const cited: LifeNode[] = ids === null
@@ -108,10 +111,9 @@ export function DailyBriefSheet({ open, onClose, canUsePrivateData = false }: { 
     } catch {
       if (briefSeqRef.current === myGen) setError('network');
     } finally {
-      // 只有仍是最新一次才收 loading,避免过期请求的 finally 提前停掉新一次的转圈。
       if (briefSeqRef.current === myGen) setLoading(false);
     }
-  }, [dict]);
+  }, [dict, canUsePrivateData]);
 
   useEffect(() => {
     if (open && !script && !loading) void fetchBrief();
@@ -122,8 +124,8 @@ export function DailyBriefSheet({ open, onClose, canUsePrivateData = false }: { 
   const now = new Date();
   const profile = loadProfileSettings();
   const dateLabel = now.toLocaleDateString(dict === 'en' ? 'en-US' : 'zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
-  // 详情浮层打开时,让底层引用卡 live 化(点开的可能是被改过的节点)
   const liveRefs = refs.map((r) => getLifeGraph().find((n) => n.id === r.id) || r);
+  const paras = splitParagraphs(script);
 
   return (
     <>
@@ -132,26 +134,47 @@ export function DailyBriefSheet({ open, onClose, canUsePrivateData = false }: { 
         open
         onOpenChange={(next) => { if (!next) onClose(); }}
         card={false}
-        className="nesio-settings-sheet-card nesio-brief-card"
+        className="nesio-settings-sheet-card nesio-brief-card nesio-brief-card--rich"
         ariaLabel={L(dict, '今日简报', "Today's brief")}
       >
-        <div className="nesio-brief-head">
+        <div className="nesio-brief-hero">
           <div>
             <p className="nesio-brief-greeting">{greetingFor(now.getHours(), dict, profile.displayName || '')}</p>
             <p className="nesio-brief-date">{dateLabel}</p>
+            <p className="nesio-brief-hero-tag">{L(dict, '今日简报 · 图文版', "Today's brief · illustrated")}</p>
           </div>
           <button type="button" className="nesio-voice-sheet-close" onClick={onClose} aria-label={L(dict, '关闭', 'Close')}>✕</button>
         </div>
-        <div className="nesio-settings-sheet-body">
+        <div className="nesio-settings-sheet-body nesio-brief-rich-body">
           {loading && <p className="nesio-mirror-writing">{L(dict, '念念正在整理今天…', 'Nessa is putting today together…')}</p>}
           {!loading && script && (
             <>
-              <p className="nesio-daily-brief-text">{script}</p>
+              <div className="nesio-brief-cards">
+                {paras.map((p, i) => (
+                  <div
+                    key={i}
+                    className="nesio-brief-color-card"
+                    style={{
+                      background: CARD_TONES[i % CARD_TONES.length],
+                      borderColor: CARD_INKS[i % CARD_INKS.length],
+                    }}
+                  >
+                    <span className="nesio-brief-color-dot" style={{ background: CARD_INKS[i % CARD_INKS.length] }} aria-hidden />
+                    <p className="nesio-brief-color-text">{p}</p>
+                  </div>
+                ))}
+              </div>
               {liveRefs.length > 0 && (
                 <div className="nesio-brief-refs">
                   <span className="nesio-brief-refs-label">{L(dict, '相关记忆', 'Related memories')}</span>
-                  {liveRefs.map((n) => (
-                    <button key={n.id} type="button" className="nesio-brief-ref-chip" onClick={() => setDetailNode(n)}>
+                  {liveRefs.map((n, i) => (
+                    <button
+                      key={n.id}
+                      type="button"
+                      className="nesio-brief-ref-chip nesio-brief-ref-chip--rich"
+                      style={{ background: CARD_TONES[i % CARD_TONES.length] }}
+                      onClick={() => setDetailNode(n)}
+                    >
                       <NodeTypeIcon type={n.type} size={12} />
                       <span className="nesio-brief-ref-name">{n.name}</span>
                     </button>
@@ -176,6 +199,9 @@ export function DailyBriefSheet({ open, onClose, canUsePrivateData = false }: { 
                 </button>
               )}
             </>
+          )}
+          {!loading && !script && !error && !canUsePaidCloudAi() && (
+            <p className="nesio-mirror-error">{L(dict, '每日简报是 Pro 的能力。', 'Daily brief is a Pro feature.')}</p>
           )}
         </div>
       </NesioSheet>

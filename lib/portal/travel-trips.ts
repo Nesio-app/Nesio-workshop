@@ -576,7 +576,11 @@ export function addTripNode(tripId: string, node: Omit<TripNode, 'id'> & { id?: 
 export function removeTripNode(tripId: string, nodeId: string): Trip | null {
   const t = getTrip(tripId);
   if (!t) return null;
-  return upsertTrip({ ...t, nodes: t.nodes.filter((n) => n.id !== nodeId) });
+  const removed = t.nodes.find((n) => n.id === nodeId);
+  upsertTrip({ ...t, nodes: t.nodes.filter((n) => n.id !== nodeId) });
+  // 删酒店/购物等会影响预算;预算节点本身不重算成空环
+  if (removed && removed.kind !== 'budget') recomputeBudgetNode(tripId);
+  return getTrip(tripId);
 }
 
 /** 按天数/目的地生成打包清单,并对照物品库标 have/need。 */
@@ -629,6 +633,17 @@ export function generatePackingList(tripId: string): Trip | null {
   return upsertTrip({ ...t, nodes: [packingNode, ...withoutOld] });
 }
 
+/** 订票正文里偶发超大数字串(订单号/金额粘连)——拒绝进预算。 */
+const MAX_REASONABLE_PRICE = 1_000_000;
+
+function parseMoneyNear(text: string): number | undefined {
+  const m = text.match(/(?:¥|￥|CNY|RMB|USD|\$)\s*([\d,]+(?:\.\d+)?)/i);
+  if (!m) return undefined;
+  const n = Number(m[1].replace(/,/g, ''));
+  if (!Number.isFinite(n) || n <= 0 || n > MAX_REASONABLE_PRICE) return undefined;
+  return n;
+}
+
 /** 从订票确认文本解析航班/酒店节点(本地规则,不耗云)。 */
 export function parseBookingConfirmation(text: string): TripNode[] {
   const raw = text.replace(/\r/g, '\n');
@@ -638,7 +653,6 @@ export function parseBookingConfirmation(text: string): TripNode[] {
   const seatRe = /(?:座位|seat)\s*[:：]?\s*([0-9]{1,2}[A-F])/i;
   const confRe = /(?:确认号|confirmation|PNR|订座编码)\s*[:：]?\s*([A-Z0-9]{5,8})/i;
   const hotelRe = /(?:酒店|hotel|入住)\s*[:：]?\s*([^\n]{2,40})/i;
-  const priceRe = /(?:¥|￥|CNY|RMB)\s*([\d,]+(?:\.\d+)?)/i;
 
   let m: RegExpExecArray | null;
   const seenFlights = new Set<string>();
@@ -679,10 +693,14 @@ export function parseBookingConfirmation(text: string): TripNode[] {
     });
   }
 
-  const hotelName = raw.match(hotelRe)?.[1]?.trim();
+  const hotelMatch = raw.match(hotelRe);
+  const hotelName = hotelMatch?.[1]?.trim();
   if (hotelName) {
-    const price = Number((raw.match(priceRe)?.[1] || '').replace(/,/g, '')) || undefined;
-    const when = parseBookingDateTime(raw.slice(Math.max(0, (raw.match(hotelRe)?.index ?? 0) - 80), (raw.match(hotelRe)?.index ?? 0) + 120));
+    const hIdx = hotelMatch?.index ?? 0;
+    // 价格只在酒店名附近扫,别扫全文把订单号/卡号粘成 ¥305 亿
+    const priceWindow = raw.slice(Math.max(0, hIdx - 80), hIdx + 160);
+    const price = parseMoneyNear(priceWindow);
+    const when = parseBookingDateTime(raw.slice(Math.max(0, hIdx - 80), hIdx + 120));
     nodes.push({
       id: uid('n'),
       kind: 'hotel',
@@ -766,9 +784,13 @@ export function recomputeBudgetNode(tripId: string): Trip | null {
   for (const n of t.nodes) {
     if (n.payload.kind === 'hotel') {
       const h = n.payload.hotel;
-      stay += (h.pricePerNight || 0) * (h.nights || 1);
+      const line = (h.pricePerNight || 0) * (h.nights || 1);
+      if (line > 0 && line <= MAX_REASONABLE_PRICE) stay += line;
     }
-    if (n.payload.kind === 'shopping') shop += n.payload.shopping.total || 0;
+    if (n.payload.kind === 'shopping') {
+      const tot = n.payload.shopping.total || 0;
+      if (tot > 0 && tot <= MAX_REASONABLE_PRICE) shop += tot;
+    }
     if (n.payload.kind === 'flight') {
       // 无票价字段时不硬估;有确认即计 0,留给用户改预算
     }
@@ -777,12 +799,23 @@ export function recomputeBudgetNode(tripId: string): Trip | null {
   const over = t.budgetByCategory || {};
   const hasOverride = Object.keys(over).length > 0;
   // 用户改过分类预算 → 总预算 = 各分类之和(改了分类总额还是老数字最容易被当成 bug);
-  // 没改过 → 沿用老逻辑(手填总额,或退回实际花费),再按 35/30/35 摊到三类。
-  const autoTotal = t.budgetTotal && t.budgetTotal > 0 ? t.budgetTotal : Math.max(actualTotal, 0);
+  // 没改过 → 优先实际节点合计;仅当手填总额合理时才沿用。
+  // 曾用「永远 sticky trip.budgetTotal」→ 订票误解析出巨额后删节点,页面变成 ¥0 / ¥305 亿。
+  let sticky = Number(t.budgetTotal) || 0;
+  if (sticky > MAX_REASONABLE_PRICE) sticky = 0;
+  if (sticky > 0 && actualTotal === 0 && !hasOverride) sticky = 0;
+  if (sticky > 0 && actualTotal > 0 && sticky > Math.max(actualTotal * 20, 1_000_000) && !hasOverride) sticky = 0;
+  const autoTotal = sticky > 0 ? sticky : Math.max(actualTotal, 0);
   const share: Record<string, number> = {
     flight: Math.round(autoTotal * 0.35), stay: Math.round(autoTotal * 0.3), shop: Math.round(autoTotal * 0.35),
   };
-  const catBudget = (id: string) => (Number.isFinite(over[id]) ? Number(over[id]) : share[id] || 0);
+  const catBudget = (id: string) => {
+    if (Number.isFinite(over[id])) {
+      const v = Math.max(0, Math.round(Number(over[id])));
+      return v > MAX_REASONABLE_PRICE ? 0 : v;
+    }
+    return share[id] || 0;
+  };
   const categories = [
     { id: 'flight', label: '机票', actual: flight, budget: catBudget('flight') },
     { id: 'stay', label: '住宿', actual: stay, budget: catBudget('stay') },
@@ -820,8 +853,25 @@ export function recomputeBudgetNode(tripId: string): Trip | null {
 export function setCategoryBudget(tripId: string, categoryId: string, budget: number): Trip | null {
   const t = getTrip(tripId);
   if (!t) return null;
-  const amt = Math.max(0, Math.round(Number(budget) || 0));
+  const amt = Math.max(0, Math.min(MAX_REASONABLE_PRICE, Math.round(Number(budget) || 0)));
   upsertTrip({ ...t, budgetByCategory: { ...(t.budgetByCategory || {}), [categoryId]: amt } });
+  return recomputeBudgetNode(tripId);
+}
+
+/** 手改行程总预算(预算页顶栏可点)。清掉分类覆盖后按 35/30/35 重摊。 */
+export function setTripBudgetTotal(tripId: string, total: number): Trip | null {
+  const t = getTrip(tripId);
+  if (!t) return null;
+  const amt = Math.max(0, Math.min(MAX_REASONABLE_PRICE, Math.round(Number(total) || 0)));
+  upsertTrip({ ...t, budgetTotal: amt, budgetByCategory: {} });
+  return recomputeBudgetNode(tripId);
+}
+
+/** 清零手填/误解析预算,回到「按节点实际」。 */
+export function clearTripBudget(tripId: string): Trip | null {
+  const t = getTrip(tripId);
+  if (!t) return null;
+  upsertTrip({ ...t, budgetTotal: 0, budgetByCategory: {} });
   return recomputeBudgetNode(tripId);
 }
 

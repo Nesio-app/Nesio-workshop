@@ -39,6 +39,11 @@ import { listStorageItems, countPantryItems, countWardrobeItems, storageHeadline
 interface InventorySheetProps {
   open: boolean;
   onClose: () => void;
+  /**
+   * sheet = 记忆页收纳浮层(默认);
+   * page = 洞察「物品」全页 —— 同套功能,列表更高,顶上 KPI,无 sheet 壳。
+   */
+  variant?: 'sheet' | 'page';
 }
 
 const ALL = '__all__';
@@ -104,7 +109,8 @@ function InventoryCategoryPie({ rows, dict }: {
   );
 }
 
-export default function InventorySheet({ open, onClose }: InventorySheetProps) {
+export default function InventorySheet({ open, onClose, variant = 'sheet' }: InventorySheetProps) {
+  const isPage = variant === 'page';
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [items, setItems] = useState<InventoryItem[]>([]);
   // 归「做饭 · 库存」的食材件数 —— 只用来在顶上说一句「另有 N 件在那边」,
@@ -137,12 +143,15 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   const refresh = () => { setItems(listStorageItems()); setPantryCount(countPantryItems()); setWardrobeCount(countWardrobeItems()); };
 
   useEffect(() => {
-    if (!open) return;
+    if (!open && !isPage) return;
     refresh();
-    setView('list');
-    setQuery('');
-    setGroupFilter(ALL);
-  }, [open]);
+    // sheet 每次打开重置;page 内嵌只首次/open 变化时刷新,不强制踢回 list(正在看详情时别被刷走)
+    if (!isPage) {
+      setView('list');
+      setQuery('');
+      setGroupFilter(ALL);
+    }
+  }, [open, isPage]);
 
   // 浏览分组:物品 location 首段(场所或自由文本首段)动态聚合
   const groups = useMemo(() => {
@@ -179,7 +188,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
   // 批次 170:物品左侧占位符 —— 该物品记忆有图就显示真图(取本机 IndexedDB 图,离线也能看)
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   useEffect(() => {
-    if (!open) return;
+    if (!open && !isPage) return;
     let cancelled = false;
     (async () => {
       const { getLocalImage } = await import('@/lib/portal/local-image-store');
@@ -193,10 +202,10 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
     })();
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, visible]);
+  }, [open, isPage, visible]);
   const detail = detailId ? items.find((i) => i.id === detailId) ?? null : null;
 
-  if (!open) return null;
+  if (!open && !isPage) return null;
 
   const resetForm = () => { setFName(''); setFLocation(''); setFQty(''); setFExpiry(''); setFNote(''); setFCategory(''); setCatCustom(false); setFTags(''); setFPrice(''); setPasteMsg(''); };
 
@@ -274,19 +283,9 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
     color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
   });
 
-  return (
-    // 2026-07-28(标注 图11「按钮失效」)根因:洞察页的「打开物品管理」按钮**是响应的** ——
-    // 事件派了、sheet 也开了,但它是 bottom 卡(z-901),被洞察这个 fullscreen 面板(z-930)整个盖住,
-    // 看着就像按钮没反应。做饭页能从洞察打开正是因为它是 fullscreen。这里抬层到 940/941。
-    <NesioSheet
-      variant="bottom"
-      elevated
-      open={open}
-      onOpenChange={(next) => { if (!next) onClose(); }}
-      card={false}
-      className="nesio-freeze-sheet"
-      ariaLabel={L(dict, '收纳', 'Storage')}
-    >
+  // page 变体:洞察内嵌时不需要 sheet(洞察自己是 fullscreen);sheet 变体仍 elevated 盖住洞察。
+  const body = (
+    <>
         {/* 批次 170:去「收纳」标题;统计挪中间上方,方块容器徽章 */}
         <div className="nesio-freeze-header nesio-inv-header">
           {/* 2026-07-29 标注(Bug4 P10):三个统计位改成「物品 / 衣橱 / 食材」三个口径 ——
@@ -316,9 +315,11 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
               )}
             </div>
           ) : <span />}
-          <button type="button" className="nesio-freeze-close nesio-inv-close" onClick={view === 'list' ? onClose : () => { setView('list'); setDetailId(null); }}>
-            {view === 'list' ? '✕' : '‹'}
-          </button>
+          {!isPage || view !== 'list' ? (
+            <button type="button" className="nesio-freeze-close nesio-inv-close" onClick={view === 'list' ? onClose : () => { setView('list'); setDetailId(null); }}>
+              {view === 'list' ? '✕' : '‹'}
+            </button>
+          ) : <span />}
         </div>
 
         {view === 'list' && (
@@ -365,7 +366,7 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
             ) : (
               <>
                 {/* 2026-07-29 标注(Bug4 P10):「物品 · 最近更新在前」删掉 —— 排序规则不必占一行字。 */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '44vh', overflowY: 'auto', paddingBottom: 4 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: isPage ? 'min(70vh, 640px)' : '44vh', overflowY: 'auto', paddingBottom: 4 }}>
                   {visible.map((i) => {
                     const exp = expiryStatus(i);
                     const src = i.node.source === 'photo' ? L(dict, '拍照', 'Photo') : i.node.source === 'email' ? L(dict, '邮件', 'Email') : L(dict, '手记', 'Note');
@@ -742,6 +743,44 @@ export default function InventorySheet({ open, onClose }: InventorySheetProps) {
             onSaved={() => { refresh(); setView('list'); setDetailId(null); }}
           />
         )}
+    </>
+  );
+
+  if (isPage) {
+    return (
+      <div className="nesio-inv-page nesio-analytics-tab">
+        {view === 'list' && items.length > 0 && (
+          <div className="nesio-inv-page-hero" style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+            <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)' }}>
+              <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{st.count}</span>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '物品', 'Items')}</span>
+            </div>
+            <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)' }}>
+              <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>≈${Math.round(st.totalValue).toLocaleString('en-US')}</span>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '估值', 'Est. value')}</span>
+            </div>
+            <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)', ...(unplacedCount > 0 ? { borderColor: 'var(--status-gentle)' } : {}) }}>
+              <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums', ...(unplacedCount > 0 ? { color: 'var(--status-gentle)' } : {}) }}>{unplacedCount}</span>
+              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '未归位', 'Unplaced')}</span>
+            </div>
+          </div>
+        )}
+        {body}
+      </div>
+    );
+  }
+
+  return (
+    <NesioSheet
+      variant="bottom"
+      elevated
+      open={open}
+      onOpenChange={(next) => { if (!next) onClose(); }}
+      card={false}
+      className="nesio-freeze-sheet"
+      ariaLabel={L(dict, '收纳', 'Storage')}
+    >
+      {body}
     </NesioSheet>
   );
 }

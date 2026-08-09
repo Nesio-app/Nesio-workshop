@@ -51,6 +51,7 @@ const CalendarCreateSheet = dynamic(() => import('./CalendarCreateSheet'), { ssr
 const FamilySharingSheet = dynamic(() => import('./family/FamilySharingSheet'), { ssr: false });
 const CookingSheet = dynamic(() => import('./cooking/CookingSheet'), { ssr: false });
 const DailyBriefSheet = dynamic(() => import('./DailyBriefSheet').then((m) => m.DailyBriefSheet), { ssr: false });
+const DictionarySheet = dynamic(() => import('./dictionary/DictionarySheet'), { ssr: false });
 // 洞察 = 全屏浮层(非 surface):提到 Portal 层,底部导航从任意页都能开。1143 行,开时才加载。
 const InsightsSheet = dynamic(() => import('./InsightsSheet'), { ssr: false });
 type InsightsMainTab = import('./InsightsSheet').MainTab;
@@ -98,7 +99,7 @@ import { recordAppOpen } from '@/lib/portal/feature-usage';
 import { track, installErrorTracking } from '@/lib/portal/telemetry';
 import type { PortalConfig, PortalDecMetadata, PortalTool } from '@/lib/portal/types';
 import { type ToolForShellState } from './tool-state';
-import { isBusy } from '@/lib/portal/app-busy';
+import { holdUiOverlay, requestDestructiveReload } from '@/lib/portal/app-busy';
 
 const DEC_METADATA_TTL_MS = 30_000;
 const FIRST_MEMORY_RECEIPT_KEY = 'nesio-first-memory-receipt-shown-v1';
@@ -407,10 +408,11 @@ export default function Portal() {
           if (Date.now() - last < 3 * 60_000) return; // 防抖:3 分钟内不重复整页刷
           const typing = document.activeElement instanceof HTMLInputElement
             || document.activeElement instanceof HTMLTextAreaElement;
-          // busy 期间(文件选择器往返 / 正在同步)不刷新,否则会把进行中的上传冲掉、跳回主页。
-          if (!typing && !isBusy()) {
+          // busy / 浮层开着时 requestDestructiveReload 会推迟到浮层关完再刷,
+          // 避免整页 reload 把状态打回「今天」、冲掉正在进行的家务/车/运营操作。
+          if (!typing) {
             sessionStorage.setItem('nesio-version-reload', String(Date.now()));
-            window.location.reload();
+            requestDestructiveReload();
           }
         }
       } catch { /* offline 等下次 */ }
@@ -479,7 +481,7 @@ export default function Portal() {
         const last = Number(sessionStorage.getItem('nesio-chunk-reload') || 0);
         if (Date.now() - last > 5 * 60_000) {
           sessionStorage.setItem('nesio-chunk-reload', String(Date.now()));
-          window.location.reload();
+          requestDestructiveReload();
         }
       } catch { /* ignore */ }
     };
@@ -597,6 +599,8 @@ export default function Portal() {
   }, []);
   const [moodOpen, setMoodOpen] = useState(false);
   const [briefOpen, setBriefOpen] = useState(false); // 批次 176:每日简报全局挂载(例行卡 + Lab demo 都派 nesio-open-brief 打开)
+  const [dictOpen, setDictOpen] = useState(false);
+  const [dictQuery, setDictQuery] = useState('');
   const [freezeOpen, setFreezeOpen] = useState(false);
   const [insightsOpen, setInsightsOpen] = useState(false); // 洞察全屏浮层(底部导航第 3 个 tab / nesio-open-insights 事件打开)
   const [insightsTab, setInsightsTab] = useState<InsightsMainTab | undefined>(undefined);
@@ -626,6 +630,22 @@ export default function Portal() {
   // 每次「开始跟练」自增,用作 WorkoutPlayer 的 key → 换一个训练(如跑步→力量)必定全新挂载,
   // 绝不复用上一个训练的内部态(idx/phase/repCount)。修「打开力量没反应 / 退出力量却冒出跑步」的换练串台。
   const [workoutKey, setWorkoutKey] = useState(0);
+  // 首次打开后保持挂载:关掉再开不丢 tab/加载结果(家务/洞察每次卸载 = 永远 Loading)。
+  const [insightsMounted, setInsightsMounted] = useState(false);
+  const [familyMounted, setFamilyMounted] = useState(false);
+  useEffect(() => { if (insightsOpen) setInsightsMounted(true); }, [insightsOpen]);
+  useEffect(() => { if (familyOpen) setFamilyMounted(true); }, [familyOpen]);
+  // 浮层开着 → 推迟整页 reload(版本检查/模块水合),否则操作中被踢回今天。
+  useEffect(() => {
+    const held = insightsOpen || familyOpen || cookingOpen || inventoryOpen
+      || chatOpen || briefOpen || Boolean(workoutSession) || Boolean(captureMode)
+      || Boolean(modeCamera) || noteOpen || moodOpen || freezeOpen || calendarCreateOpen;
+    if (!held) return;
+    return holdUiOverlay();
+  }, [
+    insightsOpen, familyOpen, cookingOpen, inventoryOpen, chatOpen, briefOpen,
+    workoutSession, captureMode, modeCamera, noteOpen, moodOpen, freezeOpen, calendarCreateOpen,
+  ]);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
     testerAllowlist: [] as string[],
@@ -974,7 +994,7 @@ export default function Portal() {
         if (Date.now() - last < 30_000) return; // 冷却:别陷入刷新循环
         sessionStorage.setItem('nesio-chunk-reload-at', String(Date.now()));
       } catch { /* ignore */ }
-      window.location.reload();
+      requestDestructiveReload();
     };
     window.addEventListener('error', onChunkError);
     window.addEventListener('unhandledrejection', onChunkError);
@@ -1105,6 +1125,11 @@ export default function Portal() {
       setInsightsOpen(true);
     };
     const briefHandler = () => { track('brief_open', {}); setBriefOpen(true); };
+    const dictHandler = (e: Event) => {
+      const q = (e as CustomEvent).detail?.query;
+      setDictQuery(typeof q === 'string' ? q : '');
+      setDictOpen(true);
+    };
     // 洞察浮层:底部导航 / 卡片 / 「开始练」都派事件打开;detail.tab 指定进哪个 tab(如 fitness)
     // 2026-07-28(标注 图21):原来只认 tab==='fitness',别的一律落回默认页 ——
     // 于是车页那几个「去财务 / 去足迹看」的入口即使派了事件也跳不过去。改成认一份白名单。
@@ -1113,6 +1138,7 @@ export default function Portal() {
     const INSIGHTS_TABS: ReadonlySet<string> = new Set([
       'reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule',
       'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'music', 'rewards', 'admin',
+      'dictionary',
     ]);
     const insightsHandler = (e: Event) => {
       const tab = (e as CustomEvent).detail?.tab;
@@ -1165,6 +1191,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-camera', openCameraHandler);
     window.addEventListener('nesio-open-rewards', rewardsHandler);
     window.addEventListener('nesio-open-brief', briefHandler);
+    window.addEventListener('nesio-open-dictionary', dictHandler);
     window.addEventListener('nesio-open-insights', insightsHandler);
     window.addEventListener('nesio-open-training', trainingHandler);
     window.addEventListener('nesio-go-today', goTodayHandler);
@@ -1185,6 +1212,7 @@ export default function Portal() {
       window.removeEventListener('nesio-open-camera', openCameraHandler);
       window.removeEventListener('nesio-open-rewards', rewardsHandler);
       window.removeEventListener('nesio-open-brief', briefHandler);
+      window.removeEventListener('nesio-open-dictionary', dictHandler);
       window.removeEventListener('nesio-open-insights', insightsHandler);
       window.removeEventListener('nesio-open-training', trainingHandler);
       window.removeEventListener('nesio-go-today', goTodayHandler);
@@ -1785,10 +1813,10 @@ export default function Portal() {
       )}
       {/* 洞察 = 真全屏页(Radix fullscreen),不是「底部 Vaul 抽屉硬撑 100lvh」。
           假全屏会让 Vaul transform 把整页上推叠状态栏、底下留缝;下滑只是重算位置。 */}
-      {insightsOpen && (
+      {insightsMounted && (
         <NesioSheet
           variant="fullscreen"
-          open
+          open={insightsOpen}
           onOpenChange={(next) => { if (!next) setInsightsOpen(false); }}
           card={false}
           className="nesio-insights-sheet-card"
@@ -1804,7 +1832,7 @@ export default function Portal() {
       <InventorySheet open={inventoryOpen} onClose={() => setInventoryOpen(false)} />
       {calendarCreateOpen && <CalendarCreateSheet open={calendarCreateOpen} onClose={() => setCalendarCreateOpen(false)} />}
       {/* onToday:右上「今天」要连洞察一起关(bug3:左边回洞察、右边回今天) */}
-      {familyOpen && (
+      {familyMounted && (
         <FamilySharingSheet
           open={familyOpen}
           onClose={() => setFamilyOpen(false)}
@@ -1820,6 +1848,10 @@ export default function Portal() {
         </TabErrorBoundary>
       )}
       {briefOpen && <DailyBriefSheet open={briefOpen} onClose={() => setBriefOpen(false)} canUsePrivateData={canViewPrivateData} />}
+      {dictOpen && (
+        <DictionarySheet open={dictOpen} initialQuery={dictQuery}
+          onClose={() => { setDictOpen(false); setDictQuery(''); }} />
+      )}
       <AskGuideSheet open={askGuideOpen} onClose={() => setAskGuideOpen(false)} onStart={openAskChat} />
 
       <NesioChatSheet open={chatOpen} onClose={() => setChatOpen(false)} canUsePrivateData={canViewPrivateData} />

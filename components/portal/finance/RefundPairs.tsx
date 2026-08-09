@@ -116,7 +116,11 @@ export default function RefundPairs({ txs, currency, onChanged }: {
               ? `${t('这笔消费名下的退款加起来会超出原额', 'Refunds on that purchase would exceed it by')} ${formatMoney(over, currency)} —— ${t('多出来的更可能是另一笔消费的退款。', 'the excess is more likely a refund for a different purchase.')}`
               : strong
                 ? t('金额、商户、时间都对得上。', 'Amount, merchant and timing all line up.')
-                : t('对得上但不完全确定 —— 看一眼再决定。', 'Plausible but not certain — take a look before deciding.')}
+                : !best.exact
+                  ? t('金额是部分退 —— 核对是不是同一笔消费拆着退的。', 'Partial amount — check whether this is a split refund for that purchase.')
+                  : best.dayGap > 14
+                    ? `${t('相隔', '')}${best.dayGap}${t(' 天 —— 也可能是同商户另一笔消费的退款。', 'd apart — could also be a refund for a different charge at the same merchant.')}`
+                    : t('对得上但不完全确定 —— 差在金额或间隔,核对后再确认。', 'Close but not certain — amount or timing is off; confirm after a look.')}
           </p>
           <div style={{ display: 'flex', gap: 6 }}>
             <button type="button" style={strong ? { ...btn, background: 'var(--portal-accent-soft-md)' } : btn}

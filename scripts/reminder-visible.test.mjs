@@ -145,22 +145,19 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
     '整行可点与否仍由 r.node 决定');
 }
 
-/* ══ ④ 每日简报要有首页入口(不是只藏在设置里)═══════════════════════════ */
+/* ══ ④ 每日简报入口:常驻卡已下架,改走输入条「+」→ 同一张 sheet ═════════ */
 {
-  const row = read('components/portal/today/DailyBriefRow.tsx');
   const feed = stripComments(read('components/portal/TodayFeed.tsx'));
-  assert.match(feed, /<DailyBriefRow \/>/,
-    '简报入口要挂在今天页上 —— 一个叫「每日简报」的东西只在设置第二屏里有个 demo 入口,等于没有');
-  // 不许在这儿再实现一份简报:点开的必须是同一张 sheet
-  assert.match(row, /nesio-open-brief/, '首页入口要派同一个事件,复用同一张 sheet');
-  assert.doesNotMatch(row, /api\/portal\/(brief|chat)/,
-    '首页入口不许自己去生成一份简报 —— 两份实现会立刻开始漂移');
-  // 权益门不许旁路(设置里那个入口有 ai_routine 门)
-  assert.match(row, /canUse\('ai_routine'\)/, '首页入口要过同一道 Pro 门');
-  // 看过之后不许消失 —— 消失的话他明天又要问一次「在哪里」
-  assert.match(row, /is-seen/, '读过之后应当收成安静的一行,而不是整条不见');
-  assert.doesNotMatch(row, /if \(seenToday\) return null/,
-    '读过就整条藏起来 = 明天又找不到,而「找不到」正是这条 bug 的由来');
+  const bar = stripComments(read('components/portal/today/CaptureBar.tsx'));
+  assert.doesNotMatch(feed, /<DailyBriefRow \/>/,
+    '首页常驻简报卡应已下架 —— 别再挂 DailyBriefRow');
+  assert.match(feed, /nesio-open-brief/,
+    '今天页仍要有打开简报的入口(输入条 onBrief 派同一事件)');
+  assert.match(bar, /onBrief/, 'CaptureBar 要接简报出口');
+  assert.match(bar, /今日简报|Today's brief/, '「+」菜单要有简报文案');
+  // 不许在入口里再实现一份生成
+  assert.doesNotMatch(bar, /api\/portal\/(brief|chat)/,
+    '入口不许自己去生成一份简报 —— 两份实现会立刻开始漂移');
 }
 
-console.log('reminder-visible: OK(提醒进问一问上下文 / 身影带钟点 / 列表显示时间 / 简报有首页入口)');
+console.log('reminder-visible: OK(提醒进问一问上下文 / 身影带钟点 / 列表显示时间 / 简报走+菜单)');

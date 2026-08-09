@@ -41,7 +41,6 @@ import {
   type Project,
   type ProjectStatus,
 } from '@/lib/portal/project';
-import { buildNarratorCards, type NarratorCard } from '@/lib/portal/memory-narrator';
 import dynamic from 'next/dynamic';
 
 // Detail/graph views load on first open, not with the tab
@@ -501,30 +500,6 @@ function OnThisDayStrip({ nodes, onOpen }: { nodes: LifeNode[]; onOpen: (n: Life
         ))}
       </div>
     </div>
-  );
-}
-
-function NarratorCardView({ card, onOpen }: { card: NarratorCard; onOpen: (n: LifeNode) => void }) {
-  const dict = useDict();
-  const colorMap: Record<string, string> = {
-    remember: 'var(--portal-accent)',
-    commitment: 'var(--status-gentle)',
-    activity: 'var(--status-go)',
-  };
-  const accent = colorMap[card.type] ?? 'var(--portal-accent)';
-  // 批次 13:整卡可点直接进详情,去掉「查看详情」文字,卡片做正方形
-  void dict;
-  return (
-    <button
-      type="button"
-      className={`nesio-narrator-card nesio-narrator-card--${card.type}`}
-      style={{ '--narrator-accent': accent } as React.CSSProperties}
-      onClick={() => { if (card.nodes.length > 0) onOpen(card.nodes[0]); }}
-    >
-      <div className="nesio-narrator-title">{card.title}</div>
-      <div className="nesio-narrator-body">{card.body.replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu, '')}</div>
-      {card.sub && <div className="nesio-narrator-sub">{card.sub}</div>}
-    </button>
   );
 }
 
@@ -1179,9 +1154,6 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     }
   }, [canUsePrivateData, selectedNode]);
 
-  // Narrator cards
-  const narratorCards = useMemo(() => buildNarratorCards(nodes, dict), [nodes, dict]);
-
   // 按键防抖 250ms(QA 性能修):smartSearch 每击键全图打分,2328 节点下打字即卡
   const [debouncedQuery, setDebouncedQuery] = useState('');
   useEffect(() => {
@@ -1402,14 +1374,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
 
               {/* 批次 168:核心/项目就地展开区已删 —— 改成点球开独立页(FavoritesSheet / ProjectsSheet) */}
 
-              {/* Narrator cards */}
-              {narratorCards.length > 0 && (
-                <div className="nesio-narrator-section">
-                  {narratorCards.map((card) => (
-                    <NarratorCardView key={card.type} card={card} onOpen={openNodeDetail} />
-                  ))}
-                </div>
-              )}
+              {/* 回忆方块(Narrator「还记得这件事吗」)已下架 —— 用户要干净的记忆首屏 */}
 
               {/* On this day */}
               {onThisDayNodes.length > 0 && (

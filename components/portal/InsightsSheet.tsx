@@ -47,6 +47,7 @@ import dynamic from 'next/dynamic';
 
 const MemoryNodeDetailLazy = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 import InventoryStatsPanel from './insights/InventoryStatsPanel';
+import DictionaryPanel from './insights/DictionaryPanel';
 import WardrobePanel from './insights/WardrobePanel';
 import AdminOpsPanel from './insights/AdminOpsPanel';
 import AssetsPanel from './AssetsPanel';
@@ -65,7 +66,7 @@ const PlansPanel = dynamic(() => import('./insights/PlansPanel'), { ssr: false }
 // 2026-08-01 用户点名纠正:回顾/计划**不是**独立的洞察宫格入口 —— 是「目标」
 // (reflection)这一格打开后里面的三个子 tab(节律/回顾/计划),不在这层 MainTab
 // 里再开两个格子。GoalsSubTab 是那三个子 tab 各自的键,只在 reflection 内部用。
-export type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'fitness' | 'timeline' | 'schedule' | 'finance' | 'inventory' | 'wardrobe' | 'relationships' | 'tesla' | 'living' | 'music' | 'rewards' | 'admin';
+export type MainTab = 'reflection' | 'growth' | 'montage' | 'health' | 'fitness' | 'timeline' | 'schedule' | 'finance' | 'inventory' | 'wardrobe' | 'relationships' | 'tesla' | 'living' | 'music' | 'rewards' | 'admin' | 'dictionary';
 type GoalsSubTab = 'rhythm' | 'retrospect' | 'plans';
 
 const DAY_MS = 86_400_000;
@@ -353,11 +354,38 @@ const hubEditBtn: React.CSSProperties = {
 export default function InsightsSheet({ onClose, canUsePrivateData = false, initialTab, tabNonce = 0, onHubChange }: { onClose: () => void; canUsePrivateData?: boolean; initialTab?: MainTab; tabNonce?: number; onHubChange?: (hub: boolean) => void }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [mainTab, setMainTab] = useState<MainTab>(initialTab ?? 'reflection');
+  // 进过的板块保持挂载(display:none)—— 否则切宫格/切 tab 就卸掉 Tesla/运营等,
+  // 再进又是整页 Loading。本地 blob 页(财务/健康)看着没事,联网页就很刺眼。
+  const [keptTabs, setKeptTabs] = useState<Set<MainTab>>(() => new Set(initialTab ? [initialTab] : []));
   // 目标页内的三个子 tab(节律/回顾/计划)。2026-08-01 用户点名纠正:
   // 「不是开三个洞察页面板块,是当前目标页打开增加为 3 个子 tab」。
   const [goalsSubTab, setGoalsSubTab] = useState<GoalsSubTab>('rhythm');
   // 洞察改版:首页是入口宫格(showHub),点卡进板块;有 initialTab(深链)时直达板块。
   const [showHub, setShowHub] = useState(!initialTab);
+  useEffect(() => {
+    if (showHub) return;
+    setKeptTabs((prev) => {
+      if (prev.has(mainTab)) return prev;
+      const next = new Set(prev);
+      next.add(mainTab);
+      return next;
+    });
+  }, [mainTab, showHub]);
+  const keepTab = (id: MainTab, node: ReactNode, className?: string) => {
+    if (!keptTabs.has(id)) return null;
+    // 宫格首页时也保持挂载(只藏),否则回宫格会把 Tesla/运营整棵卸掉 → 再进又 Loading。
+    const visible = !showHub && mainTab === id;
+    return (
+      <div
+        key={id}
+        className={className}
+        style={{ display: visible ? undefined : 'none' }}
+        aria-hidden={!visible}
+      >
+        {node}
+      </div>
+    );
+  };
   // 日程行点开详情(此前只能跳关键词搜索,标题多半零命中 → 像死按钮)
   const [detailNodeId, setDetailNodeId] = useState<string | null>(null);
   // 洞察已打开时的板块深链(如车页「充电花费 → 财务」):initialTab 变化要能就地切板块,
@@ -384,6 +412,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       : t === 'relationships' ? L(dict, '关系', 'People')
       : t === 'schedule' ? L(dict, '日程', 'Schedule')
       : t === 'inventory' ? L(dict, '物品', 'Items')
+      : t === 'dictionary' ? L(dict, '词典', 'Dictionary')
       : t === 'wardrobe' ? L(dict, '衣橱', 'Wardrobe')
       // Bug4 图23-24:「车」扩成「资产」—— 房产 tab + 车 tab。
       // tab key 仍叫 tesla:深链和宫格顺序都按 key 存,改 key 会把老用户的自定义顺序打散。
@@ -405,6 +434,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       case 'schedule': return <IconCalendar />;
       case 'finance': return <IconCard />;
       case 'inventory': return <IconBox />;
+      case 'dictionary': return <IconNote />;
       case 'wardrobe': return <IconHanger />;
       case 'relationships': return <IconUser />;
       // #8:这一格从「车」改名成「资产」(房产 + 车两个子 tab)后,图标还是一辆小汽车 ——
@@ -454,6 +484,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       // 积分是全 App 通用的攒分机制(冷冻仓忍住/健身打卡/深度疗愈都会加),
       // 没有单独开关可关掉,跟 tesla 一样恒在。
       : t === 'rewards' ? true
+      : t === 'dictionary' ? true
       : true; // 'reflection'(目标,内含节律/回顾/计划三个子 tab)= 核心,永远在
   useEffect(() => { if (!tabEnabled(mainTab)) setMainTab('reflection'); }, [showPlaces, showHealth, showFinance, showPeople, showInventory, showSchedule, showGrowth, showMontage, showWardrobe, showTesla, showLiving, showMusic, mainTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -463,7 +494,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   // tab = 切到本 sheet 的某个 tab;event = 打开另一个全屏面板。
   const hubTiles = useMemo(() => {
     const list: Array<{ key: string; label: string; icon: React.ReactNode; tab?: MainTab; event?: string }> = [];
-    for (const t of ['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule', 'finance', 'inventory', 'wardrobe', 'relationships', 'tesla', 'living', 'music', 'rewards', 'admin'] as MainTab[]) {
+    for (const t of ['reflection', 'growth', 'montage', 'health', 'fitness', 'timeline', 'schedule', 'finance', 'inventory', 'dictionary', 'wardrobe', 'relationships', 'tesla', 'living', 'music', 'rewards', 'admin'] as MainTab[]) {
       if (!tabEnabled(t)) continue;
       list.push({ key: t, label: tabLabel(t), icon: tabIcon(t), tab: t });
     }
@@ -833,67 +864,27 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
           </div>
         )}
 
-        {/* ── Tab: Timeline ── */}
-        {mainTab === 'timeline' && showPlaces && (
-          <div className="nesio-analytics-tab">
-            <TimelineTab />
-          </div>
-        )}
-
-        {/* ── Tab: 成长(引导卡 + 回看流 + 框架书架,v0 规则版零 AI 成本)── */}
-        {mainTab === 'growth' && (
-          <div className="nesio-analytics-tab">
-            <GrowthTab onOpenNode={setDetailNodeId} />
-          </div>
-        )}
-
-        {/* ── Tab: 小剧场(记忆 → 厚涂动漫短片,呈现层;生成在 Lab 端)── */}
-        {mainTab === 'montage' && (
-          <div className="nesio-analytics-tab">
-            <MontageTab />
-          </div>
-        )}
-
-        {/* ── Tab: Finance ── */}
-        {mainTab === 'finance' && showFinance && <FinanceTab />}
-
-        {/* ── Tab: 健康 Dashboard ── */}
-        {mainTab === 'health' && showHealth && <HealthDashboard />}
-        {mainTab === 'fitness' && showHealth && (
-          <TabErrorBoundary label="fitness"><div className="nesio-analytics-tab"><TrainingPlan /></div></TabErrorBoundary>
-        )}
-
-        {/* ── Tab: 关系管理 ── */}
-        {mainTab === 'relationships' && showPeople && <RelationshipsPanel />}
-
-        {/* ── Tab: 会议(只看会议记录 + 挂没挂到日程,解决「混在一堆里找不着」)── */}
-        {mainTab === 'schedule' && <TabErrorBoundary label="schedule"><SchedulePanel /></TabErrorBoundary>}
-
-        {/* ── Tab: 物品(只读统计 dashboard;管理去物品页)── */}
-        {mainTab === 'inventory' && <TabErrorBoundary label="inventory"><InventoryStatsPanel /></TabErrorBoundary>}
-
-        {mainTab === 'wardrobe' && <TabErrorBoundary label="wardrobe"><WardrobePanel /></TabErrorBoundary>}
-
-        {mainTab === 'admin' && <TabErrorBoundary label="admin"><AdminOpsPanel /></TabErrorBoundary>}
-
-        {/* ── Tab: 车 · Tesla(常驻入口,便于长期观察数据到没到、去了哪)── */}
-        {mainTab === 'tesla' && <div className="nesio-analytics-tab"><AssetsPanel /></div>}
-        {mainTab === 'music' && <div className="nesio-analytics-tab"><MusicPanel /></div>}
-
-        {/* ── Tab: 奖励(2026-08-01 从今天页顶栏 chip 打开的浮层商城升级成这里的独立页) ── */}
-        {mainTab === 'rewards' && <div className="nesio-analytics-tab"><RewardsStore /></div>}
-
-        {/* ── Tab: 认知 = 多面镜月度信(Pro);旧 7 层模型 + 节点图移 Lab ── */}
-        {mainTab === 'living' && (
-          <>
-            <MirrorLetterTab />
-            {/* 2026-07-28 UI 精修(标注 图23):「Lab · 旧认知模型(已退役)」整块删掉 ——
-                一块只用来公告「这块已经没了」的墓碑,还占着镜子页底部一屏。退役这件事
-                在 STATE.md 里记着就够,不必在用户面前立牌子。 */}
-          </>
-        )}
         </>
         )}
+
+        {/* 进过的板块 keep-alive:**放在宫格 ternary 外面** —— 回宫格也不卸,
+            否则 Tesla/运营每次从宫格再点进又是整页 Loading。 */}
+        {showPlaces && keepTab('timeline', <TimelineTab />, 'nesio-analytics-tab')}
+        {keepTab('growth', <GrowthTab onOpenNode={setDetailNodeId} />, 'nesio-analytics-tab')}
+        {keepTab('montage', <MontageTab />, 'nesio-analytics-tab')}
+        {showFinance && keepTab('finance', <FinanceTab />)}
+        {showHealth && keepTab('health', <HealthDashboard />)}
+        {showHealth && keepTab('fitness', <TabErrorBoundary label="fitness"><TrainingPlan /></TabErrorBoundary>, 'nesio-analytics-tab')}
+        {showPeople && keepTab('relationships', <RelationshipsPanel />)}
+        {keepTab('schedule', <TabErrorBoundary label="schedule"><SchedulePanel /></TabErrorBoundary>)}
+        {keepTab('inventory', <TabErrorBoundary label="inventory"><InventoryStatsPanel /></TabErrorBoundary>)}
+        {keepTab('dictionary', <TabErrorBoundary label="dictionary"><DictionaryPanel /></TabErrorBoundary>)}
+        {keepTab('wardrobe', <TabErrorBoundary label="wardrobe"><WardrobePanel /></TabErrorBoundary>)}
+        {keepTab('admin', <TabErrorBoundary label="admin"><AdminOpsPanel /></TabErrorBoundary>)}
+        {keepTab('tesla', <AssetsPanel />, 'nesio-analytics-tab')}
+        {keepTab('music', <MusicPanel />, 'nesio-analytics-tab')}
+        {keepTab('rewards', <RewardsStore />, 'nesio-analytics-tab')}
+        {keepTab('living', <MirrorLetterTab />)}
 
       </div>
 

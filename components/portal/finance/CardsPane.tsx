@@ -11,7 +11,7 @@ import { useState } from 'react';
 import {
   accountMonth, accountTypeLabel, formatMoney, removeBankAccount,
   loadAccountNames, setAccountName, displayAccountName,
-  txFlow, TX_FLOW_LABELS, effectiveCategory,
+  txFlow, TX_FLOW_LABELS, effectiveCategory, addManualBankAccount, isManualBankAccount,
   type BankTx, type BankAccount, type Holding,
 } from '@/lib/portal/bank-tx';
 import { categoryLabel, categoryDetailLabel } from '@/lib/portal/tx-category';
@@ -35,6 +35,13 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
   // bug3:「点击动作完成后页面没有消失,也看不出来是否成功,其实成功了」——
   // 保存后给一句明确回执(2 秒后自己消失),按钮本身改成对勾图标。
   const [nameSaved, setNameSaved] = useState(false);
+  // 手工添加账户(记一笔可挂到此户并进交易页)
+  const [addOpen, setAddOpen] = useState(false);
+  const [addName, setAddName] = useState('');
+  const [addType, setAddType] = useState<'depository' | 'credit' | 'loan' | 'investment' | 'other'>('depository');
+  const [addMask, setAddMask] = useState('');
+  const [addErr, setAddErr] = useState('');
+  const [addBusy, setAddBusy] = useState(false);
   const names = loadAccountNames();
   const isLiabAcct = (a: BankAccount) => ['credit', 'loan'].includes((a.type || '').toLowerCase());
   const isInvestAcct = (a: BankAccount) => ['investment', 'brokerage'].includes((a.type || '').toLowerCase());
@@ -75,10 +82,51 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
     ? txs.filter((t) => t.accountId === detailAcct.id && (t.date || '').slice(0, 7) === ym).sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 20)
     : [];
 
+  const submitManual = () => {
+    setAddErr('');
+    setAddBusy(true);
+    try {
+      const a = addManualBankAccount({ name: addName, type: addType, ...(addMask.trim() ? { mask: addMask } : {}) });
+      if (!a) { setAddErr(L(dict, '给账户起个名字。', 'Name the account first.')); return; }
+      setAddName(''); setAddMask(''); setAddOpen(false); onChanged();
+    } finally { setAddBusy(false); }
+  };
+
   return (
     <>
+      <div style={{ marginBottom: 'var(--space-3)' }}>
+        <button type="button" className="nesio-fin-review-accept" onClick={() => { setAddOpen((v) => !v); setAddErr(''); }}>
+          {L(dict, '＋ 手工添加账户', '+ Add account manually')}
+        </button>
+        {addOpen && (
+          <div style={{ marginTop: 'var(--space-2)', display: 'flex', flexDirection: 'column', gap: 8, padding: 'var(--space-3)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)' }}>
+            <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.6 }}>
+              {L(dict, '记一笔时可选这个账户,流水会出现在交易页(与银行同步账户分开存,不会被同步抹掉)。', 'Pick this account in Quick Add — entries show on Transactions and survive bank sync.')}
+            </p>
+            <input value={addName} onChange={(e) => setAddName(e.target.value)}
+              placeholder={L(dict, '账户名(例:现金钱包)', 'Name (e.g. Cash wallet)')}
+              style={{ border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', fontSize: 'var(--text-sm)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }} />
+            <select className="nesio-fin-select" value={addType} onChange={(e) => setAddType(e.target.value as typeof addType)} aria-label={L(dict, '账户类型', 'Account type')}>
+              <option value="depository">{L(dict, '存款 / 现金', 'Cash / deposit')}</option>
+              <option value="credit">{L(dict, '信用卡', 'Credit card')}</option>
+              <option value="loan">{L(dict, '贷款', 'Loan')}</option>
+              <option value="investment">{L(dict, '投资', 'Investment')}</option>
+              <option value="other">{L(dict, '其他', 'Other')}</option>
+            </select>
+            <input value={addMask} onChange={(e) => setAddMask(e.target.value)}
+              placeholder={L(dict, '尾号(可空)', 'Last 4 (optional)')}
+              inputMode="numeric" maxLength={4}
+              style={{ border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', fontSize: 'var(--text-sm)', background: 'var(--portal-bg)', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)' }} />
+            {addErr && <p role="alert" style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--status-risk)' }}>{addErr}</p>}
+            <button type="button" className="nesio-fin-review-accept" disabled={addBusy} onClick={submitManual}>
+              {addBusy ? L(dict, '保存中…', 'Saving…') : L(dict, '保存账户', 'Save account')}
+            </button>
+          </div>
+        )}
+      </div>
+
       {accounts.length === 0 ? (
-        <p className="nesio-insights-option-hint nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没有账户信息。到「设置 → 数据接入」点银行「同步」一次,就会拉到你的卡/账户(余额、消费、退款分卡显示)。', 'No account info yet. Tap Sync on the bank connector once (Settings → Data sources) to pull your cards/accounts (per-card balance, spend, refunds).')}</p>
+        <p className="nesio-insights-option-hint nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没有银行账户。可先手工添加,或到「设置 → 数据接入」点银行「同步」。', 'No bank accounts yet. Add one manually above, or sync the bank connector (Settings → Data sources).')}</p>
       ) : (
         <>
           {depositAccts.length > 0 && (<>
@@ -204,7 +252,9 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
             {/* bug3:底部这行字改红色 —— 它是破坏性动作,不该和普通选项一个颜色 */}
             <button type="button" className="nesio-fin-flowopt" style={{ color: 'var(--status-risk)' }}
               onClick={() => { removeBankAccount(detailAcct.id); setDetailId(null); onChanged(); }}>
-              {L(dict, '移除此账户(仍连接的账户同步时会回来)', 'Remove account (returns on next sync if still linked)')}
+              {isManualBankAccount(detailAcct)
+                ? L(dict, '删除此手工账户', 'Delete this manual account')
+                : L(dict, '移除此账户(仍连接的账户同步时会回来)', 'Remove account (returns on next sync if still linked)')}
             </button>
           </div>
         )}

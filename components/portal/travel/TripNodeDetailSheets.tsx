@@ -8,7 +8,8 @@ import { useState } from 'react';
 import {
   pushPackingNeedsToShopping,
   setFlightCheckInReminder, hasFlightCheckInReminder, armTravelReceiptCapture,
-  generatePackingList, recomputeBudgetNode, updateNode, setCategoryBudget, removeTripNode,
+  generatePackingList, recomputeBudgetNode, updateNode, setCategoryBudget, setTripBudgetTotal,
+  clearTripBudget, removeTripNode,
   type TripNode, type FlightPayload, type HotelPayload,
   type ShoppingPayload, type ShoppingLine, type PackingPayload, type BudgetPayload, type PoiPayload, type TodoPayload,
 } from '@/lib/portal/travel-trips';
@@ -30,6 +31,27 @@ function Row({ label, value }: { label: string; value?: string | number | null }
       <span className="nesio-trip-kv-k">{label}</span>
       <span className="nesio-trip-kv-v">{value}</span>
     </div>
+  );
+}
+
+function DeleteNodeButton({
+  tripId, nodeId, title, dict, onChanged,
+}: {
+  tripId: string; nodeId: string; title: string; dict: string; onChanged?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="nesio-trip-action"
+      style={{ color: 'var(--status-risk)', marginTop: 'var(--space-2)' }}
+      onClick={() => {
+        if (!confirm(L(dict, `删掉「${title}」?`, `Delete “${title}”?`))) return;
+        removeTripNode(tripId, nodeId);
+        onChanged?.();
+      }}
+    >
+      {L(dict, '删掉这条', 'Delete')}
+    </button>
   );
 }
 
@@ -63,12 +85,14 @@ export function FlightDetail({
     onChanged?.();
   }
 
+  const routeTitle = `${flight.fromCode || flight.from} → ${flight.toCode || flight.to}`;
+
   return (
     <div className="nesio-trip-detail">
       <div className="nesio-trip-detail-hero">
         <IconPlane size={28} />
         <div>
-          <p className="nesio-trip-detail-route">{flight.fromCode || flight.from} → {flight.toCode || flight.to}</p>
+          <p className="nesio-trip-detail-route">{routeTitle}</p>
           <p className="nesio-trip-detail-sub">{[flight.airline, flight.flightNo].filter(Boolean).join(' · ')}</p>
         </div>
         {flight.statusText && <span className="nesio-trip-status-pill">{flight.statusText}</span>}
@@ -111,6 +135,7 @@ export function FlightDetail({
           ? L(dict, '值机提醒已设', 'Check-in reminder on')
           : L(dict, '设值机提醒', 'Set check-in reminder')}
       </button>
+      <DeleteNodeButton tripId={tripId} nodeId={nodeId} title={routeTitle || flight.flightNo || L(dict, '航班', 'Flight')} dict={dict} onChanged={onChanged} />
       {msg && <p className="nesio-trip-msg" role="status">{msg}</p>}
     </div>
   );
@@ -131,6 +156,7 @@ export function HotelDetail({
       subtitle: draft.pricePerNight != null ? `${draft.currency || '¥'}${draft.pricePerNight}` : undefined,
       payload: { kind: 'hotel', hotel: draft },
     });
+    recomputeBudgetNode(tripId);
     setEdit(false);
     onChanged?.();
   }
@@ -217,6 +243,7 @@ export function HotelDetail({
           </a>
         )}
       </div>
+      <DeleteNodeButton tripId={tripId} nodeId={nodeId} title={hotel.name || L(dict, '酒店', 'Hotel')} dict={dict} onChanged={onChanged} />
     </div>
   );
 }
@@ -317,6 +344,7 @@ export function ShoppingDetail({
             ariaLabel={L(dict, '拍小票 · 记入本行程', 'Snap receipt · add to trip')}>
             <IconCamera size={16} /> {L(dict, '拍小票 · 记入本行程', 'Snap receipt · add to trip')}
           </SnapButton>
+          <DeleteNodeButton tripId={tripId} nodeId={nodeId} title={shopping.title || L(dict, '购物', 'Shopping')} dict={dict} onChanged={onChanged} />
         </>
       )}
     </div>
@@ -503,6 +531,7 @@ export function PackingDetail({
           <button type="button" className="nesio-trip-link" onClick={pushNeeds}>{L(dict, '重试', 'Retry')}</button>
         </p>
       )}
+      <DeleteNodeButton tripId={tripId} nodeId={nodeId} title={L(dict, '打包清单', 'Packing list')} dict={dict} onChanged={onChanged} />
     </div>
   );
 }
@@ -513,7 +542,9 @@ export function BudgetDetail({
   tripId: string; budget: BudgetPayload; dict: string; onChanged: () => void;
 }) {
   const currency = budget.currency || '¥';
-  // bug3:「无法点无法编辑」—— 点一行进编辑,改这一类的预算(存 Trip.budgetByCategory,重算不抹)
+  // bug3:「无法点无法编辑」—— 顶栏改总额 + 点类别改该类预算
+  const [editTotal, setEditTotal] = useState(false);
+  const [totalDraft, setTotalDraft] = useState(String(budget.budgetTotal || ''));
   const [editCat, setEditCat] = useState<string | null>(null);
   const [draft, setDraft] = useState('');
   const pct = budget.budgetTotal > 0 ? Math.min(100, Math.round((budget.actualTotal / budget.budgetTotal) * 100)) : 0;
@@ -524,7 +555,29 @@ export function BudgetDetail({
       <div className="nesio-trip-card">
         <div className="nesio-trip-budget-head">
           <span>{L(dict, '实际花费 / 预算', 'Actual / Budget')}</span>
-          <b>{currency}{budget.actualTotal.toLocaleString()} / {budget.budgetTotal.toLocaleString()}</b>
+          {!editTotal ? (
+            <button type="button" className="nesio-trip-link" style={{ padding: 0, font: 'inherit', color: 'inherit' }}
+              onClick={() => { setEditTotal(true); setTotalDraft(String(budget.budgetTotal || '')); setEditCat(null); }}
+              aria-label={L(dict, '改总预算', 'Edit total budget')}>
+              <b>{currency}{budget.actualTotal.toLocaleString()} / {budget.budgetTotal.toLocaleString()}</b>
+              <small style={{ display: 'block', color: 'var(--portal-muted)', fontWeight: 'var(--weight-regular)' }}>
+                {L(dict, '点这里改总预算', 'Tap to edit total')}
+              </small>
+            </button>
+          ) : (
+            <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center', flexWrap: 'wrap' }}>
+              <span>{currency}{budget.actualTotal.toLocaleString()} /</span>
+              <input type="number" inputMode="decimal" value={totalDraft} onChange={(e) => setTotalDraft(e.target.value)}
+                aria-label={L(dict, '总预算', 'Total budget')}
+                style={{ width: '7.5rem', padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)' }} />
+              <button type="button" className="nesio-trip-primary" onClick={() => {
+                setTripBudgetTotal(tripId, Number(totalDraft) || 0);
+                setEditTotal(false);
+                onChanged();
+              }}>{L(dict, '存', 'Save')}</button>
+              <button type="button" className="nesio-trip-action" onClick={() => setEditTotal(false)}>{L(dict, '取消', 'Cancel')}</button>
+            </div>
+          )}
         </div>
         <div className="nesio-trip-budget-bar" aria-hidden>
           <div className="nesio-trip-budget-bar-fill" style={{ width: `${pct}%` }} />
@@ -536,9 +589,7 @@ export function BudgetDetail({
       </div>
 
       <div className="nesio-trip-section-head">
-        <span>{L(dict, '按类别 · 实际 vs 预算', 'By category · actual vs budget')}</span>
-        {/* bug3:「拍照没有直接进入拍一张的智能相机 / 拍照按钮启动口不对」——
-            SnapButton 自己在用户手势里调起系统相机,拿到图再交给识别页,不再停在选择页。 */}
+        <span>{L(dict, '按类别 · 点一行可改预算', 'By category · tap a row to edit')}</span>
         <SnapButton
           className="nesio-trip-link"
           label={L(dict, '拍小票入账', 'Scan receipt')}
@@ -555,7 +606,7 @@ export function BudgetDetail({
           <div key={c.id} className="nesio-trip-card nesio-trip-cat">
             <button type="button" className="nesio-trip-cat-top" style={{ width: '100%', background: 'none', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left', font: 'inherit', color: 'inherit' }}
               aria-expanded={editing}
-              onClick={() => { setEditCat(editing ? null : c.id); setDraft(String(c.budget)); }}>
+              onClick={() => { setEditCat(editing ? null : c.id); setDraft(String(c.budget)); setEditTotal(false); }}>
               <span className="nesio-trip-cat-ico">{c.id === 'flight' ? <IconPlane size={16} /> : c.id === 'stay' ? <IconBed size={16} /> : <IconCard size={16} />}</span>
               <b>{c.label}</b>
               <span>{currency}{c.actual.toLocaleString()} / {c.budget.toLocaleString()}</span>
@@ -580,20 +631,27 @@ export function BudgetDetail({
               <div className={`nesio-trip-cat-note${over ? ' is-over' : ''}`}>
                 {over
                   ? L(dict, `超 ${currency}${delta.toLocaleString()}`, `Over ${currency}${delta.toLocaleString()}`)
-                  : L(dict, `剩 ${currency}${delta.toLocaleString()}`, `${currency}${delta.toLocaleString()} left`)}
+                  : L(dict, `剩 ${currency}${delta.toLocaleString()} · 点上改`, `${currency}${delta.toLocaleString()} left · tap to edit`)}
               </div>
             )}
           </div>
         );
       })}
 
-      <button
-        type="button"
-        className="nesio-trip-action"
-        onClick={() => { recomputeBudgetNode(tripId); onChanged(); }}
-      >
-        {L(dict, '按节点重算预算', 'Recompute from nodes')}
-      </button>
+      <div className="nesio-trip-actions" style={{ flexWrap: 'wrap' }}>
+        <button type="button" className="nesio-trip-action" onClick={() => { recomputeBudgetNode(tripId); onChanged(); }}>
+          {L(dict, '按节点重算预算', 'Recompute from nodes')}
+        </button>
+        <button type="button" className="nesio-trip-action" onClick={() => {
+          if (!confirm(L(dict, '清掉手填预算,回到节点实际?', 'Clear manual budget and use node totals?'))) return;
+          clearTripBudget(tripId);
+          setEditTotal(false);
+          setEditCat(null);
+          onChanged();
+        }}>
+          {L(dict, '清零预算', 'Clear budget')}
+        </button>
+      </div>
     </div>
   );
 }
@@ -655,6 +713,7 @@ export function PoiDetail({
           <IconCheckCircle size={16} /> {L(dict, '标记已去过', 'Mark visited')}
         </button>
       )}
+      <DeleteNodeButton tripId={tripId} nodeId={nodeId} title={poi.name} dict={dict} onChanged={onChanged} />
     </div>
   );
 }

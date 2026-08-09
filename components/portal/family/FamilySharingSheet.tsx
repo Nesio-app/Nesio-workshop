@@ -21,9 +21,11 @@ import {
   type FamilySummary, type FamilyMemberView, type BoardView, type LedgerView, type ChoreInstanceView,
 } from '@/lib/family/family-client';
 import { awardChorePoints, reconcileMyChorePoints } from './award-chore-points';
+import { readPanelCache, writePanelCache, PANEL_CACHE_KEYS } from '@/lib/portal/session-panel-cache';
 
 type View = { kind: 'board' } | { kind: 'ledger'; person: FamilyMemberView };
 type Dict = 'zh' | 'en';
+type FamilyCache = { families: FamilySummary[]; familyId: string };
 
 /**
  * 家务的「多少」怎么显示(2026-08-01 用户:「家务挣积分,把钱相关的 UI 逻辑都换。
@@ -48,10 +50,11 @@ export default function FamilySharingSheet({ open, onClose, onToday }: {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const t = (zh: string, en: string) => L(dict, zh, en);
 
-  const [loading, setLoading] = useState(true);
+  const initial = readPanelCache<FamilyCache>(PANEL_CACHE_KEYS.family);
+  const [loading, setLoading] = useState(!initial);
   const [loadErr, setLoadErr] = useState('');
-  const [families, setFamilies] = useState<FamilySummary[]>([]);
-  const [familyId, setFamilyId] = useState('');
+  const [families, setFamilies] = useState<FamilySummary[]>(() => initial?.families ?? []);
+  const [familyId, setFamilyId] = useState(() => initial?.familyId ?? '');
   const [view, setView] = useState<View>({ kind: 'board' });
 
   // 2026-07-29:这里原本把 familyId 写进 useCallback 依赖,再在函数体里读它 —— 两个后果:
@@ -59,20 +62,35 @@ export default function FamilySharingSheet({ open, onClose, onToday }: {
   //   ② 「退出家庭」那条路会拿**旧闭包**调它(familyId 还是老值),
   //      `!familyId` 判假 → 不重选家庭 → 落进「不 loading、无报错、也没内容」的空屏。
   // 改成用 setFamilyId 的函数式更新拿当前值,回调只依赖空数组 —— 拉一次、选得准。
-  const refreshFamilies = useCallback(async () => {
-    setLoading(true); setLoadErr('');
+  const refreshFamilies = useCallback(async (opts: { silent?: boolean } = {}) => {
+    if (!opts.silent) { setLoading(true); setLoadErr(''); }
     // 打开时把「我」的账号名字/头像同步到成员行(身份自成一套,不匹配 People)。best-effort。
     try { const p = loadProfileSettings(); await syncMyFamilyProfile(p.displayName, p.avatarUrl || ''); } catch { /* 首次未入伙时无行可更,忽略 */ }
     const r = await listFamilies();
-    if (!r.ok) { setLoadErr(r.error); setLoading(false); return; }
+    if (!r.ok) {
+      // 静默刷新失败且已有画面 → 保留,不整页 Loading/Error 打断。
+      if (opts.silent) {
+        const kept = readPanelCache<FamilyCache>(PANEL_CACHE_KEYS.family);
+        if (kept?.families?.length) { setLoading(false); return; }
+      }
+      setLoadErr(r.error); setLoading(false); return;
+    }
     const list = r.data.families;
     setFamilies(list);
     // 当前选中的家庭还在列表里就保持,否则(首次进 / 刚退出)落到第一个。
-    setFamilyId((cur) => (cur && list.some((f) => f.familyId === cur) ? cur : (list[0]?.familyId ?? '')));
+    setFamilyId((cur) => {
+      const next = cur && list.some((f) => f.familyId === cur) ? cur : (list[0]?.familyId ?? '');
+      writePanelCache(PANEL_CACHE_KEYS.family, { families: list, familyId: next });
+      return next;
+    });
     setLoading(false);
   }, []);
 
-  useEffect(() => { if (open) void refreshFamilies(); }, [open, refreshFamilies]);
+  useEffect(() => {
+    if (!open) return;
+    const has = Boolean(readPanelCache(PANEL_CACHE_KEYS.family));
+    void refreshFamilies({ silent: has });
+  }, [open, refreshFamilies]);
 
   if (!open) return null;
 

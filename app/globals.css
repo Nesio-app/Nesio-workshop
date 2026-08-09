@@ -19960,6 +19960,18 @@ html[data-portal-theme="night"] .nesio-sheet--bottom[data-vaul-drawer]::after {
 .nesio-trip-addbar {
   display: flex; flex-wrap: wrap; gap: var(--space-2);
 }
+.nesio-trip-addbar--secondary { margin-top: calc(-1 * var(--space-1)); }
+.nesio-trip-action--ghost {
+  border-style: dashed;
+  color: var(--portal-muted);
+  background: transparent;
+}
+.nesio-travel-plan-form--import {
+  order: 2;
+  margin-top: var(--space-2);
+}
+.nesio-trip-sheet .nesio-trip-timeline { order: 1; }
+.nesio-trip-sheet .nesio-travel-plan-form { position: relative; z-index: 1; }
 .nesio-trip-map {
   width: 100%; height: 140px; border: 0; border-radius: var(--radius-md);
   border: 1px solid var(--portal-line); background: var(--portal-accent-soft);
@@ -20157,7 +20169,7 @@ a.nesio-trip-action { color: var(--portal-ink); }
 .nesio-trip-cat-note { font-size: var(--text-xs); color: var(--status-go); }
 .nesio-trip-cat-note.is-over { color: var(--status-risk); }
 
-.nesio-trip-poi-picker { max-height: min(58lvh, 520px); overflow: auto; }
+.nesio-trip-poi-picker { max-height: min(72lvh, 640px); overflow: auto; }
 .nesio-trip-poi-head {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
 }
@@ -21899,3 +21911,76 @@ html[data-portal-theme="night"] .nesio-trip-node-dot.is-booked { color: var(--po
 }
 .nesio-tesla-health-label { font-size: var(--text-xs); color: var(--portal-muted); }
 .nesio-tesla-health-value { font-size: var(--text-sm); color: var(--portal-ink); }
+
+/* ── 离线词典(欧路风格) + 彩色简报 + 输入条 + 菜单 ── */
+.nesio-dict-sheet, .nesio-dict-panel { display: flex; flex-direction: column; gap: var(--space-2); padding: var(--space-2) var(--space-4) var(--space-6); }
+.nesio-dict-tabs { display: flex; align-items: center; gap: 6px; }
+.nesio-dict-tabs button {
+  border: 1px solid var(--portal-line); border-radius: var(--radius-pill);
+  padding: 6px 12px; font-size: var(--text-xs); font-family: var(--font-sans);
+  background: transparent; color: var(--portal-muted); cursor: pointer;
+}
+.nesio-dict-tabs button.is-on { background: var(--portal-accent-soft-md); color: var(--portal-accent); border-color: transparent; font-weight: 700; }
+.nesio-dict-close { margin-left: auto; border: none !important; font-size: var(--text-body); color: var(--portal-muted); }
+.nesio-dict-search {
+  width: 100%; border: 1px solid var(--portal-line); border-radius: var(--radius-sm);
+  padding: 12px 14px; font-size: var(--text-body); font-family: var(--font-sans);
+  background: var(--portal-bg); color: var(--portal-ink);
+}
+.nesio-dict-meta, .nesio-dict-hint, .nesio-dict-empty { margin: 0; font-size: var(--text-xs); color: var(--portal-muted); line-height: 1.5; }
+.nesio-dict-list { display: flex; flex-direction: column; gap: var(--space-3); max-height: 55vh; overflow-y: auto; }
+.nesio-dict-entry {
+  border: 1px solid var(--portal-line); border-radius: var(--radius-md);
+  padding: var(--space-3); background: var(--portal-card, #fff);
+}
+.nesio-dict-entry-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.nesio-dict-headword { margin: 0; font-size: var(--text-h3); font-weight: 700; color: var(--portal-ink); font-family: var(--font-serif); }
+.nesio-dict-phonetic { margin: 2px 0 0; font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-dict-star {
+  border: none; background: transparent; cursor: pointer; font-size: 18px;
+  color: var(--portal-muted); line-height: 1; padding: 4px;
+}
+.nesio-dict-star.is-on { color: var(--status-gentle); }
+.nesio-dict-senses { margin: var(--space-2) 0 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.nesio-dict-pos { display: inline-block; margin-right: 6px; font-size: var(--text-xs); color: var(--portal-accent); font-weight: 600; }
+.nesio-dict-def { font-size: var(--text-sm); color: var(--portal-ink); }
+.nesio-dict-def-en { display: block; margin-top: 2px; font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-dict-examples { margin-top: var(--space-2); padding-top: var(--space-2); border-top: 1px dashed var(--portal-line); }
+.nesio-dict-ex { margin: 0 0 6px; display: flex; flex-direction: column; gap: 2px; }
+.nesio-dict-ex-en { font-size: var(--text-sm); color: var(--portal-ink); }
+.nesio-dict-ex-zh { font-size: var(--text-xs); color: var(--portal-muted); }
+.nesio-dict-err { margin: 0; font-size: var(--text-sm); color: var(--status-risk); }
+
+.nesio-cap-plus-menu {
+  display: flex; flex-direction: column; gap: 4px; margin-top: 6px;
+  padding: 6px; border: 1px solid var(--portal-line); border-radius: var(--radius-md);
+  background: var(--portal-card, #fff);
+}
+.nesio-cap-plus-item {
+  border: none; background: transparent; text-align: left; cursor: pointer;
+  padding: 10px 12px; border-radius: var(--radius-sm); font-family: var(--font-sans);
+  font-size: var(--text-sm); color: var(--portal-ink); font-weight: 600;
+}
+.nesio-cap-plus-item:active { background: var(--portal-accent-soft); }
+
+.nesio-brief-card--rich .nesio-brief-hero {
+  display: flex; justify-content: space-between; align-items: flex-start; gap: 12px;
+  padding: var(--space-4) var(--space-4) var(--space-3);
+  background: linear-gradient(135deg, var(--portal-accent-soft) 0%, var(--status-go-soft) 55%, var(--status-gentle-soft) 100%);
+  border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+}
+.nesio-brief-hero-tag { margin: 6px 0 0; font-size: var(--text-xs); color: var(--portal-accent); font-weight: 600; }
+.nesio-brief-cards { display: flex; flex-direction: column; gap: var(--space-3); }
+.nesio-brief-color-card {
+  border: 1px solid transparent; border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  position: relative;
+}
+.nesio-brief-color-dot {
+  position: absolute; left: 10px; top: 16px; width: 6px; height: 6px; border-radius: 50%;
+}
+.nesio-brief-color-text { margin: 0; font-size: var(--text-body); line-height: 1.65; color: var(--portal-ink); padding-left: 8px; }
+.nesio-brief-ref-chip--rich { border: none; }
+
+.nesio-inv-page { display: flex; flex-direction: column; min-height: 0; }
+.nesio-inv-page .nesio-freeze-header { padding-top: 0; }

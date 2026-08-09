@@ -17,6 +17,7 @@ import { fetchWithTimeout } from '@/lib/portal/fetch-timeout';
 import LoadingCard from '../ui/LoadingCard';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import { readPanelCache, writePanelCache, PANEL_CACHE_KEYS } from '@/lib/portal/session-panel-cache';
 
 const SECRET_KEY = 'nesio_admin_secret';
 
@@ -122,24 +123,35 @@ const featLabel = (name: string, en: boolean): string => telemetryLabel(name, en
 
 export default function AdminOpsPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
+  const cached = readPanelCache<Metrics>(PANEL_CACHE_KEYS.adminMetrics);
   const [secret, setSecret] = useState('');
-  const [data, setData] = useState<Metrics | null>(null);
+  const [data, setData] = useState<Metrics | null>(() => cached);
   const [loading, setLoading] = useState(false);
   const [showDims, setShowDims] = useState(false);   // 点聪明度 → 展开五维
   const [showDevices, setShowDevices] = useState(false);
   const en = dict === 'en';
 
-  const load = useCallback(async (withSecret: string) => {
-    setLoading(true);
+  const load = useCallback(async (withSecret: string, opts: { silent?: boolean } = {}) => {
+    // 有缓存时静默刷新,不把整页打回「正在读后台指标…」。
+    if (!opts.silent) setLoading(true);
     try {
       // 2026-07-29:裸 fetch 无超时 —— 后台指标接口卡住时,下面那句 `if (!data)` 的
       // 「加载中…」就永远退不掉(和家务/车两页同一个病)。走带上限的 fetch。
       const res = await fetchWithTimeout('/api/admin/metrics', { headers: withSecret ? { 'x-nesio-admin-secret': withSecret } : {} });
       const json = await res.json() as Metrics;
-      setData(json);
-      if (json.ok) { try { localStorage.setItem(SECRET_KEY, withSecret); } catch { /* ignore */ } }
+      if (json.ok) {
+        setData(json);
+        writePanelCache(PANEL_CACHE_KEYS.adminMetrics, json);
+        try { localStorage.setItem(SECRET_KEY, withSecret); } catch { /* ignore */ }
+      } else if (opts.silent && readPanelCache<Metrics>(PANEL_CACHE_KEYS.adminMetrics)?.ok) {
+        // 静默失败保留旧成功画面
+      } else {
+        setData(json);
+      }
     } catch {
-      setData({ ok: false, error: 'network_failed' });
+      if (!(opts.silent && readPanelCache<Metrics>(PANEL_CACHE_KEYS.adminMetrics)?.ok)) {
+        setData({ ok: false, error: 'network_failed' });
+      }
     }
     setLoading(false);
   }, []);
@@ -148,8 +160,10 @@ export default function AdminOpsPanel() {
     let s = '';
     try { s = localStorage.getItem(SECRET_KEY) || ''; } catch { /* ignore */ }
     setSecret(s);
-    void load(s);
-  }, [load]);
+    const has = Boolean(readPanelCache(PANEL_CACHE_KEYS.adminMetrics));
+    void load(s, { silent: has });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const card: React.CSSProperties = { borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)', padding: 'var(--space-4)' };
   const label: React.CSSProperties = { fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' };

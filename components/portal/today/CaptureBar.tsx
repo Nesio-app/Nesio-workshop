@@ -10,12 +10,11 @@
  * 左边一枚「+」(上传图片/文件)、中间输入、右边实心话筒。
  * 之前是「话筒在框外左边 + 一个独立输入框」两个物件,参考图是一个整体。
  *
- * 「+」上传落到哪:
- *   · 图片 → 压缩存 IndexedDB,建一条带照片的记忆(复用记忆详情「补传照片」那条路,
- *     lib/portal/local-image-store,本机存不上传);
- *   · 文本类文件(.txt/.md/.csv/.json…)→ 正文读进 rawInput(这样能被本地检索搜到);
- *   · 其余(pdf/docx/xlsx/zip…)→ lib/portal/local-file-store 原样存 Blob。
- * 不按类型白名单收,按体积设限 —— 白名单永远会漏掉某个「常见类型」。
+ * 「+」菜单:
+ *   · 照片/文件 → TodayFeed.captureFiles(本机 + 云 Storage/memory_assets + 端上识别);
+ *   · 查词典 → 离线欧路风格词库;
+ *   · 今日简报 → 彩色图文简报 sheet。
+ * 不按类型白名单收文件,按体积设限。
  */
 import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';
 import MentionPicker from '../MentionPicker';
@@ -73,6 +72,10 @@ export interface CaptureBarProps {
   onRemind?: (at: string, title: string, repeat?: RepeatGuess) => void;
   /** 刚设成提醒之后的那条回执(带撤销)。由上层给,这里只负责显示。 */
   remindReceipt?: { text: string; onUndo: () => void } | null;
+  /** 打开离线词典(可带预填查询)。 */
+  onDictionary?: (q?: string) => void;
+  /** 打开今日简报(彩色图文版)。 */
+  onBrief?: () => void;
 }
 
 /** 输入框随字数长高(和成长页文本框同一套手感)。 */
@@ -92,13 +95,14 @@ export default function CaptureBar(capture: CaptureBarProps) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [plusOpen, setPlusOpen] = useState(false);
 
   const typed = capture.value.trim();
   // 认出时间才提议「设成提醒」。认不出就**不出这一条** —— 宁可让人自己去日程页加,
   // 也不给他一个设在他没说过的时刻上的提醒(那种他不会发现,直到错过那件事)。
   const when = useMemo(() => (typed.length >= 2 ? parseWhen(typed) : null), [typed]);
   // 两个字以下不打扰:打第一个字就弹出三行动作,比没有更烦。
-  const showActions = typed.length >= 2 && !!(capture.onSearch || capture.onAsk || capture.onRemind);
+  const showActions = typed.length >= 2 && !!(capture.onSearch || capture.onAsk || capture.onRemind || capture.onDictionary);
   // 「每天 / 每周三」这类频率也要摆在按钮上 —— 用户看不见系统读成了什么,
   // 就只能等到明天发现它天天响才知道。
   const whenRepeat = when?.repeat ? repeatLabel(when.repeat, dict) : '';
@@ -155,14 +159,15 @@ export default function CaptureBar(capture: CaptureBarProps) {
     <div className={`nesio-tl-capture nesio-tl-capture--top${capture.recording ? ' nesio-tl-capture--rec' : ''}${capture.value.trim() ? ' nesio-tl-capture--filled' : ''}`}>
       <form className="nesio-tl-capture-form" onSubmit={(e) => { e.preventDefault(); capture.onSubmit(); }}>
         <div className="nesio-tl-capture-pill">
-          {capture.onFiles && (
+          {(capture.onFiles || capture.onDictionary || capture.onBrief) && (
             <>
               <button
                 type="button"
                 className="nesio-tl-capture-plus"
-                aria-label={L(dict, '加图片或文件', 'Add a photo or file')}
+                aria-label={L(dict, '添加', 'Add')}
+                aria-expanded={plusOpen}
                 disabled={busy}
-                onClick={() => fileRef.current?.click()}
+                onClick={() => setPlusOpen((v) => !v)}
               >
                 {busy ? <span className="nesio-tl-capture-spin" aria-hidden /> : <IconPlus size={16} />}
               </button>
@@ -264,6 +269,29 @@ export default function CaptureBar(capture: CaptureBarProps) {
         </div>
       </form>
 
+      {plusOpen && (
+        <div className="nesio-cap-plus-menu" role="menu">
+          {capture.onFiles && (
+            <button type="button" role="menuitem" className="nesio-cap-plus-item"
+              onClick={() => { setPlusOpen(false); fileRef.current?.click(); }}>
+              {L(dict, '照片 / 文件', 'Photo / file')}
+            </button>
+          )}
+          {capture.onDictionary && (
+            <button type="button" role="menuitem" className="nesio-cap-plus-item"
+              onClick={() => { setPlusOpen(false); capture.onDictionary?.(typed || undefined); }}>
+              {L(dict, '查词典', 'Dictionary')}
+            </button>
+          )}
+          {capture.onBrief && (
+            <button type="button" role="menuitem" className="nesio-cap-plus-item"
+              onClick={() => { setPlusOpen(false); capture.onBrief?.(); }}>
+              {L(dict, '今日简报', "Today's brief")}
+            </button>
+          )}
+        </div>
+      )}
+
       {capture.staleNote && capture.value.trim() && (
         <p className="nesio-tl-capture-stale">{capture.staleNote}</p>
       )}
@@ -306,8 +334,17 @@ export default function CaptureBar(capture: CaptureBarProps) {
           {/* 两枚图标就够 —— 原来是两整行,把你刚打的那句话**又重复了两遍**
               (输入框一遍、两行各一遍)。要找什么、要问什么,输入框里写着呢。
               文字留在 aria-label 上,读屏用户不受影响。 */}
-          {(capture.onSearch || capture.onAsk) && (
+          {(capture.onSearch || capture.onAsk || capture.onDictionary) && (
             <div className="nesio-cap-icons">
+              {capture.onDictionary && (
+                <button
+                  type="button"
+                  className="nesio-cap-icon"
+                  aria-label={L(dict, `查词典「${typed.slice(0, 18)}」`, `Look up “${typed.slice(0, 18)}”`)}
+                  title={L(dict, '查词典', 'Dictionary')}
+                  onClick={() => capture.onDictionary?.(typed)}
+                >Aa</button>
+              )}
               {capture.onSearch && (
                 <button
                   type="button"

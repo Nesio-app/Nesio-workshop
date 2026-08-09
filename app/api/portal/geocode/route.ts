@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic';
 // 批次 40:除了地名,也返回城市/国家 —— 供足迹 World tab(去过的国家 → 城市)。
 // 真分类批:再返回地点本来的类别 kind(OSM category/type、Foursquare 分类名映射)——
 // 沃尔玛就是超市,不再靠名字猜。
-export interface GeoResult { name: string; city: string; country: string; kind?: string }
+export interface GeoResult { name: string; city: string; country: string; kind?: string; distanceM?: number }
 
 // 批次 101:Foursquare Places API 版本头。旧值 2025-02-05 偏早 —— 换当前已知可用版本
 // (官方 curl 示例用 2025-06-17)。版本头无效会让整个请求被拒 → 静默回落 OSM =
@@ -104,9 +104,12 @@ function countryName(raw: string): string {
   return v.slice(0, 40);
 }
 
+/** POI 名只在这个距离内才认店;再远宁可用街道/门牌,避免住宅被贴成隔壁餐厅。 */
+const FSQ_POI_MAX_M = 50;
+
 async function foursquareReverse(lat: number, lon: number, token: string): Promise<{ result: GeoResult | null; status: number }> {
   // 取最近一个 POI:sort=DISTANCE + limit=1。radius 收窄防抓到几百米外的店。
-  const url = `https://places-api.foursquare.com/places/search?ll=${lat},${lon}&sort=DISTANCE&radius=120&limit=1`;
+  const url = `https://places-api.foursquare.com/places/search?ll=${lat},${lon}&sort=DISTANCE&radius=60&limit=1`;
   const res = await fetch(url, {
     headers: { Authorization: `Bearer ${token}`, 'X-Places-Api-Version': FSQ_API_VERSION, Accept: 'application/json' },
   });
@@ -117,13 +120,16 @@ async function foursquareReverse(lat: number, lon: number, token: string): Promi
   const data = await res.json() as { results?: FsqPlace[] };
   const p = data.results?.[0];
   if (!p) return { result: null, status: 200 };
+  const distM = typeof p.distance === 'number' ? p.distance : undefined;
+  // 太远的 POI 不当「你在这家店」——留给 OSM 街道级;否则小区/停车场会被隔壁店名粘住。
+  if (distM != null && distM > FSQ_POI_MAX_M) return { result: null, status: 200 };
   const loc = p.location || {};
   const cats = (p.categories || []).map((c) => c.name || c.short_name || '').filter(Boolean);
   const name = (p.name || loc.formatted_address?.split(',')[0] || loc.address || '').slice(0, 40);
   const city = (loc.locality || loc.dma || loc.region || loc.admin_region || '').slice(0, 40);
   const country = countryName(loc.country || '');
   if (!name && !city && !country) return { result: null, status: 200 };
-  return { result: { name, city, country, kind: kindFromFoursquare(cats) }, status: 200 };
+  return { result: { name, city, country, kind: kindFromFoursquare(cats), distanceM: distM }, status: 200 };
 }
 
 /** 批次 62:附近 POI 候选(地点纠正选择器)—— Foursquare 搜最近 8 个,

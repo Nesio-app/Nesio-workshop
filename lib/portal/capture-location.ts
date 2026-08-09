@@ -86,8 +86,9 @@ export function prefetchCaptureLocation(force = false): void {
         lon: pos.lon,
         accuracy: pos.accuracy,
         ts: Date.now(),
-        // 没挪窝(<300m)沿用旧地名,省一次反查
-        label: prev && distMeters(prev, { latitude: pos.lat, longitude: pos.lon }) < 300 ? prev.label : undefined,
+        // 没挪窝才沿用旧地名。曾用 300m → 隔壁店名粘到家/路上(「Mellow Mushroom」每天出现)。
+        // 收紧到 60m:真停在同一栋建筑才复用,否则重新反查。
+        label: prev && distMeters(prev, { latitude: pos.lat, longitude: pos.lon }) < 60 ? prev.label : undefined,
       };
       writeFixCache(fix);
       if (!fix.label && !labelInFlight) {

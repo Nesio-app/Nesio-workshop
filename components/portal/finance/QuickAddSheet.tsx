@@ -19,7 +19,10 @@ import {
   type ManualAssetKind,
 } from '@/lib/portal/finance-assets';
 import { COMMON_EXPENSE_CATEGORIES, categoryLabel } from '@/lib/portal/tx-category';
-import { formatMoney } from '@/lib/portal/bank-tx';
+import {
+  formatMoney, loadBankAccounts, addManualBankTx, displayAccountName, loadAccountNames,
+  type BankAccount,
+} from '@/lib/portal/bank-tx';
 
 type Seg = 'expense' | 'income' | 'asset';
 
@@ -60,6 +63,8 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
   const [note, setNote] = useState('');
   const [channelId, setChannelId] = useState('');
   const [newChannel, setNewChannel] = useState('');
+  /** 挂到银行/手工账户 → 写入 BankTx 进交易页;空 = 仍走现金渠道账本。 */
+  const [accountId, setAccountId] = useState('');
   // 资产段:选已有资产记锚点,或新建
   const [assetId, setAssetId] = useState('');
   const [newAssetName, setNewAssetName] = useState('');
@@ -78,12 +83,14 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
 
   const channels = useMemo(() => listManualAssets().filter((a) => a.isChannel), [open, seg]); // eslint-disable-line react-hooks/exhaustive-deps
   const assets = useMemo(() => listManualAssets(), [open, seg]); // eslint-disable-line react-hooks/exhaustive-deps
+  const bankAccounts = useMemo((): BankAccount[] => (open ? loadBankAccounts() : []), [open, seg]); // eslint-disable-line react-hooks/exhaustive-deps
+  const acctNames = useMemo(() => loadAccountNames(), [open]); // eslint-disable-line react-hooks/exhaustive-deps
   // P2 持有成本:支出可关联到房/车等固定资产(税金/维修…),归集到资产名下、照常进月支出
   const costAssets = useMemo(() => assets.filter((a) => !a.isChannel && a.kind !== 'loan'), [assets]);
   const [costAssetId, setCostAssetId] = useState('');
   const [costKind, setCostKind] = useState<'tax' | 'repair' | 'insurance' | 'other'>('other');
 
-  const reset = () => { setAmount(''); setCat(''); setNote(''); setChannelId(''); setNewChannel(''); setAssetId(''); setNewAssetName(''); setAnchorNote(''); setCostAssetId(''); setCostKind('other'); setErr(''); setDupTx(''); setDupAck(false); };
+  const reset = () => { setAmount(''); setCat(''); setNote(''); setChannelId(''); setNewChannel(''); setAccountId(''); setAssetId(''); setNewAssetName(''); setAnchorNote(''); setCostAssetId(''); setCostKind('other'); setErr(''); setDupTx(''); setDupAck(false); };
 
   function save() {
     const v = Number(amount);
@@ -104,6 +111,15 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
           addManualAsset({ name, kind: assetKind, value: v, ...(anchorNote ? { note: anchorNote } : {}) });
         }
         recordNetWorthSnapshot(); // 资产变动即刻反映到净值曲线
+      } else if (accountId) {
+        // 挂到账户 → 真正进交易页流水(BankTx),不是只在总览出现的现金账。
+        const tx = addManualBankTx({
+          accountId, amount: v, kind: seg,
+          name: note.trim() || (seg === 'income' ? t('手工收入', 'Manual income') : t('手工支出', 'Manual expense')),
+          ...(currency ? { currency } : {}),
+          ...(cat ? { category: cat } : {}),
+        });
+        if (!tx) throw new Error('bank_tx_failed');
       } else {
         let ch = channelId;
         if (!ch && newChannel.trim()) {
@@ -174,6 +190,20 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
 
         {seg !== 'asset' && (
           <>
+            {bankAccounts.length > 0 && (
+              <div>
+                <p style={label}>{t('记到哪个账户(选了会进交易页)', 'Account (shows on Transactions)')}</p>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {bankAccounts.map((a) => (
+                    <button key={a.id} type="button" style={chip(accountId === a.id)}
+                      onClick={() => { setAccountId((v) => (v === a.id ? '' : a.id)); setChannelId(''); setNewChannel(''); }}>
+                      {displayAccountName(a, acctNames)}{a.mask ? ` ····${a.mask}` : ''}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!accountId && (
             <div>
               <p style={label}>{t('渠道(可空:现金 / 红包等银行拍不到的)', 'Channel (optional: cash / red packet…)')}</p>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -185,6 +215,7 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
                   onChange={(e) => { setNewChannel(e.target.value); setChannelId(''); }} />
               </div>
             </div>
+            )}
             <div>
               <p style={label}>{t('分类', 'Category')}</p>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -196,7 +227,7 @@ export default function QuickAddSheet({ open, onClose, onSaved, initialSeg, init
                 ))}
               </div>
             </div>
-            {seg === 'expense' && costAssets.length > 0 && (
+            {seg === 'expense' && !accountId && costAssets.length > 0 && (
               <div>
                 <p style={label}>{t('关联资产(可空:税金 / 维修记到房、车名下)', 'Tie to asset (optional: tax / repair)')}</p>
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

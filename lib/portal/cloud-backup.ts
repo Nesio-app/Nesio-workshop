@@ -482,7 +482,8 @@ export async function autoSyncBackupWithCloud(opts: { force?: boolean } = {}): P
         persisted = (Number(localStorage.getItem(SYNCED_HIGHWATER_KEY)) || 0) >= cloudN;
       } catch { persisted = false; }
       if (cloudN > prevN && restoredSomething && persisted && typeof window.location?.reload === 'function') {
-        window.location.reload();
+        const { requestDestructiveReload } = await import('./app-busy');
+        requestDestructiveReload();
         return;
       }
       // 推时带上「云端最完整那份的条目数」做防遮盖闸:本机若比它还少就不推(见 pushBackupToCloud)。

@@ -322,7 +322,10 @@ export async function autoSyncModulesWithCloud(opts: { force?: boolean } = {}): 
         }
       } catch { /* sessionStorage 不可用:不 reload,避免死循环 */ }
       if (!alreadyReloaded && flagPersisted) {
-        window.location.reload(); // 新设备首次拉到数据 → 刷新水合(每次加载至多一次)
+        // 浮层/交互开着时绝不整页刷(会把用户从家务/车/运营踢回今天)。
+        // requestDestructiveReload 会推迟到浮层关掉后再刷。
+        const { requestDestructiveReload } = await import('./app-busy');
+        requestDestructiveReload();
         return;
       }
     }

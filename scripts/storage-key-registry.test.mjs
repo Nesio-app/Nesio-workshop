@@ -167,6 +167,8 @@ const KNOWN_KEYS = new Map([
   ["nesio-asset-care-v1", "durable"],
   ["nesio-bank-acct-names-v1", "durable"],
   ["nesio-fin-tx-annotations-v1", "durable"],
+  // 离线字典生词本 —— 用户亲手收藏的词,换设备应从云备份带回来。
+  ["nesio-dict-wordbook-v1", "durable"],
   ["nesio-meal-calendar-v1", "durable"],
   ["nesio-schedule-filters-v1", "durable"],
   // 用户自己敲进去的提醒(家务/账单 due)。换台设备后从头开始**不正确** —— 那是他

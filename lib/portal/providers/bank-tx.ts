@@ -11,6 +11,15 @@
 import { reportStorageDropped } from '../storage-health';
 import { createBlobStore } from '../idb-blob-store';
 import { normalizeCategory } from '../tx-category';
+import { txAnnotationOf as _txAnnotationOf } from '../tx-annotations';
+
+/** 测试/循环加载时批注层可能尚未就绪 —— 缺函数就当没有覆盖。 */
+function annOf(txId: string): { category?: string; categoryDetail?: string } {
+  try {
+    if (typeof _txAnnotationOf !== 'function') return {};
+    return _txAnnotationOf(txId) || {};
+  } catch { return {}; }
+}
 
 export interface BankTx {
   id: string;
@@ -583,6 +592,79 @@ export function removeBankAccount(id: string): void {
   accountsStore.save(loadBankAccounts().filter((a) => a.id !== id));
 }
 
+/** 手工账户(subtype=manual / id 前缀)—— Plaid replace 同步不得抹掉它们。 */
+export function isManualBankAccount(a: Pick<BankAccount, 'id' | 'subtype'>): boolean {
+  return a.subtype === 'manual' || (a.id || '').startsWith('manual-');
+}
+
+/**
+ * 手工添加账户。记一笔可挂到这个账户下并写入流水,出现在交易页。
+ * 与 Plaid 账户共存;权威 replace 同步时需保留(见 saveBankAccounts 调用方应 merge 手工户)。
+ */
+export function addManualBankAccount(input: {
+  name: string;
+  type?: 'depository' | 'credit' | 'loan' | 'investment' | 'other';
+  mask?: string;
+  currency?: string;
+}): BankAccount | null {
+  const name = (input.name || '').trim();
+  if (!name) return null;
+  const currency = input.currency || dominantCurrency(loadBankTx()) || 'USD';
+  const id = `manual-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const acct: BankAccount = {
+    id,
+    name,
+    type: input.type || 'depository',
+    subtype: 'manual',
+    currency,
+    ...(input.mask ? { mask: String(input.mask).replace(/\D/g, '').slice(-4) } : {}),
+    institution: '手动',
+  };
+  saveBankAccounts([acct]);
+  return acct;
+}
+
+/**
+ * 在指定账户下记一笔手工流水(正数=支出,负数=进账)。进交易页、分类统计、账户明细。
+ */
+export function addManualBankTx(input: {
+  accountId: string;
+  amount: number;
+  name: string;
+  date?: string;
+  category?: string;
+  categoryDetail?: string;
+  currency?: string;
+  kind?: 'expense' | 'income';
+}): BankTx | null {
+  const acct = loadBankAccounts().find((a) => a.id === input.accountId);
+  if (!acct) return null;
+  const abs = Math.abs(Number(input.amount));
+  if (!(abs > 0)) return null;
+  const name = (input.name || '').trim() || '手工记账';
+  const kind = input.kind || 'expense';
+  const signed = kind === 'income' ? -abs : abs;
+  const d = input.date || (() => {
+    const n = new Date();
+    return `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, '0')}-${String(n.getDate()).padStart(2, '0')}`;
+  })();
+  const tx: BankTx = {
+    id: `mtx-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`,
+    date: d,
+    name,
+    amount: signed,
+    currency: input.currency || acct.currency || 'USD',
+    category: normalizeCategory(input.category || (kind === 'income' ? 'INCOME' : 'OTHER')),
+    ...(input.categoryDetail ? { categoryDetail: input.categoryDetail } : {}),
+    accountId: acct.id,
+  };
+  const existing = loadBankTx();
+  const { merged } = mergeBankTxForSync(existing, [tx], []);
+  if (!bankTxWriteAllowed(existing.length, merged.length)) return null;
+  saveBankTx(merged);
+  return tx;
+}
+
 // 账户自定义名称:本机覆盖层,不改 Plaid 原始 name(同步合并不会冲掉)。
 const ACCT_NAME_KEY = 'nesio-bank-acct-names-v1';
 export function loadAccountNames(): Record<string, string> {
@@ -603,7 +685,13 @@ export function displayAccountName(a: Pick<BankAccount, 'id' | 'name'>, names?: 
 
 export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boolean }): void {
   if (opts?.replace && accounts.length > 0) {
-    accountsStore.save(accounts.filter((a) => a?.id));
+    // Plaid 权威替换时保留手工账户,否则下次同步会抹掉「手动添加」入口下的户。
+    const prev = accountsStore.load();
+    const manuals = (Array.isArray(prev) ? prev : []).filter((a) => a?.id && isManualBankAccount(a));
+    const byId = new Map<string, BankAccount>();
+    for (const a of accounts) if (a?.id) byId.set(a.id, a);
+    for (const m of manuals) if (!byId.has(m.id)) byId.set(m.id, m);
+    accountsStore.save([...byId.values()]);
     return;
   }
   const cur = accountsStore.load();
@@ -626,6 +714,7 @@ const SUBTYPE_LABELS: Record<string, [string, string]> = {
   cd: ['定期存单', 'CD'], 'credit card': ['信用卡', 'Credit card'], paypal: ['PayPal', 'PayPal'],
   brokerage: ['投资', 'Brokerage'], ira: ['退休 IRA', 'IRA'], '401k': ['退休 401k', '401k'],
   hsa: ['医保储蓄 HSA', 'HSA'], mortgage: ['房贷', 'Mortgage'], student: ['学贷', 'Student loan'], auto: ['车贷', 'Auto loan'],
+  manual: ['手工账户', 'Manual account'],
 };
 const TYPE_LABELS: Record<string, [string, string]> = {
   depository: ['存款', 'Deposit'], credit: ['信用卡', 'Credit'], investment: ['投资', 'Investment'],
@@ -743,10 +832,16 @@ function rememberRuleLabel(key: string, name: string): void {
   try { localStorage.setItem(RULE_LABEL_KEY, JSON.stringify(all)); } catch { reportStorageDropped(); }
 }
 
-/** 生效分类:用户规则优先,其次 Plaid 分类;经 normalizeCategory 归一(财务②:旧自家词汇
- * 与 PFC 枚举合流,统计里同类不再被拆成两组)。 */
+/** 生效分类:本笔批注覆盖 → 商户规则 → Plaid;经 normalizeCategory 归一。 */
 export function effectiveCategory(t: BankTx, rules = loadMerchantRules()): string {
-  return normalizeCategory(ruleFor(rules, t) || t.category || '');
+  const overlay = (annOf(t.id).category || '').trim();
+  return normalizeCategory(overlay || ruleFor(rules, t) || t.category || '');
+}
+
+/** 生效子分类:本笔批注优先,否则 Plaid categoryDetail(可自由文本)。 */
+export function effectiveCategoryDetail(t: BankTx): string {
+  const d = (annOf(t.id).categoryDetail || '').trim();
+  return d || (t.categoryDetail || '').trim();
 }
 
 /** 需要审核的交易:本月、真支出、没有生效分类的。 */

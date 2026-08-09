@@ -27,8 +27,9 @@ function loadTs(path, requireImpl) {
 const txCategory = loadTs('../lib/portal/tx-category.ts', () => ({}));
 const bank = loadTs('../lib/portal/providers/bank-tx.ts', (p) =>
   p === '../storage-health' ? { reportStorageDropped() {} }
-  : p === '../tx-category' ? txCategory
-  : p === '../idb-blob-store' ? { createBlobStore: fakeCreateBlobStore } : ({}));
+    : p === '../tx-category' ? txCategory
+    : p === '../tx-annotations' ? { txAnnotationOf: () => ({}) }
+    : p === '../idb-blob-store' ? { createBlobStore: fakeCreateBlobStore } : ({}));
 
 const tx = (id, date, amount, category) => ({ id, date, name: id, amount, currency: 'USD', category, accountId: 'a1' });
 

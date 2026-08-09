@@ -52,6 +52,13 @@ export interface TxAnnotation {
   splits?: Array<{ target: string; amount: number; note?: string }>;
   /** 按月摊(年费/保险):`{ startMonth: '2026-01', months: 12 }`。同样只是视图。 */
   amortize?: { startMonth: string; months: number };
+  /**
+   * 本笔覆盖分类(PFC 或自由文本)。Plaid 同步不会带这个字段 ——
+   * 必须放覆盖层,否则下次合并会冲掉「我改过的分类」。
+   */
+  category?: string;
+  /** 子分类 / 自定义细分(PFC detailed 或自由文本)。 */
+  categoryDetail?: string;
 }
 
 const KEY = 'nesio-fin-tx-annotations-v1';
@@ -75,7 +82,8 @@ export function hasTxAnnotation(a: TxAnnotation | undefined): boolean {
   // 分摊也算「有批注」—— 漏掉的话存进去的分摊会被当成空键当场删掉。
   return Boolean(
     (a.people && a.people.length) || (a.attachments && a.attachments.length) || (a.note && a.note.trim())
-    || (a.splits && a.splits.length) || a.amortize,
+    || (a.splits && a.splits.length) || a.amortize
+    || (a.category && a.category.trim()) || (a.categoryDetail && a.categoryDetail.trim()),
   );
 }
 
@@ -169,6 +177,36 @@ export function clearTxAmortize(txId: string): boolean {
 
 export function setTxNote(txId: string, note: string): boolean {
   return write(txId, { note: note.trim() });
+}
+
+/**
+ * 改这一笔的分类 / 子分类。空字符串 = 清掉覆盖,回到规则或 Plaid 原值。
+ * 只影响本笔(不像商户规则会改同名商户的所有流水)。
+ */
+export function setTxCategory(
+  txId: string,
+  category: string,
+  categoryDetail?: string | null,
+): boolean {
+  if (typeof window === 'undefined') return false;
+  const all = loadTxAnnotations();
+  const next: TxAnnotation = { ...(all[txId] || {}) };
+  const cat = (category || '').trim();
+  if (cat) next.category = cat; else delete next.category;
+  if (categoryDetail !== undefined) {
+    const detail = String(categoryDetail || '').trim();
+    if (detail) next.categoryDetail = detail; else delete next.categoryDetail;
+  }
+  if (!hasTxAnnotation(next)) delete all[txId]; else all[txId] = next;
+  try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { reportStorageDropped(); return false; }
+  window.dispatchEvent(new CustomEvent(TX_ANNOTATIONS_EVENT, { detail: { txId } }));
+  return true;
+}
+
+/** 只改子分类 / 自定义细分(主分类不动)。 */
+export function setTxCategoryDetail(txId: string, categoryDetail: string): boolean {
+  const d = (categoryDetail || '').trim();
+  return write(txId, { categoryDetail: d || undefined });
 }
 
 export function addTxAttachment(txId: string, att: TxAttachment): TxWriteResult {

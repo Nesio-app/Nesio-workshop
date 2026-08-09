@@ -74,6 +74,9 @@ const code = stripComments;
   // 端上认不出单据字段才谈得上云,而云是付费能力 —— 两条判据都要防,不是二选一。
   //
   // 端上先行的原因:小票上写的就是那些字,端上认一遍就有,不该为一张图白发一趟云。
+  // 2026-08:「+」传图必须走主相机三步(本机+Storage+memory_assets),否则换端无图。
+  assert.ok(/attachPhotoToMemoryNode/.test(fn) || /attachPhotoToMemoryNode/.test(feed),
+    '「+」传图没走 attachPhotoToMemoryNode —— 换端永远看不到图');
   assert.ok(/understandImage\(/.test(fn), '「+」传图不再先在端上认字 —— 每张图都会白发一趟云');
   assert.ok(
     /needsCloud[\s\S]*?return;/.test(fn),

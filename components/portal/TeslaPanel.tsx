@@ -26,6 +26,7 @@ import { recordTeslaReadings, readTeslaLog, type TeslaLogPoint } from '@/lib/por
 import {
   vehicleStatus, statusLabel, statusTone, dataAgeLine, chargeNowLine, rangeLine, healthItems,
 } from '@/lib/portal/tesla-now';
+import { readPanelCache, writePanelCache, PANEL_CACHE_KEYS } from '@/lib/portal/session-panel-cache';
 
 interface TeslaDrive {
   vehicleId: string;
@@ -74,7 +75,26 @@ interface TeslaEnergyPayload {
   unavailable?: string;
 }
 
+type TeslaCachePayload = {
+  drives: TeslaDrive[];
+  charges: TeslaCharge[];
+  health: TeslaHealthRow[];
+  energy: TeslaEnergyPayload;
+};
+
 type LoadState = 'loading' | 'ready' | 'error';
+
+function applyTeslaVehicles(
+  onVehicles: ((v: Array<{ vehicleId: string; name: string }>) => void) | undefined,
+  drives: TeslaDrive[],
+  charges: TeslaCharge[],
+) {
+  if (!onVehicles) return;
+  const seen = new Map<string, string>();
+  for (const d of drives) if (d.vehicleId && !seen.has(d.vehicleId)) seen.set(d.vehicleId, d.displayName || `Tesla ${d.vehicleId.slice(-4)}`);
+  for (const c of charges) if (c.vehicleId && c.batteryLevel != null && !seen.has(c.vehicleId)) seen.set(c.vehicleId, c.displayName || `Tesla ${c.vehicleId.slice(-4)}`);
+  onVehicles([...seen.entries()].map(([vehicleId, name]) => ({ vehicleId, name })));
+}
 
 export default function TeslaPanel({ onVehicles, boundIds }: {
   /** #10:把认到的车报给上层(资产页据此让手动录的车认到同一辆上)。 */
@@ -83,12 +103,13 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
   boundIds?: string[];
 } = {}) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  const [state, setState] = useState<LoadState>('loading');
+  const cached = readPanelCache<TeslaCachePayload>(PANEL_CACHE_KEYS.tesla);
+  const [state, setState] = useState<LoadState>(cached ? 'ready' : 'loading');
   const [errMsg, setErrMsg] = useState('');
-  const [drives, setDrives] = useState<TeslaDrive[]>([]);
-  const [charges, setCharges] = useState<TeslaCharge[]>([]);
-  const [energy, setEnergy] = useState<TeslaEnergyPayload>({});
-  const [health, setHealth] = useState<TeslaHealthRow[]>([]);
+  const [drives, setDrives] = useState<TeslaDrive[]>(() => cached?.drives ?? []);
+  const [charges, setCharges] = useState<TeslaCharge[]>(() => cached?.charges ?? []);
+  const [energy, setEnergy] = useState<TeslaEnergyPayload>(() => cached?.energy ?? {});
+  const [health, setHealth] = useState<TeslaHealthRow[]>(() => cached?.health ?? []);
   /**
    * 车停在哪儿的**地名**(图 3 卡片上那行「345 Almaden Dr, San Jose」)。
    * 一对经纬度对人是没有意义的 —— 地图上那个点告诉你「在这儿」,
@@ -109,16 +130,20 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
   // 所以这里补两样:一个请求序号(只认最后一次的结果),
   // 和 LoadingCard 自己的 timeoutMs 兜底 —— 等待态必须**有尽头**(CLAUDE.md 红线)。
   const reqRef = useRef(0);
+  const hasDataRef = useRef(Boolean(cached));
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts: { silent?: boolean } = {}) => {
     const seq = ++reqRef.current;
     const mine = () => reqRef.current === seq;
-    setState('loading');
+    // 有缓存时静默刷新:不闪回 Loading(用户抱怨「一打开就 loading」)。
+    if (!opts.silent) setState('loading');
     try {
       const res = await fetchWithTimeout('/api/portal/tesla', { cache: 'no-store' }, 15_000);
       const data = await res.json() as { ok?: boolean; error?: string; drives?: TeslaDrive[]; charges?: TeslaCharge[]; health?: TeslaHealthRow[]; energy?: TeslaEnergyPayload };
       if (!mine()) return;   // 已经有更新的一趟在飞,旧结果一律丢弃
       if (!data.ok) {
+        // 静默刷新失败且已有画面 → 保留旧数据,不踢成 error 整页空白。
+        if (opts.silent && hasDataRef.current) return;
         setErrMsg(data.error === 'not_connected' || data.error === 'token_expired'
           ? L(dict, 'Tesla 还没连上(或授权已失效)—— 到「设置 → 数据接入 → Tesla」连接一次。', 'Tesla is not linked yet (or auth expired) — connect it from Settings → Data sources → Tesla.')
           : data.error === 'partner_not_registered'
@@ -127,18 +152,21 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
         setState('error');
         return;
       }
-      setDrives(data.drives || []);
-      setCharges(data.charges || []);
-      setEnergy(data.energy || {});
-      setHealth(data.health || []);
+      const nextDrives = data.drives || [];
+      const nextCharges = data.charges || [];
+      const nextHealth = data.health || [];
+      const nextEnergy = data.energy || {};
+      setDrives(nextDrives);
+      setCharges(nextCharges);
+      setEnergy(nextEnergy);
+      setHealth(nextHealth);
       setState('ready');
+      hasDataRef.current = true;
+      writePanelCache(PANEL_CACHE_KEYS.tesla, {
+        drives: nextDrives, charges: nextCharges, health: nextHealth, energy: nextEnergy,
+      });
       // #10:把车报上去。用 name 而不是 id 展示 —— 用户认得的是「JingBell」,不是一串数字。
-      if (onVehicles) {
-        const seen = new Map<string, string>();
-        for (const d of data.drives || []) if (d.vehicleId && !seen.has(d.vehicleId)) seen.set(d.vehicleId, d.displayName || `Tesla ${d.vehicleId.slice(-4)}`);
-        for (const c of data.charges || []) if (c.vehicleId && c.batteryLevel != null && !seen.has(c.vehicleId)) seen.set(c.vehicleId, c.displayName || `Tesla ${c.vehicleId.slice(-4)}`);
-        onVehicles([...seen.entries()].map(([vehicleId, name]) => ({ vehicleId, name })));
-      }
+      applyTeslaVehicles(onVehicles, nextDrives, nextCharges);
       // 车的接口只回「此刻」——图 4 那条曲线只能在**看过的时刻**攒。
       // 攒完立刻重读:这一次的点也要出现在图上,不用等下次开页面。
       try {
@@ -154,16 +182,26 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
       // 顺手沉淀:面板刚拉到的新鲜快照复用给足迹/财务/信号管线(externalId 去重,
       // 不会重复计),停车点/充电站即时进地图足迹、充电花费进财务 —— 看一眼车,数据就更新。
       void import('@/lib/portal/connectors')
-        .then((m) => m.refreshTesla({ drives: (data.drives || []) as never[], charges: (data.charges || []) as never[] }))
+        .then((m) => m.refreshTesla({ drives: nextDrives as never[], charges: nextCharges as never[] }))
         .catch(() => {});
     } catch {
       if (!mine()) return;
+      if (opts.silent && hasDataRef.current) return;
       setErrMsg(L(dict, '这次没等到车的回应 —— 它可能在深度休眠。稍后再试一次。', 'The car did not answer this time — it may be in deep sleep. Try again shortly.'));
       setState('error');
     }
   }, [dict, onVehicles]);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    const hasCache = hasDataRef.current;
+    void load({ silent: hasCache });
+    if (hasCache) {
+      const c = readPanelCache<TeslaCachePayload>(PANEL_CACHE_KEYS.tesla);
+      if (c) applyTeslaVehicles(onVehicles, c.drives, c.charges);
+    }
+    // 只在挂载时拉一次;语言/onVehicles 变化不该整页重 Loading。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /**
    * 把车所在的坐标反解成一个人能读的地名。

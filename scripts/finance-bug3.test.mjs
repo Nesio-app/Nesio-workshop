@@ -87,13 +87,11 @@ assert.ok(/buildRelationships\(getLifeGraph\(\)/.test(tab), '关联人的候选�
 assert.ok(/\['spending', '分类', 'Categories'\]/.test(tab), '「支出」tab 必须改名「分类」');
 const donutBig = tab.match(/<FinanceDonut big/g) || [];
 assert.ok(donutBig.length >= 2, `主视图饼图要调大(big):分类页 + 组合结构,现在只有 ${donutBig.length} 处`);
-assert.ok(/function SpendChartPager/.test(tab), '商户 Top / 收入来源必须改成可左右滑动的交互饼图');
-for (const dead of ['商户 Top\', \'Top merchants\')} ›', '收入来源\', \'Income sources\')} ›']) {
-  assert.ok(!code.includes(dead), '商户/收入来源不许再是 <details> 折叠列表');
-}
-const pager = tab.slice(tab.indexOf('function SpendChartPager'), tab.indexOf('export default function FinanceTab'));
-assert.ok(/onTouchEnd/.test(pager) && /flip\(dx < 0 \? 1 : -1\)/.test(pager), '两张图之间必须能左右滑动切换');
-assert.ok(/onSlice=\{\(c\) => setFocus/.test(pager), '饼图要可点(点一块看这一项明细)');
+// 分类页双饼合一:只留分类环;点扇区出走势 + 商户 Top + 每笔明细(不再左右滑第二张饼)
+assert.ok(!/function SpendChartPager/.test(tab), '分类页不应再有第二张商户/收入滑动饼图');
+assert.ok(/该分类 · 商户 Top|In this category · Top merchants/.test(tab), '点分类后要有该分类的商户分析');
+assert.ok(/明细 · \$\{catTxs\.length\}|Details · \$\{catTxs\.length\}/.test(tab), '点分类后要有每笔明细列表');
+assert.ok(/setSpendFocus/.test(tab) && /onSlice=/.test(tab), '分类饼图要可点');
 assert.ok(/setAllocPick/.test(tab), '组合结构环形图要能点开看这一类的持仓');
 // 四张卡 + 念念/＋记在卡片下面
 const kpiAt = tab.indexOf("'收入', 'Income'");

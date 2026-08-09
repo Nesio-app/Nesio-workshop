@@ -64,6 +64,23 @@ const okJson = (body) => ({ ok: true, json: async () => body });
   assert.equal(res.__json.city, 'Cary');
 }
 
+// ── Foursquare POI 太远(>50m)不当「在店里」→ OSM ──
+{
+  const route = loadRoute({
+    env: { FOURSQUARE_SERVICE_TOKEN: 'tkn' },
+    fetchImpl: async (url) => url.includes('foursquare')
+      ? okJson({ results: [{
+        fsq_place_id: 'far', name: 'Mellow Mushroom', distance: 95,
+        categories: [{ name: 'Pizza Place' }],
+        location: { locality: 'Cary', country: 'US' },
+      }] })
+      : okJson({ name: 'Creek Park Drive', address: { road: 'Creek Park Drive', city: 'Cary', country: 'United States' }, category: 'highway', type: 'residential' }),
+  });
+  const res = await route.POST(req(35.79, -78.78));
+  assert.equal(res.__json.source, 'osm', '远距离 POI 不粘店名');
+  assert.equal(res.__json.name, 'Creek Park Drive');
+}
+
 // ── 无 token → 直接 OSM ──
 {
   const route = loadRoute({

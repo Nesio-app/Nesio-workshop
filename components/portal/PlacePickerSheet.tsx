@@ -12,7 +12,7 @@
 
 import { useEffect, useState } from 'react';
 import NesioSheet from './ui/NesioSheet';
-import { displayLabel, renamePlaceLabel, setPlaceCategory, setPlaceGeo, PLACE_CATEGORY_META, type PlaceCategory } from '@/lib/portal/place-trail';
+import { displayLabel, renamePlaceLabel, forgetStickyPlaceLabel, setPlaceCategory, setPlaceGeo, PLACE_CATEGORY_META, type PlaceCategory } from '@/lib/portal/place-trail';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -85,6 +85,13 @@ export default function PlacePickerSheet({ raw, lat, lon, onClose, onRenamed }: 
     requestClose();
   }
 
+  /** 错贴的店名(如从没去过的餐厅天天出现):清缓存并打回未知,下次重新认。 */
+  function forgetHere() {
+    forgetStickyPlaceLabel(raw);
+    onRenamed?.('未知地点');
+    requestClose();
+  }
+
   return (
     <NesioSheet
       variant="bottom"
@@ -103,6 +110,9 @@ export default function PlacePickerSheet({ raw, lat, lon, onClose, onRenamed }: 
           />
           <button type="submit" className="nesio-fin-review-accept" disabled={!text.trim()}>{L(dict, '保存', 'Save')}</button>
         </form>
+        <button type="button" className="nesio-trip-link" style={{ marginTop: 'var(--space-2)' }} onClick={forgetHere}>
+          {L(dict, '不是这里 · 忘掉这个名字', 'Not here · forget this name')}
+        </button>
         {/* 分类收进下拉框(此前一整墙 chip 太占地方) */}
         <select
           className="nesio-fin-select nesio-placepick-select"
