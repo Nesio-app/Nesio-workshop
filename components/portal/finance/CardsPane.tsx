@@ -51,10 +51,10 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
   const investAccts = accounts.filter(isInvestAcct);
   const liabAccts = accounts.filter(isLiabAcct);
   // 投资账户无 balance 时用该账户持仓市值兜底;有 balance 且持仓更大时取较大者(与总览同口径)
-  const investBal = (a: BankAccount) => {
+  const investBal = (a: BankAccount): number | null => {
     const hv = holdings.filter((h) => h.accountId === a.id).reduce((s, h) => s + h.value, 0);
     if (a.balance != null) return Math.max(a.balance, hv);
-    return hv || undefined;
+    return hv > 0 ? hv : null;
   };
   /** 手工户未写 balance 时,用流水推余额(支出为正 → 余额 = −Σamount)。 */
   const displayBal = (a: BankAccount, group: 'deposit' | 'invest' | 'liability'): number | null => {
