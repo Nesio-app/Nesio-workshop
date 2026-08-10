@@ -1849,6 +1849,11 @@ function ErrorRow({ msg, onRetry, t }: { msg: string; onRetry: () => void; t: TT
   );
 }
 
+/** 列表行左侧圆点(库存/缺料/记餐)。删营养块时误删定义 → Vercel TS 红灯整批上不了线。 */
+function Dot() {
+  return <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--portal-accent)', flex: 'none' }} aria-hidden />;
+}
+
 const divider = '1px solid var(--portal-line)';
 const card: React.CSSProperties = { background: 'var(--portal-card)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-card)', overflow: 'hidden' };
 const row: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 'var(--space-3)', padding: 'var(--space-4)', borderBottom: divider };
