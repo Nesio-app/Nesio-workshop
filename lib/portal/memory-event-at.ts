@@ -43,17 +43,17 @@ export function memoryEventAtIso(node: LifeNode): string {
   return memoryEventAt(node).toISOString();
 }
 
+export type CreatedAtBackfillPatch = { id: string; patch: { createdAt: string } };
+
 /**
- * 一次性回填:若 attributes 里有源事件时间、且与节点 createdAt 差 > 1 天,
- * 把 createdAt 改成源时间 —— 老同步节点时间线按真实发生日排。
- * 返回改动条数。
+ * 收集需要回填的 createdAt 补丁(不写盘)。
+ * 若 attributes 里有源事件时间、且与节点 createdAt 差 > 1 天,把 createdAt 改成源时间。
  */
-export function backfillMemoryCreatedAtFromAttrs(
+export function collectCreatedAtBackfillPatches(
   nodes: readonly LifeNode[],
-  update: (id: string, patch: { createdAt: string }) => void,
   now = Date.now(),
-): number {
-  let n = 0;
+): CreatedAtBackfillPatch[] {
+  const out: CreatedAtBackfillPatch[] = [];
   for (const node of nodes) {
     const attrs = node.attributes || {};
     let event: Date | null = null;
@@ -66,8 +66,21 @@ export function backfillMemoryCreatedAtFromAttrs(
     if (stored && Math.abs(stored.getTime() - event.getTime()) < 86_400_000) continue;
     // 源时间不能离谱地在未来一年以外(防坏数据)
     if (event.getTime() > now + 366 * 86_400_000) continue;
-    update(node.id, { createdAt: event.toISOString() });
-    n++;
+    out.push({ id: node.id, patch: { createdAt: event.toISOString() } });
   }
-  return n;
+  return out;
+}
+
+/**
+ * @deprecated 易被误用成「逐条 updateLifeNode」导致卡死。
+ * 请用 collectCreatedAtBackfillPatches + batchPatchLifeNodes(..., { syncCloud: false })。
+ */
+export function backfillMemoryCreatedAtFromAttrs(
+  nodes: readonly LifeNode[],
+  update: (id: string, patch: { createdAt: string }) => void,
+  now = Date.now(),
+): number {
+  const patches = collectCreatedAtBackfillPatches(nodes, now);
+  for (const p of patches) update(p.id, p.patch);
+  return patches.length;
 }

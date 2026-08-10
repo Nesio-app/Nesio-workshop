@@ -102,6 +102,8 @@ const KNOWN_KEYS = new Map([
   ["nesio-daily-report-card-dismiss-v1", "cache"],
   ["nesio-life-graph-cloud-sync-outbox-v1", "cache"],
   ["nesio-life-graph-cloud-sync-v1", "cache"],
+  // 记忆事件日 createdAt 一次性回填完成标记。cache —— 新设备可重跑一次无害。
+  ["nesio-memory-event-at-backfill-v1", "cache"],
   ["nesio-music-last-played-v1", "cache"],
   ["nesio-music-local-tracks-v1", "cache"],
   ["nesio-module-sync-since-v1", "cache"],

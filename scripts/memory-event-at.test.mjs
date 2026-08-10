@@ -6,7 +6,7 @@ import fs from 'node:fs';
 
 const src = fs.readFileSync(new URL('../lib/portal/memory-event-at.ts', import.meta.url), 'utf8');
 assert.match(src, /\[ T\]/, '必须处理空格分隔日期');
-assert.match(src, /backfillMemoryCreatedAtFromAttrs/, '必须有回填');
+assert.match(src, /collectCreatedAtBackfillPatches/, '必须有批量回填收集');
 assert.match(src, /EVENT_DATE_KEYS/, '事件字段表');
 
 function parseMemoryDate(raw) {
@@ -49,5 +49,20 @@ for (const node of nodes) {
 assert.equal(updates.length, 1);
 assert.equal(new Date(updates[0].createdAt).getFullYear(), 2025);
 assert.equal(new Date(updates[0].createdAt).getMonth(), 11);
+
+const lifeGraph = fs.readFileSync(new URL('../lib/portal/life-graph.ts', import.meta.url), 'utf8');
+assert.match(lifeGraph, /export function batchPatchLifeNodes/, '必须有批量 patch');
+assert.match(lifeGraph, /export function batchDeleteLifeNodes/, '必须有批量删除');
+
+const memoryTab = fs.readFileSync(new URL('../components/portal/MemoryTab.tsx', import.meta.url), 'utf8');
+assert.doesNotMatch(
+  memoryTab,
+  /backfillMemoryCreatedAtFromAttrs\(getLifeGraph\(\),\s*\(id,\s*patch\)\s*=>\s*\{\s*updateLifeNode/,
+  '记忆页禁止启动时逐条 updateLifeNode 回填',
+);
+
+const connector = fs.readFileSync(new URL('../lib/portal/providers/connector-sync.ts', import.meta.url), 'utf8');
+assert.match(connector, /batchPatchLifeNodes/, '连接器同步必须批量 patch createdAt');
+assert.match(connector, /batchDeleteLifeNodes/, '日历去重必须批量删除');
 
 console.log('memory-event-at: OK');

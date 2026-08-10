@@ -147,8 +147,9 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
     });
     const batch = fresh.slice(0, FLOMO_INGEST_CAP); // memos 已按新→旧;先灌最新一批
     let imported = 0;
-    const { updateLifeNode } = await import('@/lib/portal/life-graph');
+    const { batchPatchLifeNodes } = await import('@/lib/portal/life-graph');
     for (let i = 0; i < batch.length; i += FLOMO_INGEST_CHUNK) {
+      const createdAtPatches: Array<{ id: string; patch: { createdAt: string } }> = [];
       for (const m of batch.slice(i, i + FLOMO_INGEST_CHUNK)) {
         // 先剥 markdown 再截断(QA:标题曾是 `![](https://flomoapp.com/favicon.i` 这种半截图片语法)
         const plain = stripMarkdownInline(m.content.replace(/<[^>]+>/g, ' '));
@@ -178,12 +179,14 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
         // 对照 CameraSheet EXIF:把 flomo 原创建时间写到节点 createdAt(排序/时间线用),
         // 不只塞 attributes.created —— 否则同步日会盖过真实手记日。
         // 空格分隔的 created_at 先收成 ISO,避免 Safari Invalid Date。
+        // 禁止逐条 updateLifeNode:会把每块 20 条再翻倍成整图写盘风暴。
         if (m.created_at && node?.id) {
           const d = parseMemoryDate(m.created_at);
-          updateLifeNode(node.id, { createdAt: d ? d.toISOString() : m.created_at });
+          createdAtPatches.push({ id: node.id, patch: { createdAt: d ? d.toISOString() : m.created_at } });
         }
         imported++;
       }
+      if (createdAtPatches.length) batchPatchLifeNodes(createdAtPatches);
       // 让出事件循环:主线程喘口气,避免长时间独占被系统判「无响应」杀掉。
       if (i + FLOMO_INGEST_CHUNK < batch.length) await new Promise((r) => setTimeout(r, 0));
     }
@@ -198,7 +201,7 @@ export interface CalendarSyncResult { ok: boolean; count: number; added: number;
 
 /** 近 60 天窗口的日历事件进记忆;已存在(同 calendarId)但开始时间变了 → 原位更新(时区修复后自愈老数据)。 */
 export async function saveCalendarEventsToMemory(events: Array<Record<string, unknown>>): Promise<number> {
-  const { getLifeGraph, updateLifeNode, deleteLifeNode } = await import('@/lib/portal/life-graph');
+  const { getLifeGraph, batchPatchLifeNodes, batchDeleteLifeNodes } = await import('@/lib/portal/life-graph');
   const now = Date.now();
   const windowEnd = now + 60 * 86_400_000;
 
@@ -208,12 +211,14 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
   // ② 幸存的老节点(无 calendarId)按 名字|start 认亲,同步时补上 calendarId 原位更新。
   const calNodes = getLifeGraph().filter((n) => n.source === 'calendar');
   const byNameStart = new Map<string, (typeof calNodes)[number]>();
+  const dupIds: string[] = [];
   for (const n of [...calNodes].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())) {
     const key = `${n.name}|${typeof n.attributes.start === 'string' ? n.attributes.start : ''}`;
     const first = byNameStart.get(key);
     if (!first) { byNameStart.set(key, n); continue; }
-    deleteLifeNode(n.id);
+    dupIds.push(n.id);
   }
+  if (dupIds.length) batchDeleteLifeNodes(dupIds);
   const byCalId = new Map(
     [...byNameStart.values()].filter((n) => n.attributes.calendarId)
       .map((n) => [n.attributes.calendarId as string, n] as const),
@@ -221,6 +226,8 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
   let added = 0;
   // 本次同步已落过的 calendarId 与 名字|start —— 去重表建于循环之前,新建的节点不在里面
   const seenThisRun = new Set<string>();
+  // 禁止循环里逐条 updateLifeNode:开机自动同步会对近 60 天每条事件整图写盘 → 主线程卡死。
+  const patches: Array<{ id: string; patch: Partial<LifeNode> }> = [];
   for (const evAny of events) {
     const start = evAny.start as string | undefined;
     const title = evAny.title as string | undefined;
@@ -231,12 +238,13 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
     const existing = byCalId.get(calId) || byNameStart.get(`${title}|${start}`);
     if (existing && !existing.attributes.calendarId) {
       // 老节点认亲:补 calendarId,下次同步走正常 upsert
-      updateLifeNode(existing.id, { attributes: { ...existing.attributes, calendarId: calId } });
       existing.attributes = { ...existing.attributes, calendarId: calId };
+      patches.push({ id: existing.id, patch: { attributes: { ...existing.attributes } } });
+      byCalId.set(calId, existing);
     }
     if (existing) {
       // 时间/标题有变 → 更新(TZID 修复后,老的错时区节点在下次同步自愈)
-      const patch: Partial<import('@/lib/portal/life-graph').LifeNode> = {};
+      const patch: Partial<LifeNode> = {};
       if (existing.attributes.start !== start || existing.name !== title) {
         patch.name = title;
         patch.attributes = { ...existing.attributes, start, ...(evAny.end ? { end: evAny.end as string } : {}) };
@@ -249,7 +257,22 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
           patch.createdAt = start;
         }
       }
-      if (Object.keys(patch).length) updateLifeNode(existing.id, patch);
+      if (Object.keys(patch).length) {
+        // 同一 existing 可能刚推过 calendarId patch —— 合并成一条
+        const prev = patches.find((p) => p.id === existing.id);
+        if (prev) {
+          prev.patch = {
+            ...prev.patch,
+            ...patch,
+            attributes: { ...(prev.patch.attributes || existing.attributes), ...(patch.attributes || {}) },
+          };
+        } else {
+          patches.push({ id: existing.id, patch });
+        }
+        if (patch.attributes) existing.attributes = { ...existing.attributes, ...patch.attributes };
+        if (patch.createdAt) existing.createdAt = patch.createdAt;
+        if (patch.name) existing.name = patch.name;
+      }
       continue;
     }
     // ⚠️ 本次循环内也要防重:同一次同步里两条同名同时间的事件(订阅了同一个会议的
@@ -282,10 +305,11 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
     // 对照 flomo:把日历事件开始时间写到节点 createdAt(排序/时间线用),
     // 不只塞 attributes.start —— 否则同步日会盖过真实开会日。
     if (start && node?.id) {
-      updateLifeNode(node.id, { createdAt: start });
+      patches.push({ id: node.id, patch: { createdAt: start } });
     }
     added++;
   }
+  if (patches.length) batchPatchLifeNodes(patches);
   return added;
 }
 

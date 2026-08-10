@@ -23,7 +23,7 @@ import {
 import { isTxShadow } from '@/lib/portal/tx-node';
 import { rankRelatedNodes } from '@/lib/portal/related-nodes';
 import { visibleMemoryNodes, isWeatherNode } from '@/lib/portal/memory-visibility';
-import { memoryEventAt, backfillMemoryCreatedAtFromAttrs } from '@/lib/portal/memory-event-at';
+import { memoryEventAt, collectCreatedAtBackfillPatches } from '@/lib/portal/memory-event-at';
 
 /** 展示层去重:同一 externalId / flomoSlug 只留第一条(搜索/列表都走这里)。 */
 function collapseDuplicateNodes(list: readonly LifeNode[]): LifeNode[] {
@@ -1131,14 +1131,28 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   useEffect(() => {
     const profile = loadProfileSettings();
     setLocale(profile.locale);
-    // 图2/3/4:老同步节点 createdAt 常是「同步日」——用 attributes.created/start 回填一次
-    try {
-      backfillMemoryCreatedAtFromAttrs(getLifeGraph(), (id, patch) => { updateLifeNode(id, patch); });
-    } catch { /* noop */ }
     setNodes(readNodes());
     setProjects(getProjects());
 
     let cancelled = false;
+    // 图2/3/4:老节点 createdAt 常是同步日。列表排序已用 memoryEventAt,不必启动时逐条
+    // updateLifeNode(会 O(n²) 卡死)。一次性批量回填,延后到空闲,且不同步云风暴。
+    const BACKFILL_FLAG = 'nesio-memory-event-at-backfill-v1';
+    let backfillTimer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      if (typeof window !== 'undefined' && !localStorage.getItem(BACKFILL_FLAG)) {
+        backfillTimer = setTimeout(() => {
+          if (cancelled) return;
+          void import('@/lib/portal/life-graph').then(({ batchPatchLifeNodes, getLifeGraph: graph }) => {
+            if (cancelled) return;
+            const patches = collectCreatedAtBackfillPatches(graph());
+            if (patches.length) batchPatchLifeNodes(patches, { syncCloud: false });
+            try { localStorage.setItem(BACKFILL_FLAG, '1'); } catch { /* ignore */ }
+            if (!cancelled) setNodes(readNodes());
+          }).catch(() => {});
+        }, 2500);
+      }
+    } catch { /* noop */ }
 
     async function hydrateCloud() {
       if (!canUsePrivateData) return;
@@ -1172,6 +1186,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     window.addEventListener('online', retrySync);
     return () => {
       cancelled = true;
+      if (backfillTimer) clearTimeout(backfillTimer);
       window.removeEventListener('nesio-life-graph-updated', onUpdate);
       window.removeEventListener('nesio-life-graph-cloud-sync-updated', onSyncUpdate);
       window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdate);

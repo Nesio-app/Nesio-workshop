@@ -58,6 +58,8 @@ export const CACHE_KEYS = new Set<string>([
   // 判据原句:「换台设备从零开始是否正确?」—— 正确,因为文件本来就没过去。
   'nesio-music-local-tracks-v1',
   'nesio-music-last-played-v1',
+  // 记忆事件日 createdAt 一次性回填完成标记 —— 换设备可再跑一次无害。
+  'nesio-memory-event-at-backfill-v1',
   'nesio-guidance-lang-cache-v1',
   // 语音简报的遗留缓存(功能 2026-07-30 已删)。**故意留在这张表里**:老设备的
   // localStorage 里可能还躺着这个值,一旦从 CACHE_KEYS 拿掉,keyKind() 的默认值是

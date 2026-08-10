@@ -1346,20 +1346,67 @@ export function upsertLifeNodesBatch(
 }
 
 export function updateLifeNode(id: string, patch: Partial<LifeNode>): boolean {
+  return batchPatchLifeNodes([{ id, patch }]) === 1;
+}
+
+/**
+ * 批量 patch —— **一次 loadAll、一次 saveAll**。
+ *
+ * `updateLifeNode` 每条都整图读写。记忆时间回填 / 日历对齐若对几千条逐个调,
+ * 主线程会卡死(用户「打开软件完全动不了」)。这里专治那种风暴。
+ *
+ * `syncCloud: false` 时只落本地投影+事实库,不发上千次云 upsert
+ * (回填类修正常用:展示已用 memoryEventAt,不必立刻全量推云)。
+ */
+export function batchPatchLifeNodes(
+  patches: ReadonlyArray<{ id: string; patch: Partial<LifeNode> }>,
+  opts?: { syncCloud?: boolean },
+): number {
+  if (!patches.length) return 0;
   const nodes = loadAll();
-  const idx = nodes.findIndex((n) => n.id === id);
-  if (idx < 0) return false;
-  const merged = { ...nodes[idx], ...patch };
-  // 每次编辑刷新逻辑修改时间 —— 多端同步据此定胜负(数据审计 #3)。
-  // patch 显式带 updatedAt(如恢复历史版本)则尊重,否则记为当前时刻。
-  const patchStamp = typeof patch.attributes?.updatedAt === 'string' ? patch.attributes.updatedAt : undefined;
-  merged.attributes = { ...merged.attributes, updatedAt: patchStamp ?? new Date().toISOString() };
-  nodes[idx] = merged;
+  const index = new Map<string, number>();
+  for (let i = 0; i < nodes.length; i++) index.set(nodes[i].id, i);
+  const stamp = new Date().toISOString();
+  const touched: LifeNode[] = [];
+  for (const { id, patch } of patches) {
+    const idx = index.get(id);
+    if (idx === undefined) continue;
+    const merged = { ...nodes[idx], ...patch };
+    const patchStamp = typeof patch.attributes?.updatedAt === 'string' ? patch.attributes.updatedAt : undefined;
+    merged.attributes = { ...merged.attributes, ...(patch.attributes || {}), updatedAt: patchStamp ?? stamp };
+    nodes[idx] = merged;
+    touched.push(merged);
+  }
+  if (!touched.length) return 0;
   saveAll(nodes);
-  nodeFactSink?.upsert(nodes[idx]);
-  void syncLifeGraphUpsertToCloud(nodes[idx]);
-  syncLifeNodeSignalToCloud(nodes[idx]);
-  return true;
+  const syncCloud = opts?.syncCloud !== false;
+  for (const n of touched) {
+    nodeFactSink?.upsert(n);
+    if (syncCloud) {
+      void syncLifeGraphUpsertToCloud(n);
+      syncLifeNodeSignalToCloud(n);
+    }
+  }
+  return touched.length;
+}
+
+/** 批量删除 —— 一次读写。日历去重等场景禁止 for 里逐条 deleteLifeNode。 */
+export function batchDeleteLifeNodes(ids: readonly string[]): number {
+  if (!ids.length) return 0;
+  const drop = new Set(ids);
+  const nodes = loadAll();
+  const pruned = nodes.filter((n) => drop.has(n.id));
+  if (!pruned.length) return 0;
+  const filtered = nodes.filter((n) => !drop.has(n.id));
+  saveAll(filtered);
+  for (const removed of pruned) {
+    nodeFactSink?.remove(removed);
+    void syncLifeGraphDeleteToCloud(removed.id);
+  }
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('nesio-life-node-deleted', { detail: { nodes: pruned } }));
+  }
+  return pruned.length;
 }
 
 // ── 双向关联(R1)────────────────────────────────────────────────────────────
