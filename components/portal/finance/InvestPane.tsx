@@ -1,4 +1,4 @@
-use client';
+'use client';
 
 /**
  * InvestPane — 投资页(P3 拆分自 FinanceTab)。
