@@ -140,57 +140,18 @@ function dataUrlToBlob(dataUrl: string): Blob | null {
   } catch { return null; }
 }
 
-/** 试穿图保存:原生壳优先 Capacitor Share / Filesystem;Web 走系统分享再下载。不用 fetch(dataUrl)。 */
+/** 试穿图保存:系统分享(可带文件)→ `<a download>`。不用 fetch(dataUrl),也不碰未进壳清单的原生插件名。 */
 async function saveTryonToDevice(dataUrl: string): Promise<'shared' | 'downloaded' | 'failed'> {
   const blob = dataUrlToBlob(dataUrl);
   if (!blob) return 'failed';
-  const base64 = (() => {
-    const i = dataUrl.indexOf(',');
-    return i >= 0 ? dataUrl.slice(i + 1) : '';
-  })();
-  const fileName = `nesio-tryon-${Date.now()}.png`;
-
-  // 原生壳:Share 易挂起 → 先写 Filesystem,再带 file URI 分享;写成功即算已保存。
-  if (isNativePlatform() && base64) {
-    try {
-      const cap = (window as unknown as {
-        Capacitor?: {
-          Plugins?: {
-            Filesystem?: {
-              writeFile: (o: { path: string; data: string; directory: string }) => Promise<unknown>;
-              getUri: (o: { path: string; directory: string }) => Promise<{ uri: string }>;
-            };
-            Share?: { share: (o: { title?: string; url?: string; dialogTitle?: string }) => Promise<unknown> };
-          };
-        };
-      }).Capacitor;
-      const Fs = cap?.Plugins?.Filesystem;
-      const Share = cap?.Plugins?.Share;
-      const directory = 'CACHE'; // Capacitor Directory.Cache
-      if (Fs?.writeFile) {
-        await Fs.writeFile({ path: fileName, data: base64, directory });
-        if (Share?.share && Fs.getUri) {
-          try {
-            const { uri } = await Fs.getUri({ path: fileName, directory });
-            await withTimeout(Share.share({ title: 'Nesio try-on', url: uri, dialogTitle: 'Nesio try-on' }), 8_000);
-            return 'shared';
-          } catch { /* 取消分享仍算已落到缓存 */ }
-        }
-        return 'downloaded';
-      }
-    } catch { /* fall through to web path */ }
-  }
-
   const file = new File([blob], 'nesio-tryon.png', { type: blob.type || 'image/png' });
   try {
-    if (!isNativePlatform()) {
-      const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
-      if (typeof nav.share === 'function' && nav.canShare?.({ files: [file] })) {
-        try {
-          await withTimeout(nav.share({ files: [file], title: 'Nesio try-on' }), 8_000);
-          return 'shared';
-        } catch { /* timeout / 取消 → 下载 */ }
-      }
+    const nav = navigator as Navigator & { canShare?: (d: ShareData) => boolean };
+    if (typeof nav.share === 'function' && nav.canShare?.({ files: [file] })) {
+      try {
+        await withTimeout(nav.share({ files: [file], title: 'Nesio try-on' }), 8_000);
+        return 'shared';
+      } catch { /* timeout / 取消 → 下载 */ }
     }
   } catch { /* fall through */ }
   let objUrl: string | null = null;

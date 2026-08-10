@@ -80,6 +80,6 @@ assert.ok(panel.includes('排进日历'), '排完日子要能进日历(aria-labe
 assert.ok(panel.includes('>✓<') || />\s*✓\s*</.test(panel), '「排进日历」按钮面是对勾符号');
 assert.ok(panel.includes('已淘汰:这一组变灰'), '「变灰」必须在界面上写清楚是什么意思');
 assert.ok(panel.includes('tryonAssetId'), '日历那天要能显示上身图(搭配上的 tryonAssetId)');
-assert.ok(/Plugins\?\.Filesystem/.test(panel), '试穿保存要有 Capacitor Filesystem 回退');
+assert.ok(/createObjectURL/.test(panel) && /a\.download/.test(panel), '试穿保存要有 blob 下载回退(不碰未进壳的原生插件)');
 
 console.log('wardrobe-bug3: OK');
