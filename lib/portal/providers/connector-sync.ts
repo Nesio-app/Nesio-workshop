@@ -7,6 +7,7 @@ import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { stripMarkdownInline } from '@/lib/portal/node-display';
 import { isTagOnlyText } from '@/lib/portal/topic-tags';
 import { parseMemoryDate } from '@/lib/portal/memory-event-at';
+import type { LifeNode } from '@/lib/portal/life-graph';
 
 /* ---------- Plaid 银行流水(增量游标在服务端 cookie;本机 IDB 留最近 5000 笔) ---------- */
 
@@ -235,7 +236,7 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
     }
     if (existing) {
       // 时间/标题有变 → 更新(TZID 修复后,老的错时区节点在下次同步自愈)
-      const patch: { name?: string; createdAt?: string; attributes?: Record<string, unknown> } = {};
+      const patch: Partial<import('@/lib/portal/life-graph').LifeNode> = {};
       if (existing.attributes.start !== start || existing.name !== title) {
         patch.name = title;
         patch.attributes = { ...existing.attributes, start, ...(evAny.end ? { end: evAny.end as string } : {}) };
