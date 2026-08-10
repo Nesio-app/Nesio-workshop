@@ -51,6 +51,7 @@ export const CACHE_KEYS = new Set<string>([
   // 车的电量时间线(看车这一页的副产物)。换台设备从零开始完全正确 ——
   // 它不是用户录进来的东西,没必要进备份、上云。
   'nesio-tesla-battery-log-v1',
+  'nesio-tesla-low-batt-notified-v1',
   // 本地曲库的**元数据**与播放位置(2026-07-30 音乐模块)。都判 cache,理由是同一个:
   // 音频本体在 IndexedDB、**不进备份**(几百 MB 的备份 JSON 没有意义),
   // 把列表同步到另一台设备只会得到一份点了放不出声的假曲库 —— 比没有更糟。

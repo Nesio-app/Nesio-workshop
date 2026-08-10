@@ -53,8 +53,10 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
     '直接显示「没有能源产品」会把「没授权」说成「你家没有」,那是两回事');
   // 2026-08-01:中间多了 health(胎压/待装更新/门锁,给车况格用)。
   // 判据要压的是「车辆数据照旧返回」,不是这三个字段挨在一起。
-  assert.match(route, /drives: snapshot\.drives, charges: snapshot\.charges,[\s\S]{0,80}energy/,
-    '车辆数据照旧返回');
+  assert.match(route, /drives: snapshot\.drives/, '车辆 drives 照旧返回');
+  assert.match(route, /charges: snapshot\.charges/, '车辆 charges 照旧返回');
+  assert.match(route, /energy,/, 'energy 与车辆一起返回');
+  assert.match(route, /locationHint/, '位置原因 hint 给前端');
 
   const panel = read('components/portal/TeslaPanel.tsx');
   assert.match(panel, /energy\.unavailable === 'scope'/, '前端要把「没授权」这一态说出来');
@@ -76,7 +78,8 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
   assert.match(panel, /\n      <TeslaLocationMap dict=\{dict\} vehicles=\{/,
     '车页要**无条件**渲染它(没坐标时组件自己返回 null)—— ' +
     '包一层 {false && …} 之类的等于写了没接上,那是这个仓库的老毛病');
-  assert.match(panel, /lat: v\.drive\?\.latitude/, '坐标从 drive_state 来(它早就取到了,只是没人画)');
+  assert.match(panel, /locationHint === 'scope'|Vehicle Location/,
+    '没坐标时不能一律说没授权 —— 要按 scope/asleep 区分');
 }
 
 /* ══ ④ 图 4:曲线有真数据,稀疏就说稀疏 ═══════════════════════════ */

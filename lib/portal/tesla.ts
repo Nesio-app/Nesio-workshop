@@ -284,14 +284,77 @@ async function teslaGet(path: string, accessToken: string): Promise<TeslaGetResu
   } catch { return { status: 0, data: null }; }
 }
 
-type VehicleRow = { id?: string | number; id_s?: string; display_name?: string; vin?: string };
+async function teslaPost(path: string, accessToken: string): Promise<TeslaGetResult> {
+  try {
+    const res = await fetch(`${TESLA_FLEET_BASE}${path}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+      cache: 'no-store',
+    });
+    let data: unknown = null;
+    try { data = await res.json(); } catch { /* non-JSON */ }
+    return { status: res.status, data };
+  } catch { return { status: 0, data: null }; }
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * drive_state 坐标:优先 latitude/longitude,空则退 native_*。
+ * 0 当作缺(Tesla 无权限时常填 0,不是真在几内亚湾)。
+ */
+export function pickTeslaCoords(ds: Record<string, unknown> | null | undefined): { lat: number | null; lon: number | null } {
+  if (!ds) return { lat: null, lon: null };
+  const one = (v: unknown): number | null => {
+    if (typeof v !== 'number' || !Number.isFinite(v) || v === 0) return null;
+    return v;
+  };
+  const lat = one(ds.latitude) ?? one(ds.native_latitude);
+  const lon = one(ds.longitude) ?? one(ds.native_longitude);
+  return { lat, lon };
+}
+
+/** 休眠车唤醒后再读(位置字段休眠时常被抹成 null)。最多等 ~12s,失败不抛。 */
+async function wakeVehicleIfNeeded(vehicleId: string, accessToken: string, state: string | undefined): Promise<boolean> {
+  if (state === 'online') return false;
+  const w = await teslaPost(`/api/1/vehicles/${vehicleId}/wake_up`, accessToken);
+  if (w.status === 401) return false;
+  for (let i = 0; i < 6; i++) {
+    await sleep(2_000);
+    const list = await teslaGet('/api/1/vehicles', accessToken);
+    if (list.status === 401) return false;
+    const rows = ((list.data as { response?: Array<{ id_s?: string; id?: string | number; state?: string }> })?.response) || [];
+    const row = rows.find((r) => String(r.id_s || r.id || '') === vehicleId);
+    if (row?.state === 'online') return true;
+  }
+  return false;
+}
+
+type VehicleRow = { id?: string | number; id_s?: string; display_name?: string; vin?: string; state?: string };
+
+export type TeslaLocationHint = 'ok' | 'scope' | 'asleep' | 'unknown';
 
 /**
  * Collect a read-only snapshot: latest drive/charge state per vehicle + recent
  * charging history (with billed cost). Returns status 401 so the caller can
  * refresh the token and retry.
+ *
+ * `locationHint`:有车有电却没坐标时的原因猜测 —— UI 不许一律说「没授权」。
+ * `tokenScope`:OAuth 发 token 时的 scope 串(可能为空=老记录没存)。
  */
-export async function collectTeslaData(accessToken: string): Promise<{ status: number; drives: TeslaDrive[]; charges: TeslaCharge[]; health: TeslaHealth[]; vehiclesStatus?: number }> {
+export async function collectTeslaData(
+  accessToken: string,
+  opts?: { tokenScope?: string },
+): Promise<{
+  status: number;
+  drives: TeslaDrive[];
+  charges: TeslaCharge[];
+  health: TeslaHealth[];
+  vehiclesStatus?: number;
+  locationHint?: TeslaLocationHint;
+}> {
   const vehiclesRes = await teslaGet('/api/1/vehicles', accessToken);
   if (vehiclesRes.status === 401) return { status: 401, drives: [], charges: [], health: [] };
   // 412 = 合作方域名未注册(Fleet API 前置条件)。以前被静默当成「没有车」,
@@ -304,18 +367,31 @@ export async function collectTeslaData(accessToken: string): Promise<{ status: n
   const drives: TeslaDrive[] = [];
   const charges: TeslaCharge[] = [];
   const health: TeslaHealth[] = [];
+  let sawAsleep = false;
 
   for (const v of vehicles) {
     const vehicleId = String(v.id_s || v.id || '');
     if (!vehicleId) continue;
     const displayName = v.display_name || undefined;
+    if (v.state === 'asleep' || v.state === 'offline') sawAsleep = true;
 
     // Live drive + charge state. Uses vehicle_device_data scope. vehicle_state 带上
     // 是为了拿 odometer(在 vehicle_state 里,不在 drive_state)——不然里程永远是 null。
     // climate_state 是 2026-08-01 加的:车内/车外温度。同一次请求里带上,不多一趟往返。
-    const vd = await teslaGet(`/api/1/vehicles/${vehicleId}/vehicle_data?endpoints=${encodeURIComponent('drive_state;charge_state;vehicle_state;climate_state')}`, accessToken);
+    let vd = await teslaGet(`/api/1/vehicles/${vehicleId}/vehicle_data?endpoints=${encodeURIComponent('drive_state;charge_state;vehicle_state;climate_state')}`, accessToken);
     if (vd.status === 401) return { status: 401, drives, charges, health };
-    const resp = (vd.data as { response?: { drive_state?: Record<string, unknown>; charge_state?: Record<string, unknown>; vehicle_state?: Record<string, unknown>; climate_state?: Record<string, unknown> } })?.response;
+    // 408/请求空 + 车在睡 → 唤醒再读一次(位置字段休眠时常被抹掉,电量却还能从缓存出)
+    let resp = (vd.data as { response?: { drive_state?: Record<string, unknown>; charge_state?: Record<string, unknown>; vehicle_state?: Record<string, unknown>; climate_state?: Record<string, unknown> } })?.response;
+    let coords = pickTeslaCoords(resp?.drive_state);
+    if (coords.lat == null && (v.state !== 'online' || vd.status === 408 || !resp)) {
+      const woke = await wakeVehicleIfNeeded(vehicleId, accessToken, v.state);
+      if (woke || v.state !== 'online') {
+        vd = await teslaGet(`/api/1/vehicles/${vehicleId}/vehicle_data?endpoints=${encodeURIComponent('drive_state;charge_state;vehicle_state;climate_state')}`, accessToken);
+        if (vd.status === 401) return { status: 401, drives, charges, health };
+        resp = (vd.data as { response?: { drive_state?: Record<string, unknown>; charge_state?: Record<string, unknown>; vehicle_state?: Record<string, unknown>; climate_state?: Record<string, unknown> } })?.response;
+        coords = pickTeslaCoords(resp?.drive_state);
+      }
+    }
     const ds = resp?.drive_state;
     const cs = resp?.charge_state;
     const vs = resp?.vehicle_state;
@@ -330,8 +406,8 @@ export async function collectTeslaData(accessToken: string): Promise<{ status: n
         shiftState: (ds.shift_state as string) || undefined,
         speedMph: (ds.speed as number | null) ?? null,
         odometerMi: (vs?.odometer as number | null) ?? null,
-        latitude: (ds.latitude as number | null) ?? null,
-        longitude: (ds.longitude as number | null) ?? null,
+        latitude: coords.lat,
+        longitude: coords.lon,
         // drive_state.timestamp 是**车上**那份读数的时刻(毫秒)。深度休眠时它可能是
         // 几小时前的 —— 界面必须能说出「这是 3 小时前的读数」,而不是把它当成此刻。
         dataAgeMs: typeof ds.timestamp === 'number' ? (ds.timestamp as number) : null,
@@ -399,7 +475,17 @@ export async function collectTeslaData(accessToken: string): Promise<{ status: n
     });
   }
 
-  return { status: 200, drives, charges, health };
+  const hasCoords = drives.some((d) => d.latitude != null && d.longitude != null);
+  const scope = opts?.tokenScope || '';
+  const scopeKnownMissing = scope.length > 0 && !/\bvehicle_location\b/.test(scope);
+  let locationHint: TeslaLocationHint = 'ok';
+  if (!hasCoords && (drives.length > 0 || charges.some((c) => c.batteryLevel != null))) {
+    if (scopeKnownMissing) locationHint = 'scope';
+    else if (sawAsleep) locationHint = 'asleep';
+    else locationHint = 'unknown';
+  }
+
+  return { status: 200, drives, charges, health, locationHint };
 }
 
 /**

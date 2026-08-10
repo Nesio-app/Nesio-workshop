@@ -121,6 +121,9 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
   const [geoBusy, setGeoBusy] = useState(false);
   const [geoRetryToken, setGeoRetryToken] = useState(0);
   const [log, setLog] = useState<TeslaLogPoint[]>([]);
+  /** 没坐标时的原因:scope / asleep / unknown —— 不许一律说「没授权」。 */
+  const [locationHint, setLocationHint] = useState<'ok' | 'scope' | 'asleep' | 'unknown'>('ok');
+  const [lowBattRows, setLowBattRows] = useState<Array<{ vehicleId: string; displayName?: string; batteryLevel: number }>>([]);
 
   // 2026-07-29(用户标注「车页卡死在『正在向车问好…』」的真因):这条 fetch 原本没有超时。
   // 车在深度休眠时 Tesla 侧可能几十秒不回,连接半挂时浏览器更是无限等 ——
@@ -142,8 +145,13 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
     // 有缓存时静默刷新:不闪回 Loading(用户抱怨「一打开就 loading」)。
     if (!opts.silent) setState('loading');
     try {
-      const res = await fetchWithTimeout('/api/portal/tesla', { cache: 'no-store' }, 15_000);
-      const data = await res.json() as { ok?: boolean; error?: string; drives?: TeslaDrive[]; charges?: TeslaCharge[]; health?: TeslaHealthRow[]; energy?: TeslaEnergyPayload };
+      const res = await fetchWithTimeout('/api/portal/tesla', { cache: 'no-store' }, 45_000);
+      const data = await res.json() as {
+        ok?: boolean; error?: string;
+        drives?: TeslaDrive[]; charges?: TeslaCharge[]; health?: TeslaHealthRow[];
+        energy?: TeslaEnergyPayload;
+        locationHint?: 'ok' | 'scope' | 'asleep' | 'unknown';
+      };
       if (!mine()) return;   // 已经有更新的一趟在飞,旧结果一律丢弃
       if (!data.ok) {
         // 静默刷新失败且已有画面 → 保留旧数据,不踢成 error 整页空白。
@@ -164,6 +172,7 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
       setCharges(nextCharges);
       setEnergy(nextEnergy);
       setHealth(nextHealth);
+      setLocationHint(data.locationHint || 'ok');
       setState('ready');
       hasDataRef.current = true;
       writePanelCache(PANEL_CACHE_KEYS.tesla, {
@@ -171,6 +180,22 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
       });
       // #10:把车报上去。用 name 而不是 id 展示 —— 用户认得的是「JingBell」,不是一串数字。
       applyTeslaVehicles(onVehicles, nextDrives, nextCharges);
+      // 低电量:页内横幅 + 壳内系统通知(一天一车一次)
+      try {
+        const { listLowBatteryVehicles, notifyTeslaLowBattery } = await import('@/lib/portal/tesla-low-battery');
+        const low = listLowBatteryVehicles(
+          nextCharges
+            .filter((c) => c.batteryLevel != null)
+            .map((c) => ({
+              vehicleId: c.vehicleId,
+              displayName: c.displayName,
+              batteryLevel: c.batteryLevel as number,
+              chargingState: c.chargingState,
+            })),
+        );
+        setLowBattRows(low.map((r) => ({ vehicleId: r.vehicleId, displayName: r.displayName, batteryLevel: r.batteryLevel })));
+        void notifyTeslaLowBattery(low, { zh: dict !== 'en' });
+      } catch { setLowBattRows([]); }
       // 车的接口只回「此刻」——图 4 那条曲线只能在**看过的时刻**攒。
       // 攒完立刻重读:这一次的点也要出现在图上,不用等下次开页面。
       try {
@@ -210,19 +235,15 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
   /**
    * 把车所在的坐标反解成一个人能读的地名。
    *
-   * 只在坐标**真的变了**的时候问一次:反解是一次网络请求,而这一页会因为
-   * 语言切换/重新聚焦重渲染好几次 —— 跟着渲染问的话,车停在原地不动
-   * 也会一直在发请求。
-   *
-   * 失败必须可见 + 可重试(红线):静默吞掉会变成「地图有点、底下没地名、
-   * 用户以为功能坏了」。鉴权走 guardAiRoute(需登录 cookie);401/403 单独说清楚。
+   * **先走客户端 Open-Meteo / BigDataCloud**(与天气同源,不经 guardAiRoute)——
+   * 以前先打 /api/portal/geocode,401/额度失败时会误报「要先登录」,而电量/能源
+   * 明明已经能看。服务端 Foursquare 作补充,解出店名更好。
    */
   const geoKeyRef = useRef('');
   useEffect(() => {
     const withCoords = drives.filter((d) => d.latitude != null && d.longitude != null);
     if (!withCoords.length) { setGeoErr(null); return; }
     const key = withCoords.map((d) => `${d.vehicleId}:${d.latitude!.toFixed(4)},${d.longitude!.toFixed(4)}`).join('|');
-    // 重试时强制绕过同 key 短路
     const runKey = `${key}#${geoRetryToken}`;
     if (runKey === geoKeyRef.current) return;
     geoKeyRef.current = runKey;
@@ -231,37 +252,34 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
     setGeoErr(null);
     void (async () => {
       const next: Record<string, string> = {};
-      let failKind: 'auth' | 'http' | 'empty' | 'net' | null = null;
+      let failKind: 'http' | 'empty' | 'net' | null = null;
+      const { reverseGeocode } = await import('@/lib/portal/providers/weather');
       for (const d of withCoords) {
         try {
-          // POST /api/portal/geocode(反向);credentials 默认 same-origin 带上会话 cookie
-          const res = await fetchWithTimeout('/api/portal/geocode', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ lat: d.latitude, lon: d.longitude }),
-            cache: 'no-store',
-          }, 8_000);
-          if (res.status === 401 || res.status === 403) { failKind = 'auth'; continue; }
-          if (!res.ok) { failKind = failKind || 'http'; continue; }
-          const j = await res.json().catch(() => null) as { ok?: boolean; name?: string; city?: string; error?: string } | null;
-          if (j?.ok) {
-            const label = [String(j.name || '').trim(), String(j.city || '').trim()].filter(Boolean).join(' · ');
-            if (label) { next[d.vehicleId] = label; continue; }
-          }
-          // 服务端没解出(FSQ 空 / OSM 被拦)→ 客户端 Open-Meteo / BigDataCloud 兜底
-          const { reverseGeocode } = await import('@/lib/portal/providers/weather');
           const g = await reverseGeocode(d.latitude!, d.longitude!);
-          if (g.label) next[d.vehicleId] = g.label;
-          else failKind = failKind || 'empty';
-        } catch {
-          try {
-            const { reverseGeocode } = await import('@/lib/portal/providers/weather');
-            const g = await reverseGeocode(d.latitude!, d.longitude!);
-            if (g.label) next[d.vehicleId] = g.label;
-            else failKind = failKind || 'net';
-          } catch {
-            failKind = failKind || 'net';
+          if (g.label) {
+            next[d.vehicleId] = g.label;
+            // 有坐标就先落地;服务端再试一次换更贴的店名(失败不抹掉客户端结果)
+            try {
+              const res = await fetchWithTimeout('/api/portal/geocode', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ lat: d.latitude, lon: d.longitude }),
+                cache: 'no-store',
+              }, 8_000);
+              if (res.ok) {
+                const j = await res.json().catch(() => null) as { ok?: boolean; name?: string; city?: string } | null;
+                if (j?.ok) {
+                  const label = [String(j.name || '').trim(), String(j.city || '').trim()].filter(Boolean).join(' · ');
+                  if (label) next[d.vehicleId] = label;
+                }
+              }
+            } catch { /* 客户端已有 label */ }
+            continue;
           }
+          failKind = failKind || 'empty';
+        } catch {
+          failKind = failKind || 'net';
         }
       }
       if (!alive) return;
@@ -271,13 +289,10 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
         setGeoErr(null);
         return;
       }
-      // 一辆都没解出来 → 可见失败
       setGeoErr(
-        failKind === 'auth'
-          ? L(dict, '地址没解出来 —— 可能需要先登录。点重试再问一次。', "Couldn't resolve the address — you may need to sign in. Tap retry.")
-          : failKind === 'net'
-            ? L(dict, '地址反解没连上,稍后再试一次。', "Couldn't reach geocode — try again shortly.")
-            : L(dict, '这次没解出地名。地图上的点还在,点重试再问一次。', "Couldn't resolve a place name. The map pin is still there — tap retry."),
+        failKind === 'net'
+          ? L(dict, '地址反解没连上,稍后再试一次。', "Couldn't reach geocode — try again shortly.")
+          : L(dict, '这次没解出地名。地图上的点还在,点重试再问一次。', "Couldn't resolve a place name. The map pin is still there — tap retry."),
       );
     })();
     return () => { alive = false; };
@@ -331,7 +346,7 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
       <LoadingCard
         label={L(dict, '正在向车问好…', 'Checking in with the car…')}
         lines={3}
-        timeoutMs={20_000}
+        timeoutMs={50_000}
         onTimeout={() => {
           reqRef.current += 1;   // 迟到的响应不许再把界面推回去
           setErrMsg(L(dict, '这次没等到车的回应 —— 它可能在深度休眠。稍后再试一次。', 'The car did not answer this time — it may be in deep sleep. Try again shortly.'));
@@ -461,13 +476,39 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
         );
       })}
 
-      {/* Bug4 图24「车 tab 这些字都不要,显示现在的状态」:那段「想把停车/充电位置记进足迹?
-          到设置 → 数据接入 → Tesla 重连…」的说明删掉 —— 它讲的是接线,不是车的状态。
-          没拿到坐标时留一行可点的短提示就够,真要重连的人点它直接过去。 */}
+      {/* 低电量提醒横幅(<40% 且未在充) */}
+      {lowBattRows.length > 0 && (
+        <div style={{
+          borderRadius: 'var(--radius-md)', border: '1px solid var(--status-gentle)',
+          background: 'var(--status-gentle-soft)', padding: 'var(--space-3)', marginBottom: 'var(--space-3)',
+        }} role="status">
+          {lowBattRows.map((r) => (
+            <p key={r.vehicleId} className="nesio-settings-option-hint" style={{ margin: 0, color: 'var(--portal-ink)' }}>
+              {L(
+                dict,
+                `${r.displayName || 'Tesla'} 电量 ${Math.round(r.batteryLevel)}% —— 低于 40%,找个地方充一下更安心。`,
+                `${r.displayName || 'Tesla'} is at ${Math.round(r.batteryLevel)}% — under 40%. A charge would help.`,
+              )}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* 没坐标时按真实原因说,不许一律「没授权」(能量/电量正常 ≠ 位置字段有值;
+          休眠会抹坐标;token 若真缺 vehicle_location 才提示重连)。 */}
       {hasVehicle && !hasAnyLocation && (
-        <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-3)' }}>
-          {L(dict, '位置没授权 —— 到设置 → 数据接入里重连一次 Tesla 就有了。', 'Location not granted — reconnect Tesla in Settings → Data sources.')}
-        </p>
+        <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
+          <p className="nesio-settings-option-hint" style={{ margin: 0 }}>
+            {locationHint === 'scope'
+              ? L(dict, '这枚授权里还没有 Vehicle Location —— 到设置 → 数据接入里重连一次 Tesla,勾上位置即可。', 'This grant is missing Vehicle Location — reconnect Tesla in Settings → Data sources and allow location.')
+              : locationHint === 'asleep'
+                ? L(dict, '车可能在休眠,位置这一下没带上来。点下面刷新会试着唤醒再问一次。', 'The car may be asleep, so location did not come through. Tap refresh below to wake it and ask again.')
+                : L(dict, '这次没拿到停车坐标(电量正常也不代表位置字段有值)。点刷新再问一次。', 'No parking coordinates this time (battery can work without location). Tap refresh to ask again.')}
+          </p>
+          <button type="button" className="nesio-ob-primary-btn" style={{ width: '100%', marginTop: 'var(--space-2)' }} onClick={() => void load()}>
+            {L(dict, '刷新位置', 'Refresh location')}
+          </button>
+        </div>
       )}
 
       {/* 地址反解失败态(红线):有坐标但地名没解出来时可见 + 可重试 */}

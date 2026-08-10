@@ -125,6 +125,7 @@ const KNOWN_KEYS = new Map([
   ["nesio-storage-warned-at", "cache"],
   ["nesio-telemetry-device-v1", "cache"],
   ["nesio-tesla-battery-log-v1", "cache"],
+  ["nesio-tesla-low-batt-notified-v1", "cache"],
   ["nesio-tips-shown-v1", "cache"],
   ["nesio-today-cards-v1", "cache"],
   ["nesio-today-dismissed-v1", "cache"],

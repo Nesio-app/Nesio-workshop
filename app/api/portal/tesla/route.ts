@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
 
   let accessToken = token.accessToken || '';
   let rotated: { accessToken: string; refreshToken?: string; expiresAt?: number; scope?: string } | null = null;
+  const scopeHint = () => rotated?.scope || token.scope || '';
 
   // No access token but a refresh token exists → refresh up front.
   if (!accessToken && token.refreshToken) {
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
     rotated = { accessToken: fresh.accessToken, refreshToken: fresh.refreshToken, expiresAt: fresh.expiresAt, scope: fresh.scope };
   }
 
-  let snapshot = await collectTeslaData(accessToken);
+  let snapshot = await collectTeslaData(accessToken, { tokenScope: scopeHint() });
 
   // 401 → refresh once and retry.
   if (snapshot.status === 401 && token.refreshToken) {
@@ -47,7 +48,7 @@ export async function GET(req: NextRequest) {
     if (!fresh) return NextResponse.json({ ok: false, error: 'token_expired' });
     accessToken = fresh.accessToken;
     rotated = { accessToken: fresh.accessToken, refreshToken: fresh.refreshToken, expiresAt: fresh.expiresAt, scope: fresh.scope };
-    snapshot = await collectTeslaData(accessToken);
+    snapshot = await collectTeslaData(accessToken, { tokenScope: scopeHint() });
   }
 
   if (snapshot.status === 401) {
@@ -61,7 +62,7 @@ export async function GET(req: NextRequest) {
     const domain = configured ? new URL(configured).hostname : (req.headers.get('host') || '').split(':')[0];
     const registered = domain ? await registerPartnerAccount(domain) : false;
     console.info('tesla_partner_register_on_sync', { domain, registered });
-    if (registered) snapshot = await collectTeslaData(accessToken);
+    if (registered) snapshot = await collectTeslaData(accessToken, { tokenScope: scopeHint() });
   }
   // 车辆列表仍拿不到 → 把真实状态透出去,别让 UI 只能显示「没有车」。
   if (snapshot.vehiclesStatus && snapshot.vehiclesStatus !== 200) {
@@ -91,7 +92,15 @@ export async function GET(req: NextRequest) {
     else if (e.status !== 200) energy = { live: [], days: [], unavailable: 'fetch' };
   } catch { energy = { live: [], days: [], unavailable: 'fetch' }; }
 
-  const response = NextResponse.json({ ok: true, drives: snapshot.drives, charges: snapshot.charges, health: snapshot.health, energy });
+  const response = NextResponse.json({
+    ok: true,
+    drives: snapshot.drives,
+    charges: snapshot.charges,
+    health: snapshot.health,
+    energy,
+    locationHint: snapshot.locationHint || 'ok',
+    scope: scopeHint() || undefined,
+  });
 
   // Persist rotated token (Supabase + cookies) so we don't refresh every call.
   if (rotated) {
