@@ -24,7 +24,10 @@ import type { CapacitorConfig } from '@capacitor/cli';
  */
 const REMOTE = process.env.NESIO_SHELL_URL
   || process.env.NEXT_PUBLIC_APP_ORIGIN
-  || 'https://www.nesio.app';
+  // 2026-08-10:www.nesio.app 仍指向旧 Vercel 部署(dpl 与 treasurebox-nu 不同,
+  // /api/portal/tesla 曾 404)—— IPA 在 DNS 修好前必须吃现网 fallback,否则
+  // 「代码推了但手机看不到」+「特斯拉地址 API 一直挂」。
+  || 'https://treasurebox-nu.vercel.app';
 
 const config: CapacitorConfig = {
   appId: 'app.nesio.ios',

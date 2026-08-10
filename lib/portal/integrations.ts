@@ -176,7 +176,7 @@ export function setTokenCookiesOnResponse(
  */
 export async function getIntegrationToken(
   provider: IntegrationProvider,
-): Promise<{ accessToken: string; refreshToken?: string } | null> {
+): Promise<{ accessToken: string; refreshToken?: string; scope?: string; expiresAt?: number } | null> {
   const cookieStore = await cookies();
   const supabaseToken = cookieStore.get('baohe_auth_access')?.value;
 
@@ -185,7 +185,14 @@ export async function getIntegrationToken(
     if (userId) {
       const map = await readIntegrations(userId, supabaseToken);
       const t = map?.[provider];
-      if (t?.accessToken) return { accessToken: t.accessToken, refreshToken: t.refreshToken };
+      if (t?.accessToken) {
+        return {
+          accessToken: t.accessToken,
+          refreshToken: t.refreshToken,
+          scope: t.scope,
+          expiresAt: t.expiresAt,
+        };
+      }
     }
   }
 
@@ -221,7 +228,7 @@ export async function getRefreshedUserId(): Promise<string | null> {
  */
 export async function getIntegrationTokenRefreshed(
   provider: IntegrationProvider,
-): Promise<{ accessToken: string; refreshToken?: string } | null> {
+): Promise<{ accessToken: string; refreshToken?: string; scope?: string; expiresAt?: number } | null> {
   const direct = await getIntegrationToken(provider);
   if (direct?.accessToken) return direct;
   const userId = await getRefreshedUserId();
@@ -229,7 +236,9 @@ export async function getIntegrationTokenRefreshed(
   if (!userId || !serviceKey) return null;
   const map = await readIntegrations(userId, serviceKey);
   const t = map?.[provider];
-  return t?.accessToken ? { accessToken: t.accessToken, refreshToken: t.refreshToken } : null;
+  return t?.accessToken
+    ? { accessToken: t.accessToken, refreshToken: t.refreshToken, scope: t.scope, expiresAt: t.expiresAt }
+    : null;
 }
 
 /**

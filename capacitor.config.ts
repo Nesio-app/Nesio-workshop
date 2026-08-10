@@ -21,8 +21,8 @@ const config: CapacitorConfig = {
   webDir: 'ios-shell',
 
   server: {
-    // 与 PWA canonical 同域,减少 IPA/PWA 双 origin 数据分叉。
-    url: process.env.NESIO_SHELL_URL || 'https://www.nesio.app',
+    // 2026-08-10:www.nesio.app DNS/部署与 treasurebox-nu 分叉时,壳先吃现网 fallback。
+    url: process.env.NESIO_SHELL_URL || 'https://treasurebox-nu.vercel.app',
     cleartext: false,
     // OAuth / 外链回跳(Google、Apple、Plaid 等)允许离开主域再回来。
     allowNavigation: [
