@@ -6,6 +6,7 @@
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { stripMarkdownInline } from '@/lib/portal/node-display';
 import { isTagOnlyText } from '@/lib/portal/topic-tags';
+import { parseMemoryDate } from '@/lib/portal/memory-event-at';
 
 /* ---------- Plaid 银行流水(增量游标在服务端 cookie;本机 IDB 留最近 5000 笔) ---------- */
 
@@ -175,8 +176,10 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
         });
         // 对照 CameraSheet EXIF:把 flomo 原创建时间写到节点 createdAt(排序/时间线用),
         // 不只塞 attributes.created —— 否则同步日会盖过真实手记日。
+        // 空格分隔的 created_at 先收成 ISO,避免 Safari Invalid Date。
         if (m.created_at && node?.id) {
-          updateLifeNode(node.id, { createdAt: m.created_at });
+          const d = parseMemoryDate(m.created_at);
+          updateLifeNode(node.id, { createdAt: d ? d.toISOString() : m.created_at });
         }
         imported++;
       }
@@ -232,12 +235,20 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
     }
     if (existing) {
       // 时间/标题有变 → 更新(TZID 修复后,老的错时区节点在下次同步自愈)
+      const patch: { name?: string; createdAt?: string; attributes?: Record<string, unknown> } = {};
       if (existing.attributes.start !== start || existing.name !== title) {
-        updateLifeNode(existing.id, {
-          name: title,
-          attributes: { ...existing.attributes, start, ...(evAny.end ? { end: evAny.end as string } : {}) },
-        });
+        patch.name = title;
+        patch.attributes = { ...existing.attributes, start, ...(evAny.end ? { end: evAny.end as string } : {}) };
       }
+      // 时间线按事件开始日,不按同步日 —— 老节点也每次对齐 createdAt
+      if (start && existing.createdAt !== start) {
+        const startMs = new Date(start).getTime();
+        const curMs = new Date(existing.createdAt).getTime();
+        if (!Number.isNaN(startMs) && (Number.isNaN(curMs) || Math.abs(curMs - startMs) > 60_000)) {
+          patch.createdAt = start;
+        }
+      }
+      if (Object.keys(patch).length) updateLifeNode(existing.id, patch);
       continue;
     }
     // ⚠️ 本次循环内也要防重:同一次同步里两条同名同时间的事件(订阅了同一个会议的
@@ -248,7 +259,7 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
     if (seenThisRun.has(calId) || seenThisRun.has(dupKey)) continue;
     seenThisRun.add(calId);
     seenThisRun.add(dupKey);
-    ingestLifeNode({
+    const node = ingestLifeNode({
       name: title,
       type: 'event',
       source: 'calendar',
@@ -267,6 +278,11 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
       },
       relations: [],
     });
+    // 对照 flomo:把日历事件开始时间写到节点 createdAt(排序/时间线用),
+    // 不只塞 attributes.start —— 否则同步日会盖过真实开会日。
+    if (start && node?.id) {
+      updateLifeNode(node.id, { createdAt: start });
+    }
     added++;
   }
   return added;

@@ -23,7 +23,7 @@ import {
 import { isTxShadow } from '@/lib/portal/tx-node';
 import { rankRelatedNodes } from '@/lib/portal/related-nodes';
 import { visibleMemoryNodes, isWeatherNode } from '@/lib/portal/memory-visibility';
-import { memoryEventAt } from '@/lib/portal/memory-event-at';
+import { memoryEventAt, backfillMemoryCreatedAtFromAttrs } from '@/lib/portal/memory-event-at';
 
 /** 展示层去重:同一 externalId / flomoSlug 只留第一条(搜索/列表都走这里)。 */
 function collapseDuplicateNodes(list: readonly LifeNode[]): LifeNode[] {
@@ -72,7 +72,6 @@ const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
 import { DomainIcon, IconActivity, IconBox, IconBookmark, IconCalendar, IconCamera, IconCheckSquare, IconFolder, IconMail, IconMapPin, IconMic, IconNote, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
-import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName, stripMarkdownInline } from '@/lib/portal/node-display';
 import { isPinned, loadPins, PINS_UPDATED_EVENT, togglePin, isCore, toggleCore, loadCore, CORE_UPDATED_EVENT } from '@/lib/portal/pins';
 import { inventoryStats } from '@/lib/portal/inventory';
@@ -686,14 +685,16 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
         <span className="nesio-memory-card-source">{srcMeta.icon}{srcMeta.label}</span>
         {uncertain && <span className="nesio-memory-card-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
         {(() => {
-          // 标签三层 §3.3:列表卡带相对时间(今天/昨天/N 天前),数据的"新鲜度"一眼可辨
+          // 图2:时间线按源创建/事件日。今天/昨天仍用相对词;更早显示具体月日(不藏成「N 天前」)。
           const t = memoryEventAt(node);
           const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
           const label = t >= dayStart
             ? L(dict, '今天', 'Today')
             : t >= new Date(dayStart.getTime() - 86_400_000)
               ? L(dict, '昨天', 'Yesterday')
-              : relativePastLabel(t, Date.now(), dict);
+              : dict === 'en'
+                ? t.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : `${t.getMonth() + 1}月${t.getDate()}日`;
           return <span className="nesio-memory-card-time">{label}</span>;
         })()}
       </span>
@@ -1130,6 +1131,10 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   useEffect(() => {
     const profile = loadProfileSettings();
     setLocale(profile.locale);
+    // 图2/3/4:老同步节点 createdAt 常是「同步日」——用 attributes.created/start 回填一次
+    try {
+      backfillMemoryCreatedAtFromAttrs(getLifeGraph(), (id, patch) => { updateLifeNode(id, patch); });
+    } catch { /* noop */ }
     setNodes(readNodes());
     setProjects(getProjects());
 

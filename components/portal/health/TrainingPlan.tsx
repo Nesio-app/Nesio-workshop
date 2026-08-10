@@ -300,7 +300,6 @@ export default function TrainingPlan() {
               <>
                 <p className="nesio-fit-hello">{L(dict, '先挑一个计划,今天就能开始。', 'Pick a plan — you can start today.')}</p>
                 {genCard}
-                {myWorkouts}
               </>
             )}
             {fitTab === 'plan' && (
@@ -317,9 +316,9 @@ export default function TrainingPlan() {
                   ))}
                 </div>
                 {myWorkouts}
+                {moreGrid}
               </>
             )}
-            {moreGrid}
           </>
         )}
       </div>
@@ -407,9 +406,6 @@ export default function TrainingPlan() {
               </div>
             </div>
           </section>
-
-          {myWorkouts}
-          {moreGrid}
         </>
       )}
 

@@ -216,9 +216,9 @@ const ITEMS = [
   ['87', 'p32「待确认」确认后消失', () => /confirmed\?: boolean/.test(F.bankTx) && (F.finTab.match(/status === 'predicted' && !r\.confirmed/g) || []).length >= 3],
   ['88', 'p33 每笔加「修改」:关联人 + 附件', () => /function TxEditPanel/.test(F.finTab) && /toggleTxPerson/.test(F.txAnn) && /addTxAttachment/.test(F.txAnn)],
   ['89', 'p34「支出」tab →「分类」', () => /\['spending', '分类', 'Categories'\]/.test(F.finTab)],
-  ['90', 'p34「+手动添加」→「预算」并移到最下', () => !C.finTab.includes('＋ 手动添加') && F.finTab.indexOf("{L(dict, '预算', 'Budget')}") < F.finTab.indexOf('P2 投资')],
+  ['90', 'p34「+手动添加」→「预算」并到总览', () => !C.finTab.includes('＋ 手动添加') && /预算\(图14:从分类页挪到总览\)/.test(F.finTab) && F.finTab.includes("{L(dict, '生成', 'Generate')}")],
   ['91', 'p34 饼图调大', () => (F.finTab.match(/<FinanceDonut big/g) || []).length >= 2],
-  ['92', 'p34 分类页单饼 + 点选出商户/明细', () => !/function SpendChartPager/.test(F.finTab) && /该分类 · 商户 Top|In this category · Top merchants/.test(F.finTab) && /setSpendFocus/.test(F.finTab)],
+  ['92', 'p34 分类页单饼 + 点选出商户/明细', () => !/function SpendChartPager/.test(F.finTab) && /该分类 · 商户 Top|In this category · Top merchants/.test(F.finTab) && /setDonutFocus/.test(F.finTab)],
   ['93', 'p35 组合结构去图例 + 点开看详情', () => /setAllocPick/.test(F.finTab)],
   ['94', 'p35 念卡放到卡片下面', () => F.finTab.indexOf('nesio-fin-nessa') > F.finTab.indexOf("'收入', 'Income'")],
   // 产品改口(2026-08):总览不再手记银行流水;资产更新走 CardsPane.onQuickAddAsset。

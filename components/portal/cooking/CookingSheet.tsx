@@ -8,6 +8,7 @@
  * 主线全免费·确定性;云生成是 Pro 点缀。每个异步动作有显式失败态;全用设计 token、无 emoji、线性图标。
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { openModeCamera, takePendingCapture } from '@/lib/portal/capture-pipeline';
 import NesioSheet from '../ui/NesioSheet';
 import SegTabs from '../ui/SegTabs';
@@ -38,15 +39,10 @@ import {
 import { saveGeneratedRecipe, findGeneratedRecipe } from '@/lib/cooking/generated-recipes';
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { localDayKey } from '@/lib/portal/local-day';
-import { loadHealthMetrics } from '@/lib/portal/health-store';
-import {
-  rankFoodReactions, mgDlToDisplay, buildDayLedger, ledgerPrompt, goalLabel,
-  setBodyGoalKind, type BodyGoalKind,
-} from '@/lib/portal/body-ledger';
-import type { DailyFact, HealthMetrics } from '@/lib/portal/apple-health';
-import { getLifeGraph } from '@/lib/portal/life-graph';
+import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import { resolveAssetDisplayUrl } from '@/lib/portal/capture-pipeline';
-import { PostMealBody } from '../health/BodyLedgerPanel';
+
+const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
 
 type TopTab = 'home' | 'pantry' | 'wishlist' | 'meals';
 
@@ -1655,30 +1651,17 @@ function SubTabs({ active, onSelect, t }: { active: TopTab; onSelect: (k: TopTab
 }
 
 /**
- * MealsBody — 拍照记餐列表 + 今日营养评估 + 餐后血糖趋势 + 食物反应探索。
+ * MealsBody — 拍照记餐 + 最近一餐列表(点开复用 MemoryNodeDetail)。
  */
 function MealsBody({ onLogMeal, t }: { onLogMeal: () => void; t: TT }) {
-  const dict = t('zh', 'en');
-  const zh = dict === 'zh';
+  const zh = t('zh', 'en') === 'zh';
   const [meals, setMeals] = useState<Meal[]>([]);
-  const [health, setHealth] = useState<HealthMetrics | null>(null);
-  const [daily, setDaily] = useState<DailyFact[] | undefined>();
-  const [gluUnit, setGluUnit] = useState<'mg/dL' | 'mmol/L'>('mg/dL');
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const [tick, setTick] = useState(0);
-  const [goalRev, setGoalRev] = useState(0);
+  const [openNode, setOpenNode] = useState<LifeNode | null>(null);
 
   useEffect(() => {
     try { setMeals(getMeals()); } catch { setMeals([]); }
-    try {
-      const hm = loadHealthMetrics();
-      setHealth(hm);
-      setDaily(hm?.daily);
-      if (hm?.glucose?.unit === 'mmol/L') setGluUnit('mmol/L');
-    } catch {
-      setHealth(null);
-      setDaily(undefined);
-    }
   }, [tick]);
 
   useEffect(() => {
@@ -1705,26 +1688,17 @@ function MealsBody({ onLogMeal, t }: { onLogMeal: () => void; t: TT }) {
   useEffect(() => {
     const bump = () => setTick((n) => n + 1);
     window.addEventListener('nesio-life-graph-updated', bump);
-    window.addEventListener('nesio-health-updated', bump);
-    return () => {
-      window.removeEventListener('nesio-life-graph-updated', bump);
-      window.removeEventListener('nesio-health-updated', bump);
-    };
+    return () => { window.removeEventListener('nesio-life-graph-updated', bump); };
   }, []);
-
-  const ledger = useMemo(
-    () => buildDayLedger(undefined, { rings: health?.activityRings, meals }),
-    [health, meals, goalRev],
-  );
-  const prompt = useMemo(() => ledgerPrompt(ledger, zh), [ledger, zh]);
-  const reactions = useMemo(() => rankFoodReactions(meals, daily, { minN: 2, limit: 6 }), [meals, daily]);
-  const byDate = useMemo(() => new Map((daily || []).map((d) => [d.date, d])), [daily]);
 
   const fmtDay = (d: string) => (
     zh ? `${Number(d.slice(5, 7))}月${Number(d.slice(8, 10))}日` : d.slice(5).replace('-', '/')
   );
 
-  const pct = (v: number, g: number) => (g > 0 ? Math.min(100, Math.round((v / g) * 100)) : 0);
+  const openMeal = (id: string) => {
+    const node = getLifeGraph().find((n) => n.id === id) || null;
+    if (node) setOpenNode(node);
+  };
 
   return (
     <>
@@ -1735,87 +1709,6 @@ function MealsBody({ onLogMeal, t }: { onLogMeal: () => void; t: TT }) {
       </div>
 
       <section>
-        <SectionHead label={t('今日营养', 'Today nutrition')} right={goalLabel(ledger.goals.goal, zh)} />
-        <div style={{ ...card, padding: 'var(--space-3)' }}>
-          <div style={{ display: 'flex', gap: 'var(--space-1)', marginBottom: 'var(--space-3)' }}>
-            {(['muscle', 'maintain', 'cut'] as BodyGoalKind[]).map((g) => {
-              const on = ledger.goals.goal === g;
-              return (
-                <button key={g} type="button" onClick={() => { setBodyGoalKind(g); setGoalRev((n) => n + 1); }}
-                  style={{
-                    flex: 1, border: 'none', borderRadius: 'var(--radius-pill)', padding: 'var(--space-2) 0',
-                    fontSize: 'var(--text-xs)', fontWeight: on ? 700 : 600, fontFamily: 'var(--font-sans)', cursor: 'pointer',
-                    background: on ? 'var(--portal-accent)' : 'var(--portal-accent-soft)', color: on ? '#fff' : 'var(--portal-muted)',
-                  }}>
-                  {goalLabel(g, zh)}
-                </button>
-              );
-            })}
-          </div>
-          {([
-            [t('蛋白', 'Protein'), ledger.protein, ledger.goals.proteinG, 'g'],
-            [t('热量', 'Calories'), ledger.energyKCal, ledger.goals.energyKCal, ' kcal'],
-            [t('碳水', 'Carbs'), ledger.carbs, ledger.goals.carbsG, 'g'],
-          ] as const).map(([label, v, g, unit]) => (
-            <div key={label} style={{ marginBottom: 'var(--space-2)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginBottom: 4 }}>
-                <span>{label}</span>
-                <span>{Math.round(v)} / {g}{unit}</span>
-              </div>
-              <div style={{ height: 6, borderRadius: 'var(--radius-pill)', background: 'var(--portal-accent-soft)', overflow: 'hidden' }}>
-                <div style={{
-                  width: `${pct(v, g)}%`, height: '100%', borderRadius: 'var(--radius-pill)',
-                  background: pct(v, g) > 100 ? 'var(--status-gentle)' : 'var(--portal-accent)',
-                }} />
-              </div>
-            </div>
-          ))}
-          {prompt && (
-            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-sm)', color: 'var(--portal-ink)', fontWeight: 600 }}>{prompt}</p>
-          )}
-          {!prompt && ledger.meals.length > 0 && (
-            <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-go)' }}>
-              {t('今天营养大致在目标附近。', 'Today’s intake looks near your goal.')}
-            </p>
-          )}
-        </div>
-      </section>
-
-      <section>
-        <SectionHead label={t('餐后血糖趋势', 'Post-meal glucose trend')} />
-        <div style={{ ...card, padding: 'var(--space-3)' }}>
-          <PostMealBody health={health} dict={dict} />
-        </div>
-      </section>
-
-      {reactions.length > 0 && (
-        <section>
-          <SectionHead label={t('餐后血糖探索', 'Post-meal glucose tips')} right={t('样本≥2', 'n≥2')} />
-          <div style={card}>
-            {reactions.map((r, i) => {
-              const rise = mgDlToDisplay(r.avgRise, gluUnit);
-              const label = r.tone === 'spike'
-                ? t(`偏高 · 振幅约 ${rise}`, `Higher · ~${rise}`)
-                : t(`较稳 · 振幅约 ${rise}`, `Steadier · ~${rise}`);
-              return (
-                <div key={r.name} style={{ ...row, borderBottom: i === reactions.length - 1 ? 'none' : divider }}>
-                  <Dot />
-                  <span style={{ flex: 1, fontSize: 'var(--text-sm)', fontWeight: 600 }}>{r.name}</span>
-                  <span style={{
-                    fontSize: 'var(--text-xs)', fontWeight: 600,
-                    color: r.tone === 'spike' ? 'var(--status-gentle)' : 'var(--status-go)',
-                  }}>
-                    {label}{` · n=${r.n}`}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-          <p style={caption}>{t('探索向提示,不是医疗建议。', 'Exploratory only — not medical advice.')}</p>
-        </section>
-      )}
-
-      <section>
         <SectionHead label={t('最近一餐', 'Recent meals')} right={meals.length ? `${meals.length}` : undefined} />
         {meals.length === 0 ? (
           <p className="nesio-insights-empty" style={{ margin: 0 }}>
@@ -1824,17 +1717,15 @@ function MealsBody({ onLogMeal, t }: { onLogMeal: () => void; t: TT }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             {meals.slice(0, 40).map((m) => {
-              const fact = byDate.get(m.occurredAt);
               const title = m.items.map((it) => it.name).filter(Boolean).slice(0, 3).join(' · ') || t('一餐', 'Meal');
-              const glu = fact && fact.glucoseAvg != null
-                ? t(
-                  `血糖均 ${mgDlToDisplay(fact.glucoseAvg, gluUnit)}${fact.glucoseMax != null ? ` · 高 ${mgDlToDisplay(fact.glucoseMax, gluUnit)}` : ''}`,
-                  `Glu avg ${mgDlToDisplay(fact.glucoseAvg, gluUnit)}${fact.glucoseMax != null ? ` · max ${mgDlToDisplay(fact.glucoseMax, gluUnit)}` : ''}`,
-                )
-                : null;
               const thumb = thumbs[m.id];
               return (
-                <div key={m.id} style={card}>
+                <button
+                  key={m.id}
+                  type="button"
+                  onClick={() => openMeal(m.id)}
+                  style={{ ...card, display: 'block', width: '100%', textAlign: 'left', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-sans)' }}
+                >
                   {thumb && (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={thumb} alt="" style={{ width: '100%', maxHeight: 160, objectFit: 'cover', display: 'block' }} />
@@ -1848,16 +1739,23 @@ function MealsBody({ onLogMeal, t }: { onLogMeal: () => void; t: TT }) {
                       {t(m.source, m.source === '自己做' ? 'Home' : m.source === '餐厅' ? 'Dine-in' : m.source === '外卖' ? 'Takeout' : 'Other')}
                       {` · ${Math.round(m.energyKCal)} kcal · P${Math.round(m.protein)} C${Math.round(m.cho)} F${Math.round(m.fat)}`}
                     </p>
-                    {glu && (
-                      <p style={{ margin: 'var(--space-1) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-calm)' }}>{glu}</p>
-                    )}
                   </div>
-                </div>
+                </button>
               );
             })}
           </div>
         )}
       </section>
+
+      {/* elevated:美味在 fullscreen 里,详情是 bottom 卡 —— 不抬层会被盖住。 */}
+      {openNode && (
+        <MemoryNodeDetail
+          node={openNode}
+          elevated
+          onClose={() => setOpenNode(null)}
+          onOpenNode={(n) => setOpenNode(n)}
+        />
+      )}
     </>
   );
 }
@@ -1869,9 +1767,6 @@ function NutriCol({ v, label, last }: { v: string; label: string; last?: boolean
       <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', marginTop: 2 }}>{label}</div>
     </div>
   );
-}
-function Dot() {
-  return <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--portal-accent)', flex: 'none' }} />;
 }
 /** 菜谱缩略图:无图/加载失败回退菜名首字占位(不出现破图,失败态可见但安静)。 */
 /**

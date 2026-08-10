@@ -10,6 +10,12 @@
 - iPhone 上已装 [AltStore](https://altstore.io/)
 - 壳加载现网：`https://treasurebox-nu.vercel.app`（`capacitor.config.ts` → `server.url`）
 
+## 通知与何时重打 IPA
+
+本地到点提醒已走壳内 **`NesioLocalNotify`**。只改 Web（文案 / 调度 / 授权引导）
+一般**不必**重打 IPA——壳打开的是现网 WebView。插件 API、Info.plist、或
+Capacitor/`server.url` 变了才需要按下文重新 Archive → AltStore 安装。
+
 ## 出包（一次）
 
 在仓库根目录：

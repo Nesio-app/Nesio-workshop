@@ -21,7 +21,6 @@ import { memoryEventAt } from '@/lib/portal/memory-event-at';
 // #18:「地点」字段里塞的是会议链接 —— 一条 URL 不是一个地方
 import { splitEventLocation, shortUrlLabel } from '@/lib/portal/meeting-location';
 import { L } from '@/lib/portal/i18n';
-import { relativePastLabel } from '@/lib/portal/time-labels';
 import { displayNodeName, stripMarkdownInline } from '@/lib/portal/node-display';
 import dynamicImport from 'next/dynamic';
 const ReaderSheetLazy = dynamicImport(() => import('./ArticleReaderSheet'), { ssr: false });
@@ -1002,14 +1001,17 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
     }
   }
 
-  // 标签三层 §3.3:「记录于 2026年7月9日」→ 相对时间(今天 12:34 / 昨天 / N 天前)
+  // 标签三层 §3.3 + 图2/3:「记录于」跟记忆时间线同一套事件时间;今天/昨天相对,更早写具体月日
   const createdDate = (() => {
     const created = memoryEventAt(n);
     const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
     const time = created.toLocaleTimeString(dict === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
     if (created >= dayStart) return L(dict, `今天 ${time}`, `today ${time}`);
     if (created >= new Date(dayStart.getTime() - 86_400_000)) return L(dict, `昨天 ${time}`, `yesterday ${time}`);
-    return relativePastLabel(created, Date.now(), dict);
+    const day = dict === 'en'
+      ? created.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+      : `${created.getMonth() + 1}月${created.getDate()}日`;
+    return `${day} ${time}`;
   })();
 
   // Remaining attributes not shown in type-specific sections

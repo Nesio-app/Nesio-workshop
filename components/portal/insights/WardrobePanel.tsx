@@ -741,6 +741,34 @@ export default function WardrobePanel() {
   const todayIso = new Date().toISOString().slice(0, 10);
   const retired = retiredKeys(outfits);
 
+  /**
+   * 今日试穿结果 → 存入搭配:saveOutfit + 把试穿图挂 tryonAssetId
+   * (与 runTryonForOutfit 同构:先有搭配记录,再按真实 id 挂图)。
+   */
+  const onSaveTryonAsOutfit = async (url: string) => {
+    const pieces = currentPieces;
+    if (pieces.length === 0) {
+      setOutfitErr(L(dict, '这套里的衣服已经不在衣橱里了。', 'These pieces are no longer in your wardrobe.'));
+      return;
+    }
+    const pieceIds = pieces.map((p) => p.id);
+    const okSave = saveOutfit(pieceIds, todayIso);
+    if (!okSave) { commitOutfit(false); return; }
+    const saved = loadOutfits().find((o) => o.date === todayIso && outfitKey(o.pieceIds) === outfitKey(pieceIds));
+    if (!saved) { commitOutfit(true, L(dict, '已存入搭配', 'Saved to Outfits')); setTab('saved'); return; }
+    const assetId = `wardrobe-tryon-${saved.id}`;
+    const okImg = await storeWardrobeImage(assetId, url);
+    setOutfitTryons((prev) => ({ ...prev, [assetId]: url }));
+    if (!okImg) {
+      setTryonError(L(dict, '上身图这次没能存下来(空间满了)—— 搭配记下了,重开可能没有图。', 'Could not store the try-on image (storage full) — outfit saved, image may be gone after reload.'));
+      commitOutfit(true, L(dict, '已存入搭配', 'Saved to Outfits'));
+      setTab('saved');
+      return;
+    }
+    commitOutfit(patchOutfit(saved.id, { tryonAssetId: assetId }), L(dict, '已存入搭配', 'Saved to Outfits'));
+    setTab('saved');
+  };
+
   return (
     <div className="nesio-analytics-tab">
       {/* 图15:多一个「搭配」tab —— 存下来的搭配从这里翻。
@@ -944,13 +972,15 @@ export default function WardrobePanel() {
 
           {tryonResult ? (
             <div style={{ marginTop: 'var(--space-2)' }}>
+              {/* 结果卡整卡可点放大(与图 zoom 同一 setZoomUrl) */}
               <button type="button" onClick={() => { setZoomScaled(false); setZoomUrl(tryonResult); }}
                 style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'transparent', cursor: 'zoom-in' }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={tryonResult} alt={L(dict, '试穿效果', 'Try-on result')} style={{ width: '100%', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)' }} />
               </button>
-              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)', flexWrap: 'wrap' }}>
                 <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} disabled={saveBusy} onClick={() => { void onSaveTryon(tryonResult); }}>{saveBusy ? L(dict, '保存中…', 'Saving…') : L(dict, '保存', 'Save')}</Button>
+                <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => { void onSaveTryonAsOutfit(tryonResult); }}>{L(dict, '存入搭配', 'Save outfit')}</Button>
                 <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => runTryon(currentPieces)} disabled={tryonBusy}>{L(dict, '再试', 'Retry')}</Button>
               </div>
               {saveMsg && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-go)' }} role="status">{saveMsg}</p>}
@@ -1377,6 +1407,9 @@ export default function WardrobePanel() {
           <div className="nesio-tryon-lightbox-actions" onClick={(e) => e.stopPropagation()}>
             <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} disabled={saveBusy} onClick={() => onSaveTryon(zoomUrl)}>
               {saveBusy ? L(dict, '保存中…', 'Saving…') : L(dict, '保存', 'Save')}
+            </Button>
+            <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} disabled={saveBusy} onClick={() => { void onSaveTryonAsOutfit(zoomUrl); }}>
+              {L(dict, '存入搭配', 'Save outfit')}
             </Button>
             <Button variant="secondary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => { setZoomUrl(null); setZoomScaled(false); }}>
               {L(dict, '关闭', 'Close')}

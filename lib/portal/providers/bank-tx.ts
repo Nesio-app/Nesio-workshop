@@ -86,8 +86,8 @@ export function loadBankTx(): BankTx[] {
   const raw = txStore.load();
   // Number.isFinite 挡掉 NaN(typeof NaN === 'number' 会漏过去,污染整月汇总)。
   const base = Array.isArray(raw) ? raw.filter((t) => t && Number.isFinite(t.amount) && typeof t.date === 'string') : [];
-  // 读时过滤孤儿:显示立即治愈;下次同步 merge 经由本函数 → 储存自然清掉。备份读原始 IDB,可逆。
-  return filterToKnownAccounts(base, loadBankAccounts());
+  // 读时过滤孤儿 + 内容指纹去重:显示立即治愈;下次同步 merge 也会去重写入。
+  return dedupeBankTxByContent(filterToKnownAccounts(base, loadBankAccounts()));
 }
 
 /** 原始流水(不过孤儿过滤)。同步合并的兜底基准:账户快照可疑时不让过滤结果定生死。 */
@@ -107,7 +107,32 @@ export function saveBankTx(txs: BankTx[]): void {
   txStore.save(txs);
 }
 
-/** 增量合并纯核心(可单测):按 id upsert、删 removed、日期降序留最近 cap 笔。 */
+/**
+ * 内容指纹(图13 去重):同账户 + 同日 + 同绝对金额 + 商户归一(entity id 优先)。
+ * **必须有 accountId** —— 缺账户时两笔同额同名可能是真的两笔(不同卡),不合并。
+ */
+export function bankTxContentKey(t: Pick<BankTx, 'accountId' | 'date' | 'amount' | 'name' | 'merchantId'>): string {
+  const namePart = t.merchantId || normalizeMerchant(t.name);
+  const amt = Math.abs(Number(t.amount));
+  const amtKey = Number.isFinite(amt) ? amt.toFixed(2) : '0';
+  return `${t.accountId}|${t.date}|${amtKey}|${namePart}`;
+}
+
+/**
+ * 内容指纹去重:同指纹多条 → 留后出现的那条(同步里 = 新写入/更新侧)。
+ * 无 accountId 的按 id 保留,避免误杀跨账户合法同额。
+ */
+export function dedupeBankTxByContent(txs: readonly BankTx[]): BankTx[] {
+  const byKey = new Map<string, BankTx>();
+  for (const t of txs) {
+    if (!t?.id) continue;
+    const key = t.accountId ? bankTxContentKey(t) : `id:${t.id}`;
+    byKey.set(key, t); // 后写覆盖 = 留更新的那条
+  }
+  return [...byKey.values()];
+}
+
+/** 增量合并纯核心(可单测):按 id upsert、删 removed、内容指纹去重、日期降序留最近 cap 笔。 */
 export function mergeBankTxForSync(
   existing: readonly BankTx[],
   incoming: readonly BankTx[],
@@ -119,7 +144,8 @@ export function mergeBankTxForSync(
   for (const t of existing) if (!removed.has(t.id)) byId.set(t.id, t);
   let fresh = 0;
   for (const t of incoming) { if (!byId.has(t.id)) fresh++; byId.set(t.id, t); }
-  const merged = [...byId.values()]
+  // 内容指纹去重在 id 合并之后:同日同额同名同账户的重复 id 各异(换 item/重同步)会并成一条。
+  const merged = dedupeBankTxByContent([...byId.values()])
     .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
     .slice(0, cap);
   return { merged, fresh };

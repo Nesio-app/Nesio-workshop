@@ -309,47 +309,22 @@ export default function TripTimelineSheet({
                   </header>
                   <ul className="nesio-trip-add-picker-group">
                     {([
-                      ['flight', L(dict, '航班', 'Flight')],
-                      ['hotel', L(dict, '住宿', 'Lodging')],
-                      ['transit', L(dict, '交通', 'Transit')],
-                    ] as const).map(([k, lab]) => (
+                      ['flight', L(dict, '航班', 'Flight'), 'flight' as const],
+                      ['hotel', L(dict, '住宿', 'Lodging'), 'hotel' as const],
+                      ['transit', L(dict, '交通', 'Transit'), 'transit' as const],
+                      ['poi', L(dict, '景点 / 活动', 'Sight / Activity'), 'poi' as const],
+                      ['todo', L(dict, '待办 / 会面', 'To-do / Meeting'), 'todo' as const],
+                      ['shopping', L(dict, '购物', 'Shopping'), 'shopping' as const],
+                      ['packing', L(dict, '生成打包清单', 'Packing list'), 'packing' as const],
+                      ['import', L(dict, '粘贴订票确认', 'Paste booking'), 'flight' as const],
+                    ] as const).map(([k, lab, icon]) => (
                       <li key={k}>
                         <button type="button" className="nesio-trip-add-picker-item" onClick={() => pickAdd(k)}>
-                          <span className="nesio-trip-add-picker-ico"><NodeKindIcon kind={k} /></span>
+                          <span className="nesio-trip-add-picker-ico"><NodeKindIcon kind={icon} /></span>
                           <span>{lab}</span>
                         </button>
                       </li>
                     ))}
-                  </ul>
-                  <p className="nesio-trip-add-picker-label">{L(dict, '常用', 'Most popular')}</p>
-                  <ul className="nesio-trip-add-picker-group">
-                    {([
-                      ['poi', L(dict, '景点 / 活动', 'Sight / Activity')],
-                      ['todo', L(dict, '待办 / 会面', 'To-do / Meeting')],
-                      ['shopping', L(dict, '购物', 'Shopping')],
-                    ] as const).map(([k, lab]) => (
-                      <li key={k}>
-                        <button type="button" className="nesio-trip-add-picker-item" onClick={() => pickAdd(k)}>
-                          <span className="nesio-trip-add-picker-ico"><NodeKindIcon kind={k === 'poi' ? 'poi' : k === 'shopping' ? 'shopping' : 'todo'} /></span>
-                          <span>{lab}</span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                  <p className="nesio-trip-add-picker-label">{L(dict, '更多', 'More')}</p>
-                  <ul className="nesio-trip-add-picker-group">
-                    <li>
-                      <button type="button" className="nesio-trip-add-picker-item" onClick={() => pickAdd('packing')}>
-                        <span className="nesio-trip-add-picker-ico"><NodeKindIcon kind="packing" /></span>
-                        <span>{L(dict, '生成打包清单', 'Packing list')}</span>
-                      </button>
-                    </li>
-                    <li>
-                      <button type="button" className="nesio-trip-add-picker-item" onClick={() => pickAdd('import')}>
-                        <span className="nesio-trip-add-picker-ico"><NodeKindIcon kind="flight" /></span>
-                        <span>{L(dict, '粘贴订票确认', 'Paste booking')}</span>
-                      </button>
-                    </li>
                   </ul>
                 </div>
               )}

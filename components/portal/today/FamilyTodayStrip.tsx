@@ -8,6 +8,7 @@
  * 效率:秒显 sessionStorage 缓存 + 60s 节流拉取(family-updated 事件强刷);仅登录时挂载。
  * 数据来自 Supabase 家庭表(跨账号),经 /api/portal/family/board 服务端授权拉取。
  * 说明:回响是「下次打开今天页时出现」(拉取式),不是实时推送 —— app 暂无 realtime 通道。
+ * 图15:壳统一 nesio-proactive-card + Button size=sm;点卡 → nesio-open-family。
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
@@ -16,6 +17,7 @@ import { usePortalLocale } from '../use-portal-locale';
 import { listFamilies, getBoard, choreAction, type BoardView, type ChoreInstanceView } from '@/lib/family/family-client';
 import { awardChorePoints, reconcileMyChorePoints } from '../family/award-chore-points';
 import { readPortalCache, writePortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
+import Button from '../ui/Button';
 
 // 家务的「多少」= 积分(2026-08-01 用户:「家务挣积分,把钱相关的 UI 逻辑都换」)。
 // 和 chorePointValue 同一口径(1 元 = 1 积分),界面上只说「分」。
@@ -35,6 +37,10 @@ function loadSnoozed(): Set<string> {
 }
 function persistSnoozed(s: Set<string>): void {
   try { localStorage.setItem(snoozeKey(), JSON.stringify([...s])); } catch { /* 配额/隐私模式:失败就当没记,顶多下次还提示 */ }
+}
+
+function openFamilySheet() {
+  try { window.dispatchEvent(new CustomEvent('nesio-open-family')); } catch { /* noop */ }
 }
 
 export default function FamilyTodayStrip() {
@@ -65,7 +71,7 @@ export default function FamilyTodayStrip() {
     } finally {
       inFlight.current = false;
     }
-  }, []);
+  }, [dict]);
 
   // 节流:距上次拉取 < 60s 就跳过(缓存已在显示);force 绕过(用户动作 / family-updated)。
   const maybeRefresh = useCallback((force: boolean) => {
@@ -97,7 +103,7 @@ export default function FamilyTodayStrip() {
     // 家务挣积分。和家庭板走同一个函数(判据 + 幂等都在那儿)。
     void awardChorePoints(familyId, instanceId, dict === 'en' ? 'en' : 'zh');
     void fetchNow();
-  }, [fetchNow, t]);
+  }, [fetchNow, t, dict]);
 
   const snooze = useCallback((id: string) => {
     setSnoozed((prev) => { const next = new Set(prev).add(id); persistSnoozed(next); return next; });
@@ -110,68 +116,77 @@ export default function FamilyTodayStrip() {
   if (!myChores.length && !toReview.length) return null;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-      {actionErr && <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}>{actionErr}</span>}
+    <div className="nesio-proactive-card" style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+      <div className="nesio-proactive-card-inner" style={{ cursor: 'pointer' }} onClick={openFamilySheet} role="button" tabIndex={0}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openFamilySheet(); } }}>
+        <div className="nesio-proactive-card-text">
+          <p className="nesio-proactive-card-title">{t('今天的家务', 'Today’s chores')}</p>
+          <p className="nesio-proactive-card-body">
+            {t('点这里打开家务板 · 成员积分与历史都在里面', 'Tap to open the family board — points & history live there')}
+          </p>
+          <div className="nesio-proactive-card-actions" onClick={(e) => e.stopPropagation()}>
+            <Button size="sm" variant="soft" onClick={openFamilySheet}>
+              {t('家务板 / 历史', 'Board / history')}
+            </Button>
+          </div>
+        </div>
+      </div>
 
-      {/* 回响:有人做完了家务,等你看一眼 —— 这就是「做完后你在今天页收到通知」(拉取式,非实时) */}
+      {actionErr && <span style={{ color: 'var(--status-risk)', fontSize: 'var(--text-sm)', padding: '0 var(--space-4)' }}>{actionErr}</span>}
+
+      {/* 回响:有人做完了家务,等你看一眼 */}
       {toReview.length > 0 && (
-        <section style={sectionStyle}>
-          <p style={labelStyle}>{t('家里有人做完了', 'Someone finished a chore')}</p>
+        <div style={{ padding: '0 var(--space-4) var(--space-2)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          <p className="nesio-proactive-card-body" style={{ margin: 0, fontWeight: 'var(--weight-semibold)' as unknown as number }}>
+            {t('家里有人做完了', 'Someone finished a chore')}
+          </p>
           {toReview.map(({ b, c }) => (
-            <div key={c.id} style={{ ...rowStyle, flexDirection: 'column', alignItems: 'stretch', gap: 'var(--space-2)' }}>
+            <div key={c.id} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
               <div style={{ fontSize: 'var(--text-body)' }}>
                 <b>{nameFor(b, c.assigneeId) || t('家人', 'Family')}</b> {t('做完了', 'finished')} 「{choreLabel(c, t('家务', 'Chore'))}」
                 <span style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}> · {points(c.value, dict)}</span>
               </div>
-              <div style={{ display: 'flex', gap: 'var(--space-2)', alignItems: 'center' }}>
-                <button type="button" onClick={() => void act(b.familyId, c.id, 'approve')} disabled={busyId === c.id + 'approve'} style={{ ...pillBtn, background: 'var(--status-go)', color: '#fff', flex: 1 }}>{t('看着不错', 'Looks good')}</button>
-                <button type="button" onClick={() => void act(b.familyId, c.id, 'send_back')} disabled={busyId === c.id + 'send_back'} style={{ ...pillBtn, background: 'var(--portal-accent-soft)', color: 'var(--portal-accent)', flex: 1 }}>{t('再来一次', 'Try again')}</button>
-                <button type="button" onClick={() => snooze('rv:' + c.id)} style={laterBtn}>{t('稍后', 'Later')}</button>
+              <div className="nesio-proactive-card-actions" style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
+                <Button size="sm" variant="primary" disabled={busyId === c.id + 'approve'} onClick={() => void act(b.familyId, c.id, 'approve')} layoutStyle={{ flex: 1 }}>
+                  {t('看着不错', 'Looks good')}
+                </Button>
+                <Button size="sm" variant="soft" disabled={busyId === c.id + 'send_back'} onClick={() => void act(b.familyId, c.id, 'send_back')} layoutStyle={{ flex: 1 }}>
+                  {t('再来一次', 'Try again')}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => snooze('rv:' + c.id)}>{t('稍后', 'Later')}</Button>
               </div>
             </div>
           ))}
-        </section>
+        </div>
       )}
 
-      {/* 分给我的今天家务:直接在今天页完成(走服务端 → 分派人收到回响) */}
+      {/* 分给我的今天家务 */}
       {myChores.length > 0 && (
-        <section style={sectionStyle}>
-          <p style={labelStyle}>{t('今天的家务', 'Your chores today')}</p>
+        <div style={{ padding: '0 var(--space-4) var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+          {toReview.length > 0 && (
+            <p className="nesio-proactive-card-body" style={{ margin: 0, fontWeight: 'var(--weight-semibold)' as unknown as number }}>
+              {t('轮到你的', 'Yours to do')}
+            </p>
+          )}
           {myChores.map(({ b, c }) => (
-            <div key={c.id} style={rowStyle}>
-              <div style={{ flex: 1 }}>
+            <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 'var(--text-body)', fontWeight: 'var(--weight-medium)' as unknown as number }}>{choreLabel(c, t('家务', 'Chore'))}</div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
                   {c.state === 'done' ? t('已提交,等审核', 'Submitted — waiting') : t('干完点「完成」', 'Tap Done when finished')}{c.value > 0 ? ` · ${points(c.value, dict)}` : ''}
                 </div>
               </div>
               {c.state === 'todo' && (
-                <button type="button" onClick={() => void act(b.familyId, c.id, 'done')} disabled={busyId === c.id + 'done'} style={{ ...pillBtn, background: 'var(--portal-accent)', color: '#fff' }}>{t('完成', 'Done')}</button>
+                <Button size="sm" variant="primary" disabled={busyId === c.id + 'done'} onClick={() => void act(b.familyId, c.id, 'done')}>
+                  {t('完成', 'Done')}
+                </Button>
               )}
               {c.state === 'done' && <span style={{ fontSize: 'var(--text-xs)', color: 'var(--status-gentle)' }}>{t('待审', 'In review')}</span>}
-              <button type="button" onClick={() => snooze(c.id)} style={laterBtn}>{t('稍后', 'Later')}</button>
+              <Button size="sm" variant="ghost" onClick={() => snooze(c.id)}>{t('稍后', 'Later')}</Button>
             </div>
           ))}
-        </section>
+        </div>
       )}
     </div>
   );
 }
-
-const sectionStyle: React.CSSProperties = {
-  background: 'var(--portal-bg)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)',
-  padding: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)',
-};
-const labelStyle: React.CSSProperties = {
-  fontSize: 'var(--text-xs)', letterSpacing: '0.06em', textTransform: 'uppercase',
-  color: 'var(--portal-muted)', fontWeight: 'var(--weight-semibold)' as unknown as number, margin: 0,
-};
-const rowStyle: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 'var(--space-3)' };
-const pillBtn: React.CSSProperties = {
-  border: 'none', borderRadius: 'var(--radius-pill)', fontWeight: 'var(--weight-semibold)' as unknown as number,
-  fontSize: 'var(--text-sm)', padding: 'var(--space-2) var(--space-4)', cursor: 'pointer', fontFamily: 'var(--font-sans)',
-};
-const laterBtn: React.CSSProperties = {
-  border: 'none', background: 'transparent', color: 'var(--portal-muted)', fontSize: 'var(--text-xs)',
-  cursor: 'pointer', padding: 'var(--space-1) var(--space-2)', fontFamily: 'var(--font-sans)', whiteSpace: 'nowrap',
-};

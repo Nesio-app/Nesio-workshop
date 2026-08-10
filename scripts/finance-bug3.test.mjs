@@ -91,7 +91,7 @@ assert.ok(donutBig.length >= 2, `主视图饼图要调大(big):分类页 + 组�
 assert.ok(!/function SpendChartPager/.test(tab), '分类页不应再有第二张商户/收入滑动饼图');
 assert.ok(/该分类 · 商户 Top|In this category · Top merchants/.test(tab), '点分类后要有该分类的商户分析');
 assert.ok(/明细 · \$\{catTxs\.length\}|Details · \$\{catTxs\.length\}/.test(tab), '点分类后要有每笔明细列表');
-assert.ok(/setSpendFocus/.test(tab) && /onSlice=/.test(tab), '分类饼图要可点');
+assert.ok(/setDonutFocus/.test(tab) && /onSlice=\{toggleFocus\}/.test(tab), '分类饼图要可点(各维度共用 donutFocus)');
 assert.ok(/setAllocPick/.test(tab), '组合结构环形图要能点开看这一类的持仓');
 // 四张卡 + 念念在卡片下面;手记银行流水入口已撤(资产更新走 CardsPane.onQuickAddAsset)
 const kpiAt = tab.indexOf("'收入', 'Income'");
@@ -105,11 +105,13 @@ for (const card of ["'收入', 'Income'", "'支出', 'Spending'", "'总资产', 
 assert.ok(!code.includes("['spending', '支出'"), '「支出」不再是 tab 名');
 // 「+记」不再是 sub-tab
 assert.ok(!/\['add',/.test(code), '「＋记」不许再占一个 tab 位');
-// 预算:「手动添加」改名「预算」,与「生成」一起在分类页最下面
+// 预算:「手动添加」改名「预算」;图14 与「生成」一起挪到总览(不再挂在分类页底)
 assert.ok(!code.includes('＋ 手动添加'), '「＋手动添加」已改名「预算」');
-const budgetAt = tab.indexOf("{L(dict, '预算', 'Budget')}");
-const investSplitAt = tab.indexOf('P2 投资');
-assert.ok(budgetAt > 0 && investSplitAt > budgetAt, '预算块要落在分类页最下面(投资拆分之前)');
+assert.ok(/预算\(图14:从分类页挪到总览\)/.test(tab) || /sub === 'overview'/.test(tab), '预算块要在总览');
+const budgetBlock = tab.indexOf("图14:从分类页挪到总览");
+const budgetBtn = tab.indexOf("{L(dict, '预算', 'Budget')}", budgetBlock > 0 ? budgetBlock : 0);
+const genBtn = tab.indexOf("{L(dict, '生成', 'Generate')}", budgetBtn > 0 ? budgetBtn : 0);
+assert.ok(budgetBtn > 0 && genBtn > budgetBtn, '总览要有「预算」+「生成」');
 
 // 投资页 bug3
 const invest = fs.readFileSync(new URL('../components/portal/finance/InvestPane.tsx', import.meta.url), 'utf8');

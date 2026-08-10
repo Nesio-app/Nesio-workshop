@@ -38,6 +38,7 @@ import {
 } from '@/lib/portal/inventory';
 import { listStorageItems, countPantryItems, countWardrobeItems, storageHeadline } from '@/lib/portal/inventory-visibility';
 import SpendClaimRow from './finance/SpendClaimRow';
+import SegTabs from './ui/SegTabs';
 
 interface InventorySheetProps {
   open: boolean;
@@ -976,23 +977,23 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
     return (
       <div className="nesio-inv-page nesio-analytics-tab">
         {(view === 'list' || view === 'stats' || view === 'sell' || view === 'flip') && (
-          <select
-            className="nesio-ob-input"
-            aria-label={L(dict, '物品分区', 'Inventory sections')}
-            value={pageTab}
-            onChange={(e) => {
-              setPageTab(e.target.value as typeof pageTab);
+          <SegTabs
+            size="sm"
+            ariaLabel={L(dict, '物品分区', 'Inventory sections')}
+            active={pageTab}
+            onSelect={(k) => {
+              setPageTab(k);
               setView('list');
               setDetailId(null);
             }}
-            style={{ marginBottom: 'var(--space-3)' }}
-          >
-            <option value="overview">{L(dict, '总览', 'Overview')}</option>
-            <option value="containers">{L(dict, '容器', 'Bins')}</option>
-            <option value="items">{L(dict, '列表', 'List')}</option>
-          </select>
+            items={[
+              { key: 'overview' as const, label: L(dict, '总览', 'Overview') },
+              { key: 'containers' as const, label: L(dict, '容器', 'Bins') },
+              { key: 'items' as const, label: L(dict, '列表', 'List') },
+            ]}
+          />
         )}
-        {body}
+        <div style={{ marginTop: 'var(--space-3)' }}>{body}</div>
       </div>
     );
   }

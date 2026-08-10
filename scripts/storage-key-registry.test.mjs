@@ -174,9 +174,9 @@ const KNOWN_KEYS = new Map([
   ["nesio-dict-ai-enabled-v1", "cache"],
   // 词典详情 AI 补全缓存 —— 可丢,换设备从零补即可。
   ["nesio-dict-enrich-cache-v1", "cache"],
-  // 衣橱试穿全身照标记 / 多张 id 列表 —— 图在 IDB,flag 可重建。
-  ["nesio-wardrobe-body-v1", "cache"],
-  ["nesio-wardrobe-body-ids-v1", "cache"],
+  // 衣橱试穿全身照标记 / 多张 id 列表 —— 图在 IDB,但清单必须跟人走(换端否则找不到图)。
+  ["nesio-wardrobe-body-v1", "durable"],
+  ["nesio-wardrobe-body-ids-v1", "durable"],
   ["nesio-meal-calendar-v1", "durable"],
   ["nesio-schedule-filters-v1", "durable"],
   // 用户自己敲进去的提醒(家务/账单 due)。换台设备后从头开始**不正确** —— 那是他

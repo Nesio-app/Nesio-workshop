@@ -2,9 +2,9 @@
  * 衣帽间照片逐张同步(修「换端只见衣物条目、不见照片」)—— 薄封装,逻辑全走通用 record-sync 工厂。
  *
  * 衣物元数据(life-graph 节点/搭配 durable key)早已跨端,但照片本体只躺在 nesio-images IDB:
- *   · `wardrobe-<uuid>`      单品照片
- *   · `nesio-wardrobe-body`  试穿用全身照
- *   · `wardrobe-tryon-<id>`  搭配试穿结果图
+ *   · `wardrobe-<uuid>`           单品照片
+ *   · `nesio-wardrobe-body`(+`-N`) 试穿用全身照(可多张)
+ *   · `wardrobe-tryon-<id>`       搭配试穿结果图
  * 从不上云 → 换端只剩名字和属性,衣帽间一片灰。这里把这三类每张一行同步(并集补缺,不覆盖不删除)。
  * 与地点封面照(cloud-place-image-sync)完全同构。仅本人账号内、RLS 只本人可读、不进 AI。
  */
@@ -12,10 +12,9 @@ import { createRecordSync } from './cloud-record-sync';
 import { collectLocalImages, putLocalImage } from './local-image-store';
 import { WARDROBE_IMAGE_MODULE_PREFIX } from './sync-ownership';
 
-const BODY_ASSET_ID = 'nesio-wardrobe-body';
-
+/** 全身照:首张 `nesio-wardrobe-body`,其后 `nesio-wardrobe-body-2`… 都必须上云。 */
 function isWardrobeAsset(assetId: string): boolean {
-  return assetId.startsWith('wardrobe-') || assetId === BODY_ASSET_ID;
+  return assetId.startsWith('wardrobe-') || assetId.startsWith('nesio-wardrobe-body');
 }
 
 const sync = createRecordSync({

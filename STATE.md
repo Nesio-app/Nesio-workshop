@@ -28,6 +28,19 @@
 | 数据模型 | LifeGraph(localStorage) | Signal 主事实表 | ✅ **cutover 完成(signal_source_of_truth)**:IDB 是权威源,LifeGraph 是可重建投影 |
 | 工具入口 | 11 工具宫格 | 统一入口 + 五域 | 工具由 bundle-toolbox.mjs 构建时拷入 public/ |
 
+### IPA / 本地通知(短注,2026-08-10)
+
+- **通知已走 `NesioLocalNotify`**(自研 Capacitor 插件 → UNUserNotificationCenter)。
+  Web/Vercel 上改提醒文案、调度逻辑、授权引导 → **一般不需重打 IPA**,壳只是打开
+  `server.url` 的 WebView。
+- **需要新壳**的情形:插件 API 变了(如 cancel/listPending)、权限文案进 Info.plist、
+  或 Capacitor/`server.url` 本身要改 → 按 [`docs/appstore/altstore-ipa.md`](docs/appstore/altstore-ipa.md)
+  出包装 AltStore。
+- **storage-relief**:Portal「一键腾空间」会清临时图/附件 IDB 缓存;横幅文案已写明。
+- **2026-08-10 反馈批**:流水内容去重、记忆时间线按源创建/事件日、试穿存搭配、
+  做饭页去营养血糖、健身今日去存训练/更多、财务环形各维可点+预算回总览。
+  Web 推现网即可;若本机壳很旧(缺 `NesioLocalNotify.cancel` / 通知权限),再 Archive 一版 IPA。
+
 ## 进行中的迁移
 
 1. **Signal 主事实表**:两扇合法写入门 — `createSignal()`(Signal 形态)与

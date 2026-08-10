@@ -49,6 +49,7 @@ const InventorySheet = dynamic(() => import('./InventorySheet'), { ssr: false })
 const FloatingPlayer = dynamic(() => import('./music/FloatingPlayer'), { ssr: false });
 const CalendarCreateSheet = dynamic(() => import('./CalendarCreateSheet'), { ssr: false });
 const FamilySharingSheet = dynamic(() => import('./family/FamilySharingSheet'), { ssr: false });
+const TeslaSheet = dynamic(() => import('./TeslaSheet'), { ssr: false });
 const CookingSheet = dynamic(() => import('./cooking/CookingSheet'), { ssr: false });
 const DailyBriefSheet = dynamic(() => import('./DailyBriefSheet').then((m) => m.DailyBriefSheet), { ssr: false });
 const DictionarySheet = dynamic(() => import('./dictionary/DictionarySheet'), { ssr: false });
@@ -622,6 +623,7 @@ export default function Portal() {
   const [inventoryOpen, setInventoryOpen] = useState(false);
   const [calendarCreateOpen, setCalendarCreateOpen] = useState(false);
   const [familyOpen, setFamilyOpen] = useState(false);
+  const [teslaOpen, setTeslaOpen] = useState(false);
   const [cookingOpen, setCookingOpen] = useState(false);
   const [pantryIntake, setPantryIntake] = useState(false);   // 做饭页「拍一拍进货」:复用相机、拍的当食材落库
   // 「一个相机、多种模式」:记一餐/衣帽间带模式调起主相机;拍完经 capture-pipeline 交接匣回到来源 sheet。
@@ -633,18 +635,22 @@ export default function Portal() {
   // 首次打开后保持挂载:关掉再开不丢 tab/加载结果(家务/洞察每次卸载 = 永远 Loading)。
   const [insightsMounted, setInsightsMounted] = useState(false);
   const [familyMounted, setFamilyMounted] = useState(false);
+  const [teslaMounted, setTeslaMounted] = useState(false);
   useEffect(() => { if (insightsOpen) setInsightsMounted(true); }, [insightsOpen]);
   useEffect(() => { if (familyOpen) setFamilyMounted(true); }, [familyOpen]);
+  useEffect(() => { if (teslaOpen) setTeslaMounted(true); }, [teslaOpen]);
   // 浮层开着 → 推迟整页 reload(版本检查/模块水合),否则操作中被踢回今天。
   useEffect(() => {
     const held = insightsOpen || familyOpen || cookingOpen || inventoryOpen
       || chatOpen || briefOpen || Boolean(workoutSession) || Boolean(captureMode)
-      || Boolean(modeCamera) || noteOpen || moodOpen || freezeOpen || calendarCreateOpen;
+      || Boolean(modeCamera) || noteOpen || moodOpen || freezeOpen || calendarCreateOpen
+      || teslaOpen;
     if (!held) return;
     return holdUiOverlay();
   }, [
     insightsOpen, familyOpen, cookingOpen, inventoryOpen, chatOpen, briefOpen,
     workoutSession, captureMode, modeCamera, noteOpen, moodOpen, freezeOpen, calendarCreateOpen,
+    teslaOpen,
   ]);
   const [launchSurfaceContext, setLaunchSurfaceContext] = useState({
     viewerRole: 'public' as 'public' | 'tester' | 'personal_lab',
@@ -1081,6 +1087,7 @@ export default function Portal() {
     const inventoryHandler = () => { track('inventory_open'); setInsightsOpen(false); setInventoryOpen(true); };
     const calendarCreateHandler = () => { track('calendar_create_open'); setCalendarCreateOpen(true); };
     const familyHandler = () => { track('family_sharing_open'); setFamilyOpen(true); };
+    const teslaHandler = () => { track('tesla_open'); setTeslaOpen(true); };
     const cookingHandler = () => { track('cooking_open'); setCookingOpen(true); };
     // 做饭页「拍一拍进货」:做饭页先原生拍照拿到 File(detail.file)→ 关做饭 → 用文件走已验证的相机识别路径
     // (进货模式,拍到的打食材)。相机 z=400 在全屏 sheet 之下,故先关做饭;相机关后自动重开做饭。
@@ -1185,6 +1192,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-inventory', inventoryHandler);
     window.addEventListener('nesio-open-calendar-create', calendarCreateHandler);
     window.addEventListener('nesio-open-family', familyHandler);
+    window.addEventListener('nesio-open-tesla', teslaHandler);
     window.addEventListener('nesio-open-cooking', cookingHandler);
     window.addEventListener('nesio-open-cooking-camera', cookingCameraHandler);
     window.addEventListener(OPEN_MODE_CAMERA_EVENT, modeCameraHandler);
@@ -1206,6 +1214,7 @@ export default function Portal() {
       window.removeEventListener('nesio-open-inventory', inventoryHandler);
       window.removeEventListener('nesio-open-calendar-create', calendarCreateHandler);
       window.removeEventListener('nesio-open-family', familyHandler);
+      window.removeEventListener('nesio-open-tesla', teslaHandler);
       window.removeEventListener('nesio-open-cooking', cookingHandler);
       window.removeEventListener('nesio-open-cooking-camera', cookingCameraHandler);
       window.removeEventListener(OPEN_MODE_CAMERA_EVENT, modeCameraHandler);
@@ -1594,8 +1603,8 @@ export default function Portal() {
             <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
               <span>
                 {reliefMsg ? reliefMsg : storageAlert.kind === 'full'
-                  ? L(dict, `本机空间紧张，新的记忆可能存不进来。先在设置里导出一份备份保底；登录后记忆会自动备份到云端并腾出本机空间。`, 'Local storage is tight — new memories may not save. Export a backup in Settings first; signing in backs memories up to the cloud and frees local space.')
-                  : L(dict, `本机空间已用 ${storageAlert.percent}%。方便的时候导出一份备份，之后就不用惦记这件事了。`, `Local storage is ${storageAlert.percent}% used. Export a backup when convenient and stop worrying about it.`)}
+                  ? L(dict, `本机空间紧张，新的记忆可能存不进来。先在设置里导出一份备份保底；登录后记忆会自动备份到云端。「一键腾空间」会清临时图与附件缓存。`, 'Local storage is tight — new memories may not save. Export a backup in Settings first; signing in backs memories up to the cloud. "Free up space" clears cached images and file attachments.')
+                  : L(dict, `本机空间已用 ${storageAlert.percent}%。方便的时候导出一份备份；「一键腾空间」会清临时图与附件缓存。`, `Local storage is ${storageAlert.percent}% used. Export a backup when convenient; "Free up space" clears cached images and file attachments.`)}
               </span>
               {/* 批次 116:占用最多的几项(诊断「哪里占空间」),按皮肤中性色显示 */}
               {!reliefMsg && storageAlert.largest && storageAlert.largest.length > 0 && (
@@ -1841,6 +1850,9 @@ export default function Portal() {
           onClose={() => setFamilyOpen(false)}
           onToday={() => { setFamilyOpen(false); setInsightsOpen(false); }}
         />
+      )}
+      {teslaMounted && (
+        <TeslaSheet open={teslaOpen} onClose={() => setTeslaOpen(false)} />
       )}
       {cookingOpen && <CookingSheet open={cookingOpen} onClose={() => setCookingOpen(false)} />}
       {workoutSession && (

@@ -44,17 +44,17 @@ export default function BeautyCarePanel() {
   return (
     <div className="nesio-beauty-care">
       <div className="nesio-bl-empty-actions" style={{ marginBottom: 'var(--space-3)' }}>
-        <SnapButton className="nesio-trip-action nesio-health-iconbtn" ariaLabel={L(dict, '拍一拍', 'Snap')}>
-          <IconCamera size={16} />
+        <SnapButton className="nesio-health-iconbtn" ariaLabel={L(dict, '拍一拍', 'Snap')}>
+          <IconCamera size={18} />
         </SnapButton>
-        <button type="button" className="nesio-trip-action nesio-health-iconbtn" aria-label={L(dict, '上传图片', 'Upload photo')}
+        <button type="button" className="nesio-health-iconbtn" aria-label={L(dict, '上传图片', 'Upload photo')}
           onClick={() => fileRef.current?.click()}>
-          <IconUpload size={16} />
+          <IconUpload size={18} />
         </button>
         <input ref={fileRef} type="file" accept="image/*" hidden onChange={onUploadPick} />
-        <button type="button" className="nesio-trip-action nesio-health-iconbtn" aria-label={L(dict, '去物品', 'Inventory')}
+        <button type="button" className="nesio-health-iconbtn" aria-label={L(dict, '去物品', 'Inventory')}
           onClick={openInventory}>
-          <IconBox size={16} />
+          <IconBox size={18} />
         </button>
       </div>
 

@@ -42,6 +42,47 @@ assert.equal(m1.merged.map((t) => t.id).join(','), 'c,b', 'removed 删掉 a、�
 assert.equal(m1.merged[1].amount, 99, '同 id upsert 用新值');
 assert.equal(bank.mergeBankTxForSync([tx('a', '2026-07-01'), tx('b', '2026-07-02'), tx('c', '2026-07-03')], [], [], 2).merged.length, 2, 'cap 截断');
 
+// ── ②b 内容指纹去重(图13):同账户+同日+同绝对金额+归一名 → 留后写入的 ──
+const mk = (id, opts = {}) => ({
+  id, date: opts.date || '2026-07-15', name: opts.name || 'STARBUCKS #1234',
+  amount: opts.amount ?? 5.4, currency: 'USD', category: 'FOOD_AND_DRINK',
+  accountId: opts.accountId ?? 'chk', merchantId: opts.merchantId,
+});
+{
+  const dup = bank.mergeBankTxForSync(
+    [mk('old', { name: 'STARBUCKS #1234' })],
+    [mk('new', { name: 'STARBUCKS #5678' })], // 门店号不同,normalizeMerchant 归一
+    [],
+  );
+  assert.equal(dup.merged.length, 1, '同账户同日同额近似名 → 合并成 1 条');
+  assert.equal(dup.merged[0].id, 'new', '留后写入(incoming)那条');
+}
+{
+  // 同额同日同名但不同账户 = 合法两笔,不得误杀
+  const twoAcct = bank.dedupeBankTxByContent([
+    mk('a1', { accountId: 'chk' }),
+    mk('a2', { accountId: 'cc' }),
+  ]);
+  assert.equal(twoAcct.length, 2, '不同账户同指纹不合并');
+}
+{
+  // 无 accountId 不走内容指纹(保守)
+  const noAcct = bank.dedupeBankTxByContent([
+    { ...mk('x1'), accountId: undefined },
+    { ...mk('x2'), accountId: undefined },
+  ]);
+  assert.equal(noAcct.length, 2, '缺 accountId 不内容去重');
+}
+{
+  // merchantId 优先:描述符不同但同实体 → 合并
+  const byEntity = bank.dedupeBankTxByContent([
+    mk('e1', { name: 'NETFLIX.COM', merchantId: 'm-netflix' }),
+    mk('e2', { name: 'Netflix Inc', merchantId: 'm-netflix' }),
+  ]);
+  assert.equal(byEntity.length, 1, '同 merchantId 合并');
+  assert.equal(byEntity[0].id, 'e2', '后出现的保留');
+}
+
 // ── ③ 符号化口径 ──
 caches.accounts = [{ id: 'chk', name: 'Checking', currency: 'USD', type: 'depository' }];
 const income = (id, amount) => ({ id, date: '2026-07-10', name: 'PAYROLL', amount, currency: 'USD', category: 'INCOME_WAGES', accountId: 'chk' });

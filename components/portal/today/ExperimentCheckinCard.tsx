@@ -4,6 +4,7 @@
  * ExperimentCheckinCard — 进行中实验的 Today 打卡卡(批次 5:入口浅化)。
  * 此前打卡藏在 洞察→分析→我的实验 三层深处;现在有进行中且今天未记录的
  * 实验时,打卡直接出现在 Today 首屏,点开即快选记录(步进/点按,无手动打字)。
+ * 图15:壳统一 nesio-proactive-card + Button size=sm。
  */
 
 import { useEffect, useState } from 'react';
@@ -19,6 +20,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { localDayKey } from '@/lib/portal/local-day';
+import Button from '../ui/Button';
 
 export function ExperimentCheckinCard() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -80,19 +82,15 @@ export function ExperimentCheckinCard() {
                 {L(dict, `第 ${exp!.dataPoints.length + 1} / ${exp!.targetDays} 天,今天还没记录。`, `Day ${exp!.dataPoints.length + 1} / ${exp!.targetDays} — not logged yet today.`)}
               </p>
               <div className="nesio-proactive-card-actions">
-                <button
-                  type="button"
-                  className="nesio-proactive-action-btn"
-                  onClick={() => setExpanded(true)}
-                >
+                <Button size="sm" variant="secondary" onClick={() => setExpanded(true)}>
                   {L(dict, '30 秒打卡', '30-second check-in')}
-                </button>
+                </Button>
               </div>
             </>
           )}
         </div>
       </div>
-      {/* 批次 8:记录面板占满整卡宽,不再挤在图标右侧的窄栏里 */}
+      {/* 批次 8:日志面板占满整卡宽,不再挤在图标右侧的窄栏里 */}
       {expanded && (
         <div style={{ padding: '0 var(--space-4) var(--space-4)' }}>
           <LogPanel exp={exp!} onLog={handleLog} />

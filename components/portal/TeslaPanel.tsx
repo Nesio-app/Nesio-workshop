@@ -116,6 +116,10 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
    * 但说不出「在公司」还是「在家」。反解一次,按坐标缓存。
    */
   const [placeByVehicle, setPlaceByVehicle] = useState<Record<string, string>>({});
+  /** 地址反解失败可见态(红线:异步必须有失败 UI + 重试,不可静默吞)。 */
+  const [geoErr, setGeoErr] = useState<string | null>(null);
+  const [geoBusy, setGeoBusy] = useState(false);
+  const [geoRetryToken, setGeoRetryToken] = useState(0);
   const [log, setLog] = useState<TeslaLogPoint[]>([]);
 
   // 2026-07-29(用户标注「车页卡死在『正在向车问好…』」的真因):这条 fetch 原本没有超时。
@@ -210,38 +214,74 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
    * 语言切换/重新聚焦重渲染好几次 —— 跟着渲染问的话,车停在原地不动
    * 也会一直在发请求。
    *
-   * 失败就**什么都不显示**,不显示「未知位置」——地图上那个点已经在说
-   * 「在这儿」了,底下再加一行「未知位置」只是把一次失败摆到台面上。
+   * 失败必须可见 + 可重试(红线):静默吞掉会变成「地图有点、底下没地名、
+   * 用户以为功能坏了」。鉴权走 guardAiRoute(需登录 cookie);401/403 单独说清楚。
    */
   const geoKeyRef = useRef('');
   useEffect(() => {
     const withCoords = drives.filter((d) => d.latitude != null && d.longitude != null);
-    if (!withCoords.length) return;
+    if (!withCoords.length) { setGeoErr(null); return; }
     const key = withCoords.map((d) => `${d.vehicleId}:${d.latitude!.toFixed(4)},${d.longitude!.toFixed(4)}`).join('|');
-    if (key === geoKeyRef.current) return;
-    geoKeyRef.current = key;
+    // 重试时强制绕过同 key 短路
+    const runKey = `${key}#${geoRetryToken}`;
+    if (runKey === geoKeyRef.current) return;
+    geoKeyRef.current = runKey;
     let alive = true;
+    setGeoBusy(true);
+    setGeoErr(null);
     void (async () => {
       const next: Record<string, string> = {};
+      let failKind: 'auth' | 'http' | 'empty' | 'net' | null = null;
       for (const d of withCoords) {
         try {
-          // 这条路由是 POST(GET 那支是给「附近候选」用的),返回 { name, city, country }
+          // POST /api/portal/geocode(反向);credentials 默认 same-origin 带上会话 cookie
           const res = await fetchWithTimeout('/api/portal/geocode', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ lat: d.latitude, lon: d.longitude }),
             cache: 'no-store',
           }, 8_000);
-          const j = await res.json().catch(() => null) as { ok?: boolean; name?: string; city?: string } | null;
-          if (!j?.ok) continue;
-          const label = [String(j.name || '').trim(), String(j.city || '').trim()].filter(Boolean).join(' · ');
-          if (label) next[d.vehicleId] = label;
-        } catch { /* 解不出来就不显示这一行 */ }
+          if (res.status === 401 || res.status === 403) { failKind = 'auth'; continue; }
+          if (!res.ok) { failKind = failKind || 'http'; continue; }
+          const j = await res.json().catch(() => null) as { ok?: boolean; name?: string; city?: string; error?: string } | null;
+          if (j?.ok) {
+            const label = [String(j.name || '').trim(), String(j.city || '').trim()].filter(Boolean).join(' · ');
+            if (label) { next[d.vehicleId] = label; continue; }
+          }
+          // 服务端没解出(FSQ 空 / OSM 被拦)→ 客户端 Open-Meteo / BigDataCloud 兜底
+          const { reverseGeocode } = await import('@/lib/portal/providers/weather');
+          const g = await reverseGeocode(d.latitude!, d.longitude!);
+          if (g.label) next[d.vehicleId] = g.label;
+          else failKind = failKind || 'empty';
+        } catch {
+          try {
+            const { reverseGeocode } = await import('@/lib/portal/providers/weather');
+            const g = await reverseGeocode(d.latitude!, d.longitude!);
+            if (g.label) next[d.vehicleId] = g.label;
+            else failKind = failKind || 'net';
+          } catch {
+            failKind = failKind || 'net';
+          }
+        }
       }
-      if (alive && Object.keys(next).length) setPlaceByVehicle((prev) => ({ ...prev, ...next }));
+      if (!alive) return;
+      setGeoBusy(false);
+      if (Object.keys(next).length) {
+        setPlaceByVehicle((prev) => ({ ...prev, ...next }));
+        setGeoErr(null);
+        return;
+      }
+      // 一辆都没解出来 → 可见失败
+      setGeoErr(
+        failKind === 'auth'
+          ? L(dict, '地址没解出来 —— 可能需要先登录。点重试再问一次。', "Couldn't resolve the address — you may need to sign in. Tap retry.")
+          : failKind === 'net'
+            ? L(dict, '地址反解没连上,稍后再试一次。', "Couldn't reach geocode — try again shortly.")
+            : L(dict, '这次没解出地名。地图上的点还在,点重试再问一次。', "Couldn't resolve a place name. The map pin is still there — tap retry."),
+      );
     })();
     return () => { alive = false; };
-  }, [drives]);
+  }, [drives, geoRetryToken, dict]);
 
   const healthByVehicle = new Map(health.map((h) => [h.vehicleId, h]));
 
@@ -428,6 +468,28 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
         <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-3)' }}>
           {L(dict, '位置没授权 —— 到设置 → 数据接入里重连一次 Tesla 就有了。', 'Location not granted — reconnect Tesla in Settings → Data sources.')}
         </p>
+      )}
+
+      {/* 地址反解失败态(红线):有坐标但地名没解出来时可见 + 可重试 */}
+      {hasAnyLocation && geoErr && (
+        <div style={{
+          borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)',
+          background: 'var(--status-gentle-soft)', padding: 'var(--space-3)', marginBottom: 'var(--space-3)',
+        }}>
+          <p className="nesio-settings-option-hint" style={{ margin: 0 }}>{geoErr}</p>
+          <button
+            type="button"
+            className="nesio-ob-primary-btn"
+            style={{ width: '100%', marginTop: 'var(--space-2)' }}
+            disabled={geoBusy}
+            onClick={() => {
+              geoKeyRef.current = '';
+              setGeoRetryToken((n) => n + 1);
+            }}
+          >
+            {geoBusy ? L(dict, '正在重试…', 'Retrying…') : L(dict, '重试地址', 'Retry address')}
+          </button>
+        </div>
       )}
 
       {/* 图 2:车在地图上的位置。复用足迹那张 PlaceMap(OSM 瓦片,零依赖),

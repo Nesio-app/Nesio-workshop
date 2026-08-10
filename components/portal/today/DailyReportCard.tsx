@@ -12,6 +12,8 @@
  *
  * 和 DailyBriefRow(「今天这一段」,AI 按需生成的聊天式简报)是两个不同功能,
  * 不合并——那个是 Pro 功能、点了才生成;这个是免费确定性引擎、到点自动生成。
+ *
+ * 图15:壳统一 nesio-proactive-card + Button size=sm(与 Family / 实验打卡同族)。
  */
 
 import { useState } from 'react';
@@ -21,6 +23,7 @@ import type { DailyReport } from '@/lib/portal/daily-report';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import Button from '../ui/Button';
 
 const DailyReportSheet = dynamic(() => import('../DailyReportSheet'), { ssr: false });
 
@@ -48,16 +51,20 @@ export function DailyReportCard({ nodes }: { nodes: ReadonlyArray<ReportNode> })
 
   return (
     <>
-      <div className="nesio-reengage-card" role="note">
-        <p className="nesio-reengage-title" style={{ marginBottom: '0.35rem' }}>{report.title}</p>
-        <p className="nesio-reengage-body">{report.headline}</p>
-        <div className="nesio-reengage-actions">
-          <button type="button" className="nesio-reengage-cta" onClick={() => setOpen(true)}>
-            {L(dict, '看全文', 'Read it')}
-          </button>
-          <button type="button" className="nesio-reengage-ghost" onClick={dismiss}>
-            {L(dict, '今天先不看', 'Not today')}
-          </button>
+      <div className="nesio-proactive-card" role="note">
+        <div className="nesio-proactive-card-inner">
+          <div className="nesio-proactive-card-text">
+            <p className="nesio-proactive-card-title">{report.title}</p>
+            <p className="nesio-proactive-card-body">{report.headline}</p>
+            <div className="nesio-proactive-card-actions">
+              <Button size="sm" variant="primary" onClick={() => setOpen(true)}>
+                {L(dict, '看全文', 'Read it')}
+              </Button>
+              <Button size="sm" variant="ghost" onClick={dismiss}>
+                {L(dict, '今天先不看', 'Not today')}
+              </Button>
+            </div>
+          </div>
         </div>
       </div>
       {/* 看完全文也算「今天见过了」——收起来,别在 feed 里常驻。 */}

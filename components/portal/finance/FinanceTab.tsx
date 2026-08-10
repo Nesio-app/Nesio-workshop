@@ -63,7 +63,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
-type Sub = 'overview' | 'spending' | 'tx' | 'invest' | 'cards'; // 订阅 tab 已删(定期账单在交易页);预算在支出页渲染
+type Sub = 'overview' | 'spending' | 'tx' | 'invest' | 'cards'; // 订阅 tab 已删(定期账单在交易页);预算+生成在总览
 type DonutDim = 'expense' | 'income' | 'invest' | 'account' | 'merchant';
 const DONUT_DIMS: Array<[DonutDim, string, string]> = [
   ['expense', '支出', 'Expense'],
@@ -828,7 +828,8 @@ export default function FinanceTab() {
   const [budgetNote, setBudgetNote] = useState('');
   const [showAddBudget, setShowAddBudget] = useState(false); // bug2:「手动添加」按钮展开分类选择
   const [allocPick, setAllocPick] = useState<string | null>(null); // bug3:组合结构环形图点开看这一类持仓
-  const [spendFocus, setSpendFocus] = useState<string | null>(null); // bug2:环形图点选分类 → 走势/分析/明细
+  /** 图14:统一 focus —— 各维度饼图点选扇区后展开明细(原 spendFocus 仅支出)。 */
+  const [donutFocus, setDonutFocus] = useState<string | null>(null);
   // 分类页环形图维度:支出/收入/投资结构/账户/商户 —— SegTabs + 左右滑切换
   const [donutDim, setDonutDim] = useState<DonutDim>('expense');
   const donutTouchX = useRef<number | null>(null);
@@ -1550,14 +1551,23 @@ export default function FinanceTab() {
               emptyHint = L(dict, '这个月还没有商户支出可汇总。', 'No merchant spending this month yet.');
             }
 
-            const active = donutDim === 'expense'
-              ? (cats.find((c) => c.category === spendFocus) || null)
+            const activeSlice = donutFocus
+              ? (slices.find((s) => s.category === donutFocus) || null)
+              : null;
+            // 支出维保留 CategorySlice 的环比字段
+            const activeExpense = donutDim === 'expense' && donutFocus
+              ? (cats.find((c) => c.category === donutFocus) || null)
               : null;
 
             const shiftDim = (dir: -1 | 1) => {
               const i = DONUT_DIMS.findIndex(([k]) => k === donutDim);
               const next = DONUT_DIMS[(i + dir + DONUT_DIMS.length) % DONUT_DIMS.length]?.[0];
-              if (next) { setDonutDim(next); setSpendFocus(null); }
+              if (next) { setDonutDim(next); setDonutFocus(null); }
+            };
+
+            const toggleFocus = (c: string) => {
+              if (c === 'OTHER_REST') return;
+              setDonutFocus((v) => (v === c ? null : c));
             };
 
             return (
@@ -1566,7 +1576,7 @@ export default function FinanceTab() {
                   size="sm"
                   ariaLabel={L(dict, '分类饼图维度', 'Donut dimension')}
                   active={donutDim}
-                  onSelect={(k) => { setDonutDim(k); setSpendFocus(null); }}
+                  onSelect={(k) => { setDonutDim(k); setDonutFocus(null); }}
                   items={DONUT_DIMS.map(([k, zh, en]) => ({ key: k, label: L(dict, zh, en) }))}
                 />
                 {/* 左右滑切换维度(与 SegTabs 同步) */}
@@ -1586,27 +1596,29 @@ export default function FinanceTab() {
                   {slices.length > 0 ? (
                     <FinanceDonut big
                       slices={slices}
-                      centerTop={active ? categoryLabel(active.category, dict) : centerTop}
-                      centerVal={active ? `${active.pct}%` : formatMoney(centerSum, summary.currency)}
-                      onSlice={donutDim === 'expense'
-                        ? (c) => { if (c === 'OTHER_REST') return; setSpendFocus((v) => (v === c ? null : c)); }
-                        : undefined}
-                      activeCategory={donutDim === 'expense' ? spendFocus : null}
+                      centerTop={activeSlice
+                        ? (donutDim === 'expense' ? categoryLabel(activeSlice.category, dict) : activeSlice.category)
+                        : centerTop}
+                      centerVal={activeSlice
+                        ? `${activeSlice.pct}%`
+                        : formatMoney(centerSum, summary.currency)}
+                      onSlice={toggleFocus}
+                      activeCategory={donutFocus}
                     />
                   ) : (
                     <p className="nesio-settings-option-hint" style={{ marginTop: 0, textAlign: 'center' }}>{emptyHint}</p>
                   )}
                 </div>
 
-                {donutDim === 'expense' && slices.length > 0 && !active && (
+                {slices.length > 0 && !activeSlice && (
                   <p className="nesio-fin-score-hint" style={{ textAlign: 'center', marginTop: 'var(--space-1)' }}>
-                    {L(dict, '点一块分类,看走势、商户和每笔明细 · 左右滑换维度', 'Tap a slice for details · swipe for other views')}
+                    {L(dict, '点一块看明细 · 左右滑换维度', 'Tap a slice for details · swipe for other views')}
                   </p>
                 )}
 
-                {donutDim === 'expense' && active && (() => {
+                {donutDim === 'expense' && activeExpense && (() => {
                   const flowRules = loadFlowRules();
-                  const catTxs = txs.filter((t) => (t.date || '').slice(0, 7) === ym && txFlow(t, flowRules) === 'expense' && effectiveCategory(t) === active.category)
+                  const catTxs = txs.filter((t) => (t.date || '').slice(0, 7) === ym && txFlow(t, flowRules) === 'expense' && effectiveCategory(t) === activeExpense.category)
                     .sort((a, b) => (b.date || '').localeCompare(a.date || '') || Math.abs(b.amount) - Math.abs(a.amount));
                   const merchantAgg = (() => {
                     const m = new Map<string, { name: string; total: number; count: number; logo?: string }>();
@@ -1620,9 +1632,9 @@ export default function FinanceTab() {
                     }
                     return [...m.values()].sort((a, b) => b.total - a.total).slice(0, 5);
                   })();
-                  const avg = catTxs.length ? active.total / catTxs.length : 0;
+                  const avg = catTxs.length ? activeExpense.total / catTxs.length : 0;
                   const seq = availableMonths(txs).slice(0, 6).reverse().map((m) => ({
-                    ym: m, total: categoryBreakdown(txs, m).find((x) => x.category === active.category)?.total || 0,
+                    ym: m, total: categoryBreakdown(txs, m).find((x) => x.category === activeExpense.category)?.total || 0,
                   }));
                   const max = Math.max(...seq.map((x) => x.total), 1);
                   const W = 280, H = 56, PAD = 8;
@@ -1632,9 +1644,9 @@ export default function FinanceTab() {
                   return (
                     <div style={{ marginTop: 'var(--space-2)' }}>
                       <div className="nesio-fin-cat-top">
-                        <span className="nesio-fin-cat-name">{categoryLabel(active.category, dict)}</span>
-                        <span className="nesio-fin-cat-amt">{formatMoney(active.total, summary.currency)}
-                          {active.deltaPct !== null ? <span className={`nesio-fin-delta${active.deltaPct > 0 ? ' up' : ' down'}`}>{active.deltaPct > 0 ? '+' : ''}{active.deltaPct}%</span> : active.isNew ? <span className="nesio-fin-delta is-new">{L(dict, '新增', 'new')}</span> : null}
+                        <span className="nesio-fin-cat-name">{categoryLabel(activeExpense.category, dict)}</span>
+                        <span className="nesio-fin-cat-amt">{formatMoney(activeExpense.total, summary.currency)}
+                          {activeExpense.deltaPct !== null ? <span className={`nesio-fin-delta${activeExpense.deltaPct > 0 ? ' up' : ' down'}`}>{activeExpense.deltaPct > 0 ? '+' : ''}{activeExpense.deltaPct}%</span> : activeExpense.isNew ? <span className="nesio-fin-delta is-new">{L(dict, '新增', 'new')}</span> : null}
                         </span>
                       </div>
                       <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} aria-label={L(dict, '该分类月度折线', 'Category monthly trend')}>
@@ -1648,7 +1660,7 @@ export default function FinanceTab() {
                       <div className="nesio-fin-kpis" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginTop: 'var(--space-3)', marginBottom: 0 }}>
                         <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '笔数', 'Count')}</span><span className="nesio-fin-kpi-v">{catTxs.length}</span></div>
                         <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '均笔', 'Avg')}</span><span className="nesio-fin-kpi-v">{formatMoney(avg, summary.currency)}</span></div>
-                        <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '占本月', 'Share')}</span><span className="nesio-fin-kpi-v">{active.pct}%</span></div>
+                        <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '占本月', 'Share')}</span><span className="nesio-fin-kpi-v">{activeExpense.pct}%</span></div>
                       </div>
                       {merchantAgg.length > 0 && (
                         <div style={{ marginTop: 'var(--space-3)' }}>
@@ -1701,18 +1713,116 @@ export default function FinanceTab() {
                     </div>
                   );
                 })()}
+
+                {/* 图14:收入 / 投资 / 账户 / 商户 —— 与支出同款点选展开明细 */}
+                {donutDim !== 'expense' && activeSlice && (() => {
+                  const flowRules = loadFlowRules();
+                  let rows: Array<{ key: string; left: string; sub?: string; amt: string; logo?: string }> = [];
+                  let title = activeSlice.category;
+                  let empty = L(dict, '这一块本月没有明细。', 'No details under this slice this month.');
+
+                  if (donutDim === 'income') {
+                    const matchDetail = incomeSlices.find((x) =>
+                      (categoryDetailLabel(x.detail, dict) || x.detail) === activeSlice.category,
+                    )?.detail;
+                    const list = txs.filter((t) =>
+                      (t.date || '').slice(0, 7) === ym
+                      && txFlow(t, flowRules) === 'income'
+                      && (t.categoryDetail || 'INCOME_OTHER') === matchDetail,
+                    ).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+                    title = activeSlice.category;
+                    rows = list.map((t) => ({
+                      key: t.id,
+                      left: t.name || L(dict, '收入', 'Income'),
+                      sub: (t.date || '').slice(5).replace('-', '/'),
+                      amt: `+${formatMoney(Math.abs(t.amount), summary.currency)}`,
+                      logo: t.merchantLogo,
+                    }));
+                  } else if (donutDim === 'invest') {
+                    const inType = holdings
+                      .filter((h) => (h.type || L(dict, '其他', 'Other')) === activeSlice.category)
+                      .sort((a, b) => b.value - a.value);
+                    empty = L(dict, '这一类下没有明细持仓。', 'No holdings itemized under this type.');
+                    rows = inType.map((h, i) => ({
+                      key: `${h.accountId}-${h.ticker || h.name}-${i}`,
+                      left: h.ticker || h.name,
+                      amt: formatMoney(h.value, h.currency),
+                    }));
+                  } else if (donutDim === 'account') {
+                    const acct = accounts.find((a) => (displayAccountName(a, acctNames) || a.name || a.id) === activeSlice.category);
+                    const list = acct
+                      ? txs.filter((t) => t.accountId === acct.id && (t.date || '').slice(0, 7) === ym && txFlow(t, flowRules) === 'expense')
+                        .sort((a, b) => (b.date || '').localeCompare(a.date || '') || Math.abs(b.amount) - Math.abs(a.amount))
+                      : [];
+                    rows = list.map((t) => ({
+                      key: t.id,
+                      left: t.name || L(dict, '未知商户', 'Unknown'),
+                      sub: (t.date || '').slice(5).replace('-', '/'),
+                      amt: `-${formatMoney(Math.abs(t.amount), summary.currency)}`,
+                      logo: t.merchantLogo,
+                    }));
+                  } else {
+                    // merchant:与 topMerchants 显示名对齐,再按 merchantId/name 归并
+                    const sample = txs.find((t) => t.name === activeSlice.category);
+                    const focusKey = sample ? (sample.merchantId || sample.name) : activeSlice.category;
+                    const list2 = txs.filter((t) => {
+                      if ((t.date || '').slice(0, 7) !== ym || txFlow(t, flowRules) !== 'expense') return false;
+                      const k = t.merchantId || t.name;
+                      return k === focusKey || t.name === activeSlice.category;
+                    }).sort((a, b) => (b.date || '').localeCompare(a.date || '') || Math.abs(b.amount) - Math.abs(a.amount));
+                    rows = list2.map((t) => ({
+                      key: t.id,
+                      left: t.name || L(dict, '未知商户', 'Unknown'),
+                      sub: (t.date || '').slice(5).replace('-', '/'),
+                      amt: `-${formatMoney(Math.abs(t.amount), summary.currency)}`,
+                      logo: t.merchantLogo,
+                    }));
+                  }
+
+                  return (
+                    <div style={{ marginTop: 'var(--space-2)' }}>
+                      <div className="nesio-fin-cat-top">
+                        <span className="nesio-fin-cat-name">{title}</span>
+                        <span className="nesio-fin-cat-amt">
+                          {formatMoney(activeSlice.total ?? centerSum * (activeSlice.pct / 100), summary.currency)}
+                          <span style={{ color: 'var(--portal-muted)', fontWeight: 400 }}> · {activeSlice.pct}%</span>
+                        </span>
+                      </div>
+                      <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-3)' }}>
+                        {L(dict, `明细 · ${rows.length}`, `Details · ${rows.length}`)}
+                      </p>
+                      {rows.length === 0 ? (
+                        <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{empty}</p>
+                      ) : (
+                        <div className="nesio-fin-txlist">
+                          {rows.slice(0, 40).map((r) => (
+                            <div key={r.key} className="nesio-fin-txrow" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 2 }}>
+                              {r.sub && <span className="nesio-fin-txdate">{r.sub}</span>}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                <span className="nesio-fin-txname" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {r.logo && <MLogo src={r.logo} />}{r.left}
+                                </span>
+                                <span className="nesio-fin-txamt">{r.amt}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             );
           })()}
         </>
       )}
 
-      {/* ── 预算(bug2:并入支出页;bug3:「手动添加」改名「预算」,与「生成」一起放到本页最下面) ── */}
-      {sub === 'spending' && (() => {
+      {/* ── 预算(图14:从分类页挪到总览) ── */}
+      {sub === 'overview' && (() => {
         const patchBudget = (next: BudgetConfig) => { saveBudget(next); setRev((r) => r + 1); };
         const addRow = (
           <>
-            <div className="nesio-fin-budget-add" style={{ marginTop: 0 }}>
+            <div className="nesio-fin-budget-add" style={{ marginTop: 'var(--space-5)' }}>
               <button type="button" className="nesio-fin-review-accept" onClick={() => setShowAddBudget((v) => !v)}>{L(dict, '预算', 'Budget')}</button>
               <button type="button" className="nesio-fin-flowopt" onClick={() => {
                 const s = suggestBudget(txs);
