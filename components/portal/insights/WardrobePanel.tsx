@@ -32,7 +32,6 @@ import { usePortalLocale } from '../use-portal-locale';
 import type { CalendarEvent } from '@/lib/portal/types';
 import SegTabs from '../ui/SegTabs';
 import SpendClaimRow from '../finance/SpendClaimRow';
-import { isNativePlatform } from '@/lib/portal/platform-capabilities';
 import { IconStar, IconThumbUp, IconThumbDown, IconCamera, IconAlertTriangle, IconRain, IconRefresh, GarmentIcon } from '../icons';
 
 const UNWORN_DAYS = 60; // 「好久没穿」门槛(天)
