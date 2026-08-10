@@ -146,8 +146,17 @@ writeJson(join(wwwDir, 'manifest.json'), {
 });
 
 cpSync(join(repoRoot, 'public', 'icons'), join(wwwDir, 'icons'), { recursive: true });
-cpSync(join(repoRoot, 'storage-web'), join(wwwDir, 'storage'), { recursive: true });
-cpSync(join(repoRoot, 'storage-web', 'portal-back.css'), join(wwwDir, 'portal-back.css'));
+// storage-web 可能已迁走/未检出 —— 壳靠 server.url 加载现网,本地 storage 缺了不挡 cap sync
+const storageWeb = join(repoRoot, 'storage-web');
+if (existsSync(storageWeb)) {
+  cpSync(storageWeb, join(wwwDir, 'storage'), { recursive: true });
+  const backCss = join(storageWeb, 'portal-back.css');
+  if (existsSync(backCss)) cpSync(backCss, join(wwwDir, 'portal-back.css'));
+} else {
+  mkdirSync(join(wwwDir, 'storage'), { recursive: true });
+  writeFileSync(join(wwwDir, 'storage', 'index.html'), '<!doctype html><meta charset="utf-8"><title>宝盒</title><p>打开 App 加载线上壳。</p>');
+  console.warn('sync-www: storage-web missing — stubbed www/storage (remote server.url still applies)');
+}
 
 writeFileSync(join(wwwDir, 'config.js'), "// iOS first-launch bundle: no remote API by default.\nwindow.TREASUREBOX_API = '';\n");
 
