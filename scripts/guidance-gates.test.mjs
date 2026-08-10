@@ -104,10 +104,17 @@ const fb = F.buildFallbackCards({
   ],
 }, NOW);
 const ids = fb.map((c) => c.id);
-assert.ok(ids.includes('fallback-cal-c1'), '今天的日历事件进兜底 —— 不需要知道它是什么,它今天发生就够了(家长会再也不会因为不认得而漏)');
-assert.ok(ids.includes('fallback-cal-c2') && fb.find((c) => c.id === 'fallback-cal-c2').severity === 3, '<2h 的事件 severity 3');
+assert.ok(!ids.includes('fallback-cal-c1'), '≤24h 的日历事件归时间线,不进提醒卡');
+assert.ok(!ids.includes('fallback-cal-c2'), '<2h 的事件同样归时间线');
 assert.ok(!ids.includes('fallback-cal-c3'), '已结束的不吵');
-assert.ok(!ids.includes('fallback-cal-c4'), '下周的不进今明兜底');
+assert.ok(!ids.includes('fallback-cal-c4'), '下周的太远不进');
+// >24h 且 ≤7 天的才进提醒卡
+const fbFar = F.buildFallbackCards({
+  calendarEvents: [
+    { id: 'c5', title: '后天的会', startMs: Date.parse('2026-07-31T15:00:00') },
+  ],
+}, NOW);
+assert.ok(fbFar.some((c) => c.id === 'fallback-cal-c5'), '>24h 的事件进提醒卡');
 assert.ok(ids.includes('fallback-exp-i1') && !ids.includes('fallback-exp-i2'), '物品只认今明效期');
 assert.ok(ids.includes('fallback-bill-b1') && !ids.includes('fallback-bill-b2'), '账单只认 ≤3 天');
 

@@ -100,12 +100,27 @@ export function normalizeEmail(email: string): string {
   return `${local}@${domain}`;
 }
 
-/** 账户本人身份键集合:归一后的邮箱 + 小写名字。用来把「自己」从联系人里剔除。 */
+/** 账户本人身份键集合:归一后的邮箱 + 小写名字(含 displayName 分词 / 词序翻转 / 邮箱本地名)。用来把「自己」从联系人里剔除。 */
 export function selfIdentityKeys(self?: { emails?: string[]; names?: string[] }): { emails: Set<string>; names: Set<string> } {
   const emails = new Set<string>();
   const names = new Set<string>();
-  for (const em of self?.emails ?? []) { const n = normalizeEmail(em); if (n.includes('@')) emails.add(n); }
-  for (const nm of self?.names ?? []) { const t = nm.trim().toLowerCase(); if (t.length >= 2) names.add(t); }
+  const addName = (raw: string) => {
+    const t = raw.trim().toLowerCase();
+    if (t.length < 2) return;
+    names.add(t);
+    // 「Janice Duan」→ 分词 + 反序,避免本人别名只认完整串而漏掉「Janice」/「Duan Janice」
+    const parts = t.split(/[\s·・.]+/).filter((p) => p.length >= 2);
+    for (const p of parts) names.add(p);
+    if (parts.length >= 2) names.add([...parts].reverse().join(' '));
+  };
+  for (const em of self?.emails ?? []) {
+    const n = normalizeEmail(em);
+    if (n.includes('@')) {
+      emails.add(n);
+      addName(n.slice(0, n.indexOf('@')));
+    }
+  }
+  for (const nm of self?.names ?? []) addName(nm);
   return { emails, names };
 }
 

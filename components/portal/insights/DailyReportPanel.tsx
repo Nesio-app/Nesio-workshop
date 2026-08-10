@@ -26,6 +26,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { DailyReportOffNotice } from './DailyReportOffNotice';
+import { ReportListItem } from './report-list-item';
 
 const DailyReportSheet = dynamic(() => import('../DailyReportSheet'), { ssr: false });
 
@@ -66,12 +67,7 @@ export default function DailyReportPanel() {
   /* 今天还没有冻结件时的两种情形,分开说 —— 都不许空着一块地方:
      · 还没到 08:00 → 告诉他几点来;
      · 已过 08:00 却没有 → 今天确实没什么可报的(生成过但判为空,或还没回过今天页)。 */
-  const todayRow = today ? (
-    <button type="button" className="nesio-drhist-head" onClick={() => setOpen(today)}>
-      <span className="nesio-drhist-date">{L(dict, '今天', 'Today')}</span>
-      <span className="nesio-drhist-headline">{today.headline}</span>
-    </button>
-  ) : (
+  const todayPending = !today ? (
     <p className="nesio-drhist-pending">
       {reportDue(new Date())
         ? L(dict, '今天这份还没出来 —— 回今天页转一圈就会生成。',
@@ -79,29 +75,38 @@ export default function DailyReportPanel() {
         : L(dict, '早上 8:00 出 —— 到点后它一整天不再变。',
                  'Ready at 8:00 — then it stays put all day.')}
     </p>
-  );
+  ) : null;
 
   return (
     <div className="nesio-insights-section">
       <p className="nesio-insights-section-label">{L(dict, '每日日报', 'Daily report')}</p>
       <ul className="nesio-drhist-list">
-        <li className="nesio-drhist-item">{todayRow}</li>
-        {past.map((r) => (
-          <li key={r.date} className="nesio-drhist-item">
-            <button
-              type="button"
-              className="nesio-drhist-head"
-              // 老节点没有冻结件 → 点开会是个空壳,所以直接禁掉并说明,
-              // 不做「点了没反应」的假按钮。
-              disabled={!r.report}
-              onClick={() => r.report && setOpen(r.report)}
-            >
-              <span className="nesio-drhist-date">{fmt(r.date)}</span>
-              <span className="nesio-drhist-headline">
-                {r.report ? r.headline : L(dict, `${r.headline}(这天的版面没存下来)`, `${r.headline} (layout not saved)`)}
-              </span>
-            </button>
+        {today ? (
+          <ReportListItem
+            kind="daily"
+            dateLabel={L(dict, '今天', 'Today')}
+            headline={today.headline}
+            nodes={nodes}
+            dayKey={today.date}
+            onOpen={() => setOpen(today)}
+          />
+        ) : (
+          <li className="nesio-drhist-item nesio-drhist-item--daily">
+            <span className="nesio-drhist-cover" aria-hidden />
+            {todayPending}
           </li>
+        )}
+        {past.map((r) => (
+          <ReportListItem
+            key={r.date}
+            kind="daily"
+            dateLabel={fmt(r.date)}
+            headline={r.report ? r.headline : L(dict, `${r.headline}(这天的版面没存下来)`, `${r.headline} (layout not saved)`)}
+            nodes={nodes}
+            dayKey={r.date}
+            disabled={!r.report}
+            onOpen={() => r.report && setOpen(r.report)}
+          />
         ))}
       </ul>
       {open && <DailyReportSheet report={open} elevated onClose={() => setOpen(null)} />}

@@ -19,6 +19,7 @@ import {
 } from './life-graph';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { displayStoredLocation } from './named-places';
+import { isTxShadow } from './tx-node';
 
 /* ---------- location 规范 ---------- */
 // 位置词汇的唯一真相是 named-places(场所→房间→子位置,LocationPicker 输出
@@ -195,10 +196,11 @@ export function sortAmazonFlip(items: InventoryItem[]): InventoryItem[] {
     });
 }
 
-/** 全部物品(object 节点),新→旧。容器物品的 containedCount 在此跨物品计算。 */
+/** 全部物品(object 节点),新→旧。容器物品的 containedCount 在此跨物品计算。
+ *  流水影子(txShadow)不进物品 —— 它们是记忆图投影,不是可收纳的物件。 */
 export function listInventoryItems(): InventoryItem[] {
   const items = getLifeGraph()
-    .filter((n) => n.type === 'Thing')
+    .filter((n) => n.type === 'Thing' && !isTxShadow(n))
     .map(toInventoryItem);
   // 物品④:location 任一非空间段命中容器物品名 → 算「装在里面」
   const counts = new Map<string, number>();

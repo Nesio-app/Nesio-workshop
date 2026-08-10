@@ -23,30 +23,40 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { PeriodList } from './RetrospectPanel';
+import { ReportListItem } from './report-list-item';
 import { DailyReportOffNotice } from './DailyReportOffNotice';
 
 const DailyReportSheet = dynamic(() => import('../DailyReportSheet'), { ssr: false });
 
-function PlanRow({ kind, report, dict, pendingLabel, dueLabel, onOpen }: {
+function PlanRow({ kind, report, dict, nodes, pendingLabel, dueLabel, onOpen }: {
   kind: PeriodKind;
   report: DailyReport | null;
   dict: 'zh' | 'en';
+  nodes: LifeNode[];
   pendingLabel: string;
   dueLabel: string;
   onOpen: (r: DailyReport) => void;
 }) {
+  const listKind = kind === 'week' ? 'week' as const : 'month' as const;
   if (report) {
     return (
-      <button type="button" className="nesio-drhist-head" onClick={() => onOpen(report)}>
-        <span className="nesio-drhist-date">{kind === 'week' ? L(dict, '下周', 'Next week') : L(dict, '下月', 'Next month')}</span>
-        <span className="nesio-drhist-headline">{report.headline}</span>
-      </button>
+      <ReportListItem
+        kind={listKind}
+        dateLabel={kind === 'week' ? L(dict, '下周', 'Next week') : L(dict, '下月', 'Next month')}
+        headline={report.headline}
+        nodes={nodes}
+        dayKey={report.date}
+        onOpen={() => onOpen(report)}
+      />
     );
   }
   return (
-    <p className="nesio-drhist-pending">
-      {periodDue(kind, new Date()) ? pendingLabel : dueLabel}
-    </p>
+    <li className={`nesio-drhist-item nesio-drhist-item--${listKind}`}>
+      <span className="nesio-drhist-cover" aria-hidden />
+      <p className="nesio-drhist-pending">
+        {periodDue(kind, new Date()) ? pendingLabel : dueLabel}
+      </p>
+    </li>
   );
 }
 
@@ -83,29 +93,25 @@ export default function PlansPanel() {
       <div className="nesio-insights-section">
         <p className="nesio-insights-section-label">{L(dict, '下周计划', "Next week's plan")}</p>
         <ul className="nesio-drhist-list">
-          <li className="nesio-drhist-item">
-            <PlanRow
-              kind="week" report={weekPlan} dict={dict} onOpen={setOpen}
-              pendingLabel={L(dict, '这周还没转一圈生成 —— 回今天页看看就会出来。', "Hasn't generated yet — open Today once and it will.")}
-              dueLabel={L(dict, '周日下午 4 点出 —— 到点后这一周不再变。', 'Ready Sunday 4pm — then it stays put for the week.')}
-            />
-          </li>
+          <PlanRow
+            kind="week" report={weekPlan} dict={dict} nodes={nodes} onOpen={setOpen}
+            pendingLabel={L(dict, '这周还没转一圈生成 —— 回今天页看看就会出来。', "Hasn't generated yet — open Today once and it will.")}
+            dueLabel={L(dict, '周日下午 4 点出 —— 到点后这一周不再变。', 'Ready Sunday 4pm — then it stays put for the week.')}
+          />
         </ul>
       </div>
       <div className="nesio-insights-section">
         <p className="nesio-insights-section-label">{L(dict, '下月计划', "Next month's plan")}</p>
         <ul className="nesio-drhist-list">
-          <li className="nesio-drhist-item">
-            <PlanRow
-              kind="month" report={monthPlan} dict={dict} onOpen={setOpen}
-              pendingLabel={L(dict, '这个月还没转一圈生成 —— 回今天页看看就会出来。', "Hasn't generated yet — open Today once and it will.")}
-              dueLabel={L(dict, '月末最后一天下午 4 点出 —— 到点后这个月不再变。', 'Ready 4pm on the last day of the month — then it stays put for the month.')}
-            />
-          </li>
+          <PlanRow
+            kind="month" report={monthPlan} dict={dict} nodes={nodes} onOpen={setOpen}
+            pendingLabel={L(dict, '这个月还没转一圈生成 —— 回今天页看看就会出来。', "Hasn't generated yet — open Today once and it will.")}
+            dueLabel={L(dict, '月末最后一天下午 4 点出 —— 到点后这个月不再变。', 'Ready 4pm on the last day of the month — then it stays put for the month.')}
+          />
         </ul>
       </div>
-      <PeriodList label={L(dict, '以往的周计划', 'Past weekly plans')} items={weekHistory} onOpen={setOpen} />
-      <PeriodList label={L(dict, '以往的月计划', 'Past monthly plans')} items={monthHistory} onOpen={setOpen} />
+      <PeriodList label={L(dict, '以往的周计划', 'Past weekly plans')} kind="week" nodes={nodes} items={weekHistory} onOpen={setOpen} />
+      <PeriodList label={L(dict, '以往的月计划', 'Past monthly plans')} kind="month" nodes={nodes} items={monthHistory} onOpen={setOpen} />
       {open && (
         <DailyReportSheet
           report={open}

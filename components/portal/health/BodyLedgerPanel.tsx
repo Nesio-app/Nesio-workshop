@@ -20,6 +20,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { IconPlus } from '../icons';
+import SegTabs from '../ui/SegTabs';
 
 function ProgressRow({
   label, value, goal, unit,
@@ -136,6 +137,144 @@ function HourlyGlucoseChart({
         <span><i style={{ background: 'var(--status-gentle)' }} />{meals?.length ? L(dict, '用餐记录', 'Logged meals') : L(dict, '常见用餐点', 'Usual meal hours')}</span>
         <span className="nesio-bl-unit">{unit}</span>
       </div>
+    </div>
+  );
+}
+
+/** 按日连续折线:用 GlucoseAnalysis.daily;选中日高亮,可左右换日。无单日 hourly 时用日序列。 */
+function DailyGlucoseChart({
+  daily, unit, dict, selectedIdx, onSelectIdx, meals,
+}: {
+  daily: Array<{ date: string; avg: number; min: number; max: number }>;
+  unit: string;
+  dict: string;
+  selectedIdx: number;
+  onSelectIdx: (i: number) => void;
+  meals?: Array<{ hour: number; label: string }>;
+}) {
+  const [tip, setTip] = useState<{ date: string; avg: number; xPct: number; idx: number } | null>(null);
+  if (!daily.length) {
+    return (
+      <p className="nesio-trip-footnote">
+        {L(dict, '还没有按日血糖序列 —— 导入 Apple Health 导出后会出现。', 'No daily glucose series yet — import an Apple Health export.')}
+      </p>
+    );
+  }
+  const vals = daily.map((d) => d.avg);
+  const lo = Math.min(...vals, ...daily.map((d) => d.min)) * 0.95;
+  const hi = Math.max(...vals, ...daily.map((d) => d.max)) * 1.05;
+  const range = hi - lo || 1;
+  const W = 100;
+  const H = 48;
+  const x = (i: number) => (daily.length > 1 ? (i / (daily.length - 1)) * W : W / 2);
+  const y = (v: number) => H - ((v - lo) / range) * H;
+  const pts = daily.map((d, i) => `${x(i).toFixed(1)},${y(d.avg).toFixed(1)}`);
+  const area = `0,${H} ${pts.join(' ')} ${W},${H}`;
+  const sel = daily[Math.min(selectedIdx, daily.length - 1)];
+  const pickAt = (clientX: number, rect: DOMRect) => {
+    const pct = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+    const idx = Math.min(daily.length - 1, Math.max(0, Math.round(pct * (daily.length - 1))));
+    const d = daily[idx];
+    if (!d) return;
+    onSelectIdx(idx);
+    setTip({ date: d.date, avg: d.avg, xPct: pct * 100, idx });
+  };
+  const fmtDay = (ymd: string) => {
+    const [, m, d] = ymd.split('-');
+    return dict === 'en' ? `${m}/${d}` : `${Number(m)}/${Number(d)}`;
+  };
+  return (
+    <div className="nesio-bl-chart">
+      <div className="nesio-bl-goalrow" style={{ marginBottom: 'var(--space-2)' }}>
+        <button
+          type="button"
+          className="nesio-bl-chip"
+          disabled={selectedIdx <= 0}
+          onClick={() => onSelectIdx(Math.max(0, selectedIdx - 1))}
+          aria-label={L(dict, '前一天', 'Previous day')}
+        >
+          ‹
+        </button>
+        <span style={{ fontSize: 'var(--text-sm)', color: 'var(--portal-ink)', fontVariantNumeric: 'tabular-nums' }}>
+          {sel ? `${fmtDay(sel.date)} · ${sel.avg.toFixed(1)} ${unit}` : '—'}
+          {sel ? <small style={{ color: 'var(--portal-muted)', marginLeft: 6 }}>{sel.min.toFixed(1)}–{sel.max.toFixed(1)}</small> : null}
+        </span>
+        <button
+          type="button"
+          className="nesio-bl-chip"
+          disabled={selectedIdx >= daily.length - 1}
+          onClick={() => onSelectIdx(Math.min(daily.length - 1, selectedIdx + 1))}
+          aria-label={L(dict, '后一天', 'Next day')}
+        >
+          ›
+        </button>
+      </div>
+      <div
+        style={{ position: 'relative', touchAction: 'none' }}
+        onPointerDown={(e) => pickAt(e.clientX, e.currentTarget.getBoundingClientRect())}
+        onPointerMove={(e) => {
+          if (e.pointerType === 'mouse' || e.buttons > 0) pickAt(e.clientX, e.currentTarget.getBoundingClientRect());
+        }}
+        onPointerLeave={() => setTip(null)}
+      >
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height="88" preserveAspectRatio="none" aria-hidden>
+          <polygon points={area} fill="var(--portal-accent-soft)" opacity="0.9" />
+          <polyline points={pts.join(' ')} fill="none" stroke="var(--portal-blue-deep)" strokeWidth="1.8" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+          {sel && (
+            <circle
+              cx={x(selectedIdx)}
+              cy={y(sel.avg)}
+              r="3.2"
+              fill="var(--portal-blue-deep)"
+              stroke="var(--portal-bg)"
+              strokeWidth="1"
+            />
+          )}
+          {/* 选中日有用餐记录时,在图旁用琥珀点提示(按日无小时坐标,叠在选中点旁) */}
+          {meals && meals.length > 0 && sel && (
+            <circle
+              cx={Math.min(W - 2, x(selectedIdx) + 2.5)}
+              cy={y(sel.avg)}
+              r="2.2"
+              fill="var(--status-gentle)"
+            />
+          )}
+          {tip && tip.idx !== selectedIdx && (
+            <circle cx={x(tip.idx)} cy={y(tip.avg)} r="2.4" fill="var(--portal-cool-accent)" />
+          )}
+        </svg>
+        {tip && (
+          <div
+            role="status"
+            style={{
+              position: 'absolute', top: 4, left: `clamp(0%, calc(${tip.xPct}% - 40px), calc(100% - 80px))`,
+              minWidth: 72, padding: '4px 8px', borderRadius: 'var(--radius-sm)',
+              background: 'var(--sheet-opaque, var(--portal-bg))', border: '1px solid var(--portal-line)',
+              fontSize: 'var(--text-xs)', color: 'var(--portal-ink)', pointerEvents: 'none',
+              fontVariantNumeric: 'tabular-nums', boxShadow: 'var(--shadow-sm, none)',
+            }}
+          >
+            {fmtDay(tip.date)} · {tip.avg.toFixed(1)} {unit}
+          </div>
+        )}
+      </div>
+      <div className="nesio-bl-chart-axis">
+        <span>{fmtDay(daily[0].date)}</span>
+        <span>{daily.length >= 3 ? fmtDay(daily[Math.floor(daily.length / 2)].date) : ''}</span>
+        <span>{fmtDay(daily[daily.length - 1].date)}</span>
+      </div>
+      <div className="nesio-bl-legend">
+        <span><i style={{ background: 'var(--portal-blue-deep)' }} />{L(dict, '日均血糖', 'Daily avg')}</span>
+        {meals && meals.length > 0 && (
+          <span><i style={{ background: 'var(--status-gentle)' }} />{L(dict, '当日用餐', 'Meals that day')}</span>
+        )}
+        <span className="nesio-bl-unit">{unit}</span>
+      </div>
+      {meals && meals.length > 0 && (
+        <p className="nesio-trip-footnote" style={{ marginTop: 'var(--space-1)' }}>
+          {meals.map((m) => `${String(m.hour).padStart(2, '0')}:00 ${m.label}`).join(' · ')}
+        </p>
+      )}
     </div>
   );
 }
@@ -269,6 +408,10 @@ export function BodyLedgerAnalysisCards({ health, dict }: { health: HealthMetric
 
 export function PostMealBody({ health, dict }: { health: HealthMetrics | null; dict: string }) {
   const g = health?.glucose;
+  // 模式 = 跨日小时均线;按日 = daily 连续折线 + 换日
+  const [chartMode, setChartMode] = useState<'pattern' | 'daily'>('pattern');
+  const [dayIdx, setDayIdx] = useState(0);
+
   const lastMeal = useMemo(() => {
     const meals = getMeals();
     return meals[0] || null;
@@ -284,6 +427,28 @@ export function PostMealBody({ health, dict }: { health: HealthMetrics | null; d
     }
     return out;
   }, [dict]);
+
+  // 切到按日时默认落在序列末(最近一天)
+  useEffect(() => {
+    if (chartMode === 'daily' && g?.daily?.length) {
+      setDayIdx(g.daily.length - 1);
+    }
+  }, [chartMode, g?.daily?.length]);
+
+  const selectedYmd = g?.daily?.[dayIdx]?.date;
+  const dayMeals = useMemo(() => {
+    if (!selectedYmd) return [] as Array<{ hour: number; label: string }>;
+    const out: Array<{ hour: number; label: string }> = [];
+    for (const m of getMeals().slice(0, 24)) {
+      const d = new Date(m.occurredAt);
+      if (Number.isNaN(d.getTime())) continue;
+      const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      if (ymd !== selectedYmd) continue;
+      const label = m.items.map((i) => i.name).filter(Boolean).slice(0, 2).join(' · ') || L(dict, '一餐', 'meal');
+      out.push({ hour: d.getHours(), label });
+    }
+    return out;
+  }, [selectedYmd, dict]);
 
   return (
     <div className="nesio-bl-section">
@@ -303,12 +468,42 @@ export function PostMealBody({ health, dict }: { health: HealthMetrics | null; d
             <div><small>{L(dict, '90 天最高', '90d high')}</small><b>{g.max}</b><span>{g.unit}</span></div>
             <div><small>TIR</small><b>{g.tirPct}%</b><span /></div>
           </div>
-          <HourlyGlucoseChart hourly={g.hourly} unit={g.unit} dict={dict} meals={mealOverlays} />
-          <div className="nesio-bl-prompt nesio-bl-prompt--calm">
-            {L(dict,
-              '这是全天各小时的平均曲线,橙色点是常见用餐时段 —— 仍在学习你的身体,先当模式看,别急着下结论。',
-              'Hourly averages across days; amber dots mark usual meal hours — still learning; treat as a pattern, not a verdict.')}
-          </div>
+          <SegTabs
+            size="sm"
+            ariaLabel={L(dict, '血糖图模式', 'Glucose chart mode')}
+            active={chartMode}
+            onSelect={setChartMode}
+            items={[
+              { key: 'pattern', label: L(dict, '模式', 'Pattern') },
+              { key: 'daily', label: L(dict, '按日', 'By day') },
+            ]}
+          />
+          {chartMode === 'pattern' ? (
+            <>
+              <HourlyGlucoseChart hourly={g.hourly} unit={g.unit} dict={dict} meals={mealOverlays} />
+              <div className="nesio-bl-prompt nesio-bl-prompt--calm">
+                {L(dict,
+                  '这是全天各小时的平均曲线,橙色点是常见用餐时段 —— 仍在学习你的身体,先当模式看,别急着下结论。',
+                  'Hourly averages across days; amber dots mark usual meal hours — still learning; treat as a pattern, not a verdict.')}
+              </div>
+            </>
+          ) : (
+            <>
+              <DailyGlucoseChart
+                daily={g.daily}
+                unit={g.unit}
+                dict={dict}
+                selectedIdx={dayIdx}
+                onSelectIdx={setDayIdx}
+                meals={dayMeals}
+              />
+              <div className="nesio-bl-prompt nesio-bl-prompt--calm">
+                {L(dict,
+                  '近 90 天日均折线;左右换日看单日读数。若有当日用餐会叠在选中点旁 —— 仍当趋势看。',
+                  'Daily averages over ~90 days; swipe days for one reading. Meals that day mark the selected point — still a trend, not a verdict.')}
+              </div>
+            </>
+          )}
         </>
       ) : (
         <p className="nesio-trip-footnote">

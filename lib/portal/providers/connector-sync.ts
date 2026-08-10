@@ -145,6 +145,7 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
     });
     const batch = fresh.slice(0, FLOMO_INGEST_CAP); // memos 已按新→旧;先灌最新一批
     let imported = 0;
+    const { updateLifeNode } = await import('@/lib/portal/life-graph');
     for (let i = 0; i < batch.length; i += FLOMO_INGEST_CHUNK) {
       for (const m of batch.slice(i, i + FLOMO_INGEST_CHUNK)) {
         // 先剥 markdown 再截断(QA:标题曾是 `![](https://flomoapp.com/favicon.i` 这种半截图片语法)
@@ -156,7 +157,7 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
         // 判据收在 topic-tags.isTagOnlyText —— 展示层(memory-visibility)用的是同一份,
         // 否则「入库时挡住的」和「展示时滤掉的」会慢慢漂成两套。
         if (!plain.trim() || isTagOnlyText(plain)) continue;
-        ingestLifeNode({
+        const node = ingestLifeNode({
           type: 'collection',
           name: plain.slice(0, 40),
           attributes: {
@@ -172,6 +173,11 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
           rawInput: plain.slice(0, 200),
           source: 'manual',
         });
+        // 对照 CameraSheet EXIF:把 flomo 原创建时间写到节点 createdAt(排序/时间线用),
+        // 不只塞 attributes.created —— 否则同步日会盖过真实手记日。
+        if (m.created_at && node?.id) {
+          updateLifeNode(node.id, { createdAt: m.created_at });
+        }
         imported++;
       }
       // 让出事件循环:主线程喘口气,避免长时间独占被系统判「无响应」杀掉。

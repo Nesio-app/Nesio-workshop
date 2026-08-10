@@ -11,9 +11,9 @@ import { useEffect, useRef, useState } from 'react';
 import { getLifeGraph, updateLifeNode } from '@/lib/portal/life-graph';
 import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
 import { buildPersonProfile, type PersonProfile } from '@/lib/portal/relationship-profile';
-import { markContacted, lastContactLabel, CLOSENESS_META, RELATION_TAGS } from '@/lib/portal/relationships';
+import { markContacted, lastContactLabel, CLOSENESS_META, RELATION_TAGS, buildRelationships } from '@/lib/portal/relationships';
 import { setRelationshipOverride, type OverrideCloseness } from '@/lib/portal/relationship-overrides';
-import { mergeEntity } from '@/lib/portal/entity-resolution';
+import { mergeEntity, resolveEntityKey } from '@/lib/portal/entity-resolution';
 import {
   loadPersonRecords, deletePersonRecord,
   RECORD_CATEGORY_MAP, type PersonRecord,
@@ -103,12 +103,24 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
   const p = profile;
   const avatarSrc = p.avatar || p.photo || '';
 
-  // 数据审计 #4:把「另一个名字」并到当前联系人 —— 未来这些提及都收敛到这个人。合并后关掉详情
-  // (面板会随 ENTITY_ALIASES_EVENT 重新派生),避免停留在已被并走的旧 key 上。
+  // 把「另一个名字」并到当前联系人。除了别名表,还要把名单里同名/同键的那条也并进来
+  // (用户打的是显示名,对方却以邮箱为 key 时,只写别名表不够 —— 另一条仍独立)。
   const doMerge = () => {
     const other = mergeDraft.trim();
     if (!other) return;
-    mergeEntity(other, p.key); // other 是 alias → 归到当前人(canonical)
+    const otherKey = resolveEntityKey(other);
+    mergeEntity(other, p.key);
+    try {
+      const contacts = buildRelationships(getLifeGraph());
+      for (const c of contacts) {
+        if (c.key === p.key) continue;
+        const nameKey = resolveEntityKey(c.name);
+        if (c.key === otherKey || nameKey === otherKey || c.name.trim().toLowerCase() === other.toLowerCase()) {
+          mergeEntity(c.key, p.key);
+          if (nameKey !== resolveEntityKey(c.key)) mergeEntity(c.name, p.key);
+        }
+      }
+    } catch { /* 合并别名失败时至少已写入用户输入的那条 */ }
     setMergeDraft('');
     onClose();
   };
@@ -258,36 +270,42 @@ export default function RelationshipDetailSheet({ contactKey, onClose }: Props) 
                   </button>
                 ))}
               </div>
-              {/* bug3:关系词改成选 tag —— 表里没有的旧值(数据推出来的英文关系词)当第一个 chip 显示,点一下可取消 */}
-              <div className="nesio-rel-chips" role="group" aria-label={L(dict, '关系', 'Relationship')}>
-                {relTags.map((t) => {
-                  const on = relDraft === t.zh;
-                  return (
-                    <button key={t.zh} type="button" aria-pressed={on}
-                      className={`nesio-rel-chip${on ? ' nesio-rel-chip--on' : ''}`}
-                      onClick={() => {
-                        const next = on ? '' : t.zh;
-                        setRelDraft(next);
-                        setRelationshipOverride(p.key, { relation: next });
-                      }}>
-                      {L(dict, t.zh, t.en)}
-                    </button>
-                  );
-                })}
-              </div>
-              {/* 数据审计 #4:实体解析 —— 同一个人被记成两个名字(如「妈妈」和「母亲」)时,合并成一个 */}
-              <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-                <input type="text" className="nesio-ob-input" style={{ flex: 1 }}
-                  placeholder={L(dict, '其实是同一个人?输入 TA 的另一个名字合并', 'Same person? Type their other name to merge')}
-                  value={mergeDraft} maxLength={40}
-                  onChange={(e) => setMergeDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') doMerge(); }} />
-                <button type="button" className="nesio-fin-review-accept" disabled={!mergeDraft.trim()} onClick={doMerge}>
-                  {L(dict, '合并', 'Merge')}
-                </button>
-              </div>
+              {/* 关系词:下拉选择(固定表 + 表外当前值) */}
+              <label className="nesio-settings-section-label" htmlFor="rel-tag-select" style={{ margin: '0 0 var(--space-1)' }}>{L(dict, '关系标签', 'Relation tag')}</label>
+              <select
+                id="rel-tag-select"
+                className="nesio-ob-input"
+                value={relDraft}
+                aria-label={L(dict, '关系', 'Relationship')}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setRelDraft(next);
+                  setRelationshipOverride(p.key, { relation: next });
+                }}
+              >
+                <option value="">{L(dict, '未指定', 'Unspecified')}</option>
+                {relTags.map((t) => (
+                  <option key={t.zh} value={t.zh}>{L(dict, t.zh, t.en)}</option>
+                ))}
+              </select>
             </div>
           )}
+
+          {/* 合并入口始终可见(不依赖 contact 派生)—— 只靠 chip/关系块时,无 contact 的人永远并不了 */}
+          <div className="nesio-fit-panel" style={{ marginTop: 'var(--space-2)' }}>
+            <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '其实是同一个人?', 'Same person?')}</p>
+            <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <input type="text" className="nesio-ob-input" style={{ flex: 1 }}
+                placeholder={L(dict, '输入 TA 的另一个名字合并', 'Type their other name to merge')}
+                value={mergeDraft} maxLength={40}
+                onChange={(e) => setMergeDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') doMerge(); }} />
+              <button type="button" className="nesio-fin-review-accept" disabled={!mergeDraft.trim()} onClick={doMerge}
+                style={{ minHeight: 'var(--tap-min)', flexShrink: 0 }}>
+                {L(dict, '合并', 'Merge')}
+              </button>
+            </div>
+          </div>
 
           {/* 关系网(ego) */}
           {p.ego.nodes.length > 1 && (

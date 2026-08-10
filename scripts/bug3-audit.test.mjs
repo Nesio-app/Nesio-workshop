@@ -93,7 +93,7 @@ const ITEMS = [
   }],
   ['4', 'p2 删每行「联系过了」', () => !C.relPanel.includes('联系过了')],
   ['5', 'p2 左侧显示 Gmail 头像', () => /function ContactAvatar/.test(F.relPanel) && /photo: string \| null/.test(F.relations)],
-  ['6', 'p3 关系改标签选择', () => /RELATION_TAGS/.test(F.relations) && /RELATION_TAGS/.test(F.contactEdit)],
+  ['6', 'p3 关系改标签选择', () => /RELATION_TAGS/.test(F.relations) && /RELATION_TAGS/.test(F.contactEdit) && /<select/.test(F.contactEdit)],
   ['7', 'p3 邮箱后加发邮件按钮', () => /mailto:/.test(F.contactEdit)],
   ['8', 'p3 电话删「选填」+ 加拨号按钮', () => /tel:/.test(F.contactEdit) && !/placeholder=\{[^}]*选填/.test(C.contactEdit)],
   ['9', 'p3 加「地址」+ 导航按钮', () => /maps\.apple\.com/.test(F.contactEdit) && /address\?: string/.test(F.manualContacts)],
@@ -110,7 +110,7 @@ const ITEMS = [
   ['19', 'p6 删掉说话那一页,直接手动输入', () => !/guardPaidCloudAi|person-extract/.test(C.hangNote)],
   ['20', 'p6 删中间块与说明', () => !C.hangNote.includes('把成绩')],
   ['21', 'p6「挂一条」→「记录」并与名字同行', () => C.relDetail.includes("'记录'") && /nesio-rel-detail-name-row/.test(F.relDetail)],
-  ['22', 'p7 关系可改 → 标签', () => /setRelationshipOverride/.test(F.relDetail) && /RELATION_TAGS/.test(F.relDetail)],
+  ['22', 'p7 关系可改 → 标签', () => /setRelationshipOverride/.test(F.relDetail) && /RELATION_TAGS/.test(F.relDetail) && /rel-tag-select|<select/.test(F.relDetail)],
   ['23', 'p7 删「挂在TA身上」说明', () => !C.relDetail.includes('挂在TA身上')],
 
   // ── 衣橱(p8–p12)──

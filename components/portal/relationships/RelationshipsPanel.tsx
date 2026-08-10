@@ -89,10 +89,13 @@ export default function RelationshipsPanel() {
 
   const rebuild = () => {
     const owner = getLocalOwner();
-    const displayName = loadProfileSettings().displayName;
+    const profile = loadProfileSettings();
+    const displayName = profile.displayName;
+    // 本人别名走 selfIdentityKeys(分词/反序/邮箱本地名),不要在这里硬编码任何真实姓名
+    const names = [displayName].filter((s): s is string => Boolean(s && s !== '我'));
     const self = {
       emails: owner?.email ? [owner.email] : [],
-      names: [displayName].filter((s) => s && s !== '我'),
+      names,
     };
     setContacts(buildRelationships(getLifeGraph(), Date.now(), undefined, self));
   };

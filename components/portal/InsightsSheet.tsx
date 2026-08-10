@@ -21,6 +21,7 @@ import { markFeatureUsed } from '@/lib/portal/feature-usage';
 import { looseThreads } from '@/lib/portal/loose-threads';
 import { isLabModeOn, LAB_MODE_EVENT } from '@/lib/portal/module-overrides';
 import { isTopicTag } from '@/lib/portal/topic-tags';
+import { isTxShadow } from '@/lib/portal/tx-node';
 import { L } from '@/lib/portal/i18n';
 import { applyHubOrder, moveItem, loadHubOrder, saveHubOrder, resetHubOrder, HUB_ORDER_UPDATED } from '@/lib/portal/hub-order';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -576,15 +577,21 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
   //    而两边都言之凿凿)。
   const threads = useMemo(() => looseThreads(realNodes), [realNodes]);
 
-  // ③ 走走看:随机翻一条 + 去年今天
+  // ③ 走走看:只翻有意义记忆(排除日历/邮件源 + 流水影子),点开详情而非按名搜索
+  const wanderPool = useMemo(() => realNodes.filter((n) => {
+    if (isTxShadow(n)) return false;
+    const src = String(n.source || '').toLowerCase();
+    if (src === 'calendar' || src === 'email') return false;
+    return true;
+  }), [realNodes]);
   const wanderNode = useMemo(() => {
-    if (!realNodes.length) return null;
-    return realNodes[(wanderSeed * 31 + 17) % realNodes.length];
-  }, [realNodes, wanderSeed]);
+    if (!wanderPool.length) return null;
+    return wanderPool[(wanderSeed * 31 + 17) % wanderPool.length];
+  }, [wanderPool, wanderSeed]);
   const yearAgoNode = useMemo(() => {
     const target = Date.now() - 365 * DAY_MS;
-    return realNodes.find((n) => Math.abs(new Date(n.createdAt).getTime() - target) <= 3 * DAY_MS) ?? null;
-  }, [realNodes]);
+    return wanderPool.find((n) => Math.abs(new Date(n.createdAt).getTime() - target) <= 3 * DAY_MS) ?? null;
+  }, [wanderPool]);
 
   // ④ 一行节律:本月 N 条 · 多在晚上 · 说的比打的多
   const rhythm = useMemo(() => {
@@ -742,7 +749,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
                         <IconRefresh size={15} />
                       </button>
                     </div>
-                    <button type="button" onClick={() => openInMemory(node.name)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 0, margin: 'var(--space-2) 0 0', cursor: 'pointer' }}>
+                    <button type="button" onClick={() => setDetailNodeId(node.id)} style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 0, margin: 'var(--space-2) 0 0', cursor: 'pointer' }}>
                       <span style={{ fontFamily: 'var(--font-serif)', fontSize: 'var(--text-body)', lineHeight: 1.6, color: 'var(--portal-ink)' }}>「{node.name.slice(0, 60)}」</span>
                     </button>
                   </div>
@@ -892,7 +899,7 @@ export default function InsightsSheet({ onClose, canUsePrivateData = false, init
       {detailNodeId && (() => {
         const node = getLifeGraph().find((n) => n.id === detailNodeId) || null;
         if (!node) return null;
-        return <MemoryNodeDetailLazy node={node} onClose={() => setDetailNodeId(null)} />;
+        return <MemoryNodeDetailLazy node={node} elevated onClose={() => setDetailNodeId(null)} />;
       })()}
     </div>
   );

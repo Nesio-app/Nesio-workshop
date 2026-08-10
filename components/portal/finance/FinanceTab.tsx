@@ -16,13 +16,14 @@ import {
   loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummaryWithHoldings, expenseMerchants,
   loadHoldings, setMerchantRuleFor, setFlowRuleFor, loadRuleLabels,
   bankDataReady, loadBankSyncStatus, loadAccountNames, displayAccountName,
+  topMerchants, accountMonth,
   type BankTx, type BankAccount, type TxFlow, type Holding,
 } from '@/lib/portal/bank-tx';
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
 // 另有一套 alerts 判定(函数级双实现),两个输出面据同一份流水各说各话,已删并由契约钉死不回潮。
 import { financeFindings } from '@/lib/portal/finance-insight';
 import { computeFinanceScores } from '@/lib/portal/finance-risk';
-import { detectIncome, portfolioSummary, recurringPriceHikes } from '@/lib/portal/finance-features';
+import { detectIncome, portfolioSummary, recurringPriceHikes, incomeBreakdown } from '@/lib/portal/finance-features';
 import { loadCombinedFinanceTx, loadCombinedFinanceAccounts } from '@/lib/portal/tesla-finance';
 import QuickAddSheet from './QuickAddSheet';
 import ReconcileSheet from './ReconcileSheet';
@@ -31,6 +32,7 @@ import CardsPane from './CardsPane';
 import AcctLogo from './AcctLogo';
 import InvestPane from './InvestPane';
 import NesioSheet from '../ui/NesioSheet';
+import SegTabs from '../ui/SegTabs';
 import { listManualAssets, manualNetWorth, loadNetWorthSeries, finAssetsReady, FIN_ASSETS_EVENT, type ManualAsset } from '@/lib/portal/finance-assets';
 import { listInventoryItems } from '@/lib/portal/inventory';
 import { receiptMatchCandidates, rejectPair, loadRejectedPairs } from '@/lib/portal/receipt-match';
@@ -62,6 +64,14 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 
 type Sub = 'overview' | 'spending' | 'tx' | 'invest' | 'cards'; // 订阅 tab 已删(定期账单在交易页);预算在支出页渲染
+type DonutDim = 'expense' | 'income' | 'invest' | 'account' | 'merchant';
+const DONUT_DIMS: Array<[DonutDim, string, string]> = [
+  ['expense', '支出', 'Expense'],
+  ['income', '收入', 'Income'],
+  ['invest', '投资', 'Invest'],
+  ['account', '账户', 'Account'],
+  ['merchant', '商户', 'Merchant'],
+];
 
 /** 财务批注「关联人」候选:核心 / 亲近 / 家人关系,不含一般熟人。 */
 function isFinancePickContact(c: { closeness: string; relation: string | null }): boolean {
@@ -819,6 +829,9 @@ export default function FinanceTab() {
   const [showAddBudget, setShowAddBudget] = useState(false); // bug2:「手动添加」按钮展开分类选择
   const [allocPick, setAllocPick] = useState<string | null>(null); // bug3:组合结构环形图点开看这一类持仓
   const [spendFocus, setSpendFocus] = useState<string | null>(null); // bug2:环形图点选分类 → 走势/分析/明细
+  // 分类页环形图维度:支出/收入/投资结构/账户/商户 —— SegTabs + 左右滑切换
+  const [donutDim, setDonutDim] = useState<DonutDim>('expense');
+  const donutTouchX = useRef<number | null>(null);
   const [txLimit, setTxLimit] = useState(10); // bug2:交易默认只显示 10 条
   const [recurDetail, setRecurDetail] = useState<string | null>(null); // bug2:订阅条目详情(key)
   const [reportMsg, setReportMsg] = useState(''); // 财务㉓:月报动作反馈(可见状态,不静默)
@@ -1479,132 +1492,218 @@ export default function FinanceTab() {
         );
       })()}
 
-      {/* ── 支出主体:单一环形图;点分类 → 走势 + 商户分析 + 每笔明细 ── */}
+      {/* ── 支出主体:多维环形图(支出/收入/投资/账户/商户);支出维点分类下钻 ── */}
       {sub === 'spending' && (
         <>
-          {cats.length > 0 ? (
-            <>
-              {(() => {
-                const active = cats.find((c) => c.category === spendFocus) || null;
-                const flowRules = loadFlowRules();
-                const catTxs = active
-                  ? txs.filter((t) => (t.date || '').slice(0, 7) === ym && txFlow(t, flowRules) === 'expense' && effectiveCategory(t) === active.category)
-                    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || Math.abs(b.amount) - Math.abs(a.amount))
-                  : [];
-                const merchantAgg = (() => {
-                  const m = new Map<string, { name: string; total: number; count: number; logo?: string }>();
-                  for (const t of catTxs) {
-                    const key = (t.merchantId || t.name || '?').trim();
-                    const cur = m.get(key) || { name: t.name || L(dict, '未知', 'Unknown'), total: 0, count: 0, logo: t.merchantLogo };
-                    cur.total += Math.abs(t.amount);
-                    cur.count += 1;
-                    if (t.merchantLogo) cur.logo = t.merchantLogo;
-                    m.set(key, cur);
-                  }
-                  return [...m.values()].sort((a, b) => b.total - a.total).slice(0, 5);
-                })();
-                const avg = catTxs.length ? active!.total / catTxs.length : 0;
-                return (
-                  <div style={{ marginTop: 'var(--space-3)' }}>
-                    <FinanceDonut big slices={cats}
-                      centerTop={active ? categoryLabel(active.category, dict) : L(dict, '本月支出', 'This month')}
-                      centerVal={active ? `${active.pct}%` : formatMoney(cats.reduce((s, c) => s + c.total, 0), summary.currency)}
-                      onSlice={(c) => { if (c === 'OTHER_REST') return; setSpendFocus((v) => (v === c ? null : c)); }}
-                      activeCategory={spendFocus} />
-                    {!active && (
-                      <p className="nesio-fin-score-hint" style={{ textAlign: 'center', marginTop: 'var(--space-1)' }}>
-                        {L(dict, '点一块分类,看走势、商户和每笔明细', 'Tap a slice for trend, merchants, and each charge')}
-                      </p>
-                    )}
-                    {active && (() => {
-                      const seq = availableMonths(txs).slice(0, 6).reverse().map((m) => ({
-                        ym: m, total: categoryBreakdown(txs, m).find((x) => x.category === active.category)?.total || 0,
-                      }));
-                      const max = Math.max(...seq.map((x) => x.total), 1);
-                      const W = 280, H = 56, PAD = 8;
-                      const px = (i: number) => PAD + (i / Math.max(1, seq.length - 1)) * (W - PAD * 2);
-                      const py = (v: number) => H - 12 - (v / max) * (H - 20);
-                      const path = seq.map((p, i) => `${i === 0 ? 'M' : 'L'}${px(i)},${py(p.total)}`).join(' ');
-                      return (
-                        <div style={{ marginTop: 'var(--space-2)' }}>
-                          <div className="nesio-fin-cat-top">
-                            <span className="nesio-fin-cat-name">{categoryLabel(active.category, dict)}</span>
-                            <span className="nesio-fin-cat-amt">{formatMoney(active.total, summary.currency)}
-                              {active.deltaPct !== null ? <span className={`nesio-fin-delta${active.deltaPct > 0 ? ' up' : ' down'}`}>{active.deltaPct > 0 ? '+' : ''}{active.deltaPct}%</span> : active.isNew ? <span className="nesio-fin-delta is-new">{L(dict, '新增', 'new')}</span> : null}
-                            </span>
-                          </div>
-                          <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} aria-label={L(dict, '该分类月度折线', 'Category monthly trend')}>
-                            <path d={path} fill="none" stroke="var(--portal-accent)" strokeWidth="2" />
-                            {seq.map((p, i) => <circle key={p.ym} cx={px(i)} cy={py(p.total)} r={p.ym === ym ? 3.5 : 2} fill="var(--portal-accent)" />)}
-                          </svg>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 2px' }}>
-                            {seq.map((p) => <span key={p.ym} style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{p.ym.slice(5)}</span>)}
-                          </div>
+          {(() => {
+            const portfolio = portfolioSummary(holdings);
+            const incomeSlices = incomeBreakdown(txs, ym);
+            const incomeTotal = incomeSlices.reduce((s, x) => s + x.total, 0) || 1;
+            const merchants = topMerchants(txs, ym, 12);
+            const merchantTotal = merchants.reduce((s, m) => s + m.total, 0) || 1;
+            const acctSlices = accounts
+              .map((a) => {
+                const m = accountMonth(txs, a.id, ym);
+                return { category: displayAccountName(a, acctNames) || a.name || a.id, total: Math.abs(m.spend), pct: 0 };
+              })
+              .filter((x) => x.total > 0)
+              .sort((a, b) => b.total - a.total);
+            const acctTotal = acctSlices.reduce((s, x) => s + x.total, 0) || 1;
+            acctSlices.forEach((x) => { x.pct = Math.round((x.total / acctTotal) * 100); });
 
-                          {/* 分析:笔数 / 均笔 / 占月支出 + 商户 Top(并进同一块,不再另开饼图) */}
-                          <div className="nesio-fin-kpis" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginTop: 'var(--space-3)', marginBottom: 0 }}>
-                            <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '笔数', 'Count')}</span><span className="nesio-fin-kpi-v">{catTxs.length}</span></div>
-                            <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '均笔', 'Avg')}</span><span className="nesio-fin-kpi-v">{formatMoney(avg, summary.currency)}</span></div>
-                            <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '占本月', 'Share')}</span><span className="nesio-fin-kpi-v">{active.pct}%</span></div>
-                          </div>
-                          {merchantAgg.length > 0 && (
-                            <div style={{ marginTop: 'var(--space-3)' }}>
-                              <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '该分类 · 商户 Top', 'In this category · Top merchants')}</p>
-                              {merchantAgg.map((m) => (
-                                <div key={m.name} className="nesio-fin-cat-top" style={{ marginBottom: 4 }}>
-                                  <span className="nesio-fin-cat-name" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                                    {m.logo && <MLogo src={m.logo} />}{m.name}
-                                    <span style={{ color: 'var(--portal-muted)', fontWeight: 400 }}> · {L(dict, `${m.count} 笔`, `${m.count}×`)}</span>
-                                  </span>
-                                  <span className="nesio-fin-cat-amt">{formatMoney(m.total, summary.currency)}</span>
-                                </div>
-                              ))}
+            type Slice = { category: string; pct: number; total?: number };
+            let slices: Slice[] = [];
+            let centerTop = L(dict, '本月支出', 'This month');
+            let centerSum = 0;
+            let emptyHint = L(dict, '这个月还没有可统计的支出。', 'No spending to break down this month yet.');
+
+            if (donutDim === 'expense') {
+              slices = cats;
+              centerSum = cats.reduce((s, c) => s + c.total, 0);
+            } else if (donutDim === 'income') {
+              slices = incomeSlices.map((x) => ({
+                category: categoryDetailLabel(x.detail, dict) || x.detail,
+                pct: Math.round((x.total / incomeTotal) * 100),
+                total: x.total,
+              }));
+              centerSum = incomeSlices.reduce((s, x) => s + x.total, 0);
+              centerTop = L(dict, '本月收入', 'Income');
+              emptyHint = L(dict, '这个月还没有可统计的收入。', 'No income to break down this month yet.');
+            } else if (donutDim === 'invest') {
+              slices = (portfolio?.byType || []).map((x) => ({ category: x.label, pct: x.pct, total: x.value }));
+              centerSum = portfolio?.totalValue || 0;
+              centerTop = L(dict, '投资结构', 'Allocation');
+              emptyHint = L(dict, '还没有持仓可看结构。', 'No holdings to show allocation yet.');
+            } else if (donutDim === 'account') {
+              slices = acctSlices;
+              centerSum = acctSlices.reduce((s, x) => s + x.total, 0);
+              centerTop = L(dict, '按账户', 'By account');
+              emptyHint = L(dict, '这个月各账户还没有支出可汇总。', 'No account spending to summarize this month.');
+            } else {
+              slices = merchants.map((m) => ({
+                category: m.name,
+                pct: Math.round((m.total / merchantTotal) * 100),
+                total: m.total,
+              }));
+              centerSum = merchants.reduce((s, m) => s + m.total, 0);
+              centerTop = L(dict, '商户 Top', 'Top merchants');
+              emptyHint = L(dict, '这个月还没有商户支出可汇总。', 'No merchant spending this month yet.');
+            }
+
+            const active = donutDim === 'expense'
+              ? (cats.find((c) => c.category === spendFocus) || null)
+              : null;
+
+            const shiftDim = (dir: -1 | 1) => {
+              const i = DONUT_DIMS.findIndex(([k]) => k === donutDim);
+              const next = DONUT_DIMS[(i + dir + DONUT_DIMS.length) % DONUT_DIMS.length]?.[0];
+              if (next) { setDonutDim(next); setSpendFocus(null); }
+            };
+
+            return (
+              <div style={{ marginTop: 'var(--space-3)' }}>
+                <SegTabs
+                  size="sm"
+                  ariaLabel={L(dict, '分类饼图维度', 'Donut dimension')}
+                  active={donutDim}
+                  onSelect={(k) => { setDonutDim(k); setSpendFocus(null); }}
+                  items={DONUT_DIMS.map(([k, zh, en]) => ({ key: k, label: L(dict, zh, en) }))}
+                />
+                {/* 左右滑切换维度(与 SegTabs 同步) */}
+                <div
+                  className="nesio-fin-donut-snap"
+                  style={{ marginTop: 'var(--space-2)', touchAction: 'pan-y' }}
+                  onTouchStart={(e) => { donutTouchX.current = e.touches[0]?.clientX ?? null; }}
+                  onTouchEnd={(e) => {
+                    const start = donutTouchX.current;
+                    donutTouchX.current = null;
+                    if (start == null) return;
+                    const dx = (e.changedTouches[0]?.clientX ?? start) - start;
+                    if (Math.abs(dx) < 48) return;
+                    shiftDim(dx < 0 ? 1 : -1);
+                  }}
+                >
+                  {slices.length > 0 ? (
+                    <FinanceDonut big
+                      slices={slices}
+                      centerTop={active ? categoryLabel(active.category, dict) : centerTop}
+                      centerVal={active ? `${active.pct}%` : formatMoney(centerSum, summary.currency)}
+                      onSlice={donutDim === 'expense'
+                        ? (c) => { if (c === 'OTHER_REST') return; setSpendFocus((v) => (v === c ? null : c)); }
+                        : undefined}
+                      activeCategory={donutDim === 'expense' ? spendFocus : null}
+                    />
+                  ) : (
+                    <p className="nesio-settings-option-hint" style={{ marginTop: 0, textAlign: 'center' }}>{emptyHint}</p>
+                  )}
+                </div>
+
+                {donutDim === 'expense' && slices.length > 0 && !active && (
+                  <p className="nesio-fin-score-hint" style={{ textAlign: 'center', marginTop: 'var(--space-1)' }}>
+                    {L(dict, '点一块分类,看走势、商户和每笔明细 · 左右滑换维度', 'Tap a slice for details · swipe for other views')}
+                  </p>
+                )}
+
+                {donutDim === 'expense' && active && (() => {
+                  const flowRules = loadFlowRules();
+                  const catTxs = txs.filter((t) => (t.date || '').slice(0, 7) === ym && txFlow(t, flowRules) === 'expense' && effectiveCategory(t) === active.category)
+                    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || Math.abs(b.amount) - Math.abs(a.amount));
+                  const merchantAgg = (() => {
+                    const m = new Map<string, { name: string; total: number; count: number; logo?: string }>();
+                    for (const t of catTxs) {
+                      const key = (t.merchantId || t.name || '?').trim();
+                      const cur = m.get(key) || { name: t.name || L(dict, '未知', 'Unknown'), total: 0, count: 0, logo: t.merchantLogo };
+                      cur.total += Math.abs(t.amount);
+                      cur.count += 1;
+                      if (t.merchantLogo) cur.logo = t.merchantLogo;
+                      m.set(key, cur);
+                    }
+                    return [...m.values()].sort((a, b) => b.total - a.total).slice(0, 5);
+                  })();
+                  const avg = catTxs.length ? active.total / catTxs.length : 0;
+                  const seq = availableMonths(txs).slice(0, 6).reverse().map((m) => ({
+                    ym: m, total: categoryBreakdown(txs, m).find((x) => x.category === active.category)?.total || 0,
+                  }));
+                  const max = Math.max(...seq.map((x) => x.total), 1);
+                  const W = 280, H = 56, PAD = 8;
+                  const px = (i: number) => PAD + (i / Math.max(1, seq.length - 1)) * (W - PAD * 2);
+                  const py = (v: number) => H - 12 - (v / max) * (H - 20);
+                  const path = seq.map((p, i) => `${i === 0 ? 'M' : 'L'}${px(i)},${py(p.total)}`).join(' ');
+                  return (
+                    <div style={{ marginTop: 'var(--space-2)' }}>
+                      <div className="nesio-fin-cat-top">
+                        <span className="nesio-fin-cat-name">{categoryLabel(active.category, dict)}</span>
+                        <span className="nesio-fin-cat-amt">{formatMoney(active.total, summary.currency)}
+                          {active.deltaPct !== null ? <span className={`nesio-fin-delta${active.deltaPct > 0 ? ' up' : ' down'}`}>{active.deltaPct > 0 ? '+' : ''}{active.deltaPct}%</span> : active.isNew ? <span className="nesio-fin-delta is-new">{L(dict, '新增', 'new')}</span> : null}
+                        </span>
+                      </div>
+                      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }} aria-label={L(dict, '该分类月度折线', 'Category monthly trend')}>
+                        <path d={path} fill="none" stroke="var(--portal-accent)" strokeWidth="2" />
+                        {seq.map((p, i) => <circle key={p.ym} cx={px(i)} cy={py(p.total)} r={p.ym === ym ? 3.5 : 2} fill="var(--portal-accent)" />)}
+                      </svg>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '0 2px' }}>
+                        {seq.map((p) => <span key={p.ym} style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{p.ym.slice(5)}</span>)}
+                      </div>
+
+                      <div className="nesio-fin-kpis" style={{ gridTemplateColumns: 'repeat(3, 1fr)', marginTop: 'var(--space-3)', marginBottom: 0 }}>
+                        <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '笔数', 'Count')}</span><span className="nesio-fin-kpi-v">{catTxs.length}</span></div>
+                        <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '均笔', 'Avg')}</span><span className="nesio-fin-kpi-v">{formatMoney(avg, summary.currency)}</span></div>
+                        <div className="nesio-fin-kpi"><span className="nesio-fin-kpi-l">{L(dict, '占本月', 'Share')}</span><span className="nesio-fin-kpi-v">{active.pct}%</span></div>
+                      </div>
+                      {merchantAgg.length > 0 && (
+                        <div style={{ marginTop: 'var(--space-3)' }}>
+                          <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '该分类 · 商户 Top', 'In this category · Top merchants')}</p>
+                          {merchantAgg.map((m) => (
+                            <div key={m.name} className="nesio-fin-cat-top" style={{ marginBottom: 4 }}>
+                              <span className="nesio-fin-cat-name" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                                {m.logo && <MLogo src={m.logo} />}{m.name}
+                                <span style={{ color: 'var(--portal-muted)', fontWeight: 400 }}> · {L(dict, `${m.count} 笔`, `${m.count}×`)}</span>
+                              </span>
+                              <span className="nesio-fin-cat-amt">{formatMoney(m.total, summary.currency)}</span>
                             </div>
-                          )}
-
-                          <div style={{ marginTop: 'var(--space-3)' }}>
-                            <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, `明细 · ${catTxs.length} 笔`, `Details · ${catTxs.length}`)}</p>
-                            {catTxs.length === 0 ? (
-                              <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '这个分类本月没有流水。', 'No charges in this category this month.')}</p>
-                            ) : (
-                              <div className="nesio-fin-txlist">
-                                {catTxs.map((t) => {
-                                  const a = t.accountId ? acctById.get(t.accountId) : undefined;
-                                  const detail = categoryDetailLabel(effectiveCategoryDetail(t), dict);
-                                  return (
-                                    <div key={t.id} className="nesio-fin-txrow" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 2 }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                        <span className="nesio-fin-txdate">{(t.date || '').slice(5).replace('-', '/')}</span>
-                                        {detail && <span className="nesio-fin-txcat" style={{ color: 'var(--portal-muted)' }}>{detail}</span>}
-                                      </div>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                        <span className="nesio-fin-txname" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                          {t.merchantLogo && <MLogo src={t.merchantLogo} />}{t.name || L(dict, '未知商户', 'Unknown')}
-                                        </span>
-                                        <span className="nesio-fin-txamt">-{formatMoney(Math.abs(t.amount), summary.currency)}</span>
-                                      </div>
-                                      {a && (
-                                        <span className="nesio-fin-txacct">
-                                          <AcctLogo a={a} size={13} />
-                                          {displayAccountName(a, acctNames)}{a.mask ? ` ····${a.mask}` : ''}
-                                        </span>
-                                      )}
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            )}
-                          </div>
+                          ))}
                         </div>
-                      );
-                    })()}
-                  </div>
-                );
-              })()}
-            </>
-          ) : (
-            <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '这个月还没有可统计的支出。', 'No spending to break down this month yet.')}</p>
-          )}
+                      )}
+
+                      <div style={{ marginTop: 'var(--space-3)' }}>
+                        <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, `明细 · ${catTxs.length} 笔`, `Details · ${catTxs.length}`)}</p>
+                        {catTxs.length === 0 ? (
+                          <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '这个分类本月没有流水。', 'No charges in this category this month.')}</p>
+                        ) : (
+                          <div className="nesio-fin-txlist">
+                            {catTxs.map((t) => {
+                              const a = t.accountId ? acctById.get(t.accountId) : undefined;
+                              const detail = categoryDetailLabel(effectiveCategoryDetail(t), dict);
+                              return (
+                                <div key={t.id} className="nesio-fin-txrow" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 2 }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span className="nesio-fin-txdate">{(t.date || '').slice(5).replace('-', '/')}</span>
+                                    {detail && <span className="nesio-fin-txcat" style={{ color: 'var(--portal-muted)' }}>{detail}</span>}
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                    <span className="nesio-fin-txname" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                      {t.merchantLogo && <MLogo src={t.merchantLogo} />}{t.name || L(dict, '未知商户', 'Unknown')}
+                                    </span>
+                                    <span className="nesio-fin-txamt">-{formatMoney(Math.abs(t.amount), summary.currency)}</span>
+                                  </div>
+                                  {a && (
+                                    <span className="nesio-fin-txacct">
+                                      <AcctLogo a={a} size={13} />
+                                      {displayAccountName(a, acctNames)}{a.mask ? ` ····${a.mask}` : ''}
+                                    </span>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+            );
+          })()}
         </>
       )}
 

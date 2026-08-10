@@ -17,6 +17,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import { DailyReportOffNotice } from './DailyReportOffNotice';
+import { ReportListItem, type ReportListKind } from './report-list-item';
 
 const DailyReportPanel = dynamic(() => import('./DailyReportPanel'), { ssr: false });
 const DailyReportSheet = dynamic(() => import('../DailyReportSheet'), { ssr: false });
@@ -24,9 +25,11 @@ const DailyReportSheet = dynamic(() => import('../DailyReportSheet'), { ssr: fal
 const MAX_LIST = 8;
 
 export function PeriodList({
-  label, items, onOpen,
+  label, items, kind, nodes, onOpen,
 }: {
   label: string;
+  kind: ReportListKind;
+  nodes: LifeNode[];
   items: Array<{ periodKey: string; title: string; headline: string; report: DailyReport | null }>;
   onOpen: (r: DailyReport) => void;
 }) {
@@ -37,19 +40,16 @@ export function PeriodList({
       <p className="nesio-insights-section-label">{label}</p>
       <ul className="nesio-drhist-list">
         {items.slice(0, MAX_LIST).map((r) => (
-          <li key={r.periodKey} className="nesio-drhist-item">
-            <button
-              type="button"
-              className="nesio-drhist-head"
-              disabled={!r.report}
-              onClick={() => r.report && onOpen(r.report)}
-            >
-              <span className="nesio-drhist-date">{r.periodKey}</span>
-              <span className="nesio-drhist-headline">
-                {r.report ? r.headline : L(dict, `${r.headline}(没存下版面)`, `${r.headline} (layout not saved)`)}
-              </span>
-            </button>
-          </li>
+          <ReportListItem
+            key={r.periodKey}
+            kind={kind}
+            dateLabel={r.periodKey}
+            headline={r.report ? r.headline : L(dict, `${r.headline}(没存下版面)`, `${r.headline} (layout not saved)`)}
+            nodes={nodes}
+            dayKey={r.report?.date || r.periodKey.slice(0, 10)}
+            disabled={!r.report}
+            onOpen={() => r.report && onOpen(r.report)}
+          />
         ))}
       </ul>
     </div>
@@ -77,8 +77,8 @@ export default function RetrospectPanel() {
   return (
     <div className="nesio-reflection-tab">
       <DailyReportPanel />
-      <PeriodList label={L(dict, '每周回顾', 'Weekly review')} items={weekly} onOpen={setOpen} />
-      <PeriodList label={L(dict, '每月回顾', 'Monthly review')} items={monthly} onOpen={setOpen} />
+      <PeriodList label={L(dict, '每周回顾', 'Weekly review')} kind="week" nodes={nodes} items={weekly} onOpen={setOpen} />
+      <PeriodList label={L(dict, '每月回顾', 'Monthly review')} kind="month" nodes={nodes} items={monthly} onOpen={setOpen} />
       {open && (
         <DailyReportSheet
           report={open}

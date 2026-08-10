@@ -254,10 +254,11 @@ export default function TripTimelineSheet({
         open={open}
         onOpenChange={(v) => { if (!v) onClose(); }}
         card={false}
+        elevated
         className="nesio-settings-sheet-card nesio-trip-sheet-card"
         ariaLabel={trip?.title || L(dict, '行程', 'Trip')}
       >
-        <div className="nesio-trip-sheet">
+        <div className="nesio-trip-sheet" style={{ position: 'relative' }}>
           <header className="nesio-trip-sheet-head">
             <button type="button" className="nesio-trip-back" onClick={onClose}>
               ‹ {L(dict, '计划', 'Plans')}
@@ -300,7 +301,7 @@ export default function TripTimelineSheet({
                 </button>
               </div>
               {addPickerOpen && (
-                <div className="nesio-trip-add-picker" aria-label={L(dict, '添加行程项', 'Add a plan')}>
+                <div className="nesio-trip-add-picker nesio-trip-add-picker--cover" aria-label={L(dict, '添加行程项', 'Add a plan')}>
                   <header className="nesio-trip-add-picker-head">
                     <button type="button" className="nesio-trip-link" onClick={() => setAddPickerOpen(false)}>{L(dict, '取消', 'Cancel')}</button>
                     <b>{L(dict, '添加行程项', 'Add a Plan')}</b>

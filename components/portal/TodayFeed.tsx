@@ -472,12 +472,13 @@ export default function TodayFeed({
   // 五张旁路 nudge 卡照出不误,用户设了安静还是被打扰(Today 审计 2026-07-29)。
   // 日报(显式开关)/解冻(用户自设承诺)/家庭(共享义务)不属打扰,不受此闸。
   const quietAll = getProactiveCardBudget() === 0;
-  // 架构审查 #2:统一仲裁 —— 置顶抢占的节点,其引导卡不再重复出现
+  // 架构审查 #2:统一仲裁 —— 置顶 / ≤24h 抢占的节点,其引导卡不再重复出现
   const [pinnedNodeId, setPinnedNodeId] = useState<string | null>(null);
+  const [suppressGuidanceIds, setSuppressGuidanceIds] = useState<ReadonlySet<string>>(() => new Set());
   const guidanceNodeIds = useMemo(() => proactiveCards.map((c) => c.nodeId).filter((x): x is string => Boolean(x)), [proactiveCards]);
   // 配额只管噪音不管安全:severity 3(urgent)豁免截断,登机口不能被「今天已出一张」挡住。
   const visibleProactive = proactiveCards
-    .filter((c) => !dismissedCardIds.has(c.id) && (!c.nodeId || c.nodeId !== pinnedNodeId)
+    .filter((c) => !dismissedCardIds.has(c.id) && (!c.nodeId || (c.nodeId !== pinnedNodeId && !suppressGuidanceIds.has(c.nodeId)))
       && (!c.expiresAt || new Date(c.expiresAt).getTime() > Date.now()));
   const activeProactiveCards = [
     ...visibleProactive.filter((c) => c.urgent),
@@ -833,6 +834,7 @@ export default function TodayFeed({
         <TodayFocusSection
           guidanceNodeIds={guidanceNodeIds}
           onPinnedResolved={setPinnedNodeId}
+          onSuppressGuidance={setSuppressGuidanceIds}
           focusNodes={focusNodes}
           calendarEvents={calendarEvents}
           specialDays={proactiveContext.upcomingSpecialDays}

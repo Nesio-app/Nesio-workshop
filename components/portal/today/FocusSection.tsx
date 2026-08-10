@@ -6,7 +6,7 @@
  * DormantReviewCard(休眠复访)、NightTimeline(夜间空状态)。
  */
 
-import { arbitrateTodayPresence } from '@/lib/platform/today-arbiter';
+import { arbitrateTodayPresence, TODAY_NEAR_MS } from '@/lib/platform/today-arbiter';
 import { firstNodeDate, nodeExpiryDate } from '@/lib/platform/node-dates';
 import { useEffect, useState, type RefObject } from 'react';
 import { focusTimeHint, localDayKey, markFocusNodeDone, type FocusNode, type ProactiveContextItem } from '@/lib/platform/view-models/today-view-model';
@@ -133,6 +133,7 @@ export function TodayFocusSection({
   dormantStore: dormantStoreProp,
   guidanceNodeIds,
   onPinnedResolved,
+  onSuppressGuidance,
   onSetDormantStore,
   onOpenRecorder,
   onFocusMode,
@@ -148,6 +149,8 @@ export function TodayFocusSection({
   guidanceNodeIds?: readonly string[];
   /** 置顶裁决回传(TodayFeed 据此隐藏被抢占的引导卡) */
   onPinnedResolved?: (id: string | null) => void;
+  /** 24h 分界等需压掉的引导卡 nodeId */
+  onSuppressGuidance?: (ids: ReadonlySet<string>) => void;
   onSetDormantStore: (s: DormantStore) => void;
   /** @deprecated 顶部「全部」入口已移除;prop 暂留以兼容调用方 */
   onOpenMemory?: () => void;
@@ -215,6 +218,7 @@ export function TodayFocusSection({
   //   ④ 它快到期(食材/药品这类,到期本身就是今天的事)。
   // 物品、人、地点、偏好这些没有时间语义的,一律不进 —— 它们在记忆页和收纳里好好待着。
   const todayKey = localDayKey();
+  const nowMs = now.getTime();
   const qualifiesForTimeline = (n: FocusNode): boolean => {
     if (n.attributes.focusPinnedOn === todayKey) return true;   // ①
     if (n.type === 'event') return false;                        // 日历事件走 CalendarCards
@@ -223,22 +227,42 @@ export function TodayFocusSection({
     if (nodeExpiryDate(n.attributes)) return true;               // ④
     return false;
   };
+  // 图5:时间线只收 ≤24h;更远的事件留给提醒卡(同一 nodeId 不得两边都出现)。
+  const withinTimelineWindow = (n: FocusNode): boolean => {
+    if (n.attributes.focusPinnedOn === todayKey) return true;
+    const d = firstNodeDate(n.attributes) || nodeExpiryDate(n.attributes);
+    if (!d) return true;
+    return d.getTime() - nowMs <= TODAY_NEAR_MS;
+  };
   const rawTaskNodes = allNodes.filter((n) =>
-    !dismissed.has(n.id) && !doneIds.has(n.id) && qualifiesForTimeline(n));
+    !dismissed.has(n.id) && !doneIds.has(n.id) && qualifiesForTimeline(n) && withinTimelineWindow(n));
+  const claimAtMs: Record<string, number> = {};
+  for (const id of guidanceNodeIds ?? []) {
+    const n = allNodes.find((x) => x.id === id) || allNodesProp.find((x) => x.id === id);
+    if (!n) continue;
+    const d = firstNodeDate(n.attributes) || nodeExpiryDate(n.attributes);
+    if (d) claimAtMs[id] = d.getTime();
+  }
   const verdict = arbitrateTodayPresence({
     pinnedId: pinned?.id ?? null,
     dormantCandidateId: dormantCandidate?.node.id ?? null,
     taskIds: rawTaskNodes.map((n) => n.id),
     guidanceClaims: guidanceNodeIds ?? [],
+    claimAtMs,
+    nowMs,
   });
   const taskNodes = rawTaskNodes
     .filter((n) => verdict.taskIds.includes(n.id))
     // 裁决层消费端:「没用」过的节点不再占今天(跨天生效,不只当天)
     .filter((n) => !isCardSuppressed({ cardId: n.id, factKey: n.id }));
 
-  // 置顶结果回传组合根(TodayFeed 隐藏被置顶抢占的引导卡)
+  // 置顶 / 24h 分界回传组合根(TodayFeed 隐藏被抢占或归时间线的引导卡)
   const pinnedIdForReport = pinned?.id ?? null;
   useEffect(() => { onPinnedResolved?.(pinnedIdForReport); }, [pinnedIdForReport, onPinnedResolved]);
+  const suppressKey = [...verdict.suppressGuidanceNodeIds].sort().join('|');
+  useEffect(() => {
+    onSuppressGuidance?.(verdict.suppressGuidanceNodeIds);
+  }, [suppressKey, onSuppressGuidance]); // eslint-disable-line react-hooks/exhaustive-deps -- suppressKey 钉集合内容
 
   // 纪念日与休眠复访已移出时间线(用户拍板 2026-07-29):
   // 生日走判决层 relationship 域(person 数据,正则路径全退);休眠复访不属「今天的日程」,

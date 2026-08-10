@@ -68,15 +68,18 @@ assert.ok(closetAt > 0, '找不到衣帽间分支 —— 测试锚点失效,请�
 assert.ok(panel.indexOf('加衣服 · 拍照或选图') > closetAt, '「加衣服」按钮必须在衣帽间分支里,不许留在「今天」');
 
 // 删掉的文案不许回来
-for (const dead of ['今天穿这套', '这套怎么样', '这套穿了', '上身试穿', '试穿这套']) {
+for (const dead of ['今天穿这套', '这套怎么样', '这套穿了', '上身试穿', '试穿这套', 'Wore it']) {
   assert.ok(!code.includes(dead), `「${dead}」已按标注删除,不许回来`);
 }
+assert.ok(!code.includes("L(dict, '穿了'"), '搭配详情「穿了」按钮不许回来');
 
 // 搭配列表:穿过几次 / 长按排日子 / 点开详情 / 淘汰变灰的含义
 assert.ok(panel.includes('wornCount'), '搭配行必须显示这一组穿过几次');
 assert.ok(/onPointerDown=\{startHold\}/.test(panel), '搭配行必须支持长按 → 直接排哪天穿');
-assert.ok(panel.includes('排进日历'), '排完日子要能进日历');
+assert.ok(panel.includes('排进日历'), '排完日子要能进日历(aria-label 保留文案)');
+assert.ok(panel.includes('>✓<') || />\s*✓\s*</.test(panel), '「排进日历」按钮面是对勾符号');
 assert.ok(panel.includes('已淘汰:这一组变灰'), '「变灰」必须在界面上写清楚是什么意思');
 assert.ok(panel.includes('tryonAssetId'), '日历那天要能显示上身图(搭配上的 tryonAssetId)');
+assert.ok(/Plugins\?\.Filesystem/.test(panel), '试穿保存要有 Capacitor Filesystem 回退');
 
 console.log('wardrobe-bug3: OK');

@@ -140,10 +140,47 @@ function dataUrlToBlob(dataUrl: string): Blob | null {
   } catch { return null; }
 }
 
-/** 试穿图保存:Web 可走系统分享(带超时);iOS Capacitor 上 share 易挂起 → 直接下载。不用 fetch(dataUrl) 防卡主线程。 */
+/** 试穿图保存:原生壳优先 Capacitor Share / Filesystem;Web 走系统分享再下载。不用 fetch(dataUrl)。 */
 async function saveTryonToDevice(dataUrl: string): Promise<'shared' | 'downloaded' | 'failed'> {
   const blob = dataUrlToBlob(dataUrl);
   if (!blob) return 'failed';
+  const base64 = (() => {
+    const i = dataUrl.indexOf(',');
+    return i >= 0 ? dataUrl.slice(i + 1) : '';
+  })();
+  const fileName = `nesio-tryon-${Date.now()}.png`;
+
+  // 原生壳:Share 易挂起 → 先写 Filesystem,再带 file URI 分享;写成功即算已保存。
+  if (isNativePlatform() && base64) {
+    try {
+      const cap = (window as unknown as {
+        Capacitor?: {
+          Plugins?: {
+            Filesystem?: {
+              writeFile: (o: { path: string; data: string; directory: string }) => Promise<unknown>;
+              getUri: (o: { path: string; directory: string }) => Promise<{ uri: string }>;
+            };
+            Share?: { share: (o: { title?: string; url?: string; dialogTitle?: string }) => Promise<unknown> };
+          };
+        };
+      }).Capacitor;
+      const Fs = cap?.Plugins?.Filesystem;
+      const Share = cap?.Plugins?.Share;
+      const directory = 'CACHE'; // Capacitor Directory.Cache
+      if (Fs?.writeFile) {
+        await Fs.writeFile({ path: fileName, data: base64, directory });
+        if (Share?.share && Fs.getUri) {
+          try {
+            const { uri } = await Fs.getUri({ path: fileName, directory });
+            await withTimeout(Share.share({ title: 'Nesio try-on', url: uri, dialogTitle: 'Nesio try-on' }), 8_000);
+            return 'shared';
+          } catch { /* 取消分享仍算已落到缓存 */ }
+        }
+        return 'downloaded';
+      }
+    } catch { /* fall through to web path */ }
+  }
+
   const file = new File([blob], 'nesio-tryon.png', { type: blob.type || 'image/png' });
   try {
     if (!isNativePlatform()) {
@@ -781,12 +818,6 @@ export default function WardrobePanel() {
             commitOutfit(ok, L(dict, `排到 ${date} 了`, `Scheduled for ${date}`));
             if (ok) { setSavedView('calendar'); setOpenOutfitId(null); }
           }}
-          onWear={(o) => {
-            // 计划到了那天真穿了 → 去掉 planned,这一组的「穿过几次」+1
-            for (const id of o.pieceIds) markWorn(id, new Date().toISOString());
-            commitOutfit(patchOutfit(o.id, { planned: false }), L(dict, '记下穿过了', 'Marked as worn'));
-            load();
-          }}
           onView={setSavedView}
           onStar={(o) => {
             const on = !o.starred;
@@ -959,8 +990,8 @@ export default function WardrobePanel() {
                 <img src={tryonResult} alt={L(dict, '试穿效果', 'Try-on result')} style={{ width: '100%', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)' }} />
               </button>
               <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
-                <Button variant="soft" size="sm" layoutStyle={{ flex: 1 }} onClick={() => { void onSaveTryon(tryonResult); }}>{L(dict, '保存', 'Save')}</Button>
-                <Button variant="soft" size="sm" layoutStyle={{ flex: 1 }} onClick={() => runTryon(currentPieces)} disabled={tryonBusy}>{L(dict, '再试', 'Retry')}</Button>
+                <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} disabled={saveBusy} onClick={() => { void onSaveTryon(tryonResult); }}>{saveBusy ? L(dict, '保存中…', 'Saving…') : L(dict, '保存', 'Save')}</Button>
+                <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => runTryon(currentPieces)} disabled={tryonBusy}>{L(dict, '再试', 'Retry')}</Button>
               </div>
               {saveMsg && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-go)' }} role="status">{saveMsg}</p>}
             </div>
@@ -1251,8 +1282,6 @@ export default function WardrobePanel() {
             onChanged={load}
           />
           <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)', flexWrap: 'wrap' }}>
-            <Button variant="primary" layoutStyle={{ flex: 1 }}
-              onClick={() => { markWorn(detail.id, new Date().toISOString()); giveFeedback('worn', [detail]); load(); }}>{L(dict, '今天穿了', 'Worn today')}</Button>
             <Button variant="secondary" onClick={() => { startEdit(detail); setDetailId(null); }}>{L(dict, '编辑', 'Edit')}</Button>
             <Button variant="secondary" onClick={() => {
               setFittingQueue((q) => (q.includes(detail.id) ? q : [...q, detail.id]));
@@ -1386,7 +1415,7 @@ export default function WardrobePanel() {
             />
           </div>
           <div className="nesio-tryon-lightbox-actions" onClick={(e) => e.stopPropagation()}>
-            <Button variant="soft" size="sm" layoutStyle={{ flex: 1 }} disabled={saveBusy} onClick={() => onSaveTryon(zoomUrl)}>
+            <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} disabled={saveBusy} onClick={() => onSaveTryon(zoomUrl)}>
               {saveBusy ? L(dict, '保存中…', 'Saving…') : L(dict, '保存', 'Save')}
             </Button>
             <Button variant="secondary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => { setZoomUrl(null); setZoomScaled(false); }}>
@@ -1417,7 +1446,7 @@ export default function WardrobePanel() {
  */
 function SavedOutfits({
   outfits, garments, thumbs, view, dict, tryons, openId, tryonBusy, tryonError, isPro,
-  onView, onStar, onRetire, onRemove, onOpen, onTryon, onSchedule, onWear, onZoom, onSaveTryon,
+  onView, onStar, onRetire, onRemove, onOpen, onTryon, onSchedule, onZoom, onSaveTryon,
 }: {
   outfits: SavedOutfit[]; garments: Garment[]; thumbs: Record<string, string>;
   view: 'list' | 'calendar'; dict: string;
@@ -1428,7 +1457,6 @@ function SavedOutfits({
   onOpen: (id: string | null) => void;
   onTryon: (o: SavedOutfit) => void;
   onSchedule: (o: SavedOutfit, date: string) => void;
-  onWear: (o: SavedOutfit) => void;
   onZoom: (url: string) => void;
   onSaveTryon: (url: string) => void;
 }) {
@@ -1504,9 +1532,11 @@ function SavedOutfits({
         <input type="date" value={d} onChange={(e) => setD(e.target.value)}
           aria-label={L(dict, '哪天穿', 'Wear on')}
           style={{ flex: 1, minWidth: 0, padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', fontFamily: 'var(--font-sans)', fontSize: 'var(--text-sm)' }} />
-        <Button variant="soft" disabled={!d} layoutStyle={{ flex: 1 }}
+        <Button variant="soft" disabled={!d} size="sm"
+          aria-label={L(dict, '排进日历', 'Add to calendar')}
+          title={L(dict, '排进日历', 'Add to calendar')}
           onClick={() => { if (d) { onSchedule(o, d); setSchedulingId(null); } }}>
-          {L(dict, '排进日历', 'Add to calendar')}
+          ✓
         </Button>
       </div>
     );
@@ -1565,14 +1595,11 @@ function SavedOutfits({
           <p role="alert" style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-gentle)', background: 'var(--status-gentle-soft)', padding: 'var(--space-2) var(--space-2)', borderRadius: 'var(--radius-sm)' }}>{tryonError}</p>
         )}
         <div style={{ display: 'flex', gap: 'var(--space-2)', marginTop: 'var(--space-3)' }}>
-          <Button variant="soft" layoutStyle={{ flex: 1 }} disabled={tryonBusy} onClick={() => onTryon(o)}>
+          <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} disabled={tryonBusy} onClick={() => onTryon(o)}>
             {tryonBusy ? L(dict, '生成中…', 'Generating…') : tryUrl ? L(dict, '重新试穿', 'Try again') : !isPro ? L(dict, '试穿(Pro)', 'Try on (Pro)') : L(dict, '试穿', 'Try on')}
           </Button>
           {tryUrl && (
-            <Button variant="secondary" layoutStyle={{ flex: 1 }} onClick={() => onSaveTryon(tryUrl)}>{L(dict, '存相册', 'Save')}</Button>
-          )}
-          {o.planned && (
-            <Button variant="soft" layoutStyle={{ flex: 1 }} onClick={() => onWear(o)}>{L(dict, '穿了', 'Wore it')}</Button>
+            <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => onSaveTryon(tryUrl)}>{L(dict, '存相册', 'Save')}</Button>
           )}
         </div>
 

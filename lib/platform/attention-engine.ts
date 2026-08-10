@@ -137,11 +137,16 @@ export function scoreCalendarEvents(
   const tomorrow = new Date(today);
   tomorrow.setDate(today.getDate() + 1);
 
+  const horizonMs = now.getTime() + 86_400_000; // 时间线 ≤24h;>24h 归提醒卡
   return events
     .filter((e) => {
-      // Only include today + tomorrow events
-      const d = startOfDay(parseEventDate(e.start));
-      if (!isSameDay(d, today) && !isSameDay(d, tomorrow)) return false;
+      const startDate = parseEventDate(e.start);
+      const startMs = startDate.getTime();
+      // 图5:时间线只收 ≤24h 内;更远的由提醒卡认领,两边不得重复。
+      if (startMs > horizonMs) return false;
+      // 非今天且已过点的不占时间线(昨天残留)
+      const d = startOfDay(startDate);
+      if (!isSameDay(d, today) && startMs < now.getTime()) return false;
       // 批次 49(用户定案):订阅日历的全天标签(农历「廿六」/节气 —— 全天且
       // 无任何类型关键词)不进焦点列表。生日/截止/节日等有类型的全天事件保留。
       if (e.allDay && inferEventType(e) === 'other') return false;

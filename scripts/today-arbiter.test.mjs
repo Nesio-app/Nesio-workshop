@@ -35,4 +35,17 @@ assert.equal(v.showDormant, true);
 assert.deepEqual(v.taskIds, ['z']);
 assert.equal(v.suppressGuidanceNodeIds.size, 0);
 
+// 5. 图5 24h 分界:≤24h → 时间线赢(压引导卡,任务列表保留);>24h → 引导卡赢(任务列表剔除)
+const now = 1_000_000_000_000;
+v = arbitrateTodayPresence({
+  pinnedId: null, dormantCandidateId: null,
+  taskIds: ['near', 'far'],
+  guidanceClaims: ['near', 'far'],
+  claimAtMs: { near: now + 3_600_000, far: now + 2 * 86_400_000 },
+  nowMs: now,
+});
+assert.equal(v.suppressGuidanceNodeIds.has('near'), true, '≤24h 压引导卡');
+assert.equal(v.suppressGuidanceNodeIds.has('far'), false);
+assert.deepEqual(v.taskIds, ['near'], '>24h 从时间线剔除,≤24h 保留');
+
 console.log('today-arbiter contract: OK');

@@ -41,7 +41,12 @@ function defaultItem(ex: Exercise): WorkoutItem {
 
 const MOVES: MoveTag[] = ['squat', 'hinge', 'push', 'pull', 'core_s', 'mobility'];
 
-export default function ExerciseLibrary({ open, onClose }: { open: boolean; onClose: () => void }) {
+export default function ExerciseLibrary({ open, onClose, embedded = false }: {
+  open: boolean;
+  onClose: () => void;
+  /** 内嵌在健身子页时不盖整屏 sheet */
+  embedded?: boolean;
+}) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   // 部位 = 左侧栏(图5)。一根轴同时管精选 18 和扩展 1324 —— 映射在 exercise-parts.ts。
   const [part, setPart] = useState<string>('all');
@@ -91,7 +96,7 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
       .filter((e) => catalogInEquip(e, equip));
   }, [catalog, q, part, equip]);
 
-  useSheetDismiss(open, onClose);
+  useSheetDismiss(embedded ? false : open, onClose);
   const { handleProps, cardStyle, expanded: sheetExpanded } = useSheetDrag(onClose);
 
   if (!open) return null;
@@ -143,14 +148,26 @@ export default function ExerciseLibrary({ open, onClose }: { open: boolean; onCl
   );
 
   return (
-    <div className="nesio-settings-sheet-overlay" role="dialog" aria-modal="true" aria-label={L(dict, '动作库', 'Exercise library')}>
-      <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
-      <div className={`nesio-settings-sheet-card${sheetExpanded ? ' nesio-sheet--expanded' : ''}`} style={cardStyle}>
-        <div className="nesio-sheet-handle" {...handleProps} />
-        <div className="nesio-settings-sheet-header">
-          <h2 className="nesio-settings-sheet-title">{L(dict, '动作库', 'Exercise library')}</h2>
-        </div>
-        <div className="nesio-settings-sheet-body">
+    <div
+      className={embedded ? 'nesio-xlib-embed' : 'nesio-settings-sheet-overlay'}
+      role={embedded ? 'region' : 'dialog'}
+      aria-modal={embedded ? undefined : true}
+      aria-label={L(dict, '动作库', 'Exercise library')}
+    >
+      {!embedded && (
+        <button type="button" className="nesio-settings-sheet-backdrop" onClick={onClose} aria-label={L(dict, '关闭', 'Close')} />
+      )}
+      <div
+        className={embedded ? 'nesio-xlib-embed-card' : `nesio-settings-sheet-card${sheetExpanded ? ' nesio-sheet--expanded' : ''}`}
+        style={embedded ? undefined : cardStyle}
+      >
+        {!embedded && <div className="nesio-sheet-handle" {...handleProps} />}
+        {!embedded && (
+          <div className="nesio-settings-sheet-header">
+            <h2 className="nesio-settings-sheet-title">{L(dict, '动作库', 'Exercise library')}</h2>
+          </div>
+        )}
+        <div className={embedded ? 'nesio-xlib-embed-body' : 'nesio-settings-sheet-body'}>
           {/* 2026-07-28 UI 精修(标注 图6/图7):
               ① 「精选 18 / 全部 1324」两个 chip 合并 —— 一个库一个搜索框,搜到什么算什么;
               ② 「三维筛选 · 点动作看要点 · 加入自由组合」说明行删掉(chip 自己会说话);

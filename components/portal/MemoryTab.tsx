@@ -24,6 +24,23 @@ import { isTxShadow } from '@/lib/portal/tx-node';
 import { rankRelatedNodes } from '@/lib/portal/related-nodes';
 import { visibleMemoryNodes, isWeatherNode } from '@/lib/portal/memory-visibility';
 import { memoryEventAt } from '@/lib/portal/memory-event-at';
+
+/** 展示层去重:同一 externalId / flomoSlug 只留第一条(搜索/列表都走这里)。 */
+function collapseDuplicateNodes(list: readonly LifeNode[]): LifeNode[] {
+  const seen = new Set<string>();
+  const out: LifeNode[] = [];
+  for (const n of list) {
+    const ext = typeof n.attributes?.externalId === 'string' ? n.attributes.externalId.trim() : '';
+    const slug = typeof n.attributes?.flomoSlug === 'string' ? n.attributes.flomoSlug.trim() : '';
+    const key = ext || (slug ? `flomo:${slug}` : '');
+    if (key) {
+      if (seen.has(key)) continue;
+      seen.add(key);
+    }
+    out.push(n);
+  }
+  return out;
+}
 import {
   isCustomMemoryTag,
   loadCustomMemoryTags,
@@ -1271,9 +1288,11 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     return result;
   }, [nodes, typeFilters, sourceFilters, tagFilters, showTx, hasActiveFilter]);
 
-  const results = query.trim()
-    ? visibleMemoryNodes(smartNodes, canUsePrivateData).filter((n) => !hasActiveFilter || matchesAllFilters(n))
-    : visibleNodes;
+  const results = collapseDuplicateNodes(
+    query.trim()
+      ? visibleMemoryNodes(smartNodes, canUsePrivateData).filter((n) => !hasActiveFilter || matchesAllFilters(n))
+      : visibleNodes,
+  );
 
   // 永远有渲染上限(QA 冻结修):搜索/「显示全部」曾一次挂 2000+ 张卡冻死主线程。
   // 搜索模式起步 30,浏览模式起步 displayLimit;「更多」按钮每次 +100,增量到底。

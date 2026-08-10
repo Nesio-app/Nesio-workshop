@@ -80,14 +80,17 @@ export function buildFallbackCards(
   const tomorrow = localDayISO(now.getTime() + DAY_MS);
 
   for (const e of input.calendarEvents || []) {
-    const day = localDayISO(e.startMs);
-    if (day !== today && day !== tomorrow) continue;
+    const delta = e.startMs - now.getTime();
+    // 图5:提醒卡只收 >24h 的事件;≤24h 归时间线,两边不得重复。
+    if (delta <= DAY_MS) continue;
+    if (delta >= 7 * DAY_MS) continue; // 太远不吵(≥7 天)
     if ((e.endMs ?? e.startMs) < now.getTime()) continue; // 已结束的不吵
+    const day = localDayISO(e.startMs);
     out.push({
       id: `fallback-cal-${e.id}`,
       title: e.title.slice(0, 28),
-      body: day === today ? `${t.today} ${hhmm(e.startMs)}` : `${t.tomorrow} ${hhmm(e.startMs)}`,
-      severity: e.startMs - now.getTime() < 2 * 3_600_000 ? 3 : 2,
+      body: day === today ? `${t.today} ${hhmm(e.startMs)}` : day === tomorrow ? `${t.tomorrow} ${hhmm(e.startMs)}` : `${day.slice(5).replace('-', '/')} ${hhmm(e.startMs)}`,
+      severity: delta < 2 * 3_600_000 ? 3 : 2,
       source: 'fallback-calendar',
     });
   }

@@ -1615,9 +1615,12 @@ export default function Portal() {
                 try {
                   const { runStorageRelief } = await import('@/lib/portal/storage-relief');
                   const r = await runStorageRelief();
+                  const cacheHint = (r.purgedImages || r.purgedFiles)
+                    ? L(dict, ` · 清了 ${r.purgedImages + r.purgedFiles} 个临时图/附件`, ` · cleared ${r.purgedImages + r.purgedFiles} cached images/files`)
+                    : '';
                   setReliefMsg(L(dict,
-                    `已腾出 ${Math.round(r.freedBytes / 1024)} KB(${r.percentBefore}% → ${r.percentAfter}%${r.dedupedContacts ? `,清理重复联系人 ${r.dedupedContacts} 个` : ''})`,
-                    `Freed ${Math.round(r.freedBytes / 1024)} KB (${r.percentBefore}% → ${r.percentAfter}%${r.dedupedContacts ? `, removed ${r.dedupedContacts} duplicate contacts` : ''})`));
+                    `已腾出 ${Math.round(r.freedBytes / 1024)} KB(${r.percentBefore}% → ${r.percentAfter}%${r.dedupedContacts ? `,清理重复联系人 ${r.dedupedContacts} 个` : ''})${cacheHint}`,
+                    `Freed ${Math.round(r.freedBytes / 1024)} KB (${r.percentBefore}% → ${r.percentAfter}%${r.dedupedContacts ? `, removed ${r.dedupedContacts} duplicate contacts` : ''})${cacheHint}`));
                   setTimeout(() => { setStorageAlert(null); setReliefMsg(''); }, 3500);
                 } finally { setReliefBusy(false); }
               }}

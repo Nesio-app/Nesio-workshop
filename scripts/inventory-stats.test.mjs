@@ -30,6 +30,7 @@ const invRequire = (p) => (
   p.includes('life-graph') ? lifeGraphStub
   : p.includes('ingest-node') ? ingestStub
   : p.includes('named-places') ? { displayStoredLocation: (a) => (a && typeof a.location === 'string' ? a.location : '') }
+  : p.includes('tx-node') ? { isTxShadow: (n) => Boolean(n?.attributes?.txShadow) }
   : ({}));
 const inv = loadTs('../lib/portal/inventory.ts', invRequire);
 

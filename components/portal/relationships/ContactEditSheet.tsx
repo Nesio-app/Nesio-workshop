@@ -124,20 +124,20 @@ export default function ContactEditSheet({ open, onClose, contactKey, nodeId, in
         <input id="ct-name" className="nesio-ob-input" value={draft.name} maxLength={40} autoFocus
           placeholder={L(dict, '怎么称呼 TA', 'What you call them')} onChange={set('name')} />
 
-        {/* bug3:关系改成选 tag —— 自由填写的结果是「同事/同事们/工作同事」三种写法算三种关系 */}
-        <p className="nesio-settings-section-label" style={{ marginTop: 'var(--space-3)' }}>{L(dict, '关系', 'Relationship')}</p>
-        <div className="nesio-rel-chips" role="group" aria-label={L(dict, '关系', 'Relationship')}>
-          {relTags.map((t) => {
-            const on = (draft.relation || '') === t.zh;
-            return (
-              <button key={t.zh} type="button" aria-pressed={on}
-                className={`nesio-rel-chip${on ? ' nesio-rel-chip--on' : ''}`}
-                onClick={() => setDraft((d) => ({ ...d, relation: on ? '' : t.zh }))}>
-                {L(dict, t.zh, t.en)}
-              </button>
-            );
-          })}
-        </div>
+        {/* bug3:关系改成下拉 —— 自由填写/一排 chip 都容易写出同义异形 */}
+        <label className="nesio-settings-section-label" htmlFor="ct-relation" style={{ marginTop: 'var(--space-3)' }}>{L(dict, '关系', 'Relationship')}</label>
+        <select
+          id="ct-relation"
+          className="nesio-ob-input"
+          value={draft.relation || ''}
+          aria-label={L(dict, '关系', 'Relationship')}
+          onChange={(e) => setDraft((d) => ({ ...d, relation: e.target.value }))}
+        >
+          <option value="">{L(dict, '未指定', 'Unspecified')}</option>
+          {relTags.map((t) => (
+            <option key={t.zh} value={t.zh}>{L(dict, t.zh, t.en)}</option>
+          ))}
+        </select>
 
         <label className="nesio-settings-section-label" htmlFor="ct-email" style={{ marginTop: 'var(--space-3)' }}>{L(dict, '邮箱', 'Email')}</label>
         <div className="nesio-ct-field-row">

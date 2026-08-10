@@ -17,7 +17,7 @@ import NesioSheet from './ui/NesioSheet';
 import Button from '@/components/portal/ui/Button';
 import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { relativePastLabel } from '@/lib/portal/time-labels';
-import { IconMapPin, IconClock, IconCamera, IconNote, IconBox, IconPlus, IconUpload, IconHanger, IconUtensils, IconFile } from './icons';
+import { IconMapPin, IconClock, IconCamera, IconNote, IconBox, IconPlus, IconUpload, IconHanger, IconUtensils, IconFile, IconTrendingUp, IconGift, IconCard } from './icons';
 import LocationPicker from './LocationPicker';
 import { importInventoryCsv } from '@/lib/portal/inventory-import';
 import { useRef } from 'react';
@@ -200,6 +200,7 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
     [items],
   );
   const amazonCount = useMemo(() => items.filter((i) => i.isAmazon).length, [items]);
+  const sellCount = useMemo(() => sellPile(items).items.length, [items]);
   /** 容器页:房间 › 容器 › 嵌套(location 里 LOC_SEP 分段) */
   type PlaceNode = { name: string; count: number; space: string; path: string; queryHint: string; children: PlaceNode[] };
   const containerTree = useMemo(() => {
@@ -439,7 +440,7 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
 
         {/* page · 总览:KPI + 入口(去重文案/统一按钮) */}
         {isPage && view === 'list' && pageTab === 'overview' && (
-          <div className="nesio-inv-overview" style={{ maxHeight: 'min(70vh, 640px)', overflowY: 'auto', paddingBottom: 'var(--space-4)' }}>
+          <div className="nesio-inv-overview" style={{ overflowY: 'auto', paddingBottom: 'var(--space-4)' }}>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 'var(--space-2)' }}>
               <Button type="button" variant="soft" size="sm" pill={false} aria-label={L(dict, '记一件', 'Add one')}
                 onClick={() => { resetForm(); setView('add'); }}
@@ -451,49 +452,69 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
                 iconLeft={<IconUpload size={18} />} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-              <Button type="button" variant="soft" size="sm" full onClick={() => setPageTab('items')}
-                iconLeft={<IconBox size={18} />}>
+              <Button type="button" variant="secondary" size="sm" full
+                aria-label={L(dict, '物品', 'Items')}
+                onClick={() => setPageTab('items')}
+                iconLeft={<IconBox size={16} />}>
                 {st.count}
               </Button>
-              <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)', textAlign: 'center' }}>
-                <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>$</span>
-                <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{Math.round(st.totalValue).toLocaleString('en-US')}</span>
-              </div>
-              <Button type="button" variant="secondary" size="sm" full onClick={() => { setGroupFilter(UNPLACED); setPageTab('items'); }}
-                iconLeft={<IconMapPin size={18} />}>
+              <Button type="button" variant="secondary" size="sm" full
+                aria-label={L(dict, '估值', 'Value')}
+                onClick={() => setView('stats')}
+                iconLeft={<span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>$</span>}>
+                {Math.round(st.totalValue).toLocaleString('en-US')}
+              </Button>
+              <Button type="button" variant="secondary" size="sm" full
+                aria-label={L(dict, '未归位', 'Unplaced')}
+                onClick={() => { setGroupFilter(UNPLACED); setPageTab('items'); }}
+                iconLeft={<IconMapPin size={16} />}>
                 <span style={unplacedCount > 0 ? { color: 'var(--status-gentle)' } : undefined}>{unplacedCount}</span>
               </Button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 'var(--space-3)' }}>
               {wardrobeCount > 0 && (
-                <Button type="button" variant="secondary" size="sm" full onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab: 'wardrobe' } })); }}
+                <Button type="button" variant="secondary" size="sm" full
+                  aria-label={L(dict, '衣橱', 'Wardrobe')}
+                  onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab: 'wardrobe' } })); }}
                   iconLeft={<IconHanger size={16} />}>
                   {wardrobeCount}
                 </Button>
               )}
               {pantryCount > 0 && (
-                <Button type="button" variant="secondary" size="sm" full onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-cooking')); }}
+                <Button type="button" variant="secondary" size="sm" full
+                  aria-label={L(dict, '食材', 'Pantry')}
+                  onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-cooking')); }}
                   iconLeft={<IconUtensils size={16} />}>
                   {pantryCount}
                 </Button>
               )}
               {filesCount > 0 && (
-                <Button type="button" variant="secondary" size="sm" full onClick={() => { setCategoryFilter('文件'); setQuery(''); setGroupFilter(ALL); setPageTab('items'); }}
+                <Button type="button" variant="secondary" size="sm" full
+                  aria-label={L(dict, '文件', 'Files')}
+                  onClick={() => { setCategoryFilter('文件'); setQuery(''); setGroupFilter(ALL); setPageTab('items'); }}
                   iconLeft={<IconFile size={16} />}>
                   {filesCount}
                 </Button>
               )}
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <Button type="button" variant="primary" size="sm" full
-                onClick={() => { setView('flip'); }}>
-                {L(dict, `亚马逊${amazonCount ? ` · ${amazonCount}` : ''}`, `Amazon${amazonCount ? ` · ${amazonCount}` : ''}`)}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 'var(--space-3)' }}>
+              <Button type="button" variant="secondary" size="sm" full
+                aria-label={L(dict, '亚马逊', 'Amazon')}
+                onClick={() => { setView('flip'); }}
+                iconLeft={<IconCard size={16} />}>
+                {amazonCount}
               </Button>
-              <Button type="button" variant="secondary" size="sm" full onClick={() => setView('stats')}>
-                {L(dict, '统计', 'Stats')}
+              <Button type="button" variant="secondary" size="sm" full
+                aria-label={L(dict, '统计', 'Stats')}
+                onClick={() => setView('stats')}
+                iconLeft={<IconTrendingUp size={16} />}>
+                {st.byCategory.length}
               </Button>
-              <Button type="button" variant="secondary" size="sm" full onClick={() => setView('sell')}>
-                {L(dict, '卖闲置', 'Sell pile')}
+              <Button type="button" variant="secondary" size="sm" full
+                aria-label={L(dict, '卖闲置', 'Sell pile')}
+                onClick={() => setView('sell')}
+                iconLeft={<IconGift size={16} />}>
+                {sellCount}
               </Button>
             </div>
             {importMsg && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', textAlign: 'center' }}>{importMsg}</p>}
@@ -540,7 +561,7 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
             );
           };
           return (
-            <div style={{ maxHeight: 'min(70vh, 640px)', overflowY: 'auto' }}>
+            <div style={{ overflowY: 'auto' }}>
               {unplacedCount > 0 && (
                 <Button type="button" variant="secondary" size="sm" full align="between" onClick={() => { setGroupFilter(UNPLACED); setPageTab('items'); }}
                   layoutStyle={{ marginBottom: 8 }}>
@@ -642,7 +663,7 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
                   : L(dict, '还没有物品。点右上角 ＋ 记一件,或用「拍一下」识别。', 'No items yet. Tap ＋ to add one, or snap a photo to recognize.')}
               </p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: isPage ? 'min(70vh, 640px)' : '44vh', overflowY: 'auto', paddingBottom: 4 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: isPage ? undefined : '44vh', overflowY: 'auto', flex: isPage ? 1 : undefined, paddingBottom: 4 }}>
                 {visible.map((i) => {
                   const exp = expiryStatus(i);
                   const src = i.node.source === 'photo' ? L(dict, '拍照', 'Photo') : i.node.source === 'email' ? L(dict, '邮件', 'Email') : L(dict, '手记', 'Note');

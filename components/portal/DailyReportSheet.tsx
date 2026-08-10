@@ -80,9 +80,10 @@ export default function DailyReportSheet({
         {report.sections.map((s) => {
           const SectionIcon = SECTION_ICON[s.id];
           return (
-            <div key={s.id} className="nesio-drsheet-section">
+            <div key={s.id} className={`nesio-drsheet-section nesio-drsheet-section--${s.id}`}>
               <p className="nesio-drsheet-h">
-                <SectionIcon size={15} /> {s.title}
+                <span className="nesio-drsheet-h-ico" aria-hidden><SectionIcon size={15} /></span>
+                {s.title}
               </p>
               <ul className="nesio-drsheet-ul">
                 {s.lines.map((line, i) => <li key={i}>{line}</li>)}

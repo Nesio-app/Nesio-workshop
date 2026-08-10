@@ -188,6 +188,15 @@ function extractExpiryFromText(text: string): string {
   return parseDateParts(y, mo, d);
 }
 
+function noteFromAnalyzed(n: AnalyzedNode, summary = ''): string {
+  const a = n.attributes || {};
+  const candidates = [a.note, a.description, a.summary, a.detail, a.text, summary];
+  for (const c of candidates) {
+    if (typeof c === 'string' && c.trim()) return c.trim().slice(0, 500);
+  }
+  return '';
+}
+
 function toEditedNodes(nodes: AnalyzedNode[], summary = ''): EditedNode[] {
   const kept = nodes.filter((n) => !NON_ITEM_RE.test((n.name || '').trim()));
   const usable = kept.length ? kept : nodes; // 全被滤光就保底不丢
@@ -200,7 +209,7 @@ function toEditedNodes(nodes: AnalyzedNode[], summary = ''): EditedNode[] {
     return {
       ...n,
       tags: n.tags ?? [],
-      note: '',
+      note: noteFromAnalyzed(n, summary),
       expiry: extractExpiryFromText(attrExpiry ? `有效期 ${attrExpiry}` : '') || attrExpiry || summaryExpiry || '',
       price,
       deleted: false,
@@ -1023,7 +1032,8 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype,
       for (const sn of savedNodes) updateLifeNode(sn.id, { createdAt: takenAt });
     }
 
-    // 批次 23 + A3:照片压缩存本机 IndexedDB 并挂 node.assets —— 失败必须抛出让 UI 可见。
+    // 批次 23 + A3:照片压缩存本机 IndexedDB 并挂 node.assets —— 失败不整单回滚。
+    // 节点与识别备注已写入;挂图失败只提示补图,避免「存入失败」掩盖已落库的文案。
     // 与 capture-pipeline 同构(本机 + Storage + memory_assets),换端才能看见图。
     if (savedNodes.length > 0) {
       const dataUrl = sourceFile
@@ -1037,14 +1047,17 @@ export default function CameraSheet({ open, onClose, initialFile, intakeSubtype,
         kind: 'memory',
         label: result?.summary || savedNodes[0].name,
       });
-      if (!persisted) throw new Error('photo_idb_failed');
-      // 批次 87(用户批准「以图搜图」):存图顺手算 dHash 指纹入索引
-      void import('@/lib/portal/image-hash')
-        .then(async ({ computeDHash, saveImageHash }) => {
-          const h = await computeDHash(dataUrl);
-          if (h) saveImageHash(savedNodes[0].id, h);
-        })
-        .catch(() => {});
+      if (!persisted) {
+        setError(L(dict, '文字已记下;照片没挂上,可再点「存入记忆」补图。', 'Notes saved; photo did not attach — tap Save again to attach it.'));
+      } else {
+        // 批次 87(用户批准「以图搜图」):存图顺手算 dHash 指纹入索引
+        void import('@/lib/portal/image-hash')
+          .then(async ({ computeDHash, saveImageHash }) => {
+            const h = await computeDHash(dataUrl);
+            if (h) saveImageHash(savedNodes[0].id, h);
+          })
+          .catch(() => {});
+      }
     }
 
     // 批次 63:照片带 EXIF 坐标 → 按**拍摄时间**记进足迹(扩充时间线),
