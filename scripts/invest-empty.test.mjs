@@ -34,6 +34,8 @@ const { investEmptyReason } = mod.exports;
   // 有持仓但账户数为 0(账户表没同步下来)—— 仍然不是空态,别把有数据的页面判成空
   assert.equal(investEmptyReason({ holdingCount: 5, investAccountCount: 0 }), 'none',
     '手上有持仓就不是空态,哪怕账户表这次没下来');
+  assert.equal(investEmptyReason({ holdingCount: 0, investAccountCount: 2, hasAccountBalance: true }), 'none',
+    '无持仓明细但有账户余额 → 不算纯空');
 
   // 脏输入不许抛,也不许算出第四种
   for (const bad of [
@@ -75,9 +77,9 @@ const { investEmptyReason } = mod.exports;
 {
   const pane = stripComments(read('components/portal/finance/InvestPane.tsx'));
   // 用户实测时看到的**整个页面**就是这一句。没有价格的时候谈价格的口径,
-  // 是噪音,不是诚实。
-  assert.match(pane, /emptyReason === 'none' && \(\s*\n?\s*<p className="nesio-fin-alert-note"[\s\S]{0,200}价格是上次同步的快照/,
-    '那句「价格是上次同步的快照」只在真有持仓时说 —— 一屏空白配一句它,正是用户截图上的样子');
+  // 是噪音,不是诚实。有持仓或有可展示账户余额时才说。
+  assert.match(pane, /\(emptyReason === 'none' \|\| cashOnlyAccounts\.length > 0\) && \(\s*\n?\s*<p className="nesio-fin-alert-note"[\s\S]{0,200}价格是上次同步的快照/,
+    '那句「价格是上次同步的快照」只在真有持仓/余额时说 —— 一屏空白配一句它,正是用户截图上的样子');
 }
 
 console.log('invest-empty: OK(三种空因分得开 / 各自给下一步 / 不替券商断言 / 空的时候不谈价格口径)');

@@ -31,6 +31,7 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
       ok?: boolean; error?: string; pendingItems?: number; authoritative?: boolean;
       transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>;
       removedIds?: string[]; accounts?: unknown[]; holdings?: unknown[];
+      holdingsAccountIds?: string[];
       relinkIndexes?: number[];
       investments?: { accounts?: number; holdings?: number; transactions?: number; error?: string };
     };
@@ -45,8 +46,11 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
       // (逻辑审计 #10:旧顺序下孤儿要等下个周期,且兜底会无限复活死数据)。
       bank.saveBankAccounts(data.accounts as Array<{ id: string; name: string; currency: string }>, { replace: data.authoritative === true });
     }
-    if (Array.isArray(data.holdings) && data.holdings.length) {
-      bank.saveHoldings(data.holdings as never); // 财务㉗:持仓快照,非空才替换
+    // 持仓:有 covered 账户列表时即使空数组也要按户替换(真清空);否则仅非空才写(兼容旧响应)。
+    if (Array.isArray(data.holdingsAccountIds)) {
+      bank.saveHoldings((data.holdings || []) as never, { coveredAccountIds: data.holdingsAccountIds });
+    } else if (Array.isArray(data.holdings) && data.holdings.length) {
+      bank.saveHoldings(data.holdings as never);
     }
     // P2 尾巴:Plaid 官方定期流(订阅页并集展示)。字段缺席 = 本次拉取失败,保留上次好数据;
     // 字段存在(含空数组)= 真实结果,照存(全取消也是事实)。

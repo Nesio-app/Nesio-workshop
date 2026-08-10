@@ -8,7 +8,7 @@
  * 而空的原因有三种,三个完全不同的下一步:
  *   · no-account  —— 压根没连投资账户 → 去连一个券商
  *   · no-holdings —— 连了,但这次没取到持仓 → 去同步一次
- *   · none        —— 有持仓,不是空态
+ *   · none        —— 有持仓或可展示的账户余额,不是空态
  *
  * 中间那一种是这里最要小心的:「没同步到」和「这个账户里真的没有持仓」
  * 我们**分不出来**。分不出来就如实说分不出来,不替券商断言 ——
@@ -22,11 +22,13 @@ export interface InvestEmptyInput {
   holdingCount: number;
   /** 被判成「投资账户」的账户数。 */
   investAccountCount: number;
+  /** 无持仓明细但账户有可计入余额时,不算纯空。 */
+  hasAccountBalance?: boolean;
 }
 
 export function investEmptyReason(input: InvestEmptyInput): InvestEmptyReason {
   const holdings = Math.max(0, Math.trunc(Number(input.holdingCount) || 0));
   const accounts = Math.max(0, Math.trunc(Number(input.investAccountCount) || 0));
-  if (holdings > 0) return 'none';
+  if (holdings > 0 || input.hasAccountBalance) return 'none';
   return accounts === 0 ? 'no-account' : 'no-holdings';
 }

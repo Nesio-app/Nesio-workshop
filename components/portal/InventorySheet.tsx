@@ -14,6 +14,7 @@ import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
+import Button from '@/components/portal/ui/Button';
 import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { IconMapPin, IconClock, IconCamera, IconNote, IconBox, IconPlus, IconUpload, IconHanger, IconUtensils, IconFile } from './icons';
@@ -345,12 +346,6 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
   };
 
   const label: React.CSSProperties = { display: 'block', fontSize: 'var(--text-xs)', color: 'var(--text-secondary)', margin: 'var(--space-3) 0 var(--space-1)' };
-  const chip = (active: boolean): React.CSSProperties => ({
-    padding: 'var(--space-1) var(--space-3)', borderRadius: 999, fontSize: 'var(--text-sm)', whiteSpace: 'nowrap',
-    border: `1px solid ${active ? 'var(--accent-primary, #5b8cff)' : 'var(--portal-line)'}`,
-    background: active ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent',
-    color: active ? 'var(--text-primary)' : 'var(--text-secondary)',
-  });
 
   const onImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
@@ -401,38 +396,44 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
             <div className="nesio-inv-stats">
               <span className="nesio-inv-stat">{st.count} {L(dict, '件物品', 'items')}</span>
               {wardrobeCount > 0 && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   className="nesio-inv-stat nesio-inv-pantry-link"
                   onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab: 'wardrobe' } })); }}
                 >
                   {L(dict, `${wardrobeCount} 件衣橱`, `${wardrobeCount} in wardrobe`)}
-                </button>
+                </Button>
               )}
               {pantryCount > 0 && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   className="nesio-inv-stat nesio-inv-pantry-link"
                   onClick={() => { onClose(); window.dispatchEvent(new CustomEvent('nesio-open-cooking')); }}
                 >
                   {L(dict, `${pantryCount} 件食材`, `${pantryCount} ingredients`)}
-                </button>
+                </Button>
               )}
               {filesCount > 0 && (
-                <button
+                <Button
                   type="button"
+                  variant="ghost"
+                  size="sm"
                   className="nesio-inv-stat nesio-inv-pantry-link"
                   onClick={() => { setCategoryFilter('文件'); setQuery(''); setGroupFilter(ALL); }}
                 >
                   {L(dict, `${filesCount} 件文件`, `${filesCount} files`)}
-                </button>
+                </Button>
               )}
             </div>
           ) : <span />}
           {!isPage || view !== 'list' ? (
-            <button type="button" className="nesio-freeze-close nesio-inv-close" onClick={view === 'list' ? onClose : () => { setView('list'); setDetailId(null); }}>
+            <Button type="button" variant="ghost" size="sm" className="nesio-freeze-close nesio-inv-close" onClick={view === 'list' ? onClose : () => { setView('list'); setDetailId(null); }}>
               {view === 'list' ? '✕' : '‹'}
-            </button>
+            </Button>
           ) : <span />}
         </div>
 
@@ -440,64 +441,60 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
         {isPage && view === 'list' && pageTab === 'overview' && (
           <div className="nesio-inv-overview" style={{ maxHeight: 'min(70vh, 640px)', overflowY: 'auto', paddingBottom: 'var(--space-4)' }}>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 'var(--space-2)' }}>
-              <button type="button" aria-label={L(dict, '记一件', 'Add one')}
+              <Button type="button" variant="soft" size="sm" pill={false} aria-label={L(dict, '记一件', 'Add one')}
                 onClick={() => { resetForm(); setView('add'); }}
-                style={{ width: 36, height: 36, borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-ink)', display: 'grid', placeItems: 'center' }}>
-                <IconPlus size={18} />
-              </button>
-              <button type="button" aria-label={L(dict, '导入 CSV', 'Import CSV')}
+                layoutStyle={{ width: 36, height: 36 }}
+                iconLeft={<IconPlus size={18} />} />
+              <Button type="button" variant="secondary" size="sm" pill={false} aria-label={L(dict, '导入 CSV', 'Import CSV')}
                 onClick={() => fileRef.current?.click()}
-                style={{ width: 36, height: 36, borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', display: 'grid', placeItems: 'center' }}>
-                <IconUpload size={18} />
-              </button>
+                layoutStyle={{ width: 36, height: 36 }}
+                iconLeft={<IconUpload size={18} />} />
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
-              <button type="button" onClick={() => setPageTab('items')}
-                style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)', background: 'var(--portal-accent-soft)', color: 'var(--portal-ink)', textAlign: 'center' }}>
-                <IconBox size={18} />
-                <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums', marginTop: 4 }}>{st.count}</span>
-              </button>
+              <Button type="button" variant="soft" size="sm" full onClick={() => setPageTab('items')}
+                iconLeft={<IconBox size={18} />}>
+                {st.count}
+              </Button>
               <div style={{ borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', padding: 'var(--space-3)', textAlign: 'center' }}>
                 <span style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>$</span>
                 <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{Math.round(st.totalValue).toLocaleString('en-US')}</span>
               </div>
-              <button type="button" onClick={() => { setGroupFilter(UNPLACED); setPageTab('items'); }}
-                style={{ borderRadius: 'var(--radius-md)', border: `1px solid ${unplacedCount > 0 ? 'var(--status-gentle)' : 'var(--portal-line)'}`, padding: 'var(--space-3)', background: unplacedCount > 0 ? 'var(--status-gentle-soft)' : 'transparent', color: 'var(--portal-ink)', textAlign: 'center' }}>
-                <IconMapPin size={18} />
-                <span style={{ display: 'block', fontSize: 'var(--text-h2)', fontWeight: 700, fontVariantNumeric: 'tabular-nums', marginTop: 4, ...(unplacedCount > 0 ? { color: 'var(--status-gentle)' } : {}) }}>{unplacedCount}</span>
-              </button>
+              <Button type="button" variant="secondary" size="sm" full onClick={() => { setGroupFilter(UNPLACED); setPageTab('items'); }}
+                iconLeft={<IconMapPin size={18} />}>
+                <span style={unplacedCount > 0 ? { color: 'var(--status-gentle)' } : undefined}>{unplacedCount}</span>
+              </Button>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 'var(--space-3)' }}>
               {wardrobeCount > 0 && (
-                <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab: 'wardrobe' } })); }}
-                  style={{ ...chip(false), padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                  <IconHanger size={16} /><span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{wardrobeCount}</span>
-                </button>
+                <Button type="button" variant="secondary" size="sm" full onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-insights', { detail: { tab: 'wardrobe' } })); }}
+                  iconLeft={<IconHanger size={16} />}>
+                  {wardrobeCount}
+                </Button>
               )}
               {pantryCount > 0 && (
-                <button type="button" onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-cooking')); }}
-                  style={{ ...chip(false), padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                  <IconUtensils size={16} /><span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{pantryCount}</span>
-                </button>
+                <Button type="button" variant="secondary" size="sm" full onClick={() => { window.dispatchEvent(new CustomEvent('nesio-open-cooking')); }}
+                  iconLeft={<IconUtensils size={16} />}>
+                  {pantryCount}
+                </Button>
               )}
               {filesCount > 0 && (
-                <button type="button" onClick={() => { setCategoryFilter('文件'); setQuery(''); setGroupFilter(ALL); setPageTab('items'); }}
-                  style={{ ...chip(false), padding: 'var(--space-2)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                  <IconFile size={16} /><span style={{ fontVariantNumeric: 'tabular-nums', fontWeight: 700 }}>{filesCount}</span>
-                </button>
+                <Button type="button" variant="secondary" size="sm" full onClick={() => { setCategoryFilter('文件'); setQuery(''); setGroupFilter(ALL); setPageTab('items'); }}
+                  iconLeft={<IconFile size={16} />}>
+                  {filesCount}
+                </Button>
               )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%' }}
+              <Button type="button" variant="primary" size="sm" full
                 onClick={() => { setView('flip'); }}>
                 {L(dict, `亚马逊${amazonCount ? ` · ${amazonCount}` : ''}`, `Amazon${amazonCount ? ` · ${amazonCount}` : ''}`)}
-              </button>
-              <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', background: 'transparent', color: 'var(--portal-ink)', border: '1px solid var(--portal-line)' }} onClick={() => setView('stats')}>
+              </Button>
+              <Button type="button" variant="secondary" size="sm" full onClick={() => setView('stats')}>
                 {L(dict, '统计', 'Stats')}
-              </button>
-              <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', background: 'transparent', color: 'var(--portal-ink)', border: '1px solid var(--portal-line)' }} onClick={() => setView('sell')}>
+              </Button>
+              <Button type="button" variant="secondary" size="sm" full onClick={() => setView('sell')}>
                 {L(dict, '卖闲置', 'Sell pile')}
-              </button>
+              </Button>
             </div>
             {importMsg && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', textAlign: 'center' }}>{importMsg}</p>}
             {st.byCategory.length > 0 && <InventoryCategoryPie rows={st.byCategory} dict={dict} />}
@@ -513,32 +510,26 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
               <div key={node.path}>
                 <div style={{ display: 'flex', alignItems: 'stretch', marginLeft: depth * 12, gap: 4 }}>
                   {hasKids ? (
-                    <button type="button" aria-expanded={open} aria-label={open ? L(dict, '收起', 'Collapse') : L(dict, '展开', 'Expand')}
+                    <Button type="button" variant="ghost" size="sm" pill={false} aria-expanded={open} aria-label={open ? L(dict, '收起', 'Collapse') : L(dict, '展开', 'Expand')}
                       onClick={() => setTreeOpen((prev) => {
                         const next = new Set(prev);
                         if (next.has(node.path)) next.delete(node.path);
                         else next.add(node.path);
                         return next;
                       })}
-                      style={{ width: 28, border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-sm)', background: 'transparent', color: 'var(--portal-muted)', cursor: 'pointer' }}>
+                      layoutStyle={{ width: 28, minWidth: 28 }}>
                       {open ? '▾' : '›'}
-                    </button>
+                    </Button>
                   ) : <span style={{ width: 28 }} />}
-                  <button type="button"
+                  <Button type="button" variant={depth === 0 ? 'soft' : 'secondary'} size="sm" full align="between"
                     onClick={() => {
                       setGroupFilter(node.space);
                       setQuery(node.queryHint);
                       setPageTab('items');
-                    }}
-                    style={{
-                      flex: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center', textAlign: 'left',
-                      padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-md)',
-                      border: '1px solid var(--portal-line)', background: depth === 0 ? 'var(--portal-accent-soft)' : 'transparent',
-                      color: 'var(--portal-ink)',
                     }}>
                     <span style={{ fontWeight: depth === 0 ? 600 : 500 }}>{node.name}</span>
                     <span style={{ fontVariantNumeric: 'tabular-nums', color: 'var(--portal-muted)' }}>{node.count}</span>
-                  </button>
+                  </Button>
                 </div>
                 {hasKids && open && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
@@ -551,11 +542,11 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
           return (
             <div style={{ maxHeight: 'min(70vh, 640px)', overflowY: 'auto' }}>
               {unplacedCount > 0 && (
-                <button type="button" onClick={() => { setGroupFilter(UNPLACED); setPageTab('items'); }}
-                  style={{ width: '100%', textAlign: 'left', marginBottom: 8, padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--status-gentle)', background: 'var(--status-gentle-soft)', color: 'var(--portal-ink)' }}>
+                <Button type="button" variant="secondary" size="sm" full align="between" onClick={() => { setGroupFilter(UNPLACED); setPageTab('items'); }}
+                  layoutStyle={{ marginBottom: 8 }}>
                   <span style={{ fontWeight: 600 }}>{L(dict, '未归位', 'Unplaced')}</span>
-                  <span style={{ float: 'right', fontVariantNumeric: 'tabular-nums' }}>{unplacedCount}</span>
-                </button>
+                  <span style={{ fontVariantNumeric: 'tabular-nums' }}>{unplacedCount}</span>
+                </Button>
               )}
               {containerTree.length === 0 ? (
                 <p className="nesio-freeze-empty" style={{ padding: 'var(--space-6) 0', textAlign: 'center', color: 'var(--text-tertiary)' }}>
@@ -577,19 +568,17 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
                 className="nesio-ob-input"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
-                placeholder={L(dict, '搜物品 / 位置…', 'Search items / locations…')}
+                placeholder=""
                 style={{ flex: 1, margin: 0 }}
               />
-              <button type="button" aria-label={L(dict, '记一件', 'Add one')}
+              <Button type="button" variant="soft" size="sm" pill={false} aria-label={L(dict, '记一件', 'Add one')}
                 onClick={() => { resetForm(); setView('add'); }}
-                style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-accent-border)', background: 'var(--portal-accent-soft)', color: 'var(--portal-ink)', display: 'grid', placeItems: 'center' }}>
-                <IconPlus size={18} />
-              </button>
-              <button type="button" aria-label={L(dict, '导入 CSV', 'Import CSV')}
+                layoutStyle={{ flexShrink: 0, width: 36, height: 36 }}
+                iconLeft={<IconPlus size={18} />} />
+              <Button type="button" variant="secondary" size="sm" pill={false} aria-label={L(dict, '导入 CSV', 'Import CSV')}
                 onClick={() => fileRef.current?.click()}
-                style={{ flexShrink: 0, width: 36, height: 36, borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)', display: 'grid', placeItems: 'center' }}>
-                <IconUpload size={18} />
-              </button>
+                layoutStyle={{ flexShrink: 0, width: 36, height: 36 }}
+                iconLeft={<IconUpload size={18} />} />
             </div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: 'var(--space-1) 0 var(--space-2)' }}>
               <select
@@ -712,14 +701,16 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
           // 批次 179:键盘弹起时底部让出 --kb-inset,焦点输入可滚到键盘上方(修物品表单键盘漂移)
           <div style={{ maxHeight: '58vh', overflowY: 'auto', paddingBottom: 'var(--kb-inset, 0px)' }}>
             {/* 物品⑤:从商品页复制标题/描述,一键识别预填 */}
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
+              full
               disabled={pasteBusy}
-              style={{ width: '100%', padding: 'var(--space-2)', borderRadius: 10, border: '1px dashed var(--border-subtle, rgba(255,255,255,0.2))', background: 'transparent', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)', opacity: pasteBusy ? 0.6 : 1 }}
               onClick={pasteRecognize}
             >
               {pasteBusy ? L(dict, '识别中…', 'Recognizing…') : L(dict, '粘贴商品信息识别(商品标题/描述都行)', 'Paste product info to auto-fill')}
-            </button>
+            </Button>
             {pasteMsg && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', textAlign: 'center' }}>{pasteMsg}</p>}
             <label style={label}>{L(dict, '物品名', 'Item name')}</label>
             <input className="nesio-ob-input" value={fName} onChange={(e) => setFName(e.target.value)} placeholder={L(dict, '例:护照、备用钥匙、维生素 D3', 'e.g. passport, spare keys, vitamin D3')} />
@@ -780,9 +771,10 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
             <input className="nesio-ob-input" value={fTags} onChange={(e) => setFTags(e.target.value)} placeholder="" />
             <label style={label}>{L(dict, '备注(可选)', 'Note (optional)')}</label>
             <input className="nesio-ob-input" value={fNote} onChange={(e) => setFNote(e.target.value)} placeholder={L(dict, '例:被压在护手霜下面', 'e.g. under the hand cream')} />
-            <button type="button" className="nesio-freeze-primary-btn" style={{ width: '100%', marginTop: 'var(--space-4)', opacity: fName.trim() ? 1 : 0.5 }} disabled={!fName.trim()} onClick={submitAdd}>
+            <Button type="button" variant="primary" size="sm" full disabled={!fName.trim()} onClick={submitAdd}
+              layoutStyle={{ marginTop: 'var(--space-4)' }}>
               {L(dict, '存进收纳', 'Save to storage')}
-            </button>
+            </Button>
           </div>
         )}
 
@@ -873,10 +865,10 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
                         <span style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>{i.price != null ? `$${(i.price * (i.quantity && i.quantity > 0 ? i.quantity : 1)).toLocaleString('en-US')}` : L(dict, '未估值', 'no est.')}</span>
                       </button>
                       {/* 物品⑥:一键复制转卖文案(纯模板),贴去闲鱼/FB Marketplace */}
-                      <button type="button" onClick={() => copyListing(i)}
-                        style={{ flexShrink: 0, padding: '0 var(--space-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: copiedId === i.id ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: copiedId === i.id ? 'var(--text-primary)' : 'var(--text-secondary)', fontSize: 'var(--text-xs)', whiteSpace: 'nowrap' }}>
+                      <Button type="button" variant={copiedId === i.id ? 'soft' : 'secondary'} size="sm" onClick={() => copyListing(i)}
+                        layoutStyle={{ flexShrink: 0 }}>
                         {copiedId === i.id ? `✓ ${L(dict, '已复制', 'Copied')}` : L(dict, '复制文案', 'Copy ad')}
-                      </button>
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -960,35 +952,24 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
   );
 
   if (isPage) {
-    const pageTabs: Array<{ id: typeof pageTab; zh: string; en: string }> = [
-      { id: 'overview', zh: '总览', en: 'Overview' },
-      { id: 'containers', zh: '容器', en: 'Bins' },
-      { id: 'items', zh: '列表', en: 'List' },
-    ];
     return (
       <div className="nesio-inv-page nesio-analytics-tab">
         {(view === 'list' || view === 'stats' || view === 'sell' || view === 'flip') && (
-          <div className="nesio-inv-page-tabs" role="tablist" aria-label={L(dict, '物品分区', 'Inventory sections')}
-            style={{ display: 'flex', gap: 6, marginBottom: 'var(--space-3)' }}>
-            {pageTabs.map((t) => (
-              <button
-                key={t.id}
-                type="button"
-                role="tab"
-                aria-selected={pageTab === t.id && view === 'list'}
-                className={pageTab === t.id && view === 'list' ? 'is-on' : undefined}
-                onClick={() => { setPageTab(t.id); setView('list'); setDetailId(null); }}
-                style={{
-                  flex: 1, padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-pill)',
-                  border: `1px solid ${pageTab === t.id && view === 'list' ? 'var(--portal-accent-border)' : 'var(--portal-line)'}`,
-                  background: pageTab === t.id && view === 'list' ? 'var(--portal-accent-soft)' : 'transparent',
-                  color: 'var(--portal-ink)', fontSize: 'var(--text-sm)', fontWeight: 600,
-                }}
-              >
-                {L(dict, t.zh, t.en)}
-              </button>
-            ))}
-          </div>
+          <select
+            className="nesio-ob-input"
+            aria-label={L(dict, '物品分区', 'Inventory sections')}
+            value={pageTab}
+            onChange={(e) => {
+              setPageTab(e.target.value as typeof pageTab);
+              setView('list');
+              setDetailId(null);
+            }}
+            style={{ marginBottom: 'var(--space-3)' }}
+          >
+            <option value="overview">{L(dict, '总览', 'Overview')}</option>
+            <option value="containers">{L(dict, '容器', 'Bins')}</option>
+            <option value="items">{L(dict, '列表', 'List')}</option>
+          </select>
         )}
         {body}
       </div>
@@ -1062,12 +1043,9 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
   const claimDate = orderedAt || arrivedAt || new Date().toISOString().slice(0, 10);
 
   const chip = (on: boolean, toggle: () => void, text: string) => (
-    <button type="button" onClick={toggle} style={{
-      padding: 'var(--space-1) var(--space-3)', borderRadius: 'var(--radius-pill, 999px)', fontSize: 'var(--text-xs)',
-      border: '1px solid var(--portal-accent-border)', cursor: 'pointer',
-      background: on ? 'var(--status-go-soft)' : 'transparent',
-      color: on ? 'var(--status-go)' : 'var(--portal-muted)', fontWeight: on ? 600 : 400,
-    }}>{on ? '✓ ' : ''}{text}</button>
+    <Button type="button" variant={on ? 'soft' : 'ghost'} size="sm" onClick={toggle}>
+      {on ? `✓ ${text}` : text}
+    </Button>
   );
 
   const assets = useMemo(() => {
@@ -1219,10 +1197,10 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
       <label style={label}>{L(dict, '照片 / 文件', 'Photos / files')}</label>
       <input ref={attachRef} type="file" accept="image/*,.pdf,.doc,.docx,.txt,.csv" multiple className="nesio-visually-hidden"
         onChange={(e) => { void onAttachFiles(e.target.files); e.currentTarget.value = ''; }} />
-      <button type="button" disabled={attachBusy} className="nesio-ob-input" style={{ textAlign: 'center', cursor: 'pointer' }}
+      <Button type="button" variant="secondary" size="sm" full disabled={attachBusy}
         onClick={() => attachRef.current?.click()}>
         {attachBusy ? L(dict, '正在存…', 'Saving…') : L(dict, '添加照片或文件', 'Add photo or file')}
-      </button>
+      </Button>
       {attachErr && <p role="alert" style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-risk)' }}>{attachErr}</p>}
       {assets.length > 0 && (
         <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -1246,15 +1224,17 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
       )}
 
       {/* ── 亚马逊转卖(flip)追踪:订单/返现/留评/转卖/利润 —— 对应用户 Notion 表 ── */}
-      <button
+      <Button
         type="button"
+        variant={amzOpen ? 'soft' : 'secondary'}
+        size="sm"
+        full
+        align="start"
         onClick={() => setAmzOpen((v) => !v)}
-        style={{ width: '100%', marginTop: 'var(--space-4)', padding: 'var(--space-2) var(--space-3)', borderRadius: 10, textAlign: 'left', fontWeight: 600,
-          border: '1px solid var(--portal-accent-border)', background: amzOpen ? 'var(--portal-accent-soft)' : 'transparent',
-          color: 'var(--portal-accent)', fontSize: 'var(--text-sm)' }}
+        layoutStyle={{ marginTop: 'var(--space-4)' }}
       >
         {amzOpen ? '▾' : '▸'} {L(dict, '亚马逊转卖 · 订单/返现/利润', 'Amazon flip · order / rebate / profit')}
-      </button>
+      </Button>
       {amzOpen && (
         <div style={{ marginTop: 8 }}>
           <label style={label}>{L(dict, '订单号', 'Order #')}</label>
@@ -1307,40 +1287,50 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
         </div>
       )}
 
-      <button
+      <Button
         type="button"
-        style={{ width: '100%', marginTop: 'var(--space-4)', padding: 'var(--space-2)', borderRadius: 10, border: '1px solid var(--portal-line)', background: item.forSale ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}
+        variant={item.forSale ? 'soft' : 'secondary'}
+        size="sm"
+        full
+        layoutStyle={{ marginTop: 'var(--space-4)' }}
         onClick={() => { updateInventoryItem(item.id, { forSale: !item.forSale }); onChanged(); }}
       >
         {item.forSale ? L(dict, '已在卖闲置堆 · 点击取消', 'In sell pile · tap to remove') : L(dict, '标记出售(进卖闲置堆)', 'Mark for sale')}
-      </button>
+      </Button>
       {/* 物品④:物品本身变容器(收纳箱等);解除只摘 flag,不动已放进去的物品 */}
-      <button
+      <Button
         type="button"
-        style={{ width: '100%', marginTop: 'var(--space-2)', padding: 'var(--space-2)', borderRadius: 10, border: '1px solid var(--portal-line)', background: item.isContainer ? 'var(--accent-primary-dim, rgba(91,140,255,0.18))' : 'transparent', color: 'var(--text-primary)', fontSize: 'var(--text-sm)' }}
+        variant={item.isContainer ? 'soft' : 'secondary'}
+        size="sm"
+        full
+        layoutStyle={{ marginTop: 'var(--space-2)' }}
         onClick={() => { updateInventoryItem(item.id, { isContainer: !item.isContainer }); onChanged(); }}
       >
         {item.isContainer
           ? L(dict, `已是容器,装了 ${item.containedCount} 件 · 点击解除(不影响里面的物品)`, `It's a bin holding ${item.containedCount} · tap to unmark (contents stay)`)
           : L(dict, '变成容器(其他物品的位置就能写它)', 'Make it a bin (other items can live in it)')}
-      </button>
-      <button type="button" className="nesio-freeze-primary-btn"
-        style={{ width: '100%', marginTop: 'var(--space-2)', background: saveMsg === 'ok' ? 'var(--status-go)' : undefined }}
+      </Button>
+      <Button type="button" variant="primary" size="sm" full
+        layoutStyle={{ marginTop: 'var(--space-2)' }}
         onClick={save}>
         {saveMsg === 'ok' ? L(dict, '✓ 已保存', '✓ Saved') : L(dict, '保存', 'Save')}
-      </button>
+      </Button>
       {saveMsg === 'err' && (
         <p role="alert" style={{ margin: '0.4rem 2px 0', fontSize: 'var(--text-xs)', color: 'var(--status-risk)', textAlign: 'center' }}>
           {L(dict, '没存进去 —— 本机空间可能满了。先在设置里导出备份,或删几条旧记忆再试。', "Couldn't save — local storage may be full. Export a backup in Settings or free some space, then retry.")}
         </p>
       )}
-      <button
+      <Button
         type="button"
-        style={{ width: '100%', marginTop: 'var(--space-2)', padding: 'var(--space-2)', borderRadius: 10, border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--status-risk)', fontSize: 'var(--text-sm)' }}
+        variant="ghost"
+        size="sm"
+        tone="risk"
+        full
+        layoutStyle={{ marginTop: 'var(--space-2)' }}
         onClick={() => { if (window.confirm(L(dict, '删除这件物品?', 'Delete this item?'))) { removeInventoryItem(item.id); onDeleted(); } }}
       >
         {L(dict, '删除物品', 'Delete item')}
-      </button>
+      </Button>
     </div>
   );
 }

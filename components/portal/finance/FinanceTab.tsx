@@ -32,6 +32,7 @@ import AcctLogo from './AcctLogo';
 import InvestPane from './InvestPane';
 import NesioSheet from '../ui/NesioSheet';
 import { listManualAssets, manualNetWorth, loadNetWorthSeries, finAssetsReady, FIN_ASSETS_EVENT, type ManualAsset } from '@/lib/portal/finance-assets';
+import { listInventoryItems } from '@/lib/portal/inventory';
 import { receiptMatchCandidates, rejectPair, loadRejectedPairs } from '@/lib/portal/receipt-match';
 import { linkExpenseToBankTx, loadDomainExpenses } from '@/lib/portal/finance-sources';
 import { domainExpenseTotal, listExpenses, EXPENSES_EVENT, type Expense } from '@/lib/portal/finance-sources';
@@ -253,7 +254,7 @@ function TxSplitEditor({ txId, total, dict, contacts, onChanged }: {
   );
 }
 
-function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, trips, memoryNodes, projects, financeAssets, tx, onCategoryChanged }: {
+function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, trips, memoryNodes, projects, financeAssets, inventoryItems, tx, onCategoryChanged }: {
   txId: string;
   /** 这一笔的原额(绝对值)。分摊要拿它卡合计 —— 差一分都不存。 */
   txAmount: number;
@@ -265,6 +266,8 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, trips, memo
   memoryNodes: Array<{ id: string; name: string }>;
   projects: Project[];
   financeAssets: ManualAsset[];
+  /** 物品库(耳机等)—— assetId 自由字符串,与手动财产共用字段,id 前缀本就不撞(fin-asset- / node-)。 */
+  inventoryItems: Array<{ id: string; name: string }>;
   tx: BankTx;
   onCategoryChanged?: () => void;
 }) {
@@ -590,9 +593,23 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, trips, memo
         <select className="nesio-fin-select" value={ann.assetId || ''} aria-label={L(dict, '关联财产', 'Link an asset')}
           onChange={(e) => saveLinkField(setTxAsset, e.target.value)}>
           <option value="">{L(dict, '不关联', 'None')}</option>
-          {financeAssets.map((a) => (
-            <option key={a.id} value={a.id}>{a.name}</option>
-          ))}
+          {financeAssets.length > 0 && (
+            <optgroup label={L(dict, '手动财产', 'Manual assets')}>
+              {financeAssets.map((a) => (
+                <option key={a.id} value={a.id}>{a.name}</option>
+              ))}
+            </optgroup>
+          )}
+          {inventoryItems.length > 0 && (
+            <optgroup label={L(dict, '物品库', 'Inventory')}>
+              {inventoryItems.map((i) => (
+                <option key={i.id} value={i.id}>{i.name}</option>
+              ))}
+            </optgroup>
+          )}
+          {ann.assetId && !financeAssets.some((a) => a.id === ann.assetId) && !inventoryItems.some((i) => i.id === ann.assetId) && (
+            <option value={ann.assetId}>{ann.assetId}</option>
+          )}
         </select>
       </div>
 
@@ -655,7 +672,7 @@ export default function FinanceTab() {
   // 用户实测到的正是这个:同一个财务页在「有完整数据」和「完全空白」之间跳变。
   // (CLAUDE.md 红线:失败必须看得见,不许伪装成空。)
   const [hydrateState, setHydrateState] = useState<'loading' | 'ready' | 'error'>('loading');
-  const [quickAdd, setQuickAdd] = useState<null | { seg: 'expense' | 'income' | 'asset'; assetId?: string }>(null); // P1:全局「+」(带资产上下文)
+  const [quickAdd, setQuickAdd] = useState<null | { seg: 'asset'; assetId?: string }>(null); // 仅资产估值/更新(手记银行流水已撤)
   const [reconcileOpen, setReconcileOpen] = useState(false); // L3-b:上传 statement 对账(端上解析,不上传)
 
   useEffect(() => {
@@ -674,11 +691,17 @@ export default function FinanceTab() {
     bankDataReady().then(() => { setHydrateState('ready'); reload(); }).catch(() => setHydrateState('error'));
     // P1 竞态修复:手动资产/快照 store 水合完成的 emit 可能早于监听挂载 —— ready 后强刷一次
     finAssetsReady().then(() => setRev((r) => r + 1)).catch(() => { /* 水合失败按空处理 */ });
+    // 同步期间 accounts/tx/holdings 连发 nesio-bank-updated → 防抖,避免大表反复 setState 卡死主线程
+    let bankReloadTimer: number | null = null;
+    const reloadBankDebounced = () => {
+      if (bankReloadTimer != null) window.clearTimeout(bankReloadTimer);
+      bankReloadTimer = window.setTimeout(() => { bankReloadTimer = null; reload(); }, 180);
+    };
     // 数据搬 IDB 后:水合完成/同步后派发 nesio-bank-updated → 重读(冷启动空窗自愈)。
-    window.addEventListener('nesio-bank-updated', reload);
+    window.addEventListener('nesio-bank-updated', reloadBankDebounced);
     // Tesla 同步后派发 nesio-connectors-refreshed → 新充电花费即时进财务。
-    window.addEventListener('nesio-connectors-refreshed', reload);
-    window.addEventListener(EXPENSES_EVENT, reload);
+    window.addEventListener('nesio-connectors-refreshed', reloadBankDebounced);
+    window.addEventListener(EXPENSES_EVENT, reloadBankDebounced);
     // P1:手动资产/锚点变动 → 净值 hero 与账户页即时刷新
     const onAssets = () => setRev((r) => r + 1);
     window.addEventListener(FIN_ASSETS_EVENT, onAssets);
@@ -686,9 +709,10 @@ export default function FinanceTab() {
     const onAnn = () => setAnnRev((r) => r + 1);
     window.addEventListener(TX_ANNOTATIONS_EVENT, onAnn);
     return () => {
-      window.removeEventListener('nesio-bank-updated', reload);
-      window.removeEventListener('nesio-connectors-refreshed', reload);
-      window.removeEventListener(EXPENSES_EVENT, reload);
+      if (bankReloadTimer != null) window.clearTimeout(bankReloadTimer);
+      window.removeEventListener('nesio-bank-updated', reloadBankDebounced);
+      window.removeEventListener('nesio-connectors-refreshed', reloadBankDebounced);
+      window.removeEventListener(EXPENSES_EVENT, reloadBankDebounced);
       window.removeEventListener(FIN_ASSETS_EVENT, onAssets);
       window.removeEventListener(TX_ANNOTATIONS_EVENT, onAnn);
     };
@@ -786,6 +810,10 @@ export default function FinanceTab() {
   const txEditProjects = useMemo(() => getProjects(), [rev, annRev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const txEditFinanceAssets = useMemo(() => listManualAssets(), [rev, annRev]);
+  const txEditInventoryItems = useMemo(
+    () => listInventoryItems().map((i) => ({ id: i.id, name: i.name })).filter((i) => i.name.trim()),
+    [rev, annRev],
+  );
   // 财务㉗:投资组合(持仓聚合;⚠️ 同样必须在空态早退之前)
   const [budgetNote, setBudgetNote] = useState('');
   const [showAddBudget, setShowAddBudget] = useState(false); // bug2:「手动添加」按钮展开分类选择
@@ -951,10 +979,11 @@ export default function FinanceTab() {
           {/* bug3:卡片就是这四张 —— 收入 / 支出 / 总资产 / 投资(当月盈亏放进投资卡里)。
               念念那句话和「＋记」都挪到卡片下面。 */}
           {(() => {
-            const s2 = assetSummaryWithHoldings(accounts, holdings); // 投资账户无 balance 时用持仓市值兜底
+            const s2 = assetSummaryWithHoldings(accounts, holdings, summary.currency || 'USD'); // 与账户列表同口径
             const manualNet = manualNetWorth(manualAssets);
             const totalAssets = Math.round((s2.net + manualNet) * 100) / 100;
             const portfolio = portfolioSummary(holdings);
+            const investValue = s2.investments;
             const pts = [...nwSeries].sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-60);
             const vals = pts.map((p) => p.plaidNet + p.manualNet);
             const min = Math.min(...vals), max = Math.max(...vals);
@@ -984,12 +1013,12 @@ export default function FinanceTab() {
                     )}
                   </div>
                 )}
-                {portfolio && (
+                {investValue > 0 && (
                   <div className="nesio-fin-kpi">
                     <span className="nesio-fin-kpi-l">{L(dict, '投资', 'Investing')}</span>
-                    <span className="nesio-fin-kpi-v">{formatMoney(portfolio.totalValue)}</span>
+                    <span className="nesio-fin-kpi-v">{formatMoney(investValue, summary.currency)}</span>
                     {/* 「当月盈亏想知道投资卡片里」—— 浮动盈亏就挂在这张卡上,不再单独占一格 */}
-                    {portfolio.gain !== null && (
+                    {portfolio && portfolio.gain !== null && (
                       <span className="nesio-fin-delta" style={{ color: portfolio.gain >= 0 ? 'var(--status-go)' : 'var(--status-gentle)' }}>
                         {fmtGain(portfolio.gain)}{portfolio.gainPct !== null ? ` (${portfolio.gainPct >= 0 ? '+' : ''}${portfolio.gainPct}%)` : ''}
                       </span>
@@ -1316,7 +1345,8 @@ export default function FinanceTab() {
                   </div>
                   {flowEditId === t.id && (
                     <TxEditPanel txId={t.id} txAmount={Math.abs(t.amount)} flow={f} dict={dict} contacts={pickContacts}
-                      trips={txEditTrips} memoryNodes={txEditMemoryNodes} projects={txEditProjects} financeAssets={txEditFinanceAssets}
+                      trips={txEditTrips} memoryNodes={txEditMemoryNodes} projects={txEditProjects}
+                      financeAssets={txEditFinanceAssets} inventoryItems={txEditInventoryItems}
                       tx={t} onFlow={(opt) => applyFlow(t, opt)} onCategoryChanged={() => setRev((r) => r + 1)} />
                   )}
                 </div>

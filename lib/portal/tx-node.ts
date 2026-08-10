@@ -93,10 +93,11 @@ export const txKeyOf = (attrs: LifeNode['attributes']): string | null => {
   return typeof v === 'string' && v.startsWith(TX_NODE_PREFIX) ? v : null;
 };
 
-/** 一次最多灌多少条 —— 超过的下次同步继续(幂等键保证不重复)。 */
-export const TX_NODE_CAP = 800;
+/** 一次最多灌多少条 —— 超过的下次同步继续(幂等键保证不重复)。
+ *  卡死缓解:从 800 降到 400 —— 同步后立刻灌图是主线程尖峰之一。 */
+export const TX_NODE_CAP = 400;
 /** 每块之间让出事件循环,主线程不被长时间独占。 */
-const CHUNK = 200;
+const CHUNK = 50;
 
 /**
  * 把流水同步进记忆图。**在 saveBankTx 之后调用。**

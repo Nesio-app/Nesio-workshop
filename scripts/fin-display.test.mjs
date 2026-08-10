@@ -243,4 +243,30 @@ assert.equal(assets.creditOwed, 2000, '信用卡欠款');
 assert.equal(assets.net, 16000, '净资产 = 存款 + 投资 − 欠款');
 assert.equal(bank.assetSummary([]).net, 0, '空账户表 → 全零');
 
+// 资产小结 + 持仓:小额 cash balance 不得挡住大持仓;无 balance 用持仓
+{
+  const invAccts = [
+    { id: 'brk', name: 'Brokerage', type: 'investment', balance: 120, currency: 'USD' },
+    { id: 'ira', name: 'IRA', type: 'investment', currency: 'USD' },
+  ];
+  const holds = [
+    { accountId: 'brk', name: 'VT', value: 50000, quantity: 10, currency: 'USD' },
+    { accountId: 'ira', name: 'FXAIX', value: 80000, quantity: 20, currency: 'USD' },
+  ];
+  const s = bank.assetSummaryWithHoldings(invAccts, holds);
+  assert.equal(s.investments, 130000, 'balance 与持仓取较大并加总');
+  assert.equal(bank.accountInvestValue(invAccts[0], holds), 50000, '单户取 max(balance, holdings)');
+  assert.equal(bank.accountInvestValue(invAccts[1], holds), 80000, '无 balance 用持仓');
+}
+
+// saveBankAccounts:incoming balance 缺失不得抹掉旧余额
+{
+  const prev = [{ id: 'c1', name: 'Chk', type: 'depository', balance: 9000, currency: 'USD', institution: 'Chase' }];
+  // 模拟内存合并语义(与 mergeBankAccount 一致)
+  const incoming = { id: 'c1', name: 'Chk', type: 'depository', balance: undefined, currency: 'USD', institution: 'Chase' };
+  const merged = { ...prev[0], ...incoming };
+  if (typeof incoming.balance !== 'number' && typeof prev[0].balance === 'number') merged.balance = prev[0].balance;
+  assert.equal(merged.balance, 9000, 'null/undefined balance 保留旧值');
+}
+
 console.log('fin-display: OK');

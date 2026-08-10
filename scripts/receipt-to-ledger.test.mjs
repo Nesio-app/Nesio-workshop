@@ -9,6 +9,10 @@
  *
  * 所以这道守卫盯的不是抽取逻辑本身(那是 `receipt-extract` 自己的事),
  * 是**它有没有真的被接到界面上**,以及接的方式对不对。
+ *
+ * 产品改口(2026-08):总览不再手记银行流水,QuickAddSheet 只留资产估值。
+ * 发票对账走「交易 → 修改 → 传附件」(端上识字 + 金额比对),ReceiptScanRow 仍保留给
+ * 其它入口/回归;本契约盯识字路径与查重出口。
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -21,6 +25,7 @@ const code = (rel) => stripComments(read(rel));
 
 const SCAN = code('components/portal/finance/ReceiptScanRow.tsx');
 const QUICK = code('components/portal/finance/QuickAddSheet.tsx');
+const FIN = code('components/portal/finance/FinanceTab.tsx');
 
 // ── ① 抽取函数必须有产品里的调用方 ──────────────────────────────────────────
 function walk(dir, out = []) {
@@ -75,7 +80,7 @@ for (const [s, what] of [
 }
 assert.match(SCAN, /role="alert"/, '失败提示没有 role="alert" —— 读屏用户听不到。');
 
-// ── ④ 重点:别记两遍 ────────────────────────────────────────────────────────
+// ── ④ 重点:别记两遍(交易附件路径 + ReceiptScanRow 查重) ────────────────────
 // 刷卡付的税费,Plaid 那条流水已经在账上。再手记一笔就是双计 ——
 // 和 spend-claim 里「price 只认领不记账」是同一条规矩。
 assert.match(
@@ -83,12 +88,13 @@ assert.match(
   'ReceiptScanRow 抽完金额没去查银行里有没有这笔 —— 那这个功能只是「填得快一点」,\n'
   + '  而它真正要解决的是**别把同一笔钱记两次**。',
 );
+// 交易编辑传附件:端上识字后跟本笔金额比对(FinanceTab),不再经 QuickAdd 手记流水。
 assert.match(
-  QUICK, /dupTx\s*&&\s*!dupAck/,
-  'QuickAddSheet 的 save() 没有在「银行里已经有这笔」时拦一道 —— 那提示就成了摆设。',
+  FIN, /attachImageUnderstanding/,
+  '交易「传附件」必须端上识字并对金额 —— 发票对账入口在修改面板,不在手记流水。',
 );
 
-// ── ⑤ 但不许硬拦 ────────────────────────────────────────────────────────────
+// ── ⑤ 查重不许硬拦 ──────────────────────────────────────────────────────────
 // 匹配是启发式的(±1% + ±3天),会误判。硬拦就变成「系统觉得你错了所以不让你记」。
 // CLAUDE.md 文案红线:每个提示都要有出口。
 assert.match(
@@ -96,9 +102,10 @@ assert.match(
   '没有「不是同一笔」的出口 —— 金额日期撞车是常事(同一天两笔一样的),\n'
   + '  没出口的话你就再也记不了那笔账了。',
 );
-assert.match(
-  QUICK, /setDupAck\(true\);\s*return;/,
-  '重复提示应该是「再点一次」,不是拒绝保存 —— 配对是猜的,猜错了得让人能过去。',
-);
 
-console.log(`receipt-to-ledger: OK(抽取有 ${callers.length} 个调用方 / 端上识别不打云 / 三种失败态都说得出 / 查重不硬拦)`);
+// ── ⑥ 产品改口:QuickAdd 不再手记银行流水 ───────────────────────────────────
+assert.ok(!/addManualBankTx/.test(QUICK), 'QuickAddSheet 不许再写银行流水');
+assert.ok(!/addManualEntry/.test(QUICK), 'QuickAddSheet 不许再走现金账本手记');
+assert.ok(/addAssetAnchor/.test(QUICK), '资产估值锚点仍须可记');
+
+console.log(`receipt-to-ledger: OK(抽取有 ${callers.length} 个调用方 / 端上识别不打云 / 三种失败态都说得出 / 查重不硬拦 / QuickAdd 仅资产)`);

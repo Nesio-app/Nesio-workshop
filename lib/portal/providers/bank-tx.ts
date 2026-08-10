@@ -603,19 +603,32 @@ export function loadHoldings(): Holding[] {
   return out;
 }
 
-/** 持仓是点时快照 → 整体替换(空列表不写,防同步半途清空)。落库前盖稳定 id 并去重。 */
-export function saveHoldings(holdings: Holding[]): void {
-  if (!holdings.length) return;
+/**
+ * 持仓是点时快照。
+ * 多银行时:某一 Item 投资产品失败 → 响应里只有别家持仓;若整表替换会抹掉失败 Item 的旧持仓。
+ * `coveredAccountIds` = 本次**成功**拉过 holdings 的账户(可为空数组)→ 只替换这些户,其余保留。
+ * 未传 covered 时:按本次持仓里出现的 accountId 替换,其它账户旧持仓保留(空列表仍不写)。
+ */
+export function saveHoldings(holdings: Holding[], opts?: { coveredAccountIds?: string[] }): void {
   const stamped = dedupeHoldings(
-    holdings
+    (holdings || [])
       .filter((h) => h && h.accountId)
       .map((h) => {
         const id = holdingId(h);
         return id ? { ...h, id } : h;
       }),
   );
-  if (!stamped.length) return;
-  holdingsStore.save(stamped);
+  const covered = new Set(
+    (opts?.coveredAccountIds?.length
+      ? opts.coveredAccountIds
+      : stamped.map((h) => h.accountId)
+    ).filter(Boolean),
+  );
+  if (!covered.size && !stamped.length) return;
+  const prev = loadHoldings().filter((h) => h?.accountId && !covered.has(h.accountId));
+  const next = dedupeHoldings([...prev, ...stamped]);
+  if (!next.length && !covered.size) return;
+  holdingsStore.save(next);
 }
 
 /** 财务⑯:手动移除账户(重复/失效副本兜底)。若该账户仍在连接中,下次同步会重新拉回。 */
@@ -716,6 +729,28 @@ export function displayAccountName(a: Pick<BankAccount, 'id' | 'name'>, names?: 
   return (names || loadAccountNames())[a.id] || a.name;
 }
 
+/**
+ * 合并账户字段:Plaid 常把 investment 户的 balances.current 给成 null ——
+ * 映射成 `balance: undefined` 后若整对象覆盖,会把本机旧余额抹掉,
+ * 账户列表还在、总览/净资产却像「没计入」(Cards 显示 —、assetSummary 跳过无余额户)。
+ */
+function mergeBankAccount(prev: BankAccount | undefined, incoming: BankAccount): BankAccount {
+  const next: BankAccount = { ...(prev || {}), ...incoming };
+  if (typeof incoming.balance !== 'number' && typeof prev?.balance === 'number') {
+    next.balance = prev.balance;
+  }
+  if (typeof incoming.limit !== 'number' && typeof prev?.limit === 'number') {
+    next.limit = prev.limit;
+  }
+  if (!(incoming.institution || '').trim() && (prev?.institution || '').trim()) {
+    next.institution = prev!.institution;
+  }
+  if (!(incoming.name || '').trim() && (prev?.name || '').trim()) {
+    next.name = prev!.name;
+  }
+  return next;
+}
+
 export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boolean }): void {
   if (opts?.replace && accounts.length > 0) {
     // Plaid 权威替换时保留手工账户,否则下次同步会抹掉「手动添加」入口下的户。
@@ -725,8 +760,12 @@ export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boo
     const prevList = Array.isArray(prev) ? prev.filter((a) => a?.id) : [];
     const manuals = prevList.filter((a) => isManualBankAccount(a));
     const prevPlaid = prevList.filter((a) => !isManualBankAccount(a));
+    const prevById = new Map(prevList.map((a) => [a.id, a]));
     const byId = new Map<string, BankAccount>();
-    for (const a of accounts) if (a?.id) byId.set(a.id, a);
+    for (const a of accounts) {
+      if (!a?.id) continue;
+      byId.set(a.id, mergeBankAccount(prevById.get(a.id), a));
+    }
     for (const m of manuals) if (!byId.has(m.id)) byId.set(m.id, m);
     // 保险丝要保守:只在「整家机构从快照消失、但本地仍有该机构流水」时加回。
     // 同机构换 item / 无机构元数据的权威去重,绝不能被加回(否则 bank-orphan 契约与重复账户退场失效)。
@@ -758,7 +797,7 @@ export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boo
   for (const [id, b] of [...byId]) {
     if (incoming.some((a) => a.id !== id && isSameUnderlyingAccount(a, b))) byId.delete(id);
   }
-  for (const a of accounts) if (a?.id) byId.set(a.id, { ...byId.get(a.id), ...a });
+  for (const a of accounts) if (a?.id) byId.set(a.id, mergeBankAccount(byId.get(a.id), a));
   accountsStore.save([...byId.values()]);
 }
 
@@ -807,15 +846,52 @@ export function assetSummary(accounts: BankAccount[], currency = 'USD'): { depos
   };
 }
 
-/** 资产小结 + 持仓兜底:Plaid 投资账户常只回持仓、不回 balance → assetSummary.investments
- *  为 0,净资产整块漏掉投资(QA 实测:净资产 -$1,294,同页却列着 $235k 持仓)。
- *  投资余额为 0 而持仓有市值时,用持仓市值补上;有余额时以余额为准(不重计)。 */
+/**
+ * 单户投资口径(与 CardsPane 对齐并修「有小额 cash balance 就丢掉大持仓」):
+ * 有数值 balance 与持仓时取较大者(券商有时 balance=现金、市值只在 holdings);
+ * 无 balance 时用该户持仓市值。
+ */
+export function accountInvestValue(a: BankAccount, holdings: Holding[]): number | null {
+  const hv = round2(
+    holdings.filter((h) => h.accountId === a.id).reduce((sum, h) => sum + (h.value || 0), 0),
+  );
+  if (typeof a.balance === 'number') return round2(Math.max(a.balance, hv));
+  if (hv > 0) return hv;
+  return null;
+}
+
+/** 资产小结 + 持仓兜底:按账户对齐 Cards / 总览 / 投资 KPI,避免「账户在、投资卡空白」。 */
 export function assetSummaryWithHoldings(accounts: BankAccount[], holdings: Holding[], currency = 'USD'): ReturnType<typeof assetSummary> {
-  const s = assetSummary(accounts, currency);
-  if (s.investments !== 0) return s;
-  const hv = round2(holdings.reduce((sum, h) => sum + (h.value || 0), 0));
-  if (hv <= 0) return s;
-  return { ...s, investments: hv, net: round2(s.net + hv) };
+  let deposits = 0, investments = 0, creditOwed = 0, loanOwed = 0;
+  const countedInvest = new Set<string>();
+  const ccy = currency.toUpperCase();
+  for (const a of accounts) {
+    if ((a.currency || 'USD').toUpperCase() !== ccy) continue;
+    const t = (a.type || '').toLowerCase();
+    if (t === 'depository') {
+      if (typeof a.balance === 'number') deposits += a.balance;
+    } else if (t === 'investment' || t === 'brokerage') {
+      const v = accountInvestValue(a, holdings);
+      if (v != null) { investments += v; countedInvest.add(a.id); }
+    } else if (t === 'credit') {
+      if (typeof a.balance === 'number') creditOwed += a.balance;
+    } else if (t === 'loan') {
+      if (typeof a.balance === 'number') loanOwed += a.balance;
+    }
+  }
+  // 持仓挂在已退场/未知账户上时仍计入,避免同步抖动丢市值
+  for (const h of holdings) {
+    if (!h?.accountId || countedInvest.has(h.accountId)) continue;
+    const host = accounts.find((a) => a.id === h.accountId);
+    if (host && (host.currency || 'USD').toUpperCase() !== ccy) continue;
+    if (host && typeof host.balance === 'number') continue;
+    investments += h.value || 0;
+  }
+  return {
+    deposits: round2(deposits), investments: round2(investments),
+    creditOwed: round2(creditOwed), loanOwed: round2(loanOwed),
+    net: round2(deposits + investments - creditOwed - loanOwed),
+  };
 }
 
 /** 免费最大化·Plaid A:投资组合未实现盈亏 = Σ市值 − Σ成本(有成本的持仓才计)。

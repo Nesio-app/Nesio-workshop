@@ -173,6 +173,8 @@ export async function GET(req: NextRequest) {
   const invAdded: PlaidInvTx[] = []; // 财务⑯:投资账户流水(独立产品拉取)
   // 财务㉗:持仓快照(holdings + securities join;失败不阻断,客户端仅在非空时替换)
   const holdingsOut: Array<{ id: string; accountId: string; name: string; ticker?: string; type?: string; quantity: number; value: number; costBasis?: number; currency: string }> = [];
+  /** 本次成功拉过 holdings 的账户 id(可无持仓)—— 客户端只替换这些户,避免一家失败抹掉另一家旧持仓。 */
+  const holdingsCoveredAccountIds: string[] = [];
   // 免费最大化·Plaid:投资拉取诊断 —— 此前 investments 的两个 catch 全空吞错,
   // 「有投资账户但没数据」既不显示也不进日志,连根因都看不到(违反可见失败态)。
   // 记账:发现几个投资账户 + Plaid 回的 error_code,透出给前端 + 落日志。
@@ -276,6 +278,7 @@ export async function GET(req: NextRequest) {
           }) as { holdings?: PlaidHolding[]; securities?: PlaidSecurity[]; error_code?: string };
           if (h.error_code) { invErrorCode ||= h.error_code; console.error('[plaid] investments/holdings', h.error_code); }
           if (!h.error_code && Array.isArray(h.holdings)) {
+            for (const a of invAccounts) holdingsCoveredAccountIds.push(a.account_id);
             const secById = new Map((h.securities ?? []).map((sec) => [sec.security_id, sec]));
             for (const hd of h.holdings) {
               const sec = secById.get(hd.security_id);
@@ -495,8 +498,9 @@ export async function GET(req: NextRequest) {
         }),
       ],
       removedIds,
-      // 财务㉗:持仓快照(点时值;客户端整体替换,仅在非空时)
+      // 财务㉗:持仓快照(点时值;客户端按 covered 账户替换,保留未覆盖户的旧持仓)
       holdings: holdingsOut.filter((h) => !staleAccountIds.has(h.accountId)),
+      holdingsAccountIds: [...new Set(holdingsCoveredAccountIds)].filter((id) => !staleAccountIds.has(id)),
       // 投资拉取诊断:有几个投资账户 / 拉到几条持仓 / Plaid 回的错误码(用于前端可见失败态 + 客服)。
       // 「有投资账户但 holdings=0 且有 error」= 多半是该 Item 未授权 investments 产品(需断开重连券商),
       // 或 Plaid production 未开通 Investments 产品。
