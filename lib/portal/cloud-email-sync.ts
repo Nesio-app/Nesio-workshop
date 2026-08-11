@@ -20,6 +20,7 @@ import { getAllEmailBodies, putEmailBodies } from './local-email-body';
 import { indexEmailBodies } from './email-fulltext-index';
 import { logDropped } from './storage-health';
 import { yieldToMain } from './yield-main';
+import { createBlobStore } from './idb-blob-store';
 
 /** 邮件全文行的 module_key 前缀。cloud-module-sync 靠它把邮件行排除在普通模块同步之外。 */
 export const EMAIL_BODY_MODULE_PREFIX = 'email-body:';
@@ -71,10 +72,20 @@ function contentHash(s: string): string {
 }
 
 interface EmailSyncState { [emailId: string]: string } // emailId → 上次同步哈希
+const stateStore = typeof createBlobStore === 'function'
+  ? createBlobStore<EmailSyncState>({
+      key: SYNC_STATE_KEY,
+      updateEvent: 'nesio-email-sync-state-updated',
+      validate: (v) => Boolean(v && typeof v === 'object' && !Array.isArray(v)),
+    })
+  : null;
 function readState(): EmailSyncState {
+  const v = stateStore?.load();
+  if (v && typeof v === 'object') return v;
   try { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}') as EmailSyncState; } catch { return {}; }
 }
 function writeState(state: EmailSyncState): void {
+  if (stateStore) { stateStore.save(state); return; }
   try { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(state)); } catch { /* quota */ }
 }
 

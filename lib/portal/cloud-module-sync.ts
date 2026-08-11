@@ -21,7 +21,7 @@ import { logDropped } from './storage-health';
 import { isDedicatedSyncKey, DEDICATED_SYNC_PREFIXES } from './sync-ownership';
 import { recordCloudRestore } from './cloud-restore-receipt';
 import { isBackupKey } from './storage-manifest';
-import { rehydrateIdbBlobs } from './idb-blob-store';
+import { rehydrateIdbBlobs, createBlobStore } from './idb-blob-store';
 // #29:银行流水/账户是「按 id 的集合」,云端那份只能并进来,不能整键替换
 import { yieldToMain } from './yield-main';
 import { needsUnionMerge, mergeModuleJson } from './module-merge';
@@ -102,10 +102,20 @@ function contentHash(s: string): string {
 }
 
 interface ModuleSyncState { [key: string]: { hash: string; syncedAt: string } }
+const stateStore = typeof createBlobStore === 'function'
+  ? createBlobStore<ModuleSyncState>({
+      key: SYNC_STATE_KEY,
+      updateEvent: 'nesio-module-sync-state-updated',
+      validate: (v) => Boolean(v && typeof v === 'object' && !Array.isArray(v)),
+    })
+  : null;
 function readState(): ModuleSyncState {
+  const v = stateStore?.load();
+  if (v && typeof v === 'object') return v;
   try { return JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || '{}') as ModuleSyncState; } catch { return {}; }
 }
 function writeState(state: ModuleSyncState): void {
+  if (stateStore) { stateStore.save(state); return; }
   try { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(state)); } catch { /* quota */ }
 }
 

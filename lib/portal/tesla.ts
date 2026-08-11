@@ -35,7 +35,7 @@ export const TESLA_AUDIENCE = envValue('TESLA_AUDIENCE') || TESLA_FLEET_BASE;
 // Read-only scopes chosen with the user: Vehicle Information + Location + Charging.
 // openid + offline_access are required to receive a refresh token.
 // vehicle_location 是**独立**权限:没有它,drive_state 的经纬度一律返回 null ——
-// 停车/充电位置进不了足迹(用户实锤「地址页没有」的根因)。加上后需重新授权一次生效。
+// 车页地图就画不出来。加上后需重新授权一次生效。坐标留在车页,不进足迹。
 // energy_device_data:用户的授权页里「Energy Product Information」本来就是勾上的,
 // 可 scope 串里一直没有它 —— 于是家里那套能源产品(太阳能 / Powerwall)的数据
 // 一次都没取过。用户原话:「特斯拉的 API 是有能源,位置 API 的,目前一直未实现」。
@@ -192,8 +192,8 @@ export interface TeslaDrive {
    * 不分开的话界面会把一份几小时前的读数说成「刚刚」。
    */
   dataAgeMs?: number | null;
-  // drive_state 本来就返回经纬度;之前丢了,足迹时间线拿不到位置。只读快照 = 同步时的
-  // 采样点(非连续轨迹),但配上充电站点已足够把「今天车去过哪」画进足迹。
+  // drive_state 本来就返回经纬度。只读快照 = 同步时的采样点(非连续轨迹),
+  // 画在车页地图上,不并进足迹。
   latitude?: number | null;
   longitude?: number | null;
 }

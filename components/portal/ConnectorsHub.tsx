@@ -138,7 +138,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   const signedIn: boolean | null = session.state === 'unknown' ? null : session.state === 'signed-in';
   const [importPct, setImportPct] = useState<number | null>(null); // 健康大文件导入进度(0–100)
   const [counts, setCounts] = useState<Record<string, number>>({});
-  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
+  const [toast, setToast] = useState<{ msg: string; ok: boolean; onClick?: () => void } | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [tokenInputFor, setTokenInputFor] = useState<string | null>(null);
   const [tokenValue, setTokenValue] = useState('');
   const [shortcutsFor, setShortcutsFor] = useState<string | null>(null);
@@ -232,7 +233,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     } else if (err) {
       showToast(L(dict, `连接失败：${err}`, `Connection failed: ${err}`), false);
     }
-    return () => document.removeEventListener('visibilitychange', onVisible);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
   }, [open]);
 
 
@@ -252,9 +256,13 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     );
   }
 
-  function showToast(msg: string, ok: boolean) {
-    setToast({ msg, ok });
-    setTimeout(() => setToast(null), 3500);
+  function showToast(msg: string, ok: boolean, onClick?: () => void) {
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    setToast({ msg, ok, onClick });
+    // 可点的失败条不要自己消失 —— 用户正是冲着「重新连接」来的。
+    if (!onClick) {
+      toastTimer.current = setTimeout(() => setToast(null), 3500);
+    }
   }
 
   // signalSource:落库的 LifeNodeSource 只有 6 档,notion/toggl/health 等连接器同落
@@ -908,9 +916,13 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       const data = await res.json() as { ok?: boolean; error?: string; drives?: unknown[]; charges?: unknown[] };
       if (!data.ok) {
         const reauth = data.error === 'not_connected' || data.error === 'token_expired';
+        if (reauth) {
+          setOauthSyncResult((p) => ({ ...p, tesla: { ok: false, msg: L(dict, '授权已失效', 'Auth expired'), needsReauth: true } }));
+        }
         showToast(reauth
-          ? L(dict, 'Tesla 授权已失效,点击重新连接', 'Tesla auth expired — tap to reconnect')
-          : L(dict, `Tesla 同步失败:${data.error || '未知'}`, `Tesla sync failed: ${data.error || 'unknown'}`), false);
+          ? L(dict, 'Tesla 授权已失效,点这里重新连接', 'Tesla auth expired — tap here to reconnect')
+          : L(dict, `Tesla 同步失败:${data.error || '未知'}`, `Tesla sync failed: ${data.error || 'unknown'}`), false,
+          reauth ? () => { window.location.href = '/api/portal/tesla/connect'; } : undefined);
         setSyncing(null);
         return;
       }
@@ -937,7 +949,16 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       const data = await res.json() as { ok?: boolean; error?: string; list?: Array<{ id: string; title: string; date?: string }> };
       if (!data.ok) {
         const reauth = data.error === 'token_expired' || data.error === 'not_connected';
-        showToast(reauth ? L(dict, 'Granola 授权已失效,请重新连接', 'Granola auth expired — reconnect') : L(dict, `拉取会议列表失败:${data.error || '未知'}`, `Failed to list meetings: ${data.error || 'unknown'}`), false);
+        if (reauth) {
+          setOauthSyncResult((p) => ({ ...p, granola: { ok: false, msg: L(dict, '授权已失效', 'Auth expired'), needsReauth: true } }));
+        }
+        showToast(
+          reauth
+            ? L(dict, 'Granola 授权已失效,点这里重新连接', 'Granola auth expired — tap here to reconnect')
+            : L(dict, `拉取会议列表失败:${data.error || '未知'}`, `Failed to list meetings: ${data.error || 'unknown'}`),
+          false,
+          reauth ? () => { window.location.href = '/api/portal/granola/connect'; } : undefined,
+        );
         return;
       }
       const { getLifeGraph } = await import('@/lib/portal/life-graph');
@@ -969,7 +990,13 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       if (!data.ok) {
         const reauth = data.error === 'token_expired' || data.error === 'not_connected';
         setOauthSyncResult((p) => ({ ...p, granola: { ok: false, msg: reauth ? L(dict, '需要重新授权', 'Reauth needed') : L(dict, '同步失败', 'Sync failed'), detail: data.error, needsReauth: reauth } }));
-        showToast(reauth ? L(dict, 'Granola 授权已失效,请重新连接', 'Granola auth expired — reconnect') : L(dict, `同步失败:${data.error || '未知'}`, `Sync failed: ${data.error || 'unknown'}`), false);
+        showToast(
+          reauth
+            ? L(dict, 'Granola 授权已失效,点这里重新连接', 'Granola auth expired — tap here to reconnect')
+            : L(dict, `同步失败:${data.error || '未知'}`, `Sync failed: ${data.error || 'unknown'}`),
+          false,
+          reauth ? () => { window.location.href = '/api/portal/granola/connect'; } : undefined,
+        );
         return;
       }
       const meetings = data.meetings || [];
@@ -1110,7 +1137,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
 
   // 连接后产生「无主 token / 无主外部数据」的私有数据源 —— 必须先有账号。
   // 本地文件导入(健康 zip/照片/时间轴)和设备定位不在此列(数据只进本机)。
-  const PRIVATE_SOURCE_IDS = new Set(['google', 'tesla', 'plaid', 'notion', 'flomo']);
+  const PRIVATE_SOURCE_IDS = new Set(['google', 'tesla', 'plaid', 'notion', 'flomo', 'granola']);
 
   // ── OAuth / Geo / File ──
   function handleConnect(c: ConnectorDef) {
@@ -1534,9 +1561,19 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         <p className="nesio-settings-sheet-desc">{L(dict, '连接外部信号源，让 Today Feed 出现真实数据驱动的建议。', 'Connect outside signals so Today runs on real data.')}</p>
 
         {toast && (
-          <div style={{ background: toast.ok ? 'var(--status-go-soft)' : 'var(--status-risk-soft)', border: `1px solid ${toast.ok ? 'var(--status-go)' : 'var(--status-risk)'}`, borderRadius: 'var(--radius-sm)', padding: 'var(--space-3) var(--space-3)', marginBottom: 'var(--space-3)', fontSize: 'var(--text-sm)', color: toast.ok ? 'var(--status-go)' : 'var(--status-risk)' }}>
-            {toast.ok ? '✓ ' : ''}{toast.msg}
-          </div>
+          toast.onClick ? (
+            <button
+              type="button"
+              className={`nesio-connector-banner${toast.ok ? ' is-ok' : ''} is-action`}
+              onClick={() => { const go = toast.onClick; setToast(null); go?.(); }}
+            >
+              {toast.msg}
+            </button>
+          ) : (
+            <p className={`nesio-connector-banner${toast.ok ? ' is-ok' : ''}`} role="status">
+              {toast.ok ? '✓ ' : ''}{toast.msg}
+            </p>
+          )
         )}
 
         {/* 多银行连续连接:连好一家后就地问要不要再连一家(不用跳回设置页重新找入口)。 */}

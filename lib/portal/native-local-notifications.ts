@@ -190,12 +190,22 @@ export async function scheduleLocalAlert(opts: {
   /** 几秒后弹出;默认 1 */
   afterSec?: number;
   id?: number;
+  /**
+   * 已经确认系统授权时不要再走 requestPermissions。
+   * iOS 上重复请权会让 WKWebView 闪白一下 —— 「试一条」踩过。
+   */
+  assumeGranted?: boolean;
 }): Promise<{ ok: boolean; reason?: string }> {
   if (!isNativePlatform()) {
     return { ok: false, reason: 'web_unsupported' };
   }
-  const allowed = await ensureLocalNotificationPermission();
-  if (!allowed) return { ok: false, reason: 'denied' };
+  if (opts.assumeGranted) {
+    const d = await checkLocalNotifyDisplay();
+    if (d !== 'granted') return { ok: false, reason: d === 'denied' ? 'denied' : 'not_native' };
+  } else {
+    const allowed = await ensureLocalNotificationPermission();
+    if (!allowed) return { ok: false, reason: 'denied' };
+  }
   try {
     const id = opts.id ?? (Math.floor(Date.now() % 1_000_000_000) + 1);
     const res = await NesioLocalNotify.schedule({

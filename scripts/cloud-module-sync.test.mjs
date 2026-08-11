@@ -44,15 +44,19 @@ function makeCtx({ lsInit = {}, localEntries = {}, fetchImpl, withReload = false
   let lastPost = null;
   let restoreApplied = null;
   let reloaded = false;
+  const win = withReload ? { location: { reload: () => { reloaded = true; } } } : {};
   const ctx = {
     module: { exports: {} }, exports: {}, console,
     Date, Math, JSON, btoa, atob, String, Uint8Array, Array, Object, Number,
-    window: withReload ? { location: { reload: () => { reloaded = true; } } } : {},
+    window: win,
     localStorage,
     sessionStorage,
     fetch: async (url, init) => fetchImpl(url, init, (b) => { lastPost = b; }),
     require: (p) => {
       if (p === 'fflate') return fflate;
+      if (p === './app-busy') return {
+        requestDestructiveReload: () => { try { win.location.reload(); } catch { /* no reload in this ctx */ } },
+      };
       if (p === './cloud-backup') return {
         // 枚举:返回注入的本机模块条目(含记忆图,验证被排除)
         buildCombinedBackup: async () => ({ format: 'nesio-full-backup', version: 1, exportedAt: 'x', entries: { ...localEntries } }),
@@ -60,6 +64,21 @@ function makeCtx({ lsInit = {}, localEntries = {}, fetchImpl, withReload = false
         restoreCombinedBackup: async (backup, mode) => { restoreApplied = { entries: backup.entries, mode }; return { restoredKeys: 0, idbRestored: Object.keys(backup.entries).length, skippedKeys: [], corruptKeys: [] }; },
       };
       if (p === './storage-health') return { logDropped: () => {} };
+      if (p === './idb-blob-store') return {
+        rehydrateIdbBlobs: async () => 0,
+        createBlobStore: ({ key }) => ({
+          load: () => {
+            try {
+              const raw = localStorage.getItem(key);
+              return raw ? JSON.parse(raw) : null;
+            } catch { return null; }
+          },
+          save: (v) => { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* ignore */ } },
+          ready: async () => {},
+          refresh: async () => {},
+          isReady: () => true,
+        }),
+      };
       if (p === './module-merge') return moduleMerge;
       if (p === './yield-main') return { yieldToMain: async () => {} };
       // isBackupKey:测试用的都是 durable 应用 key(nesio-*-v1),按真值等价返回 true;

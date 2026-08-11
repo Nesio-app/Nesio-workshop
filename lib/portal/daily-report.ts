@@ -40,6 +40,8 @@ export interface DailyReportEvent {
   end?: string;
   location?: string;
   calendarName?: string;
+  description?: string;
+  allDay?: boolean;
 }
 
 /** 到点的提醒(用户自己设的家务 / 账单 due)。来自 schedule-reminders。 */
@@ -48,6 +50,8 @@ export interface DailyReportReminder {
   /** 墙上时钟 `YYYY-MM-DDTHH:mm` */
   at: string;
   kind?: 'chore' | 'bill' | 'event' | 'other';
+  /** 用户自己写的备注(金额、卡号后四位、确认号)——有就原样带上,不猜。 */
+  note?: string;
 }
 
 /** 各域确定性引擎的判定(gatherDomainInsights 的形状,原样带过来)。 */
@@ -79,6 +83,10 @@ export interface DailyReportOrder {
   /** 已发货 / 已送达 / 已退款 之类,已经翻好的中文 */
   status: string;
   eta?: string;
+  amount?: string;
+  orderNo?: string;
+  trackingNo?: string;
+  store?: string;
 }
 
 export interface DailyReportInput {
@@ -143,10 +151,26 @@ export type DailyReportSectionId =
   | 'threads'   // 计划:还没接上的线头
   | 'conflicts'; // 计划:日历时间冲突(真重叠,非猜测)
 
+/**
+ * 一条日报事实。主句 + 可选时间帽 + 可选补充(地址/金额/会议号)。
+ * 参考优秀日报:「今日 · 9:00 AM · 牙医 (1h)」下面再跟地址和取消罚金,
+ * 不把所有信息揉进一句含糊的话。
+ */
+export interface DailyReportItem {
+  text: string;
+  /** 时间帽:「5 min」/「今日 · 上午 9:00」/「周四 · 8月13日」 */
+  when?: string;
+  /** 补充事实。只放已经知道的数字/地点/编号,不编。 */
+  notes?: string[];
+}
+
 export interface DailyReportSection {
   id: DailyReportSectionId;
   title: string;
+  /** 扁平句,给 markdown / 旧冻结件 / 契约测试。与 items 同步生成。 */
   lines: string[];
+  /** 层次展示。老冻结件没有这一项,UI 退回 lines。 */
+  items?: DailyReportItem[];
 }
 
 export interface DailyReport {
@@ -202,11 +226,23 @@ export function dailyReportExternalId(d: Date): string { return `daily-report-${
 
 function tt(locale: 'zh' | 'en', zh: string, en: string): string { return locale === 'en' ? en : zh; }
 
-function greetingFor(hour: number, locale: 'zh' | 'en'): string {
-  if (hour < 5) return tt(locale, '凌晨好', 'Good morning');
-  if (hour < 12) return tt(locale, '早上好', 'Good morning');
-  if (hour < 18) return tt(locale, '下午好', 'Good afternoon');
-  return tt(locale, '晚上好', 'Good evening');
+const WEEKDAY_ZH = ['周日', '周一', '周二', '周三', '周四', '周五', '周六'];
+
+function weekdayName(d: Date, locale: 'zh' | 'en'): string {
+  return locale === 'en'
+    ? d.toLocaleDateString('en-US', { weekday: 'long' })
+    : WEEKDAY_ZH[d.getDay()] || '';
+}
+
+function greetingLine(now: Date, name: string | undefined, locale: 'zh' | 'en'): string {
+  const wd = weekdayName(now, locale);
+  const who = (name || '').trim();
+  if (locale === 'en') {
+    return who
+      ? `${wd}, ${who} — here's your daily briefing.`
+      : `${wd} — here's your daily briefing.`;
+  }
+  return who ? `${wd}愉快，${who}！这是你的每日简报。` : `${wd}愉快！这是你的每日简报。`;
 }
 
 function weatherText(w: DailyReportWeather | undefined, location: string | undefined, locale: 'zh' | 'en'): string | null {
@@ -216,30 +252,115 @@ function weatherText(w: DailyReportWeather | undefined, location: string | undef
     ? `${w.tempMinC}~${w.tempMaxC}°C`
     : typeof w.temperatureC === 'number' ? `${w.temperatureC}°C` : '';
   const precip = typeof w.precipProb === 'number' && w.precipProb >= 50 && !w.forecastNote
-    ? tt(locale, `,降水概率 ${w.precipProb}%`, `, ${w.precipProb}% chance of rain`)
+    ? tt(locale, `降水概率 ${w.precipProb}%`, `${w.precipProb}% chance of rain`)
     : '';
   const cond = w.condition || '';
-  const note = w.forecastNote ? (locale === 'en' ? `, ${w.forecastNote}` : `,${w.forecastNote}`) : precip;
-  const body = [temp, cond].filter(Boolean).join(locale === 'en' ? ', ' : ',');
-  return `${body}${note}${place ? (locale === 'en' ? ` (${place})` : `(${place})`)  : ''}`.trim();
+  const note = w.forecastNote || precip;
+  const parts = locale === 'en'
+    ? [place, temp, cond, note].filter(Boolean)
+    : [place, temp, cond, note].filter(Boolean);
+  return parts.join(locale === 'en' ? ' · ' : ' · ') || null;
 }
 
-function fmtTime(iso: string, locale: 'zh' | 'en'): string {
+/** 钟面时刻。中文用上午/下午,英文用 9:00 AM —— 和优秀日报同一精度,不用含糊的「下午」。 */
+function fmtClock(iso: string, locale: 'zh' | 'en'): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString(locale === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit' });
+  const h = d.getHours();
+  const m = pad(d.getMinutes());
+  if (locale === 'en') {
+    const am = h < 12;
+    const h12 = h % 12 || 12;
+    return `${h12}:${m} ${am ? 'AM' : 'PM'}`;
+  }
+  const period = h < 6 ? '凌晨' : h < 12 ? '上午' : h < 18 ? '下午' : '晚上';
+  const h12 = h % 12 || 12;
+  return `${period} ${h12}:${m}`;
 }
 
-function fmtEvent(e: DailyReportEvent, locale: 'zh' | 'en'): string {
-  const t = fmtTime(e.start, locale);
-  const loc = e.location ? (locale === 'en' ? ` (${e.location})` : `(${e.location})`) : '';
-  return `${t ? t + ' ' : ''}${e.title}${loc}`;
+function durationLabel(e: DailyReportEvent, locale: 'zh' | 'en'): string {
+  if (e.allDay) return tt(locale, '全天', 'all day');
+  if (!e.end) return '';
+  const ms = new Date(e.end).getTime() - new Date(e.start).getTime();
+  if (!Number.isFinite(ms) || ms <= 0) return '';
+  const min = Math.round(ms / 60_000);
+  if (min < 1) return '';
+  if (min % 60 === 0) {
+    const h = min / 60;
+    return locale === 'en' ? `${h}h` : `${h}小时`;
+  }
+  if (min > 90) {
+    const h = Math.floor(min / 60);
+    const r = min % 60;
+    return locale === 'en' ? `${h}h ${r}m` : `${h}小时${r}分钟`;
+  }
+  return locale === 'en' ? `${min}m` : `${min}分钟`;
 }
 
-/** 墙上时钟 `YYYY-MM-DDTHH:mm` 里的钟点部分。认不出就返回空串(不猜)。 */
-function wallClockTime(at: string): string {
+function factNotes(...parts: Array<string | undefined | null>): string[] {
+  return parts.map((p) => (p || '').trim()).filter(Boolean);
+}
+
+/** 从地点/备注里抽出已经写明的会议号,不猜。 */
+function meetingNotes(blob: string, locale: 'zh' | 'en'): string[] {
+  const text = (blob || '').trim();
+  if (!text) return [];
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (s: string) => { if (!seen.has(s)) { seen.add(s); out.push(s); } };
+  const zoom = /(?:zoom\s*(?:meeting\s*)?(?:id)?|会议(?:\s*ID)?)\s*[:：#]?\s*([\d\s]{9,16})/i.exec(text);
+  if (zoom) push(`Zoom ${zoom[1].replace(/\s+/g, ' ').trim()}`);
+  const zoomJoin = /zoom\.us\/j\/(\d{9,13})/i.exec(text);
+  if (zoomJoin) push(`Zoom ${zoomJoin[1]}`);
+  const meet = /meet\.google\.com\/([a-z]{3}-[a-z]{4}-[a-z]{3})/i.exec(text);
+  if (meet) push(`Meet ${meet[1]}`);
+  const conf = /(?:确认号|confirmation(?:\s*(?:no|number|code))?|PNR|订座编码)\s*[:：#]?\s*([A-Z0-9]{5,12})/i.exec(text);
+  if (conf) push(tt(locale, `确认号 ${conf[1]}`, `Confirmation ${conf[1]}`));
+  return out;
+}
+
+function eventItem(e: DailyReportEvent, locale: 'zh' | 'en'): DailyReportItem {
+  const clock = e.allDay ? '' : fmtClock(e.start, locale);
+  const when = clock
+    ? tt(locale, `今日 · ${clock}`, `Today · ${clock}`)
+    : tt(locale, '今日 · 全天', 'Today · all day');
+  const dur = durationLabel(e, locale);
+  const text = dur ? `${e.title} · ${dur}` : e.title;
+  const loc = (e.location || '').trim();
+  const isUrl = /^https?:\/\//i.test(loc);
+  const notes = factNotes(
+    loc && !isUrl ? loc : (isUrl ? tt(locale, '线上', 'Online') : ''),
+    ...meetingNotes(`${e.location || ''} ${e.description || ''}`, locale),
+    e.calendarName && e.calendarName !== e.title ? e.calendarName : '',
+  );
+  return { when, text, ...(notes.length ? { notes } : {}) };
+}
+
+function flattenItem(it: DailyReportItem): string {
+  const head = [it.when, it.text].filter(Boolean).join(' · ');
+  return it.notes?.length ? `${head} —— ${it.notes.join('；')}` : head;
+}
+
+function effortMin(kind: DailyReportReminder['kind'] | undefined): number {
+  if (kind === 'chore') return 15;
+  if (kind === 'event') return 10;
+  return 5; // bill / other:打开付一下、回一句
+}
+
+/** 墙上时钟 `YYYY-MM-DDTHH:mm` 的钟面。认不出就返回空串(不猜)。 */
+function wallClockTime(at: string, locale: 'zh' | 'en' = 'zh'): string {
   const m = /T(\d{2}):(\d{2})$/.exec(at || '');
-  return m ? `${m[1]}:${m[2]}` : '';
+  if (!m) return '';
+  const h = Number(m[1]);
+  const min = m[2];
+  if (locale === 'en') {
+    const am = h < 12;
+    const h12 = h % 12 || 12;
+    return `${h12}:${min} ${am ? 'AM' : 'PM'}`;
+  }
+  const period = h < 6 ? '凌晨' : h < 12 ? '上午' : h < 18 ? '下午' : '晚上';
+  const h12 = h % 12 || 12;
+  return `${period} ${h12}:${min}`;
 }
 
 /** 这条提醒是不是今天的事(含今天已过点的 —— 那正是最该提的)。 */
@@ -346,7 +467,7 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
   const dayEnd = new Date(now).setHours(23, 59, 59, 999);
   const dayStart = new Date(now).setHours(0, 0, 0, 0);
 
-  const greeting = `${greetingFor(now.getHours(), locale)}${input.displayName ? (locale === 'en' ? `, ${input.displayName}` : `,${input.displayName}`) : ''}`;
+  const greeting = greetingLine(now, input.displayName, locale);
 
   /* ── 日程 ────────────────────────────────────────────────────────
      窗口是**当天整天**,不是「从现在起」。定稿口径钉在 08:00,而人可能中午才打开;
@@ -376,48 +497,88 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
   /* ── ① 要你动(Top of mind)──────────────────────────────────────
      准入是正向的:到点的提醒、flag 级判定、有动静的订单。
      「一切正常」不进这一段 —— 没有要你动的事,这一段整段不出现。 */
-  const reminderLines = todayReminders.slice(0, ACTION_QUOTA.reminders).map((r) => {
-    const t = wallClockTime(r.at);
+  const reminderItems = todayReminders.slice(0, ACTION_QUOTA.reminders).map((r): DailyReportItem => {
+    const clock = wallClockTime(r.at, locale);
+    const mins = effortMin(r.kind);
     const kind = r.kind === 'bill' ? tt(locale, '账单', 'Bill')
       : r.kind === 'chore' ? tt(locale, '家务', 'Chore')
         : r.kind === 'event' ? tt(locale, '日程', 'Event') : '';
-    return `${t ? t + ' ' : ''}${r.title}${kind ? ` · ${kind}` : ''}`;
+    return {
+      when: `${mins} min${clock ? ` · ${clock}` : ''}`,
+      text: r.title,
+      notes: factNotes(kind, r.note),
+    };
   });
-  const flagLines = flags.slice(0, ACTION_QUOTA.flags).map((it) => insightLine(it, locale));
-  const orderLines = orders.slice(0, ACTION_QUOTA.orders).map(
-    (o) => `${o.title} · ${o.status}${o.eta ? tt(locale, ` · 预计 ${o.eta}`, ` · ETA ${o.eta}`) : ''}`,
-  );
+  const flagItems = flags.slice(0, ACTION_QUOTA.flags).map((it): DailyReportItem => {
+    const label = DOMAIN_LABEL[it.domain];
+    const tag = label ? tt(locale, label[0], label[1]) : it.domain;
+    return { when: tag, text: it.title, notes: factNotes(it.detail) };
+  });
+  const orderItems = orders.slice(0, ACTION_QUOTA.orders).map((o): DailyReportItem => ({
+    when: tt(locale, '今日动态', 'Today’s update'),
+    text: `${o.store || o.title} · ${o.status}`,
+    notes: factNotes(
+      o.store && o.title !== o.store ? o.title : '',
+      o.amount,
+      o.orderNo ? tt(locale, `订单 ${o.orderNo}`, `Order ${o.orderNo}`) : '',
+      o.trackingNo ? tt(locale, `运单 ${o.trackingNo}`, `Tracking ${o.trackingNo}`) : '',
+      o.eta ? tt(locale, `预计 ${o.eta}`, `ETA ${o.eta}`) : '',
+    ),
+  }));
   // 各类先按自己的配额取,再合并 —— 不是先到先得,免得一类把另一类饿死。
-  const actionLines = [...reminderLines, ...flagLines, ...orderLines].slice(0, MAX_ACTION);
-  if (actionLines.length) {
-    sections.push({ id: 'action', title: tt(locale, '先处理这几件', 'Top of mind'), lines: actionLines });
+  const actionItems = [...reminderItems, ...flagItems, ...orderItems].slice(0, MAX_ACTION);
+  const actionLines = actionItems.map(flattenItem);
+  if (actionItems.length) {
+    sections.push({
+      id: 'action',
+      title: tt(locale, '此刻要处理', 'Top of mind'),
+      lines: actionLines,
+      items: actionItems,
+    });
   }
 
   /* ── ② 按时间走 ─────────────────────────────────────────────── */
   const shownEvents = todayEvents.slice(0, MAX_EVENTS);
-  const calLines = shownEvents.length
+  const calItems: DailyReportItem[] = shownEvents.length
     ? [
-        ...shownEvents.map((e) => fmtEvent(e, locale)),
+        ...shownEvents.map((e) => eventItem(e, locale)),
         ...(todayEvents.length > MAX_EVENTS
-          ? [tt(locale, `还有 ${todayEvents.length - MAX_EVENTS} 件,在日程里`, `${todayEvents.length - MAX_EVENTS} more — see Schedule`)]
+          ? [{ text: tt(locale, `还有 ${todayEvents.length - MAX_EVENTS} 件,在日程里`, `${todayEvents.length - MAX_EVENTS} more — see Schedule`) }]
           : []),
       ]
     : upcoming.length
-      ? [tt(locale, '今天日历上没有安排。', 'Nothing on today’s calendar.'),
-         `${tt(locale, '下一个:', 'Next: ')}${fmtEvent(upcoming[0], locale)}`]
-      : [tt(locale, '今天没有日历安排,可以专注深度工作。', 'No calendar events today — a good day for deep work.')];
-  sections.push({ id: 'calendar', title: tt(locale, '今日日程', 'Today’s schedule'), lines: calLines });
+      ? [
+          { text: tt(locale, '今天日历上没有安排。', 'Nothing on today’s calendar.') },
+          (() => {
+            const it = eventItem(upcoming[0], locale);
+            return { when: tt(locale, '下一个', 'Next'), text: it.text, notes: it.notes };
+          })(),
+        ]
+      : [{ text: tt(locale, '今天没有日历安排,可以专注深度工作。', 'No calendar events today — a good day for deep work.') }];
+  const calLines = calItems.map(flattenItem);
+  sections.push({
+    id: 'calendar',
+    title: tt(locale, '今日日程', 'Today’s schedule'),
+    lines: calLines,
+    items: calItems,
+  });
 
   /* ── ③ 今天的底色:天气 / 穿 / 吃 / 练 ──────────────────────────
      这一段是 Nesio 独有的那部分 —— 邮箱里那份日报永远给不出来。 */
-  const todayLines: string[] = [];
-  if (wText) todayLines.push(wText);
-  if (input.outfitNote) todayLines.push(tt(locale, `穿:${input.outfitNote}`, `Wear: ${input.outfitNote}`));
+  const todayItems: DailyReportItem[] = [];
+  if (wText) todayItems.push({ when: tt(locale, '天气', 'Weather'), text: wText });
+  if (input.outfitNote) todayItems.push({ when: tt(locale, '穿', 'Wear'), text: input.outfitNote });
   const meals = (input.meals || []).filter(Boolean).slice(0, 3);
-  if (meals.length) todayLines.push(tt(locale, `吃:${meals.join('、')}`, `Eat: ${meals.join(', ')}`));
-  if (input.fitnessSession) todayLines.push(tt(locale, `练:${input.fitnessSession}`, `Train: ${input.fitnessSession}`));
-  if (todayLines.length) {
-    sections.push({ id: 'today', title: tt(locale, '今天', 'Today'), lines: todayLines });
+  if (meals.length) todayItems.push({ when: tt(locale, '吃', 'Eat'), text: meals.join(locale === 'en' ? ', ' : '、') });
+  if (input.fitnessSession) todayItems.push({ when: tt(locale, '练', 'Train'), text: input.fitnessSession });
+  const todayLines = todayItems.map(flattenItem);
+  if (todayItems.length) {
+    sections.push({
+      id: 'today',
+      title: tt(locale, '今天', 'Today'),
+      lines: todayLines,
+      items: todayItems,
+    });
   }
 
   /* ── ④ 新进展(有昨天可比)/ 这几面(第一天)──────────────────────
@@ -447,7 +608,12 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
     domainTitle = tt(locale, '这几面', 'Across your life');
   }
   if (domainLines.length) {
-    sections.push({ id: 'domain', title: domainTitle, lines: domainLines });
+    sections.push({
+      id: 'domain',
+      title: domainTitle,
+      lines: domainLines,
+      items: domainLines.map((text) => ({ text })),
+    });
   }
 
   /* ── ⑤ 往前看:未来两周确定会发生的事 ────────────────────────────
@@ -464,34 +630,49 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
     .filter((a) => a.date > aheadFrom && a.date <= aheadUntil)   // 今天不算(今天有自己的段)
     .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   if (aheadAll.length) {
-    const fmtDay = (ymd: string) => {
+    const fmtAheadWhen = (ymd: string) => {
       const d = new Date(`${ymd}T12:00:00`);
       if (Number.isNaN(d.getTime())) return ymd;
-      return locale === 'en'
-        ? d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-        : `${d.getMonth() + 1}月${d.getDate()}日`;
+      if (locale === 'en') {
+        return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+      }
+      return `${WEEKDAY_ZH[d.getDay()]} · ${d.getMonth() + 1}月${d.getDate()}日`;
     };
     const kindTag = (k: DailyReportAhead['kind']) => (
       k === 'reminder' ? tt(locale, '提醒', 'Reminder')
         : k === 'expiry' ? tt(locale, '到期', 'Expires')
           : tt(locale, '日程', 'Event'));
     const shown = aheadAll.slice(0, MAX_AHEAD);
-    const lines = shown.map((a) => `${fmtDay(a.date)} ${a.title} · ${kindTag(a.kind)}`);
+    const aheadItems: DailyReportItem[] = shown.map((a) => ({
+      when: fmtAheadWhen(a.date),
+      text: a.title,
+      notes: [kindTag(a.kind)],
+    }));
     if (aheadAll.length > MAX_AHEAD) {
-      lines.push(tt(locale, `还有 ${aheadAll.length - MAX_AHEAD} 件`, `${aheadAll.length - MAX_AHEAD} more`));
+      aheadItems.push({ text: tt(locale, `还有 ${aheadAll.length - MAX_AHEAD} 件`, `${aheadAll.length - MAX_AHEAD} more`) });
     }
-    sections.push({ id: 'ahead', title: tt(locale, '往前看 · 两周', 'Two weeks ahead'), lines });
+    sections.push({
+      id: 'ahead',
+      title: tt(locale, '往前看 · 两周', 'Two weeks ahead'),
+      lines: aheadItems.map(flattenItem),
+      items: aheadItems,
+    });
   }
 
   /* ── ⑤ 邮件:只给一行汇总 + 出口,**不复述内容** ────────────────
      用户已经收到一份从邮件总结的日报了。在这里再抄一遍,就是花力气做一个更差的
      重复品,还会把上面那几段真正只有 Nesio 知道的东西挤下去。 */
   if (emails.length) {
+    // 只报封数和出口,不抄主题/正文 —— 用户已经有一份从邮件总结的日报。
+    const emailItems: DailyReportItem[] = [{
+      text: tt(locale, `有 ${emails.length} 封值得看一眼 —— 在日程页的「收件」里`,
+                       `${emails.length} worth a look — under Inbox in Schedule`),
+    }];
     sections.push({
       id: 'email',
       title: tt(locale, '邮件', 'Mail'),
-      lines: [tt(locale, `有 ${emails.length} 封值得看一眼 —— 在日程页的「收件」里`,
-                       `${emails.length} worth a look — under Inbox in Schedule`)],
+      lines: emailItems.map(flattenItem),
+      items: emailItems,
     });
   }
 
@@ -504,27 +685,50 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
     ...threads.map((t) => tt(locale, `还没接上:${t}`, `Still open: ${t}`)),
   ];
   if (memoryLines.length) {
-    sections.push({ id: 'memory', title: tt(locale, '念念还记得', 'From your memory'), lines: memoryLines });
+    const memoryItems: DailyReportItem[] = [
+      ...notes.map((t) => ({ text: t })),
+      ...threads.map((t) => ({ when: tt(locale, '还没接上', 'Still open'), text: t })),
+    ];
+    sections.push({
+      id: 'memory',
+      title: tt(locale, '念念还记得', 'From your memory'),
+      lines: memoryLines,
+      items: memoryItems,
+    });
   }
 
   /* ── 一句话概览 ─────────────────────────────────────────────── */
   const headlineParts: string[] = [];
-  if (actionLines.length) {
-    headlineParts.push(tt(locale, `${actionLines.length} 件要你动`, `${actionLines.length} to handle`));
+  if (actionItems.length) {
+    headlineParts.push(tt(locale, `先处理「${actionItems[0].text}」`, `Handle “${actionItems[0].text}”`));
   }
   headlineParts.push(todayEvents.length
     ? tt(locale, `今天 ${todayEvents.length} 个安排`, `${todayEvents.length} event${todayEvents.length > 1 ? 's' : ''} today`)
     : tt(locale, '今天日程空', 'Clear schedule today'));
-  if (wText) headlineParts.push(wText.split(locale === 'en' ? ',' : ',')[0]);
+  if (todayEvents[0] && !todayEvents[0].allDay) {
+    const clock = fmtClock(todayEvents[0].start, locale);
+    if (clock) headlineParts.push(clock);
+  }
+  if (wText) {
+    const tempBit = wText.split(' · ').find((p) => /°C/.test(p));
+    if (tempBit) headlineParts.push(tempBit);
+  }
   const headline = headlineParts.join(' · ');
 
   /* ── markdown(存记忆 / 展示 / 机器人直接念)──────────────────── */
   const dateLabel = now.toLocaleDateString(locale === 'en' ? 'en-US' : 'zh-CN', { month: 'long', day: 'numeric', weekday: 'long' });
   const title = `${tt(locale, '每日日报', 'Daily report')} · ${dateLabel}`;
-  const md: string[] = [`# ${title}`, '', `_${headline}_`, ''];
+  const md: string[] = [`# ${title}`, '', greeting, '', `_${headline}_`, ''];
   for (const s of sections) {
     md.push(`## ${s.title}`);
-    for (const line of s.lines) md.push(`- ${line}`);
+    if (s.items?.length) {
+      for (const it of s.items) {
+        md.push(`- ${[it.when, it.text].filter(Boolean).join(' · ')}`);
+        for (const n of it.notes || []) md.push(`  - ${n}`);
+      }
+    } else {
+      for (const line of s.lines) md.push(`- ${line}`);
+    }
     md.push('');
   }
   const markdown = md.join('\n').trim();

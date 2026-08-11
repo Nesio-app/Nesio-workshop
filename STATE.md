@@ -70,6 +70,16 @@
 - **2026-08-11 Vercel 连红三次**:`lib/portal/bank-rules-store.ts` 写成 `../idb-blob-store`
   (文件就在 lib/portal),Turbopack Module not found;CI `connector-idempotency` 把
   `prepareIngestInput` 误切进 externalKey。生产仍停在 `6d00ece` 直到本条修好。
+- **2026-08-11 日报精度**(对照优秀日报 PDF):问候改星期几;行动条带耗时(5/10/15 min);
+  日程拆成「今日 · 上午 9:00」+ 时长 + 地址/Zoom 补充行;往前看用「周四 · 8月13日」;
+  订单带已知金额/单号。不复述邮件正文。老冻结件无 `items` 时 UI 退回 `lines`。
+- **2026-08-11 图4/通知/足迹/问候/天气**:①「试一条通知」`assumeGranted`,结果写按钮下,
+  不再请权/撑高 hint(iOS 闪白)。② Tesla 坐标只留车页地图,`refreshTesla` 不再写足迹。
+  ③ `email-sync-state` / `module-sync-state` / `refund-rejected` 迁 IDB,横幅不报这几个
+  簿记名;开屏 `migrateBookkeepingOffLs`。④ 白天没事只留问候,删「想到什么随时说」。
+  ⑤ 天气 chip 可点:小时 + 7 天 + 最多 4 个其它城市(Open-Meteo)。
+- **2026-08-11 Granola 重连假链接**:授权失效横幅看起来像链接,其实只是 toast 死字。
+  改成可点按钮 → `/api/portal/granola/connect`,行上也露出「点击重新授权」。
 
 ## 进行中的迁移
 

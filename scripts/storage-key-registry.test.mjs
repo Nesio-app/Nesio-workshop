@@ -292,6 +292,7 @@ const KNOWN_KEYS = new Map([
   ["nesio-video-montage-v1", "durable"],
   ["nesio-wardrobe-outfits-v1", "durable"],
   ["nesio-wardrobe-prefs-v1", "durable"],
+  ["nesio-weather-cities-v1", "durable"],
   ["nesio-weather-last-geo-v1", "durable"],
   ["nesio-workout-equip-v1", "durable"],
   // 训练流水。durable:换台设备「我上周练了什么」不该从零开始 —— 那是你干过的事,不是缓存。

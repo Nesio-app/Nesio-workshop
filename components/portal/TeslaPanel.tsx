@@ -6,8 +6,8 @@
  *   ① TeslaSheet(数据接入 → Tesla 行「数据」)—— 包一层 bottom sheet 外壳;
  *   ② 洞察「资产 → 车」tab(AssetsPanel)—— 常驻入口,便于长期观察数据到没到、去了哪。
  * 页面真相是本机快照(IDB + 首屏种子)。进页不打 Tesla API —— 休眠唤醒又慢又空。
- * 点「刷新车况」才拉 /api/portal/tesla;顺手把新鲜快照喂给 refreshTesla,
- * 让停车点/充电站即时进足迹、充电花费进财务(externalId 去重,不重复计)。
+ * 点「刷新车况」才拉 /api/portal/tesla;顺手把新鲜快照喂给 refreshTesla
+ * (充电花费进财务,externalId 去重)。车的坐标只画在本页地图,不进足迹。
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -249,8 +249,7 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
         recordTeslaReadings([...byVehicle.values()]);
       } catch { /* 攒失败不影响看车;写失败已在 recordTeslaReadings 里上报 */ }
       setLog(readTeslaLog());
-      // 顺手沉淀:面板刚拉到的新鲜快照复用给足迹/财务/信号管线(externalId 去重,
-      // 不会重复计),停车点/充电站即时进地图足迹、充电花费进财务 —— 看一眼车,数据就更新。
+      // 顺手沉淀:新鲜快照喂给财务/信号管线(externalId 去重)。坐标不进足迹。
       void import('@/lib/portal/connectors')
         .then((m) => m.refreshTesla({ drives: nextDrives as never[], charges: nextCharges as never[] }))
         .catch(() => {});
@@ -383,7 +382,7 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
     .filter((c) => c.batteryLevel == null)
     .sort((a, b) => (a.at < b.at ? 1 : -1));
 
-  // 有车但一个坐标都没回 = 多半没授权 vehicle_location(独立权限)→ 位置进不了足迹。
+  // 有车但一个坐标都没回 = 多半没授权 vehicle_location(独立权限)→ 车页地图画不出来。
   const hasVehicle = liveByVehicle.size > 0;
   const hasAnyLocation = drives.some((d) => d.latitude != null && d.longitude != null);
   const hasStaleLocation = drives.some((d) => d.locationStale);
@@ -540,7 +539,7 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
               {v.drive?.odometerMi != null && <span>{L(dict, '总里程', 'Odometer')} {Math.round(v.drive.odometerMi).toLocaleString()} mi</span>}
               {(v.drive?.speedMph ?? null) != null && v.drive?.shiftState === 'D' && <span>{v.drive.speedMph} mph</span>}
               {v.drive?.latitude != null && v.drive?.longitude != null && (
-                <span>{L(dict, '位置已记入足迹', 'Location saved to Places')}</span>
+                <span>{L(dict, '位置在下方地图', 'Shown on the map below')}</span>
               )}
             </div>
 
@@ -695,7 +694,7 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
 
       {/* Bug4 图24:「这些数据去哪了」那三行指路入口删掉 —— 车 tab 现在是资产页里的一块,
           它该显示的是这辆车现在什么样(状态 / 里程 / 充电 / 能耗),不是一张站内地图。
-          充电花费本来就已经进了财务、位置进了足迹,那两个板块自己在导航里。 */}
+          充电花费进财务;车的位置只在本页地图,不进足迹。 */}
     </>
   );
 }

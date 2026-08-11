@@ -328,6 +328,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const [captureLocOn, setCaptureLocOn] = useState(false);
   const [pushOn, setPushOn] = useState(false);
   const [pushMsg, setPushMsg] = useState('');
+  const [testMsg, setTestMsg] = useState('');
   const [notifyPrefs, setNotifyPrefs] = useState<NotifyPrefs>({ reminders: true, teslaLowBatt: true, familyChores: true });
   const nativeNotify = isNativePlatform();
   useEffect(() => {
@@ -755,15 +756,18 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
               type="button"
               className="nesio-settings-option"
               onClick={() => {
-                setPushMsg(L(dict, '正在试一条…', 'Sending a test…'));
+                // 结果写在按钮下面,不改上面「系统通知」的 hint ——
+                // 改 hint 会撑高整块,sheet 重排,iOS 上看着像闪屏。
+                setTestMsg(L(dict, '正在试一条…', 'Sending a test…'));
                 void import('@/lib/portal/native-local-notifications').then(async (m) => {
                   const r = await m.scheduleLocalAlert({
                     title: L(dict, '试一下通知', 'Test notification'),
                     body: L(dict, '能看到这一条,系统通知就接通了。', 'If you see this, system notifications are working.'),
                     afterSec: 2,
                     id: 710_003,
+                    assumeGranted: true,
                   });
-                  setPushMsg(r.ok
+                  setTestMsg(r.ok
                     ? L(dict, '两秒后会响一条。没响的话请重装带通知插件的 IPA。', 'It should ring in two seconds. If not, reinstall an IPA that includes the notification plugin.')
                     : r.reason === 'denied'
                       ? L(dict, '系统没给通知权限 — 到设置 → 宝盒里打开通知。', 'Notifications not allowed — enable them in Settings → 宝盒.')
@@ -773,6 +777,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
             >
               <span className="nesio-settings-option-label">{L(dict, '试一条通知', 'Send a test alert')}</span>
             </button>
+            {testMsg ? <p className="nesio-settings-option-hint" style={{ margin: 0 }}>{testMsg}</p> : null}
           </div>
         )}
         </>

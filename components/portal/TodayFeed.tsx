@@ -569,7 +569,8 @@ export default function TodayFeed({
         ? `${prefix}${L(uiLocale, `今天的 ${receipt.todayCount} 条都收好了,可以放心把今天放下了。`, `Today's ${receipt.todayCount} notes are tucked away — you can let today go.`)}`
         : `${prefix}${L(uiLocale, '今天很安静,可以放心把今天放下了。', 'A quiet day. You can let it go now.')}`;
     }
-    return `${prefix}${L(uiLocale, '没有要紧的事,想到什么随时说。', "Nothing pressing — say anything, anytime.")}`;
+    // 白天没要紧的事:只留问候,不补「想到什么随时说」—— 输入框自己就在那儿。
+    return prefix.trim();
   }, [receipt, uiLocale, hourNow, isEvening, displayName, focusNodes]);
 
   return (

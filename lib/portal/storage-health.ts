@@ -39,11 +39,13 @@ export function getStorageHealth(): StorageHealth {
       total += bytes;
     }
     sizes.sort((a, b) => b.bytes - a.bytes);
+    // 同步簿记/否决名单是内部状态,不是用户该看见的「占空间的文件」。
+    const BOOKKEEPING = /(?:sync-state|sync-since|sync-last-at|refund-rejected|refund-link)/i;
     return {
       usedBytes: total,
       limitBytes: ASSUMED_LIMIT_BYTES,
       percent: Math.round((total / ASSUMED_LIMIT_BYTES) * 100),
-      largestKeys: sizes.slice(0, 5),
+      largestKeys: sizes.filter((s) => !BOOKKEEPING.test(s.key)).slice(0, 5),
     };
   } catch {
     return empty;

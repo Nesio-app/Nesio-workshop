@@ -92,6 +92,8 @@ const EIGHT = new Date(2026, 6, 30, 8, 0);
 
   const hook = strip(read('components/portal/today/useTodayData.ts'));
   assert.match(hook, /autoPersistTodayReport\(/, '定稿落库仍然只有 Today 这一处');
+  assert.match(hook, /description: \[e\.description, e\.url\]/,
+    '日程要把 description/url 喂进日报 —— 否则 Zoom 号和线上入口永远抽不出来');
   assert.doesNotMatch(hook, /setTodayReport/,
     'Today 不再持有日报 state —— 入口已挪到洞察(用户定案:「今天不要入口,用弹出卡片」)');
 }
@@ -133,6 +135,7 @@ const EIGHT = new Date(2026, 6, 30, 8, 0);
   const action = r.sections.find((s) => s.id === 'action');
   assert.ok(action.lines.length <= 5, `「先处理这几件」封顶 5 条,实际 ${action.lines.length} —— 超过 5 件就不叫 top of mind 了`);
   assert.match(action.lines[0], /交房租/, '我自己设的提醒排最前(那是我亲手写下的时间)');
+  assert.match(action.lines[0], /5 min/, '提醒带耗时估计,不说「尽快」');
 
   // **每一类来源都得有位置** —— 这一条是被实锤逼出来的:
   // 原来写成先到先得,4 条 flag + 1 条提醒直接吃满 5 个位置,在途订单永远进不来,
@@ -158,6 +161,8 @@ const EIGHT = new Date(2026, 6, 30, 8, 0);
   const cal = r.sections.find((s) => s.id === 'calendar');
   assert.ok(cal.lines.length <= 7, '日程最多列 6 条 + 一行「还有 N 件」');
   assert.match(cal.lines[cal.lines.length - 1], /还有 \d+ 件/, '被折叠掉的要如实说有几件,不能静默截断');
+  assert.ok(cal.items?.every((it) => !it.text || it.when || /还有/.test(it.text)),
+    '日程主句不把时刻揉进去 —— 时刻走 when,老冻结件没有 items 时才退回 lines');
 
   // 只有 Nesio 知道的那几面确实进来了
   const today = r.sections.find((s) => s.id === 'today').lines.join('|');
@@ -232,7 +237,9 @@ const EIGHT = new Date(2026, 6, 30, 8, 0);
       { date: day(15), title: '第 15 天', kind: 'event' },
     ],
   });
-  const lines = r.sections.find((s) => s.id === 'ahead').lines.join('|');
+  const aheadSec = r.sections.find((s) => s.id === 'ahead');
+  const lines = aheadSec.lines.join('|');
+  assert.match(aheadSec.items[0].when, /周/, '往前看用星期+日期,不用「后天」这种相对说法');
   assert.match(lines, /明天的/);
   assert.match(lines, /第 14 天/, '窗口含第 14 天(用户拍板:看两周)');
   assert.doesNotMatch(lines, /第 15 天/,
@@ -300,6 +307,10 @@ const EIGHT = new Date(2026, 6, 30, 8, 0);
   assert.match(card, /readTodayReport\(/, '卡片只读冻结件');
   assert.doesNotMatch(card, /buildDailyReport/,
     '卡片不许 build —— 同上面 DailyReportPanel 那条理由:现算的兜底是个后门');
+  assert.match(card, /report\.greeting/, '卡片标题用星期问候,不是「每日日报 · 日期」那种目录名');
+  const sheet = strip(read('components/portal/DailyReportSheet.tsx'));
+  assert.match(sheet, /s\.items\?\.length/, '弹出层按 items 层次渲染;老冻结件没有 items 时退回 lines');
+  assert.match(sheet, /report\.greeting/, '全文抬头也是问候,和优秀日报同一开口');
 }
 
 /* ── ⑦ 好久没关注的面 + 没接上的线头(2026-07-30 用户点名要的两项)────── */
@@ -310,6 +321,9 @@ const EIGHT = new Date(2026, 6, 30, 8, 0);
   assert.equal(domainNeglect(new Date()).length, 0, 'SSR/无 window 时不瞎猜');
 
   const src = strip(read('lib/portal/daily-report-sources.ts'));
+  assert.match(src, /pick\('amount'\)/, '订单金额是邮件已经抽出的字段,必须喂进日报,不许只报标题');
+  assert.match(src, /pick\('orderNo'\)/, '订单号同样');
+  assert.match(src, /r\.note\?\.trim\(\)/, '提醒自己写的备注(金额/确认号)要带上,不猜也不丢');
   assert.match(src, /typeof last !== 'number'[\s\S]{0,40}continue;/,
     '**从没打开过的面一律不判断** —— 那不是「疏于关注」,那是「你可能压根不用这个功能」。' +
     '而且数据源是 2026-07-30 才开始记的,不这么写的话新装 App 第二天就会被告知' +

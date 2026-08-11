@@ -42,11 +42,13 @@ const iso = (h, m = 0) => new Date(2026, 6, 9, h, m, 0).toISOString();
     memoryNotes: ['给妈妈买降压药'],
   });
   assert.equal(r.empty, false, '有内容不空');
+  assert.match(r.greeting, /周四愉快，小明/, '问候用星期几,不是含糊的早上好');
   const cal = r.sections.find((s) => s.id === 'calendar');
   assert.ok(cal, '有日程节');
   // 当天整天,按时间升序
   assert.ok(cal.lines[0].includes('一早已经开完的会'), '当天日程按时间升序(最早的在前)');
   assert.ok(cal.lines.some((l) => l.includes('晨会')) && cal.lines.some((l) => l.includes('牙医')), '其余都在列');
+  assert.match(cal.lines.find((l) => l.includes('牙医')), /诊所/, '地点单独作为事实,不揉进标题');
   const today = r.sections.find((s) => s.id === 'today');
   assert.ok(today && today.lines[0].includes('18~27°C'), '天气报区间(现在并进「今天」那一段)');
   assert.ok(today.lines[0].includes('降水概率 60%'), '高降水概率并入');
@@ -78,7 +80,7 @@ const iso = (h, m = 0) => new Date(2026, 6, 9, h, m, 0).toISOString();
 // ── 英文 locale ──
 {
   const r = buildDailyReport({ now: NOW, locale: 'en', displayName: 'Sam', weather: { temperatureC: 20, condition: 'Sunny' }, events: [{ title: 'Standup', start: iso(9, 30) }] });
-  assert.ok(r.greeting.includes('Good morning') && r.greeting.includes('Sam'), 'en 问候');
+  assert.ok(r.greeting.includes('Thursday') && r.greeting.includes('Sam') && /briefing/i.test(r.greeting), 'en 问候用星期几');
   assert.ok(r.title.startsWith('Daily report'), 'en title');
   assert.ok(r.markdown.startsWith('# Daily report'), 'en markdown 标题');
   assert.ok(/1 event today/.test(r.headline), 'en headline');
@@ -87,5 +89,37 @@ const iso = (h, m = 0) => new Date(2026, 6, 9, h, m, 0).toISOString();
 // ── externalId 同一天稳定、跨天不同 ──
 assert.equal(dailyReportExternalId(new Date('2026-07-09T23:00:00')), 'daily-report-2026-07-09', 'externalId 幂等键按本地日期');
 assert.notEqual(dailyReportExternalId(new Date('2026-07-09')), dailyReportExternalId(new Date('2026-07-10')), '跨天不同键');
+
+// ── 精度:钟面 + 时长 + 耗时估计 + 会议号,不编 ──
+{
+  const r = buildDailyReport({
+    now: NOW, locale: 'zh', displayName: 'Janice',
+    events: [{
+      title: '牙医',
+      start: iso(9, 0),
+      end: iso(10, 0),
+      location: '2500 Blue Ridge Rd',
+      description: 'Zoom ID: 909 4418 8958',
+    }],
+    reminders: [{ title: '取消酒店', at: '2026-07-09T10:00', kind: 'other', note: '确认号 9094418895805 · €378.51' }],
+    orders: [{ title: '耳机', status: '已发货', store: 'Amazon', amount: '$42.10', orderNo: '112-4313914', eta: 'Aug 3' }],
+  });
+  const cal = r.sections.find((s) => s.id === 'calendar');
+  const dentist = cal.items.find((it) => it.text.includes('牙医'));
+  assert.match(dentist.when, /今日/, '日程带「今日」时间帽');
+  assert.match(dentist.when, /9:00/, '钟面精确到分钟,不用「下午」这种含糊说法');
+  assert.match(dentist.text, /1小时|1h/, '有起止就报时长');
+  assert.ok(dentist.notes.some((n) => n.includes('2500 Blue Ridge')), '地址在补充行,不塞进主句');
+  assert.ok(dentist.notes.some((n) => /Zoom/.test(n) && /909/.test(n)), '会议号从已有字段抽出,不编');
+
+  const action = r.sections.find((s) => s.id === 'action');
+  const hotel = action.items.find((it) => it.text.includes('取消酒店'));
+  assert.match(hotel.when, /5 min/, '打开付一下/回一句按 5 min 估,不说「尽快」');
+  assert.ok(hotel.notes.some((n) => n.includes('9094418895805')), '用户写过的确认号原样带上');
+
+  const order = action.items.find((it) => /耳机|Amazon/.test(it.text));
+  assert.ok(order.notes.some((n) => n.includes('$42.10')), '订单金额是已知字段才报');
+  assert.ok(order.notes.some((n) => n.includes('112-4313914')), '订单号是已知字段才报');
+}
 
 console.log('daily-report: OK');

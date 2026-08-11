@@ -1027,6 +1027,7 @@ export default function Portal() {
 
   // Storage quota alerts — a dropped write must never be silent
   useEffect(() => {
+    void import('@/lib/portal/storage-relief').then((m) => m.migrateBookkeepingOffLs()).catch(() => {});
     // 批次 51:用户可以「先不管」打盹 24h(报警不能去不掉);存储满时 localStorage
     // 自身可能写不进,落 sessionStorage 兜底(至少本次会话不再骚扰)。
     const snoozedUntil = (): number => {

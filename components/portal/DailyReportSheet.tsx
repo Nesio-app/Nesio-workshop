@@ -68,9 +68,9 @@ export default function DailyReportSheet({
             <span style={{ display: 'inline-flex', verticalAlign: '-3px', marginRight: 'var(--space-2)' }}>
               <IconNote size={16} />
             </span>
-            {report.title}
+            {report.greeting || report.title}
           </p>
-          <p className="nesio-brief-date">{report.headline}</p>
+          <p className="nesio-brief-date">{report.headline || report.title}</p>
         </div>
         <button type="button" className="nesio-voice-sheet-close" onClick={onClose}
           aria-label={L(dict, '关闭', 'Close')}>✕</button>
@@ -79,6 +79,7 @@ export default function DailyReportSheet({
       <div className="nesio-settings-sheet-body">
         {report.sections.map((s) => {
           const SectionIcon = SECTION_ICON[s.id];
+          const items = s.items?.length ? s.items : s.lines.map((text) => ({ text }));
           return (
             <div key={s.id} className={`nesio-drsheet-section nesio-drsheet-section--${s.id}`}>
               <p className="nesio-drsheet-h">
@@ -86,7 +87,17 @@ export default function DailyReportSheet({
                 {s.title}
               </p>
               <ul className="nesio-drsheet-ul">
-                {s.lines.map((line, i) => <li key={i}>{line}</li>)}
+                {items.map((it, i) => (
+                  <li key={i} className="nesio-drsheet-item">
+                    {it.when ? <span className="nesio-drsheet-when">{it.when}</span> : null}
+                    <p className="nesio-drsheet-text">{it.text}</p>
+                    {it.notes?.length ? (
+                      <ul className="nesio-drsheet-notes">
+                        {it.notes.map((n, j) => <li key={j}>{n}</li>)}
+                      </ul>
+                    ) : null}
+                  </li>
+                ))}
               </ul>
             </div>
           );

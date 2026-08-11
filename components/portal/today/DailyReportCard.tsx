@@ -54,7 +54,7 @@ export function DailyReportCard({ nodes }: { nodes: ReadonlyArray<ReportNode> })
       <div className="nesio-proactive-card" role="note">
         <div className="nesio-proactive-card-inner">
           <div className="nesio-proactive-card-text">
-            <p className="nesio-proactive-card-title">{report.title}</p>
+            <p className="nesio-proactive-card-title">{report.greeting || report.title}</p>
             <p className="nesio-proactive-card-body">{report.headline}</p>
             <div className="nesio-proactive-card-actions">
               <Button size="sm" variant="primary" onClick={() => setOpen(true)}>

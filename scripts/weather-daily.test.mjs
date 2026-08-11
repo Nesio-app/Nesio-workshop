@@ -37,6 +37,9 @@ const w = loadTs('../lib/portal/providers/weather.ts', {
 
 const snap = await w.fetchWeatherAt(35.79, -78.78, 'America/New_York', 'Cary, NC');
 assert.ok(capturedUrl.includes('daily=') && capturedUrl.includes('precipitation_probability_max'), 'forecast 请求带 daily 参数');
+assert.ok(capturedUrl.includes('forecast_days=7'), '详情页要未来几天,不是只拉今天');
+assert.ok(Array.isArray(snap.hourly), 'snapshot 带小时序列');
+assert.ok(Array.isArray(snap.days), 'snapshot 带逐日预报');
 assert.equal(snap.tempMaxC, 27, '最高温取 daily[0]');
 assert.equal(snap.tempMinC, 18, '最低温取 daily[0]');
 assert.equal(snap.precipProb, 60, '降水概率取 daily[0]');

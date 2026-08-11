@@ -15,6 +15,30 @@ import { trimChatStores } from './chat-store';
 import { trimAiCache as trimAiCacheStore } from './ai-cache';
 import { purgeLocalImages } from './local-image-store';
 import { purgeLocalFiles } from './local-file-store';
+import { idbBackend, registerIdbBlobKey } from './idb-blob-store';
+
+/** 图 4 横幅里那几个「占空间的文件」:同步簿记 + 退款否决,该在 IDB 不该占 LS。 */
+const BOOKKEEPING_LS_KEYS = [
+  'nesio-email-sync-state-v1',
+  'nesio-module-sync-state-v1',
+  'nesio-refund-rejected-v1',
+  'nesio-refund-link-v1',
+];
+
+/** 把簿记从 localStorage 搬进 IDB 并删掉 LS 副本。幂等。 */
+export async function migrateBookkeepingOffLs(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  for (const key of BOOKKEEPING_LS_KEYS) {
+    try {
+      registerIdbBlobKey(key);
+      const ls = localStorage.getItem(key);
+      if (ls == null) continue;
+      const existing = await idbBackend.get(key);
+      if (existing == null) await idbBackend.set(key, ls);
+      localStorage.removeItem(key);
+    } catch { /* 迁失败留 LS,下次再试 */ }
+  }
+}
 
 // 批次 52:聊天/AI 缓存已迁 IndexedDB,修剪改走各自 store(不再直摸 localStorage)
 const CHAT_KEEP = 60;
@@ -39,6 +63,7 @@ export interface ReliefResult {
 }
 
 export async function runStorageRelief(): Promise<ReliefResult> {
+  try { await migrateBookkeepingOffLs(); } catch { /* 迁簿记失败不挡其余清理 */ }
   const before = getStorageHealth();
   let deduped = 0;
   let purgedImages = 0;

@@ -74,4 +74,14 @@ for (const [file, re, why] of MUST_HAVE_KEY) {
   assert.ok(/CONNECTORS\.filter\(\(c\) => !c\.dev\)/.test(hub), '主列表必须过滤 dev 项');
 }
 
-console.log('connector-idempotency: OK(去重键名单 / 4 条路由带键 / flomo·日历自有去重 / Notion 无云抽取 / 未验证接入收折叠)');
+// ── ⑤ Granola 授权失效条必须真能跳去重连,不能只是看起来像链接 ──
+{
+  const hub = read('components/portal/ConnectorsHub.tsx');
+  assert.match(hub, /granola\/connect/, '重连要落到 /api/portal/granola/connect');
+  assert.match(hub, /点这里重新连接/, '失效条文案要写明「点这里」,别让人猜它是不是链接');
+  assert.match(hub, /toast\.onClick/, '失效条是按钮,点了才跳,不是一段死字');
+  assert.match(hub, /granola: \{ ok: false, msg:[\s\S]*needsReauth: true/,
+    '列表拉取失败也要在行上露出「点击重新授权」');
+}
+
+console.log('connector-idempotency: OK(去重键名单 / 4 条路由带键 / flomo·日历自有去重 / Notion 无云抽取 / 未验证接入收折叠 / Granola 重连可点)');

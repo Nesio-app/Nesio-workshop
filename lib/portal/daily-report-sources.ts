@@ -81,7 +81,24 @@ export function collectOrders(nodes: readonly Orderish[], limit = 4): DailyRepor
     if (raw !== 'shipped' && raw !== 'delivered' && raw !== 'refunded') continue;
     const status = ORDER_STATUS_TEXT[raw];
     if (!status) continue;
-    out.push({ title: n.name, status, ...(typeof a.eta === 'string' && a.eta ? { eta: a.eta } : {}) });
+    const pick = (key: string): string => {
+      const v = a[key];
+      return typeof v === 'string' && v.trim() ? v.trim() : '';
+    };
+    const eta = pick('eta');
+    const amount = pick('amount');
+    const orderNo = pick('orderNo');
+    const trackingNo = pick('trackingNo');
+    const store = pick('store');
+    out.push({
+      title: n.name,
+      status,
+      ...(eta ? { eta } : {}),
+      ...(amount ? { amount } : {}),
+      ...(orderNo ? { orderNo } : {}),
+      ...(trackingNo ? { trackingNo } : {}),
+      ...(store ? { store } : {}),
+    });
     if (out.length >= limit) break;
   }
   return out;
@@ -110,7 +127,12 @@ export function collectDailyReportExtras(now: Date = new Date()): DailyReportExt
   try {
     out.reminders = listReminders()
       .filter((r) => !r.doneAt && r.at.slice(0, 10) === todayKey)
-      .map((r) => ({ title: r.title, at: r.at, kind: r.kind }));
+      .map((r) => ({
+        title: r.title,
+        at: r.at,
+        kind: r.kind,
+        ...(r.note?.trim() ? { note: r.note.trim() } : {}),
+      }));
   } catch { /* ignore */ }
 
   // ③ 今天该练哪个 —— 和健身首页/例行卡共用同一套选法(当前阶段 + 跳过本周已练的),

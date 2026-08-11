@@ -139,4 +139,15 @@ for (const fn of ['handleBackupChosen', 'handleRestoreChosen', 'handleExportLoca
 assert.ok(!privacyCode.includes('nesio-settings-inline-link'), '原来的文字链版本已被并排按钮取代');
 void setCode;
 
+assert.doesNotMatch(feedCode, /想到什么随时说|Nothing pressing/,
+  '没事的时候只留问候,不补「想到什么随时说」—— 输入框自己就在那儿');
+assert.match(set, /assumeGranted:\s*true/,
+  '试一条通知不要再走 requestPermissions —— iOS 重复请权会闪白');
+
+const weatherChip = read('components/portal/today/WeatherChip.tsx');
+assert.match(weatherChip, /<button[\s\S]*className="nesio-today-weather"/,
+  '天气符号必须是按钮,点开才看得到小时和预报');
+assert.match(read('components/portal/today/WeatherSheet.tsx'), /searchWeatherPlaces/,
+  '详情里能加别的城市');
+
 console.log('today-settings-bug3: OK');

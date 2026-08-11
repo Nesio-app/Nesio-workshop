@@ -74,7 +74,13 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
   assert.match(charts, /不是连续轨迹/,
     '只读快照 = 同步时的采样点。不说清楚会被当成实时追踪,那是个隐私误解');
 
+  const connectors = read('lib/portal/providers/connectors.ts');
+  const teslaFn = connectors.slice(connectors.indexOf('export async function refreshTesla'));
+  assert.doesNotMatch(teslaFn, /recordLiveVisit|recordVisitAt/,
+    '车的坐标留在车页地图,不许并进足迹 —— 车停在家、人在别处时足迹会说谎');
+
   const panel = read('components/portal/TeslaPanel.tsx');
+  assert.doesNotMatch(panel, /位置已记入足迹/, '文案也不能再说「已记入足迹」');
   assert.match(panel, /\n      <TeslaLocationMap dict=\{dict\} vehicles=\{/,
     '车页要**无条件**渲染它(没坐标时组件自己返回 null)—— ' +
     '包一层 {false && …} 之类的等于写了没接上,那是这个仓库的老毛病');

@@ -34,6 +34,33 @@ export interface WeatherSnapshot {
   /** 写入缓存时的坐标 —— refreshWeather 用来判断要不要因位置变化重拉 */
   lat?: number;
   lon?: number;
+  /** 接下来十几小时(从现在起)。点开天气详情用。 */
+  hourly?: WeatherHour[];
+  /** 未来几天(含今天)。 */
+  days?: WeatherDay[];
+}
+
+export interface WeatherHour {
+  at: string;
+  tempC: number;
+  condition: string;
+  precipProb?: number;
+}
+
+export interface WeatherDay {
+  date: string;
+  minC: number;
+  maxC: number;
+  condition: string;
+  precipProb?: number;
+}
+
+export interface WeatherPlaceHit {
+  id: string;
+  name: string;
+  label: string;
+  lat: number;
+  lon: number;
 }
 
 const FETCH_TIMEOUT_MS = 8_000;
@@ -177,11 +204,11 @@ export async function fetchWeatherAt(
   url.searchParams.set('latitude', String(lat));
   url.searchParams.set('longitude', String(lon));
   url.searchParams.set('current', 'temperature_2m,weather_code');
-  url.searchParams.set('hourly', 'weather_code,temperature_2m');
+  url.searchParams.set('hourly', 'weather_code,temperature_2m,precipitation_probability');
   // 免费最大化·天气:今日区间 + 降水概率 + UV(免费),进简报「今天X~Y度,降水Z%」
-  url.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max');
-  url.searchParams.set('forecast_hours', '24');
-  url.searchParams.set('forecast_days', '1');
+  // 详情页要小时 + 未来几天,所以 daily 拉 7 天、hourly 带降水概率。
+  url.searchParams.set('daily', 'temperature_2m_max,temperature_2m_min,precipitation_probability_max,uv_index_max,weather_code');
+  url.searchParams.set('forecast_days', '7');
   url.searchParams.set('timezone', timezone);
 
   const [res, alert] = await Promise.all([
@@ -218,6 +245,41 @@ export async function fetchWeatherAt(
   const precipProb = num(data.daily?.precipitation_probability_max);
   const uvMax = num(data.daily?.uv_index_max);
 
+  const hourlyTimes: string[] = data.hourly?.time || [];
+  const hourlyTemps: unknown[] = data.hourly?.temperature_2m || [];
+  const hourlyPrecip: unknown[] = data.hourly?.precipitation_probability || [];
+  const nowMs = Date.now();
+  const hourly: WeatherHour[] = [];
+  for (let i = 0; i < hourlyTimes.length; i++) {
+    const t = new Date(hourlyTimes[i]).getTime();
+    if (!Number.isFinite(t) || t < nowMs - 45 * 60_000) continue;
+    const temp = Number(hourlyTemps[i]);
+    hourly.push({
+      at: hourlyTimes[i],
+      tempC: Number.isFinite(temp) ? Math.round(temp) : tempC,
+      condition: wmoLabel(Number(codes[i]) || currentCode),
+      precipProb: Number.isFinite(Number(hourlyPrecip[i])) ? Math.round(Number(hourlyPrecip[i])) : undefined,
+    });
+    if (hourly.length >= 12) break;
+  }
+
+  const dayDates: string[] = data.daily?.time || [];
+  const dayMax: unknown[] = data.daily?.temperature_2m_max || [];
+  const dayMin: unknown[] = data.daily?.temperature_2m_min || [];
+  const dayPrecip: unknown[] = data.daily?.precipitation_probability_max || [];
+  const dayCode: unknown[] = data.daily?.weather_code || [];
+  const days: WeatherDay[] = dayDates.map((date, i) => {
+    const max = Number(dayMax[i]);
+    const min = Number(dayMin[i]);
+    return {
+      date,
+      minC: Number.isFinite(min) ? Math.round(min) : tempC,
+      maxC: Number.isFinite(max) ? Math.round(max) : tempC,
+      condition: wmoLabel(Number(dayCode[i]) || currentCode),
+      precipProb: Number.isFinite(Number(dayPrecip[i])) ? Math.round(Number(dayPrecip[i])) : undefined,
+    };
+  }).filter((d) => d.date);
+
   // 降水概率高时,forecastNote 若无更具体转变提示,给「记得带伞」
   if (!forecastNote && typeof precipProb === 'number' && precipProb >= 50) {
     forecastNote = `今天有 ${precipProb}% 概率下雨,记得带伞`;
@@ -242,7 +304,36 @@ export async function fetchWeatherAt(
     uvMax,
     lat,
     lon,
+    hourly,
+    days,
   };
+}
+
+/** 按城市名搜可添加的天气地点(Open-Meteo 地理编码,零 key)。 */
+export async function searchWeatherPlaces(q: string, language: 'zh' | 'en' = 'zh'): Promise<WeatherPlaceHit[]> {
+  const query = q.trim();
+  if (query.length < 2) return [];
+  const url = new URL('https://geocoding-api.open-meteo.com/v1/search');
+  url.searchParams.set('name', query);
+  url.searchParams.set('count', '6');
+  url.searchParams.set('language', language === 'en' ? 'en' : 'zh');
+  const res = await fetchWithTimeout(url.toString());
+  if (!res.ok) return [];
+  const data = await res.json() as { results?: Array<{ id?: number; name?: string; latitude?: number; longitude?: number; admin1?: string; country_code?: string }> };
+  const rows = Array.isArray(data?.results) ? data.results : [];
+  const out: WeatherPlaceHit[] = [];
+  for (const row of rows) {
+    const lat = Number(row.latitude);
+    const lon = Number(row.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+    const name = normalizeLocalPlaceName(String(row.name || ''));
+    if (!name) continue;
+    const state = formatStateCode(String(row.admin1 || ''));
+    const country = String(row.country_code || '').toUpperCase();
+    const label = [name, state || country].filter(Boolean).join(', ');
+    out.push({ id: `${lat.toFixed(3)},${lon.toFixed(3)}`, name, label, lat, lon });
+  }
+  return out;
 }
 
 export async function readGeo(timeoutMs = 4_000): Promise<GeolocationPosition> {

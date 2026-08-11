@@ -41,6 +41,20 @@ function makeCtx({ lsInit = {}, localBodies = {}, fetchImpl } = {}) {
       };
       if (p === './email-fulltext-index') return { indexEmailBodies: (map) => { indexedCaptured = { ...(indexedCaptured || {}), ...map }; } };
       if (p === './storage-health') return { logDropped: () => {} };
+      if (p === './idb-blob-store') return {
+        createBlobStore: ({ key }) => ({
+          load: () => {
+            try {
+              const raw = localStorage.getItem(key);
+              return raw ? JSON.parse(raw) : null;
+            } catch { return null; }
+          },
+          save: (v) => { try { localStorage.setItem(key, JSON.stringify(v)); } catch { /* ignore */ } },
+          ready: async () => {},
+          refresh: async () => {},
+          isReady: () => true,
+        }),
+      };
       if (p === './yield-main') return { yieldToMain: async () => {} };
       return {};
     },

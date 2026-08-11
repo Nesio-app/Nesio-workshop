@@ -21,6 +21,7 @@
  */
 
 import { reportStorageDropped } from './storage-health';
+import { createBlobStore } from './idb-blob-store';
 
 export interface RefundCandidateInput {
   id: string;
@@ -34,6 +35,23 @@ export interface RefundCandidateInput {
 const LINK_KEY = 'nesio-refund-link-v1';
 const REJECT_KEY = 'nesio-refund-rejected-v1';
 
+const rejectStore = typeof createBlobStore === 'function'
+  ? createBlobStore<string[]>({
+      key: REJECT_KEY,
+      updateEvent: 'nesio-refund-rejected-updated',
+      validate: (v) => Array.isArray(v),
+      onWriteError: reportStorageDropped,
+    })
+  : null;
+const linkStore = typeof createBlobStore === 'function'
+  ? createBlobStore<Record<string, string>>({
+      key: LINK_KEY,
+      updateEvent: 'nesio-refund-link-updated',
+      validate: (v) => Boolean(v && typeof v === 'object' && !Array.isArray(v)),
+      onWriteError: reportStorageDropped,
+    })
+  : null;
+
 /** 一对的稳定键。退款在前、原消费在后 —— 顺序固定,免得同一对存两份。 */
 export function refundPairKey(refundId: string, purchaseId: string): string {
   return `${refundId}|${purchaseId}`;
@@ -43,6 +61,8 @@ export function refundPairKey(refundId: string, purchaseId: string): string {
 
 export function loadRejectedRefundPairs(): Set<string> {
   if (typeof window === 'undefined') return new Set();
+  const fromStore = rejectStore?.load();
+  if (Array.isArray(fromStore)) return new Set(fromStore);
   try { return new Set(JSON.parse(localStorage.getItem(REJECT_KEY) || '[]') as string[]); } catch { return new Set(); }
 }
 
@@ -51,6 +71,7 @@ export function rejectRefundPair(refundId: string, purchaseId: string): void {
   if (typeof window === 'undefined') return;
   const set = loadRejectedRefundPairs();
   set.add(refundPairKey(refundId, purchaseId));
+  if (rejectStore) { rejectStore.save([...set]); return; }
   try { localStorage.setItem(REJECT_KEY, JSON.stringify([...set])); } catch { reportStorageDropped(); }
 }
 
@@ -59,6 +80,8 @@ export function rejectRefundPair(refundId: string, purchaseId: string): void {
 /** refundId → purchaseId。一笔退款只能挂一笔消费。 */
 export function loadRefundLinks(): Record<string, string> {
   if (typeof window === 'undefined') return {};
+  const fromStore = linkStore?.load();
+  if (fromStore && typeof fromStore === 'object' && !Array.isArray(fromStore)) return fromStore;
   try {
     const v = JSON.parse(localStorage.getItem(LINK_KEY) || '{}') as unknown;
     return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, string>) : {};
@@ -75,6 +98,7 @@ export function linkRefund(refundId: string, purchaseId: string | null): boolean
   if (typeof window === 'undefined') return false;
   const map = loadRefundLinks();
   if (purchaseId) map[refundId] = purchaseId; else delete map[refundId];
+  if (linkStore) { linkStore.save(map); return true; }
   try { localStorage.setItem(LINK_KEY, JSON.stringify(map)); return true; }
   catch { reportStorageDropped(); return false; }
 }
