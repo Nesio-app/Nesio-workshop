@@ -9,7 +9,8 @@
     "test:rc-launch-path": "node scripts/precheck-rc-launch-path.mjs",
     "test:app-store-materials": "node scripts/precheck-app-store-materials.mjs",
     "test:release-candidate": "npm run test:ios-shell && npm run test:rc-launch-path && npm run test:app-store-materials",
-    "cap:sync": "npm run sync && npx cap sync ios",
+    "cap:sync": "npm run sync && npx cap sync ios && node scripts/patch-package-class-list.mjs",
+    "patch:plugins": "node scripts/patch-package-class-list.mjs",
     "ios": "npm run cap:sync && npx cap open ios",
     "ios:run": "npm run cap:sync && npx cap run ios",
     "assets": "npx capacitor-assets generate --ios"

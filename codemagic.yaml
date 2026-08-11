@@ -65,6 +65,9 @@ definitions:
         test -f ios/App/App/NesioVisionPlugin.swift || (echo "ios/ 工程不完整,插件文件不见了" && exit 1)
         mkdir -p www && [ -f www/index.html ] || echo '<!doctype html><title>Nesio</title>' > www/index.html
         npx cap sync ios
+        # cap sync 只登记 npm 插件 → 自研 Swift 的 packageClassList 会被写成 []。
+        # 空列表 = 插件编译进包但不注册 → 真机「没带定位/通知」。必须补写。
+        node scripts/patch-package-class-list.mjs
         # 自查:六个插件必须都在编译清单里。
         # 漏一个的后果是 App 装上去照常跑,只有那个功能永远「这版没带」——
         # 而构建全绿。这种失败必须在这里拦住。
@@ -75,6 +78,16 @@ definitions:
             || (echo "❌ Nesio${p}Plugin 没进 Sources 编译清单" && exit 1)
         done
         echo "✅ 六个插件都在,且都在编译清单里"
+        python3 - <<'PY'
+import json,sys
+p="ios/App/App/capacitor.config.json"
+cls=json.load(open(p)).get("packageClassList") or []
+need=["NesioGeolocationPlugin","NesioLocalNotifyPlugin"]
+missing=[c for c in need if c not in cls]
+if missing:
+  print("❌ packageClassList 缺", missing, "实际=", cls); sys.exit(1)
+print("✅ packageClassList 含定位+通知", len(cls), "个类")
+PY
         # pbxproj 的 Resources 阶段引用的东西缺一个,xcodebuild 就是
         # "Build input file cannot be found" 直接中断。config.xml 要入库,
         # 另外两个由 cap sync 现生成 —— 这里确认它真的生成了。

@@ -55,6 +55,10 @@
   孤本记忆图 backfill 扩到全节点;健身/搭配/偏好/银行规则/Tesla 电量日志
   迁 IDB durable(腾 LS);统一同步含衣橱/照料/地点/文件图。本地音乐音频仍本机
   (体积无法走 module 行上限)——元数据可同步但文件需另开 Storage 方案。
+  **提醒真相**=`nesio-schedule-reminders-v1`(IDB durable/module);系统通知投影
+  `nesio-reminder-notify-state-v1` 仍是 cache(本机重建)。Tesla 实时仍 API 不落主库,
+  电量日志已与银行同档(IDB durable)。**壳**:`cap sync` 会清空 `packageClassList`,
+  出包前必须跑 `treasurebox-ios/scripts/patch-package-class-list.mjs`,否则定位/通知不注册。
 
 ## 进行中的迁移
 
