@@ -48,9 +48,8 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-migration-completed-v1',
   'nesio-migration-log-v1',
   'nesio-email-signals-cache',
-  // 车的电量时间线(看车这一页的副产物)。换台设备从零开始完全正确 ——
-  // 它不是用户录进来的东西,没必要进备份、上云。
-  'nesio-tesla-battery-log-v1',
+  // 车的电量时间线:2026-08-10 改为 durable(IDB)+module-sync,换端可见稀疏采样。
+  // 低电量「已通知」仍是本机 cache。
   'nesio-tesla-low-batt-notified-v1',
   // 本地曲库的**元数据**与播放位置(2026-07-30 音乐模块)。都判 cache,理由是同一个:
   // 音频本体在 IndexedDB、**不进备份**(几百 MB 的备份 JSON 没有意义),
@@ -128,6 +127,7 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-bank-synced-at', 'nesio-drive-backup-at', 'nesio-last-backup-at', // 各同步的"上次时间"
   'nesio-place-image-sync-state-v1', 'nesio-reader-sync-state-v1',         // 同步簿记(同 email-sync-state)
   'nesio-wardrobe-image-sync-state-v1', 'nesio-file-sync-state-v1',        // 同步簿记(衣帽间照片/文件附件)
+  'nesio-care-image-sync-state-v1',                                       // 照料附件图同步簿记
   'nesio-life-graph-cloud-sync-v1', 'nesio-life-graph-cloud-sync-outbox-v1', // 云同步水位与待发队列
   'nesio-family-strip-fetch-at-v1',                                        // 取数节流
   'nesio-plaid-enrich-v1',                                                 // 一次性全量回填标记

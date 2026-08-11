@@ -42,6 +42,8 @@ export const READER_BOOK_MODULE_PREFIX = 'reader-book:';
 export const PLACE_IMAGE_MODULE_PREFIX = 'place-image:';
 /** 衣帽间照片逐张行前缀(cloud-wardrobe-image-sync)—— nesio-images 里的 wardrobe-* / 全身照,per-record 上云。 */
 export const WARDROBE_IMAGE_MODULE_PREFIX = 'wardrobe-image:';
+/** 资产照料附件图前缀(cloud-care-image-sync)—— nesio-images 里的 care-att-*,per-record 上云。 */
+export const CARE_IMAGE_MODULE_PREFIX = 'care-image:';
 /** 文件附件逐份行前缀(cloud-file-sync)—— nesio-files 的 pdf/凭证/聊天文件,per-record 上云。 */
 export const LOCAL_FILE_MODULE_PREFIX = 'local-file:';
 
@@ -54,6 +56,7 @@ export const DEDICATED_SYNC_PREFIXES: readonly string[] = [
   READER_BOOK_MODULE_PREFIX,    // 导入书籍逐本行(cloud-reader-sync)
   PLACE_IMAGE_MODULE_PREFIX,    // 地点封面照逐张行(cloud-place-image-sync,走通用 record-sync 工厂)
   WARDROBE_IMAGE_MODULE_PREFIX, // 衣帽间照片逐张行(cloud-wardrobe-image-sync,同工厂)
+  CARE_IMAGE_MODULE_PREFIX,     // 资产照料附件图(cloud-care-image-sync,同工厂)
   LOCAL_FILE_MODULE_PREFIX,     // 文件附件逐份行(cloud-file-sync,同工厂)
 ];
 

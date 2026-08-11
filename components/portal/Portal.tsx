@@ -28,6 +28,7 @@ import { autoSyncEmailBodiesWithCloud } from '@/lib/portal/cloud-email-sync';
 import { autoSyncReaderBooksWithCloud } from '@/lib/portal/cloud-reader-sync';
 import { autoSyncPlaceImagesWithCloud } from '@/lib/portal/cloud-place-image-sync';
 import { autoSyncWardrobeImagesWithCloud } from '@/lib/portal/cloud-wardrobe-image-sync';
+import { autoSyncCareImagesWithCloud } from '@/lib/portal/cloud-care-image-sync';
 import { autoSyncLocalFilesWithCloud } from '@/lib/portal/cloud-file-sync';
 import { autoSyncConnectorsOnBoot } from '@/lib/portal/connector-sync';
 import { OPEN_MODE_CAMERA_EVENT, setPendingCapture, backfillMissingPhotoUploads, type ModeCameraMode } from '@/lib/portal/capture-pipeline';
@@ -160,9 +161,10 @@ const CLOUD_SYNC_TASKS = [
   { name: 'reader-books', run: () => autoSyncReaderBooksWithCloud() },
   { name: 'place-images', run: () => autoSyncPlaceImagesWithCloud() },
   { name: 'wardrobe-images', run: () => autoSyncWardrobeImagesWithCloud() },
+  { name: 'care-images', run: () => autoSyncCareImagesWithCloud() },
   { name: 'local-files', run: () => autoSyncLocalFilesWithCloud() },
-  // 旧衣物/一餐:本机有图但从未写入 memory_assets → 补传(与主相机同路)。
-  { name: 'photo-backfill', run: () => backfillMissingPhotoUploads({ limit: 12 }).then(() => {}) },
+  // 本机有图、无 storagePath 的记忆节点 → 补传 memory_assets(不限衣物/一餐)。
+  { name: 'photo-backfill', run: () => backfillMissingPhotoUploads({ limit: 24 }).then(() => {}) },
   // 外部连接器(日历/邮件/flomo/银行/通讯录)拉新,30 分钟节流,内部保证。
   { name: 'connectors', run: () => autoSyncConnectorsOnBoot() },
 ];

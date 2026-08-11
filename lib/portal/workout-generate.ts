@@ -7,6 +7,7 @@
 
 import type { CatalogExercise } from './exercise-catalog';
 import { reportStorageDropped } from './storage-health';
+import { appendWorkoutHistory, loadWorkoutHistory as loadSessionHistory } from './workout-store';
 
 export type GenEquip = 'body' | 'dumbbell' | 'band' | 'kettlebell' | 'barbell' | 'gym';
 export type GenFocus = 'balanced' | 'push' | 'pull' | 'legs' | 'core';
@@ -146,8 +147,6 @@ export interface LastWorkoutRecord {
 }
 
 const LAST_KEY = 'nesio-workout-last-v1';
-/** 训练流水 —— 「我上周训练了什么」问的是历史,只存 last 是答不上来的。 */
-const HISTORY_KEY = 'nesio-workout-history-v1';
 
 /** 精选 18(exercise-library)的肌群标签 → 目录 target,回溯归因对两套动作库一视同仁。 */
 export const CURATED_TAG_TARGET: Record<string, string> = {
@@ -169,30 +168,21 @@ export function inferFocus(targets: string[]): FocusBucket | null {
 /** 跟练完成时记一笔(任何来源:生成的 / 自定义 / 计划),给下次的回溯建议用。 */
 export function recordWorkoutDone(name: string, targets: string[], now: Date = new Date()): void {
   if (typeof window === 'undefined') return;
-  // 本地日键(不走 UTC —— 美东晚上练完别记成「明天」)
   const day = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  const rec: LastWorkoutRecord = { date: day, name, focus: inferFocus(targets) };
+  const focus = inferFocus(targets);
+  const rec: LastWorkoutRecord = { date: day, name, focus };
   try { localStorage.setItem(LAST_KEY, JSON.stringify(rec)); } catch { reportStorageDropped(); }
-  // 只存「最后一次」的话,「我上周训练了什么」永远答不上来 —— 那个问题问的是**历史**,
-  // 而历史从来没被留下过(2026-07-30 审计:矩阵里这一格是红的,根因就在这行)。
-  // 从现在起追加一条流水;月度小结(monthly-digest)从这里折。
-  // 只留最近 400 条:一天一次也够一年多,再多对「这个月练了什么」没有意义。
-  try {
-    const raw = localStorage.getItem(HISTORY_KEY);
-    const prev = raw ? (JSON.parse(raw) as LastWorkoutRecord[]) : [];
-    const next = [rec, ...(Array.isArray(prev) ? prev : [])].slice(0, 400);
-    localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
-  } catch { reportStorageDropped(); }
+  // 与 workout-store 共用同一份 IDB 历史(旧 LS 双写同 key 结构打架已收口)。
+  appendWorkoutHistory({ date: day, name, focus }, 400);
 }
 
 /** 训练流水(新→旧)。给「我上周训练了什么」和月度小结用。 */
 export function loadWorkoutHistory(): LastWorkoutRecord[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = localStorage.getItem(HISTORY_KEY);
-    const arr = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr.filter((r) => r && typeof r.date === 'string') : [];
-  } catch { return []; }
+  return loadSessionHistory().map((r) => ({
+    date: r.date,
+    name: r.name,
+    focus: (r.focus as FocusBucket | null | undefined) ?? null,
+  }));
 }
 
 export function loadLastWorkout(): LastWorkoutRecord | null {

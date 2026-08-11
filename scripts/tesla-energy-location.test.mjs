@@ -106,7 +106,30 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   const mod = { exports: {} };
-  vm.runInNewContext(js, { module: mod, exports: mod.exports, require: () => ({ logDropped() {} }), Date, Math, Number, Array, Object, String, JSON, isNaN, Boolean });
+  vm.runInNewContext(js, {
+    module: mod,
+    exports: mod.exports,
+    require: (id) => {
+      if (String(id).includes('idb-blob-store')) {
+        return {
+          createBlobStore: () => ({
+            load: () => [],
+            save: () => {},
+          }),
+        };
+      }
+      return { logDropped() {} };
+    },
+    Date,
+    Math,
+    Number,
+    Array,
+    Object,
+    String,
+    JSON,
+    isNaN,
+    Boolean,
+  });
   const { shouldRecord, prune, MIN_GAP_MS, KEEP_DAYS } = mod.exports;
 
   const NOW = Date.parse('2026-07-30T12:00:00Z');
@@ -141,14 +164,13 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
   assert.equal(old[0].batteryPct, 90);
 }
 
-/* ══ ⑤ 存储键登记(未登记的默认 durable,会悄悄进备份 + 上云)═══════ */
+/* ══ ⑤ 存储键登记(电量日志现为 durable,换端可见稀疏采样)═══════ */
 {
   const reg = read('scripts/storage-key-registry.test.mjs');
-  assert.match(reg, /\["nesio-tesla-battery-log-v1", "cache"\]/,
-    '换台设备从零开始完全正确 —— 它是看车这一页的副产物,不是用户录进来的东西。' +
-    '不登记的话默认 durable,会悄悄进备份文件、被云同步');
-  assert.match(read('lib/portal/storage-manifest.ts'), /'nesio-tesla-battery-log-v1'/,
-    'cache 类还要写进 CACHE_KEYS,否则 keyKind() 仍然判 durable');
+  assert.match(reg, /\["nesio-tesla-battery-log-v1", "durable"\]/,
+    '2026-08-10:用户要求未上云数据全部上云 —— 电量日志改为 durable+IDB+module-sync');
+  assert.doesNotMatch(read('lib/portal/storage-manifest.ts'), /'nesio-tesla-battery-log-v1'/,
+    'durable 键不得再躺在 CACHE_KEYS 里');
 
   assert.match(read('lib/portal/tesla-history.ts'), /logDropped\('tesla\.battery_log'/,
     '存储写失败不许静默吞掉(CLAUDE.md 红线)');

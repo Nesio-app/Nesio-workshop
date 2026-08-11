@@ -1,37 +1,47 @@
 /**
- * wardrobe-prefs — B｜穿搭反馈学习(本地、隐私友好、零云)。
+ * wardrobe-prefs — B｜穿搭反馈学习(端上规则引擎;偏好数据走 module-sync 换端)。
  * 把用户对每套搭配的反馈(👍 喜欢 / 👎 不喜欢 / 穿了)沉淀成偏好:
  *   - 颜色净好感(colorLikes):喜欢/穿了 +1、不喜欢 -1;
  *   - 拒绝过的上下装组合(dislikedPairs):以后规则版和云造型师都避开。
- * 偏好回喂:①规则版 suggestOutfit(传 prefs 调分);②云造型师(buildStylistDislikes → prompt)。
- * 全程 localStorage,写失败走 storage-health 可见事件(红线:不吞存储失败)。
+ * 2026-08-10:迁出 localStorage → IDB blob(「零云」只指规则计算端上跑,数据会同步)。
  */
 
+import { createBlobStore } from './idb-blob-store';
 import { reportStorageDropped } from './storage-health';
 import { pairKey, type OutfitPrefs, type Garment } from './wardrobe';
 
 const KEY = 'nesio-wardrobe-prefs-v1';
-const COLOR_CLAMP = 4;   // 每种颜色净好感封顶 ±4,避免一色霸榜
-const MAX_PAIRS = 60;    // 拒绝组合上限,超出丢最早的
+const COLOR_CLAMP = 4;
+const MAX_PAIRS = 60;
+export const WARDROBE_PREFS_UPDATED = 'nesio-wardrobe-prefs-updated';
 
 const empty = (): OutfitPrefs => ({ colorLikes: {}, dislikedItemIds: [], dislikedPairs: [] });
 
+const store = createBlobStore<OutfitPrefs>({
+  key: KEY,
+  updateEvent: WARDROBE_PREFS_UPDATED,
+  validate: (v) => Boolean(v && typeof v === 'object' && !Array.isArray(v)),
+  onWriteError: reportStorageDropped,
+});
+
 export function loadWardrobePrefs(): OutfitPrefs {
-  try {
-    const raw = localStorage.getItem(KEY);
-    if (!raw) return empty();
-    const p = JSON.parse(raw) as Partial<OutfitPrefs>;
-    return {
-      colorLikes: (p.colorLikes && typeof p.colorLikes === 'object') ? p.colorLikes as Record<string, number> : {},
-      dislikedItemIds: Array.isArray(p.dislikedItemIds) ? p.dislikedItemIds.filter((x) => typeof x === 'string') : [],
-      dislikedPairs: Array.isArray(p.dislikedPairs) ? p.dislikedPairs.filter((x) => typeof x === 'string') : [],
-    };
-  } catch { return empty(); }
+  const p = store.load();
+  if (!p) return empty();
+  return {
+    colorLikes: (p.colorLikes && typeof p.colorLikes === 'object') ? p.colorLikes as Record<string, number> : {},
+    dislikedItemIds: Array.isArray(p.dislikedItemIds) ? p.dislikedItemIds.filter((x) => typeof x === 'string') : [],
+    dislikedPairs: Array.isArray(p.dislikedPairs) ? p.dislikedPairs.filter((x) => typeof x === 'string') : [],
+  };
 }
 
 function save(p: OutfitPrefs): boolean {
-  try { localStorage.setItem(KEY, JSON.stringify(p)); return true; }
-  catch { reportStorageDropped(); return false; } // 存储满/被拒 → 可见事件,不静默丢
+  try {
+    store.save(p);
+    return true;
+  } catch {
+    reportStorageDropped();
+    return false;
+  }
 }
 
 export type FeedbackKind = 'like' | 'dislike' | 'worn';

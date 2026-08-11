@@ -97,30 +97,31 @@ export function upsertOutfit(list: readonly SavedOutfit[], next: SavedOutfit): S
   return list.map((o, i) => (i === at ? merged : o));
 }
 
-// ── 存储(只有下面这段碰 localStorage)────────────────────────────────────────
+// ── 存储(IDB blob;旧 LS 水合时自动迁出)────────────────────────────────────
 
+import { createBlobStore } from './idb-blob-store';
 import { reportStorageDropped } from './storage-health';
 
 const KEY = 'nesio-wardrobe-outfits-v1';
 export const WARDROBE_OUTFITS_UPDATED = 'nesio-wardrobe-outfits-updated';
 
+const store = createBlobStore<SavedOutfit[]>({
+  key: KEY,
+  updateEvent: WARDROBE_OUTFITS_UPDATED,
+  validate: (v) => Array.isArray(v),
+  onWriteError: reportStorageDropped,
+});
+
 export function loadOutfits(): SavedOutfit[] {
-  if (typeof window === 'undefined') return [];
-  try {
-    const raw = JSON.parse(localStorage.getItem(KEY) || '[]');
-    return Array.isArray(raw) ? raw as SavedOutfit[] : [];
-  } catch { return []; }
+  return store.load() ?? [];
 }
 
 /** 写不进去返回 false —— 调用方必须显式告诉用户,不许静默吞(CLAUDE.md 红线)。 */
 function persist(list: SavedOutfit[]): boolean {
   try {
-    localStorage.setItem(KEY, JSON.stringify(list.slice(0, 400)));
-    window.dispatchEvent(new CustomEvent(WARDROBE_OUTFITS_UPDATED));
+    store.save(list.slice(0, 400));
     return true;
   } catch {
-    // 除了把 false 交给调用方显式报错,还要点亮全局「存储满了」横幅 ——
-    // 仓里另外二十来个存储模块都走这条(reportStorageDropped),不接就成了暗处。
     reportStorageDropped();
     return false;
   }

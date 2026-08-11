@@ -341,7 +341,10 @@ function CareSection({ assetId, records, people, dict }: {
         setUpErr(L(dict, '这张没读出来,换一张试试。', 'Could not read that file — try another.'));
       }
     }
-    if (added.length) setFiles((cur) => [...cur, ...added]);
+    if (added.length) {
+      setFiles((cur) => [...cur, ...added]);
+      void import('@/lib/portal/cloud-care-image-sync').then((m) => m.kickCareImageSync()).catch(() => {});
+    }
 
     // ── 在这台设备上把单据读一遍 ──────────────────────────────────────────
     //

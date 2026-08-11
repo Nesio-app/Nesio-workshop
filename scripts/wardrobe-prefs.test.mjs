@@ -11,22 +11,29 @@ import assert from 'node:assert/strict';
 function load() {
   const src = fs.readFileSync(new URL('../lib/portal/wardrobe-prefs.ts', import.meta.url), 'utf8');
   const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
-  const store = {};
-  const localStorage = {
-    getItem: (k) => (k in store ? store[k] : null),
-    setItem: (k, v) => { store[k] = String(v); },
-    removeItem: (k) => { delete store[k]; },
-  };
+  const mem = new Map();
   const mod = { exports: {} };
   vm.runInNewContext(js, {
-    module: mod, exports: mod.exports, console, JSON, Array, Object, Math, Number, String, localStorage,
+    module: mod, exports: mod.exports, console, JSON, Array, Object, Math, Number, String,
+    window: { dispatchEvent() {} },
     require: (p) => {
       if (p === './storage-health') return { reportStorageDropped: () => {} };
       if (p === './wardrobe') return { pairKey: (a, b) => [a, b].sort().join('|') };
+      if (p === './idb-blob-store') {
+        return {
+          createBlobStore: ({ key }) => ({
+            load: () => mem.get(key) ?? null,
+            save: (v) => { mem.set(key, v); },
+            ready: async () => {},
+            refresh: async () => {},
+            isReady: () => true,
+          }),
+        };
+      }
       return {};
     },
   });
-  return { M: mod.exports, store };
+  return { M: mod.exports, store: mem };
 }
 
 const { M } = load();

@@ -245,8 +245,9 @@ export async function resolveAssetDisplayUrl(opts: {
 }
 
 /**
- * 补传:本机有图、节点上还没有 storagePath 的衣物/一餐 —— 上传并推 memory_assets。
+ * 补传:本机有图、节点上还没有 storagePath 的记忆图 —— 上传并推 memory_assets。
  * 打开衣帽间/同步批次时跑;幂等(已有 storagePath 的跳过)。
+ * 2026-08-10:不再只限衣物/一餐 —— 收纳物品、相机记忆等历史漏传一并补。
  */
 export async function backfillMissingPhotoUploads(opts?: { limit?: number }): Promise<{ uploaded: number }> {
   if (typeof window === 'undefined') return { uploaded: 0 };
@@ -255,18 +256,20 @@ export async function backfillMissingPhotoUploads(opts?: { limit?: number }): Pr
   let uploaded = 0;
   for (const node of getLifeGraph()) {
     if (uploaded >= limit) break;
-    const isGarment = node.type === 'Thing' && node.attributes?.garment === true;
-    const isMeal = node.type === 'collection' && (node.tags || []).includes('一餐');
-    if (!isGarment && !isMeal) continue;
-    if ((node.assets || []).some((a) => a.storagePath)) continue;
-    const local = (node.assets || []).find((a) => a.local && a.id);
+    const assets = node.assets || [];
+    if (assets.some((a) => a.storagePath)) continue;
+    const local = assets.find((a) => a.local && a.id);
     if (!local?.id) continue;
+    // 照料附件 / 地点封面 / 纯衣帽间旁路图不走 memory_assets(各有专属 sync)
+    if (local.id.startsWith('care-att-') || local.id.startsWith('placephoto-')) continue;
     const dataUrl = await getLocalImage(local.id);
     if (!dataUrl || !dataUrl.startsWith('data:')) continue;
+    const isGarment = node.type === 'Thing' && node.attributes?.garment === true;
+    const isMeal = node.type === 'collection' && (node.tags || []).includes('一餐');
     const r = await attachPhotoToMemoryNode({
       nodeId: node.id,
       dataUrl,
-      kind: isMeal ? 'meal' : 'wardrobe',
+      kind: isMeal ? 'meal' : isGarment ? 'wardrobe' : 'memory',
       assetId: local.id,
       label: node.name,
     });

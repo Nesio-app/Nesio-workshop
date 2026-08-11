@@ -51,6 +51,10 @@
   (记忆+资料+模块+连接器),「从云恢复」改名「用备份补缺」(merge,不清空);
   ② 云记忆 GET 翻页破 PostgREST 1000 行截断;③ 行程标题可点合一改名/日期;
   ④ 景点 sheet `elevated`;⑤ iOS `packageClassList` 不得为空(定位/通知插件)。
+- **2026-08-10 存储迁出+补云**:照料附件 `care-att-*` 走 `cloud-care-image-sync`;
+  孤本记忆图 backfill 扩到全节点;健身/搭配/偏好/银行规则/Tesla 电量日志
+  迁 IDB durable(腾 LS);统一同步含衣橱/照料/地点/文件图。本地音乐音频仍本机
+  (体积无法走 module 行上限)——元数据可同步但文件需另开 Storage 方案。
 
 ## 进行中的迁移
 

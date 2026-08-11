@@ -14,11 +14,26 @@ function load() {
   const src = fs.readFileSync(new URL('../lib/portal/wardrobe-outfits.ts', import.meta.url), 'utf8');
   const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const mod = { exports: {} };
-  // 存储模块现在会 import storage-health(全局「存储满了」横幅)。测的是纯逻辑,
-  // 这里给个空壳 require,免得为了跑纯函数把整条 DOM 依赖拖进来。
-  const require = (id) => (id.includes('storage-health') ? { reportStorageDropped() {}, logDropped() {} } : {});
-  // 没有 window → 存储那半段走 SSR 分支;纯函数照常可测
-  vm.runInNewContext(js, { module: mod, exports: mod.exports, require, Set, Array, Number, Object, Math, JSON, String, Map, Date });
+  const mem = new Map();
+  const require = (id) => {
+    if (id.includes('storage-health')) return { reportStorageDropped() {}, logDropped() {} };
+    if (id.includes('idb-blob-store')) {
+      return {
+        createBlobStore: ({ key, updateEvent }) => ({
+          load: () => mem.get(key) ?? null,
+          save: (v) => { mem.set(key, v); },
+          ready: async () => {},
+          refresh: async () => {},
+          isReady: () => true,
+        }),
+      };
+    }
+    return {};
+  };
+  vm.runInNewContext(js, {
+    module: mod, exports: mod.exports, require, Set, Array, Number, Object, Math, JSON, String, Map, Date,
+    window: { dispatchEvent() {} },
+  });
   return mod.exports;
 }
 const M = load();

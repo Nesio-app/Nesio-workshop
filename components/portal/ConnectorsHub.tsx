@@ -55,8 +55,8 @@ const CONNECTORS: ConnectorDef[] = [
   // 日历和 Gmail 是同一次 Google 授权,合并为一个入口(批次 5 用户反馈)
   { id: 'google', name: 'Google 日历 · Gmail', nameEn: 'Google Calendar · Gmail', icon: <IconCalendar />, iconBg: 'var(--chip-blue)', method: 'oauth', description: '一次授权同时接入:日程生成提醒和简报,邮件提取人物、日期、承诺', descriptionEn: 'One consent covers both: calendar drives reminders and briefs; email yields people, dates, promises' },
   { id: 'weather', name: '地理位置 · 天气', nameEn: 'Location · Weather', icon: <IconCloudSun />, iconBg: 'var(--chip-amber)', method: 'geo', description: '使用期间定位 + 可选始终(后台足迹);驱动天气与外出建议', descriptionEn: 'When-in-use location + optional Always for background place trail; powers weather tips' },
-  // 批次 21:银行流水(Plaid)—— Link 授权后增量同步交易,明细只存本机
-  { id: 'plaid', name: '银行流水 · Plaid', nameEn: 'Bank feed · Plaid', icon: <IconCard />, iconBg: 'var(--chip-fog)', method: 'oauth', description: '连接美国银行账户,交易流水增量同步(明细只存本机)', descriptionEn: 'Link a US bank account; transactions sync incrementally (details stay on-device)' },
+  // 批次 21:银行流水(Plaid)—— Link 授权后增量同步;IDB durable + module-sync 跨端
+  { id: 'plaid', name: '银行流水 · Plaid', nameEn: 'Bank feed · Plaid', icon: <IconCard />, iconBg: 'var(--chip-fog)', method: 'oauth', description: '连接美国银行账户,交易流水增量同步(随 Nesio 云跨端)', descriptionEn: 'Link a US bank account; transactions sync and follow your Nesio cloud account' },
   // 批次 21:Google 地图时间轴导入 —— 手机端导出的 JSON 并入地点足迹
   { id: 'timeline', name: 'Google 时间轴导入', nameEn: 'Google Timeline import', icon: <IconMapPin />, iconBg: 'var(--chip-leaf)', method: 'file', description: '手机 Google 地图 → 设置 → 时间轴 → 导出数据,把 JSON 传进来并入地点足迹', descriptionEn: 'Google Maps app → Settings → Timeline → export, upload the JSON to merge into your place trail' },
   // 批次 19:相册批量导入 —— 一次选多张,AI 逐张识别入库(解决「一张张传太麻烦」)

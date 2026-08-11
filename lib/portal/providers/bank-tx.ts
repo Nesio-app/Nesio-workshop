@@ -1,7 +1,7 @@
 /**
  * Bank transactions — 本机 Plaid 流水的读取与聚合(批次 27)。
  *
- * ConnectorsHub.syncPlaid 把交易存进 localStorage['nesio-bank-tx-v1'](明细只存本机)。
+ * ConnectorsHub.syncPlaid 把交易写入 IDB `nesio-bank-tx-v1`(经 module-sync 上云)。
  * 之前这份数据没有任何界面能看到,用户报「银行连了但记忆里没有」。
  * 这里提供纯函数聚合(本月净支出 / 分类占比 / 商户 Top),给支出分析视图用。
  *
@@ -12,6 +12,12 @@ import { reportStorageDropped } from '../storage-health';
 import { createBlobStore } from '../idb-blob-store';
 import { normalizeCategory } from '../tx-category';
 import { txAnnotationOf as _txAnnotationOf } from '../tx-annotations';
+import {
+  loadFlowRuleMap, saveFlowRuleMap,
+  loadMerchantRuleMap, saveMerchantRuleMap,
+  loadRuleLabelMap, saveRuleLabelMap,
+  loadRecurRuleMap, saveRecurRuleMap,
+} from '../bank-rules-store';
 
 /** 测试/循环加载时批注层可能尚未就绪 —— 缺函数就当没有覆盖。 */
 function annOf(txId: string): { category?: string; categoryDetail?: string } {
@@ -60,7 +66,7 @@ export const BANK_TX_KEY = 'nesio-bank-tx-v1';
 export const BANK_SYNCED_AT_KEY = 'nesio-bank-synced-at';
 
 // 批次 57:流水/账户(体量大)挪 IndexedDB —— 腾 localStorage 配额;老数据水合时迁移。
-// 规则(flow/merchant/recur)+ 同步时间戳(小)仍留 localStorage。
+// 2026-08-10:规则(flow/merchant/label/recur)也迁 IDB(bank-rules-store);同步时间戳仍留 LS。
 const txStore = createBlobStore<BankTx[]>({
   key: BANK_TX_KEY, updateEvent: 'nesio-bank-updated',
   validate: (v) => Array.isArray(v), onWriteError: reportStorageDropped,
@@ -237,18 +243,15 @@ export const TX_FLOW_LABELS: Record<TxFlow, [string, string]> = {
   expense: ['支出', 'Expense'], refund: ['退款', 'Refund'], rebate: ['返还/报销', 'Credit'], income: ['收入', 'Income'], transfer: ['转账/还款', 'Transfer'],
 };
 
-const FLOW_RULE_KEY = 'nesio-bank-flow-rule-v1';
-
 export function loadFlowRules(): Record<string, TxFlow> {
-  if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem(FLOW_RULE_KEY) || '{}') as Record<string, TxFlow>; } catch { return {}; }
+  return loadFlowRuleMap() as Record<string, TxFlow>;
 }
 
 export function setFlowRule(name: string, flow: TxFlow | ''): void {
   if (typeof window === 'undefined') return;
-  const rules = loadFlowRules();
+  const rules = { ...loadFlowRules() };
   if (flow) rules[name] = flow; else delete rules[name];
-  try { localStorage.setItem(FLOW_RULE_KEY, JSON.stringify(rules)); } catch { reportStorageDropped(); }
+  saveFlowRuleMap(rules);
 }
 
 /** 财务㉚:按 merchantKey 写类型规则(entity id 优先)——商户改描述符/改名后规则仍生效。 */
@@ -952,18 +955,15 @@ export function accountMonth(txs: BankTx[], accountId: string, ym: string): { sp
 
 /* ---------- 批次 31:商户→分类规则(交易页规则审核)---------- */
 
-const MERCHANT_RULE_KEY = 'nesio-bank-merchant-rule-v1';
-
 export function loadMerchantRules(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem(MERCHANT_RULE_KEY) || '{}') as Record<string, string>; } catch { return {}; }
+  return loadMerchantRuleMap();
 }
 
 export function setMerchantRule(name: string, category: string): void {
   if (typeof window === 'undefined') return;
-  const rules = loadMerchantRules();
+  const rules = { ...loadMerchantRules() };
   if (category.trim()) rules[name] = category.trim(); else delete rules[name];
-  try { localStorage.setItem(MERCHANT_RULE_KEY, JSON.stringify(rules)); } catch { reportStorageDropped(); }
+  saveMerchantRuleMap(rules);
 }
 
 /** 财务㉚:按 merchantKey 写分类规则(entity id 优先)。 */
@@ -974,19 +974,17 @@ export function setMerchantRuleFor(t: Pick<BankTx, 'name' | 'merchantId'>, categ
 }
 
 // 财务㉚:entity id 作规则键不可读,「已学规则」面板展示时用 label 映射还原商户名。
-const RULE_LABEL_KEY = 'nesio-bank-rule-label-v1';
-
 export function loadRuleLabels(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem(RULE_LABEL_KEY) || '{}') as Record<string, string>; } catch { return {}; }
+  return loadRuleLabelMap();
 }
 
 function rememberRuleLabel(key: string, name: string): void {
-  if (typeof window === 'undefined' || !key || key === name) return;
-  const all = loadRuleLabels();
+  if (typeof window === 'undefined' || !key || !name.trim()) return;
+  if (key === name) return;
+  const all = { ...loadRuleLabels() };
   if (all[key] === name) return;
-  all[key] = name;
-  try { localStorage.setItem(RULE_LABEL_KEY, JSON.stringify(all)); } catch { reportStorageDropped(); }
+  all[key] = name.trim();
+  saveRuleLabelMap(all);
 }
 
 /** 生效分类:本笔批注覆盖 → 商户规则 → Plaid;经 normalizeCategory 归一。 */
@@ -1295,16 +1293,14 @@ function rollForward(baseMs: number, cadenceDays: number): string {
 }
 
 // 批次 40:定期手动覆盖 —— 'yes'=强制算定期,'no'=强制排除。算法判断不对时用户自己调。
-const RECUR_RULE_KEY = 'nesio-bank-recur-v1';
 export function loadRecurRules(): Record<string, 'yes' | 'no'> {
-  if (typeof window === 'undefined') return {};
-  try { return JSON.parse(localStorage.getItem(RECUR_RULE_KEY) || '{}') as Record<string, 'yes' | 'no'>; } catch { return {}; }
+  return loadRecurRuleMap() as Record<string, 'yes' | 'no'>;
 }
 export function setRecurRule(name: string, v: 'yes' | 'no' | ''): void {
   if (typeof window === 'undefined') return;
-  const all = loadRecurRules();
+  const all = { ...loadRecurRules() };
   if (v) all[name] = v; else delete all[name];
-  try { localStorage.setItem(RECUR_RULE_KEY, JSON.stringify(all)); } catch { reportStorageDropped(); }
+  saveRecurRuleMap(all);
 }
 
 /**

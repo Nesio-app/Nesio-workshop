@@ -14,12 +14,18 @@ import { syncMemoryWithCloud, type CloudMemorySyncResult } from './cloud-memory-
 import { syncProfileWithCloud } from './cloud-profile-sync';
 import { autoSyncModulesWithCloud } from './cloud-module-sync';
 import { syncAllConnectors } from './connector-sync';
+import { autoSyncWardrobeImagesWithCloud } from './cloud-wardrobe-image-sync';
+import { autoSyncCareImagesWithCloud } from './cloud-care-image-sync';
+import { autoSyncPlaceImagesWithCloud } from './cloud-place-image-sync';
+import { autoSyncLocalFilesWithCloud } from './cloud-file-sync';
+import { backfillMissingPhotoUploads } from './capture-pipeline';
 
 export type UnifiedSyncResult = {
   memory: CloudMemorySyncResult;
   profileOk: boolean;
   modulesOk: boolean;
   connectorsOk: boolean;
+  mediaOk: boolean;
 };
 
 export async function runUnifiedSync(opts?: { force?: boolean }): Promise<UnifiedSyncResult> {
@@ -37,13 +43,25 @@ export async function runUnifiedSync(opts?: { force?: boolean }): Promise<Unifie
   } catch {
     modulesOk = false;
   }
+  let mediaOk = true;
+  try {
+    await Promise.all([
+      autoSyncWardrobeImagesWithCloud(force ? { force: true } : undefined),
+      autoSyncCareImagesWithCloud(force ? { force: true } : undefined),
+      autoSyncPlaceImagesWithCloud(force ? { force: true } : undefined),
+      autoSyncLocalFilesWithCloud(force ? { force: true } : undefined),
+      backfillMissingPhotoUploads({ limit: 24 }),
+    ]);
+  } catch {
+    mediaOk = false;
+  }
   let connectorsOk = true;
   try {
     await syncAllConnectors();
   } catch {
     connectorsOk = false;
   }
-  return { memory, profileOk, modulesOk, connectorsOk };
+  return { memory, profileOk, modulesOk, connectorsOk, mediaOk };
 }
 
 /** 给设置 / 记忆页共用的结果文案(中/英)。 */
@@ -57,6 +75,7 @@ export function describeUnifiedSync(r: UnifiedSyncResult, zh: boolean): string {
     else parts.push(`记忆已对齐(云上 ${total})`);
     if (!r.profileOk) parts.push('资料未对齐');
     if (!r.modulesOk) parts.push('模块未对齐');
+    if (!r.mediaOk) parts.push('图片/附件未对齐');
     if (!r.connectorsOk) parts.push('外部源未拉完');
     return `✓ ${parts.join(' · ')}`;
   }
@@ -64,6 +83,7 @@ export function describeUnifiedSync(r: UnifiedSyncResult, zh: boolean): string {
   else parts.push(`memories aligned (cloud ${total})`);
   if (!r.profileOk) parts.push('profile lag');
   if (!r.modulesOk) parts.push('modules lag');
+  if (!r.mediaOk) parts.push('media lag');
   if (!r.connectorsOk) parts.push('connectors lag');
   return `✓ ${parts.join(' · ')}`;
 }
