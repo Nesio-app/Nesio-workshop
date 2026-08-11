@@ -59,6 +59,10 @@
   `nesio-reminder-notify-state-v1` 仍是 cache(本机重建)。Tesla 实时仍 API 不落主库,
   电量日志已与银行同档(IDB durable)。**壳**:`cap sync` 会清空 `packageClassList`,
   出包前必须跑 `treasurebox-ios/scripts/patch-package-class-list.mjs`,否则定位/通知不注册。
+- **2026-08-11 同步清空记忆 + 通知/Tesla 落盘**:① 云合并在 saveAll 前再并一次本地图,
+  且等 IDB 水合;Gmail 改 `ingestLifeNodesBatch`(禁止逐条 saveAll)。② 设置「系统通知」
+  真的排程(家务/提醒/车低电量可勾选)。③ Tesla 上次快照 + 家庭家务板改 IDB durable,
+  休眠时地图用上次坐标。
 
 ## 进行中的迁移
 

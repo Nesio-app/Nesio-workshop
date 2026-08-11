@@ -118,6 +118,8 @@ const KNOWN_KEYS = new Map([
   ["nesio-pro-entitlement-v1", "cache"],
   ["nesio-proactive-dismissed", "cache"],
   ["nesio-push-enabled-v1", "cache"],
+  ["nesio-local-notify-enabled-v1", "cache"],
+  ["nesio-chore-notify-state-v1", "cache"],
   ["nesio-reader-sync-state-v1", "cache"],
   ["nesio-retro-dismissed-v1", "cache"],
   ["nesio-revgeo-cache-v1", "durable"],
@@ -127,6 +129,9 @@ const KNOWN_KEYS = new Map([
   ["nesio-storage-warned-at", "cache"],
   ["nesio-telemetry-device-v1", "cache"],
   ["nesio-tesla-battery-log-v1", "durable"],
+  ["nesio-tesla-snapshot-v1", "durable"],
+  ["nesio-notify-prefs-v1", "durable"],
+  ["nesio-family-board-v1", "durable"],
   ["nesio-tesla-low-batt-notified-v1", "cache"],
   ["nesio-tips-shown-v1", "cache"],
   ["nesio-today-cards-v1", "cache"],
@@ -333,6 +338,7 @@ for (const shape of ['nesio-foo-tokens-v1', 'nesio-bar-secret', 'nesio-baz-crede
 for (const durable of [
   'nesio-life-graph-v1', 'nesio-bank-tx-v1', 'nesio-health-v1', 'nesio-place-trail-v1',
   'nesio-person-records-v1', 'nesio-card-verdict-v1', 'nesio-workout-history-v1', 'nesio-fin-assets-v1',
+  'nesio-tesla-snapshot-v1', 'nesio-family-board-v1', 'nesio-notify-prefs-v1',
 ]) {
   assert.equal(keyKind(durable), 'durable', `${durable} 是核心用户数据,必须 durable(进备份 + 跨端)`);
 }

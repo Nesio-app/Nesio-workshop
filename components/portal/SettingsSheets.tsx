@@ -7,6 +7,10 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { pushSupported, isPushEnabled, enablePush, disablePush } from '@/lib/portal/push-notify';
+import { isNativePlatform } from '@/lib/portal/platform-capabilities';
+import {
+  isLocalNotifyEnabled, setLocalNotifyEnabled, loadNotifyPrefs, saveNotifyPrefs, type NotifyPrefs,
+} from '@/lib/portal/notify-prefs';
 import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, saveProfileSettings, touchProfileIdentity, type PortalLocale } from '@/lib/portal/profile';
 import { describeUnifiedSync, runUnifiedSync } from '@/lib/portal/unified-sync';
 import { pushProfileToCloud, syncProfileWithCloud } from '@/lib/portal/cloud-profile-sync';
@@ -324,6 +328,8 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const [captureLocOn, setCaptureLocOn] = useState(false);
   const [pushOn, setPushOn] = useState(false);
   const [pushMsg, setPushMsg] = useState('');
+  const [notifyPrefs, setNotifyPrefs] = useState<NotifyPrefs>({ reminders: true, teslaLowBatt: true, familyChores: true });
+  const nativeNotify = isNativePlatform();
   useEffect(() => {
     if (!open) return;
     setDailyReportOn(loadProfileSettings().dailyReportEnabled);
@@ -331,8 +337,9 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       setHapticsOn(localStorage.getItem(HAPTIC_FEEDBACK_KEY) !== '0');
       setCaptureLocOn(captureLocationEnabled());
     } catch { /* ignore */ }
-    setPushOn(isPushEnabled());
-  }, [open]);
+    setPushOn(nativeNotify ? isLocalNotifyEnabled() : isPushEnabled());
+    setNotifyPrefs(loadNotifyPrefs());
+  }, [open, nativeNotify]);
   function toggleDailyReport() {
     setDailyReportOn((v) => {
       saveProfileSettings({ dailyReportEnabled: !v });
@@ -347,26 +354,23 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   }
   async function togglePush() {
     if (pushOn) {
-      await disablePush();
+      if (nativeNotify) setLocalNotifyEnabled(false);
+      else await disablePush();
       setPushOn(false); setPushMsg('');
       return;
     }
     setPushMsg(L(dict, '正在开启…', 'Enabling…'));
-    // 壳内先走本地通知授权 —— 系统设置才会出现「通知」行;Web Push 另路。
-    try {
-      const { ensureLocalNotificationPermission } = await import('@/lib/portal/native-local-notifications');
-      const { isNativePlatform } = await import('@/lib/portal/platform-capabilities');
-      if (isNativePlatform()) {
-        const ok = await ensureLocalNotificationPermission();
-        if (!ok) {
-          setPushMsg(L(dict, '系统没给通知权限 — 可在设置 → 宝盒里打开通知后再试', 'Notifications not allowed — enable them in Settings → 宝盒 and retry'));
-          return;
-        }
-        setPushOn(true);
-        setPushMsg(L(dict, '本地提醒已开', 'Local alerts on'));
+    if (nativeNotify) {
+      const { applyAllLocalNotifications } = await import('@/lib/portal/notify-apply');
+      const r = await applyAllLocalNotifications({ askPermission: true, zh: dict !== 'en' });
+      if (!r.ok && r.reason === 'denied') {
+        setPushMsg(L(dict, '系统没给通知权限 — 可在设置 → 宝盒里打开通知后再试', 'Notifications not allowed — enable them in Settings → 宝盒 and retry'));
         return;
       }
-    } catch { /* fall through to web push */ }
+      setPushOn(true);
+      setPushMsg(L(dict, `系统通知已开 · 已排 ${r.scheduled} 条`, `Local alerts on · ${r.scheduled} scheduled`));
+      return;
+    }
     const r = await enablePush();
     if (r.ok) { setPushOn(true); setPushMsg(''); }
     else {
@@ -683,20 +687,49 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           {hapticsOn ? '✓' : '○'}
         </span>
       </button>
-      {pushSupported() && (
+      {(nativeNotify || pushSupported()) && (
+        <>
         <button type="button"
           className={`nesio-settings-option${pushOn ? ' nesio-settings-option--active' : ''}`}
           onClick={() => { void togglePush(); }}>
           <div>
-            <span className="nesio-settings-option-label">{L(dict, '重要提醒推送', 'Critical reminders push')}</span>
+            <span className="nesio-settings-option-label">{L(dict, nativeNotify ? '系统通知' : '重要提醒推送', nativeNotify ? 'System notifications' : 'Critical reminders push')}</span>
             <span className="nesio-settings-option-hint">
-              {pushMsg || L(dict, '只推真正要紧的(登机/就诊/还款截止),一天最多几条', 'Only truly urgent ones (boarding, appointments, due bills)')}
+              {pushMsg || (nativeNotify
+                ? L(dict, '家务、账单、车低电量到点会响 —— 先开这一项,再勾下面要提醒的', 'Chores, bills, and low Tesla battery can ring — turn this on, then pick what to notify')
+                : L(dict, '只推真正要紧的(登机/就诊/还款截止),一天最多几条', 'Only truly urgent ones (boarding, appointments, due bills)'))}
             </span>
           </div>
           <span className={`nesio-settings-space-check${pushOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
             {pushOn ? '✓' : '○'}
           </span>
         </button>
+        {nativeNotify && pushOn && (
+          <div style={{ padding: '0 var(--space-4) var(--space-3)', display: 'grid', gap: 'var(--space-2)' }}>
+            {([
+              ['reminders', L(dict, '我设的提醒(家务/账单/约会)', 'My reminders (chores / bills / events)')],
+              ['teslaLowBatt', L(dict, 'Tesla 电量低于 40%', 'Tesla battery under 40%')],
+              ['familyChores', L(dict, '家庭家务今天待办', "Family chores due today")],
+            ] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                className={`nesio-settings-option${notifyPrefs[key] ? ' nesio-settings-option--active' : ''}`}
+                onClick={() => {
+                  const next = saveNotifyPrefs({ [key]: !notifyPrefs[key] });
+                  setNotifyPrefs(next);
+                  void import('@/lib/portal/notify-apply').then((m) => m.applyAllLocalNotifications({ zh: dict !== 'en' }));
+                }}
+              >
+                <span className="nesio-settings-option-label">{label}</span>
+                <span className={`nesio-settings-space-check${notifyPrefs[key] ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
+                  {notifyPrefs[key] ? '✓' : '○'}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+        </>
       )}
       <button type="button"
         className={`nesio-settings-option${captureLocOn ? ' nesio-settings-option--active' : ''}`}

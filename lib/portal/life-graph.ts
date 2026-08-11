@@ -815,6 +815,34 @@ function persistGraphToIdb(nodes: LifeNode[]): void {
   persistTimer = setTimeout(() => { persistTimer = null; flushPersistNow(); }, 400);
 }
 
+/** 图谱 IDB 水合是否已经跑完。同步路径必须等这个,否则 loadAll() 只是空种子。 */
+export function isGraphHydrationSettled(): boolean {
+  return graphHydrationSettled;
+}
+
+/**
+ * 等到记忆图从 IDB 读完(或超时)。点同步时若抢在水合前 merge+saveAll,
+ * 会把「空种子 ∪ 云快照」当成全量落盘,界面先空、过很久才一点点回来。
+ */
+export function whenGraphHydrated(timeoutMs = 12_000): Promise<void> {
+  if (typeof window === 'undefined' || graphHydrationSettled) return Promise.resolve();
+  hydrateGraphOnce();
+  return new Promise((resolve) => {
+    let done = false;
+    const finish = () => {
+      if (done) return;
+      done = true;
+      window.clearTimeout(timer);
+      window.removeEventListener('nesio-life-graph-updated', onUp);
+      resolve();
+    };
+    const onUp = () => { if (graphHydrationSettled) finish(); };
+    const timer = window.setTimeout(finish, timeoutMs);
+    window.addEventListener('nesio-life-graph-updated', onUp);
+    if (graphHydrationSettled) finish();
+  });
+}
+
 function hydrateGraphOnce(): void {
   if (graphHydrated || typeof window === 'undefined') return;
   graphHydrated = true; // 立即置位防重入;异步内校正 memCache
@@ -1081,6 +1109,14 @@ export function mergeCloudMemorySnapshot(snapshot: { nodes?: unknown[]; assets?:
       ...merged,
       assets: mergedAssets.length ? mergedAssets : undefined,
     });
+  }
+
+  // 水合可能在上面循环期间完成。开头那次 loadAll() 若还是空种子,
+  // 这里必须再并一次当前本地图 —— 否则 saveAll(只含云端)会在 settled=true
+  // 时把完整 IDB 覆盖掉(用户:点同步记忆清空,很久才回来)。
+  for (const localNode of loadAll()) {
+    if (pendingDeleteIds.has(localNode.id)) continue;
+    if (!nodesById.has(localNode.id)) nodesById.set(localNode.id, localNode);
   }
 
   const mergedNodes = Array.from(nodesById.values()).sort(

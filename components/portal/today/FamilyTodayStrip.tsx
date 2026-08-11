@@ -17,6 +17,7 @@ import { usePortalLocale } from '../use-portal-locale';
 import { listFamilies, getBoard, choreAction, type BoardView, type ChoreInstanceView } from '@/lib/family/family-client';
 import { awardChorePoints, reconcileMyChorePoints } from '../family/award-chore-points';
 import { readPortalCache, writePortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
+import { loadFamilyBoards, saveFamilyBoards } from '@/lib/portal/family-board-store';
 import Button from '../ui/Button';
 
 // 家务的「多少」= 积分(2026-08-01 用户:「家务挣积分,把钱相关的 UI 逻辑都换」)。
@@ -47,18 +48,36 @@ export default function FamilyTodayStrip() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const t = (zh: string, en: string) => L(dict, zh, en);
 
-  const [boards, setBoards] = useState<Board[]>(() => readPortalCache<Board[]>(PORTAL_CACHE_KEYS.family) ?? []);
+  const [boards, setBoards] = useState<Board[]>(() => {
+    const durable = loadFamilyBoards();
+    if (durable.length) return durable;
+    return readPortalCache<Board[]>(PORTAL_CACHE_KEYS.family) ?? [];
+  });
   const [busyId, setBusyId] = useState('');
   const [actionErr, setActionErr] = useState('');
   const [snoozed, setSnoozed] = useState<Set<string>>(() => (typeof window === 'undefined' ? new Set() : loadSnoozed()));
   const inFlight = useRef(false);
+
+  useEffect(() => {
+    const on = () => {
+      const durable = loadFamilyBoards();
+      if (durable.length) setBoards(durable);
+    };
+    window.addEventListener('nesio-family-board-updated', on);
+    return () => window.removeEventListener('nesio-family-board-updated', on);
+  }, []);
 
   const fetchNow = useCallback(async () => {
     if (inFlight.current) return;
     inFlight.current = true;
     try {
       const fr = await listFamilies();
-      if (!fr.ok || !fr.data.families.length) { setBoards([]); writePortalCache(PORTAL_CACHE_KEYS.family, []); return; }
+      if (!fr.ok || !fr.data.families.length) {
+        setBoards([]);
+        writePortalCache(PORTAL_CACHE_KEYS.family, []);
+        saveFamilyBoards([]);
+        return;
+      }
       const next: Board[] = [];
       for (const fam of fr.data.families) {
         const br = await getBoard(fam.familyId);
@@ -66,6 +85,7 @@ export default function FamilyTodayStrip() {
       }
       setBoards(next);
       writePortalCache(PORTAL_CACHE_KEYS.family, next);
+      saveFamilyBoards(next);
       for (const fam of next) void reconcileMyChorePoints(fam.familyId, dict === 'en' ? 'en' : 'zh');
       try { localStorage.setItem(FETCH_AT_KEY, String(Date.now())); } catch { /* noop */ }
     } finally {

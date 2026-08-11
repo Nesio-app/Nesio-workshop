@@ -2,7 +2,7 @@
 
 import '@/lib/life-domain/node-fact-sink'; // 节点事实 sink:任何写入前武装
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
+import { ingestLifeNode, ingestLifeNodesBatch } from '@/lib/life-domain/ingest-node';
 import dynamic from 'next/dynamic';
 import TodayFeed from './TodayFeed';
 import MemoryTab from './MemoryTab';
@@ -460,18 +460,24 @@ export default function Portal() {
     let stop = false;
     const sync = () => {
       if (stop) return;
-      void import('@/lib/portal/reminder-notifications')
-        .then((m) => m.syncReminderNotifications())
+      void import('@/lib/portal/notify-apply')
+        .then((m) => m.applyAllLocalNotifications())
         .catch(() => { /* 排不上不影响 App —— 提醒本体在列表里,一条没丢 */ });
     };
     sync();
     const onVisible = () => { if (document.visibilityState === 'visible') sync(); };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('nesio-schedule-reminders-updated', sync);
+    window.addEventListener('nesio-notify-prefs-updated', sync);
+    window.addEventListener('nesio-family-board-updated', sync);
+    window.addEventListener('nesio-tesla-snapshot-updated', sync);
     return () => {
       stop = true;
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('nesio-schedule-reminders-updated', sync);
+      window.removeEventListener('nesio-notify-prefs-updated', sync);
+      window.removeEventListener('nesio-family-board-updated', sync);
+      window.removeEventListener('nesio-tesla-snapshot-updated', sync);
     };
   }, []);
   // 批次 85:懒加载 chunk 跨部署失效的全局兜底(错误页之外的路径,
@@ -1357,8 +1363,9 @@ export default function Portal() {
             .then((r) => r.json())
             .then((data: { ok?: boolean; nodes?: Array<Record<string, unknown>>; count?: number }) => {
               if (data.ok && data.nodes?.length) {
-                import('@/lib/portal/life-graph').then(({ addLifeNode }) => {
-                  data.nodes!.forEach((n) => ingestLifeNode({ source: 'email', ...n } as Parameters<typeof addLifeNode>[0]));
+                void import('@/lib/portal/life-graph').then(async ({ whenGraphHydrated }) => {
+                  await whenGraphHydrated();
+                  ingestLifeNodesBatch(data.nodes!.map((n) => ({ source: 'email', ...n } as Parameters<typeof ingestLifeNodesBatch>[0][number])));
                   window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
                 });
               }
@@ -1471,8 +1478,9 @@ export default function Portal() {
             .then((data: { ok?: boolean; nodes?: Array<Record<string, unknown>> }) => {
               if (data.ok && data.nodes?.length) {
                 localStorage.setItem('nesio-gmail-last-sync', String(Date.now()));
-                import('@/lib/portal/life-graph').then(({ addLifeNode }) => {
-                  data.nodes!.forEach((n) => ingestLifeNode({ source: 'email', ...n } as Parameters<typeof addLifeNode>[0]));
+                void import('@/lib/portal/life-graph').then(async ({ whenGraphHydrated }) => {
+                  await whenGraphHydrated();
+                  ingestLifeNodesBatch(data.nodes!.map((n) => ({ source: 'email', ...n } as Parameters<typeof ingestLifeNodesBatch>[0][number])));
                   window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
                 });
               }

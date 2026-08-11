@@ -114,6 +114,8 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-judge-dismissed-v1',             // 「知道了」当日日键静默:今天的事,明天自动失效
   'nesio-push-enabled-v1',                // 推送开关:**每个浏览器**自己的订阅,跨端同步会让
                                           //   别的设备显示"已开"却收不到推送(它没订阅)
+  'nesio-local-notify-enabled-v1',        // 本机系统通知总开关(权限在这台设备)
+  'nesio-chore-notify-state-v1',          // 家庭家务通知排程投影,同 reminder-notify-state
   'nesio-storage-heal-v1',                // 一次性自愈的完成标记
   // 档案是**观测面**,不是用户数据:整键 replace 同步会让两端互相抹掉对方的记录(静默丢反馈)。
   // 真正承重的那部分(静音裁决)另走 nesio-card-verdict-v1(durable,跨端跟人走)。

@@ -17,7 +17,7 @@
  */
 import { createAppApiClient } from './app-api-client';
 import { logDropped } from './storage-health';
-import { mergeCloudMemorySnapshot, retryLifeGraphCloudSync, backfillLocalLifeGraphToCloud } from './life-graph';
+import { mergeCloudMemorySnapshot, retryLifeGraphCloudSync, backfillLocalLifeGraphToCloud, whenGraphHydrated } from './life-graph';
 
 const MIN_INTERVAL_MS = 20_000;
 let lastSyncAt = 0;
@@ -45,9 +45,11 @@ export async function syncMemoryWithCloud(opts: { force?: boolean } = {}): Promi
   inFlight = true;
   lastSyncAt = now;
   try {
+    await whenGraphHydrated();
     const client = createAppApiClient();
     const snapshot = await client.fetchCloudMemorySnapshot();
     if (!snapshot.ok) return { ok: false, importedNodeCount: 0 };
+    await whenGraphHydrated();
     const merged = mergeCloudMemorySnapshot({ nodes: snapshot.nodes || [], assets: snapshot.assets || [] });
     // 顺带把本地新记忆推上云 + 重试挂起项,让「拉」的同时也「推」,两端逐步收敛。
     void retryLifeGraphCloudSync();

@@ -16,7 +16,7 @@ import './node-fact-sink';
  * 规则:组件层今后禁止直调 addLifeNode——用本函数或 createSignal。
  */
 
-import { addLifeNode, getLifeGraph, updateLifeNode, type LifeNode } from '@/lib/portal/life-graph';
+import { addLifeNode, getLifeGraph, updateLifeNode, upsertLifeNodesBatch, type LifeNode } from '@/lib/portal/life-graph';
 import { loadLastLocation, refreshLocation } from '@/lib/portal/location-store';
 import { captureLocationEnabled, getFreshCaptureFix, prefetchCaptureLocation } from '@/lib/portal/capture-location';
 import { lifeNodeToSignal } from './signal';
@@ -95,7 +95,7 @@ function externalKey(attrs: IngestNodeInput['attributes'] | undefined): string |
   return null;
 }
 
-export function ingestLifeNode(input: IngestNodeInput): LifeNode {
+function prepareIngestInput(input: IngestNodeInput): IngestNodeInput {
   input = stampCaptureLocation(input);
   // 可信度盖章:旁路迁入后门也必须带 epistemic+generator(两者均已收紧为 Signal 必填字段,
   // 2026-08-01)。原来只在 epistemic 缺失时才补,generator 单独缺失(epistemic 有效但
@@ -115,7 +115,11 @@ export function ingestLifeNode(input: IngestNodeInput): LifeNode {
     attrs.epistemic = stamp.epistemic;
     attrs.generator = stamp.generator || String(input.source);
   }
-  input = { ...input, attributes: attrs };
+  return { ...input, attributes: attrs };
+}
+
+export function ingestLifeNode(input: IngestNodeInput): LifeNode {
+  input = prepareIngestInput(input);
   // ⑦ 去重下沉到唯一写入口:带外部 id 的输入(Gmail/Notion 重复同步)幂等 —— 命中就原地更新,
   //   不再生成重复节点。一处修掉此前 Gmail/Notion 各自没做去重的问题。
   const key = externalKey(input.attributes);
@@ -146,4 +150,15 @@ export function ingestLifeNode(input: IngestNodeInput): LifeNode {
     void writeCloudSignal(signal);
   }
   return node;
+}
+
+/**
+ * 批量写入 —— 一次 upsertLifeNodesBatch / 一次 saveAll。
+ * Gmail/日历同步若逐条 ingestLifeNode,整图 O(n²) 写盘 + 每条广播,
+ * 记忆页会先被掏空再一条条回来(用户:点同步记忆清空很久才恢复)。
+ */
+export function ingestLifeNodesBatch(inputs: ReadonlyArray<IngestNodeInput>): { created: number; updated: number } {
+  if (!inputs.length) return { created: 0, updated: 0 };
+  const prepared = inputs.map((input) => prepareIngestInput(input));
+  return upsertLifeNodesBatch(prepared, (attrs) => externalKey(attrs));
 }

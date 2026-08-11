@@ -3,7 +3,7 @@
  * 记忆页下拉刷新共用同一实现,不留双实现。每个 run* 返回结构化结果,
  * UI 决定 toast/重试;失败都有明确 error(设计红线:异步动作必有可见失败态)。
  */
-import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
+import { ingestLifeNode, ingestLifeNodesBatch } from '@/lib/life-domain/ingest-node';
 import { stripMarkdownInline } from '@/lib/portal/node-display';
 import { isTagOnlyText } from '@/lib/portal/topic-tags';
 import { parseMemoryDate } from '@/lib/portal/memory-event-at';
@@ -351,8 +351,7 @@ export async function enrichGmailInBackground(afterTs: number): Promise<void> {
     let data: { ok?: boolean; nodes?: Array<Record<string, unknown>> } | null = null;
     try { data = JSON.parse(await res.text()); } catch { /* 网关/超时页 */ }
     if (data?.ok && data.nodes?.length) {
-      data.nodes.forEach((n) => ingestLifeNode({ ...n, source: 'email' } as Parameters<typeof ingestLifeNode>[0]));
-      window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+      ingestLifeNodesBatch(data.nodes.map((n) => ({ ...n, source: 'email' } as Parameters<typeof ingestLifeNode>[0])));
     }
   } catch { /* 富化 best-effort:失败无声,同步已成功 */ }
   finally { gmailEnrichInFlight = false; }
@@ -383,8 +382,9 @@ export async function runGmailSync(opts?: { force?: boolean }): Promise<GmailSyn
     }
     const nodes = data.nodes || [];
     if (nodes.length) {
-      nodes.forEach((n) => ingestLifeNode({ ...n, source: 'email' } as Parameters<typeof ingestLifeNode>[0]));
-      window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+      const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
+      await whenGraphHydrated();
+      ingestLifeNodesBatch(nodes.map((n) => ({ ...n, source: 'email' } as Parameters<typeof ingestLifeNode>[0])));
     }
     // 云 AI 抽取转后台富化:同步已成功返回,富化拿到更好的语义节点就原位升级(失败无声)。
     void enrichGmailInBackground(afterTs);

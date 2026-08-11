@@ -27,6 +27,8 @@ export interface TeslaLogPoint {
   batteryPct?: number | null;
   odometerMi?: number | null;
   chargingState?: string;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 const store = createBlobStore<TeslaLogPoint[]>({
@@ -65,7 +67,14 @@ export function prune(points: readonly TeslaLogPoint[], nowMs: number): TeslaLog
 }
 
 export function recordTeslaReadings(
-  readings: ReadonlyArray<{ vehicleId: string; batteryPct?: number | null; odometerMi?: number | null; chargingState?: string }>,
+  readings: ReadonlyArray<{
+    vehicleId: string;
+    batteryPct?: number | null;
+    odometerMi?: number | null;
+    chargingState?: string;
+    latitude?: number | null;
+    longitude?: number | null;
+  }>,
   now: Date = new Date(),
 ): number {
   if (typeof window === 'undefined') return 0;
@@ -81,6 +90,8 @@ export function recordTeslaReadings(
       batteryPct: r.batteryPct ?? null,
       odometerMi: r.odometerMi ?? null,
       ...(r.chargingState ? { chargingState: r.chargingState } : {}),
+      ...(r.latitude != null ? { latitude: r.latitude } : {}),
+      ...(r.longitude != null ? { longitude: r.longitude } : {}),
     });
     added++;
   }

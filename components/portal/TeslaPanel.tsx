@@ -27,6 +27,9 @@ import {
   vehicleStatus, statusLabel, statusTone, dataAgeLine, chargeNowLine, rangeLine, healthItems,
 } from '@/lib/portal/tesla-now';
 import { readPanelCache, writePanelCache, PANEL_CACHE_KEYS } from '@/lib/portal/session-panel-cache';
+import {
+  readTeslaSnapshot, saveTeslaSnapshot, mergeLastKnownLocation, type TeslaSnapshot,
+} from '@/lib/portal/tesla-snapshot-store';
 
 interface TeslaDrive {
   vehicleId: string;
@@ -37,6 +40,8 @@ interface TeslaDrive {
   odometerMi?: number | null;
   latitude?: number | null;
   longitude?: number | null;
+  /** 本次 API 没坐标,用的是 IDB 里上次看到的点 */
+  locationStale?: boolean;
   /** 车上那份读数的时刻(毫秒)。和 `at`(我们问它的时刻)不是一回事。 */
   dataAgeMs?: number | null;
 }
@@ -103,7 +108,10 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
   boundIds?: string[];
 } = {}) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
-  const cached = readPanelCache<TeslaCachePayload>(PANEL_CACHE_KEYS.tesla);
+  const durable = typeof window !== 'undefined' ? readTeslaSnapshot() : null;
+  const cached = durable
+    ? { drives: durable.drives, charges: durable.charges, health: (durable.health || []) as TeslaHealthRow[], energy: (durable.energy || {}) as TeslaEnergyPayload }
+    : readPanelCache<TeslaCachePayload>(PANEL_CACHE_KEYS.tesla);
   const [state, setState] = useState<LoadState>(cached ? 'ready' : 'loading');
   const [errMsg, setErrMsg] = useState('');
   const [drives, setDrives] = useState<TeslaDrive[]>(() => cached?.drives ?? []);
@@ -115,7 +123,7 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
    * 一对经纬度对人是没有意义的 —— 地图上那个点告诉你「在这儿」,
    * 但说不出「在公司」还是「在家」。反解一次,按坐标缓存。
    */
-  const [placeByVehicle, setPlaceByVehicle] = useState<Record<string, string>>({});
+  const [placeByVehicle, setPlaceByVehicle] = useState<Record<string, string>>(() => durable?.placeByVehicle ?? {});
   /** 地址反解失败可见态(红线:异步必须有失败 UI + 重试,不可静默吞)。 */
   const [geoErr, setGeoErr] = useState<string | null>(null);
   const [geoBusy, setGeoBusy] = useState(false);
@@ -164,8 +172,9 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
         setState('error');
         return;
       }
-      const nextDrives = data.drives || [];
-      const nextCharges = data.charges || [];
+      const lastSnap = readTeslaSnapshot();
+      const nextDrives = mergeLastKnownLocation(data.drives || [], lastSnap?.drives);
+      const nextCharges = (data.charges || []).length ? data.charges || [] : lastSnap?.charges || [];
       const nextHealth = data.health || [];
       const nextEnergy = data.energy || {};
       setDrives(nextDrives);
@@ -177,6 +186,14 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
       hasDataRef.current = true;
       writePanelCache(PANEL_CACHE_KEYS.tesla, {
         drives: nextDrives, charges: nextCharges, health: nextHealth, energy: nextEnergy,
+      });
+      saveTeslaSnapshot({
+        at: new Date().toISOString(),
+        drives: nextDrives,
+        charges: nextCharges,
+        health: nextHealth,
+        energy: nextEnergy,
+        locationHint: data.locationHint || 'ok',
       });
       // #10:把车报上去。用 name 而不是 id 展示 —— 用户认得的是「JingBell」,不是一串数字。
       applyTeslaVehicles(onVehicles, nextDrives, nextCharges);
@@ -200,8 +217,15 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
       // 攒完立刻重读:这一次的点也要出现在图上,不用等下次开页面。
       try {
         const byVehicle = new Map<string, { vehicleId: string; batteryPct?: number | null; odometerMi?: number | null; chargingState?: string }>();
-        for (const d of data.drives || []) byVehicle.set(d.vehicleId, { vehicleId: d.vehicleId, odometerMi: d.odometerMi ?? null });
-        for (const c of data.charges || []) {
+        for (const d of nextDrives) {
+          byVehicle.set(d.vehicleId, {
+            vehicleId: d.vehicleId,
+            odometerMi: d.odometerMi ?? null,
+            latitude: d.latitude ?? null,
+            longitude: d.longitude ?? null,
+          });
+        }
+        for (const c of nextCharges) {
           if (c.batteryLevel == null) continue;
           byVehicle.set(c.vehicleId, { ...byVehicle.get(c.vehicleId), vehicleId: c.vehicleId, batteryPct: c.batteryLevel, chargingState: c.chargingState });
         }
@@ -316,6 +340,7 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
   // 有车但一个坐标都没回 = 多半没授权 vehicle_location(独立权限)→ 位置进不了足迹。
   const hasVehicle = liveByVehicle.size > 0;
   const hasAnyLocation = drives.some((d) => d.latitude != null && d.longitude != null);
+  const hasStaleLocation = drives.some((d) => d.locationStale);
 
   const anyChargeRecord = hasAnyChargeRecord(
     history.length,
@@ -496,6 +521,11 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
 
       {/* 没坐标时按真实原因说,不许一律「没授权」(能量/电量正常 ≠ 位置字段有值;
           休眠会抹坐标;token 若真缺 vehicle_location 才提示重连)。 */}
+      {hasAnyLocation && hasStaleLocation && (
+        <p className="nesio-settings-option-hint" style={{ margin: '0 0 var(--space-2)' }}>
+          {L(dict, '地图是上次看到的停车点 —— 车这会儿没回坐标(多半在休眠)。点刷新会再问一次。', 'Map shows the last known parking spot — the car did not send coordinates this time (often asleep). Tap refresh to ask again.')}
+        </p>
+      )}
       {hasVehicle && !hasAnyLocation && (
         <div style={{ marginTop: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
           <p className="nesio-settings-option-hint" style={{ margin: 0 }}>

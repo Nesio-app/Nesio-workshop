@@ -1156,9 +1156,12 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     async function hydrateCloud() {
       if (!canUsePrivateData) return;
       try {
+        const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
+        await whenGraphHydrated();
         const client = createAppApiClient();
         const snapshot = await client.fetchCloudMemorySnapshot();
         if (cancelled || !snapshot.ok) return;
+        await whenGraphHydrated();
         mergeCloudMemorySnapshot({ nodes: snapshot.nodes || [], assets: snapshot.assets || [] });
         void retryLifeGraphCloudSync();
         void backfillLocalLifeGraphToCloud({ limit: 200 });
@@ -1167,7 +1170,11 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     }
     void hydrateCloud();
 
-    const onUpdate = () => setNodes(readNodes());
+    let updateTimer: ReturnType<typeof setTimeout> | undefined;
+    const onUpdate = () => {
+      if (updateTimer) clearTimeout(updateTimer);
+      updateTimer = setTimeout(() => { if (!cancelled) setNodes(readNodes()); }, 80);
+    };
     const onSyncUpdate = () => setCloudSyncSummary(getLifeGraphCloudSyncSummary());
     const onProfileUpdate = () => {
       const p = loadProfileSettings();
@@ -1186,6 +1193,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     return () => {
       cancelled = true;
       if (backfillTimer) clearTimeout(backfillTimer);
+      if (updateTimer) clearTimeout(updateTimer);
       window.removeEventListener('nesio-life-graph-updated', onUpdate);
       window.removeEventListener('nesio-life-graph-cloud-sync-updated', onSyncUpdate);
       window.removeEventListener(PROFILE_UPDATED_EVENT, onProfileUpdate);
