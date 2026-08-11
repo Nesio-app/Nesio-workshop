@@ -14,7 +14,7 @@
  * 两处都能写的话,今天这份到底是谁定的稿就说不清了。
  */
 
-import type { DailyReport } from '@/lib/portal/daily-report';
+import type { DailyReport, DailyReportItem } from '@/lib/portal/daily-report';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
@@ -79,7 +79,7 @@ export default function DailyReportSheet({
       <div className="nesio-settings-sheet-body">
         {report.sections.map((s) => {
           const SectionIcon = SECTION_ICON[s.id];
-          const items = s.items?.length ? s.items : s.lines.map((text) => ({ text }));
+          const items: DailyReportItem[] = s.items?.length ? s.items : s.lines.map((text) => ({ text }));
           return (
             <div key={s.id} className={`nesio-drsheet-section nesio-drsheet-section--${s.id}`}>
               <p className="nesio-drsheet-h">
