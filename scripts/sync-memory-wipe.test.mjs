@@ -38,8 +38,24 @@ assert.match(settings, /familyChores/, '家庭家务是可勾选类目');
 const tesla = read('../components/portal/TeslaPanel.tsx');
 assert.match(tesla, /saveTeslaSnapshot/, '车页把快照写入 IDB');
 assert.match(tesla, /mergeLastKnownLocation/, '没坐标时用上次停车点');
+assert.match(tesla, /whenTeslaSnapshotReady/, '进页等本机快照水合');
+assert.match(tesla, /本机还没有存过/, '有快照时禁止进页就打 Tesla API');
+assert.match(read('../lib/portal/tesla-snapshot-store.ts'), /syncSeed:\s*true/, '车况首屏种子');
 
 const family = read('../components/portal/today/FamilyTodayStrip.tsx');
 assert.match(family, /saveFamilyBoards/, '家务板写入 IDB durable');
+assert.match(family, /if \(!fr\.ok\) return/, '拉失败不许抹掉已存家务');
+assert.match(family, /FETCH_DAY_KEY/, '同一天不重复拉家务 API');
+assert.match(read('../lib/portal/family-board-store.ts'), /syncSeed:\s*true/, '家务板首屏种子');
 
-console.log('sync-memory-wipe: OK(水合再并本地 / Gmail 批量 / 通知类目 / Tesla·家务 durable)');
+const notify = read('../lib/portal/notify-apply.ts');
+assert.match(notify, /checkLocalNotifyDisplay/, '排程前问系统权限,不只看 App 内开关');
+assert.match(notify, /hasLocalNotifyChoice\(\) && display === 'granted'/, 'iOS 已授权且从未点过开关 → 自动开');
+assert.match(notify, /plugin_missing/, '壳没插件要有可见原因');
+
+const wardrobe = read('../components/portal/insights/WardrobePanel.tsx');
+assert.match(wardrobe, /ZoomableImage/, '试穿图全屏可捏合放大');
+assert.match(read('../app/globals.css'), /\.nesio-tryon-lightbox \{[\s\S]*?z-index:\s*950/,
+  '试穿灯箱必须盖过洞察全屏(930),80 会被整页盖住');
+
+console.log('sync-memory-wipe: OK(水合再并本地 / Gmail 批量 / 通知类目 / Tesla·家务 durable / 试穿全屏)');

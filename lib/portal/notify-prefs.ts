@@ -32,11 +32,17 @@ export function isLocalNotifyEnabled(): boolean {
   return localStorage.getItem(LOCAL_NOTIFY_ENABLED_KEY) === '1';
 }
 
+/** 用户有没有在 App 里点过开关。缺席 + 系统已授权 → 开机自动打开,不再空等这个旗。 */
+export function hasLocalNotifyChoice(): boolean {
+  if (typeof localStorage === 'undefined') return false;
+  const v = localStorage.getItem(LOCAL_NOTIFY_ENABLED_KEY);
+  return v === '1' || v === '0';
+}
+
 export function setLocalNotifyEnabled(on: boolean): void {
   if (typeof localStorage === 'undefined') return;
   try {
-    if (on) localStorage.setItem(LOCAL_NOTIFY_ENABLED_KEY, '1');
-    else localStorage.removeItem(LOCAL_NOTIFY_ENABLED_KEY);
+    localStorage.setItem(LOCAL_NOTIFY_ENABLED_KEY, on ? '1' : '0');
   } catch {
     reportStorageDropped();
   }

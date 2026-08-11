@@ -3,8 +3,8 @@
  * 流水/账户已在 IDB;规则(分流/分类/标签/定期)此前仍占 LS,量大时易撑爆 5MB。
  * durable → 自动进 module-sync。
  */
-import { createBlobStore } from '../idb-blob-store';
-import { reportStorageDropped } from '../storage-health';
+import { createBlobStore } from './idb-blob-store';
+import { reportStorageDropped } from './storage-health';
 
 function mapStore<T extends Record<string, string>>(key: string, event: string) {
   return createBlobStore<T>({

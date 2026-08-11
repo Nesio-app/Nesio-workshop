@@ -23,7 +23,12 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\
 // ── ① 去重键的名单就这三个,改了要同步改这里 ──────────────────────────────
 {
   const ingest = strip(read('lib/life-domain/ingest-node.ts'));
-  const fn = ingest.slice(ingest.indexOf('function externalKey'), ingest.indexOf('export function ingestLifeNode'));
+  const start = ingest.indexOf('function externalKey');
+  const after = ingest.slice(start);
+  // 只切 externalKey 自身。后面的 prepareIngestInput 也读 attrs.*,
+  // 切到 ingestLifeNode 会把 epistemic/generator 误当成去重键。
+  const endRel = after.search(/\n(?:export )?function /);
+  const fn = endRel > 0 ? after.slice(0, endRel) : after.slice(0, after.indexOf('export function ingestLifeNode'));
   for (const key of ['emailId', 'notionPageId', 'externalId']) {
     assert.ok(fn.includes(key), `externalKey 不再认 ${key} —— 依赖它的连接器会静默失去幂等`);
   }

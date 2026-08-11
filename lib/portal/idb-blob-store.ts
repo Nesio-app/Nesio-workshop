@@ -149,6 +149,12 @@ export interface BlobStoreOptions<T> {
   backend?: BlobBackend;
   onWriteError?: () => void;
   autoHydrate?: boolean;
+  /**
+   * 冷启动第一帧就能读:save 时双写 localStorage,load() 在内存空时同步读它,
+   * 水合时不删这份种子。给「进页必须立刻有画」的小 JSON(车况/家务板)用。
+   * 大块(流水/轨迹)不要开 —— 那正是迁出 LS 的原因。
+   */
+  syncSeed?: boolean;
 }
 
 export function createBlobStore<T>(opts: BlobStoreOptions<T>): BlobStore<T> {
@@ -170,6 +176,23 @@ export function createBlobStore<T>(opts: BlobStoreOptions<T>): BlobStore<T> {
   let pendingWrite: T | null = null;
   let hydrated = false;
 
+  function readLsSeed(): T | null {
+    if (!opts.syncSeed || !hasWindow) return null;
+    try {
+      const raw = localStorage.getItem(opts.key);
+      if (raw == null) return null;
+      const v = JSON.parse(raw) as unknown;
+      if (opts.validate && !opts.validate(v)) return null;
+      return v as T;
+    } catch { return null; }
+  }
+
+  function writeLsSeed(value: T): void {
+    if (!opts.syncSeed || !hasWindow) return;
+    try { localStorage.setItem(opts.key, JSON.stringify(value)); }
+    catch { opts.onWriteError?.(); }
+  }
+
   async function hydrate(): Promise<void> {
     try {
       let raw = await backend.get(opts.key);
@@ -178,7 +201,10 @@ export function createBlobStore<T>(opts: BlobStoreOptions<T>): BlobStore<T> {
         if (ls != null) {
           raw = ls;
           await backend.set(opts.key, ls);
-          try { localStorage.removeItem(opts.key); } catch { /* ignore */ }
+          // 默认可再生缓存迁完就删 LS 腾配额;syncSeed 的种子要留着给下一帧首屏。
+          if (!opts.syncSeed) {
+            try { localStorage.removeItem(opts.key); } catch { /* ignore */ }
+          }
         }
       }
       let disk: T | null = null;
@@ -195,6 +221,7 @@ export function createBlobStore<T>(opts: BlobStoreOptions<T>): BlobStore<T> {
       } else if (disk != null) {
         cache = disk;
       }
+      if (opts.syncSeed && cache != null) writeLsSeed(cache);
     } catch { /* 水合失败:缓存保持 null */ }
     hydrated = true;
     emit();
@@ -225,9 +252,15 @@ export function createBlobStore<T>(opts: BlobStoreOptions<T>): BlobStore<T> {
   if (opts.autoHydrate !== false && hasWindow) void ready();
 
   return {
-    load: () => cache,
+    load: () => {
+      if (cache != null) return cache;
+      const seed = readLsSeed();
+      if (seed != null) cache = seed;
+      return cache;
+    },
     save(value: T) {
       cache = value;
+      writeLsSeed(value);
       emit();
       if (!hydrated) {
         // 尚未水合:只记意向,等 ready 后由 hydrate 或下方 then 落盘。

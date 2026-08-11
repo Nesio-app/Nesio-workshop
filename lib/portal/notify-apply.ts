@@ -3,13 +3,21 @@
  * 设置开关此前只要了权限就 return,排程函数从未被叫到。
  */
 import { isNativePlatform } from './platform-capabilities';
-import { isLocalNotifyEnabled, loadNotifyPrefs, setLocalNotifyEnabled } from './notify-prefs';
+import { hasLocalNotifyChoice, isLocalNotifyEnabled, loadNotifyPrefs, setLocalNotifyEnabled } from './notify-prefs';
 import { syncReminderNotifications, type SyncResult } from './reminder-notifications';
 import { notifyTeslaLowBattery } from './tesla-low-battery';
 import { readTeslaSnapshot } from './tesla-snapshot-store';
 import { loadFamilyBoards } from './family-board-store';
-import { ensureLocalNotificationPermission, scheduleLocalAt, tombstoneScheduled } from './native-local-notifications';
+import {
+  checkLocalNotifyDisplay,
+  ensureLocalNotificationPermission,
+  scheduleLocalAlert,
+  scheduleLocalAt,
+  tombstoneScheduled,
+} from './native-local-notifications';
 import { logDropped } from './storage-health';
+
+export const LOCAL_NOTIFY_WELCOMED_KEY = 'nesio-local-notify-welcomed-v1';
 
 const CHORE_NOTIFY_STATE_KEY = 'nesio-chore-notify-state-v1';
 
@@ -41,7 +49,12 @@ async function scheduleFamilyChoreNotifications(zh: boolean): Promise<{ schedule
       if (c.state !== 'todo') continue;
       const due = (c.dueDate || today).slice(0, 10);
       const at = new Date(`${due}T18:00:00`);
-      if (!Number.isFinite(at.getTime()) || at.getTime() <= Date.now()) continue;
+      if (!Number.isFinite(at.getTime())) continue;
+      // 今天还没做、已经过了 18:00 → 90 秒后响一次,别等明天。
+      if (at.getTime() <= Date.now()) {
+        if (due !== today) continue;
+        at.setTime(Date.now() + 90_000);
+      }
       const title = (c.title || '').trim() || (zh ? '今天的家务' : "Today's chore");
       planned.push({
         key: `chore:${c.id}:${due}`,
@@ -69,15 +82,23 @@ async function scheduleFamilyChoreNotifications(zh: boolean): Promise<{ schedule
 }
 
 export async function applyAllLocalNotifications(
-  opts: { askPermission?: boolean; zh?: boolean } = {},
+  opts: { askPermission?: boolean; zh?: boolean; welcomePing?: boolean } = {},
 ): Promise<SyncResult> {
   if (typeof window === 'undefined' || !isNativePlatform()) {
     return { ok: false, scheduled: 0, retired: 0, reason: 'not_native' };
   }
 
+  const display = await checkLocalNotifyDisplay();
+  if (display === 'missing') {
+    return { ok: false, scheduled: 0, retired: 0, reason: 'plugin_missing' };
+  }
+
   if (opts.askPermission) {
     const granted = await ensureLocalNotificationPermission();
     if (!granted) return { ok: false, scheduled: 0, retired: 0, reason: 'denied' };
+    setLocalNotifyEnabled(true);
+  } else if (!hasLocalNotifyChoice() && display === 'granted') {
+    // iOS 设置里已经开了通知,App 内开关从未点过 → 当作已开,立刻排程。
     setLocalNotifyEnabled(true);
   }
 
@@ -114,6 +135,24 @@ export async function applyAllLocalNotifications(
     const r = await scheduleFamilyChoreNotifications(zh);
     scheduled += r.scheduled;
     retired += r.retired;
+  }
+
+  if (opts.welcomePing) {
+    try {
+      if (localStorage.getItem(LOCAL_NOTIFY_WELCOMED_KEY) !== '1') {
+        const ping = await scheduleLocalAlert({
+          title: zh ? '通知已接通' : 'Notifications on',
+          body: zh
+            ? '家务、提醒和车低电量会在到点时响。可在设置里关掉某一类。'
+            : 'Chores, reminders, and low Tesla battery will ring when due. You can turn a category off in Settings.',
+          afterSec: 3,
+          id: 710_001,
+        });
+        if (ping.ok) localStorage.setItem(LOCAL_NOTIFY_WELCOMED_KEY, '1');
+      }
+    } catch (err) {
+      logDropped('local-notify.welcome', err);
+    }
   }
 
   return { ok: true, scheduled, retired };

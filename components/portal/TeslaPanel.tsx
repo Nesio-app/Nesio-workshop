@@ -5,7 +5,8 @@
  * 被两处复用,不留双实现:
  *   ① TeslaSheet(数据接入 → Tesla 行「数据」)—— 包一层 bottom sheet 外壳;
  *   ② 洞察「资产 → 车」tab(AssetsPanel)—— 常驻入口,便于长期观察数据到没到、去了哪。
- * 只读 GET /api/portal/tesla 的实时快照;顺手把新鲜快照喂给 refreshTesla,
+ * 页面真相是本机快照(IDB + 首屏种子)。进页不打 Tesla API —— 休眠唤醒又慢又空。
+ * 点「刷新车况」才拉 /api/portal/tesla;顺手把新鲜快照喂给 refreshTesla,
  * 让停车点/充电站即时进足迹、充电花费进财务(externalId 去重,不重复计)。
  */
 
@@ -28,7 +29,7 @@ import {
 } from '@/lib/portal/tesla-now';
 import { readPanelCache, writePanelCache, PANEL_CACHE_KEYS } from '@/lib/portal/session-panel-cache';
 import {
-  readTeslaSnapshot, saveTeslaSnapshot, mergeLastKnownLocation, type TeslaSnapshot,
+  readTeslaSnapshot, saveTeslaSnapshot, mergeLastKnownLocation, whenTeslaSnapshotReady,
 } from '@/lib/portal/tesla-snapshot-store';
 
 interface TeslaDrive {
@@ -87,7 +88,7 @@ type TeslaCachePayload = {
   energy: TeslaEnergyPayload;
 };
 
-type LoadState = 'loading' | 'ready' | 'error';
+type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
 function applyTeslaVehicles(
   onVehicles: ((v: Array<{ vehicleId: string; name: string }>) => void) | undefined,
@@ -112,7 +113,7 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
   const cached = durable
     ? { drives: durable.drives, charges: durable.charges, health: (durable.health || []) as TeslaHealthRow[], energy: (durable.energy || {}) as TeslaEnergyPayload }
     : readPanelCache<TeslaCachePayload>(PANEL_CACHE_KEYS.tesla);
-  const [state, setState] = useState<LoadState>(cached ? 'ready' : 'loading');
+  const [state, setState] = useState<LoadState>(cached ? 'ready' : 'idle');
   const [errMsg, setErrMsg] = useState('');
   const [drives, setDrives] = useState<TeslaDrive[]>(() => cached?.drives ?? []);
   const [charges, setCharges] = useState<TeslaCharge[]>(() => cached?.charges ?? []);
@@ -132,6 +133,7 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
   /** 没坐标时的原因:scope / asleep / unknown —— 不许一律说「没授权」。 */
   const [locationHint, setLocationHint] = useState<'ok' | 'scope' | 'asleep' | 'unknown'>('ok');
   const [lowBattRows, setLowBattRows] = useState<Array<{ vehicleId: string; displayName?: string; batteryLevel: number }>>([]);
+  const [refreshing, setRefreshing] = useState(false);
 
   // 2026-07-29(用户标注「车页卡死在『正在向车问好…』」的真因):这条 fetch 原本没有超时。
   // 车在深度休眠时 Tesla 侧可能几十秒不回,连接半挂时浏览器更是无限等 ——
@@ -150,8 +152,9 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
   const load = useCallback(async (opts: { silent?: boolean } = {}) => {
     const seq = ++reqRef.current;
     const mine = () => reqRef.current === seq;
-    // 有缓存时静默刷新:不闪回 Loading(用户抱怨「一打开就 loading」)。
-    if (!opts.silent) setState('loading');
+    // 已有固定数据时绝不整页换成「向车问好」—— 那是当场拉 API 的形状。
+    if (!opts.silent && !hasDataRef.current) setState('loading');
+    else setRefreshing(true);
     try {
       const res = await fetchWithTimeout('/api/portal/tesla', { cache: 'no-store' }, 45_000);
       const data = await res.json() as {
@@ -161,9 +164,15 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
         locationHint?: 'ok' | 'scope' | 'asleep' | 'unknown';
       };
       if (!mine()) return;   // 已经有更新的一趟在飞,旧结果一律丢弃
+      setRefreshing(false);
       if (!data.ok) {
-        // 静默刷新失败且已有画面 → 保留旧数据,不踢成 error 整页空白。
-        if (opts.silent && hasDataRef.current) return;
+        // 已有画面 → 保留旧数据,失败写在横幅,不踢成 error 整页空白。
+        if (hasDataRef.current) {
+          setErrMsg(data.error === 'not_connected' || data.error === 'token_expired'
+            ? L(dict, 'Tesla 还没连上(或授权已失效)—— 到「设置 → 数据接入 → Tesla」连接一次。', 'Tesla is not linked yet (or auth expired) — connect it from Settings → Data sources → Tesla.')
+            : L(dict, `没取到新数据(${data.error || '未知'}),下面仍是上次存下的。`, `Couldn't refresh (${data.error || 'unknown'}) — showing the last saved snapshot.`));
+          return;
+        }
         setErrMsg(data.error === 'not_connected' || data.error === 'token_expired'
           ? L(dict, 'Tesla 还没连上(或授权已失效)—— 到「设置 → 数据接入 → Tesla」连接一次。', 'Tesla is not linked yet (or auth expired) — connect it from Settings → Data sources → Tesla.')
           : data.error === 'partner_not_registered'
@@ -182,6 +191,7 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
       setEnergy(nextEnergy);
       setHealth(nextHealth);
       setLocationHint(data.locationHint || 'ok');
+      setErrMsg('');
       setState('ready');
       hasDataRef.current = true;
       writePanelCache(PANEL_CACHE_KEYS.tesla, {
@@ -239,20 +249,44 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
         .catch(() => {});
     } catch {
       if (!mine()) return;
-      if (opts.silent && hasDataRef.current) return;
+      setRefreshing(false);
+      if (hasDataRef.current) {
+        setErrMsg(L(dict, '这次没等到车的回应 —— 下面仍是上次存下的。', 'The car did not answer — still showing the last saved snapshot.'));
+        return;
+      }
       setErrMsg(L(dict, '这次没等到车的回应 —— 它可能在深度休眠。稍后再试一次。', 'The car did not answer this time — it may be in deep sleep. Try again shortly.'));
       setState('error');
     }
   }, [dict, onVehicles]);
 
   useEffect(() => {
-    const hasCache = hasDataRef.current;
-    void load({ silent: hasCache });
-    if (hasCache) {
-      const c = readPanelCache<TeslaCachePayload>(PANEL_CACHE_KEYS.tesla);
-      if (c) applyTeslaVehicles(onVehicles, c.drives, c.charges);
-    }
-    // 只在挂载时拉一次;语言/onVehicles 变化不该整页重 Loading。
+    let stop = false;
+    void (async () => {
+      await whenTeslaSnapshotReady();
+      if (stop) return;
+      const snap = readTeslaSnapshot();
+      if (snap) {
+        const drives = snap.drives || [];
+        const charges = snap.charges || [];
+        const health = (snap.health || []) as TeslaHealthRow[];
+        const energy = (snap.energy || {}) as TeslaEnergyPayload;
+        setDrives(drives);
+        setCharges(charges);
+        setHealth(health);
+        setEnergy(energy);
+        setPlaceByVehicle(snap.placeByVehicle ?? {});
+        if (snap.locationHint) setLocationHint(snap.locationHint);
+        setState('ready');
+        hasDataRef.current = true;
+        applyTeslaVehicles(onVehicles, drives, charges);
+        try { setLog(readTeslaLog()); } catch { /* 日志缺不影响看车 */ }
+        return;
+      }
+      // 本机还没有存过 → 才当场问一次车。
+      void load();
+    })();
+    return () => { stop = true; };
+    // 只在挂载时决定要不要拉;语言/onVehicles 变化不该整页重 Loading。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -309,7 +343,12 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
       if (!alive) return;
       setGeoBusy(false);
       if (Object.keys(next).length) {
-        setPlaceByVehicle((prev) => ({ ...prev, ...next }));
+        setPlaceByVehicle((prev) => {
+          const merged = { ...prev, ...next };
+          const snap = readTeslaSnapshot();
+          if (snap) saveTeslaSnapshot({ ...snap, placeByVehicle: merged });
+          return merged;
+        });
         setGeoErr(null);
         return;
       }
@@ -366,6 +405,8 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
       : `${d.getMonth() + 1}月${d.getDate()}日`;
   };
 
+  if (state === 'idle') return null;
+
   if (state === 'loading') {
     return (
       <LoadingCard
@@ -394,6 +435,19 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
 
   return (
     <>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+        <p className="nesio-settings-option-hint" style={{ margin: 0 }}>
+          {refreshing
+            ? L(dict, '正在更新上次存下的车况…', 'Updating the saved snapshot…')
+            : L(dict, '下面是上次存下的车况,不会进页就问车。', 'This is the last saved snapshot — opening the page does not wake the car.')}
+        </p>
+        <button type="button" className="nesio-ob-primary-btn" style={{ flexShrink: 0 }} disabled={refreshing} onClick={() => void load({ silent: true })}>
+          {refreshing ? L(dict, '更新中…', 'Updating…') : L(dict, '刷新车况', 'Refresh')}
+        </button>
+      </div>
+      {errMsg && state === 'ready' && (
+        <p className="nesio-settings-option-hint" role="status" style={{ margin: '0 0 var(--space-3)' }}>{errMsg}</p>
+      )}
       {liveByVehicle.size === 0 && history.length === 0 && (
         <p className="nesio-settings-option-hint">
           {L(dict, '还没有拿到车辆数据。车辆深度休眠时 Tesla 可能暂时不回,过一会儿再看。', "No vehicle data yet. Tesla may hold back while the car is in deep sleep — check back in a bit.")}

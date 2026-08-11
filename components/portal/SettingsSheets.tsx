@@ -9,7 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { pushSupported, isPushEnabled, enablePush, disablePush } from '@/lib/portal/push-notify';
 import { isNativePlatform } from '@/lib/portal/platform-capabilities';
 import {
-  isLocalNotifyEnabled, setLocalNotifyEnabled, loadNotifyPrefs, saveNotifyPrefs, type NotifyPrefs,
+  isLocalNotifyEnabled, setLocalNotifyEnabled, hasLocalNotifyChoice, loadNotifyPrefs, saveNotifyPrefs, type NotifyPrefs,
 } from '@/lib/portal/notify-prefs';
 import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, saveProfileSettings, touchProfileIdentity, type PortalLocale } from '@/lib/portal/profile';
 import { describeUnifiedSync, runUnifiedSync } from '@/lib/portal/unified-sync';
@@ -339,7 +339,21 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     } catch { /* ignore */ }
     setPushOn(nativeNotify ? isLocalNotifyEnabled() : isPushEnabled());
     setNotifyPrefs(loadNotifyPrefs());
-  }, [open, nativeNotify]);
+    if (!nativeNotify) return;
+    let stop = false;
+    void import('@/lib/portal/native-local-notifications').then(async (m) => {
+      const d = await m.checkLocalNotifyDisplay();
+      if (stop) return;
+      if (d === 'granted' && !hasLocalNotifyChoice()) {
+        setLocalNotifyEnabled(true);
+        setPushOn(true);
+        setPushMsg(L(dict, '系统已允许通知 — 家务/提醒/车会到点响', 'Notifications already allowed — chores, reminders, and the car will ring when due'));
+      } else if (d === 'missing') {
+        setPushMsg(L(dict, '这版壳没带上通知插件 — 请用 Sideloadly 重装新 IPA', 'This app shell is missing the notification plugin — reinstall a new IPA with Sideloadly'));
+      }
+    }).catch(() => {});
+    return () => { stop = true; };
+  }, [open, nativeNotify, dict]);
   function toggleDailyReport() {
     setDailyReportOn((v) => {
       saveProfileSettings({ dailyReportEnabled: !v });
@@ -367,8 +381,18 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         setPushMsg(L(dict, '系统没给通知权限 — 可在设置 → 宝盒里打开通知后再试', 'Notifications not allowed — enable them in Settings → 宝盒 and retry'));
         return;
       }
+      if (!r.ok && r.reason === 'plugin_missing') {
+        setPushMsg(L(dict, '这版壳没带上通知插件 — 请用 Sideloadly 重装新 IPA', 'This app shell is missing the notification plugin — reinstall a new IPA with Sideloadly'));
+        return;
+      }
       setPushOn(true);
-      setPushMsg(L(dict, `系统通知已开 · 已排 ${r.scheduled} 条`, `Local alerts on · ${r.scheduled} scheduled`));
+      setPushMsg(L(dict, `系统通知已开 · 已排 ${r.scheduled} 条。两秒后会试响一条。`, `Local alerts on · ${r.scheduled} scheduled. A test alert will ring in two seconds.`));
+      void import('@/lib/portal/native-local-notifications').then((m) => m.scheduleLocalAlert({
+        title: L(dict, '通知已接通', 'Notifications on'),
+        body: L(dict, '到点的家务、提醒和车低电量会在这里响。', 'Due chores, reminders, and low Tesla battery will ring here.'),
+        afterSec: 2,
+        id: 710_002,
+      }));
       return;
     }
     const r = await enablePush();
@@ -727,6 +751,28 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
                 </span>
               </button>
             ))}
+            <button
+              type="button"
+              className="nesio-settings-option"
+              onClick={() => {
+                setPushMsg(L(dict, '正在试一条…', 'Sending a test…'));
+                void import('@/lib/portal/native-local-notifications').then(async (m) => {
+                  const r = await m.scheduleLocalAlert({
+                    title: L(dict, '试一下通知', 'Test notification'),
+                    body: L(dict, '能看到这一条,系统通知就接通了。', 'If you see this, system notifications are working.'),
+                    afterSec: 2,
+                    id: 710_003,
+                  });
+                  setPushMsg(r.ok
+                    ? L(dict, '两秒后会响一条。没响的话请重装带通知插件的 IPA。', 'It should ring in two seconds. If not, reinstall an IPA that includes the notification plugin.')
+                    : r.reason === 'denied'
+                      ? L(dict, '系统没给通知权限 — 到设置 → 宝盒里打开通知。', 'Notifications not allowed — enable them in Settings → 宝盒.')
+                      : L(dict, '这版壳排不上通知 — 请用 Sideloadly 重装新 IPA。', 'This shell cannot schedule alerts — reinstall a new IPA with Sideloadly.'));
+                });
+              }}
+            >
+              <span className="nesio-settings-option-label">{L(dict, '试一条通知', 'Send a test alert')}</span>
+            </button>
           </div>
         )}
         </>

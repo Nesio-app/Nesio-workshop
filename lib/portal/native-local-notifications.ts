@@ -66,6 +66,21 @@ export function notifyIdOf(key: string): number {
 
 const NesioLocalNotify = registerPlugin<NesioLocalNotifyPlugin>('NesioLocalNotify');
 
+export type LocalNotifyDisplay = 'granted' | 'denied' | 'prompt' | 'missing' | 'not_native';
+
+/** 这版壳带没带 NesioLocalNotify。packageClassList 空时 checkPermissions 会抛。 */
+export async function checkLocalNotifyDisplay(): Promise<LocalNotifyDisplay> {
+  if (typeof window === 'undefined' || !isNativePlatform()) return 'not_native';
+  try {
+    const cur = await NesioLocalNotify.checkPermissions();
+    const d = cur.display;
+    if (d === 'granted' || d === 'denied' || d === 'prompt') return d;
+    return 'prompt';
+  } catch {
+    return 'missing';
+  }
+}
+
 export async function ensureLocalNotificationPermission(): Promise<boolean> {
   if (typeof window === 'undefined' || !isNativePlatform()) return false;
   try {

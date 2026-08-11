@@ -154,7 +154,7 @@ export interface SyncResult {
   /** 撤掉了几条(用户删了/改了时间/做完了)。 */
   retired: number;
   /** 没做成的原因。ok=false 时一定有。 */
-  reason?: 'not_native' | 'denied' | 'no_permission_ask' | 'failed';
+  reason?: 'not_native' | 'denied' | 'no_permission_ask' | 'failed' | 'plugin_missing';
 }
 
 /**

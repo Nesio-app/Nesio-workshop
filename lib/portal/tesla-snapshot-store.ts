@@ -47,6 +47,7 @@ const store = createBlobStore<TeslaSnapshot>({
   updateEvent: TESLA_SNAPSHOT_UPDATED,
   validate: (v) => Boolean(v && typeof v === 'object' && Array.isArray((v as TeslaSnapshot).drives)),
   onWriteError: reportStorageDropped,
+  syncSeed: true,
 });
 
 export function readTeslaSnapshot(): TeslaSnapshot | null {
@@ -55,6 +56,10 @@ export function readTeslaSnapshot(): TeslaSnapshot | null {
 
 export function saveTeslaSnapshot(snap: TeslaSnapshot): void {
   store.save(snap);
+}
+
+export function whenTeslaSnapshotReady(): Promise<void> {
+  return store.ready();
 }
 
 /** 新快照没坐标时,把上次看到的经纬度补回去(休眠会抹坐标)。 */

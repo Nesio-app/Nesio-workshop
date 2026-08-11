@@ -93,4 +93,31 @@ function fakeBackend(init = {}) {
   assert.equal((await be.keys()).length, 0, 'IDB 已清空(彻底删除本机数据不漏)');
 }
 
+// 6. syncSeed:第一帧就能从 LS 读,水合不删种子
+{
+  const { mod, lsMap } = makeCtx();
+  const be = fakeBackend();
+  const store = mod.createBlobStore({
+    key: 'nesio-tesla-snapshot-v1', updateEvent: 'e', backend: be, autoHydrate: false, syncSeed: true,
+  });
+  store.save({ drives: [{ vehicleId: '1' }], charges: [] });
+  assert.equal(lsMap.get('nesio-tesla-snapshot-v1')?.includes('"vehicleId":"1"'), true, 'save 双写 LS 种子');
+  const { mod: mod2, lsMap: ls2 } = makeCtx({ 'nesio-tesla-snapshot-v1': lsMap.get('nesio-tesla-snapshot-v1') });
+  const be2 = fakeBackend();
+  const store2 = mod2.createBlobStore({
+    key: 'nesio-tesla-snapshot-v1', updateEvent: 'e', backend: be2, autoHydrate: false, syncSeed: true,
+  });
+  assert.equal(store2.load().drives[0].vehicleId, '1', '水合前 load() 就能读到种子');
+  await store2.ready();
+  assert.equal(ls2.has('nesio-tesla-snapshot-v1'), true, 'syncSeed 水合后不删 LS');
+  assert.equal(JSON.parse(be2._m.get('nesio-tesla-snapshot-v1')).drives[0].vehicleId, '1', '种子搬进 IDB');
+}
+
+{
+  const rules = fs.readFileSync(new URL('../lib/portal/bank-rules-store.ts', import.meta.url), 'utf8');
+  assert.match(rules, /from '\.\/idb-blob-store'/,
+    'bank-rules-store 与 idb-blob-store 同在 lib/portal,必须是 ./ —— ../ 会让 Vercel Turbopack Module not found(2026-08-11 连红三次)');
+  assert.match(rules, /from '\.\/storage-health'/);
+}
+
 console.log('idb-blob-store: OK');

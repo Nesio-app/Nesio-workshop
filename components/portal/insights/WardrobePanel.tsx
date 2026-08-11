@@ -26,6 +26,7 @@ import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache'
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
 import Button from '@/components/portal/ui/Button';
 import NesioSheet from '@/components/portal/ui/NesioSheet';
+import ZoomableImage from '@/components/portal/ui/ZoomableImage';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -214,7 +215,6 @@ export default function WardrobePanel() {
   const [bodyThumbs, setBodyThumbs] = useState<Record<string, string>>({});
   const [activeBodyId, setActiveBodyId] = useState(BODY_ASSET_ID);
   const [zoomUrl, setZoomUrl] = useState<string | null>(null);
-  const [zoomScaled, setZoomScaled] = useState(false);
   const [saveMsg, setSaveMsg] = useState<string | null>(null);
   const [saveBusy, setSaveBusy] = useState(false);
   const [unwornOpen, setUnwornOpen] = useState(false);
@@ -973,7 +973,7 @@ export default function WardrobePanel() {
           {tryonResult ? (
             <div style={{ marginTop: 'var(--space-2)' }}>
               {/* 结果卡整卡可点放大(与图 zoom 同一 setZoomUrl) */}
-              <button type="button" onClick={() => { setZoomScaled(false); setZoomUrl(tryonResult); }}
+              <button type="button" onClick={() => setZoomUrl(tryonResult)}
                 style={{ display: 'block', width: '100%', padding: 0, border: 'none', background: 'transparent', cursor: 'zoom-in' }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={tryonResult} alt={L(dict, '试穿效果', 'Try-on result')} style={{ width: '100%', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)' }} />
@@ -1390,19 +1390,13 @@ export default function WardrobePanel() {
       </NesioSheet>
 
       {zoomUrl && typeof document !== 'undefined' && createPortal(
-        <div className="nesio-tryon-lightbox" aria-label={L(dict, '试穿全屏', 'Try-on fullscreen')}
-          onClick={() => { setZoomUrl(null); setZoomScaled(false); }}>
+        <div className="nesio-tryon-lightbox" role="dialog" aria-modal="true"
+          aria-label={L(dict, '试穿全屏', 'Try-on fullscreen')}
+          onClick={() => setZoomUrl(null)}>
           <button type="button" className="nesio-tryon-lightbox-close" aria-label={L(dict, '关闭', 'Close')}
-            onClick={() => { setZoomUrl(null); setZoomScaled(false); }}>✕</button>
-          <div className={`nesio-tryon-lightbox-stage${zoomScaled ? ' is-zoomed' : ''}`}
-            onClick={(e) => e.stopPropagation()}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={zoomUrl}
-              alt=""
-              className={zoomScaled ? 'is-zoomed' : undefined}
-              onClick={() => setZoomScaled((z) => !z)}
-            />
+            onClick={(e) => { e.stopPropagation(); setZoomUrl(null); }}>✕</button>
+          <div className="nesio-tryon-lightbox-stage" onClick={(e) => e.stopPropagation()}>
+            <ZoomableImage src={zoomUrl} alt={L(dict, '试穿效果', 'Try-on result')} />
           </div>
           <div className="nesio-tryon-lightbox-actions" onClick={(e) => e.stopPropagation()}>
             <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} disabled={saveBusy} onClick={() => onSaveTryon(zoomUrl)}>
@@ -1411,7 +1405,7 @@ export default function WardrobePanel() {
             <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} disabled={saveBusy} onClick={() => { void onSaveTryonAsOutfit(zoomUrl); }}>
               {L(dict, '存入搭配', 'Save outfit')}
             </Button>
-            <Button variant="secondary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => { setZoomUrl(null); setZoomScaled(false); }}>
+            <Button variant="secondary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => setZoomUrl(null)}>
               {L(dict, '关闭', 'Close')}
             </Button>
           </div>

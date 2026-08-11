@@ -115,6 +115,7 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-push-enabled-v1',                // 推送开关:**每个浏览器**自己的订阅,跨端同步会让
                                           //   别的设备显示"已开"却收不到推送(它没订阅)
   'nesio-local-notify-enabled-v1',        // 本机系统通知总开关(权限在这台设备)
+  'nesio-local-notify-welcomed-v1',       // 接通后的一次性自检通知,换设备可再响一次
   'nesio-chore-notify-state-v1',          // 家庭家务通知排程投影,同 reminder-notify-state
   'nesio-storage-heal-v1',                // 一次性自愈的完成标记
   // 档案是**观测面**,不是用户数据:整键 replace 同步会让两端互相抹掉对方的记录(静默丢反馈)。
@@ -132,6 +133,7 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-care-image-sync-state-v1',                                       // 照料附件图同步簿记
   'nesio-life-graph-cloud-sync-v1', 'nesio-life-graph-cloud-sync-outbox-v1', // 云同步水位与待发队列
   'nesio-family-strip-fetch-at-v1',                                        // 取数节流
+  'nesio-family-strip-fetch-day-v1',                                       // 家务板「今天拉过了」日键
   'nesio-plaid-enrich-v1',                                                 // 一次性全量回填标记
   'nesio-pending-ask-image', 'nesio-pending-ask-text',                     // 待发问暂存(会话级)
   'nesio-storage-alert-snooze-v1',                                         // 存储告警节流

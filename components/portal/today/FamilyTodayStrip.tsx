@@ -5,8 +5,8 @@
  *  ① 分给我的今天家务 → 直接「完成」(→ 走服务端,家长会在 TA 今天页收到回响);
  *  ② 我能审核、且有人刚做完 → 「XX 做完了 · 看一眼」通知,当场 看着不错 / 再来一次。
  * 空 → 不渲染。每个异步动作都有显式失败态 + 每行都有「稍后」出口(warm-coach 红线)。
- * 效率:秒显 sessionStorage 缓存 + 60s 节流拉取(family-updated 事件强刷);仅登录时挂载。
- * 数据来自 Supabase 家庭表(跨账号),经 /api/portal/family/board 服务端授权拉取。
+ * 效率:秒显 IDB 固定快照(syncSeed 首屏);同一天不重复拉 API。
+ * family-updated 才强刷。数据来自 Supabase 家庭表,经 /api/portal/family/board。
  * 说明:回响是「下次打开今天页时出现」(拉取式),不是实时推送 —— app 暂无 realtime 通道。
  * 图15:壳统一 nesio-proactive-card + Button size=sm;点卡 → nesio-open-family。
  */
@@ -17,15 +17,15 @@ import { usePortalLocale } from '../use-portal-locale';
 import { listFamilies, getBoard, choreAction, type BoardView, type ChoreInstanceView } from '@/lib/family/family-client';
 import { awardChorePoints, reconcileMyChorePoints } from '../family/award-chore-points';
 import { readPortalCache, writePortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
-import { loadFamilyBoards, saveFamilyBoards } from '@/lib/portal/family-board-store';
+import { loadFamilyBoards, saveFamilyBoards, whenFamilyBoardsReady } from '@/lib/portal/family-board-store';
 import Button from '../ui/Button';
 
 // 家务的「多少」= 积分(2026-08-01 用户:「家务挣积分,把钱相关的 UI 逻辑都换」)。
 // 和 chorePointValue 同一口径(1 元 = 1 积分),界面上只说「分」。
 const points = (n: number, dict: 'zh' | 'en') => (dict === 'en' ? `${Math.round(n)} pts` : `${Math.round(n)} 分`);
 const dayKey = () => new Date().toLocaleDateString('en-CA');
-const THROTTLE_MS = 60_000;
 const FETCH_AT_KEY = 'nesio-family-strip-fetch-at-v1';
+const FETCH_DAY_KEY = 'nesio-family-strip-fetch-day-v1';
 const snoozeKey = () => `nesio-family-strip-snoozed-${dayKey()}`;
 
 interface Board extends BoardView { familyName: string; }
@@ -59,12 +59,21 @@ export default function FamilyTodayStrip() {
   const inFlight = useRef(false);
 
   useEffect(() => {
+    let stop = false;
+    void whenFamilyBoardsReady().then(() => {
+      if (stop) return;
+      const durable = loadFamilyBoards();
+      if (durable.length) setBoards(durable);
+    });
     const on = () => {
       const durable = loadFamilyBoards();
       if (durable.length) setBoards(durable);
     };
     window.addEventListener('nesio-family-board-updated', on);
-    return () => window.removeEventListener('nesio-family-board-updated', on);
+    return () => {
+      stop = true;
+      window.removeEventListener('nesio-family-board-updated', on);
+    };
   }, []);
 
   const fetchNow = useCallback(async () => {
@@ -72,7 +81,8 @@ export default function FamilyTodayStrip() {
     inFlight.current = true;
     try {
       const fr = await listFamilies();
-      if (!fr.ok || !fr.data.families.length) {
+      if (!fr.ok) return; // 网络失败不许把已存家务板抹掉
+      if (!fr.data.families.length) {
         setBoards([]);
         writePortalCache(PORTAL_CACHE_KEYS.family, []);
         saveFamilyBoards([]);
@@ -83,22 +93,29 @@ export default function FamilyTodayStrip() {
         const br = await getBoard(fam.familyId);
         if (br.ok) next.push({ ...br.data.board, familyName: fam.name });
       }
+      if (!next.length) return;
       setBoards(next);
       writePortalCache(PORTAL_CACHE_KEYS.family, next);
       saveFamilyBoards(next);
       for (const fam of next) void reconcileMyChorePoints(fam.familyId, dict === 'en' ? 'en' : 'zh');
-      try { localStorage.setItem(FETCH_AT_KEY, String(Date.now())); } catch { /* noop */ }
+      try {
+        localStorage.setItem(FETCH_AT_KEY, String(Date.now()));
+        localStorage.setItem(FETCH_DAY_KEY, dayKey());
+      } catch { /* noop */ }
     } finally {
       inFlight.current = false;
     }
   }, [dict]);
 
-  // 节流:距上次拉取 < 60s 就跳过(缓存已在显示);force 绕过(用户动作 / family-updated)。
+  // 已有固定数据:同一天不拉。没有存过 / 跨日 / family-updated 才拉。
   const maybeRefresh = useCallback((force: boolean) => {
     if (!force) {
-      let last = 0;
-      try { last = parseInt(localStorage.getItem(FETCH_AT_KEY) || '0', 10); } catch { /* noop */ }
-      if (Date.now() - last < THROTTLE_MS) return;
+      const stored = loadFamilyBoards();
+      if (stored.length) {
+        let day = '';
+        try { day = localStorage.getItem(FETCH_DAY_KEY) || ''; } catch { /* noop */ }
+        if (day === dayKey()) return;
+      }
     }
     void fetchNow();
   }, [fetchNow]);

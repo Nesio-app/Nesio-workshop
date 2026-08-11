@@ -84,6 +84,7 @@ const KNOWN_KEYS = new Map([
   // per-record 云同步状态(每 id 上次同步内容哈希)。cache —— 新设备从零开始重新对账是对的。
   ["nesio-file-sync-state-v1", "cache"],
   ["nesio-family-strip-fetch-at-v1", "cache"],
+  ["nesio-family-strip-fetch-day-v1", "cache"],
   ["nesio-first-memory-receipt-shown-v1", "cache"],
   ["nesio-focus-dismissed-v1", "cache"],
   ["nesio-gmail-last-sync", "cache"],
@@ -119,6 +120,7 @@ const KNOWN_KEYS = new Map([
   ["nesio-proactive-dismissed", "cache"],
   ["nesio-push-enabled-v1", "cache"],
   ["nesio-local-notify-enabled-v1", "cache"],
+  ["nesio-local-notify-welcomed-v1", "cache"],
   ["nesio-chore-notify-state-v1", "cache"],
   ["nesio-reader-sync-state-v1", "cache"],
   ["nesio-retro-dismissed-v1", "cache"],

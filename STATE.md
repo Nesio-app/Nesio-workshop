@@ -63,6 +63,13 @@
   且等 IDB 水合;Gmail 改 `ingestLifeNodesBatch`(禁止逐条 saveAll)。② 设置「系统通知」
   真的排程(家务/提醒/车低电量可勾选)。③ Tesla 上次快照 + 家庭家务板改 IDB durable,
   休眠时地图用上次坐标。
+- **2026-08-11 试穿全屏 / 固定车况家务 / 系统通知真排**:① 试穿灯箱 z=950(不再被洞察
+  全屏盖住)+ 双指捏合/双击放大。② 车页·家务以本机快照为页源,进页不打 API;
+  `createBlobStore.syncSeed` 让第一帧能读;家务拉失败不许抹盘。③ iOS 已授权且
+  App 内开关从未点过 → 自动排程;壳缺插件给出 `plugin_missing` + 设置里「试一条」。
+- **2026-08-11 Vercel 连红三次**:`lib/portal/bank-rules-store.ts` 写成 `../idb-blob-store`
+  (文件就在 lib/portal),Turbopack Module not found;CI `connector-idempotency` 把
+  `prepareIngestInput` 误切进 externalKey。生产仍停在 `6d00ece` 直到本条修好。
 
 ## 进行中的迁移
 

@@ -16,6 +16,7 @@ const store = createBlobStore<FamilyBoardSnap[]>({
   updateEvent: FAMILY_BOARD_UPDATED,
   validate: (v) => Array.isArray(v),
   onWriteError: reportStorageDropped,
+  syncSeed: true,
 });
 
 export function loadFamilyBoards(): FamilyBoardSnap[] {
@@ -24,4 +25,8 @@ export function loadFamilyBoards(): FamilyBoardSnap[] {
 
 export function saveFamilyBoards(boards: FamilyBoardSnap[]): void {
   store.save(boards);
+}
+
+export function whenFamilyBoardsReady(): Promise<void> {
+  return store.ready();
 }

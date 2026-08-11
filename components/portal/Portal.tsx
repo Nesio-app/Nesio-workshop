@@ -454,14 +454,17 @@ export default function Portal() {
    *   · **提醒变了** —— 新建/改时间/删除/打勾,立刻反映到排程,不用等下次回前台。
    *
    * 一律**不弹权限**(askPermission 默认 false):没人按按钮的时候突然弹一个系统弹窗
-   * 是最招人烦的那种。权限在用户真的设了一条提醒时才问(SchedulePanel 那边)。
+   * 是最招人烦的那种。若 iOS 设置里已经允许通知、App 内开关从未点过,
+   * applyAll 会把开关视为已开并排程(否则系统开了、App 永远 no_permission_ask)。
    */
   useEffect(() => {
     let stop = false;
+    let welcomed = false;
     const sync = () => {
       if (stop) return;
       void import('@/lib/portal/notify-apply')
-        .then((m) => m.applyAllLocalNotifications())
+        .then((m) => m.applyAllLocalNotifications({ welcomePing: !welcomed }))
+        .then(() => { welcomed = true; })
         .catch(() => { /* 排不上不影响 App —— 提醒本体在列表里,一条没丢 */ });
     };
     sync();
