@@ -226,7 +226,14 @@ export default function TeslaPanel({ onVehicles, boundIds }: {
       // 车的接口只回「此刻」——图 4 那条曲线只能在**看过的时刻**攒。
       // 攒完立刻重读:这一次的点也要出现在图上,不用等下次开页面。
       try {
-        const byVehicle = new Map<string, { vehicleId: string; batteryPct?: number | null; odometerMi?: number | null; chargingState?: string }>();
+        const byVehicle = new Map<string, {
+          vehicleId: string;
+          batteryPct?: number | null;
+          odometerMi?: number | null;
+          chargingState?: string;
+          latitude?: number | null;
+          longitude?: number | null;
+        }>();
         for (const d of nextDrives) {
           byVehicle.set(d.vehicleId, {
             vehicleId: d.vehicleId,
