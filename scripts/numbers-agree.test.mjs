@@ -134,20 +134,14 @@ function loadTs(rel) {
   assert.doesNotMatch(st, /本机 \$\{auditReport\.localCount\} 条,云端/,
     '旧写法(拿全量节点数当「本机 N 条」)要拆掉');
 
-  // 「立即同步」那颗按钮必须真的渲染 —— 它算好的解释从来没露过面
+  // 「同步」那颗按钮必须真的渲染 —— 与记忆页下拉同一条统一管道
   assert.match(st, /onClick=\{handleForceSync\}/,
-    'handleForceSync 把「从云端取回 N 条这台设备还没有的记忆」都算好了,' +
-    '可这颗按钮和这行字从来没被渲染过 —— 又一处「写了没接上」。' +
-    '同一个数字,说清来路就是功能,不说就是 bug');
+    'handleForceSync 必须挂在按钮上');
   assert.match(st, /\{diagSyncMsg && \(/, '那行解释也要渲染出来');
-  // 2026-08-01:那句话搬到 lib/portal/sync-result-copy —— 而且它原来配错了数
-  // (importedNodeCount 数的是云端总条数,句子说的却是「这台设备还没有的」,
-  //  用户看到「总显示 1000」)。行为压在 scripts/sync-count-honest,那边真跑。
-  // 这里钉住:调用点走了那个函数,且「取回」旁边的数是 importedNodeCount 而不是总数。
-  assert.match(st, /describeSyncResult\(\{[\s\S]{0,120}fresh: mem\.importedNodeCount/,
-    '「取回 N 条这台设备还没有的」旁边的数必须是 importedNodeCount —— 配上总数就是那条 bug');
+  assert.match(st, /runUnifiedSync|describeUnifiedSync/,
+    '同步必须走统一管道并说明记忆新/更新/云端总数');
   const copy = fs.readFileSync(new URL('../lib/portal/sync-result-copy.ts', import.meta.url), 'utf8');
-  assert.match(copy, /取回 \$\{fresh\} 条这台设备还没有的记忆/, '解释文案本身还在');
+  assert.match(copy, /取回 \$\{fresh\} 条这台设备还没有的记忆/, '解释文案本身还在(兼容旧路径)');
 }
 
 console.log('numbers-agree: OK(总评看最弱一维 / 门面报行数 / 记忆数两个口径说清 / 同步有来路)');

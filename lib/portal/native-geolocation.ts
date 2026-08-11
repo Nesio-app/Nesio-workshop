@@ -69,8 +69,26 @@ export async function requestLocationPermission(): Promise<boolean> {
     const cur = await NesioGeolocation.checkPermissions();
     if (granted(cur)) return true;
     return granted(await NesioGeolocation.requestPermissions());
-  } catch {
+  } catch (err) {
+    // 插件未进 packageClassList / 未编译进壳时会抛 —— 别一律当成「系统拒绝」。
+    console.warn('[nesio-geo] permission bridge failed', err);
     return false;
+  }
+}
+
+/** 区分「系统拒绝」与「壳没带定位插件」,给 ConnectorsHub 用。 */
+export async function diagnoseLocationPermission(): Promise<'granted' | 'denied' | 'plugin_missing' | 'unavailable'> {
+  if (typeof window === 'undefined') return 'unavailable';
+  if (!isNativePlatform()) {
+    return navigator.geolocation ? 'granted' : 'unavailable';
+  }
+  try {
+    const cur = await NesioGeolocation.checkPermissions();
+    if (granted(cur)) return 'granted';
+    const next = await NesioGeolocation.requestPermissions();
+    return granted(next) ? 'granted' : 'denied';
+  } catch {
+    return 'plugin_missing';
   }
 }
 

@@ -8,7 +8,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   getTrip, deleteTrip, addTripNode, generatePackingList, importBookingIntoTrip,
   recomputeBudgetNode, groupNodesByDay, formatTripNodeTime, TRAVEL_TRIPS_UPDATED_EVENT,
-  extractTextFromBookingFile,
+  extractTextFromBookingFile, updateTripMeta,
   type Trip, type TripNode,
 } from '@/lib/portal/travel-trips';
 import { ensureTravelHubsLoaded, searchTravelHubs, hubLabel, type TravelHub } from '@/lib/portal/travel-hubs';
@@ -56,6 +56,12 @@ export default function TripTimelineSheet({
   const [transitLabel, setTransitLabel] = useState('');
   const [paste, setPaste] = useState('');
   const [routesErr, setRoutesErr] = useState<string | null>(null);
+  const [editingMeta, setEditingMeta] = useState(false);
+  const [metaTitle, setMetaTitle] = useState('');
+  const [metaDest, setMetaDest] = useState('');
+  const [metaStart, setMetaStart] = useState('');
+  const [metaDays, setMetaDays] = useState('5');
+  const [metaErr, setMetaErr] = useState<string | null>(null);
 
   function reload() {
     if (!tripId) { setTrip(null); return; }
@@ -247,6 +253,38 @@ export default function TripTimelineSheet({
     reload();
   }
 
+  function openMetaEdit() {
+    if (!trip) return;
+    setMetaTitle(trip.title);
+    setMetaDest(trip.destination);
+    setMetaStart(trip.startDate.slice(0, 10));
+    setMetaDays(String(trip.days || 1));
+    setMetaErr(null);
+    setEditingMeta(true);
+  }
+
+  function saveMetaEdit() {
+    if (!trip) return;
+    const days = Math.max(1, parseInt(metaDays, 10) || 1);
+    if (!metaStart.trim()) {
+      setMetaErr(L(dict, '填出发日', 'Start date needed'));
+      return;
+    }
+    const next = updateTripMeta(trip.id, {
+      title: metaTitle.trim() || undefined,
+      destination: metaDest.trim(),
+      startDate: metaStart.trim(),
+      days,
+    });
+    if (!next) {
+      setMetaErr(L(dict, '没能保存,稍后再试', "Couldn't save — try again"));
+      return;
+    }
+    setEditingMeta(false);
+    setMetaErr(null);
+    reload();
+  }
+
   return (
     <>
       <NesioSheet
@@ -263,7 +301,15 @@ export default function TripTimelineSheet({
             <button type="button" className="nesio-trip-back" onClick={onClose}>
               ‹ {L(dict, '计划', 'Plans')}
             </button>
-            <h2 className="nesio-trip-sheet-title">{trip?.title || '…'}</h2>
+            <button
+              type="button"
+              className="nesio-trip-sheet-title"
+              onClick={openMetaEdit}
+              aria-label={L(dict, '改行程名和日期', 'Edit trip name and dates')}
+              style={{ background: 'none', border: 0, padding: 0, cursor: 'pointer', textAlign: 'center', font: 'inherit', color: 'inherit' }}
+            >
+              {trip?.title || '…'}
+            </button>
             <div className="nesio-trip-sheet-tools">
               {budgetNode && (
                 <button type="button" className="nesio-trip-iconbtn" aria-label={L(dict, '行程预算', 'Budget')} onClick={() => setDetailNode(budgetNode)}>
@@ -287,6 +333,33 @@ export default function TripTimelineSheet({
           </header>
 
           {!trip && <p className="nesio-trip-empty">{L(dict, '找不到这趟行程', 'Trip not found')}</p>}
+
+          {trip && editingMeta && (
+            <div className="nesio-travel-plan-form" style={{ marginBottom: 12 }}>
+              <p className="nesio-trip-footnote">{L(dict, '改名字和出发日、天数 —— 一次改完。', 'Edit name, start date, and length in one place.')}</p>
+              <label>
+                <span>{L(dict, '行程名', 'Trip name')}</span>
+                <input value={metaTitle} onChange={(e) => setMetaTitle(e.target.value)} placeholder={L(dict, '如 里斯本 · 5 天', 'e.g. Lisbon · 5 days')} />
+              </label>
+              <label>
+                <span>{L(dict, '目的地', 'Destination')}</span>
+                <input value={metaDest} onChange={(e) => setMetaDest(e.target.value)} />
+              </label>
+              <label>
+                <span>{L(dict, '出发日', 'Start')}</span>
+                <input type="date" value={metaStart} onChange={(e) => setMetaStart(e.target.value)} />
+              </label>
+              <label>
+                <span>{L(dict, '天数', 'Days')}</span>
+                <input inputMode="numeric" value={metaDays} onChange={(e) => setMetaDays(e.target.value)} />
+              </label>
+              {metaErr && <p className="nesio-trip-msg" role="alert" style={{ color: 'var(--status-risk)' }}>{metaErr}</p>}
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button type="button" className="nesio-trip-link" onClick={() => setEditingMeta(false)}>{L(dict, '取消', 'Cancel')}</button>
+                <button type="button" className="nesio-ob-primary-btn" onClick={saveMetaEdit}>{L(dict, '保存', 'Save')}</button>
+              </div>
+            </div>
+          )}
 
           {trip && (
             <>
@@ -476,6 +549,7 @@ export default function TripTimelineSheet({
       <NesioSheet
         variant="bottom"
         blurOverlay
+        elevated
         open={Boolean(detailNode)}
         onOpenChange={(v) => { if (!v) setDetailNode(null); }}
         card={false}
@@ -505,10 +579,11 @@ export default function TripTimelineSheet({
         )}
       </NesioSheet>
 
-      {/* 离线景点用独立 sheet,避免被粘贴确认大表单挡住 */}
+      {/* 离线景点用独立 sheet,必须 elevated:父时间线已是 elevated,默认 900 会被盖住 →「点了没反应」 */}
       <NesioSheet
         variant="bottom"
         blurOverlay
+        elevated
         open={adding === 'poi' && Boolean(trip)}
         onOpenChange={(v) => { if (!v) setAdding(null); }}
         card={false}

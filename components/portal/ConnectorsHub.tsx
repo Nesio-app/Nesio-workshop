@@ -1129,14 +1129,18 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       void (async () => {
         const {
           getDevicePosition,
-          requestLocationPermission,
+          diagnoseLocationPermission,
           requestAlwaysLocationPermission,
         } = await import('@/lib/portal/native-geolocation');
         const { isNativePlatform } = await import('@/lib/portal/platform-capabilities');
-        const allowed = await requestLocationPermission();
-        if (!allowed) {
+        const diag = await diagnoseLocationPermission();
+        if (diag !== 'granted') {
           setSyncing(null);
-          showToast(L(dict, '位置权限被拒绝 — 可在系统设置里打开定位后再试', 'Location denied — enable Location in Settings and retry'), false);
+          if (diag === 'plugin_missing') {
+            showToast(L(dict, '这版壳没带上定位插件 — 需要重装带 NesioGeolocation 的 IPA', 'This app build is missing the location plugin — reinstall an IPA that includes NesioGeolocation'), false);
+          } else {
+            showToast(L(dict, '位置权限被拒绝 — 可在系统设置里打开定位后再试', 'Location denied — enable Location in Settings and retry'), false);
+          }
           return;
         }
         const pos = await getDevicePosition({ timeoutMs: 18_000, maximumAgeMs: 300_000, enableHighAccuracy: false });

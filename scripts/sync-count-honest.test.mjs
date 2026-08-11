@@ -132,12 +132,15 @@ const read = (p) => fs.readFileSync(new URL(`../${p}`, import.meta.url), 'utf8')
   // 脏输入不许把句子搞坏
   assert.match(describeSyncResult({ fresh: -5, updated: NaN, total: 3.7 }, true), /云端一共 3 条/);
 
-  // 调用点真的用了它(抽出来没人调 = 白抽)
+  // 调用点真的用了统一同步(抽出来没人调 = 白抽)
   const s = stripComments(read('components/portal/SettingsSheets.tsx'));
-  assert.match(s, /describeSyncResult\(\{[\s\S]{0,200}fresh: mem\.importedNodeCount/,
-    '「取回 N 条这台设备还没有的」旁边的数必须是 importedNodeCount —— 这条 bug 的全部内容就是这句话配错了数');
-  assert.match(s, /updated: mem\.updatedNodeCount/, '更新数要传进去');
-  assert.match(s, /total: mem\.cloudNodeCount/, '云端总数要传进去');
+  assert.match(s, /runUnifiedSync\(\{\s*force:\s*true\s*\}\)/,
+    '设置「同步」必须走 runUnifiedSync —— 与记忆下拉同一条,不再只推记忆图');
+  assert.match(s, /describeUnifiedSync\(r/,
+    '同步结果文案必须走 describeUnifiedSync,把记忆新/更新/云端总数说清');
+  const uni = read('lib/portal/unified-sync.ts');
+  assert.match(uni, /importedNodeCount/, '统一同步文案要用 importedNodeCount');
+  assert.match(uni, /cloudNodeCount/, '统一同步文案要带云端总数');
 }
 
 /* ══ ③ 注释别再说谎:奖励/愿望其实一直在走通用云同步 ═══════════════════════ */

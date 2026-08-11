@@ -236,6 +236,42 @@ export function upsertTrip(trip: Trip): Trip {
   return next;
 }
 
+/**
+ * 合一改行程名 + 起止日(详情头入口)。改天数则按 start 重算 end;改起止则重算天数。
+ * 未显式传 title 时按「目的地 · N 天」重写标题(与 createTrip 一致)。
+ */
+export function updateTripMeta(
+  id: string,
+  patch: { title?: string; destination?: string; startDate?: string; endDate?: string; days?: number },
+): Trip | null {
+  const t = getTrip(id);
+  if (!t) return null;
+  const destination = (patch.destination ?? t.destination).trim();
+  let startDate = (patch.startDate || t.startDate).slice(0, 10);
+  let endDate = (patch.endDate || t.endDate).slice(0, 10);
+  let days = t.days;
+  if (typeof patch.days === 'number' && Number.isFinite(patch.days) && patch.days >= 1) {
+    days = Math.max(1, Math.round(patch.days));
+    const start = new Date(`${startDate}T12:00:00`);
+    if (!Number.isNaN(start.getTime())) {
+      start.setDate(start.getDate() + days - 1);
+      const y = start.getFullYear();
+      const m = String(start.getMonth() + 1).padStart(2, '0');
+      const d = String(start.getDate()).padStart(2, '0');
+      endDate = `${y}-${m}-${d}`;
+    }
+  } else if (patch.startDate || patch.endDate) {
+    const s = new Date(`${startDate}T12:00:00`);
+    const e = new Date(`${endDate}T12:00:00`);
+    if (!Number.isNaN(s.getTime()) && !Number.isNaN(e.getTime())) {
+      days = Math.max(1, Math.round((e.getTime() - s.getTime()) / 86400000) + 1);
+    }
+  }
+  const title = (patch.title ?? '').trim()
+    || (destination ? `${destination} · ${days} 天` : t.title);
+  return upsertTrip({ ...t, title, destination, startDate, endDate, days });
+}
+
 export function deleteTrip(id: string): void {
   saveTrips(loadTrips().filter((t) => t.id !== id));
 }

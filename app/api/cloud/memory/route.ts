@@ -264,6 +264,38 @@ function edgeRowsForNode(identityKey: string, userId: string | null, node: Cloud
   }));
 }
 
+/** PostgREST 默认 max-rows≈1000;不翻页时「同步」最多只拿回 1000 条 → 重装后大量记忆失踪。 */
+const MEMORY_REST_PAGE = 1000;
+
+async function fetchRestPages<T>(url: string, config: ReturnType<typeof getCloudConfig>): Promise<T[]> {
+  const headers = restHeaders(config);
+  const out: T[] = [];
+  let from = 0;
+  for (;;) {
+    const to = from + MEMORY_REST_PAGE - 1;
+    const response = await fetch(url, {
+      headers: {
+        ...headers,
+        Range: `${from}-${to}`,
+        Prefer: 'count=exact',
+      },
+      cache: 'no-store',
+    });
+    // 200=整段;206=分页片段。都算成功。
+    if (!(response.ok || response.status === 206)) {
+      throw new Error('Supabase REST memory read failed');
+    }
+    const batch = (await response.json()) as T[];
+    if (!Array.isArray(batch)) throw new Error('Supabase REST memory read failed');
+    out.push(...batch);
+    if (batch.length < MEMORY_REST_PAGE) break;
+    from += MEMORY_REST_PAGE;
+    // 硬上限防失控循环(约 5 万行);正常用户远到不了。
+    if (from >= MEMORY_REST_PAGE * 50) break;
+  }
+  return out;
+}
+
 async function readMemorySnapshot(config: ReturnType<typeof getCloudConfig>, identityKey: string) {
   const nodesUrl = new URL('/rest/v1/memory_nodes', config.supabaseUrl);
   nodesUrl.searchParams.set('identity_key', `eq.${identityKey}`);
@@ -283,18 +315,12 @@ async function readMemorySnapshot(config: ReturnType<typeof getCloudConfig>, ide
   assetsUrl.searchParams.set('select', 'local_id,node_local_id,asset,updated_at');
   assetsUrl.searchParams.set('order', 'updated_at.desc');
 
-  const [nodesResponse, edgesResponse, assetsResponse] = await Promise.all([
-    fetch(nodesUrl.toString(), { headers: restHeaders(config), cache: 'no-store' }),
-    fetch(edgesUrl.toString(), { headers: restHeaders(config), cache: 'no-store' }),
-    fetch(assetsUrl.toString(), { headers: restHeaders(config), cache: 'no-store' }),
+  const [nodeRows, edgeRows, assetRows] = await Promise.all([
+    fetchRestPages<{ node?: unknown; updated_at?: string }>(nodesUrl.toString(), config),
+    fetchRestPages<Record<string, unknown>>(edgesUrl.toString(), config),
+    fetchRestPages<{ asset?: unknown; updated_at?: string }>(assetsUrl.toString(), config),
   ]);
-  if (!nodesResponse.ok || !edgesResponse.ok || !assetsResponse.ok) {
-    throw new Error('Supabase REST memory read failed');
-  }
 
-  const nodeRows = (await nodesResponse.json()) as Array<{ node?: unknown; updated_at?: string }>;
-  const edgeRows = (await edgesResponse.json()) as Array<Record<string, unknown>>;
-  const assetRows = (await assetsResponse.json()) as Array<{ asset?: unknown; updated_at?: string }>;
   // 静态加密(数据审计 #2):node/asset/edge.evidence 落库为密文信封,读回先解密。
   // 逐值探测,旧明文行原样透传(混合模式,无需回填历史)。
   const nodes = nodeRows.map((row) => sanitizeMemoryNode(decryptField(row.node))).filter((node): node is CloudMemoryNode => Boolean(node));

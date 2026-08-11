@@ -8,9 +8,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { pushSupported, isPushEnabled, enablePush, disablePush } from '@/lib/portal/push-notify';
 import { PORTAL_LOCALE_OPTIONS, loadProfileSettings, portalLocaleToDictionaryLocale, saveProfileSettings, touchProfileIdentity, type PortalLocale } from '@/lib/portal/profile';
-import { describeSyncResult } from '@/lib/portal/sync-result-copy';
+import { describeUnifiedSync, runUnifiedSync } from '@/lib/portal/unified-sync';
 import { pushProfileToCloud, syncProfileWithCloud } from '@/lib/portal/cloud-profile-sync';
-import { syncMemoryWithCloud } from '@/lib/portal/cloud-memory-sync';
 import { getMirrorProfile } from '@/lib/portal/mirror-profile';
 import { L, t } from '@/lib/portal/i18n';
 import { usePortalLocale } from './use-portal-locale';
@@ -301,14 +300,9 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   async function handleForceSync() {
     setDiagSyncMsg(L(dict, '同步中…', 'Syncing…'));
     try {
-      const [mem] = await Promise.all([syncMemoryWithCloud({ force: true }), syncProfileWithCloud()]);
-      // 文案组装抽到 lib/portal/sync-result-copy —— 埋在这儿的话契约只能拿正则去源码里
-      // 找「提到了这个字段没有」,而 `void mem.updatedNodeCount;` 一样能骗过它(注入回归抓出来的)。
-      setDiagSyncMsg(describeSyncResult({
-        fresh: mem.importedNodeCount,
-        updated: mem.updatedNodeCount ?? 0,
-        total: mem.cloudNodeCount ?? 0,
-      }, dict !== 'en'));
+      // 与记忆页下拉同一条:记忆 + 资料 + 模块 durable + 外部连接器。不清空本机。
+      const r = await runUnifiedSync({ force: true });
+      setDiagSyncMsg(describeUnifiedSync(r, dict !== 'en'));
     } catch { setDiagSyncMsg(L(dict, '同步没能完成,过一会儿再试', 'Sync didn’t go through — try again in a bit')); }
   }
   const pickBackupDest = (d: 'drive' | 'nesio') => {
@@ -358,6 +352,21 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       return;
     }
     setPushMsg(L(dict, '正在开启…', 'Enabling…'));
+    // 壳内先走本地通知授权 —— 系统设置才会出现「通知」行;Web Push 另路。
+    try {
+      const { ensureLocalNotificationPermission } = await import('@/lib/portal/native-local-notifications');
+      const { isNativePlatform } = await import('@/lib/portal/platform-capabilities');
+      if (isNativePlatform()) {
+        const ok = await ensureLocalNotificationPermission();
+        if (!ok) {
+          setPushMsg(L(dict, '系统没给通知权限 — 可在设置 → 宝盒里打开通知后再试', 'Notifications not allowed — enable them in Settings → 宝盒 and retry'));
+          return;
+        }
+        setPushOn(true);
+        setPushMsg(L(dict, '本地提醒已开', 'Local alerts on'));
+        return;
+      }
+    } catch { /* fall through to web push */ }
     const r = await enablePush();
     if (r.ok) { setPushOn(true); setPushMsg(''); }
     else {
@@ -478,7 +487,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   }
 
   async function handleCloudRestore() {
-    if (!confirm(L(dict, '从云恢复:把云端备份合并回本机(仅补缺,不覆盖已有数据)。完成后会自动刷新。确认继续？', 'Restore from cloud: merges your cloud backup into this device (fills gaps, keeps existing). It will refresh when done. Continue?'))) return;
+    if (!confirm(L(dict, '用备份补缺:把云端整包备份合并进本机(只补缺,不清空、不覆盖已有)。完成后自动刷新。继续?', 'Fill gaps from backup: merges the cloud package into this device (fills gaps only — does not wipe or overwrite). Refreshes when done. Continue?'))) return;
     setCloudRestoreState('pulling');
     setCloudRestoreError(null);
     // 同「备份」:内部抛错时也要有结局,否则按钮永远停在「正在恢复…」
@@ -698,7 +707,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         }}>
         <div>
           <span className="nesio-settings-option-label">{L(dict, '记忆自动定位', 'Auto-locate memories')}</span>
-          <span className="nesio-settings-option-hint">{L(dict, '亲手记的带上位置 · 只存本机', 'Your own notes get a location · kept on this device only')}</span>
+          <span className="nesio-settings-option-hint">{L(dict, '亲手记的带上位置 · 随记忆上云', 'Your own notes get a location · syncs with memories')}</span>
         </div>
         <span className={`nesio-settings-space-check${captureLocOn ? ' nesio-settings-space-check--on' : ''}`} aria-hidden>
           {captureLocOn ? '✓' : '○'}
@@ -737,7 +746,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           {(cloudState === 'pushing' || driveState === 'busy') ? L(dict, '正在备份…', 'Backing up…') : L(dict, '备份', 'Back up')}
         </Button>
         <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleRestoreChosen} disabled={cloudRestoreState === 'pulling' || driveState === 'busy'}>
-          {(cloudRestoreState === 'pulling') ? L(dict, '正在恢复…', 'Restoring…') : L(dict, '从云恢复', 'Restore')}
+          {(cloudRestoreState === 'pulling') ? L(dict, '正在补缺…', 'Filling gaps…') : L(dict, '用备份补缺', 'Fill from backup')}
         </Button>
       </div>
       {/* 状态:仅当前所用目的地会填充 */}
@@ -783,17 +792,17 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, color: 'var(--portal-muted)' }}>{auditFail}</p>
       )}
 
-      {/* #14 后半:用户点了一次同步,总数从 2541 变成 2544,只报了「✓ 已同步」——
-          那 3 条看着像**凭空多出来**的。其实它们是别的设备存下、这台机器还没有的记忆。
-          handleForceSync 早就把这句话算好了(importedNodeCount),但**这颗按钮和这行字
-          从来没有被渲染过** —— 又一处「写了没接上」。同一个数字,说清来路就是功能,
-          不说就是 bug。 */}
+      {/* 统一同步:记忆图 + 资料 + 模块(衣橱/足迹/健身/行程…) + 日历邮件等外部源。
+          与记忆页下拉同一实现;「用备份补缺」是另一条整包管道,不清空本机。 */}
       <div className="nesio-settings-audit-row">
         <Button variant="soft" size="md" full className="nesio-settings-action-btn"
           onClick={handleForceSync} disabled={diagSyncMsg === L(dict, '同步中…', 'Syncing…')}>
-          {L(dict, '立即同步', 'Sync now')}
+          {L(dict, '同步', 'Sync')}
         </Button>
       </div>
+      <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, color: 'var(--portal-muted)', lineHeight: 1.6 }}>
+        {L(dict, '对齐记忆、设置、衣橱/足迹/行程等模块,并拉日历·邮件·银行。不会清空本机。', 'Aligns memories, settings, wardrobe/places/trips, and pulls calendar·mail·bank. Never wipes this device.')}
+      </p>
       {diagSyncMsg && (
         <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, lineHeight: 1.7, color: 'var(--portal-muted)' }}>{diagSyncMsg}</p>
       )}

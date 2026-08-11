@@ -102,20 +102,11 @@ const code = stripComments;
   // importedNodeCount 本来就一直算着,只是从来没露过面。
   {
     const at = settings.indexOf('async function handleForceSync');
-    assert.ok(at > 0, '隐私页的「立即同步」不见了');
-    const fn = settings.slice(at, settings.indexOf('\n  }', at));
+    assert.ok(at > 0, '隐私页的「同步」不见了');
+    const fn = settings.slice(at, settings.indexOf('\n  }', at) + 4);
     assert.ok(
-      /importedNodeCount/.test(fn),
-      '「立即同步」又只报一句「已同步」了 —— 记忆总数当场变大却不说来路,用户看到的就是「凭空多了 3 条」',
-    );
-    // 2026-08-01:文案组装抽到 lib/portal/sync-result-copy(埋在组件 async 里的
-    // 字符串拼接压不住 —— `void mem.updatedNodeCount;` 就能骗过正则)。
-    // 「什么都没变要有一支」现在由 scripts/sync-count-honest 真跑着压,那边更狠;
-    // 这里只钉住调用点确实走了那个函数、而且三个数都传了进去。
-    assert.ok(
-      /describeSyncResult\(\{[\s\S]{0,240}total: mem\.cloudNodeCount/.test(fn),
-      '同步那句话没走 describeSyncResult(或者没把云端总数传进去)—— ' +
-      '用户问的「数据是否准确」要的就是一个能和记忆库对得上的总数',
+      /runUnifiedSync/.test(fn) && /describeUnifiedSync/.test(fn),
+      '「同步」必须走统一管道并说清记忆新/更新/云端总数 —— 否则用户只看到总数变了却不来路',
     );
   }
 

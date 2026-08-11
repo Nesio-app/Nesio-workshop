@@ -47,6 +47,10 @@
   逐条 `updateLifeNode`(整图 O(n²) 写盘会冻死主线程)。改为
   `batchPatchLifeNodes` / `batchDeleteLifeNodes`;记忆页延后一次性回填且
   `syncCloud: false`。
+- **2026-08-10 同步/行程/壳热修**:① 设置「同步」=记忆页下拉=`runUnifiedSync`
+  (记忆+资料+模块+连接器),「从云恢复」改名「用备份补缺」(merge,不清空);
+  ② 云记忆 GET 翻页破 PostgREST 1000 行截断;③ 行程标题可点合一改名/日期;
+  ④ 景点 sheet `elevated`;⑤ iOS `packageClassList` 不得为空(定位/通知插件)。
 
 ## 进行中的迁移
 

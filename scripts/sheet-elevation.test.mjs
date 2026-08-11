@@ -197,6 +197,7 @@ const FULLSCREEN_SUBTREES = [
   ['components/portal/cooking', '做饭 · 库存(CookingSheet fullscreen)'],
   ['components/portal/family', '家庭分享(FamilySharingSheet fullscreen)'],
   ['components/portal/reader', '阅读器(ReaderView fullscreen)'],
+  ['components/portal/travel', '足迹 → 计划/行程'],
 ];
 
 /** 明确审阅过的豁免 —— 加进来必须写清为什么它不是 bug。 */

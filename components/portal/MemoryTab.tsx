@@ -1051,7 +1051,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   }, []);
   const [showCreateProject, setShowCreateProject] = useState(false);
   const [longPressNode, setLongPressNode] = useState<LifeNode | null>(null);
-  // 下拉刷新 = 全源同步(日历/邮件/Flomo/银行,核心在 connector-sync,与设置页各同步按钮同一实现)
+  // 下拉刷新 = 与设置「同步」同一条(记忆/资料/模块/连接器),不清空本机
   const [pullSync, setPullSync] = useState<'idle' | 'syncing' | 'done'>('idle');
   const [pullSummary, setPullSummary] = useState('');
   const pullStartY = useRef<number | null>(null);
@@ -1060,10 +1060,9 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
     setPullSync('syncing');
     setPullSummary('');
     try {
-      const { syncAllConnectors } = await import('@/lib/portal/connector-sync');
-      const outcomes = await syncAllConnectors();
-      const en = locale === 'en';
-      setPullSummary(outcomes.map((o) => (en ? o.detail[1] : o.detail[0])).join(' · '));
+      const { runUnifiedSync, describeUnifiedSync } = await import('@/lib/portal/unified-sync');
+      const r = await runUnifiedSync({ force: true });
+      setPullSummary(describeUnifiedSync(r, locale !== 'en'));
       setNodes(getLifeGraph());
     } catch {
       setPullSummary(locale === 'en' ? 'Sync failed — check network and retry' : '同步失败,检查网络后重试');
