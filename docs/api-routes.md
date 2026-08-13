@@ -59,8 +59,8 @@ Auth legend:
 | GET /api/portal/gmail-quick | session / no-Supabase + OAuth token |
 | GET /api/portal/calendar | verified session (hasVerifiedSessionCookie) / no-Supabase (cloud mode fails closed) |
 | POST /api/portal/calendar | session / no-Supabase + OAuth token (calendar.events) — 建日程(结构化 or 自然语言 LLM 解析,写 primary) |
-| POST /api/portal/drive | guardAiRoute (20/min) + Google OAuth token (drive.appdata) — 免费云备份到用户 Drive |
-| GET /api/portal/drive | guardAiRoute (20/min) + Google OAuth token (drive.appdata) — 拉回云备份 |
+| POST /api/portal/drive | guardAiRoute (20/min) + Google OAuth (`drive.appdata`+`drive.file`) — 免费云备份到「我的云端硬盘/宝盒备份」; `{action:'session'}` 发短时 token 供客户端含照片直传 |
+| GET /api/portal/drive | guardAiRoute (20/min) + Google OAuth — 拉回云备份(可见文件夹优先,旧 appDataFolder 回退) |
 | GET /api/portal/tasks | guardAiRoute (20/min) + Google OAuth token (tasks) — 读 Google Tasks 待办 |
 | GET /api/portal/people | guardAiRoute (20/min) + Google OAuth token (contacts.readonly) — 读通讯录→person 节点(人缘管理);runPeopleSync 消费 |
 | GET /api/portal/tesla | isPortalRequestAuthorized + rate limit (20/min) + Tesla OAuth token — 只读快照:车辆(drive/charge/vehicle_state)+ **能源产品**(2026-07-30 补:`/api/1/products` → `energy_sites/{id}/live_status` 与 `history?kind=energy&period=day`)。能源与车辆**分开失败**:没有能源产品或 token 缺 `energy_device_data` 时只让 energy 为空,不影响车辆数据。2026-08-01 补 `health`(胎压/待装更新/门锁/哨兵/车内外温度,来自 `vehicle_state;climate_state`)与充电功率/续航/充满还要多久/充电上限,以及 `drive_state.timestamp`(**车上那份读数的时刻**,与我们问它的时刻分开 —— 深度休眠时能差几小时) |

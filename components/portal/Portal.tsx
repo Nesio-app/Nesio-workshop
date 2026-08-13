@@ -1652,8 +1652,8 @@ export default function Portal() {
             <span style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
               <span>
                 {reliefMsg ? reliefMsg : storageAlert.kind === 'full'
-                  ? L(dict, `本机空间紧张，新的记忆可能存不进来。先在设置里导出一份备份保底；登录后记忆会自动备份到云端。「一键腾空间」会清临时图与附件缓存。`, 'Local storage is tight — new memories may not save. Export a backup in Settings first; signing in backs memories up to the cloud. "Free up space" clears cached images and file attachments.')
-                  : L(dict, `本机空间已用 ${storageAlert.percent}%。方便的时候导出一份备份；「一键腾空间」会清临时图与附件缓存。`, `Local storage is ${storageAlert.percent}% used. Export a backup when convenient; "Free up space" clears cached images and file attachments.`)}
+                  ? L(dict, `本机「网页小仓库」满了(~5MB,浏览器硬限,不能改成 1GB),新记忆可能存不进。先设置里备份到 Google 云;「一键腾空间」清临时缓存。照片等大文件在另一仓库,不占这 5MB。`, 'The in-app web vault is full (~5MB browser hard limit — cannot raise to 1GB). Back up to Google Drive in Settings; "Free up space" clears temp caches. Photos live in a separate store and do not use this 5MB.')
+                  : L(dict, `本机网页小仓库已用 ${storageAlert.percent}%(上限约 5MB,浏览器规定)。方便时备份到云;「一键腾空间」清临时缓存。`, `Web vault is ${storageAlert.percent}% full (~5MB browser limit). Back up to cloud when you can; "Free up space" clears temp caches.`)}
               </span>
               {/* 批次 116:占用最多的几项(诊断「哪里占空间」),按皮肤中性色显示 */}
               {!reliefMsg && storageAlert.largest && storageAlert.largest.length > 0 && (

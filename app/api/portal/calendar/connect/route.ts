@@ -9,7 +9,7 @@ import { isPortalRequestAuthorized } from '@/lib/portal/auth/api-auth';
 // Request gmail scope alongside calendar so one consent covers both connectors
 // and the resulting refresh token can serve either API.
 // 免费最大化·Google 扩展授权:与 gmail/connect 同步加 Drive/Tasks/People,一次授权覆盖。
-const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/contacts.readonly';
+const GOOGLE_CALENDAR_SCOPE = 'https://www.googleapis.com/auth/calendar.readonly https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/drive.appdata https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/tasks https://www.googleapis.com/auth/contacts.readonly';
 const GOOGLE_CALENDAR_OAUTH_STATE_COOKIE = 'nesio_google_calendar_oauth_state';
 
 function safeJson(body: Record<string, unknown>, status = 200) {

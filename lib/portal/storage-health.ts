@@ -2,7 +2,9 @@
  * Storage Health — visibility into the localStorage budget.
  *
  * The life graph (primary user data) lives in localStorage, which browsers
- * cap at ~5 MB per origin. Before this module, hitting the cap was silent:
+ * cap at ~5 MB per origin — **not configurable** (cannot raise to 1GB).
+ * Photos and large blobs live in IndexedDB (separate, larger quota).
+ * Before this module, hitting the cap was silent:
  * life-graph's saveAll swallowed QuotaExceededError and new memories were
  * dropped without any signal to the user. Now saveAll dispatches
  * STORAGE_FULL_EVENT, and this module measures usage so the shell can warn

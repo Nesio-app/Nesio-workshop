@@ -1,8 +1,7 @@
 /**
- * 行为契约:免费最大化·Google 扩展授权 —— Drive appDataFolder 免费云备份。
- * 锁死:三个新 scope 并入 gmail/calendar connect 常量(一次授权);POST 上传备份到
- * appDataFolder(首次 POST 带 parents:['appDataFolder'],已存在 PATCH 覆盖同一文件);
- * GET 下载最近备份(无则 backup:null);未连接 401;缺 body 400;上游失败 502。
+ * 行为契约:Google Drive 可见备份(「我的云端硬盘 / 宝盒备份」)+ 含照片客户端直传。
+ * 锁死:gmail/calendar connect 含 drive.appdata + drive.file;小包 POST 写可见文件夹;
+ * session action 发 token;GET 可读;未连接 401;缺 body 400。
  */
 import fs from 'node:fs';
 import vm from 'node:vm';
@@ -15,7 +14,7 @@ const nodeRequire = createRequire(import.meta.url);
 // ── scope 合并(源码级) ──
 const gmailConnect = fs.readFileSync(new URL('../app/api/portal/gmail/connect/route.ts', import.meta.url), 'utf8');
 const calConnect = fs.readFileSync(new URL('../app/api/portal/calendar/connect/route.ts', import.meta.url), 'utf8');
-for (const s of ['drive.appdata', 'auth/tasks', 'contacts.readonly']) {
+for (const s of ['drive.appdata', 'drive.file', 'auth/tasks', 'contacts.readonly']) {
   assert.ok(gmailConnect.includes(s), `gmail/connect scope 含 ${s}`);
   assert.ok(calConnect.includes(s), `calendar/connect scope 含 ${s}`);
 }
@@ -37,6 +36,10 @@ function loadRoute(token, fetchImpl) {
 }
 const reqBody = (backup) => ({ json: async () => ({ backup }) });
 
+function folderListOk() {
+  return { ok: true, json: async () => ({ files: [{ id: 'folder1', name: '宝盒备份' }] }) };
+}
+
 // 未连接 → 401
 {
   const route = loadRoute(null, async () => ({ ok: true, json: async () => ({}) }));
@@ -45,7 +48,7 @@ const reqBody = (backup) => ({ json: async () => ({ backup }) });
 }
 // 缺 backup → 400
 {
-  const route = loadRoute('tkn', async () => ({ ok: true, json: async () => ({ files: [] }) }));
+  const route = loadRoute('tkn', async () => folderListOk());
   assert.equal((await route.POST({ json: async () => ({}) })).__status, 400, '缺 backup 400');
 }
 // Drive list 403 → insufficient_scope
@@ -55,59 +58,94 @@ const reqBody = (backup) => ({ json: async () => ({ backup }) });
   assert.equal(res.__status, 403, '缺 Drive scope → 403');
   assert.equal(res.__json.error, 'insufficient_scope', 'error=insufficient_scope');
 }
-// 首次上传:list 空 → POST 到 appDataFolder(带 parents)
+// session → 发 token + 文件夹
+{
+  const route = loadRoute('tkn', async (url) => {
+    if (String(url).includes('mimeType')) return folderListOk();
+    if (String(url).includes('/files?')) return { ok: true, json: async () => ({ files: [] }) };
+    return { ok: true, json: async () => ({}) };
+  });
+  const res = await route.POST({ json: async () => ({ action: 'session' }) });
+  assert.equal(res.__json.ok, true, 'session ok');
+  assert.equal(res.__json.accessToken, 'tkn', 'session 带 accessToken');
+  assert.equal(res.__json.folderName, '宝盒备份', '可见文件夹名');
+  assert.ok(res.__json.folderId, 'folderId');
+}
+// 首次上传:文件夹存在、无备份文件 → POST 带 parents=folderId
 {
   const calls = [];
   const route = loadRoute('tkn', async (url, opt) => {
     calls.push({ url: String(url), method: opt?.method, body: opt?.body });
-    if (String(url).includes('/files?spaces=appDataFolder')) return { ok: true, json: async () => ({ files: [] }) };
-    return { ok: true, json: async () => ({ id: 'newid' }) }; // upload
+    if (String(url).includes('mimeType')) return folderListOk();
+    if (String(url).includes('/files?') && !String(url).includes('/upload/')) {
+      return { ok: true, json: async () => ({ files: [] }) };
+    }
+    return { ok: true, json: async () => ({ id: 'newid' }) };
   });
   const res = await route.POST(reqBody({ hello: 'world' }));
   assert.equal(res.__json.ok, true, '首次上传成功');
+  assert.equal(res.__json.folderName, '宝盒备份');
   const upload = calls.find((c) => c.url.includes('/upload/'));
   assert.ok(upload && upload.method === 'POST', '首次用 POST 新建');
   assert.ok(upload.url.includes('uploadType=multipart'), 'multipart 上传');
-  assert.ok(upload.body.includes('appDataFolder'), '新建到 appDataFolder(parents)');
+  assert.ok(upload.body.includes('folder1'), '新建到可见文件夹 parents');
+  assert.ok(!upload.body.includes('appDataFolder'), '不再默认写 appDataFolder');
   assert.ok(upload.body.includes('"hello":"world"'), '备载荷进 multipart');
 }
-// 已存在:list 命中 → PATCH 覆盖同一文件(不带 parents)
+// 已存在明文 json → PATCH 覆盖
 {
   const calls = [];
   const route = loadRoute('tkn', async (url, opt) => {
     calls.push({ url: String(url), method: opt?.method, body: opt?.body });
-    if (String(url).includes('/files?spaces=appDataFolder')) return { ok: true, json: async () => ({ files: [{ id: 'exist', name: 'nesio-backup.json' }] }) };
+    if (String(url).includes('mimeType')) return folderListOk();
+    if (String(url).includes('/files?') && !String(url).includes('/upload/')) {
+      return { ok: true, json: async () => ({ files: [{ id: 'exist', name: 'nesio-backup.json' }] }) };
+    }
     return { ok: true, json: async () => ({ id: 'exist' }) };
   });
   await route.POST(reqBody({ v: 2 }));
   const upload = calls.find((c) => c.url.includes('/upload/'));
   assert.equal(upload.method, 'PATCH', '已存在用 PATCH 覆盖');
   assert.ok(upload.url.includes('/files/exist'), '覆盖同一文件 id');
-  assert.ok(!upload.body.includes('appDataFolder'), 'PATCH 不重复带 parents');
 }
-// GET 下载:命中 → 返回 backup;无文件 → backup:null
+// GET 下载:命中 → 返回 backup;无文件 → backup:null(仍查 appData 回退)
 {
   const route = loadRoute('tkn', async (url) => {
-    if (String(url).includes('spaces=appDataFolder')) return { ok: true, json: async () => ({ files: [{ id: 'exist', name: 'nesio-backup.json' }] }) };
-    return { ok: true, json: async () => ({ restored: true }) };
+    if (String(url).includes('mimeType')) return folderListOk();
+    if (String(url).includes('spaces=appDataFolder')) return { ok: true, json: async () => ({ files: [] }) };
+    if (String(url).includes('/files?')) return { ok: true, json: async () => ({ files: [{ id: 'exist', name: 'nesio-backup.json' }] }) };
+    if (String(url).includes('alt=media')) return { ok: true, arrayBuffer: async () => Buffer.from(JSON.stringify({ restored: true })), json: async () => ({ restored: true }) };
+    return { ok: true, json: async () => ({}) };
   });
   const res = await route.GET({});
   assert.deepEqual(res.__json.backup, { restored: true }, 'GET 返回备份内容');
 
-  const empty = loadRoute('tkn', async () => ({ ok: true, json: async () => ({ files: [] }) }));
+  const empty = loadRoute('tkn', async (url) => {
+    if (String(url).includes('mimeType')) return folderListOk();
+    if (String(url).includes('spaces=appDataFolder')) return { ok: true, json: async () => ({ files: [] }) };
+    return { ok: true, json: async () => ({ files: [] }) };
+  });
   assert.equal((await empty.GET({})).__json.backup, null, '无备份 backup:null');
 }
 // 上游上传失败 → 502
 {
-  const route = loadRoute('tkn', async (url) => String(url).includes('spaces=appDataFolder')
-    ? { ok: true, json: async () => ({ files: [] }) }
-    : { ok: false, status: 500, json: async () => ({}) });
+  const route = loadRoute('tkn', async (url) => {
+    if (String(url).includes('mimeType')) return folderListOk();
+    if (String(url).includes('/upload/')) return { ok: false, status: 500, text: async () => '', json: async () => ({}) };
+    return { ok: true, json: async () => ({ files: [] }) };
+  });
   assert.equal((await route.POST(reqBody({ a: 1 }))).__status, 502, '上游失败 502');
 }
 
 // 客户端接线(源码级)
 const settings = fs.readFileSync(new URL('../components/portal/SettingsSheets.tsx', import.meta.url), 'utf8');
-assert.ok(settings.includes('pushBackupToDrive') && settings.includes('免费备份到 Google Drive'), '设置页免费 Drive 备份按钮');
+assert.ok(settings.includes('pushBackupToDrive'), '设置页 Drive 备份接线');
+assert.ok(settings.includes('includeImages: true'), 'Drive 备份默认含照片');
+assert.ok(settings.includes('宝盒备份') || settings.includes('folderName'), '成功文案指向可见文件夹');
 assert.ok(settings.includes('pullBackupFromDrive'), '设置页 Drive 恢复接线');
+
+const client = fs.readFileSync(new URL('../lib/portal/drive-backup.ts', import.meta.url), 'utf8');
+assert.ok(client.includes('includeImages'), '客户端支持含图');
+assert.ok(client.includes('resumable') || client.includes('uploadType=resumable'), '客户端可续传直传');
 
 console.log('drive-backup: OK');

@@ -423,12 +423,12 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           'Google Drive backup isn’t enabled yet — connect Google under Connected sources (includes Drive), then back up again.');
       case 'insufficient_scope':
         return L(dict,
-          '当前 Google 授权还缺 Drive 权限 —— 请重新连接 Google(会多要一次 Drive),再点备份。',
-          'This Google sign-in is missing Drive access — reconnect Google (it will ask for Drive), then back up again.');
+          '当前 Google 授权还缺「云端硬盘文件」权限 —— 请到「连接数据源」重新连接 Google(会多要一次权限),然后才能把含照片的备份存到可见的「宝盒备份」文件夹。',
+          'This Google sign-in is missing Drive file access — reconnect Google under Connected sources (it will ask again), then backups with photos can land in the visible “Nesio Backup” folder.');
       case 'too_large':
         return L(dict,
-          '这份数据太大,过不了上传上限。请先用下面「导出」留本机份;Drive 备份不含照片。',
-          'This package is too large to upload. Export a local copy below; Drive backup skips photos.');
+          '这份数据太大,这次没传完。请用下面「导出」先留本机份,联网稳定后再点备份。',
+          'This package is too large to finish uploading. Export a local copy below, then retry backup on a steadier network.');
       case 'timeout':
         return L(dict, '这次备份超时了 —— 网络慢时常见,稍后再试一次。', 'Backup timed out — common on a slow network. Try again shortly.');
       case 'build_failed':
@@ -441,7 +441,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   }
 
   async function handleDriveBackup() {
-    setDriveState('busy'); setDriveMsg(L(dict, '正在打包并上传到 Drive…', 'Packaging and uploading to Drive…'));
+    setDriveState('busy'); setDriveMsg(L(dict, '正在打包(含照片)并上传到 Google 云端硬盘…', 'Packaging (with photos) and uploading to Google Drive…'));
     try {
       await runDriveBackup();
     } catch {
@@ -453,10 +453,13 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
 
   async function runDriveBackup() {
     const { pushBackupToDrive } = await import('@/lib/portal/drive-backup');
-    const r = await pushBackupToDrive();
+    const r = await pushBackupToDrive({ includeImages: true });
     if (r.ok) {
       setDriveState('done');
-      setDriveMsg(L(dict, '✓ 已免费备份到你的 Google Drive(不含照片;照片请用导出)', '✓ Backed up free to your Google Drive (no photos — use Export for those)'));
+      const folder = r.folderName || L(dict, '宝盒备份', 'Nesio Backup');
+      setDriveMsg(L(dict,
+        `✓ 已备份到 Google 云端硬盘「${folder}」文件夹(含照片与附件)。打开 drive.google.com → 我的云端硬盘即可看到。`,
+        `✓ Backed up to Google Drive folder “${folder}” (includes photos & files). Open drive.google.com → My Drive to find it.`));
       return;
     }
     setDriveState('error');
