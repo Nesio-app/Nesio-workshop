@@ -196,6 +196,7 @@ const KNOWN_KEYS = new Map([
   // 提醒 → 系统通知的排程投影。cache:换台设备从零开始是**对的** ——
   // 排程是设备本地的东西,真相在 nesio-schedule-reminders-v1 里,这只是它的影子。
   ["nesio-reminder-notify-state-v1", "cache"],
+  ["nesio-surface-notify-state-v1", "cache"],
   // HealthKit 自动同步的「今天拉过了」簿记。cache:换设备重拉一次是对的。
   ["nesio-healthkit-auto-sync-v1", "cache"],
   // 「让 iOS 系统搜索找得到我的记忆」这个开关(Core Spotlight)。默认关。

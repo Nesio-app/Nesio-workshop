@@ -48,6 +48,10 @@ assert.match(ingest, /export function ingestLifeNodesBatch/, '批量入口存在
 assert.match(settings, /applyAllLocalNotifications/, '设置开关必须真的去排系统通知');
 assert.match(settings, /teslaLowBatt/, 'Tesla 低电量是可勾选类目');
 assert.match(settings, /familyChores/, '家庭家务是可勾选类目');
+assert.match(settings, /timeline/, '时间线日程是可勾选类目');
+assert.match(settings, /focusDue/, '焦点到期是可勾选类目');
+assert.match(settings, /dailyReport/, '日报是可勾选类目');
+assert.match(settings, /retrospect/, '回顾是可勾选类目');
 
 const tesla = read('../components/portal/TeslaPanel.tsx');
 assert.match(tesla, /saveTeslaSnapshot/, '车页把快照写入 IDB');

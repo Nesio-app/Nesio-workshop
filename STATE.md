@@ -96,6 +96,11 @@
   预览修好。⑧ 财务首页永久去掉「手动/小票/旅行」列表;删财产联动删域内支出;交易关联
   财产双向进资产卡。⑨ Google 云备份:未连 Google 时引导去「连接数据源」开通 Drive。
 
+- **2026-08-13 真实提醒不响(试一条却响)**:根因 `hasPermissionQuietly` 读
+  `Capacitor.Plugins.NesioLocalNotify`(自研插件不在那),同步永远 `no_permission_ask`。
+  改走 `checkLocalNotifyDisplay`。并把时间线日程、焦点到期、日报、周月回顾默认接入
+  系统通知(设置里可关);`nesio-surface-notify-state-v1` 为 cache。
+
 ## 进行中的迁移
 
 1. **Signal 主事实表**:两扇合法写入门 — `createSignal()`(Signal 形态)与

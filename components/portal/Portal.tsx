@@ -460,12 +460,17 @@ export default function Portal() {
   useEffect(() => {
     let stop = false;
     let welcomed = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     const sync = () => {
       if (stop) return;
-      void import('@/lib/portal/notify-apply')
-        .then((m) => m.applyAllLocalNotifications({ welcomePing: !welcomed }))
-        .then(() => { welcomed = true; })
-        .catch(() => { /* 排不上不影响 App —— 提醒本体在列表里,一条没丢 */ });
+      // 图更新很勤,合并成一次排程,别把 64 格配额打满又撤。
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        void import('@/lib/portal/notify-apply')
+          .then((m) => m.applyAllLocalNotifications({ welcomePing: !welcomed }))
+          .then(() => { welcomed = true; })
+          .catch(() => { /* 排不上不影响 App —— 提醒本体在列表里,一条没丢 */ });
+      }, 600);
     };
     sync();
     const onVisible = () => { if (document.visibilityState === 'visible') sync(); };
@@ -474,13 +479,16 @@ export default function Portal() {
     window.addEventListener('nesio-notify-prefs-updated', sync);
     window.addEventListener('nesio-family-board-updated', sync);
     window.addEventListener('nesio-tesla-snapshot-updated', sync);
+    window.addEventListener('nesio-life-graph-updated', sync);
     return () => {
       stop = true;
+      if (timer) clearTimeout(timer);
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('nesio-schedule-reminders-updated', sync);
       window.removeEventListener('nesio-notify-prefs-updated', sync);
       window.removeEventListener('nesio-family-board-updated', sync);
       window.removeEventListener('nesio-tesla-snapshot-updated', sync);
+      window.removeEventListener('nesio-life-graph-updated', sync);
     };
   }, []);
   // 批次 85:懒加载 chunk 跨部署失效的全局兜底(错误页之外的路径,

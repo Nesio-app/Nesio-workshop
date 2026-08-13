@@ -335,7 +335,10 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const [pushOn, setPushOn] = useState(false);
   const [pushMsg, setPushMsg] = useState('');
   const [testMsg, setTestMsg] = useState('');
-  const [notifyPrefs, setNotifyPrefs] = useState<NotifyPrefs>({ reminders: true, teslaLowBatt: true, familyChores: true });
+  const [notifyPrefs, setNotifyPrefs] = useState<NotifyPrefs>({
+    reminders: true, timeline: true, focusDue: true, dailyReport: true, retrospect: true,
+    teslaLowBatt: true, familyChores: true,
+  });
   const nativeNotify = isNativePlatform();
   const iosWeb = !nativeNotify && typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
   useEffect(() => {
@@ -355,7 +358,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       if (d === 'granted' && !hasLocalNotifyChoice()) {
         setLocalNotifyEnabled(true);
         setPushOn(true);
-        setPushMsg(L(dict, '系统已允许通知 — 家务/提醒/车会到点响', 'Notifications already allowed — chores, reminders, and the car will ring when due'));
+        setPushMsg(L(dict, '系统已允许通知 — 提醒/日程/焦点/日报/回顾/家务/车会到点响', 'Notifications already allowed — reminders, schedule, focus, report, retrospect, chores, and the car will ring when due'));
       } else if (d === 'missing') {
         setPushMsg(L(dict, '这版壳没带上通知插件 — 请用 Sideloadly 重装新 IPA', 'This app shell is missing the notification plugin — reinstall a new IPA with Sideloadly'));
       }
@@ -753,8 +756,12 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           <div style={{ padding: '0 var(--space-4) var(--space-3)', display: 'grid', gap: 'var(--space-2)' }}>
             {([
               ['reminders', L(dict, '我设的提醒(家务/账单/约会)', 'My reminders (chores / bills / events)')],
-              ['teslaLowBatt', L(dict, 'Tesla 电量低于 40%', 'Tesla battery under 40%')],
+              ['timeline', L(dict, '时间线日程与会议', 'Timeline events & meetings')],
+              ['focusDue', L(dict, '今天焦点 / 到期 / 弹出卡', 'Today focus / due / reminder cards')],
+              ['dailyReport', L(dict, '日报就绪', 'Daily report ready')],
+              ['retrospect', L(dict, '周 / 月回顾', 'Weekly / monthly retrospect')],
               ['familyChores', L(dict, '家庭家务今天待办', "Family chores due today")],
+              ['teslaLowBatt', L(dict, 'Tesla 电量低于 40%', 'Tesla battery under 40%')],
             ] as const).map(([key, label]) => (
               <button
                 key={key}

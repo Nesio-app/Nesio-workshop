@@ -12,13 +12,29 @@ export const NOTIFY_PREFS_UPDATED = 'nesio-notify-prefs-updated';
 export type NotifyPrefs = {
   /** 自己设的提醒(家务/账单/约会)→ 到点系统通知 */
   reminders: boolean;
+  /** 时间线日程 / 会议开始 */
+  timeline: boolean;
+  /** 今天焦点卡、到期待办、弹出提醒卡 */
+  focusDue: boolean;
+  /** 日报就绪 */
+  dailyReport: boolean;
+  /** 周/月回顾 */
+  retrospect: boolean;
   /** Tesla 电量低于 40% */
   teslaLowBatt: boolean;
   /** 家庭家务板今天待办 */
   familyChores: boolean;
 };
 
-const DEFAULTS: NotifyPrefs = { reminders: true, teslaLowBatt: true, familyChores: true };
+const DEFAULTS: NotifyPrefs = {
+  reminders: true,
+  timeline: true,
+  focusDue: true,
+  dailyReport: true,
+  retrospect: true,
+  teslaLowBatt: true,
+  familyChores: true,
+};
 
 const prefsStore = createBlobStore<NotifyPrefs>({
   key: NOTIFY_PREFS_KEY,
@@ -53,6 +69,10 @@ export function loadNotifyPrefs(): NotifyPrefs {
   if (!v) return { ...DEFAULTS };
   return {
     reminders: v.reminders !== false,
+    timeline: v.timeline !== false,
+    focusDue: v.focusDue !== false,
+    dailyReport: v.dailyReport !== false,
+    retrospect: v.retrospect !== false,
     teslaLowBatt: v.teslaLowBatt !== false,
     familyChores: v.familyChores !== false,
   };

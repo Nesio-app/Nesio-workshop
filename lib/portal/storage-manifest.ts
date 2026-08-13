@@ -72,6 +72,8 @@ export const CACHE_KEYS = new Set<string>([
   // —— 正确。iOS 的 pending 通知是**这台设备**的东西,旧手机排过什么和新手机毫无关系;
   // 真相在 nesio-schedule-reminders-v1 里,新设备回前台自己会重排一遍。
   'nesio-reminder-notify-state-v1',
+  // 时间线/焦点/日报/回顾 → 系统通知排程投影(同 reminder-notify:设备本地,回前台重排)。
+  'nesio-surface-notify-state-v1',
   // HealthKit 自动同步的日期簿记 —— 单设备本地状态,同步过去只会让新设备以为已经拉过。
   'nesio-healthkit-auto-sync-v1',
   // 「让 iOS 系统搜索找得到我的记忆」开关(Core Spotlight,2026-07-31)。

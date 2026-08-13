@@ -109,11 +109,14 @@ export async function scheduleLocalAt(opts: {
 }): Promise<{ ok: boolean; reason?: string }> {
   const afterSec = Math.round((opts.at.getTime() - (opts.now ?? new Date()).getTime()) / 1000);
   if (afterSec < 1) return { ok: false, reason: 'in_past' };
+  // 已授权时走 assumeGranted,避免每条提醒都 requestPermissions → WKWebView 闪白。
+  const display = await checkLocalNotifyDisplay();
   return scheduleLocalAlert({
     title: opts.title,
     body: opts.body,
     afterSec,
     id: notifyIdOf(opts.key),
+    assumeGranted: display === 'granted',
   });
 }
 

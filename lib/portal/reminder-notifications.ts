@@ -43,6 +43,7 @@ import {
   scheduleLocalAt,
   tombstoneScheduled,
   IOS_PENDING_LIMIT,
+  checkLocalNotifyDisplay,
 } from './native-local-notifications';
 import { isNativePlatform } from './platform-capabilities';
 import { logDropped } from './storage-health';
@@ -206,14 +207,11 @@ export async function syncReminderNotifications(
 
 /** 已经授权了吗 —— **不弹窗**。开机自动跑的那条路用这个。 */
 async function hasPermissionQuietly(): Promise<boolean> {
-  try {
-    const { Capacitor } = await import('@capacitor/core');
-    const p = (Capacitor as unknown as { Plugins?: Record<string, { checkPermissions?: () => Promise<{ display?: string }> }> })
-      .Plugins?.NesioLocalNotify;
-    if (!p?.checkPermissions) return false;
-    const cur = await p.checkPermissions();
-    return cur.display === 'granted';
-  } catch { return false; }
+  // 必须走 registerPlugin 那条桥(checkLocalNotifyDisplay)。
+  // 以前读 Capacitor.Plugins.NesioLocalNotify —— 自研插件不在那里,
+  // 结果「试一条」能响、真实提醒同步永远 no_permission_ask。
+  const d = await checkLocalNotifyDisplay();
+  return d === 'granted';
 }
 
 /** 给设置/调试页看的:iOS 上限是多少、我们最多排多少。 */

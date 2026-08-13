@@ -5,6 +5,7 @@
 import { isNativePlatform } from './platform-capabilities';
 import { hasLocalNotifyChoice, isLocalNotifyEnabled, loadNotifyPrefs, setLocalNotifyEnabled } from './notify-prefs';
 import { syncReminderNotifications, type SyncResult } from './reminder-notifications';
+import { syncSurfaceNotifications } from './surface-notifications';
 import { notifyTeslaLowBattery } from './tesla-low-battery';
 import { readTeslaSnapshot } from './tesla-snapshot-store';
 import { loadFamilyBoards } from './family-board-store';
@@ -118,6 +119,17 @@ export async function applyAllLocalNotifications(
     if (!r.ok && r.reason === 'denied') return r;
   }
 
+  {
+    const r = await syncSurfaceNotifications({
+      timeline: prefs.timeline,
+      focusDue: prefs.focusDue,
+      dailyReport: prefs.dailyReport,
+      retrospect: prefs.retrospect,
+    });
+    scheduled += r.scheduled;
+    retired += r.retired;
+  }
+
   if (prefs.teslaLowBatt) {
     const snap = readTeslaSnapshot();
     const rows = (snap?.charges || [])
@@ -143,8 +155,8 @@ export async function applyAllLocalNotifications(
         const ping = await scheduleLocalAlert({
           title: zh ? '通知已接通' : 'Notifications on',
           body: zh
-            ? '家务、提醒和车低电量会在到点时响。可在设置里关掉某一类。'
-            : 'Chores, reminders, and low Tesla battery will ring when due. You can turn a category off in Settings.',
+            ? '提醒、时间线日程、焦点到期、日报、回顾、家务和车会在到点时响。可在设置里关掉某一类。'
+            : 'Reminders, timeline events, due focus, daily report, retrospect, chores, and the car will ring when due. Turn a category off in Settings.',
           afterSec: 3,
           id: 710_001,
         });
