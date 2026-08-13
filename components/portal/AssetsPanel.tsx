@@ -204,7 +204,7 @@ function AssetCard({ asset, expenses, people, dict, open, onToggle, teslaVehicle
     .filter((t) => txAnnotationOf(t.id, anns).assetId === asset.id && t.date.startsWith(String(year)) && t.amount !== 0)
     .map((t) => ({
       id: t.id,
-      merchant: t.merchant || t.name || t.id,
+      merchant: t.name || t.id,
       amount: Math.abs(t.amount),
       date: t.date,
       assetCostKind: 'other' as const,
