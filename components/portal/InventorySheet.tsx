@@ -31,8 +31,11 @@ import {
   reviewDueInfo,
   sellPile,
   sortAmazonFlip,
+  filterAmazonFlip,
   updateInventoryItem,
   type InventoryItem,
+  type AmazonFlipFilter,
+  type AmazonFlipSort,
 } from '@/lib/portal/inventory';
 import { listStorageItems, countPantryItems, countWardrobeItems, storageHeadline } from '@/lib/portal/inventory-visibility';
 import SpendClaimRow from './finance/SpendClaimRow';
@@ -123,6 +126,8 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [view, setView] = useState<'list' | 'add' | 'detail' | 'stats' | 'sell' | 'flip'>('list');
+  const [flipFilter, setFlipFilter] = useState<AmazonFlipFilter>('all');
+  const [flipSort, setFlipSort] = useState<AmazonFlipSort>('default');
   /** page 变体三栏:总览 / 容器 / 列表(sheet 仍走原 list 流) */
   const [pageTab, setPageTab] = useState<'overview' | 'containers' | 'items'>('overview');
   const [detailId, setDetailId] = useState<string | null>(null);
@@ -878,7 +883,7 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
         })()}
 
         {view === 'flip' && (() => {
-          const flip = sortAmazonFlip(items);
+          const flip = sortAmazonFlip(filterAmazonFlip(items, flipFilter), flipSort);
           const sum = amazonSummary(items);
           const fmt = (n: number) => `$${n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
           const badge = (i: InventoryItem) => {
@@ -893,6 +898,18 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
             const [text, color, bg] = map[d.status];
             return <span style={{ fontSize: 'var(--text-overline)', fontWeight: 600, color, background: bg, padding: 'var(--space-1) var(--space-2)', borderRadius: 'var(--radius-pill, 999px)', whiteSpace: 'nowrap' }}>{text}</span>;
           };
+          const filterOpts: Array<[AmazonFlipFilter, string, string]> = [
+            ['all', '全部', 'All'],
+            ['no_review', '没评论', 'No review'],
+            ['no_rebate', '没收到返钱', 'No rebate yet'],
+            ['sold', '已卖掉', 'Sold'],
+          ];
+          const sortOpts: Array<[AmazonFlipSort, string, string]> = [
+            ['default', '默认(免评置顶)', 'Default'],
+            ['date', '到货日', 'By date'],
+            ['status', '状态', 'By status'],
+            ['expiry', '评论到期日', 'By review due'],
+          ];
           return (
             <div style={{ maxHeight: '58vh', overflowY: 'auto' }}>
               {/* 汇总:总自付 / 返现 / 已售利润 / 在库·已售 / 待评 */}
@@ -913,10 +930,33 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
                   </div>
                 );
               })()}
-              <p style={{ margin: '0.6rem 2px 0.4rem', fontSize: 'var(--text-overline)', color: 'var(--text-tertiary)' }}>
-                {L(dict, '免评置顶 · 其余按到货日排 · 到货约 10 天提醒留评', 'No-review on top · rest by arrival · review reminder ~10d after arrival')}
-              </p>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, margin: '0.6rem 0 0.35rem' }}>
+                {filterOpts.map(([k, zh, en]) => (
+                  <button key={k} type="button" onClick={() => setFlipFilter(k)}
+                    style={{
+                      fontSize: 'var(--text-xs)', padding: '4px 10px', borderRadius: 'var(--radius-pill)', cursor: 'pointer',
+                      border: `1px solid ${flipFilter === k ? 'var(--portal-accent-border)' : 'var(--portal-line)'}`,
+                      background: flipFilter === k ? 'var(--portal-accent-soft-md)' : 'transparent',
+                      color: flipFilter === k ? 'var(--portal-ink)' : 'var(--portal-muted)',
+                    }}>{L(dict, zh, en)}</button>
+                ))}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: '0.4rem', alignItems: 'center' }}>
+                <span style={{ fontSize: 'var(--text-overline)', color: 'var(--portal-muted)' }}>{L(dict, '排序', 'Sort')}</span>
+                <select
+                  value={flipSort}
+                  onChange={(e) => setFlipSort(e.target.value as AmazonFlipSort)}
+                  style={{ fontSize: 'var(--text-xs)', padding: '4px 8px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--portal-line)', background: 'transparent', color: 'var(--portal-ink)' }}
+                >
+                  {sortOpts.map(([k, zh, en]) => <option key={k} value={k}>{L(dict, zh, en)}</option>)}
+                </select>
+              </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 4 }}>
+                {flip.length === 0 && (
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', margin: '0.4rem 2px' }}>
+                    {L(dict, '这一筛选项下暂时没有东西。', 'Nothing in this filter yet.')}
+                  </p>
+                )}
                 {flip.map((i) => (
                   <button key={i.id} type="button" onClick={() => { setDetailId(i.id); setView('detail'); }}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', padding: 'var(--space-2) var(--space-3)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))', background: 'var(--glass-bg, rgba(255,255,255,0.04))', color: 'var(--text-primary)' }}>

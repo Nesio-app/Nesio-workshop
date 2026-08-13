@@ -89,7 +89,7 @@ inv.addInventoryItem({ name: '免评件', isAmazon: true, arrivedAt: '2026-07-25
 inv.addInventoryItem({ name: '早到', isAmazon: true, arrivedAt: '2026-07-10' });
 inv.addInventoryItem({ name: '非亚马逊', price: 5 });
 const flip = inv.sortAmazonFlip(inv.listInventoryItems());
-assert.deepEqual(flip.map((i) => i.name), ['免评件', '早到', '晚到'], '免评置顶,其余按到货升序,非亚马逊排除');
+assert.equal(flip.map((i) => i.name).join('|'), '免评件|早到|晚到', '免评置顶,其余按到货升序,非亚马逊排除');
 
 // ── 汇总 amazonSummary ──
 nodes.length = 0; seq = 0;
@@ -188,9 +188,11 @@ assert.ok(sheet.includes('forSale: !item.forSale'), '详情页标记/取消出�
 assert.ok(sheet.includes('isContainer: !item.isContainer'), '物品④:详情页变成/解除容器');
 assert.ok(sheet.includes('容器'), '物品④:容器切换可见(设计去 emoji 后按文案而非图标区分)');
 assert.ok(sheet.includes('containedCount'), '物品④:装了几件可见');
-assert.ok(sheet.includes('/api/portal/inventory-extract') && sheet.includes('clipboard.readText'), '物品⑤:粘贴商品信息走提取路由');
-assert.ok(sheet.includes('pasteMsg'), '物品⑤:识别失败可见(不静默)');
+// 物品⑤粘贴识别已从 UI 去掉(用户要拍照/相册,不要粘贴入口);契约改钉提取路由仍在仓内。
+assert.ok(fs.readFileSync(new URL('../app/api/portal/inventory-extract/route.ts', import.meta.url), 'utf8').includes('export'), '物品⑤:提取路由仍在');
 assert.ok(sheet.includes('buildListingText') && sheet.includes('clipboard.writeText'), '物品⑥:复制转卖文案接线');
 assert.ok(sheet.includes('copiedId'), '物品⑥:复制成功有反馈');
+assert.ok(sheet.includes('filterAmazonFlip') && sheet.includes('flipFilter'), '亚马逊列表有 filter');
+assert.ok(sheet.includes('flipSort'), '亚马逊列表有 sort');
 
 console.log('inventory-stats: OK');

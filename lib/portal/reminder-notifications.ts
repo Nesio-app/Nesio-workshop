@@ -90,6 +90,8 @@ export interface PlannedNotification {
   title: string;
   body: string;
   at: Date;
+  /** 点通知后要打开的目标(壳若带 deep link 会用;Web/回前台启发式也会用)。 */
+  deepLink?: { kind: 'memory' | 'today'; id?: string };
 }
 
 /**

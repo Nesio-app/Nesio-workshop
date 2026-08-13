@@ -34,6 +34,10 @@ export default function MedicationPanel() {
   const [tick, setTick] = useState(0);
   const [logErr, setLogErr] = useState<string | null>(null);
   const [recordOpen, setRecordOpen] = useState(false);
+  const [checkInDay, setCheckInDay] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [calMonth, setCalMonth] = useState(() => {
     const d = new Date();
     return { y: d.getFullYear(), m: d.getMonth() };
@@ -71,7 +75,7 @@ export default function MedicationPanel() {
     };
   }, [rebuild]);
 
-  const done = takenCount(meds.map((m) => m.name));
+  const done = takenCount(meds.map((m) => m.name), checkInDay);
   const whoLabel = people.find((p) => p.key === personKey)?.name || t('我', 'Me');
 
   const monthLabel = calMonth.y === new Date().getFullYear() && calMonth.m === new Date().getMonth()
@@ -93,6 +97,13 @@ export default function MedicationPanel() {
       return { y: d.getFullYear(), m: d.getMonth() };
     });
   }
+
+  const checkInLabel = checkInDay === (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  })()
+    ? t('今天', 'Today')
+    : fmtDay(checkInDay, dict);
 
   return (
     <div className="nesio-health-dash" style={{ paddingTop: 'var(--space-2)' }}>
@@ -117,24 +128,30 @@ export default function MedicationPanel() {
             <span className="nesio-fin-month">{monthLabel}</span>
             <button type="button" className="nesio-fin-monthnav" onClick={() => shiftCalMonth(1)} aria-label={t('下一月', 'Next month')}>›</button>
           </div>
-          <div className="nesio-ward-cal-grid" role="grid" aria-label={t('用药打卡日历', 'Medication calendar')}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 'var(--space-1)', marginBottom: 'var(--space-1)' }} role="grid" aria-label={t('用药打卡日历', 'Medication calendar')}>
             {['日', '一', '二', '三', '四', '五', '六'].map((w, i) => (
-              <span key={w} className="nesio-ward-cal-dow" style={{ fontSize: 'var(--text-xs)' }}>{dict === 'en' ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'][i] : w}</span>
+              <span key={w} style={{ textAlign: 'center', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{dict === 'en' ? ['S', 'M', 'T', 'W', 'T', 'F', 'S'][i] : w}</span>
             ))}
             {calCells.map((c, i) => (
               c ? (
-                <span
+                <button
                   key={c.ymd}
-                  className={`nesio-ward-cal-day${c.taken > 0 ? ' has-outfit' : ''}`}
-                  title={c.taken > 0 ? t(`${c.day}日 · 已服 ${c.taken} 种`, `Day ${c.day} · ${c.taken} taken`) : undefined}
-                  style={{ fontSize: 'var(--text-xs)' }}
+                  type="button"
+                  onClick={() => setCheckInDay(c.ymd)}
+                  title={c.taken > 0 ? t(`${c.day}日 · 已服 ${c.taken} 种`, `Day ${c.day} · ${c.taken} taken`) : t(`${c.day}日 · 点开打卡`, `Day ${c.day} · tap to check in`)}
+                  style={{
+                    position: 'relative', aspectRatio: '1', borderRadius: 'var(--radius-sm)',
+                    border: c.ymd === checkInDay ? '1.5px solid var(--portal-accent)' : '1px solid var(--portal-line)',
+                    background: c.taken > 0 ? 'var(--status-go-soft)' : c.ymd === checkInDay ? 'var(--portal-accent-soft)' : 'transparent',
+                    color: 'var(--portal-ink)', fontSize: 'var(--text-xs)', cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                  }}
                 >
                   {c.day}
                   {c.taken > 0 && meds.length > 0 && c.taken >= meds.length && (
-                    <i style={{ background: 'var(--status-go)' }} aria-hidden />
+                    <i style={{ position: 'absolute', bottom: 3, left: '50%', transform: 'translateX(-50%)', width: 5, height: 5, borderRadius: '50%', background: 'var(--status-go)' }} aria-hidden />
                   )}
-                </span>
-              ) : <span key={`e-${i}`} className="nesio-ward-cal-day is-empty" aria-hidden />
+                </button>
+              ) : <span key={`e-${i}`} aria-hidden />
             ))}
           </div>
         </section>
@@ -149,11 +166,11 @@ export default function MedicationPanel() {
           {meds.length > 0 && (
             <section style={{ marginBottom: 'var(--space-4)' }}>
               <h3 style={{ margin: '0 0 var(--space-2)', fontSize: 'var(--text-sm)', fontWeight: 'var(--weight-semibold)', color: 'var(--portal-ink)' }}>
-                {t(`今天在吃 · ${done}/${meds.length}`, `Active today · ${done}/${meds.length}`)}
+                {t(`${checkInLabel}在吃 · ${done}/${meds.length}`, `Active ${checkInLabel} · ${done}/${meds.length}`)}
               </h3>
               <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 {meds.map((m) => {
-                  const taken = isMedTaken(m.name);
+                  const taken = isMedTaken(m.name, checkInDay);
                   return (
                     <li key={m.name} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', padding: 'var(--space-3)', borderRadius: 'var(--radius-md)', border: '1px solid var(--portal-line)', background: 'var(--portal-accent-soft)' }}>
                       <div style={{ flex: 1, minWidth: 0 }}>
@@ -168,7 +185,7 @@ export default function MedicationPanel() {
                         variant={taken ? 'secondary' : 'primary'}
                         size="sm"
                         onClick={() => {
-                          const ok = setMedTaken(m.name, !taken);
+                          const ok = setMedTaken(m.name, !taken, checkInDay);
                           if (!ok) setLogErr(t('打卡没存上,再试一次。', "Couldn't save — try again."));
                           else { setLogErr(null); setTick((n) => n + 1); }
                         }}

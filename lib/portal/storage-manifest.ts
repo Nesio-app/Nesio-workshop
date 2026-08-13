@@ -74,6 +74,8 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-reminder-notify-state-v1',
   // 时间线/焦点/日报/回顾 → 系统通知排程投影(同 reminder-notify:设备本地,回前台重排)。
   'nesio-surface-notify-state-v1',
+  'nesio-focus-notify-dismissed-v1',
+  'nesio-notify-deep-links-v1',
   // HealthKit 自动同步的日期簿记 —— 单设备本地状态,同步过去只会让新设备以为已经拉过。
   'nesio-healthkit-auto-sync-v1',
   // 「让 iOS 系统搜索找得到我的记忆」开关(Core Spotlight,2026-07-31)。

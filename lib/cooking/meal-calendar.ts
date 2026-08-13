@@ -15,12 +15,13 @@ import { reportStorageDropped } from '../portal/storage-health';
 export const MEAL_CALENDAR_KEY = 'nesio-meal-calendar-v1';
 export const MEAL_CALENDAR_EVENT = 'nesio-meal-calendar-updated';
 
-export type MealSlot = 'breakfast' | 'lunch' | 'dinner';
-export const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner'];
+export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+export const MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
 export const MEAL_SLOT_LABEL: Record<MealSlot, { zh: string; en: string }> = {
   breakfast: { zh: '早', en: 'Breakfast' },
   lunch: { zh: '午', en: 'Lunch' },
   dinner: { zh: '晚', en: 'Dinner' },
+  snack: { zh: '加餐', en: 'Snack' },
 };
 
 /** date(YYYY-MM-DD)→ 三顿各安排了什么。没排的键直接不存。 */
@@ -68,7 +69,12 @@ export function setMealPlan(date: string, slot: MealSlot, dish: string | null): 
 
 /** 从今天起 n 天的日期键(用来渲染日历,天数固定,内容可以为空)。 */
 export function upcomingDayKeys(n: number, from = new Date()): string[] {
-  const base = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  return dayKeysFrom(from, n);
+}
+
+/** 从某个锚点日起 n 天的日期键(左右翻周用)。 */
+export function dayKeysFrom(anchor: Date, n: number): string[] {
+  const base = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
   return Array.from({ length: n }, (_, i) => dayKey(new Date(base.getTime() + i * 86_400_000)));
 }
 

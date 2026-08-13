@@ -6,8 +6,11 @@
  */
 import fs from 'node:fs';
 import vm from 'node:vm';
+import { createRequire } from 'node:module';
 import ts from 'typescript';
 import assert from 'node:assert/strict';
+
+const nodeRequire = createRequire(import.meta.url);
 
 // ── scope 合并(源码级) ──
 const gmailConnect = fs.readFileSync(new URL('../app/api/portal/gmail/connect/route.ts', import.meta.url), 'utf8');
@@ -23,10 +26,11 @@ function loadRoute(token, fetchImpl) {
   const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
   const mod = { exports: {} };
   vm.runInNewContext(js, {
-    module: mod, exports: mod.exports, console, JSON, Object, Array, String, Date, encodeURIComponent, fetch: fetchImpl,
+    module: mod, exports: mod.exports, console, JSON, Object, Array, String, Date, encodeURIComponent, Buffer, fetch: fetchImpl,
     require: (p) => p === 'next/server' ? { NextRequest: class {}, NextResponse: { json: (b, init) => ({ __json: b, __status: init?.status ?? 200 }) } }
       : p.includes('gmail-access') ? { resolveGmailAccessToken: async () => token }
       : p.includes('api-auth') ? { guardAiRoute: async () => null }
+      : p === 'node:zlib' || p === 'zlib' ? nodeRequire('node:zlib')
       : ({}),
   });
   return mod.exports;
@@ -43,6 +47,13 @@ const reqBody = (backup) => ({ json: async () => ({ backup }) });
 {
   const route = loadRoute('tkn', async () => ({ ok: true, json: async () => ({ files: [] }) }));
   assert.equal((await route.POST({ json: async () => ({}) })).__status, 400, '缺 backup 400');
+}
+// Drive list 403 → insufficient_scope
+{
+  const route = loadRoute('tkn', async () => ({ ok: false, status: 403, text: async () => 'PERMISSION_DENIED', json: async () => ({}) }));
+  const res = await route.POST(reqBody({ a: 1 }));
+  assert.equal(res.__status, 403, '缺 Drive scope → 403');
+  assert.equal(res.__json.error, 'insufficient_scope', 'error=insufficient_scope');
 }
 // 首次上传:list 空 → POST 到 appDataFolder(带 parents)
 {

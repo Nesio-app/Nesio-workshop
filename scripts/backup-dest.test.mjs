@@ -1,7 +1,7 @@
 /**
- * 行为契约:备份目的地选择器(Google Drive 免费 / Nesio 云兜底)。
+ * 行为契约:备份目的地选择器(Google Drive 免费 / Nesio 云)。
  * 锁死(源码级,逻辑在 React 组件内):选择器二选一 + 偏好持久化(nesio-backup-dest);
- * 备份/恢复按所选目的地分发;Drive 未连接自动落回 Nesio 云兜底。
+ * 备份/恢复按所选目的地分发;Drive 未连接引导开通,不静默兜底 Nesio。
  */
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
@@ -20,9 +20,9 @@ assert.ok(/handleBackupChosen\s*=\s*\(\)\s*=>\s*\(backupDest === 'drive' \? hand
 assert.ok(/handleRestoreChosen\s*=\s*\(\)\s*=>\s*\(backupDest === 'drive' \? handleDriveRestore\(\) : handleCloudRestore\(\)\)/.test(s), '恢复按目的地分发');
 assert.ok(s.includes('onClick={handleBackupChosen}') && s.includes('onClick={handleRestoreChosen}'), '统一按钮接线');
 
-// Drive 未连接 → 兜底 Nesio 云
-const driveFn = s.slice(s.indexOf('async function handleDriveBackup'), s.indexOf('async function handleDriveBackup') + 900);
-assert.ok(driveFn.includes("r.error === 'not_connected'") && driveFn.includes('handleCloudBackup()'), 'Drive 未连接自动落回 Nesio 云兜底');
+// Drive 未连接 / 缺 scope → 打开连接引导(不静默改用 Nesio)
+assert.ok(s.includes("r.error === 'not_connected'") && s.includes('onOpenConnect'), 'Drive 未连接引导开通');
+assert.ok(!/if \(r\.error === 'not_connected'[\s\S]{0,200}?handleCloudBackup\(\)/.test(s), 'Drive 失败不静默兜底 Nesio');
 
 // 单独的旧「备份到 Google Drive」独立按钮已并入选择器(不再各按各的)
 assert.ok(!s.includes('免费备份到 Google Drive · 换机不丢'), '旧独立 Drive 备份按钮已并入选择器');

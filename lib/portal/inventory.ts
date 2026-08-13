@@ -183,17 +183,55 @@ export function amazonSummary(items: InventoryItem[]): {
   return { count: amz.length, grossSpent: r2(grossSpent), outOfPocketTotal: r2(outOfPocketTotal), rebateTotal: r2(rebateTotal), realizedProfit: r2(realizedProfit), inStock, sold, reviewDue };
 }
 
-/** 亚马逊转卖列表排序:免评置顶(用户要求),再按到货日期升序(空到货垫底),同日按新→旧。 */
-export function sortAmazonFlip(items: InventoryItem[]): InventoryItem[] {
-  return items
-    .filter((i) => i.isAmazon)
-    .sort((a, b) => {
-      if (a.reviewExempt !== b.reviewExempt) return a.reviewExempt ? -1 : 1;
-      const ax = a.arrivedAt || '9999-12-31';
-      const bx = b.arrivedAt || '9999-12-31';
+/** 亚马逊转卖列表排序:免评置顶(默认),或按到货日/状态/过期(评论到期)日。 */
+export type AmazonFlipSort = 'default' | 'date' | 'status' | 'expiry';
+export type AmazonFlipFilter = 'all' | 'no_review' | 'no_rebate' | 'sold';
+
+export function filterAmazonFlip(items: InventoryItem[], filter: AmazonFlipFilter = 'all'): InventoryItem[] {
+  const amz = items.filter((i) => i.isAmazon);
+  switch (filter) {
+    case 'no_review': return amz.filter((i) => !i.reviewDone && !i.reviewExempt);
+    case 'no_rebate': return amz.filter((i) => (i.rebate || 0) > 0 && !i.rebateReceived);
+    case 'sold': return amz.filter((i) => i.sold);
+    default: return amz;
+  }
+}
+
+export function sortAmazonFlip(items: InventoryItem[], sort: AmazonFlipSort = 'default'): InventoryItem[] {
+  const list = items.filter((i) => i.isAmazon);
+  const statusRank = (i: InventoryItem) => {
+    const s = reviewDueInfo(i).status;
+    if (s === 'due') return 0;
+    if (s === 'waiting') return 1;
+    if (s === 'not_arrived') return 2;
+    if (s === 'done') return 3;
+    return 4; // exempt
+  };
+  return [...list].sort((a, b) => {
+    if (sort === 'date') {
+      const ax = a.arrivedAt || a.orderedAt || '9999-12-31';
+      const bx = b.arrivedAt || b.orderedAt || '9999-12-31';
       if (ax !== bx) return ax < bx ? -1 : 1;
       return new Date(b.node.createdAt).getTime() - new Date(a.node.createdAt).getTime();
-    });
+    }
+    if (sort === 'status') {
+      const d = statusRank(a) - statusRank(b);
+      if (d) return d;
+      return (a.name || '').localeCompare(b.name || '');
+    }
+    if (sort === 'expiry') {
+      const ax = reviewDueInfo(a).dueDate || '9999-12-31';
+      const bx = reviewDueInfo(b).dueDate || '9999-12-31';
+      if (ax !== bx) return ax < bx ? -1 : 1;
+      return statusRank(a) - statusRank(b);
+    }
+    // default: 免评置顶 → 到货日升序
+    if (a.reviewExempt !== b.reviewExempt) return a.reviewExempt ? -1 : 1;
+    const ax = a.arrivedAt || '9999-12-31';
+    const bx = b.arrivedAt || '9999-12-31';
+    if (ax !== bx) return ax < bx ? -1 : 1;
+    return new Date(b.node.createdAt).getTime() - new Date(a.node.createdAt).getTime();
+  });
 }
 
 /** 全部物品(object 节点),新→旧。容器物品的 containedCount 在此跨物品计算。

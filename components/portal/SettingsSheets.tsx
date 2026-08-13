@@ -415,8 +415,33 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     }
   }
 
+  function driveErrorText(err: string | undefined): string {
+    switch (err) {
+      case 'not_connected':
+        return L(dict,
+          '还没开通 Google Drive 备份 —— 先点「连接数据源」连上 Google(含 Drive),再回来备份。',
+          'Google Drive backup isn’t enabled yet — connect Google under Connected sources (includes Drive), then back up again.');
+      case 'insufficient_scope':
+        return L(dict,
+          '当前 Google 授权还缺 Drive 权限 —— 请重新连接 Google(会多要一次 Drive),再点备份。',
+          'This Google sign-in is missing Drive access — reconnect Google (it will ask for Drive), then back up again.');
+      case 'too_large':
+        return L(dict,
+          '这份数据太大,过不了上传上限。请先用下面「导出」留本机份;Drive 备份不含照片。',
+          'This package is too large to upload. Export a local copy below; Drive backup skips photos.');
+      case 'timeout':
+        return L(dict, '这次备份超时了 —— 网络慢时常见,稍后再试一次。', 'Backup timed out — common on a slow network. Try again shortly.');
+      case 'build_failed':
+        return L(dict, '这次没能把数据打包好 —— 不是网络问题。先用「导出」留一份。', "Couldn't package your data — not a network issue. Export a local copy first.");
+      case 'no_backup':
+        return L(dict, '你的 Drive 里还没有备份 —— 先点上面「免费备份到 Google Drive」', 'No backup in your Drive yet — tap "Back up free to Google Drive" above first');
+      default:
+        return L(dict, '备份到 Drive 没成功 —— 稍后再试或用「导出」', "Drive backup didn't go through — try again later or use Export");
+    }
+  }
+
   async function handleDriveBackup() {
-    setDriveState('busy'); setDriveMsg('');
+    setDriveState('busy'); setDriveMsg(L(dict, '正在打包并上传到 Drive…', 'Packaging and uploading to Drive…'));
     try {
       await runDriveBackup();
     } catch {
@@ -429,20 +454,19 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   async function runDriveBackup() {
     const { pushBackupToDrive } = await import('@/lib/portal/drive-backup');
     const r = await pushBackupToDrive();
-    if (r.ok) { setDriveState('done'); setDriveMsg(L(dict, '✓ 已免费备份到你的 Google Drive', '✓ Backed up free to your Google Drive')); }
-    else if (r.error === 'not_connected') {
-      // 没连 Google → 说清楚怎么开通,并打开数据源(不要静默改用 Nesio 云,用户以为开了 Drive)
-      setDriveState('error');
-      setDriveMsg(L(dict,
-        '还没开通 Google Drive 备份 —— 先点「连接数据源」连上 Google(含 Drive),再回来备份。',
-        'Google Drive backup isn’t enabled yet — connect Google under Connected sources (includes Drive), then back up again.'));
+    if (r.ok) {
+      setDriveState('done');
+      setDriveMsg(L(dict, '✓ 已免费备份到你的 Google Drive(不含照片;照片请用导出)', '✓ Backed up free to your Google Drive (no photos — use Export for those)'));
+      return;
+    }
+    setDriveState('error');
+    setDriveMsg(driveErrorText(r.error));
+    // 没连 / 缺 scope → 打开数据源引导重连(不要静默改用 Nesio 云)
+    if (r.error === 'not_connected' || r.error === 'insufficient_scope') {
       try { onOpenConnect?.(); } catch { /* ignore */ }
-    } else {
-      setDriveState('error');
-      setDriveMsg(L(dict, '备份到 Drive 没成功 —— 稍后再试或用「导出完整备份」', "Drive backup didn't go through — try again later or use Export full backup"));
     }
   }
-  // 备份/恢复走用户选的目的地(Drive 失败自动兜底 Nesio 已在 handleDriveBackup 内)
+  // 备份/恢复走用户选的目的地(Drive 未连接引导开通,不静默兜底 Nesio)
   const handleBackupChosen = () => (backupDest === 'drive' ? handleDriveBackup() : handleCloudBackup());
   const handleRestoreChosen = () => (backupDest === 'drive' ? handleDriveRestore() : handleCloudRestore());
 
@@ -473,17 +497,58 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   }
   async function handleDriveRestore() {
     if (!confirm(L(dict, '从 Google Drive 恢复:把云端备份合并回本机(仅补缺,不覆盖已有)。完成后自动刷新。继续?', 'Restore from Google Drive: merges the backup into this device (fills gaps, keeps existing). Refreshes when done. Continue?'))) return;
-    setDriveState('busy'); setDriveMsg('');
-    const { pullBackupFromDrive } = await import('@/lib/portal/drive-backup');
-    const r = await pullBackupFromDrive('merge');
-    if (r.ok) { setDriveMsg(L(dict, '✓ 已从 Drive 恢复,正在刷新…', '✓ Restored from Drive, refreshing…')); setTimeout(() => window.location.reload(), 900); }
-    else {
+    setDriveState('busy'); setDriveMsg(L(dict, '正在从 Drive 拉取…', 'Pulling from Drive…'));
+    try {
+      const { pullBackupFromDrive } = await import('@/lib/portal/drive-backup');
+      const r = await pullBackupFromDrive('merge');
+      if (r.ok) {
+        setDriveState('done');
+        setDriveMsg(L(dict, '✓ 已从 Drive 恢复,正在刷新…', '✓ Restored from Drive, refreshing…'));
+        setTimeout(() => window.location.reload(), 900);
+        return;
+      }
       setDriveState('error');
-      setDriveMsg(r.error === 'no_backup'
-        ? L(dict, '你的 Drive 里还没有备份 —— 先点上面「免费备份到 Google Drive」', 'No backup in your Drive yet — tap "Back up free to Google Drive" above first')
-        : r.error === 'not_connected'
-          ? L(dict, '先连接 Google 再恢复', 'Connect Google first')
+      setDriveMsg(r.error === 'not_connected' || r.error === 'insufficient_scope'
+        ? driveErrorText(r.error)
+        : r.error === 'no_backup'
+          ? driveErrorText('no_backup')
           : L(dict, '从 Drive 恢复没成功 —— 稍后再试', "Restore from Drive didn't go through — try again later"));
+      if (r.error === 'not_connected' || r.error === 'insufficient_scope') {
+        try { onOpenConnect?.(); } catch { /* ignore */ }
+      }
+    } catch {
+      setDriveState('error');
+      setDriveMsg(L(dict, '从 Drive 恢复没成功 —— 稍后再试', "Restore from Drive didn't go through — try again later"));
+    }
+  }
+
+  /** 只清空 Nesio 云(表+对象存储),保留登录与本机;配合「只用 Google Drive」。 */
+  async function clearNesioCloudKeepAccount() {
+    if (!confirm(L(dict,
+      '清空 Nesio 云:删除云端记忆/资料/备份文件,本机与 Google Drive 不动,也不登出。清空后请用 Google 云备份。继续?',
+      'Clear Nesio cloud: deletes cloud memories/profile/backups. Local data and Google Drive stay; you stay signed in. Then use Google cloud for backup. Continue?'))) return;
+    setDeleteMsg(L(dict, '正在清空 Nesio 云…', 'Clearing Nesio cloud…'));
+    try {
+      const res = await fetch('/api/user-data/delete?dryRun=0', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmation: 'CLEAR_NESIO_CLOUD_KEEP_ACCOUNT' }),
+      });
+      if (res.status === 401) {
+        setDeleteMsg(L(dict, '还没登录,没有 Nesio 云可清。', 'Not signed in — nothing on Nesio cloud to clear.'));
+        return;
+      }
+      const data = await res.json().catch(() => null) as { ok?: boolean } | null;
+      if (!res.ok || !data?.ok) {
+        setDeleteMsg(L(dict, 'Nesio 云没清空成功,本机未改动。稍后再试。', "Couldn't clear Nesio cloud — nothing changed locally. Try again later."));
+        return;
+      }
+      pickBackupDest('drive');
+      setDeleteMsg(L(dict,
+        '✓ Nesio 云已清空,已切到 Google 云备份。注意:点「同步」仍会把本机记忆写回 Nesio(那是实时同步,不是整包备份)。',
+        '✓ Nesio cloud cleared; backup dest set to Google. Note: Sync can still write memories back to Nesio (live sync, not the package backup).'));
+    } catch {
+      setDeleteMsg(L(dict, '网络错误,Nesio 云未清空。', 'Network error — Nesio cloud not cleared.'));
     }
   }
 
@@ -990,6 +1055,10 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
             说不出理由的差异就是「同一屏的按钮长得不像一家」的来源。要分轻重就用 variant。 */}
         <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={clearAllLocalData}>
           {L(dict, '彻底删除本机全部数据', 'Delete all local data')}
+        </Button>
+        {/* 只用 Google Drive:清 Nesio 云但保留登录与本机。 */}
+        <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={clearNesioCloudKeepAccount}>
+          {L(dict, '清空 Nesio 云(保留本机与登录)', 'Clear Nesio cloud (keep local & sign-in)')}
         </Button>
         {/* App Store 5.1.1 强制:App 内账号删除(云端 + 本机 + 登出)。 */}
         <Button variant="soft" size="md" tone="risk" full className="nesio-settings-danger-btn" onClick={deleteAccountAndData}>

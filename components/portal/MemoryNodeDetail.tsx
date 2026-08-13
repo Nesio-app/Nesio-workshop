@@ -17,7 +17,7 @@ import {
   loadCustomMemoryTags,
   MEMORY_CUSTOM_TAGS_EVENT,
 } from '@/lib/portal/memory-custom-tags';
-import { memoryEventAt } from '@/lib/portal/memory-event-at';
+import { memoryEventAt, formatMemoryDayLabel } from '@/lib/portal/memory-event-at';
 // #18:「地点」字段里塞的是会议链接 —— 一条 URL 不是一个地方
 import { splitEventLocation, shortUrlLabel } from '@/lib/portal/meeting-location';
 import { L } from '@/lib/portal/i18n';
@@ -221,6 +221,8 @@ const HIDDEN_ATTRIBUTE_KEYS = new Set([
   'sourceNodeId', 'schemaVersion',
   // 认知谱系内部字段(QA:详情页露出「epistemic: observation」「generator: manual」)
   'epistemic', 'generator', 'provenance', 'confidence',
+  // 想做清单 dishes 有专段渲染,不进「其他属性」JSON 裸串
+  'dishes',
   // Type-specific (handled in sections)
   'note', 'price', 'purchaseDate', 'expiry', 'store', 'merchant', 'subtype', 'paymentMethod',
   // 电商/物流事件:预计到货由 EventSection 单独渲染,不在通用属性区重复
@@ -1051,18 +1053,8 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
     }
   }
 
-  // 标签三层 §3.3 + 图2/3:「记录于」跟记忆时间线同一套事件时间;今天/昨天相对,更早写具体月日
-  const createdDate = (() => {
-    const created = memoryEventAt(n);
-    const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
-    const time = created.toLocaleTimeString(dict === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
-    if (created >= dayStart) return L(dict, `今天 ${time}`, `today ${time}`);
-    if (created >= new Date(dayStart.getTime() - 86_400_000)) return L(dict, `昨天 ${time}`, `yesterday ${time}`);
-    const day = dict === 'en'
-      ? created.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-      : `${created.getMonth() + 1}月${created.getDate()}日`;
-    return `${day} ${time}`;
-  })();
+  // 标签三层 §3.3 + 图2/3:「记录于」跟记忆时间线同一套事件时间;今天仅限当天(未来事件写月日)
+  const createdDate = formatMemoryDayLabel(memoryEventAt(n), dict === 'en' ? 'en' : 'zh', { withTime: true });
 
   // Remaining attributes not shown in type-specific sections
   const shownAttrs = Object.entries(n.attributes).filter(
@@ -1409,6 +1401,56 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               )}
             </div>
           )}
+
+          {/* 想做清单 dishes:友好名 + 点进菜谱,不露 JSON */}
+          {(() => {
+            const raw = n.attributes?.dishes;
+            const names: string[] = [];
+            if (Array.isArray(raw)) {
+              for (const x of raw) {
+                if (typeof x === 'string' && x.trim()) names.push(x.trim());
+                else if (x && typeof x === 'object' && typeof (x as { name?: string }).name === 'string') {
+                  const nm = (x as { name: string }).name.trim();
+                  if (nm) names.push(nm);
+                }
+              }
+            } else if (typeof raw === 'string' && raw.trim()) {
+              try {
+                const parsed = JSON.parse(raw) as unknown;
+                if (Array.isArray(parsed)) {
+                  for (const x of parsed) {
+                    if (typeof x === 'string' && x.trim()) names.push(x.trim());
+                    else if (x && typeof x === 'object' && typeof (x as { name?: string }).name === 'string') {
+                      const nm = (x as { name: string }).name.trim();
+                      if (nm) names.push(nm);
+                    }
+                  }
+                } else names.push(raw.trim());
+              } catch { names.push(raw.trim()); }
+            }
+            if (!names.length) return null;
+            return (
+              <div style={{ marginTop: 'var(--space-3)' }}>
+                <p className="nesio-settings-section-label">{L(dict, '想做的菜', 'Dishes to cook')}</p>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
+                  {names.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      className="nesio-node-link-add"
+                      onClick={() => {
+                        try {
+                          window.dispatchEvent(new CustomEvent('nesio-open-cooking-recipe', { detail: { name } }));
+                        } catch { /* ignore */ }
+                      }}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Remaining attributes not covered above — 默认折叠:这里剩下的多是没建专属展示位的
               长尾字段,展开前只给一个可点的标题,不把生 key 糊用户脸上。 */}

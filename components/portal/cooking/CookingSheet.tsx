@@ -34,7 +34,7 @@ import { addMeal, getMeals, type Meal, type MealSource, type MealItem } from '@/
 import { planWeek } from '@/lib/cooking/meal-plan-core';
 import {
   MEAL_SLOTS, MEAL_SLOT_LABEL, MEAL_CALENDAR_EVENT, getDayPlan, setMealPlan,
-  upcomingDayKeys, plannedDishes, dayKey, type MealSlot,
+  upcomingDayKeys, dayKeysFrom, plannedDishes, dayKey, type MealSlot,
 } from '@/lib/cooking/meal-calendar';
 import { saveGeneratedRecipe, findGeneratedRecipe } from '@/lib/cooking/generated-recipes';
 import { canUsePaidCloudAi, guardPaidCloudAi } from '@/lib/portal/entitlement';
@@ -60,9 +60,11 @@ type View =
   | { kind: 'generate' }
   | { kind: 'tips' };
 
-export default function CookingSheet({ open, onClose, initialView }: {
+export default function CookingSheet({ open, onClose, initialView, initialRecipeName }: {
   open: boolean; onClose: () => void;
   initialView?: TopTab;
+  /** 从记忆详情点菜名进来 → 直接打开对应菜谱。 */
+  initialRecipeName?: string;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const t = useCallback((zh: string, en: string) => L(dict, zh, en), [dict]);
@@ -143,6 +145,11 @@ export default function CookingSheet({ open, onClose, initialView }: {
     setErr('');
     setView({ kind: 'recipe', match: matchRecipe(r, pantryNames, normalizeIngredient) });
   }, [recipes, pantryNames, t]);
+
+  useEffect(() => {
+    if (!open || !initialRecipeName || !recipes) return;
+    openRecipeByName(initialRecipeName);
+  }, [open, initialRecipeName, recipes, openRecipeByName]);
 
   const remove = useCallback((id: string) => {
     setErr('');
@@ -610,6 +617,35 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
     catch { onError(t('没加上,再试一次。', 'Could not add — try again.')); }
   }
 
+  if (scheduling) {
+    // 排期时整页替换,不再叠 bottom sheet —— 否则菜卡会从半透明层下透出来(图5重叠)。
+    return (
+      <div style={{ paddingBottom: 'calc(var(--space-4) + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
+        <p style={{ margin: 0, fontSize: 'var(--text-body)', fontWeight: 600, color: 'var(--portal-ink)' }}>
+          {t(`哪天做「${scheduling}」?`, `When to cook “${scheduling}”?`)}
+        </p>
+        {upcomingDayKeys(7).map((date) => {
+          const d = new Date(`${date}T00:00:00`);
+          const isToday = date === dayKey(new Date());
+          return (
+            <div key={date} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 'var(--space-2)' }}>
+              <span style={{ flex: 'none', width: 72, fontSize: 'var(--text-xs)', color: isToday ? 'var(--portal-accent)' : 'var(--portal-muted)', fontWeight: isToday ? 700 : 400 }}>
+                {isToday ? t('今天', 'Today') : `${d.getMonth() + 1}/${d.getDate()}`}
+              </span>
+              {MEAL_SLOTS.map((slot) => (
+                <button key={slot} type="button" style={{ ...chip, flex: '1 1 18%', minWidth: 52 }}
+                  onClick={() => { setMealPlan(date, slot, scheduling); setScheduling(null); }}>
+                  {t(MEAL_SLOT_LABEL[slot].zh, MEAL_SLOT_LABEL[slot].en)}
+                </button>
+              ))}
+            </div>
+          );
+        })}
+        <button type="button" style={ghostBtn} onClick={() => setScheduling(null)}>{t('稍后', 'Later')}</button>
+      </div>
+    );
+  }
+
   return (
     <>
       {/* 入口置顶:手动搜 + 小相机(对齐记一物品) */}
@@ -647,17 +683,11 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
       {wishes.length === 0 && !adding
         ? <p style={{ ...hintLine, lineHeight: 1.6 }}>{t('想做的菜先攒着 —— 搜库里的,或直接打菜名。点一道看步骤,长按选哪天做。', 'Save dishes you want — search or type. Tap for steps, long-press to schedule.')}</p>
         : (
-          /* 封面卡网格。这一屏是「挑今天做哪道」——照片帮得上,所以走两列大图卡;
-             自选列表那屏是状态列表(材料齐 / 缺 3 样),行式更好扫,保持不动。
-             ⚠️ 库里只有一半的菜有图(354/704),所以无图态必须自己站得住 ——
-             见 RecipeCover:同尺寸的浅色面 + 菜名排版,不是把 32px 的字母占位放大。 */
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 'var(--space-3)' }}>
             {wishes.map((w) => {
               const rec = recipes?.find((x) => x.name === w.name);
               return (
                 <div key={w.name} style={{ ...card, padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-                  {/* 图26:长按一张菜卡 → 选哪天做。点开还是看步骤,长按才是排期 ——
-                      和记忆卡「点开/长按」的分工一致。 */}
                   <button type="button" onClick={() => { if (heldRef.current) { heldRef.current = false; return; } onOpenDish(w.name); }}
                     onPointerDown={() => startHold(w.name)} onPointerUp={cancelHold}
                     onPointerLeave={cancelHold} onPointerCancel={cancelHold}
@@ -680,36 +710,6 @@ function WishlistBody({ wishes, recipes, onCompute, onOpenDish, onPlan, onError,
             })}
           </div>
         )}
-
-      {/* 图26:长按后的排期层 —— 挑哪天、哪一顿,直接写进美食日历。 */}
-      {scheduling && (
-        <NesioSheet variant="bottom" card={false} elevated open onOpenChange={(o) => { if (!o) setScheduling(null); }}
-          ariaLabel={t('选哪天做', 'Pick a day')}>
-          <div style={{ padding: 'var(--space-4)', paddingBottom: 'calc(var(--space-4) + env(safe-area-inset-bottom, 0px))', display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            <p style={{ margin: 0, fontSize: 'var(--text-body)', fontWeight: 600, color: 'var(--portal-ink)' }}>
-              {t(`哪天做「${scheduling}」?`, `When to cook “${scheduling}”?`)}
-            </p>
-            {upcomingDayKeys(7).map((date) => {
-              const d = new Date(`${date}T00:00:00`);
-              const isToday = date === dayKey(new Date());
-              return (
-                <div key={date} style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
-                  <span style={{ flex: 'none', width: 72, fontSize: 'var(--text-xs)', color: isToday ? 'var(--portal-accent)' : 'var(--portal-muted)', fontWeight: isToday ? 700 : 400 }}>
-                    {isToday ? t('今天', 'Today') : `${d.getMonth() + 1}/${d.getDate()}`}
-                  </span>
-                  {MEAL_SLOTS.map((slot) => (
-                    <button key={slot} type="button" style={{ ...chip, flex: 1 }}
-                      onClick={() => { setMealPlan(date, slot, scheduling); setScheduling(null); }}>
-                      {t(MEAL_SLOT_LABEL[slot].zh, MEAL_SLOT_LABEL[slot].en)}
-                    </button>
-                  ))}
-                </div>
-              );
-            })}
-            <button type="button" style={ghostBtn} onClick={() => setScheduling(null)}>{t('稍后', 'Later')}</button>
-          </div>
-        </NesioSheet>
-      )}
     </>
   );
 }
@@ -1380,6 +1380,7 @@ function PlanBody({ recipes, pantryNames, onError, onEdit, t }: {
   const [msg, setMsg] = useState('');
   const [saved, setSaved] = useState(false);
   const [tick, setTick] = useState(0);
+  const [weekAnchor, setWeekAnchor] = useState(() => new Date());
   const dict = t('zh', 'en');
   const days = dict === 'zh' ? WEEK_DAYS : WEEK_DAYS_EN;
 
@@ -1389,7 +1390,7 @@ function PlanBody({ recipes, pantryNames, onError, onEdit, t }: {
     return () => window.removeEventListener(MEAL_CALENDAR_EVENT, h);
   }, []);
 
-  const dates = useMemo(() => upcomingDayKeys(CAL_DAYS), []);
+  const dates = useMemo(() => dayKeysFrom(weekAnchor, CAL_DAYS), [weekAnchor]);
   // tick 是刻意的依赖:日历是同步读快照,靠上面的事件通知重读。
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const cal = useMemo(() => dates.map((d) => ({ date: d, plan: getDayPlan(d) })), [dates, tick]);
@@ -1419,8 +1420,18 @@ function PlanBody({ recipes, pantryNames, onError, onEdit, t }: {
   }
 
   const todayKey = dayKey(new Date());
+  const weekLabel = (() => {
+    const a = new Date(`${dates[0]}T00:00:00`);
+    const b = new Date(`${dates[dates.length - 1]}T00:00:00`);
+    return `${a.getMonth() + 1}/${a.getDate()} – ${b.getMonth() + 1}/${b.getDate()}`;
+  })();
   return (
     <>
+      <div className="nesio-fin-monthbar" style={{ marginBottom: 'var(--space-2)' }}>
+        <button type="button" className="nesio-fin-monthnav" onClick={() => setWeekAnchor((p) => new Date(p.getFullYear(), p.getMonth(), p.getDate() - 7))} aria-label={t('上一周', 'Previous week')}>‹</button>
+        <span className="nesio-fin-month">{weekLabel}</span>
+        <button type="button" className="nesio-fin-monthnav" onClick={() => setWeekAnchor((p) => new Date(p.getFullYear(), p.getMonth(), p.getDate() + 7))} aria-label={t('下一周', 'Next week')}>›</button>
+      </div>
       <div style={{ ...card, padding: 0, overflow: 'hidden' }}>
         {cal.map(({ date, plan }, i) => {
           const d = new Date(`${date}T00:00:00`);
@@ -1434,14 +1445,14 @@ function PlanBody({ recipes, pantryNames, onError, onEdit, t }: {
               <div style={{ fontSize: 'var(--text-xs)', fontWeight: 700, color: isToday ? 'var(--portal-accent)' : 'var(--portal-muted)', marginBottom: 'var(--space-2)' }}>
                 {isToday ? t('今天', 'Today') : `${days[d.getDay()]} ${d.getMonth() + 1}/${d.getDate()}`}
               </div>
-              <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 'var(--space-2)' }}>
                 {MEAL_SLOTS.map((slot) => {
                   const dish = plan[slot];
                   return (
                     <button key={slot} type="button" onClick={() => onEdit(date, slot)}
                       aria-label={t(`${MEAL_SLOT_LABEL[slot].zh}餐 · ${dish || '还没排'}`, `${MEAL_SLOT_LABEL[slot].en} · ${dish || 'not planned'}`)}
                       style={{
-                        flex: 1, minWidth: 0, textAlign: 'left', cursor: 'pointer', fontFamily: 'var(--font-sans)',
+                        flex: '1 1 40%', minWidth: 64, textAlign: 'left', cursor: 'pointer', fontFamily: 'var(--font-sans)',
                         padding: 'var(--space-2)', borderRadius: 'var(--radius-sm)', border: divider,
                         background: dish ? 'var(--glass-bg-solid)' : 'transparent',
                       }}>

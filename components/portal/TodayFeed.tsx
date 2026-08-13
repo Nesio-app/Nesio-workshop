@@ -88,6 +88,23 @@ export default function TodayFeed({
     dismissedCardIds, setDismissedCardIds,
   } = useTodayData(canUsePrivateData);
   const [guideDetailNode, setGuideDetailNode] = useState<LiveMemoryNode | null>(null); // 批次 83:引导卡点开详情
+  // 系统通知点进来 / 回前台启发式 → 打开对应记忆详情
+  useEffect(() => {
+    const open = (e: Event) => {
+      const id = String((e as CustomEvent).detail?.id || '').trim();
+      if (!id) return;
+      const live = getLiveMemoryNode(id);
+      if (!live) return;
+      void import('@/lib/portal/surface-notifications').then((m) => m.dismissFocusNotification(id)).catch(() => {});
+      setGuideDetailNode(live);
+    };
+    window.addEventListener('nesio-open-memory-node', open);
+    window.addEventListener('nesio-open-notify-target', open);
+    return () => {
+      window.removeEventListener('nesio-open-memory-node', open);
+      window.removeEventListener('nesio-open-notify-target', open);
+    };
+  }, []);
   // 云端往本机填过数据时的一次性回执(QA:积分 0→150 像被人乱改)。读一次即清。
   const [restoreNote, setRestoreNote] = useState<string | null>(null);
   // 批次 31:焦点下方快捷输入(用户新指令)

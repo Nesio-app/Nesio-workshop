@@ -23,7 +23,7 @@ import {
 import { isTxShadow } from '@/lib/portal/tx-node';
 import { rankRelatedNodes } from '@/lib/portal/related-nodes';
 import { visibleMemoryNodes, isWeatherNode } from '@/lib/portal/memory-visibility';
-import { memoryEventAt, collectCreatedAtBackfillPatches } from '@/lib/portal/memory-event-at';
+import { memoryEventAt, formatMemoryDayLabel, collectCreatedAtBackfillPatches } from '@/lib/portal/memory-event-at';
 
 /** 展示层去重:同一 externalId / flomoSlug 只留第一条(搜索/列表都走这里)。 */
 function collapseDuplicateNodes(list: readonly LifeNode[]): LifeNode[] {
@@ -687,17 +687,9 @@ function MemoryCard({ node, onOpen, onDeleted, onLongPress }: { node: LifeNode; 
         <span className="nesio-memory-card-source">{srcMeta.icon}{srcMeta.label}</span>
         {uncertain && <span className="nesio-memory-card-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
         {(() => {
-          // 图2:时间线按源创建/事件日。今天/昨天仍用相对词;更早显示具体月日(不藏成「N 天前」)。
+          // 图2:时间线按源创建/事件日。今天/昨天仅限「当天」;未来事件写具体月日(勿标成今天)。
           const t = memoryEventAt(node);
-          const dayStart = new Date(); dayStart.setHours(0, 0, 0, 0);
-          const label = t >= dayStart
-            ? L(dict, '今天', 'Today')
-            : t >= new Date(dayStart.getTime() - 86_400_000)
-              ? L(dict, '昨天', 'Yesterday')
-              : dict === 'en'
-                ? t.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                : `${t.getMonth() + 1}月${t.getDate()}日`;
-          return <span className="nesio-memory-card-time">{label}</span>;
+          return <span className="nesio-memory-card-time">{formatMemoryDayLabel(t, dict === 'en' ? 'en' : 'zh')}</span>;
         })()}
       </span>
     </button>

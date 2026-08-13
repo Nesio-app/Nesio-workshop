@@ -500,9 +500,13 @@ function TxEditPanel({ txId, txAmount, flow, dict, onFlow, contacts, trips, memo
             ))}
           </select>
         )}
-        <input className="nesio-fin-input" value={detailOpts.some((d) => d.id === detailDraft) ? customDetail : (detailDraft || customDetail)}
+        <input className="nesio-fin-input" value={detailOpts.some((d) => d.id === detailDraft) ? customDetail : (categoryDetailLabel(detailDraft, dict) || (/_OTHER_/.test(detailDraft) ? L(dict, '其他', 'Other') : '') || customDetail || detailDraft)}
           placeholder={L(dict, '自定义子分类(例:物业费)', 'Custom subcategory (e.g. HOA)')}
           onChange={(e) => setCustomDetail(e.target.value)}
+          onFocus={() => {
+            // 编辑时露出真实值(若当前只是友好名 /「其他」占位)
+            if (/_OTHER_/.test(detailDraft) || categoryDetailLabel(detailDraft, dict)) setCustomDetail(detailDraft);
+          }}
           onBlur={() => {
             const v = customDetail.trim();
             if (v !== detailDraft) saveCategory(catDraft || curCat, v);

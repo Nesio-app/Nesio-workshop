@@ -38,6 +38,34 @@ export function memoryEventAt(node: LifeNode): Date {
   return Number.isNaN(fallback.getTime()) ? new Date(0) : fallback;
 }
 
+/**
+ * 卡片/详情用的相对日标签。
+ * 旧逻辑 `t >= dayStart → 今天` 会把**未来**事件(Halloween/夏令时)也标成今天 ——
+ * 必须卡在「今天结束之前」。
+ */
+export function formatMemoryDayLabel(
+  t: Date,
+  dict: 'zh' | 'en',
+  opts: { withTime?: boolean } = {},
+): string {
+  const dayStart = new Date();
+  dayStart.setHours(0, 0, 0, 0);
+  const dayEnd = dayStart.getTime() + 86_400_000;
+  const time = opts.withTime
+    ? ` ${t.toLocaleTimeString(dict === 'en' ? 'en-US' : 'zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false })}`
+    : '';
+  if (t.getTime() >= dayStart.getTime() && t.getTime() < dayEnd) {
+    return dict === 'en' ? `Today${time}` : `今天${time}`;
+  }
+  if (t.getTime() >= dayStart.getTime() - 86_400_000 && t.getTime() < dayStart.getTime()) {
+    return dict === 'en' ? `Yesterday${time}` : `昨天${time}`;
+  }
+  const day = dict === 'en'
+    ? t.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    : `${t.getMonth() + 1}月${t.getDate()}日`;
+  return `${day}${time}`;
+}
+
 /** ISO 字符串形式(便于排序比较 / 写回 createdAt)。 */
 export function memoryEventAtIso(node: LifeNode): string {
   return memoryEventAt(node).toISOString();

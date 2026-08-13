@@ -101,6 +101,19 @@
   改走 `checkLocalNotifyDisplay`。并把时间线日程、焦点到期、日报、周月回顾默认接入
   系统通知(设置里可关);`nesio-surface-notify-state-v1` 为 cache。
 
+- **2026-08-13 Google Drive 备份卡死「正在备份…」**:根因是带图整包过大/主线程卡死且无超时,
+  busy 永不收口。改:Drive 默认不带照片 + gzip 过 Vercel 体上限 + 90s 超时;403 报缺
+  `drive.appdata` 并引导重连;选 Google 云时跳过 Nesio 整包自动推拉;危险区加「清空
+  Nesio 云(保留本机与登录)」(`CLEAR_NESIO_CLOUD_KEEP_ACCOUNT`)。
+
+- **2026-08-13 截图批(通知/物品/财务关联/用药/食谱/日历日/财产/足迹)**:
+  ① 到期提醒刷屏:focus key 曾含漂移的 `now+90s` wallClock → 回前台每排一条;改稳定
+  key + 过期/已点 dismiss + 回前台启发式开详情。② 亚马逊列表 filter/sort。③ dishes
+  不露 JSON、可点进菜谱。④ 财务↔人进列表不进星图;财务↔财产修负金额过滤并列出流水。
+  ⑤ 用药月历改 7 列网格、点日打卡。⑥ 排菜重叠改整页替换;周历可左右翻 + 加餐。
+  ⑦ 记忆卡「今天」不含未来事件。⑧ 足迹坐标非 Tesla(车位故意不进足迹);同地合并/
+  改名已持久;通勤为 walk/drive/move;地点页已有甜甜圈。
+
 ## 进行中的迁移
 
 1. **Signal 主事实表**:两扇合法写入门 — `createSignal()`(Signal 形态)与

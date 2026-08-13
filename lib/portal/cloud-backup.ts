@@ -462,7 +462,18 @@ function scheduleAutoPush(skipIfFewerThan = 0): void {
  * 登录后 / 回前台调一次:先把云端最新备份 merge 回本机(补缺、不覆盖),拉完再防抖上云。
  * @param opts.force 跳过 20s 节流(手动「立即同步」用)。
  */
+/** 用户选了 Google Drive 作备份目的地时,跳过 Nesio 云自动整包推拉 —— 避免「只用 Google」仍被云端盖回来。 */
+function prefersDriveBackupDest(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem('nesio-backup-dest') === 'drive';
+  } catch {
+    return false;
+  }
+}
+
 export async function autoSyncBackupWithCloud(opts: { force?: boolean } = {}): Promise<void> {
+  if (prefersDriveBackupDest()) return;
   if (typeof window === 'undefined') return;
   if (!hasCloudEntitlement()) return;
   const now = Date.now();

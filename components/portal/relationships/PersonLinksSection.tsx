@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { personHealthItems, type PersonHealthItem } from '@/lib/health/person-health';
 import { listFamilies, listFamilyMembers, getBoard, type ChoreInstanceView } from '@/lib/family/family-client';
 import { normalizeEmail } from '@/lib/portal/relationships';
+import { findPersonNode, txNodesOfPerson } from '@/lib/portal/tx-graph-bridge';
 import { IconLock } from '../icons';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
@@ -53,17 +54,43 @@ export default function PersonLinksSection({ personKey, email }: { personKey: st
   const [showAllHealth, setShowAllHealth] = useState(false);
   const [openHealth, setOpenHealth] = useState(true);
   const [openChore, setOpenChore] = useState(true);
+  const [openSpend, setOpenSpend] = useState(true);
+  const [spendTick, setSpendTick] = useState(0);
 
   useEffect(() => {
-    const rebuild = () => setHealth(personHealthItems(personKey));
+    const rebuild = () => { setHealth(personHealthItems(personKey)); setSpendTick((n) => n + 1); };
     rebuild();
     window.addEventListener('nesio-person-records-updated', rebuild);
     window.addEventListener('nesio-life-graph-updated', rebuild);
+    window.addEventListener('nesio-tx-annotations-updated', rebuild);
     return () => {
       window.removeEventListener('nesio-person-records-updated', rebuild);
       window.removeEventListener('nesio-life-graph-updated', rebuild);
+      window.removeEventListener('nesio-tx-annotations-updated', rebuild);
     };
   }, [personKey]);
+
+  const spendRows = (() => {
+    void spendTick;
+    try {
+      const person = findPersonNode(personKey);
+      if (!person) return [];
+      return txNodesOfPerson(person.id)
+        .map((n) => {
+          const amt = typeof n.attributes?.amount === 'number' ? n.attributes.amount
+            : typeof n.attributes?.amount === 'string' ? Number(n.attributes.amount) : NaN;
+          const date = typeof n.attributes?.date === 'string' ? n.attributes.date
+            : (n.createdAt || '').slice(0, 10);
+          return {
+            id: n.id,
+            title: n.name || t('一笔流水', 'A transaction'),
+            amount: Number.isFinite(amt) ? amt : null,
+            date,
+          };
+        })
+        .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    } catch { return []; }
+  })();
 
   const loadChores = useCallback(async () => {
     setChore({ s: 'loading' });
@@ -102,6 +129,34 @@ export default function PersonLinksSection({ personKey, email }: { personKey: st
 
   return (
     <>
+      {/* ── 消费(财务关联,列表不进黑色星图) ───────────────────────── */}
+      <div className="nesio-rel-cat" style={{ marginTop: 'var(--space-4)' }}>
+        <button type="button" className="nesio-rel-cat-head" onClick={() => setOpenSpend((v) => !v)} aria-expanded={openSpend}>
+          <span className="nesio-rel-cat-title">
+            {openSpend ? '▾' : '▸'} {t('消费', 'Spending')}{spendRows.length ? ` · ${spendRows.length}` : ''}
+          </span>
+        </button>
+        {openSpend && (spendRows.length > 0 ? (
+          <div className="nesio-rel-rec-list nesio-rel-rec-list--nested">
+            {spendRows.slice(0, MAX_ROWS).map((s) => (
+              <div key={s.id} className="nesio-rel-rec-row">
+                <div className="nesio-rel-rec-main">
+                  <span className="nesio-rel-rec-title">{s.title}</span>
+                  <span className="nesio-rel-rec-sub">
+                    {[fmtDate(s.date, dict), s.amount != null ? `$${Math.abs(s.amount).toFixed(2)}` : '']
+                      .filter(Boolean).join(' · ')}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-1) 0 0' }}>
+            {t('还没有关联到 TA 的流水 —— 在财务里选「关联人」即可。', 'No linked transactions yet — pick them under Finance → Link a person.')}
+          </p>
+        ))}
+      </div>
+
       {/* ── 健康 ─────────────────────────────────────────────── */}
       <div className="nesio-rel-cat" style={{ marginTop: 'var(--space-4)' }}>
         <button type="button" className="nesio-rel-cat-head" onClick={() => setOpenHealth((v) => !v)} aria-expanded={openHealth}>

@@ -91,7 +91,12 @@ export function planTimelineNotifications(
   return out.slice(0, max);
 }
 
-/** 今天焦点 / 到期：dueDate 或 focusPinnedOn=今天，且尚未完成。 */
+/** 今天焦点 / 到期：dueDate 或 focusPinnedOn=今天，且尚未完成。
+ *
+ * 红线:不要用「now+90s」当 key 的一部分 —— App 每次回前台重排都会换新 afterSec,
+ * wallClock(at) 跟着变 → 同一条待办一天被排十几次(真机「到期提醒」刷屏的根因)。
+ * key 按「节点 + 到期日」稳定;同一天只补一次 catch-up。
+ */
 export function planFocusDueNotifications(
   nodes: readonly LifeNode[],
   now: Date = new Date(),
@@ -102,31 +107,70 @@ export function planFocusDueNotifications(
   const out: PlannedNotification[] = [];
   for (const n of nodes) {
     if (isDone(n)) continue;
+    // 用户点过/关掉的到期提醒 —— 当天内不再排。
+    if (isFocusDismissed(n.id, today)) continue;
     const pinned = n.attributes?.focusPinnedOn === today;
     const due = pickDate(n.attributes as Record<string, unknown>, ['dueDate', 'deadline', 'due', 'end']);
     if (!pinned && !due) continue;
+
+    // 过期且不是今天 → 不再响(过期的就不该再出现)。
+    if (due && dayKey(due) < today && !pinned) continue;
+
     let at: Date;
+    let keyDay = today;
     if (due && due.getTime() > now.getTime() && due.getTime() <= horizon) {
       at = due;
+      keyDay = dayKey(due);
     } else if (pinned) {
-      // 钉在今天、没有更具体时刻 → 当天 10:00；已过则 90 秒后补一次。
       at = new Date(`${today}T10:00:00`);
-      if (at.getTime() <= now.getTime()) at = new Date(now.getTime() + 90_000);
-    } else if (due && due.getTime() <= now.getTime() && dayKey(due) === today) {
-      at = new Date(now.getTime() + 90_000);
+      if (at.getTime() <= now.getTime()) {
+        // 已过 10:00:只排一次补响(固定到 10:05,别跟 now 漂移)
+        at = new Date(`${today}T10:05:00`);
+        if (at.getTime() <= now.getTime()) continue; // 过了补响窗就不再刷
+      }
+    } else if (due && dayKey(due) === today && due.getTime() <= now.getTime()) {
+      // 今天到期但时刻已过:当天 固定补响一次,不跟 now 漂移
+      at = new Date(`${today}T10:05:00`);
+      if (at.getTime() <= now.getTime()) at = new Date(`${today}T18:00:00`);
+      if (at.getTime() <= now.getTime()) continue;
+      keyDay = today;
     } else {
       continue;
     }
     const title = (n.name || '').trim() || '今天待办';
     out.push({
-      key: `focus:${n.id}:${wallClock(at)}`,
+      key: `focus:${n.id}:${keyDay}`,
       title,
       body: pinned ? '钉在今天的事 —— 打开看看。' : '到期提醒。',
       at,
+      deepLink: { kind: 'memory', id: n.id },
     });
   }
   out.sort((a, b) => a.at.getTime() - b.at.getTime());
   return out.slice(0, max);
+}
+
+const FOCUS_DISMISS_KEY = 'nesio-focus-notify-dismissed-v1';
+
+function isFocusDismissed(nodeId: string, day: string): boolean {
+  if (typeof localStorage === 'undefined') return false;
+  try {
+    const raw = JSON.parse(localStorage.getItem(FOCUS_DISMISS_KEY) || '{}') as Record<string, string>;
+    return raw[nodeId] === day;
+  } catch { return false; }
+}
+
+/** 用户点过这条到期提醒 / 打开详情 → 当天不再排。 */
+export function dismissFocusNotification(nodeId: string, day = dayKey()): void {
+  if (typeof localStorage === 'undefined') return;
+  try {
+    const raw = JSON.parse(localStorage.getItem(FOCUS_DISMISS_KEY) || '{}') as Record<string, string>;
+    raw[nodeId] = day;
+    // 只留近 14 天,避免簿记无限涨
+    const cut = dayKey(new Date(Date.now() - 14 * 86_400_000));
+    for (const [k, d] of Object.entries(raw)) if (d < cut) delete raw[k];
+    localStorage.setItem(FOCUS_DISMISS_KEY, JSON.stringify(raw));
+  } catch { /* quota */ }
 }
 
 /** 日报：当天 08:05 提醒「日报好了」（开关开着才排）。 */
@@ -213,6 +257,9 @@ export async function syncSurfaceNotifications(
     const r = await tombstoneScheduled(key);
     if (r.ok) retired += 1;
   }
+  // 深链登记:点通知 / 回前台启发式打开详情用。
+  const { rememberNotifyDeepLinks } = await import('./notify-deep-link');
+  rememberNotifyDeepLinks(planned);
   for (const p of planned) {
     const r = await scheduleLocalAt({ key: p.key, title: p.title, body: p.body, at: p.at, now });
     if (r.ok) scheduled += 1;

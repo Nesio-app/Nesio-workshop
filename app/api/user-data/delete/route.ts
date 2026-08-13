@@ -356,7 +356,10 @@ async function buildCloudUserDataDeleteResponse({
   let telemetryDeletedCount = 0;
   let authUserDeleted = false;
 
-  const hasProductDataConfirmation = confirmation === 'DELETE_CLOUD_PRODUCT_DATA';
+  // CLEAR_NESIO_CLOUD_KEEP_ACCOUNT:只清 Nesio 云表+对象存储,保留登录账号(给「只用 Google Drive 备份」)。
+  // DELETE_CLOUD_PRODUCT_DATA:完整账号删除(含 auth.users)。
+  const keepAccount = confirmation === 'CLEAR_NESIO_CLOUD_KEEP_ACCOUNT';
+  const hasProductDataConfirmation = confirmation === 'DELETE_CLOUD_PRODUCT_DATA' || keepAccount;
 
   if (!dryRun && !hasProductDataConfirmation) {
     logCloudRuntimeAudit('cloud_runtime_failure', {
@@ -452,11 +455,13 @@ async function buildCloudUserDataDeleteResponse({
     for (const table of CLOUD_PRODUCT_DATA_TABLES) {
       await deleteCloudRows(config, table, cloudIdentity.identityKey);
     }
-    telemetryDeletedCount = await deleteTelemetryForDevices(config, deviceIds);
-    // 账号本体:仅 supabase 真实 userId 可删;wechat/external 无 auth.users 行。
-    authUserDeleted = cloudIdentity.provider === 'supabase' && cloudIdentity.userId
-      ? await deleteAuthUser(config, cloudIdentity.userId)
-      : false;
+    if (!keepAccount) {
+      telemetryDeletedCount = await deleteTelemetryForDevices(config, deviceIds);
+      // 账号本体:仅 supabase 真实 userId 可删;wechat/external 无 auth.users 行。
+      authUserDeleted = cloudIdentity.provider === 'supabase' && cloudIdentity.userId
+        ? await deleteAuthUser(config, cloudIdentity.userId)
+        : false;
+    }
   }
   logCloudRuntimeAudit('cloud_runtime_success', {
     auditId,
@@ -480,7 +485,8 @@ async function buildCloudUserDataDeleteResponse({
     cloudDeleteExecution: {
       writesCloud: true,
       deletesCloudStorage: true,
-      confirmationRequired: 'DELETE_CLOUD_PRODUCT_DATA',
+      confirmationRequired: keepAccount ? 'CLEAR_NESIO_CLOUD_KEEP_ACCOUNT' : 'DELETE_CLOUD_PRODUCT_DATA',
+      keepAccount,
     },
     profile: {
       profileId: cloudIdentity.identityKey,

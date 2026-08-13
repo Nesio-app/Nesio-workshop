@@ -1,45 +1,143 @@
 /**
- * 免费云备份客户端(Google Drive appDataFolder)——免费最大化·Google 扩展授权。
+ * 免费云备份客户端(Google Drive appDataFolder)。
  *
- * 复用现有 buildCombinedBackup / restoreCombinedBackup 的备份载荷机器,后端换成
- * 用户自己的 Google Drive(免费),不走付费 entitlement。设计红线:失败必可见
- * (调用方据返回的 error 展示,不静默)。
+ * 设计红线:失败必可见;按钮不得永久停在「正在备份…」。
+ * 体积:Vercel 请求体硬上限 ~4.5MB —— 默认**不带照片/附件**(与 Nesio 云 push 同口径),
+ * 否则本机打包或上传会挂死。照片请用「导出完整备份」带走。
  */
+import { gzip, strToU8 } from 'fflate';
 import { buildCombinedBackup, restoreCombinedBackup, type RestoreMode, type CombinedRestoreResult } from './cloud-backup';
 
 const DRIVE_BACKUP_AT_KEY = 'nesio-drive-backup-at';
+/** Vercel 函数体约 4.5MB;gzip 后预检留余量。 */
+const DRIVE_UPLOAD_LIMIT = 3.8 * 1024 * 1024;
+const UPLOAD_TIMEOUT_MS = 90_000;
 
-export type DriveBackupError = 'not_connected' | 'network' | 'drive' | 'no_backup';
-export interface DriveBackupResult { ok: boolean; at?: string; error?: DriveBackupError }
+export type DriveBackupError =
+  | 'not_connected'
+  | 'insufficient_scope'
+  | 'network'
+  | 'drive'
+  | 'no_backup'
+  | 'too_large'
+  | 'build_failed'
+  | 'timeout';
 
-/** 把本机全部 durable 数据打包推到用户 Google Drive 的 appDataFolder。 */
-export async function pushBackupToDrive(): Promise<DriveBackupResult> {
-  let backup;
-  // Drive 是全量离机备份,带上照片(Drive 容量大;隐私:备份要完整)。
-  try { backup = await buildCombinedBackup({ includeImages: true }); } catch { return { ok: false, error: 'network' }; }
-  try {
-    const res = await fetch('/api/portal/drive', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ backup }),
-    });
-    if (res.status === 401) return { ok: false, error: 'not_connected' };
-    const data = await res.json().catch(() => null) as { ok?: boolean; at?: string } | null;
-    if (!res.ok || !data?.ok) return { ok: false, error: 'drive' };
-    try { localStorage.setItem(DRIVE_BACKUP_AT_KEY, data.at || new Date().toISOString()); } catch { /* quota */ }
-    return { ok: true, at: data.at };
-  } catch { return { ok: false, error: 'network' }; }
+export interface DriveBackupResult {
+  ok: boolean;
+  at?: string;
+  error?: DriveBackupError;
+  connectUrl?: string;
+  bytes?: number;
 }
 
-/** 从 Drive 拉回备份并合并/覆盖回本机(默认 merge:仅补缺不覆盖)。 */
+function timeoutSignal(): AbortSignal | undefined {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return AbortSignal.timeout(UPLOAD_TIMEOUT_MS);
+  }
+  return undefined;
+}
+
+function bytesToB64(bytes: Uint8Array): string {
+  const chunk = 0x8000;
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
+}
+
+function gzipAsync(u8: Uint8Array): Promise<Uint8Array> {
+  return new Promise((resolve, reject) => gzip(u8, (err, out) => (err ? reject(err) : resolve(out))));
+}
+
+async function gzipJson(obj: unknown): Promise<Uint8Array | null> {
+  try {
+    return await gzipAsync(strToU8(JSON.stringify(obj)));
+  } catch {
+    return null;
+  }
+}
+
+/** 把本机 durable 数据打包推到用户 Google Drive appDataFolder。 */
+export async function pushBackupToDrive(opts: { includeImages?: boolean } = {}): Promise<DriveBackupResult> {
+  let backup;
+  try {
+    // 默认不带图:带图极易超 4.5MB / 在手机上 stringify 卡死 → 按钮永远「正在备份…」。
+    backup = await buildCombinedBackup({ includeImages: Boolean(opts.includeImages) });
+  } catch {
+    return { ok: false, error: 'build_failed' };
+  }
+
+  const gz = await gzipJson(backup);
+  const bodyObj = gz
+    ? { gzipBase64: bytesToB64(gz) }
+    : { backup };
+  const body = JSON.stringify(bodyObj);
+  const bytes = new Blob([body]).size;
+  if (bytes > DRIVE_UPLOAD_LIMIT) {
+    return { ok: false, error: 'too_large', bytes };
+  }
+
+  try {
+    const signal = timeoutSignal();
+    const res = await fetch('/api/portal/drive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      cache: 'no-store',
+      ...(signal ? { signal } : {}),
+    });
+    const data = await res.json().catch(() => null) as {
+      ok?: boolean; at?: string; error?: string; connectUrl?: string;
+    } | null;
+    if (res.status === 401 || data?.error === 'not_connected') {
+      return { ok: false, error: 'not_connected', connectUrl: data?.connectUrl || '/api/portal/gmail/connect' };
+    }
+    if (res.status === 403 || data?.error === 'insufficient_scope') {
+      return { ok: false, error: 'insufficient_scope', connectUrl: data?.connectUrl || '/api/portal/gmail/connect' };
+    }
+    if (res.status === 413 || data?.error === 'too_large') {
+      return { ok: false, error: 'too_large', bytes };
+    }
+    if (!res.ok || !data?.ok) return { ok: false, error: 'drive', bytes };
+    const at = data.at || new Date().toISOString();
+    try { localStorage.setItem(DRIVE_BACKUP_AT_KEY, at); } catch { /* quota */ }
+    return { ok: true, at, bytes };
+  } catch (err) {
+    const name = err instanceof Error ? err.name : '';
+    if (name === 'TimeoutError' || name === 'AbortError') return { ok: false, error: 'timeout', bytes };
+    return { ok: false, error: 'network', bytes };
+  }
+}
+
+/** 从 Drive 拉回备份并合并回本机(默认 merge)。 */
 export async function pullBackupFromDrive(mode: RestoreMode = 'merge'): Promise<DriveBackupResult & { restore?: CombinedRestoreResult }> {
   try {
-    const res = await fetch('/api/portal/drive', { method: 'GET' });
-    if (res.status === 401) return { ok: false, error: 'not_connected' };
-    const data = await res.json().catch(() => null) as { ok?: boolean; backup?: unknown } | null;
+    const signal = timeoutSignal();
+    const res = await fetch('/api/portal/drive', {
+      method: 'GET',
+      cache: 'no-store',
+      ...(signal ? { signal } : {}),
+    });
+    const data = await res.json().catch(() => null) as {
+      ok?: boolean; backup?: unknown; error?: string; connectUrl?: string;
+    } | null;
+    if (res.status === 401 || data?.error === 'not_connected') {
+      return { ok: false, error: 'not_connected', connectUrl: data?.connectUrl || '/api/portal/gmail/connect' };
+    }
+    if (res.status === 403 || data?.error === 'insufficient_scope') {
+      return { ok: false, error: 'insufficient_scope', connectUrl: data?.connectUrl || '/api/portal/gmail/connect' };
+    }
     if (!res.ok || !data?.ok) return { ok: false, error: 'drive' };
     if (!data.backup) return { ok: false, error: 'no_backup' };
     const restore = await restoreCombinedBackup(data.backup as Parameters<typeof restoreCombinedBackup>[0], mode);
     return { ok: true, restore };
-  } catch { return { ok: false, error: 'network' }; }
+  } catch (err) {
+    const name = err instanceof Error ? err.name : '';
+    if (name === 'TimeoutError' || name === 'AbortError') return { ok: false, error: 'timeout' };
+    return { ok: false, error: 'network' };
+  }
 }
 
 export function lastDriveBackupAt(): string | null {

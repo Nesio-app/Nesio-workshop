@@ -473,13 +473,28 @@ export default function Portal() {
       }, 600);
     };
     sync();
-    const onVisible = () => { if (document.visibilityState === 'visible') sync(); };
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      sync();
+      // 点系统通知后 App 回前台 → 尝试打开刚响过的那条详情
+      void import('@/lib/portal/notify-deep-link').then((m) => {
+        m.tryOpenRecentNotifyTarget();
+      }).catch(() => {});
+    };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('nesio-schedule-reminders-updated', sync);
     window.addEventListener('nesio-notify-prefs-updated', sync);
     window.addEventListener('nesio-family-board-updated', sync);
     window.addEventListener('nesio-tesla-snapshot-updated', sync);
     window.addEventListener('nesio-life-graph-updated', sync);
+    const onNotifyOpen = (e: Event) => {
+      const id = String((e as CustomEvent).detail?.id || '');
+      if (!id) return;
+      try {
+        window.dispatchEvent(new CustomEvent('nesio-open-memory-node', { detail: { id } }));
+      } catch { /* ignore */ }
+    };
+    window.addEventListener('nesio-open-notify-target', onNotifyOpen);
     return () => {
       stop = true;
       if (timer) clearTimeout(timer);
@@ -489,6 +504,7 @@ export default function Portal() {
       window.removeEventListener('nesio-family-board-updated', sync);
       window.removeEventListener('nesio-tesla-snapshot-updated', sync);
       window.removeEventListener('nesio-life-graph-updated', sync);
+      window.removeEventListener('nesio-open-notify-target', onNotifyOpen);
     };
   }, []);
   // 批次 85:懒加载 chunk 跨部署失效的全局兜底(错误页之外的路径,
@@ -644,6 +660,7 @@ export default function Portal() {
   const [familyOpen, setFamilyOpen] = useState(false);
   const [teslaOpen, setTeslaOpen] = useState(false);
   const [cookingOpen, setCookingOpen] = useState(false);
+  const [cookingRecipeName, setCookingRecipeName] = useState<string | undefined>(undefined);
   const [pantryIntake, setPantryIntake] = useState(false);   // 做饭页「拍一拍进货」:复用相机、拍的当食材落库
   // 「一个相机、多种模式」:记一餐/衣帽间带模式调起主相机;拍完经 capture-pipeline 交接匣回到来源 sheet。
   const [modeCamera, setModeCamera] = useState<ModeCameraMode | null>(null);
@@ -1108,7 +1125,15 @@ export default function Portal() {
     const calendarCreateHandler = () => { track('calendar_create_open'); setCalendarCreateOpen(true); };
     const familyHandler = () => { track('family_sharing_open'); setFamilyOpen(true); };
     const teslaHandler = () => { track('tesla_open'); setTeslaOpen(true); };
-    const cookingHandler = () => { track('cooking_open'); setCookingOpen(true); };
+    const cookingHandler = () => { track('cooking_open'); setCookingRecipeName(undefined); setCookingOpen(true); };
+    const cookingRecipeHandler = (e: Event) => {
+      const name = String((e as CustomEvent).detail?.name || '').trim();
+      if (!name) return;
+      track('cooking_open_recipe');
+      setInsightsOpen(false);
+      setCookingRecipeName(name);
+      setCookingOpen(true);
+    };
     // 做饭页「拍一拍进货」:做饭页先原生拍照拿到 File(detail.file)→ 关做饭 → 用文件走已验证的相机识别路径
     // (进货模式,拍到的打食材)。相机 z=400 在全屏 sheet 之下,故先关做饭;相机关后自动重开做饭。
     const cookingCameraHandler = (e: Event) => {
@@ -1214,6 +1239,7 @@ export default function Portal() {
     window.addEventListener('nesio-open-family', familyHandler);
     window.addEventListener('nesio-open-tesla', teslaHandler);
     window.addEventListener('nesio-open-cooking', cookingHandler);
+    window.addEventListener('nesio-open-cooking-recipe', cookingRecipeHandler);
     window.addEventListener('nesio-open-cooking-camera', cookingCameraHandler);
     window.addEventListener(OPEN_MODE_CAMERA_EVENT, modeCameraHandler);
     window.addEventListener('nesio-open-camera', openCameraHandler);
@@ -1236,6 +1262,7 @@ export default function Portal() {
       window.removeEventListener('nesio-open-family', familyHandler);
       window.removeEventListener('nesio-open-tesla', teslaHandler);
       window.removeEventListener('nesio-open-cooking', cookingHandler);
+      window.removeEventListener('nesio-open-cooking-recipe', cookingRecipeHandler);
       window.removeEventListener('nesio-open-cooking-camera', cookingCameraHandler);
       window.removeEventListener(OPEN_MODE_CAMERA_EVENT, modeCameraHandler);
       window.removeEventListener('nesio-open-camera', openCameraHandler);
@@ -1876,7 +1903,13 @@ export default function Portal() {
       {teslaMounted && (
         <TeslaSheet open={teslaOpen} onClose={() => setTeslaOpen(false)} />
       )}
-      {cookingOpen && <CookingSheet open={cookingOpen} onClose={() => setCookingOpen(false)} />}
+      {cookingOpen && (
+        <CookingSheet
+          open={cookingOpen}
+          onClose={() => { setCookingOpen(false); setCookingRecipeName(undefined); }}
+          initialRecipeName={cookingRecipeName}
+        />
+      )}
       {workoutSession && (
         // 错误边界(修「打开跟练 app 卡死」):跟练播放器一旦被畸形数据(如别端同步回的坏 workout)
         // 击中 throw,绝不能冒泡卸载整棵 Portal(=白屏/卡死);就地兜住、显示可截图的报错。

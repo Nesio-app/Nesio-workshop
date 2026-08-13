@@ -121,16 +121,20 @@ export function buildPersonProfile(
     egoNodes.push({ id, label, type, weight: 0.5, color: NODE_COLOR[type] ?? 'var(--portal-accent)' });
     egoEdges.push({ source: centerId, target: id, label: relation });
   };
-  // 这个人自己的 relations(person 节点上)
+  // 这个人自己的 relations(person 节点上)—— 财务流水不进黑色星图,改走列表。
   for (const r of personNode?.relations || []) {
     if (!r.targetId) continue;
+    if (r.relation === 'involves_person') continue;
     const t = nodes.find((n) => n.id === r.targetId) || nodes.find((n) => n.name?.trim().toLowerCase() === r.targetId.trim().toLowerCase());
+    if (t?.attributes?.txShadow) continue;
     pushNeighbor(t?.id || `rel:${r.targetId}`, t?.name || r.targetId, t ? graphNodeType(t) : 'person', r.relation);
   }
-  // 别的节点通过 relation 指向这个人 → 也是邻居(取对方节点)
+  // 别的节点通过 relation 指向这个人 → 也是邻居(取对方节点);流水影子跳过。
   for (const n of nodes) {
     if (n.id === personNode?.id) continue;
+    if (n.attributes?.txShadow) continue;
     for (const r of n.relations || []) {
+      if (r.relation === 'involves_person') continue;
       const tgt = (r.targetId || '').trim().toLowerCase();
       if (tgt === k || tgt === matchName) { pushNeighbor(n.id, n.name || '相关', graphNodeType(n), r.relation); break; }
     }

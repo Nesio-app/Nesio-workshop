@@ -197,17 +197,26 @@ function AssetCard({ asset, expenses, people, dict, open, onToggle, teslaVehicle
   const boundVehicle = teslaVehicles.find((v) => v.vehicleId === asset.teslaVehicleId) || null;
   const cur = assetCurrentValue(asset);
   // 双向:资产页费用 = 域内支出(assetId) ∪ 银行流水批注关联到此资产的笔。
+  // 银行支出金额常为负(如 -$70),不能用 amount > 0 过滤 —— 否则关联笔永远不进列表。
   const year = new Date().getFullYear();
   const anns = loadTxAnnotations();
-  const bankLinked = loadBankTx()
-    .filter((t) => txAnnotationOf(t.id, anns).assetId === asset.id && t.date.startsWith(String(year)) && t.amount > 0)
+  const bankTxRows = loadBankTx()
+    .filter((t) => txAnnotationOf(t.id, anns).assetId === asset.id && t.date.startsWith(String(year)) && t.amount !== 0)
     .map((t) => ({
-      assetId: asset.id,
-      assetCostKind: 'other' as const,
+      id: t.id,
+      merchant: t.merchant || t.name || t.id,
       amount: Math.abs(t.amount),
-      occurredAt: t.date,
-      kind: 'expense' as const,
+      date: t.date,
+      assetCostKind: 'other' as const,
     }));
+  const bankLinked = bankTxRows.map((t) => ({
+    assetId: asset.id,
+    assetCostKind: 'other' as const,
+    amount: t.amount,
+    occurredAt: t.date,
+    kind: 'expense' as const,
+  }));
+  const domainLinked = expenses.filter((e) => e.assetId === asset.id && e.kind !== 'income' && (e.occurredAt || '').startsWith(String(year)));
   const costs = assetHoldingCosts(asset.id, [...expenses, ...bankLinked]);
   const records = listCareRecords(asset.id);
   const due = upcomingCare(asset.id);
@@ -298,6 +307,34 @@ function AssetCard({ asset, expenses, people, dict, open, onToggle, teslaVehicle
 
           {/* ② 记录:税费 / 维修 / 维护 */}
           <CareSection assetId={asset.id} records={records} people={people} dict={dict} />
+
+          {/* ③ 关联财务流水 + 域内支出明细(双向读侧;合计之外必须能看见每一笔) */}
+          {(bankTxRows.length > 0 || domainLinked.length > 0) && (
+            <div style={{ marginTop: 'var(--space-3)' }}>
+              <p className="nesio-settings-section-label" style={{ margin: '0 0 var(--space-2)' }}>
+                {L(dict, '关联花费', 'Linked spending')}
+              </p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-1)' }}>
+                {bankTxRows.map((t) => (
+                  <div key={t.id} className="nesio-assets-anchor" style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {t.date.slice(5)} · {t.merchant}
+                      <span style={{ color: 'var(--portal-muted)', marginLeft: 6 }}>{L(dict, '银行', 'Bank')}</span>
+                    </span>
+                    <span style={{ flexShrink: 0 }}>{money(t.amount)}</span>
+                  </div>
+                ))}
+                {domainLinked.map((e) => (
+                  <div key={e.id || `${e.occurredAt}-${e.amount}`} className="nesio-assets-anchor" style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {(e.occurredAt || '').slice(5)} · {e.note || e.merchant || e.assetCostKind || L(dict, '支出', 'Expense')}
+                    </span>
+                    <span style={{ flexShrink: 0 }}>{money(Math.abs(e.amount))}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {costs.total > 0 && (
             <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-3)' }}>
