@@ -58,6 +58,8 @@ const ALLOWLIST = new Map([
   ['components/portal/fitness/WorkoutPlayer.tsx', 2],
   ['components/portal/insights/MirrorLetterTab.tsx', 1],
   ['components/portal/insights/TimelineTab.tsx', 4],
+  // 试穿大图 lightbox:全屏手势缩放预览,暂不迁 NesioSheet(与 Camera 同类豁免)。
+  ['components/portal/insights/WardrobePanel.tsx', 2],
 ]);
 
 const SCAN_DIRS = ['app', 'components', 'lib'];
