@@ -101,6 +101,15 @@ export function addExpense(input: Omit<Expense, 'id' | 'createdAt'> & { id?: str
   return row;
 }
 
+/** 删掉一笔域内支出(小票/手动/旅行)。财务首页已不再展示它们,但交易关联与资产页仍读这份列表 —— 删必须真删。 */
+export function removeExpense(id: string): boolean {
+  const list = loadDomainExpenses();
+  const next = list.filter((e) => e.id !== id);
+  if (next.length === list.length) return false;
+  saveDomainExpenses(next);
+  return true;
+}
+
 /** P1「+」记一笔:手动收支(spec 写了却一直没接 UI 的手工写入门)。amount 恒正,方向由 kind 表达。 */
 export function addManualEntry(input: {
   amount: number; kind: 'expense' | 'income';

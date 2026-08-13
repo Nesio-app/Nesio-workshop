@@ -6,8 +6,8 @@ import { IconActivity, IconBook, IconBookOpen, IconCalendar, IconCar, IconCheckS
 import dynamic from 'next/dynamic';
 const WechatReadingImportSheet = dynamic(() => import('./WechatReadingImportSheet'), { ssr: false });
 const TeslaSheet = dynamic(() => import('./TeslaSheet'), { ssr: false });
-import { ingestLifeNode } from '@/lib/life-domain/ingest-node';
-import { ingestGranolaMeeting } from '@/lib/platform/view-models/today-view-model';
+import { ingestLifeNode, ingestLifeNodesBatch } from '@/lib/life-domain/ingest-node';
+import { ingestGranolaMeeting, relinkMeetingNotesToCalendar } from '@/lib/platform/view-models/today-view-model';
 import { runPlaidSync, runFlomoSync, saveCalendarEventsToMemory, enrichGmailInBackground } from '@/lib/portal/connector-sync';
 import { type LifeNode, pruneNotionNodes } from '@/lib/portal/life-graph';
 import type { HealthMetrics, HealthNode } from '@/lib/portal/apple-health';
@@ -65,7 +65,7 @@ const CONNECTORS: ConnectorDef[] = [
   // 批次 18:Notion 转正 —— OAuth 一键授权(像 flomo 那样选页面),内部 token 流保留为回退
   { id: 'notion', name: 'Notion', icon: <IconBook />, iconBg: 'var(--chip-gray)', method: 'token', syncEndpoint: '/api/portal/notion', tokenHint: 'notion.so/my-integrations → 新建集成(Internal)→ 复制 Internal Integration Secret(ntn_… 或 secret_…)→ 在要同步的 Notion 页面右上角「…」→ 连接 → 选中这个集成', tokenHintEn: 'notion.so/my-integrations → New internal integration → copy the secret (ntn_… / secret_…) → on each page: ••• → Connections → add this integration', description: '粘贴内部集成 token,同步共享给它的页面(提取项目与想法)', descriptionEn: 'Paste an internal integration token to sync the pages you shared with it' },
   // 批次 158:Granola 会议 —— Nesio 作为其远程 MCP 客户端(OAuth 2.0 DCR)。转写自动提炼成 To do/推断项。
-  { id: 'granola', name: 'Granola 会议', nameEn: 'Granola meetings', icon: <IconBookOpen />, iconBg: 'var(--chip-leaf)', method: 'oauth', description: '连接 Granola,会议转写自动提炼成 To do(带截止日)和推断项,直接进今天页', descriptionEn: 'Connect Granola — meeting transcripts distill into dated to-dos and inferred items, straight to Today' },
+  { id: 'granola', name: 'Granola 会议', nameEn: 'Granola meetings', icon: <IconBookOpen />, iconBg: 'var(--chip-leaf)', method: 'oauth', description: '连接 Granola,会议转写进洞察→日程(尽量挂到对应日历),待办进今天页', descriptionEn: 'Connect Granola — transcripts land in Insights → Schedule (linked to the calendar event when possible); to-dos go to Today' },
   { id: 'toggl', name: 'Toggl Track', icon: <IconTimer />, iconBg: 'var(--chip-red)', method: 'token', syncEndpoint: '/api/portal/toggl', tokenHint: 'track.toggl.com → Profile → API Token', tokenHintEn: 'track.toggl.com → Profile → API Token', description: '同步时间记录，了解你的专注分布', descriptionEn: 'Sync time entries to see where your focus goes', dev: true },
   { id: 'health', name: 'Apple 健康', nameEn: 'Apple Health', icon: <IconHeartPulse />, iconBg: 'var(--chip-pink)', method: 'file', description: '免费侧载无法进「健康」共享列表。请导入导出的 zip/export.xml;或付费开发者账号签带 HealthKit 的包', descriptionEn: 'Free sideload cannot join Health sharing. Import export zip/xml; or sign with a paid Apple Developer team + HealthKit' },
   { id: 'reminder', name: 'Apple 提醒事项', nameEn: 'Apple Reminders', icon: <IconCheckSquare />, iconBg: 'var(--chip-amber)', method: 'shortcuts', ingestSource: 'reminder', description: '通过快捷指令推送提醒，自动转为承诺', descriptionEn: 'Push reminders via Shortcuts; they become commitments', dev: true },
@@ -269,11 +269,13 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
   // 'manual'/'system' 会被压平成 Entry/device,分不清具体是哪个连接器 —— 这里同时
   // 盖上 Signal 层专属来源(attrs.signalSource),lifeNodeToSignal() 优先读它。
   function saveNodes(nodes: Array<Omit<NodeInput, 'source'>>, source: LifeNode['source'], signalSource?: string) {
-    nodes.forEach((n) => ingestLifeNode({
-      ...n,
-      source,
-      attributes: signalSource ? { ...n.attributes, signalSource } : n.attributes,
-    } as NodeInput));
+    if (nodes.length) {
+      ingestLifeNodesBatch(nodes.map((n) => ({
+        ...n,
+        source,
+        attributes: signalSource ? { ...n.attributes, signalSource } : n.attributes,
+      } as NodeInput)));
+    }
     window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
   }
 
@@ -673,6 +675,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     // Notion OAuth:cookie 里有授权时不需要本地 token,直接空 body 同步
     if (!token && c.id !== 'notion') { setTokenInputFor(c.id); setTokenValue(''); return; }
     setSyncing(c.id);
+    const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
+    await whenGraphHydrated();
     try {
       // Notion 选定数据源 → N-3 结构折叠:一本书一条记忆(划线折进书里),丢日历/技术列。
       // N-5:N-0 的暂停已撤销 —— 折叠管道上线后逐行倒的噪声问题已根治,恢复同步。
@@ -798,6 +802,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     const myGen = ++syncGenRef.current;
     setSyncing(c.id);
     setOauthSyncResult((p) => ({ ...p, google: { ok: true, msg: L(dict, '同步中…', 'Syncing…') } }));
+    const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
+    await whenGraphHydrated();
     const parts: string[] = [];
     let allOk = true;
     let reauth = false;
@@ -848,7 +854,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       } else if (data.ok) {
         const nodeCount = data.nodes?.length ?? 0;
         if (nodeCount > 0) {
-          data.nodes!.forEach((n) => ingestLifeNode({ ...n, source: 'email' } as NodeInput));
+          ingestLifeNodesBatch(data.nodes!.map((n) => ({ ...n, source: 'email' } as NodeInput)));
           localStorage.setItem('nesio-gmail-last-sync', String(Date.now()));
         }
         // Phase 2: 后台富化改为检查付费权限（免费用户跳过）
@@ -1000,6 +1006,8 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         return;
       }
       const meetings = data.meetings || [];
+      const { whenGraphHydrated, getLifeGraph } = await import('@/lib/portal/life-graph');
+      await whenGraphHydrated();
       let created = 0;
       let linked = 0; // 挂到对应日历日程的场次(端到端可见:没挂上 = 标题/时间差超容差或日历没同步)
       for (const m of meetings) {
@@ -1007,12 +1015,17 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
         if (r.status !== 'skipped') created += 1;
         if (r.linked) linked += 1;
       }
+      linked += relinkMeetingNotesToCalendar();
+      const stillOpen = getLifeGraph().filter((n) => (n.tags || []).includes('meeting-notes') && !n.attributes?.calendarNodeId).length;
       setCounts((p) => ({ ...p, granola: created }));
       window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
       window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
-      const detail = L(dict, `提炼 ${meetings.length} 场 · 新增 ${created} · 挂到日程 ${linked}`, `Distilled ${meetings.length} · ${created} new · ${linked} linked`);
+      const where = L(dict, '在洞察 → 日程 看会议记录(挂上的日程标「有记录」);记忆里可点「会议」。', 'Find them in Insights → Schedule (linked events show “notes”); Memory has a Meetings chip.');
+      const detail = stillOpen
+        ? L(dict, `提炼 ${meetings.length} 场 · 新增 ${created} · 挂到日程 ${linked}。没挂上的先单独放着,再同步一次 Google 日历会自动对上。${where}`, `Distilled ${meetings.length} · ${created} new · ${linked} linked. Unlinked ones wait for a Google Calendar sync. ${where}`)
+        : L(dict, `提炼 ${meetings.length} 场 · 新增 ${created} · 挂到日程 ${linked}。${where}`, `Distilled ${meetings.length} · ${created} new · ${linked} linked. ${where}`);
       setOauthSyncResult((p) => ({ ...p, granola: { ok: true, msg: L(dict, '同步成功', 'Synced'), detail } }));
-      showToast(created > 0 ? detail : L(dict, '没有新的行动项', 'No new action items'), true);
+      showToast(created > 0 || linked > 0 ? detail : L(dict, '没有新的行动项', 'No new action items'), true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setOauthSyncResult((p) => ({ ...p, granola: { ok: false, msg: L(dict, '同步失败', 'Sync failed'), detail: msg } }));
@@ -1047,8 +1060,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           const nodeCount = data.nodes?.length ?? 0;
           const emailCount = data.emailCount ?? data.messages?.length ?? 0;
           if (nodeCount > 0) {
-            const { addLifeNode } = await import('@/lib/portal/life-graph');
-            data.nodes!.forEach((n) => ingestLifeNode({ ...n, source: 'email' } as Parameters<typeof addLifeNode>[0]));
+            ingestLifeNodesBatch(data.nodes!.map((n) => ({ ...n, source: 'email' } as NodeInput)));
             localStorage.setItem('nesio-gmail-last-sync', String(Date.now()));
             window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
           }
@@ -1077,45 +1089,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
           const { saveCalendarToLocal } = await import('@/lib/portal/calendar-local-store');
           const calEvents = data.events as Parameters<typeof saveCalendarToLocal>[0];
           saveCalendarToLocal(calEvents);
-
-          // Also save upcoming events to LifeGraph so Memory tab reflects the sync
-          const { getLifeGraph } = await import('@/lib/portal/life-graph');
-          const now = Date.now();
-          const windowEnd = now + 60 * 86_400_000;
-          const existingCalIds = new Set(
-            getLifeGraph().filter((n) => n.source === 'calendar')
-              .map((n) => n.attributes.calendarId as string).filter(Boolean),
-          );
-          let lifeGraphAdded = 0;
-          calEvents.forEach((ev) => {
-            const evAny = ev as Record<string, unknown>;
-            const start = evAny.start as string | undefined;
-            const title = evAny.title as string | undefined;
-            if (!start || !title) return;
-            const t = new Date(start).getTime();
-            if (t < now - 86_400_000 || t > windowEnd) return;
-            const calId = (evAny.id as string) || `${title}-${start}`;
-            if (existingCalIds.has(calId)) return;
-            ingestLifeNode({
-              name: title,
-              type: 'event',
-              source: 'calendar',
-              confidence: 1,
-              rawInput: title,
-              tags: [(evAny.calendarName as string) || '日历'].filter(Boolean),
-              attributes: {
-                start,
-                ...(evAny.end ? { end: evAny.end as string } : {}),
-                ...(evAny.url ? { url: evAny.url as string } : {}),
-                ...(evAny.location ? { location: evAny.location as string } : {}),
-                ...(evAny.description ? { note: (evAny.description as string).slice(0, 300) } : {}),
-                calendarId: calId,
-                calendarName: (evAny.calendarName as string) || '',
-              },
-              relations: [],
-            });
-            lifeGraphAdded++;
-          });
+          const lifeGraphAdded = await saveCalendarEventsToMemory(data.events);
 
           setCounts((p) => ({ ...p, calendar: count }));
           const detail = L(dict,

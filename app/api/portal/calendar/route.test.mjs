@@ -92,8 +92,12 @@ function loadRoute() {
       }
       if (specifier === '@/lib/portal/calendar-filters') {
         return {
+          CAL_PAST_MS: 35 * 86_400_000,
           mergeCalendarEvents(lists, limit) {
             return lists.flat().slice(0, limit);
+          },
+          windowCalendarEvents(events) {
+            return events;
           },
         };
       }

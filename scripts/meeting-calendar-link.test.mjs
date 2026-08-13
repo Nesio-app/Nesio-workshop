@@ -104,4 +104,15 @@ const CAL = {
   assert.equal(rec.attributes.calendarNodeId, undefined, '多候选不硬凑');
 }
 
+// 5) Granola 常只给日期(没有时刻)→ 按同一天+标题挂上(窗口匹配会失败,因为 UTC 午夜对不上下午的会)
+{
+  const w = makeWorld([CAL]);
+  const r5 = await w.cmds.ingestGranolaMeeting({
+    id: 'g5', title: 'Kompass Migration Delivery Impacts', transcript: 'x', startedAt: '2026-07-17',
+  }, 'zh');
+  assert.equal(r5.linked, true, '只有日期的会议应按同一天挂到日程');
+  const rec = w.created.find((n) => n.tags?.includes('meeting-notes'));
+  assert.equal(rec.attributes.calendarNodeId, 'cal1');
+}
+
 console.log('meeting-calendar link contract tests passed');

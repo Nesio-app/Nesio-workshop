@@ -73,11 +73,20 @@ const DONUT_DIMS: Array<[DonutDim, string, string]> = [
   ['merchant', '商户', 'Merchant'],
 ];
 
-/** 财务批注「关联人」候选:核心 / 亲近 / 家人关系,不含一般熟人。 */
-function isFinancePickContact(c: { closeness: string; relation: string | null }): boolean {
+/** 财务批注「关联人」候选:按重要性排(核心→亲近→熟人),提到次数多的靠前;不再把熟人整批挡在门外。 */
+function closenessRank(c: string): number {
+  if (c === 'core') return 0;
+  if (c === 'close') return 1;
+  if (c === 'acquaintance') return 2;
+  return 3;
+}
+
+function isFinancePickContact(c: { closeness: string; relation: string | null; mentions: number }): boolean {
   if (c.closeness === 'core' || c.closeness === 'close') return true;
   const r = c.relation || '';
-  return /家人|亲人|配偶|伴侣|父|母|爸|妈|儿|女|兄|弟|姐|妹|family|spouse|partner|parent|child|sibling/i.test(r);
+  if (/家人|亲人|配偶|伴侣|父|母|爸|妈|儿|女|兄|弟|姐|妹|family|spouse|partner|parent|child|sibling/i.test(r)) return true;
+  // 提到 ≥1 次的熟人也进候选(用户:需要的人没出现)—— 按重要性排序后列表仍可读。
+  return c.mentions >= 1;
 }
 
 function monthLabel(ym: string, dict: string): string {
@@ -782,14 +791,16 @@ export default function FinanceTab() {
   const budget = useMemo(() => loadBudget(), [rev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const bp = useMemo(() => budgetProgress(txs, ym, budget, { domainNet: summary.domainNet }), [txs, ym, budget, summary.domainNet]);
-  // 跨域小票/旅行支出(不写 bank-tx,旁条展示)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // 跨域小票/旅行支出:财务首页不再展示列表;合计仍进 KPI 防双计口径漂移。
+  // eslint-disable-next-line react-hooks/exhaustive-deps, @typescript-eslint/no-unused-vars
   const domainSpend = useMemo(() => domainExpenseTotal(ym), [ym, rev, txs]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  void domainSpend;
+  // eslint-disable-next-line react-hooks/exhaustive-deps, @typescript-eslint/no-unused-vars
   const domainRows = useMemo(
     () => listExpenses(ym, { includeBank: false, includeDomain: true, financeOnly: true }) as Expense[],
     [ym, rev, txs],
   );
+  void domainRows;
   // bug3:交易批注(关联人/附件/备注)—— 行上只用来显示「已批注」,编辑在 TxEditPanel 里。
   // ⚠️ 必须待在空态早退**之前**:hook 顺序不能随渲染变化(fin-display 契约钉的就是这条)。
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -799,6 +810,12 @@ export default function FinanceTab() {
   const pickContacts = useMemo(
     () => buildRelationships(getLifeGraph(), Date.now())
       .filter(isFinancePickContact)
+      .sort((a, b) => {
+        const cr = closenessRank(a.closeness) - closenessRank(b.closeness);
+        if (cr !== 0) return cr;
+        if (b.mentions !== a.mentions) return b.mentions - a.mentions;
+        return a.name.localeCompare(b.name, 'zh');
+      })
       .map((c) => ({ key: c.key, name: c.name })),
     [rev, sub],
   );
@@ -884,20 +901,6 @@ export default function FinanceTab() {
           </p>
         )}
         <p className="nesio-insights-empty">{L(dict, '还没有银行流水。到「设置 → 数据接入 → 银行流水 · Plaid」连接账户并点「同步」。', 'No bank transactions yet. Connect via Settings → Data sources → Plaid and sync.')}</p>
-        {domainSpend.count > 0 && (
-          <div style={{ marginTop: 'var(--space-3)' }}>
-            <p className="nesio-settings-section-label">{L(dict, '本月小票 / 旅行', 'Receipts / travel this month')}</p>
-            <p className="nesio-fin-alert-note" style={{ textAlign: 'left' }}>
-              {L(dict, `${domainSpend.count} 笔 · 合计约 ${domainSpend.total.toFixed(0)}(未并入银行 KPI)`, `${domainSpend.count} · ~${domainSpend.total.toFixed(0)} (not in bank KPIs)`)}
-            </p>
-            {domainRows.slice(0, 6).map((e) => (
-              <div key={e.id} className="nesio-fin-person-row" style={{ marginTop: 'var(--space-1)' }}>
-                <span className="nesio-fin-person-name">{e.merchant || e.note || e.source}</span>
-                <span className="nesio-fin-person-amt">{e.currency}{e.amount}</span>
-              </div>
-            ))}
-          </div>
-        )}
         <FamilyDataCard kind="spend" />
       </div>
     );
@@ -1080,52 +1083,8 @@ export default function FinanceTab() {
               </>
             );
           })()}
-          {domainSpend.count > 0 && (
-            <>
-              <p className="nesio-settings-section-label">{L(dict, '手动 / 小票 / 旅行', 'Manual / receipts / travel')}</p>
-              <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: '-0.35rem' }}>
-                {L(
-                  dict,
-                  `本月 ${domainSpend.count} 笔 · 约 ${domainSpend.total.toFixed(0)}${summary.domainCount ? ` · 其中 ${summary.domainCount} 笔同币种已并入上方支出` : ''}${summary.otherCurrencyCount ? ` · ${summary.otherCurrencyCount} 笔异币种另计` : ''}`,
-                  `${domainSpend.count} this month · ~${domainSpend.total.toFixed(0)}${summary.domainCount ? ` · ${summary.domainCount} same-currency folded into KPIs` : ''}${summary.otherCurrencyCount ? ` · ${summary.otherCurrencyCount} other-currency aside` : ''}`,
-                )}
-              </p>
-              <div className="nesio-fin-personspend" style={{ marginBottom: 'var(--space-3)' }}>
-                {domainRows.slice(0, 5).map((e) => {
-                  // P1 小票对账:金额±1% + 日期±3天 + 商户词,给一条候选;「不是」进否决记忆。
-                  const takenTxIds = new Set(loadDomainExpenses().map((x) => x.linkedBankTxId).filter((v): v is string => Boolean(v)));
-                  const cand = receiptMatchCandidates(
-                    { id: e.id, amount: e.amount, occurredAt: e.occurredAt, merchant: e.merchant },
-                    txs, { rejected: rejectedPairs, taken: takenTxIds, max: 1 },
-                  )[0];
-                  return (
-                    <div key={e.id}>
-                      <div className="nesio-fin-person-row">
-                        <span className="nesio-fin-person-name">{e.merchant || e.note || (e.source === 'travel' ? L(dict, '旅行', 'Travel') : L(dict, '小票', 'Receipt'))}</span>
-                        <span className="nesio-fin-person-amt" style={e.kind === 'income' ? { color: 'var(--status-go)' } : undefined}>{e.kind === 'income' ? '+' : ''}{e.currency}{e.amount}</span>
-                      </div>
-                      {cand && (
-                        <div className="nesio-fin-person-row" style={{ paddingLeft: 'var(--space-2)' }}>
-                          <span className="nesio-fin-person-name" style={{ color: 'var(--portal-muted)', fontSize: 'var(--text-xs)' }}>
-                            {L(dict, `银行流水可能是同一笔:${cand.name.slice(0, 18)} · ${cand.date.slice(5)}`, `Likely same in bank feed: ${cand.name.slice(0, 18)} · ${cand.date.slice(5)}`)}
-                          </span>
-                          <button type="button" className="nesio-fin-monthnav" style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-accent)' }}
-                            onClick={() => { if (linkExpenseToBankTx(e.id, cand.id)) setRev((r) => r + 1); else setReportMsg(L(dict, '关联没成功,刷新后再试。', 'Link failed — refresh and retry.')); }}>
-                            {L(dict, '关联', 'Link')}
-                          </button>
-                          <button type="button" className="nesio-fin-monthnav" style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}
-                            onClick={() => { rejectPair(e.id, cand.id); setRev((r) => r + 1); }}>
-                            {L(dict, '不是', 'No')}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-                <p className="nesio-fin-alert-note" style={{ textAlign: 'left', marginTop: 'var(--space-1)' }}>{L(dict, '关联后小票变成那笔银行流水的明细,不再双计。', 'Linked receipts become detail of the bank txn — no double counting.')}</p>
-              </div>
-            </>
-          )}
+          {/* 2026-08-12:财务首页永远不再列「手动 / 小票 / 旅行」。
+              那些笔走交易页双向关联;删掉的记录也不该再冒出来。 */}
 
           {(findings.length > 0 || review.length > 0) && (
             <details className="nesio-fin-fold">

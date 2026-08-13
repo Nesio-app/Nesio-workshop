@@ -98,6 +98,26 @@ await run('②b 一片变空 → 删掉该片,索引跟着更新', async () => {
   looseDeepEqual(JSON.parse(idb.store.get(S.GRAPH_SHARD_INDEX_KEY)), ['2026']);
 });
 
+await run('②d 空 prev 不得把历史年从索引摘掉(同步半张图)', async () => {
+  const idb = fakeIdb();
+  await S.writeGraphShards(idb, [node('old', '2019-05-05'), node('cur', '2026-07-30')], new Map());
+  // 新会话 lastShardJson 是空的,同步只拿到今年几条日历
+  const wiped = await S.writeGraphShards(idb, [node('cal', '2026-08-01')], new Map());
+  const read = await S.readGraphShards(idb);
+  assert.ok(read.nodes.some((n) => n.id === 'old'), '2019 年记忆被空 prev 写盘从索引摘掉了');
+  assert.ok(read.nodes.some((n) => n.id === 'cur') || read.nodes.some((n) => n.id === 'cal'), '当年片应 union 而不是整片替换');
+  assert.ok(!wiped.removed.includes('2019'), '空 prev 不许删自己没见过的历史片');
+});
+
+await run('②e 空 prev 覆盖当年片时要和磁盘 union', async () => {
+  const idb = fakeIdb();
+  await S.writeGraphShards(idb, [node('keep-me', '2026-01-01'), node('also', '2026-06-01')], new Map());
+  await S.writeGraphShards(idb, [node('fresh', '2026-08-11')], new Map());
+  const read = await S.readGraphShards(idb);
+  looseDeepEqual(read.nodes.map((n) => n.id).sort(), ['also', 'fresh', 'keep-me'],
+    '当年片被日历同步整片换成新节点 —— 同片旧记忆丢了');
+});
+
 await run('②c 索引最后写(不能出现「索引指向还没写的片」)', async () => {
   const idb = fakeIdb();
   await S.writeGraphShards(idb, [node('a', '2026-01-01')], new Map());

@@ -20,6 +20,7 @@ import {
   dominantCurrency,
   effectiveCategory,
   txFlow,
+  merchantKey,
   loadFlowRules,
   expenseMerchants,
   investmentAccountIds,
@@ -124,6 +125,68 @@ function anomalyFindings(txs: BankTx[], ym: string, opts?: { domainNet?: number;
     });
   }
   return out;
+}
+
+/** 首见商家(任意卡)金额 >$50 → 今天提醒;单笔 >$200 → 大额交易提醒。 */
+function merchantAlertFindings(txs: BankTx[], ym: string): FinanceFinding[] {
+  const out: FinanceFinding[] = [];
+  const monthTxs = txs.filter((t) => t.date.slice(0, 7) === ym && txFlow(t) === 'expense' && t.amount > 0);
+  if (!monthTxs.length) return out;
+
+  const firstSeen = new Map<string, string>(); // merchantKey → earliest date ever
+  for (const t of txs) {
+    if (txFlow(t) !== 'expense' || t.amount <= 0) continue;
+    const k = merchantKey(t);
+    const prev = firstSeen.get(k);
+    if (!prev || t.date < prev) firstSeen.set(k, t.date);
+  }
+
+  const seenFirstAlert = new Set<string>();
+  let largeCount = 0;
+  let largeSum = 0;
+  let largeName = '';
+  for (const t of monthTxs) {
+    const k = merchantKey(t);
+    const amt = Math.abs(t.amount);
+    if (amt > 200) {
+      largeCount += 1;
+      largeSum += amt;
+      if (!largeName) largeName = t.name || k;
+    }
+    if (amt > 50 && firstSeen.get(k) === t.date && !seenFirstAlert.has(k)) {
+      seenFirstAlert.add(k);
+      out.push({
+        id: `finance-new-merchant-${k.slice(0, 40)}`,
+        kind: 'anomaly',
+        severity: 'attention',
+        title: [`新商家首笔超过 $50:${t.name || k}`, `First spend over $50 at ${t.name || k}`],
+        detail: [
+          `${t.date.slice(5)} · ${formatMoney(amt, t.currency || 'USD')}(任意卡都算)`,
+          `${t.date.slice(5)} · ${formatMoney(amt, t.currency || 'USD')} (any card)`,
+        ],
+      });
+    }
+  }
+  if (largeCount > 0) {
+    out.push({
+      id: 'finance-large-tx',
+      kind: 'anomaly',
+      severity: largeCount >= 3 ? 'flag' : 'attention',
+      title: [
+        largeCount === 1 ? `有一笔超过 $200 的大额支出` : `本月有 ${largeCount} 笔超过 $200 的大额支出`,
+        largeCount === 1 ? `One transaction over $200` : `${largeCount} transactions over $200 this month`,
+      ],
+      detail: [
+        largeCount === 1
+          ? `${largeName} · ${formatMoney(largeSum, 'USD')}`
+          : `合计约 ${formatMoney(largeSum, 'USD')},含 ${largeName} 等`,
+        largeCount === 1
+          ? `${largeName} · ${formatMoney(largeSum, 'USD')}`
+          : `~${formatMoney(largeSum, 'USD')} incl. ${largeName}`,
+      ],
+    });
+  }
+  return out.slice(0, 6);
 }
 
 // ── 财务⑭:费用体检 —— 本月银行费用(ATM/透支/外币/利息)合计(BillGuard:灰色费用年均 ~$350)──
@@ -305,6 +368,7 @@ export function financeFindings(
   if (!txs.length || !ym) return [];
   const all = [
     ...anomalyFindings(txs, ym, opts),
+    ...merchantAlertFindings(txs, ym),
     ...subscriptionHikeFindings(txs),
     ...cashRunwayFindings(txs, accounts, opts),
     ...upcomingBillFindings(txs),

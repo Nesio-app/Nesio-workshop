@@ -177,13 +177,38 @@ export default function CaptureBar(capture: CaptureBarProps) {
       {pendingFiles.length > 0 && (
         <div className="nesio-cap-pending" aria-label={L(dict, '待发送附件', 'Pending attachments')}>
           {pendingFiles.map((f, i) => (
-            <span key={`${f.name}-${i}`} className="nesio-cap-pending-chip">
+            <button
+              key={`${f.name}-${i}`}
+              type="button"
+              className="nesio-cap-pending-chip"
+              title={f.type.startsWith('image/')
+                ? L(dict, '点一下识别成物品;直接点 ↑ 则存成这条记忆的附件', 'Tap to recognize as an item; ↑ alone attaches to this memory')
+                : undefined}
+              onClick={() => {
+                if (!f.type.startsWith('image/')) return;
+                // 走相机识别同一条路 → 存为物品;从待发队列拿掉。
+                setPendingFiles((prev) => prev.filter((_, j) => j !== i));
+                try {
+                  window.dispatchEvent(new CustomEvent('nesio-open-camera', { detail: { file: f } }));
+                } catch { /* ignore */ }
+              }}
+            >
               {f.type.startsWith('image/') ? L(dict, '图', 'Img') : L(dict, '文件', 'File')} · {f.name.slice(0, 18)}{f.name.length > 18 ? '…' : ''}
-              <button type="button" className="nesio-cap-pending-x" aria-label={L(dict, '去掉', 'Remove')}
-                onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}>×</button>
-            </span>
+              <span
+                role="button"
+                tabIndex={0}
+                className="nesio-cap-pending-x"
+                aria-label={L(dict, '去掉', 'Remove')}
+                onClick={(e) => { e.stopPropagation(); setPendingFiles((prev) => prev.filter((_, j) => j !== i)); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setPendingFiles((prev) => prev.filter((_, j) => j !== i)); } }}
+              >×</span>
+            </button>
           ))}
-          <span className="nesio-cap-pending-hint">{L(dict, '点 ↑ 一起记下', 'Tap ↑ to save')}</span>
+          <span className="nesio-cap-pending-hint">
+            {pendingFiles.some((f) => f.type.startsWith('image/'))
+              ? L(dict, '点粉色图 → 识别成物品 · 直接 ↑ → 当附件', 'Tap pink image → item · ↑ alone → attach')
+              : L(dict, '点 ↑ 一起记下', 'Tap ↑ to save')}
+          </span>
         </div>
       )}
       <form className="nesio-tl-capture-form" onSubmit={(e) => { e.preventDefault(); void submitAll(); }}>
@@ -317,16 +342,16 @@ export default function CaptureBar(capture: CaptureBarProps) {
       {plusOpen && capture.onFiles && (
         <div className="nesio-cap-plus-menu" role="menu">
           <button type="button" role="menuitem" className="nesio-cap-plus-item"
-            onClick={() => { setPlusOpen(false); cameraRef.current?.click(); }}>
-            {L(dict, '拍照', 'Camera')}
+            onClick={() => { setPlusOpen(false); albumRef.current?.click(); }}>
+            {L(dict, '照片图库', 'Photo Library')}
           </button>
           <button type="button" role="menuitem" className="nesio-cap-plus-item"
-            onClick={() => { setPlusOpen(false); albumRef.current?.click(); }}>
-            {L(dict, '相册', 'Album')}
+            onClick={() => { setPlusOpen(false); cameraRef.current?.click(); }}>
+            {L(dict, '拍照', 'Take Photo')}
           </button>
           <button type="button" role="menuitem" className="nesio-cap-plus-item"
             onClick={() => { setPlusOpen(false); fileRef.current?.click(); }}>
-            {L(dict, '文件', 'File')}
+            {L(dict, '选取文件', 'Choose File')}
           </button>
         </div>
       )}

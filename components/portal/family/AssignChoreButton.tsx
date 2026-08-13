@@ -11,6 +11,7 @@ import type { LifeNode } from '@/lib/portal/life-graph';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
+import Button from '@/components/portal/ui/Button';
 import {
   listFamilies, listFamilyMembers, assignChoreFromEvent, getEventAssignment, cancelEventChore,
   type FamilySummary, type FamilyMemberView, type ChoreStateView,
@@ -48,7 +49,7 @@ function stateLabel(state: ChoreStateView, t: (a: string, b: string) => string):
   }
 }
 
-export default function AssignChoreButton({ node }: { node: LifeNode }) {
+export default function AssignChoreButton({ node, compact }: { node: LifeNode; compact?: boolean }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const t = (zh: string, en: string) => L(dict, zh, en);
   const [phase, setPhase] = useState<Phase>({ s: 'checking' });
@@ -154,6 +155,13 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
   }
 
   if (phase.s === 'idle') {
+    if (compact) {
+      return (
+        <Button type="button" variant="secondary" size="sm" full onClick={() => void begin()}>
+          {t('分派', 'Assign')}
+        </Button>
+      );
+    }
     return (
       <div className="nesio-nd-photo-add">
         <button type="button" className="nesio-node-action-secondary nesio-nd-photo-btn" onClick={() => void begin()}>
@@ -164,6 +172,13 @@ export default function AssignChoreButton({ node }: { node: LifeNode }) {
   }
 
   if (phase.s === 'loading' || phase.s === 'saving') {
+    if (compact) {
+      return (
+        <Button type="button" variant="secondary" size="sm" full disabled>
+          {phase.s === 'saving' ? t('分派中…', 'Assigning…') : t('加载中…', 'Loading…')}
+        </Button>
+      );
+    }
     return (
       <div className="nesio-nd-photo-add">
         <button type="button" className="nesio-node-action-secondary nesio-nd-photo-btn" disabled={true}>

@@ -70,7 +70,7 @@ import dynamic from 'next/dynamic';
 const MemoryNodeDetail = dynamic(() => import('./MemoryNodeDetail'), { ssr: false });
 const RelationGraph = dynamic(() => import('./RelationGraph'), { ssr: false });
 import type { GNode, GEdge } from '@/lib/platform/graph-engine';
-import { DomainIcon, IconActivity, IconBox, IconBookmark, IconCalendar, IconCamera, IconCheckSquare, IconFolder, IconMail, IconMapPin, IconMic, IconNote, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
+import { DomainIcon, IconActivity, IconBox, IconBookmark, IconBookOpen, IconCalendar, IconCamera, IconCheckSquare, IconFolder, IconMail, IconMapPin, IconMic, IconNote, IconStar, IconUser, NodeTypeIcon, IconMap } from './icons';
 import { L, type DictLocale } from '@/lib/portal/i18n';
 import { displayNodeName, stripMarkdownInline } from '@/lib/portal/node-display';
 import { isPinned, loadPins, PINS_UPDATED_EVENT, togglePin, isCore, toggleCore, loadCore, CORE_UPDATED_EVENT } from '@/lib/portal/pins';
@@ -431,6 +431,7 @@ function getNodeTypeMeta(node: LifeNode, dict: DictLocale = 'zh') {
 /** sourceMeta 的分组键版本(同一套判据,给筛选行去重计数用,不重复维护两份分支)。 */
 function sourceKeyOf(node: LifeNode): string {
   const tags = node.tags || [];
+  if (tags.includes('meeting-notes') || tags.includes('Granola')) return 'meeting';
   if (tags.includes('notion')) return 'notion';
   if (tags.includes('keep')) return 'keep';
   if (tags.includes('flomo')) return 'flomo';
@@ -444,6 +445,7 @@ function sourceKeyOf(node: LifeNode): string {
 function sourceMeta(node: LifeNode, dict: DictLocale): { label: string; icon: ReactNode } {
   const tags = node.tags || [];
   const sz = 11;
+  if (tags.includes('meeting-notes') || tags.includes('Granola')) return { label: L(dict, '会议', 'Meetings'), icon: <IconBookOpen size={sz} /> };
   if (tags.includes('notion')) return { label: 'Notion', icon: <IconNote size={sz} /> };
   if (tags.includes('keep')) return { label: 'Keep', icon: <IconNote size={sz} /> };
   // CARD SPEC:外部 API 来源(Flomo/微信)单独立徽章,不再落到 default「手记」。
@@ -1246,6 +1248,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const matchesFilter = (n: LifeNode, filter: string): boolean => {
     if (filter === 'facet:plan') return Boolean(n.attributes?.planContainer || n.attributes?.planImported);
     if (filter === 'facet:list') return Boolean(n.attributes?.checklist);
+    if (filter === 'facet:meeting') return (n.tags || []).includes('meeting-notes');
     return n.type === filter;
   };
 
@@ -1333,6 +1336,7 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
   const facetCounts = useMemo(() => ({
     'facet:plan': nodesForTypeCounts.filter((n) => n.attributes?.planContainer || n.attributes?.planImported).length,
     'facet:list': nodesForTypeCounts.filter((n) => n.attributes?.checklist).length,
+    'facet:meeting': nodesForTypeCounts.filter((n) => (n.tags || []).includes('meeting-notes')).length,
   }), [nodesForTypeCounts]);
 
   const sourceGroups = useMemo(() => {
@@ -1550,6 +1554,16 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
                       >
                         <IconCheckSquare size={12} /> {L(dict, '清单', 'Lists')}
                         <span className="nesio-type-chip-count">{facetCounts['facet:list']}</span>
+                      </button>
+                    )}
+                    {(facetCounts['facet:meeting'] > 0 || typeFilters.has('facet:meeting')) && (
+                      <button
+                        type="button"
+                        className={`nesio-type-chip${typeFilters.has('facet:meeting') ? ' is-active' : ''}`}
+                        onClick={() => toggleSetFilter('facet:meeting', setTypeFilters)}
+                      >
+                        <IconBookOpen size={12} /> {L(dict, '会议', 'Meetings')}
+                        <span className="nesio-type-chip-count">{facetCounts['facet:meeting']}</span>
                       </button>
                     )}
                   </div>

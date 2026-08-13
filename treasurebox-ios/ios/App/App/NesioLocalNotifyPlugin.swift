@@ -49,6 +49,16 @@ public class NesioLocalNotifyPlugin: CAPPlugin, CAPBridgedPlugin {
 
     private let center = UNUserNotificationCenter.current()
 
+    /**
+     * Capacitor 默认把 NotificationRouter 设成 UNUserNotificationCenter.delegate。
+     * 若不挂 localNotificationHandler,前台 willPresent 回传 [] —— 「试一条」排上了
+     * 也看不到横幅/听不到声音(用户以为坏了)。官方 Local Notifications 插件会挂 handler;
+     * 我们自研插件以前漏了这一步。
+     */
+    public override func load() {
+        bridge?.notificationRouter.localNotificationHandler = self
+    }
+
     // ── 权限 ────────────────────────────────────────────────────────────────
 
     @objc public override func checkPermissions(_ call: CAPPluginCall) {
@@ -162,5 +172,18 @@ public class NesioLocalNotifyPlugin: CAPPlugin, CAPBridgedPlugin {
             }
             call.resolve(["items": items, "count": items.count, "limit": 64])
         }
+    }
+}
+
+extension NesioLocalNotifyPlugin: NotificationHandlerProtocol {
+    public func willPresent(notification: UNNotification) -> UNNotificationPresentationOptions {
+        if #available(iOS 14.0, *) {
+            return [.banner, .list, .sound, .badge]
+        }
+        return [.alert, .sound, .badge]
+    }
+
+    public func didReceive(response: UNNotificationResponse) {
+        // 点开通知暂不跳页;JS 侧若要深链再补。
     }
 }

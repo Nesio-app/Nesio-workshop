@@ -788,11 +788,28 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
   // 邮件全链路 Phase 1:邮件节点按 emailId 从本机 IndexedDB 取全文,供「阅读原文」。
   useEffect(() => {
     setEmailFullBody('');
-    const eid = node?.source === 'email' && typeof node.attributes?.emailId === 'string' ? node.attributes.emailId : '';
-    if (!eid) return;
+    const attrs = node?.attributes as Record<string, unknown> | undefined;
+    const eid = typeof attrs?.emailId === 'string' ? attrs.emailId
+      : typeof attrs?.messageId === 'string' ? attrs.messageId : '';
+    const looksEmail = node?.source === 'email' || Boolean(eid);
+    if (!looksEmail || !eid) {
+      // 无 emailId 时仍可用节点里存的正文
+      const fallback = [attrs?.article, attrs?.body, attrs?.snippet, node?.rawInput]
+        .find((v): v is string => typeof v === 'string' && v.trim().length > 0);
+      if (fallback) setEmailFullBody(fallback);
+      return;
+    }
     let cancelled = false;
     void import('@/lib/portal/local-email-body').then(({ getEmailBody }) =>
-      getEmailBody(eid).then((body) => { if (!cancelled && body) setEmailFullBody(body); }),
+      getEmailBody(eid).then((body) => {
+        if (cancelled) return;
+        if (body) setEmailFullBody(body);
+        else {
+          const fallback = [attrs?.article, attrs?.body, attrs?.snippet, node?.rawInput]
+            .find((v): v is string => typeof v === 'string' && v.trim().length > 0);
+          if (fallback) setEmailFullBody(fallback);
+        }
+      }),
     ).catch(() => {});
     return () => { cancelled = true; };
   }, [node]);
@@ -821,6 +838,19 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
           getLocalImage(asset.id).then(async (dataUrl) => {
             if (cancelled) return;
             if (dataUrl) { setAssetUrls((cur) => ({ ...cur, [key]: dataUrl })); return; }
+            // 非图附件可能只在 nesio-files —— 用 blob URL 作预览占位(下载仍走 LocalFileRow)
+            if (asset.kind === 'file' || (asset.mimeType && !asset.mimeType.startsWith('image/'))) {
+              try {
+                const { getLocalFile } = await import('@/lib/portal/local-file-store');
+                const rec = await getLocalFile(asset.id);
+                if (cancelled || !rec?.blob) return;
+                if (rec.blob.type.startsWith('image/')) {
+                  const u = URL.createObjectURL(rec.blob);
+                  setAssetUrls((cur) => ({ ...cur, [key]: u }));
+                }
+              } catch { /* ignore */ }
+              return;
+            }
             const cloudPath = asset.storagePath
               || assets.find((a) => a.storagePath && (a.kind === 'image' || a.mimeType?.startsWith('image/')))?.storagePath;
             if (!cloudPath) return;
@@ -957,23 +987,42 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
     if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
     onClose();
   }
-  // 补传本地照片进这条记忆:压缩存 IndexedDB → 追加 node.assets(本机,不上传)。
+  // 补传本机照片/文件进这条记忆。图 → IndexedDB 图库;其它 → nesio-files。
   // 失败必须可见(设计红线:每个 async 动作要有显式失败态)。
   async function addPhotos(files: FileList | null) {
-    const list = Array.from(files || []).filter((f) => f.type.startsWith('image/')).slice(0, 30);
+    const list = Array.from(files || []).slice(0, 30);
     if (!list.length) return;
     setAddingPhoto(true);
     setPhotoErr('');
     try {
       const { compressToDataUrl, putLocalImage } = await import('@/lib/portal/local-image-store');
+      const { putLocalFile, MAX_FILE_BYTES, prettyBytes } = await import('@/lib/portal/local-file-store');
       const added: LifeNodeAsset[] = [];
       const thumbs: string[] = [];
+      const imageFiles: File[] = [];
+      const failed: string[] = [];
       for (let i = 0; i < list.length; i++) {
-        const dataUrl = await compressToDataUrl(list[i], 1400, 0.82);
-        const id = `local-${n.id}-${Date.now()}-${i}`;
-        await putLocalImage(id, dataUrl);
-        added.push({ id, kind: 'image', local: true, mimeType: 'image/jpeg', createdAt: new Date().toISOString() });
-        thumbs.push(dataUrl);
+        const f = list[i];
+        const isImage = f.type.startsWith('image/') || /\.(png|jpe?g|webp|gif|heic)$/i.test(f.name);
+        if (isImage) {
+          const dataUrl = await compressToDataUrl(f, 1400, 0.82);
+          if (!dataUrl) { failed.push(f.name); continue; }
+          const id = `local-${n.id}-${Date.now()}-${i}`;
+          await putLocalImage(id, dataUrl);
+          added.push({ id, kind: 'image', local: true, mimeType: 'image/jpeg', label: f.name, createdAt: new Date().toISOString() });
+          thumbs.push(dataUrl);
+          imageFiles.push(f);
+        } else {
+          if (f.size > MAX_FILE_BYTES) { failed.push(`${f.name}(${prettyBytes(f.size)})`); continue; }
+          const id = `localfile-${n.id}-${Date.now()}-${i}`;
+          const mimeType = f.type || 'application/octet-stream';
+          const stored = await putLocalFile(id, f, { name: f.name, mimeType, size: f.size });
+          if (!stored) { failed.push(f.name); continue; }
+          added.push({ id, kind: 'file', local: true, mimeType, label: f.name, createdAt: new Date().toISOString() });
+        }
+      }
+      if (!added.length) {
+        throw new Error(failed.length ? `failed:${failed.slice(0, 2).join(',')}` : 'empty');
       }
       const live = getLifeGraph().find((x) => x.id === n.id);
       const nextAssets = [...(live?.assets || n.assets || []), ...added];
@@ -982,20 +1031,21 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
       if (typeof window !== 'undefined') window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
       setAddedThumbs((p) => [...p, ...thumbs]);
 
-      // 存好了再认字(2026-07-31)。以前到上一行就结束了 —— 图挂进这条记忆,
-      // 上面写的字一个都搜不到。认字在这台设备上做,图不出手机;
-      // 名字不动(keepName)——这条记忆已经有名字了,是用户的,不该被一张附图改掉。
-      const { attachImageUnderstanding } = await import('@/lib/portal/image-understand');
-      const seen = await attachImageUnderstanding(n.id, list, { keepName: true });
-      if (seen?.text.trim()) {
-        setPhotoErr('');
-        setScanHint(L(dict, '照片上的字也记下了 —— 现在搜得到。', 'Text in the photos was read too — it\'s searchable now.'));
-      } else if (seen?.visionMessage) {
-        // 「这台设备认不了字」不是错误,是这条路今天走不通。照片已经加好了。
-        setScanHint(seen.visionMessage);
+      if (imageFiles.length) {
+        const { attachImageUnderstanding } = await import('@/lib/portal/image-understand');
+        const seen = await attachImageUnderstanding(n.id, imageFiles, { keepName: true });
+        if (seen?.text.trim()) {
+          setPhotoErr('');
+          setScanHint(L(dict, '照片上的字也记下了 —— 现在搜得到。', 'Text in the photos was read too — it\'s searchable now.'));
+        } else if (seen?.visionMessage) {
+          setScanHint(seen.visionMessage);
+        }
+      }
+      if (failed.length) {
+        setPhotoErr(L(dict, `有 ${failed.length} 个没存上`, `${failed.length} couldn’t save`));
       }
     } catch {
-      setPhotoErr(L(dict, '照片没加成功,请再试一次', 'Could not add the photos — try again'));
+      setPhotoErr(L(dict, '附件没加成功,请再试一次', 'Could not add the attachment — try again'));
     } finally {
       setAddingPhoto(false);
     }
@@ -1025,15 +1075,23 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
   // 批次 27:阅读入口不再只认 article —— 老邮件节点没存 article,退到 summary/snippet/正文,
   // 只要有一段够长的正文(>40 字)就给「阅读」按钮,进瀑布流阅读器。
   const readableAttrs = n.attributes as Record<string, unknown>;
+  const isEmailish = n.source === 'email'
+    || (n.tags || []).some((t) => /^(email|gmail|mail)$/i.test(t))
+    || Boolean(readableAttrs.emailId || readableAttrs.messageId);
   // 邮件全文优先(本机 IndexedDB,Phase 1);没有再退到节点里存的短预览/摘要。
-  const readableText = (emailFullBody && emailFullBody.trim().length > 40 ? emailFullBody : undefined)
-    ?? [readableAttrs.article, readableAttrs.summary, readableAttrs.snippet, readableAttrs.body, n.rawInput]
-      .find((v): v is string => typeof v === 'string' && v.trim().length > 40);
+  const readableText = (emailFullBody && emailFullBody.trim().length > 0 ? emailFullBody : undefined)
+    ?? [readableAttrs.article, readableAttrs.summary, readableAttrs.snippet, readableAttrs.body, readableAttrs.text, n.rawInput]
+      .find((v): v is string => typeof v === 'string' && v.trim().length > (isEmailish ? 1 : 40));
 
   // 批次 36:邮件节点 → 可在 Nesio 内直接回复。识别:source=email 且带发件人。
-  const emailFrom = typeof readableAttrs.from === 'string' ? readableAttrs.from : '';
+  // 旧节点可能只有 fromEmail / sender —— 一并认。
+  const emailFrom = typeof readableAttrs.from === 'string' && readableAttrs.from
+    ? readableAttrs.from
+    : typeof readableAttrs.fromEmail === 'string' && readableAttrs.fromEmail
+      ? String(readableAttrs.fromEmail)
+      : typeof readableAttrs.sender === 'string' ? String(readableAttrs.sender) : '';
   const emailId = typeof readableAttrs.emailId === 'string' ? readableAttrs.emailId : '';
-  const isEmailNode = n.source === 'email' && Boolean(emailFrom);
+  const isEmailNode = isEmailish && Boolean(emailFrom || emailId);
 
   // 批次 124·设计来源行:图标 + 「来自 {来源} · {provider} · {时间}」。可信度统一——只在 AI 没把握时标「待确认」。
   const SRC = (() => {
@@ -1286,61 +1344,30 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
             {srcUncertain && <span className="nesio-node-pending">{L(dict, '待确认', 'Unconfirmed')}</span>}
           </div>
 
-          {/*
-           * 2026-08-01 按钮大整理(用户原话:「详情页就阅读和编辑 2 个按钮」,
-           * 「删除、分派家人、关联记忆都放进点击编辑后的页面」)。
-           *
-           * 在这之前这一屏上散着七八个按钮:顶上「阅读原文 / 回复」一排、
-           * 紧接着「＋ 添加照片」一排、再一个「分派给家人」、底下还有
-           * 「用镜头看看 / 阅读 / 编辑 / 删除」——「阅读」甚至上下各一份。
-           * 现在只有底部一排,改这条记忆的那几件事全都收进编辑态。
-           *
-           * 「添加附件」跟着改名并去掉 accept:原来只收 image/*,而附件本来
-           * 就不该只有照片(local-file-store 早就能原样收任意文件)。
-           * 白名单在 iOS 的文件选择器里会把 PDF/docx 直接灰掉 —— 这个坑
-           * 仓里栽过两次,见 scripts/file-picker-ios.test.mjs。
-           */}
-          {editing && (
-            <div className="nesio-nd-photo-add">
-              <button
-                type="button"
-                className="nesio-node-action-secondary nesio-nd-photo-btn"
-                onClick={() => photoInputRef.current?.click()}
-                disabled={addingPhoto}
-              >
-                {addingPhoto ? L(dict, '添加中…', 'Adding…') : L(dict, '＋ 添加附件', '＋ Add files')}
+          {/* 附件控件(按钮在底部与阅读同排);这里只挂 file input + 失败态。 */}
+          <input
+            ref={photoInputRef}
+            type="file"
+            multiple
+            className="nesio-visually-hidden"
+            onChange={(e) => { const f = e.currentTarget.files; e.currentTarget.value = ''; void addPhotos(f); }}
+          />
+          {photoErr && (
+            <p className="nesio-nd-photo-err" role="alert" style={{ marginTop: 'var(--space-2)' }}>
+              {photoErr}
+              <button type="button" className="nesio-nd-photo-retry" onClick={() => photoInputRef.current?.click()}>
+                {L(dict, '重试', 'Retry')}
               </button>
-              <input
-                ref={photoInputRef}
-                type="file"
-                multiple
-                className="nesio-visually-hidden"
-                onChange={(e) => { const f = e.currentTarget.files; e.currentTarget.value = ''; void addPhotos(f); }}
-              />
-              {photoErr && (
-                <p className="nesio-nd-photo-err" role="alert">
-                  {photoErr}
-                  <button type="button" className="nesio-nd-photo-retry" onClick={() => photoInputRef.current?.click()}>
-                    {L(dict, '重试', 'Retry')}
-                  </button>
-                </p>
-              )}
-              {!photoErr && scanHint && <p className="nesio-nd-scan-hint">{scanHint}</p>}
-              {addedThumbs.length > 0 && (
-                <div className="nesio-nd-added-thumbs">
-                  {addedThumbs.map((u, i) => (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img key={i} src={u} alt="" className="nesio-nd-added-thumb" draggable={false} />
-                  ))}
-                </div>
-              )}
-            </div>
+            </p>
           )}
-
-          {/* 闭环起点:日历/承诺类记忆可「分派给家人」(→ 对方今天页看到 → 做完你今天页收到回响)。
-              2026-08-01 收进编辑态 —— 它是「对这条记忆做一次安排」,和删除/关联同类。 */}
-          {editing && (n.type === 'event' || n.type === 'task') && (
-            <AssignChoreLazy node={n} />
+          {!photoErr && scanHint && <p className="nesio-nd-scan-hint">{scanHint}</p>}
+          {addedThumbs.length > 0 && (
+            <div className="nesio-nd-added-thumbs">
+              {addedThumbs.map((u, i) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img key={i} src={u} alt="" className="nesio-nd-added-thumb" draggable={false} />
+              ))}
+            </div>
           )}
 
           {/* Type-specific section —— 「关键信息」段标已砍(详情页精简 2026-08-01):
@@ -1751,28 +1778,41 @@ function MemoryNodeDetailInner({ node, onClose, relatedNodes, onOpenNode, elevat
               <>
                 <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} onClick={saveEdit}>{L(dict, '保存', 'Save')}</Button>
                 <Button variant="secondary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => setEditing(false)}>{L(dict, '取消', 'Cancel')}</Button>
-                {/* 删除收进编辑态(2026-08-01 用户点名)。放在保存/取消后面、而且是最后一个 ——
-                    误触的代价在这一排里只有它是不可逆的。 */}
                 <Button variant="soft" size="sm" tone="risk" layoutStyle={{ flex: 1 }} onClick={handleDelete}>{L(dict, '删除', 'Delete')}</Button>
               </>
             ) : (
               <>
-                {/* 阅读 —— 顶上那份「阅读原文」已撤,这里是唯一一处。 */}
-                {readableText && (
-                  <Button variant="primary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => setReaderOpen(true)}>{L(dict, '阅读', 'Read')}</Button>
+                {/* 图 7:附件 / 分派 在阅读上方,同款 size=sm 全宽。 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', width: '100%', flexBasis: '100%' }}>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    full
+                    disabled={addingPhoto}
+                    onClick={() => photoInputRef.current?.click()}
+                  >
+                    {addingPhoto ? L(dict, '添加中…', 'Adding…') : L(dict, '附件', 'Attach')}
+                  </Button>
+                  {(n.type === 'event' || n.type === 'task') && (
+                    <AssignChoreLazy node={n} compact />
+                  )}
+                </div>
+                {(readableText || isEmailNode) && (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    layoutStyle={{ flex: 1 }}
+                    onClick={() => {
+                      if (readableText) setReaderOpen(true);
+                      else if (isEmailNode) setComposeOpen(true);
+                    }}
+                  >
+                    {L(dict, '阅读', 'Read')}
+                  </Button>
                 )}
-                {/*
-                 * 回复。用户列的「详情页就阅读和编辑 2 个按钮」里没点到它,
-                 * 但它也没被点名要挪进编辑页 —— 而回复一封邮件和编辑这条记忆
-                 * 完全是两件事,塞进编辑态会很别扭。它只在邮件节点上出现,
-                 * 所以留在这一排:非邮件的记忆看到的仍然只有阅读 + 编辑。
-                 * (要是这条也该撤,说一声就撤。)
-                 */}
                 {isEmailNode && (
                   <Button variant="secondary" size="sm" layoutStyle={{ flex: 1 }} onClick={() => setComposeOpen(true)}>{L(dict, '回复', 'Reply')}</Button>
                 )}
-                {/* 「镜头」两个字(用户点名),而且只给写下来的字看 —— 判据在 lens-eligible。
-                    一封对账单、一个日历事件底下没有话可看,给它镜头就是一条无话可说的路。 */}
                 {isLensEligible(n) && (
                   <Button variant="soft" size="sm" layoutStyle={{ flex: 1 }} onClick={() => setLensOpen(true)}>{L(dict, '镜头', 'Lens')}</Button>
                 )}

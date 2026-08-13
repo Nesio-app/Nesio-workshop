@@ -187,6 +187,7 @@ export default function EmailComposeSheet({ open, onClose, context }: EmailCompo
   return (
     <NesioSheet
       variant="bottom"
+      elevated
       open={open}
       onOpenChange={(next) => { if (!next) onClose(); }}
       card={false}

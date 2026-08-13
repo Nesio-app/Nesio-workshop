@@ -3,11 +3,12 @@
  * 记忆页下拉刷新共用同一实现,不留双实现。每个 run* 返回结构化结果,
  * UI 决定 toast/重试;失败都有明确 error(设计红线:异步动作必有可见失败态)。
  */
-import { ingestLifeNode, ingestLifeNodesBatch } from '@/lib/life-domain/ingest-node';
+import { ingestLifeNode, ingestLifeNodesBatch, type IngestNodeInput } from '@/lib/life-domain/ingest-node';
 import { stripMarkdownInline } from '@/lib/portal/node-display';
 import { isTagOnlyText } from '@/lib/portal/topic-tags';
 import { parseMemoryDate } from '@/lib/portal/memory-event-at';
 import type { LifeNode } from '@/lib/portal/life-graph';
+import { CAL_PAST_MS } from './calendar-filters';
 
 /* ---------- Plaid 银行流水(增量游标在服务端 cookie;本机 IDB 留最近 5000 笔) ---------- */
 
@@ -195,15 +196,16 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
   } catch { return { ok: false, fresh: 0, error: 'network' }; }
 }
 
-/* ---------- 日历(本地表整体替换 + 近 60 天事件进记忆;时间变了会更新) ---------- */
+/* ---------- 日历(本地表整体替换 + 过去 35 天/未来 90 天进记忆;时间变了会更新) ---------- */
 
 export interface CalendarSyncResult { ok: boolean; count: number; added: number; error?: string }
 
-/** 近 60 天窗口的日历事件进记忆;已存在(同 calendarId)但开始时间变了 → 原位更新(时区修复后自愈老数据)。 */
+/** 过去 35 天 + 未来 90 天进记忆(覆盖 Granola last_30_days);已存在(同 calendarId)但开始时间变了 → 原位更新。 */
 export async function saveCalendarEventsToMemory(events: Array<Record<string, unknown>>): Promise<number> {
-  const { getLifeGraph, batchPatchLifeNodes, batchDeleteLifeNodes } = await import('@/lib/portal/life-graph');
+  const { getLifeGraph, batchPatchLifeNodes, batchDeleteLifeNodes, whenGraphHydrated } = await import('@/lib/portal/life-graph');
+  await whenGraphHydrated();
   const now = Date.now();
-  const windowEnd = now + 60 * 86_400_000;
+  const windowEnd = now + 90 * 86_400_000;
 
   // 批次 43:calendarId 机制之前入库的老日历节点没这个字段,byCalId 永远认不出
   // 它们 → 每次同步都再灌一遍(「廿七」×2 的根因)。两步自愈:
@@ -226,14 +228,15 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
   let added = 0;
   // 本次同步已落过的 calendarId 与 名字|start —— 去重表建于循环之前,新建的节点不在里面
   const seenThisRun = new Set<string>();
-  // 禁止循环里逐条 updateLifeNode:开机自动同步会对近 60 天每条事件整图写盘 → 主线程卡死。
+  // 禁止循环里逐条 updateLifeNode / ingestLifeNode:开机自动同步会对近窗口每条事件整图写盘 → 主线程卡死,记忆页被掏空再一条条回来。
   const patches: Array<{ id: string; patch: Partial<LifeNode> }> = [];
+  const freshInputs: IngestNodeInput[] = [];
   for (const evAny of events) {
     const start = evAny.start as string | undefined;
     const title = evAny.title as string | undefined;
     if (!start || !title) continue;
     const t = new Date(start).getTime();
-    if (t < now - 86_400_000 || t > windowEnd) continue;
+    if (t < now - CAL_PAST_MS || t > windowEnd) continue;
     const calId = (evAny.id as string) || `${title}-${start}`;
     const existing = byCalId.get(calId) || byNameStart.get(`${title}|${start}`);
     if (existing && !existing.attributes.calendarId) {
@@ -283,7 +286,7 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
     if (seenThisRun.has(calId) || seenThisRun.has(dupKey)) continue;
     seenThisRun.add(calId);
     seenThisRun.add(dupKey);
-    const node = ingestLifeNode({
+    freshInputs.push({
       name: title,
       type: 'event',
       source: 'calendar',
@@ -299,17 +302,29 @@ export async function saveCalendarEventsToMemory(events: Array<Record<string, un
         ...(evAny.description ? { note: (evAny.description as string).slice(0, 300) } : {}),
         calendarId: calId,
         calendarName: (evAny.calendarName as string) || '',
+        externalId: `cal:${calId}`,
       },
       relations: [],
     });
-    // 对照 flomo:把日历事件开始时间写到节点 createdAt(排序/时间线用),
-    // 不只塞 attributes.start —— 否则同步日会盖过真实开会日。
-    if (start && node?.id) {
-      patches.push({ id: node.id, patch: { createdAt: start } });
+  }
+  if (freshInputs.length) {
+    ingestLifeNodesBatch(freshInputs);
+    added = freshInputs.length;
+    // 对照 flomo:事件开始日写到 createdAt(时间线用),一次 batch 对齐,禁止逐条 update。
+    const after = getLifeGraph();
+    for (const input of freshInputs) {
+      const calId = input.attributes.calendarId;
+      const start = typeof input.attributes.start === 'string' ? input.attributes.start : '';
+      if (!calId || !start) continue;
+      const node = after.find((n) => n.attributes.calendarId === calId);
+      if (node && node.createdAt !== start) patches.push({ id: node.id, patch: { createdAt: start } });
     }
-    added++;
   }
   if (patches.length) batchPatchLifeNodes(patches);
+  try {
+    const { relinkMeetingNotesToCalendar } = await import('@/lib/platform/view-models/today-commands');
+    relinkMeetingNotesToCalendar();
+  } catch { /* 挂档失败不挡日历同步 */ }
   return added;
 }
 

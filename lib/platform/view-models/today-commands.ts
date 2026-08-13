@@ -6,7 +6,7 @@
  */
 
 import { ingestLifeNode } from '../../life-domain/ingest-node';
-import { getLifeGraph, updateLifeNode, deleteLifeNode } from '../../portal/life-graph';
+import { getLifeGraph, updateLifeNode, deleteLifeNode, type LifeNode } from '../../portal/life-graph';
 import { localDayKey, type SubTask, type FocusNode } from './today-view-model';
 
 function broadcast(): void {
@@ -80,28 +80,14 @@ function writeMeetingExtraction(
   const extraTags = prov?.extraTags ?? [];
   const recordedAt = prov?.recordedAt || new Date().toISOString();
 
-  // ⓪ 闭环(用户定):会议记录挂到对应的日历日程记忆上 —— Granola 的会议本来就
-  // 来自日历,按「会议时间落在日程窗口内(前 30min 후 60min 宽容)+ 标题吻合;
-  // 窗口内唯一候选则放宽标题」找日历节点,下面创建记录时带上双向可见的关联。
-  const meetingT = new Date(recordedAt).getTime();
-  const norm = (s: string) => (s || '').toLowerCase().replace(/[\s·:：\-—_,,。.]/g, '');
-  const mName = norm(meetingName);
-  const calCandidates = Number.isFinite(meetingT) ? getLifeGraph().filter((n) => {
-    if (n.source !== 'calendar') return false;
-    const s = n.attributes?.start ? new Date(String(n.attributes.start)).getTime() : NaN;
-    if (!Number.isFinite(s)) return false;
-    const e = n.attributes?.end ? new Date(String(n.attributes.end)).getTime() : s + 60 * 60_000;
-    return meetingT >= s - 30 * 60_000 && meetingT <= e + 60 * 60_000;
-  }) : [];
-  const calNode = calCandidates.find((n) => {
-    const cName = norm(n.name);
-    return cName && mName && (cName.includes(mName) || mName.includes(cName));
-  }) || (calCandidates.length === 1 ? calCandidates[0] : undefined);
+  // ⓪ 闭环:挂到对应日历日程。Granola 常只给日期(没有时刻)—— 那种按「同一天 + 标题」
+  // 匹配;有时刻的仍走窗口(前 30min / 后 60min)。窗口外不硬凑。
+  const calNode = findCalendarForMeeting(meetingName, recordedAt);
 
   // ① 会议记录节点:留转写原文,并把总结/推断项/人名收进 attributes(详情页可读)。
   const record = ingestLifeNode({
     name: `${en ? 'Meeting notes' : '会议记录'} · ${meetingName}`,
-    type: 'task',
+    type: 'event',
     tags: [en ? 'Meeting notes' : '会议记录', 'meeting-notes', ...extraTags],
     attributes: {
       meetingNodeId,
@@ -133,31 +119,115 @@ function writeMeetingExtraction(
     });
   }
 
-  // ② To do(显式指派)→ 各成一条 commitment 节点,钉进今天页;承诺了截止日的带 date(走倒计时)。
-  const today = localDayKey();
-  for (const t of extraction?.todo ?? []) {
-    const text = (t.text || '').trim();
-    if (!text) continue;
-    const deadline = typeof t.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.deadline) ? t.deadline : null;
-    ingestLifeNode({
-      name: text,
-      type: 'task',
-      tags: [en ? 'Meeting to-do' : '会议待办', 'meeting-todo', ...extraTags],
+  // ② To do → 会议记录节点上的清单项(subtasksJson),不再各成一条今天页提醒。
+  // 用户:行动项应出现在会议记录列表里,不该冒充独立提醒。
+  const subtasks = (extraction?.todo ?? [])
+    .map((t, i) => {
+      const text = (t.text || '').trim();
+      if (!text) return null;
+      const deadline = typeof t.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(t.deadline) ? t.deadline : null;
+      return {
+        id: `mtodo-${Date.now()}-${i}`,
+        text: deadline ? `${text} · ${deadline}` : text,
+        done: false,
+      };
+    })
+    .filter((s): s is { id: string; text: string; done: boolean } => Boolean(s));
+  if (record?.id && subtasks.length) {
+    updateLifeNode(record.id, {
       attributes: {
-        fromMeeting: meetingName,
-        meetingRecordId: record.id,
-        focusPinnedOn: today, // 刚开完会,行动项直接进今天页注意力
-        ...(prov?.granolaMeetingId ? { granolaMeetingId: prov.granolaMeetingId } : {}),
-        ...(deadline ? { date: deadline } : {}),
+        ...record.attributes,
+        ...(calNode ? { calendarNodeId: calNode.id, calendarName: calNode.name } : {}),
+        subtasksJson: JSON.stringify(subtasks),
+        checklist: true,
       },
-      rawInput: text,
-      confidence: 1, // 显式指派 = 高置信,不进「待确认」
-      source: 'voice',
-      relations: record.id ? [{ targetId: record.id, relation: en ? 'from meeting' : '来自会议' }] : [],
     });
   }
   broadcast();
   return calNode?.id ?? null;
+}
+
+function isDateOnlyIso(iso: string): boolean {
+  const s = (iso || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(s) || /^\d{4}-\d{2}-\d{2}T00:00:00(\.000)?Z?$/.test(s);
+}
+
+function titleNorm(s: string): string {
+  return (s || '').toLowerCase().replace(/[\s·:：\-—_,,。.]/g, '');
+}
+
+function titleMatches(meetingName: string, calendarName: string): boolean {
+  const a = titleNorm(meetingName);
+  const b = titleNorm(calendarName);
+  return Boolean(a && b && (a.includes(b) || b.includes(a)));
+}
+
+function sameMeetingDay(eventStartMs: number, recordedAt: string): boolean {
+  const day = recordedAt.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+  const d = new Date(eventStartMs);
+  const local = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  return local === day || d.toISOString().slice(0, 10) === day;
+}
+
+function pickCalendar(cands: LifeNode[], meetingName: string): LifeNode | undefined {
+  return cands.find((n) => titleMatches(meetingName, n.name)) || (cands.length === 1 ? cands[0] : undefined);
+}
+
+/** 会议 → 日历节点。有时刻走时间窗;Granola 只有日期时走同一天。 */
+function findCalendarForMeeting(meetingName: string, recordedAt: string): LifeNode | undefined {
+  const meetingT = new Date(recordedAt).getTime();
+  const calendars = getLifeGraph().filter((n) => n.source === 'calendar');
+  const windowed = Number.isFinite(meetingT) && !isDateOnlyIso(recordedAt)
+    ? calendars.filter((n) => {
+      const s = n.attributes?.start ? new Date(String(n.attributes.start)).getTime() : NaN;
+      if (!Number.isFinite(s)) return false;
+      const e = n.attributes?.end ? new Date(String(n.attributes.end)).getTime() : s + 60 * 60_000;
+      return meetingT >= s - 30 * 60_000 && meetingT <= e + 60 * 60_000;
+    })
+    : [];
+  const fromWindow = pickCalendar(windowed, meetingName);
+  if (fromWindow) return fromWindow;
+  if (!isDateOnlyIso(recordedAt)) return undefined;
+  const sameDay = calendars.filter((n) => {
+    const s = n.attributes?.start ? new Date(String(n.attributes.start)).getTime() : NaN;
+    return Number.isFinite(s) && sameMeetingDay(s, recordedAt);
+  });
+  return pickCalendar(sameDay, meetingName);
+}
+
+/** 日历同步之后补挂:Granola 常先到、当时图里还没有过去的日程。 */
+export function relinkMeetingNotesToCalendar(): number {
+  const graph = getLifeGraph();
+  let linked = 0;
+  for (const n of graph) {
+    if (!(n.tags || []).includes('meeting-notes')) continue;
+    if (typeof n.attributes?.calendarNodeId === 'string' && n.attributes.calendarNodeId) continue;
+    const meetingName = (n.name || '').replace(/^(会议记录|Meeting notes)\s*·\s*/, '').trim() || n.name;
+    const recordedAt = typeof n.attributes?.recordedAt === 'string' ? n.attributes.recordedAt : n.createdAt;
+    const cal = findCalendarForMeeting(meetingName, recordedAt);
+    if (!cal) continue;
+    const relations = [...(n.relations || [])];
+    if (!relations.some((r) => r.targetId === cal.id)) {
+      relations.push({ targetId: cal.id, relation: '对应日程' });
+    }
+    updateLifeNode(n.id, {
+      attributes: { ...n.attributes, calendarNodeId: cal.id, calendarName: cal.name },
+      relations,
+    });
+    updateLifeNode(cal.id, {
+      attributes: {
+        ...cal.attributes,
+        meetingRecordId: n.id,
+        ...(typeof n.attributes?.granolaMeetingId === 'string'
+          ? { granolaMeetingId: n.attributes.granolaMeetingId }
+          : {}),
+      },
+    });
+    linked += 1;
+  }
+  if (linked) broadcast();
+  return linked;
 }
 
 export function addMeetingNotes(

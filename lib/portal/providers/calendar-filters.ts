@@ -170,3 +170,31 @@ export function mergeCalendarEvents(
     .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
     .slice(0, limit);
 }
+
+/** 拉日历给会议挂档:过去 35 天(Granola last_30_days)+ 未来仍按 80 条。 */
+const DAY_MS = 86_400_000;
+export const CAL_PAST_MS = 35 * DAY_MS;
+export const CAL_FUTURE_LIMIT = 80;
+export const CAL_PAST_LIMIT = 150;
+
+/**
+ * 合并去重之后再切窗口。不能对「过去+未来」整表 slice(80):
+ * 按开始时间排序的话 80 条会全是过去,今天页的即将开始会被挤掉。
+ */
+export function windowCalendarEvents(
+  events: readonly CalendarEvent[],
+  now = Date.now(),
+): CalendarEvent[] {
+  const pastMin = now - CAL_PAST_MS;
+  const past: CalendarEvent[] = [];
+  const future: CalendarEvent[] = [];
+  for (const ev of events) {
+    const t = new Date(ev.start).getTime();
+    if (!Number.isFinite(t) || t < pastMin) continue;
+    if (t < now) past.push(ev);
+    else future.push(ev);
+  }
+  past.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+  future.sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime());
+  return [...past.slice(-CAL_PAST_LIMIT), ...future.slice(0, CAL_FUTURE_LIMIT)];
+}

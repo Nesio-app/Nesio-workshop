@@ -3,7 +3,7 @@ import { cookies } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
-import { mergeCalendarEvents } from '@/lib/portal/calendar-filters';
+import { mergeCalendarEvents, windowCalendarEvents, CAL_PAST_MS } from '@/lib/portal/calendar-filters';
 import type { CalendarEvent } from '@/lib/portal/types';
 import { parseIcsEvents, parseCalendarName } from '@/lib/portal/ics';
 import { resolveGmailAccessToken } from '@/lib/portal/providers/gmail-access';
@@ -235,13 +235,15 @@ async function fetchGoogleCalendarList(accessToken: string): Promise<GoogleCalen
 
 async function fetchEventsForCalendar(accessToken: string, cal: GoogleCalendarListEntry) {
   const now = new Date();
-  const timeMin = now.toISOString();
+  // 过去 35 天:Granola 会议(last_30_days)才能挂到对应日程。只拉「现在起」时
+  // 历史会议永远 挂到日程 0。未来窗口仍是 90 天。
+  const timeMin = new Date(now.getTime() - CAL_PAST_MS).toISOString();
   const timeMax = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000).toISOString();
   const url = new URL(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(cal.id)}/events`);
   url.searchParams.set('singleEvents', 'true');
   url.searchParams.set('orderBy', 'startTime');
-  // 主日历保持原 80;订阅日历各 50(农历/节假日一天一条,靠 mergeCalendarEvents 的农历过滤 + 总量 80 挡噪音)
-  url.searchParams.set('maxResults', cal.primary ? '80' : '50');
+  // 主日历 250:过去+未来;订阅日历各 80(农历靠 merge 过滤)
+  url.searchParams.set('maxResults', cal.primary ? '250' : '80');
   url.searchParams.set('timeMin', timeMin);
   url.searchParams.set('timeMax', timeMax);
 
@@ -288,8 +290,8 @@ async function fetchGoogleOAuthEvents(accessToken: string): Promise<{ events: Ca
     const first = settled.find((r): r is PromiseRejectedResult => r.status === 'rejected');
     throw first ? (first.reason instanceof Error ? first.reason : new Error(String(first.reason))) : new Error('calendar_all_failed');
   }
-  // mergeCalendarEvents:跨日历去重(同一会议同时出现在主日历+团队日历)+ 农历标记过滤 + 时间排序,总量 80
-  const events = mergeCalendarEvents(lists, 80);
+  // 先去重/滤农历(宽松上限),再按「过去 35 天 + 未来 80」切,避免 slice(80) 把即将开始挤掉。
+  const events = windowCalendarEvents(mergeCalendarEvents(lists, 10_000));
   return { events, feeds };
 }
 
@@ -438,7 +440,7 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const events = mergeCalendarEvents(lists, 80);
+  const events = windowCalendarEvents(mergeCalendarEvents(lists, 10_000));
 
   return NextResponse.json(
     {

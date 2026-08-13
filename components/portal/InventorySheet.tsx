@@ -9,18 +9,16 @@
  * 浏览分组从物品 location 首段动态聚合;复用 nesio-freeze-* sheet 骨架样式。
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
 import Button from '@/components/portal/ui/Button';
-import { guardPaidCloudAi } from '@/lib/portal/entitlement';
 import { relativePastLabel } from '@/lib/portal/time-labels';
 import { IconMapPin, IconClock, IconCamera, IconNote, IconBox, IconPlus, IconUpload, IconHanger, IconUtensils, IconFile, IconTrendingUp, IconGift, IconCard } from './icons';
 import LocationPicker from './LocationPicker';
 import { importInventoryCsv } from '@/lib/portal/inventory-import';
-import { useRef } from 'react';
 import {
   addInventoryItem,
   amazonSummary,
@@ -130,8 +128,8 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
   const [detailId, setDetailId] = useState<string | null>(null);
   const [importMsg, setImportMsg] = useState(''); // 物品②:导入结果可见展示(不静默)
   const fileRef = useRef<HTMLInputElement>(null);
-  const [pasteBusy, setPasteBusy] = useState(false); // 物品⑤:粘贴商品信息识别
-  const [pasteMsg, setPasteMsg] = useState('');
+  const smartCamRef = useRef<HTMLInputElement>(null);
+  const smartAlbumRef = useRef<HTMLInputElement>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null); // 物品⑥:复制转卖文案反馈
 
   // 加物品表单
@@ -279,46 +277,9 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
 
   if (!open && !isPage) return null;
 
-  const resetForm = () => { setFName(''); setFLocation(''); setFQty(''); setFExpiry(''); setFNote(''); setFCategory(''); setCatCustom(false); setFTags(''); setFPrice(''); setPasteMsg(''); };
+  const resetForm = () => { setFName(''); setFLocation(''); setFQty(''); setFExpiry(''); setFNote(''); setFCategory(''); setCatCustom(false); setFTags(''); setFPrice(''); };
 
-  // 物品⑤:粘贴商品信息(商品页标题/描述/链接文本)→ AI 识别预填表单;失败可见,不静默
-  const pasteRecognize = async () => {
-    setPasteMsg('');
-    let text = '';
-    try { text = (await navigator.clipboard.readText()).trim(); }
-    catch { setPasteMsg(L(dict, '读不到剪贴板 —— 请允许粘贴权限,或直接手动填写', 'Clipboard unavailable — allow paste permission or fill in manually')); return; }
-    if (!text) { setPasteMsg(L(dict, '剪贴板是空的 —— 先去商品页复制标题或描述', 'Clipboard is empty — copy a product title or description first')); return; }
-    if (!guardPaidCloudAi('inventory_extract')) { setPasteBusy(false); return; } // 安全审计 #2:AI 抽取付费云
-    setPasteBusy(true);
-    try {
-      const res = await fetch('/api/portal/inventory-extract', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) });
-      const data = await res.json().catch(() => null) as { items?: Array<{ name?: string; quantity?: number; location?: string; category?: string; tags?: string[]; price?: number; note?: string }> } | null;
-      const list = res.ok && Array.isArray(data?.items) ? data!.items! : [];
-      if (!list.length || !list[0]?.name) {
-        setPasteMsg(L(dict, '没识别出物品 —— 手动填一下吧', "Couldn't recognize an item — fill it in manually"));
-        return;
-      }
-      if (list.length > 1) {
-        // 多件直接入库(和问一问同语义),不让第 2 件之后静默丢失
-        for (const it of list) { if (it.name) addInventoryItem(it as { name: string }); }
-        refresh();
-        setView('list');
-        setImportMsg(L(dict, `已识别并存入 ${list.length} 件`, `Recognized and saved ${list.length} items`));
-        return;
-      }
-      const first = list[0];
-      setFName(first.name || '');
-      if (first.location) setFLocation(first.location);
-      if (first.quantity != null) setFQty(String(first.quantity));
-      if (first.category) setFCategory(first.category);
-      if (first.tags?.length) setFTags(first.tags.join(', '));
-      if (first.price != null) setFPrice(String(first.price));
-      if (first.note) setFNote(first.note);
-      setPasteMsg(L(dict, '已识别,确认或补几笔再保存', 'Recognized — review and save'));
-    } catch {
-      setPasteMsg(L(dict, '识别服务暂时不可用 —— 稍后再试,或手动填写', 'Recognition unavailable — try again later or fill in manually'));
-    } finally { setPasteBusy(false); }
-  };
+  // 智能添加:总览 ＋ → 拍照/图库弹出(同今天页),走相机识别成物品。
 
   // 物品⑥:复制转卖文案(纯模板,不花钱);复制失败降级为可手动复制的弹窗
   const copyListing = async (i: InventoryItem) => {
@@ -443,7 +404,7 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
         {isPage && view === 'list' && pageTab === 'overview' && (
           <div className="nesio-inv-overview" style={{ overflowY: 'auto', paddingBottom: 'var(--space-4)' }}>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginBottom: 'var(--space-2)' }}>
-              <Button type="button" variant="soft" size="sm" pill={false} aria-label={L(dict, '记一件', 'Add one')}
+              <Button type="button" variant="soft" size="sm" pill={false} aria-label={L(dict, '智能添加', 'Smart add')}
                 onClick={() => { resetForm(); setView('add'); }}
                 layoutStyle={{ width: 36, height: 36 }}
                 iconLeft={<IconPlus size={18} />} />
@@ -722,18 +683,35 @@ export default function InventorySheet({ open, onClose, variant = 'sheet' }: Inv
         {view === 'add' && (
           // 批次 179:键盘弹起时底部让出 --kb-inset,焦点输入可滚到键盘上方(修物品表单键盘漂移)
           <div style={{ maxHeight: '58vh', overflowY: 'auto', paddingBottom: 'var(--kb-inset, 0px)' }}>
-            {/* 物品⑤:从商品页复制标题/描述,一键识别预填 */}
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              full
-              disabled={pasteBusy}
-              onClick={pasteRecognize}
-            >
-              {pasteBusy ? L(dict, '识别中…', 'Recognizing…') : L(dict, '粘贴商品信息识别(商品标题/描述都行)', 'Paste product info to auto-fill')}
-            </Button>
-            {pasteMsg && <p style={{ margin: 'var(--space-2) 0 0', fontSize: 'var(--text-xs)', color: 'var(--text-tertiary)', textAlign: 'center' }}>{pasteMsg}</p>}
+            {/* 智能添加:拍照 / 图库 → 相机识别成物品;手填表单仍在下面。 */}
+            <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-3)' }}>
+              <Button type="button" variant="soft" size="sm" full
+                onClick={() => smartCamRef.current?.click()}
+                iconLeft={<IconCamera size={14} />}>
+                {L(dict, '拍照识别', 'Snap to recognize')}
+              </Button>
+              <Button type="button" variant="secondary" size="sm" full
+                onClick={() => smartAlbumRef.current?.click()}
+                iconLeft={<IconUpload size={14} />}>
+                {L(dict, '从相册', 'From album')}
+              </Button>
+            </div>
+            <input ref={smartCamRef} type="file" accept="image/*" capture="environment" className="nesio-visually-hidden"
+              onChange={(e) => {
+                const f = e.currentTarget.files?.[0];
+                e.currentTarget.value = '';
+                if (!f) return;
+                try { window.dispatchEvent(new CustomEvent('nesio-open-camera', { detail: { file: f } })); } catch { /* ignore */ }
+                setView('list');
+              }} />
+            <input ref={smartAlbumRef} type="file" accept="image/*" className="nesio-visually-hidden"
+              onChange={(e) => {
+                const f = e.currentTarget.files?.[0];
+                e.currentTarget.value = '';
+                if (!f) return;
+                try { window.dispatchEvent(new CustomEvent('nesio-open-camera', { detail: { file: f } })); } catch { /* ignore */ }
+                setView('list');
+              }} />
             <label style={label}>{L(dict, '物品名', 'Item name')}</label>
             <input className="nesio-ob-input" value={fName} onChange={(e) => setFName(e.target.value)} placeholder={L(dict, '例:护照、备用钥匙、维生素 D3', 'e.g. passport, spare keys, vitamin D3')} />
             <label style={label}>{L(dict, '放哪了?(和拍一下识别同一套位置)', 'Where does it live? (same places as Snap)')}</label>
@@ -1217,7 +1195,7 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
       <input className="nesio-ob-input" value={note} onChange={(e) => setNote(e.target.value)} />
 
       <label style={label}>{L(dict, '照片 / 文件', 'Photos / files')}</label>
-      <input ref={attachRef} type="file" accept="image/*,.pdf,.doc,.docx,.txt,.csv" multiple className="nesio-visually-hidden"
+      <input ref={attachRef} type="file" multiple className="nesio-visually-hidden"
         onChange={(e) => { void onAttachFiles(e.target.files); e.currentTarget.value = ''; }} />
       <Button type="button" variant="secondary" size="sm" full disabled={attachBusy}
         onClick={() => attachRef.current?.click()}>
@@ -1225,10 +1203,10 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
       </Button>
       {attachErr && <p role="alert" style={{ margin: '4px 0 0', fontSize: 'var(--text-xs)', color: 'var(--status-risk)' }}>{attachErr}</p>}
       {assets.length > 0 && (
-        <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <ul style={{ margin: '8px 0 0', padding: 0, listStyle: 'none', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
           {assets.map((a) => (
             <li key={a.id} style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
-              {a.label || a.id}{a.kind === 'image' ? ` · ${L(dict, '图片', 'Image')}` : ` · ${L(dict, '文件', 'File')}`}
+              <AssetThumb assetId={a.id} label={a.label || a.id} isImage={a.kind === 'image' || Boolean(a.mimeType?.startsWith('image/'))} dict={dict} />
             </li>
           ))}
         </ul>
@@ -1354,5 +1332,49 @@ function ItemDetail({ item, dict, label, onChanged, onDeleted, onSaved }: {
         {L(dict, '删除物品', 'Delete item')}
       </Button>
     </div>
+  );
+}
+
+/** 物品详情附件缩略图:本机图从 IDB 读;非图文件显示文件名。 */
+function AssetThumb({ assetId, label, isImage, dict }: {
+  assetId: string; label: string; isImage: boolean; dict: string;
+}) {
+  const [url, setUrl] = useState<string>('');
+  useEffect(() => {
+    let live = true;
+    let objectUrl = '';
+    (async () => {
+      if (isImage) {
+        const { getLocalImage } = await import('@/lib/portal/local-image-store');
+        const u = await getLocalImage(assetId);
+        if (live && u) setUrl(u);
+        return;
+      }
+      const { getLocalFile } = await import('@/lib/portal/local-file-store');
+      const rec = await getLocalFile(assetId);
+      if (!live || !rec?.blob) return;
+      objectUrl = URL.createObjectURL(rec.blob);
+      setUrl(objectUrl);
+    })().catch(() => {});
+    return () => {
+      live = false;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [assetId, isImage]);
+
+  if (isImage && url) {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={url} alt={label} style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 8, border: '1px solid var(--portal-line)' }} />
+    );
+  }
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4, maxWidth: 120,
+      padding: '6px 8px', borderRadius: 8, border: '1px solid var(--portal-line)',
+      background: 'var(--portal-accent-soft)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+    }}>
+      {label || L(dict, '附件', 'File')}
+    </span>
   );
 }

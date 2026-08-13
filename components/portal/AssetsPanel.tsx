@@ -24,6 +24,8 @@ import {
   type ManualAsset, type ManualAssetKind,
 } from '@/lib/portal/finance-assets';
 import { loadDomainExpenses, addManualEntry, EXPENSES_EVENT } from '@/lib/portal/finance-sources';
+import { loadBankTx } from '@/lib/portal/bank-tx';
+import { loadTxAnnotations, txAnnotationOf } from '@/lib/portal/tx-annotations';
 import {
   listCareRecords, addCareRecord, removeCareRecord, upcomingCare, nextDueDate,
   ASSET_CARE_EVENT, type CareKind, type CareRecord,
@@ -194,7 +196,19 @@ function AssetCard({ asset, expenses, people, dict, open, onToggle, teslaVehicle
 
   const boundVehicle = teslaVehicles.find((v) => v.vehicleId === asset.teslaVehicleId) || null;
   const cur = assetCurrentValue(asset);
-  const costs = assetHoldingCosts(asset.id, expenses);
+  // 双向:资产页费用 = 域内支出(assetId) ∪ 银行流水批注关联到此资产的笔。
+  const year = new Date().getFullYear();
+  const anns = loadTxAnnotations();
+  const bankLinked = loadBankTx()
+    .filter((t) => txAnnotationOf(t.id, anns).assetId === asset.id && t.date.startsWith(String(year)) && t.amount > 0)
+    .map((t) => ({
+      assetId: asset.id,
+      assetCostKind: 'other' as const,
+      amount: Math.abs(t.amount),
+      occurredAt: t.date,
+      kind: 'expense' as const,
+    }));
+  const costs = assetHoldingCosts(asset.id, [...expenses, ...bankLinked]);
   const records = listCareRecords(asset.id);
   const due = upcomingCare(asset.id);
   const latest = asset.anchors[0];

@@ -312,6 +312,12 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const pickBackupDest = (d: 'drive' | 'nesio') => {
     setBackupDest(d);
     try { localStorage.setItem('nesio-backup-dest', d); } catch { /* ignore */ }
+    if (d === 'drive') {
+      setDriveMsg(L(dict,
+        '已选 Google 云。点「备份」即可;若尚未连接 Google,会引导你去「连接数据源」开通 Drive。',
+        'Google cloud selected. Tap Back up; if Google isn’t connected yet, you’ll be guided to enable Drive under Connected sources.'));
+      setDriveState('idle');
+    }
   };
 
   /**
@@ -331,6 +337,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   const [testMsg, setTestMsg] = useState('');
   const [notifyPrefs, setNotifyPrefs] = useState<NotifyPrefs>({ reminders: true, teslaLowBatt: true, familyChores: true });
   const nativeNotify = isNativePlatform();
+  const iosWeb = !nativeNotify && typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
   useEffect(() => {
     if (!open) return;
     setDailyReportOn(loadProfileSettings().dailyReportEnabled);
@@ -421,9 +428,12 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     const r = await pushBackupToDrive();
     if (r.ok) { setDriveState('done'); setDriveMsg(L(dict, '✓ 已免费备份到你的 Google Drive', '✓ Backed up free to your Google Drive')); }
     else if (r.error === 'not_connected') {
-      // 兜底:没连 Google → 自动落回 Nesio 云(用户要求「我们的云兜底」)
-      setDriveState('idle'); setDriveMsg(L(dict, '未连接 Google,改用 Nesio 云…', 'Google not connected — using Nesio cloud…'));
-      await handleCloudBackup();
+      // 没连 Google → 说清楚怎么开通,并打开数据源(不要静默改用 Nesio 云,用户以为开了 Drive)
+      setDriveState('error');
+      setDriveMsg(L(dict,
+        '还没开通 Google Drive 备份 —— 先点「连接数据源」连上 Google(含 Drive),再回来备份。',
+        'Google Drive backup isn’t enabled yet — connect Google under Connected sources (includes Drive), then back up again.'));
+      try { onOpenConnect?.(); } catch { /* ignore */ }
     } else {
       setDriveState('error');
       setDriveMsg(L(dict, '备份到 Drive 没成功 —— 稍后再试或用「导出完整备份」', "Drive backup didn't go through — try again later or use Export full backup"));
@@ -712,7 +722,17 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           {hapticsOn ? '✓' : '○'}
         </span>
       </button>
-      {(nativeNotify || pushSupported()) && (
+      {!nativeNotify && (
+        <div className="nesio-settings-option" style={{ cursor: 'default' }}>
+          <div>
+            <span className="nesio-settings-option-label">{L(dict, '系统通知', 'System notifications')}</span>
+            <span className="nesio-settings-option-hint">
+              {L(dict, '系统通知只在「宝盒」App 里响。现在是浏览器 —— iPhone 设置里打开的是 Safari/Chrome 的通知,不是宝盒。请用 Sideloadly 安装带通知插件的 IPA,打开宝盒后再点「试一条」。', 'System alerts only ring in the 宝盒 app. This is the browser — iOS Settings for Safari/Chrome is not 宝盒. Install the Sideloadly IPA that includes the notification plugin, then tap “Send a test alert” inside the app.')}
+            </span>
+          </div>
+        </div>
+      )}
+      {(nativeNotify || (pushSupported() && !iosWeb)) && (
         <>
         <button type="button"
           className={`nesio-settings-option${pushOn ? ' nesio-settings-option--active' : ''}`}
@@ -763,12 +783,12 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
                   const r = await m.scheduleLocalAlert({
                     title: L(dict, '试一下通知', 'Test notification'),
                     body: L(dict, '能看到这一条,系统通知就接通了。', 'If you see this, system notifications are working.'),
-                    afterSec: 2,
+                    afterSec: 5,
                     id: 710_003,
                     assumeGranted: true,
                   });
                   setTestMsg(r.ok
-                    ? L(dict, '两秒后会响一条。没响的话请重装带通知插件的 IPA。', 'It should ring in two seconds. If not, reinstall an IPA that includes the notification plugin.')
+                    ? L(dict, '已排程。请立刻按 Home 切到桌面等几秒 —— 停在 App 里旧壳会吞掉横幅。若桌面也不响,需重装带前台通知修复的 IPA。', 'Scheduled. Press Home now and wait a few seconds — older shells swallow banners while the app is open. If nothing appears on the Home Screen, reinstall an IPA with the foreground-notification fix.')
                     : r.reason === 'denied'
                       ? L(dict, '系统没给通知权限 — 到设置 → 宝盒里打开通知。', 'Notifications not allowed — enable them in Settings → 宝盒.')
                       : L(dict, '这版壳排不上通知 — 请用 Sideloadly 重装新 IPA。', 'This shell cannot schedule alerts — reinstall a new IPA with Sideloadly.'));

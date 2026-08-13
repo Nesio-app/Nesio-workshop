@@ -80,6 +80,21 @@
   ⑤ 天气 chip 可点:小时 + 7 天 + 最多 4 个其它城市(Open-Meteo)。
 - **2026-08-11 Granola 重连假链接**:授权失效横幅看起来像链接,其实只是 toast 死字。
   改成可点按钮 → `/api/portal/granola/connect`,行上也露出「点击重新授权」。
+- **2026-08-11 同步清空记忆 / 会议找不到 / 浏览器通知不响**:① 分片写盘在空
+  prev(新会话)时必须和磁盘 union,禁止把历史年从索引摘掉、禁止整片换成当次日历。
+  连接中心 Gmail/Notion 改 `ingestLifeNodesBatch`,点同步先 `whenGraphHydrated`。
+  ② Google 日历改为过去 35 天+未来 90 天;Granola 只有日期时按同一天挂日程;
+  日历同步后 `relinkMeetingNotesToCalendar`;会议记录 `type:event`,记忆页有「会议」
+  片,洞察→日程有说明。③ 浏览器设置页明写:系统通知只在宝盒 App 响,iOS 里打开的
+  是 Safari/Chrome 不是宝盒,需 Sideloadly IPA。
+- **2026-08-12 IPA 通知前台吞 / 财务·附件·物品一轮**:① `NesioLocalNotifyPlugin.load`
+  挂上 `localNotificationHandler`,前台 willPresent 给 banner+sound(旧 IPA 仍须按 Home
+  测,新壳需重打 Sideloadly)。② 今天提醒:首见商家>$50 + 单笔≥$200。③ 会议 To do →
+  会议记录 `subtasksJson`,不再各成今天提醒。④ 邮件「阅读/回复」Compose/Reader 抬层
+  elevated;附件/分派改名并放到阅读上方。⑤ 主页+弹出选图;粉气泡点进相机识别成物品,
+  ↑ 单独发则当记忆附件。⑥ 物品+智能添加(拍照/相册),去掉粘贴识别。⑦ 记忆/物品附件
+  预览修好。⑧ 财务首页永久去掉「手动/小票/旅行」列表;删财产联动删域内支出;交易关联
+  财产双向进资产卡。⑨ Google 云备份:未连 Google 时引导去「连接数据源」开通 Drive。
 
 ## 进行中的迁移
 

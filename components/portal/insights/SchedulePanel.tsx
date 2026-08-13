@@ -1237,6 +1237,11 @@ export default function SchedulePanel() {
         onSelect={setSub}
         ariaLabel={L(dict, '日程视图', 'Schedule view')}
       />
+      {sub === 'calendar' && nodes.some((n) => (n.tags || []).includes('meeting-notes')) && (
+        <p className="nesio-settings-option-hint" style={{ margin: 'var(--space-2) 0 var(--space-3)' }}>
+          {L(dict, '会议记录在这里。挂到日程的标「有记录」;没对上的单独列一行。再同步一次 Google 日历会自动补挂。', 'Meeting notes live here. Linked events show “notes”; unmatched ones are listed on their own. Sync Google Calendar again to attach them.')}
+        </p>
+      )}
 
       {/* ── 搜索(2026-07-30 用户要求「日历和邮件增加搜索,模糊搜索,包括全文和 title」)──
           放在筛选标签**上面**:先搜后筛,标签的数字也跟着搜索结果走。 */}

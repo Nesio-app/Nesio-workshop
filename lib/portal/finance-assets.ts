@@ -14,7 +14,7 @@
 import { createBlobStore } from './idb-blob-store';
 import { reportStorageDropped } from './storage-health';
 import { loadBankAccounts, assetSummaryWithHoldings, loadHoldings } from './bank-tx';
-import { loadDomainExpenses } from './finance-sources';
+import { loadDomainExpenses, saveDomainExpenses } from './finance-sources';
 
 export const FIN_ASSETS_KEY = 'nesio-fin-assets-v1';
 export const FIN_NETWORTH_SERIES_KEY = 'nesio-fin-networth-series-v1';
@@ -131,6 +131,10 @@ export function addAssetAnchor(assetId: string, anchor: AssetAnchor): boolean {
 
 export function removeManualAsset(assetId: string): void {
   assetsStore.save(listManualAssets().filter((a) => a.id !== assetId));
+  // 联动:挂在这件财产上的域内支出一并删掉,避免财务首页/资产卡幽灵账。
+  try {
+    saveDomainExpenses(loadDomainExpenses().filter((e) => e.assetId !== assetId));
+  } catch { /* ignore */ }
   emit();
 }
 

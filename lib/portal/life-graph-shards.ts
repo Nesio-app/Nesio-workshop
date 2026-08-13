@@ -76,6 +76,37 @@ export function groupByShard(nodes: readonly LifeNode[]): Map<string, LifeNode[]
   return out;
 }
 
+function stampOf(n: LifeNode): string {
+  return String((n.attributes?.updatedAt as string) || n.createdAt || '');
+}
+
+/** 同 id 取较新的。写盘在不知道上一份内容时必须先和磁盘 union,不能整片覆盖。 */
+function unionNodesById(a: readonly LifeNode[], b: readonly LifeNode[]): LifeNode[] {
+  const byId = new Map<string, LifeNode>();
+  for (const n of [...a, ...b]) {
+    if (!n?.id) continue;
+    const prev = byId.get(n.id);
+    if (!prev || stampOf(n) >= stampOf(prev)) byId.set(n.id, n);
+  }
+  return Array.from(byId.values());
+}
+
+async function readIndexShards(idb: ShardBackend): Promise<string[]> {
+  const indexRaw = await idb.get(GRAPH_SHARD_INDEX_KEY).catch(() => null);
+  if (!indexRaw) return [];
+  try {
+    const parsed = JSON.parse(indexRaw) as unknown;
+    return Array.isArray(parsed) ? parsed.filter((s): s is string => typeof s === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 会话里第一次写(prev 空)或某片突然少了一大半 → 先和磁盘/上一份并,防止同步把记忆写瘫。 */
+function looksLikeShardWipe(prevCount: number, nextCount: number): boolean {
+  return prevCount > 20 && nextCount < prevCount * 0.5 && prevCount - nextCount > 15;
+}
+
 /**
  * 纯函数:对比「这次要写的每片 JSON」与「上次写过的每片 JSON」,得出真正要落盘的片。
  * @returns write 要写的片名;remove 变空、应当删掉的片名。
@@ -151,6 +182,33 @@ export async function writeGraphShards(
   prevJson: ReadonlyMap<string, string>,
 ): Promise<{ nextJson: Map<string, string>; written: string[]; removed: string[] }> {
   const grouped = groupByShard(nodes);
+  const existingShards = await readIndexShards(idb);
+
+  // ① 要覆盖的片:会话里没见过上一份 JSON → 先读磁盘 union。
+  //    见过但条数腰斩 → 也 union(同步路径曾拿半张图把当年片整片换成日历)。
+  for (const [shard, list] of [...grouped.entries()]) {
+    const prevRaw = prevJson.get(shard);
+    if (prevRaw) {
+      const prevNodes = parseNodeArray(prevRaw);
+      if (prevNodes && looksLikeShardWipe(prevNodes.length, list.length)) {
+        grouped.set(shard, unionNodesById(prevNodes, list));
+      }
+      continue;
+    }
+    const onDisk = parseNodeArray(await idb.get(shardStorageKey(shard)).catch(() => null));
+    if (onDisk?.length) grouped.set(shard, unionNodesById(onDisk, list));
+  }
+
+  // ② 索引里有、这次 nodes 没提到的年:只有 prev 里明确知道那片内容时才允许删。
+  //    prev 空 = 不知道全图,历史年必须留在索引里,否则日历同步会把 2019/2025 从索引摘掉,
+  //    物理数据还在但再也读不出来。
+  for (const shard of existingShards) {
+    if (grouped.has(shard)) continue;
+    if (prevJson.has(shard)) continue;
+    const onDisk = parseNodeArray(await idb.get(shardStorageKey(shard)).catch(() => null));
+    if (onDisk?.length) grouped.set(shard, onDisk);
+  }
+
   const nextJson = new Map<string, string>();
   for (const [shard, list] of grouped) nextJson.set(shard, JSON.stringify(list));
 
