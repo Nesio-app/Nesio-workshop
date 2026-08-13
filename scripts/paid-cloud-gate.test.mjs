@@ -21,10 +21,10 @@ const read = (p) => fs.readFileSync(new URL('../' + p, import.meta.url), 'utf8')
 
 // ── 用户触发的云 AI 入口:接 guardPaidCloudAi ──
 // (bug3 起 HangNoteSheet 不在此列 —— 记一条改成纯手动输入,不再有云调用)
+// InventorySheet 粘贴识别入口已撤(改拍照/相册);inventory_extract 门仍钉在 NesioChatSheet。
 const GATED = [
   ['components/portal/today/MeetingRecorderSheet.tsx', 'meeting_notes'],
   ['components/portal/NesioProfileCard.tsx', 'avatar_ai'],
-  ['components/portal/InventorySheet.tsx', 'inventory_extract'],
   ['components/portal/NesioChatSheet.tsx', 'inventory_extract'],
   ['components/portal/health/HealthDashboard.tsx', 'health_insight'],
 ];
