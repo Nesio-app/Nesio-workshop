@@ -375,7 +375,7 @@ export async function POST(req: NextRequest) {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': `multipart/related; boundary=${boundary}`,
         },
-        body: multipart,
+        body: new Uint8Array(multipart) as BodyInit,
       });
       if (!res.ok) {
         const text = await res.text().catch(() => '');
