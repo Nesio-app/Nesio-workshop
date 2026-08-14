@@ -676,7 +676,11 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     if (!token && c.id !== 'notion') { setTokenInputFor(c.id); setTokenValue(''); return; }
     setSyncing(c.id);
     const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
-    await whenGraphHydrated();
+    if (!(await whenGraphHydrated())) {
+      showToast(L(dict, '记忆库还在加载,稍后再同步', 'Memory graph still loading — try sync again shortly'), false);
+      setSyncing(null);
+      return;
+    }
     try {
       // Notion 选定数据源 → N-3 结构折叠:一本书一条记忆(划线折进书里),丢日历/技术列。
       // N-5:N-0 的暂停已撤销 —— 折叠管道上线后逐行倒的噪声问题已根治,恢复同步。
@@ -803,7 +807,14 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     setSyncing(c.id);
     setOauthSyncResult((p) => ({ ...p, google: { ok: true, msg: L(dict, '同步中…', 'Syncing…') } }));
     const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
-    await whenGraphHydrated();
+    if (!(await whenGraphHydrated())) {
+      setOauthSyncResult((p) => ({
+        ...p,
+        google: { ok: false, msg: L(dict, '记忆库还在加载,稍后再同步', 'Memory graph still loading — try sync again shortly') },
+      }));
+      setSyncing(null);
+      return;
+    }
     const parts: string[] = [];
     let allOk = true;
     let reauth = false;
@@ -1007,7 +1018,13 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       }
       const meetings = data.meetings || [];
       const { whenGraphHydrated, getLifeGraph } = await import('@/lib/portal/life-graph');
-      await whenGraphHydrated();
+      if (!(await whenGraphHydrated())) {
+        setOauthSyncResult((p) => ({
+          ...p,
+          granola: { ok: false, msg: L(dict, '记忆库还在加载,稍后再同步', 'Memory graph still loading — try sync again shortly') },
+        }));
+        return;
+      }
       let created = 0;
       let linked = 0; // 挂到对应日历日程的场次(端到端可见:没挂上 = 标题/时间差超容差或日历没同步)
       for (const m of meetings) {

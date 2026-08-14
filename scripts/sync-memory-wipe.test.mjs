@@ -18,6 +18,12 @@ const second = region.lastIndexOf('for (const localNode of loadAll())');
 const first = region.indexOf('for (const localNode of loadAll())');
 assert.ok(second > first, 'saveAll 前必须再 loadAll 一次,否则水合完成会把空种子 ∪ 云快照盖掉 IDB');
 assert.match(merge, /export function whenGraphHydrated/, '同步路径要能等图谱水合');
+assert.match(merge, /finish\(graphHydrationSettled\)/, '水合超时不得假装已就绪');
+assert.match(merge, /persistChain/, '写盘必须串行,防半图交错删年');
+
+const shards = read('../lib/portal/life-graph-shards.ts');
+assert.match(shards, /allowYearPrune/, '半图落盘不许删历史年');
+assert.match(shards, /looksLikeShardWipe\(countNodesInPrevJson/, '按全图条数判断腰斩');
 
 const sync = read('../lib/portal/cloud-memory-sync.ts');
 assert.match(sync, /whenGraphHydrated/, '拉云前等水合');
@@ -28,11 +34,17 @@ const runGmail = gmail.slice(gmail.indexOf('export async function runGmailSync')
 assert.doesNotMatch(runGmail, /nodes\.forEach\(\(n\) => ingestLifeNode/, '禁止逐条 ingestLifeNode 灌邮件');
 assert.match(gmail, /CAL_PAST_MS/, '日历进记忆要覆盖 Granola 过去 30 天,不能只留昨天起');
 assert.match(gmail, /relinkMeetingNotesToCalendar/, '日历同步后要补挂会议记录');
+assert.match(gmail, /graph_not_ready/, '水合未完成要显式失败,不能空种子写图');
+assert.match(gmail, /串行写图源/, '统一同步禁止五路并行写图');
+const runFlomo = gmail.slice(gmail.indexOf('export async function runFlomoSync'), gmail.indexOf('export async function saveCalendarEventsToMemory'));
+assert.match(runFlomo, /ingestLifeNodesBatch/, 'Flomo 也必须批量写图');
+assert.doesNotMatch(runFlomo, /ingestLifeNode\(\{/, 'Flomo 禁止逐条 ingestLifeNode');
 
 const hub = read('../components/portal/ConnectorsHub.tsx');
 assert.match(hub, /ingestLifeNodesBatch/, '连接中心同步必须批量写图');
 assert.doesNotMatch(hub, /data\.nodes!\.forEach\(\(n\) => ingestLifeNode/, '连接中心禁止逐条 ingest 邮件');
 assert.match(hub, /whenGraphHydrated/, '点同步先等图谱水合');
+assert.match(hub, /记忆库还在加载/, '水合未完成要有可见失败态');
 assert.match(hub, /洞察 → 日程/, 'Granola 同步成功要告诉人会议记录在哪');
 
 const calRoute = read('../app/api/portal/calendar/route.ts');

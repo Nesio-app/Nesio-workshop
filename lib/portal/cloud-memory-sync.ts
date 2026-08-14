@@ -49,7 +49,7 @@ export async function syncMemoryWithCloud(opts: { force?: boolean } = {}): Promi
     const client = createAppApiClient();
     const snapshot = await client.fetchCloudMemorySnapshot();
     if (!snapshot.ok) return { ok: false, importedNodeCount: 0 };
-    await whenGraphHydrated();
+    if (!(await whenGraphHydrated())) return { ok: false, importedNodeCount: 0 };
     const merged = mergeCloudMemorySnapshot({ nodes: snapshot.nodes || [], assets: snapshot.assets || [] });
     // 顺带把本地新记忆推上云 + 重试挂起项,让「拉」的同时也「推」,两端逐步收敛。
     void retryLifeGraphCloudSync();

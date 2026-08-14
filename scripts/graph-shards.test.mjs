@@ -98,6 +98,21 @@ await run('②b 一片变空 → 删掉该片,索引跟着更新', async () => {
   looseDeepEqual(JSON.parse(idb.store.get(S.GRAPH_SHARD_INDEX_KEY)), ['2026']);
 });
 
+await run('②f 半张图配上已满的 prevJson 不得删历史年', async () => {
+  const idb = fakeIdb();
+  const many = [];
+  for (let i = 0; i < 40; i++) many.push(node(`old-${i}`, '2019-05-05'));
+  for (let i = 0; i < 40; i++) many.push(node(`cur-${i}`, '2026-07-30'));
+  const first = await S.writeGraphShards(idb, many, new Map());
+  // 同步只带着几条今年日历,但会话里 lastShardJson 已经知道全图
+  const half = [node('cal-1', '2026-08-01'), node('cal-2', '2026-08-02')];
+  const wiped = await S.writeGraphShards(idb, half, first.nextJson);
+  const read = await S.readGraphShards(idb);
+  assert.ok(read.nodes.some((n) => n.id === 'old-0'), '半图落盘把 2019 从索引摘掉了');
+  assert.ok(!wiped.removed.includes('2019'), '条数腰斩时不许删历史年');
+  assert.ok(read.nodes.some((n) => n.id === 'cal-1'), '新日历应 union 进当年片');
+});
+
 await run('②d 空 prev 不得把历史年从索引摘掉(同步半张图)', async () => {
   const idb = fakeIdb();
   await S.writeGraphShards(idb, [node('old', '2019-05-05'), node('cur', '2026-07-30')], new Map());

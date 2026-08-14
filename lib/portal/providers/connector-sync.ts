@@ -26,6 +26,8 @@ export interface PlaidSyncResult {
 export async function runPlaidSync(): Promise<PlaidSyncResult> {
   const fail = (error: string): PlaidSyncResult => ({ ok: false, error, fresh: 0, total: 0, accounts: 0, pending: 0, withLogo: 0 });
   try {
+    const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
+    if (!(await whenGraphHydrated())) return fail('graph_not_ready');
     // 财务㉑:富化回填 —— 每设备一次全量重拉,按 id 覆盖补齐,之后回到增量
     let full = false;
     try { full = !localStorage.getItem('nesio-plaid-enrich-v1'); } catch { /* ignore */ }
@@ -127,12 +129,17 @@ const FLOMO_INGEST_CHUNK = 20;
 
 export async function runFlomoSync(): Promise<FlomoSyncResult> {
   try {
+    const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
+    if (!(await whenGraphHydrated())) {
+      return { ok: false, fresh: 0, error: 'graph_not_ready' };
+    }
     // limit 从 5000 收到 800:5000 = 服务端翻 25 页,拉取本身就慢/易超时;800 足够覆盖增量,
     // 首灌超量的部分靠多点几次同步逐步消化(去重保证不重复)。
     const res = await fetch('/api/portal/flomo?limit=800');
     const data = await res.json() as { ok?: boolean; memos?: Array<{ content: string; created_at: string; tags: string[]; slug?: string }>; error?: string };
     if (!data.ok) return { ok: false, fresh: 0, error: data.error || 'not_configured' };
-    const { getLifeGraph } = await import('@/lib/portal/life-graph');
+    const { getLifeGraph, batchPatchLifeNodes } = await import('@/lib/portal/life-graph');
+    const { ingestLifeNodesBatch } = await import('@/lib/life-domain/ingest-node');
     const graph = getLifeGraph();
     const existingSlugs = new Set(graph.map((n) => n.attributes?.flomoSlug as string).filter(Boolean));
     const existingBodies = new Set(
@@ -146,29 +153,22 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
       const plain = stripMarkdownInline(m.content.replace(/<[^>]+>/g, ' ')).trim().slice(0, 200);
       return plain && !existingBodies.has(plain);
     });
-    const batch = fresh.slice(0, FLOMO_INGEST_CAP); // memos 已按新→旧;先灌最新一批
+    const batch = fresh.slice(0, FLOMO_INGEST_CAP);
     let imported = 0;
-    const { batchPatchLifeNodes } = await import('@/lib/portal/life-graph');
     for (let i = 0; i < batch.length; i += FLOMO_INGEST_CHUNK) {
-      const createdAtPatches: Array<{ id: string; patch: { createdAt: string } }> = [];
-      for (const m of batch.slice(i, i + FLOMO_INGEST_CHUNK)) {
-        // 先剥 markdown 再截断(QA:标题曾是 `![](https://flomoapp.com/favicon.i` 这种半截图片语法)
+      const chunk = batch.slice(i, i + FLOMO_INGEST_CHUNK);
+      const inputs: IngestNodeInput[] = [];
+      const memosForInputs: typeof chunk = [];
+      for (const m of chunk) {
         const plain = stripMarkdownInline(m.content.replace(/<[^>]+>/g, ' '));
-        // 只有标签、没有正文的 flomo 笔记不进记忆。
-        // flomo 里这种条目很常见(建标签时随手留的一行 `#主题/健身`),导进来就是一条
-        // 名字叫「#主题/健身」、正文也是「#主题/健身」的「记忆」—— 用户在记忆库里
-        // 搜「健身」,第一条命中的就是这个内部分类标签本身(QA #14)。
-        // 判据收在 topic-tags.isTagOnlyText —— 展示层(memory-visibility)用的是同一份,
-        // 否则「入库时挡住的」和「展示时滤掉的」会慢慢漂成两套。
         if (!plain.trim() || isTagOnlyText(plain)) continue;
-        const node = ingestLifeNode({
+        inputs.push({
           type: 'collection',
           name: plain.slice(0, 40),
           attributes: {
             source: 'Flomo',
             created: m.created_at,
             flomoSlug: m.slug || '',
-            // ingestLifeNode externalKey 认 externalId —— slug 稳定,重同步原地更新不堆重复
             ...(m.slug ? { externalId: `flomo:${m.slug}` } : {}),
           },
           relations: [],
@@ -177,18 +177,20 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
           rawInput: plain.slice(0, 200),
           source: 'manual',
         });
-        // 对照 CameraSheet EXIF:把 flomo 原创建时间写到节点 createdAt(排序/时间线用),
-        // 不只塞 attributes.created —— 否则同步日会盖过真实手记日。
-        // 空格分隔的 created_at 先收成 ISO,避免 Safari Invalid Date。
-        // 禁止逐条 updateLifeNode:会把每块 20 条再翻倍成整图写盘风暴。
-        if (m.created_at && node?.id) {
-          const d = parseMemoryDate(m.created_at);
-          createdAtPatches.push({ id: node.id, patch: { createdAt: d ? d.toISOString() : m.created_at } });
-        }
-        imported++;
+        memosForInputs.push(m);
       }
+      if (!inputs.length) continue;
+      const nodes = ingestLifeNodesBatch(inputs);
+      const createdAtPatches: Array<{ id: string; patch: { createdAt: string } }> = [];
+      for (let j = 0; j < nodes.length; j++) {
+        const m = memosForInputs[j];
+        const node = nodes[j];
+        if (!m?.created_at || !node?.id) continue;
+        const d = parseMemoryDate(m.created_at);
+        createdAtPatches.push({ id: node.id, patch: { createdAt: d ? d.toISOString() : m.created_at } });
+      }
+      imported += nodes.length;
       if (createdAtPatches.length) batchPatchLifeNodes(createdAtPatches);
-      // 让出事件循环:主线程喘口气,避免长时间独占被系统判「无响应」杀掉。
       if (i + FLOMO_INGEST_CHUNK < batch.length) await new Promise((r) => setTimeout(r, 0));
     }
     if (imported) window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
@@ -203,7 +205,7 @@ export interface CalendarSyncResult { ok: boolean; count: number; added: number;
 /** 过去 35 天 + 未来 90 天进记忆(覆盖 Granola last_30_days);已存在(同 calendarId)但开始时间变了 → 原位更新。 */
 export async function saveCalendarEventsToMemory(events: Array<Record<string, unknown>>): Promise<number> {
   const { getLifeGraph, batchPatchLifeNodes, batchDeleteLifeNodes, whenGraphHydrated } = await import('@/lib/portal/life-graph');
-  await whenGraphHydrated();
+  if (!(await whenGraphHydrated())) return 0;
   const now = Date.now();
   const windowEnd = now + 90 * 86_400_000;
 
@@ -398,7 +400,9 @@ export async function runGmailSync(opts?: { force?: boolean }): Promise<GmailSyn
     const nodes = data.nodes || [];
     if (nodes.length) {
       const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
-      await whenGraphHydrated();
+      if (!(await whenGraphHydrated())) {
+        return { ok: false, read: data.emailCount ?? 0, extracted: 0, error: 'graph_not_ready' };
+      }
       ingestLifeNodesBatch(nodes.map((n) => ({ ...n, source: 'email' } as Parameters<typeof ingestLifeNode>[0])));
     }
     // 云 AI 抽取转后台富化:同步已成功返回,富化拿到更好的语义节点就原位升级(失败无声)。
@@ -424,6 +428,8 @@ export async function runPeopleSync(): Promise<PeopleSyncResult> {
   if (peopleSyncInFlight) return peopleSyncInFlight;
   peopleSyncInFlight = (async () => {
   try {
+    const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
+    if (!(await whenGraphHydrated())) return { ok: false, error: 'graph_not_ready', imported: 0, updated: 0 };
     const res = await fetch('/api/portal/people');
     if (res.status === 401) return { ok: false, error: 'not_connected', imported: 0, updated: 0 };
     const data = await res.json().catch(() => null) as { ok?: boolean; contacts?: Array<{ name?: string; emails?: string[]; photo?: string; birthday?: string; groups?: string[] }> } | null;
@@ -499,10 +505,24 @@ export async function dedupeImportedContacts(): Promise<number> {
 }
 
 export async function syncAllConnectors(): Promise<SyncAllOutcome[]> {
+  const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
+  if (!(await whenGraphHydrated())) {
+    const detail: [string, string] = ['记忆库还在加载,稍后再同步', 'Memory graph still loading — try sync again shortly'];
+    return [
+      { id: 'calendar', ok: false, detail },
+      { id: 'gmail', ok: false, detail },
+      { id: 'flomo', ok: false, detail },
+      { id: 'plaid', ok: false, detail },
+      { id: 'people', ok: false, detail },
+    ];
+  }
   const out: SyncAllOutcome[] = [];
-  const [cal, mail, flomo, plaid, people] = await Promise.all([
-    runCalendarSync(), runGmailSync({ force: true }), runFlomoSync(), runPlaidSync(), runPeopleSync(),
-  ]);
+  // 串行写图源,避免五路并行 saveAll 交错半图落盘。
+  const cal = await runCalendarSync();
+  const mail = await runGmailSync({ force: true });
+  const flomo = await runFlomoSync();
+  const plaid = await runPlaidSync();
+  const people = await runPeopleSync();
   out.push({ id: 'calendar', ok: cal.ok, detail: cal.ok ? [`日历 ${cal.count} 条(新进记忆 ${cal.added})`, `Calendar ${cal.count} (${cal.added} new)`] : ['日历未同步(未连接或出错)', 'Calendar not synced'] });
   out.push({ id: 'gmail', ok: mail.ok, detail: mail.ok ? [`邮件读 ${mail.read} 封,提取 ${mail.extracted} 条`, `Mail read ${mail.read}, extracted ${mail.extracted}`] : [`邮件未同步(${mail.error || '未连接或出错'})`, `Mail not synced (${mail.error || 'error'})`] });
   out.push({ id: 'flomo', ok: flomo.ok, detail: flomo.ok ? [`Flomo 新增 ${flomo.fresh} 条`, `Flomo +${flomo.fresh}`] : ['Flomo 未配置', 'Flomo not configured'] });

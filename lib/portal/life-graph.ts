@@ -779,30 +779,33 @@ let persistPending: LifeNode[] | null = null;
 // 上次落盘时每片的 JSON(会话内)。写的时候只落**变了的片** —— 改一条今年的记忆
 // 不再重写历史几年的数据。空 Map = 下次全量重写(首次/迁移后)。
 let lastShardJson = new Map<string, string>();
+/** 串行化写盘:并行 flush 会交错 lastShardJson,半张图配上「已知全索引」会删历史年。 */
+let persistChain: Promise<void> = Promise.resolve();
 
 function flushPersistNow(): void {
   if (persistTimer != null) { clearTimeout(persistTimer); persistTimer = null; }
   const nodes = persistPending;
   persistPending = null;
   if (!nodes) return;
-  void (async () => {
+  const snapshot = nodes;
+  persistChain = persistChain.then(async () => {
     try {
       const [{ idbBackend }, shards] = await Promise.all([
         import('./idb-blob-store'),
         import('./life-graph-shards'),
       ]);
       if (!idbBackend) return;
-      const res = await shards.writeGraphShards(idbBackend, nodes, lastShardJson);
+      // 再取一份当前 memCache:队列等待期间若已有更新的全图,用更新的,避免旧半图晚到覆盖。
+      const latest = memCache && memCache.length >= snapshot.length ? memCache : snapshot;
+      const res = await shards.writeGraphShards(idbBackend, latest, lastShardJson);
       lastShardJson = res.nextJson;
     } catch {
-      // 写盘失败必须可见(红线:不许吞掉会丢数据的存储写失败)。
-      // 同时把分片缓存清空 —— 下次写全量重来,免得「以为写过了」而跳过某片。
       lastShardJson = new Map();
       import('./storage-health').then(({ STORAGE_FULL_EVENT, getStorageHealth }) => {
         window.dispatchEvent(new CustomEvent(STORAGE_FULL_EVENT, { detail: getStorageHealth() }));
       }).catch(() => {});
     }
-  })();
+  }).catch(() => { /* 单次失败已在内处理;链不能断 */ });
 }
 
 if (typeof window !== 'undefined') {
@@ -821,25 +824,27 @@ export function isGraphHydrationSettled(): boolean {
 }
 
 /**
- * 等到记忆图从 IDB 读完(或超时)。点同步时若抢在水合前 merge+saveAll,
- * 会把「空种子 ∪ 云快照」当成全量落盘,界面先空、过很久才一点点回来。
+ * 等到记忆图从 IDB 读完。
+ * @returns true=已 settle,可以安全写图;false=超时仍未就绪 —— 调用方必须中止同步写图,
+ *   否则会在空种子上 ingest,界面先空,半图落盘还会掏空历史年。
  */
-export function whenGraphHydrated(timeoutMs = 12_000): Promise<void> {
-  if (typeof window === 'undefined' || graphHydrationSettled) return Promise.resolve();
+export function whenGraphHydrated(timeoutMs = 12_000): Promise<boolean> {
+  if (typeof window === 'undefined') return Promise.resolve(true);
+  if (graphHydrationSettled) return Promise.resolve(true);
   hydrateGraphOnce();
   return new Promise((resolve) => {
     let done = false;
-    const finish = () => {
+    const finish = (ok: boolean) => {
       if (done) return;
       done = true;
       window.clearTimeout(timer);
       window.removeEventListener('nesio-life-graph-updated', onUp);
-      resolve();
+      resolve(ok);
     };
-    const onUp = () => { if (graphHydrationSettled) finish(); };
-    const timer = window.setTimeout(finish, timeoutMs);
+    const onUp = () => { if (graphHydrationSettled) finish(true); };
+    const timer = window.setTimeout(() => finish(graphHydrationSettled), timeoutMs);
     window.addEventListener('nesio-life-graph-updated', onUp);
-    if (graphHydrationSettled) finish();
+    if (graphHydrationSettled) finish(true);
   });
 }
 

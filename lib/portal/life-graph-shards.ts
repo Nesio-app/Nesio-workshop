@@ -103,8 +103,17 @@ async function readIndexShards(idb: ShardBackend): Promise<string[]> {
 }
 
 /** 会话里第一次写(prev 空)或某片突然少了一大半 → 先和磁盘/上一份并,防止同步把记忆写瘫。 */
-function looksLikeShardWipe(prevCount: number, nextCount: number): boolean {
+export function looksLikeShardWipe(prevCount: number, nextCount: number): boolean {
   return prevCount > 20 && nextCount < prevCount * 0.5 && prevCount - nextCount > 15;
+}
+
+function countNodesInPrevJson(prevJson: ReadonlyMap<string, string>): number {
+  let n = 0;
+  for (const raw of prevJson.values()) {
+    const arr = parseNodeArray(raw);
+    if (arr) n += arr.length;
+  }
+  return n;
 }
 
 /**
@@ -199,12 +208,21 @@ export async function writeGraphShards(
     if (onDisk?.length) grouped.set(shard, unionNodesById(onDisk, list));
   }
 
-  // ② 索引里有、这次 nodes 没提到的年:只有 prev 里明确知道那片内容时才允许删。
-  //    prev 空 = 不知道全图,历史年必须留在索引里,否则日历同步会把 2019/2025 从索引摘掉,
-  //    物理数据还在但再也读不出来。
+  // ② 索引里有、这次 nodes 没提到的年:
+  //    - 全量写图(条数相对 prev 正常)→ 允许删空年(用户真删光了那一年)
+  //    - 半张图(条数腰斩)→ 绝不许删:同步/竞态常只带着当年几条日历/邮件来落盘
+  const allowYearPrune = prevJson.size === 0
+    || !looksLikeShardWipe(countNodesInPrevJson(prevJson), nodes.length);
+
   for (const shard of existingShards) {
     if (grouped.has(shard)) continue;
-    if (prevJson.has(shard)) continue;
+    if (allowYearPrune && prevJson.has(shard)) continue;
+    const fromPrev = prevJson.get(shard);
+    if (fromPrev) {
+      const prevNodes = parseNodeArray(fromPrev);
+      if (prevNodes?.length) grouped.set(shard, prevNodes);
+      continue;
+    }
     const onDisk = parseNodeArray(await idb.get(shardStorageKey(shard)).catch(() => null));
     if (onDisk?.length) grouped.set(shard, onDisk);
   }
