@@ -110,8 +110,9 @@ export async function packBackupZip(backup: BackupLike): Promise<{ blob: Blob; b
 
   const zipped = await zipAsync(zipFiles);
   const copy = copyU8(zipped);
+  const ab = copy.buffer.slice(copy.byteOffset, copy.byteOffset + copy.byteLength) as ArrayBuffer;
   return {
-    blob: new Blob([copy], { type: BACKUP_ZIP_MIME }),
+    blob: new Blob([ab], { type: BACKUP_ZIP_MIME }),
     bytes: copy.byteLength,
     photoCount,
   };
@@ -121,7 +122,8 @@ export async function packBackupZip(backup: BackupLike): Promise<{ blob: Blob; b
 export async function packBackupGzip(backup: unknown): Promise<{ blob: Blob; bytes: number }> {
   const gz = await gzipAsync(strToU8(JSON.stringify(backup)));
   const copy = copyU8(gz);
-  return { blob: new Blob([copy], { type: BACKUP_GZ_MIME }), bytes: copy.byteLength };
+  const ab = copy.buffer.slice(copy.byteOffset, copy.byteOffset + copy.byteLength) as ArrayBuffer;
+  return { blob: new Blob([ab], { type: BACKUP_GZ_MIME }), bytes: copy.byteLength };
 }
 
 function looksLikeZip(buf: Uint8Array, name: string, type: string): boolean {

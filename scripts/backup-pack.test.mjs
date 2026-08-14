@@ -22,8 +22,12 @@ function loadTs(rel) {
     Blob: class {
       constructor(parts, opts) { this._parts = parts; this.type = opts?.type || ''; }
       async arrayBuffer() {
-        const u8 = this._parts[0];
-        return u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength);
+        const p = this._parts[0];
+        if (p instanceof ArrayBuffer) return p.slice(0);
+        if (ArrayBuffer.isView(p)) {
+          return p.buffer.slice(p.byteOffset, p.byteOffset + p.byteLength);
+        }
+        throw new Error('unsupported Blob part');
       }
     },
     File: class extends Blob {
