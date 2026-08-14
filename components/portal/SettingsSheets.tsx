@@ -416,9 +416,11 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
   }
 
   function driveErrorText(err: string | undefined, detail?: string): string {
-    const tip = detail ? ` (${detail})` : '';
+    const tip = [err, detail].filter(Boolean).join(':');
+    const suffix = tip ? `（${tip}）` : '';
     switch (err) {
       case 'not_connected':
+      case 'auth_required':
         return L(dict,
           '还没开通 Google Drive 备份 —— 先点「连接数据源」连上 Google(含 Drive),再回来备份。',
           'Google Drive backup isn’t enabled yet — connect Google under Connected sources (includes Drive), then back up again.');
@@ -436,10 +438,12 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         return L(dict, '这次没能把数据打包好 —— 不是网络问题。先用「导出」留一份。', "Couldn't package your data — not a network issue. Export a local copy first.");
       case 'no_backup':
         return L(dict, '你的 Drive 里还没有备份 —— 先点上面「备份」', 'No backup in your Drive yet — tap Back up above first');
+      case 'rate_limited':
+        return L(dict, '备份请求太密,稍等半分钟再试一次。', 'Too many backup requests — wait about 30 seconds and try again.');
       case 'network':
-        return L(dict, `网络没通,备份没送出${tip} —— 换稳一点的网再试,或先「导出」。`, `Network failed, backup didn’t leave the phone${tip} — try a steadier connection, or Export first.`);
+        return L(dict, `网络没通,备份没送出${suffix} —— 换稳一点的网再试,或先「导出」。`, `Network failed, backup didn’t leave the phone${suffix} — try a steadier connection, or Export first.`);
       default:
-        return L(dict, `备份到 Drive 没成功${tip} —— 稍后再试或用「导出」`, `Drive backup didn’t go through${tip} — try again later or use Export`);
+        return L(dict, `备份到 Drive 没成功${suffix} —— 稍后再试或用「导出」`, `Drive backup didn’t go through${suffix} — try again later or use Export`);
     }
   }
 

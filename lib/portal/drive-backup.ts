@@ -2,16 +2,17 @@
  * 免费云备份客户端(Google Drive「我的云端硬盘 / 宝盒备份」)。
  *
  * 设计红线:失败必可见;按钮不得永久停在「正在备份…」。
- * 含照片/附件:默认全量打包。可续传会话由**服务端**向 Google 发起(浏览器读不到
- * Location 头),客户端再 PUT 分片到 uploadUrl —— 避开 CORS + Vercel 4.5MB 双坑。
+ * 上传一律经本服务代传到 Google —— iOS WKWebView 直连 googleapis 常被 CORS 挡死
+ * (表现成「备份到 Drive 没成功」且无细节)。小包 uploadGzip;大包 beginResumable+putChunk。
  */
-import { gzip, gunzip, strToU8, strFromU8 } from 'fflate';
+import { gzip, strToU8 } from 'fflate';
 import { buildCombinedBackup, restoreCombinedBackup, type RestoreMode, type CombinedRestoreResult } from './cloud-backup';
 
 const DRIVE_BACKUP_AT_KEY = 'nesio-drive-backup-at';
-const DRIVE = 'https://www.googleapis.com/drive/v3';
-/** 单次可续传分片(手机弱网友好)。 */
-const CHUNK = 256 * 1024;
+/** 单次分片(base64 后仍远低于 Vercel ~4.5MB 请求体)。 */
+const CHUNK = 512 * 1024;
+/** 整包经 uploadGzip 的上限(留余量给 JSON 外壳)。 */
+const DIRECT_GZ_LIMIT = 3.2 * 1024 * 1024;
 const UPLOAD_TIMEOUT_MS = 180_000;
 
 export type DriveBackupError =
@@ -22,7 +23,9 @@ export type DriveBackupError =
   | 'no_backup'
   | 'too_large'
   | 'build_failed'
-  | 'timeout';
+  | 'timeout'
+  | 'rate_limited'
+  | 'auth_required';
 
 export interface DriveBackupResult {
   ok: boolean;
@@ -32,24 +35,9 @@ export interface DriveBackupResult {
   bytes?: number;
   folderName?: string;
   fileName?: string;
-  /** 是否含照片/附件。 */
   withMedia?: boolean;
-  /** 便于排障的短说明(可选)。 */
   detail?: string;
 }
-
-type DriveSession = {
-  ok?: boolean;
-  error?: string;
-  connectUrl?: string;
-  accessToken?: string;
-  folderId?: string;
-  folderName?: string;
-  backupNameGz?: string;
-  backupNameJson?: string;
-  file?: { id: string; name: string; size?: string } | null;
-  location?: string;
-};
 
 function timeoutSignal(ms: number): AbortSignal | undefined {
   if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
@@ -62,39 +50,66 @@ function gzipAsync(u8: Uint8Array): Promise<Uint8Array> {
   return new Promise((resolve, reject) => gzip(u8, (err, out) => (err ? reject(err) : resolve(out))));
 }
 
-function gunzipAsync(u8: Uint8Array): Promise<Uint8Array> {
-  return new Promise((resolve, reject) => gunzip(u8, (err, out) => (err ? reject(err) : resolve(out))));
+function bytesToB64(bytes: Uint8Array): string {
+  const chunk = 0x8000;
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
 }
 
-async function requestSession(): Promise<DriveSession & { httpStatus: number }> {
-  const signal = timeoutSignal(30_000);
-  const res = await fetch('/api/portal/drive', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: 'session' }),
-    cache: 'no-store',
-    ...(signal ? { signal } : {}),
-  });
-  const data = (await res.json().catch(() => null)) as DriveSession | null;
-  return { ...(data || {}), httpStatus: res.status };
-}
-
-function mapAuth(session: DriveSession & { httpStatus: number }): DriveBackupResult | null {
-  if (session.httpStatus === 401 || session.error === 'not_connected') {
-    return { ok: false, error: 'not_connected', connectUrl: session.connectUrl || '/api/portal/gmail/connect' };
+function mapHttpError(status: number, data: { error?: string; detail?: string; connectUrl?: string } | null): DriveBackupResult | null {
+  if (status === 401 || data?.error === 'not_connected' || data?.error === 'auth_required') {
+    return {
+      ok: false,
+      error: data?.error === 'auth_required' ? 'auth_required' : 'not_connected',
+      connectUrl: data?.connectUrl || '/api/portal/gmail/connect',
+      detail: data?.error,
+    };
   }
-  if (session.httpStatus === 403 || session.error === 'insufficient_scope') {
-    return { ok: false, error: 'insufficient_scope', connectUrl: session.connectUrl || '/api/portal/gmail/connect' };
+  if (status === 403 || data?.error === 'insufficient_scope') {
+    return { ok: false, error: 'insufficient_scope', connectUrl: data?.connectUrl || '/api/portal/gmail/connect', detail: data?.detail };
   }
-  if (!session.ok || !session.accessToken) {
-    return { ok: false, error: 'drive', detail: `session_${session.httpStatus || 'bad'}` };
+  if (status === 429 || data?.error === 'rate_limited') {
+    return { ok: false, error: 'rate_limited', detail: data?.error || 'rate_limited' };
+  }
+  if (status === 413 || data?.error === 'too_large') {
+    return { ok: false, error: 'too_large', detail: data?.detail };
   }
   return null;
 }
 
+async function uploadGzipDirect(gz: Uint8Array): Promise<DriveBackupResult> {
+  const signal = timeoutSignal(UPLOAD_TIMEOUT_MS);
+  const res = await fetch('/api/portal/drive', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: 'uploadGzip', gzipBase64: bytesToB64(gz) }),
+    cache: 'no-store',
+    ...(signal ? { signal } : {}),
+  });
+  const data = await res.json().catch(() => null) as {
+    ok?: boolean; at?: string; folderName?: string; fileName?: string;
+    error?: string; detail?: string; connectUrl?: string;
+  } | null;
+  const mapped = mapHttpError(res.status, data);
+  if (mapped) return { ...mapped, bytes: gz.byteLength };
+  if (!res.ok || !data?.ok) {
+    return { ok: false, error: 'drive', bytes: gz.byteLength, detail: data?.error || data?.detail || `uploadGzip_${res.status}` };
+  }
+  return {
+    ok: true,
+    at: data.at || new Date().toISOString(),
+    bytes: gz.byteLength,
+    folderName: data.folderName || '宝盒备份',
+    fileName: data.fileName || 'nesio-backup.json.gz',
+  };
+}
+
 async function beginResumable(byteSize: number): Promise<
   | { ok: true; uploadUrl: string; folderName: string; fileName: string }
-  | { ok: false; error: DriveBackupError; detail?: string; connectUrl?: string }
+  | { ok: false; result: DriveBackupResult }
 > {
   const signal = timeoutSignal(30_000);
   const res = await fetch('/api/portal/drive', {
@@ -106,16 +121,15 @@ async function beginResumable(byteSize: number): Promise<
   });
   const data = await res.json().catch(() => null) as {
     ok?: boolean; uploadUrl?: string; folderName?: string; fileName?: string;
-    error?: string; connectUrl?: string;
+    error?: string; detail?: string; connectUrl?: string;
   } | null;
-  if (res.status === 401 || data?.error === 'not_connected') {
-    return { ok: false, error: 'not_connected', connectUrl: data?.connectUrl || '/api/portal/gmail/connect' };
-  }
-  if (res.status === 403 || data?.error === 'insufficient_scope') {
-    return { ok: false, error: 'insufficient_scope', connectUrl: data?.connectUrl || '/api/portal/gmail/connect' };
-  }
+  const mapped = mapHttpError(res.status, data);
+  if (mapped) return { ok: false, result: { ...mapped, bytes: byteSize } };
   if (!res.ok || !data?.ok || !data.uploadUrl) {
-    return { ok: false, error: 'drive', detail: data?.error || `begin_${res.status}` };
+    return {
+      ok: false,
+      result: { ok: false, error: 'drive', bytes: byteSize, detail: data?.error || data?.detail || `begin_${res.status}` },
+    };
   }
   return {
     ok: true,
@@ -125,32 +139,50 @@ async function beginResumable(byteSize: number): Promise<
   };
 }
 
-/** 把 gzip 分片 PUT 到服务端开好的可续传 URL。 */
-async function putResumableChunks(
+/** 分片经本服务代 PUT —— 手机绝不直连 googleapis。 */
+async function putChunksViaServer(
   uploadUrl: string,
   gz: Uint8Array,
-): Promise<{ ok: true; fileId: string } | { ok: false; error: DriveBackupError; detail?: string }> {
+): Promise<{ ok: true; fileId: string } | { ok: false; result: DriveBackupResult }> {
   let offset = 0;
   while (offset < gz.byteLength) {
     const end = Math.min(offset + CHUNK, gz.byteLength);
     const chunk = gz.subarray(offset, end);
-    let put: Response;
+    const signal = timeoutSignal(60_000);
+    let res: Response;
     try {
-      put = await fetch(uploadUrl, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/gzip',
-          'Content-Length': String(chunk.byteLength),
-          'Content-Range': `bytes ${offset}-${end - 1}/${gz.byteLength}`,
-        },
-        body: new Blob([chunk as BlobPart]),
+      res = await fetch('/api/portal/drive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'putChunk',
+          uploadUrl,
+          offset,
+          total: gz.byteLength,
+          chunkBase64: bytesToB64(chunk),
+        }),
+        cache: 'no-store',
+        ...(signal ? { signal } : {}),
       });
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'fetch_failed';
-      return { ok: false, error: 'network', detail: msg.slice(0, 80) };
+      return { ok: false, result: { ok: false, error: 'network', bytes: gz.byteLength, detail: msg.slice(0, 80) } };
     }
-    if (put.status === 308) {
-      const range = put.headers.get('Range');
+    const data = await res.json().catch(() => null) as {
+      ok?: boolean; incomplete?: boolean; done?: boolean; fileId?: string;
+      range?: string | null; error?: string; detail?: string; connectUrl?: string;
+    } | null;
+    const mapped = mapHttpError(res.status, data);
+    if (mapped) return { ok: false, result: { ...mapped, bytes: gz.byteLength } };
+    if (!res.ok || !data?.ok) {
+      return {
+        ok: false,
+        result: { ok: false, error: 'drive', bytes: gz.byteLength, detail: data?.error || data?.detail || `chunk_${res.status}` },
+      };
+    }
+    if (data.done) return { ok: true, fileId: data.fileId || '' };
+    if (data.incomplete) {
+      const range = data.range;
       if (range) {
         const m = /bytes=0-(\d+)/.exec(range);
         offset = m ? Number(m[1]) + 1 : end;
@@ -159,16 +191,10 @@ async function putResumableChunks(
       }
       continue;
     }
-    if (put.status === 401 || put.status === 403) {
-      return { ok: false, error: 'insufficient_scope', detail: `put_${put.status}` };
-    }
-    if (!put.ok) {
-      return { ok: false, error: 'drive', detail: `put_${put.status}` };
-    }
-    const done = await put.json().catch(() => null) as { id?: string } | null;
-    return { ok: true, fileId: done?.id || '' };
+    // 未标 incomplete/done —— 保守按本片已收
+    offset = end;
   }
-  return { ok: false, error: 'drive', detail: 'put_incomplete' };
+  return { ok: false, result: { ok: false, error: 'drive', bytes: gz.byteLength, detail: 'put_incomplete' } };
 }
 
 /** 把本机 durable 数据(默认含照片/附件)打包推到 Google Drive「宝盒备份」。 */
@@ -176,11 +202,10 @@ export async function pushBackupToDrive(opts: { includeImages?: boolean } = {}):
   const withMedia = opts.includeImages !== false;
   let backup;
   try {
-    // 等图谱水合完再打包,避免导出/备份打到空图。
     try {
       const { whenGraphHydrated } = await import('./life-graph');
       await whenGraphHydrated();
-    } catch { /* 无图模块时跳过 */ }
+    } catch { /* ignore */ }
     backup = await buildCombinedBackup({ includeImages: withMedia });
   } catch {
     return { ok: false, error: 'build_failed' };
@@ -194,27 +219,21 @@ export async function pushBackupToDrive(opts: { includeImages?: boolean } = {}):
   }
 
   try {
-    const started = await beginResumable(gz.byteLength);
-    if (!started.ok) {
-      return {
-        ok: false,
-        error: started.error,
-        connectUrl: started.connectUrl,
-        bytes: gz.byteLength,
-        detail: started.detail,
-      };
+    // 小包:一次 multipart 代传(最稳)。大包:可续传 + 服务端分片 PUT。
+    if (gz.byteLength <= DIRECT_GZ_LIMIT) {
+      const direct = await uploadGzipDirect(gz);
+      if (direct.ok) {
+        try { localStorage.setItem(DRIVE_BACKUP_AT_KEY, direct.at || new Date().toISOString()); } catch { /* quota */ }
+        return { ...direct, withMedia };
+      }
+      // 小包失败也继续试可续传(个别环境 multipart 怪)。
     }
 
-    const uploaded = await putResumableChunks(started.uploadUrl, gz);
-    if (!uploaded.ok) {
-      return {
-        ok: false,
-        error: uploaded.error,
-        connectUrl: uploaded.error === 'insufficient_scope' ? '/api/portal/gmail/connect' : undefined,
-        bytes: gz.byteLength,
-        detail: uploaded.detail,
-      };
-    }
+    const started = await beginResumable(gz.byteLength);
+    if (!started.ok) return { ...started.result, withMedia };
+
+    const uploaded = await putChunksViaServer(started.uploadUrl, gz);
+    if (!uploaded.ok) return { ...uploaded.result, withMedia };
 
     const at = new Date().toISOString();
     try { localStorage.setItem(DRIVE_BACKUP_AT_KEY, at); } catch { /* quota */ }
@@ -228,55 +247,16 @@ export async function pushBackupToDrive(opts: { includeImages?: boolean } = {}):
     };
   } catch (err) {
     const name = err instanceof Error ? err.name : '';
-    if (name === 'TimeoutError' || name === 'AbortError') return { ok: false, error: 'timeout', bytes: gz.byteLength };
+    if (name === 'TimeoutError' || name === 'AbortError') {
+      return { ok: false, error: 'timeout', bytes: gz.byteLength };
+    }
     return { ok: false, error: 'network', bytes: gz.byteLength, detail: name || 'catch' };
   }
 }
 
-async function downloadDriveFile(accessToken: string, fileId: string): Promise<Uint8Array | null> {
-  const res = await fetch(`${DRIVE}/files/${fileId}?alt=media`, {
-    headers: { Authorization: `Bearer ${accessToken}` },
-    cache: 'no-store',
-  });
-  if (!res.ok) return null;
-  return new Uint8Array(await res.arrayBuffer());
-}
-
-/** 从 Drive 拉回备份并合并回本机(默认 merge)。优先客户端直下(含大包)。 */
+/** 从 Drive 拉回备份并合并回本机(默认 merge)。走服务端 GET,避免 WKWebView 直连 Google。 */
 export async function pullBackupFromDrive(mode: RestoreMode = 'merge'): Promise<DriveBackupResult & { restore?: CombinedRestoreResult }> {
   try {
-    const session = await requestSession();
-    const authErr = mapAuth(session);
-    if (authErr) return authErr;
-
-    if (session.file?.id) {
-      const raw = await downloadDriveFile(session.accessToken!, session.file.id);
-      if (!raw) return { ok: false, error: 'drive', detail: 'download_failed' };
-      let backup: unknown;
-      const name = session.file.name || '';
-      if (name.endsWith('.gz') || (raw.length > 2 && raw[0] === 0x1f && raw[1] === 0x8b)) {
-        try {
-          backup = JSON.parse(strFromU8(await gunzipAsync(raw)));
-        } catch {
-          return { ok: false, error: 'drive', detail: 'gunzip_failed' };
-        }
-      } else {
-        try {
-          backup = JSON.parse(strFromU8(raw));
-        } catch {
-          return { ok: false, error: 'drive', detail: 'json_failed' };
-        }
-      }
-      const restore = await restoreCombinedBackup(backup as Parameters<typeof restoreCombinedBackup>[0], mode);
-      return {
-        ok: true,
-        restore,
-        folderName: session.folderName || '宝盒备份',
-        fileName: session.file.name,
-      };
-    }
-
-    // 无可见文件:走服务端(含旧 appDataFolder)
     const signal = timeoutSignal(UPLOAD_TIMEOUT_MS);
     const res = await fetch('/api/portal/drive', {
       method: 'GET',
@@ -284,17 +264,21 @@ export async function pullBackupFromDrive(mode: RestoreMode = 'merge'): Promise<
       ...(signal ? { signal } : {}),
     });
     const data = await res.json().catch(() => null) as {
-      ok?: boolean; backup?: unknown; error?: string; connectUrl?: string; folderName?: string;
+      ok?: boolean; backup?: unknown; error?: string; connectUrl?: string; folderName?: string; detail?: string;
     } | null;
-    if (res.status === 401 || data?.error === 'not_connected') {
-      return { ok: false, error: 'not_connected', connectUrl: data?.connectUrl || '/api/portal/gmail/connect' };
+    const mapped = mapHttpError(res.status, data);
+    if (mapped) return mapped;
+    if (!res.ok || !data?.ok) {
+      return { ok: false, error: 'drive', detail: data?.error || data?.detail || `get_${res.status}` };
     }
-    if (res.status === 403 || data?.error === 'insufficient_scope') {
-      return { ok: false, error: 'insufficient_scope', connectUrl: data?.connectUrl || '/api/portal/gmail/connect' };
-    }
-    if (!res.ok || !data?.ok) return { ok: false, error: 'drive', detail: data?.error || `get_${res.status}` };
     if (!data.backup) return { ok: false, error: 'no_backup' };
-    const restore = await restoreCombinedBackup(data.backup as Parameters<typeof restoreCombinedBackup>[0], mode);
+
+    // 服务端已解压 gzip;若仍是压缩壳(旧路径)再解一次。
+    let backup = data.backup;
+    if (typeof backup === 'string') {
+      try { backup = JSON.parse(backup); } catch { /* keep */ }
+    }
+    const restore = await restoreCombinedBackup(backup as Parameters<typeof restoreCombinedBackup>[0], mode);
     return { ok: true, restore, folderName: data.folderName || '宝盒备份' };
   } catch (err) {
     const name = err instanceof Error ? err.name : '';

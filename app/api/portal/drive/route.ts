@@ -168,7 +168,8 @@ async function parseMediaBackup(buf: ArrayBuffer, name: string): Promise<unknown
 }
 
 export async function POST(req: NextRequest) {
-  const guard = await guardAiRoute(req, 'drive', { limit: 20 });
+  // 分片代传会打多次;20/min 会在大备份中途被掐。
+  const guard = await guardAiRoute(req, 'drive', { limit: 300 });
   if (guard) return guard;
   const accessToken = await resolveGmailAccessToken(req);
   if (!accessToken) return notConnected();
@@ -178,6 +179,10 @@ export async function POST(req: NextRequest) {
     backup?: unknown;
     gzipBase64?: string;
     byteSize?: number;
+    uploadUrl?: string;
+    offset?: number;
+    total?: number;
+    chunkBase64?: string;
   } | null;
 
   // 客户端直传/直下:发短时 Google access token(同一次 OAuth;限流见 guard)。
@@ -216,7 +221,7 @@ export async function POST(req: NextRequest) {
     }, { headers: { 'Cache-Control': 'no-store' } });
   }
 
-  // 服务端发起可续传会话:浏览器读不到 Google 的 Location 头(CORS),必须由本服务代开。
+  // 服务端发起可续传会话:浏览器/WKWebView 读不到 Location,且直连 Google 常被 CORS 挡。
   if (body?.action === 'beginResumable') {
     const byteSize = Number(body.byteSize);
     if (!Number.isFinite(byteSize) || byteSize <= 0 || byteSize > 512 * 1024 * 1024) {
@@ -247,7 +252,11 @@ export async function POST(req: NextRequest) {
       if (!initRes.ok) {
         const text = await initRes.text().catch(() => '');
         if (isScopeError(initRes.status, text)) return insufficientScope();
-        return NextResponse.json({ ok: false, error: `drive_resumable_${initRes.status}` }, { status: 502 });
+        return NextResponse.json({
+          ok: false,
+          error: `drive_resumable_${initRes.status}`,
+          detail: text.slice(0, 180),
+        }, { status: 502 });
       }
       const uploadUrl = initRes.headers.get('Location');
       if (!uploadUrl) {
@@ -259,6 +268,129 @@ export async function POST(req: NextRequest) {
         folderName: FOLDER_NAME,
         fileName: BACKUP_GZ_NAME,
         fileId: existingGz?.id || null,
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    } catch {
+      return NextResponse.json({ ok: false, error: 'drive_unreachable' }, { status: 502 });
+    }
+  }
+
+  // 手机不直连 Google:分片经本服务 PUT 到可续传 URL(仅允许 googleapis upload 域)。
+  if (body?.action === 'putChunk') {
+    const uploadUrl = String(body.uploadUrl || '');
+    if (!/^https:\/\/www\.googleapis\.com\/upload\//.test(uploadUrl)) {
+      return NextResponse.json({ ok: false, error: 'invalid_upload_url' }, { status: 400 });
+    }
+    const offset = Number(body.offset);
+    const total = Number(body.total);
+    const b64 = String(body.chunkBase64 || '');
+    if (!Number.isFinite(offset) || offset < 0 || !Number.isFinite(total) || total <= 0 || !b64) {
+      return NextResponse.json({ ok: false, error: 'invalid_chunk' }, { status: 400 });
+    }
+    let buf: Buffer;
+    try {
+      buf = Buffer.from(b64, 'base64');
+    } catch {
+      return NextResponse.json({ ok: false, error: 'invalid_chunk' }, { status: 400 });
+    }
+    if (buf.length === 0 || buf.length > 2 * 1024 * 1024) {
+      return NextResponse.json({ ok: false, error: 'invalid_chunk' }, { status: 400 });
+    }
+    const end = offset + buf.length - 1;
+    try {
+      const put = await fetch(uploadUrl, {
+        method: 'PUT',
+        headers: {
+          'Content-Length': String(buf.length),
+          'Content-Type': 'application/gzip',
+          'Content-Range': `bytes ${offset}-${end}/${total}`,
+        },
+        body: buf,
+      });
+      if (put.status === 308) {
+        return NextResponse.json({
+          ok: true,
+          incomplete: true,
+          range: put.headers.get('Range'),
+        }, { headers: { 'Cache-Control': 'no-store' } });
+      }
+      if (!put.ok) {
+        const text = await put.text().catch(() => '');
+        if (isScopeError(put.status, text)) return insufficientScope();
+        return NextResponse.json({
+          ok: false,
+          error: `put_${put.status}`,
+          detail: text.slice(0, 180),
+        }, { status: 502 });
+      }
+      const done = await put.json().catch(() => null) as { id?: string } | null;
+      return NextResponse.json({
+        ok: true,
+        done: true,
+        fileId: done?.id || null,
+        folderName: FOLDER_NAME,
+        fileName: BACKUP_GZ_NAME,
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    } catch {
+      return NextResponse.json({ ok: false, error: 'drive_unreachable' }, { status: 502 });
+    }
+  }
+
+  // 小包整份 gzip 代传(不经可续传;受 Vercel ~4.5MB 请求体限制)。
+  if (body?.action === 'uploadGzip') {
+    const b64 = String(body.gzipBase64 || '');
+    if (!b64) return NextResponse.json({ ok: false, error: 'no_backup' }, { status: 400 });
+    let buf: Buffer;
+    try {
+      buf = Buffer.from(b64, 'base64');
+    } catch {
+      return NextResponse.json({ ok: false, error: 'invalid_gzip' }, { status: 400 });
+    }
+    if (buf.length === 0 || buf.length > 3.6 * 1024 * 1024) {
+      return NextResponse.json({ ok: false, error: 'too_large' }, { status: 413 });
+    }
+    try {
+      const folderId = await ensureBackupFolder(accessToken);
+      if (folderId === 'insufficient_scope') return insufficientScope();
+      const existing = await findInFolder(accessToken, folderId, [BACKUP_GZ_NAME, BACKUP_NAME]);
+      if (existing === 'insufficient_scope') return insufficientScope();
+      const existingGz = existing?.name === BACKUP_GZ_NAME ? existing : null;
+      const boundary = 'nesio_drive_gz';
+      const metadata = existingGz
+        ? { name: BACKUP_GZ_NAME }
+        : { name: BACKUP_GZ_NAME, parents: [folderId] };
+      const multipart = Buffer.concat([
+        Buffer.from(
+          `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+          `--${boundary}\r\nContent-Type: application/gzip\r\n\r\n`,
+        ),
+        buf,
+        Buffer.from(`\r\n--${boundary}--`),
+      ]);
+      const url = existingGz
+        ? `${UPLOAD}/files/${existingGz.id}?uploadType=multipart&fields=id`
+        : `${UPLOAD}/files?uploadType=multipart&fields=id`;
+      const res = await fetch(url, {
+        method: existingGz ? 'PATCH' : 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': `multipart/related; boundary=${boundary}`,
+        },
+        body: multipart,
+      });
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        if (isScopeError(res.status, text)) return insufficientScope();
+        return NextResponse.json({
+          ok: false,
+          error: `drive_upload_${res.status}`,
+          detail: text.slice(0, 180),
+        }, { status: 502 });
+      }
+      return NextResponse.json({
+        ok: true,
+        at: new Date().toISOString(),
+        folderName: FOLDER_NAME,
+        fileName: BACKUP_GZ_NAME,
       }, { headers: { 'Cache-Control': 'no-store' } });
     } catch {
       return NextResponse.json({ ok: false, error: 'drive_unreachable' }, { status: 502 });
@@ -310,7 +442,7 @@ export async function POST(req: NextRequest) {
 }
 
 export async function GET(req: NextRequest) {
-  const guard = await guardAiRoute(req, 'drive', { limit: 20 });
+  const guard = await guardAiRoute(req, 'drive', { limit: 60 });
   if (guard) return guard;
   const accessToken = await resolveGmailAccessToken(req);
   if (!accessToken) return notConnected();

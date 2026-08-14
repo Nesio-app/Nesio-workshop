@@ -92,6 +92,55 @@ function folderListOk() {
   assert.match(res.__json.uploadUrl, /upload_id=abc/, 'uploadUrl 来自 Location');
   assert.equal(res.__json.fileName, 'nesio-backup.json.gz');
 }
+// putChunk:仅允许 googleapis upload 域;成功返回 done
+{
+  const route = loadRoute('tkn', async (url, opt) => {
+    if (String(url).includes('upload_id=abc')) {
+      assert.equal(opt?.method, 'PUT');
+      return { ok: true, status: 200, json: async () => ({ id: 'file1' }), text: async () => '' };
+    }
+    return { ok: true, json: async () => ({}) };
+  });
+  const bad = await route.POST({
+    json: async () => ({
+      action: 'putChunk', uploadUrl: 'https://evil.example/x', offset: 0, total: 3,
+      chunkBase64: Buffer.from('abc').toString('base64'),
+    }),
+  });
+  assert.equal(bad.__status, 400, '非法 uploadUrl → 400');
+
+  const ok = await route.POST({
+    json: async () => ({
+      action: 'putChunk',
+      uploadUrl: 'https://www.googleapis.com/upload/drive/v3/files?upload_id=abc',
+      offset: 0, total: 3,
+      chunkBase64: Buffer.from('abc').toString('base64'),
+    }),
+  });
+  assert.equal(ok.__json.ok, true);
+  assert.equal(ok.__json.done, true);
+  assert.equal(ok.__json.fileId, 'file1');
+}
+// uploadGzip 小包代传
+{
+  const { gzipSync } = nodeRequire('node:zlib');
+  const gz = gzipSync(Buffer.from(JSON.stringify({ v: 1 })));
+  const calls = [];
+  const route = loadRoute('tkn', async (url, opt) => {
+    calls.push(String(url));
+    if (String(url).includes('mimeType')) return folderListOk();
+    if (String(url).includes('/files?') && !String(url).includes('/upload/')) {
+      return { ok: true, json: async () => ({ files: [] }) };
+    }
+    return { ok: true, json: async () => ({ id: 'gz1' }) };
+  });
+  const res = await route.POST({
+    json: async () => ({ action: 'uploadGzip', gzipBase64: gz.toString('base64') }),
+  });
+  assert.equal(res.__json.ok, true, 'uploadGzip ok');
+  assert.equal(res.__json.fileName, 'nesio-backup.json.gz');
+  assert.ok(calls.some((u) => u.includes('/upload/')), '走了 upload API');
+}
 // 首次上传:文件夹存在、无备份文件 → POST 带 parents=folderId
 {
   const calls = [];
@@ -167,7 +216,8 @@ assert.ok(settings.includes('pullBackupFromDrive'), '设置页 Drive 恢复接�
 
 const client = fs.readFileSync(new URL('../lib/portal/drive-backup.ts', import.meta.url), 'utf8');
 assert.ok(client.includes('includeImages'), '客户端支持含图');
-assert.ok(client.includes('beginResumable'), '客户端走服务端发起的可续传');
-assert.ok(!client.includes('googleapis.com/upload/drive/v3/files?uploadType=resumable'), '客户端不再自己开 resumable(CORS)');
+assert.ok(client.includes('beginResumable') && client.includes('putChunk'), '大包走服务端可续传分片');
+assert.ok(client.includes('uploadGzip'), '小包整份代传');
+assert.ok(!client.includes('googleapis.com/upload/drive'), '客户端上传不直连 Google');
 
 console.log('drive-backup: OK');
