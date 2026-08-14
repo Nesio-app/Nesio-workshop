@@ -304,7 +304,7 @@ export async function POST(req: NextRequest) {
           'Content-Type': 'application/gzip',
           'Content-Range': `bytes ${offset}-${end}/${total}`,
         },
-        body: buf,
+        body: new Uint8Array(buf) as BodyInit,
       });
       if (put.status === 308) {
         return NextResponse.json({
