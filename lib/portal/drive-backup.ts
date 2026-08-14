@@ -131,7 +131,7 @@ async function resumablePutGz(
         'Content-Length': String(chunk.byteLength),
         'Content-Range': `bytes ${offset}-${end - 1}/${gz.byteLength}`,
       },
-      body: chunk,
+      body: new Blob([chunk]),
     });
     if (put.status === 308) {
       // 未完成:Google 用 Range 指示已收字节
