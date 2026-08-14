@@ -177,6 +177,7 @@ export async function POST(req: NextRequest) {
     action?: string;
     backup?: unknown;
     gzipBase64?: string;
+    byteSize?: number;
   } | null;
 
   // 客户端直传/直下:发短时 Google access token(同一次 OAuth;限流见 guard)。
@@ -213,6 +214,55 @@ export async function POST(req: NextRequest) {
       file: resolved.file,
       location: resolved.location,
     }, { headers: { 'Cache-Control': 'no-store' } });
+  }
+
+  // 服务端发起可续传会话:浏览器读不到 Google 的 Location 头(CORS),必须由本服务代开。
+  if (body?.action === 'beginResumable') {
+    const byteSize = Number(body.byteSize);
+    if (!Number.isFinite(byteSize) || byteSize <= 0 || byteSize > 512 * 1024 * 1024) {
+      return NextResponse.json({ ok: false, error: 'invalid_size' }, { status: 400 });
+    }
+    try {
+      const folderId = await ensureBackupFolder(accessToken);
+      if (folderId === 'insufficient_scope') return insufficientScope();
+      const existing = await findInFolder(accessToken, folderId, [BACKUP_GZ_NAME, BACKUP_NAME]);
+      if (existing === 'insufficient_scope') return insufficientScope();
+      const existingGz = existing?.name === BACKUP_GZ_NAME ? existing : null;
+      const meta = existingGz
+        ? { name: BACKUP_GZ_NAME }
+        : { name: BACKUP_GZ_NAME, parents: [folderId] };
+      const initUrl = existingGz
+        ? `${UPLOAD}/files/${existingGz.id}?uploadType=resumable`
+        : `${UPLOAD}/files?uploadType=resumable`;
+      const initRes = await fetch(initUrl, {
+        method: existingGz ? 'PATCH' : 'POST',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json; charset=UTF-8',
+          'X-Upload-Content-Type': 'application/gzip',
+          'X-Upload-Content-Length': String(byteSize),
+        },
+        body: JSON.stringify(meta),
+      });
+      if (!initRes.ok) {
+        const text = await initRes.text().catch(() => '');
+        if (isScopeError(initRes.status, text)) return insufficientScope();
+        return NextResponse.json({ ok: false, error: `drive_resumable_${initRes.status}` }, { status: 502 });
+      }
+      const uploadUrl = initRes.headers.get('Location');
+      if (!uploadUrl) {
+        return NextResponse.json({ ok: false, error: 'drive_no_upload_url' }, { status: 502 });
+      }
+      return NextResponse.json({
+        ok: true,
+        uploadUrl,
+        folderName: FOLDER_NAME,
+        fileName: BACKUP_GZ_NAME,
+        fileId: existingGz?.id || null,
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    } catch {
+      return NextResponse.json({ ok: false, error: 'drive_unreachable' }, { status: 502 });
+    }
   }
 
   const decoded = decodeBackupBody(body);

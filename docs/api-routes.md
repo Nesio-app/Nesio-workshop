@@ -59,7 +59,7 @@ Auth legend:
 | GET /api/portal/gmail-quick | session / no-Supabase + OAuth token |
 | GET /api/portal/calendar | verified session (hasVerifiedSessionCookie) / no-Supabase (cloud mode fails closed) |
 | POST /api/portal/calendar | session / no-Supabase + OAuth token (calendar.events) — 建日程(结构化 or 自然语言 LLM 解析,写 primary) |
-| POST /api/portal/drive | guardAiRoute (20/min) + Google OAuth (`drive.appdata`+`drive.file`) — 免费云备份到「我的云端硬盘/宝盒备份」; `{action:'session'}` 发短时 token 供客户端含照片直传 |
+| POST /api/portal/drive | guardAiRoute (20/min) + Google OAuth (`drive.appdata`+`drive.file`) — 免费云备份到「我的云端硬盘/宝盒备份」; `{action:'session'}` 发短时 token;`{action:'beginResumable'}` 代开可续传(避开浏览器 CORS) |
 | GET /api/portal/drive | guardAiRoute (20/min) + Google OAuth — 拉回云备份(可见文件夹优先,旧 appDataFolder 回退) |
 | GET /api/portal/tasks | guardAiRoute (20/min) + Google OAuth token (tasks) — 读 Google Tasks 待办 |
 | GET /api/portal/people | guardAiRoute (20/min) + Google OAuth token (contacts.readonly) — 读通讯录→person 节点(人缘管理);runPeopleSync 消费 |

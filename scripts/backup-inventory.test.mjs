@@ -81,6 +81,18 @@ assert.match(en, /Memories 2328/);
 assert.ok(!/MB/.test(en), '未知体积不硬报 0 MB');
 assert.match(B.inventoryWarning(inv2, 'en'), /Bank transactions/);
 
+// ── 分片记忆图:只看整图键会误报空(真机导出场景)──
+const sharded = {
+  'nesio-life-graph-v1:index': JSON.stringify(['2023', '2024']),
+  'nesio-life-graph-v1:2023': arr(10),
+  'nesio-life-graph-v1:2024': arr(25),
+  'nesio-bank-tx-v1': arr(5),
+};
+const invShard = B.inventoryBackup(sharded, 2048);
+assert.equal(Object.fromEntries(invShard.lines.map((l) => [l.key, l]))['nesio-life-graph-v1'].count, 35, '分片求和');
+assert.equal(invShard.suspect.length, 0, '分片有记忆 → 不可疑');
+assert.match(B.inventorySummary(invShard, 'zh'), /记忆 35/);
+
 // ── 导入窗口清单:事实表,防止「窗口悄悄变了但文档还写着老的」 ──
 assert.ok(Array.isArray(B.IMPORT_WINDOWS) && B.IMPORT_WINDOWS.length >= 7, '每个 API 导入源都要在表里');
 const cal = B.IMPORT_WINDOWS.find((w) => /日历/.test(w.source[0]));

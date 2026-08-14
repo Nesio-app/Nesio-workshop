@@ -415,7 +415,8 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     }
   }
 
-  function driveErrorText(err: string | undefined): string {
+  function driveErrorText(err: string | undefined, detail?: string): string {
+    const tip = detail ? ` (${detail})` : '';
     switch (err) {
       case 'not_connected':
         return L(dict,
@@ -434,9 +435,11 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       case 'build_failed':
         return L(dict, '这次没能把数据打包好 —— 不是网络问题。先用「导出」留一份。', "Couldn't package your data — not a network issue. Export a local copy first.");
       case 'no_backup':
-        return L(dict, '你的 Drive 里还没有备份 —— 先点上面「免费备份到 Google Drive」', 'No backup in your Drive yet — tap "Back up free to Google Drive" above first');
+        return L(dict, '你的 Drive 里还没有备份 —— 先点上面「备份」', 'No backup in your Drive yet — tap Back up above first');
+      case 'network':
+        return L(dict, `网络没通,备份没送出${tip} —— 换稳一点的网再试,或先「导出」。`, `Network failed, backup didn’t leave the phone${tip} — try a steadier connection, or Export first.`);
       default:
-        return L(dict, '备份到 Drive 没成功 —— 稍后再试或用「导出」', "Drive backup didn't go through — try again later or use Export");
+        return L(dict, `备份到 Drive 没成功${tip} —— 稍后再试或用「导出」`, `Drive backup didn’t go through${tip} — try again later or use Export`);
     }
   }
 
@@ -463,7 +466,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       return;
     }
     setDriveState('error');
-    setDriveMsg(driveErrorText(r.error));
+    setDriveMsg(driveErrorText(r.error, r.detail));
     // 没连 / 缺 scope → 打开数据源引导重连(不要静默改用 Nesio 云)
     if (r.error === 'not_connected' || r.error === 'insufficient_scope') {
       try { onOpenConnect?.(); } catch { /* ignore */ }
@@ -624,6 +627,10 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     setRestoreMsg('');
     setExportWarn(null);
     try {
+      try {
+        const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
+        await whenGraphHydrated();
+      } catch { /* ignore */ }
       const backup = await buildCombinedBackup({ includeImages: true });
       const payload = JSON.stringify(backup);
       const blob = new Blob([payload], { type: 'application/json' });

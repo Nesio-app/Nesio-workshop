@@ -71,6 +71,27 @@ function folderListOk() {
   assert.equal(res.__json.folderName, '宝盒备份', '可见文件夹名');
   assert.ok(res.__json.folderId, 'folderId');
 }
+// beginResumable → 返回 uploadUrl(服务端读 Location,避开浏览器 CORS)
+{
+  const route = loadRoute('tkn', async (url, opt) => {
+    if (String(url).includes('mimeType')) return folderListOk();
+    if (String(url).includes('uploadType=resumable')) {
+      return {
+        ok: true,
+        status: 200,
+        headers: { get: (h) => (h === 'Location' ? 'https://www.googleapis.com/upload/drive/v3/files?upload_id=abc' : null) },
+        json: async () => ({}),
+        text: async () => '',
+      };
+    }
+    if (String(url).includes('/files?')) return { ok: true, json: async () => ({ files: [] }) };
+    return { ok: true, json: async () => ({}), headers: { get: () => null } };
+  });
+  const res = await route.POST({ json: async () => ({ action: 'beginResumable', byteSize: 1024 }) });
+  assert.equal(res.__json.ok, true, 'beginResumable ok');
+  assert.match(res.__json.uploadUrl, /upload_id=abc/, 'uploadUrl 来自 Location');
+  assert.equal(res.__json.fileName, 'nesio-backup.json.gz');
+}
 // 首次上传:文件夹存在、无备份文件 → POST 带 parents=folderId
 {
   const calls = [];
@@ -146,6 +167,7 @@ assert.ok(settings.includes('pullBackupFromDrive'), '设置页 Drive 恢复接�
 
 const client = fs.readFileSync(new URL('../lib/portal/drive-backup.ts', import.meta.url), 'utf8');
 assert.ok(client.includes('includeImages'), '客户端支持含图');
-assert.ok(client.includes('resumable') || client.includes('uploadType=resumable'), '客户端可续传直传');
+assert.ok(client.includes('beginResumable'), '客户端走服务端发起的可续传');
+assert.ok(!client.includes('googleapis.com/upload/drive/v3/files?uploadType=resumable'), '客户端不再自己开 resumable(CORS)');
 
 console.log('drive-backup: OK');

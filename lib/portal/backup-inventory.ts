@@ -81,11 +81,29 @@ function countEntry(raw: string | undefined): number | null {
   }
 }
 
+/**
+ * 记忆图已按年分片(`nesio-life-graph-v1:2024` 等);装箱单若只看整图键会误报「记忆是空的」。
+ * 分片优先求和;无分片再回退整图键。
+ */
+function countLifeGraph(entries: Record<string, string>): number | null {
+  let shardTotal = 0;
+  let hasShard = false;
+  for (const [k, v] of Object.entries(entries)) {
+    if (!k.startsWith('nesio-life-graph-v1:')) continue;
+    if (k === 'nesio-life-graph-v1:index') continue;
+    hasShard = true;
+    const n = countEntry(v);
+    if (n != null) shardTotal += n;
+  }
+  if (hasShard) return shardTotal;
+  return countEntry(entries['nesio-life-graph-v1']);
+}
+
 export function inventoryBackup(entries: Record<string, string>, bytes = 0): BackupInventory {
   const lines: InventoryLine[] = TRACKED.map((t) => ({
     key: t.key,
     label: t.label,
-    count: countEntry(entries[t.key]),
+    count: t.key === 'nesio-life-graph-v1' ? countLifeGraph(entries) : countEntry(entries[t.key]),
     critical: t.critical,
   }));
   let photos = 0;
