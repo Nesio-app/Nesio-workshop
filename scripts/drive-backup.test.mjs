@@ -122,12 +122,29 @@ function folderListOk() {
   assert.equal(ok.__json.done, true);
   assert.equal(ok.__json.fileId, 'file1');
 }
-// uploadGzip 小包代传(内容为 zip;action 名兼容)
+// uploadGzip 小包代传:按魔数命名(gzip→.json.gz, zip→.zip)
 {
-  const zip = Buffer.from('PK\x03\x04fake-zip-bytes-for-upload');
+  const { gzipSync } = nodeRequire('node:zlib');
+  const gz = gzipSync(Buffer.from(JSON.stringify({ v: 1 })));
   const calls = [];
-  const route = loadRoute('tkn', async (url, opt) => {
+  const route = loadRoute('tkn', async (url) => {
     calls.push(String(url));
+    if (String(url).includes('mimeType')) return folderListOk();
+    if (String(url).includes('/files?') && !String(url).includes('/upload/')) {
+      return { ok: true, json: async () => ({ files: [] }) };
+    }
+    return { ok: true, json: async () => ({ id: 'gz1' }) };
+  });
+  const res = await route.POST({
+    json: async () => ({ action: 'uploadGzip', gzipBase64: gz.toString('base64') }),
+  });
+  assert.equal(res.__json.ok, true, 'uploadGzip gzip ok');
+  assert.equal(res.__json.fileName, 'nesio-backup.json.gz');
+  assert.ok(calls.some((u) => u.includes('/upload/')), '走了 upload API');
+}
+{
+  const zip = Buffer.concat([Buffer.from('PK\x03\x04'), Buffer.from('fake-zip-bytes')]);
+  const route = loadRoute('tkn', async (url) => {
     if (String(url).includes('mimeType')) return folderListOk();
     if (String(url).includes('/files?') && !String(url).includes('/upload/')) {
       return { ok: true, json: async () => ({ files: [] }) };
@@ -137,9 +154,33 @@ function folderListOk() {
   const res = await route.POST({
     json: async () => ({ action: 'uploadGzip', gzipBase64: zip.toString('base64') }),
   });
-  assert.equal(res.__json.ok, true, 'uploadGzip ok');
+  assert.equal(res.__json.ok, true, 'uploadGzip zip ok');
   assert.equal(res.__json.fileName, 'nesio-backup.zip');
-  assert.ok(calls.some((u) => u.includes('/upload/')), '走了 upload API');
+}
+// openDownload + readChunk 分片代下
+{
+  const route = loadRoute('tkn', async (url, opt) => {
+    if (String(url).includes('mimeType')) return folderListOk();
+    if (String(url).includes('/files?') && !String(url).includes('alt=media')) {
+      return { ok: true, json: async () => ({ files: [{ id: 'f1', name: 'nesio-backup.zip', size: '4' }] }) };
+    }
+    if (String(url).includes('alt=media')) {
+      assert.equal(opt?.headers?.Range, 'bytes=0-3');
+      return { ok: true, status: 206, arrayBuffer: async () => Buffer.from('PK\x03\x04'), json: async () => ({}) };
+    }
+    return { ok: true, json: async () => ({}) };
+  });
+  const opened = await route.POST({ json: async () => ({ action: 'openDownload' }) });
+  assert.equal(opened.__json.ok, true);
+  assert.equal(opened.__json.fileId, 'f1');
+  assert.equal(opened.__json.fileName, 'nesio-backup.zip');
+
+  const chunk = await route.POST({
+    json: async () => ({ action: 'readChunk', fileId: 'f1', offset: 0, length: 4 }),
+  });
+  assert.equal(chunk.__json.ok, true);
+  assert.equal(chunk.__json.bytes, 4);
+  assert.equal(Buffer.from(chunk.__json.chunkBase64, 'base64').toString('binary'), 'PK\x03\x04');
 }
 // 首次上传:文件夹存在、无备份文件 → POST 带 parents=folderId
 {
@@ -219,6 +260,7 @@ assert.ok(client.includes('includeImages'), '客户端支持含图');
 assert.ok(client.includes('beginResumable') && client.includes('putChunk'), '大包走服务端可续传分片');
 assert.ok(client.includes('packBackupZip'), '客户端打 zip');
 assert.ok(client.includes('uploadGzip'), '小包整份代传');
+assert.ok(client.includes('openDownload') && client.includes('readChunk'), '大包分片代下');
 assert.ok(!client.includes('googleapis.com/upload/drive'), '客户端上传不直连 Google');
 
 console.log('drive-backup: OK');

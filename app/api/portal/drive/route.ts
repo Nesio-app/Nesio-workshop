@@ -164,11 +164,11 @@ function decodeBackupBody(body: { backup?: unknown; gzipBase64?: string } | null
 
 async function parseMediaBackup(buf: ArrayBuffer, name: string): Promise<unknown | null> {
   const u8 = new Uint8Array(buf);
-  const isZip = name.endsWith('.zip')
-    || (u8.length > 3 && u8[0] === 0x50 && u8[1] === 0x4b);
-  const isGz = name.endsWith('.gz') || (u8.length > 2 && u8[0] === 0x1f && u8[1] === 0x8b);
+  // 必须看魔数:历史上曾把 gzip 内容以 .zip 文件名上传,按扩展名硬解 zip 会整份失败。
+  const isZipMagic = u8.length > 3 && u8[0] === 0x50 && u8[1] === 0x4b;
+  const isGzMagic = u8.length > 2 && u8[0] === 0x1f && u8[1] === 0x8b;
   try {
-    if (isZip) {
+    if (isZipMagic) {
       const files = unzipSync(u8);
       const jsonFile = files['nesio-backup.json']
         || files['backup.json']
@@ -199,7 +199,9 @@ async function parseMediaBackup(buf: ArrayBuffer, name: string): Promise<unknown
       }
       return { ...backup, entries };
     }
-    const text = isGz ? gunzipSync(Buffer.from(u8)).toString('utf8') : Buffer.from(u8).toString('utf8');
+    const text = (isGzMagic || name.endsWith('.gz'))
+      ? gunzipSync(Buffer.from(u8)).toString('utf8')
+      : Buffer.from(u8).toString('utf8');
     return JSON.parse(text);
   } catch {
     return null;
@@ -264,8 +266,83 @@ export async function POST(req: NextRequest) {
     uploadUrl?: string;
     offset?: number;
     total?: number;
+    length?: number;
     chunkBase64?: string;
+    fileId?: string;
   } | null;
+
+  // 大备份不能经 GET 整包 JSON 返回(常 >4.5MB);客户端先 open 再分片读原始字节。
+  if (body?.action === 'openDownload') {
+    try {
+      const resolved = await resolveBackupFile(accessToken);
+      if (!resolved.ok) return insufficientScope();
+      if (!resolved.file) {
+        return NextResponse.json({
+          ok: true,
+          file: null,
+          folderName: FOLDER_NAME,
+        }, { headers: { 'Cache-Control': 'no-store' } });
+      }
+      return NextResponse.json({
+        ok: true,
+        fileId: resolved.file.id,
+        fileName: resolved.file.name,
+        size: Number(resolved.file.size || 0) || null,
+        folderName: FOLDER_NAME,
+        location: resolved.location,
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    } catch {
+      return NextResponse.json({ ok: false, error: 'drive_unreachable' }, { status: 502 });
+    }
+  }
+
+  if (body?.action === 'readChunk') {
+    const fileId = String(body.fileId || '').replace(/[^\w-]/g, '');
+    const offset = Number(body.offset);
+    const length = Number(body.length);
+    if (!fileId || !Number.isFinite(offset) || offset < 0 || !Number.isFinite(length) || length <= 0 || length > 768 * 1024) {
+      return NextResponse.json({ ok: false, error: 'invalid_chunk' }, { status: 400 });
+    }
+    try {
+      const end = offset + length - 1;
+      const res = await fetch(`${DRIVE}/files/${fileId}?alt=media`, {
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Range: `bytes=${offset}-${end}`,
+        },
+      });
+      if (res.status === 404) {
+        return NextResponse.json({ ok: false, error: 'no_backup' }, { status: 404 });
+      }
+      if (!res.ok && res.status !== 206) {
+        const text = await res.text().catch(() => '');
+        if (isScopeError(res.status, text)) return insufficientScope();
+        return NextResponse.json({
+          ok: false,
+          error: `drive_download_${res.status}`,
+          detail: text.slice(0, 180),
+        }, { status: 502 });
+      }
+      const ab = await res.arrayBuffer();
+      let buf = Buffer.from(ab);
+      // 少数环境忽略 Range、整份返回:按 offset/length 切片,避免一次塞爆响应体。
+      if (buf.length > length) {
+        if (res.status === 200 && offset > 0 && buf.length > offset) {
+          buf = buf.subarray(offset, Math.min(offset + length, buf.length));
+        } else {
+          buf = buf.subarray(0, length);
+        }
+      }
+      return NextResponse.json({
+        ok: true,
+        chunkBase64: buf.toString('base64'),
+        bytes: buf.length,
+        offset,
+      }, { headers: { 'Cache-Control': 'no-store' } });
+    } catch {
+      return NextResponse.json({ ok: false, error: 'drive_unreachable' }, { status: 502 });
+    }
+  }
 
   // 客户端直传/直下:发短时 Google access token(同一次 OAuth;限流见 guard)。
   if (body?.action === 'session') {
@@ -424,7 +501,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // 小包整份 ZIP 代传(action 名保留 uploadGzip 兼容客户端;内容为 zip)。
+  // 小包整份代传(action 名保留 uploadGzip;按魔数写成 .zip 或 .json.gz,避免假 zip)。
   if (body?.action === 'uploadGzip') {
     const b64 = String(body.gzipBase64 || '');
     if (!b64) return NextResponse.json({ ok: false, error: 'no_backup' }, { status: 400 });
@@ -437,29 +514,33 @@ export async function POST(req: NextRequest) {
     if (buf.length === 0 || buf.length > 3.6 * 1024 * 1024) {
       return NextResponse.json({ ok: false, error: 'too_large' }, { status: 413 });
     }
+    const isZipMagic = buf.length > 3 && buf[0] === 0x50 && buf[1] === 0x4b;
+    const isGzMagic = buf.length > 2 && buf[0] === 0x1f && buf[1] === 0x8b;
+    const outName = isZipMagic ? BACKUP_ZIP_NAME : isGzMagic ? BACKUP_GZ_NAME : BACKUP_ZIP_NAME;
+    const outMime = isZipMagic ? 'application/zip' : isGzMagic ? 'application/gzip' : 'application/octet-stream';
     try {
       const folderId = await ensureBackupFolder(accessToken);
       if (folderId === 'insufficient_scope') return insufficientScope();
-      const existing = await findInFolder(accessToken, folderId, [BACKUP_ZIP_NAME, BACKUP_GZ_NAME, BACKUP_NAME]);
+      const existing = await findInFolder(accessToken, folderId, [outName]);
       if (existing === 'insufficient_scope') return insufficientScope();
-      const existingZip = existing?.name === BACKUP_ZIP_NAME ? existing : null;
-      const boundary = 'nesio_drive_zip';
-      const metadata = existingZip
-        ? { name: BACKUP_ZIP_NAME }
-        : { name: BACKUP_ZIP_NAME, parents: [folderId] };
+      const existingSame = existing?.name === outName ? existing : null;
+      const boundary = 'nesio_drive_pack';
+      const metadata = existingSame
+        ? { name: outName }
+        : { name: outName, parents: [folderId] };
       const multipart = Buffer.concat([
         Buffer.from(
           `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
-          `--${boundary}\r\nContent-Type: application/zip\r\n\r\n`,
+          `--${boundary}\r\nContent-Type: ${outMime}\r\n\r\n`,
         ),
         buf,
         Buffer.from(`\r\n--${boundary}--`),
       ]);
-      const url = existingZip
-        ? `${UPLOAD}/files/${existingZip.id}?uploadType=multipart&fields=id`
+      const url = existingSame
+        ? `${UPLOAD}/files/${existingSame.id}?uploadType=multipart&fields=id`
         : `${UPLOAD}/files?uploadType=multipart&fields=id`;
       const res = await fetch(url, {
-        method: existingZip ? 'PATCH' : 'POST',
+        method: existingSame ? 'PATCH' : 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': `multipart/related; boundary=${boundary}`,
@@ -475,13 +556,13 @@ export async function POST(req: NextRequest) {
           detail: text.slice(0, 180),
         }, { status: 502 });
       }
-      await trashLegacyBackups(accessToken, folderId);
+      if (isZipMagic) await trashLegacyBackups(accessToken, folderId);
       await ensureReadme(accessToken, folderId);
       return NextResponse.json({
         ok: true,
         at: new Date().toISOString(),
         folderName: FOLDER_NAME,
-        fileName: BACKUP_ZIP_NAME,
+        fileName: outName,
       }, { headers: { 'Cache-Control': 'no-store' } });
     } catch {
       return NextResponse.json({ ok: false, error: 'drive_unreachable' }, { status: 502 });

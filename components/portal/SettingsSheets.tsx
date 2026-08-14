@@ -433,7 +433,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           '这份数据太大,这次没传完。请用下面「导出」先留本机份,联网稳定后再点备份。',
           'This package is too large to finish uploading. Export a local copy below, then retry backup on a steadier network.');
       case 'timeout':
-        return L(dict, '这次备份超时了 —— 网络慢时常见,稍后再试一次。', 'Backup timed out — common on a slow network. Try again shortly.');
+        return L(dict, '这次超时了 —— 备份较大或网络慢时常见,稍后再试一次。', 'Timed out — common with a large backup or slow network. Try again shortly.');
       case 'build_failed':
         return L(dict, '这次没能把数据打包好 —— 不是网络问题。先用「导出」留一份。', "Couldn't package your data — not a network issue. Export a local copy first.");
       case 'no_backup':
@@ -441,9 +441,14 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       case 'rate_limited':
         return L(dict, '备份请求太密,稍等半分钟再试一次。', 'Too many backup requests — wait about 30 seconds and try again.');
       case 'network':
-        return L(dict, `网络没通,备份没送出${suffix} —— 换稳一点的网再试,或先「导出」。`, `Network failed, backup didn’t leave the phone${suffix} — try a steadier connection, or Export first.`);
+        return L(dict, `网络没通${suffix} —— 换稳一点的网再试,或先「导出」。`, `Network failed${suffix} — try a steadier connection, or Export first.`);
       default:
-        return L(dict, `备份到 Drive 没成功${suffix} —— 稍后再试或用「导出」`, `Drive backup didn’t go through${suffix} — try again later or use Export`);
+        if (detail?.includes('invalid_backup') || err === 'invalid_backup') {
+          return L(dict,
+            'Drive 里那份备份打不开(可能是旧的假 zip)。请再点一次「备份」覆盖后,再「用备份补缺」;或用本机「导入」。',
+            'The Drive backup couldn’t be read (often an old mislabeled file). Tap Back up once more, then Fill from backup — or Import a local copy.');
+        }
+        return L(dict, `这次没成功${suffix} —— 稍后再试或用「导出 / 导入」`, `Didn’t go through${suffix} — try again later, or use Export / Import`);
     }
   }
 
@@ -519,17 +524,17 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       const r = await pullBackupFromDrive('merge');
       if (r.ok) {
         setDriveState('done');
-        setDriveMsg(L(dict, '✓ 已从 Drive 恢复,正在刷新…', '✓ Restored from Drive, refreshing…'));
+        const photos = r.restore?.imagesRestored ?? 0;
+        const keys = (r.restore?.restoredKeys ?? 0) + (r.restore?.idbRestored ?? 0);
+        setDriveMsg(L(dict,
+          `✓ 已从 Drive 恢复(写入 ${keys} 项${photos > 0 ? ` · 照片 ${photos}` : ''}),正在刷新…`,
+          `✓ Restored from Drive (${keys} items${photos > 0 ? ` · ${photos} photos` : ''}), refreshing…`));
         setTimeout(() => window.location.reload(), 900);
         return;
       }
       setDriveState('error');
-      setDriveMsg(r.error === 'not_connected' || r.error === 'insufficient_scope'
-        ? driveErrorText(r.error)
-        : r.error === 'no_backup'
-          ? driveErrorText('no_backup')
-          : L(dict, '从 Drive 恢复没成功 —— 稍后再试', "Restore from Drive didn't go through — try again later"));
-      if (r.error === 'not_connected' || r.error === 'insufficient_scope') {
+      setDriveMsg(driveErrorText(r.error, r.detail));
+      if (r.error === 'not_connected' || r.error === 'insufficient_scope' || r.error === 'auth_required') {
         try { onOpenConnect?.(); } catch { /* ignore */ }
       }
     } catch {
@@ -1065,7 +1070,7 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           {L(dict, '导入', 'Import')}
         </Button>
       </div>
-      <input ref={importRef} type="file" accept=".zip,application/zip,.json.gz,application/gzip,.gz,application/json,.json" className="nesio-visually-hidden" onChange={handleImportFile} />
+      <input ref={importRef} type="file" accept=".zip,application/zip,.json.gz,application/gzip,.gz,application/json,.json,.txt,text/plain" className="nesio-visually-hidden" onChange={handleImportFile} />
       {restoreMsg && <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)', whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{restoreMsg}</p>}
       {exportWarn && <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, lineHeight: 1.6, color: 'var(--status-gentle)', whiteSpace: 'pre-wrap' }}>{exportWarn}</p>}
 

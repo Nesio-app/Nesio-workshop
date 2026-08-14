@@ -253,31 +253,91 @@ export async function pushBackupToDrive(opts: { includeImages?: boolean } = {}):
   }
 }
 
-/** 从 Drive 拉回备份并合并回本机(默认 merge)。走服务端 GET,避免 WKWebView 直连 Google。 */
+/** 从 Drive 拉回备份并合并回本机(默认 merge)。
+ * 原始文件经服务端分片代下(避开 Vercel JSON 体积上限 + WKWebView CORS),本机 parseBackupFile。
+ */
 export async function pullBackupFromDrive(mode: RestoreMode = 'merge'): Promise<DriveBackupResult & { restore?: CombinedRestoreResult }> {
   try {
     const signal = timeoutSignal(UPLOAD_TIMEOUT_MS);
-    const res = await fetch('/api/portal/drive', {
-      method: 'GET',
+    const openRes = await fetch('/api/portal/drive', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'openDownload' }),
       cache: 'no-store',
       ...(signal ? { signal } : {}),
     });
-    const data = await res.json().catch(() => null) as {
-      ok?: boolean; backup?: unknown; error?: string; connectUrl?: string; folderName?: string; detail?: string;
+    const open = await openRes.json().catch(() => null) as {
+      ok?: boolean; fileId?: string; fileName?: string; size?: number | null;
+      file?: null; folderName?: string; error?: string; detail?: string; connectUrl?: string;
     } | null;
-    const mapped = mapHttpError(res.status, data);
-    if (mapped) return mapped;
-    if (!res.ok || !data?.ok) {
-      return { ok: false, error: 'drive', detail: data?.error || data?.detail || `get_${res.status}` };
+    const mappedOpen = mapHttpError(openRes.status, open);
+    if (mappedOpen) return mappedOpen;
+    if (!openRes.ok || !open?.ok) {
+      return { ok: false, error: 'drive', detail: open?.error || open?.detail || `open_${openRes.status}` };
     }
-    if (!data.backup) return { ok: false, error: 'no_backup' };
+    if (!open.fileId) return { ok: false, error: 'no_backup' };
 
-    let backup = data.backup;
-    if (typeof backup === 'string') {
-      try { backup = JSON.parse(backup); } catch { /* keep */ }
+    const parts: Uint8Array[] = [];
+    let offset = 0;
+    const knownSize = typeof open.size === 'number' && open.size > 0 ? open.size : null;
+    const maxBytes = 120 * 1024 * 1024;
+    while (offset < maxBytes) {
+      const want = knownSize != null ? Math.min(CHUNK, knownSize - offset) : CHUNK;
+      if (want <= 0) break;
+      const chunkSignal = timeoutSignal(60_000);
+      const chunkRes = await fetch('/api/portal/drive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'readChunk',
+          fileId: open.fileId,
+          offset,
+          length: want,
+        }),
+        cache: 'no-store',
+        ...(chunkSignal ? { signal: chunkSignal } : {}),
+      });
+      const chunk = await chunkRes.json().catch(() => null) as {
+        ok?: boolean; chunkBase64?: string; bytes?: number;
+        error?: string; detail?: string; connectUrl?: string;
+      } | null;
+      const mappedChunk = mapHttpError(chunkRes.status, chunk);
+      if (mappedChunk) return mappedChunk;
+      if (!chunkRes.ok || !chunk?.ok || !chunk.chunkBase64) {
+        return {
+          ok: false,
+          error: chunk?.error === 'no_backup' ? 'no_backup' : 'drive',
+          detail: chunk?.error || chunk?.detail || `chunk_${chunkRes.status}`,
+        };
+      }
+      const raw = Uint8Array.from(atob(chunk.chunkBase64), (c) => c.charCodeAt(0));
+      parts.push(raw);
+      offset += raw.byteLength;
+      if (raw.byteLength < want) break;
+      if (knownSize != null && offset >= knownSize) break;
+    }
+
+    if (parts.length === 0) return { ok: false, error: 'no_backup', detail: 'empty_download' };
+
+    const total = parts.reduce((n, p) => n + p.byteLength, 0);
+    const merged = new Uint8Array(total);
+    let at = 0;
+    for (const p of parts) {
+      merged.set(p, at);
+      at += p.byteLength;
+    }
+    const ab = merged.buffer.slice(merged.byteOffset, merged.byteOffset + merged.byteLength) as ArrayBuffer;
+    const file = new File([ab], open.fileName || 'nesio-backup.zip', { type: 'application/octet-stream' });
+    const { parseBackupFile } = await import('./backup-pack');
+    let backup: unknown;
+    try {
+      backup = await parseBackupFile(file);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'parse_failed';
+      return { ok: false, error: 'drive', detail: `invalid_backup:${msg}` };
     }
     const restore = await restoreCombinedBackup(backup as Parameters<typeof restoreCombinedBackup>[0], mode);
-    return { ok: true, restore, folderName: data.folderName || '宝盒备份' };
+    return { ok: true, restore, folderName: open.folderName || '宝盒备份', bytes: total, fileName: open.fileName };
   } catch (err) {
     const name = err instanceof Error ? err.name : '';
     if (name === 'TimeoutError' || name === 'AbortError') return { ok: false, error: 'timeout' };
