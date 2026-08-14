@@ -180,16 +180,21 @@ export async function runFlomoSync(): Promise<FlomoSyncResult> {
         memosForInputs.push(m);
       }
       if (!inputs.length) continue;
-      const nodes = ingestLifeNodesBatch(inputs);
+      ingestLifeNodesBatch(inputs);
+      const graphNow = getLifeGraph();
       const createdAtPatches: Array<{ id: string; patch: { createdAt: string } }> = [];
-      for (let j = 0; j < nodes.length; j++) {
-        const m = memosForInputs[j];
-        const node = nodes[j];
-        if (!m?.created_at || !node?.id) continue;
+      for (const m of memosForInputs) {
+        if (!m.created_at) continue;
+        const slug = m.slug || '';
+        const node = graphNow.find((n) =>
+          (slug && (n.attributes?.flomoSlug === slug || n.attributes?.externalId === `flomo:${slug}`))
+          || (!slug && (n.rawInput || '').slice(0, 200) === stripMarkdownInline(m.content.replace(/<[^>]+>/g, ' ')).slice(0, 200)),
+        );
+        if (!node?.id) continue;
         const d = parseMemoryDate(m.created_at);
         createdAtPatches.push({ id: node.id, patch: { createdAt: d ? d.toISOString() : m.created_at } });
       }
-      imported += nodes.length;
+      imported += inputs.length;
       if (createdAtPatches.length) batchPatchLifeNodes(createdAtPatches);
       if (i + FLOMO_INGEST_CHUNK < batch.length) await new Promise((r) => setTimeout(r, 0));
     }
