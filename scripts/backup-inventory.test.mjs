@@ -40,7 +40,7 @@ assert.equal(byKey['nesio-health-v1'].count, null, '没导过健康 → 键不�
 assert.equal(inv.suspect.length, 0, '主数据齐全 → 不可疑');
 
 const sum = B.inventorySummary(inv, 'zh');
-assert.match(sum, /^✓ 已导出到本机:/);
+assert.match(sum, /^✓ 备份装箱:/);
 assert.match(sum, /记忆 2328/);
 assert.match(sum, /银行流水 3128/);
 assert.match(sum, /照片 2/);
@@ -57,6 +57,13 @@ const warn = B.inventoryWarning(inv2, 'zh');
 assert.ok(warn && /银行流水/.test(warn), '提醒里点名是哪一项空了');
 assert.ok(/同步/.test(warn), '给出可能原因(设备没同步完)');
 assert.ok(/换/.test(warn) || /再导/.test(warn), '给出出路,不是只报警');
+
+// 本机有图但备份无图 → 单独警告
+const noPhotoPack = B.inventoryBackup({ 'nesio-life-graph-v1': arr(3), 'nesio-bank-tx-v1': arr(3) }, 100);
+assert.equal(noPhotoPack.photos, 0);
+const photoWarn = B.inventoryWarning(noPhotoPack, 'zh', { localPhotoCount: 12 });
+assert.ok(photoWarn && /12 张照片/.test(photoWarn), '本机有图备份无图必须警告');
+assert.equal(B.inventoryWarning(noPhotoPack, 'zh', { localPhotoCount: 0 }), null, '本机也没图 → 不因照片打扰');
 
 // 主数据存在但 0 条,同样可疑(空数组比缺键更迷惑人)
 const empty = { 'nesio-life-graph-v1': arr(0), 'nesio-bank-tx-v1': arr(0) };
@@ -76,7 +83,7 @@ assert.equal(B.inventoryBackup({}).totalKeys, 0, '空备份不炸');
 
 // ── 英文 ──
 const en = B.inventorySummary(B.inventoryBackup(full, 0), 'en');
-assert.match(en, /^✓ Exported: /);
+assert.match(en, /^✓ Backup pack: /);
 assert.match(en, /Memories 2328/);
 assert.ok(!/MB/.test(en), '未知体积不硬报 0 MB');
 assert.match(B.inventoryWarning(inv2, 'en'), /Bank transactions/);

@@ -115,24 +115,39 @@ export function inventoryBackup(entries: Record<string, string>, bytes = 0): Bac
   return { lines, totalKeys: Object.keys(entries).length, photos, bytes, suspect };
 }
 
-/** 人话摘要:导出成功后就地给回执,让用户能一眼核对。 */
+/** 人话摘要:导出成功后就地给回执,让用户能一眼核对。照片数始终报出(含 0)。 */
 export function inventorySummary(inv: BackupInventory, dict: string): string {
   const zh = dict !== 'en';
   const parts = inv.lines
     .filter((l) => (l.count ?? 0) > 0)
     .map((l) => `${zh ? l.label[0] : l.label[1]} ${l.count}`);
-  if (inv.photos > 0) parts.push(`${zh ? '照片' : 'Photos'} ${inv.photos}`);
+  parts.push(`${zh ? '照片' : 'Photos'} ${inv.photos}`);
   const mb = inv.bytes > 0 ? ` · ${(inv.bytes / 1048576).toFixed(1)} MB` : '';
-  const head = zh ? '✓ 已导出到本机:' : '✓ Exported: ';
+  const head = zh ? '✓ 备份装箱:' : '✓ Backup pack: ';
   return `${head}${parts.join(' · ')}${mb}`;
 }
 
-/** 可疑时的提醒文案(warm-coach:说清现象与出路,不吓人)。 */
-export function inventoryWarning(inv: BackupInventory, dict: string): string | null {
-  if (!inv.suspect.length) return null;
+/**
+ * @param localPhotoCount 本机图库实际张数。若本机有图但备份里 0 张 → 明确警告不完整。
+ */
+export function inventoryWarning(
+  inv: BackupInventory,
+  dict: string,
+  opts?: { localPhotoCount?: number },
+): string | null {
   const zh = dict !== 'en';
-  const names = inv.suspect.map((l) => (zh ? l.label[0] : l.label[1])).join('、');
-  return zh
-    ? `注意:这份备份里「${names}」是空的。如果你在 App 里能看到这些内容,说明这台设备还没同步完 —— 等一会儿再导一次,或换常用的那台设备导出。`
-    : `Heads up: “${names}” is empty in this backup. If you can see that data in the app, this device hasn’t finished syncing — wait a moment and export again, or export from the device you use most.`;
+  const bits: string[] = [];
+  if (inv.suspect.length) {
+    const names = inv.suspect.map((l) => (zh ? l.label[0] : l.label[1])).join('、');
+    bits.push(zh
+      ? `「${names}」是空的。若 App 里还能看到,多半这台还没同步完 —— 等一会儿再导,或换常用设备。`
+      : `“${names}” is empty. If you still see it in the app, this device may not have finished syncing — wait and export again, or use your usual device.`);
+  }
+  const localPhotos = opts?.localPhotoCount;
+  if (typeof localPhotos === 'number' && localPhotos > 0 && inv.photos === 0) {
+    bits.push(zh
+      ? `本机有 ${localPhotos} 张照片,但这份备份里一张都没有 —— 换机后图会丢。请重试导出/备份;仍不行先「一键腾空间」后再试。`
+      : `This device has ${localPhotos} photos, but none are in this backup — they would be lost on a new phone. Retry export/backup; if it still fails, free up space and try again.`);
+  }
+  return bits.length ? (zh ? `注意:${bits.join(' ')}` : bits.join(' ')) : null;
 }

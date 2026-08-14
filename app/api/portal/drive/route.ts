@@ -167,6 +167,47 @@ async function parseMediaBackup(buf: ArrayBuffer, name: string): Promise<unknown
   }
 }
 
+async function trashFile(accessToken: string, fileId: string): Promise<void> {
+  await fetch(`${DRIVE}/files/${fileId}`, {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ trashed: true }),
+  }).catch(() => null);
+}
+
+/** 新 .gz 备份成功后,丢掉旧的无图明文 json,避免用户打开错文件。 */
+async function trashLegacyPlainJson(accessToken: string, folderId: string): Promise<void> {
+  const existing = await findInFolder(accessToken, folderId, [BACKUP_NAME]);
+  if (existing && existing !== 'insufficient_scope' && existing.name === BACKUP_NAME) {
+    await trashFile(accessToken, existing.id);
+  }
+}
+
+async function ensureReadme(accessToken: string, folderId: string): Promise<void> {
+  const name = '请读我-宝盒备份说明.txt';
+  const existing = await findInFolder(accessToken, folderId, [name]);
+  if (existing && existing !== 'insufficient_scope') return;
+  const body =
+    '宝盒 / Nesio 备份说明\n\n' +
+    '请保留 nesio-backup.json.gz —— 这是完整压缩备份,内含记忆、设置、银行流水和照片。\n' +
+    '旧版 nesio-backup.json(若还在)可能不含照片,可删。\n\n' +
+    '换手机:打开宝盒 → 设置 → Google 云 →「用备份补缺」。\n' +
+    '本机导出:设置里「导出」,在系统分享面板选「存储到文件」。\n';
+  const boundary = 'nesio_readme';
+  const meta = { name, parents: [folderId] };
+  const multipart =
+    `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(meta)}\r\n` +
+    `--${boundary}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${body}\r\n--${boundary}--`;
+  await fetch(`${UPLOAD}/files?uploadType=multipart&fields=id`, {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      'Content-Type': `multipart/related; boundary=${boundary}`,
+    },
+    body: multipart,
+  }).catch(() => null);
+}
+
 export async function POST(req: NextRequest) {
   // 分片代传会打多次;20/min 会在大备份中途被掐。
   const guard = await guardAiRoute(req, 'drive', { limit: 300 });
@@ -323,6 +364,13 @@ export async function POST(req: NextRequest) {
         }, { status: 502 });
       }
       const done = await put.json().catch(() => null) as { id?: string } | null;
+      try {
+        const folderId = await ensureBackupFolder(accessToken);
+        if (folderId !== 'insufficient_scope') {
+          await trashLegacyPlainJson(accessToken, folderId);
+          await ensureReadme(accessToken, folderId);
+        }
+      } catch { /* 清理失败不影响主备份 */ }
       return NextResponse.json({
         ok: true,
         done: true,
@@ -386,6 +434,8 @@ export async function POST(req: NextRequest) {
           detail: text.slice(0, 180),
         }, { status: 502 });
       }
+      await trashLegacyPlainJson(accessToken, folderId);
+      await ensureReadme(accessToken, folderId);
       return NextResponse.json({
         ok: true,
         at: new Date().toISOString(),

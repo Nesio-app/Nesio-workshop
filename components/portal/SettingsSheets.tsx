@@ -464,15 +464,21 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     if (r.ok) {
       setDriveState('done');
       const folder = r.folderName || L(dict, '宝盒备份', 'Nesio Backup');
+      const photos = typeof r.photoCount === 'number' ? r.photoCount : null;
+      const photoLine = photos == null
+        ? ''
+        : photos > 0
+          ? L(dict, ` · 含 ${photos} 张照片`, ` · ${photos} photos`)
+          : L(dict, ' · 本份无照片', ' · no photos in this pack');
       setDriveMsg(L(dict,
-        `✓ 已备份到 Google 云端硬盘「${folder}」文件夹(含照片与附件)。打开 drive.google.com → 我的云端硬盘即可看到。`,
-        `✓ Backed up to Google Drive folder “${folder}” (includes photos & files). Open drive.google.com → My Drive to find it.`));
+        `✓ 已备份到 Google「${folder}」里的 nesio-backup.json.gz${photoLine}。请打开 .gz 压缩包(不要看旧的 .json)。换机用「用备份补缺」。`,
+        `✓ Backed up to Google folder “${folder}” as nesio-backup.json.gz${photoLine}. Open the .gz file (ignore any old .json). On a new phone use “Fill from backup”.`));
       return;
     }
     setDriveState('error');
     setDriveMsg(driveErrorText(r.error, r.detail));
     // 没连 / 缺 scope → 打开数据源引导重连(不要静默改用 Nesio 云)
-    if (r.error === 'not_connected' || r.error === 'insufficient_scope') {
+    if (r.error === 'not_connected' || r.error === 'insufficient_scope' || r.error === 'auth_required') {
       try { onOpenConnect?.(); } catch { /* ignore */ }
     }
   }
@@ -635,22 +641,28 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
         await whenGraphHydrated();
       } catch { /* ignore */ }
+      const { collectLocalImages } = await import('@/lib/portal/local-image-store');
+      const localPhotoCount = Object.keys(await collectLocalImages()).length;
       const backup = await buildCombinedBackup({ includeImages: true });
       const payload = JSON.stringify(backup);
       const blob = new Blob([payload], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `nesio-backup-${localDayKey()}.json`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-      // 装箱单回执:「随时导出你的全部数据」是承诺,**无法验证的承诺等于没有承诺**。
-      // 导完就地报清各主数据条数;主数据空了显式提醒(多半是这台设备没同步完)。
+      const filename = `nesio-backup-${localDayKey()}.json`;
+      const { saveBackupBlob } = await import('@/lib/portal/save-backup-file');
+      const saved = await saveBackupBlob(blob, filename);
+      if (saved === 'cancelled') {
+        setRestoreMsg(L(dict, '已取消导出', 'Export cancelled'));
+        return;
+      }
+      if (saved === 'failed') {
+        setRestoreMsg(L(dict, '导出失败,请重试', 'Export failed — please try again'));
+        return;
+      }
       const inv = inventoryBackup(backup.entries, blob.size);
-      setRestoreMsg(inventorySummary(inv, dict));
-      setExportWarn(inventoryWarning(inv, dict));
+      const where = saved === 'shared'
+        ? L(dict, '请在分享面板选「存储到文件」或隔空投送 —— 文件不会自动出现在相册。', 'In the share sheet, choose “Save to Files” or AirDrop — it won’t appear in Photos.')
+        : L(dict, '已触发下载;若找不到文件,请再点一次导出并选「存储到文件」。', 'Download started; if you can’t find it, export again and choose “Save to Files”.');
+      setRestoreMsg(`${inventorySummary(inv, dict)}\n${where}`);
+      setExportWarn(inventoryWarning(inv, dict, { localPhotoCount }));
     } catch {
       setRestoreMsg(L(dict, '导出失败,请重试', 'Export failed — please try again'));
     } finally {
@@ -1049,8 +1061,8 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         </Button>
       </div>
       <input ref={importRef} type="file" accept="application/json,.json" className="nesio-visually-hidden" onChange={handleImportFile} />
-      {restoreMsg && <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)' }}>{restoreMsg}</p>}
-      {exportWarn && <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, lineHeight: 1.6, color: 'var(--status-gentle)' }}>{exportWarn}</p>}
+      {restoreMsg && <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)', whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{restoreMsg}</p>}
+      {exportWarn && <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, lineHeight: 1.6, color: 'var(--status-gentle)', whiteSpace: 'pre-wrap' }}>{exportWarn}</p>}
 
       {/* 2026-07-29:三个红按钮原来是平铺的,一屏三条红 —— CLAUDE.md 红线明写「不用红色制造焦虑」,
           而且这三件事一年也未必做一次,却天天占着视线。收进一个入口,点开才展开。

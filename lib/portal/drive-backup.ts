@@ -36,6 +36,7 @@ export interface DriveBackupResult {
   folderName?: string;
   fileName?: string;
   withMedia?: boolean;
+  photoCount?: number;
   detail?: string;
 }
 
@@ -212,7 +213,9 @@ export async function pushBackupToDrive(opts: { includeImages?: boolean } = {}):
   }
 
   let gz: Uint8Array;
+  let photoCount = 0;
   try {
+    photoCount = Object.keys(backup.entries).filter((k) => k.startsWith('local-image:')).length;
     gz = await gzipAsync(strToU8(JSON.stringify(backup)));
   } catch {
     return { ok: false, error: 'build_failed' };
@@ -224,16 +227,16 @@ export async function pushBackupToDrive(opts: { includeImages?: boolean } = {}):
       const direct = await uploadGzipDirect(gz);
       if (direct.ok) {
         try { localStorage.setItem(DRIVE_BACKUP_AT_KEY, direct.at || new Date().toISOString()); } catch { /* quota */ }
-        return { ...direct, withMedia };
+        return { ...direct, withMedia, photoCount };
       }
       // 小包失败也继续试可续传(个别环境 multipart 怪)。
     }
 
     const started = await beginResumable(gz.byteLength);
-    if (!started.ok) return { ...started.result, withMedia };
+    if (!started.ok) return { ...started.result, withMedia, photoCount };
 
     const uploaded = await putChunksViaServer(started.uploadUrl, gz);
-    if (!uploaded.ok) return { ...uploaded.result, withMedia };
+    if (!uploaded.ok) return { ...uploaded.result, withMedia, photoCount };
 
     const at = new Date().toISOString();
     try { localStorage.setItem(DRIVE_BACKUP_AT_KEY, at); } catch { /* quota */ }
@@ -244,6 +247,7 @@ export async function pushBackupToDrive(opts: { includeImages?: boolean } = {}):
       folderName: started.folderName,
       fileName: started.fileName,
       withMedia,
+      photoCount,
     };
   } catch (err) {
     const name = err instanceof Error ? err.name : '';
