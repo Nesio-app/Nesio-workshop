@@ -6,12 +6,14 @@
  *
  * POST:
  *   { backup } | { gzipBase64 } — 小包经本服务上传(兼容;受 Vercel ~4.5MB 限制)
- *   { action:'session' } — 返回短时 accessToken + 备份文件元信息,供客户端直传/直下
- *     (含照片的大包必须绕过本服务请求体上限)
- * GET → 经本服务拉回 JSON 备份(小包/旧明文);大包请用 session 直下。
+ *   { action:'uploadGzip', gzipBase64 } — 小包 ZIP 代传(action 名历史兼容)
+ *   { action:'session' } — 返回短时 accessToken + 备份文件元信息
+ *   { action:'beginResumable'|'putChunk' } — 大包可续传(内容为 .zip)
+ * GET → 经本服务拉回 JSON 备份(自动解 zip/gz);大包请用 session 直下。
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { gunzipSync } from 'node:zlib';
+import { unzipSync, strFromU8 } from 'fflate';
 import { resolveGmailAccessToken } from '@/lib/portal/providers/gmail-access';
 import { guardAiRoute } from '@/lib/portal/api-auth';
 
@@ -22,8 +24,9 @@ const DRIVE = 'https://www.googleapis.com/drive/v3';
 const UPLOAD = 'https://www.googleapis.com/upload/drive/v3';
 const BACKUP_NAME = 'nesio-backup.json';
 const BACKUP_GZ_NAME = 'nesio-backup.json.gz';
+const BACKUP_ZIP_NAME = 'nesio-backup.zip';
 const FOLDER_NAME = '宝盒备份';
-/** 经本服务中转的明文 JSON 上限;更大走客户端直传。 */
+/** 经本服务中转的明文 JSON 上限;更大走客户端分片。 */
 const MAX_PAYLOAD_CHARS = 12 * 1024 * 1024;
 
 const notConnected = () =>
@@ -91,7 +94,10 @@ async function findInFolder(
   );
   if (!listed.ok) return listed.scope ? 'insufficient_scope' : null;
   const files = (listed.data.files || []).filter((f): f is DriveFile => Boolean(f.id && f.name));
-  return files.find((f) => f.name === BACKUP_GZ_NAME) || files.find((f) => f.name === BACKUP_NAME) || null;
+  return files.find((f) => f.name === BACKUP_ZIP_NAME)
+    || files.find((f) => f.name === BACKUP_GZ_NAME)
+    || files.find((f) => f.name === BACKUP_NAME)
+    || null;
 }
 
 /** 旧版隐藏 appDataFolder 里的明文备份。 */
@@ -115,7 +121,7 @@ async function resolveBackupFile(accessToken: string): Promise<
       folderId = undefined;
     } else {
       folderId = ensured;
-      const visible = await findInFolder(accessToken, folderId, [BACKUP_GZ_NAME, BACKUP_NAME]);
+      const visible = await findInFolder(accessToken, folderId, [BACKUP_ZIP_NAME, BACKUP_GZ_NAME, BACKUP_NAME]);
       if (visible === 'insufficient_scope') {
         /* fall through to appData */
       } else if (visible) {
@@ -158,8 +164,41 @@ function decodeBackupBody(body: { backup?: unknown; gzipBase64?: string } | null
 
 async function parseMediaBackup(buf: ArrayBuffer, name: string): Promise<unknown | null> {
   const u8 = new Uint8Array(buf);
+  const isZip = name.endsWith('.zip')
+    || (u8.length > 3 && u8[0] === 0x50 && u8[1] === 0x4b);
   const isGz = name.endsWith('.gz') || (u8.length > 2 && u8[0] === 0x1f && u8[1] === 0x8b);
   try {
+    if (isZip) {
+      const files = unzipSync(u8);
+      const jsonFile = files['nesio-backup.json']
+        || files['backup.json']
+        || Object.entries(files).find(([p]) => p.endsWith('.json') && !p.includes('/'))?.[1];
+      if (!jsonFile) return null;
+      const backup = JSON.parse(strFromU8(jsonFile)) as {
+        entries?: Record<string, string>;
+        format?: string;
+        version?: number;
+        exportedAt?: string;
+      };
+      const entries = { ...(backup.entries || {}) };
+      for (const [path, bytes] of Object.entries(files)) {
+        if (!path.startsWith('photos/') || !/\.jpe?g$/i.test(path)) continue;
+        const base = path.slice('photos/'.length).replace(/\.jpe?g$/i, '');
+        let assetId = base;
+        for (const [k, v] of Object.entries(entries)) {
+          if (k.startsWith('local-image:') && typeof v === 'string' && v.startsWith('zip-photo:') && v.includes(base)) {
+            assetId = k.slice('local-image:'.length);
+            break;
+          }
+        }
+        const b64 = Buffer.from(bytes).toString('base64');
+        entries[`local-image:${assetId}`] = `data:image/jpeg;base64,${b64}`;
+      }
+      for (const [k, v] of Object.entries(entries)) {
+        if (k.startsWith('local-image:') && typeof v === 'string' && v.startsWith('zip-photo:')) delete entries[k];
+      }
+      return { ...backup, entries };
+    }
     const text = isGz ? gunzipSync(Buffer.from(u8)).toString('utf8') : Buffer.from(u8).toString('utf8');
     return JSON.parse(text);
   } catch {
@@ -175,11 +214,13 @@ async function trashFile(accessToken: string, fileId: string): Promise<void> {
   }).catch(() => null);
 }
 
-/** 新 .gz 备份成功后,丢掉旧的无图明文 json,避免用户打开错文件。 */
-async function trashLegacyPlainJson(accessToken: string, folderId: string): Promise<void> {
-  const existing = await findInFolder(accessToken, folderId, [BACKUP_NAME]);
-  if (existing && existing !== 'insufficient_scope' && existing.name === BACKUP_NAME) {
-    await trashFile(accessToken, existing.id);
+/** 新 zip 备份成功后,丢掉旧的明文 json / 嵌图 gz,避免用户打开错文件。 */
+async function trashLegacyBackups(accessToken: string, folderId: string): Promise<void> {
+  for (const name of [BACKUP_NAME, BACKUP_GZ_NAME]) {
+    const existing = await findInFolder(accessToken, folderId, [name]);
+    if (existing && existing !== 'insufficient_scope' && existing.name === name) {
+      await trashFile(accessToken, existing.id);
+    }
   }
 }
 
@@ -189,10 +230,10 @@ async function ensureReadme(accessToken: string, folderId: string): Promise<void
   if (existing && existing !== 'insufficient_scope') return;
   const body =
     '宝盒 / Nesio 备份说明\n\n' +
-    '只保留 nesio-backup.json.gz —— 压缩包里是完整 JSON(记忆、设置、流水、照片)。\n' +
-    '不要用旧的明文 nesio-backup.json(若还在可删,可能没有照片)。\n\n' +
-    '换手机:打开宝盒 → 设置 → Google 云 →「用备份补缺」。\n' +
-    '本机导出/导入:同样只用 .json.gz 压缩包。\n';
+    '请保留 nesio-backup.zip\n' +
+    '  · 解压后可见 nesio-backup.json(文字数据)与 photos/*.jpg(照片)\n' +
+    '  · 旧的 .json / .json.gz 可删\n\n' +
+    '换手机:宝盒设置 → Google 云 →「用备份补缺」,或「导入」选这个 zip。\n';
   const boundary = 'nesio_readme';
   const meta = { name, parents: [folderId] };
   const multipart =
@@ -241,7 +282,7 @@ export async function POST(req: NextRequest) {
           accessToken,
           folderId: null,
           folderName: FOLDER_NAME,
-          backupNameGz: BACKUP_GZ_NAME,
+          backupNameGz: BACKUP_ZIP_NAME,
           backupNameJson: BACKUP_NAME,
           file: resolved.file,
           location: resolved.location,
@@ -255,7 +296,7 @@ export async function POST(req: NextRequest) {
       accessToken,
       folderId,
       folderName: FOLDER_NAME,
-      backupNameGz: BACKUP_GZ_NAME,
+      backupNameGz: BACKUP_ZIP_NAME,
       backupNameJson: BACKUP_NAME,
       file: resolved.file,
       location: resolved.location,
@@ -271,21 +312,21 @@ export async function POST(req: NextRequest) {
     try {
       const folderId = await ensureBackupFolder(accessToken);
       if (folderId === 'insufficient_scope') return insufficientScope();
-      const existing = await findInFolder(accessToken, folderId, [BACKUP_GZ_NAME, BACKUP_NAME]);
+      const existing = await findInFolder(accessToken, folderId, [BACKUP_ZIP_NAME, BACKUP_GZ_NAME, BACKUP_NAME]);
       if (existing === 'insufficient_scope') return insufficientScope();
-      const existingGz = existing?.name === BACKUP_GZ_NAME ? existing : null;
-      const meta = existingGz
-        ? { name: BACKUP_GZ_NAME }
-        : { name: BACKUP_GZ_NAME, parents: [folderId] };
-      const initUrl = existingGz
-        ? `${UPLOAD}/files/${existingGz.id}?uploadType=resumable`
+      const existingZip = existing?.name === BACKUP_ZIP_NAME ? existing : null;
+      const meta = existingZip
+        ? { name: BACKUP_ZIP_NAME }
+        : { name: BACKUP_ZIP_NAME, parents: [folderId] };
+      const initUrl = existingZip
+        ? `${UPLOAD}/files/${existingZip.id}?uploadType=resumable`
         : `${UPLOAD}/files?uploadType=resumable`;
       const initRes = await fetch(initUrl, {
-        method: existingGz ? 'PATCH' : 'POST',
+        method: existingZip ? 'PATCH' : 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': 'application/json; charset=UTF-8',
-          'X-Upload-Content-Type': 'application/gzip',
+          'X-Upload-Content-Type': 'application/zip',
           'X-Upload-Content-Length': String(byteSize),
         },
         body: JSON.stringify(meta),
@@ -307,8 +348,8 @@ export async function POST(req: NextRequest) {
         ok: true,
         uploadUrl,
         folderName: FOLDER_NAME,
-        fileName: BACKUP_GZ_NAME,
-        fileId: existingGz?.id || null,
+        fileName: BACKUP_ZIP_NAME,
+        fileId: existingZip?.id || null,
       }, { headers: { 'Cache-Control': 'no-store' } });
     } catch {
       return NextResponse.json({ ok: false, error: 'drive_unreachable' }, { status: 502 });
@@ -342,7 +383,7 @@ export async function POST(req: NextRequest) {
         method: 'PUT',
         headers: {
           'Content-Length': String(buf.length),
-          'Content-Type': 'application/gzip',
+          'Content-Type': 'application/zip',
           'Content-Range': `bytes ${offset}-${end}/${total}`,
         },
         body: new Uint8Array(buf) as BodyInit,
@@ -367,7 +408,7 @@ export async function POST(req: NextRequest) {
       try {
         const folderId = await ensureBackupFolder(accessToken);
         if (folderId !== 'insufficient_scope') {
-          await trashLegacyPlainJson(accessToken, folderId);
+          await trashLegacyBackups(accessToken, folderId);
           await ensureReadme(accessToken, folderId);
         }
       } catch { /* 清理失败不影响主备份 */ }
@@ -376,14 +417,14 @@ export async function POST(req: NextRequest) {
         done: true,
         fileId: done?.id || null,
         folderName: FOLDER_NAME,
-        fileName: BACKUP_GZ_NAME,
+        fileName: BACKUP_ZIP_NAME,
       }, { headers: { 'Cache-Control': 'no-store' } });
     } catch {
       return NextResponse.json({ ok: false, error: 'drive_unreachable' }, { status: 502 });
     }
   }
 
-  // 小包整份 gzip 代传(不经可续传;受 Vercel ~4.5MB 请求体限制)。
+  // 小包整份 ZIP 代传(action 名保留 uploadGzip 兼容客户端;内容为 zip)。
   if (body?.action === 'uploadGzip') {
     const b64 = String(body.gzipBase64 || '');
     if (!b64) return NextResponse.json({ ok: false, error: 'no_backup' }, { status: 400 });
@@ -399,26 +440,26 @@ export async function POST(req: NextRequest) {
     try {
       const folderId = await ensureBackupFolder(accessToken);
       if (folderId === 'insufficient_scope') return insufficientScope();
-      const existing = await findInFolder(accessToken, folderId, [BACKUP_GZ_NAME, BACKUP_NAME]);
+      const existing = await findInFolder(accessToken, folderId, [BACKUP_ZIP_NAME, BACKUP_GZ_NAME, BACKUP_NAME]);
       if (existing === 'insufficient_scope') return insufficientScope();
-      const existingGz = existing?.name === BACKUP_GZ_NAME ? existing : null;
-      const boundary = 'nesio_drive_gz';
-      const metadata = existingGz
-        ? { name: BACKUP_GZ_NAME }
-        : { name: BACKUP_GZ_NAME, parents: [folderId] };
+      const existingZip = existing?.name === BACKUP_ZIP_NAME ? existing : null;
+      const boundary = 'nesio_drive_zip';
+      const metadata = existingZip
+        ? { name: BACKUP_ZIP_NAME }
+        : { name: BACKUP_ZIP_NAME, parents: [folderId] };
       const multipart = Buffer.concat([
         Buffer.from(
           `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n${JSON.stringify(metadata)}\r\n` +
-          `--${boundary}\r\nContent-Type: application/gzip\r\n\r\n`,
+          `--${boundary}\r\nContent-Type: application/zip\r\n\r\n`,
         ),
         buf,
         Buffer.from(`\r\n--${boundary}--`),
       ]);
-      const url = existingGz
-        ? `${UPLOAD}/files/${existingGz.id}?uploadType=multipart&fields=id`
+      const url = existingZip
+        ? `${UPLOAD}/files/${existingZip.id}?uploadType=multipart&fields=id`
         : `${UPLOAD}/files?uploadType=multipart&fields=id`;
       const res = await fetch(url, {
-        method: existingGz ? 'PATCH' : 'POST',
+        method: existingZip ? 'PATCH' : 'POST',
         headers: {
           Authorization: `Bearer ${accessToken}`,
           'Content-Type': `multipart/related; boundary=${boundary}`,
@@ -434,13 +475,13 @@ export async function POST(req: NextRequest) {
           detail: text.slice(0, 180),
         }, { status: 502 });
       }
-      await trashLegacyPlainJson(accessToken, folderId);
+      await trashLegacyBackups(accessToken, folderId);
       await ensureReadme(accessToken, folderId);
       return NextResponse.json({
         ok: true,
         at: new Date().toISOString(),
         folderName: FOLDER_NAME,
-        fileName: BACKUP_GZ_NAME,
+        fileName: BACKUP_ZIP_NAME,
       }, { headers: { 'Cache-Control': 'no-store' } });
     } catch {
       return NextResponse.json({ ok: false, error: 'drive_unreachable' }, { status: 502 });
