@@ -471,8 +471,8 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
           ? L(dict, ` · 含 ${photos} 张照片`, ` · ${photos} photos`)
           : L(dict, ' · 本份无照片', ' · no photos in this pack');
       setDriveMsg(L(dict,
-        `✓ 已备份到 Google「${folder}」里的 nesio-backup.json.gz${photoLine}。请打开 .gz 压缩包(不要看旧的 .json)。换机用「用备份补缺」。`,
-        `✓ Backed up to Google folder “${folder}” as nesio-backup.json.gz${photoLine}. Open the .gz file (ignore any old .json). On a new phone use “Fill from backup”.`));
+        `✓ 已备份到 Google「${folder}」/ nesio-backup.json.gz（压缩包里是完整 JSON，含照片）${photoLine}。换机用「用备份补缺」。`,
+        `✓ Backed up to Google “${folder}” / nesio-backup.json.gz (JSON inside the archive, with photos)${photoLine}. On a new phone use “Fill from backup”.`));
       return;
     }
     setDriveState('error');
@@ -629,8 +629,8 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     }
   }
 
-  // 数据审计 #8:兑现「随时导出你的全部数据」—— 直接下载一份完整备份 JSON 到本机
-  // (localStorage + IDB blob + 照片),与「导入备份」对称、无需上云。每个异步动作都有可见失败态。
+  // 数据审计 #8:兑现「随时导出你的全部数据」—— 导出 .json.gz(JSON 在压缩包内),
+  // 与 Google 云同一口径;导入对称支持 .gz 与旧明文 .json。
   async function handleExportLocal() {
     if (exportBusy) return;
     setExportBusy(true);
@@ -644,9 +644,9 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       const { collectLocalImages } = await import('@/lib/portal/local-image-store');
       const localPhotoCount = Object.keys(await collectLocalImages()).length;
       const backup = await buildCombinedBackup({ includeImages: true });
-      const payload = JSON.stringify(backup);
-      const blob = new Blob([payload], { type: 'application/json' });
-      const filename = `nesio-backup-${localDayKey()}.json`;
+      const { packBackupGzip } = await import('@/lib/portal/backup-pack');
+      const { blob, bytes } = await packBackupGzip(backup);
+      const filename = `nesio-backup-${localDayKey()}.json.gz`;
       const { saveBackupBlob } = await import('@/lib/portal/save-backup-file');
       const saved = await saveBackupBlob(blob, filename);
       if (saved === 'cancelled') {
@@ -657,10 +657,10 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
         setRestoreMsg(L(dict, '导出失败,请重试', 'Export failed — please try again'));
         return;
       }
-      const inv = inventoryBackup(backup.entries, blob.size);
+      const inv = inventoryBackup(backup.entries, bytes);
       const where = saved === 'shared'
-        ? L(dict, '请在分享面板选「存储到文件」或隔空投送 —— 文件不会自动出现在相册。', 'In the share sheet, choose “Save to Files” or AirDrop — it won’t appear in Photos.')
-        : L(dict, '已触发下载;若找不到文件,请再点一次导出并选「存储到文件」。', 'Download started; if you can’t find it, export again and choose “Save to Files”.');
+        ? L(dict, '压缩包已打开分享面板 —— 选「存储到文件」或隔空投送。文件名以 .json.gz 结尾。', 'Share sheet opened — choose “Save to Files” or AirDrop. Filename ends with .json.gz.')
+        : L(dict, '已触发下载(.json.gz);若找不到,再点导出并选「存储到文件」。', 'Download started (.json.gz); if missing, export again and choose “Save to Files”.');
       setRestoreMsg(`${inventorySummary(inv, dict)}\n${where}`);
       setExportWarn(inventoryWarning(inv, dict, { localPhotoCount }));
     } catch {
@@ -675,8 +675,13 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
     e.target.value = '';
     if (!file) return;
     let parsed: unknown;
-    try { parsed = JSON.parse(await file.text()); }
-    catch { setRestoreMsg(L(dict, '文件不是有效的 JSON', 'File is not valid JSON')); return; }
+    try {
+      const { parseBackupFile } = await import('@/lib/portal/backup-pack');
+      parsed = await parseBackupFile(file);
+    } catch {
+      setRestoreMsg(L(dict, '不是有效的备份压缩包或 JSON', 'Not a valid backup .gz or JSON'));
+      return;
+    }
     if (!isValidBackup(parsed)) { setRestoreMsg(L(dict, '不是有效的 Nesio 备份文件', 'Not a valid Nesio backup file')); return; }
 
     const replace = confirm(L(dict,
@@ -1052,15 +1057,15 @@ export function PrivacySheet({ open, onClose, onOpenConnect }: SheetProps & { on
       {/* 并排后放不下长标题,按钮上只留动词;导出的到底是什么放进 title(长按/悬停可见)。 */}
       <div className="nesio-settings-btn-row">
         <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={handleExportLocal} disabled={exportBusy}
-          title={L(dict, '导出全部:记忆 + 学到的偏好,下载 JSON', 'Export everything: memories + learned prefs, JSON')}>
+          title={L(dict, '导出全部为 .json.gz 压缩包(内含 JSON 与照片)', 'Export everything as .json.gz (JSON + photos inside)')}>
           {exportBusy ? L(dict, '正在导出…', 'Exporting…') : L(dict, '导出', 'Export')}
         </Button>
         <Button variant="soft" size="md" full className="nesio-settings-action-btn" onClick={() => importRef.current?.click()}
-          title={L(dict, '从备份 JSON 导入', 'Import from a backup JSON')}>
+          title={L(dict, '从 .json.gz 压缩包导入(也兼容旧明文 JSON)', 'Import from .json.gz (legacy plain JSON still works)')}>
           {L(dict, '导入', 'Import')}
         </Button>
       </div>
-      <input ref={importRef} type="file" accept="application/json,.json" className="nesio-visually-hidden" onChange={handleImportFile} />
+      <input ref={importRef} type="file" accept=".json.gz,application/gzip,.gz,application/json,.json" className="nesio-visually-hidden" onChange={handleImportFile} />
       {restoreMsg && <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, color: restoreMsg.startsWith('✓') ? 'var(--status-go)' : 'var(--status-risk)', whiteSpace: 'pre-wrap', lineHeight: 1.55 }}>{restoreMsg}</p>}
       {exportWarn && <p style={{ fontSize: 'var(--text-xs)', marginTop: 4, lineHeight: 1.6, color: 'var(--status-gentle)', whiteSpace: 'pre-wrap' }}>{exportWarn}</p>}
 

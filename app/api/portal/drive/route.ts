@@ -189,10 +189,10 @@ async function ensureReadme(accessToken: string, folderId: string): Promise<void
   if (existing && existing !== 'insufficient_scope') return;
   const body =
     '宝盒 / Nesio 备份说明\n\n' +
-    '请保留 nesio-backup.json.gz —— 这是完整压缩备份,内含记忆、设置、银行流水和照片。\n' +
-    '旧版 nesio-backup.json(若还在)可能不含照片,可删。\n\n' +
+    '只保留 nesio-backup.json.gz —— 压缩包里是完整 JSON(记忆、设置、流水、照片)。\n' +
+    '不要用旧的明文 nesio-backup.json(若还在可删,可能没有照片)。\n\n' +
     '换手机:打开宝盒 → 设置 → Google 云 →「用备份补缺」。\n' +
-    '本机导出:设置里「导出」,在系统分享面板选「存储到文件」。\n';
+    '本机导出/导入:同样只用 .json.gz 压缩包。\n';
   const boundary = 'nesio_readme';
   const meta = { name, parents: [folderId] };
   const multipart =

@@ -6,7 +6,7 @@
 export type SaveBackupOutcome = 'shared' | 'downloaded' | 'cancelled' | 'failed';
 
 export async function saveBackupBlob(blob: Blob, filename: string): Promise<SaveBackupOutcome> {
-  const file = new File([blob], filename, { type: blob.type || 'application/json' });
+  const file = new File([blob], filename, { type: blob.type || 'application/gzip' });
   const nav = navigator as Navigator & {
     canShare?: (data: { files?: File[] }) => boolean;
     share?: (data: ShareData & { files?: File[] }) => Promise<void>;
