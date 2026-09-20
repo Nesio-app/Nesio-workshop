@@ -16,8 +16,8 @@ import { buildRetrospect, buildPlan, autoPersistPeriodicReport } from '@/lib/por
 import {
   collectDailyReportExtras, collectOrders, aheadEvents,
   yesterdayImportantNotes, yesterdayHealthFacts, yesterdayFinanceFacts,
+  emailHighlightsWithNodes,
 } from '@/lib/portal/daily-report-sources';
-import { getLifeGraph } from '@/lib/portal/life-graph';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext, type TodayReceipt } from '@/lib/platform/view-models/today-view-model';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
@@ -230,20 +230,7 @@ export function useTodayData(canUsePrivateData: boolean) {
               allDay: e.allDay,
             })),
             // 重要邮件:写清主题,并尽量挂上记忆节点(点一下进对应记忆)。
-            emailHighlights: (() => {
-              const graph = getLifeGraph();
-              return latestEmailSignals.slice(0, 5).map((s) => {
-                const text = (s.subject || s.cardTitle || '').trim();
-                if (!text) return null;
-                const msgId = s.id.startsWith(`${s.type}-`) ? s.id.slice(s.type.length + 1) : s.id;
-                const hit = graph.find((n) => (
-                  n.source === 'email'
-                  && (n.attributes?.emailId === msgId
-                    || (s.subject && (n.name || '').includes(s.subject.slice(0, 40))))
-                ));
-                return hit ? { text, nodeId: hit.id } : { text };
-              }).filter(Boolean) as Array<{ text: string; nodeId?: string }>;
-            })(),
+            emailHighlights: emailHighlightsWithNodes(latestEmailSignals, 5),
             // 念念还记得:前一日重要笔记(可点);旧 memoryNotes 只作兜底。
             memoryNotes: (() => {
               const y = yesterdayImportantNotes(anchor, 4);

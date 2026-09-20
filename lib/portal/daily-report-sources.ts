@@ -316,6 +316,30 @@ export function yesterdayImportantNotes(now: Date = new Date(), limit = 4): Arra
   } catch { return []; }
 }
 
+/** 重要邮件主题 + 尽量挂上记忆节点 id(供日报可点)。 */
+export function emailHighlightsWithNodes(
+  signals: ReadonlyArray<{ id: string; type: string; subject?: string; cardTitle?: string }>,
+  limit = 5,
+): Array<{ text: string; nodeId?: string }> {
+  if (typeof window === 'undefined' || !signals.length) return [];
+  try {
+    const graph = getLifeGraph();
+    const out: Array<{ text: string; nodeId?: string }> = [];
+    for (const s of signals.slice(0, limit)) {
+      const text = (s.subject || s.cardTitle || '').trim();
+      if (!text) continue;
+      const msgId = s.id.startsWith(`${s.type}-`) ? s.id.slice(s.type.length + 1) : s.id;
+      const hit = graph.find((n) => (
+        n.source === 'email'
+        && (n.attributes?.emailId === msgId
+          || (s.subject && (n.name || '').includes(s.subject.slice(0, 40))))
+      ));
+      out.push(hit ? { text, nodeId: hit.id } : { text });
+    }
+    return out;
+  } catch { return []; }
+}
+
 /** 前一日健康事实:步数 / 睡眠小时;没有就不返回。 */
 export function yesterdayHealthFacts(now: Date = new Date()): { steps?: number; sleepHours?: number } | undefined {
   if (typeof window === 'undefined') return undefined;

@@ -20,7 +20,7 @@ import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { readTodayReport } from '@/lib/portal/daily-report-persist';
 import type { DailyReport } from '@/lib/portal/daily-report';
-import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
+import { getLiveMemoryNode, type LiveMemoryNode } from '@/lib/platform/view-models/today-view-model';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
@@ -39,7 +39,7 @@ type ReportNode = { name?: string; rawInput?: string; attributes?: Record<string
 export function DailyReportCard({ nodes }: { nodes: ReadonlyArray<ReportNode> }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [open, setOpen] = useState(false);
-  const [detailNode, setDetailNode] = useState<LifeNode | null>(null);
+  const [detailNode, setDetailNode] = useState<LiveMemoryNode | null>(null);
   const [dismissed, setDismissed] = useState(() => {
     try { return localStorage.getItem(DISMISS_KEY) === todayKey(); } catch { return false; }
   });
@@ -76,7 +76,7 @@ export function DailyReportCard({ nodes }: { nodes: ReadonlyArray<ReportNode> })
           report={report}
           onClose={() => { setOpen(false); dismiss(); }}
           onOpenNode={(id) => {
-            const n = getLifeGraph().find((x) => x.id === id);
+            const n = getLiveMemoryNode(id);
             if (n) setDetailNode(n);
           }}
         />
