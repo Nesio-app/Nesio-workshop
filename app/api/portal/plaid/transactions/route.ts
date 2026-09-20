@@ -191,6 +191,7 @@ export async function GET(req: NextRequest) {
   // 财务⑦:刚连上的机构,accounts/get 立即可用,但流水初始拉取要在 Plaid 侧准备几分钟——
   // /transactions/sync 此时返回 NOT_READY/空。不识别它就是静默空同步(账户出现了、数字全不动)。
   let pendingItems = 0;
+  let syncIncomplete = false;
   const nextCursors: string[] = [];
   // 财务⑧:每 token 的账户归属/机构元数据;accountsOk 全真才敢说这份账户表是权威快照
   const perToken: Array<{ institutionId: string; accounts: PlaidAccount[] }> = [];
@@ -201,26 +202,22 @@ export async function GET(req: NextRequest) {
   try {
     for (let i = 0; i < tokens.length; i++) {
       const accessToken = tokens[i];
-      // 从上次存的游标续拉;首次(无游标)全量回填,页数上限抬到 50(=5000 笔)防极端,
-      // 但只要 has_more 为真就继续,不再在 10 页处硬停。
+      // 从上次存的游标续拉;首次(无游标)全量回填。
+      // 页数上限抬到 200(=2 万笔);若仍 has_more,标记 incomplete 且**不**让客户端以为回填完成。
       let cursor = typeof cursors[i] === 'string' ? cursors[i] : '';
-      for (let page = 0; page < 50; page++) {
+      let truncated = false;
+      for (let page = 0; page < 200; page++) {
         type SyncResp = {
           added?: PlaidTx[]; modified?: PlaidTx[]; removed?: Array<{ transaction_id: string }>; accounts?: PlaidAccount[];
           next_cursor?: string; has_more?: boolean; error_code?: string; transactions_update_status?: string;
         };
-        // 免费最大化·Plaid B:附加富化参数 include_original_description(默认关,拿原始描述符)。
-        // 修断流回归:plaidPost 对 400 也照常返回 error 体,循环里 `if (data.error_code) break`
-        // 会因一个不被接受的附加参数**静默 break → 流水永远 0**。所以自愈——若 Plaid 判
-        // INVALID_*,去掉附加参数重试同一页,保证同步永不因富化参数中断。
-        // (此前误加的 PFCv2 顶层参数值非法,是流水返回 0 的真因,已移除。)
         const syncBody = { access_token: accessToken, cursor: cursor || undefined, count: 100 };
         let data = await plaidPost('/transactions/sync', { ...syncBody, options: { include_original_description: true } }) as SyncResp;
         if (typeof data.error_code === 'string' && data.error_code.startsWith('INVALID')) {
           data = await plaidPost('/transactions/sync', syncBody) as SyncResp;
         }
         if (data.error_code === 'PRODUCT_NOT_READY' || data.transactions_update_status === 'NOT_READY') {
-          pendingItems += 1; // 游标不动,下次同步从头再拉这家
+          pendingItems += 1;
           break;
         }
         if (data.error_code) {
@@ -228,13 +225,14 @@ export async function GET(req: NextRequest) {
           if (data.error_code === 'INVALID_ACCESS_TOKEN') deadTokenIndexes.add(i);
           break;
         }
-        // added + modified 都送客户端按 id upsert;removed 让客户端删掉。
         added.push(...(data.added ?? []), ...(data.modified ?? []));
         for (const r of data.removed ?? []) removedIds.push(r.transaction_id);
         for (const a of data.accounts ?? []) acctById.set(a.account_id, a);
         cursor = data.next_cursor || cursor;
         if (!data.has_more) break;
+        if (page === 199) truncated = true;
       }
+      if (truncated) syncIncomplete = true;
       nextCursors[i] = cursor;
       // 账户:独立拉一次,保证一定有账户/余额(这家失效不阻断其他家)
       let tokenAccounts: PlaidAccount[] = [];
@@ -438,6 +436,7 @@ export async function GET(req: NextRequest) {
       relinkIndexes: relinkIndexes.length ? relinkIndexes : undefined,
       prunedDead: deadTokenIndexes.size || undefined,
       pendingItems: pendingItems || undefined,
+      syncIncomplete: syncIncomplete || undefined,
       authoritative,
       ok: true,
       accounts: accounts.map((a) => ({

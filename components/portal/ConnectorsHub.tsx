@@ -806,7 +806,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     const myGen = ++syncGenRef.current;
     setSyncing(c.id);
     setOauthSyncResult((p) => ({ ...p, google: { ok: true, msg: L(dict, '同步中…', 'Syncing…') } }));
-    const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
+    const { whenGraphHydrated, getLifeGraph, reloadGraphFromIdb } = await import('@/lib/portal/life-graph');
     if (!(await whenGraphHydrated())) {
       setOauthSyncResult((p) => ({
         ...p,
@@ -815,6 +815,7 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
       setSyncing(null);
       return;
     }
+    const beforeCount = getLifeGraph().length;
     const parts: string[] = [];
     let allOk = true;
     let reauth = false;
@@ -915,6 +916,10 @@ export default function ConnectorsHub({ open, onClose }: ConnectorsHubProps) {
     // 若同步期间用户点了「断开」(bump 了 syncGenRef),不许收尾把连接器弹回「已连接」——
     // 那会和已撤销的服务端 token 不一致。仅清同步态,保留 disconnect 写下的断开状态。
     if (syncGenRef.current !== myGen) { setSyncing(null); return; }
+    // 急救:点同步若 RAM 腰斩,从 IDB 整图重载(不经慢云下拉)。
+    if (beforeCount > 20 && getLifeGraph().length < beforeCount * 0.5) {
+      await reloadGraphFromIdb();
+    }
     saveConnectorState('google', true);
     setConnected((p) => ({ ...p, google: true }));
     setOauthSyncResult((p) => ({ ...p, google: { ok: allOk, msg: allOk ? L(dict, '同步成功', 'Synced') : L(dict, '部分同步失败', 'Partly failed'), detail: parts.join('\n'), needsReauth: reauth } }));

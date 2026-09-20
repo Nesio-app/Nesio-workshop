@@ -46,6 +46,7 @@ export async function syncMemoryWithCloud(opts: { force?: boolean } = {}): Promi
   lastSyncAt = now;
   try {
     await whenGraphHydrated();
+    if (!(await whenGraphHydrated())) return { ok: false, importedNodeCount: 0 };
     const client = createAppApiClient();
     const snapshot = await client.fetchCloudMemorySnapshot();
     if (!snapshot.ok) return { ok: false, importedNodeCount: 0 };

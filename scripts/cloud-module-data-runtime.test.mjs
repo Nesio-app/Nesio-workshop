@@ -78,7 +78,11 @@ for (const marker of ['pushEmailBodiesToCloud', 'pullEmailBodiesFromCloud', 'aut
   assert.ok(emailClient.includes(marker), `email-sync client missing: ${marker}`);
 }
 assert.ok(!/gzipSync\(|gunzipSync\(/.test(emailClient), 'email-sync 不得再调用同步 gzipSync/gunzipSync(须走离主线程的 gzipAsync)');
-assert.match(emailClient, /keyPrefix=/, 'email-sync GET 用 keyPrefix 只取邮件行');
+assert.match(emailClient, /pullModulePrefixRows/, 'email-sync pull 走共用 pullModulePrefixRows(since/meta)');
+assert.match(emailClient, /pullModulePrefixRows|meta=1|since=/, 'email-sync pull 须 since/meta 省 egress');
+assert.match(fs.readFileSync(path.join(root, 'lib', 'portal', 'cloud-record-sync.ts'), 'utf8'), /meta=1/, 'record-sync 冷启动 meta 对账');
+assert.match(fs.readFileSync(path.join(root, 'lib', 'portal', 'cloud-record-sync.ts'), 'utf8'), /since=/, 'record-sync 增量 since');
+assert.match(route, /metaOnly|meta === '1'/, 'module-data 路由支持 meta=1 不回 data');
 assert.ok(emailClient.includes("EMAIL_BODY_MODULE_PREFIX = 'email-body:'"), 'email 行前缀 = email-body:');
 
 // Portal 顶层触发(mount + visibility)

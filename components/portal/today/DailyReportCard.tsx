@@ -20,12 +20,14 @@ import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { readTodayReport } from '@/lib/portal/daily-report-persist';
 import type { DailyReport } from '@/lib/portal/daily-report';
+import { getLifeGraph, type LifeNode } from '@/lib/portal/life-graph';
 import { L } from '@/lib/portal/i18n';
 import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from '../use-portal-locale';
 import Button from '../ui/Button';
 
 const DailyReportSheet = dynamic(() => import('../DailyReportSheet'), { ssr: false });
+const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
 
 /** 今天不想看了——只压到明天,不是「再也不要」(那个开关在设置里)。 */
 const DISMISS_KEY = 'nesio-daily-report-card-dismiss-v1';
@@ -37,6 +39,7 @@ type ReportNode = { name?: string; rawInput?: string; attributes?: Record<string
 export function DailyReportCard({ nodes }: { nodes: ReadonlyArray<ReportNode> }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [open, setOpen] = useState(false);
+  const [detailNode, setDetailNode] = useState<LifeNode | null>(null);
   const [dismissed, setDismissed] = useState(() => {
     try { return localStorage.getItem(DISMISS_KEY) === todayKey(); } catch { return false; }
   });
@@ -68,7 +71,23 @@ export function DailyReportCard({ nodes }: { nodes: ReadonlyArray<ReportNode> })
         </div>
       </div>
       {/* 看完全文也算「今天见过了」——收起来,别在 feed 里常驻。 */}
-      {open && <DailyReportSheet report={report} onClose={() => { setOpen(false); dismiss(); }} />}
+      {open && (
+        <DailyReportSheet
+          report={report}
+          onClose={() => { setOpen(false); dismiss(); }}
+          onOpenNode={(id) => {
+            const n = getLifeGraph().find((x) => x.id === id);
+            if (n) setDetailNode(n);
+          }}
+        />
+      )}
+      {detailNode && (
+        <MemoryNodeDetail
+          node={detailNode}
+          onClose={() => setDetailNode(null)}
+          onOpenNode={(n) => setDetailNode(n)}
+        />
+      )}
     </>
   );
 }

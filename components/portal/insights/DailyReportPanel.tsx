@@ -29,6 +29,7 @@ import { DailyReportOffNotice } from './DailyReportOffNotice';
 import { ReportListItem } from './report-list-item';
 
 const DailyReportSheet = dynamic(() => import('../DailyReportSheet'), { ssr: false });
+const MemoryNodeDetail = dynamic(() => import('../MemoryNodeDetail'), { ssr: false });
 
 /** 最多往回翻多少天 —— 再往前请去记忆页搜「每日日报」。 */
 const MAX_DAYS = 14;
@@ -37,6 +38,7 @@ export default function DailyReportPanel() {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
   const [nodes, setNodes] = useState<LifeNode[]>([]);
   const [open, setOpen] = useState<DailyReport | null>(null);
+  const [detailNode, setDetailNode] = useState<LifeNode | null>(null);
 
   useEffect(() => {
     const read = () => { try { setNodes(getLifeGraph()); } catch { setNodes([]); } };
@@ -109,7 +111,25 @@ export default function DailyReportPanel() {
           />
         ))}
       </ul>
-      {open && <DailyReportSheet report={open} elevated onClose={() => setOpen(null)} />}
+      {open && (
+        <DailyReportSheet
+          report={open}
+          elevated
+          onClose={() => setOpen(null)}
+          onOpenNode={(id) => {
+            const n = nodes.find((x) => x.id === id) || getLifeGraph().find((x) => x.id === id);
+            if (n) setDetailNode(n);
+          }}
+        />
+      )}
+      {detailNode && (
+        <MemoryNodeDetail
+          node={detailNode}
+          elevated
+          onClose={() => setDetailNode(null)}
+          onOpenNode={(n) => setDetailNode(n)}
+        />
+      )}
     </div>
   );
 }

@@ -9,8 +9,8 @@
  *   ② 日程窗口从「今天剩余」改成**当天整天**。用户定了「早上 8 点定稿、当天不再变」,
  *      而人可能中午才打开这份「早上八点的日报」—— 用「今天剩余」的话早上那场会
  *      就从里面消失了,跟他早上看到的对不上。
- *   ③ 邮件从「列出亮点」改成**只给一行汇总 + 出口**。用户已经收到一份从邮件总结的
- *      日报,在这儿再抄一遍是更差的重复品,还会把只有 Nesio 知道的那几段挤下去。
+ *   ③ 邮件列出具体主题(可点进记忆)。旧「只给一行汇总」已推翻 —— 用户要知道
+ *      具体是哪几封,并能点进对应记忆。
  * 这三条的新判据在 scripts/daily-report-crossface.test.mjs 里正面钉住。
  */
 import fs from 'node:fs';
@@ -53,7 +53,8 @@ const iso = (h, m = 0) => new Date(2026, 6, 9, h, m, 0).toISOString();
   assert.ok(today && today.lines[0].includes('18~27°C'), '天气报区间(现在并进「今天」那一段)');
   assert.ok(today.lines[0].includes('降水概率 60%'), '高降水概率并入');
   const mail = r.sections.find((s) => s.id === 'email');
-  assert.equal(mail.lines.length, 1, '邮件只给一行汇总,不复述内容(见文件头③)');
+  assert.equal(mail.lines.length, 2, '邮件列出具体主题');
+  assert.ok(mail.lines.some((l) => /账单/.test(l)) && mail.lines.some((l) => /快递/.test(l)), '主题可见');
   assert.ok(r.sections.some((s) => s.id === 'memory' && s.lines[0].includes('降压药')), '记忆提醒分节');
   assert.ok(/今天 3 个安排/.test(r.headline), 'headline 概览当天安排数');
   assert.ok(r.title.startsWith('每日日报'), 'title 字段');

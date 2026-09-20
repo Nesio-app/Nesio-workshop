@@ -96,8 +96,9 @@ export interface DailyReportInput {
   weather?: DailyReportWeather;
   location?: string;             // 设备反地理编码城市,如 "Cary, NC"
   events?: DailyReportEvent[];
-  emailHighlights?: string[];
-  memoryNotes?: string[];
+  emailHighlights?: Array<string | { text: string; nodeId?: string }>;
+  /** 念念还记得:前一日重要笔记等;可带 nodeId 点进记忆 */
+  memoryNotes?: Array<string | { text: string; nodeId?: string }>;
   locale?: 'zh' | 'en';
 
   /* ── 2026-07-30 跨面扩展 ────────────────────────────────────────── */
@@ -107,8 +108,12 @@ export interface DailyReportInput {
   domainInsights?: DailyReportDomainInsight[];
   /** 今天该练哪个(训练计划已排好的那一节) */
   fitnessSession?: string;
-  /** 今天穿什么(衣橱按天气 + 今天正式度给的一句) */
+  /** @deprecated 穿衣不再进日报;保留字段避免旧调用方炸 */
   outfitNote?: string;
+  /** 前一日健康事实(步数/睡眠);没有就不进日报 */
+  healthFacts?: { steps?: number; sleepHours?: number };
+  /** 前一日财务事实(支出/收入/投资涨跌) */
+  financeFacts?: { spent?: number; income?: number; investDelta?: number | null; currency?: string };
   /** 今天计划的菜 */
   meals?: string[];
   /** 在途订单今天的动静 */
@@ -141,11 +146,12 @@ export interface DailyReportInput {
 export type DailyReportSectionId =
   | 'action'    // 要你动:到点的提醒 / flag 级判定 / 到货
   | 'calendar'  // 按时间走
-  | 'today'     // 今天的底色:天气 / 穿 / 吃 / 练
+  | 'today'     // 今天的底色:天气 / 吃 / 练 / 健康事实
+  | 'chores'    // 家务专栏
   | 'domain'    // 新进展(有昨天可比时是差分)/ 这几面(第一天时是快照)
   | 'ahead'     // 往前看:未来两周确定会发生的事(默认折叠)
-  | 'email'     // 邮件:只给一行汇总 + 出口,不复述内容
-  | 'memory'    // 念念还记得
+  | 'email'     // 邮件:具体主题,可点进记忆
+  | 'memory'    // 念念还记得(含前一日重要笔记)
   | 'completed' // 回顾:这一期做完的(提醒/家务)
   | 'tally'     // 回顾:各域被提到几次(非叙事,纯计数)
   | 'threads'   // 计划:还没接上的线头
@@ -162,6 +168,8 @@ export interface DailyReportItem {
   when?: string;
   /** 补充事实。只放已经知道的数字/地点/编号,不编。 */
   notes?: string[];
+  /** 点进对应记忆(邮件/笔记)。有则 Sheet 可点。 */
+  nodeId?: string;
 }
 
 export interface DailyReportSection {
@@ -485,10 +493,23 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
     .slice(0, 3);
 
   const wText = weatherText(input.weather, input.location, locale);
-  const emails = (input.emailHighlights || []).filter(Boolean);
-  const notes = (input.memoryNotes || []).filter(Boolean).slice(0, 3);
-  const insights = (input.domainInsights || []).filter((i) => i && i.title);
+  const emailsRaw = (input.emailHighlights || []).map((e) => (
+    typeof e === 'string' ? { text: e } : { text: e.text, nodeId: e.nodeId }
+  )).filter((e) => e.text);
+  const notesRaw = (input.memoryNotes || []).map((n) => (
+    typeof n === 'string' ? { text: n } : { text: n.text, nodeId: n.nodeId }
+  )).filter((n) => n.text).slice(0, 4);
+  const notes = notesRaw.map((n) => n.text);
+  const insights = (input.domainInsights || []).filter((i) => i && i.title)
+    // 日报不要现金跑道/应急金这类大方向警示,也不要 RHR/HRV 基线偏离。
+    .filter((i) => {
+      if (i.domain === 'finance' && /跑道|应急|runway|emergency/i.test(`${i.title} ${i.detail || ''}`)) return false;
+      if (i.domain === 'health' && /静息心率|HRV|基线|baseline|RHR/i.test(`${i.title} ${i.detail || ''}`)) return false;
+      return true;
+    });
   const todayReminders = (input.reminders || []).filter((r) => r && r.title && isReminderToday(r, todayKey));
+  const choreReminders = todayReminders.filter((r) => r.kind === 'chore');
+  const otherReminders = todayReminders.filter((r) => r.kind !== 'chore');
   const orders = (input.orders || []).filter((o) => o && o.title && o.status);
   const { flags, attentions } = splitInsights(insights, MAX_ACTION, MAX_DOMAIN);
 
@@ -497,12 +518,11 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
   /* ── ① 要你动(Top of mind)──────────────────────────────────────
      准入是正向的:到点的提醒、flag 级判定、有动静的订单。
      「一切正常」不进这一段 —— 没有要你动的事,这一段整段不出现。 */
-  const reminderItems = todayReminders.slice(0, ACTION_QUOTA.reminders).map((r): DailyReportItem => {
+  const reminderItems = otherReminders.slice(0, ACTION_QUOTA.reminders).map((r): DailyReportItem => {
     const clock = wallClockTime(r.at, locale);
     const mins = effortMin(r.kind);
     const kind = r.kind === 'bill' ? tt(locale, '账单', 'Bill')
-      : r.kind === 'chore' ? tt(locale, '家务', 'Chore')
-        : r.kind === 'event' ? tt(locale, '日程', 'Event') : '';
+      : r.kind === 'event' ? tt(locale, '日程', 'Event') : '';
     return {
       when: `${mins} min${clock ? ` · ${clock}` : ''}`,
       text: r.title,
@@ -537,13 +557,15 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
     });
   }
 
-  /* ── ② 按时间走 ─────────────────────────────────────────────── */
-  const shownEvents = todayEvents.slice(0, MAX_EVENTS);
+  /* ── ② 按时间走(家务味标题挪到「家务」专栏,不占日程位)─────────── */
+  const isChoreTitle = (t: string) => /wash|vacuum|clean|laundry|chore|家务|打扫|洗衣|吸尘|drain/i.test(t || '');
+  const scheduleEvents = todayEvents.filter((e) => !isChoreTitle(e.title || ''));
+  const shownEvents = scheduleEvents.slice(0, MAX_EVENTS);
   const calItems: DailyReportItem[] = shownEvents.length
     ? [
         ...shownEvents.map((e) => eventItem(e, locale)),
-        ...(todayEvents.length > MAX_EVENTS
-          ? [{ text: tt(locale, `还有 ${todayEvents.length - MAX_EVENTS} 件,在日程里`, `${todayEvents.length - MAX_EVENTS} more — see Schedule`) }]
+        ...(scheduleEvents.length > MAX_EVENTS
+          ? [{ text: tt(locale, `还有 ${scheduleEvents.length - MAX_EVENTS} 件,在日程里`, `${scheduleEvents.length - MAX_EVENTS} more — see Schedule`) }]
           : []),
       ]
     : upcoming.length
@@ -563,14 +585,35 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
     items: calItems,
   });
 
-  /* ── ③ 今天的底色:天气 / 穿 / 吃 / 练 ──────────────────────────
-     这一段是 Nesio 独有的那部分 —— 邮箱里那份日报永远给不出来。 */
+  /* ── ③ 今天的底色:天气 / 吃 / 练 / 健康·财务昨日事实 ────────────
+     穿衣不再进日报(用户反馈)。 */
   const todayItems: DailyReportItem[] = [];
   if (wText) todayItems.push({ when: tt(locale, '天气', 'Weather'), text: wText });
-  if (input.outfitNote) todayItems.push({ when: tt(locale, '穿', 'Wear'), text: input.outfitNote });
   const meals = (input.meals || []).filter(Boolean).slice(0, 3);
   if (meals.length) todayItems.push({ when: tt(locale, '吃', 'Eat'), text: meals.join(locale === 'en' ? ', ' : '、') });
   if (input.fitnessSession) todayItems.push({ when: tt(locale, '练', 'Train'), text: input.fitnessSession });
+  const hf = input.healthFacts;
+  if (hf?.steps != null && hf.steps > 0) {
+    todayItems.push({ when: tt(locale, '健康', 'Health'), text: tt(locale, `昨天走了 ${hf.steps.toLocaleString()} 步`, `Yesterday: ${hf.steps.toLocaleString()} steps`) });
+  }
+  if (hf?.sleepHours != null && hf.sleepHours > 0) {
+    todayItems.push({
+      when: tt(locale, '健康', 'Health'),
+      text: tt(locale, `昨天睡了 ${hf.sleepHours.toFixed(1)} 小时`, `Yesterday: ${hf.sleepHours.toFixed(1)}h sleep`),
+    });
+  }
+  const ff = input.financeFacts;
+  if (ff && (ff.spent != null || ff.income != null || (ff.investDelta != null && ff.investDelta !== 0))) {
+    const ccy = ff.currency || 'USD';
+    const bits: string[] = [];
+    if (ff.spent != null) bits.push(tt(locale, `支出 ${ccy} ${Math.round(ff.spent)}`, `Spent ${ccy} ${Math.round(ff.spent)}`));
+    if (ff.income != null) bits.push(tt(locale, `收入 ${ccy} ${Math.round(ff.income)}`, `Income ${ccy} ${Math.round(ff.income)}`));
+    if (ff.investDelta != null && ff.investDelta !== 0) {
+      const sign = ff.investDelta > 0 ? '+' : '';
+      bits.push(tt(locale, `投资 ${sign}${Math.round(ff.investDelta)}`, `Invest ${sign}${Math.round(ff.investDelta)}`));
+    }
+    if (bits.length) todayItems.push({ when: tt(locale, '财务', 'Finance'), text: bits.join(locale === 'en' ? ' · ' : ' · ') });
+  }
   const todayLines = todayItems.map(flattenItem);
   if (todayItems.length) {
     sections.push({
@@ -578,6 +621,25 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
       title: tt(locale, '今天', 'Today'),
       lines: todayLines,
       items: todayItems,
+    });
+  }
+
+  /* ── ③b 家务专栏(提醒 kind=chore + 日历里家务味标题)──────────── */
+  const choreCal = todayEvents.filter((e) => isChoreTitle(e.title || ''));
+  const choreItems: DailyReportItem[] = [
+    ...choreReminders.map((r): DailyReportItem => ({
+      when: wallClockTime(r.at, locale) || tt(locale, '全天', 'All day'),
+      text: r.title,
+      notes: factNotes(r.note),
+    })),
+    ...choreCal.map((e): DailyReportItem => eventItem(e, locale)),
+  ].slice(0, 6);
+  if (choreItems.length) {
+    sections.push({
+      id: 'chores',
+      title: tt(locale, '家务', 'Housework'),
+      lines: choreItems.map(flattenItem),
+      items: choreItems,
     });
   }
 
@@ -659,15 +721,13 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
     });
   }
 
-  /* ── ⑤ 邮件:只给一行汇总 + 出口,**不复述内容** ────────────────
-     用户已经收到一份从邮件总结的日报了。在这里再抄一遍,就是花力气做一个更差的
-     重复品,还会把上面那几段真正只有 Nesio 知道的东西挤下去。 */
-  if (emails.length) {
-    // 只报封数和出口,不抄主题/正文 —— 用户已经有一份从邮件总结的日报。
-    const emailItems: DailyReportItem[] = [{
-      text: tt(locale, `有 ${emails.length} 封值得看一眼 —— 在日程页的「收件」里`,
-                       `${emails.length} worth a look — under Inbox in Schedule`),
-    }];
+  /* ── ⑤ 邮件:具体主题,可点进记忆 ─────────────────────────────── */
+  if (emailsRaw.length) {
+    const emailItems: DailyReportItem[] = emailsRaw.slice(0, 5).map((e) => ({
+      text: e.text,
+      when: tt(locale, '邮件', 'Mail'),
+      ...(e.nodeId ? { nodeId: e.nodeId } : {}),
+    }));
     sections.push({
       id: 'email',
       title: tt(locale, '邮件', 'Mail'),
@@ -686,7 +746,7 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
   ];
   if (memoryLines.length) {
     const memoryItems: DailyReportItem[] = [
-      ...notes.map((t) => ({ text: t })),
+      ...notesRaw.map((n) => ({ text: n.text, ...(n.nodeId ? { nodeId: n.nodeId } : {}) })),
       ...threads.map((t) => ({ when: tt(locale, '还没接上', 'Still open'), text: t })),
     ];
     sections.push({
@@ -742,7 +802,7 @@ export function buildDailyReport(input: DailyReportInput): DailyReport {
     && todayEvents.length === 0 && upcoming.length === 0
     && actionLines.length === 0 && domainLines.length === 0
     && todayLines.length === 0 && aheadAll.length === 0
-    && emails.length === 0 && memoryLines.length === 0;
+    && emailsRaw.length === 0 && memoryLines.length === 0;
 
   return { date: todayKey, title, greeting, headline, sections, markdown, empty };
 }

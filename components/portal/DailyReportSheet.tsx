@@ -20,7 +20,7 @@ import { portalLocaleToDictionaryLocale } from '@/lib/portal/profile';
 import { usePortalLocale } from './use-portal-locale';
 import NesioSheet from './ui/NesioSheet';
 import {
-  IconNote, IconCloudSun, IconCalendar, IconMail, IconBook, IconCheckSquare, IconTrendingUp, IconClock, IconAlertTriangle,
+  IconNote, IconCloudSun, IconCalendar, IconMail, IconBook, IconCheckSquare, IconTrendingUp, IconClock, IconAlertTriangle, IconHome,
 } from './icons';
 
 // 段落图标。Record<DailyReportSectionId, …> 是穷举类型 —— 日报/周报/月报加新段时
@@ -28,7 +28,8 @@ import {
 const SECTION_ICON: Record<DailyReport['sections'][number]['id'], React.ComponentType<{ size?: number }>> = {
   action: IconCheckSquare,     // 先处理这几件
   calendar: IconCalendar,      // 今日日程 / 计划里的日程
-  today: IconCloudSun,         // 今天(天气/穿/吃/练)
+  today: IconCloudSun,         // 今天(天气/吃/练/健康·财务事实)
+  chores: IconHome,            // 家务专栏
   domain: IconTrendingUp,      // 新进展 / 这几面
   ahead: IconClock,            // 往前看(未来两周)
   email: IconMail,
@@ -40,7 +41,7 @@ const SECTION_ICON: Record<DailyReport['sections'][number]['id'], React.Componen
 };
 
 export default function DailyReportSheet({
-  report, elevated = false, onClose,
+  report, elevated = false, onClose, onOpenNode,
   // 日报「早上 8:00 定稿 · 这一天不再变」——周报/月报口径不同,由调用方传自己的说法。
   footNote,
 }: {
@@ -48,6 +49,8 @@ export default function DailyReportSheet({
   /** 从洞察(fullscreen,z-930)里打开时必须抬层,否则会被整个盖住。 */
   elevated?: boolean;
   onClose: () => void;
+  /** 有 nodeId 的条目可点进对应记忆 */
+  onOpenNode?: (nodeId: string) => void;
   footNote?: string;
 }) {
   const dict = portalLocaleToDictionaryLocale(usePortalLocale());
@@ -87,17 +90,36 @@ export default function DailyReportSheet({
                 {s.title}
               </p>
               <ul className="nesio-drsheet-ul">
-                {items.map((it, i) => (
-                  <li key={i} className="nesio-drsheet-item">
-                    {it.when ? <span className="nesio-drsheet-when">{it.when}</span> : null}
-                    <p className="nesio-drsheet-text">{it.text}</p>
-                    {it.notes?.length ? (
-                      <ul className="nesio-drsheet-notes">
-                        {it.notes.map((n, j) => <li key={j}>{n}</li>)}
-                      </ul>
-                    ) : null}
-                  </li>
-                ))}
+                {items.map((it, i) => {
+                  const clickable = Boolean(it.nodeId && onOpenNode);
+                  const body = (
+                    <>
+                      {it.when ? <span className="nesio-drsheet-when">{it.when}</span> : null}
+                      <p className="nesio-drsheet-text" style={clickable ? { color: 'var(--portal-blue-deep)', textDecoration: 'underline', textUnderlineOffset: 2 } : undefined}>
+                        {it.text}
+                      </p>
+                      {it.notes?.length ? (
+                        <ul className="nesio-drsheet-notes">
+                          {it.notes.map((n, j) => <li key={j}>{n}</li>)}
+                        </ul>
+                      ) : null}
+                    </>
+                  );
+                  return (
+                    <li key={i} className="nesio-drsheet-item">
+                      {clickable ? (
+                        <button
+                          type="button"
+                          className="nesio-drsheet-item-btn"
+                          onClick={() => onOpenNode!(it.nodeId!)}
+                          style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer' }}
+                        >
+                          {body}
+                        </button>
+                      ) : body}
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           );

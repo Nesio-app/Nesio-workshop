@@ -56,6 +56,52 @@ function makeCtx({ lsInit = {}, localBodies = {}, fetchImpl } = {}) {
         }),
       };
       if (p === './yield-main') return { yieldToMain: async () => {} };
+      if (p === './cloud-record-sync') {
+        // 与生产同构的最小桩:meta 齐了跳过;否则原样返回 fetch 结果(测试 fetchImpl 自带 rows)。
+        const sinceKeyFromStateKey = (stateKey) => stateKey.replace(/-state(-v\d+)?$/, '-since$1');
+        const readPullSince = (sinceKey) => {
+          try {
+            const v = localStorage.getItem(sinceKey);
+            if (!v || !Date.parse(v)) return null;
+            return new Date(Date.parse(v)).toISOString();
+          } catch { return null; }
+        };
+        const writePullSince = (sinceKey, iso) => { try { localStorage.setItem(sinceKey, iso); } catch { /* */ } };
+        const clearPullSince = (sinceKey) => { try { localStorage.removeItem(sinceKey); } catch { /* */ } };
+        const maxRowUpdatedAt = (rows, fallback) => {
+          let max = fallback || '';
+          for (const r of rows) if (typeof r.updatedAt === 'string' && r.updatedAt > max) max = r.updatedAt;
+          return max || new Date().toISOString();
+        };
+        const pullModulePrefixRows = async ({ prefix, sinceKey, hasLocal, localCount }) => {
+          let since = readPullSince(sinceKey);
+          if (since && localCount === 0) { clearPullSince(sinceKey); since = null; }
+          const fetchRows = async (qs) => {
+            const res = await ctx.fetch(`/api/cloud/module-data?${qs}`, { cache: 'no-store' });
+            const data = await res.json();
+            if (!res.ok || !data.ok || !Array.isArray(data.modules)) return null;
+            return data.modules;
+          };
+          if (since) {
+            const rows = await fetchRows(`keyPrefix=${encodeURIComponent(prefix)}&since=${encodeURIComponent(since)}`);
+            if (!rows) return { rows: [], nextSince: null, skippedDownload: false };
+            return { rows, nextSince: maxRowUpdatedAt(rows, since), skippedDownload: false };
+          }
+          const meta = await fetchRows(`keyPrefix=${encodeURIComponent(prefix)}&meta=1`);
+          if (!meta) return { rows: [], nextSince: null, skippedDownload: false };
+          const missing = meta.filter((row) => {
+            const key = row.moduleKey;
+            if (!key || !key.startsWith(prefix)) return false;
+            const id = key.slice(prefix.length);
+            return Boolean(id) && !hasLocal(id);
+          });
+          if (!missing.length) return { rows: [], nextSince: maxRowUpdatedAt(meta), skippedDownload: true };
+          const rows = await fetchRows(`keyPrefix=${encodeURIComponent(prefix)}`);
+          if (!rows) return { rows: [], nextSince: null, skippedDownload: false };
+          return { rows, nextSince: maxRowUpdatedAt(rows), skippedDownload: false };
+        };
+        return { pullModulePrefixRows, writePullSince, sinceKeyFromStateKey, readPullSince, clearPullSince, maxRowUpdatedAt };
+      }
       return {};
     },
     _lastPost: () => lastPost,
@@ -99,18 +145,21 @@ function cloudRow(emailId, body) {
   assert.equal(r2.pushed, 0, '已推的不重推');
 }
 
-// 2. pull:keyPrefix 取邮件行、并集补缺、落地 putEmailBodies + 喂 indexEmailBodies
+// 2. pull:since/meta 省 egress、并集补缺、落地 putEmailBodies + 喂 indexEmailBodies
 {
   const rows = [cloudRow('18c1aa', '云端邮件正文 A'), cloudRow('18c2bb', 'Cloud email body B')];
   const fetchImpl = async (url, init, cap) => {
     cap.get(url);
-    if (typeof url === 'string' && url.startsWith('/api/cloud/module-data')) return { ok: true, status: 200, json: async () => ({ ok: true, modules: rows }) };
+    if (typeof url === 'string' && url.startsWith('/api/cloud/module-data')) {
+      // meta=1 时路由不回 data;测试里用同样 rows 即可(客户端只读 moduleKey)
+      return { ok: true, status: 200, json: async () => ({ ok: true, modules: rows }) };
+    }
     return { ok: false, status: 404, json: async () => ({}) };
   };
   // 本机已有 18c1aa(不覆盖),缺 18c2bb(补)
   const { mod, ctx } = makeCtx({ localBodies: { '18c1aa': '本机已有的正文 A' }, fetchImpl });
   const r = await mod.pullEmailBodiesFromCloud();
-  assert.ok(ctx._lastGetUrl().includes('keyPrefix=email-body%3A'), 'GET 用 keyPrefix=email-body: 只取邮件行');
+  assert.ok(String(ctx._lastGetUrl()).includes('keyPrefix=email-body%3A'), 'GET 用 keyPrefix=email-body:');
   assert.equal(r.applied, 1, '只补本机没有的 1 封(并集,不覆盖已有)');
   const put = ctx._put();
   assert.deepEqual(Object.keys(put), ['18c2bb'], '只 put 缺的那封');

@@ -1151,11 +1151,11 @@ export default function MemoryTab({ canUsePrivateData }: { canUsePrivateData: bo
       if (!canUsePrivateData) return;
       try {
         const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
-        await whenGraphHydrated();
+        if (!(await whenGraphHydrated())) return;
         const client = createAppApiClient();
         const snapshot = await client.fetchCloudMemorySnapshot();
         if (cancelled || !snapshot.ok) return;
-        await whenGraphHydrated();
+        if (!(await whenGraphHydrated())) return;
         mergeCloudMemorySnapshot({ nodes: snapshot.nodes || [], assets: snapshot.assets || [] });
         void retryLifeGraphCloudSync();
         void backfillLocalLifeGraphToCloud({ limit: 200 });

@@ -16,6 +16,9 @@ import { READER_BOOK_MODULE_PREFIX } from './sync-ownership';
 import type { ReaderBook } from './adhd-reader';
 import { logDropped } from './storage-health';
 import { yieldToMain } from './yield-main';
+import {
+  pullModulePrefixRows, writePullSince, sinceKeyFromStateKey,
+} from './cloud-record-sync';
 
 const SYNC_STATE_KEY = 'nesio-reader-sync-state-v1';
 const MAX_BOOK_PACKED_BYTES = 4 * 1024 * 1024; // 单本压缩块上限(< Vercel 4.5MB);超限的书跳过(留日志)
@@ -112,22 +115,26 @@ export async function pushReaderBooksToCloud(): Promise<{ pushed: number }> {
   return { pushed };
 }
 
-/** 拉云端全部书行,并集补缺落地(只补本机没有的书,不覆盖不删除)。 */
+/** 拉云端书行,并集补缺落地。Egress:since / meta,本机齐了不下 gz。 */
 export async function pullReaderBooksFromCloud(): Promise<{ applied: number }> {
   if (typeof window === 'undefined') return { applied: 0 };
-  let rows: Array<{ moduleKey?: string; data?: unknown }>;
-  try {
-    const res = await fetch(`/api/cloud/module-data?keyPrefix=${encodeURIComponent(READER_BOOK_MODULE_PREFIX)}`, { cache: 'no-store' });
-    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; modules?: unknown };
-    if (!res.ok || !data.ok || !Array.isArray(data.modules)) return { applied: 0 };
-    rows = data.modules as typeof rows;
-  } catch { return { applied: 0 }; }
-
   let localIds: Set<string>;
   try { localIds = new Set((await loadReaderBooks()).map((b) => b.id)); } catch { return { applied: 0 }; }
+  const sinceKey = sinceKeyFromStateKey(SYNC_STATE_KEY);
+  const pulled = await pullModulePrefixRows({
+    prefix: READER_BOOK_MODULE_PREFIX,
+    sinceKey,
+    hasLocal: (id) => localIds.has(id),
+    localCount: localIds.size,
+  });
   const state = readState();
+  if (pulled.skippedDownload) {
+    if (pulled.nextSince) writePullSince(sinceKey, pulled.nextSince);
+    writeState(state);
+    return { applied: 0 };
+  }
   let applied = 0;
-  for (const row of rows) {
+  for (const row of pulled.rows) {
     const key = row.moduleKey;
     if (!key || typeof key !== 'string' || !key.startsWith(READER_BOOK_MODULE_PREFIX)) continue;
     const id = key.slice(READER_BOOK_MODULE_PREFIX.length);
@@ -143,6 +150,7 @@ export async function pullReaderBooksFromCloud(): Promise<{ applied: number }> {
     try { await saveReaderBook(book); state[id] = contentHash(json); applied++; } catch (err) { logDropped('cloud.reader_book_apply', err); }
   }
   writeState(state);
+  if (pulled.nextSince) writePullSince(sinceKey, pulled.nextSince);
   if (applied > 0 && typeof window.dispatchEvent === 'function') {
     try { window.dispatchEvent(new CustomEvent(READER_BOOKS_SYNCED_EVENT, { detail: { added: applied } })); } catch { /* ignore */ }
   }

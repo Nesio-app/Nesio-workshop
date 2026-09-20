@@ -1403,7 +1403,7 @@ export default function Portal() {
             .then((data: { ok?: boolean; nodes?: Array<Record<string, unknown>>; count?: number }) => {
               if (data.ok && data.nodes?.length) {
                 void import('@/lib/portal/life-graph').then(async ({ whenGraphHydrated }) => {
-                  await whenGraphHydrated();
+                  if (!(await whenGraphHydrated())) return;
                   ingestLifeNodesBatch(data.nodes!.map((n) => ({ source: 'email', ...n } as Parameters<typeof ingestLifeNodesBatch>[0][number])));
                   window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
                 });
@@ -1518,7 +1518,7 @@ export default function Portal() {
               if (data.ok && data.nodes?.length) {
                 localStorage.setItem('nesio-gmail-last-sync', String(Date.now()));
                 void import('@/lib/portal/life-graph').then(async ({ whenGraphHydrated }) => {
-                  await whenGraphHydrated();
+                  if (!(await whenGraphHydrated())) return;
                   ingestLifeNodesBatch(data.nodes!.map((n) => ({ source: 'email', ...n } as Parameters<typeof ingestLifeNodesBatch>[0][number])));
                   window.dispatchEvent(new CustomEvent('nesio-connectors-refreshed'));
                 });

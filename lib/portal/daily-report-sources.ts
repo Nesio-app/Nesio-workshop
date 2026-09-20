@@ -27,6 +27,9 @@ import { listInventoryItems } from './inventory';
 import { loadFeatureUsage } from './feature-usage';
 import { looseThreads } from './loose-threads';
 import { getLifeGraph } from './life-graph';
+import { loadHealthMetrics } from './health-store';
+import { loadBankTx, loadFlowRules, txFlow } from './bank-tx';
+import { loadNetWorthSeries, investDailyChange } from './finance-assets';
 import { loadTrainingState, protocolById } from '@/lib/platform/training-protocol-engine';
 import { activeProtocol } from '@/lib/platform/training-overrides';
 import { pickPhaseIndex, pickTodaySessionIndex } from '@/lib/platform/fitness-home-core';
@@ -287,4 +290,74 @@ export function outfitNoteFor(
   } catch {
     return undefined;
   }
+}
+
+/** 前一天写过的重要笔记(非日历/邮件系统灌入)。 */
+export function yesterdayImportantNotes(now: Date = new Date(), limit = 4): Array<{ text: string; nodeId?: string }> {
+  if (typeof window === 'undefined') return [];
+  try {
+    const y = new Date(now);
+    y.setDate(y.getDate() - 1);
+    const key = dayKeyOf(y);
+    const out: Array<{ text: string; nodeId?: string }> = [];
+    for (const n of getLifeGraph()) {
+      if (!n?.id) continue;
+      if (n.source === 'calendar' || n.source === 'email') continue;
+      if ((n.tags || []).includes('daily-report')) continue;
+      const day = String(n.createdAt || '').slice(0, 10);
+      if (day !== key) continue;
+      const text = (n.name || n.rawInput || '').trim();
+      if (text.length < 6) continue;
+      if (/Daylight Saving|夏令时/.test(text) && text.length < 40) continue;
+      out.push({ text: text.slice(0, 80), nodeId: n.id });
+      if (out.length >= limit) break;
+    }
+    return out;
+  } catch { return []; }
+}
+
+/** 前一日健康事实:步数 / 睡眠小时;没有就不返回。 */
+export function yesterdayHealthFacts(now: Date = new Date()): { steps?: number; sleepHours?: number } | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const hm = loadHealthMetrics();
+    if (!hm?.daily?.length) return undefined;
+    const y = new Date(now); y.setDate(y.getDate() - 1);
+    const key = dayKeyOf(y);
+    const fact = hm.daily.find((d) => d.date === key);
+    if (!fact) return undefined;
+    const out: { steps?: number; sleepHours?: number } = {};
+    if (typeof fact.steps === 'number' && fact.steps > 0) out.steps = Math.round(fact.steps);
+    if (typeof fact.sleepH === 'number' && fact.sleepH > 0) out.sleepHours = Math.round(fact.sleepH * 10) / 10;
+    return Object.keys(out).length ? out : undefined;
+  } catch { return undefined; }
+}
+
+/** 前一日财务事实:支出/收入/投资涨跌。 */
+export function yesterdayFinanceFacts(now: Date = new Date()): {
+  spent?: number; income?: number; investDelta?: number | null; currency?: string;
+} | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const y = new Date(now); y.setDate(y.getDate() - 1);
+    const key = dayKeyOf(y);
+    const txs = loadBankTx();
+    const flowRules = loadFlowRules();
+    let spent = 0; let income = 0; let ccy = 'USD';
+    for (const t of txs) {
+      if ((t.date || '').slice(0, 10) !== key) continue;
+      const f = txFlow(t, flowRules);
+      if (f === 'expense') { spent += Math.abs(t.amount); ccy = t.currency || ccy; }
+      if (f === 'income') { income += Math.abs(t.amount); ccy = t.currency || ccy; }
+    }
+    const inv = investDailyChange(loadNetWorthSeries());
+    const investDelta = inv ? inv.delta : null;
+    if (!spent && !income && (investDelta == null || investDelta === 0)) return undefined;
+    return {
+      ...(spent ? { spent } : {}),
+      ...(income ? { income } : {}),
+      investDelta,
+      currency: ccy,
+    };
+  } catch { return undefined; }
 }

@@ -799,6 +799,18 @@ function flushPersistNow(): void {
       const latest = memCache && memCache.length >= snapshot.length ? memCache : snapshot;
       const res = await shards.writeGraphShards(idbBackend, latest, lastShardJson);
       lastShardJson = res.nextJson;
+      // 磁盘 union 后的全量必须回写 RAM —— 否则 UI 仍读着半张 memCache,下拉只能靠慢云恢复。
+      const flat: LifeNode[] = [];
+      for (const raw of res.nextJson.values()) {
+        try {
+          const v = JSON.parse(raw) as unknown;
+          if (Array.isArray(v)) flat.push(...(v as LifeNode[]));
+        } catch { /* skip bad shard */ }
+      }
+      if (flat.length > (memCache?.length ?? 0)) {
+        memCache = flat;
+        window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
+      }
     } catch {
       lastShardJson = new Map();
       import('./storage-health').then(({ STORAGE_FULL_EVENT, getStorageHealth }) => {
@@ -888,6 +900,12 @@ function hydrateGraphOnce(): void {
         if (seed.length) persistGraphToIdb(seed); // IDB 空:首次迁移 localStorage → 分片
         memCache = seed;
       }
+      // 会话内 lastShardJson 从刚读到的全图播种 —— 否则第一次写仍是空 prev,半图保护弱一截。
+      if (memCache?.length) {
+        const grouped = shards.groupByShard(memCache);
+        lastShardJson = new Map();
+        for (const [shard, list] of grouped) lastShardJson.set(shard, JSON.stringify(list));
+      }
       try { localStorage.removeItem(STORAGE_KEY); } catch { /* ignore */ }
       // R1 存量修复:把「targetId 存的是人名」那类悬空关联就地修好。
       // 只在真有悬空关联时才写盘(repairDanglingRelations 自己判),所以每次启动
@@ -915,7 +933,13 @@ function loadAll(): LifeNode[] {
 function saveAll(nodes: LifeNode[]): void {
   if (typeof window === 'undefined') return;
   compactCloudSyncOutboxOnce();
-  memCache = nodes;
+  // 内存保险丝:半张图绝不能直接替换 memCache —— 否则 UI 立刻空掉,磁盘 union 也救不了当前会话。
+  // 与 life-graph-shards.looksLikeShardWipe 同阈值。
+  let next = nodes;
+  if (memCache && memCache.length > 20 && nodes.length < memCache.length * 0.5 && memCache.length - nodes.length > 15) {
+    next = unionNodesById(memCache, nodes);
+  }
+  memCache = next;
   // 2026-08-01 修复:必须用「水合真跑完」而不是「水合已发起」来判断能不能直接落盘 ——
   // 见上面 graphHydrationSettled 声明处的注释。未 settle 时 hydrateGraphOnce() 若已
   // 在飞行中会因重入锁直接返回,但没关系:memDirty 已置 true、memCache 已是最新,
@@ -925,10 +949,20 @@ function saveAll(nodes: LifeNode[]): void {
   window.dispatchEvent(new CustomEvent('nesio-life-graph-updated'));
   import('./storage-health').then(({ checkStorageWarning }) => checkStorageWarning());
   if (wasSettled) {
-    persistGraphToIdb(nodes);
+    persistGraphToIdb(next);
   } else {
     hydrateGraphOnce(); // 未水合完成:reconcile(union 旧 IDB)后由水合回写,防覆盖旧数据
   }
+}
+
+/** 从 IDB 强制重载全图到 memCache(同步掏空后的急救;不经云)。 */
+export async function reloadGraphFromIdb(): Promise<number> {
+  if (typeof window === 'undefined') return 0;
+  graphHydrated = false;
+  graphHydrationSettled = false;
+  hydrateGraphOnce();
+  const ok = await whenGraphHydrated(20_000);
+  return ok ? (memCache?.length ?? 0) : 0;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -290,6 +290,8 @@ const INVEST_ACCT_SUBTYPES = new Set(['brokerage', 'ira', 'roth', '401k', '403b'
 function computeInvestIds(accounts: BankAccount[]): Set<string> {
   const out = new Set<string>();
   for (const a of accounts) {
+    // 工资/Salary 账户是储存卡,即使 Plaid 误标成 investment 也不进投资集合。
+    if (/salary|工资|薪水/i.test(a.name || '')) continue;
     if (INVEST_ACCT_TYPES.has((a.type || '').toLowerCase()) || INVEST_ACCT_SUBTYPES.has((a.subtype || '').toLowerCase())) out.add(a.id);
   }
   return out;
@@ -317,6 +319,10 @@ export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string
   if (forced) return forced;
   const cat = (t.category || '').toUpperCase();
   if (/INCOME/.test(cat)) return 'income';
+  // 401k/养老金账户进账(缴存等):用户口径算收入,不是内部转账。
+  if (t.accountId && investAccounts?.has(t.accountId) && (/TRANSFER_IN|DEPOSIT|CONTRIBUTION/.test(cat) || t.amount < 0)) {
+    return 'income';
+  }
   if (/TRANSFER|LOAN_PAYMENT/.test(cat)) return 'transfer';
   if (t.accountId && investAccounts?.has(t.accountId)) return 'transfer';
   if (INVEST_XFER_RE.test(t.name || '')) return 'transfer';

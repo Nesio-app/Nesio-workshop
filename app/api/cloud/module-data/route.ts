@@ -78,6 +78,9 @@ export async function GET(request: NextRequest) {
   const excludePrefixes = (request.nextUrl.searchParams.get('excludePrefix') || '')
     .split(',').map((s) => sanitizePrefix(s)).filter((s): s is string => Boolean(s));
   const since = sanitizeSince(request.nextUrl.searchParams.get('since'));
+  // meta=1:只回 module_key + updated_at,**不带 data** —— 客户端先对账本机缺哪些,
+  // 齐了就不必把 gz 大包再拉一遍(egress 主犯:回前台全量重下邮件/图片)。
+  const metaOnly = request.nextUrl.searchParams.get('meta') === '1';
 
   try {
     const url = new URL('/rest/v1/user_module_data', config.supabaseUrl);
@@ -92,7 +95,7 @@ export async function GET(request: NextRequest) {
     }
     // 增量:只回自上次以来变过的行(updated_at >= since)。gte 含边界,客户端按内容哈希去重,零误漏。
     if (since) url.searchParams.set('updated_at', `gte.${since}`);
-    url.searchParams.set('select', 'module_key,data,updated_at');
+    url.searchParams.set('select', metaOnly ? 'module_key,updated_at' : 'module_key,data,updated_at');
     const res = await fetch(url.toString(), {
       headers: cloudRuntime.serviceRoleRestHeaders(config),
       cache: 'no-store',
@@ -101,10 +104,17 @@ export async function GET(request: NextRequest) {
     const rows = (await res.json()) as Array<{ module_key?: string; data?: unknown; updated_at?: string }>;
     const modules = rows
       .filter((r) => typeof r.module_key === 'string')
-      .map((r) => ({ moduleKey: r.module_key as string, data: r.data ?? null, updatedAt: r.updated_at ?? null }));
-    logAudit('cloud_runtime_success', { auditId: id, method: 'GET', readsCloud: true, writesCloud: false, moduleCount: modules.length });
+      .map((r) => (
+        metaOnly
+          ? { moduleKey: r.module_key as string, updatedAt: r.updated_at ?? null }
+          : { moduleKey: r.module_key as string, data: r.data ?? null, updatedAt: r.updated_at ?? null }
+      ));
+    logAudit('cloud_runtime_success', {
+      auditId: id, method: 'GET', readsCloud: true, writesCloud: false,
+      moduleCount: modules.length, metaOnly,
+    });
     return cloudRuntime.setRefreshedAuthCookies(
-      safeJson({ ok: true, auditId: id, readsCloud: true, writesCloud: false, modules }),
+      safeJson({ ok: true, auditId: id, readsCloud: true, writesCloud: false, metaOnly: metaOnly || undefined, modules }),
       userSession.refreshedSession,
     );
   } catch {

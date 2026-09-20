@@ -1574,9 +1574,31 @@ export default function FinanceTab() {
                 </div>
 
                 {slices.length > 0 && !activeSlice && (
-                  <p className="nesio-fin-score-hint" style={{ textAlign: 'center', marginTop: 'var(--space-1)' }}>
-                    {L(dict, '点一块看明细 · 左右滑换维度', 'Tap a slice for details · swipe for other views')}
-                  </p>
+                  <>
+                    <p className="nesio-fin-score-hint" style={{ textAlign: 'center', marginTop: 'var(--space-1)' }}>
+                      {L(dict, '点一块看明细 · 左右滑换维度', 'Tap a slice for details · swipe for other views')}
+                    </p>
+                    {donutDim === 'expense' && cats.length > 0 && (
+                      <div style={{ marginTop: 'var(--space-3)' }}>
+                        <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '分类小计', 'Category totals')}</p>
+                        {cats.map((c) => (
+                          <button
+                            key={c.category}
+                            type="button"
+                            className="nesio-fin-cat-top"
+                            style={{ marginBottom: 4, width: '100%', background: 'transparent', border: 'none', padding: 0, cursor: 'pointer', textAlign: 'left' }}
+                            onClick={() => setDonutFocus(c.category)}
+                          >
+                            <span className="nesio-fin-cat-name">
+                              {categoryLabel(c.category, dict)}
+                              <span style={{ color: 'var(--portal-muted)', fontWeight: 400 }}> · {c.pct}%</span>
+                            </span>
+                            <span className="nesio-fin-cat-amt">{formatMoney(c.total, summary.currency)}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {donutDim === 'expense' && activeExpense && (() => {
@@ -1639,6 +1661,35 @@ export default function FinanceTab() {
                           ))}
                         </div>
                       )}
+
+                      {(() => {
+                        const detailAgg = (() => {
+                          const m = new Map<string, { id: string; total: number; count: number }>();
+                          for (const t of catTxs) {
+                            const id = effectiveCategoryDetail(t) || `${activeExpense.category}_OTHER`;
+                            const cur = m.get(id) || { id, total: 0, count: 0 };
+                            cur.total += Math.abs(t.amount);
+                            cur.count += 1;
+                            m.set(id, cur);
+                          }
+                          return [...m.values()].sort((a, b) => b.total - a.total);
+                        })();
+                        if (detailAgg.length < 2) return null;
+                        return (
+                          <div style={{ marginTop: 'var(--space-3)' }}>
+                            <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, '子分类小计', 'Subcategory totals')}</p>
+                            {detailAgg.map((d) => (
+                              <div key={d.id} className="nesio-fin-cat-top" style={{ marginBottom: 4 }}>
+                                <span className="nesio-fin-cat-name">
+                                  {categoryDetailLabel(d.id, dict) || d.id}
+                                  <span style={{ color: 'var(--portal-muted)', fontWeight: 400 }}> · {L(dict, `${d.count} 笔`, `${d.count}×`)}</span>
+                                </span>
+                                <span className="nesio-fin-cat-amt">{formatMoney(d.total, summary.currency)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
 
                       <div style={{ marginTop: 'var(--space-3)' }}>
                         <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, `明细 · ${catTxs.length} 笔`, `Details · ${catTxs.length}`)}</p>

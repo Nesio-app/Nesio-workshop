@@ -99,6 +99,7 @@ export const CACHE_KEYS = new Set<string>([
   // nesio-wardrobe-body-v1 / body-ids-v1 → durable(换端要带着全身照清单,图在 IDB 经 wardrobe-image-sync)
   'nesio-rel-nudge-dismissed-v1',         // 关系页绿提示关闭日键:本机 UI 状态
   'nesio-email-sync-state-v1',            // cloud-email-sync 每封上次同步哈希
+  'nesio-email-sync-since-v1',            // email-body 增量水位(省 egress)
   'nesio-backup-synced-entrycount-v1',    // cloud-backup 高水位
   'nesio-cloud-backup-last-v1',           // cloud-backup 上次推送标记
   'nesio-backup-first-sync-done-v1',      // legacy 首次同步标志
@@ -134,7 +135,10 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-bank-synced-at', 'nesio-drive-backup-at', 'nesio-last-backup-at', // 各同步的"上次时间"
   'nesio-place-image-sync-state-v1', 'nesio-reader-sync-state-v1',         // 同步簿记(同 email-sync-state)
   'nesio-wardrobe-image-sync-state-v1', 'nesio-file-sync-state-v1',        // 同步簿记(衣帽间照片/文件附件)
-  'nesio-care-image-sync-state-v1',                                       // 照料附件图同步簿记
+  'nesio-care-image-sync-state-v1',
+  'nesio-place-image-sync-since-v1', 'nesio-reader-sync-since-v1',
+  'nesio-wardrobe-image-sync-since-v1', 'nesio-file-sync-since-v1',
+  'nesio-care-image-sync-since-v1',
   'nesio-life-graph-cloud-sync-v1', 'nesio-life-graph-cloud-sync-outbox-v1', // 云同步水位与待发队列
   'nesio-family-strip-fetch-at-v1',                                        // 取数节流
   'nesio-family-strip-fetch-day-v1',                                       // 家务板「今天拉过了」日键

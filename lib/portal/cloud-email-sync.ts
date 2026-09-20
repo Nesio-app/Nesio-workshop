@@ -21,6 +21,9 @@ import { indexEmailBodies } from './email-fulltext-index';
 import { logDropped } from './storage-health';
 import { yieldToMain } from './yield-main';
 import { createBlobStore } from './idb-blob-store';
+import {
+  pullModulePrefixRows, writePullSince, sinceKeyFromStateKey,
+} from './cloud-record-sync';
 
 /** 邮件全文行的 module_key 前缀。cloud-module-sync 靠它把邮件行排除在普通模块同步之外。 */
 export const EMAIL_BODY_MODULE_PREFIX = 'email-body:';
@@ -134,23 +137,29 @@ export async function pushEmailBodiesToCloud(): Promise<{ pushed: number }> {
 }
 
 /**
- * 拉取云端全部邮件全文行,并集合并落地(只补本机没有的封;不覆盖、不删除)。落地即喂全文索引。
+ * 拉取云端邮件全文行,并集合并落地(只补本机没有的封;不覆盖、不删除)。落地即喂全文索引。
+ * Egress:since 增量;冷启动 meta 对账,本机齐了不下 gz。
  */
 export async function pullEmailBodiesFromCloud(): Promise<{ applied: number }> {
   if (typeof window === 'undefined') return { applied: 0 };
-  let rows: Array<{ moduleKey?: string; data?: unknown }>;
-  try {
-    const res = await fetch(`/api/cloud/module-data?keyPrefix=${encodeURIComponent(EMAIL_BODY_MODULE_PREFIX)}`, { cache: 'no-store' });
-    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; modules?: unknown };
-    if (!res.ok || !data.ok || !Array.isArray(data.modules)) return { applied: 0 };
-    rows = data.modules as typeof rows;
-  } catch { return { applied: 0 }; }
-
   let local: Record<string, string>;
   try { local = await getAllEmailBodies(); } catch { return { applied: 0 }; }
+  const sinceKey = sinceKeyFromStateKey(SYNC_STATE_KEY);
+  const pulled = await pullModulePrefixRows({
+    prefix: EMAIL_BODY_MODULE_PREFIX,
+    sinceKey,
+    hasLocal: (id) => local[id] !== undefined,
+    localCount: Object.keys(local).length,
+  });
   const state = readState();
+  if (pulled.skippedDownload) {
+    if (pulled.nextSince) writePullSince(sinceKey, pulled.nextSince);
+    writeState(state);
+    return { applied: 0 };
+  }
+
   const toPut: Record<string, string> = {};
-  for (const row of rows) {
+  for (const row of pulled.rows) {
     const key = row.moduleKey;
     if (!key || typeof key !== 'string' || !key.startsWith(EMAIL_BODY_MODULE_PREFIX)) continue;
     const emailId = key.slice(EMAIL_BODY_MODULE_PREFIX.length);
@@ -173,6 +182,7 @@ export async function pullEmailBodiesFromCloud(): Promise<{ applied: number }> {
       indexEmailBodies(toPut);            // 即刻并入全文检索索引,拉回的邮件立即可搜(无需 reload)
     } catch (err) { logDropped('cloud.email_sync_apply', err); }
   }
+  if (pulled.nextSince) writePullSince(sinceKey, pulled.nextSince);
   writeState(state);
   return { applied: ids.length };
 }

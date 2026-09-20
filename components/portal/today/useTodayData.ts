@@ -13,7 +13,11 @@ import { loadProfileSettings, portalLocaleToDictionaryLocale, PROFILE_UPDATED_EV
 import { canUsePaidCloudAi } from '@/lib/portal/entitlement';
 import { autoPersistTodayReport, reportAnchor, readYesterdayInsights } from '@/lib/portal/daily-report-persist';
 import { buildRetrospect, buildPlan, autoPersistPeriodicReport } from '@/lib/portal/periodic-report';
-import { collectDailyReportExtras, outfitNoteFor, collectOrders, aheadEvents } from '@/lib/portal/daily-report-sources';
+import {
+  collectDailyReportExtras, collectOrders, aheadEvents,
+  yesterdayImportantNotes, yesterdayHealthFacts, yesterdayFinanceFacts,
+} from '@/lib/portal/daily-report-sources';
+import { getLifeGraph } from '@/lib/portal/life-graph';
 import { buildTodayViewModel, type FocusNode, type ProactiveContext, type TodayReceipt } from '@/lib/platform/view-models/today-view-model';
 import { readPortalCache, PORTAL_CACHE_KEYS } from '@/lib/portal/prefetch-cache';
 import type { CalendarEvent } from '@/lib/portal/types';
@@ -209,12 +213,6 @@ export function useTodayData(canUsePrivateData: boolean) {
         {
           const profile = loadProfileSettings();
           const anchor = reportAnchor(now);
-          const todayEvents = calEvents.filter((e) => {
-            const t = new Date(e.start).getTime();
-            const d0 = new Date(anchor); d0.setHours(0, 0, 0, 0);
-            const d1 = new Date(anchor); d1.setHours(23, 59, 59, 999);
-            return Number.isFinite(t) && t >= d0.getTime() && t <= d1.getTime();
-          });
           // 跨面取数:七个域走已有的单一判定源,另加提醒/健身/吃/在途订单。
           const extras = collectDailyReportExtras(anchor);
           const reportInput = {
@@ -231,12 +229,30 @@ export function useTodayData(canUsePrivateData: boolean) {
               description: [e.description, e.url].filter(Boolean).join('\n') || undefined,
               allDay: e.allDay,
             })),
-            emailHighlights: latestEmailSignals.map((s) => s.cardTitle || s.subject).filter(Boolean).slice(0, 3),
-            memoryNotes: updated.memoryNotes.slice(0, 3),
+            // 重要邮件:写清主题,并尽量挂上记忆节点(点一下进对应记忆)。
+            emailHighlights: (() => {
+              const graph = getLifeGraph();
+              return latestEmailSignals.slice(0, 5).map((s) => {
+                const text = (s.subject || s.cardTitle || '').trim();
+                if (!text) return null;
+                const msgId = s.id.startsWith(`${s.type}-`) ? s.id.slice(s.type.length + 1) : s.id;
+                const hit = graph.find((n) => (
+                  n.source === 'email'
+                  && (n.attributes?.emailId === msgId
+                    || (s.subject && (n.name || '').includes(s.subject.slice(0, 40))))
+                ));
+                return hit ? { text, nodeId: hit.id } : { text };
+              }).filter(Boolean) as Array<{ text: string; nodeId?: string }>;
+            })(),
+            // 念念还记得:前一日重要笔记(可点);旧 memoryNotes 只作兜底。
+            memoryNotes: (() => {
+              const y = yesterdayImportantNotes(anchor, 4);
+              if (y.length) return y;
+              return updated.memoryNotes.slice(0, 3);
+            })(),
             ...extras,
-            // 穿什么要今天的天气 + 今天的日历当输入,这两样这里手上就有,
-            // 不回存储再读一遍(会读到另一个快照)。
-            outfitNote: outfitNoteFor(weather ?? undefined, todayEvents, anchor),
+            healthFacts: yesterdayHealthFacts(anchor),
+            financeFacts: yesterdayFinanceFacts(anchor),
             // 用 updated.allNodes,不用 allNodes 那个 state —— 后者是**上一轮渲染**的值
             // (本轮的 setAllNodes 就在几行之前,还没生效),会让日报比列表慢一天。
             orders: collectOrders(updated.allNodes),

@@ -167,7 +167,7 @@ const EIGHT = new Date(2026, 6, 30, 8, 0);
   // 只有 Nesio 知道的那几面确实进来了
   const today = r.sections.find((s) => s.id === 'today').lines.join('|');
   assert.match(today, /下肢 A/, '今天该练哪个');
-  assert.match(today, /灰卫衣/, '今天穿什么');
+  assert.doesNotMatch(today, /灰卫衣/, '穿衣不再进日报');
   assert.match(today, /番茄炒蛋/, '今天吃什么');
 }
 
@@ -267,18 +267,53 @@ const EIGHT = new Date(2026, 6, 30, 8, 0);
   assert.equal(buildDailyReport({ now: EIGHT, meals: ['粥'] }).empty, false, '任何一面有东西就不算空');
 }
 
-/* ── ⑤ 邮件只给一行汇总,不复述内容 ────────────────────────────────── */
+/* ── ⑤ 邮件列出具体主题(可点进记忆),不再只给一行汇总 ─────────────── */
 {
   const r = buildDailyReport({
     now: EIGHT,
-    emailHighlights: ['WakeMed 新消息', 'Oak City Sound Chorus 邀请', '订单已发货'],
+    emailHighlights: [
+      { text: 'WakeMed 新消息', nodeId: 'n1' },
+      'Oak City Sound Chorus 邀请',
+      '订单已发货',
+    ],
   });
   const mail = r.sections.find((s) => s.id === 'email');
-  assert.equal(mail.lines.length, 1, '邮件只给一行');
-  assert.doesNotMatch(mail.lines[0], /WakeMed|Chorus/,
-    '不复述邮件内容 —— 用户已经收到一份从邮件总结的日报了,' +
-    '在这儿再抄一遍就是更差的重复品,还会把真正只有 Nesio 知道的那几段挤下去');
-  assert.match(mail.lines[0], /3 封/, '但要如实说有几封 + 去哪儿看');
+  assert.equal(mail.lines.length, 3, '邮件列出具体主题');
+  assert.match(mail.lines.join('|'), /WakeMed/, '主题可见');
+  assert.equal(mail.items?.[0]?.nodeId, 'n1', '可带 nodeId 点进记忆');
+}
+
+/* ── ⑤b 家务专栏 + 去现金跑道/穿衣 ──────────────────────────────── */
+{
+  const r = buildDailyReport({
+    now: EIGHT,
+    events: [
+      { title: 'Vacuum base', start: iso(10), allDay: true },
+      { title: '牙医', start: iso(15) },
+    ],
+    reminders: [{ title: 'Wash Clothes', at: '2026-07-30T09:00', kind: 'chore' }],
+    domainInsights: [
+      { domain: 'finance', severity: 'flag', title: '现金流跑道偏短', detail: '应急金 0.8 mo' },
+      { domain: 'health', severity: 'attention', title: '静息心率高于基线', detail: 'RHR 77' },
+    ],
+    healthFacts: { steps: 8200, sleepHours: 7.2 },
+    financeFacts: { spent: 120, income: 50, investDelta: 12, currency: 'USD' },
+    memoryNotes: [{ text: '昨天写的重要笔记', nodeId: 'm1' }],
+  });
+  const chores = r.sections.find((s) => s.id === 'chores');
+  assert.ok(chores, '家务专栏');
+  assert.match(chores.lines.join('|'), /Vacuum|Wash/, '家务进专栏');
+  const cal = r.sections.find((s) => s.id === 'calendar');
+  assert.doesNotMatch(cal.lines.join('|'), /Vacuum/, '家务不占日程位');
+  assert.match(cal.lines.join('|'), /牙医/, '普通日程仍在');
+  assert.equal(r.sections.find((s) => s.id === 'action'), undefined, '现金跑道大方向警示不进「此刻要处理」');
+  const today = r.sections.find((s) => s.id === 'today').lines.join('|');
+  assert.match(today, /8200|8,200/, '昨天步数');
+  assert.match(today, /7\.2/, '昨天睡眠');
+  assert.match(today, /支出|Spent/, '昨天支出');
+  assert.doesNotMatch(today, /穿|卫衣|outfit/i, '不提穿衣');
+  const mem = r.sections.find((s) => s.id === 'memory');
+  assert.equal(mem.items?.[0]?.nodeId, 'm1', '笔记可点进记忆');
 }
 
 /* ── ⑥ 默认开,亲手关过的保持关 ────────────────────────────────────── */

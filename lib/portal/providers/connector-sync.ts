@@ -33,7 +33,7 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
     try { full = !localStorage.getItem('nesio-plaid-enrich-v1'); } catch { /* ignore */ }
     const res = await fetch(`/api/portal/plaid/transactions${full ? '?full=1' : ''}`);
     const data = await res.json() as {
-      ok?: boolean; error?: string; pendingItems?: number; authoritative?: boolean;
+      ok?: boolean; error?: string; pendingItems?: number; authoritative?: boolean; syncIncomplete?: boolean;
       transactions?: Array<{ id: string; accountId?: string; date: string; name: string; amount: number; currency: string; category: string }>;
       removedIds?: string[]; accounts?: unknown[]; holdings?: unknown[];
       holdingsAccountIds?: string[];
@@ -101,7 +101,12 @@ export async function runPlaidSync(): Promise<PlaidSyncResult> {
       recordNetWorthSnapshot();
     } catch { /* 快照失败不影响同步结果 */ }
     try { localStorage.setItem('nesio-bank-synced-at', new Date().toISOString()); } catch { /* quota */ }
-    if (full) { try { localStorage.setItem('nesio-plaid-enrich-v1', '1'); } catch { /* quota */ } }
+    if (full && !data.syncIncomplete) {
+      try { localStorage.setItem('nesio-plaid-enrich-v1', '1'); } catch { /* quota */ }
+    } else if (data.syncIncomplete) {
+      // 回填被页数截断:下次继续 full,别停在 8 月初的游标上当完成。
+      try { localStorage.removeItem('nesio-plaid-enrich-v1'); } catch { /* ignore */ }
+    }
     const withLogo = merged.filter((t) => (t as { merchantLogo?: string }).merchantLogo).length;
     const inv = data.investments;
     return {
@@ -510,7 +515,7 @@ export async function dedupeImportedContacts(): Promise<number> {
 }
 
 export async function syncAllConnectors(): Promise<SyncAllOutcome[]> {
-  const { whenGraphHydrated } = await import('@/lib/portal/life-graph');
+  const { whenGraphHydrated, getLifeGraph, reloadGraphFromIdb } = await import('@/lib/portal/life-graph');
   if (!(await whenGraphHydrated())) {
     const detail: [string, string] = ['记忆库还在加载,稍后再同步', 'Memory graph still loading — try sync again shortly'];
     return [
@@ -521,6 +526,7 @@ export async function syncAllConnectors(): Promise<SyncAllOutcome[]> {
       { id: 'people', ok: false, detail },
     ];
   }
+  const beforeCount = getLifeGraph().length;
   const out: SyncAllOutcome[] = [];
   // 串行写图源,避免五路并行 saveAll 交错半图落盘。
   const cal = await runCalendarSync();
@@ -533,6 +539,11 @@ export async function syncAllConnectors(): Promise<SyncAllOutcome[]> {
   out.push({ id: 'flomo', ok: flomo.ok, detail: flomo.ok ? [`Flomo 新增 ${flomo.fresh} 条`, `Flomo +${flomo.fresh}`] : ['Flomo 未配置', 'Flomo not configured'] });
   out.push({ id: 'plaid', ok: plaid.ok, detail: plaid.ok ? [`银行新增 ${plaid.fresh} 笔(共 ${plaid.total})`, `Bank +${plaid.fresh} (${plaid.total} total)`] : ['银行未连接', 'Bank not linked'] });
   out.push({ id: 'people', ok: people.ok, detail: people.ok ? [`联系人导入 ${people.imported}、更新 ${people.updated}${(people.deduped ?? 0) > 0 ? `、清理重复 ${people.deduped}` : ''}(库中 ${people.total ?? '?'} 人)`, `Contacts +${people.imported}, updated ${people.updated}${(people.deduped ?? 0) > 0 ? `, deduped ${people.deduped}` : ''} (${people.total ?? '?'} total)`] : ['通讯录未同步(未连接 Google)', 'Contacts not synced'] });
+  // 急救:若 RAM 仍腰斩,从 IDB 整图重载(不经慢云)。
+  const afterCount = getLifeGraph().length;
+  if (beforeCount > 20 && afterCount < beforeCount * 0.5) {
+    await reloadGraphFromIdb();
+  }
   return out;
 }
 
