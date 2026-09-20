@@ -27,6 +27,12 @@ const txCategory = loadTs('../lib/portal/tx-category.ts', () => ({}));
 const bank = loadTs('../lib/portal/providers/bank-tx.ts', (p) =>
   p === '../storage-health' ? { reportStorageDropped() {} }
     : p === '../tx-category' ? txCategory
+    : p === '../bank-rules-store' ? {
+      loadFlowRuleMap: () => ({}), saveFlowRuleMap() {},
+      loadMerchantRuleMap: () => ({}), saveMerchantRuleMap() {},
+      loadRuleLabelMap: () => ({}), saveRuleLabelMap() {},
+      loadRecurRuleMap: () => ({}), saveRecurRuleMap() {},
+    }
       : { createBlobStore: fakeCreateBlobStore });
 
 // ── ① 保险丝 ──

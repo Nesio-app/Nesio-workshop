@@ -47,7 +47,7 @@ import { splitEvenly } from '@/lib/portal/ledger-allocation';
 import {
   loadTxAnnotations, txAnnotationOf, hasTxAnnotation, setTxPeople, setTxNote,
   addTxAttachment, removeTxAttachment, TX_ANNOTATIONS_EVENT, type TxAnnotation, type TxWriteResult,
-  setTxSplits, clearTxSplits, setTxAmortize, clearTxAmortize, setTxCategory,
+  setTxSplits, clearTxSplits, setTxAmortize, clearTxAmortize, setTxCategory, setTxFlow,
   setTxTrip, setTxTripNode, setTxMemoryNode, setTxAsset, setTxProject,
 } from '@/lib/portal/tx-annotations';
 import { putLocalFile, prettyBytes, MAX_FILE_BYTES } from '@/lib/portal/local-file-store';
@@ -746,18 +746,18 @@ export default function FinanceTab() {
   const isCurMonth = ym === ymOf();
   const todayDay = new Date().getDate();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const summary = useMemo(() => financeMonthAggregate(ym, { txs }), [txs, ym, rev]);
+  const summary = useMemo(() => financeMonthAggregate(ym, { txs }), [txs, ym, rev, annRev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const prevSummary = useMemo(
     () => financeMonthAggregate(prevYm(ym), { txs, ...(isCurMonth ? { throughDay: todayDay } : {}) }),
-    [txs, ym, rev, isCurMonth, todayDay],
+    [txs, ym, rev, annRev, isCurMonth, todayDay],
   );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const cats = useMemo(() => categoryBreakdown(txs, ym), [txs, ym, rev]);
+  const cats = useMemo(() => categoryBreakdown(txs, ym), [txs, ym, rev, annRev]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const findings = useMemo(
     () => financeFindings(txs, accounts, ym, { domainNet: summary.domainNet, prevDomainNet: prevSummary.domainNet }),
-    [txs, accounts, ym, rev, summary.domainNet, prevSummary.domainNet],
+    [txs, accounts, ym, rev, annRev, summary.domainNet, prevSummary.domainNet],
   );
   // 口径统一:趋势柱与 KPI 同含域内支出(此前同屏两个「净支出」差一个小票的量)
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -766,7 +766,7 @@ export default function FinanceTab() {
     [txs, rev],
   );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const review = useMemo(() => needsReview(txs, ym), [txs, ym, rev]);
+  const review = useMemo(() => needsReview(txs, ym), [txs, ym, rev, annRev]);
   const monthTx = useMemo(() => txs.filter((t) => (t.date || '').slice(0, 7) === ym).sort((a, b) => (b.date || '').localeCompare(a.date || '')), [txs, ym]);
   // 财务⑰:定期页含「待确认」早识别(2 笔规律 / 知名品牌 1 笔);统计消费面仍只用成熟流
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -963,7 +963,12 @@ export default function FinanceTab() {
   const acctNames = loadAccountNames(); // bug2:账户自定义名(rev 变化时组件已重渲)
 
   function resolveReview(t: BankTx, category: string) { setMerchantRuleFor(t, category); setRev((r) => r + 1); } // 财务㉚:写 merchantKey
-  function applyFlow(t: BankTx, flow: TxFlow) { setFlowRuleFor(t, flow); setFlowEditId(null); setRev((r) => r + 1); } // 财务㉚:写 merchantKey
+  function applyFlow(t: BankTx, flow: TxFlow) {
+    setTxFlow(t.id, flow); // 本笔覆盖 —— 分类页立刻跟进
+    setFlowRuleFor(t, flow); // 商户级记忆(同商户以后自动)
+    setFlowEditId(null);
+    setRev((r) => r + 1);
+  }
 
   return (
     <div className="nesio-analytics-tab">
@@ -1262,7 +1267,7 @@ export default function FinanceTab() {
               <select className="nesio-fin-select" value={acctFilter} onChange={(e) => setAcctFilter(e.target.value)} aria-label={L(dict, '按账户筛选', 'Filter by account')}>
                 <option value="all">{L(dict, '所有账户', 'All accounts')}</option>
                 {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}{a.mask ? ` ····${a.mask}` : ''}</option>
+                  <option key={a.id} value={a.id}>{displayAccountName(a, acctNames)}{a.mask ? ` ····${a.mask}` : ''}</option>
                 ))}
               </select>
             )}
@@ -1276,6 +1281,13 @@ export default function FinanceTab() {
 
           {/* bug2 交易行三行制:①日期+类别 ②logo+名字+金额同行 ③账户logo+自定义名+卡尾号 */}
           <div className="nesio-fin-txlist">
+            {shownTx.length === 0 && (
+              <p className="nesio-settings-option-hint" style={{ marginTop: 'var(--space-2)' }}>
+                {acctFilter !== 'all'
+                  ? L(dict, '这个账户本月还没有流水。若刚重连过银行,再同步一次即可把历史挂回这个账户。', 'No transactions for this account this month. If you recently re-linked the bank, sync again to remount history onto this account.')
+                  : L(dict, '这个月还没有流水。', 'No transactions this month.')}
+              </p>
+            )}
             {shownTx.slice(0, txLimit).map((t) => {
               const f = txFlow(t, undefined, refundEvidence);
               const a = t.accountId ? acctById.get(t.accountId) : undefined;
@@ -1590,7 +1602,8 @@ export default function FinanceTab() {
                             onClick={() => setDonutFocus(c.category)}
                           >
                             <span className="nesio-fin-cat-name">
-                              {categoryLabel(c.category, dict)}
+                              {categoryLabel(c.category, dict) || c.category}
+                              {c.count > 0 && <span style={{ color: 'var(--portal-muted)', fontWeight: 400 }}> · {c.count}</span>}
                               <span style={{ color: 'var(--portal-muted)', fontWeight: 400 }}> · {c.pct}%</span>
                             </span>
                             <span className="nesio-fin-cat-amt">{formatMoney(c.total, summary.currency)}</span>

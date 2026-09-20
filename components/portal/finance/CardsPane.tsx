@@ -99,12 +99,16 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
   const groupBlock = (id: 'deposit' | 'invest' | 'liability', titleZh: string, titleEn: string, list: BankAccount[]) => {
     if (!list.length) return null;
     const open = openGroups[id] !== false;
+    const monthTxCount = list.reduce((n, a) => n + accountMonth(txs, a.id, ym).count, 0);
     return (
       <>
         <button type="button" className="nesio-fin-group-h" style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 0, padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit' }}
           aria-expanded={open}
           onClick={() => setOpenGroups((g) => ({ ...g, [id]: !open }))}>
-          <span>{L(dict, titleZh, titleEn)} · {list.length}</span>
+          <span>
+            {L(dict, titleZh, titleEn)} · {list.length}
+            {monthTxCount > 0 ? L(dict, ` · 本月 ${monthTxCount}`, ` · ${monthTxCount} this mo`) : ''}
+          </span>
           <span aria-hidden style={{ color: 'var(--portal-muted)' }}>{open ? '▾' : '▸'}</span>
         </button>
         {open && <div className="nesio-fin-acctgroup">{list.map((a) => acctRow(a, id))}</div>}
@@ -188,6 +192,9 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
         if (!shown.length) return null;
         return (
           <div style={{ marginTop: 'var(--space-4)' }}>
+            <p className="nesio-fin-group-h" style={{ margin: '0 0 var(--space-2)' }}>
+              {L(dict, '财产', 'Assets')} · {shown.length}
+            </p>
             {shown.map((a: ManualAsset) => {
               const latest = a.anchors[0];
               const staleDays = latest ? Math.floor((Date.now() - new Date(`${latest.date}T00:00:00`).getTime()) / 86400000) : 0;

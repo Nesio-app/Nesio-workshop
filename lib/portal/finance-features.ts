@@ -7,7 +7,7 @@
  */
 const localDayKey = (d: Date = new Date()): string => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; // 本地日键(vm 测试壳 stub require,lib 层内联不 import)
 import {
-  summarizeMonth, availableMonths, detectRecurring, effectiveCategory, txFlow, loadFlowRules,
+  summarizeMonth, availableMonths, detectRecurring, effectiveCategory, effectiveCategoryDetail, txFlow, loadFlowRules,
   expenseMerchants, median, ymOf, merchantKey, investmentAccountIds,
   type BankTx, type BankAccount, type RecurringCharge, type Holding,
 } from './bank-tx';
@@ -123,7 +123,7 @@ export function incomeBreakdown(txs: BankTx[], ym: string): IncomeSlice[] {
   for (const t of txs) {
     if ((t.date || '').slice(0, 7) !== ym) continue;
     if (txFlow(t, rules) !== 'income') continue;
-    const d = t.categoryDetail || 'INCOME_OTHER';
+    const d = effectiveCategoryDetail(t) || 'INCOME_OTHER';
     m.set(d, (m.get(d) || 0) + Math.abs(t.amount));
   }
   return [...m.entries()]

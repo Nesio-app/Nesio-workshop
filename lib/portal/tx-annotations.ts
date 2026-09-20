@@ -59,6 +59,11 @@ export interface TxAnnotation {
   category?: string;
   /** 子分类 / 自定义细分(PFC detailed 或自由文本)。 */
   categoryDetail?: string;
+  /**
+   * 本笔覆盖流向。手改分类时写入,让分类页/KPI 立刻跟这笔走
+   * (商户级 flow 规则会改同名所有流水,太宽)。
+   */
+  flow?: 'expense' | 'refund' | 'rebate' | 'income' | 'transfer';
   /** 关联的旅行(trip.id)。 */
   tripId?: string;
   /** 旅行内具体节点(机票/酒店/购物等 TripNode.id);依赖 tripId。 */
@@ -96,6 +101,7 @@ export function hasTxAnnotation(a: TxAnnotation | undefined): boolean {
     (a.people && a.people.length) || (a.attachments && a.attachments.length) || (a.note && a.note.trim())
     || (a.splits && a.splits.length) || a.amortize
     || (a.category && a.category.trim()) || (a.categoryDetail && a.categoryDetail.trim())
+    || a.flow
     || (a.tripId && a.tripId.trim()) || (a.tripNodeId && a.tripNodeId.trim())
     || (a.memoryTag && a.memoryTag.trim())
     || (a.memoryNodeId && a.memoryNodeId.trim()) || (a.projectId && a.projectId.trim())
@@ -198,6 +204,8 @@ export function setTxNote(txId: string, note: string): boolean {
 /**
  * 改这一笔的分类 / 子分类。空字符串 = 清掉覆盖,回到规则或 Plaid 原值。
  * 只影响本笔(不像商户规则会改同名商户的所有流水)。
+ * 同时写入本笔 flow:支出类 → expense,收入 → income,转账类 → transfer ——
+ * 分类页按 flow 汇总,只改 category 不改 flow 会对不上。
  */
 export function setTxCategory(
   txId: string,
@@ -213,6 +221,24 @@ export function setTxCategory(
     const detail = String(categoryDetail || '').trim();
     if (detail) next.categoryDetail = detail; else delete next.categoryDetail;
   }
+  if (cat) {
+    const upper = cat.toUpperCase();
+    if (upper === 'INCOME' || upper.startsWith('INCOME_')) next.flow = 'income';
+    else if (upper.startsWith('TRANSFER') || upper === 'LOAN_PAYMENTS') next.flow = 'transfer';
+    else next.flow = 'expense';
+  }
+  if (!hasTxAnnotation(next)) delete all[txId]; else all[txId] = next;
+  try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { reportStorageDropped(); return false; }
+  window.dispatchEvent(new CustomEvent(TX_ANNOTATIONS_EVENT, { detail: { txId } }));
+  return true;
+}
+
+/** 只改本笔流向(覆盖商户级规则与自动判定)。 */
+export function setTxFlow(txId: string, flow: TxAnnotation['flow'] | ''): boolean {
+  if (typeof window === 'undefined') return false;
+  const all = loadTxAnnotations();
+  const next: TxAnnotation = { ...(all[txId] || {}) };
+  if (flow) next.flow = flow; else delete next.flow;
   if (!hasTxAnnotation(next)) delete all[txId]; else all[txId] = next;
   try { localStorage.setItem(KEY, JSON.stringify(all)); } catch { reportStorageDropped(); return false; }
   window.dispatchEvent(new CustomEvent(TX_ANNOTATIONS_EVENT, { detail: { txId } }));

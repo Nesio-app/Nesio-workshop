@@ -29,6 +29,12 @@ const bank = loadTs('../lib/portal/providers/bank-tx.ts', (p) =>
   p === '../storage-health' ? { reportStorageDropped() {} }
     : p === '../tx-category' ? txCategory
     : p === '../tx-annotations' ? { txAnnotationOf: () => ({}) }
+    : p === '../bank-rules-store' ? {
+      loadFlowRuleMap: () => ({}), saveFlowRuleMap() {},
+      loadMerchantRuleMap: () => ({}), saveMerchantRuleMap() {},
+      loadRuleLabelMap: () => ({}), saveRuleLabelMap() {},
+      loadRecurRuleMap: () => ({}), saveRecurRuleMap() {},
+    }
     : p === '../idb-blob-store' ? { createBlobStore: fakeCreateBlobStore } : ({}));
 
 const tx = (id, date, amount, category) => ({ id, date, name: id, amount, currency: 'USD', category, accountId: 'a1' });
@@ -47,6 +53,7 @@ const byCat = (c) => cats.find((x) => x.category === c);
 
 assert.equal(byCat('FOOD_AND_DRINK').deltaPct, 50, '基数够 → 正常出环比');
 assert.equal(byCat('FOOD_AND_DRINK').isNew, false);
+assert.equal(byCat('FOOD_AND_DRINK').count, 1, '分类小计带笔数');
 assert.equal(byCat('ENTERTAINMENT').deltaPct, null, '上月 <$50 → 小基数噪音不出百分比');
 assert.equal(byCat('ENTERTAINMENT').isNew, false, '上月有痕迹就不算「新增」');
 assert.equal(byCat('TRANSPORTATION').deltaPct, null, '上月无数据 → 无环比');

@@ -19,12 +19,20 @@ import {
   loadRecurRuleMap, saveRecurRuleMap,
 } from '../bank-rules-store';
 
+export type TxFlow = 'expense' | 'refund' | 'rebate' | 'income' | 'transfer';
+
 /** 测试/循环加载时批注层可能尚未就绪 —— 缺函数就当没有覆盖。 */
-function annOf(txId: string): { category?: string; categoryDetail?: string } {
+function annOf(txId: string): { category?: string; categoryDetail?: string; flow?: TxFlow } {
   try {
     if (typeof _txAnnotationOf !== 'function') return {};
-    return _txAnnotationOf(txId) || {};
+    return (_txAnnotationOf(txId) || {}) as { category?: string; categoryDetail?: string; flow?: TxFlow };
   } catch { return {}; }
+}
+
+/** 工资/Salary 账户名(官方名或自定义名)—— 储存卡,不是券商。 */
+const SALARY_ACCT_RE = /salary|工资|薪水|paycheck|payroll/i;
+export function isSalaryAccountName(name: string | undefined | null): boolean {
+  return SALARY_ACCT_RE.test(name || '');
 }
 
 export interface BankTx {
@@ -237,8 +245,6 @@ export function dominantCurrency(txs: BankTx[]): string {
 // Plaid amount 约定:正=花出去,负=进账。但「进账」里混了 收入/转账/信用卡还款,
 // 这些都不该计入收支。按 personal_finance_category 自动分流,并允许用户手动纠正、记住。
 
-export type TxFlow = 'expense' | 'refund' | 'rebate' | 'income' | 'transfer';
-
 export const TX_FLOW_LABELS: Record<TxFlow, [string, string]> = {
   expense: ['支出', 'Expense'], refund: ['退款', 'Refund'], rebate: ['返还/报销', 'Credit'], income: ['收入', 'Income'], transfer: ['转账/还款', 'Transfer'],
 };
@@ -287,23 +293,45 @@ const INVEST_XFER_RE = /FID BKG|FIDELITY|VANGUARD|SCHWAB|ROBINHOOD|WEALTHFRONT|B
 /** 投资类账户 id 集合(txFlow 用:投资账户内的流转不是消费)。 */
 const INVEST_ACCT_TYPES = new Set(['investment', 'brokerage']);
 const INVEST_ACCT_SUBTYPES = new Set(['brokerage', 'ira', 'roth', '401k', '403b', 'hsa', '529', 'mutual fund', 'pension', 'retirement']);
-function computeInvestIds(accounts: BankAccount[]): Set<string> {
+function computeInvestIds(accounts: BankAccount[], names?: Record<string, string>): Set<string> {
   const out = new Set<string>();
   for (const a of accounts) {
     // 工资/Salary 账户是储存卡,即使 Plaid 误标成 investment 也不进投资集合。
-    if (/salary|工资|薪水/i.test(a.name || '')) continue;
+    if (isSalaryAccountName(a.name) || isSalaryAccountName(names?.[a.id])) continue;
     if (INVEST_ACCT_TYPES.has((a.type || '').toLowerCase()) || INVEST_ACCT_SUBTYPES.has((a.subtype || '').toLowerCase())) out.add(a.id);
+  }
+  return out;
+}
+function computeSalaryIds(accounts: BankAccount[], names?: Record<string, string>): Set<string> {
+  const out = new Set<string>();
+  for (const a of accounts) {
+    if (isSalaryAccountName(a.name) || isSalaryAccountName(names?.[a.id])) out.add(a.id);
   }
   return out;
 }
 // 引用恒等 memo:store 缓存数组换引用(save/水合)才重算 —— txFlow 每行调用也不贵。
 let investCacheSrc: unknown = Symbol('init');
 let investCacheVal = new Set<string>();
+let salaryCacheSrc: unknown = Symbol('init');
+let salaryCacheVal = new Set<string>();
 export function investmentAccountIds(accounts?: BankAccount[]): Set<string> {
-  if (accounts) return computeInvestIds(accounts);
+  if (accounts) return computeInvestIds(accounts, loadAccountNames());
   const raw = accountsStore.load();
-  if (raw !== investCacheSrc) { investCacheSrc = raw; investCacheVal = computeInvestIds(loadBankAccounts()); }
+  if (raw !== investCacheSrc) {
+    investCacheSrc = raw;
+    investCacheVal = computeInvestIds(loadBankAccounts(), loadAccountNames());
+  }
   return investCacheVal;
+}
+/** 工资账户 id 集合(进账记收入,不进投资/转账黑洞)。 */
+export function salaryAccountIds(accounts?: BankAccount[]): Set<string> {
+  if (accounts) return computeSalaryIds(accounts, loadAccountNames());
+  const raw = accountsStore.load();
+  if (raw !== salaryCacheSrc) {
+    salaryCacheSrc = raw;
+    salaryCacheVal = computeSalaryIds(loadBankAccounts(), loadAccountNames());
+  }
+  return salaryCacheVal;
 }
 
 /**
@@ -315,10 +343,18 @@ export function investmentAccountIds(accounts?: BankAccount[]): Set<string> {
  * (INCOME_DIVIDENDS 等)仍是收入。账户不明时按券商描述符兜底。
  */
 export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string>, investAccounts: Set<string> = investmentAccountIds()): TxFlow {
+  // 本笔批注流向优先(手改分类时一并写入,分类页才跟得上)。
+  const overlayFlow = annOf(t.id).flow;
+  if (overlayFlow === 'expense' || overlayFlow === 'refund' || overlayFlow === 'rebate' || overlayFlow === 'income' || overlayFlow === 'transfer') {
+    return overlayFlow;
+  }
   const forced = ruleFor(rules, t);
   if (forced) return forced;
   const cat = (t.category || '').toUpperCase();
+  const salary = t.accountId ? salaryAccountIds().has(t.accountId) : false;
   if (/INCOME/.test(cat)) return 'income';
+  // 工资账户进账(含 Plaid 标成 TRANSFER_IN/空分类的发薪):一律收入,不再掉进转账黑洞。
+  if (salary && (t.amount < 0 || /TRANSFER_IN|DEPOSIT|CONTRIBUTION/.test(cat))) return 'income';
   // 401k/养老金账户进账(缴存等):用户口径算收入,不是内部转账。
   if (t.accountId && investAccounts?.has(t.accountId) && (/TRANSFER_IN|DEPOSIT|CONTRIBUTION/.test(cat) || t.amount < 0)) {
     return 'income';
@@ -329,6 +365,7 @@ export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string
   if (!cat) {
     // 分类缺失(Plaid 老账户/未增强常见):正数=花出去仍是可靠支出;负数=进账时无法区分
     // 退款/收入/转账,一律当 transfer 不计收支 —— 避免把工资/转账当退款倒扣净支出。
+    // (工资账户已在上方拦截。)
     return t.amount >= 0 ? 'expense' : 'transfer';
   }
   if (t.amount >= 0) return 'expense';
@@ -437,6 +474,7 @@ export interface CategorySlice {
   pct: number; // 占本月总支出比例 0..100
   deltaPct: number | null; // 环比上月;null=上月无数据或基数太小(百分比无意义)
   isNew: boolean; // 上月完全没有此类支出
+  count: number; // 本月该类支出笔数(分类小计旁小计数)
 }
 
 // 财务④:环比基数下限。上月不足 $50 的类别,百分比全是小基数噪音(¥30→¥314 就是
@@ -446,18 +484,25 @@ const DELTA_MIN_BASE = 50;
 export function categoryBreakdown(txs: BankTx[], ym: string, opts?: SummarizeOpts): CategorySlice[] {
   const cur = sumByCategory(txs, ym, opts);
   const prev = sumByCategory(txs, prevYm(ym), opts);
-  const grand = [...cur.values()].reduce((a, b) => a + b, 0) || 1;
+  const grand = [...cur.values()].reduce((a, b) => a + b.total, 0) || 1;
   return [...cur.entries()]
-    .map(([category, total]) => {
-      const before = prev.get(category) || 0;
+    .map(([category, { total, count }]) => {
+      const before = prev.get(category)?.total || 0;
       const deltaPct = before >= DELTA_MIN_BASE ? Math.round(((total - before) / before) * 100) : null;
-      return { category, total: round2(total), pct: Math.round((total / grand) * 100), deltaPct, isNew: before <= 0 };
+      return {
+        category,
+        total: round2(total),
+        pct: Math.round((total / grand) * 100),
+        deltaPct,
+        isNew: before <= 0,
+        count,
+      };
     })
     .sort((a, b) => b.total - a.total);
 }
 
-function sumByCategory(txs: BankTx[], ym: string, opts?: SummarizeOpts): Map<string, number> {
-  const m = new Map<string, number>();
+function sumByCategory(txs: BankTx[], ym: string, opts?: SummarizeOpts): Map<string, { total: number; count: number }> {
+  const m = new Map<string, { total: number; count: number }>();
   const rules = loadMerchantRules();
   const flowRules = loadFlowRules();
   const invest = investmentAccountIds();
@@ -466,7 +511,10 @@ function sumByCategory(txs: BankTx[], ym: string, opts?: SummarizeOpts): Map<str
   for (const t of txs) {
     if (txYm(t) !== ym || ccyOf(t) !== ccy || (limitDay != null && dayOf(t) > limitDay) || txFlow(t, flowRules, undefined, invest) !== 'expense') continue;
     const cat = effectiveCategory(t, rules) || '未分类';
-    m.set(cat, (m.get(cat) || 0) + Math.abs(t.amount));
+    const cur = m.get(cat) || { total: 0, count: 0 };
+    cur.total += Math.abs(t.amount);
+    cur.count += 1;
+    m.set(cat, cur);
   }
   return m;
 }
@@ -758,6 +806,8 @@ export function setAccountName(id: string, name: string): void {
   const v = name.trim();
   if (v) all[id] = v; else delete all[id];
   try { localStorage.setItem(ACCT_NAME_KEY, JSON.stringify(all)); } catch { reportStorageDropped(); return; }
+  investCacheSrc = Symbol('bust');
+  salaryCacheSrc = Symbol('bust');
   window.dispatchEvent(new CustomEvent('nesio-bank-updated'));
 }
 export function displayAccountName(a: Pick<BankAccount, 'id' | 'name'>, names?: Record<string, string>): string {
@@ -786,6 +836,49 @@ function mergeBankAccount(prev: BankAccount | undefined, incoming: BankAccount):
   return next;
 }
 
+/**
+ * 账户 id 换皮后把流水挂到新 id(同 mask 指纹退场旧 item 时用)。
+ * 不 remap 的话旧流水变孤儿 → 新 Salary/支票账户看起来「本月零笔」。
+ */
+export function remapBankTxAccountIds(fromTo: ReadonlyMap<string, string>): number {
+  if (!fromTo.size) return 0;
+  const raw = loadBankTxRaw();
+  let n = 0;
+  const next = raw.map((t) => {
+    const dest = t.accountId ? fromTo.get(t.accountId) : undefined;
+    if (!dest || dest === t.accountId) return t;
+    n += 1;
+    return { ...t, accountId: dest };
+  });
+  if (n) saveBankTx(next);
+  return n;
+}
+
+/** 账户自定义名跟着 id 迁移(指纹退场时别把「Salary」留在死 id 上)。 */
+function remapAccountNames(fromTo: ReadonlyMap<string, string>): void {
+  if (typeof window === 'undefined' || !fromTo.size) return;
+  try {
+    const all = loadAccountNames();
+    let dirty = false;
+    for (const [from, to] of fromTo) {
+      if (!all[from]) continue;
+      if (!all[to]) all[to] = all[from];
+      delete all[from];
+      dirty = true;
+    }
+    if (!dirty) return;
+    localStorage.setItem(ACCT_NAME_KEY, JSON.stringify(all));
+  } catch { /* 覆盖层丢了不阻断主路径 */ }
+}
+
+function applyAccountIdRemaps(fromTo: Map<string, string>): void {
+  if (!fromTo.size) return;
+  remapBankTxAccountIds(fromTo);
+  remapAccountNames(fromTo);
+  investCacheSrc = Symbol('bust');
+  salaryCacheSrc = Symbol('bust');
+}
+
 export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boolean }): void {
   if (opts?.replace && accounts.length > 0) {
     // Plaid 权威替换时保留手工账户,否则下次同步会抹掉「手动添加」入口下的户。
@@ -797,11 +890,18 @@ export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boo
     const prevPlaid = prevList.filter((a) => !isManualBankAccount(a));
     const prevById = new Map(prevList.map((a) => [a.id, a]));
     const byId = new Map<string, BankAccount>();
+    const remaps = new Map<string, string>();
     for (const a of accounts) {
       if (!a?.id) continue;
       byId.set(a.id, mergeBankAccount(prevById.get(a.id), a));
     }
     for (const m of manuals) if (!byId.has(m.id)) byId.set(m.id, m);
+    // 同实体换 id:把旧流水挂到新 id,而不是孤儿隐藏(Salary 空账的根因)。
+    for (const a of prevPlaid) {
+      if (byId.has(a.id)) continue;
+      const match = accounts.find((n) => n.id !== a.id && isSameUnderlyingAccount(n, a));
+      if (match?.id) remaps.set(a.id, match.id);
+    }
     // 保险丝要保守:只在「整家机构从快照消失、但本地仍有该机构流水」时加回。
     // 同机构换 item / 无机构元数据的权威去重,绝不能被加回(否则 bank-orphan 契约与重复账户退场失效)。
     if (prevPlaid.length > accounts.length) {
@@ -809,6 +909,7 @@ export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boo
       const txAccountIds = new Set(rawTx.map((t) => t.accountId).filter(Boolean));
       for (const a of prevPlaid) {
         if (byId.has(a.id)) continue;
+        if (remaps.has(a.id)) continue;
         if (!txAccountIds.has(a.id)) continue;
         if (accounts.some((n) => isSameUnderlyingAccount(n, a))) continue;
         const inst = (a.institution || '').trim();
@@ -821,19 +922,23 @@ export function saveBankAccounts(accounts: BankAccount[], opts?: { replace?: boo
       }
     }
     accountsStore.save([...byId.values()]);
+    applyAccountIdRemaps(remaps);
     return;
   }
   const cur = accountsStore.load();
   const byId = new Map<string, BankAccount>();
   for (const a of Array.isArray(cur) ? cur : []) if (a?.id) byId.set(a.id, a);
   // 指纹去重:本次同步的账户与既存账户是同一实体账户但不同 id → 旧 id 是重复授权残留,
-  // 退场(其交易随之被孤儿过滤隐藏)。同 id 正常合并更新。
+  // 退场并把流水 remap 到新 id(不再靠孤儿过滤「藏」起来)。
   const incoming = accounts.filter((a) => a?.id);
+  const remaps = new Map<string, string>();
   for (const [id, b] of [...byId]) {
-    if (incoming.some((a) => a.id !== id && isSameUnderlyingAccount(a, b))) byId.delete(id);
+    const match = incoming.find((a) => a.id !== id && isSameUnderlyingAccount(a, b));
+    if (match?.id) { remaps.set(id, match.id); byId.delete(id); }
   }
   for (const a of accounts) if (a?.id) byId.set(a.id, mergeBankAccount(byId.get(a.id), a));
   accountsStore.save([...byId.values()]);
+  applyAccountIdRemaps(remaps);
 }
 
 /* ---------- 财务⑩:账户类型友好名 + 资产小结 ---------- */
@@ -993,16 +1098,24 @@ function rememberRuleLabel(key: string, name: string): void {
   saveRuleLabelMap(all);
 }
 
-/** 生效分类:本笔批注覆盖 → 商户规则 → Plaid;经 normalizeCategory 归一。 */
+/** 生效分类:本笔批注覆盖 → 商户规则 → Plaid;经 normalizeCategory 归一。
+ *  工资账户进账缺分类时补 INCOME,保证「每笔可归类」且收入维能看见发薪。 */
 export function effectiveCategory(t: BankTx, rules = loadMerchantRules()): string {
   const overlay = (annOf(t.id).category || '').trim();
-  return normalizeCategory(overlay || ruleFor(rules, t) || t.category || '');
+  const raw = normalizeCategory(overlay || ruleFor(rules, t) || t.category || '');
+  if (raw) return raw;
+  if (t.accountId && salaryAccountIds().has(t.accountId) && t.amount < 0) return 'INCOME';
+  return '';
 }
 
 /** 生效子分类:本笔批注优先,否则 Plaid categoryDetail(可自由文本)。 */
 export function effectiveCategoryDetail(t: BankTx): string {
   const d = (annOf(t.id).categoryDetail || '').trim();
-  return d || (t.categoryDetail || '').trim();
+  if (d) return d;
+  if ((t.categoryDetail || '').trim()) return (t.categoryDetail || '').trim();
+  // 工资账户进账无细分 → 默认工资,收入构成不再只剩「其他」。
+  if (t.accountId && salaryAccountIds().has(t.accountId) && t.amount < 0) return 'INCOME_WAGES';
+  return '';
 }
 
 /** 需要审核的交易:本月、真支出、没有生效分类的。 */

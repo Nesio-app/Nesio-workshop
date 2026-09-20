@@ -31,13 +31,25 @@ function loadBank() {
   const mod = { exports: {} };
   vm.runInNewContext(js, {
     module: mod, exports: mod.exports, console, Math, Number, Array, Date, Set, Map, Object, JSON,
+    window: globalThis, localStorage: globalThis.localStorage,
     require: (p) => p === '../storage-health' ? { reportStorageDropped() {} }
       : p === '../tx-category' ? txCategory
+      : p === '../tx-annotations' ? { txAnnotationOf: () => ({}) }
+      : p === '../bank-rules-store' ? {
+        loadFlowRuleMap: () => ({}), saveFlowRuleMap() {},
+        loadMerchantRuleMap: () => ({}), saveMerchantRuleMap() {},
+        loadRuleLabelMap: () => ({}), saveRuleLabelMap() {},
+        loadRecurRuleMap: () => ({}), saveRecurRuleMap() {},
+      }
       : p === '../idb-blob-store' ? { createBlobStore: fakeCreateBlobStore } : ({}),
   });
   return mod.exports;
 }
 const bank = loadBank();
+
+// stub account-name / window so salaryAccountIds 能读到自定义名
+globalThis.window = globalThis;
+globalThis.localStorage = { _d: {}, getItem(k) { return this._d[k] || null; }, setItem(k, v) { this._d[k] = String(v); }, removeItem(k) { delete this._d[k]; } };
 
 const tx = (id, accountId, amount = 10) => ({ id, accountId, date: '2026-06-10', name: id, amount, currency: 'USD', category: '' });
 
@@ -154,5 +166,38 @@ assert.equal(bank.internalAdjustmentIds(crossAcct).size, 0, '跨账户不视为�
 // 10. 单边命中不配对:只有一方名字带调整词
 const oneSided = [adj('o1', 'ADJ REDIST FR', 150), adj('o2', 'Coffee Shop', -150)];
 assert.equal(bank.internalAdjustmentIds(oneSided).size, 0, '双方名字都须命中关键词');
+
+// 11. 指纹退场必须 remap 流水到新 id(不再孤儿隐藏 → Salary 等账户空账)
+caches.tx = [tx('hist', 'old-item-chk', -2000)];
+caches.accounts = [
+  { id: 'old-item-chk', name: 'Salary', mask: '4983', type: 'depository', subtype: 'checking', currency: 'USD', institution: 'Chase' },
+];
+bank.saveBankAccounts([
+  { id: 'new-item-chk', name: 'Salary', mask: '4983', type: 'depository', subtype: 'checking', currency: 'USD', institution: 'Chase' },
+]);
+assert.equal(bank.loadBankAccounts().length, 1, '指纹退场只留新 id');
+assert.equal(bank.loadBankAccounts()[0].id, 'new-item-chk');
+const remapped = bank.loadBankTx();
+assert.equal(remapped.length, 1, '历史流水仍可见');
+assert.equal(remapped[0].accountId, 'new-item-chk', 'accountId 已 remap 到新账户');
+assert.equal(remapped[0].id, 'hist');
+
+// 12. 权威 replace 同实体换 id 同样 remap
+caches.tx = [tx('r1', 'old-sal', -100)];
+caches.accounts = [
+  { id: 'old-sal', name: 'Salary', mask: '4983', type: 'depository', subtype: 'checking', currency: 'USD', institution: 'Chase' },
+];
+bank.saveBankAccounts(
+  [{ id: 'new-sal', name: 'Salary', mask: '4983', type: 'depository', subtype: 'checking', currency: 'USD', institution: 'Chase' }],
+  { replace: true },
+);
+assert.equal(bank.loadBankTx()[0].accountId, 'new-sal', 'replace 路径也 remap');
+
+// 13. Salary 账户进账(空分类 / TRANSFER_IN)算收入,不是转账
+caches.accounts = [{ id: 'sal', name: 'Salary', mask: '4983', type: 'depository', currency: 'USD' }];
+assert.equal(bank.txFlow({ id: 'p1', accountId: 'sal', amount: -3000, category: '', name: 'ACME PAYROLL', date: '2026-09-01', currency: 'USD' }), 'income', 'Salary 空分类进账 → income');
+assert.equal(bank.txFlow({ id: 'p2', accountId: 'sal', amount: -3000, category: 'TRANSFER_IN', name: 'Direct Dep', date: '2026-09-01', currency: 'USD' }), 'income', 'Salary TRANSFER_IN → income');
+assert.equal(bank.effectiveCategory({ id: 'p1', accountId: 'sal', amount: -3000, category: '', name: 'ACME', date: '2026-09-01', currency: 'USD' }), 'INCOME');
+assert.equal(bank.effectiveCategoryDetail({ id: 'p1', accountId: 'sal', amount: -3000, category: '', name: 'ACME', date: '2026-09-01', currency: 'USD' }), 'INCOME_WAGES');
 
 console.log('bank-orphan: OK');
