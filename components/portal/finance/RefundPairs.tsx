@@ -32,7 +32,7 @@ function similarName(a: string, b: string): boolean {
   const tb = nb.split(' ').filter((w) => w.length >= 3);
   if (!ta.size || !tb.length) return false;
   const hit = tb.filter((w) => ta.has(w)).length;
-  return hit >= Math.min(2, ta.size, tb.size);
+  return hit >= Math.min(2, ta.size, tb.length);
 }
 
 export default function RefundPairs({ txs, currency, onChanged }: {
