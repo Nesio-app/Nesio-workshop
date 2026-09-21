@@ -25,6 +25,7 @@ function loadTs(path, requireImpl) {
   return mod.exports;
 }
 const txCategory = loadTs('../lib/portal/tx-category.ts', () => ({}));
+const financeClassify = loadTs('../lib/portal/finance-classify.ts', () => ({}));
 const bank = loadTs('../lib/portal/providers/bank-tx.ts', (p) =>
   p === '../storage-health' ? { reportStorageDropped() {} }
     : p === '../tx-category' ? txCategory
@@ -34,7 +35,9 @@ const bank = loadTs('../lib/portal/providers/bank-tx.ts', (p) =>
       loadMerchantRuleMap: () => ({}), saveMerchantRuleMap() {},
       loadRuleLabelMap: () => ({}), saveRuleLabelMap() {},
       loadRecurRuleMap: () => ({}), saveRecurRuleMap() {},
+      loadRecurCadenceMap: () => ({}), saveRecurCadenceMap() {},
     }
+    : p === '../finance-classify' ? financeClassify
     : p === '../idb-blob-store' ? { createBlobStore: fakeCreateBlobStore } : ({}));
 
 const tx = (id, date, amount, category) => ({ id, date, name: id, amount, currency: 'USD', category, accountId: 'a1' });
@@ -77,22 +80,27 @@ assert.ok(css.includes('.nesio-fin-delta.is-new'), '「新增」标有中性样�
 const tab = fs.readFileSync(new URL('../components/portal/finance/FinanceTab.tsx', import.meta.url), 'utf8');
 assert.ok(/prevSummary\.net >= 50/.test(tab), '净支出环比有 $50 基数下限');
 
-// ── 财务⑤:statement credit 语义(返还/报销 ≠ 商户退款) ──
+// ── 财务⑤:statement credit 语义;图 1 把返现/银行报销归金融收入 ──
 const ftx = (name, amount, category = 'TRAVEL') => ({ id: name, date: '2026-06-20', name, amount, currency: 'USD', category, accountId: 'a1' });
 
 assert.equal(bank.txFlow(ftx('AMEX GLOBAL ENTRY CREDIT', -120), {}), 'rebate', '卡权益 credit → 返还');
-assert.equal(bank.txFlow(ftx('CASHBACK REBATE', -25), {}), 'rebate', 'rebate/cashback → 返还');
+assert.equal(bank.txFlow(ftx('CASHBACK REBATE', -25), {}), 'income', '图1:返现/报销 → 金融收入');
+assert.equal(bank.effectiveCategoryDetail(ftx('CASHBACK REBATE', -25)), 'INCOME_FINANCE_REWARD', '返现细分为金融收入');
 assert.equal(bank.txFlow(ftx('Amazon.com', -35, 'GENERAL_MERCHANDISE'), {}), 'refund', '普通商户负数仍是退款(不误伤)');
 assert.equal(bank.txFlow(ftx('NAVY FEDERAL CREDIT UNION', -500, 'GENERAL_SERVICES'), {}), 'refund', 'CREDIT UNION 是机构名,不当返还');
 assert.equal(bank.txFlow(ftx('GLOBAL ENTRY CREDIT', 120), {}), 'expense', '正数照旧是支出');
 assert.equal(bank.txFlow(ftx('SOME CREDIT', -50, ''), {}), 'transfer', '无分类负数照旧 transfer(不计收支)');
 assert.equal(bank.txFlow(ftx('AMEX GLOBAL ENTRY CREDIT', -120), { 'AMEX GLOBAL ENTRY CREDIT': 'income' }), 'income', '用户手动规则仍最高优先');
 
-// 金额口径:返还与退款同样冲抵支出(净额不因语义细分而变)
+// 金额口径:返还冲抵支出;图1 返现进收入桶
 const mixed = [ftx('Coffee', 200, 'FOOD_AND_DRINK'), ftx('AMEX GLOBAL ENTRY CREDIT', -120)];
 const sum = bank.summarizeMonth(mixed, '2026-06');
 assert.equal(sum.refunds, 120, '返还进退款/返还桶');
 assert.equal(sum.net, 80, '净支出 = 支出 - 返还');
+const cashbackMix = [ftx('Coffee', 200, 'FOOD_AND_DRINK'), ftx('CASHBACK REBATE', -25)];
+const sumCb = bank.summarizeMonth(cashbackMix, '2026-06');
+assert.equal(sumCb.income, 25, '返现进收入');
+assert.equal(sumCb.net, 200, '返现不冲抵支出净额(算收入)');
 
 // UI:分流选项与标签齐备
 assert.ok(bank.TX_FLOW_LABELS.rebate, 'TX_FLOW_LABELS 有 rebate');

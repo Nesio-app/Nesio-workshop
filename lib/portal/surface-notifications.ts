@@ -10,6 +10,8 @@ import { loadProfileSettings } from './profile';
 import { scheduleLocalAt, tombstoneScheduled } from './native-local-notifications';
 import { logDropped } from './storage-health';
 import type { PlannedNotification } from './reminder-notifications';
+import { financeFindings } from './finance-insight';
+import { loadBankTx, loadBankAccounts } from './bank-tx';
 
 export const SURFACE_NOTIFY_STATE_KEY = 'nesio-surface-notify-state-v1';
 
@@ -226,11 +228,41 @@ export function planRetrospectNotifications(now: Date = new Date()): PlannedNoti
   return out;
 }
 
+/** 图 7/8:FDRXX 闲置 / Salary 现金不够 → 本机 push(与日报同源判定)。 */
+export function planFinanceAlertNotifications(now: Date = new Date()): PlannedNotification[] {
+  try {
+    const txs = loadBankTx();
+    const accounts = loadBankAccounts();
+    if (!txs.length) return [];
+    const findings = financeFindings(txs, accounts).filter(
+      (f) => f.kind === 'money_fund_idle' || f.kind === 'salary_cash_short',
+    );
+    if (!findings.length) return [];
+    const today = dayKey(now);
+    let at = new Date(`${today}T09:05:00`);
+    if (at.getTime() <= now.getTime()) {
+      if (now.getHours() < 20) at = new Date(now.getTime() + 90_000);
+      else return [];
+    }
+    const top = findings[0];
+    return [{
+      key: `finance-alert:${today}:${top.id}`,
+      title: top.title[0],
+      body: top.detail[0],
+      at,
+    }];
+  } catch {
+    return [];
+  }
+}
+
 export type SurfaceNotifyKinds = {
   timeline: boolean;
   focusDue: boolean;
   dailyReport: boolean;
   retrospect: boolean;
+  /** 图 7/8 财务现金/货币基金提醒 */
+  financeAlerts?: boolean;
 };
 
 export async function syncSurfaceNotifications(
@@ -247,6 +279,9 @@ export async function syncSurfaceNotifications(
     if (d) planned.push(d);
   }
   if (kinds.retrospect) planned.push(...planRetrospectNotifications(now));
+  if (kinds.financeAlerts !== false && kinds.dailyReport) {
+    planned.push(...planFinanceAlertNotifications(now));
+  }
 
   const plannedKeys = new Set(planned.map((p) => p.key));
   const previous = loadKeys();

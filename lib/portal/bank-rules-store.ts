@@ -19,11 +19,14 @@ export const FLOW_RULE_KEY = 'nesio-bank-flow-rule-v1';
 export const MERCHANT_RULE_KEY = 'nesio-bank-merchant-rule-v1';
 export const RULE_LABEL_KEY = 'nesio-bank-rule-label-v1';
 export const RECUR_RULE_KEY = 'nesio-bank-recur-v1';
+/** 图 2:订阅账单频率覆盖(30=月费 / 365=年费)。 */
+export const RECUR_CADENCE_KEY = 'nesio-bank-recur-cadence-v1';
 
 const flowStore = mapStore<Record<string, string>>(FLOW_RULE_KEY, 'nesio-bank-flow-rules-updated');
 const merchantStore = mapStore<Record<string, string>>(MERCHANT_RULE_KEY, 'nesio-bank-merchant-rules-updated');
 const labelStore = mapStore<Record<string, string>>(RULE_LABEL_KEY, 'nesio-bank-rule-labels-updated');
 const recurStore = mapStore<Record<string, string>>(RECUR_RULE_KEY, 'nesio-bank-recur-rules-updated');
+const cadenceStore = mapStore<Record<string, string>>(RECUR_CADENCE_KEY, 'nesio-bank-recur-cadence-updated');
 
 export function loadFlowRuleMap(): Record<string, string> {
   return flowStore.load() ?? {};
@@ -51,4 +54,11 @@ export function loadRecurRuleMap(): Record<string, string> {
 }
 export function saveRecurRuleMap(m: Record<string, string>): void {
   recurStore.save(m);
+}
+
+export function loadRecurCadenceMap(): Record<string, string> {
+  return cadenceStore.load() ?? {};
+}
+export function saveRecurCadenceMap(m: Record<string, string>): void {
+  cadenceStore.save(m);
 }

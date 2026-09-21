@@ -12,11 +12,13 @@ import { reportStorageDropped } from '../storage-health';
 import { createBlobStore } from '../idb-blob-store';
 import { normalizeCategory } from '../tx-category';
 import { txAnnotationOf as _txAnnotationOf } from '../tx-annotations';
+import { classifyBankTx } from '../finance-classify';
 import {
   loadFlowRuleMap, saveFlowRuleMap,
   loadMerchantRuleMap, saveMerchantRuleMap,
   loadRuleLabelMap, saveRuleLabelMap,
   loadRecurRuleMap, saveRecurRuleMap,
+  loadRecurCadenceMap, saveRecurCadenceMap,
 } from '../bank-rules-store';
 
 export type TxFlow = 'expense' | 'refund' | 'rebate' | 'income' | 'transfer';
@@ -350,6 +352,15 @@ export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string
   }
   const forced = ruleFor(rules, t);
   if (forced) return forced;
+  // 用户标注规则(工资/金融/投资收入、银行互转/信用卡还款、基金买卖…)
+  const hit = classifyBankTx({
+    name: t.name,
+    amount: t.amount,
+    category: t.category,
+    categoryDetail: t.categoryDetail,
+    invSubtype: (t as BankTx & { invSubtype?: string }).invSubtype,
+  });
+  if (hit) return hit.flow;
   const cat = (t.category || '').toUpperCase();
   const salary = t.accountId ? salaryAccountIds().has(t.accountId) : false;
   if (/INCOME/.test(cat)) return 'income';
@@ -1098,20 +1109,33 @@ function rememberRuleLabel(key: string, name: string): void {
   saveRuleLabelMap(all);
 }
 
-/** 生效分类:本笔批注覆盖 → 商户规则 → Plaid;经 normalizeCategory 归一。
+/** 生效分类:本笔批注覆盖 → 商户规则 → 标注规则 → Plaid;经 normalizeCategory 归一。
  *  工资账户进账缺分类时补 INCOME,保证「每笔可归类」且收入维能看见发薪。 */
 export function effectiveCategory(t: BankTx, rules = loadMerchantRules()): string {
   const overlay = (annOf(t.id).category || '').trim();
-  const raw = normalizeCategory(overlay || ruleFor(rules, t) || t.category || '');
+  if (overlay) return normalizeCategory(overlay);
+  const fromRule = ruleFor(rules, t);
+  if (fromRule) return normalizeCategory(fromRule);
+  const hit = classifyBankTx({
+    name: t.name, amount: t.amount, category: t.category, categoryDetail: t.categoryDetail,
+    invSubtype: (t as BankTx & { invSubtype?: string }).invSubtype,
+  });
+  if (hit?.category) return normalizeCategory(hit.category);
+  const raw = normalizeCategory(t.category || '');
   if (raw) return raw;
   if (t.accountId && salaryAccountIds().has(t.accountId) && t.amount < 0) return 'INCOME';
   return '';
 }
 
-/** 生效子分类:本笔批注优先,否则 Plaid categoryDetail(可自由文本)。 */
+/** 生效子分类:本笔批注优先 → 标注规则 → Plaid categoryDetail。 */
 export function effectiveCategoryDetail(t: BankTx): string {
   const d = (annOf(t.id).categoryDetail || '').trim();
   if (d) return d;
+  const hit = classifyBankTx({
+    name: t.name, amount: t.amount, category: t.category, categoryDetail: t.categoryDetail,
+    invSubtype: (t as BankTx & { invSubtype?: string }).invSubtype,
+  });
+  if (hit?.detail) return hit.detail;
   if ((t.categoryDetail || '').trim()) return (t.categoryDetail || '').trim();
   // 工资账户进账无细分 → 默认工资,收入构成不再只剩「其他」。
   if (t.accountId && salaryAccountIds().has(t.accountId) && t.amount < 0) return 'INCOME_WAGES';
@@ -1253,6 +1277,11 @@ export interface RecurringCharge {
    */
   confirmed?: boolean;
   logo?: string; // 财务⑲:商户 logo URL(Plaid 富化;可缺)
+  /**
+   * 图 2:订阅账单(金额稳定/知名订阅) vs 居家账单(水电等金额浮动)。
+   * 由 detectRecurring 根据 amountCv / 分类推断;用户可在详情里改频率。
+   */
+  billKind?: 'subscription' | 'household';
 }
 
 /** 归一化商户名:去掉尾部门店号/流水号/日期,合并同一商家的多笔。 */
@@ -1392,6 +1421,15 @@ export function matchKnownSubscription(name: string): KnownSubscription | null {
   return null;
 }
 
+/** 图 2:金额稳定 / 知名订阅 → 订阅账单;水电房租等浮动 → 居家账单。 */
+function inferBillKind(opts: { category: string; amountCv: number; name: string; known?: KnownSubscription | null }): 'subscription' | 'household' {
+  if (opts.category === 'RENT_AND_UTILITIES') return 'household';
+  if (opts.known || opts.amountCv < 0.15) return 'subscription';
+  if (opts.amountCv >= 0.2) return 'household';
+  return /electric|gas|water|utility|energy|物业|电费|水费|燃气|enbridge|duke/i.test(opts.name)
+    ? 'household' : 'subscription';
+}
+
 /** 变异系数(标准差/均值)—— 账单金额稳定(低),超市/餐饮飘(高)。 */
 function coeffVar(nums: number[]): number {
   if (nums.length < 2) return 0;
@@ -1422,6 +1460,31 @@ export function setRecurRule(name: string, v: 'yes' | 'no' | ''): void {
   saveRecurRuleMap(all);
 }
 
+/** 图 2:订阅频率覆盖 —— 30=月费,365=年费。key 用 merchantKey。 */
+export function loadRecurCadence(): Record<string, number> {
+  const raw = loadRecurCadenceMap();
+  const out: Record<string, number> = {};
+  for (const [k, v] of Object.entries(raw)) {
+    const n = Number(v);
+    if (n === 30 || n === 365) out[k] = n;
+  }
+  return out;
+}
+export function setRecurCadence(key: string, days: 30 | 365 | 0): void {
+  if (typeof window === 'undefined' || !key) return;
+  const all = { ...loadRecurCadenceMap() };
+  if (days) all[key] = String(days); else delete all[key];
+  saveRecurCadenceMap(all);
+}
+
+function applyCadenceOverride(r: RecurringCharge, cadenceOverrides: Record<string, number>): void {
+  const ov = cadenceOverrides[r.key];
+  if (!ov) return;
+  r.cadenceDays = ov;
+  r.cadenceLabel = ov >= 300 ? ['每年', 'Yearly'] : ['每月', 'Monthly'];
+  r.nextEstimate = rollForward(Date.parse(r.lastDate) + ov * 86_400_000, ov);
+}
+
 /**
  * 识别定期账单(批次 39 重写,批次 40 加手动覆盖,财务⑰加早识别):
  * 1. 先按商户归并支出;2. 手动覆盖优先(yes 强制/no 排除);3. 否则判类别(账单关键词 OR
@@ -1434,6 +1497,7 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
   const flowRules = loadFlowRules();
   const merchantRules = loadMerchantRules();
   const recurRules = loadRecurRules();
+  const cadenceOverrides = loadRecurCadence();
   const byKey = new Map<string, BankTx[]>();
   for (const t of txs) {
     if (txFlow(t, flowRules) !== 'expense') continue;
@@ -1502,6 +1566,7 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
         status: 'predicted',
         confirmed: ruleFor(recurRules, last) === 'yes',
         logo: [...sorted2].reverse().find((t) => t.merchantLogo)?.merchantLogo,
+        billKind: inferBillKind({ category: catPred, amountCv: coeffVar(amts2), name: last.name, known }),
       });
       continue;
     }
@@ -1558,9 +1623,12 @@ export function detectRecurring(txs: BankTx[], opts?: { includePredicted?: boole
       baselineMax,
       amountCv: Math.round(cv * 100) / 100,
       status: 'mature',
+      confirmed: override === 'yes',
       logo: [...sorted].reverse().find((t) => t.merchantLogo)?.merchantLogo,
+      billKind: inferBillKind({ category: cat, amountCv: cv, name: last.name, known: matchKnownSubscription(last.name) }),
     });
   }
+  for (const r of out) applyCadenceOverride(r, cadenceOverrides);
   return out.sort((a, b) => a.nextEstimate.localeCompare(b.nextEstimate));
 }
 

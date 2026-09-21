@@ -99,7 +99,12 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
   const groupBlock = (id: 'deposit' | 'invest' | 'liability', titleZh: string, titleEn: string, list: BankAccount[]) => {
     if (!list.length) return null;
     const open = openGroups[id] !== false;
-    const monthTxCount = list.reduce((n, a) => n + accountMonth(txs, a.id, ym).count, 0);
+    // 图 8:分类旁展示本月交易总额(绝对额合计),不再显示笔数
+    const monthTotal = list.reduce((n, a) => {
+      return n + txs
+        .filter((t) => t.accountId === a.id && (t.date || '').slice(0, 7) === ym)
+        .reduce((s, t) => s + Math.abs(t.amount || 0), 0);
+    }, 0);
     return (
       <>
         <button type="button" className="nesio-fin-group-h" style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 0, padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit' }}
@@ -107,7 +112,7 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
           onClick={() => setOpenGroups((g) => ({ ...g, [id]: !open }))}>
           <span>
             {L(dict, titleZh, titleEn)} · {list.length}
-            {monthTxCount > 0 ? L(dict, ` · 本月 ${monthTxCount}`, ` · ${monthTxCount} this mo`) : ''}
+            {monthTotal > 0 ? ` · ${formatMoney(monthTotal, currency)}` : ''}
           </span>
           <span aria-hidden style={{ color: 'var(--portal-muted)' }}>{open ? '▾' : '▸'}</span>
         </button>

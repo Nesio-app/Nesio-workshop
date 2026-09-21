@@ -25,6 +25,14 @@ const txCategory = (() => {
   return mod.exports;
 })();
 
+const financeClassify = (() => {
+  const src = fs.readFileSync(new URL('../lib/portal/finance-classify.ts', import.meta.url), 'utf8');
+  const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
+  const mod = { exports: {} };
+  vm.runInNewContext(js, { module: mod, exports: mod.exports, require: () => ({}), console });
+  return mod.exports;
+})();
+
 function loadBank() {
   const src = fs.readFileSync(new URL('../lib/portal/providers/bank-tx.ts', import.meta.url), 'utf8');
   const js = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText;
@@ -40,7 +48,9 @@ function loadBank() {
         loadMerchantRuleMap: () => ({}), saveMerchantRuleMap() {},
         loadRuleLabelMap: () => ({}), saveRuleLabelMap() {},
         loadRecurRuleMap: () => ({}), saveRecurRuleMap() {},
+        loadRecurCadenceMap: () => ({}), saveRecurCadenceMap() {},
       }
+      : p === '../finance-classify' ? financeClassify
       : p === '../idb-blob-store' ? { createBlobStore: fakeCreateBlobStore } : ({}),
   });
   return mod.exports;

@@ -28,18 +28,25 @@ import {
   median,
   type BankTx,
   type BankAccount,
+  loadHoldings,
+  loadAccountNames,
+  displayAccountName,
+  type Holding,
 } from './bank-tx';
 import {
   categoryBaseline, baselineZ, balanceProjection, detectIncome, monthlyCashflow,
   recurringPriceHikes, monthlyNetSpendBaseline,
 } from './finance-features';
 import { categoryLabel } from './tx-category';
+import { MONEY_FUND_RE } from './finance-classify';
 
 export type FinanceSeverity = 'flag' | 'attention'; // flag=值得尽快看, attention=可关注
 export type FinanceFindingKind =
   | 'anomaly' | 'subscription_hike' | 'cash_runway' | 'upcoming_bill'
   // 财务⑭(L2,docs/design/finance-expert-layers.md):
-  | 'fee_audit' | 'new_recurring' | 'balance_risk' | 'savings_rate';
+  | 'fee_audit' | 'new_recurring' | 'balance_risk' | 'savings_rate'
+  // 图 7/8:货币基金闲置 / Salary 现金不够下周账单
+  | 'money_fund_idle' | 'salary_cash_short';
 
 export interface FinanceFinding {
   id: string;
@@ -355,6 +362,67 @@ function upcomingBillFindings(txs: BankTx[]): FinanceFinding[] {
   }];
 }
 
+/** 图 7/8:HSA / Linda / Roth 账户里 FDRXX(等货币基金)有余额 → 提醒。 */
+function moneyFundIdleFindings(accounts: BankAccount[], holdings: Holding[] = loadHoldings()): FinanceFinding[] {
+  const names = loadAccountNames();
+  const watch = accounts.filter((a) => {
+    const n = `${displayAccountName(a, names)} ${a.name || ''}`.toLowerCase();
+    return /\bhsa\b|linda|roth/i.test(n);
+  });
+  if (!watch.length) return [];
+  const out: FinanceFinding[] = [];
+  for (const a of watch) {
+    const funds = holdings.filter((h) => h.accountId === a.id && (MONEY_FUND_RE.test(h.ticker || '') || MONEY_FUND_RE.test(h.name || '')) && h.value > 0.5);
+    const total = funds.reduce((s, h) => s + h.value, 0);
+    if (total < 1) continue;
+    const label = displayAccountName(a, names) || a.name || a.id;
+    const tickers = [...new Set(funds.map((h) => (h.ticker || h.name || '').toUpperCase().slice(0, 8)))].join('/');
+    out.push({
+      id: `finance-fund-idle-${a.id}`,
+      kind: 'money_fund_idle',
+      severity: 'attention',
+      title: [`${label} 的 ${tickers || '货币基金'} 还有余额`, `${label} still holds ${tickers || 'money-market'} cash`],
+      detail: [
+        `约 ${formatMoney(total, a.currency || 'USD')} 停在核心仓;要用或改配置时记得看一眼`,
+        `~${formatMoney(total, a.currency || 'USD')} sitting in core cash — glance before you need it`,
+      ],
+    });
+  }
+  return out;
+}
+
+/** 图 7/8:Salary 账户 FDRXX/现金仓 < 未来一周信用卡+账单 → 提醒。 */
+function salaryCashShortFindings(txs: BankTx[], accounts: BankAccount[], holdings: Holding[] = loadHoldings()): FinanceFinding[] {
+  const names = loadAccountNames();
+  const salary = accounts.find((a) => /salary|工资|薪水/i.test(displayAccountName(a, names) || a.name || ''));
+  if (!salary) return [];
+  // 优先 FDRXX 等货币基金仓;没有则看 CUR:USD / CASH;再退回账户余额。
+  const fundHoldings = holdings.filter((h) => h.accountId === salary.id && (
+    MONEY_FUND_RE.test(h.ticker || '') || MONEY_FUND_RE.test(h.name || '')
+  ));
+  const cashHoldings = holdings.filter((h) => h.accountId === salary.id && /CUR:USD|^\s*CASH\b/i.test(`${h.ticker || ''} ${h.name || ''}`));
+  const fundBal = fundHoldings.reduce((s, h) => s + (h.value || 0), 0);
+  const cashBal = cashHoldings.reduce((s, h) => s + (h.value || 0), 0);
+  const cash = fundBal > 0.5 ? fundBal : (cashBal > 0.5 ? cashBal : (typeof salary.balance === 'number' ? salary.balance : 0));
+  const { total: bills7 } = upcomingRecurring(txs, 7);
+  const ccDue = accounts
+    .filter((a) => (a.type || '').toLowerCase() === 'credit' && typeof a.balance === 'number' && a.balance > 0)
+    .reduce((s, a) => s + (a.balance || 0), 0);
+  const need = Math.round((bills7 + ccDue) * 100) / 100;
+  if (need < 50 || cash >= need) return [];
+  const ccy = salary.currency || dominantCurrency(txs);
+  return [{
+    id: 'finance-salary-cash-short',
+    kind: 'salary_cash_short',
+    severity: 'flag',
+    title: ['Salary 现金可能不够下周账单', 'Salary cash may not cover next week’s bills'],
+    detail: [
+      `Salary FDRXX/现金约 ${formatMoney(cash, ccy)},未来一周账单+信用卡约 ${formatMoney(need, ccy)};提前挪一点就稳`,
+      `Salary FDRXX/cash ~${formatMoney(cash, ccy)}; next week’s bills+cards ~${formatMoney(need, ccy)} — move a little over early`,
+    ],
+  }];
+}
+
 /**
  * 财务 findings 总入口。ym 默认取最近有数据的月份。
  * 返回按严重度(flag 优先)排序的 finding —— 给 Today 桥;完整明细仍在财务页。
@@ -366,6 +434,7 @@ export function financeFindings(
   opts?: { domainNet?: number; prevDomainNet?: number },
 ): FinanceFinding[] {
   if (!txs.length || !ym) return [];
+  const holdings = loadHoldings();
   const all = [
     ...anomalyFindings(txs, ym, opts),
     ...merchantAlertFindings(txs, ym),
@@ -376,6 +445,8 @@ export function financeFindings(
     ...newRecurringFindings(txs),
     ...balanceRiskFindings(txs, accounts),
     ...savingsRateFindings(txs),
+    ...moneyFundIdleFindings(accounts, holdings),
+    ...salaryCashShortFindings(txs, accounts, holdings),
   ];
   const rank: Record<FinanceSeverity, number> = { flag: 0, attention: 1 };
   return all.sort((a, b) => rank[a.severity] - rank[b.severity]);

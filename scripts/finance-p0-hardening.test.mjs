@@ -24,6 +24,7 @@ function loadTs(path, requireImpl) {
   return mod.exports;
 }
 const txCategory = loadTs('../lib/portal/tx-category.ts', () => ({}));
+const financeClassify = loadTs('../lib/portal/finance-classify.ts', () => ({}));
 const bank = loadTs('../lib/portal/providers/bank-tx.ts', (p) =>
   p === '../storage-health' ? { reportStorageDropped() {} }
     : p === '../tx-category' ? txCategory
@@ -32,7 +33,10 @@ const bank = loadTs('../lib/portal/providers/bank-tx.ts', (p) =>
       loadMerchantRuleMap: () => ({}), saveMerchantRuleMap() {},
       loadRuleLabelMap: () => ({}), saveRuleLabelMap() {},
       loadRecurRuleMap: () => ({}), saveRecurRuleMap() {},
+      loadRecurCadenceMap: () => ({}), saveRecurCadenceMap() {},
     }
+    : p === '../finance-classify' ? financeClassify
+    : p === '../tx-annotations' ? { txAnnotationOf: () => ({}) }
       : { createBlobStore: fakeCreateBlobStore });
 
 // ── ① 保险丝 ──

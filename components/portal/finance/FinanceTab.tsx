@@ -12,18 +12,19 @@ import {
   availableMonths, categoryBreakdown,
   needsReview, suggestCategory, setMerchantRule, effectiveCategory, effectiveCategoryDetail,
   formatMoney, ymOf, prevYm, txFlow, setFlowRule, TX_FLOW_LABELS,
-  detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule,
+  detectRecurring, upcomingRecurring, loadMerchantRules, loadFlowRules, setRecurRule, setRecurCadence,
   loadBankSyncedAt, excludedTxCount, internalAdjustmentIds, accountTypeLabel, assetSummaryWithHoldings, expenseMerchants,
   loadHoldings, setMerchantRuleFor, setFlowRuleFor, loadRuleLabels,
   bankDataReady, loadBankSyncStatus, loadAccountNames, displayAccountName,
-  topMerchants, accountMonth,
+  topMerchants, accountMonth, investmentAccountIds,
   type BankTx, type BankAccount, type TxFlow, type Holding,
 } from '@/lib/portal/bank-tx';
 // 风险预警与 Today/问一问 同读一份判定(financeFindings,Layer1 漂移收口)——此前 bank-tx 里
 // 另有一套 alerts 判定(函数级双实现),两个输出面据同一份流水各说各话,已删并由契约钉死不回潮。
 import { financeFindings } from '@/lib/portal/finance-insight';
 import { computeFinanceScores } from '@/lib/portal/finance-risk';
-import { detectIncome, portfolioSummary, recurringPriceHikes, incomeBreakdown } from '@/lib/portal/finance-features';
+import { detectIncome, portfolioSummary, recurringPriceHikes, incomeBreakdown, investIncomeYTD } from '@/lib/portal/finance-features';
+import { TRANSFER_DETAIL_LABELS } from '@/lib/portal/finance-classify';
 import { loadCombinedFinanceTx, loadCombinedFinanceAccounts } from '@/lib/portal/tesla-finance';
 import QuickAddSheet from './QuickAddSheet';
 import ReconcileSheet from './ReconcileSheet';
@@ -1008,8 +1009,17 @@ export default function FinanceTab() {
             const s2 = assetSummaryWithHoldings(accounts, holdings, summary.currency || 'USD'); // 与账户列表同口径
             const manualNet = manualNetWorth(manualAssets);
             const totalAssets = Math.round((s2.net + manualNet) * 100) / 100;
+            const totalLiab = Math.round((s2.creditOwed + s2.loanOwed) * 100) / 100;
             const portfolio = portfolioSummary(holdings);
             const investValue = s2.investments;
+            // 图 5:总金融收益 = 持仓浮动盈亏(有成本时) + 当年股利利息
+            const finGain = (() => {
+              const invIds = investmentAccountIds(accounts);
+              const y = investIncomeYTD(txs, new Date().getFullYear(), invIds.size ? invIds : undefined);
+              const ytd = (y.dividends || 0) + (y.interest || 0);
+              const floatGain = portfolio?.gain ?? 0;
+              return Math.round((floatGain + ytd) * 100) / 100;
+            })();
             const pts = [...nwSeries].sort((a, b) => (a.date < b.date ? -1 : 1)).slice(-60);
             const vals = pts.map((p) => p.plaidNet + p.manualNet);
             const min = Math.min(...vals), max = Math.max(...vals);
@@ -1043,12 +1053,26 @@ export default function FinanceTab() {
                   <div className="nesio-fin-kpi">
                     <span className="nesio-fin-kpi-l">{L(dict, '投资', 'Investing')}</span>
                     <span className="nesio-fin-kpi-v">{formatMoney(investValue, summary.currency)}</span>
-                    {/* 「当月盈亏想知道投资卡片里」—— 浮动盈亏就挂在这张卡上,不再单独占一格 */}
                     {portfolio && portfolio.gain !== null && (
                       <span className="nesio-fin-delta" style={{ color: portfolio.gain >= 0 ? 'var(--status-go)' : 'var(--status-gentle)' }}>
                         {fmtGain(portfolio.gain)}{portfolio.gainPct !== null ? ` (${portfolio.gainPct >= 0 ? '+' : ''}${portfolio.gainPct}%)` : ''}
                       </span>
                     )}
+                  </div>
+                )}
+                {/* 图 5:总负债 + 总金融收益 */}
+                {totalLiab > 0 && (
+                  <div className="nesio-fin-kpi">
+                    <span className="nesio-fin-kpi-l">{L(dict, '总负债', 'Liabilities')}</span>
+                    <span className="nesio-fin-kpi-v">{formatMoney(totalLiab, summary.currency)}</span>
+                  </div>
+                )}
+                {(finGain !== 0 || (portfolio && portfolio.gain !== null)) && (
+                  <div className="nesio-fin-kpi">
+                    <span className="nesio-fin-kpi-l">{L(dict, '总金融收益', 'Financial gains')}</span>
+                    <span className="nesio-fin-kpi-v" style={{ color: finGain >= 0 ? 'var(--status-go)' : 'var(--status-gentle)' }}>
+                      {fmtGain(finGain)}
+                    </span>
                   </div>
                 )}
               </div>
@@ -1106,6 +1130,7 @@ export default function FinanceTab() {
                     anomaly: 'tx', fee_audit: 'tx',
                     subscription_hike: 'tx', new_recurring: 'tx', upcoming_bill: 'tx', // 订阅 tab 已删,定期在交易页
                     cash_runway: 'cards', balance_risk: 'cards', savings_rate: 'spending',
+                    money_fund_idle: 'cards', salary_cash_short: 'cards',
                   };
                   const target = FINDING_SUB[f.kind];
                   const inner = (
@@ -1297,7 +1322,14 @@ export default function FinanceTab() {
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span className="nesio-fin-txdate">{(t.date || '').slice(5).replace('-', '/')}</span>
                       <button type="button" className={`nesio-fin-txflow nesio-fin-txflow--${f}`} onClick={() => setFlowEditId((id) => (id === t.id ? null : t.id))}>
-                        <span className="nesio-fin-txflow-l">{L(dict, TX_FLOW_LABELS[f][0], TX_FLOW_LABELS[f][1])}</span>
+                        <span className="nesio-fin-txflow-l">{(() => {
+                          if (f === 'transfer') {
+                            const d = effectiveCategoryDetail(t);
+                            const lab = TRANSFER_DETAIL_LABELS[d];
+                            if (lab) return L(dict, lab[0], lab[1]);
+                          }
+                          return L(dict, TX_FLOW_LABELS[f][0], TX_FLOW_LABELS[f][1]);
+                        })()}</span>
                         {f === 'expense' && (() => {
                           // 财务⑨:primary 友好名后接 detailed 细分类(咖啡/加油…);*_OTHER_* 无增量不显示
                           const primary = categoryLabel(effectiveCategory(t), dict) || L(dict, '待归类', 'Uncategorized');
@@ -1408,19 +1440,28 @@ export default function FinanceTab() {
             <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{L(dict, '还没识别到定期账单 —— 同一商户 2 笔规律扣款(或知名订阅品牌 1 笔)就会以「待确认」出现,3 笔转正。新连接的银行,完整历史会在几天内陆续回填,期间隔天点一次「同步」即可。', 'No recurring bills yet — 2 regular charges per merchant (or 1 from a known subscription brand) show up as "unconfirmed" and are confirmed after 3 charges. Newly linked banks backfill history over a few days; sync again occasionally.')}</p>
           ) : (
             <div className="nesio-fin-recurlist">
-              {/* bug2:去掉行尾 ✕;点一下进入订阅详情页(内有编辑/确认按钮) */}
-              {recurring.map((r) => (
-                <button key={r.key} type="button" className="nesio-fin-recur" style={{ border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', background: 'transparent', fontFamily: 'var(--font-sans)' }}
-                  onClick={() => setRecurDetail(r.key)}>
-                  <div className="nesio-fin-recur-main">
-                    <span className="nesio-fin-recur-name">{r.logo && <MLogo src={r.logo} />}{r.name}{r.status === 'predicted' && !r.confirmed && <span className="nesio-fin-recur-badge">{L(dict, '待确认', 'unconfirmed')}</span>}{hikeByKey.has(r.key) && (() => { const h = hikeByKey.get(r.key)!; return <span className="nesio-fin-recur-badge" style={{ color: 'var(--status-gentle)', borderColor: 'var(--status-gentle)' }} title={L(dict, `从 ${formatMoney(h.from, h.currency)} 涨到 ${formatMoney(h.to, h.currency)}`, `up from ${formatMoney(h.from, h.currency)} to ${formatMoney(h.to, h.currency)}`)}>{L(dict, `↑涨价 ${h.deltaPct}%`, `↑ up ${h.deltaPct}%`)}</span>; })()}</span>
-                    <span className="nesio-fin-recur-meta">{L(dict, r.cadenceLabel[0], r.cadenceLabel[1])} · {categoryLabel(r.category, dict)} · {L(dict, `下次约 ${r.nextEstimate.slice(5).replace('-', '/')}`, `next ~${r.nextEstimate.slice(5).replace('-', '/')}`)}</span>
+              {([
+                ['subscription', '订阅账单', 'Subscriptions'] as const,
+                ['household', '居家账单', 'Household bills'] as const,
+              ]).map(([kind, zh, en]) => {
+                const list = recurring.filter((r) => (r.billKind || 'subscription') === kind);
+                if (!list.length) return null;
+                return (
+                  <div key={kind} style={{ marginBottom: 'var(--space-3)' }}>
+                    <p className="nesio-settings-section-label" style={{ marginTop: 0 }}>{L(dict, zh, en)} · {list.length}</p>
+                    {list.map((r) => (
+                      <button key={r.key} type="button" className="nesio-fin-recur" style={{ border: 'none', width: '100%', textAlign: 'left', cursor: 'pointer', background: 'transparent', fontFamily: 'var(--font-sans)' }}
+                        onClick={() => setRecurDetail(r.key)}>
+                        <div className="nesio-fin-recur-main">
+                          <span className="nesio-fin-recur-name">{r.logo && <MLogo src={r.logo} />}{r.name}{r.status === 'predicted' && !r.confirmed && <span className="nesio-fin-recur-badge">{L(dict, '待确认', 'unconfirmed')}</span>}{hikeByKey.has(r.key) && (() => { const h = hikeByKey.get(r.key)!; return <span className="nesio-fin-recur-badge" style={{ color: 'var(--status-gentle)', borderColor: 'var(--status-gentle)' }} title={L(dict, `从 ${formatMoney(h.from, h.currency)} 涨到 ${formatMoney(h.to, h.currency)}`, `up from ${formatMoney(h.from, h.currency)} to ${formatMoney(h.to, h.currency)}`)}>{L(dict, `↑涨价 ${h.deltaPct}%`, `↑ up ${h.deltaPct}%`)}</span>; })()}</span>
+                          <span className="nesio-fin-recur-meta">{L(dict, r.cadenceLabel[0], r.cadenceLabel[1])} · {categoryLabel(r.category, dict)} · {L(dict, `下次约 ${r.nextEstimate.slice(5).replace('-', '/')}`, `next ~${r.nextEstimate.slice(5).replace('-', '/')}`)}</span>
+                        </div>
+                        <span className="nesio-fin-recur-amt nesio-fin-recur-amt--right">{formatMoney(r.avgAmount, r.currency)}</span>
+                      </button>
+                    ))}
                   </div>
-                  {/* bug3:金额右对齐(定宽右靠,一列数字能对上);删行尾 › ——
-                      整行就是按钮,箭头只是又一个视觉噪点 */}
-                  <span className="nesio-fin-recur-amt nesio-fin-recur-amt--right">{formatMoney(r.avgAmount, r.currency)}</span>
-                </button>
-              ))}
+                );
+              })}
             </div>
           )}
         </>
@@ -1453,6 +1494,26 @@ export default function FinanceTab() {
                     ))}
                   </select>
                 </div>
+                {/* 图 2:订阅账单可改频率(月/年);居家账单金额本就不固定,只展示推断周期 */}
+                {(r.billKind || 'subscription') === 'subscription' && (
+                  <div>
+                    <p style={{ margin: '0 0 4px', fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>{L(dict, '频率', 'Frequency')}</p>
+                    <select className="nesio-fin-select" value={r.cadenceDays >= 300 ? '365' : '30'}
+                      onChange={(e) => {
+                        const v = e.target.value === '365' ? 365 : 30;
+                        setRecurCadence(r.key, v as 30 | 365);
+                        setRev((x) => x + 1);
+                      }}>
+                      <option value="30">{L(dict, '每月(金额通常固定)', 'Monthly (usually fixed)')}</option>
+                      <option value="365">{L(dict, '每年 · 年费', 'Yearly · annual fee')}</option>
+                    </select>
+                  </div>
+                )}
+                {(r.billKind || 'subscription') === 'household' && (
+                  <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                    {L(dict, '居家账单:每月金额可能浮动(水电燃气等)。', 'Household bill: amount can vary month to month (utilities, etc.).')}
+                  </p>
+                )}
                 {/* 确认过就不再问第二遍(bug3:确认后「待确认」必须消失) */}
                 {r.status === 'predicted' && !r.confirmed && (
                   <button type="button" className="nesio-fin-review-accept" onClick={() => { setRecurRule(r.key, 'yes'); setRev((v) => v + 1); setRecurDetail(null); }}>

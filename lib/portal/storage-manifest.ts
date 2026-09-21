@@ -76,6 +76,8 @@ export const CACHE_KEYS = new Set<string>([
   'nesio-surface-notify-state-v1',
   'nesio-focus-notify-dismissed-v1',
   'nesio-notify-deep-links-v1',
+  // 退款待配对折叠态 —— UI 展开偏好,换台从零开始正确。
+  'nesio-fin-refund-pairs-open-v1',
   // HealthKit 自动同步的日期簿记 —— 单设备本地状态,同步过去只会让新设备以为已经拉过。
   'nesio-healthkit-auto-sync-v1',
   // 「让 iOS 系统搜索找得到我的记忆」开关(Core Spotlight,2026-07-31)。

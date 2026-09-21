@@ -138,6 +138,13 @@ const DETAIL_META: Record<string, [string, string]> = {
   INCOME_INTEREST_EARNED: ['利息收入', 'Interest earned'],
   INCOME_DIVIDENDS: ['分红', 'Dividends'],
   INCOME_TAX_REFUND: ['退税', 'Tax refund'],
+  INCOME_FINANCE_REWARD: ['积分返现', 'Reward cashback'],
+  INCOME_FINANCE_REBATE: ['银行报销', 'Bank rebate'],
+  INCOME_FINANCE_OTHER: ['金融收入', 'Financial income'],
+  INCOME_INVEST_CONTRIB: ['投资缴存', 'Investment contribution'],
+  INCOME_INVEST_CAP_GAIN: ['长期资本利得', 'Long-term capital gain'],
+  INCOME_RESALE_VENMO: ['二手转卖', 'Resale (Venmo)'],
+  INCOME_AMZN_CASHBACK: ['亚马逊返现', 'Amazon cashback'],
   // bug2(收入来源那一列出现「Contractor / Salary / Transfer From Apps」英文):
   // 中文界面下未命中 DETAIL_META 的键会被 prettify 兜成 Title Case 英文,读起来像半拉子。
   // Plaid income / transfer_in 的其余枚举在此补齐中文。
@@ -150,6 +157,10 @@ const DETAIL_META: Record<string, [string, string]> = {
   TRANSFER_IN_INVESTMENT_AND_RETIREMENT_FUNDS: ['投资转入', 'Investment transfer in'],
   TRANSFER_IN_SAVINGS: ['储蓄转入', 'Savings transfer in'],
   TRANSFER_IN_ACCOUNT_TRANSFER: ['账户互转', 'Account transfer'],
+  TRANSFER_BANK: ['银行互转', 'Bank transfer'],
+  TRANSFER_CC_PAYMENT: ['信用卡还款', 'Card payment'],
+  TRANSFER_FUND_TRADE: ['基金划转', 'Fund move'],
+  BANK_FEES_ATM_WITHDRAWAL: ['ATM 取款', 'ATM withdrawal'],
 };
 
 /**

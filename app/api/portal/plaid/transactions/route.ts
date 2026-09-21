@@ -81,14 +81,26 @@ interface PlaidInvTx {
 
 // 财务⑯:投资账户的交易走 investments 产品(transactions 产品不覆盖 → 此前 Fidelity 全空)。
 // 分红/利息 → 收入(带细分,喂「收入构成」);费用 → 银行费用;缴存/取出与买卖 → 转账不计收支。
-export function invTxCategory(t: { type?: string; subtype?: string; amount: number }): { category: string; detail?: string } {
+export function invTxCategory(t: { type?: string; subtype?: string; amount: number; name?: string }): { category: string; detail?: string } {
   const st = `${t.subtype || ''} ${t.type || ''}`.toLowerCase();
+  const name = t.name || '';
+  // 基金买卖 / 核心仓赎回 → 转账(图 3/10),不进退款配对
+  if (/you\s+sold|you\s+bought|personal\s+withdrawal|redemption\s+from\s+core|fdrxx|spaxx/i.test(name)
+    || /buy|sell|rebalance/.test(st)) {
+    return { category: t.amount >= 0 ? 'TRANSFER_OUT' : 'TRANSFER_IN', detail: 'TRANSFER_FUND_TRADE' };
+  }
   if (st.includes('dividend')) return { category: 'INCOME', detail: 'INCOME_DIVIDENDS' };
   if (st.includes('interest')) return { category: 'INCOME', detail: 'INCOME_INTEREST_EARNED' };
+  if (/long.?term.?cap|capital\s+gain/.test(st) || /LONG[-\s]?TERM\s+CAP/i.test(name)) {
+    return { category: 'INCOME', detail: 'INCOME_INVEST_CAP_GAIN' };
+  }
+  if (st.includes('contribution') || /partic(?:ipant)?\s*contr|401\s*k|roth/i.test(`${st} ${name}`)) {
+    return { category: 'INCOME', detail: 'INCOME_INVEST_CONTRIB' };
+  }
   if (st.includes('fee') || st.includes('tax')) return { category: 'BANK_FEES' };
-  if (st.includes('deposit') || st.includes('contribution')) return { category: 'TRANSFER_IN' };
-  if (st.includes('withdrawal') || st.includes('distribution')) return { category: 'TRANSFER_OUT' };
-  return { category: t.amount >= 0 ? 'TRANSFER_OUT' : 'TRANSFER_IN' }; // buy/sell 等内部流转
+  if (st.includes('deposit')) return { category: 'TRANSFER_IN', detail: 'TRANSFER_BANK' };
+  if (st.includes('withdrawal') || st.includes('distribution')) return { category: 'TRANSFER_OUT', detail: 'TRANSFER_BANK' };
+  return { category: t.amount >= 0 ? 'TRANSFER_OUT' : 'TRANSFER_IN', detail: 'TRANSFER_FUND_TRADE' };
 }
 
 /**
