@@ -81,7 +81,7 @@ interface PlaidInvTx {
 
 // 财务⑯:投资账户的交易走 investments 产品(transactions 产品不覆盖 → 此前 Fidelity 全空)。
 // 分红/利息 → 收入(带细分,喂「收入构成」);费用 → 银行费用;缴存/取出与买卖 → 转账不计收支。
-export function invTxCategory(t: { type?: string; subtype?: string; amount: number; name?: string }): { category: string; detail?: string } {
+export function invTxCategory(t: { type?: string; subtype?: string; amount: number; name?: string | null }): { category: string; detail?: string } {
   const st = `${t.subtype || ''} ${t.type || ''}`.toLowerCase();
   const name = t.name || '';
   // 基金买卖 / 核心仓赎回 → 转账(图 3/10),不进退款配对
