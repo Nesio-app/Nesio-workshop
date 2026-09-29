@@ -219,6 +219,9 @@
 
 ## 红线(动之前必读)
 
+- **Agent 收尾默认部署**:Web/Portal 功能改完 → commit + `git push origin main` → 等到 Vercel
+  **production READY**,并确认别名 **`https://treasurebox-nu.vercel.app`** 指向该部署(Capacitor 壳
+  `server.url` 远程源;用户验收取此 URL,不要只停在 push)。
 - **CI 每次 push 跑 `test:security`(18 套安全契约)**,见 .github/workflows/deploy.yml。
   本地验证命令:`npm run test:security`。改动 integrations.ts / DailyBriefCard /
   MemoryNodeDetail / TodayFeed / Portal 前先看 scripts/anonymous-private-data-gate.test.mjs
