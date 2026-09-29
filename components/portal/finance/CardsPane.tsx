@@ -99,11 +99,13 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
   const groupBlock = (id: 'deposit' | 'invest' | 'liability', titleZh: string, titleEn: string, list: BankAccount[]) => {
     if (!list.length) return null;
     const open = openGroups[id] !== false;
-    // 图 8:分类旁展示本月交易总额(绝对额合计),不再显示笔数
-    const monthTotal = list.reduce((n, a) => {
-      return n + txs
-        .filter((t) => t.accountId === a.id && (t.date || '').slice(0, 7) === ym)
-        .reduce((s, t) => s + Math.abs(t.amount || 0), 0);
+    // 与总览 KPI 同口径:分组旁显示余额合计(负债=信用卡+贷款欠款;投资=max(balance,持仓);存款=余额)
+    // 此前用本月 |amount| 流水额,和「总负债」对不上。
+    const ccy = (currency || 'USD').toUpperCase();
+    const balTotal = list.reduce((n, a) => {
+      if ((a.currency || 'USD').toUpperCase() !== ccy) return n;
+      const b = displayBal(a, id);
+      return n + (b != null ? Math.max(0, b) : 0);
     }, 0);
     return (
       <>
@@ -112,7 +114,7 @@ export default function CardsPane({ txs, accounts, holdings, manualAssets, ym, c
           onClick={() => setOpenGroups((g) => ({ ...g, [id]: !open }))}>
           <span>
             {L(dict, titleZh, titleEn)} · {list.length}
-            {monthTotal > 0 ? ` · ${formatMoney(monthTotal, currency)}` : ''}
+            {balTotal > 0 ? ` · ${id === 'liability' ? '-' : ''}${formatMoney(balTotal, currency)}` : ''}
           </span>
           <span aria-hidden style={{ color: 'var(--portal-muted)' }}>{open ? '▾' : '▸'}</span>
         </button>

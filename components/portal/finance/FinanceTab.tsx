@@ -25,6 +25,7 @@ import { financeFindings } from '@/lib/portal/finance-insight';
 import { computeFinanceScores } from '@/lib/portal/finance-risk';
 import { detectIncome, portfolioSummary, recurringPriceHikes, incomeBreakdown, investIncomeYTD } from '@/lib/portal/finance-features';
 import { TRANSFER_DETAIL_LABELS } from '@/lib/portal/finance-classify';
+import { bankTxToCsv, importFinanceCsv, downloadTextFile } from '@/lib/portal/finance-csv';
 import { loadCombinedFinanceTx, loadCombinedFinanceAccounts } from '@/lib/portal/tesla-finance';
 import QuickAddSheet from './QuickAddSheet';
 import ReconcileSheet from './ReconcileSheet';
@@ -698,6 +699,12 @@ export default function FinanceTab() {
   const [hydrateState, setHydrateState] = useState<'loading' | 'ready' | 'error'>('loading');
   const [quickAdd, setQuickAdd] = useState<null | { seg: 'asset'; assetId?: string }>(null); // 仅资产估值/更新(手记银行流水已撤)
   const [reconcileOpen, setReconcileOpen] = useState(false); // L3-b:上传 statement 对账(端上解析,不上传)
+  // CSV 导出时间段(默认当前 ym 整月)
+  const [csvFrom, setCsvFrom] = useState('');
+  const [csvTo, setCsvTo] = useState('');
+  const [csvMsg, setCsvMsg] = useState('');
+  const [csvErr, setCsvErr] = useState('');
+  const csvFileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     const reload = () => {
@@ -969,6 +976,55 @@ export default function FinanceTab() {
     setFlowRuleFor(t, flow); // 商户级记忆(同商户以后自动)
     setFlowEditId(null);
     setRev((r) => r + 1);
+  }
+
+  /** 分类明细 → 交易页并展开修改面板。 */
+  function openTxEditor(txId: string, category?: string) {
+    setSub('tx');
+    if (category) setFilter(category);
+    else setFilter('all');
+    setAcctFilter('all');
+    setFlowEditId(txId);
+    setTxLimit((n) => Math.max(n, 80));
+  }
+
+  function exportCsv() {
+    setCsvErr('');
+    setCsvMsg('');
+    const from = csvFrom || `${ym}-01`;
+    const to = csvTo || (() => {
+      const [y, m] = ym.split('-').map(Number);
+      const last = new Date(y, m, 0).getDate();
+      return `${ym}-${String(last).padStart(2, '0')}`;
+    })();
+    try {
+      const text = bankTxToCsv(txs, { from, to });
+      const n = text.split('\n').filter((l) => l.trim()).length - 1;
+      downloadTextFile(`nesio-finance-${from}_${to}.csv`, text);
+      setCsvMsg(L(dict, `已导出 ${Math.max(0, n)} 笔(${from} ~ ${to})`, `Exported ${Math.max(0, n)} tx (${from} ~ ${to})`));
+    } catch {
+      setCsvErr(L(dict, '导出失败,请重试。', 'Export failed — try again.'));
+    }
+  }
+
+  async function importCsvFile(file: File | null) {
+    setCsvErr('');
+    setCsvMsg('');
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const r = importFinanceCsv(text);
+      if (r.imported > 0) setRev((v) => v + 1);
+      if (r.errors.length && r.imported === 0) {
+        setCsvErr(r.errors[0]);
+      } else {
+        setCsvMsg(L(dict,
+          `导入 ${r.imported} 笔${r.skipped ? ` · 跳过 ${r.skipped}` : ''}${r.errors.length ? ` · ${r.errors[0]}` : ''}`,
+          `Imported ${r.imported}${r.skipped ? ` · skipped ${r.skipped}` : ''}${r.errors.length ? ` · ${r.errors[0]}` : ''}`));
+      }
+    } catch {
+      setCsvErr(L(dict, '读文件失败。', 'Could not read the file.'));
+    }
   }
 
   return (
@@ -1286,6 +1342,48 @@ export default function FinanceTab() {
           </button>
           <ReconcileSheet open={reconcileOpen} onClose={() => setReconcileOpen(false)} onSaved={() => setRev((r) => r + 1)} />
 
+          {/* CSV 导入 / 导出(可选时间段) */}
+          <div style={{
+            display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 'var(--space-3)',
+            padding: 'var(--space-3)', border: '1px solid var(--portal-line)', borderRadius: 'var(--radius-md)',
+          }}>
+            <p style={{ margin: 0, fontSize: 'var(--text-sm)', fontWeight: 600, color: 'var(--portal-ink)' }}>
+              {L(dict, 'CSV 导入 / 导出', 'CSV import / export')}
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+              <label style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                {L(dict, '从', 'From')}
+                <input type="date" className="nesio-fin-select" style={{ marginLeft: 4 }}
+                  value={csvFrom || `${ym}-01`}
+                  onChange={(e) => setCsvFrom(e.target.value)} />
+              </label>
+              <label style={{ fontSize: 'var(--text-xs)', color: 'var(--portal-muted)' }}>
+                {L(dict, '到', 'To')}
+                <input type="date" className="nesio-fin-select" style={{ marginLeft: 4 }}
+                  value={csvTo || (() => {
+                    const [y, m] = ym.split('-').map(Number);
+                    return `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+                  })()}
+                  onChange={(e) => setCsvTo(e.target.value)} />
+              </label>
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              <button type="button" className="nesio-fin-review-accept" onClick={exportCsv}>
+                {L(dict, '导出 CSV', 'Export CSV')}
+              </button>
+              <button type="button" className="nesio-fin-flowopt" onClick={() => csvFileRef.current?.click()}>
+                {L(dict, '导入 CSV', 'Import CSV')}
+              </button>
+              <input ref={csvFileRef} type="file" accept=".csv,text/csv" hidden
+                onChange={(e) => { void importCsvFile(e.target.files?.[0] || null); e.target.value = ''; }} />
+            </div>
+            <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.5 }}>
+              {L(dict, '金额约定:正数=支出流出,负数=收入流入。导入按账户名/账户 id 匹配;匹配不到会跳过。',
+                'Amount: + outflow / − inflow. Import matches account name or id; unmatched rows are skipped.')}
+            </p>
+            {csvErr && <p role="alert" style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--status-risk)' }}>{csvErr}</p>}
+            {csvMsg && !csvErr && <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--status-go)' }}>{csvMsg}</p>}
+          </div>
           {/* 批次 40:筛选改成下拉菜单(账户 + 分类) —— 人工审核/退款配对沉到列表下方 */}
           <div className="nesio-fin-filterbar" style={{ marginTop: 0 }}>
             {accounts.length > 1 && (
@@ -1775,10 +1873,13 @@ export default function FinanceTab() {
                               const a = t.accountId ? acctById.get(t.accountId) : undefined;
                               const detail = categoryDetailLabel(effectiveCategoryDetail(t), dict);
                               return (
-                                <div key={t.id} className="nesio-fin-txrow" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 2 }}>
+                                <button key={t.id} type="button" className="nesio-fin-txrow"
+                                  style={{ flexDirection: 'column', alignItems: 'stretch', gap: 2, width: '100%', textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-sans)', padding: 0 }}
+                                  onClick={() => openTxEditor(t.id, activeExpense.category)}>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                                     <span className="nesio-fin-txdate">{(t.date || '').slice(5).replace('-', '/')}</span>
                                     {detail && <span className="nesio-fin-txcat" style={{ color: 'var(--portal-muted)' }}>{detail}</span>}
+                                    <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--portal-accent)' }}>{L(dict, '去修改 ›', 'Edit ›')}</span>
                                   </div>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                     <span className="nesio-fin-txname" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -1792,7 +1893,7 @@ export default function FinanceTab() {
                                       {displayAccountName(a, acctNames)}{a.mask ? ` ····${a.mask}` : ''}
                                     </span>
                                   )}
-                                </div>
+                                </button>
                               );
                             })}
                           </div>
@@ -1805,7 +1906,7 @@ export default function FinanceTab() {
                 {/* 图14:收入 / 投资 / 账户 / 商户 —— 与支出同款点选展开明细 */}
                 {donutDim !== 'expense' && activeSlice && (() => {
                   const flowRules = loadFlowRules();
-                  let rows: Array<{ key: string; left: string; sub?: string; amt: string; logo?: string }> = [];
+                  let rows: Array<{ key: string; left: string; sub?: string; amt: string; logo?: string; txId?: string; cat?: string }> = [];
                   let title = activeSlice.category;
                   let empty = L(dict, '这一块本月没有明细。', 'No details under this slice this month.');
 
@@ -1816,11 +1917,12 @@ export default function FinanceTab() {
                     const list = txs.filter((t) =>
                       (t.date || '').slice(0, 7) === ym
                       && txFlow(t, flowRules) === 'income'
-                      && (t.categoryDetail || 'INCOME_OTHER') === matchDetail,
+                      && (effectiveCategoryDetail(t) || 'INCOME_OTHER') === matchDetail,
                     ).sort((a, b) => (b.date || '').localeCompare(a.date || ''));
                     title = activeSlice.category;
                     rows = list.map((t) => ({
                       key: t.id,
+                      txId: t.id,
                       left: t.name || L(dict, '收入', 'Income'),
                       sub: (t.date || '').slice(5).replace('-', '/'),
                       amt: `+${formatMoney(Math.abs(t.amount), summary.currency)}`,
@@ -1844,6 +1946,8 @@ export default function FinanceTab() {
                       : [];
                     rows = list.map((t) => ({
                       key: t.id,
+                      txId: t.id,
+                      cat: effectiveCategory(t),
                       left: t.name || L(dict, '未知商户', 'Unknown'),
                       sub: (t.date || '').slice(5).replace('-', '/'),
                       amt: `-${formatMoney(Math.abs(t.amount), summary.currency)}`,
@@ -1860,6 +1964,8 @@ export default function FinanceTab() {
                     }).sort((a, b) => (b.date || '').localeCompare(a.date || '') || Math.abs(b.amount) - Math.abs(a.amount));
                     rows = list2.map((t) => ({
                       key: t.id,
+                      txId: t.id,
+                      cat: effectiveCategory(t),
                       left: t.name || L(dict, '未知商户', 'Unknown'),
                       sub: (t.date || '').slice(5).replace('-', '/'),
                       amt: `-${formatMoney(Math.abs(t.amount), summary.currency)}`,
@@ -1883,17 +1989,36 @@ export default function FinanceTab() {
                         <p className="nesio-settings-option-hint" style={{ marginTop: 0 }}>{empty}</p>
                       ) : (
                         <div className="nesio-fin-txlist">
-                          {rows.slice(0, 40).map((r) => (
-                            <div key={r.key} className="nesio-fin-txrow" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 2 }}>
-                              {r.sub && <span className="nesio-fin-txdate">{r.sub}</span>}
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                                <span className="nesio-fin-txname" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {r.logo && <MLogo src={r.logo} />}{r.left}
-                                </span>
-                                <span className="nesio-fin-txamt">{r.amt}</span>
+                          {rows.slice(0, 40).map((r) => {
+                            const clickable = Boolean(r.txId);
+                            const inner = (
+                              <>
+                                {r.sub && (
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                    <span className="nesio-fin-txdate">{r.sub}</span>
+                                    {clickable && <span style={{ marginLeft: 'auto', fontSize: 'var(--text-xs)', color: 'var(--portal-accent)' }}>{L(dict, '去修改 ›', 'Edit ›')}</span>}
+                                  </div>
+                                )}
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                  <span className="nesio-fin-txname" style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                    {r.logo && <MLogo src={r.logo} />}{r.left}
+                                  </span>
+                                  <span className="nesio-fin-txamt">{r.amt}</span>
+                                </div>
+                              </>
+                            );
+                            return clickable ? (
+                              <button key={r.key} type="button" className="nesio-fin-txrow"
+                                style={{ flexDirection: 'column', alignItems: 'stretch', gap: 2, width: '100%', textAlign: 'left', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'var(--font-sans)', padding: 0 }}
+                                onClick={() => openTxEditor(r.txId!, r.cat)}>
+                                {inner}
+                              </button>
+                            ) : (
+                              <div key={r.key} className="nesio-fin-txrow" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 2 }}>
+                                {inner}
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       )}
                     </div>

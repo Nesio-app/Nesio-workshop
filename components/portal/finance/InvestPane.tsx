@@ -3,9 +3,10 @@
 /**
  * InvestPane — 投资页(P3 拆分自 FinanceTab)。
  * bug2 批:收益柱状图删除(投资图不需要);持仓按账户分组显示(多一层账户分类);
- * 不显示份数。只陈述事实,不给建议。
+ * 不显示份数。只陈述事实,不给建议。账户明细可折叠。
  */
 
+import { useState } from 'react';
 import { formatMoney, investmentAccountIds, displayAccountName, loadAccountNames, holdingId, accountInvestValue, type BankTx, type BankAccount, type Holding } from '@/lib/portal/bank-tx';
 import { portfolioCheckup } from '@/lib/portal/finance-features';
 import { investDailyChange, type NetWorthSnapshot } from '@/lib/portal/finance-assets';
@@ -19,6 +20,7 @@ export default function InvestPane({ txs, holdings, accounts, nwSeries, currency
   const checkup = portfolioCheckup(holdings, txs);
   const names = loadAccountNames();
   const acctById = new Map(accounts.map((a) => [a.id, a]));
+  const [openAccts, setOpenAccts] = useState<Record<string, boolean>>({});
 
   const investIds = investmentAccountIds(accounts);
   const investAccounts = accounts.filter((a) => investIds.has(a.id));
@@ -79,7 +81,7 @@ export default function InvestPane({ txs, holdings, accounts, nwSeries, currency
           {cashOnlyAccounts.map(({ a, value }) => (
             <div key={a.id} className="nesio-fin-acctrow">
               <div className="nesio-fin-acctrow-body">
-                <span className="nesio-fin-acctrow-name" style={{ fontWeight: 'var(--weight-regular)' }}>
+                <span className="nesio-fin-acctrow-name" style={{ fontWeight: 'var(--weight-regular)' as never }}>
                   {displayAccountName(a, names)}{a.mask ? ` ····${a.mask}` : ''}
                 </span>
               </div>
@@ -91,16 +93,23 @@ export default function InvestPane({ txs, holdings, accounts, nwSeries, currency
       {groups.map((g) => {
         const a = acctById.get(g.accountId);
         const label = a ? `${displayAccountName(a, names)}${a.mask ? ` ····${a.mask}` : ''}` : L(dict, '其他账户', 'Other account');
+        const open = openAccts[g.accountId] !== false;
         return (
           <div key={g.accountId} style={{ marginTop: 'var(--space-3)' }}>
-            <p className="nesio-fin-group-h nesio-fin-group-h--plain">{label} · {formatMoney(g.total, currency)}</p>
-            {g.list.map((h) => {
+            <button type="button" className="nesio-fin-group-h"
+              style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', background: 'none', border: 0, padding: 0, cursor: 'pointer', font: 'inherit', color: 'inherit' }}
+              aria-expanded={open}
+              onClick={() => setOpenAccts((s) => ({ ...s, [g.accountId]: !open }))}>
+              <span>{label} · {formatMoney(g.total, currency)}</span>
+              <span aria-hidden style={{ color: 'var(--portal-muted)' }}>{open ? '▾' : '▸'}</span>
+            </button>
+            {open && g.list.map((h) => {
               const gain = typeof h.costBasis === 'number' && h.costBasis > 0 ? Math.round(((h.value - h.costBasis) / h.costBasis) * 100) : null;
               const rowKey = h.id || holdingId(h);
               return (
                 <div key={rowKey} className="nesio-fin-acctrow">
                   <div className="nesio-fin-acctrow-body">
-                    <span className="nesio-fin-acctrow-name" style={{ fontWeight: 'var(--weight-regular)' }}>{h.ticker || h.name}</span>
+                    <span className="nesio-fin-acctrow-name" style={{ fontWeight: 'var(--weight-regular)' as never }}>{h.ticker || h.name}</span>
                     {typeof h.costBasis === 'number' && h.costBasis > 0 && (
                       <span className="nesio-fin-acctrow-sub">{L(dict, `成本 ${formatMoney(h.costBasis, h.currency)}`, `cost ${formatMoney(h.costBasis, h.currency)}`)}</span>
                     )}
