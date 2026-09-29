@@ -344,12 +344,8 @@ export function salaryAccountIds(accounts?: BankAccount[]): Set<string> {
  * (定投买入/卖出/内部划拨)一律 transfer —— Fidelity 每周定投不再算「支出」;股利/利息
  * (INCOME_DIVIDENDS 等)仍是收入。账户不明时按券商描述符兜底。
  */
-export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string>, investAccounts: Set<string> = investmentAccountIds()): TxFlow {
-  // 本笔批注流向优先(手改分类时一并写入,分类页才跟得上)。
-  const overlayFlow = annOf(t.id).flow;
-  if (overlayFlow === 'expense' || overlayFlow === 'refund' || overlayFlow === 'rebate' || overlayFlow === 'income' || overlayFlow === 'transfer') {
-    return overlayFlow;
-  }
+/** 不含本笔批注的流向(商户规则 + 标注规则 + Plaid 启发)。 */
+export function autoTxFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string>, investAccounts: Set<string> = investmentAccountIds()): TxFlow {
   const forced = ruleFor(rules, t);
   if (forced) return forced;
   // 用户标注规则(工资/金融/投资收入、银行互转/信用卡还款、基金买卖…)
@@ -383,6 +379,14 @@ export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string
   if (REBATE_NAME_RE.test(t.name || '')) return 'rebate';
   if (evidence && !evidence.has(merchantKey(t)) && !evidence.has(normalizeMerchant(t.name))) return 'transfer';
   return 'refund';
+}
+
+export function txFlow(t: BankTx, rules = loadFlowRules(), evidence?: Set<string>, investAccounts: Set<string> = investmentAccountIds()): TxFlow {
+  const overlayFlow = annOf(t.id).flow;
+  if (overlayFlow === 'expense' || overlayFlow === 'refund' || overlayFlow === 'rebate' || overlayFlow === 'income' || overlayFlow === 'transfer') {
+    return overlayFlow;
+  }
+  return autoTxFlow(t, rules, evidence, investAccounts);
 }
 
 /* ---------- 财务③:内部调整对识别 ---------- */
@@ -1109,11 +1113,8 @@ function rememberRuleLabel(key: string, name: string): void {
   saveRuleLabelMap(all);
 }
 
-/** 生效分类:本笔批注覆盖 → 商户规则 → 标注规则 → Plaid;经 normalizeCategory 归一。
- *  工资账户进账缺分类时补 INCOME,保证「每笔可归类」且收入维能看见发薪。 */
-export function effectiveCategory(t: BankTx, rules = loadMerchantRules()): string {
-  const overlay = (annOf(t.id).category || '').trim();
-  if (overlay) return normalizeCategory(overlay);
+/** 自动分类(商户规则 → 标注规则 → Plaid;无本笔批注)。 */
+export function autoCategory(t: BankTx, rules = loadMerchantRules()): string {
   const fromRule = ruleFor(rules, t);
   if (fromRule) return normalizeCategory(fromRule);
   const hit = classifyBankTx({
@@ -1127,19 +1128,30 @@ export function effectiveCategory(t: BankTx, rules = loadMerchantRules()): strin
   return '';
 }
 
-/** 生效子分类:本笔批注优先 → 标注规则 → Plaid categoryDetail。 */
-export function effectiveCategoryDetail(t: BankTx): string {
-  const d = (annOf(t.id).categoryDetail || '').trim();
-  if (d) return d;
+/** 生效分类:本笔批注覆盖 → autoCategory。 */
+export function effectiveCategory(t: BankTx, rules = loadMerchantRules()): string {
+  const overlay = (annOf(t.id).category || '').trim();
+  if (overlay) return normalizeCategory(overlay);
+  return autoCategory(t, rules);
+}
+
+/** 自动子分类(标注规则 → Plaid;无本笔批注)。 */
+export function autoCategoryDetail(t: BankTx): string {
   const hit = classifyBankTx({
     name: t.name, amount: t.amount, category: t.category, categoryDetail: t.categoryDetail,
     invSubtype: (t as BankTx & { invSubtype?: string }).invSubtype,
   });
   if (hit?.detail) return hit.detail;
   if ((t.categoryDetail || '').trim()) return (t.categoryDetail || '').trim();
-  // 工资账户进账无细分 → 默认工资,收入构成不再只剩「其他」。
   if (t.accountId && salaryAccountIds().has(t.accountId) && t.amount < 0) return 'INCOME_WAGES';
   return '';
+}
+
+/** 生效子分类:本笔批注优先 → autoCategoryDetail。 */
+export function effectiveCategoryDetail(t: BankTx): string {
+  const d = (annOf(t.id).categoryDetail || '').trim();
+  if (d) return d;
+  return autoCategoryDetail(t);
 }
 
 /** 需要审核的交易:本月、真支出、没有生效分类的。 */

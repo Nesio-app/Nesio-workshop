@@ -21,16 +21,32 @@ const txCat = loadTs('../lib/portal/tx-category.ts', () => ({}));
 const bank = {
   loadBankTx: () => [],
   saveBankTx() {},
-  loadBankAccounts: () => [{ id: 'a1', name: 'Checking', type: 'depository', currency: 'USD' }],
+  loadBankAccounts: () => [{ id: 'a1', name: 'Checking', type: 'depository', currency: 'USD', institution: 'Chase', mask: '1234' }],
   mergeBankTxForSync: (prev, add) => ({ merged: [...prev, ...add], fresh: add.length }),
   bankTxWriteAllowed: () => true,
   displayAccountName: (a) => a.name,
   loadAccountNames: () => ({}),
+  merchantKey: (t) => t.merchantId || (t.name || '').toLowerCase(),
+  loadRuleLabels: () => ({}),
+  loadMerchantRules: () => ({}),
+  loadFlowRules: () => ({}),
+  autoCategory: (t) => t.category || '',
+  autoCategoryDetail: (t) => t.categoryDetail || '',
+  effectiveCategory: (t) => t.category || '',
+  effectiveCategoryDetail: (t) => t.categoryDetail || '',
+  autoTxFlow: () => 'expense',
+  txFlow: () => 'expense',
+  TX_FLOW_LABELS: { expense: ['支出', 'Expense'], income: ['收入', 'Income'], transfer: ['转账/还款', 'Transfer'], refund: ['退款', 'Refund'], rebate: ['返还/报销', 'Credit'] },
+};
+const ann = {
+  loadTxAnnotations: () => ({}),
+  txAnnotationOf: () => ({}),
 };
 const csv = loadTs('../lib/portal/finance-csv.ts', (p) => {
   if (p === './inventory-import') return inv;
   if (p === './tx-category') return txCat;
   if (p === './bank-tx') return bank;
+  if (p === './tx-annotations') return ann;
   return {};
 });
 
@@ -44,8 +60,11 @@ assert.equal(csv.filterTxByDateRange(txs, '2026-09-01', '2026-09-30').length, 2,
 assert.equal(csv.filterTxByDateRange(txs, '2026-09-10', '2026-09-10').length, 1, '单日');
 
 const out = csv.bankTxToCsv(txs, { from: '2026-09-01', to: '2026-09-30' });
-assert.ok(out.includes('date,name,amount'), '含表头');
+assert.ok(out.includes('merchant_key'), '含商家键');
+assert.ok(out.includes('category_manual'), '含手动分类列');
+assert.ok(out.includes('account_institution'), '含账户机构');
 assert.ok(out.includes('Coffee'), '含咖啡');
+assert.ok(out.includes('Chase'), '含机构名');
 assert.ok(!out.includes('Pay'), '工资不在九月导出');
 
 const parsed = csv.parseFinanceCsv(out.replace(/^\uFEFF/, ''));

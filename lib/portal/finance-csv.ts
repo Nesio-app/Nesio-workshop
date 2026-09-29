@@ -9,12 +9,25 @@ import { normalizeCategory } from './tx-category';
 import {
   loadBankTx, saveBankTx, loadBankAccounts, mergeBankTxForSync, bankTxWriteAllowed,
   displayAccountName, loadAccountNames,
+  merchantKey, loadRuleLabels,
+  autoCategory, autoCategoryDetail, effectiveCategory, effectiveCategoryDetail,
+  autoTxFlow, txFlow, loadMerchantRules, loadFlowRules,
+  TX_FLOW_LABELS,
   type BankTx,
+  type TxFlow,
 } from './bank-tx';
+import { loadTxAnnotations, txAnnotationOf } from './tx-annotations';
 
 export const FINANCE_CSV_HEADERS = [
-  'date', 'name', 'amount', 'currency', 'category', 'category_detail',
-  'account_id', 'account_name', 'flow', 'id',
+  'date', 'name', 'amount', 'currency',
+  'merchant_key', 'merchant_name',
+  'category_plaid', 'category_detail_plaid',
+  'category_auto', 'category_detail_auto',
+  'category_manual', 'category_detail_manual',
+  'category_effective', 'category_detail_effective',
+  'flow_auto', 'flow_manual', 'flow_effective',
+  'account_id', 'account_name', 'account_institution', 'account_mask',
+  'id',
 ] as const;
 
 export type FinanceCsvRow = {
@@ -39,6 +52,11 @@ function ymDay(d: string): string {
   return (d || '').slice(0, 10);
 }
 
+function flowCsvLabel(flow: TxFlow): string {
+  const pair = TX_FLOW_LABELS[flow];
+  return pair ? `${flow}(${pair[0]})` : flow;
+}
+
 /** 按日期闭区间过滤(含两端);空串表示不限。 */
 export function filterTxByDateRange(txs: readonly BankTx[], from: string, to: string): BankTx[] {
   const f = ymDay(from);
@@ -56,6 +74,10 @@ export function bankTxToCsv(txs: readonly BankTx[], opts?: { from?: string; to?:
   const names = loadAccountNames();
   const accounts = loadBankAccounts();
   const byId = new Map(accounts.map((a) => [a.id, a]));
+  const merchantRules = loadMerchantRules();
+  const flowRules = loadFlowRules();
+  const ruleLabels = loadRuleLabels();
+  const annotations = loadTxAnnotations();
   const list = filterTxByDateRange(txs, opts?.from || '', opts?.to || '')
     .slice()
     .sort((a, b) => (b.date || '').localeCompare(a.date || '') || Math.abs(b.amount) - Math.abs(a.amount));
@@ -63,16 +85,40 @@ export function bankTxToCsv(txs: readonly BankTx[], opts?: { from?: string; to?:
   for (const x of list) {
     const acct = x.accountId ? byId.get(x.accountId) : undefined;
     const acctName = acct ? displayAccountName(acct, names) : '';
+    const ann = txAnnotationOf(x.id, annotations);
+    const mKey = merchantKey(x);
+    const mName = ruleLabels[mKey] || x.name || '';
+    const catAuto = autoCategory(x, merchantRules);
+    const catDetailAuto = autoCategoryDetail(x);
+    const catManual = (ann.category || '').trim();
+    const catDetailManual = (ann.categoryDetail || '').trim();
+    const catEff = effectiveCategory(x, merchantRules);
+    const catDetailEff = effectiveCategoryDetail(x);
+    const flowAuto = autoTxFlow(x, flowRules);
+    const flowManual = ann.flow || '';
+    const flowEff = txFlow(x, flowRules);
     lines.push([
       esc(ymDay(x.date)),
       esc(x.name || ''),
       String(x.amount),
       esc((x.currency || 'USD').toUpperCase()),
+      esc(mKey),
+      esc(mName),
       esc(x.category || ''),
       esc(x.categoryDetail || ''),
+      esc(catAuto),
+      esc(catDetailAuto),
+      esc(catManual),
+      esc(catDetailManual),
+      esc(catEff),
+      esc(catDetailEff),
+      esc(flowCsvLabel(flowAuto)),
+      esc(flowManual ? flowCsvLabel(flowManual) : ''),
+      esc(flowCsvLabel(flowEff)),
       esc(x.accountId || ''),
       esc(acctName),
-      '', // flow 由导入端忽略;导出占位便于人读
+      esc(acct?.institution || ''),
+      esc(acct?.mask || ''),
       esc(x.id || ''),
     ].join(','));
   }
@@ -81,15 +127,18 @@ export function bankTxToCsv(txs: readonly BankTx[], opts?: { from?: string; to?:
 
 const HEADER_ALIASES: Record<string, keyof FinanceCsvRow | 'flow'> = {
   date: 'date', 日期: 'date', 交易日: 'date', '交易日期': 'date',
-  name: 'name', 商户: 'name', 描述: 'name', description: 'name', merchant: 'name',
+  name: 'name', 商户: 'name', 描述: 'name', description: 'name',
   amount: 'amount', 金额: 'amount',
   currency: 'currency', 币种: 'currency', ccy: 'currency',
   category: 'category', 分类: 'category',
+  category_effective: 'category', category_plaid: 'category',
   category_detail: 'categoryDetail', categorydetail: 'categoryDetail', 细分类: 'categoryDetail', detail: 'categoryDetail',
+  category_detail_effective: 'categoryDetail', category_detail_plaid: 'categoryDetail',
   account_id: 'accountId', accountid: 'accountId', 账户id: 'accountId',
   account_name: 'accountName', accountname: 'accountName', 账户: 'accountName', 账户名: 'accountName',
-  flow: 'flow', 流向: 'flow',
+  flow: 'flow', flow_effective: 'flow', 流向: 'flow',
   id: 'id',
+  merchant: 'name', merchant_name: 'name',
 };
 
 function mapHeader(h: string): keyof FinanceCsvRow | 'flow' | null {
@@ -112,11 +161,11 @@ function resolveAccountId(accountId: string | undefined, accountName: string | u
     const hit = accounts.find((a) => {
       const n = displayAccountName(a, names).toLowerCase();
       const raw = (a.name || '').toLowerCase();
-      return n === want || raw === want || n.includes(want) || want.includes(n);
+      const inst = (a.institution || '').toLowerCase();
+      return n === want || raw === want || inst === want || n.includes(want) || want.includes(n);
     });
     if (hit) return hit.id;
   }
-  // 兜底:唯一存款户 / 唯一账户
   const deps = accounts.filter((a) => (a.type || '').toLowerCase() === 'depository');
   if (deps.length === 1) return deps[0].id;
   if (accounts.length === 1) return accounts[0].id;
@@ -153,6 +202,8 @@ export function parseFinanceCsv(text: string): { rows: FinanceCsvRow[]; errors: 
       errors.push(`第 ${i + 1} 行跳过:日期/名称/金额无效`);
       continue;
     }
+    const flowRaw = get('flow');
+    const flow = flowRaw.split('(')[0].trim() || flowRaw;
     rows.push({
       date,
       name,
@@ -162,7 +213,7 @@ export function parseFinanceCsv(text: string): { rows: FinanceCsvRow[]; errors: 
       categoryDetail: get('categoryDetail') || undefined,
       accountId: get('accountId') || undefined,
       accountName: get('accountName') || undefined,
-      flow: get('flow') || undefined,
+      flow: flow || undefined,
       id: get('id') || undefined,
     });
   }
@@ -205,7 +256,6 @@ export function importFinanceCsv(text: string): FinanceCsvImportResult {
       accountId,
     };
     if (byId.has(id)) {
-      // 覆盖同 id(更新)
       byId.set(id, { ...byId.get(id)!, ...tx });
     } else {
       incoming.push(tx);

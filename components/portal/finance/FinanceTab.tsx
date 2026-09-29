@@ -1378,8 +1378,9 @@ export default function FinanceTab() {
                 onChange={(e) => { void importCsvFile(e.target.files?.[0] || null); e.target.value = ''; }} />
             </div>
             <p style={{ margin: 0, fontSize: 'var(--text-xs)', color: 'var(--portal-muted)', lineHeight: 1.5 }}>
-              {L(dict, '金额约定:正数=支出流出,负数=收入流入。导入按账户名/账户 id 匹配;匹配不到会跳过。',
-                'Amount: + outflow / − inflow. Import matches account name or id; unmatched rows are skipped.')}
+              {L(dict,
+                '导出含商家、Plaid/自动/手动/生效分类与细分类、流向、所属账户(机构/尾号)。金额:正=支出,负=收入;导入仍按账户名或 id 匹配。',
+                'Export includes merchant, Plaid/auto/manual/effective categories & details, flow, and account (institution/mask). + = outflow, − = inflow; import matches account name or id.')}
             </p>
             {csvErr && <p role="alert" style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--status-risk)' }}>{csvErr}</p>}
             {csvMsg && !csvErr && <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: 'var(--status-go)' }}>{csvMsg}</p>}
